@@ -31,6 +31,7 @@
 import { createHash } from 'node:crypto'
 import { parseQueueCards, parseNowCard } from './queue-order-guard-core.mjs'
 import { parseNowCardPoints } from './dashboard-guard-core.mjs'
+import { compareNowProjection } from './board-core.mjs'
 // The remedies' publish steps come from scripts/board-remedy.mjs — one copy.
 import { REPUBLISH } from './board-remedy.mjs'
 
@@ -268,6 +269,55 @@ export function driftedCards(input) {
 const ALLOW = { block: false, reason: '' }
 const block = (reason) => ({ block: true, reason })
 
+/** Pure Stop-hook half of the derived now-section invariant. */
+export function nowProjectionStopDecision({
+  dashboardHtml,
+  activeWork = null,
+  knownPoints = null,
+  paused = false,
+  heldByOther = false,
+} = {}) {
+  if (paused || heldByOther || !activeWork || activeWork.ok !== true) return ALLOW
+  // AN `ok:true` SOURCE STILL HAS TO CARRY A POINT LIST (ninth cross-vendor
+  // round): a malformed one made this function throw, and the only catch was
+  // the outermost one in `evaluate()` — so the projection's own error silently
+  // swallowed the duplicate- and stale-card findings beside it. This check
+  // fails open HERE, on its own error alone.
+  if (!Array.isArray(activeWork.points)) return ALLOW
+  let comparison
+  try {
+    // The focus invariant is the render's rule, so the Stop side reads it too —
+    // otherwise the two halves block on different things (ninth cross-vendor round).
+    comparison = compareNowProjection(dashboardHtml, activeWork.points, {
+      knownPoints,
+      focusPoint: activeWork.focusPoint ?? null,
+    })
+  } catch {
+    return ALLOW
+  }
+  if (comparison.ok) return { ...ALLOW, comparison }
+  const parts = []
+  if (comparison.missing?.length) parts.push(`missing ${comparison.missing.join(', ')}`)
+  if (comparison.extra?.length) parts.push(`extra ${comparison.extra.join(', ')}`)
+  if (comparison.duplicates?.length) parts.push(`duplicate ${comparison.duplicates.join(', ')}`)
+  if (comparison.unknown?.length) parts.push(`unknown ${comparison.unknown.join(', ')}`)
+  if (comparison.crossSection?.length) {
+    parts.push(`cross-section ${comparison.crossSection.map((item) => `${item.point} (${item.sections.join('/')})`).join(', ')}`)
+  }
+  if (comparison.focusUnrepresented) parts.push(`the focus names point ${comparison.focusPoint}, which has no card`)
+  if (comparison.focusMisplaced) parts.push(`the focused point ${comparison.focusPoint} does not stand first`)
+  if (comparison.emptyStateCount !== undefined && activeWork.points.length === 0) {
+    parts.push('verified zero requires exactly the dedicated non-card empty state')
+  } else if (comparison.emptyStateCount > 0) parts.push('the zero-work state stands while points are active')
+  return {
+    block: true,
+    comparison,
+    reason:
+      `NOW-SECTION DOES NOT MATCH DECLARED ACTIVE WORK: ${parts.join('; ') || comparison.error || 'unreadable board'}. ` +
+      `Reconcile and publish as one serialized operation: ${REPUBLISH}.`,
+  }
+}
+
 /**
  * Decide on the raw inputs. All optional; any bad shape → allow:
  *   dashboardHtml, tasksMd   the two files' contents
@@ -308,7 +358,8 @@ export function duplicateDonePoints(dashboardHtml) {
 
 export function evaluate(input) {
   try {
-    const { dashboardHtml, tasksMd, focusPoint = null, commitSubjects = [], touchedFiles = [], snapshots = null } =
+    const { dashboardHtml, tasksMd, focusPoint = null, commitSubjects = [], touchedFiles = [], snapshots = null,
+      activeWork = null, paused = false, heldByOther = false } =
       input ?? {}
     // (D) ONE POINT, ONE ERLEDIGT CARD — checked BEFORE every early return
     // (cross-vendor review 18.08.2026): a finished batch and a board holding
@@ -323,9 +374,19 @@ export function evaluate(input) {
       : ''
 
     const specs = parsePointSpecs(tasksMd)
+    const projection = nowProjectionStopDecision({
+      dashboardHtml,
+      activeWork,
+      knownPoints: new Set(specs.keys()),
+      paused,
+      heldByOther,
+    })
     let anyOpen = false
     for (const s of specs.values()) if (s.open) anyOpen = true
-    if (!anyOpen) return duplicateProblem ? block(duplicateProblem) : ALLOW
+    if (!anyOpen) {
+      const ending = [duplicateProblem, projection.block ? projection.reason : ''].filter(Boolean)
+      return ending.length ? block(ending.join(' | ')) : ALLOW
+    }
 
     const cards = parseQueueCards(dashboardHtml)
     const nowCard = parseNowCard(dashboardHtml)
@@ -333,7 +394,7 @@ export function evaluate(input) {
     // active parallel work (user decision 22.07.2026), so check A must accept
     // evidence for any of them, not only the first card.
     const nowPoints = parseNowCardPoints(dashboardHtml)
-    if (!nowCard && cards.length === 0) {
+    if (!nowCard && cards.length === 0 && !projection.block) {
       // no board — dashboard-guard owns registration, but a duplicated archive is
       // still a duplicated archive
       return duplicateProblem ? block(duplicateProblem) : ALLOW
@@ -341,6 +402,7 @@ export function evaluate(input) {
 
     const problems = []
     if (duplicateProblem) problems.push(duplicateProblem)
+    if (projection.block) problems.push(projection.reason)
 
     // (B) stale queue cards
     const { closed, unknown } = staleQueueCards(cards.map((c) => c.point), specs)

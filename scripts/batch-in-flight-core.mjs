@@ -788,11 +788,21 @@ export function transferBlockMessage({ blockers = [] } = {}) {
  * transfer supersedes it, and a record still stamped `adopted` would lose the
  * mutation protection the moment it crossed a SECOND boundary — the very
  * record a chain of handovers depends on most.
+ *
+ * THE TRANSFER IS A WRITE, SO IT MIGRATES (sixth cross-review): writing the
+ * legacy evidence back unchanged handed the successor a declaration that had
+ * lost its once-only migration, so each item leaves here with its resolved
+ * point RECORDED (`withRecordedEvidencePoint`; an unresolvable item records the
+ * answer "nobody could tell" as `point: null` — never guessed at, never
+ * dropped, and never left legacy for the next read to re-derive).
  */
-export function markTransferred({ declaration, bySid, now, checkpoints = [], runs = [] } = {}) {
+export function markTransferred({ declaration, bySid, now, checkpoints = [], runs = [], worktreeRef = () => null } = {}) {
   const { adopted: _superseded, ...rest } = declaration ?? {}
   return {
     ...rest,
+    ...(Array.isArray(rest.evidence)
+      ? { evidence: rest.evidence.map((item) => withRecordedEvidencePoint(item, { worktreeRef })) }
+      : {}),
     transfer: {
       v: 1,
       by: String(bySid ?? ''),
@@ -1305,6 +1315,211 @@ export function pointOfBranch(ref) {
   const m = /^feat\/(\d+)(?:[-/]|$)/.exec(normRef(ref))
   const n = m ? Number(m[1]) : NaN
   return Number.isInteger(n) && n > 0 ? n : null
+}
+
+/**
+ * The point ONE evidence item names — the single resolution every consumer
+ * shares. An explicit `point` field decides (and never falls through to the
+ * branch when it is invalid); the legacy branch/worktree forms, which predate
+ * the field, derive it from the ref the item itself declares. Returns the
+ * positive integer or null. The RECORDED field is the normal case — the write
+ * side stamps it (`tagEvidencePoint`) and `withRecordedEvidencePoint` migrates
+ * a legacy item at the next write — so the legacy derivation exists only until
+ * a declaration written before the field has been rewritten once.
+ */
+export function evidencePoint(item, { worktreeRef = () => null } = {}) {
+  if (!item || typeof item !== 'object') return null
+  if (Object.hasOwn(item, 'point')) {
+    const n = Number(item.point)
+    return Number.isInteger(n) && n > 0 ? n : null
+  }
+  const legacyRef = item.kind === 'branch'
+    ? item.ref
+    : item.kind === 'worktree'
+      ? worktreeRef(item.path)
+      : null
+  return pointOfBranch(legacyRef)
+}
+
+/**
+ * Migrate one evidence item to its RECORDED form: an item already carrying the
+ * `point` field is returned unchanged, a legacy item gets the point the read
+ * side resolves persisted, so the legacy form disappears at the first write
+ * that touches it (fifth cross-vendor round: five rounds of findings all grew
+ * from the exit having to GUESS an assignment nobody had written down). An
+ * item that resolves to no point RECORDS `point: null` — never guessed at,
+ * never dropped; the read side reports it and names the explicit human way
+ * out (`UNATTRIBUTABLE_EVIDENCE_REMEDY`).
+ *
+ * THE NULL IS WRITTEN DOWN TOO (ninth cross-vendor round). Leaving the field
+ * off meant the item stayed legacy: a later read re-derived it, and a worktree
+ * path that became resolvable — or was reused by another point — then produced
+ * a DIFFERENT answer than the write had. "Recorded, never re-derived" has to
+ * include the recorded answer "nobody could tell".
+ */
+export function withRecordedEvidencePoint(item, { worktreeRef = () => null } = {}) {
+  if (!item || typeof item !== 'object') return item
+  if (Object.hasOwn(item, 'point')) return item
+  return { ...item, point: evidencePoint(item, { worktreeRef }) }
+}
+
+/**
+ * The one way an unattributable evidence item leaves the declaration: a human
+ * reads it and clears explicitly. Named in the read side's error, so the
+ * remedy travels with the complaint.
+ */
+export const UNATTRIBUTABLE_EVIDENCE_REMEDY =
+  'inspect the declaration and clear it explicitly: node scripts/batch-in-flight.mjs --clear'
+
+/**
+ * The LOUD report for evidence that stays unattributable after a migrating
+ * write (sixth cross-review): `--adopt` answered plain success while retained
+ * point-less pid/log items made `normalizeActiveWork` refuse the whole source
+ * one read later — a success message followed by a silently empty result. One
+ * alert line per such item, each naming the human way out. PURE.
+ *
+ * It judges by the SAME phase resolution as the read side (seventh
+ * cross-review): `normalizeActiveWork` skips a TERMINAL item before it ever
+ * resolves the point, so a point-less terminal item never refuses the record —
+ * alerting on it claimed a refusal that would not happen and recommended the
+ * destructive whole clear for a record the read side accepts. `declarationPhase`
+ * is the same fallback the read side applies to an item without its own phase.
+ */
+export function unattributableEvidenceAlerts(
+  evidence = [],
+  { worktreeRef = () => null, declarationPhase = null } = {},
+) {
+  const out = []
+  const list = Array.isArray(evidence) ? evidence : []
+  list.forEach((item, index) => {
+    if (!item || typeof item !== 'object') return
+    const phase = String(item.phase ?? declarationPhase ?? 'authoring').trim().toLowerCase()
+    if (TERMINAL_WORK_PHASES.includes(phase)) return
+    if (evidencePoint(item, { worktreeRef }) != null) return
+    const name = `${item.kind ?? '?'} ${item.ref ?? item.path ?? item.pid ?? ''}`.trim()
+    out.push(
+      `evidence item ${index + 1} (${name}) carries no point and resolves to none — the active-work read ` +
+        `side will refuse the whole record until it is attributed or cleared; ${UNATTRIBUTABLE_EVIDENCE_REMEDY}`,
+    )
+  })
+  return out
+}
+
+/** Phases that keep a declared strand on the board until an explicit exit. */
+export const ACTIVE_WORK_PHASES = Object.freeze([
+  'authoring',
+  'counter-read',
+  'verification',
+  'ready-to-land',
+  'landing',
+  'transferred',
+  'awaiting-adoption',
+  'adopted',
+  'handover',
+])
+
+/** Phases whose lifecycle command has already moved the point elsewhere. */
+export const TERMINAL_WORK_PHASES = Object.freeze([
+  'completed',
+  'landed',
+  'returned',
+  'decommissioned',
+  'abandoned',
+  'blocked-on-user',
+])
+
+/**
+ * Normalize the ONE structured active-work source into the ordered point set
+ * projected by the board. New evidence carries its point explicitly; legacy
+ * branch/worktree evidence derives the point from the declared strand itself.
+ * No undeclared `feat/*` branch is consulted, so stale branches cannot become
+ * active work. The owner focus is part of the same source snapshot and leads
+ * the order, so a render can put the focused strand first.
+ *
+ * Returns `{ ok, points, focusPoint, errors }` and never throws. An unreadable,
+ * malformed, unresolvable, closed or checkpoint-contradictory source is UNKNOWN,
+ * never the empty set. A missing declaration is a valid zero-strand record when
+ * no numbered focus stands. `openPoints` is always the KNOWN open set — an
+ * empty one means "nothing is open", so any declared strand against it is
+ * UNKNOWN too (sixth cross-review: the old size guard made the empty set a
+ * free pass on the fail-closed publish side).
+ */
+export function normalizeActiveWork({
+  readable = true,
+  declaration = null,
+  focusPoint = null,
+  openPoints = [],
+  worktreeRef = () => null,
+  checkpointContradicted = false,
+} = {}) {
+  try {
+    const errors = []
+    if (readable !== true) errors.push('the active-work record is unreadable')
+    if (checkpointContradicted === true) errors.push('a transferred checkpoint contradicts the recorded strand')
+
+    const open = openPoints instanceof Set
+      ? openPoints
+      : new Set(Array.isArray(openPoints) ? openPoints.map(Number).filter(Number.isInteger) : [])
+    const ordered = []
+    const seen = new Set()
+    const add = (raw, where) => {
+      const point = Number(raw)
+      if (!Number.isInteger(point) || point <= 0) {
+        errors.push(`${where} has no valid point number`)
+        return
+      }
+      // The membership check has no size guard (sixth cross-review): an EMPTY
+      // open-point set is a verified "nothing is open", and a declared strand
+      // against it is exactly as wrong as one naming a closed point. Skipping
+      // the check there made the empty set a free pass on the publish side,
+      // which fails CLOSED — the Stop side's fail-open lives in its consumer,
+      // never here.
+      if (!open.has(point)) {
+        errors.push(`${where} names point ${point}, which is not open`)
+        return
+      }
+      if (!seen.has(point)) {
+        seen.add(point)
+        ordered.push(point)
+      }
+    }
+
+    const declaredFocus = focusPoint ?? declaration?.focusPoint ?? null
+    if (declaredFocus != null) add(declaredFocus, 'the owner focus')
+    if (declaration != null) {
+      if (!declaration || typeof declaration !== 'object' || !Array.isArray(declaration.evidence)) {
+        errors.push('the active-work declaration is malformed')
+      } else {
+        declaration.evidence.forEach((item, index) => {
+          if (!item || typeof item !== 'object') {
+            errors.push(`evidence item ${index + 1} is malformed`)
+            return
+          }
+          const phase = String(item.phase ?? declaration.phase ?? 'authoring').trim().toLowerCase()
+          if (TERMINAL_WORK_PHASES.includes(phase)) return
+          if (!ACTIVE_WORK_PHASES.includes(phase)) {
+            errors.push(`evidence item ${index + 1} has unknown phase "${phase || '<blank>'}"`)
+            return
+          }
+          const point = evidencePoint(item, { worktreeRef })
+          if (point == null) {
+            // Not guessed at, not dropped: the assignment was never recorded
+            // and cannot be resolved, so only a human decides — loudly.
+            errors.push(
+              `evidence item ${index + 1} cannot be attributed to a point (no recorded point, ` +
+                `no resolvable ref) — ${UNATTRIBUTABLE_EVIDENCE_REMEDY}`,
+            )
+            return
+          }
+          add(point, `evidence item ${index + 1}`)
+        })
+      }
+    }
+
+    return { ok: errors.length === 0, points: errors.length ? [] : ordered, focusPoint: Number(declaredFocus) || null, errors }
+  } catch (error) {
+    return { ok: false, points: [], focusPoint: null, errors: [`active-work normalization failed: ${error?.message ?? error}`] }
+  }
 }
 
 /** Shell quoting stripped off a captured branch name: `git switch -c

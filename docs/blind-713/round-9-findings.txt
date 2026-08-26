@@ -1,0 +1,247 @@
+# Point 713 — ninth cross-vendor round (26.08.2026), GPT-5.6 Sol at effort high
+
+Recorded in .claude/mechanism-reviews.jsonl against 332e148 (pass 3, merge-with-fixes),
+02c0334 (pass 3, merge; pass 4, do-not-merge). What each finding got, and why.
+
+## Pass 3 — scripts/batch-in-flight.mjs — ANSWERED
+
+- The delegated event's point fell through to the next point-bearing item when the strand
+  evidence carried none — and a pid item carries the OWNER's focus point. Answered in
+  332e148 (an unnumbered strand answers null) and again in 02c0334, after the same pass
+  read the first answer back and found it still skipped an unnumbered strand until a LATER
+  strand supplied a number: the strands are now asked together and must agree on ONE point.
+  Regression: scripts/batch-in-flight-cli.test.mjs, three shapes through the real `--clear`.
+  Pass 3 came back `merge` on 02c0334.
+
+## Pass 4 — scripts/board-core.mjs — three answered, two declined
+
+ANSWERED in 5b6feb7:
+
+- [P1] `compareNowProjection` checked neither focus membership nor focused-first order, so
+  `{points:[1], focusPoint:2}` passed the fail-closed preflight while the render's own
+  ordering rule was broken. Both halves of the invariant read the focus now and name it
+  (`focusUnrepresented`, `focusMisplaced`); the Stop side reads the same fields, so the two
+  cannot block on different things.
+
+- [P2] The next section boundary was an unvalidated `indexOf(SECT_OPEN)`: authored prose
+  carrying the bare token ended the section early, and a section never closed before the
+  next one swallowed the rest of the document. A real section opener is recognised by its
+  own `<summary><h2>`, an unclosed section refuses by name, and the newline-led spelling of
+  the closer is preferred without being demanded.
+
+- The refusal now carries its CAUSE. Missing, doubled, orphaned and unclosed are four
+  different repairs, and one generic "heading is missing" sent every one of them looking
+  for a heading that was there.
+
+DECLINED, with the reason recorded rather than averaged:
+
+- [P1] "`reconcileNowProjection` removes every numbered card, so an unexpected card's
+  authored prose disappears before the comparison can see the loss — the renderer must
+  refuse or restore it." DECLINED: the point's own final state orders that removal — "it
+  CREATES a stub card for a point that has none and REMOVES one whose point is no longer in
+  flight" — and the prose-survival clause governs an EXISTING card, i.e. one whose point is
+  still in flight ("AN EXISTING CARD'S PROSE SURVIVES THE RENDER"). Building the refusal
+  was tried and reverted: it fails five accepted tests of this point, among them "creates
+  missing stubs, removes stale cards and preserves surviving prose byte for byte". The
+  ordinary retirement path (`board.mjs done <N>`) moves the card to Erledigt WITH its text
+  before any render sees it.
+
+- [P1] "The handover-card exemption is not gated on batch-lock ownership, so a stale or
+  hand-written handover card is publishable after its session loses the lock." DECLINED as
+  another point's scope, by this point's own words: the permission is bounded, and "a card
+  left behind by a session that died or lost the batch is the separate defect of point 465
+  — orphan detection by session and by the owner's `acquiredAt` … which this point neither
+  covers nor supersedes". What 713 owes is the SHAPE check, which stands.
+
+- Queue-card prose (raised in an earlier pass of the same round as prose loss in
+  `stripProjectedQueueCards`): not a loss. `buildQueueSection` rewrites the WHOLE queue
+  section from the work order on every publish — "Because the whole section is rewritten
+  here…" — so a queue card holds no authored text to preserve.
+
+## Pass 4, confirming round — one answered, one declined
+
+ANSWERED: the unclosed-section check read the LAST `</details>` before the next section, so
+a card's own closer passed for the wrapper's, and the `nextSect < 0` branch returned the
+whole remaining document without verifying closure at all. The section end is COUNTED now —
+`<details>` in, `</details>` out, from the heading — which is the only reading a card's prose
+cannot fool; a wrapper that never closes refuses. The regression keeps one card and removes
+only the wrapper's close, which the previous reading blessed.
+
+DECLINED: "`pointsInSection`'s `catch { return [] }` reads structural failure in `queue` or
+`vdzk` as 'contains no points', so a damaged queue section hides a cross-section conflict
+from the fail-closed preflight." This is already filed, verbatim, as work-order point 929:
+"STRUCTURAL DAMAGE REFUSES INSTEAD OF ANSWERING 'NOTHING THERE'. `pointsInSection` and
+`stripProjectedQueueCards` answer a missing or duplicated heading with an empty result,
+which is fail-open under a preflight that must fail closed." The eighth round measured it
+and the owner filed it OUTSIDE this point's final state precisely so 713 could converge.
+
+## Pass 4, second confirming round — one answered, one deferred to a new point
+
+ANSWERED: `isTrulyDerivedCard` accepted the reserved title alone, so any hand-written
+unnumbered card wearing `PAUSED_TITLE` or `AUTOMATIC_DECISION_TITLE` stood beside active
+work and passed the fail-closed comparison. It now requires `data-state="derived"` as well
+— the same hardening the eighth round gave the handover card, which had the same hole.
+
+RESTATED AND STILL DECLINED HERE, filed instead: the reviewer raised the removal of an
+unexpected numbered card (and of the queue copy) a second time, at P0. The decision above
+stands for THIS point — its final state orders the removal and five of its accepted tests
+pin it — but the disagreement is real and about design, not about a line, so it is filed as
+its own work-order point rather than settled twice or averaged. Two readings of the same
+spec met here: "REMOVES one whose point is no longer in flight" against "a render that
+would drop prose refuses or restores it".
+
+## Pass 5 — the board's tests and its edit/publish path — two answered, one deferred
+
+ANSWERED:
+
+- [P1] `scripts/board-publish.mjs` took `--locked` on the caller's word: anyone could publish
+  straight past the serialization this branch introduced, concurrently with another board
+  command. The claim is checked now against something nobody outside can satisfy — the live
+  board-edit lock's recorded pid must be this process's PARENT — and a shell that types the
+  flag is refused, measured live (exit 1).
+
+- [P1] `scripts/board-edit-core.mjs`: when `preparePublish()` itself failed, the board was
+  durably changed while the active-work record still described the board as it stood BEFORE
+  the edit — and the shared remedy sent the operator to a standalone publish, which projects
+  that record and can undo the edit. That one stage has its own remedy now: do not publish,
+  reconcile the record first.
+
+DEFERRED, already filed: the ordering case in `scripts/board-edit-core.test.mjs` never
+observes the write callback and stays green if `preparePublish()` moves before the write.
+Work-order point 929 names it verbatim, together with the "writes nothing" case in
+`scripts/batch-in-flight-cli.test.mjs`.
+
+## Pass 6 — the board CLI, focus.mjs and the Stop-side guard core — all three answered
+
+- [P1] `scripts/focus.mjs set` wrote only the focus FILE, so a session or script calling it
+  directly — which every one of them may — left `declaration.focusPoint` on the old strand:
+  the second copy of one fact the shared transition exists to prevent. The declaration
+  follows the focus now, idempotently, so `board.mjs focus` (which writes it first and then
+  calls this CLI) rewrites the same value. Regression in the spawned suite, proven to fail
+  without it.
+
+- [P1] `board.mjs attest` ran OUTSIDE `withBoardEditLock`, and it rotates the archive — a
+  read-modify-write of the board like every other, and the last board-CLI path that could
+  interleave with a locked edit or publish. It runs under the lock now; none of its three
+  children takes the lock, so nothing deadlocks.
+
+- [P2] `nowProjectionStopDecision` let a projection error escape to `evaluate()`'s outermost
+  catch, which returns ALLOW for the WHOLE guard — so one check's own error silently
+  swallowed the duplicate- and stale-card findings beside it. It fails open locally now, and
+  an `ok:true` source without a point array is refused before it can throw.
+
+## Pass 2 — the normalization core and the source/CLI suites — all four answered
+
+- [P1] `withRecordedEvidencePoint` left an unresolvable item WITHOUT the field, so it stayed
+  legacy and the next read re-derived it — a worktree path that later resolves, or is reused
+  by another point, then gives a different answer than the write had. The recorded answer
+  "nobody could tell" is written down too (`point: null`), and the six assertions that
+  pinned byte-identical retention now pin the recorded null.
+
+- [P2] The `--clear` helper read only the journal's LAST line, so a call that emitted nothing
+  inherited the previous call's verdict. Each call now proves exactly one new event.
+
+- [P2] The two delegated-start cases asserted only the last event's point; they assert the
+  event TYPE with it.
+
+- [P2] The projection case searched the WHOLE document for its cards and stubs, so a card
+  rendered into the wrong section satisfied it and the assertion leaned on `comparison.ok`
+  for the one thing it was meant to prove independently. Both checks are scoped to the
+  current-work section.
+
+## Pass 1 — the documents and the active-work source — one answered, one declined
+
+ANSWERED:
+
+- [P1] `gatherActiveWorkSource` read a focus record naming `"700"` — or `0`, `-1`, `7.5`,
+  `true` — as "no focus at all", which is byte for byte the answer the two genuinely ABSENT
+  sources give. A corrupt record therefore became a VERIFIED zero: the focus half of the
+  projection invariant (`focusUnrepresented`, `focusMisplaced`) quietly stopped being checked
+  while the fail-closed publish preflight still passed. `focus.mjs set` writes exactly two
+  shapes — a positive integer, or an explicit `null` for the "-" focus — so the boundary now
+  accepts those two and reports anything else as a source error, which is what "present but
+  unreadable" already meant everywhere else in this file. Regression in
+  `scripts/active-work-source.test.mjs`, proven to fail without the fix.
+
+DECLINED, with the reason recorded rather than averaged:
+
+- [P2] "`openPointNumbers` treats `DEFERRED` anywhere in a task's header as lifecycle
+  metadata; it should recognize only the designated defer marker." DECLINED: `\bDEFERRED\b`
+  ON THE HEADER LINE *is* the designated marker of this work order, and this module holds the
+  seventh identical copy of that predicate — `batch-in-flight-core.mjs` (`openPointSpecs`),
+  `batch-progress-guard.mjs`, `batch-resume-hook.mjs`, `dashboard-guard-core.mjs`,
+  `dashboard-sync-core.mjs` and `dashboard-integrity-guard-core.mjs` all test the same thing
+  the same way. There is no other marker to recognise, and narrowing THIS reading alone would
+  make the board's active set disagree with the batch's own open set — the board would then
+  demand a card for a point the resume hook refuses to work. The match is already confined to
+  the `- [ ] N.` header, so a `DEFERRED` in a point's BODY does not reach it.
+
+## Pass 1, confirming round — two answered, one declined
+
+ANSWERED:
+
+- [P1] `readFocusPoint` still let a PRESENT record with no `point` field through as success,
+  so `{}` stayed indistinguishable from an absent source and contradicted the rule written
+  down one paragraph above it. Absent is now the only shape that answers "no focus"; a
+  present record owes either a positive integer or an explicit `null`, and a fieldless one
+  is named as such. The regression covers it.
+
+- [P2] Two comments still described the pre-migration behaviour: `transitionActiveDeclaration`
+  said an unattributable item "keeps standing UNCHANGED" and `markTransferred` said it "stays
+  byte-identical", although both now write `point: null` into it. Both say what they do.
+
+DECLINED, with the reason recorded rather than averaged:
+
+- [P2] "`.claude/mechanism-reviews.jsonl` mislabels the recorded passes: the entry whose
+  structured pass index is 2 says 'pass-6', the one with index 1 says 'pass-2'." DECLINED as
+  unfixable-in-place and not a defect of the record: the `subject` field is the COMMIT
+  SUBJECT, copied verbatim, and it was accurate when it was written. Pass indices are not
+  stable names — `review-sol.mjs` recuts the split over the END-STATE file set on every run,
+  so the same file set was pass 6, then pass 2, then pass 3, as files changed and the sizes
+  moved (this round went from 7 runnable passes to 8 while it ran). The structured `pass`
+  object records the index AND its file list, which is the reading that means something; the
+  subject records what the session called it that hour. Rewriting those subjects would mean
+  rebasing recorded, reviewed history to make a label agree with a number that is by
+  construction temporary. WHAT IS WORTH KEEPING is the trap itself: a commit subject naming a
+  pass index goes stale the moment the split is recut, so it should name what was reviewed
+  instead. Filed to the findings carrier rather than fixed here.
+
+## Pass 8 — the two guard wrappers, read by Opus 5 — both answered
+
+The two files are Sol's within this range (`1ee13a4a`, `6a55f54a`), so the independent
+reader is the Anthropic side; the verdict is recorded against `1ee13a4a`, whose content
+they still carry.
+
+- [P2] `dashboard-integrity-guard.mjs` read the focus point a SECOND time, leniently
+  (`Number.isInteger(focus.point) ? … : null`), two lines below the validated
+  `activeWork.focusPoint` it now gathers. The two answers agree for every input, so the copy
+  bought nothing and carried the exact fail-open pass 1 had just closed in the other reader —
+  the shape these rounds keep re-finding. One reading now feeds both checks.
+
+- [P3] The `parseNowCardPoint` fallback in `dashboard-guard.mjs --synced` is unreachable:
+  both parsers read the same bounded section, so an empty set implies a null first point.
+  Removed, and with it the import that only served it.
+
+## The round is closed
+
+The confirming round over the answering commit came back MERGE on both halves and on both
+sides of the vendor line: the source and the declaration core (`c411a38` — every focus shape
+walked through, the fail-closed contract intact, both comments matching their functions), and
+the two guard wrappers (`11a442d` — the validated reuse preserves the integer-or-null contract
+and the Stop fail-open, the removed fallback was unreachable, the publish refusal paths
+unchanged). The documents and the recorded verdicts were read separately and cleared (`ff77b8b`).
+
+WHAT THIS ROUND ACTUALLY COST AND BOUGHT, so the tenth does not have to guess: nine passes plus
+three confirming rounds found ONE defect class twice — a value that is present but unusable read
+as a value that is absent, first for an evidence item without an attributable point, then for a
+focus record naming something that is not a point number, and then a second, lenient copy of that
+same reading two lines below the strict one. Everything else the round raised was either already
+filed (points 929, 930) or a reading of this point's own final state that the point had to decide
+rather than average.
+
+LIVE PROOF at the end of the round, against the real board and the real declaration rather than a
+fixture: the source answers `{ok:true, points:[713], focusPoint:713}`, the published board agrees,
+removing the numbered 713 card makes the comparison answer `missing:[713]` with
+`focusUnrepresented` instead of passing, and the render puts the card back as a visible stub. That
+is the 17.08.2026 defect — a section that stood empty while three strands ran — caught and
+repaired by the mechanism this point builds.

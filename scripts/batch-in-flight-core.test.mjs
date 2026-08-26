@@ -12,8 +12,8 @@
 //   · with none declared, the guard behaves exactly as it did before;
 //   · and nothing here may touch the repository's .claude/ (finding 3).
 import { describe, it, expect } from 'vitest'
-import { existsSync, mkdtempSync, mkdirSync, readFileSync, rmSync, statSync, utimesSync, writeFileSync } from 'node:fs'
-import { execFileSync } from 'node:child_process'
+import { cpSync, existsSync, mkdtempSync, mkdirSync, readFileSync, rmSync, statSync, utimesSync, writeFileSync } from 'node:fs'
+import { execFileSync, spawnSync } from 'node:child_process'
 import { tmpdir } from 'node:os'
 import { basename, join, resolve } from 'node:path'
 import { REPO_ROOT } from './repo-paths.mjs'
@@ -58,6 +58,8 @@ import {
   POOL_CAP,
   COMMISSION_RECORD_PATH,
   pointOfBranch,
+  normalizeActiveWork,
+  unattributableEvidenceAlerts,
   describeBranchAge,
   parseCommissionRecord,
   commissionOverrideFor,
@@ -110,6 +112,7 @@ import {
   worktreeActiveAt,
   worktreeFilesActiveAt,
   runningBranchFiles,
+  tagEvidencePoint,
 } from './batch-in-flight.mjs'
 import { selfCommandLine } from './verify/run-record.mjs'
 
@@ -147,6 +150,175 @@ const declaration = (over = {}) => ({
 
 const assess = (over = {}, probeOver = {}) =>
   assessInFlight({ declaration: declaration(over), sid: SID, now: NOW, ...probes(probeOver) })
+
+describe('normalizeActiveWork — the board\'s structured point source', () => {
+  const openPoints = new Set([697, 700, 711])
+
+  it('combines the focused point with tagged strands and deduplicates repeated evidence', () => {
+    const result = normalizeActiveWork({
+      focusPoint: 700,
+      openPoints,
+      declaration: {
+        evidence: [
+          { kind: 'branch', point: 697, phase: 'authoring' },
+          { kind: 'worktree', point: 697, phase: 'counter-read' },
+          { kind: 'pid', point: 711, phase: 'verification' },
+        ],
+      },
+    })
+    expect(result).toMatchObject({ ok: true, points: [700, 697, 711], focusPoint: 700 })
+  })
+
+  it('keeps transfer and landing continuity active but excludes explicit exit phases', () => {
+    const result = normalizeActiveWork({
+      openPoints,
+      declaration: {
+        evidence: [
+          { point: 697, phase: 'transferred' },
+          { point: 700, phase: 'ready-to-land' },
+          { point: 711, phase: 'returned' },
+        ],
+      },
+    })
+    expect(result).toMatchObject({ ok: true, points: [697, 700] })
+  })
+
+  it('does not promote undeclared feat branches into active work', () => {
+    expect(normalizeActiveWork({ openPoints, declaration: null, focusPoint: null, openBranches: [
+      'feat/697-a', 'feat/700-b', 'feat/711-c', 'feat/1', 'feat/2', 'feat/3', 'feat/4', 'feat/5', 'feat/6',
+    ] })).toMatchObject({ ok: true, points: [] })
+  })
+
+  it('derives legacy branch and worktree strands without consulting undeclared branches', () => {
+    const result = normalizeActiveWork({
+      focusPoint: 713,
+      openPoints: new Set([713]),
+      declaration: {
+        evidence: [
+          { kind: 'branch', ref: 'refs/heads/feat/713-now-section-derived' },
+          { kind: 'worktree', path: '/workspace/hoa/.claude/worktrees/point-713' },
+        ],
+      },
+      worktreeRef: (path) => path.endsWith('/point-713') ? 'refs/heads/feat/713-now-section-derived' : null,
+    })
+    expect(result).toMatchObject({ ok: true, points: [713], focusPoint: 713, errors: [] })
+  })
+
+  it('stamps branch/worktree evidence from its own strand and pid/log evidence from the declared focus', () => {
+    expect(tagEvidencePoint({ kind: 'branch', ref: 'feat/697-a' }, { currentPoint: 700 })).toMatchObject({
+      point: 697,
+      phase: 'authoring',
+    })
+    expect(tagEvidencePoint({ kind: 'worktree', path: '/w/711' }, {
+      currentPoint: 700,
+      worktreeRef: 'refs/heads/feat/711-c',
+    })).toMatchObject({ point: 711 })
+    expect(tagEvidencePoint({ kind: 'log', path: '/w/run.log' }, { currentPoint: 700, phase: 'verification' }))
+      .toMatchObject({ point: 700, phase: 'verification' })
+  })
+
+  // Sixth cross-vendor round: the branch name used to outvote an EXPLICIT
+  // --point, so `--point 713 --branch feat/999-work` recorded 999 while the
+  // CLI's own message told the caller to declare the point first.
+  it('lets a DECLARED point win over the branch name and refuses the contradiction', () => {
+    // A name that derives nothing takes the declared point rather than none.
+    expect(
+      tagEvidencePoint({ kind: 'branch', ref: 'refs/heads/topic/live' }, { currentPoint: 713, declared: true }),
+    ).toMatchObject({ point: 713 })
+    // A name that derives a DIFFERENT point is the contradiction, and it is
+    // refused rather than silently recorded either way round.
+    expect(() =>
+      tagEvidencePoint({ kind: 'branch', ref: 'refs/heads/feat/999-work' }, { currentPoint: 713, declared: true }),
+    ).toThrow(/declared point 713 .* names point 999 .* disagree/)
+    // The same pair WITHOUT a declaration is the multi-strand case, not a
+    // contradiction: the focus names this session, the branch names its strand.
+    expect(
+      tagEvidencePoint({ kind: 'branch', ref: 'refs/heads/feat/697-a' }, { currentPoint: 713 }),
+    ).toMatchObject({ point: 697 })
+    // A declared point also stamps evidence whose name says nothing.
+    expect(
+      tagEvidencePoint({ kind: 'log', path: '/w/run.log' }, { currentPoint: 713, declared: true, phase: 'verification' }),
+    ).toMatchObject({ point: 713, phase: 'verification' })
+  })
+
+  it.each([
+    ['unreadable source', { readable: false }],
+    ['untagged evidence with no derivable point', { declaration: { evidence: [{ kind: 'branch', ref: 'main', point: null }] } }],
+    ['malformed point', { declaration: { evidence: [{ point: 'x' }] } }],
+    ['closed point', { declaration: { evidence: [{ point: 699 }] } }],
+    ['unknown phase', { declaration: { evidence: [{ point: 697, phase: 'maybe' }] } }],
+    ['contradicted checkpoint', { checkpointContradicted: true }],
+  ])('returns unknown rather than an empty active set for %s', (_label, over) => {
+    const result = normalizeActiveWork({ openPoints, ...over })
+    expect(result.ok).toBe(false)
+    expect(result.points).toEqual([])
+    expect(result.errors.length).toBeGreaterThan(0)
+  })
+
+  it('an EMPTY open-point set is a verified "nothing is open", never a free pass', () => {
+    // Sixth cross-review: the old `open.size > 0` guard skipped the membership
+    // check entirely when nothing was open, so any declared strand sailed
+    // through on the fail-closed publish side.
+    const declared = { declaration: { evidence: [{ point: 697 }] } }
+    const result = normalizeActiveWork({ openPoints: new Set(), ...declared })
+    expect(result).toMatchObject({ ok: false, points: [] })
+    expect(result.errors.join(' ')).toContain('not open')
+    // …and a numbered focus against the empty set refuses the same way.
+    expect(normalizeActiveWork({ openPoints: [], focusPoint: 700 }).ok).toBe(false)
+    // The genuinely idle record stays a valid zero.
+    expect(normalizeActiveWork({ openPoints: new Set(), declaration: null, focusPoint: null }))
+      .toMatchObject({ ok: true, points: [] })
+  })
+})
+
+describe('unattributableEvidenceAlerts — an adoption never succeeds silently into an empty board', () => {
+  it('names every kept item that stays point-less after the migration, with the human way out', () => {
+    const alerts = unattributableEvidenceAlerts(
+      [
+        { kind: 'branch', ref: 'feat/700-x', point: 700 },
+        { kind: 'pid', pid: 77 },
+        { kind: 'log', path: '/l' },
+        { kind: 'worktree', path: '/w/point-713' },
+      ],
+      { worktreeRef: (p) => (p === '/w/point-713' ? 'refs/heads/feat/713-x' : null) },
+    )
+    expect(alerts).toHaveLength(2)
+    expect(alerts[0]).toContain('pid 77')
+    expect(alerts[1]).toContain('log /l')
+    for (const alert of alerts) expect(alert).toContain('batch-in-flight.mjs --clear')
+  })
+
+  it('stays silent when every item is attributed, and never throws on junk', () => {
+    expect(unattributableEvidenceAlerts([{ kind: 'branch', ref: 'feat/700-x', point: 700 }])).toEqual([])
+    // Point-carrying pid/log evidence is attributed by the SAME field (seventh
+    // cross-review): an implementation that complained about pid/log by KIND,
+    // regardless of the recorded point, would block every valid adoption.
+    expect(unattributableEvidenceAlerts([
+      { kind: 'pid', pid: 77, point: 700 },
+      { kind: 'log', path: '/l', point: 697 },
+    ])).toEqual([])
+    expect(unattributableEvidenceAlerts()).toEqual([])
+    expect(unattributableEvidenceAlerts([null, 'x'])).toEqual([])
+  })
+
+  it('skips a point-less TERMINAL item, exactly as the read side does', () => {
+    // Seventh cross-review: `normalizeActiveWork` returns on a terminal phase
+    // BEFORE resolving the point, so this item never refuses the record — an
+    // alert here falsely claimed a refusal and recommended the whole clear.
+    expect(unattributableEvidenceAlerts([{ kind: 'log', path: '/l', phase: 'landed' }])).toEqual([])
+    // The declaration-level phase is the same fallback the read side applies…
+    expect(unattributableEvidenceAlerts([{ kind: 'pid', pid: 77 }], { declarationPhase: 'completed' })).toEqual([])
+    // …and an item's own phase wins over it, in both directions.
+    expect(
+      unattributableEvidenceAlerts([{ kind: 'pid', pid: 77, phase: 'verification' }], { declarationPhase: 'landed' }),
+    ).toHaveLength(1)
+    expect(
+      unattributableEvidenceAlerts([{ kind: 'pid', pid: 77, phase: 'returned' }], { declarationPhase: 'authoring' }),
+    ).toEqual([])
+    // A point-less ACTIVE item still alerts — that one the read side refuses.
+    expect(unattributableEvidenceAlerts([{ kind: 'log', path: '/l', phase: 'authoring' }])).toHaveLength(1)
+  })
+})
 
 // ---------------------------------------------------------------------------
 describe('checkEvidence — every kind is answered by a probe, never by the claim', () => {
@@ -1251,7 +1423,11 @@ describe('the stand-down boundary — declared children cross ownership', () => 
 
       // The declaration is written directly because the test exercises the
       // handover seam, not the CLI's separate self-reference refusal.
-      writeDeclaration(declaration({ evidence: [{ kind: 'branch', ref: 'main' }] }), path)
+      // The evidence names its point, as every write path stamps it since the
+      // fifth cross-vendor round: `main` resolves to no `feat/<N>-…` point, so
+      // an unstamped item would be refused as unattributable — which is the
+      // rule, not this case's subject.
+      writeDeclaration(declaration({ evidence: [{ kind: 'branch', ref: 'main', point: 713 }] }), path)
       const boundary = gatherStandDownBoundary(SID, {
         cwd: repo,
         lockPath,
@@ -2813,10 +2989,41 @@ describe('runRecordFor — the run record beside a declared log, reduced for the
 
 describe('markTransferred — the adoption record stays probeable (M4/M7)', () => {
   it('keeps the declaration intact and records who, when and which checkpoints', () => {
-    const declaration = { v: 1, sessionId: 's1', at: 1, waitingOn: 'agent', evidence: [{ kind: 'branch', ref: 'b' }] }
+    const declaration = { v: 1, sessionId: 's1', at: 1, waitingOn: 'agent', evidence: [{ kind: 'branch', ref: 'b', point: null }] }
     const t = markTransferred({ declaration, bySid: 's1', now: 99, checkpoints: [{ ref: 'b', sha: 'x' }] })
     expect(t.evidence).toEqual(declaration.evidence)
     expect(t.transfer).toEqual({ v: 1, by: 's1', at: 99, checkpoints: [{ ref: 'b', sha: 'x' }] })
+  })
+
+  it('the transfer is a write, so it migrates: legacy evidence leaves with its point recorded', () => {
+    // Sixth cross-review: writing the legacy evidence back unchanged handed
+    // the successor a declaration without its once-only migration.
+    const declaration = {
+      v: 1,
+      sessionId: 's1',
+      at: 1,
+      waitingOn: 'agent',
+      evidence: [
+        { kind: 'branch', ref: 'feat/700-context-fence' },
+        { kind: 'worktree', path: '/w/point-713' },
+        { kind: 'log', path: '/l' },
+      ],
+    }
+    const t = markTransferred({
+      declaration,
+      bySid: 's1',
+      now: 9,
+      checkpoints: [],
+      worktreeRef: (p) => (p === '/w/point-713' ? 'refs/heads/feat/713-now-section-derived' : null),
+    })
+    expect(t.evidence).toEqual([
+      { kind: 'branch', ref: 'feat/700-context-fence', point: 700 },
+      { kind: 'worktree', path: '/w/point-713', point: 713 },
+      // What resolves to nothing records the NULL, so the next read cannot
+      // re-derive a different answer than this write had (ninth round).
+      { kind: 'log', path: '/l', point: null },
+    ])
+    expect(declaration.evidence[0]).toEqual({ kind: 'branch', ref: 'feat/700-context-fence' })
   })
 
   it('a RE-TRANSFER supersedes the old adoption, so the record stays protected (Sol re-review, finding 1)', () => {
@@ -2825,7 +3032,7 @@ describe('markTransferred — the adoption record stays probeable (M4/M7)', () =
       sessionId: 's2',
       at: 5,
       waitingOn: 'agent',
-      evidence: [{ kind: 'branch', ref: 'b' }],
+      evidence: [{ kind: 'branch', ref: 'b', point: null }],
       transfer: { v: 1, by: 's1', at: 2, checkpoints: [] },
       adopted: { from: 's1', at: 3 },
     }
@@ -3008,6 +3215,233 @@ describe('gatherHandoverTransfer — session-bound and idempotent', () => {
       // on who transferred it.
       const a = adoptTransferred('session-successor', { lockPath })
       expect(['own-commit', 'own-transfer']).not.toContain(a.reason)
+    })
+  })
+})
+
+// ---------------------------------------------------------------------------
+// THE ADOPTION ITSELF, run for real against the declaration file (seventh
+// cross-review): the sixth round's alert stood BESIDE `adopted: true`, so the
+// CLI printed ADOPTED and exited 0 while the read side discarded the whole
+// record one look later. These cases pin the WRITE path, not the alert helper.
+// ---------------------------------------------------------------------------
+describe('adoptTransferred — unattributable kept evidence refuses BEFORE the write', () => {
+  const withTempLock = (fn) => {
+    const dir = mkdtempSync(join(tmpdir(), 'hoa-adopt-'))
+    const lockPath = join(dir, 'batch-lock.json')
+    try {
+      fn({ dir, lockPath, path: statePathsFor(lockPath).inFlightPath })
+    } finally {
+      rmSync(dir, { recursive: true, force: true })
+    }
+  }
+
+  /** A transferred declaration whose evidence is FRESH log files — the probe
+   *  keeps them, so the attribution question is what decides the adoption. */
+  const transferred = (evidence) => ({
+    v: 1,
+    sessionId: 'session-predecessor',
+    at: Date.now(),
+    waitingOn: 'a delegated agent',
+    transfer: { v: 1, by: 'session-predecessor', at: Date.now(), checkpoints: [] },
+    evidence,
+  })
+
+  it('refuses with the human way out and writes NOTHING while a kept live item resolves to no point', () => {
+    withTempLock(({ dir, lockPath, path }) => {
+      const log = join(dir, 'agent.log')
+      writeFileSync(log, 'still writing')
+      const before = transferred([
+        { kind: 'log', path: log, point: 700, phase: 'authoring' },
+        { kind: 'log', path: log },
+      ])
+      writeDeclaration(before, path)
+      const a = adoptTransferred('session-successor', { lockPath })
+      expect(a.adopted).toBe(false)
+      expect(a.reason).toBe('unattributable-evidence')
+      expect(a.alerts.join(' ')).toContain('batch-in-flight.mjs --clear')
+      // The record was NOT rewritten: no adopted stamp, still the
+      // predecessor's, its evidence byte-identical.
+      const after = readDeclaration(path)
+      expect(after.adopted).toBeUndefined()
+      expect(after.sessionId).toBe('session-predecessor')
+      expect(after.evidence).toEqual(before.evidence)
+    })
+  })
+
+  it('adopts point-carrying pid/log evidence cleanly — attribution is the recorded field, never the kind', () => {
+    // The valid adoption a kind-based complaint would block (finding 3's
+    // hostile implementation): the log item carries its point, so it adopts.
+    withTempLock(({ dir, lockPath, path }) => {
+      const log = join(dir, 'agent.log')
+      writeFileSync(log, 'still writing')
+      writeDeclaration(transferred([{ kind: 'log', path: log, point: 700, phase: 'authoring' }]), path)
+      const a = adoptTransferred('session-successor', { lockPath })
+      expect(a).toMatchObject({ adopted: true, reason: 'adopted', kept: 1, dropped: 0 })
+      expect(a.alerts).toEqual([])
+      const after = readDeclaration(path)
+      expect(after.sessionId).toBe('session-successor')
+      expect(after.adopted.from).toBe('session-predecessor')
+      // The ROUNDTRIP holds (eighth cross-review): the adopted record still
+      // carries the evidence with its point — an adoption that stamped
+      // `adopted: true` but blanked the evidence or damaged the point would
+      // leave the read side silently empty one look later.
+      expect(after.evidence).toEqual([{ kind: 'log', path: log, point: 700, phase: 'authoring' }])
+      expect(normalizeActiveWork({ declaration: after, openPoints: [700] })).toMatchObject({
+        ok: true,
+        points: [700],
+      })
+    })
+  })
+
+  it('adopts LIVE PID evidence with its recorded point kept verbatim — attribution is never decided by kind', () => {
+    // Eighth cross-review: the pid path had only reached the alert helper. This
+    // runs the real adoption over a pid the real probe confirms alive, so an
+    // adoption that ignored or stripped `point` on pid items, or reported every
+    // pid as unattributable by kind, fails here.
+    withTempLock(({ lockPath, path }) => {
+      const probe = probePid(process.pid)
+      expect(probe.exists).toBe(true)
+      const item = { kind: 'pid', pid: process.pid, startedAt: probe.startedAt, point: 700, phase: 'authoring' }
+      writeDeclaration(transferred([item]), path)
+      const a = adoptTransferred('session-successor', { lockPath })
+      expect(a).toMatchObject({ adopted: true, reason: 'adopted', kept: 1, dropped: 0 })
+      expect(a.alerts).toEqual([])
+      const after = readDeclaration(path)
+      expect(after.evidence).toEqual([item])
+      expect(normalizeActiveWork({ declaration: after, openPoints: [700] })).toMatchObject({ ok: true, points: [700] })
+    })
+  })
+
+  it('judges attribution on the KEPT evidence only — a stale point-less item is dropped and named, never a refusal', () => {
+    // Eighth cross-review: the refusal case fed both items from one fresh log,
+    // so an implementation that questioned already-EXPIRED point-less items
+    // before the probe — refusing an otherwise valid adoption — stayed green.
+    withTempLock(({ dir, lockPath, path }) => {
+      const live = join(dir, 'live.log')
+      writeFileSync(live, 'still writing')
+      const stale = join(dir, 'stale.log')
+      writeFileSync(stale, 'long finished')
+      const old = new Date(Date.now() - LOG_FRESH_MS - 3_600_000)
+      utimesSync(stale, old, old)
+      writeDeclaration(
+        transferred([
+          { kind: 'log', path: live, point: 700, phase: 'authoring' },
+          { kind: 'log', path: stale, phase: 'authoring' },
+        ]),
+        path,
+      )
+      const a = adoptTransferred('session-successor', { lockPath })
+      expect(a).toMatchObject({ adopted: true, reason: 'adopted', kept: 1, dropped: 1 })
+      expect(a.alerts.join(' ')).toContain('expired')
+      // The dropped item does not survive into the adopted record.
+      expect(readDeclaration(path).evidence).toEqual([{ kind: 'log', path: live, point: 700, phase: 'authoring' }])
+    })
+  })
+
+  it('hands the DECLARATION-level phase to the attribution check — terminal at the record, point-less item adopts', () => {
+    // Eighth cross-review: the declaration-phase fallback was only proven at
+    // the helper; a wiring that never passed `declaration.phase` through would
+    // default the item to "authoring" and falsely refuse this adoption.
+    withTempLock(({ dir, lockPath, path }) => {
+      const log = join(dir, 'agent.log')
+      writeFileSync(log, 'still writing')
+      writeDeclaration({ ...transferred([{ kind: 'log', path: log }]), phase: 'landed' }, path)
+      const a = adoptTransferred('session-successor', { lockPath })
+      expect(a).toMatchObject({ adopted: true, reason: 'adopted', kept: 1, dropped: 0 })
+      expect(a.alerts).toEqual([])
+      expect(readDeclaration(path).sessionId).toBe('session-successor')
+    })
+  })
+
+  it('a point-less TERMINAL item never blocks the adoption — the read side skips it the same way', () => {
+    withTempLock(({ dir, lockPath, path }) => {
+      const log = join(dir, 'agent.log')
+      writeFileSync(log, 'still writing')
+      writeDeclaration(
+        transferred([
+          { kind: 'log', path: log, point: 700, phase: 'authoring' },
+          { kind: 'log', path: log, phase: 'landed' },
+        ]),
+        path,
+      )
+      const a = adoptTransferred('session-successor', { lockPath })
+      expect(a).toMatchObject({ adopted: true, reason: 'adopted' })
+      // No alert rides beside the success (eighth cross-review): the sixth
+      // round's defect was exactly an adoption that succeeded AND printed a
+      // false clear-alarm — a terminal item must produce neither.
+      expect(a.alerts).toEqual([])
+      expect(readDeclaration(path).sessionId).toBe('session-successor')
+    })
+  })
+})
+
+// ---------------------------------------------------------------------------
+// THE CLI ITSELF (eighth cross-review): every case above calls
+// `adoptTransferred` in-process, so a CLI that ignored `--adopt`, routed it
+// elsewhere, or printed ADOPTED and exited 0 regardless of the result stayed
+// green. Spawned inside an isolated temp repo, like board-focus-behaviour —
+// nothing here touches the repository's own .claude/.
+// ---------------------------------------------------------------------------
+describe('batch-in-flight.mjs --adopt (spawned) — the CLI answers with the real verdict, exit code and write', () => {
+  const withCliRepo = (fn) => {
+    const repo = mkdtempSync(join(tmpdir(), 'hoa-adopt-cli-'))
+    try {
+      cpSync(join(REPO_ROOT, 'scripts'), join(repo, 'scripts'), {
+        recursive: true,
+        filter: (src) => !/[\\/](git-hooks)([\\/]|$)/.test(src),
+      })
+      mkdirSync(join(repo, '.claude'), { recursive: true })
+      const lockPath = join(repo, '.claude', 'batch-lock.json')
+      writeFileSync(lockPath, JSON.stringify({ sessionId: 'session-successor', claimedAt: Date.now() }))
+      fn({ repo, declarationPath: statePathsFor(lockPath).inFlightPath })
+    } finally {
+      rmSync(repo, { recursive: true, force: true })
+    }
+  }
+  const runAdopt = (repo) =>
+    spawnSync(process.execPath, [join(repo, 'scripts', 'batch-in-flight.mjs'), '--adopt'], {
+      windowsHide: true,
+      cwd: repo,
+      encoding: 'utf8',
+      timeout: 60_000,
+    })
+  const transferred = (evidence) => ({
+    v: 1,
+    sessionId: 'session-predecessor',
+    at: Date.now(),
+    waitingOn: 'a delegated agent',
+    transfer: { v: 1, by: 'session-predecessor', at: Date.now(), checkpoints: [] },
+    evidence,
+  })
+
+  it('adopts through the real entry point: exit 0, ADOPTED said, the record rewritten with its evidence intact', () => {
+    withCliRepo(({ repo, declarationPath }) => {
+      const log = join(repo, 'agent.log')
+      writeFileSync(log, 'still writing')
+      const item = { kind: 'log', path: log, point: 700, phase: 'authoring' }
+      writeFileSync(declarationPath, JSON.stringify(transferred([item])))
+      const r = runAdopt(repo)
+      expect(r.status, r.stderr).toBe(0)
+      expect(r.stdout).toContain('ADOPTED the transferred declaration')
+      const after = JSON.parse(readFileSync(declarationPath, 'utf8'))
+      expect(after.sessionId).toBe('session-successor')
+      expect(after.adopted.from).toBe('session-predecessor')
+      expect(after.evidence).toEqual([item])
+    })
+  })
+
+  it('refuses through the real entry point: exit 1, the alert and the way out on stderr, the record untouched', () => {
+    withCliRepo(({ repo, declarationPath }) => {
+      const log = join(repo, 'agent.log')
+      writeFileSync(log, 'still writing')
+      const before = JSON.stringify(transferred([{ kind: 'log', path: log, phase: 'authoring' }]))
+      writeFileSync(declarationPath, before)
+      const r = runAdopt(repo)
+      expect(r.status).toBe(1)
+      expect(r.stderr).toContain('ALERT:')
+      expect(r.stderr).toContain('ADOPTION REFUSED')
+      expect(readFileSync(declarationPath, 'utf8')).toBe(before)
     })
   })
 })

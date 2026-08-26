@@ -18515,16 +18515,6 @@ Nummerierung bleiben deshalb identisch — hier wird nur verschoben, nie umgesch
     at, so the distance between the mark and the real handover is a number somebody can read
     rather than a claim. A session that ends more than a stated margin past the mark says so in
     its closing report.
-  - AND THE HANDOVER STATE MUST NOT BLOCK THE HANDOVER (measured 17.08.2026, twice, on the live
-    board): `scripts/board-core.test.mjs` ("promotes, returns, archives and answers without a new
-    violation") goes RED with `dup-in-section` as soon as the board carries the UNNUMBERED
-    handover card instead of a numbered now-card — the audit simulates "the now-card back into
-    the queue" and finds no now-card to move. Green again the moment a numbered card stands
-    there. Because the pre-push gate runs the unit layer, every commit is refused from the moment
-    a session prepares its handover, which is the most expensive moment there is; one commit was
-    dropped here rather than fought for. Decide which it is — the handover state is legitimate
-    and the audit must know it, or the board owes a numbered card even then — and pin the answer
-    with a case, so the last bookkeeping of a session cannot be blocked by the session ending.
   VERIFIABLE: Vitest cases over the pure fence (over the mark + a starting call → deny, naming
   the mark; over the mark + a finishing call or a read → allow; under the mark → allow all;
   unreadable measurement → fail-open) and over the transferable-run record (a declared run with

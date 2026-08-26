@@ -42,7 +42,9 @@ import { resolve } from 'node:path'
 import { writeTextAtomic } from './atomic-write.mjs'
 import { withDerivedState } from './board-state.mjs'
 import { REPO_ROOT, STATE_PATH, readJson, mergeState } from './dashboard-state.mjs'
-import { normaliseLineEndings, refreshFooter, renderCardCriticalities, upgradeNowCards } from './board-core.mjs'
+import { normaliseLineEndings, projectNowForPublish, refreshFooter, renderCardCriticalities, upgradeNowCards } from './board-core.mjs'
+import { gatherActiveWorkSource, openPointNumbers } from './active-work-source.mjs'
+import { BOARD_EDIT_LOCK_PATH, withBoardEditLock } from './board-edit-lock.mjs'
 import { currentSetting, settingProblemLine } from './sol-share.mjs'
 import { applyFooterNote } from './sol-share-core.mjs'
 import { structureViolations } from './board-structure-core.mjs'
@@ -93,6 +95,27 @@ async function fetchWithTimeout(url, ms = FETCH_TIMEOUT_MS) {
 }
 
 const args = process.argv.slice(2)
+const lockedByCaller = args.length === 1 && args[0] === '--locked'
+
+/**
+ * `--locked` says "my parent already holds the board-edit lock, do not take it
+ * again". That was taken on the caller's word (ninth cross-vendor round), so
+ * anyone could publish straight past the serialization this branch introduced.
+ * The claim is CHECKED now, and the check is one nobody outside can satisfy:
+ * the live lock's recorded pid has to be this process's PARENT. A shell that
+ * types the flag has a shell for a parent and is refused.
+ */
+function parentHoldsBoardEditLock() {
+  try {
+    const lock = JSON.parse(readFileSync(BOARD_EDIT_LOCK_PATH, 'utf8'))
+    if (!lock || typeof lock !== 'object') return false
+    if (Number(lock.pid) !== process.ppid) return false
+    const until = Number(lock.leaseUntil)
+    return !Number.isFinite(until) || until > Date.now()
+  } catch {
+    return false
+  }
+}
 const git = (a, opts = {}) =>
   execFileSync('git', a, { windowsHide: true, cwd: REPO_ROOT, encoding: 'utf8', ...opts }).trim()
 
@@ -153,11 +176,39 @@ if (args.includes('--check')) {
   // unref'd, so the process ends by itself once the loop drains.
   process.exitCode = v.verdict === 'behind' || v.verdict === 'unreachable' ? 1 : 0
 } else {
-  if (args.length > 0) {
+  if (args.length > 0 && !lockedByCaller) {
     console.error('usage: node scripts/board-publish.mjs [--check | --url]')
     process.exit(1)
   }
-  publish()
+  if (lockedByCaller) {
+    if (!parentHoldsBoardEditLock()) {
+      console.error(
+        'board-publish: --locked claims the caller holds the board edit lock, and this process is not ' +
+          'its child. Run node scripts/board-publish.mjs without the flag — it takes the lock itself.',
+      )
+      process.exit(1)
+    }
+    publish()
+  }
+  else {
+    try {
+      // The lock-owning parent stays alive while the publishing child runs.
+      // `publish()` has deliberate `process.exit(1)` failure paths; running it
+      // in the owner process would skip the lock's finally/release and leave a
+      // live-pid lock wedged for the rest of this process.
+      withBoardEditLock(() => execFileSync(process.execPath, [process.argv[1], '--locked'], {
+        windowsHide: true,
+        cwd: REPO_ROOT,
+        stdio: 'inherit',
+      }))
+    } catch (error) {
+      if (Number.isInteger(error?.status)) process.exitCode = error.status || 1
+      else {
+        console.error(`board-publish FAILED — serialized publish could not run: ${error?.message ?? error}`)
+        process.exitCode = 1
+      }
+    }
+  }
 }
 
 // ---- publish --------------------------------------------------------------
@@ -177,11 +228,24 @@ const fail = (reason) => {
   process.exit(1)
 }
 
+  const original = readFileSync(boardFile, 'utf8')
+  const tasksText = readFileSync(tasksPath, 'utf8')
+  const { open } = parseTasks(tasksText)
+  let repoBytes = original
+
+  try {
+    repoBytes = projectNowForPublish(repoBytes, gatherActiveWorkSource({ tasksText }), {
+      knownPoints: openPointNumbers(tasksText),
+    }).html
+  } catch (e) {
+    console.error(`board-publish REFUSED — the derived now-section could not be rendered (${e.message}).`)
+    console.error('No publication beats a knowingly false board. Reconcile the active-work source and retry publish.')
+    process.exit(1)
+  }
+
 // The footer's date and open-point count are derived, not typed — same parse as
 // the audit, so the two cannot disagree.
 try {
-  const html = readFileSync(boardFile, 'utf8')
-  const { open } = parseTasks(readFileSync(tasksPath, 'utf8'))
   // LF-NORMALISED HERE TOO (point 439). This is the last write before the bytes
   // go out, so whatever wrote the file before — a hand edit in Windows text mode
   // included — the published board and the local one agree on their newlines,
@@ -206,28 +270,33 @@ try {
   const refreshed = normaliseLineEndings(
     renderCardCriticalities(
       withDerivedState(
-        upgradeNowCards(applyFooterNote(refreshFooter(html, { openCount: open.length }), share)),
+        upgradeNowCards(applyFooterNote(refreshFooter(repoBytes, { openCount: open.length }), share)),
       ),
       readTasksAll(),
     ),
   )
-  if (refreshed !== html) {
-    // Atomic (point 443, four-eyes F3) — and this one writes the very file the
-    // next lines read, hash and push to the public page.
-    writeTextAtomic(boardFile, refreshed)
-    console.log(`footer refreshed: ${open.length} open point(s)`)
-    if (upgradeNowCards(html) !== html) console.log('current-work card(s) lifted into the numbered chip')
-  }
+  repoBytes = refreshed
 } catch (e) {
   // A publish must never be blocked by the footer; the audit still catches a
   // stale one, and saying why beats failing silently.
   console.error(`board-publish: footer not refreshed (${e.message})`)
 }
 
+if (repoBytes !== original) {
+  // Atomic (point 443, four-eyes F3) — and this one writes the very file the
+  // next lines read, hash and push to the public page.
+  writeTextAtomic(boardFile, repoBytes)
+  if (repoBytes !== original && repoBytes.includes('data-state="stub"') && !original.includes('data-state="stub"')) {
+    console.log('current-work section reconciled to the active-work record')
+  }
+  if (repoBytes !== original) console.log(`footer refreshed: ${open.length} open point(s)`)
+  if (upgradeNowCards(original) !== original) console.log('current-work card(s) lifted into the numbered chip')
+}
+
 // ONE read of the board from here on: the gates below, the bytes that go out and
 // the hash that is recorded must all be the SAME bytes, or a gate passes on one
 // version while another is published.
-const repoBytes = readFileSync(boardFile, 'utf8')
+repoBytes = readFileSync(boardFile, 'utf8')
 
 // STRUCTURE BEFORE PUBLISH: a malformed board must not be publishable at all.
 // The gate sits before the bytes leave, exactly as in dashboard-publish.mjs —
@@ -252,7 +321,7 @@ if (!fingerprint) fail('the work order could not be read, so the page would carr
 // deadlock: editing the board is never blocked by any gate, and the deny that
 // asks for a publish fires at most once per turn.
 let openPoints = []
-try { openPoints = parseTasks(readFileSync(tasksPath, 'utf8')).open } catch { /* judged unreadable above */ }
+try { openPoints = open } catch { /* judged unreadable above */ }
 const uncovered = boardMissingPoints(repoBytes, openPoints)
 if (uncovered.length) {
   console.error(`board-publish REFUSED — the board does not show open point(s) ${uncovered.join(', ')}.`)
@@ -275,7 +344,7 @@ if (uncovered.length) {
 // second time. Reported, never refused: the board must stay publishable, the
 // session must simply not be able to publish these unknowingly.
 try {
-  const report = boardTitleReport(repoBytes, parseTaskTitles(readFileSync(tasksPath, 'utf8')))
+  const report = boardTitleReport(repoBytes, parseTaskTitles(tasksText))
   if (report.untranslated.length) {
     console.error(`board-publish: point(s) ${report.untranslated.join(', ')} still carry the ENGLISH work-order`)
     console.error(`  headline as their card title. Give them German ones: ${TITLE_CMD}`)

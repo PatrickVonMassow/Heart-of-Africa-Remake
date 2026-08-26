@@ -68,6 +68,9 @@ import {
   openPointSpecs,
   waitEtaRefusal,
   openBranchSlots,
+  pointOfBranch,
+  withRecordedEvidencePoint,
+  unattributableEvidenceAlerts,
   parseCommissionRecord,
   COMMISSION_RECORD_PATH,
   IN_FLIGHT_MAX_AGE_MS,
@@ -76,20 +79,39 @@ import {
 } from './batch-in-flight-core.mjs'
 import { readTasksOpen, TASKS_PATH } from './tasks-source.mjs'
 import { durableBlock } from './batch-adoption-core.mjs'
-import { boardFilePath } from './dashboard-state.mjs'
+import { boardFilePath, FOCUS_PATH, readJson } from './dashboard-state.mjs'
 import { berlinMinutes } from './dashboard-guard.mjs'
 import { emitActivity } from './batch-activity-journal.mjs'
 import { ACTIVITY_EVENTS } from './batch-activity-journal-core.mjs'
 
 export { IN_FLIGHT_PATH }
 
+/**
+ * The point a delegated activity event belongs to — READ, never re-derived
+ * (sixth cross-vendor round). This used to run its own regex over the ref or
+ * path, so a declaration that recorded 713 could emit its start and finish
+ * events under a different number, or under none at all when the evidence
+ * named no digits. The mapping is written down at every write path; the exit
+ * and the journal both read that one record.
+ */
 function delegatedPoint(declaration) {
-  for (const item of declaration?.evidence ?? []) {
-    const value = item?.ref ?? item?.path ?? ''
-    const match = String(value).match(/(?:^|[/\\-])(?:feat[/\\-])?(\d+)(?:[-/\\]|$)/)
-    if (match) return Number(match[1])
-  }
-  return null
+  const evidence = declaration?.evidence ?? []
+  // THE EVENT NAMES THE STRAND IT FIRES ON (eighth cross-vendor round), AND
+  // ONLY WHEN THE STRANDS AGREE (ninth): `emitDelegated` fires on branch and
+  // worktree evidence, so a pid or log item — which carries the OWNER's focus
+  // point — must never decide the event's point just by standing first. The
+  // strands are the only items asked, and they have to answer with ONE point:
+  // an unnumbered strand beside a numbered one, or two strands naming
+  // different points, is an attribution nobody recorded, and guessing it
+  // stamps a delegate's start and finish under a number it never worked. The
+  // ordinary shape — one branch plus its own worktree — names one point and is
+  // unaffected.
+  const strands = evidence.filter((item) => item?.kind === 'branch' || item?.kind === 'worktree')
+  if (strands.length === 0) return null
+  const points = new Set(
+    strands.map((item) => (Number.isInteger(item?.point) && item.point > 0 ? item.point : null)),
+  )
+  return points.size === 1 ? [...points][0] : null
 }
 
 function emitDelegated(event, declaration, { at = Date.now(), result = null } = {}) {
@@ -143,6 +165,38 @@ export function clearDeclaration(path = IN_FLIGHT_PATH) {
   } catch {
     return false
   }
+}
+
+/**
+ * Stamp one newly-declared evidence item with the point the board projects.
+ *
+ * A DECLARED point wins over the branch name, and a contradiction between them
+ * is REFUSED (sixth cross-vendor round): `--point 713 --branch feat/999-work`
+ * silently recorded 999, while the CLI's own message told the caller to put
+ * `--point` before the item. A branch name is a GUESS about which point the
+ * work belongs to; `--point` is a STATEMENT of it, and where the two disagree
+ * only the declaring human knows which was meant.
+ *
+ * The OWNER FOCUS is not such a statement, so it keeps yielding to the name:
+ * that is how one session declares several strands at once — the focus names
+ * the session's own point, and each delegated branch or worktree names its own.
+ * `declared` is what tells the two sources apart.
+ */
+export function tagEvidencePoint(
+  item,
+  { currentPoint = null, declared = false, worktreeRef = null, phase = 'authoring' } = {},
+) {
+  const raw = Number(currentPoint)
+  const stated = Number.isInteger(raw) && raw > 0 ? raw : null
+  const named = item?.ref ?? worktreeRef ?? null
+  const derived = pointOfBranch(named)
+  if (declared && stated != null && derived != null && derived !== stated) {
+    throw new Error(
+      `the declared point ${stated} and "${named}" — which names point ${derived} — disagree. ` +
+        'Declare one point for this item: drop the --point, or name evidence that belongs to it.',
+    )
+  }
+  return { ...item, point: declared ? stated ?? derived : derived ?? stated, phase }
 }
 
 // --- The probes ----------------------------------------------------------------
@@ -1149,7 +1203,16 @@ export function gatherHandoverTransfer(sid, { cwd = REPO_ROOT, lockPath = LOCK_P
     note: `the declared in-flight work is transferable (${summary})`,
     commit: () => {
       writeDeclaration(
-        markTransferred({ declaration, bySid: sid, now, checkpoints: assessment.checkpoints, runs: assessment.runs }),
+        markTransferred({
+          declaration,
+          bySid: sid,
+          now,
+          checkpoints: assessment.checkpoints,
+          runs: assessment.runs,
+          // The transfer is a write, so it migrates (sixth cross-review): a
+          // legacy item leaves with its resolved point RECORDED.
+          worktreeRef: (p) => worktreeBranch(p, { cwd }),
+        }),
         path,
       )
       return summary
@@ -1326,13 +1389,39 @@ export function adoptTransferred(
   const assessment = adoptionAssessment({ items, checkpointStates })
   if (!assessment.adopt) return { adopted: false, reason: 'refused', alerts: assessment.alerts }
   const lock = readOwnerLock(lockPath)
+  // Adoption is a WRITE, so it migrates: a legacy item that still resolves
+  // gets its point RECORDED here, and the legacy form does not survive the
+  // handover (fifth cross-vendor round — the assignment is written down,
+  // never re-guessed at the exit).
+  const worktreeRef = (p) => worktreeBranch(p, { cwd })
+  const keptEvidence = evidence
+    .filter((_, i) => items[i]?.ok === true)
+    .map((e) => withRecordedEvidencePoint(e, { worktreeRef }))
+  // A kept item that stays unattributable after the migration REFUSES the
+  // adoption BEFORE anything is written (seventh cross-review): the sixth
+  // round only said it out loud beside `adopted: true`, so the CLI printed
+  // ADOPTED and exited 0 while the read side discarded the whole record one
+  // look later. Nothing is stripped here either — the item may be the only
+  // trace of running work, so a human attributes or clears it, exactly as
+  // the alert says.
+  const unattributable = unattributableEvidenceAlerts(keptEvidence, {
+    worktreeRef,
+    declarationPhase: declaration.phase,
+  })
+  if (unattributable.length > 0) {
+    return {
+      adopted: false,
+      reason: 'unattributable-evidence',
+      alerts: [...assessment.alerts, ...unattributable],
+    }
+  }
   const adopted = {
     ...declaration,
     sessionId: sid,
     pid: typeof lock?.pid === 'number' ? lock.pid : null,
     pidStartedAt: typeof lock?.pidStartedAt === 'number' ? lock.pidStartedAt : null,
     at: now,
-    evidence: evidence.filter((_, i) => items[i]?.ok === true),
+    evidence: keptEvidence,
     adopted: { from: declaration.transfer.by || declaration.sessionId || null, at: now },
   }
   writeDeclaration(adopted, path)
@@ -1401,7 +1490,7 @@ if (isMain) {
     process.exit(1)
   }
   const usage =
-    'usage: node scripts/batch-in-flight.mjs --waiting-on "<what>" [--pid N] [--branch REF] ' +
+    'usage: node scripts/batch-in-flight.mjs --waiting-on "<what>" [--point N] [--pid N] [--branch REF] ' +
     '[--worktree PATH] [--log PATH] [--slots-free "<why the free pool slots stay free>"] ' +
     '[--durable-batch ID --durable-point ID --durable-attempt ID [--transferable]] | --status | --clear | ' +
     '--agent-check [--worktree PATH]… [--branch REF]… [--log PATH]… | --handover-check | --adopt'
@@ -1432,6 +1521,15 @@ if (isMain) {
       // denies exactly that.
       if (a.reason === 'own-commit' || a.reason === 'own-transfer' || a.reason === 'sealed-commit') {
         fail('ADOPTION REFUSED — this record is not this session\'s to adopt; see the alert above for the way forward.')
+      }
+      if (a.reason === 'unattributable-evidence') {
+        fail(
+          'ADOPTION REFUSED — the transferred declaration carries live evidence that resolves to NO point ' +
+            '(named above), and adopting it would only move the refusal to the next read. LOOK at each named ' +
+            'item yourself; then clear the record (`node scripts/batch-in-flight.mjs --clear`, withdrawing the ' +
+            'boundary first if it refuses) and RE-DECLARE what is really running with its point ' +
+            '(`--waiting-on "…" --point N …`). Nothing was adopted, nothing written.',
+        )
       }
       fail(
         a.reason === 'no-transferred-declaration'
@@ -1533,61 +1631,97 @@ if (isMain) {
     if (commitRefusal) fail(commitRefusal)
     const evidence = []
     let slotsFreeReason = ''
+    const focus = readJson(FOCUS_PATH)
+    const ownerFocusPoint = Number.isInteger(focus?.point) && focus.point > 0 ? focus.point : null
+    let currentPoint = ownerFocusPoint
+    let pointDeclared = false
     // The durable-lane adoption record (point 834, union M17): stable batch,
     // point and attempt identities plus an explicit transferable flag. The
     // block is all-or-nothing; batch-adoption-core refuses half of one.
     const durableFields = {}
     let transferableFlag = null
-    for (let i = 2; i < argv.length; i += 2) {
-      const flag = argv[i]
-      if (flag === '--transferable') {
-        // A bare flag: it consumes no value, so step back by one.
-        transferableFlag = true
-        i -= 1
-        continue
-      }
-      const value = argv[i + 1]
-      if (value === undefined) fail(`${flag} needs a value.\n${usage}`)
-      if (flag === '--durable-batch' || flag === '--durable-point' || flag === '--durable-attempt') {
-        durableFields[flag.slice('--durable-'.length)] = String(value).trim()
-        continue
-      }
-      if (flag === '--slots-free') {
-        // Point 427: not evidence, a REASON. It answers "why do the free pool slots
-        // stay free", and the guard demands it only when they demonstrably could not.
-        slotsFreeReason = String(value).trim()
-        if (!slotsFreeReason) fail(`--slots-free needs a reason for the idle pool slots.\n${usage}`)
-        continue
-      }
-      if (flag === '--pid') {
-        // The start time is recorded WITH the pid, so a later probe can tell the
-        // same process from a stranger that inherited the number.
-        const pid = Number(value)
-        const probe = Number.isInteger(pid) && pid > 0 ? probePid(pid) : { exists: false, startedAt: null }
-        if (probe.exists === true && typeof probe.startedAt !== 'number') {
-          fail(
-            `the start time of pid ${pid} could not be established, so a reused pid could later pass as this ` +
-              'process. Declare something else instead (--log <the file the run writes to> is the closest ' +
-              'equivalent). Nothing recorded.',
-          )
+    // A refused ATTRIBUTION is a refused declaration, not a stack trace: the
+    // stamping throws when the declared point and the named branch disagree,
+    // and the caller gets the same one-line refusal every other bad option
+    // gets, with nothing written.
+    try {
+      for (let i = 2; i < argv.length; i += 2) {
+        const flag = argv[i]
+        if (flag === '--transferable') {
+          // A bare flag: it consumes no value, so step back by one.
+          transferableFlag = true
+          i -= 1
+          continue
         }
-        evidence.push({ kind: 'pid', pid, startedAt: probe.startedAt })
+        const value = argv[i + 1]
+        if (value === undefined) fail(`${flag} needs a value.\n${usage}`)
+        if (flag === '--point') {
+          const point = Number(value)
+          if (!Number.isInteger(point) || point <= 0) fail(`--point needs a positive work-order point, got "${value}".\n${usage}`)
+          currentPoint = point
+          pointDeclared = true
+          continue
+        }
+        if (flag === '--durable-batch' || flag === '--durable-point' || flag === '--durable-attempt') {
+          durableFields[flag.slice('--durable-'.length)] = String(value).trim()
+          continue
+        }
+        if (flag === '--slots-free') {
+          // Point 427: not evidence, a REASON. It answers "why do the free pool slots
+          // stay free", and the guard demands it only when they demonstrably could not.
+          slotsFreeReason = String(value).trim()
+          if (!slotsFreeReason) fail(`--slots-free needs a reason for the idle pool slots.\n${usage}`)
+          continue
+        }
+        if (flag === '--pid') {
+          // The start time is recorded WITH the pid, so a later probe can tell the
+          // same process from a stranger that inherited the number.
+          const pid = Number(value)
+          const probe = Number.isInteger(pid) && pid > 0 ? probePid(pid) : { exists: false, startedAt: null }
+          if (probe.exists === true && typeof probe.startedAt !== 'number') {
+            fail(
+              `the start time of pid ${pid} could not be established, so a reused pid could later pass as this ` +
+                'process. Declare something else instead (--log <the file the run writes to> is the closest ' +
+                'equivalent). Nothing recorded.',
+            )
+          }
+          evidence.push(tagEvidencePoint({ kind: 'pid', pid, startedAt: probe.startedAt }, { currentPoint, declared: pointDeclared, phase: 'verification' }))
+        }
+        // WHAT IS STORED IS WHAT THE LAUNCHER WILL PROBE (second four-eyes review,
+        // 28.07.2026, finding B). Both of the following used to be recorded raw:
+        //   - a REF, so `@`, `heads/main` and `main@{0}` — every one of them a
+        //     spelling of something eternally fresh — walked past the refusal below
+        //     and then answered "still moving" forever. Git resolves it, git's
+        //     answer is what gets refused, and git's answer is what gets stored.
+        //   - a PATH, which `normPath` only cleans up and never RESOLVES, so
+        //     `--worktree .` from the repo root, `<root>/.` and `<root>/../hoa` all
+        //     named the checkout itself without being recognised as it. And a
+        //     relative path is meaningless to the launcher anyway: it probes from
+        //     its own cwd, not from the one the declaration was written in.
+        else if (flag === '--branch') {
+          const ref = resolveRefName(value) ?? value
+          evidence.push(tagEvidencePoint({ kind: 'branch', ref }, { currentPoint, declared: pointDeclared }))
+        }
+        else if (flag === '--worktree') {
+          const path = absPath(value)
+          const ref = worktreeBranch(path)
+          evidence.push(tagEvidencePoint({ kind: 'worktree', path }, { currentPoint, declared: pointDeclared, worktreeRef: ref }))
+        }
+        else if (flag === '--log') {
+          evidence.push(tagEvidencePoint({ kind: 'log', path: absPath(value) }, { currentPoint, declared: pointDeclared, phase: 'verification' }))
+        }
+        else fail(`unknown option "${flag}".\n${usage}`)
       }
-      // WHAT IS STORED IS WHAT THE LAUNCHER WILL PROBE (second four-eyes review,
-      // 28.07.2026, finding B). Both of the following used to be recorded raw:
-      //   - a REF, so `@`, `heads/main` and `main@{0}` — every one of them a
-      //     spelling of something eternally fresh — walked past the refusal below
-      //     and then answered "still moving" forever. Git resolves it, git's
-      //     answer is what gets refused, and git's answer is what gets stored.
-      //   - a PATH, which `normPath` only cleans up and never RESOLVES, so
-      //     `--worktree .` from the repo root, `<root>/.` and `<root>/../hoa` all
-      //     named the checkout itself without being recognised as it. And a
-      //     relative path is meaningless to the launcher anyway: it probes from
-      //     its own cwd, not from the one the declaration was written in.
-      else if (flag === '--branch') evidence.push({ kind: 'branch', ref: resolveRefName(value) ?? value })
-      else if (flag === '--worktree') evidence.push({ kind: 'worktree', path: absPath(value) })
-      else if (flag === '--log') evidence.push({ kind: 'log', path: absPath(value) })
-      else fail(`unknown option "${flag}".\n${usage}`)
+    } catch (e) {
+      fail(`${e.message}\nNothing recorded.`)
+    }
+    const untagged = evidence.filter((item) => !Number.isInteger(item.point) || item.point <= 0)
+    if (untagged.length) {
+      fail(
+        `${untagged.length} evidence item(s) name no point, so the board could not derive which now-card they ` +
+          'require. Declare the owner focus first (`node scripts/focus.mjs set <N> "<what>"`) or put `--point <N>` ' +
+          'before the item. Nothing recorded.',
+      )
     }
     // Evidence that cannot go quiet is refused HERE (four-eyes review
     // 28.07.2026): the repo root is git-active whenever the session runs any git
@@ -1657,6 +1791,7 @@ if (isMain) {
       pidStartedAt: typeof lock.pidStartedAt === 'number' ? lock.pidStartedAt : null,
       at: now,
       waitingOn,
+      focusPoint: ownerFocusPoint,
       evidence,
       // Empty string when not given, so the decision sees "no reason" rather than
       // an absent field it has to interpret (point 427).

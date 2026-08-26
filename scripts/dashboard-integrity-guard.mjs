@@ -17,12 +17,13 @@
 import { readFileSync, existsSync } from 'node:fs'
 import { execSync } from 'node:child_process'
 import { resolve } from 'node:path'
-import { REPO_ROOT, STATE_PATH, FOCUS_PATH, readJson } from './dashboard-state.mjs'
+import { REPO_ROOT, STATE_PATH, readJson } from './dashboard-state.mjs'
 import { evaluate, RECENT_COMMIT_COUNT } from './dashboard-integrity-guard-core.mjs'
 import { heldByOtherLiveOwner } from './batch-singleton.mjs'
 import { readTasksAll } from './tasks-source.mjs'
 import { isMainModule } from './is-main.mjs'
 import { CAUSE } from './guard-preflight-core.mjs'
+import { gatherActiveWorkSource } from './active-work-source.mjs'
 
 const TASKS = resolve(REPO_ROOT, 'TASKS.md')
 const DASHBOARD = resolve(REPO_ROOT, '.batch-dashboard.html')
@@ -69,7 +70,6 @@ export function gatherDashboardIntegrityInputs({ sessionId = '' } = {}) {
   // No board yet — dashboard-guard owns that case.
   if (!existsSync(DASHBOARD)) return { applicable: false, why: 'no dashboard file in this checkout' }
 
-  const focus = readJson(FOCUS_PATH)
   const state = readJson(STATE_PATH)
 
   // Commit testimony covers ONLY the stretch since the last attested --synced
@@ -82,12 +82,19 @@ export function gatherDashboardIntegrityInputs({ sessionId = '' } = {}) {
     ? git(`log -n ${RECENT_COMMIT_COUNT} --format=%s ${reviewedHead}..HEAD`).split('\n').filter(Boolean)
     : []
 
+  const tasksMd = readTasksAll(TASKS)
+  // ONE reading of the focus point, not two (ninth round, pass 8): the second,
+  // lenient one that stood here answered the same for every input AND carried
+  // the fail-open pass 1 closed in `gatherActiveWorkSource` — a malformed point
+  // read as "no focus". The gathered source validates it once, for both checks.
+  const activeWork = gatherActiveWorkSource({ tasksText: tasksMd })
   return {
     applicable: true,
     inputs: {
       dashboardHtml: readFileSync(DASHBOARD, 'utf8'),
-      tasksMd: readTasksAll(TASKS),
-      focusPoint: focus && Number.isInteger(focus.point) ? focus.point : null,
+      tasksMd,
+      activeWork,
+      focusPoint: activeWork.focusPoint ?? null,
       commitSubjects,
       touchedFiles: touchedFiles(),
       snapshots: state && state.integritySnapshots ? state.integritySnapshots : null,
