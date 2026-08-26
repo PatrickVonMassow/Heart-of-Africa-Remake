@@ -144,16 +144,6 @@ jede Änderung braucht die volle Batterie — sonst wird Testen umgangen. Bewäh
 
 Die Ursache findest du durch **Zerlegen**, nicht durch Wiederholen.
 
-Und ein Test ist nur so echt wie das, wogegen er läuft. Prüft er eine Datei, die es im
-Projekt wirklich gibt, dann **leite die Testdaten aus dieser Datei ab** — bau sie nicht aus
-dem Gedächtnis nach. Ein Nachbau prüft nicht das Ding, sondern die Vorstellung davon, und er
-wird zuverlässig grün, weil beide aus demselben Kopf stammen.
-
-> *Prompt:* „Wo ein Test gegen ein Artefakt läuft, das im Repository liegt, leite die
-> Testdaten aus der echten Datei ab statt sie nachzubauen. Und sichere zu, dass der Lauf
-> **wiederholbar dasselbe** ergibt und den Anfang der Datei unverändert lässt."
-
-
 ---
 
 ## Die häufigsten Fallstricke → und was hilft
@@ -163,7 +153,9 @@ wird zuverlässig grün, weil beide aus demselben Kopf stammen.
   → *Prompt:* „Eine sichtbare Änderung ist erst fertig, wenn sie am **echten gerenderten Bild**
   unter einer erreichbaren Bedingung geprüft wurde. Zu jeder Prüfung: **Welche Zeile ruft die
   Sache auf — und was bliebe grün, wenn sie völlig kaputt wäre?** Vergehende Zeit darf ein Test
-  abkürzen, den **Aufruf** nie.“ *(≈ 1,5x.)* *(Sieht das richtig aus?)*
+  abkürzen, den **Aufruf** nie. Und wo die Prüfung gegen eine Datei läuft, die es im Projekt
+  wirklich gibt, **leite die Testdaten aus ihr ab, statt sie nachzubauen** — ein Nachbau prüft
+  die Vorstellung davon und wird zuverlässig grün.“ *(≈ 1,5x.)* *(Sieht das richtig aus?)*
 - **Neue Features zerbrechen alte.** Eine Änderung repariert X und bricht das unbeobachtete Y.
   → *Prompt:* „Etabliere einen Mechanismus, der jede Mechanik auch im **Danach-Zustand** prüft und
   nach jedem Zusammenführen die schnelle Testschicht erzwingt. Bau ‚Invarianten' ein, die im

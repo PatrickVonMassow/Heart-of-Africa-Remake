@@ -139,7 +139,12 @@ export const LIMITS = {
   // sie gerade gebaut hat", which already carries the self-unblocking gate, and the fold paid for
   // itself: the entry came back under its own 4-line risk budget and the file is one line and
   // eleven words SHORTER than before. The ceilings follow the measurement down, as the rule says.
-  maxLines: 465,
+  // RAISED 26.08.2026 by exactly the measured size of one genuinely new tip (§3.184): a fixture
+  // rebuilt from memory instead of derived from the real file passed twice while the live board
+  // took a different branch each time. It was FOLDED into "Grüner Test, falsches Bild", which
+  // already carries the green-over-a-proxy defect, rather than opening a sixth neighbour — two
+  // lines and thirty-four words for a defect class that costs a full review round each time.
+  maxLines: 467,
   // EXACT FIT, not headroom — corrected 30.07.2026 after the four-eyes review
   // pointed out that this comment had long stopped describing the numbers. The
   // rule above ("raised only by the measured size of genuinely new tips")
@@ -306,7 +311,9 @@ export const LIMITS = {
   // were tightened in the same pass. The guide measures 465 / 4162 afterwards, so
   // BOTH ceilings RATCHET DOWN — the line ceiling by five, the word ceiling by
   // eighteen.
-  maxWords: 4162,
+  // 26.08.2026: the folded fixture-derivation clause above measures 4196, so the word ceiling
+  // follows the measurement UP by thirty-four — the raise the same entry justifies, no headroom.
+  maxWords: 4196,
   // A pitfall entry = the risk lines plus its prompt. Anything longer is a
   // story, not a tip.
   maxEntryLines: 11,
