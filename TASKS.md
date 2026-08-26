@@ -12022,3 +12022,71 @@ to land than a mechanism that needs a review.
   Criticality: medium-high — the fence is the one mechanism that stops a session from starting new
   work past the watermark, and this session ran to 272k tokens with it observing.
   Bundle: Session- & Repo-Hygiene.
+
+- [ ] 933. A commit subject naming a review pass index goes stale the moment the split is recut
+  (measured 26.08.2026 during the ninth cross-vendor round on point 713). `review-sol.mjs` recuts
+  the pass split over the END-STATE file set on every invocation, so the SAME file set was pass 6,
+  then pass 2, then pass 3 inside one round — and the round itself went from 7 runnable passes to
+  8 while it ran, because one commit changed which files were owed. Commits written as "Record the
+  pass-N verdict of the Mth round" therefore disagree with the structured `pass.index` in
+  `.claude/mechanism-reviews.jsonl` as soon as the split moves. The ninth round's own reviewer read
+  that disagreement as an internally inconsistent audit record and raised it as a finding, which
+  cost a round to decline: the structured record is right, the subject is accurate history, and
+  rebasing reviewed commits to make a label agree with a number that is temporary by construction
+  is worse than the mismatch.
+  FINAL STATE:
+  - A COMMIT THAT RECORDS A VERDICT NAMES WHAT WAS REVIEWED — the files or the mechanism — never
+    the pass number. The convention is written where the author reads it: the `review-sol.mjs`
+    usage text that prints the record command, and `scripts/verify/README.md`.
+  - THE PRINTED RECORD COMMAND CARRIES ITS OWN WARNING, one line, where the pass index appears:
+    the index is a cut of the moment, the file list is what identifies the round.
+  - EXISTING SUBJECTS ARE NOT REWRITTEN, and the reason is stated once so the next reviewer does
+    not raise it a third time.
+  VERIFIABLE: Vitest over whatever core prints the record command (the warning is present and
+  names the file list as the identifying half); a doc test or a grep-level assertion that the
+  convention stands in the README. No behaviour of the review split changes.
+  Criticality: low — it costs no correctness, but it has now cost one review round of a
+  cross-vendor budget, and it will cost the next one the same way.
+  Bundle: Session- & Repo-Hygiene.
+
+- [ ] 934. The dependency mechanism is built as the smaller core Sol's review prescribes, not as
+  proposed (cross-vendor four-eyes review 26.08.2026 ~10:03, GPT-5.6 Sol at effort high, codex
+  session 01a03d16-3273-7d12-be55-5b3d0dcd56a3, on the four-layer proposal: `Needs`/`Serie`
+  notation in TASKS.md, guard enforcement, ripeness alarm, dashboard chips). VERDICT:
+  DO-NOT-BUILD in that shape — 4 blockers, 7 major, 1 minor.
+  THE FOUR BLOCKERS, which the built shape must answer:
+  - `Needs` CONFLATES THREE THINGS — queue order, UI blocking, and completion readiness. It is
+    defined as ONE relation: "must be satisfied before this point may close or activate". Order
+    and grey-out are PROJECTIONS of that relation, never its definition.
+  - CLOSED IS NOT SATISFIED. A cancelled, folded or superseded prerequisite would read as ripe.
+    Edges resolve across the archive with explicit states — satisfied, superseded, cancelled,
+    waived.
+  - DELETING AN EDGE DEFEATS EVERY GUARD. A change to a point's dependency set is itself a
+    guarded, audited decision, not an ordinary edit.
+  - SPLIT, FOLD, ARCHIVE AND BUNDLE LACK GRAPH TRANSACTIONS: an umbrella point stays unsatisfied
+    until its children are, a fold leaves a stable alias, and every TASKS mutation validates the
+    whole graph rather than the touched line.
+  MAJORS TO CARRY: the notation may not be optional (`Needs: none` is required on a new point,
+  legacy silence reads as unknown, never as none); `Serie k/n` ordinals duplicate the graph and are
+  derived or presentation-only; ORDERING ALONE DOES NOT PREVENT THE 925 INCIDENT — a ripe
+  activation must enter the decision-card workflow immediately, with age only escalating it;
+  validation runs at creation and at merge, not only on reorder; one activation record keyed by
+  carrier plus feature stops the alarm and the card from double-firing; and waiving or cutting an
+  edge needs a named authority.
+  FINAL STATE — THE SMALLER CORE (the review's own finding 12), and nothing beyond it: `Needs`
+  satisfaction semantics, an activation-carrier field with a stable feature id, lifecycle
+  validation across the archive, and a projection into the parking decision card that is already
+  commissioned plus the dashboard. Series ordinals and a separate auto-card layer are DEFERRED and
+  named as deferred.
+  CAVEAT RECORDED WITH THE REVIEW: Sol could not read the repository (bwrap namespace refusal in
+  the container), so this verdict is prompt-only. A repo-backed re-verification is OWED when the
+  point is specced out, and its result is written into the point before any code is written.
+  VERIFIABLE: Vitest over the satisfaction core — a cancelled and a superseded prerequisite do NOT
+  read as satisfied, an umbrella stays unsatisfied while a child is open, a folded point resolves
+  through its alias, a legacy point without notation reads unknown rather than none, and a ripe
+  carrier yields exactly one activation record. Plus the repo-backed re-verification as recorded
+  evidence.
+  Criticality: medium-high — it is the mechanism that was supposed to stop the 925 class of
+  incident, and the proposed shape would have shipped four ways to be wrong about what "done"
+  means.
+  Bundle: Session- & Repo-Hygiene.
