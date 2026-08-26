@@ -144,6 +144,24 @@ jede Änderung braucht die volle Batterie — sonst wird Testen umgangen. Bewäh
 
 Die Ursache findest du durch **Zerlegen**, nicht durch Wiederholen.
 
+Und die Falle, die teurer ist als jeder rote Test: **ein Test, der seinen Gegenstand gar nicht
+mehr berührt — und trotzdem grün meldet.** Er entsteht beiläufig: Der Test baut sich das zu
+Prüfende als Kopie nach, statt es aus der echten Quelle zu holen; er löst einen Pfad falsch auf
+und liest am Ende das echte Projekt statt seiner Wegwerf-Kulisse; oder eine Stufe der Prüfkette
+wird übersprungen und die Freigabe meldet trotzdem grün. In allen drei Fällen schweigt niemand —
+es wird weiter gemeldet, und genau der Bereich, für den du den Test angeschafft hast, ist
+zugedeckt.
+
+> *Prompt:* „Stelle sicher, dass jeder Test seinen Gegenstand aus **derselben Quelle** bezieht,
+> aus der der Gegenstand im echten Betrieb entsteht — keine nachgebaute Kopie, keine zweite
+> Abschrift einer Regel; wo eine Kopie unvermeidlich ist, prüft ein eigener Fall, dass beide noch
+> übereinstimmen. Und sorge dafür, dass jede Prüfstufe berichtet, ob sie **gelaufen** ist, nicht
+> nur ob sie grün war: Grün ohne Ausführung ist kein Urteil, und **null geschaffte Prüfungen sind
+> ein lauteres Urteil als eine gerissene Prüfung**."
+
+Die Gegenprobe kostet eine Minute und lohnt sich immer: Mach den Code absichtlich kaputt, den der
+Test bewachen soll. Wird er nicht rot, bewacht er ihn nicht.
+
 ---
 
 ## Die häufigsten Fallstricke → und was hilft
@@ -470,4 +488,4 @@ Die Ursache findest du durch **Zerlegen**, nicht durch Wiederholen.
 
 Sie ersetzt die Fallstricke oben nicht.
 
-<!-- GUIDE-FINGERPRINT: 811618dac6abfb638932a1297f6dddadb71fad9abadbff3d51c3d90c8c247d94 -->
+<!-- GUIDE-FINGERPRINT: 5a0e5b580addfa9296490462c15e1f7c2ac159b60f97439044dfef787fcf481a -->

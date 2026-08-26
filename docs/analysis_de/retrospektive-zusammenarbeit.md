@@ -1384,7 +1384,7 @@ Punktgrenze. Gebucht als Punkt 916.
 
 ## Anhang A — Maschinell gepflegte Quellen-Übersicht
 
-Zuletzt aktualisiert: Mittwoch, 26.08.2026, 17:19 · Quellen-Fingerprint: `811618dac6ab…`
+Zuletzt aktualisiert: Mittwoch, 26.08.2026, 19:08 · Quellen-Fingerprint: `5a0e5b580add…`
 
 Spalten heuristisch aus den Quellen abgeleitet (Anläufe = distinkte Datumsnennungen im Memory;
 Maßnahme = Guard-Skripte mit Namens-Treffer). Die inhaltliche Bewertung gehört der Prosa oben.
@@ -1422,7 +1422,7 @@ Maßnahme = Guard-Skripte mit Namens-Treffer). Die inhaltliche Bewertung gehört
 | Work at High effort by default; the user reserves Extra high for research and design decisions, not implementation | 4 | hoch | — (Regel/Memory) | ◐ Regel |
 | Write idiomatic English in all English text (README, code comments, commit messages) — no German calques like 'stand' for a version | 1 | niedrig | — (Regel/Memory) | ◐ Regel |
 | Fable is NOT the default lane because its volume is the scarcest; difficulty is no reason for it either (since 18.08.2026 hard cases go straight to Sol), and review is cross-vendor, not Fable-by-default | 4 | hoch | — (Regel/Memory) | ◐ Regel |
-| Findings recorded by a session that could not write the work order — carry each into TASKS.md, then mark it drained | 26 | hoch | findings-guard.mjs | ✔ Mechanismus |
+| Findings recorded by a session that could not write the work order — carry each into TASKS.md, then mark it drained | 27 | hoch | findings-guard.mjs | ✔ Mechanismus |
 | A recurring lookup gets a script; never pull raw transcripts, listings, or logs into context to answer it | 1 | niedrig | — (Regel/Memory) | ◐ Regel |
 | Past the 150k context watermark, FINISH the step and hand over — never start a suite, an agent or a point after it; the user raised the cost twice (13.08. and 17.08.2026) | 2 | mittel | — (Regel/Memory) | ◐ Regel |
 | User 18.08.2026: hard, complex, error-prone and HIGH-criticality points are AUTHORED by GPT-5.6 Sol directly — Opus 5 authors only what is left, and Fable authors only a point that tags its lane or one the router escalates | 4 | hoch | — (Regel/Memory) | ◐ Regel |
@@ -1483,10 +1483,10 @@ Maßnahme = Guard-Skripte mit Namens-Treffer). Die inhaltliche Bewertung gehört
 | A pending batch claim HOLDS THE LAUNCHER BACK — withdraw it whenever the claiming window is left unattended | 2 | mittel | clear-claim-guard.mjs | ✔ Mechanismus |
 | Multi-agent workflows eat the session/weekly limit fast — verify findings INLINE, keep fan-outs small, warn the user with a cost estimate before any big workflow | 3 | mittel | doc-budget-guard.mjs | ✔ Mechanismus |
 
-Erfasste Quellen: 91 Feedback-/Projekt-Memories · 57 Guard-/Hook-Skripte · 6 Revert-/Reapply-Commits · 105 Prozess-/Meta-TASKS-Punkte (davon 46 offen).
+Erfasste Quellen: 91 Feedback-/Projekt-Memories · 57 Guard-/Hook-Skripte · 6 Revert-/Reapply-Commits · 106 Prozess-/Meta-TASKS-Punkte (davon 46 offen).
 
-<!-- RETRO-FINGERPRINT: 811618dac6abfb638932a1297f6dddadb71fad9abadbff3d51c3d90c8c247d94 -->
-<!-- RETRO-LAST-REFRESHED: 2026-08-26T15:19:36.999Z -->
+<!-- RETRO-FINGERPRINT: 5a0e5b580addfa9296490462c15e1f7c2ac159b60f97439044dfef787fcf481a -->
+<!-- RETRO-LAST-REFRESHED: 2026-08-26T17:08:08.623Z -->
 <!-- AUTO-GENERATED:END -->
 
 ### 3.111 Ein Erfolg ist kein Beweis für den Weg, auf dem er zustande kam
@@ -3965,3 +3965,35 @@ Zähler darf nur zählen, was tatsächlich versucht wurde. Weil diese Prüfung n
 gehört darunter eine unabhängige zweite Sicherung auf eigenem Zeitgeber, die nur eine Frage
 stellt: Steht die Batch, obwohl arbeitbare Punkte da sind — und alle Rettung versagt hat? Dann
 räumt sie auf und startet neu (Nutzer-Auftrag vom 26.08.2026, gefilet als Punkt 947).
+
+### 3.192 Das Messgerät hatte den Kontakt zu seinem Gegenstand verloren — und meldete weiter
+
+Eine einzige Sitzung förderte am 26.08.2026 fünf Befunde zutage, die auf den ersten Blick nichts
+miteinander zu tun haben und bei genauerem Hinsehen alle dieselbe Sache sind. Auf `main` scheiterte
+die Typprüfung der Testschicht, und weil die Prüfkette dort stehenbleibt, kam tagelang kein Punkt
+mehr zu seinen Suiten — die Landungen der Punkte, die die Fehler eingeschleppt hatten, hatten
+trotzdem grün gemeldet. Ein Modul leitete seinen Repositoriums-Pfad aus dem eigenen Dateiort ab,
+sodass eine Testkulisse im Wegwerf-Verzeichnis in Wahrheit den echten Arbeitsbaum las; die beiden
+Fälle waren vier Tage lang nur INNERHALB der Prüfkette rot und allein grün. Ein Schnitt in der
+Bauordnung nahm Zeilen heraus, nach denen die Dokumentations-Suite weiter suchte — ausgerechnet
+der Wächter, dessen Aufgabe es ist, genau diesen Schnitt zu verweigern, zerbrach an ihm und
+meldete fünf Tage lang sechs Regeln rot. Drei Prüf-Suiten warteten auf ein 90 MB grosses Modell aus
+dem Netz, und eine von ihnen starb dabei ohne jedes Urteil: kein Befund, keine Fehlerzeile, ein Rot,
+das über den Code nichts aussagte. Und die Suite, die den Umbruch im Kartenkopf des Bretts beweisen
+soll, stellt sich das Brett dafür aus einer handgeschriebenen Kopie des Stylesheets nach — sie
+bliebe grün, nachdem ihr Gegenstand weggezogen ist.
+
+Fünf verschiedene Mechanismen, ein Muster: Die Verbindung zwischen dem Prüfmittel und dem, was es
+prüfen soll, war durchtrennt — durch eine übersprungene Stufe, einen falsch aufgelösten Pfad, eine
+weggeschnittene Textgestalt, eine offene Netzanfrage, eine Kopie statt der Quelle. Keiner der fünf
+verstummte. Sie meldeten weiter, grün oder mit einem Rot ohne Aussage, und beides liest sich wie
+Arbeit. Das ist die teurere Hälfte: Ein Prüfmittel, das ausfällt und schweigt, wird bemerkt; eines,
+das ausfällt und weiterredet, deckt genau den Bereich zu, für den es angeschafft wurde.
+
+**Lehre:** Zwei Forderungen, und beide sind mechanisch prüfbar. Erstens bezieht ein Prüfmittel
+seinen Gegenstand aus derselben Quelle, aus der der Gegenstand entsteht — kein nachgebautes
+Stylesheet, kein aus dem eigenen Dateiort geratener Pfad, keine zweite Abschrift einer Regel; wo
+eine Abschrift unvermeidlich ist, prüft ein Fall, dass die beiden noch übereinstimmen. Zweitens
+muss jede Prüfstufe sagen können, ob sie GELAUFEN ist, und nicht nur, ob sie grün war: Grün ohne
+Ausführung ist kein Urteil, und null geschaffte Prüfungen sind ein LAUTERES Urteil als eine
+gerissene Prüfung, nicht ein leiseres. Gefilet als Punkte 948 bis 952.
