@@ -704,8 +704,8 @@
       "place": "last"
     },
     "925": {
-      "at": "2026-08-26T00:37:45.177Z",
-      "why": "Die dauerhafte Lane bleibt bis zu diesem Punkt abgeschaltet und blockiert nichts; Kommunikationsmechanik, Abschluss und Tag gehen vor.",
+      "at": "2026-08-26T07:23:47.399Z",
+      "why": "Nutzerentscheidung 26.08.2026 07:37: direkt hinter die laufenden Punkte, vor 686 — die Maschinen-Rangierung ans Ende war unsichtbar und ist damit ueberstimmt.",
       "origin": "machine",
       "place": "last"
     },
@@ -726,48 +726,28 @@
       "why": "Es haertet dieselben Board-Dateien wie 713 und darf nicht parallel dazu laufen; sinnvoll erst nach dessen Landung, also am Ende der Warteschlange.",
       "origin": "machine",
       "place": "last"
+    },
+    "930": {
+      "at": "2026-08-26T06:59:23.288Z",
+      "why": "Es kann erst nach der Landung von 713 gearbeitet werden und aendert dieselbe Render-Datei, also ist hinten richtig.",
+      "origin": "machine",
+      "place": "last"
+    },
+    "931": {
+      "at": "2026-08-26T07:24:48.111Z",
+      "why": "Beobachtungspunkt ohne Blocker; hinten ist richtig.",
+      "origin": "machine",
+      "place": "last"
+    },
+    "932": {
+      "at": "2026-08-26T07:24:48.189Z",
+      "why": "Der Zaun beobachtet weiter, waehrend er hinten steht; das Lesen des Beobachtungsprotokolls geht der Scharfstellung ohnehin voraus.",
+      "origin": "machine",
+      "place": "last"
     }
   },
-  "boundary": {
-    "at": "2026-08-21T00:55:14.962Z",
-    "points": [
-      336,
-      553,
-      581,
-      596,
-      633,
-      659,
-      660,
-      663,
-      686,
-      687,
-      688,
-      689,
-      690,
-      691,
-      692,
-      708,
-      713,
-      715,
-      719,
-      733,
-      734,
-      735,
-      736,
-      738,
-      739,
-      746,
-      747,
-      750,
-      759,
-      760,
-      762,
-      764
-    ],
-    "why": "The order standing in front of the release today is the arrangement that predates this rule; the four machine-filed points that had ranked themselves there were moved behind 174 first"
-  },
   "settled": {
-    "at": "2026-08-26T05:00:03.998Z",
+    "at": "2026-08-26T06:59:23.296Z",
     "points": [
       174,
       184,
@@ -1057,7 +1037,46 @@
       925,
       926,
       927,
-      929
+      929,
+      930
     ]
+  },
+  "boundary": {
+    "at": "2026-08-21T00:55:14.962Z",
+    "points": [
+      336,
+      553,
+      581,
+      596,
+      633,
+      659,
+      660,
+      663,
+      686,
+      687,
+      688,
+      689,
+      690,
+      691,
+      692,
+      708,
+      713,
+      715,
+      719,
+      733,
+      734,
+      735,
+      736,
+      738,
+      739,
+      746,
+      747,
+      750,
+      759,
+      760,
+      762,
+      764
+    ],
+    "why": "The order standing in front of the release today is the arrangement that predates this rule; the four machine-filed points that had ranked themselves there were moved behind 174 first"
   }
 }

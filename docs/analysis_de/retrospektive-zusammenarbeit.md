@@ -1251,6 +1251,31 @@ zweiten, auf den Rest geschnittenen Lauf oder durch eigenes Lesen. Was hier noch
 ist der Mechanismus: Solange die Abdeckung nur in der Prosa des Prüfers steht, hängt sie
 daran, dass jemand sie liest — und vier Runden lang hat das niemand getan.
 
+### 3.185 Ein Guard, der im falschen Baum misst, schickt die Reparatur an den falschen Ort
+
+Am 26.08.2026 blockierten drei Stop-Guards dieselbe Sitzung drei Züge lang, jedes Mal mit
+demselben Wortlaut: Die Tafel sei nicht registriert, eine Hintergrund-Suite laufe noch, der
+Batch dürfe nicht anhalten. Aus dem Hauptbaum aufgerufen antwortete jeder dieser Guards
+grün. Der Unterschied war das Arbeitsverzeichnis: Die Sitzung stand im Worktree des Punktes,
+an dem sie gearbeitet hatte, und dort lasen die Guards die Zustandsdateien und die
+Arbeitsordnung DIESES Baums — eine Tafel, die es dort nicht gibt, eine Suite-Markierung, die
+dort gesetzt worden war, eine TASKS.md, der ein auf main frisch angelegter Punkt fehlt.
+
+Die Regel dagegen existierte längst, mit Memory-Notiz und eigenem Reminder-Mechanismus. Sie
+hat trotzdem nicht gegriffen, und der Grund ist lehrreich: Ein `cd` in einen Worktree ist
+keine Aktion, die nach Regelbruch aussieht — es ist die naheliegendste Art, an einem Zweig zu
+arbeiten, und sie bleibt über Dutzende Aufrufe unsichtbar bestehen. Die Klasse ist damit
+nicht „Regel vergessen", sondern: **Ein Guard, der seinen Befund im falschen Baum erhebt,
+meldet ein Symptom, dessen benannte Reparatur nichts repariert.** Die Meldung „Tafel nicht
+registriert" führt zum Veröffentlichen und Registrieren der Tafel — und die ist längst
+registriert, nur eben woanders. Wer der Meldung folgt, dreht Runden.
+
+Was fehlt, ist billig und benennbar: Jeder Guard, dessen Urteil vom Repository-Wurzelpfad
+abhängt, sollte diesen Pfad IM Refusal nennen. „Nicht registriert **in
+/workspace/hoa/.claude/worktrees/point-713**" hätte die Ursache im ersten Zug sichtbar
+gemacht statt im dritten. Ein Guard, der nur sein Symptom nennt, verlangt vom Leser genau
+die Diagnose, die der Guard schon gestellt hat.
+
 ---
 
 ## 4. Die Guards als Immunsystem
@@ -1357,7 +1382,7 @@ Punktgrenze. Gebucht als Punkt 916.
 
 ## Anhang A — Maschinell gepflegte Quellen-Übersicht
 
-Zuletzt aktualisiert: Mittwoch, 26.08.2026, 07:00 · Quellen-Fingerprint: `179d99d5dc46…`
+Zuletzt aktualisiert: Mittwoch, 26.08.2026, 08:59 · Quellen-Fingerprint: `2336b94d716b…`
 
 Spalten heuristisch aus den Quellen abgeleitet (Anläufe = distinkte Datumsnennungen im Memory;
 Maßnahme = Guard-Skripte mit Namens-Treffer). Die inhaltliche Bewertung gehört der Prosa oben.
@@ -1395,7 +1420,7 @@ Maßnahme = Guard-Skripte mit Namens-Treffer). Die inhaltliche Bewertung gehört
 | Work at High effort by default; the user reserves Extra high for research and design decisions, not implementation | 4 | hoch | — (Regel/Memory) | ◐ Regel |
 | Write idiomatic English in all English text (README, code comments, commit messages) — no German calques like 'stand' for a version | 1 | niedrig | — (Regel/Memory) | ◐ Regel |
 | Fable is NOT the default lane because its volume is the scarcest; difficulty is no reason for it either (since 18.08.2026 hard cases go straight to Sol), and review is cross-vendor, not Fable-by-default | 4 | hoch | — (Regel/Memory) | ◐ Regel |
-| Findings recorded by a session that could not write the work order — carry each into TASKS.md, then mark it drained | 25 | hoch | findings-guard.mjs | ✔ Mechanismus |
+| Findings recorded by a session that could not write the work order — carry each into TASKS.md, then mark it drained | 26 | hoch | findings-guard.mjs | ✔ Mechanismus |
 | A recurring lookup gets a script; never pull raw transcripts, listings, or logs into context to answer it | 1 | niedrig | — (Regel/Memory) | ◐ Regel |
 | Past the 150k context watermark, FINISH the step and hand over — never start a suite, an agent or a point after it; the user raised the cost twice (13.08. and 17.08.2026) | 2 | mittel | — (Regel/Memory) | ◐ Regel |
 | User 18.08.2026: hard, complex, error-prone and HIGH-criticality points are AUTHORED by GPT-5.6 Sol directly — Opus 5 authors only what is left, and Fable authors only a point that tags its lane or one the router escalates | 4 | hoch | — (Regel/Memory) | ◐ Regel |
@@ -1458,8 +1483,8 @@ Maßnahme = Guard-Skripte mit Namens-Treffer). Die inhaltliche Bewertung gehört
 
 Erfasste Quellen: 91 Feedback-/Projekt-Memories · 57 Guard-/Hook-Skripte · 6 Revert-/Reapply-Commits · 101 Prozess-/Meta-TASKS-Punkte (davon 42 offen).
 
-<!-- RETRO-FINGERPRINT: 179d99d5dc46df3d92b9f3240bfcd22415a6dceb6fa4460fea5cd3dac3083f0c -->
-<!-- RETRO-LAST-REFRESHED: 2026-08-26T05:00:25.919Z -->
+<!-- RETRO-FINGERPRINT: 2336b94d716b5da8d32492dcdd0405a14ec2a9d3dd78e8def279e83c0cde4711 -->
+<!-- RETRO-LAST-REFRESHED: 2026-08-26T06:59:27.034Z -->
 <!-- AUTO-GENERATED:END -->
 
 ### 3.111 Ein Erfolg ist kein Beweis für den Weg, auf dem er zustande kam

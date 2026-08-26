@@ -264,6 +264,52 @@ put it is the mistake this line exists to stop.
   Criticality: medium — the boundary is what tells the player where the settlement ends
   and the bird's-eye view resumes; §2.6 and criterion 15 both rest on it being legible.
 
+- [ ] 925. The durable lane is built but neither measured nor journalled, and its failure
+  matrix does not touch the real path. Point 676 landed the whole plane — bounded dispatch,
+  checkpoint barrier, two-phase boundary, successor reconciliation, landing journal, board
+  projection, metrics — with build, lint and unit green, and the cross-vendor read recorded
+  (`.claude/mechanism-reviews.jsonl`, e1439227). THREE THINGS IT LEFT OPEN, all of them
+  conditions 676's own VERIFIABLE clause names, and none of them reachable while the lane is
+  switched off (`.claude/durable-lane-flag.json` is `enabled: false`, `changedBy:
+  awaiting-point-676-measured-trial`).
+  FIRST, NOTHING JOURNALS A REASON. `updateReasonInterval` in `scripts/batch-dispatch-core.mjs`
+  and the daemon's `record-metric` command have NO production caller: `dispatchOnce` decides
+  and starts attempts without ever recording why fewer than three eligible lanes ran, and
+  `metricEventsFromJournal` therefore consumes events nothing writes. The spec demands "a
+  journalled REASON whenever three eligible lanes exist and fewer run". It fails SAFE today —
+  `trialVerdict` scores an unmeasured p95 or median as a failure, so an unwired metric can
+  never produce a passing trial — but that is the reason the gap is invisible, not a reason
+  to keep it.
+  SECOND, ELEVEN OF TWELVE DRILLS RECREATE THE AFTERMATH INSTEAD OF CAUSING IT.
+  `scripts/batch-daemon-failure-drills.mjs` calls the decision functions on hand-built inputs;
+  only `parent-death` in `scripts/batch-daemon-drill.mjs` runs real processes. A drill that
+  never calls the thing stays green over a broken thing — the exact failure this house has
+  already paid for. `DURABLE_LANE_STEPS` step 12 nevertheless reads green with the evidence
+  "complete daemon failure matrix", and step 12 is one of `STEPS_REQUIRED_FOR_ACTIVATION`, so
+  that wording is what an operator would enable the lane on.
+  THIRD, THE MEASURED TRIAL IS NOT RUN. 676 requires a trial against a recorded baseline day
+  with zero safety incidents, a median handover context materially below baseline, and points
+  per day no worse than baseline. The recorded baseline day and the trial both remain owed.
+  FINAL STATE: the dispatcher journals its reason interval and its lane-utilization,
+  checkpoint, boundary and landing events through `record-metric` under the coordinator fence,
+  so `calculateBatchMetrics` reads a real series; the failure matrix drives the real daemon,
+  the real worker and the real files for at least worker-crash, stall, push-failure,
+  dirty-worktree, marker-deletion, daemon-restart and checkpoint-timeout, with the pure-input
+  checks kept as the cheap layer beneath them rather than as the proof; and the durable lane
+  runs its measured trial with the Sol adapter alone, whose verdict — not an operator's
+  judgement — flips `enabled` and writes the evidence into `DURABLE_LANE_STEPS`.
+  ALSO FIX, one line: `scripts/batch-board-core.mjs` hardcodes `cap: 3` instead of
+  `DAEMON_POOL_CAP`, so a changed cap would leave the board projecting the old one.
+  VERIFIABLE: unit cases that a dispatch leaving eligible lanes unstarted writes exactly one
+  open reason interval and closes it when the pool recovers, and that a metric series read back
+  from the journal reproduces the recorded events; each real-path drill asserted through
+  `node scripts/batch-daemon-drill.mjs --scenario <name>` against processes it actually killed,
+  stalled or dirtied; a trial report against the recorded baseline day whose `trialVerdict`
+  carries zero failures; plus `npm run test:unit`, lint, build.
+  Criticality: high — it decides whether the durable lane may be switched on at all, and every
+  claim that unlocks it is currently carried by a green flag rather than by a measurement.
+  Bundle: Session- & Repo-Hygiene.
+
 - [ ] 686. The taught language is five concepts, and the chief's message is four of them (user
   13.08.2026, playing the deployed communication slice).
   The user played the deployed communication slice on 13.08.2026 with the debug
@@ -11875,52 +11921,6 @@ to land than a mechanism that needs a review.
   every commit, and its refusal cannot be cleared by doing what it asks.
   Bundle: Session- & Repo-Hygiene.
 
-- [ ] 925. The durable lane is built but neither measured nor journalled, and its failure
-  matrix does not touch the real path. Point 676 landed the whole plane — bounded dispatch,
-  checkpoint barrier, two-phase boundary, successor reconciliation, landing journal, board
-  projection, metrics — with build, lint and unit green, and the cross-vendor read recorded
-  (`.claude/mechanism-reviews.jsonl`, e1439227). THREE THINGS IT LEFT OPEN, all of them
-  conditions 676's own VERIFIABLE clause names, and none of them reachable while the lane is
-  switched off (`.claude/durable-lane-flag.json` is `enabled: false`, `changedBy:
-  awaiting-point-676-measured-trial`).
-  FIRST, NOTHING JOURNALS A REASON. `updateReasonInterval` in `scripts/batch-dispatch-core.mjs`
-  and the daemon's `record-metric` command have NO production caller: `dispatchOnce` decides
-  and starts attempts without ever recording why fewer than three eligible lanes ran, and
-  `metricEventsFromJournal` therefore consumes events nothing writes. The spec demands "a
-  journalled REASON whenever three eligible lanes exist and fewer run". It fails SAFE today —
-  `trialVerdict` scores an unmeasured p95 or median as a failure, so an unwired metric can
-  never produce a passing trial — but that is the reason the gap is invisible, not a reason
-  to keep it.
-  SECOND, ELEVEN OF TWELVE DRILLS RECREATE THE AFTERMATH INSTEAD OF CAUSING IT.
-  `scripts/batch-daemon-failure-drills.mjs` calls the decision functions on hand-built inputs;
-  only `parent-death` in `scripts/batch-daemon-drill.mjs` runs real processes. A drill that
-  never calls the thing stays green over a broken thing — the exact failure this house has
-  already paid for. `DURABLE_LANE_STEPS` step 12 nevertheless reads green with the evidence
-  "complete daemon failure matrix", and step 12 is one of `STEPS_REQUIRED_FOR_ACTIVATION`, so
-  that wording is what an operator would enable the lane on.
-  THIRD, THE MEASURED TRIAL IS NOT RUN. 676 requires a trial against a recorded baseline day
-  with zero safety incidents, a median handover context materially below baseline, and points
-  per day no worse than baseline. The recorded baseline day and the trial both remain owed.
-  FINAL STATE: the dispatcher journals its reason interval and its lane-utilization,
-  checkpoint, boundary and landing events through `record-metric` under the coordinator fence,
-  so `calculateBatchMetrics` reads a real series; the failure matrix drives the real daemon,
-  the real worker and the real files for at least worker-crash, stall, push-failure,
-  dirty-worktree, marker-deletion, daemon-restart and checkpoint-timeout, with the pure-input
-  checks kept as the cheap layer beneath them rather than as the proof; and the durable lane
-  runs its measured trial with the Sol adapter alone, whose verdict — not an operator's
-  judgement — flips `enabled` and writes the evidence into `DURABLE_LANE_STEPS`.
-  ALSO FIX, one line: `scripts/batch-board-core.mjs` hardcodes `cap: 3` instead of
-  `DAEMON_POOL_CAP`, so a changed cap would leave the board projecting the old one.
-  VERIFIABLE: unit cases that a dispatch leaving eligible lanes unstarted writes exactly one
-  open reason interval and closes it when the pool recovers, and that a metric series read back
-  from the journal reproduces the recorded events; each real-path drill asserted through
-  `node scripts/batch-daemon-drill.mjs --scenario <name>` against processes it actually killed,
-  stalled or dirtied; a trial report against the recorded baseline day whose `trialVerdict`
-  carries zero failures; plus `npm run test:unit`, lint, build.
-  Criticality: high — it decides whether the durable lane may be switched on at all, and every
-  claim that unlocks it is currently carried by a green flag rather than by a measurement.
-  Bundle: Session- & Repo-Hygiene.
-
 - [ ] 926. The world suite's Victoria Falls frame misses its subject, and it has been red for
   a while. MEASURED 26.08.2026 on `main` (f14cf8e9) with
   `node scripts/verify/baseline-classify.mjs world --ref main`: the frame
@@ -12023,4 +12023,89 @@ to land than a mechanism that needs a review.
   fails when its subject is broken.
   Criticality: medium-high — it is the fail-closed publish preflight and the two stores the board
   is derived from, and every item was measured rather than supposed.
+  Bundle: Session- & Repo-Hygiene.
+
+- [ ] 930. A now-card removed by the projection takes its handwritten text with it — the one
+  disagreement the ninth cross-vendor round on point 713 could not settle inside that point
+  (GPT-5.6 Sol at effort high, raised twice, the second time at P0; the wording and the
+  reasoning stand in `docs/blind-713/round-9-findings.txt`). Point 713's final state orders
+  BOTH: "it CREATES a stub card for a point that has none and REMOVES one whose point is no
+  longer in flight", and "a projection that regenerates the section must never blank text a
+  session wrote, and a render that would drop prose refuses or restores it". The reviewer
+  reads the second as covering the removed card; the point was built on the first, and five
+  of its accepted tests pin the removal. Both readings are defensible, which is why this is
+  a point and not a line.
+  FINAL STATE:
+  - REMOVAL STAYS, LOSS DOES NOT. A numbered now-card whose point has left the flight is
+    still removed from the section — the projection is the derived set — but its authored
+    text is not destroyed by the render: it is carried where a reader can still find it, or
+    the render refuses and names the command that retires the card WITH its text
+    (`board.mjs done <N>`). Which of the two, this point decides; it may not answer "both
+    sometimes" without saying exactly when.
+  - THE ORDINARY PATH IS UNCHANGED. `board.mjs done <N>` already moves the card to Erledigt
+    with its prose before any render sees it, and a card this render CREATED is a
+    placeholder that may go quietly. Only the out-of-band case — a strand that ended without
+    its card being retired — is at stake.
+  - THE QUEUE COPY IS NOT PART OF IT: `buildQueueSection` rewrites the whole queue section
+    from the work order on every publish, so a deleted queue card holds no authored text.
+    Say so where the deletion happens, so the next round does not raise it a third time.
+  VERIFIABLE: Vitest over the render — a stale numbered card carrying authored prose is
+  either archived with its text or refuses by name, proven by reading the text back out of
+  wherever it went; a stale STUB still goes quietly; the five existing removal tests of
+  point 713 still pass or are amended in the same commit with the reason written down.
+  Criticality: medium — it is a loss of the user's own words, but only on a path the
+  ordinary lifecycle does not take.
+  Bundle: Chat & Tafel.
+
+- [ ] 931. A machine ranking that parks a high-criticality point stays invisible to the user
+  (found 26.08.2026 05:38, and the user caught the consequence by chance the same morning).
+  Point 925 — the measured trial that alone may switch the durable lane on — was ranked `last`
+  at 02:37 by a machine decision in `.claude/queue-rank.json`, citing the release-order ruling
+  of 21.08. The dependency that makes it urgent ("without it the whole series stays parked")
+  stood only in the done-text of another card and deep inside 925's own; NO decision card ever
+  showed the ranking. The user overruled it at 07:37 and moved the point directly behind the
+  running work.
+  FINAL STATE:
+  - A MACHINE RANKING THAT PARKS A POINT SURFACES. When `queue-rank.mjs` files a `last` (or any
+    demotion) by machine decision for a point whose criticality is high, it writes a board card
+    the way the "Automatische Entscheidung" cards already do: what was decided, on what ground,
+    and how to overrule it. The user reads the board, not the ranking file.
+  - THE GROUND IS THE POINT'S OWN DEPENDENCY, not only the release order. A ranking that parks a
+    point which other open points wait on names those points in the card, so the reader sees the
+    cost of the parking rather than the tidiness of the order.
+  - THE OVERRULE IS ONE COMMAND and is recorded as a USER ruling, distinguishable in the file
+    from a machine one; today both read `origin: machine`.
+  VERIFIABLE: Vitest over the ranking core — a machine demotion of a high-criticality point
+  yields a card payload naming the dependent points, the same demotion of a low-criticality one
+  does not, and a recorded user ruling is readable back as such.
+  Criticality: medium — it costs no correctness, but it hides exactly the decisions the user
+  says he wants to see, and it already did.
+  Bundle: Session- & Repo-Hygiene.
+
+- [ ] 932. The context fence has stood in observe mode for six days with no visible arming point
+  (systematic dormant-feature sweep 26.08.2026, prompted by the same buried-activation pattern as
+  925). Point 700 built and armed the fence; commit e0813568 (20.08. 02:21) set
+  `CONTEXT_FENCE_MODE_DEFAULT` to `observe` in `scripts/context-watermark-core.mjs`, and only
+  `HOA_CONTEXT_FENCE_MODE=armed` arms a session — a variable nothing in the repository sets. Its
+  refusals are recorded silently and refuse nothing. Re-arming exists only as a CONDITION inside
+  open point 747, itself preconditioned by three others, so the switch has no visible point of its
+  own — the pattern the user just ruled against for 925.
+  FINAL STATE:
+  - THE ARMING IS ITS OWN VISIBLE STEP, either as this point's own deliverable or as a decision
+    card that asks for it — not a side-condition of a point four dependencies deep.
+  - THE OBSERVED RECORD IS READ FIRST. Six days of observe-mode refusals are exactly the evidence
+    for whether arming is safe: what WOULD have been refused, how often, and in which sessions.
+    That reading comes before the switch, and its result is written down.
+  - A DORMANT DEFAULT SAYS SO WHERE IT IS SET: a shipped feature whose default disarms it carries
+    the reason and the condition for arming beside the constant, so the next sweep needs no
+    archaeology.
+  ALSO NOTED, no action here: the point-589 speech-silence alarms are dead (`watchProducer` has
+  only the tag round as a caller) while the debug menu still ships both sliders in both languages
+  — carried as an item inside open point 686, so it is not forgotten, but the sliders currently
+  promise an alarm that cannot fire. Everything else the sweep found is deliberate and documented.
+  VERIFIABLE: the observe-record reading is evidence in the point; Vitest over the fence core that
+  the armed mode refuses what the observed mode recorded, and that the default is whatever this
+  point decides, asserted against the constant rather than against a copy of it.
+  Criticality: medium-high — the fence is the one mechanism that stops a session from starting new
+  work past the watermark, and this session ran to 272k tokens with it observing.
   Bundle: Session- & Repo-Hygiene.
