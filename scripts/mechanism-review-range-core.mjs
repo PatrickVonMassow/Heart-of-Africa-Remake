@@ -4,7 +4,7 @@
 // version that led there. Each net-changed path therefore appears once, routed
 // by the author of its final change. Intermediate versions are named as
 // superseded, and paths whose final state equals the base are dropped.
-import { sameModel } from './mechanism-review-core.mjs'
+import { isMechanismPath, sameModel } from './mechanism-review-core.mjs'
 import { passComposition } from './review-material-core.mjs'
 
 export const REVIEWER_CANDIDATES = Object.freeze(['GPT-5.6 Sol', 'Opus 5', 'Fable 5', 'Opus 4.8'])
@@ -54,7 +54,10 @@ export const REVIEW_UNREADABLE_EXTENSIONS = Object.freeze([
   // fonts
   'woff', 'woff2', 'ttf', 'otf', 'eot',
   // archives, models and compiled artefacts
-  'zip', 'gz', 'tgz', 'bz2', 'xz', 'pdf', 'onnx', 'wasm', 'bin', 'node', 'so', 'dll', 'dylib',
+  // No PDF here, deliberately (Sol, review of ac82936): a PDF commonly carries
+  // extractable text, so calling it categorically unreadable would drop
+  // documentation somebody can in fact read.
+  'zip', 'gz', 'tgz', 'bz2', 'xz', 'onnx', 'wasm', 'bin', 'node', 'so', 'dll', 'dylib',
 ])
 
 const UNREADABLE_RE = new RegExp(`\\.(?:${REVIEW_UNREADABLE_EXTENSIONS.join('|')})$`, 'i')
@@ -68,11 +71,20 @@ const UNREADABLE_RE = new RegExp(`\\.(?:${REVIEW_UNREADABLE_EXTENSIONS.join('|')
 export function reviewEndStateExclusion(file) {
   const path = String(file ?? '')
   if (Object.hasOwn(REVIEW_END_STATE_EXCLUSIONS, path)) return REVIEW_END_STATE_EXCLUSIONS[path]
+  // A MECHANISM IS NEVER DROPPED, WHATEVER ITS BYTES (Sol, review of ac82936).
+  // `scripts/git-hooks/…` classifies by PREFIX and the named files by exact
+  // path, so `scripts/git-hooks/pre-commit.wasm` is the enforcer itself rather
+  // than an artefact riding along — and an unreadable enforcer is a reason to
+  // refuse the shape, never to waive its review. Asked WITHOUT a scripts/
+  // listing, which only narrows the "core beside a guard" arm; that arm reaches
+  // `.mjs` names alone, and no `.mjs` is in the extension list, so nothing this
+  // reading misses could have been dropped below anyway.
+  if (isMechanismPath(path)) return null
   // Judged on the path's TAIL alone, so the separator spelling cannot matter:
   // `verification\\a.png` and `verification/a.png` are recognised alike.
   if (UNREADABLE_RE.test(path)) {
     const ext = path.slice(path.lastIndexOf('.') + 1).toLowerCase()
-    return `a .${ext} blob carries no text a reviewer can read, and no binary is a mechanism path; ` +
+    return `a .${ext} blob carries no text a reviewer can read, and it is no mechanism path; ` +
       'a rendered picture is accepted by render-verify on both backends instead'
   }
   return null

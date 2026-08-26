@@ -38,12 +38,29 @@ describe('authorship-cut mechanism review planning', () => {
     // Point 943: 22 verification PNGs carried ~13 MB of one range's end state
     // and made every runnable round impossible. A picture is accepted by
     // render-verify on both backends, never by a diff a second model reads.
-    const blobs = ['verification/01-birdseye-view.png', 'assets/voice/model.onnx', 'docs/handbook.pdf']
+    const blobs = ['verification/01-birdseye-view.png', 'assets/voice/model.onnx', 'public/fonts/journal.woff2']
     expect(reviewEndStateFiles(blobs)).toEqual([])
     for (const blob of blobs) {
       expect(reviewEndStateExclusion(blob), blob).toMatch(/no text a reviewer can read/)
     }
     expect(reviewEndStateExclusion('verification/01-birdseye-view.png')).toContain('.png')
+  })
+
+  it('never drops a MECHANISM, whatever bytes it carries', () => {
+    // Sol, review of ac82936: `scripts/git-hooks/…` classifies by PREFIX, so a
+    // compiled hook IS the enforcer. An unreadable enforcer is a reason to
+    // refuse that shape, never to waive its review.
+    for (const path of ['scripts/git-hooks/pre-commit.wasm', 'scripts/git-hooks/pre-push.bin']) {
+      expect(reviewEndStateExclusion(path), path).toBe(null)
+      expect(reviewEndStateFiles([path])).toEqual([path])
+    }
+  })
+
+  it('keeps a PDF inside the gate — it commonly carries extractable text', () => {
+    // Sol, same review: "no text a reviewer can read" is the boundary, and a
+    // PDF does not categorically fail it.
+    expect(reviewEndStateExclusion('docs/handbook.pdf')).toBe(null)
+    expect(REVIEW_UNREADABLE_EXTENSIONS).not.toContain('pdf')
   })
 
   it('reads the extension case-insensitively and whatever separator spelled the path', () => {
