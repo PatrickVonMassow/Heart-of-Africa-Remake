@@ -12046,17 +12046,25 @@ to land than a mechanism that needs a review.
   check are byte-identical between `main` and that branch apart from the section wrapper's
   indentation, so 595 neither caused the red nor tightened the check — it is only the run that
   finally read it out loud.
-  WHAT IS UNKNOWN IS WHICH OF THE TWO IS WRONG, and that is the point's first job: either the
-  camera aim for lat -17.9 / lon 25.9 no longer centres the falls for the current terrain, or
-  the frame-subject projection (`scripts/verify/frameSubject.mjs`, point 375) judges the frame
-  by a world point the shot was never aimed at. A verdict reached by moving the camera until
-  the check goes green, without deciding which side was wrong, is exactly the papering-over
-  CLAUDE.md §7.2 forbids.
+  IT IS NOT THE VICTORIA FALLS — IT IS THE LANDMARK LOOP. Measured the same night on the
+  WebGL 2 lane of the same tree: there Victoria Falls PASSES and
+  `11-worldmodel-khartoum-confluence` fails instead, with the identical symptom "off the left
+  and bottom edge of the frame". One frame out of the seven-landmark loop misses its subject on
+  every run, and WHICH one it is moves between the lanes. So the camera aim for any single
+  landmark is NOT the defect; the loop's staging is: `jump(lat, lon)` returns before the camera
+  has settled where the shutter then judges it, and whichever landmark the shutter catches
+  mid-flight is the one that reddens. A verdict reached by nudging one landmark's coordinates
+  until its check goes green would only move the red to the next frame, and that is exactly the
+  papering-over CLAUDE.md §7.2 forbids.
+  FIRST JOB is therefore to make `jump` wait on the state the shutter reads — the same class as
+  the point-489 blank picture and the point-375 shutter, one layer further out — rather than to
+  re-aim a camera.
   THE FRAME IS ACCEPTANCE EVIDENCE for criterion 3 (world model) and 13 (real geodata), so a
   frame the shutter refuses is a missing proof, not a cosmetic blemish.
-  VERIFIABLE: `npm test -- world` green whole-suite on WebGPU and WebGL 2, with the Victoria
-  Falls frame present in `verification/` and its subject visibly in the picture; plus the
-  written verdict on which of the two sides was wrong.
+  VERIFIABLE: `npm test -- world` green whole-suite on WebGPU and WebGL 2 — all seven landmark
+  frames present in `verification/` with their subjects visibly in the picture, on BOTH lanes
+  and without a retry, since a red that moves between frames is precisely what a single green
+  run cannot rule out.
   Criticality: medium — acceptance evidence is missing, but nothing in the game is broken by it.
   Bundle: Testinfrastruktur.
 
@@ -12072,12 +12080,17 @@ to land than a mechanism that needs a review.
   that night: the picture is the whole reason the report exists, and the report is the channel
   the user hands bug reports over on. Every archive taken since the regression is worth less
   than it looks.
-  FIRST SUSPECT, to be confirmed rather than assumed: the canvas capture inside the F6
-  assembly. A WebGPU canvas read back outside the rendered tick, or without
-  `preserveDrawingBuffer`, yields an empty or failing capture, and the assembly currently drops
-  the member instead of failing loudly — which is why nothing reported it. The assembly must
-  therefore ALSO become loud: an archive that cannot carry its picture says so, in the UI, at
-  the moment it is written.
+  IT IS A WEBGPU-ONLY DEFECT, measured the same night: the identical tree run on the WebGL 2
+  lane passes the report suite whole, 33 checks, with all four members present. Only the WebGPU
+  lane loses the picture — and WebGPU is the everyday lane the player gets, so the defect sits
+  on the path that matters, while the green lane is the control proving the assembly itself is
+  sound. That narrows the cause to the canvas readback: a WebGPU canvas read outside the
+  rendered tick, or without the backbuffer preserved, yields an empty or failing capture where
+  WebGL 2 still hands one out.
+  THE SECOND HALF OF THE POINT IS THE SILENCE, and it is the half that let this run unnoticed:
+  the assembly DROPS the member instead of failing, so a picture-less archive looks exactly like
+  a good one. An archive that cannot carry its picture must say so, in the UI, at the moment it
+  is written.
   VERIFIABLE: `npm test -- report` green whole-suite on WebGPU and WebGL 2 with all four
   members present; a Vitest case that the assembly REFUSES to hand out an archive whose picture
   is missing rather than shipping three members quietly; plus lint, build, `npm run test:unit`.
