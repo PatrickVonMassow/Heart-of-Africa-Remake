@@ -3,7 +3,7 @@
 // touching the real board or its live branch.
 import { boardMissingPoints } from './board-currency-core.mjs'
 import { parseTasks } from './dashboard-guard-core.mjs'
-import { dropStrayNowCards, normaliseLineEndings, upgradeNowCards } from './board-core.mjs'
+import { dropStrayNowCards, normaliseLineEndings, renderCardCriticalities, upgradeNowCards } from './board-core.mjs'
 import { PUBLISH_CMD } from './board-remedy.mjs'
 
 const firstLine = (text) => String(text ?? '').trim().split('\n')[0]
@@ -41,7 +41,10 @@ export function runBoardEdit({
 } = {}) {
   const swept = dropStrayNowCards(normaliseLineEndings(html))
   const edited = dropStrayNowCards(
-    derive(upgradeNowCards(normaliseLineEndings(transform(swept.html)))),
+    renderCardCriticalities(
+      derive(upgradeNowCards(normaliseLineEndings(transform(swept.html)))),
+      tasksText,
+    ),
   )
   const missing = boardMissingPoints(edited.html, parseTasks(tasksText).open)
   if (missing.length) throw publishPreconditionError(missing)

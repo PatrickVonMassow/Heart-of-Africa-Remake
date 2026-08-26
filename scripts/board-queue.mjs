@@ -33,7 +33,7 @@ import { dirname, resolve } from 'node:path'
 import { writeTextAtomic } from './atomic-write.mjs'
 import { REPO_ROOT, STATE_PATH, readJson } from './dashboard-state.mjs'
 import { parseKlaerungPoints, parseNowCardPoints } from './dashboard-guard-core.mjs'
-import { normaliseLineEndings } from './board-core.mjs'
+import { normaliseLineEndings, renderCardCriticalities } from './board-core.mjs'
 import {
   ESTIMATE_CMD,
   QUEUE_DATA_PATH,
@@ -58,6 +58,7 @@ import { CALIBRATION_PATH, parseCriticality, pictureBearingPoints } from './queu
 import { carrierPath } from './findings-paths.mjs'
 import { pendingRequests, requestRoute } from './findings-request-core.mjs'
 import { gateReport, gateSets } from './user-gate-core.mjs'
+import { readTasksAll } from './tasks-source.mjs'
 
 const state = readJson(STATE_PATH) ?? {}
 const boardFile = resolve(REPO_ROOT, state.dashboardPath ?? '.batch-dashboard.html')
@@ -248,21 +249,22 @@ try {
   } else if (cmd === '--check' || cmd === undefined) {
     const { html, tasks, open, titles, exclude, requests, gates, calibration: measured } = inputs()
     const built = buildQueueSection(html, { open, data: readData(), exclude, titles, requests, gates, calibration: measured })
+    const rendered = renderCardCriticalities(normaliseLineEndings(built.html), readTasksAll())
     const saySoIfRequests = () => {
       if (requests.length) {
         console.log(`  ${requests.length} deposited request(s) named under the queue — node scripts/finding.mjs --requests`)
       }
     }
     if (cmd === '--check') {
-      console.log(`${built.entries.length} queue card(s) would be rendered${built.html === html ? ' (no change)' : ''}`)
+      console.log(`${built.entries.length} queue card(s) would be rendered${rendered === html ? ' (no change)' : ''}`)
       reportEntries(built.entries, tasks)
       saySoIfRequests()
-      process.exitCode = built.html === html ? 0 : 1
+      process.exitCode = rendered === html ? 0 : 1
     } else {
       // Atomic (point 443, four-eyes F3): a kill mid-write leaves torn bytes that
       // the doctor's board repair would push to the public page. LF-normalised
       // (point 439) so a hand edit's CRLF cannot outlive one rebuild.
-      const out = normaliseLineEndings(built.html)
+      const out = rendered
       if (out !== html) writeTextAtomic(boardFile, out)
       console.log(`queue rebuilt from the work order: ${built.entries.length} card(s)${out === html ? ' (unchanged)' : ''}`)
       reportEntries(built.entries, tasks)

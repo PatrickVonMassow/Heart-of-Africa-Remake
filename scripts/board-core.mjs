@@ -12,6 +12,7 @@ import { namesFollowOnWork } from './handover-card-contract.mjs'
 // The derived state card's vocabulary lives beside the derivation itself, so the
 // renderer here and the module that decides WHAT to report cannot drift apart.
 import { AUTOMATIC_DECISION_TITLE, DERIVED_STATE_KIND, PAUSED_TITLE } from './board-state-core.mjs'
+import { criticalityOf, parsePointBlocks } from './criticality-review-guard-core.mjs'
 // The admissibility rule for a card written by a script, kept beside the guard's
 // own notion of "this asks the user" rather than restated here.
 import { judgeAutomatedCard } from './vdzk-admissibility-core.mjs'
@@ -192,6 +193,76 @@ export function refreshFooter(html, { openCount, now = new Date() } = {}) {
  */
 const numberChip = (point) => `<span class="num">${point}</span>`
 
+/** German board labels for the English criticality vocabulary used by code. */
+export const CRITICALITY_LABELS = Object.freeze({ low: 'niedrig', med: 'mittel', high: 'hoch' })
+
+const CRITICALITY_BADGE_RE =
+  /<span\s+class="criticality(?:\s+criticality-(?:low|med|high))?"[^>]*>[\s\S]*?<\/span>\s*/g
+const CRITICALITY_BADGE_SOURCE =
+  '<span\\s+class="criticality(?:\\s+criticality-(?:low|med|high))?"[^>]*>[\\s\\S]*?<\\/span>\\s*'
+const CRITICALITY_STYLE_ID = 'board-criticality-style'
+const CRITICALITY_STYLE = `<style id="${CRITICALITY_STYLE_ID}">
+.criticality{flex-shrink:0;border:1px solid currentColor;border-radius:999px;padding:.08em .48em;font-size:.72em;font-weight:700;line-height:1.35}
+.criticality-low{background:#dcebd9;color:#24511f}.criticality-med{background:#f3e4ad;color:#684e00}.criticality-high{background:#f3d1cb;color:#7a2115}
+</style>`
+
+const criticalityBadge = (level) =>
+  level && CRITICALITY_LABELS[level]
+    ? `<span class="criticality criticality-${level}">${CRITICALITY_LABELS[level]}</span>`
+    : ''
+
+/**
+ * Derive every numbered card's criticality badge from the work order.
+ *
+ * This is deliberately a whole-document render pass rather than another field
+ * accepted by the card writers: a typed value could drift, while this pass also
+ * repairs already-published and hand-edited cards on the next edit or publish.
+ * Summaries without a pure numeric point chip are returned verbatim, including
+ * the handover card and the queue's non-point request card.
+ */
+export function renderCardCriticalities(html, tasksText) {
+  const levels = new Map(
+    parsePointBlocks(tasksText).map((point) => [String(point.n), criticalityOf(point.body).level]),
+  )
+  let badges = 0
+  let out = String(html ?? '').replace(/<summary>([\s\S]*?)<\/summary>/g, (whole, summary) => {
+    const { chip } = summaryPoint(summary)
+    if (chip == null) return whole
+    const clean = summary.replace(CRITICALITY_BADGE_RE, '')
+    const badge = criticalityBadge(levels.get(chip))
+    if (!badge) return `<summary>${clean}</summary>`
+    badges += 1
+    return `<summary>${clean.replace(
+      new RegExp(`^(\\s*<span class="num">\\s*${chip}\\s*</span>)`),
+      `$1${badge}`,
+    )}</summary>`
+  })
+
+  // Remove only the line ending this renderer writes after its style. `\s`
+  // includes U+FEFF in ECMAScript; consuming arbitrary trailing whitespace here
+  // deleted the live board's BOM after an older render had displaced it.
+  const styleRe = new RegExp(
+    `<style id="${CRITICALITY_STYLE_ID}">[\\s\\S]*?</style>(?:[\\t ]*\\r?\\n)?`,
+    'g',
+  )
+  out = out.replace(styleRe, '')
+  if (!badges) return out
+  if (out.includes('</head>')) return out.replace('</head>', `${CRITICALITY_STYLE}\n</head>`)
+  // The live headless board starts with BOM, title, metadata and its own
+  // stylesheet. That stylesheet's first `</style>` is an unambiguous landmark
+  // before any script (whose comments mention `<main>` before the real element),
+  // so intervening metadata cannot change this anchor or put CSS in JavaScript.
+  const firstStyleEnd = out.search(/<\/style>/i)
+  if (firstStyleEnd >= 0) {
+    const at = firstStyleEnd + '</style>'.length
+    return `${out.slice(0, at)}\n${CRITICALITY_STYLE}${out.slice(at)}`
+  }
+  // A different headless fragment may have no stylesheet. Keep a leading BOM
+  // at byte zero while placing the derived stylesheet before the fragment.
+  const bom = out.startsWith('\uFEFF') ? '\uFEFF' : ''
+  return `${bom}${CRITICALITY_STYLE}\n${out.slice(bom.length)}`
+}
+
 /**
  * A card TITLE as markup-safe text (four-eyes review, 12.08.2026). Every reader
  * of a title — the gate, the finders, the retitle itself — matches `[^<]*`, so a
@@ -325,7 +396,11 @@ export function dropStrayNowCards(html) {
  */
 export function summaryPoint(summary) {
   const text = String(summary ?? '')
-  const chip = text.match(/^\s*<span class="num">\s*(\d+)\s*<\/span>\s*<span class="t">/)
+  const chip = text.match(
+    new RegExp(
+      `^\\s*<span class="num">\\s*(\\d+)\\s*</span>\\s*(?:${CRITICALITY_BADGE_SOURCE})?<span class="t">`,
+    ),
+  )
   if (chip) return { chip: chip[1], legacy: null }
   const legacy = text.match(new RegExp(`^\\s*<span class="t">\\s*(\\d+)\\s*${DASH}`))
   return { chip: null, legacy: legacy ? legacy[1] : null }
@@ -1247,7 +1322,11 @@ export function toClosingWork(html, point, { subject, reason, stamp = berlinStam
  */
 export function pointSubject(html, point) {
   const doc = String(html ?? '')
-  const chip = doc.match(new RegExp(`<span class="num">${point}</span><span class="t">${TITLE_TEXT}</span>`))
+  const chip = doc.match(
+    new RegExp(
+      `<span class="num">${point}</span>\\s*(?:${CRITICALITY_BADGE_SOURCE})?<span class="t">${TITLE_TEXT}</span>`,
+    ),
+  )
   const legacy = chip ? null : doc.match(new RegExp(`<span class="t">${point}\\s*${DASH}\\s*${TITLE_TEXT}</span>`))
   const text = stripClosingStage((chip ?? legacy ?? [])[1])
   return text || null
@@ -1495,7 +1574,8 @@ export function setCardTitle(html, point, title) {
   }
   const bare = escapeCardTitle(closingMarked ? closingCardTitle(stripPointPrefix(text, point)) : stripPointPrefix(text, point))
   const chipRe = new RegExp(
-    `(<details class="now"[^>]*>\\s*<summary>\\s*<span class="num">\\s*${point}\\s*</span>\\s*<span class="t">)` +
+    `(<details class="now"[^>]*>\\s*<summary>\\s*<span class="num">\\s*${point}\\s*</span>\\s*` +
+      `(?:${CRITICALITY_BADGE_SOURCE})?<span class="t">)` +
       `(?:(?!</span>)[\\s\\S])*(</span>)`,
   )
   if (chipRe.test(now.text)) {
@@ -1518,7 +1598,8 @@ export function setCardTitle(html, point, title) {
   // command reports success either way. The Erledigt section is history; a
   // retitle there is a hand edit's business, not this command's.
   const queueRe = new RegExp(
-    `(<summary><span class="num">${point}</span><span class="t">)(?:(?!</span>)[\\s\\S])*(</span>)`,
+    `(<summary><span class="num">${point}</span>\\s*(?:${CRITICALITY_BADGE_SOURCE})?` +
+      `<span class="t">)(?:(?!</span>)[\\s\\S])*(</span>)`,
   )
   try {
     const { from, end } = sectionBounds(html, 'queue')

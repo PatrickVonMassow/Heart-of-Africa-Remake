@@ -74,9 +74,9 @@ import { writeTextAtomic } from './atomic-write.mjs'
 import { QUEUE_DATA_PATH, setQueueEntry } from './board-queue-core.mjs'
 import { readJson } from './dashboard-state.mjs'
 import { withBoardEditLock } from './board-edit-lock.mjs'
+import { readTasksAll } from './tasks-source.mjs'
 
 const BOARD = resolve(REPO_ROOT, '.batch-dashboard.html')
-const TASKS = resolve(REPO_ROOT, 'TASKS.md')
 const PUBLISH_SCRIPT = 'scripts/board-publish.mjs'
 const run = (args) => execFileSync(process.execPath, args, { windowsHide: true, cwd: REPO_ROOT, encoding: 'utf8' })
 
@@ -148,7 +148,7 @@ function applyEdit(fn, done) {
   // would be its own defect.
   const result = runBoardEdit({
     html: readFileSync(BOARD, 'utf8'),
-    tasksText: readFileSync(TASKS, 'utf8'),
+    tasksText: readTasksAll(),
     transform: fn,
     done,
     write: (html) => writeTextAtomic(BOARD, html),
