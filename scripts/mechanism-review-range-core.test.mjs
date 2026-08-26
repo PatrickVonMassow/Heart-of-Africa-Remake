@@ -8,9 +8,10 @@ import {
   outstandingFiles,
   planAuthorshipGroups,
   REVIEW_END_STATE_EXCLUSIONS,
-  REVIEW_UNREADABLE_EXTENSIONS,
   reviewEndStateExclusion,
   reviewEndStateFiles,
+  reviewRangeExclusion,
+  parseRangeDeletions,
   summarizeReviewDebt,
   vendorOf,
 } from './mechanism-review-range-core.mjs'
@@ -34,85 +35,68 @@ describe('authorship-cut mechanism review planning', () => {
     )
   })
 
-  it('owes no pass for this gate\u2019s own data documents', () => {
-    // Point 943: the review ledger and the retrospective are append-only owner
-    // data with their own enforcement. Both are past any single round, and the
-    // ledger's case is circular besides - recording the clearing review appends
-    // to the very file being cleared.
-    const data = ['.claude/mechanism-reviews.jsonl', 'docs/analysis_de/retrospektive-zusammenarbeit.md']
-    expect(reviewEndStateFiles(data)).toEqual([])
-    expect(reviewEndStateExclusion('.claude/mechanism-reviews.jsonl')).toMatch(/circular/)
-    expect(reviewEndStateExclusion('docs/analysis_de/retrospektive-zusammenarbeit.md')).toMatch(/retro-currency-guard/)
+  it('owes no pass for the retrospective, which has its own guard and no round can hold', () => {
+    const retro = 'docs/analysis_de/retrospektive-zusammenarbeit.md'
+    expect(reviewEndStateFiles([retro])).toEqual([])
+    expect(reviewEndStateExclusion(retro)).toMatch(/retro-currency-guard/)
   })
 
-  it('owes no pass for a blob no reviewer can read, and says which one', () => {
-    // Point 943: 22 verification PNGs carried ~13 MB of one range's end state
-    // and made every runnable round impossible. A picture is accepted by
-    // render-verify on both backends, never by a diff a second model reads.
-    const blobs = ['verification/01-birdseye-view.png', 'assets/voice/model.onnx', 'public/fonts/journal.woff2']
-    expect(reviewEndStateFiles(blobs)).toEqual([])
-    for (const blob of blobs) {
-      expect(reviewEndStateExclusion(blob), blob).toMatch(/no text a reviewer can read/)
-    }
-    expect(reviewEndStateExclusion('verification/01-birdseye-view.png')).toContain('.png')
-  })
-
-  it('never drops a MECHANISM, whatever bytes it carries', () => {
-    // Sol, review of ac82936: `scripts/git-hooks/…` classifies by PREFIX, so a
-    // compiled hook IS the enforcer. An unreadable enforcer is a reason to
-    // refuse that shape, never to waive its review.
-    for (const path of ['scripts/git-hooks/pre-commit.wasm', 'scripts/git-hooks/pre-push.bin']) {
-      expect(reviewEndStateExclusion(path), path).toBe(null)
-      expect(reviewEndStateFiles([path])).toEqual([path])
+  it('drops the review ledger only for a range that DELETED nothing from it', () => {
+    // Sol, review of 334f7c6: recording the clearing review appends to the very
+    // file being cleared, so an unconditional demand is circular - but a hand
+    // edit, a deleted row or a reordering is a real change somebody must read.
+    const ledger = '.claude/mechanism-reviews.jsonl'
+    expect(reviewEndStateFiles([ledger], { deletionsByFile: { [ledger]: 0 } })).toEqual([])
+    expect(reviewRangeExclusion(ledger, { deletions: 0 })).toMatch(/only APPENDED/)
+    for (const deletions of [1, 42]) {
+      expect(reviewEndStateFiles([ledger], { deletionsByFile: { [ledger]: deletions } })).toEqual([ledger])
+      expect(reviewRangeExclusion(ledger, { deletions })).toBe(null)
     }
   })
 
-  it('keeps a PDF inside the gate — it commonly carries extractable text', () => {
-    // Sol, same review: "no text a reviewer can read" is the boundary, and a
-    // PDF does not categorically fail it.
-    expect(reviewEndStateExclusion('docs/handbook.pdf')).toBe(null)
-    expect(REVIEW_UNREADABLE_EXTENSIONS).not.toContain('pdf')
-  })
-
-  it('reads the extension case-insensitively and whatever separator spelled the path', () => {
-    for (const path of ['verification/A.PNG', String.raw`verification\a.png`, 'a.WoFf2']) {
-      expect(reviewEndStateExclusion(path), path).not.toBe(null)
+  it('keeps the ledger owed where nothing measured the range at all', () => {
+    // An unmeasured range can only ever demand more; it never drops a path.
+    const ledger = '.claude/mechanism-reviews.jsonl'
+    expect(reviewEndStateFiles([ledger])).toEqual([ledger])
+    expect(reviewEndStateExclusion(ledger)).toBe(null)
+    for (const bad of [null, undefined, '0', Number.NaN, -1, 0.5]) {
+      expect(reviewRangeExclusion(ledger, { deletions: bad }), String(bad)).toBe(null)
     }
   })
 
-  it('keeps every reviewable text artefact inside the gate', () => {
-    // The exclusion may only ever remove what nobody can read: a file whose
-    // NAME merely contains an extension word, or a source file beside the
-    // blobs, still owes its pass.
-    const kept = [
-      'scripts/png-guard.mjs',
-      'scripts/verify/preview.mjs',
-      'docs/render-architecture.md',
-      'verification/README.md',
-      'src/render/water.zip.ts',
-    ]
-    expect(reviewEndStateFiles(kept)).toEqual(kept)
-    for (const file of kept) expect(reviewEndStateExclusion(file), file).toBe(null)
+  it('parses one NUL-terminated numstat record per path, and no binary', () => {
+    // `--numstat -z` writes `added\tdeleted\tpath\0`. Reading two fields per
+    // entry dropped every second path (measured against a real 470-file range).
+    const out = '3\t0\tscripts/a-guard.mjs\0' + '0\t7\tscripts/b-guard.mjs\0' + '-\t-\tverification/x.png\0'
+    expect(parseRangeDeletions(out)).toEqual({
+      'scripts/a-guard.mjs': 0,
+      'scripts/b-guard.mjs': 7,
+    })
   })
 
-  it('still owes the mechanism beside an unreadable blob', () => {
-    const mechanism = 'scripts/four-eyes-guard.mjs'
-    const shot = 'verification/07-victory.png'
+  it('keeps a path that legally contains a tab', () => {
+    expect(parseRangeDeletions('1\t2\tscripts/od\td.mjs\0')).toEqual({ 'scripts/od\td.mjs': 2 })
+  })
+
+  it('skips anything that does not parse, rather than guessing', () => {
+    for (const out of ['', 'nonsense\0', '1\0', '1\t2\t\0', 'x\ty\tp\0']) {
+      expect(parseRangeDeletions(out), JSON.stringify(out)).toEqual({})
+    }
+  })
+
+  it('names the append reason where a pure-append ledger is dropped from a plan', () => {
+    const ledger = '.claude/mechanism-reviews.jsonl'
     const plan = planAuthorshipGroups({
-      commits: [commit('a', 'GPT-5.6 Sol', [shot, mechanism])],
-      endStateFiles: [shot, mechanism],
+      commits: [commit('a', 'GPT-5.6 Sol', [ledger, 'scripts/x-guard.mjs'])],
+      endStateFiles: [ledger, 'scripts/x-guard.mjs'],
+      deletionsByFile: { [ledger]: 0 },
     })
     expect(plan.groups).toEqual([
-      expect.objectContaining({ files: [mechanism], reviewer: 'Opus 5' }),
+      expect.objectContaining({ files: ['scripts/x-guard.mjs'], reviewer: 'Opus 5' }),
     ])
     expect(plan.dropped).toEqual([
-      expect.objectContaining({ file: shot, reason: reviewEndStateExclusion(shot) }),
+      expect.objectContaining({ file: ledger, reason: reviewRangeExclusion(ledger, { deletions: 0 }) }),
     ])
-  })
-
-  it('names no extension twice and none with its dot', () => {
-    expect(new Set(REVIEW_UNREADABLE_EXTENSIONS).size).toBe(REVIEW_UNREADABLE_EXTENSIONS.length)
-    for (const ext of REVIEW_UNREADABLE_EXTENSIONS) expect(ext).toMatch(/^[a-z0-9]+$/)
   })
 
   it('still owes the mechanism beside an excluded work-order document', () => {

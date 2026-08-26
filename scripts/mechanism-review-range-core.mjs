@@ -4,7 +4,7 @@
 // version that led there. Each net-changed path therefore appears once, routed
 // by the author of its final change. Intermediate versions are named as
 // superseded, and paths whose final state equals the base are dropped.
-import { isMechanismPath, sameModel } from './mechanism-review-core.mjs'
+import { sameModel } from './mechanism-review-core.mjs'
 import { passComposition } from './review-material-core.mjs'
 
 export const REVIEWER_CANDIDATES = Object.freeze(['GPT-5.6 Sol', 'Opus 5', 'Fable 5', 'Opus 4.8'])
@@ -28,16 +28,6 @@ export const REVIEW_END_STATE_EXCLUSIONS = Object.freeze({
     'work-order text; governed by tasks-spec-guard, queue-order-guard, tasks-archive-guard, bundle-first-guard, and doc-budget-guard over its preamble',
   'docs/tasks-archive.md':
     'work-order archive; governed by tasks-spec-guard, queue-order-guard, tasks-archive-guard, and bundle-first-guard',
-  // THE LEDGER IS THIS GATE'S DATA, NOT A MECHANISM (point 943, measured
-  // 26.08.2026). Demanding a cross-vendor reading of the review ledger's own
-  // end state is circular: recording the very review that would clear it
-  // appends a line and changes it again. It is append-only and already past
-  // 900 000 characters, so it can never fit a round and would suspend the gate
-  // for good. Its integrity is enforced where it belongs — readRecords refuses
-  // an unreadable ledger outright, reviewRecordWellFormed judges every row, and
-  // the recorded blob identity is re-measured on every read.
-  '.claude/mechanism-reviews.jsonl':
-    "the review ledger this gate READS; a cross-vendor reading of it is circular and it can never fit a round, and its integrity is enforced by readRecords, reviewRecordWellFormed and the re-measured blob identity",
   // The German retrospective, same class as the work order: owner prose with
   // its own enforcement (retro-currency-guard over retro-core), past 400 000
   // characters and growing, and no mechanism assurance comes from a second
@@ -51,33 +41,6 @@ const uniq = (xs) => [
 ]
 const keyFor = (sha, file) => `${String(sha)}\0${String(file)}`
 
-// A REVIEWER READS TEXT (point 943, measured 26.08.2026). The gate demanded the
-// whole end state of every contribution, screenshots included: 22 verification
-// PNGs carried ~13 MB of the 19 MB this range owed, which is why no round could
-// be assembled at all and the gate suspended itself on main. A blob nobody can
-// read is not review debt — handing a model a megabyte of PNG bytes buys no
-// mechanism assurance, it only makes the readable half unreachable. Nothing is
-// waived by this: `isMechanismPath` classifies only `scripts/<name>.mjs`,
-// `scripts/git-hooks/…` and the named files, so a binary can never BE a
-// mechanism — it can only ride along in a mechanism contribution's file set.
-// A verification picture has its own acceptance anyway: the rendered picture on
-// both backends, recorded by render-verify, never a diff a second model reads.
-export const REVIEW_UNREADABLE_EXTENSIONS = Object.freeze([
-  // pictures and video
-  'png', 'jpg', 'jpeg', 'gif', 'webp', 'avif', 'bmp', 'ico', 'mp4', 'webm', 'mov',
-  // audio
-  'mp3', 'wav', 'ogg', 'flac', 'm4a',
-  // fonts
-  'woff', 'woff2', 'ttf', 'otf', 'eot',
-  // archives, models and compiled artefacts
-  // No PDF here, deliberately (Sol, review of ac82936): a PDF commonly carries
-  // extractable text, so calling it categorically unreadable would drop
-  // documentation somebody can in fact read.
-  'zip', 'gz', 'tgz', 'bz2', 'xz', 'onnx', 'wasm', 'bin', 'node', 'so', 'dll', 'dylib',
-])
-
-const UNREADABLE_RE = new RegExp(`\\.(?:${REVIEW_UNREADABLE_EXTENSIONS.join('|')})$`, 'i')
-
 /**
  * Why this end-state path is outside the mechanism gate's reach, or null when it
  * belongs to the reviewable file set. ONE boundary, so the gate, its coverage
@@ -87,28 +50,79 @@ const UNREADABLE_RE = new RegExp(`\\.(?:${REVIEW_UNREADABLE_EXTENSIONS.join('|')
 export function reviewEndStateExclusion(file) {
   const path = String(file ?? '')
   if (Object.hasOwn(REVIEW_END_STATE_EXCLUSIONS, path)) return REVIEW_END_STATE_EXCLUSIONS[path]
-  // A MECHANISM IS NEVER DROPPED, WHATEVER ITS BYTES (Sol, review of ac82936).
-  // `scripts/git-hooks/…` classifies by PREFIX and the named files by exact
-  // path, so `scripts/git-hooks/pre-commit.wasm` is the enforcer itself rather
-  // than an artefact riding along — and an unreadable enforcer is a reason to
-  // refuse the shape, never to waive its review. Asked WITHOUT a scripts/
-  // listing, which only narrows the "core beside a guard" arm; that arm reaches
-  // `.mjs` names alone, and no `.mjs` is in the extension list, so nothing this
-  // reading misses could have been dropped below anyway.
-  if (isMechanismPath(path)) return null
-  // Judged on the path's TAIL alone, so the separator spelling cannot matter:
-  // `verification\\a.png` and `verification/a.png` are recognised alike.
-  if (UNREADABLE_RE.test(path)) {
-    const ext = path.slice(path.lastIndexOf('.') + 1).toLowerCase()
-    return `a .${ext} blob carries no text a reviewer can read, and it is no mechanism path; ` +
-      'a rendered picture is accepted by render-verify on both backends instead'
-  }
   return null
 }
 
+// THE RECORDER'S OWN APPEND, AND NOTHING ELSE (Sol, review of 334f7c6). The
+// review ledger cannot simply be dropped: a hand edit, a deleted row or a
+// reordering is a real change somebody must read, and readability plus row-shape
+// validation prove nothing about rows that were already there. But recording the
+// very review that would clear the ledger APPENDS to it, so an unconditional
+// demand is circular and — past 900 000 characters — unmeetable for good.
+//
+// The narrow exception: this file is dropped only for a range whose diff on it
+// DELETED nothing. Zero deletions is exactly the recorder's signature; a removed
+// or rewritten row shows as a deletion and keeps the whole file owed. Measured
+// per range by the caller (one `git diff --numstat`), never assumed: without a
+// measurement the file stays in the demand.
+export const APPEND_ONLY_DATA_FILES = Object.freeze({
+  '.claude/mechanism-reviews.jsonl':
+    'the review ledger this gate READS, and this range only APPENDED to it — recording the clearing review is itself such an append, so demanding a reading of it is circular; a deleted or rewritten row keeps the whole file owed',
+})
+
+/**
+ * Why this end-state path is outside the gate's reach for THIS range, or null.
+ * `deletions` is the measured deleted-line count of the range's diff on the
+ * path; an absent or unmeasured entry can only ever keep the file owed.
+ */
+export function reviewRangeExclusion(file, { deletions = null } = {}) {
+  const named = reviewEndStateExclusion(file)
+  if (named !== null) return named
+  const path = String(file ?? '')
+  if (!Object.hasOwn(APPEND_ONLY_DATA_FILES, path)) return null
+  return Number.isInteger(deletions) && deletions === 0 ? APPEND_ONLY_DATA_FILES[path] : null
+}
+
+/** DELETED LINES PER PATH, in ONE call (the cost rule of attachCoverage applies
+ *  here too). The append-only ledger is dropped from the demand ONLY for a
+ *  range that removed nothing from it, and this is the measurement that says
+ *  so. `--numstat -z` writes `added\tdeleted\0path\0`; a binary path reports
+ *  `-` for both, which parses to no integer and therefore drops nothing. */
+export const rangeDeletionsCommand = (base, sha) => [
+  'diff',
+  '--numstat',
+  '-z',
+  '--no-renames',
+  `${base}..${sha}`,
+]
+
+export function parseRangeDeletions(out) {
+  const map = {}
+  // `--numstat -z` writes ONE NUL-terminated field per entry, `added\tdeleted\tpath`.
+  // (A rename spends three fields instead — `--no-renames` removes that shape, and
+  // anything that does not parse is skipped rather than guessed: an unparsed path
+  // simply stays in the demand.) Splitting the record itself only on the FIRST two
+  // tabs keeps a path that legally contains one intact.
+  for (const field of String(out ?? '').split('\0')) {
+    if (!field) continue
+    const first = field.indexOf('\t')
+    if (first < 0) continue
+    const second = field.indexOf('\t', first + 1)
+    if (second < 0) continue
+    const deleted = Number(field.slice(first + 1, second))
+    const path = field.slice(second + 1)
+    if (!path || !Number.isInteger(deleted)) continue
+    map[path] = deleted
+  }
+  return map
+}
+
 /** The range paths which belong to the mechanism-review end-state file set. */
-export function reviewEndStateFiles(files = []) {
-  return uniq(files).filter((file) => reviewEndStateExclusion(file) === null)
+export function reviewEndStateFiles(files = [], { deletionsByFile = null } = {}) {
+  const deletions = deletionsByFile instanceof Map
+    ? (file) => (deletionsByFile.has(file) ? deletionsByFile.get(file) : null)
+    : (file) => (deletionsByFile && Object.hasOwn(deletionsByFile, file) ? deletionsByFile[file] : null)
+  return uniq(files).filter((file) => reviewRangeExclusion(file, { deletions: deletions(file) }) === null)
 }
 
 // CONTROL CHARACTERS, NOT PRINTABLE MARKERS (round-4 pass 3, and the reason
@@ -278,7 +292,7 @@ export function contributionsIn(commits = []) {
 }
 
 /** One reviewable artefact per file in the range's end state. */
-export function endStateArtefacts({ commits = [], endStateFiles = null } = {}) {
+export function endStateArtefacts({ commits = [], endStateFiles = null, deletionsByFile = null } = {}) {
   const contributions = contributionsIn(commits)
   const byFile = new Map()
   for (const contribution of contributions) {
@@ -290,7 +304,7 @@ export function endStateArtefacts({ commits = [], endStateFiles = null } = {}) {
   // net diff plan every touched path. An explicit list is authoritative, and an
   // explicit empty list means the whole range reverted to its base state.
   const requested = endStateFiles === null ? [...byFile.keys()] : uniq(endStateFiles)
-  const material = new Set(reviewEndStateFiles(requested))
+  const material = new Set(reviewEndStateFiles(requested, { deletionsByFile }))
   const artefacts = []
   const dropped = []
   const superseded = []
@@ -298,7 +312,10 @@ export function endStateArtefacts({ commits = [], endStateFiles = null } = {}) {
     if (!material.has(file)) {
       dropped.push({
         file,
-        reason: reviewEndStateExclusion(file) ?? 'end state identical to the base',
+        reason:
+          reviewRangeExclusion(file, {
+            deletions: deletionsByFile && Object.hasOwn(deletionsByFile, file) ? deletionsByFile[file] : null,
+          }) ?? 'end state identical to the base',
         commits: changes.map((change) => change.sha),
       })
       continue
@@ -336,9 +353,10 @@ export function endStateArtefacts({ commits = [], endStateFiles = null } = {}) {
 export function planAuthorshipGroups({
   commits = [],
   endStateFiles = null,
+  deletionsByFile = null,
   candidates = REVIEWER_CANDIDATES,
 } = {}) {
-  const state = endStateArtefacts({ commits, endStateFiles })
+  const state = endStateArtefacts({ commits, endStateFiles, deletionsByFile })
   const byVendors = new Map()
   for (const artefact of state.artefacts) {
     const key = artefact.vendors.join('+')

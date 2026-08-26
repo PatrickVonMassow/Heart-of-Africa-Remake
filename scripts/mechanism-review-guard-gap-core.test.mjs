@@ -413,6 +413,7 @@ describe('assessReviewGap — the wrapper cannot waive on its own failure (round
     const range = `${'a'.repeat(40)}..${'b'.repeat(40)}`
     expect(seen).toEqual([
       ['diff', '--name-only', '-z', range],
+      ['diff', '--numstat', '-z', range],
       ['diff', '--stat', range, '--', 'big.md'],
       ['diff', '--no-ext-diff', '--no-textconv', range, '--', 'big.md'],
       ['cat-file', '-s', `${'b'.repeat(40)}:big.md`],
@@ -440,10 +441,55 @@ describe('assessReviewGap — the wrapper cannot waive on its own failure (round
     })
     expect(decision.gap).toBe(false)
     expect(seen.some((args) => args.join(' ').includes('TASKS.md'))).toBe(false)
-    expect(seen.filter((args) => args[0] === 'diff' && !args.includes('--name-only'))).toEqual([
+    expect(
+      seen.filter(
+        (args) => args[0] === 'diff' && !args.includes('--name-only') && !args.includes('--numstat'),
+      ),
+    ).toEqual([
       expect.arrayContaining(['--', 'scripts/x-guard.mjs']),
       expect.arrayContaining(['--', 'scripts/x-guard.mjs']),
     ])
+    expect(seen).toContainEqual(['show', `${'b'.repeat(40)}:scripts/x-guard.mjs`])
+  })
+
+  it('prices a binary the way the packer delivers it, and never reads its bytes', async () => {
+    // Point 943: the packer substitutes a one-line ABSENT BY DESIGN header for a
+    // binary body. This measurement used to `git show` the blob and charge its
+    // megabytes, so 22 screenshots made a range look 32.5M characters wide
+    // against a deliverable half that size — a gap ruled over material nobody
+    // would ever have been sent. The path stays IN the demand; only its price
+    // changes.
+    const seen = []
+    const withBinary = (args) => {
+      seen.push(args)
+      if (args.includes('--name-only')) return 'verification/shot.png\0scripts/x-guard.mjs\0'
+      if (args.includes('--numstat')) return '-\t-\tverification/shot.png\0' + '3\t0\tscripts/x-guard.mjs\0'
+      if (args.includes('--stat')) return 'stat'
+      if (args[0] === 'diff') {
+        return [
+          'diff --git a/verification/shot.png b/verification/shot.png',
+          'index 1111111..2222222 100644',
+          'Binary files a/verification/shot.png and b/verification/shot.png differ',
+          'diff --git a/scripts/x-guard.mjs b/scripts/x-guard.mjs',
+          'index 3333333..4444444 100644',
+          '--- a/scripts/x-guard.mjs',
+          '+++ b/scripts/x-guard.mjs',
+          '@@ -1 +1,2 @@',
+          '+x',
+        ].join('\n')
+      }
+      if (args[0] === 'cat-file') return '4'
+      if (args[0] === 'show') return 'body'
+      return ''
+    }
+    const { measureReviewMaterial } = await import('./mechanism-review-guard-gap.mjs')
+    const m = measureReviewMaterial({ baseline: 'a'.repeat(40), head: 'b'.repeat(40), run: withBinary })
+    expect(m.files.map((f) => f.path)).toEqual(['verification/shot.png', 'scripts/x-guard.mjs'])
+    expect(m.files[0].text).toBe('')
+    // Neither its size nor its bytes were ever asked for.
+    expect(seen.some((a) => a[0] === 'show' && a[1].includes('shot.png'))).toBe(false)
+    expect(seen.some((a) => a[0] === 'cat-file' && a[1].includes('shot.png'))).toBe(false)
+    // The text file beside it is read exactly as before.
     expect(seen).toContainEqual(['show', `${'b'.repeat(40)}:scripts/x-guard.mjs`])
   })
 

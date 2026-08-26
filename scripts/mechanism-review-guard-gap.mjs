@@ -19,7 +19,8 @@
 import { execFileSync } from 'node:child_process'
 import { REPO_ROOT } from './repo-paths.mjs'
 import { decideReviewGap, formatReviewGap, REVIEW_GAP_BUDGET_CHARS } from './mechanism-review-guard-gap-core.mjs'
-import { reviewEndStateFiles } from './mechanism-review-range-core.mjs'
+import { parseRangeDeletions, reviewEndStateFiles } from './mechanism-review-range-core.mjs'
+import { isBinaryPatchSection, patchSectionMap } from './review-material-core.mjs'
 
 // The patch of a jammed range is megabytes by definition here — the default
 // 1 MiB pipe would throw ENOBUFS and turn every measurement into 'unmeasured'.
@@ -93,6 +94,7 @@ export function measureReviewMaterial({ baseline, head, run = runGitArgs }) {
     // could run — a second, contradictory file-set policy in the same guard.
     paths = reviewEndStateFiles(
       run(['diff', '--name-only', '-z', range]).split('\0').filter(Boolean),
+      { deletionsByFile: parseRangeDeletions(run(['diff', '--numstat', '-z', range])) },
     )
     const pathspec = ['--', ...paths]
     if (paths.length) {
@@ -117,7 +119,25 @@ export function measureReviewMaterial({ baseline, head, run = runGitArgs }) {
   }
   const files = []
   let measuredChars = stat.length + patch.length
+  // PRICE A BINARY THE WAY IT IS DELIVERED (point 943, measured 26.08.2026).
+  // The material a reviewer receives never carries a binary body: the packer
+  // substitutes a one-line "FILE BODY ABSENT BY DESIGN — binary" header, and
+  // deliberately so, that the file may not silently vanish. This measurement
+  // read the blob anyway and charged its megabytes, so 22 screenshots made a
+  // range look 32.5 million characters wide when its deliverable material was
+  // half that — a gap ruled over material nobody would ever have been sent.
+  // The section decides it, exactly as the packer decides it; a path with no
+  // section is unknown here and is read as before.
+  const sections = patchSectionMap(patch)
   for (const path of paths) {
+    const section = sections.get(path)
+    if (section !== undefined && isBinaryPatchSection(section)) {
+      // Empty body: what the packer would send is the header alone, which it
+      // charges itself. Nothing is dropped from the demand — the path stays in
+      // `files`, and the plan still owes a pass that names it.
+      files.push({ path, text: '' })
+      continue
+    }
     // THE BLOB'S SIZE IS ASKED BEFORE ITS BYTES (landing-round pass 3): `git
     // show` on a big-enough blob overflowed the buffer, ruled 'unmeasured'
     // and blocked forever. cat-file -s answers in a dozen characters; a blob
