@@ -781,12 +781,6 @@
       "origin": "machine",
       "place": "last"
     },
-    "943": {
-      "at": "2026-08-26T15:10:49.225Z",
-      "why": "It blocks every session exit today and grows with each landing; the two DO-NOT-MERGE findings sit in shipped guard code",
-      "origin": "machine",
-      "place": "ahead"
-    },
     "944": {
       "at": "2026-08-26T15:10:49.314Z",
       "why": "It kills owner sessions mid-flight; every launcher spawn until the fix risks repeating the 26.08. standstill",
@@ -864,6 +858,12 @@
       "why": "Behind the queue's front: the ledger hole is real but static — nothing new lands while 943 blocks every merge, so no further merge-with-fixes debt can accrue before this point is reached.",
       "origin": "machine",
       "place": "last"
+    },
+    "957": {
+      "at": "2026-08-26T20:57:19.045Z",
+      "why": "The four-eyes gate on main enforces nothing while it stands suspended, so every landing between now and the release is unguarded - waiting for the release means shipping a version whose whole guard chain was never cross-read.",
+      "origin": "machine",
+      "place": "ahead"
     }
   },
   "boundary": {
@@ -904,7 +904,7 @@
     "why": "The order standing in front of the release today is the arrangement that predates this rule; the four machine-filed points that had ranked themselves there were moved behind 174 first"
   },
   "settled": {
-    "at": "2026-08-26T18:39:10.083Z",
+    "at": "2026-08-26T20:57:19.054Z",
     "points": [
       174,
       184,
@@ -1205,7 +1205,6 @@
       939,
       940,
       942,
-      943,
       944,
       945,
       946,
@@ -1218,7 +1217,8 @@
       953,
       954,
       955,
-      956
+      956,
+      957
     ]
   }
 }

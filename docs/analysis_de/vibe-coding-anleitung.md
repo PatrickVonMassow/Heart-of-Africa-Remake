@@ -151,9 +151,8 @@ Die Ursache findest du durch **Zerlegen**, nicht durch Wiederholen.
 - **Grüner Test, falsches Bild.** Er prüfte einen Hilfswert oder *stellt her*, was die Handlung
   bewirkt hätte, statt sie aufzurufen — und ist für immer grün.
   → *Prompt:* „Eine sichtbare Änderung ist erst fertig, wenn sie am **echten gerenderten Bild**
-  unter einer erreichbaren Bedingung geprüft wurde. Zu jeder Prüfung: **Welche Zeile ruft die
-  Sache auf — und was bliebe grün, wenn sie kaputt wäre?** Zeit darf ein Test abkürzen, den
-  **Aufruf** nie.“ *(≈ 1,5x.)* *(Sieht das richtig aus?)*
+  geprüft wurde. Zu jeder Prüfung: **Welche Zeile ruft die Sache auf — und was bliebe grün, wenn
+  sie kaputt wäre?** Zeit darf ein Test abkürzen, den **Aufruf** nie.“ *(Sieht das richtig aus?)*
 - **Neue Features zerbrechen alte.** Eine Änderung repariert X und bricht das unbeobachtete Y.
   → *Prompt:* „Etabliere einen Mechanismus, der jede Mechanik auch im **Danach-Zustand** prüft und
   nach jedem Zusammenführen die schnelle Testschicht erzwingt. Bau ‚Invarianten' ein, die im
@@ -203,11 +202,9 @@ Die Ursache findest du durch **Zerlegen**, nicht durch Wiederholen.
   Handy lesbar — und halte Format und Sprache auf **allen** Ausgaben ein."
 
 - **Test und Wächter hingen an ihrer Umgebung, nicht am Verhalten.** Sie messen dein Repository
-  statt deinen Code; von Hand nachgeprüft bestätigt sich der Fehler selbst, denn dein Aufruf erbt
-  dasselbe Verzeichnis.
+  statt deinen Code — von Hand nachgeprüft bestätigt sich der Fehler selbst.
   → *Prompt:* „Jede Prüfung bekommt ihre Pfade **eingespritzt**; was fürs **ganze Projekt** gilt,
-  wird an **einer** Stelle gelesen — wahr wegen des Codes, nie wegen des Checkouts. Grün bei dir,
-  rot im Haken? Lass die Bedingung aus **beiden** Wurzeln laufen."
+  wird an **einer** Stelle gelesen. Grün bei dir, rot im Haken? Lass es aus **beiden** Wurzeln laufen."
 
 - **Messung und Vorschau verunreinigt.** Halbfertiges gilt als ‚fertig'.
   → *Prompt:* „Hol mein Urteil am **veröffentlichten** Stand ein, nie an einem Zwischenzweig, und
@@ -328,16 +325,14 @@ Die Ursache findest du durch **Zerlegen**, nicht durch Wiederholen.
   Fähigkeit, bitte **einmal um sie** — nie um ihre Ausführung."
 
 - **Nicht jedes Rot ist deins — und manches war nie eines.** Eine Prüfung, die nur „rot" und
-  „grün" kennt, schiebt Fremdes dir zu; ein *geerbtes* Rot kann ein Abbruch auf altem Stand sein.
+  „grün" kennt, schiebt Fremdes dir zu.
   → *Prompt:* „Sag bei jedem Rot zuerst, **wo die Ursache liegt** — lief überhaupt ein eigener
-  Schritt? Liegt sie außerhalb, nenn den **echten Griff**. Was du nicht selbst gemessen hast, ist
-  eine **Behauptung** — nachmessen, nicht reparieren."
+  Schritt? Was du nicht selbst gemessen hast, ist eine **Behauptung**."
 
 - **Die Reparatur nimmt den Reparierenden mit.** Wer die Leitung repariert, auf der er sitzt,
   verliert die nächste Reparatur mit; ein abgebrochener Lauf räumt nicht weg, was er hinterlässt.
   → *Prompt:* „Änderst du deine eigene Umgebung: Gibt es eine **kleinere Handlung**, die nur
-  **ergänzt**? Lass jeden Neuaufbau nach **offen** scheitern — und frag: **Wer räumt auf, wenn der
-  Aufräumende nicht mehr da ist?**"
+  **ergänzt**? Und: **Wer räumt auf, wenn der Aufräumende nicht mehr da ist?**"
 
 - **Verschlucken sieht aus wie Erfolg — ein nie gestartetes Werkzeug wie ein strenges.**
   → *Prompt:* „Ein Ersatzwert im `catch` gilt nur, wenn er zu **weniger** Aktion führt.
@@ -405,27 +400,32 @@ Die Ursache findest du durch **Zerlegen**, nicht durch Wiederholen.
 
 - **Ein Auftrag, den du einer laufenden Sitzung nur zurufst, stirbt mit ihr.**
   → *Prompt:* „Was eine Sitzung überdauern soll, gehört in eine Datei, die dein Werkzeug beim
-  nächsten Start selbst liest. Ein Zuruf ist ein Hinweis, nie ein Auftrag."
+  nächsten Start liest. Ein Zuruf ist ein Hinweis, nie ein Auftrag."
 
 - **Die Ausnahme existiert nur in der Verweigerung.** Ein Mechanismus verspricht einen Sonderweg
-  und baut ihn nicht — oder ein zweiter räumt ihn im selben Zug wieder ab und meldet Erfolg dabei.
+  und baut ihn nicht.
   → *Prompt:* „Baue jede zugesagte Ausnahme als eigenen Zustand und Befehl, und schreib einen Test,
   der sie **geht**. Prüffrage: Kann der ehrlichste Wortlaut der Ausnahme meine eigene Prüfung
   bestehen?"
 
 - **Zwei Helfer, ein Projekt — und der zweite merkt es nie.** Startet dein Werkzeug automatisch
-  nach, geht eine zweite Sitzung neben der laufenden auf — beide haben beim Start ehrlich gefragt.
+  nach, geht eine zweite Sitzung neben der laufenden auf.
   → *Prompt:* „Nimm eine **Sperre mit laufender Nummer**, die einen kleineren Anspruch **abweist**,
-  und stell die Besitzfrage **vor jedem Schreibvorgang** neu — nicht nur beim Start."
+  und stell die Besitzfrage **vor jedem Schreibvorgang** neu."
 
 - **Die neue Pflicht verurteilt die alten Einträge.** Der verschärfte Prüfer liest den ganzen
   Bestand und erklärt korrekt entstandene Altdaten für gefälscht.
   → *Prompt:* „Eine Pflicht in einer Prüfung, die Altbestände liest, sagt **ab wann** sie gilt."
 
 - **Der Wächter tritt zurück — und hört dabei auf zu messen.** Wer fremde Arbeit nicht anfassen
-  darf, nennt nur noch den Grund, nichts zu tun — und ist blind, wo die Sperre immer belegt ist.
-  → *Prompt:* „Zurücktreten heißt **nicht handeln**, nie **nicht wissen**. Berichte den gemessenen
-  Zustand auch dann, wenn du nichts ändern darfst. Lesen kollidiert mit nichts.“
+  darf, nennt nur noch den Grund, nichts zu tun.
+  → *Prompt:* „Zurücktreten heißt **nicht handeln**, nie **nicht wissen**. Lesen kollidiert mit
+  nichts.“
+
+- **Die Pflicht wächst schneller, als du sie erfüllen kannst.** Verlangt eine Prüfung „alles seit
+  dem letzten Mal", wird sie unerfüllbar und setzt sich aus — der Rückstand wächst währenddessen.
+  → *Prompt:* „Binde jede Prüfpflicht an den **einzelnen Beitrag**, nie an einen offenen Zeitraum.
+  Sieht eine Pflicht unerfüllbar aus, prüf zuerst dein **Messgerät**."
 
 - **Das Protokoll ohne Verfallsdatum wird zum Dauerplakat.** Was dein Werkzeug über die eigene
   Entscheidung aufschreibt, nimmt niemand je wieder heraus.
@@ -470,4 +470,4 @@ Die Ursache findest du durch **Zerlegen**, nicht durch Wiederholen.
 
 Sie ersetzt die Fallstricke oben nicht.
 
-<!-- GUIDE-FINGERPRINT: e9a27b5dd21d7fc31e875184dd346983617187e9e95e8c9b352b088c14789a4a -->
+<!-- GUIDE-FINGERPRINT: d6419f54f7c501889ee8e8122e63a8366ae2b2cd5f3f32cd5f36b2b55be9dd02 -->

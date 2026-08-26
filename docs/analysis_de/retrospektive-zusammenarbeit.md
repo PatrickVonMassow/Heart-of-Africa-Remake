@@ -1405,7 +1405,7 @@ keinen Träger hat. Gebucht als Punkt 956.
 
 ## Anhang A — Maschinell gepflegte Quellen-Übersicht
 
-Zuletzt aktualisiert: Mittwoch, 26.08.2026, 21:12 · Quellen-Fingerprint: `e9a27b5dd21d…`
+Zuletzt aktualisiert: Mittwoch, 26.08.2026, 23:07 · Quellen-Fingerprint: `d6419f54f7c5…`
 
 Spalten heuristisch aus den Quellen abgeleitet (Anläufe = distinkte Datumsnennungen im Memory;
 Maßnahme = Guard-Skripte mit Namens-Treffer). Die inhaltliche Bewertung gehört der Prosa oben.
@@ -1506,8 +1506,8 @@ Maßnahme = Guard-Skripte mit Namens-Treffer). Die inhaltliche Bewertung gehört
 
 Erfasste Quellen: 91 Feedback-/Projekt-Memories · 57 Guard-/Hook-Skripte · 6 Revert-/Reapply-Commits · 106 Prozess-/Meta-TASKS-Punkte (davon 46 offen).
 
-<!-- RETRO-FINGERPRINT: e9a27b5dd21d7fc31e875184dd346983617187e9e95e8c9b352b088c14789a4a -->
-<!-- RETRO-LAST-REFRESHED: 2026-08-26T19:12:27.287Z -->
+<!-- RETRO-FINGERPRINT: d6419f54f7c501889ee8e8122e63a8366ae2b2cd5f3f32cd5f36b2b55be9dd02 -->
+<!-- RETRO-LAST-REFRESHED: 2026-08-26T21:07:55.179Z -->
 <!-- AUTO-GENERATED:END -->
 
 ### 3.111 Ein Erfolg ist kein Beweis für den Weg, auf dem er zustande kam
@@ -4042,3 +4042,38 @@ bequemsten. Wer einen Absturz von der Zuordnung ausschließt, hat den Fall ausge
 die Zuordnung am dringendsten gebraucht wird — und wer die Zuordnung beim Aufzeichnen festschreibt
 statt beim Urteilen, macht die eigene Buchführung fälschungssicher gegen sich selbst. Beides gehört
 zum offenen Punkt 734; die Ausnahme dieses Tages ist sein Beleg.
+
+### 3.194 Die Forderung wuchs schneller, als irgendwer sie erfüllen konnte
+
+Der Vier-Augen-Wächter über Mechanismen verlangt, dass ein zweites Modell liest, was seit dem
+letzten bestätigten Grundstand an Wächtern, Toren und ihren Kernen geändert wurde. Solange dieser
+Grundstand mitwandert, ist das eine kleine, tägliche Bitte. Am 26.08.2026 wurde gemessen, was
+passiert, wenn er es nicht tut: Auf main lag er 226 Mechanismus-Commits zurück. Eine Gegenlesung
+dieses Bereichs plant 115 Passagen über 15,1 Millionen Zeichen; schon die Änderungsübersicht allein
+passt in keine Runde, also entsteht überhaupt kein Plan. Der Wächter tat dann das einzig
+Vernünftige, das ihm einprogrammiert war — er setzte sich aus. Und genau dort schließt sich die
+Falle: Während er ausgesetzt ist, landen weiter Commits, der Bereich wächst, und die Aussetzung
+wird dauerhaft. Der Rückstand wächst exakt so lange, wie ihn niemand abtragen kann.
+
+Am eigenen Prüfbuch wird es unstrittig. Über diese 226 Commits braucht `.claude/mechanism-reviews.jsonl`
+489311 Zeichen Differenz und passt in keine Runde; über einen normalen Zweig sind es 10765 und es
+liest sich in einer Minute. Dieselbe Datei, dieselbe Regel — nur der Bereich entscheidet, ob die
+Forderung erfüllbar ist oder nicht.
+
+Zwei Umwege waren an diesem Abend verlockend, und beide wurden gebaut und unter Gegenlesung wieder
+eingesammelt: Bilddateien pauschal aus der Forderung zu nehmen, und das Prüfbuch selbst
+auszuschließen. Der erste war falsch, weil der Materialpacker Binärdateien längst richtig behandelt
+— er schickt eine Kopfzeile statt der Megabytes — und nur die MESSUNG ihm widersprach; der Fehler
+lag also im Messgerät, nicht in der Forderung. Der zweite war falsch, weil eine gelöschte oder
+umgeschriebene Zeile im Prüfbuch genau die Änderung ist, die jemand lesen muss. Was übrig blieb,
+war die Korrektur des Messgeräts: 32,5 Millionen Zeichen fielen auf 15,1, und die Aussetzung hat
+seither EINE benannte Ursache statt eines Nebels.
+
+**Lehre:** Eine Forderung muss an einen Gegenstand gebunden sein, der nicht wächst — an den
+einzelnen Beitrag, nicht an einen offenen Bereich. Ein Wächter, dessen Anspruch mit der Zeit
+mitwächst, hat einen eingebauten Kipp-Punkt, ab dem er nichts mehr durchsetzt und trotzdem als
+Absicherung gilt; das ist derselbe Defekt wie ein Wächter, der gar nicht verdrahtet ist, nur mit
+einem Datum davor. Und wenn eine Forderung unerfüllbar wird, ist der erste Verdacht das MESSGERÄT,
+nicht der Anspruch: Zweimal an diesem Abend sah die Forderung unerfüllbar aus, weil gemessen wurde,
+was nie verschickt worden wäre. Das gehört zum offenen Punkt 957; Punkt 943 ist die Messung, die
+ihn geschnitten hat.
