@@ -1384,7 +1384,7 @@ Punktgrenze. Gebucht als Punkt 916.
 
 ## Anhang A — Maschinell gepflegte Quellen-Übersicht
 
-Zuletzt aktualisiert: Mittwoch, 26.08.2026, 10:56 · Quellen-Fingerprint: `d92c289fcbe1…`
+Zuletzt aktualisiert: Mittwoch, 26.08.2026, 11:54 · Quellen-Fingerprint: `2b8e95a05b72…`
 
 Spalten heuristisch aus den Quellen abgeleitet (Anläufe = distinkte Datumsnennungen im Memory;
 Maßnahme = Guard-Skripte mit Namens-Treffer). Die inhaltliche Bewertung gehört der Prosa oben.
@@ -1483,10 +1483,10 @@ Maßnahme = Guard-Skripte mit Namens-Treffer). Die inhaltliche Bewertung gehört
 | A pending batch claim HOLDS THE LAUNCHER BACK — withdraw it whenever the claiming window is left unattended | 2 | mittel | clear-claim-guard.mjs | ✔ Mechanismus |
 | Multi-agent workflows eat the session/weekly limit fast — verify findings INLINE, keep fan-outs small, warn the user with a cost estimate before any big workflow | 3 | mittel | doc-budget-guard.mjs | ✔ Mechanismus |
 
-Erfasste Quellen: 91 Feedback-/Projekt-Memories · 57 Guard-/Hook-Skripte · 6 Revert-/Reapply-Commits · 101 Prozess-/Meta-TASKS-Punkte (davon 42 offen).
+Erfasste Quellen: 91 Feedback-/Projekt-Memories · 57 Guard-/Hook-Skripte · 6 Revert-/Reapply-Commits · 102 Prozess-/Meta-TASKS-Punkte (davon 43 offen).
 
-<!-- RETRO-FINGERPRINT: d92c289fcbe1094f5edec78568297bae83db0a9d6cd617ff3372451140a2a171 -->
-<!-- RETRO-LAST-REFRESHED: 2026-08-26T08:56:21.455Z -->
+<!-- RETRO-FINGERPRINT: 2b8e95a05b72d263ca1179ed54633d6e7277d62f13b5238ce3b6809e77089b60 -->
+<!-- RETRO-LAST-REFRESHED: 2026-08-26T09:54:40.678Z -->
 <!-- AUTO-GENERATED:END -->
 
 ### 3.111 Ein Erfolg ist kein Beweis für den Weg, auf dem er zustande kam
@@ -3863,3 +3863,45 @@ Ausnahme stehen muss, und wer sie in einem Zweig prüft, hat die Hälfte geprüf
 Ausnahme in beide Zweige — oder es steht dort, warum sie nur in einen gehört. Und der teuerste
 Zeitpunkt, das zu merken, ist der Moment, in dem eine Sitzung ihre Übergabe schreiben will:
 Dieser Zustand tritt zwangsläufig ein, aber im Betrieb erst dann, wenn kein Test mehr läuft.
+
+### 3.187 Der Ausweg wurde geschrieben und im selben Zug wieder eingesammelt
+
+Zwischen »gemergt und abgehakt« und »fertig« gibt es einen Zustand, in dem nur noch aufgeräumt
+wird. Das Brett kennt ihn: Sein Tor nennt für genau diesen Zwischenzustand eine eigene Karte als
+Ausweg, und der Text, der die Sitzung dorthin schickt, ist Teil der Fehlermeldung. Am 26.08.2026
+war dieser Ausweg tot. Die Karte trägt eine Nummer, und die inzwischen abgeleitete Jetzt-Sektion
+entfernt jede nummerierte Karte, deren Punkt nicht mehr offen ist — ein gerade abgehakter Punkt
+ist per Definition nicht mehr offen. Schreiben und Wiederentfernen geschehen in **derselben**
+Operation, dreimal hintereinander nachgestellt.
+
+Das Tückische ist nicht die Regel, sondern die Rückmeldung: Der Schreibvorgang meldete Erfolg.
+Wer ihn ausführte, hatte keinen Grund zu zweifeln — und stand danach wieder vor derselben
+Verweigerung. Ein Fehlschlag, der sich als Erfolg meldet, kostet jeden Leser dieselbe Runde.
+
+Verwandt mit 3.186, aber die Ursache liegt woanders: Dort fehlte eine Ausnahme in einem Zweig
+derselben Regel. Hier haben **zwei** Mechanismen ihre Verträge auseinanderlaufen lassen — der
+eine verspricht einen Ausweg, der andere räumt ihn ab, und keiner von beiden weiß vom anderen.
+Dieselbe Familie hatte schon einmal zugeschlagen, als der von der Sitzungsgrenze diktierte
+Übergabetext vom Publish-Tor des Bretts abgelehnt wurde.
+
+**Lehre:** Wer einen Ausweg in eine Fehlermeldung schreibt, schuldet einen Test, der genau diesen
+Weg **geht** — nicht einen, der prüft, dass der Text dasteht. Und eine Projektion, die Karten
+entfernt, braucht die Liste derer, die sie nie entfernen darf, an der Stelle, an der die andere
+Seite sie verspricht.
+
+### 3.188 Ein Protokoll ohne Verfallsdatum wird zum Dauerplakat
+
+Die Alarm-Leiter darf allein entscheiden, wenn der Nutzer über mehrere Sendungen nicht antwortet,
+und sie schreibt diese Entscheidung als Karte aufs Brett, mitsamt dem Angebot eines nachträglichen
+Vetos. Das ist richtig so. Falsch ist, was danach nicht passiert: Nichts nimmt den Eintrag je
+wieder heraus. Am 26.08.2026 fragte der Nutzer, warum die Karte von 05:34 noch stehe — obwohl der
+Reparatur-Check um 08:32 den Zustand sauber gefunden und damit genau das Risiko widerlegt hatte,
+um dessentwillen die Entscheidung überhaupt protokolliert wurde.
+
+Ein Protokoll, das nur der Nutzer beenden kann, verlagert die Aufräumarbeit auf ihn — und zwar
+für einen Vorgang, den die Maschine selbst messbar abgeschlossen hat. Nach der zweiten solchen
+Karte liest niemand die Sektion mehr, in der die eine wirklich offene Entscheidung stehen müsste.
+
+**Lehre:** Eine Entscheidung, die die Maschine für sich selbst trifft, nennt die Messung, die sie
+stützen oder widerlegen würde, und verfällt, sobald diese Messung vorliegt und sauber ist. Das
+Veto des Nutzers bleibt der zweite Weg, nie der einzige.

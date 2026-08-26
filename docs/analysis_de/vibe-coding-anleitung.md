@@ -426,6 +426,18 @@ Die Ursache findest du durch **Zerlegen**, nicht durch Wiederholen.
   → *Prompt:* „Zurücktreten heißt **nicht handeln**, nie **nicht wissen**. Berichte den gemessenen
   Zustand auch dann, wenn du nichts ändern darfst. Lesen kollidiert mit nichts.“
 
+- **Der Ausweg, den die Fehlermeldung nennt, führt nirgendwohin.** Ein Mechanismus verspricht
+  einen Sonderweg, ein anderer räumt ihn im selben Zug wieder ab — und der Schreibvorgang meldet
+  dabei Erfolg.
+  → *Prompt:* „Jeder Ausweg, den eine Fehlermeldung nennt, braucht einen Test, der ihn **geht**.
+  Dass der Text dasteht, beweist nichts."
+
+- **Das Protokoll ohne Verfallsdatum wird zum Dauerplakat.** Was die Maschine über ihre eigene
+  Entscheidung aufschreibt, nimmt niemand je wieder heraus — auch dann nicht, wenn eine spätere
+  Messung das Risiko widerlegt hat.
+  → *Prompt:* „Eine Entscheidung, die du selbst triffst, nennt die **Messung**, die sie stützen
+  oder widerlegen würde, und **verfällt**, sobald diese Messung sauber vorliegt."
+
 ---
 
 ## Drei Meta-Regeln, die alles zusammenhalten
@@ -464,4 +476,4 @@ Die Ursache findest du durch **Zerlegen**, nicht durch Wiederholen.
 
 Sie ersetzt die Fallstricke oben nicht.
 
-<!-- GUIDE-FINGERPRINT: d92c289fcbe1094f5edec78568297bae83db0a9d6cd617ff3372451140a2a171 -->
+<!-- GUIDE-FINGERPRINT: 2b8e95a05b72d263ca1179ed54633d6e7277d62f13b5238ce3b6809e77089b60 -->
