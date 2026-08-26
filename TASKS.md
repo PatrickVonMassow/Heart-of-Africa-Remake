@@ -177,7 +177,23 @@ put it is the mistake this line exists to stop.
   inventories the wider four-eyes debt of the same range. Reconcile that overlap when this point is
   worked: what this point's leg 1 fixed is what 876 and 877 describe, so they close with it or are
   re-cut, and neither is worked twice.
-  VERIFIABLE: `mechanism-review-guard --status` reports zero unreviewed backlog contributions.
+  MEASURED AND CUT 26.08.2026, 22:40, at the close of this point's own working stretch. Legs 1 and
+  2 are done and cross-vendor clean. Leg 3 as written is NOT REACHABLE and is cut out to point 957,
+  with the numbers that say so: the backlog stood at 45 outstanding review passes when this stretch
+  opened and at 42 when it closed — six passes were genuinely reviewed and recorded in between, and
+  this point's own new commits owed some back. On MAIN's baseline the same range plans 115 passes
+  over 15.1 million characters, and its diffstat alone (27 948 characters) does not fit one round's
+  share, so no plan assembles at all. The gate on main therefore stays SUSPENDED, with one named
+  cause: `.claude/mechanism-reviews.jsonl`, whose diff over those 226 commits is 489 311 characters
+  and fits no round. Clearing that by reviewing is arithmetic nobody can win — the range grows while
+  it is read. What this point DID deliver beside its two legs: the gap measurement no longer charges
+  a binary's megabytes where the packer sends a one-line ABSENT-BY-DESIGN header (main's range fell
+  from 32.5 to 15.1 million characters on that alone), and the retrospective — owner prose with its
+  own guard, past any round — left the demand like the work order. A blanket ledger exclusion and an
+  extension-based blob exclusion were both BUILT AND WITHDRAWN under Sol's review, each because it
+  would have hidden something a reader must see; the reasoning is in the branch's commits.
+  VERIFIABLE: the two DO-NOT-MERGE findings are answered by recorded cross-vendor passes, the
+  missing `92cbc0e` pass is recorded, and the backlog count is reported at open and at close.
   Criticality: high — until it clears, every landing session drags the same block.
   Bundle: Modell & Wächter. It performs reviews and fixes on already-landed guard code; it edits
   the review ledger only through the recording commands, so it is worked before 916 changes what
@@ -12650,3 +12666,32 @@ to land than a mechanism that needs a review.
   Criticality: medium-high — it is the second silent hole found in the four-eyes ledger in one
   evening, and it invalidates part of what the gate claims to guarantee.
   Bundle: Urlaubsfestigkeit.
+
+- [ ] 957. The four-eyes gate's baseline can outrun every review that could clear it, so the gate
+  lives suspended instead of enforcing. MEASURED 26.08.2026 while working point 943, which was cut
+  here: on main the confirmed baseline sits 226 mechanism commits back, and a review of that range
+  plans 115 passes over 15.1 million characters — its diffstat alone (27 948 characters) is past one
+  round's share, so `planPasses` assembles nothing and the gap clause suspends the gate. Under
+  suspension commits keep landing, so the range only grows: the debt compounds exactly while nobody
+  can pay it. One file makes it unarguable — `.claude/mechanism-reviews.jsonl`, this gate's own
+  ledger, whose diff across those commits is 489 311 characters and fits no round; over a normal
+  branch range the same file's diff is 10 765 characters and reviews fine. The demand is therefore
+  not too strict, it is scoped to the wrong thing: an unbounded RANGE rather than a contribution.
+  FINAL STATE:
+  - The review a contribution owes is BOUNDED BY THAT CONTRIBUTION, not by how far the baseline has
+    fallen behind. A commit's own change is reviewable the day it lands and stays reviewable; a
+    stale baseline may make the gate demand MORE reviews, never one that no round can hold.
+  - The gate's suspension becomes rare and named rather than permanent: after the change, main's
+    current range either assembles into runnable passes or names the exact contribution that cannot
+    be assembled — never a 15-million-character fog.
+  - The historical backlog reachable only through the old scoping gets a RECORDED disposition, per
+    contribution: reviewed, or retired with the measured reason the guard honours. Point 943's
+    measurement (45 passes at open, 42 at close, 115 on main's baseline) is the starting count.
+  VERIFIABLE: Vitest over the scoping decision — a contribution whose own material fits is owed and
+  runnable however far the baseline lags; a range whose accumulated material does not fit no longer
+  suspends the contributions inside it; plus the guard's own status on main's real range naming a
+  finite, runnable plan or a named unassemblable contribution.
+  Criticality: high — it is why the four-eyes gate on main enforces nothing today, and why point
+  943 could not close its third leg.
+  Bundle: Modell & Wächter. It rescopes what the mechanism gate demands, so it is worked before 916
+  changes what the ledger reader accepts, never beside it.
