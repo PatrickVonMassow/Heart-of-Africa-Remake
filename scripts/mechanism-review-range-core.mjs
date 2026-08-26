@@ -28,6 +28,22 @@ export const REVIEW_END_STATE_EXCLUSIONS = Object.freeze({
     'work-order text; governed by tasks-spec-guard, queue-order-guard, tasks-archive-guard, bundle-first-guard, and doc-budget-guard over its preamble',
   'docs/tasks-archive.md':
     'work-order archive; governed by tasks-spec-guard, queue-order-guard, tasks-archive-guard, and bundle-first-guard',
+  // THE LEDGER IS THIS GATE'S DATA, NOT A MECHANISM (point 943, measured
+  // 26.08.2026). Demanding a cross-vendor reading of the review ledger's own
+  // end state is circular: recording the very review that would clear it
+  // appends a line and changes it again. It is append-only and already past
+  // 900 000 characters, so it can never fit a round and would suspend the gate
+  // for good. Its integrity is enforced where it belongs — readRecords refuses
+  // an unreadable ledger outright, reviewRecordWellFormed judges every row, and
+  // the recorded blob identity is re-measured on every read.
+  '.claude/mechanism-reviews.jsonl':
+    "the review ledger this gate READS; a cross-vendor reading of it is circular and it can never fit a round, and its integrity is enforced by readRecords, reviewRecordWellFormed and the re-measured blob identity",
+  // The German retrospective, same class as the work order: owner prose with
+  // its own enforcement (retro-currency-guard over retro-core), past 400 000
+  // characters and growing, and no mechanism assurance comes from a second
+  // vendor reading it whole.
+  'docs/analysis_de/retrospektive-zusammenarbeit.md':
+    'owner retrospective prose; governed by retro-currency-guard over retro-core, and past any single review round',
 })
 
 const uniq = (xs) => [

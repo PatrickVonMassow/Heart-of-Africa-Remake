@@ -34,6 +34,17 @@ describe('authorship-cut mechanism review planning', () => {
     )
   })
 
+  it('owes no pass for this gate\u2019s own data documents', () => {
+    // Point 943: the review ledger and the retrospective are append-only owner
+    // data with their own enforcement. Both are past any single round, and the
+    // ledger's case is circular besides - recording the clearing review appends
+    // to the very file being cleared.
+    const data = ['.claude/mechanism-reviews.jsonl', 'docs/analysis_de/retrospektive-zusammenarbeit.md']
+    expect(reviewEndStateFiles(data)).toEqual([])
+    expect(reviewEndStateExclusion('.claude/mechanism-reviews.jsonl')).toMatch(/circular/)
+    expect(reviewEndStateExclusion('docs/analysis_de/retrospektive-zusammenarbeit.md')).toMatch(/retro-currency-guard/)
+  })
+
   it('owes no pass for a blob no reviewer can read, and says which one', () => {
     // Point 943: 22 verification PNGs carried ~13 MB of one range's end state
     // and made every runnable round impossible. A picture is accepted by
@@ -252,7 +263,9 @@ describe('authorship-cut mechanism review planning', () => {
   })
 
   it('attributes a trailerless merge to the contribution at its merged-parent tip', () => {
-    const ledger = '.claude/mechanism-reviews.jsonl'
+    // Any ordinary carried file: the subject here is merge attribution, and the
+    // review ledger itself is outside the end-state set (see the exclusion above).
+    const ledger = 'scripts/carried-notes.md'
     const plan = planAuthorshipGroups({
       commits: [
         { ...commit('a', 'GPT-5.6 Sol', ['sol-only']), parentShas: [] },
