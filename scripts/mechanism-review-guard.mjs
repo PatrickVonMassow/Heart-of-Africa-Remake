@@ -46,10 +46,8 @@ import {
   formatInvalidatedCoverage,
   mechanismLogCommand,
   outstandingFiles,
-  parseRangeDeletions,
   parseRangeLog as parseWholeRangeLog,
   planAuthorshipGroups,
-  rangeDeletionsCommand,
   reviewEndStateFiles,
   summarizeReviewDebt,
 } from './mechanism-review-range-core.mjs'
@@ -392,12 +390,9 @@ export function gatherMechanismReviewInputs({ sessionId = '', guardDuty = gather
   // Carried rows are RE-MEASURED on every read (delta rounds, 18.08.2026):
   // the blob-identity stamp is the wrapper's, never the ledger's own word.
   let endStateFiles = null
-  let deletionsByFile = null
   try {
-    deletionsByFile = parseRangeDeletions(gitRawFile(rangeDeletionsCommand(base, head)))
     endStateFiles = reviewEndStateFiles(
       gitRawFile(rangeFilesCommand(base, head)).split('\0').filter(Boolean),
-      { deletionsByFile },
     )
   } catch {
     // An unmeasured end state can only demand more below; it never drops a path.
@@ -421,7 +416,6 @@ export function gatherMechanismReviewInputs({ sessionId = '', guardDuty = gather
     // completeness demand and the detection would talk about different ranges.
     rangeFiles: (sha) => reviewEndStateFiles(
       gitRawFile(rangeFilesCommand(base, sha)).split('\0').filter(Boolean),
-      { deletionsByFile: parseRangeDeletions(gitRawFile(rangeDeletionsCommand(base, sha))) },
     ),
   }))
 
@@ -440,7 +434,6 @@ export function gatherMechanismReviewInputs({ sessionId = '', guardDuty = gather
   const authorshipPlan = planAuthorshipGroups({
     commits: commitsForFiles(debt.outstanding),
     endStateFiles: debt.outstanding.map((artefact) => artefact.file),
-    deletionsByFile,
   })
 
   return {

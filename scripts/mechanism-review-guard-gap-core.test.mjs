@@ -413,7 +413,6 @@ describe('assessReviewGap — the wrapper cannot waive on its own failure (round
     const range = `${'a'.repeat(40)}..${'b'.repeat(40)}`
     expect(seen).toEqual([
       ['diff', '--name-only', '-z', range],
-      ['diff', '--numstat', '-z', range],
       ['diff', '--stat', range, '--', 'big.md'],
       ['diff', '--no-ext-diff', '--no-textconv', range, '--', 'big.md'],
       ['cat-file', '-s', `${'b'.repeat(40)}:big.md`],
@@ -441,11 +440,7 @@ describe('assessReviewGap — the wrapper cannot waive on its own failure (round
     })
     expect(decision.gap).toBe(false)
     expect(seen.some((args) => args.join(' ').includes('TASKS.md'))).toBe(false)
-    expect(
-      seen.filter(
-        (args) => args[0] === 'diff' && !args.includes('--name-only') && !args.includes('--numstat'),
-      ),
-    ).toEqual([
+    expect(seen.filter((args) => args[0] === 'diff' && !args.includes('--name-only'))).toEqual([
       expect.arrayContaining(['--', 'scripts/x-guard.mjs']),
       expect.arrayContaining(['--', 'scripts/x-guard.mjs']),
     ])
@@ -463,7 +458,6 @@ describe('assessReviewGap — the wrapper cannot waive on its own failure (round
     const withBinary = (args) => {
       seen.push(args)
       if (args.includes('--name-only')) return 'verification/shot.png\0scripts/x-guard.mjs\0'
-      if (args.includes('--numstat')) return '-\t-\tverification/shot.png\0' + '3\t0\tscripts/x-guard.mjs\0'
       if (args.includes('--stat')) return 'stat'
       if (args[0] === 'diff') {
         return [

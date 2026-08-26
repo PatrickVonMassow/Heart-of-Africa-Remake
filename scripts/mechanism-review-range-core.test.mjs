@@ -10,8 +10,6 @@ import {
   REVIEW_END_STATE_EXCLUSIONS,
   reviewEndStateExclusion,
   reviewEndStateFiles,
-  reviewRangeExclusion,
-  parseRangeDeletions,
   summarizeReviewDebt,
   vendorOf,
 } from './mechanism-review-range-core.mjs'
@@ -36,67 +34,15 @@ describe('authorship-cut mechanism review planning', () => {
   })
 
   it('owes no pass for the retrospective, which has its own guard and no round can hold', () => {
+    const ledger = '.claude/mechanism-reviews.jsonl'
+    // The LEDGER is deliberately NOT excluded (Sol, review of 334f7c6 and
+    // cd1c16e): a deleted or rewritten row is a real change somebody must read,
+    // and an appended one is where a hand-written forgery would sit.
+    expect(reviewEndStateExclusion(ledger)).toBe(null)
+    expect(reviewEndStateFiles([ledger])).toEqual([ledger])
     const retro = 'docs/analysis_de/retrospektive-zusammenarbeit.md'
     expect(reviewEndStateFiles([retro])).toEqual([])
     expect(reviewEndStateExclusion(retro)).toMatch(/retro-currency-guard/)
-  })
-
-  it('drops the review ledger only for a range that DELETED nothing from it', () => {
-    // Sol, review of 334f7c6: recording the clearing review appends to the very
-    // file being cleared, so an unconditional demand is circular - but a hand
-    // edit, a deleted row or a reordering is a real change somebody must read.
-    const ledger = '.claude/mechanism-reviews.jsonl'
-    expect(reviewEndStateFiles([ledger], { deletionsByFile: { [ledger]: 0 } })).toEqual([])
-    expect(reviewRangeExclusion(ledger, { deletions: 0 })).toMatch(/only APPENDED/)
-    for (const deletions of [1, 42]) {
-      expect(reviewEndStateFiles([ledger], { deletionsByFile: { [ledger]: deletions } })).toEqual([ledger])
-      expect(reviewRangeExclusion(ledger, { deletions })).toBe(null)
-    }
-  })
-
-  it('keeps the ledger owed where nothing measured the range at all', () => {
-    // An unmeasured range can only ever demand more; it never drops a path.
-    const ledger = '.claude/mechanism-reviews.jsonl'
-    expect(reviewEndStateFiles([ledger])).toEqual([ledger])
-    expect(reviewEndStateExclusion(ledger)).toBe(null)
-    for (const bad of [null, undefined, '0', Number.NaN, -1, 0.5]) {
-      expect(reviewRangeExclusion(ledger, { deletions: bad }), String(bad)).toBe(null)
-    }
-  })
-
-  it('parses one NUL-terminated numstat record per path, and no binary', () => {
-    // `--numstat -z` writes `added\tdeleted\tpath\0`. Reading two fields per
-    // entry dropped every second path (measured against a real 470-file range).
-    const out = '3\t0\tscripts/a-guard.mjs\0' + '0\t7\tscripts/b-guard.mjs\0' + '-\t-\tverification/x.png\0'
-    expect(parseRangeDeletions(out)).toEqual({
-      'scripts/a-guard.mjs': 0,
-      'scripts/b-guard.mjs': 7,
-    })
-  })
-
-  it('keeps a path that legally contains a tab', () => {
-    expect(parseRangeDeletions('1\t2\tscripts/od\td.mjs\0')).toEqual({ 'scripts/od\td.mjs': 2 })
-  })
-
-  it('skips anything that does not parse, rather than guessing', () => {
-    for (const out of ['', 'nonsense\0', '1\0', '1\t2\t\0', 'x\ty\tp\0']) {
-      expect(parseRangeDeletions(out), JSON.stringify(out)).toEqual({})
-    }
-  })
-
-  it('names the append reason where a pure-append ledger is dropped from a plan', () => {
-    const ledger = '.claude/mechanism-reviews.jsonl'
-    const plan = planAuthorshipGroups({
-      commits: [commit('a', 'GPT-5.6 Sol', [ledger, 'scripts/x-guard.mjs'])],
-      endStateFiles: [ledger, 'scripts/x-guard.mjs'],
-      deletionsByFile: { [ledger]: 0 },
-    })
-    expect(plan.groups).toEqual([
-      expect.objectContaining({ files: ['scripts/x-guard.mjs'], reviewer: 'Opus 5' }),
-    ])
-    expect(plan.dropped).toEqual([
-      expect.objectContaining({ file: ledger, reason: reviewRangeExclusion(ledger, { deletions: 0 }) }),
-    ])
   })
 
   it('still owes the mechanism beside an excluded work-order document', () => {

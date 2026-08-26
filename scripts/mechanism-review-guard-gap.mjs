@@ -19,7 +19,7 @@
 import { execFileSync } from 'node:child_process'
 import { REPO_ROOT } from './repo-paths.mjs'
 import { decideReviewGap, formatReviewGap, REVIEW_GAP_BUDGET_CHARS } from './mechanism-review-guard-gap-core.mjs'
-import { parseRangeDeletions, reviewEndStateFiles } from './mechanism-review-range-core.mjs'
+import { reviewEndStateFiles } from './mechanism-review-range-core.mjs'
 import { isBinaryPatchSection, patchSectionMap } from './review-material-core.mjs'
 
 // The patch of a jammed range is megabytes by definition here — the default
@@ -94,7 +94,6 @@ export function measureReviewMaterial({ baseline, head, run = runGitArgs }) {
     // could run — a second, contradictory file-set policy in the same guard.
     paths = reviewEndStateFiles(
       run(['diff', '--name-only', '-z', range]).split('\0').filter(Boolean),
-      { deletionsByFile: parseRangeDeletions(run(['diff', '--numstat', '-z', range])) },
     )
     const pathspec = ['--', ...paths]
     if (paths.length) {

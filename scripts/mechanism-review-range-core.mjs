@@ -53,76 +53,9 @@ export function reviewEndStateExclusion(file) {
   return null
 }
 
-// THE RECORDER'S OWN APPEND, AND NOTHING ELSE (Sol, review of 334f7c6). The
-// review ledger cannot simply be dropped: a hand edit, a deleted row or a
-// reordering is a real change somebody must read, and readability plus row-shape
-// validation prove nothing about rows that were already there. But recording the
-// very review that would clear the ledger APPENDS to it, so an unconditional
-// demand is circular and — past 900 000 characters — unmeetable for good.
-//
-// The narrow exception: this file is dropped only for a range whose diff on it
-// DELETED nothing. Zero deletions is exactly the recorder's signature; a removed
-// or rewritten row shows as a deletion and keeps the whole file owed. Measured
-// per range by the caller (one `git diff --numstat`), never assumed: without a
-// measurement the file stays in the demand.
-export const APPEND_ONLY_DATA_FILES = Object.freeze({
-  '.claude/mechanism-reviews.jsonl':
-    'the review ledger this gate READS, and this range only APPENDED to it — recording the clearing review is itself such an append, so demanding a reading of it is circular; a deleted or rewritten row keeps the whole file owed',
-})
-
-/**
- * Why this end-state path is outside the gate's reach for THIS range, or null.
- * `deletions` is the measured deleted-line count of the range's diff on the
- * path; an absent or unmeasured entry can only ever keep the file owed.
- */
-export function reviewRangeExclusion(file, { deletions = null } = {}) {
-  const named = reviewEndStateExclusion(file)
-  if (named !== null) return named
-  const path = String(file ?? '')
-  if (!Object.hasOwn(APPEND_ONLY_DATA_FILES, path)) return null
-  return Number.isInteger(deletions) && deletions === 0 ? APPEND_ONLY_DATA_FILES[path] : null
-}
-
-/** DELETED LINES PER PATH, in ONE call (the cost rule of attachCoverage applies
- *  here too). The append-only ledger is dropped from the demand ONLY for a
- *  range that removed nothing from it, and this is the measurement that says
- *  so. `--numstat -z` writes `added\tdeleted\0path\0`; a binary path reports
- *  `-` for both, which parses to no integer and therefore drops nothing. */
-export const rangeDeletionsCommand = (base, sha) => [
-  'diff',
-  '--numstat',
-  '-z',
-  '--no-renames',
-  `${base}..${sha}`,
-]
-
-export function parseRangeDeletions(out) {
-  const map = {}
-  // `--numstat -z` writes ONE NUL-terminated field per entry, `added\tdeleted\tpath`.
-  // (A rename spends three fields instead — `--no-renames` removes that shape, and
-  // anything that does not parse is skipped rather than guessed: an unparsed path
-  // simply stays in the demand.) Splitting the record itself only on the FIRST two
-  // tabs keeps a path that legally contains one intact.
-  for (const field of String(out ?? '').split('\0')) {
-    if (!field) continue
-    const first = field.indexOf('\t')
-    if (first < 0) continue
-    const second = field.indexOf('\t', first + 1)
-    if (second < 0) continue
-    const deleted = Number(field.slice(first + 1, second))
-    const path = field.slice(second + 1)
-    if (!path || !Number.isInteger(deleted)) continue
-    map[path] = deleted
-  }
-  return map
-}
-
 /** The range paths which belong to the mechanism-review end-state file set. */
-export function reviewEndStateFiles(files = [], { deletionsByFile = null } = {}) {
-  const deletions = deletionsByFile instanceof Map
-    ? (file) => (deletionsByFile.has(file) ? deletionsByFile.get(file) : null)
-    : (file) => (deletionsByFile && Object.hasOwn(deletionsByFile, file) ? deletionsByFile[file] : null)
-  return uniq(files).filter((file) => reviewRangeExclusion(file, { deletions: deletions(file) }) === null)
+export function reviewEndStateFiles(files = []) {
+  return uniq(files).filter((file) => reviewEndStateExclusion(file) === null)
 }
 
 // CONTROL CHARACTERS, NOT PRINTABLE MARKERS (round-4 pass 3, and the reason
@@ -292,7 +225,7 @@ export function contributionsIn(commits = []) {
 }
 
 /** One reviewable artefact per file in the range's end state. */
-export function endStateArtefacts({ commits = [], endStateFiles = null, deletionsByFile = null } = {}) {
+export function endStateArtefacts({ commits = [], endStateFiles = null } = {}) {
   const contributions = contributionsIn(commits)
   const byFile = new Map()
   for (const contribution of contributions) {
@@ -304,7 +237,7 @@ export function endStateArtefacts({ commits = [], endStateFiles = null, deletion
   // net diff plan every touched path. An explicit list is authoritative, and an
   // explicit empty list means the whole range reverted to its base state.
   const requested = endStateFiles === null ? [...byFile.keys()] : uniq(endStateFiles)
-  const material = new Set(reviewEndStateFiles(requested, { deletionsByFile }))
+  const material = new Set(reviewEndStateFiles(requested))
   const artefacts = []
   const dropped = []
   const superseded = []
@@ -312,10 +245,7 @@ export function endStateArtefacts({ commits = [], endStateFiles = null, deletion
     if (!material.has(file)) {
       dropped.push({
         file,
-        reason:
-          reviewRangeExclusion(file, {
-            deletions: deletionsByFile && Object.hasOwn(deletionsByFile, file) ? deletionsByFile[file] : null,
-          }) ?? 'end state identical to the base',
+        reason: reviewEndStateExclusion(file) ?? 'end state identical to the base',
         commits: changes.map((change) => change.sha),
       })
       continue
@@ -353,10 +283,9 @@ export function endStateArtefacts({ commits = [], endStateFiles = null, deletion
 export function planAuthorshipGroups({
   commits = [],
   endStateFiles = null,
-  deletionsByFile = null,
   candidates = REVIEWER_CANDIDATES,
 } = {}) {
-  const state = endStateArtefacts({ commits, endStateFiles, deletionsByFile })
+  const state = endStateArtefacts({ commits, endStateFiles })
   const byVendors = new Map()
   for (const artefact of state.artefacts) {
     const key = artefact.vendors.join('+')
