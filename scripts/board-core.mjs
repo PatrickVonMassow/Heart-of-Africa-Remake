@@ -202,6 +202,12 @@ const CRITICALITY_BADGE_SOURCE =
   '<span\\s+class="criticality(?:\\s+criticality-(?:low|med|high))?"[^>]*>[\\s\\S]*?<\\/span>\\s*'
 const CRITICALITY_STYLE_ID = 'board-criticality-style'
 const CARD_HEADER_LEFT_CLASS = 'card-header-left'
+// A published board persists this visual wrapper around every numeric chip.
+// Raw card readers must match it in place: flattening a copy would invalidate
+// the source offsets used by archive and section slicing consumers.
+const CARD_HEADER_LEFT_PREFIX_SOURCE = `(?:<span class="${CARD_HEADER_LEFT_CLASS}">\\s*)?`
+const CARD_NUMBER_SOURCE = (pointSource) =>
+  `${CARD_HEADER_LEFT_PREFIX_SOURCE}<span class="num">\\s*${pointSource}\\s*<\\/span>`
 const CARD_HEADER_LEFT_SOURCE =
   `<span class="${CARD_HEADER_LEFT_CLASS}">\\s*(<span class="num">\\s*\\d+\\s*<\\/span>)\\s*` +
   `(?:${CRITICALITY_BADGE_SOURCE})?<\\/span>`
@@ -571,7 +577,7 @@ function sectionBounds(html, key) {
  * unreplaceable in the first place.
  */
 const NOW_HEAD = (point) =>
-  `<details class="now"[^>]*>\\s*<summary>\\s*(?:<span class="num">\\s*${point}\\s*</span>|<span class="t">\\s*${point}\\s*${DASH})`
+  `<details class="now"[^>]*>\\s*<summary>\\s*(?:${CARD_NUMBER_SOURCE(point)}|<span class="t">\\s*${point}\\s*${DASH})`
 
 /** The current-work card for `point`, or null. Searched in its own section. */
 export function nowCard(html, point) {
@@ -1231,7 +1237,7 @@ function doneBounds(html) {
 
 /** An Erledigt card, matched inside the section alone. */
 const DONE_CARD_RE =
-  /<details>\s*<summary>(?:<span class="card-header-left">\s*)?<span class="num">\s*(\d+)\s*<\/span>[\s\S]*?<\/details>\n?/g
+  new RegExp(`<details>\\s*<summary>${CARD_NUMBER_SOURCE('(\\d+)')}[\\s\\S]*?<\\/details>\\n?`, 'g')
 
 /** Every Erledigt card as `{ point, text, at }`, in document order (newest first). */
 export function doneEntries(html) {
