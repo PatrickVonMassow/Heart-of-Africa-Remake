@@ -74,3 +74,18 @@ from the fail-closed preflight." This is already filed, verbatim, as work-order 
 `stripProjectedQueueCards` answer a missing or duplicated heading with an empty result,
 which is fail-open under a preflight that must fail closed." The eighth round measured it
 and the owner filed it OUTSIDE this point's final state precisely so 713 could converge.
+
+## Pass 4, second confirming round — one answered, one deferred to a new point
+
+ANSWERED: `isTrulyDerivedCard` accepted the reserved title alone, so any hand-written
+unnumbered card wearing `PAUSED_TITLE` or `AUTOMATIC_DECISION_TITLE` stood beside active
+work and passed the fail-closed comparison. It now requires `data-state="derived"` as well
+— the same hardening the eighth round gave the handover card, which had the same hole.
+
+RESTATED AND STILL DECLINED HERE, filed instead: the reviewer raised the removal of an
+unexpected numbered card (and of the queue copy) a second time, at P0. The decision above
+stands for THIS point — its final state orders the removal and five of its accepted tests
+pin it — but the disagreement is real and about design, not about a line, so it is filed as
+its own work-order point rather than settled twice or averaged. Two readings of the same
+spec met here: "REMOVES one whose point is no longer in flight" against "a render that
+would drop prose refuses or restores it".

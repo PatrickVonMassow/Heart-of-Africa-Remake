@@ -1441,7 +1441,14 @@ const derivedCardPattern = () =>
  * removal on its own.
  */
 function isTrulyDerivedCard(card) {
-  const summary = (String(card).match(/<summary>([\s\S]*?)<\/summary>/) ?? [])[1] ?? ''
+  const text = String(card ?? '')
+  // THE MARKER IS REQUIRED, AS IT IS FOR THE HANDOVER CARD (ninth cross-vendor
+  // round): the reserved title alone let any hand-written unnumbered card wear
+  // it and stand beside active work, past the fail-closed comparison. The
+  // eighth round closed exactly this hole on the handover card; the derived
+  // card had the same one.
+  if (!new RegExp(`<details class="now"[^>]*data-state="${DERIVED_STATE_KIND}"[^>]*>`).test(text)) return false
+  const summary = (text.match(/<summary>([\s\S]*?)<\/summary>/) ?? [])[1] ?? ''
   const title = ((summary.match(new RegExp(`<span class="t">${TITLE_TEXT}</span>`)) ?? [])[1] ?? '').trim()
   if (summaryPoint(summary).chip != null) return false
   return title === PAUSED_TITLE || title === AUTOMATIC_DECISION_TITLE

@@ -293,6 +293,15 @@ describe('derived now-section membership', () => {
       '  <div class="body"></div>\n</details>\n'
     expect(compareNowProjection(fullBoard({ now: nowEntry(700, 'A', '20:07') + empty }), [700]))
       .toMatchObject({ ok: false, strayCards: 1 })
+
+    // …and the derived card is held to the same standard (ninth round): the
+    // reserved title alone used to buy the exemption, so any hand-written
+    // unnumbered card could wear it and stand beside active work.
+    const titleOnly =
+      `<details class="now">\n  <summary><span class="t">${PAUSED_TITLE}</span></summary>\n` +
+      '  <div class="body"><p>Von Hand.</p></div>\n</details>\n'
+    expect(compareNowProjection(fullBoard({ now: nowEntry(700, 'A', '20:07') + titleOnly }), [700]))
+      .toMatchObject({ ok: false, strayCards: 1 })
   })
 
   // Sixth cross-vendor round: the reorder ran over the SURVIVING cards alone,
