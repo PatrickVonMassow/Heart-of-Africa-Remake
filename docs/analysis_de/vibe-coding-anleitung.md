@@ -153,9 +153,7 @@ Die Ursache findest du durch **Zerlegen**, nicht durch Wiederholen.
   → *Prompt:* „Eine sichtbare Änderung ist erst fertig, wenn sie am **echten gerenderten Bild**
   unter einer erreichbaren Bedingung geprüft wurde. Zu jeder Prüfung: **Welche Zeile ruft die
   Sache auf — und was bliebe grün, wenn sie kaputt wäre?** Zeit darf ein Test abkürzen, den
-  **Aufruf** nie. Läuft die Prüfung gegen eine echte Projektdatei, **leite die Testdaten aus ihr
-  ab, statt sie nachzubauen** — ein Nachbau prüft die Vorstellung davon und ist zuverlässig
-  grün.“ *(≈ 1,5x.)* *(Sieht das richtig aus?)*
+  **Aufruf** nie.“ *(≈ 1,5x.)* *(Sieht das richtig aus?)*
 - **Neue Features zerbrechen alte.** Eine Änderung repariert X und bricht das unbeobachtete Y.
   → *Prompt:* „Etabliere einen Mechanismus, der jede Mechanik auch im **Danach-Zustand** prüft und
   nach jedem Zusammenführen die schnelle Testschicht erzwingt. Bau ‚Invarianten' ein, die im
@@ -195,16 +193,10 @@ Die Ursache findest du durch **Zerlegen**, nicht durch Wiederholen.
   → *Prompt:* „Stell zu Sitzungsbeginn fest, **welches Modell tatsächlich antwortet**, und halte es
   gegen die erlaubte Reihe. Steht es außerhalb, **halte an und melde**."
 
-- **Der autonome Lauf bleibt stehen — still oder wartend.** Beides gleich teuer, wenn du weg bist.
-  → *Prompt:* „Bleib **nie mit einer Rückfrage stehen**: Annahme treffen, festhalten, weitergehen."
-
-- **Die Rettungsmechanismen verklemmen einander.** Jeder tut für sich das Richtige — der Schutz
-  schützt, der Zähler zählt — und zusammen halten sie den Lauf stundenlang an, obwohl nichts
-  kaputt ist.
-  → *Prompt:* „Prüfe deine Rettungsmechanismen **paarweise**: Kann einer den Zustand erzeugen, in
-  dem ein anderer dauerhaft verweigert? Ein Zähler zählt nur, was **versucht** wurde. Und darunter
-  liegt eine **unabhängige zweite Sicherung** auf eigenem Zeitgeber: Steht alles und alle Rettung
-  hat versagt — aufräumen, neu starten, protokollieren."
+- **Der autonome Lauf bleibt stehen — still oder wartend.** Beides teuer, wenn du weg bist —
+  auch durch Rettungsmechanismen, die einzeln das Richtige tun und einander verklemmen.
+  → *Prompt:* „Bleib **nie mit einer Rückfrage stehen**: Annahme treffen, festhalten, weitergehen.
+  Prüfe Rettung **paarweise**, zähle nur **Versuchtes**, sichere mit **zweitem, eigenem Zeitgeber**."
 
 - **Kommunikation verfehlt.** Zu technisch, zu lang, an der Zielgruppe vorbei.
   → *Prompt:* „Beschreibe Bugs und Status in der Zielgruppensprache — Symptom zuerst, fürs
