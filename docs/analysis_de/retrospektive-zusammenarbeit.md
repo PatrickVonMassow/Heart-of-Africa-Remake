@@ -1384,7 +1384,7 @@ Punktgrenze. Gebucht als Punkt 916.
 
 ## Anhang A — Maschinell gepflegte Quellen-Übersicht
 
-Zuletzt aktualisiert: Mittwoch, 26.08.2026, 19:25 · Quellen-Fingerprint: `ecc0a71b2ace…`
+Zuletzt aktualisiert: Mittwoch, 26.08.2026, 19:35 · Quellen-Fingerprint: `a0c0e40252b2…`
 
 Spalten heuristisch aus den Quellen abgeleitet (Anläufe = distinkte Datumsnennungen im Memory;
 Maßnahme = Guard-Skripte mit Namens-Treffer). Die inhaltliche Bewertung gehört der Prosa oben.
@@ -1485,8 +1485,8 @@ Maßnahme = Guard-Skripte mit Namens-Treffer). Die inhaltliche Bewertung gehört
 
 Erfasste Quellen: 91 Feedback-/Projekt-Memories · 57 Guard-/Hook-Skripte · 6 Revert-/Reapply-Commits · 106 Prozess-/Meta-TASKS-Punkte (davon 46 offen).
 
-<!-- RETRO-FINGERPRINT: ecc0a71b2ace6525da6526bafb63ccd8a032ab986a7f75b0498fe297e9c6b3b1 -->
-<!-- RETRO-LAST-REFRESHED: 2026-08-26T17:25:33.903Z -->
+<!-- RETRO-FINGERPRINT: a0c0e40252b2d9b098a7760540c9b2645e6c4c89d82917ed0e0960b1c1469632 -->
+<!-- RETRO-LAST-REFRESHED: 2026-08-26T17:35:50.741Z -->
 <!-- AUTO-GENERATED:END -->
 
 ### 3.111 Ein Erfolg ist kein Beweis für den Weg, auf dem er zustande kam
@@ -3997,3 +3997,27 @@ eine Abschrift unvermeidlich ist, prüft ein Fall, dass die beiden noch überein
 muss jede Prüfstufe sagen können, ob sie GELAUFEN ist, und nicht nur, ob sie grün war: Grün ohne
 Ausführung ist kein Urteil, und null geschaffte Prüfungen sind ein LAUTERES Urteil als eine
 gerissene Prüfung, nicht ein leiseres. Gefilet als Punkte 948 bis 952.
+
+### 3.193 Der Mechanismus, der Rote zuordnet, versagt genau bei den härtesten Roten
+
+Für ein rotes Prüfergebnis gibt es drei saubere Wege: Ursache benennen und beheben, es einem
+offenen Punkt zuordnen, oder einen eigenen Punkt daraus machen. Der mittlere Weg hat ein Buch,
+in das man einträgt, welcher bekannte Defekt welches Rot besitzt. Am 26.08.2026 stellte sich beim
+Aufräumen von zehn unquittierten Läufen heraus, dass dieser Weg für sie alle verschlossen ist —
+und zwar nicht zufällig, sondern der Konstruktion nach: Ein Lauf, der ABSTÜRZT statt in seinem
+eigenen Bericht zu enden, nimmt keinen Eintrag an, weil die Urteilsfunktion für abgestürzte Läufe
+eine leere Zuordnungsliste zurückgibt. Dazu kommt, dass die Zuordnung beim AUFZEICHNEN gesetzt
+wird und nicht beim Urteilen: Ein bereits aufgezeichnetes rotes Fenster lässt sich rückwirkend
+durch keinen späteren Eintrag mehr schließen.
+
+Das Ergebnis ist eine unangenehme Umkehrung. Je schlimmer ein Lauf scheitert — ein sauberer
+Fehlschlag berichtet, ein Absturz berichtet nichts —, desto weniger Mittel hat man, ihn ordentlich
+abzulegen. Für den harmlosen Fall gibt es das Buch; für den schweren bleibt nur die laute Ausnahme.
+Und weil die laute Ausnahme mühsam ist, ist sie genau die Stelle, an der jemand irgendwann anfängt,
+das Rot einfach stehen zu lassen.
+
+**Lehre:** Ein Ablage-Mechanismus muss für den SCHLECHTESTEN Fall gebaut sein, nicht für den
+bequemsten. Wer einen Absturz von der Zuordnung ausschließt, hat den Fall ausgeschlossen, für den
+die Zuordnung am dringendsten gebraucht wird — und wer die Zuordnung beim Aufzeichnen festschreibt
+statt beim Urteilen, macht die eigene Buchführung fälschungssicher gegen sich selbst. Beides gehört
+zum offenen Punkt 734; die Ausnahme dieses Tages ist sein Beleg.
