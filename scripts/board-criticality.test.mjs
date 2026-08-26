@@ -1,6 +1,9 @@
+import { existsSync, readFileSync } from 'node:fs'
+import { resolve } from 'node:path'
 import { JSDOM } from 'jsdom'
 import { describe, expect, it } from 'vitest'
 import { renderCardCriticalities, setCardTitle, summaryPoint } from './board-core.mjs'
+import { readTasksAll } from './tasks-source.mjs'
 
 const card = (point, title, extra = '') =>
   `<details><summary><span class="num">${point}</span>${extra}<span class="t">${title}</span></summary>` +
@@ -68,17 +71,27 @@ describe('derived card criticality badges', () => {
     expect(new JSDOM(once).window.document.querySelectorAll('#board-criticality-style')).toHaveLength(1)
   })
 
-  it('puts CSS beside the leading board style when script comments mention main first', () => {
-    const board = `﻿<title>HoA Batch-Dashboard</title>
-<style>body{color:#123}</style>
-<script>
-// Fetch the latest published HTML and swap ONLY the <main> content.
-// The shell has no <main> before the board is written.
-const refreshStillParses = true
-</script>
-<main>${card(11, 'Elf')}</main>`
+  // The board is a git-ignored local artefact, so fresh CI checkouts do not
+  // carry it. Where it exists, use its actual leading bytes and landmarks: a
+  // remembered miniature is exactly how the title/meta/style drift escaped.
+  const liveBoardPath = resolve(import.meta.dirname, '../.batch-dashboard.html')
+  it.skipIf(!existsSync(liveBoardPath))('preserves the real board BOM and renders it idempotently', () => {
+    const board = readFileSync(liveBoardPath, 'utf8')
+    const titleEnd = board.indexOf('</title>')
+    const viewport = board.indexOf('<meta name="viewport"')
+    const ownStyle = board.indexOf('<style', viewport)
+    const firstScript = board.indexOf('<script', ownStyle)
+    const scriptEnd = board.indexOf('</script>', firstScript)
+    const realMain = board.indexOf('<main', scriptEnd)
 
-    const once = renderCardCriticalities(board, tasks)
+    expect([...Buffer.from(board).subarray(0, 3)]).toEqual([0xef, 0xbb, 0xbf])
+    expect(viewport).toBeGreaterThan(titleEnd)
+    expect(ownStyle).toBeGreaterThan(viewport)
+    expect(firstScript).toBeGreaterThan(ownStyle)
+    expect(board.slice(firstScript, scriptEnd)).toContain('<main>')
+    expect(realMain).toBeGreaterThan(scriptEnd)
+
+    const once = renderCardCriticalities(board, readTasksAll())
     const document = new JSDOM(once).window.document
     const derivedStyle = document.querySelector('#board-criticality-style')
     const script = document.querySelector('script')
@@ -87,7 +100,8 @@ const refreshStillParses = true
     expect(derivedStyle.previousElementSibling.tagName).toBe('STYLE')
     expect(script.textContent).not.toContain('board-criticality-style')
     expect(() => new Function(script.textContent)).not.toThrow()
-    expect(renderCardCriticalities(once, tasks)).toBe(once)
+    expect(Buffer.from(once).subarray(0, 3)).toEqual(Buffer.from(board).subarray(0, 3))
+    expect(renderCardCriticalities(once, readTasksAll())).toBe(once)
   })
 
   it('keeps an already-decorated current-work card replaceable', () => {

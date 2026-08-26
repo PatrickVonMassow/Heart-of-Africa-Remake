@@ -238,20 +238,29 @@ export function renderCardCriticalities(html, tasksText) {
     )}</summary>`
   })
 
-  const styleRe = new RegExp(`<style id="${CRITICALITY_STYLE_ID}">[\\s\\S]*?</style>\\s*`, 'g')
+  // Remove only the line ending this renderer writes after its style. `\s`
+  // includes U+FEFF in ECMAScript; consuming arbitrary trailing whitespace here
+  // deleted the live board's BOM after an older render had displaced it.
+  const styleRe = new RegExp(
+    `<style id="${CRITICALITY_STYLE_ID}">[\\s\\S]*?</style>(?:[\\t ]*\\r?\\n)?`,
+    'g',
+  )
   out = out.replace(styleRe, '')
   if (!badges) return out
   if (out.includes('</head>')) return out.replace('</head>', `${CRITICALITY_STYLE}\n</head>`)
-  // The live board is an HTML fragment: BOM, title, its stylesheet, then a
-  // script and main. In particular, its refresh script mentions `<main>` in
-  // comments before the actual element, so a raw search for that text would
-  // inject CSS into JavaScript. Anchor the board shape at the document start
-  // and put derived CSS beside its own leading stylesheet. Other headless
-  // fragments get the stylesheet before all of their bytes, never inside one.
-  const leadingStyle = /^(\uFEFF?\s*<title\b[^>]*>[\s\S]*?<\/title>\s*<style\b[^>]*>[\s\S]*?<\/style>)/i
-  return leadingStyle.test(out)
-    ? out.replace(leadingStyle, `$1\n${CRITICALITY_STYLE}`)
-    : `${CRITICALITY_STYLE}\n${out}`
+  // The live headless board starts with BOM, title, metadata and its own
+  // stylesheet. That stylesheet's first `</style>` is an unambiguous landmark
+  // before any script (whose comments mention `<main>` before the real element),
+  // so intervening metadata cannot change this anchor or put CSS in JavaScript.
+  const firstStyleEnd = out.search(/<\/style>/i)
+  if (firstStyleEnd >= 0) {
+    const at = firstStyleEnd + '</style>'.length
+    return `${out.slice(0, at)}\n${CRITICALITY_STYLE}${out.slice(at)}`
+  }
+  // A different headless fragment may have no stylesheet. Keep a leading BOM
+  // at byte zero while placing the derived stylesheet before the fragment.
+  const bom = out.startsWith('\uFEFF') ? '\uFEFF' : ''
+  return `${bom}${CRITICALITY_STYLE}\n${out.slice(bom.length)}`
 }
 
 /**
