@@ -83,11 +83,29 @@ describe('derived card criticality badges', () => {
     expect(summary.querySelector('.right .meta').textContent).toBe('10:00 · ~12:00')
 
     const css = document.querySelector('#board-criticality-style').textContent
-    expect(css).toContain('details:not(.sect)>summary{flex-wrap:wrap;min-width:0;max-width:100%}')
+    expect(css).toContain('details:not(.sect)>summary:has(>.right){flex-wrap:wrap;min-width:0;max-width:100%}')
     expect(css).toContain('.card-header-left{display:inline-flex;flex:0 1 auto;flex-wrap:wrap;')
     expect(css).toContain('summary>.t{flex:1 1 12rem;min-width:0;max-width:100%;overflow-wrap:anywhere}')
-    expect(css).toContain('summary>.right{flex:0 1 auto;flex-wrap:wrap;min-width:0;max-width:100%;white-space:normal}')
+    expect(css).toContain(
+      'summary>.right{display:inline-flex;align-items:baseline;flex:0 1 auto;flex-wrap:nowrap;min-width:0;max-width:100%;white-space:normal}',
+    )
     expect(css).toContain('summary>.right .meta{min-width:0;max-width:100%;white-space:normal;overflow-wrap:anywhere}')
+  })
+
+  it('keeps the disclosure marker in the non-wrapping estimate group', () => {
+    const document = new JSDOM(rendered()).window.document
+    const rules = [...document.querySelector('#board-criticality-style').sheet.cssRules]
+    const declarations = (selector) => rules.find((rule) => rule.selectorText === selector)?.style
+
+    // The living board creates its marker as summary::after. Once the summary
+    // wraps, that pseudo-element is a fourth flex item and can occupy a line by
+    // itself. Suppress it only when there is a right-hand group, then recreate
+    // both marker states inside that group. Its nowrap rule makes estimate and
+    // marker one indivisible flex item at the summary level.
+    expect(declarations('details:not(.sect)>summary:has(>.right)::after')?.content).toBe('none')
+    expect(declarations('details:not(.sect)>summary>.right')?.flexWrap).toBe('nowrap')
+    expect(declarations('details:not(.sect)>summary>.right::after')?.content).toBe('"▸"')
+    expect(declarations('details:not(.sect)[open]>summary>.right::after')?.content).toBe('"▾"')
   })
 
   it('keeps old and decorated summary shapes readable and renders idempotently', () => {

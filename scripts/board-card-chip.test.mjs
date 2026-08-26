@@ -113,7 +113,7 @@ describe('the numbered chip renders on a now-card as it does in the queue', () =
     expect(summaryRule).toContain('flex-wrap:nowrap')
     expect((css.match(/\.num\{([^}]*)\}/) ?? [])[1] ?? '').toContain('flex-shrink:0')
     const derived = (readFileSync(BOARD_FILE, 'utf8').match(/<style id="board-criticality-style">([\s\S]*?)<\/style>/) ?? [])[1] ?? ''
-    expect(derived).toContain('details:not(.sect)>summary{flex-wrap:wrap')
+    expect(derived).toContain('details:not(.sect)>summary:has(>.right){flex-wrap:wrap')
     expect(derived).toContain('.card-header-left{display:inline-flex')
     expect(derived).toContain('min-width:0;max-width:100%')
     // The phone rule must not hide or reorder the left group.

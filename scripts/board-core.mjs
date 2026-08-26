@@ -207,10 +207,13 @@ const CARD_HEADER_LEFT_SOURCE =
   `(?:${CRITICALITY_BADGE_SOURCE})?<\\/span>`
 const CRITICALITY_STYLE = `<style id="${CRITICALITY_STYLE_ID}">
 .card-header-left{display:inline-flex;flex:0 1 auto;flex-wrap:wrap;align-items:baseline;gap:2px 9px;min-width:0;max-width:100%}
-details:not(.sect)>summary{flex-wrap:wrap;min-width:0;max-width:100%}
+details:not(.sect)>summary:has(>.right){flex-wrap:wrap;min-width:0;max-width:100%}
 details:not(.sect)>summary>.t{flex:1 1 12rem;min-width:0;max-width:100%;overflow-wrap:anywhere}
-details:not(.sect)>summary>.right{flex:0 1 auto;flex-wrap:wrap;min-width:0;max-width:100%;white-space:normal}
+details:not(.sect)>summary:has(>.right)::after{content:none}
+details:not(.sect)>summary>.right{display:inline-flex;align-items:baseline;flex:0 1 auto;flex-wrap:nowrap;min-width:0;max-width:100%;white-space:normal}
 details:not(.sect)>summary>.right .meta{min-width:0;max-width:100%;white-space:normal;overflow-wrap:anywhere}
+details:not(.sect)>summary>.right::after{content:"▸";flex:0 0 auto;margin-left:6px}
+details:not(.sect)[open]>summary>.right::after{content:"▾"}
 .criticality{flex:0 1 auto;min-width:0;max-width:100%;overflow-wrap:anywhere;border:1px solid currentColor;border-radius:999px;padding:.08em .48em;font-size:.72em;font-weight:700;line-height:1.35}
 .criticality-low{background:#dcebd9;color:#24511f}.criticality-med{background:#f3e4ad;color:#684e00}.criticality-high{background:#f3d1cb;color:#7a2115}
 </style>`
