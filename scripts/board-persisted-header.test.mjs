@@ -4,12 +4,16 @@ import { describe, expect, it } from 'vitest'
 import { mkdtempSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import { nowCard, renderCardCriticalities } from './board-core.mjs'
+import { nowCard, queueCard, renderCardCriticalities } from './board-core.mjs'
 import { pointCardStanding } from './batch-boundary.mjs'
 import { readCard } from './board-heartbeat.mjs'
+import { boardCardReady } from './fold-point-core.mjs'
 
 const POINT = 941
-const TASKS = `- [ ] ${POINT}. Kartenkopf auf schmalen Ansichten\n  Criticality: high — reviewed.\n`
+const QUEUE_POINT = 942
+const TASKS =
+  `- [ ] ${POINT}. Kartenkopf auf schmalen Ansichten\n  Criticality: high — reviewed.\n\n` +
+  `- [ ] ${QUEUE_POINT}. Nächste Kartenarbeit\n  Criticality: med — reviewed.\n`
 
 const board = () => `<!doctype html>
 <html><head></head><body><main>
@@ -20,7 +24,12 @@ const board = () => `<!doctype html>
 </details>
 </details>
 <details class="sect"><summary><h2>Von dir zu klären</h2></summary></details>
-<details class="sect"><summary><h2>Warteschlange</h2></summary></details>
+<details class="sect"><summary><h2>Warteschlange</h2></summary>
+<details>
+  <summary><span class="num">${QUEUE_POINT}</span><span class="t">Nächste Kartenarbeit</span><span class="right"><span class="meta">~2 h · Feature</span></span></summary>
+  <div class="body"><p>Wartet auf Umsetzung.</p></div>
+</details>
+</details>
 <details class="sect"><summary><h2>Erledigt</h2></summary></details>
 </main></body></html>`
 
@@ -47,5 +56,14 @@ describe('persisted card-header-left wrappers', () => {
     } finally {
       rmSync(dir, { recursive: true, force: true })
     }
+  })
+
+  it('remain visible to the queue and fold readers after the real render pass', () => {
+    const html = publishedBoard()
+    const card = queueCard(html, QUEUE_POINT)
+
+    expect(card).toContain(`<span class="card-header-left"><span class="num">${QUEUE_POINT}</span>`)
+    expect(card).toContain('Wartet auf Umsetzung.')
+    expect(boardCardReady(html, QUEUE_POINT)).toEqual({ ok: true, from: 'queue' })
   })
 })

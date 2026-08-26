@@ -443,7 +443,7 @@ export function stripPointPrefix(title, point) {
 
 /** The queue card for `point`, or null. Exported so the caller can check first. */
 export function queueCard(html, point) {
-  const re = new RegExp(`<details>\\s*<summary><span class="num">${point}</span>[\\s\\S]*?</details>\\s*`)
+  const re = new RegExp(`<details>\\s*<summary>${CARD_NUMBER_SOURCE(point)}[\\s\\S]*?</details>\\s*`)
   const m = String(html ?? '').match(re)
   return m ? m[0] : null
 }
