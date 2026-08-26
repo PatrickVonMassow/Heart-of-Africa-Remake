@@ -23607,3 +23607,264 @@ Nummerierung bleiben deshalb identisch — hier wird nur verschoben, nie umgesch
   following 747. The ceiling mechanisms bound the damage, this one buys throughput, and its own
   first stage depends on 744's corrected exit path.
   Bundle: Session- & Repo-Hygiene.
+
+- [x] 918. The durable lane's activation interlock takes the drain's word for it, and the drain
+  itself has an admission window. FOUND 25.08.2026 by a cross-vendor audit (GPT-5.6 Sol via
+  `ask-sol`, kind audit) of a proposed pull-forward of 676's activation slice; the audit REJECTED
+  the pull-forward and its findings are recorded here so they survive the conversation. The two
+  code-level gaps, verified against the sources:
+  (1) EVIDENCE GAP: `activationDecision` in `scripts/durable-lane-flag-core.mjs` demands
+  commit-visible evidence for every required STEP, but for the boundary mode it verifies only the
+  literal string `drain-before-boundary`. The same reviewed change can therefore declare the mode,
+  mark the steps green, and open the flag without the manifest ever carrying evidence that the
+  drain ENFORCEMENT exists as code. The interlock's own header says a hand-edited flag may not
+  silently advertise a boundary mode the mechanisms cannot perform — today it can.
+  (2) ADMISSION RACE: refusing a planned boundary while a daemon-owned worker is OBSERVED active
+  is not a drain. The flag is not consulted per call and gates only daemon startup, so a live
+  daemon can admit a new worker between the boundary's active-worker check and the handover.
+  Draining must atomically CLOSE ADMISSION first (a fenced refusal the daemon enforces), then
+  empty, then hand over.
+  CONTEXT THE AUDIT ALSO SETTLED, recorded for the planner rather than as work of this point:
+  step 9 (crash-recoverable serial landing) is NOT landed — 895 delivered only the journal
+  vocabulary and successor decision (`scripts/batch-landing-core.mjs` says the landing inside
+  `land-point.mjs` is 676's remainder); ten of the eleven step-12 drills do not exist yet
+  (`scripts/batch-daemon-drill.mjs` carries only `parent-death`); and 676's measured baseline
+  trial is the acceptance and may not slip past activation. An activation shortcut around 676's
+  order is therefore off the table.
+  FINAL STATE: the activation decision requires, beside the step manifest, a boundary-mechanism
+  entry with the same green-plus-evidence shape, refusing while it is absent; and the daemon's
+  control plane exposes an atomic close-admission operation the boundary path uses before it
+  counts workers, so the drain 676 builds has the seam it needs. Both land with unit cases; the
+  behavior of an already-open flag is unchanged.
+  VERIFIABLE: Vitest over `activationDecision` — a manifest with all steps green but no evidenced
+  boundary mechanism refuses and names it; over the daemon core — after close-admission a spawn
+  request is refused with a journalled reason, and the refusal survives a daemon restart; and the
+  existing flag tests stay green.
+  Criticality: med — the flag opens only through a reviewed change, but a wrongly opened lane
+  loses work, and this is the recorded reason the shortcut was rejected.
+  Bundle: unbundled (batch autonomy).
+
+- [x] 921. An era rule turns correctly recorded do-not-merge rows into hand-written ones, and the
+  four-eyes gate then blocks every turn. FOUND 25.08.2026 at the point boundary after point 918
+  landed: `mechanism-review-guard` reports UNREVIEWABLE for a dozen pending commits, and for each
+  one the reason is "a recorded do-not-merge on <sha> is malformed … it can only have arrived by
+  hand". The rows it names are not hand-written. `reviewRecordWellFormed`
+  (`scripts/mechanism-review-core.mjs:1266`) demands a `reviewerAuthorship` object, and for an
+  Anthropic reviewer the status `agreement`; rows the recorder itself wrote BEFORE that field
+  existed carry none at all (`5ce597c`, `042ffbf`, `e1d242a`, `65022b1`) or carry `unverified`
+  beside an Anthropic model (`ece3757`). The check has no era boundary, so a later rule reaches
+  backwards and condemns its own history.
+  WHY IT MATTERS: the message names a repair — "fix or remove the row, on the record" — for which
+  no command exists, and editing the ledger by hand is precisely what the message treats as the
+  defect. The gate is therefore not merely wrong, it is unexitable, and it stands in front of
+  every turn that ends on `main`.
+  FINAL STATE: the well-formedness check gains an era boundary of the same shape
+  `MODE_REQUIRED_SINCE` already has for the mode field — a row recorded before the identity
+  requirement landed stays well formed without it, a row recorded after it does not — or, where
+  that is judged too weak, a migration command that stamps the historical rows verifiably instead
+  of a person editing them. Either way the recorded verdicts keep their meaning: a do-not-merge
+  stays a do-not-merge, and nothing becomes reviewable that was not.
+  VERIFIABLE: Vitest over `reviewRecordWellFormed` — a pre-era row without `reviewerAuthorship`
+  is well formed, the same row dated after the boundary is not, an Anthropic `unverified` row
+  from before the boundary is well formed and from after it is not; plus a case over the guard
+  showing the named commits no longer report UNREVIEWABLE for that reason; plus `npm run
+  test:unit`, lint, build.
+  MEASURED WHILE FILING IT, so the successor does not repeat the probe: ten distinct malformed
+  rows stand behind the refusal (`042ffbf`, `5ce597c`, `65022b1`, `7db99ea`, `80b96e6`,
+  `c3f5ad8`, `e0ebcff`, `e1d242a`, `ece3757`, `f999250`, `fe20777`), and beside them one debt of
+  a different kind that this point also owes an answer: five commits report "the review was split
+  into 2 passes over the FILE SET and only 1 are on record". A COMPLETE scoped one-round review
+  recorded on 25.08.2026 for `8d69529` (GPT-5.6 Sol, verdict merge, all four end-state files)
+  did NOT clear that entry, so a scoped 1/1 record and a recorded 2-pass split do not meet — say
+  which of the two the file debt is measured against, and make the other one say so.
+  Criticality: high — it blocks the batch at the turn end and its stated repair invites hand
+  edits of the very ledger that carries the four-eyes evidence.
+  Bundle: Session- & Repo-Hygiene.
+
+- [x] 923. The preflight and the four-eyes gate return opposite verdicts for the same HEAD, so
+  the one report that exists to answer "would a guard block me" cannot be believed. MEASURED
+  25.08.2026 at `df540a3f`, seconds apart and in the same tree: the Stop-path guard
+  (`echo '{"session_id":"…"}' | node scripts/mechanism-review-guard.mjs`) reported REVIEW GAP —
+  "a review nobody can produce is not demanded: this turn may end" — while
+  `node scripts/guard-preflight.mjs --for answer --session <id>` reported the SAME guard as
+  "would-block: FOUR-EYES GATE ON MECHANISMS — UNREVIEWABLE: this range contains contributions
+  with no eligible reviewer vendor."
+  WHY IT MATTERS: `gatherMechanismReviewInputs` is exported precisely so the preflight judges
+  the gate "from the SAME gathering the Stop hook uses rather than a second copy of this git
+  work, which would drift and hand back a false 'clean'"
+  (`scripts/mechanism-review-guard.mjs:275-280`). This is that drift, in the false-BLOCK
+  direction: the comment guarded against a false green and the measured failure is a false red,
+  which costs a session's opening hunting a refusal the real gate never raises. A preflight that
+  contradicts the guard is useless in both directions, because the reader cannot tell which of
+  the two to believe.
+  FINAL STATE: preflight and Stop path yield the same block/allow decision and the same finding
+  kind for the same HEAD, or the preflight states in its own row which additional condition it
+  is judging that the Stop path is not — so a difference is a stated difference, never a
+  contradiction.
+  VERIFIABLE: Vitest driving both paths over one fixed set of inputs (baseline, head, pending
+  commits, records) and asserting the same decision and the same finding kind, including the
+  review-gap case that produced this divergence; plus `npm run test:unit`, lint, build.
+  Criticality: med — no player-visible defect, but it is the batch's own "may I act" report
+  disagreeing with the gate it reports on.
+  Bundle: Session- & Repo-Hygiene.
+
+- [x] 676. An authoring lane must survive the session that spawned it (specified 13.08.2026 by
+  the blind-parallel four-eyes stage of CLAUDE.md §6; the counted union, the final proposal and
+  the rejected alternatives are `docs/handover-architecture.md`). TWO RULES OF THIS HOUSE
+  CONTRADICT EACH OTHER TODAY: the pool runs up to three authoring lanes, and the session hands
+  over on context — but every lane a session spawned dies with that session, so a session that
+  keeps the pool busy can hand over only by throwing its own work away. Point 675 closes the
+  three MECHANICAL defeats of the handover on today's mechanics; this point builds the plane
+  underneath, so that a lane stops belonging to a session at all.
+  THIS POINT BEGINS AFTER POINT 834, its front stage, and the steps 834 carries are struck from
+  here rather than repeated: the neutral fold of the two blind lists by a model that wrote neither
+  half, the schemas and invariants, the durable state store, the daemon with the Sol adapter, the
+  transferable declarations with their fencing, and the slice of fenced discovery, adoption and
+  reconciliation a fresh session needs before it may prove and land what it adopted. What 834's
+  fold settles in the union is what this point builds on. An Agent-tool child stays NON-
+  transferable, and the stand-down and dead-owner rules are point 716's, inherited rather than
+  restated.
+  FINAL STATE, as the union settles it: authoring runs as DAEMON-OWNED detached workers under a
+  model-neutral adapter (`scripts/detached-agent.mjs`) whose reference implementation is the
+  already-detached `scripts/author-sol.mjs`; an Agent-tool child stays session-bound and is
+  declared NON-transferable, blocking a boundary until it finishes or is safely stopped. The
+  coordinator plane is short-lived and split into dispatcher and lander epochs, holding one
+  renewable batch lease whose epoch FENCES every mutation, so two sessions can never adopt the
+  same batch. Coordination state is an append-only checksummed journal beside the repository with
+  an atomically replaced snapshot for fast resume, and every point carries an explicit state
+  (queued, running, checkpointing, ready-for-review, landing, landed, failed, stalled,
+  cancelled). A successor adopts supervision by STABLE JOB IDENTITY — never by process
+  reparenting, never by PID alone — after reconciling every recorded lane against journal,
+  worktrees and local/remote SHAs, and quarantining what it cannot prove. Refill comes only from
+  a bounded, pre-authorized queue behind a global three-lane cap and a completed-review backlog
+  limit, with a journalled REASON whenever three eligible lanes exist and fewer run. Landing stays
+  serial behind a batch-wide landing lock with a crash-recoverable staged journal, and the
+  main-session picture judgments are persisted as evidence a worker may never substitute.
+  Drain-before-boundary REMAINS as the explicit degraded mode whenever any active lane is not
+  transferable.
+  BUILD THE REMAINDER IN THE UNION'S ORDER (bounded dispatch, checkpoint barrier, the two-phase
+  boundary, successor reconciliation beyond the slice 834 claims, the crash-recoverable landing
+  journal, board projection, metrics), each step green on the unit layer before the next, and roll
+  out with the Sol adapter ALONE until the failure drills pass.
+  VERIFIABLE: the unit cases the union names per step; the failure drills — worker crash, stall,
+  push failure, dirty worktree, marker deletion, daemon restart, corrupt snapshot, PID reuse,
+  duplicate coordinator, remote outage, checkpoint timeout — each run through the daemon's drill
+  command; and a measured trial against a recorded baseline day, whose success needs ZERO safety
+  incidents (no lost attempt, no duplicate writer, no overlapping lease, no silently missed
+  boundary), a median handover context materially below baseline, and points landed per day no
+  worse than baseline. Utilization is supporting evidence, never the acceptance test on its own.
+  MECHANISM REVIEW REQUIRED (CLAUDE.md §7.2) per step, not once at the end.
+  Criticality: high — it owns the batch's dominant cost and every lane's durability, and a defect
+  here loses work rather than merely slowing it.
+
+- [x] 595. The verification ladder (point 572's measure 5). While a render point is still
+  being FIXED, only the cheapest covering suite runs, on the everyday WebGPU lane; the
+  full proof — both backends where they can differ, LARGE where the change warrants it —
+  runs exactly ONCE, on the EXACT MERGE CANDIDATE — `main` merged into the branch, the tree
+  that will land — with the recorded `git HEAD` of that run as the evidence that the verified
+  tree IS the merged one. Nothing enforces or measures that today. The expensive browser
+  suites abort at the FIRST failure during that iteration (a red run is never credited
+  anyway) and run to completion only for the final proof. The rule is a brief building block
+  for render points, so it is applied rather than remembered.
+  A RED IS A RED. No "critical versus cosmetic" class is introduced to decide what may be
+  aborted on — the classification buys nothing here, because an iteration run is not credited
+  either way, and it would open the door to waving a red through.
+  THE SHARED FINAL RUN IS ALREADY DECIDED, and this point must not be read as contradicting
+  it: `docs/work-packages.md` settled that several FINISHED per-point branches may be merged
+  together and ONE regression run over the merged result — "the only sizeable saving left".
+  What that shared run may replace is the repeated full REGRESSION. The both-backend PICTURE
+  proof stays on the branch, BEFORE the merge, exactly as it is today; merging first to
+  verify afterwards cost about thirty turns of a block-loop on 24.07.2026.
+  THE UNIT LAYER HAS THE SAME LADDER: `vitest --changed` or a path filter and
+  `tsc --incremental` are legal WHILE REPAIRING, and an incremental green is never an
+  acceptance — the full fast gate stays the proof. One rule covering both layers, not two
+  half-rules.
+  MEASURED TARGET: verification is 47.0 % of the weighted spend and 37.4 % of the machine
+  hours, the ten costliest points hold 64.4 % of all point-assigned verification tokens,
+  and eight of ten recorded `enrichments` runs failed while still writing all 37 frames at
+  951–1029 s each.
+  THE LADDER'S CHEAPEST RUNG ALREADY EXISTS AND IS UNUSED (user question 09.08.2026: "Und
+  die neuen Möglichkeiten für differenziertes Testen durch 566 werden auch inzwischen bei
+  den Feature- und Bugtests eingesetzt?"). Point 566 built `--section=<name>`, and
+  `enrichments` declares nine of them; the resolver, the PARTIAL marking and the refusal to
+  count a partial run as coverage all work. CHECKED 09.08.2026: nothing routes anyone to
+  it. It appears in `scripts/verify/README.md` and in `tiers.mjs`, in no delegation brief,
+  in no agent prompt and in no rule text — the three agents commissioned that same evening
+  were not told about it either — and the recorded render-verify runs contain no partial
+  run at all. So the ladder's bottom rung is not a thing to invent here; it is a built
+  tool to PUT IN THE PATH. This point therefore also: (a) makes `--section` the stated
+  iteration rung for a render point in the delegation brief's building block, so an agent
+  reaches for it before replaying a whole pass; (b) SECTIONS the remaining render suites,
+  which 566 deferred ("enrichments first, then the other render suites"); and (c) states
+  in the same building block that the final proof is whole-suite, so the cheap rung can
+  never be mistaken for the acceptance.
+  WORK FOR 595–598 ALREADY STANDS ON A BRANCH (11.08.2026). A session that died left
+  `feat/595-598-verification-ladder-brief` PUSHED at 0d555552 — four commits plus a merge of
+  `origin/main`, covering all four points — with its worktree
+  `.claude/worktrees/agent-a7b6ba2cc654e6411` still in the tree. It was never reported,
+  verified or landed. Whoever takes these points STARTS FROM THAT BRANCH and verifies it
+  against the specs here; rebuilding from scratch throws away finished work. Cleaning that
+  worktree away before the branch has been judged is what point 629 exists to prevent.
+  Criticality: medium — it reorders the proof but must not dilute it; the both-backend
+  picture proof stays exactly as binding as it is today.
+  BRANCH STATE, RE-MEASURED 23.08.2026 (the 17.08. paragraph it replaces is stale): the branch
+  `feat/595-598-verification-ladder-brief` (tip 85eaa47c) DELIVERS this point and is now ~1615
+  commits behind main — but that number overstates the conflict badly. NONE of the nine
+  re-sectioned suites (events, gamepad, handwriting, health, invariants, report, touch, voice,
+  world) and not `scripts/point-brief.mjs` carry a single main commit since the branch tip. Only
+  two files moved: `scripts/point-brief-core.mjs` (e5737113, sentence-case titles) and
+  `scripts/verify/README.md` (2bac561f, 79b6e4f1, f6c92b65, 35b9f00a). SO: merge main, resolve
+  those two surgically, then read the real diff — do NOT rebuild the suites.
+  THE OWED BOTH-BACKEND PICTURE PROOF NOW RUNS IN A DIFFERENT ENVIRONMENT than the one the
+  17.08. paragraph assumed, and it must be produced under this one: headless EGL routing
+  (fed2fe84), GPU backend probing at bring-up (35b9f00a), a hard failure before app startup when
+  a backend is absent (f6c92b65), bounded verify-run digests (64691b29) and the re-exec-ed
+  default verify launch (764f477b). Those four post-branch README changes must survive the
+  README merge.
+  THE NAME IS NOT THE SCOPE: point 597 has LANDED since and is archived — a taker must not
+  redo it — and open point 596 must not be pulled into this landing.
+  THE ABORT-AT-FIRST-FAILURE SENTENCE IS A RULE FOR AGENTS, NOT A MECHANISM (decided
+  25.08.2026 from the delegated author's escalation): the opening sentence says the expensive
+  browser suites abort at the FIRST failure during iteration, but the scope list (a)/(b)/(c)
+  does not carry it and no shared check helper spans the suites — each defines its own `check`,
+  so enforcing it would be a cross-suite build. It ships as ladder text. If it is ever wanted as
+  a mechanism, it needs its own point, because that is what it costs.
+
+- [x] 598. The brief orients in the code, not only in the spec (point 572's measure 8).
+  The delegation brief carries a GENERATED orientation: the paths the specification itself
+  names, and a per-directory line of responsibility derived from the tree and its file
+  headers. It is marked as a HINT, never as an instruction ("the specification names these
+  paths", not "change these files"), and it is generated on every run so it cannot go
+  stale.
+  AND IT NAMES THE PLANNED CHECK — as an ITERATION CHECK SET, not as one suite. Two corrections
+  to the original wording, both from the 23.08.2026 staleness audit.
+  TIMING: a brief is generated BEFORE the implementation diff exists, so the hint cannot
+  initially derive from the real diff→suite mapping. It derives from the PROSPECTIVE paths the
+  specification itself names; once a diff exists, a regenerated brief derives it from that diff.
+  SHAPE: the hint names one or more suite/`--section` pairs — a diff touching several suites
+  cannot be represented by a single pair — and it is stated SEPARATELY from the whole-suite
+  final proof, so the cheap rung can never be read as the acceptance. The singular wording
+  contradicted point 595 itself, where sections are the iteration rung and the proof is the
+  whole suite. Generated like the rest so it cannot go stale, and marked as a hint like the path
+  list. This is the cheapest possible answer to what the ladder point found: a rung that is built
+  and routed to nobody gets used when it stands in the artefact the agent reads FIRST, not in a
+  rule it must remember.
+  MEASURED TARGET: search/read is 25.2 % of the weighted spend and the first responses of
+  a delegated agent are almost always search; five saved responses per point is ~2 % of a
+  median point.
+  NOT THE OPPOSITE DIRECTION: shrinking the brief was weighed and rejected on the arithmetic.
+  Removing 1.5k tokens saves ~35.7k weighted per point, while a single reference the agent
+  must then look up costs 22.9k — it breaks even at 1.5 extra lookups and goes negative
+  after. The brief is 1.9 % of the spend and exists to avoid the ~108k wholesale read.
+  Criticality: low — a wrong list would misdirect, which generation-from-the-tree and the
+  hint framing address.
+  BRANCH STATE, RE-MEASURED 23.08.2026 (the 17.08. paragraph it replaces is stale): the branch
+  `feat/595-598-verification-ladder-brief` (tip 85eaa47c) DELIVERS this point too. Main has not
+  touched `scripts/point-brief.mjs` since the branch tip, and a brief generated today carries
+  neither an orientation nor a planned-check section — so this deliverable is NOT superseded. The
+  merge surface and the owed both-backend picture proof are described once, under point 595.
+  WHICH DIFF THE ORIENTATION READS IS NAMED HERE, because the TIMING correction left it open
+  and a different base yields a different check set (decided 25.08.2026): the fork point to
+  HEAD, plus uncommitted work — not the working tree alone and not the point's own commits.
+  The delegated author chose this base and documented it in the code; this line makes the
+  choice the spec's rather than the author's.

@@ -826,6 +826,338 @@ export const CALL_DISCIPLINE = [
   '  session or another agent has written since.',
 ]
 
+/**
+ * WHAT MAKES A POINT A RENDER POINT — the trigger for the verification ladder
+ * below (point 595). Read off the SPEC's own wording, because that is all a
+ * brief has: the files a point will touch are not known until it is worked.
+ *
+ * DELIBERATELY GENEROUS. The two errors are not symmetric: a missed render
+ * point is an agent replaying whole suites because nobody told it about the
+ * cheap rung — the exact cost this point exists to remove — while a false
+ * positive costs ~250 tokens of advice that is merely irrelevant. So a browser
+ * suite named by name counts, and so does any word that means the rendered
+ * picture, the renderer, or a backend.
+ */
+const RENDER_WORDS =
+  /\b(?:render(?:s|ed|er|ing)?|re-render|shader|tsl|screenshot|frame|picture|pixel|backend|webgpu|webgl|graphic|visual|camera|zoom|texture|material|lighting|shadow|terrain|water|river|wildlife|animal|herd|geometry|mesh|scene|sky|fog|hud|overlay|settlement|village|panorama|silhouette|animation|animated|draw|drawn|paint(?:s|ed)?)\w*/i
+/** The browser suites (scripts/verify/*.mjs that drive a page). `docs` is the
+ *  one pure-Node check and is not one, so naming it is no render signal. */
+const RENDER_SUITE =
+  /\b(?:startup|world|i18n|flow|health|events|collision|handwriting|polish|gamepad|touch|voice|settings|enrichments|invariants|benchmark|report)\.mjs\b/i
+
+/** Does this spec describe work that can move the rendered picture? Total. */
+export function isRenderPoint(spec) {
+  const text = String(spec ?? '')
+  return RENDER_WORDS.test(text) || RENDER_SUITE.test(text)
+}
+
+/**
+ * THE VERIFICATION LADDER (point 595, measure 5 of point 572). Carried by the
+ * BRIEF rather than by a guard, for the same reason as the call discipline
+ * above: "you replayed a whole suite where one section would have done" is not
+ * decidable after the fact, and the rule is only worth anything BEFORE the run.
+ *
+ * WHY IT IS OWED AT ALL. Verification is 47.0 % of the weighted spend and 37.4 %
+ * of the machine hours; the ten costliest points hold 64.4 % of all
+ * point-assigned verification tokens; eight of ten recorded `enrichments` runs
+ * FAILED while still writing all 37 frames at 951–1029 s each. And the cheapest
+ * rung already existed and was unused: point 566 built `--section`, `enrichments`
+ * declares nine of them, and on 09.08.2026 nothing routed anyone to it — not one
+ * recorded run was partial, and the three agents commissioned that evening were
+ * not told it exists. This block is that routing.
+ *
+ * IT MUST NOT READ AS A DISCOUNT ON THE PROOF, which is why every rung says what
+ * it does NOT prove, why the whole-suite/both-backend picture proof is stated in
+ * the same breath, and why "a red is a red" stands here rather than a
+ * critical-versus-cosmetic class nobody could apply honestly.
+ */
+export const VERIFICATION_LADDER = [
+  'THE VERIFICATION LADDER — THIS POINT CAN MOVE THE PICTURE (point 595). Climb it; do not',
+  'start at the top:',
+  '- WHILE YOU ARE STILL FIXING, run the CHEAPEST rung that covers what you changed, on the',
+  '  everyday WebGPU lane (unpinned `VERIFY_GL`):',
+  '  1. ONE SECTION of one suite — `npm test -- <suite> --section=<name>` (point 566). It runs',
+  '     that block\'s setup and its checks and nothing else. The names come from the suite\'s own',
+  '     source: `node scripts/verify/run-all.mjs <suite> --section=list` refuses the unknown name',
+  '     and PRINTS every real one, in a tenth of a second and without booting a browser.',
+  '  2. then the ONE suite that covers the change — `npm test -- <suite>`;',
+  '  3. the whole set only for the final proof.',
+  '  The unit layer has the SAME ladder, not a second rule: a path filter',
+  '  (`npx vitest run <path>`), `vitest --changed` and `tsc --incremental` are legal while you',
+  '  are repairing.',
+  '  An iteration run is never CREDITED as coverage, so let an expensive suite STOP at its',
+  '  first failure while you iterate; run it to completion only for the final proof.',
+  '- AN INCREMENTAL GREEN IS NEVER AN ACCEPTANCE. A `--section` run is recorded PARTIAL and',
+  '  `runVerdict` refuses it as coverage whatever its exit code; a path-filtered unit run',
+  '  proves that path and nothing around it. The proof is the FULL fast gate (`npm run build`,',
+  '  `npm run lint`, `npm run test:unit`) plus the WHOLE suite, unfiltered.',
+  '- THE FULL PROOF RUNS EXACTLY ONCE, ON THE EXACT MERGE CANDIDATE. Merge `main` INTO your',
+  '  branch FIRST, then verify that tree — the one that will land — and REPORT the `git HEAD`',
+  '  you verified (`git rev-parse HEAD`), which is the evidence that the verified tree is the',
+  '  merged one. Verifying before the sync proves a tree nobody merges; merging FIRST and',
+  '  verifying afterwards cost ~30 turns of a block-loop on 24.07.2026, so the both-backend',
+  '  PICTURE proof stays ON THE BRANCH, before the merge — a shared final regression over',
+  '  several finished branches may replace the repeated REGRESSION, never that picture.',
+  '- A RED IS A RED. There is no "cosmetic" class that may be waved through: an iteration run',
+  '  is not credited either way, so the distinction buys nothing and only opens a door.',
+]
+
+// ---------------------------------------------------------------------------
+// ORIENTATION IN THE CODE (point 598). The brief oriented its reader in the
+// SPEC and left it to find its way around the TREE by searching — and search is
+// 25.2 % of the weighted spend, most of it in a delegated agent's first
+// responses. So the brief also carries the paths the spec itself names, what
+// lives in their directories, and the check set to iterate against.
+//
+// EVERYTHING HERE IS GENERATED ON EVERY RUN, from the tree and from the work
+// order's own diff→suite mapping. A hand-kept list would be wrong within a
+// month, and a wrong list is worse than none: it MISDIRECTS, which is the one
+// real risk this block carries. Hence the second rule — it is framed as a HINT
+// ("the specification names these paths"), never as an instruction ("change
+// these files"): the spec decides what is to be changed, this only says where
+// the reader might start looking.
+// ---------------------------------------------------------------------------
+
+/** Directories a repo path may start with — the tree's own top level. */
+const ROOT_DIRS = ['src', 'scripts', 'docs', 'public', 'verification', 'local', '.claude', '.github']
+/** Root files the corpus names without a directory. */
+const ROOT_FILES = ['CLAUDE.md', 'TASKS.md', 'design.md', 'README.md', 'package.json', 'index.html', 'vite.config.ts']
+const PATH_EXT = /\.(?:ts|tsx|mjs|cjs|js|jsx|json|md|html|css|yml|yaml|png|glsl|wgsl)$/
+
+/** A token that could be a path: no whitespace, no quotes, at least one slash. */
+const PATH_TOKEN = /[A-Za-z0-9_@.][A-Za-z0-9_./-]*/g
+
+/**
+ * The repo paths a spec NAMES, in the order it names them, de-duplicated.
+ *
+ * The corpus writes paths in backticks, in prose and inside sentences, so the
+ * token is read first and JUDGED after: it counts only if it starts at the
+ * tree's own top level or carries a source extension. That is what keeps
+ * "store/systems logic", "journal/TTS", "and/or" and a CDN host out — each of
+ * them a slash-carrying token this brief must not present as a file.
+ * Total: never throws.
+ */
+export function pathsIn(spec) {
+  const out = []
+  const seen = new Set()
+  for (const m of String(spec ?? '').matchAll(PATH_TOKEN)) {
+    let p = m[0].replace(/[.,;:)]+$/, '')
+    if (ROOT_FILES.includes(p)) {
+      if (!seen.has(p)) { seen.add(p); out.push(p) }
+      continue
+    }
+    if (!p.includes('/')) continue
+    const top = p.split('/')[0]
+    if (!ROOT_DIRS.includes(top) && !PATH_EXT.test(p)) continue
+    // A trailing slash marks a directory and is kept — `src/ui/` and `src/ui`
+    // are the same place, so one spelling wins to keep the list short.
+    p = p.replace(/\/+$/, '/')
+    if (seen.has(p)) continue
+    seen.add(p)
+    out.push(p)
+  }
+  return out
+}
+
+/** The mapping paragraph in the work order's preamble, as written there. */
+const DIFF_MAP_RE = /Diff\s*→\s*browser-suite mapping:([\s\S]*?)(?:\n\s*\n|$)/
+
+/**
+ * The work order's OWN diff→suite mapping, parsed out of the text the brief is
+ * already reading. Nothing is copied into this file: the paragraph in TASKS.md
+ * stays the single source, so the mapping in a brief is whatever the work order
+ * says today. An entry is `<subject> → <suites>`, the entries separated by `·`.
+ *
+ * `subject` keeps its written form; `paths` are the backticked ones (the only
+ * mechanically matchable half — "store/systems logic" and "journal/TTS" are
+ * prose and are carried as prose, so a reader still sees the rule that governs
+ * them). Total: an absent or reshaped paragraph yields [], never a throw.
+ */
+export function parseDiffSuiteMap(tasksText) {
+  const m = DIFF_MAP_RE.exec(normalise(tasksText))
+  if (!m) return []
+  return m[1]
+    .split('·')
+    .map((entry) => entry.replace(/\s+/g, ' ').trim())
+    .filter(Boolean)
+    .map((entry) => {
+      const arrow = entry.split(/→/)
+      if (arrow.length < 2) return null
+      const subject = arrow[0].trim()
+      const suites = arrow
+        .slice(1)
+        .join('→')
+        .replace(/\.\s*When unsure.*$/i, '')
+        .trim()
+      const paths = [...subject.matchAll(/`([^`]+)`/g)].map((p) => p[1])
+      return suites ? { subject, suites, paths } : null
+    })
+    .filter(Boolean)
+}
+
+/** Does a mapping subject cover this path? A directory subject covers what is
+ *  under it; `scripts/verify/X.mjs` is the wildcard the work order writes for
+ *  "the suite itself"; `*.md` covers any document. */
+function mapEntryCovers(entry, path) {
+  return entry.paths.some((raw) => {
+    if (raw === '*.md') return path.endsWith('.md')
+    const pattern = raw.replace(/\/+$/, '/')
+    if (pattern.includes('X.mjs')) {
+      const dir = pattern.slice(0, pattern.indexOf('X.mjs'))
+      return path.startsWith(dir) && path.endsWith('.mjs')
+    }
+    return pattern.endsWith('/') ? path.startsWith(pattern) : path === pattern
+  })
+}
+
+/**
+ * The ITERATION check set for this point: which suites the work order's mapping
+ * names for the paths handed in — the spec's prospective paths before an
+ * implementation exists, the real diff once one does — and, for
+ * `scripts/verify/X.mjs`, the suite that IS the file. Each answer carries the rule it came from, so a
+ * reader can see the reasoning and overrule it.
+ *
+ * `unmapped` names the paths no rule covers, rather than passing over them: a
+ * silent omission would read as "nothing to run here", which is the one wrong
+ * message this block could send. Total: never throws.
+ */
+export function plannedCheck(paths, map) {
+  const byRule = []
+  const unmapped = []
+  for (const path of paths ?? []) {
+    const entry = (map ?? []).find((e) => mapEntryCovers(e, path))
+    if (!entry) {
+      unmapped.push(path)
+      continue
+    }
+    // `scripts/verify/X.mjs → X itself` names a suite per FILE, so resolve it.
+    const suites = /itself/i.test(entry.suites)
+      ? [path.replace(/^.*\//, '').replace(/\.mjs$/, '')]
+      : entry.suites
+          .split(/,| and /)
+          // The paragraph is prose: its last entry ends in a full stop, which is
+          // punctuation and not part of a suite name.
+          .map((s) => s.trim().replace(/[.;]+$/, ''))
+          .filter(Boolean)
+    const found = byRule.find((r) => r.rule === entry.subject && r.suites.join() === suites.join())
+    if (found) found.paths.push(path)
+    else byRule.push({ rule: entry.subject, suites, paths: [path] })
+  }
+  return { byRule, unmapped }
+}
+
+/**
+ * Documents the orientation does NOT point at, however often a spec names them.
+ * design.md, CLAUDE.md and the work order are the AUTHORITIES nearly every spec
+ * cites; the brief already resolves them for its reader (the sections carried
+ * above, the reference map, the harness's own copy of CLAUDE.md). Listing them
+ * as "where to look" would put a line nobody needs in every brief, and would
+ * plan the `docs` suite for every point on the strength of a citation.
+ */
+export const ORIENTATION_SKIP = new Set(['design.md', 'CLAUDE.md', 'TASKS.md', 'docs/tasks-archive.md'])
+
+/** How many named paths / directories one orientation block carries. A brief
+ *  that lists forty files has stopped orienting anybody, and the cost of the
+ *  block has to stay far under the search it replaces. */
+export const ORIENTATION_LIMITS = { paths: 12, dirs: 6, siblings: 8, sections: 12 }
+
+/**
+ * The orientation block, from facts the caller read out of the tree:
+ *   files  [{ path, header, exists }]   — the spec's paths and their own headers
+ *   dirs   [{ dir, count, note }]       — what lives around them
+ *   check  { byRule, unmapped }         — plannedCheck's answer
+ *   sections { suite: [name, …] }       — the ladder's cheapest rung, per suite
+ *   checkSource 'spec' | 'diff'         — where the check set was derived from
+ * Returns [] when there is nothing to say, so the brief prints no empty heading.
+ *
+ * THE CHECK SET IS AN ITERATION SET, NOT AN ACCEPTANCE (correction 23.08.2026).
+ * It is printed as suite/`--section` PAIRS — a diff touching several suites has
+ * no single pair — and the whole-suite final proof stands under its OWN heading
+ * below it, because a cheap rung printed as "the check that proves it" is read
+ * as the acceptance, and point 595 says the proof is the whole suite.
+ */
+export function orientationBlock({ files = [], dirs = [], check = null, sections = {}, checkSource = 'spec' } = {}) {
+  const out = []
+  if (!files.length && !dirs.length && !(check && check.byRule.length)) return out
+  out.push(
+    '--- ORIENTATION (GENERATED HINT — the spec decides, this only says where to look) ---',
+    'Read from the tree at generation time, so it cannot be stale. It is where the',
+    'specification points, NOT a list of files to change, and it is not exhaustive.',
+  )
+  if (files.length) {
+    out.push('THE PATHS THE SPECIFICATION NAMES, with each file\'s own first header line:')
+    for (const f of files.slice(0, ORIENTATION_LIMITS.paths)) {
+      out.push(
+        f.exists
+          ? `- ${f.path}${f.header ? ` — ${f.header}` : ''}`
+          : `- ${f.path} — NOT IN THE TREE. The spec names it: either it is to be created, or the name moved.`,
+      )
+    }
+    if (files.length > ORIENTATION_LIMITS.paths) {
+      out.push(`- (+${files.length - ORIENTATION_LIMITS.paths} more named in the spec above)`)
+    }
+  }
+  if (dirs.length) {
+    out.push('WHAT LIVES AROUND THEM:')
+    for (const d of dirs.slice(0, ORIENTATION_LIMITS.dirs)) {
+      out.push(`- ${d.dir} (${d.count} file${d.count === 1 ? '' : 's'})${d.note ? ` — ${d.note}` : ''}`)
+    }
+  }
+  if (check && (check.byRule.length || check.unmapped.length)) {
+    // WHERE THE SET COMES FROM is said out loud, because it changes with time:
+    // a brief cut BEFORE the implementation exists can only read the paths the
+    // spec names, while a brief regenerated once a diff exists reads that diff
+    // and is the sharper of the two (correction 23.08.2026).
+    out.push(
+      checkSource === 'diff'
+        ? 'THE ITERATION CHECK SET (from YOUR CURRENT DIFF through the work order\'s diff→suite mapping) —'
+        : 'THE ITERATION CHECK SET (from the PROSPECTIVE paths the spec names, through the work order\'s' +
+            ' diff→suite mapping; regenerate once a diff exists and it derives from that) —',
+      'the cheap rung to REPAIR with. It is never the acceptance:',
+    )
+    const planned = []
+    for (const r of check.byRule) {
+      const names = r.suites.join(', ')
+      out.push(`- ${r.paths.join(', ')} → ${names}   [rule: ${r.rule}]`)
+      for (const suite of r.suites) {
+        if (!planned.includes(suite)) planned.push(suite)
+        const list = sections[suite]
+        if (list && list.length) {
+          // `enrichments` declares forty; printing them all would cost more than
+          // the search this block replaces. The rest are one command away, and
+          // that command is named instead of the names.
+          const shown = list.slice(0, ORIENTATION_LIMITS.sections)
+          const rest = list.length - shown.length
+          out.push(
+            `    npm test -- ${suite} --section=<one of>:`,
+            `      ${shown.join(' · ')}${rest > 0 ? ` … +${rest} more: node scripts/verify/run-all.mjs ${suite} --section=list` : ''}`,
+          )
+        } else {
+          out.push(`    ${suite} declares no sections — its cheapest rung is the suite itself: npm test -- ${suite}`)
+        }
+      }
+    }
+    if (check.unmapped.length) {
+      // A DIFF-derived set can be long, and a forty-path line orients nobody —
+      // the same reason the path list above is capped.
+      const shown = check.unmapped.slice(0, ORIENTATION_LIMITS.paths)
+      const rest = check.unmapped.length - shown.length
+      out.push(
+        `- no mapping rule covers ${shown.join(', ')}${rest > 0 ? ` (+${rest} more)` : ''} — decide the suite yourself; ` +
+          'the work order says: when unsure, include the suite.',
+      )
+    }
+    out.push(
+      'THE FINAL PROOF IS SEPARATE AND WHOLE-SUITE (point 595), run ONCE on the exact merge candidate:',
+      `      ${planned.length ? `${planned.join(', ')} — unfiltered` : 'the covering suite(s) — unfiltered'}`,
+      'plus the full fast gate (npm run build, npm run lint, npm run test:unit). A --section run is',
+      'recorded PARTIAL and counts as no coverage whatever its exit code.',
+      'The Vitest layer runs ALWAYS, whatever this says.',
+    )
+  }
+  return out
+}
+
 const HOUSE_FACTS = [
   'HOW TO USE THIS BRIEF — READ THIS FIRST',
   '- This brief IS your spec. Do NOT read TASKS.md or docs/tasks-archive.md or design.md',
@@ -968,6 +1300,8 @@ export function assembleBrief({
   referenced = [],
   notes = [],
   referenceMap = [],
+  ladder = [],
+  orientation = [],
   revision,
   adopted = [],
   adoptionBeyond = [],
@@ -1019,6 +1353,13 @@ export function assembleBrief({
       '',
     )
   }
+  // AFTER the spec, never before it: the ladder is how this point is proven, and
+  // it is only readable once the reader knows what the point is — the adopted
+  // specifications above are part of that spec, so they come first. The
+  // orientation follows the ladder for the same reason: where to look only means
+  // something once the reader knows what it is looking for.
+  if (ladder.length) out.push(...ladder, '')
+  if (orientation.length) out.push(...orientation, '')
   if (sections.length) {
     out.push('--- SECTIONS THE SPEC REFERENCES (verbatim) ---')
     for (const s of sections) {
@@ -1071,7 +1412,18 @@ export function assembleBrief({
  * The whole job: point number → brief text. Throws BriefError on an unknown point
  * number and on a `§` that resolves in none of the documents searched.
  */
-export function buildBrief({ tasksText, designText, claudeText = '', docs = [], number, registry, revision = {}, solShare = DEFAULT_SOL_SHARE }) {
+export function buildBrief({
+  tasksText,
+  designText,
+  claudeText = '',
+  docs = [],
+  number,
+  registry,
+  revision = {},
+  readTree = null,
+  diffPaths = [],
+  solShare = DEFAULT_SOL_SHARE,
+}) {
   const all = parseWorkOrderPoints(tasksText)
   const point = all.find((p) => p.number === Number(number)) ?? null
   if (!point) {
@@ -1266,12 +1618,49 @@ export function buildBrief({ tasksText, designText, claudeText = '', docs = [], 
   // The caller supplies the git half (it needs I/O); the content half is computed
   // here, so a brief built through the library can never lack its fingerprint.
   const stamp = { head: null, dirty: null, ...revision, workOrder: workOrderFingerprint(tasksText) }
+  const render = isRenderPoint(point.body)
+
+  // The orientation (point 598) needs the TREE, and this module does no I/O — so
+  // the caller hands in a reader, called with the paths and the suites the spec
+  // turned out to name. Without one the brief is exactly what it was before,
+  // rather than a block of guesses; a reader that throws costs the block, never
+  // the brief (an orientation is a convenience, the spec is not).
+  const namedPaths = pathsIn(point.body).filter((p) => !ORIENTATION_SKIP.has(p))
+  const diffMap = parseDiffSuiteMap(tasksText)
+  // TIMING (correction 23.08.2026). The first cut of a brief happens BEFORE any
+  // implementation exists, so the check set can only be prospective: the paths
+  // the specification itself names. Once work stands in the tree, a REGENERATED
+  // brief has the real thing to read, and the diff wins — it is what will
+  // actually be verified. The path LIST above stays the spec's, because that is
+  // where the reader is being oriented; only the check set follows the diff.
+  const changed = (diffPaths ?? []).filter((p) => !ORIENTATION_SKIP.has(p))
+  const checkSource = changed.length ? 'diff' : 'spec'
+  const check = plannedCheck(checkSource === 'diff' ? changed : namedPaths, diffMap)
+  let orientation = []
+  if (typeof readTree === 'function') {
+    try {
+      const suites = [...new Set(check.byRule.flatMap((r) => r.suites))]
+      const tree = readTree({ paths: namedPaths, suites }) ?? {}
+      orientation = orientationBlock({
+        files: tree.files ?? [],
+        dirs: tree.dirs ?? [],
+        check,
+        checkSource,
+        sections: tree.sections ?? {},
+      })
+    } catch {
+      orientation = []
+    }
+  }
+
   const brief = assembleBrief({
     point,
     sections: carried,
     referenced,
     notes,
     referenceMap,
+    ladder: render ? VERIFICATION_LADDER : [],
+    orientation,
     revision: stamp,
     adopted,
     adoptionBeyond,
@@ -1281,6 +1670,9 @@ export function buildBrief({ tasksText, designText, claudeText = '', docs = [], 
   return {
     brief,
     revision: stamp,
+    render,
+    namedPaths,
+    check,
     point,
     refs,
     sections: carried,

@@ -6,6 +6,7 @@
 // fell back to HEAD on Windows and grandfathered the branch's own work — the
 // gate reported "GATE CLEAR" on four unreviewed mechanism commits.
 import { describe, it, expect } from 'vitest'
+import { readFileSync } from 'node:fs'
 import {
   attachCoverage,
   BASELINE_RECOVERY_ANCHOR,
@@ -17,6 +18,7 @@ import {
 } from './mechanism-review-guard.mjs'
 import { reviewGapRange } from './mechanism-review-guard-gap-core.mjs'
 import { evaluateMechanismReview, formatMechanismReviewVerdict } from './mechanism-review-core.mjs'
+import { repoPath } from './repo-paths.mjs'
 
 describe('baselineFor', () => {
   const state = { baselines: { main: 'aaa', 'feat/x': 'bbb' } }
@@ -69,6 +71,52 @@ describe('bootstrapBase', () => {
     })
     expect(verdict).toMatchObject({ block: true, clear: false })
     expect(formatMechanismReviewVerdict(verdict)).toContain('merge origin/main into this branch')
+  })
+})
+
+describe('historical ledger eras', () => {
+  it('keeps every named historical refusal reviewable without changing its verdict', () => {
+    const named = [
+      '042ffbf',
+      '5ce597c',
+      '65022b1',
+      '7db99ea',
+      '80b96e6',
+      'c3f5ad8',
+      'e0ebcff',
+      'e1d242a',
+      'ece3757',
+      'f999250',
+      'fe20777',
+    ]
+    const ledger = readFileSync(repoPath('.claude/mechanism-reviews.jsonl'), 'utf8')
+      .trim()
+      .split('\n')
+      .map((line) => JSON.parse(line))
+
+    for (const shortSha of named) {
+      const row = ledger.find(
+        (record) => String(record.sha ?? '').startsWith(shortSha) && record.verdict === 'do-not-merge',
+      )
+      expect(row, shortSha).toBeTruthy()
+      const reviewerIsAnthropic = /claude|opus|fable/i.test(String(row.model))
+      const verdict = evaluateMechanismReview({
+        baseline: 'b',
+        head: 'h',
+        pendingCommits: [{
+          sha: shortSha.padEnd(40, '0'),
+          subject: `historical refusal ${shortSha}`,
+          at: Number(row.at) - 1,
+          authorModel: reviewerIsAnthropic ? 'GPT-5.6 Sol' : 'Claude Opus 5',
+          files: [row.pass?.files?.[0] ?? 'scripts/historical-guard.mjs'],
+          coveringRecordShas: [row.sha],
+        }],
+        records: [row],
+      })
+      expect(verdict.block, shortSha).toBe(true)
+      expect(verdict.findings.some((finding) => finding.kind === 'malformed-record'), shortSha).toBe(false)
+      expect(formatMechanismReviewVerdict(verdict), shortSha).not.toContain('is malformed')
+    }
   })
 })
 

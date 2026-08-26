@@ -1,0 +1,6 @@
+{
+  "enabled": false,
+  "boundaryMode": "checkpointed-handover",
+  "adapters": ["sol"],
+  "changedBy": "awaiting-point-676-measured-trial"
+}

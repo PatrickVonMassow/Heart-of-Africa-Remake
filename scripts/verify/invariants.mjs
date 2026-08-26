@@ -19,11 +19,29 @@
 //    enrichments §19.5 body-spacing spot check already owns (tried here and reverted).
 //  - I2 floating needs a rendered-y hook the data model does not expose.
 import { launchVerifyBrowser, assertBackend } from './_browser.mjs'
+import { sectionGate } from './sections.mjs'
 
 const BASE = process.env.BASE_URL ?? 'http://localhost:5173/'
+
+// SECTIONS (points 566/595). The unit that costs time here is a ROUTE STOP — a
+// jump, a warm-up drive and twelve driven sim-seconds of frame-by-frame scanning,
+// six of them per run — so each stop is its own section. The shape differs from
+// the other suites (a section SELECTS its stop rather than wrapping its checks)
+// because the two invariants are judged over the whole driven route at the end;
+// a partial run then judges them over the stops that ran, and is stamped PARTIAL
+// like every other one. The names are read out of THIS FILE by
+// scripts/verify/sections.mjs, so an unknown one is refused with the list of the
+// real ones.
+const sections = sectionGate()
+const { section } = sections
+if (sections.banner()) console.log(sections.banner())
+
 let failures = 0
 const check = (name, ok, detail) => {
-  console.log(`${ok ? 'PASS' : 'FAIL'}  ${name}${detail ? ' — ' + detail : ''}`)
+  // The tag goes AFTER the ' — ' separator: the check's NAME is its identity for
+  // the red ledger and the baseline classifier and must not change.
+  const tail = [detail, sections.tag().trim()].filter(Boolean).join('  ')
+  console.log(`${ok ? 'PASS' : 'FAIL'}  ${name}${tail ? ' — ' + tail : ''}`)
   if (!ok) failures++
 }
 
@@ -54,14 +72,16 @@ await prepPage()
 
 // Representative regions/biomes to drive through (lat, lon of a spot with wildlife).
 // The dry-season override keeps the shore seeders active (the point-183 pop path).
-const ROUTE = [
-  { name: 'maasai-savanna', lat: -2.5, lon: 36.4 },
-  { name: 'congo-jungle', lat: 0.4, lon: 22.5 },
-  { name: 'sahel', lat: 14, lon: 2 },
-  { name: 'nile-corridor', lat: 25.6, lon: 32.6 },
-  { name: 'zambezi-south', lat: -16.5, lon: 26.5 },
-  { name: 'west-guinea', lat: 7.5, lon: -6 },
-]
+// Each stop is DECLARED as a section, one literal call per stop, because the
+// declarations are read out of this file as text — a `section(stop.name)` inside
+// the loop below would declare nothing a CLI argument could name.
+const ROUTE = []
+if (section('maasai-savanna')) ROUTE.push({ name: 'maasai-savanna', lat: -2.5, lon: 36.4 })
+if (section('congo-jungle')) ROUTE.push({ name: 'congo-jungle', lat: 0.4, lon: 22.5 })
+if (section('sahel')) ROUTE.push({ name: 'sahel', lat: 14, lon: 2 })
+if (section('nile-corridor')) ROUTE.push({ name: 'nile-corridor', lat: 25.6, lon: 32.6 })
+if (section('zambezi-south')) ROUTE.push({ name: 'zambezi-south', lat: -16.5, lon: 26.5 })
+if (section('west-guinea')) ROUTE.push({ name: 'west-guinea', lat: 7.5, lon: -6 })
 
 // Drive one stop at the achievable zoom 0.5, scanning EVERY frame for a new animal
 // that is on-screen the frame it joins (I1). Continuous held-key driving keeps the
@@ -186,7 +206,16 @@ check(
 const realErrors = recovered
   ? errors.filter((e) => !/simTime|Execution context was destroyed|navigation/i.test(e))
   : errors
+
+// A selected section that never executed is a FAILURE, not a quiet pass: it is
+// the one way a --section run could report green having driven nothing.
+const unrun = sections.unrun()
+if (unrun) check('the selected section actually ran', false, unrun)
+
 console.log('console errors:', realErrors.length)
 for (const e of realErrors) console.log('ERR:', e.slice(0, 300))
+// Said again where the verdict is read: a green one-section run is not a green
+// suite, and nothing downstream may quote it as one.
+if (sections.banner()) console.log(sections.banner())
 await browser.close()
 process.exit(failures > 0 || realErrors.length > 0 ? 1 : 0)

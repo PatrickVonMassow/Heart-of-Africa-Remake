@@ -83,12 +83,6 @@
       "why": "Small evidence-plumbing fix; it belongs with the other verification-chain hardening rather than ahead of the release fixes",
       "place": "last"
     },
-    "676": {
-      "at": "2026-08-25T17:30:18.150Z",
-      "why": "Nutzer-Entscheidung 25.08.2026, 19:14: 918+676 direkt hinter 752 einreihen (Chat, nach Sol-Audit)",
-      "origin": "user",
-      "place": "ahead"
-    },
     "677": {
       "at": "2026-08-13T17:13:15.449Z",
       "why": "Haengt nur den Aufrufer, nicht das Projekt, und hat mit '< /dev/null' einen sofort verfuegbaren Umweg — vor dem Release gehen die Release-Punkte vor",
@@ -249,12 +243,6 @@
       "why": "User ruling 21.08.2026 (only the communication mechanic, then 633 and the release 174): queued directly behind 174. It writes a reconstructed record for a series only 747 consumes.",
       "origin": "user",
       "place": "last"
-    },
-    "752": {
-      "at": "2026-08-21T16:05:59.447Z",
-      "why": "User ruling 21.08.2026 (only the communication mechanic, then 633 and the release 174); kept in front for SPEED: the paradigm case the user named, 43 measured handovers with a median of 12.7 and a p90 of 47.8 minutes of dead time.",
-      "origin": "user",
-      "place": "ahead"
     },
     "754": {
       "at": "2026-08-19T19:59:31.708Z",
@@ -715,12 +703,6 @@
       "origin": "machine",
       "place": "last"
     },
-    "918": {
-      "at": "2026-08-25T17:30:18.314Z",
-      "why": "Nutzer-Entscheidung 25.08.2026, 19:14: 918+676 direkt hinter 752 einreihen; 918 ist die Naht, auf der 676 aufsetzt",
-      "origin": "user",
-      "place": "ahead"
-    },
     "919": {
       "at": "2026-08-25T18:43:13.130Z",
       "why": "Last is right: the phantom red costs a session's opening, never correctness — no code is wrong, no player-visible defect, and the guard still catches every genuine red. It waits behind the release work like the other CI-guard defects of its class.",
@@ -730,6 +712,30 @@
     "920": {
       "at": "2026-08-25T18:43:13.227Z",
       "why": "Last is right: the duplicate number is caught by the pre-push fast gate before it can reach main, so the damage is a repair, not a defect that ships. The command is convenience over a rule that already holds.",
+      "origin": "machine",
+      "place": "last"
+    },
+    "924": {
+      "at": "2026-08-25T23:39:04.937Z",
+      "why": "Es kostet Zugzeit, nicht Arbeit — der Handlauf beweist den Baum gruen und der Push geht danach durch; last is right.",
+      "origin": "machine",
+      "place": "last"
+    },
+    "925": {
+      "at": "2026-08-26T00:37:45.177Z",
+      "why": "Die dauerhafte Lane bleibt bis zu diesem Punkt abgeschaltet und blockiert nichts; Kommunikationsmechanik, Abschluss und Tag gehen vor.",
+      "origin": "machine",
+      "place": "last"
+    },
+    "926": {
+      "at": "2026-08-26T01:26:40.592Z",
+      "why": "Vorbestehender Abnahme-Frame-Roter ohne Spielwirkung — er wartet hinter der laufenden Warteschlange, weil nichts auf ihm blockiert.",
+      "origin": "machine",
+      "place": "last"
+    },
+    "927": {
+      "at": "2026-08-26T01:26:40.709Z",
+      "why": "Der Fehlerbericht ohne Bild ist hoch kritisch, aber er betrifft einen Meldeweg, keinen Spielzustand; er steht am Ende, bis der Nutzer ihn vorzieht.",
       "origin": "machine",
       "place": "last"
     }
@@ -767,7 +773,6 @@
       746,
       747,
       750,
-      752,
       759,
       760,
       762,
@@ -776,7 +781,7 @@
     "why": "The order standing in front of the release today is the arrangement that predates this rule; the four machine-filed points that had ranked themselves there were moved behind 174 first"
   },
   "settled": {
-    "at": "2026-08-25T18:43:13.236Z",
+    "at": "2026-08-26T01:26:40.719Z",
     "points": [
       174,
       184,
@@ -929,7 +934,6 @@
       665,
       668,
       670,
-      676,
       677,
       678,
       680,
@@ -968,7 +972,6 @@
       746,
       747,
       750,
-      752,
       754,
       755,
       756,
@@ -1064,9 +1067,13 @@
       915,
       916,
       917,
-      918,
       919,
-      920
+      920,
+      922,
+      924,
+      925,
+      926,
+      927
     ]
   }
 }

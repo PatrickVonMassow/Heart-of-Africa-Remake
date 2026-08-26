@@ -607,7 +607,9 @@ async function waitForNewSha({ originDir, since, timeoutMs }) {
  *  that stays green over it does not call the thing it claims to prove. */
 export async function runDrill({ scenario, keep = false, neuterEpoch = false } = {}) {
   if (scenario === 'parent-death') return parentDeathScenario({ keep, neuterEpoch })
-  return { ok: false, reason: `unknown scenario: ${String(scenario)}; this slice carries parent-death (the later drills are 676's remainder)` }
+  const { FAILURE_DRILL_SCENARIOS, runFailureDrill } = await import('./batch-daemon-failure-drills.mjs')
+  if (FAILURE_DRILL_SCENARIOS.includes(scenario)) return runFailureDrill(scenario)
+  return { ok: false, reason: `unknown scenario: ${String(scenario)}; known scenarios: parent-death, ${FAILURE_DRILL_SCENARIOS.join(', ')}` }
 }
 
 if (isMainModule(import.meta.url)) {

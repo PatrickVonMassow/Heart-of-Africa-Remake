@@ -11,6 +11,7 @@ import { describe, it, expect } from 'vitest'
 import { runDrill, staleProbeRefused, expectedStaleRefusal, branchPreserved } from './batch-daemon-drill.mjs'
 import { startDaemon } from './batch-daemon.mjs'
 import { validateMutation } from './batch-schema-core.mjs'
+import { FAILURE_DRILL_SCENARIOS } from './batch-daemon-failure-drills.mjs'
 
 // THE DOCUMENTED ENTRYPOINT IS THE ONE UNDER TEST. The architecture promises
 // `node scripts/batch-daemon.mjs drill --scenario parent-death`; a suite that
@@ -72,6 +73,16 @@ describe('the documented drill entrypoint', () => {
     const ran = await drillCli('--scenario', 'made-up')
     expect(ran.code, ran.stderr).toBe(1)
     expect(JSON.parse(ran.stdout).reason).toMatch(/unknown scenario/)
+  })
+
+  it.each(FAILURE_DRILL_SCENARIOS)('%s: runs through the daemon drill CLI and proves every named check', async (scenario) => {
+    const ran = await drillCli('--scenario', scenario)
+    const result = JSON.parse(ran.stdout)
+    expect(result.scenario).toBe(scenario)
+    expect(result.checks?.length).toBeGreaterThan(0)
+    expect(result.checks?.every((item) => item.ok), JSON.stringify(result, null, 2)).toBe(true)
+    expect(result.ok).toBe(true)
+    expect(ran.code, ran.stderr).toBe(0)
   })
 
   it('parent-death: daemon and worker survive the killed session and a fresh session adopts them', async () => {

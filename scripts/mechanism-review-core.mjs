@@ -1276,17 +1276,25 @@ export function reviewRecordWellFormed(record = {}, { commitAt = 0 } = {}) {
   // A review cannot happen before the commit it claims to have read.  This is a
   // direct ordering invariant, not an era selector controlled by either clock.
   if (Number(commitAt) > 0 && at < Number(commitAt)) return false
-  // Identity evidence is required by the code evaluating the row, not by a
-  // timestamp supplied by the row or its author.  Backdating either object can
-  // therefore select no weaker version of the rule.
+  // Identity evidence became part of the recorder's row shape at a known
+  // ledger boundary. Rows written before that boundary cannot acquire evidence
+  // the recorder did not yet emit, and remain usable for commits they could
+  // actually have reviewed (the ordering invariant above still prevents an old
+  // row from clearing newer code). Missing identity on a modern row remains a
+  // malformed hand-written claim.
   const authorship = record.reviewerAuthorship
-  if (!authorship || typeof authorship !== 'object') return false
+  if (!authorship || typeof authorship !== 'object') {
+    return at < AUTHORSHIP_CHECK_SINCE && (record.carried === undefined || record.carriedVerified === true)
+  }
   if (authorship.status !== 'agreement' && authorship.status !== 'unverified') return false
   if (!sameModel(authorship.claimedModel, record.model)) return false
   if (authorship.status === 'agreement' && !sameModel(authorship.actualModel, record.model)) return false
   const vendor = modelVendor(record.model)
   if (vendor === 'unknown') return false
-  if (vendor === 'anthropic' && authorship.status !== 'agreement') return false
+  // Anthropic agreement became provable only at the later transcript boundary.
+  // Preserve earlier reasoned unverified rows; after it, anything short of the
+  // recorder's agreement stamp is malformed.
+  if (vendor === 'anthropic' && authorship.status !== 'agreement' && at >= VERIFIED_REVIEWER_SINCE) return false
   if (vendor === 'openai') {
     if (authorship.status !== 'unverified') return false
     if (typeof authorship.reason !== 'string' || !authorship.reason.trim()) return false
@@ -1468,11 +1476,36 @@ export function evaluateMechanismReview({
       return passComposition(rows, { expect: expected })
     })
     const incompleteScoped = scopedSplits.filter((split) => !split.complete)
+    const incompleteScopedShas = new Set(incompleteScoped.map((split) => String(split.sha)))
+    // FILE DEBT IS MEASURED AGAINST THE CURRENT END STATE, not against the
+    // numbering of every range plan that once contained that file. A complete
+    // scoped reading at another covering sha therefore settles the files it
+    // names even when an older range split remains incomplete for other files.
+    // This is the same rule outstandingFiles uses for the status/next-pass
+    // plan. A sha carrying any incomplete composition contributes nothing,
+    // while a bounded 1/1 is itself a complete file-scoped reading.
+    const completeScoped = [
+      ...scoped
+        .filter((r) =>
+          Number(r?.pass?.index) === 1 &&
+          Number(r?.pass?.total) === 1 &&
+          !incompleteScopedShas.has(String(r?.sha ?? '')))
+        .map((r) => ({ sha: String(r.sha ?? ''), files: r.pass.files.map(String), records: [r] })),
+      ...scopedSplits.filter((split) => split.complete && !incompleteScopedShas.has(String(split.sha))),
+    ]
     const scopedWholeReviews = sound.filter((r) => !fileClaim(r) && !r?.pass)
     const standingScoped = incompleteScoped.filter(
-      (split) => !scopedWholeReviews.some(
-        (answer) => Number(answer.at) > Math.max(...split.records.map((r) => Number(r.at))) && descendsFrom(answer, split),
-      ),
+      (split) => {
+        const wholeRangeAnswer = scopedWholeReviews.some(
+          (answer) => Number(answer.at) > Math.max(...split.records.map((r) => Number(r.at))) && descendsFrom(answer, split),
+        )
+        const endStateAnswer = completeScoped.some(
+          (answer) =>
+            String(answer.sha) !== String(split.sha) &&
+            (commit.files ?? []).every((file) => answer.files.map(String).includes(String(file))),
+        )
+        return !wholeRangeAnswer && !endStateAnswer
+      },
     )
     if (standingScoped.length) {
       const worst = standingScoped.reduce((a, b) =>
@@ -1745,6 +1778,8 @@ export function formatMechanismReviewVerdict(verdict, { authorshipPlan = null } 
             `record — missing pass ${(p.missing ?? []).join(', ')}`,
           '      A pass covers the files it named; the range is cleared when every pass is recorded:',
           `      node scripts/review-sol.mjs --sha ${short(c.sha)} --brief "<what to judge>" --pass ${(p.missing ?? [])[0] ?? 1}`,
+          '      File debt is measured against the CURRENT END-STATE FILE: a complete scoped',
+          '      review at another covering sha also settles each current file that it names.',
         )
       }
       // COUNTING THE PASSES IS NOT COUNTING THE FILES. Passes that are all on

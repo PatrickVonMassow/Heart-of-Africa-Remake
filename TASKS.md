@@ -77,203 +77,6 @@ then point 633 (the closing run), then point 174 (the tag). A newly appended poi
 kind is MOVED to the front in the same turn that files it; leaving it where append-and-defer
 put it is the mistake this line exists to stop.
 
-- [ ] 918. The durable lane's activation interlock takes the drain's word for it, and the drain
-  itself has an admission window. FOUND 25.08.2026 by a cross-vendor audit (GPT-5.6 Sol via
-  `ask-sol`, kind audit) of a proposed pull-forward of 676's activation slice; the audit REJECTED
-  the pull-forward and its findings are recorded here so they survive the conversation. The two
-  code-level gaps, verified against the sources:
-  (1) EVIDENCE GAP: `activationDecision` in `scripts/durable-lane-flag-core.mjs` demands
-  commit-visible evidence for every required STEP, but for the boundary mode it verifies only the
-  literal string `drain-before-boundary`. The same reviewed change can therefore declare the mode,
-  mark the steps green, and open the flag without the manifest ever carrying evidence that the
-  drain ENFORCEMENT exists as code. The interlock's own header says a hand-edited flag may not
-  silently advertise a boundary mode the mechanisms cannot perform — today it can.
-  (2) ADMISSION RACE: refusing a planned boundary while a daemon-owned worker is OBSERVED active
-  is not a drain. The flag is not consulted per call and gates only daemon startup, so a live
-  daemon can admit a new worker between the boundary's active-worker check and the handover.
-  Draining must atomically CLOSE ADMISSION first (a fenced refusal the daemon enforces), then
-  empty, then hand over.
-  CONTEXT THE AUDIT ALSO SETTLED, recorded for the planner rather than as work of this point:
-  step 9 (crash-recoverable serial landing) is NOT landed — 895 delivered only the journal
-  vocabulary and successor decision (`scripts/batch-landing-core.mjs` says the landing inside
-  `land-point.mjs` is 676's remainder); ten of the eleven step-12 drills do not exist yet
-  (`scripts/batch-daemon-drill.mjs` carries only `parent-death`); and 676's measured baseline
-  trial is the acceptance and may not slip past activation. An activation shortcut around 676's
-  order is therefore off the table.
-  FINAL STATE: the activation decision requires, beside the step manifest, a boundary-mechanism
-  entry with the same green-plus-evidence shape, refusing while it is absent; and the daemon's
-  control plane exposes an atomic close-admission operation the boundary path uses before it
-  counts workers, so the drain 676 builds has the seam it needs. Both land with unit cases; the
-  behavior of an already-open flag is unchanged.
-  VERIFIABLE: Vitest over `activationDecision` — a manifest with all steps green but no evidenced
-  boundary mechanism refuses and names it; over the daemon core — after close-admission a spawn
-  request is refused with a journalled reason, and the refusal survives a daemon restart; and the
-  existing flag tests stay green.
-  Criticality: med — the flag opens only through a reviewed change, but a wrongly opened lane
-  loses work, and this is the recorded reason the shortcut was rejected.
-  Bundle: unbundled (batch autonomy).
-
-- [ ] 676. An authoring lane must survive the session that spawned it (specified 13.08.2026 by
-  the blind-parallel four-eyes stage of CLAUDE.md §6; the counted union, the final proposal and
-  the rejected alternatives are `docs/handover-architecture.md`). TWO RULES OF THIS HOUSE
-  CONTRADICT EACH OTHER TODAY: the pool runs up to three authoring lanes, and the session hands
-  over on context — but every lane a session spawned dies with that session, so a session that
-  keeps the pool busy can hand over only by throwing its own work away. Point 675 closes the
-  three MECHANICAL defeats of the handover on today's mechanics; this point builds the plane
-  underneath, so that a lane stops belonging to a session at all.
-  THIS POINT BEGINS AFTER POINT 834, its front stage, and the steps 834 carries are struck from
-  here rather than repeated: the neutral fold of the two blind lists by a model that wrote neither
-  half, the schemas and invariants, the durable state store, the daemon with the Sol adapter, the
-  transferable declarations with their fencing, and the slice of fenced discovery, adoption and
-  reconciliation a fresh session needs before it may prove and land what it adopted. What 834's
-  fold settles in the union is what this point builds on. An Agent-tool child stays NON-
-  transferable, and the stand-down and dead-owner rules are point 716's, inherited rather than
-  restated.
-  FINAL STATE, as the union settles it: authoring runs as DAEMON-OWNED detached workers under a
-  model-neutral adapter (`scripts/detached-agent.mjs`) whose reference implementation is the
-  already-detached `scripts/author-sol.mjs`; an Agent-tool child stays session-bound and is
-  declared NON-transferable, blocking a boundary until it finishes or is safely stopped. The
-  coordinator plane is short-lived and split into dispatcher and lander epochs, holding one
-  renewable batch lease whose epoch FENCES every mutation, so two sessions can never adopt the
-  same batch. Coordination state is an append-only checksummed journal beside the repository with
-  an atomically replaced snapshot for fast resume, and every point carries an explicit state
-  (queued, running, checkpointing, ready-for-review, landing, landed, failed, stalled,
-  cancelled). A successor adopts supervision by STABLE JOB IDENTITY — never by process
-  reparenting, never by PID alone — after reconciling every recorded lane against journal,
-  worktrees and local/remote SHAs, and quarantining what it cannot prove. Refill comes only from
-  a bounded, pre-authorized queue behind a global three-lane cap and a completed-review backlog
-  limit, with a journalled REASON whenever three eligible lanes exist and fewer run. Landing stays
-  serial behind a batch-wide landing lock with a crash-recoverable staged journal, and the
-  main-session picture judgments are persisted as evidence a worker may never substitute.
-  Drain-before-boundary REMAINS as the explicit degraded mode whenever any active lane is not
-  transferable.
-  BUILD THE REMAINDER IN THE UNION'S ORDER (bounded dispatch, checkpoint barrier, the two-phase
-  boundary, successor reconciliation beyond the slice 834 claims, the crash-recoverable landing
-  journal, board projection, metrics), each step green on the unit layer before the next, and roll
-  out with the Sol adapter ALONE until the failure drills pass.
-  VERIFIABLE: the unit cases the union names per step; the failure drills — worker crash, stall,
-  push failure, dirty worktree, marker deletion, daemon restart, corrupt snapshot, PID reuse,
-  duplicate coordinator, remote outage, checkpoint timeout — each run through the daemon's drill
-  command; and a measured trial against a recorded baseline day, whose success needs ZERO safety
-  incidents (no lost attempt, no duplicate writer, no overlapping lease, no silently missed
-  boundary), a median handover context materially below baseline, and points landed per day no
-  worse than baseline. Utilization is supporting evidence, never the acceptance test on its own.
-  MECHANISM REVIEW REQUIRED (CLAUDE.md §7.2) per step, not once at the end.
-  Criticality: high — it owns the batch's dominant cost and every lane's durability, and a defect
-  here loses work rather than merely slowing it.
-
-- [ ] 595. The verification ladder (point 572's measure 5). While a render point is still
-  being FIXED, only the cheapest covering suite runs, on the everyday WebGPU lane; the
-  full proof — both backends where they can differ, LARGE where the change warrants it —
-  runs exactly ONCE, on the EXACT MERGE CANDIDATE — `main` merged into the branch, the tree
-  that will land — with the recorded `git HEAD` of that run as the evidence that the verified
-  tree IS the merged one. Nothing enforces or measures that today. The expensive browser
-  suites abort at the FIRST failure during that iteration (a red run is never credited
-  anyway) and run to completion only for the final proof. The rule is a brief building block
-  for render points, so it is applied rather than remembered.
-  A RED IS A RED. No "critical versus cosmetic" class is introduced to decide what may be
-  aborted on — the classification buys nothing here, because an iteration run is not credited
-  either way, and it would open the door to waving a red through.
-  THE SHARED FINAL RUN IS ALREADY DECIDED, and this point must not be read as contradicting
-  it: `docs/work-packages.md` settled that several FINISHED per-point branches may be merged
-  together and ONE regression run over the merged result — "the only sizeable saving left".
-  What that shared run may replace is the repeated full REGRESSION. The both-backend PICTURE
-  proof stays on the branch, BEFORE the merge, exactly as it is today; merging first to
-  verify afterwards cost about thirty turns of a block-loop on 24.07.2026.
-  THE UNIT LAYER HAS THE SAME LADDER: `vitest --changed` or a path filter and
-  `tsc --incremental` are legal WHILE REPAIRING, and an incremental green is never an
-  acceptance — the full fast gate stays the proof. One rule covering both layers, not two
-  half-rules.
-  MEASURED TARGET: verification is 47.0 % of the weighted spend and 37.4 % of the machine
-  hours, the ten costliest points hold 64.4 % of all point-assigned verification tokens,
-  and eight of ten recorded `enrichments` runs failed while still writing all 37 frames at
-  951–1029 s each.
-  THE LADDER'S CHEAPEST RUNG ALREADY EXISTS AND IS UNUSED (user question 09.08.2026: "Und
-  die neuen Möglichkeiten für differenziertes Testen durch 566 werden auch inzwischen bei
-  den Feature- und Bugtests eingesetzt?"). Point 566 built `--section=<name>`, and
-  `enrichments` declares nine of them; the resolver, the PARTIAL marking and the refusal to
-  count a partial run as coverage all work. CHECKED 09.08.2026: nothing routes anyone to
-  it. It appears in `scripts/verify/README.md` and in `tiers.mjs`, in no delegation brief,
-  in no agent prompt and in no rule text — the three agents commissioned that same evening
-  were not told about it either — and the recorded render-verify runs contain no partial
-  run at all. So the ladder's bottom rung is not a thing to invent here; it is a built
-  tool to PUT IN THE PATH. This point therefore also: (a) makes `--section` the stated
-  iteration rung for a render point in the delegation brief's building block, so an agent
-  reaches for it before replaying a whole pass; (b) SECTIONS the remaining render suites,
-  which 566 deferred ("enrichments first, then the other render suites"); and (c) states
-  in the same building block that the final proof is whole-suite, so the cheap rung can
-  never be mistaken for the acceptance.
-  WORK FOR 595–598 ALREADY STANDS ON A BRANCH (11.08.2026). A session that died left
-  `feat/595-598-verification-ladder-brief` PUSHED at 0d555552 — four commits plus a merge of
-  `origin/main`, covering all four points — with its worktree
-  `.claude/worktrees/agent-a7b6ba2cc654e6411` still in the tree. It was never reported,
-  verified or landed. Whoever takes these points STARTS FROM THAT BRANCH and verifies it
-  against the specs here; rebuilding from scratch throws away finished work. Cleaning that
-  worktree away before the branch has been judged is what point 629 exists to prevent.
-  Criticality: medium — it reorders the proof but must not dilute it; the both-backend
-  picture proof stays exactly as binding as it is today.
-  BRANCH STATE, RE-MEASURED 23.08.2026 (the 17.08. paragraph it replaces is stale): the branch
-  `feat/595-598-verification-ladder-brief` (tip 85eaa47c) DELIVERS this point and is now ~1615
-  commits behind main — but that number overstates the conflict badly. NONE of the nine
-  re-sectioned suites (events, gamepad, handwriting, health, invariants, report, touch, voice,
-  world) and not `scripts/point-brief.mjs` carry a single main commit since the branch tip. Only
-  two files moved: `scripts/point-brief-core.mjs` (e5737113, sentence-case titles) and
-  `scripts/verify/README.md` (2bac561f, 79b6e4f1, f6c92b65, 35b9f00a). SO: merge main, resolve
-  those two surgically, then read the real diff — do NOT rebuild the suites.
-  THE OWED BOTH-BACKEND PICTURE PROOF NOW RUNS IN A DIFFERENT ENVIRONMENT than the one the
-  17.08. paragraph assumed, and it must be produced under this one: headless EGL routing
-  (fed2fe84), GPU backend probing at bring-up (35b9f00a), a hard failure before app startup when
-  a backend is absent (f6c92b65), bounded verify-run digests (64691b29) and the re-exec-ed
-  default verify launch (764f477b). Those four post-branch README changes must survive the
-  README merge.
-  THE NAME IS NOT THE SCOPE: point 597 has LANDED since and is archived — a taker must not
-  redo it — and open point 596 must not be pulled into this landing.
-  THE ABORT-AT-FIRST-FAILURE SENTENCE IS A RULE FOR AGENTS, NOT A MECHANISM (decided
-  25.08.2026 from the delegated author's escalation): the opening sentence says the expensive
-  browser suites abort at the FIRST failure during iteration, but the scope list (a)/(b)/(c)
-  does not carry it and no shared check helper spans the suites — each defines its own `check`,
-  so enforcing it would be a cross-suite build. It ships as ladder text. If it is ever wanted as
-  a mechanism, it needs its own point, because that is what it costs.
-
-- [ ] 598. The brief orients in the code, not only in the spec (point 572's measure 8).
-  The delegation brief carries a GENERATED orientation: the paths the specification itself
-  names, and a per-directory line of responsibility derived from the tree and its file
-  headers. It is marked as a HINT, never as an instruction ("the specification names these
-  paths", not "change these files"), and it is generated on every run so it cannot go
-  stale.
-  AND IT NAMES THE PLANNED CHECK — as an ITERATION CHECK SET, not as one suite. Two corrections
-  to the original wording, both from the 23.08.2026 staleness audit.
-  TIMING: a brief is generated BEFORE the implementation diff exists, so the hint cannot
-  initially derive from the real diff→suite mapping. It derives from the PROSPECTIVE paths the
-  specification itself names; once a diff exists, a regenerated brief derives it from that diff.
-  SHAPE: the hint names one or more suite/`--section` pairs — a diff touching several suites
-  cannot be represented by a single pair — and it is stated SEPARATELY from the whole-suite
-  final proof, so the cheap rung can never be read as the acceptance. The singular wording
-  contradicted point 595 itself, where sections are the iteration rung and the proof is the
-  whole suite. Generated like the rest so it cannot go stale, and marked as a hint like the path
-  list. This is the cheapest possible answer to what the ladder point found: a rung that is built
-  and routed to nobody gets used when it stands in the artefact the agent reads FIRST, not in a
-  rule it must remember.
-  MEASURED TARGET: search/read is 25.2 % of the weighted spend and the first responses of
-  a delegated agent are almost always search; five saved responses per point is ~2 % of a
-  median point.
-  NOT THE OPPOSITE DIRECTION: shrinking the brief was weighed and rejected on the arithmetic.
-  Removing 1.5k tokens saves ~35.7k weighted per point, while a single reference the agent
-  must then look up costs 22.9k — it breaks even at 1.5 extra lookups and goes negative
-  after. The brief is 1.9 % of the spend and exists to avoid the ~108k wholesale read.
-  Criticality: low — a wrong list would misdirect, which generation-from-the-tree and the
-  hint framing address.
-  BRANCH STATE, RE-MEASURED 23.08.2026 (the 17.08. paragraph it replaces is stale): the branch
-  `feat/595-598-verification-ladder-brief` (tip 85eaa47c) DELIVERS this point too. Main has not
-  touched `scripts/point-brief.mjs` since the branch tip, and a brief generated today carries
-  neither an orientation nor a planned-check section — so this deliverable is NOT superseded. The
-  merge surface and the owed both-backend picture proof are described once, under point 595.
-  WHICH DIFF THE ORIENTATION READS IS NAMED HERE, because the TIMING correction left it open
-  and a different base yields a different check set (decided 25.08.2026): the fork point to
-  HEAD, plus uncommitted work — not the working tree alone and not the point's own commits.
-  The delegated author chose this base and documented it in the code; this line makes the
-  choice the spec's rather than the author's.
-
 - [ ] 844. The board never shows how risky a point is (user request 22.08.2026, 21:19: "Reihe ein
   neues Ticket nach 598 ein: Im Header jeder Dashboard-Karte soll auch die Kritikalität angezeigt
   werden"; deposited from an attended session that holds no batch lock and therefore edits neither
@@ -11290,6 +11093,13 @@ to land than a mechanism that needs a review.
   `.claude/mechanism-reviews.jsonl`, `TASKS.md` and `docs/tasks-archive.md` each exceed the budget
   alone, so no split can cover the range; `scripts/mechanism-review-guard-gap-core.mjs` is the single
   wording of that ruling and preflight does not consult it.
+  RECURRED 25.08.2026 at `df540a3f` and again 26.08.2026 at `a2d9d0c2`, both times in the same tree
+  seconds apart: the preflight row still reads "would-block: UNREVIEWABLE" while the guard's own Stop
+  path rules the gap and lets the turn end. It was filed a SECOND time, as point 923, because nothing
+  compared the new finding against the open set; 923 is folded into this point, and its demand is
+  carried here — parity must cover the FINDING KIND as well as the block/allow decision, or the
+  preflight row must state in its own words which extra condition it judges that the Stop path does
+  not, so a difference reads as a stated difference rather than a contradiction.
   WHAT IT COSTS: preflight is the batch's advertised pre-action oracle — CLAUDE.md §7.2 sends every
   governed action through it. Acting on its verdict, this session planned a 64-pass review round over
   13.8 M characters that the real gate does not demand, and only caught it by running the guard by
@@ -11754,6 +11564,43 @@ to land than a mechanism that needs a review.
   the point where the session is least able to tell a real refusal from a phantom.
   Bundle: Session- & Repo-Hygiene.
 
+- [ ] 922. A worktree working directory makes the four-eyes gate report a missing baseline it
+  cannot fix. MEASURED 25.08.2026 while resuming point 921: the Stop hooks are registered with
+  RELATIVE commands (`node scripts/mechanism-review-guard.mjs` in `.claude/settings.json`), so a
+  session whose shell working directory sits in a linked worktree runs THAT worktree's copy of
+  the guard. A worktree has no untracked `.claude/mechanism-review-baseline.json`, so
+  `baselineFor(state, 'main')` resolves to null, `evaluateMechanismReview` returns the
+  `missing-baseline` finding, and the refusal prescribes a repair that cannot work: "merge
+  origin/main into this branch" is a no-op when `main` and `origin/main` are already identical
+  (measured 0/0), and "end the turn again so the guard can seed the anchor" never seeds, because
+  `writeBaseline` then writes into the WORKTREE `.claude`. The same invocation with the same
+  stdin session id, run from the main checkout, reports instead the point-714 gap clause and
+  exits 0 (17 537 000 characters measured against the 200 000-character round budget). The same
+  working directory flips `dashboard-guard` to NOT REGISTERED.
+  WHY IT MATTERS: two turn ends were refused by a gate that had nothing to complain about, and
+  the refusal reads as a product defect while naming a repair that changes nothing — the same
+  unexitable shape point 921 is fixing one layer up. The session-side lesson is already carried
+  as an operator memory; a memory cannot enforce a working directory, and the next session that
+  spawns an author in a worktree meets it again.
+  FINAL STATE: the guard state files are resolved from the git COMMON directory rather than the
+  per-worktree top level, so a worktree checkout reads and writes the one baseline that exists;
+  where that is judged too broad, the guard instead DETECTS the linked-worktree working
+  directory and refuses with a message naming it as the cause, never prescribing a merge that
+  changes nothing. Either way a worktree working directory may no longer produce a
+  `missing-baseline` verdict on a repository whose baseline is present.
+  VERIFIABLE: Vitest over the resolution — a fixture whose top level is a linked worktree and
+  whose common directory holds the baseline resolves that baseline and reports no
+  `missing-baseline`; a repository whose baseline is genuinely absent still reports it; the
+  worktree-detection message, where that branch is chosen, names the working directory; plus
+  `npm run test:unit`, lint, build.
+  SIBLING: point 910 is the same defect in `dashboard-guard`, which resolves the board path
+  against whatever repository root it happens to run from. Both are the relative-command Stop
+  hook meeting a linked worktree, so the two are worked together and this one stands directly
+  behind it.
+  Criticality: high — it blocks every turn end from a working directory the batch's own
+  delegation model creates, and its stated repair is a no-op.
+  Bundle: Session- & Repo-Hygiene.
+
 - [ ] 911. The escape drill's "launcher's shape" is a comment, not a coupling, and the
   drill's claims outrun its instrument. FOUND 25.08.2026 answering the round-15 and
   round-16 cross-vendor reads of point 834. `scripts/detached-escape-drill.mjs` measures two
@@ -11998,3 +11845,143 @@ to land than a mechanism that needs a review.
   Criticality: med — no player-visible defect, but it puts a red gate in front of the routine
   act of recording a finding, which is exactly where the batch must not be slowed.
   Bundle: Session- & Repo-Hygiene.
+
+- [ ] 924. The pre-push fast gate calls `test:unit` red where the same command, in the same tree
+  and on the same machine, is green — and its two-reds rule turns that into a refusal no operator
+  can clear. MEASURED 26.08.2026, 01:05-01:30: four blocked pushes of `main` carrying only
+  work-order and documentation commits. Each push ran the gate's unit suite twice (its own retry
+  included) and every run exited non-zero while its summary named NO failing test; the gate itself
+  prints the diagnosis — "a `[vitest-worker]: Timeout calling \"onTaskUpdate\"` has this exact
+  signature, and the machine may be loaded" — and then blocks anyway, because
+  `scripts/pre-push-gate.mjs` treats two reds as conclusive regardless of what the load probe says.
+  A hand run of `npm run test:unit`, started while the same parallel authoring run held eight
+  vitest processes on the host, finished in 164.48s: 417/417 files, 13778 passed, 1 skipped,
+  exit 0. The push then went through with nothing changed.
+  WHY IT MATTERS: the gate's own message already distinguishes "a runner that did not finish" from
+  "a test that failed", and then discards that distinction in the verdict. The only route out is
+  the one this session took — prove the suite green by hand, then push into the same red gate and
+  hope the timing differs — which is exactly the unearned work a gate exists to prevent. It also
+  contradicts CLAUDE.md §7.2, which says to fail soft for environment transients and loud for
+  product defects: an unfinished runner is the environment, and a second unfinished runner is not
+  evidence of a defect. Point 296 (load produces false reds, never false greens) is the rule the
+  gate cites, and the gate applies its first half without its second.
+  FINAL STATE: a gate run whose summary names NO failing test is UNMEASURED, never red — it is
+  retried when the machine is quiet, and it refuses the push only on a run that named a failing
+  test or on a measured-quiet machine. The gate's own invocation gets the same reporter and
+  teardown budget the plain `npm run test:unit` gets, so the two cannot disagree about the same
+  suite in the same minute.
+  VERIFIABLE: Vitest over the pure part — a non-zero exit with zero named failures yields
+  UNMEASURED rather than red; two such runs still yield UNMEASURED; a run naming one failing test
+  yields red on the first; and a red on a probe-quiet machine still blocks. Plus a case that pins
+  the gate's runner options against the package script's, so a divergence reddens a test rather
+  than a push. Plus `npm run test:unit`, lint, build.
+  Criticality: med — it loses no work, but it blocks the one action the house rule demands after
+  every commit, and its refusal cannot be cleared by doing what it asks.
+  Bundle: Session- & Repo-Hygiene.
+
+- [ ] 925. The durable lane is built but neither measured nor journalled, and its failure
+  matrix does not touch the real path. Point 676 landed the whole plane — bounded dispatch,
+  checkpoint barrier, two-phase boundary, successor reconciliation, landing journal, board
+  projection, metrics — with build, lint and unit green, and the cross-vendor read recorded
+  (`.claude/mechanism-reviews.jsonl`, e1439227). THREE THINGS IT LEFT OPEN, all of them
+  conditions 676's own VERIFIABLE clause names, and none of them reachable while the lane is
+  switched off (`.claude/durable-lane-flag.json` is `enabled: false`, `changedBy:
+  awaiting-point-676-measured-trial`).
+  FIRST, NOTHING JOURNALS A REASON. `updateReasonInterval` in `scripts/batch-dispatch-core.mjs`
+  and the daemon's `record-metric` command have NO production caller: `dispatchOnce` decides
+  and starts attempts without ever recording why fewer than three eligible lanes ran, and
+  `metricEventsFromJournal` therefore consumes events nothing writes. The spec demands "a
+  journalled REASON whenever three eligible lanes exist and fewer run". It fails SAFE today —
+  `trialVerdict` scores an unmeasured p95 or median as a failure, so an unwired metric can
+  never produce a passing trial — but that is the reason the gap is invisible, not a reason
+  to keep it.
+  SECOND, ELEVEN OF TWELVE DRILLS RECREATE THE AFTERMATH INSTEAD OF CAUSING IT.
+  `scripts/batch-daemon-failure-drills.mjs` calls the decision functions on hand-built inputs;
+  only `parent-death` in `scripts/batch-daemon-drill.mjs` runs real processes. A drill that
+  never calls the thing stays green over a broken thing — the exact failure this house has
+  already paid for. `DURABLE_LANE_STEPS` step 12 nevertheless reads green with the evidence
+  "complete daemon failure matrix", and step 12 is one of `STEPS_REQUIRED_FOR_ACTIVATION`, so
+  that wording is what an operator would enable the lane on.
+  THIRD, THE MEASURED TRIAL IS NOT RUN. 676 requires a trial against a recorded baseline day
+  with zero safety incidents, a median handover context materially below baseline, and points
+  per day no worse than baseline. The recorded baseline day and the trial both remain owed.
+  FINAL STATE: the dispatcher journals its reason interval and its lane-utilization,
+  checkpoint, boundary and landing events through `record-metric` under the coordinator fence,
+  so `calculateBatchMetrics` reads a real series; the failure matrix drives the real daemon,
+  the real worker and the real files for at least worker-crash, stall, push-failure,
+  dirty-worktree, marker-deletion, daemon-restart and checkpoint-timeout, with the pure-input
+  checks kept as the cheap layer beneath them rather than as the proof; and the durable lane
+  runs its measured trial with the Sol adapter alone, whose verdict — not an operator's
+  judgement — flips `enabled` and writes the evidence into `DURABLE_LANE_STEPS`.
+  ALSO FIX, one line: `scripts/batch-board-core.mjs` hardcodes `cap: 3` instead of
+  `DAEMON_POOL_CAP`, so a changed cap would leave the board projecting the old one.
+  VERIFIABLE: unit cases that a dispatch leaving eligible lanes unstarted writes exactly one
+  open reason interval and closes it when the pool recovers, and that a metric series read back
+  from the journal reproduces the recorded events; each real-path drill asserted through
+  `node scripts/batch-daemon-drill.mjs --scenario <name>` against processes it actually killed,
+  stalled or dirtied; a trial report against the recorded baseline day whose `trialVerdict`
+  carries zero failures; plus `npm run test:unit`, lint, build.
+  Criticality: high — it decides whether the durable lane may be switched on at all, and every
+  claim that unlocks it is currently carried by a green flag rather than by a measurement.
+  Bundle: Session- & Repo-Hygiene.
+
+- [ ] 926. The world suite's Victoria Falls frame misses its subject, and it has been red for
+  a while. MEASURED 26.08.2026 on `main` (f14cf8e9) with
+  `node scripts/verify/baseline-classify.mjs world --ref main`: the frame
+  `15-worldmodel-victoria-falls` fails with "its subject is not in the rendered picture: off
+  the left and bottom edge of the frame", red in BOTH baseline runs, and red again in the
+  point-595 proof run on its merge candidate. It is NOT point 595's: the landmark loop and the
+  check are byte-identical between `main` and that branch apart from the section wrapper's
+  indentation, so 595 neither caused the red nor tightened the check — it is only the run that
+  finally read it out loud.
+  IT IS NOT THE VICTORIA FALLS — IT IS THE LANDMARK LOOP. Measured the same night on the
+  WebGL 2 lane of the same tree: there Victoria Falls PASSES and
+  `11-worldmodel-khartoum-confluence` fails instead, with the identical symptom "off the left
+  and bottom edge of the frame". One frame out of the seven-landmark loop misses its subject on
+  every run, and WHICH one it is moves between the lanes. So the camera aim for any single
+  landmark is NOT the defect; the loop's staging is: `jump(lat, lon)` returns before the camera
+  has settled where the shutter then judges it, and whichever landmark the shutter catches
+  mid-flight is the one that reddens. A verdict reached by nudging one landmark's coordinates
+  until its check goes green would only move the red to the next frame, and that is exactly the
+  papering-over CLAUDE.md §7.2 forbids.
+  FIRST JOB is therefore to make `jump` wait on the state the shutter reads — the same class as
+  the point-489 blank picture and the point-375 shutter, one layer further out — rather than to
+  re-aim a camera.
+  THE FRAME IS ACCEPTANCE EVIDENCE for criterion 3 (world model) and 13 (real geodata), so a
+  frame the shutter refuses is a missing proof, not a cosmetic blemish.
+  VERIFIABLE: `npm test -- world` green whole-suite on WebGPU and WebGL 2 — all seven landmark
+  frames present in `verification/` with their subjects visibly in the picture, on BOTH lanes
+  and without a retry, since a red that moves between frames is precisely what a single green
+  run cannot rule out.
+  Criticality: medium — acceptance evidence is missing, but nothing in the game is broken by it.
+  Bundle: Testinfrastruktur.
+
+- [ ] 927. The F6 bug report hands the user an archive WITHOUT the picture. MEASURED
+  26.08.2026 on `main` (f14cf8e9) with `node scripts/verify/baseline-classify.mjs report --ref
+  main`: three checks of the report suite fail — "the archive holds picture, state, overlay and
+  description" (the zip holds only `.json`, `-overlay.json` and `.txt`), "member `<stem>.png` is
+  present" and "the archive carries a screenshot — no PNG member". Red in BOTH baseline runs,
+  and red again in the point-595 proof run on its merge candidate. It is NOT point 595's: the
+  archive block is byte-identical between `main` and that branch apart from the section
+  wrapper's indentation.
+  THIS IS A PRODUCT DEFECT, NOT A TEST DEFECT, and it is the worse half of the two reds found
+  that night: the picture is the whole reason the report exists, and the report is the channel
+  the user hands bug reports over on. Every archive taken since the regression is worth less
+  than it looks.
+  IT IS A WEBGPU-ONLY DEFECT, measured the same night: the identical tree run on the WebGL 2
+  lane passes the report suite whole, 33 checks, with all four members present. Only the WebGPU
+  lane loses the picture — and WebGPU is the everyday lane the player gets, so the defect sits
+  on the path that matters, while the green lane is the control proving the assembly itself is
+  sound. That narrows the cause to the canvas readback: a WebGPU canvas read outside the
+  rendered tick, or without the backbuffer preserved, yields an empty or failing capture where
+  WebGL 2 still hands one out.
+  THE SECOND HALF OF THE POINT IS THE SILENCE, and it is the half that let this run unnoticed:
+  the assembly DROPS the member instead of failing, so a picture-less archive looks exactly like
+  a good one. An archive that cannot carry its picture must say so, in the UI, at the moment it
+  is written.
+  VERIFIABLE: `npm test -- report` green whole-suite on WebGPU and WebGL 2 with all four
+  members present; a Vitest case that the assembly REFUSES to hand out an archive whose picture
+  is missing rather than shipping three members quietly; plus lint, build, `npm run test:unit`.
+  Criticality: high — a silently picture-less bug report is a broken channel to the user, and it
+  degraded unnoticed.
+  Bundle: Testinfrastruktur.

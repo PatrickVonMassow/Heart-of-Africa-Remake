@@ -62,6 +62,8 @@ Das Musterbeispiel sind die Chat-Zeitstempel: neun Eskalationsstufen, acht weich
 | 24.08. nachts | Die Vier-Augen-Regel sperrte sich selbst ein: Punkt 834 war fertig und grün, aber seine Prüfrunde liess sich auf keiner Basis beauftragen — ein Merge ohne Autor-Trailer nahm sieben Dateien den beweisbaren Gegenleser, und der Planer verweigerte darauf die ganze Runde statt dieser Dateien, obwohl die Ledger die Ausnahme-Satzart dafür längst führt (§3.169); derselbe Blick fand einen Auftragspunkt, der ohne Zeilenumbruch an den vorigen geklebt war und deshalb für jeden Leser der Datei nicht existierte |
 | 24.08. früh | Die Vorschau widersprach dem Tor: `guard-preflight` meldete den Mechanismus-Wächter als blockierend, während der Wächter selbst die Spanne gegen das Rundenbudget maß, eine Lesbarkeitslücke urteilte und den Zug durchließ — eine geplante 64-Pässe-Runde über 13,8 M Zeichen, die niemand verlangt (Punkt 873) |
 | 24.08. morgens | Der übernommene Autorenlauf war seit zwei Minuten tot, und die Probe, die im Batch über Leben und Tod eines Agenten entscheidet, verbot in Großbuchstaben, ihn zu ersetzen: Sie schaut die pid ihrer eigenen Deklaration nie an und lässt den frischen Zweigstand die Prozessprüfung überstimmen — den hinterlässt aber gerade ein soeben gestorbener Lauf (§3.170, Punkt 874) |
+| 26.08. | Der einzige ungeordnete Punkt der Sitzungseröffnung war eine Dublette: derselbe Vorschau-gegen-Tor-Widerspruch stand seit zwei Tagen als Punkt 873, 273 Positionen tiefer — gefunden wieder nur durch die Bündelpflicht, nicht beim Anlegen (§3.168-Nachtrag, Punkt 923 in 873 gefaltet) |
+| 26.08. | Das Push-Tor wies viermal denselben Push ab und druckte die Entlastung mit: kein benannter Fehlschlag, ein Läufer, der nicht fertig wurde — derselbe Befehl von Hand war in 164 s mit 13 778 grünen Fällen durch (§3.182, Punkt 924) |
 | 24.08. mittags | Der delegierte Autor schrieb drei Commits um, die er bereits veroeffentlicht hatte: Sein Abschluss-Push scheiterte als non-fast-forward, und sein eigener Bericht meldete die fertige Arbeit als „nur lokal“ — obwohl die Baeume beider Seiten byte-identisch waren und sich nur eine Leerzeile im Commit-Text unterschied. Wer dem Bericht glaubt, sucht verlorene Arbeit, die nie verloren war; wer ihn ignoriert, uebersieht den echten Fall. Dieselbe Stunde zeigte die Kehrseite von der Gegenseite: Ein Tor-Lauf im Arbeitsbaum wurde rot, weil die pruefende Sitzung selbst waehrenddessen auf main committete — kein Test schlug fehl, nur der Teardown benannte die Ref-Bewegung |
 | 11.08. abends | Der VS-Code-Neustart nimmt den Devcontainer mit — die Batch-Sitzung und sechs Agenten sterben, nachdem ich das Gegenteil zugesichert hatte (§3.111); die Rechte-Rückfragen kamen weiter, weil `defaultMode` eine fortgesetzte Sitzung gar nicht mehr erreicht (§3.3) |
 
@@ -519,6 +521,8 @@ Ein neuer Riegel im Board-Werkzeug verweigert eine Veröffentlichung, wenn ein o
 Am 21.08.2026 dieselbe Bauform in einem anderen Werkzeug: `fold-point` schließt einen Punkt, der als Mitläufer auf einem fremden Zweig geliefert wurde, meldet ausdrücklich „NOT DONE: the push — run: `git push origin main`" — und genau dieser Befehl wird sofort vom `board-first-guard` verweigert, weil dasselbe `fold-point` einen Zug vorher die Übergabe-Karte gesetzt hat und die Tafel damit „hier läuft nichts mehr" behauptet. Der genannte Ausweg ist nicht falsch, er ist nur im **erzeugten** Zustand nicht mehr gangbar; der tragfähige Weg (eine `closing`-Karte, dann der Push, dann die Übergabe-Karte erneut) steht in der Verweigerung des anderen Riegels, nicht in der Anweisung, die ihn ausgelöst hat.
 
 Am 24.08.2026 zwei weitere Ausprägungen an einem Abend, und beide zeigen dieselbe Wurzel aus einer neuen Richtung: Der Ausweg ist nicht nur unbegehbar, er wird dem Falschen genannt. Der `board-first-guard` will delegierte Arbeitsbäume ausdrücklich ausnehmen — die Ausnahme fragt aber das Verzeichnis des HOOK-Prozesses und nicht das des geprüften Aufrufs, und das ist bei einem angehefteten Agenten die Haupt-Auscheckung. Der delegierte Autor wird also auf eine Tafelkarte verwiesen, die er in seinem Arbeitsbaum gar nicht schreiben kann; die Auskunft, die ihn befreien würde, liegt im Prozess-Nutzlastfeld, das der Riegel eine Zeile weiter unten für etwas anderes bereits liest. Und der Review-Rekorder weist eine Identitätsprüfung mit dem Rat ab, genau die zwei Flags zu setzen, die schon gesetzt waren: Der gemessene Grund — das Sitzungstranskript deckt den angegebenen Zeitpunkt nicht ab, weil die Harness es mit Verzögerung schreibt und „jetzt“ deshalb immer hinter der letzten modelltragenden Nachricht liegt — wird eine Schicht tiefer berechnet und dann verworfen. Beide Male ist die Information, die den Ausweg gangbar macht, im Werkzeug bereits vorhanden.
+
+**Nachtrag 25.08.2026 — dieselbe Wurzel, diesmal an der Vier-Augen-Schranke.** Die Stop-Riegel stehen mit RELATIVEN Befehlen in der Konfiguration, also laeuft aus einem Arbeitsbaum heraus dessen eigene Kopie des Riegels. Die ungetrackte Grundlinien-Datei liegt aber nur im Haupt-Checkout, und so meldete `mechanism-review-guard` eine fehlende Grundlinie, die es nicht gab. Der genannte Ausweg war zum zweiten Mal an einem Abend einer, den niemand gehen kann: „merge origin/main into this branch" bei zwei Refs, die nachweislich identisch sind (0/0), und „end the turn again so the guard can seed the anchor", wobei das Saatkorn wieder in den Arbeitsbaum faellt. Derselbe Aufruf mit derselben Sitzungskennung meldete aus dem Haupt-Checkout die Lueckenklausel und beendete den Zug gruen. Zwei Zugenden gingen dafuer verloren, und die Verweigerung las sich wie ein Produktdefekt, obwohl der Riegel nichts zu beanstanden hatte. Die Lehre ist nicht neu, aber sie hat jetzt eine zweite Adresse: Ein Riegel, der Zustand gegen die Wurzel aufloest, in der er zufaellig laeuft, ist im Delegationsmodell dieses Batches falsch — die Arbeitsbaeume sind der NORMALFALL, nicht die Ausnahme. Als Punkt 922 aufgenommen, direkt hinter Punkt 910, das denselben Defekt am Tafel-Riegel traegt.
 
 **Lehre:** Ein Durchsetzer ist erst dann fertig, wenn sein genannter Ausweg **ausgeführt** worden ist, nicht wenn er plausibel klingt. Das gehört in die Prüfung jedes neuen Riegels: den Weg, den die Fehlermeldung vorschlägt, einmal wirklich gehen — im auslösenden Zustand, nicht im gesunden. Zwei Zusatzfragen aus dem 24.08.: Gilt der Weg auch für den, der die Meldung liest — ein delegierter Autor hat andere Rechte als der Besitzer? Und nennt die Absage den Grund, den sie gemessen hat, statt eine Handlung zu empfehlen, die der Aufrufer schon ausgeführt hat?
 
@@ -1351,7 +1355,7 @@ Punktgrenze. Gebucht als Punkt 916.
 
 ## Anhang A — Maschinell gepflegte Quellen-Übersicht
 
-Zuletzt aktualisiert: Dienstag, 25.08.2026, 20:47 · Quellen-Fingerprint: `09369b5dd2b1…`
+Zuletzt aktualisiert: Mittwoch, 26.08.2026, 03:26 · Quellen-Fingerprint: `7428be098bfc…`
 
 Spalten heuristisch aus den Quellen abgeleitet (Anläufe = distinkte Datumsnennungen im Memory;
 Maßnahme = Guard-Skripte mit Namens-Treffer). Die inhaltliche Bewertung gehört der Prosa oben.
@@ -1389,7 +1393,7 @@ Maßnahme = Guard-Skripte mit Namens-Treffer). Die inhaltliche Bewertung gehört
 | Work at High effort by default; the user reserves Extra high for research and design decisions, not implementation | 4 | hoch | — (Regel/Memory) | ◐ Regel |
 | Write idiomatic English in all English text (README, code comments, commit messages) — no German calques like 'stand' for a version | 1 | niedrig | — (Regel/Memory) | ◐ Regel |
 | Fable is NOT the default lane because its volume is the scarcest; difficulty is no reason for it either (since 18.08.2026 hard cases go straight to Sol), and review is cross-vendor, not Fable-by-default | 4 | hoch | — (Regel/Memory) | ◐ Regel |
-| Findings recorded by a session that could not write the work order — carry each into TASKS.md, then mark it drained | 24 | hoch | findings-guard.mjs | ✔ Mechanismus |
+| Findings recorded by a session that could not write the work order — carry each into TASKS.md, then mark it drained | 25 | hoch | findings-guard.mjs | ✔ Mechanismus |
 | A recurring lookup gets a script; never pull raw transcripts, listings, or logs into context to answer it | 1 | niedrig | — (Regel/Memory) | ◐ Regel |
 | Past the 150k context watermark, FINISH the step and hand over — never start a suite, an agent or a point after it; the user raised the cost twice (13.08. and 17.08.2026) | 2 | mittel | — (Regel/Memory) | ◐ Regel |
 | User 18.08.2026: hard, complex, error-prone and HIGH-criticality points are AUTHORED by GPT-5.6 Sol directly — Opus 5 authors only what is left, and Fable authors only a point that tags its lane or one the router escalates | 4 | hoch | — (Regel/Memory) | ◐ Regel |
@@ -1450,10 +1454,10 @@ Maßnahme = Guard-Skripte mit Namens-Treffer). Die inhaltliche Bewertung gehört
 | A pending batch claim HOLDS THE LAUNCHER BACK — withdraw it whenever the claiming window is left unattended | 2 | mittel | clear-claim-guard.mjs | ✔ Mechanismus |
 | Multi-agent workflows eat the session/weekly limit fast — verify findings INLINE, keep fan-outs small, warn the user with a cost estimate before any big workflow | 3 | mittel | doc-budget-guard.mjs | ✔ Mechanismus |
 
-Erfasste Quellen: 91 Feedback-/Projekt-Memories · 57 Guard-/Hook-Skripte · 6 Revert-/Reapply-Commits · 100 Prozess-/Meta-TASKS-Punkte (davon 41 offen).
+Erfasste Quellen: 91 Feedback-/Projekt-Memories · 57 Guard-/Hook-Skripte · 6 Revert-/Reapply-Commits · 101 Prozess-/Meta-TASKS-Punkte (davon 42 offen).
 
-<!-- RETRO-FINGERPRINT: 09369b5dd2b12ace47fa332cc8eff105b80c4a138c2a42953f262cfda4c64215 -->
-<!-- RETRO-LAST-REFRESHED: 2026-08-25T18:47:33.169Z -->
+<!-- RETRO-FINGERPRINT: 7428be098bfc3b36f38351f010f43ad722763d4de0435caa7bc17738fb3aabac -->
+<!-- RETRO-LAST-REFRESHED: 2026-08-26T01:26:43.982Z -->
 <!-- AUTO-GENERATED:END -->
 
 ### 3.111 Ein Erfolg ist kein Beweis für den Weg, auf dem er zustande kam
@@ -3178,6 +3182,22 @@ Anlegen eines Punktes: *Wenn es das schon gibt — wäre der bestehende Zielzust
 meinen Fall richtig, oder erklärt er ihn zum Fehler?* Ein Befund, der einen bestehenden
 Punkt WIDERLEGT, gehört zwingend in diesen Punkt und nicht daneben.
 
+**Nachtrag 26.08.2026 — dieselbe Route, dasselbe Ergebnis, zwei Tage später.** Die Eröffnung dieser
+Sitzung fand als einzigen ungeordneten Punkt 923: die Vorschau meldet die Vier-Augen-Schranke als
+blockierend, während der Hook-Pfad desselben Wächters über demselben HEAD die Lückenklausel zieht.
+Sichtbar wurde die Dublette wieder nicht beim Anlegen, sondern erst durch die Bündelpflicht, die den
+Punkt namentlich einforderte — und der Vergleich fand Punkt 873, der denselben Defekt seit dem
+24.08.2026 trägt, 273 Positionen tiefer in der Warteschlange. Diesmal widersprachen sich die beiden
+Fassungen nicht, aber sie ergänzten sich: 873 verlangt Gleichlauf der Entscheidung, 923 zusätzlich
+Gleichlauf des BEFUNDTYPS. Beide getrennt gebaut hätten zwei Runden über denselben Mechanismus
+gekostet, von denen die zweite die erste hätte anfassen müssen. Der Befund ist in 873 eingetragen,
+923 ist dorthin gefaltet.
+
+**Lehre, ergänzt:** Der Dublettencheck darf nicht am Bündel-Wächter hängen. Er greift dort erst,
+wenn der Punkt schon steht, und er greift nur, weil dieser Wächter zufällig jeden offenen Punkt
+namentlich aufzählt — er ist ein Nebenprodukt, kein Mechanismus. Die Stelle, an der zwei
+Beschreibungen desselben Mechanismus verglichen werden, gehört an das ANLEGEN eines Punktes.
+
 ### 3.169 Die Vier-Augen-Regel hat sich selbst eingesperrt
 
 In der Nacht zum 24.08.2026 war Punkt 834 fertig: 94 Commits, 28 Autorenrunden, die letzte
@@ -3626,3 +3646,100 @@ Der Arbeitsauftrag ist nicht nach Nummern sortiert, und die freie Nummer ist das
 Reparatur kostete eine Umnummerierung und eine überschriebene Board-Karte. Für das *Ende*
 eines Punktes gibt es Befehle, für seinen *Anfang* keinen — und wo kein Befehl steht, steht
 Handarbeit gegen eine 12 000-Zeilen-Datei. Gebucht als Punkt 920.
+
+### 3.120 Eine Regel verurteilt ihre eigene Vorgeschichte
+
+Am 25.08.2026 hielt der Vier-Augen-Wächter an der Punktgrenze jeden Zug an. Seine Begründung
+war für ein Dutzend Commits dieselbe: „ein aufgezeichnetes do-not-merge ist fehlerhaft — es
+kann nur von Hand gekommen sein." Die genannten Zeilen waren nicht von Hand gekommen. Der
+Rekorder selbst hatte sie geschrieben, korrekt, Wochen zuvor — nur eben bevor es das Feld
+gab, das die Prüfung heute verlangt: einen Identitätsnachweis des Prüfmodells. Die
+Wohlgeformtheitsprüfung kennt keine Zeitgrenze, und so greift eine spätere Regel rückwärts
+und erklärt die eigene Vorgeschichte für gefälscht.
+
+Das Muster ist nicht der Tippfehler, sondern die Richtung. Wir verschärfen Regeln laufend,
+und das ist richtig; jede Verschärfung sitzt aber in einem Prüfer, der über einen *Bestand*
+läuft, nicht nur über den nächsten Eintrag. Für das Modus-Feld hatte dieselbe Datei diese
+Einsicht schon — `MODE_REQUIRED_SINCE` zieht genau die Grenze, die dem Identitätsfeld fehlt.
+Die Lehre ist deshalb konkret: **Wer eine Pflicht in einen Prüfer einbaut, der Altbestände
+liest, schreibt im selben Commit hin, ab wann sie gilt.** Sonst wächst die Strenge nicht nach
+vorn, sondern nach hinten.
+
+Verschärft wurde es durch die zweite Hälfte: Die Meldung nennt eine Reparatur — „die Zeile
+korrigieren oder entfernen, auf dem Protokoll" —, für die es keinen Befehl gibt, und
+Handeditieren des Ledgers ist genau das, was sie anprangert. Ein Tor, dessen einziger
+Ausgang die Handlung ist, die es verbietet, ist kein Tor, sondern eine Wand. Gebucht als
+Punkt 921.
+
+### 3.182 Das Tor stellte die Diagnose selbst — und urteilte gegen sie
+
+In der Nacht zum 26.08.2026 wies das Tor vor dem Push viermal denselben Push von `main`
+ab. Der Inhalt waren drei Commits an der Auftragsliste und an der Retrospektive; die
+gemeldete Ursache war `test:unit`. Bemerkenswert ist nicht das Rot, sondern der Text, den
+das Tor dabei druckte: 417 Dateien, 13 779 Fälle, **kein einziger benannter Fehlschlag**,
+und dazu die Einordnung in eigenen Worten — beobachtet wurde „ein Läufer, der nicht fertig
+wurde, kein Test, der fehlschlug", mit dem `[vitest-worker]: Timeout calling
+"onTaskUpdate"` als genau dieser Signatur, und „die Maschine mag belastet sein".
+Anschließend blockierte es trotzdem, weil seine Regel zwei Rot als abschließend behandelt.
+
+Der Gegenbeweis kostete einen einzigen Befehl. Derselbe `npm run test:unit`, im selben
+Baum, auf derselben Maschine, gestartet während der parallele Autorenlauf acht
+Vitest-Prozesse hielt: 164,48 Sekunden, 417 von 417 Dateien, 13 778 grün, einer
+übersprungen, Exit 0. Der Push ging danach unverändert durch. Der Baum war also nie rot,
+und „Last" allein erklärt es auch nicht — die Aufrufe des Tores erreichen eine Zeitgrenze,
+die derselbe Aufruf über das Paketskript nicht erreicht.
+
+**Lehre:** Ein Mechanismus, der die Unterscheidung zwischen *nicht fertig geworden* und
+*fehlgeschlagen* selbst treffen kann — und sie hier sogar ausdruckt —, darf sie im Urteil
+nicht wieder wegwerfen. Ein Lauf, der keinen fehlschlagenden Test nennt, ist **ungemessen**,
+nicht rot; er gehört wiederholt, nicht gezählt. Punkt 296 sagt, Last erzeuge falsche Rote
+und nie falsche Grüne — das Tor wendet die erste Hälfte an und ignoriert die zweite, und
+macht damit aus einer Umgebungsstörung eine Verweigerung, die der Bedienende nur umgehen
+kann, indem er von Hand beweist, was das Tor gerade bestreitet. Prüffrage für jedes Tor:
+*Nennt mein Rot einen Gegenstand — einen Test, eine Datei, eine Zeile? Wenn nicht, worüber
+urteile ich dann?* Gebucht als Punkt 924.
+
+### 3.112 Ein Schalter, der auf Zusage statt auf Messung steht
+
+Der dauerhafte Autoren-Unterbau (Punkt 676) landete in der Nacht zum 26.08.2026 vollständig:
+begrenzte Nachfüllung, Übergabe-Prüfpunkt, zweiphasige Sitzungsgrenze mit Siegel, Landejournal,
+Metriken. Build, Lint und Unit-Suite grün, 13 820 Fälle, die Gegenlese quer über die Anbieter
+geführt. Und trotzdem stand am Ende ein Bauteil im Baum, das die eigene Fertigkeit behauptet,
+ohne sie zu messen: Die Tabelle `DURABLE_LANE_STEPS` führt Schritt 12 — die Ausfallproben — als
+grün mit der Begründung „complete daemon failure matrix". Elf der zwölf Proben rufen aber
+Entscheidungsfunktionen mit handgebauten Eingaben auf; nur eine startet echte Prozesse und
+tötet sie. Genau dieser Schritt gehört zu den sieben, die das Einschalten der Bahn freigeben.
+
+Dasselbe Muster eine Ebene tiefer: `updateReasonInterval` und der Daemon-Befehl `record-metric`
+sind gebaut und getestet, haben aber keinen einzigen Produktionsaufrufer. Der Punkt verlangt
+ausdrücklich einen journallierten Grund, sobald drei Bahnen möglich wären und weniger laufen —
+geschrieben wird er nirgends. Es fällt hier sicher aus, weil `trialVerdict` alles Unmessbare als
+Fehlschlag wertet; das ist aber der Grund, warum die Lücke unsichtbar bleibt, nicht der Grund,
+sie zu lassen.
+
+**Lehre:** Eine Bibliothek plus ein grünes Feld sind kein Nachweis. Wo eine Tabelle im Code
+festhält, welcher Schritt fertig ist, muss ihr Beweistext benennen, *was gelaufen ist* — welcher
+Prozess getötet, welche Datei beschmutzt, welcher Lauf gemessen wurde — und nicht, welche Datei
+existiert. Prüffrage: *Würde meine Probe auch dann grün bleiben, wenn die Sache, die sie prüft,
+kaputt wäre?* Gebucht als Punkt 925.
+
+### 3.183 Zwei Rote standen seit Wochen im Baum, weil niemand die Suite ganz lief
+
+Der Beweislauf für die Verifikationsleiter fuhr am 26.08.2026 neun Render-Suiten am Stück —
+und fand zwei Rote, die keiner der Punkte davor verursacht hatte. Der Victoria-Falls-Frame
+der world-Suite trifft sein Motiv nicht, und der F6-Fehlerbericht legt seit unbekannter Zeit
+kein Bild ins Archiv. Die Baseline-Klassifikation gegen main bestätigte beide als
+vorbestehend, in je zwei Läufen, deterministisch.
+
+Das ist nicht die Klasse aus `residuals-hide-defects` — hier hat niemand einen Rest
+weggeschrieben. Es ist die Kehrseite der Leiter selbst: Wer immer nur die billigste Sprosse
+tritt, die seine eigene Änderung abdeckt, sieht die Rote in der Sprosse daneben nie. Die
+Ersparnis, die 566 und 595 bauen, verschiebt Kosten von der Iteration in den Endbeweis — und
+genau deshalb hängt an ihr die Bedingung, dass der Endbeweis wirklich GANZ läuft. Bei 927
+kostet das Übersehene mehr als die gesparten Minuten: Der Bericht, mit dem der Nutzer uns
+Fehler übergibt, reicht ihm ein Archiv ohne das Bild — die Zusammenstellung lässt den
+fehlenden Teil still weg, statt laut zu scheitern.
+
+**Lehre:** Eine billige Sprosse ist nur dann billig, wenn eine teure sie regelmäßig einholt.
+Und ein Artefakt, das der Nutzer nach draußen trägt, darf unvollständig nicht ausliefern:
+Wo ein Teil fehlt, ist Schweigen die schlimmste Antwort. Gebucht als Punkt 926 und 927.
