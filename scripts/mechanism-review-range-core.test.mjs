@@ -8,6 +8,8 @@ import {
   outstandingFiles,
   planAuthorshipGroups,
   REVIEW_END_STATE_EXCLUSIONS,
+  REVIEW_UNREADABLE_EXTENSIONS,
+  reviewEndStateExclusion,
   reviewEndStateFiles,
   summarizeReviewDebt,
   vendorOf,
@@ -30,6 +32,59 @@ describe('authorship-cut mechanism review planning', () => {
     expect(plan.dropped).toEqual(
       files.map((file) => expect.objectContaining({ file, reason: REVIEW_END_STATE_EXCLUSIONS[file] })),
     )
+  })
+
+  it('owes no pass for a blob no reviewer can read, and says which one', () => {
+    // Point 943: 22 verification PNGs carried ~13 MB of one range's end state
+    // and made every runnable round impossible. A picture is accepted by
+    // render-verify on both backends, never by a diff a second model reads.
+    const blobs = ['verification/01-birdseye-view.png', 'assets/voice/model.onnx', 'docs/handbook.pdf']
+    expect(reviewEndStateFiles(blobs)).toEqual([])
+    for (const blob of blobs) {
+      expect(reviewEndStateExclusion(blob), blob).toMatch(/no text a reviewer can read/)
+    }
+    expect(reviewEndStateExclusion('verification/01-birdseye-view.png')).toContain('.png')
+  })
+
+  it('reads the extension case-insensitively and whatever separator spelled the path', () => {
+    for (const path of ['verification/A.PNG', String.raw`verification\a.png`, 'a.WoFf2']) {
+      expect(reviewEndStateExclusion(path), path).not.toBe(null)
+    }
+  })
+
+  it('keeps every reviewable text artefact inside the gate', () => {
+    // The exclusion may only ever remove what nobody can read: a file whose
+    // NAME merely contains an extension word, or a source file beside the
+    // blobs, still owes its pass.
+    const kept = [
+      'scripts/png-guard.mjs',
+      'scripts/verify/preview.mjs',
+      'docs/render-architecture.md',
+      'verification/README.md',
+      'src/render/water.zip.ts',
+    ]
+    expect(reviewEndStateFiles(kept)).toEqual(kept)
+    for (const file of kept) expect(reviewEndStateExclusion(file), file).toBe(null)
+  })
+
+  it('still owes the mechanism beside an unreadable blob', () => {
+    const mechanism = 'scripts/four-eyes-guard.mjs'
+    const shot = 'verification/07-victory.png'
+    const plan = planAuthorshipGroups({
+      commits: [commit('a', 'GPT-5.6 Sol', [shot, mechanism])],
+      endStateFiles: [shot, mechanism],
+    })
+    expect(plan.groups).toEqual([
+      expect.objectContaining({ files: [mechanism], reviewer: 'Opus 5' }),
+    ])
+    expect(plan.dropped).toEqual([
+      expect.objectContaining({ file: shot, reason: reviewEndStateExclusion(shot) }),
+    ])
+  })
+
+  it('names no extension twice and none with its dot', () => {
+    expect(new Set(REVIEW_UNREADABLE_EXTENSIONS).size).toBe(REVIEW_UNREADABLE_EXTENSIONS.length)
+    for (const ext of REVIEW_UNREADABLE_EXTENSIONS) expect(ext).toMatch(/^[a-z0-9]+$/)
   })
 
   it('still owes the mechanism beside an excluded work-order document', () => {

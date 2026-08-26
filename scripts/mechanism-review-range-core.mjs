@@ -35,9 +35,52 @@ const uniq = (xs) => [
 ]
 const keyFor = (sha, file) => `${String(sha)}\0${String(file)}`
 
+// A REVIEWER READS TEXT (point 943, measured 26.08.2026). The gate demanded the
+// whole end state of every contribution, screenshots included: 22 verification
+// PNGs carried ~13 MB of the 19 MB this range owed, which is why no round could
+// be assembled at all and the gate suspended itself on main. A blob nobody can
+// read is not review debt — handing a model a megabyte of PNG bytes buys no
+// mechanism assurance, it only makes the readable half unreachable. Nothing is
+// waived by this: `isMechanismPath` classifies only `scripts/<name>.mjs`,
+// `scripts/git-hooks/…` and the named files, so a binary can never BE a
+// mechanism — it can only ride along in a mechanism contribution's file set.
+// A verification picture has its own acceptance anyway: the rendered picture on
+// both backends, recorded by render-verify, never a diff a second model reads.
+export const REVIEW_UNREADABLE_EXTENSIONS = Object.freeze([
+  // pictures and video
+  'png', 'jpg', 'jpeg', 'gif', 'webp', 'avif', 'bmp', 'ico', 'mp4', 'webm', 'mov',
+  // audio
+  'mp3', 'wav', 'ogg', 'flac', 'm4a',
+  // fonts
+  'woff', 'woff2', 'ttf', 'otf', 'eot',
+  // archives, models and compiled artefacts
+  'zip', 'gz', 'tgz', 'bz2', 'xz', 'pdf', 'onnx', 'wasm', 'bin', 'node', 'so', 'dll', 'dylib',
+])
+
+const UNREADABLE_RE = new RegExp(`\\.(?:${REVIEW_UNREADABLE_EXTENSIONS.join('|')})$`, 'i')
+
+/**
+ * Why this end-state path is outside the mechanism gate's reach, or null when it
+ * belongs to the reviewable file set. ONE boundary, so the gate, its coverage
+ * demand, the gap measurement and the pass planner never disagree about what a
+ * review is owed for.
+ */
+export function reviewEndStateExclusion(file) {
+  const path = String(file ?? '')
+  if (Object.hasOwn(REVIEW_END_STATE_EXCLUSIONS, path)) return REVIEW_END_STATE_EXCLUSIONS[path]
+  // Judged on the path's TAIL alone, so the separator spelling cannot matter:
+  // `verification\\a.png` and `verification/a.png` are recognised alike.
+  if (UNREADABLE_RE.test(path)) {
+    const ext = path.slice(path.lastIndexOf('.') + 1).toLowerCase()
+    return `a .${ext} blob carries no text a reviewer can read, and no binary is a mechanism path; ` +
+      'a rendered picture is accepted by render-verify on both backends instead'
+  }
+  return null
+}
+
 /** The range paths which belong to the mechanism-review end-state file set. */
 export function reviewEndStateFiles(files = []) {
-  return uniq(files).filter((file) => !Object.hasOwn(REVIEW_END_STATE_EXCLUSIONS, file))
+  return uniq(files).filter((file) => reviewEndStateExclusion(file) === null)
 }
 
 // CONTROL CHARACTERS, NOT PRINTABLE MARKERS (round-4 pass 3, and the reason
@@ -227,7 +270,7 @@ export function endStateArtefacts({ commits = [], endStateFiles = null } = {}) {
     if (!material.has(file)) {
       dropped.push({
         file,
-        reason: REVIEW_END_STATE_EXCLUSIONS[file] ?? 'end state identical to the base',
+        reason: reviewEndStateExclusion(file) ?? 'end state identical to the base',
         commits: changes.map((change) => change.sha),
       })
       continue
