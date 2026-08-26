@@ -149,8 +149,13 @@ export function executedScriptRefs(command) {
  * path used as another command's argument therefore armed a guard that could
  * never fire. The wrapper now supplies only commands from parsed settings and
  * recognized executable Git hooks; this final pure step still insists that the
- * file is Node's entry script in a shell segment. `wiredText` callers are kept
- * compatible by passing its lines here, but prose and comments prove nothing.
+ * file is Node's entry script in a shell segment. That deliberately excludes an
+ * npm script which invokes it indirectly, a dispatcher which imports it, and a
+ * `node -e`/`--eval` program which dynamically imports it: this reader cannot
+ * prove that any of those paths reaches the enforcer. A future indirect wiring
+ * must either become a direct invocation or extend this reader to measure that
+ * shape. `wiredText` callers are kept compatible by passing its lines here, but
+ * prose and comments prove nothing.
  */
 export function enforcerWiredByCommands(commands, name) {
   const wanted = String(name ?? '').trim()
