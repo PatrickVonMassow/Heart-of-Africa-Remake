@@ -45,6 +45,9 @@ const WORKFLOW_OR_OUTAGE_REMEDY =
   'Re-run the workflow. If it goes green it was an outage on GitHub\'s side. If it dies the same way, ' +
   'the fault is in the workflow FILE — check what the recent commits changed under `.github/workflows/` ' +
   '(a `uses:` reference that resolves nowhere, or a `runs-on` label no runner matches) and fix it there.'
+const NEVER_STARTED_REMEDY =
+  'GitHub never assigned the job to a runner. Re-run only the failed jobs once and wait for that run; ' +
+  'a repository push cannot repair runner acquisition.'
 
 function outageDeadline({ famineSince = 0, now = Date.now(), maxMs = OUTAGE_WAIVER_MAX_MS } = {}) {
   const start = Number(famineSince) > 0 ? Number(famineSince) : Number(now)
@@ -95,6 +98,51 @@ export function ranNothingOfOurs(job) {
   if (!Array.isArray(steps)) return false // unknown — never claim an excuse we cannot see
   if (steps.length === 0) return true // never got a runner at all
   return steps.every((s) => isRunnerOwnStep(s?.name))
+}
+
+/**
+ * Decide whether one run has the never-started signature and whether its one
+ * permitted failed-jobs re-run remains available.
+ *
+ * A queued job by itself is not evidence: the RUN must already have completed
+ * red. Conversely, one job that reached an actual failing step keeps the whole
+ * run on the product-red path. `run_attempt` is GitHub's durable bound: attempt
+ * one may dispatch once, later attempts are still environmental but never
+ * dispatch recursively.
+ *
+ * @returns {{kind:'environment'|'product'|'pending'|'other', dispatch:boolean}}
+ */
+export function failedJobsRerunDecision({ run, jobs, alreadyDispatched = false } = {}) {
+  try {
+    const status = String(run?.status ?? '')
+    const conclusion = String(run?.conclusion ?? '')
+    if (status !== 'completed') return { kind: 'pending', dispatch: false }
+    if (conclusion !== 'failure' && conclusion !== 'startup_failure') {
+      return { kind: 'other', dispatch: false }
+    }
+    if (!Array.isArray(jobs)) return { kind: 'other', dispatch: false }
+
+    const failedWithSteps = jobs.some((job) => {
+      const jobConclusion = String(job?.conclusion ?? '')
+      return FAILED_JOB_CONCLUSIONS.has(jobConclusion) && !ranNothingOfOurs(job)
+    })
+    if (failedWithSteps) return { kind: 'product', dispatch: false }
+
+    const neverStarted = jobs.some((job) => {
+      const jobConclusion = job?.conclusion
+      return (jobConclusion === null || jobConclusion === 'startup_failure') &&
+        Array.isArray(job?.steps) && job.steps.length === 0
+    })
+    if (!neverStarted) return { kind: 'other', dispatch: false }
+
+    const attempt = Number(run?.run_attempt ?? run?.runAttempt ?? 1)
+    return {
+      kind: 'environment',
+      dispatch: !alreadyDispatched && Number.isFinite(attempt) && attempt <= 1,
+    }
+  } catch {
+    return { kind: 'other', dispatch: false }
+  }
 }
 
 /** How long a famine-shaped red on an untouched workflow stays credible as
@@ -186,15 +234,18 @@ export function moreJobPages({ fetched = 0, totalCount = null, page = 1, perPage
  * `OUTAGE_WAIVER_MAX_MS` the waiver stops being credible and `escalate` is set,
  * so the alert names the retired-image / yanked-tag reading only a push can fix.
  *
- * @param {{workflowName?:string, conclusion?:string, jobs?:object[]|null, workflowsUntouched?:boolean, pagesBlockers?:object[]|null, famineSince?:number, now?:number}} input
+ * @param {{workflowName?:string, runStatus?:string, runAttempt?:number, conclusion?:string, jobs?:object[]|null, alreadyDispatched?:boolean, workflowsUntouched?:boolean, pagesBlockers?:object[]|null, famineSince?:number, now?:number}} input
  * @returns {{cause:'repository'|'external'|'unknown', actionable?:boolean, escalate?:boolean, failedJobs:string[], detail:string, remedy:string}}
  */
 export function classifyFailureCause(input) {
   try {
     const {
       workflowName = '',
+      runStatus = '',
+      runAttempt = 1,
       conclusion = '',
       jobs = null,
+      alreadyDispatched = false,
       workflowsUntouched,
       pagesBlockers,
       famineSince = 0,
@@ -212,6 +263,29 @@ export function classifyFailureCause(input) {
           ? 'the run was cancelled — a newer push supersedes an older one in the `pages` concurrency group, and a superseded run can leave its Pages deployment in progress'
           : 'the run was cancelled, so it never reached a verdict on the code',
         remedy: isPages ? PAGES_REMEDY : RERUN_REMEDY,
+      }
+    }
+
+    const rerun = failedJobsRerunDecision({
+      run: { status: runStatus, conclusion: verdict, run_attempt: runAttempt },
+      jobs,
+      alreadyDispatched,
+    })
+    if (rerun.kind === 'environment') {
+      const names = (Array.isArray(jobs) ? jobs : [])
+        .filter((job) => (job?.conclusion === null || job?.conclusion === 'startup_failure') && Array.isArray(job?.steps) && job.steps.length === 0)
+        .map((job) => String(job?.name ?? ''))
+        .filter(Boolean)
+      return {
+        cause: 'external',
+        actionable: false,
+        neverStarted: true,
+        rerunFailedJobs: rerun.dispatch,
+        failedJobs: names,
+        detail: `the failing job is "${names.join('", "')}", and GitHub concluded the run without ever assigning that job to a runner`,
+        remedy: rerun.dispatch
+          ? NEVER_STARTED_REMEDY
+          : 'The one bounded failed-jobs re-run was already dispatched; wait for GitHub recovery rather than pushing repository changes.',
       }
     }
 
