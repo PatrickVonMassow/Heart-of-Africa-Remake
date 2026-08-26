@@ -23868,3 +23868,31 @@ Nummerierung bleiben deshalb identisch — hier wird nur verschoben, nie umgesch
   HEAD, plus uncommitted work — not the working tree alone and not the point's own commits.
   The delegated author chose this base and documented it in the code; this line makes the
   choice the spec's rather than the author's.
+
+- [x] 844. The board never shows how risky a point is (user request 22.08.2026, 21:19: "Reihe ein
+  neues Ticket nach 598 ein: Im Header jeder Dashboard-Karte soll auch die Kritikalität angezeigt
+  werden"; deposited from an attended session that holds no batch lock and therefore edits neither
+  the work order nor the board). The board is the user's single reading surface, and criticality
+  is what tells him at a glance how risky a point is and which lanes it triggers — HIGH routes
+  authoring straight to Sol and owes a recorded cross-model review before its tick. Today that
+  signal lives ONLY in the `Criticality:` tag inside a TASKS.md point body, which he does not
+  read. Since point 655 every point-bearing card already carries its number in a header chip
+  (`summaryPoint` in `scripts/board-core.mjs`), so the established place for per-card metadata
+  exists and is empty of this one.
+  FINAL STATE: every card whose header carries a point chip also shows that point's criticality in
+  the same header line, visually distinct from number and title. The board speaks German to him,
+  so the labels are niedrig / mittel / hoch while code, identifiers and markup stay English. The
+  value is DERIVED at render time from the point's `Criticality:` tag through the existing
+  `criticalityOf` reader (`scripts/criticality-review-guard-core.mjs`) and is never typed into a
+  card, so it cannot go stale against the work order; open and closed points resolve alike through
+  `scripts/tasks-source.mjs`. A point with NO criticality tag renders without the badge — no
+  guessed default and no empty placeholder — and unnumbered state cards such as the handover card
+  are untouched. The gates that pin the summary shape accept the new shape in the same commit, and
+  cards published before this point stay readable and replaceable exactly as pre-655 titles did.
+  VERIFIABLE: Vitest for each of the three levels in a tagged point's header, an untagged point's
+  header, an unnumbered state card left alone, and a hand-written stale badge overwritten by the
+  derived value; plus one published render showing the badge on every point-bearing card and none
+  on the handover card.
+  Criticality: low — it is a reading aid on a surface that already works; a wrong badge misinforms
+  the reader but changes no gate, and deriving it from the tag is what keeps it honest.
+  Bundle: Chat & Tafel.
