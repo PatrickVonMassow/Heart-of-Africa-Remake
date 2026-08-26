@@ -11981,35 +11981,3 @@ to land than a mechanism that needs a review.
   Criticality: high — a silently picture-less bug report is a broken channel to the user, and it
   degraded unnoticed.
   Bundle: Testinfrastruktur.
-
-- [ ] 928. The sanctioned reviewer trailer takes the commit's reviewer away (measured 26.08.2026
-  while closing point 844). CLAUDE.md §6 says in as many words: "A commit may also name its
-  cross-vendor reviewer in a second model trailer." Commit `079a13a1` did exactly that — it
-  answers a GPT-5.6 Sol review finding and carries both `Co-Authored-By: Claude Opus 5` and
-  `Co-Authored-By: GPT-5.6 Sol`. `scripts/review-sol.mjs` then reported `0 RUNNABLE PASSES` and
-  `UNREVIEWABLE: every configured reviewer vendor authored part of this contribution` for all
-  three of its files. THE RULE THAT EXISTS TO MAKE THE REVIEWER VISIBLE IS WHAT REMOVES HIM.
-  The cause is that the measurement reads EVERY `Co-Authored-By` model trailer as AUTHORSHIP; the
-  second meaning the rule intends — "this model REVIEWED it" — has no representation in the code
-  at all. That leaves only bad exits: omit the trailer and break the written rule, or set it and
-  push the commit into precisely the class `mechanism-review-guard` blocks as "no eligible
-  reviewer vendor" — the class that already held 24 older contributions that same night.
-  FINAL STATE:
-  - THE REVIEWER HAS HIS OWN TRAILER KEY, one the authorship measurement does not count as an
-    author. The ledger already models the distinction (`reviewerAuthorship`), so the record type
-    exists; what is missing is the key on the commit and the reader that understands it.
-  - CLAUDE.md §6 NAMES THAT KEY instead of saying "a second model trailer", and until the key
-    exists the rule says plainly that a reviewer is NOT recorded as `Co-Authored-By`.
-  - A COMMIT ALREADY CARRYING BOTH VENDORS IS NOT STRANDED. Today's only route is a point-bound
-    unavailable receipt, which reads as "nobody could review this" when the truth is "the trailer
-    misdescribed who did what". Such a commit must become reviewable by the vendor that did not
-    review it, or be recorded as mislabelled rather than as unreviewable.
-  VERIFIABLE: Vitest over the pure authorship read — a commit carrying the reviewer key is
-  attributed to its author alone and stays reviewable by the other vendor; one carrying the
-  reviewer as `Co-Authored-By` is still counted as today, so no existing record silently changes
-  meaning; and `review-sol.mjs` plans a runnable pass for the first where it plans none for the
-  second. Plus the real proof: `079a13a1` gets a recorded cross-vendor verdict without a receipt.
-  Criticality: medium — it writes no wrong pixel and breaks no player-visible behaviour, but it
-  manufactures unreviewable commits out of rule-following, and every one of those blocks a turn
-  ending until it is waived.
-  Bundle: Session- & Repo-Hygiene.
