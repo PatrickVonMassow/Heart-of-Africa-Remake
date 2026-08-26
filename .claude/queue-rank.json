@@ -775,12 +775,6 @@
       "origin": "machine",
       "place": "last"
     },
-    "941": {
-      "at": "2026-08-26T10:53:41.506Z",
-      "why": "Der Nutzer hat den Punkt am 26.08.2026 im Brett-Chat gemeldet und ausdruecklich 'direkt als naechstes erledigen' gesagt.",
-      "origin": "user",
-      "place": "ahead"
-    },
     "942": {
       "at": "2026-08-26T11:11:20.225Z",
       "why": "Es blockiert nur, wenn ein hoch eingestufter Punkt ein offenes Do-not-merge traegt; heute ist der Weg von Hand gangbar und dokumentiert, deshalb steht es hinter der Auslieferung.",
@@ -815,6 +809,42 @@
       "at": "2026-08-26T15:10:49.134Z",
       "why": "User order 26.08.2026 ~17:05: queue it directly behind 935 (now landed, so at the queue front) — the batch must never stop again",
       "origin": "user",
+      "place": "ahead"
+    },
+    "948": {
+      "at": "2026-08-26T17:21:21.643Z",
+      "why": "The forensic question behind it is worth answering carefully, but the red itself is repaired and nothing is blocked by it today — it stands behind the user-ordered standstill work.",
+      "origin": "machine",
+      "place": "last"
+    },
+    "949": {
+      "at": "2026-08-26T17:21:21.728Z",
+      "why": "The one measured instance is repaired; what is left is a sweep of the class, which is thorough work rather than urgent work and must not displace the user-ordered standstill points.",
+      "origin": "machine",
+      "place": "last"
+    },
+    "950": {
+      "at": "2026-08-26T17:21:21.812Z",
+      "why": "Repaired and green; the remaining work is enumerating the other parsers, which nothing waits on.",
+      "origin": "machine",
+      "place": "last"
+    },
+    "951": {
+      "at": "2026-08-26T17:21:21.903Z",
+      "why": "The suites run again; the two residual threads are quality of verdict, not a block, so they stand behind the user-ordered work.",
+      "origin": "machine",
+      "place": "last"
+    },
+    "952": {
+      "at": "2026-08-26T17:21:21.992Z",
+      "why": "The suite is green and its subject is correct today — the defect is only that it would stay green after the subject moved, so it has no urgency.",
+      "origin": "machine",
+      "place": "last"
+    },
+    "953": {
+      "at": "2026-08-26T17:21:33.850Z",
+      "why": "It is a LIVE stop-the-batch path, not a latent one: it blocks the turn end today and only a human re-run clears it, which is the exact thing the user's standing order of 26.08.2026 forbids — and point 947, which the user placed at the front, names this class as part of its sweep.",
+      "origin": "machine",
       "place": "ahead"
     }
   },
@@ -856,7 +886,7 @@
     "why": "The order standing in front of the release today is the arrangement that predates this rule; the four machine-filed points that had ranked themselves there were moved behind 174 first"
   },
   "settled": {
-    "at": "2026-08-26T15:10:49.498Z",
+    "at": "2026-08-26T17:21:33.861Z",
     "points": [
       174,
       184,
@@ -1156,13 +1186,18 @@
       938,
       939,
       940,
-      941,
       942,
       943,
       944,
       945,
       946,
-      947
+      947,
+      948,
+      949,
+      950,
+      951,
+      952,
+      953
     ]
   }
 }
