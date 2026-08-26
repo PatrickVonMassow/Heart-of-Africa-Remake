@@ -23707,3 +23707,52 @@ Nummerierung bleiben deshalb identisch — hier wird nur verschoben, nie umgesch
   Criticality: med — no player-visible defect, but it is the batch's own "may I act" report
   disagreeing with the gate it reports on.
   Bundle: Session- & Repo-Hygiene.
+
+- [x] 676. An authoring lane must survive the session that spawned it (specified 13.08.2026 by
+  the blind-parallel four-eyes stage of CLAUDE.md §6; the counted union, the final proposal and
+  the rejected alternatives are `docs/handover-architecture.md`). TWO RULES OF THIS HOUSE
+  CONTRADICT EACH OTHER TODAY: the pool runs up to three authoring lanes, and the session hands
+  over on context — but every lane a session spawned dies with that session, so a session that
+  keeps the pool busy can hand over only by throwing its own work away. Point 675 closes the
+  three MECHANICAL defeats of the handover on today's mechanics; this point builds the plane
+  underneath, so that a lane stops belonging to a session at all.
+  THIS POINT BEGINS AFTER POINT 834, its front stage, and the steps 834 carries are struck from
+  here rather than repeated: the neutral fold of the two blind lists by a model that wrote neither
+  half, the schemas and invariants, the durable state store, the daemon with the Sol adapter, the
+  transferable declarations with their fencing, and the slice of fenced discovery, adoption and
+  reconciliation a fresh session needs before it may prove and land what it adopted. What 834's
+  fold settles in the union is what this point builds on. An Agent-tool child stays NON-
+  transferable, and the stand-down and dead-owner rules are point 716's, inherited rather than
+  restated.
+  FINAL STATE, as the union settles it: authoring runs as DAEMON-OWNED detached workers under a
+  model-neutral adapter (`scripts/detached-agent.mjs`) whose reference implementation is the
+  already-detached `scripts/author-sol.mjs`; an Agent-tool child stays session-bound and is
+  declared NON-transferable, blocking a boundary until it finishes or is safely stopped. The
+  coordinator plane is short-lived and split into dispatcher and lander epochs, holding one
+  renewable batch lease whose epoch FENCES every mutation, so two sessions can never adopt the
+  same batch. Coordination state is an append-only checksummed journal beside the repository with
+  an atomically replaced snapshot for fast resume, and every point carries an explicit state
+  (queued, running, checkpointing, ready-for-review, landing, landed, failed, stalled,
+  cancelled). A successor adopts supervision by STABLE JOB IDENTITY — never by process
+  reparenting, never by PID alone — after reconciling every recorded lane against journal,
+  worktrees and local/remote SHAs, and quarantining what it cannot prove. Refill comes only from
+  a bounded, pre-authorized queue behind a global three-lane cap and a completed-review backlog
+  limit, with a journalled REASON whenever three eligible lanes exist and fewer run. Landing stays
+  serial behind a batch-wide landing lock with a crash-recoverable staged journal, and the
+  main-session picture judgments are persisted as evidence a worker may never substitute.
+  Drain-before-boundary REMAINS as the explicit degraded mode whenever any active lane is not
+  transferable.
+  BUILD THE REMAINDER IN THE UNION'S ORDER (bounded dispatch, checkpoint barrier, the two-phase
+  boundary, successor reconciliation beyond the slice 834 claims, the crash-recoverable landing
+  journal, board projection, metrics), each step green on the unit layer before the next, and roll
+  out with the Sol adapter ALONE until the failure drills pass.
+  VERIFIABLE: the unit cases the union names per step; the failure drills — worker crash, stall,
+  push failure, dirty worktree, marker deletion, daemon restart, corrupt snapshot, PID reuse,
+  duplicate coordinator, remote outage, checkpoint timeout — each run through the daemon's drill
+  command; and a measured trial against a recorded baseline day, whose success needs ZERO safety
+  incidents (no lost attempt, no duplicate writer, no overlapping lease, no silently missed
+  boundary), a median handover context materially below baseline, and points landed per day no
+  worse than baseline. Utilization is supporting evidence, never the acceptance test on its own.
+  MECHANISM REVIEW REQUIRED (CLAUDE.md §7.2) per step, not once at the end.
+  Criticality: high — it owns the batch's dominant cost and every lane's durability, and a defect
+  here loses work rather than merely slowing it.
