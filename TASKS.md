@@ -77,30 +77,6 @@ then point 633 (the closing run), then point 174 (the tag). A newly appended poi
 kind is MOVED to the front in the same turn that files it; leaving it where append-and-defer
 put it is the mistake this line exists to stop.
 
-- [ ] 941. Only the middle column of a dashboard card header wraps (user, board chat, 26.08.2026
-  12:41: "Auch die linke Spalte im Header (die mit der Nummer und der Severity) und die rechte (die
-  mit den Uhrzeiten) sollen umbrechen können. Bisher bricht nur die Mittlere (die mit dem Titel)
-  um."). The card summary is a three-part header: the number and criticality badge on the left, the
-  title in the middle, the times on the right. Today only the title reflows when the width runs
-  out; the outer two are laid out as if they could never need a second line, so on a narrow phone
-  they either squeeze the title or push the row wider than the card.
-  FINAL STATE:
-  - ALL THREE COLUMNS WRAP. The left group (number plus severity badge) and the right group (the
-    time stamps) break onto a further line exactly as the title does, instead of being fixed to one.
-  - THE HEADER STAYS READABLE WHEN THEY DO: a wrapped badge stays attached to its number and a
-    wrapped time stays attached to its own group, so a break never separates two things that belong
-    together or reorders them.
-  - THE CARD NEVER PUSHES THE PAGE WIDER THAN THE VIEWPORT at the narrowest supported width.
-  VERIFIABLE: a rendering assertion at a narrow viewport — with a long title, a wide badge and two
-  time stamps, no header group overflows its card and the page has no horizontal scroll; and the
-  three groups' contents stay grouped after the break. The assertion measures the RENDERED layout
-  (title-column width) in a real browser: jsdom computes no layout and stylesheet-string checks
-  cannot fail on the defect, and the unfixed board already satisfies the overflow clause at 320 px
-  (measured 26.08.2026), so only the measured column width separates fixed from broken.
-  Criticality: low — it is a legibility defect on the surface the user reads on his phone, and it
-  costs no correctness.
-  Bundle: Chat & Tafel.
-
 - [ ] 947. Blind four-eyes sweep of every way the batch can still stop, plus a double-safety
   fallback. USER ORDER 26.08.2026, ~17:05, after the two-hour standstill (verbatim): "Es darf
   niemals vorkommen, dass die Batch einfach anhält - es sei denn, es ist ein absolut unlösbares
