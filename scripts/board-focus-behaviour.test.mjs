@@ -111,6 +111,35 @@ describe('board.mjs focus (spawned)', () => {
     }
   })
 
+  // Sixth cross-vendor round: the same rollback ran on the BOARD commands too,
+  // where the edited board is already on disk when the focus step runs. Undoing
+  // the declaration there recreates the split-brain in the other direction, and
+  // the prescribed publish retry projects the old membership over the new
+  // board. The new state stands; the focus store is named as the one behind.
+  it('KEEPS the new declaration when the focus step fails after a durable board write', () => {
+    const focusScript = resolve(repo, 'scripts', 'focus.mjs')
+    const original = readFileSync(focusScript, 'utf8')
+    writeFileSync(focusScript, 'process.stderr.write("focus stub: refusing\\n")\nprocess.exit(1)\n')
+    try {
+      // Archiving the FOCUSED strand: the board write lands first, then the
+      // transition clears the focus — which is the step that fails here. The
+      // work order has to agree that 697 is closed, or the publish precondition
+      // refuses before anything is written at all.
+      writeFileSync(resolve(repo, 'TASKS.md'), '- [x] 697. First strand\n- [ ] 700. Second strand\n')
+      const r = runCli('board.mjs', 'done', '697', 'erster Strang fertig')
+      expect(r.status).toBe(1)
+      expect(r.stderr).toContain('node scripts/focus.mjs set')
+      // The board write stands, so the record of what it means stands with it:
+      // the archived strand is gone from the source, not restored into it.
+      expect(readFileSync(resolve(repo, '.batch-dashboard.html'), 'utf8')).toContain('erster Strang fertig')
+      expect(readJson(declarationPath()).evidence.map((item) => item.point)).toEqual([700])
+      // …and the focus file is the store the message names as behind.
+      expect(readJson(focusPath()).point).toBe(697)
+    } finally {
+      writeFileSync(focusScript, original)
+    }
+  })
+
   it('clears both stores with "-" and refuses a non-point before touching either', () => {
     const cleared = runCli('board.mjs', 'focus', '-', 'kein Punkt gerade')
     expect(cleared.stdout + cleared.stderr).toContain('focus declared: -')

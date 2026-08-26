@@ -170,7 +170,19 @@ function applyEdit(fn, done, preparePublish = () => {}) {
 }
 
 /** Update the structured active source inside the same board transaction. */
-function prepareActiveTransition({ focusPoint = undefined, exitPoint = null, note = 'board lifecycle transition' } = {}) {
+function prepareActiveTransition({
+  focusPoint = undefined,
+  exitPoint = null,
+  note = 'board lifecycle transition',
+  // MAY THIS STILL BE ROLLED BACK (sixth cross-vendor round)? Only while no
+  // board write has become durable yet — the focus-only command. Run as a
+  // board edit's prepare step, the edited board is already on disk, so undoing
+  // the declaration would make the two disagree in the OTHER direction and the
+  // publish remedy would then project the old membership over the new board.
+  // There the new state stands and the focus store is named as the thing that
+  // is behind.
+  rollbackable = false,
+} = {}) {
   return () => {
     const declaration = readDeclaration()
     if (declaration) {
@@ -202,6 +214,13 @@ function prepareActiveTransition({ focusPoint = undefined, exitPoint = null, not
       // close, with the edit lock offering no rollback of its own. The
       // declaration write is in-process and restorable; the focus subprocess
       // failed and wrote nothing. Restore, then fail the command loudly.
+      if (!rollbackable) {
+        throw new Error(
+          `${error.message} — the board edit is already written, so the active-work record KEEPS the new ` +
+            'state and the focus store is the one left behind. Fix the cause, then: node scripts/focus.mjs ' +
+            `set ${focusPoint == null ? '-' : String(focusPoint)} "${note}"`,
+        )
+      }
       if (declaration) {
         try {
           writeDeclaration(declaration)
@@ -425,7 +444,9 @@ try {
       throw new Error(`board: focus "${point}" is neither a TASKS point number nor "-"`)
     }
     withBoardEditLock(() => {
-      prepareActiveTransition({ focusPoint, note })()
+      // The one caller with NO durable board write before it: nothing is on
+      // disk yet, so a failed focus step is undone rather than announced.
+      prepareActiveTransition({ focusPoint, note, rollbackable: true })()
       console.log(run([PUBLISH_SCRIPT, '--locked']).trim().split('\n')[0])
     })
   } else if (cmd === 'attest') {

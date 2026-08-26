@@ -66,6 +66,19 @@ export function runBoardEdit({
     return { html: edited.html, written: true, published: false }
   }
 
+  // THE AUTHORITATIVE RECORD FOLLOWS THE DURABLE WRITE IMMEDIATELY (sixth
+  // cross-vendor round). It used to run after archive rotation, so a rotation
+  // that failed left the board changed and the active-work declaration stale —
+  // and the failure message's own remedy, a standalone publish, then projected
+  // the OLD membership over the new board, which can put a card back for a
+  // point the edit has just finished or returned to the queue. Nothing may sit
+  // between the board write and the record of what it means.
+  try {
+    preparePublish()
+  } catch (error) {
+    return reportFailure('board state update', error)
+  }
+
   let rotated
   try {
     rotated = firstLine(rotate())
@@ -75,10 +88,9 @@ export function runBoardEdit({
 
   let published
   try {
-    preparePublish()
     published = firstLine(publish())
   } catch (error) {
-    return reportFailure('board publish preparation', error)
+    return reportFailure('board publish', error)
   }
 
   stdout(done)
