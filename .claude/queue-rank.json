@@ -768,10 +768,16 @@
       "why": "Ein einzelner Lauf mit einer Umgebungsstoerung; er faellt aus dem Fenster, sobald startup wieder gruen laeuft, deshalb steht er hinter der Arbeit, die das Tor selbst betrifft.",
       "origin": "machine",
       "place": "last"
+    },
+    "940": {
+      "at": "2026-08-26T10:42:56.933Z",
+      "why": "Maschinell gefiled und hoch eingestuft, aber es ueberholt die Auslieferung nicht: Der Verlustpfad braucht eine handgeschriebene Karte in genau der fremden Gestalt, und 930 raeumt denselben Bereich ohnehin auf.",
+      "origin": "machine",
+      "place": "last"
     }
   },
   "settled": {
-    "at": "2026-08-26T09:48:58.843Z",
+    "at": "2026-08-26T10:34:45.327Z",
     "points": [
       174,
       184,
@@ -1067,7 +1073,9 @@
       933,
       934,
       936,
-      937
+      937,
+      938,
+      939
     ]
   },
   "boundary": {

@@ -77,6 +77,27 @@ then point 633 (the closing run), then point 174 (the tag). A newly appended poi
 kind is MOVED to the front in the same turn that files it; leaving it where append-and-defer
 put it is the mistake this line exists to stop.
 
+- [ ] 941. Only the middle column of a dashboard card header wraps (user, board chat, 26.08.2026
+  12:41: "Auch die linke Spalte im Header (die mit der Nummer und der Severity) und die rechte (die
+  mit den Uhrzeiten) sollen umbrechen können. Bisher bricht nur die Mittlere (die mit dem Titel)
+  um."). The card summary is a three-part header: the number and criticality badge on the left, the
+  title in the middle, the times on the right. Today only the title reflows when the width runs
+  out; the outer two are laid out as if they could never need a second line, so on a narrow phone
+  they either squeeze the title or push the row wider than the card.
+  FINAL STATE:
+  - ALL THREE COLUMNS WRAP. The left group (number plus severity badge) and the right group (the
+    time stamps) break onto a further line exactly as the title does, instead of being fixed to one.
+  - THE HEADER STAYS READABLE WHEN THEY DO: a wrapped badge stays attached to its number and a
+    wrapped time stays attached to its own group, so a break never separates two things that belong
+    together or reorders them.
+  - THE CARD NEVER PUSHES THE PAGE WIDER THAN THE VIEWPORT at the narrowest supported width.
+  VERIFIABLE: a rendering assertion at a narrow viewport — with a long title, a wide badge and two
+  time stamps, no header group overflows its card and the page has no horizontal scroll; and the
+  three groups' contents stay grouped after the break.
+  Criticality: low — it is a legibility defect on the surface the user reads on his phone, and it
+  costs no correctness.
+  Bundle: Chat & Tafel.
+
 - [ ] 734. A run whose reds exceed the capture cap can never be closed, so it blocks the render
   set forever (measured 19.08.2026 while landing point 732). `render-verify-guard` blocked with
   12 unexplained red runs, the oldest from 17.08.2026 — `webgpu/enrichments` from 08:25 on, and
@@ -12203,3 +12224,37 @@ to land than a mechanism that needs a review.
   gate cannot tell a broken machine from a broken game, and that confusion is what makes a red
   gate get waved through.
   Bundle: Session- & Repo-Hygiene.
+
+- [ ] 940. The derived state card is authenticated by a shape that is not the writer's (cross-vendor
+  four-eyes review 26.08.2026, GPT-5.6 Sol at effort high, two passes over the landed range of point
+  935; receipts `f55c5ec3de6e859a` and `654d0d5c3f81a977`, both DO-NOT-MERGE, recorded in the
+  ledger). The review ran AFTER the landing, because the five rounds of that point were recorded
+  without a point number and the criticality gate could not attribute them; the findings are
+  therefore against code that is already on `main`, and this point owns them.
+  THE TWO FINDINGS:
+  - `scripts/board-core.mjs`: the regex that grants a card DERIVED identity does not check the
+    writer's actual opening-tag shape. It also accepts `class="nowhere"`, `x-data-state="derived"`,
+    and even an attribute whose VALUE contains the string, e.g.
+    `data-note='data-state="derived"'`. With the expected summary, such a hand-written card is
+    exempted by reconciliation and comparison — and `stripDerivedStateCard` can then silently
+    DELETE it. That is the loss point 930 exists to prevent, reached through the door this point's
+    own round opened.
+  - `scripts/board-core.test.mjs`: the suite cannot catch it. The "impostor" case lacks
+    `data-state="derived"` altogether, and every marked negative case adds point-looking content, so
+    a recognizer built on "marker plus title plus no number-like markup" passes the whole suite.
+    There is no marked, unnumbered, NON-writer-shaped case at all.
+  FINAL STATE:
+  - IDENTITY IS THE WRITER'S EXACT SHAPE: class TOKEN boundaries and attribute NAME boundaries are
+    required before a card is granted derived identity, so a value that merely contains the string
+    grants nothing.
+  - THE SUITE PROVES IT BY MUTATION: cases are built by mutating a card that
+    `applyDerivedStateCard` actually produced — an extra `<span class="note">…</span>`, a malformed
+    meta wrapper, a look-alike attribute — and BOTH comparison and reconciliation must reject each
+    one. A blacklist that only knows number-like markup must fail these cases.
+  VERIFIABLE: Vitest — each of the three accepted look-alike shapes is rejected as an identity, the
+  genuine writer output is still accepted, and a mutated genuine card is rejected by comparison AND
+  by reconciliation. Plus the negative control: the old regex fails the new cases.
+  Criticality: high — it is the one path on which the board silently deletes text a session wrote,
+  and it sits in the mechanism that publishes every handover.
+  Bundle: Chat & Tafel. It edits the same board projection as 930, 936 and 937 and must not run
+  beside them.
