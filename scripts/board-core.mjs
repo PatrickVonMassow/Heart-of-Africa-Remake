@@ -705,14 +705,28 @@ export function compareNowProjection(html, expectedPoints, { knownPoints = null,
     // preflight blessed it as a faithful projection. Beside active work the
     // section is exactly the derived cards; the render refuses the same state,
     // so the two halves cannot disagree about it.
+    // AND THE DERIVED STATE CARD IS EXEMPT HERE TOO (point 935, measured on the
+    // live board): the exemption existed only in the branch below, so a machine
+    // decision or a pause standing while nothing ran made the section
+    // unpublishable — in the exact state every session ends in. The card is
+    // rendered by this module from state kept elsewhere, carries no authored
+    // text and claims nothing about what is running, which is the same reason
+    // it may stand beside active work.
+    const claimCards = unnumberedCards - derivedCards
+    // …and there is at most ONE of them (point 935's review): subtracting every
+    // derived card without bounding the count let a stack of them cancel the
+    // zero claim out, so damaged machine state was blessed instead of refused.
+    // This module renders exactly one; a second is never something it wrote.
+    const duplicateDerived = derivedCards > 1
     const emptyStateWrong = expected.length === 0
       ? (idleCards === 1
-          ? emptyStateCount !== 0 || unnumberedCards !== 1
-          : emptyStateCount !== 1 || unnumberedCards > 0)
+          ? emptyStateCount !== 0 || claimCards !== 1
+          : emptyStateCount !== 1 || claimCards > 0)
       : emptyStateCount > 0 || idleCards > 0 || strayCards > 0
     return {
       ok: !missing.length && !extra.length && !duplicates.length && !unknown.length && !crossSection.length
-        && !emptyStateWrong && !focusUnrepresented && !focusMisplaced,
+        && !emptyStateWrong && !duplicateDerived && !focusUnrepresented && !focusMisplaced,
+      duplicateDerived,
       focusPoint: focusChecked ? focused : null,
       focusUnrepresented,
       focusMisplaced,
@@ -802,7 +816,14 @@ export function reconcileNowProjection(
   const conflicts = [...counts].filter(([, count]) => count > 1).map(([point]) => point)
   if (conflicts.length) throw new Error(`board: conflicting current-work copies for point(s) ${conflicts.join(', ')}`)
   const unnumbered = cards.filter((card) => card.point == null)
-  if (expected.length === 0 && unnumbered.some((card) => !isTrulyStateCard(card.html, 'idle'))) {
+  // …and the derived state card is not one of them (point 935): it is exempt
+  // beside active work for reasons that hold just as well beside none, and
+  // refusing it here made the board unpublishable at every session boundary
+  // where a machine decision or a pause still stood.
+  if (
+    expected.length === 0 &&
+    unnumbered.some((card) => !isTrulyStateCard(card.html, 'idle') && !isTrulyDerivedCard(card.html))
+  ) {
     throw new Error('board: refusing to replace an authored unnumbered non-idle card with the empty-state element')
   }
   // The idle card claims "nothing is running". BESIDE numbered cards that is
@@ -902,11 +923,21 @@ export function reconcileNowProjection(
   const ordered = displayOrder.map((point) => ({ point, html: survivorMap.get(point) ?? stubs.get(point) }))
 
   const now = { ...bounds, text: source.slice(bounds.from, bounds.end) }
+  let derivedKept = 0
   let remainder = now.text
     .replace(/<details class="now"[^>]*>[\s\S]*?<\/details>\s*/g, (card) => {
       const summary = (card.match(/<summary>([\s\S]*?)<\/summary>/) ?? [])[1] ?? ''
       const { chip, legacy } = summaryPoint(summary)
       if (chip != null || legacy != null) return ''
+      // ONE derived state card, never a stack (point 935's review). This module
+      // renders it and it holds no information of its own — `stripDerivedStateCard`
+      // is documented safe to call unconditionally for exactly that reason — so a
+      // duplicate is damaged machine state that is normalised away rather than
+      // carried. The comparison refuses the stack it would otherwise have blessed.
+      if (isTrulyDerivedCard(card)) {
+        derivedKept += 1
+        return derivedKept > 1 ? '' : card
+      }
       // Active work ENDS the idle state: a lone idle card is replaced by the
       // derived cards (the beside-numbered contradiction threw above).
       if (expected.length > 0 && isTrulyStateCard(card, 'idle')) return ''
@@ -918,7 +949,15 @@ export function reconcileNowProjection(
   // review): the idle card `done --none` puts up carries the handover reason
   // the reader opens the board for, so it survives the render byte for byte.
   // The generic empty element is only the fallback when nobody wrote anything.
-  if (expected.length === 0) remainder = remainder || NOW_EMPTY_STATE_MARKUP
+  if (expected.length === 0) {
+    // THE ZERO CLAIM IS MADE EVEN WHEN THE DERIVED CARD FILLS THE SECTION
+    // (point 935): the remainder was only tested for emptiness, so a standing
+    // machine decision suppressed the empty element and the comparison then
+    // found no zero claim at all. "Nothing is running" and "this is what the
+    // machine decided" are two statements, and the reader is owed both.
+    const claims = unnumbered.some((card) => isTrulyStateCard(card.html, 'idle'))
+    if (!claims) remainder = remainder ? `${remainder}\n${NOW_EMPTY_STATE_MARKUP}` : NOW_EMPTY_STATE_MARKUP
+  }
   else remainder = `${ordered.map((card) => card.html).join('')}${remainder ? `\n${remainder}` : ''}`.trimEnd()
   const projected = source.slice(0, now.from) + `\n${remainder}\n` + source.slice(now.end).replace(/^\n/, '')
   return stripProjectedQueueCards(projected, expected)
@@ -949,6 +988,7 @@ export function projectNowForPublish(html, activeWork, { knownPoints = null, sta
         : '',
       comparison.focusUnrepresented ? `the focus names point ${comparison.focusPoint}, which has no card` : '',
       comparison.focusMisplaced ? `the focused point ${comparison.focusPoint} does not stand first` : '',
+      comparison.duplicateDerived ? 'more than one derived state card stands in the section' : '',
     ].filter(Boolean)
     throw new Error(`now-section exact-set preflight failed: ${facts.join('; ') || comparison.error || 'state mismatch'}`)
   }
@@ -1440,6 +1480,37 @@ const derivedCardPattern = () =>
  * states? A marker is hand-writable, so here as everywhere it never authorises a
  * removal on its own.
  */
+const escapeForRegExp = (value) => String(value).replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+
+/** A card's meta field carries a clock time and nothing else. */
+const STAMP_SHAPE = /^\d{1,2}:\d{2}$/
+const cardStamp = (stamp) => {
+  const value = String(stamp ?? '').trim()
+  return STAMP_SHAPE.test(value) ? value : berlinStamp()
+}
+
+/**
+ * The summary `applyDerivedStateCard` writes — and nothing else.
+ *
+ * FOUR ROUNDS of one review widened a NEGATIVE test ("this summary shows no
+ * point number"), and every round found another spelling of HTML that walked
+ * past it — an extra attribute, single quotes, an unquoted or upper-case
+ * attribute, a foreign tag, an entity, a nested element, `<wbr>` between the
+ * digits, a quoted `>` inside an attribute, a zero-width space. Twice it found
+ * the widening REFUSING a legitimate card instead. Proving that negative over
+ * arbitrary markup means writing a browser, and each attempt bought a
+ * false-negative at the price of a false-positive.
+ *
+ * So the card is authenticated the other way round. It is written by ONE
+ * function thirty lines above this one, in one shape; anything that is not that
+ * shape is not the machine's card and gets no exemption. Every evasion of the
+ * negative test fails this one, and no card this module writes can.
+ */
+const DERIVED_SUMMARY = new RegExp(
+  `^<span class="t">(?:${escapeForRegExp(PAUSED_TITLE)}|${escapeForRegExp(AUTOMATIC_DECISION_TITLE)})</span>` +
+    '<span class="right"><span class="meta">\\d{1,2}:\\d{2}</span></span>$',
+)
+
 function isTrulyDerivedCard(card) {
   const text = String(card ?? '')
   // THE MARKER IS REQUIRED, AS IT IS FOR THE HANDOVER CARD (ninth cross-vendor
@@ -1450,8 +1521,8 @@ function isTrulyDerivedCard(card) {
   if (!new RegExp(`<details class="now"[^>]*data-state="${DERIVED_STATE_KIND}"[^>]*>`).test(text)) return false
   const summary = (text.match(/<summary>([\s\S]*?)<\/summary>/) ?? [])[1] ?? ''
   const title = ((summary.match(new RegExp(`<span class="t">${TITLE_TEXT}</span>`)) ?? [])[1] ?? '').trim()
-  if (summaryPoint(summary).chip != null) return false
-  return title === PAUSED_TITLE || title === AUTOMATIC_DECISION_TITLE
+  if (!(title === PAUSED_TITLE || title === AUTOMATIC_DECISION_TITLE)) return false
+  return DERIVED_SUMMARY.test(summary.trim())
 }
 
 /**
@@ -1472,11 +1543,17 @@ export function stripDerivedStateCard(html) {
 export function applyDerivedStateCard(html, derived, { stamp = berlinStamp() } = {}) {
   const stripped = stripDerivedStateCard(html)
   if (!derived || !String(derived.body ?? '').trim()) return stripped
+  // THE STAMP IS A CLOCK TIME OR IT IS THE CLOCK'S (final round of the review):
+  // the meta field went into the markup uninterpolated, so a caller-supplied
+  // `stamp` could carry entity-encoded digits a browser renders as a point
+  // number — or markup that this writer emits and its own authentication then
+  // refuses. One shape, written and read.
+  const at = cardStamp(stamp)
   const card =
     `<details class="now"${STATE_ATTR(DERIVED_STATE_KIND)}>\n  <summary>` +
     `<span class="t">${escapeCardTitle(derived.title)}</span>` +
-    `<span class="right"><span class="meta">${stamp}</span></span></summary>\n` +
-    `  <div class="body">\n${renderCardBody(derived.body, { stamp })}\n  </div>\n</details>\n`
+    `<span class="right"><span class="meta">${at}</span></span></summary>\n` +
+    `  <div class="body">\n${renderCardBody(derived.body, { stamp: at })}\n  </div>\n</details>\n`
   return insertAsFirstNowCard(stripped, card)
 }
 
@@ -1523,18 +1600,79 @@ const stateCardPattern = (kind) =>
  * something. Otherwise any hand-marked card would buy itself the exemption
  * that the stray rule exists to deny.
  */
+/**
+ * Does this summary carry a point number ANYWHERE?
+ *
+ * `summaryPoint` reads the CANONICAL leading chip, which is the right reading
+ * when the question is "which point is this card's" — and the WRONG one when
+ * the question is "is this card unnumbered" (point 935's review). A card marked
+ * `data-state="derived"`, wearing a reserved title and carrying
+ * `<span class="num">935</span>` further along its summary, passed as
+ * unnumbered — and with an empty expected set that publishes a visible point
+ * chip under the claim that nothing is running. `parseNowCardPoints` has always
+ * scanned the whole section; the three state predicates now agree with it.
+ */
+const classTokens = (attrs) => {
+  // `\bclass` also matches the tail of `data-class`, which read an ordinary
+  // authored attribute as a title span and RETIRED a legitimate card. The
+  // attribute has to start where an attribute starts.
+  const m = String(attrs ?? '').match(/(?:^|\s)class\s*=\s*(?:"([^"]*)"|'([^']*)'|([^\s"'>=`]+))/i)
+  return (m ? m[1] ?? m[2] ?? m[3] ?? '' : '').split(/\s+/).filter(Boolean)
+}
+
+/** The text a browser would show: tags removed, numeric entities resolved. */
+const visibleText = (html) =>
+  String(html ?? '')
+    .replace(/<[^>]*>/g, '')
+    .replace(/&#x([0-9a-fA-F]+);/g, (_, hex) => String.fromCodePoint(parseInt(hex, 16)))
+    .replace(/&#(\d+);/g, (_, dec) => String.fromCodePoint(Number(dec)))
+
+const summaryCarriesPoint = (summary) => {
+  // A COMMENT IS NOT VISIBLE, so a number inside one is not a chip — scanning it
+  // as markup retired legitimate cards (same round as the `data-class` slip).
+  const text = String(summary ?? '').replace(/<!--[\s\S]*?-->/g, '')
+  const { chip, legacy } = summaryPoint(text)
+  if (chip != null || legacy != null) return true
+  // …AND THE FALLBACK READS MARKUP, NOT ONE SPELLING OF IT (two confirming
+  // passes of the same review). The first spelling-bound attempt missed
+  // `<span class="num" aria-label="Punkt">935</span>`; the second still missed
+  // single quotes, an unquoted or upper-case attribute, a tag other than
+  // `span`, an entity-encoded digit and a number wrapped in a nested element.
+  // So the summary is WALKED as markup: every element that carries the `num`
+  // class token is asked what a BROWSER would show inside it, and the legacy
+  // "651 — Titel" spelling counts wherever it stands rather than only first.
+  const tag = /<\s*(\/?)\s*([a-zA-Z][\w:-]*)((?:"[^"]*"|'[^']*'|[^>])*)>/g
+  const open = []
+  const legacyStart = new RegExp(`^\\s*\\d+\\s*${DASH}`)
+  for (let m = tag.exec(text); m; m = tag.exec(text)) {
+    const [whole, closing, , attrs] = m
+    if (closing) {
+      const element = open.pop()
+      if (!element) continue
+      const shown = visibleText(text.slice(element.from, m.index))
+      if (element.num && /^\s*\d+\s*$/.test(shown)) return true
+      if (element.legacy && legacyStart.test(shown)) return true
+      continue
+    }
+    if (/\/\s*$/.test(attrs)) continue
+    const tokens = classTokens(attrs)
+    open.push({ num: tokens.includes('num'), legacy: tokens.includes('t'), from: m.index + whole.length })
+  }
+  return false
+}
+
 function isHandoverCard(card) {
   const text = String(card ?? '')
   if (!/<details class="now"[^>]*data-state="handover"[^>]*>/.test(text)) return false
   const summary = (text.match(/<summary>([\s\S]*?)<\/summary>/) ?? [])[1] ?? ''
-  if (summaryPoint(summary).chip != null) return false
+  if (summaryCarriesPoint(summary)) return false
   return cardBodyText(text).length > 0
 }
 
 function isTrulyStateCard(card, kind) {
   const summary = (String(card).match(/<summary>([\s\S]*?)<\/summary>/) ?? [])[1] ?? ''
   const title = ((summary.match(new RegExp(`<span class="t">${TITLE_TEXT}</span>`)) ?? [])[1] ?? '').trim()
-  const numbered = summaryPoint(summary).chip != null
+  const numbered = summaryCarriesPoint(summary)
   if (kind === 'idle') return title === NO_CURRENT_WORK_TITLE && !numbered
   // THE LEGACY TITLE ONLY COUNTS ON AN UNNUMBERED CARD (four-eyes review,
   // 12.08.2026). That card never had a number; a NUMBERED card wearing the old

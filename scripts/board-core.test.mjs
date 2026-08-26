@@ -16,7 +16,7 @@ import {
 } from './dashboard-guard-core.mjs'
 import { concisenessOffenders } from './dashboard-conciseness-guard-core.mjs'
 import { structureViolations } from './board-structure-core.mjs'
-import { PAUSED_TITLE } from './board-state-core.mjs'
+import { AUTOMATIC_DECISION_TITLE, PAUSED_TITLE } from './board-state-core.mjs'
 import {
   CLOSING_WORK_TITLE,
   ERLEDIGT_ANCHOR,
@@ -275,6 +275,232 @@ describe('derived now-section membership', () => {
   // anything WEARING the handover marker, so it rejected this module's own
   // derived state card — unnumbered by design and documented to stand beside
   // running work — while letting a hand-marked card buy the exemption.
+  // Point 935, measured on the live board twenty minutes after the derived
+  // now-section landed: the exemption above existed ONLY beside active work, so
+  // a standing machine decision made the section unpublishable in the exact
+  // state every session ends in — the render refused the card, the empty
+  // element was then never inserted because the card filled the remainder, and
+  // the comparison demanded a single unnumbered card.
+  it('lets the derived state card stand while nothing runs, and still makes the zero claim', () => {
+    const idleReason =
+      `<details class="now" data-state="idle">\n  <summary><span class="t">${NO_CURRENT_WORK_TITLE}</span>` +
+      '<span class="right"><span class="meta">10:17</span></span></summary>\n' +
+      '  <div class="body"><p>Ich übergebe an eine frische Sitzung.</p></div>\n</details>\n'
+    const decision = { title: AUTOMATIC_DECISION_TITLE, body: 'Der Batch läuft trotz der Meldung weiter.' }
+
+    // SLICED INDEPENDENTLY of the production comparison (the reviewer of this
+    // very case): a substring found anywhere in the document proves nothing
+    // about the section it is supposed to stand in, and leaning on
+    // `compareNowProjection` for placement would let one changed path vouch
+    // for the other.
+    // …and the slice ENDS AT THE SECTION'S OWN CLOSER (the confirming pass of
+    // this case): cutting at the next section's opening tag left everything
+    // between the two inside the slice, so an element inserted BETWEEN sections
+    // satisfied an assertion that claims to prove it is inside this one.
+    // …and the slice is found by COUNTING the section wrapper's own tags (two
+    // confirming passes of this case). Cutting at the next section's opening
+    // tag left everything between the two inside the slice; cutting at the LAST
+    // closer in that stretch was fooled by a misplaced `<details>` card standing
+    // between the sections — whose closer then became the last one. Depth
+    // counting is the only reading neither can fool.
+    const nowSectionOf = (html) => {
+      const heading = html.indexOf('Woran ich gerade arbeite')
+      const from = heading < 0 ? -1 : html.lastIndexOf('<details', heading)
+      // A SECTION ORACLE MAY NOT FAIL OPEN (the third confirming pass of this
+      // case): returning the rest of the document when the wrapper never
+      // balances let later sections satisfy the placement assertions — the one
+      // thing this helper exists to rule out.
+      if (from < 0) throw new Error('no now-section wrapper in this board')
+      const tag = /<(\/?)details\b/g
+      tag.lastIndex = from
+      let depth = 0
+      for (let m = tag.exec(html); m; m = tag.exec(html)) {
+        depth += m[1] ? -1 : 1
+        if (depth === 0) return html.slice(from, m.index)
+      }
+      throw new Error('the now-section wrapper never closes')
+    }
+
+    // (a) Beside the authored idle claim: both stand, and NOTHING is rewritten
+    // — the render is a byte-for-byte identity here, which is the only reading
+    // a moved or silently edited card cannot satisfy.
+    const withIdle = applyDerivedStateCard(fullBoard({ now: idleReason }), decision, { stamp: '10:17' })
+    expect(compareNowProjection(withIdle, [])).toMatchObject({ ok: true, idleCards: 1, emptyStateCount: 0 })
+    const renderedIdle = reconcileNowProjection(withIdle, [], { stamp: '10:17' })
+    expect(renderedIdle).toBe(withIdle)
+    const idleSection = nowSectionOf(renderedIdle)
+    expect(idleSection).toContain('Ich übergebe an eine frische Sitzung.')
+    expect(idleSection).toContain('data-state="derived"')
+    expect(compareNowProjection(renderedIdle, []).ok).toBe(true)
+
+    // (b) ALONE: the card must not swallow the zero claim — the empty element
+    // stands INSIDE the section beside it, so "nothing is running" is still
+    // said out loud, exactly once.
+    const alone = applyDerivedStateCard(fullBoard({ now: '' }), decision, { stamp: '10:17' })
+    const renderedAlone = reconcileNowProjection(alone, [], { stamp: '10:17' })
+    const aloneSection = nowSectionOf(renderedAlone)
+    expect(aloneSection).toContain(NOW_EMPTY_STATE_MARKUP.trim())
+    expect(aloneSection).toContain('data-state="derived"')
+    expect(renderedAlone.split(NOW_EMPTY_STATE_TEXT)).toHaveLength(2)
+    expect(compareNowProjection(renderedAlone, [])).toMatchObject({ ok: true, emptyStateCount: 1 })
+    // …and rendering again changes nothing: no second element, no drift.
+    expect(reconcileNowProjection(renderedAlone, [], { stamp: '10:17' })).toBe(renderedAlone)
+
+    // (c) THE EXEMPTION DOES NOT WIDEN: a hand-written unnumbered card, and one
+    // wearing the reserved title WITHOUT the marker, still refuse with nothing
+    // running — the ninth round's hardening is untouched.
+    const handWritten =
+      '<details class="now">\n  <summary><span class="t">Von Hand</span></summary>\n' +
+      '  <div class="body"><p>Text.</p></div>\n</details>\n'
+    expect(compareNowProjection(fullBoard({ now: handWritten }), []).ok).toBe(false)
+    expect(() => reconcileNowProjection(fullBoard({ now: handWritten }), [], { stamp: '10:17' })).toThrow(
+      /authored unnumbered non-idle card/,
+    )
+    const impostor = handWritten.replace('<span class="t">Von Hand</span>', `<span class="t">${AUTOMATIC_DECISION_TITLE}</span>`)
+    expect(compareNowProjection(fullBoard({ now: impostor }), []).ok).toBe(false)
+    expect(() => reconcileNowProjection(fullBoard({ now: impostor }), [], { stamp: '10:17' })).toThrow(
+      /authored unnumbered non-idle card/,
+    )
+  })
+
+  // Point 935's own reviewer, on the repair above: the exemption authenticated
+  // the card with `summaryPoint`, which reads only a CANONICAL LEADING chip —
+  // so a derived-marked card carrying its number further along the summary
+  // passed as unnumbered, and beside an empty expected set that publishes a
+  // visible point chip under the claim that nothing is running. And subtracting
+  // every derived card without bounding the count let a STACK of them cancel
+  // the zero claim out.
+  it('authenticates the derived card by the whole summary, and tolerates only one of it', () => {
+    const derivedCard = (summaryExtra = '', body = 'Der Batch läuft weiter.') =>
+      '<details class="now" data-state="derived">\n  <summary><span class="t">' +
+      `${AUTOMATIC_DECISION_TITLE}</span>${summaryExtra}` +
+      '<span class="right"><span class="meta">10:17</span></span></summary>\n' +
+      `  <div class="body"><p>${body}</p></div>\n</details>\n`
+
+    // (a) A NON-LEADING chip is still a chip: the card is not the machine's —
+    // and the reading is of MARKUP, not of one spelling of it, so an ordinary
+    // attribute or a second class token does not walk past it.
+    const chipShapes = [
+      '<span class="num">935</span>',
+      '<span class="num" aria-label="Punkt">935</span>',
+      '<span class="chip num">935</span>',
+      "<span class='num'>935</span>",
+      '<span class=num>935</span>',
+      '<SPAN CLASS="num">935</SPAN>',
+      '<div class="num">935</div>',
+      '<span class="num chip">935</span>',
+      '<span class="num\tchip">935</span>',
+      '<span class="chip\nnum">935</span>',
+      '<span class="num">&#57;35</span>',
+      '<span class="num">&#x39;35</span>',
+      '<span class="num"><b>935</b></span>',
+      '<span class="num">9<b>35</b></span>',
+      // The shapes the negative test never caught and never will — a browser
+      // shows a number, a regex does not (fourth confirming pass). The card is
+      // authenticated against the ONE shape this module writes, so each of
+      // these fails on its own account rather than on a spelling.
+      '<span class="num">9<wbr>35</span>',
+      '<span class=num><i title=">">935</i></span>',
+      '<span class="num">&nbsp;935&nbsp;</span>',
+      '<span class="num">9&#x200b;35</span>',
+      '<span class=num/>935',
+      `<span class="t">935 ${'\u2014'} Getarnt</span>`,
+    ]
+    for (const shape of chipShapes) {
+      const smuggled = derivedCard(shape)
+      const board = fullBoard({ now: smuggled })
+      expect(compareNowProjection(board, []).ok).toBe(false)
+      expect(() => reconcileNowProjection(board, [], { stamp: '10:17' })).toThrow(
+        /authored unnumbered non-idle card/,
+      )
+      // …and it is not laundered into the section beside real work either —
+      // BOTH halves say so, for EVERY shape (the second confirming pass of this
+      // case: the loop had left only the last shape standing for this half).
+      const beside = fullBoard({ now: nowEntry(700, 'A', '20:07') + smuggled })
+      expect(compareNowProjection(beside, [700])).toMatchObject({ ok: false, strayCards: 1 })
+      expect(() => reconcileNowProjection(beside, [700], { stamp: '20:10' })).toThrow(
+        /unnumbered current-work card/,
+      )
+    }
+    // (b) TWO genuine derived cards are damaged machine state, not two facts.
+    // THE TWO ARE DISTINGUISHABLE ON PURPOSE (the confirming pass of this case):
+    // byte-identical cards cannot tell keeping the FIRST from keeping the last.
+    const stacked = fullBoard({ now: derivedCard('', 'Die erste Entscheidung.') + derivedCard('', 'Die zweite.') })
+    expect(compareNowProjection(stacked, [])).toMatchObject({ ok: false, duplicateDerived: true })
+    // The render normalises the stack away — the card holds nothing of its own —
+    // and what it leaves behind is the state the comparison accepts.
+    const normalised = reconcileNowProjection(stacked, [], { stamp: '10:17' })
+    expect(normalised.match(/data-state="derived"/g)).toHaveLength(1)
+    expect(normalised).toContain('Die erste Entscheidung.')
+    expect(normalised).not.toContain('Die zweite.')
+    expect(compareNowProjection(normalised, [])).toMatchObject({ ok: true, duplicateDerived: false })
+    // The same stack beside active work is refused rather than blessed.
+    expect(compareNowProjection(fullBoard({ now: nowEntry(700, 'A', '20:07') + derivedCard() + derivedCard() }), [700]))
+      .toMatchObject({ ok: false, duplicateDerived: true })
+  })
+
+  // The same round found the widening REFUSING legitimate cards, which is the
+  // worse failure: a number inside an HTML COMMENT is invisible in a browser,
+  // and `data-class` is an ordinary authored attribute — both used to retire a
+  // card that was exactly what the machine had written.
+  it('keeps a state card whose summary only LOOKS numbered to a regex', () => {
+    const commented =
+      '<details class="now" data-state="idle">\n  <summary><span class="t">' +
+      `${NO_CURRENT_WORK_TITLE}</span><!-- <span class="num">935</span> -->` +
+      '<span class="right"><span class="meta">10:17</span></span></summary>\n' +
+      '  <div class="body"><p>Ich übergebe.</p></div>\n</details>\n'
+    const commentedBoard = fullBoard({ now: commented })
+    expect(compareNowProjection(commentedBoard, [])).toMatchObject({ ok: true, idleCards: 1 })
+    // BOTH halves, and the card survives byte for byte — "retire a card" is a
+    // thing the RENDER does, so comparing alone cannot pin it (the final pass).
+    const commentedRendered = reconcileNowProjection(commentedBoard, [], { stamp: '10:17' })
+    expect(commentedRendered).toBe(commentedBoard)
+    expect(commentedRendered).toContain('Ich übergebe.')
+
+    const dataClass =
+      '<details class="now" data-state="handover">\n  <summary><span class="t">Übergabe</span>' +
+      `<span data-class="t">2026 ${'\u2014'} Übergabe</span>` +
+      '<span class="right"><span class="meta">10:17</span></span></summary>\n' +
+      '  <div class="body"><p>Weiter mit Punkt 734.</p></div>\n</details>\n'
+    const dataClassBoard = fullBoard({ now: nowEntry(700, 'A', '20:07') + dataClass })
+    expect(compareNowProjection(dataClassBoard, [700])).toMatchObject({ ok: true, strayCards: 0 })
+    const dataClassRendered = reconcileNowProjection(dataClassBoard, [700], { stamp: '20:10' })
+    expect(dataClassRendered).toContain('Weiter mit Punkt 734.')
+    expect(dataClassRendered).toContain('data-state="handover"')
+  })
+
+  // The final pass of the same review, on the positive predicate: the meta
+  // field went into the markup uninterpolated, so a caller-supplied stamp could
+  // carry entity-encoded digits a browser renders as a point number — or markup
+  // that this writer emits and its own authentication then refuses.
+  it('gives the state card stamp one shape, at the writer and at the reader', () => {
+    const decision = { title: AUTOMATIC_DECISION_TITLE, body: 'Der Batch läuft weiter.' }
+    // A stamp that is not a clock time never reaches the markup — asserted on
+    // what the meta field IS, not on the absence of one raw spelling: a writer
+    // that merely ESCAPED the hostile stamp would still have embedded it and
+    // still have passed a substring check (the closing pass of this case).
+    const metaOf = (html) => (html.match(/<span class="meta">([\s\S]*?)<\/span>/) ?? [])[1]
+    const smuggledStamp = applyDerivedStateCard(fullBoard({ now: '' }), decision, {
+      stamp: 'Punkt &#57;&#51;&#53;',
+    })
+    expect(metaOf(smuggledStamp)).toMatch(/^\d{1,2}:\d{2}$/)
+    expect(smuggledStamp).not.toMatch(/Punkt (&|&amp;)#57;/)
+    // …and markup in the stamp neither ships nor breaks the card's own reading.
+    const markupStamp = applyDerivedStateCard(fullBoard({ now: '' }), decision, { stamp: '<b>12:34</b>' })
+    expect(metaOf(markupStamp)).toMatch(/^\d{1,2}:\d{2}$/)
+    expect(markupStamp).not.toMatch(/(<|&lt;)b(>|&gt;)12:34/)
+    // Both are still the machine's card: the render keeps them and adds the
+    // zero claim beside them, and the comparison then agrees.
+    for (const board of [smuggledStamp, markupStamp]) {
+      const rendered = reconcileNowProjection(board, [], { stamp: '10:17' })
+      expect(rendered).toContain('data-state="derived"')
+      expect(compareNowProjection(rendered, [])).toMatchObject({ ok: true, emptyStateCount: 1 })
+    }
+    // An ordinary stamp is kept exactly as given.
+    expect(applyDerivedStateCard(fullBoard({ now: '' }), decision, { stamp: '10:17' }))
+      .toContain('<span class="meta">10:17</span>')
+  })
+
   it('exempts the derived state card and demands the handover card really be one', () => {
     const board = applyDerivedStateCard(
       fullBoard({ now: nowEntry(700, 'A', '20:07') }),
