@@ -28,11 +28,11 @@
           --check primary` — which re-registers, enables or starts the primary
           when it is gone, disabled or silent.
 
-      (d) Exports both task definitions to local\windows-tasks\, which is what a
-          re-registration reads. Git-ignored: they belong to this machine.
-
-      (e) Registers HoA-Batch-Emergency on its own hourly SYSTEM timer. It calls
+      (d) Registers HoA-Batch-Emergency on its own hourly SYSTEM timer. It calls
           batch-emergency.mjs, and the watchdog independently repairs this task.
+
+      (e) Exports all three task definitions to local\windows-tasks\, which is
+          what a re-registration reads. Git-ignored: they belong to this machine.
 
       (f) The pre-departure update settings: no forced restart while a user is
           logged on, and automatic restart sign-on ENABLED so an update restart
