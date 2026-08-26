@@ -750,44 +750,13 @@
       "why": "Der Mechanismus wird erst nach der geschuldeten repo-gestuetzten Nachpruefung spezifiziert, und die sichtbare Haelfte des 925-Vorfalls deckt Punkt 931 bereits ab.",
       "origin": "machine",
       "place": "last"
+    },
+    "935": {
+      "at": "2026-08-26T08:20:55.056Z",
+      "why": "Sie blockiert die Veroeffentlichung des Bretts vollstaendig in genau dem Zustand, in dem jede Sitzung endet; der Batch kann seine Uebergabe sonst nicht schreiben.",
+      "origin": "machine",
+      "place": "ahead"
     }
-  },
-  "boundary": {
-    "at": "2026-08-21T00:55:14.962Z",
-    "points": [
-      336,
-      553,
-      581,
-      596,
-      633,
-      659,
-      660,
-      663,
-      686,
-      687,
-      688,
-      689,
-      690,
-      691,
-      692,
-      708,
-      715,
-      719,
-      733,
-      734,
-      735,
-      736,
-      738,
-      739,
-      746,
-      747,
-      750,
-      759,
-      760,
-      762,
-      764
-    ],
-    "why": "The order standing in front of the release today is the arrangement that predates this rule; the four machine-filed points that had ranked themselves there were moved behind 174 first"
   },
   "settled": {
     "at": "2026-08-26T08:10:50.140Z",
@@ -1086,5 +1055,42 @@
       933,
       934
     ]
+  },
+  "boundary": {
+    "at": "2026-08-21T00:55:14.962Z",
+    "points": [
+      336,
+      553,
+      581,
+      596,
+      633,
+      659,
+      660,
+      663,
+      686,
+      687,
+      688,
+      689,
+      690,
+      691,
+      692,
+      708,
+      715,
+      719,
+      733,
+      734,
+      735,
+      736,
+      738,
+      739,
+      746,
+      747,
+      750,
+      759,
+      760,
+      762,
+      764
+    ],
+    "why": "The order standing in front of the release today is the arrangement that predates this rule; the four machine-filed points that had ranked themselves there were moved behind 174 first"
   }
 }

@@ -12090,3 +12090,43 @@ to land than a mechanism that needs a review.
   incident, and the proposed shape would have shipped four ways to be wrong about what "done"
   means.
   Bundle: Session- & Repo-Hygiene.
+
+- [ ] 935. The derived state card blocks the board the moment nothing is running (MEASURED
+  26.08.2026 10:17, on the live board, by the mechanism point 713 had landed twenty minutes
+  earlier). At the session boundary the board says "nothing is running" — and the publish REFUSED:
+  `board: refusing to replace an authored unnumbered non-idle card with the empty-state element`.
+  The card it refused to touch was the machine's OWN derived state card, standing since 05:34 with
+  the unanswered "PARALLEL batch sessions" decision, marked `data-state="derived"` exactly as it
+  should be. The board could not be published at all, in the last bookkeeping step of a session —
+  which is point 700's lesson repeating in a new place: the handover state must not block the
+  handover.
+  THE GAP IS AN ASYMMETRY, NOT A NEW RULE. The eighth cross-vendor round already settled that the
+  derived state card is NOT a stray: `reconcileNowProjection` exempts it beside active work
+  ("this module renders it itself, it is unnumbered by design, and it is documented to stand
+  BESIDE running work"), and `compareNowProjection` subtracts it from `strayCards` in the same
+  branch. NEITHER half carries that exemption into the branch where the expected set is EMPTY:
+  the render refuses it as an authored card, the empty-state element is then never inserted
+  because the card makes the remainder non-empty, and the comparison demands
+  `unnumberedCards === 1`. Three consequences of one missing exemption.
+  FINAL STATE:
+  - THE DERIVED STATE CARD IS EXEMPT IN BOTH BRANCHES, for the reason it is already exempt in one:
+    it is machine-rendered from state kept elsewhere, it carries no authored text, and it makes no
+    claim about what is running. Beside the idle claim and beside the empty element it stands.
+  - THE ZERO CLAIM IS STILL MADE. With nothing running and no authored idle card, the
+    parser-distinct empty element is inserted BESIDE the derived card rather than suppressed by
+    it — "nothing is running" and "this is what the machine decided" are two different statements
+    and the reader gets both.
+  - THE EXEMPTION DOES NOT WIDEN. A hand-written unnumbered card, and a card wearing the reserved
+    title WITHOUT the `data-state="derived"` marker, are refused exactly as they are today — the
+    ninth round's hardening stays intact.
+  VERIFIABLE: Vitest over the two pure halves — with nothing expected, a derived card beside the
+  authored idle card renders unchanged and compares ok; a derived card ALONE gains the empty
+  element beside it and compares ok; a derived card beside numbered work still behaves as the
+  eighth round pinned it; a hand-written unnumbered card and a marker-less card wearing the
+  reserved title still refuse in both branches. Plus the live proof: the board that refused above
+  publishes.
+  MECHANISM REVIEW REQUIRED (CLAUDE.md §7.2): it changes the board render and the fail-closed
+  preflight core.
+  Criticality: high — it blocks publication of the board entirely in the exact state every session
+  ends in, and a paused batch with no running point cannot publish at all.
+  Bundle: Chat & Tafel.
