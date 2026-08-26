@@ -23829,3 +23829,42 @@ Nummerierung bleiben deshalb identisch — hier wird nur verschoben, nie umgesch
   does not carry it and no shared check helper spans the suites — each defines its own `check`,
   so enforcing it would be a cross-suite build. It ships as ladder text. If it is ever wanted as
   a mechanism, it needs its own point, because that is what it costs.
+
+- [x] 598. The brief orients in the code, not only in the spec (point 572's measure 8).
+  The delegation brief carries a GENERATED orientation: the paths the specification itself
+  names, and a per-directory line of responsibility derived from the tree and its file
+  headers. It is marked as a HINT, never as an instruction ("the specification names these
+  paths", not "change these files"), and it is generated on every run so it cannot go
+  stale.
+  AND IT NAMES THE PLANNED CHECK — as an ITERATION CHECK SET, not as one suite. Two corrections
+  to the original wording, both from the 23.08.2026 staleness audit.
+  TIMING: a brief is generated BEFORE the implementation diff exists, so the hint cannot
+  initially derive from the real diff→suite mapping. It derives from the PROSPECTIVE paths the
+  specification itself names; once a diff exists, a regenerated brief derives it from that diff.
+  SHAPE: the hint names one or more suite/`--section` pairs — a diff touching several suites
+  cannot be represented by a single pair — and it is stated SEPARATELY from the whole-suite
+  final proof, so the cheap rung can never be read as the acceptance. The singular wording
+  contradicted point 595 itself, where sections are the iteration rung and the proof is the
+  whole suite. Generated like the rest so it cannot go stale, and marked as a hint like the path
+  list. This is the cheapest possible answer to what the ladder point found: a rung that is built
+  and routed to nobody gets used when it stands in the artefact the agent reads FIRST, not in a
+  rule it must remember.
+  MEASURED TARGET: search/read is 25.2 % of the weighted spend and the first responses of
+  a delegated agent are almost always search; five saved responses per point is ~2 % of a
+  median point.
+  NOT THE OPPOSITE DIRECTION: shrinking the brief was weighed and rejected on the arithmetic.
+  Removing 1.5k tokens saves ~35.7k weighted per point, while a single reference the agent
+  must then look up costs 22.9k — it breaks even at 1.5 extra lookups and goes negative
+  after. The brief is 1.9 % of the spend and exists to avoid the ~108k wholesale read.
+  Criticality: low — a wrong list would misdirect, which generation-from-the-tree and the
+  hint framing address.
+  BRANCH STATE, RE-MEASURED 23.08.2026 (the 17.08. paragraph it replaces is stale): the branch
+  `feat/595-598-verification-ladder-brief` (tip 85eaa47c) DELIVERS this point too. Main has not
+  touched `scripts/point-brief.mjs` since the branch tip, and a brief generated today carries
+  neither an orientation nor a planned-check section — so this deliverable is NOT superseded. The
+  merge surface and the owed both-backend picture proof are described once, under point 595.
+  WHICH DIFF THE ORIENTATION READS IS NAMED HERE, because the TIMING correction left it open
+  and a different base yields a different check set (decided 25.08.2026): the fork point to
+  HEAD, plus uncommitted work — not the working tree alone and not the point's own commits.
+  The delegated author chose this base and documented it in the code; this line makes the
+  choice the spec's rather than the author's.
