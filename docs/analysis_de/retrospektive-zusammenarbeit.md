@@ -1384,7 +1384,7 @@ Punktgrenze. Gebucht als Punkt 916.
 
 ## Anhang A — Maschinell gepflegte Quellen-Übersicht
 
-Zuletzt aktualisiert: Mittwoch, 26.08.2026, 12:21 · Quellen-Fingerprint: `d7eb83e6d733…`
+Zuletzt aktualisiert: Mittwoch, 26.08.2026, 12:53 · Quellen-Fingerprint: `7fac4aad707c…`
 
 Spalten heuristisch aus den Quellen abgeleitet (Anläufe = distinkte Datumsnennungen im Memory;
 Maßnahme = Guard-Skripte mit Namens-Treffer). Die inhaltliche Bewertung gehört der Prosa oben.
@@ -1483,10 +1483,10 @@ Maßnahme = Guard-Skripte mit Namens-Treffer). Die inhaltliche Bewertung gehört
 | A pending batch claim HOLDS THE LAUNCHER BACK — withdraw it whenever the claiming window is left unattended | 2 | mittel | clear-claim-guard.mjs | ✔ Mechanismus |
 | Multi-agent workflows eat the session/weekly limit fast — verify findings INLINE, keep fan-outs small, warn the user with a cost estimate before any big workflow | 3 | mittel | doc-budget-guard.mjs | ✔ Mechanismus |
 
-Erfasste Quellen: 91 Feedback-/Projekt-Memories · 57 Guard-/Hook-Skripte · 6 Revert-/Reapply-Commits · 102 Prozess-/Meta-TASKS-Punkte (davon 43 offen).
+Erfasste Quellen: 91 Feedback-/Projekt-Memories · 57 Guard-/Hook-Skripte · 6 Revert-/Reapply-Commits · 103 Prozess-/Meta-TASKS-Punkte (davon 44 offen).
 
-<!-- RETRO-FINGERPRINT: d7eb83e6d733411ac9ac55bf55eaab782bef8d7d0364dd3a73eb8653e9dc0d37 -->
-<!-- RETRO-LAST-REFRESHED: 2026-08-26T10:21:52.915Z -->
+<!-- RETRO-FINGERPRINT: 7fac4aad707c6d50be947ab495110a9b486dca98637f39b092898fd0edc43ad9 -->
+<!-- RETRO-LAST-REFRESHED: 2026-08-26T10:53:41.692Z -->
 <!-- AUTO-GENERATED:END -->
 
 ### 3.111 Ein Erfolg ist kein Beweis für den Weg, auf dem er zustande kam
@@ -3924,3 +3924,22 @@ Umgebung, in der sie jetzt läuft. Beides ist wichtig, beides ist Arbeit — und
 **Lehre:** Wenn eine Zuordnung mit ihrem Besitzer verfällt, braucht das, was sie erklärt hat, in
 demselben Moment einen neuen Besitzer oder eine gemessene Abmeldung. Ein Zeuge, der seinen Fall
 überlebt, sagt weiter aus; wer ihn nicht anhört, hat nicht abgeschlossen, sondern weggehört.
+
+### 3.190 Die Prüfung auf die richtige Gestalt war selbst wieder eine Ausschlussliste
+
+Fünf Runden Gegenlesung hingen an einer Frage: Woran erkennt man das Kärtchen, das die Maschine
+selbst schreibt? Jede Verschärfung fand die nächste Schreibweise, zweimal wies sie ein
+rechtmäßiges Kärtchen ab. Der Ausweg war richtig gedacht und wurde auch so aufgeschrieben: nicht
+mehr aufzählen, was ein Fremdkörper an sich hat, sondern prüfen gegen die eine Gestalt, in der
+geschrieben wird.
+
+Die nachgeholte Gegenlesung — sie kam nur zustande, weil ein Tor die fehlende Zuordnung erzwang —
+zeigte, dass die neue Prüfung diese Umkehrung nur behauptet. Sie sucht die Merkmale als Text und
+nicht an ihren Grenzen, also genügt ein Attribut, das die Zeichenfolge bloß enthält. Und die
+Testfälle können es nicht auffangen: Jeder negative Fall trägt zusätzlich etwas Nummernartiges, so
+dass eine Prüfung, die nur »Marker plus Titel plus nichts Nummernartiges« kann, die ganze Reihe
+besteht. Die Umkehrung stand im Kommentar, nicht im Code.
+
+**Lehre:** Eine Prüfung auf »genau diese Gestalt« ist erst dann eine, wenn ihre Fälle aus dem
+Erzeuger stammen und mutiert werden. Wer die negativen Fälle von Hand erfindet, prüft die eigene
+Vorstellung vom Fremdkörper — und das ist wieder die Ausschlussliste, die man loswerden wollte.
