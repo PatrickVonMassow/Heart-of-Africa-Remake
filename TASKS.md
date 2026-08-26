@@ -9481,6 +9481,14 @@ to land than a mechanism that needs a review.
   cases — which this suite always does — is classified as a non-green gate. Both of today's
   authoring runs tripped it while their gates were green, and the supervising session then looks
   for a cause that does not exist.
+  STILL TRUE 27.08.2026, and now it fires on EVERY leg: all three authoring legs of point 953
+  reported "test:unit green (430 files, 14,008 passed, 6 skipped); build green; lint green" and
+  "test:unit passed (14,010 tests, 6 skipped); build passed; lint passed", and all three were
+  flagged "it reports a gate as anything but green". The suite has carried 6 skipped tests all
+  evening, so no truthful report of it can pass this check. The module's own justification — a
+  false positive costs one line of explanation — does not survive a false positive that fires every
+  single time: a warning that is always wrong trains the reader to skip the PROBLEMS block, which
+  is where a real red would be. That raises the cost above the recorded "low".
   FINAL STATE:
   - THE PATTERN MATCHES FAILURE, NOT ABSENCE. `gatesProblem` reads a gate as not green on the
     words that mean a failure; a summary line reporting skipped cases beside passing ones is
@@ -11584,6 +11592,13 @@ to land than a mechanism that needs a review.
   `8e0a2341`/`c6988d8c`/`293ae43d` with a `Rescue:` body, and `git diff HEAD origin/…` was EMPTY —
   identical trees, different parents. The closing report again said the work was local-only, and the
   main session recovered it by resetting the local branch onto the remote tip it already matched.
+  A THIRD INSTANCE, measured 27.08.2026 01:15-01:19 on `feat/953-never-started-ci-red`: the
+  wrapper pushed the leg's two commits at 01:15:17, and at 01:18:49 the local branch carried two
+  commits with the same subjects, a byte-identical tree (`91fd8e7b…` on both sides) and different
+  SHAs, so the final push was rejected and the closing report again said the work was local-only.
+  The main session recovered the same way as on 25.08. — proving the trees identical, then resetting
+  onto the remote tip — which is a hand-measured escape, not a path, and the only push that would
+  have "worked" from that state is a force push over the wrapper's own publication.
   FINAL STATE: the interim push reconciles a rewritten branch through the same lease-gated
   compare-and-swap the wrapper already uses for checkpoints — a rejected push is re-observed, an
   already-contained head is accepted, and a head that legitimately supersedes the remote is pushed
@@ -12358,6 +12373,18 @@ to land than a mechanism that needs a review.
   end until the cleanup had happened — union entry S-10 in `docs/batch-autonomy.md`, reached through
   S-05. The only way out was to declare an UNRELATED open point as current work, which is a false
   claim on the board the user reads. That is the cost this point removes.
+  A FIFTH INSTANCE, measured 27.08.2026 01:35-01:41 while landing point 953, names the escape that
+  works today and what it costs. With the focus at `-` the run reproduced the fourth instance
+  exactly. But with `focus.mjs set 953` put back on the TICKED point, `board.mjs closing 953` DOES
+  write the card into `.batch-dashboard.html` — the file then holds
+  `<details class="now" data-state="closing">`, and the point-470 gate lets the branch deletion, the
+  work-order append and the retrospective refresh through — while `board-publish.mjs` refuses that
+  same state outright ("active-work source unresolved: the owner focus names point 953, which is not
+  open"). So the wedge opens at the price of a board FILE that no longer matches the PUBLISHED page
+  for the length of the closing work, which is the hour the user reads it. That is better than
+  declaring an unrelated point as current work, and it is still a false state on the phone.
+  ALSO IN THE FINAL STATE: the publish gate resolves the closing state instead of refusing it, so
+  the escape and the publication stop excluding each other.
   VERIFIABLE: Vitest over the projection — a closing card for a just-ticked point survives the
   publish step that removes an ordinary numbered card for the same point; and over the gate — the
   three cleanup calls are permitted while the idle card stands, an unrelated state-changing call is
@@ -12626,3 +12653,67 @@ to land than a mechanism that needs a review.
   Criticality: medium-high — it is the second silent hole found in the four-eyes ledger in one
   evening, and it invalidates part of what the gate claims to guarantee.
   Bundle: Urlaubsfestigkeit.
+
+- [ ] 959. A done card reports the last run's start and end, so a point worked over several
+  sessions understates what it cost (MEASURED 27.08.2026 ~01:20 on the landed points 943 — card
+  22:06-22:50 against a first branch commit at 26.08. 19:59 — and 947 — card 23:39-00:04 against
+  19:53). Mechanism: `board-core.mjs` `toQueue` turns a now-card's span into a bare `~h` estimate
+  when a point goes back to the Warteschlange, and `toNow`/`promoteToNow` stamp a FRESH
+  `berlinStamp()` start on resumption, so the final card shows only the last run. The
+  earliest-start merge in `toDone` protects only points that already HAD a done card (the point-700
+  rule); the requeue path has no equivalent, and the true span survives only in git, where
+  `measure-point-cost` reads `firstBranchCommitAt`.
+  USER RULING 27.08.2026 (verbatim): »Stattdessen die erste Startzeit anzugeben, könnte auch zu
+  falschen Schlüssen führen, weil ein Punkt evtl. in einem Zwischenstand für längere Zeit in der
+  Warteschlange geparkt wird. Am besten wäre dann wohl, bei erledigten Punkten anstatt Start- und
+  Endzeit die Bearbeitungsdauer anzugeben - also die Zeit in Stunden, die er sich in Arbeit befunden
+  hat.« So the fix is NOT to preserve the first start.
+  FINAL STATE: a done card reports the ACCUMULATED IN-WORK DURATION — the time the point stood as
+  current work, summed over every run, with queue-parked time excluded — instead of a start·end
+  pair. `toQueue` records the elapsed span it already computes as worked-so-far in the queue card's
+  meta beside the estimate, `toNow` carries it onto the fresh now-card, and `toDone` adds the final
+  run and renders one duration. Every consumer of the start·end meta moves in the same change:
+  `doneStart`, `earliestStart`, `withStart`, `mergeDoneDuplicates` and the `spanHours` recovery,
+  plus the queue-meta stamp-shape audit.
+  VERIFIABLE: Vitest over the card transitions — a point parked once and resumed once reports the
+  sum of both runs and not the last, a point never parked reports its single run unchanged, and the
+  parked interval itself is excluded; plus the stamp-shape audit accepting the extended queue meta.
+  The dateless stamps stop being ambiguous for display, because a duration needs no date.
+  Criticality: medium — it is board truth, and the number it prints is the one the batch is judged
+  by.
+  Bundle: Chat & Tafel.
+
+
+
+- [ ] 960. A filed finding is never checked against the work order, so with 313 open points the
+  cheapest mistake is to write a point that already exists (MEASURED 27.08.2026 01:35-01:50, while
+  closing point 953). Four items were carried that turn. The board-closing wedge, recorded through
+  `scripts/finding.mjs --record` and drained as a new point, was already owned by point 937 — which
+  records the same wedge with three earlier instances and had been raised to high the night before.
+  Two further points written from tonight's own measurements duplicated point 906 (a delegated
+  run's push rejected non-fast-forward after it rewrote its own published history) and point 729
+  (`gatesProblem` reading Vitest's truthful "6 skipped" as a red gate); both were caught only
+  because a retrospective paragraph happened to name their owner. One item — the done-card duration
+  — was genuinely new and became point 959. So three of four were duplicates, and nothing in the
+  path from `--record` through `--drain` to the append asks the one question that would have found
+  them.
+  WHY IT IS NOT A DISCIPLINE PROBLEM: 313 open points is past what any reader holds, the titles are
+  English while findings are recorded in German, and the same defect is described from a different
+  angle each time it recurs — so a literal title match finds nothing while the owner sits in plain
+  sight. The correct instance note (this turn wrote three of those, into 937, 906 and 729) is
+  cheap; discovering that it is the correct shape is what costs.
+  FINAL STATE: recording and draining a finding both answer "who already owns this?" with machine
+  output. `finding.mjs --record` and `--drain` print the closest open points — matched over point
+  text and not only titles, across the two languages the corpus is written in — with the line
+  numbers to read, and the drain names an owner candidate before it offers the append. A finding
+  whose owner is found is folded into that point as a dated instance rather than filed anew; the
+  command says which of the two it did. `scripts/tasks-source.mjs` is the reader, so open and
+  closed points are both searched — a class closed last week must not be re-filed either.
+  VERIFIABLE: Vitest over the matcher against THIS turn's four measured items — the board-closing
+  finding names 937, the push-rejection text names 906, the skipped-gate text names 729, and the
+  done-card text names no owner; plus a case that the German finding text still finds its English
+  point, and one that a genuinely new finding is not forced onto a weak match.
+  Criticality: medium — it wastes an authoring round each time it lands, and a duplicate point that
+  is NOT caught splits one defect's evidence across two numbers, which is how a fix comes to stand
+  on half its measurements.
+  Bundle: Session- & Repo-Hygiene.
