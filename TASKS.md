@@ -10958,10 +10958,21 @@ to land than a mechanism that needs a review.
   the cross-vendor reviewer credit that CLAUDE.md §6 permits since point 854. Reading that credit as
   authorship leaves NO eligible reviewer, so the four-eyes debt on such a commit can never be cleared
   through the review path, only hand-recorded around it (done once for `c54e4615` via ask-sol).
+  IT HAPPENED AGAIN THREE DAYS LATER, on a commit written to ANSWER a review (26.08.2026, at the
+  point-844 boundary): `079a13a1` carries `Co-Authored-By: Claude Opus 5` beside
+  `Co-Authored-By: GPT-5.6 Sol`, exactly the pair §6 invites, and `review-sol.mjs` planned
+  `0 RUNNABLE PASSES` over all three of its files. So this is not one commit's accident — following
+  the written rule MANUFACTURES unreviewable commits, and each one blocks a turn ending until it is
+  waived. The only route offered is a point-bound unavailable receipt, which records "nobody could
+  review this" when the truth is "the trailer misdescribed who did what" — the receipt is a wrong
+  reason on the record, not merely an inconvenience.
   FINAL STATE: the planner's authorship read distinguishes the authoring trailer from a reviewer
   credit on commits that carry both (the ledger's own review record for the commit, or the §6 rule
   that the second model trailer names the reviewer, decides which is which); a genuinely mixed-vendor
-  contribution stays unreviewable as today.
+  contribution stays unreviewable as today. CLAUDE.md §6 NAMES the reviewer's trailer key instead of
+  saying "a second model trailer", and until that key exists the rule says plainly that a reviewer is
+  NOT recorded as `Co-Authored-By` — a rule whose only compliant form breaks a gate must not stay
+  written as an invitation.
   VERIFIABLE: unit cases over the planner's vendor cut — a commit with one Anthropic author trailer
   plus one OpenAI reviewer trailer plans an OpenAI review pass; a commit whose CHANGES came from both
   vendors still refuses; and the c54e4615 shape no longer reports "no eligible reviewer vendor".
