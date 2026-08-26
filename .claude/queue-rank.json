@@ -726,6 +726,12 @@
       "why": "Es haertet dieselben Board-Dateien wie 713 und darf nicht parallel dazu laufen; sinnvoll erst nach dessen Landung, also am Ende der Warteschlange.",
       "origin": "machine",
       "place": "last"
+    },
+    "930": {
+      "at": "2026-08-26T06:59:23.288Z",
+      "why": "Es kann erst nach der Landung von 713 gearbeitet werden und aendert dieselbe Render-Datei, also ist hinten richtig.",
+      "origin": "machine",
+      "place": "last"
     }
   },
   "boundary": {
@@ -767,7 +773,7 @@
     "why": "The order standing in front of the release today is the arrangement that predates this rule; the four machine-filed points that had ranked themselves there were moved behind 174 first"
   },
   "settled": {
-    "at": "2026-08-26T05:00:03.998Z",
+    "at": "2026-08-26T06:59:23.296Z",
     "points": [
       174,
       184,
@@ -1057,7 +1063,8 @@
       925,
       926,
       927,
-      929
+      929,
+      930
     ]
   }
 }
