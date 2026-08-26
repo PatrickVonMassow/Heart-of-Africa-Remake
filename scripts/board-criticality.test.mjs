@@ -68,6 +68,28 @@ describe('derived card criticality badges', () => {
     expect(new JSDOM(once).window.document.querySelectorAll('#board-criticality-style')).toHaveLength(1)
   })
 
+  it('puts CSS beside the leading board style when script comments mention main first', () => {
+    const board = `﻿<title>HoA Batch-Dashboard</title>
+<style>body{color:#123}</style>
+<script>
+// Fetch the latest published HTML and swap ONLY the <main> content.
+// The shell has no <main> before the board is written.
+const refreshStillParses = true
+</script>
+<main>${card(11, 'Elf')}</main>`
+
+    const once = renderCardCriticalities(board, tasks)
+    const document = new JSDOM(once).window.document
+    const derivedStyle = document.querySelector('#board-criticality-style')
+    const script = document.querySelector('script')
+
+    expect(derivedStyle).not.toBeNull()
+    expect(derivedStyle.previousElementSibling.tagName).toBe('STYLE')
+    expect(script.textContent).not.toContain('board-criticality-style')
+    expect(() => new Function(script.textContent)).not.toThrow()
+    expect(renderCardCriticalities(once, tasks)).toBe(once)
+  })
+
   it('keeps an already-decorated current-work card replaceable', () => {
     const now = renderCardCriticalities(card(11, 'Elf').replace('<details>', '<details class="now">'), tasks)
     const renamed = setCardTitle(now, 11, 'Elf neu')

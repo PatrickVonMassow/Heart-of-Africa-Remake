@@ -242,8 +242,16 @@ export function renderCardCriticalities(html, tasksText) {
   out = out.replace(styleRe, '')
   if (!badges) return out
   if (out.includes('</head>')) return out.replace('</head>', `${CRITICALITY_STYLE}\n</head>`)
-  const main = out.indexOf('<main')
-  return main < 0 ? `${CRITICALITY_STYLE}\n${out}` : `${out.slice(0, main)}${CRITICALITY_STYLE}\n${out.slice(main)}`
+  // The live board is an HTML fragment: BOM, title, its stylesheet, then a
+  // script and main. In particular, its refresh script mentions `<main>` in
+  // comments before the actual element, so a raw search for that text would
+  // inject CSS into JavaScript. Anchor the board shape at the document start
+  // and put derived CSS beside its own leading stylesheet. Other headless
+  // fragments get the stylesheet before all of their bytes, never inside one.
+  const leadingStyle = /^(\uFEFF?\s*<title\b[^>]*>[\s\S]*?<\/title>\s*<style\b[^>]*>[\s\S]*?<\/style>)/i
+  return leadingStyle.test(out)
+    ? out.replace(leadingStyle, `$1\n${CRITICALITY_STYLE}`)
+    : `${CRITICALITY_STYLE}\n${out}`
 }
 
 /**
