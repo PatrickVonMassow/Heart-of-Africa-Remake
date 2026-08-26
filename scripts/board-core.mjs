@@ -1480,6 +1480,30 @@ const derivedCardPattern = () =>
  * states? A marker is hand-writable, so here as everywhere it never authorises a
  * removal on its own.
  */
+const escapeForRegExp = (value) => String(value).replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+
+/**
+ * The summary `applyDerivedStateCard` writes — and nothing else.
+ *
+ * FOUR ROUNDS of one review widened a NEGATIVE test ("this summary shows no
+ * point number"), and every round found another spelling of HTML that walked
+ * past it — an extra attribute, single quotes, an unquoted or upper-case
+ * attribute, a foreign tag, an entity, a nested element, `<wbr>` between the
+ * digits, a quoted `>` inside an attribute, a zero-width space. Twice it found
+ * the widening REFUSING a legitimate card instead. Proving that negative over
+ * arbitrary markup means writing a browser, and each attempt bought a
+ * false-negative at the price of a false-positive.
+ *
+ * So the card is authenticated the other way round. It is written by ONE
+ * function thirty lines above this one, in one shape; anything that is not that
+ * shape is not the machine's card and gets no exemption. Every evasion of the
+ * negative test fails this one, and no card this module writes can.
+ */
+const DERIVED_SUMMARY = new RegExp(
+  `^<span class="t">(?:${escapeForRegExp(PAUSED_TITLE)}|${escapeForRegExp(AUTOMATIC_DECISION_TITLE)})</span>` +
+    '<span class="right"><span class="meta">[^<>]*</span></span>$',
+)
+
 function isTrulyDerivedCard(card) {
   const text = String(card ?? '')
   // THE MARKER IS REQUIRED, AS IT IS FOR THE HANDOVER CARD (ninth cross-vendor
@@ -1490,8 +1514,8 @@ function isTrulyDerivedCard(card) {
   if (!new RegExp(`<details class="now"[^>]*data-state="${DERIVED_STATE_KIND}"[^>]*>`).test(text)) return false
   const summary = (text.match(/<summary>([\s\S]*?)<\/summary>/) ?? [])[1] ?? ''
   const title = ((summary.match(new RegExp(`<span class="t">${TITLE_TEXT}</span>`)) ?? [])[1] ?? '').trim()
-  if (summaryCarriesPoint(summary)) return false
-  return title === PAUSED_TITLE || title === AUTOMATIC_DECISION_TITLE
+  if (!(title === PAUSED_TITLE || title === AUTOMATIC_DECISION_TITLE)) return false
+  return DERIVED_SUMMARY.test(summary.trim())
 }
 
 /**
@@ -1576,7 +1600,10 @@ const stateCardPattern = (kind) =>
  * scanned the whole section; the three state predicates now agree with it.
  */
 const classTokens = (attrs) => {
-  const m = String(attrs ?? '').match(/\bclass\s*=\s*(?:"([^"]*)"|'([^']*)'|([^\s"'>=`]+))/i)
+  // `\bclass` also matches the tail of `data-class`, which read an ordinary
+  // authored attribute as a title span and RETIRED a legitimate card. The
+  // attribute has to start where an attribute starts.
+  const m = String(attrs ?? '').match(/(?:^|\s)class\s*=\s*(?:"([^"]*)"|'([^']*)'|([^\s"'>=`]+))/i)
   return (m ? m[1] ?? m[2] ?? m[3] ?? '' : '').split(/\s+/).filter(Boolean)
 }
 
@@ -1588,7 +1615,9 @@ const visibleText = (html) =>
     .replace(/&#(\d+);/g, (_, dec) => String.fromCodePoint(Number(dec)))
 
 const summaryCarriesPoint = (summary) => {
-  const text = String(summary ?? '')
+  // A COMMENT IS NOT VISIBLE, so a number inside one is not a chip — scanning it
+  // as markup retired legitimate cards (same round as the `data-class` slip).
+  const text = String(summary ?? '').replace(/<!--[\s\S]*?-->/g, '')
   const { chip, legacy } = summaryPoint(text)
   if (chip != null || legacy != null) return true
   // …AND THE FALLBACK READS MARKUP, NOT ONE SPELLING OF IT (two confirming

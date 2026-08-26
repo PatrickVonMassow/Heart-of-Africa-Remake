@@ -305,7 +305,12 @@ describe('derived now-section membership', () => {
     // counting is the only reading neither can fool.
     const nowSectionOf = (html) => {
       const heading = html.indexOf('Woran ich gerade arbeite')
-      const from = html.lastIndexOf('<details', heading)
+      const from = heading < 0 ? -1 : html.lastIndexOf('<details', heading)
+      // A SECTION ORACLE MAY NOT FAIL OPEN (the third confirming pass of this
+      // case): returning the rest of the document when the wrapper never
+      // balances let later sections satisfy the placement assertions — the one
+      // thing this helper exists to rule out.
+      if (from < 0) throw new Error('no now-section wrapper in this board')
       const tag = /<(\/?)details\b/g
       tag.lastIndex = from
       let depth = 0
@@ -313,7 +318,7 @@ describe('derived now-section membership', () => {
         depth += m[1] ? -1 : 1
         if (depth === 0) return html.slice(from, m.index)
       }
-      return html.slice(from)
+      throw new Error('the now-section wrapper never closes')
     }
 
     // (a) Beside the authored idle claim: both stand, and NOTHING is rewritten
@@ -383,8 +388,22 @@ describe('derived now-section membership', () => {
       '<span class=num>935</span>',
       '<SPAN CLASS="num">935</SPAN>',
       '<div class="num">935</div>',
+      '<span class="num chip">935</span>',
+      '<span class="num\tchip">935</span>',
+      '<span class="chip\nnum">935</span>',
       '<span class="num">&#57;35</span>',
+      '<span class="num">&#x39;35</span>',
       '<span class="num"><b>935</b></span>',
+      '<span class="num">9<b>35</b></span>',
+      // The shapes the negative test never caught and never will — a browser
+      // shows a number, a regex does not (fourth confirming pass). The card is
+      // authenticated against the ONE shape this module writes, so each of
+      // these fails on its own account rather than on a spelling.
+      '<span class="num">9<wbr>35</span>',
+      '<span class=num><i title=">">935</i></span>',
+      '<span class="num">&nbsp;935&nbsp;</span>',
+      '<span class="num">9&#x200b;35</span>',
+      '<span class=num/>935',
       `<span class="t">935 ${'\u2014'} Getarnt</span>`,
     ]
     for (const shape of chipShapes) {
@@ -418,6 +437,28 @@ describe('derived now-section membership', () => {
     // The same stack beside active work is refused rather than blessed.
     expect(compareNowProjection(fullBoard({ now: nowEntry(700, 'A', '20:07') + derivedCard() + derivedCard() }), [700]))
       .toMatchObject({ ok: false, duplicateDerived: true })
+  })
+
+  // The same round found the widening REFUSING legitimate cards, which is the
+  // worse failure: a number inside an HTML COMMENT is invisible in a browser,
+  // and `data-class` is an ordinary authored attribute — both used to retire a
+  // card that was exactly what the machine had written.
+  it('keeps a state card whose summary only LOOKS numbered to a regex', () => {
+    const commented =
+      '<details class="now" data-state="idle">\n  <summary><span class="t">' +
+      `${NO_CURRENT_WORK_TITLE}</span><!-- <span class="num">935</span> -->` +
+      '<span class="right"><span class="meta">10:17</span></span></summary>\n' +
+      '  <div class="body"><p>Ich übergebe.</p></div>\n</details>\n'
+    expect(compareNowProjection(fullBoard({ now: commented }), []))
+      .toMatchObject({ ok: true, idleCards: 1 })
+
+    const dataClass =
+      '<details class="now" data-state="handover">\n  <summary><span class="t">Übergabe</span>' +
+      `<span data-class="t">2026 ${'\u2014'} Übergabe</span>` +
+      '<span class="right"><span class="meta">10:17</span></span></summary>\n' +
+      '  <div class="body"><p>Weiter mit Punkt 734.</p></div>\n</details>\n'
+    expect(compareNowProjection(fullBoard({ now: nowEntry(700, 'A', '20:07') + dataClass }), [700]))
+      .toMatchObject({ ok: true, strayCards: 0 })
   })
 
   it('exempts the derived state card and demands the handover card really be one', () => {
