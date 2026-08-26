@@ -288,21 +288,41 @@ describe('derived now-section membership', () => {
       '  <div class="body"><p>Ich übergebe an eine frische Sitzung.</p></div>\n</details>\n'
     const decision = { title: AUTOMATIC_DECISION_TITLE, body: 'Der Batch läuft trotz der Meldung weiter.' }
 
-    // (a) Beside the authored idle claim: both stand, nothing is rewritten.
+    // SLICED INDEPENDENTLY of the production comparison (the reviewer of this
+    // very case): a substring found anywhere in the document proves nothing
+    // about the section it is supposed to stand in, and leaning on
+    // `compareNowProjection` for placement would let one changed path vouch
+    // for the other.
+    const nowSectionOf = (html) => {
+      const from = html.indexOf('Woran ich gerade arbeite')
+      const next = html.indexOf('<details class="sect"', from + 1)
+      return html.slice(from, next < 0 ? undefined : next)
+    }
+
+    // (a) Beside the authored idle claim: both stand, and NOTHING is rewritten
+    // — the render is a byte-for-byte identity here, which is the only reading
+    // a moved or silently edited card cannot satisfy.
     const withIdle = applyDerivedStateCard(fullBoard({ now: idleReason }), decision, { stamp: '10:17' })
     expect(compareNowProjection(withIdle, [])).toMatchObject({ ok: true, idleCards: 1, emptyStateCount: 0 })
     const renderedIdle = reconcileNowProjection(withIdle, [], { stamp: '10:17' })
-    expect(renderedIdle).toContain('Ich übergebe an eine frische Sitzung.')
-    expect(renderedIdle).toContain('data-state="derived"')
+    expect(renderedIdle).toBe(withIdle)
+    const idleSection = nowSectionOf(renderedIdle)
+    expect(idleSection).toContain('Ich übergebe an eine frische Sitzung.')
+    expect(idleSection).toContain('data-state="derived"')
     expect(compareNowProjection(renderedIdle, []).ok).toBe(true)
 
     // (b) ALONE: the card must not swallow the zero claim — the empty element
-    // is inserted beside it, so "nothing is running" is still said out loud.
+    // stands INSIDE the section beside it, so "nothing is running" is still
+    // said out loud, exactly once.
     const alone = applyDerivedStateCard(fullBoard({ now: '' }), decision, { stamp: '10:17' })
     const renderedAlone = reconcileNowProjection(alone, [], { stamp: '10:17' })
-    expect(renderedAlone).toContain(NOW_EMPTY_STATE_TEXT)
-    expect(renderedAlone).toContain('data-state="derived"')
+    const aloneSection = nowSectionOf(renderedAlone)
+    expect(aloneSection).toContain(NOW_EMPTY_STATE_MARKUP.trim())
+    expect(aloneSection).toContain('data-state="derived"')
+    expect(renderedAlone.split(NOW_EMPTY_STATE_TEXT)).toHaveLength(2)
     expect(compareNowProjection(renderedAlone, [])).toMatchObject({ ok: true, emptyStateCount: 1 })
+    // …and rendering again changes nothing: no second element, no drift.
+    expect(reconcileNowProjection(renderedAlone, [], { stamp: '10:17' })).toBe(renderedAlone)
 
     // (c) THE EXEMPTION DOES NOT WIDEN: a hand-written unnumbered card, and one
     // wearing the reserved title WITHOUT the marker, still refuse with nothing
