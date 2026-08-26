@@ -55,7 +55,14 @@ writeFileSync(process.env.STUB_ARGS, JSON.stringify(argv))
 appendFileSync(process.env.STUB_LOG, model + '\\n')
 const answer = process.env.STUB_ANSWER || 'The two lists overlap on the stale owner.\\nCAUSE: the stale owner remains authoritative\\nEVIDENCE: scripts/batch-lock.mjs keeps the dead lease'
 const served = process.env.STUB_SERVED_MODEL || model
-process.stdout.write(JSON.stringify({ result: answer, modelUsage: { [served]: {} } }))
+process.stdout.write(JSON.stringify({
+  result: answer,
+  usage: { input_tokens: 5, output_tokens: 9, cache_read_input_tokens: 0, cache_creation_input_tokens: 20 },
+  modelUsage: {
+    'claude-haiku-4-5': { inputTokens: 90, outputTokens: 2, cacheReadInputTokens: 0, cacheCreationInputTokens: 0 },
+    [served]: { inputTokens: 5, outputTokens: 9, cacheReadInputTokens: 0, cacheCreationInputTokens: 20, canonicalModel: served },
+  },
+}))
 process.exit(0)
 `
 
@@ -217,7 +224,8 @@ describe('an ask that runs', () => {
       STUB_SERVED_MODEL: 'claude-opus-5',
     })
     expect(r.status).toBe(3)
-    expect(r.stderr).toMatch(/served claude-opus-5, not Fable 5/)
+    expect(r.stderr).toMatch(/top-level answer was not attributed to Fable 5/)
+    expect(r.stderr).toMatch(/usage named claude-haiku-4-5, claude-opus-5/)
     expect(r.stderr).toMatch(/Fable 5 did NOT answer/)
   })
 

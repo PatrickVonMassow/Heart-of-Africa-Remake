@@ -31,8 +31,8 @@ import { currentSetting, settingProblemLine } from './sol-share.mjs'
 import { routeFor } from './sol-share-core.mjs'
 import { currentFableState } from './fable-switch.mjs'
 import { fableIsOn } from './fable-switch-core.mjs'
-import { authoringClaudeArgs, parseClaudeAuthoringOutput } from './author-fable-core.mjs'
-import { buildAskPrompt, formatAnswerReport, formatAskMaterial, formatUnavailable, KINDS, normaliseKind, parseAnswer, resolveAskModel } from './ask-sol-core.mjs'
+import { authoringClaudeArgs } from './author-fable-core.mjs'
+import { buildAskPrompt, formatAnswerReport, formatAskMaterial, formatUnavailable, KINDS, normaliseKind, parseAnswer, parseClaudeAskOutput, resolveAskModel } from './ask-sol-core.mjs'
 
 /** One git read that never throws — a missing range is reported, not fatal. */
 function git(args) {
@@ -117,7 +117,7 @@ export function runClaudeAsk({ prompt, input = '', model, timeoutMs = REVIEW_TIM
     timeout: timeoutMs,
     maxBuffer: 128 * 1024 * 1024,
   })
-  const modelResult = parseClaudeAuthoringOutput(res.stdout, model.name)
+  const modelResult = parseClaudeAskOutput(res.stdout, model)
   const timedOut = res.error?.code === 'ETIMEDOUT' || res.signal != null
   const cause = res.error
     ? `Claude could not complete the ask: ${res.error.message}`

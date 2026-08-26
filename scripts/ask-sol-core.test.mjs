@@ -18,6 +18,7 @@ import {
   formatUnavailable,
   normaliseKind,
   parseAnswer,
+  parseClaudeAskOutput,
   resolveAskModel,
 } from './ask-sol-core.mjs'
 
@@ -43,6 +44,39 @@ describe('the kinds', () => {
     expect(entryPrefix('audit')).toBe('A')
     expect(entryPrefix('enumerate')).toBe('B')
     expect(entryPrefix('explain')).toBe('')
+  })
+})
+
+describe('Claude answer attribution', () => {
+  const response = (answerModel = 'claude-fable-5') => JSON.stringify({
+    result: 'the folded answer',
+    usage: { input_tokens: 7, output_tokens: 4, cache_read_input_tokens: 0, cache_creation_input_tokens: 90 },
+    modelUsage: {
+      'claude-haiku-4-5-20251001': { inputTokens: 800, outputTokens: 12, cacheReadInputTokens: 0, cacheCreationInputTokens: 0 },
+      [answerModel]: { inputTokens: 7, outputTokens: 4, cacheReadInputTokens: 0, cacheCreationInputTokens: 90, canonicalModel: answerModel },
+    },
+  })
+
+  it('accepts the selected answer model while recording an auxiliary classifier', () => {
+    expect(parseClaudeAskOutput(response(), resolveAskModel('fable'))).toMatchObject({
+      ok: true,
+      result: 'the folded answer',
+      answerModel: 'claude-fable-5',
+      models: ['claude-haiku-4-5-20251001', 'claude-fable-5'],
+    })
+  })
+
+  it('refuses substitution even when the requested model appears as auxiliary usage', () => {
+    const value = JSON.parse(response('claude-opus-5'))
+    value.modelUsage['claude-fable-5'] = { inputTokens: 100, outputTokens: 1, cacheReadInputTokens: 0, cacheCreationInputTokens: 0 }
+    expect(parseClaudeAskOutput(JSON.stringify(value), resolveAskModel('fable'))).toMatchObject({ ok: false })
+  })
+
+  it('refuses unreadable output and a non-text result', () => {
+    expect(parseClaudeAskOutput('no json', resolveAskModel('fable')).ok).toBe(false)
+    const value = JSON.parse(response())
+    value.result = { plan: 'not the answer' }
+    expect(parseClaudeAskOutput(JSON.stringify(value), resolveAskModel('fable')).error).toMatch(/no text result/)
   })
 })
 
