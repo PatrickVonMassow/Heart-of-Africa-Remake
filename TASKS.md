@@ -12036,3 +12036,51 @@ to land than a mechanism that needs a review.
   Criticality: high — it decides whether the durable lane may be switched on at all, and every
   claim that unlocks it is currently carried by a green flag rather than by a measurement.
   Bundle: Session- & Repo-Hygiene.
+
+- [ ] 926. The world suite's Victoria Falls frame misses its subject, and it has been red for
+  a while. MEASURED 26.08.2026 on `main` (f14cf8e9) with
+  `node scripts/verify/baseline-classify.mjs world --ref main`: the frame
+  `15-worldmodel-victoria-falls` fails with "its subject is not in the rendered picture: off
+  the left and bottom edge of the frame", red in BOTH baseline runs, and red again in the
+  point-595 proof run on its merge candidate. It is NOT point 595's: the landmark loop and the
+  check are byte-identical between `main` and that branch apart from the section wrapper's
+  indentation, so 595 neither caused the red nor tightened the check — it is only the run that
+  finally read it out loud.
+  WHAT IS UNKNOWN IS WHICH OF THE TWO IS WRONG, and that is the point's first job: either the
+  camera aim for lat -17.9 / lon 25.9 no longer centres the falls for the current terrain, or
+  the frame-subject projection (`scripts/verify/frameSubject.mjs`, point 375) judges the frame
+  by a world point the shot was never aimed at. A verdict reached by moving the camera until
+  the check goes green, without deciding which side was wrong, is exactly the papering-over
+  CLAUDE.md §7.2 forbids.
+  THE FRAME IS ACCEPTANCE EVIDENCE for criterion 3 (world model) and 13 (real geodata), so a
+  frame the shutter refuses is a missing proof, not a cosmetic blemish.
+  VERIFIABLE: `npm test -- world` green whole-suite on WebGPU and WebGL 2, with the Victoria
+  Falls frame present in `verification/` and its subject visibly in the picture; plus the
+  written verdict on which of the two sides was wrong.
+  Criticality: medium — acceptance evidence is missing, but nothing in the game is broken by it.
+  Bundle: Testinfrastruktur.
+
+- [ ] 927. The F6 bug report hands the user an archive WITHOUT the picture. MEASURED
+  26.08.2026 on `main` (f14cf8e9) with `node scripts/verify/baseline-classify.mjs report --ref
+  main`: three checks of the report suite fail — "the archive holds picture, state, overlay and
+  description" (the zip holds only `.json`, `-overlay.json` and `.txt`), "member `<stem>.png` is
+  present" and "the archive carries a screenshot — no PNG member". Red in BOTH baseline runs,
+  and red again in the point-595 proof run on its merge candidate. It is NOT point 595's: the
+  archive block is byte-identical between `main` and that branch apart from the section
+  wrapper's indentation.
+  THIS IS A PRODUCT DEFECT, NOT A TEST DEFECT, and it is the worse half of the two reds found
+  that night: the picture is the whole reason the report exists, and the report is the channel
+  the user hands bug reports over on. Every archive taken since the regression is worth less
+  than it looks.
+  FIRST SUSPECT, to be confirmed rather than assumed: the canvas capture inside the F6
+  assembly. A WebGPU canvas read back outside the rendered tick, or without
+  `preserveDrawingBuffer`, yields an empty or failing capture, and the assembly currently drops
+  the member instead of failing loudly — which is why nothing reported it. The assembly must
+  therefore ALSO become loud: an archive that cannot carry its picture says so, in the UI, at
+  the moment it is written.
+  VERIFIABLE: `npm test -- report` green whole-suite on WebGPU and WebGL 2 with all four
+  members present; a Vitest case that the assembly REFUSES to hand out an archive whose picture
+  is missing rather than shipping three members quietly; plus lint, build, `npm run test:unit`.
+  Criticality: high — a silently picture-less bug report is a broken channel to the user, and it
+  degraded unnoticed.
+  Bundle: Session- & Repo-Hygiene.
