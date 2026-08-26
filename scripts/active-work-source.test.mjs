@@ -36,6 +36,32 @@ describe('active-work source I/O boundary', () => {
       .toMatchObject({ ok: true, points: [700, 697, 711] })
   })
 
+  // Seventh cross-vendor round: the publish assertions here checked only that
+  // the comparison said ok, never that the RENDER produced the cards — a
+  // projection that emitted nothing would have passed with a comparison
+  // sharing the same blind spot. This drives the real source through the real
+  // render and reads the result.
+  it('renders one card per source point, the focused one first, and the check agrees', () => {
+    const io = files({
+      declaration: JSON.stringify({ evidence: [{ point: 711 }] }),
+      focus: JSON.stringify({ point: 697 }),
+    })
+    const activeWork = gatherActiveWorkSource({
+      tasksText: TASKS,
+      declarationPath: 'declaration',
+      focusPath: 'focus',
+      ...io,
+    })
+    expect(activeWork).toMatchObject({ ok: true, points: [697, 711], focusPoint: 697 })
+
+    const { html, comparison } = projectNowForPublish(BARE_BOARD, activeWork, { stamp: '20:10' })
+    expect(comparison.ok).toBe(true)
+    const rendered = [...html.matchAll(/<span class="num">\s*(\d+)\s*<\/span>/g)].map((m) => Number(m[1]))
+    expect(rendered).toEqual([697, 711])
+    // Both cards are visibly there and visibly unwritten, rather than absent.
+    expect(html.match(/<details class="now"[^>]*data-state="stub"/g)).toHaveLength(2)
+  })
+
   it('treats missing records as verified zero but present malformed JSON as unknown', () => {
     expect(gatherActiveWorkSource({ tasksText: TASKS, declarationPath: 'd', focusPath: 'f', ...files() }))
       .toMatchObject({ ok: true, points: [] })
