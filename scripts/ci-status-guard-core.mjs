@@ -23,6 +23,10 @@ function runName(r) {
 function runUrl(r) {
   return String((r && (r.url ?? r.html_url)) ?? '')
 }
+function runAttempt(r) {
+  const value = Number(r && (r.runAttempt ?? r.run_attempt))
+  return Number.isSafeInteger(value) && value > 0 ? value : 1
+}
 
 /**
  * The runs for ONE workflow at ONE sha, reduced to the single run that carries
@@ -102,6 +106,7 @@ export function classifyRuns(runs, headSha) {
           runId: runId(r),
           workflowName: runName(r),
           conclusion,
+          runAttempt: runAttempt(r),
           url: runUrl(r),
         }
       }
@@ -137,6 +142,7 @@ export function failedRuns(runs, headSha) {
         runId: runId(r),
         workflowName: runName(r),
         conclusion: String(r?.conclusion ?? ''),
+        runAttempt: runAttempt(r),
         url: runUrl(r),
       }))
   } catch {
@@ -213,8 +219,8 @@ export const CI_WAIT_VERSION = 1
 /** How long an outage-waiver clock may sit unrefreshed before it is forgotten. */
 export const FAMINE_TTL_MS = 7 * 24 * 60 * 60 * 1000
 
-/** Stable identity of one workflow run. A re-run receives a new run id and is
- * therefore a new wait even when ref, sha and workflow name are unchanged. */
+/** Stable identity of one workflow run. GitHub keeps the run id across a
+ * failed-jobs re-run; that is deliberately one wait while `run_attempt` moves. */
 export function ciWaitIdentity({ target, classification } = {}) {
   const ref = typeof target?.ref === 'string' ? target.ref : ''
   const sha = typeof target?.sha === 'string' ? target.sha : ''
@@ -227,11 +233,12 @@ export function ciWaitIdentity({ target, classification } = {}) {
 /**
  * Create or renew the durable observation of an unfinished workflow run.
  *
- * The wake token and first-observation deadline never move on a repeat Stop:
- * replacing either would orphan the already-running observer. Last observation
- * and observation count do move, making the wait renewable and visible without
- * pretending that the interaction budget also renewed. Token creation stays
- * injected so this module remains deterministic under a fake clock.
+ * The wake token and current-attempt deadline never move on a repeat Stop:
+ * replacing the token would orphan the already-running observer, and replacing
+ * the deadline would silently extend one attempt forever. A failed-jobs re-run
+ * is a new attempt, however, so it gets a fresh budget without replacing the
+ * observer. Last observation and observation count always move. Token creation
+ * stays injected so this module remains deterministic under a fake clock.
  */
 export function renewCiWait(previous, observation, {
   now = Date.now(),
@@ -242,12 +249,25 @@ export function renewCiWait(previous, observation, {
     const identity = ciWaitIdentity(observation)
     if (!identity || observation?.classification?.state !== 'pending' || !Number.isFinite(Number(now))) return null
     const same = previous?.v === CI_WAIT_VERSION && previous?.identity === identity && previous?.state === 'pending' && previous?.terminal == null
+    const runAttempt = observation.classification.runAttempt ?? previous?.runAttempt ?? 1
+    const rerunKey = observation.classification.rerunKey ?? previous?.rerunKey ?? null
+    const newAttempt = same && (
+      (observation.classification.rerunKey != null && observation.classification.rerunKey !== previous?.rerunKey) ||
+      (Number.isFinite(Number(observation.classification.runAttempt)) &&
+        Number.isFinite(Number(previous?.runAttempt)) &&
+        Number(observation.classification.runAttempt) > Number(previous.runAttempt))
+    )
     const firstObservationAt = same && Number.isFinite(previous.firstObservationAt)
       ? previous.firstObservationAt
       : Number.isFinite(observation?.observedAt)
         ? observation.observedAt
         : Number(now)
-    const budgetStartedAt = Number.isFinite(observation?.firstSeenAt) ? observation.firstSeenAt : firstObservationAt
+    const observedBudgetStart = Number.isFinite(observation?.firstSeenAt) ? observation.firstSeenAt : firstObservationAt
+    const budgetStartedAt = newAttempt
+      ? (Number.isFinite(observation?.observedAt) ? observation.observedAt : Number(now))
+      : same && Number.isFinite(previous?.budgetStartedAt)
+        ? previous.budgetStartedAt
+        : observedBudgetStart
     const wakeToken = same && typeof previous.wakeToken === 'string' && previous.wakeToken
       ? previous.wakeToken
       : String(makeWakeToken() ?? '')
@@ -260,9 +280,12 @@ export function renewCiWait(previous, observation, {
       sha: observation.target.sha,
       workflow: observation.classification.workflowName,
       runId: observation.classification.runId,
+      runAttempt,
+      rerunKey,
       firstObservationAt,
+      budgetStartedAt,
       lastObservationAt: Number(now),
-      deadline: same && Number.isFinite(previous.deadline)
+      deadline: same && !newAttempt && Number.isFinite(previous.deadline)
         ? previous.deadline
         : budgetStartedAt + waitBudgetMs,
       wakeToken,
@@ -619,12 +642,13 @@ export async function sweepTargets({
       // keep blocking once the ceiling has passed in the meantime (four-eyes
       // residual (b)). Past it the entry still mutes the API, it just no longer
       // holds the turn.
-      if (refVerdict({ state: 'pending', at: Number(entry.firstSeenAt) || now, now }) === 'wait') {
+      const waitStartedAt = Number(entry.budgetStartedAt) || Number(entry.firstSeenAt) || now
+      if (refVerdict({ state: 'pending', at: waitStartedAt, now }) === 'wait') {
         if (gates) waiting ??= entry.reason
         observations.push({
           target,
           classification: { state: 'pending', runId: entry.runId ?? null, workflowName: entry.workflowName ?? null },
-          firstSeenAt: Number(entry.firstSeenAt) || now,
+          firstSeenAt: waitStartedAt,
           observedAt: now,
           previousState: entry.state,
           verdict: 'wait',
@@ -633,7 +657,11 @@ export async function sweepTargets({
       continue
     }
 
-    const at = Number(target.at) || Number(entry?.firstSeenAt) || now
+    // A re-run is a new attempt on the SAME sha. Its explicit budget origin
+    // therefore outranks the reflog time of the original push on every recheck.
+    const rerunBudgetStartedAt = Number(entry?.budgetStartedAt) || 0
+    const at = rerunBudgetStartedAt || Number(target.at) || Number(entry?.firstSeenAt) || now
+    const keepRerunBudget = rerunBudgetStartedAt > 0 ? { budgetStartedAt: rerunBudgetStartedAt } : {}
     const runs = await fetchRuns(target.sha)
     if (!runs) {
       // Offline / rate-limited / API error → fail OPEN, with the reason STATED
@@ -661,7 +689,7 @@ export async function sweepTargets({
       // an hour later is still judged (four-eyes finding 3): the runner famine
       // that motivated this guard is exactly the case that takes that long.
       failedOpen.push(`${target.ref} ${String(target.sha).slice(0, 7)}: its run never concluded — waited past the budget`)
-      nextCache[target.sha] = { state: 'pending', firstSeenAt: at, checkedAt: now }
+      nextCache[target.sha] = { state: 'pending', firstSeenAt: at, checkedAt: now, ...keepRerunBudget }
       continue
     }
     if (verdict === 'nocheck') {
@@ -679,6 +707,7 @@ export async function sweepTargets({
       nextCache[target.sha] = {
         state: 'pending', firstSeenAt: at, checkedAt: now, reason,
         runId: classification.runId ?? null, workflowName: classification.workflowName ?? null,
+        ...keepRerunBudget,
       }
       continue
     }
@@ -692,7 +721,7 @@ export async function sweepTargets({
     // RED. WHERE the fault lies decides the remedy: a red the repository cannot
     // fix must not demand a fixing push (point 526), and EVERY failed run on the
     // sha is judged, not just the one classifyRuns names (four-eyes 06.08.2026).
-    const { classification: chosen, standDown, stillFamished, judgedWorkflows } = await judgeRed({
+    const { classification: chosen, standDown, stillFamished, judgedWorkflows, rerunWait } = await judgeRed({
       sha: target.sha,
       runs,
       // What this sweep has learned so far included, so a second red target on
@@ -726,6 +755,18 @@ export async function sweepTargets({
     // A red with NOTHING to do is reported, not sat on (point 528): holding the
     // turn end over GitHub's own outage clears nothing and stops the batch.
     const reason = standDown ? null : blockReason(chosen, target.sha, target.ref)
+    if (standDown && rerunWait?.state === 'pending') {
+      const wait = waitReason(target, rerunWait)
+      if (gates) waiting ??= wait
+      // Dispatch happened NOW; neither the original push nor the original
+      // attempt's queue time may consume the new attempt's wait budget.
+      Object.assign(observations.at(-1), { classification: rerunWait, firstSeenAt: now, verdict: 'wait' })
+      nextCache[target.sha] = {
+        state: 'pending', firstSeenAt: now, budgetStartedAt: now, checkedAt: now, reason: wait,
+        runId: rerunWait.runId ?? null, workflowName: rerunWait.workflowName ?? null,
+      }
+      continue
+    }
     nextCache[target.sha] = { state: 'failed', firstSeenAt: at, checkedAt: now, reason }
     if (gates && reason) block ??= reason
   }
