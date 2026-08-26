@@ -88,12 +88,12 @@ describe('parseContextTokens — the reading is the NEWEST real usage record', (
 describe('watermarkDecision — past, below, or LOUDLY unreadable', () => {
   it('pins the ceiling and the remaining handover threshold above the startup floor', () => {
     expect(CONTEXT_CEILING_TOKENS).toBe(150_000)
-    expect(CONTEXT_TRIGGER_TOKENS).toBe(122_000) // handover — close under the ceiling
+    expect(CONTEXT_TRIGGER_TOKENS).toBe(122_000) // provisional point-743 handover threshold
     expect(CONTEXT_TRIGGER_TOKENS).toBeGreaterThan(MEASURED_STARTUP_FLOOR_TOKENS)
     expect(CONTEXT_TRIGGER_TOKENS).toBeLessThan(CONTEXT_CEILING_TOKENS)
   })
 
-  it('exports the one provisional handover reserve derived from the point-743 pair', () => {
+  it('exports the provisional handover reserve derived from the point-743 pair', () => {
     expect(CONTEXT_HANDOVER_RESERVE_TOKENS).toBe(
       CONTEXT_CEILING_TOKENS - CONTEXT_TRIGGER_TOKENS,
     )
@@ -177,7 +177,7 @@ describe('watermarkDecision — past, below, or LOUDLY unreadable', () => {
     expect(d).toEqual({ state: 'past', tokens: 123_000, watermark: CONTEXT_TRIGGER_TOKENS, alert: false })
     // Admission consumes this raw reading separately; the watermark remains a
     // handover-only question.
-    expect(watermarkDecision({ reading: { tokens: 111_000 } }).state).toBe('below')
+    expect(watermarkDecision({ reading: { tokens: CONTEXT_TRIGGER_TOKENS - 1 } }).state).toBe('below')
   })
 })
 

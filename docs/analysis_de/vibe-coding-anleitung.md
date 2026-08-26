@@ -148,13 +148,12 @@ Die Ursache findest du durch **Zerlegen**, nicht durch Wiederholen.
 
 ## Die häufigsten Fallstricke → und was hilft
 
-- **Grüner Test, falsches Bild.** Er prüfte einen Hilfswert, einen unerreichbaren Zustand — oder
-  er *stellt her*, was die Handlung bewirkt hätte, statt sie aufzurufen, und ist für immer grün.
+- **Grüner Test, falsches Bild.** Er prüfte einen Hilfswert oder *stellt her*, was die Handlung
+  bewirkt hätte, statt sie aufzurufen — und ist für immer grün.
   → *Prompt:* „Eine sichtbare Änderung ist erst fertig, wenn sie am **echten gerenderten Bild**
   unter einer erreichbaren Bedingung geprüft wurde. Zu jeder Prüfung: **Welche Zeile ruft die
   Sache auf — und was bliebe grün, wenn sie völlig kaputt wäre?** Vergehende Zeit darf ein Test
-  abkürzen, den **Aufruf** nie." *(≈ 1,5x.)* *(Sieht das richtig aus?)*
-
+  abkürzen, den **Aufruf** nie.“ *(≈ 1,5x.)* *(Sieht das richtig aus?)*
 - **Neue Features zerbrechen alte.** Eine Änderung repariert X und bricht das unbeobachtete Y.
   → *Prompt:* „Etabliere einen Mechanismus, der jede Mechanik auch im **Danach-Zustand** prüft und
   nach jedem Zusammenführen die schnelle Testschicht erzwingt. Bau ‚Invarianten' ein, die im
@@ -171,16 +170,13 @@ Die Ursache findest du durch **Zerlegen**, nicht durch Wiederholen.
 
 - **Runde um Runde, ohne näher zu kommen.** Das Gegenlesen findet jedes Mal etwas, der Abstand
   schließt sich nie.
-  → *Prompt:* „Frag vor jeder Runde: **Hat sich etwas bewegt außer der Zählung?** Steht das Urteil,
-  während der Umfang bleibt, ist der Gegenstand zu groß — **teile das Ticket und arbeite jedes
-  Stück für sich ab**."
+  → *Prompt:* „Frag vor jeder Runde: **Hat sich etwas bewegt außer der Zählung?** Bleibt der
+  Umfang, ist der Gegenstand zu groß — **teile das Ticket und arbeite jedes Stück für sich ab**.“
 
-- **Gebaut — und nie in Betrieb genommen.** Die Ausnahme steht im Fließtext statt in der Datei, die
-  das Werkzeug liest; die Umgebung führt ihre **eigene Kopie** aus; oder das Tor urteilt richtig,
-  nur fährt es kein Weg, den das Projekt wirklich geht.
+- **Gebaut — und nie in Betrieb genommen.** Die Ausnahme steht im Fließtext statt in der Datei,
+  die das Werkzeug liest; oder das Tor urteilt richtig, nur fährt es kein Weg des Projekts.
   → *Prompt:* „Trag eine Ausnahme **im selben Zug** dort ein, wo der Mechanismus sie liest, und
-  **vergleiche Ausgeführtes mit dem Repository.** Nenn zu jedem Tor, auf das du dich berufst, den
-  **Weg, der es fährt** — und wann es dort zuletzt rot war."
+  nenn zu jedem Tor den **Weg, der es fährt**.“
 
 - **Zahlen geschätzt statt gemessen — auch die, die dir jemand reicht.** ‚Das dauert ~2 Minuten';
   oder ein Wert, der einmal stimmte.
@@ -205,31 +201,29 @@ Die Ursache findest du durch **Zerlegen**, nicht durch Wiederholen.
   Handy lesbar — und halte Format und Sprache auf **allen** Ausgaben ein."
 
 - **Test und Wächter hingen an ihrer Umgebung, nicht am Verhalten.** Sie messen dein Repository
-  statt deinen Code und stimmen nur dort, wo sie zufällig liefen; von Hand nachgeprüft bestätigt
-  sich der Fehler selbst, denn dein Aufruf erbt dasselbe Verzeichnis.
+  statt deinen Code; von Hand nachgeprüft bestätigt sich der Fehler selbst, denn dein Aufruf erbt
+  dasselbe Verzeichnis.
   → *Prompt:* „Jede Prüfung bekommt ihre Pfade **eingespritzt**; was fürs **ganze Projekt** gilt,
   wird an **einer** Stelle gelesen — wahr wegen des Codes, nie wegen des Checkouts. Grün bei dir
   und rot im Haken? Lass die Bedingung aus **beiden** Wurzeln laufen."
 
-- **Messung und Vorschau verunreinigt.** Halbfertiges wird als ‚fertig' beurteilt.
+- **Messung und Vorschau verunreinigt.** Halbfertiges gilt als ‚fertig'.
   → *Prompt:* „Hol mein Urteil am **veröffentlichten** Stand ein, nie an einem Zwischenzweig, und
   miss auf einer ruhigen Maschine."
 
-- **Der Bericht urteilt über den Versuch, nicht über die Wirkung.** „Erfolgreich" heißt nicht
-  „angekommen" — und „gescheitert" nicht „nicht angekommen": ein fehlgeschlagener Push nennt
-  Arbeit „nur lokal", die längst drüben liegt, und schickt dich Verlorenes suchen.
-  → *Prompt:* „Beleg nach jeder Fernwirkung den **Zielzustand** statt des Versuchs, nenne im
-  Fehlerfall die betroffenen Änderungen einzeln, und melde beim Start, was **lokal fertig, aber
-  nirgends angekommen** ist."
+- **Der Bericht urteilt über den Versuch, nicht über die Wirkung.** „Erfolgreich“ heißt nicht
+  „angekommen“ — und ein fehlgeschlagener Push nennt Arbeit „nur lokal“, die längst drüben liegt.
+  → *Prompt:* „Beleg nach jeder Fernwirkung den **Zielzustand** statt des Versuchs, und melde beim
+  Start, was **lokal fertig, aber nirgends angekommen** ist.“
 
 - **Regeln und Wächter verrotten — nur merkt es niemand.** Eine Absicherung greift enger als ihr
   Satz, oder weiter, und sperrt Unbeteiligte.
   → *Prompt:* „Leg Satz und Code periodisch **nebeneinander**, zieh **den Code auf den Satz**."
 
-- **Die Verweigerung nennt eine Abhilfe, die schadet — oder nie eintritt.** Wer ihr folgt, steht
-  schlechter da oder wartet vergeblich.
-  → *Prompt:* „Prüf jede Verweigerung dort, wo sie feuert: **Führt ihre Abhilfe zum Guten — und
-  kann sie eintreten?**"
+- **Die Verweigerung nennt eine Abhilfe, die schadet, nie eintritt — oder längst getan ist.** Wer
+  ihr folgt, steht schlechter da, wartet vergeblich oder wiederholt einen erledigten Schritt.
+  → *Prompt:* „**Geh den Ausweg jeder Verweigerung einmal wirklich**, im auslösenden Zustand:
+  Führt er zum Guten, kann er eintreten, und gilt er auch für **den, der die Meldung liest**?“
 
 - **Der rote Test klagt den Falschen an.** Prüfungen veralten; ein Rot täuscht gefährlich.
   → *Prompt:* „Verlang auf ein Rot hin erst ein **Experiment**: Produkt oder Messung? Gemessen
@@ -331,17 +325,17 @@ Die Ursache findest du durch **Zerlegen**, nicht durch Wiederholen.
   → *Prompt:* „Ein Schritt in deiner Umgebung gehört dir; **miss** erst, ob er trägt. Fehlt eine
   Fähigkeit, bitte **einmal um sie** — nie um ihre Ausführung."
 
-- **Nicht jedes Rot ist deins.** Eine Prüfung, die nur „rot" und „grün" kennt, schiebt fremde
-  Ausfälle deinem Code zu.
+- **Nicht jedes Rot ist deins — und manches war nie eines.** Eine Prüfung, die nur „rot" und
+  „grün" kennt, schiebt Fremdes dir zu; ein *geerbtes* Rot kann ein Abbruch auf altem Stand sein.
   → *Prompt:* „Sag bei jedem Rot zuerst, **wo die Ursache liegt** — lief überhaupt ein eigener
-  Schritt? Liegt sie außerhalb, nenn den **echten Griff** dort."
+  Schritt? Liegt sie außerhalb, nenn den **echten Griff**. Was du nicht selbst gemessen hast, ist
+  eine **Behauptung** — nachmessen, nicht reparieren."
 
 - **Die Reparatur nimmt den Reparierenden mit.** Wer die Leitung repariert, auf der er sitzt,
-  verliert die nächste Reparatur mit — und ein abgebrochener Lauf räumt nicht weg, was er
-  hinterlässt, am schlimmsten beim Prüfen von Prozesstod.
+  verliert die nächste Reparatur mit; ein abgebrochener Lauf räumt nicht weg, was er hinterlässt.
   → *Prompt:* „Änderst du deine eigene Umgebung: Gibt es eine **kleinere Handlung**, die nur
-  **ergänzt**? Lass jeden Neuaufbau nach **offen** scheitern — und frag zu jeder Aufräumung: **Wer
-  räumt auf, wenn der Aufräumende nicht mehr da ist?**"
+  **ergänzt**? Lass jeden Neuaufbau nach **offen** scheitern — und frag: **Wer räumt auf, wenn der
+  Aufräumende nicht mehr da ist?**"
 
 - **Verschlucken sieht aus wie Erfolg — ein nie gestartetes Werkzeug wie ein strenges.**
   → *Prompt:* „Ein Ersatzwert im `catch` gilt nur, wenn er zu **weniger** Aktion führt.
@@ -389,16 +383,14 @@ Die Ursache findest du durch **Zerlegen**, nicht durch Wiederholen.
   → *Prompt:* „Eine Grenze verwehrt die **erste** Handlung nach dem Überschreiten, nicht die
   letzte. Was den Schritt **abschließt**, bleibt erlaubt; was festhält, mach **übergebbar**."
 
-- **Die KI repariert den Wächter, den sie gerade gebaut hat** — am schlimmsten, wenn er sie
-  selbst sperrt. Ein Tor kann auch zu Recht sperren und unlösbar sein: wenn es nur einen der
-  erlaubten Arbeitswege abliest, oder wenn seine Abhilfe außerhalb der Reichweite des Gesperrten
-  liegt — dann bleibt nur die Ausnahmegenehmigung.
-  → *Prompt:* „Fasst du dieselbe Mechanik wieder an, **zähl mit**. Sperrt ein Tor dich, ändere es
-  nie allein: **leg dein Eigeninteresse offen**, nimm das zweite Urteil. Bevor ein Tor scharf
-  geht: **zähl alle Wege auf** und prüfe, dass seine Abhilfe **erreichbar** ist."
+- **Die KI repariert den Wächter, der sie gerade sperrt.** Ein Tor kann zu Recht sperren und
+  trotzdem unlösbar sein: es kennt nur einen erlaubten Weg, oder seine Abhilfe liegt außer
+  Reichweite.
+  → *Prompt:* „Sperrt ein Tor dich, ändere es nie allein: **leg dein Eigeninteresse offen**, nimm
+  das zweite Urteil. Bevor ein Tor scharf geht: **zähl alle Wege auf** und prüfe seine Abhilfe."
 
 - **Der Prüflauf verändert sein eigenes Projekt.** Eine Suite, die ihren Zielpfad aus dem Quellort
-  statt der Testumgebung ableitet, schreibt Zweige um und bleibt grün.
+  statt der Testumgebung nimmt, schreibt Zweige um und bleibt grün.
   → *Prompt:* „Etabliere einen Mechanismus, der einen Prüflauf rot färbt, sobald er das Projekt verändert hat, in dem er läuft".
 
 - **Grün über einem Programm, das nicht startet.** Der Testlader ist milder als der echte.
@@ -423,11 +415,14 @@ Die Ursache findest du durch **Zerlegen**, nicht durch Wiederholen.
   → *Prompt:* „Nimm eine **Sperre mit laufender Nummer**, die einen kleineren Anspruch **abweist**,
   und stell die Besitzfrage **vor jedem Schreibvorgang** neu — nicht nur beim Start."
 
+- **Die neue Pflicht verurteilt die alten Einträge.** Der verschärfte Prüfer liest den ganzen
+  Bestand und erklärt korrekt entstandene Altdaten für gefälscht.
+  → *Prompt:* „Eine Pflicht in einer Prüfung, die Altbestände liest, sagt **ab wann** sie gilt."
+
 - **Der Wächter tritt zurück — und hört dabei auf zu messen.** Wer fremde Arbeit nicht anfassen
-  darf, antwortet auf die Frage nach dem Zustand nur noch mit dem Grund, nichts zu tun — und ist
-  im Normalbetrieb, wo die Sperre immer belegt ist, blind.
+  darf, nennt nur noch den Grund, nichts zu tun — und ist blind, wo die Sperre immer belegt ist.
   → *Prompt:* „Zurücktreten heißt **nicht handeln**, nie **nicht wissen**. Berichte den gemessenen
-  Zustand auch dann, wenn du nichts ändern darfst. Lesen kollidiert mit nichts."
+  Zustand auch dann, wenn du nichts ändern darfst. Lesen kollidiert mit nichts.“
 
 ---
 
@@ -467,4 +462,4 @@ Die Ursache findest du durch **Zerlegen**, nicht durch Wiederholen.
 
 Sie ersetzt die Fallstricke oben nicht.
 
-<!-- GUIDE-FINGERPRINT: a6976bf45d4cdbb60e485470f0fd26e388f2acac0af46d4a501904ee350fc96d -->
+<!-- GUIDE-FINGERPRINT: 8e1bc7b58f18a65a2a6d9e0b22526ca3f9d85a90cdb6f88778d3de8deeede42f -->

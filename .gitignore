@@ -162,6 +162,14 @@ scripts/.tile-cache
 .claude/context-fence-permit-pending.json.tmp-*
 .claude/context-fence-permits.jsonl
 .claude/context-fence-state.lock/
+# First-refusal state and the append-only evidence for the measured exit cap.
+.claude/handover-budget.json
+.claude/handover-budget.json.tmp-*
+.claude/handover-costs.jsonl
+# Per-stage exit/ramp attribution: active state plus append-only machine-local readings.
+.claude/handover-attribution.json
+.claude/handover-attribution.json.tmp-*
+.claude/handover-attribution.jsonl
 .claude/context-ceiling-notices/
 .claude/batch-in-flight.json
 .claude/batch-in-flight.json.tmp-*

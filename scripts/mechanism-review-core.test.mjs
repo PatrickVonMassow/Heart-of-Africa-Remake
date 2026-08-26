@@ -31,6 +31,7 @@ import {
   parseArgs,
   parseModel,
   receiptBalances,
+  reviewRecordWellFormed,
   reviewIdentityProblem,
   resolveMergePolicy,
   sameModel,
@@ -392,6 +393,27 @@ describe('evaluateMechanismReview', () => {
     }
   }
 
+  it('dates identity well-formedness from the recorder eras', () => {
+    const beforeIdentity = record({ at: AUTHORSHIP_CHECK_SINCE - 1 })
+    delete beforeIdentity.reviewerAuthorship
+    const afterIdentity = { ...beforeIdentity, at: AUTHORSHIP_CHECK_SINCE + 1 }
+
+    const anthropicUnverified = (at) => record({
+      at,
+      model: 'Claude Opus 5',
+      reviewerAuthorship: {
+        status: 'unverified',
+        claimedModel: 'Claude Opus 5',
+        reason: 'the recorder did not verify transcripts in this era',
+      },
+    })
+
+    expect(reviewRecordWellFormed(beforeIdentity)).toBe(true)
+    expect(reviewRecordWellFormed(afterIdentity)).toBe(false)
+    expect(reviewRecordWellFormed(anthropicUnverified(VERIFIED_REVIEWER_SINCE - 1))).toBe(true)
+    expect(reviewRecordWellFormed(anthropicUnverified(VERIFIED_REVIEWER_SINCE + 1))).toBe(false)
+  })
+
   it('BLOCKS a changed mechanism with no record at all', () => {
     const v = evaluateMechanismReview({ baseline: 'b', head: 'h', pendingCommits: [commit()], records: [] })
     expect(v.block).toBe(true)
@@ -470,15 +492,15 @@ describe('evaluateMechanismReview', () => {
     expect(
       judge(claim('GPT-5.6 Sol', { status: 'agreement', actualModel: 'GPT-5.6 Sol' }), 'Claude Opus 5'),
     ).toBe(true)
-    // A row cannot select the superseded identity rule by backdating itself.
+    // A genuinely pre-boundary row keeps the rule under which it was recorded.
     const older = {
       ...record({ at: VERIFIED_REVIEWER_SINCE - 1, model: 'Claude Opus 5' }),
       reviewerAuthorship: { status: 'unverified', claimedModel: 'Claude Opus 5', reason: 'transcript expired' },
     }
-    expect(judge(older, 'GPT-5.6 Sol')).toBe(true)
+    expect(judge(older, 'GPT-5.6 Sol')).toBe(false)
   })
 
-  it('has no author-controlled reviewer-verification era', () => {
+  it('preserves the reviewer-verification era without letting an old row clear newer code', () => {
     const backdated = {
       ...record({ at: VERIFIED_REVIEWER_SINCE - 1, model: 'Claude Opus 5' }),
       reviewerAuthorship: { status: 'unverified', claimedModel: 'Claude Opus 5', reason: 'transcript expired' },
@@ -491,12 +513,10 @@ describe('evaluateMechanismReview', () => {
         records: [backdated],
       }).block
     expect(judgeAt(VERIFIED_REVIEWER_SINCE + 1)).toBe(true)
-    expect(judgeAt(VERIFIED_REVIEWER_SINCE - 1)).toBe(true)
+    expect(judgeAt(VERIFIED_REVIEWER_SINCE - 1)).toBe(false)
   })
 
-  it('keys the AUTHORSHIP requirement itself on the commit, not only the narrowing', () => {
-    // A row backdated past AUTHORSHIP_CHECK_SINCE used to omit reviewerAuthorship
-    // entirely and clear a commit made today (re-review round 4).
+  it('preserves the authorship era without letting an old row clear newer code', () => {
     const bare = record({ at: AUTHORSHIP_CHECK_SINCE - 1, model: 'Fable 5' })
     delete bare.reviewerAuthorship
     const judgeAt = (commitAt) =>
@@ -507,7 +527,7 @@ describe('evaluateMechanismReview', () => {
         records: [bare],
       }).block
     expect(judgeAt(AUTHORSHIP_CHECK_SINCE + 1)).toBe(true)
-    expect(judgeAt(AUTHORSHIP_CHECK_SINCE - 2)).toBe(true)
+    expect(judgeAt(AUTHORSHIP_CHECK_SINCE - 2)).toBe(false)
   })
 
   it('does not accept a blind-parallel fold as a code review', () => {
@@ -710,6 +730,57 @@ describe('evaluateMechanismReview', () => {
         expect(verdict.block).toBe(true)
         expect(verdict.findings[0].kind).toBe('incomplete-passes')
       }
+    })
+
+    it('lets the complete 8d69529 scope settle current files from an older incomplete split', () => {
+      const oldSha = 'a3a04322e3fc9fa9dfb139e10815484c5f453083'
+      const reviewedSha = '8d69529674a1c7d6827e38a46769d4915226e486'
+      const oldSplit = scoped({
+        sha: oldSha,
+        pass: {
+          index: 1,
+          total: 2,
+          files: ['scripts/doc-budget-core.mjs', 'scripts/guard-hooks.test.mjs'],
+          endState: oldSha,
+        },
+        at: 1_787_551_772_590,
+      })
+      const completeScope = scoped({
+        sha: reviewedSha,
+        pass: {
+          index: 1,
+          total: 1,
+          files: ['TASKS.md', 'docs/analysis_de/retrospektive-zusammenarbeit.md', 'docs/document-cut-757.md', 'scripts/doc-budget-core.mjs'],
+          endState: reviewedSha,
+        },
+        at: 1_787_689_347_342,
+      })
+      const fivePending = Array.from({ length: 5 }, (_, index) => covered({
+        sha: String(index + 1).repeat(40),
+        files: ['scripts/doc-budget-core.mjs'],
+        coveringRecordShas: [oldSha, reviewedSha],
+      }))
+
+      const verdict = evaluateMechanismReview({
+        baseline: 'b',
+        head: reviewedSha,
+        pendingCommits: fivePending,
+        records: [oldSplit, completeScope],
+      })
+      expect(verdict.block).toBe(false)
+
+      const wrongFile = {
+        ...completeScope,
+        pass: { ...completeScope.pass, files: ['docs/document-cut-757.md'] },
+      }
+      const stillOwed = evaluateMechanismReview({
+        baseline: 'b',
+        head: reviewedSha,
+        pendingCommits: [fivePending[0]],
+        records: [oldSplit, wrongFile],
+      })
+      expect(stillOwed.findings[0].kind).toBe('incomplete-passes')
+      expect(formatMechanismReviewVerdict(stillOwed)).toContain('CURRENT END-STATE FILE')
     })
 
     it('refuses a record timestamped before the commit it claims to read', () => {
@@ -2041,14 +2112,14 @@ describe('the mode and reviewer identity are required on every clearance path', 
     expect(v.block, formatMechanismReviewVerdict(v)).toBe(true)
   })
 
-  it('also requires reviewer identity evidence beside a valid mode', () => {
+  it('preserves identity-less rows from before the recorder required that evidence', () => {
     const v = evaluateMechanismReview({
       baseline: 'b',
       head: 'h',
       pendingCommits: [commit()],
       records: [legacy({ mode: 'review' })],
     })
-    expect(v.block).toBe(true)
+    expect(v.block).toBe(false)
   })
 
   it('a wrong-SCALE timestamp cannot stand either — the ledger domain is milliseconds (round-5 pass 1)', () => {
@@ -2249,7 +2320,7 @@ describe('the mode and reviewer identity are required on every clearance path', 
     }
   })
 
-  it('a non-finite timestamp cannot out-stand a later do-not-merge (round-3 pass 1)', () => {
+  it('a non-finite timestamp cannot hide a later do-not-merge (round-3 pass 1)', () => {
     // Every "latest verdict" reduction compares Number(at), and NaN loses
     // every comparison — a hand-made merge row with at:"unknown" stayed
     // "latest" past a later, finite-dated refusal and cleared it.
@@ -2270,7 +2341,7 @@ describe('the mode and reviewer identity are required on every clearance path', 
       ],
     })
     expect(v.block).toBe(true)
-    expect(v.findings[0].kind).toBe('malformed-record')
+    expect(v.findings[0].kind).toBe('do-not-merge')
   })
 
   it('refuses an unknown mode whatever the row’s era — the recorder would never have written it', () => {

@@ -23463,3 +23463,296 @@ Nummerierung bleiben deshalb identisch — hier wird nur verschoben, nie umgesch
   undelivered message returns to pending.
   Criticality: high — it loses the user's own words, silently, on the path built to reach them.
   Bundle: Chat & Tafel.
+
+- [x] 744. Leaving is the most expensive step of a session, and nobody has measured it
+  (19.08.2026). Every token spent on the handover is a token subtracted from the working
+  window: the trigger of point 743 is literally the ceiling minus the cost of leaving, so this
+  cost sets how much work a session can do at all. Measured once, badly: 27,336 tokens between
+  the fence's first refusal and the committed boundary — and that measurement is CONTAMINATED,
+  because two gates contradicted each other inside it. `batch-boundary.mjs --prepare --context`
+  prints the handover card and demands it VERBATIM ("… und sie nimmt den nächsten Punkt der
+  Warteschlange auf"), while `board.mjs none` refuses exactly that text because the unnumbered
+  card must NAME the point the batch picks up next; on top of that, `none` refuses while any
+  now-card still stands, so the point must be sent back to the queue first — three steps the
+  template does not name, at the most expensive moment of the session.
+  FINAL STATE: the template produces a text that ALREADY names the point the successor picks
+  up and ALREADY names sending the now-card back as its first step, so the printed sequence
+  passes both gates as printed; and the boundary is then measured across three clean
+  handovers, the result recorded beside `CONTEXT_TRIGGER_TOKENS`: the clean figure REPLACES the
+  contaminated 27,336 in that constant's arithmetic comment, and the trigger is recomputed from
+  it. (Point 743 split the former `CONTEXT_WATERMARK_TOKENS` into `CONTEXT_CEILING_TOKENS` and
+  `CONTEXT_TRIGGER_TOKENS`; the old name exists nowhere in the code any more.)
+  THIS IS A FUNCTIONAL CHANGE, not bookkeeping (GPT-5.6 Sol, audit 19.08.2026): it must not be
+  filed under "measurement only", and the measurement is worthless until it lands, because the
+  contradiction is inside every reading taken before it.
+  THE HANDOVER GETS A MECHANICAL CAP, not only a measurement (GPT-5.6 Sol, review 19.08.2026:
+  three readings and their spread still establish no maximum, and point 745 reserves a number
+  it can only trust if something enforces it). The boundary path's own inputs and outputs pass
+  point 597's budget like everything else, and the cap is the constant point 745 reserves from
+  the session's first call onward. An overrun is not silently swallowed: the boundary still
+  COMPLETES — the handover is the one path that must never fail — but records that it exceeded
+  its cap, so the reserve is corrected from evidence rather than from hope.
+  THE GAP CARD MAY NAME THE BATCH'S NEXT POINT, and that is the FIRST part of this point, not
+  a detail of it (GPT-5.6 Sol, audit 19.08.2026, finding A10; verified against the source in
+  the same session). The two sanctioned mechanisms are made consistent in ONE change, and the
+  GUARD is the side that gives: `dashboard-card-topic-guard` learns exactly one exception —
+  the boundary gap card written by `board.mjs done <n> --none` and `board.mjs none` MAY name
+  the point the batch takes up next, because that point is the batch's own DESTINATION, not a
+  foreign reference. The comment at `scripts/batch-boundary-core.mjs:874-882` ("IT NAMES NO
+  POINT NUMBER (point 439)") is rewritten in the SAME commit to carry the new rule and why
+  439's reason no longer holds, so the next reader is not sent back into the resolved
+  contradiction.
+  THE EXCEPTION IS NARROW, or it becomes the hole the topic guard was built against: it holds
+  for the gap card alone, and inside it for the ONE number that is the batch's next point. A
+  second point number in that card, and any foreign point number in any other card, still
+  block as before.
+  THE ALTERNATIVE IS NAMED AND REJECTED so it is not re-litigated: leaving the card numberless
+  and letting the successor derive its point from the queue keeps the guard untouched but
+  defeats this point's purpose — the printed sequence would again need interpretation at the
+  most expensive moment of the session, which is the cost this point was written to remove.
+  VERIFIABLE: a Vitest case driving the printed template through the board gate's own
+  validator and asserting it is accepted unchanged; a case asserting the template names both
+  the point and the queue-return step; a case where the same gap card names a SECOND point
+  number and is still refused; a case where a normal (non-gap) card naming a foreign point
+  still blocks; a case that the rewritten source comment and the guard agree, so the two
+  cannot drift apart again; a case proving the boundary completes even when it
+  overruns its cap AND that the overrun is recorded; and the three recorded handover
+  measurements with their spread, not only their mean.
+  THE HANDOVER-TEXT HALF OF THIS POINT BELONGS TO POINT 800 (cut 21.08.2026, stated here because
+  a point that gives work away must say so). What remains uniquely this point's own: the three
+  clean handover measurements that replace the contaminated 27,336 tokens in the
+  `CONTEXT_TRIGGER_TOKENS` arithmetic comment, and the mechanical cap on the boundary path. This
+  point's own text says the measurement is worthless until that contradiction lands, so 800 runs
+  first; point 752's first stage in turn depends on the exit path corrected here.
+  Criticality: high — it sits on the handover path, the one path that must never fail, and its
+  failure mode is the measured one: a session that can neither hand over nor stop; every
+  change here is fail-open or it is wrong.
+  Bundle: Session- & Repo-Hygiene.
+  THE GAP CARD MUST NOT CLAIM AN IDLE BATCH WHILE WORK IS BEING ADOPTED (measured 25.08.2026,
+  18:20): `--prepare --context` reported the in-flight work as TRANSFERABLE
+  (`feat/744-measured-exit@7ac27a0c`, an author still running on it) and in the same output
+  printed the verbatim card ending "Hier läuft nichts weiter." Both cannot be true, and the card
+  is the first thing the successor reads — it says the batch is idle at the moment an agent is
+  handed over. The template gets a transferable-work variant that NAMES the adopted branch, or
+  that sentence is dropped whenever `--adopt` has something to adopt. Same failure class as the
+  two contradicting gates above: a printed sequence that does not survive its own facts.
+
+- [x] 752. The handover's exit and ramp are unattributed, so its acceleration is guesswork
+  (measured 19.08.2026, 20:35, over 43 handovers since 18.08.: sources `.claude/boundary.log`
+  HANDOVER markers, `.claude/autostart.log` spawns, commit timestamps, deduplicated by session
+  id within 60 min). Marker → launcher spawns successor: median 0.0 min, p90 0.1, max 65.
+  Spawn → successor's first commit: median 6.3, p90 14.9, max 91. Last commit old → first
+  commit new: median 12.7, p90 47.8, max 100; of that the outgoing session's tail median 6.1,
+  p90 11.8. The mechanism is not the delay — the spawn follows the marker in under a second.
+  What costs is the sequence of model turns on both sides: the exit (now-card back to the
+  queue, board publish, handover card, carrier drain, `--prepare`, `--commit`) and the ramp
+  (board-first duties, adopting in-flight work, reading the queue, cutting and reading the
+  brief). WHAT THAT MEASUREMENT CANNOT DO, and why this point starts with attribution (GPT-5.6
+  Sol, audit 19.08.2026, findings A7/A14/A17/A18/A19): it reports elapsed MINUTES and therefore
+  cannot price tokens, cannot show that the six exit steps dominate, and uses "first commit" as
+  a proxy for productive work, which reading, analysis and uncommitted implementation all
+  precede. The 60-minute deduplication also suppressed the very retry burst under study, and of
+  the 29- and 65-minute outliers roughly 25 and 35 minutes stay undecomposed. So the numbers
+  establish that a gap EXISTS and roughly how large it is, not what it is made of. Handover
+  cost and context ceiling multiply: a lower trigger means more handovers, and each pays the
+  startup load of a fresh session before its first useful turn.
+  FINAL STATE, in two stages, because building the levers before the attribution would spend
+  the session's scarcest budget on a guess:
+  1. THE BOUNDARY PATH IS ATTRIBUTED IN TOKENS, PER STEP, not in minutes. Point 744 already
+     measures the exit as one number; this splits that number: every stage of
+     `--prepare`/`--commit` and the successor's first turn up to its first work-bearing call
+     carries its own reading, so "which step dominates" is settled by evidence. Elapsed time is
+     recorded BESIDE it, never instead of it: idle stretches (the claiming reservation, the
+     launcher's tick cadence) are real throughput loss that no token count shows, and they are
+     reported separately so neither hides the other.
+  2. ONLY WHAT THE ATTRIBUTION SHOWS DOMINANT IS THEN BUILT. The candidates, each with the
+     bound that makes it safe:
+     a. ONE EXIT COMMAND (`batch-boundary.mjs --leave`) driving the bookkeeping the way
+        `land-point.mjs` drives the landing — one verdict per step, stopping at the first red.
+        It is IDEMPOTENT AND RESUMABLE: each step records its own completion, a re-run
+        continues where it stopped, and no board edit or carrier drain is ever performed twice.
+        It PRESERVES THE TWO-PHASE INVARIANT rather than collapsing it: `--prepare` still
+        proves fresh bookkeeping, `--commit` remains the LAST repository action, and a guard
+        that demands remedial work between them still gets its chance. Fail-open like the rest
+        of the boundary: it COMPLETES even when it overruns its cap, and records the overrun.
+     b. THE LAUNCHER DOES MECHANICAL RAMP WORK ONLY WHERE THE DESTINATION IS ALREADY DECIDED.
+        An honoured claim redirects a handover to a claiming window
+        (`resolveBoundaryDestination`), so nothing — focus, board card, adoption — is
+        pre-assigned while that redirect is still possible; where it is not, the launcher
+        discharges the board-first duties before the model's first turn.
+     c. THE BRIEF TRAVELS IN THE SPAWN PROMPT ONLY WITH A FRESHNESS CHECK. It names the
+        revision it was cut from, and the successor REGENERATES instead of trusting it when
+        head, queue rank or claim moved in between. This shifts the brief's token cost rather
+        than removing it, which is the honest claim.
+     d. RETRY IS BOUNDED WITH A DEFINED TERMINAL BEHAVIOUR. After the second failed boundary
+        attempt the session stops retrying: it completes the handover fail-open, records the
+        overrun and alerts. It never loops (the 18 markers in four minutes) and never strands
+        the batch. Where point 751 already removes a cause of that loop, this is folded into
+        751 rather than duplicated.
+  3. SCOPE, STATED SO IT IS NOT MISCOUNTED: these are THROUGHPUT measures, not ceiling safety.
+     The ceiling is held by point 597 (capped tool inputs and outputs) and point 745 (the
+     prospective budget asked before the call). Nothing here may be subtracted from the trigger
+     arithmetic of 743, and no turn-count saving may be treated as a token bound — one uncapped
+     40,000-token response crosses the ceiling however few turns it took.
+  VERIFIABLE: Vitest over the per-step attribution record (a fixture boundary run yields one
+  reading per stage, and a missing reading is reported rather than silently absent); a case that
+  `--leave` re-run after an interrupted step completes without repeating the finished ones; a
+  case that it still completes when a step overruns, WITH the overrun recorded; a case that no
+  pre-assignment happens while a claim can still be honoured; a case that a stale brief is
+  regenerated; and a case that the retry bound terminates in a completed handover rather than a
+  loop.
+  Criticality: medium — every change touches the handover path, where fail-open is the rule;
+  the attribution stage itself is low risk and is what the rest is decided from.
+  RANK: after the ceiling programme (743, 742, 744, 597, 745, 746, 747), i.e. directly
+  following 747. The ceiling mechanisms bound the damage, this one buys throughput, and its own
+  first stage depends on 744's corrected exit path.
+  Bundle: Session- & Repo-Hygiene.
+
+- [x] 918. The durable lane's activation interlock takes the drain's word for it, and the drain
+  itself has an admission window. FOUND 25.08.2026 by a cross-vendor audit (GPT-5.6 Sol via
+  `ask-sol`, kind audit) of a proposed pull-forward of 676's activation slice; the audit REJECTED
+  the pull-forward and its findings are recorded here so they survive the conversation. The two
+  code-level gaps, verified against the sources:
+  (1) EVIDENCE GAP: `activationDecision` in `scripts/durable-lane-flag-core.mjs` demands
+  commit-visible evidence for every required STEP, but for the boundary mode it verifies only the
+  literal string `drain-before-boundary`. The same reviewed change can therefore declare the mode,
+  mark the steps green, and open the flag without the manifest ever carrying evidence that the
+  drain ENFORCEMENT exists as code. The interlock's own header says a hand-edited flag may not
+  silently advertise a boundary mode the mechanisms cannot perform — today it can.
+  (2) ADMISSION RACE: refusing a planned boundary while a daemon-owned worker is OBSERVED active
+  is not a drain. The flag is not consulted per call and gates only daemon startup, so a live
+  daemon can admit a new worker between the boundary's active-worker check and the handover.
+  Draining must atomically CLOSE ADMISSION first (a fenced refusal the daemon enforces), then
+  empty, then hand over.
+  CONTEXT THE AUDIT ALSO SETTLED, recorded for the planner rather than as work of this point:
+  step 9 (crash-recoverable serial landing) is NOT landed — 895 delivered only the journal
+  vocabulary and successor decision (`scripts/batch-landing-core.mjs` says the landing inside
+  `land-point.mjs` is 676's remainder); ten of the eleven step-12 drills do not exist yet
+  (`scripts/batch-daemon-drill.mjs` carries only `parent-death`); and 676's measured baseline
+  trial is the acceptance and may not slip past activation. An activation shortcut around 676's
+  order is therefore off the table.
+  FINAL STATE: the activation decision requires, beside the step manifest, a boundary-mechanism
+  entry with the same green-plus-evidence shape, refusing while it is absent; and the daemon's
+  control plane exposes an atomic close-admission operation the boundary path uses before it
+  counts workers, so the drain 676 builds has the seam it needs. Both land with unit cases; the
+  behavior of an already-open flag is unchanged.
+  VERIFIABLE: Vitest over `activationDecision` — a manifest with all steps green but no evidenced
+  boundary mechanism refuses and names it; over the daemon core — after close-admission a spawn
+  request is refused with a journalled reason, and the refusal survives a daemon restart; and the
+  existing flag tests stay green.
+  Criticality: med — the flag opens only through a reviewed change, but a wrongly opened lane
+  loses work, and this is the recorded reason the shortcut was rejected.
+  Bundle: unbundled (batch autonomy).
+
+- [x] 921. An era rule turns correctly recorded do-not-merge rows into hand-written ones, and the
+  four-eyes gate then blocks every turn. FOUND 25.08.2026 at the point boundary after point 918
+  landed: `mechanism-review-guard` reports UNREVIEWABLE for a dozen pending commits, and for each
+  one the reason is "a recorded do-not-merge on <sha> is malformed … it can only have arrived by
+  hand". The rows it names are not hand-written. `reviewRecordWellFormed`
+  (`scripts/mechanism-review-core.mjs:1266`) demands a `reviewerAuthorship` object, and for an
+  Anthropic reviewer the status `agreement`; rows the recorder itself wrote BEFORE that field
+  existed carry none at all (`5ce597c`, `042ffbf`, `e1d242a`, `65022b1`) or carry `unverified`
+  beside an Anthropic model (`ece3757`). The check has no era boundary, so a later rule reaches
+  backwards and condemns its own history.
+  WHY IT MATTERS: the message names a repair — "fix or remove the row, on the record" — for which
+  no command exists, and editing the ledger by hand is precisely what the message treats as the
+  defect. The gate is therefore not merely wrong, it is unexitable, and it stands in front of
+  every turn that ends on `main`.
+  FINAL STATE: the well-formedness check gains an era boundary of the same shape
+  `MODE_REQUIRED_SINCE` already has for the mode field — a row recorded before the identity
+  requirement landed stays well formed without it, a row recorded after it does not — or, where
+  that is judged too weak, a migration command that stamps the historical rows verifiably instead
+  of a person editing them. Either way the recorded verdicts keep their meaning: a do-not-merge
+  stays a do-not-merge, and nothing becomes reviewable that was not.
+  VERIFIABLE: Vitest over `reviewRecordWellFormed` — a pre-era row without `reviewerAuthorship`
+  is well formed, the same row dated after the boundary is not, an Anthropic `unverified` row
+  from before the boundary is well formed and from after it is not; plus a case over the guard
+  showing the named commits no longer report UNREVIEWABLE for that reason; plus `npm run
+  test:unit`, lint, build.
+  MEASURED WHILE FILING IT, so the successor does not repeat the probe: ten distinct malformed
+  rows stand behind the refusal (`042ffbf`, `5ce597c`, `65022b1`, `7db99ea`, `80b96e6`,
+  `c3f5ad8`, `e0ebcff`, `e1d242a`, `ece3757`, `f999250`, `fe20777`), and beside them one debt of
+  a different kind that this point also owes an answer: five commits report "the review was split
+  into 2 passes over the FILE SET and only 1 are on record". A COMPLETE scoped one-round review
+  recorded on 25.08.2026 for `8d69529` (GPT-5.6 Sol, verdict merge, all four end-state files)
+  did NOT clear that entry, so a scoped 1/1 record and a recorded 2-pass split do not meet — say
+  which of the two the file debt is measured against, and make the other one say so.
+  Criticality: high — it blocks the batch at the turn end and its stated repair invites hand
+  edits of the very ledger that carries the four-eyes evidence.
+  Bundle: Session- & Repo-Hygiene.
+
+- [x] 923. The preflight and the four-eyes gate return opposite verdicts for the same HEAD, so
+  the one report that exists to answer "would a guard block me" cannot be believed. MEASURED
+  25.08.2026 at `df540a3f`, seconds apart and in the same tree: the Stop-path guard
+  (`echo '{"session_id":"…"}' | node scripts/mechanism-review-guard.mjs`) reported REVIEW GAP —
+  "a review nobody can produce is not demanded: this turn may end" — while
+  `node scripts/guard-preflight.mjs --for answer --session <id>` reported the SAME guard as
+  "would-block: FOUR-EYES GATE ON MECHANISMS — UNREVIEWABLE: this range contains contributions
+  with no eligible reviewer vendor."
+  WHY IT MATTERS: `gatherMechanismReviewInputs` is exported precisely so the preflight judges
+  the gate "from the SAME gathering the Stop hook uses rather than a second copy of this git
+  work, which would drift and hand back a false 'clean'"
+  (`scripts/mechanism-review-guard.mjs:275-280`). This is that drift, in the false-BLOCK
+  direction: the comment guarded against a false green and the measured failure is a false red,
+  which costs a session's opening hunting a refusal the real gate never raises. A preflight that
+  contradicts the guard is useless in both directions, because the reader cannot tell which of
+  the two to believe.
+  FINAL STATE: preflight and Stop path yield the same block/allow decision and the same finding
+  kind for the same HEAD, or the preflight states in its own row which additional condition it
+  is judging that the Stop path is not — so a difference is a stated difference, never a
+  contradiction.
+  VERIFIABLE: Vitest driving both paths over one fixed set of inputs (baseline, head, pending
+  commits, records) and asserting the same decision and the same finding kind, including the
+  review-gap case that produced this divergence; plus `npm run test:unit`, lint, build.
+  Criticality: med — no player-visible defect, but it is the batch's own "may I act" report
+  disagreeing with the gate it reports on.
+  Bundle: Session- & Repo-Hygiene.
+
+- [x] 676. An authoring lane must survive the session that spawned it (specified 13.08.2026 by
+  the blind-parallel four-eyes stage of CLAUDE.md §6; the counted union, the final proposal and
+  the rejected alternatives are `docs/handover-architecture.md`). TWO RULES OF THIS HOUSE
+  CONTRADICT EACH OTHER TODAY: the pool runs up to three authoring lanes, and the session hands
+  over on context — but every lane a session spawned dies with that session, so a session that
+  keeps the pool busy can hand over only by throwing its own work away. Point 675 closes the
+  three MECHANICAL defeats of the handover on today's mechanics; this point builds the plane
+  underneath, so that a lane stops belonging to a session at all.
+  THIS POINT BEGINS AFTER POINT 834, its front stage, and the steps 834 carries are struck from
+  here rather than repeated: the neutral fold of the two blind lists by a model that wrote neither
+  half, the schemas and invariants, the durable state store, the daemon with the Sol adapter, the
+  transferable declarations with their fencing, and the slice of fenced discovery, adoption and
+  reconciliation a fresh session needs before it may prove and land what it adopted. What 834's
+  fold settles in the union is what this point builds on. An Agent-tool child stays NON-
+  transferable, and the stand-down and dead-owner rules are point 716's, inherited rather than
+  restated.
+  FINAL STATE, as the union settles it: authoring runs as DAEMON-OWNED detached workers under a
+  model-neutral adapter (`scripts/detached-agent.mjs`) whose reference implementation is the
+  already-detached `scripts/author-sol.mjs`; an Agent-tool child stays session-bound and is
+  declared NON-transferable, blocking a boundary until it finishes or is safely stopped. The
+  coordinator plane is short-lived and split into dispatcher and lander epochs, holding one
+  renewable batch lease whose epoch FENCES every mutation, so two sessions can never adopt the
+  same batch. Coordination state is an append-only checksummed journal beside the repository with
+  an atomically replaced snapshot for fast resume, and every point carries an explicit state
+  (queued, running, checkpointing, ready-for-review, landing, landed, failed, stalled,
+  cancelled). A successor adopts supervision by STABLE JOB IDENTITY — never by process
+  reparenting, never by PID alone — after reconciling every recorded lane against journal,
+  worktrees and local/remote SHAs, and quarantining what it cannot prove. Refill comes only from
+  a bounded, pre-authorized queue behind a global three-lane cap and a completed-review backlog
+  limit, with a journalled REASON whenever three eligible lanes exist and fewer run. Landing stays
+  serial behind a batch-wide landing lock with a crash-recoverable staged journal, and the
+  main-session picture judgments are persisted as evidence a worker may never substitute.
+  Drain-before-boundary REMAINS as the explicit degraded mode whenever any active lane is not
+  transferable.
+  BUILD THE REMAINDER IN THE UNION'S ORDER (bounded dispatch, checkpoint barrier, the two-phase
+  boundary, successor reconciliation beyond the slice 834 claims, the crash-recoverable landing
+  journal, board projection, metrics), each step green on the unit layer before the next, and roll
+  out with the Sol adapter ALONE until the failure drills pass.
+  VERIFIABLE: the unit cases the union names per step; the failure drills — worker crash, stall,
+  push failure, dirty worktree, marker deletion, daemon restart, corrupt snapshot, PID reuse,
+  duplicate coordinator, remote outage, checkpoint timeout — each run through the daemon's drill
+  command; and a measured trial against a recorded baseline day, whose success needs ZERO safety
+  incidents (no lost attempt, no duplicate writer, no overlapping lease, no silently missed
+  boundary), a median handover context materially below baseline, and points landed per day no
+  worse than baseline. Utilization is supporting evidence, never the acceptance test on its own.
+  MECHANISM REVIEW REQUIRED (CLAUDE.md §7.2) per step, not once at the end.
+  Criticality: high — it owns the batch's dominant cost and every lane's durability, and a defect
+  here loses work rather than merely slowing it.

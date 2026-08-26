@@ -139,7 +139,7 @@ export const LIMITS = {
   // sie gerade gebaut hat", which already carries the self-unblocking gate, and the fold paid for
   // itself: the entry came back under its own 4-line risk budget and the file is one line and
   // eleven words SHORTER than before. The ceilings follow the measurement down, as the rule says.
-  maxLines: 470,
+  maxLines: 465,
   // EXACT FIT, not headroom — corrected 30.07.2026 after the four-eyes review
   // pointed out that this comment had long stopped describing the numbers. The
   // rule above ("raised only by the measured size of genuinely new tips")
@@ -292,7 +292,21 @@ export const LIMITS = {
   // paid for it by dropping clauses the retrospective carries in full (§3.179).
   // The guide measures 470 / 4195 afterwards, so the word ceiling RATCHETS DOWN
   // by seven more. The line ceiling stays 470 because the file does.
-  maxWords: 4195,
+  // 25.08.2026, later the same day: the retroactive-rule pitfall went in — a
+  // tightened check reading an existing stock condemns records that were correct
+  // when they were written, so the duty says from WHEN it applies. Three
+  // neighbouring entries paid for it by dropping clauses the retrospective now
+  // carries in full (§3.120), and the new tip is three lines. The guide measures
+  // 470 / 4180 afterwards, so the word ceiling RATCHETS DOWN by fifteen more; the
+  // line ceiling stays 470 because the file does.
+  // 25.08.2026, that evening: the walked-exit lesson MERGED into the existing
+  // refusal pitfall rather than adding a sixth neighbour — the guide already
+  // warned that a remedy may harm or never arrive, and "already carried out" is
+  // the third form of the same defect, not a new one. Four neighbouring entries
+  // were tightened in the same pass. The guide measures 465 / 4162 afterwards, so
+  // BOTH ceilings RATCHET DOWN — the line ceiling by five, the word ceiling by
+  // eighteen.
+  maxWords: 4162,
   // A pitfall entry = the risk lines plus its prompt. Anything longer is a
   // story, not a tip.
   maxEntryLines: 11,

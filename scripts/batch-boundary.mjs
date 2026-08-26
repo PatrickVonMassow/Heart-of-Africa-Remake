@@ -65,6 +65,12 @@ import { launcherState } from './batch-launcher.mjs'
 import { BOARD_FILE_DEFAULT } from './dashboard-state.mjs'
 import { nowCard } from './board-core.mjs'
 import { parseTasks } from './dashboard-guard-core.mjs'
+import { recordHandoverBudgetCompletion } from './handover-budget.mjs'
+import {
+  noteHandoverAttributionCommit,
+  noteHandoverAttributionPrepare,
+} from './handover-attribution.mjs'
+import { commitDurableBoundary, prepareDurableBoundary } from './batch-boundary-plane.mjs'
 
 export const BOUNDARY_PATH = repoPath('.claude/batch-boundary.json')
 
@@ -575,7 +581,14 @@ export function successorRequestFailureLine(result) {
  * may no longer depend on `batch-progress-guard` being the first Stop guard to
  * allow. Both writes are injectable for an ordered proof.
  */
-export function commitSealedBoundary({ transfer, marker, write = writeBoundary, handover = null } = {}) {
+export function commitSealedBoundary({
+  transfer,
+  marker,
+  write = writeBoundary,
+  handover = null,
+  complete = null,
+  warn = console.log,
+} = {}) {
   let transferred = null
   if (transfer && typeof transfer.commit === 'function') {
     try {
@@ -605,6 +618,16 @@ export function commitSealedBoundary({ transfer, marker, write = writeBoundary, 
       })
     }
   }
+  // THE EVIDENCE FOLLOWS THE HANDOVER. The marker and ownership transfer now
+  // stand, so a broken recorder may warn but may never turn a successful exit
+  // into a failed one.
+  if (typeof complete === 'function') {
+    try {
+      complete(marker)
+    } catch (error) {
+      warn(`\nWARNING: handover completion evidence failed (${error?.message ?? error}); the boundary stands.`)
+    }
+  }
   return transferred
 }
 
@@ -617,12 +640,24 @@ if (isMain) {
   const argv = process.argv.slice(2)
   const arg = argv[0]
   const sid = readOwnerLock()?.sessionId ?? ''
+  const ownerLock = readOwnerLock()
+  const durableBatchIndex = argv.indexOf('--batch')
+  const durableBatchId = durableBatchIndex >= 0 ? argv[durableBatchIndex + 1] : null
   const fail = (msg) => {
     console.error(msg)
     process.exit(1)
   }
 
-  if (arg === '--clear') {
+  if (durableBatchId && (arg === '--prepare' || arg === '--commit')) {
+    if (!sid || !Number.isInteger(ownerLock?.fence)) {
+      fail('a durable batch boundary requires the live batch-lock owner and its fence; nothing recorded')
+    }
+    const result = arg === '--prepare'
+      ? await prepareDurableBoundary({ repoDir: repoPath('.'), batchId: durableBatchId, sessionId: sid, fence: ownerLock.fence })
+      : await commitDurableBoundary({ repoDir: repoPath('.'), batchId: durableBatchId, sessionId: sid, fence: ownerLock.fence })
+    if (!result.ok) fail(`durable boundary ${arg.slice(2)} refused: ${result.reason ?? (result.refusals ?? []).join('; ')}`)
+    console.log(JSON.stringify(result, null, 2))
+  } else if (arg === '--clear') {
     // The prepare receipt goes with the marker: a withdrawn boundary is re-TAKEN
     // from the first phase, bookkeeping included, not committed on the strength
     // of an attempt the session deliberately abandoned.
@@ -743,6 +778,15 @@ if (isMain) {
             board: standingCards({ cause: BOUNDARY_CAUSES.CONTEXT, destination: handover.destination }),
           }),
         )
+        noteHandoverAttributionPrepare({
+          sessionId: sid,
+          tokens: wm.tokens,
+          at: Date.now(),
+          cause: BOUNDARY_CAUSES.CONTEXT,
+          point: null,
+          transcript: wm.transcript ?? '',
+          destination: handover.destination,
+        })
         console.log(
           `PREPARED (nothing recorded yet): the context measures ${wm.tokens} tokens against the ` +
             `${wm.watermark} watermark, the launcher is armed` +
@@ -789,6 +833,22 @@ if (isMain) {
         transferred = commitSealedBoundary({
           transfer,
           handover: () => (handoverResult = handoverAndRequest({ sid, point: null })),
+          complete: (committedMarker) => {
+            recordHandoverBudgetCompletion({
+              sessionId: sid,
+              tokens: wm.tokens,
+              cause: BOUNDARY_CAUSES.CONTEXT,
+              point: null,
+              transcript: wm.transcript ?? '',
+            })
+            noteHandoverAttributionCommit({
+              sessionId: sid,
+              tokens: wm.tokens,
+              at: committedMarker.at,
+              transcript: wm.transcript ?? '',
+              destination: handover.destination,
+            })
+          },
           marker: {
             v: 2,
             phase: BOUNDARY_PHASES.COMMITTED,
@@ -932,6 +992,15 @@ if (isMain) {
           board: standingCards({ cause: BOUNDARY_CAUSES.POINT, destination: handover.destination }),
         }),
       )
+      noteHandoverAttributionPrepare({
+        sessionId: sid,
+        tokens: contextTokens,
+        at: Date.now(),
+        cause: BOUNDARY_CAUSES.POINT,
+        point,
+        transcript: wmPoint.transcript ?? '',
+        destination: handover.destination,
+      })
       console.log(
         (phaseFlag === null
           ? `NOTE: the one-shot form is retired (point 675) — this call ran --prepare ${point} instead, and ` +
@@ -988,6 +1057,22 @@ if (isMain) {
       transferred = commitSealedBoundary({
         transfer,
         handover: () => (handoverResult = handoverAndRequest({ sid, point })),
+        complete: (committedMarker) => {
+          recordHandoverBudgetCompletion({
+            sessionId: sid,
+            tokens: contextTokens,
+            cause: BOUNDARY_CAUSES.POINT,
+            point,
+            transcript: wmPoint.transcript ?? '',
+          })
+          noteHandoverAttributionCommit({
+            sessionId: sid,
+            tokens: contextTokens,
+            at: committedMarker.at,
+            transcript: wmPoint.transcript ?? '',
+            destination: handover.destination,
+          })
+        },
         marker: {
           v: 2,
           phase: BOUNDARY_PHASES.COMMITTED,

@@ -83,11 +83,6 @@
       "why": "Small evidence-plumbing fix; it belongs with the other verification-chain hardening rather than ahead of the release fixes",
       "place": "last"
     },
-    "676": {
-      "at": "2026-08-13T17:13:15.401Z",
-      "why": "Grosse Infrastruktur, kein Bugfix: vor dem Demo-Checkpoint gilt Bugfixes zuerst, und 675 deckt die drei mechanischen Niederlagen der Uebergabe bereits ohne diese Ebene ab",
-      "place": "last"
-    },
     "677": {
       "at": "2026-08-13T17:13:15.449Z",
       "why": "Haengt nur den Aufrufer, nicht das Projekt, und hat mit '< /dev/null' einen sofort verfuegbaren Umweg — vor dem Release gehen die Release-Punkte vor",
@@ -231,12 +226,6 @@
       "why": "A carrier-quality fix with no dependency on the context-ceiling programme; it waits behind it deliberately.",
       "place": "last"
     },
-    "744": {
-      "at": "2026-08-21T16:06:00.216Z",
-      "why": "User ruling 21.08.2026 (only the communication mechanic, then 633 and the release 174): queued directly behind 174. Its handover-text half went to point 800; what is left prices the exit rather than shortening it.",
-      "origin": "user",
-      "place": "last"
-    },
     "746": {
       "at": "2026-08-21T16:06:00.699Z",
       "why": "User ruling 21.08.2026 (only the communication mechanic, then 633 and the release 174): queued directly behind 174. It only defers commissioning and rests on an estimator that does not exist yet.",
@@ -254,12 +243,6 @@
       "why": "User ruling 21.08.2026 (only the communication mechanic, then 633 and the release 174): queued directly behind 174. It writes a reconstructed record for a series only 747 consumes.",
       "origin": "user",
       "place": "last"
-    },
-    "752": {
-      "at": "2026-08-21T16:05:59.447Z",
-      "why": "User ruling 21.08.2026 (only the communication mechanic, then 633 and the release 174); kept in front for SPEED: the paradigm case the user named, 43 measured handovers with a median of 12.7 and a p90 of 47.8 minutes of dead time.",
-      "origin": "user",
-      "place": "ahead"
     },
     "754": {
       "at": "2026-08-19T19:59:31.708Z",
@@ -636,12 +619,6 @@
       "origin": "machine",
       "place": "last"
     },
-    "885": {
-      "at": "2026-08-24T07:11:06.028Z",
-      "why": "It loses the user's own words with no trace on either layer, and it fires whenever the owner delegates — which is the standing instruction, so every remaining point before the release widens the window.",
-      "origin": "machine",
-      "place": "ahead"
-    },
     "898": {
       "at": "2026-08-24T14:37:17.169Z",
       "why": "Maschinell abgelegter Befund mittlerer Dringlichkeit — steht hinter dem Release, weil er weder den Stapel anhaelt noch eine Spur blockiert",
@@ -725,6 +702,30 @@
       "why": "Hygienebefund ohne Spielerwirkung — er wartet hinter allem, womit die Arbeitsordnung zuletzt geordnet wurde, weil er nichts blockiert.",
       "origin": "machine",
       "place": "last"
+    },
+    "919": {
+      "at": "2026-08-25T18:43:13.130Z",
+      "why": "Last is right: the phantom red costs a session's opening, never correctness — no code is wrong, no player-visible defect, and the guard still catches every genuine red. It waits behind the release work like the other CI-guard defects of its class.",
+      "origin": "machine",
+      "place": "last"
+    },
+    "920": {
+      "at": "2026-08-25T18:43:13.227Z",
+      "why": "Last is right: the duplicate number is caught by the pre-push fast gate before it can reach main, so the damage is a repair, not a defect that ships. The command is convenience over a rule that already holds.",
+      "origin": "machine",
+      "place": "last"
+    },
+    "924": {
+      "at": "2026-08-25T23:39:04.937Z",
+      "why": "Es kostet Zugzeit, nicht Arbeit — der Handlauf beweist den Baum gruen und der Push geht danach durch; last is right.",
+      "origin": "machine",
+      "place": "last"
+    },
+    "925": {
+      "at": "2026-08-26T00:37:45.177Z",
+      "why": "Die dauerhafte Lane bleibt bis zu diesem Punkt abgeschaltet und blockiert nichts; Kommunikationsmechanik, Abschluss und Tag gehen vor.",
+      "origin": "machine",
+      "place": "last"
     }
   },
   "boundary": {
@@ -757,11 +758,9 @@
       736,
       738,
       739,
-      744,
       746,
       747,
       750,
-      752,
       759,
       760,
       762,
@@ -770,7 +769,7 @@
     "why": "The order standing in front of the release today is the arrangement that predates this rule; the four machine-filed points that had ranked themselves there were moved behind 174 first"
   },
   "settled": {
-    "at": "2026-08-25T14:41:41.521Z",
+    "at": "2026-08-26T00:37:45.183Z",
     "points": [
       174,
       184,
@@ -923,7 +922,6 @@
       665,
       668,
       670,
-      676,
       677,
       678,
       680,
@@ -959,11 +957,9 @@
       738,
       739,
       741,
-      744,
       746,
       747,
       750,
-      752,
       754,
       755,
       756,
@@ -1038,7 +1034,6 @@
       882,
       883,
       884,
-      885,
       886,
       887,
       888,
@@ -1059,7 +1054,12 @@
       914,
       915,
       916,
-      917
+      917,
+      919,
+      920,
+      922,
+      924,
+      925
     ]
   }
 }

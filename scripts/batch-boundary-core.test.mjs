@@ -67,6 +67,14 @@ import {
 import { evaluateRuleReview } from './rule-review-core.mjs'
 import { evaluate as evaluateRenderVerify } from './render-verify-core.mjs'
 import { evaluateMechanismReview } from './mechanism-review-core.mjs'
+import { recordHandoverBudgetCompletion } from './handover-budget.mjs'
+import {
+  durableBoundaryMarker,
+  durableCommitVerdict,
+  durablePostCommitMutation,
+  durablePrepareReceipt,
+  durablePrepareVerdict,
+} from './batch-boundary-plane-core.mjs'
 
 const NOW = 1_785_000_000_000
 const SID = 'session-abc'
@@ -1193,6 +1201,42 @@ describe('commitSealedBoundary — the marker and ownership handover are one com
     expect(out).toBe('feat/x@abcd')
   })
 
+  it('completes the boundary before recording an over-cap exit, and recorder failure cannot undo it', () => {
+    const order = []
+    const said = []
+    const records = []
+    expect(() => commitSealedBoundary({
+      marker: { v: 2, cause: 'context' },
+      write: () => order.push('marker'),
+      handover: () => (order.push('handover'), { handed: true }),
+      complete: () => {
+        order.push('overrun-record')
+        return recordHandoverBudgetCompletion(
+          { sessionId: SID, tokens: 150_001, cause: 'context', at: NOW },
+          {
+            read: () => ({ v: 1, sessionId: SID, startTokens: 122_000, startedAt: NOW - 1 }),
+            makeDir: () => {},
+            append: (_path, line) => records.push(JSON.parse(line)),
+            say: (line) => said.push(line),
+          },
+        )
+      },
+      warn: (line) => said.push(line),
+    })).not.toThrow()
+    expect(order).toEqual(['marker', 'handover', 'overrun-record'])
+    expect(records).toMatchObject([{ exceeded: true, overrunTokens: 1 }])
+    expect(said.join('\n')).toMatch(/HANDOVER CAP EXCEEDED.*boundary stands/s)
+
+    expect(() => commitSealedBoundary({
+      marker: { v: 2 },
+      write: () => {},
+      handover: () => ({ handed: true }),
+      complete: () => { throw new Error('series unavailable') },
+      warn: (line) => said.push(line),
+    })).not.toThrow()
+    expect(said.join('\n')).toMatch(/WARNING.*boundary stands/s)
+  })
+
   it('a THROWING transfer leaves NO marker behind, and names its stage', () => {
     let wrote = false
     let caught = null
@@ -1828,5 +1872,57 @@ describe('markerFresh / boardCarriesCard — a forged stamp, an unannounced hand
         missing: [],
       })
     }
+  })
+})
+
+describe('the durable two-phase batch boundary', () => {
+  const evidence = (overrides = {}) => ({
+    daemon: { ok: true, journalVerdict: 'ok' },
+    state: { journalVerdict: 'ok', snapshotSealed: true },
+    landingStage: null,
+    bookkeeping: { clean: true },
+    board: { updated: true, readable: true },
+    queue: { ok: true },
+    checkpoint: { ok: true, verdict: 'ready', requestId: 'cp-7' },
+    ...overrides,
+  })
+
+  it('prepares only after every health and checkpoint dependency is affirmative', () => {
+    expect(durablePrepareVerdict(evidence())).toEqual({ ok: true, verdict: 'prepared' })
+    for (const broken of [
+      { daemon: { ok: false } },
+      { state: { journalVerdict: 'corrupt', snapshotSealed: false } },
+      { landingStage: 'gates' },
+      { bookkeeping: { clean: false } },
+      { board: { updated: false, readable: true } },
+      { queue: { ok: false, reason: 'bad queue' } },
+      { checkpoint: { ok: false, verdict: 'blocked' } },
+    ]) expect(durablePrepareVerdict(evidence(broken)).ok).toBe(false)
+  })
+
+  it('failed prepare cannot produce a receipt or marker', () => {
+    const refused = durablePrepareReceipt({ batchId: 'b', sessionId: SID, fence: 7, requestId: 'r', at: NOW, evidence: evidence({ checkpoint: { ok: false } }) })
+    expect(refused.ok).toBe(false)
+    expect(durableBoundaryMarker({ prepared: refused.receipt, daemonReceipt: { ok: true } }).ok).toBe(false)
+  })
+
+  it('binds commit to batch, session, unchanged fence, and sealed snapshot', () => {
+    const prepared = durablePrepareReceipt({ batchId: 'b', sessionId: SID, fence: 7, requestId: 'r', at: NOW, evidence: evidence() }).receipt
+    const snapshot = { ok: true, snapshot: { batchId: 'b' } }
+    expect(durableCommitVerdict({ prepared, batchId: 'b', sessionId: SID, fence: 7, snapshot })).toEqual({ ok: true, alreadyCommitted: false })
+    expect(durableCommitVerdict({ prepared, batchId: 'b', sessionId: SID, fence: 8, snapshot }).ok).toBe(false)
+  })
+
+  it('makes commit idempotent without advancing the fence', () => {
+    const prepared = durablePrepareReceipt({ batchId: 'b', sessionId: SID, fence: 7, requestId: 'r', at: NOW, evidence: evidence() }).receipt
+    const built = durableBoundaryMarker({ prepared, daemonReceipt: { ok: true, daemonGeneration: 'daemon-g' } })
+    expect(built.marker.fence).toBe(7)
+    expect(durableCommitVerdict({ prepared, batchId: 'b', sessionId: SID, fence: 7, snapshot: { ok: true, snapshot: { batchId: 'b' } }, marker: built.marker })).toEqual({ ok: true, alreadyCommitted: true })
+  })
+
+  it('fences every post-commit mutation by the old coordinator', () => {
+    const marker = { kind: 'durable-batch-boundary', phase: 'committed', sessionId: SID, fence: 7 }
+    expect(durablePostCommitMutation({ marker, sessionId: SID, fence: 7 }).ok).toBe(false)
+    expect(durablePostCommitMutation({ marker, sessionId: 'successor', fence: 8 }).ok).toBe(true)
   })
 })

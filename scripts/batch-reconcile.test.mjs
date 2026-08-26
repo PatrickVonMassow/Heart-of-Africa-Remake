@@ -17,6 +17,7 @@ import { resumeBatch } from './resume-batch.mjs'
 
 const BATCH = 'reconcile-batch'
 const SID = 'owner-session'
+const SUCCESSOR_SID = 'successor-session'
 const FENCE = 5
 
 let sandbox, repo, worktree, originDir
@@ -85,7 +86,22 @@ describe('reconciliation over a live batch, then over its corpse', () => {
     expect(attempt.ok, attempt.reason).toBe(true)
     await sleep(2500)
 
-    const resumed = await resumeBatch({ repoDir: repo, batchId: BATCH, sessionId: SID })
+    const sealed = await controlRequest({
+      repoDir: repo,
+      batchId: BATCH,
+      request: { cmd: 'seal-boundary', sessionId: SID, fence: FENCE, payload: { batchId: BATCH, requestId: 'reconcile-boundary' } },
+    })
+    expect(sealed.ok, sealed.reason).toBe(true)
+    writeFileSync(join(repo, '.claude', 'batch-boundary.json'), JSON.stringify({
+      v: 1, kind: 'durable-batch-boundary', phase: 'committed', batchId: BATCH,
+      sessionId: SID, fence: FENCE, requestId: 'reconcile-boundary',
+    }))
+    const oldLock = JSON.parse(readFileSync(join(repo, '.claude', 'batch-lock.json'), 'utf8'))
+    writeFileSync(join(repo, '.claude', 'batch-lock.json'), JSON.stringify({
+      ...oldLock, sessionId: SUCCESSOR_SID, fence: FENCE + 1, leaseUntil: Date.now() + 3_600_000,
+    }))
+
+    const resumed = await resumeBatch({ repoDir: repo, batchId: BATCH, sessionId: SUCCESSOR_SID, refill: false })
     expect(resumed.registry.ok).toBe(true)
     expect(resumed.pair.reading).toBe('healthy')
     expect(resumed.daemonLive).toBe(true)
@@ -93,6 +109,7 @@ describe('reconciliation over a live batch, then over its corpse', () => {
     expect(lane?.reading, lane?.reason).toBe('running')
     expect(resumed.adoptions).toEqual([{ attemptId: 'r1', ok: true, reason: null }])
     expect(resumed.refill.ok).toBe(true)
+    expect(resumed.boundary).toMatchObject({ ok: true, markerFence: FENCE, successorFence: FENCE + 1 })
   }, 30_000)
 
   it('reads a SIGKILLed daemon as the cold record it is, with its worker lane still accounted', async () => {
@@ -109,7 +126,7 @@ describe('reconciliation over a live batch, then over its corpse', () => {
     const lane = report.lanes.find((l) => l.attemptId === 'r1')
     expect(lane?.reading).toBe('running')
 
-    const refused = applyPairResolution({ repoDir: repo, batchId: BATCH, report, sessionId: SID })
+    const refused = applyPairResolution({ repoDir: repo, batchId: BATCH, report, sessionId: SUCCESSOR_SID })
     expect(refused.ok).toBe(false)
     expect(refused.did).toMatch(/still read running/)
   }, 20_000)
@@ -137,11 +154,11 @@ describe('reconciliation over a live batch, then over its corpse', () => {
       await sleep(300)
     }
     expect(lane?.reading, lane?.reason).toBe('missing')
-    const applied = applyPairResolution({ repoDir: repo, batchId: BATCH, report, sessionId: SID })
+    const applied = applyPairResolution({ repoDir: repo, batchId: BATCH, report, sessionId: SUCCESSOR_SID })
     expect(applied.ok, applied.did).toBe(true)
     const again = gatherEvidence({ repoDir: repo, batchId: BATCH })
     expect(again.pair.reading).toBe('no-daemon')
-    expect(applyPairResolution({ repoDir: repo, batchId: BATCH, report: again, sessionId: SID }).did).toBe('nothing to do')
+    expect(applyPairResolution({ repoDir: repo, batchId: BATCH, report: again, sessionId: SUCCESSOR_SID }).did).toBe('nothing to do')
     // Refill stays refused while the dead lane is unresolved (M29).
     expect(again.refill.ok).toBe(false)
   }, 20_000)
@@ -161,14 +178,14 @@ describe('reconciliation over a live batch, then over its corpse', () => {
     // exactly where a bare read-before-write would already have validated and
     // would rename its stale snapshot over the successor's lock.
     reconcileProbe.onMutexEntered = (path) => {
-      writeFileSync(path, JSON.stringify({ ...JSON.parse(before), sessionId: 'successor-session', fence: FENCE + 1 }))
+      writeFileSync(path, JSON.stringify({ ...JSON.parse(before), sessionId: 'racing-session', fence: FENCE + 2 }))
     }
     try {
-      const raced = applyPairResolution({ repoDir: repo, batchId: BATCH, report: { ...report, pair: { ...report.pair, action: 'clear-copy' } }, sessionId: SID })
+      const raced = applyPairResolution({ repoDir: repo, batchId: BATCH, report: { ...report, pair: { ...report.pair, action: 'clear-copy' } }, sessionId: SUCCESSOR_SID })
       expect(raced.ok).toBe(false)
       expect(raced.did).toMatch(/lock owner/)
       // The successor's lock SURVIVES: nothing renamed a stale snapshot over it.
-      expect(JSON.parse(readFileSync(lockPath, 'utf8')).sessionId).toBe('successor-session')
+      expect(JSON.parse(readFileSync(lockPath, 'utf8')).sessionId).toBe('racing-session')
     } finally {
       reconcileProbe.onMutexEntered = null
       writeFileSync(lockPath, before)
@@ -180,7 +197,7 @@ describe('reconciliation over a live batch, then over its corpse', () => {
     mkdirSync(mutexDir)
     try {
       const report = gatherEvidence({ repoDir: repo, batchId: BATCH })
-      const held = applyPairResolution({ repoDir: repo, batchId: BATCH, report: { ...report, pair: { ...report.pair, action: 'clear-copy' } }, sessionId: SID })
+      const held = applyPairResolution({ repoDir: repo, batchId: BATCH, report: { ...report, pair: { ...report.pair, action: 'clear-copy' } }, sessionId: SUCCESSOR_SID })
       expect(held.ok).toBe(false)
       expect(held.did).toMatch(/mutex is held/)
     } finally {
@@ -198,7 +215,7 @@ describe('reconciliation over a live batch, then over its corpse', () => {
         repoDir: repo,
         batchId: BATCH,
         report: { ...report, ...bad, pair: { ...report.pair, action: 'clear-copy' } },
-        sessionId: SID,
+        sessionId: SUCCESSOR_SID,
       })
       expect(res.ok).toBe(false)
       expect(res.did).toMatch(/corrupt or carries quarantined/)
@@ -224,7 +241,7 @@ describe('reconciliation over a live batch, then over its corpse', () => {
     let status = 0
     let out = ''
     try {
-      out = execFileSync('node', ['scripts/resume-batch.mjs', '--repo', repo, '--batch', BATCH, '--session', SID], { windowsHide: true, encoding: 'utf8' })
+      out = execFileSync('node', ['scripts/resume-batch.mjs', '--repo', repo, '--batch', BATCH, '--session', SUCCESSOR_SID], { windowsHide: true, encoding: 'utf8' })
     } catch (error) {
       status = error.status
       out = `${error.stdout ?? ''}`
@@ -256,8 +273,8 @@ describe('reconciliation over a live batch, then over its corpse', () => {
     try {
       // A handover advanced the fence AFTER the report was taken: the write
       // must refuse instead of clobbering the successor's lock.
-      writeFileSync(lockPath, JSON.stringify({ ...JSON.parse(lockBefore), fence: FENCE + 1 }))
-      const moved = applyPairResolution({ repoDir: repo, batchId: BATCH, report: { ...report, pair: { ...report.pair, action: 'clear-copy' } }, sessionId: SID })
+      writeFileSync(lockPath, JSON.stringify({ ...JSON.parse(lockBefore), fence: FENCE + 2 }))
+      const moved = applyPairResolution({ repoDir: repo, batchId: BATCH, report: { ...report, pair: { ...report.pair, action: 'clear-copy' } }, sessionId: SUCCESSOR_SID })
       expect(moved.ok).toBe(false)
       expect(moved.did).toMatch(/regather/)
     } finally {
@@ -275,7 +292,7 @@ describe('reconciliation over a live batch, then over its corpse', () => {
         ...report,
         pair: { action: 'reconcile-workers-then-release-record', record: { pid: 424242, pidStartedAt: 1, generation: 'gen-reconcile-1' } },
       }
-      const res = applyPairResolution({ repoDir: repo, batchId: BATCH, report: stale, sessionId: SID })
+      const res = applyPairResolution({ repoDir: repo, batchId: BATCH, report: stale, sessionId: SUCCESSOR_SID })
       expect(res.ok).toBe(false)
       expect(res.did).toMatch(/different daemon record/)
     } finally {

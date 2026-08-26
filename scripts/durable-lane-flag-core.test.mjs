@@ -5,7 +5,9 @@
 // because controlling what the board advertises does not control what somebody
 // switches on. These cases are that refusal, pinned.
 import { describe, it, expect } from 'vitest'
+import { readFileSync } from 'node:fs'
 import {
+  DURABLE_LANE_BOUNDARY_MECHANISM,
   DURABLE_LANE_STEPS,
   REQUIRED_BOUNDARY_MODE,
   STEPS_REQUIRED_FOR_ACTIVATION,
@@ -14,21 +16,26 @@ import {
   mayStartDaemon,
 } from './durable-lane-flag-core.mjs'
 
+const evidencedBoundary = Object.freeze({
+  ...DURABLE_LANE_BOUNDARY_MECHANISM,
+  green: true,
+  evidence: 'close-admission is durably enforced by the daemon control plane',
+})
+
 const green = (...steps) => {
   const out = {}
   for (const [n, step] of Object.entries(DURABLE_LANE_STEPS)) {
-    out[n] = steps.includes(Number(n)) ? { ...step, green: true, evidence: `case for step ${n}` } : { ...step }
+    out[n] = steps.includes(Number(n)) ? { ...step, green: true, evidence: `case for step ${n}` } : { ...step, green: false, evidence: null }
   }
   return out
 }
 
 describe('the activation interlock', () => {
-  it('refuses today, and names every step it is waiting for', () => {
+  it('ships every proved step but refuses when no boundary mode is presented', () => {
     const verdict = activationDecision()
     expect(verdict.ok).toBe(false)
-    expect(verdict.missing).toEqual([...STEPS_REQUIRED_FOR_ACTIVATION])
-    expect(verdict.reason).toMatch(/successor startup and reconciliation/)
-    expect(verdict.reason).toMatch(/crash-recoverable serial landing/)
+    expect(verdict.missing).toBeUndefined()
+    expect(verdict.reason).toMatch(/checkpointed-handover/)
   })
 
   it('still refuses when steps 1 to 4 are green but 8 and 9 are not — durable execution is not transferable supervision', () => {
@@ -58,17 +65,31 @@ describe('the activation interlock', () => {
       activationDecision({
         steps: green(...STEPS_REQUIRED_FOR_ACTIVATION),
         boundaryMode: REQUIRED_BOUNDARY_MODE,
+        boundaryMechanism: evidencedBoundary,
       }).ok,
     ).toBe(true)
   })
 
-  it('demands drain-before-boundary even after every activation step is green — crash survival is not planned handover', () => {
+  it('demands checkpointed handover after steps 6 and 7 become green', () => {
     const steps = green(...STEPS_REQUIRED_FOR_ACTIVATION)
-    for (const boundaryMode of [null, 'planned-handover', 'checkpoint-handover']) {
-      const verdict = activationDecision({ steps, boundaryMode })
+    for (const boundaryMode of [null, 'planned-handover', 'drain-before-boundary']) {
+      const verdict = activationDecision({ steps, boundaryMode, boundaryMechanism: evidencedBoundary })
       expect(verdict.ok, String(boundaryMode)).toBe(false)
-      expect(verdict.reason).toMatch(/drain-before-boundary/)
-      expect(verdict.reason).toMatch(/steps 6 and 7/)
+      expect(verdict.reason).toMatch(/checkpointed-handover/)
+    }
+  })
+
+  it('refuses a named boundary mode without green evidence that its enforcement exists', () => {
+    const steps = green(...STEPS_REQUIRED_FOR_ACTIVATION)
+    const absent = activationDecision({ steps, boundaryMode: REQUIRED_BOUNDARY_MODE, boundaryMechanism: { ...DURABLE_LANE_BOUNDARY_MECHANISM, green: false, evidence: null } })
+    expect(absent).toMatchObject({ ok: false, missingBoundaryMechanism: true })
+    expect(absent.reason).toMatch(/boundary mechanism: checkpointed two-phase boundary enforcement/)
+
+    for (const boundaryMechanism of [
+      { ...DURABLE_LANE_BOUNDARY_MECHANISM, green: 'yes', evidence: 'a claim' },
+      { ...DURABLE_LANE_BOUNDARY_MECHANISM, green: true, evidence: '   ' },
+    ]) {
+      expect(activationDecision({ steps, boundaryMode: REQUIRED_BOUNDARY_MODE, boundaryMechanism }).ok).toBe(false)
     }
   })
 
@@ -81,18 +102,24 @@ describe('the activation interlock', () => {
     expect(activationDecision({ steps: blankEvidence }).missing).toEqual([9])
   })
 
-  it('the shipped manifest has nothing green — the lane is dark as it stands', () => {
+  it('the shipped manifest records green evidence for every activation step', () => {
     for (const [n, step] of Object.entries(DURABLE_LANE_STEPS)) {
-      expect(step.green, `step ${n}`).toBe(false)
+      expect(step.green, `step ${n}`).toBe(true)
+      expect(step.evidence, `step ${n}`).toMatch(/\S/)
     }
   })
 })
 
 describe('the door the flag opens', () => {
-  it('refuses to start a daemon even when a hand-edited flag says enabled', () => {
+  it('ships the proved Sol-only mode dark until the representative trial exists', () => {
+    const flag = JSON.parse(readFileSync('.claude/durable-lane-flag.json', 'utf8'))
+    expect(flag).toMatchObject({ enabled: false, boundaryMode: REQUIRED_BOUNDARY_MODE, adapters: ['sol'] })
+  })
+
+  it('refuses an enabled flag that omits the proved boundary mode', () => {
     const verdict = mayStartDaemon({ flag: { enabled: true } })
     expect(verdict.ok).toBe(false)
-    expect(verdict.missing).toEqual([...STEPS_REQUIRED_FOR_ACTIVATION])
+    expect(verdict.reason).toMatch(/checkpointed-handover/)
   })
 
   it('refuses with the flag off even once every step is green', () => {
@@ -100,13 +127,13 @@ describe('the door the flag opens', () => {
     expect(mayStartDaemon({ flag: { enabled: false }, steps }).reason).toMatch(/off/)
     expect(mayStartDaemon({ flag: null, steps }).ok).toBe(false)
     expect(mayStartDaemon({ flag: { enabled: true }, steps }).ok).toBe(false)
-    expect(mayStartDaemon({ flag: { enabled: true, boundaryMode: REQUIRED_BOUNDARY_MODE }, steps }).ok).toBe(true)
+    expect(mayStartDaemon({ flag: { enabled: true, boundaryMode: REQUIRED_BOUNDARY_MODE }, steps, boundaryMechanism: evidencedBoundary }).ok).toBe(true)
   })
 
   it('a hand-edited flag that is merely truthy reads as off', () => {
     const steps = green(...STEPS_REQUIRED_FOR_ACTIVATION)
-    expect(mayStartDaemon({ flag: { enabled: 1, boundaryMode: REQUIRED_BOUNDARY_MODE }, steps }).ok).toBe(false)
-    expect(mayStartDaemon({ flag: { enabled: 'true', boundaryMode: REQUIRED_BOUNDARY_MODE }, steps }).ok).toBe(false)
+    expect(mayStartDaemon({ flag: { enabled: 1, boundaryMode: REQUIRED_BOUNDARY_MODE }, steps, boundaryMechanism: evidencedBoundary }).ok).toBe(false)
+    expect(mayStartDaemon({ flag: { enabled: 'true', boundaryMode: REQUIRED_BOUNDARY_MODE }, steps, boundaryMechanism: evidencedBoundary }).ok).toBe(false)
   })
 })
 
@@ -130,14 +157,16 @@ describe('setting the flag', () => {
       flag: { enabled: false },
       enable: true,
       steps,
+      boundaryMechanism: evidencedBoundary,
       boundaryMode: 'planned-handover',
     })
     expect(unsafeBoundary.ok).toBe(false)
-    expect(unsafeBoundary.reason).toMatch(/drain-before-boundary/)
+    expect(unsafeBoundary.reason).toMatch(/checkpointed-handover/)
     const out = flagChange({
       flag: { enabled: false },
       enable: true,
       steps,
+      boundaryMechanism: evidencedBoundary,
       boundaryMode: REQUIRED_BOUNDARY_MODE,
       at: 2,
       by: 'operator',

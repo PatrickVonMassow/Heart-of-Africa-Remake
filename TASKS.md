@@ -77,77 +77,6 @@ then point 633 (the closing run), then point 174 (the tag). A newly appended poi
 kind is MOVED to the front in the same turn that files it; leaving it where append-and-defer
 put it is the mistake this line exists to stop.
 
-- [ ] 752. The handover's exit and ramp are unattributed, so its acceleration is guesswork
-  (measured 19.08.2026, 20:35, over 43 handovers since 18.08.: sources `.claude/boundary.log`
-  HANDOVER markers, `.claude/autostart.log` spawns, commit timestamps, deduplicated by session
-  id within 60 min). Marker → launcher spawns successor: median 0.0 min, p90 0.1, max 65.
-  Spawn → successor's first commit: median 6.3, p90 14.9, max 91. Last commit old → first
-  commit new: median 12.7, p90 47.8, max 100; of that the outgoing session's tail median 6.1,
-  p90 11.8. The mechanism is not the delay — the spawn follows the marker in under a second.
-  What costs is the sequence of model turns on both sides: the exit (now-card back to the
-  queue, board publish, handover card, carrier drain, `--prepare`, `--commit`) and the ramp
-  (board-first duties, adopting in-flight work, reading the queue, cutting and reading the
-  brief). WHAT THAT MEASUREMENT CANNOT DO, and why this point starts with attribution (GPT-5.6
-  Sol, audit 19.08.2026, findings A7/A14/A17/A18/A19): it reports elapsed MINUTES and therefore
-  cannot price tokens, cannot show that the six exit steps dominate, and uses "first commit" as
-  a proxy for productive work, which reading, analysis and uncommitted implementation all
-  precede. The 60-minute deduplication also suppressed the very retry burst under study, and of
-  the 29- and 65-minute outliers roughly 25 and 35 minutes stay undecomposed. So the numbers
-  establish that a gap EXISTS and roughly how large it is, not what it is made of. Handover
-  cost and context ceiling multiply: a lower trigger means more handovers, and each pays the
-  startup load of a fresh session before its first useful turn.
-  FINAL STATE, in two stages, because building the levers before the attribution would spend
-  the session's scarcest budget on a guess:
-  1. THE BOUNDARY PATH IS ATTRIBUTED IN TOKENS, PER STEP, not in minutes. Point 744 already
-     measures the exit as one number; this splits that number: every stage of
-     `--prepare`/`--commit` and the successor's first turn up to its first work-bearing call
-     carries its own reading, so "which step dominates" is settled by evidence. Elapsed time is
-     recorded BESIDE it, never instead of it: idle stretches (the claiming reservation, the
-     launcher's tick cadence) are real throughput loss that no token count shows, and they are
-     reported separately so neither hides the other.
-  2. ONLY WHAT THE ATTRIBUTION SHOWS DOMINANT IS THEN BUILT. The candidates, each with the
-     bound that makes it safe:
-     a. ONE EXIT COMMAND (`batch-boundary.mjs --leave`) driving the bookkeeping the way
-        `land-point.mjs` drives the landing — one verdict per step, stopping at the first red.
-        It is IDEMPOTENT AND RESUMABLE: each step records its own completion, a re-run
-        continues where it stopped, and no board edit or carrier drain is ever performed twice.
-        It PRESERVES THE TWO-PHASE INVARIANT rather than collapsing it: `--prepare` still
-        proves fresh bookkeeping, `--commit` remains the LAST repository action, and a guard
-        that demands remedial work between them still gets its chance. Fail-open like the rest
-        of the boundary: it COMPLETES even when it overruns its cap, and records the overrun.
-     b. THE LAUNCHER DOES MECHANICAL RAMP WORK ONLY WHERE THE DESTINATION IS ALREADY DECIDED.
-        An honoured claim redirects a handover to a claiming window
-        (`resolveBoundaryDestination`), so nothing — focus, board card, adoption — is
-        pre-assigned while that redirect is still possible; where it is not, the launcher
-        discharges the board-first duties before the model's first turn.
-     c. THE BRIEF TRAVELS IN THE SPAWN PROMPT ONLY WITH A FRESHNESS CHECK. It names the
-        revision it was cut from, and the successor REGENERATES instead of trusting it when
-        head, queue rank or claim moved in between. This shifts the brief's token cost rather
-        than removing it, which is the honest claim.
-     d. RETRY IS BOUNDED WITH A DEFINED TERMINAL BEHAVIOUR. After the second failed boundary
-        attempt the session stops retrying: it completes the handover fail-open, records the
-        overrun and alerts. It never loops (the 18 markers in four minutes) and never strands
-        the batch. Where point 751 already removes a cause of that loop, this is folded into
-        751 rather than duplicated.
-  3. SCOPE, STATED SO IT IS NOT MISCOUNTED: these are THROUGHPUT measures, not ceiling safety.
-     The ceiling is held by point 597 (capped tool inputs and outputs) and point 745 (the
-     prospective budget asked before the call). Nothing here may be subtracted from the trigger
-     arithmetic of 743, and no turn-count saving may be treated as a token bound — one uncapped
-     40,000-token response crosses the ceiling however few turns it took.
-  VERIFIABLE: Vitest over the per-step attribution record (a fixture boundary run yields one
-  reading per stage, and a missing reading is reported rather than silently absent); a case that
-  `--leave` re-run after an interrupted step completes without repeating the finished ones; a
-  case that it still completes when a step overruns, WITH the overrun recorded; a case that no
-  pre-assignment happens while a claim can still be honoured; a case that a stale brief is
-  regenerated; and a case that the retry bound terminates in a completed handover rather than a
-  loop.
-  Criticality: medium — every change touches the handover path, where fail-open is the rule;
-  the attribution stage itself is low risk and is what the rest is decided from.
-  RANK: after the ceiling programme (743, 742, 744, 597, 745, 746, 747), i.e. directly
-  following 747. The ceiling mechanisms bound the damage, this one buys throughput, and its own
-  first stage depends on 744's corrected exit path.
-  Bundle: Session- & Repo-Hygiene.
-
 - [ ] 595. The verification ladder (point 572's measure 5). While a render point is still
   being FIXED, only the cheapest covering suite runs, on the everyday WebGPU lane; the
   full proof — both backends where they can differ, LARGE where the change warrants it —
@@ -214,6 +143,12 @@ put it is the mistake this line exists to stop.
   README merge.
   THE NAME IS NOT THE SCOPE: point 597 has LANDED since and is archived — a taker must not
   redo it — and open point 596 must not be pulled into this landing.
+  THE ABORT-AT-FIRST-FAILURE SENTENCE IS A RULE FOR AGENTS, NOT A MECHANISM (decided
+  25.08.2026 from the delegated author's escalation): the opening sentence says the expensive
+  browser suites abort at the FIRST failure during iteration, but the scope list (a)/(b)/(c)
+  does not carry it and no shared check helper spans the suites — each defines its own `check`,
+  so enforcing it would be a cross-suite build. It ships as ladder text. If it is ever wanted as
+  a mechanism, it needs its own point, because that is what it costs.
 
 - [ ] 598. The brief orients in the code, not only in the spec (point 572's measure 8).
   The delegation brief carries a GENERATED orientation: the paths the specification itself
@@ -248,6 +183,11 @@ put it is the mistake this line exists to stop.
   touched `scripts/point-brief.mjs` since the branch tip, and a brief generated today carries
   neither an orientation nor a planned-check section — so this deliverable is NOT superseded. The
   merge surface and the owed both-backend picture proof are described once, under point 595.
+  WHICH DIFF THE ORIENTATION READS IS NAMED HERE, because the TIMING correction left it open
+  and a different base yields a different check set (decided 25.08.2026): the fork point to
+  HEAD, plus uncommitted work — not the working tree alone and not the point's own commits.
+  The delegated author chose this base and documented it in the code; this line makes the
+  choice the spec's rather than the author's.
 
 - [ ] 844. The board never shows how risky a point is (user request 22.08.2026, 21:19: "Reihe ein
   neues Ticket nach 598 ein: Im Header jeder Dashboard-Karte soll auch die Kritikalität angezeigt
@@ -1685,71 +1625,6 @@ put it is the mistake this line exists to stop.
   Criticality: medium — it is narrow, but it is the only lane where the machine still cannot help
   itself.
   Bundle: Urlaubsfestigkeit.
-- [ ] 744. Leaving is the most expensive step of a session, and nobody has measured it
-  (19.08.2026). Every token spent on the handover is a token subtracted from the working
-  window: the trigger of point 743 is literally the ceiling minus the cost of leaving, so this
-  cost sets how much work a session can do at all. Measured once, badly: 27,336 tokens between
-  the fence's first refusal and the committed boundary — and that measurement is CONTAMINATED,
-  because two gates contradicted each other inside it. `batch-boundary.mjs --prepare --context`
-  prints the handover card and demands it VERBATIM ("… und sie nimmt den nächsten Punkt der
-  Warteschlange auf"), while `board.mjs none` refuses exactly that text because the unnumbered
-  card must NAME the point the batch picks up next; on top of that, `none` refuses while any
-  now-card still stands, so the point must be sent back to the queue first — three steps the
-  template does not name, at the most expensive moment of the session.
-  FINAL STATE: the template produces a text that ALREADY names the point the successor picks
-  up and ALREADY names sending the now-card back as its first step, so the printed sequence
-  passes both gates as printed; and the boundary is then measured across three clean
-  handovers, the result recorded beside `CONTEXT_TRIGGER_TOKENS`: the clean figure REPLACES the
-  contaminated 27,336 in that constant's arithmetic comment, and the trigger is recomputed from
-  it. (Point 743 split the former `CONTEXT_WATERMARK_TOKENS` into `CONTEXT_CEILING_TOKENS` and
-  `CONTEXT_TRIGGER_TOKENS`; the old name exists nowhere in the code any more.)
-  THIS IS A FUNCTIONAL CHANGE, not bookkeeping (GPT-5.6 Sol, audit 19.08.2026): it must not be
-  filed under "measurement only", and the measurement is worthless until it lands, because the
-  contradiction is inside every reading taken before it.
-  THE HANDOVER GETS A MECHANICAL CAP, not only a measurement (GPT-5.6 Sol, review 19.08.2026:
-  three readings and their spread still establish no maximum, and point 745 reserves a number
-  it can only trust if something enforces it). The boundary path's own inputs and outputs pass
-  point 597's budget like everything else, and the cap is the constant point 745 reserves from
-  the session's first call onward. An overrun is not silently swallowed: the boundary still
-  COMPLETES — the handover is the one path that must never fail — but records that it exceeded
-  its cap, so the reserve is corrected from evidence rather than from hope.
-  THE GAP CARD MAY NAME THE BATCH'S NEXT POINT, and that is the FIRST part of this point, not
-  a detail of it (GPT-5.6 Sol, audit 19.08.2026, finding A10; verified against the source in
-  the same session). The two sanctioned mechanisms are made consistent in ONE change, and the
-  GUARD is the side that gives: `dashboard-card-topic-guard` learns exactly one exception —
-  the boundary gap card written by `board.mjs done <n> --none` and `board.mjs none` MAY name
-  the point the batch takes up next, because that point is the batch's own DESTINATION, not a
-  foreign reference. The comment at `scripts/batch-boundary-core.mjs:874-882` ("IT NAMES NO
-  POINT NUMBER (point 439)") is rewritten in the SAME commit to carry the new rule and why
-  439's reason no longer holds, so the next reader is not sent back into the resolved
-  contradiction.
-  THE EXCEPTION IS NARROW, or it becomes the hole the topic guard was built against: it holds
-  for the gap card alone, and inside it for the ONE number that is the batch's next point. A
-  second point number in that card, and any foreign point number in any other card, still
-  block as before.
-  THE ALTERNATIVE IS NAMED AND REJECTED so it is not re-litigated: leaving the card numberless
-  and letting the successor derive its point from the queue keeps the guard untouched but
-  defeats this point's purpose — the printed sequence would again need interpretation at the
-  most expensive moment of the session, which is the cost this point was written to remove.
-  VERIFIABLE: a Vitest case driving the printed template through the board gate's own
-  validator and asserting it is accepted unchanged; a case asserting the template names both
-  the point and the queue-return step; a case where the same gap card names a SECOND point
-  number and is still refused; a case where a normal (non-gap) card naming a foreign point
-  still blocks; a case that the rewritten source comment and the guard agree, so the two
-  cannot drift apart again; a case proving the boundary completes even when it
-  overruns its cap AND that the overrun is recorded; and the three recorded handover
-  measurements with their spread, not only their mean.
-  THE HANDOVER-TEXT HALF OF THIS POINT BELONGS TO POINT 800 (cut 21.08.2026, stated here because
-  a point that gives work away must say so). What remains uniquely this point's own: the three
-  clean handover measurements that replace the contaminated 27,336 tokens in the
-  `CONTEXT_TRIGGER_TOKENS` arithmetic comment, and the mechanical cap on the boundary path. This
-  point's own text says the measurement is worthless until that contradiction lands, so 800 runs
-  first; point 752's first stage in turn depends on the exit path corrected here.
-  Criticality: high — it sits on the handover path, the one path that must never fail, and its
-  failure mode is the measured one: a session that can neither hand over nor stop; every
-  change here is fail-open or it is wrong.
-  Bundle: Session- & Repo-Hygiene.
-
 - [ ] 708. Only the landing is one command; the beginning and the turn's end are hand-driven chains
   (analysed 17.08.2026 against the code). The project knows the pattern: `land-point.mjs` drives 15
   steps — merge, gate, tick, archive, push, board, cleanup — as ONE command, and CLAUDE.md calls it
@@ -9010,55 +8885,6 @@ to land than a mechanism that needs a review.
   Criticality: low — it costs a re-run, but it is the difference between closing a red by its
   cause and closing it by a green, which is exactly what point 640 forbids.
 
-- [ ] 676. An authoring lane must survive the session that spawned it (specified 13.08.2026 by
-  the blind-parallel four-eyes stage of CLAUDE.md §6; the counted union, the final proposal and
-  the rejected alternatives are `docs/handover-architecture.md`). TWO RULES OF THIS HOUSE
-  CONTRADICT EACH OTHER TODAY: the pool runs up to three authoring lanes, and the session hands
-  over on context — but every lane a session spawned dies with that session, so a session that
-  keeps the pool busy can hand over only by throwing its own work away. Point 675 closes the
-  three MECHANICAL defeats of the handover on today's mechanics; this point builds the plane
-  underneath, so that a lane stops belonging to a session at all.
-  THIS POINT BEGINS AFTER POINT 834, its front stage, and the steps 834 carries are struck from
-  here rather than repeated: the neutral fold of the two blind lists by a model that wrote neither
-  half, the schemas and invariants, the durable state store, the daemon with the Sol adapter, the
-  transferable declarations with their fencing, and the slice of fenced discovery, adoption and
-  reconciliation a fresh session needs before it may prove and land what it adopted. What 834's
-  fold settles in the union is what this point builds on. An Agent-tool child stays NON-
-  transferable, and the stand-down and dead-owner rules are point 716's, inherited rather than
-  restated.
-  FINAL STATE, as the union settles it: authoring runs as DAEMON-OWNED detached workers under a
-  model-neutral adapter (`scripts/detached-agent.mjs`) whose reference implementation is the
-  already-detached `scripts/author-sol.mjs`; an Agent-tool child stays session-bound and is
-  declared NON-transferable, blocking a boundary until it finishes or is safely stopped. The
-  coordinator plane is short-lived and split into dispatcher and lander epochs, holding one
-  renewable batch lease whose epoch FENCES every mutation, so two sessions can never adopt the
-  same batch. Coordination state is an append-only checksummed journal beside the repository with
-  an atomically replaced snapshot for fast resume, and every point carries an explicit state
-  (queued, running, checkpointing, ready-for-review, landing, landed, failed, stalled,
-  cancelled). A successor adopts supervision by STABLE JOB IDENTITY — never by process
-  reparenting, never by PID alone — after reconciling every recorded lane against journal,
-  worktrees and local/remote SHAs, and quarantining what it cannot prove. Refill comes only from
-  a bounded, pre-authorized queue behind a global three-lane cap and a completed-review backlog
-  limit, with a journalled REASON whenever three eligible lanes exist and fewer run. Landing stays
-  serial behind a batch-wide landing lock with a crash-recoverable staged journal, and the
-  main-session picture judgments are persisted as evidence a worker may never substitute.
-  Drain-before-boundary REMAINS as the explicit degraded mode whenever any active lane is not
-  transferable.
-  BUILD THE REMAINDER IN THE UNION'S ORDER (bounded dispatch, checkpoint barrier, the two-phase
-  boundary, successor reconciliation beyond the slice 834 claims, the crash-recoverable landing
-  journal, board projection, metrics), each step green on the unit layer before the next, and roll
-  out with the Sol adapter ALONE until the failure drills pass.
-  VERIFIABLE: the unit cases the union names per step; the failure drills — worker crash, stall,
-  push failure, dirty worktree, marker deletion, daemon restart, corrupt snapshot, PID reuse,
-  duplicate coordinator, remote outage, checkpoint timeout — each run through the daemon's drill
-  command; and a measured trial against a recorded baseline day, whose success needs ZERO safety
-  incidents (no lost attempt, no duplicate writer, no overlapping lease, no silently missed
-  boundary), a median handover context materially below baseline, and points landed per day no
-  worse than baseline. Utilization is supporting evidence, never the acceptance test on its own.
-  MECHANISM REVIEW REQUIRED (CLAUDE.md §7.2) per step, not once at the end.
-  Criticality: high — it owns the batch's dominant cost and every lane's durability, and a defect
-  here loses work rather than merely slowing it.
-
 - [ ] 677. A guard run by hand hangs forever on its own stdin (measured 13.08.2026, 19:20). The
   house rule says to ASK THE GUARDS BEFORE THE ACTION (CLAUDE.md §7.2), and a session that does
   so directly — `node scripts/tasks-spec-guard.mjs` — never comes back: the wrapper reads the
@@ -11379,6 +11205,13 @@ to land than a mechanism that needs a review.
   `.claude/mechanism-reviews.jsonl`, `TASKS.md` and `docs/tasks-archive.md` each exceed the budget
   alone, so no split can cover the range; `scripts/mechanism-review-guard-gap-core.mjs` is the single
   wording of that ruling and preflight does not consult it.
+  RECURRED 25.08.2026 at `df540a3f` and again 26.08.2026 at `a2d9d0c2`, both times in the same tree
+  seconds apart: the preflight row still reads "would-block: UNREVIEWABLE" while the guard's own Stop
+  path rules the gap and lets the turn end. It was filed a SECOND time, as point 923, because nothing
+  compared the new finding against the open set; 923 is folded into this point, and its demand is
+  carried here — parity must cover the FINDING KIND as well as the block/allow decision, or the
+  preflight row must state in its own words which extra condition it judges that the Stop path does
+  not, so a difference reads as a stated difference rather than a contradiction.
   WHAT IT COSTS: preflight is the batch's advertised pre-action oracle — CLAUDE.md §7.2 sends every
   governed action through it. Acting on its verdict, this session planned a 64-pass review round over
   13.8 M characters that the real gate does not demand, and only caught it by running the guard by
@@ -11843,6 +11676,43 @@ to land than a mechanism that needs a review.
   the point where the session is least able to tell a real refusal from a phantom.
   Bundle: Session- & Repo-Hygiene.
 
+- [ ] 922. A worktree working directory makes the four-eyes gate report a missing baseline it
+  cannot fix. MEASURED 25.08.2026 while resuming point 921: the Stop hooks are registered with
+  RELATIVE commands (`node scripts/mechanism-review-guard.mjs` in `.claude/settings.json`), so a
+  session whose shell working directory sits in a linked worktree runs THAT worktree's copy of
+  the guard. A worktree has no untracked `.claude/mechanism-review-baseline.json`, so
+  `baselineFor(state, 'main')` resolves to null, `evaluateMechanismReview` returns the
+  `missing-baseline` finding, and the refusal prescribes a repair that cannot work: "merge
+  origin/main into this branch" is a no-op when `main` and `origin/main` are already identical
+  (measured 0/0), and "end the turn again so the guard can seed the anchor" never seeds, because
+  `writeBaseline` then writes into the WORKTREE `.claude`. The same invocation with the same
+  stdin session id, run from the main checkout, reports instead the point-714 gap clause and
+  exits 0 (17 537 000 characters measured against the 200 000-character round budget). The same
+  working directory flips `dashboard-guard` to NOT REGISTERED.
+  WHY IT MATTERS: two turn ends were refused by a gate that had nothing to complain about, and
+  the refusal reads as a product defect while naming a repair that changes nothing — the same
+  unexitable shape point 921 is fixing one layer up. The session-side lesson is already carried
+  as an operator memory; a memory cannot enforce a working directory, and the next session that
+  spawns an author in a worktree meets it again.
+  FINAL STATE: the guard state files are resolved from the git COMMON directory rather than the
+  per-worktree top level, so a worktree checkout reads and writes the one baseline that exists;
+  where that is judged too broad, the guard instead DETECTS the linked-worktree working
+  directory and refuses with a message naming it as the cause, never prescribing a merge that
+  changes nothing. Either way a worktree working directory may no longer produce a
+  `missing-baseline` verdict on a repository whose baseline is present.
+  VERIFIABLE: Vitest over the resolution — a fixture whose top level is a linked worktree and
+  whose common directory holds the baseline resolves that baseline and reports no
+  `missing-baseline`; a repository whose baseline is genuinely absent still reports it; the
+  worktree-detection message, where that branch is chosen, names the working directory; plus
+  `npm run test:unit`, lint, build.
+  SIBLING: point 910 is the same defect in `dashboard-guard`, which resolves the board path
+  against whatever repository root it happens to run from. Both are the relative-command Stop
+  hook meeting a linked worktree, so the two are worked together and this one stands directly
+  behind it.
+  Criticality: high — it blocks every turn end from a working directory the batch's own
+  delegation model creates, and its stated repair is a no-op.
+  Bundle: Session- & Repo-Hygiene.
+
 - [ ] 911. The escape drill's "launcher's shape" is a comment, not a coupling, and the
   drill's claims outrun its instrument. FOUND 25.08.2026 answering the round-15 and
   round-16 cross-vendor reads of point 834. `scripts/detached-escape-drill.mjs` measures two
@@ -12027,3 +11897,142 @@ to land than a mechanism that needs a review.
   Criticality: med — no player-visible defect, but it is the one command that answers whether
   closed work is really in `main`.
   Bundle: Modell & Wächter.
+
+
+- [ ] 919. A sha whose ref has already moved on is reported as a red CI verdict, and
+  the successor session is sent down a repair path for code that is not broken. MEASURED
+  25.08.2026 at this session's start: the CI-terminal handoff named
+  `origin/main:19d0a59fa9934a58fd5867a783efb94be119fb2f:CI:32880517245` as "concluded RED" and
+  declared the fresh session the repair path — inspect the failure, repair it, run the gates, push
+  the fixing commit before taking any work-order point. The run had concluded `cancelled`, not
+  `failure`: `da78cf5b` was pushed to `main` about two minutes after `19d0a59f`, and
+  `concurrency: { group: ci-${{ github.ref }}, cancel-in-progress: true }`
+  (`.github/workflows/ci.yml:43-45`) stopped the older run. Its sibling job `windows-argv-proof`
+  had already succeeded; only `fast` was cancelled mid-flight. No defect existed, and no fixing
+  push was possible — the sha was no longer main's tip.
+  WHY THE EXISTING CUT DOES NOT REACH IT: `verdictRuns` (`scripts/ci-status-guard-core.mjs:51-61`)
+  already drops a superseded cancellation, and its comment states the principle exactly — "a
+  cancellation carries NO information about the code: the run was stopped, it did not judge". But
+  it only drops one when ANOTHER run of the same workflow CONCLUDED on the SAME sha. A sha the
+  ref has already moved past never gets a second run, so its lone cancellation is read as a
+  genuine verdict.
+  WHAT IT COSTS: this reproduces on every back-to-back push to `main`, which is the batch's
+  routine landing rhythm — merge commit, then the tick commit, then the board commit. The cost is
+  a whole session's opening spent proving a non-defect, and worse, a handoff that cries red often
+  enough to be discounted is the exact failure the guard was built against (point 387).
+  FINAL STATE: the same reasoning is extended across shas of one ref — when a pushed sha is an
+  ancestor of a NEWER pushed sha on the same ref, its cancellation carries no information and the
+  newer sha's run holds the verdict. It must never turn a red green: `failure`, `timed_out` and
+  `startup_failure` stay untouched, and a lone cancellation on a ref's CURRENT tip still demands
+  attention exactly as it does today.
+  VERIFIABLE: Vitest over the pure decision — a ref with two pushed shas, the older cancelled and
+  the newer green, yields no block; the same pair with the newer `failure` still blocks; a lone
+  cancellation on the tip still blocks; and an older cancelled sha that is NOT an ancestor of the
+  newer one (a force-push) is not silently dropped. Plus `npm run test:unit`, lint, build.
+  Criticality: med — no player-visible defect, but it spends whole sessions on phantom repairs and
+  erodes the one signal that guarantees a red CI is noticed.
+  Bundle: Modell & Wächter.
+
+- [ ] 920. Appending a work-order point is hand work, so it can take a number that is already
+  taken and turn `main` red. MEASURED 25.08.2026: a finding was filed as point 918 after reading
+  the tail of `TASKS.md`, where the highest visible number was 917. Point 918 already stood at
+  line 151. The push was refused by the pre-push fast gate with three red suites —
+  `tasks-archive-guard-core.test.mjs` ("duplicate-within-file: point(s) 918"),
+  `point-brief-core.test.mjs` ("918: brief does not carry the body") and the dashboard queue
+  render — and the repair cost a renumbering, a rebuilt queue card, and a restored board card
+  whose body a `board.mjs queue 918` call had overwritten in passing.
+  WHY IT RECURS: the number must be the maximum across BOTH `TASKS.md` and
+  `docs/tasks-archive.md`, and the work order is not sorted by number — reading its tail is the
+  obvious move and it is wrong. `scripts/` has `land-point.mjs` and `fold-point.mjs` for the
+  other end of a point's life and nothing at all for its start, so every append is done by hand
+  against a 12 000-line file.
+  FINAL STATE: one command opens a point — it derives the next free number from both files,
+  appends the block, and creates the queue card in the same step, so the number, the work order
+  and the board can no longer disagree. It refuses an append whose number is taken rather than
+  writing it, and it names the number it chose.
+  VERIFIABLE: Vitest over the pure part — the next number is the maximum over both files plus
+  one and skips no gap-filling; a fixture whose archive holds the highest number still yields a
+  free number; an explicit number that is already taken is refused with the file and line that
+  holds it; plus `npm run test:unit`, lint, build.
+  Criticality: med — no player-visible defect, but it puts a red gate in front of the routine
+  act of recording a finding, which is exactly where the batch must not be slowed.
+  Bundle: Session- & Repo-Hygiene.
+
+- [ ] 924. The pre-push fast gate calls `test:unit` red where the same command, in the same tree
+  and on the same machine, is green — and its two-reds rule turns that into a refusal no operator
+  can clear. MEASURED 26.08.2026, 01:05-01:30: four blocked pushes of `main` carrying only
+  work-order and documentation commits. Each push ran the gate's unit suite twice (its own retry
+  included) and every run exited non-zero while its summary named NO failing test; the gate itself
+  prints the diagnosis — "a `[vitest-worker]: Timeout calling \"onTaskUpdate\"` has this exact
+  signature, and the machine may be loaded" — and then blocks anyway, because
+  `scripts/pre-push-gate.mjs` treats two reds as conclusive regardless of what the load probe says.
+  A hand run of `npm run test:unit`, started while the same parallel authoring run held eight
+  vitest processes on the host, finished in 164.48s: 417/417 files, 13778 passed, 1 skipped,
+  exit 0. The push then went through with nothing changed.
+  WHY IT MATTERS: the gate's own message already distinguishes "a runner that did not finish" from
+  "a test that failed", and then discards that distinction in the verdict. The only route out is
+  the one this session took — prove the suite green by hand, then push into the same red gate and
+  hope the timing differs — which is exactly the unearned work a gate exists to prevent. It also
+  contradicts CLAUDE.md §7.2, which says to fail soft for environment transients and loud for
+  product defects: an unfinished runner is the environment, and a second unfinished runner is not
+  evidence of a defect. Point 296 (load produces false reds, never false greens) is the rule the
+  gate cites, and the gate applies its first half without its second.
+  FINAL STATE: a gate run whose summary names NO failing test is UNMEASURED, never red — it is
+  retried when the machine is quiet, and it refuses the push only on a run that named a failing
+  test or on a measured-quiet machine. The gate's own invocation gets the same reporter and
+  teardown budget the plain `npm run test:unit` gets, so the two cannot disagree about the same
+  suite in the same minute.
+  VERIFIABLE: Vitest over the pure part — a non-zero exit with zero named failures yields
+  UNMEASURED rather than red; two such runs still yield UNMEASURED; a run naming one failing test
+  yields red on the first; and a red on a probe-quiet machine still blocks. Plus a case that pins
+  the gate's runner options against the package script's, so a divergence reddens a test rather
+  than a push. Plus `npm run test:unit`, lint, build.
+  Criticality: med — it loses no work, but it blocks the one action the house rule demands after
+  every commit, and its refusal cannot be cleared by doing what it asks.
+  Bundle: Session- & Repo-Hygiene.
+
+- [ ] 925. The durable lane is built but neither measured nor journalled, and its failure
+  matrix does not touch the real path. Point 676 landed the whole plane — bounded dispatch,
+  checkpoint barrier, two-phase boundary, successor reconciliation, landing journal, board
+  projection, metrics — with build, lint and unit green, and the cross-vendor read recorded
+  (`.claude/mechanism-reviews.jsonl`, e1439227). THREE THINGS IT LEFT OPEN, all of them
+  conditions 676's own VERIFIABLE clause names, and none of them reachable while the lane is
+  switched off (`.claude/durable-lane-flag.json` is `enabled: false`, `changedBy:
+  awaiting-point-676-measured-trial`).
+  FIRST, NOTHING JOURNALS A REASON. `updateReasonInterval` in `scripts/batch-dispatch-core.mjs`
+  and the daemon's `record-metric` command have NO production caller: `dispatchOnce` decides
+  and starts attempts without ever recording why fewer than three eligible lanes ran, and
+  `metricEventsFromJournal` therefore consumes events nothing writes. The spec demands "a
+  journalled REASON whenever three eligible lanes exist and fewer run". It fails SAFE today —
+  `trialVerdict` scores an unmeasured p95 or median as a failure, so an unwired metric can
+  never produce a passing trial — but that is the reason the gap is invisible, not a reason
+  to keep it.
+  SECOND, ELEVEN OF TWELVE DRILLS RECREATE THE AFTERMATH INSTEAD OF CAUSING IT.
+  `scripts/batch-daemon-failure-drills.mjs` calls the decision functions on hand-built inputs;
+  only `parent-death` in `scripts/batch-daemon-drill.mjs` runs real processes. A drill that
+  never calls the thing stays green over a broken thing — the exact failure this house has
+  already paid for. `DURABLE_LANE_STEPS` step 12 nevertheless reads green with the evidence
+  "complete daemon failure matrix", and step 12 is one of `STEPS_REQUIRED_FOR_ACTIVATION`, so
+  that wording is what an operator would enable the lane on.
+  THIRD, THE MEASURED TRIAL IS NOT RUN. 676 requires a trial against a recorded baseline day
+  with zero safety incidents, a median handover context materially below baseline, and points
+  per day no worse than baseline. The recorded baseline day and the trial both remain owed.
+  FINAL STATE: the dispatcher journals its reason interval and its lane-utilization,
+  checkpoint, boundary and landing events through `record-metric` under the coordinator fence,
+  so `calculateBatchMetrics` reads a real series; the failure matrix drives the real daemon,
+  the real worker and the real files for at least worker-crash, stall, push-failure,
+  dirty-worktree, marker-deletion, daemon-restart and checkpoint-timeout, with the pure-input
+  checks kept as the cheap layer beneath them rather than as the proof; and the durable lane
+  runs its measured trial with the Sol adapter alone, whose verdict — not an operator's
+  judgement — flips `enabled` and writes the evidence into `DURABLE_LANE_STEPS`.
+  ALSO FIX, one line: `scripts/batch-board-core.mjs` hardcodes `cap: 3` instead of
+  `DAEMON_POOL_CAP`, so a changed cap would leave the board projecting the old one.
+  VERIFIABLE: unit cases that a dispatch leaving eligible lanes unstarted writes exactly one
+  open reason interval and closes it when the pool recovers, and that a metric series read back
+  from the journal reproduces the recorded events; each real-path drill asserted through
+  `node scripts/batch-daemon-drill.mjs --scenario <name>` against processes it actually killed,
+  stalled or dirtied; a trial report against the recorded baseline day whose `trialVerdict`
+  carries zero failures; plus `npm run test:unit`, lint, build.
+  Criticality: high — it decides whether the durable lane may be switched on at all, and every
+  claim that unlocks it is currently carried by a green flag rather than by a measurement.
+  Bundle: Session- & Repo-Hygiene.

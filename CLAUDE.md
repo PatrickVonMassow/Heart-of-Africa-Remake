@@ -65,8 +65,7 @@ strategy and suite map: `scripts/verify/README.md`.
 - A delegated author runs `node scripts/point-brief.mjs <N>`, may read named
   sections on demand, and escalates an ambiguous or insufficient brief instead
   of guessing. Regenerate a brief from an older revision.
-- Delegated authors work on their own branch, test, commit, push, and do not
-  merge.
+- Durable Sol authors are daemon-owned and survive handover; Agent-tool children stay session-bound and block it. Delegates test, commit, push, and never merge.
 - The context fence remains preventive text, not a pointer: at its refusal mark
   do not begin agents, suites, points, or authoring; finish/reading/boundary
   remain allowed. It currently defaults to `observe` and refuses nothing until
@@ -81,12 +80,10 @@ strategy and suite map: `scripts/verify/README.md`.
   Serving models outside its reported chain pause the batch. Every commit names
   its author model in a `Co-Authored-By` trailer.
   A commit may also name its cross-vendor reviewer in a second model trailer.
-- **Four eyes has two modes.** A divergent stage runs blind-parallel from the
-  same inputs, each model producing a complete result before either sees the
-  other. A third model merges by meaning and counts every id through
-  `scripts/blind-merge.mjs`. A convergent stage reviews one artefact after
-  reading it before the author's rationale. Use cross-vendor pairs by default;
-  record a same-model fallback as weaker and decorrelate its framing.
+- **Four eyes has two modes.** Divergent work runs blind-parallel from identical
+  inputs, then a third model merges and counts ids through `scripts/blind-merge.mjs`.
+  Convergent work reviews the artefact before its rationale. Prefer cross-vendor
+  pairs; record and decorrelate a weaker same-model fallback.
 - All player-visible text comes from language files: English default, German
   available, both changed together, further languages requiring only a file.
   Code, identifiers, labels, comments, and filenames are English.
