@@ -1,0 +1,38 @@
+# Point 713 — sixth cross-vendor round (26.08.2026), GPT-5.6 Sol at effort high
+
+Recorded in .claude/mechanism-reviews.jsonl against 460356f as passes 3/7, 4/7 and 5/7,
+all three do-not-merge. The findings verbatim:
+
+## Pass 3 — scripts/batch-in-flight.mjs
+
+- [P1] [`delegatedPoint()`](/workspace/hoa/.claude/worktrees/point-713/scripts/batch-in-flight.mjs:91) ignores `item.point` and re-derives a single point from `ref`/`path`. Thus `--point 713 --branch topic/live` records 713, but `emitDelegated()` emits start/finish activity with `point: null`; misleading digits can instead produce the wrong point. This violates the requirement that exit processing use the recorded point alone.
+
+- [P1] [`tagEvidencePoint()`](/workspace/hoa/.claude/worktrees/point-713/scripts/batch-in-flight.mjs:151) gives `pointOfBranch(...)` precedence over the explicit `currentPoint`. Consequently, `--point 713 --branch feat/999-work` silently records point 999 despite the CLI instructing users to put `--point N` before the item. Explicit attribution must win, or a mismatch must be refused.
+
+RECEIPT: c60243d3ac2cd738
+VERDICT: do-not-merge
+EVIDENCE: Checked the complete scripts/batch-in-flight.mjs patch and end-state content; found two recorded-point violations, with no truncation in this pass.
+
+## Pass 4 — scripts/board-core.mjs
+
+- `scripts/board-core.mjs`, `compareNowProjection`, line `const actual = cards.filter((card) => card.point != null)`: with active work, arbitrary unnumbered non-idle `.now` cards are ignored. `reconcileNowProjection` retains them, while `emptyStateWrong` checks only idle/empty-state forms. The publish preflight can therefore return `ok: true` for a visible card not derived from the active-work projection.
+
+- `scripts/board-core.mjs`, `claimsNoCurrentWork`, line `return sectionStateCards(text, 'idle')...`: when the now heading is missing or structurally invalid, both this function and `sectionStateCards` scan the entire document. An idle card in another section then returns `true`, causing the Stop-side guard to deny instead of failing open.
+
+- `scripts/board-core.mjs`, `compareNowProjection`, line listing `['done', 'Erledigt']`: an active point with a historical Erledigt entry is rejected as `crossSection`. That breaks the reopening lifecycle explicitly documented later in `toDone` (“A point comes back into current work…”); reconciliation does not remove or otherwise resolve the historical entry, so publishing remains impossible.
+
+- `scripts/board-core.mjs`, lines constructing `survivorOrder` and then appending `newPoints`: a newly introduced focus point is not moved to the front. For existing point 711, expected `[711, 713]`, and focus 713, the result remains `711, 713`, contradicting the stated focused-strand-first ordering.
+
+RECEIPT: 90413eb3afe6ed83
+VERDICT: do-not-merge
+EVIDENCE: Checked the complete board-core patch/current file for projection exactness, authored-card retention, missing-heading behavior, focus ordering, and historical-section interaction; found four line-specific failures above.
+
+## Pass 5 — the board edit and publish files
+
+- High — `scripts/board-edit-core.mjs:51,67-76`: the board is written before archive rotation, but `preparePublish()`—which updates the authoritative in-flight declaration—runs only after rotation. If rotation fails, the board lifecycle change survives while the declaration remains stale; the prescribed publish retry then re-projects the old membership, potentially resurrecting a completed/queued point. The new test checks ordering relative to publish but not this failure path.
+
+- High — `scripts/board.mjs:170-217`: `prepareActiveTransition()` restores the old declaration whenever `focus.mjs set` fails. For `now`, `queue`, `done`, and `promote`, this callback runs after the board write is already durable. Consequently rollback makes the declaration contradict the changed board, and the standalone publish remedy projects that stale declaration over the authored result. The rollback test covers only the focus-only command, where no board mutation precedes it.
+
+RECEIPT: a668552bec8fa8df
+VERDICT: do-not-merge
+EVIDENCE: Checked all six complete pass-5 files and their patch; found two untested partial-failure paths that leave the authoritative declaration stale after a durable board lifecycle edit.
