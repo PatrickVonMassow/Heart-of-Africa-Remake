@@ -412,12 +412,39 @@ describe('assessReviewGap — the wrapper cannot waive on its own failure (round
     })
     const range = `${'a'.repeat(40)}..${'b'.repeat(40)}`
     expect(seen).toEqual([
-      ['diff', '--stat', range],
-      ['diff', '--no-ext-diff', '--no-textconv', range],
       ['diff', '--name-only', '-z', range],
+      ['diff', '--stat', range, '--', 'big.md'],
+      ['diff', '--no-ext-diff', '--no-textconv', range, '--', 'big.md'],
       ['cat-file', '-s', `${'b'.repeat(40)}:big.md`],
       ['show', `${'b'.repeat(40)}:big.md`],
     ])
+  })
+
+  it('measures only the mechanism beside an excluded work-order document', async () => {
+    const seen = []
+    const run = (args) => {
+      seen.push(args)
+      if (args.includes('--name-only')) return 'TASKS.md\0scripts/x-guard.mjs\0'
+      if (args.includes('--stat')) return 'stat'
+      if (args[0] === 'diff') return 'diff --git a/scripts/x-guard.mjs b/scripts/x-guard.mjs\n+x'
+      if (args[0] === 'cat-file') return '4'
+      if (args[0] === 'show') return 'body'
+      return ''
+    }
+    const { assessReviewGap } = await import('./mechanism-review-guard-gap.mjs')
+    const decision = await assessReviewGap({
+      baseline: 'a'.repeat(40),
+      head: 'b'.repeat(40),
+      run,
+      loadTool: () => import('./review-material-core.mjs'),
+    })
+    expect(decision.gap).toBe(false)
+    expect(seen.some((args) => args.join(' ').includes('TASKS.md'))).toBe(false)
+    expect(seen.filter((args) => args[0] === 'diff' && !args.includes('--name-only'))).toEqual([
+      expect.arrayContaining(['--', 'scripts/x-guard.mjs']),
+      expect.arrayContaining(['--', 'scripts/x-guard.mjs']),
+    ])
+    expect(seen).toContainEqual(['show', `${'b'.repeat(40)}:scripts/x-guard.mjs`])
   })
 
   it('an overflowed range reading rules a PROVEN floor, never unmeasured (landing-round pass 3)', async () => {

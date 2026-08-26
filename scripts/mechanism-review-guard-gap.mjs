@@ -19,6 +19,7 @@
 import { execFileSync } from 'node:child_process'
 import { REPO_ROOT } from './repo-paths.mjs'
 import { decideReviewGap, formatReviewGap, REVIEW_GAP_BUDGET_CHARS } from './mechanism-review-guard-gap-core.mjs'
+import { reviewEndStateFiles } from './mechanism-review-range-core.mjs'
 
 // The patch of a jammed range is megabytes by definition here — the default
 // 1 MiB pipe would throw ENOBUFS and turn every measurement into 'unmeasured'.
@@ -86,11 +87,23 @@ export function measureReviewMaterial({ baseline, head, run = runGitArgs }) {
   let patch
   let paths
   try {
-    stat = run(['diff', '--stat', range])
-    // The same external-driver hardening as gatherRange (round-4 pass 7): the
-    // measurement must weigh git's own patch, not a substituted one.
-    patch = run(['diff', '--no-ext-diff', '--no-textconv', range])
-    paths = run(['diff', '--name-only', '-z', range]).split('\0').filter(Boolean)
+    // Use the SAME end-state boundary as the gate and runnable-pass planner.
+    // Measuring the raw range here reintroduced excluded work-order documents
+    // through the gap clause and suspended the gate before its real passes
+    // could run — a second, contradictory file-set policy in the same guard.
+    paths = reviewEndStateFiles(
+      run(['diff', '--name-only', '-z', range]).split('\0').filter(Boolean),
+    )
+    const pathspec = ['--', ...paths]
+    if (paths.length) {
+      stat = run(['diff', '--stat', range, ...pathspec])
+      // The same external-driver hardening as gatherRange (round-4 pass 7): the
+      // measurement must weigh git's own patch, not a substituted one.
+      patch = run(['diff', '--no-ext-diff', '--no-textconv', range, ...pathspec])
+    } else {
+      stat = ''
+      patch = ''
+    }
   } catch (e) {
     // Recognised on the ERROR ITSELF, not only on the internal helper's tag,
     // so an injected runner (the unit layer) and the real one rule alike —
