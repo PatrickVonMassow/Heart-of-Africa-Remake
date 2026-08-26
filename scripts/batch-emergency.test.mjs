@@ -4,7 +4,7 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { ACTIVITY_CLASSES } from './batch-standstill-core.mjs'
 import { EMERGENCY_COOLDOWN_MS, EMERGENCY_THRESHOLD_MS } from './batch-emergency-core.mjs'
-import { runEmergency, terminateLockedOwner } from './batch-emergency.mjs'
+import { restartOutcome, runEmergency, terminateLockedOwner } from './batch-emergency.mjs'
 
 const dirs = []
 afterEach(() => {
@@ -109,5 +109,14 @@ describe('locked owner termination', () => {
       expect(terminateLockedOwner(lock, { probe: () => ({ exists: true, startedAt: 1001 }), kill })).toMatchObject({ ok: true, pid: 123 })
       expect(kill).toHaveBeenCalledWith(123, 'SIGTERM')
     }
+  })
+})
+
+describe('restart identity', () => {
+  it('starts the interactive primary task from the SYSTEM timer on Windows', () => {
+    const execute = vi.fn(() => '')
+    expect(restartOutcome({ execute, platform: 'win32' })).toMatchObject({ step: 'start-primary-scheduled-task', ok: true })
+    expect(execute.mock.calls[0][0]).toBe('powershell')
+    expect(execute.mock.calls[0][1].join(' ')).toMatch(/Start-ScheduledTask.*HoA-Batch-Autostart/)
   })
 })

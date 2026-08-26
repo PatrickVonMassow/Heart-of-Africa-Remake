@@ -20,7 +20,7 @@ import {
   revokeWriterFence,
 } from './batch-singleton.mjs'
 import { EMERGENCY_THRESHOLD_MS, emergencyDecision, strikeRecord } from './batch-emergency-core.mjs'
-import { EMERGENCY_INTERVAL_MINUTES, EMERGENCY_SCRIPT_PATH, EMERGENCY_TASK_NAME } from './windows-task-core.mjs'
+import { EMERGENCY_INTERVAL_MINUTES, EMERGENCY_SCRIPT_PATH, EMERGENCY_TASK_NAME, PRIMARY_TASK_NAME } from './windows-task-core.mjs'
 
 export { EMERGENCY_INTERVAL_MINUTES, EMERGENCY_SCRIPT_PATH, EMERGENCY_TASK_NAME }
 export const EMERGENCY_STATE_PATH = join(REPO_ROOT, 'local', 'batch-emergency-state.json')
@@ -48,6 +48,22 @@ function commandOutcome(name, args, { execute = execFileSync, repo = REPO_ROOT }
       step: `${name} ${args.join(' ')}`.trim(), ok: false,
       error: String(error?.stderr || error?.message || error).trim().split('\n').slice(-1)[0],
     }
+  }
+}
+
+/** On Windows the emergency task runs as SYSTEM but the authenticated primary
+ * runs as the interactive user. Start that task so Task Scheduler supplies the
+ * right profile; spawning batch-autostart directly as SYSTEM would lose auth. */
+export function restartOutcome({ execute = execFileSync, repo = REPO_ROOT, platform = process.platform } = {}) {
+  if (platform !== 'win32') return commandOutcome('batch-autostart.mjs', [], { execute, repo })
+  try {
+    execute('powershell', [
+      '-NoProfile', '-NonInteractive', '-Command',
+      `Start-ScheduledTask -TaskName '${PRIMARY_TASK_NAME}'`,
+    ], { windowsHide: true, timeout: 30_000, stdio: ['ignore', 'pipe', 'pipe'] })
+    return { step: 'start-primary-scheduled-task', ok: true }
+  } catch (error) {
+    return { step: 'start-primary-scheduled-task', ok: false, error: error?.message ?? String(error) }
   }
 }
 
@@ -128,7 +144,7 @@ export function runEmergency({
   // Doctor may write only after every recorded live process was terminated with
   // exact pid-incarnation proof. A failed kill leaves it diagnostic-only.
   outcomes.push(commandOutcome('batch-doctor.mjs', mayRepair ? ['--repair'] : [], { execute, repo }))
-  outcomes.push(commandOutcome('batch-autostart.mjs', [], { execute, repo }))
+  outcomes.push(restartOutcome({ execute, repo }))
   const restored = outcomes.at(-1)?.ok === true
   const outcome = strikeRecord({ id, decision, at: Date.now(), phase: 'outcome', outcomes })
   writeJsonAtomic(statePath, {
