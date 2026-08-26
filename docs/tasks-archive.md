@@ -24121,3 +24121,54 @@ Nummerierung bleiben deshalb identisch — hier wird nur verschoben, nie umgesch
   Bundle: Modell & Wächter. It performs reviews and fixes on already-landed guard code; it edits
   the review ledger only through the recording commands, so it is worked before 916 changes what
   the ledger reader accepts, never beside it.
+
+- [x] 947. Blind four-eyes sweep of every way the batch can still stop, plus a double-safety
+  fallback. USER ORDER 26.08.2026, ~17:05, after the two-hour standstill (verbatim): "Es darf
+  niemals vorkommen, dass die Batch einfach anhält - es sei denn, es ist ein absolut unlösbares
+  Problem, das sich auch nicht zurückstellen lässt (z. B. indem stattdessen mit einem anderen Task
+  weiter gemacht wird). […] Reihe hinter 935 einen Punkt ein, der gründlich, mit vier Augen blind
+  voneinander analysiert, ob es noch ähnliche Fälle geben kann und wie man diese sicher behebt.
+  Ziehe in Erwägung, zusätzlich zu den Mechanismen, die das sichern, Fallback-Mechanismen
+  einzuführen, die unvorhergesehene Fälle behandeln, sodass es doppelte Sicherheit gibt, dass die
+  Batch auf jeden Fall weiter läuft." Suggested shape (user, explicitly only a suggestion): on total
+  wedge kill everything running, clean up, restart the process; ensure a session exists that CAN do
+  that — e.g. an hourly emergency-repair agent that checks for total failure (batch stands AND every
+  recovery mechanism failed) and strikes. Acceptable stops stay: truly insurmountable blockers, e.g.
+  only unacceptable models available.
+  FINAL STATE:
+  - THE SWEEP: two blind-parallel analyses from identical inputs (CLAUDE.md §6 divergent mode,
+    cross-vendor, merged by a third model through `scripts/blind-merge.mjs`) enumerate every state
+    in which the batch stands still although workable points exist — including the 26.08. pair
+    (points 944/945), deferral of a stuck point in favour of other work, and every guard/launcher
+    refusal loop — each with its fix or an explicit insurmountable-blocker classification.
+  - THE DOUBLE SAFETY: a fallback lane, independent of the mechanisms it backs up, detects "batch
+    stands and recovery failed" and restores operation (the user's kill-clean-restart idea is one
+    candidate; the point decides the design and names why). It runs from a timer that does not
+    depend on the wedged sessions, and its every strike is recorded and veto-able.
+  - The no-standstill inventory (docs/batch-autonomy.md, point 861) carries the sweep's result.
+- THE FOLD IS REACHABLE. Measured 26.08.2026 while running this point's own sweep: both halves
+  are committed (`docs/four-eyes/947-blind-a-opus5.*`, Opus 5, 23 entries; `947-blind-b-sol.*`,
+  Sol, 18 entries) and `blind-merge.mjs` correctly names Fable 5 as the merging model — but
+  nothing in `scripts/` can ask Fable for a READ-ONLY answer. `ask-sol.mjs` is Sol-only, and
+  `author-fable.mjs` authors a point in a worktree and commits; it is not an ask. An Opus-served
+  session may not fold a stage it half-wrote, so the documented fold is unreachable from the
+  session that holds the batch, and the stage waits on a model change nothing requests. Same class
+  as points 942 and 937. Either a read-only ask exists for every model the switch can name as
+  merger (the obvious shape is `ask-sol.mjs` generalised to `--model`, keeping the routing
+  refusal), or the fold is a lane the boundary HANDS OVER, with a mechanism that requests it.
+- ONE MORE STOP-PATH, measured 26.08.2026 while cross-reading `7d1a39d` for point 943.
+  `mechanism-review-guard.mjs` builds `buildAuthorshipPassPlan` INSIDE the same `try` that calls
+  `assessReviewGap`. Before that commit only `assessReviewGap` could fail there; now a throw from
+  `review-sol.mjs`'s planner also leaves `gap` null, and `guardOutcome` then BLOCKS. It is
+  fail-closed, so nothing is waved through — but the gap clause exists precisely so an unassemblable
+  range cannot trap the session, and it is now coupled to a second module's health. A broken
+  `review-sol.mjs` therefore turns a suspendable range into a hard block with no runnable review,
+  which is this point's own class. Fix shape: build the sized plan in its own `try`, so a planner
+  failure degrades to the unsliced measurement instead of removing the clause.
+  VERIFIABLE: a chaos drill (Urlaubsfestigkeit pattern) that recreates a total wedge and measures
+  the fallback restoring the batch without human action; drills must call the real thing
+  (memory `drills-must-call-the-thing`).
+  Criticality: HIGH — user order; it is the systemic answer to a class that has now cost hours twice.
+  Bundle: Urlaubsfestigkeit. Queue position: directly behind 935 (user order). It reads every
+  pause/gate/launcher path; its fallback lane is new code beside 859/866, so the sweep may run
+  blind-parallel at any time while the fallback build is not worked beside 944/945.
