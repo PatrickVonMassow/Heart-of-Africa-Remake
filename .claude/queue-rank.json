@@ -799,12 +799,6 @@
       "origin": "machine",
       "place": "ahead"
     },
-    "947": {
-      "at": "2026-08-26T15:10:49.134Z",
-      "why": "User order 26.08.2026 ~17:05: queue it directly behind 935 (now landed, so at the queue front) — the batch must never stop again",
-      "origin": "user",
-      "place": "ahead"
-    },
     "948": {
       "at": "2026-08-26T17:21:21.643Z",
       "why": "The forensic question behind it is worth answering carefully, but the red itself is repaired and nothing is blocked by it today — it stands behind the user-ordered standstill work.",
@@ -864,6 +858,12 @@
       "why": "The four-eyes gate on main enforces nothing while it stands suspended, so every landing between now and the release is unguarded - waiting for the release means shipping a version whose whole guard chain was never cross-read.",
       "origin": "machine",
       "place": "ahead"
+    },
+    "958": {
+      "at": "2026-08-26T22:39:56.623Z",
+      "why": "It is the measured hole in the double safety the user ordered on 26.08.2026 as point 947 — the emergency lane cannot see a busy wedge, so the very state the order forbids can still stand until the release",
+      "origin": "machine",
+      "place": "ahead"
     }
   },
   "boundary": {
@@ -904,7 +904,7 @@
     "why": "The order standing in front of the release today is the arrangement that predates this rule; the four machine-filed points that had ranked themselves there were moved behind 174 first"
   },
   "settled": {
-    "at": "2026-08-26T20:57:19.054Z",
+    "at": "2026-08-26T22:39:56.633Z",
     "points": [
       174,
       184,
@@ -1208,7 +1208,6 @@
       944,
       945,
       946,
-      947,
       948,
       949,
       950,
@@ -1218,7 +1217,8 @@
       954,
       955,
       956,
-      957
+      957,
+      958
     ]
   }
 }

@@ -70,6 +70,7 @@ let dir = ''
 let stubDir = ''
 let stateDir = ''
 let shareFile = ''
+let fableFile = ''
 let materialFile = ''
 
 const run = (args, env = {}) =>
@@ -84,6 +85,11 @@ const run = (args, env = {}) =>
       PATH: `${stubDir}${delimiter}${process.env.PATH}`,
       REVIEW_SOL_STATE_DIR: stateDir,
       SOL_SHARE_FILE: shareFile,
+      // The Fable switch lives in the MAIN checkout's .claude/, which is
+      // git-ignored: a fresh clone and every CI runner have none, and the two
+      // Fable cases below then died on "the switch state is absent" while
+      // passing on the developing machine. The fixture owns its own switch.
+      FABLE_SWITCH_FILE: fableFile,
       STUB_LOG: join(dir, 'calls.log'),
       STUB_STDIN: join(dir, 'stdin.txt'),
       STUB_PROMPT: join(dir, 'prompt.txt'),
@@ -108,6 +114,11 @@ beforeAll(() => {
   chmodSync(join(stubDir, 'claude'), 0o755)
   shareFile = join(dir, 'sol-share.json')
   setting('prefer-sol')
+  fableFile = join(dir, 'fable-switch.json')
+  writeFileSync(fableFile, JSON.stringify({
+    state: 'on', reason: 'fixture: the Fable lane is open for this suite',
+    setBy: 'ask-sol-cli.test', changedAt: Date.parse('2026-08-22T16:26:48.740Z'),
+  }))
   materialFile = join(dir, 'suite.log')
   writeFileSync(materialFile, 'FAIL place: the frame shows the port, not the village\n')
   clearCalls()
