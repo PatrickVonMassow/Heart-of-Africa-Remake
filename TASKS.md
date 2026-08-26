@@ -93,10 +93,134 @@ put it is the mistake this line exists to stop.
   - THE CARD NEVER PUSHES THE PAGE WIDER THAN THE VIEWPORT at the narrowest supported width.
   VERIFIABLE: a rendering assertion at a narrow viewport — with a long title, a wide badge and two
   time stamps, no header group overflows its card and the page has no horizontal scroll; and the
-  three groups' contents stay grouped after the break.
+  three groups' contents stay grouped after the break. The assertion measures the RENDERED layout
+  (title-column width) in a real browser: jsdom computes no layout and stylesheet-string checks
+  cannot fail on the defect, and the unfixed board already satisfies the overflow clause at 320 px
+  (measured 26.08.2026), so only the measured column width separates fixed from broken.
   Criticality: low — it is a legibility defect on the surface the user reads on his phone, and it
   costs no correctness.
   Bundle: Chat & Tafel.
+
+- [ ] 947. Blind four-eyes sweep of every way the batch can still stop, plus a double-safety
+  fallback. USER ORDER 26.08.2026, ~17:05, after the two-hour standstill (verbatim): "Es darf
+  niemals vorkommen, dass die Batch einfach anhält - es sei denn, es ist ein absolut unlösbares
+  Problem, das sich auch nicht zurückstellen lässt (z. B. indem stattdessen mit einem anderen Task
+  weiter gemacht wird). […] Reihe hinter 935 einen Punkt ein, der gründlich, mit vier Augen blind
+  voneinander analysiert, ob es noch ähnliche Fälle geben kann und wie man diese sicher behebt.
+  Ziehe in Erwägung, zusätzlich zu den Mechanismen, die das sichern, Fallback-Mechanismen
+  einzuführen, die unvorhergesehene Fälle behandeln, sodass es doppelte Sicherheit gibt, dass die
+  Batch auf jeden Fall weiter läuft." Suggested shape (user, explicitly only a suggestion): on total
+  wedge kill everything running, clean up, restart the process; ensure a session exists that CAN do
+  that — e.g. an hourly emergency-repair agent that checks for total failure (batch stands AND every
+  recovery mechanism failed) and strikes. Acceptable stops stay: truly insurmountable blockers, e.g.
+  only unacceptable models available.
+  FINAL STATE:
+  - THE SWEEP: two blind-parallel analyses from identical inputs (CLAUDE.md §6 divergent mode,
+    cross-vendor, merged by a third model through `scripts/blind-merge.mjs`) enumerate every state
+    in which the batch stands still although workable points exist — including the 26.08. pair
+    (points 944/945), deferral of a stuck point in favour of other work, and every guard/launcher
+    refusal loop — each with its fix or an explicit insurmountable-blocker classification.
+  - THE DOUBLE SAFETY: a fallback lane, independent of the mechanisms it backs up, detects "batch
+    stands and recovery failed" and restores operation (the user's kill-clean-restart idea is one
+    candidate; the point decides the design and names why). It runs from a timer that does not
+    depend on the wedged sessions, and its every strike is recorded and veto-able.
+  - The no-standstill inventory (docs/batch-autonomy.md, point 861) carries the sweep's result.
+  VERIFIABLE: a chaos drill (Urlaubsfestigkeit pattern) that recreates a total wedge and measures
+  the fallback restoring the batch without human action; drills must call the real thing
+  (memory `drills-must-call-the-thing`).
+  Criticality: HIGH — user order; it is the systemic answer to a class that has now cost hours twice.
+  Bundle: Urlaubsfestigkeit. Queue position: directly behind 935 (user order). It reads every
+  pause/gate/launcher path; its fallback lane is new code beside 859/866, so the sweep may run
+  blind-parallel at any time while the fallback build is not worked beside 944/945.
+
+- [ ] 943. The unreviewed four-eyes backlog is worked off as one pulled-forward point. The
+  mechanism-review-guard reported 25 contributions without a valid cross-vendor review on 26.08.2026
+  (one of them in review that night; 24 older). Two carry an unanswered DO-NOT-MERGE from GPT-5.6
+  Sol with named findings (`aeedceb` guard-health-guard, `c3f5ad8` queue-order-guard-core) whose
+  verdicts demand fix-then-re-review — real work, not bookkeeping; a third (`92cbc0e`) had its
+  review split into two passes with only one recorded. The backlog blocks every session exit and
+  grows while it stands. DECIDED 26.08.2026, 16:47, under the user's delegation of such calls
+  ("löse solche Probleme immer nach deinem Ermessen"): one own point, pulled in front of the
+  running queue; the answer with the verbatim quote sits in the VDZK answer carrier.
+  FINAL STATE:
+  - The two DO-NOT-MERGE findings are fixed and their commits re-reviewed cross-vendor, first.
+  - The missing second pass of `92cbc0e` is run and recorded.
+  - Every remaining backlog entry has a recorded valid review, or a recorded retirement reason the
+    guard honours; the count is re-measured at start (it grows) and reported at close.
+  VERIFIABLE: `mechanism-review-guard --status` reports zero unreviewed backlog contributions.
+  Criticality: high — until it clears, every landing session drags the same block.
+  Bundle: Modell & Wächter. It performs reviews and fixes on already-landed guard code; it edits
+  the review ledger only through the recording commands, so it is worked before 916 changes what
+  the ledger reader accepts, never beside it.
+
+- [ ] 944. The launcher starts the batch session inside a point worktree, so the board bookkeeping
+  splits. MEASURED 26.08.2026, 15:27, by the dying owner session itself (carrier finding): it was
+  spawned with cwd `/workspace/hoa/.claude/worktrees/point-941`; `repositoryRoot()` follows the cwd,
+  so every board command read and wrote `.claude/dashboard-state.json` IN THE WORKTREE while publish,
+  attest and focus landed in the main checkout — the Stop guard twice reported BATCH DASHBOARD NOT
+  REGISTERED although attest and `dashboard-guard --synced` had both reported green, and the worktree
+  has no `.batch-dashboard.html` at all, so board-publish cannot run there. The session wedged on
+  this split and died without a handover at 15:30; memory `session-cwd-stays-in-main-tree` names the
+  class. Predecessor sessions ran in the main checkout.
+  FINAL STATE:
+  - The launcher spawns every batch session with cwd in the main checkout, proven by a test on the
+    spawn path.
+  - OR the board bookkeeping resolves the common checkout (`commonCheckoutRoot` exists in
+    `repo-paths.mjs`) so a worktree cwd reads and writes the same state — one of the two, decided in
+    the point, with the other path refused loudly instead of splitting silently.
+  VERIFIABLE: Vitest on the chosen path; plus a regression case reproducing today's split (board
+  state written from a worktree cwd is seen by a main-checkout read).
+  Criticality: high — it kills owner sessions mid-flight and cost the 26.08. two-hour standstill its
+  first half.
+  Bundle: Urlaubsfestigkeit. It edits the launcher spawn path 859 and 612 own, so it is worked with
+  them, never beside them.
+
+- [ ] 945. A dead owner beside a live delegate wedges resurrection into the runaway pause. MEASURED
+  26.08.2026, 12:44–16:30 (autostart.log): after the owner died without handover, its GPT-5.6 Sol
+  delegate kept writing in the point worktree — by design, delegates are daemon-owned and survive
+  handover (CLAUDE.md §6) — and the successor decision in `batch-autostart-core.mjs` read that
+  activity as an unrecognized live feature-writer and refused every spawn (`registered-writer-live`).
+  Meanwhile the watchdog counted each refused tick as "previous spawn did NOT take over"
+  (failCount 1→3) although no new spawn had been attempted between counts, paused the batch as
+  RUNAWAY, resumed on the clock, ran the same loop, and paused again — over two hours of standstill
+  with the finished, pushed delegate work sitting there, until the user noticed.
+  FINAL STATE:
+  - A live registered writer whose owning session is dead does not veto the successor: the successor
+    spawns and adopts the in-flight work (`batch-in-flight --adopt`); only a writer beside a LIVE
+    owner vetoes.
+  - `failCount` counts only actual spawn attempts without progress; a refused tick is a wait, not a
+    fault, and can never reach the runaway limit on its own.
+  - A runaway pause marker names the concretely measured refusal cause of its ticks instead of four
+    guesses.
+  VERIFIABLE: Vitest over the successor decision — dead owner + live delegate yields start-and-adopt;
+  live owner + delegate yields the veto; a sequence of refused ticks leaves failCount untouched.
+  Criticality: high — it is the second half of the 26.08. standstill and recurs on every owner death
+  beside a running delegate.
+  Bundle: Urlaubsfestigkeit. It edits the successor decision and the watchdog counters 859 and 866
+  own, so it is worked with them, never beside them.
+
+- [ ] 946. A VDZK card still parks an owner-decidable question; admissibility gets the point-864
+  typing. Point 864 typed the `AWAITING-USER` point gate (`defer-for-user.mjs` refuses advisory
+  reasons), but the CARD path kept accepting open questions: on 26.08.2026 the card "Vier-Augen-
+  Rückstand: würde ich als eigenen Punkt vorziehen — oder anders priorisiert?" stood on the board
+  with the owner's own recommendation inside it, waiting for the user. The user's standing order of
+  26.08.2026, 16:47 (verbatim: "löse solche Probleme immer nach deinem Ermessen. Stelle per
+  Mechanismus sicher, dass das immer passiert und für so etwas nicht die Batch angehalten wird. Für
+  solche Details brauche ich auch nicht gefragt zu werden.") closes the class.
+  FINAL STATE:
+  - `vdzk-add` (and the admissibility core behind it) refuses a card whose question is
+    owner-decidable — prioritization, ordering, splitting, internal process detail — unless it
+    records the decision already taken and acting, with the veto as the user's only action
+    (the Entscheidungsprotokoll pattern of point 864).
+  - An open question remains admissible only for the named user-owned categories: design.md content,
+    releases/tags, scope extensions, money/permissions, deletion of user data — the card names its
+    category and the refusal message teaches the pattern.
+  VERIFIABLE: Vitest over admissibility — today's card text is refused with the pattern named; the
+  same text carrying a recorded decision is accepted; each user-owned category example is accepted.
+  Criticality: high — it is the enforcement half of the user's no-standstill order on the one path
+  point 864 did not reach.
+  Bundle: Chat & Tafel. It edits the decision-card gate 843 and 902 also reach, so it is worked
+  after them, never beside them.
 
 - [ ] 734. A run whose reds exceed the capture cap can never be closed, so it blocks the render
   set forever (measured 19.08.2026 while landing point 732). `render-verify-guard` blocked with
