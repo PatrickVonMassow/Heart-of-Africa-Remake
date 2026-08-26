@@ -388,20 +388,21 @@ export function parseAnswer({ kind = '', text = '' } = {}) {
  * The exit code beside it (3, as on the review path) is what lets a script tell "Sol
  * answered" from "Sol did not" without reading prose.
  */
-export function formatUnavailable({ kind = '', cause = '', setting = '' } = {}) {
+export function formatUnavailable({ kind = '', cause = '', setting = '', modelName = SOL_MODEL_NAME } = {}) {
   const k = normaliseKind(kind) ?? String(kind ?? '')
+  const handoff = modelName === SOL_MODEL_NAME ? 'Do it in the Claude chain' : 'Hand it to another eligible lane'
   return [
-    `ask-sol: ${SOL_MODEL_NAME} did NOT answer this ${k}: ${cause || 'no cause was reported'}.`,
-    `  The ${k} is NOT done. Do it in the Claude chain — nothing here may be recorded as ${SOL_MODEL_NAME}'s work.`,
+    `ask-sol: ${modelName} did NOT answer this ${k}: ${cause || 'no cause was reported'}.`,
+    `  The ${k} is NOT done. ${handoff} — nothing here may be recorded as ${modelName}'s work.`,
     ...(setting === 'claude-only' ? ['  (The share switch is at `claude-only`; `node scripts/sol-share.mjs --more` sends this kind to Sol again.)'] : []),
   ].join('\n')
 }
 
 /** The whole answer as the command prints it: the shape first, the reader's summary last. */
-export function formatAnswerReport({ kind = '', parsed = {}, elapsedMs = 0 } = {}) {
+export function formatAnswerReport({ kind = '', parsed = {}, elapsedMs = 0, modelName = SOL_MODEL_NAME, effort = SOL_REASONING_EFFORT } = {}) {
   const k = normaliseKind(kind) ?? String(kind ?? '')
   const seconds = Number.isFinite(Number(elapsedMs)) ? Math.round(Number(elapsedMs) / 1000) : 0
-  const head = `ask-sol: ${SOL_MODEL_NAME} (effort ${SOL_REASONING_EFFORT}) answered the ${k} in ${seconds}s — ${parsed.summary ?? ''}`
+  const head = `ask-sol: ${modelName} (effort ${effort}) answered the ${k} in ${seconds}s — ${parsed.summary ?? ''}`
   if (k === 'diagnose') return [head, `  CAUSE:    ${parsed.answer?.cause ?? ''}`, `  EVIDENCE: ${parsed.answer?.evidence ?? ''}`].join('\n')
   if (k === 'audit' || k === 'enumerate') {
     return [head, ...(parsed.answer?.entries ?? []).map((e) => `  ${e.id} | ${e.file} | ${e.text}`)].join('\n')

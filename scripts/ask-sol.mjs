@@ -101,7 +101,14 @@ export function runClaudeAsk({ prompt, input = '', model, timeoutMs = REVIEW_TIM
   const args = authoringClaudeArgs({ modelId: model.id, prompt })
   const dangerous = args.indexOf('--dangerously-skip-permissions')
   if (dangerous >= 0) args.splice(dangerous, 1)
-  args.push('--permission-mode', 'plan', '--tools', '', '--safe-mode', '--no-session-persistence', '--effort', model.effort)
+  args.push(
+    '--permission-mode', 'dontAsk',
+    '--tools', '',
+    '--safe-mode',
+    '--no-session-persistence',
+    '--prompt-suggestions', 'false',
+    '--effort', model.effort,
+  )
   const res = spawn('claude', args, {
     cwd: REPO_ROOT,
     encoding: 'utf8',
@@ -225,7 +232,7 @@ if (isMainModule(import.meta.url)) {
 
     if (!parsed.ok) {
       const cause = outcome.ok ? `the run produced no usable answer (${parsed.error})` : outcome.cause
-      console.error(formatUnavailable({ kind, cause, setting: share.setting }))
+      console.error(formatUnavailable({ kind, cause, setting: share.setting, modelName: model.name }))
       if (String(run.finalMessage ?? '').trim()) {
         console.error(`--- what came back, unusable as it is ---\n${String(run.finalMessage).trim()}\n--- end ---`)
       }
@@ -239,7 +246,7 @@ if (isMainModule(import.meta.url)) {
     if (asJson) {
       console.log(JSON.stringify({ kind, model: model.name, effort: model.effort, elapsedMs, setting: share.setting, ...parsed, raw: said }, null, 2))
     } else {
-      console.log(formatAnswerReport({ kind, parsed, elapsedMs }))
+      console.log(formatAnswerReport({ kind, parsed, elapsedMs, modelName: model.name, effort: model.effort }))
     }
     process.exit(0)
   } catch (e) {

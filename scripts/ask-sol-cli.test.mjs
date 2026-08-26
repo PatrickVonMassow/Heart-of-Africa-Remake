@@ -51,6 +51,7 @@ let stdin = ''
 try { stdin = readFileSync(0, 'utf8') } catch {}
 writeFileSync(process.env.STUB_STDIN, stdin)
 writeFileSync(process.env.STUB_PROMPT, argv[argv.indexOf('-p') + 1])
+writeFileSync(process.env.STUB_ARGS, JSON.stringify(argv))
 appendFileSync(process.env.STUB_LOG, model + '\\n')
 const answer = process.env.STUB_ANSWER || 'The two lists overlap on the stale owner.\\nCAUSE: the stale owner remains authoritative\\nEVIDENCE: scripts/batch-lock.mjs keeps the dead lease'
 const served = process.env.STUB_SERVED_MODEL || model
@@ -79,6 +80,7 @@ const run = (args, env = {}) =>
       STUB_LOG: join(dir, 'calls.log'),
       STUB_STDIN: join(dir, 'stdin.txt'),
       STUB_PROMPT: join(dir, 'prompt.txt'),
+      STUB_ARGS: join(dir, 'args.json'),
       ...env,
     },
   })
@@ -202,6 +204,11 @@ describe('an ask that runs', () => {
     expect(calls()).toEqual(['claude-fable-5'])
     expect(readFileSync(join(dir, 'stdin.txt'), 'utf8')).toContain('FAIL place')
     expect(readFileSync(join(dir, 'prompt.txt'), 'utf8')).toContain('READ-ONLY work for this repository as Fable 5')
+    const args = JSON.parse(readFileSync(join(dir, 'args.json'), 'utf8'))
+    expect(args).toContain('dontAsk')
+    expect(args).toContain('--tools')
+    expect(args[args.indexOf('--tools') + 1]).toBe('')
+    expect(args).not.toContain('--dangerously-skip-permissions')
   })
 
   it('refuses a substituted Claude model instead of misattributing its answer', () => {
@@ -211,6 +218,7 @@ describe('an ask that runs', () => {
     })
     expect(r.status).toBe(3)
     expect(r.stderr).toMatch(/served claude-opus-5, not Fable 5/)
+    expect(r.stderr).toMatch(/Fable 5 did NOT answer/)
   })
 
   it('supports Opus as the third read-only roster model', () => {

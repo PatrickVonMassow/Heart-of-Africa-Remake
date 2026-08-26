@@ -82,6 +82,17 @@ describe('the prompt', () => {
   })
 })
 
+describe('model-specific reports', () => {
+  it('never labels a Fable refusal or answer as Sol', () => {
+    expect(formatUnavailable({ kind: 'explain', cause: 'substituted', modelName: 'Fable 5' })).toMatch(
+      /Fable 5 did NOT answer/,
+    )
+    expect(formatAnswerReport({ kind: 'explain', parsed: { summary: 'folded' }, modelName: 'Fable 5', effort: 'high' })).toMatch(
+      /Fable 5 \(effort high\) answered/,
+    )
+  })
+})
+
 describe('the material', () => {
   it('keeps every section under the budget and CUTS VISIBLY', () => {
     const { text } = formatAskMaterial({ sections: [{ title: 'LOG: a', text: 'x'.repeat(5000) }], budget: 1000 })
