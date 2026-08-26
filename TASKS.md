@@ -11990,3 +11990,49 @@ to land than a mechanism that needs a review.
   Criticality: med — it loses no work, but it blocks the one action the house rule demands after
   every commit, and its refusal cannot be cleared by doing what it asks.
   Bundle: Session- & Repo-Hygiene.
+
+- [ ] 925. The durable lane is built but neither measured nor journalled, and its failure
+  matrix does not touch the real path. Point 676 landed the whole plane — bounded dispatch,
+  checkpoint barrier, two-phase boundary, successor reconciliation, landing journal, board
+  projection, metrics — with build, lint and unit green, and the cross-vendor read recorded
+  (`.claude/mechanism-reviews.jsonl`, e1439227). THREE THINGS IT LEFT OPEN, all of them
+  conditions 676's own VERIFIABLE clause names, and none of them reachable while the lane is
+  switched off (`.claude/durable-lane-flag.json` is `enabled: false`, `changedBy:
+  awaiting-point-676-measured-trial`).
+  FIRST, NOTHING JOURNALS A REASON. `updateReasonInterval` in `scripts/batch-dispatch-core.mjs`
+  and the daemon's `record-metric` command have NO production caller: `dispatchOnce` decides
+  and starts attempts without ever recording why fewer than three eligible lanes ran, and
+  `metricEventsFromJournal` therefore consumes events nothing writes. The spec demands "a
+  journalled REASON whenever three eligible lanes exist and fewer run". It fails SAFE today —
+  `trialVerdict` scores an unmeasured p95 or median as a failure, so an unwired metric can
+  never produce a passing trial — but that is the reason the gap is invisible, not a reason
+  to keep it.
+  SECOND, ELEVEN OF TWELVE DRILLS RECREATE THE AFTERMATH INSTEAD OF CAUSING IT.
+  `scripts/batch-daemon-failure-drills.mjs` calls the decision functions on hand-built inputs;
+  only `parent-death` in `scripts/batch-daemon-drill.mjs` runs real processes. A drill that
+  never calls the thing stays green over a broken thing — the exact failure this house has
+  already paid for. `DURABLE_LANE_STEPS` step 12 nevertheless reads green with the evidence
+  "complete daemon failure matrix", and step 12 is one of `STEPS_REQUIRED_FOR_ACTIVATION`, so
+  that wording is what an operator would enable the lane on.
+  THIRD, THE MEASURED TRIAL IS NOT RUN. 676 requires a trial against a recorded baseline day
+  with zero safety incidents, a median handover context materially below baseline, and points
+  per day no worse than baseline. The recorded baseline day and the trial both remain owed.
+  FINAL STATE: the dispatcher journals its reason interval and its lane-utilization,
+  checkpoint, boundary and landing events through `record-metric` under the coordinator fence,
+  so `calculateBatchMetrics` reads a real series; the failure matrix drives the real daemon,
+  the real worker and the real files for at least worker-crash, stall, push-failure,
+  dirty-worktree, marker-deletion, daemon-restart and checkpoint-timeout, with the pure-input
+  checks kept as the cheap layer beneath them rather than as the proof; and the durable lane
+  runs its measured trial with the Sol adapter alone, whose verdict — not an operator's
+  judgement — flips `enabled` and writes the evidence into `DURABLE_LANE_STEPS`.
+  ALSO FIX, one line: `scripts/batch-board-core.mjs` hardcodes `cap: 3` instead of
+  `DAEMON_POOL_CAP`, so a changed cap would leave the board projecting the old one.
+  VERIFIABLE: unit cases that a dispatch leaving eligible lanes unstarted writes exactly one
+  open reason interval and closes it when the pool recovers, and that a metric series read back
+  from the journal reproduces the recorded events; each real-path drill asserted through
+  `node scripts/batch-daemon-drill.mjs --scenario <name>` against processes it actually killed,
+  stalled or dirtied; a trial report against the recorded baseline day whose `trialVerdict`
+  carries zero failures; plus `npm run test:unit`, lint, build.
+  Criticality: high — it decides whether the durable lane may be switched on at all, and every
+  claim that unlocks it is currently carried by a green flag rather than by a measurement.
+  Bundle: Session- & Repo-Hygiene.
