@@ -553,6 +553,42 @@ export function runIdentity(run) {
  *     still stands.
  */
 export function incompleteClosureFor(run, closures) {
+  return signedClosureFor(run, closures)
+}
+
+/**
+ * THE CLOSURE THAT A CRASHED RUN HAS AND A RED DOES NOT (point 734, sixth
+ * round). A crash is the one verdict no ledger can ever reach: `runVerdict`
+ * returns `charges: []` for it, deliberately — a run that died rather than
+ * reported judged no picture, so there is nothing in it to charge, fix or file.
+ * Point 640's three closings all need a red's identity, and a crash has none to
+ * give; before this, a crashed run inside the window could only leave through
+ * the hand `--defer`, which is the waiver this whole point exists to abolish.
+ *
+ * So the crash gets the SAME signed route the broken recording has, with the
+ * same limits — one record by content identity, written evidence, never
+ * coverage — and one honest difference: it closes the WHOLE record, not a
+ * residual. A truncated run CONCLUDED, so the reds it did record are completed
+ * observations and keep blocking past its closure; a crashed run never
+ * concluded, and the gate has always refused to read its fragmentary output as
+ * evidence in either direction (its recorded reds have never blocked — only the
+ * crash sentence does — and no charge may lift it). The signature states
+ * exactly that: "we read the kept log; the run died; there is no report here to
+ * judge." A disposition, not a pass: `runVerdict` still answers `red` with the
+ * crash sentence, and the backend still needs a real covering run.
+ *
+ * Kept as its own list (`crashClosures` beside `incompleteClosures`) rather
+ * than one shared pool, so a signature written for the one class can never be
+ * read as the other's — a crashed run that ALSO truncated stays refused by the
+ * incomplete draft (a crash outranks the truncation, round-5 review) and is
+ * signed as what it is: a crash.
+ */
+export function crashClosureFor(run, closures) {
+  return signedClosureFor(run, closures)
+}
+
+/** The shared binding rules of both signed closures. Total; null closes nothing. */
+function signedClosureFor(run, closures) {
   if (!run || typeof run !== 'object') return null
   const id = runIdentity(run)
   if (id === null) return null
@@ -831,7 +867,7 @@ export function coveringRun(runs, backend, since, options) {
  * Total: never throws on partial input.
  */
 export function unexplainedRuns(runs, since, options) {
-  const { openPoints = null, ledger = RED_CHARGES, incompleteClosures = null } = options ?? {}
+  const { openPoints = null, ledger = RED_CHARGES, incompleteClosures = null, crashClosures = null } = options ?? {}
   const from = Number.isFinite(since) ? since : 0
   const all = Array.isArray(runs) ? runs : []
   /**
@@ -906,6 +942,32 @@ export function unexplainedRuns(runs, since, options) {
     // The WebGPU feature level this run really came up at, so a charge scoped to
     // the compatibility lane cannot excuse the core adapter the player runs.
     const level = r.featureLevel === 'core' || r.featureLevel === 'compatibility' ? r.featureLevel : null
+    // A CRASHED RUN IS ITS OWN CLASS TOO (point 734, sixth round), judged here
+    // in runVerdict's own precedence — above the truncation, below the partial
+    // probe. Reported apart from the reds, because calling it an "unexplained
+    // red" sends the reader hunting a defect the run never reported; and lifted
+    // by exactly ONE thing, the signed crash closure. Not by the ledger (a
+    // crash carries no charge at any time), not by a later green of the same
+    // suite (the recorded rounds pinned that a crash inside the window is not
+    // talked away by the runs that followed it — the way out is the explicit,
+    // evidenced signature or the deferral, never silence). The closure lifts
+    // the WHOLE record: a crashed run concluded nothing, and its fragmentary
+    // reds have never blocked on their own (only the crash sentence does), so
+    // there is no residual observation left standing to preserve — see
+    // crashClosureFor for the whole argument.
+    if (r.crashed === true) {
+      if (!crashClosureFor(r, crashClosures)) {
+        out.push({
+          backend,
+          suite,
+          at,
+          status: 'crashed',
+          unaccounted: verdict.unaccounted,
+          reds: verdict.unaccounted.map((u) => u.name),
+        })
+      }
+      continue
+    }
     // AN INCOMPLETE RECORDING IS ITS OWN CLASS (point 734), reported apart from
     // the reds so the guard can name it as what it is. Two things lift it, and
     // NEITHER is the ledger — a charge needs the red's identity, and the lost
@@ -964,19 +1026,16 @@ export function unexplainedRuns(runs, since, options) {
       })
       continue
     }
-    // A crash explains nothing about the picture whatever its reds say, so it is
-    // never talked away by the ledger — runVerdict says so and this must not
-    // undo it.
+    // Only red and suspect runs reach this point — a crash took its own branch
+    // above, where the ledger can never touch it.
     let unowned = null
-    if (r.crashed !== true) {
-      const reds = verdict.status === 'suspect' ? suspectRedsOf(r) : Array.isArray(r.reds) ? r.reds : []
-      if (reds.length > 0) {
-        // Only the reds NOBODY owns are still open. Counting the whole run's
-        // reds would report a charged one as waved through beside its
-        // unexplained neighbour.
-        unowned = reds.filter((red) => !owned(red, suite, backend, level))
-        if (unowned.length === 0) continue
-      }
+    const observed = verdict.status === 'suspect' ? suspectRedsOf(r) : Array.isArray(r.reds) ? r.reds : []
+    if (observed.length > 0) {
+      // Only the reds NOBODY owns are still open. Counting the whole run's
+      // reds would report a charged one as waved through beside its
+      // unexplained neighbour.
+      unowned = observed.filter((red) => !owned(red, suite, backend, level))
+      if (unowned.length === 0) continue
     }
     // The individual reds, NOT the one sentence runVerdict writes about them: a
     // suspect run's whole first attempt is summarised into a single unaccounted
@@ -1106,6 +1165,27 @@ function incompleteRecordingParagraph(incomplete) {
   )
 }
 
+/** The block-message paragraph that names crashed runs AS crashes (point 734,
+ *  sixth round): the gate used to report one as an unexplained red, which sends
+ *  the reader hunting a defect the run never reported — a crashed run judged no
+ *  picture and holds nothing to explain, and its way out is its own. */
+function crashedRunParagraph(crashed) {
+  const named = crashed
+    .slice(0, 3)
+    .map((u) => `${u.backend}/${u.suite} @${isoOf(u.at)}`)
+    .join(' | ')
+  return (
+    `CRASHED RUN — NOT AN UNEXPLAINED RED, AND NEVER A JUDGED PICTURE: ${crashed.length} recorded ` +
+    `run(s) died rather than reported — ${named}${crashed.length > 3 ? ', …' : ''}. Do NOT hunt a ` +
+    'defect in them and do NOT charge them: a crash carries no red anybody can own, so the three ' +
+    'closings of point 640 cannot reach it. RE-RUN the suite for a real judgment; where the crash is ' +
+    'the end of the story, READ the kept log (local/verify-logs/, point 460) and sign the record off ' +
+    'as unreadable: node scripts/render-verify-guard.mjs --crashed "<backend>/<suite>" --evidence ' +
+    '"<what the log shows>". That signature closes the RECORD, never the picture — the run still ' +
+    'covers no backend, and a signed-off crash is never a pass.'
+  )
+}
+
 const ALLOW = { decision: 'allow' }
 
 /**
@@ -1163,6 +1243,7 @@ export function evaluate(input) {
     openPoints = null,
     ledger = RED_CHARGES,
     incompleteClosures = null,
+    crashClosures = null,
     fence = null,
     sessionId = '',
   } = input ?? {}
@@ -1178,7 +1259,7 @@ export function evaluate(input) {
   }
 
   const since = Number.isFinite(latestChangeAt) ? latestChangeAt : 0
-  const opts = { openPoints, ledger, incompleteClosures }
+  const opts = { openPoints, ledger, incompleteClosures, crashClosures }
   // Two backends only where the two backends can DIFFER; otherwise one passing
   // run is the whole proof, and the second is a picture inspection bought for
   // nothing (user 26.07.2026).
@@ -1237,12 +1318,14 @@ export function evaluate(input) {
   // (Where a backend is missing too, the message below says so with the same
   // three ways out — this one is for the case the old gate waved through.)
   if (missing.length === 0 && unexplained.length > 0) {
-    // THE TWO FAMILIES ARE NAMED APART (point 734). An incomplete recording sent
-    // the reader hunting for a defect that was never captured, because the gate
-    // called it an unexplained red; it is the opposite — a record with nothing
-    // in it to explain, and a different way out.
+    // THE THREE FAMILIES ARE NAMED APART (point 734). An incomplete recording —
+    // and a crash — sent the reader hunting for a defect that was never
+    // captured, because the gate called each an unexplained red; both are the
+    // opposite, a record with nothing in it to explain, and each has its own
+    // way out.
     const incomplete = unexplained.filter((u) => u.status === 'incomplete')
-    const reds = unexplained.filter((u) => u.status !== 'incomplete')
+    const crashed = unexplained.filter((u) => u.status === 'crashed')
+    const reds = unexplained.filter((u) => u.status !== 'incomplete' && u.status !== 'crashed')
     const parts = []
     if (reds.length > 0) {
       const named = reds
@@ -1266,6 +1349,7 @@ export function evaluate(input) {
           'node scripts/render-verify-guard.mjs --defer "<reason>".',
       )
     }
+    if (crashed.length > 0) parts.push(crashedRunParagraph(crashed))
     if (incomplete.length > 0) parts.push(incompleteRecordingParagraph(incomplete))
     return scopeRenderVerification({ decision: 'block', reason: parts.join(' ') }, { fence, sessionId })
   }
@@ -1289,8 +1373,10 @@ export function evaluate(input) {
   // EVERY unclosed incomplete recording in the window, named AS one whatever
   // else is blocking (round-5 finding 3): reading only each backend's LATEST
   // run reported an older broken recording as invisible behind a later genuine
-  // red, which violates the rule that the guard says WHICH it is.
+  // red, which violates the rule that the guard says WHICH it is. The crashed
+  // class gets the same visibility for the same reason (sixth round).
   const incompleteInWindow = unexplained.filter((u) => u.status === 'incomplete')
+  const crashedInWindow = unexplained.filter((u) => u.status === 'crashed')
 
   // WHY the last attempt on a missing backend did not count — the actionable
   // half of the block message: an unaccounted red is either a real finding, or a
@@ -1310,6 +1396,19 @@ export function evaluate(input) {
     const reported = unexplained.find(
       (u) => u.backend === b && u.suite === suiteName && u.at === (finite(run.at) ?? 0),
     )
+    // A crashed run is named by its own paragraph below while it still blocks;
+    // signed off, it simply leaves the backend uncovered — quoting its synthetic
+    // "unaccounted red" here sent the reader hunting a defect the run never
+    // reported (sixth round; the same rule the incomplete class already has).
+    if (run.crashed === true && verdict.status === 'red') {
+      if (!reported) {
+        whyNot.push(
+          `${b}: the last run (${suiteName}) CRASHED, but that record is already signed off as ` +
+            'unreadable, so it neither blocks nor proves anything. This backend simply has no covering run yet.',
+        )
+      }
+      continue
+    }
     if (verdict.status === 'incomplete') {
       // Still an open incomplete recording: the paragraph below names it as its
       // own class, so saying it here again would only bury the other backends.
@@ -1376,8 +1475,10 @@ export function evaluate(input) {
       'ONLY if one backend genuinely cannot be judged headless (e.g. a washed-out ' +
       'WebGPU frame — that is a FINDING, not a pass), record a loud deferral: ' +
       'node scripts/render-verify-guard.mjs --defer "<reason>".' +
-      // Named in THIS branch too: an incomplete recording must never hide
-      // behind a missing backend or a later red (round-5 finding 3).
+      // Named in THIS branch too: a crash and an incomplete recording must
+      // never hide behind a missing backend or a later red (round-5 finding 3;
+      // the crashed class since the sixth round).
+      (crashedInWindow.length > 0 ? ` ${crashedRunParagraph(crashedInWindow)}` : '') +
       (incompleteInWindow.length > 0 ? ` ${incompleteRecordingParagraph(incompleteInWindow)}` : ''),
   }, { fence, sessionId })
 }

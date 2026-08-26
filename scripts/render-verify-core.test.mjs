@@ -32,6 +32,7 @@ import {
   unexplainedRuns,
   isIncompleteRecording,
   incompleteClosureFor,
+  crashClosureFor,
   droppedLinesOf,
   runIdentity,
   SUSPECT_UNNAMED,
@@ -1035,12 +1036,47 @@ describe('evaluate — a red is not closed by the runs that FOLLOWED it (point 6
     expect(evaluate(renderChange({ runs, openPoints, ledger })).decision).toBe('allow')
   })
 
+  // The sixth-round review bullet (26.08.2026) claimed extending RED_CHARGES
+  // reclassifies NOTHING already recorded, because `red.point` is stamped at
+  // record time. Measured half true, and the half matters: COVERAGE is frozen
+  // at record time by design (a later ledger edit cannot bless a finished run),
+  // but the BLOCKING question re-reads the ledger as it stands — the 11.08.2026
+  // four-eyes rule above — so a new entry DOES reach a run already on disk.
+  // Pinned on the exact shape of the stored 13.08.2026 webgpu/settings records:
+  // console reds carrying `point: null`, the feature level recorded.
+  it('a run ALREADY on disk changes its disposition when the ledger gains its entry — but never becomes coverage', () => {
+    const stored = redRun(
+      'webgpu',
+      1500,
+      [red('console error: THREE.WebGPURenderer: Uncaptured WebGPU GPUValidationError: [Invalid TextureView] is invalid due to a previous error.', null, 'console')],
+      { suite: 'settings', featureLevel: 'compatibility' },
+    )
+    expect(unexplainedRuns([stored], 1000, { openPoints, ledger: [] })).toHaveLength(1)
+    const ledger = [{
+      point: 506,
+      suite: 'settings',
+      backend: 'webgpu',
+      featureLevel: 'compatibility',
+      kind: 'console',
+      match: /is invalid due to a previous error/i,
+      why: 'measured 26.08.2026 on the stored 13.08. records',
+    }]
+    expect(unexplainedRuns([stored], 1000, { openPoints, ledger })).toEqual([])
+    // The record's own charge stamp is what coverage reads: however the ledger
+    // grows, the stored run stays non-covering — the backend needs a fresh run.
+    expect(coveringRun([stored], 'webgpu', 1000, { openPoints })).toBeNull()
+  })
+
   it('does NOT talk a CRASH away with a charge — a run that died judged no picture', () => {
     const ledger = [{ point: 506, match: /goat/, why: 'the software lane cannot draw fast enough' }]
     const crashed = redRun('webgpu', 1500, [red('goat stance', 506)], { crashed: true })
     const result = evaluate(renderChange({ runs: [crashed, run('webgpu', 2000), run('webgl', 2100)], openPoints, ledger }))
     expect(result.decision).toBe('block')
-    expect(result.reason).toMatch(/UNEXPLAINED RED/)
+    // Since the sixth round the crash blocks under its OWN name — reporting it
+    // as an unexplained red sent the reader hunting a defect the run never
+    // reported. The charge still lifts nothing; only the message class moved.
+    expect(result.reason).toMatch(/CRASHED RUN — NOT AN UNEXPLAINED RED/)
+    expect(result.reason).not.toMatch(/UNEXPLAINED RED SINCE THE LAST RENDER EDIT/)
   })
 
   it('a charge to a point that is NOT open explains nothing', () => {
@@ -1408,8 +1444,10 @@ describe('an INCOMPLETE RECORDING is its own class, and has its own way out (poi
 
   // A CRASH OUTRANKS THE TRUNCATION. A run that died judged no picture, and a
   // crashed run that also flooded its output must not be liftable by one
-  // signature (review, 19.08.2026).
-  it('never lifts a run that CRASHED, whatever its recording lost', () => {
+  // INCOMPLETE signature (review, 19.08.2026). The crash has its own signed
+  // route since the sixth round — a different list, a different judgment — and
+  // this pin is what keeps the two from ever serving each other.
+  it('never lifts a run that CRASHED by an incomplete-recording signature, whatever its recording lost', () => {
     const crashedToo = { ...truncatedLegacy('webgpu', 1500), crashed: true }
     expect(runVerdict(crashedToo, { openPoints }).status).toBe('red')
     expect(runVerdict(crashedToo, { openPoints }).unaccounted[0].name).toMatch(/crash/)
@@ -1480,6 +1518,127 @@ describe('an INCOMPLETE RECORDING is its own class, and has its own way out (poi
     }).not.toThrow()
     expect(result.decision).toBe('block')
     expect(result.reason).toMatch(/INCOMPLETE RECORDING/)
+  })
+})
+
+// Point 734, sixth round. A crash was the one verdict with NO way out inside
+// the window: runVerdict returns `charges: []` for it at any time, so extending
+// the ledger reclassifies nothing, and the three closings of point 640 cannot
+// reach a run that reported no red — the only exit left was the hand --defer.
+// The signed crash closure is the named way out: "we read the kept log; the run
+// died; there is no report here to judge" — a disposition, never a pass.
+describe('a CRASHED run is its own class, and has its own signed way out (point 734, sixth round)', () => {
+  const openPoints = [506, 546]
+  /** EXACTLY the shape on disk for the 19.08.2026 webgpu/startup crashes:
+   *  exit 1, `crashed: true`, an empty red list. */
+  const crashedRun = (backend, at, overrides = {}) =>
+    redRun(backend, at, [], { crashed: true, suite: 'startup', ...overrides })
+  /** A closure as the --crashed CLI writes it: content identity plus evidence. */
+  const crashClosure = (run_, evidence = 'local/verify-logs shows the browser died by SIGKILL; no report exists') => ({
+    run: runIdentity(run_),
+    backend: run_.backend,
+    suite: run_.suite,
+    at: run_.at ?? null,
+    evidence,
+    closedAt: 9999,
+  })
+
+  it('reports the crash as its OWN status, apart from red and incomplete', () => {
+    const found = unexplainedRuns([crashedRun('webgpu', 1500)], 1000, { openPoints })
+    expect(found).toHaveLength(1)
+    expect(found[0].status).toBe('crashed')
+    expect(found[0].reds).toEqual(['the run ended in a crash, not in its own report'])
+  })
+
+  // THE DISPOSITION REACHES A RUN ALREADY ON DISK: nothing about the record
+  // changes — the closure is written beside it, and the same record stops
+  // blocking. That is the retroactivity the sixth-round bullet demands.
+  it('a signed crash closure lifts the recorded run, retroactively and without a --defer', () => {
+    const r = crashedRun('webgpu', 1500)
+    expect(unexplainedRuns([r], 1000, { openPoints })).toHaveLength(1)
+    expect(unexplainedRuns([r], 1000, { openPoints, crashClosures: [crashClosure(r)] })).toEqual([])
+  })
+
+  it('binds by content identity — a closure for another run, or without evidence, lifts nothing', () => {
+    const r = crashedRun('webgpu', 1500)
+    const other = crashedRun('webgpu', 1600)
+    expect(unexplainedRuns([r], 1000, { openPoints, crashClosures: [crashClosure(other)] })).toHaveLength(1)
+    expect(unexplainedRuns([r], 1000, { openPoints, crashClosures: [{ ...crashClosure(r), evidence: '  ' }] })).toHaveLength(1)
+    expect(crashClosureFor(r, [crashClosure(r)])).toEqual(crashClosure(r))
+    expect(crashClosureFor(r, [{ ...crashClosure(r), run: '' }])).toBeNull()
+  })
+
+  it('never lets a charge or a later green lift a crash — only the signature does', () => {
+    // A recorded red the ledger could own, and a later covering run of the SAME
+    // suite/backend inside the window: neither lifts a crash. The recorded
+    // rounds pinned both directions — a run that died judged no picture, and
+    // "it worked the next time" explains nothing about why it died.
+    const withRed = crashedRun('webgpu', 1500, { reds: [red('goat stance', 506)] })
+    const later = { ...run('webgpu', 2000), suite: 'startup' }
+    expect(unexplainedRuns([withRed, later], 1000, { openPoints }).map((u) => u.status)).toEqual(['crashed'])
+  })
+
+  // The cross-family locks: each signature closes only what it names.
+  it('an INCOMPLETE closure does not lift a crash, and a CRASH closure does not lift a mere truncation', () => {
+    const truncation = { name: "9 further result line(s) exceeded the capture cap — this run's reds were NOT all read", key: 'capture-truncated', kind: 'check', point: null }
+    const crashedAndTruncated = crashedRun('webgpu', 1500, { reds: [truncation] })
+    // The incomplete signature bounces off the crash (round-5 order: a crash
+    // outranks the truncation, and no one signature may serve both families)…
+    expect(
+      unexplainedRuns([crashedAndTruncated], 1000, {
+        openPoints,
+        incompleteClosures: [crashClosure(crashedAndTruncated)],
+      }),
+    ).toHaveLength(1)
+    // …while the crash signature closes the whole record: a crashed run
+    // CONCLUDED nothing, so there is no completed observation left to preserve
+    // — unlike a truncated run, which finished, and whose recorded reds stand
+    // past its own closure.
+    expect(
+      unexplainedRuns([crashedAndTruncated], 1000, {
+        openPoints,
+        crashClosures: [crashClosure(crashedAndTruncated)],
+      }),
+    ).toEqual([])
+    // And a truncated run that did NOT crash is untouched by a crash closure.
+    const merelyTruncated = redRun('webgpu', 1600, [truncation])
+    expect(
+      unexplainedRuns([merelyTruncated], 1000, { openPoints, crashClosures: [crashClosure(merelyTruncated)] }).map((u) => u.status),
+    ).toEqual(['incomplete'])
+  })
+
+  it('a signed-off crash still covers NOTHING — the backend needs a real run', () => {
+    const r = crashedRun('webgpu', 1500)
+    const closures = [crashClosure(r)]
+    expect(runVerdict(r, { openPoints }).covers).toBe(false)
+    expect(coveringRun([r], 'webgpu', 1000, { openPoints })).toBeNull()
+    const result = evaluate(renderChange({ runs: [r, run('webgl', 2100)], openPoints, crashClosures: closures }))
+    expect(result.decision).toBe('block')
+    expect(result.reason).toMatch(/RENDER CHANGE NOT VERIFIED ON WEBGPU/)
+    // …and the signed-off record is not quoted as an unaccounted red there.
+    expect(result.reason).not.toMatch(/ended in a crash/)
+  })
+
+  it('names an unsigned crash as its own class in BOTH block branches', () => {
+    const r = crashedRun('webgpu', 1500)
+    // Beside full coverage…
+    const covered = evaluate(
+      renderChange({ runs: [r, { ...run('webgpu', 2000), suite: 'startup' }, run('webgl', 2100)], openPoints }),
+    )
+    expect(covered.decision).toBe('block')
+    expect(covered.reason).toMatch(/CRASHED RUN — NOT AN UNEXPLAINED RED/)
+    // …and behind a missing backend, where it must not hide (round-5 finding 3).
+    const missing = evaluate(renderChange({ runs: [r, run('webgl', 2100)], openPoints }))
+    expect(missing.decision).toBe('block')
+    expect(missing.reason).toMatch(/CRASHED RUN — NOT AN UNEXPLAINED RED/)
+    expect(missing.reason).not.toMatch(/UNACCOUNTED red\(s\) — "the run ended in a crash/)
+  })
+
+  it('is total on malformed closures', () => {
+    const r = crashedRun('webgpu', 1500)
+    expect(() => unexplainedRuns([r], 1000, { openPoints, crashClosures: [null, 7, {}] })).not.toThrow()
+    expect(crashClosureFor(null, [crashClosure(r)])).toBeNull()
+    expect(() => crashClosureFor(r, 'nope')).not.toThrow()
   })
 })
 
