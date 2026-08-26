@@ -1355,7 +1355,7 @@ Punktgrenze. Gebucht als Punkt 916.
 
 ## Anhang A — Maschinell gepflegte Quellen-Übersicht
 
-Zuletzt aktualisiert: Mittwoch, 26.08.2026, 01:39 · Quellen-Fingerprint: `da15dab937ec…`
+Zuletzt aktualisiert: Mittwoch, 26.08.2026, 02:43 · Quellen-Fingerprint: `8e1bc7b58f18…`
 
 Spalten heuristisch aus den Quellen abgeleitet (Anläufe = distinkte Datumsnennungen im Memory;
 Maßnahme = Guard-Skripte mit Namens-Treffer). Die inhaltliche Bewertung gehört der Prosa oben.
@@ -1456,8 +1456,8 @@ Maßnahme = Guard-Skripte mit Namens-Treffer). Die inhaltliche Bewertung gehört
 
 Erfasste Quellen: 91 Feedback-/Projekt-Memories · 57 Guard-/Hook-Skripte · 6 Revert-/Reapply-Commits · 101 Prozess-/Meta-TASKS-Punkte (davon 42 offen).
 
-<!-- RETRO-FINGERPRINT: da15dab937ec32c348ad92b6f872a3082c1d73f52fc2be987d62cfcf420d508b -->
-<!-- RETRO-LAST-REFRESHED: 2026-08-25T23:39:08.083Z -->
+<!-- RETRO-FINGERPRINT: 8e1bc7b58f18a65a2a6d9e0b22526ca3f9d85a90cdb6f88778d3de8deeede42f -->
+<!-- RETRO-LAST-REFRESHED: 2026-08-26T00:43:09.763Z -->
 <!-- AUTO-GENERATED:END -->
 
 ### 3.111 Ein Erfolg ist kein Beweis für den Weg, auf dem er zustande kam
@@ -3698,3 +3698,27 @@ macht damit aus einer Umgebungsstörung eine Verweigerung, die der Bedienende nu
 kann, indem er von Hand beweist, was das Tor gerade bestreitet. Prüffrage für jedes Tor:
 *Nennt mein Rot einen Gegenstand — einen Test, eine Datei, eine Zeile? Wenn nicht, worüber
 urteile ich dann?* Gebucht als Punkt 924.
+
+### 3.112 Ein Schalter, der auf Zusage statt auf Messung steht
+
+Der dauerhafte Autoren-Unterbau (Punkt 676) landete in der Nacht zum 26.08.2026 vollständig:
+begrenzte Nachfüllung, Übergabe-Prüfpunkt, zweiphasige Sitzungsgrenze mit Siegel, Landejournal,
+Metriken. Build, Lint und Unit-Suite grün, 13 820 Fälle, die Gegenlese quer über die Anbieter
+geführt. Und trotzdem stand am Ende ein Bauteil im Baum, das die eigene Fertigkeit behauptet,
+ohne sie zu messen: Die Tabelle `DURABLE_LANE_STEPS` führt Schritt 12 — die Ausfallproben — als
+grün mit der Begründung „complete daemon failure matrix". Elf der zwölf Proben rufen aber
+Entscheidungsfunktionen mit handgebauten Eingaben auf; nur eine startet echte Prozesse und
+tötet sie. Genau dieser Schritt gehört zu den sieben, die das Einschalten der Bahn freigeben.
+
+Dasselbe Muster eine Ebene tiefer: `updateReasonInterval` und der Daemon-Befehl `record-metric`
+sind gebaut und getestet, haben aber keinen einzigen Produktionsaufrufer. Der Punkt verlangt
+ausdrücklich einen journallierten Grund, sobald drei Bahnen möglich wären und weniger laufen —
+geschrieben wird er nirgends. Es fällt hier sicher aus, weil `trialVerdict` alles Unmessbare als
+Fehlschlag wertet; das ist aber der Grund, warum die Lücke unsichtbar bleibt, nicht der Grund,
+sie zu lassen.
+
+**Lehre:** Eine Bibliothek plus ein grünes Feld sind kein Nachweis. Wo eine Tabelle im Code
+festhält, welcher Schritt fertig ist, muss ihr Beweistext benennen, *was gelaufen ist* — welcher
+Prozess getötet, welche Datei beschmutzt, welcher Lauf gemessen wurde — und nicht, welche Datei
+existiert. Prüffrage: *Würde meine Probe auch dann grün bleiben, wenn die Sache, die sie prüft,
+kaputt wäre?* Gebucht als Punkt 925.
