@@ -95,7 +95,18 @@ export { IN_FLIGHT_PATH }
  * and the journal both read that one record.
  */
 function delegatedPoint(declaration) {
-  for (const item of declaration?.evidence ?? []) {
+  const evidence = declaration?.evidence ?? []
+  // THE EVENT NAMES THE STRAND THAT TRIGGERS IT (eighth cross-vendor round):
+  // `emitDelegated` fires on branch/worktree evidence, so a pid or log item —
+  // which carries the OWNER's focus point — must not decide the event's point
+  // just by standing first. Only when no strand item is recorded does any
+  // other item answer.
+  for (const kind of ['branch', 'worktree']) {
+    for (const item of evidence) {
+      if (item?.kind === kind && Number.isInteger(item?.point) && item.point > 0) return item.point
+    }
+  }
+  for (const item of evidence) {
     if (Number.isInteger(item?.point) && item.point > 0) return item.point
   }
   return null

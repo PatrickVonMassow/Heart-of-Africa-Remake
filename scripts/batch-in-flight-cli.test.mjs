@@ -137,6 +137,35 @@ describe('batch-in-flight — durable adoption CLI flags', () => {
     expect(events.at(-1)).toMatchObject({ point: 713 })
   })
 
+  // Eighth cross-vendor round: a pid item carries the OWNER's focus point, and
+  // it used to decide the event's point purely by standing first — while the
+  // event fires on the BRANCH the delegate is working on.
+  it('names the strand the event fires on, not whichever item stands first', () => {
+    const git = (...argv) =>
+      spawnSync('git', ['-C', root, ...argv], { encoding: 'utf8', windowsHide: true, stdio: ['ignore', 'pipe', 'pipe'] })
+    git('init', '-q', '--initial-branch=main')
+    writeFileSync(join(root, 'work.txt'), 'delegated work\n')
+    git('add', 'work.txt')
+    git('-c', 'user.name=Fixture', '-c', 'user.email=fixture@example.invalid', 'commit', '-q', '-m', 'work')
+    git('branch', 'feat/697-strand')
+
+    // The pid takes its point from the OWNER FOCUS, the branch from its own
+    // name — the multi-strand shape, which is exactly where the two differ.
+    writeFileSync(
+      join(root, '.claude', 'current-focus.json'),
+      JSON.stringify({ point: 713, note: 'owner strand', setAt: Date.now(), confirmedAt: Date.now() }),
+    )
+    const result = runIn({}, '--pid', String(process.pid), '--branch', 'refs/heads/feat/697-strand')
+
+    expect(result.status, result.stderr).toBe(0)
+    expect(declaration().evidence.map((item) => item.point)).toEqual([713, 697])
+    const events = readFileSync(journalPath(), 'utf8')
+      .split('\n')
+      .filter(Boolean)
+      .map((line) => JSON.parse(line))
+    expect(events.at(-1)).toMatchObject({ point: 697 })
+  })
+
   it('refuses a declared point that the named branch contradicts, and writes nothing', () => {
     const result = runIn({}, '--point', '713', '--branch', 'refs/heads/feat/999-work')
 
