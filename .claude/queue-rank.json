@@ -846,6 +846,24 @@
       "why": "It is a LIVE stop-the-batch path, not a latent one: it blocks the turn end today and only a human re-run clears it, which is the exact thing the user's standing order of 26.08.2026 forbids — and point 947, which the user placed at the front, names this class as part of its sweep.",
       "origin": "machine",
       "place": "ahead"
+    },
+    "954": {
+      "at": "2026-08-26T18:37:44.563Z",
+      "why": "Behind 952 by its own text: the suite that must measure the visible break reads a copy of the stylesheet until 952 fixes it, and the board is readable today — nothing before the release waits on this.",
+      "origin": "machine",
+      "place": "last"
+    },
+    "955": {
+      "at": "2026-08-26T18:39:09.960Z",
+      "why": "Behind the queue's front: the pre-push gate's own single re-run already carries it, so it costs a suite rather than a standstill, and the front is held by the standstill and review-backlog points that block landings outright.",
+      "origin": "machine",
+      "place": "last"
+    },
+    "956": {
+      "at": "2026-08-26T18:39:10.069Z",
+      "why": "Behind the queue's front: the ledger hole is real but static — nothing new lands while 943 blocks every merge, so no further merge-with-fixes debt can accrue before this point is reached.",
+      "origin": "machine",
+      "place": "last"
     }
   },
   "boundary": {
@@ -886,7 +904,7 @@
     "why": "The order standing in front of the release today is the arrangement that predates this rule; the four machine-filed points that had ranked themselves there were moved behind 174 first"
   },
   "settled": {
-    "at": "2026-08-26T17:21:33.861Z",
+    "at": "2026-08-26T18:39:10.083Z",
     "points": [
       174,
       184,
@@ -1197,7 +1215,10 @@
       950,
       951,
       952,
-      953
+      953,
+      954,
+      955,
+      956
     ]
   }
 }

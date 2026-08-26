@@ -12595,3 +12595,42 @@ to land than a mechanism that needs a review.
   Criticality: medium — the board is readable today; what fails is the phone picture the request
   asked for.
   Bundle: Chat & Tafel.
+
+- [ ] 955. The unit gate refuses while a delegated author commits, so the push gate goes red for no
+  defect (measured 26.08.2026, 20:33, with two Sol authoring lanes running).
+  `scripts/repository-integrity.mjs` asserts in the Vitest GLOBAL TEARDOWN that no ref moved while
+  the unit suite ran, and it fails the whole run when one did: "LIVE REPOSITORY CHANGED WHILE UNIT
+  SUITE RAN: refs changed: refs/heads/feat/943-…". Delegated authors commit on their own branches
+  every few minutes BY DESIGN — `author-sol.mjs` pushes the branch for them — so every unit run that
+  overlaps a busy lane dies, which is every run the owner makes while lanes are busy and every
+  pre-push gate. The check's own message already names the legitimate case, and the pre-push gate's
+  single re-run is what rescued tonight's push; that re-run is a fail-soft, not an answer, because it
+  costs a full unit suite and reports SUSPECT.
+  FINAL STATE: the teardown distinguishes TEST LEAKAGE into the live repository from a foreign
+  branch's own progress. A ref that belongs to a declared in-flight lane, or any ref that is neither
+  the running checkout's HEAD nor its branch, is not this suite's leakage and does not fail the run;
+  what remains — the running checkout's own refs, the index, the working tree — still fails loud.
+  VERIFIABLE: Vitest over the decision — a moved foreign branch passes, a moved own HEAD fails, and
+  an undeclared foreign ref is reported by name rather than silently allowed.
+  Criticality: medium-high — it turns every parallel authoring evening into red gates that hide real
+  reds among false ones.
+  Bundle: Urlaubsfestigkeit.
+
+- [ ] 956. A merge-with-fixes verdict leaves its named fix owed, and nothing tracks it (measured
+  26.08.2026 while reading the review ledger for point 943). `.claude/mechanism-reviews.jsonl`
+  records `92cbc0e` ("Refuse a repeated flag, and make the legacy fixture discriminate", Claude Opus
+  5) as reviewed by GPT-5.6 Sol with verdict `merge-with-fixes` and the named finding "repeated help
+  flags bypass the new rejection logic" in `scripts/defer-for-user.mjs`. The commit is long since on
+  main, the fix was never made, and no guard can see the debt — `merge-with-fixes` CLEARS the
+  four-eyes gate by design, so the owed half simply disappears. That is a hole in the whole review
+  machinery, not one forgotten fix.
+  FINAL STATE: the named fix of `92cbc0e` is made and its confirming pass recorded; and a
+  `merge-with-fixes` verdict carries its owed fixes as a debt the guard reports until each is
+  answered by a recorded pass at a descendant commit, so no future verdict of that kind can vanish
+  the same way. Every `merge-with-fixes` already in the ledger is re-measured once and reported.
+  VERIFIABLE: Vitest over the debt reader — a merge-with-fixes with no descendant answering pass is
+  reported, one with such a pass is clear; plus the guard's own status naming the re-measured
+  historical set.
+  Criticality: medium-high — it is the second silent hole found in the four-eyes ledger in one
+  evening, and it invalidates part of what the gate claims to guarantee.
+  Bundle: Urlaubsfestigkeit.
