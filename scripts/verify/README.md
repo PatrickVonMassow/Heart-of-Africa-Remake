@@ -1318,6 +1318,37 @@ red's identity, and the lost part has none):
    — but it can never bury a red that reached the record, and for every run
    recorded since the fix, ALL of them did.
 
+### A crashed run has the same named way out (point 734, sixth round)
+
+A CRASH is the one verdict no ledger can ever reach: `runVerdict` returns no
+charges for it, deliberately — a run that died rather than reported judged no
+picture, so there is nothing in it to fix, charge or file, and extending
+`RED_CHARGES` reclassifies nothing. Eight of the recorded 13.–19.08.2026 runs
+are exactly this shape, and inside the window their only exit was the hand
+`--defer`. The guard now names a crash as its own class — **not** an
+"unexplained red" to hunt — in the status view and in every branch of its
+block message, and gives it the same signed route:
+
+```
+node scripts/render-verify-guard.mjs --crashed "<backend>/<suite>" [--at <iso|ms>] [--run <id>] --evidence "<what the kept log shows>"
+```
+
+Same binding rules as `--incomplete` (one record by content identity, written
+evidence, ambiguity refused), one honest difference: the closure lifts the
+**whole record**. A truncated run CONCLUDED, so the reds it did record are
+completed observations and keep blocking past its closure; a crashed run never
+concluded, and the gate has never read its fragmentary output as evidence in
+either direction — only the crash sentence blocks. The signature states
+exactly "we read the kept log (`local/verify-logs/`, point 460); the run died;
+there is no report here to judge", which is a disposition and never coverage:
+`runVerdict` still answers red, the backend still needs a real covering run,
+and a signed-off crash is never a pass. The two closure families live in
+separate lists (`crashClosures` beside `incompleteClosures`), so neither
+signature can ever serve the other — a run that crashed AND truncated is
+refused by the `--incomplete` draft (a crash outranks the truncation) and is
+signed as what it is: a crash. No later green lifts a crash inside the window
+either; the way out is the re-run judged on its own record, the signature, or
+the loud deferral — never silence.
 
 ## The world seed is pinned AT THE LAUNCHER (points 549/557)
 
