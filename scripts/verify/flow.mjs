@@ -8,6 +8,7 @@ import { launchVerifyBrowser, assertBackend } from './_browser.mjs'
 import { frameShutter } from './frameSubject.mjs'
 import { sectionGate } from './sections.mjs'
 import { fileURLToPath } from 'node:url'
+import { installTtsCache } from './ttsCache.mjs'
 
 const BASE = process.env.BASE_URL ?? 'http://localhost:5173/'
 const OUT = fileURLToPath(new URL('../../verification/', import.meta.url))
@@ -109,6 +110,13 @@ async function closeDialog() {
   await page.waitForTimeout(200)
 }
 
+// THE STARTUP PRE-WARM PULLS ~90 MB (measured 26.08.2026). speech.ts warms the
+// Kokoro model at game start, so a page navigated with `waitUntil: 'networkidle'`
+// waits out the whole CDN download — the model request was still open when the
+// 30 s navigation timed out, and this suite died in both attempts of every run.
+// The cache voice.mjs records and marks complete serves it from disk instead;
+// here it is only consumed, exactly as handwriting.mjs consumes it.
+await installTtsCache(page)
 await page.goto(BASE, { waitUntil: 'networkidle' })
 await page.evaluate(() => localStorage.clear())
 await page.reload({ waitUntil: 'networkidle' })
@@ -555,6 +563,7 @@ if (section('fresh-start-window')) {
   // settlement scene mounts on. On the GPU lane it got there before the throttle mattered;
   // on the software WebGPU lane the scene never mounted at all and the run died waiting for
   // __placePlayer, three minutes in, on the first attempt of every run. One line of focus.
+  await installTtsCache(page2) // the same startup pre-warm, on the second window
   await page2.bringToFront()
   page2.on('console', (m) => m.type() === 'error' && errors.push('page2: ' + m.text()))
   page2.on('pageerror', (e) => errors.push('page2 PAGEERROR: ' + e.message))

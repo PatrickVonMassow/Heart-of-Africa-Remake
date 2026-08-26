@@ -3,6 +3,7 @@
 import { launchVerifyBrowser } from './_browser.mjs'
 import { frameShutter } from './frameSubject.mjs'
 import { fileURLToPath } from 'node:url'
+import { installTtsCache } from './ttsCache.mjs'
 
 // The one DELIBERATELY UNSEEDED suite (verify-seed.mjs `UNSEEDED_SUITES`, point 557):
 // the ?seed hook is DEV-only, so the production build randomises its world whatever
@@ -16,6 +17,13 @@ const page = await browser.newPage({ viewport: { width: 1280, height: 800 } })
 const errors = []
 page.on('console', (m) => m.type() === 'error' && errors.push(m.text()))
 page.on('pageerror', (e) => errors.push('PAGEERROR: ' + e.message))
+// THE STARTUP PRE-WARM PULLS ~90 MB (measured 26.08.2026). speech.ts warms the
+// Kokoro model at game start, so a page navigated with `waitUntil: 'networkidle'`
+// waits out the whole CDN download — the model request was still open when the
+// 30 s navigation timed out, and this suite died in both attempts of every run.
+// The cache voice.mjs records and marks complete serves it from disk instead;
+// here it is only consumed, exactly as handwriting.mjs consumes it.
+await installTtsCache(page)
 await page.goto(BASE, { waitUntil: 'networkidle' })
 await page.waitForTimeout(4000)
 // The production build carries no dev hooks (no window.__game, no __camera), so

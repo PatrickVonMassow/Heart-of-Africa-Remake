@@ -7,6 +7,7 @@ import { launchVerifyBrowser, assertBackend } from './_browser.mjs'
 import { frameShutter } from './frameSubject.mjs'
 import { sectionGate } from './sections.mjs'
 import { fileURLToPath } from 'node:url'
+import { installTtsCache } from './ttsCache.mjs'
 import { mkdirSync, existsSync, rmSync } from 'node:fs'
 
 const BASE = process.env.BASE_URL ?? 'http://localhost:5173/'
@@ -36,6 +37,13 @@ const errors = []
 page.on('console', (m) => { if (m.type() === 'error') errors.push(m.text()) })
 page.on('pageerror', (e) => errors.push(String(e)))
 
+// THE STARTUP PRE-WARM PULLS ~90 MB (measured 26.08.2026). speech.ts warms the
+// Kokoro model at game start, so a page navigated with `waitUntil: 'networkidle'`
+// waits out the whole CDN download — the model request was still open when the
+// 30 s navigation timed out, and this suite died in both attempts of every run.
+// The cache voice.mjs records and marks complete serves it from disk instead;
+// here it is only consumed, exactly as handwriting.mjs consumes it.
+await installTtsCache(page)
 await page.goto(BASE, { waitUntil: 'networkidle' })
 await page.waitForFunction(() => window.__renderer, null, { timeout: 60000 })
 await assertBackend(page) // point 204: fail loud if the requested backend silently fell back
