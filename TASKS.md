@@ -12348,6 +12348,26 @@ to land than a mechanism that needs a review.
     the point it has just closed; the point decides which and says why. Net effect on the day: the
     branch, the remote branch and the worktree of point 941 stayed standing, and only
     `branch-hygiene-guard` noticed.
+  THE SAME WEDGE AT THE SESSION END — a THIRD instance, measured 26.08.2026 19:39 while taking
+  the context-watermark boundary, and distinct from the two above because the card here is the
+  UNNUMBERED handover card, which the projection keeps. `batch-boundary --prepare` dictates that
+  card verbatim, `board.mjs none` puts it up, and from that moment the point-470 gate refuses every
+  state-changing call. Its escape list names `batch-boundary`, the focus stamp, `board-publish` and
+  the work-order tick — but NOT `git push`. With one commit still unpushed, which is the ordinary
+  state (the boundary itself does not push; there is no push path in `batch-boundary.mjs` or its
+  core), the session sits between two binding rules: push after every commit, and do not claim
+  running work while the handover card stands. The way through cost five extra calls: put the work
+  card back up, push, return the point to the queue, write the handover card again, publish and
+  attest again. WORSE, and stated nowhere: the gate judges a whole bundled call by any
+  state-changing SEGMENT in it, so `board.mjs now` chained with the push in one shell command is
+  refused as a unit and the card never goes up — the two must be separate calls.
+  ALSO IN THE FINAL STATE:
+  - `git push` joins the session-ending escape list beside `batch-boundary`, the focus stamp and
+    `board-publish`. A push publishes no claim about running work; it only makes the last commit
+    durable, which is the very thing the boundary exists to guarantee. Alternatively the boundary
+    pushes before it dictates the card — but then it must say so.
+  - THE REFUSAL SAYS that a bundled call is judged segment by segment, so the reader does not
+    lose a round trip discovering it.
   VERIFIABLE: Vitest over the projection — a closing card for a just-ticked point survives the
   publish step that removes an ordinary numbered card for the same point; and over the gate — the
   three cleanup calls are permitted while the idle card stands, an unrelated state-changing call is
