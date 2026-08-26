@@ -24172,3 +24172,31 @@ Nummerierung bleiben deshalb identisch — hier wird nur verschoben, nie umgesch
   Bundle: Urlaubsfestigkeit. Queue position: directly behind 935 (user order). It reads every
   pause/gate/launcher path; its fallback lane is new code beside 859/866, so the sweep may run
   blind-parallel at any time while the fallback build is not worked beside 944/945.
+
+- [x] 953. A red CI run whose job never STARTED is unclassified, and it blocks the turn end until a
+  human re-runs it (measured 26.08.2026). Pages deploy run 32986502898 (`main`, 15:58 UTC)
+  concluded `failure` with its build job stuck queued forever — conclusion `null`, zero steps, no
+  runner ever picked it up, deploy skipped. The cause is provably outside the repository: the
+  GitHub incident from 15:11 UTC (Actions degraded availability, database primary failover, upstream
+  Vitess; Pages degraded), confirmed by the user from githubstatus.com; three further runs
+  (15:04-15:38 UTC) sat queued for over an hour in the same window. Point 711's deploy retry cannot
+  reach this BY DESIGN — its retry lives inside the deploy job's steps, and a job that never starts
+  has no steps; the 711 archive entry already records this class as a residual reachable only by a
+  job-level re-run.
+  FINAL STATE:
+  - THE SIGNATURE IS CLASSIFIED: run failure plus a failing job with conclusion `null` or
+    `startup_failure` and empty steps is recognised as never-started and treated as an environment
+    transient under the fail-soft invariant, not as a product defect.
+  - ONE BOUNDED JOB-LEVEL RE-RUN IS DISPATCHED automatically (`gh run rerun --failed`, or the
+    `runs/<id>/rerun-failed-jobs` API). The Batch watchdog workflow and `ci-status-guard`'s remedy
+    path are the candidate homes; the point decides which and names why.
+  - `ci-status-guard` WAITS on the dispatched re-run instead of hard-blocking the turn end on the
+    transient red.
+  SECONDARY, one look before anything is built: why the Pages concurrency group left superseded
+  deploy runs queued for over an hour instead of cancelling them — possibly incident-side API lag.
+  VERIFIABLE: Vitest as a pure decision over run/job JSON fixtures — the never-started signature is
+  classified as environment, a genuine step failure is still a product red, and a run whose job
+  merely queues briefly is neither; plus the guard's wait path over a dispatched re-run fixture.
+  Criticality: medium-high — it stops the batch on an outage nobody in the repository can fix, and
+  the stop needs a human to clear.
+  Bundle: Urlaubsfestigkeit. It is a stop-the-batch path and belongs to 947's sweep.
