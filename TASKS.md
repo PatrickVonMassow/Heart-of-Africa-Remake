@@ -12024,3 +12024,35 @@ to land than a mechanism that needs a review.
   Criticality: medium-high — it is the fail-closed publish preflight and the two stores the board
   is derived from, and every item was measured rather than supposed.
   Bundle: Session- & Repo-Hygiene.
+
+- [ ] 930. A now-card removed by the projection takes its handwritten text with it — the one
+  disagreement the ninth cross-vendor round on point 713 could not settle inside that point
+  (GPT-5.6 Sol at effort high, raised twice, the second time at P0; the wording and the
+  reasoning stand in `docs/blind-713/round-9-findings.txt`). Point 713's final state orders
+  BOTH: "it CREATES a stub card for a point that has none and REMOVES one whose point is no
+  longer in flight", and "a projection that regenerates the section must never blank text a
+  session wrote, and a render that would drop prose refuses or restores it". The reviewer
+  reads the second as covering the removed card; the point was built on the first, and five
+  of its accepted tests pin the removal. Both readings are defensible, which is why this is
+  a point and not a line.
+  FINAL STATE:
+  - REMOVAL STAYS, LOSS DOES NOT. A numbered now-card whose point has left the flight is
+    still removed from the section — the projection is the derived set — but its authored
+    text is not destroyed by the render: it is carried where a reader can still find it, or
+    the render refuses and names the command that retires the card WITH its text
+    (`board.mjs done <N>`). Which of the two, this point decides; it may not answer "both
+    sometimes" without saying exactly when.
+  - THE ORDINARY PATH IS UNCHANGED. `board.mjs done <N>` already moves the card to Erledigt
+    with its prose before any render sees it, and a card this render CREATED is a
+    placeholder that may go quietly. Only the out-of-band case — a strand that ended without
+    its card being retired — is at stake.
+  - THE QUEUE COPY IS NOT PART OF IT: `buildQueueSection` rewrites the whole queue section
+    from the work order on every publish, so a deleted queue card holds no authored text.
+    Say so where the deletion happens, so the next round does not raise it a third time.
+  VERIFIABLE: Vitest over the render — a stale numbered card carrying authored prose is
+  either archived with its text or refuses by name, proven by reading the text back out of
+  wherever it went; a stale STUB still goes quietly; the five existing removal tests of
+  point 713 still pass or are amended in the same commit with the reason written down.
+  Criticality: medium — it is a loss of the user's own words, but only on a path the
+  ordinary lifecycle does not take.
+  Bundle: Chat & Tafel.
