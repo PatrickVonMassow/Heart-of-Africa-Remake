@@ -11981,3 +11981,46 @@ to land than a mechanism that needs a review.
   Criticality: high — a silently picture-less bug report is a broken channel to the user, and it
   degraded unnoticed.
   Bundle: Testinfrastruktur.
+
+- [ ] 929. The board's core hardens against damaged and hand-edited input — the remainder of the
+  eighth cross-vendor round on point 713, which found it but did not cause it (GPT-5.6 Sol at
+  effort high, recorded against f54bea3; the wording stands in `docs/blind-713/`). Point 713 makes
+  the current-work section a projection; these seven answers sit OUTSIDE its final state, and
+  carrying them there kept it from converging over eight rounds.
+  FINAL STATE:
+  - ONE SNAPSHOT PER PUBLISH. `scripts/board-publish.mjs` reads `TASKS.md` twice — projection and
+    coverage from one read, `expectedFingerprint()` from another — so a work order that changes
+    between them publishes a board reflecting the old set under the new fingerprint, and `--check`
+    stays green over missing work. Projection, coverage, titles and fingerprint come from one
+    snapshot.
+  - AN UNREADABLE WORK ORDER FAILS THE WAY THE WATCHDOG READS. The same path can throw before
+    `fail()` is reached, so it prints a stack trace and no longer persists `pagesFailurePatch`.
+  - THE FOOTER REPORT TELLS THE TRUTH: a refresh that threw is still followed by "footer
+    refreshed" whenever the projection alone changed the document.
+  - THE FOCUS TRANSITION IS ALL OR NOTHING. `scripts/focus.mjs` writes the new focus before it
+    clears the pending marker, so a later failing step leaves the focus durable while the rollback
+    in `scripts/board.mjs` restores only the declaration — the split-brain that rollback exists to
+    prevent, from the other side.
+  - A POINT NUMBER IS READ FROM A CARD, NOT FROM ANY SPAN. `pointsInSection` scans every matching
+    `class="num"`/`class="t"` span, so an authored clarification title beginning "713 Tage …"
+    invents a cross-section conflict.
+  - STRUCTURAL DAMAGE REFUSES INSTEAD OF ANSWERING "NOTHING THERE". `pointsInSection` and
+    `stripProjectedQueueCards` answer a missing or duplicated heading with an empty result, which
+    is fail-open under a preflight that must fail closed.
+  - THE HONEST ZERO STATE IS ITS OWN TEXT. `emptyStatePattern` accepts any content between the
+    tags and never checks `NOW_EMPTY_STATE_TEXT`, so a damaged paragraph passes as the verified
+    zero and `claimsNoCurrentWork` returns true on it.
+  ALSO IN SCOPE, two tests that cannot fail as written: the ordering case in
+  `scripts/board-edit-core.test.mjs` never observes the write callback, so it would stay green if
+  `preparePublish()` moved BEFORE the write it is ordered against; and the "writes nothing" case in
+  `scripts/batch-in-flight-cli.test.mjs` checks only the declaration file, never the activity
+  journal it could still have written to.
+  VERIFIABLE: Vitest over each answer — one work-order snapshot proven by a fixture that changes
+  the file between the two former reads; an unreadable work order recording the failure patch; a
+  thrown footer refresh reported as not refreshed; a focus transition that restores BOTH stores;
+  a clarification title of the "713 Tage …" shape claiming no point; a damaged section refusing;
+  a damaged empty-state paragraph refused as the zero claim; plus the two tests rewritten so each
+  fails when its subject is broken.
+  Criticality: medium-high — it is the fail-closed publish preflight and the two stores the board
+  is derived from, and every item was measured rather than supposed.
+  Bundle: Session- & Repo-Hygiene.
