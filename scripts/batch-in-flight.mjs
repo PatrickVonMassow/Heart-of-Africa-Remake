@@ -96,21 +96,22 @@ export { IN_FLIGHT_PATH }
  */
 function delegatedPoint(declaration) {
   const evidence = declaration?.evidence ?? []
-  // THE EVENT NAMES THE STRAND THAT TRIGGERS IT (eighth cross-vendor round):
-  // `emitDelegated` fires on branch/worktree evidence, so a pid or log item —
-  // which carries the OWNER's focus point — must not decide the event's point
-  // just by standing first. The strands are the only items that answer.
-  for (const kind of ['branch', 'worktree']) {
-    for (const item of evidence) {
-      if (item?.kind === kind && Number.isInteger(item?.point) && item.point > 0) return item.point
-    }
-  }
-  // AN UNNUMBERED STRAND ANSWERS null, IT DOES NOT HAND THE QUESTION ON (ninth
-  // cross-vendor round): the caller only fires on strand evidence, so every
-  // other item here belongs to the owner, not to the strand. Falling back to
-  // one of them stamped the owner's focus point on a delegate's event — the
-  // very misattribution the eighth round removed from the ordering.
-  return null
+  // THE EVENT NAMES THE STRAND IT FIRES ON (eighth cross-vendor round), AND
+  // ONLY WHEN THE STRANDS AGREE (ninth): `emitDelegated` fires on branch and
+  // worktree evidence, so a pid or log item — which carries the OWNER's focus
+  // point — must never decide the event's point just by standing first. The
+  // strands are the only items asked, and they have to answer with ONE point:
+  // an unnumbered strand beside a numbered one, or two strands naming
+  // different points, is an attribution nobody recorded, and guessing it
+  // stamps a delegate's start and finish under a number it never worked. The
+  // ordinary shape — one branch plus its own worktree — names one point and is
+  // unaffected.
+  const strands = evidence.filter((item) => item?.kind === 'branch' || item?.kind === 'worktree')
+  if (strands.length === 0) return null
+  const points = new Set(
+    strands.map((item) => (Number.isInteger(item?.point) && item.point > 0 ? item.point : null)),
+  )
+  return points.size === 1 ? [...points][0] : null
 }
 
 function emitDelegated(event, declaration, { at = Date.now(), result = null } = {}) {

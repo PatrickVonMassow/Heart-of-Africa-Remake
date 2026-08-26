@@ -166,12 +166,9 @@ describe('batch-in-flight — durable adoption CLI flags', () => {
     expect(events.at(-1)).toMatchObject({ point: 697 })
   })
 
-  // Ninth cross-vendor round: with a strand recorded but UNNUMBERED, the
-  // question used to fall through to the next point-bearing item — and a pid
-  // carries the OWNER's point, so the delegate's finish event was stamped with
-  // the owner's number after all. A declaration written by an older revision
-  // (or adopted from one) is exactly that shape.
-  it('answers null for an unnumbered strand instead of falling back to the pid point', () => {
+  // The finish event is emitted from the declaration as it stands ON DISK, so a
+  // legacy or adopted shape is written straight into the file and cleared.
+  const finishEventFor = (evidence) => {
     writeFileSync(
       inFlightPath(),
       JSON.stringify({
@@ -179,13 +176,9 @@ describe('batch-in-flight — durable adoption CLI flags', () => {
         at: Date.now(),
         waitingOn: 'legacy declaration',
         pid: process.pid,
-        evidence: [
-          { kind: 'pid', pid: process.pid, point: 713, phase: 'authoring' },
-          { kind: 'branch', ref: 'refs/heads/topic/live', point: null, phase: 'authoring' },
-        ],
+        evidence,
       }),
     )
-
     const result = spawnSync(process.execPath, [CLI, '--clear'], {
       encoding: 'utf8',
       env: {
@@ -197,14 +190,53 @@ describe('batch-in-flight — durable adoption CLI flags', () => {
       stdio: ['ignore', 'pipe', 'pipe'],
       windowsHide: true,
     })
-
     expect(result.status, result.stderr).toBe(0)
     const events = readFileSync(journalPath(), 'utf8')
       .split('\n')
       .filter(Boolean)
       .map((line) => JSON.parse(line))
     expect(events.at(-1)).toMatchObject({ event: 'delegated-finish' })
-    expect(events.at(-1).point).toBe(null)
+    return events.at(-1)
+  }
+
+  // Ninth cross-vendor round: with a strand recorded but UNNUMBERED, the
+  // question used to fall through to the next point-bearing item — and a pid
+  // carries the OWNER's point, so the delegate's finish event was stamped with
+  // the owner's number after all. A declaration written by an older revision,
+  // or adopted from one, is exactly that shape.
+  it('answers null for an unnumbered strand instead of falling back to the pid point', () => {
+    const event = finishEventFor([
+      { kind: 'pid', pid: process.pid, point: 713, phase: 'authoring' },
+      { kind: 'branch', ref: 'refs/heads/topic/live', point: null, phase: 'authoring' },
+    ])
+
+    expect(event.point).toBe(null)
+  })
+
+  // …and the same rule between the strands themselves: skipping the unnumbered
+  // one until a LATER strand carries a number is the same guess one step over.
+  it('answers null when the strands disagree, and their point when they agree', () => {
+    expect(
+      finishEventFor([
+        { kind: 'branch', ref: 'refs/heads/topic/live', point: null, phase: 'authoring' },
+        { kind: 'worktree', path: '/w/point-697', point: 697, phase: 'authoring' },
+      ]).point,
+    ).toBe(null)
+
+    expect(
+      finishEventFor([
+        { kind: 'branch', ref: 'refs/heads/feat/711-x', point: 711, phase: 'authoring' },
+        { kind: 'worktree', path: '/w/point-697', point: 697, phase: 'authoring' },
+      ]).point,
+    ).toBe(null)
+
+    // The ordinary shape — one branch and its own worktree — is untouched.
+    expect(
+      finishEventFor([
+        { kind: 'branch', ref: 'refs/heads/feat/697-strand', point: 697, phase: 'authoring' },
+        { kind: 'worktree', path: '/w/point-697', point: 697, phase: 'authoring' },
+      ]).point,
+    ).toBe(697)
   })
 
   it('refuses a declared point that the named branch contradicts, and writes nothing', () => {
