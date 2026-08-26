@@ -12090,3 +12090,59 @@ to land than a mechanism that needs a review.
   incident, and the proposed shape would have shipped four ways to be wrong about what "done"
   means.
   Bundle: Session- & Repo-Hygiene.
+
+- [ ] 936. A decision log on the board has no end but the user's veto (the user asked on
+  26.08.2026 at 11:21 why the "Automatische Entscheidung" card was still on the dashboard). It is
+  not an open point but the record of a decision the alert escalation ladder took by itself on
+  26.08.2026 at 05:34 — alarm "PARALLEL batch sessions", rung 5, five unanswered sends: the batch
+  keeps running, with a retroactive veto offered. `deriveStateCard` in
+  `scripts/board-state-core.mjs` renders that card out of `.claude/resilience/alert-escalation.json`
+  for as long as a record stands there, and NOTHING ever takes the record out again. Meanwhile the
+  matter is measurably settled: `batch-doctor --gate` ran on 26.08.2026 at 08:32, reported "repo
+  state CONSISTENT" and marked the parallel alarm handled — so the decision was right and its risk
+  is refuted. The card stands anyway and reads to the user like an open matter.
+  FINAL STATE:
+  - A DECISION LOG NAMES THE MEASUREMENT that would justify or refute it, and EXPIRES BY ITSELF
+    once that measurement has been taken and is clean — here: the doctor run that clears the
+    parallel session. Until then it stands.
+  - THE USER'S VETO REMAINS THE SECOND WAY OUT, never the only one.
+  - AN EXPIRED RECORD LEAVES A TRACE: the decision and the measurement that ended it stay readable
+    where such decisions are recorded, so an expiry is not a deletion.
+  VERIFIABLE: Vitest over the pure projection — a record whose named measurement is missing still
+  renders its card, the same record with a clean measurement renders none, and a record whose
+  measurement came back dirty keeps standing. Plus the real proof: with the 08:32 doctor run on
+  disk the dashboard no longer carries the 05:34 card.
+  Criticality: low-medium — it costs no correctness, but a board that keeps a settled decision
+  standing teaches the reader to skip the section that is supposed to be the one place a real
+  decision is visible.
+  Bundle: Chat & Tafel.
+
+- [ ] 937. After a landing the board's closing state is unreachable, and it blocks the branch
+  cleanup (measured 26.08.2026, 11:32-11:34, immediately after point 935 landed). The point-470
+  board gate refuses every state-changing call while the card "Gerade keine laufende Arbeit"
+  stands, and names three ways out; one of them is `node scripts/board.mjs closing <N>` for exactly
+  this in-between state — the point is merged AND ticked, its closing work still outstanding. Since
+  the derived now-section (point 713) that way out is DEAD: `closing <N>` writes a NUMBERED card,
+  and the projection removes, in the same edit operation, every numbered card whose point is no
+  longer open — a just-ticked point is by definition no longer open. Reproduced three times in a
+  row: the card is written, the publish step of the same edit operation takes it away, the gate
+  sees the empty statement again and keeps refusing. What was concretely blocked was `git branch -d
+  feat/935-derived-card-beside-idle` after the landing; the worktree could be removed
+  (`scripts/worktree-cleanup.mjs` is not a blocked call), the local and the remote branch stayed
+  and were left to `branch-hygiene-guard` as the backstop.
+  FINAL STATE:
+  - THE CLOSING CARD SURVIVES THE PROJECTION. It is a STATE card like the handover card and the
+    machine card and is exempted like those, or it carries no number — whichever the projection's
+    own shape makes honest.
+  - THE POST-LANDING CLEANUP PASSES THE GATE. Removing the local branch, the remote branch and the
+    worktree belongs in the list of calls the point-470 gate lets through as part of the session
+    end; today it names only `batch-boundary`, `focus`, `board-publish` and the work-order tick.
+  VERIFIABLE: Vitest over the projection — a closing card for a just-ticked point survives the
+  publish step that removes an ordinary numbered card for the same point; and over the gate — the
+  three cleanup calls are permitted while the idle card stands, an unrelated state-changing call is
+  still refused. Plus the real proof: the sequence that failed three times on 26.08. runs through
+  in one go.
+  Criticality: medium — it leaves merged branches alive behind every landing and pushes the work
+  onto a backstop guard, and it makes a documented way out of a documented state a dead letter.
+  Bundle: Chat & Tafel. It touches the same board projection as 930 and 935 and must not run
+  beside them.
