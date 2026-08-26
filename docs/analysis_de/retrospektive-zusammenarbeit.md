@@ -65,6 +65,7 @@ Das Musterbeispiel sind die Chat-Zeitstempel: neun Eskalationsstufen, acht weich
 | 26.08. | Der einzige ungeordnete Punkt der Sitzungseröffnung war eine Dublette: derselbe Vorschau-gegen-Tor-Widerspruch stand seit zwei Tagen als Punkt 873, 273 Positionen tiefer — gefunden wieder nur durch die Bündelpflicht, nicht beim Anlegen (§3.168-Nachtrag, Punkt 923 in 873 gefaltet) |
 | 26.08. | Das Push-Tor wies viermal denselben Push ab und druckte die Entlastung mit: kein benannter Fehlschlag, ein Läufer, der nicht fertig wurde — derselbe Befehl von Hand war in 164 s mit 13 778 grünen Fällen durch (§3.182, Punkt 924) |
 | 26.08. nachts | Zweimal grün über einer Attrappe, die das echte Board nur nachgebaut statt gelesen hat: Das Kritikalitäts-Stylesheet landete im Kommentar der Refresh-Routine, und die auf Zuruf nachgereichte Regressionsprüfung ließ genau die eine `<meta>`-Zeile weg, die den gemeinten Anker im echten Board verfehlen lässt — Runde zwei verschob und löschte dabei die BOM der Datei (§3.184, Punkt 844) |
+| 26.08. früh | Dritter Rückfall derselben Dublette, diesmal von mir: Ich legte einen frisch gemessenen Befund als Punkt 928 ab, obwohl Punkt 856 seit dem 23.08. genau ihn beschreibt — gefunden wieder erst von der Bündelpflicht, nicht beim Anlegen. Neu war nur die zweite Messung; sie ist jetzt in 856 nachgetragen (§3.168-Nachtrag, 928 in 856 gefaltet) |
 | 24.08. mittags | Der delegierte Autor schrieb drei Commits um, die er bereits veroeffentlicht hatte: Sein Abschluss-Push scheiterte als non-fast-forward, und sein eigener Bericht meldete die fertige Arbeit als „nur lokal“ — obwohl die Baeume beider Seiten byte-identisch waren und sich nur eine Leerzeile im Commit-Text unterschied. Wer dem Bericht glaubt, sucht verlorene Arbeit, die nie verloren war; wer ihn ignoriert, uebersieht den echten Fall. Dieselbe Stunde zeigte die Kehrseite von der Gegenseite: Ein Tor-Lauf im Arbeitsbaum wurde rot, weil die pruefende Sitzung selbst waehrenddessen auf main committete — kein Test schlug fehl, nur der Teardown benannte die Ref-Bewegung |
 | 11.08. abends | Der VS-Code-Neustart nimmt den Devcontainer mit — die Batch-Sitzung und sechs Agenten sterben, nachdem ich das Gegenteil zugesichert hatte (§3.111); die Rechte-Rückfragen kamen weiter, weil `defaultMode` eine fortgesetzte Sitzung gar nicht mehr erreicht (§3.3) |
 
@@ -1356,7 +1357,7 @@ Punktgrenze. Gebucht als Punkt 916.
 
 ## Anhang A — Maschinell gepflegte Quellen-Übersicht
 
-Zuletzt aktualisiert: Mittwoch, 26.08.2026, 04:31 · Quellen-Fingerprint: `359574d45a06…`
+Zuletzt aktualisiert: Mittwoch, 26.08.2026, 05:23 · Quellen-Fingerprint: `c4fcb7910a9c…`
 
 Spalten heuristisch aus den Quellen abgeleitet (Anläufe = distinkte Datumsnennungen im Memory;
 Maßnahme = Guard-Skripte mit Namens-Treffer). Die inhaltliche Bewertung gehört der Prosa oben.
@@ -1457,8 +1458,8 @@ Maßnahme = Guard-Skripte mit Namens-Treffer). Die inhaltliche Bewertung gehört
 
 Erfasste Quellen: 91 Feedback-/Projekt-Memories · 57 Guard-/Hook-Skripte · 6 Revert-/Reapply-Commits · 101 Prozess-/Meta-TASKS-Punkte (davon 42 offen).
 
-<!-- RETRO-FINGERPRINT: 359574d45a06bad825574032dc882072a0daecfc959907e2ed47bba8907a3f22 -->
-<!-- RETRO-LAST-REFRESHED: 2026-08-26T02:31:11.615Z -->
+<!-- RETRO-FINGERPRINT: c4fcb7910a9c4a8fce1baf4ae9df02a65df55a2c7a6cf5826f3126e460616864 -->
+<!-- RETRO-LAST-REFRESHED: 2026-08-26T03:23:36.017Z -->
 <!-- AUTO-GENERATED:END -->
 
 ### 3.111 Ein Erfolg ist kein Beweis für den Weg, auf dem er zustande kam
