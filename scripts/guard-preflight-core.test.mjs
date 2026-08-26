@@ -651,7 +651,15 @@ describe('GATHER-STEP REUSE (the drift guard)', () => {
   // three-commit guard branch), so the default 5 s budget makes these tests fail
   // for the state of the checkout rather than for a defect. The generous timeout
   // is the fail-soft; what they assert is unchanged.
-  const REAL_REPO_TIMEOUT_MS = 30_000
+  //
+  // RAISED AGAIN 26.08.2026, and the reason is worth keeping: the cost grows with
+  // the UNREVIEWED BACKLOG, not with this file. With ~40 contributions awaiting a
+  // cross-vendor review the sibling test measured 28.1 s against the 30 s budget,
+  // so every machine carrying any other load turned this into a red unit gate —
+  // which blocks the push, which stops the batch, for no defect at all. The
+  // budget must therefore stand clear of the backlog's growth, not just above
+  // today's reading.
+  const REAL_REPO_TIMEOUT_MS = 180_000
 
   /**
    * THE ID THESE TWO RUN UNDER (point 434 (8), four-eyes re-check, SHOULD-FIX 2).

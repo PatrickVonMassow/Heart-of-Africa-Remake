@@ -5,9 +5,9 @@
 // tree and is fail-OPEN. --status answers regardless of who owns the batch
 // lock: a probe that stays silent under another owner is indistinguishable from
 // "nothing wrong", which is the very defect this guard looks for.
-import { existsSync, readFileSync, readdirSync } from 'node:fs'
+import { existsSync, readFileSync, readdirSync, statSync } from 'node:fs'
 import { resolve } from 'node:path'
-import { execSync } from 'node:child_process'
+import { spawnSync } from 'node:child_process'
 import { anchorCommand, auditGuardHealth, commandAnchoring, formatGuardHealth } from './guard-health-core.mjs'
 import { parseHookTable } from './guard-inventory-core.mjs'
 import { heldByOtherLiveOwner } from './batch-singleton.mjs'
@@ -19,48 +19,85 @@ const SCRIPTS = repoPath('scripts')
 const SETTINGS = repoPath('.claude', 'settings.json')
 const PAUSE = repoPath('.claude', 'batch-paused')
 
+/** Names Git itself may invoke from core.hooksPath. A readable sample beside
+ * them is documentation, not wiring; a non-executable recognized file cannot
+ * fire on POSIX either. */
+export const RECOGNIZED_GIT_HOOKS = new Set([
+  'applypatch-msg', 'pre-applypatch', 'post-applypatch', 'pre-commit', 'pre-merge-commit',
+  'prepare-commit-msg', 'commit-msg', 'post-commit', 'pre-rebase', 'post-checkout',
+  'post-merge', 'pre-push', 'pre-receive', 'update', 'proc-receive', 'post-receive',
+  'post-update', 'reference-transaction', 'push-to-checkout', 'pre-auto-gc',
+  'post-rewrite', 'sendemail-validate', 'fsmonitor-watchman', 'p4-changelist',
+  'p4-prepare-changelist', 'p4-post-changelist', 'p4-pre-submit', 'post-index-change',
+])
+
 /**
- * Everything that could invoke an enforcer: the hook settings plus the contents
- * of an ACTIVE git hooks directory. An inactive hooks path contributes nothing —
- * which is the point, since that is exactly how a gate script ends up dead.
+ * Measure every command that could invoke an enforcer. Any unreadable source is
+ * UNKNOWN, never an empty source: proceeding on the readable half produced both
+ * false refusals named by the cross-vendor review of aeedceb.
  *
- * TWO shapes, on purpose (point 438). The BLOB answers "is this enforcer named
- * anywhere at all", where a git hook counts exactly like a settings line. The
- * ANCHORING check may not read that blob: `scripts/git-hooks/pre-push` and
- * `commit-msg` are relative on purpose — git runs a hook from the repo root — so
- * it gets the settings' hook rows STRUCTURED and never sees the git hooks. A
- * settings file that will not parse yields `hooks: null`, i.e. "not measured".
+ * Dependencies are injectable so Vitest can assert the failure distinctions
+ * without touching the live repository or its shared Git config.
  */
-function wiringText() {
-  let text = ''
-  let hooks = null
+export function measureWiringSources({
+  readSettings = () => readFileSync(SETTINGS, 'utf8'),
+  gitConfig = () => spawnSync('git', ['config', '--get', 'core.hooksPath'], {
+    cwd: REPO_ROOT,
+    encoding: 'utf8',
+    windowsHide: true,
+  }),
+  pathExists = existsSync,
+  readDir = readdirSync,
+  hookStat = statSync,
+  readHook = (path) => readFileSync(path, 'utf8'),
+} = {}) {
+  let hookCommands
   try {
-    const raw = readFileSync(SETTINGS, 'utf8')
-    text += raw
-    hooks = parseHookTable(JSON.parse(raw))
-  } catch {
-    /* no settings, or unparsable — everything reads as unwired, so fail open below */
+    const parsed = JSON.parse(readSettings())
+    hookCommands = parseHookTable(parsed)
+  } catch (error) {
+    return { ok: false, why: `Hook-Einstellungen nicht messbar (${error?.message ?? error})` }
   }
-  try {
-    const hooksPath = execSync('git config core.hooksPath', {
-      cwd: REPO_ROOT,
-      encoding: 'utf8',
-      windowsHide: true,
-    }).trim()
+
+  const configured = gitConfig()
+  const stderr = String(configured?.stderr ?? '').trim()
+  if (configured?.error || (configured?.status !== 0 && !(configured?.status === 1 && !stderr))) {
+    return {
+      ok: false,
+      why: `aktiver Git-Hook-Pfad nicht messbar (${stderr || configured?.error?.message || `git exit ${configured?.status}`})`,
+    }
+  }
+
+  const wiringCommands = hookCommands.map((row) => row.command)
+  const hooksPath = configured?.status === 0 ? String(configured.stdout ?? '').trim() : ''
+  if (hooksPath) {
     const dir = resolve(REPO_ROOT, hooksPath)
-    if (hooksPath && existsSync(dir)) {
-      for (const f of readdirSync(dir)) {
+    if (pathExists(dir)) {
+      let names
+      try {
+        names = readDir(dir)
+      } catch (error) {
+        return { ok: false, why: `aktives Git-Hook-Verzeichnis nicht lesbar (${error?.message ?? error})` }
+      }
+      for (const name of names) {
+        if (!RECOGNIZED_GIT_HOOKS.has(name)) continue
+        const path = resolve(dir, name)
+        let executable
         try {
-          text += readFileSync(resolve(dir, f), 'utf8')
-        } catch {
-          /* unreadable hook file */
+          executable = (hookStat(path).mode & 0o111) !== 0
+        } catch (error) {
+          return { ok: false, why: `Git-Hook ${name} nicht messbar (${error?.message ?? error})` }
+        }
+        if (!executable) continue
+        try {
+          wiringCommands.push(...String(readHook(path)).split(/\r?\n/))
+        } catch (error) {
+          return { ok: false, why: `aktiver Git-Hook ${name} nicht lesbar (${error?.message ?? error})` }
         }
       }
     }
-  } catch {
-    /* no hooksPath configured — nothing to add */
   }
-  return { text, hooks }
+  return { ok: true, wiringCommands, hookCommands }
 }
 
 /**
@@ -79,12 +116,8 @@ export function gatherGuardHealthInputs({ sessionId = '', ignoreOwnership = fals
     if (existsSync(PAUSE)) return { applicable: false, why: 'the batch is paused' }
   }
 
-  const { text: wiredText, hooks: hookCommands } = wiringText()
-  // No wiring source readable at all: every enforcer would look dead. That is a
-  // measurement failure, not a finding — say so instead of blocking on it.
-  if (!wiredText.trim()) {
-    return { applicable: false, why: 'Verdrahtungsquelle nicht lesbar — keine Aussage möglich' }
-  }
+  const wiring = measureWiringSources()
+  if (!wiring.ok) return { applicable: false, why: `${wiring.why} — keine Aussage möglich` }
 
   const files = readdirSync(SCRIPTS)
   const sources = {}
@@ -96,7 +129,15 @@ export function gatherGuardHealthInputs({ sessionId = '', ignoreOwnership = fals
       /* unreadable: left undefined so its testedness is not judged */
     }
   }
-  return { applicable: true, inputs: { files, sources, wiredText, hookCommands } }
+  return {
+    applicable: true,
+    inputs: {
+      files,
+      sources,
+      wiringCommands: wiring.wiringCommands,
+      hookCommands: wiring.hookCommands,
+    },
+  }
 }
 
 /**

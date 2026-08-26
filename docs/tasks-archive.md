@@ -24069,3 +24069,55 @@ Nummerierung bleiben deshalb identisch — hier wird nur verschoben, nie umgesch
   Criticality: low — it is a legibility defect on the surface the user reads on his phone, and it
   costs no correctness.
   Bundle: Chat & Tafel.
+
+- [x] 943. The unreviewed four-eyes backlog is worked off as one pulled-forward point. The
+  mechanism-review-guard reported 25 contributions without a valid cross-vendor review on 26.08.2026
+  (one of them in review that night; 24 older). Two carry an unanswered DO-NOT-MERGE from GPT-5.6
+  Sol with named findings (`aeedceb` guard-health-guard, `c3f5ad8` queue-order-guard-core) whose
+  verdicts demand fix-then-re-review — real work, not bookkeeping; a third (`92cbc0e`) had its
+  review split into two passes with only one recorded. The backlog blocks every session exit and
+  grows while it stands. DECIDED 26.08.2026, 16:47, under the user's delegation of such calls
+  ("löse solche Probleme immer nach deinem Ermessen"): one own point, pulled in front of the
+  running queue; the answer with the verbatim quote sits in the VDZK answer carrier.
+  FINAL STATE:
+  - The two DO-NOT-MERGE findings are fixed and their commits re-reviewed cross-vendor, first.
+  - The missing second pass of `92cbc0e` is run and recorded.
+  - Every remaining backlog entry has a recorded valid review, or a recorded retirement reason the
+    guard honours; the count is re-measured at start (it grows) and reported at close.
+  MEASURED 26.08.2026, answering the user's question whether this backlog is what the Fable switch
+  being off (20.08. 17:34 – 22.08. 16:26) left behind: it is not. Review is cross-vendor — Sol reads
+  Anthropic work and Opus reads Sol work — so the switch removed no reviewer; Fable is only the
+  weaker same-vendor fallback, and its trace in the off window is a recorded merger fallback on
+  blind merges, nothing else. The ledger shows no dip either (54 verdicts on 20.08., 62 on 21.08.,
+  44 on 22.08.). The backlog is mostly UNANSWERED rather than unreviewed, reaching back to at least
+  10.08. and surfaced by the guard's 26.08. measurement.
+  TICKET MAP, measured 26.08.2026, because this point overlaps points that already exist: `c3f5ad8`
+  belongs to the closed point 789 and `92cbc0e` to the closed point 864, while `aeedceb` is a revert
+  landed straight on main with no point of its own — all three are on origin/main, so this backlog is
+  precisely LANDED AND TICKED work whose reviews stand unanswered. The two DO-NOT-MERGE finding sets
+  are ALSO already filed as their own OPEN points — 876 (guard-health reads absence and measurement
+  failure as one state) and 877 (the urgency parser's negation and question findings) — and point 837
+  inventories the wider four-eyes debt of the same range. Reconcile that overlap when this point is
+  worked: what this point's leg 1 fixed is what 876 and 877 describe, so they close with it or are
+  re-cut, and neither is worked twice.
+  MEASURED AND CUT 26.08.2026, 22:40, at the close of this point's own working stretch. Legs 1 and
+  2 are done and cross-vendor clean. Leg 3 as written is NOT REACHABLE and is cut out to point 957,
+  with the numbers that say so: the backlog stood at 45 outstanding review passes when this stretch
+  opened and at 42 when it closed — six passes were genuinely reviewed and recorded in between, and
+  this point's own new commits owed some back. On MAIN's baseline the same range plans 115 passes
+  over 15.1 million characters, and its diffstat alone (27 948 characters) does not fit one round's
+  share, so no plan assembles at all. The gate on main therefore stays SUSPENDED, with one named
+  cause: `.claude/mechanism-reviews.jsonl`, whose diff over those 226 commits is 489 311 characters
+  and fits no round. Clearing that by reviewing is arithmetic nobody can win — the range grows while
+  it is read. What this point DID deliver beside its two legs: the gap measurement no longer charges
+  a binary's megabytes where the packer sends a one-line ABSENT-BY-DESIGN header (main's range fell
+  from 32.5 to 15.1 million characters on that alone), and the retrospective — owner prose with its
+  own guard, past any round — left the demand like the work order. A blanket ledger exclusion and an
+  extension-based blob exclusion were both BUILT AND WITHDRAWN under Sol's review, each because it
+  would have hidden something a reader must see; the reasoning is in the branch's commits.
+  VERIFIABLE: the two DO-NOT-MERGE findings are answered by recorded cross-vendor passes, the
+  missing `92cbc0e` pass is recorded, and the backlog count is reported at open and at close.
+  Criticality: high — until it clears, every landing session drags the same block.
+  Bundle: Modell & Wächter. It performs reviews and fixes on already-landed guard code; it edits
+  the review ledger only through the recording commands, so it is worked before 916 changes what
+  the ledger reader accepts, never beside it.

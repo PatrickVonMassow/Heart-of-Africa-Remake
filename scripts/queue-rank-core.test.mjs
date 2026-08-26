@@ -579,32 +579,38 @@ describe('URGENCY is read off what the point STATES', () => {
     // … unless it is one of the idioms that ARE a denial, whole.
     expect(statesHighUrgency('It blocks the release under no circumstances.')).toBe(false)
     expect(statesHighUrgency('It stops the batch in no case.')).toBe(false)
+    // A condition around the fix STATES what happens without it; `without`
+    // does not deny the blocking predicate across the comma. A denial of a
+    // different action before a connector likewise leaves the assertion live.
+    expect(statesHighUrgency('Without a fix, it blocks the release.')).toBe(true)
+    expect(statesHighUrgency('It cannot be deferred because it blocks the release.')).toBe(true)
     // …while the condition's OWN "cannot" is not read as a denial of itself.
     expect(statesHighUrgency('It holds a red that cannot otherwise close.')).toBe(true)
     expect(statesHighUrgency('It blocks a lane — no Sol-authored point can be served.')).toBe(true)
   })
 
-  it('states its residual exactly — an UNRECORDED point is refused either way', () => {
-    // THE STATED RESIDUAL, in both halves. No cue list closes every English
-    // construction: a denial split across sentences still reads as a claim.
+  it('does not promote a question or hypothetical mention into an assertion', () => {
     const split = 'Does it block the release? No.'
-    expect(statesHighUrgency(split)).toBe(true)
+    expect(statesHighUrgency(split)).toBe(false)
+    expect(statesHighUrgency('If it blocks the release, rank it ahead.')).toBe(false)
+    expect(statesHighUrgency('It would block the release if shipped.')).toBe(false)
     const front = { at: 't', why: 'legacy', points: [] }
     const bare = { ranked: {}, settled: { at: 't', points: [50] }, boundary: front }
-    // With NO front decision the false reading costs only wording: still refused.
+    // With no front decision the point is refused as non-high before the record
+    // question can excuse it.
     expect(releaseBoundaryBreaches([60, 50], bare, { releasePoint: 50, bodies: { 60: split } })).toEqual([
-      { point: 60, cause: 'unrecorded' },
+      { point: 60, cause: 'not-high' },
     ])
-    // With one already recorded it DOES keep the placement alive — the narrow
-    // edge this rule accepts, and the reason the flat claim was withdrawn.
+    // A prior recorded decision is not a permanent exemption after the body is
+    // rewritten as a question.
     const recorded = {
       ranked: { 60: { at: '', why: 'it cannot wait', origin: ORIGIN_MACHINE, place: PLACE_AHEAD } },
       settled: { at: 't', points: [50] },
       boundary: front,
     }
-    expect(releaseBoundaryBreaches([60, 50], recorded, { releasePoint: 50, bodies: { 60: split } })).toEqual([])
-    // …while a body the reading gets RIGHT withdraws the placement at once, so a
-    // recorded decision is not a permanent exemption.
+    expect(releaseBoundaryBreaches([60, 50], recorded, { releasePoint: 50, bodies: { 60: split } })).toEqual([
+      { point: 60, cause: 'not-high' },
+    ])
     expect(releaseBoundaryBreaches([60, 50], recorded, { releasePoint: 50, bodies: { 60: MEDIUM } })).toEqual([
       { point: 60, cause: 'not-high' },
     ])

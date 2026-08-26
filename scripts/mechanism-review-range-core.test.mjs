@@ -7,6 +7,9 @@ import {
   eligibleReviewer,
   outstandingFiles,
   planAuthorshipGroups,
+  REVIEW_END_STATE_EXCLUSIONS,
+  reviewEndStateExclusion,
+  reviewEndStateFiles,
   summarizeReviewDebt,
   vendorOf,
 } from './mechanism-review-range-core.mjs'
@@ -16,6 +19,46 @@ const sha = (letter) => letter.repeat(40)
 const commit = (id, authorModel, files) => ({ sha: sha(id), authorModel, files })
 
 describe('authorship-cut mechanism review planning', () => {
+  it('owes no pass for a range touching only the two work-order documents', () => {
+    const files = ['TASKS.md', 'docs/tasks-archive.md']
+    const plan = planAuthorshipGroups({
+      commits: [commit('a', 'GPT-5.6 Sol', files)],
+      endStateFiles: files,
+    })
+    expect(reviewEndStateFiles(files)).toEqual([])
+    expect(plan.groups).toEqual([])
+    expect(plan.artefacts).toEqual([])
+    expect(plan.dropped).toEqual(
+      files.map((file) => expect.objectContaining({ file, reason: REVIEW_END_STATE_EXCLUSIONS[file] })),
+    )
+  })
+
+  it('owes no pass for the retrospective, which has its own guard and no round can hold', () => {
+    const ledger = '.claude/mechanism-reviews.jsonl'
+    // The LEDGER is deliberately NOT excluded (Sol, review of 334f7c6 and
+    // cd1c16e): a deleted or rewritten row is a real change somebody must read,
+    // and an appended one is where a hand-written forgery would sit.
+    expect(reviewEndStateExclusion(ledger)).toBe(null)
+    expect(reviewEndStateFiles([ledger])).toEqual([ledger])
+    const retro = 'docs/analysis_de/retrospektive-zusammenarbeit.md'
+    expect(reviewEndStateFiles([retro])).toEqual([])
+    expect(reviewEndStateExclusion(retro)).toMatch(/retro-currency-guard/)
+  })
+
+  it('still owes the mechanism beside an excluded work-order document', () => {
+    const mechanism = 'scripts/four-eyes-guard.mjs'
+    const plan = planAuthorshipGroups({
+      commits: [commit('a', 'GPT-5.6 Sol', ['TASKS.md', mechanism])],
+      endStateFiles: ['TASKS.md', mechanism],
+    })
+    expect(plan.groups).toEqual([
+      expect.objectContaining({ files: [mechanism], reviewer: 'Opus 5' }),
+    ])
+    expect(plan.dropped).toEqual([
+      expect.objectContaining({ file: 'TASKS.md', reason: REVIEW_END_STATE_EXCLUSIONS['TASKS.md'] }),
+    ])
+  })
+
   it('groups single-vendor files and names an other-vendor reviewer', () => {
     const plan = planAuthorshipGroups({
       commits: [
@@ -150,18 +193,20 @@ describe('authorship-cut mechanism review planning', () => {
   })
 
   it('attributes a trailerless merge to the contribution at its merged-parent tip', () => {
-    const ledger = '.claude/mechanism-reviews.jsonl'
+    // Any ordinary carried file — the subject here is merge attribution, not
+    // which paths the gate demands.
+    const carried = 'scripts/carried-notes.md'
     const plan = planAuthorshipGroups({
       commits: [
         { ...commit('a', 'GPT-5.6 Sol', ['sol-only']), parentShas: [] },
-        { ...commit('b', 'Claude Opus 5', [ledger]), parentShas: [] },
-        { sha: sha('c'), parentShas: [sha('a'), sha('b')], files: [ledger] },
+        { ...commit('b', 'Claude Opus 5', [carried]), parentShas: [] },
+        { sha: sha('c'), parentShas: [sha('a'), sha('b')], files: [carried] },
       ],
     })
     expect(plan.groups).toEqual([
       expect.objectContaining({ files: ['sol-only'], commits: [sha('a')], reviewer: 'Opus 5' }),
       expect.objectContaining({
-        files: [ledger],
+        files: [carried],
         commits: [sha('b'), sha('c')],
         authors: ['Claude Opus 5'],
         reviewer: 'GPT-5.6 Sol',

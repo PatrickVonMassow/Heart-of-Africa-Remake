@@ -1377,6 +1377,27 @@ Die Antwort ist nicht ein weicheres Tor, sondern ein früheres: Eine Zeile, die 
 so geschrieben hätte, muss beim **Schreiben** auffallen, nicht Wochen später an einer fremden
 Punktgrenze. Gebucht als Punkt 916.
 
+**Die Reinheitsprüfung kann Nachbararbeit nicht von Verunreinigung unterscheiden.**
+Gemessen am 26.08.2026, als zum ersten Mal zwei delegierte Autorenbahnen gleichzeitig
+liefen: Die Schlussprüfung des Testlaufs wacht zu Recht darüber, dass die Tests das
+echte Repository nicht anfassen — sie fällt den ganzen Lauf, sobald sich während des
+Laufs eine Referenz bewegt hat. Nur bewegt sich bei paralleler Arbeit ständig eine:
+Die delegierten Autoren committen auf ihren eigenen Zweigen alle paar Minuten, weil
+genau das ihre Arbeit rettbar macht. Damit ist praktisch jeder Lauf rot, den der
+Besitzer neben einer laufenden Bahn macht — und jedes Push-Tor dazu. Der einzelne
+Wiederholungslauf des Tors hat den Abend zweimal gerettet und ist genau deshalb keine
+Antwort: Er kostet eine volle Suite und meldet sich selbst als verdächtig. Die Prüfung
+braucht den Begriff „gehört zu mir“: der eigene Arbeitsstand ja, ein fremder erklärter
+Zweig nein. Gebucht als Punkt 955.
+
+**„Freigabe mit Auflagen" merkt sich die Auflage nicht.** Ebenfalls am 26.08.2026
+gefunden, beim Lesen des Prüfregisters: Ein Urteil `merge-with-fixes` erfüllt das
+Vier-Augen-Tor — die benannte Auflage selbst schuldet danach niemand mehr. Ein solcher
+Fall stand seit Wochen offen, ohne dass ein Wächter ihn sehen konnte, denn aus Sicht
+des Registers ist der Beitrag geprüft. Das ist die stillste Art, eine eingebaute
+Prüfung zu verlieren: nicht durch Umgehung, sondern dadurch, dass die halbe Zusage
+keinen Träger hat. Gebucht als Punkt 956.
+
 <!-- AUTO-GENERATED:START -->
 <!-- Dieser Abschnitt wird maschinell von scripts/retro-refresh.mjs gepflegt.
      NICHT von Hand editieren — der naechste Refresh ueberschreibt ihn.
@@ -1384,7 +1405,7 @@ Punktgrenze. Gebucht als Punkt 916.
 
 ## Anhang A — Maschinell gepflegte Quellen-Übersicht
 
-Zuletzt aktualisiert: Mittwoch, 26.08.2026, 19:41 · Quellen-Fingerprint: `400d62f8c3b1…`
+Zuletzt aktualisiert: Mittwoch, 26.08.2026, 23:07 · Quellen-Fingerprint: `d6419f54f7c5…`
 
 Spalten heuristisch aus den Quellen abgeleitet (Anläufe = distinkte Datumsnennungen im Memory;
 Maßnahme = Guard-Skripte mit Namens-Treffer). Die inhaltliche Bewertung gehört der Prosa oben.
@@ -1422,7 +1443,7 @@ Maßnahme = Guard-Skripte mit Namens-Treffer). Die inhaltliche Bewertung gehört
 | Work at High effort by default; the user reserves Extra high for research and design decisions, not implementation | 4 | hoch | — (Regel/Memory) | ◐ Regel |
 | Write idiomatic English in all English text (README, code comments, commit messages) — no German calques like 'stand' for a version | 1 | niedrig | — (Regel/Memory) | ◐ Regel |
 | Fable is NOT the default lane because its volume is the scarcest; difficulty is no reason for it either (since 18.08.2026 hard cases go straight to Sol), and review is cross-vendor, not Fable-by-default | 4 | hoch | — (Regel/Memory) | ◐ Regel |
-| Findings recorded by a session that could not write the work order — carry each into TASKS.md, then mark it drained | 27 | hoch | findings-guard.mjs | ✔ Mechanismus |
+| Findings recorded by a session that could not write the work order — carry each into TASKS.md, then mark it drained | 29 | hoch | findings-guard.mjs | ✔ Mechanismus |
 | A recurring lookup gets a script; never pull raw transcripts, listings, or logs into context to answer it | 1 | niedrig | — (Regel/Memory) | ◐ Regel |
 | Past the 150k context watermark, FINISH the step and hand over — never start a suite, an agent or a point after it; the user raised the cost twice (13.08. and 17.08.2026) | 2 | mittel | — (Regel/Memory) | ◐ Regel |
 | User 18.08.2026: hard, complex, error-prone and HIGH-criticality points are AUTHORED by GPT-5.6 Sol directly — Opus 5 authors only what is left, and Fable authors only a point that tags its lane or one the router escalates | 4 | hoch | — (Regel/Memory) | ◐ Regel |
@@ -1485,8 +1506,8 @@ Maßnahme = Guard-Skripte mit Namens-Treffer). Die inhaltliche Bewertung gehört
 
 Erfasste Quellen: 91 Feedback-/Projekt-Memories · 57 Guard-/Hook-Skripte · 6 Revert-/Reapply-Commits · 106 Prozess-/Meta-TASKS-Punkte (davon 46 offen).
 
-<!-- RETRO-FINGERPRINT: 400d62f8c3b17509dd1bda4bff67952e81330b136e2af3e3bd431b284f319736 -->
-<!-- RETRO-LAST-REFRESHED: 2026-08-26T17:41:47.728Z -->
+<!-- RETRO-FINGERPRINT: d6419f54f7c501889ee8e8122e63a8366ae2b2cd5f3f32cd5f36b2b55be9dd02 -->
+<!-- RETRO-LAST-REFRESHED: 2026-08-26T21:07:55.179Z -->
 <!-- AUTO-GENERATED:END -->
 
 ### 3.111 Ein Erfolg ist kein Beweis für den Weg, auf dem er zustande kam
@@ -4021,3 +4042,38 @@ bequemsten. Wer einen Absturz von der Zuordnung ausschließt, hat den Fall ausge
 die Zuordnung am dringendsten gebraucht wird — und wer die Zuordnung beim Aufzeichnen festschreibt
 statt beim Urteilen, macht die eigene Buchführung fälschungssicher gegen sich selbst. Beides gehört
 zum offenen Punkt 734; die Ausnahme dieses Tages ist sein Beleg.
+
+### 3.194 Die Forderung wuchs schneller, als irgendwer sie erfüllen konnte
+
+Der Vier-Augen-Wächter über Mechanismen verlangt, dass ein zweites Modell liest, was seit dem
+letzten bestätigten Grundstand an Wächtern, Toren und ihren Kernen geändert wurde. Solange dieser
+Grundstand mitwandert, ist das eine kleine, tägliche Bitte. Am 26.08.2026 wurde gemessen, was
+passiert, wenn er es nicht tut: Auf main lag er 226 Mechanismus-Commits zurück. Eine Gegenlesung
+dieses Bereichs plant 115 Passagen über 15,1 Millionen Zeichen; schon die Änderungsübersicht allein
+passt in keine Runde, also entsteht überhaupt kein Plan. Der Wächter tat dann das einzig
+Vernünftige, das ihm einprogrammiert war — er setzte sich aus. Und genau dort schließt sich die
+Falle: Während er ausgesetzt ist, landen weiter Commits, der Bereich wächst, und die Aussetzung
+wird dauerhaft. Der Rückstand wächst exakt so lange, wie ihn niemand abtragen kann.
+
+Am eigenen Prüfbuch wird es unstrittig. Über diese 226 Commits braucht `.claude/mechanism-reviews.jsonl`
+489311 Zeichen Differenz und passt in keine Runde; über einen normalen Zweig sind es 10765 und es
+liest sich in einer Minute. Dieselbe Datei, dieselbe Regel — nur der Bereich entscheidet, ob die
+Forderung erfüllbar ist oder nicht.
+
+Zwei Umwege waren an diesem Abend verlockend, und beide wurden gebaut und unter Gegenlesung wieder
+eingesammelt: Bilddateien pauschal aus der Forderung zu nehmen, und das Prüfbuch selbst
+auszuschließen. Der erste war falsch, weil der Materialpacker Binärdateien längst richtig behandelt
+— er schickt eine Kopfzeile statt der Megabytes — und nur die MESSUNG ihm widersprach; der Fehler
+lag also im Messgerät, nicht in der Forderung. Der zweite war falsch, weil eine gelöschte oder
+umgeschriebene Zeile im Prüfbuch genau die Änderung ist, die jemand lesen muss. Was übrig blieb,
+war die Korrektur des Messgeräts: 32,5 Millionen Zeichen fielen auf 15,1, und die Aussetzung hat
+seither EINE benannte Ursache statt eines Nebels.
+
+**Lehre:** Eine Forderung muss an einen Gegenstand gebunden sein, der nicht wächst — an den
+einzelnen Beitrag, nicht an einen offenen Bereich. Ein Wächter, dessen Anspruch mit der Zeit
+mitwächst, hat einen eingebauten Kipp-Punkt, ab dem er nichts mehr durchsetzt und trotzdem als
+Absicherung gilt; das ist derselbe Defekt wie ein Wächter, der gar nicht verdrahtet ist, nur mit
+einem Datum davor. Und wenn eine Forderung unerfüllbar wird, ist der erste Verdacht das MESSGERÄT,
+nicht der Anspruch: Zweimal an diesem Abend sah die Forderung unerfüllbar aus, weil gemessen wurde,
+was nie verschickt worden wäre. Das gehört zum offenen Punkt 957; Punkt 943 ist die Messung, die
+ihn geschnitten hat.

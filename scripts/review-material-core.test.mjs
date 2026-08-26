@@ -853,9 +853,12 @@ describe('the passes a range too large is cut into', () => {
     const huge = ['diff --git a/x.md b/x.md', `+${'y'.repeat(30_000)}`].join('\n')
     const plan = planPasses({ stat: 's', patch: huge, files: [file('x.md', 10)], budget: 5000 })
     expect(plan.uncoverable.map((u) => u.path)).toEqual(['x.md'])
+    expect(plan.uncoverable[0].reason).toContain('complete diff plus required frame')
+    expect(plan.uncoverable[0].reason).toContain('one round has')
     expect(plan.passes.flatMap((p) => p.files)).not.toContain('x.md')
     expect(plan.fits).toBe(false)
     expect(formatCoveragePlan(plan)).toContain('0% planned coverage (0/1 changed files); x.md')
+    expect(formatBudgetNotice(plan)).toContain(`x.md — ${plan.uncoverable[0].reason}`)
   })
 
   it('costs a deleted file from the patch alone, so it is not lost from the plan', () => {

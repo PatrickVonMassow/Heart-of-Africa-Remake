@@ -333,7 +333,10 @@ export const LIMITS = {
   // 26.08.2026, evening: the mutually-wedging-recovery lesson was folded INTO the standstill
   // pitfall and the fixture-derivation clause moved fully to the retrospective (§3.190 carries
   // it), so the ceiling follows the measurement DOWN by five words — a tightening, no raise.
-  maxWords: 4245,
+  // 26.08.2026, late: the growing-duty lesson (§3.194) was ADDED and six older entries gave up
+  // their narration for it, so the ceiling follows the measurement DOWN by forty-six — the guide
+  // is shorter than before it learned tonight's class.
+  maxWords: 4199,
   // A pitfall entry = the risk lines plus its prompt. Anything longer is a
   // story, not a tip.
   maxEntryLines: 11,

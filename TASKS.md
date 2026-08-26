@@ -111,6 +111,15 @@ put it is the mistake this line exists to stop.
   as points 942 and 937. Either a read-only ask exists for every model the switch can name as
   merger (the obvious shape is `ask-sol.mjs` generalised to `--model`, keeping the routing
   refusal), or the fold is a lane the boundary HANDS OVER, with a mechanism that requests it.
+- ONE MORE STOP-PATH, measured 26.08.2026 while cross-reading `7d1a39d` for point 943.
+  `mechanism-review-guard.mjs` builds `buildAuthorshipPassPlan` INSIDE the same `try` that calls
+  `assessReviewGap`. Before that commit only `assessReviewGap` could fail there; now a throw from
+  `review-sol.mjs`'s planner also leaves `gap` null, and `guardOutcome` then BLOCKS. It is
+  fail-closed, so nothing is waved through — but the gap clause exists precisely so an unassemblable
+  range cannot trap the session, and it is now coupled to a second module's health. A broken
+  `review-sol.mjs` therefore turns a suspendable range into a hard block with no runnable review,
+  which is this point's own class. Fix shape: build the sized plan in its own `try`, so a planner
+  failure degrades to the unsliced measurement instead of removing the clause.
   VERIFIABLE: a chaos drill (Urlaubsfestigkeit pattern) that recreates a total wedge and measures
   the fallback restoring the batch without human action; drills must call the real thing
   (memory `drills-must-call-the-thing`).
@@ -147,25 +156,42 @@ put it is the mistake this line exists to stop.
   the stop needs a human to clear.
   Bundle: Urlaubsfestigkeit. It is a stop-the-batch path and belongs to 947's sweep.
 
-- [ ] 943. The unreviewed four-eyes backlog is worked off as one pulled-forward point. The
-  mechanism-review-guard reported 25 contributions without a valid cross-vendor review on 26.08.2026
-  (one of them in review that night; 24 older). Two carry an unanswered DO-NOT-MERGE from GPT-5.6
-  Sol with named findings (`aeedceb` guard-health-guard, `c3f5ad8` queue-order-guard-core) whose
-  verdicts demand fix-then-re-review — real work, not bookkeeping; a third (`92cbc0e`) had its
-  review split into two passes with only one recorded. The backlog blocks every session exit and
-  grows while it stands. DECIDED 26.08.2026, 16:47, under the user's delegation of such calls
-  ("löse solche Probleme immer nach deinem Ermessen"): one own point, pulled in front of the
-  running queue; the answer with the verbatim quote sits in the VDZK answer carrier.
+- [ ] 957. The four-eyes gate's baseline can outrun every review that could clear it, so the gate
+  lives suspended instead of enforcing. MEASURED 26.08.2026 while working point 943, which was cut
+  here: on main the confirmed baseline sits 226 mechanism commits back, and a review of that range
+  plans 115 passes over 15.1 million characters — its diffstat alone (27 948 characters) is past one
+  round's share, so `planPasses` assembles nothing and the gap clause suspends the gate. Under
+  suspension commits keep landing, so the range only grows: the debt compounds exactly while nobody
+  can pay it. One file makes it unarguable — `.claude/mechanism-reviews.jsonl`, this gate's own
+  ledger, whose diff across those commits is 489 311 characters and fits no round; over a normal
+  branch range the same file's diff is 10 765 characters and reviews fine. The demand is therefore
+  not too strict, it is scoped to the wrong thing: an unbounded RANGE rather than a contribution.
   FINAL STATE:
-  - The two DO-NOT-MERGE findings are fixed and their commits re-reviewed cross-vendor, first.
-  - The missing second pass of `92cbc0e` is run and recorded.
-  - Every remaining backlog entry has a recorded valid review, or a recorded retirement reason the
-    guard honours; the count is re-measured at start (it grows) and reported at close.
-  VERIFIABLE: `mechanism-review-guard --status` reports zero unreviewed backlog contributions.
-  Criticality: high — until it clears, every landing session drags the same block.
-  Bundle: Modell & Wächter. It performs reviews and fixes on already-landed guard code; it edits
-  the review ledger only through the recording commands, so it is worked before 916 changes what
-  the ledger reader accepts, never beside it.
+  - The review a contribution owes is BOUNDED BY THAT CONTRIBUTION, not by how far the baseline has
+    fallen behind. A commit's own change is reviewable the day it lands and stays reviewable; a
+    stale baseline may make the gate demand MORE reviews, never one that no round can hold.
+  - The gate's suspension becomes rare and named rather than permanent: after the change, main's
+    current range either assembles into runnable passes or names the exact contribution that cannot
+    be assembled — never a 15-million-character fog.
+  - The historical backlog reachable only through the old scoping gets a RECORDED disposition, per
+    contribution: reviewed, or retired with the measured reason the guard honours. Point 943's
+    measurement (45 passes at open, 42 at close, 115 on main's baseline) is the starting count.
+- ONE TEXT DEFECT MEASURED ON THE WAY, 26.08.2026, while cross-reading
+  `scripts/review-material-core.mjs`: `formatPassManifest` writes "The runnable passes together
+  cover the complete changed file set." whenever `plan.unreviewable` is empty — it never consults
+  `plan.uncoverable`. A plan with files BEYOND THE REACH OF ANY PASS therefore tells the reviewer
+  coverage is complete and lists what no pass covers two lines below, and the flattering sentence is
+  the one read first. It is the text a pass verdict's meaning rests on, so it belongs to this point:
+  make the sentence conditional on `unavailable.length` OR `(plan.uncoverable ?? []).length`, and say
+  that files no pass can carry remain owed.
+  VERIFIABLE: Vitest over the scoping decision — a contribution whose own material fits is owed and
+  runnable however far the baseline lags; a range whose accumulated material does not fit no longer
+  suspends the contributions inside it; plus the guard's own status on main's real range naming a
+  finite, runnable plan or a named unassemblable contribution.
+  Criticality: high — it is why the four-eyes gate on main enforces nothing today, and why point
+  943 could not close its third leg.
+  Bundle: Modell & Wächter. It rescopes what the mechanism gate demands, so it is worked before 916
+  changes what the ledger reader accepts, never beside it.
 
 - [ ] 944. The launcher starts the batch session inside a point worktree, so the board bookkeeping
   splits. MEASURED 26.08.2026, 15:27, by the dying owner session itself (carrier finding): it was
@@ -12569,3 +12595,68 @@ to land than a mechanism that needs a review.
   Criticality: medium — the suite is green today and its subject is correct today; the defect is
   that it would stay green after the subject moved.
   Bundle: Chat & Tafel.
+
+- [ ] 954. The board header's outer groups still never break, so a phone squeezes the title while
+  the number and the time stamps keep their full width (user report 26.08.2026, 19:54, phone Chrome
+  at ~412 CSS px and desktop Firefox; confirmed by direct question at 20:03). Point 941 set out to
+  end exactly that picture — "Auch die linke und die rechte Spalte sollen umbrechen können" — and
+  its acceptance holds as written: measured tonight against the LIVE board content (board branch
+  fetched 19:57, rendered in headless system Chrome at 412 px and 610 px) the 941 style block is
+  present and active, nothing overflows and no horizontal scroll appears. The gap is in the
+  mechanism. `details:not(.sect)>summary>.right` is `flex-wrap: nowrap`, so the time group can never
+  break INSIDE itself; it only drops as one whole block onto the next flex line, which happens only
+  at the rare width where it no longer fits beside the title's 12rem minimum (card 943 tonight).
+  `.card-header-left` may wrap, but as a `flex: 0 1 auto` item in a wrapping row it is never
+  squeezed below its one-line base width at any realistic viewport, so the badge never moves under
+  its number. Net effect on a phone: a narrow title column beside two fixed groups with dead space
+  under them.
+  FINAL STATE: at narrow widths the outer groups actually yield. The right group stacks its stamps
+  (the `nowrap` goes; each individual stamp stays unsplittable) and gives up its slot on the first
+  header line before the title is squeezed below a readable width; the left group's badge may sit
+  under its number at the same pressure.
+  VERIFIABLE: the browser suite measures the VISIBLE break — the right group occupying more than one
+  line, or sitting beneath the title — at a phone width with a card carrying two time stamps, and it
+  measures it on the REAL published stylesheet rather than a fixture copy, so this point is worked
+  after 952 or takes that fix with it.
+  Criticality: medium — the board is readable today; what fails is the phone picture the request
+  asked for.
+  Bundle: Chat & Tafel.
+
+- [ ] 955. The unit gate refuses while a delegated author commits, so the push gate goes red for no
+  defect (measured 26.08.2026, 20:33, with two Sol authoring lanes running).
+  `scripts/repository-integrity.mjs` asserts in the Vitest GLOBAL TEARDOWN that no ref moved while
+  the unit suite ran, and it fails the whole run when one did: "LIVE REPOSITORY CHANGED WHILE UNIT
+  SUITE RAN: refs changed: refs/heads/feat/943-…". Delegated authors commit on their own branches
+  every few minutes BY DESIGN — `author-sol.mjs` pushes the branch for them — so every unit run that
+  overlaps a busy lane dies, which is every run the owner makes while lanes are busy and every
+  pre-push gate. The check's own message already names the legitimate case, and the pre-push gate's
+  single re-run is what rescued tonight's push; that re-run is a fail-soft, not an answer, because it
+  costs a full unit suite and reports SUSPECT.
+  FINAL STATE: the teardown distinguishes TEST LEAKAGE into the live repository from a foreign
+  branch's own progress. A ref that belongs to a declared in-flight lane, or any ref that is neither
+  the running checkout's HEAD nor its branch, is not this suite's leakage and does not fail the run;
+  what remains — the running checkout's own refs, the index, the working tree — still fails loud.
+  VERIFIABLE: Vitest over the decision — a moved foreign branch passes, a moved own HEAD fails, and
+  an undeclared foreign ref is reported by name rather than silently allowed.
+  Criticality: medium-high — it turns every parallel authoring evening into red gates that hide real
+  reds among false ones.
+  Bundle: Urlaubsfestigkeit.
+
+- [ ] 956. A merge-with-fixes verdict leaves its named fix owed, and nothing tracks it (measured
+  26.08.2026 while reading the review ledger for point 943). `.claude/mechanism-reviews.jsonl`
+  records `92cbc0e` ("Refuse a repeated flag, and make the legacy fixture discriminate", Claude Opus
+  5) as reviewed by GPT-5.6 Sol with verdict `merge-with-fixes` and the named finding "repeated help
+  flags bypass the new rejection logic" in `scripts/defer-for-user.mjs`. The commit is long since on
+  main, the fix was never made, and no guard can see the debt — `merge-with-fixes` CLEARS the
+  four-eyes gate by design, so the owed half simply disappears. That is a hole in the whole review
+  machinery, not one forgotten fix.
+  FINAL STATE: the named fix of `92cbc0e` is made and its confirming pass recorded; and a
+  `merge-with-fixes` verdict carries its owed fixes as a debt the guard reports until each is
+  answered by a recorded pass at a descendant commit, so no future verdict of that kind can vanish
+  the same way. Every `merge-with-fixes` already in the ledger is re-measured once and reported.
+  VERIFIABLE: Vitest over the debt reader — a merge-with-fixes with no descendant answering pass is
+  reported, one with such a pass is clear; plus the guard's own status naming the re-measured
+  historical set.
+  Criticality: medium-high — it is the second silent hole found in the four-eyes ledger in one
+  evening, and it invalidates part of what the gate claims to guarantee.
+  Bundle: Urlaubsfestigkeit.
