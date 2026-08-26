@@ -376,6 +376,41 @@ describe('derived now-section membership', () => {
     expect(compareNowProjection(out, [700, 697]).ok).toBe(true)
   })
 
+  // Ninth cross-vendor round: an unclosed now-section quietly swallowed the
+  // rest of the document — a fail-open under a preflight that must fail closed.
+  // (The bare `<details class="sect">` token inside authored prose ended the
+  // section early by the same route; the recogniser removes that class, and it
+  // has no assertable difference on today's board, so it gets no test that
+  // would stay green either way.)
+  it('refuses a now-section that is never closed instead of swallowing the rest', () => {
+    const damaged =
+      `<main>\n<details class="sect"><summary><h2>Woran ich gerade arbeite</h2></summary>\n` +
+      `${sect('Warteschlange', '')}${sect('Erledigt', '')}</main>\n`
+    expect(() => reconcileNowProjection(damaged, [700])).toThrow(/not closed before the next section/)
+    expect(compareNowProjection(damaged, [700]).ok).toBe(false)
+  })
+
+  // Ninth cross-vendor round: the render puts the focused strand first, but the
+  // comparison never looked at the focus — so the fail-closed preflight blessed
+  // a board whose focus named a point with no card, or stood behind another.
+  it('checks the focus the render orders by, in both halves of the invariant', () => {
+    const two = fullBoard({ now: `${nowEntry(711, 'B', '20:07')}${nowEntry(700, 'A', '20:07')}` })
+
+    expect(compareNowProjection(two, [711, 700], { focusPoint: 711 })).toMatchObject({ ok: true })
+    expect(compareNowProjection(two, [711, 700], { focusPoint: 700 })).toMatchObject({
+      ok: false,
+      focusMisplaced: true,
+      focusPoint: 700,
+    })
+    expect(compareNowProjection(two, [711, 700], { focusPoint: 697 })).toMatchObject({
+      ok: false,
+      focusUnrepresented: true,
+    })
+    // …and the fail-closed preflight refuses the same state by name.
+    expect(() => projectNowForPublish(two, { ok: true, points: [711, 700], focusPoint: 697 }))
+      .toThrow(/the focus names point 697, which has no card/)
+  })
+
   it('refuses a document without the now-section heading in both render and comparison', () => {
     // The lenient slice used to treat the WHOLE document as the now-section:
     // the render mutated foreign sections and the comparison blessed the
@@ -383,14 +418,14 @@ describe('derived now-section membership', () => {
     // round, pass 2). A missing heading refuses in both halves.
     const noSection =
       `<main>\n${sect('Von dir zu klären', '')}${sect('Warteschlange', '')}${sect('Erledigt', '')}</main>\n`
-    expect(() => reconcileNowProjection(noSection, [700])).toThrow(/section heading is missing/)
-    expect(() => reconcileNowProjection(noSection, [])).toThrow(/section heading is missing/)
+    expect(() => reconcileNowProjection(noSection, [700])).toThrow(/section not found: now/)
+    expect(() => reconcileNowProjection(noSection, [])).toThrow(/section not found: now/)
     expect(compareNowProjection(noSection, [700]))
       .toMatchObject({ ok: false, error: expect.stringMatching(/section heading is missing/) })
     // A bare card fragment no longer passes as its own section either.
     expect(compareNowProjection(nowEntry(700, 'A', '20:07'), [700]).ok).toBe(false)
     expect(() => projectNowForPublish(noSection, { ok: true, points: [700], focusPoint: 700 }))
-      .toThrow(/section heading is missing/)
+      .toThrow(/refusing to project the now-section/)
   })
 
   it('a findable heading OUTSIDE its sect wrapper is no section — the foreign region after it is never sliced', () => {
@@ -404,7 +439,7 @@ describe('derived now-section membership', () => {
     const orphaned =
       `<main>\n${heading}\n${sect('Von dir zu klären', '')}` +
       `${sect('Warteschlange', queueEntry(700, 'Wartend', '~2 h'))}${sect('Erledigt', '')}</main>\n`
-    expect(() => reconcileNowProjection(orphaned, [700])).toThrow(/section heading is missing/)
+    expect(() => reconcileNowProjection(orphaned, [700])).toThrow(/stands outside its <details class="sect"> wrapper/)
     const compared = compareNowProjection(orphaned, [700])
     expect(compared).toMatchObject({ ok: false, error: expect.stringMatching(/section heading is missing/) })
     // (2) Inside card prose: the real section is gone, a card in another
@@ -413,7 +448,7 @@ describe('derived now-section membership', () => {
       vdzk: `<details>\n  <summary><span class="t">Zitat</span></summary>\n` +
         `  <div class="body">\n    <p>${heading}</p>\n  </div>\n</details>\n`,
     }).replace(sect('Woran ich gerade arbeite', ''), '')
-    expect(() => reconcileNowProjection(quoted, [700])).toThrow(/section heading is missing/)
+    expect(() => reconcileNowProjection(quoted, [700])).toThrow(/refusing to project the now-section/)
     expect(compareNowProjection(quoted, [700]).ok).toBe(false)
     // (3) Beside the intact section, a quoted duplicate changes nothing: the
     // wrapper decides, so the real section still renders and compares.

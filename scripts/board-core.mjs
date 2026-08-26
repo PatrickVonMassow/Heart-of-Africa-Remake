@@ -513,9 +513,30 @@ function sectionBounds(html, key) {
     throw new Error(`board: the ${key} section heading appears ${hits.length} times — refusing to guess the section`)
   }
   const from = hits[0] + head.length
-  const nextSect = text.indexOf(SECT_OPEN, from)
-  const end = nextSect < 0 ? text.length : text.lastIndexOf('\n</details>', nextSect)
-  return { from, end: end < from ? text.length : end }
+  // THE NEXT SECTION IS RECOGNISED, NOT ASSUMED (ninth cross-vendor round): the
+  // bare `<details class="sect">` token can stand inside authored card prose,
+  // and looking for the token alone let that text end the section early — the
+  // render then edited a region that was not the section. A real section opener
+  // carries its own `<summary><h2>`, which is what is searched for here. And a
+  // section that is NOT closed before the next one begins is structural damage:
+  // swallowing the rest of the document instead was the fail-open under a
+  // preflight that must fail closed.
+  const opener = /<details class="sect"[^>]*>\s*<summary>\s*<h2/g
+  opener.lastIndex = from
+  const nextSect = opener.exec(text)?.index ?? -1
+  if (nextSect < 0) return { from, end: text.length }
+  // The wrapper's own closer, preferring the newline-led spelling the board
+  // writes; a section whose last child ends on the same line closes just as
+  // validly, and demanding the newline turned that into false damage.
+  const led = text.lastIndexOf('\n</details>', nextSect)
+  const end = led >= from ? led : text.lastIndexOf('</details>', nextSect)
+  if (end < from) {
+    throw new Error(
+      `board: the ${key} section is not closed before the next section begins — ` +
+        'structural damage, refusing to guess the section',
+    )
+  }
+  return { from, end }
 }
 
 /**
@@ -602,7 +623,7 @@ const emptyStatePattern = () => /<p class="now-empty" data-state="idle">[\s\S]*?
  * Compare the rendered numbered membership with the normalized active record.
  * This is shared by the fail-open Stop hook and fail-closed publish preflight.
  */
-export function compareNowProjection(html, expectedPoints, { knownPoints = null } = {}) {
+export function compareNowProjection(html, expectedPoints, { knownPoints = null, focusPoint = null } = {}) {
   try {
     // A document without the now-section heading is judged NOWHERE: the lenient
     // slice would read cards from any section as the projection and bless the
@@ -650,6 +671,16 @@ export function compareNowProjection(html, expectedPoints, { knownPoints = null 
       }
     }
     const crossSection = [...elsewhere].map(([point, sections]) => ({ point, sections }))
+    // THE FOCUS IS CHECKED, NOT ONLY RENDERED (ninth cross-vendor round): the
+    // render puts the focused strand first, but the comparison never looked at
+    // the focus at all — so a board whose focus names a point with no card, or
+    // whose focused card is not the one standing first, passed the fail-closed
+    // preflight while the render's own rule was broken. Both halves have to
+    // agree about the same thing or neither means anything.
+    const focused = Number(focusPoint)
+    const focusChecked = Number.isInteger(focused) && focused > 0
+    const focusUnrepresented = focusChecked && !actualSet.has(focused)
+    const focusMisplaced = focusChecked && !focusUnrepresented && actual[0] !== focused
     const emptyStateCount = (nowSectionSlice(html).text.match(emptyStatePattern()) ?? []).length
     const unnumbered = cards.filter((card) => card.point == null)
     const unnumberedCards = unnumbered.length
@@ -678,7 +709,11 @@ export function compareNowProjection(html, expectedPoints, { knownPoints = null 
           : emptyStateCount !== 1 || unnumberedCards > 0)
       : emptyStateCount > 0 || idleCards > 0 || strayCards > 0
     return {
-      ok: !missing.length && !extra.length && !duplicates.length && !unknown.length && !crossSection.length && !emptyStateWrong,
+      ok: !missing.length && !extra.length && !duplicates.length && !unknown.length && !crossSection.length
+        && !emptyStateWrong && !focusUnrepresented && !focusMisplaced,
+      focusPoint: focusChecked ? focused : null,
+      focusUnrepresented,
+      focusMisplaced,
       missing,
       extra,
       duplicates,
@@ -694,15 +729,16 @@ export function compareNowProjection(html, expectedPoints, { knownPoints = null 
   }
 }
 
+/** The one sentence an unwritten stub says, and the only body it may carry. */
+const NOW_STUB_TEXT = 'Diese Karte braucht noch ihren handgeschriebenen Text.'
+
 /** A visible placeholder; its copy is explicitly not mistaken for authored prose.
  *  `carried` is authored text rescued from the idle card the render replaces —
  *  it rides in the stub's body so the transition never blanks what a session
  *  wrote (fifth cross-vendor round, pass 2). */
 export function renderNowStub(point, { stamp = berlinStamp(), carried = '' } = {}) {
   const note = String(carried ?? '').trim()
-  const text = note
-    ? `Diese Karte braucht noch ihren handgeschriebenen Text.\n\nAus der Übergabekarte übernommen: ${note}`
-    : 'Diese Karte braucht noch ihren handgeschriebenen Text.'
+  const text = note ? `${NOW_STUB_TEXT}\n\nAus der Übergabekarte übernommen: ${note}` : NOW_STUB_TEXT
   return (
     `<details class="now" data-state="stub">\n  <summary>${numberChip(point)}` +
     `<span class="t">Text für diesen Punkt fehlt noch</span>` +
@@ -746,8 +782,12 @@ export function reconcileNowProjection(
   let bounds
   try {
     bounds = sectionBounds(source, 'now')
-  } catch {
-    throw new Error('board: the current-work section heading is missing — refusing to project the now-section')
+  } catch (error) {
+    // The CAUSE survives the refusal (ninth cross-vendor round): a heading that
+    // is missing, doubled, standing outside its wrapper or never closed are four
+    // different repairs, and one generic sentence sent every one of them looking
+    // for a heading that was there all along.
+    throw new Error(`board: refusing to project the now-section — ${error?.message ?? error}`)
   }
   const expected = Array.isArray(expectedPoints) ? expectedPoints.map(Number) : []
   if (expected.some((n) => !Number.isInteger(n) || n <= 0) || new Set(expected).size !== expected.length) {
@@ -892,7 +932,10 @@ export function projectNowForPublish(html, activeWork, { knownPoints = null, sta
     focusPoint: activeWork.focusPoint,
     stamp,
   })
-  const comparison = compareNowProjection(projected, activeWork.points, { knownPoints })
+  const comparison = compareNowProjection(projected, activeWork.points, {
+    knownPoints,
+    focusPoint: activeWork.focusPoint ?? null,
+  })
   if (!comparison.ok) {
     const facts = [
       comparison.missing?.length ? `missing ${comparison.missing.join(', ')}` : '',
@@ -902,6 +945,8 @@ export function projectNowForPublish(html, activeWork, { knownPoints = null, sta
       comparison.crossSection?.length
         ? `cross-section ${comparison.crossSection.map((item) => item.point).join(', ')}`
         : '',
+      comparison.focusUnrepresented ? `the focus names point ${comparison.focusPoint}, which has no card` : '',
+      comparison.focusMisplaced ? `the focused point ${comparison.focusPoint} does not stand first` : '',
     ].filter(Boolean)
     throw new Error(`now-section exact-set preflight failed: ${facts.join('; ') || comparison.error || 'state mismatch'}`)
   }

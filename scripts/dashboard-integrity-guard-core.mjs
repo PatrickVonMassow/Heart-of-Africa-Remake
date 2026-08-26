@@ -278,7 +278,12 @@ export function nowProjectionStopDecision({
   heldByOther = false,
 } = {}) {
   if (paused || heldByOther || !activeWork || activeWork.ok !== true) return ALLOW
-  const comparison = compareNowProjection(dashboardHtml, activeWork.points, { knownPoints })
+  // The focus invariant is the render's rule, so the Stop side reads it too —
+  // otherwise the two halves block on different things (ninth cross-vendor round).
+  const comparison = compareNowProjection(dashboardHtml, activeWork.points, {
+    knownPoints,
+    focusPoint: activeWork.focusPoint ?? null,
+  })
   if (comparison.ok) return { ...ALLOW, comparison }
   const parts = []
   if (comparison.missing?.length) parts.push(`missing ${comparison.missing.join(', ')}`)
@@ -288,6 +293,8 @@ export function nowProjectionStopDecision({
   if (comparison.crossSection?.length) {
     parts.push(`cross-section ${comparison.crossSection.map((item) => `${item.point} (${item.sections.join('/')})`).join(', ')}`)
   }
+  if (comparison.focusUnrepresented) parts.push(`the focus names point ${comparison.focusPoint}, which has no card`)
+  if (comparison.focusMisplaced) parts.push(`the focused point ${comparison.focusPoint} does not stand first`)
   if (comparison.emptyStateCount !== undefined && activeWork.points.length === 0) {
     parts.push('verified zero requires exactly the dedicated non-card empty state')
   } else if (comparison.emptyStateCount > 0) parts.push('the zero-work state stands while points are active')
