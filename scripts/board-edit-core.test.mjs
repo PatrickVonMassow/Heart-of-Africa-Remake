@@ -46,8 +46,8 @@ describe('runBoardEdit — publish preflight and honest partial failure', () => 
 
     edit((html) => html, 'metadata refreshed')
 
-    expect(state.html).toContain('criticality-low">niedrig</span><span class="t">Task 204</span>')
-    expect(state.html).toContain('criticality-high">hoch</span><span class="t">Done 209</span>')
+    expect(state.html).toContain('criticality-low">niedrig</span></span><span class="t">Task 204</span>')
+    expect(state.html).toContain('criticality-high">hoch</span></span><span class="t">Done 209</span>')
   })
 
   // Ninth cross-vendor round: when the ACTIVE-WORK RECORD is the stage that

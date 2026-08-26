@@ -201,8 +201,17 @@ const CRITICALITY_BADGE_RE =
 const CRITICALITY_BADGE_SOURCE =
   '<span\\s+class="criticality(?:\\s+criticality-(?:low|med|high))?"[^>]*>[\\s\\S]*?<\\/span>\\s*'
 const CRITICALITY_STYLE_ID = 'board-criticality-style'
+const CARD_HEADER_LEFT_CLASS = 'card-header-left'
+const CARD_HEADER_LEFT_SOURCE =
+  `<span class="${CARD_HEADER_LEFT_CLASS}">\\s*(<span class="num">\\s*\\d+\\s*<\\/span>)\\s*` +
+  `(?:${CRITICALITY_BADGE_SOURCE})?<\\/span>`
 const CRITICALITY_STYLE = `<style id="${CRITICALITY_STYLE_ID}">
-.criticality{flex-shrink:0;border:1px solid currentColor;border-radius:999px;padding:.08em .48em;font-size:.72em;font-weight:700;line-height:1.35}
+.card-header-left{display:inline-flex;flex:0 1 auto;flex-wrap:wrap;align-items:baseline;gap:2px 9px;min-width:0;max-width:100%}
+details:not(.sect)>summary{flex-wrap:wrap;min-width:0;max-width:100%}
+details:not(.sect)>summary>.t{flex:1 1 12rem;min-width:0;max-width:100%;overflow-wrap:anywhere}
+details:not(.sect)>summary>.right{flex:0 1 auto;flex-wrap:wrap;min-width:0;max-width:100%;white-space:normal}
+details:not(.sect)>summary>.right .meta{min-width:0;max-width:100%;white-space:normal;overflow-wrap:anywhere}
+.criticality{flex:0 1 auto;min-width:0;max-width:100%;overflow-wrap:anywhere;border:1px solid currentColor;border-radius:999px;padding:.08em .48em;font-size:.72em;font-weight:700;line-height:1.35}
 .criticality-low{background:#dcebd9;color:#24511f}.criticality-med{background:#f3e4ad;color:#684e00}.criticality-high{background:#f3d1cb;color:#7a2115}
 </style>`
 
@@ -210,6 +219,16 @@ const criticalityBadge = (level) =>
   level && CRITICALITY_LABELS[level]
     ? `<span class="criticality criticality-${level}">${CRITICALITY_LABELS[level]}</span>`
     : ''
+
+/**
+ * Flatten the derived visual group before a card editor applies its strict,
+ * head-anchored transformations. The published board groups number + badge so
+ * flex wrapping cannot split them into different columns; the editing grammar
+ * deliberately continues to use its older, simple number/title sequence.
+ */
+export function unwrapCardHeaderGroups(html) {
+  return String(html ?? '').replace(new RegExp(CARD_HEADER_LEFT_SOURCE, 'g'), '$1')
+}
 
 /**
  * Derive every numbered card's criticality badge from the work order.
@@ -224,17 +243,17 @@ export function renderCardCriticalities(html, tasksText) {
   const levels = new Map(
     parsePointBlocks(tasksText).map((point) => [String(point.n), criticalityOf(point.body).level]),
   )
-  let badges = 0
+  let groups = 0
   let out = String(html ?? '').replace(/<summary>([\s\S]*?)<\/summary>/g, (whole, summary) => {
-    const { chip } = summaryPoint(summary)
+    const flat = unwrapCardHeaderGroups(summary)
+    const { chip } = summaryPoint(flat)
     if (chip == null) return whole
-    const clean = summary.replace(CRITICALITY_BADGE_RE, '')
+    const clean = flat.replace(CRITICALITY_BADGE_RE, '')
     const badge = criticalityBadge(levels.get(chip))
-    if (!badge) return `<summary>${clean}</summary>`
-    badges += 1
+    groups += 1
     return `<summary>${clean.replace(
       new RegExp(`^(\\s*<span class="num">\\s*${chip}\\s*</span>)`),
-      `$1${badge}`,
+      `<span class="${CARD_HEADER_LEFT_CLASS}">$1${badge}</span>`,
     )}</summary>`
   })
 
@@ -246,7 +265,7 @@ export function renderCardCriticalities(html, tasksText) {
     'g',
   )
   out = out.replace(styleRe, '')
-  if (!badges) return out
+  if (!groups) return out
   if (out.includes('</head>')) return out.replace('</head>', `${CRITICALITY_STYLE}\n</head>`)
   // The live headless board starts with BOM, title, metadata and its own
   // stylesheet. That stylesheet's first `</style>` is an unambiguous landmark
@@ -395,7 +414,7 @@ export function dropStrayNowCards(html) {
  * the finders cannot disagree about what "numbered" means.
  */
 export function summaryPoint(summary) {
-  const text = String(summary ?? '')
+  const text = unwrapCardHeaderGroups(summary)
   const chip = text.match(
     new RegExp(
       `^\\s*<span class="num">\\s*(\\d+)\\s*</span>\\s*(?:${CRITICALITY_BADGE_SOURCE})?<span class="t">`,
@@ -2129,6 +2148,7 @@ export function removeVdzk(html, fragment) {
  */
 export function setCardStatus(html, point, text, stamp = berlinStamp()) {
   if (typeof html !== 'string' || !html) throw new Error('board: empty document')
+  html = unwrapCardHeaderGroups(html)
   if (!/^\d+$/.test(String(point))) throw new Error(`board: not a point number: ${point}`)
   if (!text || !String(text).trim()) throw new Error('board: refusing to write an empty status')
   // BOUNDED TO ITS OWN CARD (four-eyes review, 12.08.2026). The run to the body
@@ -2156,6 +2176,7 @@ export function setCardStatus(html, point, text, stamp = berlinStamp()) {
  */
 export function setCardTitle(html, point, title) {
   if (typeof html !== 'string' || !html) throw new Error('board: empty document')
+  html = unwrapCardHeaderGroups(html)
   if (!/^\d+$/.test(String(point))) throw new Error(`board: not a point number: ${point}`)
   const text = String(title ?? '').trim()
   if (!text) throw new Error('board: refusing to write an empty title')

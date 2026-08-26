@@ -30,7 +30,7 @@ function rendered() {
 const summaryFor = (html, point) => {
   const document = new JSDOM(html).window.document
   return [...document.querySelectorAll('summary')].find(
-    (summary) => summary.querySelector(':scope > .num')?.textContent.trim() === String(point),
+    (summary) => summary.querySelector(':scope > .card-header-left > .num')?.textContent.trim() === String(point),
   )
 }
 
@@ -40,13 +40,13 @@ describe('derived card criticality badges', () => {
     [12, 'med', 'mittel'],
     [13, 'high', 'hoch'],
   ])('renders point %i as %s with its German label', (point, level, label) => {
-    const badge = summaryFor(rendered(), point).querySelector(':scope > .criticality')
+    const badge = summaryFor(rendered(), point).querySelector(':scope > .card-header-left > .criticality')
     expect(badge.className).toBe(`criticality criticality-${level}`)
     expect(badge.textContent).toBe(label)
   })
 
   it('renders no empty or guessed badge for an untagged point', () => {
-    expect(summaryFor(rendered(), 14).querySelector(':scope > .criticality')).toBeNull()
+    expect(summaryFor(rendered(), 14).querySelector(':scope > .card-header-left > .criticality')).toBeNull()
   })
 
   it('leaves the unnumbered handover summary untouched', () => {
@@ -58,9 +58,36 @@ describe('derived card criticality badges', () => {
   it('overwrites a hand-written stale badge with the derived value', () => {
     const stale = card(11, 'Elf', '<span class="criticality criticality-high">hoch</span>')
     const summary = summaryFor(renderCardCriticalities(stale, tasks), 11)
-    expect(summary.querySelectorAll(':scope > .criticality')).toHaveLength(1)
-    expect(summary.querySelector(':scope > .criticality').className).toContain('criticality-low')
-    expect(summary.querySelector(':scope > .criticality').textContent).toBe('niedrig')
+    expect(summary.querySelectorAll(':scope > .card-header-left > .criticality')).toHaveLength(1)
+    expect(summary.querySelector(':scope > .card-header-left > .criticality').className).toContain('criticality-low')
+    expect(summary.querySelector(':scope > .card-header-left > .criticality').textContent).toBe('niedrig')
+  })
+
+  it('keeps all three header columns bounded and wrap-capable at a narrow viewport', () => {
+    const narrow = renderCardCriticalities(
+      '<meta name="viewport" content="width=device-width, initial-scale=1">' +
+        '<details><summary><span class="num">12</span>' +
+        '<span class="t">Ein absichtlich sehr langer Kartentitel für das schmale Telefon</span>' +
+        '<span class="right"><span class="meta">10:00 · ~12:00</span></span></summary>' +
+        '<div class="body"><p>Text.</p></div></details>',
+      tasks,
+    )
+    const document = new JSDOM(narrow).window.document
+    const summary = document.querySelector('details > summary')
+    const groups = [...summary.children].map((element) => element.className)
+    expect(groups).toEqual(['card-header-left', 't', 'right'])
+    expect([...summary.querySelector('.card-header-left').children].map((element) => element.className)).toEqual([
+      'num',
+      'criticality criticality-med',
+    ])
+    expect(summary.querySelector('.right .meta').textContent).toBe('10:00 · ~12:00')
+
+    const css = document.querySelector('#board-criticality-style').textContent
+    expect(css).toContain('details:not(.sect)>summary{flex-wrap:wrap;min-width:0;max-width:100%}')
+    expect(css).toContain('.card-header-left{display:inline-flex;flex:0 1 auto;flex-wrap:wrap;')
+    expect(css).toContain('summary>.t{flex:1 1 12rem;min-width:0;max-width:100%;overflow-wrap:anywhere}')
+    expect(css).toContain('summary>.right{flex:0 1 auto;flex-wrap:wrap;min-width:0;max-width:100%;white-space:normal}')
+    expect(css).toContain('summary>.right .meta{min-width:0;max-width:100%;white-space:normal;overflow-wrap:anywhere}')
   })
 
   it('keeps old and decorated summary shapes readable and renders idempotently', () => {
@@ -106,9 +133,9 @@ describe('derived card criticality badges', () => {
 
   it('keeps an already-decorated current-work card replaceable', () => {
     const now = renderCardCriticalities(card(11, 'Elf').replace('<details>', '<details class="now">'), tasks)
-    const renamed = setCardTitle(now, 11, 'Elf neu')
+    const renamed = renderCardCriticalities(setCardTitle(now, 11, 'Elf neu'), tasks)
 
     expect(summaryFor(renamed, 11).querySelector(':scope > .t').textContent).toBe('Elf neu')
-    expect(summaryFor(renamed, 11).querySelector(':scope > .criticality').textContent).toBe('niedrig')
+    expect(summaryFor(renamed, 11).querySelector(':scope > .card-header-left > .criticality').textContent).toBe('niedrig')
   })
 })
