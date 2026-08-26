@@ -18,9 +18,17 @@ import {
   formatUnavailable,
   normaliseKind,
   parseAnswer,
+  resolveAskModel,
 } from './ask-sol-core.mjs'
 
 describe('the kinds', () => {
+  it('addresses every model the blind-merger switch can select', () => {
+    expect(resolveAskModel()).toMatchObject({ key: 'sol', runtime: 'codex', name: 'GPT-5.6 Sol' })
+    expect(resolveAskModel('fable')).toMatchObject({ runtime: 'claude', name: 'Fable 5', id: 'claude-fable-5' })
+    expect(resolveAskModel('opus')).toMatchObject({ runtime: 'claude', name: 'Opus 5' })
+    expect(resolveAskModel('sonnet')).toBeNull()
+  })
+
   it('are the four read-only ones, each with a task and an answer shape', () => {
     expect(KINDS).toEqual(['diagnose', 'audit', 'enumerate', 'explain'])
     for (const kind of KINDS) {
@@ -48,6 +56,12 @@ describe('the prompt', () => {
     expect(p).toMatch(/TRUNCATED/)
     expect(p).toMatch(/CAUSE:/)
     expect(p).toMatch(/EVIDENCE:/)
+  })
+
+  it('names the selected read-only model in the prompt', () => {
+    expect(buildAskPrompt({ kind: 'explain', brief: 'fold these', modelName: 'Fable 5' })).toContain(
+      'READ-ONLY work for this repository as Fable 5',
+    )
   })
 
   it('tells an ENUMERATE it is a divergent half that a third model will merge by id', () => {

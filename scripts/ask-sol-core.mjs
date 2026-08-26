@@ -18,9 +18,24 @@
 // Side-effect free: the process spawn, the material gathering and the printing belong to
 // scripts/ask-sol.mjs. Pinned by ask-sol-core.test.mjs.
 
-import { blindReviewerAdmission, charStripped, MATERIAL_BUDGET_CHARS, rawFieldValue, SOL_MODEL_NAME, stripDecoration, SOL_REASONING_EFFORT } from './review-sol-core.mjs'
+import { FABLE_MODEL, FABLE_MODEL_ID, OPUS_MODEL, OPUS_MODEL_ID } from './fable-switch-core.mjs'
+import { blindReviewerAdmission, charStripped, MATERIAL_BUDGET_CHARS, rawFieldValue, SOL_MODEL_ID, SOL_MODEL_NAME, stripDecoration, SOL_REASONING_EFFORT } from './review-sol-core.mjs'
 
 export { MATERIAL_BUDGET_CHARS, SOL_MODEL_NAME, SOL_REASONING_EFFORT }
+
+/** Every read-only model this command can address. The served model must agree
+ *  with this descriptor before any output is attributed to it. */
+export const ASK_MODELS = Object.freeze({
+  sol: Object.freeze({ key: 'sol', name: SOL_MODEL_NAME, id: SOL_MODEL_ID, runtime: 'codex', effort: SOL_REASONING_EFFORT }),
+  fable: Object.freeze({ key: 'fable', name: FABLE_MODEL, id: FABLE_MODEL_ID, runtime: 'claude', effort: 'high' }),
+  opus: Object.freeze({ key: 'opus', name: OPUS_MODEL, id: OPUS_MODEL_ID, runtime: 'claude', effort: 'high' }),
+})
+
+/** A supported model descriptor, or null. Sol remains the compatibility default. */
+export function resolveAskModel(value = 'sol') {
+  const key = String(value ?? '').trim().toLowerCase() || 'sol'
+  return ASK_MODELS[key] ?? null
+}
 
 /** The kinds of work this command carries. All of them are pure text. */
 export const KINDS = Object.freeze(['diagnose', 'audit', 'enumerate', 'explain'])
@@ -71,12 +86,12 @@ export function entryPrefix(kind) {
  * not be told to fetch anything), and a part marked TRUNCATED must be reported as such
  * rather than guessed past.
  */
-export function buildAskPrompt({ kind = '', brief = '' } = {}) {
+export function buildAskPrompt({ kind = '', brief = '', modelName = SOL_MODEL_NAME } = {}) {
   const k = normaliseKind(kind)
   if (!k) throw new Error(`ask-sol: not a kind: ${kind}`)
   const shape = ANSWER_SHAPES[k]
   const lines = [
-    `You are doing READ-ONLY work for this repository as ${SOL_MODEL_NAME}. You were chosen`,
+    `You are doing READ-ONLY work for this repository as ${modelName}. You were chosen`,
     'because you are a DIFFERENT model from the one that wrote the material: your value is the',
     'errors and the readings the author cannot see, so judge what is attached and do not assume',
     'it is correct.',

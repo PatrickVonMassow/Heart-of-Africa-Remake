@@ -42,6 +42,22 @@ process.stdout.write(answer)
 process.exit(0)
 `
 
+/** A `claude` that proves the requested served model in modelUsage. */
+const CLAUDE_STUB = `#!/usr/bin/env node
+const { readFileSync, writeFileSync, appendFileSync } = require('node:fs')
+const argv = process.argv.slice(2)
+const model = argv[argv.indexOf('--model') + 1]
+let stdin = ''
+try { stdin = readFileSync(0, 'utf8') } catch {}
+writeFileSync(process.env.STUB_STDIN, stdin)
+writeFileSync(process.env.STUB_PROMPT, argv[argv.indexOf('-p') + 1])
+appendFileSync(process.env.STUB_LOG, model + '\\n')
+const answer = process.env.STUB_ANSWER || 'The two lists overlap on the stale owner.\\nCAUSE: the stale owner remains authoritative\\nEVIDENCE: scripts/batch-lock.mjs keeps the dead lease'
+const served = process.env.STUB_SERVED_MODEL || model
+process.stdout.write(JSON.stringify({ result: answer, modelUsage: { [served]: {} } }))
+process.exit(0)
+`
+
 let dir = ''
 let stubDir = ''
 let stateDir = ''
@@ -79,6 +95,8 @@ beforeAll(() => {
   mkdirSync(stateDir, { recursive: true })
   writeFileSync(join(stubDir, 'codex'), STUB)
   chmodSync(join(stubDir, 'codex'), 0o755)
+  writeFileSync(join(stubDir, 'claude'), CLAUDE_STUB)
+  chmodSync(join(stubDir, 'claude'), 0o755)
   shareFile = join(dir, 'sol-share.json')
   setting('prefer-sol')
   materialFile = join(dir, 'suite.log')
@@ -177,6 +195,31 @@ describe('what it refuses before spending anything', () => {
 })
 
 describe('an ask that runs', () => {
+  it('runs Fable read-only, proves the served model, and keeps the material off tools', () => {
+    clearCalls()
+    const r = run(['--model', 'fable', '--kind', 'diagnose', '--brief', 'fold the stage', '--file', materialFile])
+    expect(r.status, r.stderr).toBe(0)
+    expect(calls()).toEqual(['claude-fable-5'])
+    expect(readFileSync(join(dir, 'stdin.txt'), 'utf8')).toContain('FAIL place')
+    expect(readFileSync(join(dir, 'prompt.txt'), 'utf8')).toContain('READ-ONLY work for this repository as Fable 5')
+  })
+
+  it('refuses a substituted Claude model instead of misattributing its answer', () => {
+    clearCalls()
+    const r = run(['--model', 'fable', '--kind', 'diagnose', '--brief', 'fold it', '--file', materialFile], {
+      STUB_SERVED_MODEL: 'claude-opus-5',
+    })
+    expect(r.status).toBe(3)
+    expect(r.stderr).toMatch(/served claude-opus-5, not Fable 5/)
+  })
+
+  it('supports Opus as the third read-only roster model', () => {
+    clearCalls()
+    const r = run(['--model', 'opus', '--kind', 'diagnose', '--brief', 'fold it', '--file', materialFile])
+    expect(r.status, r.stderr).toBe(0)
+    expect(calls()).toEqual(['claude-opus-5[1m]'])
+  })
+
   it('proves the model id first, sends the material on stdin and prints the answer', () => {
     setting('prefer-sol')
     clearCalls()
