@@ -89,3 +89,24 @@ pin it — but the disagreement is real and about design, not about a line, so i
 its own work-order point rather than settled twice or averaged. Two readings of the same
 spec met here: "REMOVES one whose point is no longer in flight" against "a render that
 would drop prose refuses or restores it".
+
+## Pass 5 — the board's tests and its edit/publish path — two answered, one deferred
+
+ANSWERED:
+
+- [P1] `scripts/board-publish.mjs` took `--locked` on the caller's word: anyone could publish
+  straight past the serialization this branch introduced, concurrently with another board
+  command. The claim is checked now against something nobody outside can satisfy — the live
+  board-edit lock's recorded pid must be this process's PARENT — and a shell that types the
+  flag is refused, measured live (exit 1).
+
+- [P1] `scripts/board-edit-core.mjs`: when `preparePublish()` itself failed, the board was
+  durably changed while the active-work record still described the board as it stood BEFORE
+  the edit — and the shared remedy sent the operator to a standalone publish, which projects
+  that record and can undo the edit. That one stage has its own remedy now: do not publish,
+  reconcile the record first.
+
+DEFERRED, already filed: the ordering case in `scripts/board-edit-core.test.mjs` never
+observes the write callback and stays green if `preparePublish()` moves before the write.
+Work-order point 929 names it verbatim, together with the "writes nothing" case in
+`scripts/batch-in-flight-cli.test.mjs`.

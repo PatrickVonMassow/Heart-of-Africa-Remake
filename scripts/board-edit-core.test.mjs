@@ -50,6 +50,26 @@ describe('runBoardEdit — publish preflight and honest partial failure', () => 
     expect(state.html).toContain('criticality-high">hoch</span><span class="t">Done 209</span>')
   })
 
+  // Ninth cross-vendor round: when the ACTIVE-WORK RECORD is the stage that
+  // failed, the shared "fix the above, then publish" remedy is the wrong one —
+  // the record still describes the board as it stood before this edit, so
+  // publishing projects it back over the edit and can undo it.
+  it('does not send a failed active-work update off to publish', () => {
+    const { state, edit } = harness(boardHtml(), tasks(210, 211, 204), () => 'board PUBLISHED', () => {
+      throw new Error('declaration write refused')
+    })
+
+    const result = edit((html) => addVdzk(html, 'Kartenschrift wählen', 'Welche Variante?'))
+
+    expect(result).toMatchObject({ written: true, published: false })
+    expect(state.writes).toBe(1)
+    expect(state.publishes).toBe(0)
+    const said = state.stderr.join('\n')
+    expect(said).toContain('ACTIVE-WORK RECORD was NOT updated')
+    expect(said).toContain('Do NOT publish yet')
+    expect(said).not.toContain('The LIVE page was NOT updated — fix the above')
+  })
+
   it('refuses a knowably incomplete board before writing or publishing', () => {
     const { state, edit } = harness(boardHtml(), tasks(210, 211, 204, 703))
 

@@ -44,7 +44,7 @@ import { withDerivedState } from './board-state.mjs'
 import { REPO_ROOT, STATE_PATH, readJson, mergeState } from './dashboard-state.mjs'
 import { normaliseLineEndings, projectNowForPublish, refreshFooter, renderCardCriticalities, upgradeNowCards } from './board-core.mjs'
 import { gatherActiveWorkSource, openPointNumbers } from './active-work-source.mjs'
-import { withBoardEditLock } from './board-edit-lock.mjs'
+import { BOARD_EDIT_LOCK_PATH, withBoardEditLock } from './board-edit-lock.mjs'
 import { currentSetting, settingProblemLine } from './sol-share.mjs'
 import { applyFooterNote } from './sol-share-core.mjs'
 import { structureViolations } from './board-structure-core.mjs'
@@ -96,6 +96,26 @@ async function fetchWithTimeout(url, ms = FETCH_TIMEOUT_MS) {
 
 const args = process.argv.slice(2)
 const lockedByCaller = args.length === 1 && args[0] === '--locked'
+
+/**
+ * `--locked` says "my parent already holds the board-edit lock, do not take it
+ * again". That was taken on the caller's word (ninth cross-vendor round), so
+ * anyone could publish straight past the serialization this branch introduced.
+ * The claim is CHECKED now, and the check is one nobody outside can satisfy:
+ * the live lock's recorded pid has to be this process's PARENT. A shell that
+ * types the flag has a shell for a parent and is refused.
+ */
+function parentHoldsBoardEditLock() {
+  try {
+    const lock = JSON.parse(readFileSync(BOARD_EDIT_LOCK_PATH, 'utf8'))
+    if (!lock || typeof lock !== 'object') return false
+    if (Number(lock.pid) !== process.ppid) return false
+    const until = Number(lock.leaseUntil)
+    return !Number.isFinite(until) || until > Date.now()
+  } catch {
+    return false
+  }
+}
 const git = (a, opts = {}) =>
   execFileSync('git', a, { windowsHide: true, cwd: REPO_ROOT, encoding: 'utf8', ...opts }).trim()
 
@@ -160,7 +180,16 @@ if (args.includes('--check')) {
     console.error('usage: node scripts/board-publish.mjs [--check | --url]')
     process.exit(1)
   }
-  if (lockedByCaller) publish()
+  if (lockedByCaller) {
+    if (!parentHoldsBoardEditLock()) {
+      console.error(
+        'board-publish: --locked claims the caller holds the board edit lock, and this process is not ' +
+          'its child. Run node scripts/board-publish.mjs without the flag — it takes the lock itself.',
+      )
+      process.exit(1)
+    }
+    publish()
+  }
   else {
     try {
       // The lock-owning parent stays alive while the publishing child runs.
