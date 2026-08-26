@@ -161,7 +161,18 @@ export const LIMITS = {
   // way: a first attempt shortened the folded entry past its pinned check question, and the suite
   // that pins every entry's claim caught it — the question is back and cost the line it saves.
   // Net: six lines and fifty-four words, which is the new tip plus the fold's added half.
-  maxLines: 473,
+  // RAISED 27.08.2026 by the measured net of two genuinely new claims (§3.195 and §3.196), both
+  // FOLDED rather than given entries of their own: what a rescue TIMER must measure — the outcome,
+  // a commit or a finished step, never the busyness of the thing it is there to catch, because a
+  // session wedged in a loop keeps making tool calls and holds the clock open forever — and that
+  // every guard must name the ONE movement that satisfies it, checked against every other guard.
+  // Both went into "Der autonome Lauf bleibt stehen", which already carries rescue mechanisms that
+  // wedge each other and the second independent timer. Drafted as two standalone entries at
+  // +12 lines / +121 words, the fold brought that down to +2 / +26. The third claim of that night —
+  // test the escape a guard NAMES, it can report success and still do nothing — needed no words at
+  // all: "Die Ausnahme existiert nur in der Verweigerung" already demands a test that WALKS the
+  // promised way out.
+  maxLines: 475,
   // EXACT FIT, not headroom — corrected 30.07.2026 after the four-eyes review
   // pointed out that this comment had long stopped describing the numbers. The
   // rule above ("raised only by the measured size of genuinely new tips")
@@ -336,7 +347,7 @@ export const LIMITS = {
   // 26.08.2026, late: the growing-duty lesson (§3.194) was ADDED and six older entries gave up
   // their narration for it, so the ceiling follows the measurement DOWN by forty-six — the guide
   // is shorter than before it learned tonight's class.
-  maxWords: 4199,
+  maxWords: 4225,
   // A pitfall entry = the risk lines plus its prompt. Anything longer is a
   // story, not a tip.
   maxEntryLines: 11,

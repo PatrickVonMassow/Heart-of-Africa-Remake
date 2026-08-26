@@ -195,7 +195,9 @@ Die Ursache findest du durch **Zerlegen**, nicht durch Wiederholen.
 - **Der autonome Lauf bleibt stehen — still oder wartend.** Beides teuer, wenn du weg bist —
   auch durch Rettungsmechanismen, die einzeln das Richtige tun und einander verklemmen.
   → *Prompt:* „Bleib **nie mit einer Rückfrage stehen**: Annahme treffen, festhalten, weitergehen.
-  Prüfe Rettung **paarweise**, zähle nur **Versuchtes**, sichere mit **zweitem, eigenem Zeitgeber**."
+  Prüfe Rettung **paarweise** — jeder Wächter nennt die eine Bewegung, die ihn erfüllt —, zähle nur
+  **Versuchtes**, sichere mit **zweitem, eigenem Zeitgeber**, und lass den am **Ergebnis** messen,
+  nie an der Betriebsamkeit dessen, den er auffangen soll."
 
 - **Kommunikation verfehlt.** Zu technisch, zu lang, an der Zielgruppe vorbei.
   → *Prompt:* „Beschreibe Bugs und Status in der Zielgruppensprache — Symptom zuerst, fürs
@@ -470,4 +472,4 @@ Die Ursache findest du durch **Zerlegen**, nicht durch Wiederholen.
 
 Sie ersetzt die Fallstricke oben nicht.
 
-<!-- GUIDE-FINGERPRINT: d6419f54f7c501889ee8e8122e63a8366ae2b2cd5f3f32cd5f36b2b55be9dd02 -->
+<!-- GUIDE-FINGERPRINT: 8fbf794a84b3da880bc694d6e3a5aad65f2a84840a1cf852d00c3baedd445e20 -->

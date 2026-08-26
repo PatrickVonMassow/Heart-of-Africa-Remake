@@ -1405,7 +1405,7 @@ keinen Träger hat. Gebucht als Punkt 956.
 
 ## Anhang A — Maschinell gepflegte Quellen-Übersicht
 
-Zuletzt aktualisiert: Mittwoch, 26.08.2026, 23:07 · Quellen-Fingerprint: `d6419f54f7c5…`
+Zuletzt aktualisiert: Donnerstag, 27.08.2026, 00:14 · Quellen-Fingerprint: `8fbf794a84b3…`
 
 Spalten heuristisch aus den Quellen abgeleitet (Anläufe = distinkte Datumsnennungen im Memory;
 Maßnahme = Guard-Skripte mit Namens-Treffer). Die inhaltliche Bewertung gehört der Prosa oben.
@@ -1443,7 +1443,7 @@ Maßnahme = Guard-Skripte mit Namens-Treffer). Die inhaltliche Bewertung gehört
 | Work at High effort by default; the user reserves Extra high for research and design decisions, not implementation | 4 | hoch | — (Regel/Memory) | ◐ Regel |
 | Write idiomatic English in all English text (README, code comments, commit messages) — no German calques like 'stand' for a version | 1 | niedrig | — (Regel/Memory) | ◐ Regel |
 | Fable is NOT the default lane because its volume is the scarcest; difficulty is no reason for it either (since 18.08.2026 hard cases go straight to Sol), and review is cross-vendor, not Fable-by-default | 4 | hoch | — (Regel/Memory) | ◐ Regel |
-| Findings recorded by a session that could not write the work order — carry each into TASKS.md, then mark it drained | 29 | hoch | findings-guard.mjs | ✔ Mechanismus |
+| Findings recorded by a session that could not write the work order — carry each into TASKS.md, then mark it drained | 30 | hoch | findings-guard.mjs | ✔ Mechanismus |
 | A recurring lookup gets a script; never pull raw transcripts, listings, or logs into context to answer it | 1 | niedrig | — (Regel/Memory) | ◐ Regel |
 | Past the 150k context watermark, FINISH the step and hand over — never start a suite, an agent or a point after it; the user raised the cost twice (13.08. and 17.08.2026) | 2 | mittel | — (Regel/Memory) | ◐ Regel |
 | User 18.08.2026: hard, complex, error-prone and HIGH-criticality points are AUTHORED by GPT-5.6 Sol directly — Opus 5 authors only what is left, and Fable authors only a point that tags its lane or one the router escalates | 4 | hoch | — (Regel/Memory) | ◐ Regel |
@@ -1504,10 +1504,10 @@ Maßnahme = Guard-Skripte mit Namens-Treffer). Die inhaltliche Bewertung gehört
 | A pending batch claim HOLDS THE LAUNCHER BACK — withdraw it whenever the claiming window is left unattended | 2 | mittel | clear-claim-guard.mjs | ✔ Mechanismus |
 | Multi-agent workflows eat the session/weekly limit fast — verify findings INLINE, keep fan-outs small, warn the user with a cost estimate before any big workflow | 3 | mittel | doc-budget-guard.mjs | ✔ Mechanismus |
 
-Erfasste Quellen: 91 Feedback-/Projekt-Memories · 57 Guard-/Hook-Skripte · 6 Revert-/Reapply-Commits · 106 Prozess-/Meta-TASKS-Punkte (davon 46 offen).
+Erfasste Quellen: 91 Feedback-/Projekt-Memories · 57 Guard-/Hook-Skripte · 6 Revert-/Reapply-Commits · 107 Prozess-/Meta-TASKS-Punkte (davon 46 offen).
 
-<!-- RETRO-FINGERPRINT: d6419f54f7c501889ee8e8122e63a8366ae2b2cd5f3f32cd5f36b2b55be9dd02 -->
-<!-- RETRO-LAST-REFRESHED: 2026-08-26T21:07:55.179Z -->
+<!-- RETRO-FINGERPRINT: 8fbf794a84b3da880bc694d6e3a5aad65f2a84840a1cf852d00c3baedd445e20 -->
+<!-- RETRO-LAST-REFRESHED: 2026-08-26T22:14:23.010Z -->
 <!-- AUTO-GENERATED:END -->
 
 ### 3.111 Ein Erfolg ist kein Beweis für den Weg, auf dem er zustande kam
@@ -4077,3 +4077,50 @@ einem Datum davor. Und wenn eine Forderung unerfüllbar wird, ist der erste Verd
 nicht der Anspruch: Zweimal an diesem Abend sah die Forderung unerfüllbar aus, weil gemessen wurde,
 was nie verschickt worden wäre. Das gehört zum offenen Punkt 957; Punkt 943 ist die Messung, die
 ihn geschnitten hat.
+
+### 3.195 Das Sicherheitsnetz maß die Zappelei dessen, den es auffangen soll
+
+Der Auftrag vom 26.08.2026 war eindeutig: Die Batch darf nie einfach anhalten, und zusätzlich zu
+den Mechanismen, die das sichern, soll es eine unabhängige Bahn geben, die den unvorhergesehenen
+Fall auffängt. Die Bahn wurde gebaut, sie läuft stündlich aus einer eigenen Zeitschaltung, ihre
+Schläge sind protokolliert und widerrufbar, und der Chaos-Drill ruft sie wirklich auf: Er startet
+einen echten festgefahrenen Prozess, misst den weichen Schlag als wirkungslos und sieht den harten
+Schlag ihn beenden. Das alles stimmt.
+
+Beim Gegenlesen fiel trotzdem auf, woran ihre Entscheidung hängt. Als Fortschritt zählt jedes
+Intervall der Klasse »Vordergrund«, und die Klassifizierung braucht dafür nicht mehr als einen
+Werkzeugaufruf einer Sitzung mit Zeitstempel. Eine Sitzung, die sich in einer Schleife festgefahren
+hat, ruft aber weiter Werkzeuge auf — die Poll-Schleife dieses Projekts hat einmal 437 Antworten für
+ein Wort gebraucht. Ihre Uhr läuft damit nie ab. Das Netz fängt den STILLEN Stillstand; den lauten
+sieht es nicht, und die Dokumentation sagt genau umgekehrt, es urteile nach begrenzten Intervallen
+statt nach Anwesenheit eines Prozesses. Beides ist wahr und trotzdem irreführend: Nach Anwesenheit
+urteilt es nicht, nach Zappelei schon.
+
+**Lehre:** Ein Sicherheitsnetz darf seinen Fortschrittsbegriff nicht von dem Ding borgen, das es
+auffangen soll. Fortschritt der Batch ist ein Commit auf `main`, ein gelandeter Punkt, eine
+committete Grenze — etwas, das die festgefahrene Sitzung gerade NICHT mehr erzeugt. Sobald das
+Netz stattdessen deren Betriebsamkeit misst, hält jede Schleife es offen, und es gilt weiter als
+Absicherung. Gebucht als Punkt 958.
+
+### 3.196 Zwei Wächter verboten einander die einzige Bewegung, die beide erfüllt hätte
+
+Punkt 947 war gelandet — gemergt, abgehakt, committet, gepusht. Übrig blieb die Nacharbeit: den
+Zweig und den Fernzweig löschen und den Befund der Gegenlesung in die Arbeitsliste schreiben. Der
+Tafel-Wächter verweigerte beides, weil die Tafel »gerade keine laufende Arbeit« zeigte, und nannte
+selbst den Ausweg: eine Abschlusskarte für den gerade abgehakten Punkt. Der Befehl dafür meldete
+Erfolg und schrieb die Karte auch — die Jetzt-Projektion verwarf sie nur wieder, weil ihr Punkt
+nicht mehr offen ist. Ein zweiter Versuch ändert daran nichts: Das Schreiben gelingt jedes Mal, das
+Verwerfen auch. Sogar `land-point.mjs --help` wurde abgelehnt, denn geurteilt wird über das
+Segment, nicht über das, was es täte.
+
+Damit stand die Sitzung zwischen zwei Regeln, die einander ausschlossen: Der Tafel-Wächter verbot
+das Aufräumen, und der Zweig-Hygiene-Wächter verbot das Ende des Zuges, solange nicht aufgeräumt
+war. Genau diese Paarung steht als S-10 in der Stillstands-Übersicht, erreicht über S-05. Der
+einzige Ausweg, der blieb, war eine unbeteiligte offene Nummer als laufende Arbeit auszurufen —
+also eine falsche Aussage auf der Tafel, die der Nutzer auf dem Telefon liest.
+
+**Lehre:** Ein Ausweg, den ein Wächter selbst nennt, gehört getestet wie eine Funktion. Dieser hier
+war viermal gescheitert, und jedes Mal sah es aus wie Erfolg, weil der schreibende Befehl grün
+meldete und erst eine zweite Stufe die Karte wegwarf. Ein Wächter, dessen Ausweg nur auf dem Papier
+existiert, ist kein Wächter mehr, sondern eine Falle mit Begründung. Punkt 937 besitzt den Fall und
+ist deshalb heute Nacht von mittel auf hoch gestuft worden.
