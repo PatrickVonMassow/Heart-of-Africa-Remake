@@ -111,6 +111,15 @@ put it is the mistake this line exists to stop.
   as points 942 and 937. Either a read-only ask exists for every model the switch can name as
   merger (the obvious shape is `ask-sol.mjs` generalised to `--model`, keeping the routing
   refusal), or the fold is a lane the boundary HANDS OVER, with a mechanism that requests it.
+- ONE MORE STOP-PATH, measured 26.08.2026 while cross-reading `7d1a39d` for point 943.
+  `mechanism-review-guard.mjs` builds `buildAuthorshipPassPlan` INSIDE the same `try` that calls
+  `assessReviewGap`. Before that commit only `assessReviewGap` could fail there; now a throw from
+  `review-sol.mjs`'s planner also leaves `gap` null, and `guardOutcome` then BLOCKS. It is
+  fail-closed, so nothing is waved through — but the gap clause exists precisely so an unassemblable
+  range cannot trap the session, and it is now coupled to a second module's health. A broken
+  `review-sol.mjs` therefore turns a suspendable range into a hard block with no runnable review,
+  which is this point's own class. Fix shape: build the sized plan in its own `try`, so a planner
+  failure degrades to the unsliced measurement instead of removing the clause.
   VERIFIABLE: a chaos drill (Urlaubsfestigkeit pattern) that recreates a total wedge and measures
   the fallback restoring the batch without human action; drills must call the real thing
   (memory `drills-must-call-the-thing`).
