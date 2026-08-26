@@ -144,6 +144,16 @@ jede Änderung braucht die volle Batterie — sonst wird Testen umgangen. Bewäh
 
 Die Ursache findest du durch **Zerlegen**, nicht durch Wiederholen.
 
+Und ein Test ist nur so echt wie das, wogegen er läuft. Prüft er eine Datei, die es im
+Projekt wirklich gibt, dann **leite die Testdaten aus dieser Datei ab** — bau sie nicht aus
+dem Gedächtnis nach. Ein Nachbau prüft nicht das Ding, sondern die Vorstellung davon, und er
+wird zuverlässig grün, weil beide aus demselben Kopf stammen.
+
+> *Prompt:* „Wo ein Test gegen ein Artefakt läuft, das im Repository liegt, leite die
+> Testdaten aus der echten Datei ab statt sie nachzubauen. Und sichere zu, dass der Lauf
+> **wiederholbar dasselbe** ergibt und den Anfang der Datei unverändert lässt."
+
+
 ---
 
 ## Die häufigsten Fallstricke → und was hilft
@@ -462,4 +472,4 @@ Die Ursache findest du durch **Zerlegen**, nicht durch Wiederholen.
 
 Sie ersetzt die Fallstricke oben nicht.
 
-<!-- GUIDE-FINGERPRINT: 7428be098bfc3b36f38351f010f43ad722763d4de0435caa7bc17738fb3aabac -->
+<!-- GUIDE-FINGERPRINT: 359574d45a06bad825574032dc882072a0daecfc959907e2ed47bba8907a3f22 -->
