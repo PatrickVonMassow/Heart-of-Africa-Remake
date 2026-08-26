@@ -45,6 +45,13 @@ const WORKFLOW_OR_OUTAGE_REMEDY =
   'Re-run the workflow. If it goes green it was an outage on GitHub\'s side. If it dies the same way, ' +
   'the fault is in the workflow FILE — check what the recent commits changed under `.github/workflows/` ' +
   '(a `uses:` reference that resolves nowhere, or a `runs-on` label no runner matches) and fix it there.'
+// SECONDARY OBSERVATION (measured 06.08.2026): deploy-pages.yml already asks
+// Actions to supersede older Pages runs (`group: pages`,
+// `cancel-in-progress: true`). Supersession is enacted by the Actions service,
+// however, and that service was itself degraded during the measured database
+// primary failover. The declaration establishes that the repository requested
+// cancellation; it does not establish that the service carried it out, nor
+// evidence a more specific cause for the queued runs.
 const NEVER_STARTED_REMEDY =
   'GitHub never assigned the job to a runner. Re-run only the failed jobs once and wait for that run; ' +
   'a repository push cannot repair runner acquisition.'
