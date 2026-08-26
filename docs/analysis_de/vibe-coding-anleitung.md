@@ -144,16 +144,6 @@ jede Änderung braucht die volle Batterie — sonst wird Testen umgangen. Bewäh
 
 Die Ursache findest du durch **Zerlegen**, nicht durch Wiederholen.
 
-Und eine dritte, die uns am 26.08.2026 zwei Rote gekostet hat, die wochenlang im Baum
-standen: Die billige Stufe sieht nur, was sie abdeckt. Was daneben rot wird, sieht niemand,
-bis die große Stufe wirklich GANZ läuft — bei uns war es ein Fehlerbericht, der dem Nutzer
-still ein Archiv ohne das Bild aushändigte.
-
-> *Prompt:* „Wenn ein Artefakt, das der Nutzer nach draußen trägt, einen Bestandteil nicht
-> beilegen kann, dann liefere es **nicht still unvollständig** aus: Es soll an Ort und Stelle
-> sagen, was fehlt. Und lass die große Stufe regelmäßig laufen, nicht nur dann, wenn jemand
-> eine Änderung an genau der Suite gemacht hat."
-
 ---
 
 ## Die häufigsten Fallstricke → und was hilft
