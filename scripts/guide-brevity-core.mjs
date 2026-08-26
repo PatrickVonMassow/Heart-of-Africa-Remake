@@ -150,7 +150,18 @@ export const LIMITS = {
   // SHRINK and called the raise inconsistent, correctly for the range it was given; the range was
   // the reviewer's brief, not the code. Split a change like this again and give the reviewer the
   // whole span, because a ratchet can only be judged against the state before the change began.
-  maxLines: 467,
+  // RAISED 26.08.2026 by the measured NET of one genuinely new tip (§3.188): a decision the tool
+  // takes for itself is written to the board and NOTHING ever retires it, so a notice whose risk a
+  // later measurement refuted keeps standing until the user takes it down. Its sibling class of the
+  // same session (§3.187, the escape hatch a second mechanism removes in the same operation) needed
+  // NO entry of its own — it was FOLDED into "Die Ausnahme existiert nur in der Verweigerung",
+  // which already carries the promised-but-unbuilt special path, and the fold added the missing
+  // half (a test that WALKS the way out) inside the existing four lines. Two neighbouring entries
+  // were tightened to pay the rest back. NO CLAIM WAS DROPPED, and the fold proved it the hard
+  // way: a first attempt shortened the folded entry past its pinned check question, and the suite
+  // that pins every entry's claim caught it — the question is back and cost the line it saves.
+  // Net: six lines and fifty-four words, which is the new tip plus the fold's added half.
+  maxLines: 473,
   // EXACT FIT, not headroom — corrected 30.07.2026 after the four-eyes review
   // pointed out that this comment had long stopped describing the numbers. The
   // rule above ("raised only by the measured size of genuinely new tips")
@@ -319,7 +330,7 @@ export const LIMITS = {
   // eighteen.
   // 26.08.2026: the folded fixture-derivation clause above measures 4196, so the word ceiling
   // follows the measurement UP by thirty-four — the raise the same entry justifies, no headroom.
-  maxWords: 4196,
+  maxWords: 4250,
   // A pitfall entry = the risk lines plus its prompt. Anything longer is a
   // story, not a tip.
   maxEntryLines: 11,

@@ -152,10 +152,10 @@ Die Ursache findest du durch **Zerlegen**, nicht durch Wiederholen.
   bewirkt hätte, statt sie aufzurufen — und ist für immer grün.
   → *Prompt:* „Eine sichtbare Änderung ist erst fertig, wenn sie am **echten gerenderten Bild**
   unter einer erreichbaren Bedingung geprüft wurde. Zu jeder Prüfung: **Welche Zeile ruft die
-  Sache auf — und was bliebe grün, wenn sie völlig kaputt wäre?** Vergehende Zeit darf ein Test
-  abkürzen, den **Aufruf** nie. Und wo die Prüfung gegen eine Datei läuft, die es im Projekt
-  wirklich gibt, **leite die Testdaten aus ihr ab, statt sie nachzubauen** — ein Nachbau prüft
-  die Vorstellung davon und wird zuverlässig grün.“ *(≈ 1,5x.)* *(Sieht das richtig aus?)*
+  Sache auf — und was bliebe grün, wenn sie kaputt wäre?** Zeit darf ein Test abkürzen, den
+  **Aufruf** nie. Läuft die Prüfung gegen eine echte Projektdatei, **leite die Testdaten aus ihr
+  ab, statt sie nachzubauen** — ein Nachbau prüft die Vorstellung davon und ist zuverlässig
+  grün.“ *(≈ 1,5x.)* *(Sieht das richtig aus?)*
 - **Neue Features zerbrechen alte.** Eine Änderung repariert X und bricht das unbeobachtete Y.
   → *Prompt:* „Etabliere einen Mechanismus, der jede Mechanik auch im **Danach-Zustand** prüft und
   nach jedem Zusammenführen die schnelle Testschicht erzwingt. Bau ‚Invarianten' ein, die im
@@ -206,8 +206,8 @@ Die Ursache findest du durch **Zerlegen**, nicht durch Wiederholen.
   statt deinen Code; von Hand nachgeprüft bestätigt sich der Fehler selbst, denn dein Aufruf erbt
   dasselbe Verzeichnis.
   → *Prompt:* „Jede Prüfung bekommt ihre Pfade **eingespritzt**; was fürs **ganze Projekt** gilt,
-  wird an **einer** Stelle gelesen — wahr wegen des Codes, nie wegen des Checkouts. Grün bei dir
-  und rot im Haken? Lass die Bedingung aus **beiden** Wurzeln laufen."
+  wird an **einer** Stelle gelesen — wahr wegen des Codes, nie wegen des Checkouts. Grün bei dir,
+  rot im Haken? Lass die Bedingung aus **beiden** Wurzeln laufen."
 
 - **Messung und Vorschau verunreinigt.** Halbfertiges gilt als ‚fertig'.
   → *Prompt:* „Hol mein Urteil am **veröffentlichten** Stand ein, nie an einem Zwischenzweig, und
@@ -407,10 +407,11 @@ Die Ursache findest du durch **Zerlegen**, nicht durch Wiederholen.
   → *Prompt:* „Was eine Sitzung überdauern soll, gehört in eine Datei, die dein Werkzeug beim
   nächsten Start selbst liest. Ein Zuruf ist ein Hinweis, nie ein Auftrag."
 
-- **Die Ausnahme existiert nur in der Verweigerung.** Ein Mechanismus verspricht einen Sonderweg,
-  baut aber weder Zustand noch Befehl dafür.
-  → *Prompt:* „Baue jede zugesagte Ausnahme als eigenen Zustand und Befehl. Prüffrage: Kann der
-  ehrlichste Wortlaut der Ausnahme meine eigene Prüfung bestehen?"
+- **Die Ausnahme existiert nur in der Verweigerung.** Ein Mechanismus verspricht einen Sonderweg
+  und baut ihn nicht — oder ein zweiter räumt ihn im selben Zug wieder ab und meldet Erfolg dabei.
+  → *Prompt:* „Baue jede zugesagte Ausnahme als eigenen Zustand und Befehl, und schreib einen Test,
+  der sie **geht**. Prüffrage: Kann der ehrlichste Wortlaut der Ausnahme meine eigene Prüfung
+  bestehen?"
 
 - **Zwei Helfer, ein Projekt — und der zweite merkt es nie.** Startet dein Werkzeug automatisch
   nach, geht eine zweite Sitzung neben der laufenden auf — beide haben beim Start ehrlich gefragt.
@@ -426,15 +427,8 @@ Die Ursache findest du durch **Zerlegen**, nicht durch Wiederholen.
   → *Prompt:* „Zurücktreten heißt **nicht handeln**, nie **nicht wissen**. Berichte den gemessenen
   Zustand auch dann, wenn du nichts ändern darfst. Lesen kollidiert mit nichts.“
 
-- **Der Ausweg, den die Fehlermeldung nennt, führt nirgendwohin.** Ein Mechanismus verspricht
-  einen Sonderweg, ein anderer räumt ihn im selben Zug wieder ab — und der Schreibvorgang meldet
-  dabei Erfolg.
-  → *Prompt:* „Jeder Ausweg, den eine Fehlermeldung nennt, braucht einen Test, der ihn **geht**.
-  Dass der Text dasteht, beweist nichts."
-
-- **Das Protokoll ohne Verfallsdatum wird zum Dauerplakat.** Was die Maschine über ihre eigene
-  Entscheidung aufschreibt, nimmt niemand je wieder heraus — auch dann nicht, wenn eine spätere
-  Messung das Risiko widerlegt hat.
+- **Das Protokoll ohne Verfallsdatum wird zum Dauerplakat.** Was dein Werkzeug über die eigene
+  Entscheidung aufschreibt, nimmt niemand je wieder heraus.
   → *Prompt:* „Eine Entscheidung, die du selbst triffst, nennt die **Messung**, die sie stützen
   oder widerlegen würde, und **verfällt**, sobald diese Messung sauber vorliegt."
 
