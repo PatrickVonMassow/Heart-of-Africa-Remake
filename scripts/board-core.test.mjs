@@ -297,12 +297,23 @@ describe('derived now-section membership', () => {
     // this case): cutting at the next section's opening tag left everything
     // between the two inside the slice, so an element inserted BETWEEN sections
     // satisfied an assertion that claims to prove it is inside this one.
+    // …and the slice is found by COUNTING the section wrapper's own tags (two
+    // confirming passes of this case). Cutting at the next section's opening
+    // tag left everything between the two inside the slice; cutting at the LAST
+    // closer in that stretch was fooled by a misplaced `<details>` card standing
+    // between the sections — whose closer then became the last one. Depth
+    // counting is the only reading neither can fool.
     const nowSectionOf = (html) => {
-      const from = html.indexOf('Woran ich gerade arbeite')
-      const next = html.indexOf('<details class="sect"', from + 1)
-      const scope = html.slice(from, next < 0 ? undefined : next)
-      const close = scope.lastIndexOf('</details>')
-      return close < 0 ? scope : scope.slice(0, close)
+      const heading = html.indexOf('Woran ich gerade arbeite')
+      const from = html.lastIndexOf('<details', heading)
+      const tag = /<(\/?)details\b/g
+      tag.lastIndex = from
+      let depth = 0
+      for (let m = tag.exec(html); m; m = tag.exec(html)) {
+        depth += m[1] ? -1 : 1
+        if (depth === 0) return html.slice(from, m.index)
+      }
+      return html.slice(from)
     }
 
     // (a) Beside the authored idle claim: both stand, and NOTHING is rewritten
@@ -368,26 +379,30 @@ describe('derived now-section membership', () => {
       '<span class="num">935</span>',
       '<span class="num" aria-label="Punkt">935</span>',
       '<span class="chip num">935</span>',
+      "<span class='num'>935</span>",
+      '<span class=num>935</span>',
+      '<SPAN CLASS="num">935</SPAN>',
+      '<div class="num">935</div>',
+      '<span class="num">&#57;35</span>',
+      '<span class="num"><b>935</b></span>',
       `<span class="t">935 ${'\u2014'} Getarnt</span>`,
     ]
-    let smuggled = ''
     for (const shape of chipShapes) {
-      smuggled = derivedCard(shape)
+      const smuggled = derivedCard(shape)
       const board = fullBoard({ now: smuggled })
       expect(compareNowProjection(board, []).ok).toBe(false)
       expect(() => reconcileNowProjection(board, [], { stamp: '10:17' })).toThrow(
         /authored unnumbered non-idle card/,
       )
+      // …and it is not laundered into the section beside real work either —
+      // BOTH halves say so, for EVERY shape (the second confirming pass of this
+      // case: the loop had left only the last shape standing for this half).
+      const beside = fullBoard({ now: nowEntry(700, 'A', '20:07') + smuggled })
+      expect(compareNowProjection(beside, [700])).toMatchObject({ ok: false, strayCards: 1 })
+      expect(() => reconcileNowProjection(beside, [700], { stamp: '20:10' })).toThrow(
+        /unnumbered current-work card/,
+      )
     }
-    // …and it is not laundered into the section beside real work either —
-    // BOTH halves say so, not only the comparison (the confirming pass of this
-    // case: a render that accepted it there would have stayed green).
-    const beside = fullBoard({ now: nowEntry(700, 'A', '20:07') + smuggled })
-    expect(compareNowProjection(beside, [700])).toMatchObject({ ok: false, strayCards: 1 })
-    expect(() => reconcileNowProjection(beside, [700], { stamp: '20:10' })).toThrow(
-      /unnumbered current-work card/,
-    )
-
     // (b) TWO genuine derived cards are damaged machine state, not two facts.
     // THE TWO ARE DISTINGUISHABLE ON PURPOSE (the confirming pass of this case):
     // byte-identical cards cannot tell keeping the FIRST from keeping the last.

@@ -1575,21 +1575,46 @@ const stateCardPattern = (kind) =>
  * chip under the claim that nothing is running. `parseNowCardPoints` has always
  * scanned the whole section; the three state predicates now agree with it.
  */
+const classTokens = (attrs) => {
+  const m = String(attrs ?? '').match(/\bclass\s*=\s*(?:"([^"]*)"|'([^']*)'|([^\s"'>=`]+))/i)
+  return (m ? m[1] ?? m[2] ?? m[3] ?? '' : '').split(/\s+/).filter(Boolean)
+}
+
+/** The text a browser would show: tags removed, numeric entities resolved. */
+const visibleText = (html) =>
+  String(html ?? '')
+    .replace(/<[^>]*>/g, '')
+    .replace(/&#x([0-9a-fA-F]+);/g, (_, hex) => String.fromCodePoint(parseInt(hex, 16)))
+    .replace(/&#(\d+);/g, (_, dec) => String.fromCodePoint(Number(dec)))
+
 const summaryCarriesPoint = (summary) => {
   const text = String(summary ?? '')
   const { chip, legacy } = summaryPoint(text)
   if (chip != null || legacy != null) return true
-  // …AND THE FALLBACK READS MARKUP, NOT ONE SPELLING OF IT (the confirming pass
-  // of the same review): an exact `class="num">` only recognises the attribute
-  // when it sits immediately before the `>`, so an ordinary
-  // `<span class="num" aria-label="Punkt">935</span>` walked straight past it.
-  // Each opening span is read for its class TOKENS and the text that directly
-  // follows it, which also survives nesting.
-  for (const [, attrs, body] of text.matchAll(/<span\b([^>]*)>\s*([^<]*)/g)) {
-    const tokens = (((attrs.match(/\bclass\s*=\s*"([^"]*)"/) ?? [])[1]) ?? '').split(/\s+/).filter(Boolean)
-    if (tokens.includes('num') && /^\d+$/.test(body.trim())) return true
-    // The legacy "651 — Titel" spelling counts wherever it stands, not only first.
-    if (tokens.includes('t') && new RegExp(`^\\s*\\d+\\s*${DASH}`).test(body)) return true
+  // …AND THE FALLBACK READS MARKUP, NOT ONE SPELLING OF IT (two confirming
+  // passes of the same review). The first spelling-bound attempt missed
+  // `<span class="num" aria-label="Punkt">935</span>`; the second still missed
+  // single quotes, an unquoted or upper-case attribute, a tag other than
+  // `span`, an entity-encoded digit and a number wrapped in a nested element.
+  // So the summary is WALKED as markup: every element that carries the `num`
+  // class token is asked what a BROWSER would show inside it, and the legacy
+  // "651 — Titel" spelling counts wherever it stands rather than only first.
+  const tag = /<\s*(\/?)\s*([a-zA-Z][\w:-]*)((?:"[^"]*"|'[^']*'|[^>])*)>/g
+  const open = []
+  const legacyStart = new RegExp(`^\\s*\\d+\\s*${DASH}`)
+  for (let m = tag.exec(text); m; m = tag.exec(text)) {
+    const [whole, closing, , attrs] = m
+    if (closing) {
+      const element = open.pop()
+      if (!element) continue
+      const shown = visibleText(text.slice(element.from, m.index))
+      if (element.num && /^\s*\d+\s*$/.test(shown)) return true
+      if (element.legacy && legacyStart.test(shown)) return true
+      continue
+    }
+    if (/\/\s*$/.test(attrs)) continue
+    const tokens = classTokens(attrs)
+    open.push({ num: tokens.includes('num'), legacy: tokens.includes('t'), from: m.index + whole.length })
   }
   return false
 }
