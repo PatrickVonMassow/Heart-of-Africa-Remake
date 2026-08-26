@@ -152,6 +152,38 @@ put it is the mistake this line exists to stop.
   into a formality.
   Bundle: Session- & Repo-Hygiene.
 
+- [ ] 938. Three recorded `enrichments` reds name a TICKED point, so nothing can ever own them
+  (measured 26.08.2026 on `.claude/render-verify-state.json` while answering point 734's sixth
+  round). The `webgpu/enrichments` runs of 17.08.2026 08:46, 09:07 and 09:26 each carry the same
+  unaccounted check red — "the streamed dressing does not grow over a session at a fixed anchor
+  (point 278)" — recorded with `point=null` and `featureLevel=compatibility`. That check is point
+  278's own live witness, and 278 is TICKED. Under the charge-expiry rule a charge dies with its
+  point, so this red has NO owner it could ever be charged to: the ledger requires an OPEN point,
+  and point 734's retroactive route — proven in the same round by a Vitest case, a new
+  `RED_CHARGES` entry reaching the blocking question of a run already on disk — has nothing to bind
+  it to. This is exactly the "unowned product defect" hole point 734's own text names, met in the
+  wild for the first time.
+  DECIDE BY MEASUREMENT, NOT BY TASTE — the two readings are opposite and only one can be true:
+  either the dressing-growth regression 278 fixed is BACK (the check is right and the game is
+  wrong), or the check is stale on the compatibility feature level, where the adapter's own
+  streaming behaviour differs from the core lane it was written against (the check is wrong and the
+  game is fine). Every one of the three recorded runs is `featureLevel=compatibility`, which is a
+  reason to suspect the second and no proof of it.
+  FINAL STATE:
+  - THE MEASUREMENT IS TAKEN FIRST: the fixed-anchor instance count is re-measured on BOTH feature
+    levels, and the verdict names which of the two readings the numbers support.
+  - THE RED GETS AN OWNER EITHER WAY. If the regression is back, this point owns it and fixes it.
+    If the check is stale, this point re-scopes the check and says so where it is written.
+  - THE THREE STORED RUNS STOP BLOCKING WITHOUT A DEFERRAL, through one ledger entry scoped
+    `suite=enrichments`, `backend=webgpu`, `kind=check` — which is precisely what point 734's
+    retroactive route exists for, and this point is its first real user.
+  VERIFIABLE: the re-measurement with its numbers on both feature levels; the Vitest witness of
+  whichever half turns out to be wrong; and `node scripts/render-verify-guard.mjs --status` on a
+  quiet machine showing the three 17.08. runs accounted for with no `--defer`.
+  Criticality: medium-high — a red nobody can own is the one state the charge ledger cannot
+  express, and it blocks the render window for as long as it stands.
+  Bundle: Steuerung & Performance.
+
 - [ ] 581. The settlement boundary is too faint, and its slider is already at the ceiling
   (user 09.08.2026, F6 report `local/bugreports/DorfgrenzeSchlechtErkennbar.zip`: "Die
   Dorfgrenze ist zu schlecht erkennbar. Der Kontrast muss höher sein"). MEASURED from his
@@ -12146,3 +12178,28 @@ to land than a mechanism that needs a review.
   onto a backstop guard, and it makes a documented way out of a documented state a dead letter.
   Bundle: Chat & Tafel. It touches the same board projection as 930 and 935 and must not run
   beside them.
+
+- [ ] 939. The 19.08. `webgpu/startup` red is a dev-server transient with no owner (measured
+  26.08.2026 on `.claude/render-verify-state.json` while answering point 734's sixth round). The
+  run of 19.08.2026 12:09:17 carries one unaccounted console red: "Failed to load resource: the
+  server responded with a status of 504 (Outdated Optimize Dep)" — Vite's dependency optimizer
+  re-bundling in the middle of the run. By CLAUDE.md's own classification that is an
+  ENVIRONMENT/STAGING transient, which fails soft, and not a product defect; but the recorder
+  captured it as an ordinary console red, no open point owns it, and the ledger may not charge an
+  unfiled red. So a transient that the rules say to fail soft on blocks the gate exactly as a
+  product defect would.
+  FINAL STATE:
+  - THE LANE STOPS PRODUCING THIS RED. The dev server is warmed before the suite starts, so the
+    optimizer has re-bundled before the first navigation rather than during it.
+  - THE CAPTURE KNOWS THE DIFFERENCE. This exact 504 signature is classified as environment rather
+    than product where the console capture decides, and the run says which it saw — a soft-failing
+    transient must not be indistinguishable from a defect in the record.
+  - THE STORED RUN GETS ITS DISPOSITION through the retroactive route point 734 provides, so it
+    stops blocking without a `--defer`.
+  VERIFIABLE: Vitest over the console classification — the exact 504 text is read as environment,
+  a neighbouring 504 from the app itself is NOT; a warm-up whose absence reproduces the red at
+  least once; and the stored 19.08. run accounted for in `--status`.
+  Criticality: medium — one run, one line, but it is the cheapest possible demonstration that the
+  gate cannot tell a broken machine from a broken game, and that confusion is what makes a red
+  gate get waved through.
+  Bundle: Session- & Repo-Hygiene.

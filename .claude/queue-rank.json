@@ -762,44 +762,13 @@
       "why": "Das Aufraeumen nach der Landung hat mit branch-hygiene-guard eine Rueckfallebene, deshalb steht der Punkt hinter der laufenden Arbeit, aber vor den bewusst zurueckgestellten Altpunkten.",
       "origin": "machine",
       "place": "last"
+    },
+    "939": {
+      "at": "2026-08-26T10:10:38.893Z",
+      "why": "Ein einzelner Lauf mit einer Umgebungsstoerung; er faellt aus dem Fenster, sobald startup wieder gruen laeuft, deshalb steht er hinter der Arbeit, die das Tor selbst betrifft.",
+      "origin": "machine",
+      "place": "last"
     }
-  },
-  "boundary": {
-    "at": "2026-08-21T00:55:14.962Z",
-    "points": [
-      336,
-      553,
-      581,
-      596,
-      633,
-      659,
-      660,
-      663,
-      686,
-      687,
-      688,
-      689,
-      690,
-      691,
-      692,
-      708,
-      715,
-      719,
-      733,
-      734,
-      735,
-      736,
-      738,
-      739,
-      746,
-      747,
-      750,
-      759,
-      760,
-      762,
-      764
-    ],
-    "why": "The order standing in front of the release today is the arrangement that predates this rule; the four machine-filed points that had ranked themselves there were moved behind 174 first"
   },
   "settled": {
     "at": "2026-08-26T09:48:58.843Z",
@@ -1100,5 +1069,42 @@
       936,
       937
     ]
+  },
+  "boundary": {
+    "at": "2026-08-21T00:55:14.962Z",
+    "points": [
+      336,
+      553,
+      581,
+      596,
+      633,
+      659,
+      660,
+      663,
+      686,
+      687,
+      688,
+      689,
+      690,
+      691,
+      692,
+      708,
+      715,
+      719,
+      733,
+      734,
+      735,
+      736,
+      738,
+      739,
+      746,
+      747,
+      750,
+      759,
+      760,
+      762,
+      764
+    ],
+    "why": "The order standing in front of the release today is the arrangement that predates this rule; the four machine-filed points that had ranked themselves there were moved behind 174 first"
   }
 }
