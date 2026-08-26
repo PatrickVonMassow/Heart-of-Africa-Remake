@@ -20,13 +20,12 @@
 // commit — a closing is per-commit, so a new tagged commit needs a fresh pass.
 import { readFileSync, writeFileSync, mkdirSync } from 'node:fs'
 import { execSync } from 'node:child_process'
-import { resolve, dirname } from 'node:path'
-import { fileURLToPath } from 'node:url'
+import { dirname } from 'node:path'
 import { CLOSING_STEPS, STEP_IDS, evaluate, missingSteps, mayTickPoint } from './closing-guard-core.mjs'
 import { readTasksAll } from './tasks-source.mjs'
+import { REPO_ROOT, repoPath } from './repo-paths.mjs'
 
-const REPO_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..')
-const STATE_PATH = resolve(REPO_ROOT, '.claude', 'closing-state.json')
+const STATE_PATH = repoPath('.claude', 'closing-state.json')
 
 /** The tools whose calls can be a release act: the shells tag, the editors tick. */
 const GUARDED_TOOLS = new Set(['Bash', 'PowerShell', 'Edit', 'Write', 'MultiEdit', 'NotebookEdit'])

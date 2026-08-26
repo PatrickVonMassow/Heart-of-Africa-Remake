@@ -8,6 +8,8 @@ const ROOT = resolve(process.cwd())
 const EXCLUDED = new Set([
   'TASKS.md',
   'design.md',
+  // Generated command syntax lists both --on and --off; it records no current state.
+  'docs/command-index.md',
   'docs/tasks-archive.md',
   'scripts/author-routing-core.mjs',
   'src/config/fableEscalationDoc.test.ts',
@@ -35,19 +37,53 @@ function trackedProseAndSource() {
   return new Map(paths.map((path) => [path, readFileSync(resolve(ROOT, path), 'utf8')]))
 }
 
-describe('the Fable escalation boundary has one prose statement', () => {
-  it('finds the threshold only in CLAUDE.md §6', () => {
-    expect(thresholdClaims(trackedProseAndSource())).toEqual(['CLAUDE.md'])
+const stateClaim =
+  /\bfable\b[\s\S]{0,100}\bswitch\b[\s\S]{0,100}\b(?:on|off|enabled|disabled|suspended|active|inactive)\b|\bfable\b[\s\S]{0,100}\b(?:on|off|enabled|disabled|suspended|active|inactive)\b[\s\S]{0,100}\bswitch\b/i
+
+function switchStateClaims(files: Map<string, string>) {
+  return [...files].filter(([, text]) => stateClaim.test(text)).map(([path]) => path)
+}
+
+function trackedDocuments() {
+  const paths = execFileSync('git', ['ls-files', '*.md'], { cwd: ROOT, encoding: 'utf8' })
+    .split(/\r?\n/)
+    .filter(Boolean)
+    // The work order and archive are specifications/history, not operational
+    // restatements; they necessarily preserve the instruction this test enforces.
+    .filter((path) => !EXCLUDED.has(path))
+  return new Map(paths.map((path) => [path, readFileSync(resolve(ROOT, path), 'utf8')]))
+}
+
+describe('the Fable escalation boundary has at most one prose statement', () => {
+  it('finds the threshold stated in no prose file', () => {
+    expect(thresholdClaims(trackedProseAndSource())).toEqual([])
   })
 
-  it('would fail the consistency check if a second statement appeared', () => {
+  it('would fail the consistency check if a statement appeared', () => {
     for (const duplicate of [
       'Fable escalates after five unsuccessful review rounds.',
       'After five unsuccessful review rounds, escalate the point to Fable.',
     ]) {
       const files = trackedProseAndSource()
       files.set('docs/duplicate.md', duplicate)
-      expect(thresholdClaims(files)).toEqual(['CLAUDE.md', 'docs/duplicate.md'])
+      expect(thresholdClaims(files)).toEqual(['docs/duplicate.md'])
+    }
+  })
+})
+
+describe('the Fable switch state exists in no tracked operational document', () => {
+  it('finds no prose claim that the switch has a direction', () => {
+    expect(switchStateClaims(trackedDocuments())).toEqual([])
+  })
+
+  it('catches either direction written around the switch name', () => {
+    for (const duplicate of [
+      'The Fable switch is enabled for this run.',
+      'Fable remains disabled by the shared switch.',
+    ]) {
+      const files = trackedDocuments()
+      files.set('docs/duplicate.md', duplicate)
+      expect(switchStateClaims(files)).toEqual(['docs/duplicate.md'])
     }
   })
 })

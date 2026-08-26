@@ -46,41 +46,38 @@ import { createWriteStream, mkdirSync, readFileSync } from 'node:fs'
 import { constants as osConstants } from 'node:os'
 import { dirname, isAbsolute, join, relative } from 'node:path'
 import { fileURLToPath } from 'node:url'
-import { DEFAULTS, buildDigest, createSelector, failureSurface, showWindow } from './run-digest-core.mjs'
+import { buildDigest, createSelector, failureSurface, showWindow } from './run-digest-core.mjs'
 import { backendsFrom, buildReceipt, formatReceipt, planRun } from './run-wait-core.mjs'
 import { framesWrittenSince, gitPosition, readRecord, recordPathFor, selfCommandLine, writeRecord } from './run-record.mjs'
+import { emitActivity } from '../batch-activity-journal.mjs'
+import { ACTIVITY_EVENTS } from '../batch-activity-journal-core.mjs'
+import { budgetToolOutput } from '../tool-output-budget-core.mjs'
+import { parseRunLoggedArgs } from './run-logged-args.mjs'
 
 const HERE = dirname(fileURLToPath(import.meta.url))
 const ROOT = join(HERE, '..', '..')
+const PROGRESS_LEASE_MS = 15 * 60_000
+const PROGRESS_EMIT_MS = 60_000
+const RUNNER_STARTED_AT = Date.now() - Math.round(process.uptime() * 1000)
+
+function emitRunActivity(event, { at = Date.now(), recordPath, command, startedAt, leaseUntil = null, result = null } = {}) {
+  emitActivity({
+    event,
+    at,
+    session: process.env.CLAUDE_SESSION_ID ?? process.env.HOA_SESSION_ID ?? null,
+    pid: process.pid,
+    pidStartedAt: RUNNER_STARTED_AT,
+    generation: null,
+    cause: 'named-verification-run',
+    evidence: { id: recordPath, recordPath, command, startedAt, leaseUntil, result },
+  })
+}
 
 /** The termination signals both layers FORWARD to their child rather than
  *  dying around it — SIGHUP/SIGQUIT beside the classic two (Sol round 5), so
  *  a hangup reaches the runner instead of killing a middle layer and
  *  orphaning it. */
 const FORWARDED_SIGNALS = ['SIGINT', 'SIGTERM', 'SIGHUP', 'SIGQUIT']
-
-/** Split our own flags out of the argv; everything else goes to run-all. */
-function parseOwnArgs(argv) {
-  const own = { show: null, grep: null, tail: DEFAULTS.tailLines, max: 400, keep: DEFAULTS.maxKeptLines, stream: false, quiet: false, logFile: null }
-  const forward = []
-  for (let i = 0; i < argv.length; i++) {
-    const a = argv[i]
-    const value = () => argv[++i]
-    if (a === '--show') own.show = value()
-    else if (a === '--grep') own.grep = value()
-    else if (a === '--tail') own.tail = Number(value())
-    else if (a === '--max') own.max = Number(value())
-    else if (a === '--keep') own.keep = Number(value())
-    else if (a === '--log-file') own.logFile = value()
-    else if (a === '--stream') own.stream = true
-    else if (a === '--quiet') own.quiet = true
-    else forward.push(a)
-  }
-  if (!Number.isFinite(own.tail)) own.tail = DEFAULTS.tailLines
-  if (!Number.isFinite(own.max)) own.max = 400
-  if (!Number.isFinite(own.keep)) own.keep = DEFAULTS.maxKeptLines
-  return { own, forward }
-}
 
 /** `2026-08-07T14-31-09-large.log` — sortable, and it says what it ran. */
 function logPathFor(args, own) {
@@ -111,11 +108,27 @@ function showLog(path) {
     return 1
   }
   const all = text.split(/\r?\n/)
-  const win = showWindow(all, { grep: own.grep, tail: own.tail, max: own.max })
-  const what = own.grep ? `${win.matched} line(s) matching /${own.grep}/i of ${all.length}` : `${all.length} line(s)`
-  console.log(`── ${forDisplay(full)} — ${what}; showing the last ${win.lines.length}${win.truncated > 0 ? ` (${win.truncated} not shown)` : ''}`)
-  for (const l of win.lines) console.log(l)
-  return 0
+  const shown = forDisplay(full)
+  try {
+    const win = showWindow(all, { grep: own.grep, tail: own.tail, max: own.max })
+    const what = own.grep ? `${win.matched} line(s) matching /${own.grep}/i of ${all.length}` : `${all.length} line(s)`
+    const selected = [
+      `── ${shown} — ${what}; showing the last ${win.lines.length}${win.truncated > 0 ? ` (${win.truncated} not shown)` : ''}`,
+      ...win.lines,
+    ].join('\n')
+    process.stdout.write(budgetToolOutput({ text: selected, exitCode: 0, logPath: shown, command: 'run-logged --show' }).text)
+    return 0
+  } catch (error) {
+    process.stdout.write(
+      budgetToolOutput({
+        text: `ERROR: could not select a log window: ${error?.message ?? String(error)}`,
+        exitCode: 1,
+        logPath: shown,
+        command: 'run-logged --show',
+      }).text,
+    )
+    return 1
+  }
 }
 
 /**
@@ -158,6 +171,20 @@ function closeRecord({ lines, exitCode, started, recordPath, baseRecord }) {
       exitCode,
       framesWritten,
       receipt,
+    })
+    emitRunActivity(ACTIVITY_EVENTS.VERIFICATION_FINISH, {
+      at: receipt.finishedAt,
+      recordPath,
+      command: baseRecord.command,
+      startedAt: baseRecord.startedAt,
+      result: {
+        exitCode,
+        status: exitCode === 0 ? 'green' : 'red',
+        head: receipt.head,
+        branch: receipt.branch,
+        framesExpected: receipt.framesExpected,
+        framesWritten: receipt.framesWritten,
+      },
     })
     return formatReceipt(receipt)
   } catch (err) {
@@ -211,6 +238,13 @@ function runVerify() {
     receipt: null,
   }
   writeRecord(recordPath, baseRecord)
+  emitRunActivity(ACTIVITY_EVENTS.VERIFICATION_START, {
+    at: started,
+    recordPath,
+    command,
+    startedAt: started,
+    leaseUntil: started + PROGRESS_LEASE_MS,
+  })
 
   const child = spawn(process.execPath, [join(HERE, 'run-all.mjs'), ...forward], {
     windowsHide: true,
@@ -225,11 +259,23 @@ function runVerify() {
   const select = createSelector()
   let rawChars = 0
   let pending = ''
+  let lastProgressEmittedAt = started
 
   function consume(chunk) {
     const text = String(chunk)
     rawChars += text.length
     log.write(text)
+    const progressAt = Date.now()
+    if (text.length > 0 && progressAt - lastProgressEmittedAt >= PROGRESS_EMIT_MS) {
+      lastProgressEmittedAt = progressAt
+      emitRunActivity(ACTIVITY_EVENTS.VERIFICATION_PROGRESS, {
+        at: progressAt,
+        recordPath,
+        command,
+        startedAt: started,
+        leaseUntil: progressAt + PROGRESS_LEASE_MS,
+      })
+    }
     pending += text
     const parts = pending.split(/\r?\n/)
     pending = parts.pop() ?? ''
@@ -275,8 +321,16 @@ function runVerify() {
       maxKeptLines: own.keep,
       tailLines: own.tail,
     })
-    console.log(digest.text)
-    for (const line of closeRecord({ lines, exitCode, started, recordPath, baseRecord })) console.log(line)
+    const receipt = closeRecord({ lines, exitCode, started, recordPath, baseRecord })
+    const endBlock = `${[digest.text, ...receipt].join('\n')}\n`
+    process.stdout.write(
+      budgetToolOutput({
+        text: endBlock,
+        exitCode,
+        logPath: shown,
+        command: 'run-logged verify digest',
+      }).text,
+    )
     // NOT process.exit(): stdout may be a pipe, and an explicit exit can drop
     // what is still buffered in it — which is the digest itself. Setting the code
     // and letting the loop drain keeps the caller's copy complete.
@@ -360,7 +414,7 @@ function reexecWithLogPath() {
   })
 }
 
-const { own, forward } = parseOwnArgs(process.argv.slice(2))
+const { own, forward } = parseRunLoggedArgs(process.argv.slice(2))
 if (own.show) process.exitCode = showLog(own.show)
 else if (own.logFile) runVerify()
 else reexecWithLogPath()

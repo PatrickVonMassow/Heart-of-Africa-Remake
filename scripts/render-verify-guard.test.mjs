@@ -30,6 +30,7 @@ const okDeps = () => ({
   baselineGone: () => true,
   // The work order, from which the chargeable points come (point 550).
   workOrder: () => '- [ ] 506. an open point\n- [x] 387. a finished one',
+  guardDuty: ({ sessionId }) => ({ closed: false, successor: 'the successor session', sessionId }),
 })
 
 const gatherWith = (broken) =>
@@ -47,6 +48,8 @@ describe('gatherRenderVerifyInputs — the happy path it must keep', () => {
       runs: [],
       deferral: undefined,
       openPoints: [506],
+      sessionId: 'sid',
+      fence: { closed: false, successor: 'the successor session', sessionId: 'sid' },
     })
   })
 

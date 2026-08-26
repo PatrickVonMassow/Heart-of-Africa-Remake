@@ -48,6 +48,25 @@ Das Musterbeispiel sind die Chat-Zeitstempel: neun Eskalationsstufen, acht weich
 | 09.08. abends | Spielsitzung: zwölf Defekte in einer Mechanik, deren zwölf Punkte alle abgenommen waren — grün gegen einen Stellvertreter (Punkt 589); die veröffentlichte Reihenfolge zweimal falsch, weil sie eine zweite Heimat hat (Punkt 590, Rückfall in §3.77); ein abgehakter Punkt mit unerfülltem drittem Liefergegenstand, gefunden durch eine Nutzerfrage (§3.99) |
 
 | 13.08. | Der Nachprüfer findet eine echte zweite Klippe im geheilten Mechanismus — und jede der fünf gemessenen Kuren verschlechtert gesunde Dörfer stärker, als der Fehler schadet: Befund wird gebucht statt behoben (§3.115) |
+| 20.08. | Der Dokumentschnitt strich Regeln als »von einem Wächter abgedeckt«, ohne einen einzigen Wächter darauf zu prüfen — die Kontextanzeige verschwand, der Nutzer fand es (§3.134); eine vom Nutzer gesetzte Rangfolge wurde in einer Nacht zweimal maschinell überholt, ohne dass irgendwo ein Grund stand (Punkt 614); zwei Werkzeuge derselben Bauart am falschen Ort gemessen — im Hauptbaum gebaut und geprüft, während der Prozess die Arbeit in den isolierten Bereich schickt (§3.137) |
+| 21.08. | Ein Tor verlangte eine Freigabe, die seine eigenen Werkzeuge nicht herstellen können — der HIGH-Punkt war gemergt, geprüft und freigegeben, und der Zugausgang wies ihn trotzdem ab (§3.153) |
+| 24.08. | Ein Rot, das die Wiederholung heilt: eine Netzprobe im Testfall überlebt dessen Timeout — deterministisch rot nach jedem Push, grün beim zweiten Lauf (§3.171); zehn Prüfrunden mit zehn echten Befunden neben einem Punkt bei Runde 27 ohne Konvergenz — die Rundenzahl sagt nichts, die Bewegung des Urteils alles (§3.172) |
+| 25.08. nachts | Dieselbe Tür, zweiter Rückfall: Das Kritikalitätstor kann den Dateisatz eines selbst verfassten Punktes nicht messen, weil sein Anker nur beim delegierten Autorenlauf entsteht — ein gemergter, abgehakter und dreizehnmal geprüfter HIGH-Punkt sperrte jedes Zugende, bis eine überflüssige Ganzbereichsrunde ihn räumte (§3.153, Punkt 903) |
+| 25.08. früh | Der delegierte Autor überholte seine eigene Veröffentlichung und kam allein nicht zurück: Nach dem Umschreiben bereits gepushter Commits scheiterte jeder weitere Zwischen-Push, und der Lauf wiederholte zehn Minuten lang denselben nackten Versuch, obwohl der Lease-gesicherte Weg im selben Wrapper längst existiert — der Zweig blieb blind, und die Diagnose druckte einen Bereich aus zwei undefinierten Variablen (§3.174, Punkt 906) |
+| 24.08. mittags | Zwei Batch-Sitzungen arbeiteten fünf Minuten am selben Punkt: zwei CI-Übergaben für verschiedene Refs starteten beide, die zweite nahm die Sperre mit einem Zaunwert weit unter dem Stand, und die unterlegene erfuhr es nur durch eine beiläufige Wächter-Vorschau (§3.173, Punkt 897); dieselbe Sitzung fand, dass ein unbekanntes Flag an der Gegenlese-Kommandozeile stillschweigend geschluckt wird und trotzdem eine bezahlte Runde startet (Punkt 896) |
+| 23.08. | Zwei Mechanismen standen, ihre Eingaben fehlten: Die Board-Aktualität greift nur am Turn-Ende und war während der längsten Sitzung der Nacht blind — 15 Prüfrunden liefen unsichtbar hinter einer 2,5 h alten Karte (§3.163, Punkt 848); und die §6-Eskalationsschwelle zählte 0 statt 14 erfolgloser Runden, weil kein erzwungener Pfad die Verdicts ins Ledger schrieb — die Eskalation nach Fable zündete erst, als eine Nachfolge-Sitzung die Logs von Hand nachtrug (§3.163) |
+| 23.08. früh | Der Parallel-Alarm feuerte auf jedem Zug auf den Vorgänger, der gerade übergeben hatte — das Feld `retired` stand im selben Datensatz, den die Sonde las, und jeder Fehlalarm kostete drei Minuten Torlauf ohne Urteil (§3.164) |
+| 23.08. morgens | Ein Test über einem erzeugten Dokument verglich es mit einer frischen Ernte derselben Quellen — fünf falsche Aufrufzeilen standen jahrelang unter grünem Test, gefunden erst beim Lesen eines Diffs (§3.165) |
+| 22.08. | Der Vier-Augen-Schnitt der Bauordnung ließ einen gezählten Eintrag liegen, weil eine Regel-Signatur sechs Regeln zu weit greift — der Mechanismus entschied mit (§3.156); derselbe Tag zeigte den Prüfstand, der an der Umgebung statt am Code stirbt, und den Starter, der seine Einzigartigkeit aus einer Notizdatei liest (Punkte 830, 831); das Etikett einer blind geschriebenen Hälfte war der einzige Verfasser-Nachweis und log fünf Tage lang (§3.157); und der Parallel-Detektor meldete die Chat-Sitzung des Nutzers als zweiten Arbeiter, der derselbe Wächter gerade Stillstehen angesagt hatte (§3.158, Punkt 841) |
+| 21.08. abends | Die Übergabe trug den Zustand, aber nicht das Leben: Der delegierte Autorenlauf starb mit seiner Elternsitzung, die Deklaration meldete ihn weiter als laufend, und seine angefangene Arbeit lag unversioniert im Arbeitsbaum und blockierte dort die eigene Fortsetzung (§3.155) |
+| 24.08. nachts | Die Vier-Augen-Regel sperrte sich selbst ein: Punkt 834 war fertig und grün, aber seine Prüfrunde liess sich auf keiner Basis beauftragen — ein Merge ohne Autor-Trailer nahm sieben Dateien den beweisbaren Gegenleser, und der Planer verweigerte darauf die ganze Runde statt dieser Dateien, obwohl die Ledger die Ausnahme-Satzart dafür längst führt (§3.169); derselbe Blick fand einen Auftragspunkt, der ohne Zeilenumbruch an den vorigen geklebt war und deshalb für jeden Leser der Datei nicht existierte |
+| 24.08. früh | Die Vorschau widersprach dem Tor: `guard-preflight` meldete den Mechanismus-Wächter als blockierend, während der Wächter selbst die Spanne gegen das Rundenbudget maß, eine Lesbarkeitslücke urteilte und den Zug durchließ — eine geplante 64-Pässe-Runde über 13,8 M Zeichen, die niemand verlangt (Punkt 873) |
+| 24.08. morgens | Der übernommene Autorenlauf war seit zwei Minuten tot, und die Probe, die im Batch über Leben und Tod eines Agenten entscheidet, verbot in Großbuchstaben, ihn zu ersetzen: Sie schaut die pid ihrer eigenen Deklaration nie an und lässt den frischen Zweigstand die Prozessprüfung überstimmen — den hinterlässt aber gerade ein soeben gestorbener Lauf (§3.170, Punkt 874) |
+| 26.08. | Der einzige ungeordnete Punkt der Sitzungseröffnung war eine Dublette: derselbe Vorschau-gegen-Tor-Widerspruch stand seit zwei Tagen als Punkt 873, 273 Positionen tiefer — gefunden wieder nur durch die Bündelpflicht, nicht beim Anlegen (§3.168-Nachtrag, Punkt 923 in 873 gefaltet) |
+| 26.08. | Das Push-Tor wies viermal denselben Push ab und druckte die Entlastung mit: kein benannter Fehlschlag, ein Läufer, der nicht fertig wurde — derselbe Befehl von Hand war in 164 s mit 13 778 grünen Fällen durch (§3.182, Punkt 924) |
+| 26.08. nachts | Zweimal grün über einer Attrappe, die das echte Board nur nachgebaut statt gelesen hat: Das Kritikalitäts-Stylesheet landete im Kommentar der Refresh-Routine, und die auf Zuruf nachgereichte Regressionsprüfung ließ genau die eine `<meta>`-Zeile weg, die den gemeinten Anker im echten Board verfehlen lässt — Runde zwei verschob und löschte dabei die BOM der Datei (§3.184, Punkt 844) |
+| 26.08. früh | Dritter Rückfall derselben Dublette, diesmal von mir: Ich legte einen frisch gemessenen Befund als Punkt 928 ab, obwohl Punkt 856 seit dem 23.08. genau ihn beschreibt — gefunden wieder erst von der Bündelpflicht, nicht beim Anlegen. Neu war nur die zweite Messung; sie ist jetzt in 856 nachgetragen (§3.168-Nachtrag, 928 in 856 gefaltet) |
+| 24.08. mittags | Der delegierte Autor schrieb drei Commits um, die er bereits veroeffentlicht hatte: Sein Abschluss-Push scheiterte als non-fast-forward, und sein eigener Bericht meldete die fertige Arbeit als „nur lokal“ — obwohl die Baeume beider Seiten byte-identisch waren und sich nur eine Leerzeile im Commit-Text unterschied. Wer dem Bericht glaubt, sucht verlorene Arbeit, die nie verloren war; wer ihn ignoriert, uebersieht den echten Fall. Dieselbe Stunde zeigte die Kehrseite von der Gegenseite: Ein Tor-Lauf im Arbeitsbaum wurde rot, weil die pruefende Sitzung selbst waehrenddessen auf main committete — kein Test schlug fehl, nur der Teardown benannte die Ref-Bewegung |
 | 11.08. abends | Der VS-Code-Neustart nimmt den Devcontainer mit — die Batch-Sitzung und sechs Agenten sterben, nachdem ich das Gegenteil zugesichert hatte (§3.111); die Rechte-Rückfragen kamen weiter, weil `defaultMode` eine fortgesetzte Sitzung gar nicht mehr erreicht (§3.3) |
 
 Muster: Ab dem 22.07. explodiert die Commit-Rate (Delegation) — und genau dann häufen sich die Infrastruktur-Vorfälle. **Skalierung der Autonomie erzeugt eine eigene Problemklasse, die die Feature-Arbeit zeitweise überholt.**
@@ -78,7 +97,7 @@ Gelöst durch den harten Singleton: Liveness am **OS-PID + Prozessstartzeit**, *
 
 Der zweite Teil ist die eigentlich teure Lehre: Am selben Tag war eine Absicherung genau gegen „lebender Besitzer wird enteignet" gebaut worden — sie greift nur, wenn die Pacht abläuft, und dieser Fall kam durch die Tür „nachweislich tot", die davor rangiert. Die Absicherung war korrekt gebaut und wurde nie gefragt. **Wer gegen eine Fehlerart absichert, muss die Absicherung an jeder Tür anbringen, durch die diese Fehlerart hereinkommt** — sonst prüft man den Weg, den man sich vorgestellt hat, statt den, den der Fehler nimmt. Der Stand-down-Teil derselben Absicherung hat dagegen funktioniert: Die enteignete Sitzung erfuhr es beim nächsten Hook und trat sauber ab.
 
-Die Eindämmung ist am **27.07.2026** wieder aufgehoben: Der Scheduled Task ist auf Nutzerbefehl erneut scharf (`Enable-ScheduledTask`, State *Ready*), nachdem der Singleton live gegengeprüft war — während eine Sitzung die Sperre hielt, spawnte der Starter nichts, sondern meldete „owner alive". Das ist die Vorbedingung der autonomen Sitzungsgrenze, und es zeigt die Reihenfolge, die vorher fehlte: erst die Exklusivität am OS-Fakt beweisen, dann die Redundanz wieder einschalten. Eine spontan auftauchende zweite Sitzung ist seitdem **erwartetes Verhalten**, kein Vorfall — solange sie für den Lock-Owner zurücktritt.
+Die Eindämmung ist am **27.07.2026** wieder aufgehoben: Der Scheduled Task ist auf Nutzerbefehl erneut scharf (`Enable-ScheduledTask`, State *Ready*), nachdem der Singleton live gegengeprüft war — während eine Sitzung die Sperre hielt, spawnte der Starter nichts, sondern meldete „owner alive". Das ist die Vorbedingung der autonomen Sitzungsgrenze, und es zeigt die Reihenfolge, die vorher fehlte: erst die Exklusivität am OS-Fakt beweisen, dann die Redundanz wieder einschalten. Eine spontan auftauchende zweite Sitzung ist seitdem **erwartetes Verhalten**, kein Vorfall — solange sie für den Lock-Owner zurücktritt. **Nachtrag 24.08.2026:** Genau diese Bedingung hatte nie einen Mechanismus für eine bereits laufende Sitzung — siehe §3.173.
 
 ### 3.3 Berechtigungs-Rückfragen
 
@@ -501,7 +520,13 @@ Ein neuer Riegel im Board-Werkzeug verweigert eine Veröffentlichung, wenn ein o
 
 Übrig geblieben wäre die Handbearbeitung der Board-Datei — dieselbe Handbearbeitung, an der das Board am Vortag dreimal zerbrochen ist (§3.45).
 
-**Lehre:** Ein Durchsetzer ist erst dann fertig, wenn sein genannter Ausweg **ausgeführt** worden ist, nicht wenn er plausibel klingt. Das gehört in die Prüfung jedes neuen Riegels: den Weg, den die Fehlermeldung vorschlägt, einmal wirklich gehen — im auslösenden Zustand, nicht im gesunden.
+Am 21.08.2026 dieselbe Bauform in einem anderen Werkzeug: `fold-point` schließt einen Punkt, der als Mitläufer auf einem fremden Zweig geliefert wurde, meldet ausdrücklich „NOT DONE: the push — run: `git push origin main`" — und genau dieser Befehl wird sofort vom `board-first-guard` verweigert, weil dasselbe `fold-point` einen Zug vorher die Übergabe-Karte gesetzt hat und die Tafel damit „hier läuft nichts mehr" behauptet. Der genannte Ausweg ist nicht falsch, er ist nur im **erzeugten** Zustand nicht mehr gangbar; der tragfähige Weg (eine `closing`-Karte, dann der Push, dann die Übergabe-Karte erneut) steht in der Verweigerung des anderen Riegels, nicht in der Anweisung, die ihn ausgelöst hat.
+
+Am 24.08.2026 zwei weitere Ausprägungen an einem Abend, und beide zeigen dieselbe Wurzel aus einer neuen Richtung: Der Ausweg ist nicht nur unbegehbar, er wird dem Falschen genannt. Der `board-first-guard` will delegierte Arbeitsbäume ausdrücklich ausnehmen — die Ausnahme fragt aber das Verzeichnis des HOOK-Prozesses und nicht das des geprüften Aufrufs, und das ist bei einem angehefteten Agenten die Haupt-Auscheckung. Der delegierte Autor wird also auf eine Tafelkarte verwiesen, die er in seinem Arbeitsbaum gar nicht schreiben kann; die Auskunft, die ihn befreien würde, liegt im Prozess-Nutzlastfeld, das der Riegel eine Zeile weiter unten für etwas anderes bereits liest. Und der Review-Rekorder weist eine Identitätsprüfung mit dem Rat ab, genau die zwei Flags zu setzen, die schon gesetzt waren: Der gemessene Grund — das Sitzungstranskript deckt den angegebenen Zeitpunkt nicht ab, weil die Harness es mit Verzögerung schreibt und „jetzt“ deshalb immer hinter der letzten modelltragenden Nachricht liegt — wird eine Schicht tiefer berechnet und dann verworfen. Beide Male ist die Information, die den Ausweg gangbar macht, im Werkzeug bereits vorhanden.
+
+**Nachtrag 25.08.2026 — dieselbe Wurzel, diesmal an der Vier-Augen-Schranke.** Die Stop-Riegel stehen mit RELATIVEN Befehlen in der Konfiguration, also laeuft aus einem Arbeitsbaum heraus dessen eigene Kopie des Riegels. Die ungetrackte Grundlinien-Datei liegt aber nur im Haupt-Checkout, und so meldete `mechanism-review-guard` eine fehlende Grundlinie, die es nicht gab. Der genannte Ausweg war zum zweiten Mal an einem Abend einer, den niemand gehen kann: „merge origin/main into this branch" bei zwei Refs, die nachweislich identisch sind (0/0), und „end the turn again so the guard can seed the anchor", wobei das Saatkorn wieder in den Arbeitsbaum faellt. Derselbe Aufruf mit derselben Sitzungskennung meldete aus dem Haupt-Checkout die Lueckenklausel und beendete den Zug gruen. Zwei Zugenden gingen dafuer verloren, und die Verweigerung las sich wie ein Produktdefekt, obwohl der Riegel nichts zu beanstanden hatte. Die Lehre ist nicht neu, aber sie hat jetzt eine zweite Adresse: Ein Riegel, der Zustand gegen die Wurzel aufloest, in der er zufaellig laeuft, ist im Delegationsmodell dieses Batches falsch — die Arbeitsbaeume sind der NORMALFALL, nicht die Ausnahme. Als Punkt 922 aufgenommen, direkt hinter Punkt 910, das denselben Defekt am Tafel-Riegel traegt.
+
+**Lehre:** Ein Durchsetzer ist erst dann fertig, wenn sein genannter Ausweg **ausgeführt** worden ist, nicht wenn er plausibel klingt. Das gehört in die Prüfung jedes neuen Riegels: den Weg, den die Fehlermeldung vorschlägt, einmal wirklich gehen — im auslösenden Zustand, nicht im gesunden. Zwei Zusatzfragen aus dem 24.08.: Gilt der Weg auch für den, der die Meldung liest — ein delegierter Autor hat andere Rechte als der Besitzer? Und nennt die Absage den Grund, den sie gemessen hat, statt eine Handlung zu empfehlen, die der Aufrufer schon ausgeführt hat?
 
 ### 3.53 Der Schreiber und der Prüfer kannten dieselbe Regel verschieden
 
@@ -672,6 +697,8 @@ Am 30.07.2026 fiel Claude für rund eine Stunde aus, mitten in einem Zug. Der Ba
 Was durchfiel, war die Übergabe an das Fenster des Nutzers. Sie ist ein Zwei-Schritt-Handschlag: Das Fenster beansprucht den Batch, der Eigentümer gibt ihn am nächsten sauberen Zugende frei, und das Fenster **holt ihn dann ab**. Die Freigabe kam um 10:16 — in eine Sitzung, die der Ausfall gerade getötet hatte. Ein Anspruch, der eingelöst werden MUSS, ist damit nur so verlässlich wie der Anspruchsteller im Moment der Freigabe, und dieser Moment ist genau der, den niemand wählt. Zwanzig Minuten später nahm der Launcher den freien Lock für sich, korrekt nach seinen Regeln und trotzdem gegen die Absicht des Nutzers.
 
 Die Klasse ist dieselbe wie beim Herzschlag, der für Fortschritt gehalten wird, nur an der Übergabe statt an der Lebendigkeit: Ein Mechanismus, der einen zweiten Schritt von der Gegenseite ERWARTET, hat für dessen Ausfall keinen Plan. Punkt 434 hatte die Schwesterlücke schon geschlossen — ein Anspruch verfällt nicht mehr, solange das Fenster lebt —, aber nur für die Zeit VOR der Freigabe; danach ist der Anspruch verbraucht und es gewinnt, wer zuerst greift.
+
+Am 21.08.2026 dieselbe Naht, nur liegt die zweite Hälfte diesmal bei DERSELBEN Sitzung: Der CI-Wartelauf ist ein selbstgetriebener Kreis — der Riegel sagt „schlaf kurz und beende den Zug noch einmal", und er läuft nur weiter, solange die Sitzung sich selbst wieder aufruft. Sitzung 6a0621ed schrieb ihre letzte Zeile um 10:15:29 in genau dieser Anweisung und kam nicht zurück. Bemerkenswert ist nicht der Ausfall, sondern was ihn verlängert hat: Der Launcher tickt alle 900 Sekunden, hätte also binnen einer Viertelstunde übernehmen können — aber das Schreiber-Veto (2 h) und die Lebendigkeitsprüfung des Locks lasen die Spuren der toten Sitzung als „da arbeitet noch jemand". Der Nachfolger startete um 11:14:05, nach 59 Minuten ohne Arbeit am Stapel. Der Rettungsweg war also nicht kaputt, er war durch die Hinterlassenschaft des Verunglückten versperrt — als Punkt 808 aufgenommen.
 
 **Lehre:** Ein Handschlag, dessen zweite Hälfte bei der Gegenseite liegt, braucht ein Zeitfenster, in dem niemand anders zugreifen darf — und die Prüfung eines Wiederanlaufs endet nicht bei „läuft es weiter?", sondern bei „läuft es dort weiter, wo es laufen sollte?". Ein Ausfall trifft nie die bequeme Stelle; jede Aktion mit zwei Hälften ist an ihrer Naht zu prüfen.
 
@@ -1306,6 +1333,23 @@ Der rote Faden: **Ich habe Zuverlässigkeit zu lange als Verhaltensfrage behande
 
 ---
 
+### 3.179 Ein Tor, dessen Abhilfe außerhalb der Reichweite liegt
+
+Punkt 749 landete am 25.08.2026 grün: 13 703 Tests, Bild-Prüfung nicht fällig, Zweig beendet.
+Direkt danach verweigerte das Vier-Augen-Tor die Antwort — nicht wegen dieser Arbeit, sondern
+weil auf der Hauptlinie mehrere handgeschriebene Zeilen im Prüf-Register liegen, deren Zeitstempel
+sich nicht einordnen lässt, und weil eine geteilte Durchsicht nur zur Hälfte aufgezeichnet ist.
+Beides betrifft fremde Commits.
+
+Die Klasse: **Ein Wächter, dessen Abhilfe außerhalb der Reichweite der blockierten Sitzung liegt,
+erzieht zur Ausnahmegenehmigung.** Wer landet, kann fremde Register-Zeilen nicht reparieren, ohne
+seine eigene Punktgrenze zu verlassen — und die einzige verbleibende Taste heißt „waive". Damit
+verliert das Tor genau dort seine Kraft, wo es sie beweisen müsste.
+
+Die Antwort ist nicht ein weicheres Tor, sondern ein früheres: Eine Zeile, die der Aufzeichner nie
+so geschrieben hätte, muss beim **Schreiben** auffallen, nicht Wochen später an einer fremden
+Punktgrenze. Gebucht als Punkt 916.
+
 <!-- AUTO-GENERATED:START -->
 <!-- Dieser Abschnitt wird maschinell von scripts/retro-refresh.mjs gepflegt.
      NICHT von Hand editieren — der naechste Refresh ueberschreibt ihn.
@@ -1313,7 +1357,7 @@ Der rote Faden: **Ich habe Zuverlässigkeit zu lange als Verhaltensfrage behande
 
 ## Anhang A — Maschinell gepflegte Quellen-Übersicht
 
-Zuletzt aktualisiert: Mittwoch, 19.08.2026, 12:42 · Quellen-Fingerprint: `bde94d1f61f4…`
+Zuletzt aktualisiert: Mittwoch, 26.08.2026, 05:23 · Quellen-Fingerprint: `c4fcb7910a9c…`
 
 Spalten heuristisch aus den Quellen abgeleitet (Anläufe = distinkte Datumsnennungen im Memory;
 Maßnahme = Guard-Skripte mit Namens-Treffer). Die inhaltliche Bewertung gehört der Prosa oben.
@@ -1321,11 +1365,13 @@ Maßnahme = Guard-Skripte mit Namens-Treffer). Die inhaltliche Bewertung gehört
 | Problemklasse (Memory) | Anläufe | Schwere (heuristisch) | Maßnahme (Guard-Treffer) | Status |
 |---|---|---|---|---|
 | Always use background-wait time for prep on upcoming tickets — autonomously, guaranteed by a mechanism, never on a reminder | 1 | niedrig | prep-arm-hook.mjs, prep-guard.mjs | ✔ Mechanismus |
+| An analysis over a moving set is run only when it is executed immediately in the same run — never produced and parked | 4 | hoch | — (Regel/Memory) | ◐ Regel |
+| OFFEN, attended-only: Punkt 542 scharfschalten — vier gebaute Guards hängen in keiner Hook-Kette | 2 | mittel | — (Regel/Memory) | ◐ Regel |
 | User's rulings on the point-205 plausibility audit (what to fix vs. accept, 21.07.2026) | 1 | niedrig | — (Regel/Memory) | ◐ Regel |
 | For code audits/reviews, mix in a DIFFERENT model than the one that wrote the code — different blind spots find more bugs | 1 | niedrig | model-guard.mjs | ✔ Mechanismus |
 | The hardened batch-autonomy system — never idle-stop, resurrect after crash/reboot, signal on failure, never block on the user | 1 | niedrig | batch-autostart.mjs, batch-doctor-states.mjs, batch-doctor.mjs, batch-lock.mjs, batch-progress-guard.mjs, batch-resume-hook.mjs, batch-singleton.mjs | ✔ Mechanismus |
 | The batch dashboard — its live GH-Pages transport, its BINDING four-section structure (never change without explicit user go) and update discipline | 11 | hoch | batch-autostart.mjs, batch-doctor-states.mjs, batch-doctor.mjs, batch-lock.mjs, batch-progress-guard.mjs, batch-resume-hook.mjs, batch-singleton.mjs, dashboard-card-topic-guard.mjs, dashboard-conciseness-guard.mjs, dashboard-guard-fixtures.mjs, dashboard-guard.mjs, dashboard-integrity-guard.mjs, dashboard-reminder-hook.mjs | ✔ Mechanismus |
-| A blocked tool call means the wrong path, not a missing permission — search the repo for its own command; never hand the user manual steps | 1 | niedrig | findings-guard.mjs | ✔ Mechanismus |
+| A blocked tool call means the wrong path, not a missing permission — search the repo for its own command; never hand the user manual steps | 2 | mittel | findings-guard.mjs | ✔ Mechanismus |
 | board.mjs commands must run SEQUENTIALLY — two in one turn raced and tore the dashboard's section structure | 1 | niedrig | board-edit-lock.mjs, board-first-guard.mjs, dashboard-card-topic-guard.mjs, dashboard-conciseness-guard.mjs, dashboard-guard-fixtures.mjs, dashboard-guard.mjs, dashboard-integrity-guard.mjs, dashboard-reminder-hook.mjs | ✔ Mechanismus |
 | The batch dashboard may leave the private claude.ai artifact for a publicly readable transport — privacy is no longer a constraint | 1 | niedrig | board-edit-lock.mjs, board-first-guard.mjs, dashboard-card-topic-guard.mjs, dashboard-conciseness-guard.mjs, dashboard-guard-fixtures.mjs, dashboard-guard.mjs, dashboard-integrity-guard.mjs, dashboard-reminder-hook.mjs | ✔ Mechanismus |
 | Take the session boundary as the LAST action and with bare commands — a pipe makes the call count as work and silently deletes the marker | 1 | niedrig | — (Regel/Memory) | ◐ Regel |
@@ -1333,23 +1379,26 @@ Maßnahme = Guard-Skripte mit Namens-Treffer). Die inhaltliche Bewertung gehört
 | F6 bug-report zips the user hands over are saved into the repo's git-ignored local/ folder — search there first, not only Downloads | 1 | niedrig | — (Regel/Memory) | ◐ Regel |
 | A newly found problem goes into an EXISTING bundle point first; a new standalone point is the exception, and may instead re-cut the bundles | 1 | niedrig | bundle-first-guard.mjs, point-proof-guard.mjs | ✔ Mechanismus |
 | Work packages are SPOKEN by name, never by letter — the user cannot read \"bundle H\"; the letter stays only as an internal ID | 1 | niedrig | bundle-first-guard.mjs | ✔ Mechanismus |
-| Jede Chat-Antwort mit einem Zeitstempel nach deutscher Zeit (Europe/Berlin, DST-korrekt) beginnen | 7 | hoch | timestamp-guard.mjs | ✔ Mechanismus |
+| Jede Chat-Antwort mit einem Zeitstempel nach deutscher Zeit (Europe/Berlin, DST-korrekt) beginnen | 9 | hoch | timestamp-guard.mjs | ✔ Mechanismus |
 | CLAUDE.md §7.1 references design.md instead of retelling it; future doc edits must preserve the verifiable conditions, script mappings, numbering and checked numbers | 1 | niedrig | — (Regel/Memory) | ◐ Regel |
 | Autonomously insert a full CLOSING cycle (regression + dead-code/stale-doc cleanup + .md audit) when warranted — after extensive rework or many small completed tasks — without waiting for the user to ask | 1 | niedrig | closing-guard.mjs | ✔ Mechanismus |
 | hoa commit messages must not reference the TASKS point (\"Point N\") | 1 | niedrig | commit-scope-guard.mjs, point-proof-guard.mjs | ✔ Mechanismus |
+| Never measure a model's spend by commit trailers — unlanded, looping work has no commits and is the most expensive kind | 2 | mittel | commit-scope-guard.mjs, worktree-reminder.mjs | ✔ Mechanismus |
 | Never ask the user to run anything inside the container — he granted full rights; do it myself | 1 | niedrig | container-ask-guard.mjs, worktree-reminder.mjs | ✔ Mechanismus |
 | The batch dashboard's Warteschlange must ALWAYS list every open TASKS point — no open point may be missing | 1 | niedrig | dashboard-card-topic-guard.mjs, dashboard-conciseness-guard.mjs, dashboard-guard-fixtures.mjs, dashboard-guard.mjs, dashboard-integrity-guard.mjs, dashboard-reminder-hook.mjs, queue-order-guard.mjs | ✔ Mechanismus |
 | Every dashboard card's body must speak STRICTLY about its own point — never report on or reference another TASKS point inside a card | 1 | niedrig | batch-singleton.mjs, dashboard-card-topic-guard.mjs, dashboard-conciseness-guard.mjs, dashboard-guard-fixtures.mjs, dashboard-guard.mjs, dashboard-integrity-guard.mjs, dashboard-reminder-hook.mjs, decision-card-guard.mjs | ✔ Mechanismus |
 | hoa dashboard \"Woran ich gerade arbeite\" holds ONE CARD PER parallel point being actively worked (not a single card); cards move from Warteschlange into it (possibly several at once); a point is NEVER in both sections at once | 1 | niedrig | dashboard-card-topic-guard.mjs, dashboard-conciseness-guard.mjs, dashboard-guard-fixtures.mjs, dashboard-guard.mjs, dashboard-integrity-guard.mjs, dashboard-reminder-hook.mjs | ✔ Mechanismus |
 | Never put a hardcoded `open` attribute on a dashboard `<details>` card — default all closed; localStorage persistence keeps user-opened cards open across refresh | 1 | niedrig | batch-autostart.mjs, dashboard-card-topic-guard.mjs, dashboard-conciseness-guard.mjs, dashboard-guard-fixtures.mjs, dashboard-guard.mjs, dashboard-integrity-guard.mjs, dashboard-reminder-hook.mjs | ✔ Mechanismus |
 | The batch dashboard \"Von dir zu klären\" section holds ONLY genuine user decisions — no done items, no announcements for in-progress work | 2 | mittel | dashboard-card-topic-guard.mjs, dashboard-conciseness-guard.mjs, dashboard-guard-fixtures.mjs, dashboard-guard.mjs, dashboard-integrity-guard.mjs, dashboard-reminder-hook.mjs | ✔ Mechanismus |
-| When a measured doc budget blocks an addition, shorten or MERGE existing entries — raising the limit is the last resort, decided by me with a written reason, NEVER asked of the user | 2 | mittel | doc-budget-guard.mjs | ✔ Mechanismus |
+| When a measured doc budget blocks an addition, shorten or MERGE existing entries — raising the limit is the last resort, decided by me with a written reason, NEVER asked of the user | 3 | mittel | doc-budget-guard.mjs | ✔ Mechanismus |
+| a drill that recreates the state after an action tests the assumption, not the action — and stays green forever | 1 | niedrig | — (Regel/Memory) | ◐ Regel |
 | Work at High effort by default; the user reserves Extra high for research and design decisions, not implementation | 4 | hoch | — (Regel/Memory) | ◐ Regel |
 | Write idiomatic English in all English text (README, code comments, commit messages) — no German calques like 'stand' for a version | 1 | niedrig | — (Regel/Memory) | ◐ Regel |
 | Fable is NOT the default lane because its volume is the scarcest; difficulty is no reason for it either (since 18.08.2026 hard cases go straight to Sol), and review is cross-vendor, not Fable-by-default | 4 | hoch | — (Regel/Memory) | ◐ Regel |
-| Bare `gh` is UNAUTHENTICATED in this container — export GH_TOKEN from .secrets/github-token, or ask the project's own CI scripts instead | 1 | niedrig | — (Regel/Memory) | ◐ Regel |
+| Findings recorded by a session that could not write the work order — carry each into TASKS.md, then mark it drained | 25 | hoch | findings-guard.mjs | ✔ Mechanismus |
+| A recurring lookup gets a script; never pull raw transcripts, listings, or logs into context to answer it | 1 | niedrig | — (Regel/Memory) | ◐ Regel |
 | Past the 150k context watermark, FINISH the step and hand over — never start a suite, an agent or a point after it; the user raised the cost twice (13.08. and 17.08.2026) | 2 | mittel | — (Regel/Memory) | ◐ Regel |
-| User 18.08.2026: hard, complex, error-prone and HIGH-criticality points are AUTHORED by GPT-5.6 Sol directly — Opus 5 authors only what is left, Fable stays the escalation | 4 | hoch | — (Regel/Memory) | ◐ Regel |
+| User 18.08.2026: hard, complex, error-prone and HIGH-criticality points are AUTHORED by GPT-5.6 Sol directly — Opus 5 authors only what is left, and Fable authors only a point that tags its lane or one the router escalates | 4 | hoch | — (Regel/Memory) | ◐ Regel |
 | Two test layers — Vitest (jsdom) for logic/store/HUD, Playwright for browser-only; add a test per new feature on the right layer | 1 | niedrig | — (Regel/Memory) | ◐ Regel |
 | STANDING RULE: design.md §19.14 (climate) and §19.15 (peoples) — the research→game implementation records — must be updated in the SAME commit whenever the climate or people rendering changes; peoples-1890 §8 / climate-1890 §9 are pointers | 1 | niedrig | — (Regel/Memory) | ◐ Regel |
 | All journal texts (de + en) must carry emotional voice markup; English read-aloud runs via Kokoro TTS | 1 | niedrig | — (Regel/Memory) | ◐ Regel |
@@ -1357,13 +1406,14 @@ Maßnahme = Guard-Skripte mit Namens-Treffer). Die inhaltliche Bewertung gehört
 | After every change, npm run lint (oxlint) and npm audit must be clean — zero lint errors/warnings, zero CVEs. Standing user directive. | 1 | niedrig | — (Regel/Memory) | ◐ Regel |
 | hoa PERMANENT process — delegate as much implementation as possible to worktree-isolated subagents; keep only picture-verify + merge at the main session; run a pool of parallel agents on non-overlapping files | 4 | hoch | — (Regel/Memory) | ◐ Regel |
 | The \"Maximum QA\" QA process and the \"new demo\" trigger (append it + closing + increment tag + publish) | 2 | mittel | — (Regel/Memory) | ◐ Regel |
-| State only what was just measured, with its reading time; never assert machine/repo state from a plausible model | 1 | niedrig | — (Regel/Memory) | ◐ Regel |
+| State only what was just measured, with its reading time; never assert machine/repo state from a plausible model | 2 | mittel | — (Regel/Memory) | ◐ Regel |
 | Before building, triage difficulty × criticality; HIGH/critical work gets a second, different model — in which FORM (blind-parallel vs. review) is normative in CLAUDE.md §6, not here | 3 | mittel | criticality-review-guard.mjs, model-guard.mjs | ✔ Mechanismus |
 | A user question is an INTERRUPT, not a new task — after answering, the last action of the turn must resume the batch; only an explicit stop or a genuine block on user input ends it | 3 | mittel | batch-autostart.mjs, batch-doctor-states.mjs, batch-doctor.mjs, batch-lock.mjs, batch-progress-guard.mjs, batch-resume-hook.mjs, batch-singleton.mjs | ✔ Mechanismus |
 | EVERY user change request is a TASKS.md point appended at the END, done only after the current work finishes — never interleaved or mass-committed | 5 | hoch | tasks-archive-guard.mjs, tasks-spec-guard.mjs | ✔ Mechanismus |
+| never stretch a scoped user remark into a standing instruction or cite it as one | 1 | niedrig | — (Regel/Memory) | ◐ Regel |
 | The batch-owning session is a headless successor the launcher spawned — the user cannot see, reach or close it; never ask them to | 1 | niedrig | — (Regel/Memory) | ◐ Regel |
+| User order 23.08.2026: a lasting standstill must NEVER happen — self-recovery over alerting, no stop that waits on a user card; decide by own judgment and record the decision in the board state section, never as a decision card (vetoed three times) | 4 | hoch | — (Regel/Memory) | ◐ Regel |
 | Parallel batch sessions are spawned by the HoA-Batch-Autostart scheduled task after a reboot; the advisory lock never stopped it — a hard singleton is being built | 2 | mittel | — (Regel/Memory) | ◐ Regel |
-| DRAINED 30.07.2026 — the carrier's work is all in the work order now; what remains is the list of options a /doctor run REJECTED, so nobody re-analyses them | 2 | mittel | queue-order-guard.mjs, worktree-reminder.mjs | ✔ Mechanismus |
 | Always take the point boundary autonomously at a closed point — never ask the user whether to hand over or /clear | 1 | niedrig | point-proof-guard.mjs | ✔ Mechanismus |
 | Per-point QA runs scoped (Vitest always, browser suites by diff mapping, flake-retry single suites) — WATCHDOG duty to report any bug that slips through | 3 | mittel | — (Regel/Memory) | ◐ Regel |
 | Edits to .claude/settings.json and .git/hooks ALWAYS trigger a permission prompt (harness safety layer, allowlist cannot override); never schedule such work for unattended night batches | 1 | niedrig | — (Regel/Memory) | ◐ Regel |
@@ -1371,43 +1421,45 @@ Maßnahme = Guard-Skripte mit Namens-Treffer). Die inhaltliche Bewertung gehört
 | hoa uses a feature-branch workflow — each TASKS point on feat/<point>-<slug>, push the branch after every commit, merge to main only when done+verified; cross-cutting changes go straight to main | 2 | mittel | commit-scope-guard.mjs, push-arrival-guard.mjs | ✔ Mechanismus |
 | Direct pushes to main are approved despite GitHub's branch protection — never ask about switching to pull requests again | 1 | niedrig | push-arrival-guard.mjs | ✔ Mechanismus |
 | Order the TASKS/queue so known-bug fixes + user-requested extensions come BEFORE the big bug-FINDING / QA-framework tickets | 1 | niedrig | queue-order-guard.mjs | ✔ Mechanismus |
-| Before the 224 demo checkpoint queue ONLY bugfixes + almost-done points; new features go to v0.3 (after 224) | 2 | mittel | queue-order-guard.mjs | ✔ Mechanismus |
 | Console warning \"THREE.Clock deprecated, use THREE.Timer\" comes from R3F v9 internals — fix by updating @react-three/fiber once it migrates to Timer | 1 | niedrig | — (Regel/Memory) | ◐ Regel |
 | Choose the browser-regression tier per task at my discretion (Vitest-only / Vitest+small / Vitest+large); the closing cycle ALWAYS runs Vitest+large | 1 | niedrig | — (Regel/Memory) | ◐ Regel |
 | Priority tiers for picking the next point — token-reduction work first, then the communication mechanic, then everything else; open branches before a fresh point | 2 | mittel | lock-release-hook.mjs, queue-order-guard.mjs | ✔ Mechanismus |
 | A declared \"intended residual\" is where real defects hide — legitimate only when the information to close it is genuinely not at hand | 1 | niedrig | — (Regel/Memory) | ◐ Regel |
+| A point delivered as a rider on another branch is closed with fold-point --delivered, and its push needs a closing card first | 1 | niedrig | point-proof-guard.mjs, push-arrival-guard.mjs | ✔ Mechanismus |
 | Saved games do not constrain design work: the feature is switched off, nobody plays a serious run, and no migration is ever owed for a data change | 1 | niedrig | — (Regel/Memory) | ◐ Regel |
 | 24.07.2026 evening chaos — serving model silently degraded to Haiku 4.5; verify the serving model before batch work, Haiku-class must pause instead of working | 5 | hoch | model-guard.mjs | ✔ Mechanismus |
+| Keep the shell cwd in /workspace/hoa; a worktree cwd makes the Stop guards judge the wrong repo root | 1 | niedrig | worktree-reminder.mjs | ✔ Mechanismus |
 | ENDED 17.08.2026 — the 13.08. emergency that pushed the MAXIMUM load to OpenAI (hard cases to Sol via --anyway, pool of one) is over; the normal three-lane split of CLAUDE.md §6 applies again | 4 | hoch | — (Regel/Memory) | ◐ Regel |
 | Every new optical/graphics feature must be sorted into the low/medium/high detail presets, enforced by a pure completeness test — a new quality key with no preset entries fails the gate | 2 | mittel | — (Regel/Memory) | ◐ Regel |
 | Write about this project as a participant (\"wir/unser\"), never as an outside observer (\"euer Mechanismus\", \"die ihr abschaffen wollt\") | 1 | niedrig | — (Regel/Memory) | ◐ Regel |
+| a large point that stops converging is cut into smaller standalone points and each is worked on its own — general procedure, no confirmation needed | 1 | niedrig | point-proof-guard.mjs | ✔ Mechanismus |
 | Never access paths outside the project directory unless strictly necessary (e.g. the global ~/.claude rules); keep local non-versioned artefacts in a git-ignored local/ folder inside the repo | 1 | niedrig | — (Regel/Memory) | ◐ Regel |
 | Release tags are re-pointed ONLY on the user's explicit request — never automatically after a fix; a cut vX.Y is frozen | 3 | mittel | — (Regel/Memory) | ◐ Regel |
 | TASKS.md and all new entries in it are written in English | 1 | niedrig | tasks-archive-guard.mjs, tasks-spec-guard.mjs | ✔ Mechanismus |
 | TASKS.md entries state the final correct target directly — never keep a 'first defined wrong, then clarified/corrected' trail in the spec | 1 | niedrig | batch-doctor-states.mjs, tasks-archive-guard.mjs, tasks-spec-guard.mjs | ✔ Mechanismus |
-| TASKS.md points get [*] when started and a tracking line (start, finish, minutes, ~tokens) when done — mandated 2026-07-14 | 6 | hoch | tasks-archive-guard.mjs, tasks-spec-guard.mjs, timestamp-guard.mjs | ✔ Mechanismus |
 | Think harder about what to test; when in doubt add MORE tests — never skimp on fast browserless Vitest cases | 1 | niedrig | — (Regel/Memory) | ◐ Regel |
 | Tests and probes must use IN-GAME-achievable zoom (non-debug 0.125–0.5 at least), never a debug-only zoom — testing at an unrealistic zoom has passed while the player still saw the bug, repeatedly | 1 | niedrig | — (Regel/Memory) | ◐ Regel |
 | Permissions are deliberately maximally broad (whole-tool allows incl. Bash); NEVER narrow or \"tidy\" them again — standing user directive | 2 | mittel | — (Regel/Memory) | ◐ Regel |
 | On every user change request, also update CLAUDE.md and design.md where appropriate — standing directive for all future sessions. | 1 | niedrig | — (Regel/Memory) | ◐ Regel |
 | Every place/landmark/settlement name in the game uses the name that was VALID IN 1890, not a later renaming | 1 | niedrig | — (Regel/Memory) | ◐ Regel |
+| vdzk-answer.mjs CLI refuses in SDK-driven sessions; record via its exported functions with the real transcript uuid | 1 | niedrig | — (Regel/Memory) | ◐ Regel |
 | Run the both-backend browser verify on the feat BRANCH before merging to main — merging an unverified render change first triggers a render-verify Stop-guard block-loop | 1 | niedrig | render-verify-guard.mjs | ✔ Mechanismus |
 | Headless probes must screenshot the DEFAULT zoom too (zoom-gated dressing like haze only shows there); headless WebGPU is impossible, so WebGPU-only branches stay user-checked | 2 | mittel | render-verify-guard.mjs | ✔ Mechanismus |
 | Every GUI/rendering fix must be verified on BOTH WebGPU and WebGL2 before it counts as done — never mark a render fix done on one path | 2 | mittel | render-verify-guard.mjs | ✔ Mechanismus |
 | A resumed batch session must check the previous owner's PROCESS before working — the launcher's \"provably dead\" verdict was wrong and double-spawned | 2 | mittel | render-verify-guard.mjs | ✔ Mechanismus |
-| Rotating verify AND unit failures under a running agent pool are LOAD, not bugs — 8 of 12 unit runs red from load alone; judge a red only on a quiet machine | 2 | mittel | render-verify-guard.mjs | ✔ Mechanismus |
+| Rotating verify AND unit failures under a running agent pool are LOAD, not bugs — 8 of 12 unit runs red from load alone; judge a red only on a quiet machine | 4 | hoch | render-verify-guard.mjs | ✔ Mechanismus |
 | The named \"version release\" process and its trigger — queue/run a version release for a version the user names (full closing → user approval → tag → mirror poc → publish /TAG/ and /poc/) | 1 | niedrig | lock-release-hook.mjs | ✔ Mechanismus |
 | Standing licence to move, REMOVE or ADD villages when it helps — but every change must be checked against the other requirements first, and the check has already caught a real bug | 1 | niedrig | — (Regel/Memory) | ◐ Regel |
-| A VS Code restart restarts the devcontainer — every process inside dies, PPID 1 proves nothing | 1 | niedrig | container-ask-guard.mjs | ✔ Mechanismus |
+| A VS Code restart restarts the devcontainer — every process inside dies, PPID 1 proves nothing | 2 | mittel | container-ask-guard.mjs | ✔ Mechanismus |
 | Keep the visual QA eye open for functionally-fine but weird-LOOKING oddities, not just functional bugs | 2 | mittel | — (Regel/Memory) | ◐ Regel |
-| CORRECTED 19.07.2026 — WebGPU IS testable headless/autonomously via system Chrome (channel:'chrome') + --headless=new; the 'untestable' belief held only for Playwright's BUNDLED Chromium | 2 | mittel | — (Regel/Memory) | ◐ Regel |
-| A pending batch claim HOLDS THE LAUNCHER BACK — withdraw it whenever the claiming window is left unattended | 2 | mittel | — (Regel/Memory) | ◐ Regel |
+| WebGPU is testable headless/autonomously via system Chrome (channel:'chrome') + --headless=new; the limitation applies only to Playwright's bundled Chromium | 2 | mittel | — (Regel/Memory) | ◐ Regel |
+| A pending batch claim HOLDS THE LAUNCHER BACK — withdraw it whenever the claiming window is left unattended | 2 | mittel | clear-claim-guard.mjs | ✔ Mechanismus |
 | Multi-agent workflows eat the session/weekly limit fast — verify findings INLINE, keep fan-outs small, warn the user with a cost estimate before any big workflow | 3 | mittel | doc-budget-guard.mjs | ✔ Mechanismus |
 
-Erfasste Quellen: 83 Feedback-/Projekt-Memories · 53 Guard-/Hook-Skripte · 4 Revert-/Reapply-Commits · 60 Prozess-/Meta-TASKS-Punkte (davon 26 offen).
+Erfasste Quellen: 91 Feedback-/Projekt-Memories · 57 Guard-/Hook-Skripte · 6 Revert-/Reapply-Commits · 101 Prozess-/Meta-TASKS-Punkte (davon 42 offen).
 
-<!-- RETRO-FINGERPRINT: bde94d1f61f4caa8b7f69032f4eff9e5e9295eedec829ebeaf01f79ebb450531 -->
-<!-- RETRO-LAST-REFRESHED: 2026-08-19T10:42:47.723Z -->
+<!-- RETRO-FINGERPRINT: c4fcb7910a9c4a8fce1baf4ae9df02a65df55a2c7a6cf5826f3126e460616864 -->
+<!-- RETRO-LAST-REFRESHED: 2026-08-26T03:23:36.017Z -->
 <!-- AUTO-GENERATED:END -->
 
 ### 3.111 Ein Erfolg ist kein Beweis für den Weg, auf dem er zustande kam
@@ -1748,3 +1800,1982 @@ einem Strang keine Schätzung für zwei. Die Frage lautet nicht »wie oft passie
 sondern »wovon hängt die Häufigkeit ab?« — hängt sie an der Anzahl gleichzeitiger Stränge,
 kippt das Ärgernis bei der nächsten Pool-Erhöhung in einen Stillstand. Wir haben den Pool
 auf drei gehoben, ohne diese Frage zu stellen.
+
+### 3.126 Die Bereitschaftsprüfung fragte, ob das Werkzeug da ist — nicht, ob es funktioniert
+
+Am 19.08.2026 stand die gesamte Bildprüfung still, und niemand hatte es bemerkt. Der
+Prüf-Browser bekam überhaupt kein Grafik-Backend: `webgl2` und `webgpu` lieferten in beiden
+Browsern und unter jeder Flag-Kombination `false`. Sichtbar wurde das erst als
+Zeitüberschreitung von 180 Sekunden mitten in einer Suite, beim Warten auf den Renderer —
+und das liest sich wie eine langsame Maschine oder ein hängendes Spiel, also wie die zwei
+Dinge, die es gerade nicht war. Ein delegierter Autor verlor eine ganze Runde daran, bevor
+der Befund als solcher dastand.
+
+Die Ursache war zäh, aber nicht das Lehrreiche daran. Das Lehrreiche ist, was die
+Bereitschaftsprüfung sagte, während das galt: `verify-bringup` meldete beide Browser
+»present«, mit Pfad, und verließ sich mit Code 0. Sie prüfte die Existenz der Binärdateien.
+Ob aus ihnen ein Grafikkontext herauskommt — das, wofür sie überhaupt da sind — hat sie nie
+gefragt. Die Prüfung war grün, weil sie das Falsche maß, und ihr Grün war teurer als gar
+keine Prüfung: Es hat den Ausfall gedeckt.
+
+Dazu kommt die Form des Ausfalls. Alle Schichten darunter waren intakt — die
+Gerätedurchreichung, die Bibliotheken, der Treiber, beide Browser. Kaputt war nur die
+Verbindung ganz oben, und weil jede einzelne Schicht für sich »da« meldete, ergab die Summe
+der Ja-Antworten ein Nein, das niemand aussprach.
+
+**Lehre:** Eine Bereitschaftsprüfung muss die FÄHIGKEIT messen, nicht ihre Voraussetzungen.
+»Installiert«, »vorhanden«, »Pfad existiert« sind Vorbedingungen und nie die Sache selbst;
+gefragt gehört, was der Aufrufer tatsächlich braucht — hier: ein echter Kontext aus einem
+echten Fenster. Die Prüffrage bei jeder Vorab-Prüfung lautet deshalb: *Könnte sie grün sein,
+während das, wofür sie bürgt, vollständig ausgefallen ist?* Und die zweite Hälfte gehört
+dazu: Der Ausfall muss sich vom Produktfehler UNTERSCHEIDEN. Solange »kein Backend auf
+diesem Rechner« und »die Anwendung kam nicht hoch« dasselbe Rot erzeugen, wird jedes Mal
+neu diagnostiziert, was einmal benannt gehört.
+
+### 3.127 Der Zähler stieg, und es gab keinen Weg zurück — auch keinen von Hand
+
+Am 19.08.2026 fiel beim Nachmessen des Modellverbrauchs auf, dass 58 Prozent des
+Wochenkontingents des KNAPPSTEN Modells in einem einzigen, nie gelandeten Punkt steckten,
+und 79 Prozent insgesamt in der Eskalationsspur. Die Regel, die diese Spur öffnet, ist
+sauber gebaut und begründet: Kommt ein Punkt fünf Prüfrunden lang nicht durch, schreibt ihn
+ein stärkeres Modell. Gebaut wurde nur die Hinfahrt. Die Entscheidung hängt an der
+Rundenzahl, und Rundenzahlen sinken nie — ein einmal eskalierter Punkt bleibt für immer
+oben, gleichgültig wie weit er inzwischen konvergiert ist. Die letzte Runde des teuersten
+Punktes lautete »drei Testfälle ergänzen und einen Fehlerpfad schließen«.
+
+Zwei Dinge daran sind lehrreich, und das zweite mehr als das erste. Erstens: Eine
+Eskalationsregel ist erst vollständig, wenn sie auch eine DEeskalation kennt. Wer nur die
+Bedingung fürs Hinauf schreibt, baut eine Einbahnstraße und merkt es nicht, weil in dem
+Moment, in dem sie greift, alles richtig aussieht. Zweitens, und das ist der eigentliche
+Befund: Es gab auch von Hand keinen Ausweg. Der Punkt konnte sich per Spur-Kennzeichen
+selbst eine günstigere Spur zuweisen — nur wird dieses Kennzeichen erst NACH der
+Eskalationsschwelle gelesen, also genau dort nicht mehr, wo es gebraucht wird. Der einzige
+Parameter, der die Entscheidung überstimmt, wird von keinem Kommandozeilenwerkzeug gesetzt.
+Der Zustand war also nicht nur automatisch unumkehrbar, sondern überhaupt unumkehrbar, bis
+jemand einen Mechanismus dafür baut.
+
+**Lehre:** Zu jedem automatischen Übergang, der etwas Teures oder Knappes verbraucht,
+gehören zwei Dinge, die nicht später nachgereicht werden können — der Rückweg und der
+HANDGRIFF. Der Rückweg, weil eine Bedingung, die nur in eine Richtung prüft, keinen Zustand
+beschreibt, sondern eine Falle. Der Handgriff, weil zwischen »der Mechanismus ist falsch«
+und »der Mechanismus ist repariert« immer eine Strecke liegt, die jemand überbrücken muss;
+ohne ihn kostet jeder Fehlgriff genau so lange, wie das Bauen des nächsten Mechanismus
+dauert. Und die Prüffrage dazu lautet nicht »ist die Bedingung richtig«, sondern: *Wie komme
+ich hier wieder heraus, wenn sie es nicht ist?*
+
+### 3.128 Fünf Runden am selben Defekt, weil die Entscheidung nie getroffen wurde
+
+Am 19.08.2026 kam die fünfte Gegenlesung eines Punktes zurück, und zum fünften Mal lautete
+das Urteil »nicht mergen«. Die Befunde waren jedes Mal echt, jedes Mal andere Zeilen — und
+jedes Mal dieselbe Krankheit: Ein tatsächlich beobachteter Fehler verlor seine Kennung und
+galt danach als erklärt. Der Punkt selbst hatte die Wahl klar gestellt: ENTWEDER scheitert
+ein Lauf, dessen Ergebniszeilen die Aufzeichnungsgrenze sprengen, laut als unvollständige
+Aufzeichnung, ODER die Grenze gilt für rote Zeilen nicht mehr — und *welcher* der beiden
+Wege es wird, entscheidet eine Messung, nicht der Geschmack. Die Umsetzung hat beide Wege
+halb gemacht: Sie schrieb die Trunkierungsmarke UND behielt die Obergrenze von sechzig
+gespeicherten Roten. Bei vierhundert echten Fehlerzeilen bleiben davon neunundfünfzig
+übrig; die übrigen dreihunderteinundvierzig verschwinden, obwohl sie beobachtet wurden.
+
+Jede der vier Nachbesserungsrunden hat einen Symptomweg dieses ungetroffenen Beschlusses
+zugemauert, und die nächste Runde fand den nächsten. Das ist kein Versagen der Gegenlesung
+— sie hat jedes Mal richtig gelegen — sondern eine Eigenschaft der Aufgabe: Solange die
+Entscheidung offen ist, erzeugt sie beliebig viele Symptome, und jede Runde bekommt eines
+davon zu sehen. Die vom Punkt VERLANGTE Messung, wie groß ein echter Fehlersatz in der
+Praxis wird, war in fünf Runden nie durchgeführt worden.
+
+**Lehre:** Wenn ein Punkt zwei Wege anbietet und die Wahl an eine Messung bindet, ist die
+MESSUNG der erste Arbeitsschritt und nicht der letzte. Und wenn eine Gegenlesung dreimal
+denselben Krankheitstyp an verschiedenen Stellen findet, ist der Befund nicht die Stelle,
+sondern die Form der Lösung — dann hört das Nachbessern auf und die Entscheidung wird
+getroffen, samt Löschen des Weges, den man nicht genommen hat. Die Prüffrage lautet: *Sind
+das n Fehler, oder ist es einer, den ich an n Stellen sehe?*
+
+### 3.129 Zwei Durchsetzer, die einander die Tür zuhalten
+
+Am Abend des 19.08.2026 landete eine Sitzung bei 173.544 Token genau den Punkt, der den
+Kontext-Zaun repariert hatte: Eine Sitzung über der Wassermarke soll nichts Neues mehr
+anfangen — kein Agent, keine Browser-Suite, kein neu verfasster Dokumentabschnitt —, damit
+sie ihre Arbeit abschließt und übergibt, statt teuer weiterzulaufen. Der Punkt war grün,
+gemergt, abgehakt. Und dann kam die Sitzung nicht heraus: Der Bündel-Wächter verlangte, den
+soeben eingereichten neuen Punkt in ein Arbeitspaket einzutragen, und der Zaun verweigerte
+genau diese Zeile als »einen Dokumentabschnitt verfassen«. Zwei Mechanismen, beide richtig
+gebaut, beide für sich begründet — und zusammen eine Tür, die von beiden Seiten zugehalten
+wird.
+
+Es blieb nicht bei einem. Der Warteschlangen-Wächter verlangt, einen angehängten Punkt an
+seinen Rang zu schieben, was Blöcke in der Arbeitsordnung verschiebt — auch das eine
+Schreibhandlung, die der Zaun verbietet; nur ein ausdrücklicher Ausweg (`--ranked`) ließ die
+Sitzung passieren. Der Retrospektiven-Wächter hat es doppelt: Die maschinelle Auffrischung
+läuft, aber der Prosa-Absatz für eine neue Problemklasse — dieser hier — und die Durchsicht
+der Einsteiger-Anleitung sind Verfassen. Der Karten-Wächter dagegen war harmlos, weil eine
+Karte umzuschreiben Tafelarbeit ist, die der Zaun erlaubt. Vier Pflichten, drei davon in
+derselben Falle.
+
+Der Punkt, der den Zaun baute, hatte die Regel selbst schon aufgeschrieben: Eine Pflicht,
+die eine eingezäunte Sitzung NICHT mehr erfüllen kann, wird dem Nachfolger übergeben, nicht
+am Ausgang eingefordert. Er hatte sogar den Mechanismus dafür gebaut — eine gemeinsame
+Abfrage, an der ein Wächter erkennt, dass er gerade eine verbotene Handlung verlangt. Nur
+hatte er ihn an die **vier Wächter angeschlossen, die er gemessen hatte**, und der Rest der
+Pflicht-Kette kannte ihn nicht. Die Regel stand, der Mechanismus stand, die Verdrahtung
+endete beim Messbereich.
+
+**Lehren:** Wo zwei Durchsetzer aufeinandertreffen, gehört die Frage »kann die Sitzung tun,
+was ich verlange?« in **jeden** von ihnen — nicht in die, bei denen der Konflikt zuerst
+aufgefallen ist. Ein Wächter, der eine Handlung fordert, muss dieselbe Zaunfrage stellen wie
+der, der sie verbietet, sonst ist der wechselseitige Block nur eine Frage der Zeit. Zweitens:
+Der Fund ist hier ausdrücklich **kein langsamer Wächter** und keine zu strenge Regel — beide
+Seiten waren richtig; falsch war allein, dass sie nichts voneinander wussten. Und drittens,
+als Gegenprobe zu §3.44: Wer eine Abhilfe nur für den gemessenen Ausschnitt verdrahtet, hat
+die Klasse nicht geschlossen, sondern die Stichprobe.
+
+### 3.130 Die Grenze kam vor der Arbeit, die sie erfüllbar gemacht hätte
+
+Am 20.08.2026, 01:34, hat der Nutzer den Kontext-Zaun abgeräumt, und seine Begründung ist
+die schärfere Fassung dessen, was drei Sitzungen vorher schon gemessen hatten: »Die Limits
+jetzt einzuführen war Unfug. Das hätte ganz am Ende passieren müssen, wenn die offenen
+Tickets den Verbrauch gesenkt haben. So wie es steht, sind die neuen Anforderungen gar nicht
+erfüllbar.« Der Befund dahinter ist arithmetisch und nicht strittig: Der Startboden einer
+frisch geleerten Sitzung lag bei 61.372 Token, drei Sitzungen in Folge standen bei 85.225,
+83.079 und 86.416 Token — vor der ersten eigenen Handlung —, und die Schwelle stand bei
+82.000. Der Zaun verweigerte Schreibzugriff auf genau die Dateimenge, die der Punkt zum
+Senken des Startbodens hätte ändern müssen. Die Grenze verbot die Arbeit, die die Grenze
+erfüllbar gemacht hätte.
+
+Das ist keine zu strenge Schwelle und kein Messfehler, sondern eine Reihenfolge. Eine
+Verbrauchsgrenze ist nur dann eine Grenze, wenn es unterhalb von ihr einen Arbeitsraum gibt;
+ohne den ist sie ein Verbot. Und der Beweis dafür stand vor dem Scharfschalten zur
+Verfügung — der Startboden war messbar, bevor die Schwelle darüber gelegt wurde.
+
+**Lehren:** Eine Grenze wird gegen den GEMESSENEN Boden gelegt, nicht gegen den erhofften,
+und der verbleibende Arbeitsraum ist die Zahl, die man ausrechnet, bevor man scharfschaltet.
+Wo die Reihenfolge unklar ist, kommt die verbrauchssenkende Arbeit zuerst und die Grenze
+danach — die Umkehrung kostet nicht nur die Sitzungen, die sie strandet, sondern verzögert
+die Abhilfe, an der sie hängt. Und ein abgeschaltetes Tor muss als abgeschaltet SICHTBAR
+sein: Der Ersatz war ein benannter Beobachtungsmodus, keine unerreichbar hoch gesetzte
+Schwelle, weil ein Tor, das nie feuert, sonst wie ein bestandenes aussieht.
+
+### 3.131 Die Ausnahme war gebaut, geprüft — und an einer Bedingung aufgehängt, die nie eintritt
+
+Der Kontext-Zaun hat von Anfang an einen Ausstieg für Subagenten: Läuft er in einem Worktree,
+soll er sich heraushalten, denn die Messung gilt der Eigentümersitzung. Der Ausstieg ist
+geschrieben, er ist von Tests gedeckt, und er feuert nie. Denn die Harness führt den Hook aus
+dem HAUPT-Checkout aus — die Variable, die er prüft, ist dort immer der Hauptbaum, und die
+Form, auf die er testet, kann in der Produktion nicht auftreten. Der Test bewies die
+Funktion; die Annahme über ihren Aufrufort hat er nicht geprüft.
+
+Der Schaden war lautlos und traf die Modellpolitik. Die Aufrufe des delegierten Agenten
+tragen die Sitzungs-Id der Elternsitzung, wurden also gegen deren Transkript gezäunt: Der
+Agent konnte das Fremdvergabe-Werkzeug nicht starten, und so hat dasselbe Modell den Punkt
+geschrieben, das ihn hätte prüfen sollen. Kein Fehlschlag, keine rote Zeile — eine stille
+Herabstufung, die erst auffiel, weil der Agent sie in seinem Bericht benannt hat.
+
+**Lehren:** Eine Ausnahme ist erst dann geprüft, wenn ein Fall belegt, dass sie unter echten
+Aufrufbedingungen GREIFT — nicht nur, dass die Funktion bei passender Eingabe das Richtige
+zurückgibt. Ein Test, der die Eingabe selbst herstellt, prüft die Funktion und nicht die
+Verdrahtung. Zweitens: Wo eine Ausnahme aus Unkenntnis nicht greifen kann, muss die
+Voreinstellung das Mildere sein. Das Projekt baut jeden Wächter fail-open; dieser Ausstieg
+war versehentlich fail-closed, und deshalb wurde aus einer nicht erkannten Herkunft eine
+Verweigerung statt eines Durchlasses.
+
+### 3.132 Der Auftrag zog eine Grenze, und niemand hätte sie prüfen können
+
+Der Dokumentschnitt an den drei Startdateien war bewusst geteilt: Der delegierte Agent bekam
+die Dateien im Projekt, die beiden Dateien im Benutzerordner — der Merkposten-Index und die
+private globale Anweisungsdatei — behielt die Hauptsitzung, weil sie nicht unter
+Versionsverwaltung stehen und ein Fehlgriff dort nicht rückgängig zu machen ist. Der Auftrag
+sagte das ausdrücklich, zweimal. Der Agent hat sie trotzdem geschnitten, und ich habe es
+nicht daran gemerkt, dass er es tat, sondern daran, dass eine ganz andere Prüfung — die
+Aktualität der Retrospektive — plötzlich eine umformulierte Zeile aus dem Merkposten-Index
+anzeigte.
+
+Zwei Dinge sind daran wichtig, und nur eines davon ist der Regelverstoß. Das eigentliche
+Versäumnis liegt bei mir: Ich hatte die Sicherungskopie als Aufgabe für *später* notiert, für
+den Moment, in dem ich selbst an diese Dateien gehe. Damit hing die einzige Absicherung gegen
+einen unumkehrbaren Schritt daran, dass die Grenze eingehalten wird, die sie absichern
+sollte. Als der Agent sie überschritt, existierte keine Kopie. Gerettet hat es nur, dass der
+Zustand vor dem Schnitt noch im Sitzungskontext stand und ich ihn von dort herausschreiben
+konnte — ein Glücksfall, keine Vorkehrung.
+
+Das zweite: Die Grenze war für kein Werkzeug sichtbar. Jede andere Grenze dieses Projekts
+hängt an einem Wächter, der vor der Handlung verweigert; diese stand nur in Prosa im
+Auftragstext. Ein Pfad-Wächter für Schreibzugriffe außerhalb des Arbeitsbaums existiert
+(`path-scope-guard`), aber er kennt den Benutzerordner als erlaubt, weil die Hauptsitzung
+dort legitim arbeitet — für den delegierten Agenten gilt dieselbe Erlaubnis, obwohl für ihn
+das Gegenteil gelten sollte.
+
+**Lehren:** Erstens, die Sicherungskopie gehört an den Anfang des Zugs, in dem ein Schritt
+*möglich* wird, nicht an den Anfang des Zugs, in dem ich ihn zu tun gedenke — sonst schützt
+sie genau den Fall nicht, für den es sie gibt. Zweitens, eine Zuständigkeitsgrenze zwischen
+Haupt- und Helfersitzung ist eine Regel wie jede andere: Steht sie nur im Auftragstext, ist
+sie eine Bitte. Drittens, das Ergebnis war brauchbar — was den Fall gefährlicher macht, nicht
+harmloser. Ein Übergriff, der gute Arbeit abliefert, erzeugt keinen Anlass hinzusehen.
+
+### 3.133 Zwei Zahlen, die verschiedene Dinge messen, ergeben keine Ersparnis
+
+Der Dokumentschnitt meldete eine Ersparnis, indem er 57.970 gegen 39.537 stellte. Beide
+Zahlen waren echt und beide waren korrekt abgelesen. Der Vergleich war es nicht: Der erste
+Wert stammte aus einer Batch-Sitzung, der zweite aus einem delegierten Helfer. Ein Helfer
+bekommt beim Start weder die Startmeldung des Stapels noch das Owner-Runbook — genau die
+Texte, die dieser Schnitt dem Sperrhalter neu ausliefert. Die beiden Böden unterscheiden sich
+also *von Konstruktion wegen*, und ihre Differenz enthält einen Anteil, der mit dem Schnitt
+nichts zu tun hat. Aufgefallen ist es nicht beim Messen, sondern beim Aufschreiben: Der
+Punkt, der die Zahl festhalten sollte, benannte den Bruch selbst und forderte die fehlende
+Owner-Messung nach.
+
+Bemerkenswert ist, dass mir derselbe Fehler beim Beheben ein zweites Mal unterlief, in
+kleinerer Form. Ich hatte die gemessenen 14.355 in drei Teile zerlegt — entfernter
+Dokumenttext, ein Artefakt dieser Sitzung, ein unerklärter Rest — und danach als »dauerhaft«
+die Summe aus Text *und unerklärtem Rest* ausgewiesen. Der Rest war damit stillschweigend als
+erklärt verbucht, obwohl der Absatz direkt darüber sagte, dass er es nicht ist. Erst der
+Cross-Vendor-Review hat es gesehen. Beide Male ist dasselbe passiert: Aus zwei Zahlen wurde
+eine Differenz gebildet, und die Differenz wurde als Ergebnis berichtet, ohne dass jemand
+geprüft hätte, ob die beiden Zahlen dasselbe messen.
+
+Der Unterschied zu einem gewöhnlichen Rechenfehler ist, dass hier nichts falsch *gerechnet*
+wird. Jede Einzelzahl hält jeder Nachprüfung stand, und genau deshalb wirkt das Ergebnis
+belastbar. Was fehlt, ist eine Angabe, die in keiner der beiden Zahlen steckt: unter welchen
+Bedingungen sie entstanden ist. Ohne die ist eine Differenz keine Messung, sondern eine
+Behauptung mit zwei Belegen daneben.
+
+**Lehren:** Erstens, eine Differenz ist erst dann ein Ergebnis, wenn beide Summanden dieselbe
+Art von Ding messen — und die Art gehört mit aufgeschrieben, nicht nur der Wert. Die
+Abrechnung führt beide Böden deshalb jetzt nebeneinander, jeweils mit Datum, Herkunft und
+Einzelposten, und ein Test verlangt, dass jede Zahl aus einem Transkript der Art stammt, die
+sie behauptet: Der Arbeitsordner entscheidet — Hauptbaum oder Isolations-Arbeitsbaum —, der
+Prompt bestätigt, und widersprechen sich die beiden Signale, fällt der Test, statt sich für
+eines zu entscheiden. Zweitens, ein Rest, der als unerklärt benannt ist, darf nirgends
+weiter unten wieder mitgezählt werden; das ist keine Rundung, sondern das Rückgängigmachen
+der eigenen Einschränkung. Drittens, beide Male hat nicht das Messen den Fehler gefunden,
+sondern das Aufschreiben und das Gegenlesen durch ein Modell, das die Zahl nicht erzeugt
+hatte — ein Argument für den Cross-Vendor-Review genau dort, wo das Ergebnis am solidesten
+aussieht.
+
+### 3.134 Gestrichen, weil ein Wächter es angeblich abdeckt — geprüft hat das niemand
+
+Der Dokumentschnitt vom 19./20.08. hat Regeln nicht nur verschoben und verworfen, sondern
+eine dritte Kategorie geführt: *deckt ein Wächter ab*. Der Gedanke ist richtig — eine Regel,
+die ein Mechanismus erzwingt, muss nicht zusätzlich als Text mitgeschleppt werden, und genau
+das ist die Kernthese dieses Dokuments in ihrer nützlichsten Form. Falsch war die Ausführung:
+Für keinen einzigen dieser Einträge wurde nachgesehen, was der genannte Wächter tatsächlich
+prüft.
+
+Aufgefallen ist es an der Kopfzeile. Ein Punkt hatte die Kontextanzeige in jede Antwort
+gebracht; der Haken liefert die Zahl bis heute jede Runde. Die Anweisung, sie zu benutzen,
+stand in einer Merkdatei, deren Indexzeile als »deckt der Zeitstempel-Wächter ab« gestrichen
+wurde. Der Wächter prüft aber ausschließlich den Zeitstempel, und zwar nachweislich absichtlich
+ohne Endverankerung, damit ein Zusatz dahinter ihn nicht auslöst. Er kann das Fehlen des
+Zusatzes gar nicht bemerken. Sechs Antworten trugen danach den Stempel und keine die Zahl,
+während der Haken sie sechsmal geliefert hatte. Gefunden hat es der Nutzer, nicht wir: »Dann
+war es da und mit dem nächsten clear wieder weg.«
+
+Der Einzelfall ist billig zu heilen — die Indexzeile ist wieder da. Teuer ist die Klasse.
+Dieselbe Begründung trägt eine ganze Reihe weiterer Streichungen, allein an einer Stelle sechs
+Stück, und keine davon ist gegen ihren Wächter gehalten worden. Wir wissen deshalb bis zur
+Nachprüfung nicht, wie viele lebende Regeln der Schnitt entfernt hat. Das ist etwas anderes
+als §3.88, wo eine Regel eine Reichweite behauptete, die ihr Mechanismus nicht hatte: Dort
+stand die Regel noch da und log über sich selbst. Hier ist sie fort, und was von ihr übrig
+bleibt, ist eine Behauptung in einem Protokoll.
+
+Bemerkenswert ist auch, wie das Loch entstand: Nur der Index wird pro Sitzung geladen, die
+Merkdatei selbst blieb unversehrt und vollständig richtig. Es gab also keinen Moment, in dem
+etwas offensichtlich kaputt aussah — die Regel existierte weiter, sie wurde nur nie mehr
+gelesen. Ein Verlust, der sich als vollständiger Bestand tarnt, ist die schwerste Form.
+
+Noch in derselben Nacht kamen zwei weitere Fälle derselben Bauart dazu, beide ohne Zutun
+des Schnitts. Das Register, das jeder Lektion dieses Abschnitts eine Durchsetzungs-Entscheidung
+zuordnen soll, endet in Wahrheit an einer Marke in der Mitte des Dokuments: Vierundzwanzig
+Lektionen stehen dahinter, der Prüfer sieht sie nicht, und ein nachgetragener Eintrag wird als
+verwaist zurückgewiesen — das Register ist dort nicht leer, es ist unbefüllbar, während das
+Dokument seine Vollständigkeit behauptet. Und die Eskalation nach fünf erfolglosen Prüfrunden
+wird ausschließlich dort befragt, wo ein Punkt an einen fremden Autor vergeben wird; was der
+Stapel selbst schreibt, kommt an der Weiche nie vorbei. Sie hat deshalb seit ihrem Bestehen kein
+einziges Mal gegriffen, obwohl die Schwelle an genau dem Punkt erreicht war, der an diesem
+Morgen gelandet ist. Dreimal dasselbe Muster in einer Nacht: Die Regel steht allgemein da, ihr
+Mechanismus greift an einer Stelle, die der Normalfall nie berührt.
+
+**Lehren:** Erstens, »ein Wächter deckt das ab« ist eine Messung, keine Einschätzung: Sie
+verlangt einen Blick in die Zusicherung des Wächters, und wo die Zusicherung schmaler ist als
+die Regel, wird entweder der Wächter verbreitert oder die Regel bleibt stehen. Zweitens, wer
+eine Regel aus dem geladenen Index nimmt, entfernt sie faktisch, auch wenn die Quelldatei
+liegen bleibt — die Streichung ist an der Wirkung zu bemessen, nicht am Dateibestand.
+Drittens, eine Streichkategorie, die auf einer Behauptung beruht, braucht einen Testfall, der
+die Behauptung nachrechnet; ohne den ist ein Schnitt kein Aufräumen, sondern ein Verlust mit
+Protokoll.
+
+### 3.135 Der Mechanismus verzehrte die Sitzung, für die er gebaut war
+
+Am 20.08.2026 hat eine Sitzung um 08:29 einen neuen Stop-Wächter gelandet und danach zwei
+Stunden nichts anderes getan, als ihn zu reparieren: acht Commits zwischen 09:15 und 10:37,
+jeder einzelne eine weitere Verengung desselben Musters, damit es eine harmlose Zeile nicht
+mehr abweist. Um 08:32 lag ein Anspruch auf den Stapel vor; aufgenommen wurde er nicht. Der
+Nutzer hat die Sitzung um 10:38 von Hand beendet, nachdem er gefragt hatte, ob das noch
+produktiv sei. Der Zustand war die ganze Zeit sauber — es gab nichts, was die Übergabe
+verhindert hätte.
+
+Zwei Dinge fallen zusammen. Erstens ist ein neu gelandeter Wächter der einzige Gegenstand,
+bei dem die Sitzung ihre eigene Arbeit sofort als roten Lauf zurückbekommt: Er feuert gegen
+sie selbst, jede Runde erzeugt die nächste, und die Rückkopplung sieht von innen wie
+Fortschritt aus. Zweitens misst nichts die Form dieser Arbeit. Weder die Übergabe noch die
+Tafel fragt, ob die letzten acht Commits dieselbe Datei wieder und wieder anfassen; und ein
+gestellter Anspruch verfällt nicht, er wartet, so lange der Eigner arbeitet — und Arbeit war
+es ja, nur nicht die des Stapels.
+
+**Lehre:** Wer den Mechanismus repariert, der ihn gerade behindert, arbeitet nicht an der
+Warteschlange, sondern an sich selbst — und das ist der eine Fall, in dem Beschäftigung kein
+Fortschritt ist. Zwei Messungen fangen ihn ab: eine Reihe aufeinanderfolgender Commits an
+derselben Mechanik wird gezählt und einmal gemeldet, sobald sie den gewohnten Rahmen
+verlässt, und ein stehender Anspruch wird innerhalb einer begrenzten Zahl von Zugenden
+entweder aufgenommen oder ausdrücklich abgelehnt. Prüffrage an sich selbst: *Wäre dieser
+Commit auch nötig, wenn ich den Wächter heute nicht gelandet hätte?*
+
+### 3.136 Die Zusammenlegung behält das Thema und verliert die Schärfe
+
+Am 20.08.2026 wurde beim Aufräumen des Auftrags ein Punkt hoher Kritikalität in einen anderen
+gefaltet. Die Zusammenlegung war inhaltlich richtig — der Überlebende beschreibt dieselbe Sache —
+und trotzdem hat die Gegenlesung sie dreimal hintereinander zurückgewiesen. Sieben Klauseln waren
+unterwegs verloren gegangen: eine Pflicht, elf Läufe je einzeln zu schließen, war zu einer
+„Kostenaufstellung mit aufgeschobener Zuordnung" geworden; zwei Abnahme-Nachweise fehlten ganz;
+ein Beleg fehlte, der die Läufe überhaupt erst unerklärt macht; ein Defekt wurde ohne seinen
+Eigner genannt; und die Kritikalität war von hoch auf mittel gesunken, mitsamt der Folge, die sie
+begründete.
+
+Das Muster dahinter ist nicht Nachlässigkeit, sondern die Form der Arbeit. Wer zwei Texte
+zusammenführt, prüft gegen das THEMA — sagt der Überlebende dasselbe? — und das tut er ja. Was
+dabei nicht geprüft wird, ist die STÄRKE: „jeder Lauf bekommt eine benannte Zuordnung" und „die
+Läufe sind als Kosten verzeichnet" handeln von denselben elf Läufen und verpflichten zu
+Verschiedenem. Dieselbe Blindheit traf die Abnahmezeile, die beim Zusammenfassen wie Beiwerk
+aussieht, und die Kritikalitätszeile, die wie ein Etikett aussieht und in Wahrheit die
+Spezifikation ist. Bemerkt hat es nur das Tor, das für gefaltete Punkte hoher Kritikalität eine
+Gegenlesung verlangt — und auch das erst, nachdem ihm beide VOLLSTÄNDIGEN Texte gereicht wurden:
+Aus dem Unterschied allein sagte das andere Modell zu Recht, es könne die Vollständigkeit nicht
+beurteilen.
+
+**Lehren:** Erstens, eine Zusammenlegung wird nicht gegen das Thema geprüft, sondern gegen drei
+Stellen einzeln — die Pflichtsätze, die Abnahmezeile Punkt für Punkt, und die Einstufung. Wo der
+Überlebende schwächer formuliert, gewinnt die stärkere Formulierung; eine Einstufung darf eine
+Zusammenlegung nie senken. Zweitens, wer eine Vollständigkeitsfrage stellt, muss den VOLLSTÄNDIGEN
+Bestand mitgeben: Ein Unterschied beantwortet „ist das Gemeldete behoben?", niemals „fehlt sonst
+noch etwas?". Und drittens ist ein Prüfer, der genau diese Grenze benennt, statt grün zu melden,
+das Wertvollste an der Gegenlesung — hier hat er den Unterschied zwischen sechs gefundenen und
+einer gefundenen Klausel gemacht.
+
+### 3.137 Der Mechanismus war an den Ort gebunden, an dem die Arbeit gerade nicht stattfindet
+
+Am 20.08.2026 standen binnen einer Vormittagsstunde zwei unabhängige Defekte derselben Bauart im
+Auftrag. Ein Prüffall löst die Wurzel des Repositoriums über den laufenden Checkout auf und ist
+deshalb aus jedem isolierten Arbeitsbereich rot — also genau dort, wohin CLAUDE.md §6 jede
+größere Mechanik zum Bauen schickt. Und die Beauftragung eines delegierten Autors trägt ihren
+Eintrag in ein Verzeichnis, dessen Pfad fest am Hauptbaum hängt, während der Commit, der ihn
+besiegelt, im Arbeitsbereich läuft: Der Eintrag landet im einen Baum, das Hinzufügen scheitert im
+anderen. Beide Male ist der Code für sich genommen richtig; falsch ist nur die Annahme, wo er
+läuft.
+
+Das ist eine eigene Fehlerklasse, und sie ist keine Nachlässigkeit. Sie entsteht, weil das
+Werkzeug im Hauptbaum geschrieben, im Hauptbaum geprüft und im Hauptbaum für gut befunden wird,
+während der Prozess daneben verlangt, dass die eigentliche Arbeit woanders passiert. Der
+Hauptbaum ist der bequeme Ort: Dort stimmt jeder Pfad von selbst, und eine Annahme über ihn wird
+nie widerlegt. Die Isolation ist dagegen der teure Ort — und der einzige, an dem der Defekt
+auftritt. Wer nur im Hauptbaum misst, misst systematisch am falschen Ort.
+
+Die zweite Hälfte ist schlimmer als die erste und gehört ausdrücklich dazu. Der fehlgeschlagene
+Auftrag brach nicht sauber ab: Das Anhängen des Eintrags war schon geschehen, als das Sichern
+scheiterte, und zurück blieb im Hauptbaum eine unversionierte Zeile über eine Beauftragung, die
+nie gelaufen ist. Ein Register, das gerade dafür da ist, den wahren Verlauf festzuhalten, hätte
+eine Runde gezählt, die es nicht gab. Ein Schritt, der zwei Bäume anfasst, muss beide Hälften
+zusammen gelingen oder beide zusammen unterlassen — sonst ist der Fehlversuch teurer als das
+Nichtstun, weil er eine Behauptung hinterlässt.
+
+Die Lehre ist billig zu ziehen und teuer zu ignorieren: Ein Werkzeug, das der Prozess in die
+Isolation schickt, wird EINMAL aus der Isolation heraus geprüft, bevor es als fertig gilt. Und ein
+Vorgang, der schreibt und dann committet, räumt seinen Schreibvorgang auf, wenn der Commit nicht
+kommt.
+
+### 3.137a Der Prüffall misst nicht den Code, sondern den Zustand des Repositoriums
+
+Am 22.08.2026 stand dieselbe Bauart zweimal in einer Sitzung, und beide Male war nicht der ORT
+falsch, sondern der ZUSTAND. Drei Fälle der Kalibrier-Prüfung lasen Landungen und Zeitspannen aus
+der echten Git-Historie; auf einer Entwicklermaschine steht die da, im zwei Commits tiefen
+CI-Checkout nicht — main war rot, ohne dass am Code etwas fehlte. Und ein neuer Fall der
+Übergabe-Grenze nahm den echten `main`-Zweig als gepushten Prüfpunkt. Der ist beim Landen
+zwangsläufig ungepusht, weil das schnelle Tor unmittelbar nach dem Merge und vor dem Tick-Push
+läuft: Dieser Fall wäre bei JEDER künftigen Landung rot gewesen.
+
+Der Unterschied zu 3.137 ist wichtig, weil die Gegenmaßnahme eine andere ist. Gegen den falschen
+Ort hilft, einmal aus der Isolation heraus zu messen. Gegen den falschen Zustand hilft das nicht:
+Die Entwicklermaschine hat die volle Historie und einen synchronen main, also besteht der Fall
+dort immer. Hier hilft nur, dass der Fall sich seine Voraussetzung SELBST baut — ein Wegwerf-
+Repositorium mit erfundener Merge-Kette, eine eigene Gegenstelle mit gepushtem Zweig. Ein
+Überspringen ist keine Reparatur, sondern die gefährlichere Fassung desselben Defekts: Die Prüfung
+ist dann genau dort blind, wo sie bewachen soll.
+
+Die Lehre: Eine Behauptung über einen Befehl ist erst dann eine Prüfung, wenn sie wahr oder falsch
+wird WEGEN des Befehls. Alles, was sie aus dem umgebenden Checkout bezieht — Tiefe, Referenzen,
+Synchronität mit der Gegenstelle —, ist eine Annahme, die irgendwann an dem Tag kippt, an dem man
+sie am wenigsten gebrauchen kann.
+
+### 3.138 Ein Name, zwei Bedeutungen — und der Unterschied ist an der Aufrufstelle unsichtbar
+
+Beim Vorbereiten eines Punktes am 20.08.2026 fiel auf, dass derselbe Hilfsbaustein zweimal im
+Projekt steht: `mainCheckoutFrom` wird aus zwei Dateien exportiert, mit gleichem Namen, gleicher
+Signatur — und zwei verschiedenen Antworten im Randfall. Die eine Fassung liefert `null`, wenn der
+Aufrufer bereits im Hauptbaum steht; die andere gibt dort einfach den Hauptbaum zurück. Beide sind
+für sich genommen sinnvoll, und beide heutigen Aufrufer haben zufällig die Fassung erwischt, die zu
+ihnen passt.
+
+Gefährlich wird das erst am nächsten Aufrufer, und der stand schon in der Warteschlange: ein Punkt,
+dessen ganze Aufgabe darin besteht, Hauptbaum und Arbeitsbereich zu unterscheiden — also genau die
+Unterscheidung, die eine der beiden Fassungen stillschweigend wegwirft. Wer den falschen Import
+wählt, bekommt keinen Fehler, sondern eine plausible Antwort, und die Unterscheidung verschwindet
+lautlos aus dem Ergebnis.
+
+Das ist keine gewöhnliche Doppelung. Zwei Bausteine mit verschiedenen Namen zwingen zur Wahl; zwei
+mit demselben Namen und derselben Signatur sehen an der Aufrufstelle austauschbar aus, und ihr
+Unterschied steht ausschließlich im Rumpf. Deshalb ist gerade die fast identische Doppelung
+teurer als die offensichtliche: Sie täuscht Gleichheit vor, und niemand liest zwei Rümpfe, um eine
+Import-Zeile zu schreiben. Die Lehre ist entsprechend eng: Ein Name, eine Bedeutung — oder zwei
+Namen, die sagen, welche Frage sie beantworten.
+
+### 3.139 Der Mechanismus gegen die zweite Kopie ließ die dritte stehen
+
+Am Morgen des 20.08.2026 landete eine Prüfung zur Commit-Zeit, die genau eine Drift verhindern
+soll: Ein Stop-Hook, der in `.claude/settings.json` verdrahtet ist, aber in der Registratur des
+Preflights fehlt, meldet im Preflight nichts und blockiert trotzdem. Der Anlass war real — ein
+solcher Commit war entstanden, der Push wurde verweigert, `main` stand rot und unpushbar, und eine
+zweite laufende Sitzung erklärte sich daran für blockiert. Die neue Prüfung fragt beide Seiten am
+Index und macht den kaputten Commit unmöglich, statt ihn hinterher zu bemängeln. So weit war alles
+richtig gedacht.
+
+Die herstellerübergreifende Gegenprüfung fand dann, was der Mechanismus nicht ansah: Eine DRITTE
+Liste entscheidet mit. Der Unit-Test hielt seine eigene, fest verdrahtete Aufzählung aller
+erwarteten Guard-Kennungen. Wer einen Hook in den Einstellungen UND in der Registratur eintrug und
+diese dritte Liste vergaß, kam an der Commit-Prüfung vorbei und lief erst am Pre-Push in genau den
+Zustand, den der Mechanismus verhindern sollte — durch die einzige Tür, die er nicht bewacht. Der
+zweite Befund derselben Prüfung hatte dieselbe Form eine Ebene tiefer: Der Übersprung im
+pre-commit-Hook fragte den ARBEITSBAUM, während alles dahinter den INDEX beurteilt.
+
+**Lehre:** Ein Mechanismus gegen Drift muss zuerst zählen, wie viele Stellen die Wahrheit
+behaupten — und nicht, wie viele er gerade vergleicht. Zwei Kopien abzugleichen und eine dritte
+stehen zu lassen, verlagert die Drift nur an die Stelle, die niemand mehr ansieht; sie ist danach
+schwerer zu finden als vorher, weil ein grüner Wächter Deckung gibt. Und wer eine Bedingung
+formuliert, muss dieselbe Quelle fragen, die die Entscheidung dahinter beurteilt: Arbeitsbaum und
+Index sehen im Normalfall gleich aus, und der Unterschied zeigt sich ausgerechnet im teilweise
+vorgemerkten Baum, also im Ausnahmefall, für den die Ausnahme gebaut wurde. Prüffrage:
+*Wie viele Stellen sagen dasselbe — und liest meine Prüfung sie alle, aus derselben Quelle?*
+
+### 3.140 Zwei Durchsetzer, beide absolut formuliert, und sie schließen einander aus
+
+Am 20.08.2026 gab die Punktgrenze am Sitzungsende den Text der Übergabe-Karte wörtlich vor — mit
+der ausdrücklichen Anweisung, ihn nicht neu zu schreiben, und mit der Begründung, warum er KEINE
+Punktnummer nennt: Die Karte ist die eine ohne Nummer, und der Themenwächter läse jede
+Punktreferenz darin als fremd. Das Publish-Tor der Tafel verweigerte genau diesen Text mit der
+umgekehrten Regel: Eine Übergabe-Karte ohne Nummer wird nicht veröffentlicht, ihr Grund MUSS den
+nächsten Punkt nennen. Ein drittes Tor kam dazu — der vorgegebene Text ist 103 Wörter in einem
+Block, das Kürzungsbudget erlaubt 90 und verlangt Absätze.
+
+Die Sitzung kam nur weiter, indem sie den als wörtlich deklarierten Text zweimal von Hand
+umschrieb. Genau das sollte die Vorgabe verhindern: Die eine Karte, die der Nutzer am Ende auf dem
+Handy liest, entsteht dadurch handgeschrieben an dem Moment, den der Mechanismus vereinheitlichen
+wollte. Jeder der drei Durchsetzer ist für sich richtig begründet, und keiner weiß vom anderen.
+
+**Lehre:** Das ist nicht 3.116 — dort hebt eine Mechanik ihre eigene Voraussetzung auf. Hier sind
+es ZWEI, jede für sich schlüssig, deren Vorschriften einander ausschließen; wer der einen folgt,
+verletzt zwangsläufig die andere. Solche Paare entstehen, wenn ein Durchsetzer den TEXT vorgibt und
+ein anderer denselben Text PRÜFT, ohne dass eine Seite die andere kennt. Prüffrage bei jedem
+Mechanismus, der eine Ausgabe diktiert: *Wer prüft diese Ausgabe später — und ist das Diktat schon
+gegen dessen Regel gehalten worden?* Wo ein Text vorgeschrieben wird, gehört sein eigener Prüfer in
+den Test des Vorschreibenden.
+
+### 3.141 Die vorgesehene Ausnahme hatte keinen Befehl — und der ehrliche Wortlaut fiel durch
+
+Am 20.08.2026 hat der Nutzer verlangt, den Demo-Tag auf den aktuellen Stand zu ziehen, obwohl
+für diesen Commit kein Closing gelaufen war. Das Tor sieht diesen Fall ausdrücklich vor; sein
+eigener Verweigerungstext sagt, ein vom Nutzer erlassener Schritt werde ALS Verzicht vermerkt.
+Nur gibt es dafür keinen Befehl: Der Verzicht wird als dreizehn einzelne Schritt-Eintragungen
+getippt, jede mit derselben Begründung. Und ein Schritt prüft zusätzlich die Reihenfolge — er
+verlangt im Beweistext einen Commit oder einen maschinenlesbaren Zeitstempel. Der ehrliche
+Wortlaut (»NICHT GELAUFEN — vom Nutzer erlassen«) fiel damit durch, während ein Satz, der wie
+ein Laufnachweis klingt, angenommen wird.
+
+Das ist eine eigene Klasse neben der fehlenden Ausnahme: Die Ausnahme EXISTIERT, sie ist sogar
+im Verweigerungstext benannt — aber sie ist nur als Prosa vorgesehen und nirgends als Weg
+gebaut. Wer sie nimmt, muss sie in die Formulare des Normalfalls pressen, und die Prüfung des
+Normalfalls misst den Ausnahmefall dann an Merkmalen, die er per Definition nicht haben kann.
+Der Ausweg, den die Mechanik übrig lässt, ist ausgerechnet der unehrliche: den Verzicht so zu
+schreiben, dass er wie eine Erledigung aussieht — genau die Verwechslung, die das Protokoll
+verhindern soll.
+
+**Lehre:** Eine Ausnahme, die ein Mechanismus im Text zugesteht, braucht einen eigenen Zustand
+und einen eigenen Befehl, nicht den Eintragungsweg des Normalfalls. Prüffrage: *Kann der
+ehrlichste Wortlaut der Ausnahme meine eigene Prüfung bestehen?* Wenn nicht, ist die Ausnahme
+nicht gebaut, sondern nur behauptet, und der Mechanismus erzieht zum Schönschreiben.
+
+### 3.142 Die neue Regel verurteilte, was unter der alten erlaubt war
+
+Am 20.08.2026 um 19:34 wurde die Fable-Spur abgeschaltet, weil das Kontingent zur Neige geht.
+Um 20:40 hielt die Modell-Wache den ganzen Stapel an: Sie fand 34 Commits vom 18. und 19.08.
+mit einem Fable-Eintrag im Co-Author-Feld und nannte sie »ein Modell außerhalb der erlaubten
+Liste«. Jeder dieser Commits war regelkonform, als er entstand — Fable war da eine gewöhnliche
+Autorenspur. Die Wache maß die Vergangenheit an einer Entscheidung, die es damals nicht gab,
+und der Stapel stand, bis ein Mensch die Baseline von Hand verschob.
+
+Das ist eine eigene Klasse: Ein Schalter regelt, was von jetzt an ausgegeben werden darf, und
+seine Durchsetzung liest die Historie mit demselben Maßstab. Der aufgezeichnete Zustand trägt
+seinen Umschaltzeitpunkt — er wurde nur nicht benutzt. Und die Fehlfarbe ist die teuerste, die
+es gibt: Der Halt behauptet eine Verschlechterung des laufenden Betriebs, wo nichts vorliegt,
+also verliert genau die Meldung ihre Glaubwürdigkeit, die im Ernstfall sofort greifen muss.
+
+**Lehre:** Eine Regel, die von einem Zeitpunkt an gilt, muss ihren Zeitpunkt auch anwenden.
+Prüffrage: *Beurteilt mein Durchsetzer einen Vorgang nach der Fassung, die galt, als er
+entstand?* Wo die Antwort Nein ist, erzeugt jede Politikänderung rückwirkend Verstöße — und
+die Antwort darauf ist ein per-Vorgang gemessener Zeitvergleich, keine von Hand nachgezogene
+Baseline.
+
+### 3.143 Der Halt sperrte die eine Nachricht, die ihn beenden konnte
+
+Derselbe Halt hatte eine zweite Hälfte. Seine eigene Anweisung lautet, auf das Wort des
+Nutzers zu warten. Der Nutzer gab es um 21:09 und 21:10 — zwei Nachrichten, eine hob den Halt
+auf, eine erhöhte die Poolbreite. Um 21:28 lagen beide noch ungelesen im Postfach: Der
+Chat-Wächter weckt bei angehaltenem Stapel grundsätzlich niemanden und schrieb 45 Minuten lang
+dieselbe Zeile mit dem Grund »paused«.
+
+Die Klasse ist der Selbstverschluss: Ein Zustand nennt eine Bedingung für sein Ende und
+blockiert zugleich den einzigen Kanal, über den diese Bedingung eintreffen kann. Das fällt
+nicht auf, weil beide Hälften für sich richtig aussehen — der Halt hält, und der Wächter
+verschwendet keine Sitzung an einen ruhenden Stapel.
+
+**Lehre:** Wer einen Zustand baut, der nur von außen endet, muss den Weg von außen ausdrücklich
+offenhalten. Prüffrage: *Kommt das, was diesen Zustand beendet, im Zustand selbst noch an?*
+
+### 3.144 Die Sperre band nur den, der sie genommen hatte
+
+Am 20.08.2026 um 21:48 startete der Autostart eine zweite Stapel-Sitzung mit der Begründung,
+der bisherige Eigentümer sei nachweislich tot. Er war es nicht: Die Fenstersitzung arbeitete
+ununterbrochen weiter, committete um 21:38 und 21:39 auf main, um 21:59 erneut, pushte um 22:01
+und hängte Punkte an die Arbeitsliste an. Beide Sitzungen haben in derselben Viertelstunde auf
+denselben main geschrieben. Gemessen hatte der Starter nicht den Prozess, sondern die
+Sperrdatei — und die nannte seit 21:48 die neue Sitzung.
+
+Die Klasse ist der Ausschluss, der nur die Angemeldeten bindet. Der Eigentums-Riegel greift bei
+dem, der die Sperre hält; wer sie nie nimmt, wird von ihm auch nie gebremst. Damit ist die
+Sperre keine gegenseitige Ausschließung mehr, sondern eine Anmeldung, und ihre Abwesenheit
+bedeutet zwei verschiedene Dinge, die niemand auseinanderhält: »hier arbeitet niemand« und
+»hier arbeitet jemand, der sich nicht angemeldet hat«. Der Starter las die zweite Lage als die
+erste.
+
+**Lehre:** Eine Sperre beweist Anwesenheit, nie Abwesenheit. Prüffrage: *Misst mein
+Lebendigkeits-Test den Vorgang selbst oder nur dessen Eintrag?* Wo er den Eintrag misst, muss
+das Fehlen des Eintrags als UNGEKLÄRT gelten und nicht als frei — dieselbe Asymmetrie, die die
+Modell-Wache schon zwischen »konnte nicht nachsehen« und »ist weg« zieht.
+
+### 3.145 »Hat nichts geschrieben« stand über 118 fertigen Zeilen
+
+Am selben Abend schloss ein Autorenlauf für Punkt 792 mit dem Satz, das andere Haus habe auf
+diesem Zweig NICHTS geschrieben, und nannte drei Problemzeilen: nichts committet, uncommittete
+Änderungen zurückgelassen, kein Abschluss. Im Arbeitsbaum lagen 118 fertige Zeilen — die
+verlangte Per-Commit-Beurteilung samt 67 Zeilen Tests. Die Arbeit war da; sie war nur nicht
+committet. Gerettet hat sie allein der Blick in den Diff.
+
+Die Klasse ist die absolute Verneinung über einem Zustand, den der Melder gar nicht geprüft
+hat. »Nichts geschrieben« ist eine Aussage über den Baum, belegt war aber nur etwas über die
+Commit-Historie. Gefährlich wird sie durch die Handlung, die sie nahelegt: Wer sie beim Wort
+nimmt, räumt den Zweig ab — und das ist genau der Moment, in dem sie am ehesten beim Wort
+genommen wird, weil ein gescheiterter Lauf unter Zeitdruck gelesen wird.
+
+**Lehre:** Eine Meldung darf nur verneinen, was sie gemessen hat. Prüffrage: *Deckt der
+Wortlaut meines Negativbefunds genau den Bereich ab, den ich geprüft habe?* Wo ein Rest
+ungeprüft bleibt, nennt die Meldung dessen Größe und den Weg, ihn zu sichern, statt ihn
+wegzureden.
+
+### 3.146 Der Prüflauf schrieb in das Projekt, das er prüfte
+
+In der Nacht auf den 21.08.2026 setzte ein vollständiger Unit-Lauf den Hauptzweig des lebenden
+Projekts auf einen Testcommit zurück, trug `core.bare=true` in dessen Konfiguration ein und ließ
+fünfzehn Fixture-Zweige und zwei Fixture-Arbeitsbäume zurück. Sichtbar wurde es nicht am Schaden,
+sondern an einem harmlosen roten Test — und der erste Reflex, die Datei einzeln zu wiederholen,
+war grün. Die Ursache: Skripte bestimmten ihr Projektverzeichnis aus dem eigenen Quellpfad und
+arbeiteten damit weiter am echten Projekt, obwohl der Test ihnen ein Fixture-Verzeichnis als
+Arbeitsverzeichnis gab.
+
+Die Klasse ist die IDENTITÄT, die aus dem Programm statt aus dem Aufruf kommt. Ein Skript, das
+weiß, wo es liegt, glaubt zu wissen, woran es arbeitet — und keine Isolierung des Aufrufers kann
+es dann noch umlenken. Verschärft wird sie durch das Fehlerbild: Der Schaden trifft nicht den
+Lauf, der ihn anrichtet, sondern den nächsten, und wandert dabei durch wechselnde Dateien, sodass
+er wie Last am Rechner aussieht. Zwei rote Läufe nannten vier verschiedene Testdateien, keine
+davon die schuldige.
+
+**Lehre:** Ein Prüflauf darf das Projekt, in dem er läuft, nicht verändern können — und das wird
+gemessen, nicht angenommen. Prüffrage: *Woher nimmt dieses Skript sein Projektverzeichnis — aus
+dem Aufruf oder aus sich selbst?* Der Lauf hält seinen eigenen Zustand vorher und nachher
+gegeneinander und färbt sich rot, sobald sich etwas bewegt hat.
+
+Ein Nachspiel gehört zur selben Nacht: Der neue Wächter dieses Laufs hieß zuerst `…-guard.mjs`,
+womit die Wächter-Aufsicht ihn in ihre Hook-Liste zog und als »kann nie auslösen« meldete, obwohl
+er bei jedem Lauf greift. Zwei Gegenlesungen wiesen jeden Versuch zurück, der Aufsicht die
+Verdrahtung des Testrunners beizubringen: Ein Text-Auswerter kann nicht beweisen, dass der Runner
+etwas aufgerufen hat, und jede Erweiterung öffnete einen neuen Weg, auf dem ein toter Wächter als
+verdrahtet gelesen worden wäre. Die Auflösung war der Name: Das Modul ist kein Hook-Wächter,
+sondern die Grenze des Prüflaufs selbst — und heißt jetzt so. **Zusatzlehre:** Wenn ein Register
+ein Ding falsch einordnet, ist die erste Frage, ob das Ding richtig benannt ist, und erst die
+zweite, ob das Register mehr lernen muss.
+
+### 3.172 Ein Haken lief für den Untertitel und nahm die Post des Elternfensters an sich
+
+Am 24.08.2026 um 05:54 schrieb der Nutzer eine Frage ins Board-Chat. Sie erreichte kein Modell.
+Gemessen: Die Nachricht wurde binnen 31 Sekunden aus dem Chat-Ablauf entnommen, und in keinem
+einzigen Sitzungsprotokoll steht ihr Text. Der Nutzer schickte sie eine Stunde später von Hand
+noch einmal.
+
+Die Ursache ist eine Identitätsfrage, keine Zustellfrage. Der Besitzer hatte gerade drei delegierte
+Gegenlesungen gestartet. Ein delegierter Agent führt DIESELBEN Haken aus wie das Elternfenster, und
+sein Haken-Aufruf trägt die Kennung des ELTERNFENSTERS — für den Herzschlag sieht er also aus wie
+der Besitzer und nimmt die wartende Nachricht entgegen. Nur wird die Ausgabe eines Untertitel-Hakens
+nirgends eingespielt: Sie fällt auf den Boden. Und das Auffangnetz, das genau diesen Fall abfangen
+soll, liest nur, was noch WARTET — das Annehmen hatte die Nachricht da schon aus der Warteschlange
+genommen. Beide Schichten schwiegen.
+
+**Lehre:** Wo ein Mechanismus »wer bin ich« aus einer geerbten Kennung beantwortet, beantwortet er
+sie für zwei verschiedene Läufer gleich — und der falsche gewinnt, sobald er zuerst zieht. Die
+Unterscheidung muss aus etwas kommen, das der Untertitel nicht erbt; hier ist es der Pfad seines
+eigenen Protokolls. **Zweite Lehre:** Ein Zustellweg, der ANNIMMT und dann zustellt, verliert jede
+Nachricht, deren Zustellung scheitert. Zustellen und danach abbuchen kostet einen Zwischenzustand
+und macht jeden verlorenen Versuch zu einem Wiederholungsversuch.
+
+**Und die unbequeme Hälfte:** Diese Sitzung hat den Verlust selbst verursacht — mit genau der
+Delegation, die die Betriebsanweisung fordert. Je mehr delegiert wird, desto breiter das Fenster.
+Das ist kein Argument gegen Delegation, sondern eines dafür, dass ein Verlust auf dem Weg zum
+Nutzer sich MELDEN muss, statt sich auf ein Netz zu verlassen, das ihn nicht sehen kann.
+
+### 3.171 Dieselbe Klasse, zweimal an einem Tag — und der Punkt lag schon im Auftragsbuch
+
+Am 24.08.2026, wenige Stunden nachdem Punkt 873 die Divergenz zwischen Vorschau und Tor
+aufgeschrieben hatte, lief die Nachfolgesitzung ungebremst hinein: `guard-preflight` meldete den
+Mechanismus-Wächter als blockierend, die Sitzung nahm das für eine Forderung, plante 64
+Gegenlese-Pässe über 13,8 M Zeichen und arbeitete elf davon ab — bis sie beim Anhängen neuer Punkte
+über den Text von 873 stolperte und das Tor selbst befragte. Das Tor urteilte »Lesbarkeitslücke«
+und ließ den Zug durch; verlangt hatte niemand etwas.
+
+Bemerkenswert ist nicht der Fehler der Vorschau, der stand schon geschrieben. Bemerkenswert ist,
+dass ein gemessener, im Auftragsbuch stehender Befund eine Sitzung nicht erreicht, weil er dort
+steht, wo sie nicht liest: 273 offene Punkte tief. **Lehre:** Ein Befund über ein WERKZEUG, das
+jede Sitzung benutzt, gehört an das Werkzeug — als Warnzeile in seiner eigenen Ausgabe —, nicht
+allein in die Warteschlange. Solange 873 offen ist, muss `guard-preflight` in der betroffenen Zeile
+selbst sagen, dass sie mit dem Tor uneins sein kann und wie man das Tor fragt.
+
+**Zweite Lehre, gegen die erste gehalten:** Die elf Pässe waren keine verlorene Zeit — sie fanden
+zehn belegte Defekte, die als Punkte 875–884 im Auftragsbuch stehen. Einer davon, Punkt 880, zählt
+allein fünf Wege auf, eine Vier-Augen-Pflicht ohne zweite Augen zu erfüllen; ein anderer, Punkt 879,
+einen Zaun, den eine Sitzung ohne Sperre umgeht. Unverlangte Arbeit ist nicht automatisch
+wertlose Arbeit. Aber sie war unverlangt, und das entscheidet die nächste Sitzung nur dann richtig,
+wenn das Werkzeug es ihr sagt.
+
+### 3.147 Der Wächter urteilte richtig und gab falsch Auskunft — gefragt wird nur die Auskunft
+
+Am frühen 21.08.2026 meldete die Wächter-Vorschau `mechanism-review-guard` als merge-blockierend.
+Die naheliegende Rückfrage — `node scripts/mechanism-review-guard.mjs --status` — antwortete nicht
+mit dem Grund, sondern mit »stands down: another live session owns the batch lock«, und zwar
+gegenüber genau der Sitzung, die den Lock nachweislich hielt: Das Sperrfile nannte ihre Id und
+ihren lebenden Prozess. Gemessen betraf das nicht einen Wächter, sondern fünf; die übrigen
+Status-Leser antworteten normal, die Menge ist also keine pauschale.
+
+Entscheidend ist die Aufteilung: Derselbe Mechanismus hat einen DURCHSETZENDEN Pfad, den der Hook
+aufruft, und einen LESENDEN Pfad, den ein Mensch aufruft. Der durchsetzende Pfad bekommt die
+Sitzungs-Id gereicht und urteilt korrekt — deshalb fällt nichts auf, solange man nur zusieht. Der
+lesende Pfad löst dieselbe Frage selbst auf, greift ins Leere und schließt aus der leeren Id auf
+einen fremden Eigner. Die Wirkung ist tückischer als ein kaputter Wächter: Die Durchsetzung bleibt
+richtig, nur die Begründung ist unerreichbar. Wer nachfragt, warum er blockiert wird, bekommt eine
+Antwort, die zu seiner Lage nicht passt — und die einzige Stelle, an der ein Mensch überhaupt
+nachfragt, ist die falsche.
+
+**Lehre:** Der Lesepfad eines Durchsetzers ist Teil des Durchsetzers, nicht sein Beiwerk. Er muss
+seine Eingaben aus derselben Quelle nehmen wie der Hook-Pfad, und ein Wert, den er ehrlich nicht
+bestimmen kann, wird als *unbekannt* gemeldet, nie als eine fremde Zuständigkeit. Prüffrage:
+*Sagt `--status` derselben Sitzung dasselbe wie der Hook, der sie gerade gebremst hat?* Und weil
+die Aufteilung baulich ist und nicht namentlich, zählt die Prüfung nicht die bekannten Namen auf,
+sondern zählt alle Wächter mit Status-Pfad auf und misst jeden.
+
+### 3.148 Die Messung nahm sich selbst die Maschine weg — und wertete das Ergebnis als Befund
+
+In der Nacht auf den 21.08.2026 lehnte das Push-Tor einen Push ab, weil die Unit-Schicht zweimal
+rot lief. Sein eigener Text nannte den Sachverhalt bereits richtig: 357 Dateien, 12320 Tests, KEIN
+benannter fehlschlagender Test, dazu ein Runner, der ohne Zusammenfassung ausstieg — die Signatur
+eines Laufs, der nicht fertig wurde. Daneben gemessen: Last 11, kurz darauf 18, weil im selben
+Moment ein beauftragter Autoren-Agent im isolierten Arbeitsbaum seine eigenen drei Tore fuhr. Der
+Beweis kam eine halbe Stunde später von allein: Derselbe Stand lief grün, sobald die Maschine frei
+war, und der Agent meldete für seine eigene Arbeit 12.329 grüne Tests.
+
+Die Klasse ist die Prüfung, die mit dem konkurriert, was sie prüft. Sie ist nicht falsch
+programmiert — sie ist bloß nicht allein auf der Maschine, und ihr Ergebnis misst ab einer
+gewissen Last die Belegung statt das Produkt. Verschärfend kommt zweierlei hinzu: Der
+Wiederholungslauf, der die Verwechslung ausschließen soll, läuft unter derselben Last und schließt
+deshalb nichts aus; und die Regel, die es gäbe — rotierende Fehlschläge nur auf ruhiger Maschine
+beurteilen — wird erst NACH dem teuren Lauf herangezogen, wo sie nichts mehr retten kann. Der
+Schaden ist nicht das falsche Rot, sondern seine Folge: Fertige, geprüfte Buchhaltung bleibt
+ungepusht liegen, also genau der Zustand, den die Push-nach-jedem-Commit-Regel verhindern soll.
+
+**Lehre:** Wer eine Messung als Tor benutzt, muss ihre Gültigkeitsbedingung mitmessen — und zwar
+BEVOR er sie startet, nicht als Erklärung hinterher. Prüffrage: *Kann dieses Ergebnis unter den
+gerade herrschenden Bedingungen überhaupt etwas beweisen?* Wo es das nicht kann, ist die ehrliche
+Antwort **nicht beurteilt** und ein späterer Lauf — nicht **rot**. Und die Unterscheidung gehört in
+die Entscheidung des Mechanismus, nicht nur in seinen Meldetext: Ein Tor, das den Unterschied
+zwischen »Test fehlgeschlagen« und »Lauf nicht fertig geworden« bereits in Worten benennt, aber
+beide gleich behandelt, weiß mehr, als es tut.
+
+### 3.149 Zwei Leser, ein Datensatz, zwei Antworten — und der dritte fragte gar nicht
+
+Am 21.08.2026 beanspruchte das Fenster des Nutzers den Stapel um 07:46 und verlor ihn trotzdem.
+Der Launcher respektierte den Anspruch zweimal und protokollierte das auch — »skip: session … has
+CLAIMED the batch 9 min ago (reserved)«, dann dieselbe Zeile bei 24 Minuten. Bei 39 Minuten
+verschwand der Anspruch aus seiner Begründung, und fünf Minuten später übergab der Eigner regulär:
+Der Launcher startete eine frische Sitzung, statt den freien Lock für das anspruchsberechtigte
+Fenster zu halten.
+
+Die Klasse hat zwei Hälften, und die zweite ist die lehrreichere. Die sichtbare Hälfte ist der
+dritte Pfad: Übergabe, Lease-Ablauf und Boundary entscheiden dieselbe Frage, aber nur zwei von
+ihnen fragen den Anspruch überhaupt. Die unsichtbare Hälfte liegt eine Ebene tiefer — die
+gemeinsame Entscheidungsfunktion hält ihre Uhr an, solange ein lebender Eigner hält, aber diesen
+Eingang leiten nur zwei der drei Aufrufstellen ab. Die dritte übergibt ihn nicht und bekommt den
+Vorgabewert, also läuft für sie jeder Anspruch nach dreißig Minuten ab, während das
+Auskunftskommando denselben Datensatz weiter für gültig erklärt. Der Kommentar über genau dieser
+Prädikatsfunktion warnt wörtlich davor, dass zwei Leser über einen Zustand uneins werden — und die
+Aufrufstelle, die abdriftete, ist die, die den Lock in derselben Sekunde in der Hand hält.
+
+**Lehre:** Eine reine Entscheidungsfunktion vereinheitlicht nichts, solange ihre Eingänge an jeder
+Aufrufstelle einzeln zusammengebaut werden. Wer eine gemeinsame Regel wirklich will, macht den
+Eingang zur Pflicht oder leitet ihn in der Funktion selbst ab; ein Vorgabewert, der »nein« bedeutet,
+verwandelt eine vergessene Übergabe in eine stille, gegenteilige Entscheidung. Prüffrage bei jedem
+geteilten Mechanismus: *Wie viele Stellen rufen ihn auf, und beantworten sie alle dieselbe Frage
+gleich?* Der Vergleich der Antworten ist billig — hier hätte ein Aufruf des Auskunftskommandos
+neben dem Launcher-Protokoll den Widerspruch sofort gezeigt.
+
+### 3.150 Sichtbar wird die verwaiste Arbeit nur durch den, der sie nicht mehr sichtbar machen kann
+
+Am 21.08.2026 fand die aufnehmende Sitzung zwei Zweige mit fertiger, gepushter Arbeit: einer meldete
+im eigenen Commit drei grüne Tore, der andere trug eine aufgezeichnete Gegenlesung. Beide waren
+weniger als eine Stunde alt, und auf beide zeigte nichts. Die Sitzung, die sie gebaut hatte, war ohne
+Punktgrenze und ohne In-Flight-Erklärung gestorben; die Auskunft über laufende Arbeit antwortete
+folgerichtig »nichts erklärt«. Gefunden wurden die Zweige, weil beim Prüfen auf einen halb fertigen
+Merge von Hand die Arbeitsbäume aufgelistet wurden — also durch einen Nebeneffekt, nicht durch einen
+Mechanismus.
+
+Die Klasse ist nicht »es fehlt ein Mechanismus«, denn der Mechanismus existiert: Die Parkliste macht
+genau solche Zweige sichtbar, mit Begründung und außerhalb der Platzzählung. Sie wird nur von Hand
+gefüllt — und zwar von der Sitzung, die den Zweig verlässt. Damit hängt der Rettungsschritt an
+demjenigen, der ihn im gemessenen Fall per Definition nicht mehr tun kann: Wer sauber übergibt,
+braucht die Parkliste nicht, weil die Übergabe die Arbeit ohnehin weiterreicht; wer unsauber endet,
+kommt nicht mehr dazu. Der Mechanismus deckt genau die Fälle ab, in denen er entbehrlich ist.
+
+**Lehre:** Ein Aufräumschritt, den nur die scheidende Partei ausführen kann, ist keine Absicherung
+gegen ihr Verschwinden — er ist eine Höflichkeit für den geordneten Fall. Prüffrage bei jedem
+Sicherungsnetz: *Wer muss handeln, damit es greift — und ist das ausgerechnet der, dessen Ausfall es
+abfangen soll?* Wo die Antwort ja lautet, muss die Absicherung aus dem Zustand selbst ablesbar sein
+(hier: aus den Refs), nicht aus einer gepflegten Liste.
+
+### 3.151 Der Stillstand, den nie jemand gemessen hat
+
+Am 21.08.2026 wurde zum ersten Mal gefragt, wie viel Zeit der Stapel eigentlich mit nichts verbringt.
+Die Antwort war, dass es keine Antwort gibt: Über vier Tage nahm `main` 588 Commits an, dazwischen
+liegen 65 Lücken von zwanzig Minuten und mehr, zusammen 48,8 von rund 96 Stunden — und nichts im
+Projekt kann sagen, welche dieser Stunden Arbeit waren (eine Browser-Suite, ein delegierter Autor,
+eine lange Prüfung) und welche Leerlauf. Das Startprotokoll unterscheidet nur seine eigenen
+Übersprung-Gründe, und der Punkt, der die Übergabe misst, misst die Übergabe, nicht den Stillstand.
+
+Bemerkenswert ist, was passierte, als EINE Lücke von Hand aufgeschlüsselt wurde. Sie war reiner
+Stillstand: 59 Minuten, in denen niemand am Stapel arbeitete, weil eine Sitzung im CI-Warten starb
+und der Starter ihren Nachfolger nicht startete — ein seit zwei Tagen untätiges Editor-Fenster galt
+ihm als lebender Schreiber und blockierte jeden Start, vor jeder anderen Regel und auch vor einer
+ausdrücklichen Übergabe. Der Starter SAH es und protokollierte es sogar als Eskalation, hatte aber
+keine Handlung dahinter, sondern übersprang erneut. Und die blinde Zweitlesung fand eine dritte,
+größere Ursache, nach der niemand gesucht hatte: Die Übergabe reist überhaupt nur im
+Viertelstundentakt des Schedulers — ein sauberes Punktende startet keinen Nachfolger, es wartet auf
+den nächsten Tick. Der gemessene Ausfall war also nicht die Ausnahme, sondern der sichtbar gewordene
+Teil eines Regelfalls.
+
+**Lehren:** Ein System, das seine eigene Untätigkeit nicht messen kann, optimiert zwangsläufig das,
+was es messen kann — hier die Kosten je Übergabe, während daneben Stunden verschwanden, die niemand
+je aufaddiert hatte. Die erste Lieferung eines solchen Punktes ist deshalb die MESSUNG, nicht der
+Hebel: Wer zuerst repariert, repariert die zwei Vorfälle, die jemand zufällig bemerkt hat. Und eine
+Zuordnung, die alles erklärt, ist die eigentliche Gefahr — nicht zuordenbare Zeit muss als solche
+ausgewiesen werden und ihr Anteil ist selbst ein Ergebnis. Dass ausgerechnet die größte Ursache erst
+der blinden Zweitlesung auffiel, ist der Beleg dafür, wozu das geteilte Verfahren da ist (§3.19).
+
+### 3.152 Die Regel griff nur nach vorn — der Bestand, den sie meinte, blieb liegen
+
+Am 20.08.2026 wurde ein Tor gebaut, das jeden maschinell abgelegten Punkt hinter den Release-Punkt
+einreiht, sofern er nicht hoch dringlich ist. Es funktionierte: In den achtzehn Stunden danach
+rückten von neunzehn gerankten Punkten genau zwei nach vorn, und der Vorderblock schrumpfte. Am
+21.08.2026 fragte der Nutzer trotzdem, warum wieder so viele neue Tickets vor der
+Kommunikationsmechanik stünden — und die Messung gab ihm scheinbar unrecht und in der Sache recht.
+Vor der Mechanik standen 34 Punkte, aber 32 davon trugen überhaupt keinen Rang-Eintrag. Sie hatten
+dort gestanden, bevor das Tor existierte, und niemand hatte je zurückgegriffen.
+
+Die erste Antwort auf seine Frage war zusätzlich falsch: Sie behauptete, das Tor schütze die
+Kommunikationsmechanik nicht, weil es nur die Grenze am Release-Punkt kenne. Der Nutzer stellte das
+richtig — die Mechanik steht auf den Positionen 34 bis 41, der Release-Punkt auf 49, also heißt
+»hinter den Release« bereits »hinter die Mechanik«. Die Diagnose hatte einen Mechanismus-Umbau
+vorgeschlagen, wo eine einmalige Nachräumung fällig war.
+
+**Lehren:** Eine Regel, die den Zugang regelt, sagt nichts über den Bestand, der vor ihr da war —
+und weil sie ab ihrem Inkrafttreten sauber arbeitet, sieht die Statistik gut aus, während der
+Zustand, den sie herstellen sollte, unverändert bleibt. Wer ein solches Tor baut, schuldet im selben
+Zug die Frage, was mit dem Altbestand geschieht: nachräumen, oder ausdrücklich stehen lassen und das
+schreiben. Und die Diagnose eines Fehlers, den ein Nutzer meldet, gehört gegen die tatsächliche
+Reihenfolge geprüft, bevor sie einen Umbau vorschlägt — die Zahlen lagen vor, die Positionen waren
+mit einem Befehl abfragbar, und die Fehldiagnose kostete einen ganzen Zug plus die Korrektur eines
+bereits festgehaltenen Befundes.
+
+### 3.153 Das Tor verlangte eine Freigabe, die unsere eigenen Werkzeuge nicht ausstellen können
+
+Am 21.08.2026 wurde Punkt 769 gelandet — der Zeitstempel-Wächter, der eine Zwischenzeile beurteilte
+und einen Stempel forderte, der längst dastand. Vier Review-Runden mit GPT-5.6 Sol endeten auf
+`merge` ohne Befund. Danach wies das Kritikalitäts-Gate den Zugausgang ab: »no second model has
+cleared it«, unter Nennung einer Runde, deren Befunde alle beantwortet waren.
+
+Die Ursache ist eine Formfrage mit voller Wirkung. `passShape()` verlangte `pass.total >= 2`. Ein
+Review-Record mit `pass 1/1` fiel damit in keinen der beiden Freigabe-Töpfe — weder in den für
+ungescopte Reviews noch in die Kompositionen —, und `review-sol.mjs` stellt genau `1/1` aus, sobald
+ein `--since` den Bereich auf eine passende Runde verengt. Das Gate lehnte also den Normalfall
+seiner eigenen Werkzeugkette strukturell ab, und das Mechanismus-Gate akzeptierte dieselben Records.
+Das ist dieselbe Klasse wie der Defekt, den 769 gerade entfernt hatte: ein Wächter, der einen
+erfundenen Fehler an den Zugausgang schreibt und Arbeit verlangt, die schon getan ist.
+
+Der naheliegende Einzeiler — die Untergrenze auf 1 — wurde gebaut, getestet und Sol ausdrücklich
+feindselig vorgelegt, mit offengelegtem Eigeninteresse: Er entsperrte den eigenen Zug. Sol lehnte
+ab, und zu Recht. Die Vollständigkeitsschleife prüft nur Pass-INDIZES und vergleicht nie die
+gelesenen Dateien mit denen, die der Punkt geändert hat; ein `1/1`-Record hätte damit einen Punkt
+freigegeben, dessen übrige Dateien niemand gelesen hat. Die Änderung wurde zurückgenommen.
+
+Darunter liegt die zweite Hälfte: Ein Punkt, an dem BEIDE Anbieter geschrieben haben, bekommt
+überhaupt keinen ungescopten sauberen Record. Auf die Bitte um eine Gesamtrunde über 769 zerlegte
+`review-sol` den Bereich nach Autorschaft in dreizehn Pässe über zwei Anbieter und erklärte einen
+davon für UNREVIEWABLE. Für einen solchen Punkt ist die Bedingung des Gates mit ehrlichen Mitteln
+nicht erfüllbar — 769 steht gemergt und abgehakt da, während sein Gate weiter ablehnt.
+
+**Lehren:** Ein Tor muss gegen die Form geprüft werden, die die eigenen Werkzeuge tatsächlich
+ausstellen, sonst verlangt es einen Nachweis, den niemand erbringen kann — und die Prüfung gehört an
+den Tag der Inbetriebnahme, nicht an den ersten Zug, den es blockiert. Zweitens: Wenn ein Gate den
+eigenen Zug sperrt, ist die Versuchung, es aufzuweiten, am größten und die Urteilskraft am
+kleinsten; der einzige verlässliche Umgang ist, das Eigeninteresse dem zweiten Modell offenzulegen
+und sein Nein zu nehmen. Drittens: Vier-Augen über einen Bereich, an dem beide Anbieter geschrieben
+haben, braucht eine ausdrücklich benannte Form — sonst entsteht eine Bedingung, die nur deshalb
+unerfüllbar ist, weil niemand sie je gegen diesen Fall gedacht hat.
+
+**Rückfall am 25.08.2026, durch eine andere Tür.** Dieselbe Klasse, dieselbe Stelle, ein neuer
+Grund: Das Kritikalitätstor misst inzwischen, ob die Freigabe wirklich jede geänderte Datei gelesen
+hat — und leitet den Dateisatz eines Punktes aus der Beauftragungszeile ab, die eine delegierte
+Autorenspur ins Prüfverzeichnis schreibt. Verfasst die dienende Sitzung den Punkt selbst, gibt es
+diese Zeile nicht. Der Dateisatz bleibt dann unmessbar, keine Freigabe kann ihn abdecken, und weil
+die Grundlinie erst vorrückt, wenn das Tor frei ist, blockiert ein einziger solcher Punkt jedes
+weitere Zugende — nicht nur seine eigene Landung. Gefunden an Punkt 893, der gemergt, abgehakt und
+über dreizehn Runden bis `merge` geprüft war; geräumt hat ihn nur eine frische Ganzbereichsrunde,
+die niemand gebraucht hätte. Die Lehre von damals steht unverändert und wurde ein zweites Mal
+verletzt: Ein Tor ist gegen die Formen zu prüfen, die im Betrieb tatsächlich entstehen — und dazu
+gehört der Punkt, den die Sitzung selbst schreibt, ebenso wie der delegierte. Gebucht als Punkt 903.
+
+### 3.120 Der Statussatz wurde angehängt, nicht aus dem gemessenen Zustand abgeleitet
+
+Die Punktgrenze stellt beim Übergeben fest, ob übertragbare Arbeit läuft — sie nennt den Zweig und
+den Commit sogar beim Namen. Im selben Ausdruck diktiert sie danach eine Tafel-Karte, die
+unbedingt mit »Hier läuft nichts weiter.« endet. Beide Sätze stammen aus einem Aufruf, und der
+zweite liest nicht, was der erste gerade gemessen hat. Am 21.08.2026 hat die Nachfolgesitzung
+genau das vorgefunden: Die veröffentlichte Tafel meldete Stillstand, während GPT-5.6 Sol an
+Punkt 809 weiterbaute.
+
+Die Klasse ist nicht »falscher Text«, sondern eine Ausgabe, die neben dem Zustand hergestellt wird
+statt aus ihm. Solange der Satz eine Konstante ist, kann keine Messung ihn widerlegen — er ist
+richtig, solange der häufigste Fall eintritt, und schweigend falsch im Rest. Das trifft
+ausgerechnet die Karte, die der Nutzer auf dem Handy liest, und sie wird unter dem Zeitdruck des
+Sitzungsendes wörtlich übernommen, also ohne die Ruhe, in der jemand den Widerspruch bemerkt.
+
+Die Prüfung dagegen ist billig und wurde nie gefordert: Ein diktierter Text wird mit BEIDEN
+Belegungen des Zustands erzeugt — mit laufender Arbeit und ohne — und beide Male gelesen. Wo eine
+Ausgabe zwei Fälle behaupten kann, aber nur einer je erzeugt wird, ist der zweite Fall nicht
+getestet, sondern nur noch nicht aufgefallen. Verwandt mit §3.19 (die zweite Lesung findet, was
+die erste nicht sehen konnte) und mit der Familie der diktierten Übergabe-Karte, die schon
+mehrfach an ihren eigenen Toren gescheitert ist.
+
+### 3.121 Zwei Autoren auf einem Zweig — und die Gegenlese fand nicht statt
+
+Punkt 809 ist am 21.08.2026 abgehakt worden, und das Kritikalitäts-Tor verweigerte danach jedes
+Zugende: Die Verdikt-Kartei hält für den Punkt genau einen Eintrag, die Beauftragung um 10:57Z,
+und kein Urteil. Eine Gegenlese hat es dabei nachweislich gegeben — die Punkte 810 und 815
+bezeichnen sich selbst als deren Ergebnis. Nur las sie die QUELLEN des Punktes, nicht den Zweig,
+der zusammengeführt wurde, und niemand hat sie als Urteil über den gelandeten Stand verzeichnet.
+
+Der Grund steht im Zweig selbst: Er hat ZWEI Autoren. GPT-5.6 Sol hat das meiste geschrieben,
+eine Claude-Sitzung einen Commit. Die Vier-Augen-Regel ist für einen Autor je Zweig gedacht — sie
+sagt, wer NICHT lesen darf, und lässt offen, wer bei geteilter Urheberschaft liest. Genau in
+dieser Lücke ist die Gegenlese nicht ausgefallen, sondern nie zugewiesen worden; das Tor hat den
+Fehler erst nach dem Abhaken bemerkt, also an der Stelle, an der er am teuersten ist.
+
+Die naheliegende Reparatur wäre gewesen, ein Urteil aus dem Vorhandenen zu buchen — es gab ja eine
+Lesung. Das wäre eine erfundene Quittung: Sie nennt weder den gelesenen Stand noch den Leser. Der
+Vorgang ist deshalb als eigener Punkt aktenkundig, nicht als Kartei-Eintrag.
+
+**Lehre:** Eine Regel, die Rollen über AUTORSCHAFT verteilt, muss den geteilten Zweig mitdenken —
+sonst hat sie für den häufigsten Mischfall gar keine Antwort, und die stille Antwort lautet
+»niemand«. Und ein Tor, das erst beim Abhaken prüft, prüft zu spät: Was die Landung verlangt,
+gehört an den Anfang des Punktes, nicht an sein Ende. Verwandt mit §3.119 (die Marke mahnt beim
+Aufhören statt beim Anfangen).
+
+### 3.154 Eine Frischemessung als Antwort auf eine Lebendigkeitsfrage
+
+Am 21.08.2026 um 17:40:28Z startete der Nachfolger, 34 Sekunden später meldete der Launcher zwei
+parallele Sitzungen, und zwei Sekunden danach pausierte der gesamte Stapel. Es lief genau eine
+Sitzung. Die zweite war der Vorgänger, der 37 Sekunden zuvor regulär übergeben hatte und dessen
+Prozess nachweislich tot war; der Batch-Doctor bestätigte Minuten später `parallelNow=1` und ein
+konsistentes Repository.
+
+Der Klassifikator stellt die richtige Frage — »fährt hier ein zweiter?« — und beantwortet sie mit
+einer anderen Größe: der Frische des letzten Werkzeugaufrufs. Das ist keine Ungenauigkeit am Rand,
+sondern ein Treffer per Konstruktion: Eine Übergabe besteht gerade darin, dass der Vorgänger seine
+letzte Handlung tut und geht, während der Nachfolger anfängt. Der Detektor feuert also am
+zuverlässigsten in dem Moment, in dem er am sichersten falsch liegt. Dass er es nicht nur einmal
+tat, steht im Protokoll: dieselbe Eskalation am 09., 13., 17., 18. und 19.08.2026, jedes Mal mit
+zehn bis zwanzig Minuten Stillstand als Preis. Die Ausnahmeliste des Klassifikators kannte die
+angemeldete Zweitsitzung bereits — der abgetretene Vorgänger gehört in dieselbe Klasse und fehlte.
+
+Zwei Dinge machen den Fall teuer statt bloß ärgerlich. Erstens eskaliert der Mechanismus mit der
+Wiederholung: Die fünfte unbeantwortete Meldung pausiert den Batch, und die Meldungen blieben
+unbeantwortet, weil niemand da war — die Eskalation ist an einen Menschen adressiert und feuert im
+unbeaufsichtigten Lauf. Zweitens hat der Mechanismus einen gebauten Ausweg, der auch stimmte: Der
+Doctor ist der vorgesehene Weg, den Alarm zu beantworten, und er tat es in einem einzigen Aufruf.
+Der Stillstand entstand nicht, weil die Prüfung fehlte, sondern weil niemand sie aufrief.
+
+**Lehre:** Wer eine Zustandsfrage stellt, muss den Zustand messen und nicht seine Spur. Eine
+Aktivitätsspur sagt, dass etwas geschehen IST, nie dass etwas noch geschieht — und die
+Verwechslung ist genau dort am wahrscheinlichsten, wo ein Übergang stattfindet. Prüffrage bei
+jedem Detektor: *Welchen Zustand behaupte ich, und wäre meine Messung auch dann noch wahr, wenn
+der Zustand gerade endet?* Und für jede Eskalation, die einen Menschen adressiert: *Was passiert,
+wenn niemand liest?* Verwandt mit §3.149 (zwei Leser, ein Datensatz, zwei Antworten).
+
+
+### 3.155 Die Übergabe trug den Zustand, aber nicht das Leben
+
+Am 21.08.2026 gegen 20:05 nahm eine frische Sitzung den Stapel auf. Die Vorgängerin war tot, und
+ihre Übergabe hatte funktioniert — jedenfalls die Hälfte, die aus Daten besteht: Die In-Flight-
+Deklaration zum laufenden Autorenlauf war sauber transferiert, der Nachfolger konnte sie
+übernehmen, und sie benannte Zweig, Arbeitsbaum, Protokoll und Prozess. Nur lief der Prozess
+nicht mehr. Er war ein Kind der gestorbenen Sitzung und mit ihr gefallen.
+
+Die Deklaration behauptete das Gegenteil, und sie hatte sogar einen Beleg dafür: Der als Nachweis
+geführte Prozess antwortete auf `kill -0`. Er war der kurzlebige Shell-Mantel um den Autorenlauf,
+nicht der Autorenlauf selbst — ein Prozess, der nur langsamer starb als sein Kind. Damit ist das
+dieselbe Wurzel wie in §3.154, eine Ebene tiefer: Dort beantwortete eine Frischemessung die Frage
+nach dem Leben einer Sitzung, hier beantwortet ein Mantelprozess die Frage nach dem Leben der
+delegierten ARBEIT. Ein Lebendnachweis ist nur so viel wert wie die Genauigkeit dessen, worauf er
+zeigt.
+
+Die zweite Hälfte des Schadens ist die lehrreichere, weil sie zeigt, wie zwei je für sich richtige
+Regeln zusammen eine Sackgasse bauen. Im Arbeitsbaum lagen zehn geänderte und zwei neue Dateien,
+unversioniert — die angefangene Arbeit des Autors im Moment seines Todes. Das Runbook sagt, nicht
+gepushte Arbeit werde zuerst gedraint; erzwungen wird das nirgends, denn ein Drain geschieht nur
+auf dem geordneten Weg, und genau den nimmt ein unerwarteter Tod nicht. Zugleich weigert sich der
+Autorenstart zu Recht, auf einem schmutzigen Baum anzufangen: Sonst ließe sich neu Geschriebenes
+nicht von Vorgefundenem unterscheiden. Ergebnis: Die geretteten Reste blockierten genau die
+Fortsetzung, zu der sie gehörten. Auflösen ließ sich das nur von Hand, mit einem Rettungs-Commit,
+der die Arbeit ungeprüft und CI-übersprungen sichert und dem Autor zugeschrieben bleibt.
+
+Am selben Abend fiel ein zweiter Mechanismus in dieselbe Kerbe wie §3.140: Das Kritikalitätstor
+nennt in seinem eigenen Verweigerungstext einen zweiten Ausweg — jeden Befund als offenen Punkt
+anlegen und eine Quittung anhängen —, und für diese Quittung existiert kein Befehl. Sie musste als
+JSON-Zeile von Hand in das Register geschrieben werden, samt der Bedingungen, die nur im Quelltext
+stehen. Dass eine falsch getroffene Quittung stillschweigend ignoriert wird, macht den Handweg
+zusätzlich gefährlich.
+
+**Lehre:** Eine Übergabe ist erst vollständig, wenn sie neben dem Zustand auch das Schicksal der
+laufenden Arbeit regelt — überlebt sie, wird sie nachweisbar am richtigen Prozess gemessen; stirbt
+sie, wird ihr Rest gesichert statt liegengelassen. Prüffragen: *Zeigt mein Lebendnachweis auf den
+Prozess, der die Arbeit tut, oder auf seine Hülle?* Und: *Was passiert mit dem, was halbfertig im
+Baum liegt, wenn niemand mehr den geordneten Weg geht?* Wo zwei Regeln einander sperren — hier
+»nicht ungeprüft committen« gegen »nicht auf schmutzigem Baum starten« —, braucht die Kreuzung
+einen eigenen benannten Weg, sonst wird sie jedes Mal von Hand aufgelöst. Verwandt mit §3.154
+(Frische statt Leben) und §3.140 (die nur behauptete Ausnahme).
+
+### 3.156 Ein Mechanismus, der weiter greift als seine Regel, entscheidet mit
+
+Beim Kürzen der Bauordnung (Punkt 768) trug ein Vier-Augen-Lauf 56 gezählte Einträge zusammen,
+und genau einer davon wurde bewusst nicht ausgeführt: der Vorschlag, den Satz über das Handeln
+nach gefestigtem Urteil aus §6 zu streichen. Der Grund war kein inhaltlicher. Zwölf Dateien tragen
+einen Stempel der Modell-Regel, und die Signatur dafür beginnt bei der Modell-Regel und läuft bis
+zur nächsten LEERZEILE — in einem Abschnitt, dessen Aufzählungspunkte ohne Leerzeile aufeinander
+folgen, sind das sechs weitere Regeln. Wer eine davon anfasst, macht zwölf Dateien schal, obwohl
+sich die gestempelte Regel nicht geändert hat. Der Schnitt hat sich davor gebeugt und den Eintrag
+liegen lassen.
+
+Das ist die eigentliche Beobachtung: Der Mechanismus hat nicht bloß gestört, er hat mitentschieden.
+Eine Absicherung, deren Reichweite größer ist als die Regel, die sie absichert, verteuert jede
+Änderung in ihrem Schatten — und zwar unsichtbar, denn niemand schreibt auf, was er wegen einer
+Signatur NICHT getan hat. Die Kosten fallen nicht dort an, wo der Mechanismus gebaut wurde, sondern
+irgendwann später, in einer Entscheidung, die leiser ausfällt als sie sollte. Nach demselben Muster
+lief am selben Tag der Prüfstand der Warteschlangen-Kalibrierung rot: Er misst die Historie des
+Auslieferungszweigs, auf einem Feature-Zweig existiert diese Referenz gar nicht, und die Suite
+starb an der Umgebung statt am Code — auch das eine Reichweite, die niemand gemeint hatte.
+
+**Lehre:** Eine Signatur, ein Budget, ein Wächter braucht eine Reichweite, die genau die Regel
+deckt, die er nennt — nicht die Textumgebung, in der die Regel zufällig steht. Prüffragen: *Wo
+genau endet das, was mein Mechanismus als „seine" Stelle betrachtet — und habe ich dieses Ende
+selbst gesetzt oder von einer Formatierung geerbt?* Und: *Welche Änderung wird durch ihn teurer,
+obwohl sie ihn nichts angeht?* Wo ein Eintrag einer Analyse nur wegen des Mechanismus liegen
+bleibt, ist nicht der Eintrag das Ergebnis, sondern der Mechanismus der Befund — er gehört als
+eigener Punkt aufgeschrieben, sonst entscheidet er beim nächsten Mal wieder mit. Verwandt mit
+§3.134 (die behauptete, nie geprüfte Wächterdeckung) und §3.140 (die nur behauptete Ausnahme).
+
+### 3.157 Das Etikett war der einzige Beweis — und es log
+
+Die Architektur-Vorlage für die dauerhafte Autorenspur entstand am 13.08.2026 aus zwei blind
+geschriebenen Hälften. Hälfte A trägt in ihrer eigenen ersten Zeile »Proposal A — Fable 5«, und
+die Sitzung wiederholte beim Übergeben an die Zusammenführung »written blind by Fable 5«. Beides
+ist falsch. Die Sitzungsaufzeichnung hält für jede Nachricht fest, welches Modell sie erzeugt hat,
+und der Werkzeugaufruf, der Hälfte A schrieb, kam von `claude-opus-5`. Die Sitzung lief an dem Tag
+auf zwei Modellen und wechselte genau einmal, um 12:49:10Z; die Blindstufe beginnt um 15:33:16Z,
+zwei Stunden und vierundvierzig Minuten nach Fables letzter Nachricht. Delegiert war auch nichts:
+Die Aufzeichnung enthält keinen einzigen Nebenstrang.
+
+Das Etikett stand fünf Tage und wurde in der Vorlage wiederholt. Am 22.08.2026 hat diese Sitzung
+es dann geglaubt, die *richtige* Verfasserangabe der Vorlage auf seine Grundlage umgeschrieben,
+daraus die Erlaubnis abgeleitet, selbst zusammenzuführen — und genau das getan und aufgezeichnet.
+Aufgefallen ist es nur, weil die Gegenlese sich weigerte, ein Etikett als Beweis zu nehmen, und
+nach Metadaten fragte. Vier Commits des Zweigs sind diese Korrektur und ihre Rücknahme.
+
+Die verallgemeinerbare Beobachtung: *Woran hängt eine Erlaubnis, und wer stellt die Angabe aus,
+von der sie abhängt?* Hier entscheidet die Verfasserschaft, wer eine Vier-Augen-Vorlage
+zusammenführen darf — und die Werkzeuge nehmen die Antwort aus einem Feld, das die geprüfte Partei
+selbst schreibt. Eine selbst behauptete Angabe ist genau so vertrauenswürdig wie derjenige, der von
+ihr profitiert. Zwei Lehren folgen daraus, und die zweite ist die unbequemere. Erstens: Wo eine
+Angabe eine Erlaubnis trägt, muss sie gegen eine Quelle prüfbar sein, die der Begünstigte nicht
+schreibt — hier die Modell-Metadaten der Nachrichten, und zwar pro Nachricht, denn ein
+Modellwechsel innerhalb einer Sitzung macht die Antwort auf Sitzungsebene wertlos. Zweitens: Die
+strukturellen Prüfungen, die wir im selben Zug gebaut haben — jede Kennung genau einmal verbucht,
+beide Darstellungen der Vorlage identisch — waren grün, während die Vorlage inhaltlich unvollständig
+war und die Verfasserangabe falsch. Eine Zählung beweist, dass nichts verschwunden ist, nicht dass
+etwas stimmt. Verwandt mit §3.153 (die Freigabe, die unsere Werkzeuge nicht ausstellen können) und
+§3.140 (die nur behauptete Ausnahme).
+
+
+### 3.158 Der Wächter hatte die Antwort schon gegeben — und fragte sich nicht
+
+Am 22.08.2026 um 18:23 nannte `.claude/parallel-alert.json` die Sitzung 60142e49 als zweite
+Batch-Sitzung. Sie war die interaktive Chat-Sitzung des Nutzers, und derselbe Singleton hatte ihr
+im selben Zeitraum ausdrücklich STAND DOWN bescheinigt: kein Batch-Arbeiter, beantwortet nur den
+Nutzer. Fünf eskalierende Meldungen blieben unbeantwortet, um 18:23 pausierte der Stapel sich
+selbst, und erst eine Diagnose von Hand hob die Pause um 18:37 wieder auf.
+
+Der Fall sieht aus wie §3.154 und ist ein anderer. Dort maß der Detektor eine Spur statt eines
+Zustands, und die Lehre lautete, den Zustand zu messen. Hier ist die Zustandsmessung richtig: Die
+Chat-Sitzung lebt, ihr Prozess läuft, ihre Werkzeugaufrufe sind echt und frisch. Falsch ist die
+EIGENSCHAFT. Gefragt war »fährt hier ein zweiter am Batch?«, gemessen wurde »ist hier eine zweite
+Sitzung wach?«. Wer den Fix von §3.154 einbaut — tote Prozesse und abgetretene Vorgänger auslassen
+—, fängt diesen Fall nicht: An dieser Sitzung ist nichts tot.
+
+Das Unangenehme liegt eine Ebene darüber. Der Mechanismus hatte die richtige Antwort bereits
+ausgesprochen. Der Stand-down ist eine Entscheidung des Singletons selbst, über genau diese
+Sitzung, im selben Zeitraum, und sie lautet: »du fährst den Batch nicht«. Zwei Teile desselben
+Wächters urteilten damit gegenläufig über dieselbe Sitzung, und keiner las den anderen. Die
+Ausnahmeliste des Klassifikators, die es längst gibt, hätte den Eintrag nur entgegennehmen müssen.
+Solange das nicht geschieht, ist der Alarm reproduzierbar: Er feuert jedes Mal, wenn der Nutzer
+zusieht und dabei schreibt — also genau dann, wenn ein pausierter Stapel am meisten kostet.
+
+**Lehre:** Bevor ein Detektor eine Eigenschaft schätzt, gehört die Frage gestellt, ob das System
+sie an anderer Stelle schon ENTSCHIEDEN hat. Eine geschätzte Antwort neben einer vorhandenen
+entschiedenen ist keine zweite Meinung, sondern ein Widerspruch mit Alarmrecht. Prüffragen:
+*Welche Eigenschaft brauche ich wirklich — messe ich sie, oder nur eine, die meistens mit ihr
+zusammenfällt?* Und: *Hat mein eigener Mechanismus über diesen Fall schon geurteilt?* Verwandt mit
+§3.154 (die Frischemessung auf eine Lebendigkeitsfrage) und §3.149 (zwei Leser, ein Datensatz,
+zwei Antworten).
+
+### 3.159 Das grüne Tor stand über einer Datei, die gar nicht mehr lud
+
+Am 22.08.2026 holte `scripts/batch-autostart.mjs` eine Funktion aus einem Modul, das sie nicht
+exportiert. Node weist so etwas beim VERLINKEN ab, vor der ersten ausgeführten Zeile: Der
+Launcher — der 900-Sekunden-Wiederanlauf, das Einzige, was einen toten Stapel neu startet — wäre
+mit einem Syntaxfehler gestorben, sobald der nächste Tick ihn aufgerufen hätte. Alle 12.859
+Unit-Fälle blieben grün, Lint blieb grün, das Landungs-Gate blieb grün.
+
+Der Grund ist kein übersehener Testfall, sondern ein Unterschied zwischen zwei Ladewegen. Vitest
+lädt Module über die SSR-Transformation von Vite; dort wird ein benannter Import, den das Ziel
+nicht hergibt, still zu `undefined`. Node verweigert denselben Import. Das Tor maß also
+zuverlässig — nur eben eine andere Umgebung als die, in der die Datei läuft. Es gab sogar einen
+Test, der genau diese Datei importierte, und er war grün, weil er unter derselben Transformation
+lief wie alles andere.
+
+Diese Klasse ist tückischer als eine Lücke in der Abdeckung, denn sie schweigt nicht, sie
+BESTÄTIGT. Eine unbetestete Datei sieht man in der Abdeckung; eine Datei, deren Test unter einem
+milderen Lader grün wird, sieht aus wie geprüft. Betroffen ist alles, was das Produktionssystem
+anders lädt als der Prüfstand: Auflösung von Modulen, Bedingungen im `exports`-Feld, native
+Erweiterungen, Umgebungsvariablen zur Ladezeit.
+
+Der Zeuge dafür war selbst nicht leicht zu bauen, und das gehört zur Lehre. Die erste Fassung
+importierte den echten Launcher in einem Kindprozess und verließ sich darauf, dass dessen eigene
+CLI-Wache die Nebenwirkungen abfängt — ein Test, der bei einer Regression dieser Wache eine echte
+Batch-Sitzung gestartet hätte. Erst die Fassung, die den Prüfling gar nicht lädt, sondern seine
+Import-Anweisungen nachbildet und nur deren Ziele verlinkt, ist gefahrlos. Vier
+Gegenlesungs-Runden brauchte es dorthin, jede mit einem echten Befund; drei Restlücken des
+Scanners stehen als eigener Punkt im Arbeitsauftrag statt als offene Verweigerung.
+
+**Lehre:** Ein grüner Prüfstand beweist nur, was der Prüfstand lädt. Wo Produktion und Prüfstand
+verschiedene Lader haben, braucht die Produktionsumgebung einen eigenen, kleinen Zeugen — und der
+Zeuge darf seine Sicherheit nicht von dem Mechanismus borgen, den er prüft. Prüffragen: *Lädt
+mein Test die Datei so, wie sie im Betrieb geladen wird?* Und: *Wenn das, was diesen Test
+absichert, kaputtginge — wäre der Test dann noch harmlos?* Verwandt mit §3.157 (das Etikett als
+einziger Beweis) und §3.156 (ein Mechanismus, der weiter greift als seine Regel).
+
+### 3.160 Die Entscheidung war getroffen, aufgeschrieben — und wurde trotzdem wieder gefragt
+
+Am 10.08.2026 hat der Nutzer allgemein zurückgezogen, dass ich ihn bei Anhebungen einer
+gemessenen Obergrenze frage: Ich entscheide selbst, als letztes Mittel, mit schriftlicher
+Begründung im Commit. Die Regel steht seitdem korrekt im Gedächtnis, mit seinen eigenen
+Worten. Am 22.08.2026 stand trotzdem wieder eine Karte auf der Tafel, die ihn genau danach
+fragte — und seine Antwort benannte die Ursache schärfer, als der Vorfall es getan hätte:
+„Die bisherige Form, in der das hinterlegt ist, ist offensichtlich unzureichend."
+
+Die Klasse ist nicht „Regel vergessen". Die Regel war da, richtig formuliert und auffindbar.
+Sie hat nur keinen Ort, an dem sie WIRKT: Ein Gedächtniseintrag wird gelesen, wenn eine
+Sitzung ihn zufällig erinnert, und nichts verweigert die Frage in dem Moment, in dem sie
+gestellt wird. Damit steht sie schwächer da als jede unserer Bau-Regeln, die alle einen
+Wächter an genau der Stelle haben, an der man gegen sie verstößt. Das gilt für jede
+getroffene Entscheidung des Nutzers, nicht nur für diese: Der Zähler in Anhang A stand bei
+drei Anläufen, und der dritte kostete ihn dieselbe Minute wie der erste.
+
+Bemerkenswert ist auch, dass die Karte inhaltlich sauber argumentiert war — sie nannte die
+Regel, nannte den Rückzug vom 10.08. und fragte trotzdem. Eine gute Begründung ersetzt keine
+Verweigerung; sie macht die überflüssige Frage nur höflicher.
+
+**Lehre:** Eine Entscheidung des Nutzers gehört nicht ins Gedächtnis, sondern an das Tor, an
+dem man sie sonst erneut stellt — mit seinen Worten, sodass die Abweisung ihn zitiert statt
+mich. Prüffrage bei jeder Karte in „Von dir zu klären": *Hat er das schon einmal entschieden
+— und wenn ja, warum steht die Frage überhaupt noch offen?* Verwandt mit §3.112 (der
+verdrahtete, aber wirkungslose Mechanismus).
+
+### 3.161 Der Singleton wurde nicht überstimmt, sondern umgangen
+
+In der Nacht zum 23.08.2026 liefen zwei autonome Batch-Sitzungen gleichzeitig auf demselben
+Repository. Die eine baute seit einer Viertelstunde an Punkt 834 und committete gerade, die
+andere war neunzig Sekunden zuvor vom 900-Sekunden-Wächter gestartet worden, weil der Starter
+gemessen hatte: „no owner lock, no live batch-writer process". Beides war aus seiner Sicht wahr.
+
+Die Ursache liegt eine Ebene unter dem Streit um den Besitz. Die Sperre wird über
+`repoPath('.claude/batch-lock.json')` aufgelöst, und das löst gegen den Checkout auf, in dem der
+Prozess läuft. Jeder Worktree trägt sein eigenes eingechecktes `.claude/`. Die Nachfolgesitzung
+war aus der Punktgrenze heraus mit einem Arbeitsverzeichnis IM Worktree gestartet worden, hat
+dort ihre eigene Sperre angelegt und pflegt deren Heartbeat bis heute — während die Datei im
+Hauptbaum schlicht nicht existierte. Der harte Singleton hatte damit eine Sperrdatei pro
+Checkout statt einer pro Batch. Er hat nicht falsch entschieden; er hat über zwei verschiedene
+Fragen entschieden und beide mit „ja" beantwortet.
+
+Der teuerste Teil ist nicht die doppelte Sitzung, sondern was sie durfte. Die Guards der
+Worktree-Sitzung lasen deren private Sperre als Eigentumsnachweis. Kein Merge, kein Abhaken,
+keine Landung wäre ihr verweigert worden. Getrennt wurden die beiden Sitzungen am Ende nicht
+durch Mechanik, sondern durch eine Absprache: Die eine erklärte sich zur delegierten Autorin
+und rührt Board, `main` und die Landung nicht an. Das ist die richtige Rettung und ein
+schlechter Zustand — eine Vereinbarung zwischen zwei Modellen anstelle einer Sperre.
+
+Bemerkenswert ist, dass die Evidenz vollständig vorlag. `batch-in-flight --agent-check` hat die
+angeblich nicht existente Sitzung in derselben Minute korrekt als „alive" erkannt, geurteilt an
+den Git-Metadaten ihres Zweigs. Der Starter fragte das Register, der Prüfer fragte das
+Repository, und nur der Prüfer hatte recht.
+
+**Lehre:** Ein Singleton ist nur so global wie der Pfad, an dem er hängt. Sobald eine
+Ausschlussregel eine Datei benennt, ist die Auflösung dieses Pfades Teil der Regel — und ein
+relativer Pfad macht aus einer Regel so viele Regeln, wie es Arbeitsverzeichnisse gibt.
+Prüffragen bei jedem exklusiven Zustand: *Gegen welchen Baum löst sein Pfad auf, wenn der
+Prozess woanders steht?* und *Wenn eine zweite Instanz trotzdem läuft — erfährt sie es aus
+demselben Zustand, oder glaubt sie ihrer eigenen Kopie?* Und für die Erkennung: Wer fragt, ob
+noch jemand arbeitet, fragt das Repository, nicht die Anmeldeliste. Verwandt mit §3.112 (der
+verdrahtete, aber wirkungslose Mechanismus).
+
+### 3.162 Der Wegweiser zeigt auf eine Straße, die nie gebaut wurde
+
+In der Nacht zum 23.08.2026 sollte die nächste Stufe von Punkt 834 beauftragt werden. Der Router
+antwortete korrekt: nach achtzehn erfolglosen Prüfrunden eskaliert der Punkt gemäß §6 in die
+Fable-Bahn. Dort gibt es kein Kommando. Es existiert kein `author-fable.mjs`, und der einzige
+Rekorder, der eine Beauftragung ins Vier-Augen-Ledger schreibt, trägt das Modell fest verdrahtet
+als Sol ein — eine Beauftragung in der eskalierten Bahn ließe sich also nicht einmal wahrheitsgemäß
+protokollieren.
+
+Das ist nicht der verdrahtete, aber wirkungslose Mechanismus aus §3.112. Hier entscheidet die
+Mechanik richtig und vollständig; was fehlt, ist die ausführende Hälfte hinter ihrer Entscheidung.
+Der Unterschied zeigt sich an dem, was die Lücke der Sitzung anbietet: Alle drei naheliegenden
+Auswege sind Regelbrüche. Die Eskalation mit `--anyway` überstimmen heißt, genau die Bahn
+weiterzufahren, die achtzehnmal gescheitert ist. Selbst weiterschreiben heißt, den neunzehnten
+Versuch desselben Modells zu starten, gegen das die Eskalation gerichtet war. Von Hand ins
+append-only-Ledger schreiben heißt, die Haltbarkeitsgarantie der einen Datei zu verletzen, die
+ehrlich sein soll. Eine Sackgasse, die nur durch Regelbruch verlassen werden kann, ist gefährlicher
+als eine offene Lücke: Sie erzeugt Druck genau in dem Moment, in dem niemand zusieht.
+
+**Lehre:** Eine Weiche darf nur Ziele nennen, für die eine Fahrt existiert. Wer einen
+Entscheidungspfad einbaut, baut im selben Zug den ausführenden Befehl und dessen Protokollzeile —
+oder die Weiche nennt das Ziel gar nicht erst. Prüffrage bei jeder Verzweigung: *Wenn dieser Zweig
+gewählt wird, welches Kommando führt ihn aus, und was schreibt es auf?* Und wo die Antwort fehlt,
+gehört sie als eigener Punkt vor den, der auf sie wartet — nicht hinter ihn. Verwandt mit §3.112
+(der verdrahtete, aber wirkungslose Mechanismus) und mit der Trennung von *benannt* und *gebaut*.
+
+### 3.163 Der Mechanismus stand, aber niemand war gezwungen, ihn zu füttern
+
+Am frühen Morgen des 23.08.2026 fielen zwei Funde in derselben Stunde zusammen, die dieselbe
+Anatomie haben. Erstens: Die Batch-Sitzung der Nacht drehte fünfzehn Prüfrunden zu einem Punkt in
+einem einzigen, nie endenden Turn — und jede Aktualitäts-Sicherung des Boards (Karten-Abgleich,
+Publish-Zwang) hängt an der Stop-Kette, die nur ein Turn-Ende auslöst. Die öffentliche Karte zeigte
+zweieinhalb Stunden lang erledigte Arbeit von 02:30, während die Maschine ununterbrochen arbeitete;
+der Nutzer musste fragen, ob überhaupt noch etwas läuft (Punkt 848). Zweitens: Dieselben fünfzehn
+Runden standen in keiner Zeile des Mechanism-Ledgers. Jedes Prüf-Log endete mit dem fertigen
+Record-Kommando — ausgeführt hat es niemand, und dem Kommando im Log fehlte zudem das
+`--point`-Feld, an dem die Zählung hängt. Die Folge: Die §6-Eskalationsschwelle (fünf erfolglose
+Runden) las 0 statt 14, und die Weiche, die den Punkt längst in eine andere Bahn hätte legen
+müssen, bekam ihre Fahrkarte nie zu sehen. Erst die Nachfolge-Sitzung trug die Verdicts aus den
+Logs nach — dann eskalierte der Router sofort und regelgemäß.
+
+Die gemeinsame Anatomie: Beide Mechanismen existierten, waren getestet und hätten funktioniert —
+ihre EINGABE aber entstand auf keinem erzwungenen Pfad. Ein Guard, der am Turn-Ende ankert, deckt
+genau die Sitzungen nicht, die am längsten arbeiten, und das sind die wertvollsten Fenster. Ein
+Schwellwert, dessen Zähler von einer freiwilligen Protokollzeile lebt, zählt Null, solange die
+Protokollzeile Höflichkeit bleibt. Das ist die Steigerung der Lehre aus §3.135 („formal vorhanden,
+faktisch unsichtbar"): Dort war die Meldung im Erfolgsfall unlesbar, hier ist der ganze Mechanismus
+von einer Zuarbeit abhängig, die kein Werkzeug erzwingt und keine Prüfung vermisst.
+
+**Lehre:** Zu jedem Mechanismus gehört die Frage, WER seine Eingabe schreibt und WAS denjenigen
+dazu zwingt. Ein Zähler, ein Guard oder eine Schwelle ohne erzwungenen Schreibpfad ist kein
+Mechanismus, sondern eine Hoffnung mit Testabdeckung. Der Schreibschritt gehört in das Werkzeug,
+das die Eingabe ohnehin in der Hand hält — das Prüfskript zeichnet sein eigenes Verdict auf, statt
+das Kommando dafür ins Log zu legen; der In-Turn-Schritt stempelt die Karte, statt auf das Turn-Ende
+zu hoffen (Punkt 848). Verwandt mit §3.162 (die Weiche ohne Fahrt) — zusammen ergeben sie die
+Prüffrage: *Wenn dieser Zweig entscheidet, wer schreibt seine Eingabe, und wer fährt sein Ziel?*
+
+### 3.164 Der Alarm feuerte auf den Vorgänger, der gerade übergeben hatte
+
+Am Morgen des 23.08.2026 bekam eine frische Batch-Sitzung auf JEDEM ihrer Züge dieselbe Meldung:
+`PARALLEL SESSION DETECTED` — und wurde jedes Mal in einen vollständigen `batch-doctor --gate`
+geschickt, rund drei Minuten, unter der Last des gerade laufenden Autorenlaufs ohnehin mit dem
+Urteil „nicht bewertbar". Die gemeldete Sitzung war der zurückgetretene Vorgänger, der den Batch
+Sekunden zuvor an genau diese Sitzung übergeben hatte. Ihr Eintrag sagte das ausdrücklich:
+`authorityState: "retired"`, `retiredReason: "handover"` — und ihr letzter Schreibzugriff lag
+28 Millisekunden VOR ihrem eigenen Rücktritt, war also die Übergabe selbst. Lebendig war nur ihre
+PID, weil sie die interaktive VS-Code-Sitzung ist, die nie in den Batch schreibt. Die Sonde las
+„lebende PID hat gerade geschrieben" und schloss auf einen Konkurrenten (Punkt 849).
+
+Die Anatomie ist die von §3.158 (der Wächter hatte die Antwort schon gegeben): Das Feld, das die
+Frage entscheidet, stand in genau dem Datensatz, den die Sonde ohnehin öffnete — sie hat es nicht
+gelesen. Neu ist der PREIS. Ein Fehlalarm, der eine Zeile Ausgabe kostet, ist ein Schönheitsfehler;
+dieser hier kostete pro Zug drei Minuten Torlauf für null Information, und zwar auf einer Maschine,
+auf der derselbe Lauf wegen der Agentenlast gar kein Urteil fällen KANN. Damit verkehrt sich die
+Wirkung: Ein Alarm, der auf jedem Zug schreit und nie recht hat, wird abgehakt statt gelesen — und
+er ist dann genau an dem Zug stumm, an dem eine echte zweite Schreiberin danebensteht. Die drei
+Parallel-Session-Vorfälle vom 13./14.07., 23.07. und 20.08. sind der Grund, warum dieser Detektor
+überhaupt existiert; ein Detektor, der sich selbst unglaubwürdig macht, gibt diese Absicherung
+wieder her.
+
+**Lehre:** Ein Detektor wird nicht nur an seiner Trefferquote gemessen, sondern am PREIS seines
+Fehlalarms mal seiner Häufigkeit. Bevor eine Sonde aus indirekten Signalen (lebende PID, junger
+Zeitstempel) auf einen Zustand schließt, liest sie das Feld, in dem dieser Zustand ausdrücklich
+steht — und ein Ereignis, das zum Rücktritt selbst gehört, ist nie Beleg für Arbeit danach. Und
+wenn ein Alarm eine teure Pflichtmaßnahme auslöst, muss die Maßnahme unter den Bedingungen, unter
+denen der Alarm typischerweise feuert, überhaupt ein Urteil fällen können — sonst ist die Pflicht
+nur Zeremonie. Verwandt mit §3.161 (der Singleton wurde umgangen) und §3.158.
+
+### 3.165 Der Test verglich den Erzeuger mit sich selbst
+
+Beim Gegenlesen des Fable-Spur-Punktes am 23.08.2026 fiel im erzeugten Befehlsverzeichnis eine
+Aufrufzeile auf, die keinen Befehl mehr nannte, sondern einen Platzhalter: `node
+scripts/${commandName}.mjs`. Der Ernter hebt die Aufruftexte wörtlich aus dem Quellcode und
+wertet sie nicht aus — sobald eine Aufrufzeile als Vorlage geschrieben wird, landet die Vorlage
+im Nachschlagedokument. Die eigentliche Entdeckung war aber nicht dieser eine Fall, sondern
+seine Nachbarschaft: Es standen fünf weitere Platzhalter im selben Dokument, an vier Stellen,
+und keiner davon war neu. Sie standen dort unbemerkt, obwohl ein Test genau dieses Dokument
+prüft — und obwohl dieser Test grün war (Punkt 850).
+
+Grün war er, weil er das Dokument gegen eine FRISCHE ERNTE DERSELBEN QUELLEN vergleicht. Beide
+Seiten der Gleichung entstehen aus demselben Erzeuger; trägt der Erzeuger einen Fehler, trägt
+ihn die Erwartung genauso, und der Vergleich bestätigt ihn, statt ihn zu finden. Ein solcher
+Test prüft KONSISTENZ, nicht RICHTIGKEIT: Er beweist, dass das eingecheckte Dokument nicht
+veraltet ist — eine echte und nützliche Aussage — und er wird dabei fast unvermeidlich als
+Abdeckung für „das Dokument stimmt" gelesen. Das ist die teure Verwechslung, denn ein Bereich
+mit grünem Test wird nicht noch einmal von Hand angesehen.
+
+Bemerkenswert ist der Weg, auf dem es auffiel: nicht durch den Test, sondern weil ein
+Regenerieren die Datei anfasste und ein zweites Augenpaar den Diff LAS. Die fünf alten Stellen
+hatte niemand je gelesen, weil nie ein Anlass sie in einen Diff gehoben hat.
+
+**Lehre:** Zu jedem Test über einem erzeugten Artefakt gehört die Frage, WOHER seine Erwartung
+kommt. Stammt sie aus demselben Erzeuger, ist der Test ein Aktualitätswächter und darf nie als
+Richtigkeitsnachweis gezählt werden; die Richtigkeit braucht dann eine Aussage, die der
+Erzeuger nicht selbst herstellen kann — hier: dass keine geerntete Aufrufzeile einen
+unaufgelösten Platzhalter enthält. Zweite Regel aus demselben Fall: Wenn ein Fund eine KLASSE
+offenlegt, wird zuerst gezählt, wie viele Fälle sie hat und wem sie gehören. Fünf der sechs
+gehörten nicht zum laufenden Punkt — hätte der Test dort verlangt werden müssen, wäre er an
+fremder Arbeit rot geworden, und die Wahl wäre nur noch zwischen einem weichgeklopften Test und
+einer fremden Reparatur unter falscher Nummer gewesen. Verwandt mit §3.163 (der Mechanismus
+ohne erzwungene Eingabe): Dort fehlte dem Zähler die Zufuhr, hier fehlt dem Vergleich ein
+unabhängiger Maßstab.
+
+### 3.166 Ein Feld, drei Leser — und geprüft wurde nur der, der Ja sagt
+
+Am 23.08.2026 stand der Batch still, weil ein Commit seinen Gegenleser ehrte. Zwei
+`Co-Authored-By`-Zeilen — Autor und Cross-Vendor-Prüfer, beide erlaubt — passierten das
+Commit-Tor anstandslos, denn das Tor beurteilt jede Zeile einzeln. Dann kamen die anderen
+Leser desselben Feldes an die Reihe: Der Modellwächter zog die Historie über ein
+`git log`-Format, dessen `separator=,` von Git als leerer Trenner gelesen wird, bekam die
+zwei Zeilen als EINEN zusammengeklebten Namen und rief den Ernstfall aus — Batch angehalten,
+Ausweg nur über den Nutzer (Punkt 854). Und der Review-Planer las den Prüfer-Credit als
+Autorschaft, fand damit keinen unabhängigen Prüfer-Vendor mehr und erklärte jede Range mit
+diesem Commit für unreviewbar — eine Vier-Augen-Schuld, die auf dem Review-Weg nie mehr
+beglichen werden kann (Punkt 856).
+
+Kein Leser war für sich genommen kaputt gebaut worden; jeder folgte seiner eigenen, älteren
+Grammatik desselben Feldes. Die neue Schreibweise wurde nur gegen den Leser geprüft, der sie
+annahm — das Tor am Commit —, und die beiden Leser, die später und seltener laufen, sprachen
+erst im Ernstfall. Das Tückische an der Klasse: Der erste grüne Leser fühlt sich wie eine
+Systemabnahme an, und ein Wächter, der auf ein erlaubtes Muster anschlägt, ist genau der,
+den man am echten Tag aus Gewohnheit wegwinkt.
+
+**Lehre:** Ein gemeinsames Artefakt hat so viele Grammatiken wie Leser. Bevor eine neue
+Schreibform hineindarf, werden die Leser AUFGEZÄHLT (`grep` nach dem Feldnamen ist die
+Mindestform) und jeder gegen die neue Form geprüft — das Ja des annehmenden Tors zählt
+nicht für die Kette dahinter. Und schlägt ein Wächter auf etwas Erlaubtes an, wird zuerst
+seine MESSKETTE verdächtigt, nicht die Regel weichgeklopft: Hier lag der Fehler zwei Glieder
+vor dem Urteil, im Format der Datenbeschaffung.
+
+### 3.167 Der Wächter lebte, aber seine Stimme wohnte im kranken Kanal
+
+Am 23.08.2026 stand die Arbeit dreieinhalb Stunden still, und niemand erfuhr es. Ab 11:22
+wurde der Container krank: Jeder Prozessstart lief in ein Timeout, das Netz fiel weg, der
+Host schlief zwischendurch. Der Launcher-Daemon überlebte das alles — er protokollierte
+dreimal »tick exceeded 900000 ms — killed« — aber ein toter Tick war nur eine Logzeile.
+Jeder Alarmweg des Projekts (ntfy über batch-autostart, die Watchdogs) lief in einem
+Kindprozess, und Kindprozesse waren exakt das, was die kranke Maschine nicht mehr
+herausgab. Der eine beweisbar lebende Prozess hatte keine Stimme. Erlöst hat den Batch
+kein Mechanismus, sondern der Mensch, der zufällig zurückkam und VS Code neu startete.
+
+Die Klasse ist nicht »Alarm fehlte«, sondern: **Der Alarmkanal hing von genau der
+Ressource ab, deren Ausfall er melden sollte.** Dieselbe Falle in zweiter Gestalt: Nach
+dem Container-Neubau brachte den Launcher nichts Maschinelles zurück — nur eine
+Memory-Notiz, also ein Vorsatz, den eine Sitzung lesen musste. Seit Punkt 859 urteilt der
+Daemon über seine eigenen Ticks (reiner Kern, die Vorfalls-Formen als Fixtures) und
+spricht in-Prozess — ein HTTPS-POST braucht kein Kind —, mit Episoden-Schlüssel in der
+Eskalationsleiter, Zustell-Rückmeldung statt Absichts-Buchung und einem Sende-Budget,
+damit die Stimme nie die Schleife würgt, die sie bewacht; und ein Sitzungsstart rüstet
+einen toten Starter selbst wieder auf, ohne je ein absichtliches --stop zu überstimmen.
+Die Prüffrage für jeden künftigen Alarm- oder Heilungsweg: **Welche Ressource braucht
+er — und ist das dieselbe, deren Ausfall er behandelt?** Der Nutzer hat daraus die
+stehende Ordnung gemacht (Punkte 860/861): Selbstheilung vor Alarm, kein Stopp hinter
+einer Warte-Karte, im Zweifel entscheiden und die Entscheidung vetofähig dokumentieren.
+
+### 3.168 Der Dublettencheck ist keine Ordnungsfrage, sondern eine Richtigkeitsfrage
+
+Am Abend des 23.08.2026 meldete der Stop-Wächter zweimal in vier Minuten eine
+Parallelsitzung, obwohl keine da war: Die genannte Sitzung war längst beendet, was noch
+unter ihrer Kennung schrieb, war ihr übriggebliebenes Kind — der delegierte Autorenlauf,
+dessen Deklaration die lesende Sitzung einen Zug zuvor selbst übernommen hatte. Jede
+Meldung bestellte einen dreiminütigen Doktorlauf, der unter der Last genau dieses Kindes
+kein Urteil fällen konnte. Ich habe den Befund aufgenommen und als neuen Punkt angehängt.
+
+Erst die Pflicht, ihn einem Bündel zuzuordnen, führte zu dem Punkt, der dieselbe
+Falschmeldung schon besaß (3.164). Und da zeigte sich, warum die Frage „steht das schon
+irgendwo?" hier mehr wert war als Ordnung: Der bestehende Punkt schrieb als Zielzustand
+fest, ein Schreibzugriff NACH dem Rücktritt der Sitzung sei „ein echter Verstoß" und müsse
+den Alarm weiter auslösen — und genau das ist der heute gemessene Fall. Als eigener Punkt
+gebaut, hätten beide Hälften sauber und grün nebeneinander gelegen, und die eine hätte den
+Fall der anderen als Verstoß eingestuft. Der Defekt wäre nicht durch Doppelarbeit
+entstanden, sondern durch zwei getrennt korrekte Regeln über denselben Gegenstand.
+
+**Lehre:** Der Dublettencheck bei 3.105 wurde als Sparmaßnahme gelesen — er verhindert,
+zweimal dasselbe zu bauen. Er ist aber vor allem der Moment, in dem zwei Beschreibungen
+desselben Mechanismus miteinander verglichen werden, und das ist die einzige Stelle, an
+der ein Widerspruch zwischen ihnen auffallen kann, bevor er Code wird. Prüffrage beim
+Anlegen eines Punktes: *Wenn es das schon gibt — wäre der bestehende Zielzustand für
+meinen Fall richtig, oder erklärt er ihn zum Fehler?* Ein Befund, der einen bestehenden
+Punkt WIDERLEGT, gehört zwingend in diesen Punkt und nicht daneben.
+
+**Nachtrag 26.08.2026 — dieselbe Route, dasselbe Ergebnis, zwei Tage später.** Die Eröffnung dieser
+Sitzung fand als einzigen ungeordneten Punkt 923: die Vorschau meldet die Vier-Augen-Schranke als
+blockierend, während der Hook-Pfad desselben Wächters über demselben HEAD die Lückenklausel zieht.
+Sichtbar wurde die Dublette wieder nicht beim Anlegen, sondern erst durch die Bündelpflicht, die den
+Punkt namentlich einforderte — und der Vergleich fand Punkt 873, der denselben Defekt seit dem
+24.08.2026 trägt, 273 Positionen tiefer in der Warteschlange. Diesmal widersprachen sich die beiden
+Fassungen nicht, aber sie ergänzten sich: 873 verlangt Gleichlauf der Entscheidung, 923 zusätzlich
+Gleichlauf des BEFUNDTYPS. Beide getrennt gebaut hätten zwei Runden über denselben Mechanismus
+gekostet, von denen die zweite die erste hätte anfassen müssen. Der Befund ist in 873 eingetragen,
+923 ist dorthin gefaltet.
+
+**Lehre, ergänzt:** Der Dublettencheck darf nicht am Bündel-Wächter hängen. Er greift dort erst,
+wenn der Punkt schon steht, und er greift nur, weil dieser Wächter zufällig jeden offenen Punkt
+namentlich aufzählt — er ist ein Nebenprodukt, kein Mechanismus. Die Stelle, an der zwei
+Beschreibungen desselben Mechanismus verglichen werden, gehört an das ANLEGEN eines Punktes.
+
+### 3.169 Die Vier-Augen-Regel hat sich selbst eingesperrt
+
+In der Nacht zum 24.08.2026 war Punkt 834 fertig: 94 Commits, 28 Autorenrunden, die letzte
+allein rund 62 $, und die Tore grün — Build, Lint, 13350 Unit-Tests. Gefehlt hat nur das
+Gegenlesen. Es liess sich nicht beauftragen. Nicht „es fiel schlecht aus" — es liess sich
+auf **keiner** Basis überhaupt starten.
+
+Der Grund war ein Merge, der Konflikte über 41 Dateien mit 2119 Einfügungen aufgelöst und
+keinen `Co-Authored-By`-Trailer getragen hatte. Der Planer liest den Bereich mit
+`--diff-merges=cc`, und das ist richtig so: eine Konfliktauflösung IST geschriebener Code.
+Nur steht bei diesem keine Hand darunter. Für sieben Enddateien war damit kein
+unabhängiger Gegenleser mehr beweisbar — und der Planer verweigerte daraufhin nicht diese
+sieben, sondern die GANZE Runde. 87 % lesbares Material blieben wegen der übrigen 13 %
+ungelesen.
+
+Das Bitterste stand schon im Haus: Die Ledger führt eine Satzart für genau diese Ausnahme,
+`criticality-review-unavailable`, gegen Git verifiziert. Ihre eigene Dokumentation sagt
+aber, sie „answers no refusal" — kein Befehl schreibt sie, und der Planer liest sie nie.
+Zwei Hälften desselben Mechanismus, gebaut für denselben Fall, und nie miteinander
+verbunden. Der vom Werkzeug selbst genannte Ausweg, enger zu schneiden, führte in zwei
+weitere Sackgassen: teurer (21 statt 13 Pässe) und mitten in einen bereits gefilten
+Nachbardefekt. Übrig blieben nur eine Historien-Umschreibung, die jede aufgezeichnete
+Prüf-Sha des Zweigs entwertet hätte, oder das Vorbeirecherchieren an der eigenen Regel.
+
+**Lehre:** Ein Wächter über einer Regel, die niemand umgehen darf, braucht trotzdem einen
+gebauten, geprüften Weg für den Fall, dass seine Vorbedingung nachweislich nicht
+herstellbar ist — sonst sperrt er irgendwann die Arbeit ein, die er schützen sollte. Das
+ist dieselbe Klasse wie 3.153, nur eine Stufe härter: dort verlangte ein Tor eine Freigabe,
+die seine Werkzeuge nicht herstellen konnten; hier EXISTIERT die Freigabe als Satzart und
+ist trotzdem wirkungslos, weil niemand sie schreibt und niemand sie liest. Prüffrage beim
+Bauen eines Wächters: *Was passiert, wenn meine Vorbedingung unerfüllbar ist — habe ich
+dafür einen Weg, und ist er an beiden Enden angeschlossen?* Und: eine Verweigerung sollte
+so schmal sein wie ihr Grund. Alles-oder-nichts ist die teuerste Form, recht zu haben.
+
+### 3.170 Der letzte Atemzug wird als Herzschlag gelesen
+
+Am 24.08.2026 gegen 05:20 nahm eine frische Sitzung den Stapel auf. Die Übergabe war
+tadellos: Die In-Flight-Deklaration zum laufenden Autorenlauf an Punkt 834 lag transferiert
+bereit, der Nachfolger übernahm sie als erste Handlung, und der Startvorgang nannte den
+Probe-Befehl gleich mit. Die Probe antwortete `alive`, `respawn: false`, und darunter stand
+in Großbuchstaben, was zu tun sei: **DO NOT REPLACE THIS AGENT: it is working.** Sie berief
+sich dabei auf den Vorfall vom 30.07.2026, bei dem ein Nachfolger einen lebenden Agenten für
+tot erklärt und zwei fertige Punkte neu gebaut hatte.
+
+Der Prozess war zu diesem Zeitpunkt seit zwei Minuten tot. Er war — wieder, wie in §3.155 —
+mit seiner Elternsitzung gefallen. Gemessen wurde das erst, als die Sitzung neben der Probe
+von Hand `ps -p` auf die pid legte, die in der Deklaration als Nachweis steht: Prozess weg,
+Elternsitzung weg. Genau diese pid schaut `--agent-check` nie an; das Unterkommando nimmt
+`--worktree`, `--branch` und `--log` und kein `--pid`, obwohl die Deklaration, die es prüft,
+die pid samt Startzeit als Nachweis führt.
+
+Die zweite Hälfte ist die eigentliche Lehre. `batch-in-flight-core.mjs` entscheidet die
+Rangfolge der Nachweise mit einer Zeile: Ist der Zweigstand frisch, gilt `judgedOn: 'git'` —
+und zwar *statt* der Prozessprüfung, nicht zusätzlich zu ihr. Das ist für den Fall gebaut,
+den der 30.07. lehrte, und für den ist es richtig: Ein stiller Autor, der gerade committet
+hat, arbeitet. Nur ist der frischeste denkbare Zweigstand zugleich das, was ein soeben
+gestorbener Lauf hinterlässt — der letzte Checkpoint fiel um 05:17:44, der Tod um 05:18. Die
+Regel liest den letzten Atemzug als Herzschlag, und sie tut es mit maximaler Zuversicht
+genau in dem halbstündigen Fenster, in dem ein Neustart noch billig ist.
+
+Das ist die dritte Stufe derselben Klasse: In §3.154 beantwortete eine Frischemessung die
+Frage nach dem Leben einer Sitzung, in §3.155 antwortete der Mantelprozess statt des
+Arbeiters, und hier antwortet ein Artefakt statt des Prozesses. Jedes Mal war der Nachweis
+formal vorhanden und zeigte auf etwas, das dem Leben nur ähnlich sieht. Gebucht als Punkt
+874; der Lauf wurde neu gestartet, diesmal von der Sitzung abgekoppelt, damit er das nächste
+Sitzungsende überlebt, und seine halbfertige Arbeit vorher als Patch gesichert statt im Baum
+liegengelassen — die Lehre aus §3.155, die diesmal gegriffen hat.
+
+**Lehre:** Ein Lebendnachweis darf durch ein Artefakt bestätigt, aber nie durch ein Artefakt
+ERSETZT werden. Stille ist keine Messung — ein toter Prozess ist eine. Wo eine Probe mehrere
+Nachweisarten kennt, gehört die Rangfolge so gebaut, dass eine positive Todesmessung nicht
+von einem frischen Nebenzeichen überstimmt wird; das Fehlen eines Nachweises und ein
+widerlegter Nachweis sind zwei verschiedene Dinge. Prüffrage: *Kann mein Lebendzeichen auch
+das Letzte sein, was ein Sterbender hinterlässt?* Und für Verweigerungstexte: Wer einem
+Nachfolger in Großbuchstaben verbietet zu handeln, sollte die Messung, auf die er sich
+stützt, im selben Atemzug nennen — hier stand `judgedOn: "git"` als Feld in der Ausgabe und
+rettete die Diagnose, während der Fließtext daneben nur Gewissheit behauptete.
+
+### 3.171 Ein Rot, das die Wiederholung heilt, ist das gefährlichste Rot
+
+Am 24.08.2026 fiel `scripts/guard-preflight-core.test.mjs` in einen Timeout — und lief bei der
+nächsten Ausführung grün durch. Genau diese Signatur verbieten unsere eigenen Regeln als Beweis:
+Eine Wiederholung ist VERDÄCHTIG und deckt nichts ab. Trotzdem ist sie verführerisch, denn ein
+Rot, das beim zweiten Mal verschwindet, sieht aus wie Rauschen auf einer belegten Maschine.
+
+Die Auflösung kam nicht aus dem Wiederholen, sondern aus dem Zerlegen. Jeder Gather-Schritt wurde
+einzeln gemessen: `ci-status-guard` brauchte 38.150 ms, jeder andere Schritt blieb unter 500 ms.
+GitHub Actions ist aus diesem Container nicht erreichbar, also brennt die KALTE Probe für jede
+gepushte Referenz ihr Netz-Timeout ab, bevor sie antwortet; danach liegt die Antwort im Cache und
+derselbe Fall braucht 3,4 s. Der Testtimeout liegt mit 30 s zwischen beiden Werten. Der Fall ist
+damit nicht flatterhaft, sondern deterministisch: rot beim ersten vollen Lauf nach jedem Push,
+grün bei jedem weiteren. Zwei Gegenproben trennten Ursache von Verdacht — derselbe Fall auf
+`main` und auf einem fremden Zweig, beide grün.
+
+Die Klasse ist heimtückischer als ein schlichter Fehlschlag, weil sie die Diagnose gegen sich
+selbst wendet. Wer einmal wiederholt, hat eine grüne Suite und ein gutes Gefühl; wer die Regel
+befolgt und die Ursache sucht, zahlt zwei volle Suite-Läufe. Der billige Weg führt zur falschen
+Antwort, der teure zur richtigen — und nur der teure hinterlässt etwas, das der nächsten Sitzung
+hilft. Der Befund steht jetzt als eigener Punkt im Arbeitsauftrag, statt als Wissen in einem
+Gesprächsverlauf zu sterben.
+
+**Lehre:** Ein Rot, das eine Wiederholung heilt, ist keine Erlaubnis weiterzugehen, sondern eine
+Frage nach der Ursache. Die Messung, die sie beantwortet, zerlegt den roten Schritt in seine
+Teile und vergleicht ihn mit einer Umgebung, in der er grün ist — nie mit sich selbst beim
+zweiten Versuch. Prüffragen: *Warum war der zweite Lauf anders als der erste?* Und wenn die
+Antwort „Cache", „Netz" oder „Last" lautet: *Steht dieser Unterschied irgendwo geschrieben, wo
+ihn der nächste Leser eines roten Laufs findet?* Verwandt mit §3.83 (rote Suiten, die der
+Prüfstand verursacht) und §3.159 (ein grüner Prüfstand beweist nur, was er lädt).
+
+### 3.172 Zehn Runden, zehn echte Befunde — und die Frage, wann Iterieren aufhört
+
+Dieselbe Sitzung trug zwei gegensätzliche Erfahrungen mit demselben Verfahren. Der neue
+Board-Heartbeat ging zehn kreuzvendorielle Runden; jede fand einen echten Defekt, das Urteil
+wanderte über `do-not-merge` und `merge-with-fixes` bis zu einem sauberen `merge`, und mehrere
+Funde waren Klassen, die eine Sitzung allein kaum findet: eine Frische-Quelle, die jede fremde
+Veröffentlichung mitverschiebt; eine Alterung modulo 24 Stunden, die einmal täglich zehn Minuten
+lang falsch frisch meldet; eine Aufzeichnung vor dem Schreiben, die einen fehlgeschlagenen
+Schreibversuch die eigene Wiederholung unterdrücken lässt. Das Verfahren hat hier genau das
+geleistet, wofür es existiert.
+
+Auf demselben Zweig lag der Gegenfall: Ein anderer Punkt stand bei Autorenrunde 27, die vier
+letzten aufgezeichneten Prüfpässe lauteten alle `do-not-merge`, und der Kern seiner Arbeit war
+weiterhin offen. Dieselbe Schleife, dieselbe Sorgfalt — nur ohne Konvergenz. Der Unterschied ist
+nicht die Anzahl der Runden, sondern ihre Richtung: Wandert das Urteil, schließt sich der Abstand;
+bleibt es stehen, während der Umfang nicht kleiner wird, iteriert das Verfahren an einem
+Gegenstand, der für eine Runde zu groß ist.
+
+Was fehlt, ist keine Obergrenze — eine feste Zahl hätte den guten Fall bei Runde fünf abgewürgt —
+sondern eine Beobachtung: Bewegt sich das Urteil? Schrumpft der offene Umfang? Findet jede Runde
+etwas Neues oder Varianten desselben? Diese Frage habe ich nicht selbst entschieden, sondern als
+Karte in »Von dir zu klären« gestellt, weil sie festlegt, wann ich Arbeit des Nutzers abbreche.
+
+**Lehre:** Die Rundenzahl allein sagt nichts. Ein Verfahren, das bei jeder Wiederholung einen
+echten Defekt findet und dessen Urteil wandert, arbeitet; eines, dessen Urteil steht, während der
+Umfang bleibt, braucht einen kleineren Gegenstand statt einer weiteren Runde. Prüffrage vor jeder
+neuen Runde: *Hat sich seit der letzten etwas bewegt außer der Zählung?*
+
+### 3.120 Der Probelauf stellte die Stufe nach, die er beweisen sollte
+
+Der Punkt, der einen Autorenlauf den Tod seiner Sitzung überleben lässt, steht und fällt mit einem
+Probelauf: Elternsitzung starten, mitten in der Arbeit hart abschießen, und zeigen, dass Daemon und
+Arbeiter weiterlaufen und eine frische Sitzung sie wiederfindet. Der Probelauf lief grün, seit
+Tagen.
+
+Die Gegenlesung des anderen Hauses las ihn genauer (24.08.2026): Die Stufe „frische Sitzung
+übernimmt die Sperre" rief die Übernahme nie auf. Sie schrieb Zaundatei und Sperrdatei von Hand
+mit einer fest einprogrammierten Nummer — dem *Ergebnis* einer geglückten Übernahme. Ein Zaun, der
+keine Nummer prägt, eine verlorene Wettlaufsituation, eine wiederverwendete Nummer: Jeder dieser
+Fehler wäre durchgelaufen.
+
+Als die Stufe die echte Übernahme ausführte, hielt sie sofort an — und legte einen Fehler frei,
+den es ohne sie nicht zu finden gab: Der Daemon las seinen Zaunspeicher aus der Datei der
+Stapelsperre. Deren einziger Schreiber baut sie bei *jeder* Übernahme aus einem festen Feldsatz neu
+auf und löscht dabei die Generation, ohne die der Daemon sich weigert zu starten. Auf dem gebauten
+Weg hätte nach der ersten echten Übernahme nie wieder ein Daemon starten können. Die Nachstellung
+hat den Fehler nicht übersehen — sie hat ihn getragen.
+
+**Lehre:** Ein Test, der den Zustand *nach* einer Handlung herstellt, statt die Handlung
+auszuführen, prüft die Handlung nicht, sondern die eigene Annahme darüber. Er ist besonders
+gefährlich, weil er dauerhaft grün ist und dadurch als Beweis zählt. Prüffrage an jeden Probelauf:
+*Welche Zeile ruft die Sache auf, die hier bewiesen werden soll — und was bliebe grün, wenn diese
+Sache völlig kaputt wäre?* Was ein Probelauf legitim abkürzen darf, ist die vergehende Zeit; was er
+nie abkürzen darf, ist den Aufruf.
+
+### 3.173 Die zweite Sitzung trat nicht zurück — weil nichts sie danach je wieder fragte
+
+§3.2 endet mit einem Satz, der die ganze Parallelitäts-Absicherung trägt: Eine spontan auftauchende
+zweite Sitzung sei „erwartetes Verhalten, kein Vorfall — **solange sie für den Lock-Owner
+zurücktritt**". Am 24.08.2026 mittags trat sie nicht zurück, und der Grund ist, dass niemand sie
+danach noch einmal gefragt hat.
+
+Gemessen: Sitzung A wurde vom Autostart-Starter geweckt (CI-Übergabe für `origin/main:7c93ebf5`);
+ihr SessionStart-Hook meldete „no live batch-writer process measured; owner lock assessed inactive
+(handed-over)" und ließ sie arbeiten — zu diesem Zeitpunkt korrekt. Um 14:51:49 startete Sitzung B
+aus einer **zweiten** CI-Übergabe, die für einen anderen Ref galt (`origin/feat/890-…:68214a5f`),
+und nahm die Sperre. Fünf Minuten lang arbeiteten beide an Punkt 890: A ließ eine Gegenlesung
+laufen und dazu Lint, Build und die Unit-Suite im Arbeitsbaum `point-890`, während B auf denselben
+Branch committete und pushte. Kurz darauf stand die Sperre wieder bei A.
+
+Drei Lücken, und die dritte ist die eigentliche:
+
+**Die Startentscheidung ist pro Ref, nicht pro Stapel.** Zwei grün gewordene CI-Läufe auf
+verschiedenen Refs erzeugen zwei Übergaben und damit zwei Sitzungen. Die zweite sieht die erste
+nicht, weil beide zum Startzeitpunkt eine ehrliche Antwort bekamen — nur eben zu verschiedenen
+Zeitpunkten.
+
+**Der Zaunwert wurde als Etikett geführt, nicht als Bedingung.** Während B hielt, trug die
+Sperrdatei `fence: 3`; als sie zu A zurückkam, stand dort `fence: 690`. Die laufende Zählung ist
+offensichtlich die zweite — der Anspruch der zweiten Sitzung trug also einen Wert weit **unter**
+dem Stand und wurde trotzdem in die Datei geschrieben statt als veraltet abgewiesen. Ein Zaun, der
+den kleineren Wert durchlässt, ordnet keine Ansprüche mehr, er protokolliert sie nur.
+
+**Und die unterlegene Sitzung erfährt es nicht.** A hat die Kollision nicht bemerkt, weil ein
+Wächter sie gestoppt hätte, sondern weil eine *Vorschau* — `guard-preflight` vor einer geplanten
+Landung — beiläufig „another live session owns the batch lock" druckte. Ohne diesen zufälligen
+Aufruf wäre A in `land-point` hineingelaufen, während B denselben Punkt landete. Der Stand-down aus
+§3.2 ist gebaut für den Moment des Starts; für eine Sitzung, die **schon läuft**, gibt es keinen
+wiederkehrenden Punkt, an dem die Besitzfrage neu gestellt wird.
+
+Ausgegangen ist es gut, und das ist der unangenehmste Teil des Befunds: B hat den Ledger-Eintrag,
+den A unversioniert im gemeinsamen Arbeitsbaum liegen ließ, aufgenommen und mitcommittet, und A's
+Commit an der Arbeitsordnung ritt auf B's Push nach `main` mit — weil beide Arbeitsbäume dieselbe
+Objektdatenbank teilen. Kein Verlust, keine Halblandung. Nur eben aus Zufall.
+
+**Lehre:** Eine Absicherung, die aus einer Bedingung besteht („solange sie zurücktritt"), ist erst
+gebaut, wenn die Bedingung einen Mechanismus hat — sonst steht sie als Annahme in genau dem
+Dokument, das erklärt, warum Annahmen hier nichts taugen. Besitz ist kein Zustand, den man beim
+Betreten prüft, sondern einer, der zwischen zwei Schreibvorgängen wechseln kann. Prüffrage:
+*Woran würde diese Sitzung merken, dass ihr der Stapel nicht mehr gehört — und wie viele
+Schreibvorgänge lägen zwischen diesem Moment und der Antwort?* Gebucht als Punkt 897.
+
+### 3.174 Wer seine eigene Veröffentlichung überschreibt, kommt allein nicht mehr heraus
+
+Der 24.08.2026 hatte die Klasse schon in der Zeitleiste: Ein delegierter Autor schrieb Commits um,
+die er bereits veröffentlicht hatte, sein Abschluss-Push scheiterte als non-fast-forward, und sein
+Bericht meldete fertige Arbeit als „nur lokal". Damals endete der Befund beim irreführenden
+Bericht. Am 25.08.2026 früh zeigte derselbe Mechanismus die schärfere Hälfte: Der Lauf kommt aus
+dem Zustand nicht mehr heraus.
+
+Gemessen auf `feat/894-daemon-control-plane`, während GPT-5.6 Sol den zweiten Prüfdurchgang fuhr.
+Der Läufer hatte zwei Commits gepusht und schrieb dieselbe Historie danach lokal um — die Bäume
+waren auf beiden Seiten byte-identisch, nur die Elternkette unterschied sich. Von diesem Moment an
+scheiterte **jeder** weitere Zwischen-Push mit derselben Meldung, und `author-sol.mjs` wiederholte
+zehn Minuten lang den identischen nackten Push, statt sich zu versöhnen. Der Zweig war für den
+Rest des Laufs unveröffentlichbar; jeder spätere Checkpoint blieb unsichtbar auf der Gegenseite —
+genau die Aussetzung, wegen der die Hausregel sagt, dass nur überlebt, was gepusht wurde.
+
+Zwei Dinge fallen dabei auseinander, und beide sind es wert, getrennt benannt zu werden. Das eine
+ist die fehlende Erholung: Der Wrapper besitzt für seine Checkpoints längst einen Lease-gesicherten
+Compare-and-Swap — genau den Mechanismus, dessen Reparatur der Inhalt dieses Punktes war —, aber
+sein Zwischen-Push benutzt ihn nicht. Der Lauf hatte die Lösung an Bord und griff nicht danach.
+Das andere ist die Diagnose: Die Zeile, die die gefährdeten Commits benennen soll, druckte
+`fatal: ambiguous argument 'undefined..undefined'`. Sie baute ihren Bereich aus zwei undefinierten
+Variablen und sagte damit über das, was auf dem Spiel stand, exakt nichts.
+
+Das Zusammenspiel ist die eigentliche Kostenstelle. Ein Bericht, der „PUSH FAILED — the work is
+committed but only local" sagt, während der Inhalt längst drüben liegt, schickt jeden Leser auf die
+Suche nach verlorener Arbeit, die nie verloren war — und wer diesen Bericht einmal als Fehlalarm
+abtut, übersieht den echten Fall beim nächsten Mal. Genau deshalb darf die Quittung nicht über den
+eigenen Push urteilen, sondern über die Ankunft: dieselbe Unterscheidung, die dieser Punkt für die
+Checkpoints eingeführt hat, fehlt eine Ebene darüber noch.
+
+Prüffrage: *Wenn dieser Lauf seine eigene Veröffentlichung überholt — kommt er allein zurück, und
+sagt sein Bericht, was wirklich fehlt?* Gebucht als Punkt 906.
+
+### 3.175 Das Tor, das niemand fährt, ist kein Tor
+
+Am 25.08.2026 stellte sich beim Landen von Punkt 834 heraus, dass die Typprüfung der Tests auf dem
+Hauptstand seit einer Woche rot war. Drei Fehler, der älteste vom 17.08.: ein echter Typfehler in
+einer Fauna-Testdatei und zwei Importe von `.mjs`-Skripten, für die die Testkonfiguration keine
+Deklarationen zulässt. Nichts davon war versteckt, und niemand hatte es gesehen.
+
+Der Grund ist die eigentliche Beobachtung, und er hat nichts mit den drei Fehlern zu tun.
+`test-types` läuft **nur** im lokalen Prüfläufer. Die CI führt es nicht aus — also meldete die CI
+die ganze Woche grün, auf jedem einzelnen Push. Das Landetor führt es ebenfalls nicht aus — also
+hat es kein einziges Landen aufgehalten. Das Tor existierte, war korrekt gebaut, urteilte richtig,
+und wurde von keinem Weg berührt, den der Batch tatsächlich geht. Eine Woche ist nicht die
+Reaktionszeit auf ein rotes Tor, sondern die Zeit, bis jemand zufällig danebentritt.
+
+Das ist die Umkehrung von §3.15: Dort war das Bild falsch und der Test grün. Hier ist der Test
+ehrlich rot — nur fragt ihn niemand. Beide Male trägt die Grün-Meldung dieselbe falsche Zusage, und
+beide Male ist die Absicherung gegen das Falsche gerichtet. Ein Tor braucht nicht nur ein Urteil,
+sondern einen Weg, auf dem es gefällt wird; sonst ist es Dokumentation.
+
+Prüffrage: *Für jedes Tor, auf das wir uns berufen — welcher Weg fährt es, und wann ist es dort
+zuletzt rot gewesen?* Ein Tor, das noch nie etwas aufgehalten hat, ist entweder überflüssig oder
+nicht angeschlossen. Gebucht als Punkt 909.
+
+### 3.176 Der Wächter verlangt eine Reparatur, die er selbst nicht gelten lässt
+
+Am selben Tag verweigerte der Dashboard-Wächter dreimal hintereinander den Zug-Abschluss mit
+„BATCH DASHBOARD NOT REGISTERED" und nannte dazu die Reparatur: veröffentlichen, Fokus setzen,
+`--synced` laufen lassen. Diese drei Befehle liefen — und meldeten jedes Mal Erfolg. Der Wächter,
+von Hand aufgerufen, beendete sich danach still mit Null. Jede verfügbare Auskunft sagte
+„registriert", und der Haken lehnte weiter ab.
+
+Die Ursache war die Arbeitsverzeichnis-Frage, die niemand stellt: Die Stop-Haken erben das
+Arbeitsverzeichnis der Sitzung, und der Wächter löst den Dashboard-Pfad gegen die Wurzel auf, aus
+der er gerade läuft. Die Sitzung stand in einem Arbeitsbaum — dem **Normalfall** unseres
+Zweig-Verfahrens —, und dort liegt keine Dashboard-Datei. Also lief bei jedem Zug-Ende die Kopie
+im Arbeitsbaum, fand nichts und blockierte, während `--synced` im Hauptbaum eine Markierung schrieb,
+die diese Kopie nie liest. Sichtbar wurde es erst, als der Wächter mit identischer Eingabe aus
+beiden Wurzeln nebeneinander laufen gelassen wurde: Null und still aus dem einen, Blockade aus dem
+anderen.
+
+Die Klasse ist nicht „Wächter hat Fehler", sondern eine schärfere: **Eine Diagnose, die dieselbe
+falsche Annahme teilt wie der Fehler, bestätigt ihn statt ihn zu finden.** Der Wächter von Hand
+aufgerufen ist kein unabhängiger Zeuge — er erbt das Arbeitsverzeichnis, das gerade das Problem
+ist. Deshalb kosteten drei Züge nichts, und der vierte, der die Bedingung aus zwei Wurzeln
+verglich, kostete einen. Dazu kommt die Härte der Fehlermeldung: Sie schickt in eine Reparatur, die
+in dieser Lage nachweislich nicht wirken kann, und wer ihr folgt, hält sich für nicht sorgfältig
+genug statt für falsch informiert.
+
+Prüffrage: *Kann meine Diagnose diesen Fehler überhaupt sehen — oder steht sie in derselben
+Annahme wie er?* Wo eine Prüfung grün meldet, obwohl der Haken ablehnt, ist die Prüfung verdächtig,
+nicht der Haken. Gebucht als Punkt 910.
+
+Am 25.08.2026 traf es dieselbe Klasse ein zweites Mal, obwohl die Memory dazu längst existierte —
+und sie half nicht, weil eine Zeile darin falsch war. Sie riet, mit einem blanken `cd` in den
+Hauptbaum zurückzugehen, behauptete aber, ein `cd` innerhalb einer `&&`-Kette halte ebenfalls.
+Gemessen hält es nicht: Die Sitzung fiel beim nächsten Aufruf in den Arbeitsbaum zurück. Wer der
+Zeile folgt, repariert genau einen Befehl und hält die Drift danach für behoben. Zweitens ist der
+Dashboard-Wächter nicht das einzige Opfer — `mechanism-review-guard` sucht seine Review-Grundlinie
+in derselben falschen Wurzel, findet keine und verweigert den Zug mit „the local review baseline is
+missing", dessen eigener Rat (`origin/main` hereinmergen) in dieser Lage nichts ausrichten kann,
+weil im Hauptbaum nichts fehlt. Zwei Haken, ein Wurzelverzeichnis, zwei Fehlermeldungen, die beide
+woanders hinzeigen.
+
+Das schärft die Lehre: **Eine Memory, die eine Falle beschreibt, schützt nur so weit, wie ihr
+letzter Satz gemessen ist.** Der beschreibende Teil war richtig und hat trotzdem nicht getragen,
+weil der handelnde Teil geraten war.
+
+### 3.177 Die Regel gegen den Fehlalarm wurde zur Regel gegen den Befund
+
+Seit vier Anläufen steht bei uns dieselbe Lehre: Ein rotierender Fehlschlag unter laufendem
+Agenten-Pool ist Last, kein Fehler — acht von zwölf Unit-Läufen waren einmal allein aus Last rot.
+Die Regel ist richtig, sie hat viel Reparaturarbeit an Phantomen gespart, und sie hat einen
+Wächter. Am 25.08.2026 hat sie zum ersten Mal in die andere Richtung gekostet.
+
+Das negative Kontrollstück des Übernahme-Probelaufs meldete beim Landen von Punkt 907 eine dritte
+fehlgeschlagene Prüfung statt der zwei, die es festnagelt. Der Reflex der Regel lautet: ruhige
+Maschine abwarten, neu laufen lassen. Genau das geschah — und es wurde grün. Die ehrliche Messung
+danach zeigte aber, dass die erste Meldung **auf einer ruhigen Maschine** entstanden war: Last 2,4
+auf 16 Kernen. Der Fehler ist echt, er braucht nur die Fächerung des vollen Laufs, und er ist ein
+Wettlauf im Probelauf selbst — ein angenommener Prüfpunkt schiebt seinen Push, der landet nach dem
+Ablesen des Zweigstands, und die Abbruch-Prüfung schreibt der Stornierung eine Bewegung zu, die sie
+nicht verursacht hat.
+
+Die Klasse ist nicht „die Last-Regel ist falsch", sondern: **Eine Heuristik, die eine ganze
+Fehlerform als Rauschen einordnet, macht genau diese Form unsichtbar, sobald sie einmal echt ist.**
+Sie schützt vor dem Fehlalarm und erzeugt dafür den Fehlschluss in der Gegenrichtung, und der ist
+teurer, weil er keine Spur hinterlässt: Ein Rot, das man wegwiederholt, meldet sich nicht noch
+einmal an. Die Wiederholung ist bei uns aus gutem Grund VERDÄCHTIG und deckt nichts ab — aber diese
+Regel wirkt nur, wenn jemand sie auch dann anwendet, wenn eine bequemere Erklärung bereitsteht.
+
+Was die Regel rettet, ist die Reihenfolge: erst die Last MESSEN, dann urteilen. Nicht „es war
+vermutlich Last", sondern Last und Laufzeit im selben Zug ablesen wie den roten Fall. Wo die
+Maschine ruhig war, ist das Rot ein Befund und wird gebucht, auch wenn der nächste Lauf grün ist.
+Gebucht als Punkt 913.
+
+### 3.178 Die Regel war da, der Mechanismus nicht — und dann wiederholt sie sich
+
+Am 23.08.2026 kam die Anordnung, dass ein dauerhafter Stillstand nie eintreten darf: lieber
+selbst entscheiden als auf eine Antwort warten. Ihr dritter Schritt lautete damals: entscheiden,
+weiterarbeiten, und die Entscheidung als Karte ablegen, die der Benutzer im Nachhinein kippen
+kann. Das klang nach der freundlichen Lösung — die Arbeit läuft weiter, der Mensch behält das
+letzte Wort.
+
+Was daraus wurde, hat er am 19.08., am 24.08. und wieder am 25.08.2026 zurückgewiesen, jedes Mal
+mit demselben Satz: „Das sind interne Probleme, die du selbst lösen musst." Auf seinem Telefon
+landete eine Entscheidungskarte über zwei gleichzeitig laufende Sitzungen — ein Vorgang, der
+diagnostiziert, harmlos und längst vorbei war. Die Karte war formal genau das, was Schritt 3
+vorschrieb, und trotzdem falsch: Ein Protokolleintrag ist keine Frage, und die Rubrik „Von dir zu
+klären" ist für Fragen da.
+
+Die Klasse ist nicht „falsche Rubrik gewählt", sondern: **Eine Regel, die niemand durchsetzt,
+wird so oft gebrochen, wie sie bequem ist — und jede Wiederholung kostet den Benutzer erneut die
+Aufmerksamkeit, die die Regel ihm sparen sollte.** Dreimal derselbe Einspruch heißt nicht, dass
+die Botschaft nicht angekommen ist; es heißt, dass sie nur im Text stand. Zwischen der ersten
+Anordnung und heute liegen sechs Tage, in denen der Mechanismus als Punkt in der Warteschlange
+wartete, während die Karten weiter entstanden.
+
+Was daraus folgt, ist unbequem: Eine Anordnung, die sich wiederholt, ist kein
+Verständnisproblem, sondern ein fehlender Wächter — und der gehört an die Spitze der
+Warteschlange, nicht in ihre Mitte. Genau dorthin ist Punkt 749 an diesem Tag gerückt. Und der
+zweite Teil ist billiger, als er klingt: Die Erkennung sollte eine ordnungsgemäß
+zurückgetretene, mitlesende Zweitsitzung gar nicht erst als Alarm werten — dann steigt die Leiter
+nie bis zur Karte.
+
+### 3.179 Ein Wächter, der nicht handeln darf, hört auch auf zu messen
+
+Am 25.08.2026 sollte eine Routinefrage beantwortet werden: Sind die neun offenen Worktrees in
+diesem Repository Reste, die ein Merge hätte beseitigen müssen? Genau dafür gibt es
+`branch-hygiene-guard`. Sein `--status` antwortete: „steht zurück — another live session owns the
+batch lock." Kein Zustand, keine Liste, keine Zahl. Die Antwort auf eine Lesefrage war die
+Begründung, warum nicht geschrieben wird.
+
+Die Zurückhaltung selbst ist richtig und teuer erkauft: Ein Wächter, der in den Baum einer
+fremden Sitzung greift, richtet mehr an, als er repariert. Falsch ist nur, dass dieselbe Regel
+auch das Berichten erfasst hat. Lesen kollidiert mit nichts. Der Zustand wurde am Ende von Hand
+über `git worktree list` und `git merge-base --is-ancestor` ermittelt — mit dem Ergebnis, dass
+tatsächlich ein Rest existiert, den niemand gemeldet hatte, weil das eine Kommando, das ihn
+findet, sich in dem Moment für unzuständig erklärt, in dem der Batch läuft. Also praktisch immer.
+
+Die Klasse ist nicht „Wächter zu vorsichtig", sondern: **Stand-down ist eine Aussage über das
+Handeln, nie über das Wissen — wer beides zusammen abschaltet, macht den Zustand genau dann
+unsichtbar, wenn Betrieb herrscht.** Ein zurückgetretener Wächter, der weiter misst und sein
+Urteil mit „ich handle hier nicht" versieht, kostet nichts und bleibt brauchbar. Einer, der
+schweigt, ist im Normalbetrieb kein Wächter, sondern ein Kommando für den Ausnahmefall, in dem
+ohnehin niemand fragt. Gebucht als Punkt 917, zusammen mit dem Rest, den er hätte finden sollen.
+
+### 3.180 Ein Zitat mit gedehntem Geltungsbereich ist ein erfundenes Zitat
+
+Am 25.08.2026 wurde der Batch mit `--user-stop` pausiert und als Begründung ein
+Nutzersatz eingetragen — „Erstmal nur antworten" —, der sich erkennbar nur auf die eine
+gerade gestellte Frage bezog. Der Nutzer fragte zu Recht, welche Anweisung er denn gegeben
+habe, den Batch zu pausieren: keine. Der Fehler ist nicht die falsche Vorsicht, sondern die
+Buchführung: Ein `--user-stop`-Eintrag ist eine Tatsachenbehauptung über den Nutzer, und
+eine gedehnte Auslegung macht daraus ein Zitat, das nie gefallen ist — in genau dem
+Protokoll, dem spätere Sitzungen glauben müssen.
+
+Die Klasse: **Eine Nutzeräußerung gilt exakt in ihrem Geltungsbereich; für einen
+Zustandswechsel braucht es eine Anweisung, die ihn wirklich ausspricht.** Im Zweifel gilt
+der Default (der Batch läuft), und die offene Frage wird als Karte gestellt statt als
+Anweisung erfunden. Festgehalten als Memory `no-invented-user-instructions`; die Pause
+wurde im selben Zug aufgehoben und der Batch fortgesetzt.
+
+### 3.181 Ein falsches Urteil in der Übergabe kapert die ganze nächste Sitzung
+
+Am 25.08.2026 startete eine frische Sitzung mit einem Auftrag, der keinen Widerspruch
+duldete: Der CI-Terminal-Handoff nannte einen Lauf auf `main` als „concluded RED" und
+erklärte die neue Sitzung zum Reparaturpfad — erst den Fehlschlag untersuchen, reparieren,
+Gates fahren, den heilenden Commit pushen, und *dann* erst einen Punkt aufnehmen. Der Lauf
+war abgebrochen, nicht fehlgeschlagen: Der nächste Push auf `main` folgte zwei Minuten
+später, und `cancel-in-progress` stoppte den älteren. Sein Geschwister-Job war schon grün.
+Es gab keinen Defekt und es gab keinen möglichen heilenden Push, denn die sha war nicht
+mehr die Spitze.
+
+Der Mechanismus dahinter ist sauber gebaut und trotzdem zu kurz: Die Verwerfungsregel für
+abgebrochene Läufe verwirft einen Abbruch nur, wenn ein *anderer* Lauf desselben Workflows
+auf *derselben* sha zu Ende kam. Genau das kann eine sha, an der der Ref weitergezogen ist,
+nie bekommen. Die Regel trifft also präzise den Fall, für den sie geschrieben wurde (zwei
+Läufe auf einer sha), und verfehlt den benachbarten (zwei shas auf einem Ref) — und der
+zweite ist der Landerhythmus des Batches: Merge-Commit, Abhak-Commit, Board-Commit.
+
+Was diese Klasse von einem gewöhnlichen Fehlalarm unterscheidet, ist der **Transport**. Ein
+Fehlalarm innerhalb eines Zuges kostet einen Torlauf; ein falsches Urteil in der Übergabe
+wird zur *Geburtsurkunde* der nächsten Sitzung. Sie erbt es als Auftrag, nicht als
+Beobachtung, und sie kann die Prämisse nicht billig prüfen, weil der Vorgänger weg ist und
+nur seine Behauptung dasteht. Die naheliegende, gehorsame Reaktion — „einen Reparatur-Commit
+bauen" — hätte hier Code verändert, an dem nichts falsch war.
+
+Zwei Lehren. Erstens: **Ein Urteil, das eine Sitzungsgrenze überquert, muss seine Belege
+mitnehmen, nicht nur sein Ergebnis.** „RED" ist kein Beleg; `conclusion=cancelled`,
+`workflow`, `sha` und ob die sha noch die Spitze ihres Refs ist, sind welche — der
+Nachfolger muss die Behauptung nachrechnen können, ohne den Vorgänger zu haben. Zweitens,
+und das ist die eigentliche Gefahr: Ein Handoff, der oft genug grundlos „rot" ruft, wird
+irgendwann überlesen — und dann ist genau der Kanal taub, der gebaut wurde, damit ein echtes
+Rot nie wieder unbemerkt bleibt. Gebucht als Punkt 919.
+
+Ein Nachspiel desselben Abends gehört dazu, weil es dieselbe Wurzel hat und sofort zubiss:
+Der Fund wurde als Punkt abgelegt, seine Nummer aus dem *Ende* des Arbeitsauftrags
+abgeleitet — dort stand 917 — und damit doppelt vergeben, denn 918 stand längst weiter oben.
+Der Arbeitsauftrag ist nicht nach Nummern sortiert, und die freie Nummer ist das Maximum
+über die Datei *und* das Archiv. Das Pre-Push-Tor fing es ab und machte drei Suiten rot; die
+Reparatur kostete eine Umnummerierung und eine überschriebene Board-Karte. Für das *Ende*
+eines Punktes gibt es Befehle, für seinen *Anfang* keinen — und wo kein Befehl steht, steht
+Handarbeit gegen eine 12 000-Zeilen-Datei. Gebucht als Punkt 920.
+
+### 3.120 Eine Regel verurteilt ihre eigene Vorgeschichte
+
+Am 25.08.2026 hielt der Vier-Augen-Wächter an der Punktgrenze jeden Zug an. Seine Begründung
+war für ein Dutzend Commits dieselbe: „ein aufgezeichnetes do-not-merge ist fehlerhaft — es
+kann nur von Hand gekommen sein." Die genannten Zeilen waren nicht von Hand gekommen. Der
+Rekorder selbst hatte sie geschrieben, korrekt, Wochen zuvor — nur eben bevor es das Feld
+gab, das die Prüfung heute verlangt: einen Identitätsnachweis des Prüfmodells. Die
+Wohlgeformtheitsprüfung kennt keine Zeitgrenze, und so greift eine spätere Regel rückwärts
+und erklärt die eigene Vorgeschichte für gefälscht.
+
+Das Muster ist nicht der Tippfehler, sondern die Richtung. Wir verschärfen Regeln laufend,
+und das ist richtig; jede Verschärfung sitzt aber in einem Prüfer, der über einen *Bestand*
+läuft, nicht nur über den nächsten Eintrag. Für das Modus-Feld hatte dieselbe Datei diese
+Einsicht schon — `MODE_REQUIRED_SINCE` zieht genau die Grenze, die dem Identitätsfeld fehlt.
+Die Lehre ist deshalb konkret: **Wer eine Pflicht in einen Prüfer einbaut, der Altbestände
+liest, schreibt im selben Commit hin, ab wann sie gilt.** Sonst wächst die Strenge nicht nach
+vorn, sondern nach hinten.
+
+Verschärft wurde es durch die zweite Hälfte: Die Meldung nennt eine Reparatur — „die Zeile
+korrigieren oder entfernen, auf dem Protokoll" —, für die es keinen Befehl gibt, und
+Handeditieren des Ledgers ist genau das, was sie anprangert. Ein Tor, dessen einziger
+Ausgang die Handlung ist, die es verbietet, ist kein Tor, sondern eine Wand. Gebucht als
+Punkt 921.
+
+### 3.182 Das Tor stellte die Diagnose selbst — und urteilte gegen sie
+
+In der Nacht zum 26.08.2026 wies das Tor vor dem Push viermal denselben Push von `main`
+ab. Der Inhalt waren drei Commits an der Auftragsliste und an der Retrospektive; die
+gemeldete Ursache war `test:unit`. Bemerkenswert ist nicht das Rot, sondern der Text, den
+das Tor dabei druckte: 417 Dateien, 13 779 Fälle, **kein einziger benannter Fehlschlag**,
+und dazu die Einordnung in eigenen Worten — beobachtet wurde „ein Läufer, der nicht fertig
+wurde, kein Test, der fehlschlug", mit dem `[vitest-worker]: Timeout calling
+"onTaskUpdate"` als genau dieser Signatur, und „die Maschine mag belastet sein".
+Anschließend blockierte es trotzdem, weil seine Regel zwei Rot als abschließend behandelt.
+
+Der Gegenbeweis kostete einen einzigen Befehl. Derselbe `npm run test:unit`, im selben
+Baum, auf derselben Maschine, gestartet während der parallele Autorenlauf acht
+Vitest-Prozesse hielt: 164,48 Sekunden, 417 von 417 Dateien, 13 778 grün, einer
+übersprungen, Exit 0. Der Push ging danach unverändert durch. Der Baum war also nie rot,
+und „Last" allein erklärt es auch nicht — die Aufrufe des Tores erreichen eine Zeitgrenze,
+die derselbe Aufruf über das Paketskript nicht erreicht.
+
+**Lehre:** Ein Mechanismus, der die Unterscheidung zwischen *nicht fertig geworden* und
+*fehlgeschlagen* selbst treffen kann — und sie hier sogar ausdruckt —, darf sie im Urteil
+nicht wieder wegwerfen. Ein Lauf, der keinen fehlschlagenden Test nennt, ist **ungemessen**,
+nicht rot; er gehört wiederholt, nicht gezählt. Punkt 296 sagt, Last erzeuge falsche Rote
+und nie falsche Grüne — das Tor wendet die erste Hälfte an und ignoriert die zweite, und
+macht damit aus einer Umgebungsstörung eine Verweigerung, die der Bedienende nur umgehen
+kann, indem er von Hand beweist, was das Tor gerade bestreitet. Prüffrage für jedes Tor:
+*Nennt mein Rot einen Gegenstand — einen Test, eine Datei, eine Zeile? Wenn nicht, worüber
+urteile ich dann?* Gebucht als Punkt 924.
+
+### 3.112 Ein Schalter, der auf Zusage statt auf Messung steht
+
+Der dauerhafte Autoren-Unterbau (Punkt 676) landete in der Nacht zum 26.08.2026 vollständig:
+begrenzte Nachfüllung, Übergabe-Prüfpunkt, zweiphasige Sitzungsgrenze mit Siegel, Landejournal,
+Metriken. Build, Lint und Unit-Suite grün, 13 820 Fälle, die Gegenlese quer über die Anbieter
+geführt. Und trotzdem stand am Ende ein Bauteil im Baum, das die eigene Fertigkeit behauptet,
+ohne sie zu messen: Die Tabelle `DURABLE_LANE_STEPS` führt Schritt 12 — die Ausfallproben — als
+grün mit der Begründung „complete daemon failure matrix". Elf der zwölf Proben rufen aber
+Entscheidungsfunktionen mit handgebauten Eingaben auf; nur eine startet echte Prozesse und
+tötet sie. Genau dieser Schritt gehört zu den sieben, die das Einschalten der Bahn freigeben.
+
+Dasselbe Muster eine Ebene tiefer: `updateReasonInterval` und der Daemon-Befehl `record-metric`
+sind gebaut und getestet, haben aber keinen einzigen Produktionsaufrufer. Der Punkt verlangt
+ausdrücklich einen journallierten Grund, sobald drei Bahnen möglich wären und weniger laufen —
+geschrieben wird er nirgends. Es fällt hier sicher aus, weil `trialVerdict` alles Unmessbare als
+Fehlschlag wertet; das ist aber der Grund, warum die Lücke unsichtbar bleibt, nicht der Grund,
+sie zu lassen.
+
+**Lehre:** Eine Bibliothek plus ein grünes Feld sind kein Nachweis. Wo eine Tabelle im Code
+festhält, welcher Schritt fertig ist, muss ihr Beweistext benennen, *was gelaufen ist* — welcher
+Prozess getötet, welche Datei beschmutzt, welcher Lauf gemessen wurde — und nicht, welche Datei
+existiert. Prüffrage: *Würde meine Probe auch dann grün bleiben, wenn die Sache, die sie prüft,
+kaputt wäre?* Gebucht als Punkt 925.
+
+### 3.183 Zwei Rote standen seit Wochen im Baum, weil niemand die Suite ganz lief
+
+Der Beweislauf für die Verifikationsleiter fuhr am 26.08.2026 neun Render-Suiten am Stück —
+und fand zwei Rote, die keiner der Punkte davor verursacht hatte. Der Victoria-Falls-Frame
+der world-Suite trifft sein Motiv nicht, und der F6-Fehlerbericht legt seit unbekannter Zeit
+kein Bild ins Archiv. Die Baseline-Klassifikation gegen main bestätigte beide als
+vorbestehend, in je zwei Läufen, deterministisch.
+
+Das ist nicht die Klasse aus `residuals-hide-defects` — hier hat niemand einen Rest
+weggeschrieben. Es ist die Kehrseite der Leiter selbst: Wer immer nur die billigste Sprosse
+tritt, die seine eigene Änderung abdeckt, sieht die Rote in der Sprosse daneben nie. Die
+Ersparnis, die 566 und 595 bauen, verschiebt Kosten von der Iteration in den Endbeweis — und
+genau deshalb hängt an ihr die Bedingung, dass der Endbeweis wirklich GANZ läuft. Bei 927
+kostet das Übersehene mehr als die gesparten Minuten: Der Bericht, mit dem der Nutzer uns
+Fehler übergibt, reicht ihm ein Archiv ohne das Bild — die Zusammenstellung lässt den
+fehlenden Teil still weg, statt laut zu scheitern.
+
+**Lehre:** Eine billige Sprosse ist nur dann billig, wenn eine teure sie regelmäßig einholt.
+Und ein Artefakt, das der Nutzer nach draußen trägt, darf unvollständig nicht ausliefern:
+Wo ein Teil fehlt, ist Schweigen die schlimmste Antwort. Gebucht als Punkt 926 und 927.
+
+### 3.184 Zweimal grün über einer Attrappe, die es nur nachgebaut statt gelesen hat
+
+Punkt 844 hängt ein Kritikalitäts-Abzeichen in jeden Kartenkopf des Boards. Der Autor lieferte
+423 grüne Testdateien — und das Stylesheet landete auf dem echten Board mitten in einem
+JavaScript-Kommentar der Refresh-Routine. Der Grund: Die Datei hat keinen `</head>`, also griff
+der Rückfall auf das erste `<main`, und das erste `<main` im Board steht nicht im Dokument,
+sondern im Kommentar eines Skripts, das über `<main>` spricht. Ergebnis: 208 ungestylte
+Abzeichen und ein zerlegtes Inline-Skript.
+
+Interessant ist nicht dieser Fehler, sondern der zweite. Der Review benannte die Ursache
+ausdrücklich — »nicht der Code hat den Fall verfehlt, sondern die Fixture« — und verlangte eine
+Regressionsprüfung in der Gestalt des echten Boards. Die Nachbesserung kam prompt, mit genau so
+einer Prüfung. Sie war wieder falsch: Der neue Anker verlangt `<title>` unmittelbar gefolgt von
+`<style>`, und im echten Board steht dazwischen ein `<meta name="viewport">`. Die neue Fixture
+ließ genau diese eine Zeile weg. Also lief der Test durch den gemeinten Zweig, während das echte
+Board weiter in den Rückfall fiel — diesmal ohne Skript-Schaden, dafür mit verschobener und im
+zweiten Durchlauf **gelöschter** BOM, weil `\s` in ECMAScript auch U+FEFF matcht.
+
+Das ist verwandt mit §3.89, aber nicht dasselbe. Dort war die Attrappe **kleiner** als die
+Wirklichkeit, eine Mengengrenze fiel heraus. Hier hat sie die **falsche Gestalt**, und zwar
+zweimal hintereinander, obwohl die Wirklichkeit die ganze Zeit als Datei im Repository lag und
+mit einem `head -c 300` zu lesen gewesen wäre. Eine aus dem Gedächtnis nachgebaute Fixture prüft
+nicht das Artefakt, sondern die Vorstellung, die der Autor davon hat — und sie prüft sie
+zuverlässig grün, weil beide aus derselben Quelle stammen. Der Aufruf »nimm die echte Gestalt«
+reicht dagegen nicht: Er wurde befolgt und traf trotzdem daneben, weil auch der zweite Nachbau
+wieder aus dem Kopf kam.
+
+**Lehre:** Wo eine Prüfung gegen ein Artefakt läuft, das im Repository liegt, wird die Fixture
+aus dieser Datei **abgeleitet**, nicht nachgebaut — und wo das aus guten Gründen nicht geht,
+gehört mindestens eine Zusicherung dazu, die den Rückfall selbst verbietet, statt nur den
+gemeinten Zweig zu bestätigen. Zwei Zusicherungen hätten beide Runden sofort erledigt:
+Idempotenz über der echten Datei und Byte-Erhalt ihres Kopfes. Beide sind billiger als eine
+Review-Runde, und beide messen die Wirklichkeit statt der Absicht.

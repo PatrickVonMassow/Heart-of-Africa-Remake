@@ -53,6 +53,7 @@ import {
 import { normaliseLineEndings } from './board-core.mjs'
 import { SINGLE_PARAGRAPH_WORD_BUDGET, WORD_BUDGET } from './dashboard-conciseness-guard-core.mjs'
 import { gateSets } from './user-gate-core.mjs'
+import { INHERITED_ESTIMATE_NOTE, inheritedEstimate } from './queue-calibration-core.mjs'
 // The pool cap is the width of the queue's front (point 712) — three slots,
 // three candidates. It is IMPORTED rather than restated: a second 3 in this file
 // would be a second home for the number CLAUDE.md §6 states.
@@ -356,8 +357,13 @@ export function gatedMeta(since) {
  * gated point that already has its "Von dir zu klären" card is excluded by the
  * caller anyway; this is the honest state of the window before that card exists,
  * or after somebody forgot it.)
+ *
+ * `calibration` is what `queue-calibration.mjs` measured (point 730). A point
+ * nobody has estimated inherits the MEASURED MEDIAN of its criticality class
+ * instead of showing the "no estimate yet" marker — the marker is not retired,
+ * it is what still stands when the point carries no class the measurement covers.
  */
-export function queueEntries({ open = [], data = null, exclude = [], titles = {}, gates = null } = {}) {
+export function queueEntries({ open = [], data = null, exclude = [], titles = {}, gates = null, calibration = null } = {}) {
   const { points } = normaliseQueueData(data)
   const g = normaliseGates(gates)
   const skip = new Set((Array.isArray(exclude) ? exclude : [...exclude]).map(Number))
@@ -372,7 +378,7 @@ export function queueEntries({ open = [], data = null, exclude = [], titles = {}
       point,
       title,
       body: entry.body ?? [QUEUE_STUB_BODY],
-      meta: gated ? gatedMeta(g.since.get(point)) : entry.estimate || QUEUE_STUB_META,
+      meta: gated ? gatedMeta(g.since.get(point)) : entry.estimate || inheritedEstimate(point, calibration ?? {}) || QUEUE_STUB_META,
       stub,
       gated,
       // The fallback is still TAKEN — it is no longer taken SILENTLY.
@@ -536,10 +542,10 @@ export function queueSectionBounds(html) {
  * a request that has since been queued disappears from the board on the next
  * rebuild without anything having to remember it.
  */
-export function buildQueueSection(html, { open = [], data = null, exclude = [], titles = {}, requests = [], gates = null } = {}) {
+export function buildQueueSection(html, { open = [], data = null, exclude = [], titles = {}, requests = [], gates = null, calibration = null } = {}) {
   const doc = String(html ?? '')
   const { from, end } = queueSectionBounds(doc)
-  const entries = queueEntries({ open, data, exclude, titles, gates })
+  const entries = queueEntries({ open, data, exclude, titles, gates, calibration })
   const cards = `${renderQueueCards(entries)}${renderRequestsCard(requests)}`
   return { html: `${doc.slice(0, from)}\n${cards}${doc.slice(end)}`, entries }
 }
@@ -593,7 +599,12 @@ export function importQueueFromHtml(html) {
     // THE GATED META IS NOT AN ESTIMATE (point 450). Importing it would store
     // "wartet auf deine Entscheidung" as the point's duration, and one rebuild
     // later the card would carry that string for ever — even after the answer.
-    const isGated = metaRaw.trim().startsWith(QUEUE_GATED_META)
+    const meta = metaRaw.trim()
+    const isGated = meta.startsWith(QUEUE_GATED_META)
+    // A rendered class median is a derived fallback, not an authored estimate.
+    // Importing it would freeze the inheritance and let calibration multiply a
+    // value derived from that same calibration a second time.
+    const isInherited = meta.includes(INHERITED_ESTIMATE_NOTE)
     points[point] = {
       gated: isGated || undefined,
       // UNESCAPED, like the body (four-eyes finding 2): the card renders its
@@ -605,7 +616,7 @@ export function importQueueFromHtml(html) {
       // would make the card count as described and silence the "no prose yet"
       // report for ever.
       body: body.length && body.join(' ') !== QUEUE_STUB_BODY ? body : null,
-      estimate: metaRaw.trim() && metaRaw.trim() !== QUEUE_STUB_META && !isGated ? metaRaw.trim() : null,
+      estimate: meta && meta !== QUEUE_STUB_META && !isGated && !isInherited ? meta : null,
     }
   }
   return { points }
@@ -731,7 +742,16 @@ export function setQueueEntry(data, point, { title, body, estimate } = {}) {
 export const SET_STDIN_FLAG = '--text-stdin'
 
 /** Every flag `set` knows — named back at a caller that mistyped one. */
-export const SET_FLAGS = Object.freeze(['--title', '--estimate', SET_STDIN_FLAG, '--'])
+export const SET_FLAGS = Object.freeze(['--title', '--estimate', '--if-estimate', SET_STDIN_FLAG, '--'])
+
+/** Exact compare decision used by `set --if-estimate`, kept pure for tests. */
+export function estimateCompareDecision(current, expected) {
+  return {
+    matched: current === expected,
+    current: current ?? null,
+    expected: expected ?? null,
+  }
+}
 
 /**
  * Split `set`'s argv into its buckets (point 439). PURE, so the flag handling is
@@ -749,10 +769,11 @@ export const SET_FLAGS = Object.freeze(['--title', '--estimate', SET_STDIN_FLAG,
 export function parseSetArgs(rest) {
   const args = (Array.isArray(rest) ? rest : []).map((a) => String(a))
   const buckets = { body: [], title: [], estimate: [] }
-  const out = { point: args[0], title: null, body: null, estimate: null, stdinField: null }
+  const out = { point: args[0], title: null, body: null, estimate: null, ifEstimate: null, stdinField: null }
   let field = 'body'
   let literal = false
-  for (const a of args.slice(1)) {
+  for (let i = 1; i < args.length; i += 1) {
+    const a = args[i]
     if (!literal) {
       // A bare `--` ends the flags for the CURRENT field, so a text that begins
       // with a dash stays writable without a second command.
@@ -762,6 +783,14 @@ export function parseSetArgs(rest) {
       }
       if (a === '--title' || a === '--estimate') {
         field = a.slice(2)
+        continue
+      }
+      if (a === '--if-estimate') {
+        const expected = args[i + 1]
+        if (!expected || expected.startsWith('--')) throw new Error('board-queue: --if-estimate needs an estimate value')
+        if (out.ifEstimate !== null) throw new Error('board-queue: --if-estimate was given more than once')
+        out.ifEstimate = expected
+        i += 1
         continue
       }
       if (a === SET_STDIN_FLAG) {
@@ -918,7 +947,7 @@ export function commissionDecision({
  * honoured (`commissionDecision` asks the gate first), so a reader who followed
  * that printed remedy would record a reason the decision then ignores and be
  * denied again — the block-loop class that cost ~30 turns on 24.07.2026. What
- * lifts a gate is the USER'S WORD, closing the point's AWAITING-USER line in
+ * lifts a gate is the USER'S WORD, closing the point's AWAITING-CONFIRMATION line in
  * the work order, and that is what the refusal says.
  */
 export function commissionRefusal(decision = {}) {
@@ -932,9 +961,9 @@ export function commissionRefusal(decision = {}) {
       : 'the work order does not rank it'
   if (decision?.why === 'user-gated') {
     return (
-      `POINT ${n} IS WAITING ON THE USER (its AWAITING-USER line in the work order), so no work may be opened ` +
+      `POINT ${n} IS WAITING FOR CONFIRMATION (its AWAITING-CONFIRMATION line in the work order), so no work may be opened ` +
       `on it: ${front}. The ONLY thing that lifts this is the user's answer — his word closes the point's ` +
-      'AWAITING-USER line, and the point becomes workable in the same moment. A recorded override is ' +
+      'AWAITING-CONFIRMATION line, and the point becomes workable in the same moment. A recorded override is ' +
       'deliberately NOT honoured for a gated point, so do not record one: work a front candidate, or ask the ' +
       'user (the board carries the decision card).'
     )

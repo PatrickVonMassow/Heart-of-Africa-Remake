@@ -102,8 +102,8 @@ Notes:
   `__culturalLandmarks`, `__terrainType`, `__setLang`, `__voiceMarkup`);
   they do not work against the production build.
 - Chromium must run with `--enable-gpu` and the ANGLE backend its PLATFORM can
-  provide — `--use-angle=d3d11` on Windows, and on Linux whatever the host's GPU
-  offers (`VERIFY_ANGLE=gl`). The verify suites pick it themselves (point 475,
+  provide — `--use-angle=d3d11` on Windows, and surfaceless EGL over the host's GPU
+  on Linux (`VERIFY_ANGLE=gl-egl`). The verify suites pick it themselves (point 475,
   `scripts/verify/launch-args-core.mjs`); the perf tools here still hard-code the
   Windows flag. Beware the SwiftShader fallback — the only backend a GPU-less
   container can run: requestAnimationFrame drops to ~1 fps and interaction tests

@@ -23,8 +23,9 @@
 // session id cannot, and the deny it used to eat was one it could never act on.
 // A subagent running in the main tree still gets the deny, and its text still
 // tells it to repeat the call, which the once-per-turn stand-down lets through.
-import { readFileSync, existsSync } from 'node:fs'
-import { resolve } from 'node:path'
+import { readFileSync, existsSync, lstatSync, readlinkSync, realpathSync } from 'node:fs'
+import { execFileSync } from 'node:child_process'
+import { dirname, relative, resolve } from 'node:path'
 import {
   REPO_ROOT,
   STATE_PATH,
@@ -41,8 +42,11 @@ import {
   readFence,
   readBoundaryMarker,
   readOwnerLock,
+  ownsLock,
+  noteBatchWriter,
 } from './batch-singleton.mjs'
-import { fenceDecision } from './batch-lease-core.mjs'
+import { fenceDecision, mainWriteFenceDecision } from './batch-lease-core.mjs'
+import { renewOwnClaim } from './batch-claim.mjs'
 import {
   handoverSurvivesCall,
   describeWithdrawalTrigger,
@@ -50,9 +54,60 @@ import {
   sealedBoundaryDeny,
 } from './batch-boundary-core.mjs'
 import { publishCapability } from './board-currency-core.mjs'
-import { evaluate, isWorktreeCheckout } from './board-first-core.mjs'
+import { evaluate, isWorktreeCheckout, ownershipStandDownDecision } from './board-first-core.mjs'
 
 const PAUSE = resolve(REPO_ROOT, '.claude', 'batch-paused')
+
+/**
+ * Resolve a write destination even when its leaf (or several parent directories)
+ * does not exist yet. Entry existence matters here: `existsSync` follows a
+ * symlink and therefore mistakes a link to a not-yet-created target for a
+ * missing entry. Stop the upward walk on `lstatSync`, expand that link against
+ * its canonical containing directory, and repeat so dangling links and link
+ * chains cannot disguise a checkout destination.
+ *
+ * An unreadable link, a link loop, or a path with no readable ancestor returns
+ * the empty evidence sentinel. The pure fence deliberately treats that as
+ * inside the checkout, which is the conservative direction for a write guard.
+ */
+function resolvedWriteTarget(filePath, cwd = REPO_ROOT) {
+  if (typeof filePath !== 'string' || !filePath.trim()) return ''
+  let candidate = resolve(cwd, filePath)
+  const expandedLinks = new Set()
+
+  while (true) {
+    let existing = candidate
+    let entry
+    while (true) {
+      try {
+        entry = lstatSync(existing)
+        break
+      } catch (error) {
+        if (error?.code !== 'ENOENT' && error?.code !== 'ENOTDIR') return ''
+        const parent = dirname(existing)
+        if (parent === existing) return ''
+        existing = parent
+      }
+    }
+
+    if (!entry.isSymbolicLink()) {
+      try {
+        return resolve(realpathSync(existing), relative(existing, candidate))
+      } catch {
+        return ''
+      }
+    }
+
+    if (expandedLinks.has(existing)) return ''
+    expandedLinks.add(existing)
+    try {
+      const linkTarget = resolve(realpathSync(dirname(existing)), readlinkSync(existing))
+      candidate = resolve(linkTarget, relative(existing, candidate))
+    } catch {
+      return ''
+    }
+  }
+}
 
 /**
  * The transport this session may publish through (point 400, delta B/D). The
@@ -185,6 +240,11 @@ try {
   }
   if (existsSync(PAUSE)) process.exit(0)
 
+  // A claim/reservation is renewed by this window doing real foreground work,
+  // never by its editor process merely remaining alive. Delegated worktrees are
+  // not the claiming window and must not refresh the parent's reservation.
+  if (!isWorktreeCheckout(REPO_ROOT)) renewOwnClaim(payload.session_id || '')
+
   // ---- THE FENCE CHOKEPOINT (point 434, docs/batch-resilience.md §3 layer 1) --
   // It sits BEFORE the ownership stand-down below, and it has to: a session whose
   // fence is stale is by definition NOT the owner, so the ordinary
@@ -229,7 +289,93 @@ try {
     /* fail-OPEN: a fence we cannot read must never cost anybody a tool call */
   }
 
-  if (heldByOtherLiveOwner(payload.session_id || '')) process.exit(0)
+  // A LOCKLESS MAIN WRITER IS NOT COVERED BY STALE-FENCE DETECTION (point 795).
+  // The fence above can stop only a session whose old grant is on record. The
+  // measured concurrent writer had never acquired at all, so `held === null`
+  // correctly meant "not stale" while also leaving the launcher with no process
+  // identity to measure. Main writes now require ownership in their own right.
+  //
+  // Feature worktrees stand down: they commit their own branch by design and
+  // inherit the parent's session id. A paused batch also stood down above. For
+  // the owning main session, record its process separately from the lock before
+  // allowing the call; if the lock later disappears, the launcher still sees the
+  // live writer rather than treating lock absence as death.
+  try {
+    const branch = execFileSync('git', ['symbolic-ref', '--short', 'HEAD'], {
+      cwd: REPO_ROOT,
+      encoding: 'utf8',
+      windowsHide: true,
+      timeout: 5000,
+      stdio: ['ignore', 'pipe', 'ignore'],
+    }).trim()
+    const sid = payload.session_id || ''
+    const lock = readOwnerLock()
+    const filePath = input0.file_path ?? input0.notebook_path
+    const mainWrite = mainWriteFenceDecision({
+      branch,
+      worktree: isWorktreeCheckout(REPO_ROOT),
+      ownsBatchLock: ownsLock(sid, { lock }).mine,
+      toolName: payload.tool_name,
+      command: input0.command,
+      filePath,
+      resolvedFilePath: resolvedWriteTarget(filePath, payload.cwd || REPO_ROOT),
+      checkoutRoot: realpathSync(REPO_ROOT),
+      // The call's own directory, so a shell write can be located at all
+      // (point 749): without it a heredoc to the session memory directory is
+      // judged by intent alone and refused like a write to main.
+      cwd: payload.cwd || REPO_ROOT,
+    })
+    if (mainWrite.block) {
+      process.stdout.write(
+        JSON.stringify({
+          hookSpecificOutput: {
+            hookEventName: 'PreToolUse',
+            permissionDecision: 'deny',
+            permissionDecisionReason: mainWrite.reason,
+          },
+        }),
+      )
+      process.exit(0)
+    }
+    if (mainWrite.registerWriter) noteBatchWriter(sid)
+  } catch {
+    /* fail-OPEN: an unreadable branch or process identity never traps a call */
+  }
+
+  // OWNERSHIP IS RE-CHECKED BEFORE EVERY MUTATION (point 897). The old line here
+  // simply exited this guard when another live owner appeared. That stood the
+  // board duty down but let the tool call itself run, so a session dispossessed
+  // after SessionStart kept building, editing and eventually landing beside its
+  // successor. Reads still stand down silently; paused batches and isolated
+  // delegated worktrees retain the same exemption they have in every guard.
+  try {
+    const otherOwner = heldByOtherLiveOwner(payload.session_id || '')
+    if (otherOwner) {
+      const ownership = ownershipStandDownDecision({
+        heldByOtherLiveOwner: true,
+        paused: existsSync(PAUSE),
+        worktree: isWorktreeCheckout(REPO_ROOT),
+        ownerSession: readOwnerLock()?.sessionId ?? '',
+        toolName: payload.tool_name,
+        command: input0.command,
+        filePath: input0.file_path ?? input0.notebook_path,
+      })
+      if (ownership.block) {
+        process.stdout.write(
+          JSON.stringify({
+            hookSpecificOutput: {
+              hookEventName: 'PreToolUse',
+              permissionDecision: 'deny',
+              permissionDecisionReason: ownership.reason,
+            },
+          }),
+        )
+      }
+      process.exit(0)
+    }
+  } catch {
+    /* fail-OPEN: an ownership probe error must never invent a new owner */
+  }
 
   // A DELEGATED AGENT HAS NO BOARD DUTY (point 440). It runs from its own
   // worktree under .claude/worktrees/, which is the one thing the inherited

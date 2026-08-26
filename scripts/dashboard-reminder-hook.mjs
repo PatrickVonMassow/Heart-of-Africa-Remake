@@ -10,11 +10,17 @@
 // re-declares its focus (scripts/focus.mjs) — enforcement, not a reminder.
 import fs from 'node:fs'
 import { PENDING_PATH, STATE_PATH, boardFilePath, readJson, writeJsonAtomic, mergeState } from './dashboard-state.mjs'
-import { heldByOtherLiveOwner, withdrawHandover } from './batch-singleton.mjs'
+import { heldByOtherLiveOwner, readOwnerLock, withdrawHandover } from './batch-singleton.mjs'
 // The injected board obligation, in a pure module so its size is measurable and
 // its content testable (point 436).
-import { promptInjectionText } from './dashboard-reminder-core.mjs'
+import { attendedCeilingNoticeText, hookInjectionText } from './dashboard-reminder-core.mjs'
+import { CONTEXT_CEILING_TOKENS, parseContextTokens } from './context-watermark-core.mjs'
+import { fenceMode, readTail } from './context-watermark.mjs'
 import { seedDecisionCardBaseline } from './decision-card-guard.mjs'
+import { classifyContextSession, CONTEXT_SESSION_CLASS } from './session-context-ceiling-core.mjs'
+import { markAttendedContextNotice, prepareAttendedContextNotice } from './attended-context-notice.mjs'
+import { gitOperationInProgress } from './batch-claim.mjs'
+import { activeRecordPath, logDir, readRecord, runIsLive } from './verify/run-record.mjs'
 
 // Hard singleton (24.07.2026): a session that does not own the live batch lock
 // has NO dashboard/focus duty — arming the pivot check or issuing the board
@@ -24,17 +30,36 @@ import { seedDecisionCardBaseline } from './decision-card-guard.mjs'
 let standDown = false
 let sid = ''
 let transcriptPath = ''
+let contextTokens = null
+let agentId = null
 try {
   const payload = JSON.parse(fs.readFileSync(0, 'utf8'))
   sid = payload.session_id || ''
   transcriptPath = payload.transcript_path || ''
+  agentId = payload.agent_id ?? null
 } catch {
   /* no/!JSON stdin */
 }
+let ownerSessionId = ''
+try {
+  ownerSessionId = readOwnerLock()?.sessionId ?? ''
+} catch {
+  /* absent ownership evidence leaves a top-level session attended */
+}
+const sessionClass = classifyContextSession({ agentId, sessionId: sid, ownerSessionId })
 try {
   standDown = heldByOtherLiveOwner(sid)
 } catch {
   standDown = false
+}
+// The header reading comes from the newest non-sidechain usage record. Read
+// only the bounded tail used by context-watermark.mjs, then delegate the
+// counting rule to its pure core — one definition of what "context" means.
+try {
+  const tail = transcriptPath ? readTail(transcriptPath) : null
+  contextTokens = tail === null ? null : (parseContextTokens(tail)?.tokens ?? null)
+} catch {
+  contextTokens = null
 }
 // A user prompt is the earliest possible proof that a session which took a point
 // boundary is alive and about to work again — earlier than any tool call, and it
@@ -96,12 +121,51 @@ try {
 // form ("06.08.26, 21:00"), which is exactly what the guard's TIMESTAMP_RE
 // rejects. See PROMPT_ENFORCED_CLAIMS.
 
+let preparedNotice = null
+let ceilingNotice = ''
+if (sessionClass === CONTEXT_SESSION_CLASS.ATTENDED) {
+  preparedNotice = prepareAttendedContextNotice({
+    sessionClass,
+    sessionId: sid,
+    tokens: contextTokens,
+    ceiling: CONTEXT_CEILING_TOKENS,
+  })
+  // The reading and marker are cheap and decide almost every prompt. Pay for
+  // the git/process probes only for the one warning otherwise ready to speak.
+  if (preparedNotice.speak) {
+    let gitBusy = false
+    let verificationRunning = false
+    try {
+      gitBusy = gitOperationInProgress() !== null
+    } catch {
+      gitBusy = true // an unreadable git state is not proof of a clean moment
+    }
+    try {
+      const recordPath = activeRecordPath(logDir())
+      verificationRunning = recordPath ? runIsLive(readRecord(recordPath)).live : false
+    } catch {
+      verificationRunning = true // the bad-moment suppression takes the timid direction
+    }
+    preparedNotice = prepareAttendedContextNotice({
+      sessionClass,
+      sessionId: sid,
+      tokens: contextTokens,
+      ceiling: CONTEXT_CEILING_TOKENS,
+      gitBusy,
+      verificationRunning,
+    })
+  }
+  if (preparedNotice.speak) {
+    ceilingNotice = attendedCeilingNoticeText({
+      tokens: contextTokens,
+      ceiling: CONTEXT_CEILING_TOKENS,
+      mode: fenceMode(),
+    })
+  }
+}
+
 if (standDown) {
-  console.log(
-    '[batch-singleton] Eine ANDERE Session hält den Batch-Lock (lebendig geprüft). STAND DOWN: ' +
-      'Diese Session ist NICHT der Batch-Worker — keine Batch-Arbeit, kein Merge nach main, ' +
-      'kein TASKS.md-/Dashboard-Edit. Beantworte die Nutzer-Nachricht normal.',
-  )
+  process.stdout.write(hookInjectionText({ standDown: true, contextTokens, ceilingNotice }))
 } else {
 // The age of the CANONICAL board file (point 435). It used to stat the
 // scratchpad copy of the retired mirror, which most sessions never write — so
@@ -122,5 +186,8 @@ try {
 // end while it stands — naming `focus.mjs confirm`, `focus.mjs set`, the now-card
 // update, the republish and `--synced` in its own block text, which is read
 // exactly when it is needed instead of on every prompt.
-process.stdout.write(promptInjectionText(mtimeNote))
+process.stdout.write(hookInjectionText({ mtimeNote, contextTokens, ceilingNotice }))
 }
+// The marker follows the successful stdout write. A process killed before the
+// person-facing instruction is injected must leave the next prompt able to ask.
+if (preparedNotice?.speak) markAttendedContextNotice(preparedNotice)

@@ -1,156 +1,773 @@
 {
   "ranked": {
+    "336": {
+      "at": "2026-08-21T16:06:02.037Z",
+      "why": "User ruling 21.08.2026 (only the communication mechanic, then 633 and the release 174), plus the branch decision of the same day: feat/336-croc-staging was deleted because two of two files had moved on main, so nothing is left to fall behind and the rebuild this point demands waits until after the release.",
+      "origin": "user",
+      "place": "last"
+    },
+    "553": {
+      "at": "2026-08-21T16:06:01.436Z",
+      "why": "User ruling 21.08.2026 (only the communication mechanic, then 633 and the release 174): queued directly behind 174. It states the weekly-volume diagnosis correctly but overlaps 745 and 746 and is the largest build in the block.",
+      "origin": "user",
+      "place": "last"
+    },
+    "581": {
+      "at": "2026-08-23T08:37:05.342Z",
+      "why": "Nutzeranweisung 23.08.2026, 10:36 (Board-Chat): 581 direkt vor 686 schieben",
+      "origin": "user",
+      "place": "ahead"
+    },
+    "596": {
+      "at": "2026-08-21T16:06:01.515Z",
+      "why": "User ruling 21.08.2026 (only the communication mechanic, then 633 and the release 174): queued directly behind 174. It makes a running tail visible; the tail points it targets are render work that follows the release.",
+      "origin": "user",
+      "place": "last"
+    },
     "643": {
       "at": "2026-08-11T15:00:17.845Z",
-      "why": "Not release-blocking: the closing run proves the build with two full regressions rather than relying on a released red, and 643 refines a mechanism that only landed today. It waits behind the release work."
+      "why": "Not release-blocking: the closing run proves the build with two full regressions rather than relying on a released red, and 643 refines a mechanism that only landed today. It waits behind the release work.",
+      "place": "last"
     },
     "646": {
       "at": "2026-08-11T18:08:06.988Z",
-      "why": "Zweite Tuer zum selben Loeschen wie 629 — hinter den Spielfehlern, aber vor der Release-Mechanik"
+      "why": "Zweite Tuer zum selben Loeschen wie 629 — hinter den Spielfehlern, aber vor der Release-Mechanik",
+      "place": "last"
     },
     "647": {
       "at": "2026-08-11T18:08:07.037Z",
-      "why": "Der unerklaerte Rot-Lauf ist auf einem Zweig, nicht auf main; das Fast-Gate steht davor"
-    },
-    "650": {
-      "at": "2026-08-11T18:34:39.594Z",
-      "why": "Verfahrensschaerfe an der Gegenpruefung; wichtig, aber kein Spielfehler und niemand ist darauf blockiert"
+      "why": "Der unerklaerte Rot-Lauf ist auf einem Zweig, nicht auf main; das Fast-Gate steht davor",
+      "place": "last"
     },
     "652": {
       "at": "2026-08-11T21:10:35.758Z",
-      "why": "Last is right: it is a guard over the session's own answers, which costs nothing the deployed game shows — and 174 gates the release."
+      "why": "Last is right: it is a guard over the session's own answers, which costs nothing the deployed game shows — and 174 gates the release.",
+      "place": "last"
     },
     "653": {
       "at": "2026-08-11T21:10:45.801Z",
-      "why": "Last is right for the mechanism; the ONE stale section it names (criterion 7) is corrected inside point 174, which gates the release anyway."
+      "why": "Last is right for the mechanism; the ONE stale section it names (criterion 7) is corrected inside point 174, which gates the release anyway.",
+      "place": "last"
+    },
+    "660": {
+      "at": "2026-08-21T16:06:01.878Z",
+      "why": "User ruling 21.08.2026 (only the communication mechanic, then 633 and the release 174): queued directly behind 174. A total stall when it fires, but measured once on 12.08.2026 with no recurrence since.",
+      "origin": "user",
+      "place": "last"
     },
     "663": {
-      "at": "2026-08-12T20:20:48.210Z",
-      "why": "Infrastruktur-Aergernis mit Retry als Sofort-Handgriff; hinter den Release-Punkten bei den Infrastruktur-Nachbarn"
+      "at": "2026-08-21T16:06:01.959Z",
+      "why": "User ruling 21.08.2026 (only the communication mechanic, then 633 and the release 174): queued directly behind 174. The deploy flake is intermittent rather than currently blocking, and one automatic retry is the cheap half if it recurs.",
+      "origin": "user",
+      "place": "last"
     },
     "668": {
       "at": "2026-08-13T12:07:50.425Z",
-      "why": "Small landing-chain hardening; the red is loud and the remedy obvious, so it waits behind the release-critical fixes"
-    },
-    "669": {
-      "at": "2026-08-13T13:50:49.371Z",
-      "why": "Blocks the supervising session's turn ends on every Sol run, so it belongs right behind the lane that causes it"
+      "why": "Small landing-chain hardening; the red is loud and the remedy obvious, so it waits behind the release-critical fixes",
+      "place": "last"
     },
     "670": {
       "at": "2026-08-13T15:12:02.801Z",
-      "why": "Small evidence-plumbing fix; it belongs with the other verification-chain hardening rather than ahead of the release fixes"
-    },
-    "676": {
-      "at": "2026-08-13T17:13:15.401Z",
-      "why": "Grosse Infrastruktur, kein Bugfix: vor dem Demo-Checkpoint gilt Bugfixes zuerst, und 675 deckt die drei mechanischen Niederlagen der Uebergabe bereits ohne diese Ebene ab"
+      "why": "Small evidence-plumbing fix; it belongs with the other verification-chain hardening rather than ahead of the release fixes",
+      "place": "last"
     },
     "677": {
       "at": "2026-08-13T17:13:15.449Z",
-      "why": "Haengt nur den Aufrufer, nicht das Projekt, und hat mit '< /dev/null' einen sofort verfuegbaren Umweg — vor dem Release gehen die Release-Punkte vor"
+      "why": "Haengt nur den Aufrufer, nicht das Projekt, und hat mit '< /dev/null' einen sofort verfuegbaren Umweg — vor dem Release gehen die Release-Punkte vor",
+      "place": "last"
     },
     "678": {
       "at": "2026-08-13T18:14:11.985Z",
-      "why": "Vor dem Release gehen die Release-Punkte vor; die akute Haelfte — die Rettung ungesicherter Arbeit — fuehre ich bis dahin von Hand aus, und die leere Spur ist ab jetzt bekannt"
+      "why": "Vor dem Release gehen die Release-Punkte vor; die akute Haelfte — die Rettung ungesicherter Arbeit — fuehre ich bis dahin von Hand aus, und die leere Spur ist ab jetzt bekannt",
+      "place": "last"
     },
     "680": {
       "at": "2026-08-13T18:48:25.602Z",
-      "why": "Es blockiert 666 nicht sofort — die Diagnose kann auch aus dem Seed nachgestellt werden —, aber jeder weitere Bericht dieser Art bleibt ohne es undiagnostizierbar; Release-Punkte gehen trotzdem vor"
-    },
-    "681": {
-      "at": "2026-08-13T18:54:12.170Z",
-      "why": "Gehoert zum Release-Thema Verstaendigung und wird zusammen mit 682 und 659 gespielt; die Reihenfolge dort entscheidet 659"
-    },
-    "682": {
-      "at": "2026-08-13T18:54:12.244Z",
-      "why": "Gehoert zum Release-Thema Verstaendigung; 659 spielt die Kette durch und entscheidet, was zuerst greifen muss"
+      "why": "Es blockiert 666 nicht sofort — die Diagnose kann auch aus dem Seed nachgestellt werden —, aber jeder weitere Bericht dieser Art bleibt ohne es undiagnostizierbar; Release-Punkte gehen trotzdem vor",
+      "place": "last"
     },
     "683": {
       "at": "2026-08-13T20:19:36.791Z",
-      "why": "Letzter Rest eines Siegels, das gegen jede andere Mutation haelt — hinter die Release-Bugfixes gestellt"
-    },
-    "693": {
-      "at": "2026-08-13T23:44:58.490Z",
-      "why": "Der Umweg ist bekannt und kostenlos (author-sol --anyway, in der Merk-Datei festgehalten), deshalb steht der Punkt hinter den Spielfehlern und dem Verständigungsumbau, die der Nutzer für diese Auslieferung zuerst sehen will"
+      "why": "Letzter Rest eines Siegels, das gegen jede andere Mutation haelt — hinter die Release-Bugfixes gestellt",
+      "place": "last"
     },
     "694": {
       "at": "2026-08-14T01:20:00.398Z",
-      "why": "Es erbt nur die Freigabe eines seltenen, bekannten Rots und hat keinen Spieler-Effekt; die Bugfixes und fast fertigen Punkte davor gehen vor."
-    },
-    "695": {
-      "at": "2026-08-14T02:25:45.277Z",
-      "why": "Es blockiert das Bild-Tor jeder Sitzung, gehört aber hinter die laufenden Spieler-Fixes; als Werkzeug-Punkt kommt es mit dem nächsten Werkzeug-Block."
+      "why": "Es erbt nur die Freigabe eines seltenen, bekannten Rots und hat keinen Spieler-Effekt; die Bugfixes und fast fertigen Punkte davor gehen vor.",
+      "place": "last"
     },
     "696": {
       "at": "2026-08-14T05:13:27.358Z",
-      "why": "Sits with the other infrastructure fixes filed the same night (693-695), behind the communication-slice points the release is cut for"
+      "why": "Sits with the other infrastructure fixes filed the same night (693-695), behind the communication-slice points the release is cut for",
+      "place": "last"
     },
     "698": {
       "at": "2026-08-17T09:12:55.330Z",
-      "why": "Kalibrierung, kein Defekt: Sie gehoert hinter die uebrigen Sprachpunkte, weil 688-691 die Mechanik noch aendern und die Dichte erst danach sinnvoll eingestellt wird."
+      "why": "Kalibrierung, kein Defekt: Sie gehoert hinter die uebrigen Sprachpunkte, weil 688-691 die Mechanik noch aendern und die Dichte erst danach sinnvoll eingestellt wird.",
+      "place": "last"
     },
     "699": {
       "at": "2026-08-17T09:44:54.861Z",
-      "why": "Kosmetisch und eng verwandt mit 628: Sie wartet hinter den gemeldeten Fehlern und den fast fertigen Punkten, wie es die Warteschlangenregel fuer Fundstuecke vorsieht."
+      "why": "Kosmetisch und eng verwandt mit 628: Sie wartet hinter den gemeldeten Fehlern und den fast fertigen Punkten, wie es die Warteschlangenregel fuer Fundstuecke vorsieht.",
+      "place": "last"
     },
     "704": {
       "at": "2026-08-17T13:43:56.910Z",
-      "why": "Tafel-Fix aus dem heutigen 429; klein und eigenstaendig, die Reihung hinter den laufenden Punkten ist folgenlos"
+      "why": "Tafel-Fix aus dem heutigen 429; klein und eigenstaendig, die Reihung hinter den laufenden Punkten ist folgenlos",
+      "place": "last"
     },
     "705": {
       "at": "2026-08-17T14:29:14.631Z",
-      "why": "Ursache der Tafel-Drosselung, aber die Lesesite (704) faengt den Nutzer schon ab; die Reihung hinter den laufenden Punkten ist folgenlos"
+      "why": "Ursache der Tafel-Drosselung, aber die Lesesite (704) faengt den Nutzer schon ab; die Reihung hinter den laufenden Punkten ist folgenlos",
+      "place": "last"
     },
     "706": {
       "at": "2026-08-17T14:29:14.683Z",
-      "why": "Kleiner Argument-Fehler in einem Hilfsbefehl; nichts haengt daran, letzte Stelle ist richtig"
+      "why": "Kleiner Argument-Fehler in einem Hilfsbefehl; nichts haengt daran, letzte Stelle ist richtig",
+      "place": "last"
     },
     "708": {
-      "at": "2026-08-17T14:29:14.792Z",
-      "why": "Groesserer Umbau der Ablaeufe; er lohnt erst nach 707, das dieselbe Vorabpruefung braucht"
+      "at": "2026-08-21T16:06:00.301Z",
+      "why": "User ruling 21.08.2026 (only the communication mechanic, then 633 and the release 174): queued directly behind 174. Four bundled commands is a large build whose payback before the release is not shown.",
+      "origin": "user",
+      "place": "last"
+    },
+    "713": {
+      "at": "2026-08-21T16:05:59.985Z",
+      "why": "User ruling 21.08.2026 (only the communication mechanic, then 633 and the release 174), second rule: feat/713-now-section-derived carries 40 commits and is 658 behind main, so it is cleared rather than left to rot.",
+      "origin": "user",
+      "place": "ahead"
     },
     "715": {
-      "at": "2026-08-17T22:08:35.893Z",
-      "why": "Filed directly beside 714 in the process-fix block, not appended last: it is the class the whole Stop chain rests on and the check meant to catch it currently certifies it."
+      "at": "2026-08-21T16:06:01.612Z",
+      "why": "User ruling 21.08.2026 (only the communication mechanic, then 633 and the release 174): queued directly behind 174. Attended-only by its own execution note and already placed behind the user's block.",
+      "origin": "user",
+      "place": "last"
     },
-    "716": {
-      "at": "2026-08-18T13:41:45.936Z",
-      "why": "Batch autonomy defect with a known workaround (the successor adopts the strand); it waits behind the token and communication blocks the user ordered first."
-    },
-    "718": {
-      "at": "2026-08-18T13:41:46.018Z",
-      "why": "The lane ruling it records is already in force since 714 landed; what remains is the tag plus its unit case, which nothing blocks."
+    "719": {
+      "at": "2026-08-21T16:06:01.709Z",
+      "why": "User ruling 21.08.2026 (only the communication mechanic, then 633 and the release 174): queued directly behind 174. The enforcement gap it measures costs correctness, not speed or tokens.",
+      "origin": "user",
+      "place": "last"
     },
     "722": {
       "at": "2026-08-18T16:54:33.891Z",
-      "why": "Nobody is blocked on the historical reading — the gates stand clear after the rule-5 re-baseline, the debt is tracked in the point itself, and the user's queue work (723, the game points) comes first"
+      "why": "Nobody is blocked on the historical reading — the gates stand clear after the rule-5 re-baseline, the debt is tracked in the point itself, and the user's queue work (723, the game points) comes first",
+      "place": "last"
     },
     "724": {
       "at": "2026-08-19T01:04:46.783Z",
-      "why": "Hygiene of the branch pool, not a bugfix or a requested extension — the queue takes those first, and the debris it names is already parked, so nothing waits on it."
+      "why": "Hygiene of the branch pool, not a bugfix or a requested extension — the queue takes those first, and the debris it names is already parked, so nothing waits on it.",
+      "place": "last"
     },
     "725": {
       "at": "2026-08-19T02:12:32.321Z",
-      "why": "An unverified review claim about one frame of one animal: it waits behind the queued fixes and the finding blocks, and its first step is a measurement that may close it outright."
+      "why": "An unverified review claim about one frame of one animal: it waits behind the queued fixes and the finding blocks, and its first step is a measurement that may close it outright.",
+      "place": "last"
     },
     "728": {
       "at": "2026-08-19T09:07:16.285Z",
-      "why": "Neu angelegter Fehlerbefund vom 19.08.2026 (dreifache Chat-Antwort neben lebendem Besitzer). Er bleibt hinten: der Fehler kostet den Nutzer Lesezeit, korrumpiert aber nichts, und die vorderen Punkte sind entweder vom Nutzer vorgezogen oder bereits im Bau. Vor die grossen Finder-Punkte gehoert er trotzdem, was die Anhaengeposition ohnehin leistet."
+      "why": "Neu angelegter Fehlerbefund vom 19.08.2026 (dreifache Chat-Antwort neben lebendem Besitzer). Er bleibt hinten: der Fehler kostet den Nutzer Lesezeit, korrumpiert aber nichts, und die vorderen Punkte sind entweder vom Nutzer vorgezogen oder bereits im Bau. Vor die grossen Finder-Punkte gehoert er trotzdem, was die Anhaengeposition ohnehin leistet.",
+      "place": "last"
     },
     "729": {
       "at": "2026-08-19T09:26:29.525Z",
-      "why": "Kleiner, alter Defekt aus dem 727-Lauf: meldet ein gruenes Gate als rot, nie umgekehrt. Er bleibt hinten — er kostet eine Diagnose, blockiert aber nichts und faellt beim naechsten Autorenlauf ohnehin auf."
+      "why": "Kleiner, alter Defekt aus dem 727-Lauf: meldet ein gruenes Gate als rot, nie umgekehrt. Er bleibt hinten — er kostet eine Diagnose, blockiert aber nichts und faellt beim naechsten Autorenlauf ohnehin auf.",
+      "place": "last"
     },
-    "730": {
-      "at": "2026-08-19T10:37:26.991Z",
-      "why": "Der Nutzer hat 730 ausdrücklich vorgezogen (Tafel-Chat 19.08.2026, 12:36: »Ziehe 730 vor.«) — die Schätzungen sind das, wonach er die Tafel liest, und 713 läuft bereits auf seinem Zweig."
+    "733": {
+      "at": "2026-08-19T11:53:10.666Z",
+      "why": "Direkt hinter 732, das den Befund erst sichtbar gemacht hat: Solange startup rot ist, ist die Suite rot, an der jeder andere Lauf gemessen wird.",
+      "place": "last"
     },
-    "731": {
-      "at": "2026-08-19T10:19:49.258Z",
-      "why": "Low-criticality one-line inconsistency; it costs a hand-rewrite per boundary and nothing is lost, so it waits behind the queue's settled order."
+    "734": {
+      "at": "2026-08-21T16:06:00.065Z",
+      "why": "User ruling 21.08.2026 (only the communication mechanic, then 633 and the release 174), second rule: feat/734-red-capture-cap carries 20 commits, and 8 of its 9 files have moved on main, so it decays fastest of the standing branches.",
+      "origin": "user",
+      "place": "ahead"
+    },
+    "735": {
+      "at": "2026-08-21T16:06:01.356Z",
+      "why": "User ruling 21.08.2026 (only the communication mechanic, then 633 and the release 174): queued directly behind 174. Its own criticality note prices review rounds at 0.5 percent of the ten-point token ledger, so the saving is explicitly not marked.",
+      "origin": "user",
+      "place": "last"
+    },
+    "736": {
+      "at": "2026-08-19T13:52:29.970Z",
+      "why": "Nutzerentscheidung 19.08.2026: 736 vor 735 — gemessen adressiert 736 79 Prozent des Fable-Wochenverbrauchs, 735 rund 0,5 Prozent der Tokens.",
+      "place": "last"
+    },
+    "738": {
+      "at": "2026-08-21T16:06:01.197Z",
+      "why": "User ruling 21.08.2026 (only the communication mechanic, then 633 and the release 174): queued directly behind 174. Nothing is lost while one session owns the batch, and no measurement has found the hole open.",
+      "origin": "user",
+      "place": "last"
+    },
+    "739": {
+      "at": "2026-08-21T16:06:01.277Z",
+      "why": "User ruling 21.08.2026 (only the communication mechanic, then 633 and the release 174): queued directly behind 174. It costs the quality of a session that claims late, which the user catches by hand today.",
+      "origin": "user",
+      "place": "last"
+    },
+    "741": {
+      "at": "2026-08-19T17:02:06.150Z",
+      "why": "A carrier-quality fix with no dependency on the context-ceiling programme; it waits behind it deliberately.",
+      "place": "last"
+    },
+    "746": {
+      "at": "2026-08-21T16:06:00.699Z",
+      "why": "User ruling 21.08.2026 (only the communication mechanic, then 633 and the release 174): queued directly behind 174. It only defers commissioning and rests on an estimator that does not exist yet.",
+      "origin": "user",
+      "place": "last"
+    },
+    "747": {
+      "at": "2026-08-21T16:06:00.874Z",
+      "why": "User ruling 21.08.2026 (only the communication mechanic, then 633 and the release 174): queued directly behind 174. It moves a number and needs a series the points before it must first produce.",
+      "origin": "user",
+      "place": "last"
+    },
+    "750": {
+      "at": "2026-08-21T16:06:01.118Z",
+      "why": "User ruling 21.08.2026 (only the communication mechanic, then 633 and the release 174): queued directly behind 174. It writes a reconstructed record for a series only 747 consumes.",
+      "origin": "user",
+      "place": "last"
+    },
+    "754": {
+      "at": "2026-08-19T19:59:31.708Z",
+      "why": "Rangfolge bleibt hinter der Deckenprogramm-Kette; Gruppe A ist zwar hoch kritisch, aber der Modell-Verstoss wird von model-guard nachtraeglich gefangen — die Sitzung ist am Kontext-Zaun und darf den Work Order nicht mehr umschichten (Punkt 751), deshalb ordnet der Nachfolger die Gruppe A gegebenenfalls vor",
+      "place": "last"
+    },
+    "755": {
+      "at": "2026-08-19T20:42:12.049Z",
+      "why": "Es ist der Nachfolger von 751 in derselben Kontext-Programm-Reihe; die vorderen Punkte 743/742/744 stehen davor, und 755 blockiert nichts, was vor ihm liegt",
+      "place": "last"
+    },
+    "756": {
+      "at": "2026-08-19T21:23:30.975Z",
+      "why": "Shares the fence's classifier files with the running context-ceiling programme, so it must not run beside it; the defect has a working workaround (reword the card), so it waits behind 755 rather than displacing anything",
+      "place": "last"
+    },
+    "759": {
+      "at": "2026-08-21T16:06:00.781Z",
+      "why": "User ruling 21.08.2026 (only the communication mechanic, then 633 and the release 174): queued directly behind 174. Masked while the fence stands in observe mode; it becomes a precondition only when admission is armed.",
+      "origin": "user",
+      "place": "last"
+    },
+    "760": {
+      "at": "2026-08-21T16:06:00.532Z",
+      "why": "User ruling 21.08.2026 (only the communication mechanic, then 633 and the release 174): queued directly behind 174. The live installation was repaired by hand; hardening a future reinstall is not a present blocker.",
+      "origin": "user",
+      "place": "last"
+    },
+    "762": {
+      "at": "2026-08-21T16:06:00.455Z",
+      "why": "User ruling 21.08.2026 (only the communication mechanic, then 633 and the release 174): queued directly behind 174. It fires only on the next memory written and costs one blocked turn with a hand workaround.",
+      "origin": "user",
+      "place": "last"
+    },
+    "763": {
+      "at": "2026-08-20T05:42:49.579Z",
+      "why": "Documentation and memory hygiene on rules the user has already released — nothing depends on it and nothing breaks while it waits, so last is where it belongs.",
+      "place": "last"
+    },
+    "764": {
+      "at": "2026-08-21T16:06:00.379Z",
+      "why": "User ruling 21.08.2026 (only the communication mechanic, then 633 and the release 174): queued directly behind 174. The acute case is repaired by hand and the remaining walk over the cut document is blocked on an unresolved MEMORY.md ruling.",
+      "origin": "user",
+      "place": "last"
+    },
+    "765": {
+      "at": "2026-08-20T05:43:43.591Z",
+      "why": "The carrier defect drops rulings silently, but its one known case is already re-filed and landed, so nothing is waiting on it.",
+      "place": "last"
+    },
+    "766": {
+      "at": "2026-08-20T06:03:28.398Z",
+      "why": "The register is unfillable for those lessons but nothing is blocked by it today; it waits behind the cut re-check that produced it.",
+      "place": "last"
+    },
+    "767": {
+      "at": "2026-08-20T06:03:57.318Z",
+      "why": "An escalation that never fires costs nothing while it waits; it belongs with the other rule-corpus findings of the same night.",
+      "place": "last"
+    },
+    "785": {
+      "at": "2026-08-20T15:51:25.029Z",
+      "why": "Last is right: it improves what the header REPORTS, while 764 first has to make the suffix mandatory at all — until that lands there is nothing requiring a truer value, and both edit the same header path, so they must not run in parallel anyway.",
+      "place": "last"
+    },
+    "786": {
+      "at": "2026-08-20T16:16:13.001Z",
+      "why": "Last is right: it corrects how we REPORT the batch, not what the batch delivers, so no queued point waits on it — and it reads the same archive history the review-planner points 783/784 edit, which should settle first.",
+      "place": "last"
+    },
+    "802": {
+      "at": "2026-08-21T01:29:55.069Z",
+      "why": "Low criticality, nothing red today, and it is blocked behind point 762 which owns the same file — so last is where it belongs; the release order puts nothing but communication-mechanic work ahead of the queue anyway.",
+      "origin": "machine",
+      "place": "last"
+    },
+    "803": {
+      "at": "2026-08-21T02:07:14.003Z",
+      "why": "Bleibt hinten: Die Sperre löst sich, sobald der Agent fertig ist und erneut gepusht wird — heute genau so gemessen — also kostet sie einen Wiederholungslauf, nicht einen Punkt Vorrang.",
+      "origin": "machine",
+      "place": "last"
+    },
+    "804": {
+      "at": "2026-08-21T05:01:34.649Z",
+      "why": "Medium, no product defect and nothing blocked: the four-eyes gate reports less than it knows but still reports, so it waits behind the release like every other machine-filed medium.",
+      "origin": "machine",
+      "place": "last"
+    },
+    "805": {
+      "at": "2026-08-21T05:13:34.873Z",
+      "why": "Medium and nothing blocked once the author is quiet: the push waits out the delegated run instead of being lost, so it takes the place append-and-defer gives it, behind the release.",
+      "origin": "machine",
+      "place": "last"
+    },
+    "806": {
+      "at": "2026-08-21T07:03:38.926Z",
+      "why": "Nachgelagerte Verschaerfung des gerade gelandeten 772; kein Blocker, gehoert ans Ende der Ordnung.",
+      "origin": "machine",
+      "place": "last"
+    },
+    "807": {
+      "at": "2026-08-21T07:34:40.121Z",
+      "why": "Directly behind the release point 174 and before 736: it is a medium-criticality backstop, not urgent, and the two branches it would have caught are parked and visible in the meantime.",
+      "origin": "machine",
+      "place": "last"
+    },
+    "810": {
+      "at": "2026-08-21T10:35:17.647Z",
+      "why": "Hinten ist richtig: Jeder der sechzehn Verdachtsfälle sitzt in Code, den der vorderste Punkt ohnehin neu schreibt — vorher geprüft hieße zweimal prüfen",
+      "origin": "machine",
+      "place": "last"
+    },
+    "815": {
+      "at": "2026-08-21T12:12:01.487Z",
+      "why": "Last is right: the classifier's cost only becomes a defect once the journal has accumulated for weeks, and the retention rule it needs is not urgent today — it belongs behind the release point with 810, the other medium finding from the same 809 review.",
+      "origin": "machine",
+      "place": "last"
+    },
+    "817": {
+      "at": "2026-08-21T13:06:43.801Z",
+      "why": "Es gehört hinter 816, das die Prüfung erst kommissioniert hat, und hinter 815, das denselben Tagebuch-Kern anfasst; vor der Freigabe muss es nicht stehen, weil die doppelte Nummer die bereits gemessenen Urteile nicht rückwirkend verfälscht.",
+      "origin": "machine",
+      "place": "last"
+    },
+    "818": {
+      "at": "2026-08-21T13:09:51.974Z",
+      "why": "Es gehört hinter 817, das denselben Tagebuch-Kern repariert; eine Vorreihung vor die Freigabe bringt nichts, weil der Bericht ein Messinstrument des Stapels ist und kein Spielfehler.",
+      "origin": "machine",
+      "place": "last"
+    },
+    "819": {
+      "at": "2026-08-21T15:54:50.353Z",
+      "why": "Es ist kein Produktdefekt und keine Nutzeranweisung, sondern die einmalige Nachraeumung eines Altbestands — nach Punkt 789 gehoert ein maschinell abgelegter, nicht hoch kritischer Punkt hinter den Release-Punkt 174 und damit hinter die Kommunikationsmechanik, und genau dieselbe Regel wendet er auf sich selbst an.",
+      "origin": "machine",
+      "place": "last"
+    },
+    "822": {
+      "at": "2026-08-21T17:30:39.905Z",
+      "why": "Hinter 174 einsortiert: Es fehlinformiert die Tafel, blockiert aber weder Batch noch Release",
+      "origin": "machine",
+      "place": "last"
+    },
+    "823": {
+      "at": "2026-08-21T17:57:36.026Z",
+      "why": "Hinter Punkt 174 ans Ende: Der Fehlalarm kostet gemessene Minuten, nicht Korrektheit, und faellt damit unter die Nutzerregel vom 20.08.2026 fuer maschinell eingereihte Punkte dieser Dringlichkeit.",
+      "origin": "machine",
+      "place": "last"
+    },
+    "824": {
+      "at": "2026-08-21T18:34:18.366Z",
+      "why": "Bleibt hinten: es kostete eine Sitzung eine Handreparatur, nicht die Korrektheit, und faellt unter die Nutzerregel vom 20.08.2026, dass ein maschinell abgelegter Punkt dieser Dringlichkeit auf das Release wartet.",
+      "origin": "machine",
+      "place": "last"
+    },
+    "825": {
+      "at": "2026-08-21T18:39:12.975Z",
+      "why": "Hinter 174: Kritikalitaet mittel, und die Nutzerregel vom 20.08.2026 laesst nur einen HIGH-Punkt vor dem Release stehen. Wird mit 820 zusammen angefasst, weil beide denselben Kern schreiben.",
+      "origin": "machine",
+      "place": "last"
+    },
+    "826": {
+      "at": "2026-08-21T18:57:56.949Z",
+      "why": "Bleibt hinten und wird mit 825 zusammen angefasst: das Loch ist latent, keine heutige Landung bricht daran, und die Nutzerregel vom 20.08.2026 laesst nur einen HIGH-Punkt vor dem Release stehen.",
+      "origin": "machine",
+      "place": "last"
+    },
+    "827": {
+      "at": "2026-08-22T00:13:54.202Z",
+      "why": "Behind point 174: the machine filed it from a drained finding, and the user's ruling of 20.08.2026 keeps such a point out of the release's way; the live top-up covers the outage until it runs.",
+      "origin": "machine",
+      "place": "last"
+    },
+    "830": {
+      "at": "2026-08-22T07:24:25.223Z",
+      "why": "The machine filed this point itself out of point 768's blind-parallel record; the user's ruling of 20.08.2026 keeps such a point behind the release, and nothing waits on it — the fingerprint is wider than its rule, it costs no product behaviour, and the one decision it blocks (U36) is recorded as open.",
+      "origin": "machine",
+      "place": "last"
+    },
+    "831": {
+      "at": "2026-08-22T07:38:21.696Z",
+      "why": "The machine filed this point itself after measuring the duplicate daemon by hand at the boundary of 768; the user's ruling of 20.08.2026 keeps such a point behind the release, and the measured occurrence is already closed.",
+      "origin": "machine",
+      "place": "last"
+    },
+    "832": {
+      "at": "2026-08-22T08:27:30.311Z",
+      "why": "Filed by the machine from the cross-vendor review of its own point 768; the user's ruling of 20.08.2026 keeps such a point behind the release, and the ratchet works in the common direction today.",
+      "origin": "machine",
+      "place": "last"
+    },
+    "833": {
+      "at": "2026-08-22T09:58:47.024Z",
+      "why": "Last is right: the machine filed this point from its own gate run, and the user ruled on 20.08.2026 that such a point does not overtake the release.",
+      "origin": "machine",
+      "place": "last"
+    },
+    "836": {
+      "at": "2026-08-22T12:10:43.694Z",
+      "why": "Machine-filed from its own run; the user's 20.08.2026 ruling keeps such a point behind the release",
+      "origin": "machine",
+      "place": "last"
+    },
+    "837": {
+      "at": "2026-08-22T12:10:43.779Z",
+      "why": "Machine-filed from its own preflight; the gate is suspended rather than failing, so it waits behind the release like every self-filed point",
+      "origin": "machine",
+      "place": "last"
+    },
+    "838": {
+      "at": "2026-08-22T12:10:43.859Z",
+      "why": "Queue bookkeeping, not delivery — the user's 20.08.2026 ruling keeps it behind the release",
+      "origin": "machine",
+      "place": "last"
+    },
+    "839": {
+      "at": "2026-08-22T14:01:36.720Z",
+      "why": "Behind point 174 by the user's rule of 20.08.2026: the machine filed this point itself, so it does not overtake the release — its own QUEUE RANK clause says so and states the cost of the delay",
+      "origin": "machine",
+      "place": "last"
+    },
+    "841": {
+      "at": "2026-08-22T17:12:36.005Z",
+      "why": "The machine filed it, so the user's rule of 20.08.2026 keeps it behind the release; it is worked with 823, which edits the same classifier",
+      "origin": "machine",
+      "place": "last"
+    },
+    "842": {
+      "at": "2026-08-22T19:14:46.139Z",
+      "why": "Ein Melder-Blindfleck hinter dem behobenen Defekt: der Launcher-Fehler, für den der Prüfer gebaut wurde, ist gefangen und grün, also darf der Rest warten.",
+      "origin": "machine",
+      "place": "last"
+    },
+    "843": {
+      "at": "2026-08-22T20:07:51.458Z",
+      "why": "Append-and-defer: der Besitzer hat den Mechanismus verlangt, aber keine Vorziehung; die Regel selbst gilt ab sofort auch ohne ihn",
+      "origin": "machine",
+      "place": "last"
+    },
+    "845": {
+      "at": "2026-08-22T20:51:29.892Z",
+      "why": "Machine-filed, low and cheap: it costs a false red on unrelated points, not lost work, so it waits behind the release like the other detector-hygiene findings of this evening.",
+      "origin": "machine",
+      "place": "last"
+    },
+    "847": {
+      "at": "2026-08-23T00:30:42.022Z",
+      "why": "Es ist ein Wächter, der weniger misst als sein eigener Satz — kein Produktverhalten, keine verlorene Arbeit, und die Anleitung nutzt heute keinen der vier Wege; es kann hinter der Veröffentlichung stehen.",
+      "origin": "machine",
+      "place": "last"
+    },
+    "849": {
+      "at": "2026-08-23T03:41:54.860Z",
+      "why": "Low criticality, no product behaviour: a noisy alert costs gate time but blocks nothing, so last is right.",
+      "origin": "machine",
+      "place": "last"
+    },
+    "850": {
+      "at": "2026-08-23T04:06:48.522Z",
+      "why": "Low criticality, documentation only; the one instance that blocked a point is already repaired, so last is right.",
+      "origin": "machine",
+      "place": "last"
+    },
+    "851": {
+      "at": "2026-08-23T06:22:10.145Z",
+      "why": "Maschinell gemeldeter Befund ohne Produktverhalten; er kostet eine selbst verursachte zweite Stornierung, keine Arbeit — er steht wie 845–850 hinter der Veröffentlichung.",
+      "origin": "machine",
+      "place": "last"
+    },
+    "852": {
+      "at": "2026-08-23T06:22:10.218Z",
+      "why": "Maschinell gemeldeter Befund; er hält eine Landung nur auf, und die In-Flight-Deklaration nennt die fremde Bahn heute schon, sodass die Landung wiederholbar bleibt — er steht wie 845–851 hinter der Veröffentlichung.",
+      "origin": "machine",
+      "place": "last"
+    },
+    "853": {
+      "at": "2026-08-23T06:46:41.044Z",
+      "why": "Machine-filed hygiene finding; it costs a wasted gate run per repetition and no product behaviour, so it keeps its appended place behind the release like the findings before it.",
+      "origin": "machine",
+      "place": "last"
+    },
+    "855": {
+      "at": "2026-08-23T08:09:39.410Z",
+      "why": "Test-only follow-up from a confirming review; low criticality, stands at the end behind the release",
+      "origin": "machine",
+      "place": "last"
+    },
+    "856": {
+      "at": "2026-08-23T08:23:12.998Z",
+      "why": "Machine-filed planner defect; medium, stands behind the release at its work-order place",
+      "origin": "machine",
+      "place": "last"
+    },
+    "857": {
+      "at": "2026-08-23T09:17:24.447Z",
+      "why": "Machine-filed from a review, criticality medium and not blocking: the six vacuous checks can be classified against a baseline, so it stands behind the release like every other non-urgent machine finding",
+      "origin": "machine",
+      "place": "last"
+    },
+    "869": {
+      "at": "2026-08-24T01:05:03.714Z",
+      "why": "a board CLI nuisance with a working manual route; it blocks nothing and stands behind the release like every other non-urgent finding",
+      "origin": "machine",
+      "place": "last"
+    },
+    "871": {
+      "at": "2026-08-24T01:53:40.685Z",
+      "why": "The card only misleads while a run is transferred, and the session that meets it can append a truthful sentence — behind the release, like every machine-filed point",
+      "origin": "machine",
+      "place": "last"
+    },
+    "872": {
+      "at": "2026-08-24T01:53:40.762Z",
+      "why": "The gap is closed in practice as long as only Claude sessions merge, and point 870 already stops it from deadlocking a round — behind the release, like every machine-filed point",
+      "origin": "machine",
+      "place": "last"
+    },
+    "873": {
+      "at": "2026-08-24T03:03:54.753Z",
+      "why": "Steht direkt hinter seinem Bündelnachbarn 872 (Modell & Wächter); der Umweg kostet nur Arbeit, keine Arbeit geht verloren, und die Handumgehung ist ein einziger Aufruf",
+      "origin": "machine",
+      "place": "last"
+    },
+    "875": {
+      "at": "2026-08-24T06:26:44.960Z",
+      "why": "An environment fault stops every commit, but the switch file is repaired without one — it waits behind the fences that protect main.",
+      "origin": "machine",
+      "place": "last"
+    },
+    "876": {
+      "at": "2026-08-24T06:26:45.034Z",
+      "why": "It clears a dead enforcer, which is severe, but no enforcer is known to be dead today — it waits behind the two fences that are demonstrably open.",
+      "origin": "machine",
+      "place": "last"
+    },
+    "877": {
+      "at": "2026-08-24T06:26:45.113Z",
+      "why": "It misorders the release queue in both directions and loses no work; 883 is its other half and waits with it.",
+      "origin": "machine",
+      "place": "last"
+    },
+    "878": {
+      "at": "2026-08-24T06:26:45.188Z",
+      "why": "It needs a lock collision inside a thirty-second window to bite, and the CI failure still arrives by mail from the workflow itself.",
+      "origin": "machine",
+      "place": "last"
+    },
+    "881": {
+      "at": "2026-08-24T06:26:45.274Z",
+      "why": "The fence defaults to observe and refuses nothing; it must be settled before its arming point lands, not before the queue.",
+      "origin": "machine",
+      "place": "last"
+    },
+    "882": {
+      "at": "2026-08-24T06:26:45.350Z",
+      "why": "It only bites for a document somebody deleted or mis-keyed, and the guard reports every document it did measure.",
+      "origin": "machine",
+      "place": "last"
+    },
+    "883": {
+      "at": "2026-08-24T06:26:45.423Z",
+      "why": "The other half of 877; both are queue ordering, which costs attention rather than work.",
+      "origin": "machine",
+      "place": "last"
+    },
+    "884": {
+      "at": "2026-08-24T06:26:45.501Z",
+      "why": "One fuse dated at point 1000 and one half-covered assertion — nothing bites at 884.",
+      "origin": "machine",
+      "place": "last"
+    },
+    "898": {
+      "at": "2026-08-24T14:37:17.169Z",
+      "why": "Maschinell abgelegter Befund mittlerer Dringlichkeit — steht hinter dem Release, weil er weder den Stapel anhaelt noch eine Spur blockiert",
+      "origin": "machine",
+      "place": "last"
+    },
+    "902": {
+      "at": "2026-08-25T00:02:37.526Z",
+      "why": "Prozesshygiene mit niedriger Kritikalität: der Eintrag ändert nur Regeltext und einen Auditeintrag, blockiert nichts und hat keinen Vorläufer, der ihn nach vorn zieht",
+      "origin": "machine",
+      "place": "last"
+    },
+    "904": {
+      "at": "2026-08-25T00:23:39.794Z",
+      "why": "Letzter Platz ist richtig: die drei Befunde liegen in bereits gelandetem Code, blockieren keine offene Spur und keinen Release-Schritt",
+      "origin": "machine",
+      "place": "last"
+    },
+    "905": {
+      "at": "2026-08-25T01:13:13.978Z",
+      "why": "Reine Effizienzbereinigung ohne Korrektheitsverlust; sie kann erst nach 903 gearbeitet werden, dessen Code sie ändert — hinten ist der richtige Platz",
+      "origin": "machine",
+      "place": "last"
+    },
+    "906": {
+      "at": "2026-08-25T02:50:59.229Z",
+      "why": "Machine-filed, loses no work: the run stays blind for its remainder but its commits survive, so it waits behind the release like the other reporting defects of its class",
+      "origin": "machine",
+      "place": "last"
+    },
+    "908": {
+      "at": "2026-08-25T07:23:10.638Z",
+      "why": "Last is right: 849 repairs the neighbouring class in the same detector reading, so a fix written before it would be rewritten by it; the tax is recurring but costs no work and blocks nothing.",
+      "origin": "machine",
+      "place": "last"
+    },
+    "909": {
+      "at": "2026-08-25T08:53:59.782Z",
+      "why": "Der Fehler versteckt drei Testtyp-Fehler, keinen Spielfehler — nichts blockiert daran, also bleibt er hinter der gesetzten Reihenfolge.",
+      "origin": "machine",
+      "place": "last"
+    },
+    "910": {
+      "at": "2026-08-25T08:53:59.860Z",
+      "why": "Kostet Zuege, keine Arbeit: der Umweg ueber den Hauptbaum steht als Regel und traegt, bis der Waechter repariert ist.",
+      "origin": "machine",
+      "place": "last"
+    },
+    "911": {
+      "at": "2026-08-25T08:53:59.941Z",
+      "why": "Die Messung ist heute richtig; das Risiko ist Drift, und keine offene Arbeit haengt daran.",
+      "origin": "machine",
+      "place": "last"
+    },
+    "912": {
+      "at": "2026-08-25T09:31:29.682Z",
+      "why": "Letzter Platz ist richtig: maschinell gefunden, nichts haengt daran, und der Nachbar-Drillpunkt 911 steht unmittelbar davor — zusammen abzuarbeiten ist billiger als getrennt.",
+      "origin": "machine",
+      "place": "last"
+    },
+    "914": {
+      "at": "2026-08-25T11:44:32.511Z",
+      "why": "It stands behind the release: the four-eyes gate still works — the reviewer refuses honestly rather than clearing blind — and the range that hits it is the oversized one, not every review.",
+      "origin": "machine",
+      "place": "last"
+    },
+    "915": {
+      "at": "2026-08-25T11:55:55.327Z",
+      "why": "It stands behind the release: the gate still closes on an honest route — the bounded 1/1 scope — and only a range planned into several authorship groups meets the refusal.",
+      "origin": "machine",
+      "place": "last"
+    },
+    "916": {
+      "at": "2026-08-25T13:28:45.006Z",
+      "why": "Machine-filed at the point-749 boundary, so it stands behind the release under the user's 20.08.2026 ruling — last in the order, however urgent the block it describes.",
+      "origin": "machine",
+      "place": "last"
+    },
+    "917": {
+      "at": "2026-08-25T14:41:41.503Z",
+      "why": "Hygienebefund ohne Spielerwirkung — er wartet hinter allem, womit die Arbeitsordnung zuletzt geordnet wurde, weil er nichts blockiert.",
+      "origin": "machine",
+      "place": "last"
+    },
+    "919": {
+      "at": "2026-08-25T18:43:13.130Z",
+      "why": "Last is right: the phantom red costs a session's opening, never correctness — no code is wrong, no player-visible defect, and the guard still catches every genuine red. It waits behind the release work like the other CI-guard defects of its class.",
+      "origin": "machine",
+      "place": "last"
+    },
+    "920": {
+      "at": "2026-08-25T18:43:13.227Z",
+      "why": "Last is right: the duplicate number is caught by the pre-push fast gate before it can reach main, so the damage is a repair, not a defect that ships. The command is convenience over a rule that already holds.",
+      "origin": "machine",
+      "place": "last"
+    },
+    "924": {
+      "at": "2026-08-25T23:39:04.937Z",
+      "why": "Es kostet Zugzeit, nicht Arbeit — der Handlauf beweist den Baum gruen und der Push geht danach durch; last is right.",
+      "origin": "machine",
+      "place": "last"
+    },
+    "925": {
+      "at": "2026-08-26T00:37:45.177Z",
+      "why": "Die dauerhafte Lane bleibt bis zu diesem Punkt abgeschaltet und blockiert nichts; Kommunikationsmechanik, Abschluss und Tag gehen vor.",
+      "origin": "machine",
+      "place": "last"
+    },
+    "926": {
+      "at": "2026-08-26T01:26:40.592Z",
+      "why": "Vorbestehender Abnahme-Frame-Roter ohne Spielwirkung — er wartet hinter der laufenden Warteschlange, weil nichts auf ihm blockiert.",
+      "origin": "machine",
+      "place": "last"
+    },
+    "927": {
+      "at": "2026-08-26T01:26:40.709Z",
+      "why": "Der Fehlerbericht ohne Bild ist hoch kritisch, aber er betrifft einen Meldeweg, keinen Spielzustand; er steht am Ende, bis der Nutzer ihn vorzieht.",
+      "origin": "machine",
+      "place": "last"
+    },
+    "928": {
+      "at": "2026-08-26T03:12:08.350Z",
+      "why": "Es blockiert keinen Zug von sich aus, sondern nur den einen Commit, der es ausgeloest hat; die 24 aelteren unpruefbaren Beitraege sind der akute Rueckstand und stehen als Klaerungskarte beim Nutzer. Vor diesem Punkt gehoert deren Priorisierung entschieden.",
+      "origin": "machine",
+      "place": "last"
     }
   },
+  "boundary": {
+    "at": "2026-08-21T00:55:14.962Z",
+    "points": [
+      336,
+      553,
+      581,
+      596,
+      633,
+      659,
+      660,
+      663,
+      686,
+      687,
+      688,
+      689,
+      690,
+      691,
+      692,
+      708,
+      713,
+      715,
+      719,
+      733,
+      734,
+      735,
+      736,
+      738,
+      739,
+      746,
+      747,
+      750,
+      759,
+      760,
+      762,
+      764
+    ],
+    "why": "The order standing in front of the release today is the arrangement that predates this rule; the four machine-filed points that had ranked themselves there were moved behind 174 first"
+  },
   "settled": {
-    "at": "2026-08-19T10:19:49.258Z",
+    "at": "2026-08-26T03:12:08.357Z",
     "points": [
       174,
       184,
@@ -158,7 +775,6 @@
       203,
       205,
       207,
-      224,
       265,
       269,
       285,
@@ -204,7 +820,6 @@
       415,
       422,
       428,
-      438,
       448,
       449,
       451,
@@ -216,7 +831,6 @@
       463,
       464,
       465,
-      466,
       467,
       468,
       471,
@@ -224,23 +838,16 @@
       495,
       497,
       498,
-      500,
-      501,
       504,
-      506,
       507,
       508,
       510,
       511,
-      512,
       514,
-      515,
-      517,
       518,
       519,
       520,
       521,
-      522,
       523,
       528,
       529,
@@ -252,7 +859,6 @@
       536,
       537,
       538,
-      542,
       548,
       551,
       552,
@@ -272,17 +878,13 @@
       575,
       581,
       591,
-      595,
       596,
-      597,
-      598,
       599,
       602,
       603,
       607,
       609,
       611,
-      614,
       615,
       616,
       617,
@@ -306,7 +908,6 @@
       643,
       646,
       647,
-      650,
       652,
       653,
       658,
@@ -316,14 +917,10 @@
       664,
       665,
       668,
-      669,
       670,
-      676,
       677,
       678,
       680,
-      681,
-      682,
       683,
       686,
       687,
@@ -332,9 +929,7 @@
       690,
       691,
       692,
-      693,
       694,
-      695,
       696,
       698,
       699,
@@ -345,17 +940,124 @@
       710,
       713,
       715,
-      716,
-      718,
       719,
-      720,
       722,
       724,
       725,
       728,
       729,
-      730,
-      731
+      733,
+      734,
+      735,
+      736,
+      738,
+      739,
+      741,
+      746,
+      747,
+      750,
+      754,
+      755,
+      756,
+      759,
+      760,
+      762,
+      763,
+      764,
+      765,
+      766,
+      767,
+      774,
+      777,
+      778,
+      785,
+      786,
+      791,
+      797,
+      798,
+      799,
+      802,
+      803,
+      804,
+      805,
+      806,
+      807,
+      810,
+      814,
+      815,
+      817,
+      818,
+      819,
+      822,
+      823,
+      824,
+      825,
+      826,
+      827,
+      830,
+      831,
+      832,
+      833,
+      836,
+      837,
+      838,
+      839,
+      841,
+      842,
+      843,
+      845,
+      847,
+      849,
+      850,
+      851,
+      852,
+      853,
+      855,
+      856,
+      857,
+      867,
+      868,
+      869,
+      871,
+      872,
+      873,
+      875,
+      876,
+      877,
+      878,
+      881,
+      882,
+      883,
+      884,
+      886,
+      887,
+      888,
+      896,
+      898,
+      899,
+      900,
+      901,
+      902,
+      904,
+      905,
+      906,
+      908,
+      909,
+      910,
+      911,
+      912,
+      914,
+      915,
+      916,
+      917,
+      919,
+      920,
+      922,
+      924,
+      925,
+      926,
+      927,
+      928
     ]
   }
 }

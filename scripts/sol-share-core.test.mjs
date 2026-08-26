@@ -170,7 +170,9 @@ describe('the state file', () => {
 
   it('lives in the MAIN checkout, so a worktree agent reads the setting the user flipped', () => {
     expect(settingPathFrom('/workspace/hoa/.git', '/workspace/hoa/.claude/worktrees/agent-a1')).toBe('/workspace/hoa/.claude/sol-share.json')
+    expect(settingPathFrom('/workspace/hoa/.git', '/workspace/hoa')).toBe('/workspace/hoa/.claude/sol-share.json')
     expect(settingPathFrom('', '/workspace/hoa')).toBe('/workspace/hoa/.claude/sol-share.json')
+    expect(settingPathFrom('/srv/hoa.git', '/workspace/hoa')).toBe('/workspace/hoa/.claude/sol-share.json')
   })
 })
 

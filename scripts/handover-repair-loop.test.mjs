@@ -1,0 +1,270 @@
+import { describe, expect, it, vi } from 'vitest'
+import { readFileSync } from 'node:fs'
+import { resolve } from 'node:path'
+import { callMayCreateCommit, commitsBetween, observeOwnerLoops } from './handover-repair-loop.mjs'
+
+const claim = {
+  claim: { claimantSid: 'visible-window', at: 100 },
+  honour: true,
+  claimantSid: 'visible-window',
+}
+
+const deps = (over = {}) => ({
+  readHead: () => 'head-a',
+  readCommits: () => [],
+  readTurnKey: () => 'turn-a',
+  readClaimVerdict: () => ({ assessment: claim, verdict: { verdict: 'release', reason: 'clean' } }),
+  handBack: vi.fn(() => ({ released: true, stamped: true })),
+  ...over,
+})
+
+describe('observeOwnerLoops', () => {
+  it('releases on the bounded clean response and explains why Stop did not', () => {
+    const handBack = vi.fn(() => ({ released: true, stamped: true }))
+    let state
+    let result
+    for (const turn of ['turn-a', 'turn-b', 'turn-c']) {
+      result = observeOwnerLoops(
+        { sid: 'owner', ownsBatch: true, transcriptPath: '/transcript', state },
+        deps({ readTurnKey: () => turn, handBack }),
+      )
+      state = result.state
+    }
+    expect(handBack).toHaveBeenCalledOnce()
+    expect(result.context).toContain('HAND-BACK BOUND REACHED')
+    expect(result.context).toContain('never reached its Stop hook')
+  })
+
+  it('states the dirty reason at the bound without releasing', () => {
+    const handBack = vi.fn()
+    let state
+    let result
+    for (const turn of ['turn-a', 'turn-b', 'turn-c']) {
+      result = observeOwnerLoops(
+        { sid: 'owner', ownsBatch: true, state },
+        deps({
+          readTurnKey: () => turn,
+          readClaimVerdict: () => ({ assessment: claim, verdict: { verdict: 'wait', reason: 'merge' } }),
+          handBack,
+        }),
+      )
+      state = result.state
+    }
+    expect(handBack).not.toHaveBeenCalled()
+    expect(result.context).toContain('cannot be released yet (merge)')
+  })
+
+  it('exposes a release whose reservation stamp failed', () => {
+    let state
+    let result
+    for (const turn of ['turn-a', 'turn-b', 'turn-c']) {
+      result = observeOwnerLoops(
+        { sid: 'owner', ownsBatch: true, state },
+        deps({ readTurnKey: () => turn, handBack: () => ({ released: true, stamped: false }) }),
+      )
+      state = result.state
+    }
+    expect(result.context).toContain('pickup reservation is unproven')
+  })
+
+  it('defers a bounded release through a landing call, then releases on the next ordinary call', () => {
+    const handBack = vi.fn(() => ({ released: true, stamped: true }))
+    let state
+    for (const turn of ['turn-a', 'turn-b']) {
+      state = observeOwnerLoops(
+        { sid: 'owner', ownsBatch: true, state },
+        deps({ readTurnKey: () => turn, handBack }),
+      ).state
+    }
+
+    const deferred = observeOwnerLoops(
+      {
+        sid: 'owner',
+        ownsBatch: true,
+        state,
+        toolName: 'Bash',
+        command: 'node scripts/land-point.mjs 700',
+      },
+      deps({ readTurnKey: () => 'turn-c', handBack }),
+    )
+    expect(handBack).not.toHaveBeenCalled()
+    expect(deferred.state.claim).toMatchObject({ cleanTurns: 3, releaseDeferred: true })
+    expect(deferred.context).toContain('HAND-BACK WAIT EXPOSED')
+    expect(deferred.context).toContain('landing or commit-creating sequence')
+
+    const released = observeOwnerLoops(
+      { sid: 'owner', ownsBatch: true, state: deferred.state, toolName: 'Read' },
+      deps({ readTurnKey: () => 'turn-c', handBack }),
+    )
+    expect(handBack).toHaveBeenCalledOnce()
+    expect(released.state.claim.releaseDeferred).toBe(false)
+    expect(released.context).toContain('HAND-BACK BOUND REACHED')
+  })
+
+  it('defers a report when another heartbeat duty already owns stdout', () => {
+    let state
+    for (const turn of ['turn-a', 'turn-b']) {
+      state = observeOwnerLoops(
+        { sid: 'owner', ownsBatch: true, state },
+        deps({ readTurnKey: () => turn }),
+      ).state
+    }
+    const deferred = observeOwnerLoops(
+      { sid: 'owner', ownsBatch: true, state, mayAct: false },
+      deps({ readTurnKey: () => 'turn-c' }),
+    )
+    expect(deferred.context).toBe('')
+    const spoken = observeOwnerLoops(
+      { sid: 'owner', ownsBatch: true, state: deferred.state },
+      deps({ readTurnKey: () => 'turn-c' }),
+    )
+    expect(spoken.context).toContain('HAND-BACK BOUND REACHED')
+  })
+
+  it('stands down without reading state for non-owners and pauses', () => {
+    const readHead = vi.fn()
+    expect(observeOwnerLoops({ sid: 'other', ownsBatch: false }, deps({ readHead }))).toEqual({
+      state: {},
+      context: '',
+    })
+    expect(observeOwnerLoops({ sid: 'owner', ownsBatch: true, paused: true }, deps({ readHead }))).toEqual({
+      state: {},
+      context: '',
+    })
+    expect(readHead).not.toHaveBeenCalled()
+  })
+
+  it('reads the transcript only while an honoured claim stands', () => {
+    const readTurnKey = vi.fn(() => 'turn-a')
+    observeOwnerLoops(
+      { sid: 'owner', ownsBatch: true, transcriptPath: '/transcript' },
+      deps({
+        readTurnKey,
+        readClaimVerdict: () => ({ assessment: {}, verdict: { verdict: 'none' } }),
+      }),
+    )
+    expect(readTurnKey).not.toHaveBeenCalled()
+
+    observeOwnerLoops(
+      { sid: 'owner', ownsBatch: true, transcriptPath: '/transcript' },
+      deps({ readTurnKey }),
+    )
+    expect(readTurnKey).toHaveBeenCalledOnce()
+    expect(readTurnKey).toHaveBeenCalledWith('/transcript')
+  })
+
+  it('surfaces a nine-commit script run once as later repairs extend it', () => {
+    const scriptCommit = (sha) => ({ sha, paths: ['scripts/example-hook.mjs'] })
+    let state = {
+      repair: {
+        ownerSid: 'owner',
+        lastHead: 'old',
+        commits: ['c8', 'c7', 'c6', 'c5', 'c4', 'c3', 'c2', 'c1'].map(scriptCommit),
+      },
+    }
+    const ninth = observeOwnerLoops(
+      { sid: 'owner', ownsBatch: true, state },
+      deps({
+        readHead: () => 'c9',
+        readCommits: () => [scriptCommit('c9')],
+        readClaimVerdict: () => ({ assessment: {}, verdict: { verdict: 'none' } }),
+      }),
+    )
+    expect(ninth.context).toContain('REPAIR LOOP 9')
+    const tenth = observeOwnerLoops(
+      { sid: 'owner', ownsBatch: true, state: ninth.state },
+      deps({
+        readHead: () => 'c10',
+        readCommits: () => [scriptCommit('c10')],
+        readClaimVerdict: () => ({ assessment: {}, verdict: { verdict: 'none' } }),
+      }),
+    )
+    expect(tenth.context).toBe('')
+  })
+
+  it('counts the commit that first loads the new observer, instead of baselining past it', () => {
+    const readCommits = vi.fn(() => [
+      { sha: 'observer-landing', paths: ['scripts/example-guard.mjs'] },
+    ])
+    const result = observeOwnerLoops(
+      {
+        sid: 'owner',
+        ownsBatch: true,
+        toolName: 'Bash',
+        command: 'git commit -m "land observer"',
+      },
+      deps({
+        readHead: () => 'observer-landing',
+        readCommits,
+        readClaimVerdict: () => ({ assessment: {}, verdict: { verdict: 'none' } }),
+      }),
+    )
+    expect(readCommits).toHaveBeenCalledWith('observer-landing^', 'observer-landing')
+    expect(result.state.repair.commits).toHaveLength(1)
+  })
+
+  it('never joins consecutive-looking commits across two owner sessions', () => {
+    const guardCommit = (sha) => ({ sha, paths: ['scripts/example-guard.mjs'] })
+    const result = observeOwnerLoops(
+      {
+        sid: 'new-owner',
+        ownsBatch: true,
+        state: {
+          repair: {
+            ownerSid: 'old-owner',
+            lastHead: 'old-head',
+            commits: ['c1', 'c2', 'c3', 'c4'].map(guardCommit),
+          },
+        },
+      },
+      deps({
+        readHead: () => 'same-head',
+        readClaimVerdict: () => ({ assessment: {}, verdict: { verdict: 'none' } }),
+      }),
+    )
+    expect(result.context).toBe('')
+    expect(result.state.repair).toMatchObject({ ownerSid: 'new-owner', commits: [] })
+  })
+})
+
+describe('commitsBetween', () => {
+  it('parses first-parent commit paths newest first', () => {
+    const runGit = vi.fn((args) => {
+      if (args[0] === 'merge-base') return ''
+      return '@@new-a\nscripts/a-guard.mjs\n\n@@new-b\nscripts/a-guard-core.mjs\nsrc/x.ts'
+    })
+    expect(commitsBetween('old', 'new-b', { runGit })).toEqual([
+      { sha: 'new-b', paths: ['scripts/a-guard-core.mjs', 'src/x.ts'] },
+      { sha: 'new-a', paths: ['scripts/a-guard.mjs'] },
+    ])
+  })
+})
+
+describe('callMayCreateCommit', () => {
+  it('recognises history writes without matching quoted mentions', () => {
+    for (const command of [
+      'git commit -m done',
+      'git merge topic',
+      'git push origin main',
+      'git cherry-pick abc123',
+      'git revert abc123',
+    ]) {
+      expect(callMayCreateCommit({ toolName: 'Bash', command })).toBe(true)
+    }
+    expect(callMayCreateCommit({ toolName: 'Bash', command: 'node scripts/land-point.mjs 700' })).toBe(true)
+    expect(callMayCreateCommit({ toolName: 'Bash', command: 'rg "git commit" docs' })).toBe(false)
+    expect(callMayCreateCommit({ toolName: 'Read', command: 'git commit -m done' })).toBe(false)
+  })
+})
+
+describe('the live event path', () => {
+  it('is called by the already-wired all-tools PostToolUse hook', () => {
+    const settings = JSON.parse(readFileSync(resolve(process.cwd(), '.claude/settings.json'), 'utf8'))
+    const postTools = settings.hooks.PostToolUse.flatMap((entry) => entry.hooks ?? [])
+    expect(postTools.some((hook) => /lock-heartbeat-hook\.mjs/.test(hook.command))).toBe(true)
+
+    const heartbeat = readFileSync(resolve(process.cwd(), 'scripts/lock-heartbeat-hook.mjs'), 'utf8')
+    expect(heartbeat).toContain("import { observeOwnerLoops } from './handover-repair-loop.mjs'")
+    expect(heartbeat).toContain('const observed = observeOwnerLoops({')
+  })
+})

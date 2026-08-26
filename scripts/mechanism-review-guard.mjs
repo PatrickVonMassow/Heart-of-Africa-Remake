@@ -14,10 +14,9 @@
 // error never traps the session. It stands down while .claude/batch-paused exists
 // and for a session that does not own the batch lock.
 //
-// GRANDFATHERING: the baseline is per branch and self-arms at the current HEAD on
-// its first run, exactly as model-guard does with its timestamp. The twenty-odd
-// guards that predate this gate therefore owe nothing; the point is the next
-// mechanism, not a review debt for the existing ones.
+// RECOVERY: the baseline is per branch local state. Its absence blocks once and
+// seeds a fixed tracked-history anchor; it never self-arms at HEAD, because on
+// main that would forgive every outstanding review in one empty-range turn.
 //
 // How the gate clears:
 //   node scripts/mechanism-review.mjs --record <sha> --model <name> \
@@ -33,24 +32,27 @@ import { isMainModule } from './is-main.mjs'
 import { heldByOtherLiveOwner } from './batch-singleton.mjs'
 import { readRecords, verifyCarried } from './mechanism-review.mjs'
 import {
+  attestsToCodeReading,
   evaluateMechanismReview,
   formatMechanismReviewVerdict,
   mechanismPathsIn,
   modelFromTrailers,
   modelsFromTrailers,
-  mergeProblem,
   reviewRecordWellFormed,
+  reviewIdentityProblem,
 } from './mechanism-review-core.mjs'
 import {
-  commitsForContributions,
+  commitsForFiles,
+  formatInvalidatedCoverage,
   mechanismLogCommand,
-  outstandingContributions,
+  outstandingFiles,
   parseRangeLog as parseWholeRangeLog,
   planAuthorshipGroups,
   summarizeReviewDebt,
 } from './mechanism-review-range-core.mjs'
 import { quotePassFile, unquoteGitPath } from './review-material-core.mjs'
 import { guardOutcome, reviewGapRange } from './mechanism-review-guard-gap-core.mjs'
+import { gatherGuardDutyContext } from './guard-duty.mjs'
 
 const PAUSE = repoPath('.claude/batch-paused')
 
@@ -58,6 +60,11 @@ const PAUSE = repoPath('.claude/batch-paused')
  *  it is deliberately NOT tracked: a shared file would conflict on every branch,
  *  while the ledger that must travel — the reviews — is the tracked one. */
 export const BASELINE_PATH = repoPath('.claude/mechanism-review-baseline.json')
+
+/** The reviewed source revision immediately before fail-closed recovery. Unlike
+ * a timestamp or ledger field, reachability from this immutable commit is not a
+ * value the recording hand can edit. */
+export const BASELINE_RECOVERY_ANCHOR = '28293f97ce0149a9936593733763fd20e62b13e7'
 
 // The record/field sentinels and the header shape of the one `git log` this
 // guard runs now live with the parser that owns them, in
@@ -126,30 +133,25 @@ export function baselineFor(state, branch) {
 }
 
 /**
- * Where a tree with NO baseline at all starts judging. The baseline file is
- * local bookkeeping, so a fresh clone or a fresh worktree has none — and arming
- * at HEAD would grandfather whatever mechanism work is already on the branch
- * (four-eyes review, 27.07.2026). The fork point from the integration branch is
- * the honest answer: everything on main is genuinely old, everything this branch
- * added is genuinely new. Falls back to HEAD where no such branch resolves,
- * which is the grandfathering the point asks for.
+ * Recover a missing local baseline from one immutable, tracked history point.
+ * There is deliberately no HEAD or main fallback: on main both resolve to HEAD,
+ * producing an empty range and silently forgiving all existing debt.
  */
-export function bootstrapBase(head, revParse = (r) => git(`rev-parse ${r}`)) {
-  for (const ref of ['main', 'origin/main']) {
-    try {
-      // The revision MUST stay quoted: execSync goes through cmd.exe on Windows,
-      // where `^` is the escape character — unquoted, git received `main{commit}`
-      // and the fallback to HEAD silently grandfathered the branch's own work.
-      // render-verify-guard carries the same note from the same bite.
-      const base = revParse(`--verify --quiet "${ref}^{commit}"`)
-      if (!base) continue
-      const fork = execSync(`git merge-base "${base}" "${head}"`, { windowsHide: true, cwd: REPO_ROOT, encoding: 'utf8' }).trim()
-      if (fork) return fork
-    } catch {
-      /* no such branch here — try the next, then fall back to HEAD */
-    }
+export function bootstrapBase(
+  head,
+  revParse = (r) => git(`rev-parse ${r}`),
+  isAncestor = (base, tip) => {
+    execFileSync('git', ['merge-base', '--is-ancestor', base, tip], { windowsHide: true, cwd: REPO_ROOT })
+    return true
+  },
+) {
+  try {
+    const base = revParse(`--verify --quiet "${BASELINE_RECOVERY_ANCHOR}^{commit}"`)
+    if (!base || isAncestor(base, head) !== true) return null
+    return base
+  } catch {
+    return null
   }
-  return head
 }
 
 /** The current scripts/ listing — needed for the "a core beside a guard" rule. */
@@ -276,7 +278,7 @@ function rangeCommits(base, head, files) {
  * git work, which would drift and hand back a false "clean". Read-only: arming
  * and advancing the baseline stay in the main path below.
  */
-export function gatherMechanismReviewInputs({ sessionId = '' } = {}) {
+export function gatherMechanismReviewInputs({ sessionId = '', guardDuty = gatherGuardDutyContext } = {}) {
   if (existsSync(PAUSE)) return { applicable: false, why: 'the batch is paused' }
   if (heldByOtherLiveOwner(sessionId)) {
     return {
@@ -294,7 +296,23 @@ export function gatherMechanismReviewInputs({ sessionId = '' } = {}) {
   }
   const state = readBaselineState()
   const stored = baselineFor(state, branch)
+  const baselineMissing = !stored
   const baseline = stored || bootstrapBase(head)
+
+  if (!baseline) {
+    return {
+      applicable: true,
+      head,
+      branch,
+      baseline: null,
+      baselineMissing: true,
+      rangeBase: null,
+      inputs: { baseline: null, baselineMissing: true, head, pendingCommits: [], records: [], sessionId },
+      commits: [],
+      debt: { outstanding: [], invalidatedCoverage: [] },
+      authorshipPlan: { groups: [], unreviewable: [] },
+    }
+  }
 
   // Diff from merge-base, never the raw baseline: on a feature branch the
   // baseline sits on main, and a two-dot diff would re-show main's own (already
@@ -334,6 +352,20 @@ export function gatherMechanismReviewInputs({ sessionId = '' } = {}) {
       // is then judged for real — a recovery that reported "clear" without
       // looking would be the same silent pass in a new place.
       effective = bootstrapBase(head)
+      if (!effective) {
+        return {
+          applicable: true,
+          head,
+          branch,
+          baseline: null,
+          baselineMissing: true,
+          rangeBase: null,
+          inputs: { baseline: null, baselineMissing: true, head, pendingCommits: [], records: [], sessionId },
+          commits: [],
+          debt: { outstanding: [], invalidatedCoverage: [] },
+          authorshipPlan: { groups: [], unreviewable: [] },
+        }
+      }
       base = effective
       rangeBase = null
       try {
@@ -356,6 +388,12 @@ export function gatherMechanismReviewInputs({ sessionId = '' } = {}) {
   // turn end is a hook people switch off.
   // Carried rows are RE-MEASURED on every read (delta rounds, 18.08.2026):
   // the blob-identity stamp is the wrapper's, never the ledger's own word.
+  let endStateFiles = null
+  try {
+    endStateFiles = gitRawFile(rangeFilesCommand(base, head)).split('\0').filter(Boolean)
+  } catch {
+    // An unmeasured end state can only demand more below; it never drops a path.
+  }
   const records = verifyCarried(attachCoverage({
     pendingCommits,
     allRecords: pendingCommits.length ? readRecords() : [],
@@ -376,16 +414,22 @@ export function gatherMechanismReviewInputs({ sessionId = '' } = {}) {
     rangeFiles: (sha) => gitRawFile(rangeFilesCommand(base, sha)).split('\0').filter(Boolean),
   }))
 
-  // A scoped pass advances only the commit/file contribution it actually read.
-  // The remaining contribution list is both the gate's debt and the next pass
-  // plan's input; a cleared file therefore never returns merely because HEAD
-  // moved elsewhere in the range.
-  const debt = outstandingContributions({
+  // A scoped pass advances the end-state files it actually read. The remaining
+  // file list is both the gate's debt and the next pass plan's input; a cleared
+  // file therefore never returns merely because HEAD moved elsewhere.
+  const debt = outstandingFiles({
     commits,
+    endStateFiles,
     records,
-    recordUsable: (record, commit) => reviewRecordWellFormed(record) && !mergeProblem(record, commit),
+    recordUsable: (record, commit) =>
+      reviewRecordWellFormed(record, { commitAt: commit?.at }) &&
+      attestsToCodeReading(record) &&
+      !reviewIdentityProblem(record.model, commit),
   })
-  const authorshipPlan = planAuthorshipGroups({ commits: commitsForContributions(debt.outstanding) })
+  const authorshipPlan = planAuthorshipGroups({
+    commits: commitsForFiles(debt.outstanding),
+    endStateFiles: debt.outstanding.map((artefact) => artefact.file),
+  })
 
   return {
     applicable: true,
@@ -396,7 +440,17 @@ export function gatherMechanismReviewInputs({ sessionId = '' } = {}) {
     // using its conservative raw fallback, but that unproved range can never
     // support a gap waiver.
     rangeBase,
-    inputs: { baseline: effective, head, pendingCommits, records },
+    inputs: {
+      baseline: effective,
+      baselineMissing,
+      head,
+      pendingCommits,
+      records,
+      sessionId,
+      fence: guardDuty({ sessionId }),
+      authorshipPlan,
+      endStateFiles,
+    },
     commits,
     debt,
     authorshipPlan,
@@ -490,6 +544,20 @@ if (isMainModule(import.meta.url)) {
 
     const verdict = evaluateMechanismReview(gathered.inputs)
 
+    // Recovery is a two-turn operation: this turn reports and refuses the
+    // missing evidence; a non-status Stop invocation may seed only the immutable
+    // anchor, never HEAD. The next turn then judges the full anchor..HEAD range.
+    if (!status && gathered.baselineMissing && gathered.baseline) {
+      writeBaseline(gathered.branch, gathered.baseline)
+    }
+
+    if (verdict.deferred) {
+      // Leave the baseline behind the pending mechanism range: that range is
+      // the successor's inbox, not a clearance by the fenced session.
+      process.stdout.write(JSON.stringify({ systemMessage: verdict.reason }))
+      process.exit(0)
+    }
+
     // THE GAP CLAUSE (point 714, c06a02d2): while the range's material CANNOT
     // be assembled for review at all, demanding that review traps the session
     // — so a blocking turn first MEASURES the range against the budget. A gap
@@ -536,7 +604,7 @@ if (isMainModule(import.meta.url)) {
           statusPlan = buildAuthorshipPassPlan({
             sha: gathered.head,
             base: gathered.rangeBase,
-            commits: commitsForContributions(gathered.debt.outstanding),
+            commits: commitsForFiles(gathered.debt.outstanding),
           })
         } catch {
           /* the status names an unavailable plan instead of inventing a count */
@@ -565,12 +633,20 @@ if (isMainModule(import.meta.url)) {
       )
       for (const group of debtStatus.groups.length ? debtStatus.groups : gathered.authorshipPlan?.groups ?? []) {
         console.log(
-          `  ${(group.authorshipKind ?? group.kind) === 'commit' ? `commit ${group.commits[0].slice(0, 7)}` : `${group.vendor ?? 'authored'} files`} → ` +
-            `${group.reviewer || 'NO ELIGIBLE REVIEWER'}: ${group.files.map((f) => quotePassFile(f)).join(', ')}`,
+          `  ${group.vendor ?? 'authored'} end-state files → ` +
+            `${group.reviewer ? `${group.reviewerVendor} reviewer ${group.reviewer}` : `UNREVIEWABLE — ${group.unreviewableReason}`}: ` +
+            `${group.files.map((f) => quotePassFile(f)).join(', ')}`,
         )
       }
+      if ((gathered.debt?.invalidatedCoverage ?? []).length) {
+        console.log(formatInvalidatedCoverage(gathered.debt.invalidatedCoverage, { quoteFile: quotePassFile }))
+      }
       if (outcome.action === 'report-gap') console.log(`\n${gap.report}`)
-      else console.log(verdict.block ? `\n${formatMechanismReviewVerdict(verdict)}` : '\nGATE CLEAR')
+      else console.log(
+        verdict.block
+          ? `\n${formatMechanismReviewVerdict(verdict, { authorshipPlan: gathered.authorshipPlan })}`
+          : '\nGATE CLEAR',
+      )
       process.exit(0)
     }
 
@@ -583,7 +659,10 @@ if (isMainModule(import.meta.url)) {
     }
     if (outcome.action === 'block') {
       process.stdout.write(
-        JSON.stringify({ decision: 'block', reason: formatMechanismReviewVerdict(verdict) }),
+        JSON.stringify({
+          decision: 'block',
+          reason: formatMechanismReviewVerdict(verdict, { authorshipPlan: gathered.authorshipPlan }),
+        }),
       )
       process.exit(0)
     }
@@ -592,6 +671,22 @@ if (isMainModule(import.meta.url)) {
     if (gathered.head) writeBaseline(gathered.branch, gathered.head)
     process.exit(0)
   } catch (e) {
+    // AN UNREADABLE LEDGER IS NOT AN ENVIRONMENT TRANSIENT (cross-vendor review
+    // of point 780). The ledger IS this gate's evidence: without it the gate
+    // cannot tell a reviewed mechanism from an unreviewed one, so the fail-open
+    // catch below would wave through exactly what it exists to stop.
+    if (e && e.ledgerUnreadable) {
+      process.stdout.write(
+        JSON.stringify({
+          decision: 'block',
+          reason:
+            `mechanism-review-guard: the review ledger cannot be read, so nothing here can be proven reviewed.\n` +
+            `  ${e.message}\n` +
+            '  Repair the ledger (it is tracked in git) and end the turn again.',
+        }),
+      )
+      process.exit(0)
+    }
     console.error(`mechanism-review-guard error (allowing stop): ${e && e.message}`)
     process.exit(0)
   }

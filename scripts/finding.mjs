@@ -275,8 +275,8 @@ if (has('--blocked')) {
   try {
     const out = execFileSync(
       process.execPath,
-      ['scripts/board.mjs', 'vdzk-add', blockedCardTitle(hits[0].title), '--text-stdin'],
-      { cwd: REPO_ROOT, encoding: 'utf8', windowsHide: true, input: `${why}\n\nDie Anfrage liegt im Träger; sie wird nicht in den Arbeitsauftrag übernommen, solange das so bleibt.\n` },
+      ['scripts/board.mjs', 'vdzk-add', '--automated', blockedCardTitle(hits[0].title), '--text-stdin'],
+      { cwd: REPO_ROOT, encoding: 'utf8', windowsHide: true, input: `${why}\n\nDie Anfrage liegt im Träger und wird nicht in den Arbeitsauftrag übernommen, solange das so bleibt. Deine Möglichkeiten: den Befund als Punkt aufnehmen, oder ihn verwerfen.\n` },
     )
     console.log(out.trim().split('\n')[0])
   } catch (e) {

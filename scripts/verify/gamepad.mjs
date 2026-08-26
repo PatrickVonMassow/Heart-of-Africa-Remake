@@ -1,12 +1,28 @@
 // Headless verification for CLAUDE.md §7.1.30 (gamepad controls and the
 // position query, design.md §17). A virtual gamepad is injected by
 // overriding navigator.getGamepads. Dev server only.
-import { launchVerifyBrowser, assertBackend } from './_browser.mjs'
+import { launchVerifyBrowser, assertBackend, waitForSceneBuilt } from './_browser.mjs'
+import { sectionGate } from './sections.mjs'
 
 const BASE = process.env.BASE_URL ?? 'http://localhost:5173/'
+
+// SECTIONS (points 566/595). One block per control, each owning the scene it
+// needs — the first-person blocks stay in the start port, the travel block leaves
+// it, and the two village blocks enter the village themselves through the shared
+// helper below rather than inheriting it from the block before. The names are
+// read out of THIS FILE by scripts/verify/sections.mjs, so an unknown one is
+// refused with the list of the real ones — and the run is stamped PARTIAL, never
+// suite coverage.
+const sections = sectionGate()
+const { section } = sections
+if (sections.banner()) console.log(sections.banner())
+
 let failures = 0
 const check = (name, ok, detail) => {
-  console.log(`${ok ? 'PASS' : 'FAIL'}  ${name}${detail ? ' — ' + detail : ''}`)
+  // The tag goes AFTER the ' — ' separator: the check's NAME is its identity for
+  // the red ledger and the baseline classifier and must not change.
+  const tail = [detail, sections.tag().trim()].filter(Boolean).join('  ')
+  console.log(`${ok ? 'PASS' : 'FAIL'}  ${name}${tail ? ' — ' + tail : ''}`)
   if (!ok) failures++
 }
 
@@ -69,96 +85,147 @@ const pulseButtonUntil = async (index, cond, timeout = 15000) => {
   return ok
 }
 
+// SHARED STAGING (point 566). The two village blocks both need to be standing in
+// the NORTHERN village — one to address its elder, one to have the position query
+// answer "North" — so entering it is a helper each of them calls, not something
+// the second inherits from the first. A no-op once the traveller is already
+// standing there (so a whole run still enters exactly once), and it steps out of
+// any OTHER settlement first: going out and in is the path the player takes and
+// the one the §2.5 panorama capture expects.
+const enterNubianVillage = async () => {
+  const alreadyThere = await page.evaluate(
+    () => window.__game.getState().placeId === 'nubian-village' && !!window.__placeLayout,
+  )
+  if (alreadyThere) return
+  await page.evaluate(() => {
+    const g = window.__game.getState()
+    if (g.mode === 'place') g.leavePlace()
+  })
+  await page.evaluate(() => window.__game.getState().enterPlace('nubian-village'))
+  await page
+    .waitForFunction((want) => window.__game.getState().placeId === want && !!window.__placeLayout, "nubian-village", { timeout: 30000 })
+    .catch(() => {})
+  // Wait for the SCENE, not the clock. The button poll runs on requestAnimationFrame
+  // (src/systems/input.ts), so while the freshly entered settlement is still
+  // streaming there are frames in which no press is read at all — measured: a
+  // standalone `--section=position-query` pressed Select into that gap and the
+  // query answered nothing, while the same check passed in a whole run, where the
+  // scene had long settled. A section owns its setup, and this is that setup.
+  await waitForSceneBuilt(page)
+  await page.evaluate(() => window.__game.getState().setJournalOpen(false))
+}
+
 // --- Idle axis drift must not steer (worn pads, wheels, flight sticks) -------------
 // Below the engagement threshold nothing may move before a deliberate input.
-await page.evaluate(() => (window.__pad.axes = [0.35, 0.35, 0.4, 0]))
-await page.waitForTimeout(700)
-const driftYaw = await page.evaluate(() => window.__placePlayer?.yaw ?? 0)
-check('idle axis drift steers nothing before engagement', Math.abs(driftYaw) < 0.01, `yaw ${driftYaw.toFixed(3)}`)
-await page.evaluate(() => (window.__pad.axes = [0, 0, 0, 0]))
+if (section('axis-drift')) {
+  await page.evaluate(() => (window.__pad.axes = [0.35, 0.35, 0.4, 0]))
+  await page.waitForTimeout(700)
+  const driftYaw = await page.evaluate(() => window.__placePlayer?.yaw ?? 0)
+  check('idle axis drift steers nothing before engagement', Math.abs(driftYaw) < 0.01, `yaw ${driftYaw.toFixed(3)}`)
+  await page.evaluate(() => (window.__pad.axes = [0, 0, 0, 0]))
+}
 
 // --- Right stick turns the first-person view (in Cairo at start) -------------------
-const yaw0 = await page.evaluate(() => window.__placePlayer?.yaw ?? 0)
-const turned = await holdAxesUntil([0, 0, 1, 0], (y0) => Math.abs((window.__placePlayer?.yaw ?? 0) - y0) > 0.2, yaw0)
-const yaw1 = await page.evaluate(() => window.__placePlayer?.yaw ?? 0)
-check('right stick turns the first-person view', turned, `yaw ${yaw0.toFixed(2)} → ${yaw1.toFixed(2)}`)
+if (section('right-stick-turn')) {
+  const yaw0 = await page.evaluate(() => window.__placePlayer?.yaw ?? 0)
+  const turned = await holdAxesUntil([0, 0, 1, 0], (y0) => Math.abs((window.__placePlayer?.yaw ?? 0) - y0) > 0.2, yaw0)
+  const yaw1 = await page.evaluate(() => window.__placePlayer?.yaw ?? 0)
+  check('right stick turns the first-person view', turned, `yaw ${yaw0.toFixed(2)} → ${yaw1.toFixed(2)}`)
+}
 
 // --- Left stick walks in the settlement ----------------------------------------------
-const pos0 = await page.evaluate(() => ({ x: window.__placePlayer.x, z: window.__placePlayer.z }))
-const walkedOk = await holdAxesUntil(
-  [0, -1, 0, 0],
-  (p0) => Math.hypot(window.__placePlayer.x - p0.x, window.__placePlayer.z - p0.z) > 1,
-  pos0,
-)
-const pos1 = await page.evaluate(() => ({ x: window.__placePlayer.x, z: window.__placePlayer.z }))
-const walked = Math.hypot(pos1.x - pos0.x, pos1.z - pos0.z)
-check('left stick walks the character (first-person)', walkedOk, `moved ${walked.toFixed(1)} m`)
+if (section('left-stick-walk')) {
+  const pos0 = await page.evaluate(() => ({ x: window.__placePlayer.x, z: window.__placePlayer.z }))
+  const walkedOk = await holdAxesUntil(
+    [0, -1, 0, 0],
+    (p0) => Math.hypot(window.__placePlayer.x - p0.x, window.__placePlayer.z - p0.z) > 1,
+    pos0,
+  )
+  const pos1 = await page.evaluate(() => ({ x: window.__placePlayer.x, z: window.__placePlayer.z }))
+  const walked = Math.hypot(pos1.x - pos0.x, pos1.z - pos0.z)
+  check('left stick walks the character (first-person)', walkedOk, `moved ${walked.toFixed(1)} m`)
+}
 
 // --- Y opens the journal, B closes it ---------------------------------------------------
-await pulseButtonUntil(3, () => window.__game.getState().journalOpen === true) // Y → Tab (open)
-let journalOpen = await page.evaluate(() => window.__game.getState().journalOpen)
-check('Y toggles the journal', journalOpen === true, '')
-await pulseButtonUntil(1, () => window.__game.getState().journalOpen === false) // B → Escape (close)
-journalOpen = await page.evaluate(() => window.__game.getState().journalOpen)
-check('B closes the journal again', journalOpen === false, '')
+if (section('journal-buttons')) {
+  await pulseButtonUntil(3, () => window.__game.getState().journalOpen === true) // Y → Tab (open)
+  let journalOpen = await page.evaluate(() => window.__game.getState().journalOpen)
+  check('Y toggles the journal', journalOpen === true, '')
+  await pulseButtonUntil(1, () => window.__game.getState().journalOpen === false) // B → Escape (close)
+  journalOpen = await page.evaluate(() => window.__game.getState().journalOpen)
+  check('B closes the journal again', journalOpen === false, '')
+}
 
 // --- Left stick travels in the bird's-eye view --------------------------------------------
-await page.evaluate(() => window.__game.getState().leavePlace())
-await page.waitForTimeout(1200)
-const tpos0 = await page.evaluate(() => ({ ...window.__game.getState().pos }))
-const travelledOk = await holdAxesUntil(
-  [0, 1, 0, 0], // stick down = south
-  (p0) => Math.hypot(window.__game.getState().pos.x - p0.x, window.__game.getState().pos.z - p0.z) > 0.5,
-  tpos0,
-)
-const tpos1 = await page.evaluate(() => ({ ...window.__game.getState().pos }))
-const travelled = Math.hypot(tpos1.x - tpos0.x, tpos1.z - tpos0.z)
-check("left stick travels in the bird's-eye view", travelledOk, `moved ${travelled.toFixed(2)} units`)
+if (section('left-stick-travel')) {
+  await page.evaluate(() => window.__game.getState().leavePlace())
+  await page.waitForTimeout(1200)
+  const tpos0 = await page.evaluate(() => ({ ...window.__game.getState().pos }))
+  const travelledOk = await holdAxesUntil(
+    [0, 1, 0, 0], // stick down = south
+    (p0) => Math.hypot(window.__game.getState().pos.x - p0.x, window.__game.getState().pos.z - p0.z) > 0.5,
+    tpos0,
+  )
+  const tpos1 = await page.evaluate(() => ({ ...window.__game.getState().pos }))
+  const travelled = Math.hypot(tpos1.x - tpos0.x, tpos1.z - tpos0.z)
+  check("left stick travels in the bird's-eye view", travelledOk, `moved ${travelled.toFixed(2)} units`)
+}
 
 // --- A interacts (Space): addresses the elder in a village -------------------------------------
 // The A button maps to the Space use key (design.md §17.5), which addresses the
 // village elder when standing by him. The northern Nubian village keeps the
 // following position query in the North.
-await page.evaluate(() => window.__game.getState().enterPlace('nubian-village'))
-await page
-  .waitForFunction((want) => window.__game.getState().placeId === want && !!window.__placeLayout, "nubian-village", { timeout: 30000 })
-  .catch(() => {})
-await page.waitForTimeout(500)
-await page.evaluate(() => {
-  window.__game.getState().setJournalOpen(false)
-  const el = window.__placeLayout.interactives.find((i) => i.type === 'villager')
-  const p = window.__placePlayer
-  p.x = el.pos[0]
-  p.z = el.pos[1] + 2
-})
-await page.waitForTimeout(500)
-await pulseButtonUntil(0, () => window.__game.getState().languagesLearned.north === true) // A → Space → talk
-const talked = await page.evaluate(() => window.__game.getState().languagesLearned.north)
-check('A interacts: the elder is addressed (language lesson)', talked === true, '')
+if (section('interact-elder')) {
+  await enterNubianVillage()
+  await page.evaluate(() => {
+    const el = window.__placeLayout.interactives.find((i) => i.type === 'villager')
+    const p = window.__placePlayer
+    p.x = el.pos[0]
+    p.z = el.pos[1] + 2
+  })
+  await page.waitForTimeout(500)
+  await pulseButtonUntil(0, () => window.__game.getState().languagesLearned.north === true) // A → Space → talk
+  const talked = await page.evaluate(() => window.__game.getState().languagesLearned.north)
+  check('A interacts: the elder is addressed (language lesson)', talked === true, '')
+}
 
 // --- Position query (P / Select) in both languages -------------------------------------------
-// Hold the button until the toast appears (like a real press): right after
-// a place entry the scene build can stall frames longer than a short tap,
-// so a fixed 150 ms window may fall between two rAF ticks of the poller.
-const queryToast = async () => {
-  await page.evaluate(() => window.__game.getState().setToast(null))
-  await page.evaluate(() => (window.__pad.buttons[8] = { pressed: true, touched: true, value: 1 }))
-  const toast = await page
-    .waitForFunction(() => window.__game.getState().toast, null, { timeout: 8000 })
-    .then((h) => h.jsonValue())
-    .catch(() => null)
-  await page.evaluate(() => (window.__pad.buttons[8] = { pressed: false, touched: false, value: 0 }))
-  await page.waitForTimeout(150)
-  return toast
+if (section('position-query')) {
+  await enterNubianVillage()
+  // Hold the button until the toast appears (like a real press): right after
+  // a place entry the scene build can stall frames longer than a short tap,
+  // so a fixed 150 ms window may fall between two rAF ticks of the poller.
+  const queryToast = async () => {
+    await page.evaluate(() => window.__game.getState().setToast(null))
+    await page.evaluate(() => (window.__pad.buttons[8] = { pressed: true, touched: true, value: 1 }))
+    const toast = await page
+      .waitForFunction(() => window.__game.getState().toast, null, { timeout: 8000 })
+      .then((h) => h.jsonValue())
+      .catch(() => null)
+    await page.evaluate(() => (window.__pad.buttons[8] = { pressed: false, touched: false, value: 0 }))
+    await page.waitForTimeout(150)
+    return toast
+  }
+  let toast = await queryToast()
+  check('position query reports coordinates and region (EN)', !!toast && toast.includes('Latitude') && toast.includes('North'), `"${toast}"`)
+  // Switch, then wait for the switch to have LANDED (the locale store keeps
+  // <html lang> in sync) — pressing into the re-render answers in no language.
+  await page.evaluate(() => window.__setLang('de'))
+  await page.waitForFunction(() => document.documentElement.lang === 'de', null, { timeout: 10000 }).catch(() => {})
+  toast = await queryToast()
+  check('position query localized (DE)', !!toast && toast.includes('Breite'), `"${toast}"`)
+  await page.evaluate(() => window.__setLang('en'))
 }
-let toast = await queryToast()
-check('position query reports coordinates and region (EN)', !!toast && toast.includes('Latitude') && toast.includes('North'), `"${toast}"`)
-await page.evaluate(() => window.__setLang('de'))
-toast = await queryToast()
-check('position query localized (DE)', !!toast && toast.includes('Breite'), `"${toast}"`)
-await page.evaluate(() => window.__setLang('en'))
+
+// A selected section that never executed is a FAILURE, not a quiet pass: it is
+// the one way a --section run could report green having verified nothing.
+const unrun = sections.unrun()
+if (unrun) check('the selected section actually ran', false, unrun)
 
 console.log('console errors:', errors.length)
 for (const e of errors) console.log('ERR:', e.slice(0, 300))
+// Said again where the verdict is read: a green one-section run is not a green
+// suite, and nothing downstream may quote it as one.
+if (sections.banner()) console.log(sections.banner())
 await browser.close()
 process.exit(failures > 0 || errors.length > 0 ? 1 : 0)

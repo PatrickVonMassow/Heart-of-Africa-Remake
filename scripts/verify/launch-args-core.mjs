@@ -16,7 +16,8 @@
  *  win32 keeps `d3d11` — the historical value, unchanged byte for byte; the Windows
  *  host is the one this project has always verified on and nothing about it moved.
  *
- *  Linux headless gets `gl` (point 493, 04.08.2026). The earlier `swiftshader` was
+ *  Linux headless gets `gl-egl` (point 493, repaired 19.08.2026). The earlier
+ *  `swiftshader` was
  *  chosen on 03.08.2026 from a premise that has since been measured false — "the
  *  container has no GPU, no DRI driver and no system libEGL/libGL". It has all three:
  *  /dev/dxg is passed through, /usr/lib/wsl/lib carries libd3d12/libd3d12core/libdxcore,
@@ -25,20 +26,22 @@
  *  against SwiftShader's "Vulkan 1.3.0 (SwiftShader Device (Subzero))" — measured on the
  *  identical scene at 170 vs 22.7 renderer calls per second, a 7.5× picture rate. What
  *  the host needs for it is installed by scripts/verify-host-setup.sh (libgl1, libegl1,
- *  mesa DRI) and by the devcontainer's X11 socket.
+ *  mesa DRI). `gl-egl`, unlike ANGLE's `gl` route, is surfaceless in headless Chrome:
+ *  Chrome 149/151 otherwise asks for the default X display, exits its GPU process when
+ *  the container's DISPLAY is stale, and reports `(gl=none,angle=none)` with WebGL and
+ *  WebGPU both `disabled_off`. The EGL route was measured on those same two browser
+ *  versions with no live X server: both contexts return and the renderer remains D3D12.
  *
- *  It DEGRADES rather than breaks: with the X socket gone the same flags still come up,
- *  on SwiftShader (measured — the 03.08 note's "context-less page" does not happen here),
- *  so a host without the graphics stack loses speed and keeps its picture. Which one a
- *  run actually got is not left to inference: backend-lane-check.mjs prints the renderer
- *  string and names a software rasteriser as one.
+ *  The backend name is not proof that the card accepted it. The bring-up probe and
+ *  backend-lane-check.mjs read Chrome's renderer string, so a disabled GPU process or a
+ *  software rasteriser is named rather than inferred from the requested flag.
  *
  *  darwin gets `metal`, the only backend ANGLE has there.
  */
 const ANGLE_BY_PLATFORM = {
   win32: 'd3d11',
   darwin: 'metal',
-  linux: 'gl',
+  linux: 'gl-egl',
 }
 
 /** Fallback for a platform not named above — software, so it cannot assume a driver. */
@@ -192,7 +195,7 @@ const LINUX_WEBGPU_SOFTWARE_ARGS = ['--use-angle=swiftshader', '--enable-feature
  *  read back as core coverage. */
 const LINUX_WEBGPU_GLES_ARGS = [
   '--use-gl=angle',
-  '--use-angle=gl',
+  '--use-angle=gl-egl',
   '--use-webgpu-adapter=opengles',
   '--force-webgpu-compat',
 ]

@@ -20,7 +20,6 @@
 // This module answers only "what should happen"; nothing here touches the disk,
 // so every branch is covered by plain Vitest cases.
 import { createHash } from 'node:crypto'
-import { dirname, resolve } from 'node:path'
 
 /** Actions plan() can return. */
 export const ACTIONS = {
@@ -47,36 +46,6 @@ export const REASONS = {
 export function lockDigest(text) {
   if (typeof text !== 'string' || text.length === 0) return null
   return createHash('sha256').update(text).digest('hex')
-}
-
-/**
- * The main working tree behind a checkout, derived from git's COMMON directory.
- *
- * `git rev-parse --git-common-dir` answers the shared `.git` of the repository:
- * `<main>/.git` from the main checkout AND from every worktree (a worktree's own
- * `.git` is a file pointing at `<main>/.git/worktrees/<name>`). Its parent is
- * therefore the main working tree — the one place a worktree's dependencies can
- * be borrowed from. Returns null when the answer is a bare repository (a
- * `.git`-less common dir, which has no working tree to borrow from) or when it
- * IS this checkout.
- */
-export function mainCheckoutFrom(gitCommonDir, checkoutRoot) {
-  if (typeof gitCommonDir !== 'string' || gitCommonDir.trim() === '') return null
-  const common = resolve(gitCommonDir.trim())
-  // A bare repo's common dir is the repository itself, not a `.git` inside a
-  // working tree; borrowing from it is meaningless.
-  if (!/[/\\]\.git$/.test(common)) return null
-  const main = dirname(common)
-  if (samePath(main, checkoutRoot)) return null
-  return main
-}
-
-/** Path comparison that does not care about case on Windows. */
-export function samePath(a, b, platform = process.platform) {
-  if (typeof a !== 'string' || typeof b !== 'string') return false
-  const x = resolve(a)
-  const y = resolve(b)
-  return platform === 'win32' ? x.toLowerCase() === y.toLowerCase() : x === y
 }
 
 /**

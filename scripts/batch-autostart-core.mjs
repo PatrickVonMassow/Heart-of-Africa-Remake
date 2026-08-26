@@ -40,16 +40,14 @@ export const BG_WAIT_CEILING_OVERRIDE_ENV = 'HOA_BG_WAIT_CEILING_MS'
 /** 0 = wait indefinitely (the runtime's own documented value). */
 export const BG_WAIT_CEILING_DEFAULT = '0'
 
-/** Model policy (CLAUDE.md §6). rule:model-policy@19ee578a
- *  The fallback CHAIN is
- *  Opus 5 → Fable 5 → Opus 4.8, so the SESSION this launcher spawns is Opus 5.
- *  That is the spawn, not the whole policy: authoring and escalation are the
- *  decisions named in §6 and applied by scripts/author-routing-core.mjs, not by
- *  any `--model` flag here. The CLI
- *  takes a single --fallback-model, so Fable is wired as the first fallback; the
- *  model-guard Stop hook enforces the allowlist from inside either way. */
-export const SPAWN_MODEL = 'claude-opus-5[1m]'
-export const SPAWN_FALLBACK_MODEL = 'claude-fable-5'
+import { OPUS_MODEL_ID, servingFallbackModelId } from './fable-switch-core.mjs'
+import { PAUSE_RETRY_LADDER_MS, planPause } from './batch-pause-core.mjs'
+
+/** Model policy (CLAUDE.md §6). rule:model-policy@840f3e46
+ *  The session starts on Opus 5. Its one CLI fallback is the next member of the
+ *  chain reported by scripts/fable-switch.mjs; the model guard enforces that
+ *  same allowlist from inside the spawned session. */
+export const SPAWN_MODEL = OPUS_MODEL_ID
 
 /**
  * ONE TURN, SEVERAL CALLS (point 593) — the German rendering of the paragraph the
@@ -133,8 +131,10 @@ export const RESUME_PROMPT =
   '<punkt>` aus, erledige dessen Buchhaltung, dann `--commit <punkt>` als LETZTE Repository-Aktion, und ' +
   'BEENDE die Session, statt den naechsten Punkt in denselben Kontext zu ziehen; ein noch bauender Agent ' +
   'mit gepushten Checkpoints wird dabei an den Nachfolger uebergeben (`--adopt`), und die ' +
-  'Kontext-Wassermarke erzwingt dieselbe Uebergabe auch ohne gelandeten Punkt (`--context`). Der OS-Task ' +
-  'startet die naechste Session. Halte sonst NICHT still an. Wenn ein git ' +
+  'Kontext-Wassermarke erzwingt dieselbe Uebergabe auch ohne gelandeten Punkt (`--context`). Die Punktgrenze ' +
+  'fordert den Nachfolger SOFORT ueber dieselbe geschuetzte Startentscheidung an; der Child-Supervisor tut ' +
+  'das bei jedem Prozessende ebenfalls. Der 900-Sekunden-OS-Tick bleibt nur der Recovery-Watchdog fuer einen ' +
+  'fehlenden Supervisor oder fehlgeschlagenen Spawn — er ist NICHT der normale Transport. Halte sonst NICHT still an. Wenn ein git ' +
   'push scheitert, schreibe .claude/push-failed und benachrichtige via scripts/notify.mjs. WICHTIG: Wenn ' +
   'der SessionStart-Hook meldet, dass eine ANDERE Session den Batch-Lock haelt (STAND DOWN), dann arbeite ' +
   'NICHT am Batch und beende dich sofort. Wenn alles erledigt ist: Closing fahren. ' +
@@ -264,8 +264,13 @@ export function standingAlertDue({ lastAt = null, now = Date.now(), intervalMs =
  * bare "Bash" allow does NOT blanket-approve novel command shapes in this harness,
  * and defaultMode "dontAsk" is the settings ceiling.
  */
-export function buildSpawnArgs({ prompt = RESUME_PROMPT, model = SPAWN_MODEL, fallbackModel = SPAWN_FALLBACK_MODEL } = {}) {
-  return ['-p', prompt, '--model', model, '--fallback-model', fallbackModel, '--dangerously-skip-permissions']
+export function buildSpawnArgs({ prompt = RESUME_PROMPT, model = SPAWN_MODEL, fallbackModel, fableState } = {}) {
+  const fallback = fallbackModel === null ? null : fallbackModel || servingFallbackModelId(fableState)
+  return [
+    '-p', prompt, '--model', model,
+    ...(fallback ? ['--fallback-model', fallback] : []),
+    '--dangerously-skip-permissions',
+  ]
 }
 
 /**
@@ -367,6 +372,461 @@ export function pruneSpawns({ spawns, probePid } = {}) {
   return (Array.isArray(spawns) ? spawns : []).filter(
     (s) => s && typeof s.pid === 'number' && typeof s.at === 'number' && probePid(s.pid)?.exists === true,
   )
+}
+
+// --- WHAT THE LAUNCHER MEASURED BEFORE STARTING -------------------------------
+
+/**
+ * May the launcher start a batch session? PURE.
+ *
+ * The owner lock is an ownership registration, not a process registry. A batch
+ * writer can therefore be alive after the lock was lost or released, and using
+ * lock absence as liveness evidence starts a second writer beside it. The
+ * PreToolUse ownership fence records batch-writer process identities separately;
+ * this decision probes those identities and lets a live one veto a start even
+ * when `lock` is null.
+ *
+ * A PID alone is not an identity. Where both recorded and measured start times
+ * exist they must match; a recycled PID is measured as dead. Where the host
+ * cannot provide one of the start times, existence is the conservative answer —
+ * a missed start costs one launcher start, while a false start recreates the
+ * concurrent-main-writer incident this decision closes.
+ *
+ * `assessment` is the existing owner-lock verdict. It remains a conservative
+ * fallback for legacy and pending-spawn locks that have no separately recorded
+ * writer yet. Every outcome carries the evidence used, so the start record never
+ * describes a lock state as if it had measured a process.
+ */
+export function launcherStartDecision({
+  lock = null,
+  assessment = null,
+  batchWriters = {},
+  previousBatchWriters = {},
+  fenceState = null,
+  featureWriterRegister = { readable: true, writers: [] },
+  includeOwnerWriter = false,
+  probePid = () => null,
+  now = Date.now(),
+} = {}) {
+  const writers = []
+  for (const [sessionId, record] of Object.entries(batchWriters && typeof batchWriters === 'object' ? batchWriters : {})) {
+    if (!record || typeof record !== 'object' || typeof record.batchWriterAt !== 'number') continue
+    const pid = typeof record.pid === 'number' && record.pid > 0 ? record.pid : null
+    const probe = pid === null ? null : probePid(pid)
+    const recordedStartedAt = typeof record.startedAt === 'number' ? record.startedAt : null
+    const measuredStartedAt = typeof probe?.startedAt === 'number' ? probe.startedAt : null
+    const sameProcess =
+      probe?.exists === true &&
+      (recordedStartedAt === null || measuredStartedAt === null || Math.abs(recordedStartedAt - measuredStartedAt) <= 2000)
+    const generation = Number.isSafeInteger(record.generation) && record.generation >= 0 ? record.generation : null
+    const previous = previousBatchWriters && typeof previousBatchWriters === 'object'
+      ? previousBatchWriters[sessionId]
+      : null
+    const sameRecordedProcess = !!(
+      previous &&
+      previous.pid === record.pid &&
+      (typeof previous.startedAt !== 'number' || recordedStartedAt === null || Math.abs(previous.startedAt - recordedStartedAt) <= 2000)
+    )
+    const advancing = !!(
+      sameRecordedProcess &&
+      previous.generation === record.generation &&
+      typeof previous.batchWriterAt === 'number' &&
+      record.batchWriterAt > previous.batchWriterAt &&
+      record.batchWriterAt <= now
+    )
+    // Missing state is the one-release migration path for records written by the
+    // previous build. New writes always make the state explicit; only an explicit
+    // retirement can remove authority.
+    const authorityState = record.authorityState === 'retired' ? 'retired' : 'active'
+    const currentFence =
+      generation !== null &&
+      Number.isSafeInteger(fenceState?.fence) &&
+      fenceState.fence === generation &&
+      (typeof fenceState?.holder !== 'string' || !fenceState.holder || fenceState.holder === sessionId)
+    const authoritative = authorityState === 'active' && sameProcess && (currentFence || advancing)
+    writers.push({
+      sessionId,
+      generation,
+      authorityState,
+      pid,
+      recordedStartedAt,
+      measuredExists: probe?.exists === true,
+      measuredStartedAt,
+      sameProcess,
+      batchWriterAt: record.batchWriterAt,
+      writerAgeMs: now - record.batchWriterAt,
+      currentFence,
+      advancing,
+      authoritative,
+    })
+  }
+  const evidence = {
+    lock: {
+      present: !!lock,
+      sessionId: typeof lock?.sessionId === 'string' ? lock.sessionId : null,
+      pid: typeof lock?.pid === 'number' ? lock.pid : null,
+      assessedAlive: assessment?.alive === true,
+      assessmentReason: typeof assessment?.reason === 'string' ? assessment.reason : lock ? 'unmeasured' : 'no-lock',
+    },
+    batchWriters: writers,
+    featureWriterRegister: {
+      readable: featureWriterRegister?.readable === true,
+      reason: typeof featureWriterRegister?.reason === 'string' ? featureWriterRegister.reason : null,
+      writers: Array.isArray(featureWriterRegister?.writers) ? featureWriterRegister.writers : [],
+    },
+  }
+  // A lock's OWN writer does not overrule an explicit handover, idle release or
+  // expired lease: those are ownership transitions the existing assessment was
+  // built to decide, and handover deliberately leaves its process alive. What
+  // this independent registry adds is the process the lock DOES NOT name — a
+  // lockless writer, or a second writer beside a stale lock.
+  const vetoes = writers.filter((writer) =>
+    writer.authoritative && (includeOwnerWriter === true || !lock || writer.sessionId !== evidence.lock.sessionId),
+  )
+  if (vetoes.length > 0) {
+    const identities = vetoes.map((writer) => `${writer.sessionId} (pid ${writer.pid})`).join(', ')
+    return {
+      start: false,
+      reason:
+        `authoritative batch-writer process${vetoes.length === 1 ? '' : 'es'} measured for ${identities}` +
+        (lock ? ' independently of the owner lock' : ' with no owner lock present'),
+      veto: vetoes[0],
+      vetoes,
+      evidence,
+    }
+  }
+  const ownerInactive = !lock || assessment?.alive !== true
+  if (ownerInactive && evidence.featureWriterRegister.readable !== true) {
+    return {
+      start: false,
+      code: 'writer-register-unreadable',
+      reason: `the registered feature-writer evidence is unreadable (${evidence.featureWriterRegister.reason ?? 'unknown cause'})`,
+      evidence,
+    }
+  }
+  const featureVetoes = ownerInactive ? evidence.featureWriterRegister.writers.filter(
+    (writer) => writer?.recognized !== true && writer?.output?.verdict === 'alive',
+  ) : []
+  if (featureVetoes.length > 0) {
+    const identities = featureVetoes.map((writer) => `${writer.branch} (${writer.worktree})`).join(', ')
+    return {
+      start: false,
+      code: 'registered-writer-live',
+      reason: `recent registered feature-writer activity measured for ${identities}`,
+      veto: featureVetoes[0],
+      vetoes: featureVetoes,
+      evidence,
+    }
+  }
+  if (lock && assessment?.alive === true) {
+    return {
+      start: false,
+      reason: `owner lock conservatively assessed alive (${evidence.lock.assessmentReason}); no live writer process was measured`,
+      evidence,
+    }
+  }
+  return {
+    start: true,
+    reason: lock
+      ? `no live batch-writer process measured; owner lock assessed inactive (${evidence.lock.assessmentReason})`
+      : 'no owner lock and no live batch-writer process measured',
+    evidence,
+  }
+}
+
+/** Every transport which may ask for a successor. The scheduler is deliberately
+ * only one member: boundaries and supervised process exits use this same door. */
+export const SUCCESSOR_TRIGGERS = Object.freeze({
+  BOUNDARY: 'boundary',
+  CHILD_EXIT: 'child-exit',
+  CRASH: 'crash',
+  CI_TERMINAL: 'ci-terminal',
+  WATCHDOG: 'watchdog',
+})
+
+const SUCCESSOR_TRIGGER_SET = new Set(Object.values(SUCCESSOR_TRIGGERS))
+const CI_WAIT_VETO_TRIGGERS = new Set([
+  SUCCESSOR_TRIGGERS.CHILD_EXIT,
+  SUCCESSOR_TRIGGERS.CRASH,
+  SUCCESSOR_TRIGGERS.WATCHDOG,
+])
+
+/**
+ * THE ONE SUCCESSOR-START DECISION. PURE.
+ *
+ * Callers gather policy state and process evidence, then every event comes
+ * through here. A refusal is never a boolean without a diagnosis: `code`,
+ * `reason`, and the exact evidence used travel together into the launch record.
+ * The returned reservation is also plain data. The IO half places all of it on
+ * the pending-spawn lock in the same atomic acquisition which wins ownership.
+ */
+export function successorStartDecision({
+  trigger = { kind: SUCCESSOR_TRIGGERS.WATCHDOG },
+  spawnToken = '',
+  ciWait = null,
+  paused = false,
+  openPoints = 1,
+  formatAlarm = false,
+  claimReserved = false,
+  lock = null,
+  assessment = null,
+  batchWriters = {},
+  previousBatchWriters = {},
+  fenceState = null,
+  featureWriterRegister = { readable: true, writers: [] },
+  probePid = () => null,
+  now = Date.now(),
+} = {}) {
+  const kind = trigger && typeof trigger.kind === 'string' ? trigger.kind : ''
+  const sourceGeneration = Number.isSafeInteger(trigger?.generation) ? trigger.generation : null
+  const sourceSpawnToken = typeof trigger?.predecessorToken === 'string' && trigger.predecessorToken
+    ? trigger.predecessorToken
+    : null
+  const wakeToken = typeof trigger?.wakeToken === 'string' && trigger.wakeToken ? trigger.wakeToken : null
+  const durableFence = Number.isSafeInteger(fenceState?.fence) && fenceState.fence >= 0 ? fenceState.fence : 0
+  const lockFence = Number.isSafeInteger(lock?.fence) && lock.fence >= 0 ? lock.fence : 0
+  const observedFence = Math.max(durableFence, lockFence)
+  const requestedFence = observedFence < Number.MAX_SAFE_INTEGER ? observedFence + 1 : null
+  const ciWaitDeadline = Number.isFinite(ciWait?.deadline) ? ciWait.deadline : null
+  const ciWaitDeadlineLabel = ciWaitDeadline !== null && Math.abs(ciWaitDeadline) <= 8.64e15
+    ? new Date(ciWaitDeadline).toISOString()
+    : 'its recorded interaction deadline'
+  const ciWaitVetoActive =
+    CI_WAIT_VETO_TRIGGERS.has(kind) &&
+    ciWait?.visible === true &&
+    ciWait.pending === true &&
+    ciWait.deadlineReached !== true
+  const evidence = {
+    trigger: {
+      kind: kind || null,
+      generation: sourceGeneration,
+      predecessorToken: sourceSpawnToken,
+      wakeToken,
+      result: trigger?.result ?? null,
+    },
+    policy: { paused: paused === true, openPoints, formatAlarm: formatAlarm === true, claimReserved: claimReserved === true },
+    ciWait: ciWait?.visible === true
+      ? {
+          pending: ciWait.pending === true,
+          terminal: ciWait.terminal === true,
+          observerAlive: ciWait.observerAlive === true,
+          repair: ciWait.repair === true,
+          deadline: ciWaitDeadline,
+          deadlineReached: ciWait.deadlineReached === true,
+          vetoActive: ciWaitVetoActive,
+          identity: ciWait.identity ?? null,
+          wakeToken: ciWait.wakeToken ?? null,
+          result: ciWait.result ?? null,
+        }
+      : null,
+    observed: {
+      lockKind: typeof lock?.kind === 'string' ? lock.kind : null,
+      lockSession: typeof lock?.sessionId === 'string' ? lock.sessionId : null,
+      lockGeneration: Number.isSafeInteger(lock?.fence) ? lock.fence : null,
+      lockSpawnToken: typeof lock?.spawnToken === 'string' ? lock.spawnToken : null,
+      handedOver: lock?.handedOver === true,
+    },
+  }
+  const refuse = (code, reason, extra = {}) => ({ start: false, code, reason, evidence: { ...evidence, ...extra } })
+
+  if (!SUCCESSOR_TRIGGER_SET.has(kind)) return refuse('invalid-trigger', `unknown successor trigger "${kind || 'missing'}"`)
+  if (typeof spawnToken !== 'string' || spawnToken.trim() === '') {
+    return refuse('missing-spawn-token', 'the request has no spawn token, so it cannot be reserved atomically')
+  }
+  if (paused === true) return refuse('paused', 'the batch is paused')
+  if (formatAlarm === true || !Number.isInteger(openPoints) || openPoints < 0) {
+    return refuse('work-order-unreadable', 'the open-point count is not trustworthy')
+  }
+  if (openPoints === 0) return refuse('batch-complete', 'the work order has no open successor')
+  if (claimReserved === true) return refuse('claim-reserved', 'an honoured user claim reserves the next ownership')
+
+  // An unfinished run temporarily owns the empty interval after its worker
+  // exits. Replacement-style child-exit, crash, and watchdog requests would
+  // only wake into the same Stop, so they wait for the observer. A deliberate
+  // boundary does useful work on the next point while CI continues in parallel
+  // and must not make every clean handover pay this exceptional-path latency.
+  // The interaction deadline also bounds the veto so an unreachable run cannot
+  // idle the batch forever; observation itself continues on either path.
+  if (ciWaitVetoActive) {
+    return refuse(
+      'ci-wait-pending',
+      `CI run ${ciWait.identity ?? 'unknown'} is still under durable observation and remains a successor veto until ${ciWaitDeadlineLabel}` +
+        (ciWait.repair === true ? '; its observer must be repaired before a successor starts' : ''),
+    )
+  }
+
+  if (kind === SUCCESSOR_TRIGGERS.BOUNDARY) {
+    if (sourceGeneration === null) return refuse('missing-generation', 'the boundary notification names no handover generation')
+    if (!lock || lock.handedOver !== true) return refuse('boundary-not-standing', 'the notified boundary is not standing on the owner lock')
+    if (evidence.observed.lockGeneration !== sourceGeneration) {
+      return refuse(
+        'stale-generation',
+        `the boundary observed generation ${sourceGeneration}, but the owner lock is generation ${evidence.observed.lockGeneration ?? 'unknown'}`,
+      )
+    }
+  }
+
+  if (kind === SUCCESSOR_TRIGGERS.CI_TERMINAL) {
+    if (trigger?.terminal !== true || ciWait?.terminal !== true) {
+      return refuse('ci-not-terminal', 'the CI notification does not carry a persisted terminal result')
+    }
+    if (!wakeToken) return refuse('missing-ci-wake', 'the terminal CI notification carries no wake token')
+    if (wakeToken !== ciWait.wakeToken) {
+      return refuse('stale-ci-wake', 'the terminal CI notification belongs to a superseded wait')
+    }
+  }
+
+  if (sourceSpawnToken && evidence.observed.lockSpawnToken && evidence.observed.lockSpawnToken !== sourceSpawnToken) {
+    return refuse(
+      'stale-spawn',
+      `the exit notification belongs to spawn ${sourceSpawnToken}, but the current owner came from ${evidence.observed.lockSpawnToken}`,
+    )
+  }
+
+  const ownership = launcherStartDecision({
+    lock,
+    assessment,
+    batchWriters,
+    previousBatchWriters,
+    fenceState,
+    featureWriterRegister,
+    // A clean boundary is itself a successor transport and deliberately overlaps
+    // the predecessor while that process finishes. A terminal CI notification is
+    // not: several refs may conclude together, and none may turn the still-live
+    // current session into one new session per ref merely because its lock still
+    // carries a handover mark. Its current fenced writer identity therefore
+    // vetoes CI-terminal starts just like a writer outside the lock.
+    includeOwnerWriter: kind === SUCCESSOR_TRIGGERS.CI_TERMINAL,
+    probePid,
+    now,
+  })
+  evidence.ownership = ownership.evidence
+  if (!ownership.start) {
+    return refuse(ownership.code ?? 'owner-live', ownership.reason, {
+      ownership: ownership.evidence,
+      veto: ownership.veto ?? null,
+      vetoes: ownership.vetoes ?? [],
+    })
+  }
+  if (requestedFence === null) {
+    return refuse('fence-exhausted', 'the ownership fence has no safe successor generation')
+  }
+
+  return {
+    start: true,
+    code: 'start',
+    reason: ownership.reason,
+    evidence,
+    reservation: {
+      spawnToken,
+      sourceGeneration,
+      sourceSpawnToken,
+      wakeToken,
+      trigger: kind,
+      // This is a PROPOSAL, captured with the start decision rather than
+      // recomputed after the exclusive lock create. The serialized fence door
+      // refuses it if another grant advances the durable mark in between.
+      requestedFence,
+      requestedAt: now,
+    },
+  }
+}
+
+/** Whether the watchdog must replace a missing supervisor for the live child. PURE. */
+export function supervisorRestartDecision({ lastSpawn = null, lock = null, childProbe = null, supervisorProbe = null } = {}) {
+  const recordedChildStartedAt = typeof lastSpawn?.pidStartedAt === 'number' ? lastSpawn.pidStartedAt : null
+  const measuredChildStartedAt = typeof childProbe?.startedAt === 'number' ? childProbe.startedAt : null
+  const sameChild = childProbe?.exists === true && (
+    recordedChildStartedAt === null ||
+    measuredChildStartedAt === null ||
+    Math.abs(recordedChildStartedAt - measuredChildStartedAt) <= 2000
+  )
+  const recordedSupervisorStartedAt = typeof lastSpawn?.supervisorStartedAt === 'number' ? lastSpawn.supervisorStartedAt : null
+  const measuredSupervisorStartedAt = typeof supervisorProbe?.startedAt === 'number' ? supervisorProbe.startedAt : null
+  const sameSupervisor = supervisorProbe?.exists === true && (
+    recordedSupervisorStartedAt === null ||
+    measuredSupervisorStartedAt === null ||
+    Math.abs(recordedSupervisorStartedAt - measuredSupervisorStartedAt) <= 2000
+  )
+  const evidence = {
+    childPid: Number.isInteger(lastSpawn?.pid) ? lastSpawn.pid : null,
+    childStartedAt: recordedChildStartedAt,
+    measuredChildStartedAt,
+    spawnToken: typeof lastSpawn?.spawnToken === 'string' ? lastSpawn.spawnToken : null,
+    supervisorPid: Number.isInteger(lastSpawn?.supervisorPid) ? lastSpawn.supervisorPid : null,
+    supervisorStartedAt: recordedSupervisorStartedAt,
+    measuredSupervisorStartedAt,
+    lockSession: typeof lock?.sessionId === 'string' ? lock.sessionId : null,
+    lockSpawnToken: typeof lock?.spawnToken === 'string' ? lock.spawnToken : null,
+    childAlive: sameChild,
+    supervisorAlive: sameSupervisor,
+  }
+  if (!evidence.childPid || !evidence.spawnToken) return { restart: false, reason: 'no supervised spawn is recorded', evidence }
+  if (!evidence.childAlive) return { restart: false, reason: 'the recorded child has already exited', evidence }
+  if (!lock || lock.kind === 'pending-spawn' || evidence.lockSpawnToken !== evidence.spawnToken) {
+    return { restart: false, reason: 'the recorded child is not the current session owner', evidence }
+  }
+  if (evidence.supervisorAlive) return { restart: false, reason: 'the child supervisor is alive', evidence }
+  return { restart: true, reason: 'the live owner child has no live supervisor', evidence }
+}
+
+/** The terminal event a supervisor carries into the shared decision after its
+ * child exits. A terminal CI observation in this child's lifetime is preserved
+ * as the cause; every other normal/crash/Stop termination is `child-exit`. PURE. */
+export function supervisedExitTrigger(records = [], { childStartedAt = 0 } = {}) {
+  const terminal = (Array.isArray(records) ? records : [])
+    .filter((record) =>
+      record?.event === 'ci-wait-finish' &&
+      typeof record?.atMs === 'number' &&
+      record.atMs >= (Number.isFinite(childStartedAt) ? childStartedAt : 0) &&
+      record?.evidence?.terminal,
+    )
+    .at(-1)
+  if (terminal) {
+    return {
+      kind: SUCCESSOR_TRIGGERS.CI_TERMINAL,
+      terminal: true,
+      wakeToken: terminal.evidence.wakeToken ?? null,
+      result: terminal.evidence.terminal,
+      evidence: { seq: terminal.seq ?? null, result: terminal.evidence.terminal },
+    }
+  }
+  return { kind: SUCCESSOR_TRIGGERS.CHILD_EXIT, evidence: null }
+}
+
+/** A red terminal wake is a repair handoff, not permission to select unrelated
+ * work. Green simply confirms why the sleeping batch was resumed. */
+export function ciTerminalPrompt(ciWait) {
+  if (ciWait?.terminal !== true) return ''
+  const result = ciWait.result ?? {}
+  const identity = ciWait.identity ?? 'the observed workflow run'
+  if (result.verdict === 'red' || result.state === 'failed') {
+    return (
+      `\n\nCI-TERMINAL-HANDOFF: ${identity} concluded RED. This successor is the repair path: ` +
+      'run `node scripts/ci-status-guard.mjs` first, inspect the named failure, repair it, run the required gates, ' +
+      'and push the fixing commit before selecting another work-order point.'
+    )
+  }
+  if (result.verdict === 'green' || result.state === 'success') {
+    return `\n\nCI-TERMINAL-HANDOFF: ${identity} concluded GREEN; continue the batch immediately.`
+  }
+  return ''
+}
+
+/** The persisted record for a start the decision licensed. PURE. */
+export function launcherStartRecord({ decision, at, head = '', pid, pidStartedAt, supervisorPid, supervisorStartedAt } = {}) {
+  return {
+    at,
+    head,
+    ...(typeof pid === 'number' && pid > 0 ? { pid } : {}),
+    ...(typeof pidStartedAt === 'number' ? { pidStartedAt } : {}),
+    ...(typeof supervisorPid === 'number' && supervisorPid > 0 ? { supervisorPid } : {}),
+    ...(typeof supervisorStartedAt === 'number' ? { supervisorStartedAt } : {}),
+    ...(typeof decision?.reservation?.spawnToken === 'string' ? { spawnToken: decision.reservation.spawnToken } : {}),
+    ...(decision?.reservation ? { reservation: decision.reservation } : {}),
+    startReason: decision?.reason ?? 'start decision unavailable',
+    measured: decision?.evidence ?? { lock: null, batchWriters: [] },
+  }
 }
 
 // --- WHERE THE CLI LIVES ------------------------------------------------------
@@ -588,11 +1048,51 @@ export const SPAWN_PROVE_MS = 20 * 60 * 1000
  * which is exactly the state `judgePreviousSpawn` is asked about; a usage-limit
  * refusal, which converts nothing, would never be classified at all.
  */
-export function spawnProgressed({ curHead = '', lastHead = '', lock = null, lastSpawnAt = 0 } = {}) {
-  if (curHead && lastHead && curHead !== lastHead) return true
-  if (!lock || !Number.isFinite(lock.claimedAt)) return false
-  if (lock.kind === 'pending-spawn') return false // not converted = not proof of anything
-  return lock.claimedAt > lastSpawnAt
+export function spawnProgressed({
+  curHead = '',
+  lastHead = '',
+  lock = null,
+  batchWriters = {},
+  lastSpawn = null,
+  lastSpawnAt = 0,
+} = {}) {
+  const spawnedAt = Number.isFinite(lastSpawn?.at) ? lastSpawn.at : lastSpawnAt
+  if (!(spawnedAt > 0)) return false
+  const token = typeof lastSpawn?.spawnToken === 'string' && lastSpawn.spawnToken ? lastSpawn.spawnToken : null
+  const sessionId = typeof lastSpawn?.sessionId === 'string' && lastSpawn.sessionId ? lastSpawn.sessionId : null
+  const generation = Number.isSafeInteger(lastSpawn?.generation) ? lastSpawn.generation : null
+  const pid = Number.isInteger(lastSpawn?.pid) && lastSpawn.pid > 0 ? lastSpawn.pid : null
+  const pidStartedAt = Number.isFinite(lastSpawn?.pidStartedAt) ? lastSpawn.pidStartedAt : null
+  const attributed = (record, sid = null) => {
+    if (!record || typeof record !== 'object') return false
+    if (token && record.spawnToken === token) return true
+    if (sessionId && (record.sessionId === sessionId || sid === sessionId)) return true
+    if (generation !== null && record.generation === generation) return true
+    const observedStartedAt = Number.isFinite(record.pidStartedAt)
+      ? record.pidStartedAt
+      : (Number.isFinite(record.startedAt) ? record.startedAt : null)
+    return pid !== null && pidStartedAt !== null && record.pid === pid && observedStartedAt !== null &&
+      Math.abs(observedStartedAt - pidStartedAt) <= 2000
+  }
+  const convertedLock =
+    lock?.kind !== 'pending-spawn' &&
+    Number.isFinite(lock?.claimedAt) &&
+    lock.claimedAt > spawnedAt &&
+    attributed(lock, lock.sessionId)
+  if (convertedLock) return true
+
+  const fencedWrite = Object.entries(batchWriters && typeof batchWriters === 'object' ? batchWriters : {}).some(
+    ([sid, record]) =>
+      Number.isFinite(record?.batchWriterAt) &&
+      record.batchWriterAt > spawnedAt &&
+      attributed(record, sid),
+  )
+  if (fencedWrite) return true
+
+  // A commit is progress only after some current state attributes it to this
+  // child. An unrelated user/session moving HEAD no longer clears a failed
+  // spawn's watchdog.
+  return !!(curHead && lastHead && curHead !== lastHead && attributed(lock, lock?.sessionId))
 }
 
 /**
@@ -634,6 +1134,15 @@ export const SPAWN_BACKOFF_BASE_MS = 10 * 60 * 1000
 /** Its ceiling. Two hours: long enough to stop burning tokens on a broken night,
  *  short enough that a recovered machine is picked up the same morning. */
 export const SPAWN_BACKOFF_CAP_MS = 2 * 60 * 60 * 1000
+
+/** A clean boundary is an optimization over the watchdog and may start at
+ * once. Failure-triggered transports still need the same backoff ladder as a
+ * scheduler tick, even though they arrive through the immediate CLI path. */
+export function shouldWaitForSpawnBackoff({ triggerKind, lastSpawnAt, now = Date.now(), backoffMs } = {}) {
+  if (triggerKind === SUCCESSOR_TRIGGERS.BOUNDARY) return false
+  return Number.isFinite(lastSpawnAt) && Number.isFinite(now) && Number.isFinite(backoffMs) &&
+    now - lastSpawnAt < backoffMs
+}
 
 /**
  * (iii) THE BACKOFF ESCALATES. PURE.
@@ -743,6 +1252,30 @@ export function detectQuotaSignature(text, { tailLines = QUOTA_SIGNATURE_TAIL_LI
 /** The runaway brake's threshold, exported so the launcher and this decision
  *  cannot disagree about when a pause would be written. */
 export const RUNAWAY_FAIL_LIMIT = 3
+
+/** The runaway terminal is a capped scheduling decision, not a human park. */
+export function runawayRecoveryDecision({
+  failCount = RUNAWAY_FAIL_LIMIT,
+  attempt = 0,
+  now = Date.now(),
+  ladder = PAUSE_RETRY_LADDER_MS,
+} = {}) {
+  const plan = planPause({ cause: 'runaway', attempt, now, ladder })
+  const n = Number.isFinite(attempt) && attempt > 0 ? Math.floor(attempt) : 0
+  const capped = !plan.clockless && n >= ladder.length
+  const decisionRecord = capped
+    ? {
+        title: 'Entscheidungsprotokoll: Runaway-Watchdog prüft am Zeitlimit weiter',
+        body:
+          `Automatische Entscheidung [${new Date(now).toISOString()}]: ${failCount} Starts ohne Git-Fortschritt ` +
+          `haben die ${ladder.length} Stufen des Watchdogs verbraucht. Der Batch wird nicht an eine Person ` +
+          `übergeben; der bestehende Evidence-, Preflight- und Doctor-Pfad läuft nach der gedeckelten Uhr erneut. ` +
+          `Nächster Versuch: ${new Date(plan.retryAfter).toISOString()}. Retroaktives Veto: Antworte mit „Veto“ ` +
+          `und nenne den letzten zulässigen Start oder die stattdessen zu sperrende Fehlerklasse.`,
+      }
+    : null
+  return { ...plan, capped, decisionRecord }
+}
 
 /**
  * WHAT THE LAUNCHER MAKES OF THE PREVIOUS SPAWN. PURE — the state machine that

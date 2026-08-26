@@ -259,6 +259,27 @@ describe('evaluate — the dual-backend gate', () => {
     expect(r.decision).toBe('block')
     expect(r.reason).toContain('…')
   })
+
+  it('hands browser and throttle work to the successor after the context fence closes', () => {
+    const r = evaluate(renderChange({
+      fence: { closed: true, successor: 'the successor session' },
+      sessionId: 'sealed-session',
+    }))
+    expect(r).toMatchObject({ decision: 'defer', deferred: true, debt: { decision: 'block' } })
+    expect(r.reason).toContain('render-verify-guard')
+    expect(r.reason).toContain('successor session')
+    expect(r.reason).toContain('batch-boundary.mjs --clear')
+    expect(r.clear).toBeUndefined()
+  })
+
+  it('still demands the pending render work on the successor\'s first turn', () => {
+    const r = evaluate(renderChange({
+      fence: { closed: false, successor: 'the successor session' },
+      sessionId: 'successor-session',
+    }))
+    expect(r.decision).toBe('block')
+    expect(r.reason).toContain('verify/run-all.mjs')
+  })
 })
 
 describe('baselineFor — the per-branch verified baseline (feature-branch workflow)', () => {
@@ -1166,16 +1187,27 @@ describe('the shipped charge ledger', () => {
   })
 
   // THE TWO LANES ANSWER TO DIFFERENT POINTS, and that separation is the whole
-  // value of the charge (13.08.2026). Point 506 is the software lane's rate
-  // problem and says in its own words that on WebGL 2 the check "stays a real
-  // red" — so it must never swallow a hardware-lane occurrence. When one
-  // appeared, it did not become 506's: it became point 671, which must classify
-  // it by measurement. The pairing below is what stops the two from merging back
-  // together, and 671's entry dies with 671, which is the point of the charge.
+  // value of the charge (13.08.2026). The WebGPU entry says in its own words that
+  // on WebGL 2 the check "stays a real red" — so it must never swallow a
+  // hardware-lane occurrence. When one appeared, it did not join it: it became
+  // point 671, which must classify it by measurement. The pairing below is what
+  // stops the two from merging back together, and 671's entry dies with 671,
+  // which is the point of the charge.
+  // THE OWNER MOVED 20.08.2026: point 506 was folded into 642, which carries its
+  // mechanism, and a charge to a ticked point expires. The number changed; the
+  // pairing this case exists for did not.
   it('charges the goat-stance red to a DIFFERENT point on each lane', () => {
     const goat = red('settlement walker (goat): the planted foot holds its ground spot')
-    expect(chargeFor(goat, { suite: 'polish', backend: 'webgpu' }).point).toBe(506)
+    expect(chargeFor(goat, { suite: 'polish', backend: 'webgpu' }).point).toBe(642)
     expect(chargeFor(goat, { suite: 'polish', backend: 'webgl' })).toBeNull()
+  })
+
+  // The entry excuses the assertion that was MEASURED, never the walker it was
+  // measured on (cross-vendor review of c33b031, finding 2). A different check
+  // under the same label is a red nobody has measured, and it must stay a red.
+  it('leaves another check under the same goat label uncharged', () => {
+    const neighbour = red('settlement walker (goat): stays out of the compound fence (point 413)')
+    expect(chargeFor(neighbour, { suite: 'polish', backend: 'webgpu' })).toBeNull()
   })
 
   it('charges only the measured children composition and leaves every other red uncovered', () => {

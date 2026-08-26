@@ -12,16 +12,92 @@
 // `alert: true`) instead of silently never firing.
 
 /**
- * THE WATERMARK, in tokens of context. One named place, calibratable via
- * HOA_CONTEXT_WATERMARK_TOKENS (read by the IO wrapper so this stays pure).
- *
- * WHY 150 000: it is the measured cost cliff the whole boundary rule exists for
- * — 87–94 % of the batch's token spend sat ABOVE 150k context, one session
- * carrying point after point (CLAUDE.md §6, users 27./28.07.2026). A session at
- * the mark has already consumed the cheap region; everything further multiplies
- * every subsequent turn's cost, so the handover pays for itself immediately.
+ * THE CEILING, in tokens of context. This is the cost cliff against which an
+ * incident overshoot is measured; it is NOT the point at which new work may be
+ * admitted, because a handover begun here would finish beyond the ceiling.
  */
-export const CONTEXT_WATERMARK_TOKENS = 150_000
+export const CONTEXT_CEILING_TOKENS = 150_000
+
+/**
+ * THE HANDOVER THRESHOLD, in tokens of context — the mark at which a session
+ * finishes its step and ENDS. It is DERIVED, not chosen: the largest mark at
+ * which the ordinary case (the mark fires, the boundary is taken straight
+ * away) still lands under the ceiling is 150,000 − 27,336 = 122,664, rounded
+ * down to 122,000. The 27,336-token observation was contaminated by the old
+ * dictated-card contradiction, so it remains only the provisional point-743
+ * basis while this recorder gathers clean evidence. A calibration commit will
+ * follow once `.claude/handover-costs.jsonl` holds three real completions; it
+ * will round the largest clean reading UP, never use the mean.
+ *
+ * IT SITS CLOSE UNDER THE CEILING BY DESIGN (point 758, user 20.08.2026). It
+ * used to be 110,000 and served TWO purposes at once — it ended the session AND
+ * it was the mark past which the context fence refused new work. Those are
+ * different contracts: ending late is cheap (the boundary still fits), while
+ * refusing early is expensive (it forbids work a session could still do).
+ * Point 745 replaces the refusal side with per-call remaining-budget arithmetic;
+ * this handover side stays where its own boundary arithmetic puts it.
+ *
+ * THE FLOOR RULE still binds: this number may never sit below the measured
+ * startup cost of a session that has done no work, plus a margin. A threshold
+ * under that floor bounds nothing — it forbids a fresh session its FIRST call,
+ * and the batch cannot advance a point at all. That is what the earlier 82,000
+ * did: four autostarted sessions in a row stood above it before any work of
+ * their own (85,225 / 83,079 / 86,416, and one that reached 91,605 on
+ * orientation alone). A freshly cleared session's first response already carries
+ * 61,372 tokens before a single tool call.
+ *
+ * INTERIM, not a result: point 747 recalibrates it from the recorded series once
+ * the consumption-reducing points have landed.
+ */
+export const CONTEXT_TRIGGER_TOKENS = 122_000
+
+/**
+ * THE HANDOVER RESERVE used by pre-call admission. Until the recorder has the
+ * first three clean completions named above, it stays derived from point 743's
+ * ceiling/trigger pair so the exit budget that pair withheld is never lent to
+ * ordinary calls.
+ */
+export const CONTEXT_HANDOVER_RESERVE_TOKENS =
+  CONTEXT_CEILING_TOKENS - CONTEXT_TRIGGER_TOKENS
+
+/**
+ * THE FENCE MODES — the named, single-valued switch point 758 demands, so that a
+ * disabled gate is VISIBLE as disabled rather than disguised as a passing one
+ * (a threshold set absurdly high would read as an armed fence that happens never
+ * to fire, which is the same lie the user objected to).
+ *
+ *   'observe' — DEFAULT. The fence measures, records what it WOULD have
+ *               refused, and refuses nothing.
+ *   'armed'   — the fence refuses exactly as it did before point 758.
+ *
+ * WHY OBSERVE IS THE DEFAULT (user 20.08.2026): "Introducing the limits now was
+ * nonsense. That should have happened right at the end, once the outstanding
+ * tickets had reduced the consumption." The fence refuses writes to every
+ * authoring target — the work order, the archive, CLAUDE.md, design.md, docs/,
+ * memory/ — which is exactly the file set the consumption-reducing points must
+ * edit, and three fresh sessions in a row were stopped above the mark before
+ * beginning any work at all.
+ *
+ * RE-ARMING IS NOT AUTOMATIC and is not this point's business: it is a condition
+ * inside point 747, once 757/614/742/744/597 have landed and the start floor has
+ * been measured anew.
+ */
+export const CONTEXT_FENCE_MODES = Object.freeze(['observe', 'armed'])
+
+/** The mode in force while nothing overrides it. Flipping this constant to
+ *  'armed' is what re-arming the fence means. */
+export const CONTEXT_FENCE_MODE_DEFAULT = 'observe'
+
+/**
+ * ONE mode name, normalised. PURE. An unrecognised spelling falls back to the
+ * default rather than inventing a third behaviour — the same fail direction the
+ * rest of the fence takes, and the caller reports the mode it ended up with, so
+ * a typo shows up in `--status` instead of silently arming or disarming.
+ */
+export function normalizeFenceMode(raw, fallback = CONTEXT_FENCE_MODE_DEFAULT) {
+  const v = String(raw ?? '').trim().toLowerCase()
+  return CONTEXT_FENCE_MODES.includes(v) ? v : fallback
+}
 
 /**
  * The CURRENT CONTEXT SIZE from a transcript tail. PURE.
@@ -72,11 +148,10 @@ export function parseContextTokens(text) {
  *                  (a watermark that silently never fires is defeat 3 intact).
  */
 /**
- * THE STATED MARGIN (point 700): how far past the mark a boundary may honestly
- * land — the mark fires mid-step and finishing that step costs context. A
- * boundary taken FURTHER past it than this says so in the session's closing
- * report, so the distance between the mark and the real handover stays a
- * number somebody reads rather than a claim. Calibratable like the mark.
+ * THE STATED MARGIN (point 700): how far past the ceiling a boundary may
+ * honestly land. A boundary taken FURTHER past it than this says so in the
+ * session's closing report, so the distance between the ceiling and the real
+ * handover stays a number somebody reads rather than a claim.
  */
 export const CONTEXT_MARGIN_TOKENS = 25_000
 
@@ -87,24 +162,24 @@ export const CONTEXT_MARGIN_TOKENS = 25_000
  * rode on the boundary at all, since an unmeasured distance must not read as a
  * small one.
  */
-export function contextDistanceNote({ tokens, watermark, margin = CONTEXT_MARGIN_TOKENS } = {}) {
+export function contextDistanceNote({ tokens, ceiling, margin = CONTEXT_MARGIN_TOKENS } = {}) {
   if (typeof tokens !== 'number' || !(tokens > 0)) {
     return (
-      'NO CONTEXT READING RODE ON THIS BOUNDARY — the distance to the watermark cannot be judged. ' +
+      'NO CONTEXT READING RODE ON THIS BOUNDARY — the distance to the ceiling cannot be judged. ' +
       'Say so in the closing report.'
     )
   }
-  const mark = typeof watermark === 'number' && watermark > 0 ? watermark : CONTEXT_WATERMARK_TOKENS
-  const over = tokens - mark
+  const limit = typeof ceiling === 'number' && ceiling > 0 ? ceiling : CONTEXT_CEILING_TOKENS
+  const over = tokens - limit
   if (over <= margin) return null
   return (
-    `THIS BOUNDARY WAS TAKEN ${over} TOKENS PAST THE ${mark} WATERMARK (measured ${tokens}, stated margin ` +
-    `${margin}) — say so in the closing report, naming what kept the session working past the mark.`
+    `THIS BOUNDARY WAS TAKEN ${over} TOKENS PAST THE ${limit} CEILING (measured ${tokens}, stated margin ` +
+    `${margin}) — say so in the closing report, naming what kept the session working past the ceiling.`
   )
 }
 
-export function watermarkDecision({ reading, watermark = CONTEXT_WATERMARK_TOKENS } = {}) {
-  const mark = Number.isFinite(watermark) && watermark > 0 ? watermark : CONTEXT_WATERMARK_TOKENS
+export function watermarkDecision({ reading, watermark = CONTEXT_TRIGGER_TOKENS } = {}) {
+  const mark = Number.isFinite(watermark) && watermark > 0 ? watermark : CONTEXT_TRIGGER_TOKENS
   if (!reading || typeof reading.tokens !== 'number' || !(reading.tokens > 0)) {
     return { state: 'unreadable', tokens: null, watermark: mark, alert: true }
   }

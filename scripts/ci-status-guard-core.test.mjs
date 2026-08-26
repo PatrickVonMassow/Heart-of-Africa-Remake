@@ -2,9 +2,14 @@
 // red blocks and notifies once per sha, pending/success/none allow, malformed
 // input fails open, and a green re-run supersedes its red predecessor.
 import { describe, it, expect } from 'vitest'
+import { assessCiWait } from './batch-in-flight-core.mjs'
+import { successorStartDecision, SUCCESSOR_TRIGGERS } from './batch-autostart-core.mjs'
 import {
+  acknowledgeCiWaitState,
   blockReason,
   cachedAnswer,
+  ciWaitBackoffMs,
+  ciWaitIdentity,
   ciRedAlertMessage,
   classifyRuns,
   failedRuns,
@@ -15,9 +20,13 @@ import {
   pushedRefsFromReflog,
   recoveredWorkflows,
   refTargets,
+  selectCiTargets,
   refVerdict,
+  reconcileCiWait,
+  renewCiWait,
   shouldBlock,
   shouldNotify,
+  observeCiWait,
   sweepTargets,
   FAMINE_TTL_MS,
   PUSH_WINDOW_MS,
@@ -91,6 +100,48 @@ describe('classifyRuns', () => {
   it('treats cancelled and timed_out as failed too', () => {
     expect(classifyRuns([run({ conclusion: 'cancelled' })], HEAD).state).toBe('failed')
     expect(classifyRuns([run({ conclusion: 'timed_out' })], HEAD).state).toBe('failed')
+  })
+
+  // THE BRANCHING FALSE RED (measured 21.08.2026). Creating feat/<point> at
+  // main's tip pushes main's sha a second time; GitHub starts a second "CI" run
+  // for it, and the author's first commit cancels that run through
+  // `concurrency: cancel-in-progress`. The cancellation is NEWER than main's own
+  // concluded run, so "newest id wins" reported origin/main RED against a sha
+  // whose CI had SUCCEEDED — and demanded a fixing push no code could supply.
+  it('lets a concluded run outrank a newer cancellation on the same sha', () => {
+    const green = run({ databaseId: 10, conclusion: 'success' })
+    const supersededByBranch = run({ databaseId: 11, conclusion: 'cancelled' })
+    expect(classifyRuns([green, supersededByBranch], HEAD).state).toBe('success')
+    expect(failedRuns([green, supersededByBranch], HEAD)).toEqual([])
+    expect(recoveredWorkflows([green, supersededByBranch], HEAD)).toEqual(['CI'])
+  })
+
+  // A cancellation is only noise when something else JUDGED. Alone it still
+  // demands attention, and it must never bury a genuine red standing behind it.
+  it('keeps a lone cancellation red, and never hides a real failure', () => {
+    expect(classifyRuns([run({ conclusion: 'cancelled' })], HEAD).state).toBe('failed')
+    const red = run({ databaseId: 10, conclusion: 'failure' })
+    const newerCancel = run({ databaseId: 11, conclusion: 'cancelled' })
+    const c = classifyRuns([red, newerCancel], HEAD)
+    expect(c.state).toBe('failed')
+    expect(c.conclusion).toBe('failure')
+  })
+
+  // The rule is per workflow: a green "CI" says nothing about a cancelled
+  // "Deploy to GitHub Pages" that reached no other verdict.
+  it('does not let one workflow\'s verdict excuse another\'s cancellation', () => {
+    const ciGreen = run({ databaseId: 10, conclusion: 'success', workflowName: 'CI' })
+    const deployCancelled = run({ databaseId: 11, conclusion: 'cancelled', workflowName: 'Deploy to GitHub Pages' })
+    const c = classifyRuns([ciGreen, deployCancelled], HEAD)
+    expect(c.state).toBe('failed')
+    expect(c.workflowName).toBe('Deploy to GitHub Pages')
+  })
+
+  // An unfinished run has reached no verdict either, so it cannot excuse one.
+  it('does not let a still-running run excuse a cancellation', () => {
+    const running = run({ databaseId: 10, status: 'in_progress', conclusion: null })
+    const cancelled = run({ databaseId: 11, conclusion: 'cancelled' })
+    expect(classifyRuns([running, cancelled], HEAD).state).toBe('failed')
   })
 
   it('classifies an unfinished run as pending', () => {
@@ -173,6 +224,7 @@ describe('blockReason', () => {
     expect(reason).toContain('https://x')
     expect(reason).toContain('npm run test:unit')
     expect(reason).toContain('--log-failed')
+    expect(reason).toContain('batch-pause.mjs --user-stop')
   })
 
   it('tolerates a missing classification', () => {
@@ -339,11 +391,49 @@ describe('refTargets', () => {
     expect(got).toHaveLength(1)
   })
 
+  it('keeps main as the owner of a shared sha even when the feature push is newer', () => {
+    const got = refTargets({
+      pushed: [
+        { ref: 'origin/feat/x', sha: HEAD, at: t(30) },
+        { ref: 'origin/main', sha: HEAD, at: t(60) },
+      ],
+      existingRefs: ['origin/main', 'origin/feat/x'],
+      headSha: HEAD,
+    })
+    expect(got).toEqual([{ ref: 'origin/main', sha: HEAD, at: t(60) }])
+  })
+
   it('keeps the old guarantee: a HEAD pushed from another clone is still judged', () => {
     const got = refTargets({ pushed: [], existingRefs: [], headSha: HEAD, headPushed: true })
     expect(got).toEqual([{ ref: 'HEAD', sha: HEAD, at: 0 }])
     // …and nothing is claimed when HEAD was never pushed at all.
     expect(refTargets({ pushed: [], existingRefs: [], headSha: HEAD, headPushed: false })).toEqual([])
+  })
+})
+
+describe('selectCiTargets', () => {
+  const main = { ref: 'origin/main', sha: HEAD, at: t(120) }
+  const candidate = { ref: 'origin/feat/669-rescue', sha: BRANCH, at: t(60) }
+
+  it('always gates main, even if a malformed declaration names it', () => {
+    expect(selectCiTargets({ targets: [main], liveAuthorBranches: ['main'] })[0].disposition).toBe('gate')
+  })
+
+  it('gates a landing candidate whose author is no longer declared', () => {
+    expect(selectCiTargets({ targets: [candidate], liveAuthorBranches: [] })[0].disposition).toBe('gate')
+  })
+
+  it('reports without gating while that exact branch has a live author', () => {
+    expect(
+      selectCiTargets({ targets: [candidate], liveAuthorBranches: ['refs/heads/feat/669-rescue'] })[0].disposition,
+    ).toBe('report')
+  })
+
+  it('gates the branch again the moment its author declaration is gone', () => {
+    const live = selectCiTargets({ targets: [candidate], liveAuthorBranches: ['origin/feat/669-rescue'] })
+    const gone = selectCiTargets({ targets: [candidate], liveAuthorBranches: [] })
+    expect(live[0].disposition).toBe('report')
+    expect(gone[0].disposition).toBe('gate')
   })
 })
 
@@ -408,6 +498,113 @@ describe('cachedAnswer', () => {
   it('fails open on junk', () => {
     expect(cachedAnswer(undefined, NOW)).toBe(null)
     expect(cachedAnswer({ state: 'seen', checkedAt: NOW }, NOW)).toBe(null)
+  })
+})
+
+describe('renewable durable CI wait', () => {
+  const observation = (at, state = 'pending') => ({
+    target: { ref: 'origin/feat/x', sha: BRANCH },
+    classification: { state, workflowName: 'CI', runId: 32462093487 },
+    firstSeenAt: at,
+    observedAt: at,
+  })
+
+  it('carries the complete identity and renews without replacing its wake token or deadline', () => {
+    const firstObservation = { ...observation(t(120)), observedAt: t(90) }
+    const secondObservation = { ...observation(t(120)), observedAt: t(30) }
+    const first = renewCiWait(null, firstObservation, { now: t(90), makeWakeToken: () => 'wake-1' })
+    const second = renewCiWait(first, secondObservation, { now: t(30), makeWakeToken: () => 'wake-2' })
+    expect(ciWaitIdentity(observation(t(120)))).toBe(`origin/feat/x:${BRANCH}:CI:32462093487`)
+    expect(second).toMatchObject({
+      state: 'pending',
+      ref: 'origin/feat/x',
+      sha: BRANCH,
+      workflow: 'CI',
+      runId: 32462093487,
+      firstObservationAt: t(90),
+      lastObservationAt: t(30),
+      deadline: t(120) + WAIT_BUDGET_MS,
+      wakeToken: 'wake-1',
+      observations: 2,
+      terminal: null,
+    })
+  })
+
+  it('keeps observing past the interaction deadline and preserves a terminal result for recovery', () => {
+    const wait = renewCiWait(null, observation(NOW - WAIT_BUDGET_MS), { now: NOW, makeWakeToken: () => 'wake-1' })
+    const stillPending = observeCiWait(wait, { state: 'pending' }, { now: NOW + 1 })
+    const finished = observeCiWait(stillPending, { state: 'success', conclusion: 'success', url: 'https://x' }, { now: NOW + 2 })
+    expect(stillPending).toMatchObject({ state: 'pending', deadline: NOW, lastObservationAt: NOW + 1 })
+    expect(finished).toMatchObject({
+      state: 'success',
+      wakeToken: 'wake-1',
+      observer: null,
+      terminal: { state: 'success', verdict: 'green', observedAt: NOW + 2, conclusion: 'success', url: 'https://x' },
+    })
+  })
+
+  it('backs off exponentially but never reaches the 900-second scheduler interval', () => {
+    expect(ciWaitBackoffMs({ observations: 1 })).toBe(15_000)
+    expect(ciWaitBackoffMs({ observations: 2 })).toBe(30_000)
+    expect(ciWaitBackoffMs({ observations: 20 })).toBe(90_000)
+  })
+
+  it('fails closed as data: malformed input cannot invent a wait or erase a valid one', () => {
+    expect(renewCiWait(null, {}, { makeWakeToken: () => 'wake' })).toBeNull()
+    const wait = renewCiWait(null, observation(NOW), { now: NOW, makeWakeToken: () => 'wake' })
+    expect(observeCiWait(wait, { state: 'mystery' }, { now: NOW + 1 })).toEqual(wait)
+  })
+
+  it('never lets a stale pending observation resurrect an already-terminal wait', () => {
+    const pending = renewCiWait(null, observation(NOW), { now: NOW, makeWakeToken: () => 'wake' })
+    const terminal = observeCiWait(pending, { state: 'success' }, { now: NOW + 1 })
+    const reconciled = reconcileCiWait(terminal, [observation(NOW)], { now: NOW + 2, makeWakeToken: () => 'new-wake' })
+    expect(reconciled).toEqual(terminal)
+  })
+
+  it('archives terminal evidence only for the matching successor wake token', () => {
+    const pending = renewCiWait(null, observation(NOW), { now: NOW, makeWakeToken: () => 'wake' })
+    const terminal = observeCiWait(pending, { state: 'failed', conclusion: 'failure' }, { now: NOW + 1 })
+    const original = { shas: {}, ciWait: terminal }
+    expect(acknowledgeCiWaitState(original, 'stale', { now: NOW + 2 })).toEqual({ state: original, acknowledged: false })
+    expect(acknowledgeCiWaitState(original, 'wake', { now: NOW + 2 })).toMatchObject({
+      acknowledged: true,
+      state: { ciWait: null, lastCiWait: { wakeToken: 'wake', recoveredAt: NOW + 2, terminal: { verdict: 'red' } } },
+    })
+  })
+
+  it('FAKE CLOCK: two Stop attempts and worker exit keep the wait visible, then terminal wakes before 900 seconds', () => {
+    let clock = NOW
+    const stop = () => observation(clock)
+    const first = renewCiWait(null, stop(), { now: clock, makeWakeToken: () => 'wake-incident' })
+
+    clock += 60_000 // the second Stop attempt from the measured interaction
+    const second = renewCiWait(first, stop(), { now: clock, makeWakeToken: () => 'must-not-replace' })
+    expect(second).toMatchObject({ state: 'pending', wakeToken: 'wake-incident', observations: 2 })
+
+    clock += 1 // worker exits; neither its pid nor its turn owns the observation
+    const afterExit = assessCiWait({ wait: second, now: clock, probePid: () => null })
+    expect(afterExit).toMatchObject({ visible: true, pending: true, repair: true })
+
+    const workerExitedAt = clock
+    clock += ciWaitBackoffMs(second)
+    const terminalWait = observeCiWait(second, { state: 'success', conclusion: 'success' }, { now: clock })
+    const terminal = assessCiWait({ wait: terminalWait, now: clock, probePid: () => null })
+    const wake = successorStartDecision({
+      trigger: {
+        kind: SUCCESSOR_TRIGGERS.CI_TERMINAL,
+        terminal: true,
+        wakeToken: terminal.wakeToken,
+        result: terminal.result,
+      },
+      spawnToken: 'successor-token',
+      ciWait: terminal,
+      openPoints: 1,
+      assessment: { alive: false, reason: 'worker-exited' },
+      now: clock,
+    })
+    expect(wake).toMatchObject({ start: true, code: 'start', reservation: { wakeToken: 'wake-incident' } })
+    expect(clock - workerExitedAt).toBeLessThan(900_000)
   })
 })
 
@@ -483,6 +680,29 @@ describe('sweepTargets', () => {
     expect(got.alerts[0].target.ref).toBe('origin/feat/x')
   })
 
+  it('reports a live author red without blocking, then reuses that verdict to gate after handoff', async () => {
+    const reportTarget = { ...branchTarget, disposition: 'report' }
+    const first = await sweep({ targets: [reportTarget], runsBySha: { [BRANCH]: redRun(BRANCH) } })
+    expect(first.decision).toBe(null)
+    expect(first.alerts).toEqual([])
+
+    const afterHandoff = await sweepTargets({
+      targets: [{ ...branchTarget, disposition: 'gate' }],
+      cache: first.cache,
+      notified: first.notified,
+      now: NOW,
+      fetchRuns: async () => {
+        throw new Error('the fresh terminal verdict should be reused')
+      },
+      judgeRed: async () => {
+        throw new Error('the fresh terminal verdict should be reused')
+      },
+      notify: async () => {},
+    })
+    expect(afterHandoff.decision).toContain('origin/feat/x')
+    expect(afterHandoff.decision).toContain('RED')
+  })
+
   it('alerts ONCE per (ref, sha) — the next turn on the same pair stays silent', async () => {
     const first = await sweep({ targets: [branchTarget], runsBySha: { [BRANCH]: redRun(BRANCH) } })
     expect(first.alerts).toHaveLength(1)
@@ -523,10 +743,22 @@ describe('sweepTargets', () => {
     expect(got.decision).toContain('NOT yet concluded')
     expect(got.decision).toContain('origin/feat/x')
     expect(got.failedOpen).toEqual([])
+    expect(got.observations).toEqual([
+      expect.objectContaining({
+        target: branchTarget,
+        classification: expect.objectContaining({ state: 'pending' }),
+        firstSeenAt: branchTarget.at,
+        observedAt: NOW,
+        verdict: 'wait',
+      }),
+    ])
     // …and the wait is re-read from the cache without a second API call.
     const again = await sweep({ targets: [branchTarget], cache: got.cache, runsBySha: { [BRANCH]: pendingRun(BRANCH) } })
     expect(again.asked).toEqual([])
     expect(again.decision).toContain('NOT yet concluded')
+    expect(again.observations).toEqual([
+      expect.objectContaining({ previousState: 'pending', verdict: 'wait' }),
+    ])
   })
 
   it('the wait has a CEILING — past it the guard fails open, says so, and KEEPS asking', async () => {

@@ -40,13 +40,15 @@
 //     the heartbeat past it, and a live pid still gets a grace window.
 //   - the launcher REPORTS a silent owner instead of only logging it.
 //
-// The imports are NAMES, from two constants modules that import nothing: the
-// board's commands (board-remedy) and the launcher's identity
-// (batch-launcher-core). This core prints the instruction a session follows
+// The imports are NAMES, from constants/contract modules that import nothing:
+// the board's commands (board-remedy), the launcher's identity
+// (batch-launcher-core), and the canonical empty handover state
+// (handover-card-contract). This core prints the instruction a session follows
 // literally at a boundary, and a second spelling of those names here is how the
 // printed path and the working path came apart in the first place.
 import { EDIT_CMD, NONE_CARD_CMD } from './board-remedy.mjs'
 import { LAUNCHER_TASK_NAME } from './batch-launcher-core.mjs'
+import { NO_FOLLOW_ON_WORK } from './handover-card-contract.mjs'
 
 /** How long a recorded boundary marker stays usable. Long enough for the merge,
  *  the tick, the push and the closing report of a point; short enough that a
@@ -449,6 +451,21 @@ export function cardProofFragments({ cause = BOUNDARY_CAUSES.POINT, destination 
 }
 
 /**
+ * The claimant identity the handover card may print. The claim record is the
+ * launcher's authority; a session id remembered elsewhere can predate a
+ * `/clear`, while the window's process survives it. Keeping this projection
+ * pure lets the composer test prove that no stale session id leaks in.
+ */
+export function claimantCardIdentity(claim) {
+  const claimantSid = typeof claim?.sessionId === 'string' ? claim.sessionId.trim() : ''
+  const claimantPid = Number(claim?.pid)
+  return {
+    claimantSid: claimantSid || null,
+    claimantPid: Number.isInteger(claimantPid) && claimantPid > 0 ? claimantPid : null,
+  }
+}
+
+/**
  * DOES THE BOARD CARRY THAT CARD? PURE. Returns
  * { carries, verifiable, missing } — `verifiable` false for a board that could
  * not be read at all.
@@ -679,21 +696,53 @@ export const CLOSING_SET_FILES = new Set([
  *  `board-publish` and `batch-in-flight` joined for point 675: publishing the
  *  handover card IS ending (its absence from this list was one of the measured
  *  marker deletions of 13.08.2026), and transferring/adopting the in-flight
- *  declaration is boundary bookkeeping, not batch work. */
+ *  declaration is boundary bookkeeping, not batch work. The less obvious
+ *  readers and boundary-bookkeeping commands below are here for the same
+ *  reason: a Stop guard can print them after the seal is committed, so refusing
+ *  their targets would leave the session unable either to inspect the debt or
+ *  to end. Real work is deliberately absent; its guard hands the debt to the
+ *  successor instead. The boundary test derives that inventory from the live
+ *  Stop chain and its imported cores. */
 export const CLOSING_SET_SCRIPTS = [
   'dashboard-publish',
   'dashboard-sync',
   'focus',
   'board',
+  'board-queue',
   'board-publish',
+  'finding',
   'mechanism-review',
   'retro-refresh',
+  'batch-pause',
   'batch-boundary',
+  'batch-claim',
+  'batch-doctor',
   'batch-handover-observe',
   'batch-in-flight',
+  'batch-launcher',
   'batch-singleton',
+  'chat-reply',
   'context-watermark',
+  'branch-hygiene-guard',
+  'bundle-first-guard',
+  'ci-status-guard',
+  'container-ask-guard',
+  'criticality-review-guard',
+  'dashboard-guard',
+  'guide-brevity-guard',
+  'guard-health-guard',
   'guard-preflight',
+  'mechanism-review-guard',
+  'model-guard',
+  'pages-deploy-unblock',
+  'prep-guard',
+  'queue-rank',
+  'render-verify-guard',
+  'rule-echo',
+  'rule-review',
+  'vdzk-answer',
+  'verify/run-wait',
+  'worktree-cleanup',
 ]
 
 const CLOSING_SCRIPT_RE = new RegExp(`scripts[\\\\/](?:${CLOSING_SET_SCRIPTS.join('|')})\\.mjs`, 'i')
@@ -716,12 +765,66 @@ export function isClosingSetPath(p) {
  * because a kept handover plus a long enough silence lets a successor spawn
  * beside a working session.
  *
- * A segment must also be nothing but the invocation: any command substitution
- * (`$(…)`, backticks) or redirection (`>`, `<`) makes it non-closing, whatever
- * its head reads as. Those run or write something this function cannot see, and
- * the head is no longer evidence of what the segment does.
+ * A segment must also be nothing but the invocation and harmless OUTPUT
+ * handling: any command substitution (`$(…)`, backticks) or redirection to a
+ * file (`>`, `<`) makes it non-closing, whatever its head reads as. A descriptor
+ * merge such as `2>&1` is different: it only selects where already-produced
+ * output is displayed, and is removed before separators are classified.
  */
 const OPAQUE_SEGMENT_RE = /\$\(|`|>|</
+
+/**
+ * Remove shell descriptor-to-descriptor OUTPUT merges before splitting on `&`.
+ * They write no file and run no command. Anchoring both descriptors to decimal
+ * file-descriptor syntax keeps `> result.txt`, `>& result.txt` and an arbitrary
+ * ampersand expression opaque. The residual `>`/`<` check below remains the
+ * authority for every other redirection.
+ *
+ * A SEPARATOR ENDS THE MERGE AS SURELY AS A SPACE (Claude review of a6bcd9a5):
+ * `--clear 2>&1|tail -3` is the same harmless decoration as the spaced form, and
+ * demanding the space would leave the very shape this point exists to unblock
+ * denied for a typing habit. A LONE TRAILING `&` IS NOT SUCH A SEPARATOR (Sol
+ * re-review of c5a97818): stripping the merge in `--clear 2>&1&` would leave
+ * `--clear &`, whose empty trailing segment disappears in the split, and the call
+ * would pass as closing work while actually running detached. Only `&&`, which
+ * sequences, qualifies — and the detachment itself is refused separately below,
+ * so no spelling of it reaches the segment split.
+ */
+export function withoutOutputDescriptorMerges(command) {
+  return String(command ?? '').replace(/(^|\s)\d*>>?&\d+(?=[\s;|]|&&|$)/g, '$1')
+}
+
+/**
+ * A standalone `&` DETACHES THE COMMAND TO ITS LEFT, wherever it stands, and a
+ * detached call is not the closing work it names (Sol re-review of 0de0a948;
+ * Claude review of 114bbdd7). `--clear &`, `--clear 2>&1 &` and `--clear & tail`
+ * all let the shell move on before the closing command has withdrawn the
+ * boundary. Even when the command on the right is itself in the closing set,
+ * the left one was backgrounded, so the whole line is refused. `&&` remains a
+ * sequencing operator rather than detachment.
+ */
+const DETACH_RE = /(^|[^&])&(?!&)/
+
+/**
+ * Split a shell line while RETAINING the separator that introduces each
+ * segment. Pager tolerance depends on that identity: only `| tail` consumes
+ * output from the preceding closing command; `; tail`, `&& tail` and `|| tail`
+ * launch a second command and must be judged as such. Empty segments are kept
+ * so malformed or dangling chains fail closed instead of disappearing.
+ */
+function commandSegments(command) {
+  const segments = []
+  const separatorRe = /&&|\|\||[;&|]|\r\n?|\n/g
+  let separator = null
+  let start = 0
+  for (const match of command.matchAll(separatorRe)) {
+    segments.push({ separator, text: command.slice(start, match.index).trim() })
+    separator = match[0]
+    start = match.index + match[0].length
+  }
+  segments.push({ separator, text: command.slice(start).trim() })
+  return segments
+}
 
 /**
  * A PURE OUTPUT PAGER — a segment that only looks at what the segment before it
@@ -746,19 +849,20 @@ export function isOutputPagerSegment(segment) {
 
 export function isClosingSetCommand(command) {
   if (typeof command !== 'string' || !command.trim()) return false
-  const segments = command
-    .split(/&&|\|\||[;|&\n\r]+/)
-    .map((s) => s.trim())
-    .filter(Boolean)
+  const stripped = withoutOutputDescriptorMerges(command)
+  if (DETACH_RE.test(stripped)) return false
+  const segments = commandSegments(stripped)
   let sawClosing = false
   for (let i = 0; i < segments.length; i += 1) {
-    const seg = segments[i]
+    const { separator, text: seg } = segments[i]
+    if (!seg) return false
     if (OPAQUE_SEGMENT_RE.test(seg)) return false
     if (/^(?:cd|set-location|pushd|popd)\b/i.test(seg)) continue
     // A pager is tolerated ONLY as the final segment of a line that has already
-    // shown a closing script. In the middle it would hide whatever follows it, and
-    // on its own it is not a closing line at all.
-    if (i === segments.length - 1 && sawClosing && isOutputPagerSegment(seg)) continue
+    // shown a closing script AND only when a PIPE introduces it. In the middle it
+    // would hide whatever follows it; after a sequencing operator it is an
+    // independent command; and on its own it is not a closing line at all.
+    if (separator === '|' && i === segments.length - 1 && sawClosing && isOutputPagerSegment(seg)) continue
     const head = seg.match(/^(?:node|npx\s+node)\s+(?:"[^"]*"|'[^']*'|\S+)/i)
     if (!head || !CLOSING_SCRIPT_RE.test(head[0])) return false
     sawClosing = true
@@ -871,15 +975,14 @@ export function boundaryDestination({ claimHonoured = false, claimantSid = null 
  * User-facing prose (the board is read on a phone), so it says the destination in
  * the first sentence and never leaves the reader to infer it.
  *
- * IT NAMES NO POINT NUMBER (point 439, 30.07.2026). This text is prescribed for
- * use VERBATIM, and it goes into the gap card `board.mjs done <n> --none` writes
- * — a card that owns no point number, so `dashboard-card-topic-guard` counted
- * every "Punkt N" in it as a reference to a FOREIGN point and blocked the turn
- * end. Two sanctioned mechanisms thus contradicted each other, and the loser was
- * always the boundary: the block costs a turn, and every remedy command counts as
- * work and deletes the boundary marker, so the handover had to be re-taken. The
- * closed point's own story belongs in Erledigt anyway, which is where `done`
- * files it in the same edit; this card says only where the batch GOES.
+ * IT NAMES THE NEXT OPEN POINT (point 800), or states canonically that none
+ * remains. This text is prescribed for use VERBATIM in the unnumbered gap card
+ * `board.mjs done <n> --none` writes. The board writer requires that destination,
+ * and the topic guard permits it only on this state card by title; the shared
+ * property test applies the same writer predicate so those two rules cannot
+ * drift apart again. The closed point's own story belongs in Erledigt anyway,
+ * which is where `done` files it in the same edit; this card says where the
+ * batch GOES.
  */
 /**
  * THE COMMAND THAT PUTS THE BOUNDARY CARD UP. PURE.
@@ -901,13 +1004,33 @@ export function boundaryCardCommand({ point, pointCardStanding = false } = {}) {
     : `${NONE_CARD_CMD} --text-stdin`
 }
 
-export function boundaryCardText({ destination, claimantSid = null, cause = BOUNDARY_CAUSES.POINT } = {}) {
+export function boundaryCardText({
+  destination,
+  claimantSid = null,
+  claimantPid = null,
+  nextPoint,
+  cause = BOUNDARY_CAUSES.POINT,
+} = {}) {
+  const noFollowOn = nextPoint === null
+  const followOn = Number(nextPoint)
+  if (!noFollowOn && (!Number.isInteger(followOn) || followOn <= 0 || followOn > 999_999)) {
+    throw new Error('boundary card: nextPoint must name the first open work-order point')
+  }
   // The WATERMARK head (point 675, defeat 3): the reader must see that the
   // handover happens BECAUSE the context passed the mark, not because a point
   // closed — a card that says "der Punkt ist abgeschlossen" over a watermark
   // handover claims a closure that never happened.
   const head = BOUNDARY_CARD_HEADS[cause] ?? BOUNDARY_CARD_HEADS[BOUNDARY_CAUSES.POINT]
-  if (destination === BOUNDARY_DESTINATIONS.CLAIMING_WINDOW && claimantSid) {
+  if (destination === BOUNDARY_DESTINATIONS.CLAIMING_WINDOW) {
+    const currentSid = typeof claimantSid === 'string' ? claimantSid.trim() : ''
+    const stablePid = Number(claimantPid)
+    if (!currentSid) {
+      throw new Error('boundary card: a claiming-window handover needs the current claim session')
+    }
+    const claimantIdentity =
+      Number.isInteger(stablePid) && stablePid > 0
+        ? `Fenster mit PID ${stablePid} (aktuelle Sitzung ${currentSid})`
+        : `Fenster der aktuellen Sitzung ${currentSid} (PID unbekannt)`
     // The reservation is stated with its LIMIT, not as a promise. It survives the
     // release now (point 461 — the freed lock stays that window's while its
     // process lives), so the card no longer has to warn about losing a race; but
@@ -915,21 +1038,25 @@ export function boundaryCardText({ destination, claimantSid = null, cause = BOUN
     // closing the window, and letting the take-up window run out. Promising more
     // would repeat, one step later, the very misdirection this card was rewritten
     // to remove (four-eyes review, finding 2).
+    const followOnSentence = noFollowOn
+      ? NO_FOLLOW_ON_WORK
+      : `Dort wird mit Punkt ${followOn} weitergearbeitet, sobald das Fenster den Anspruch mit ` +
+        `\`node scripts/batch-claim.mjs --session ${currentSid}\` einlöst.`
     return (
-      `${head} Der Stapel geht NICHT an eine frische Sitzung: Fenster ${claimantSid} hat ihn beansprucht, der ` +
-      'Launcher hält den Start deshalb zurück und reserviert den Stapel für dieses Fenster. Weitergearbeitet ' +
-      `wird dort, sobald es den Anspruch einlöst (\`node scripts/batch-claim.mjs --session ${claimantSid}\`). ` +
-      'Die Reservierung bleibt auch nach der Freigabe bestehen, solange dieses Fenster offen ist — kein ' +
-      'Launcher-Lauf und keine andere Sitzung nimmt sie ihm beim Rundenende weg. Wird sie innerhalb der ' +
-      'Übernahmefrist nicht eingelöst oder das Fenster geschlossen, greift die gewöhnliche Übergabe — der ' +
-      'Stapel bleibt nie ohne Eigentümer. ' +
-      'Hier läuft nichts weiter.'
+      `${head} Der Stapel geht NICHT an eine frische Sitzung: ${claimantIdentity} hat ihn beansprucht; der ` +
+      `Launcher hält den Start deshalb zurück. ${followOnSentence} ` +
+      'Die Reservierung bleibt bis zum ' +
+      'Ende der Übernahmefrist oder bis zum Schließen des Fensters bestehen.\n\n' +
+      'Danach greift die gewöhnliche Übergabe; der Stapel bleibt nie ohne Eigentümer. Hier läuft nichts weiter.'
     )
   }
+  const followOnSentence = noFollowOn
+    ? NO_FOLLOW_ON_WORK
+    : `Sie nimmt Punkt ${followOn} als nächsten offenen Punkt der Warteschlange auf.`
   return (
-    `${head} Ich übergebe an eine frische Sitzung: Der Launcher startet sie innerhalb seines Intervalls, und ` +
-    'sie nimmt den nächsten Punkt der Warteschlange auf. Kein Fenster hat den Stapel beansprucht. Hier läuft ' +
-    'nichts weiter.'
+    `${head} Ich übergebe an eine frische Sitzung: Der Launcher startet sie innerhalb seines Intervalls. ` +
+    `${followOnSentence} Kein Fenster hat den Stapel ` +
+    'beansprucht.\n\nHier läuft nichts weiter.'
   )
 }
 

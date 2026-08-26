@@ -1,4 +1,4 @@
-// Pure decision core of the serving-model tripwire (point 309). rule:model-policy@19ee578a
+// Pure decision core of the serving-model tripwire (point 309). rule:model-policy@840f3e46
 // On 24.07.2026 the session silently degraded to Haiku 4.5 and merged defective work; the
 // Co-Authored-By trailer in `git log` is the one mechanical record of WHO
 // actually authored a commit. This module only decides — no I/O; the gathering
@@ -6,14 +6,16 @@
 //
 // Model policy (users 25.07.2026 / 18.08.2026): ONLY Opus 5 (the serving
 // session, and the author of the points whose verification is the work and
-// that nothing marks hard — a hard one is Sol's),
-// Opus 4.8 (fallback when Opus 5 is unavailable), Fable 5 (the escalation: work
-// whose re-work the review still rejects) and GPT-5.6 Sol (the OpenAI authoring
-// lane, point 667, which since 18.08.2026 takes the hard and critical points
-// too) may run the batch. Every other
+// that nothing marks hard — a hard one is Sol's), Opus 4.8 (fallback when Opus
+// 5 is unavailable), GPT-5.6 Sol (the OpenAI authoring lane, point 667, which
+// since 18.08.2026 takes the hard and critical points too), and Fable 5 when
+// admitted by the shared Fable switch may run the batch. Every other
 // model — Sonnet and Haiku included — is a policy breach: the batch must stop
 // rather than run on it. Hence an ALLOWLIST, not a Haiku blocklist: an unknown
-// future model name fails closed.
+// future model name fails closed. The list names the FAMILIES those models
+// belong to, not pinned versions — deliberately, see the note at `ALLOWED` —
+// so `Opus 99` would pass; what the tripwire is bought against is the silent
+// swap to another family, not a point release inside an allowed one.
 //
 // SOL AUTHORS UNDER A ROLE SWAP (point 667). Where Sol authors, CLAUDE reviews,
 // runs the suites, judges the picture and lands — so the change is still seen by
@@ -40,7 +42,13 @@
 // `Claude Haiku 4.5 (opus mode)` or a `Claude Sonnet 5 / Claude Opus 5` walked
 // straight through. The name is therefore parsed out first and matched WHOLE,
 // and a trailer claiming more than one model is a finding rather than a pass on
-// its first allowed name: a commit has exactly one authoring model.
+// its first allowed name: ONE TRAILER names exactly one model.
+// THE COMMIT may carry TWO (point 854): CLAUDE.md §6 lets it name its
+// cross-vendor reviewer in a second model trailer, so the trailers are judged
+// SEPARATELY and the commit passes when every model named is allowed. Reducing
+// them to one string is what once raised a breach on an allowed pair.
+
+import { fableIsOn, fableRefusalReason } from './fable-switch-core.mjs'
 
 /** Model names allowed to author batch commits, ONE PATTERN PER AUTHORING LANE,
  *  matched against the name PARSED out of a trailer (`modelNamesIn`) — anchored,
@@ -53,14 +61,43 @@
  *  The OpenAI lane demands the word `sol`: `gpt` alone is NOT an author here, so
  *  a session degraded to some other GPT is a breach exactly as Haiku is. */
 export const ALLOWED = Object.freeze([
-  /^(opus|fable)[\s.\d]*$/i, //          the Anthropic lane: Opus 5, Opus 4.8, Fable 5
+  /^opus[\s.\d]*$/i, //                   the standing Anthropic lane: Opus 5 / 4.8
   /^(gpt[\s.\d]*)?sol[\s.\d]*$/i, //     the OpenAI lane: GPT-5.6 Sol (point 667)
 ])
 
+const FABLE_ALLOWED = /^fable[\s.\d]*$/i
+
+/** Explicit opt-out from switch policy for pure parsing fixtures and historic-log tests. */
+export const POLICY_NEUTRAL = Symbol('model-policy-neutral')
+
+/**
+ * The Fable policy that governed one historical commit.
+ *
+ * The state record describes the latest transition: at `changedAt` its recorded
+ * direction took effect, and before that instant the opposite direction was in
+ * force. Commit-message callers deliberately do not use this function — a new
+ * commit is always judged against the policy in force now.
+ */
+export function fableStateAtCommit(commitWhen, fableState) {
+  if (fableState === undefined || fableState === POLICY_NEUTRAL) return fableState
+  const currentIsOn = fableIsOn(fableState) // validates the complete state; an unreadable policy never grandfathers history
+  const when = Number(commitWhen)
+  if (!Number.isFinite(when)) throw new Error('the commit timestamp is invalid')
+  if (when >= fableState.changedAt) return fableState
+  return { ...fableState, state: currentIsOn ? 'off' : 'on' }
+}
+
+/** Missing switch policy fails closed; policy-neutral parsing must say so at the call site. */
+const admitsFable = (fableState) =>
+  fableState === POLICY_NEUTRAL || (fableState !== undefined && fableIsOn(fableState))
+
 /** May this PARSED model name author a commit here? */
-export function isAllowedModelName(name) {
+export function isAllowedModelName(name, fableState) {
   const value = String(name ?? '').trim()
-  return value !== '' && ALLOWED.some((pattern) => pattern.test(value))
+  return (
+    value !== '' &&
+    (ALLOWED.some((pattern) => pattern.test(value)) || (admitsFable(fableState) && FABLE_ALLOWED.test(value)))
+  )
 }
 
 /** Any Claude co-author trailer (human co-authors are not model evidence). */
@@ -94,8 +131,13 @@ export const MODEL_FAMILY_WORD =
  *
  * The local part is matched WHOLE, not as a prefix (fourth round): `botany@` and
  * `assistant-professor@` are people, and a prefix test called them robots.
+ *
+ * THE DOMAIN ENDS AT `.com` (Sol review of a4975b0): `\b` alone let
+ * `assistant@openai.com.evil` qualify, so a human at a look-alike domain was
+ * read as a model and refused as one. Nothing our harnesses write continues
+ * after the TLD, so any word character, dot or hyphen behind it disqualifies.
  */
-export const MODEL_VENDOR_ADDRESS = /(?:^|[\s<"'(])(?:noreply|no-reply|bot|assistant)@(?:anthropic|openai)\.com\b/i
+export const MODEL_VENDOR_ADDRESS = /(?:^|[\s<"'(])(?:noreply|no-reply|bot|assistant)@(?:anthropic|openai)\.com(?![\w.-])/i
 
 /** A family word with a VERSION ATTACHED TO IT — `Haiku 4.5`, `llama-3`,
  *  `GPT-5.6 Sol`, `o3`. A digit merely somewhere in the line is not a version:
@@ -187,6 +229,21 @@ export function modelNamesIn(trailer) {
     return names
   }
   if (namesNonClaudeModel(cleaned, raw)) {
+    // SEVERAL NON-CLAUDE CLAIMS IN ONE TRAILER (Sol review of a4975b0): with no
+    // "Claude" token to split on, `GPT-5.6 Sol / GPT-5.6 Sol` collapsed into one
+    // composite name and took the FORBIDDEN path instead of the documented
+    // several-names-is-unidentified one. Only segments that name a model ON
+    // THEIR OWN count as claims, and only when MORE THAN ONE does is the line
+    // read as several — a lone model beside filler words stays the single
+    // composite name that fails the allowlist LOUD, so the smuggling shape of
+    // point 527 (`GPT-5.6 Sol / Haiku`) cannot pass as its allowed half.
+    // The separators are symbols AND the textual conjunctions (Sol's confirming
+    // pass): `GPT-5.6 Sol and GPT-5.6 Sol` is the same two claims as with `/`.
+    const claims = cleaned
+      .split(/[/&+]|\b(?:and|und)\b/i)
+      .map(bareName)
+      .filter((segment) => segment && namesNonClaudeModel(segment))
+    if (claims.length > 1) return claims
     const name = bareName(cleaned)
     return name ? [name] : []
   }
@@ -215,7 +272,7 @@ export const CLASSES = Object.freeze(['forbidden', 'unidentified', 'allowed'])
  * 'allowed'      exactly one name, and it is on the allowlist (or the trailer
  *                is not a Claude one at all, which is no model evidence)
  */
-export function judgeTrailer(trailer) {
+export function judgeTrailer(trailer, fableState) {
   const names = modelNamesIn(trailer)
   if (!names.length) {
     // A trailer that IS model evidence but names nothing readable — the bare
@@ -224,12 +281,12 @@ export function judgeTrailer(trailer) {
     const isModel = CLAUDE_TRAILER.test(text) || MODEL_VENDOR_ADDRESS.test(text)
     return { verdict: isModel ? 'unidentified' : 'allowed', names }
   }
-  if (names.some((name) => !isAllowedModelName(name))) return { verdict: 'forbidden', names }
+  if (names.some((name) => !isAllowedModelName(name, fableState))) return { verdict: 'forbidden', names }
   return { verdict: names.length > 1 ? 'unidentified' : 'allowed', names }
 }
 
 /**
- * Split a `%(trailers:…,separator=,)` field — or one commit-message trailer
+ * Split a `%(trailers:…,separator=%x2C)` field — or one commit-message trailer
  * line — into the values judged SEPARATELY. The separator ALWAYS separates,
  * a bracket notwithstanding.
  *
@@ -255,10 +312,10 @@ export function splitTrailerField(field) {
  * WORST verdict wins, so one forbidden co-author flags the commit even next to
  * an allowed one, and one bare trailer beside a named one is still unidentified.
  */
-export function classifyTrailer(trailerField) {
+export function classifyTrailer(trailerField, fableState) {
   let worst = 'allowed'
   for (const part of splitTrailerField(trailerField)) {
-    const { verdict } = judgeTrailer(part)
+    const { verdict } = judgeTrailer(part, fableState)
     if (verdict === 'forbidden') return 'forbidden'
     if (verdict === 'unidentified' && worst === 'allowed') worst = 'unidentified'
   }
@@ -268,8 +325,8 @@ export function classifyTrailer(trailerField) {
 /** True when a commit's trailer field NAMES a Claude model outside the
  *  allowlist. A trailer naming nothing is not a breach — it is unidentified
  *  (`classifyTrailer`), which has its own, resolvable path. */
-export function isPolicyBreach(trailerField) {
-  return classifyTrailer(trailerField) === 'forbidden'
+export function isPolicyBreach(trailerField, fableState) {
+  return classifyTrailer(trailerField, fableState) === 'forbidden'
 }
 
 // ---------------------------------------------------------------------------
@@ -285,16 +342,22 @@ export function isPolicyBreach(trailerField) {
 // does NOT stand down for a paused batch or a session that owns no lock: a
 // subagent is exactly whose commits this is for, and a commit is not batch work.
 
-/** The trailers a commit may carry, printed as the remedy. */
-export const ALLOWED_TRAILERS = Object.freeze([
-  'Co-Authored-By: Claude Opus 5 <noreply@anthropic.com>',
-  'Co-Authored-By: Claude Fable 5 <noreply@anthropic.com>',
-  'Co-Authored-By: Claude Opus 4.8 <noreply@anthropic.com>',
-  'Co-Authored-By: GPT-5.6 Sol <noreply@openai.com>',
-])
+/** The trailers a commit may carry, generated from the switch for every remedy. */
+export function allowedTrailers(fableState) {
+  return Object.freeze([
+    'Co-Authored-By: Claude Opus 5 <noreply@anthropic.com>',
+    ...(admitsFable(fableState) ? ['Co-Authored-By: Claude Fable 5 <noreply@anthropic.com>'] : []),
+    'Co-Authored-By: Claude Opus 4.8 <noreply@anthropic.com>',
+    'Co-Authored-By: GPT-5.6 Sol <noreply@openai.com>',
+  ])
+}
 
-/** The authoring lanes in one phrase, for the refusals that must name them. */
-export const ALLOWED_MODELS_PHRASE = 'Opus 5, Opus 4.8, Fable 5 and GPT-5.6 Sol'
+/** The authoring lanes in one phrase, generated for the same refusal surface. */
+export function allowedModelsPhrase(fableState) {
+  return admitsFable(fableState)
+    ? 'Opus 5, Opus 4.8, Fable 5 and GPT-5.6 Sol'
+    : 'Opus 5, Opus 4.8 and GPT-5.6 Sol'
+}
 
 /** The `Co-Authored-By` values in a commit message, git's comment lines dropped
  *  so a hint in the commit template is never read as the author's own trailer. */
@@ -320,12 +383,17 @@ export function coAuthorTrailers(message) {
  *
  * Returns { block, findings: [{ rule, trailer, detail }] } and NEVER throws.
  */
-export function evaluateCommitTrailers(message) {
+export function evaluateCommitTrailers(message, fableState) {
+  // Resolve before the fail-open parsing boundary: an unknown switch is a missing
+  // policy, not a malformed trailer that may be ignored.
+  const trailers = allowedTrailers(fableState)
+  const phrase = allowedModelsPhrase(fableState)
+  const switchRefusal = fableState !== undefined && !admitsFable(fableState) ? fableRefusalReason(fableState) : ''
   const findings = []
   try {
     for (const trailer of coAuthorTrailers(message)) {
       for (const part of splitTrailerField(trailer)) {
-        const { verdict, names } = judgeTrailer(part)
+        const { verdict, names } = judgeTrailer(part, fableState)
         if (verdict === 'unidentified' && names.length > 1) {
           findings.push({
             rule: 'multiple-model-trailer',
@@ -339,10 +407,11 @@ export function evaluateCommitTrailers(message) {
             detail: 'names no model — it cannot show that an allowed model wrote this commit',
           })
         } else if (verdict === 'forbidden') {
+          const fableDetail = names.some((name) => FABLE_ALLOWED.test(name)) && switchRefusal ? `; ${switchRefusal}` : ''
           findings.push({
             rule: 'forbidden-model-trailer',
             trailer,
-            detail: `names a model outside the allowlist (read as "${names.join(' + ')}"; only ${ALLOWED_MODELS_PHRASE} may author here)`,
+            detail: `names a model outside the allowlist (read as "${names.join(' + ')}"; only ${phrase} may author here${fableDetail})`,
           })
         }
       }
@@ -350,7 +419,7 @@ export function evaluateCommitTrailers(message) {
   } catch {
     /* fail-open: a broken gate must never make the tree uncommittable */
   }
-  return { block: findings.length > 0, findings }
+  return { block: findings.length > 0, findings, allowedTrailers: trailers, allowedModelsPhrase: phrase }
 }
 
 /** The refusal, naming every offender and the exact trailer to write instead. */
@@ -366,7 +435,7 @@ export function formatCommitTrailerVerdict(verdict) {
     '',
     'Write your own model:',
     '',
-    ...ALLOWED_TRAILERS.map((t) => `    ${t}`),
+    ...(verdict.allowedTrailers ?? allowedTrailers()).map((t) => `    ${t}`),
     '',
     'The `(1M context)` suffix is fine. If you do not know which model you are:',
     '',
@@ -388,24 +457,30 @@ export function parseLogLine(line) {
 }
 
 /** Commits at/after sinceMs whose trailer field falls into `wanted`. */
-function findCommitsClassified(logText, sinceMs, wanted) {
+function findCommitsClassified(logText, sinceMs, wanted, fableState) {
+  // Validate once even for an empty/malformed log. Missing policy is a loud
+  // refusal, never a way to make the whole history look compliant.
+  fableStateAtCommit(sinceMs, fableState)
   const hits = []
   for (const line of String(logText ?? '').split(/\r?\n/)) {
     const c = parseLogLine(line)
     if (!c || c.when < sinceMs) continue
-    if (classifyTrailer(c.trailers) === wanted) hits.push({ sha: c.sha, trailer: c.trailers.trim() })
+    const policyAtCommit = fableStateAtCommit(c.when, fableState)
+    if (classifyTrailer(c.trailers, policyAtCommit) === wanted) {
+      hits.push({ sha: c.sha, when: c.when, trailer: c.trailers.trim() })
+    }
   }
   return hits
 }
 
 /** Commits at/after sinceMs authored by a model NAMED outside the allowlist. */
-export function findForbiddenCommits(logText, sinceMs) {
-  return findCommitsClassified(logText, sinceMs, 'forbidden')
+export function findForbiddenCommits(logText, sinceMs, fableState) {
+  return findCommitsClassified(logText, sinceMs, 'forbidden', fableState)
 }
 
 /** Commits at/after sinceMs whose Claude trailer names no model at all. */
-export function findUnidentifiedCommits(logText, sinceMs) {
-  return findCommitsClassified(logText, sinceMs, 'unidentified')
+export function findUnidentifiedCommits(logText, sinceMs, fableState) {
+  return findCommitsClassified(logText, sinceMs, 'unidentified', fableState)
 }
 
 // ---------------------------------------------------------------------------
@@ -456,20 +531,47 @@ export function backupRefNotice(backupRefs) {
 
 const shaList = (hits) => (hits ?? []).map((h) => `${h.sha.slice(0, 7)} (${h.trailer})`).join(', ')
 
-/** The HARD stop: a named model outside the allowlist. Unchanged in substance —
- *  pause the batch and wait for the user (point 309, incident 24.07.2026).
+/** Explain why a forbidden Fable trailer is history or a present emergency. */
+function fableTimingNotices(hits, fableState) {
+  if (fableState === undefined || fableState === POLICY_NEUTRAL) return []
+  const current = fableIsOn(fableState) ? 'ON' : 'OFF'
+  const changedAt = Number(fableState.changedAt)
+  return (hits ?? []).flatMap((hit) => {
+    const namesFable = modelNamesIn(hit?.trailer).some((name) => FABLE_ALLOWED.test(name))
+    if (!namesFable || !Number.isFinite(hit?.when)) return []
+    const commitAt = new Date(hit.when).toISOString()
+    const switchAt = new Date(changedAt).toISOString()
+    if (hit.when >= changedAt) {
+      return [
+        `Commit ${hit.sha.slice(0, 7)} was made at ${commitAt}, after the Fable switch changed to ${current} ` +
+          `at ${switchAt}; it is judged under that post-switch ${current} policy.`,
+      ]
+    }
+    const previous = current === 'ON' ? 'OFF' : 'ON'
+    return [
+      `Commit ${hit.sha.slice(0, 7)} was made at ${commitAt}, before the Fable switch changed to ${current} ` +
+        `at ${switchAt}; it is historical and is judged under the previous ${previous} policy.`,
+    ]
+  })
+}
+
+/** The HARD stop: a named model outside the allowlist. The wrapper transfers the
+ *  batch to a fresh allowed lane rather than asking the suspect to repair itself.
  *  `alsoUnidentified` are the unnamed commits found in the same window: they are
  *  NAMED here rather than dropped, because advancing the baseline past the
  *  forbidden ones would otherwise clear them unseen (four-eyes review). */
-export function formatForbiddenReason(hits, { backupRefs = [], alsoUnidentified = [] } = {}) {
+export function formatForbiddenReason(hits, { backupRefs = [], alsoUnidentified = [], fableState } = {}) {
   const unnamed = (alsoUnidentified ?? []).filter(Boolean)
+  const switchRefusal = fableState !== undefined && !admitsFable(fableState) ? ` ${fableRefusalReason(fableState)}` : ''
   return [
     `SERVING-MODEL TRIPWIRE: commit(s) ${shaList(hits)} carry a co-author trailer NAMING a model ` +
-      `outside the allowlist (only ${ALLOWED_MODELS_PHRASE} may run the batch — Sonnet and ` +
-      'Haiku are NOT acceptable; user policy 25.07./13.08.2026). Do NOT continue batch work: create ' +
-      '.claude/batch-paused (reason: forbidden serving model) and stop. Only after the user has ' +
-      'confirmed an allowed model may .claude/model-guard-baseline.json be advanced past these ' +
-      'commits.',
+      `outside the allowlist in force at each commit's own time (Opus 5, Opus 4.8 and GPT-5.6 Sol ` +
+      `may author throughout; Fable 5 may author only while its recorded policy is ON; Sonnet and Haiku ` +
+      `are never admitted; user policy 25.07./13.08.2026).${switchRefusal} Do NOT continue batch work. ` +
+      'The tripwire records a handoff to the next allowed lane of the serving chain. Only that fresh lane, ' +
+      'after transcript metadata proves which model answered and it re-reads every trailer, may advance ' +
+      '.claude/model-guard-baseline.json past these commits; an unreachable chain probes on a clock.',
+    ...fableTimingNotices(hits, fableState),
     ...(unnamed.length
       ? [
           '',
@@ -484,7 +586,8 @@ export function formatForbiddenReason(hits, { backupRefs = [], alsoUnidentified 
 
 /** The RESOLVABLE block: the trailer names nothing, so nobody knows yet what
  *  authored it. Look it up, then take the path the answer dictates. */
-export function formatUnidentifiedReason(hits, { backupRefs = [] } = {}) {
+export function formatUnidentifiedReason(hits, { backupRefs = [], fableState } = {}) {
+  const phrase = allowedModelsPhrase(fableState).replace(/, /g, ' / ').replace(/ and /, ' / ')
   return [
     `UNIDENTIFIED AUTHOR: commit(s) ${shaList(hits)} carry a Claude co-author trailer that names NO ` +
       'SINGLE model — no model at all, or several at once — so they cannot show WHICH model wrote ' +
@@ -493,10 +596,10 @@ export function formatUnidentifiedReason(hits, { backupRefs = [] } = {}) {
     '',
     ...TRANSCRIPT_HINT,
     '',
-    '  · an ALLOWED model (Opus 5 / Opus 4.8 / Fable 5 / GPT-5.6 Sol) → advance .claude/model-guard-baseline.json',
+    `  · an ALLOWED model (${phrase}) → advance .claude/model-guard-baseline.json`,
     '    past these commits and carry on; no user interruption is owed.',
     '  · a model outside the allowlist, or no transcript covers the commit → treat it as the ',
-    '    forbidden case: create .claude/batch-paused (reason: forbidden serving model) and stop.',
+    '    forbidden case: record the trusted-lane handoff; only that lane may advance the baseline.',
     '',
     'Then stop it recurring: write your own model into the trailer —',
     '`Co-Authored-By: Claude Opus 5 <noreply@anthropic.com>`.',

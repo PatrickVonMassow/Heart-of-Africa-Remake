@@ -212,7 +212,7 @@ const leavesARecord = (c) => {
     (c.name === 'Bash' &&
       /(?:^|[;&|]\s*)(?:\S*\/)?git\s+(?:-[Cc]\s+\S+\s+|-\S+\s+|\S+=\S+\s+)*(?:commit|merge|cherry-pick|revert)\b/.test(command)) ||
     (c.name === 'Bash' && /finding\.mjs\b[^;&|]*--(?:record|none|drained|request|queued|blocked)\b/.test(command)) ||
-    (['Edit', 'Write', 'NotebookEdit'].includes(c.name) &&
+    (['Edit', 'Write', 'MultiEdit', 'NotebookEdit'].includes(c.name) &&
       /(?:^|\/)TASKS\.md$|\/\.claude\/projects\/[^/]+\/memory\//.test(c.filePath ?? ''))
   )
 }

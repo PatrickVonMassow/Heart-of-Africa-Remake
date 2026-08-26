@@ -38,9 +38,30 @@ needs, both in `.devcontainer/init-firewall.sh`:
 `/dev/dxg` IS reachable from the container, and what stood between the suites and it was
 packages, not hardware:
 
-- **WebGL 2 now runs on the card.** `--use-angle=gl` with `GALLIUM_DRIVER=d3d12` in the
+**Outage and repair, measured 19.08.2026 (point 732).** The passthrough had not
+disappeared: `/dev/dxg`, `/usr/lib/wsl/lib`, `d3d12_dri.so`, `libGL.so.1`, and
+`libEGL.so.1` were all present. Both browser executables were present too. The loss was
+the browser GPU process above that chain: bundled Chrome for Testing 149 and system
+Chrome 151 launched ANGLE's former `--use-angle=gl` route against `DISPLAY=:8`, but no
+usable X display answered. Chrome stderr said `Could not open the default X display`,
+`eglInitialize OpenGL failed`, then `Exiting GPU process due to errors during
+initialization`. CDP `SystemInfo.getInfo` supplied the decisive equivalent of
+`chrome://gpu`: `glImplementationParts=(gl=none,angle=none)`, zero initialization time,
+and both `webgl=disabled_off` and `webgpu=disabled_off`. Bare canvases agreed: no WebGL 2
+context and no WebGPU adapter. This is why changing SwiftShader/Vulkan flags could not
+help; there was no live GL implementation to fall back from.
+
+The additive repair is ANGLE's headless EGL route, `--use-angle=gl-egl`, on both lanes.
+It needs no X display and keeps the same Mesa-D3D12 device: both browser versions now
+report `(gl=egl-angle,angle=opengl)` and `ANGLE (Microsoft Corporation, D3D12 (NVIDIA
+GeForce RTX 4070 Ti), OpenGL ES 3.1 Mesa 25.0.7-2~bpo12+1)`; a WebGL 2 context and the
+WebGPU compatibility adapter both return. `npm run verify:bringup -- --check` reproduces
+that bare-canvas/CDP measurement in seconds and distinguishes a host/browser failure
+from a later app `window.__renderer` timeout before any suite starts.
+
+- **WebGL 2 now runs on the card.** `--use-angle=gl-egl` with `GALLIUM_DRIVER=d3d12` in the
   browser's environment comes up as `ANGLE (Microsoft Corporation, D3D12 (NVIDIA GeForce
-  RTX 4070 Ti), OpenGL 4.6)`. Measured against the SwiftShader lane it replaced: **170 vs
+  RTX 4070 Ti), OpenGL ES 3.1)`. Measured against the SwiftShader lane it replaced: **170 vs
   22.7 renderer calls per second** on the identical scene, and the `flow` suite went from
   red-and-unfinished-after-ten-minutes to **green in 58 seconds**. Both halves are
   load-bearing, and the next container rebuild needs BOTH: without `libgl1`, `libglx-mesa0`
@@ -52,7 +73,7 @@ packages, not hardware:
   System Chrome exposes `navigator.gpu` on a secure-context page — the earlier "undefined"
   reading came from probing `about:blank`/`data:` URLs, which are not secure contexts — and
   the lane now rides Dawn's **OpenGLES** backend over the same Mesa-d3d12 chain WebGL 2
-  uses: `--use-gl=angle --use-angle=gl --use-webgpu-adapter=opengles
+  uses: `--use-gl=angle --use-angle=gl-egl --use-webgpu-adapter=opengles
   --force-webgpu-compat`, no Vulkan flag and no ICD in sight. Measured against the software
   lane in the same session: **103.7 vs 15.3 renderer calls per second**, 487 KB frames
   against 29 KB, ANGLE reporting `D3D12 (NVIDIA GeForce RTX 4070 Ti), OpenGL 4.6`, no

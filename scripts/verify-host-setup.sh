@@ -7,9 +7,10 @@
 #   - /dev/dxg IS passed through and /usr/lib/wsl/lib carries libd3d12/libd3d12core/
 #     libdxcore. The GeForce behind it is reachable; nothing needed to change on the host.
 #   - WebGL 2 came up as "ANGLE (…SwiftShader…)" only because libGL/libEGL were absent, so
-#     ANGLE's `gl` backend had no driver to sit on. With them installed the same lane comes
-#     up as "ANGLE (Microsoft Corporation, D3D12 (NVIDIA GeForce RTX 4070 Ti), OpenGL 4.2)"
-#     — measured 170 vs 22.7 renderer calls per second on the identical scene, and the
+#     ANGLE's GL backend had no driver to sit on. With them installed the `gl-egl` route
+#     comes up as "ANGLE (Microsoft Corporation, D3D12 (NVIDIA GeForce RTX 4070 Ti),
+#     OpenGL ES 3.1)" without depending on the container's X display — measured 170 vs
+#     22.7 renderer calls per second on the identical scene, and the
 #     `flow` suite went from red-and-unfinished-in-10-minutes to GREEN IN 58 SECONDS.
 #   - WebGPU reaches the card too, at the COMPATIBILITY level (point 505, 05.08.2026).
 #     Dawn's OpenGLES backend rides the same GL chain, so the same two packages carry both

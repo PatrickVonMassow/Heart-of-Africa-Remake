@@ -10,21 +10,25 @@
 //       cause: a stale heartbeat with a LIVE pid (mid-long-tool-call) is ALIVE;
 //   (5) a non-owner session at the batch-progress-guard → stands down.
 import { describe, it, expect, beforeEach, afterEach } from 'vitest'
-import { mkdtempSync, rmSync, writeFileSync, existsSync, readFileSync, readdirSync, renameSync, utimesSync } from 'node:fs'
+import { mkdtempSync, mkdirSync, rmdirSync, rmSync, writeFileSync, existsSync, readFileSync, readdirSync, renameSync, utimesSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { basename, join, resolve } from 'node:path'
 import { execFile } from 'node:child_process'
-import { REPO_ROOT } from './repo-paths.mjs'
+import { COMMON_REPO_ROOT, REPO_ROOT } from './repo-paths.mjs'
 import { WRITE_RETRY_DELAYS_MS } from './atomic-write.mjs'
+import { parseActivityJournal } from './batch-activity-journal-core.mjs'
+import { spawnProgressed, successorStartDecision, SUCCESSOR_TRIGGERS } from './batch-autostart-core.mjs'
 import {
   assessOwner,
-  spawnDecision,
   classifyParallel,
+  claimGeneration,
+  detectParallel,
   isProbeSessionId,
   ownsLock,
   PROBE_SESSION_PREFIX,
   progressGuardDecision,
   acquire,
+  acquisitionExpectationMatches,
   heartbeat,
   release,
   readOwnerLock,
@@ -51,6 +55,7 @@ import {
   sweepableTmpFiles,
   resolveOwnership,
   transitionOwnerSession,
+  ownerSessionTear,
   validTransitionSessionId,
   ourClaudeProcess,
   findClaudeAncestor,
@@ -61,6 +66,12 @@ import {
   IN_FLIGHT_PATH,
   SESSIONS_SEEN_PATH,
   SESSION_ACTIVITY_PATH,
+  noteBatchWriter,
+  noteTopLevelSession,
+  noteSessionStandDown,
+  retireBatchWriter,
+  revokeWriterFence,
+  readSessionProcesses,
   PARALLEL_ALERT_PATH,
   DOCTOR_STATE_PATH,
   ANCESTOR_CACHE_PATH,
@@ -123,6 +134,10 @@ describe('statePathsFor — a redirected lock never reaches the repo .claude/', 
     // …and the repo defaults are themselves one consistent family, so a new
     // state file added to statePathsFor gets its default for free.
     expect(Object.values(statePathsFor(LOCK_PATH))).toEqual(expect.arrayContaining(defaults))
+  })
+
+  it('the default authority family lives in the common checkout', () => {
+    expect(LOCK_PATH).toBe(resolve(COMMON_REPO_ROOT(), '.claude', 'batch-lock.json'))
   })
 })
 
@@ -197,7 +212,6 @@ describe('assessOwner (liveness = heartbeat AND real pid, never age alone)', () 
     })
     expect(a.alive).toBe(false)
     expect(a.reason).toBe('lease-expired')
-    expect(spawnDecision(a)).toBe('spawn')
   })
 
   // POINT 556 (measured 08.08.2026, 05:45Z) — the SAME expired lease, but the two
@@ -214,7 +228,6 @@ describe('assessOwner (liveness = heartbeat AND real pid, never age alone)', () 
       work: { advancing: true, declared: true, judgedOn: 'git', summary: 'active 2 min ago (working files)' },
     })
     expect(a).toMatchObject({ alive: true, reason: 'lease-expired-owner-working' })
-    expect(spawnDecision(a)).toBe('skip-alive')
     // …and the skip SAYS the lease age it overrode, or the next incident is as
     // invisible in the log as this one was.
     expect(a.detail).toContain('3 min out')
@@ -277,11 +290,13 @@ describe('assessOwner (liveness = heartbeat AND real pid, never age alone)', () 
     // exactly the trap: it says 'process' while the log is demonstrably fresh.
     expect(work.judgedOn).toBe('process')
     expect(work.corroboratedBy).toBe('log')
-    // …and the owner therefore keeps its batch, which is the rule this branch states.
+    // …and the launcher gets the exact evidence-backed renewal to persist.
     const silent = lock({ claimedAt: NOW - 63 * 60_000, leaseUntil: NOW - 3 * 60_000 })
     expect(assessOwner(silent, { now: NOW, bootTime: BOOT, probe: aliveProbe, work })).toMatchObject({
       alive: true,
-      reason: 'lease-expired-owner-working',
+      reason: 'lease-renewal-due',
+      leaseExpired: true,
+      renewalUntil: NOW - 5_000 + LEASE_MS,
     })
     // A log that has gone SILENT leaves only the breathing pid — taken over.
     const quiet = assessOwnerWork({
@@ -357,7 +372,6 @@ describe('assessOwner (liveness = heartbeat AND real pid, never age alone)', () 
       probe: aliveProbe,
     })
     expect(a).toMatchObject({ alive: true, reason: 'pid-alive' })
-    expect(spawnDecision(a)).toBe('skip-alive')
   })
 
   it('NEEDS NO MIGRATION: a lock written before the lease existed carries an implicit one', () => {
@@ -382,7 +396,6 @@ describe('assessOwner (liveness = heartbeat AND real pid, never age alone)', () 
       probe: aliveProbe,
     })
     expect(expired.wedged).toBeUndefined()
-    expect(['spawn', 'skip-alive']).toContain(spawnDecision(expired))
   })
 
   it('no lock → dead (free to claim)', () => {
@@ -401,7 +414,6 @@ describe('assessOwner (liveness = heartbeat AND real pid, never age alone)', () 
     const a = assessOwner(handed(), { now: NOW, bootTime: BOOT, probe: deadProbe })
     expect(a.alive).toBe(false)
     expect(a.reason).toBe('handed-over')
-    expect(spawnDecision(a)).toBe('spawn')
   })
 
   it('a handed-over lock with a LIVE process frees AT ONCE — no grace (point 612)', () => {
@@ -416,7 +428,6 @@ describe('assessOwner (liveness = heartbeat AND real pid, never age alone)', () 
     })
     expect(justNow.alive).toBe(false)
     expect(justNow.reason).toBe('handed-over')
-    expect(spawnDecision(justNow)).toBe('spawn')
 
     // …and it is still the same verdict a whole grace window later.
     const old = NOW - HANDOVER_GRACE_MS - 1000
@@ -449,7 +460,6 @@ describe('assessOwner (liveness = heartbeat AND real pid, never age alone)', () 
     })
     expect(a.alive).toBe(false)
     expect(a.reason).toBe('handed-over')
-    expect(spawnDecision(a)).toBe('spawn')
 
     // THE SAFETY INVARIANT IS UNCHANGED, only its mechanism: a session that really
     // did keep working WITHDRAWS its handover by DELETING it, which `heartbeat`
@@ -457,7 +467,6 @@ describe('assessOwner (liveness = heartbeat AND real pid, never age alone)', () 
     // with no mark on it is an ordinary live owner again.
     const withdrawn = assessOwner(lock({ claimedAt: NOW - 60_000 }), { now: NOW, bootTime: BOOT, probe: aliveProbe })
     expect(withdrawn.alive).toBe(true)
-    expect(spawnDecision(withdrawn)).toBe('skip-alive')
   })
 
   it('a half-written or forged handover flag alone frees nothing', () => {
@@ -523,7 +532,6 @@ describe('assessOwner (liveness = heartbeat AND real pid, never age alone)', () 
   it('a CRASH still holds the lock until the lease runs out — only a taken boundary hands it over early', () => {
     const crashed = assessOwner(lock({ claimedAt: NOW - 30 * 60_000 }), { now: NOW, bootTime: BOOT, probe: aliveProbe })
     expect(crashed.alive).toBe(true)
-    expect(spawnDecision(crashed)).toBe('skip-alive')
   })
 })
 
@@ -593,29 +601,6 @@ describe('resolveOwnership — identity on the process, never on liveness alone'
     expect(resolveOwnership({ lock: lock({ kind: 'pending-spawn' }), sessionId: 'new-id', ancestor: ours }).via).toBe(
       'pending-spawn',
     )
-  })
-})
-
-// ---------------------------------------------------------------------------
-describe('spawnDecision (scenario 2 + 4: the launcher path)', () => {
-  it('live owner, fresh heartbeat → skip (no spawn)', () => {
-    const a = assessOwner({ sessionId: 's', claimedAt: NOW - 60_000, pid: 1, pidStartedAt: null }, { now: NOW, bootTime: BOOT, probe: aliveProbe })
-    expect(spawnDecision(a)).toBe('skip-alive')
-  })
-
-  it('THE EXACT 24.07 BUG REPLAY: heartbeat 24 min stale, owner process alive → skip (the old 12-min window spawned here)', () => {
-    const a = assessOwner({ sessionId: 'f8c46e2f', claimedAt: NOW - 24 * 60_000, pid: 4242, pidStartedAt: null }, { now: NOW, bootTime: BOOT, probe: aliveProbe })
-    expect(spawnDecision(a)).toBe('skip-alive')
-  })
-
-  it('post-reboot with a fresh re-claimed heartbeat → skip (reboot is NOT sufficient)', () => {
-    const a = assessOwner({ sessionId: 're-claimed', claimedAt: NOW - 60_000, pid: 777, pidStartedAt: null }, { now: NOW, bootTime: NOW - 5 * 60_000, probe: aliveProbe })
-    expect(spawnDecision(a)).toBe('skip-alive')
-  })
-
-  it('post-reboot, owner never came back (pre-boot heartbeat, dead pid) → spawn', () => {
-    const a = assessOwner({ sessionId: 'gone', claimedAt: NOW - 60 * 60_000, pid: 4242, pidStartedAt: null }, { now: NOW, bootTime: NOW - 30 * 60_000, probe: deadProbe })
-    expect(spawnDecision(a)).toBe('spawn')
   })
 })
 
@@ -737,6 +722,24 @@ describe('renewLease / grantFence (the I/O half)', () => {
     expect(lockOf().leaseUntil).toBeGreaterThan(Date.now())
   })
 
+  it('a transiently busy grant mutex cannot leave the acquired lock without a fence number', () => {
+    const mutexPath = `${fencePath}.claiming`
+    mkdirSync(mutexPath)
+    let waited = false
+
+    expect(acquire('s1', opts({
+      fenceMutexWaitMs: 100,
+      fenceMutexSleep: () => {
+        waited = true
+        rmdirSync(mutexPath)
+      },
+    }))).toBe('acquired')
+
+    expect(waited).toBe(true)
+    expect(lockOf().fence).toBe(1)
+    expect(readFence({ fencePath })).toMatchObject({ fence: 1, holder: 's1' })
+  })
+
   /** The lock of a session that fell silent: heartbeat AND lease both run out.
    *  (A FRESH heartbeat with an expired lease is a contradictory state — the
    *  PostToolUse stamp is younger than the PreToolUse renewal that precedes it —
@@ -766,6 +769,40 @@ describe('renewLease / grantFence (the I/O half)', () => {
     rmSync(fencePath, { force: true })
     expect(acquire('s2', opts())).toBe('acquired')
     expect(readFence({ fencePath }).fence).toBe(10)
+  })
+
+  it('the production successor acquisition refuses a proposed fence that fell behind the durable mark', () => {
+    const start = successorStartDecision({
+      trigger: { kind: SUCCESSOR_TRIGGERS.WATCHDOG },
+      spawnToken: 'stale-spawn',
+      openPoints: 1,
+      assessment: { alive: false, reason: 'no-lock' },
+      // This is the young worktree counter from the measured incident. The
+      // production decision carries its next generation into acquire().
+      fenceState: { fence: 2 },
+      now: NOW,
+    })
+    expect(start).toMatchObject({ start: true, reservation: { requestedFence: 3 } })
+
+    const standing = {
+      v: 1,
+      fence: 690,
+      holder: 'current-session',
+      at: NOW,
+      holders: [{ sessionId: 'current-session', fence: 690, at: NOW }],
+    }
+    writeFileSync(fencePath, JSON.stringify(standing, null, 2))
+    const before = readFileSync(fencePath, 'utf8')
+
+    expect(acquire('stale-session', opts({
+      kind: 'pending-spawn',
+      requestedFence: start.reservation.requestedFence,
+      extra: start.reservation,
+      now: NOW + 1,
+    }))).toBe('stale-fence')
+    expect(existsSync(lockPath)).toBe(false)
+    expect(readFileSync(fencePath, 'utf8')).toBe(before)
+    expect(readFence({ fencePath })).toMatchObject({ fence: 690, holder: 'current-session' })
   })
 
   it('renewLease writes only for the owner, and only once per interval', () => {
@@ -922,6 +959,47 @@ describe('acquire (atomic test-and-set on the real filesystem)', () => {
     expect(readOwnerLock(lockPath).sessionId).toBe('s2')
   })
 
+  it('moves the handover generation, reservation and spawn token in one checked takeover', () => {
+    const handedOverAt = Date.now()
+    writeFileSync(lockPath, JSON.stringify({
+      sessionId: 'owner', kind: 'session', fence: 17, handedOver: true, handedOverAt,
+      claimedAt: handedOverAt, pid: 999999,
+    }))
+    const reservation = {
+      spawnToken: 'spawn-token', sourceGeneration: 17, sourceSpawnToken: 'before-token',
+      trigger: 'boundary', requestedAt: NOW,
+    }
+    expect(acquire('launcher', opts({
+      kind: 'pending-spawn',
+      expected: { sessionId: 'owner', fence: 17, handedOver: true },
+      extra: reservation,
+    }))).toBe('acquired')
+    expect(readOwnerLock(lockPath)).toMatchObject({
+      sessionId: 'launcher', kind: 'pending-spawn', ...reservation,
+    })
+  })
+
+  it('a stale boundary generation cannot reserve over a newer owner', () => {
+    writeFileSync(lockPath, JSON.stringify({
+      sessionId: 'new-owner', kind: 'session', fence: 18, handedOver: true,
+      claimedAt: Date.now(), pid: 999999,
+    }))
+    expect(acquire('launcher', opts({
+      kind: 'pending-spawn',
+      expected: { sessionId: 'old-owner', fence: 17, handedOver: true },
+      extra: { spawnToken: 'stale-token', sourceGeneration: 17 },
+    }))).toBe('stale-event')
+    expect(readOwnerLock(lockPath)).toMatchObject({ sessionId: 'new-owner', fence: 18 })
+  })
+
+  it('the expectation matcher compares only the supplied CAS fields', () => {
+    const lock = { sessionId: 'owner', fence: 17, handedOver: true, spawnToken: 'one' }
+    expect(acquisitionExpectationMatches(lock, { sessionId: 'owner', fence: 17, handedOver: true })).toBe(true)
+    expect(acquisitionExpectationMatches(lock, { fence: 18 })).toBe(false)
+    expect(acquisitionExpectationMatches(lock, { spawnToken: 'two' })).toBe(false)
+    expect(acquisitionExpectationMatches(null, { fence: 17 })).toBe(false)
+  })
+
   it('a corrupt but FRESH lock file is never reaped (mid-write protection)', () => {
     writeFileSync(lockPath, '{ torn')
     expect(acquire('s2', opts())).toBe('held')
@@ -1004,12 +1082,20 @@ describe('acquire (atomic test-and-set on the real filesystem)', () => {
     expect(acquire('', opts())).toBe('held')
   })
 
+  it('a placeholder id is refused before the lock can be written', () => {
+    expect(acquire('x', opts())).toBe('invalid')
+    expect(existsSync(lockPath)).toBe(false)
+  })
+
   it('release only by the owner', () => {
     acquire('s1', opts())
     expect(release('s2', lockPath)).toBe(false)
     expect(readOwnerLock(lockPath)).not.toBeNull()
     expect(release('s1', lockPath)).toBe(true)
     expect(readOwnerLock(lockPath)).toBeNull()
+    expect(parseActivityJournal(readFileSync(join(dir, 'batch-activity.jsonl'), 'utf8')).records.map((r) => r.event)).toEqual([
+      'owner-claim', 'process-exit',
+    ])
   })
 
   it('heartbeat refreshes only the owner and never claims', () => {
@@ -1035,6 +1121,25 @@ describe('acquire (atomic test-and-set on the real filesystem)', () => {
     expect(lock.kind).toBe('session')
   })
 
+  it('pending-spawn conversion preserves the token which binds supervised exit to this child', () => {
+    acquire('launcher-1', opts({
+      kind: 'pending-spawn',
+      extra: {
+        spawnedPid: 555,
+        spawnToken: 'spawn-token',
+        sourceGeneration: 17,
+        sourceSpawnToken: 'before-token',
+        trigger: 'boundary',
+        requestedAt: NOW,
+      },
+    }))
+    expect(convertPendingSpawn('spawned', { lockPath, pid: 555 })).toBe(true)
+    expect(readOwnerLock(lockPath)).toMatchObject({
+      sessionId: 'spawned', kind: 'session', spawnToken: 'spawn-token',
+      sourceGeneration: 17, sourceSpawnToken: 'before-token', trigger: 'boundary', requestedAt: NOW,
+    })
+  })
+
   it('markHandover: only the owner may hand over, and it does not touch the heartbeat', () => {
     acquire('s1', opts())
     const before = readOwnerLock(lockPath).claimedAt
@@ -1050,6 +1155,9 @@ describe('acquire (atomic test-and-set on the real filesystem)', () => {
     expect(lock.handoverPoint).toBe(388)
     expect(lock.claimedAt).toBe(before) // the heartbeat is NOT bumped
     expect(lock.sessionId).toBe('s1') // and it is not a release
+    expect(parseActivityJournal(readFileSync(join(dir, 'batch-activity.jsonl'), 'utf8')).records.map((r) => r.event)).toEqual([
+      'owner-claim', 'handover',
+    ])
   })
 
   // --- FINDING 1 (28.07.2026): the lock write that kept failing ---------------
@@ -1520,13 +1628,36 @@ describe('acquire (atomic test-and-set on the real filesystem)', () => {
     expect(readOwnerLock(lockPath).sessionId).toBe('successor')
   })
 
+  it('diagnoses only a valid id on this exact owner process as the repairable torn state', () => {
+    acquire('before-compaction', opts())
+    const lock = readOwnerLock(lockPath)
+    const ancestor = { pid: lock.pid, startedAt: lock.pidStartedAt }
+    expect(ownerSessionTear({ sessionId: 'after-compaction', lock, ancestor })).toMatchObject({
+      torn: true,
+      reason: 'owner-session-id-mismatch',
+      recordedSessionId: 'before-compaction',
+    })
+    expect(ownerSessionTear({ sessionId: 'before-compaction', lock, ancestor })).toEqual({ torn: false, reason: 'consistent' })
+    expect(ownerSessionTear({ sessionId: 'x', lock, ancestor })).toEqual({ torn: false, reason: 'invalid-session-id' })
+    expect(
+      ownerSessionTear({ sessionId: 'after-compaction', lock, ancestor: { ...ancestor, startedAt: ancestor.startedAt - 60_000 } }),
+    ).toMatchObject({ torn: false, reason: 'not-owner:pid-reused' })
+  })
+
   it('validates transition ids without coupling them to the harness UUID format', () => {
     for (const sid of ['after-compaction', '830a6878-915f-4838-92fc-4af7859c4758']) {
       expect(validTransitionSessionId(sid)).toBe(true)
     }
-    for (const sid of ['', ' preflight-safe', 'preflight-test', 'line\nbreak', null, 42]) {
+    for (const sid of ['', 'x', 'X', ' preflight-safe', 'preflight-test', 'line\nbreak', null, 42]) {
       expect(validTransitionSessionId(sid)).toBe(false)
     }
+  })
+
+  it('a placeholder ownership query leaves the recorded owner byte-identical', () => {
+    acquire('before-compaction', opts())
+    const before = readFileSync(lockPath, 'utf8')
+    expect(ownsLock('x', { lockPath, ancestor: { pid: process.pid, startedAt: NOW } }).mine).toBe(true)
+    expect(readFileSync(lockPath, 'utf8')).toBe(before)
   })
 
   it('a SECOND WINDOW is still a second window — its own claude process gives it away', () => {
@@ -1599,6 +1730,220 @@ describe('acquire (atomic test-and-set on the real filesystem)', () => {
     // …but not forever.
     expect(ourClaudeProcess('sid2', { ancestorCachePath, findAncestorFn: fail, retryMs: 0 })).toBe(null)
     expect(failed).toBe(2)
+  })
+
+  it('records a batch writer process independently of the owner lock', () => {
+    const path = join(dir, 'batch-writer-process.json')
+    expect(
+      noteBatchWriter('writer-session', {
+        path,
+        lockPath,
+        now: NOW,
+        processIdentity: { pid: 4242, startedAt: NOW - 60_000 },
+      }),
+    ).toBe(true)
+    expect(readSessionProcesses({ path })).toEqual({
+      'writer-session': {
+        pid: 4242,
+        startedAt: NOW - 60_000,
+        at: NOW,
+        batchWriterAt: NOW,
+        generation: null,
+        spawnToken: null,
+        authorityState: 'active',
+      },
+    })
+    // The marker survives without a lock and advances on the next main write.
+    expect(existsSync(lockPath)).toBe(false)
+    noteBatchWriter('writer-session', {
+      path,
+      lockPath,
+      now: NOW + 1_000,
+      processIdentity: { pid: 4242, startedAt: NOW - 60_000 },
+    })
+    expect(readSessionProcesses({ path })['writer-session']).toMatchObject({ at: NOW, batchWriterAt: NOW + 1_000 })
+    writeFileSync(lockPath, JSON.stringify({ sessionId: 'writer-session', claimedAt: NOW, fence: 17 }))
+    noteBatchWriter('writer-session', {
+      path,
+      lockPath,
+      now: NOW + 2_000,
+      processIdentity: { pid: 4242, startedAt: NOW - 60_000 },
+    })
+    expect(readSessionProcesses({ path })['writer-session'].generation).toBe(17)
+  })
+
+  it('does not borrow another session’s spawn token and preserves its own prior token', () => {
+    const path = join(dir, 'foreign-spawn-token.json')
+    const processIdentity = { pid: 4242, startedAt: NOW - 60_000 }
+    writeFileSync(lockPath, JSON.stringify({
+      sessionId: 'writer-session',
+      claimedAt: NOW,
+      fence: 17,
+      spawnToken: 'writer-token',
+    }))
+    expect(noteBatchWriter('writer-session', { path, lockPath, now: NOW, processIdentity })).toBe(true)
+
+    rmSync(lockPath)
+    expect(noteBatchWriter('writer-session', {
+      path,
+      lockPath,
+      now: NOW + 1_000,
+      processIdentity,
+    })).toBe(true)
+    expect(readSessionProcesses({ path })['writer-session'].spawnToken).toBe('writer-token')
+
+    writeFileSync(lockPath, JSON.stringify({
+      sessionId: 'other-session',
+      claimedAt: NOW + 2_000,
+      fence: 18,
+      spawnToken: 'foreign-token',
+    }))
+    expect(noteBatchWriter('writer-session', {
+      path,
+      lockPath,
+      now: NOW + 2_000,
+      processIdentity,
+    })).toBe(true)
+    expect(readSessionProcesses({ path })['writer-session']).toMatchObject({
+      generation: 17,
+      spawnToken: 'writer-token',
+    })
+
+    const newPath = join(dir, 'foreign-spawn-token-new-writer.json')
+    expect(noteBatchWriter('new-writer', {
+      path: newPath,
+      lockPath,
+      now: NOW + 3_000,
+      processIdentity,
+    })).toBe(true)
+    const batchWriters = readSessionProcesses({ path: newPath })
+    expect(batchWriters['new-writer'].spawnToken).toBe(null)
+    expect(spawnProgressed({
+      batchWriters,
+      lastSpawn: {
+        at: NOW + 2_000,
+        spawnToken: 'foreign-token',
+        pid: 9898,
+        pidStartedAt: NOW - 120_000,
+      },
+    })).toBe(false)
+  })
+
+  it('retires only the named writer generation and a later fenced write reactivates it', () => {
+    const path = join(dir, 'writer-authority.json')
+    writeFileSync(lockPath, JSON.stringify({ sessionId: 'writer-session', claimedAt: NOW, fence: 17 }))
+    noteBatchWriter('writer-session', {
+      path,
+      lockPath,
+      now: NOW,
+      processIdentity: { pid: 4242, startedAt: NOW - 60_000 },
+    })
+    expect(retireBatchWriter('writer-session', { path, generation: 16, now: NOW + 1_000 })).toBe(false)
+    expect(readSessionProcesses({ path })['writer-session'].authorityState).toBe('active')
+    expect(retireBatchWriter('writer-session', {
+      path,
+      generation: 17,
+      now: NOW + 2_000,
+      reason: 'handover',
+    })).toBe(true)
+    expect(readSessionProcesses({ path })['writer-session']).toMatchObject({
+      generation: 17,
+      authorityState: 'retired',
+      retiredAt: NOW + 2_000,
+      retiredReason: 'handover',
+    })
+    noteBatchWriter('writer-session', {
+      path,
+      lockPath,
+      now: NOW + 3_000,
+      processIdentity: { pid: 4242, startedAt: NOW - 60_000 },
+    })
+    expect(readSessionProcesses({ path })['writer-session']).toMatchObject({
+      generation: 17,
+      authorityState: 'active',
+      batchWriterAt: NOW + 3_000,
+    })
+  })
+
+  it('handover and release retire authority while the process record remains', () => {
+    const path = join(dir, 'session-process.json')
+    acquire('writer-session', opts({ now: NOW, pid: 4242, pidStartedAt: NOW - 60_000 }))
+    const generation = readOwnerLock(lockPath).fence
+    noteBatchWriter('writer-session', {
+      path,
+      lockPath,
+      now: NOW + 1_000,
+      processIdentity: { pid: 4242, startedAt: NOW - 60_000 },
+    })
+    expect(markHandover('writer-session', { lockPath, now: NOW + 2_000, point: 812 }).handed).toBe(true)
+    expect(readSessionProcesses({ path })['writer-session']).toMatchObject({
+      generation,
+      authorityState: 'retired',
+      retiredReason: 'handover',
+    })
+
+    noteBatchWriter('writer-session', {
+      path,
+      lockPath,
+      now: NOW + 3_000,
+      processIdentity: { pid: 4242, startedAt: NOW - 60_000 },
+    })
+    expect(release('writer-session', lockPath)).toBe(true)
+    expect(readSessionProcesses({ path })['writer-session']).toMatchObject({
+      generation,
+      authorityState: 'retired',
+      retiredReason: 'owner-release',
+    })
+  })
+
+  it('revokes only the still-current writer fence and records the recovery', () => {
+    const fencePath = join(dir, 'writer-recovery-fence.json')
+    writeFileSync(fencePath, JSON.stringify({
+      v: 1,
+      fence: 17,
+      holder: 'writer-session',
+      at: NOW - 1_000,
+      holders: [{ sessionId: 'writer-session', fence: 17, at: NOW - 1_000 }],
+    }))
+    expect(revokeWriterFence('other', 17, { fencePath, now: NOW })).toMatchObject({
+      revoked: false,
+      reason: 'holder-changed',
+    })
+    expect(revokeWriterFence('writer-session', 16, { fencePath, now: NOW })).toMatchObject({
+      revoked: false,
+      reason: 'generation-changed',
+    })
+    expect(revokeWriterFence('writer-session', 17, {
+      fencePath,
+      now: NOW,
+      reason: 'launcher-stall-recovery',
+    })).toEqual({ revoked: true, reason: 'revoked', fence: 18 })
+    expect(readFence({ fencePath })).toMatchObject({
+      fence: 18,
+      holder: '',
+      lastTakeover: {
+        from: 'writer-session',
+        fence: 18,
+        reason: 'launcher-stall-recovery',
+        at: NOW,
+      },
+    })
+    expect(revokeWriterFence('writer-session', 17, { fencePath, now: NOW + 1 })).toMatchObject({
+      revoked: false,
+      reason: 'generation-changed',
+      fence: 18,
+    })
+  })
+
+  it('never records an unidentifiable process or a synthetic probe as a writer', () => {
+    const path = join(dir, 'unidentified-writer-process.json')
+    expect(noteBatchWriter('writer-session', { path, lockPath, processIdentity: null })).toBe(false)
+    expect(noteBatchWriter('preflight-writer', {
+      path,
+      lockPath,
+      processIdentity: { pid: 42, startedAt: NOW },
+    })).toBe(false)
+    expect(readSessionProcesses({ path })).toEqual({})
   })
 
   it('a PROBE gets the same answer and leaves no record behind (point 434 (8))', () => {
@@ -1747,9 +2092,14 @@ describe('the lock write: retried, atomic, propagating, and swept up after (poin
       bootTime: 0,
       probePidFn: (pid) => ({ exists: pid !== 7777, startedAt: null }),
     })
-    // `batch-fence.json` is written by the acquisition itself (point 434) and is
-    // NEVER swept: it is the one record that outlives the lock.
-    expect(readdirSync(dir).sort()).toEqual(['batch-fence.json', 'batch-lock.json', 'batch-lock.json.tmp-4242'])
+    // The fence and point-809 activity journal are both written by acquisition;
+    // neither is orphan tmp litter and neither may be swept.
+    expect(readdirSync(dir).sort()).toEqual([
+      'batch-activity.jsonl', 'batch-fence.json', 'batch-lock.json', 'batch-lock.json.tmp-4242',
+    ])
+    expect(parseActivityJournal(readFileSync(join(dir, 'batch-activity.jsonl'), 'utf8')).records).toEqual([
+      expect.objectContaining({ event: 'owner-claim', session: 's1', cause: 'acquired' }),
+    ])
   })
 })
 
@@ -1847,6 +2197,131 @@ describe('classifyParallel (active detector, subagent-safe)', () => {
       now: NOW,
     })
     expect(parallel).toEqual([])
+  })
+
+  it('treats a placeholder owner as UNKNOWN, never as evidence of a foreign session', () => {
+    expect(validTransitionSessionId('x')).toBe(false)
+    expect(
+      classifyParallel({
+        sessionsSeen: { real: NOW - 60_000 },
+        activity: { real: NOW - 1_000 },
+        ownerSid: 'x',
+        now: NOW,
+      }),
+    ).toEqual([])
+  })
+
+  it('recognises the lock pid only with the same incarnation and ownership generation', () => {
+    const owner = { sessionId: 'foreign-id', pid: 42, pidStartedAt: NOW - 60_000, fence: 17 }
+    const base = {
+      sessionsSeen: {
+        real: { seenAt: NOW - 60_000, pid: 42, pidStartedAt: NOW - 60_000, generation: 17 },
+      },
+      activity: { real: NOW - 1_000 },
+      ownerSid: owner.sessionId,
+      owner,
+      now: NOW,
+    }
+    expect(classifyParallel(base)).toEqual([])
+    expect(
+      classifyParallel({
+        ...base,
+        sessionsSeen: { real: { ...base.sessionsSeen.real, pidStartedAt: NOW - 120_000 } },
+      }).map((entry) => entry.sid),
+    ).toEqual(['real'])
+    expect(
+      classifyParallel({
+        ...base,
+        sessionsSeen: { real: { ...base.sessionsSeen.real, generation: 16 } },
+      }).map((entry) => entry.sid),
+    ).toEqual(['real'])
+  })
+
+  it('keeps an unchanged singleton stand-down as attended observation only', () => {
+    const owner = { sessionId: 'owner', pid: 10, pidStartedAt: NOW - 100_000, fence: 17 }
+    const claim = { sessionId: 'claimant', at: NOW - 10_000, pid: 77, pidStartedAt: NOW - 20_000 }
+    const writer = { generation: null, batchWriterAt: null }
+    const record = {
+      seenAt: NOW - 60_000,
+      pid: 42,
+      pidStartedAt: NOW - 50_000,
+      generation: null,
+      stoodDown: {
+        at: NOW - 40_000,
+        pid: 42,
+        pidStartedAt: NOW - 50_000,
+        ownerSession: 'owner',
+        ownerGeneration: 17,
+        claimGeneration: claimGeneration(claim),
+        writerGeneration: null,
+        writerAt: null,
+      },
+    }
+    const base = {
+      sessionsSeen: { observer: record, owner: NOW - 100_000 },
+      activity: { observer: NOW - 1_000, owner: NOW - 1_000 },
+      ownerSid: 'owner',
+      owner,
+      processes: { observer: writer },
+      claim,
+      now: NOW,
+    }
+    expect(classifyParallel(base)).toEqual([])
+    expect(classifyParallel({ ...base, owner: { ...owner, fence: 18 } }).map((entry) => entry.sid)).toEqual(['observer'])
+    expect(classifyParallel({ ...base, claim: { ...claim, activityAt: NOW } }).map((entry) => entry.sid)).toEqual(['observer'])
+    expect(
+      classifyParallel({ ...base, processes: { observer: { generation: 18, batchWriterAt: NOW - 1_000 } } })
+        .map((entry) => entry.sid),
+    ).toEqual(['observer'])
+  })
+
+  it('replays the placeholder incident through the real detector without an alert', () => {
+    const dir = mkdtempSync(join(tmpdir(), 'hoa-placeholder-detector-'))
+    const lockPath = join(dir, 'batch-lock.json')
+    const paths = statePathsFor(lockPath)
+    try {
+      writeFileSync(lockPath, JSON.stringify({ sessionId: 'x', pid: 42, pidStartedAt: NOW - 60_000, fence: 17 }))
+      writeFileSync(paths.sessionsSeenPath, JSON.stringify({
+        real: { seenAt: NOW - 50_000, pid: 42, pidStartedAt: NOW - 60_000, generation: 17 },
+      }))
+      writeFileSync(paths.activityPath, JSON.stringify({ real: NOW - 1_000 }))
+      expect(detectParallel('x', { lockPath, now: NOW })).toEqual([])
+    } finally {
+      rmSync(dir, { recursive: true, force: true })
+    }
+  })
+
+  it('persists process-qualified stand-down evidence for the real detector', () => {
+    const dir = mkdtempSync(join(tmpdir(), 'hoa-stand-down-detector-'))
+    const lockPath = join(dir, 'batch-lock.json')
+    const paths = statePathsFor(lockPath)
+    const owner = { sessionId: 'owner', claimedAt: NOW - 80_000, pid: 10, pidStartedAt: NOW - 80_000, fence: 17 }
+    const observerProcess = { pid: 42, startedAt: NOW - 60_000 }
+    try {
+      writeFileSync(lockPath, JSON.stringify(owner))
+      noteTopLevelSession('observer', {
+        path: paths.sessionsSeenPath,
+        lockPath,
+        lock: owner,
+        now: NOW - 50_000,
+        processIdentity: observerProcess,
+      })
+      expect(noteSessionStandDown('observer', {
+        path: paths.sessionsSeenPath,
+        processesPath: paths.ancestorCachePath,
+        lockPath,
+        lock: owner,
+        claim: null,
+        writer: null,
+        now: NOW - 40_000,
+        processIdentity: observerProcess,
+      })).toBe(true)
+      writeFileSync(paths.activityPath, JSON.stringify({ observer: NOW - 1_000 }))
+      expect(detectParallel('owner', { lockPath, now: NOW })).toEqual([])
+      expect(detectParallel('owner', { lockPath, owner: { ...owner, fence: 18 }, now: NOW })).toHaveLength(1)
+    } finally {
+      rmSync(dir, { recursive: true, force: true })
+    }
   })
 })
 

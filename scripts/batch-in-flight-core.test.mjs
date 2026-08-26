@@ -18,6 +18,7 @@ import { tmpdir } from 'node:os'
 import { basename, join, resolve } from 'node:path'
 import { REPO_ROOT } from './repo-paths.mjs'
 import {
+  assessCiWait,
   IN_FLIGHT_MAX_AGE_MS,
   LAUNCHER_WORK_MAX_AGE_MS,
   LOG_FRESH_MS,
@@ -25,15 +26,19 @@ import {
   RESPAWN_GRACE_MS,
   WORK_FRESH_MS,
   agentOutputVerdict,
+  declaredAgentProbe,
   assessInFlight,
   assessOwnerWork,
   checkEvidence,
   combineWorktreeStamps,
   porcelainPaths,
+  registeredFeatureWorktrees,
   worktreeStamp,
   describeInFlight,
   evidenceVerdict,
   respawnDecision,
+  standDownBoundaryDecision,
+  successorAgentOrientation,
   selfReferentialEvidence,
   slotReasonDecision,
   declaredAgentCount,
@@ -80,14 +85,21 @@ import {
 import { LEASE_MS } from './batch-lease-core.mjs'
 import {
   absPath,
+  agentCheckDeclaration,
   adoptTransferred,
+  checkAgentOutput,
+  checkDeclaredAgentOutput,
   commandNamesRun,
+  declaredAgentCheckCommand,
   gatherHandoverTransfer,
+  gatherStandDownBoundary,
+  gatherSuccessorAgentOrientation,
   processCommandOf,
   runRecordFor,
   gatherInFlight,
   gatherSlots,
   openFeatBranches,
+  registeredFeatureWriters,
   maxAgeMs,
   readDeclaration,
   resolveRefName,
@@ -289,10 +301,14 @@ describe('checkEvidence — every kind is answered by a probe, never by the clai
   const pidItem = (over = {}) => ({ kind: 'pid', pid: 77, startedAt: RUN_STARTED, ...over })
 
   it('a pid counts only while the process is really alive', () => {
-    expect(checkEvidence(pidItem(), { now: NOW, probePid: () => alive() }).ok).toBe(true)
+    expect(checkEvidence(pidItem(), { now: NOW, probePid: () => alive() })).toMatchObject({
+      ok: true,
+      progressAt: NOW,
+    })
     expect(checkEvidence(pidItem(), { now: NOW, probePid: () => dead() })).toMatchObject({
       ok: false,
       detail: 'process-gone',
+      progressAt: null,
     })
   })
 
@@ -495,6 +511,58 @@ describe('the worktree stamp reads BOTH sources and says which one answered', ()
     // verbatim — trimming it would make its stat miss (four-eyes review, finding 6).
     expect(porcelainPaths(rec('?? odd name .ts', '?? tab\tname.ts'))).toEqual(['odd name .ts', 'tab\tname.ts'])
     for (const junk of ['', null, undefined, '\0\0', 'XY']) expect(porcelainPaths(junk), String(junk)).toEqual([])
+  })
+})
+
+describe('the launcher-facing feature worktree register', () => {
+  const porcelain = [
+    'worktree /repo',
+    'HEAD aaaaa',
+    'branch refs/heads/main',
+    '',
+    'worktree /repo/.claude/worktrees/point-515',
+    'HEAD bbbbb',
+    'branch refs/heads/feat/515-detector',
+    '',
+    'worktree /repo/.claude/worktrees/detached',
+    'HEAD ccccc',
+    'detached',
+    '',
+  ].join('\n')
+
+  it('reads only registered feature checkouts from porcelain', () => {
+    expect(registeredFeatureWorktrees(porcelain)).toEqual([
+      { path: '/repo/.claude/worktrees/point-515', branch: 'feat/515-detector' },
+    ])
+  })
+
+  it('asks the same agent-check evidence and recognises a declared transfer', () => {
+    const declaration = {
+      evidence: [{ kind: 'branch', ref: 'feat/515-detector' }],
+    }
+    const result = registeredFeatureWriters({
+      now: NOW,
+      declaration,
+      exec: () => porcelain,
+      openProbe: () => ({ readable: true, branches: [{ ref: 'feat/515-detector' }] }),
+      check: ({ branch, worktree, now }) => ({
+        output: agentOutputVerdict({ branchTipAt: now - 1_000, now }),
+        reason: 'agent-alive',
+        detail: `${branch} moving in ${worktree}`,
+      }),
+    })
+    expect(result).toMatchObject({
+      readable: true,
+      writers: [{ branch: 'feat/515-detector', recognized: true, output: { verdict: 'alive' } }],
+    })
+  })
+
+  it('refuses to invent an empty register when Git cannot enumerate worktrees', () => {
+    expect(registeredFeatureWriters({ exec: () => { throw new Error('broken') } })).toEqual({
+      readable: false,
+      writers: [],
+      reason: 'git-worktree-register-unreadable',
+    })
   })
 })
 
@@ -1003,6 +1071,395 @@ describe('agentOutputVerdict / respawnDecision — an agent is judged by what it
 })
 
 // ---------------------------------------------------------------------------
+// POINT 716: losing the lock is a boundary for the owner's children, and the
+// successor may not turn an owner-process verdict into an agent verdict.
+describe('the stand-down boundary — declared children cross ownership', () => {
+  const agent = declaration({
+    evidence: [
+      { kind: 'worktree', path: '/repo/.claude/worktrees/point-716' },
+      { kind: 'branch', ref: 'feat/716-standdown-boundary' },
+      { kind: 'log', path: '/tmp/agent.log' },
+    ],
+  })
+  const working = respawnDecision({ output: agentOutputVerdict({ worktreeAt: NOW - 60_000, now: NOW }) })
+  const unknown = respawnDecision({ output: agentOutputVerdict({ now: NOW }) })
+
+  it('extracts every output address for one combined --agent-check', () => {
+    expect(declaredAgentProbe(agent)).toEqual({
+      agent: true,
+      worktrees: ['/repo/.claude/worktrees/point-716'],
+      branches: ['feat/716-standdown-boundary'],
+      logs: ['/tmp/agent.log'],
+      pids: [],
+    })
+    expect(declaredAgentProbe(declaration({ evidence: [{ kind: 'pid', pid: 7 }] }))).toMatchObject({
+      agent: false,
+      pids: [{ kind: 'pid', pid: 7 }],
+    })
+  })
+
+  it('asks every declared path in one --agent-check verdict', () => {
+    const command = declaredAgentCheckCommand(agent)
+    expect(command).toContain('--worktree "/repo/.claude/worktrees/point-716"')
+    expect(command).toContain('--branch "feat/716-standdown-boundary"')
+    expect(command).toContain('--log "/tmp/agent.log"')
+    const checked = checkDeclaredAgentOutput(agent, {
+      now: NOW,
+      worktreeProbe: () => null,
+      branchProbe: () => NOW - 60_000,
+      logProbe: () => null,
+    })
+    expect(checked).toMatchObject({ checked: true, respawn: false, reason: 'agent-alive' })
+    // The newest of several children decides; one quiet branch can never permit
+    // replacement while another declared worktree is moving.
+    expect(
+      checkAgentOutput({
+        worktree: ['/quiet', '/moving'],
+        branch: ['quiet-branch'],
+        now: NOW,
+        worktreeProbe: (path) => (path === '/moving' ? NOW - 1000 : NOW - 90 * 60_000),
+        branchProbe: () => NOW - 90 * 60_000,
+      }),
+    ).toMatchObject({ respawn: false, reason: 'agent-alive' })
+  })
+
+  it('a gone declared pid refutes a branch tip left one minute ago', () => {
+    const recorded = declaration({
+      evidence: [
+        { kind: 'branch', ref: 'feat/874-author', label: 'author output' },
+        { kind: 'pid', pid: RUN_PID, startedAt: RUN_STARTED, label: 'author process' },
+      ],
+    })
+    const checked = checkDeclaredAgentOutput(recorded, {
+      now: NOW,
+      branchProbe: () => NOW - 60_000,
+      pidProbe: () => dead(),
+    })
+    expect(checked).toMatchObject({
+      checked: true,
+      respawn: true,
+      reason: 'process-refuted',
+      judgedOn: 'process',
+      output: {
+        verdict: 'dead',
+        refutations: [
+          {
+            evidence: `pid ${RUN_PID} (author process)`,
+            measurement: 'process-gone',
+            refuted: expect.stringContaining('work output 1 min old'),
+          },
+        ],
+      },
+    })
+  })
+
+  it('a reused declared pid refutes the same fresh branch tip', () => {
+    const recorded = declaration({
+      evidence: [
+        { kind: 'branch', ref: 'feat/874-author' },
+        { kind: 'pid', pid: RUN_PID, startedAt: RUN_STARTED },
+      ],
+    })
+    const checked = checkDeclaredAgentOutput(recorded, {
+      now: NOW,
+      branchProbe: () => NOW - 60_000,
+      pidProbe: () => ({ exists: true, startedAt: RUN_STARTED + PID_START_TOLERANCE_MS + 1 }),
+    })
+    expect(checked).toMatchObject({
+      respawn: true,
+      reason: 'process-refuted',
+      judgedOn: 'process',
+      output: { verdict: 'dead', refutations: [{ measurement: 'pid-reused' }] },
+    })
+    expect(checked.detail).toContain(`pid ${RUN_PID}`)
+    expect(checked.detail).toContain('pid-reused')
+  })
+
+  it('without pid evidence a fresh tip still decides alone, unchanged', () => {
+    const recorded = declaration({ evidence: [{ kind: 'branch', ref: 'feat/874-author' }] })
+    expect(
+      checkDeclaredAgentOutput(recorded, { now: NOW, branchProbe: () => NOW - 60_000 }),
+    ).toMatchObject({
+      checked: true,
+      respawn: false,
+      reason: 'agent-alive',
+      judgedOn: 'git',
+      output: { verdict: 'alive' },
+    })
+  })
+
+  it('a live pid and silent log beside a fresh commit retain the 30.07 verdict', () => {
+    const recorded = declaration({
+      evidence: [
+        { kind: 'branch', ref: 'feat/874-author' },
+        { kind: 'pid', pid: RUN_PID, startedAt: RUN_STARTED },
+        { kind: 'log', path: '/tmp/author-874.log' },
+      ],
+    })
+    expect(
+      checkDeclaredAgentOutput(recorded, {
+        now: NOW,
+        branchProbe: () => NOW - 60_000,
+        pidProbe: () => alive(),
+        logProbe: () => NOW - 59 * 60_000,
+      }),
+    ).toMatchObject({
+      respawn: false,
+      reason: 'agent-alive',
+      judgedOn: 'git',
+      output: { verdict: 'alive' },
+    })
+  })
+
+  it('--agent-check with no output arguments probes the recorded declaration', () => {
+    const recorded = declaration({
+      evidence: [
+        { kind: 'branch', ref: 'feat/874-author' },
+        { kind: 'pid', pid: RUN_PID, startedAt: RUN_STARTED, label: 'recorded author' },
+      ],
+    })
+    const fromNoArguments = agentCheckDeclaration(recorded)
+    expect(fromNoArguments.evidence).toEqual(recorded.evidence)
+    expect(
+      checkDeclaredAgentOutput(fromNoArguments, {
+        now: NOW,
+        branchProbe: () => NOW - 60_000,
+        pidProbe: () => dead(),
+      }),
+    ).toMatchObject({
+      checked: true,
+      respawn: true,
+      reason: 'process-refuted',
+      output: { verdict: 'dead', refutations: [{ evidence: `pid ${RUN_PID} (recorded author)` }] },
+    })
+  })
+
+  it('explicit output arguments augment and de-duplicate recorded evidence', () => {
+    const recorded = declaration({ evidence: [{ kind: 'branch', ref: 'feat/874-author' }] })
+    expect(
+      agentCheckDeclaration(recorded, {
+        branches: ['feat/874-author', 'feat/875-other'],
+        worktrees: ['/repo/point-875'],
+        logs: ['/tmp/author.log'],
+      }).evidence,
+    ).toEqual([
+      { kind: 'branch', ref: 'feat/874-author' },
+      { kind: 'worktree', path: '/repo/point-875' },
+      { kind: 'branch', ref: 'feat/875-other' },
+      { kind: 'log', path: '/tmp/author.log' },
+    ])
+  })
+
+  it('does not let a gone recorded pid refute a foreign explicit branch', () => {
+    const recorded = declaration({
+      evidence: [
+        { kind: 'branch', ref: 'feat/A' },
+        { kind: 'pid', pid: RUN_PID, startedAt: RUN_STARTED },
+      ],
+    })
+    const probe = agentCheckDeclaration(recorded, { branches: ['feat/B'] })
+    expect(probe.evidence).toEqual([
+      { kind: 'branch', ref: 'feat/A' },
+      { kind: 'branch', ref: 'feat/B' },
+    ])
+    expect(
+      checkDeclaredAgentOutput(probe, {
+        now: NOW,
+        branchProbe: (ref) => (ref === 'feat/B' ? NOW - 60_000 : NOW - 60 * 60_000),
+        pidProbe: () => dead(),
+      }),
+    ).toMatchObject({
+      checked: true,
+      respawn: false,
+      reason: 'agent-alive',
+      judgedOn: 'git',
+      output: { verdict: 'alive' },
+    })
+  })
+
+  it('keeps a gone recorded pid when explicit arguments re-state its own address', () => {
+    const recorded = declaration({
+      evidence: [
+        { kind: 'branch', ref: 'feat/A' },
+        { kind: 'pid', pid: RUN_PID, startedAt: RUN_STARTED },
+      ],
+    })
+    const probe = agentCheckDeclaration(recorded, { branches: ['feat/A'] })
+    expect(probe.evidence).toEqual(recorded.evidence)
+    expect(
+      checkDeclaredAgentOutput(probe, {
+        now: NOW,
+        branchProbe: () => NOW - 60_000,
+        pidProbe: () => dead(),
+      }),
+    ).toMatchObject({
+      checked: true,
+      respawn: true,
+      reason: 'process-refuted',
+      judgedOn: 'process',
+      output: { verdict: 'dead' },
+    })
+  })
+
+  it('turns a live declared agent into a transfer, never a silent stand-down', () => {
+    expect(
+      standDownBoundaryDecision({
+        sid: SID,
+        declaration: agent,
+        agentCheck: working,
+        transfer: { available: true, blocked: false },
+      }),
+    ).toEqual({ action: 'transfer', reason: 'agent-working' })
+  })
+
+  it('keeps the parent alive for a working child without a pushed checkpoint', () => {
+    expect(
+      standDownBoundaryDecision({
+        sid: SID,
+        declaration: agent,
+        agentCheck: working,
+        transfer: { available: false, blocked: true },
+      }),
+    ).toEqual({ action: 'block', reason: 'checkpoint-required' })
+    expect(
+      standDownBoundaryDecision({ sid: SID, declaration: agent, agentCheck: unknown, transfer: { available: false } }),
+    ).toEqual({ action: 'block', reason: 'agent-unmeasurable' })
+  })
+
+  it('keeps today’s plain stand-down when this session has no declared agent', () => {
+    expect(standDownBoundaryDecision({ sid: SID })).toEqual({ action: 'stand-down', reason: 'no-own-agent' })
+    expect(
+      standDownBoundaryDecision({ sid: SID, declaration: declaration({ evidence: [{ kind: 'pid', pid: 7 }] }) }),
+    ).toEqual({ action: 'stand-down', reason: 'no-declared-agent' })
+    expect(standDownBoundaryDecision({ sid: 'successor', declaration: agent })).toEqual({
+      action: 'stand-down',
+      reason: 'no-own-agent',
+    })
+  })
+
+  it('orients the successor from the measurement and names the exact probe', () => {
+    const transferred = { ...agent, transfer: { v: 1, by: SID, at: NOW, checkpoints: [] } }
+    const text = successorAgentOrientation({
+      declaration: transferred,
+      sid: 'successor',
+      agentCheck: working,
+      command: 'node scripts/batch-in-flight.mjs --agent-check --worktree "/repo/w"',
+    })
+    expect(text).toContain('MEASURED WORKING')
+    expect(text).toContain('--adopt')
+    expect(text).toContain('--agent-check')
+    expect(text).not.toContain('provably dead')
+    expect(successorAgentOrientation({ declaration: agent, sid: SID, agentCheck: working })).toBe('')
+  })
+
+  it('carries a process refutation into the stand-down and successor verdicts', () => {
+    const refuted = {
+      respawn: true,
+      reason: 'process-refuted',
+      judgedOn: 'process',
+      detail: 'pid 9001 (author) — process-gone refutes work output 1 min old',
+    }
+    expect(
+      standDownBoundaryDecision({ sid: SID, declaration: agent, agentCheck: refuted, transfer: { available: false } }),
+    ).toEqual({ action: 'stand-down', reason: 'agent-process-refuted' })
+    const text = successorAgentOrientation({ declaration: agent, sid: 'successor', agentCheck: refuted })
+    expect(text).toContain('PROCESS MEASURED DEAD')
+    expect(text).toContain('pid 9001 (author)')
+    expect(text).not.toContain('STATE UNKNOWN')
+  })
+
+  it('writes the transfer at stand-down, and the successor sees and adopts it', () => {
+    const dir = mkdtempSync(join(tmpdir(), 'hoa-standdown-'))
+    const repo = join(dir, 'repo')
+    const remote = join(dir, 'remote.git')
+    const lockPath = join(dir, 'batch-lock.json')
+    const path = statePathsFor(lockPath).inFlightPath
+    const gitEnv = { ...process.env, GIT_CONFIG_GLOBAL: '/dev/null', GIT_CONFIG_SYSTEM: '/dev/null' }
+    const git = (cwd, ...args) =>
+      execFileSync('git', ['-c', 'commit.gpgsign=false', '-c', 'core.hooksPath=', ...args], {
+        cwd,
+        env: gitEnv,
+        encoding: 'utf8',
+        windowsHide: true,
+        stdio: ['ignore', 'pipe', 'ignore'],
+      }).trim()
+    try {
+      // The checkpoint belongs to this case, never to the checkout running it:
+      // immediately after a landing, that checkout's main is necessarily ahead
+      // of origin/main. A bare remote gives the fixture the pushed equality the
+      // transfer contract requires in every repository state.
+      git(dir, 'init', '-q', '--bare', remote)
+      git(dir, 'init', '-q', '--initial-branch=main', repo)
+      writeFileSync(join(repo, 'agent.txt'), 'moving work\n')
+      git(repo, 'add', 'agent.txt')
+      git(repo, '-c', 'user.name=Fixture', '-c', 'user.email=fixture@example.invalid', 'commit', '-q', '-m', 'checkpoint')
+      git(repo, 'remote', 'add', 'origin', remote)
+      git(repo, 'push', '-q', '-u', 'origin', 'main')
+      expect(git(repo, 'rev-parse', 'main')).toBe(git(repo, 'rev-parse', 'origin/main'))
+
+      // The declaration is written directly because the test exercises the
+      // handover seam, not the CLI's separate self-reference refusal.
+      // The evidence names its point, as every write path stamps it since the
+      // fifth cross-vendor round: `main` resolves to no `feat/<N>-…` point, so
+      // an unstamped item would be refused as unattributable — which is the
+      // rule, not this case's subject.
+      writeDeclaration(declaration({ evidence: [{ kind: 'branch', ref: 'main', point: 713 }] }), path)
+      const boundary = gatherStandDownBoundary(SID, {
+        cwd: repo,
+        lockPath,
+        now: NOW,
+        agentProbes: { branchProbe: () => NOW - 60_000 },
+      })
+      expect(boundary).toMatchObject({ action: 'transferred', reason: 'agent-working' })
+      expect(readDeclaration(path).transfer).toMatchObject({ by: SID })
+
+      const orientation = gatherSuccessorAgentOrientation('session-successor', {
+        lockPath,
+        now: NOW,
+        agentProbes: { branchProbe: () => NOW - 60_000 },
+      })
+      expect(orientation).toContain('MEASURED WORKING')
+      expect(orientation).toContain('--adopt')
+      expect(orientation).not.toContain('provably dead')
+
+      const adopted = adoptTransferred('session-successor', {
+        cwd: repo,
+        lockPath,
+        now: NOW + 1,
+        probeSet: { refTipAt: () => NOW, probePid: () => null, worktreeActiveAt: () => null, mtimeOf: () => null },
+      })
+      expect(adopted).toMatchObject({ adopted: true, reason: 'adopted' })
+      expect(readDeclaration(path)).toMatchObject({
+        sessionId: 'session-successor',
+        adopted: { from: SID, at: NOW + 1 },
+      })
+    } finally {
+      rmSync(dir, { recursive: true, force: true })
+    }
+  })
+
+  it('calls an unreadable declaration UNKNOWN and names the probes on both sides', () => {
+    const dir = mkdtempSync(join(tmpdir(), 'hoa-standdown-unknown-'))
+    const lockPath = join(dir, 'batch-lock.json')
+    const path = statePathsFor(lockPath).inFlightPath
+    try {
+      writeFileSync(path, '{not json')
+      expect(gatherStandDownBoundary(SID, { lockPath })).toMatchObject({
+        action: 'block',
+        reason: 'declaration-unreadable',
+        command: 'node scripts/batch-in-flight.mjs --status',
+      })
+      const text = gatherSuccessorAgentOrientation('session-successor', { lockPath })
+      expect(text).toContain('STATE UNKNOWN')
+      expect(text).toContain('--agent-check')
+      expect(text).not.toContain('provably dead')
+    } finally {
+      rmSync(dir, { recursive: true, force: true })
+    }
+  })
+})
+
+// ---------------------------------------------------------------------------
 describe('evidenceVerdict — the verdict names the source it rests on', () => {
   const item = (kind, ok) => ({ ok, kind, describe: `${kind} x`, detail: ok ? 'fresh' : 'quiet' })
 
@@ -1019,6 +1476,20 @@ describe('evidenceVerdict — the verdict names the source it rests on', () => {
     expect(v.outputFresh).toBe(true)
     expect(v.fresh).toHaveLength(1)
     expect(v.silent).toEqual(['log x — quiet'])
+  })
+
+  it('lets a positive process refutation outrank the process\'s fresh last output', () => {
+    const v = evidenceVerdict([
+      item('branch', true),
+      { ...item('pid', false), describe: 'pid 42 (author)', detail: 'process-gone' },
+    ])
+    expect(v).toMatchObject({
+      judgedOn: 'process',
+      outputFresh: true,
+      refutations: [{ evidence: 'pid 42 (author)', measurement: 'process-gone' }],
+    })
+    // An unverifiable identity remains uncertainty, not a fabricated death.
+    expect(evidenceVerdict([{ ...item('pid', false), detail: 'start-time-unverifiable' }]).refutations).toEqual([])
   })
 })
 
@@ -1053,6 +1524,13 @@ describe('the declaration file is derived from the caller’s lock path', () => 
       expect(readDeclaration(path)).toMatchObject({ sessionId: SID })
       // The real gather, real probe: this process is alive, so the wait holds.
       expect(gatherInFlight(SID, { lockPath })).toMatchObject({ live: true, reason: 'live' })
+      // A consumer of declaration liveness does not pay for or receive the
+      // separate batch-capacity census.
+      expect(gatherInFlight(SID, { lockPath, includeSlots: false })).toMatchObject({
+        live: true,
+        reason: 'live',
+        slots: null,
+      })
       clearDeclaration(path)
       expect(readDeclaration(path)).toBe(null)
       expect(gatherInFlight(SID, { lockPath })).toMatchObject({ live: false, reason: 'no-declaration' })
@@ -1438,9 +1916,15 @@ describe('the CLI records RESOLVED evidence, not what was typed', () => {
   it('resolveRefName asks GIT what a ref names, so an alias cannot hide behind a spelling', () => {
     const dir = mkdtempSync(join(tmpdir(), 'hoa-ref-'))
     const git = (...args) =>
-      execFileSync('git', args, { windowsHide: true, cwd: dir, encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] }).trim()
+      execFileSync('git', ['-c', 'commit.gpgsign=false', '-c', 'core.hooksPath=', ...args], {
+        windowsHide: true,
+        cwd: dir,
+        encoding: 'utf8',
+        stdio: ['ignore', 'pipe', 'ignore'],
+      }).trim()
     try {
       git('init', '-b', 'main')
+      expect(git('rev-parse', '--show-toplevel')).toBe(resolve(dir))
       git('-c', 'user.name=t', '-c', 'user.email=t@t', 'commit', '--allow-empty', '-m', 'x')
       const at = (ref) => resolveRefName(ref, { cwd: dir })
       // The two live bypasses, resolved to names the refusal already knows.
@@ -1555,7 +2039,7 @@ describe('filesNamedIn / openPointSpecs — what a queued point says it touches'
 
   it('carries a point waiting on the user, but FLAGGED (point 450)', () => {
     const tasks = [
-      '- [ ] 500. FIRST POINT touching scripts/a.mjs AWAITING-USER(2026-07-29; needs a ruling)',
+      '- [ ] 500. FIRST POINT touching scripts/a.mjs AWAITING-CONFIRMATION(2026-07-29; release-tag: push the version tag, safe prepared state: verified locally and no tag pushed)',
       '  and also src/ui/B.tsx',
       '- [ ] 503. THIRD POINT touching docs/d.md',
       '- [ ] 504. ANSWERED POINT touching docs/e.md USER-ANSWERED(2026-08-07)',
@@ -1724,13 +2208,14 @@ describe('the running-file set comes from the worktree too, not only from a --br
     const dir = mkdtempSync(join(tmpdir(), 'hoa-slots-'))
     try {
       const git = (...args) =>
-        execFileSync('git', ['-c', 'user.email=t@t', '-c', 'user.name=t', '-c', 'commit.gpgsign=false', ...args], {
+        execFileSync('git', ['-c', 'user.email=t@t', '-c', 'user.name=t', '-c', 'commit.gpgsign=false', '-c', 'core.hooksPath=', ...args], {
           windowsHide: true,
           cwd: dir,
           encoding: 'utf8',
           stdio: ['ignore', 'pipe', 'ignore'],
         })
       git('init', '-q', '-b', 'main', '.')
+      expect(git('rev-parse', '--show-toplevel').trim()).toBe(resolve(dir))
       writeFileSync(join(dir, 'seed.txt'), 'seed\n')
       git('add', '-A')
       git('commit', '-q', '-m', 'seed')
@@ -1966,6 +2451,76 @@ describe('declarationShields — the expiry the branch sweep now applies too', (
     expect(declarationShields({ declaration: {}, now: NOW })).toMatchObject({ shields: true, reason: 'no-timestamp' })
     expect(declarationShields({ declaration: { at: 'soon' }, now: NOW }).shields).toBe(true)
     expect(declarationShields().shields).toBe(true)
+  })
+})
+
+describe('durable CI wait assessment', () => {
+  const wait = (over = {}) => ({
+    v: 1,
+    identity: 'origin/feat/x:abc:CI:42',
+    state: 'pending',
+    ref: 'origin/feat/x',
+    sha: 'abc',
+    workflow: 'CI',
+    runId: 42,
+    firstObservationAt: NOW - 60_000,
+    lastObservationAt: NOW - 1_000,
+    deadline: NOW + 60_000,
+    wakeToken: 'wake-1',
+    observer: { pid: 44, startedAt: NOW - 20_000 },
+    terminal: null,
+    ...over,
+  })
+
+  it('remains visible after its worker exits and after its interaction deadline', () => {
+    expect(assessCiWait({ wait: wait(), now: NOW, probePid: () => null })).toMatchObject({
+      visible: true,
+      pending: true,
+      observerAlive: false,
+      repair: true,
+      deadline: NOW + 60_000,
+      deadlineReached: false,
+      reason: 'observer-missing',
+    })
+    expect(assessCiWait({ wait: wait({ deadline: NOW - 1 }), now: NOW, probePid: () => null })).toMatchObject({
+      visible: true,
+      pending: true,
+      repair: true,
+      deadline: NOW - 1,
+      deadlineReached: true,
+    })
+  })
+
+  it('proves the observer by pid and start time, never by a recycled pid alone', () => {
+    expect(assessCiWait({
+      wait: wait(),
+      now: NOW,
+      probePid: () => ({ exists: true, startedAt: NOW - 20_000 }),
+    })).toMatchObject({ observerAlive: true, repair: false, reason: 'observing' })
+    expect(assessCiWait({
+      wait: wait(),
+      now: NOW,
+      probePid: () => ({ exists: true, startedAt: NOW - 200_000 }),
+    })).toMatchObject({ observerAlive: false, repair: true })
+  })
+
+  it('keeps a terminal result visible for the matching wake request', () => {
+    expect(assessCiWait({
+      wait: wait({ state: 'failed', observer: null, terminal: { state: 'failed', verdict: 'red', observedAt: NOW } }),
+      now: NOW,
+    })).toMatchObject({
+      visible: true,
+      pending: false,
+      terminal: true,
+      repair: false,
+      wakeToken: 'wake-1',
+      result: { verdict: 'red' },
+    })
+  })
+
+  it('does not invent visibility from malformed state', () => {
+    expect(assessCiWait({ wait: null })).toMatchObject({ visible: false, reason: 'no-wait' })
+    expect(assessCiWait({ wait: { state: 'pending' } })).toMatchObject({ visible: false, reason: 'unreadable' })
   })
 })
 
@@ -3014,9 +3569,17 @@ describe('branchSlotDecision — the pool counts OPEN BRANCHES, not running agen
   it('marks the entire census unreadable when one requested behind-count fails', () => {
     const dir = mkdtempSync(join(tmpdir(), 'hoa-open-branches-'))
     const git = (...args) =>
-      execFileSync('git', args, { cwd: dir, stdio: 'ignore', windowsHide: true, env: { ...process.env, LC_ALL: 'C' } })
+      execFileSync('git', ['-c', 'commit.gpgsign=false', '-c', 'core.hooksPath=', ...args], {
+        cwd: dir,
+        stdio: 'ignore',
+        windowsHide: true,
+        env: { ...process.env, LC_ALL: 'C' },
+      })
     try {
       git('init', '-b', 'main')
+      expect(
+        execFileSync('git', ['-C', dir, 'rev-parse', '--show-toplevel'], { encoding: 'utf8', windowsHide: true }).trim(),
+      ).toBe(resolve(dir))
       git('config', 'user.email', 'test@example.invalid')
       git('config', 'user.name', 'Test')
       writeFileSync(join(dir, 'base.txt'), 'base')
@@ -3752,6 +4315,13 @@ describe('commissionTarget — the act of opening a point, recognised', () => {
       refsLoose: false,
       how: 'author',
     })
+    expect(commissionTarget({ toolName: 'Bash', command: 'node scripts/author-fable.mjs --point 834' })).toEqual({
+      point: 834,
+      points: [834],
+      refs: [],
+      refsLoose: false,
+      how: 'author',
+    })
   })
 
   it('opens NOTHING on the read-only authoring legs — routing and dry-run', () => {
@@ -3760,6 +4330,9 @@ describe('commissionTarget — the act of opening a point, recognised', () => {
     )
     expect(
       commissionTarget({ toolName: 'Bash', command: 'node scripts/author-sol.mjs --point 697 --dry-run' }).point,
+    ).toBeNull()
+    expect(
+      commissionTarget({ toolName: 'Bash', command: 'node scripts/author-fable.mjs --point 834 --dry-run' }).point,
     ).toBeNull()
     // …and a read-only leg beside a real cut does not shield the cut.
     expect(

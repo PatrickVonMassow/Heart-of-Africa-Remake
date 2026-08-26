@@ -40,8 +40,9 @@ import { createHash } from 'node:crypto'
 import { existsSync, readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
 import { writeTextAtomic } from './atomic-write.mjs'
+import { withDerivedState } from './board-state.mjs'
 import { REPO_ROOT, STATE_PATH, readJson, mergeState } from './dashboard-state.mjs'
-import { normaliseLineEndings, projectNowForPublish, refreshFooter, upgradeNowCards } from './board-core.mjs'
+import { normaliseLineEndings, projectNowForPublish, refreshFooter, renderCardCriticalities, upgradeNowCards } from './board-core.mjs'
 import { gatherActiveWorkSource, openPointNumbers } from './active-work-source.mjs'
 import { withBoardEditLock } from './board-edit-lock.mjs'
 import { currentSetting, settingProblemLine } from './sol-share.mjs'
@@ -49,6 +50,7 @@ import { applyFooterNote } from './sol-share-core.mjs'
 import { structureViolations } from './board-structure-core.mjs'
 import { QUEUE_STUB_META, parseTasks } from './dashboard-guard-core.mjs'
 import { ESTIMATE_CMD, TITLE_CMD, boardTitleReport, parseTaskTitles } from './board-queue-core.mjs'
+import { readTasksAll } from './tasks-source.mjs'
 import {
   ARCHIVE_CONTENT_URL,
   ARCHIVE_FILE,
@@ -230,8 +232,19 @@ try {
   // number inside the title. `board.mjs` lifts them on every edit; doing it here
   // too means a board that was last written by an older version can still be
   // published — a strict gate must never be reachable without a way out.
+  // THE BATCH'S OWN STATE IS DERIVED HERE TOO (point 749). The board edit derives
+  // it as well, but a publish can be the only thing that runs — the watchdog
+  // republishes, the launcher checks the live page — and the whole promise of the
+  // derived card is that a condition which has passed stops being shown without
+  // anybody remembering to remove it. Deriving on the last write before the bytes
+  // go out is what makes that true for the page the user actually reads.
   const refreshed = normaliseLineEndings(
-    upgradeNowCards(applyFooterNote(refreshFooter(repoBytes, { openCount: open.length }), share)),
+    renderCardCriticalities(
+      withDerivedState(
+        upgradeNowCards(applyFooterNote(refreshFooter(repoBytes, { openCount: open.length }), share)),
+      ),
+      readTasksAll(),
+    ),
   )
   repoBytes = refreshed
 } catch (e) {
@@ -319,7 +332,9 @@ try {
 // bytes are what every publish record attests, and moving them under that record
 // would make the board look stale on every publish.
 const published = stampFingerprint(repoBytes, fingerprint)
-const archive = existsSync(archiveFile) ? readFileSync(archiveFile, 'utf8') : null
+const archive = existsSync(archiveFile)
+  ? renderCardCriticalities(readFileSync(archiveFile, 'utf8'), readTasksAll())
+  : null
 
 // A tree built with plumbing: no checkout, no index, no branch switch. The
 // working tree this runs in is left completely untouched — the publisher must be

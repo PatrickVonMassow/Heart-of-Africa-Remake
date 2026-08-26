@@ -54,18 +54,35 @@ import {
 import { execFileSync } from 'node:child_process'
 import os from 'node:os'
 import { dirname, join } from 'node:path'
-import { repoPath } from './repo-paths.mjs'
-import { writeJsonAtomic, tryWriteJsonAtomic } from './atomic-write.mjs'
+import { commonRepoPath } from './repo-paths.mjs'
+import { sleepSync, writeJsonAtomic, tryWriteJsonAtomic } from './atomic-write.mjs'
 import {
   LEASE_MS,
   renewedLock,
   renewalDecision,
-  nextFence,
+  fenceClaimDecision,
   grantedFenceState,
   normaliseFence,
 } from './batch-lease-core.mjs'
 import { IDLE_WINDOW_MS, ownershipVerdict } from './batch-ownership-core.mjs'
 import { markerFresh } from './batch-boundary-core.mjs'
+import { emitActivity } from './batch-activity-journal.mjs'
+import { ACTIVITY_EVENTS } from './batch-activity-journal-core.mjs'
+
+function emitLockActivity(event, lock, { lockPath = LOCK_PATH, at = Date.now(), cause, evidence = {} } = {}) {
+  if (!lock || typeof lock !== 'object') return false
+  return emitActivity({
+    event,
+    at,
+    session: lock.sessionId ?? null,
+    point: lock.handoverPoint ?? null,
+    pid: lock.pid ?? null,
+    pidStartedAt: lock.pidStartedAt ?? null,
+    generation: lock.fence ?? null,
+    cause,
+    evidence,
+  }, lockPath === LOCK_PATH ? {} : { path: join(dirname(lockPath), 'batch-activity.jsonl') })
+}
 
 /**
  * Does a SEALED boundary marker protect the handover for THIS session right now
@@ -121,6 +138,10 @@ export const PARALLEL_FRESH_MS = 10 * 60 * 1000
 /** A reap-mutex directory older than this belongs to a crashed reaper and may
  *  be cleared. */
 export const REAP_MUTEX_STALE_MS = 60 * 1000
+/** A fence writer's atomic write can itself retry for ~0.8 s. A claimant waits
+ *  just beyond that bounded window before accepting a genuinely unavailable
+ *  grant door and falling back to an unfenced lock. */
+export const FENCE_MUTEX_WAIT_MS = 1000
 /** Start times within this tolerance count as the same process (pid reuse
  *  detection). */
 export const PID_START_TOLERANCE_MS = 2000
@@ -160,7 +181,11 @@ export function statePathsFor(lockPath) {
   }
 }
 
-export const LOCK_PATH = repoPath('.claude/batch-lock.json')
+// Unlike source paths, the batch authority belongs to the repository as a
+// whole. `commonRepoPath` follows Git's common directory back to the main
+// checkout, so a process launched from a linked author/reviewer worktree sees
+// this exact same lock and fence family.
+export const LOCK_PATH = commonRepoPath('.claude/batch-lock.json')
 const DEFAULT_PATHS = statePathsFor(LOCK_PATH)
 export const SESSIONS_SEEN_PATH = DEFAULT_PATHS.sessionsSeenPath
 export const SESSION_ACTIVITY_PATH = DEFAULT_PATHS.activityPath
@@ -262,21 +287,30 @@ const readJson = (p) => {
  * arithmetics on the same number. This function reads the files and the pid probe
  * and asks that one; only the pid branches below, which ARE probe semantics, stay.
  */
-export function assessOwner(lock, { now, bootTime, probe, work, leaseMs = LEASE_MS, paused = false, idleWindowMs = idleWindow() } = {}) {
+export function assessOwner(lock, {
+  now,
+  bootTime,
+  probe,
+  work,
+  activity,
+  leaseMs = LEASE_MS,
+  paused = false,
+  idleWindowMs = idleWindow(),
+} = {}) {
   const v = ownershipVerdict({
     lock,
     now,
     bootTime,
     work,
+    activity,
     paused,
     idleWindowMs,
     leaseMs,
     corroboration: pidCorroboration(lock, probe),
   })
   if (v.settled) {
-    return v.detail === undefined
-      ? { alive: v.owns, reason: v.reason }
-      : { alive: v.owns, reason: v.reason, detail: v.detail }
+    const { settled: _settled, owns, ...decision } = v
+    return { alive: owns, ...decision }
   }
   const age = now - lock.claimedAt
   const kind = lock.kind === 'pending-spawn' ? 'pending-spawn' : 'session'
@@ -390,21 +424,6 @@ export function sweepableTmpFiles({ entries, lockName, now, probe, staleMs = REA
     out.push(entry.name)
   }
   return out
-}
-
-/**
- * Launcher decision: may the autostart spawn a takeover session?
- * Returns 'spawn' | 'skip-alive'.
- *
- * THE THIRD OUTCOME IS GONE (point 434). 'skip-wedged' named a session that was
- * alive AND stuck, and everything downstream of it — `wedgeAction`,
- * `wedgeTakeover`, `takeWedged`, the two-stage silence report — existed to decide
- * what to do about a state the launcher could describe but not resolve. An
- * expired lease is not a third state: it is simply not alive, and the ordinary
- * takeover this function has always licensed handles it.
- */
-export function spawnDecision(assessment) {
-  return assessment.alive ? 'skip-alive' : 'spawn'
 }
 
 /**
@@ -562,16 +581,92 @@ export function isProbeSessionId(sid) {
  * that announced itself in the open is not the covert second driver this detector
  * was written for.
  */
-export function classifyParallel({ sessionsSeen, activity, ownerSid, now, exclude = [] }) {
+const sessionRecord = (value) =>
+  value && typeof value === 'object' && !Array.isArray(value) ? value : { seenAt: value }
+
+/** A claim/reservation generation suitable for equality, never authority. PURE. */
+export function claimGeneration(claim) {
+  if (!claim || typeof claim !== 'object') return 'none'
+  return [
+    claim.sessionId ?? '',
+    claim.pid ?? '',
+    claim.pidStartedAt ?? '',
+    claim.at ?? '',
+    claim.activityAt ?? '',
+    claim.releasedAt ?? '',
+    claim.releasedBy ?? '',
+  ].join('#')
+}
+
+function sameProcessIncarnation(record, lock) {
+  return (
+    typeof record?.pid === 'number' &&
+    record.pid > 0 &&
+    record.pid === lock?.pid &&
+    typeof record?.pidStartedAt === 'number' &&
+    typeof lock?.pidStartedAt === 'number' &&
+    Math.abs(record.pidStartedAt - lock.pidStartedAt) <= PID_START_TOLERANCE_MS
+  )
+}
+
+/** Does a SessionStart stand-down still describe this exact ownership episode? */
+export function standDownNoteCurrent({ record, owner, claim = null, writer = null } = {}) {
+  const note = record?.stoodDown
+  if (!note || typeof note !== 'object') return false
+  if (!sameProcessIncarnation(record, { pid: note.pid, pidStartedAt: note.pidStartedAt })) return false
+  if (!owner || note.ownerSession !== owner.sessionId || note.ownerGeneration !== owner.fence) return false
+  if (note.claimGeneration !== claimGeneration(claim)) return false
+  const currentWriterGeneration = Number.isSafeInteger(writer?.generation) ? writer.generation : null
+  const currentWriterAt = typeof writer?.batchWriterAt === 'number' ? writer.batchWriterAt : null
+  if (currentWriterGeneration !== note.writerGeneration) return false
+  if (currentWriterAt !== note.writerAt && (currentWriterAt === null || currentWriterAt > note.at)) return false
+  return true
+}
+
+export function classifyParallel({
+  sessionsSeen,
+  activity,
+  ownerSid,
+  owner = null,
+  processes = {},
+  claim = null,
+  now,
+  exclude = [],
+}) {
   const out = []
   const skip = new Set((exclude ?? []).filter(Boolean))
-  // A PROBE OWNER MEANS THE REAL OWNER IS UNKNOWN (point 434 (8)): every genuine
-  // session would then read as the second driver, which is the false alarm itself.
-  if (isProbeSessionId(ownerSid)) return out
+  // AN INVALID OWNER MEANS THE REAL OWNER IS UNKNOWN. Every genuine session
+  // would otherwise read as a second driver, which is precisely the placeholder
+  // incident (`owner=x plus <the one real session>`). Unknown is diagnosable;
+  // invented parallelism is not.
+  if (!validTransitionSessionId(ownerSid)) return out
   for (const [sid, lastToolAt] of Object.entries(activity ?? {})) {
     if (!sid || sid === ownerSid || skip.has(sid) || isProbeSessionId(sid)) continue
     if (!(sessionsSeen && Object.prototype.hasOwnProperty.call(sessionsSeen, sid))) continue
     if (typeof lastToolAt !== 'number' || now - lastToolAt > PARALLEL_FRESH_MS) continue
+    const seen = sessionRecord(sessionsSeen[sid])
+    const process = processes?.[sid] && typeof processes[sid] === 'object' ? processes[sid] : null
+    const identity = {
+      pid: seen.pid ?? process?.pid ?? null,
+      pidStartedAt: seen.pidStartedAt ?? process?.startedAt ?? null,
+      generation: seen.generation ?? process?.generation ?? null,
+      stoodDown: seen.stoodDown,
+    }
+    // A renamed/placeholder owner cannot turn its OWN process into a second
+    // session. PID equality alone is insufficient: both the process start time
+    // and this ownership fence must match, so PID reuse and a completed transfer
+    // remain visible.
+    if (
+      owner &&
+      sameProcessIncarnation(identity, owner) &&
+      Number.isSafeInteger(owner.fence) &&
+      identity.generation === owner.fence
+    ) continue
+    // A top-level window the singleton explicitly stood down may continue as an
+    // attended observer. Its note is tied to the current owner, claim/reservation
+    // and writer generation; any later transition or fenced mutation breaks the
+    // equality and restores the real parallel alarm.
+    if (standDownNoteCurrent({ record: identity, owner, claim, writer: process })) continue
     out.push({ sid, lastToolAt })
   }
   return out
@@ -590,9 +685,10 @@ export function classifyParallel({ sessionsSeen, activity, ownerSid, now, exclud
  *   'block-take-boundary' — owner, a point closed IN THIS SESSION and no marker:
  *                        the boundary is DUE and must be TAKEN, not offered
  *                        (point 388) — block, naming the one command
- *   'allow-release'    — owner with an honoured CLAIM at a CLEAN moment (point
- *                        395): the user took the batch back into the window they
- *                        are sitting at. Release the lock and end here
+ *   'allow-release'    — owner with an honoured CLAIM at a SAFE boundary (points
+ *                        395/716): the user took the batch back into the window
+ *                        they are sitting at. Transfer pushed declared work,
+ *                        release the lock and end here
  *   'allow-in-flight'  — owner WAITING on work it has declared and that is
  *                        provably still running (point 388, fifth live finding):
  *                        the turn may end, the lock stays held, nothing is handed
@@ -635,8 +731,9 @@ export function progressGuardDecision({
   // where both apply the session is finished either way, and handing the batch to
   // the window the user is sitting at beats handing it to the launcher. The
   // 'wait' verdict deliberately falls through to the ordinary decisions — a
-  // release is only ever offered at a moment `releaseDecision` has judged CLEAN,
-  // so a merge, a building agent or a running verification is never cut in half.
+  // release is only ever offered at a boundary `releaseDecision` has judged
+  // safe, so a merge or uncheckpointed work is never cut in half. Transferable
+  // agent work crosses it through the declaration's adoption record.
   if (claim === 'release') return 'allow-release'
   // The point boundary (point 373). A valid boundary is only ever honoured with
   // an armed launcher — an unarmed one would turn "end the session" into "end the
@@ -887,6 +984,26 @@ function enterReapMutex(mutexPath) {
   }
 }
 
+/**
+ * Fence grants are shorter than reap operations, and a claimant has already won
+ * the owner lock before it reaches this door. Give the current grant one bounded
+ * write window to finish, then retry the atomic mkdir. This prevents ordinary
+ * contention from erasing the new lock's fence number while preserving the
+ * established fail-open exit for a genuinely stuck mutex.
+ */
+function enterFenceMutex(mutexPath, opts = {}) {
+  if (enterReapMutex(mutexPath)) return true
+  const waitMs = opts.fenceMutexWaitMs ?? FENCE_MUTEX_WAIT_MS
+  if (!(Number.isFinite(waitMs) && waitMs > 0)) return false
+  const sleep = opts.fenceMutexSleep ?? sleepSync
+  const deadline = Date.now() + waitMs
+  while (Date.now() < deadline) {
+    sleep(Math.min(10, Math.max(1, deadline - Date.now())))
+    if (enterReapMutex(mutexPath)) return true
+  }
+  return false
+}
+
 function exitReapMutex(mutexPath) {
   try {
     rmdirSync(mutexPath)
@@ -896,11 +1013,41 @@ function exitReapMutex(mutexPath) {
 }
 
 /**
- * ATOMIC acquisition. Returns 'acquired' | 'mine' | 'held' | 'lost-race'.
+ * Runs `fn` under the SAME `.reaping` mutex that serializes lock takeover
+ * (docs/handover-architecture.md: every update of the EXISTING lock — the
+ * daemon copy, its clearing — takes this mutex and re-reads the lock inside
+ * it). A writer that used any OTHER mutex would still race a takeover: the
+ * takeover unlinks and recreates the lock under THIS mutex, so only a writer
+ * holding the same one can be sure the lock it re-read is the lock its rename
+ * replaces. Returns { ok: true, result } or { ok: false, reason } when the
+ * mutex could not be entered before `waitMs` ran out — the caller refuses,
+ * never writes.
+ */
+export function withLockWriteMutex(lockPath, fn, { waitMs = 2000 } = {}) {
+  const mutexPath = `${lockPath}.reaping`
+  const deadline = Date.now() + waitMs
+  while (!enterReapMutex(mutexPath)) {
+    if (Date.now() > deadline) {
+      return { ok: false, reason: 'the lock mutex is held; another lock writer or a takeover is mid-swap — retry or reconcile' }
+    }
+    // A synchronous, bounded spin: contention is measured in milliseconds.
+  }
+  try {
+    return { ok: true, result: fn() }
+  } finally {
+    exitReapMutex(mutexPath)
+  }
+}
+
+/**
+ * ATOMIC acquisition. Returns 'acquired' | 'mine' | 'held' | 'lost-race' |
+ * 'stale-event' | 'stale-fence'.
  *   - 'acquired'  — this session now owns the batch.
  *   - 'mine'      — it already did (heartbeat refreshed).
  *   - 'held'      — a (provably or possibly) live other owner exists. STAND DOWN.
  *   - 'lost-race' — a concurrent starter won. STAND DOWN.
+ *   - 'stale-event' — the lock no longer matches the triggering event.
+ *   - 'stale-fence' — the explicit generation proposal no longer advances the mark.
  * Options: { kind, pid, pidStartedAt, now, deps } — deps override probes for tests.
  *
  * THERE IS NO `takeWedged` ANY MORE (point 434). A wedged owner used to be a case
@@ -917,11 +1064,22 @@ function exitReapMutex(mutexPath) {
  * fence file AND onto the lock, which is what lets the mark be re-seeded upward
  * if the fence file is ever lost.
  */
+export function acquisitionExpectationMatches(lock, expected) {
+  if (!expected || typeof expected !== 'object') return true
+  if (!lock || typeof lock !== 'object') return false
+  if (typeof expected.sessionId === 'string' && lock.sessionId !== expected.sessionId) return false
+  if (Number.isSafeInteger(expected.fence) && lock.fence !== expected.fence) return false
+  if (typeof expected.spawnToken === 'string' && lock.spawnToken !== expected.spawnToken) return false
+  if (expected.handedOver === true && lock.handedOver !== true) return false
+  return true
+}
+
 export function acquire(sessionId, opts = {}) {
   if (!sessionId) return 'held'
   // A PROBE IS NOT A SESSION (point 434 (8)): it may never own the batch. See
   // `isProbeSessionId` for the four nights of false alarms this cost.
   if (isProbeSessionId(sessionId)) return 'probe'
+  if (!validTransitionSessionId(sessionId)) return 'invalid'
   const lockPath = opts.lockPath ?? LOCK_PATH
   const mutexPath = `${lockPath}.reaping`
   const now = opts.now ?? Date.now()
@@ -972,17 +1130,50 @@ export function acquire(sessionId, opts = {}) {
    * nobody could record simply blocks nobody (fail-open, as everywhere here).
    */
   const claim = () => {
-    if (!tryExclusiveCreate(lockPath, identity(null))) return false
+    if (!tryExclusiveCreate(lockPath, identity(null))) return 'lost-race'
     try {
-      const fence = grantFence(sessionId, { fencePath, priorFence, now, takeover: takenFrom })
+      const fence = grantFence(sessionId, {
+        fencePath,
+        priorFence,
+        requestedFence: opts.requestedFence,
+        fenceMutexWaitMs: opts.fenceMutexWaitMs,
+        fenceMutexSleep: opts.fenceMutexSleep,
+        now,
+        takeover: takenFrom,
+      })
       const fresh = readOwnerLock(lockPath)
+      // An explicit proposal is part of the acquisition's authority. If the
+      // durable mark has already reached it, this claimant never owned that
+      // generation: remove only our just-created, still-unfenced lock and
+      // report the refusal. Callers without a proposal retain the historic
+      // fail-open behaviour for an unavailable fence file.
+      if (opts.requestedFence !== undefined && fence === null) {
+        if (fresh?.sessionId === sessionId && fresh.fence === null) rmSync(lockPath, { force: true })
+        return 'stale-fence'
+      }
       if (fence !== null && fresh && fresh.sessionId === sessionId) {
         writeJsonAtomic(lockPath, { ...fresh, fence }, opts)
       }
     } catch {
-      /* see above — an unrecordable fence never fails an acquisition */
+      if (opts.requestedFence !== undefined) {
+        const fresh = readOwnerLock(lockPath)
+        if (fresh?.sessionId === sessionId && fresh.fence === null) rmSync(lockPath, { force: true })
+        return 'stale-fence'
+      }
+      /* see above — an unrecordable implicit fence never fails an acquisition */
     }
-    return true
+    const acquired = readOwnerLock(lockPath)
+    emitLockActivity(ACTIVITY_EVENTS.OWNER_CLAIM, acquired, {
+      lockPath,
+      at: now,
+      cause: takenFrom ? 'takeover' : 'acquired',
+      evidence: {
+        leaseUntil: acquired?.leaseUntil ?? null,
+        kind: acquired?.kind ?? null,
+        takenFrom,
+      },
+    })
+    return 'acquired'
   }
 
   // Sweep the litter of past failed writes (point 340 (b)) — only tmp files
@@ -993,10 +1184,13 @@ export function acquire(sessionId, opts = {}) {
 
   // Fast path: no lock → exclusive create (test-and-set; one winner).
   if (!existsSync(lockPath)) {
-    if (claim()) return 'acquired'
+    if (opts.expected) return 'stale-event'
+    const result = claim()
+    if (result !== 'lost-race') return result
   }
 
   const lock = readOwnerLock(lockPath)
+  if (opts.expected && !acquisitionExpectationMatches(lock, opts.expected)) return 'stale-event'
   if (lock && typeof lock.fence === 'number') priorFence = lock.fence
   // Ours by id, or permission by PROCESS to act for the recorded owner. Process
   // ancestry never changes identity; a genuine compaction has already used
@@ -1022,8 +1216,7 @@ export function acquire(sessionId, opts = {}) {
       if (now - st.mtimeMs < REAP_MUTEX_STALE_MS) return 'held'
     } catch {
       // vanished between the existsSync and here — retry the fast path once
-      if (claim()) return 'acquired'
-      return 'lost-race'
+      return claim()
     }
   }
 
@@ -1035,6 +1228,7 @@ export function acquire(sessionId, opts = {}) {
   if (!enterReapMutex(mutexPath)) return 'held'
   try {
     const recheck = readOwnerLock(lockPath)
+    if (opts.expected && !acquisitionExpectationMatches(recheck, opts.expected)) return 'stale-event'
     if (recheck) {
       if (recheck.sessionId === sessionId) {
         heartbeat(sessionId, { lockPath, now })
@@ -1058,8 +1252,7 @@ export function acquire(sessionId, opts = {}) {
     } catch {
       return 'lost-race'
     }
-    if (claim()) return 'acquired'
-    return 'lost-race'
+    return claim()
   } finally {
     exitReapMutex(mutexPath)
   }
@@ -1141,11 +1334,19 @@ export function recordFenceNotice(sessionId, fence, opts = {}) {
  * doctor. It is the one record that outlives `acquire` unlinking the lock.
  */
 export function grantFence(sessionId, opts = {}) {
+  const fencePath = opts.fencePath ?? FENCE_PATH
+  const mutexPath = `${fencePath}.claiming`
+  if (!enterFenceMutex(mutexPath, opts)) return null
   try {
-    const fencePath = opts.fencePath ?? FENCE_PATH
     const now = opts.now ?? Date.now()
     const state = normaliseFence(readJson(fencePath))
-    const fence = nextFence({ fenceState: state, priorFence: opts.priorFence })
+    const decision = fenceClaimDecision({
+      fenceState: state,
+      priorFence: opts.priorFence,
+      requestedFence: opts.requestedFence,
+    })
+    if (!decision.accept) return null
+    const fence = decision.fence
     writeJsonAtomic(
       fencePath,
       // `takeover` names WHO lost the batch and WHY, so the dispossessed session
@@ -1156,6 +1357,8 @@ export function grantFence(sessionId, opts = {}) {
     return fence
   } catch {
     return null
+  } finally {
+    exitReapMutex(mutexPath)
   }
 }
 
@@ -1387,6 +1590,139 @@ export function ourClaudeProcess(sessionId, opts = {}) {
 }
 
 /**
+ * Record that this top-level session is actively writing the batch's main
+ * checkout. The process identity lives beside, but independently of, the owner
+ * lock: losing or releasing the lock must not erase the launcher's evidence that
+ * the writer process itself is still alive.
+ *
+ * `ourClaudeProcess` supplies the memoised identity on the real hook path;
+ * tests may inject `processIdentity`. A missing identity records nothing — a
+ * session id or PID without a start-time-qualified process is not evidence the
+ * launcher may use to suppress a start indefinitely.
+ */
+export function noteBatchWriter(sessionId, opts = {}) {
+  if (!sessionId || isProbeSessionId(sessionId)) return false
+  try {
+    const path = opts.path ?? statePathsFor(opts.lockPath ?? LOCK_PATH).ancestorCachePath
+    const now = opts.now ?? Date.now()
+    const processIdentity = Object.prototype.hasOwnProperty.call(opts, 'processIdentity')
+      ? opts.processIdentity
+      : ourClaudeProcess(sessionId, { ...opts, ancestorCachePath: path })
+    if (!(typeof processIdentity?.pid === 'number' && processIdentity.pid > 0)) return false
+    const processes = readJson(path) ?? {}
+    const prior = processes[sessionId] && typeof processes[sessionId] === 'object' ? processes[sessionId] : {}
+    const owner = opts.lock ?? readOwnerLock(opts.lockPath ?? LOCK_PATH)
+    const generation = owner?.sessionId === sessionId && typeof owner.fence === 'number'
+      ? owner.fence
+      : (typeof prior.generation === 'number' ? prior.generation : null)
+    const spawnToken = owner?.sessionId === sessionId && typeof owner.spawnToken === 'string' && owner.spawnToken
+      ? owner.spawnToken
+      : (typeof prior.spawnToken === 'string' && prior.spawnToken ? prior.spawnToken : null)
+    processes[sessionId] = {
+      ...prior,
+      pid: processIdentity.pid,
+      startedAt: typeof processIdentity.startedAt === 'number' ? processIdentity.startedAt : null,
+      at: typeof prior.at === 'number' ? prior.at : now,
+      batchWriterAt: now,
+      generation,
+      spawnToken,
+      authorityState: 'active',
+    }
+    for (const [sid, entry] of Object.entries(processes)) {
+      const last = Math.max(Number(entry?.at) || 0, Number(entry?.batchWriterAt) || 0)
+      if (now - last > 7 * 24 * 3600 * 1000) delete processes[sid]
+    }
+    writeJsonAtomic(path, processes)
+    return true
+  } catch {
+    return false
+  }
+}
+
+/**
+ * Retire one writer generation without depending on its host process exiting.
+ * Handover and release are ownership events; a process that remains alive after
+ * either event has no authority merely because it once wrote main.
+ *
+ * A generation-qualified request never retires a newer episode which reused the
+ * same session id. Missing records are already non-authoritative and count as a
+ * successful no-op so lifecycle callers do not turn observability into a wedge.
+ */
+export function retireBatchWriter(sessionId, opts = {}) {
+  if (!sessionId || isProbeSessionId(sessionId)) return false
+  try {
+    const path = opts.path ?? statePathsFor(opts.lockPath ?? LOCK_PATH).ancestorCachePath
+    const processes = readJson(path) ?? {}
+    const prior = processes[sessionId]
+    if (!prior || typeof prior !== 'object') return true
+    const generation = Number.isSafeInteger(opts.generation) ? opts.generation : null
+    if (generation !== null && prior.generation !== generation) return false
+    const now = opts.now ?? Date.now()
+    processes[sessionId] = {
+      ...prior,
+      generation: Number.isSafeInteger(prior.generation) ? prior.generation : generation,
+      authorityState: 'retired',
+      retiredAt: now,
+      retiredReason: typeof opts.reason === 'string' && opts.reason ? opts.reason : 'ownership-ended',
+    }
+    writeJsonAtomic(path, processes)
+    return true
+  } catch {
+    return false
+  }
+}
+
+/**
+ * Revoke exactly one still-current writer fence. The launcher uses this only
+ * after the same non-advancing authority blocked two decisions. Advancing the
+ * high-water mark makes every guard reject the old generation at its next main
+ * write; it does not kill the process or invent a replacement owner.
+ */
+export function revokeWriterFence(sessionId, generation, opts = {}) {
+  const rejected = (reason, fence = null) => ({ revoked: false, reason, fence })
+  if (!sessionId || !Number.isSafeInteger(generation) || generation < 0) return rejected('invalid-authority')
+  const fencePath = opts.fencePath ?? statePathsFor(opts.lockPath ?? LOCK_PATH).fencePath
+  const mutexPath = `${fencePath}.claiming`
+  if (!enterFenceMutex(mutexPath, opts)) return rejected('write-busy')
+  try {
+    const current = readFence({ fencePath })
+    if (current.fence !== generation) return rejected('generation-changed', current.fence)
+    if (current.holder && current.holder !== sessionId) return rejected('holder-changed', current.fence)
+    const now = opts.now ?? Date.now()
+    const next = generation + 1
+    writeJsonAtomic(fencePath, {
+      ...current,
+      v: 1,
+      fence: next,
+      holder: '',
+      at: now,
+      lastTakeover: {
+        from: sessionId,
+        fence: next,
+        reason: typeof opts.reason === 'string' && opts.reason ? opts.reason : 'stalled-writer-veto',
+        at: now,
+      },
+    }, opts)
+    return { revoked: true, reason: 'revoked', fence: next }
+  } catch {
+    return rejected('write-failed')
+  } finally {
+    exitReapMutex(mutexPath)
+  }
+}
+
+/** Process identities available to the launcher. Missing/torn state is empty. */
+export function readSessionProcesses(opts = {}) {
+  try {
+    const path = opts.path ?? statePathsFor(opts.lockPath ?? LOCK_PATH).ancestorCachePath
+    const processes = readJson(path)
+    return processes && typeof processes === 'object' && !Array.isArray(processes) ? processes : {}
+  } catch {
+    return {}
+  }
+}
+
+/**
  * Ownership, by session id first and by PROCESS second. Returns
  * `{ mine, via, lock }`. A process match is deliberately READ-ONLY: ancestry
  * grants the caller permission to act for the existing owner, but never lets an
@@ -1440,6 +1776,7 @@ export function validTransitionSessionId(sessionId) {
     sessionId.length <= 512 &&
     sessionId === sessionId.trim() &&
     !containsControlCharacter &&
+    !/^x$/i.test(sessionId) &&
     !isProbeSessionId(sessionId)
   )
 }
@@ -1511,9 +1848,41 @@ export function transitionOwnerSession(sessionId, opts = {}) {
     } catch (error) {
       return rejected(`write-failed:${error && error.message ? error.message : 'unknown error'}`)
     }
+    retireBatchWriter(current.sessionId, {
+      lockPath,
+      generation,
+      now: opts.now,
+      reason: 'session-transition',
+    })
+    emitLockActivity(ACTIVITY_EVENTS.OWNER_CLAIM, readOwnerLock(lockPath), {
+      lockPath,
+      at: opts.now ?? Date.now(),
+      cause: 'session-transition',
+      evidence: { sessionIdBefore: current.sessionId, generation },
+    })
     return { transitioned: true, reason: 'transitioned', sessionIdBefore: current.sessionId }
   } finally {
     exitReapMutex(mutexPath)
+  }
+}
+
+/** Diagnose the one torn owner identity batch-doctor may repair. PURE.
+ * The current session id must be valid and its exact process incarnation must
+ * own the current lock; an id mismatch alone never grants this verdict. */
+export function ownerSessionTear({ sessionId, lock, ancestor } = {}) {
+  if (!validTransitionSessionId(sessionId)) return { torn: false, reason: 'invalid-session-id' }
+  if (!lock) return { torn: false, reason: 'no-lock' }
+  if (lock.sessionId === sessionId) return { torn: false, reason: 'consistent' }
+  const permission = resolveOwnership({ lock, sessionId, ancestor })
+  if (!permission.mine || permission.via !== 'process') {
+    return { torn: false, reason: `not-owner:${permission.via}` }
+  }
+  if (ownerLockGeneration(lock) === null) return { torn: false, reason: 'lock-without-generation' }
+  return {
+    torn: true,
+    reason: 'owner-session-id-mismatch',
+    recordedSessionId: lock.sessionId,
+    sessionId,
   }
 }
 
@@ -1553,11 +1922,21 @@ export function heldByOtherLiveOwner(sessionId, opts = {}) {
 export function release(sessionId, lockPath = LOCK_PATH) {
   const lock = readOwnerLock(lockPath)
   if (lock && lock.sessionId === sessionId) {
+    retireBatchWriter(sessionId, {
+      lockPath,
+      generation: Number.isSafeInteger(lock.fence) ? lock.fence : null,
+      reason: 'owner-release',
+    })
     try {
       rmSync(lockPath, { force: true })
     } catch {
       /* already gone */
     }
+    emitLockActivity(ACTIVITY_EVENTS.PROCESS_EXIT, lock, {
+      lockPath,
+      cause: 'owner-release',
+      evidence: { explicit: true },
+    })
     return true
   }
   return false
@@ -1598,6 +1977,20 @@ export function markHandover(sessionId, opts = {}) {
     { ...lock, handedOver: true, handedOverAt: now, handoverPoint: opts.point ?? null },
     opts,
   )
+  if (res.ok) {
+    retireBatchWriter(sessionId, {
+      lockPath,
+      generation: Number.isSafeInteger(lock.fence) ? lock.fence : null,
+      now,
+      reason: 'handover',
+    })
+    emitLockActivity(ACTIVITY_EVENTS.HANDOVER, { ...lock, handoverPoint: opts.point ?? null }, {
+      lockPath,
+      at: now,
+      cause: opts.point == null ? 'context-boundary' : 'point-boundary',
+      evidence: { point: opts.point ?? null },
+    })
+  }
   return {
     handed: res.ok,
     reason: res.ok ? 'ok' : 'write-failed',
@@ -1842,6 +2235,17 @@ export function convertPendingSpawn(sessionId, opts = {}) {
       fence: fence ?? recheck.fence ?? null,
       pid: anc ? anc.pid : (recheck.spawnedPid ?? null),
       pidStartedAt: anc ? anc.startedAt : null,
+      ...(typeof recheck.spawnToken === 'string' ? { spawnToken: recheck.spawnToken } : {}),
+      ...(typeof recheck.sourceGeneration === 'number' ? { sourceGeneration: recheck.sourceGeneration } : {}),
+      ...(typeof recheck.sourceSpawnToken === 'string' ? { sourceSpawnToken: recheck.sourceSpawnToken } : {}),
+      ...(typeof recheck.trigger === 'string' ? { trigger: recheck.trigger } : {}),
+      ...(typeof recheck.requestedAt === 'number' ? { requestedAt: recheck.requestedAt } : {}),
+    })
+    emitLockActivity(ACTIVITY_EVENTS.OWNER_CLAIM, readOwnerLock(lockPath), {
+      lockPath,
+      at: now,
+      cause: 'successor-converted-pending-spawn',
+      evidence: { leaseUntil: now + (opts.leaseMs ?? LEASE_MS), previousSession: recheck.sessionId },
     })
     return true
   } finally {
@@ -1859,11 +2263,72 @@ export function noteTopLevelSession(sid, opts = {}) {
     const path = opts.path ?? SESSIONS_SEEN_PATH
     const now = opts.now ?? Date.now()
     const seen = readJson(path) ?? {}
-    seen[sid] = seen[sid] ?? now
-    for (const [k, v] of Object.entries(seen)) if (now - v > 7 * 24 * 3600 * 1000) delete seen[k]
+    const prior = sessionRecord(seen[sid])
+    const processIdentity = opts.processIdentity ?? null
+    const lock = opts.lock !== undefined ? opts.lock : readOwnerLock(opts.lockPath ?? LOCK_PATH)
+    const generation = sameProcessIncarnation(
+      { pid: processIdentity?.pid, pidStartedAt: processIdentity?.startedAt },
+      lock,
+    ) && Number.isSafeInteger(lock?.fence)
+      ? lock.fence
+      : (Number.isSafeInteger(prior.generation) ? prior.generation : null)
+    seen[sid] = {
+      ...prior,
+      seenAt: typeof prior.seenAt === 'number' ? prior.seenAt : now,
+      pid: typeof processIdentity?.pid === 'number' ? processIdentity.pid : (prior.pid ?? null),
+      pidStartedAt:
+        typeof processIdentity?.startedAt === 'number' ? processIdentity.startedAt : (prior.pidStartedAt ?? null),
+      generation,
+    }
+    for (const [k, v] of Object.entries(seen)) {
+      const started = sessionRecord(v).seenAt
+      if (typeof started === 'number' && now - started > 7 * 24 * 3600 * 1000) delete seen[k]
+    }
     writeJsonAtomic(path, seen)
   } catch {
     /* best effort */
+  }
+}
+
+/** Persist the singleton's SessionStart stand-down as attended-observer evidence. */
+export function noteSessionStandDown(sid, opts = {}) {
+  if (!sid || !validTransitionSessionId(sid)) return false
+  try {
+    const path = opts.path ?? SESSIONS_SEEN_PATH
+    const seen = readJson(path) ?? {}
+    const prior = sessionRecord(seen[sid])
+    const processIdentity = opts.processIdentity ?? null
+    const owner = opts.lock !== undefined ? opts.lock : readOwnerLock(opts.lockPath ?? LOCK_PATH)
+    if (
+      !owner ||
+      !Number.isSafeInteger(owner.fence) ||
+      !(typeof processIdentity?.pid === 'number' && typeof processIdentity?.startedAt === 'number')
+    ) return false
+    const now = opts.now ?? Date.now()
+    const writer = opts.writer !== undefined
+      ? opts.writer
+      : readSessionProcesses({ path: opts.processesPath ?? statePathsFor(opts.lockPath ?? LOCK_PATH).ancestorCachePath })[sid]
+    seen[sid] = {
+      ...prior,
+      seenAt: typeof prior.seenAt === 'number' ? prior.seenAt : now,
+      pid: processIdentity.pid,
+      pidStartedAt: processIdentity.startedAt,
+      generation: Number.isSafeInteger(prior.generation) ? prior.generation : null,
+      stoodDown: {
+        at: now,
+        pid: processIdentity.pid,
+        pidStartedAt: processIdentity.startedAt,
+        ownerSession: owner.sessionId,
+        ownerGeneration: owner.fence,
+        claimGeneration: claimGeneration(opts.claim),
+        writerGeneration: Number.isSafeInteger(writer?.generation) ? writer.generation : null,
+        writerAt: typeof writer?.batchWriterAt === 'number' ? writer.batchWriterAt : null,
+      },
+    }
+    writeJsonAtomic(path, seen)
+    return true
+  } catch {
+    return false
   }
 }
 
@@ -1895,10 +2360,16 @@ export function clearActivity(sid, opts = {}) {
 
 /** Live parallel sessions right now (excluding `ownerSid` and `opts.exclude`). */
 export function detectParallel(ownerSid, opts = {}) {
+  const lockPath = opts.lockPath ?? LOCK_PATH
+  const paths = statePathsFor(lockPath)
+  const owner = opts.owner !== undefined ? opts.owner : readOwnerLock(lockPath)
   return classifyParallel({
-    sessionsSeen: readJson(opts.sessionsPath ?? SESSIONS_SEEN_PATH) ?? {},
-    activity: readJson(opts.activityPath ?? SESSION_ACTIVITY_PATH) ?? {},
+    sessionsSeen: readJson(opts.sessionsPath ?? paths.sessionsSeenPath) ?? {},
+    activity: readJson(opts.activityPath ?? paths.activityPath) ?? {},
     ownerSid,
+    owner,
+    processes: opts.processes ?? readSessionProcesses({ path: opts.processesPath ?? paths.ancestorCachePath }),
+    claim: opts.claim !== undefined ? opts.claim : readJson(opts.claimPath ?? paths.claimPath),
     now: opts.now ?? Date.now(),
     exclude: opts.exclude ?? [],
   })

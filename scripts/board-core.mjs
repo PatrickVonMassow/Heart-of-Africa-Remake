@@ -2,11 +2,22 @@
 // board guard accepts is pinned by tests rather than by the shape of one
 // regex written once. The wrapper does the I/O.
 //
-// The one import is the auditor's OWN name for "no estimate yet": a card this
-// module writes must satisfy the audit that reads it, and spelling that value a
-// second time here is how the two would drift apart. dashboard-guard-core
-// imports nothing, so the direction cannot become a cycle.
+// The imports are the auditor's OWN name for "no estimate yet" and the handover
+// card's shared destination predicate. A card this module writes must satisfy
+// the gates that read it, and spelling either value a second time here is how
+// the writer and readers would drift apart. Both imported modules are leaves,
+// so the direction cannot become a cycle.
 import { QUEUE_STUB_META, parseNowCardPoints } from './dashboard-guard-core.mjs'
+import { namesFollowOnWork } from './handover-card-contract.mjs'
+// The derived state card's vocabulary lives beside the derivation itself, so the
+// renderer here and the module that decides WHAT to report cannot drift apart.
+import { AUTOMATIC_DECISION_TITLE, DERIVED_STATE_KIND, PAUSED_TITLE } from './board-state-core.mjs'
+import { criticalityOf, parsePointBlocks } from './criticality-review-guard-core.mjs'
+// The admissibility rule for a card written by a script, kept beside the guard's
+// own notion of "this asks the user" rather than restated here.
+import { judgeAutomatedCard } from './vdzk-admissibility-core.mjs'
+
+export { namesFollowOnWork }
 
 /** The flag that takes a card's text from STDIN instead of the argv (point 410). */
 export const TEXT_STDIN_FLAG = '--text-stdin'
@@ -182,6 +193,76 @@ export function refreshFooter(html, { openCount, now = new Date() } = {}) {
  */
 const numberChip = (point) => `<span class="num">${point}</span>`
 
+/** German board labels for the English criticality vocabulary used by code. */
+export const CRITICALITY_LABELS = Object.freeze({ low: 'niedrig', med: 'mittel', high: 'hoch' })
+
+const CRITICALITY_BADGE_RE =
+  /<span\s+class="criticality(?:\s+criticality-(?:low|med|high))?"[^>]*>[\s\S]*?<\/span>\s*/g
+const CRITICALITY_BADGE_SOURCE =
+  '<span\\s+class="criticality(?:\\s+criticality-(?:low|med|high))?"[^>]*>[\\s\\S]*?<\\/span>\\s*'
+const CRITICALITY_STYLE_ID = 'board-criticality-style'
+const CRITICALITY_STYLE = `<style id="${CRITICALITY_STYLE_ID}">
+.criticality{flex-shrink:0;border:1px solid currentColor;border-radius:999px;padding:.08em .48em;font-size:.72em;font-weight:700;line-height:1.35}
+.criticality-low{background:#dcebd9;color:#24511f}.criticality-med{background:#f3e4ad;color:#684e00}.criticality-high{background:#f3d1cb;color:#7a2115}
+</style>`
+
+const criticalityBadge = (level) =>
+  level && CRITICALITY_LABELS[level]
+    ? `<span class="criticality criticality-${level}">${CRITICALITY_LABELS[level]}</span>`
+    : ''
+
+/**
+ * Derive every numbered card's criticality badge from the work order.
+ *
+ * This is deliberately a whole-document render pass rather than another field
+ * accepted by the card writers: a typed value could drift, while this pass also
+ * repairs already-published and hand-edited cards on the next edit or publish.
+ * Summaries without a pure numeric point chip are returned verbatim, including
+ * the handover card and the queue's non-point request card.
+ */
+export function renderCardCriticalities(html, tasksText) {
+  const levels = new Map(
+    parsePointBlocks(tasksText).map((point) => [String(point.n), criticalityOf(point.body).level]),
+  )
+  let badges = 0
+  let out = String(html ?? '').replace(/<summary>([\s\S]*?)<\/summary>/g, (whole, summary) => {
+    const { chip } = summaryPoint(summary)
+    if (chip == null) return whole
+    const clean = summary.replace(CRITICALITY_BADGE_RE, '')
+    const badge = criticalityBadge(levels.get(chip))
+    if (!badge) return `<summary>${clean}</summary>`
+    badges += 1
+    return `<summary>${clean.replace(
+      new RegExp(`^(\\s*<span class="num">\\s*${chip}\\s*</span>)`),
+      `$1${badge}`,
+    )}</summary>`
+  })
+
+  // Remove only the line ending this renderer writes after its style. `\s`
+  // includes U+FEFF in ECMAScript; consuming arbitrary trailing whitespace here
+  // deleted the live board's BOM after an older render had displaced it.
+  const styleRe = new RegExp(
+    `<style id="${CRITICALITY_STYLE_ID}">[\\s\\S]*?</style>(?:[\\t ]*\\r?\\n)?`,
+    'g',
+  )
+  out = out.replace(styleRe, '')
+  if (!badges) return out
+  if (out.includes('</head>')) return out.replace('</head>', `${CRITICALITY_STYLE}\n</head>`)
+  // The live headless board starts with BOM, title, metadata and its own
+  // stylesheet. That stylesheet's first `</style>` is an unambiguous landmark
+  // before any script (whose comments mention `<main>` before the real element),
+  // so intervening metadata cannot change this anchor or put CSS in JavaScript.
+  const firstStyleEnd = out.search(/<\/style>/i)
+  if (firstStyleEnd >= 0) {
+    const at = firstStyleEnd + '</style>'.length
+    return `${out.slice(0, at)}\n${CRITICALITY_STYLE}${out.slice(at)}`
+  }
+  // A different headless fragment may have no stylesheet. Keep a leading BOM
+  // at byte zero while placing the derived stylesheet before the fragment.
+  const bom = out.startsWith('\uFEFF') ? '\uFEFF' : ''
+  return `${bom}${CRITICALITY_STYLE}\n${out.slice(bom.length)}`
+}
+
 /**
  * A card TITLE as markup-safe text (four-eyes review, 12.08.2026). Every reader
  * of a title — the gate, the finders, the retitle itself — matches `[^<]*`, so a
@@ -290,6 +371,11 @@ export function dropStrayNowCards(html) {
     const { chip, legacy } = summaryPoint(summary)
     if (chip || legacy) return card
     if (isStateCardTitle(title)) return card
+    // THE DERIVED CARD IS NOT STRAY (point 749). It carries no number by design
+    // and is replaced by the derivation on the very next edit, so sweeping it
+    // here would report a "lost" card on every command while removing nothing
+    // that was not about to be rewritten anyway.
+    if (isTrulyDerivedCard(card)) return card
     // A genuine state card that lost its chip is still replaceable by its own
     // command (`none`, `closing <N>`), so it is kept rather than swept.
     if (/data-state="closing"/.test(card) && looksLikeClosingTitle(title)) return card
@@ -310,7 +396,11 @@ export function dropStrayNowCards(html) {
  */
 export function summaryPoint(summary) {
   const text = String(summary ?? '')
-  const chip = text.match(/^\s*<span class="num">\s*(\d+)\s*<\/span>\s*<span class="t">/)
+  const chip = text.match(
+    new RegExp(
+      `^\\s*<span class="num">\\s*(\\d+)\\s*</span>\\s*(?:${CRITICALITY_BADGE_SOURCE})?<span class="t">`,
+    ),
+  )
   if (chip) return { chip: chip[1], legacy: null }
   const legacy = text.match(new RegExp(`^\\s*<span class="t">\\s*(\\d+)\\s*${DASH}`))
   return { chip: null, legacy: legacy ? legacy[1] : null }
@@ -454,10 +544,21 @@ export function nowCard(html, point) {
  * `claimsNoCurrentWork`) scopes itself and says so; nothing gets the whole
  * document as "the section" by default any more.
  */
-function nowSectionSlice(html) {
+function nowSectionSlice(html, { whenMissing = 'throw' } = {}) {
   const text = String(html ?? '')
-  const { from, end } = sectionBounds(text, 'now')
-  return { from, end, text: text.slice(from, end) }
+  try {
+    const { from, end } = sectionBounds(text, 'now')
+    return { from, end, text: text.slice(from, end) }
+  } catch (e) {
+    // The ONE sanctioned fragment semantics, and it is opt-in per call: a
+    // caller that rewrites ONE card by its `<details class="now">` head reads
+    // nothing out of a foreign section — that markup exists nowhere else — so
+    // a bare card fragment is a legitimate input for it. The render and the
+    // comparison never pass this: for them a missing section is the
+    // fail-closed refusal above.
+    if (whenMissing !== 'document') throw e
+    return { from: 0, end: text.length, text }
+  }
 }
 
 /** A card's authored body text, stamp spans stripped — the prose a render owes. */
@@ -1225,11 +1326,63 @@ export const STATE_KINDS = ['idle', 'closing']
 const LEGACY_STATE_TITLE = { idle: NO_CURRENT_WORK_TITLE, closing: CLOSING_WORK_TITLE }
 
 /**
- * The UNNUMBERED state-card titles. The handover card owns no point number by
- * design, so every rule written for a numbered card — the topic guard's
- * foreign-point complaint above all — has to know it by name. The closing card
- * carries a number since point 655; its legacy title stays listed so a board
- * written earlier is still exempted.
+ * THE DERIVED STATE CARD (point 749). It is not a kind any session writes: it is
+ * re-derived from the pause marker, the alert ladder and the retry state on every
+ * board edit and every publish, so a condition that has passed disappears from
+ * the board on its own instead of having to be cleared by hand — which is the
+ * whole reason the machine's own status reports may leave "Von dir zu klären".
+ *
+ * It stands BESIDE the other voices rather than replacing them: a paused batch
+ * still has a running point, so this card is excluded from the one-kind rule and
+ * from `stripStateCards`.
+ */
+const derivedCardPattern = () =>
+  new RegExp(`<details class="now"[^>]*data-state="${DERIVED_STATE_KIND}"[^>]*>[\\s\\S]*?</details>\\s*`, 'g')
+
+/**
+ * Is this really the derived card — unnumbered, and titled as one of its two
+ * states? A marker is hand-writable, so here as everywhere it never authorises a
+ * removal on its own.
+ */
+function isTrulyDerivedCard(card) {
+  const summary = (String(card).match(/<summary>([\s\S]*?)<\/summary>/) ?? [])[1] ?? ''
+  const title = ((summary.match(new RegExp(`<span class="t">${TITLE_TEXT}</span>`)) ?? [])[1] ?? '').trim()
+  if (summaryPoint(summary).chip != null) return false
+  return title === PAUSED_TITLE || title === AUTOMATIC_DECISION_TITLE
+}
+
+/**
+ * The document without the derived state card. Safe to call unconditionally: the
+ * card holds no information of its own, only a rendering of state kept elsewhere.
+ */
+export function stripDerivedStateCard(html) {
+  return withinNowSection(html, (scope) =>
+    scope.replace(derivedCardPattern(), (card) => (isTrulyDerivedCard(card) ? '' : card)),
+  )
+}
+
+/**
+ * Render the derived state card, or remove it when there is no state to report.
+ * IDEMPOTENT by construction — the strip runs either way — which is what makes
+ * calling it on every edit and every publish safe.
+ */
+export function applyDerivedStateCard(html, derived, { stamp = berlinStamp() } = {}) {
+  const stripped = stripDerivedStateCard(html)
+  if (!derived || !String(derived.body ?? '').trim()) return stripped
+  const card =
+    `<details class="now"${STATE_ATTR(DERIVED_STATE_KIND)}>\n  <summary>` +
+    `<span class="t">${escapeCardTitle(derived.title)}</span>` +
+    `<span class="right"><span class="meta">${stamp}</span></span></summary>\n` +
+    `  <div class="body">\n${renderCardBody(derived.body, { stamp })}\n  </div>\n</details>\n`
+  return insertAsFirstNowCard(stripped, card)
+}
+
+/**
+ * The UNNUMBERED state-card titles. The handover card owns no point chip by
+ * design, but must name its follow-on point in prose, so rules written for a
+ * numbered card — the topic guard's foreign-point complaint above all — have
+ * to know it by name. The closing card carries a number since point 655; its
+ * legacy title stays listed so a board written earlier is still exempted.
  */
 export const STATE_CARD_TITLES = [NO_CURRENT_WORK_TITLE, CLOSING_WORK_TITLE]
 
@@ -1430,7 +1583,8 @@ function sectionStateCards(html, kind) {
  *
  * IT IS THE ONE UNNUMBERED CARD (point 655), so it owes the reader in prose what
  * the numbered cards give him in a chip: the reason must NAME the point the
- * successor picks up. The publish gate refuses a handover card that names none.
+ * successor picks up, or say canonically that the work order has none. The
+ * publish gate refuses a handover card that does neither.
  *
  * AND IT MUST BE TRUE WHEN IT IS WRITTEN. A numbered card standing in the
  * section is work the board itself says is running, so the claim would
@@ -1454,8 +1608,8 @@ export function toNoCurrentWork(html, reason, { stamp = berlinStamp() } = {}) {
       namesFollowOnWork(text)
         ? null
         : 'board: the handover card is the one card without a number, so its reason must NAME the ' +
-          'point the batch picks up next ("… der Nachfolger nimmt Punkt 656"). The publish gate ' +
-          'refuses a handover card that names none.',
+          'point the batch picks up next ("… der Nachfolger nimmt Punkt 656") or use the dictated ' +
+          'no-open-point form. The publish gate refuses a handover card that does neither.',
   })
 }
 
@@ -1517,25 +1671,17 @@ export function toClosingWork(html, point, { subject, reason, stamp = berlinStam
 }
 
 /**
- * Does this text name a FOLLOW-ON point? It lives beside the writer that owes it,
- * and the publish gate imports it, so the two cannot ask it differently.
- *
- * KNOWN LIMIT: it asks that A point is named, not that it is the RIGHT one —
- * nothing here can know which point just ended. It catches the card that names
- * none at all, which is the reported defect.
- */
-export function namesFollowOnWork(text) {
-  return /\b(?:punkt|point)\s*(\d{1,6})\b/i.test(String(text ?? ''))
-}
-
-/**
  * The German subject a point is known by on this board: from its numbered chip
  * (a queue, Erledigt or current-work card) or from a title still written in the
  * pre-655 "651 — …" shape. Null when the point stands nowhere.
  */
 export function pointSubject(html, point) {
   const doc = String(html ?? '')
-  const chip = doc.match(new RegExp(`<span class="num">${point}</span><span class="t">${TITLE_TEXT}</span>`))
+  const chip = doc.match(
+    new RegExp(
+      `<span class="num">${point}</span>\\s*(?:${CRITICALITY_BADGE_SOURCE})?<span class="t">${TITLE_TEXT}</span>`,
+    ),
+  )
   const legacy = chip ? null : doc.match(new RegExp(`<span class="t">${point}\\s*${DASH}\\s*${TITLE_TEXT}</span>`))
   const text = stripClosingStage((chip ?? legacy ?? [])[1])
   return text || null
@@ -1657,7 +1803,15 @@ export function parseClosingArgs(rest) {
  * name a command. The card carries a TITLE ONLY in its collapsed header, per the
  * board's binding structure, and the body says what is to be decided.
  */
-export function addVdzk(html, title, text) {
+export function addVdzk(html, title, text, { automated = false } = {}) {
+  // AN AUTOMATED CALLER IS HELD TO THE RULE, NOT REMINDED OF IT (point 749). A
+  // script has no judgement to apply, so the board asks for the two things that
+  // make a card a decision — it asks, and it names the options — and refuses
+  // anything else with the place its information does belong.
+  if (automated) {
+    const verdict = judgeAutomatedCard({ title, body: text })
+    if (!verdict.ok) throw new Error(verdict.reason)
+  }
   // ESCAPED, unlike the other card builders (four-eyes review 30.07.2026): the
   // guard's remedy line hands out a literal `"<Titel der Frage>"` placeholder, so
   // a paste of it is the LIKELY first call — and an unescaped `<` produces a card
@@ -1758,7 +1912,7 @@ export function setCardTitle(html, point, title) {
   // ON A CLOSING CARD THE TITLE KEEPS ITS SHAPE. The marker and the composed
   // title are one statement; retitling only the subject would leave a card the
   // gate reads as a false closing marker.
-  const now = nowSectionSlice(html)
+  const now = nowSectionSlice(html, { whenMissing: 'document' })
   const closingMarked = new RegExp(
     `<details class="now"[^>]*data-state="closing"[^>]*>\\s*<summary>[\\s\\S]*?<span class="num">\\s*${point}\\s*</span>`,
   ).test(now.text)
@@ -1775,7 +1929,8 @@ export function setCardTitle(html, point, title) {
   }
   const bare = escapeCardTitle(closingMarked ? closingCardTitle(stripPointPrefix(text, point)) : stripPointPrefix(text, point))
   const chipRe = new RegExp(
-    `(<details class="now"[^>]*>\\s*<summary>\\s*<span class="num">\\s*${point}\\s*</span>\\s*<span class="t">)` +
+    `(<details class="now"[^>]*>\\s*<summary>\\s*<span class="num">\\s*${point}\\s*</span>\\s*` +
+      `(?:${CRITICALITY_BADGE_SOURCE})?<span class="t">)` +
       `(?:(?!</span>)[\\s\\S])*(</span>)`,
   )
   if (chipRe.test(now.text)) {
@@ -1798,7 +1953,8 @@ export function setCardTitle(html, point, title) {
   // command reports success either way. The Erledigt section is history; a
   // retitle there is a hand edit's business, not this command's.
   const queueRe = new RegExp(
-    `(<summary><span class="num">${point}</span><span class="t">)(?:(?!</span>)[\\s\\S])*(</span>)`,
+    `(<summary><span class="num">${point}</span>\\s*(?:${CRITICALITY_BADGE_SOURCE})?` +
+      `<span class="t">)(?:(?!</span>)[\\s\\S])*(</span>)`,
   )
   try {
     const { from, end } = sectionBounds(html, 'queue')

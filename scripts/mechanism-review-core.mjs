@@ -17,14 +17,18 @@
 // scripts/mechanism-review-guard.mjs (fail-open) and the record CLI
 // scripts/mechanism-review.mjs. Pinned by mechanism-review-core.test.mjs.
 
+import { resolve } from 'node:path'
+
 // What a co-author trailer naming a MODEL looks like. It is the author
 // allowlist's own answer (scripts/model-guard-core.mjs, which imports nothing),
 // so "who authored this" cannot drift from "who may author at all".
 import { modelNamesIn } from './model-guard-core.mjs'
+import { isSwitchFallbackReason, mergeFallbackReason, mergerModel } from './fable-switch-core.mjs'
 // …and how a review split into PASSES over the file set composes back into a
 // coverage (point 714). Both the recorder and this gate ask the same module, so
 // what may be WRITTEN and what CLEARS cannot drift apart.
 import { parsePassFiles, parsePassSpec, passComposition, worstVerdict } from './review-material-core.mjs'
+import { scopeMandatoryDuty } from './mandatory-duty-core.mjs'
 
 /** The verdicts a review may end in, weakest refusal last. */
 export const VERDICTS = Object.freeze(['merge', 'merge-with-fixes', 'do-not-merge'])
@@ -164,6 +168,39 @@ export const LEDGER_AT_MAX_MS = 4_102_444_800_000
 export const ledgerAtUsable = (at) =>
   typeof at === 'number' && Number.isFinite(at) && at >= LEDGER_AT_MIN_MS && at <= LEDGER_AT_MAX_MS
 
+/** Where the tracked ledger sits inside ANY checkout of this repository. */
+export const LEDGER_RELATIVE_PATH = '.claude/mechanism-reviews.jsonl'
+
+/**
+ * The ledger of the checkout a command is ACTUALLY RUNNING IN (point 780).
+ *
+ * It used to be pinned to the module's own directory, which is the MAIN
+ * checkout whenever the command is invoked by its main-tree path — and every
+ * delegated author runs from an isolation worktree (CLAUDE.md §6). The append
+ * then landed in the main tree while the commit that seals it ran in the
+ * worktree, so `git add` refused the absolute main path as "outside repository"
+ * and the run aborted having already written a line about a commission that
+ * never started. Resolving against the git TOPLEVEL of the working directory
+ * puts the record on the point's own branch, where the comment above it always
+ * said it belonged, and it travels to `main` with the merge.
+ *
+ * NO FALLBACK CHECKOUT (cross-vendor review of this point, both passes). A run
+ * outside any checkout — a bare repository, a stray working directory — has NO
+ * ledger, and answering it with the module's own tree is the very defect this
+ * function exists to remove, only quieter: it would silently read and write a
+ * DIFFERENT checkout's tracked file. `null` says so, and the writers refuse on
+ * it rather than guessing.
+ *
+ * The toplevel is used EXACTLY as git gave it (same review): a POSIX path may
+ * legitimately end in a space, so only "git said nothing" is special-cased here
+ * and the caller strips git's terminating line break, nothing else.
+ */
+export function ledgerPathFrom(toplevel) {
+  const root = toplevel == null ? '' : String(toplevel)
+  if (root === '') return null
+  return resolve(root, LEDGER_RELATIVE_PATH)
+}
+
 /** The mechanism paths out of a commit's file list. */
 export function mechanismPathsIn(paths, opts) {
   return (paths ?? []).filter((p) => isMechanismPath(p, opts))
@@ -211,6 +248,55 @@ export function sameModel(a, b) {
   if (x.family !== y.family) return false
   if (!x.version || !y.version) return true
   return x.version === y.version
+}
+
+/**
+ * Why `reviewer` cannot be independent of EVERY author named by a commit.
+ *
+ * Four eyes is a vendor boundary, not a model-family boundary.  The author list
+ * is authoritative even when it is empty: an empty list means authorship is
+ * unknown, never "no author to conflict with".  Keeping this as one predicate
+ * gives the recorder, whole-range reviews and file-scoped reviews the same
+ * fail-closed answer.
+ */
+export function reviewIdentityProblem(reviewer, commit = {}) {
+  const authors = Array.isArray(commit.authorModels)
+    ? commit.authorModels
+    : Array.isArray(commit.authors)
+      ? commit.authors
+      : [commit.authorModel ?? commit.authoredBy].filter(Boolean)
+  const named = authors.map((author) => String(author ?? '').trim()).filter(Boolean)
+  if (!named.length || named.some((author) => modelVendor(author) === 'unknown')) return 'unknown-author'
+  const reviewerVendor = modelVendor(reviewer)
+  if (reviewerVendor === 'unknown') return 'unknown-reviewer'
+  return named.some((author) => modelVendor(author) === reviewerVendor) ? 'same-vendor' : ''
+}
+
+/** Only a convergent reading of the changed code can cover that code. */
+export function attestsToCodeReading(record = {}) {
+  return String(record.mode ?? '').trim() === 'review' && !String(record.specExamination ?? '').trim()
+}
+
+const containedBy = (record, sha) => {
+  if (String(record?.sha ?? '') === String(sha)) return true
+  const fact = record?.containedShas
+  return fact instanceof Set
+    ? fact.has(String(sha))
+    : Array.isArray(fact) && fact.map(String).includes(String(sha))
+}
+
+const descendsFrom = (record, earlier) =>
+  String(record?.sha ?? '') !== String(earlier?.sha ?? '') && containedBy(record, earlier?.sha)
+
+const openRefusalsIn = (records = []) => {
+  const clearing = records.filter((record) => String(record.verdict) !== BLOCKING_VERDICT)
+  return records.filter(
+    (refusal) =>
+      String(refusal.verdict) === BLOCKING_VERDICT &&
+      !clearing.some(
+        (answer) => Number(answer.at) > Number(refusal.at) && descendsFrom(answer, refusal),
+      ),
+  )
 }
 
 /** The family words of a model this project would recognise. */
@@ -274,9 +360,16 @@ export function namesOtherModel(text, who) {
  * The shape is asserted against a real summaryLine() in blind-merge-core.test.mjs,
  * so the two halves cannot drift apart — the regex lives HERE because this core
  * must not import the accounting one (that one already imports this).
+ *
+ * TWO WORDINGS ARE ACCEPTED for one meaning. The count in the parenthesis has
+ * always been INPUT ENTRIES folded, never union rows, but the line used to say
+ * only "N merged" next to a union count it does not add up to. The printer names
+ * the unit since 24.08.2026; the rows recorded before that say the same thing in
+ * the ambiguous words and are read, not rewritten — a receipt is evidence of what
+ * the accounting printed, and correcting its text after the fact would forge it.
  */
 export const ACCOUNTING_RECEIPT =
-  /^(\d+) A \+ (\d+) B entries → (\d+) union entries \((\d+) merged, (\d+) only A, (\d+) only B\): every input entry accounted for$/
+  /^(\d+) A \+ (\d+) B entries → (\d+) union entries \((\d+)(?: of the (\d+) input entries)? merged, (\d+) only A, (\d+) only B\): every input entry accounted for$/
 
 /**
  * Is this receipt a line the accounting could actually have printed?
@@ -291,9 +384,19 @@ export const ACCOUNTING_RECEIPT =
 export function receiptBalances(line) {
   const m = ACCOUNTING_RECEIPT.exec(String(line ?? '').trim())
   if (!m) return false
-  const [a, b, union, merged, onlyA, onlyB] = m.slice(1).map(Number)
+  // IN BIGINT, or the arithmetic is IEEE-754 rounding instead of counting:
+  // individually safe operands still produce unsafe SUMS near 2^53, where two
+  // unequal totals compare equal as doubles and a fabricated line balances
+  // without adding up (re-review rounds 7 and 8). No real stage counts
+  // anywhere near this; a forged one may claim whatever it likes.
+  const [a, b, union, merged, statedInputs, onlyA, onlyB] = m
+    .slice(1)
+    .map((v) => (v === undefined ? undefined : BigInt(v)))
   if (merged + onlyA + onlyB !== a + b) return false
-  if (merged === 1) return false
+  // The named unit is checked, not just parsed: a line stating a total the two
+  // list sizes do not make would otherwise pass on the strength of its shape.
+  if (m[5] !== undefined && statedInputs !== a + b) return false
+  if (merged === 1n) return false
   if (onlyA > a || onlyB > b) return false
   // THE UNION'S SIZE FOLLOWS FROM THE DISPOSITIONS (four-eyes review, fourth
   // round). Every entry standing alone is one union entry, and the merged ones
@@ -302,7 +405,7 @@ export function receiptBalances(line) {
   // could have produced.
   const singles = onlyA + onlyB
   if (!merged) return union === singles
-  return union > singles && union <= singles + Math.floor(merged / 2)
+  return union > singles && union <= singles + merged / 2n
 }
 
 /**
@@ -324,6 +427,24 @@ export const MERGE_ACCOUNTING_SINCE = Date.UTC(2026, 7, 11)
  * 07.08.2026, and a row with no timestamp is not old, it is unstamped.
  */
 export const MODE_REQUIRED_SINCE = Date.UTC(2026, 7, 8)
+
+/** New ledger rows after point 840's recorded commission owe an explicit
+ * transcript verdict. The exact boundary preserves every earlier 22.08 row. */
+export const AUTHORSHIP_CHECK_SINCE = 1_787_415_913_284
+
+/** From here on, "unverified" is no longer a clearance for a reviewer the
+ * harness could have verified. Cross-vendor review of point 889 (pass 3): an
+ * unknown actual reviewer could claim an independent model, record the claim
+ * with `status: 'unverified'`, and clear the commit — which is the
+ * unknown-authorship case the gate exists to refuse. Where the claimed
+ * reviewer is an Anthropic model, its session transcript exists in the harness
+ * at recording time, so AGREEMENT is achievable and anything less is refused.
+ * An OpenAI reviewer runs outside the harness — no Claude transcript can hold
+ * its messages, so demanding one would end every cross-vendor review — and
+ * stays recordable as unverified, but only with the reason stated; an unknown
+ * vendor is refused outright. The boundary preserves the rows recorded under
+ * the older reading (both vendors' 24.08 reviews among them). */
+export const VERIFIED_REVIEWER_SINCE = 1_787_588_100_000
 
 /**
  * May THIS model MERGE the two lists of a blind-parallel stage? (point 634)
@@ -364,6 +485,7 @@ export function validateMerger({ mergedBy, authors = [], fallback = '' } = {}) {
     errors.push(`a two-model fallback is recorded, but "${who}" authored neither list — no fallback was needed`)
   }
   if (reason) {
+    const switchFallback = isSwitchFallbackReason(reason)
     // A FALLBACK HAS TO SAY WHICH MODEL WAS NOT THERE (four-eyes review of point
     // 634, rounds one and five). Any eight characters would otherwise buy an
     // author the right to merge its own list — the escape hatch would be the
@@ -380,7 +502,14 @@ export function validateMerger({ mergedBy, authors = [], fallback = '' } = {}) {
     const bound = clauses.some(
       (c) => UNAVAILABLE.test(c) && !NEGATED_ABSENCE.test(c) && namesOtherModel(c, who),
     )
-    if (!named.length) {
+    if (switchFallback && !sameModel(who, 'GPT-5.6 Sol')) {
+      errors.push(`the Fable-switch fallback is only the recorded reason GPT-5.6 Sol may merge its own blind half`)
+    } else if (switchFallback && !conflict) {
+      // The general no-fallback-needed error above remains the one explanation.
+    } else if (switchFallback) {
+      // A decision is not an outage. This exact, command-bearing form is the
+      // separately checkable exception; every other reason still owes absence.
+    } else if (!named.length) {
       errors.push(
         `the two-model fallback has to NAME the model that was unavailable ("${reason}" names none) — ` +
           'it is the reason an author was allowed to merge, and an unnamed reason cannot be checked',
@@ -397,7 +526,35 @@ export function validateMerger({ mergedBy, authors = [], fallback = '' } = {}) {
       )
     }
   }
-  return { ok: errors.length === 0, errors, fallback: Boolean(conflict && reason) }
+  return {
+    ok: errors.length === 0,
+    errors,
+    fallback: Boolean(conflict && reason),
+  }
+}
+
+/** Resolve the switch-owned merger and the fallback owed when it authored a half. */
+export function resolveMergePolicy({ mode, mergedBy = '', mergeFallback = '', authors = [], fableState } = {}) {
+  const m = String(mode ?? '').trim()
+  if (m !== BLIND_PARALLEL || fableState === undefined) {
+    return { mergedBy: String(mergedBy ?? '').trim(), mergeFallback: String(mergeFallback ?? '').trim(), errors: [] }
+  }
+  const expected = mergerModel(fableState, authors)
+  const declared = String(mergedBy ?? '').trim()
+  const errors = []
+  if (declared && !sameModel(declared, expected)) {
+    errors.push(
+      `--merged-by "${declared}" is not the one this stage owes: ${expected} owns this merge ` +
+        '(node scripts/fable-switch.mjs --status)',
+    )
+  }
+  const conflict = (authors ?? []).filter(Boolean).some((author) => sameModel(expected, author))
+  const derivedReason = conflict ? mergeFallbackReason(fableState) : ''
+  const statedReason = String(mergeFallback ?? '').trim()
+  if (statedReason && statedReason !== derivedReason) {
+    errors.push('--merge-fallback contradicts the reason generated by the Fable switch')
+  }
+  return { mergedBy: expected, mergeFallback: statedReason || derivedReason, errors }
 }
 
 /**
@@ -423,10 +580,27 @@ export function validateMergedBy({
   model,
   authoredBy,
   authors,
+  halfAuthors,
+  fableState,
 } = {}) {
   const m = String(mode ?? '').trim()
-  const who = String(mergedBy ?? '').trim()
-  const reason = String(mergeFallback ?? '').trim()
+  const wrote = (Array.isArray(authors) && authors.length ? authors : [authoredBy]).filter(Boolean)
+  // THE HALVES THEMSELVES WHERE THEY WERE READ, the trailer proxy only failing that.
+  // The proxy treats the union commit's models as the list authors, which is right
+  // while the merger is a delegate somebody else commits for, and wrong the moment
+  // the merging model commits its own union: it then names the merger as an author
+  // of the material and refuses the one model the rule allows.
+  const halves = (Array.isArray(halfAuthors) ? halfAuthors : []).map((a) => String(a ?? '').trim()).filter(Boolean)
+  const listAuthors = halves.length === 2 ? halves : [model, ...wrote]
+  const policy = resolveMergePolicy({
+    mode: m,
+    mergedBy,
+    mergeFallback,
+    authors: listAuthors,
+    fableState,
+  })
+  const who = policy.mergedBy
+  const reason = policy.mergeFallback
   const receipt = String(accounting ?? '').trim()
   if (m && m !== BLIND_PARALLEL) {
     const errors = []
@@ -440,8 +614,7 @@ export function validateMergedBy({
     return { ok: errors.length === 0, errors }
   }
   if (m !== BLIND_PARALLEL) return { ok: true, errors: [] }
-  const wrote = (Array.isArray(authors) && authors.length ? authors : [authoredBy]).filter(Boolean)
-  const { errors } = validateMerger({ mergedBy: who, authors: [model, ...wrote], fallback: reason })
+  const errors = [...policy.errors, ...validateMerger({ mergedBy: who, authors: listAuthors, fallback: reason }).errors]
   if (!receipt) {
     errors.push(
       '--accounting "<the summary line>": the union of a blind-parallel stage is COUNTED, not trusted. ' +
@@ -512,6 +685,8 @@ export function modelsFromTrailers(field) {
 export const FLAG_SPEC = Object.freeze({
   '--record': true,
   '--model': true,
+  '--model-at': true,
+  '--model-transcript': true,
   '--verdict': true,
   '--evidence': true,
   '--point': true,
@@ -529,11 +704,6 @@ export const FLAG_SPEC = Object.freeze({
   // the file set, and each pass records what it actually read (point 714).
   '--pass': true,
   '--pass-files': true,
-  // Authorship-cut passes also name the commits whose contributions they read.
-  // A mixed-vendor path may occur in two passes, one per authoring commit; the
-  // commit list makes those two readings distinct and lets the gate advance the
-  // baseline for exactly the contribution that was seen.
-  '--pass-commits': true,
   // A pass of an EARLIER round carries forward to a new head where every file
   // it read is byte-identical there (delta-scoped rounds, user decision
   // 18.08.2026): the recorder verifies the blob identity and the source
@@ -550,6 +720,8 @@ export const KNOWN_FLAGS = new Set(Object.keys(FLAG_SPEC))
 const VALUE_KEY = Object.freeze({
   '--record': 'sha',
   '--model': 'model',
+  '--model-at': 'modelAt',
+  '--model-transcript': 'modelTranscript',
   '--verdict': 'verdict',
   '--evidence': 'evidence',
   '--point': 'point',
@@ -565,7 +737,6 @@ const VALUE_KEY = Object.freeze({
   '--list-b': 'listBPath',
   '--pass': 'pass',
   '--pass-files': 'passFiles',
-  '--pass-commits': 'passCommits',
   '--carried-from': 'carriedFrom',
 })
 
@@ -842,9 +1013,10 @@ export function validateMode({ mode, framing } = {}) {
 /**
  * Is the PASS this record claims a usable one, and does it say what it read?
  *
- * A pass record is the answer to a range no single review round can hold (point
- * 714): the material is cut through the FILE SET, each pass is reviewed on its
- * own, and the range is cleared only once every pass is on record. So a pass
+ * A pass record is either a bounded one-round scope or the answer to a range no
+ * single review round can hold (points 783 and 714): the material is cut through
+ * the FILE SET, each pass is reviewed on its own, and the range is cleared only
+ * once every contribution (and, for a split, every pass) is on record. So a pass
  * MUST name its files — a verdict that covers "one of three passes" without
  * saying which files it read is a coverage claim nobody can check — and the two
  * flags come as a pair, because either alone describes half a composition.
@@ -867,7 +1039,7 @@ export function validateMode({ mode, framing } = {}) {
  *
  * Returns { ok, errors, pass } with `pass` the parsed record field, or null.
  */
-export function validatePass({ pass, passFiles, passCommits } = {}) {
+export function validatePass({ pass, passFiles } = {}) {
   const spec = String(pass ?? '').trim()
   // The list is parsed RAW (fourth cross-vendor round): trimming it here strips
   // the FIRST token's leading and the LAST token's trailing whitespace before
@@ -876,9 +1048,7 @@ export function validatePass({ pass, passFiles, passCommits } = {}) {
   // the trimmed view; the bytes go to the parser untouched, which fails loud.
   const listed = String(passFiles ?? '')
   const hasList = listed.trim() !== ''
-  const commitList = String(passCommits ?? '').trim()
-  const hasCommits = commitList !== ''
-  if (!spec && !hasList && !hasCommits) return { ok: true, errors: [], pass: null }
+  if (!spec && !hasList) return { ok: true, errors: [], pass: null }
   const errors = []
   if (!spec) {
     errors.push('--pass-files without --pass <k>/<n>: a file list belongs to a pass, and this record names none')
@@ -888,9 +1058,6 @@ export function validatePass({ pass, passFiles, passCommits } = {}) {
       '--pass <k>/<n> without --pass-files: a pass verdict covers the files it actually read, and a ' +
         'record that does not name them claims a coverage nobody can check',
     )
-  }
-  if (!spec && hasCommits) {
-    errors.push('--pass-commits without --pass <k>/<n>: commit scope belongs to a pass, and this record names none')
   }
   const parsed = spec ? parsePassSpec(spec) : { ok: false, errors: [] }
   errors.push(...parsed.errors)
@@ -903,18 +1070,11 @@ export function validatePass({ pass, passFiles, passCommits } = {}) {
   if (hasList && list.ok && !list.files.length) {
     errors.push('--pass-files "<a,b,c>": the paths this pass reviewed, comma-separated')
   }
-  const commits = commitList ? commitList.split(',') : []
-  if (hasCommits && commits.some((sha) => !/^[0-9a-f]{7,40}$/i.test(sha))) {
-    errors.push('--pass-commits "<sha,sha>": every contribution boundary must be a 7–40 character commit sha')
-  }
-  if (hasCommits && uniqStrings(commits).length !== commits.length) {
-    errors.push('--pass-commits: each commit is named once; duplicate boundaries do not add coverage')
-  }
   if (errors.length) return { ok: false, errors, pass: null }
   return {
     ok: true,
     errors: [],
-    pass: { index: parsed.index, total: parsed.total, files: list.files, ...(hasCommits ? { commits } : {}) },
+    pass: { index: parsed.index, total: parsed.total, files: list.files },
   }
 }
 
@@ -933,6 +1093,8 @@ export function validateRecord({
   verdict,
   evidence,
   authoredBy,
+  commitAt,
+  at,
   mode,
   framing,
   authorFraming,
@@ -941,9 +1103,10 @@ export function validateRecord({
   mergeFallback,
   accounting,
   authors,
+  halfAuthors,
   pass,
   passFiles,
-  passCommits,
+  fableState,
 } = {}) {
   const errors = []
   errors.push(...validateMode({ mode, framing }).errors)
@@ -970,8 +1133,11 @@ export function validateRecord({
   if (examination && authorFrame) {
     errors.push('--spec-examination is not an authoring round and cannot also carry --author-framing')
   }
-  errors.push(...validatePass({ pass, passFiles, passCommits }).errors)
-  errors.push(...validateMergedBy({ mode, mergedBy, mergeFallback, accounting, model, authoredBy, authors }).errors)
+  errors.push(...validatePass({ pass, passFiles }).errors)
+  errors.push(
+    ...validateMergedBy({ mode, mergedBy, mergeFallback, accounting, model, authoredBy, authors, halfAuthors, fableState })
+      .errors,
+  )
   if (!/^[0-9a-f]{7,40}$/i.test(String(sha ?? '').trim())) {
     errors.push('--record <sha>: the commit that was judged, as a resolvable sha')
   }
@@ -1006,12 +1172,27 @@ export function validateRecord({
     // ledger line naming nothing in front of a gate that then reads green.
     errors.push(`--evidence: "${ev}" is still the placeholder — write what the review actually checked`)
   }
-  if (String(model ?? '').trim() && String(authoredBy ?? '').trim() && sameModel(model, authoredBy)) {
-    errors.push(
-      `a SELF-REVIEW is refused: ${short(sha)} was authored by "${String(authoredBy).trim()}" and ` +
-        `"${String(model).trim()}" is the same model. The value of a second pair of eyes is that ` +
-        'they are different eyes — have the other model review it.',
-    )
+  if (String(model ?? '').trim()) {
+    const identity = reviewIdentityProblem(model, {
+      authors: Array.isArray(authors) ? authors : [authoredBy].filter(Boolean),
+    })
+    if (identity === 'unknown-author') {
+      errors.push(
+        `an INDEPENDENT REVIEW cannot be proved for ${short(sha)}: its commit names no recognised model ` +
+          'author in its Co-Authored-By trailers. Unknown authorship is unreviewable, not authorless.',
+      )
+    } else if (identity === 'unknown-reviewer') {
+      errors.push(`the claimed reviewer "${String(model).trim()}" has no recognised vendor, so independence cannot be proved`)
+    } else if (identity === 'same-vendor') {
+      errors.push(
+        `a SAME-VENDOR REVIEW is refused: ${short(sha)} was authored by ` +
+          `"${(Array.isArray(authors) ? authors : [authoredBy]).filter(Boolean).join(', ')}" and ` +
+          `"${String(model).trim()}" is from that vendor. Four eyes requires the other vendor.`,
+      )
+    }
+  }
+  if (Number(commitAt) > 0 && ledgerAtUsable(Number(commitAt)) && ledgerAtUsable(at) && Number(at) < Number(commitAt)) {
+    errors.push('a review record may not predate the commit it claims to clear')
   }
   return { ok: errors.length === 0, errors }
 }
@@ -1027,30 +1208,62 @@ export function validateRecord({
  * so a second one named in the trailers cannot merge its own list either.
  */
 export function mergeProblem(record = {}, commit = {}) {
-  if (String(record.mode ?? '') !== BLIND_PARALLEL) return ''
+  // TRIMMED, like the well-formedness check reads it: " blind-parallel " passed
+  // there and fell out HERE, so a hand-edited row bypassed every fold check by
+  // one space (re-review round 6).
+  if (String(record.mode ?? '').trim() !== BLIND_PARALLEL) return ''
   // A row is grandfathered only by a REAL timestamp older than the rule. A row
   // with NO `at` is not old, it is unstamped — reading a missing field as legacy
   // was itself a bypass (four-eyes review, third round): omit `at`, `mergedBy`
   // and `accounting` together and nothing was ever checked.
   const at = Number(record.at)
-  if (Number.isFinite(at) && at > 0 && at < MERGE_ACCOUNTING_SINCE) return ''
+  // The grandfather clause reads the later of row and commit time, like every
+  // era cutoff (re-review round 4): a modern hand-edited row backdated before
+  // the accounting rule otherwise skips fold validation entirely.
+  const foldEra = Math.max(Number.isFinite(at) && at > 0 ? at : 0, Number(commit?.at) || 0)
+  if (Number.isFinite(at) && at > 0 && foldEra < MERGE_ACCOUNTING_SINCE) return ''
   const who = String(record.mergedBy ?? '').trim()
   if (!who) return 'no-merger'
   if (!receiptBalances(record.accounting)) return 'no-count'
   // The FALLBACK is judged, not merely present: any word in that field used to
   // buy an author the merge, while the recorder demanded it name the model that
   // was missing. One function answers for both halves.
+  // THE HALVES THE RECORD ITSELF NAMES, where it names them from tracked files,
+  // and only failing that the commit-trailer proxy. Re-judging a recorded merge
+  // by the proxy alone condemns every merge whose merging model committed its own
+  // union — which is precisely the case the recorder was taught to accept, so the
+  // gate has to read the same fact or the two disagree by construction.
+  //
+  // BUT THE FIELD IS A CLAIM, NOT EVIDENCE: ledger rows are hand-editable, and
+  // two fabricated names excluding the merger would bypass the self-merge
+  // fence entirely. The halves therefore decide ONLY when the ledger reader
+  // stamped them VERIFIED against the repository's committed bytes
+  // (readRecords → verifyHalfAuthors); a claim the repository cannot confirm
+  // POISONS the record instead of being trusted or silently ignored — silently
+  // falling back to the proxy would let a forger probe until a wording passes.
+  const halves = (Array.isArray(record.halfAuthors) ? record.halfAuthors : [])
+    .map((a) => String(a ?? '').trim())
+    .filter(Boolean)
+  if (halves.length && record.halfAuthorsVerified !== true) return 'unverified-halves'
+  // A MODERN ROW DOES NOT GET THE PROXY BACK BY DROPPING ITS CLAIM (re-review
+  // round 3): with `halfAuthors` deleted from a hand-edited row, the judgment
+  // fell through to the commit trailers, which say nothing when the union
+  // commit does not name the merger. Since the recorder began refusing folds
+  // with unproven halves, every legitimate new blind-parallel row carries its
+  // verified halves — one that does not is hand-made and clears nothing. The
+  // era reads the later of row and commit time, as everywhere else.
+  if (!halves.length && foldEra >= VERIFIED_REVIEWER_SINCE) return 'unverified-halves'
   const authors = (commit.authorModels ?? [commit.authorModel]).filter(Boolean)
   const check = validateMerger({
     mergedBy: who,
-    authors: [...authors, record.model].filter(Boolean),
+    authors: halves.length === 2 ? halves : [...authors, record.model].filter(Boolean),
     fallback: record.mergeFallback,
   })
   return check.ok ? '' : 'self-merge'
 }
 
 /** Ledger-era validity shared by the gate and the per-file debt planner. */
-export function reviewRecordWellFormed(record = {}) {
+export function reviewRecordWellFormed(record = {}, { commitAt = 0 } = {}) {
   if (!VERDICTS.includes(String(record.verdict))) return false
   if (typeof record.model !== 'string' || !record.model.trim()) return false
   if (!ledgerAtUsable(record.at)) return false
@@ -1059,17 +1272,86 @@ export function reviewRecordWellFormed(record = {}) {
   if (evidence.length < 10 || /^<.*>$/.test(evidence) || blindReviewerAdmission(evidence)) return false
   const mode = String(record.mode ?? '').trim()
   const at = Number(record.at)
-  if (mode ? !MODES.includes(mode) : !(Number.isFinite(at) && at > 0 && at < MODE_REQUIRED_SINCE)) return false
+  if (!MODES.includes(mode)) return false
+  // A review cannot happen before the commit it claims to have read.  This is a
+  // direct ordering invariant, not an era selector controlled by either clock.
+  if (Number(commitAt) > 0 && at < Number(commitAt)) return false
+  // Identity evidence became part of the recorder's row shape at a known
+  // ledger boundary. Rows written before that boundary cannot acquire evidence
+  // the recorder did not yet emit, and remain usable for commits they could
+  // actually have reviewed (the ordering invariant above still prevents an old
+  // row from clearing newer code). Missing identity on a modern row remains a
+  // malformed hand-written claim.
+  const authorship = record.reviewerAuthorship
+  if (!authorship || typeof authorship !== 'object') {
+    return at < AUTHORSHIP_CHECK_SINCE && (record.carried === undefined || record.carriedVerified === true)
+  }
+  if (authorship.status !== 'agreement' && authorship.status !== 'unverified') return false
+  if (!sameModel(authorship.claimedModel, record.model)) return false
+  if (authorship.status === 'agreement' && !sameModel(authorship.actualModel, record.model)) return false
+  const vendor = modelVendor(record.model)
+  if (vendor === 'unknown') return false
+  // Anthropic agreement became provable only at the later transcript boundary.
+  // Preserve earlier reasoned unverified rows; after it, anything short of the
+  // recorder's agreement stamp is malformed.
+  if (vendor === 'anthropic' && authorship.status !== 'agreement' && at >= VERIFIED_REVIEWER_SINCE) return false
+  if (vendor === 'openai') {
+    if (authorship.status !== 'unverified') return false
+    if (typeof authorship.reason !== 'string' || !authorship.reason.trim()) return false
+  }
   return record.carried === undefined || record.carriedVerified === true
+}
+
+/** Current file artefacts synthesized from the pending history. */
+function pendingEndStateFiles(pendingCommits, endStateFiles) {
+  if (endStateFiles === null || endStateFiles === undefined) return pendingCommits ?? []
+  const material = new Set((endStateFiles ?? []).map(String))
+  const byFile = new Map()
+  for (const commit of pendingCommits ?? []) {
+    for (const file of [...new Set((commit?.files ?? []).map(String))]) {
+      if (!byFile.has(file)) byFile.set(file, [])
+      byFile.get(file).push(commit)
+    }
+  }
+  const artefacts = []
+  for (const [file, changes] of byFile) {
+    if (!material.has(file)) continue
+    const latest = changes.at(-1)
+    const authors = Array.isArray(latest?.authorModels) && latest.authorModels.length
+      ? uniqStrings(latest.authorModels)
+      : [latest?.authorModel].filter(Boolean)
+    artefacts.push({
+      ...latest,
+      files: [file],
+      authorModel: authors[0] ?? '',
+      authorModels: authors,
+      sourceCommits: changes.map((commit) => commit.sha),
+    })
+  }
+  return artefacts
+}
+
+export const modelVendor = (model) => {
+  const value = String(model ?? '').toLowerCase()
+  const openai = /\bsol\b|\bgpt[- ]?5(?:\.|\b)/.test(value) || /openai\.com/.test(value)
+  const anthropic = /\b(?:claude|opus|fable|sonnet|haiku)\b/.test(value) || /anthropic\.com/.test(value)
+  // CONTRADICTORY MARKERS ARE NOBODY, not first-match-wins (re-review round 5):
+  // "Claude Opus 5 GPT-5" reached the OpenAI branch and cleared as
+  // unverified-with-reason, bypassing both the unknown-vendor refusal and the
+  // Anthropic agreement requirement.
+  if (openai && anthropic) return 'unknown'
+  if (openai) return 'openai'
+  if (anthropic) return 'anthropic'
+  return 'unknown'
 }
 
 /**
  * The gate itself.
  *
  * Inputs (plain data — the wrapper does the git work):
- *   baseline        sha the tree has already confirmed, or null (grandfathering:
- *                   with no baseline nothing is owed, which is how the twenty-odd
- *                   guards that predate this gate stay out of it)
+ *   baseline        sha the tree has already confirmed, or null. A missing
+ *                   baseline is a refusal: the wrapper may recover only from
+ *                   the immutable policy anchor, never from current HEAD.
  *   head            current HEAD
  *   pendingCommits  [{ sha, subject, at, authorModel, files, coveringRecordShas }]
  *                   — the commits in baseline..HEAD that touch a mechanism path;
@@ -1082,11 +1364,27 @@ export function reviewRecordWellFormed(record = {}) {
  */
 export function evaluateMechanismReview({
   baseline = null,
+  baselineMissing = false,
   head = '',
   pendingCommits = [],
   records = [],
+  endStateFiles = null,
+  fence = null,
+  sessionId = '',
 } = {}) {
-  if (!baseline) return { block: false, clear: true, bootstrap: true, findings: [], head }
+  // Missing local evidence is itself a finding. It may never mean "start at
+  // HEAD": on main that makes the pending range empty and forgives every debt
+  // in one turn. The wrapper may seed a durable recovery anchor after reporting
+  // this refusal, but this evaluation never clears on absence.
+  if (!baseline || baselineMissing) {
+    return {
+      block: true,
+      clear: false,
+      bootstrap: false,
+      findings: [{ kind: 'missing-baseline', commit: null, records: [] }],
+      head,
+    }
+  }
 
   // A MULTIMAP, not one row per sha (point 714). A range reviewed in passes has
   // several records at the SAME sha, and keying them by sha alone kept only the
@@ -1099,7 +1397,7 @@ export function evaluateMechanismReview({
   }
   const findings = []
 
-  for (const pendingCommit of pendingCommits ?? []) {
+  for (const pendingCommit of pendingEndStateFiles(pendingCommits, endStateFiles)) {
     let commit = pendingCommit
     const covering = [...new Set(commit?.coveringRecordShas ?? [])].flatMap((s) => bySha.get(String(s)) ?? [])
     // A record is only a review if it says who reviewed, how it ended AND what
@@ -1113,7 +1411,7 @@ export function evaluateMechanismReview({
     // standard from the day the recorder began demanding it (see
     // MODE_REQUIRED_SINCE): a row of that era naming no usable mode can only
     // have arrived by hand.
-    const rowWellFormed = reviewRecordWellFormed
+    const rowWellFormed = (r) => reviewRecordWellFormed(r, { commitAt: commit.at })
     const wellFormed = covering.filter(rowWellFormed)
     // A MALFORMED REFUSAL POISONS, IT DOES NOT VANISH (final-round pass 1,
     // applied to both gates): a covering do-not-merge whose timestamp fails
@@ -1143,23 +1441,79 @@ export function evaluateMechanismReview({
     // way — by an edit, or from a branch whose CLI predates the rule. Rows older
     // than MERGE_ACCOUNTING_SINCE are grandfathered by DATE; treating a MISSING
     // field as legacy is what let an edited row simply omit it.
-    const selfReviews = wellFormed.filter((r) => sameModel(r.model, commit?.authorModel) || mergeProblem(r, commit))
-    // A SPEC EXAMINATION READS TEXT, NOT CODE. It deliberately shares the
-    // append-only ledger with reviews, but it cannot satisfy this gate: in
-    // particular, its merge verdict at a descendant sha must never discharge
-    // a do-not-merge that demanded a code fix. Keep it out of `sound` so it can
-    // neither clear an otherwise unreviewed commit nor answer a refusal.
+    const selfReviews = wellFormed.filter(
+      (r) => attestsToCodeReading(r) && reviewIdentityProblem(r.model, commit),
+    )
+    // COVERAGE MEANS ONE THING ON EVERY PATH: a well-formed, convergent reading
+    // of this code by a vendor that authored none of it. A spec examination
+    // reads the commission; a blind-parallel row attests to independently
+    // producing and folding lists. Neither attests to reading this commit, so
+    // neither joins `sound` or answers a refusal.
     const sound = wellFormed.filter(
-      (r) => !r?.specExamination && !sameModel(r.model, commit?.authorModel) && !mergeProblem(r, commit),
+      (r) => attestsToCodeReading(r) && !reviewIdentityProblem(r.model, commit),
     )
 
-    // AUTHORSHIP-SCOPED PASSES ADVANCE PER CONTRIBUTION. Unlike the legacy
-    // size-only split below, these rows name the commits whose changes were in
-    // the material. Each file can therefore clear as soon as its own
-    // contribution was read; missing siblings stay owed by name instead of
-    // pulling the cleared file back into every later whole-range demand.
-    const scopedShape = (r) => Array.isArray(r?.pass?.commits) && Array.isArray(r?.pass?.files)
-    const scoped = sound.filter((r) => scopedShape(r) && r.pass.commits.map(String).includes(String(commit.sha)))
+    // END-STATE FILE PASSES CLEAR WHAT THEY READ. The record's own sha is the
+    // stored end state, and the wrapper selected this artefact at its latest
+    // change, so a record covering it remains valid across later commits to
+    // other files. Historical pass.commits rows describe superseded
+    // contribution slices and deliberately clear nothing here.
+    const fileClaim = (r) => r?.pass?.endState !== undefined
+    const fileScopedShape = (r) =>
+      fileClaim(r) &&
+      String(r.pass.endState) === String(r.sha) &&
+      Array.isArray(r?.pass?.files) &&
+      !Array.isArray(r?.pass?.commits)
+    const scoped = sound.filter(fileScopedShape)
+
+    // New recorder rows are file-scoped, but they are still parts of ONE split.
+    // No part clears until every numbered part of that split is present. Without
+    // this check pass 1/3 cleared its named file and the legacy composition code
+    // never saw it because `endState` excluded it from that path.
+    const scopedSplits = [...new Set(covering.filter(fileClaim).map((r) => String(r?.sha ?? '')))].flatMap((sha) => {
+      const rows = scoped.filter((r) => String(r?.sha ?? '') === sha)
+      const expected = [...new Set(rows.flatMap((r) => (Array.isArray(r?.pass?.files) ? r.pass.files : [])))]
+      return passComposition(rows, { expect: expected })
+    })
+    const incompleteScoped = scopedSplits.filter((split) => !split.complete)
+    const incompleteScopedShas = new Set(incompleteScoped.map((split) => String(split.sha)))
+    // FILE DEBT IS MEASURED AGAINST THE CURRENT END STATE, not against the
+    // numbering of every range plan that once contained that file. A complete
+    // scoped reading at another covering sha therefore settles the files it
+    // names even when an older range split remains incomplete for other files.
+    // This is the same rule outstandingFiles uses for the status/next-pass
+    // plan. A sha carrying any incomplete composition contributes nothing,
+    // while a bounded 1/1 is itself a complete file-scoped reading.
+    const completeScoped = [
+      ...scoped
+        .filter((r) =>
+          Number(r?.pass?.index) === 1 &&
+          Number(r?.pass?.total) === 1 &&
+          !incompleteScopedShas.has(String(r?.sha ?? '')))
+        .map((r) => ({ sha: String(r.sha ?? ''), files: r.pass.files.map(String), records: [r] })),
+      ...scopedSplits.filter((split) => split.complete && !incompleteScopedShas.has(String(split.sha))),
+    ]
+    const scopedWholeReviews = sound.filter((r) => !fileClaim(r) && !r?.pass)
+    const standingScoped = incompleteScoped.filter(
+      (split) => {
+        const wholeRangeAnswer = scopedWholeReviews.some(
+          (answer) => Number(answer.at) > Math.max(...split.records.map((r) => Number(r.at))) && descendsFrom(answer, split),
+        )
+        const endStateAnswer = completeScoped.some(
+          (answer) =>
+            String(answer.sha) !== String(split.sha) &&
+            (commit.files ?? []).every((file) => answer.files.map(String).includes(String(file))),
+        )
+        return !wholeRangeAnswer && !endStateAnswer
+      },
+    )
+    if (standingScoped.length) {
+      const worst = standingScoped.reduce((a, b) =>
+        ((b.missing?.length ?? 0) + (b.uncovered?.length ?? 0) >=
+        (a.missing?.length ?? 0) + (a.uncovered?.length ?? 0) ? b : a))
+      findings.push({ kind: 'incomplete-passes', commit, records: worst.records, passes: worst, besideSplit: scopedWholeReviews })
+      continue
+    }
     const remainingFiles = []
     let scopedRefusal = null
     for (const file of commit.files ?? []) {
@@ -1168,9 +1522,12 @@ export function evaluateMechanismReview({
         remainingFiles.push(file)
         continue
       }
-      const latest = rows.reduce((a, b) => (Number(b.at ?? 0) >= Number(a.at ?? 0) ? b : a))
-      if (String(latest.verdict) === BLOCKING_VERDICT) {
+      const open = openRefusalsIn(rows)
+      if (open.length) {
+        const latest = open.reduce((a, b) => (Number(b.at) >= Number(a.at) ? b : a))
         scopedRefusal = !scopedRefusal || Number(latest.at) >= Number(scopedRefusal.at) ? latest : scopedRefusal
+        remainingFiles.push(file)
+      } else if (!rows.some((row) => String(row.verdict) !== BLOCKING_VERDICT)) {
         remainingFiles.push(file)
       }
     }
@@ -1180,8 +1537,8 @@ export function evaluateMechanismReview({
     }
     if (!remainingFiles.length) continue
     commit = { ...commit, files: remainingFiles }
-    const legacyCovering = covering.filter((r) => !scopedShape(r))
-    const legacySound = sound.filter((r) => !scopedShape(r))
+    const legacyContributionShape = (r) => Array.isArray(r?.pass?.commits)
+    const legacySound = sound.filter((r) => !fileClaim(r) && !legacyContributionShape(r))
 
     // A PASS CLEARS NOTHING ON ITS OWN (point 714). The material of a large range
     // is cut through the file set and reviewed one pass at a time, so a single
@@ -1242,7 +1599,7 @@ export function evaluateMechanismReview({
     const passRow = (r) => r?.pass !== undefined && r?.pass !== null
     // THE SPLIT IS READ OFF EVERY RECORD AT EVERY COVERING SHA, sound or not
     // (fourth cross-vendor round, widened by the fifth): a pass row excluded as
-    // a self-review or a broken merge still WITNESSES that the offering tool
+    // a same-vendor review or a broken merge still WITNESSES that the offering tool
     // measured a range containing THIS COMMIT as too large for one round — the
     // measurement stands whether or not that row's verdict may count, and a
     // MALFORMED one (an index outside its total, no file list) witnesses it no
@@ -1256,7 +1613,9 @@ export function evaluateMechanismReview({
     // way out stays honest and is always open: complete the recorded passes.
     // Only records that COMPOSE must be sound; the evidence of the split need
     // not be.
-    const split = legacyCovering.some(passRow)
+    // File-scoped rows are split evidence too. Excluding them let a pass-less
+    // whole-range row stand beside a recorded 1/3 and bypass completeness.
+    const split = covering.some((r) => !legacyContributionShape(r) && passRow(r))
     const besideSplit = split ? legacySound.filter((r) => !r?.pass) : []
     const valid = [
       ...(split ? [] : legacySound.filter((r) => !r?.pass)),
@@ -1329,32 +1688,56 @@ export function evaluateMechanismReview({
     // `containedShas`) and handed in as data; a clearing record whose fact is
     // missing answers nothing — no ancestry fact, no clearance — and a
     // same-sha re-record fixes nothing, exactly as at the sibling gate.
-    const clearing = valid.filter((r) => String(r.verdict) !== BLOCKING_VERDICT)
-    const refusals = valid.filter((r) => String(r.verdict) === BLOCKING_VERDICT)
-    const answers = (c, u) => {
-      if (String(c.sha) === String(u.sha)) return false
-      const fact = c.containedShas
-      const set = fact instanceof Set ? fact : Array.isArray(fact) ? new Set(fact.map(String)) : null
-      return set ? set.has(String(u.sha)) : false
-    }
-    const open = refusals.filter(
-      (u) => !clearing.some((c) => Number(c.at ?? 0) > Number(u.at ?? 0) && answers(c, u)),
-    )
+    const open = openRefusalsIn(valid)
     if (open.length) {
       const latest = open.reduce((a, b) => (Number(b.at ?? 0) >= Number(a.at ?? 0) ? b : a))
       findings.push({ kind: 'do-not-merge', commit, records: [latest] })
     }
   }
 
+  const duty = scopeMandatoryDuty({
+    owed: findings.length > 0,
+    fence,
+    guardId: 'mechanism-review-guard',
+    sessionId,
+    duty: 'the pending cross-vendor mechanism review',
+  })
+  if (duty.deferred) {
+    // `findings` and the unchanged baseline are the successor's durable debt.
+    return {
+      block: false,
+      clear: false,
+      bootstrap: false,
+      deferred: true,
+      reason: duty.message,
+      findings,
+      head,
+    }
+  }
   return { block: findings.length > 0, clear: findings.length === 0, bootstrap: false, findings, head }
 }
 
 /** Render the verdict as the guard's refusal — every offender, and the way out. */
-export function formatMechanismReviewVerdict(verdict) {
+export function formatMechanismReviewVerdict(verdict, { authorshipPlan = null } = {}) {
   if (!verdict?.block) return ''
+  if ((verdict.findings ?? []).some((finding) => finding.kind === 'missing-baseline')) {
+    return [
+      'FOUR-EYES GATE ON MECHANISMS: the local review baseline is missing.',
+      '',
+      'Absence cannot bootstrap at HEAD: on main that would make the pending range empty and',
+      'silently grandfather every outstanding mechanism review. This stop is refused. The guard',
+      'will seed its tracked-history recovery anchor when available. If this branch cannot reach',
+      'that anchor, merge origin/main into this branch. Then end the turn again so the guard can',
+      'seed the anchor and judge the complete range from it.',
+    ].join('\n')
+  }
+  const groups = Array.isArray(authorshipPlan?.groups) ? authorshipPlan.groups : []
+  const unreviewable = Array.isArray(authorshipPlan?.unreviewable) ? authorshipPlan.unreviewable : []
   const lines = [
-    'FOUR-EYES GATE ON MECHANISMS: a guard, gate or git hook changed here and no ' +
-      'second model has recorded a review of it.',
+    unreviewable.length
+      ? 'FOUR-EYES GATE ON MECHANISMS — UNREVIEWABLE: this range contains contributions with no eligible reviewer vendor.'
+      : 'FOUR-EYES GATE ON MECHANISMS: a guard, gate or git hook changed here and no ' +
+        'second model has recorded a review of it.',
     '',
   ]
   for (const f of verdict.findings) {
@@ -1395,6 +1778,8 @@ export function formatMechanismReviewVerdict(verdict) {
             `record — missing pass ${(p.missing ?? []).join(', ')}`,
           '      A pass covers the files it named; the range is cleared when every pass is recorded:',
           `      node scripts/review-sol.mjs --sha ${short(c.sha)} --brief "<what to judge>" --pass ${(p.missing ?? [])[0] ?? 1}`,
+          '      File debt is measured against the CURRENT END-STATE FILE: a complete scoped',
+          '      review at another covering sha also settles each current file that it names.',
         )
       }
       // COUNTING THE PASSES IS NOT COUNTING THE FILES. Passes that are all on
@@ -1428,6 +1813,12 @@ export function formatMechanismReviewVerdict(verdict) {
       if (problem === 'no-count') {
         return `      ${who} merged the union, but the record carries no count of it — a merge nobody counted`
       }
+      if (problem === 'unverified-halves') {
+        return (
+          '      the record names half authors the repository does not confirm — ' +
+          'a claim the committed halves cannot back clears nothing'
+        )
+      }
       return (
         `      the union was merged by ${who}, which wrote one of the two lists — ` +
         'a self-merge is where a finding disappears'
@@ -1440,20 +1831,53 @@ export function formatMechanismReviewVerdict(verdict) {
         ? `      authored by ${author}; no review recorded`
         : blind
           ? mergeLine()
-          : `      the only review on record is by ${author}'s own model — a self-review is not a review`,
+          : `      the only review on record is from ${author}'s vendor — a same-vendor review is not independent`,
     )
   }
-  lines.push(
-    '',
-    'A mechanism that is wrong is worse than none: the rule then COUNTS as enforced and',
-    'nobody looks again. Have the OTHER model review the change — plan and result — and',
-    'record what it said:',
-    '',
-    '  node scripts/mechanism-review.mjs --record <sha> --model <name> \\',
-    `      --verdict <${VERDICTS.join('|')}> --evidence "<one line>" --mode <${MODES.join('|')}>`,
-    '',
-    'One record covers every mechanism commit it contains, so reviewing the branch head is',
-    'enough. Inspect the gate with: node scripts/mechanism-review-guard.mjs --status',
-  )
+  if (unreviewable.length) {
+    lines.push('', 'UNREVIEWABLE end-state files (none may be treated as an ordinary missing review):')
+    for (const group of unreviewable) {
+      lines.push(
+        `  · ${(group.files ?? []).join(', ') || '<files unknown>'}: ` +
+          `${group.unreviewableReason || 'no configured reviewer vendor is eligible'}`,
+      )
+    }
+    lines.push(
+      '',
+      'No record by the configured reviewer chain can clear those files. Inspect the',
+      'authorship split with: node scripts/mechanism-review-guard.mjs --status',
+    )
+  } else if (groups.length > 1) {
+    lines.push('', 'This range MIXES AUTHORSHIP. Review it as these end-state file groups:')
+    for (const group of groups) {
+      lines.push(
+        `  · ${group.vendor || 'unknown'}-authored end-state files ` +
+          `→ ${group.reviewerVendor || 'unknown'} reviewer ${group.reviewer || '<none>'}: ` +
+          `${(group.files ?? []).join(', ') || '<files unknown>'}`,
+      )
+    }
+    lines.push(
+      '',
+      'Ask the planner for the runnable pass commands; each recorded pass clears only its',
+      'listed files at their reviewed end state, so the two vendors accumulate independent coverage:',
+      '',
+      `  node scripts/review-sol.mjs --sha ${short(verdict.head) || '<sha>'} --brief "<what to judge>"`,
+      '',
+      'Inspect the remaining file debt with: node scripts/mechanism-review-guard.mjs --status',
+    )
+  } else {
+    lines.push(
+      '',
+      'A mechanism that is wrong is worse than none: the rule then COUNTS as enforced and',
+      'nobody looks again. Have the OTHER vendor review the change — plan and result — and',
+      'record what it said:',
+      '',
+      '  node scripts/mechanism-review.mjs --record <sha> --model <name> \\',
+      `      --verdict <${VERDICTS.join('|')}> --evidence "<one line>" --mode review`,
+      '',
+      'One record covers every mechanism commit it contains, so reviewing the branch head is',
+      'enough. Inspect the gate with: node scripts/mechanism-review-guard.mjs --status',
+    )
+  }
   return lines.join('\n')
 }

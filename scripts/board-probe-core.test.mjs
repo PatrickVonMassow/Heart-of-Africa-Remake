@@ -23,9 +23,7 @@ import {
 import { watchdogDecision } from './board-currency-core.mjs'
 import {
   ALERT_PAUSE_RUNG,
-  PAUSE_MIN_PRIORITY,
   escalationDecision,
-  priorityRank,
 } from './alert-escalation-core.mjs'
 
 const ok = (body = '<html>') => ({ ok: true, body })
@@ -211,40 +209,45 @@ describe('the verdict names WHICH of the two happened', () => {
 // The alert assembly lives in `watchdogDecision`; these cases pin the two claims
 // the point makes about it, because a verdict nobody acts on differently is no
 // distinction at all.
-describe('a transport failure can never pause the batch, an outage still can', () => {
+describe('board reachability alerts can never manufacture a batch pause', () => {
   const alert = (verdict, reason) => watchdogDecision({ verdict, reason, state: {}, now: 1_000_000, lastKey: null })
 
-  it('a TRANSPORT failure is reported, under its own title, at a priority the ladder may not pause on', () => {
+  it('a TRANSPORT failure is reported under its own title and continues at the last rung', () => {
     const d = alert('transport', 'the CURRENCY transport could not be fetched, while the viewer answered')
     expect(d.notify).toBe(true)
     expect(d.title).toBe('Board transport hiccup')
     expect(d.message).toMatch(/not stale/)
-    // THE MECHANISM: the escalation ladder's pause rung is gated on the CALLER's
-    // priority (PAUSE_MIN_PRIORITY), so an alert raised below it is an EVENT that
-    // throttles for ever and never pauses. That is what makes rule 4 hold.
-    expect(priorityRank(d.priority)).toBeLessThan(priorityRank(PAUSE_MIN_PRIORITY))
+    expect(d.recurring).toBe(true)
     const top = escalationDecision({
       key: 'k',
+      title: d.title,
       now: 10_000_000,
       entry: { rung: ALERT_PAUSE_RUNG, lastSentAt: 0, firstSentAt: 0, sends: 5 },
       priority: d.priority,
+      recurring: d.recurring,
     })
     expect(top.action).toBe('send')
     expect(top.action).not.toBe('pause-and-send')
+    expect(top.nextRung).toBe(ALERT_PAUSE_RUNG)
+    expect(top.priority).toBe(d.priority)
+    expect(top.decisionCard).toBeUndefined()
   })
 
-  it('a genuinely UNREACHABLE board still climbs all the way to the pause', () => {
+  it('a genuinely UNREACHABLE board still climbs in priority but records continuation', () => {
     const d = alert('unreachable', 'neither the currency transport nor the viewer answered, for 2 consecutive probes')
     expect(d.notify).toBe(true)
     expect(d.title).toBe('Board unreachable')
-    expect(priorityRank(d.priority)).toBeGreaterThanOrEqual(priorityRank(PAUSE_MIN_PRIORITY))
+    expect(d.recurring).toBe(false)
     const top = escalationDecision({
       key: 'k',
+      title: d.title,
       now: 10_000_000,
       entry: { rung: ALERT_PAUSE_RUNG, lastSentAt: 0, firstSentAt: 0, sends: 5 },
       priority: d.priority,
     })
-    expect(top.action).toBe('pause-and-send')
+    expect(top.priority).toBe('urgent')
+    expect(top.action).toBe('continue-and-record')
+    expect(top.decisionCard).toMatch(/Board unreachable/)
   })
 
   it('a FLAKY probe wakes nobody at all', () => {

@@ -6,8 +6,10 @@
 // fell back to HEAD on Windows and grandfathered the branch's own work — the
 // gate reported "GATE CLEAR" on four unreviewed mechanism commits.
 import { describe, it, expect } from 'vitest'
+import { readFileSync } from 'node:fs'
 import {
   attachCoverage,
+  BASELINE_RECOVERY_ANCHOR,
   baselineFor,
   bootstrapBase,
   mechanismLogCommand,
@@ -15,6 +17,8 @@ import {
   rangeFilesCommand,
 } from './mechanism-review-guard.mjs'
 import { reviewGapRange } from './mechanism-review-guard-gap-core.mjs'
+import { evaluateMechanismReview, formatMechanismReviewVerdict } from './mechanism-review-core.mjs'
+import { repoPath } from './repo-paths.mjs'
 
 describe('baselineFor', () => {
   const state = { baselines: { main: 'aaa', 'feat/x': 'bbb' } }
@@ -37,26 +41,82 @@ describe('baselineFor', () => {
 })
 
 describe('bootstrapBase', () => {
-  it('QUOTES the revision — cmd.exe eats a bare ^ and the gate then armed at HEAD', () => {
-    // The regression, exactly: `main^{commit}` reached git as `main{commit}`,
-    // every lookup failed, and the fallback below silently grandfathered a whole
-    // branch. Asserting the argument pins it without needing a repository.
+  it('recovers only from the immutable tracked anchor, quoted for cmd.exe', () => {
     const asked = []
     const head = 'headsha'
     expect(
       bootstrapBase(head, (rev) => {
         asked.push(rev)
-        throw new Error('no such ref')
-      }),
-    ).toBe(head)
-    expect(asked[0]).toContain('"main^{commit}"')
-    expect(asked[1]).toContain('"origin/main^{commit}"')
+        return BASELINE_RECOVERY_ANCHOR
+      }, () => true),
+    ).toBe(BASELINE_RECOVERY_ANCHOR)
+    expect(asked).toEqual([`--verify --quiet "${BASELINE_RECOVERY_ANCHOR}^{commit}"`])
   })
 
-  it('falls back to HEAD when no integration branch resolves', () => {
-    // The grandfathering the point asks for: a checkout with no main to fork
-    // from owes nothing for its history.
-    expect(bootstrapBase('headsha', () => '')).toBe('headsha')
+  it('never falls back to HEAD when the anchor is absent', () => {
+    expect(bootstrapBase('headsha', () => '')).toBe(null)
+  })
+
+  it('refuses an unreachable anchor and names the merge that makes recovery possible', () => {
+    const head = 'headsha'
+    const baseline = bootstrapBase(head, () => BASELINE_RECOVERY_ANCHOR, () => false)
+    expect(baseline).toBe(null)
+
+    const verdict = evaluateMechanismReview({
+      baseline,
+      baselineMissing: true,
+      head,
+      pendingCommits: [],
+      records: [],
+    })
+    expect(verdict).toMatchObject({ block: true, clear: false })
+    expect(formatMechanismReviewVerdict(verdict)).toContain('merge origin/main into this branch')
+  })
+})
+
+describe('historical ledger eras', () => {
+  it('keeps every named historical refusal reviewable without changing its verdict', () => {
+    const named = [
+      '042ffbf',
+      '5ce597c',
+      '65022b1',
+      '7db99ea',
+      '80b96e6',
+      'c3f5ad8',
+      'e0ebcff',
+      'e1d242a',
+      'ece3757',
+      'f999250',
+      'fe20777',
+    ]
+    const ledger = readFileSync(repoPath('.claude/mechanism-reviews.jsonl'), 'utf8')
+      .trim()
+      .split('\n')
+      .map((line) => JSON.parse(line))
+
+    for (const shortSha of named) {
+      const row = ledger.find(
+        (record) => String(record.sha ?? '').startsWith(shortSha) && record.verdict === 'do-not-merge',
+      )
+      expect(row, shortSha).toBeTruthy()
+      const reviewerIsAnthropic = /claude|opus|fable/i.test(String(row.model))
+      const verdict = evaluateMechanismReview({
+        baseline: 'b',
+        head: 'h',
+        pendingCommits: [{
+          sha: shortSha.padEnd(40, '0'),
+          subject: `historical refusal ${shortSha}`,
+          at: Number(row.at) - 1,
+          authorModel: reviewerIsAnthropic ? 'GPT-5.6 Sol' : 'Claude Opus 5',
+          files: [row.pass?.files?.[0] ?? 'scripts/historical-guard.mjs'],
+          coveringRecordShas: [row.sha],
+        }],
+        records: [row],
+      })
+      expect(verdict.block, shortSha).toBe(true)
+      expect(verdict.findings.some((finding) => finding.kind === 'malformed-record'), shortSha).toBe(false)
+      expect(formatMechanismReviewVerdict(verdict), shortSha).not.toContain('is malformed')
+    }
   })
 })
 
@@ -73,7 +133,7 @@ describe('parseMechanismLog', () => {
   // appear in a quoted-on path line, so no file name can forge a boundary.
   const REC = String.fromCharCode(0x1e)
   const FLD = String.fromCharCode(0x1f)
-  const header = (sha) => `${REC}${sha}${FLD}1723000000`
+  const header = (sha, parents = []) => `${REC}${sha}${FLD}1723000000${FLD}${parents.join(' ')}`
   const files = ['x-guard.mjs']
 
   it('keeps a path with a trailing space BYTE-EXACT, never its trimmed spelling', () => {
@@ -82,7 +142,12 @@ describe('parseMechanismLog', () => {
     expect(commits).toHaveLength(1)
     expect(commits[0].files).toEqual(['scripts/git-hooks/check '])
     expect(commits[0].files).not.toContain('scripts/git-hooks/check')
-    expect(commits[0]).toMatchObject({ sha: SHA, at: 1723000000000 })
+    expect(commits[0]).toMatchObject({ sha: SHA, at: 1723000000000, parentShas: [] })
+  })
+
+  it('carries only machine-shaped parent shas for merge attribution', () => {
+    const out = [header(SHA, [SHB, 'c'.repeat(40)]), '', 'scripts/x-guard.mjs', ''].join('\n')
+    expect(parseMechanismLog(out, files)[0].parentShas).toEqual([SHB, 'c'.repeat(40)])
   })
 
   // ROUND-1 PASS 2: the header used to carry the subject and the trailers behind
@@ -189,7 +254,7 @@ describe('the path-carrying git commands', () => {
       '-c',
       'core.quotepath=on',
       'log',
-      '--format=%x1e%H%x1f%ct',
+      '--format=%x1e%H%x1f%ct%x1f%P',
       '--name-only',
       '--no-renames',
       '--diff-merges=cc',
@@ -308,6 +373,7 @@ describe('attachCoverage', () => {
     const rec = (index) => ({
       sha: recSha,
       model: 'GPT-5.6 Sol',
+      reviewerAuthorship: { status: 'unverified', claimedModel: 'GPT-5.6 Sol', reason: 'fixture transcript absent' },
       authoredBy: 'Claude Opus 5 <noreply@anthropic.com>',
       verdict: 'merge',
       evidence: 'checked the guard change against its spec end to end',

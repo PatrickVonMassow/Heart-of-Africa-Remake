@@ -101,10 +101,14 @@ export function formatPassManifest(plan, pass) {
   const patchOnly = new Set(pass?.patchOnly ?? [])
   const absentByDesign = new Map((pass?.absentByDesign ?? []).map((entry) => [entry.path, entry.reason]))
   const carried = pass?.files ?? []
+  const unavailable = (plan?.unreviewable ?? []).flatMap((group) => group?.files ?? [])
   const lines = [
     `=== REVIEW PASS ${index}/${total} — THE SHAPE OF THIS MATERIAL ===`,
-    `This range is too large for one review round, so it is reviewed in ${total} passes over its`,
-    'FILE SET, whose union covers the range. This material is ONE of those passes. The DIFFSTAT',
+    `This range is reviewed in ${total} runnable ${total === 1 ? 'pass' : 'passes'} over its REVIEWABLE FILE SET.`,
+    unavailable.length
+      ? 'Files for which no independent reviewer vendor exists are named separately below and remain owed.'
+      : 'The runnable passes together cover the complete changed file set.',
+    'This material is ONE of those passes. The DIFFSTAT',
     'below describes the WHOLE range for context: it names files this pass deliberately omits.',
     `THIS PASS CARRIES ${carried.length} file(s), each at the delivery level stated:`,
   ]
@@ -127,6 +131,10 @@ export function formatPassManifest(plan, pass) {
   if ((plan?.uncoverable ?? []).length) {
     lines.push('BEYOND THE REACH OF ANY PASS — no round can hold these; NO pass covers them:')
     for (const u of plan.uncoverable) lines.push(`  · ${quotePassFile(u.path)}`)
+  }
+  if (unavailable.length) {
+    lines.push('UNAVAILABLE TO THE REVIEWER CHAIN — this pass does not cover these files:')
+    for (const path of unavailable) lines.push(`  · ${quotePassFile(path)}`)
   }
   lines.push(
     'A file declared ABSENT BY DESIGN here is NOT truncated — the two mean opposite things:',
@@ -945,11 +953,9 @@ export function passByIndex(plan, index) {
 /**
  * Coverage of a complete pass plan, or of one selected pass within it.
  *
- * This is FILE-CONTRIBUTION coverage, deliberately: pass records clear named
- * files and, for authorship splits, named commit contributions. A mixed-vendor
- * file therefore has one assignment per contribution group and is reported as
- * split; a character-weighted percentage would claim a precision the ledger
- * cannot reproduce.
+ * This is END-STATE FILE coverage, deliberately: every net-changed path is one
+ * assignment regardless of how many commits touched it. A character-weighted
+ * percentage would claim a precision the ledger cannot reproduce.
  */
 export function reviewCoverage(plan = null, pass = null) {
   const passes = Array.isArray(plan?.passes) ? plan.passes : []
@@ -993,7 +999,7 @@ export function formatReviewCoverage(plan, pass = null) {
   const block = pass ? `; block ${pass.index}/${pass.total}` : `; ${blockCount} block(s)`
   const names = (paths) => (paths.length ? paths.map(quotePassFile).join(', ') : 'none')
   return [
-    `Coverage: ${label} — ${coverage.percent}% of file contributions (${coverage.covered}/${coverage.total})${block}.`,
+    `Coverage: ${label} — ${coverage.percent}% of changed files (${coverage.covered}/${coverage.total})${block}.`,
     `  files read whole: ${names(coverage.whole)}`,
     `  oversized files read as complete diff only: ${names(coverage.diffOnly)}`,
     `  opaque bodies declared, with their complete diff read: ${names(coverage.opaque)}`,
@@ -1013,7 +1019,7 @@ export function formatCoveragePlan(plan) {
   const split = coverage.splitFiles.length
     ? `; split across blocks: ${coverage.splitFiles.map(quotePassFile).join(', ')}`
     : ''
-  return `  Coverage plan: ${status} (${coverage.covered}/${coverage.total} file contributions); ${dropped}${split}.`
+  return `  Coverage plan: ${status} (${coverage.covered}/${coverage.total} changed files); ${dropped}${split}.`
 }
 
 /**
@@ -1284,9 +1290,10 @@ export function formatShortfall(shortfall, { sha = '', plan = null } = {}) {
 /**
  * The `--pass k/n` value, parsed.
  *
- * Refuses n = 1: a single pass is an ordinary whole-range record, and letting one
- * be recorded as a pass would put a composition marker on a review that never
- * needed one — the gate would then wait forever for a pass 2 nobody owes.
+ * `1/1` is meaningful for a BOUNDED review: it says the one round covered only
+ * the end-state files named beside it. The recorder stores its reviewed sha, so
+ * it can never masquerade as an ordinary whole-range record. Larger totals are
+ * the size/authorship split used by passComposition for legacy rows.
  */
 export function parsePassSpec(value) {
   const raw = String(value ?? '').trim()
@@ -1297,8 +1304,8 @@ export function parsePassSpec(value) {
   const index = Number(m[1])
   const total = Number(m[2])
   const errors = []
-  if (total < 2) {
-    errors.push('--pass <k>/<n>: n must be at least 2 — one pass over the whole range is an ordinary record')
+  if (total < 1) {
+    errors.push('--pass <k>/<n>: n must be at least 1')
   }
   // BOUNDED, so no ledger row can spin the gate (final-round pass 5): the
   // composition walks 1..total, and a hand-written huge total would hang the
