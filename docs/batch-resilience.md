@@ -339,20 +339,21 @@ open points in `TASKS.md`. It also cannot go red, because the morning it was
 written the owner's inbox was flooded by 53 failed runs and a watchdog that fails
 would add to the noise it exists to cut through.
 
-### Layer 5 — a child's transient death is retryable, an environment outage is not
+### Layer 5 — a child's death always leaves a bounded recovery
 
 Transience is an **allowlist**: HTTP 5xx/429/529, ECONNRESET/ETIMEDOUT, the
-harness's own "API error" death. A red gate, a guard block or an escalated brief is
-never transient, and the default is no retry. At most two retries with backoff, on
-the same branch and the same brief revision; if the child committed since its spawn,
-the retry prompt says CONTINUE, not repeat.
+harness's own "API error" death. A red gate, guard block or escalated brief is
+never transient. At most two immediate retries run with backoff on the same branch
+and brief revision; if the child committed since its spawn, the retry prompt says
+CONTINUE, not repeat. Every other result is diagnosed and scheduled, not abandoned.
 
-Three stop conditions, and the first is the lesson of this night: **the same
+Three recovery bounds, and the first is the lesson of this night: **the same
 transient signature across two or more children inside one window is an environment
-outage, not bad luck** — pause and report instead of retrying, because both agents
-died on the same 500 and two retries each would have bought four more deaths.
-Never retry a child that already reported a step complete. And cap the tokens a
-single point may consume.
+outage, not bad luck** — set a restart clock instead of retrying immediately,
+because both agents died on the same 500 and two retries each would have bought
+four more deaths. Never rebuild a child that already reported a step complete.
+Cap the tokens a single point may consume, then requeue that point while the queue
+continues (or re-open it with `--critical`).
 
 **BUILT 30.07.2026** as a pure decision core plus one command, because the party
 that spawns children is the MAIN SESSION and no hook fires when a delegated agent
@@ -362,10 +363,10 @@ decides anything itself:**
 
 ```
 node scripts/child-retry.mjs --point <n> --branch <ref> --death "<what the harness said>"
-     [--child <agent id>] [--brief-revision <sha>] [--reported-complete] [--tokens <n>]
+     [--child <agent id>] [--brief-revision <sha>] [--reported-complete] [--critical] [--tokens <n>]
 ```
 
-It answers exactly one of four verdicts and never spawns anything:
+It answers exactly one of five verdicts and never spawns anything:
 
 - **RETRY** — with the backoff to wait out (2 min, then 8 min) and a prompt hint
   that says CONTINUE where the child had already committed and REPEAT where it
@@ -377,32 +378,33 @@ It answers exactly one of four verdicts and never spawns anything:
   reason `--committed` / `--no-committed` can override it. Any git failure
   answers "not committed": evidence that cannot be established never counts as
   established.
-- **NO-RETRY** — the default. A death outside the allowlist, a child that
-  reported a step complete, a changed branch or brief revision, the second retry
-  already spent, or the point's token budget gone.
-- **OUTAGE-PAUSE** — two distinct children dead of the same signature inside 15
-  minutes. It pauses the batch, writes a German reason into
-  `.claude/batch-paused`, files a board card and sends an urgent notification.
-  Nothing is retried.
+- **RECOVER** — branch evidence chooses `resume`, `fix`, or `exchange`; a spent
+  retry/token budget chooses `requeue`, or `reopen` for a critical point. The
+  state and board card carry the evidence, consequence, capped next attempt and
+  exact retroactive-veto choices.
+- **OUTAGE-PROBE** — two distinct children dead of the same signature inside 15
+  minutes. It writes a typed pause whose `retry-after` is the child lane's capped
+  clock, persists the probe decision and sends an urgent notification. It never
+  creates a clockless circuit breaker.
+- **SCHEDULED** — the point already has a recovery whose capped clock has not
+  elapsed. The duplicate invocation records no death and takes no action early.
 - **STAND-DOWN** — the batch is paused, or this session does not own the lock.
   It records nothing in that case; a session that may not act leaves no
   footprints either.
 
 The exit code is always 0 — the verdict is the output, not the status. An
-internal error degrades to "no automatic verdict, decide by hand": fail-open in
-the sense that it never traps the session, but deliberately NOT to "retry",
-because a retry taken on a decision the code could not make is the exact
-retry-into-an-outage this layer exists to prevent. Its runtime state (the outage
-window and the per-point retry/token budget) lives in `.claude/resilience/`;
-deleting it forgets the window, never work. `--status`, `--complete --point <n>`
-and `--forget --point <n>` read and adjust it by hand.
+internal error degrades to a clocked `exchange` record, not an immediate retry
+and not a person-only verdict. Its runtime state (the outage window and the
+per-point retry/token budget) lives in `.claude/resilience/`; deleting it forgets
+the window, never work. `--status`, `--complete --point <n>` and `--forget
+--point <n>` let the owning agent read and adjust it explicitly.
 
 **It is deliberately NOT idempotent per death.** Running the identical command
 twice for ONE death books two retries against that point's budget. The command
 has a single disciplined caller — the main session, once per dead child — and a
 death carries no id the command could deduplicate on without inventing one. The
-failure mode is therefore the safe direction: a double-run exhausts the budget
-early and stops retrying, it never grants an extra attempt. `--forget --point
+failure mode is therefore the safe direction: a double-run exhausts the immediate
+budget early and moves the point to its recovery schedule; it never grants an extra attempt. `--forget --point
 <n>` re-opens a budget spent by mistake.
 
 **THE ESCALATION LADDER, the remainder of part (1), built with it** — the

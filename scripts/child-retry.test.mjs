@@ -3,11 +3,11 @@
 // edges cannot turn a correct decision into a wrong one, and that a broken
 // environment degrades instead of throwing.
 import { describe, it, expect, beforeEach, afterEach } from 'vitest'
-import { mkdtempSync, rmSync, writeFileSync, readFileSync, existsSync } from 'node:fs'
+import { mkdtempSync, rmSync, writeFileSync, readFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
-import { join } from 'node:path'
+import { join, resolve } from 'node:path'
 import { POINT_TOKEN_CAP } from './child-retry-core.mjs'
-import { readState, writeState, tokenCap, committedOnBranch, logLine, boardCard } from './child-retry.mjs'
+import { readState, writeState, tokenCap, committedOnBranch, diagnoseBranch, logLine } from './child-retry.mjs'
 
 let dir
 beforeEach(() => {
@@ -85,14 +85,29 @@ describe('committedOnBranch — judged by OUTPUT, never by a log', () => {
   })
 })
 
+describe('diagnoseBranch — terminal scheduling reads durable git evidence', () => {
+  it('distinguishes a missing branch from an existing one', () => {
+    expect(diagnoseBranch('feat/does-not-exist-9f3a')).toEqual({
+      exists: false,
+      committedSinceSpawn: false,
+      branch: 'feat/does-not-exist-9f3a',
+    })
+    expect(diagnoseBranch('HEAD')).toMatchObject({ exists: true, branch: 'HEAD' })
+  })
+
+  it('fails closed to missing evidence outside a repository', () => {
+    expect(diagnoseBranch('HEAD', { cwd: dir })).toEqual({ exists: false, committedSinceSpawn: false, branch: 'HEAD' })
+  })
+})
+
 describe('the reason reaches the morning reader', () => {
   it('logLine appends a timestamped line', () => {
     const p = join(dir, 'child-retry.log')
     logLine('point 421 died: http-500 → retry', p)
-    logLine('point 421 died: http-500 → outage-pause', p)
+    logLine('point 421 died: http-500 → outage-probe', p)
     const text = readFileSync(p, 'utf8')
     expect(text.split('\n').filter(Boolean)).toHaveLength(2)
-    expect(text).toMatch(/outage-pause/)
+    expect(text).toMatch(/outage-probe/)
   })
 
   it('logLine swallows an unwritable path instead of losing the decision with it', () => {
@@ -101,8 +116,34 @@ describe('the reason reaches the morning reader', () => {
     expect(() => logLine('x', join(dir, 'no-such-dir', 'a.log'))).not.toThrow()
   })
 
-  it('boardCard reports failure instead of throwing when the board command cannot run', () => {
-    expect(boardCard('t', 'q', { cwd: dir })).toBe(false)
-    expect(existsSync(join(dir, '.batch-dashboard.html'))).toBe(false)
+  it('exports no board writer at all any more (point 749)', async () => {
+    // "Batch pausiert: Umgebungsausfall" used to be posted under "Von dir zu
+    // klären", where it asked the user to check a machine-side outage and then
+    // outlived the retry clock that cleared it. There is no writer left to call:
+    // the pause marker and the retry state are the record, and the board derives
+    // its state card from them.
+    const module = await import('./child-retry.mjs')
+    expect(Object.keys(module).filter((name) => /^board/.test(name))).toEqual([])
+  })
+})
+
+describe('the CLI wires terminal decisions without a person-only exit', () => {
+  const source = readFileSync(resolve(process.cwd(), 'scripts', 'child-retry.mjs'), 'utf8')
+
+  it('persists the recovery record in the retry state and reaches no decision section', () => {
+    expect(source).toMatch(/recordRecovery\(next, decision\)/)
+    // Point 749: NO call site here may reach the user's decision section.
+    expect(source).not.toMatch(/vdzk-add/)
+    expect(source).not.toMatch(/boardCard\(/)
+  })
+
+  it('writes the outage pause with the decision clock, never a clockless marker', () => {
+    expect(source).toMatch(/setPaused\(reason, \{ cause: 'outage', retryAfter: decision\.retryAt \}\)/)
+    expect(source).not.toMatch(/outage-pause|NO-RETRY|by hand/)
+  })
+
+  it('turns an internal classifier error into a capped exchange record', () => {
+    expect(source).toMatch(/fallbackRecoveryDecision\(\{/)
+    expect(source).toMatch(/writeState\(recordRecovery\(readState\(\), decision\)\)/)
   })
 })

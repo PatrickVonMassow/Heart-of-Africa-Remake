@@ -6,6 +6,7 @@
 //   node scripts/board-queue.mjs set <N> "<text>"   # write one point's prose
 //   node scripts/board-queue.mjs set <N> --title --text-stdin      # …its German title
 //   node scripts/board-queue.mjs set <N> --estimate "~2 h"         # …its estimate
+//   node scripts/board-queue.mjs set <N> --estimate "~1 h" --if-estimate "~2 h"
 //   node scripts/board-queue.mjs import             # add cards the data lacks, from the board
 //
 // GERMAN TEXT GOES IN ON STDIN (point 439, the rule of point 410): `--text-stdin`
@@ -28,11 +29,11 @@
 // already promoted would trip the double-listing invariant (4b) and block the
 // turn that published it.
 import { existsSync, readFileSync } from 'node:fs'
-import { resolve } from 'node:path'
+import { dirname, resolve } from 'node:path'
 import { writeTextAtomic } from './atomic-write.mjs'
 import { REPO_ROOT, STATE_PATH, readJson } from './dashboard-state.mjs'
 import { parseKlaerungPoints, parseNowCardPoints } from './dashboard-guard-core.mjs'
-import { normaliseLineEndings } from './board-core.mjs'
+import { normaliseLineEndings, renderCardCriticalities } from './board-core.mjs'
 import {
   ESTIMATE_CMD,
   QUEUE_DATA_PATH,
@@ -47,17 +48,27 @@ import {
   parseSetArgs,
   parseTaskTitles,
   queueImportOffenders,
+  estimateCompareDecision,
   setQueueEntry,
   unestimatedPoints,
   untranslatedTitlePoints,
 } from './board-queue-core.mjs'
+import { withBoardEditLock } from './board-edit-lock.mjs'
+import { CALIBRATION_PATH, parseCriticality, pictureBearingPoints } from './queue-calibration-core.mjs'
 import { carrierPath } from './findings-paths.mjs'
 import { pendingRequests, requestRoute } from './findings-request-core.mjs'
 import { gateReport, gateSets } from './user-gate-core.mjs'
+import { readTasksAll } from './tasks-source.mjs'
 
 const state = readJson(STATE_PATH) ?? {}
 const boardFile = resolve(REPO_ROOT, state.dashboardPath ?? '.batch-dashboard.html')
-const dataFile = resolve(REPO_ROOT, QUEUE_DATA_PATH)
+const dataFile = process.env.HOA_QUEUE_DATA_FILE
+  ? resolve(process.env.HOA_QUEUE_DATA_FILE)
+  : resolve(REPO_ROOT, QUEUE_DATA_PATH)
+// The lock follows the DATA. A calibration process in an isolation worktree can
+// target the main checkout's state file; locking its own worktree would serialize
+// the wrong writers and put the lost-update race back.
+const boardEditLockPath = resolve(dirname(dataFile), 'board-edit-lock.json')
 const tasksFile = resolve(REPO_ROOT, 'TASKS.md')
 const [cmd, ...rest] = process.argv.slice(2)
 
@@ -89,7 +100,7 @@ function reportEntries(entries, tasksText = '') {
   // opening the work order, or the skip is indistinguishable from a point
   // quietly falling off the board.
   const gated = gatedEntryPoints(entries)
-  if (gated.length) console.log(`  waiting on the user (skipped, card says so): ${gated.join(', ')}`)
+  if (gated.length) console.log(`  awaiting confirmation (skipped, card says so): ${gated.join(', ')}`)
   // The report is NOT nested inside that condition (four-eyes review, Fable 5):
   // an ANSWERED point — back at the head of the queue — and a leftover marker
   // are exactly the states with no gated card to trigger the report.
@@ -123,6 +134,34 @@ function carrierRequests() {
   }
 }
 
+/**
+ * WHAT A CARD NOBODY ESTIMATED INHERITS (point 730) — the measured medians per
+ * criticality class, written by `queue-calibration.mjs`.
+ *
+ * FAIL-SOFT: the file is git-ignored state like the queue data itself, so a fresh
+ * checkout simply has none, and a queue rebuild must not stop for that. Without
+ * it every unestimated card shows the "no estimate yet" marker exactly as before.
+ */
+function calibration(tasksText) {
+  try {
+    const file = resolve(REPO_ROOT, CALIBRATION_PATH)
+    if (!existsSync(file)) return null
+    const { defaults } = JSON.parse(readFileSync(file, 'utf8')) ?? {}
+    if (!defaults || typeof defaults !== 'object') return null
+    return {
+      defaults,
+      criticality: parseCriticality(tasksText),
+      // The measurement's own limit travels with its medians: it is blind to what
+      // a picture check costs, so a point that owes one inherits nothing. Read
+      // from the WORK ORDER rather than the stored list, so a point filed since
+      // the last measurement is judged too.
+      pictureBearing: pictureBearingPoints(tasksText),
+    }
+  } catch {
+    return null
+  }
+}
+
 /** Board, work order and the exclusions the other sections already own. */
 function inputs() {
   if (!existsSync(boardFile)) throw new Error(`board not found: ${boardFile}`)
@@ -133,6 +172,7 @@ function inputs() {
     tasks,
     open: openPointsOf(tasks),
     titles: parseTaskTitles(tasks),
+    calibration: calibration(tasks),
     // The user gate (point 450): which points wait on the user, which he has
     // answered, and since when.
     gates: gateSets(tasks),
@@ -156,50 +196,75 @@ try {
     }
     const fields = ['title', 'body', 'estimate'].filter((f) => parsed[f])
     if (!parsed.point || fields.length === 0) {
-      throw new Error('usage: board-queue.mjs set <N> ["<text>"] [--title …] [--estimate "~2 h"] [--text-stdin]')
+      throw new Error(
+        'usage: board-queue.mjs set <N> ["<text>"] [--title …] [--estimate "~2 h"] [--if-estimate "~old h"] [--text-stdin]',
+      )
     }
-    writeData(setQueueEntry(readData(), parsed.point, parsed))
-    console.log(`${fields.join(' + ')} for point ${parsed.point} stored in ${QUEUE_DATA_PATH}`)
-    console.log('Render it into the board: node scripts/board-queue.mjs')
+    const result = withBoardEditLock(() => {
+      const current = readData()
+      if (parsed.ifEstimate !== null) {
+        const stored = current?.points?.[String(Number(parsed.point))]?.estimate ?? null
+        const decision = estimateCompareDecision(stored, parsed.ifEstimate)
+        if (!decision.matched) return { refused: true, decision }
+      }
+      writeData(setQueueEntry(current, parsed.point, parsed))
+      return { refused: false }
+    }, { lockPath: boardEditLockPath })
+    if (result.refused) {
+      console.error(
+        `compare-and-set refused for point ${parsed.point}: expected ${JSON.stringify(result.decision.expected)}, ` +
+          `found ${JSON.stringify(result.decision.current)}; nothing was written`,
+      )
+      process.exitCode = 3
+    } else {
+      console.log(`${fields.join(' + ')} for point ${parsed.point} stored in ${QUEUE_DATA_PATH}`)
+      console.log('Render it into the board: node scripts/board-queue.mjs')
+    }
   } else if (cmd === 'import') {
     // Seed the data from cards the board carries but the data does not know yet.
     // ADDITIVE ONLY (point 530): a stored body is never replaced, and nothing is
     // written at all while the result would put an over-long card on the board.
-    const { data, added, kept } = mergeQueueImport(readData(), importQueueFromHtml(readFileSync(boardFile, 'utf8')), {
-      titles: parseTaskTitles(readFileSync(tasksFile, 'utf8')),
-    })
-    const offenders = queueImportOffenders(data)
-    if (offenders.length) {
-      throw new Error(
-        `import refused — ${offenders.length} card(s) would go on the board too long or unbroken: ` +
-          `${offenders.map((o) => `${o.point}: ${o.reason}`).join(' | ')}. ` +
-          'Nothing was written. Give each of them its paragraphs back (a blank line splits them): ' +
-          'node scripts/board-queue.mjs set <N> --text-stdin',
+    const { added, kept } = withBoardEditLock(() => {
+      const { data, added: nextAdded, kept: nextKept } = mergeQueueImport(
+        readData(),
+        importQueueFromHtml(readFileSync(boardFile, 'utf8')),
+        { titles: parseTaskTitles(readFileSync(tasksFile, 'utf8')) },
       )
-    }
-    writeData(data)
+      const offenders = queueImportOffenders(data)
+      if (offenders.length) {
+        throw new Error(
+          `import refused — ${offenders.length} card(s) would go on the board too long or unbroken: ` +
+            `${offenders.map((o) => `${o.point}: ${o.reason}`).join(' | ')}. ` +
+            'Nothing was written. Give each of them its paragraphs back (a blank line splits them): ' +
+            'node scripts/board-queue.mjs set <N> --text-stdin',
+        )
+      }
+      writeData(data)
+      return { added: nextAdded, kept: nextKept }
+    }, { lockPath: boardEditLockPath })
     console.log(
       `import: ${added.length} card(s) added${added.length ? ` (${added.join(', ')})` : ''}, ` +
         `${kept} already known (stored fields kept, empty ones filled from the board) → ${QUEUE_DATA_PATH}`,
     )
   } else if (cmd === '--check' || cmd === undefined) {
-    const { html, tasks, open, titles, exclude, requests, gates } = inputs()
-    const built = buildQueueSection(html, { open, data: readData(), exclude, titles, requests, gates })
+    const { html, tasks, open, titles, exclude, requests, gates, calibration: measured } = inputs()
+    const built = buildQueueSection(html, { open, data: readData(), exclude, titles, requests, gates, calibration: measured })
+    const rendered = renderCardCriticalities(normaliseLineEndings(built.html), readTasksAll())
     const saySoIfRequests = () => {
       if (requests.length) {
         console.log(`  ${requests.length} deposited request(s) named under the queue — node scripts/finding.mjs --requests`)
       }
     }
     if (cmd === '--check') {
-      console.log(`${built.entries.length} queue card(s) would be rendered${built.html === html ? ' (no change)' : ''}`)
+      console.log(`${built.entries.length} queue card(s) would be rendered${rendered === html ? ' (no change)' : ''}`)
       reportEntries(built.entries, tasks)
       saySoIfRequests()
-      process.exitCode = built.html === html ? 0 : 1
+      process.exitCode = rendered === html ? 0 : 1
     } else {
       // Atomic (point 443, four-eyes F3): a kill mid-write leaves torn bytes that
       // the doctor's board repair would push to the public page. LF-normalised
       // (point 439) so a hand edit's CRLF cannot outlive one rebuild.
-      const out = normaliseLineEndings(built.html)
+      const out = rendered
       if (out !== html) writeTextAtomic(boardFile, out)
       console.log(`queue rebuilt from the work order: ${built.entries.length} card(s)${out === html ? ' (unchanged)' : ''}`)
       reportEntries(built.entries, tasks)
@@ -207,7 +272,9 @@ try {
       console.log('Publish it: node scripts/board-publish.mjs')
     }
   } else {
-    console.error('usage: board-queue.mjs [--check] | set <N> ["<text>"] [--title …] [--estimate …] | import')
+    console.error(
+      'usage: board-queue.mjs [--check] | set <N> ["<text>"] [--title …] [--estimate …] [--if-estimate …] | import',
+    )
     process.exitCode = 2
   }
 } catch (e) {

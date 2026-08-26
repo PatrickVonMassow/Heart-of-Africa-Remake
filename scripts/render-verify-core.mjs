@@ -19,6 +19,7 @@
 // point. The two are never conflated — see runVerdict.
 
 import { RED_CHARGES } from './render-verify-charges.mjs'
+import { scopeMandatoryDuty } from './mandatory-duty-core.mjs'
 
 /** Both renderer backends the game ships; each needs a passing verify run. */
 export const BACKENDS = ['webgpu', 'webgl']
@@ -85,6 +86,7 @@ export const NON_RENDER_VERIFY = new Set([
   'machine-load.mjs',
   'run-all.mjs',
   'run-digest-core.mjs', // which of a run's OUTPUT lines the caller reads; it draws nothing
+  'run-logged-args.mjs', // pure CLI parsing and output-line caps for the logging wrapper
   'run-logged.mjs', // the logging wrapper around run-all; it spawns the runner, it does not render
   'run-record.mjs', // the run's own bookkeeping file (point 592); it counts frames, it draws none
   'run-wait-core.mjs', // the poll budget and the receipt's shape; pure arithmetic over a run
@@ -1106,6 +1108,26 @@ function incompleteRecordingParagraph(incomplete) {
 
 const ALLOW = { decision: 'allow' }
 
+/**
+ * A pending picture check is real work: it runs a browser suite, and may run an
+ * eight-attempt throttle probe. Once the context boundary is committed this
+ * session may not begin either. Keep the original block as the successor's
+ * debt, but turn it into the same explicit handoff used by the other mandatory
+ * Stop duties.
+ */
+function scopeRenderVerification(block, { fence = null, sessionId = '' } = {}) {
+  const scoped = scopeMandatoryDuty({
+    owed: block?.decision === 'block',
+    fence,
+    guardId: 'render-verify-guard',
+    sessionId,
+    duty: 'the pending render verification and any diagnostic reruns it requires',
+  })
+  return scoped.deferred
+    ? { decision: 'defer', deferred: true, reason: scoped.message, debt: block }
+    : block
+}
+
 /** How many waved-through reds one deferral record keeps. A bound, because the
  *  state file is read on every turn — never a silent one: the count that goes
  *  with it is the real number. */
@@ -1141,6 +1163,8 @@ export function evaluate(input) {
     openPoints = null,
     ledger = RED_CHARGES,
     incompleteClosures = null,
+    fence = null,
+    sessionId = '',
   } = input ?? {}
 
   // Garbage where the path list should be: fail open, but do NOT advance the
@@ -1243,7 +1267,7 @@ export function evaluate(input) {
       )
     }
     if (incomplete.length > 0) parts.push(incompleteRecordingParagraph(incomplete))
-    return { decision: 'block', reason: parts.join(' ') }
+    return scopeRenderVerification({ decision: 'block', reason: parts.join(' ') }, { fence, sessionId })
   }
 
   if (missing.length === 0) {
@@ -1324,7 +1348,7 @@ export function evaluate(input) {
     .map((b) => `VERIFY_GL=${b} node scripts/verify/run-all.mjs ${suite}`)
     .join('  AND  ')
   const label = missing.length === 2 ? 'EITHER BACKEND' : missing[0].toUpperCase()
-  return {
+  return scopeRenderVerification({
     decision: 'block',
     reason:
       `RENDER CHANGE NOT VERIFIED ON ${label}: commits since ${String(clearedHead).slice(0, 7)} ` +
@@ -1355,5 +1379,5 @@ export function evaluate(input) {
       // Named in THIS branch too: an incomplete recording must never hide
       // behind a missing backend or a later red (round-5 finding 3).
       (incompleteInWindow.length > 0 ? ` ${incompleteRecordingParagraph(incompleteInWindow)}` : ''),
-  }
+  }, { fence, sessionId })
 }

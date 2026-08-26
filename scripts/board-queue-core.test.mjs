@@ -49,9 +49,14 @@ import {
   commissionDecision,
   commissionRefusal,
   COMMISSION_OVERRIDE_CMD,
+  estimateCompareDecision,
 } from './board-queue-core.mjs'
 import { gateSets } from './user-gate-core.mjs'
 import { POOL_CAP } from './batch-in-flight-core.mjs'
+
+const CONFIRMATION_REASON = 'release-tag: push the version tag, safe prepared state: verified locally and no tag pushed'
+const confirmationLine = (point, title = 'GATED', stamp = '2026-07-29') =>
+  `- [ ] ${point}. ${title} AWAITING-CONFIRMATION(${stamp}; ${CONFIRMATION_REASON})`
 
 const board = (queue) => `<title>B</title>
 <main><h1>Dashboard</h1>
@@ -139,6 +144,23 @@ describe('queueEntries — every open point gets a card, and never two', () => {
       stub: false,
     })
   })
+  // POINT 730 — a card nobody has estimated inherits the MEASURED median of its
+  // criticality class, and the "no estimate yet" marker stays for the rest.
+  it('inherits the measured median of its class when nobody estimated the point', () => {
+    const calibration = { defaults: { medium: 1 }, criticality: new Map([[412, 'medium']]) }
+    expect(queueEntries({ open: [412], calibration })[0].meta).toBe('~1 h · Klassenmedian')
+  })
+  it('keeps the "no estimate yet" marker when the point\'s class was never measured', () => {
+    const calibration = { defaults: { medium: 1 }, criticality: new Map([[412, 'maximum']]) }
+    expect(queueEntries({ open: [412], calibration })[0].meta).toBe(QUEUE_STUB_META)
+    // …and with no measurement at all, nothing about the card changes.
+    expect(queueEntries({ open: [412] })[0].meta).toBe(QUEUE_STUB_META)
+  })
+  it('never overrides a stored estimate with an inherited one', () => {
+    const calibration = { defaults: { medium: 1 }, criticality: new Map([[412, 'medium']]) }
+    const data = { points: { 412: { title: null, body: 'Text.', estimate: '~3 h' } } }
+    expect(queueEntries({ open: [412], data, calibration })[0].meta).toBe('~3 h')
+  })
   it('REFUSES to re-add a point another section already claims', () => {
     // The double-listing trap: the point moved to the now-card must not come
     // back as a queue card, or invariant 4b blocks the very turn that published.
@@ -151,14 +173,14 @@ describe('the user gate (point 450) — a point waiting on the user never jams t
   const gates = (...lines) => gateSets(lines.join('\n'))
 
   it('moves a gated point behind every workable one, whatever the work order says', () => {
-    const g = gates('- [ ] 7. GATED AWAITING-USER(2026-07-29; needs a ruling)')
+    const g = gates(confirmationLine(7))
     expect(queueOrder([7, 8, 9], g)).toEqual([8, 9, 7])
   })
 
   it('keeps several gated points out of the way at once, in their work-order sequence', () => {
     const g = gates(
-      '- [ ] 7. A AWAITING-USER(2026-07-29; a)',
-      '- [ ] 8. B AWAITING-USER(2026-07-30; b)',
+      confirmationLine(7, 'A'),
+      confirmationLine(8, 'B', '2026-07-30'),
     )
     expect(queueOrder([7, 8, 9], g)).toEqual([9, 7, 8])
   })
@@ -169,7 +191,7 @@ describe('the user gate (point 450) — a point waiting on the user never jams t
   })
 
   it('lets an answered point outrank even the head of the work order', () => {
-    const g = gates('- [ ] 9. ANSWERED USER-ANSWERED(2026-08-07)', '- [ ] 7. GATED AWAITING-USER(2026-01-01; why)')
+    const g = gates('- [ ] 9. ANSWERED USER-ANSWERED(2026-08-07)', confirmationLine(7, 'GATED', '2026-01-01'))
     expect(queueOrder([7, 8, 9], g)).toEqual([9, 8, 7])
   })
 
@@ -179,12 +201,12 @@ describe('the user gate (point 450) — a point waiting on the user never jams t
   })
 
   it('takes the raw work order as its gate argument, not only a parsed one', () => {
-    const tasks = '- [ ] 7. GATED AWAITING-USER(2026-07-29; needs a ruling)\n- [ ] 8. B.\n- [ ] 9. C.'
+    const tasks = `${confirmationLine(7)}\n- [ ] 8. B.\n- [ ] 9. C.`
     expect(queueOrder([7, 8, 9], tasks)).toEqual([8, 9, 7])
   })
 
   it('marks the card as waiting on the USER instead of promising a duration', () => {
-    const g = gates('- [ ] 7. GATED AWAITING-USER(2026-07-29; needs a ruling)')
+    const g = gates(confirmationLine(7))
     const data = { points: { 7: { title: 'Gattertitel', body: 'Der Text.', estimate: '~3 h' } } }
     const [e] = queueEntries({ open: [7], data, gates: g })
     expect(e.gated).toBe(true)
@@ -203,25 +225,25 @@ describe('the user gate (point 450) — a point waiting on the user never jams t
   })
 
   it('KEEPS the gated point on the board — a skipped point is never a dropped one', () => {
-    const g = gates('- [ ] 7. GATED AWAITING-USER(2026-07-29; why)')
+    const g = gates(confirmationLine(7))
     expect(queueEntries({ open: [7, 8], gates: g }).map((e) => e.point)).toEqual([8, 7])
   })
 
   it('does not nag for an estimate the gate itself forbids', () => {
-    const g = gates('- [ ] 7. GATED AWAITING-USER(2026-07-29; why)')
+    const g = gates(confirmationLine(7))
     const entries = queueEntries({ open: [7], gates: g })
     expect(unestimatedPoints(entries)).toEqual([])
   })
 
   it('passes the board audit with the gated meta — no block loop while the user is away', () => {
-    const g = gates('- [ ] 412. GATED AWAITING-USER(2026-07-29; why)')
+    const g = gates(confirmationLine(412))
     const { html } = buildQueueSection(board(''), { open: [210, 412], exclude: [210], titles: { 412: 'Neu' }, gates: g })
     expect(html).toContain(QUEUE_GATED_META)
     expect(auditDashboard(html, { open: [210, 412], done: [], nowMinutes: 9 * 60 }).map((x) => x.code)).not.toContain('queue-meta')
   })
 
   it('never imports the gated meta back as the point’s estimate', () => {
-    const g = gates('- [ ] 412. GATED AWAITING-USER(2026-07-29; why)')
+    const g = gates(confirmationLine(412))
     const { html } = buildQueueSection(board(''), { open: [412], titles: { 412: 'Neu' }, gates: g })
     const imported = importQueueFromHtml(html)
     expect(imported.points[412].estimate).toBeNull()
@@ -234,8 +256,17 @@ describe('the user gate (point 450) — a point waiting on the user never jams t
   it('normaliseGates takes text, a parsed result or nothing at all', () => {
     expect(normaliseGates(null).gated.size).toBe(0)
     expect(normaliseGates(undefined).answered.size).toBe(0)
-    expect([...normaliseGates('- [ ] 3. X AWAITING-USER(2026-01-01; y)').gated]).toEqual([3])
-    expect([...normaliseGates(gates('- [ ] 3. X AWAITING-USER(2026-01-01; y)')).gated]).toEqual([3])
+    expect([...normaliseGates(confirmationLine(3, 'X', '2026-01-01')).gated]).toEqual([3])
+    expect([...normaliseGates(gates(confirmationLine(3, 'X', '2026-01-01'))).gated]).toEqual([3])
+  })
+
+  it('keeps an all-advisory queue workable in work-order order', () => {
+    const advisory = [
+      '- [ ] 7. A AWAITING-USER(2026-07-29; choose blue or green)',
+      '- [ ] 8. B SELF-DECIDED(2026-08-23; use the existing layout)',
+    ].join('\n')
+    expect(queueOrder([7, 8], advisory)).toEqual([7, 8])
+    expect(frontCandidates({ open: [7, 8], gates: advisory, count: 2 })).toEqual([7, 8])
   })
 })
 
@@ -383,6 +414,11 @@ describe('the one-time import from a hand-written board', () => {
   it('does not import the generator’s own stub as prose', () => {
     const html = board(renderQueueCard({ point: 4, title: 'Vier', body: null, meta: QUEUE_STUB_META }))
     expect(importQueueFromHtml(html).points[4].body).toBeNull()
+  })
+
+  it('does not import an inherited class median as an authored estimate', () => {
+    const html = board(renderQueueCard({ point: 4, title: 'Vier', body: 'Text.', meta: '~2 h · Klassenmedian' }))
+    expect(importQueueFromHtml(html).points[4].estimate).toBeNull()
   })
 })
 
@@ -656,6 +692,25 @@ describe('parseSetArgs — the flags behind one `set` call', () => {
       title: 'Ein Titel',
       estimate: '~2 h Der Text.',
     })
+  })
+  it('parses an optional exact estimate guard without storing it as card text', () => {
+    expect(parseSetArgs(['452', '--estimate', '~1 h', '--if-estimate', '~2 h'])).toMatchObject({
+      point: '452',
+      estimate: '~1 h',
+      ifEstimate: '~2 h',
+    })
+    expect(() => parseSetArgs(['452', '--estimate', '~1 h', '--if-estimate', '--title'])).toThrow(
+      /--if-estimate needs an estimate value/,
+    )
+  })
+  it('makes the compare-and-set decision by exact stored value', () => {
+    expect(estimateCompareDecision('~2 h', '~2 h')).toEqual({ matched: true, current: '~2 h', expected: '~2 h' })
+    expect(estimateCompareDecision('~2,5 h', '~2 h')).toEqual({
+      matched: false,
+      current: '~2,5 h',
+      expected: '~2 h',
+    })
+    expect(estimateCompareDecision(null, '~2 h').matched).toBe(false)
   })
   it('names which field --text-stdin fills — the umlaut-safe path for a TITLE', () => {
     expect(parseSetArgs(['452', '--text-stdin']).stdinField).toBe('body')
@@ -952,7 +1007,7 @@ describe('frontCandidates — the workable head of the derived order', () => {
   })
 
   it('accepts the raw work-order text as its gates, like every other queue rule', () => {
-    const tasks = '- [ ] 700. A\n- [ ] 701. B AWAITING-USER(2026-08-17; needs his word)\n- [ ] 707. C\n- [ ] 708. D\n'
+    const tasks = `- [ ] 700. A\n${confirmationLine(701, 'B', '2026-08-17')}\n- [ ] 707. C\n- [ ] 708. D\n`
     expect(frontCandidates({ open: [700, 701, 707, 708], gates: tasks })).toEqual([700, 707, 708])
   })
 
@@ -1002,7 +1057,7 @@ describe('commissionDecision — the real 17.08.2026 pick is refused', () => {
     expect(d).toMatchObject({ allowed: true, why: 'at-front' })
     const gated = commissionDecision({ point: 701, open: QUEUE_17_08, gates })
     expect(gated).toMatchObject({ allowed: false, why: 'user-gated' })
-    expect(commissionRefusal(gated)).toContain('WAITING ON THE USER')
+    expect(commissionRefusal(gated)).toContain('WAITING FOR CONFIRMATION')
   })
 
   // THE GATED REFUSAL NAMES THE REMEDY THAT ACTUALLY LIFTS IT, AND NO OTHER
@@ -1015,7 +1070,7 @@ describe('commissionDecision — the real 17.08.2026 pick is refused', () => {
     const text = commissionRefusal(commissionDecision({ point: 701, open: QUEUE_17_08, gates }))
     expect(text).not.toContain('--override')
     expect(text).not.toContain(COMMISSION_OVERRIDE_CMD)
-    expect(text).toContain('AWAITING-USER')
+    expect(text).toContain('AWAITING-CONFIRMATION')
     expect(text).toContain("user's answer")
     expect(text).toContain('NOT honoured')
     // …while the ORDINARY queue refusal keeps the override as its recorded escape.
@@ -1064,7 +1119,7 @@ describe('commissionDecision — the real 17.08.2026 pick is refused', () => {
     const gates = { gated: new Set([697]), answered: new Set(), since: new Map() }
     const d = commissionDecision({ point: 697, open: QUEUE_17_08, gates, inFlight: [697] })
     expect(d).toMatchObject({ allowed: false, why: 'user-gated' })
-    expect(commissionRefusal(d)).toContain('WAITING ON THE USER')
+    expect(commissionRefusal(d)).toContain('WAITING FOR CONFIRMATION')
     // …and with a typed reason on top of the branch, still refused.
     expect(
       commissionDecision({ point: 697, open: QUEUE_17_08, gates, inFlight: [697], override: 'urgent' }).allowed,

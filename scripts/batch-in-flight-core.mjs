@@ -93,6 +93,53 @@ export const IN_FLIGHT_MAX_AGE_MS = 45 * 60 * 1000
 export const LAUNCHER_WORK_MAX_AGE_MS = 4 * 60 * 60 * 1000
 
 /**
+ * A CI wait is in-flight work even after the worker that first observed it has
+ * exited. Unlike a hand-authored declaration it does not age out: its deadline
+ * releases the interaction budget, while the detached observer remains obliged
+ * to carry the run to a terminal result. The observer identity is evidence for
+ * repair, not a condition for visibility — losing the observer must expose a
+ * repair action, never make the wait disappear. PURE.
+ */
+export function assessCiWait({ wait, now = Date.now(), probePid = () => null } = {}) {
+  const empty = (reason) => ({ visible: false, pending: false, terminal: false, observerAlive: false, repair: false, deadline: null, deadlineReached: false, reason })
+  try {
+    if (!wait || typeof wait !== 'object') return empty('no-wait')
+    const required = ['identity', 'ref', 'sha', 'workflow', 'wakeToken']
+    if (required.some((key) => typeof wait[key] !== 'string' || !wait[key])) return empty('unreadable')
+    if ((typeof wait.runId !== 'number' && typeof wait.runId !== 'string') || !Number.isFinite(wait.firstObservationAt) || !Number.isFinite(wait.lastObservationAt) || !Number.isFinite(wait.deadline)) {
+      return empty('unreadable')
+    }
+    const pending = wait.state === 'pending' && wait.terminal == null
+    const terminal = (wait.state === 'success' || wait.state === 'failed') && !!wait.terminal
+    if (!pending && !terminal) return empty('unreadable')
+    const pid = Number(wait.observer?.pid)
+    const recordedStartedAt = Number(wait.observer?.startedAt)
+    const measured = Number.isInteger(pid) && pid > 0 ? probePid(pid) : null
+    const measuredStartedAt = Number(measured?.startedAt)
+    const observerAlive = pending && measured?.exists === true && (
+      !Number.isFinite(recordedStartedAt) ||
+      !Number.isFinite(measuredStartedAt) ||
+      Math.abs(measuredStartedAt - recordedStartedAt) <= PID_START_TOLERANCE_MS
+    )
+    return {
+      visible: true,
+      pending,
+      terminal,
+      observerAlive,
+      repair: pending && !observerAlive,
+      deadline: wait.deadline,
+      deadlineReached: Number(now) >= wait.deadline,
+      reason: pending ? (observerAlive ? 'observing' : 'observer-missing') : `terminal-${wait.state}`,
+      identity: wait.identity,
+      wakeToken: wait.wakeToken,
+      result: terminal ? wait.terminal : null,
+    }
+  } catch {
+    return empty('unreadable')
+  }
+}
+
+/**
  * MAY A DECLARATION STILL SHIELD SOMETHING FROM A SWEEP? PURE (point 437 G).
  *
  * The branch sweep read the in-flight file RAW — every branch and worktree it
@@ -248,26 +295,62 @@ export function porcelainPaths(out, { limit = 400 } = {}) {
   return paths
 }
 
+/** Checked-out feat/* branches from Git's worktree register. Detached trees and
+ * the main checkout are deliberately absent: only a registered feature
+ * checkout can be the lockless writer this evidence is meant to find. */
+export function registeredFeatureWorktrees(porcelain) {
+  if (typeof porcelain !== 'string') return []
+  const records = []
+  let current = null
+  for (const line of porcelain.split(/\r?\n/)) {
+    if (line.startsWith('worktree ')) {
+      if (current?.path && current.branch?.startsWith('feat/')) records.push(current)
+      current = { path: line.slice('worktree '.length).trim(), branch: '' }
+    } else if (current && line.startsWith('branch refs/heads/')) {
+      current.branch = line.slice('branch refs/heads/'.length).trim()
+    }
+  }
+  if (current?.path && current.branch?.startsWith('feat/')) records.push(current)
+  return records
+}
+
 /**
  * WHICH EVIDENCE CARRIES THE VERDICT? PURE.
  *
  * `items` is the output of `checkEvidence`, one per declared piece. Returns
- * { judgedOn, outputFresh, fresh, silent } — `judgedOn` is the strongest kind
- * that still checks out ('git' > 'process' > 'log', 'none' when nothing does),
- * and it is REPORTED wherever a verdict is printed, because the 30.07 mistake
- * was not visible in the verdict itself: "evidence-gone" named a log without
- * ever saying that a stronger source had been asked and had answered.
+ * { judgedOn, outputFresh, fresh, silent, refutations } — `judgedOn` is a
+ * positive process refutation where one exists, otherwise the strongest kind
+ * that still checks out ('git' > 'process' > 'log', 'none' when nothing does).
+ * It is REPORTED wherever a verdict is printed, because the 30.07 mistake was
+ * not visible in the verdict itself: "evidence-gone" named a log without ever
+ * saying that a stronger source had been asked and had answered.
  */
 export function evidenceVerdict(items = []) {
   const list = Array.isArray(items) ? items : []
   const ok = list.filter((i) => i?.ok === true)
+  // A dead process and a reused pid are positive measurements of identity, not
+  // silence. The last commit of that process may be newer than its death, so it
+  // cannot outvote either refutation. Other failed pid checks remain unknown:
+  // an absent start time or an unavailable probe proves no death.
+  const refutations = list.filter(
+    (i) => i?.kind === 'pid' && i?.ok !== true && (i?.detail === 'process-gone' || i?.detail === 'pid-reused'),
+  )
   const outputFresh = ok.some((i) => OUTPUT_KINDS.has(i.kind))
-  const judgedOn = outputFresh ? 'git' : ok.some((i) => i.kind === 'pid') ? 'process' : ok.length > 0 ? 'log' : 'none'
+  const judgedOn = refutations.length > 0
+    ? 'process'
+    : outputFresh
+      ? 'git'
+      : ok.some((i) => i.kind === 'pid')
+        ? 'process'
+        : ok.length > 0
+          ? 'log'
+          : 'none'
   return {
     judgedOn,
     outputFresh,
     fresh: ok.map((i) => `${i.describe} — ${i.detail}`),
     silent: list.filter((i) => i?.ok !== true).map((i) => `${i.describe} — ${i.detail}`),
+    refutations: refutations.map((i) => ({ evidence: i.describe, measurement: i.detail })),
   }
 }
 
@@ -378,9 +461,11 @@ const minutes = (ms) => Math.round(ms / 60000)
  * EVERY kind is now judged on RECENCY, not on existence — a pid by the identity
  * of the process behind it, the other three by when something last happened.
  *
- * Returns { ok, kind, describe, detail } — `describe` is what the guard's allow
- * message says out loud, so a later reader of the transcript can see what the
- * turn ended on.
+ * Returns { ok, kind, describe, detail, progressAt } — `describe` is what the
+ * guard's allow message says out loud, so a later reader of the transcript can
+ * see what the turn ended on. `progressAt` is the latest moment the probe proves:
+ * for a matching live process that is this observation, while file/ref evidence
+ * carries the timestamp of its last durable movement.
  */
 export function checkEvidence(
   item,
@@ -397,8 +482,8 @@ export function checkEvidence(
 ) {
   const kind = String(item?.kind ?? '')
   const label = typeof item?.label === 'string' && item.label.trim() ? ` (${item.label.trim()})` : ''
-  const no = (describe, detail) => ({ ok: false, kind, describe, detail })
-  const yes = (describe, detail) => ({ ok: true, kind, describe, detail })
+  const no = (describe, detail) => ({ ok: false, kind, describe, detail, progressAt: null })
+  const yes = (describe, detail, progressAt = null) => ({ ok: true, kind, describe, detail, progressAt })
   const window = (fallback) => (Number.isFinite(item?.freshMs) && item.freshMs > 0 ? item.freshMs : fallback)
 
   if (kind === 'pid') {
@@ -413,7 +498,11 @@ export function checkEvidence(
     if (typeof item.startedAt !== 'number') return no(`pid ${pid}${label}`, 'no-start-time')
     if (typeof probe.startedAt !== 'number') return no(`pid ${pid}${label}`, 'start-time-unverifiable')
     if (Math.abs(probe.startedAt - item.startedAt) > tolerance) return no(`pid ${pid}${label}`, 'pid-reused')
-    return yes(`pid ${pid}${label}`, 'alive')
+    // A matching live process is not a bare owner heartbeat. It is the bounded,
+    // session-attributed work the owner declared, freshly re-proved by this tick.
+    // Stamp the observation itself so one long blocking verification call remains
+    // demonstrably live across launcher intervals instead of looking unchanged.
+    return yes(`pid ${pid}${label}`, 'alive', Number.isFinite(now) ? now : null)
   }
   if (kind === 'branch') {
     const ref = String(item.ref ?? '').trim()
@@ -422,7 +511,7 @@ export function checkEvidence(
     if (typeof tip !== 'number') return no(`branch ${ref}${label}`, 'branch-gone')
     const idle = now - tip
     return idle <= window(workFreshMs)
-      ? yes(`branch ${ref}${label}`, `tip ${minutes(idle)} min old`)
+      ? yes(`branch ${ref}${label}`, `tip ${minutes(idle)} min old`, tip)
       : no(`branch ${ref}${label}`, `no commit for ${minutes(idle)} min`)
   }
   if (kind === 'worktree') {
@@ -435,7 +524,7 @@ export function checkEvidence(
     // both asked, and a verdict that does not say which one answered is exactly
     // how "quiet for 21 min" hid a mid-edit agent.
     return idle <= window(workFreshMs)
-      ? yes(`worktree ${path}${label}`, `active ${minutes(idle)} min ago${stamp.source ? ` (${stamp.source})` : ''}`)
+      ? yes(`worktree ${path}${label}`, `active ${minutes(idle)} min ago${stamp.source ? ` (${stamp.source})` : ''}`, stamp.at)
       : no(`worktree ${path}${label}`, `quiet for ${minutes(idle)} min${stamp.source ? ` (newest: ${stamp.source})` : ''}`)
   }
   if (kind === 'log') {
@@ -445,7 +534,7 @@ export function checkEvidence(
     if (typeof mtime !== 'number') return no(`log ${path}${label}`, 'log-missing')
     const idle = now - mtime
     return idle <= window(logFreshMs)
-      ? yes(`log ${path}${label}`, `written ${Math.round(idle / 1000)}s ago`)
+      ? yes(`log ${path}${label}`, `written ${Math.round(idle / 1000)}s ago`, mtime)
       : no(`log ${path}${label}`, `silent for ${minutes(idle)} min`)
   }
   return no(`${kind || 'unnamed'}${label}`, 'unknown-kind')
@@ -699,11 +788,21 @@ export function transferBlockMessage({ blockers = [] } = {}) {
  * transfer supersedes it, and a record still stamped `adopted` would lose the
  * mutation protection the moment it crossed a SECOND boundary — the very
  * record a chain of handovers depends on most.
+ *
+ * THE TRANSFER IS A WRITE, SO IT MIGRATES (sixth cross-review): writing the
+ * legacy evidence back unchanged handed the successor a declaration that had
+ * lost its once-only migration, so each item leaves here with its resolved
+ * point RECORDED (`withRecordedEvidencePoint`; an unresolvable item records the
+ * answer "nobody could tell" as `point: null` — never guessed at, never
+ * dropped, and never left legacy for the next read to re-derive).
  */
-export function markTransferred({ declaration, bySid, now, checkpoints = [], runs = [] } = {}) {
+export function markTransferred({ declaration, bySid, now, checkpoints = [], runs = [], worktreeRef = () => null } = {}) {
   const { adopted: _superseded, ...rest } = declaration ?? {}
   return {
     ...rest,
+    ...(Array.isArray(rest.evidence)
+      ? { evidence: rest.evidence.map((item) => withRecordedEvidencePoint(item, { worktreeRef })) }
+      : {}),
     transfer: {
       v: 1,
       by: String(bySid ?? ''),
@@ -802,6 +901,8 @@ export const LOG_OVERRIDES_QUIET_GIT_MS = 2 * RESPAWN_GRACE_MS
  * ms, or null where the probe could not answer.
  *
  * Returns { verdict, judgedOn, ageMs, detail }:
+ *   'dead'         — recorded process identity was positively refuted as gone
+ *                    or reused; `refutations` names it and the output it beats.
  *   'alive'        — something moved inside the grace window. `judgedOn` names
  *                    what: 'git' (its worktree or branch) or 'log'.
  *   'quiet'        — git output COULD be measured and has stood still.
@@ -813,6 +914,7 @@ export function agentOutputVerdict({
   worktreeAt = null,
   branchTipAt = null,
   logAt = null,
+  processEvidence = [],
   now,
   graceMs = RESPAWN_GRACE_MS,
   logOverrideMs = LOG_OVERRIDES_QUIET_GIT_MS,
@@ -827,29 +929,42 @@ export function agentOutputVerdict({
   // Say which source the newest stamp came from where the WORKTREE is the newest
   // one and it named itself; a branch tip is already named by `commit`.
   const named = wt && wt.source && wt.at === newestGit ? wt.source : null
+  let output
   if (newestGit !== null && now - newestGit <= graceMs) {
-    return {
+    output = {
       verdict: 'alive',
       judgedOn: 'git',
       ageMs: now - newestGit,
       detail: `work output ${minutes(now - newestGit)} min old${named ? ` (${named})` : ''}`,
     }
+  } else {
+    // A FRESH log is genuine evidence that something is happening — it is only
+    // SILENCE that proves nothing — but it may not outrank measured, quiet output
+    // indefinitely (see `LOG_OVERRIDES_QUIET_GIT_MS`).
+    const gitLongQuiet = newestGit !== null && now - newestGit > logOverrideMs
+    if (log !== null && now - log <= graceMs && !gitLongQuiet) {
+      output = { verdict: 'alive', judgedOn: 'log', ageMs: now - log, detail: `log written ${minutes(now - log)} min ago` }
+    } else if (newestGit === null) {
+      output = { verdict: 'unmeasurable', judgedOn: 'none', ageMs: null, detail: 'no worktree and no branch could be read' }
+    } else {
+      output = {
+        verdict: 'quiet',
+        judgedOn: 'git',
+        ageMs: now - newestGit,
+        detail: `no commit and nothing written for ${minutes(now - newestGit)} min${named ? ` (newest: ${named})` : ''}`,
+      }
+    }
   }
-  // A FRESH log is genuine evidence that something is happening — it is only
-  // SILENCE that proves nothing — but it may not outrank measured, quiet output
-  // indefinitely (see `LOG_OVERRIDES_QUIET_GIT_MS`).
-  const gitLongQuiet = newestGit !== null && now - newestGit > logOverrideMs
-  if (log !== null && now - log <= graceMs && !gitLongQuiet) {
-    return { verdict: 'alive', judgedOn: 'log', ageMs: now - log, detail: `log written ${minutes(now - log)} min ago` }
-  }
-  if (newestGit === null) {
-    return { verdict: 'unmeasurable', judgedOn: 'none', ageMs: null, detail: 'no worktree and no branch could be read' }
-  }
+
+  const measured = evidenceVerdict(processEvidence)
+  if (measured.refutations.length === 0) return output
+  const refuted = `${output.detail} (judged on ${output.judgedOn})`
   return {
-    verdict: 'quiet',
-    judgedOn: 'git',
-    ageMs: now - newestGit,
-    detail: `no commit and nothing written for ${minutes(now - newestGit)} min${named ? ` (newest: ${named})` : ''}`,
+    verdict: 'dead',
+    judgedOn: 'process',
+    ageMs: null,
+    detail: `${measured.refutations.map((item) => `${item.evidence} — ${item.measurement}`).join('; ')} refutes ${refuted}`,
+    refutations: measured.refutations.map((item) => ({ ...item, refuted })),
   }
 }
 
@@ -857,15 +972,91 @@ export function agentOutputVerdict({
  * MAY THIS AGENT BE REPLACED? PURE. Takes the verdict above.
  * Returns { respawn, reason, judgedOn, detail }.
  *
- * Only a measurable, quiet output permits it. 'alive' and 'unmeasurable' both
- * refuse — the second because "I could not look" must never read as "it is gone",
- * the same asymmetry `GIT_STATE_UNVERIFIABLE` enforces on the release side.
+ * Measurable quiet output and a positively refuted process permit it. 'alive'
+ * and 'unmeasurable' both refuse — the second because "I could not look" must
+ * never read as "it is gone", the same asymmetry
+ * `GIT_STATE_UNVERIFIABLE` enforces on the release side.
  */
 export function respawnDecision({ output } = {}) {
   const o = output ?? { verdict: 'unmeasurable', judgedOn: 'none', detail: 'nothing probed' }
   if (o.verdict === 'alive') return { respawn: false, reason: 'agent-alive', judgedOn: o.judgedOn, detail: o.detail }
+  if (o.verdict === 'dead') return { respawn: true, reason: 'process-refuted', judgedOn: o.judgedOn, detail: o.detail }
   if (o.verdict === 'quiet') return { respawn: true, reason: 'output-quiet', judgedOn: o.judgedOn, detail: o.detail }
   return { respawn: false, reason: 'output-unmeasurable', judgedOn: o.judgedOn ?? 'none', detail: o.detail ?? '' }
+}
+
+/**
+ * THE OUTPUT ADDRESSES IN A DECLARED AGENT WAIT. PURE.
+ *
+ * A declaration may name several agents, and `--agent-check` must ask all of
+ * their durable output in one verdict: checking a quiet branch separately from
+ * its moving worktree would print a replacement permission while the same child
+ * was still editing files. Pids travel with those output addresses as
+ * corroborating identities. A live pid never replaces output freshness, but a
+ * measured dead/reused pid refutes the last output the process left behind.
+ */
+export function declaredAgentProbe(declaration) {
+  const out = { agent: false, worktrees: [], branches: [], logs: [], pids: [] }
+  for (const item of Array.isArray(declaration?.evidence) ? declaration.evidence : []) {
+    if (item?.kind === 'worktree' && typeof item.path === 'string' && item.path.trim()) {
+      out.agent = true
+      out.worktrees.push(item.path.trim())
+    } else if (item?.kind === 'branch' && typeof item.ref === 'string' && item.ref.trim()) {
+      out.agent = true
+      out.branches.push(item.ref.trim())
+    } else if (item?.kind === 'log' && typeof item.path === 'string' && item.path.trim()) {
+      out.logs.push(item.path.trim())
+    } else if (item?.kind === 'pid') {
+      out.pids.push(item)
+    }
+  }
+  return out
+}
+
+/**
+ * MAY THE PARENT'S NON-OWNER STOP BE A PLAIN STAND-DOWN? PURE.
+ *
+ * A live child turns that exit into a boundary. Transferable work crosses it;
+ * work without a pushed checkpoint keeps the parent alive until it has one; and
+ * an unreadable child is UNKNOWN rather than dead. A declaration that belongs to
+ * somebody else is never this session's to transfer.
+ */
+export function standDownBoundaryDecision({ sid = '', declaration = null, agentCheck = null, transfer = null } = {}) {
+  const plain = (reason) => ({ action: 'stand-down', reason })
+  if (!sid || !declaration || declaration.sessionId !== sid) return plain('no-own-agent')
+  if (!declaredAgentProbe(declaration).agent) return plain('no-declared-agent')
+
+  const measured = agentCheck?.reason
+  const working = measured === 'agent-alive'
+  const processRefuted = measured === 'process-refuted'
+  const unknown = measured === 'output-unmeasurable' || !measured
+  const available = transfer?.available === true
+  if (available) {
+    return { action: 'transfer', reason: working ? 'agent-working' : unknown ? 'agent-unknown' : 'checkpoint-preserved' }
+  }
+  if (working) return { action: 'block', reason: transfer?.blocked === true ? 'checkpoint-required' : 'transfer-unavailable' }
+  if (unknown) return { action: 'block', reason: 'agent-unmeasurable' }
+  return plain(processRefuted ? 'agent-process-refuted' : 'agent-measured-quiet')
+}
+
+/** The successor-facing words for the child measurement. PURE. */
+export function successorAgentOrientation({ declaration = null, sid = '', agentCheck = null, command = '' } = {}) {
+  if (!declaration || declaration.sessionId === sid || !declaredAgentProbe(declaration).agent) return ''
+  const probe = command || 'node scripts/batch-in-flight.mjs --agent-check <declared worktree/branch>'
+  const transferred =
+    declaration.transfer && !declaration.adopted
+      ? ' The declaration is TRANSFERRED: adopt it first with `node scripts/batch-in-flight.mjs --adopt`.'
+      : ''
+  if (agentCheck?.reason === 'agent-alive') {
+    return `PREDECESSOR CHILD MEASURED WORKING (${agentCheck.detail}). Do not describe it as dead or start the same work.${transferred} Re-probe with \`${probe}\`.`
+  }
+  if (agentCheck?.reason === 'output-quiet') {
+    return `PREDECESSOR CHILD OUTPUT MEASURED QUIET (${agentCheck.detail}); replacement is permitted only from that measurement, not from the lock.${transferred} Re-run \`${probe}\` immediately before replacing it.`
+  }
+  if (agentCheck?.reason === 'process-refuted') {
+    return `PREDECESSOR CHILD PROCESS MEASURED DEAD (${agentCheck.detail}); replacement is permitted from that process measurement, which refutes the recorded output.${transferred} Re-run \`${probe}\` immediately before replacing it.`
+  }
+  return `PREDECESSOR CHILD STATE UNKNOWN (${agentCheck?.detail || 'its worktree/branch could not be read'}). The lock does not answer for children, so do not call the agent dead.${transferred} Probe with \`${probe}\`.`
 }
 
 // ---------------------------------------------------------------------------
@@ -1126,6 +1317,211 @@ export function pointOfBranch(ref) {
   return Number.isInteger(n) && n > 0 ? n : null
 }
 
+/**
+ * The point ONE evidence item names — the single resolution every consumer
+ * shares. An explicit `point` field decides (and never falls through to the
+ * branch when it is invalid); the legacy branch/worktree forms, which predate
+ * the field, derive it from the ref the item itself declares. Returns the
+ * positive integer or null. The RECORDED field is the normal case — the write
+ * side stamps it (`tagEvidencePoint`) and `withRecordedEvidencePoint` migrates
+ * a legacy item at the next write — so the legacy derivation exists only until
+ * a declaration written before the field has been rewritten once.
+ */
+export function evidencePoint(item, { worktreeRef = () => null } = {}) {
+  if (!item || typeof item !== 'object') return null
+  if (Object.hasOwn(item, 'point')) {
+    const n = Number(item.point)
+    return Number.isInteger(n) && n > 0 ? n : null
+  }
+  const legacyRef = item.kind === 'branch'
+    ? item.ref
+    : item.kind === 'worktree'
+      ? worktreeRef(item.path)
+      : null
+  return pointOfBranch(legacyRef)
+}
+
+/**
+ * Migrate one evidence item to its RECORDED form: an item already carrying the
+ * `point` field is returned unchanged, a legacy item gets the point the read
+ * side resolves persisted, so the legacy form disappears at the first write
+ * that touches it (fifth cross-vendor round: five rounds of findings all grew
+ * from the exit having to GUESS an assignment nobody had written down). An
+ * item that resolves to no point RECORDS `point: null` — never guessed at,
+ * never dropped; the read side reports it and names the explicit human way
+ * out (`UNATTRIBUTABLE_EVIDENCE_REMEDY`).
+ *
+ * THE NULL IS WRITTEN DOWN TOO (ninth cross-vendor round). Leaving the field
+ * off meant the item stayed legacy: a later read re-derived it, and a worktree
+ * path that became resolvable — or was reused by another point — then produced
+ * a DIFFERENT answer than the write had. "Recorded, never re-derived" has to
+ * include the recorded answer "nobody could tell".
+ */
+export function withRecordedEvidencePoint(item, { worktreeRef = () => null } = {}) {
+  if (!item || typeof item !== 'object') return item
+  if (Object.hasOwn(item, 'point')) return item
+  return { ...item, point: evidencePoint(item, { worktreeRef }) }
+}
+
+/**
+ * The one way an unattributable evidence item leaves the declaration: a human
+ * reads it and clears explicitly. Named in the read side's error, so the
+ * remedy travels with the complaint.
+ */
+export const UNATTRIBUTABLE_EVIDENCE_REMEDY =
+  'inspect the declaration and clear it explicitly: node scripts/batch-in-flight.mjs --clear'
+
+/**
+ * The LOUD report for evidence that stays unattributable after a migrating
+ * write (sixth cross-review): `--adopt` answered plain success while retained
+ * point-less pid/log items made `normalizeActiveWork` refuse the whole source
+ * one read later — a success message followed by a silently empty result. One
+ * alert line per such item, each naming the human way out. PURE.
+ *
+ * It judges by the SAME phase resolution as the read side (seventh
+ * cross-review): `normalizeActiveWork` skips a TERMINAL item before it ever
+ * resolves the point, so a point-less terminal item never refuses the record —
+ * alerting on it claimed a refusal that would not happen and recommended the
+ * destructive whole clear for a record the read side accepts. `declarationPhase`
+ * is the same fallback the read side applies to an item without its own phase.
+ */
+export function unattributableEvidenceAlerts(
+  evidence = [],
+  { worktreeRef = () => null, declarationPhase = null } = {},
+) {
+  const out = []
+  const list = Array.isArray(evidence) ? evidence : []
+  list.forEach((item, index) => {
+    if (!item || typeof item !== 'object') return
+    const phase = String(item.phase ?? declarationPhase ?? 'authoring').trim().toLowerCase()
+    if (TERMINAL_WORK_PHASES.includes(phase)) return
+    if (evidencePoint(item, { worktreeRef }) != null) return
+    const name = `${item.kind ?? '?'} ${item.ref ?? item.path ?? item.pid ?? ''}`.trim()
+    out.push(
+      `evidence item ${index + 1} (${name}) carries no point and resolves to none — the active-work read ` +
+        `side will refuse the whole record until it is attributed or cleared; ${UNATTRIBUTABLE_EVIDENCE_REMEDY}`,
+    )
+  })
+  return out
+}
+
+/** Phases that keep a declared strand on the board until an explicit exit. */
+export const ACTIVE_WORK_PHASES = Object.freeze([
+  'authoring',
+  'counter-read',
+  'verification',
+  'ready-to-land',
+  'landing',
+  'transferred',
+  'awaiting-adoption',
+  'adopted',
+  'handover',
+])
+
+/** Phases whose lifecycle command has already moved the point elsewhere. */
+export const TERMINAL_WORK_PHASES = Object.freeze([
+  'completed',
+  'landed',
+  'returned',
+  'decommissioned',
+  'abandoned',
+  'blocked-on-user',
+])
+
+/**
+ * Normalize the ONE structured active-work source into the ordered point set
+ * projected by the board. New evidence carries its point explicitly; legacy
+ * branch/worktree evidence derives the point from the declared strand itself.
+ * No undeclared `feat/*` branch is consulted, so stale branches cannot become
+ * active work. The owner focus is part of the same source snapshot and leads
+ * the order, so a render can put the focused strand first.
+ *
+ * Returns `{ ok, points, focusPoint, errors }` and never throws. An unreadable,
+ * malformed, unresolvable, closed or checkpoint-contradictory source is UNKNOWN,
+ * never the empty set. A missing declaration is a valid zero-strand record when
+ * no numbered focus stands. `openPoints` is always the KNOWN open set — an
+ * empty one means "nothing is open", so any declared strand against it is
+ * UNKNOWN too (sixth cross-review: the old size guard made the empty set a
+ * free pass on the fail-closed publish side).
+ */
+export function normalizeActiveWork({
+  readable = true,
+  declaration = null,
+  focusPoint = null,
+  openPoints = [],
+  worktreeRef = () => null,
+  checkpointContradicted = false,
+} = {}) {
+  try {
+    const errors = []
+    if (readable !== true) errors.push('the active-work record is unreadable')
+    if (checkpointContradicted === true) errors.push('a transferred checkpoint contradicts the recorded strand')
+
+    const open = openPoints instanceof Set
+      ? openPoints
+      : new Set(Array.isArray(openPoints) ? openPoints.map(Number).filter(Number.isInteger) : [])
+    const ordered = []
+    const seen = new Set()
+    const add = (raw, where) => {
+      const point = Number(raw)
+      if (!Number.isInteger(point) || point <= 0) {
+        errors.push(`${where} has no valid point number`)
+        return
+      }
+      // The membership check has no size guard (sixth cross-review): an EMPTY
+      // open-point set is a verified "nothing is open", and a declared strand
+      // against it is exactly as wrong as one naming a closed point. Skipping
+      // the check there made the empty set a free pass on the publish side,
+      // which fails CLOSED — the Stop side's fail-open lives in its consumer,
+      // never here.
+      if (!open.has(point)) {
+        errors.push(`${where} names point ${point}, which is not open`)
+        return
+      }
+      if (!seen.has(point)) {
+        seen.add(point)
+        ordered.push(point)
+      }
+    }
+
+    const declaredFocus = focusPoint ?? declaration?.focusPoint ?? null
+    if (declaredFocus != null) add(declaredFocus, 'the owner focus')
+    if (declaration != null) {
+      if (!declaration || typeof declaration !== 'object' || !Array.isArray(declaration.evidence)) {
+        errors.push('the active-work declaration is malformed')
+      } else {
+        declaration.evidence.forEach((item, index) => {
+          if (!item || typeof item !== 'object') {
+            errors.push(`evidence item ${index + 1} is malformed`)
+            return
+          }
+          const phase = String(item.phase ?? declaration.phase ?? 'authoring').trim().toLowerCase()
+          if (TERMINAL_WORK_PHASES.includes(phase)) return
+          if (!ACTIVE_WORK_PHASES.includes(phase)) {
+            errors.push(`evidence item ${index + 1} has unknown phase "${phase || '<blank>'}"`)
+            return
+          }
+          const point = evidencePoint(item, { worktreeRef })
+          if (point == null) {
+            // Not guessed at, not dropped: the assignment was never recorded
+            // and cannot be resolved, so only a human decides — loudly.
+            errors.push(
+              `evidence item ${index + 1} cannot be attributed to a point (no recorded point, ` +
+                `no resolvable ref) — ${UNATTRIBUTABLE_EVIDENCE_REMEDY}`,
+            )
+            return
+          }
+          add(point, `evidence item ${index + 1}`)
+        })
+      }
+    }
+
+    return { ok: errors.length === 0, points: errors.length ? [] : ordered, focusPoint: Number(declaredFocus) || null, errors }
+  } catch (error) {
+    return { ok: false, points: [], focusPoint: null, errors: [`active-work normalization failed: ${error?.message ?? error}`] }
+  }
+}
+
 /** Shell quoting stripped off a captured branch name: `git switch -c
  *  'feat/712-work'` reaches the `(\S+)` capture WITH its quotes, and a name the
  *  normaliser cannot read walks past both refusals (fourth review, finding 2).
@@ -1266,7 +1662,7 @@ function segmentTarget(seg) {
   // An authoring run IS the commissioning of a point, whichever vendor runs it —
   // unless it is one of the read-only legs, which produce no work at all.
   if (!/--routing\b|--dry-run\b/.test(seg)) {
-    const authored = uniq([...seg.matchAll(/author-sol\.mjs.*?--point\s+(\d+)/gi)].map((m) => Number(m[1])))
+    const authored = uniq([...seg.matchAll(/author-(?:sol|fable)\.mjs.*?--point\s+(\d+)/gi)].map((m) => Number(m[1])))
     if (authored.length) return { points: authored, refs: [], how: 'author' }
   }
   if (/\bworktree\s+add\b/.test(seg)) {
@@ -1322,7 +1718,8 @@ function segmentTarget(seg) {
  * CREATES anything, and none is recognised here.
  *
  * A READ-ONLY RUN OPENS NOTHING either: `author-sol.mjs --routing` answers which
- * lane owns a point and `--dry-run` prints the prompt it would send. Refusing
+ * lane owns a point and either author command's `--dry-run` prints the prompt it
+ * would send. Refusing
  * those would deny the very question a session asks BEFORE it commissions.
  */
 export function commissionTarget({ toolName = '', command = '', prompt = '', description = '' } = {}) {

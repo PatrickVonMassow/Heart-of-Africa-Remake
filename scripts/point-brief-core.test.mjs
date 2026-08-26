@@ -22,6 +22,7 @@ import {
   BRIEF_TOKEN_CEILING,
   CALL_DISCIPLINE,
   DOC_WINDOW,
+  VERIFICATION_LADDER,
   classifyPointRefs,
   acceptanceCriteriaFrom,
   aliasesFor,
@@ -32,8 +33,13 @@ import {
   estimateTokens,
   extractPointRefs,
   findPoint,
+  isRenderPoint,
+  orientationBlock,
   parseDesignSections,
+  parseDiffSuiteMap,
   parseSliceDeclarations,
+  pathsIn,
+  plannedCheck,
   parseWorkOrderPoints,
   sliceDocsFor,
   pointTitle,
@@ -929,6 +935,332 @@ describe('assembleBrief', () => {
     expect(brief).not.toContain('--- CROSS-REFERENCED')
     expect(brief).not.toContain('--- REFERENCE MAP')
     expect(brief).not.toContain('--- NOTES')
+    expect(brief).not.toContain('THE VERIFICATION LADDER')
+  })
+
+  it('puts the ladder AFTER the spec — it is only readable once the point is known', () => {
+    const brief = assembleBrief({
+      point: { number: 1, done: false, body: 'the spec body' },
+      ladder: VERIFICATION_LADDER,
+    })
+    expect(brief.indexOf('the spec body')).toBeLessThan(brief.indexOf('THE VERIFICATION LADDER'))
+  })
+})
+
+// ---------------------------------------------------------------------------
+// The verification ladder (point 595): the cheap rung is only worth anything
+// BEFORE the run, so the brief carries it for every point that can move a
+// picture — and says in the same breath what it does NOT prove.
+// ---------------------------------------------------------------------------
+describe('the verification ladder', () => {
+  it('classifies a point that names the picture, a backend or a browser suite as a render point', () => {
+    for (const spec of [
+      'the rendered coast still steps on WebGPU',
+      'a screenshot of the chief hut',
+      'the enrichments.mjs staging pins the wrong cell',
+      'the herds pop in at zoom 0.5',
+      'the shader builds off the critical path',
+    ]) {
+      expect(isRenderPoint(spec), spec).toBe(true)
+    }
+  })
+
+  it('leaves a point that touches no picture alone', () => {
+    for (const spec of [
+      'the commit-msg hook refuses a trailer naming no model',
+      'TASKS.md is split into open points and an archive',
+      'the chat inbox hands untrusted input on as input, not authorization',
+    ]) {
+      expect(isRenderPoint(spec), spec).toBe(false)
+    }
+  })
+
+  it('carries the ladder in a render point’s brief and not in another’s', () => {
+    const tasks = ALL.replace('AN OPEN POINT', 'A RENDER POINT — the rendered river shows steps')
+    const rendered = buildBrief({ ...args, tasksText: tasks, number: 400 })
+    expect(rendered.render).toBe(true)
+    expect(rendered.brief).toContain('THE VERIFICATION LADDER')
+    const plain = buildBrief({ ...args, number: 401 })
+    expect(plain.render).toBe(false)
+    expect(plain.brief).not.toContain('THE VERIFICATION LADDER')
+  })
+
+  it('names the cheapest rung AND refuses to let it count as the proof', () => {
+    const text = VERIFICATION_LADDER.join('\n')
+    // The rung nobody was routed to (point 566, unused until 09.08.2026) …
+    expect(text).toMatch(/--section=<name>/)
+    expect(text).toMatch(/run-all\.mjs <suite> --section=list/)
+    // … the unit layer's half of the SAME rule, not a second one …
+    expect(text).toMatch(/vitest run <path>/)
+    expect(text).toMatch(/--changed/)
+    expect(text).toMatch(/tsc --incremental/)
+    // … and what none of it proves.
+    expect(text).toMatch(/NEVER AN ACCEPTANCE/)
+    expect(text).toMatch(/PARTIAL/)
+    expect(text).toMatch(/WHOLE suite/)
+  })
+
+  it('binds the final proof to the merge candidate and to a reported git HEAD', () => {
+    const text = VERIFICATION_LADDER.join('\n')
+    expect(text).toMatch(/EXACTLY ONCE/)
+    expect(text).toMatch(/Merge `main` INTO your/)
+    expect(text).toMatch(/git rev-parse HEAD/)
+    // The shared final regression must not be read as licence to merge first and
+    // photograph afterwards — that block-loop cost ~30 turns on 24.07.2026.
+    expect(text).toMatch(/PICTURE proof stays ON THE BRANCH/)
+  })
+
+  it('states that a red is a red, with no cosmetic class to wave one through', () => {
+    const text = VERIFICATION_LADDER.join('\n')
+    expect(text).toMatch(/A RED IS A RED/)
+    expect(text).toMatch(/cosmetic/)
+  })
+
+  it('stays inside the brief’s width, like every other carried block', () => {
+    for (const line of VERIFICATION_LADDER) expect(line.length, line).toBeLessThanOrEqual(100)
+  })
+})
+
+// ---------------------------------------------------------------------------
+// The orientation in the CODE (point 598): the paths the spec names, what lives
+// around them, and the check that proves the point — generated, and framed as a
+// hint, because a stale or bossy list misdirects.
+// ---------------------------------------------------------------------------
+describe('pathsIn — what counts as a path the spec names', () => {
+  it('reads the paths out of backticks and out of plain prose alike', () => {
+    const spec = 'It changes `src/world/rivers.ts` and scripts/verify/polish.mjs, and docs/climate-1890.md §9.'
+    expect(pathsIn(spec)).toEqual(['src/world/rivers.ts', 'scripts/verify/polish.mjs', 'docs/climate-1890.md'])
+  })
+
+  it('keeps a directory, and counts one spelling of it', () => {
+    expect(pathsIn('under `src/ui/` — and src/ui/ again')).toEqual(['src/ui/'])
+  })
+
+  it('names the root documents the corpus cites without a directory', () => {
+    expect(pathsIn('CLAUDE.md §7.2 and TASKS.md say so')).toEqual(['CLAUDE.md', 'TASKS.md'])
+  })
+
+  it('is NOT fooled by the slash-carrying prose this corpus really writes', () => {
+    // Every one of these appears in the work order; presenting any as a file
+    // would send the reader hunting for something that does not exist.
+    const spec = 'store/systems logic and journal/TTS, and/or the 24.07.2026 note, ' +
+      'served from huggingface.co/onnx-community/Kokoro-82M-v1.0-ONNX/resolve/main'
+    expect(pathsIn(spec)).toEqual([])
+  })
+
+  it('is total on junk', () => {
+    expect(pathsIn(null)).toEqual([])
+    expect(pathsIn(undefined)).toEqual([])
+  })
+})
+
+describe('the work order’s own diff→suite mapping', () => {
+  const MAP_TEXT = [
+    'Diff → browser-suite mapping: `src/i18n/` → i18n · store/systems logic → Vitest',
+    'only (flow if the core loop is touched) · `src/scenes/place/` → collision,',
+    'polish, settings · `src/world/` → world, enrichments · `scripts/verify/X.mjs` → X itself ·',
+    '`*.md` → docs. When unsure, include the suite.',
+    '',
+    'Something else entirely.',
+  ].join('\n')
+
+  it('parses the paragraph rather than keeping a copy of it', () => {
+    const map = parseDiffSuiteMap(MAP_TEXT)
+    expect(map.map((e) => e.subject)).toContain('`src/world/`')
+    expect(map.find((e) => e.subject === '`src/world/`').suites).toBe('world, enrichments')
+    // The prose subjects survive as prose — nothing is dropped for being unmatchable.
+    expect(map.some((e) => e.subject === 'store/systems logic')).toBe(true)
+  })
+
+  it('stops at the paragraph and is total when there is none', () => {
+    expect(parseDiffSuiteMap(MAP_TEXT).some((e) => /Something else/.test(e.subject))).toBe(false)
+    expect(parseDiffSuiteMap('no mapping here')).toEqual([])
+    expect(parseDiffSuiteMap(null)).toEqual([])
+  })
+
+  it('resolves a path to the suites its rule names, and the wildcard to the suite itself', () => {
+    const map = parseDiffSuiteMap(MAP_TEXT)
+    const { byRule } = plannedCheck(['src/world/rivers.ts', 'scripts/verify/polish.mjs', 'docs/x.md'], map)
+    expect(byRule.find((r) => r.paths.includes('src/world/rivers.ts')).suites).toEqual(['world', 'enrichments'])
+    expect(byRule.find((r) => r.paths.includes('scripts/verify/polish.mjs')).suites).toEqual(['polish'])
+    expect(byRule.find((r) => r.paths.includes('docs/x.md')).suites).toEqual(['docs'])
+  })
+
+  it('NAMES what no rule covers instead of passing over it', () => {
+    const { byRule, unmapped } = plannedCheck(['public/logo.png'], parseDiffSuiteMap(MAP_TEXT))
+    expect(byRule).toEqual([])
+    expect(unmapped).toEqual(['public/logo.png'])
+  })
+
+  it('reads the REAL paragraph in the work order, so the brief cannot quote a mapping nobody keeps', () => {
+    const map = parseDiffSuiteMap(readFileSync(resolve(ROOT, 'TASKS.md'), 'utf8'))
+    expect(map.length, 'the preamble names a diff→suite mapping').toBeGreaterThan(4)
+    const { byRule } = plannedCheck(['src/world/x.ts', 'scripts/verify/enrichments.mjs'], map)
+    expect(byRule.flatMap((r) => r.suites)).toContain('world')
+    expect(byRule.flatMap((r) => r.suites)).toContain('enrichments')
+  })
+})
+
+describe('the orientation block', () => {
+  const files = [
+    { path: 'src/world/rivers.ts', exists: true, header: 'The river courses of the 1890 map.' },
+    { path: 'src/world/gone.ts', exists: false, header: null },
+  ]
+  const dirs = [{ dir: 'src/world/', count: 26, note: 'coastVector.ts, geo.ts, …' }]
+  const check = { byRule: [{ rule: '`src/world/`', suites: ['world'], paths: ['src/world/rivers.ts'] }], unmapped: [] }
+
+  it('is framed as a HINT and never as an instruction', () => {
+    const text = orientationBlock({ files, dirs, check }).join('\n')
+    expect(text).toMatch(/GENERATED HINT/)
+    expect(text).toMatch(/the spec decides/)
+    expect(text).toMatch(/NOT a list of files to change/)
+  })
+
+  it('carries each file’s own header and says plainly when a named path is not in the tree', () => {
+    const text = orientationBlock({ files, dirs, check }).join('\n')
+    expect(text).toContain('The river courses of the 1890 map.')
+    expect(text).toMatch(/src\/world\/gone\.ts — NOT IN THE TREE/)
+  })
+
+  it('names the suite AND its cheapest rung, capped so a forty-section suite cannot flood the brief', () => {
+    const many = Array.from({ length: 40 }, (_, i) => `block-${i}`)
+    const text = orientationBlock({ files, dirs, check, sections: { world: many } }).join('\n')
+    expect(text).toContain('block-0')
+    expect(text).not.toContain('block-39')
+    expect(text).toMatch(/\+28 more: node scripts\/verify\/run-all\.mjs world --section=list/)
+  })
+
+  it('prints nothing at all when there is nothing to say', () => {
+    expect(orientationBlock({})).toEqual([])
+    expect(orientationBlock({ check: { byRule: [], unmapped: [] } })).toEqual([])
+  })
+
+  // THE 23.08.2026 CORRECTIONS. The block used to head its suites "THE CHECK
+  // THAT PROVES IT", which is the one thing they are NOT: sections are the rung
+  // an agent repairs on, and point 595 says the proof is the whole suite.
+  it('offers the suites as an ITERATION set and never as the acceptance', () => {
+    const text = orientationBlock({ files, dirs, check, sections: { world: ['rivers', 'coast'] } }).join('\n')
+    expect(text).toMatch(/THE ITERATION CHECK SET/)
+    expect(text).not.toMatch(/THE CHECK THAT PROVES IT/)
+    expect(text).toMatch(/never the acceptance/)
+    expect(text).toMatch(/THE FINAL PROOF IS SEPARATE AND WHOLE-SUITE/)
+    expect(text).toMatch(/world — unfiltered/)
+    expect(text).toMatch(/recorded PARTIAL/)
+  })
+
+  it('names suite/--section PAIRS, one per suite, since a multi-suite diff has no single pair', () => {
+    const twoSuites = {
+      byRule: [
+        { rule: '`src/world/`', suites: ['world', 'enrichments'], paths: ['src/world/rivers.ts'] },
+      ],
+      unmapped: [],
+    }
+    const text = orientationBlock({
+      files,
+      dirs,
+      check: twoSuites,
+      sections: { world: ['rivers'], enrichments: ['huts'] },
+    }).join('\n')
+    expect(text).toContain('npm test -- world --section=<one of>')
+    expect(text).toContain('npm test -- enrichments --section=<one of>')
+    expect(text).toMatch(/world, enrichments — unfiltered/)
+  })
+
+  it('says so when a planned suite has no sections, rather than leaving a silent gap', () => {
+    const text = orientationBlock({ files, dirs, check, sections: {} }).join('\n')
+    expect(text).toMatch(/world declares no sections/)
+    expect(text).toContain('npm test -- world')
+  })
+
+  it('states WHERE the set came from, and caps a long unmapped list', () => {
+    const many = Array.from({ length: 20 }, (_, i) => `src/other/f${i}.bin`)
+    const spec = orientationBlock({ files, dirs, check }).join('\n')
+    expect(spec).toMatch(/PROSPECTIVE paths the spec names/)
+    const diff = orientationBlock({
+      files,
+      dirs,
+      check: { byRule: check.byRule, unmapped: many },
+      checkSource: 'diff',
+    }).join('\n')
+    expect(diff).toMatch(/from YOUR CURRENT DIFF/)
+    expect(diff).toContain('src/other/f0.bin')
+    expect(diff).not.toContain('src/other/f19.bin')
+    expect(diff).toMatch(/\(\+8 more\)/)
+  })
+})
+
+describe('the orientation inside a brief', () => {
+  const tasks = ALL.replace(
+    'AN OPEN POINT — it references design.md §4.2 and, later, §19.8.',
+    'AN OPEN POINT — it changes `src/world/rivers.ts` per design.md §4.2 and, later, §19.8.',
+  ).replace('## Checklist', '## Checklist\n\nDiff → browser-suite mapping: `src/world/` → world, enrichments.\n')
+
+  it('is absent when the caller hands in no reader — the module itself does no I/O', () => {
+    const { brief } = buildBrief({ ...args, tasksText: tasks, number: 400 })
+    expect(brief).not.toContain('--- ORIENTATION')
+  })
+
+  it('is built from what the reader returns, and hands the reader the resolved suites', () => {
+    let asked = null
+    const { brief, namedPaths, check } = buildBrief({
+      ...args,
+      tasksText: tasks,
+      number: 400,
+      readTree: (q) => {
+        asked = q
+        return { files: [{ path: 'src/world/rivers.ts', exists: true, header: 'The rivers.' }], dirs: [], sections: {} }
+      },
+    })
+    // design.md is named by the spec and deliberately NOT pointed at: the brief
+    // already carries its sections, and "look in design.md" is in every spec.
+    expect(namedPaths).toEqual(['src/world/rivers.ts'])
+    expect(check.byRule[0].suites).toEqual(['world', 'enrichments'])
+    expect(asked).toEqual({ paths: ['src/world/rivers.ts'], suites: ['world', 'enrichments'] })
+    expect(brief).toContain('--- ORIENTATION')
+    expect(brief).toContain('The rivers.')
+  })
+
+  it('loses the BLOCK and never the brief when the reader throws', () => {
+    const { brief } = buildBrief({
+      ...args,
+      tasksText: tasks,
+      number: 400,
+      readTree: () => {
+        throw new Error('the tree is gone')
+      },
+    })
+    expect(brief).not.toContain('--- ORIENTATION')
+    expect(brief).toContain('AN OPEN POINT')
+  })
+
+  // TIMING (23.08.2026): a first cut has no diff to read and must say "prospective";
+  // a regenerated brief has one, and the diff is what will actually be verified.
+  it('derives its check set from the DIFF once one exists, and from the spec before that', () => {
+    const withoutDiff = buildBrief({ ...args, tasksText: tasks, number: 400, readTree: () => ({}) })
+    expect(withoutDiff.check.byRule[0].paths).toEqual(['src/world/rivers.ts'])
+    expect(withoutDiff.brief).toMatch(/PROSPECTIVE paths the spec names/)
+
+    const withDiff = buildBrief({
+      ...args,
+      tasksText: tasks,
+      number: 400,
+      readTree: () => ({}),
+      diffPaths: ['src/world/coast.ts', 'design.md'],
+    })
+    expect(withDiff.check.byRule[0].paths).toEqual(['src/world/coast.ts'])
+    expect(withDiff.brief).toMatch(/from YOUR CURRENT DIFF/)
+    // The path LIST still orients in the SPEC — only the check set follows the diff.
+    expect(withDiff.namedPaths).toEqual(['src/world/rivers.ts'])
+  })
+
+  it('stands AFTER the spec, where "where to look" first means something', () => {
+    const { brief } = buildBrief({
+      ...args,
+      tasksText: tasks,
+      number: 400,
+      readTree: () => ({ files: [{ path: 'src/world/rivers.ts', exists: true, header: 'The rivers.' }] }),
+    })
+    expect(brief.indexOf('AN OPEN POINT')).toBeLessThan(brief.indexOf('--- ORIENTATION'))
   })
 })
 

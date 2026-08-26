@@ -16,6 +16,7 @@ import {
 } from './dashboard-guard-core.mjs'
 import { concisenessOffenders } from './dashboard-conciseness-guard-core.mjs'
 import { structureViolations } from './board-structure-core.mjs'
+import { AUTOMATIC_DECISION_TITLE, PAUSED_TITLE } from './board-state-core.mjs'
 import {
   CLOSING_WORK_TITLE,
   ERLEDIGT_ANCHOR,
@@ -55,6 +56,8 @@ import {
   refreshFooter,
   removeVdzk,
   setCardStatus,
+  applyDerivedStateCard,
+  stripDerivedStateCard,
   setCardTitle,
   toDone,
   doneCards,
@@ -63,12 +66,22 @@ import {
   mergeDoneDuplicates,
   toNow,
   toQueue,
+  compareNowProjection,
+  reconcileNowProjection,
+  NOW_EMPTY_STATE_MARKUP,
+  NOW_EMPTY_STATE_TEXT,
+  projectNowForPublish,
 } from './board-core.mjs'
 
+// A minimal document WITH the section heading: since the sixth cross-review
+// there is no fragment fallback — a writer on a document without the
+// now-section heading refuses instead of treating the whole text as the
+// section.
 const board = (point = 361) =>
-  `<main>\n<details class="now">\n  <summary><span class="t">${point} — Etwas</span>` +
+  '<main>\n<details class="sect"><summary><h2>Woran ich gerade arbeite</h2></summary>\n' +
+  `<details class="now">\n  <summary><span class="t">${point} — Etwas</span>` +
   `<span class="right"><span class="meta">10:00 · ~12:00</span></span></summary>\n` +
-  `  <div class="body">\n    <p>alter Text</p>\n  </div>\n</details>\n</main>`
+  `  <div class="body">\n    <p>alter Text</p>\n  </div>\n</details>\n</details>\n</main>`
 
 describe('setCardStatus', () => {
   it('replaces the body with one stamped paragraph', () => {
@@ -83,11 +96,21 @@ describe('setCardStatus', () => {
     const out = setCardStatus(board(), 361, 'X', '09:00')
     expect(out).toMatch(/<details class="now">\s*<summary>/)
     expect(out).toMatch(/<div class="body">\s*<p>/)
-    expect(out.match(/<\/details>/g)).toHaveLength(1)
+    // The card plus its section wrapper — exactly what the fixture carries.
+    expect(out.match(/<\/details>/g)).toHaveLength(2)
   })
 
   it('refuses a point that has no current-work card', () => {
     expect(() => setCardStatus(board(361), 999, 'X', '09:00')).toThrow(/no current-work card/)
+  })
+
+  it('refuses a document without the now-section heading instead of scanning it whole', () => {
+    // Sixth cross-review: the fragment fallback is gone — a missing section
+    // refuses in every consumer of the slice, not only in render and compare.
+    const fragment =
+      '<details class="now">\n  <summary><span class="t">361 — Etwas</span></summary>\n' +
+      '  <div class="body">\n    <p>alter Text</p>\n  </div>\n</details>'
+    expect(() => setCardStatus(fragment, 361, 'X', '09:00')).toThrow(/section not found: now/)
   })
 
   it('refuses an empty status rather than writing a blank card', () => {
@@ -97,6 +120,46 @@ describe('setCardStatus', () => {
   it('refuses a non-numeric point and an empty document', () => {
     expect(() => setCardStatus(board(), 'abc', 'X', '09:00')).toThrow(/not a point number/)
     expect(() => setCardStatus('', 361, 'X', '09:00')).toThrow(/empty document/)
+  })
+})
+
+describe('applyDerivedStateCard — the machine reports state instead of asking', () => {
+  const derived = { title: 'Batch pausiert', body: 'Umgebungsausfall. Nächster Versuch 25.08.2026, 15:10.' }
+  const running = () => fullBoard({ now: nowEntry(361, 'Etwas', '10:00 · ~12:00'), vdzk: vdzkEntry('Eine echte Frage') })
+
+  it('stands BESIDE a running point card instead of overwriting its status', () => {
+    const out = applyDerivedStateCard(running(), derived, { stamp: '14:49' })
+    expect(out).toContain('Batch pausiert')
+    expect(out).toContain('data-state="derived"')
+    // The point's own status survives — the reader still learns what is running.
+    expect(out).toContain('läuft')
+    expect(out.match(/<details class="now"/g)).toHaveLength(2)
+  })
+
+  it('DISAPPEARS again when there is no state to report — no hand edit needed', () => {
+    const paused = applyDerivedStateCard(running(), derived, { stamp: '14:49' })
+    const cleared = applyDerivedStateCard(paused, null, { stamp: '15:20' })
+    expect(cleared).not.toContain('Batch pausiert')
+    expect(cleared).not.toContain('data-state="derived"')
+    expect(cleared.match(/<details class="now"/g)).toHaveLength(1)
+  })
+
+  it('is idempotent: two derivations leave ONE card, restamped', () => {
+    const once = applyDerivedStateCard(running(), derived, { stamp: '14:49' })
+    const twice = applyDerivedStateCard(once, derived, { stamp: '14:52' })
+    expect(twice.match(/data-state="derived"/g)).toHaveLength(1)
+    expect(twice).toContain('Stand 14:52')
+  })
+
+  it('never puts the state under "Von dir zu klären"', () => {
+    const out = applyDerivedStateCard(running(), derived, { stamp: '14:49' })
+    const vdzk = out.slice(out.indexOf('Von dir zu klären'))
+    expect(vdzk).not.toContain('Batch pausiert')
+  })
+
+  it('leaves a NUMBERED card wearing the marker alone — a marker authorises no deletion', () => {
+    const impostor = running().replace('<details class="now">', '<details class="now" data-state="derived">')
+    expect(stripDerivedStateCard(impostor)).toContain('361')
   })
 })
 
@@ -166,6 +229,595 @@ const nowEntry = (n, title, times, status = 'läuft') =>
 const vdzkEntry = (title) =>
   `<details>\n  <summary><span class="t">${title}</span></summary>\n` +
   `  <div class="body">\n    <p>Die Frage.</p>\n  </div>\n</details>\n`
+
+describe('derived now-section membership', () => {
+  const handover =
+    '<details class="now" data-state="handover">\n  <summary><span class="t">Sitzungsübergabe</span></summary>\n' +
+    '  <div class="body"><p>Die Arbeit wird übergeben.</p></div>\n</details>\n'
+
+  it('reports the measured partial and empty boards with the missing point numbers', () => {
+    expect(compareNowProjection(fullBoard({ now: nowEntry(700, 'Kontext', '20:07') }), [700, 697, 711]))
+      .toMatchObject({ ok: false, missing: [697, 711], extra: [] })
+    expect(compareNowProjection(fullBoard(), [700, 697, 711]))
+      .toMatchObject({ ok: false, missing: [700, 697, 711] })
+  })
+
+  it('reports stale and duplicate numbered cards even when set equality would hide them', () => {
+    const duplicate = fullBoard({ now: nowEntry(700, 'A', '20:07') + nowEntry(700, 'B', '20:08') })
+    expect(compareNowProjection(duplicate, [700])).toMatchObject({ ok: false, duplicates: [700] })
+    const stale = fullBoard({ now: nowEntry(700, 'A', '20:07') + nowEntry(699, 'Alt', '19:00') })
+    expect(compareNowProjection(stale, [700])).toMatchObject({ ok: false, extra: [699] })
+  })
+
+  it('allows an unnumbered handover beside numbered work but never instead of it', () => {
+    expect(compareNowProjection(fullBoard({ now: nowEntry(700, 'A', '20:07') + handover }), [700]).ok).toBe(true)
+    expect(compareNowProjection(fullBoard({ now: handover }), [700])).toMatchObject({ ok: false, missing: [700] })
+  })
+
+  // Sixth cross-vendor round: only the IDLE form was counted beside active
+  // work, so any other hand-written unnumbered card stood visibly in the
+  // section, belonged to no active point, and the fail-closed preflight
+  // blessed it. The render refuses the same state, so the two cannot disagree.
+  it('refuses a stray unnumbered card beside active work, in the check and in the render alike', () => {
+    const stray =
+      '<details class="now">\n  <summary><span class="t">Handnotiz</span></summary>\n' +
+      '  <div class="body"><p>Von Hand eingefügt.</p></div>\n</details>\n'
+    const board = fullBoard({ now: nowEntry(700, 'A', '20:07') + stray })
+    expect(compareNowProjection(board, [700])).toMatchObject({ ok: false, strayCards: 1 })
+    expect(() => reconcileNowProjection(board, [700], { stamp: '20:10' }))
+      .toThrow(/unnumbered current-work card\(s\) stand beside active point\(s\) 700/)
+    // The one sanctioned unnumbered card is still no stray.
+    expect(compareNowProjection(fullBoard({ now: nowEntry(700, 'A', '20:07') + handover }), [700]))
+      .toMatchObject({ ok: true, strayCards: 0 })
+  })
+
+  // Eighth cross-vendor round: the stray rule exempted only the idle claim and
+  // anything WEARING the handover marker, so it rejected this module's own
+  // derived state card — unnumbered by design and documented to stand beside
+  // running work — while letting a hand-marked card buy the exemption.
+  // Point 935, measured on the live board twenty minutes after the derived
+  // now-section landed: the exemption above existed ONLY beside active work, so
+  // a standing machine decision made the section unpublishable in the exact
+  // state every session ends in — the render refused the card, the empty
+  // element was then never inserted because the card filled the remainder, and
+  // the comparison demanded a single unnumbered card.
+  it('lets the derived state card stand while nothing runs, and still makes the zero claim', () => {
+    const idleReason =
+      `<details class="now" data-state="idle">\n  <summary><span class="t">${NO_CURRENT_WORK_TITLE}</span>` +
+      '<span class="right"><span class="meta">10:17</span></span></summary>\n' +
+      '  <div class="body"><p>Ich übergebe an eine frische Sitzung.</p></div>\n</details>\n'
+    const decision = { title: AUTOMATIC_DECISION_TITLE, body: 'Der Batch läuft trotz der Meldung weiter.' }
+
+    // SLICED INDEPENDENTLY of the production comparison (the reviewer of this
+    // very case): a substring found anywhere in the document proves nothing
+    // about the section it is supposed to stand in, and leaning on
+    // `compareNowProjection` for placement would let one changed path vouch
+    // for the other.
+    // …and the slice ENDS AT THE SECTION'S OWN CLOSER (the confirming pass of
+    // this case): cutting at the next section's opening tag left everything
+    // between the two inside the slice, so an element inserted BETWEEN sections
+    // satisfied an assertion that claims to prove it is inside this one.
+    // …and the slice is found by COUNTING the section wrapper's own tags (two
+    // confirming passes of this case). Cutting at the next section's opening
+    // tag left everything between the two inside the slice; cutting at the LAST
+    // closer in that stretch was fooled by a misplaced `<details>` card standing
+    // between the sections — whose closer then became the last one. Depth
+    // counting is the only reading neither can fool.
+    const nowSectionOf = (html) => {
+      const heading = html.indexOf('Woran ich gerade arbeite')
+      const from = heading < 0 ? -1 : html.lastIndexOf('<details', heading)
+      // A SECTION ORACLE MAY NOT FAIL OPEN (the third confirming pass of this
+      // case): returning the rest of the document when the wrapper never
+      // balances let later sections satisfy the placement assertions — the one
+      // thing this helper exists to rule out.
+      if (from < 0) throw new Error('no now-section wrapper in this board')
+      const tag = /<(\/?)details\b/g
+      tag.lastIndex = from
+      let depth = 0
+      for (let m = tag.exec(html); m; m = tag.exec(html)) {
+        depth += m[1] ? -1 : 1
+        if (depth === 0) return html.slice(from, m.index)
+      }
+      throw new Error('the now-section wrapper never closes')
+    }
+
+    // (a) Beside the authored idle claim: both stand, and NOTHING is rewritten
+    // — the render is a byte-for-byte identity here, which is the only reading
+    // a moved or silently edited card cannot satisfy.
+    const withIdle = applyDerivedStateCard(fullBoard({ now: idleReason }), decision, { stamp: '10:17' })
+    expect(compareNowProjection(withIdle, [])).toMatchObject({ ok: true, idleCards: 1, emptyStateCount: 0 })
+    const renderedIdle = reconcileNowProjection(withIdle, [], { stamp: '10:17' })
+    expect(renderedIdle).toBe(withIdle)
+    const idleSection = nowSectionOf(renderedIdle)
+    expect(idleSection).toContain('Ich übergebe an eine frische Sitzung.')
+    expect(idleSection).toContain('data-state="derived"')
+    expect(compareNowProjection(renderedIdle, []).ok).toBe(true)
+
+    // (b) ALONE: the card must not swallow the zero claim — the empty element
+    // stands INSIDE the section beside it, so "nothing is running" is still
+    // said out loud, exactly once.
+    const alone = applyDerivedStateCard(fullBoard({ now: '' }), decision, { stamp: '10:17' })
+    const renderedAlone = reconcileNowProjection(alone, [], { stamp: '10:17' })
+    const aloneSection = nowSectionOf(renderedAlone)
+    expect(aloneSection).toContain(NOW_EMPTY_STATE_MARKUP.trim())
+    expect(aloneSection).toContain('data-state="derived"')
+    expect(renderedAlone.split(NOW_EMPTY_STATE_TEXT)).toHaveLength(2)
+    expect(compareNowProjection(renderedAlone, [])).toMatchObject({ ok: true, emptyStateCount: 1 })
+    // …and rendering again changes nothing: no second element, no drift.
+    expect(reconcileNowProjection(renderedAlone, [], { stamp: '10:17' })).toBe(renderedAlone)
+
+    // (c) THE EXEMPTION DOES NOT WIDEN: a hand-written unnumbered card, and one
+    // wearing the reserved title WITHOUT the marker, still refuse with nothing
+    // running — the ninth round's hardening is untouched.
+    const handWritten =
+      '<details class="now">\n  <summary><span class="t">Von Hand</span></summary>\n' +
+      '  <div class="body"><p>Text.</p></div>\n</details>\n'
+    expect(compareNowProjection(fullBoard({ now: handWritten }), []).ok).toBe(false)
+    expect(() => reconcileNowProjection(fullBoard({ now: handWritten }), [], { stamp: '10:17' })).toThrow(
+      /authored unnumbered non-idle card/,
+    )
+    const impostor = handWritten.replace('<span class="t">Von Hand</span>', `<span class="t">${AUTOMATIC_DECISION_TITLE}</span>`)
+    expect(compareNowProjection(fullBoard({ now: impostor }), []).ok).toBe(false)
+    expect(() => reconcileNowProjection(fullBoard({ now: impostor }), [], { stamp: '10:17' })).toThrow(
+      /authored unnumbered non-idle card/,
+    )
+  })
+
+  // Point 935's own reviewer, on the repair above: the exemption authenticated
+  // the card with `summaryPoint`, which reads only a CANONICAL LEADING chip —
+  // so a derived-marked card carrying its number further along the summary
+  // passed as unnumbered, and beside an empty expected set that publishes a
+  // visible point chip under the claim that nothing is running. And subtracting
+  // every derived card without bounding the count let a STACK of them cancel
+  // the zero claim out.
+  it('authenticates the derived card by the whole summary, and tolerates only one of it', () => {
+    const derivedCard = (summaryExtra = '', body = 'Der Batch läuft weiter.') =>
+      '<details class="now" data-state="derived">\n  <summary><span class="t">' +
+      `${AUTOMATIC_DECISION_TITLE}</span>${summaryExtra}` +
+      '<span class="right"><span class="meta">10:17</span></span></summary>\n' +
+      `  <div class="body"><p>${body}</p></div>\n</details>\n`
+
+    // (a) A NON-LEADING chip is still a chip: the card is not the machine's —
+    // and the reading is of MARKUP, not of one spelling of it, so an ordinary
+    // attribute or a second class token does not walk past it.
+    const chipShapes = [
+      '<span class="num">935</span>',
+      '<span class="num" aria-label="Punkt">935</span>',
+      '<span class="chip num">935</span>',
+      "<span class='num'>935</span>",
+      '<span class=num>935</span>',
+      '<SPAN CLASS="num">935</SPAN>',
+      '<div class="num">935</div>',
+      '<span class="num chip">935</span>',
+      '<span class="num\tchip">935</span>',
+      '<span class="chip\nnum">935</span>',
+      '<span class="num">&#57;35</span>',
+      '<span class="num">&#x39;35</span>',
+      '<span class="num"><b>935</b></span>',
+      '<span class="num">9<b>35</b></span>',
+      // The shapes the negative test never caught and never will — a browser
+      // shows a number, a regex does not (fourth confirming pass). The card is
+      // authenticated against the ONE shape this module writes, so each of
+      // these fails on its own account rather than on a spelling.
+      '<span class="num">9<wbr>35</span>',
+      '<span class=num><i title=">">935</i></span>',
+      '<span class="num">&nbsp;935&nbsp;</span>',
+      '<span class="num">9&#x200b;35</span>',
+      '<span class=num/>935',
+      `<span class="t">935 ${'\u2014'} Getarnt</span>`,
+    ]
+    for (const shape of chipShapes) {
+      const smuggled = derivedCard(shape)
+      const board = fullBoard({ now: smuggled })
+      expect(compareNowProjection(board, []).ok).toBe(false)
+      expect(() => reconcileNowProjection(board, [], { stamp: '10:17' })).toThrow(
+        /authored unnumbered non-idle card/,
+      )
+      // …and it is not laundered into the section beside real work either —
+      // BOTH halves say so, for EVERY shape (the second confirming pass of this
+      // case: the loop had left only the last shape standing for this half).
+      const beside = fullBoard({ now: nowEntry(700, 'A', '20:07') + smuggled })
+      expect(compareNowProjection(beside, [700])).toMatchObject({ ok: false, strayCards: 1 })
+      expect(() => reconcileNowProjection(beside, [700], { stamp: '20:10' })).toThrow(
+        /unnumbered current-work card/,
+      )
+    }
+    // (b) TWO genuine derived cards are damaged machine state, not two facts.
+    // THE TWO ARE DISTINGUISHABLE ON PURPOSE (the confirming pass of this case):
+    // byte-identical cards cannot tell keeping the FIRST from keeping the last.
+    const stacked = fullBoard({ now: derivedCard('', 'Die erste Entscheidung.') + derivedCard('', 'Die zweite.') })
+    expect(compareNowProjection(stacked, [])).toMatchObject({ ok: false, duplicateDerived: true })
+    // The render normalises the stack away — the card holds nothing of its own —
+    // and what it leaves behind is the state the comparison accepts.
+    const normalised = reconcileNowProjection(stacked, [], { stamp: '10:17' })
+    expect(normalised.match(/data-state="derived"/g)).toHaveLength(1)
+    expect(normalised).toContain('Die erste Entscheidung.')
+    expect(normalised).not.toContain('Die zweite.')
+    expect(compareNowProjection(normalised, [])).toMatchObject({ ok: true, duplicateDerived: false })
+    // The same stack beside active work is refused rather than blessed.
+    expect(compareNowProjection(fullBoard({ now: nowEntry(700, 'A', '20:07') + derivedCard() + derivedCard() }), [700]))
+      .toMatchObject({ ok: false, duplicateDerived: true })
+  })
+
+  // The same round found the widening REFUSING legitimate cards, which is the
+  // worse failure: a number inside an HTML COMMENT is invisible in a browser,
+  // and `data-class` is an ordinary authored attribute — both used to retire a
+  // card that was exactly what the machine had written.
+  it('keeps a state card whose summary only LOOKS numbered to a regex', () => {
+    const commented =
+      '<details class="now" data-state="idle">\n  <summary><span class="t">' +
+      `${NO_CURRENT_WORK_TITLE}</span><!-- <span class="num">935</span> -->` +
+      '<span class="right"><span class="meta">10:17</span></span></summary>\n' +
+      '  <div class="body"><p>Ich übergebe.</p></div>\n</details>\n'
+    const commentedBoard = fullBoard({ now: commented })
+    expect(compareNowProjection(commentedBoard, [])).toMatchObject({ ok: true, idleCards: 1 })
+    // BOTH halves, and the card survives byte for byte — "retire a card" is a
+    // thing the RENDER does, so comparing alone cannot pin it (the final pass).
+    const commentedRendered = reconcileNowProjection(commentedBoard, [], { stamp: '10:17' })
+    expect(commentedRendered).toBe(commentedBoard)
+    expect(commentedRendered).toContain('Ich übergebe.')
+
+    const dataClass =
+      '<details class="now" data-state="handover">\n  <summary><span class="t">Übergabe</span>' +
+      `<span data-class="t">2026 ${'\u2014'} Übergabe</span>` +
+      '<span class="right"><span class="meta">10:17</span></span></summary>\n' +
+      '  <div class="body"><p>Weiter mit Punkt 734.</p></div>\n</details>\n'
+    const dataClassBoard = fullBoard({ now: nowEntry(700, 'A', '20:07') + dataClass })
+    expect(compareNowProjection(dataClassBoard, [700])).toMatchObject({ ok: true, strayCards: 0 })
+    const dataClassRendered = reconcileNowProjection(dataClassBoard, [700], { stamp: '20:10' })
+    expect(dataClassRendered).toContain('Weiter mit Punkt 734.')
+    expect(dataClassRendered).toContain('data-state="handover"')
+  })
+
+  // The final pass of the same review, on the positive predicate: the meta
+  // field went into the markup uninterpolated, so a caller-supplied stamp could
+  // carry entity-encoded digits a browser renders as a point number — or markup
+  // that this writer emits and its own authentication then refuses.
+  it('gives the state card stamp one shape, at the writer and at the reader', () => {
+    const decision = { title: AUTOMATIC_DECISION_TITLE, body: 'Der Batch läuft weiter.' }
+    // A stamp that is not a clock time never reaches the markup — asserted on
+    // what the meta field IS, not on the absence of one raw spelling: a writer
+    // that merely ESCAPED the hostile stamp would still have embedded it and
+    // still have passed a substring check (the closing pass of this case).
+    const metaOf = (html) => (html.match(/<span class="meta">([\s\S]*?)<\/span>/) ?? [])[1]
+    const smuggledStamp = applyDerivedStateCard(fullBoard({ now: '' }), decision, {
+      stamp: 'Punkt &#57;&#51;&#53;',
+    })
+    expect(metaOf(smuggledStamp)).toMatch(/^\d{1,2}:\d{2}$/)
+    expect(smuggledStamp).not.toMatch(/Punkt (&|&amp;)#57;/)
+    // …and markup in the stamp neither ships nor breaks the card's own reading.
+    const markupStamp = applyDerivedStateCard(fullBoard({ now: '' }), decision, { stamp: '<b>12:34</b>' })
+    expect(metaOf(markupStamp)).toMatch(/^\d{1,2}:\d{2}$/)
+    expect(markupStamp).not.toMatch(/(<|&lt;)b(>|&gt;)12:34/)
+    // Both are still the machine's card: the render keeps them and adds the
+    // zero claim beside them, and the comparison then agrees.
+    for (const board of [smuggledStamp, markupStamp]) {
+      const rendered = reconcileNowProjection(board, [], { stamp: '10:17' })
+      expect(rendered).toContain('data-state="derived"')
+      expect(compareNowProjection(rendered, [])).toMatchObject({ ok: true, emptyStateCount: 1 })
+    }
+    // An ordinary stamp is kept exactly as given.
+    expect(applyDerivedStateCard(fullBoard({ now: '' }), decision, { stamp: '10:17' }))
+      .toContain('<span class="meta">10:17</span>')
+  })
+
+  it('exempts the derived state card and demands the handover card really be one', () => {
+    const board = applyDerivedStateCard(
+      fullBoard({ now: nowEntry(700, 'A', '20:07') }),
+      { title: PAUSED_TITLE, body: 'Der Stapel ist pausiert.' },
+      { stamp: '20:10' },
+    )
+    expect(compareNowProjection(board, [700])).toMatchObject({ ok: true, strayCards: 0 })
+    expect(() => reconcileNowProjection(board, [700], { stamp: '20:10' })).not.toThrow()
+
+    const marked =
+      '<details class="now" data-state="handover">\n  <summary><span class="num">700</span>' +
+      '<span class="t">Getarnt</span></summary>\n  <div class="body"><p>Text.</p></div>\n</details>\n'
+    expect(compareNowProjection(fullBoard({ now: nowEntry(700, 'A', '20:07') + marked }), [700]).ok).toBe(false)
+    const empty =
+      '<details class="now" data-state="handover">\n  <summary><span class="t">Leer</span></summary>\n' +
+      '  <div class="body"></div>\n</details>\n'
+    expect(compareNowProjection(fullBoard({ now: nowEntry(700, 'A', '20:07') + empty }), [700]))
+      .toMatchObject({ ok: false, strayCards: 1 })
+
+    // …and the derived card is held to the same standard (ninth round): the
+    // reserved title alone used to buy the exemption, so any hand-written
+    // unnumbered card could wear it and stand beside active work.
+    const titleOnly =
+      `<details class="now">\n  <summary><span class="t">${PAUSED_TITLE}</span></summary>\n` +
+      '  <div class="body"><p>Von Hand.</p></div>\n</details>\n'
+    expect(compareNowProjection(fullBoard({ now: nowEntry(700, 'A', '20:07') + titleOnly }), [700]))
+      .toMatchObject({ ok: false, strayCards: 1 })
+  })
+
+  // Sixth cross-vendor round: the reorder ran over the SURVIVING cards alone,
+  // so the moment the focus moved to a strand that was only now being opened,
+  // the older card stayed first and contradicted the stated order.
+  it('puts the focused card first even when that point is only now getting its card', () => {
+    const before = fullBoard({ now: nowEntry(711, 'Älter', '19:00') })
+    const out = reconcileNowProjection(before, [711, 713], { focusPoint: 713, stamp: '20:10' })
+    // The surviving card keeps its legacy "711 — …" title shape, so both forms
+    // are read out of the section by position rather than by one markup.
+    const order = [...out.matchAll(/<span class="(?:num|t)">\s*(711|713)\b/g)].map((m) => Number(m[1]))
+    expect(order).toEqual([713, 711])
+    expect(out).toContain('Älter')
+  })
+
+  it('accepts verified zero only through the parser-distinct non-card state', () => {
+    const idle = fullBoard({ now: NOW_EMPTY_STATE_MARKUP })
+    expect(compareNowProjection(idle, [])).toMatchObject({ ok: true, emptyStateCount: 1 })
+    expect(claimsNoCurrentWork(idle)).toBe(true)
+    expect(idle).toContain(NOW_EMPTY_STATE_TEXT)
+    expect(compareNowProjection(fullBoard(), []).ok).toBe(false)
+    expect(compareNowProjection(fullBoard({ now: handover }), []).ok).toBe(false)
+  })
+
+  it('accepts verified zero through the one authored idle card, never a mixed or stacked form', () => {
+    const idleReason =
+      `<details class="now" data-state="idle">\n  <summary><span class="t">${NO_CURRENT_WORK_TITLE}</span>` +
+      '<span class="right"><span class="meta">16:45</span></span></summary>\n' +
+      '  <div class="body">\n<p><span class="stamp">Stand 16:45</span> Sitzungsgrenze; der Nachfolger nimmt ' +
+      'Punkt 707.</p>\n  </div>\n</details>\n'
+    expect(compareNowProjection(fullBoard({ now: idleReason }), []))
+      .toMatchObject({ ok: true, idleCards: 1, emptyStateCount: 0 })
+    // The written card and the generic element side by side contradict each other,
+    // and a stacked pair is the point-470 defect — both stay unpublishable.
+    expect(compareNowProjection(fullBoard({ now: idleReason + NOW_EMPTY_STATE_MARKUP }), []).ok).toBe(false)
+    expect(compareNowProjection(fullBoard({ now: idleReason + idleReason }), []).ok).toBe(false)
+    // An idle card claims a stop; beside expected active work it is wrong —
+    // even when the numbered set is exactly right, the board would say two
+    // things at once, so the pair is unpublishable (second cross-vendor round).
+    expect(compareNowProjection(fullBoard({ now: idleReason }), [700])).toMatchObject({ ok: false, missing: [700] })
+    expect(compareNowProjection(fullBoard({ now: nowEntry(700, 'Kontext', '20:07') + idleReason }), [700]))
+      .toMatchObject({ ok: false, idleCards: 1 })
+    expect(() => reconcileNowProjection(fullBoard({ now: nowEntry(700, 'Kontext', '20:07') + idleReason }), [700]))
+      .toThrow(/beside the standing[\s\S]*nothing is running/)
+  })
+
+  it('replaces a LONE idle card when work resumes — the publish path renders the transition', () => {
+    // Idleness ends, work resumes: the declaration names a point while the
+    // board still carries only the handover card. The render must produce the
+    // derived stub — a throw here killed exactly this transition for
+    // board-publish and land-point (fourth cross-vendor round).
+    const idleReason =
+      `<details class="now" data-state="idle">\n  <summary><span class="t">${NO_CURRENT_WORK_TITLE}</span>` +
+      '<span class="right"><span class="meta">16:45</span></span></summary>\n' +
+      '  <div class="body">\n<p><span class="stamp">Stand 16:45</span> Sitzungsgrenze; der Nachfolger nimmt ' +
+      'Punkt 700.</p>\n  </div>\n</details>\n'
+    const { html, comparison } = projectNowForPublish(
+      fullBoard({ now: idleReason, queue: queueEntry(700, 'Wartend', '~2 h') }),
+      { ok: true, points: [700], focusPoint: 700 },
+    )
+    expect(comparison).toMatchObject({ ok: true, idleCards: 0, emptyStateCount: 0 })
+    expect(html).toContain('Text für diesen Punkt fehlt noch')
+    expect(html).not.toContain(NO_CURRENT_WORK_TITLE)
+    // The AUTHORED handover prose survives the transition — carried into the
+    // created stub, never dropped with the idle card (point 491's lesson;
+    // fifth cross-vendor round, pass 2).
+    expect(html).toContain('Sitzungsgrenze; der Nachfolger nimmt Punkt 700.')
+  })
+
+  it('carries the idle prose into the FIRST stub only when several points resume at once', () => {
+    const idleReason =
+      `<details class="now" data-state="idle">\n  <summary><span class="t">${NO_CURRENT_WORK_TITLE}</span>` +
+      '<span class="right"><span class="meta">16:45</span></span></summary>\n' +
+      '  <div class="body">\n<p><span class="stamp">Stand 16:45</span> Sitzungsgrenze; der Nachfolger nimmt ' +
+      'Punkt 700.</p>\n  </div>\n</details>\n'
+    const out = reconcileNowProjection(fullBoard({ now: idleReason }), [700, 697], { focusPoint: 700, stamp: '20:10' })
+    expect(out.match(/Sitzungsgrenze; der Nachfolger nimmt Punkt 700\./g)).toHaveLength(1)
+    const at = out.indexOf('Sitzungsgrenze')
+    expect(at).toBeGreaterThan(out.indexOf('<span class="num">700</span>'))
+    expect(at).toBeLessThan(out.indexOf('<span class="num">697</span>'))
+    expect(compareNowProjection(out, [700, 697]).ok).toBe(true)
+  })
+
+  // Ninth cross-vendor round: an unclosed now-section quietly swallowed the
+  // rest of the document — a fail-open under a preflight that must fail closed.
+  // The section end is COUNTED now, so a card's own closer cannot pass for the
+  // wrapper's: the second case keeps one card and removes only the wrapper's
+  // close, which the `lastIndexOf('</details>')` reading accepted.
+  it('refuses a now-section that is never closed instead of swallowing the rest', () => {
+    const damaged =
+      `<main>\n<details class="sect"><summary><h2>Woran ich gerade arbeite</h2></summary>\n` +
+      `${sect('Warteschlange', '')}${sect('Erledigt', '')}</main>\n`
+    expect(() => reconcileNowProjection(damaged, [700])).toThrow(/is never closed/)
+    expect(compareNowProjection(damaged, [700]).ok).toBe(false)
+
+    // …and a CARD's closer is not the wrapper's: the section holds one card and
+    // its own close is gone, which the last-closer reading blessed.
+    const cardButNoClose =
+      `<main>\n<details class="sect"><summary><h2>Woran ich gerade arbeite</h2></summary>\n` +
+      `${nowEntry(700, 'A', '20:07')}${sect('Warteschlange', '')}${sect('Erledigt', '')}</main>\n`
+    expect(() => reconcileNowProjection(cardButNoClose, [700])).toThrow(/is never closed/)
+    expect(compareNowProjection(cardButNoClose, [700]).ok).toBe(false)
+  })
+
+  // Ninth cross-vendor round: the render puts the focused strand first, but the
+  // comparison never looked at the focus — so the fail-closed preflight blessed
+  // a board whose focus named a point with no card, or stood behind another.
+  it('checks the focus the render orders by, in both halves of the invariant', () => {
+    const two = fullBoard({ now: `${nowEntry(711, 'B', '20:07')}${nowEntry(700, 'A', '20:07')}` })
+
+    expect(compareNowProjection(two, [711, 700], { focusPoint: 711 })).toMatchObject({ ok: true })
+    expect(compareNowProjection(two, [711, 700], { focusPoint: 700 })).toMatchObject({
+      ok: false,
+      focusMisplaced: true,
+      focusPoint: 700,
+    })
+    expect(compareNowProjection(two, [711, 700], { focusPoint: 697 })).toMatchObject({
+      ok: false,
+      focusUnrepresented: true,
+    })
+    // …and the fail-closed preflight refuses the same state by name.
+    expect(() => projectNowForPublish(two, { ok: true, points: [711, 700], focusPoint: 697 }))
+      .toThrow(/the focus names point 697, which has no card/)
+  })
+
+  it('refuses a document without the now-section heading in both render and comparison', () => {
+    // The lenient slice used to treat the WHOLE document as the now-section:
+    // the render mutated foreign sections and the comparison blessed the
+    // result, so the fail-closed preflight was open (fifth cross-vendor
+    // round, pass 2). A missing heading refuses in both halves.
+    const noSection =
+      `<main>\n${sect('Von dir zu klären', '')}${sect('Warteschlange', '')}${sect('Erledigt', '')}</main>\n`
+    expect(() => reconcileNowProjection(noSection, [700])).toThrow(/section not found: now/)
+    expect(() => reconcileNowProjection(noSection, [])).toThrow(/section not found: now/)
+    expect(compareNowProjection(noSection, [700]))
+      .toMatchObject({ ok: false, error: expect.stringMatching(/section heading is missing/) })
+    // A bare card fragment no longer passes as its own section either.
+    expect(compareNowProjection(nowEntry(700, 'A', '20:07'), [700]).ok).toBe(false)
+    expect(() => projectNowForPublish(noSection, { ok: true, points: [700], focusPoint: 700 }))
+      .toThrow(/refusing to project the now-section/)
+  })
+
+  it('a findable heading OUTSIDE its sect wrapper is no section — the foreign region after it is never sliced', () => {
+    // Seventh cross-review: the fail-closed path checked only indexOf(HEAD.now),
+    // so a heading orphaned by damage — or standing unescaped inside a card's
+    // prose — made the FOREIGN region after it the "now-section": the render
+    // could project there and the comparison confirmed it.
+    const heading = '<summary><h2>Woran ich gerade arbeite</h2></summary>'
+    // (1) Orphaned: the heading stands bare, its wrapper gone; the queue
+    // section follows it.
+    const orphaned =
+      `<main>\n${heading}\n${sect('Von dir zu klären', '')}` +
+      `${sect('Warteschlange', queueEntry(700, 'Wartend', '~2 h'))}${sect('Erledigt', '')}</main>\n`
+    expect(() => reconcileNowProjection(orphaned, [700])).toThrow(/stands outside its <details class="sect"> wrapper/)
+    const compared = compareNowProjection(orphaned, [700])
+    expect(compared).toMatchObject({ ok: false, error: expect.stringMatching(/section heading is missing/) })
+    // (2) Inside card prose: the real section is gone, a card in another
+    // section QUOTES the heading unescaped — still no section.
+    const quoted = fullBoard({
+      vdzk: `<details>\n  <summary><span class="t">Zitat</span></summary>\n` +
+        `  <div class="body">\n    <p>${heading}</p>\n  </div>\n</details>\n`,
+    }).replace(sect('Woran ich gerade arbeite', ''), '')
+    expect(() => reconcileNowProjection(quoted, [700])).toThrow(/refusing to project the now-section/)
+    expect(compareNowProjection(quoted, [700]).ok).toBe(false)
+    // (3) Beside the intact section, a quoted duplicate changes nothing: the
+    // wrapper decides, so the real section still renders and compares.
+    const intact = fullBoard({
+      now: nowEntry(700, 'Echt', '20:07'),
+      vdzk: `<details>\n  <summary><span class="t">Zitat</span></summary>\n` +
+        `  <div class="body">\n    <p>${heading}</p>\n  </div>\n</details>\n`,
+    })
+    expect(compareNowProjection(intact, [700]).ok).toBe(true)
+  })
+
+  it('accepts a heading behind ANY amount of whitespace inside its wrapper — depth of indent is not damage', () => {
+    // Eighth cross-review: the orphan check capped its lookback at 32
+    // characters, so a legitimately deep indent between `<details
+    // class="sect">` and its heading was refused as structural damage. Only
+    // the CONTENT between wrapper and heading decides: whitespace of any
+    // length is formatting, one non-whitespace character is an orphan.
+    const heading = '<summary><h2>Woran ich gerade arbeite</h2></summary>'
+    const rest = `${sect('Von dir zu klären', '')}${sect('Warteschlange', '')}${sect('Erledigt', '')}`
+    const withGap = (gap) =>
+      `<main>\n<details class="sect">${gap}${heading}\n${nowEntry(700, 'Echt', '20:07')}</details>\n${rest}</main>\n`
+    // The everyday pretty-print form: newline plus a small indent.
+    expect(compareNowProjection(withGap('\n  '), [700]).ok).toBe(true)
+    // The reviewer's exact failing layout: more than 32 whitespace characters.
+    expect(compareNowProjection(withGap(`\n${' '.repeat(48)}`), [700]).ok).toBe(true)
+    expect(() => reconcileNowProjection(withGap(`\n${' '.repeat(48)}`), [700])).not.toThrow()
+    // Mixed whitespace far beyond the old cap stays formatting too.
+    expect(compareNowProjection(withGap(`\n\t${'  \t'.repeat(20)}\n`), [700]).ok).toBe(true)
+    // The other direction holds: ONE non-whitespace character between wrapper
+    // and heading is still an orphaned heading, however far back the wrapper.
+    expect(compareNowProjection(withGap(`\n<p>x</p>\n${' '.repeat(48)}`), [700]))
+      .toMatchObject({ ok: false, error: expect.stringMatching(/section heading is missing/) })
+  })
+
+  it('creates missing stubs, removes stale cards and preserves surviving prose byte for byte', () => {
+    const authored = nowEntry(700, 'Die Übergabe', '20:07', 'Umlaute, <a href="/x">Link</a> und Text.')
+    const before = fullBoard({
+      now: authored + nowEntry(699, 'Alt', '19:00'),
+      queue: queueEntry(697, 'Wartend', '~2 h') + queueEntry(711, 'Wartend', '~1 h'),
+    })
+    const out = reconcileNowProjection(before, [700, 697, 711], { focusPoint: 700, stamp: '20:10' })
+    expect(out).toContain(authored)
+    expect(out).not.toContain('699 — Alt')
+    expect(out.match(/Text für diesen Punkt fehlt noch/g)).toHaveLength(2)
+    expect(parseQueuePoints(out)).toEqual(new Set())
+    expect(compareNowProjection(out, [700, 697, 711]).ok).toBe(true)
+  })
+
+  it('refuses any reconciliation path that would rewrite or blank authored prose', () => {
+    const before = fullBoard({ now: nowEntry(700, 'Text', '20:07', 'Bleibt erhalten.') })
+    expect(() => reconcileNowProjection(before, [700], {
+      transformExisting: (card) => card.replace('Bleibt erhalten.', ''),
+    })).toThrow(/rewrite or blank authored prose.*700/)
+  })
+
+  it('puts focus first, keeps other survivors stable and is byte-idempotent', () => {
+    const before = fullBoard({
+      now: nowEntry(700, 'A', '20:07') + nowEntry(697, 'B', '20:08'),
+      queue: queueEntry(711, 'C', '~1 h'),
+    })
+    const once = reconcileNowProjection(before, [700, 697, 711], { focusPoint: 697, stamp: '20:10' })
+    expect([...parseNowCardPoints(once)]).toEqual([697, 700, 711])
+    expect(reconcileNowProjection(once, [700, 697, 711], { focusPoint: 697, stamp: '20:10' })).toBe(once)
+  })
+
+  it('renders verified zero by removing stale numbered cards', () => {
+    const out = reconcileNowProjection(fullBoard({ now: nowEntry(700, 'A', '20:07') }), [])
+    expect(out).not.toContain('700 — A')
+    expect(out).toContain(NOW_EMPTY_STATE_MARKUP)
+    expect(compareNowProjection(out, []).ok).toBe(true)
+  })
+
+  it('reports an active point duplicated into a WAITING section, never into the archive', () => {
+    const queued = fullBoard({ now: nowEntry(700, 'A', '20:07'), queue: queueEntry(700, 'A', '20:09') })
+    expect(compareNowProjection(queued, [700])).toMatchObject({
+      ok: false,
+      crossSection: [{ point: 700, sections: ['Warteschlange'] }],
+    })
+    // Sixth cross-vendor round: Erledigt is HISTORY. `toDone` states that a
+    // point comes back into current work when a boundary or a follow-up
+    // reopens it and keeps its one archive card, so reading that card as a
+    // conflict made every reopened point unpublishable.
+    const reopened = fullBoard({ now: nowEntry(700, 'A', '20:07'), done: queueEntry(700, 'A', '20:09') })
+    expect(compareNowProjection(reopened, [700])).toMatchObject({ ok: true, crossSection: [] })
+  })
+
+  it('fails publish closed on an unreadable source without mutating the input', () => {
+    const before = fullBoard({ now: nowEntry(700, 'A', '20:07') })
+    expect(() => projectNowForPublish(before, { ok: false, points: [], errors: ['broken JSON'] }))
+      .toThrow(/source unresolved.*broken JSON/)
+    expect(before).toContain('700 — A')
+  })
+
+  it('projects the publish-time active set and keeps the surviving authored prose', () => {
+    const authored = nowEntry(700, 'Kontext', '20:07', 'Bleibt genau so stehen.')
+    const before = fullBoard({ now: authored, queue: queueEntry(697, 'Wartend', '~2 h') + queueEntry(711, 'Wartend', '~1 h') })
+    const { html, comparison } = projectNowForPublish(before, { ok: true, points: [700, 697, 711], focusPoint: 700 })
+    expect(html).toContain('<span class="t">700 — Kontext</span>')
+    expect(html).toContain('Bleibt genau so stehen.')
+    expect(html.match(/Text für diesen Punkt fehlt noch/g)).toHaveLength(2)
+    expect(comparison).toMatchObject({ ok: true })
+  })
+
+  it('refuses verified zero when only an authored handover card stands there', () => {
+    expect(() => projectNowForPublish(fullBoard({ now: handover }), { ok: true, points: [], focusPoint: null }))
+      .toThrow(/refusing to replace an authored unnumbered non-idle card/)
+  })
+
+  it('publishes the handover reason written by done --none instead of blanking it', () => {
+    const before = fullBoard({ now: nowEntry(713, 'Abgeleitete Jetzt-Sektion', '10:07 · ~14:30') })
+    const edited = closeCard(before, 713, {
+      text: 'Fertig.',
+      end: '16:45',
+      none: 'Sitzungsgrenze; der Nachfolger nimmt Punkt 707.',
+    })
+
+    expect(claimsNoCurrentWork(edited)).toBe(true)
+    const { html, comparison } = projectNowForPublish(edited, { ok: true, points: [], focusPoint: null })
+    // The render never blanks text a session wrote: the authored idle card
+    // survives with its reason, and the generic element stays the fallback
+    // for a section where nobody wrote anything.
+    expect(html).toContain(NO_CURRENT_WORK_TITLE)
+    expect(html).toContain('Sitzungsgrenze; der Nachfolger nimmt Punkt 707.')
+    expect(html).not.toContain(NOW_EMPTY_STATE_MARKUP)
+    expect(comparison).toMatchObject({ ok: true, emptyStateCount: 0, unnumberedCards: 1, idleCards: 1 })
+  })
+})
 
 // Point 410: the shell is what broke the umlauts, so the text must be able to
 // skip it. These cases pin the seam between the argv and the stdin path.
@@ -456,6 +1108,26 @@ describe('addVdzk — a decision asked of the user gets a card', () => {
     expect(cards[0].body).toContain('&amp;')
   })
 
+  it('REFUSES an automated status report and names the section it belongs in (point 749)', () => {
+    const b = fullBoard({ vdzk: '' })
+    const report = 'Der Batch hat sich selbst pausiert, weil ein Alarm fünfmal unbeantwortet blieb.'
+    expect(() => addVdzk(b, 'Batch pausiert', report, { automated: true })).toThrow(/not a user decision/)
+    expect(() => addVdzk(b, 'Batch pausiert', report, { automated: true })).toThrow(/Woran ich gerade arbeite/)
+    // A session's own judgement is not second-guessed — the flag is what a SCRIPT
+    // declares about itself, and `decision-card-guard` holds sessions to the rule.
+    expect(addVdzk(b, 'Batch pausiert', report)).toContain('Batch pausiert')
+  })
+
+  it('admits an automated card that names a choice and its options', () => {
+    const out = addVdzk(
+      fullBoard({ vdzk: '' }),
+      'Rasterung der Höhenkarte',
+      'Deine Möglichkeiten: die Entscheidung stehen lassen, oder sie zurücknehmen — antworte „Veto Rasterung".',
+      { automated: true },
+    )
+    expect(out).toContain('Rasterung der Höhenkarte')
+  })
+
   it('refuses a card with no title or no question — an empty card asks nothing', () => {
     const b = fullBoard({ vdzk: '' })
     expect(() => addVdzk(b, '', 'Die Frage.')).toThrow(/needs a title/)
@@ -738,11 +1410,13 @@ describe('cardParagraphs / renderCardBody — a blank line is a paragraph bounda
   // hand-editing the board HTML, which is what wrecked the line endings.
   it('lets the sanctioned command produce what the conciseness guard demands', () => {
     const long = `${'Wort '.repeat(40).trim()}.\n\n${'Wort '.repeat(40).trim()}.`
+    // board() carries the section heading itself since the fragment fallback
+    // ended (sixth cross-review), so the document goes to the guard as is.
     const html = setCardStatus(board(), 361, long, '16:20')
-    expect(concisenessOffenders(`<h2>Woran ich gerade arbeite</h2>${html}`)).toEqual([])
+    expect(concisenessOffenders(html)).toEqual([])
     // Piped through as ONE paragraph it is exactly the block the guard refuses.
     const squashed = setCardStatus(board(), 361, long.replace(/\n\n/g, ' '), '16:20')
-    expect(concisenessOffenders(`<h2>Woran ich gerade arbeite</h2>${squashed}`)[0].reason).toMatch(/unbroken paragraph/)
+    expect(concisenessOffenders(squashed)[0].reason).toMatch(/unbroken paragraph/)
   })
 
   it('carries a multi-paragraph status over intact when the card MOVES', () => {

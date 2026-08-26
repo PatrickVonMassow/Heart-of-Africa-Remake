@@ -13,15 +13,23 @@ import { fileURLToPath } from 'node:url'
 
 import {
   CONTRACT_MEMORY,
+  ATTENDED_CEILING_NOTICE_CHAR_BUDGET,
+  CONTEXT_LEVEL_CHAR_BUDGET,
   ENFORCED_CLAIMS,
   PROMPT_CHAR_BUDGET,
   PROMPT_ENFORCED_CLAIMS,
   REMINDER_CHAR_BUDGET,
   REMINDER_COMMANDS,
+  STAND_DOWN_TEXT,
   UNENFORCEABLE_DUTIES,
   boardReminderText,
+  attendedCeilingNoticeText,
+  contextLevelSuffix,
+  groupThousands,
+  hookInjectionText,
   promptInjectionText,
 } from './dashboard-reminder-core.mjs'
+import { parseContextTokens } from './context-watermark-core.mjs'
 import { REQUIRED_SECTIONS, structureViolations } from './board-structure-core.mjs'
 import { auditDashboard, evaluate as dashboardEvaluate } from './dashboard-guard-core.mjs'
 import { berlinStamp, evaluate as timestampEvaluate } from './timestamp-guard-core.mjs'
@@ -75,7 +83,7 @@ describe('the injected board reminder (point 436)', () => {
 
   it('is what the hook actually injects — no second copy of the prose', () => {
     const hook = readFileSync(join(SCRIPTS, 'dashboard-reminder-hook.mjs'), 'utf8')
-    expect(hook).toContain('process.stdout.write(promptInjectionText(mtimeNote))')
+    expect(hook).toContain('process.stdout.write(hookInjectionText({ mtimeNote, contextTokens, ceilingNotice }))')
     expect(hook).not.toContain('[dashboard-reminder] PFLICHT')
   })
 })
@@ -112,8 +120,10 @@ describe('the WHOLE per-prompt injection (point 440)', () => {
   it('holds the whole injection to its measured budget', () => {
     // MEASURED before the cut: 1771 characters per prompt (139 timestamp line +
     // 843 board obligation + 427 focus block + 358 banner + newlines).
-    expect(promptInjectionText().length).toBeLessThanOrEqual(PROMPT_CHAR_BUDGET)
-    expect(promptInjectionText(' Letzte Dashboard-Dateiänderung vor ~4 min.')).toContain('vor ~4 min.')
+    const text = hookInjectionText({ contextTokens: Number.MAX_SAFE_INTEGER })
+    expect(text.length).toBeLessThanOrEqual(PROMPT_CHAR_BUDGET)
+    expect(hookInjectionText({ mtimeNote: ' Letzte Dashboard-Dateiänderung vor ~4 min.' })).toContain('vor ~4 min.')
+    expect(CONTEXT_LEVEL_CHAR_BUDGET).toBeLessThanOrEqual(80)
     expect(PROMPT_CHAR_BUDGET).toBeLessThan(1771)
   })
 
@@ -128,5 +138,84 @@ describe('the WHOLE per-prompt injection (point 440)', () => {
     expect(hook).not.toContain('dateStyle')
     expect(hook).not.toContain('[timestamp] PFLICHT')
     expect(hook).not.toContain('[focus-guard]')
+  })
+})
+
+describe('the context level in the answer header', () => {
+  const readableTranscript = [
+    JSON.stringify({
+      type: 'assistant',
+      isSidechain: false,
+      timestamp: '2026-08-19T18:35:00.000Z',
+      message: {
+        usage: {
+          input_tokens: 120000,
+          cache_read_input_tokens: 3456,
+          cache_creation_input_tokens: 78,
+        },
+      },
+    }),
+    JSON.stringify({
+      type: 'assistant',
+      isSidechain: true,
+      timestamp: '2026-08-19T18:36:00.000Z',
+      message: { usage: { input_tokens: 999999 } },
+    }),
+  ].join('\n')
+
+  const transcriptTokens = (text) => parseContextTokens(text)?.tokens ?? null
+
+  it.each([
+    ['owner', false],
+    ['stand-down', true],
+  ])('puts a readable transcript measurement in the %s hook text', (_name, standDown) => {
+    const text = hookInjectionText({ standDown, contextTokens: transcriptTokens(readableTranscript) })
+    expect(text).toContain('[context-level] Kopfzeilen-Suffix: · Kontext: 123.534 Tokens')
+    expect(text).toContain(standDown ? STAND_DOWN_TEXT : '[dashboard-reminder]')
+  })
+
+  it.each([
+    ['owner', false],
+    ['stand-down', true],
+  ])('reports an unreadable transcript honestly in the %s hook text', (_name, standDown) => {
+    const text = hookInjectionText({ standDown, contextTokens: transcriptTokens('{not json') })
+    expect(text).toContain('[context-level] Kopfzeilen-Suffix: · Kontext: -- Tokens')
+    expect(text).not.toContain('Kontext: 0 Tokens')
+  })
+
+  it('keeps the produced header acceptable to the timestamp guard', () => {
+    const now = new Date('2026-08-19T16:36:00.000Z')
+    const header = `**${berlinStamp(now)}**${contextLevelSuffix(transcriptTokens(readableTranscript))}`
+    expect(timestampEvaluate({ lastText: header, now })).toBe(null)
+  })
+
+  it.each([
+    [999, '999'],
+    [1000, '1.000'],
+    [143495, '143.495'],
+    [1234567, '1.234.567'],
+  ])('groups %i as %s so the reading reads as a number', (tokens, grouped) => {
+    expect(groupThousands(tokens)).toBe(grouped)
+    expect(contextLevelSuffix(tokens)).toBe(` · Kontext: ${grouped} Tokens`)
+  })
+
+  it('has the live hook read through the shared context parser and output the pure branch text', () => {
+    const hook = readFileSync(join(SCRIPTS, 'dashboard-reminder-hook.mjs'), 'utf8')
+    expect(hook).toContain("CONTEXT_CEILING_TOKENS, parseContextTokens } from './context-watermark-core.mjs'")
+    expect(hook).toContain('process.stdout.write(hookInjectionText({ standDown: true, contextTokens, ceilingNotice }))')
+    expect(hook).toContain('process.stdout.write(hookInjectionText({ mtimeNote, contextTokens, ceilingNotice }))')
+  })
+
+  it('asks the attended user for /clear in observe and armed mode without blocking the answer', () => {
+    for (const mode of ['observe', 'armed']) {
+      const text = attendedCeilingNoticeText({ tokens: 265_517, ceiling: 150_000, mode })
+      expect(text).toContain('265.517 Tokens')
+      expect(text).toContain('150.000')
+      expect(text).toContain('`/clear`')
+      expect(text).toMatch(/Antworten werden nie verweigert/)
+      expect(text.length).toBeLessThanOrEqual(ATTENDED_CEILING_NOTICE_CHAR_BUDGET)
+      expect(hookInjectionText({ contextTokens: 265_517, ceilingNotice: text }).length)
+        .toBeLessThanOrEqual(PROMPT_CHAR_BUDGET + ATTENDED_CEILING_NOTICE_CHAR_BUDGET)
+    }
   })
 })

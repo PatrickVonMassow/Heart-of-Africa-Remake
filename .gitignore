@@ -38,6 +38,7 @@ scripts/.tile-cache
 # a committed one would hand a clone a fence from somebody else's history.
 .claude/batch-fence.json
 .claude/batch-fence.json.tmp-*
+.claude/batch-fence.json.claiming
 # The fence's per-session notice ledger — which session has already been told
 # about which fenced turn. Same class as the fence itself: this machine's
 # runtime state, keyed by session ids that mean nothing in a clone.
@@ -53,6 +54,11 @@ scripts/.tile-cache
 # The derived queue's prose and order (point 400, delta C) — session state that
 # belongs beside the board it renders, not in the source history.
 .claude/board-queue.json
+# The measured queue calibration (point 730) — the reading `queue-calibration.mjs`
+# takes off the merge history, serving the estimates on the file above. Derived
+# state: it is re-measured on demand, never carried in the source history.
+.claude/queue-calibration.json
+.claude/queue-calibration.json.tmp-*
 # The chat channel's shared SECRET and its runtime state. The secret is what
 # stands between a PUBLIC board page and a session with permissions pre-granted,
 # so it is never committed — and neither is a topic name derived from it.
@@ -64,6 +70,10 @@ scripts/.tile-cache
 .claude/chat-spool.jsonl
 .claude/chat-spool.jsonl.migrated-*
 .claude/chat-spool/
+# The carrier bell's last observed count and reminder time. This is per-machine
+# delivery state like the spool ledger, never source history.
+.claude/carrier-bell-state.json
+.claude/carrier-bell-state.json.tmp-*
 # The message watcher's own runtime state (point 407). Both belong here for the
 # same reason .claude/batch-claim.json does — batch-doctor's stash sweeps what
 # git does not know about, and each of these has a failure mode when it goes:
@@ -82,8 +92,14 @@ scripts/.tile-cache
 .claude/worktrees/
 .claude/dashboard-state.json
 .claude/current-focus.json
+# The heartbeat's memory of the now-card it last saw, and the launcher's
+# mandate verdict: tooling state, written per machine, never authorship.
+.claude/board-heartbeat.json
+.claude/board-heartbeat.json.tmp-*
+.claude/repo-mandate.json
 .claude/focus-check-pending.json
 .claude/session-process.json
+.claude/session-process.json.tmp-*
 .claude/tool-activity.json
 .claude/wait-prep.json
 .claude/render-verify-state.json
@@ -126,8 +142,42 @@ scripts/.tile-cache
 .claude/batch-boundary.json.tmp-*
 .claude/batch-boundary-prepared.json
 .claude/batch-boundary-prepared.json.tmp-*
+# The LIVE context-overshoot series the boundary appends to (point 742). Runtime
+# state like the fence beside it: these are THIS machine's session readings, and a
+# committed one would hand a clone somebody else's history — while a boundary, the
+# session's LAST repository action, could never commit what it writes anyway. The
+# readings that must outlive the machine sit in the TRACKED
+# .claude/context-incidents-seed.jsonl.
+.claude/context-incidents.jsonl
+# What the DISARMED context fence would have refused (point 758). This
+# machine's session readings, like every other .claude runtime record.
+.claude/context-fence-observations.jsonl
+.claude/context-fence-ledger.json
+.claude/context-fence-ledger.json.tmp-*
+.claude/context-fence-ledgers/
+.claude/context-fence-ledger.lock/
+.claude/context-fence-permit.json
+.claude/context-fence-permit.json.tmp-*
+.claude/context-fence-permit-pending.json
+.claude/context-fence-permit-pending.json.tmp-*
+.claude/context-fence-permits.jsonl
+.claude/context-fence-state.lock/
+# First-refusal state and the append-only evidence for the measured exit cap.
+.claude/handover-budget.json
+.claude/handover-budget.json.tmp-*
+.claude/handover-costs.jsonl
+# Per-stage exit/ramp attribution: active state plus append-only machine-local readings.
+.claude/handover-attribution.json
+.claude/handover-attribution.json.tmp-*
+.claude/handover-attribution.jsonl
+.claude/context-ceiling-notices/
 .claude/batch-in-flight.json
 .claude/batch-in-flight.json.tmp-*
+# Point 809's append-only activity journal and its short-lived append mutex are
+# runtime evidence from this machine. Historical fixtures are tracked under
+# scripts/fixtures; a clone must never inherit live session/process identities.
+.claude/batch-activity.jsonl
+.claude/batch-activity.jsonl.lock/
 # The commissioning record (point 712): the overrides taken against the queue's
 # front and the branches parked out of the slot count. It describes THIS
 # checkout's batch, not the repository's content.
@@ -160,6 +210,8 @@ scripts/.tile-cache
 # reads the setting the user actually flipped.
 .claude/sol-share.json
 .claude/sol-share.json.tmp-*
+.claude/fable-switch.json
+.claude/fable-switch.json.tmp-*
 
 # Local GitHub PAT (ci-status-guard.mjs probes this path) — never committed
 .secrets/

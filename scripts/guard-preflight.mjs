@@ -50,6 +50,8 @@ import { gatherTasksSpecInputs } from './tasks-spec-guard.mjs'
 import { gatherTasksArchiveInputs } from './tasks-archive-guard.mjs'
 import { gatherQueueOrderInputs } from './queue-order-guard.mjs'
 import { gatherDocBudgetInputs } from './doc-budget-guard.mjs'
+import { gatherBundleFirstInputs } from './bundle-first-guard.mjs'
+import { evaluate as evaluateBundleFirst } from './bundle-first-core.mjs'
 import { gatherModelGuardInputs } from './model-guard.mjs'
 import { gatherRenderVerifyInputs } from './render-verify-guard.mjs'
 import { gatherMechanismReviewInputs } from './mechanism-review-guard.mjs'
@@ -85,6 +87,7 @@ import { evaluate as dashboardSyncEvaluate } from './dashboard-sync-core.mjs'
 import { gatherCiStatusInputs } from './ci-status-guard.mjs'
 import { timestampReplyCondition } from './timestamp-guard-core.mjs'
 import { gatherDecisionCardCondition } from './decision-card-guard.mjs'
+import { gatherClearClaimCondition } from './clear-claim-guard.mjs'
 import { decideBatchProgress, gatherBatchProgressInputs } from './batch-progress-guard.mjs'
 import { commissionVerdict, gatherCommissionInputs } from './commission-guard.mjs'
 
@@ -166,17 +169,18 @@ export const GUARDS = [
     gather: ({ sessionId } = {}) => gatherModelGuardInputs({ sessionId, arm: false }),
     // Both halves of the split (point 397), so the preflight predicts which of
     // the two blocks the session would meet — they have different remedies.
-    decide: ({ log, baselineMs, backupRefs }) => {
-      const forbidden = findForbiddenCommits(log, baselineMs)
-      const unidentified = findUnidentifiedCommits(log, baselineMs)
+    decide: ({ log, baselineMs, backupRefs, fableState }) => {
+      if (!fableState?.ok) return { block: true, reason: `SERVING-MODEL TRIPWIRE: ${fableState?.problem}` }
+      const forbidden = findForbiddenCommits(log, baselineMs, fableState)
+      const unidentified = findUnidentifiedCommits(log, baselineMs, fableState)
       if (forbidden.length) {
         return {
           block: true,
-          reason: formatForbiddenReason(forbidden, { backupRefs, alsoUnidentified: unidentified }),
+          reason: formatForbiddenReason(forbidden, { backupRefs, alsoUnidentified: unidentified, fableState }),
         }
       }
       if (unidentified.length) {
-        return { block: true, reason: formatUnidentifiedReason(unidentified, { backupRefs }) }
+        return { block: true, reason: formatUnidentifiedReason(unidentified, { backupRefs, fableState }) }
       }
       return { block: false }
     },
@@ -196,7 +200,12 @@ export const GUARDS = [
     gather: gatherMechanismReviewInputs,
     decide: (inputs) => {
       const verdict = evaluateMechanismReview(inputs)
-      return { block: verdict.block, reason: formatMechanismReviewVerdict(verdict) }
+      return {
+        block: verdict.block,
+        reason: verdict.deferred
+          ? verdict.reason
+          : formatMechanismReviewVerdict(verdict, { authorshipPlan: inputs.authorshipPlan }),
+      }
     },
   },
   {
@@ -231,6 +240,14 @@ export const GUARDS = [
     decide: ({ docs }) => {
       const verdict = evaluateDocBudgets(docs)
       return { block: verdict.block, reason: formatDocBudgetVerdict(verdict) }
+    },
+  },
+  {
+    id: 'bundle-first-guard',
+    gather: gatherBundleFirstInputs,
+    decide: (inputs) => {
+      const verdict = evaluateBundleFirst(inputs)
+      return { block: verdict.block, reason: verdict.reason }
     },
   },
   {
@@ -307,7 +324,7 @@ export const GUARDS = [
     gather: gatherRuleReviewInputs,
     decide: (inputs) => {
       const verdict = evaluateRuleReview(inputs)
-      return { block: Boolean(verdict), reason: verdict ? verdict.reason : '' }
+      return { block: verdict?.decision === 'block', reason: verdict ? verdict.reason : '' }
     },
   },
   {
@@ -358,6 +375,11 @@ export const GUARDS = [
   {
     id: 'decision-card-guard',
     gather: gatherDecisionCardCondition,
+    decide: () => ({ block: false }),
+  },
+  {
+    id: 'clear-claim-guard',
+    gather: gatherClearClaimCondition,
     decide: () => ({ block: false }),
   },
   {

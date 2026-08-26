@@ -14,7 +14,8 @@
 //   node scripts/board.mjs done   <point> --none "<reason>"   # …or name the gap
 //   node scripts/board.mjs none   "<reason>"           # the gap card, no point to close
 //   node scripts/board.mjs closing <point> "<reason>"  # …still owed: its closing duties
-//   node scripts/board.mjs vdzk-add "<title>" "<question>"  # ask the user a decision
+//   node scripts/board.mjs vdzk-add ["--automated"] "<title>" "<question>"
+//                                                     # ask the user a decision
 //   node scripts/board.mjs vdzk-remove "<title>"      # drop an answered question
 //   node scripts/board.mjs vdzk-keep "<title>" [...] # message did not answer it
 //   node scripts/board.mjs focus  <point> "<note>"    # declare focus + stamp
@@ -67,14 +68,18 @@ import {
   mergeDoneDuplicates,
 } from './board-core.mjs'
 import { runBoardEdit } from './board-edit-core.mjs'
+import { withDerivedState } from './board-state.mjs'
 import { recordDecisionCardKeep } from './decision-card-guard.mjs'
 import { writeTextAtomic } from './atomic-write.mjs'
 import { QUEUE_DATA_PATH, setQueueEntry } from './board-queue-core.mjs'
 import { readJson } from './dashboard-state.mjs'
+import { FOCUS_PATH } from './dashboard-state.mjs'
+import { readDeclaration, writeDeclaration } from './batch-in-flight.mjs'
+import { transitionActiveDeclaration } from './active-work-source.mjs'
 import { withBoardEditLock } from './board-edit-lock.mjs'
+import { readTasksAll } from './tasks-source.mjs'
 
 const BOARD = resolve(REPO_ROOT, '.batch-dashboard.html')
-const TASKS = resolve(REPO_ROOT, 'TASKS.md')
 const PUBLISH_SCRIPT = 'scripts/board-publish.mjs'
 const run = (args) => execFileSync(process.execPath, args, { windowsHide: true, cwd: REPO_ROOT, encoding: 'utf8' })
 
@@ -121,8 +126,12 @@ function edit(fn, done) {
   return withBoardEditLock(() => applyEdit(fn, done))
 }
 
+function editPrepared(fn, done, preparePublish = () => {}) {
+  return withBoardEditLock(() => applyEdit(fn, done, preparePublish))
+}
+
 /** Apply a pure card edit, rotate the archive overflow, publish, and say what is left by hand. */
-function applyEdit(fn, done) {
+function applyEdit(fn, done, preparePublish = () => {}) {
   // Both ends of the round trip name their encoding (point 410). The write used
   // to take the platform default, which is the other half of the way a German
   // card could reach the file as something the reader sees as damage.
@@ -146,16 +155,86 @@ function applyEdit(fn, done) {
   // would be its own defect.
   const result = runBoardEdit({
     html: readFileSync(BOARD, 'utf8'),
-    tasksText: readFileSync(TASKS, 'utf8'),
+    tasksText: readTasksAll(),
     transform: fn,
     done,
     write: (html) => writeTextAtomic(BOARD, html),
     rotate: () => run(['scripts/board-archive-rotate.mjs']),
-    publish: () => run([PUBLISH_SCRIPT]),
+    preparePublish,
+    publish: () => run([PUBLISH_SCRIPT, '--locked']),
+    derive: (html) => withDerivedState(html),
     stdout: (line) => console.log(line),
     stderr: (line) => console.error(line),
   })
   if (!result.published) process.exitCode = 1
+}
+
+/** Update the structured active source inside the same board transaction. */
+function prepareActiveTransition({
+  focusPoint = undefined,
+  exitPoint = null,
+  note = 'board lifecycle transition',
+  // MAY THIS STILL BE ROLLED BACK (sixth cross-vendor round)? Only while no
+  // board write has become durable yet — the focus-only command. Run as a
+  // board edit's prepare step, the edited board is already on disk, so undoing
+  // the declaration would make the two disagree in the OTHER direction and the
+  // publish remedy would then project the old membership over the new board.
+  // There the new state stands and the focus store is named as the thing that
+  // is behind.
+  rollbackable = false,
+} = {}) {
+  return () => {
+    const declaration = readDeclaration()
+    if (declaration) {
+      // EVERY transition is a write, so every transition migrates: a legacy
+      // item gets its resolved point RECORDED (fifth cross-vendor round), on
+      // the focus path as much as on an exit — the sixth round found the
+      // migration skipped when nothing exited. The exit then filters on the
+      // RECORDED point alone: nothing is probed, guessed or retired here —
+      // an unattributable item survives and the read side names the human
+      // way out.
+      writeDeclaration(transitionActiveDeclaration(declaration, {
+        exitPoint,
+        focusPoint: focusPoint === undefined ? declaration.focusPoint ?? null : focusPoint,
+      }))
+    }
+    try {
+      if (focusPoint !== undefined) {
+        console.log(run(['scripts/focus.mjs', 'set', focusPoint == null ? '-' : String(focusPoint), note]).trim())
+      } else if (exitPoint != null) {
+        const focus = readJson(FOCUS_PATH)
+        if (Number(focus?.point) === Number(exitPoint)) {
+          console.log(run(['scripts/focus.mjs', 'set', '-', note]).trim())
+        }
+      }
+    } catch (error) {
+      // ROLLBACK (eighth cross-review): the declaration is written FIRST, so a
+      // focus step that fails here would leave the two stores contradicting
+      // each other — the very split-brain this shared transition exists to
+      // close, with the edit lock offering no rollback of its own. The
+      // declaration write is in-process and restorable; the focus subprocess
+      // failed and wrote nothing. Restore, then fail the command loudly.
+      if (!rollbackable) {
+        throw new Error(
+          `${error.message} — the board edit is already written, so the active-work record KEEPS the new ` +
+            'state and the focus store is the one left behind. Fix the cause, then: node scripts/focus.mjs ' +
+            `set ${focusPoint == null ? '-' : String(focusPoint)} "${note}"`,
+        )
+      }
+      if (declaration) {
+        try {
+          writeDeclaration(declaration)
+        } catch (rollbackError) {
+          throw new Error(
+            `${error.message} — AND rolling the active-work declaration back failed too ` +
+              `(${rollbackError.message}): the two active-work stores may now disagree; ` +
+              're-run this command once the cause is fixed.',
+          )
+        }
+      }
+      throw error
+    }
+  }
 }
 
 const [cmd, ...rest] = process.argv.slice(2)
@@ -167,6 +246,18 @@ try {
     if (!point || words.length === 0) throw new Error('usage: board.mjs status <point> "<text>"|--text-stdin')
     const at = berlinStamp()
     edit((html) => setCardStatus(html, point, textOf(words), at), `status of ${point} restated (Stand ${at})`)
+  } else if (cmd === 'paused') {
+    // THERE IS NOTHING TO COMMAND HERE ANY MORE (point 749). A pause used to be
+    // written — first as a user-decision card, then briefly onto the running
+    // point's own status line, which overwrote the status the reader needed. It
+    // is DERIVED now, from `.claude/batch-paused`, on every edit and every
+    // publish, so a paused batch shows up without being told and stops showing
+    // up when the marker goes.
+    throw new Error(
+      'board: the pause is not written, it is derived. Pause the batch itself — ' +
+        'node scripts/batch-pause.mjs "<Grund>" — and the board reports it on the next edit; ' +
+        'clearing the pause marker removes the card again with no board command at all.',
+    )
   } else if (cmd === 'title') {
     // RETITLING HAD NO COMMAND AT ALL for a now-card (point 439), so the three
     // current-work cards of 30.07.2026 were fixed by hand-editing the HTML — the
@@ -188,15 +279,20 @@ try {
     // it carried an estimate — and a now-card promoted without one renders a
     // start time and no expected end, which is the invisibility point 439 ends.
     const noEstimate = promotionEstimateWarning(readFileSync(BOARD, 'utf8'), point)
-    edit(
+    editPrepared(
       (html) => toNow(html, point, textOf(words), { stamp: at }),
       `${point} is current work since ${at} (title and estimate taken from its queue card)`,
+      prepareActiveTransition({ focusPoint: Number(point), note: `point ${point}: current work` }),
     )
     if (noEstimate) console.error(noEstimate)
   } else if (cmd === 'queue') {
     const [point, ...words] = rest
     if (!point) throw new Error('usage: board.mjs queue <point> ["<text>"|--text-stdin]')
-    edit((html) => toQueue(html, point, { text: textOf(words) }), `${point} returned to the queue`)
+    editPrepared(
+      (html) => toQueue(html, point, { text: textOf(words) }),
+      `${point} returned to the queue`,
+      prepareActiveTransition({ exitPoint: Number(point), note: `point ${point}: returned to queue` }),
+    )
   } else if (cmd === 'done') {
     // ONE edit, one write (point 416): archiving and the successor go into the
     // same document, so the board is never observed without current work.
@@ -209,7 +305,7 @@ try {
     }
     const at = berlinStamp()
     const noEstimate = next == null ? null : promotionEstimateWarning(readFileSync(BOARD, 'utf8'), next)
-    edit(
+    editPrepared(
       (html) =>
         closeCard(html, point, {
           text: textOf(words),
@@ -225,6 +321,11 @@ try {
         : hasNone
           ? `${point} archived as done at ${at}; the board now names why nothing is running`
           : `${point} archived as done at ${at}`,
+      prepareActiveTransition({
+        exitPoint: Number(point),
+        focusPoint: next == null ? null : Number(next),
+        note: next == null ? `point ${point}: completed` : `point ${next}: current work after ${point}`,
+      }),
     )
     if (noEstimate) console.error(noEstimate)
   } else if (cmd === 'none') {
@@ -282,11 +383,16 @@ try {
     // inbox he writes into, not a board he reads. `decision-card-guard` blocks a
     // turn whose reply asks for a decision with no card standing for it, and this
     // is the command its remedy names.
-    const [title, ...words] = rest
+    // A SCRIPT DECLARES ITSELF WITH --automated (point 749). Four of them used to
+    // file status reports here; the flag routes the card through the
+    // admissibility rule, which refuses anything that is not a named choice and
+    // says where batch state belongs instead.
+    const automated = rest.includes('--automated')
+    const [title, ...words] = rest.filter((arg) => arg !== '--automated')
     if (!title || (words.length === 0 && !stdinText.trim())) {
-      throw new Error('usage: board.mjs vdzk-add "<title>" "<question>"|--text-stdin')
+      throw new Error('usage: board.mjs vdzk-add [--automated] "<title>" "<question>"|--text-stdin')
     }
-    edit((html) => addVdzk(html, title, textOf(words)), `open question added: ${title}`)
+    edit((html) => addVdzk(html, title, textOf(words), { automated }), `open question added: ${title}`)
   } else if (cmd === 'vdzk-remove') {
     const fragment = textOf(rest)
     if (!fragment) throw new Error('usage: board.mjs vdzk-remove "<title>"|--text-stdin')
@@ -305,9 +411,10 @@ try {
     if (!point || !times || !title || words.length === 0) {
       throw new Error('usage: board.mjs promote <point> "<times>" "<title>" "<status>"|--text-stdin')
     }
-    edit(
+    editPrepared(
       (html) => promoteToNow(html, point, { title, times, status: textOf(words) }),
       `${point} promoted to current work`,
+      prepareActiveTransition({ focusPoint: Number(point), note: `point ${point}: promoted to current work` }),
     )
   } else if (cmd === 'merge-done') {
     // One point, one Erledigt card. `done` folds them at write time; this is for
@@ -325,20 +432,42 @@ try {
     )
   } else if (cmd === 'focus') {
     const [point, ...words] = rest
-    if (!point) throw new Error('usage: board.mjs focus <point> "<note>"|--text-stdin')
-    console.log(run(['scripts/focus.mjs', 'set', point, textOf(words)]).trim())
+    const note = textOf(words)
+    if (!point || !note) throw new Error('usage: board.mjs focus <point> "<note>"|--text-stdin')
+    // A focus switch is an active-work TRANSITION like now/done (seventh
+    // cross-review): writing only the focus FILE left the structured source's
+    // declaration.focusPoint on the old strand — a split-brain the publish
+    // could project as the old order while the set-check blessed it. The
+    // shared transition writes both stores in the same locked publish.
+    const focusPoint = point === '-' || point.toLowerCase() === 'none' ? null : Number(point)
+    if (focusPoint !== null && (!Number.isInteger(focusPoint) || focusPoint <= 0)) {
+      throw new Error(`board: focus "${point}" is neither a TASKS point number nor "-"`)
+    }
+    withBoardEditLock(() => {
+      // The one caller with NO durable board write before it: nothing is on
+      // disk yet, so a failed focus step is undone rather than announced.
+      prepareActiveTransition({ focusPoint, note, rollbackable: true })()
+      console.log(run([PUBLISH_SCRIPT, '--locked']).trim().split('\n')[0])
+    })
   } else if (cmd === 'attest') {
-    // Rotation first: a tick that pushed the Erledigt section past its cap would
-    // otherwise fail the audit two steps later, after the publish.
-    console.log(run(['scripts/board-archive-rotate.mjs']).trim().split('\n')[0])
-    console.log(run(['scripts/dashboard-guard.mjs', '--synced', '.batch-dashboard.html']).trim())
-    console.log(run(['scripts/prep-guard.mjs', '--prepped']).trim())
+    // UNDER THE SAME LOCK AS EVERY OTHER BOARD WRITE (ninth cross-vendor round):
+    // attest ROTATES the archive, so it is a read-modify-write of the board file
+    // like the rest, and it stood outside the lock — the one board-CLI path left
+    // that could interleave with a locked edit or publish. None of the three
+    // children takes the lock itself, so nothing deadlocks under it.
+    withBoardEditLock(() => {
+      // Rotation first: a tick that pushed the Erledigt section past its cap would
+      // otherwise fail the audit two steps later, after the publish.
+      console.log(run(['scripts/board-archive-rotate.mjs']).trim().split('\n')[0])
+      console.log(run(['scripts/dashboard-guard.mjs', '--synced', '.batch-dashboard.html']).trim())
+      console.log(run(['scripts/prep-guard.mjs', '--prepped']).trim())
+    })
   } else {
     console.error(
       'usage: board.mjs now|status|title|queue <point> "<text>" | ' +
         'done <point> ["<text>"] [--next <m> "<status>" | --none "<reason>"] | ' +
         'none "<reason>" | closing <point> ["--title <Betreff>"] "<reason>" | ' +
-        'vdzk-add "<title>" "<question>" | vdzk-remove "<title>" | ' +
+        'vdzk-add [--automated] "<title>" "<question>" | vdzk-remove "<title>" | ' +
         'vdzk-keep "<title>" [...] [--why "<reason>"] | ' +
         'promote <point> "<times>" "<title>" "<status>" | focus <point> "<note>" | attest\n' +
         `Any "<text>" may be replaced by ${TEXT_STDIN_FLAG} and piped in — use that for German prose.`,

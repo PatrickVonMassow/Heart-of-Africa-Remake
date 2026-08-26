@@ -93,6 +93,16 @@ beforeEach(() => {
 })
 
 describe('closing-guard (spawned)', () => {
+  it('uses the fixture cwd even when the executable script lives in the source checkout', () => {
+    const r = spawnSync(process.execPath, [resolve(SOURCE_SCRIPTS, 'closing-guard.mjs'), '--status'], {
+      windowsHide: true,
+      cwd: repo,
+      encoding: 'utf8',
+    })
+    expect(r.status, r.stderr).toBe(0)
+    expect(r.stdout).toContain(`HEAD ${head.slice(0, 12)}`)
+  })
+
   it('denies a version tag on an incomplete closing, with a well-formed deny payload', () => {
     const r = callGuard('Bash', { command: 'git tag -a v0.3 -m "demo"' })
     expect(r.status, r.stderr).toBe(0)

@@ -3,11 +3,26 @@
 // events are driven through CDP so pointer capture and multi-touch behave like
 // hardware. Dev server only.
 import { launchVerifyBrowser, waitForStable, assertBackend } from './_browser.mjs'
+import { sectionGate } from './sections.mjs'
 
 const BASE = process.env.BASE_URL ?? 'http://localhost:5173/'
+
+// SECTIONS (points 566/595). One block per touch gesture. The order matters in
+// ONE place — the deliberate-input guard can only be read BEFORE the first touch
+// — so that block stands first and touches nothing, while every later block arms
+// the layer itself through the shared helper below. The names are read out of
+// THIS FILE by scripts/verify/sections.mjs, so an unknown one is refused with the
+// list of the real ones — and the run is stamped PARTIAL, never suite coverage.
+const sections = sectionGate()
+const { section } = sections
+if (sections.banner()) console.log(sections.banner())
+
 let failures = 0
 const check = (name, ok, detail) => {
-  console.log(`${ok ? 'PASS' : 'FAIL'}  ${name}${detail ? ' — ' + detail : ''}`)
+  // The tag goes AFTER the ' — ' separator: the check's NAME is its identity for
+  // the red ledger and the baseline classifier and must not change.
+  const tail = [detail, sections.tag().trim()].filter(Boolean).join('  ')
+  console.log(`${ok ? 'PASS' : 'FAIL'}  ${name}${tail ? ' — ' + tail : ''}`)
   if (!ok) failures++
 }
 
@@ -42,102 +57,140 @@ await page.evaluate(() => {
   window.__game.getState().setJournalOpen(false)
 })
 
+// SHARED STAGING (point 566): the touch layer, armed. Every gesture block below
+// needs the overlay mounted, and the FIRST touch is what mounts it — so a block
+// that opened with its own gesture would spend that gesture on the arming and
+// measure nothing. A no-op once the layer is up, so a whole run still arms once
+// (and the deliberate-input block above still sees a page nobody has touched).
+const armTouchLayer = async () => {
+  if (await page.evaluate(() => window.__ui.getState().touchActive)) return
+  await touch('touchStart', [{ x: 215, y: 120 }])
+  await touch('touchEnd', [])
+  await page.waitForFunction(() => !!document.querySelector('.touch-controls'), null, { timeout: 8000 }).catch(() => {})
+  await page.waitForTimeout(400)
+}
+
 // --- Before any touch: no overlay, PC-identical (deliberate-input guard) -------
-const before = await page.evaluate(() => ({
-  active: window.__ui.getState().touchActive,
-  overlay: !!document.querySelector('.touch-controls'),
-}))
-check('no touch overlay before the first touch (desktop stays identical)', !before.active && !before.overlay, JSON.stringify(before))
+if (section('before-first-touch')) {
+  const before = await page.evaluate(() => ({
+    active: window.__ui.getState().touchActive,
+    overlay: !!document.querySelector('.touch-controls'),
+  }))
+  check('no touch overlay before the first touch (desktop stays identical)', !before.active && !before.overlay, JSON.stringify(before))
+}
 
 // --- First touch arms the layer and applies the mobile quality preset ---------
-await touch('touchStart', [{ x: 215, y: 120 }])
-await touch('touchEnd', [])
-await page.waitForTimeout(400)
-const armed = await page.evaluate(() => {
-  const u = window.__ui.getState()
-  return {
-    active: u.touchActive,
-    overlay: !!document.querySelector('.touch-controls'),
-    stick: !!document.querySelector('.touch-stick'),
-    look: !!document.querySelector('.touch-look'),
-    traa: u.traaEnabled,
-    ssao: u.ssaoEnabled,
-    shadowHalf: u.shadowMapHalf,
-  }
-})
-check('first touch mounts the overlay (stick + look surface)', armed.active && armed.overlay && armed.stick && armed.look, JSON.stringify(armed))
-check('touch applies the mobile quality preset (TRAA/SSAO off, half shadows)', armed.traa === false && armed.ssao === false && armed.shadowHalf === true, JSON.stringify(armed))
+if (section('first-touch-arms')) {
+  await armTouchLayer()
+  const armed = await page.evaluate(() => {
+    const u = window.__ui.getState()
+    return {
+      active: u.touchActive,
+      overlay: !!document.querySelector('.touch-controls'),
+      stick: !!document.querySelector('.touch-stick'),
+      look: !!document.querySelector('.touch-look'),
+      traa: u.traaEnabled,
+      ssao: u.ssaoEnabled,
+      shadowHalf: u.shadowMapHalf,
+    }
+  })
+  check('first touch mounts the overlay (stick + look surface)', armed.active && armed.overlay && armed.stick && armed.look, JSON.stringify(armed))
+  check('touch applies the mobile quality preset (TRAA/SSAO off, half shadows)', armed.traa === false && armed.ssao === false && armed.shadowHalf === true, JSON.stringify(armed))
+}
 
 // --- Virtual stick walks the character (first-person, Cairo start) ------------
-const stickCX = 24 + 64 // stick centre x (left inset + half of 128)
-const stickCY = 850 - (24 + 64) // bottom inset + half height
-const pos0 = await page.evaluate(() => ({ x: window.__placePlayer.x, z: window.__placePlayer.z }))
-await touch('touchStart', [{ x: stickCX, y: stickCY }])
-await touch('touchMove', [{ x: stickCX, y: stickCY - 60 }]) // drag up = forward
-// Poll until the stick has walked the character (point 200), not a fixed wait.
-await page
-  .waitForFunction((p) => Math.hypot(window.__placePlayer.x - p.x, window.__placePlayer.z - p.z) > 1, pos0, { timeout: 5000 })
-  .catch(() => {})
-await touch('touchEnd', [])
-const pos1 = await page.evaluate(() => ({ x: window.__placePlayer.x, z: window.__placePlayer.z }))
-const walked = Math.hypot(pos1.x - pos0.x, pos1.z - pos0.z)
-check('virtual stick walks the character', walked > 1, `moved ${walked.toFixed(1)} m`)
-// The stick releases to neutral: the walk-feel inertia (point 97) coasts a
-// fraction of a metre, then the position must be fully settled — poll until the
-// coast stops (point 200) rather than a fixed wait, then confirm no drift.
-await waitForStable(page, () => window.__placePlayer.x, { settleMs: 150, timeout: 4000 })
-const pos2 = await page.evaluate(() => ({ x: window.__placePlayer.x, z: window.__placePlayer.z }))
-await page.waitForTimeout(200)
-const pos3 = await page.evaluate(() => ({ x: window.__placePlayer.x, z: window.__placePlayer.z }))
-check('lifting the stick stops the walk', Math.hypot(pos3.x - pos2.x, pos3.z - pos2.z) < 0.1, 'settled')
+if (section('virtual-stick')) {
+  await armTouchLayer()
+  const stickCX = 24 + 64 // stick centre x (left inset + half of 128)
+  const stickCY = 850 - (24 + 64) // bottom inset + half height
+  const pos0 = await page.evaluate(() => ({ x: window.__placePlayer.x, z: window.__placePlayer.z }))
+  await touch('touchStart', [{ x: stickCX, y: stickCY }])
+  await touch('touchMove', [{ x: stickCX, y: stickCY - 60 }]) // drag up = forward
+  // Poll until the stick has walked the character (point 200), not a fixed wait.
+  await page
+    .waitForFunction((p) => Math.hypot(window.__placePlayer.x - p.x, window.__placePlayer.z - p.z) > 1, pos0, { timeout: 5000 })
+    .catch(() => {})
+  await touch('touchEnd', [])
+  const pos1 = await page.evaluate(() => ({ x: window.__placePlayer.x, z: window.__placePlayer.z }))
+  const walked = Math.hypot(pos1.x - pos0.x, pos1.z - pos0.z)
+  check('virtual stick walks the character', walked > 1, `moved ${walked.toFixed(1)} m`)
+  // The stick releases to neutral: the walk-feel inertia (point 97) coasts a
+  // fraction of a metre, then the position must be fully settled — poll until the
+  // coast stops (point 200) rather than a fixed wait, then confirm no drift.
+  await waitForStable(page, () => window.__placePlayer.x, { settleMs: 150, timeout: 4000 })
+  const pos2 = await page.evaluate(() => ({ x: window.__placePlayer.x, z: window.__placePlayer.z }))
+  await page.waitForTimeout(200)
+  const pos3 = await page.evaluate(() => ({ x: window.__placePlayer.x, z: window.__placePlayer.z }))
+  check('lifting the stick stops the walk', Math.hypot(pos3.x - pos2.x, pos3.z - pos2.z) < 0.1, 'settled')
+}
 
 // --- Right-half drag turns the first-person yaw -------------------------------
-const yaw0 = await page.evaluate(() => window.__placePlayer.yaw)
-await touch('touchStart', [{ x: 320, y: 420 }])
-await touch('touchMove', [{ x: 220, y: 420 }]) // drag left
-await touch('touchMove', [{ x: 140, y: 420 }])
-await page.waitForTimeout(150)
-await touch('touchEnd', [])
-const yaw1 = await page.evaluate(() => window.__placePlayer.yaw)
-check('right-half drag turns the first-person view', Math.abs(yaw1 - yaw0) > 0.1, `yaw ${yaw0.toFixed(2)} → ${yaw1.toFixed(2)}`)
+if (section('look-drag')) {
+  await armTouchLayer()
+  const yaw0 = await page.evaluate(() => window.__placePlayer.yaw)
+  await touch('touchStart', [{ x: 320, y: 420 }])
+  await touch('touchMove', [{ x: 220, y: 420 }]) // drag left
+  await touch('touchMove', [{ x: 140, y: 420 }])
+  await page.waitForTimeout(150)
+  await touch('touchEnd', [])
+  const yaw1 = await page.evaluate(() => window.__placePlayer.yaw)
+  check('right-half drag turns the first-person view', Math.abs(yaw1 - yaw0) > 0.1, `yaw ${yaw0.toFixed(2)} → ${yaw1.toFixed(2)}`)
+}
 
 // --- Tapping the interaction prompt fires the Space use key (talk to elder) ---
-await page.evaluate(() => window.__game.getState().enterPlace('nubian-village'))
-await page
-  .waitForFunction(() => window.__game.getState().placeId === 'nubian-village' && !!window.__placeLayout, null, { timeout: 30000 })
-  .catch(() => {})
-await page.waitForTimeout(500)
-await page.evaluate(() => {
-  window.__game.getState().setJournalOpen(false)
-  const el = window.__placeLayout.interactives.find((i) => i.type === 'villager')
-  const p = window.__placePlayer
-  p.x = el.pos[0]
-  p.z = el.pos[1] + 2
-})
-// Let the prompt appear, then tap it.
-await page.waitForSelector('.prompt-tappable', { timeout: 8000 }).catch(() => {})
-const promptShown = await page.evaluate(() => !!document.querySelector('.prompt-tappable'))
-await page.click('.prompt-tappable').catch(() => {})
-await page.waitForTimeout(300)
-const talked = await page.evaluate(() => window.__game.getState().languagesLearned.north)
-check('tapping the prompt fires the interaction (elder addressed)', promptShown && talked === true, `prompt ${promptShown}, learned ${talked}`)
+if (section('prompt-tap')) {
+  await armTouchLayer()
+  await page.evaluate(() => window.__game.getState().enterPlace('nubian-village'))
+  await page
+    .waitForFunction(() => window.__game.getState().placeId === 'nubian-village' && !!window.__placeLayout, null, { timeout: 30000 })
+    .catch(() => {})
+  await page.waitForTimeout(500)
+  await page.evaluate(() => {
+    window.__game.getState().setJournalOpen(false)
+    const el = window.__placeLayout.interactives.find((i) => i.type === 'villager')
+    const p = window.__placePlayer
+    p.x = el.pos[0]
+    p.z = el.pos[1] + 2
+  })
+  // Let the prompt appear, then tap it.
+  await page.waitForSelector('.prompt-tappable', { timeout: 8000 }).catch(() => {})
+  const promptShown = await page.evaluate(() => !!document.querySelector('.prompt-tappable'))
+  await page.click('.prompt-tappable').catch(() => {})
+  await page.waitForTimeout(300)
+  const talked = await page.evaluate(() => window.__game.getState().languagesLearned.north)
+  check('tapping the prompt fires the interaction (elder addressed)', promptShown && talked === true, `prompt ${promptShown}, learned ${talked}`)
+}
 
 // --- Two-finger pinch zooms the bird's-eye view -------------------------------
-await page.evaluate(() => window.__game.getState().leavePlace())
-await page.waitForTimeout(1200)
-await page.evaluate(() => window.__game.getState().setJournalOpen(false))
-const zoom0 = await page.evaluate(() => window.__ui.getState().travelZoom)
-// Spread two fingers apart = zoom in (travelZoom decreases; zoom-in is always
-// allowed). Both fingers stay inside the right-half look surface (x > 215).
-await touch('touchStart', [{ x: 280, y: 400, id: 0 }, { x: 360, y: 400, id: 1 }])
-await touch('touchMove', [{ x: 260, y: 400, id: 0 }, { x: 380, y: 400, id: 1 }])
-await touch('touchMove', [{ x: 240, y: 400, id: 0 }, { x: 400, y: 400, id: 1 }])
-await page.waitForTimeout(150)
-await touch('touchEnd', [])
-const zoom1 = await page.evaluate(() => window.__ui.getState().travelZoom)
-check('two-finger pinch changes the bird\'s-eye zoom', Math.abs(zoom1 - zoom0) > 0.01, `zoom ${zoom0.toFixed(3)} → ${zoom1.toFixed(3)}`)
+if (section('pinch-zoom')) {
+  await armTouchLayer()
+  await page.evaluate(() => {
+    const g = window.__game.getState()
+    if (g.mode === 'place') g.leavePlace()
+  })
+  await page.waitForTimeout(1200)
+  await page.evaluate(() => window.__game.getState().setJournalOpen(false))
+  const zoom0 = await page.evaluate(() => window.__ui.getState().travelZoom)
+  // Spread two fingers apart = zoom in (travelZoom decreases; zoom-in is always
+  // allowed). Both fingers stay inside the right-half look surface (x > 215).
+  await touch('touchStart', [{ x: 280, y: 400, id: 0 }, { x: 360, y: 400, id: 1 }])
+  await touch('touchMove', [{ x: 260, y: 400, id: 0 }, { x: 380, y: 400, id: 1 }])
+  await touch('touchMove', [{ x: 240, y: 400, id: 0 }, { x: 400, y: 400, id: 1 }])
+  await page.waitForTimeout(150)
+  await touch('touchEnd', [])
+  const zoom1 = await page.evaluate(() => window.__ui.getState().travelZoom)
+  check('two-finger pinch changes the bird\'s-eye zoom', Math.abs(zoom1 - zoom0) > 0.01, `zoom ${zoom0.toFixed(3)} → ${zoom1.toFixed(3)}`)
+}
+
+// A selected section that never executed is a FAILURE, not a quiet pass: it is
+// the one way a --section run could report green having verified nothing.
+const unrun = sections.unrun()
+if (unrun) check('the selected section actually ran', false, unrun)
 
 console.log('console errors:', errors.length)
 for (const e of errors) console.log('ERR:', e.slice(0, 300))
+// Said again where the verdict is read: a green one-section run is not a green
+// suite, and nothing downstream may quote it as one.
+if (sections.banner()) console.log(sections.banner())
 await browser.close()
 process.exit(failures > 0 || errors.length > 0 ? 1 : 0)

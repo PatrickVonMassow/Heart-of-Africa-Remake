@@ -30,18 +30,24 @@
 //       --mode <review|blind-parallel>
 // CLI:
 //   node scripts/criticality-review-guard.mjs --status
+// usage: node scripts/criticality-review-guard.mjs --record-unavailable <sha> --point <N> --files "<exact paths>" --reason "<why no vendor is eligible>"
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs'
-import { execSync } from 'node:child_process'
+import { execFileSync, execSync } from 'node:child_process'
 import { dirname } from 'node:path'
 import { REPO_ROOT, repoPath } from './repo-paths.mjs'
 import { isMainModule } from './is-main.mjs'
 import { heldByOtherLiveOwner } from './batch-singleton.mjs'
-import { readRecords, verifyCarried } from './mechanism-review.mjs'
+import { appendRecord, readRecords, verifyCarried } from './mechanism-review.mjs'
+import { modelsFromTrailers } from './mechanism-review-core.mjs'
+import { parseRangeLog, planAuthorshipGroups } from './mechanism-review-range-core.mjs'
+import { parsePassFiles, quotePassFile, unquoteGitPath } from './review-material-core.mjs'
 import {
   ancestorIndex,
   evaluateCriticalityReview,
   formatCriticalityReviewVerdict,
   highTicks,
+  openNumbers,
+  REVIEW_UNAVAILABLE_KIND,
   strictAncestorProbe,
 } from './criticality-review-guard-core.mjs'
 
@@ -57,6 +63,11 @@ export const TICK_BRANCH = 'main'
 
 const TASKS_FILE = 'TASKS.md'
 const ARCHIVE_FILE = 'docs/tasks-archive.md'
+const AUTHORING_COMMISSION_KIND = 'authoring-commission'
+
+export const unavailableReceiptUsage = () =>
+  'node scripts/criticality-review-guard.mjs --record-unavailable <sha> --point <N> ' +
+  '--files "<exact measured paths>" --reason "<why no reviewer vendor is eligible>"'
 
 // maxBuffer is NOT a precaution here, it is the difference between a guard that
 // works and one that never once fires: `git show <rev>:docs/tasks-archive.md`
@@ -72,6 +83,364 @@ const git = (cmd) =>
     encoding: 'utf8',
     maxBuffer: 64 * 1024 * 1024,
   }).trim()
+
+/** Path-carrying git output never goes through a shell and is never trimmed. */
+const gitRawFile = (args) =>
+  execFileSync('git', args, {
+    windowsHide: true,
+    cwd: REPO_ROOT,
+    encoding: 'utf8',
+    maxBuffer: 64 * 1024 * 1024,
+  })
+
+/**
+ * Files authored for one point between its recorded commission and a review.
+ *
+ * First-parent, non-merge commits are the point's own lane. A merge from main
+ * imports other points into the reviewed tree; counting those paths would make
+ * this point owe reviews of work it did not author. NUL separation preserves
+ * every legal path byte representable in the ledger, including edge spaces.
+ */
+export const pointFilesCommand = (commissionSha, reviewSha) => [
+  'log',
+  '--first-parent',
+  '--no-merges',
+  '--format=format:',
+  '--name-only',
+  '-z',
+  `${commissionSha}..${reviewSha}`,
+]
+
+/** Named point landings on main, oldest first so a later rework cannot claim an
+ * older review from the same point. */
+export const pointLandingLogCommand = () => [
+  'log',
+  '--first-parent',
+  '--merges',
+  '--reverse',
+  '--format=%x1e%H%x1f%P%x1f%s',
+  'HEAD',
+]
+
+/** Live local/remote lane refs are the second Git-owned route before landing. */
+export const pointLaneRefsCommand = (point) => [
+  'for-each-ref',
+  '--format=%(refname)%09%(objectname)',
+  `refs/heads/feat/${Number(point)}-*`,
+  `refs/remotes/origin/feat/${Number(point)}-*`,
+]
+
+/** Commits authored on a lane, excluding everything already on main. */
+export const pointLaneCommitsCommand = (ref, exclude = TICK_BRANCH) => [
+  'rev-list',
+  '--first-parent',
+  '--reverse',
+  String(ref),
+  '--not',
+  String(exclude),
+]
+
+const uniqueFiles = (raw) => [...new Set(String(raw).split('\0').filter(Boolean))]
+
+const ancestorOrEqual = (a, b, isAncestor) => Boolean(a && b && (a === b || isAncestor(a, b)))
+
+/**
+ * Measure a point that has no authoring-commission row from Git alone.
+ *
+ * A named landing merge is the strongest fallback: its first-parent tree diff
+ * is exactly what the point brought to main, including merge resolutions. If
+ * the point has not landed yet, a retained feat/<point>-… ref proves the lane;
+ * the parent of that lane's first commit is the range base, so the first commit
+ * itself is not accidentally omitted.
+ */
+export function measurePointFilesWithoutCommission(
+  point,
+  reviewSha,
+  { run = gitRawFile, isAncestor = gitIsStrictAncestor } = {},
+) {
+  const number = Number(point)
+  const reviewed = String(reviewSha ?? '').trim()
+  if (!Number.isInteger(number) || number <= 0 || !reviewed) throw new Error('point and reviewed commit are required')
+
+  const mergePattern = new RegExp(`^Merge branch '(?:origin/)?feat/${number}-`)
+  const landings = String(run(pointLandingLogCommand()))
+    .split('\x1e')
+    .map((entry) => entry.trim())
+    .filter(Boolean)
+    .map((entry) => {
+      const [sha = '', parents = '', subject = ''] = entry.split('\x1f')
+      return { sha, parents: parents.trim().split(/\s+/).filter(Boolean), subject }
+    })
+  for (const landing of landings) {
+    if (!mergePattern.test(landing.subject) || landing.parents.length < 2) continue
+    if (reviewed !== landing.sha && !ancestorOrEqual(reviewed, landing.parents[1], isAncestor)) continue
+    if (reviewed === landing.sha) {
+      return uniqueFiles(run(['diff', '--name-only', '-z', `${landing.sha}^1`, landing.sha]))
+    }
+    const first = String(run(pointLaneCommitsCommand(landing.parents[1], `${landing.sha}^1`)))
+      .trim()
+      .split(/\s+/)
+      .filter(Boolean)[0]
+    if (!first || !ancestorOrEqual(first, reviewed, isAncestor)) continue
+    const base = String(run(['rev-parse', '--verify', `${first}^`])).trim()
+    if (!base) continue
+    return uniqueFiles(run(pointFilesCommand(base, reviewed)))
+  }
+
+  const refs = String(run(pointLaneRefsCommand(number)))
+    .split('\n')
+    .map((line) => line.trim())
+    .filter(Boolean)
+    .map((line) => line.split('\t'))
+  for (const [ref, tip] of refs) {
+    if (!ref || !tip || !ancestorOrEqual(reviewed, tip, isAncestor)) continue
+    const first = String(run(pointLaneCommitsCommand(ref))).trim().split(/\s+/).filter(Boolean)[0]
+    if (!first || !ancestorOrEqual(first, reviewed, isAncestor)) continue
+    const base = String(run(['rev-parse', '--verify', `${first}^`])).trim()
+    if (!base) continue
+    return uniqueFiles(run(pointFilesCommand(base, reviewed)))
+  }
+  throw new Error(`Git has no landing merge or feat/${number}-… lane for the reviewed commit`)
+}
+
+/**
+ * Replace any ledger-supplied `pointFiles` with Git's measurement. Each review
+ * prefers the latest authoring commission for its point that it contains, then
+ * falls back to a named landing merge or retained point lane. A failed
+ * measurement stays absent, which the pure core reads as unknown coverage and
+ * refuses for pass compositions.
+ */
+export function attachPointFileSets(records = [], measure = (base, sha) =>
+  uniqueFiles(gitRawFile(pointFilesCommand(base, sha))), fallbackMeasure = measurePointFilesWithoutCommission) {
+  const rows = records ?? []
+  for (const row of rows) delete row.pointFiles
+  const commissions = rows.filter((row) => row?.kind === AUTHORING_COMMISSION_KIND && row.reachable !== false)
+  for (const row of rows) {
+    if (!row?.verdict || row.reachable === false) continue
+    const bases = commissions.filter(
+      (commission) =>
+        Number(commission.point) === Number(row.point) &&
+        (commission.sha === row.sha || (row.descendsFrom ?? []).includes(commission.sha)),
+    )
+    if (bases.length) {
+      const commission = bases.reduce((a, b) => (Number(b.at ?? 0) >= Number(a.at ?? 0) ? b : a))
+      try {
+        const files = measure(commission.sha, row.sha)
+        if (Array.isArray(files)) row.pointFiles = [...new Set(files.map(String).filter(Boolean))]
+      } catch {
+        /* try the Git-only routes below */
+      }
+    }
+    if (!Array.isArray(row.pointFiles)) {
+      try {
+        const files = fallbackMeasure(row.point, row.sha)
+        if (Array.isArray(files)) row.pointFiles = [...new Set(files.map(String).filter(Boolean))]
+      } catch {
+        /* unknown coverage is intentionally represented by absence */
+      }
+    }
+  }
+  return rows
+}
+
+/** The point lane plus cc-only work authored while it merged main. */
+export const pointAuthorshipLogCommand = (commissionSha, reviewSha) => [
+  '-c',
+  'core.quotepath=on',
+  'log',
+  '--first-parent',
+  '--format=%x1e%H%x1f%ct%x1f%P',
+  '--name-only',
+  '--no-renames',
+  '--diff-merges=cc',
+  '--reverse',
+  `${commissionSha}..${reviewSha}`,
+]
+
+/** Git-owned authorship and touched-file facts for one point's own lane. */
+export function pointAuthorship(commissionSha, reviewSha) {
+  const commits = parseRangeLog(gitRawFile(pointAuthorshipLogCommand(commissionSha, reviewSha)), {
+    decodePath: unquoteGitPath,
+  })
+  const inRange = new Set(commits.map((commit) => commit.sha))
+  const attributed = commits.map((commit) => {
+    const trailers = gitRawFile([
+      'show',
+      '-s',
+      '--format=%(trailers:key=Co-Authored-By,valueonly,separator=;)',
+      commit.sha,
+    ])
+    const parentAuthorModels = Object.fromEntries(
+      (commit.parentShas ?? [])
+        .slice(1)
+        .filter((parent) => !inRange.has(parent))
+        .map((parent) => [
+          parent,
+          modelsFromTrailers(
+            gitRawFile([
+              'show',
+              '-s',
+              '--format=%(trailers:key=Co-Authored-By,valueonly,separator=;)',
+              parent,
+            ]),
+          ),
+        ]),
+    )
+    return { ...commit, authorModels: modelsFromTrailers(trailers), parentAuthorModels }
+  })
+  const plan = planAuthorshipGroups({ commits: attributed })
+  return {
+    pointFiles: [...new Set(attributed.flatMap((commit) => commit.files))],
+    unavailableFiles: [...new Set(plan.unreviewable.flatMap((group) => group.files))],
+  }
+}
+
+const sameFileSet = (a = [], b = []) => {
+  const left = [...new Set(a.map(String))].sort()
+  const right = [...new Set(b.map(String))].sort()
+  return JSON.stringify(left) === JSON.stringify(right)
+}
+
+/** Build the exception only after Git reproduces the caller's exact file set. */
+export function buildUnavailableReceipt({
+  sha = '',
+  point = '',
+  files = [],
+  reason = '',
+  records = [],
+  now = Date.now(),
+  resolveSha = (ref) => gitRawFile(['rev-parse', '--verify', `${ref}^{commit}`]).trim(),
+  isAncestor = gitIsStrictAncestor,
+  measure = pointAuthorship,
+} = {}) {
+  const errors = []
+  const ref = String(sha).trim()
+  const number = Number(point)
+  const claimed = [...new Set((Array.isArray(files) ? files : []).map(String).filter(Boolean))]
+  const why = String(reason).trim()
+  if (!/^[0-9a-f]{7,40}$/i.test(ref)) errors.push('--record-unavailable <sha> must be a 7–40 digit hexadecimal commit id')
+  if (!Number.isInteger(number) || number <= 0) errors.push('--point <N> must be a positive integer')
+  if (!claimed.length) errors.push('--files must name the exact non-empty unavailable file set')
+  if (why.length < 8) errors.push('--reason must explain why no configured reviewer vendor is eligible')
+  if (errors.length) return { ok: false, errors }
+
+  let full = ''
+  try {
+    full = resolveSha(ref)
+  } catch {
+    return { ok: false, errors: [`--record-unavailable: ${ref} is not a commit in this repository`] }
+  }
+  const commissions = (records ?? []).filter(
+    (row) =>
+      row?.kind === AUTHORING_COMMISSION_KIND &&
+      Number(row.point) === number &&
+      (row.sha === full || isAncestor(row.sha, full)),
+  )
+  if (!commissions.length) {
+    return { ok: false, errors: [`point ${number} has no reachable authoring commission at ${full.slice(0, 7)}`] }
+  }
+  const commission = commissions.reduce((a, b) => (Number(b.at ?? 0) >= Number(a.at ?? 0) ? b : a))
+  let measured
+  try {
+    measured = measure(commission.sha, full)
+  } catch (error) {
+    return { ok: false, errors: [`Git could not measure point ${number}'s unavailable files: ${error?.message ?? error}`] }
+  }
+  const actual = [...new Set((measured?.unavailableFiles ?? []).map(String).filter(Boolean))]
+  if (!actual.length) {
+    return { ok: false, errors: [`Git measures no unavailable files for point ${number} at ${full.slice(0, 7)}`] }
+  }
+  if (!sameFileSet(claimed, actual)) {
+    return {
+      ok: false,
+      errors: [`--files does not equal Git's unavailable set; expected ${actual.map(quotePassFile).join(', ')}`],
+    }
+  }
+  return {
+    ok: true,
+    record: {
+      kind: REVIEW_UNAVAILABLE_KIND,
+      point: number,
+      sha: full,
+      files: actual,
+      reason: why,
+      at: now,
+      atIso: new Date(now).toISOString(),
+    },
+  }
+}
+
+/** Strict parser for the manual write route; no unknown token is ignored. */
+export function parseUnavailableReceiptArgs(argv = []) {
+  const spec = new Map([
+    ['--record-unavailable', 'sha'],
+    ['--point', 'point'],
+    ['--files', 'files'],
+    ['--reason', 'reason'],
+  ])
+  const values = {}
+  const errors = []
+  for (let i = 0; i < argv.length; i++) {
+    const flag = String(argv[i])
+    const key = spec.get(flag)
+    if (!key) {
+      errors.push(`unknown unavailable-receipt argument ${flag}`)
+      continue
+    }
+    if (values[key] !== undefined) {
+      errors.push(`${flag} was given more than once`)
+      i++
+      continue
+    }
+    const value = argv[i + 1]
+    if (value === undefined || String(value).startsWith('--')) {
+      errors.push(`${flag} expects a value`)
+      continue
+    }
+    values[key] = String(value)
+    i++
+  }
+  const parsedFiles = parsePassFiles(values.files ?? '')
+  errors.push(...parsedFiles.errors.map((error) => error.replaceAll('--pass-files', '--files')))
+  return { ok: errors.length === 0, values: { ...values, files: parsedFiles.files }, errors }
+}
+
+/**
+ * Verify explicit no-reviewer receipts from Git, never from their own fields.
+ * The claimed files must equal the complete unreviewable set byte-for-byte;
+ * omitting one or adding an ordinary reviewable path earns no exception.
+ */
+export function attachUnavailableClearances(records = [], verify = pointAuthorship) {
+  const rows = records ?? []
+  for (const row of rows) {
+    delete row.unavailableVerified
+    delete row.unavailableFiles
+  }
+  const commissions = rows.filter((row) => row?.kind === AUTHORING_COMMISSION_KIND && row.reachable !== false)
+  for (const row of rows) {
+    if (row?.kind !== REVIEW_UNAVAILABLE_KIND || row.reachable === false) continue
+    const bases = commissions.filter(
+      (commission) =>
+        Number(commission.point) === Number(row.point) &&
+        (commission.sha === row.sha || (row.descendsFrom ?? []).includes(commission.sha)),
+    )
+    if (!bases.length) continue
+    const commission = bases.reduce((a, b) => (Number(b.at ?? 0) >= Number(a.at ?? 0) ? b : a))
+    try {
+      const measured = verify(commission.sha, row.sha)
+      const actual = [...new Set((measured?.unavailableFiles ?? []).map(String).filter(Boolean))]
+      const claimed = [...new Set((Array.isArray(row.files) ? row.files : []).map(String).filter(Boolean))]
+      const same = actual.length > 0 && JSON.stringify([...actual].sort()) === JSON.stringify([...claimed].sort())
+      if (!same) continue
+      row.unavailableVerified = true
+      row.unavailableFiles = actual
+      row.pointFiles = [...new Set((measured?.pointFiles ?? []).map(String).filter(Boolean))]
+    } catch {
+      /* no Git ruling means no exception */
+    }
+  }
+  return rows
+}
 
 function readBaselineState() {
   try {
@@ -296,18 +665,50 @@ export function gatherCriticalityReviewInputs({ sessionId = '' } = {}) {
       .filter((o) => Number(o.point) === Number(r.point) && isStrictAncestor(o.sha, r.sha))
       .map((o) => o.sha)
   }
+  attachPointFileSets(records)
+  attachUnavailableClearances(records)
 
   return {
     applicable: true,
     head,
     branch,
     baseline: effective,
-    inputs: { baseline: effective, head, ticks, records },
+    // A filed finding clears only while its numbered carrier is visibly open in
+    // the live work order. TASKS.md is the open half; the archive cannot prove
+    // that unfinished work remains scheduled.
+    inputs: { baseline: effective, head, ticks, openPoints: [...openNumbers(headTasks)], records },
   }
 }
 
 if (isMainModule(import.meta.url)) {
-  const status = process.argv[2] === '--status'
+  const argv = process.argv.slice(2)
+  if (argv.includes('--record-unavailable')) {
+    try {
+      const parsed = parseUnavailableReceiptArgs(argv)
+      if (!parsed.ok) {
+        console.error(`criticality-review-guard: refusing unavailable receipt.\n  · ${parsed.errors.join('\n  · ')}`)
+        console.error(`\nrun: ${unavailableReceiptUsage()}`)
+        process.exit(1)
+      }
+      const built = buildUnavailableReceipt({ ...parsed.values, records: readRecords() })
+      if (!built.ok) {
+        console.error(`criticality-review-guard: refusing unavailable receipt.\n  · ${built.errors.join('\n  · ')}`)
+        console.error(`\nrun: ${unavailableReceiptUsage()}`)
+        process.exit(1)
+      }
+      appendRecord(built.record)
+      console.log(
+        `recorded: ${built.record.sha.slice(0, 7)} point ${built.record.point} has ` +
+          `${built.record.files.length} Git-verified unavailable file(s)\n` +
+          '  ledger: .claude/mechanism-reviews.jsonl (tracked — commit it with the reviewed passes)',
+      )
+      process.exit(0)
+    } catch (error) {
+      console.error(`criticality-review-guard: unavailable receipt failed: ${error?.message ?? error}`)
+      process.exit(1)
+    }
+  }
+  const status = argv[0] === '--status'
   try {
     let sessionId = ''
     try {
@@ -373,6 +774,22 @@ if (isMainModule(import.meta.url)) {
     if (gathered.head) writeBaseline(gathered.branch, gathered.head)
     process.exit(0)
   } catch (e) {
+    // AN UNREADABLE LEDGER IS NOT AN ENVIRONMENT TRANSIENT (cross-vendor review
+    // of point 780). The ledger IS this gate's evidence: without it the gate
+    // cannot tell a reviewed mechanism from an unreviewed one, so the fail-open
+    // catch below would wave through exactly what it exists to stop.
+    if (e && e.ledgerUnreadable) {
+      process.stdout.write(
+        JSON.stringify({
+          decision: 'block',
+          reason:
+            `criticality-review-guard: the review ledger cannot be read, so nothing here can be proven reviewed.\n` +
+            `  ${e.message}\n` +
+            '  Repair the ledger (it is tracked in git) and end the turn again.',
+        }),
+      )
+      process.exit(0)
+    }
     console.error(`criticality-review-guard error (allowing stop): ${e && e.message}`)
     process.exit(0)
   }

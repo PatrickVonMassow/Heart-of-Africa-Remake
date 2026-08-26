@@ -145,25 +145,51 @@ export function hookPayload(messages) {
   return { hookSpecificOutput: { hookEventName: 'PostToolUse', additionalContext } }
 }
 
+/** Wrap any already-rendered context in the one PostToolUse shape the model can
+ * see. Shared by chat and the findings-carrier bell. */
+export function additionalContextStdout(additionalContext) {
+  if (typeof additionalContext !== 'string' || additionalContext.length === 0) return ''
+  return `${JSON.stringify({ hookSpecificOutput: { hookEventName: 'PostToolUse', additionalContext } })}\n`
+}
+
 /** What the hook writes to stdout: the JSON line, or the empty string — and the
  *  empty string means it writes NOTHING, not an empty line. */
 export function hookStdout(messages) {
-  const payload = hookPayload(messages)
-  return payload ? `${JSON.stringify(payload)}\n` : ''
+  return additionalContextStdout(renderChatContext(messages))
+}
+
+/**
+ * A delegated agent receives the parent's session id in its hook payload, so
+ * ownership alone cannot tell its PostToolUse call from the owner's. The
+ * transcript path can: delegated transcripts are `agent-*.jsonl` files below
+ * a `subagents` directory, while the top-level owner's transcript is not.
+ */
+export function isSubagentHook(payload) {
+  const path = payload?.transcript_path ?? payload?.transcriptPath
+  if (typeof path !== 'string' || path === '') return false
+  const segments = path.replaceAll('\\', '/').split('/')
+  return segments.includes('subagents') && /^agent-.*\.jsonl$/.test(segments.at(-1))
 }
 
 /**
  * WHICH WAITING MESSAGES THIS TOOL CALL MAY TAKE. PURE.
  *
- * The stand-downs are the house rule every guard here follows: a session that
- * does NOT own the batch lock must not consume the batch's messages (it would
- * take them out of the owner's spool and show them in a window nobody is
- * driving), and a paused batch is not addressed at all. Both produce the empty
- * delivery, which by the token rule is silence.
+ * A session that does NOT own the batch lock must not consume the batch's
+ * messages (it would take them out of the owner's spool and show them in a
+ * window nobody is driving). A pause is deliberately different: instructions
+ * are most valuable while work is parked, so the owning session keeps receiving
+ * them. The watcher supplies the ownerless paused case.
  */
-export function deliveryDecision({ ownsBatch = false, paused = false, pending = [], max = MAX_PER_CALL } = {}) {
-  if (!ownsBatch || paused) return { deliver: [], reason: paused ? 'paused' : 'not-owner' }
+export function deliveryDecision({
+  ownsBatch = false,
+  paused = false,
+  pending = [],
+  max = MAX_PER_CALL,
+  hookInput = null,
+} = {}) {
+  if (isSubagentHook(hookInput)) return { deliver: [], reason: 'subagent-hook' }
+  if (!ownsBatch) return { deliver: [], reason: 'not-owner' }
   const list = orderMessages(pending)
   if (list.length === 0) return { deliver: [], reason: 'empty' }
-  return { deliver: list.slice(0, Math.max(0, max)), reason: 'deliver' }
+  return { deliver: list.slice(0, Math.max(0, max)), reason: paused ? 'deliver-paused' : 'deliver' }
 }

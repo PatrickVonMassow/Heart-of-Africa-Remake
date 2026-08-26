@@ -177,4 +177,23 @@ describe('evaluate', () => {
     expect(evaluate({}).block).toBe(false)
     expect(evaluate().block).toBe(false)
   })
+
+  // Measured 26.08.2026: the machine's own derived state card carried 105 words
+  // of RECORD — the alert the batch continued past and the veto route back —
+  // and this guard demanded it be shortened, which would have shortened the
+  // evidence. It is capped at three paragraphs by board-state-core instead.
+  it('does not judge the derived state card, and still judges every authored one', () => {
+    const derived =
+      '<details class="now" data-state="derived">\n  <summary><span class="t">Automatische Entscheidung</span></summary>\n' +
+      `  <div class="body"><p>${'Wort '.repeat(120)}</p></div>\n</details>\n`
+    const authored =
+      '<details class="now">\n  <summary><span class="num">713</span><span class="t">Punkt</span></summary>\n' +
+      `  <div class="body"><p>${'Wort '.repeat(120)}</p></div>\n</details>\n`
+    const section = (body) =>
+      `<main><details class="sect"><summary><h2>Woran ich gerade arbeite</h2></summary>\n${body}</details>` +
+      '<details class="sect"><summary><h2>Warteschlange</h2></summary>\n</details></main>'
+
+    expect(concisenessOffenders(section(derived))).toEqual([])
+    expect(concisenessOffenders(section(derived + authored))).toMatchObject([{ where: 'now', point: 713 }])
+  })
 })

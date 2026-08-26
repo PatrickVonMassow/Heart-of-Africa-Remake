@@ -16,7 +16,8 @@
 // .claude/ (batch-singleton finding 3): every state file is derived from the
 // caller's lock path.
 import { describe, it, expect } from 'vitest'
-import { existsSync, mkdtempSync, readFileSync, rmSync } from 'node:fs'
+import { spawnSync } from 'node:child_process'
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { basename, join, resolve } from 'node:path'
 import { REPO_ROOT } from './repo-paths.mjs'
@@ -27,11 +28,14 @@ import {
   assessClaim,
   claimIsBounded,
   claimWriteDecision,
+  claimWaitDecision,
   describeClaim,
   ownerIsHolding,
   releaseDecision,
+  resolveBoundaryDestination,
   reservationDecision,
   takeoverDecision,
+  waitForClaimEnd,
 } from './batch-claim-core.mjs'
 import {
   acquire,
@@ -52,6 +56,7 @@ import {
   markClaimReleased,
   maxAgeMs,
   readClaim,
+  renewOwnClaim,
   writeClaim,
 } from './batch-claim.mjs'
 
@@ -89,6 +94,136 @@ const asOwner = (claim, over = {}) =>
     ...over,
   })
 
+describe('--wait — the status assessment is the only state it reads', () => {
+  it('returns on the exact probe that sees the fixture lock free', async () => {
+    let now = 0
+    let reads = 0
+    let sleeps = 0
+    const states = [
+      { lockHeld: true, assessment: { reason: 'honour' } },
+      { lockHeld: false, assessment: { reason: 'honour' } },
+    ]
+    const waited = await waitForClaimEnd({
+      readState: () => states[Math.min(reads++, states.length - 1)],
+      clock: () => now,
+      sleep: async (ms) => { sleeps += 1; now += ms },
+      timeoutMs: 10_000,
+      pollMs: 500,
+    })
+    expect(waited).toMatchObject({ ok: true, reason: 'free', probes: 2 })
+    expect(reads).toBe(2)
+    expect(sleeps).toBe(1)
+  })
+
+  it('keeps waiting while a live owner holds the lock over a spent released record', async () => {
+    let now = NOW
+    const state = {
+      lockHeld: true,
+      assessment: {
+        claimantSid: CLAIMANT,
+        releasedAt: NOW - 8_000_000,
+        reason: 'released',
+        reserve: false,
+      },
+    }
+    expect(claimWaitDecision(state, CLAIMANT)).toEqual({ done: false, reason: 'held' })
+    const waited = await waitForClaimEnd({
+      readState: () => state,
+      claimantSid: CLAIMANT,
+      clock: () => now,
+      sleep: async (ms) => { now += ms },
+      timeoutMs: 1_000,
+      pollMs: 500,
+    })
+    expect(waited).toMatchObject({ ok: false, reason: 'timeout', probes: 3 })
+  })
+
+  it('reports a released reservation only to its claimant after the lock is free', () => {
+    const state = {
+      lockHeld: false,
+      assessment: {
+        claimantSid: CLAIMANT,
+        releasedAt: NOW,
+        reason: 'released-reserved',
+        reserve: true,
+      },
+    }
+    expect(claimWaitDecision(state, CLAIMANT)).toEqual({ done: true, reason: 'spent' })
+    expect(claimWaitDecision(state, 'session-other')).toEqual({ done: true, reason: 'free' })
+    expect(claimWaitDecision(state)).toEqual({ done: true, reason: 'free' })
+  })
+
+  it('returns immediately when nobody holds the lock and times out without real sleeping', async () => {
+    const free = await waitForClaimEnd({
+      readState: () => ({ lockHeld: false, assessment: { reason: 'no-claim' } }),
+      clock: () => 0,
+      sleep: async () => { throw new Error('a free lock must not sleep') },
+    })
+    expect(free).toMatchObject({ ok: true, reason: 'free', probes: 1 })
+
+    let now = 0
+    const timedOut = await waitForClaimEnd({
+      readState: () => ({ lockHeld: true, assessment: { reason: 'no-claim' } }),
+      clock: () => now,
+      sleep: async (ms) => { now += ms },
+      timeoutMs: 900,
+      pollMs: 500,
+    })
+    expect(timedOut).toMatchObject({ ok: false, reason: 'timeout', probes: 3 })
+  })
+
+  it('the CLI exits non-zero on timeout, and --take never writes a replacement claim', () => {
+    const root = mkdtempSync(join(tmpdir(), 'hoa-claim-wait-'))
+    const stateDir = join(root, '.claude')
+    mkdirSync(stateDir)
+    const stamp = Date.now()
+    writeFileSync(join(stateDir, 'batch-lock.json'), JSON.stringify({
+      v: 2,
+      sessionId: OWNER,
+      kind: 'session',
+      startedAt: stamp,
+      claimedAt: stamp,
+      acquiredAt: stamp,
+      leaseUntil: stamp + 60_000,
+      pid: null,
+      pidStartedAt: null,
+    }))
+    const run = (args) => spawnSync(process.execPath, [resolve(REPO_ROOT, 'scripts', 'batch-claim.mjs'), ...args], {
+      cwd: root,
+      env: { ...process.env, HOA_REPO_ROOT: root },
+      encoding: 'utf8',
+      timeout: 5_000,
+      windowsHide: true,
+    })
+    const waited = run(['--wait', '--timeout', '0.001'])
+    expect(waited.status).toBe(1)
+    expect(waited.stderr).toContain('timed out')
+
+    const spentClaim = JSON.stringify(claimOf({
+      at: stamp - 9_000_000,
+      releasedAt: stamp - 8_000_000,
+      releasedBy: 'session-old-owner',
+    }))
+    writeFileSync(join(stateDir, 'batch-claim.json'), spentClaim)
+    const waitedOverSpentClaim = run(['--wait', '--session', CLAIMANT, '--timeout', '0.001'])
+    expect(waitedOverSpentClaim.status).toBe(1)
+    expect(waitedOverSpentClaim.stderr).toContain('timed out')
+
+    const taken = run(['--take', '--session', CLAIMANT])
+    expect(taken.status).toBe(1)
+    expect(taken.stderr).toContain('--take never writes or replaces a claim')
+    expect(readFileSync(join(stateDir, 'batch-claim.json'), 'utf8')).toBe(spentClaim)
+
+    rmSync(join(stateDir, 'batch-lock.json'))
+    const takenFree = run(['--take', '--session', CLAIMANT])
+    expect(takenFree.status).toBe(0)
+    expect(takenFree.stdout).toContain('THE BATCH IS YOURS')
+    expect(JSON.parse(readFileSync(join(stateDir, 'batch-lock.json'), 'utf8')).sessionId).toBe(CLAIMANT)
+    expect(existsSync(join(stateDir, 'batch-claim.json'))).toBe(false)
+    rmSync(root, { recursive: true, force: true })
+  })
+})
+
 // ---------------------------------------------------------------------------
 describe('assessClaim — a claim only ever moves the batch when it is provably live', () => {
   it('HONOURS a fresh claim by a live session other than the owner', () => {
@@ -106,17 +241,13 @@ describe('assessClaim — a claim only ever moves the batch when it is provably 
     expect(asOwner(claimOf({ at: NOW - CLAIM_MAX_AGE_MS })).honour).toBe(true)
   })
 
-  it('29.07.2026 20:00: while a LIVE OWNER holds the lock the claim does NOT age out', () => {
-    // The incident (point 434 (6a)): 30 minutes is shorter than the owner's own
-    // gap between clean turn ends — this repository runs 30-40 minute suites — so
-    // a takeover recorded at the start of one lapsed unseen, and keeping it alive
-    // needed a background refresher that itself died silently (a watcher hit a
-    // 60-minute timeout; the claim would have lapsed at 20:29 with nobody the
-    // wiser). There is somebody to wait for, so nothing has to be fed.
+  it('a LIVE owner preserves the claim until there is nobody left to wait for', () => {
     const longTurn = claimOf({ at: NOW - 3 * 60 * 60 * 1000 })
     expect(asOwner(longTurn, { ownerHolding: true })).toMatchObject({ honour: true, reason: 'honour' })
-    // The bound that replaced the clock is the claiming WINDOW's own life: close
-    // it and the claim dies at once, however young it is.
+    expect(asOwner({ ...longTurn, activityAt: NOW - 1_000 }, { ownerHolding: true })).toMatchObject({
+      honour: true,
+      reason: 'honour',
+    })
     expect(asOwner(claimOf(), { ownerHolding: true, probePid: deadClaimant }).reason).toBe('claimant-dead')
   })
 
@@ -310,14 +441,23 @@ describe('assessClaim — a claim only ever moves the batch when it is provably 
     })
 
     it('counts the take-up window FROM THE RELEASE, and ends there', () => {
-      // The claim itself may be hours old — a live owner's turn is long, and that
-      // is why it does not age (bound 1). Counting the reservation from `claim.at`
-      // would expire every reservation a long-held batch produces before it began.
+      // The release starts the take-up reservation independently of claim age.
       expect(asOwner(releasedNow({ at: NOW - 5 * 60 * 60 * 1000 })).reserve).toBe(true)
       // It IS bounded, so a window left open but never taking what it asked for
       // cannot hold the batch: past the take-up window the handover applies again.
       expect(asOwner(releasedNow({ releasedAt: NOW - CLAIM_MAX_AGE_MS - 1 })).reserve).toBe(false)
       expect(asOwner(releasedNow({ releasedAt: NOW - CLAIM_MAX_AGE_MS })).reserve).toBe(true)
+    })
+
+    it('renews a released reservation only from attributable holder activity', () => {
+      const expired = releasedNow({ releasedAt: NOW - CLAIM_MAX_AGE_MS - 1 })
+      expect(asOwner(expired).reserve).toBe(false)
+      expect(asOwner({ ...expired, activityAt: NOW - 1_000 })).toMatchObject({
+        reserve: true,
+        reason: 'released-reserved',
+      })
+      expect(asOwner({ ...expired, activityAt: NOW + 1_000 }).reserve).toBe(false)
+      expect(asOwner({ ...expired, activityAt: expired.releasedAt - 1 }).reserve).toBe(false)
     })
 
     it('refuses a stamp nobody can reason about — a future one, or none at all', () => {
@@ -363,6 +503,39 @@ describe('assessClaim — a claim only ever moves the batch when it is provably 
   })
 })
 
+describe('renewOwnClaim — foreground activity renews only its holder', () => {
+  it('writes activity for the same session or process, never a stranger', () => {
+    const dir = mkdtempSync(join(tmpdir(), 'claim-renew-'))
+    const path = join(dir, 'batch-claim.json')
+    try {
+      writeClaim(claimOf(), path)
+      expect(renewOwnClaim('stranger', {
+        path,
+        now: NOW,
+        ancestor: { pid: 9999, startedAt: NOW - 1_000 },
+      })).toBe(false)
+      expect(readClaim(path).activityAt).toBeUndefined()
+      expect(renewOwnClaim(CLAIMANT, { path, now: NOW })).toBe(true)
+      expect(readClaim(path).activityAt).toBe(NOW)
+      expect(renewOwnClaim('after-compaction', {
+        path,
+        now: NOW + 1_000,
+        ancestor: { pid: CLAIMANT_PID, startedAt: CLAIMANT_STARTED },
+      })).toBe(true)
+      expect(readClaim(path).activityAt).toBe(NOW + 1_000)
+    } finally {
+      rmSync(dir, { recursive: true, force: true })
+    }
+  })
+
+  it('is wired before the non-owner stand-down and after pause stand-down', () => {
+    const source = readFileSync(resolve(REPO_ROOT, 'scripts', 'board-first-guard.mjs'), 'utf8')
+    expect(source.indexOf("if (existsSync(PAUSE)) process.exit(0)")).toBeLessThan(source.indexOf('renewOwnClaim('))
+    expect(source.indexOf('renewOwnClaim(')).toBeLessThan(source.indexOf('heldByOtherLiveOwner('))
+    expect(source).toMatch(/!isWorktreeCheckout\(REPO_ROOT\)[^\n]+renewOwnClaim/)
+  })
+})
+
 // ---------------------------------------------------------------------------
 describe('releaseDecision — the owner releases only at a CLEAN moment', () => {
   const honoured = { honour: true, reason: 'honour', claimantSid: CLAIMANT, ageMs: 60_000, releasedAt: null }
@@ -376,6 +549,32 @@ describe('releaseDecision — the owner releases only at a CLEAN moment', () => 
       verdict: 'wait',
       reason: 'work-in-flight',
     })
+  })
+
+  it('releases across a pushed checkpoint because the agent transfers to the claimant', () => {
+    expect(releaseDecision({ assessment: honoured, inFlightLive: true, inFlightTransferable: true })).toEqual({
+      verdict: 'release',
+      reason: 'work-transferable',
+    })
+    // A merge is still local mutable state, not adoptable work.
+    expect(
+      releaseDecision({
+        assessment: honoured,
+        inFlightLive: true,
+        inFlightTransferable: true,
+        gitOperation: 'merge',
+      }),
+    ).toEqual({ verdict: 'wait', reason: 'git-merge' })
+  })
+
+  it('writes the transfer before releasing and gives a non-owner Stop its boundary', () => {
+    const source = readFileSync(resolve(REPO_ROOT, 'scripts', 'batch-progress-guard.mjs'), 'utf8')
+    const transferAt = source.indexOf('transferred = handoverTransfer.commit()')
+    const releaseAt = source.indexOf('handBackToClaimant(sid, claimInfo.claim)')
+    expect(transferAt).toBeGreaterThan(0)
+    expect(transferAt).toBeLessThan(releaseAt)
+    expect(source).toContain('gatherStandDownBoundary(sid)')
+    expect(source).toContain('STAND-DOWN BOUNDARY COMPLETE')
   })
 
   it('does NOT release mid-merge, mid-rebase or on an unresolved conflict', () => {
@@ -510,7 +709,7 @@ describe('reservationDecision — a free lock still belongs to the window that c
       // decision and adds the pick-up window's own log line (point 446).
       ['batch-autostart.mjs', 'takeoverDecision('],
       ['chat-watcher.mjs', 'reservationDecision('],
-      ['batch-boundary.mjs', 'reservationDecision('],
+      ['batch-boundary.mjs', 'resolveBoundaryDestination('],
       ['batch-resume-hook.mjs', 'reservationDecision('],
       // The door whose 17:11 re-acquire IS the incident: it was already wired
       // correctly, and nothing pinned it against drift (four-eyes finding 2).
@@ -699,6 +898,53 @@ describe('takeoverDecision — the launcher does not grab a lock that was freed 
       expect(takeoverDecision({ claim, now: NOW, probePid: aliveClaimant }).spawn).toBe(
         reservationDecision({ assessment }).acquire,
       )
+    }
+  })
+})
+
+describe('resolveBoundaryDestination — every ownership exit uses one decision', () => {
+  const honoured = { honour: true, reserve: false, reason: 'honour', claimantSid: CLAIMANT }
+
+  it('reserves an expired lease or handover for an honoured claim', () => {
+    expect(resolveBoundaryDestination({ assessment: honoured, leaseExpired: true, renewalUntil: NOW + 60_000 })).toMatchObject({
+      action: 'reserve',
+      spawn: false,
+      claimantSid: CLAIMANT,
+    })
+    expect(resolveBoundaryDestination({ assessment: honoured, ownerAlive: false })).toMatchObject({
+      action: 'reserve',
+      spawn: false,
+    })
+  })
+
+  it('matches --status for an old claim while a live owner still holds', () => {
+    const old = claimOf({ at: NOW - CLAIM_MAX_AGE_MS - 1 })
+    const ownerHolding = ownerIsHolding({
+      lock: { sessionId: OWNER, kind: 'session' },
+      claimantSid: CLAIMANT,
+      alive: true,
+    })
+    const assessment = assessClaim({ claim: old, ownerHolding, now: NOW, probePid: aliveClaimant })
+    expect(assessment).toMatchObject({ honour: true, reason: 'honour' })
+    expect(resolveBoundaryDestination({ assessment, ownerAlive: false })).toMatchObject({
+      action: 'reserve',
+      spawn: false,
+      claimantSid: CLAIMANT,
+    })
+  })
+
+  it('renews advancing evidence only when no claim is waiting', () => {
+    expect(resolveBoundaryDestination({ leaseExpired: true, renewalUntil: NOW + 60_000 })).toMatchObject({
+      action: 'renew',
+      spawn: false,
+      renewalUntil: NOW + 60_000,
+    })
+  })
+
+  it('spawns for an expired lease or handover with no honoured claim', () => {
+    for (const assessment of [null, { honour: false, reserve: false, reason: 'expired', claimantSid: CLAIMANT }]) {
+      expect(resolveBoundaryDestination({ assessment, leaseExpired: true }).action).toBe('spawn')
+      expect(resolveBoundaryDestination({ assessment, ownerAlive: false }).action).toBe('spawn')
     }
   })
 })

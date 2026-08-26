@@ -19,8 +19,8 @@
 // every command the reviewer would run (see formatReviewMaterial).
 //
 // WHEN SOL IS NOT AVAILABLE the command says so in ONE line, names the cause,
-// and hands the review to Fable 5 — and the record it prints then carries
-// Fable's name with an EMPTY verdict, so nothing can be recorded as reviewed
+// and hands the review to the first eligible Claude reviewer — and the record it
+// prints then carries that model's name with an EMPTY verdict, so nothing can be recorded as reviewed
 // that nobody reviewed. The decision logic is pure (review-sol-core.mjs); this
 // half does the process work and fails LOUD. It is a command, not a hook.
 //
@@ -50,6 +50,9 @@ import { REPO_ROOT } from './repo-paths.mjs'
 import { isMainModule } from './is-main.mjs'
 import { currentSetting, settingProblemLine } from './sol-share.mjs'
 import { routeFor } from './sol-share-core.mjs'
+import { currentFableState } from './fable-switch.mjs'
+import { readRecords, verifyCarried } from './mechanism-review.mjs'
+import { mergeProblem, reviewRecordWellFormed } from './mechanism-review-core.mjs'
 import {
   addedFilesAreCoveredByPatch,
   buildReviewPrompt,
@@ -60,7 +63,6 @@ import {
   coverageDecision,
   decideReview,
   OUTCOME,
-  FALLBACK_CHAIN,
   formatReviewReport,
   isUnknownModelRefusal,
   modelsInTrailerField,
@@ -78,6 +80,7 @@ import {
 import {
   assembleMaterial,
   formatCoveragePlan,
+  formatPassFiles,
   formatPassManifest,
   formatShortfall,
   gitlinkPathsFromRawDiff,
@@ -95,7 +98,13 @@ import {
   undecodablePaths,
   unquoteGitPath,
 } from './review-material-core.mjs'
-import { mechanismLogCommand, parseRangeLog, planAuthorshipGroups } from './mechanism-review-range-core.mjs'
+import {
+  formatInvalidatedCoverage,
+  mechanismLogCommand,
+  outstandingFiles,
+  parseRangeLog,
+  planAuthorshipGroups,
+} from './mechanism-review-range-core.mjs'
 
 /** Where codex keeps the ChatGPT login, and where we park a copy of it. */
 export const CODEX_HOME = process.env.CODEX_HOME || join(homedir(), '.codex')
@@ -226,7 +235,7 @@ function gatherRange(sha, base, onlyPaths = null) {
   // whitespace makes a different path, one `git show` misses — the real file
   // then travelled in no pass while nothing named the loss (third round).
   const pathspec = Array.isArray(onlyPaths) && onlyPaths.length ? ['--', ...onlyPaths] : []
-  const paths = git(['diff', '--name-only', '-z', range, ...pathspec], { raw: true }).split('\0').filter(Boolean)
+  const paths = git(['diff', '--name-only', '-z', '--no-renames', range, ...pathspec], { raw: true }).split('\0').filter(Boolean)
   // A PATH NODE'S STRINGS CANNOT CARRY IS REFUSED, NOT COLLAPSED (fourth
   // cross-vendor round; named residual — see unquoteGitPath). Bytes that are
   // not valid UTF-8 decode to U+FFFD here, distinct real paths can then fall
@@ -312,56 +321,115 @@ function gatherRange(sha, base, onlyPaths = null) {
   // THE RAW PARTS, NOT THE FORMATTED MATERIAL (point 714). The budget decision,
   // the pass plan and the accounting all need the parts separately; assembling
   // here would leave the caller with a string and no way to tell what it lost.
-  return { stat: git(['diff', '--stat', range, ...pathspec], { raw: true }), patch, files }
+  return {
+    stat: git(['diff', '--stat', range, ...pathspec], { raw: true }),
+    patch,
+    files,
+    paths: [...new Set(paths)],
+  }
 }
 
 /** Commit/file authorship facts for a range, in the same path semantics as the guard. */
 export function gatherAuthorshipCommits(sha, base) {
   const raw = git(mechanismLogCommand(base, sha), { raw: true })
-  return parseRangeLog(raw, { decodePath: unquoteGitPath }).map((commit) => {
+  const commits = parseRangeLog(raw, { decodePath: unquoteGitPath })
+  const inRange = new Set(commits.map((commit) => commit.sha))
+  return commits.map((commit) => {
     const field = git([
       'show', '-s', '--format=%(trailers:key=Co-Authored-By,valueonly,separator=;)', commit.sha,
     ])
-    return { ...commit, authorModels: modelsInTrailerField(field), authorModel: modelsInTrailerField(field)[0] ?? '' }
+    const authorModels = modelsInTrailerField(field)
+    // A main-into-feature merge's second parent is already reachable from the
+    // range base, so `base..sha` deliberately omits that parent commit. The
+    // merge's cc-only resolution is still a real contribution. Preserve the
+    // merged tip's model evidence beside the merge so the pure resolver can
+    // attribute it without widening the reviewed range to unrelated main work.
+    const parentAuthorModels = Object.fromEntries(
+      (commit.parentShas ?? [])
+        .slice(1)
+        .filter((parent) => !inRange.has(parent))
+        .map((parent) => {
+          const trailers = git([
+            'show', '-s', '--format=%(trailers:key=Co-Authored-By,valueonly,separator=;)', parent,
+          ])
+          return [parent, modelsInTrailerField(trailers)]
+        }),
+    )
+    return { ...commit, authorModels, authorModel: authorModels[0] ?? '', parentAuthorModels }
   })
+}
+
+/** Historical scoped rows on this exact range, with ancestry re-measured from
+ *  Git. Only these measured facts may explain why an old reading is reusable or
+ *  why a later file state invalidated it. */
+export function gatherHistoricalCoverageRecords(sha, base, allRecords = readRecords()) {
+  const branchShas = new Set(git(['rev-list', sha, '--not', base]).split(/\r?\n/).filter(Boolean))
+  const records = (allRecords ?? []).filter(
+    (record) => branchShas.has(String(record?.sha ?? '')) && Array.isArray(record?.pass?.files),
+  )
+  for (const record of records) {
+    record.containedShas = new Set(
+      git(['rev-list', record.sha, '--not', base]).split(/\r?\n/).filter(Boolean),
+    )
+  }
+  return verifyCarried(records, allRecords)
 }
 
 /**
  * Size every authorship group with the standing material planner, then flatten
  * the result into one recordable pass sequence at the requested head.
  */
-export function buildAuthorshipPassPlan({ sha, base, commits = gatherAuthorshipCommits(sha, base) } = {}) {
-  const authorship = planAuthorshipGroups({ commits })
+export function buildAuthorshipPassPlan({
+  sha,
+  base,
+  commits = gatherAuthorshipCommits(sha, base),
+  records = [],
+  recordUsable = () => true,
+} = {}) {
+  // The net range is authority for materiality. Commit history supplies only
+  // authorship: a reverted path is absent, while a path touched eight times is
+  // still one current artefact.
+  const fullRange = gatherRange(sha, base)
+  const authorship = planAuthorshipGroups({ commits, endStateFiles: fullRange.paths })
+  const coverage = outstandingFiles({
+    commits,
+    endStateFiles: fullRange.paths,
+    records,
+    recordUsable,
+  })
   const passes = []
   const uncoverable = []
   let rawSize = 0
+  let statTruncated = false
   for (const group of authorship.groups) {
-    let rangeHead = sha
-    let rangeBase = base
-    if (group.kind === 'commit') {
-      rangeHead = group.commits[0]
-      rangeBase = git(['rev-parse', `${rangeHead}^`])
-    }
-    const range = gatherRange(rangeHead, rangeBase, group.files)
+    const range = gatherRange(sha, base, group.files)
     const sized = planPasses({ ...range, budget: MATERIAL_BUDGET_CHARS })
     rawSize += Number(sized.rawSize ?? 0)
+    statTruncated ||= Boolean(sized.statTruncated)
+    // No eligible vendor can spend these passes honestly. They stay measured
+    // and named through `unreviewable`, but never occupy a runnable pass index:
+    // one unavailable slice must not prevent reviewers from reading every
+    // independent slice beside it.
+    if (!group.reviewer) continue
     uncoverable.push(...(sized.uncoverable ?? []).map((item) => ({ ...item, reviewer: group.reviewer })))
     for (const child of sized.passes ?? []) {
       const childFiles = child.files ?? []
-      const childCommits = group.commits.filter((commitSha) => {
-        const source = commits.find((commit) => String(commit.sha) === String(commitSha))
-        return (source?.files ?? []).some((file) => childFiles.includes(file))
-      })
       passes.push({
         ...child,
         files: childFiles,
-        commits: childCommits,
+        endState: sha,
+        sourceCommits: group.commits.filter((commitSha) => {
+          const source = commits.find((commit) => String(commit.sha) === String(commitSha))
+          return (source?.files ?? []).some((file) => childFiles.includes(file))
+        }),
         authors: group.authors,
         vendor: group.vendor,
         reviewer: group.reviewer,
+        reviewerVendor: group.reviewerVendor,
+        unreviewableReason: group.unreviewableReason,
         authorshipKind: group.kind,
-        rangeBase,
-        rangeHead,
+        rangeBase: base,
+        rangeHead: sha,
         sourceRange: range,
       })
     }
@@ -369,14 +437,17 @@ export function buildAuthorshipPassPlan({ sha, base, commits = gatherAuthorshipC
   const total = passes.length
   const numbered = passes.map((pass, index) => ({ ...pass, index: index + 1, total }))
   return {
-    fits: total === 1 && uncoverable.length === 0,
+    fits: total === 1 && uncoverable.length === 0 && authorship.unreviewable.length === 0,
     passes: numbered,
     uncoverable,
     rawSize,
     budget: MATERIAL_BUDGET_CHARS,
-    statTruncated: false,
+    statTruncated,
     mixedFiles: authorship.mixedFiles,
     unreviewable: authorship.unreviewable,
+    dropped: authorship.dropped,
+    superseded: authorship.superseded,
+    invalidatedCoverage: coverage.invalidatedCoverage,
   }
 }
 
@@ -385,29 +456,66 @@ export function formatAuthorshipPlan(plan, { sha = '' } = {}) {
     `review-sol: the material budget is ${plan.budget} characters per round; ` +
       `this range has ${plan.rawSize} characters of outstanding material.`,
   ]
-  if (plan.fits) lines.push('  It fits in one round.')
+  if (!plan.passes.length && plan.dropped?.length) {
+    lines.push('  No end-state material remains, so no review round is owed.')
+  } else if (plan.fits) lines.push('  It fits in one round.')
   else {
     lines.push(
-      `  IT DOES NOT FIT, so ${String(sha).slice(0, 7) || 'this range'} is reviewed in ` +
-        `${plan.passes.length} PASSES over the FILE SET, cut by authorship before size:`,
+      `  ${String(sha).slice(0, 7) || 'This range'} has ${plan.passes.length} RUNNABLE ` +
+        `${plan.passes.length === 1 ? 'PASS' : 'PASSES'} over the END-STATE FILE SET's reviewable material, ` +
+        'cut by independent reviewer and then by size:',
     )
   }
   if (plan.mixedFiles?.length) {
-    lines.push(`  mixed-vendor files (split at commit boundaries): ${plan.mixedFiles.map(quotePassFile).join(', ')}`)
+    lines.push(`  mixed-vendor end-state files (kept whole, never split by commit): ${plan.mixedFiles.map(quotePassFile).join(', ')}`)
   }
   for (const pass of plan.passes ?? []) {
     lines.push(
-      `  pass ${pass.index}/${pass.total} → ${pass.reviewer || 'NO ELIGIBLE REVIEWER'}; ` +
-        `${pass.size} characters; commits ${pass.commits.map((commit) => commit.slice(0, 7)).join(', ')}; ` +
+      `  pass ${pass.index}/${pass.total} → ${pass.reviewer ? `${pass.reviewerVendor} reviewer ${pass.reviewer}` : 'UNREVIEWABLE'}; ` +
+        `${pass.size} characters; end state ${String(pass.endState).slice(0, 7)}; ` +
         `files ${pass.files.map(quotePassFile).join(', ')}`,
       `    node scripts/review-sol.mjs --sha ${sha} --brief "<what to judge>" --pass ${pass.index}`,
     )
   }
   for (const group of plan.unreviewable ?? []) {
-    lines.push(`  CANNOT ASSIGN: ${group.files.map(quotePassFile).join(', ')} — every candidate authored this group`)
+    lines.push(
+      `  UNREVIEWABLE: ${group.files.map(quotePassFile).join(', ')} — ${group.unreviewableReason}`,
+    )
+  }
+  const unavailableFiles = [...new Set((plan.unreviewable ?? []).flatMap((group) => group.files ?? []))]
+  if (unavailableFiles.length) {
+    lines.push('  These files remain owed until Git verifies an explicit unavailable receipt.')
+  }
+  const invalidated = formatInvalidatedCoverage(plan.invalidatedCoverage, { quoteFile: quotePassFile })
+  if (invalidated) lines.push(invalidated)
+  for (const item of plan.dropped ?? []) {
+    lines.push(`  DROPPED AS NON-MATERIAL: ${quotePassFile(item.file)} — ${item.reason}.`)
+  }
+  for (const item of plan.superseded ?? []) {
+    lines.push(
+      `  DROPPED INTERMEDIATE STATES: ${quotePassFile(item.file)} — ${item.commits.length} ` +
+        `${item.commits.length === 1 ? 'state was' : 'states were'} superseded within the range; the current file remains once.`,
+    )
   }
   lines.push(formatCoveragePlan(plan))
   return lines.join('\n')
+}
+
+const shellQuote = (value) => `"${String(value ?? '').replace(/(["\\$`])/g, '\\$1')}"`
+
+export function formatUnavailableReceiptRoute(plan, { sha = '', point = '' } = {}) {
+  const files = [...new Set((plan?.unreviewable ?? []).flatMap((group) => group?.files ?? []))]
+  if (!files.length) return ''
+  if (!/^\d+$/.test(String(point).trim())) {
+    return 'review-sol: unavailable files need a point-bound receipt; rerun this plan with --point <N> to print its verified record command.'
+  }
+  return [
+    'review-sol: after every runnable pass is recorded, record only the measured unavailable remainder:',
+    '  node scripts/criticality-review-guard.mjs ' +
+      `--record-unavailable ${sha} --point ${String(point).trim()} ` +
+      `--files ${shellQuote(formatPassFiles(files))} ` +
+      `--reason ${shellQuote('no configured reviewer vendor is independent of these measured contributions')}`,
+  ].join('\n')
 }
 
 /**
@@ -749,15 +857,21 @@ export const usage = () =>
     'The material is the whole range <since>..<sha> (--since defaults to main), because',
     'one record covers every commit it contains.',
     `A round carries at most ${MATERIAL_BUDGET_CHARS} characters. A range beyond that is REFUSED`,
-    'and split into PASSES over the FILE SET — --pass <k> reviews one of them, and the',
+    'and split into PASSES over the END-STATE FILE SET — --pass <k> reviews one of them, and the',
     'record it prints covers that pass alone. Splitting by COMMIT does not help: every',
     'commit ships the current content of the files it touches.',
-    'Recorded scoped passes remain cleared at their exact commit/file contributions; later',
-    'plans owe only new contributions. No carry record or carry planning flag is needed.',
-    'A commit written to answer a recorded finding is itself a new contribution by design:',
-    'the confirming clean pass reviews it too. The convergence cost is accepted, not hidden.',
+    'An explicit --since that narrows a fitting range records one scoped 1/1 pass whose',
+    'file list and reviewed sha clear exactly the end-state artefacts that round read.',
+    'Recorded scoped files remain cleared until those files change; later commits touching',
+    'only other files leave them clear. No carry record or carry planning flag is needed.',
+    'A commit written to answer a recorded finding owes a confirming clean pass only for',
+    'the files it changes. The convergence cost is accepted, not hidden.',
+    'Files with no independent reviewer stay outside runnable pass indices instead of blocking',
+    'them. With --point <N>, the plan prints the Git-verified unavailable-receipt command for',
+    'that exact remainder; the receipt never claims that a review occurred.',
     `Reviews run on ${SOL_MODEL_NAME} at reasoning effort ${SOL_REASONING_EFFORT} (CLAUDE.md §6). When it`,
-    `cannot be reached the review is HANDED OVER to the first model of ${FALLBACK_CHAIN.join(' → ')}`,
+    'cannot be reached the review is HANDED OVER to the first eligible Claude model',
+    'allowed by the shared Fable switch (`node scripts/fable-switch.mjs --status`)',
     'that authored no part of the reviewed range — the recorded review always names the',
     'model that ACTUALLY ran, and none of them may review its own work.',
   ].join('\n')
@@ -802,6 +916,8 @@ if (isMainModule(import.meta.url)) {
     // exactly where every unavailable Sol lands: with a Claude reviewer that authored
     // none of the range, and with NO verdict, because nobody has reviewed it yet.
     const share = currentSetting()
+    const fableState = currentFableState()
+    if (!fableState.ok) throw new Error(fableState.problem)
     // A fallback nobody is told about is a setting nobody chose (cross-vendor review).
     if (share.problem) console.error(settingProblemLine(share, 'review-sol'))
     // THE COVERAGE QUESTION IS ASKED ON EVERY PATH THAT PRINTS A TEMPLATE
@@ -823,8 +939,8 @@ if (isMainModule(import.meta.url)) {
     const passFlag = flag('--pass')
     if (argv.includes('--carry-from')) {
       console.error(
-        'review-sol: --carry-from is obsolete — recorded pass coverage now follows the exact ' +
-          'commit/file contributions it read, so the next plan automatically omits them and owes only new changes.',
+        'review-sol: --carry-from is obsolete — recorded pass coverage follows end-state files, so the next ' +
+          'plan automatically omits unchanged files and owes only files changed since their recorded state.',
       )
       process.exit(2)
     }
@@ -836,7 +952,7 @@ if (isMainModule(import.meta.url)) {
           error: `--pass ${passFlag} names a pass of a split this range does not need — it fits in one round.`,
         }
       }
-      if (plan.passes.length < 2) {
+      if (plan.passes.length < 2 && !(plan.unreviewable?.length > 0)) {
         return {
           error:
             `--pass ${passFlag}: this range packs into one coverable pass beside files beyond ` +
@@ -859,20 +975,32 @@ if (isMainModule(import.meta.url)) {
     }
 
     const base = mergeBase(sinceFlag || 'main', full, { explicit: Boolean(sinceFlag) })
-    const plan = buildAuthorshipPassPlan({ sha: full, base })
+    const records = gatherHistoricalCoverageRecords(full, base)
+    const plan = buildAuthorshipPassPlan({
+      sha: full,
+      base,
+      records,
+      recordUsable: (record, commit) => reviewRecordWellFormed(record, { commitAt: commit?.at }) && !mergeProblem(record, commit),
+    })
     console.error(formatAuthorshipPlan(plan, { sha: full }))
-    if (plan.unreviewable.length) {
-      console.error('review-sol: at least one pass has no eligible non-author reviewer; no round can clear it.')
-      process.exit(4)
-    }
+    const unavailableRoute = formatUnavailableReceiptRoute(plan, { sha: full, point })
+    if (unavailableRoute) console.error(unavailableRoute)
     if (plan.passes.length > MAX_PASS_TOTAL) {
       console.error(
         `review-sol: this range needs ${plan.passes.length} passes — more than the ${MAX_PASS_TOTAL} a record can hold.`,
       )
       process.exit(2)
     }
+    if (!plan.passes.length && plan.dropped.length && !plan.uncoverable.length) {
+      console.error('review-sol: every touched file returned to its base state; no review record is needed.')
+      process.exit(0)
+    }
     if (!plan.passes.length || plan.uncoverable.length) {
-      console.error('review-sol: the authorship plan cannot cover every changed file; no record is offered.')
+      console.error(
+        plan.unreviewable.length && !plan.uncoverable.length
+          ? 'review-sol: no runnable review pass remains; use the verified unavailable receipt route above.'
+          : 'review-sol: the authorship plan cannot cover every changed file; no record is offered.',
+      )
       process.exit(4)
     }
     const selection = passFor(plan)
@@ -881,7 +1009,10 @@ if (isMainModule(import.meta.url)) {
       process.exit(2)
     }
     const selected = plan.fits ? plan.passes[0] : selection.pass
-    const pass = plan.fits ? null : selected
+    // A FITTING BUT NARROWED RANGE IS ONE SCOPED PASS. Its file list and record
+    // sha are the exact end-state boundary the old pass-less row could not express.
+    // A full branch-range review stays pass-less for ledger compatibility.
+    const pass = plan.fits ? (partialFor(base) ? selected : null) : selected
     const rangeAuthors = selected
       ? selected.authors
       : [...new Set(plan.passes.flatMap((candidate) => candidate.authors ?? []))]
@@ -891,6 +1022,7 @@ if (isMainModule(import.meta.url)) {
         outcome: { ok: false, kind: OUTCOME.SWITCHED_OFF, cause: causeTextFor(OUTCOME.SWITCHED_OFF) },
         parsed: { ok: false },
         authorModel: rangeAuthors,
+        fableState,
       })
       // THE FIT IS MEASURED ON THIS PATH TOO (cross-vendor review, second
       // round). No round is spent here, but the record command printed for the
@@ -926,6 +1058,7 @@ if (isMainModule(import.meta.url)) {
         outcome: { ok: false, kind: OUTCOME.SELF_REVIEW, cause: causeTextFor(OUTCOME.SELF_REVIEW) },
         parsed: { ok: false },
         authorModel: rangeAuthors,
+        fableState,
       })
       // Same measurement, same reason: the role swap hands the WHOLE range on,
       // and a range no single round can hold must be handed on as its passes.
@@ -964,12 +1097,11 @@ if (isMainModule(import.meta.url)) {
       process.exit(2)
     }
 
-    // What a record at this sha would CLEAR: everything back to where the branch
-    // left `main`. A narrower review is allowed, but it may not be recorded.
-    // FAILING TO ANSWER IS NOT AN ANSWER OF "FULL COVERAGE" (fourth round): a
-    // sha with no merge base against `main` used to leave this empty, which
-    // switched the check OFF and printed a record for a range nobody bounded.
-    // The decision itself is pure and tested (coverageDecision).
+    // A narrowed one-round review records its explicit end-state file scope above;
+    // a pass-less record still requires whole-branch coverage. FAILING TO
+    // ANSWER IS NOT AN ANSWER OF "FULL COVERAGE" (fourth round): a sha with no
+    // merge base against `main` used to leave this empty, which switched the
+    // check off and printed a record for a range nobody bounded.
     const partial = pass ? null : partialFor(base)
     const range = selected.sourceRange
     const assembly = assemblePass(range, selected, plan)
@@ -1002,10 +1134,10 @@ if (isMainModule(import.meta.url)) {
     // `ready` rests on this answer (escalation round): a clean exit with a
     // parseable verdict is not delivery evidence.
     const shortfall = materialShortfall({ assembly, sent: run.sentInput, transportError: run.transportError })
-    // WHO AUTHORED IT decides who may review it if Sol is unavailable: Fable
-    // cannot review its own commit (see fallbackReviewerFor), and the record
+    // WHO AUTHORED IT decides who may review it if Sol is unavailable: no model
+    // can review its own commit (see fallbackReviewerFor), and the record
     // covers the whole range, so every author in it counts.
-    const decision = decideReview({ outcome, parsed, authorModel: rangeAuthors, shortfall })
+    const decision = decideReview({ outcome, parsed, authorModel: rangeAuthors, shortfall, fableState })
     // THE FINDINGS ARE THE POINT, not the verdict word: a `do-not-merge` whose
     // reasons were never printed cannot be acted on, and the evidence line the
     // ledger carries is one sentence by design. So the reviewer's whole answer
@@ -1015,6 +1147,14 @@ if (isMainModule(import.meta.url)) {
       console.log(`--- ${SOL_MODEL_NAME} said ---\n${said}\n--- end of review ---\n`)
     }
     console.log(formatReviewReport({ decision, sha: full, mode, point, partial, shortfall, plan, pass }))
+    // Round N goes on the board while round N+1 runs: fifteen rounds in one turn
+    // used to leave the page standing on finished work for hours.
+    // OPTIONAL bookkeeping, imported lazily and swallowed whole: this command
+    // must still run where the board stack is absent — the CLI fixtures build a
+    // minimal repo — and a board that cannot follow must never fail the work.
+    await import('./board-heartbeat.mjs')
+      .then((m) => m.heartbeat({ trigger: m.TRIGGERS.REVIEW_ROUND, detail: `Prüfrunde zu ${full.slice(0, 7)} beantwortet: ${decision.verdict || 'ohne Urteil'}` }))
+      .catch(() => {})
     // A fallback is not an error of THIS command — it did its job by refusing to
     // invent a review — but it must not read as a finished one either, so the
     // exit code distinguishes them for any script that chains on it. A short-fall

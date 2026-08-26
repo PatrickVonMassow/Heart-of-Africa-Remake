@@ -4,6 +4,7 @@ import { resolve } from 'node:path'
 import {
   LIMITS,
   auditGuide,
+  measureGuide,
   parseEntries,
   sliceSection,
   strayLines,
@@ -13,6 +14,7 @@ import { gatherGuideBrevityInputs } from './guide-brevity-guard.mjs'
 
 // Vitest rewrites import.meta.url, so resolve from the repo root it runs in.
 const GUIDE = resolve(process.cwd(), 'docs/analysis_de/vibe-coding-anleitung.md')
+const CORE = resolve(process.cwd(), 'scripts/guide-brevity-core.mjs')
 
 const entry = (title, riskLines, withPrompt = true) =>
   [
@@ -200,7 +202,10 @@ describe('formatViolations', () => {
 })
 
 describe('guide-brevity ownership', () => {
-  const overBudget = doc(entry('Zu lang', 2)) + `${'zusatz '.repeat(4000)}\n`
+  // DERIVED from the ceiling, never a literal: this fixture exists to be over budget, and a
+  // literal that merely happened to clear the ceiling of the day turns into an under-budget
+  // document the moment the budget ratchets, which is what happened on 25.08.2026.
+  const overBudget = doc(entry('Zu lang', 2)) + `${'zusatz '.repeat(LIMITS.maxWords + 100)}\n`
 
   it('stands down when another live session owns the batch', () => {
     const gathered = gatherGuideBrevityInputs({
@@ -235,8 +240,47 @@ describe('guide-brevity ownership', () => {
 // THE ACTUAL GATE: the real document must satisfy its own budget on every unit
 // run, so the guide cannot drift back into a chronicle between closings.
 describe('the real vibe-coding guide', () => {
+  const guide = readFileSync(GUIDE, 'utf8')
+
   it('stays a short, project-neutral beginner guide', () => {
-    const { ok, violations } = auditGuide(readFileSync(GUIDE, 'utf8'))
+    const { ok, violations } = auditGuide(guide)
     expect(ok, `\n${formatViolations(violations)}\n`).toBe(true)
+  })
+
+  it('carries both new lessons in actionable house form', () => {
+    const entries = parseEntries(sliceSection(guide, /Fallstrick/i))
+    const byTitle = Object.fromEntries(
+      entries.map((entry) => [entry.title, entry.lines.join(' ').replace(/\s+/g, ' ')]),
+    )
+
+    expect(byTitle['Der Prüflauf verändert sein eigenes Projekt.']).toContain(
+      '„Etabliere einen Mechanismus, der einen Prüflauf rot färbt, sobald er das Projekt verändert hat, in dem er läuft"',
+    )
+    expect(byTitle['Die Ausnahme existiert nur in der Verweigerung.']).toContain(
+      'Kann der ehrlichste Wortlaut der Ausnahme meine eigene Prüfung bestehen?',
+    )
+  })
+
+  it('sets both ceilings to the guard\'s exact measured size', () => {
+    const measured = measureGuide(guide)
+    expect({ maxLines: LIMITS.maxLines, maxWords: LIMITS.maxWords }).toEqual({
+      maxLines: measured.lines,
+      maxWords: measured.words,
+    })
+  })
+})
+
+describe('the guide-budget escalation instruction', () => {
+  it('finishes a justified raise in the code record and produces no decision card', () => {
+    const source = readFileSync(CORE, 'utf8')
+    const instruction = source.slice(
+      source.indexOf('// The budget caps NARRATIVE growth'),
+      source.indexOf('export const PROJECT_MARKERS'),
+    )
+
+    expect(instruction).toContain('its final step is the written')
+    expect(instruction).toContain('It produces no decision card')
+    expect(instruction).not.toContain('Recorded as a decision card')
+    expect(instruction).not.toContain('last step of a raise belongs')
   })
 })

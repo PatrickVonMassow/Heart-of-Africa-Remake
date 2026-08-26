@@ -1,7 +1,7 @@
 // THE ESCALATION LADDER (point 434, remainder of part 1) — the I/O half.
 // Every decision is in scripts/alert-escalation-core.mjs; this file keeps the
-// ladder state, pauses the batch on the last rung, writes the board card and
-// logs the reason.
+// ladder state, applies the last-rung decision, writes its board card and logs
+// the reason.
 //
 // It is called from `scripts/notify.mjs`, i.e. from EVERY local alert: the
 // launcher, the board watchdog, the model guard, the deferral command and the
@@ -40,7 +40,6 @@ import {
   clearLadder,
   describeEscalation,
   escalationDecision,
-  escalationPauseReason,
   higherPriority,
   ladderEntry,
 } from './alert-escalation-core.mjs'
@@ -96,19 +95,71 @@ function berlinStamp(now = new Date()) {
   }).format(now)
 }
 
-/** The board card for the last rung — best effort; the log and the pause file
- *  carry the reason even when the board cannot be written. */
-export function boardCard(title, question, { cwd = REPO_ROOT } = {}) {
+// THE LAST RUNG WRITES NO BOARD CARD AT ALL (point 749).
+//
+// It used to post "Batch pausiert: Alarm blieb unbeantwortet" and the
+// continuation/corruption protocols under "Von dir zu klären" — a section that
+// holds GENUINE user decisions only. None of them asked the user to decide
+// anything: they reported that an alert went unanswered, that the environment
+// failed, that the batch had continued on its own. He cleared three of them by
+// hand and ruled, the third time: "Das sind interne Probleme, die du selbst
+// lösen musst. Etabliere einen Mechanismus, der das verhindert."
+//
+// The mechanism is that the record travels with the LADDER, in the same atomic
+// write that books the rung, and the board DERIVES its state card from that
+// ladder (scripts/board-state-core.mjs). Two consequences fall out of it: the
+// record can no longer fail separately from the rung it belongs to, and the card
+// stops existing when the alert is cleared or ages out — nobody has to remove it.
+// The ntfy alert is untouched: that is the channel built for reaching the user,
+// and the retroactive veto is answered there or in the board chat.
+
+/** The durable record demanded by a generic alert's last rung. */
+export function continuationCardBody(title, message, decision, stamp) {
+  return (
+    `Automatische Entscheidung [${stamp}]: Der Batch läuft trotz der wiederholt unbeantworteten Meldung ` +
+    `„${title}“ weiter. Die Meldung lautete: ${message || '(ohne Nachricht)'}. ` +
+    `Die Klasse „${decision?.alertClass ?? 'generic'}“ gehört nicht zur geschlossenen Korruptionsliste; ` +
+    `Warten wäre deshalb gefährlicher als Weiterarbeiten. ` +
+    `Retroaktives Veto: Antworte auf diese Karte mit „Veto“ und nenne den letzten zulässigen Commit oder Zeitraum. ` +
+    `Der nächste Batch-Besitzer muss dann die seit dieser Entscheidung entstandenen Folgen als Wiederherstellungsarbeit ` +
+    `prüfen und behandeln, bevor er neue Arbeit übernimmt.`
+  )
+}
+
+/** Durable record for a corruption-class repair and its next capped probe. */
+export function corruptionCardBody(title, message, decision, repairResult, stamp) {
+  const repair = decision?.repair?.remedy ?? 'named repair'
+  const result = repairResult?.ok
+    ? 'Der Reparaturlauf endete grün.'
+    : `Der Reparaturlauf blieb offen${Number.isInteger(repairResult?.exitCode) ? ` (Exit ${repairResult.exitCode})` : ''}; die nächste Prüfung bleibt eingeplant.`
+  return (
+    `Automatische Entscheidung [${stamp}]: Die Korruptionsklasse „${decision?.alertClass}“ führt ` +
+    `${repair} aus, bevor gewöhnliche Batch-Arbeit fortgesetzt wird. Die Meldung „${title}“ lautete: ` +
+    `${message || '(ohne Nachricht)'}. ${result} Nächster Versuch: ${new Date(decision.nextAttemptAt).toISOString()}. ` +
+    `Retroaktives Veto: Antworte auf diese Karte mit „Veto“ und nenne den letzten zulässigen Commit; ` +
+    `Quarantäne- und Rescue-Nachweise des Doctors bleiben erhalten.`
+  )
+}
+
+/** Execute only the repair named by the closed-list decision. batch-doctor's
+ * evidence rules decide whether quarantine/repair is safe in this process. */
+export function runCorruptionRepair(decision, { cwd = REPO_ROOT } = {}) {
+  const [script, ...args] = decision?.repair?.command ?? []
+  if (!script) return { ok: false, exitCode: null, reason: 'no closed-list repair was named' }
   try {
-    execFileSync(process.execPath, ['scripts/board.mjs', 'vdzk-add', title, question], {
+    execFileSync(process.execPath, [script, ...args], {
       cwd,
       encoding: 'utf8',
       stdio: ['ignore', 'pipe', 'pipe'],
       windowsHide: true,
     })
-    return true
-  } catch {
-    return false
+    return { ok: true, exitCode: 0 }
+  } catch (error) {
+    return {
+      ok: false,
+      exitCode: Number.isInteger(error?.status) ? error.status : null,
+      reason: String(error?.stderr ?? error?.message ?? error).trim().slice(0, 500),
+    }
   }
 }
 
@@ -133,6 +184,8 @@ export async function escalate({
   message = '',
   key = null,
   priority = 'default',
+  alertClass = 'generic',
+  recurring = false,
   now = Date.now(),
   env = process.env,
   // Injected in the unit layer so the REAL rung logic is exercised there: the
@@ -140,7 +193,7 @@ export async function escalate({
   // injection point every test would fall through the fail-open catch below and
   // prove only that failing open works.
   pause = null,
-  board = boardCard,
+  repair = runCorruptionRepair,
   ladderPath = LADDER_PATH,
   logPath = LOG_PATH,
 } = {}) {
@@ -150,25 +203,55 @@ export async function escalate({
   try {
     const k = key ?? alertKey(title, message)
     const state = readLadder(ladderPath)
-    const { isPaused, setPaused } = pause ?? (await pauseApi())
+    const { isPaused } = pause ?? (await pauseApi())
     const paused = isPaused()
-    const decision = escalationDecision({ key: k, now, entry: ladderEntry(state, k), paused, priority })
+    const decision = {
+      ...escalationDecision({
+        key: k,
+        title,
+        now,
+        entry: ladderEntry(state, k),
+        paused,
+        priority,
+        alertClass,
+        recurring,
+      }),
+      // Kept on the returned decision for the card prose and an audit reader.
+      alertClass,
+      recurring: recurring === true,
+    }
 
     if (decision.action === 'suppress') {
       logLine(`[${k}] ${describeEscalation(decision)}`, logPath)
       return { deliver: false, priority: decision.priority, decision }
     }
 
-    if (decision.action === 'pause-and-send') {
-      const reason = escalationPauseReason(title, decision, berlinStamp(new Date(now)))
-      setPaused(reason)
-      board(
-        'Batch pausiert: Alarm blieb unbeantwortet',
-        `${reason} Bitte prüfen, was die Meldung ausgelöst hat, und die Pause danach aufheben.`,
+    // THE RECORD RIDES WITH THE RUNG (point 749). It is composed here and
+    // persisted by `commit()` in the same atomic ladder write, so there is no
+    // second write that can fail on its own — and the board derives its state
+    // card from the ladder, so this record appears there without a board call and
+    // vanishes when the alert is cleared.
+    let record = null
+    if (decision.action === 'continue-and-record') {
+      const stamp = berlinStamp(new Date(now))
+      record = { title: decision.decisionCard, body: continuationCardBody(title, message, decision, stamp), at: now }
+      logLine(`[${k}] CONTINUING THE BATCH — ${decision.decisionCard} — ${decision.reason}`, logPath)
+    }
+
+    let repairResult = null
+    if (decision.action === 'repair-and-probe') {
+      const stamp = berlinStamp(new Date(now))
+      repairResult = repair(decision)
+      record = {
+        title: decision.decisionCard,
+        body: corruptionCardBody(title, message, decision, repairResult, stamp),
+        at: now,
+      }
+      logLine(
+        `[${k}] CORRUPTION REPAIR ${repairResult.ok ? 'CLEARED' : 'REMAINS'}; next attempt ` +
+          `${new Date(decision.nextAttemptAt).toISOString()} — ${decision.reason}`,
+        logPath,
       )
-      logLine(`[${k}] PAUSED THE BATCH — ${decision.reason}`, logPath)
-      // The pause is deliberately NOT deferred to the commit: it is the safety
-      // action, and it must happen even if the notification then fails to send.
     }
 
     // THE LADDER ADVANCES ONLY AFTER THE MESSAGE IS ACTUALLY OUT (four-eyes
@@ -182,7 +265,12 @@ export async function escalate({
         // The DECISION's clock, not a fresh one: delivery follows the decision by
         // milliseconds, and re-reading the wall clock here would make the rung's
         // own timestamp disagree with the gap that was just measured against it.
-        writeLadder(advanceLadder(state, { key: k, decision, now }), ladderPath)
+        //
+        // The record goes in HERE, with the rung (point 749). It replaced a
+        // separate board write that could fail on its own and used to hold the
+        // ladder back — the rung and the reason it was reached are one fact and
+        // are now written once.
+        writeLadder(advanceLadder(state, { key: k, decision, now, record }), ladderPath)
         logLine(`[${k}] ${describeEscalation(decision)}`, logPath)
         return true
       } catch (e) {
@@ -190,7 +278,14 @@ export async function escalate({
         return false
       }
     }
-    return { deliver: true, priority: higherPriority(priority, decision.priority), decision, commit }
+    return {
+      deliver: true,
+      priority: higherPriority(priority, decision.priority),
+      decision,
+      record,
+      repairResult,
+      commit,
+    }
   } catch (e) {
     // FAIL-OPEN = DELIVER.
     logLine(`escalation failed, delivering unthrottled: ${e?.message ?? e}`, logPath)

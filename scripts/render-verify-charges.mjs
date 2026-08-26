@@ -140,16 +140,35 @@ export const RED_CHARGES = [
       'than for a number, and on both backends.',
   },
   {
-    point: 506,
+    // RE-POINTED 20.08.2026: point 506 was folded into 642, and a charge to a ticked point
+    // expires. 642 carries 506's mechanism, so it owns this red now.
+    // THE STATED REASON NO LONGER HOLDS AS WRITTEN. 506 argued from a SOFTWARE WebGPU lane.
+    // Measured today with scripts/verify/backend-lane-check.mjs: BOTH lanes are hardware-backed
+    // on the same GPU and WebGPU reports COMPATIBILITY level. That refutes the software premise
+    // and nothing more — it does not measure the two lanes' rates against each other and it
+    // does not show what causes the stance red. (The cross-vendor review of 20.08.2026 refused
+    // the causal reading this comment first carried, and it was right to.) Point 725 disputes
+    // the artefact reading altogether. So this entry is a stopgap on contested ground: it keeps
+    // the release branch honest, and 642 owes the measurement that decides whether the red is a
+    // lane artefact or a product defect.
+    point: 642,
     suite: 'polish',
     backend: 'webgpu',
     kind: 'check',
-    match: /settlement walker \(goat\)/i,
+    // SCOPED TO THE MEASURED ASSERTION, not to the walker's label (cross-vendor
+    // review of c33b031, finding 2). The label prefix alone matched every future
+    // check trackFeet could emit under that name, so a NEW goat red would have
+    // been charged away by an entry that never measured it. Only the planted-foot
+    // assertion of point 300 was measured, and only it is excused.
+    match: /settlement walker \(goat\): the planted foot holds its ground spot/i,
     why:
       'Measured 07.08.2026: the stance check reds in BOTH WebGPU runs (20 stance intervals, ' +
-      'worst foot travel 0.967) and passes on WebGL 2 (0.337) — the software lane cannot draw ' +
-      'fast enough to answer a rate question, which is point 506. Backend-scoped on purpose: ' +
-      'on the WebGL 2 lane this check stays a real red.',
+      'worst foot travel 0.967) and passes on WebGL 2 (0.337). The original reading — a software ' +
+      'lane too slow to answer a rate question — was REFUTED on 20.08.2026: both lanes are ' +
+      'hardware-backed and WebGPU reports compatibility level. What causes the difference is ' +
+      'UNMEASURED, and point 725 disputes the artefact reading altogether, so this entry now ' +
+      'excuses a red whose explanation is open. ' +
+      'Backend-scoped on purpose: on the WebGL 2 lane this check stays a real red.',
   },
   {
     point: 514,

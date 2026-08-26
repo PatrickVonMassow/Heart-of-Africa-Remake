@@ -18,6 +18,7 @@ import {
   launcherRemedy,
   ownershipSignal,
   releaseSpawnDecision,
+  resumeArmDecision,
 } from './batch-launcher-core.mjs'
 import { classifyLauncherState } from './batch-boundary-core.mjs'
 
@@ -240,5 +241,44 @@ describe('releaseSpawnDecision — cut the sleep short when ownership ENDS', () 
     expect(WAKE_POLL_MS).toBeLessThanOrEqual(15_000) // "within seconds"
     expect(WAKE_MIN_GAP_MS).toBeGreaterThan(WAKE_POLL_MS)
     expect(WAKE_MIN_GAP_MS).toBeLessThan(TICK_MS) // else the fast path is no faster
+  })
+})
+
+// --- RE-ARM AT SESSION START (point 859) ---------------------------------------
+// A container rebuild kills the daemon and nothing inside survives to restart
+// it; the SessionStart hook asks THIS decision. The one direction that must
+// never be possible: arming over a deliberate --stop.
+describe('resumeArmDecision — a session start heals a dead launcher, never a stopped one', () => {
+  it('arms on a dead or absent record', () => {
+    for (const state of ['unknown', undefined, null]) {
+      const d = resumeArmDecision({ state, platform: 'linux', worktree: false })
+      expect(d.arm).toBe(true)
+      expect(d.reason).toMatch(/dead or absent/)
+    }
+  })
+
+  it('leaves a live launcher alone', () => {
+    for (const state of ['ready', 'running']) {
+      expect(resumeArmDecision({ state, platform: 'linux', worktree: false }).arm).toBe(false)
+    }
+  })
+
+  it('NEVER reverts a deliberate --stop', () => {
+    const d = resumeArmDecision({ state: 'disabled', platform: 'linux', worktree: false })
+    expect(d.arm).toBe(false)
+    expect(d.reason).toMatch(/--start/)
+  })
+
+  it('never arms on Windows or from a worktree checkout', () => {
+    expect(resumeArmDecision({ state: 'unknown', platform: 'win32', worktree: false }).arm).toBe(false)
+    expect(resumeArmDecision({ state: 'unknown', platform: 'linux', worktree: true }).arm).toBe(false)
+  })
+
+  it('FAILS CLOSED on a checkout nobody could verify (.git unreadable → null)', () => {
+    for (const worktree of [null, undefined]) {
+      const d = resumeArmDecision({ state: 'unknown', platform: 'linux', worktree })
+      expect(d.arm).toBe(false)
+      expect(d.reason).toMatch(/could not be verified/)
+    }
   })
 })

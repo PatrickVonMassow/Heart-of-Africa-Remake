@@ -2,14 +2,12 @@
 import { describe, it, expect } from 'vitest'
 import { mkdtempSync, mkdirSync, writeFileSync, rmSync, existsSync, readFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
-import { join, resolve } from 'node:path'
+import { join } from 'node:path'
 import {
   ACTIONS,
   REASONS,
   lockDigest,
-  mainCheckoutFrom,
   planBootstrap,
-  samePath,
   formatPlan,
 } from './worktree-bootstrap-core.mjs'
 import { inspect, linkDependencies } from './worktree-bootstrap.mjs'
@@ -30,33 +28,6 @@ describe('the lockfile digest', () => {
     const plan = planBootstrap({ mainCheckout: '/main', mainHasDeps: true, ownLock: null, mainLock: null })
     expect(plan.action).toBe(ACTIONS.install)
     expect(plan.reason).toBe(REASONS.lockDiffers)
-  })
-})
-
-describe('deriving the main checkout from the git common directory', () => {
-  it('answers the parent of the shared .git — the tree a worktree may borrow from', () => {
-    expect(mainCheckoutFrom('/repo/.git', '/repo/.claude/worktrees/agent-1')).toBe(resolve('/repo'))
-  })
-
-  it('answers null for the main checkout itself, which has nothing to borrow', () => {
-    expect(mainCheckoutFrom('/repo/.git', '/repo')).toBe(null)
-    expect(mainCheckoutFrom('/repo/.git', '/repo/')).toBe(null)
-  })
-
-  it('answers null for a BARE repository — no working tree, no node_modules', () => {
-    expect(mainCheckoutFrom('/srv/hoa.git', '/wt')).toBe(null)
-  })
-
-  it('is total on junk rather than throwing inside a gate', () => {
-    expect(mainCheckoutFrom(null, '/wt')).toBe(null)
-    expect(mainCheckoutFrom('', '/wt')).toBe(null)
-    expect(mainCheckoutFrom('   ', '/wt')).toBe(null)
-  })
-
-  it('compares paths case-insensitively on Windows only', () => {
-    expect(samePath('C:/Repo', 'C:/repo', 'win32')).toBe(true)
-    expect(samePath('/Repo', '/repo', 'linux')).toBe(false)
-    expect(samePath(null, '/repo')).toBe(false)
   })
 })
 

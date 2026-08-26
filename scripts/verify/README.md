@@ -467,6 +467,20 @@ front of each turns one into a declaration.
   `if (section('<slug>')) { … }` and give each block the jump/wait it inherited
   from the one before. A suite that declares none keeps working unchanged and
   refuses `--section` with that reason.
+- **Which suites are sectioned (point 595 finished what 566 began).** Every
+  browser suite is, except two that are ONE measurement each and would gain a
+  single section naming the whole file: `startup` (one liveness window across the
+  whole load) and `benchmark` (one F8 sweep, which every check afterwards reads
+  out of the same report). `docs` drives no browser at all. `invariants` is
+  sectioned by ROUTE STOP, and its declarations therefore SELECT a stop rather
+  than wrap a block — the two invariants are judged over the driven route at the
+  end, so a partial run judges them over the stops that ran.
+- **A partial run must not damage the runs after it.** `voice` records the TTS
+  asset cache (point 88) and seals it as COMPLETE at the end; one section asks
+  for a fraction of the assets, so the seal is skipped on a partial run
+  (`sections.partial`) — otherwise the cheap rung would make every later STRICT
+  run abort on a gap it created itself. A suite that WRITES a shared artefact
+  owes the same check.
 - **A section is a BLOCK SCOPE, so anything two of them share lives ABOVE
   them.** A helper declared inside one block is invisible to the next, and
   nothing says so until the browser run reaches the call: `pinFamily`, declared
@@ -477,6 +491,29 @@ front of each turns one into a declaration.
   carry `page.evaluate` callbacks), so `npm run lint` refuses it in a tenth of a
   second, and `scope.test.mjs` keeps the rule armed by running the real config
   over a fixture of exactly that shape.
+- **The delegation brief ROUTES a render point here (point 595).** The rung
+  existed and was unused: checked 09.08.2026, `--section` appeared in this file
+  and in `tiers.mjs` and nowhere else — in no brief, no agent prompt, no rule
+  text — and not one recorded render-verify run was partial. So
+  `scripts/point-brief-core.mjs` carries the VERIFICATION LADDER in the brief of
+  every point whose spec can move a picture: section → suite → whole set while
+  repairing, the full fast gate and the whole suite as the proof, the both-backend
+  picture proof once, on `main`-merged-into-the-branch, with the verified
+  `git HEAD` reported. It is a building block of the brief, not a paragraph
+  somebody has to remember.
+- **And the brief NAMES the check set, with its sections (point 598).** The same
+  brief carries a generated ORIENTATION: the paths the spec itself names with
+  each file's own header line, what lives in their directories, and — read from
+  the work order's own `Diff → browser-suite mapping` paragraph — an ITERATION
+  CHECK SET of suite/`--section` pairs, one per covering suite, with the
+  whole-suite final proof stated separately beneath it so the cheap rung can
+  never be read as the acceptance. The set follows the CURRENT DIFF where the
+  branch already has one and the spec's prospective paths before that, and says
+  which of the two it used. All of it is read from the tree at generation time
+  (`readTree` and `currentDiffPaths` in `scripts/point-brief.mjs`), so it cannot
+  go stale, and all of it is framed as a HINT: the spec decides what changes,
+  the block only says where to look. An unknown name lists the real ones, so
+  `--section=list` is the way to see a suite's blocks without booting anything.
 - **The one recurring defect is a section that does NOT own its setup**: it
   reads a scene the block before it staged, so it passes in the whole run and
   fails standalone. Where blocks genuinely share one staging they belong in ONE
@@ -733,6 +770,14 @@ the session. Only the run is skipped — and the NEXT commit on that branch, the
 one that finishes the work, carries neither marker nor trailer and runs CI
 normally.
 
+The timed Sol authoring lane applies that distinction mechanically. Every
+author-written checkpoint and the pre-run commission receipt use the rescue
+pair, so its two-minute pushes start no disposable CI chain. Only after the
+author process exits cleanly, leaves a clean tree and reports `test:unit`, build
+and lint green does the wrapper add one unskipped completion commit. A killed or
+malformed run gets no completion commit; its pushed history therefore claims
+only recoverable work, never readiness to land.
+
 The convention is unchanged by point 513, only its reason has narrowed: a branch
 run mails nobody now, so what the marker still buys is that a half-finished state
 raises no alert, no red commit status and no entry to triage at all. Both halves
@@ -775,9 +820,11 @@ differences included, where merely noticing red closes only the cases someone
 happens to look at. Concretely (`ci-status-guard-core.mjs`, pure and pinned in
 `ci-status-guard-core.test.mjs`):
 
-- **Every ref this repository pushed** is judged, not just HEAD. A delegated
-  agent pushes under the parent's session id and into the shared reflog, so those
-  refs are the parent's responsibility. The ref is named in the block message.
+- **Every ref this repository pushed** is observed, not just HEAD. `main` always
+  gates, and a feature branch gates once its author hands it back as a landing
+  candidate. While that exact branch has a live in-flight declaration it is
+  reported without blocking the supervisor; removal of the declaration restores
+  the gate immediately, including from a fresh cached verdict.
 - **The list comes from the local push reflog** (`update by push` entries only —
   a fetch is somebody else's branch), never from an API sweep over branches.
   Four local git calls per turn end, ~30 ms measured, none of them growing with
@@ -1460,6 +1507,34 @@ Read it as the model case: when the shutter refuses, ask FIRST whether the frame
 was ever pointed at its subject. Do NOT resolve a refusal by redeclaring the
 frame `general` — a check that reports its own subject as optional is the
 failure this mechanism exists to prevent.
+
+## Verification rules extracted from the per-turn policy
+
+Exercise features at states a player can reach. In bird's-eye view the ordinary
+zoom range is 0.125–0.5 (default 0.5); use a debug-wide zoom only when testing
+that control. Decide visibility by projecting the subject into the rendered
+frame (`__camera.onScreen`/`ndc`), never from a guessed radius, fog distance, or
+other proxy. A proxy can pass while the pixels remain wrong.
+
+Every frame declares its subject at the shutter: `world` for a place or
+landmark, `local`/`place` for settlement content, `hud` for an interface target,
+or `general` with a reason. `frameSubject.mjs` refuses a frame that does not show
+the named subject, and the unit layer refuses screenshot writes outside the
+shutter.
+
+Every browser suite launches through `launchVerifyBrowser()` and calls
+`assertBackend` after `window.__renderer` appears. WebGPU is the ordinary and
+SMALL lane; LARGE runs the full WebGL 2 regression and then the WebGPU render
+suites. `touch` and `voice` route to WebGL 2 because headless WebGPU cannot drive
+them. `docs` and `preview` are exempt because the first is pure Node and the
+second intentionally lacks the dev-only renderer probe. The accepted residual
+is explicit: a WebGL-2-only regression can surface at the next LARGE.
+
+A red closes only through a named fix, a charge to the owning open point via
+`scripts/render-verify-charges.mjs`, or a newly filed point. Passing on retry is
+SUSPECT and covers nothing; `--defer` waives one record but does not close it.
+To test a load hypothesis, use `scripts/throttle-probe.mjs` rather than inferring
+it from a later green.
 
 ## Headless limitations
 

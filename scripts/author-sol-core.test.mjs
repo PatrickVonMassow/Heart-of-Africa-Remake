@@ -7,9 +7,11 @@
 import { readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
 import { describe, expect, it } from 'vitest'
-import { evaluateCommitTrailers, ALLOWED_TRAILERS } from './model-guard-core.mjs'
+import { evaluateCommitTrailers, allowedTrailers } from './model-guard-core.mjs'
 import {
   AUTHOR_TIMEOUT_MS,
+  authorCommitMessage,
+  authorCompletionMessage,
   authoringCodexArgs,
   buildAuthoringPrompt,
   buildSpecExaminationPrompt,
@@ -24,8 +26,10 @@ import {
   readinessProblems,
   SOL_MODEL_ID,
   SOL_TRAILER,
+  uncommittedSummary,
   withheldEnvNames,
 } from './author-sol-core.mjs'
+import { evaluateCommitMessage } from './commit-scope-guard-core.mjs'
 
 const solCommit = (sha, subject = 'Do a thing') => ({ sha, subject, trailers: 'GPT-5.6 Sol <noreply@openai.com>' })
 const okRun = { ok: true, kind: 'ok', cause: '' }
@@ -34,8 +38,35 @@ const answered = parseAuthoringAnswer('DONE: built the thing\nGATES: test:unit, 
 describe('the commit trailer of the lane', () => {
   it('is the allowlist’s own spelling, and passes the commit-msg gate', () => {
     expect(SOL_TRAILER).toBe('Co-Authored-By: GPT-5.6 Sol <noreply@openai.com>')
-    expect(ALLOWED_TRAILERS).toContain(SOL_TRAILER)
+    expect(allowedTrailers()).toContain(SOL_TRAILER)
     expect(evaluateCommitTrailers(`Do a thing\n\n${SOL_TRAILER}\n`).block).toBe(false)
+  })
+})
+
+describe('author commit messages', () => {
+  it('marks an interim checkpoint with both halves of the rescue convention', () => {
+    const message = authorCommitMessage({ subject: 'Add branch selection', rescue: 'the guard tests are still in progress' })
+    expect(message.split('\n')[0]).toBe('Add branch selection [skip ci]')
+    expect(message).toContain('\nRescue: the guard tests are still in progress\n')
+    expect(message).toContain(`Rescue: the guard tests are still in progress\n${SOL_TRAILER}`)
+    expect(message).toContain(SOL_TRAILER)
+    expect(evaluateCommitMessage(message).block).toBe(false)
+  })
+
+  it('keeps both rescue halves out of the final completion commit', () => {
+    const message = authorCommitMessage({
+      subject: 'Complete the authored changes [skip ci]',
+      rescue: 'this must be ignored',
+      final: true,
+    })
+    expect(message).not.toMatch(/\[skip ci\]|^Rescue:/m)
+    expect(message).toContain(SOL_TRAILER)
+    expect(evaluateCommitMessage(message).block).toBe(false)
+  })
+
+  it('offers no completion commit when the author run dies', () => {
+    expect(authorCompletionMessage({ clean: false, outcome: { cause: 'timeout' } })).toBe(null)
+    expect(authorCompletionMessage({ clean: true })).toBe(authorCommitMessage({ final: true }))
   })
 })
 
@@ -292,10 +323,24 @@ describe('judgeAuthoring — what GIT says, not what the run claimed', () => {
     expect(j.problems).toEqual([])
   })
 
-  it('calls a run that committed NOTHING what it is, however well it reported', () => {
+  it('keeps the clean-tree no-commit problem unchanged', () => {
     const j = judgeAuthoring({ outcome: okRun, commits: [], parsed: answered })
     expect(j.delivered).toBe(false)
-    expect(j.problems.join(' ')).toMatch(/NOTHING WAS COMMITTED/)
+    expect(j.problems[0]).toBe('NOTHING WAS COMMITTED — the branch is where it started, so there is nothing to review')
+  })
+
+  it('does not erase dirty work from the no-commit problem', () => {
+    const j = judgeAuthoring({
+      outcome: okRun,
+      commits: [],
+      parsed: answered,
+      dirty: ' M scripts/a.mjs\n?? scripts/b.mjs',
+      numstat: '4\t1\tscripts/a.mjs\n1\t0\tscripts/b.mjs',
+    })
+    expect(j.problems[0]).toBe(
+      'NOTHING WAS COMMITTED — the commits are missing, but the work is not; see its measured UNCOMMITTED SIZE and run CHECKPOINT IT NOW before the review',
+    )
+    expect(j.problems[0]).not.toMatch(/nothing to review/i)
   })
 
   it('catches a commit that names the wrong author, or none', () => {
@@ -405,11 +450,25 @@ describe('judgeAuthoring — what GIT says, not what the run claimed', () => {
       commits: [solCommit('e'.repeat(40))],
       parsed: { ok: false, error: 'no closing lines' },
       dirty: ' M scripts/x.mjs',
+      numstat: '118\t6\tscripts/x.mjs',
     })
     expect(j.delivered).toBe(true)
     expect(j.clean).toBe(false)
     expect(j.problems.join(' ')).toMatch(/did not finish cleanly/)
-    expect(j.problems.join(' ')).toMatch(/UNCOMMITTED changes/)
+    expect(j.problems.join(' ')).toMatch(/UNCOMMITTED changes behind: 1 changed path\(s\), 118 insertion\(s\), 6 deletion\(s\)/)
+    expect(j.problems.join(' ')).toMatch(/CHECKPOINT IT NOW/)
+    expect(j.problems.join(' ')).not.toMatch(/discard/i)
+  })
+})
+
+describe('uncommittedSummary', () => {
+  it('measures text and binary changes while counting every dirty path', () => {
+    expect(
+      uncommittedSummary({
+        dirty: ' M scripts/a.mjs\n?? scripts/new.test.mjs\n?? image.png',
+        numstat: '52\t5\tscripts/a.mjs\n66\t1\tscripts/new.test.mjs\n-\t-\timage.png',
+      }),
+    ).toEqual({ changedPaths: 3, measuredPaths: 3, binaryPaths: 1, insertions: 118, deletions: 6 })
   })
 })
 
@@ -439,11 +498,43 @@ describe('formatAuthoringReport', () => {
     expect(text).toContain(`--mode review --point 1 --author-framing "${framing}"`)
   })
 
-  it('offers no next step where nothing was authored', () => {
+  it('reports NOTHING only for a clean tree with no commits', () => {
     const judged = judgeAuthoring({ outcome: okRun, commits: [], parsed: answered })
     const text = formatAuthoringReport({ point: 1, branch: 'b', judged, parsed: answered })
     expect(text).toMatch(/authored NOTHING/)
     expect(text).not.toMatch(/land-point/)
     expect(text).toMatch(/NOTHING WAS COMMITTED/)
+  })
+
+  it('measures a dirty tree with no commits and offers a checkpoint instead of claiming NOTHING', () => {
+    const judged = judgeAuthoring({
+      outcome: okRun,
+      commits: [],
+      parsed: answered,
+      dirty: ' M scripts/model-guard-core.mjs\n M scripts/model-guard-core.test.mjs',
+      numstat: '52\t5\tscripts/model-guard-core.mjs\n66\t1\tscripts/model-guard-core.test.mjs',
+    })
+    const text = formatAuthoringReport({ point: 792, branch: 'feat/792-fable-state', judged, parsed: answered })
+    expect(text).toMatch(/left UNCOMMITTED WORK/)
+    expect(text).toMatch(/2 changed path\(s\), 118 insertion\(s\), 6 deletion\(s\)/)
+    expect(text).toContain(
+      `git add -A && git commit -m 'Checkpoint uncommitted authoring work' -m '${SOL_TRAILER}'` +
+        ` && git push -u origin feat/792-fable-state`,
+    )
+    expect(text).not.toMatch(/authored NOTHING/)
+  })
+
+  it('reports commits first even when more work remains dirty', () => {
+    const judged = judgeAuthoring({
+      outcome: okRun,
+      commits: [solCommit('a'.repeat(40), 'Save the first step')],
+      parsed: answered,
+      dirty: '?? scripts/next.mjs',
+      numstat: '7\t0\tscripts/next.mjs',
+    })
+    const text = formatAuthoringReport({ branch: 'feat/x', judged, parsed: answered })
+    expect(text).toMatch(/authored 1 commit\(s\)/)
+    expect(text).toMatch(/UNCOMMITTED SIZE: 1 changed path\(s\), 7 insertion\(s\)/)
+    expect(text).not.toMatch(/authored NOTHING/)
   })
 })

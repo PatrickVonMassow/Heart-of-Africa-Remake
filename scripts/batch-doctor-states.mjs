@@ -30,7 +30,7 @@ import { MANDATE_MAX_AGE_MS, mandateMarkerVerdict } from './batch-doctor-core.mj
 export const gitIn =
   (cwd) =>
   (args, opts = {}) =>
-    execFileSync('git', args, {
+    execFileSync('git', ['-c', 'commit.gpgsign=false', '-c', 'core.hooksPath=', ...args], {
       windowsHide: true,
       cwd,
       encoding: 'utf8',

@@ -1,18 +1,20 @@
 // Pure decision core of the CROSS-VENDOR four-eyes review (work-order point 624).
 //
-// rule:model-policy@19ee578a
-// WHY IT EXISTS: our two reviewers were Opus 5 and Fable 5 — one house, similar
+// rule:model-policy@840f3e46
+// WHY IT EXISTS: our Claude reviewers are one house, with similar
 // training, therefore CORRELATED blind spots, which is exactly what the
 // four-eyes rule is bought against (CLAUDE.md §6). A model from a different
 // vendor is the strongest decorrelation available, so REVIEWS go to OpenAI's
-// GPT-5.6 Sol at reasoning effort HIGH first and to Fable 5 when Sol cannot be
-// reached. AUTHORSHIP is untouched: Sol writes no commit here, and
-// scripts/model-guard-core.mjs keeps its author allowlist exactly as it was.
+// GPT-5.6 Sol at reasoning effort HIGH first and to the first eligible Claude
+// reviewer when Sol cannot be reached. Since point 667 Sol also AUTHORS under
+// the role swap (scripts/author-sol.mjs, admitted in the model-guard allowlist);
+// what this file protects is the other half of that swap — no model reviews its
+// own work (`solAuthored`, the self-review refusal), whoever wrote the commit.
 //
 // THE FAILURE MODE THIS FILE IS SHAPED AROUND: a review nobody ran must never be
 // recorded as done. That is worse than having no second pair of eyes, because
 // the mechanism/criticality gates then read GREEN on a commit nothing judged.
-// So every path out of a failed Sol run yields Fable 5 as the reviewer and NO
+// So every path out of a failed Sol run yields an eligible Claude reviewer and NO
 // verdict — the verdict is the reviewer's to give, never the runner's to
 // invent — and the model that is RECORDED is always the one that actually ran,
 // never the one that was preferred.
@@ -21,6 +23,8 @@
 // scripts/review-sol.mjs. Pinned by review-sol-core.test.mjs.
 
 import { BLIND_REVIEWER, blindReviewerAdmission, modelFromTrailers, sameModel, VERDICTS } from './mechanism-review-core.mjs'
+import { fableIsOn } from './fable-switch-core.mjs'
+import { mainCheckoutFrom } from './main-checkout-core.mjs'
 import {
   assembleMaterial,
   formatPassFiles,
@@ -66,6 +70,12 @@ export const FALLBACK_CHAIN = Object.freeze([FALLBACK_MODEL_NAME, SECOND_FALLBAC
  */
 export const CLAUDE_REVIEW_CHAIN = Object.freeze(['Opus 5', 'Fable 5', 'Opus 4.8'])
 
+/** A review candidate chain with the shared switch applied. */
+export function availableReviewChain(chain, fableState) {
+  if (fableState === undefined || fableIsOn(fableState)) return Object.freeze([...chain])
+  return Object.freeze(chain.filter((model) => !sameModel(model, 'Fable 5')))
+}
+
 /** The binary, and the ceiling a review may take before it counts as stuck. */
 export const CODEX_BIN = 'codex'
 export const REVIEW_TIMEOUT_MS = 15 * 60_000
@@ -73,7 +83,7 @@ export const REVIEW_TIMEOUT_MS = 15 * 60_000
 /**
  * How a Sol run ended. `ok` is the ONLY kind that may be recorded as Sol's; each
  * other kind is a cause the command names in one line before handing the review
- * to Fable 5.
+ * to the first eligible Claude reviewer.
  */
 export const OUTCOME = Object.freeze({
   OK: 'ok',
@@ -467,11 +477,11 @@ export function parseVerdict(text, { receipt = '' } = {}) {
  *
  * The one rule this function exists for: the recorded model NAMES THE RUN THAT
  * ACTUALLY HAPPENED, never the preference. Sol is preferred, so a successful Sol
- * run records Sol — but every failure, of every kind, records Fable 5, and does
+ * run records Sol — but every failure records the selected Claude reviewer, and does
  * so with an EMPTY verdict, because at that moment no second pair of eyes has
  * seen the change yet. `ready` says whether a record may be written at all.
  */
-export function decideReview({ outcome = {}, parsed = {}, authorModel = '', shortfall } = {}) {
+export function decideReview({ outcome = {}, parsed = {}, authorModel = '', shortfall, fableState } = {}) {
   // THE REVERSED DIRECTION IS DECIDED BEFORE ANYTHING ELSE (point 667). Sol now
   // AUTHORS as well as reviews, and a model may not review its own work — so a
   // Sol run over a Sol-authored range is not a review whatever it answered, and
@@ -479,8 +489,10 @@ export function decideReview({ outcome = {}, parsed = {}, authorModel = '', shor
   // green. The runner asks the same question before it spends a codex call; this
   // is the backstop for every caller that does not.
   if (solAuthored(authorModel)) {
+    const chain = availableReviewChain(CLAUDE_REVIEW_CHAIN, fableState)
     return {
-      model: claudeReviewerFor(authorModel),
+      model: firstNonAuthor(chain, authorModel),
+      chain,
       ranBy: '',
       verdict: '',
       evidence: '',
@@ -513,8 +525,10 @@ export function decideReview({ outcome = {}, parsed = {}, authorModel = '', shor
   const cause = outcome.ok
     ? `${CAUSE_TEXT[OUTCOME.NO_VERDICT]}${parsed.error ? ` (${parsed.error})` : ''}`
     : outcome.cause || CAUSE_TEXT[kind] || 'codex did not deliver a review'
+  const chain = availableReviewChain(FALLBACK_CHAIN, fableState)
   return {
-    model: fallbackReviewerFor(authorModel),
+    model: firstNonAuthor(chain, authorModel),
+    chain,
     ranBy: '',
     verdict: '',
     evidence: '',
@@ -528,7 +542,7 @@ export function decideReview({ outcome = {}, parsed = {}, authorModel = '', shor
 /**
  * The fallback reviewer, given who AUTHORED the change.
  *
- * Normally Fable 5 — but Fable also AUTHORS here (CLAUDE.md §6), and a Fable
+ * The chain follows the shared Fable switch. Fable also AUTHORS here (CLAUDE.md §6), and a Fable
  * review of Fable's own commit is the self-review both gates refuse. That would
  * leave a Fable-authored change with no reachable reviewer at all whenever Sol
  * is down, so the second Anthropic model in the chain takes over instead (found
@@ -544,8 +558,8 @@ export function decideReview({ outcome = {}, parsed = {}, authorModel = '', shor
  * no valid Anthropic reviewer at all, and saying so is the only honest answer —
  * the review waits for Sol rather than being recorded by an author of the work.
  */
-export function fallbackReviewerFor(authorModels = '') {
-  return firstNonAuthor(FALLBACK_CHAIN, authorModels)
+export function fallbackReviewerFor(authorModels = '', fableState) {
+  return firstNonAuthor(availableReviewChain(FALLBACK_CHAIN, fableState), authorModels)
 }
 
 /** Every model designation of an author list, however it was handed over. */
@@ -578,8 +592,8 @@ export function solAuthored(authorModels = '') {
  * all three Claude models has no reviewer that is not also an author, and
  * saying so beats recording a self-review.
  */
-export function claudeReviewerFor(authorModels = '') {
-  return firstNonAuthor(CLAUDE_REVIEW_CHAIN, authorModels)
+export function claudeReviewerFor(authorModels = '', fableState) {
+  return firstNonAuthor(availableReviewChain(CLAUDE_REVIEW_CHAIN, fableState), authorModels)
 }
 
 /**
@@ -733,19 +747,8 @@ export function probeFreshness(receipt, now = Date.now(), maxAgeMs = PROBE_MAX_A
  * git answer the current checkout is the honest fallback.
  */
 export function savedAuthPathFrom(gitCommonDir, repoRoot, { sep = '/' } = {}) {
-  return `${mainCheckoutFrom(gitCommonDir, repoRoot)}${sep}local${sep}codex-auth.json`
-}
-
-/**
- * The MAIN checkout, given git's common dir — the directory the login above and the
- * share switch (scripts/sol-share-core.mjs) both belong in, for the same reason: they
- * are the MACHINE's state, and a delegated agent's worktree is deleted when its point
- * lands. With no git answer the current checkout is the honest fallback.
- */
-export function mainCheckoutFrom(gitCommonDir, repoRoot) {
-  const common = String(gitCommonDir ?? '').trim().replace(/[/\\]+$/, '')
-  const base = /(?:^|[/\\])\.git$/.test(common) ? common.replace(/[/\\]\.git$/, '') : String(repoRoot ?? '')
-  return base || String(repoRoot ?? '')
+  const owner = mainCheckoutFrom(gitCommonDir, repoRoot) ?? String(repoRoot ?? '')
+  return `${owner}${sep}local${sep}codex-auth.json`
 }
 
 /** Shell-quote one value for the record command line we print. */
@@ -780,18 +783,14 @@ export function formatRecordCommand({
     `--mode ${mode}`,
   ]
   if (String(point ?? '').trim()) parts.push(`--point ${String(point).trim()}`)
-  // A PASS RECORD NAMES WHAT IT ACTUALLY READ (point 714). The range was too
-  // large for one round, so this verdict covers the files of this pass alone —
-  // and the gate clears the range only once every pass of the same total is on
-  // record, which is what makes a composition a coverage rather than a claim.
+  // A PASS RECORD NAMES WHAT IT ACTUALLY READ (points 714 and 737). The record's
+  // sha is the end state at which those files were read; no commit boundaries
+  // travel, because intermediate file states are not review artefacts.
   // The list is written in the ONE round-trippable representation (a path with
   // a comma, a quote or edge whitespace travels C-quoted, as git prints it), so
   // what the recorder stores is byte-identical to what this pass read.
   if (pass) {
     parts.push(`--pass ${pass.index}/${pass.total}`, `--pass-files ${q(formatPassFiles(pass.files ?? []))}`)
-    if (Array.isArray(pass.commits) && pass.commits.length) {
-      parts.push(`--pass-commits ${q(pass.commits.join(','))}`)
-    }
   }
   return parts.join(' ')
 }
@@ -893,22 +892,20 @@ export function formatReviewReport({
     point,
     pass,
   })
-  // EVERY pass template carries the not-cleared warning — the fallback and
-  // role-swap templates included (round-5 pass 6) — and the way to the
-  // remainder consults the LEDGER, not the pass number (round-4 pass 6):
-  // passes run in any order, so "next: k+1" recommended recorded passes and
-  // fell silent on unrecorded ones. This formatter is pure and cannot read
-  // the ledger, so it points at the listing that can.
+  // Every pass says exactly what its record clears. Passes run in any order, so
+  // the remainder is discovered from the ledger rather than a guessed number.
   const passWarning = pass
     ? [
         '',
-        `  The range is NOT cleared until every pass 1..${pass.total} is recorded — ` +
-          'node scripts/mechanism-review.mjs --list shows which already are.',
+        `  This record clears the listed files at ${String(sha).slice(0, 7)}; unchanged files stay cleared, ` +
+          'and node scripts/mechanism-review.mjs --list shows the remaining file debt.',
       ]
     : []
   if (!decision.fellBack) {
     const scope = pass
-      ? ` (PASS ${pass.index}/${pass.total} — ${(pass.files ?? []).length} file(s) of a range too large for one round)`
+      ? Number(pass.total) === 1
+        ? ` (SCOPED PASS — ${(pass.files ?? []).length} end-state file(s))`
+        : ` (PASS ${pass.index}/${pass.total} — ${(pass.files ?? []).length} file(s) of a range too large for one round)`
       : ''
     return [
       `review-sol: ${SOL_MODEL_NAME} (effort ${SOL_REASONING_EFFORT}) reviewed ${String(sha).slice(0, 7)} → ${decision.verdict}${scope}`,
@@ -920,9 +917,9 @@ export function formatReviewReport({
       ...passWarning,
     ].join('\n')
   }
-  // The prose names the model the DECISION picked, not the usual one: where
-  // Fable authored the change the reviewer is Opus 5, and an instruction saying
-  // "hand it to Fable" beside a command naming Opus is how a self-review gets
+  // The prose names the model the DECISION picked, not the usual one. If the
+  // first candidate authored the change another reviewer is selected; an
+  // instruction naming the wrong model beside the command is how a self-review gets
   // recorded (four-eyes finding, second round, 10.08.2026).
   const who = decision.model
   // THE ROLE SWAP IS NOT A FALLBACK (point 667), and calling it one would read as
@@ -932,7 +929,7 @@ export function formatReviewReport({
     if (!who) {
       return [
         `review-sol: ROLE SWAP — ${SOL_MODEL_NAME} AUTHORED part of ${String(sha).slice(0, 7)}, so it may not review it.`,
-        `  And every model of ${CLAUDE_REVIEW_CHAIN.join(', ')} authored part of it too, so none of them`,
+        `  And every model of ${(decision.chain ?? CLAUDE_REVIEW_CHAIN).join(', ')} authored part of it too, so none of them`,
         '  may either. The review is NOT done and cannot be recorded: review a narrower range.',
       ].join('\n')
     }
@@ -948,7 +945,7 @@ export function formatReviewReport({
   if (!who) {
     return [
       `review-sol: FALLBACK — ${SOL_MODEL_NAME} did not review ${String(sha).slice(0, 7)}: ${decision.cause}.`,
-      `  And EVERY model in the fallback chain (${FALLBACK_CHAIN.join(', ')}) authored part of this`,
+      `  And EVERY model in the fallback chain (${(decision.chain ?? FALLBACK_CHAIN).join(', ')}) authored part of this`,
       '  range, so none of them may review it. The review is NOT done and cannot be recorded:',
       `  fix the ${SOL_MODEL_NAME} run, or review a narrower range one of them did not write.`,
     ].join('\n')

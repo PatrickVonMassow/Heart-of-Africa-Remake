@@ -39,6 +39,12 @@ export const LEVELS = Object.freeze(['low', 'med', 'high'])
 /** The level that arms this gate. */
 export const GATED_LEVEL = 'high'
 
+/** Append-only ledger row that transfers every finding of one review to open points. */
+export const FINDINGS_FILED_KIND = 'review-findings-filed'
+
+/** Explicit receipt for files Git proves no configured vendor may review. */
+export const REVIEW_UNAVAILABLE_KIND = 'criticality-review-unavailable'
+
 const short = (sha) => String(sha ?? '').slice(0, 7)
 
 /**
@@ -102,6 +108,11 @@ export function criticalityOf(body) {
 /** The point numbers a work-order text marks done. */
 export function tickedNumbers(text) {
   return new Set(parsePointBlocks(text).filter((p) => p.done).map((p) => p.n))
+}
+
+/** Point numbers the current work order still carries as open. */
+export function openNumbers(text) {
+  return new Set(parsePointBlocks(text).filter((p) => !p.done).map((p) => p.n))
 }
 
 /**
@@ -223,8 +234,9 @@ export function strictAncestorProbe(index, fallback) {
  *   head       current HEAD, for the message only
  *   ticks      [{ number, rationale }] — the HIGH points newly ticked since the
  *              baseline
+ *   openPoints point numbers that are visibly open in the current work order
  *   records    [{ point, sha, model, verdict, evidence, at, authoredBy,
- *                reachable, descendsFrom }]
+ *                reachable, descendsFrom, pointFiles }]
  *              `reachable` false means the record judged a commit that is not in
  *              this history (an abandoned branch) — it does not count.
  *              `descendsFrom` are the shas of OTHER records for the same point
@@ -233,10 +245,11 @@ export function strictAncestorProbe(index, fallback) {
  *
  * Returns { block, clear, bootstrap, findings }.
  */
-export function evaluateCriticalityReview({ baseline = null, head = '', ticks = [], records = [] } = {}) {
+export function evaluateCriticalityReview({ baseline = null, head = '', ticks = [], openPoints = [], records = [] } = {}) {
   if (!baseline) return { block: false, clear: true, bootstrap: true, findings: [], head }
 
   const findings = []
+  const open = new Set((openPoints ?? []).map(Number).filter(Number.isInteger))
   for (const tick of ticks ?? []) {
     const all = (records ?? []).filter((r) => Number(r?.point) === Number(tick?.number))
     const reachable = all.filter((r) => r.reachable !== false)
@@ -306,9 +319,32 @@ export function evaluateCriticalityReview({ baseline = null, head = '', ticks = 
     // A self-review in the ledger is worse than none: the gate would read green.
     // Refused at the record command too, but re-checked here — the ledger is a
     // file anyone can hand-edit.
-    const valid = reviews.filter((r) => !sameModel(r.model, r.authoredBy))
+    // AN EMPTY AUTHORSHIP PROVES NOTHING (point 862, found 23.08.2026): the
+    // recorder legitimately writes authoredBy '' for a commit without a model
+    // trailer (a merge, the user's own edit), and `!sameModel(model, '')` then
+    // read the UNKNOWN author as a different model — the one gate that exists
+    // to prove two vendors cleared on absence of evidence. Emptiness stays
+    // WELL-FORMED (38 such rows stand in the ledger; poisoning them would
+    // redden history), it just can never be the diversity proof.
+    const valid = reviews.filter((r) => String(r.authoredBy).trim() && !sameModel(r.model, r.authoredBy))
 
-    if (!valid.length) {
+    // This is an exception record, never a review. The wrapper verifies its
+    // exact file list against Git's authorship plan and replaces both trusted
+    // fields below; a hand-written `unavailableVerified: true` is stripped.
+    const unavailable = reachable.filter(
+      (r) =>
+        r?.kind === REVIEW_UNAVAILABLE_KIND &&
+        r.unavailableVerified === true &&
+        ledgerAtUsable(r.at) &&
+        typeof r.reason === 'string' &&
+        r.reason.trim().length >= 8 &&
+        Array.isArray(r.unavailableFiles) &&
+        r.unavailableFiles.length > 0 &&
+        Array.isArray(r.pointFiles) &&
+        r.pointFiles.length > 0,
+    )
+
+    if (!valid.length && !unavailable.length) {
       let kind = 'no-review'
       if (reviews.length) kind = 'self-review'
       else if (all.length && !reachable.length) kind = 'not-in-history'
@@ -322,14 +358,31 @@ export function evaluateCriticalityReview({ baseline = null, head = '', ticks = 
     // whole-range review, so ONE merge pass row could clear a HIGH point
     // whose other passes were never recorded. A pass-split review clears
     // only as a COMPLETE COMPOSITION — every index 1..total present at one
-    // sha among the valid rows — speaking with the WORST of its passes,
-    // exactly as at the mechanism gate. A pass REFUSAL keeps its individual
-    // standing in `unresolved` (fail-closed in both directions).
+    // sha among the valid rows AND the files read up to that sha covering the
+    // point's measured file set — speaking with the WORST of its passes. A
+    // pass REFUSAL keeps its individual standing in `unresolved` (fail-closed
+    // in both directions).
+    //
+    // COUNTING PASSES IS NOT COVERAGE (point 820). A scoped 1/1 is the normal
+    // shape produced for a fitting delta, but accepting it on its index alone
+    // lets one named file clear a point that changed ten. `pointFiles` is not a
+    // ledger claim: the wrapper replaces it with the paths changed by this
+    // point between its authoring commission and the reviewed sha. Coverage is
+    // cumulative along the review ancestry. An earlier refusal still proves
+    // what that review read; the later clean verdict decides whether its
+    // findings were answered. Unknown coverage refuses rather than narrowing.
     const passShape = (r) => {
       const total = Number(r?.pass?.total)
       const index = Number(r?.pass?.index)
       return (
-        Number.isInteger(total) && total >= 2 && total <= 256 && Number.isInteger(index) && index >= 1 && index <= total
+        Number.isInteger(total) &&
+        total >= 1 &&
+        total <= 256 &&
+        Number.isInteger(index) &&
+        index >= 1 &&
+        index <= total &&
+        Array.isArray(r?.pass?.files) &&
+        r.pass.files.every((file) => typeof file === 'string' && file.length > 0)
       )
     }
     const compositions = []
@@ -356,33 +409,117 @@ export function evaluateCriticalityReview({ baseline = null, head = '', ticks = 
           'merge',
         )
         const latest = rows.reduce((a, b) => (Number(b.at ?? 0) >= Number(a.at ?? 0) ? b : a))
-        compositions.push({ ...latest, verdict: worst, at: Math.max(...rows.map((r) => Number(r.at ?? 0))) })
+        const expected = Array.isArray(latest.pointFiles)
+          ? [...new Set(latest.pointFiles.filter((file) => typeof file === 'string' && file.length > 0))]
+          : []
+        const ancestors = valid.filter(
+          (r) => r.sha === latest.sha || (latest.descendsFrom ?? []).includes(r.sha),
+        )
+        const covered = new Set()
+        for (const r of ancestors) {
+          const files = r.pass === undefined ? r.pointFiles : passShape(r) ? r.pass.files : []
+          if (Array.isArray(files)) for (const file of files) covered.add(file)
+        }
+        const uncovered = expected.filter((file) => !covered.has(file))
+        compositions.push({
+          ...latest,
+          verdict: worst,
+          at: Math.max(...rows.map((r) => Number(r.at ?? 0))),
+          compositionComplete: expected.length > 0 && uncovered.length === 0,
+          coverageUnknown: expected.length === 0,
+          uncovered,
+        })
       }
     }
+    // A point can mix authoring vendors so completely that no configured
+    // reviewer is independent of every file. A verified availability receipt
+    // covers only the exact unreviewable paths; ordinary review rows must still
+    // cover every reviewable path. It can establish a clearance, but it is NOT
+    // a merge verdict and therefore cannot answer a do-not-merge below.
+    const unavailableClearances = unavailable.map((receipt) => {
+      const covered = new Set(receipt.unavailableFiles)
+      for (const r of valid) {
+        if (r.sha !== receipt.sha && !(receipt.descendsFrom ?? []).includes(r.sha)) continue
+        const files = r.pass === undefined ? r.pointFiles : passShape(r) ? r.pass.files : []
+        if (Array.isArray(files)) for (const file of files) covered.add(file)
+      }
+      const uncovered = receipt.pointFiles.filter((file) => !covered.has(file))
+      return {
+        ...receipt,
+        verdict: CLEARING_VERDICT,
+        availabilityClearance: true,
+        compositionComplete: uncovered.length === 0,
+        uncovered,
+      }
+    })
     const clean = [
       ...valid.filter((r) => r.pass === undefined && String(r.verdict) === CLEARING_VERDICT),
-      ...compositions.filter((g) => String(g.verdict) === CLEARING_VERDICT),
+      ...compositions.filter((g) => g.compositionComplete && String(g.verdict) === CLEARING_VERDICT),
+      ...unavailableClearances.filter((g) => g.compositionComplete),
     ]
     const unresolved = valid.filter((r) => String(r.verdict) !== CLEARING_VERDICT)
+    // A refusal has two durable answers:
+    //   1. a `merge` recorded later in time against a later commit; or
+    //   2. an append-only disposition row binding THIS exact review to one or
+    //      more point numbers that are still visibly OPEN in the work order.
+    // The second form is deliberately structured. Evidence prose saying
+    // "filed" is not a receipt, and a refusal that names no point still blocks.
+    // `reviewAt` disambiguates two reviews by the same model against the same
+    // sha without rewriting either historical ledger row.
+    const filed = (review) =>
+      reachable.some((r) => {
+        if (r?.kind !== FINDINGS_FILED_KIND || r.reachable === false) return false
+        if (Number(r.point) !== Number(tick.number) || r.sha !== review.sha) return false
+        if (String(r.model ?? '').trim() !== String(review.model ?? '').trim()) return false
+        if (Number(r.reviewAt) !== Number(review.at) || !ledgerAtUsable(r.at) || Number(r.at) <= Number(review.at)) {
+          return false
+        }
+        if (!Array.isArray(r.findingPoints) || r.findingPoints.length === 0) return false
+        const points = r.findingPoints.map(Number)
+        return points.every((n) => Number.isInteger(n) && n > 0 && open.has(n))
+      })
+
     if (!clean.length) {
+      const unfiled = unresolved.filter((r) => !filed(r))
+      // All honest refusals have been transferred to open numbered points. No
+      // invented clean verdict is needed, and no refusal has vanished.
+      if (unresolved.length && !unfiled.length) continue
       // Merge pass rows of an INCOMPLETE split leave `unresolved` empty while
       // nothing may clear — the finding then names those rows instead.
-      const pool = unresolved.length ? unresolved : valid
+      const incompleteCoverage = [...compositions, ...unavailableClearances]
+        .filter((g) => String(g.verdict) === CLEARING_VERDICT && !g.compositionComplete)
+        .sort((a, b) => Number(b.at ?? 0) - Number(a.at ?? 0))[0]
+      if (incompleteCoverage) {
+        findings.push({
+          kind: 'uncovered-files',
+          tick,
+          records: [incompleteCoverage],
+          uncovered: incompleteCoverage.uncovered,
+          coverageUnknown: incompleteCoverage.coverageUnknown,
+        })
+        continue
+      }
+      const pool = unfiled.length ? unfiled : valid
       const latest = pool.reduce((a, b) => (Number(b.at ?? 0) >= Number(a.at ?? 0) ? b : a))
       findings.push({ kind: 'unresolved', tick, records: [latest] })
       continue
     }
-    // Every refusal must have been ANSWERED: a `merge` recorded later in time
-    // AND against a later commit. Same-commit re-records do not count — nothing
-    // changed between them, so nothing was fixed.
-    const open = unresolved.filter(
+
+    // Same-commit re-records do not count as code fixes — nothing changed
+    // between them. A filed disposition may name that commit because it answers
+    // by moving the work, not by claiming the code changed.
+    const unanswered = unresolved.filter(
       (u) =>
+        !filed(u) &&
         !clean.some(
-          (c) => Number(c.at ?? 0) > Number(u.at ?? 0) && (c.descendsFrom ?? []).includes(u.sha),
+          (c) =>
+            !c.availabilityClearance &&
+            Number(c.at ?? 0) > Number(u.at ?? 0) &&
+            (c.descendsFrom ?? []).includes(u.sha),
         ),
     )
-    if (open.length) {
-      const latest = open.reduce((a, b) => (Number(b.at ?? 0) >= Number(a.at ?? 0) ? b : a))
+    if (unanswered.length) {
+      const latest = unanswered.reduce((a, b) => (Number(b.at ?? 0) >= Number(a.at ?? 0) ? b : a))
       findings.push({ kind: 'unanswered', tick, records: [latest] })
     }
   }
@@ -424,11 +561,27 @@ export function formatCriticalityReviewVerdict(verdict) {
         `      the only review on record is by ${String(r.model ?? '').trim() || 'the same model'}, which ` +
           `authored the work — a self-review is not a review`,
       )
+    } else if (f.kind === 'uncovered-files') {
+      lines.push(head)
+      if (f.coverageUnknown) {
+        lines.push(
+          "      Git cannot measure this point's file set from any available route.",
+          '      No usable authoring commission, landing merge, or feat/<point>-… lane establishes',
+          '      the reviewed range; the pass composition therefore cannot prove coverage.',
+        )
+      } else {
+        lines.push(
+          '      the recorded pass files do not cover every file this point changed. Still uncovered:',
+          ...(f.uncovered ?? []).map((file) => `        ${file}`),
+          '      Review those files and record the pass; a composition covers its union and not one file more.',
+        )
+      }
     } else if (f.kind === 'unresolved') {
       lines.push(
         head,
         `      ${String(r.model ?? '').trim()} recorded ${r.verdict} on ${short(r.sha)}: ${r.evidence ?? ''}`,
-        '      A refusal is not advisory. Fix what it found, commit the fix, then record the re-review.',
+        '      A refusal is not advisory. Fix it and record the re-review, or file every finding',
+        '      as an open work-order point and append a review-findings-filed receipt naming them.',
       )
     } else {
       lines.push(
@@ -447,6 +600,11 @@ export function formatCriticalityReviewVerdict(verdict) {
     '',
     '  node scripts/mechanism-review.mjs --record <sha> --point <N> --model <name> \\',
     `      --verdict <${VERDICTS.join('|')}> --evidence "<one line>" --mode <${MODES.join('|')}>`,
+    '',
+    `If Git proves no configured vendor can review part of the point, record that exact exception:`,
+    '  node scripts/criticality-review-guard.mjs --record-unavailable <sha> --point <N> \\',
+    '      --files "<exact paths printed by review-sol>" --reason "<why no vendor is eligible>"',
+    `It writes kind ${REVIEW_UNAVAILABLE_KIND}; it covers only its verified file list and answers no refusal.`,
     '',
     'Inspect the gate with: node scripts/criticality-review-guard.mjs --status',
     'If the tag is wrong, correct the point rather than the ledger — the tag is the spec.',

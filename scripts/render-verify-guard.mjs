@@ -60,6 +60,7 @@ import {
 import { readTasksAll } from './tasks-source.mjs'
 import { heldByOtherLiveOwner } from './batch-singleton.mjs'
 import { isMainModule } from './is-main.mjs'
+import { gatherGuardDutyContext } from './guard-duty.mjs'
 
 function git(cmd) {
   return execSync(cmd, { windowsHide: true, cwd: REPO_ROOT, encoding: 'utf8' }).trim()
@@ -210,6 +211,7 @@ export function gatherRenderVerifyInputs({ sessionId = '', deps = {} } = {}) {
     changeTimeOf = latestChangeAt,
     baselineGone = commitMissing,
     workOrder = readTasksAll,
+    guardDuty = gatherGuardDutyContext,
   } = deps
   // Hard singleton: a session that does not own the live batch lock stands down.
   if (heldByOther(sessionId)) {
@@ -265,6 +267,8 @@ export function gatherRenderVerifyInputs({ sessionId = '', deps = {} } = {}) {
       // The signed-off broken RECORDINGS (point 734) — not waivers: each names
       // one run by identity and clears no backend.
       incompleteClosures: state.incompleteClosures,
+      sessionId,
+      fence: guardDuty({ sessionId }),
     },
   }
 }
@@ -610,6 +614,11 @@ if (isMainModule(import.meta.url)) {
 
     if (result.decision === 'block') {
       process.stdout.write(JSON.stringify({ decision: 'block', reason: result.reason }))
+      process.exit(0)
+    }
+    if (result.decision === 'defer') {
+      // No baseline advance: the pending diff is the successor's durable inbox.
+      process.stdout.write(JSON.stringify({ systemMessage: result.reason }))
       process.exit(0)
     }
     if (result.clear && head !== cleared) {

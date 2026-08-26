@@ -14,33 +14,83 @@
 // Modes:
 //   1. PreToolUse HOOK: reads the tool call on stdin, MEASURES the session's
 //      context from its own transcript (the payload's transcript_path, else
-//      located by session id) and DENIES a call that would START a new unit of
-//      work while the measurement is past the watermark. Everything that
-//      finishes the step in flight, and every read, passes untouched — the
-//      fence ends a session, it never idles one. Any internal error → ALLOW.
+//      located by session id) and asks whether THIS call's measured p90 cost
+//      still fits below the ceiling after pending debits and the handover
+//      reserve. Reads are admitted like every other growing call; only the
+//      enumerated bounded controls are exempt. Any internal error → ALLOW.
 //   2. `--status`: the current measurement and what a starting call would get.
 //
-// WHO IT BINDS: only the batch lock's OWNER. A session that does not own
-// `.claude/batch-lock.json` has no batch to hand over and no `--prepare
-// --context` it could run, so fencing it would trap it — it passes. A paused
-// batch passes. A WORKTREE-ISOLATED delegated agent passes too (point 440's
-// rule): its tool calls carry the PARENT session id, so the measurement would
-// be the parent's expensive transcript while the agent's own context is small
-// — the deny would hit exactly the worker the handover machinery keeps alive.
+// OBSERVATION MODE IS THE DEFAULT (point 758, user 20.08.2026). The fence is
+// DISARMED: it still measures, still classifies, and RECORDS every call it
+// would have refused to `.claude/context-fence-observations.jsonl` — but it
+// refuses nothing. The switch is the single named value
+// `CONTEXT_FENCE_MODE_DEFAULT` in context-watermark-core.mjs ('observe' |
+// 'armed'), overridable per session with `HOA_CONTEXT_FENCE_MODE`. It is a
+// MODE and not a threshold pushed out of reach on purpose: `--status` prints
+// the mode first and says in words that a disarmed fence refuses nothing, so
+// nobody can mistake it for an armed one that happens never to fire.
+//
+// The old separately-derived REFUSAL threshold is gone from this path. The
+// HANDOVER threshold still belongs to the boundary/Stop chain; this guard owns
+// prospective admission against the ceiling and the reserved exit cost.
+//
+// WHO IT BINDS: every session class. `agent_id` on the real hook payload marks
+// a subagent; without it, lock equality distinguishes the batch owner from an
+// attended main window. The arithmetic is shared. Only the remedy differs: a
+// subagent returns what it has, the owner takes its existing boundary, and an
+// attended window asks for `/clear`. A paused batch still passes.
 //
 // THE DENY REPEATS, deliberately (unlike board-first's once-per-turn nudge):
 // repeating the suite start is exactly what the measured session of 17.08.2026
 // did for another hour. It cannot trap: the allowed set contains the whole
 // exit (finish, board, boundary, end).
-import { existsSync, readFileSync, realpathSync } from 'node:fs'
+import { appendFileSync, existsSync, readFileSync, realpathSync } from 'node:fs'
 import { resolve } from 'node:path'
 import { REPO_ROOT } from './repo-paths.mjs'
 import { readOwnerLock } from './batch-singleton.mjs'
-import { isWorktreeCheckout } from './board-first-core.mjs'
-import { gatherWatermark } from './context-watermark.mjs'
-import { contextFenceDecision, resolveThroughAncestors } from './context-fence-core.mjs'
+import { fenceMode, gatherWatermark, triggerTokens } from './context-watermark.mjs'
+import { CONTEXT_CEILING_TOKENS, watermarkDecision } from './context-watermark-core.mjs'
+import { resolveThroughAncestors } from './context-fence-core.mjs'
+import { contextBudgetRefusal } from './context-budget-core.mjs'
+import { admitContextCall, inspectContextCall } from './context-budget.mjs'
+import { readSeries } from './context-incidents.mjs'
+import { summarizeSeries } from './context-incidents-core.mjs'
+import { FOCUS_PATH, readJson } from './dashboard-state.mjs'
+import { classifyContextSession, contextSessionIdentity } from './session-context-ceiling-core.mjs'
 
 const PAUSE = resolve(REPO_ROOT, '.claude', 'batch-paused')
+
+/** WHERE OBSERVATION MODE WRITES (point 758). Git-ignored like every other
+ *  .claude runtime record — these are THIS machine's session readings. One
+ *  JSON object per line, appended; nothing reads it automatically. It is
+ *  DELIBERATELY not `.claude/context-incidents.jsonl`: that series records
+ *  BOUNDARY overshoots (point 742) and mixing a second record kind into it
+ *  would corrupt exactly the reading point 747 needs. */
+const OBSERVATIONS = resolve(REPO_ROOT, '.claude', 'context-fence-observations.jsonl')
+
+/**
+ * Record one call the fence WOULD have refused. Best-effort by construction:
+ * a guard that threw while recording would trap the session, which is the one
+ * thing this fence must never do, so every failure is swallowed.
+ */
+function recordObservation(record) {
+  try {
+    appendFileSync(OBSERVATIONS, `${JSON.stringify(record)}\n`)
+  } catch {
+    /* the measurement is worth more than the record; never trap the session */
+  }
+}
+
+/** The handover state for the same reading, independent of admission. */
+const handoverStateOf = (tokens) =>
+  watermarkDecision({ reading: tokens === null ? null : { tokens }, watermark: triggerTokens() })
+
+const currentPoint = () => {
+  const point = readJson(FOCUS_PATH)?.point
+  return Number.isInteger(point) && point > 0 ? point : null
+}
+
+const costSeries = () => summarizeSeries(readSeries().records)
 
 // The verify-prefix rule judges SYMLINK spellings on their resolved target
 // (Sol round 4: `verify-link -> scripts/verify` passed the lexical rule while
@@ -78,15 +128,63 @@ if (process.argv.includes('--status')) {
   const argv = process.argv.slice(2)
   const tIdx = argv.indexOf('--transcript')
   const sid = readOwnerLock()?.sessionId ?? ''
-  const wm = gatherWatermark({ transcriptPath: tIdx >= 0 ? argv[tIdx + 1] ?? '' : '', sid })
-  const starting = contextFenceDecision({ ...wm, toolName: 'Agent', resolvePath: resolveRealPath })
-  console.log(JSON.stringify({ ownerSessionId: sid || null, ...wm }, null, 2))
+  const mode = fenceMode()
+  const wm = gatherWatermark({
+    transcriptPath: tIdx >= 0 ? argv[tIdx + 1] ?? '' : '',
+    sid,
+  })
+  const handover = handoverStateOf(wm.tokens)
+  const reading = wm.tokens === null ? null : { tokens: wm.tokens, at: wm.readingAt }
+  const admission = inspectContextCall({
+    sessionId: sid,
+    reading,
+    series: costSeries(),
+    toolName: 'Agent',
+    toolInput: {},
+    resolvePath: resolveRealPath,
+  })
   console.log(
-    `verdict for a STARTING call (agent spawn, browser suite, work-order/doc/memory authoring): ${
-      starting.block ? 'DENY' : 'allow'
+    JSON.stringify(
+      {
+        ownerSessionId: sid || null,
+        mode,
+        armed: mode === 'armed',
+        ...wm,
+        ceiling: CONTEXT_CEILING_TOKENS,
+        pendingDebit: admission.ledger.pendingDebit,
+        projectedCost: admission.decision.projectedCost,
+        remainingAfterCall: admission.decision.remainingAfterCall,
+        handoverWatermark: handover.watermark,
+        handoverState: handover.state,
+      },
+      null,
+      2,
+    ),
+  )
+  // THE MODE IS SAID IN WORDS, not left to be inferred from a threshold: a
+  // disabled gate must be visible as disabled (point 758).
+  console.log(
+    mode === 'armed'
+      ? `\nfence mode: ARMED — a call that cannot fit below the ${CONTEXT_CEILING_TOKENS}-token ceiling is REFUSED.`
+      : `\nfence mode: OBSERVE — THE FENCE IS DISARMED and refuses NOTHING. It measures against the ` +
+          `${CONTEXT_CEILING_TOKENS}-token ceiling and records what it would have refused to ` +
+          `.claude/context-fence-observations.jsonl. Re-arming is point 747's decision; ` +
+          `HOA_CONTEXT_FENCE_MODE=armed arms this session alone.`,
+  )
+  console.log(
+    `\nHANDOVER stays in force in BOTH modes: the boundary fires at ${handover.watermark} tokens ` +
+      `(currently ${handover.state}).`,
+  )
+  console.log(
+    `verdict for an AGENT call: ${
+      admission.decision.fits === false
+        ? mode === 'armed' ? 'DENY' : 'allow (OBSERVED — an armed fence would DENY)'
+        : 'allow'
     }`,
   )
-  if (starting.block) console.log(starting.reason)
+  if (mode === 'armed' && admission.decision.fits === false) {
+    console.log(contextBudgetRefusal({ decision: admission.decision, reading, sessionId: sid, point: currentPoint() }))
+  }
   process.exit(0)
 }
 
@@ -106,31 +204,94 @@ try {
   }
   if (!payload) process.exit(0)
   if (existsSync(PAUSE)) process.exit(0)
-  if (isWorktreeCheckout(REPO_ROOT)) process.exit(0)
   const sid = payload.session_id || ''
+  if (!sid) process.exit(0)
   const lock = readOwnerLock()
-  if (!sid || !lock || lock.sessionId !== sid) process.exit(0) // not the batch owner → no fence
-  const wm = gatherWatermark({ transcriptPath: payload.transcript_path || '', sid })
+  const sessionClass = classifyContextSession({
+    agentId: payload.agent_id,
+    sessionId: sid,
+    ownerSessionId: lock?.sessionId,
+  })
+  const contextSessionId = contextSessionIdentity({ agentId: payload.agent_id, sessionId: sid })
+  // THE MEASUREMENT AND LEDGER BOOKING HAPPEN IN BOTH MODES — that is what
+  // observation mode IS. The boundary's handover state is read beside them.
+  const mode = fenceMode()
+  const wm = gatherWatermark({
+    transcriptPath: payload.transcript_path || '',
+    sid,
+  })
   const input = payload.tool_input ?? {}
-  const verdict = contextFenceDecision({
-    ...wm,
+  const reading = wm.tokens === null ? null : { tokens: wm.tokens, at: wm.readingAt }
+  const point = currentPoint()
+  const verdict = admitContextCall({
+    sessionId: contextSessionId,
+    sessionClass,
+    point,
+    reading,
+    series: costSeries(),
+    mode,
     toolName: payload.tool_name,
-    command: input.command,
-    filePath: input.file_path ?? input.notebook_path,
+    toolInput: input,
+    toolUseId: payload.tool_use_id ?? payload.toolUseId,
+    caller: {
+      toolName: payload.tool_name ?? null,
+      command: input.command ?? null,
+      filePath: input.file_path ?? input.notebook_path ?? null,
+    },
     resolvePath: resolveRealPath,
   })
+  if (verdict.decision.alert) {
+    process.stderr.write(
+      'CONTEXT FENCE FAIL-OPEN: NO CONTEXT READING COULD BE TAKEN; this call is allowed, and the Stop-chain alert remains the backstop.\n',
+    )
+  }
+  if (verdict.observed) {
+    const handover = handoverStateOf(wm.tokens)
+    recordObservation({
+      at: new Date().toISOString(),
+      sessionId: sid,
+      contextSessionId,
+      sessionClass,
+      mode,
+      refused: verdict.block,
+      permitted: verdict.permitted,
+      tokens: wm.tokens,
+      ceiling: CONTEXT_CEILING_TOKENS,
+      pendingDebit: verdict.decision.pendingDebit,
+      projectedCost: verdict.decision.projectedCost,
+      remainingAfterCall: verdict.decision.remainingAfterCall,
+      callKind: verdict.decision.kind,
+      unknownTypeCost: verdict.decision.unknownTypeCost,
+      unknownTypeCostFirings: verdict.ledger.unknownTypeCostFirings,
+      handoverWatermark: handover.watermark,
+      handoverState: handover.state,
+      tool: payload.tool_name ?? null,
+      toolUseId: payload.tool_use_id ?? payload.toolUseId ?? null,
+    })
+  }
   if (verdict.block) {
     process.stdout.write(
       JSON.stringify({
         hookSpecificOutput: {
           hookEventName: 'PreToolUse',
           permissionDecision: 'deny',
-          permissionDecisionReason: verdict.reason,
+          permissionDecisionReason: contextBudgetRefusal({
+            decision: verdict.decision,
+            reading,
+            sessionId: contextSessionId,
+            point,
+            sessionClass,
+          }),
         },
       }),
     )
   }
   process.exit(0)
-} catch {
+} catch (error) {
+  try {
+    process.stderr.write(`CONTEXT FENCE FAIL-OPEN: ${error?.message ?? error}\n`)
+  } catch {
+    /* even the loud fail-open must never trap the session */
+  }
   process.exit(0) // fail-open: never trap the session on a guard bug
 }
