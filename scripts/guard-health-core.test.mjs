@@ -6,6 +6,7 @@ import {
   auditGuardHealth,
   auditHookAnchoring,
   commandAnchoring,
+  enforcerWiredByCommands,
   formatGuardHealth,
   isEnforcerWired,
   refAnchoring,
@@ -177,6 +178,22 @@ describe('auditGuardHealth — can it fire at all', () => {
     expect(r.ok).toBe(true)
   })
 
+  it('requires execution, not a comment, sample, or another command argument', () => {
+    for (const wiringCommands of [
+      ['# node scripts/a-guard.mjs'],
+      ['node scripts/other-guard.mjs --config scripts/a-guard.mjs'],
+      ['echo node scripts/a-guard.mjs'],
+    ]) {
+      const r = auditGuardHealth({ ...healthy, wiringCommands })
+      expect(r.violations.map((v) => v.kind), wiringCommands[0]).toContain('cannot-fire')
+    }
+  })
+
+  it('recognizes the executable behind exec and leading environment assignments', () => {
+    expect(enforcerWiredByCommands(['exec node scripts/a-guard.mjs'], 'a-guard.mjs')).toBe(true)
+    expect(enforcerWiredByCommands(['HOA_MODE=guard exec node scripts/a-guard.mjs'], 'a-guard.mjs')).toBe(true)
+  })
+
   it('is not satisfied by a mention of the CORE instead of the enforcer', () => {
     const r = auditGuardHealth({ ...healthy, wiredText: 'import a-guard-core.mjs' })
     expect(r.violations.map((v) => v.kind)).toContain('cannot-fire')
@@ -281,7 +298,7 @@ describe('auditGuardHealth — is its decision tested', () => {
         'old-guard.mjs': "import { a } from './shared.mjs'",
         'new-guard.mjs': "import { a } from './shared.mjs'",
       },
-      wiredText: 'node scripts/old-guard.mjs node scripts/new-guard.mjs',
+      wiredText: 'node scripts/old-guard.mjs; node scripts/new-guard.mjs',
       knownUntested: new Set(['old-guard.mjs']),
     }
     const kinds = auditGuardHealth(world).violations.map((v) => `${v.script}:${v.kind}`)

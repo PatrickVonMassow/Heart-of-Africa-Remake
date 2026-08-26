@@ -108,7 +108,15 @@ export function executedScriptRefs(command) {
   for (const seg of String(command ?? '').split(/\n|&&|\|\||[;|&]/)) {
     const tokens = seg.match(/"(?:\\.|[^"])*"|'[^']*'|\S+/g) ?? []
     const unquote = (token) => String(token ?? '').replace(/^(['"])(.*)\1$/, '$2')
-    const program = unquote(tokens.shift())
+    let program = unquote(tokens.shift())
+    // `exec node …` is the normal final line of a Git hook. `exec` replaces
+    // the shell process; it does not make Node an argument. Reading only the
+    // first token therefore called every such hook inert. Environment
+    // assignments can precede the command for the same reason, and are skipped
+    // only before the program — an assignment after `node` is an argument.
+    while (program === 'exec' || /^[A-Za-z_][A-Za-z0-9_]*=/.test(program)) {
+      program = unquote(tokens.shift())
+    }
     if (!/(?:^|[/\\])node(?:\.exe)?$/i.test(program)) continue
     let entry = ''
     for (let i = 0; i < tokens.length; i += 1) {
@@ -133,6 +141,24 @@ export function executedScriptRefs(command) {
     if (ref) out.push(ref)
   }
   return out
+}
+
+/** Whether one of the measured commands ACTUALLY executes this enforcer.
+ *
+ * The old audit searched one concatenated blob. A comment, a sample hook, or a
+ * path used as another command's argument therefore armed a guard that could
+ * never fire. The wrapper now supplies only commands from parsed settings and
+ * recognized executable Git hooks; this final pure step still insists that the
+ * file is Node's entry script in a shell segment. `wiredText` callers are kept
+ * compatible by passing its lines here, but prose and comments prove nothing.
+ */
+export function enforcerWiredByCommands(commands, name) {
+  const wanted = String(name ?? '').trim()
+  if (!wanted) return false
+  const rows = Array.isArray(commands) ? commands : []
+  return rows.some((command) =>
+    executedScriptRefs(command).some((ref) => ref.split(/[/\\]/).pop() === wanted),
+  )
 }
 
 /**
@@ -436,7 +462,9 @@ export function auditHookAnchoring({ hookCommands = null, rollout = RELATIVE_WIR
  *   sources      { filename: text } for the enforcers, so the core a wrapper
  *                actually IMPORTS can be read rather than guessed from its name
  *   wiredText    concatenated text of everything that can INVOKE an enforcer —
- *                the hook settings plus any git hooks that are actually active
+ *                compatibility input, parsed line-by-line as commands
+ *   wiringCommands commands measured structurally from parsed settings and
+ *                recognized executable Git hooks (preferred)
  *   hookCommands the settings' hook rows, structured — the ANCHORING check needs
  *                to know which line came from where, which the blob cannot say
  *   dormant      override for INTENTIONALLY_DORMANT (tests inject their own)
@@ -447,6 +475,7 @@ export function auditGuardHealth({
   files = [],
   sources = {},
   wiredText = '',
+  wiringCommands = null,
   hookCommands = null,
   dormant = INTENTIONALLY_DORMANT,
   knownUntested = KNOWN_UNTESTED,
@@ -455,6 +484,7 @@ export function auditGuardHealth({
   const all = Array.isArray(files) ? files : []
   const names = all.filter((f) => ENFORCER_RE.test(f))
   const text = String(wiredText ?? '')
+  const commands = Array.isArray(wiringCommands) ? wiringCommands : text.split(/\r?\n/)
   const violations = []
   const report = []
 
@@ -462,7 +492,7 @@ export function auditGuardHealth({
     // Wired = something that can actually run it names it. Matching the file
     // name (not the base) keeps `foo-guard.mjs` from being satisfied by a
     // mention of `foo-guard-core.mjs`.
-    const wired = text.includes(file)
+    const wired = enforcerWiredByCommands(commands, file)
     // Which pure modules does this wrapper actually import? Guessing the core
     // from the wrapper's NAME produced false accusations — retro-currency-guard
     // imports retro-core, which is thoroughly tested, and a name-based rule
