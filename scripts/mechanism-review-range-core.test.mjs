@@ -193,20 +193,20 @@ describe('authorship-cut mechanism review planning', () => {
   })
 
   it('attributes a trailerless merge to the contribution at its merged-parent tip', () => {
-    // Any ordinary carried file: the subject here is merge attribution, and the
-    // review ledger itself is outside the end-state set (see the exclusion above).
-    const ledger = 'scripts/carried-notes.md'
+    // Any ordinary carried file — the subject here is merge attribution, not
+    // which paths the gate demands.
+    const carried = 'scripts/carried-notes.md'
     const plan = planAuthorshipGroups({
       commits: [
         { ...commit('a', 'GPT-5.6 Sol', ['sol-only']), parentShas: [] },
-        { ...commit('b', 'Claude Opus 5', [ledger]), parentShas: [] },
-        { sha: sha('c'), parentShas: [sha('a'), sha('b')], files: [ledger] },
+        { ...commit('b', 'Claude Opus 5', [carried]), parentShas: [] },
+        { sha: sha('c'), parentShas: [sha('a'), sha('b')], files: [carried] },
       ],
     })
     expect(plan.groups).toEqual([
       expect.objectContaining({ files: ['sol-only'], commits: [sha('a')], reviewer: 'Opus 5' }),
       expect.objectContaining({
-        files: [ledger],
+        files: [carried],
         commits: [sha('b'), sha('c')],
         authors: ['Claude Opus 5'],
         reviewer: 'GPT-5.6 Sol',
