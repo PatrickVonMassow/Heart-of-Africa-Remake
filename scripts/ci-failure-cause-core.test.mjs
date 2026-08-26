@@ -48,6 +48,13 @@ describe('failedJobsRerunDecision', () => {
       run: failedRun(),
       jobs: [job({ conclusion: 'failure', steps: [{ name: 'Build', conclusion: 'failure' }] })],
     })).toEqual({ kind: 'product', dispatch: false })
+    expect(failedJobsRerunDecision({
+      run: failedRun(),
+      jobs: [
+        job({ name: 'queued', status: 'queued', conclusion: null, steps: [] }),
+        job({ name: 'ran', conclusion: null, steps: [{ name: 'Build', conclusion: 'failure' }] }),
+      ],
+    })).toEqual({ kind: 'product', dispatch: false })
   })
 
   it('does not classify a job that is merely queued while its run is unfinished', () => {

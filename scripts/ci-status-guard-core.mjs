@@ -23,6 +23,10 @@ function runName(r) {
 function runUrl(r) {
   return String((r && (r.url ?? r.html_url)) ?? '')
 }
+function runAttempt(r) {
+  const value = Number(r && (r.runAttempt ?? r.run_attempt))
+  return Number.isSafeInteger(value) && value > 0 ? value : 1
+}
 
 /**
  * The runs for ONE workflow at ONE sha, reduced to the single run that carries
@@ -102,6 +106,7 @@ export function classifyRuns(runs, headSha) {
           runId: runId(r),
           workflowName: runName(r),
           conclusion,
+          runAttempt: runAttempt(r),
           url: runUrl(r),
         }
       }
@@ -137,6 +142,7 @@ export function failedRuns(runs, headSha) {
         runId: runId(r),
         workflowName: runName(r),
         conclusion: String(r?.conclusion ?? ''),
+        runAttempt: runAttempt(r),
         url: runUrl(r),
       }))
   } catch {
@@ -213,8 +219,8 @@ export const CI_WAIT_VERSION = 1
 /** How long an outage-waiver clock may sit unrefreshed before it is forgotten. */
 export const FAMINE_TTL_MS = 7 * 24 * 60 * 60 * 1000
 
-/** Stable identity of one workflow run. A re-run receives a new run id and is
- * therefore a new wait even when ref, sha and workflow name are unchanged. */
+/** Stable identity of one workflow run. GitHub keeps the run id across a
+ * failed-jobs re-run; that is deliberately one wait while `run_attempt` moves. */
 export function ciWaitIdentity({ target, classification } = {}) {
   const ref = typeof target?.ref === 'string' ? target.ref : ''
   const sha = typeof target?.sha === 'string' ? target.sha : ''
@@ -260,6 +266,8 @@ export function renewCiWait(previous, observation, {
       sha: observation.target.sha,
       workflow: observation.classification.workflowName,
       runId: observation.classification.runId,
+      runAttempt: observation.classification.runAttempt ?? previous?.runAttempt ?? 1,
+      rerunKey: observation.classification.rerunKey ?? previous?.rerunKey ?? null,
       firstObservationAt,
       lastObservationAt: Number(now),
       deadline: same && Number.isFinite(previous.deadline)
@@ -692,7 +700,7 @@ export async function sweepTargets({
     // RED. WHERE the fault lies decides the remedy: a red the repository cannot
     // fix must not demand a fixing push (point 526), and EVERY failed run on the
     // sha is judged, not just the one classifyRuns names (four-eyes 06.08.2026).
-    const { classification: chosen, standDown, stillFamished, judgedWorkflows } = await judgeRed({
+    const { classification: chosen, standDown, stillFamished, judgedWorkflows, rerunWait } = await judgeRed({
       sha: target.sha,
       runs,
       // What this sweep has learned so far included, so a second red target on
@@ -726,6 +734,16 @@ export async function sweepTargets({
     // A red with NOTHING to do is reported, not sat on (point 528): holding the
     // turn end over GitHub's own outage clears nothing and stops the batch.
     const reason = standDown ? null : blockReason(chosen, target.sha, target.ref)
+    if (standDown && rerunWait?.state === 'pending') {
+      const wait = waitReason(target, rerunWait)
+      if (gates) waiting ??= wait
+      Object.assign(observations.at(-1), { classification: rerunWait, verdict: 'wait' })
+      nextCache[target.sha] = {
+        state: 'pending', firstSeenAt: at, checkedAt: now, reason: wait,
+        runId: rerunWait.runId ?? null, workflowName: rerunWait.workflowName ?? null,
+      }
+      continue
+    }
     nextCache[target.sha] = { state: 'failed', firstSeenAt: at, checkedAt: now, reason }
     if (gates && reason) block ??= reason
   }

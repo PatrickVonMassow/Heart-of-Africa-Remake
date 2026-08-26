@@ -124,7 +124,8 @@ export function failedJobsRerunDecision({ run, jobs, alreadyDispatched = false }
 
     const failedWithSteps = jobs.some((job) => {
       const jobConclusion = String(job?.conclusion ?? '')
-      return FAILED_JOB_CONCLUSIONS.has(jobConclusion) && !ranNothingOfOurs(job)
+      const mayHaveFailed = job?.conclusion === null || FAILED_JOB_CONCLUSIONS.has(jobConclusion)
+      return mayHaveFailed && !ranNothingOfOurs(job)
     })
     if (failedWithSteps) return { kind: 'product', dispatch: false }
 

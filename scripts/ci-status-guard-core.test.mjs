@@ -636,7 +636,7 @@ describe('pruneShaCache', () => {
 
 // The sweep itself: all I/O injected, so what is asked, what is cached, what
 // blocks and what alerts is decided here and pinned without a network.
-async function sweep({ targets, runsBySha = {}, standDown = false, ...rest }) {
+async function sweep({ targets, runsBySha = {}, standDown = false, rerunWait = null, ...rest }) {
   const asked = []
   const alerts = []
   const result = await sweepTargets({
@@ -650,6 +650,7 @@ async function sweep({ targets, runsBySha = {}, standDown = false, ...rest }) {
     judgeRed: async ({ classification }) => ({
       classification: { ...classification, cause: 'repository', detail: 'the failing job is "gate"', actionable: !standDown },
       standDown,
+      rerunWait,
       stillFamished: standDown ? { CI: NOW } : {},
       judgedWorkflows: ['CI'],
     }),
@@ -758,6 +759,27 @@ describe('sweepTargets', () => {
     expect(again.decision).toContain('NOT yet concluded')
     expect(again.observations).toEqual([
       expect.objectContaining({ previousState: 'pending', verdict: 'wait' }),
+    ])
+  })
+
+  it('WAITS on the dispatched failed-jobs re-run instead of caching the transient red', async () => {
+    const rerunWait = {
+      state: 'pending',
+      runId: 42,
+      runAttempt: 2,
+      workflowName: 'Deploy to GitHub Pages',
+      rerunKey: '42:1',
+    }
+    const got = await sweep({
+      targets: [headTarget],
+      runsBySha: { [HEAD]: redRun(HEAD) },
+      standDown: true,
+      rerunWait,
+    })
+    expect(got.decision).toContain('NOT yet concluded')
+    expect(got.cache[HEAD]).toMatchObject({ state: 'pending', runId: 42 })
+    expect(got.observations).toEqual([
+      expect.objectContaining({ classification: rerunWait, verdict: 'wait' }),
     ])
   })
 
