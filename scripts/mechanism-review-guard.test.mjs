@@ -438,9 +438,12 @@ describe('measureReviewGap', () => {
       base: gapRange.base,
       commits: [{ sha: 'c'.repeat(40) }],
       standingRecords: 1,
-      loadPlanner: () => {
-        throw new Error('review-sol.mjs is broken')
-      },
+      // The module LOADS; its BUILDER throws — the shape the live defect had.
+      loadPlanner: async () => ({
+        buildAuthorshipPassPlan: () => {
+          throw new Error('planPasses assembled nothing')
+        },
+      }),
       loadAssessor: async () => ({ assessReviewGap: assessorSpy(seen) }),
     })
     expect(gap).toEqual({ gap: true, reason: 'range does not fit' })
@@ -448,6 +451,24 @@ describe('measureReviewGap', () => {
     // The assessment runs UNSLICED rather than not at all.
     expect(seen[0].sizedPlan).toBe(null)
     expect(seen[0].standingRecords).toBe(1)
+  })
+
+  it('still rules on the gap when the planner MODULE cannot be loaded', async () => {
+    const seen = []
+    const { gap, sizedPlan } = await measureReviewGap({
+      gapRange,
+      sha: gapRange.head,
+      base: gapRange.base,
+      commits: [],
+      standingRecords: 0,
+      loadPlanner: () => {
+        throw new Error('review-sol.mjs is broken')
+      },
+      loadAssessor: async () => ({ assessReviewGap: assessorSpy(seen) }),
+    })
+    expect(gap.gap).toBe(true)
+    expect(sizedPlan).toBe(null)
+    expect(seen[0].sizedPlan).toBe(null)
   })
 
   it('passes the sized plan through when the planner works', async () => {

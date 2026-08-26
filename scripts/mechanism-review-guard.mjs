@@ -128,6 +128,11 @@ function writeBaseline(branch, head) {
  * HEAD and grandfather the very mechanism it just added — the hole that makes the
  * gate look green precisely where it should bite.
  */
+export function baselineFor(state, branch) {
+  const map = state?.baselines ?? {}
+  return map[branch] ?? map.main ?? state?.baseline ?? null
+}
+
 // The gap measurement, in the TWO independent steps it actually has. The sized
 // plan only REFINES the measurement, so it gets its own try: before this split
 // a throw out of review-sol.mjs's planner left `gap` null and the guard BLOCKED
@@ -161,11 +166,6 @@ export async function measureReviewGap({
     /* no ruling — the caller's block stands */
   }
   return { gap, sizedPlan }
-}
-
-export function baselineFor(state, branch) {
-  const map = state?.baselines ?? {}
-  return map[branch] ?? map.main ?? state?.baseline ?? null
 }
 
 /**
