@@ -288,10 +288,10 @@ Die Ursache findest du durch **Zerlegen**, nicht durch Wiederholen.
   → *Prompt:* „Sichere Befunde mit einem billigen Kommando, das immer schreibt, und einer Prüfung,
   die keinen Zug enden lässt, der untersucht und nichts hinterlassen hat."
 
-- **Still ersetzt statt sichtbar gescheitert.** Fehlt eine Angabe, setzt das Programm klaglos einen
-  Ersatz ein, und der Folgefehler taucht weit weg auf.
-  → *Prompt:* „Jede eingabeverarbeitende Stelle wird gegen **mehrere Eingabeformen** getestet und
-  scheitert **sichtbar**; jeder Rückfall wird **gemeldet**, mit dem Befehl, der ihn behebt."
+- **Still ersetzt — und »kaputt« antwortet wie »fehlt«.** Der Ersatz wird klaglos gesetzt; wer
+  aus »fehlt« etwas schließen darf, schließt es dann aus Schrott.
+  → *Prompt:* „Jede eingabeverarbeitende Stelle scheitert **sichtbar**; **fehlend und unlesbar
+  liefern verschiedene Werte**, und jeder Rückfall wird **gemeldet**, mit seinem Behebungsbefehl."
 
 - **Die Gegenprüfung wurde angestoßen, nie abgeschlossen** — der Zweig sieht geprüft aus.
   → *Prompt:* „Wer eine Gegenprüfung beauftragt, bleibt dran, bis sie da ist. Ein ‚nicht
@@ -464,4 +464,4 @@ Die Ursache findest du durch **Zerlegen**, nicht durch Wiederholen.
 
 Sie ersetzt die Fallstricke oben nicht.
 
-<!-- GUIDE-FINGERPRINT: 2336b94d716b5da8d32492dcdd0405a14ec2a9d3dd78e8def279e83c0cde4711 -->
+<!-- GUIDE-FINGERPRINT: d92c289fcbe1094f5edec78568297bae83db0a9d6cd617ff3372451140a2a171 -->
