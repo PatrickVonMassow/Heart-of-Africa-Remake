@@ -16,9 +16,11 @@ import {
   commitMissing,
   gatherRenderVerifyInputs,
   incompleteClosureDraft,
+  crashClosureDraft,
   openIncompleteRuns,
+  openCrashedRuns,
 } from './render-verify-guard.mjs'
-import { incompleteClosureFor, runIdentity } from './render-verify-core.mjs'
+import { incompleteClosureFor, crashClosureFor, runIdentity } from './render-verify-core.mjs'
 
 const boom = (what) => () => {
   throw new Error(`${what} exploded`)
@@ -179,7 +181,8 @@ describe('openIncompleteRuns — what the sign-off may close', () => {
 
   // The sign-off may only be OFFERED where it would lift something (round 5,
   // finding 6). A truncated run that also CRASHED stays `red` (a crash outranks
-  // everything, and no signature lifts it), and a truncated `--section` probe
+  // everything, and no INCOMPLETE signature lifts it — since the sixth round it
+  // belongs to the --crashed route instead), and a truncated `--section` probe
   // stays `partial` (it blocks nobody) — listing either as an open incomplete
   // recording had the CLI report "SIGNED OFF" on a closure that binds nothing.
   it('offers no closure for a truncated run that CRASHED, or for a truncated --section probe', () => {
@@ -282,6 +285,72 @@ describe('openIncompleteRuns — what the sign-off may close', () => {
       expect(incompleteClosureDraft(null, null).error).toMatch(/--evidence/)
       expect(incompleteClosureDraft(null, signed).error).toMatch(/no OPEN incomplete recording/)
     })
+  })
+})
+
+// Point 734, sixth round: which runs the `--crashed` sign-off may see, and the
+// signature it would write. The selection and binding rules are shared with the
+// incomplete draft on purpose — these tests pin the family-specific halves.
+describe('openCrashedRuns / crashClosureDraft — the crash sign-off', () => {
+  const crashed = (at, overrides = {}) => ({ backend: 'webgpu', suite: 'startup', at, exit: 1, crashed: true, reds: [], ...overrides })
+  const signed = { selector: 'webgpu/startup', evidence: 'local/verify-logs/…: SIGKILL at frame 3; the run wrote no report' }
+
+  it('lists the crashed runs and nothing else — a crashed --section probe blocks nobody', () => {
+    const probe = { ...crashed(1600), partial: true, section: 'boot' }
+    const ordinary = { backend: 'webgpu', suite: 'polish', at: 1700, exit: 1, reds: [{ name: 'a real red', kind: 'check', point: null }] }
+    expect(openCrashedRuns({ runs: [crashed(1500), probe, ordinary] }).map((r) => r.at)).toEqual([1500])
+  })
+
+  it('drops a run that is already signed off, and keeps the next one', () => {
+    const one = crashed(1500)
+    const state = {
+      runs: [one, crashed(2500)],
+      crashClosures: [{ run: runIdentity(one), backend: 'webgpu', suite: 'startup', at: 1500, evidence: 'the log shows the death' }],
+    }
+    expect(openCrashedRuns(state).map((r) => r.at)).toEqual([2500])
+  })
+
+  it('writes a closure that really MATCHES the run — and only that run', () => {
+    const a = crashed(1500)
+    const b = crashed(1500, { screenshotCount: 3 })
+    const ambiguous = crashClosureDraft({ runs: [a, b] }, signed)
+    expect(ambiguous.error).toMatch(/matches 2 open crashed runs/)
+    expect(ambiguous.choices).toHaveLength(2)
+    const draft = crashClosureDraft({ runs: [a, b] }, { ...signed, run: runIdentity(b) })
+    expect(draft.error).toBeUndefined()
+    expect(draft.closure.run).toBe(runIdentity(b))
+    expect(crashClosureFor(b, [draft.closure])).toEqual(draft.closure)
+    expect(crashClosureFor(a, [draft.closure])).toBeNull()
+    // A crash closure carries no droppedLines — there is no fragment it keeps.
+    expect(draft.closure.droppedLines).toBeUndefined()
+  })
+
+  it('refuses an empty evidence, an unnamed run and a selector that matches none', () => {
+    const state = { runs: [crashed(1500)] }
+    expect(crashClosureDraft(state, { ...signed, evidence: ' ' }).error).toMatch(/--evidence/)
+    expect(crashClosureDraft(state, { ...signed, selector: '' }).error).toMatch(/name the run as/)
+    expect(crashClosureDraft(state, { ...signed, selector: 'webgl/startup' }).error).toMatch(/no OPEN crashed run/)
+  })
+
+  // The families stay locked apart at the CLI too: each draft sees only its own
+  // open set, so neither signature can ever be minted for the other's run.
+  it('offers no crash closure for a truncated run that did not crash — and the reverse holds above', () => {
+    const truncated = {
+      backend: 'webgpu',
+      suite: 'settings',
+      at: 1500,
+      exit: 1,
+      reds: [{ name: "115 further result line(s) exceeded the capture cap — this run's reds were NOT all read", key: 'capture-truncated', kind: 'truncated', point: null }],
+    }
+    expect(crashClosureDraft({ runs: [truncated] }, { ...signed, selector: 'webgpu/settings' }).error).toMatch(/no OPEN crashed run/)
+    expect(incompleteClosureDraft({ runs: [crashed(1500, { suite: 'settings' })] }, { ...signed, selector: 'webgpu/settings' }).error).toMatch(/no OPEN incomplete recording/)
+  })
+
+  it('is total on a missing state and missing options', () => {
+    expect(() => crashClosureDraft(null, null)).not.toThrow()
+    expect(crashClosureDraft(null, null).error).toMatch(/--evidence/)
+    expect(openCrashedRuns(null)).toEqual([])
+    expect(() => openCrashedRuns({ runs: [null, 7], crashClosures: 'nope' })).not.toThrow()
   })
 })
 

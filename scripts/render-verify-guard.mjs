@@ -28,11 +28,15 @@
 // 640's three closings can reach it, and before this it could only be waived by
 // hand. It is now named as its own class and signed off per run, with evidence —
 // a closure that discards the record and clears no backend.
+// A run that CRASHED rather than reported is named apart the same way (sixth
+// round): it judged no picture, no charge can reach it, and it is signed off
+// per run with the evidence of its kept log — a disposition, never coverage.
 // CLI:
-//   node scripts/render-verify-guard.mjs status            # inspect the gate
+//   node scripts/render-verify-guard.mjs --status          # inspect the gate (alias: status)
 //   node scripts/render-verify-guard.mjs --defer "<why>"   # loud escape valve
 //   node scripts/render-verify-guard.mjs --clear "<why>"   # manual baseline advance
 //   node scripts/render-verify-guard.mjs --incomplete "<backend>/<suite>" --evidence "<why>"
+//   node scripts/render-verify-guard.mjs --crashed "<backend>/<suite>" --evidence "<what the log shows>"
 import { readFileSync, statSync } from 'node:fs'
 import { execSync } from 'node:child_process'
 import { resolve } from 'node:path'
@@ -53,6 +57,7 @@ import {
   latestRun,
   isIncompleteRecording,
   incompleteClosureFor,
+  crashClosureFor,
   droppedLinesOf,
   runStamp,
   runIdentity,
@@ -264,18 +269,19 @@ export function gatherRenderVerifyInputs({ sessionId = '', deps = {} } = {}) {
       runs: state.runs,
       deferral: state.deferral,
       openPoints,
-      // The signed-off broken RECORDINGS (point 734) — not waivers: each names
-      // one run by identity and clears no backend.
+      // The signed-off broken RECORDINGS and CRASHES (point 734) — not
+      // waivers: each names one run by identity and clears no backend.
       incompleteClosures: state.incompleteClosures,
+      crashClosures: state.crashClosures,
       sessionId,
       fence: guardDuty({ sessionId }),
     },
   }
 }
 
-/** How many signed incomplete-recording closures the state keeps. The run window
- *  itself holds 40, so a closure older than that names a run nobody can see. */
-const MAX_INCOMPLETE_CLOSURES = 40
+/** How many signed closures the state keeps, per family. The run window itself
+ *  holds 40, so a closure older than that names a run nobody can see. */
+const MAX_SIGNED_CLOSURES = 40
 
 /** A run's timestamp for a human, never throwing: `toISOString()` dies on a
  *  finite but out-of-range number, and these come off disk. */
@@ -303,43 +309,60 @@ export function openIncompleteRuns(state) {
   )
 }
 
+/** The recorded runs that CRASHED, are judged as such (a `--section` probe
+ *  stays `partial` and blocks nobody), and are not yet signed off. What the
+ *  `--crashed` sign-off may see — same discipline as openIncompleteRuns: the
+ *  CLI can only ever name a run that is really recorded and still blocking. */
+export function openCrashedRuns(state) {
+  const runs = Array.isArray(state?.runs) ? state.runs : []
+  return runs.filter(
+    (r) => r?.crashed === true && runVerdict(r).status === 'red' && !crashClosureFor(r, state?.crashClosures),
+  )
+}
+
 /**
- * THE CLOSURE A `--incomplete` INVOCATION WOULD WRITE, or the reason it writes
- * none. Pure and exported so the CLI's whole judgment is testable without a
- * state file. The closure names its run by CONTENT identity (`runIdentity`),
- * never by a stamp: the stamp route let one signature close a second, different
- * run that happened to share a millisecond, and left a record with no readable
- * timestamp closable by nothing at all (round-5 review, 19.08.2026) — content
- * identifies both. `--at` and `--run` narrow the SELECTION; the written
- * signature always binds the one record's full content.
+ * THE CLOSURE A `--incomplete` OR `--crashed` INVOCATION WOULD WRITE, or the
+ * reason it writes none. Pure and exported so the CLI's whole judgment is
+ * testable without a state file. The closure names its run by CONTENT identity
+ * (`runIdentity`), never by a stamp: the stamp route let one signature close a
+ * second, different run that happened to share a millisecond, and left a record
+ * with no readable timestamp closable by nothing at all (round-5 review,
+ * 19.08.2026) — content identifies both. `--at` and `--run` narrow the
+ * SELECTION; the written signature always binds the one record's full content.
+ *
+ * ONE judgment, TWO families: the selection and binding rules are deliberately
+ * shared (a divergence here is how one family's signature would start serving
+ * the other), while each family keeps its own open set, its own evidence
+ * question and its own wording.
  *
  * @returns {{ closure: object } | { error: string, choices?: object[] }}
  *   `choices` is set only where the selector matched several open runs, so the
  *   caller can print each with its own --run. Total.
  */
-export function incompleteClosureDraft(state, options) {
+function signedClosureDraft(state, options, family) {
+  const { flag, what, whats, evidenceAsk, openRuns, extras } = family
   const { selector = '', at = '', run = '', evidence = '' } = options ?? {}
   if (!String(evidence).trim()) {
     return {
       error:
-        'render-verify-guard --incomplete: --evidence "<why this recording cannot be redone>" is required. ' +
+        `render-verify-guard ${flag}: --evidence "<${evidenceAsk}>" is required. ` +
         'The evidence is the whole difference between this and a silent waiver.',
     }
   }
   if (!String(selector).trim()) {
     return {
       error:
-        'render-verify-guard --incomplete: name the run as "<backend>/<suite>" (add --at <iso|ms> or ' +
+        `render-verify-guard ${flag}: name the run as "<backend>/<suite>" (add --at <iso|ms> or ` +
         '--run <id> when more than one is open). A closure names ONE run and can never pre-clear a ' +
         'future one.',
     }
   }
   const wanted = at ? new Date(/^\d+$/.test(at) ? Number(at) : at).getTime() : null
   if (at && !Number.isFinite(wanted)) {
-    return { error: `render-verify-guard --incomplete: --at "${at}" is not a timestamp (ISO or epoch ms).` }
+    return { error: `render-verify-guard ${flag}: --at "${at}" is not a timestamp (ISO or epoch ms).` }
   }
   const wantedId = String(run).trim()
-  const open = openIncompleteRuns(state).filter(
+  const open = openRuns(state).filter(
     (r) =>
       `${r.backend}/${r.suite}` === selector &&
       (wanted === null || runStamp(r) === wanted) &&
@@ -348,9 +371,9 @@ export function incompleteClosureDraft(state, options) {
   if (open.length === 0) {
     return {
       error:
-        `render-verify-guard --incomplete: no OPEN incomplete recording matches "${selector}"` +
+        `render-verify-guard ${flag}: no OPEN ${what} matches "${selector}"` +
         `${at ? ` at ${at}` : ''}${wantedId ? ` with id ${wantedId}` : ''}. Run ` +
-        '`node scripts/render-verify-guard.mjs status` to see which runs are truncated.',
+        `\`node scripts/render-verify-guard.mjs --status\` to see which runs still block.`,
     }
   }
   // Several matches that are one and the same CONTENT are one identity — sign
@@ -360,7 +383,7 @@ export function incompleteClosureDraft(state, options) {
   if (distinct.size > 1) {
     return {
       error:
-        `render-verify-guard --incomplete: "${selector}" matches ${open.length} open incomplete recordings. ` +
+        `render-verify-guard ${flag}: "${selector}" matches ${open.length} open ${whats}. ` +
         'A closure signs for ONE run, so name it — each is its own judgment and its own reason:',
       choices: open,
     }
@@ -373,11 +396,35 @@ export function incompleteClosureDraft(state, options) {
       backend: run_.backend,
       suite: run_.suite,
       at: runStamp(run_),
-      droppedLines: droppedLinesOf(run_),
+      ...extras(run_),
       evidence: String(evidence),
       closedAt: Date.now(),
     },
   }
+}
+
+export function incompleteClosureDraft(state, options) {
+  return signedClosureDraft(state, options, {
+    flag: '--incomplete',
+    what: 'incomplete recording',
+    whats: 'incomplete recordings',
+    evidenceAsk: 'why this recording cannot be redone',
+    openRuns: openIncompleteRuns,
+    extras: (run_) => ({ droppedLines: droppedLinesOf(run_) }),
+  })
+}
+
+export function crashClosureDraft(state, options) {
+  return signedClosureDraft(state, options, {
+    flag: '--crashed',
+    what: 'crashed run',
+    whats: 'crashed runs',
+    // "We looked, and there is nothing to read" is only a disposition when the
+    // looking really happened — the evidence names what the kept log showed.
+    evidenceAsk: 'what the kept log (local/verify-logs/) shows — the death, and that no report exists',
+    openRuns: openCrashedRuns,
+    extras: () => ({}),
+  })
 }
 
 const arg = isMainModule(import.meta.url) ? process.argv[2] : '__imported__'
@@ -408,21 +455,26 @@ if (arg === '--defer') {
 
 // --incomplete "<backend>/<suite>" [--at <iso|ms>] --evidence "<why>":
 // THE NAMED WAY OUT OF A BROKEN RECORDING (point 734).
+// --crashed "<backend>/<suite>" [--at <iso|ms>] --evidence "<what the log shows>":
+// THE SAME NAMED WAY OUT FOR A RUN THAT DIED RATHER THAN REPORTED (sixth round).
 //
-// A run whose result lines the capture cap truncated cannot be closed by any of
-// point 640's three ways — they all need to know WHAT the red was, and such a
-// run never recorded it. Before this, its only exit was a hand-written --defer,
-// i.e. the waiver the charge ledger exists to abolish. This signs the RECORDING
-// off as broken instead — and only that: the reds the run DID record keep
-// blocking and close the ordinary ways, it clears NO backend, and it names
-// exactly ONE run, so two truncated runs need two signatures with two reasons.
+// Neither run can be closed by any of point 640's three ways — they all need to
+// know WHAT the red was, and a truncated run never recorded it while a crashed
+// run reported nothing at all. Before this, the only exit was a hand-written
+// --defer, i.e. the waiver the charge ledger exists to abolish. This signs the
+// RECORD off instead — and only that: it clears NO backend, and it names
+// exactly ONE run, so two broken runs need two signatures with two reasons. For
+// a truncation the reds the run DID record keep blocking and close the ordinary
+// ways; a crash concluded nothing, so its signature closes the whole record —
+// the two live in separate lists precisely so neither signature can ever serve
+// the other family (round-5 order: a crash outranks the truncation).
 // Ambiguity is REFUSED rather than resolved (review finding, 19.08.2026): a
-// selector matching several open runs prints each with its own --at, and a
+// selector matching several open runs prints each with its own --run, and a
 // record whose timestamp is unreadable is refused as well — a signature that can
 // name no run closes none, and saying so beats reporting a success that binds
-// nothing. The judgment itself is incompleteClosureDraft above, so it is
-// testable without a state file.
-if (arg === '--incomplete') {
+// nothing. The judgment itself is the draft pair above, so it is testable
+// without a state file.
+if (arg === '--incomplete' || arg === '--crashed') {
   try {
     const rest = process.argv.slice(3)
     const valueOf = (flag) => {
@@ -442,29 +494,35 @@ if (arg === '--incomplete') {
     // the selector whenever an evidence text happened to read the same.
     const selector = rest.find((a, i) => !consumed.has(i) && !a.startsWith('--')) ?? ''
     const state = readRenderState() ?? {}
-    const draft = incompleteClosureDraft(state, { selector, at, run: runSel, evidence })
+    const crashed = arg === '--crashed'
+    const draft = (crashed ? crashClosureDraft : incompleteClosureDraft)(state, { selector, at, run: runSel, evidence })
     if (draft.error) {
       console.error(draft.error)
       for (const r of draft.choices ?? []) {
         console.error(
-          `  --run ${runIdentity(r)}   (@${isoText(runStamp(r) ?? r.at)}, ${droppedLinesOf(r)} line(s) dropped)`,
+          `  --run ${runIdentity(r)}   (@${isoText(runStamp(r) ?? r.at)}${crashed ? '' : `, ${droppedLinesOf(r)} line(s) dropped`})`,
         )
       }
       process.exit(1)
     }
     const { closure } = draft
-    const closures = (Array.isArray(state.incompleteClosures) ? state.incompleteClosures : []).concat([closure])
-    while (closures.length > MAX_INCOMPLETE_CLOSURES) closures.shift()
-    mergeRenderState({ incompleteClosures: closures })
+    const key = crashed ? 'crashClosures' : 'incompleteClosures'
+    const closures = (Array.isArray(state[key]) ? state[key] : []).concat([closure])
+    while (closures.length > MAX_SIGNED_CLOSURES) closures.shift()
+    mergeRenderState({ [key]: closures })
     console.log(
-      `⚠ INCOMPLETE RECORDING SIGNED OFF: ${closure.backend}/${closure.suite} @${isoText(closure.at)} ` +
-        `(${closure.droppedLines} result line(s) dropped) — "${closure.evidence}". This closes the RECORD, not the ` +
-        'picture: the run still covers no backend and is never a pass, and every red it DID record still ' +
-        'blocks until it is fixed, charged or filed. Re-run the suite at the first chance.',
+      crashed
+        ? `⚠ CRASHED RUN SIGNED OFF: ${closure.backend}/${closure.suite} @${isoText(closure.at)} — ` +
+            `"${closure.evidence}". This closes the RECORD, not the picture: the run judged nothing, ` +
+            'still covers no backend and is never a pass. Re-run the suite at the first chance.'
+        : `⚠ INCOMPLETE RECORDING SIGNED OFF: ${closure.backend}/${closure.suite} @${isoText(closure.at)} ` +
+            `(${closure.droppedLines} result line(s) dropped) — "${closure.evidence}". This closes the RECORD, not the ` +
+            'picture: the run still covers no backend and is never a pass, and every red it DID record still ' +
+            'blocks until it is fixed, charged or filed. Re-run the suite at the first chance.',
     )
     process.exit(0)
   } catch (e) {
-    console.error(`render-verify-guard --incomplete failed: ${e && e.message}`)
+    console.error(`render-verify-guard ${arg} failed: ${e && e.message}`)
     process.exit(1)
   }
 }
@@ -496,7 +554,10 @@ if (arg === '--clear') {
 }
 
 // status: inspect the gate — pending render paths, per-backend coverage, runs.
-if (arg === 'status') {
+// `--status` is the same command: every other guard here spells it that way,
+// the docs quote it that way — and unrecognised, it fell through to Stop-hook
+// mode, where an inspection could WRITE state (sixth round, hostile re-check).
+if (arg === 'status' || arg === '--status') {
   try {
     const state = readRenderState() ?? {}
     const head = git('git rev-parse HEAD')
@@ -549,6 +610,21 @@ if (arg === 'status') {
       console.log(
         `(signed-off incomplete recording: ${c.backend}/${c.suite} @${isoText(c.at)} — "${c.evidence}")`,
       )
+    }
+    // Crashed runs, listed apart for the same reason (sixth round): there is no
+    // defect to hunt in them and no red to charge — a run that died judged no
+    // picture, and its way out is the re-run or the signed crash closure.
+    for (const r of openCrashedRuns(state)) {
+      console.log(
+        `⚠ CRASHED RUN (not an unexplained red): ${r.backend}/${r.suite} @${isoText(r.at)} ` +
+          `(id ${runIdentity(r)}) — the run died rather than reported, so nothing in it can be ` +
+          'explained or charged. Re-run the suite, or read its kept log (local/verify-logs/) and ' +
+          `sign it off: node scripts/render-verify-guard.mjs --crashed "${r.backend}/${r.suite}" ` +
+          '--evidence "<what the log shows>"',
+      )
+    }
+    for (const c of Array.isArray(state.crashClosures) ? state.crashClosures : []) {
+      console.log(`(signed-off crashed run: ${c.backend}/${c.suite} @${isoText(c.at)} — "${c.evidence}")`)
     }
     if (state.deferral) console.log(`⚠ active deferral @${String(state.deferral.head).slice(0, 7)}: "${state.deferral.reason}"`)
     if (state.lastDeferral) console.log(`(last consumed deferral: "${state.lastDeferral.reason}")`)
