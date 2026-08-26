@@ -1377,6 +1377,27 @@ Die Antwort ist nicht ein weicheres Tor, sondern ein früheres: Eine Zeile, die 
 so geschrieben hätte, muss beim **Schreiben** auffallen, nicht Wochen später an einer fremden
 Punktgrenze. Gebucht als Punkt 916.
 
+**Die Reinheitsprüfung kann Nachbararbeit nicht von Verunreinigung unterscheiden.**
+Gemessen am 26.08.2026, als zum ersten Mal zwei delegierte Autorenbahnen gleichzeitig
+liefen: Die Schlussprüfung des Testlaufs wacht zu Recht darüber, dass die Tests das
+echte Repository nicht anfassen — sie fällt den ganzen Lauf, sobald sich während des
+Laufs eine Referenz bewegt hat. Nur bewegt sich bei paralleler Arbeit ständig eine:
+Die delegierten Autoren committen auf ihren eigenen Zweigen alle paar Minuten, weil
+genau das ihre Arbeit rettbar macht. Damit ist praktisch jeder Lauf rot, den der
+Besitzer neben einer laufenden Bahn macht — und jedes Push-Tor dazu. Der einzelne
+Wiederholungslauf des Tors hat den Abend zweimal gerettet und ist genau deshalb keine
+Antwort: Er kostet eine volle Suite und meldet sich selbst als verdächtig. Die Prüfung
+braucht den Begriff „gehört zu mir“: der eigene Arbeitsstand ja, ein fremder erklärter
+Zweig nein. Gebucht als Punkt 955.
+
+**„Freigabe mit Auflagen" merkt sich die Auflage nicht.** Ebenfalls am 26.08.2026
+gefunden, beim Lesen des Prüfregisters: Ein Urteil `merge-with-fixes` erfüllt das
+Vier-Augen-Tor — die benannte Auflage selbst schuldet danach niemand mehr. Ein solcher
+Fall stand seit Wochen offen, ohne dass ein Wächter ihn sehen konnte, denn aus Sicht
+des Registers ist der Beitrag geprüft. Das ist die stillste Art, eine eingebaute
+Prüfung zu verlieren: nicht durch Umgehung, sondern dadurch, dass die halbe Zusage
+keinen Träger hat. Gebucht als Punkt 956.
+
 <!-- AUTO-GENERATED:START -->
 <!-- Dieser Abschnitt wird maschinell von scripts/retro-refresh.mjs gepflegt.
      NICHT von Hand editieren — der naechste Refresh ueberschreibt ihn.
@@ -1384,7 +1405,7 @@ Punktgrenze. Gebucht als Punkt 916.
 
 ## Anhang A — Maschinell gepflegte Quellen-Übersicht
 
-Zuletzt aktualisiert: Mittwoch, 26.08.2026, 19:41 · Quellen-Fingerprint: `400d62f8c3b1…`
+Zuletzt aktualisiert: Mittwoch, 26.08.2026, 21:12 · Quellen-Fingerprint: `e9a27b5dd21d…`
 
 Spalten heuristisch aus den Quellen abgeleitet (Anläufe = distinkte Datumsnennungen im Memory;
 Maßnahme = Guard-Skripte mit Namens-Treffer). Die inhaltliche Bewertung gehört der Prosa oben.
@@ -1422,7 +1443,7 @@ Maßnahme = Guard-Skripte mit Namens-Treffer). Die inhaltliche Bewertung gehört
 | Work at High effort by default; the user reserves Extra high for research and design decisions, not implementation | 4 | hoch | — (Regel/Memory) | ◐ Regel |
 | Write idiomatic English in all English text (README, code comments, commit messages) — no German calques like 'stand' for a version | 1 | niedrig | — (Regel/Memory) | ◐ Regel |
 | Fable is NOT the default lane because its volume is the scarcest; difficulty is no reason for it either (since 18.08.2026 hard cases go straight to Sol), and review is cross-vendor, not Fable-by-default | 4 | hoch | — (Regel/Memory) | ◐ Regel |
-| Findings recorded by a session that could not write the work order — carry each into TASKS.md, then mark it drained | 27 | hoch | findings-guard.mjs | ✔ Mechanismus |
+| Findings recorded by a session that could not write the work order — carry each into TASKS.md, then mark it drained | 29 | hoch | findings-guard.mjs | ✔ Mechanismus |
 | A recurring lookup gets a script; never pull raw transcripts, listings, or logs into context to answer it | 1 | niedrig | — (Regel/Memory) | ◐ Regel |
 | Past the 150k context watermark, FINISH the step and hand over — never start a suite, an agent or a point after it; the user raised the cost twice (13.08. and 17.08.2026) | 2 | mittel | — (Regel/Memory) | ◐ Regel |
 | User 18.08.2026: hard, complex, error-prone and HIGH-criticality points are AUTHORED by GPT-5.6 Sol directly — Opus 5 authors only what is left, and Fable authors only a point that tags its lane or one the router escalates | 4 | hoch | — (Regel/Memory) | ◐ Regel |
@@ -1485,8 +1506,8 @@ Maßnahme = Guard-Skripte mit Namens-Treffer). Die inhaltliche Bewertung gehört
 
 Erfasste Quellen: 91 Feedback-/Projekt-Memories · 57 Guard-/Hook-Skripte · 6 Revert-/Reapply-Commits · 106 Prozess-/Meta-TASKS-Punkte (davon 46 offen).
 
-<!-- RETRO-FINGERPRINT: 400d62f8c3b17509dd1bda4bff67952e81330b136e2af3e3bd431b284f319736 -->
-<!-- RETRO-LAST-REFRESHED: 2026-08-26T17:41:47.728Z -->
+<!-- RETRO-FINGERPRINT: e9a27b5dd21d7fc31e875184dd346983617187e9e95e8c9b352b088c14789a4a -->
+<!-- RETRO-LAST-REFRESHED: 2026-08-26T19:12:27.287Z -->
 <!-- AUTO-GENERATED:END -->
 
 ### 3.111 Ein Erfolg ist kein Beweis für den Weg, auf dem er zustande kam
