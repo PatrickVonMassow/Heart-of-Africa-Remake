@@ -720,6 +720,12 @@
       "why": "Der Fehlerbericht ohne Bild ist hoch kritisch, aber er betrifft einen Meldeweg, keinen Spielzustand; er steht am Ende, bis der Nutzer ihn vorzieht.",
       "origin": "machine",
       "place": "last"
+    },
+    "928": {
+      "at": "2026-08-26T03:12:08.350Z",
+      "why": "Es blockiert keinen Zug von sich aus, sondern nur den einen Commit, der es ausgeloest hat; die 24 aelteren unpruefbaren Beitraege sind der akute Rueckstand und stehen als Klaerungskarte beim Nutzer. Vor diesem Punkt gehoert deren Priorisierung entschieden.",
+      "origin": "machine",
+      "place": "last"
     }
   },
   "boundary": {
@@ -761,7 +767,7 @@
     "why": "The order standing in front of the release today is the arrangement that predates this rule; the four machine-filed points that had ranked themselves there were moved behind 174 first"
   },
   "settled": {
-    "at": "2026-08-26T03:03:53.321Z",
+    "at": "2026-08-26T03:12:08.357Z",
     "points": [
       174,
       184,
@@ -1050,7 +1056,8 @@
       924,
       925,
       926,
-      927
+      927,
+      928
     ]
   }
 }
