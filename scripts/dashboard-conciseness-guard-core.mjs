@@ -73,6 +73,8 @@ export function parseCards(sectionHtml, where) {
       where,
       point: num ? Number(num[1]) : titleNum ? Number(titleNum[1]) : null,
       title: title ? title[1].trim() : '',
+      // The card's own opening tag, so a rule can ask what KIND of card it is.
+      kind: (chunk.match(/^[^>]*data-state="([^"]*)"/) ?? [])[1] ?? null,
       bodyHtml: body[1],
     })
   }
@@ -90,6 +92,11 @@ export function cardStats(bodyHtml) {
   }
 }
 
+/** The one card this guard does not judge: the machine's own derived state card. */
+function isDerivedStateCard(card) {
+  return card?.kind === 'derived'
+}
+
 /**
  * The offending now/queue cards as [{where: 'now'|'queue', point, reason}].
  * Total: malformed input yields no offenders.
@@ -102,6 +109,14 @@ export function concisenessOffenders(html) {
   ]
   const offenders = []
   for (const card of cards) {
+    // THE DERIVED STATE CARD IS THE MACHINE'S OWN RECORD, not authored prose
+    // (measured 26.08.2026): it carries decisions the batch made on its own —
+    // the alert it continued past, the veto route back — and the wording is a
+    // RECORD, so shortening it would shorten the evidence. `board-state-core`
+    // already caps it at MAX_STATE_PARAGRAPHS, which is the bound that keeps it
+    // from becoming the "Text-Tapete" this guard exists to prevent; the budgets
+    // below stay in force for every card a session writes by hand.
+    if (isDerivedStateCard(card)) continue
     const { words, paragraphs, techTokens } = cardStats(card.bodyHtml)
     const reasons = []
     if (words > WORD_BUDGET) reasons.push(`${words} words (budget ${WORD_BUDGET}) — too verbose`)
