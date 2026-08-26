@@ -726,6 +726,18 @@
       "why": "Die dauerhafte Lane bleibt bis zu diesem Punkt abgeschaltet und blockiert nichts; Kommunikationsmechanik, Abschluss und Tag gehen vor.",
       "origin": "machine",
       "place": "last"
+    },
+    "926": {
+      "at": "2026-08-26T01:26:40.592Z",
+      "why": "Vorbestehender Abnahme-Frame-Roter ohne Spielwirkung — er wartet hinter der laufenden Warteschlange, weil nichts auf ihm blockiert.",
+      "origin": "machine",
+      "place": "last"
+    },
+    "927": {
+      "at": "2026-08-26T01:26:40.709Z",
+      "why": "Der Fehlerbericht ohne Bild ist hoch kritisch, aber er betrifft einen Meldeweg, keinen Spielzustand; er steht am Ende, bis der Nutzer ihn vorzieht.",
+      "origin": "machine",
+      "place": "last"
     }
   },
   "boundary": {
@@ -769,7 +781,7 @@
     "why": "The order standing in front of the release today is the arrangement that predates this rule; the four machine-filed points that had ranked themselves there were moved behind 174 first"
   },
   "settled": {
-    "at": "2026-08-26T00:37:45.183Z",
+    "at": "2026-08-26T01:26:40.719Z",
     "points": [
       174,
       184,
@@ -1059,7 +1071,9 @@
       920,
       922,
       924,
-      925
+      925,
+      926,
+      927
     ]
   }
 }
