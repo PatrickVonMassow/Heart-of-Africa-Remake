@@ -28,6 +28,8 @@ import {
   removeFile,
 } from './dashboard-state.mjs'
 import { parseNowCardPoints } from './dashboard-guard-core.mjs'
+import { readDeclaration, writeDeclaration } from './batch-in-flight.mjs'
+import { transitionActiveDeclaration } from './active-work-source.mjs'
 import { REPUBLISH } from './board-remedy.mjs'
 
 /** ALL point numbers the registered dashboard's now-cards carry (empty Set:
@@ -67,6 +69,21 @@ if (cmd === 'set') {
   }
   const now = Date.now()
   writeJsonAtomic(FOCUS_PATH, { point, note, setAt: now, confirmedAt: now })
+  // THE OTHER STORE OF THE SAME FACT MOVES WITH IT (ninth cross-vendor round).
+  // `board.mjs focus` runs the shared transition and then calls this command,
+  // so a declaration written there is already correct and this rewrite is the
+  // same value again. Called DIRECTLY — which every session and script may do —
+  // it used to leave `declaration.focusPoint` on the old strand, a second copy
+  // of the focus that disagreed with the file. It is idempotent either way.
+  try {
+    const declaration = readDeclaration()
+    if (declaration && Number(declaration.focusPoint ?? null) !== Number(point)) {
+      writeDeclaration(transitionActiveDeclaration(declaration, { focusPoint: point }))
+    }
+  } catch (error) {
+    console.error(`focus set: the active-work declaration could not follow the focus — ${error?.message ?? error}`)
+    process.exit(1)
+  }
   removeFile(PENDING_PATH)
   console.log(`focus declared: ${point ?? '-'} — ${note}`)
   const cp = cardPoints()

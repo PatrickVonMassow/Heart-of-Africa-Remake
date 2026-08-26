@@ -110,3 +110,22 @@ DEFERRED, already filed: the ordering case in `scripts/board-edit-core.test.mjs`
 observes the write callback and stays green if `preparePublish()` moves before the write.
 Work-order point 929 names it verbatim, together with the "writes nothing" case in
 `scripts/batch-in-flight-cli.test.mjs`.
+
+## Pass 6 — the board CLI, focus.mjs and the Stop-side guard core — all three answered
+
+- [P1] `scripts/focus.mjs set` wrote only the focus FILE, so a session or script calling it
+  directly — which every one of them may — left `declaration.focusPoint` on the old strand:
+  the second copy of one fact the shared transition exists to prevent. The declaration
+  follows the focus now, idempotently, so `board.mjs focus` (which writes it first and then
+  calls this CLI) rewrites the same value. Regression in the spawned suite, proven to fail
+  without it.
+
+- [P1] `board.mjs attest` ran OUTSIDE `withBoardEditLock`, and it rotates the archive — a
+  read-modify-write of the board like every other, and the last board-CLI path that could
+  interleave with a locked edit or publish. It runs under the lock now; none of its three
+  children takes the lock, so nothing deadlocks.
+
+- [P2] `nowProjectionStopDecision` let a projection error escape to `evaluate()`'s outermost
+  catch, which returns ALLOW for the WHOLE guard — so one check's own error silently
+  swallowed the duplicate- and stale-card findings beside it. It fails open locally now, and
+  an `ok:true` source without a point array is refused before it can throw.

@@ -450,11 +450,18 @@ try {
       console.log(run([PUBLISH_SCRIPT, '--locked']).trim().split('\n')[0])
     })
   } else if (cmd === 'attest') {
-    // Rotation first: a tick that pushed the Erledigt section past its cap would
-    // otherwise fail the audit two steps later, after the publish.
-    console.log(run(['scripts/board-archive-rotate.mjs']).trim().split('\n')[0])
-    console.log(run(['scripts/dashboard-guard.mjs', '--synced', '.batch-dashboard.html']).trim())
-    console.log(run(['scripts/prep-guard.mjs', '--prepped']).trim())
+    // UNDER THE SAME LOCK AS EVERY OTHER BOARD WRITE (ninth cross-vendor round):
+    // attest ROTATES the archive, so it is a read-modify-write of the board file
+    // like the rest, and it stood outside the lock — the one board-CLI path left
+    // that could interleave with a locked edit or publish. None of the three
+    // children takes the lock itself, so nothing deadlocks under it.
+    withBoardEditLock(() => {
+      // Rotation first: a tick that pushed the Erledigt section past its cap would
+      // otherwise fail the audit two steps later, after the publish.
+      console.log(run(['scripts/board-archive-rotate.mjs']).trim().split('\n')[0])
+      console.log(run(['scripts/dashboard-guard.mjs', '--synced', '.batch-dashboard.html']).trim())
+      console.log(run(['scripts/prep-guard.mjs', '--prepped']).trim())
+    })
   } else {
     console.error(
       'usage: board.mjs now|status|title|queue <point> "<text>" | ' +

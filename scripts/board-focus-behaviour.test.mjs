@@ -89,6 +89,22 @@ describe('board.mjs focus (spawned)', () => {
     expect(confirm.stdout).toContain('focus confirmed: 700')
   })
 
+  // Ninth cross-vendor round: the shared transition closed the split-brain for
+  // `board.mjs focus`, but focus.mjs is a CLI of its own and every session and
+  // script may call it directly — and it wrote only the FILE, leaving the
+  // declaration's copy of the same fact on the old strand.
+  it('takes the declaration with it when focus.mjs set is called DIRECTLY', () => {
+    const r = runCli('focus.mjs', 'set', '700', 'direkt umgestellt')
+
+    expect(r.status, r.stderr).toBe(0)
+    expect(r.stdout).toContain('focus declared: 700')
+    expect(readJson(focusPath()).point).toBe(700)
+    const declaration = readJson(declarationPath())
+    expect(declaration.focusPoint).toBe(700)
+    // Nothing else moves: a focus switch exits no strand.
+    expect(declaration.evidence.map((item) => item.point)).toEqual([697, 700])
+  })
+
   it('rolls the declaration back when the focus step fails AFTER the declaration write', () => {
     // Eighth cross-review: the transition writes declaration.focusPoint FIRST
     // and runs `focus.mjs set` second. A second step that fails must not leave

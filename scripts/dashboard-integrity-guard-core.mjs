@@ -278,12 +278,23 @@ export function nowProjectionStopDecision({
   heldByOther = false,
 } = {}) {
   if (paused || heldByOther || !activeWork || activeWork.ok !== true) return ALLOW
-  // The focus invariant is the render's rule, so the Stop side reads it too —
-  // otherwise the two halves block on different things (ninth cross-vendor round).
-  const comparison = compareNowProjection(dashboardHtml, activeWork.points, {
-    knownPoints,
-    focusPoint: activeWork.focusPoint ?? null,
-  })
+  // AN `ok:true` SOURCE STILL HAS TO CARRY A POINT LIST (ninth cross-vendor
+  // round): a malformed one made this function throw, and the only catch was
+  // the outermost one in `evaluate()` — so the projection's own error silently
+  // swallowed the duplicate- and stale-card findings beside it. This check
+  // fails open HERE, on its own error alone.
+  if (!Array.isArray(activeWork.points)) return ALLOW
+  let comparison
+  try {
+    // The focus invariant is the render's rule, so the Stop side reads it too —
+    // otherwise the two halves block on different things (ninth cross-vendor round).
+    comparison = compareNowProjection(dashboardHtml, activeWork.points, {
+      knownPoints,
+      focusPoint: activeWork.focusPoint ?? null,
+    })
+  } catch {
+    return ALLOW
+  }
   if (comparison.ok) return { ...ALLOW, comparison }
   const parts = []
   if (comparison.missing?.length) parts.push(`missing ${comparison.missing.join(', ')}`)
