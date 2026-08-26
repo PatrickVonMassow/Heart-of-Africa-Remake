@@ -426,12 +426,6 @@ Die Ursache findest du durch **Zerlegen**, nicht durch Wiederholen.
   → *Prompt:* „Zurücktreten heißt **nicht handeln**, nie **nicht wissen**. Berichte den gemessenen
   Zustand auch dann, wenn du nichts ändern darfst. Lesen kollidiert mit nichts.“
 
-- **Die Prüfung misst im falschen Ordner — und du reparierst, was heil ist.** Arbeitest du in
-  einer Nebenkopie deines Projekts, lesen die Prüfungen deren Dateien: „nicht eingetragen",
-  „läuft noch", obwohl im Hauptordner alles stimmt. Du folgst der Meldung und drehst Runden.
-  → *Prompt:* „Jede Prüfung, deren Urteil vom Projektordner abhängt, **nennt diesen Ordner in
-  ihrer Ablehnung**. Und arbeite deine Werkzeuge im Hauptordner ab, nicht in der Nebenkopie."
-
 ---
 
 ## Drei Meta-Regeln, die alles zusammenhalten
@@ -470,4 +464,4 @@ Die Ursache findest du durch **Zerlegen**, nicht durch Wiederholen.
 
 Sie ersetzt die Fallstricke oben nicht.
 
-<!-- GUIDE-FINGERPRINT: 2336b94d716b5da8d32492dcdd0405a14ec2a9d3dd78e8def279e83c0cde4711 -->
+<!-- GUIDE-FINGERPRINT: 179d99d5dc46df3d92b9f3240bfcd22415a6dceb6fa4460fea5cd3dac3083f0c -->

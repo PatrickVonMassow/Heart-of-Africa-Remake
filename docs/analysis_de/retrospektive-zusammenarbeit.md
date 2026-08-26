@@ -1251,7 +1251,7 @@ zweiten, auf den Rest geschnittenen Lauf oder durch eigenes Lesen. Was hier noch
 ist der Mechanismus: Solange die Abdeckung nur in der Prosa des Prüfers steht, hängt sie
 daran, dass jemand sie liest — und vier Runden lang hat das niemand getan.
 
-### Ein Guard, der im falschen Baum misst, schickt die Reparatur an den falschen Ort
+### 3.185 Ein Guard, der im falschen Baum misst, schickt die Reparatur an den falschen Ort
 
 Am 26.08.2026 blockierten drei Stop-Guards dieselbe Sitzung drei Züge lang, jedes Mal mit
 demselben Wortlaut: Die Tafel sei nicht registriert, eine Hintergrund-Suite laufe noch, der
