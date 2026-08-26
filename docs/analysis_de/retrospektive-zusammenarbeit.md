@@ -1405,7 +1405,7 @@ keinen Träger hat. Gebucht als Punkt 956.
 
 ## Anhang A — Maschinell gepflegte Quellen-Übersicht
 
-Zuletzt aktualisiert: Donnerstag, 27.08.2026, 00:14 · Quellen-Fingerprint: `8fbf794a84b3…`
+Zuletzt aktualisiert: Donnerstag, 27.08.2026, 01:40 · Quellen-Fingerprint: `bd8babe06f13…`
 
 Spalten heuristisch aus den Quellen abgeleitet (Anläufe = distinkte Datumsnennungen im Memory;
 Maßnahme = Guard-Skripte mit Namens-Treffer). Die inhaltliche Bewertung gehört der Prosa oben.
@@ -1504,10 +1504,10 @@ Maßnahme = Guard-Skripte mit Namens-Treffer). Die inhaltliche Bewertung gehört
 | A pending batch claim HOLDS THE LAUNCHER BACK — withdraw it whenever the claiming window is left unattended | 2 | mittel | clear-claim-guard.mjs | ✔ Mechanismus |
 | Multi-agent workflows eat the session/weekly limit fast — verify findings INLINE, keep fan-outs small, warn the user with a cost estimate before any big workflow | 3 | mittel | doc-budget-guard.mjs | ✔ Mechanismus |
 
-Erfasste Quellen: 91 Feedback-/Projekt-Memories · 57 Guard-/Hook-Skripte · 6 Revert-/Reapply-Commits · 107 Prozess-/Meta-TASKS-Punkte (davon 46 offen).
+Erfasste Quellen: 91 Feedback-/Projekt-Memories · 57 Guard-/Hook-Skripte · 6 Revert-/Reapply-Commits · 108 Prozess-/Meta-TASKS-Punkte (davon 47 offen).
 
-<!-- RETRO-FINGERPRINT: 8fbf794a84b3da880bc694d6e3a5aad65f2a84840a1cf852d00c3baedd445e20 -->
-<!-- RETRO-LAST-REFRESHED: 2026-08-26T22:14:23.010Z -->
+<!-- RETRO-FINGERPRINT: bd8babe06f137076fdd3da5462e78ee878aedeb08693ac4d1bcc05eb0684f61d -->
+<!-- RETRO-LAST-REFRESHED: 2026-08-26T23:40:10.756Z -->
 <!-- AUTO-GENERATED:END -->
 
 ### 3.111 Ein Erfolg ist kein Beweis für den Weg, auf dem er zustande kam
@@ -4124,3 +4124,30 @@ war viermal gescheitert, und jedes Mal sah es aus wie Erfolg, weil der schreiben
 meldete und erst eine zweite Stufe die Karte wegwarf. Ein Wächter, dessen Ausweg nur auf dem Papier
 existiert, ist kein Wächter mehr, sondern eine Falle mit Begründung. Punkt 937 besitzt den Fall und
 ist deshalb heute Nacht von mittel auf hoch gestuft worden.
+
+### 3.197 Drei von vier Befunden hatten längst einen Besitzer
+
+Nach der Landung von Punkt 953 lagen vier Beobachtungen auf dem Tisch: die Abschlusskarte, die
+nach dem Abhaken nicht mehr auf die Tafel kommt; ein delegierter Lauf, der seinen eigenen
+veröffentlichten Stand überschreibt und danach „nur lokal" meldet; ein Torzeilen-Leser, der die
+ehrliche Meldung „6 übersprungen" als rotes Tor liest; und die Erledigt-Karte, die nur den letzten
+Lauf zeigt. Drei davon waren bereits gebucht — als Punkt 937, Punkt 906 und Punkt 729 —, zwei
+davon hatte ich vorher als neue Punkte geschrieben. Aufgefallen ist es nur, weil beim Nachziehen
+der Retrospektive zufällig die Absätze danebenstanden, die ihre Besitzer nennen.
+
+Das ist keine Frage der Sorgfalt. Vierhundert Zeilen weiter oben stehen dreihundertvierzehn offene
+Punkte; die Arbeitsordnung ist englisch, der Befund wird deutsch notiert, und derselbe Defekt wird
+bei jedem Wiederauftreten aus einem anderen Winkel beschrieben. Ein wörtlicher Titelvergleich
+findet deshalb nichts, während der Besitzer offen dasteht. Der Weg vom `finding.mjs --record` über
+`--drain` bis zum Anhängen stellt die eine Frage nie, die das entscheidet: Wem gehört das schon?
+
+Teuer ist nicht das Schreiben der falschen Nummer — das war in zwei Minuten zurückgenommen. Teuer
+ist der Fall, in dem es NICHT auffällt: Dann steht ein Defekt unter zwei Nummern, seine Messungen
+verteilen sich auf beide, und die Reparatur steht am Ende auf der Hälfte ihrer Belege. Genau
+deshalb ist der richtige Zug fast immer der billigere: eine datierte Instanz in den bestehenden
+Punkt schreiben statt einen neuen zu eröffnen — drei solche Absätze sind heute Nacht in 937, 906
+und 729 gewandert, und jeder von ihnen macht seinen Punkt schärfer, statt ihn zu verdünnen.
+
+**Lehre:** Ein Korpus, den niemand mehr im Kopf hält, braucht eine Maschine, die den Besitzer
+nennt, bevor eine neue Nummer entsteht. Solange die Suche Handarbeit ist, ist die Dublette kein
+Ausrutscher, sondern der Normalfall mit Verzögerung. Gebucht als Punkt 960.
