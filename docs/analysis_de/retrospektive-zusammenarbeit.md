@@ -67,6 +67,8 @@ Das Musterbeispiel sind die Chat-Zeitstempel: neun Eskalationsstufen, acht weich
 | 26.08. nachts | Zweimal grün über einer Attrappe, die das echte Board nur nachgebaut statt gelesen hat: Das Kritikalitäts-Stylesheet landete im Kommentar der Refresh-Routine, und die auf Zuruf nachgereichte Regressionsprüfung ließ genau die eine `<meta>`-Zeile weg, die den gemeinten Anker im echten Board verfehlen lässt — Runde zwei verschob und löschte dabei die BOM der Datei (§3.184, Punkt 844) |
 | 26.08. früh | Dritter Rückfall derselben Dublette, diesmal von mir: Ich legte einen frisch gemessenen Befund als Punkt 928 ab, obwohl Punkt 856 seit dem 23.08. genau ihn beschreibt — gefunden wieder erst von der Bündelpflicht, nicht beim Anlegen. Neu war nur die zweite Messung; sie ist jetzt in 856 nachgetragen (§3.168-Nachtrag, 928 in 856 gefaltet) |
 | 24.08. mittags | Der delegierte Autor schrieb drei Commits um, die er bereits veroeffentlicht hatte: Sein Abschluss-Push scheiterte als non-fast-forward, und sein eigener Bericht meldete die fertige Arbeit als „nur lokal“ — obwohl die Baeume beider Seiten byte-identisch waren und sich nur eine Leerzeile im Commit-Text unterschied. Wer dem Bericht glaubt, sucht verlorene Arbeit, die nie verloren war; wer ihn ignoriert, uebersieht den echten Fall. Dieselbe Stunde zeigte die Kehrseite von der Gegenseite: Ein Tor-Lauf im Arbeitsbaum wurde rot, weil die pruefende Sitzung selbst waehrenddessen auf main committete — kein Test schlug fehl, nur der Teardown benannte die Ref-Bewegung |
+| 26.08. vormittags | Neun Gegenlesungsdurchgänge über die abgeleitete Board-Sektion fanden am Ende EINE Fehlerklasse — zweimal: Ein Beleg ohne zuordenbaren Punkt und ein Fokus-Eintrag, der etwas nennt, das keine Punktnummer ist, kamen beide als »kein Fokus« heraus, also Byte für Byte als die Antwort einer FEHLENDEN Quelle. Aus beschädigten Daten wurde so eine geprüfte Null (§3.185, Punkt 713) |
+| 26.08. mittags | Zwanzig Minuten nach der Landung verweigerte derselbe Mechanismus die Veröffentlichung des Boards an der Sitzungsgrenze: Die Ausnahme für das Kärtchen, das die Maschine selbst schreibt, galt nur im Zweig »es läuft etwas« und nie in seinem Spiegel (§3.186, Punkt 935) |
 | 11.08. abends | Der VS-Code-Neustart nimmt den Devcontainer mit — die Batch-Sitzung und sechs Agenten sterben, nachdem ich das Gegenteil zugesichert hatte (§3.111); die Rechte-Rückfragen kamen weiter, weil `defaultMode` eine fortgesetzte Sitzung gar nicht mehr erreicht (§3.3) |
 
 Muster: Ab dem 22.07. explodiert die Commit-Rate (Delegation) — und genau dann häufen sich die Infrastruktur-Vorfälle. **Skalierung der Autonomie erzeugt eine eigene Problemklasse, die die Feature-Arbeit zeitweise überholt.**
@@ -1382,7 +1384,7 @@ Punktgrenze. Gebucht als Punkt 916.
 
 ## Anhang A — Maschinell gepflegte Quellen-Übersicht
 
-Zuletzt aktualisiert: Mittwoch, 26.08.2026, 08:59 · Quellen-Fingerprint: `2336b94d716b…`
+Zuletzt aktualisiert: Mittwoch, 26.08.2026, 10:56 · Quellen-Fingerprint: `d92c289fcbe1…`
 
 Spalten heuristisch aus den Quellen abgeleitet (Anläufe = distinkte Datumsnennungen im Memory;
 Maßnahme = Guard-Skripte mit Namens-Treffer). Die inhaltliche Bewertung gehört der Prosa oben.
@@ -1483,8 +1485,8 @@ Maßnahme = Guard-Skripte mit Namens-Treffer). Die inhaltliche Bewertung gehört
 
 Erfasste Quellen: 91 Feedback-/Projekt-Memories · 57 Guard-/Hook-Skripte · 6 Revert-/Reapply-Commits · 101 Prozess-/Meta-TASKS-Punkte (davon 42 offen).
 
-<!-- RETRO-FINGERPRINT: 2336b94d716b5da8d32492dcdd0405a14ec2a9d3dd78e8def279e83c0cde4711 -->
-<!-- RETRO-LAST-REFRESHED: 2026-08-26T06:59:27.034Z -->
+<!-- RETRO-FINGERPRINT: d92c289fcbe1094f5edec78568297bae83db0a9d6cd617ff3372451140a2a171 -->
+<!-- RETRO-LAST-REFRESHED: 2026-08-26T08:56:21.455Z -->
 <!-- AUTO-GENERATED:END -->
 
 ### 3.111 Ein Erfolg ist kein Beweis für den Weg, auf dem er zustande kam
@@ -3804,3 +3806,60 @@ gehört mindestens eine Zusicherung dazu, die den Rückfall selbst verbietet, st
 gemeinten Zweig zu bestätigen. Zwei Zusicherungen hätten beide Runden sofort erledigt:
 Idempotenz über der echten Datei und Byte-Erhalt ihres Kopfes. Beide sind billiger als eine
 Review-Runde, und beide messen die Wirklichkeit statt der Absicht.
+
+### 3.185 Ein Wert, der da ist, aber unbrauchbar, wurde gelesen wie ein Wert, der fehlt
+
+Punkt 713 gibt der Board-Sektion »Woran ich gerade arbeite« eine Quelle: Welche Karten dort
+stehen, leitet sich aus der In-Flight-Erklärung ab, und vor dem Veröffentlichen wird geschlossen
+geprüft. Neun Gegenlesungsdurchgänge und drei Bestätigungsrunden über beide Häuser haben am Ende
+**eine** Fehlerklasse gefunden — aber zweimal, an zwei unabhängigen Stellen.
+
+Zuerst bei einem Beleg, den niemand einem Punkt zuordnen konnte: Er blieb ohne das Feld stehen,
+also leitete ihn jede spätere Lesung neu ab — und ein Arbeitsbaum-Pfad, der später auflösbar wird
+oder von einem anderen Punkt wiederverwendet wird, antwortet dann anders als die Schreibung.
+Dann beim Fokus-Eintrag: Steht dort `"713"` statt `713`, oder `0`, oder gar kein Feld, so kam
+»kein Fokus« heraus — Byte für Byte dieselbe Antwort, die zwei tatsächlich **fehlende** Quellen
+geben. Damit wurde aus beschädigten Daten eine *geprüfte* Null: Die Fokus-Hälfte der Prüfung
+hörte still auf zu prüfen, während die fail-closed-Veröffentlichung weiter bestand. Und
+dieselbe nachsichtige Lesung stand zwei Zeilen tiefer im Integritäts-Wächter ein zweites Mal, neben
+der geprüften, die er inzwischen ohnehin bekam.
+
+Das Muster ist nicht »fehlende Validierung«. Die Stelle hatte einen sauber formulierten Vertrag —
+»ein fehlender Datensatz erlaubt die geprüfte Null, ein vorhandener unlesbarer bedeutet unbekannt«
+— und der Code hielt ihn für zwei von drei Zuständen. Der dritte, *vorhanden, aber unbrauchbar*,
+fiel in den falschen Topf, weil das Ergebnis dieselbe Gestalt hat: `null`. Wo »fehlt« und
+»unbrauchbar« am Ende denselben Wert liefern, gibt es keine Stelle mehr, an der der Unterschied
+noch sichtbar wäre — und weil der eine Zustand eine Aussage rechtfertigt, die der andere gerade
+verbietet, ist es immer die gefährliche Richtung.
+
+**Lehre:** Eine Quelle, deren Abwesenheit etwas beweisen darf, muss Abwesenheit und Unlesbarkeit
+mit **verschiedenen** Werten beantworten, und die Prüfung, die sich auf den Beweis stützt, liest
+den Unterschied. Praktisch heißt das: Die Lesestelle spiegelt genau den Wertebereich, den ihre
+Schreibstelle erzeugt — hier eine positive Ganzzahl oder ein ausdrückliches `null` —, und alles
+andere ist ein benannter Quellenfehler, nicht ein stiller Vorgabewert. Und: Wo eine Tatsache
+bereits geprüft vorliegt, wird sie nicht daneben ein zweites Mal roh gelesen.
+
+### 3.186 Die Ausnahme galt in einem Zweig der Regel und nicht in ihrem Spiegel
+
+Zwanzig Minuten nachdem Punkt 713 gelandet war, hat der eben gebaute Mechanismus die
+Veröffentlichung des Boards verweigert — an der Sitzungsgrenze, im letzten Buchhaltungsschritt,
+also genau in dem Zustand, in dem **jede** Sitzung endet. Der Grund: Das Kärtchen, das die
+Maschine selbst in die Sektion schreibt, stand der leeren Sektion im Weg.
+
+Dass dieses Kärtchen dort stehen darf, war längst entschieden. Die achte Gegenlesungsrunde hatte
+es ausdrücklich von der Streuner-Regel ausgenommen, in beiden Hälften — aber nur in dem Zweig,
+in dem gleichzeitig Arbeit läuft. Der Spiegel-Zweig, »es läuft nichts«, bekam dieselbe Ausnahme
+nie. Aus dieser einen Auslassung folgten drei Wirkungen: Der Render wies das Kärtchen als
+handgeschrieben ab, das Leer-Element wurde deshalb nie gesetzt, weil das Kärtchen die Sektion
+schon füllte, und der Abgleich verlangte danach genau eine nummernlose Karte.
+
+Das ist die Verwandtschaft zu Punkt 700 — die Übergabe darf nicht am Übergabezustand scheitern —,
+aber an einer neuen Stelle und mit einer anderen Ursache. Dort war der Zustand selbst nicht
+vorgesehen. Hier war er vorgesehen und die Ausnahme geschrieben; sie wurde nur nicht in beide
+Zweige derselben Regel getragen. Eine Regel mit zwei Zweigen hat zwei Stellen, an denen jede
+Ausnahme stehen muss, und wer sie in einem Zweig prüft, hat die Hälfte geprüft.
+
+**Lehre:** Wenn eine Regel nach »es läuft etwas« und »es läuft nichts« verzweigt, gehört jede
+Ausnahme in beide Zweige — oder es steht dort, warum sie nur in einen gehört. Und der teuerste
+Zeitpunkt, das zu merken, ist der Moment, in dem eine Sitzung ihre Übergabe schreiben will:
+Dieser Zustand tritt zwangsläufig ein, aber im Betrieb erst dann, wenn kein Test mehr läuft.

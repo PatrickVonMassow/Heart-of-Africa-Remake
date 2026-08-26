@@ -752,14 +752,51 @@
       "place": "last"
     },
     "935": {
-      "at": "2026-08-26T08:20:55.056Z",
-      "why": "Sie blockiert die Veroeffentlichung des Bretts vollstaendig in genau dem Zustand, in dem jede Sitzung endet; der Batch kann seine Uebergabe sonst nicht schreiben.",
+      "at": "2026-08-26T08:39:57.862Z",
+      "why": "Der Punkt steht bereits ueber --ahead vor dem Release; seine Blockposition am Ende des Arbeitsauftrags ist richtig, weil er noch in dieser Sitzung gebaut und gelandet wird.",
       "origin": "machine",
-      "place": "ahead"
+      "place": "last"
     }
   },
+  "boundary": {
+    "at": "2026-08-21T00:55:14.962Z",
+    "points": [
+      336,
+      553,
+      581,
+      596,
+      633,
+      659,
+      660,
+      663,
+      686,
+      687,
+      688,
+      689,
+      690,
+      691,
+      692,
+      708,
+      715,
+      719,
+      733,
+      734,
+      735,
+      736,
+      738,
+      739,
+      746,
+      747,
+      750,
+      759,
+      760,
+      762,
+      764
+    ],
+    "why": "The order standing in front of the release today is the arrangement that predates this rule; the four machine-filed points that had ranked themselves there were moved behind 174 first"
+  },
   "settled": {
-    "at": "2026-08-26T08:10:50.140Z",
+    "at": "2026-08-26T08:39:57.869Z",
     "points": [
       174,
       184,
@@ -1053,44 +1090,8 @@
       931,
       932,
       933,
-      934
+      934,
+      935
     ]
-  },
-  "boundary": {
-    "at": "2026-08-21T00:55:14.962Z",
-    "points": [
-      336,
-      553,
-      581,
-      596,
-      633,
-      659,
-      660,
-      663,
-      686,
-      687,
-      688,
-      689,
-      690,
-      691,
-      692,
-      708,
-      715,
-      719,
-      733,
-      734,
-      735,
-      736,
-      738,
-      739,
-      746,
-      747,
-      750,
-      759,
-      760,
-      762,
-      764
-    ],
-    "why": "The order standing in front of the release today is the arrangement that predates this rule; the four machine-filed points that had ranked themselves there were moved behind 174 first"
   }
 }
