@@ -129,3 +129,22 @@ Work-order point 929 names it verbatim, together with the "writes nothing" case 
   catch, which returns ALLOW for the WHOLE guard — so one check's own error silently
   swallowed the duplicate- and stale-card findings beside it. It fails open locally now, and
   an `ok:true` source without a point array is refused before it can throw.
+
+## Pass 2 — the normalization core and the source/CLI suites — all four answered
+
+- [P1] `withRecordedEvidencePoint` left an unresolvable item WITHOUT the field, so it stayed
+  legacy and the next read re-derived it — a worktree path that later resolves, or is reused
+  by another point, then gives a different answer than the write had. The recorded answer
+  "nobody could tell" is written down too (`point: null`), and the six assertions that
+  pinned byte-identical retention now pin the recorded null.
+
+- [P2] The `--clear` helper read only the journal's LAST line, so a call that emitted nothing
+  inherited the previous call's verdict. Each call now proves exactly one new event.
+
+- [P2] The two delegated-start cases asserted only the last event's point; they assert the
+  event TYPE with it.
+
+- [P2] The projection case searched the WHOLE document for its cards and stubs, so a card
+  rendered into the wrong section satisfied it and the assertion leaned on `comparison.ok`
+  for the one thing it was meant to prove independently. Both checks are scoped to the
+  current-work section.

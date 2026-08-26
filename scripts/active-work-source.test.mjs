@@ -56,10 +56,17 @@ describe('active-work source I/O boundary', () => {
 
     const { html, comparison } = projectNowForPublish(BARE_BOARD, activeWork, { stamp: '20:10' })
     expect(comparison.ok).toBe(true)
-    const rendered = [...html.matchAll(/<span class="num">\s*(\d+)\s*<\/span>/g)].map((m) => Number(m[1]))
+    // SCOPED TO THE SECTION (ninth round): searched over the whole document,
+    // cards rendered into the WRONG section satisfied these assertions, and the
+    // check leaned on `comparison.ok` for the only thing it was meant to prove.
+    const nowSection = html.slice(
+      html.indexOf('Woran ich gerade arbeite'),
+      html.indexOf('<details class="sect"', html.indexOf('Woran ich gerade arbeite')),
+    )
+    const rendered = [...nowSection.matchAll(/<span class="num">\s*(\d+)\s*<\/span>/g)].map((m) => Number(m[1]))
     expect(rendered).toEqual([697, 711])
     // Both cards are visibly there and visibly unwritten, rather than absent.
-    expect(html.match(/<details class="now"[^>]*data-state="stub"/g)).toHaveLength(2)
+    expect(nowSection.match(/<details class="now"[^>]*data-state="stub"/g)).toHaveLength(2)
   })
 
   it('treats missing records as verified zero but present malformed JSON as unknown', () => {
@@ -157,9 +164,9 @@ describe('active-work source I/O boundary', () => {
     // No recorded point, no resolvable ref: the item is neither guessed at nor
     // dropped — it survives every exit, and the gather side blocks loudly with
     // `batch-in-flight.mjs --clear` as the only sanctioned exit.
-    const unresolved = { evidence: [{ kind: 'worktree', path: '/still-there' }] }
+    const unresolved = { evidence: [{ kind: 'worktree', path: '/still-there', point: null }] }
     const out = transitionActiveDeclaration(unresolved, { exitPoint: 713, focusPoint: null, worktreeRef: () => null })
-    expect(out.evidence).toEqual([{ kind: 'worktree', path: '/still-there' }])
+    expect(out.evidence).toEqual([{ kind: 'worktree', path: '/still-there', point: null }])
     const io = files({ d: JSON.stringify(out), f: JSON.stringify({ point: null }) })
     const gathered = gatherActiveWorkSource({
       tasksText: TASKS,
@@ -177,10 +184,10 @@ describe('active-work source I/O boundary', () => {
     // `main` parses to no point: it is never provably the exited strand, so it
     // stands until a human clears the declaration.
     const out = transitionActiveDeclaration(
-      { evidence: [{ kind: 'branch', ref: 'main' }] },
+      { evidence: [{ kind: 'branch', ref: 'main', point: null }] },
       { exitPoint: 999, focusPoint: null, worktreeRef: () => null },
     )
-    expect(out.evidence).toEqual([{ kind: 'branch', ref: 'main' }])
+    expect(out.evidence).toEqual([{ kind: 'branch', ref: 'main', point: null }])
   })
 
   it('reads the exited legacy declaration as verified zero afterwards', () => {
@@ -220,16 +227,19 @@ describe('the write side records the evidence→point mapping', () => {
     // is the source, not the ref.
     const recorded = { kind: 'branch', ref: 'feat/713-x', point: 700 }
     expect(withRecordedEvidencePoint(recorded)).toBe(recorded)
-    // What resolves to nothing stays byte-identical: no field is invented.
+    // What resolves to nothing records the NULL (ninth round) — otherwise the
+    // item stays legacy and a path that later resolves, or is reused, gives the
+    // next read a different answer than this write had.
     const unresolvable = { kind: 'worktree', path: '/x' }
-    expect(withRecordedEvidencePoint(unresolvable, { worktreeRef: () => null })).toBe(unresolvable)
+    expect(withRecordedEvidencePoint(unresolvable, { worktreeRef: () => null }))
+      .toEqual({ ...unresolvable, point: null })
   })
 
   it('clearDeclaration removes the declaration file — the named human way out', () => {
     const root = mkdtempSync(join(tmpdir(), 'in-flight-clear-'))
     try {
       const path = join(root, 'in-flight.json')
-      writeFileSync(path, JSON.stringify({ evidence: [{ kind: 'worktree', path: '/still-there' }] }))
+      writeFileSync(path, JSON.stringify({ evidence: [{ kind: 'worktree', path: '/still-there', point: null }] }))
       expect(clearDeclaration(path)).toBe(true)
       expect(existsSync(path)).toBe(false)
       // Clearing what is already gone stays a success: the wedge is open either way.
@@ -306,7 +316,7 @@ describe('active-work lifecycle under the default git and fs adapters', () => {
     // loudly, naming the explicit human command as the way out.
     rmSync(repo, { recursive: true, force: true })
     const kept = transitionActiveDeclaration(declaration, { exitPoint: 999, focusPoint: null })
-    expect(kept.evidence).toEqual([{ kind: 'worktree', path: repo }])
+    expect(kept.evidence).toEqual([{ kind: 'worktree', path: repo, point: null }])
     writeFileSync(declarationPath, JSON.stringify(kept))
     const blocked = gatherActiveWorkSource({ tasksText, declarationPath, focusPath })
     expect(blocked).toMatchObject({ ok: false, points: [] })
@@ -325,7 +335,7 @@ describe('active-work lifecycle under the default git and fs adapters', () => {
       { evidence: [{ kind: 'worktree', path: repo }] },
       { exitPoint: 999, focusPoint: null },
     )
-    expect(after.evidence).toEqual([{ kind: 'worktree', path: repo }])
+    expect(after.evidence).toEqual([{ kind: 'worktree', path: repo, point: null }])
     // …and the read side reports the survivor as unknown rather than silently
     // zero, so the publish stays blocked LOUDLY until somebody looks.
     const declarationPath = join(root, 'decl.json')

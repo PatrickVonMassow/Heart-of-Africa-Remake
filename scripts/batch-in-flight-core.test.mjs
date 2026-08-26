@@ -243,7 +243,7 @@ describe('normalizeActiveWork — the board\'s structured point source', () => {
 
   it.each([
     ['unreadable source', { readable: false }],
-    ['untagged evidence with no derivable point', { declaration: { evidence: [{ kind: 'branch', ref: 'main' }] } }],
+    ['untagged evidence with no derivable point', { declaration: { evidence: [{ kind: 'branch', ref: 'main', point: null }] } }],
     ['malformed point', { declaration: { evidence: [{ point: 'x' }] } }],
     ['closed point', { declaration: { evidence: [{ point: 699 }] } }],
     ['unknown phase', { declaration: { evidence: [{ point: 697, phase: 'maybe' }] } }],
@@ -2989,7 +2989,7 @@ describe('runRecordFor — the run record beside a declared log, reduced for the
 
 describe('markTransferred — the adoption record stays probeable (M4/M7)', () => {
   it('keeps the declaration intact and records who, when and which checkpoints', () => {
-    const declaration = { v: 1, sessionId: 's1', at: 1, waitingOn: 'agent', evidence: [{ kind: 'branch', ref: 'b' }] }
+    const declaration = { v: 1, sessionId: 's1', at: 1, waitingOn: 'agent', evidence: [{ kind: 'branch', ref: 'b', point: null }] }
     const t = markTransferred({ declaration, bySid: 's1', now: 99, checkpoints: [{ ref: 'b', sha: 'x' }] })
     expect(t.evidence).toEqual(declaration.evidence)
     expect(t.transfer).toEqual({ v: 1, by: 's1', at: 99, checkpoints: [{ ref: 'b', sha: 'x' }] })
@@ -3019,8 +3019,9 @@ describe('markTransferred — the adoption record stays probeable (M4/M7)', () =
     expect(t.evidence).toEqual([
       { kind: 'branch', ref: 'feat/700-context-fence', point: 700 },
       { kind: 'worktree', path: '/w/point-713', point: 713 },
-      // What resolves to nothing stays byte-identical: nothing is invented.
-      { kind: 'log', path: '/l' },
+      // What resolves to nothing records the NULL, so the next read cannot
+      // re-derive a different answer than this write had (ninth round).
+      { kind: 'log', path: '/l', point: null },
     ])
     expect(declaration.evidence[0]).toEqual({ kind: 'branch', ref: 'feat/700-context-fence' })
   })
@@ -3031,7 +3032,7 @@ describe('markTransferred — the adoption record stays probeable (M4/M7)', () =
       sessionId: 's2',
       at: 5,
       waitingOn: 'agent',
-      evidence: [{ kind: 'branch', ref: 'b' }],
+      evidence: [{ kind: 'branch', ref: 'b', point: null }],
       transfer: { v: 1, by: 's1', at: 2, checkpoints: [] },
       adopted: { from: 's1', at: 3 },
     }

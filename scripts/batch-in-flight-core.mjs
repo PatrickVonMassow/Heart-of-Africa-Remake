@@ -1346,15 +1346,20 @@ export function evidencePoint(item, { worktreeRef = () => null } = {}) {
  * side resolves persisted, so the legacy form disappears at the first write
  * that touches it (fifth cross-vendor round: five rounds of findings all grew
  * from the exit having to GUESS an assignment nobody had written down). An
- * item that resolves to no point is returned UNCHANGED — never guessed at,
+ * item that resolves to no point RECORDS `point: null` — never guessed at,
  * never dropped; the read side reports it and names the explicit human way
  * out (`UNATTRIBUTABLE_EVIDENCE_REMEDY`).
+ *
+ * THE NULL IS WRITTEN DOWN TOO (ninth cross-vendor round). Leaving the field
+ * off meant the item stayed legacy: a later read re-derived it, and a worktree
+ * path that became resolvable — or was reused by another point — then produced
+ * a DIFFERENT answer than the write had. "Recorded, never re-derived" has to
+ * include the recorded answer "nobody could tell".
  */
 export function withRecordedEvidencePoint(item, { worktreeRef = () => null } = {}) {
   if (!item || typeof item !== 'object') return item
   if (Object.hasOwn(item, 'point')) return item
-  const point = evidencePoint(item, { worktreeRef })
-  return point == null ? item : { ...item, point }
+  return { ...item, point: evidencePoint(item, { worktreeRef }) }
 }
 
 /**

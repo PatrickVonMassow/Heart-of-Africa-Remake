@@ -134,7 +134,7 @@ describe('batch-in-flight — durable adoption CLI flags', () => {
       .filter(Boolean)
       .map((line) => JSON.parse(line))
     expect(events.length).toBeGreaterThan(0)
-    expect(events.at(-1)).toMatchObject({ point: 713 })
+    expect(events.at(-1)).toMatchObject({ event: 'delegated-start', point: 713 })
   })
 
   // Eighth cross-vendor round: a pid item carries the OWNER's focus point, and
@@ -163,12 +163,17 @@ describe('batch-in-flight — durable adoption CLI flags', () => {
       .split('\n')
       .filter(Boolean)
       .map((line) => JSON.parse(line))
-    expect(events.at(-1)).toMatchObject({ point: 697 })
+    expect(events.at(-1)).toMatchObject({ event: 'delegated-start', point: 697 })
   })
 
   // The finish event is emitted from the declaration as it stands ON DISK, so a
   // legacy or adopted shape is written straight into the file and cleared.
   const finishEventFor = (evidence) => {
+    // EXACTLY ONE NEW EVENT PER CALL (ninth round): reading only the last line
+    // let a call that emitted NOTHING inherit the previous call's verdict.
+    const before = existsSync(journalPath())
+      ? readFileSync(journalPath(), 'utf8').split('\n').filter(Boolean).length
+      : 0
     writeFileSync(
       inFlightPath(),
       JSON.stringify({
@@ -195,6 +200,7 @@ describe('batch-in-flight — durable adoption CLI flags', () => {
       .split('\n')
       .filter(Boolean)
       .map((line) => JSON.parse(line))
+    expect(events.length).toBe(before + 1)
     expect(events.at(-1)).toMatchObject({ event: 'delegated-finish' })
     return events.at(-1)
   }
