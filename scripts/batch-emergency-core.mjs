@@ -1,3 +1,8 @@
+// THE INDEPENDENT TOTAL-WEDGE DECISION (point 947) — the pure half. It judges
+// one hourly timer tick from measured standstill evidence alone: whether the
+// batch stands although workable points exist, whether ordinary recovery has
+// already been tried against this same standstill, and what the successor
+// session must be told. scripts/batch-emergency.mjs does the acting.
 import { ACTIVITY_CLASSES } from './batch-standstill-core.mjs'
 
 export const EMERGENCY_THRESHOLD_MS = 60 * 60 * 1000

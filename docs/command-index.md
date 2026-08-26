@@ -47,7 +47,7 @@
 | `batch-doctor-core.mjs` | Decision logic for the batch doctor (scripts/batch-doctor.mjs): after a parallel-session incident the OWNER must prove the repo was not corrupted by concurrent writes — and if it was, prefer THROWING AWAY suspect work (recoverably: rescue branch + stash, everything logged) over leaving a corrupted tree. | — |
 | `batch-doctor-states.mjs` | THE TORN STATES A KILL LEAVES BEHIND (point 443) — the filesystem half. | — |
 | `batch-doctor.mjs` | Batch doctor (user mandate 24.07.2026): after a parallel-session incident the OWNER verifies the repo was not corrupted by the concurrent writes, and remediates — willing to THROW AWAY suspect work (recoverably: rescue branch + named stash) rather than leave a corrupted tree. | Usage: |
-| `batch-emergency-core.mjs` | Tests and support for batch-emergency-core. | — |
+| `batch-emergency-core.mjs` | THE INDEPENDENT TOTAL-WEDGE DECISION (point 947) — the pure half. | — |
 | `batch-emergency-drill.mjs` | Chaos drill: run the real emergency orchestrator through soft failure and a hard strike, with an actual wedged child process as the owner. | — |
 | `batch-emergency.mjs` | Independent last-resort lane for a total batch wedge. | usage: node scripts/batch-emergency.mjs [--dry-run\|--status] |
 | `batch-handover-observe-core.mjs` | Pure core of the END-TO-END HANDOVER OBSERVATION (point 388). | — |
