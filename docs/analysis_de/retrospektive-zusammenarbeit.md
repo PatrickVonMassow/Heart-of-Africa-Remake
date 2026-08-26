@@ -1355,7 +1355,7 @@ Punktgrenze. Gebucht als Punkt 916.
 
 ## Anhang A — Maschinell gepflegte Quellen-Übersicht
 
-Zuletzt aktualisiert: Mittwoch, 26.08.2026, 02:43 · Quellen-Fingerprint: `8e1bc7b58f18…`
+Zuletzt aktualisiert: Mittwoch, 26.08.2026, 03:26 · Quellen-Fingerprint: `7428be098bfc…`
 
 Spalten heuristisch aus den Quellen abgeleitet (Anläufe = distinkte Datumsnennungen im Memory;
 Maßnahme = Guard-Skripte mit Namens-Treffer). Die inhaltliche Bewertung gehört der Prosa oben.
@@ -1456,8 +1456,8 @@ Maßnahme = Guard-Skripte mit Namens-Treffer). Die inhaltliche Bewertung gehört
 
 Erfasste Quellen: 91 Feedback-/Projekt-Memories · 57 Guard-/Hook-Skripte · 6 Revert-/Reapply-Commits · 101 Prozess-/Meta-TASKS-Punkte (davon 42 offen).
 
-<!-- RETRO-FINGERPRINT: 8e1bc7b58f18a65a2a6d9e0b22526ca3f9d85a90cdb6f88778d3de8deeede42f -->
-<!-- RETRO-LAST-REFRESHED: 2026-08-26T00:43:09.763Z -->
+<!-- RETRO-FINGERPRINT: 7428be098bfc3b36f38351f010f43ad722763d4de0435caa7bc17738fb3aabac -->
+<!-- RETRO-LAST-REFRESHED: 2026-08-26T01:26:43.982Z -->
 <!-- AUTO-GENERATED:END -->
 
 ### 3.111 Ein Erfolg ist kein Beweis für den Weg, auf dem er zustande kam
@@ -3722,3 +3722,24 @@ festhält, welcher Schritt fertig ist, muss ihr Beweistext benennen, *was gelauf
 Prozess getötet, welche Datei beschmutzt, welcher Lauf gemessen wurde — und nicht, welche Datei
 existiert. Prüffrage: *Würde meine Probe auch dann grün bleiben, wenn die Sache, die sie prüft,
 kaputt wäre?* Gebucht als Punkt 925.
+
+### 3.183 Zwei Rote standen seit Wochen im Baum, weil niemand die Suite ganz lief
+
+Der Beweislauf für die Verifikationsleiter fuhr am 26.08.2026 neun Render-Suiten am Stück —
+und fand zwei Rote, die keiner der Punkte davor verursacht hatte. Der Victoria-Falls-Frame
+der world-Suite trifft sein Motiv nicht, und der F6-Fehlerbericht legt seit unbekannter Zeit
+kein Bild ins Archiv. Die Baseline-Klassifikation gegen main bestätigte beide als
+vorbestehend, in je zwei Läufen, deterministisch.
+
+Das ist nicht die Klasse aus `residuals-hide-defects` — hier hat niemand einen Rest
+weggeschrieben. Es ist die Kehrseite der Leiter selbst: Wer immer nur die billigste Sprosse
+tritt, die seine eigene Änderung abdeckt, sieht die Rote in der Sprosse daneben nie. Die
+Ersparnis, die 566 und 595 bauen, verschiebt Kosten von der Iteration in den Endbeweis — und
+genau deshalb hängt an ihr die Bedingung, dass der Endbeweis wirklich GANZ läuft. Bei 927
+kostet das Übersehene mehr als die gesparten Minuten: Der Bericht, mit dem der Nutzer uns
+Fehler übergibt, reicht ihm ein Archiv ohne das Bild — die Zusammenstellung lässt den
+fehlenden Teil still weg, statt laut zu scheitern.
+
+**Lehre:** Eine billige Sprosse ist nur dann billig, wenn eine teure sie regelmäßig einholt.
+Und ein Artefakt, das der Nutzer nach draußen trägt, darf unvollständig nicht ausliefern:
+Wo ein Teil fehlt, ist Schweigen die schlimmste Antwort. Gebucht als Punkt 926 und 927.

@@ -12083,4 +12083,4 @@ to land than a mechanism that needs a review.
   is missing rather than shipping three members quietly; plus lint, build, `npm run test:unit`.
   Criticality: high — a silently picture-less bug report is a broken channel to the user, and it
   degraded unnoticed.
-  Bundle: Session- & Repo-Hygiene.
+  Bundle: Testinfrastruktur.
