@@ -635,7 +635,14 @@ export function compareNowProjection(html, expectedPoints, { knownPoints = null 
     const known = knownPoints instanceof Set ? knownPoints : null
     const unknown = known ? [...actualSet].filter((point) => !known.has(point)).sort((a, b) => a - b) : []
     const elsewhere = new Map()
-    for (const [key, label] of [['vdzk', 'Von dir zu klären'], ['queue', 'Warteschlange'], ['done', 'Erledigt']]) {
+    // ERLEDIGT IS HISTORY, NOT A COMPETING SECTION (sixth cross-vendor round):
+    // `toDone` states the lifecycle — "a point comes back into current work
+    // whenever a session boundary or a follow-up reopens it" — and keeps its one
+    // archive card. Counting that card as a cross-section conflict made every
+    // reopened point unpublishable, with nothing that could resolve it short of
+    // deleting written history. A queue or clarification copy stays a real
+    // conflict: those say the point is waiting, which contradicts running.
+    for (const [key, label] of [['vdzk', 'Von dir zu klären'], ['queue', 'Warteschlange']]) {
       for (const point of pointsInSection(html, key)) {
         if (!expectedSet.has(point)) continue
         if (!elsewhere.has(point)) elsewhere.set(point, [])
@@ -647,6 +654,10 @@ export function compareNowProjection(html, expectedPoints, { knownPoints = null 
     const unnumbered = cards.filter((card) => card.point == null)
     const unnumberedCards = unnumbered.length
     const idleCards = unnumbered.filter((card) => isTrulyStateCard(card.html, 'idle')).length
+    const handoverCards = unnumbered.filter((card) => isHandoverCard(card.html)).length
+    // Every unnumbered card that is neither the idle claim nor the ONE sanctioned
+    // handover card (sixth cross-vendor round).
+    const strayCards = unnumberedCards - idleCards - Math.min(handoverCards, 1)
     // Verified zero has TWO honest forms (second cross-vendor review): the one
     // authored idle card carrying the written handover reason, or — when nobody
     // wrote one — exactly the one parser-distinct empty element. Never both,
@@ -654,11 +665,17 @@ export function compareNowProjection(html, expectedPoints, { knownPoints = null 
     // …and beside expected active work, NEITHER zero-claim form may stand: an
     // idle card or the empty element next to numbered cards is the board
     // saying two things at once (second cross-vendor round).
+    // NOR ANY OTHER UNNUMBERED CARD (sixth cross-vendor round): only the idle
+    // form was counted, so an arbitrary hand-written `.now` card stood visibly
+    // in the section, belonged to no active point, and the fail-closed publish
+    // preflight blessed it as a faithful projection. Beside active work the
+    // section is exactly the derived cards; the render refuses the same state,
+    // so the two halves cannot disagree about it.
     const emptyStateWrong = expected.length === 0
       ? (idleCards === 1
           ? emptyStateCount !== 0 || unnumberedCards !== 1
           : emptyStateCount !== 1 || unnumberedCards > 0)
-      : emptyStateCount > 0 || idleCards > 0
+      : emptyStateCount > 0 || idleCards > 0 || strayCards > 0
     return {
       ok: !missing.length && !extra.length && !duplicates.length && !unknown.length && !crossSection.length && !emptyStateWrong,
       missing,
@@ -669,6 +686,7 @@ export function compareNowProjection(html, expectedPoints, { knownPoints = null 
       emptyStateCount,
       unnumberedCards,
       idleCards,
+      strayCards,
     }
   } catch (error) {
     return { ok: false, error: error?.message ?? String(error), missing: [], extra: [], duplicates: [] }
@@ -764,6 +782,24 @@ export function reconcileNowProjection(
     )
   }
 
+  // AND NO OTHER UNNUMBERED CARD STANDS BESIDE ACTIVE WORK (sixth cross-vendor
+  // round). Such a card used to be kept byte for byte and then blessed by the
+  // comparison, so the section carried something the active-work record does
+  // not know about. No sanctioned writer can create one — every point command
+  // needs the number it lacks, and the handover card is the idle form refused
+  // above — so this is a hand edit, and it is said out loud rather than
+  // silently carried or silently dropped.
+  const stray = unnumbered.filter(
+    (card) => !isTrulyStateCard(card.html, 'idle') && !isHandoverCard(card.html),
+  )
+  if (expected.length > 0 && stray.length > 0) {
+    throw new Error(
+      `board: ${stray.length} unnumbered current-work card(s) stand beside active point(s) ` +
+        `${expected.join(', ')} and belong to none of them. The section is the derived set beside the one ` +
+        'handover card: give the card its point with node scripts/board.mjs now <N> "<Text>", or remove it.',
+    )
+  }
+
   // The lone idle card's authored handover prose is CARRIED, never dropped
   // with the card (point 491's lesson; fifth cross-vendor round, pass 2): when
   // active work replaces the idle state, the written reason moves into the
@@ -788,27 +824,31 @@ export function reconcileNowProjection(
     kept.push({ point, html: original })
   }
 
-  // Focus is the only permitted reorder of surviving cards; every other
-  // survivor keeps its previous relative order, independent of insertion time.
+  // Focus is the only permitted reorder; every other card keeps its previous
+  // relative order, independent of insertion time. THE FOCUS LEADS EVEN WHEN IT
+  // IS NEW (sixth cross-vendor round): the reorder used to run over the
+  // SURVIVORS alone, so opening the focused strand — the very moment the focus
+  // moves — left the older card first and contradicted the stated order.
   const previous = numbered.map((card) => card.point).filter((point) => new Set(expected).has(point))
-  const survivorOrder = Number.isInteger(Number(focusPoint)) && previous.includes(Number(focusPoint))
-    ? [Number(focusPoint), ...previous.filter((point) => point !== Number(focusPoint))]
-    : previous
   const survivorMap = new Map(kept.map((card) => [card.point, card.html]))
   const newPoints = expected.filter((point) => !survivorMap.has(point))
+  const focused = Number(focusPoint)
+  const sequence = [...previous, ...newPoints]
+  const displayOrder = Number.isInteger(focused) && sequence.includes(focused)
+    ? [focused, ...sequence.filter((point) => point !== focused)]
+    : sequence
   // Unreachable today (idle beside numbered work threw above, so a carried
   // text always meets an all-stub render) — but if a future path got here with
   // prose and nowhere to put it, refusing beats blanking it.
   if (carried && newPoints.length === 0) {
     throw new Error("board: reconciliation would drop the idle card's authored prose with nowhere to carry it")
   }
-  const ordered = [
-    ...survivorOrder.map((point) => ({ point, html: survivorMap.get(point) })),
-    ...newPoints.map((point, index) => ({
-      point,
-      html: renderNowStub(point, { stamp, carried: index === 0 ? carried : '' }),
-    })),
-  ]
+  // The carried prose rides in the first CREATED stub, which is a question of
+  // creation order, not of where the focus puts it on screen.
+  const stubs = new Map(
+    newPoints.map((point, index) => [point, renderNowStub(point, { stamp, carried: index === 0 ? carried : '' })]),
+  )
+  const ordered = displayOrder.map((point) => ({ point, html: survivorMap.get(point) ?? stubs.get(point) }))
 
   const now = { ...bounds, text: source.slice(bounds.from, bounds.end) }
   let remainder = now.text
@@ -1410,6 +1450,16 @@ const stateCardPattern = (kind) =>
  * carries its constant title, the closing card carries a composed closing title.
  * Anything else keeps standing and the publish gate names it.
  */
+/**
+ * The ONE unnumbered card that may stand beside derived numbered cards: the
+ * session handover card (point 700's clause, answered by point 713). It is
+ * sanctioned only there — a card that is neither this nor the idle claim is a
+ * stray, and both the render and the comparison say so.
+ */
+function isHandoverCard(card) {
+  return /<details class="now"[^>]*data-state="handover"[^>]*>/.test(String(card ?? ''))
+}
+
 function isTrulyStateCard(card, kind) {
   const summary = (String(card).match(/<summary>([\s\S]*?)<\/summary>/) ?? [])[1] ?? ''
   const title = ((summary.match(new RegExp(`<span class="t">${TITLE_TEXT}</span>`)) ?? [])[1] ?? '').trim()
@@ -1518,8 +1568,12 @@ function standingPointCards(html) {
  * scoped to the section: an idle card quoted anywhere else — in the archive, in
  * a queue entry's prose — is not the claim.
  *
- * A document without the section is answered from the whole text: a fragment is
- * all the caller has, and reading it is closer to the truth than saying "no".
+ * A document WITHOUT the section heading claims NOTHING (sixth cross-vendor
+ * round). The old whole-text fallback made an idle card quoted in any other
+ * section — the archive, a queue entry's prose — read as the claim, and this
+ * predicate is the one `board-first-guard` DENIES on: a broken heading turned
+ * a fail-open guard into a deny with no way out. Nothing established is
+ * nothing claimed.
  *
  * THE CLOSING CARD IS NOT THIS CLAIM (point 544). It says the opposite — work is
  * still owed on the point that just ended — so the deny must not fire under it.
@@ -1528,15 +1582,12 @@ function standingPointCards(html) {
  */
 export function claimsNoCurrentWork(html) {
   const text = String(html ?? '')
-  let scope = text
+  let scope = null
   try {
     const { from, end } = sectionBounds(text, 'now')
     scope = text.slice(from, end)
   } catch {
-    // No section heading — a FRAGMENT is all the caller has, and this is the
-    // fail-open Stop-side predicate, so it is judged as it stands. The
-    // fail-closed paths (render, comparison) refuse instead; this deliberate
-    // local scope is the one place fragment semantics survive (point 713).
+    return false
   }
   return sectionStateCards(text, 'idle').length > 0 || (scope.match(emptyStatePattern()) ?? []).length > 0
 }
@@ -1558,12 +1609,16 @@ export function claimsClosingWork(html) {
  */
 function sectionStateCards(html, kind) {
   const text = String(html ?? '')
-  let scope = text
+  let scope = ''
   try {
     const { from, end } = sectionBounds(text, 'now')
     scope = text.slice(from, end)
   } catch {
-    /* no section — judge the fragment as it stands */
+    // No heading, no section, so no card STANDS IN it (sixth cross-vendor
+    // round): scanning the whole document found state cards quoted in the
+    // archive and in queue prose, and both callers are claims about the
+    // current-work section alone.
+    return []
   }
   return (scope.match(stateCardPattern(kind)) ?? []).filter((card) => isTrulyStateCard(card, kind))
 }

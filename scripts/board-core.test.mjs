@@ -253,6 +253,36 @@ describe('derived now-section membership', () => {
     expect(compareNowProjection(fullBoard({ now: handover }), [700])).toMatchObject({ ok: false, missing: [700] })
   })
 
+  // Sixth cross-vendor round: only the IDLE form was counted beside active
+  // work, so any other hand-written unnumbered card stood visibly in the
+  // section, belonged to no active point, and the fail-closed preflight
+  // blessed it. The render refuses the same state, so the two cannot disagree.
+  it('refuses a stray unnumbered card beside active work, in the check and in the render alike', () => {
+    const stray =
+      '<details class="now">\n  <summary><span class="t">Handnotiz</span></summary>\n' +
+      '  <div class="body"><p>Von Hand eingefügt.</p></div>\n</details>\n'
+    const board = fullBoard({ now: nowEntry(700, 'A', '20:07') + stray })
+    expect(compareNowProjection(board, [700])).toMatchObject({ ok: false, strayCards: 1 })
+    expect(() => reconcileNowProjection(board, [700], { stamp: '20:10' }))
+      .toThrow(/unnumbered current-work card\(s\) stand beside active point\(s\) 700/)
+    // The one sanctioned unnumbered card is still no stray.
+    expect(compareNowProjection(fullBoard({ now: nowEntry(700, 'A', '20:07') + handover }), [700]))
+      .toMatchObject({ ok: true, strayCards: 0 })
+  })
+
+  // Sixth cross-vendor round: the reorder ran over the SURVIVING cards alone,
+  // so the moment the focus moved to a strand that was only now being opened,
+  // the older card stayed first and contradicted the stated order.
+  it('puts the focused card first even when that point is only now getting its card', () => {
+    const before = fullBoard({ now: nowEntry(711, 'Älter', '19:00') })
+    const out = reconcileNowProjection(before, [711, 713], { focusPoint: 713, stamp: '20:10' })
+    // The surviving card keeps its legacy "711 — …" title shape, so both forms
+    // are read out of the section by position rather than by one markup.
+    const order = [...out.matchAll(/<span class="(?:num|t)">\s*(711|713)\b/g)].map((m) => Number(m[1]))
+    expect(order).toEqual([713, 711])
+    expect(out).toContain('Älter')
+  })
+
   it('accepts verified zero only through the parser-distinct non-card state', () => {
     const idle = fullBoard({ now: NOW_EMPTY_STATE_MARKUP })
     expect(compareNowProjection(idle, [])).toMatchObject({ ok: true, emptyStateCount: 1 })
@@ -431,12 +461,18 @@ describe('derived now-section membership', () => {
     expect(compareNowProjection(out, []).ok).toBe(true)
   })
 
-  it('reports an active point duplicated into another section', () => {
-    const doubled = fullBoard({ now: nowEntry(700, 'A', '20:07'), done: queueEntry(700, 'A', '20:09') })
-    expect(compareNowProjection(doubled, [700])).toMatchObject({
+  it('reports an active point duplicated into a WAITING section, never into the archive', () => {
+    const queued = fullBoard({ now: nowEntry(700, 'A', '20:07'), queue: queueEntry(700, 'A', '20:09') })
+    expect(compareNowProjection(queued, [700])).toMatchObject({
       ok: false,
-      crossSection: [{ point: 700, sections: ['Erledigt'] }],
+      crossSection: [{ point: 700, sections: ['Warteschlange'] }],
     })
+    // Sixth cross-vendor round: Erledigt is HISTORY. `toDone` states that a
+    // point comes back into current work when a boundary or a follow-up
+    // reopens it and keeps its one archive card, so reading that card as a
+    // conflict made every reopened point unpublishable.
+    const reopened = fullBoard({ now: nowEntry(700, 'A', '20:07'), done: queueEntry(700, 'A', '20:09') })
+    expect(compareNowProjection(reopened, [700])).toMatchObject({ ok: true, crossSection: [] })
   })
 
   it('fails publish closed on an unreadable source without mutating the input', () => {
