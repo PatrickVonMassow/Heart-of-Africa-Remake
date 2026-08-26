@@ -91,6 +91,12 @@ describe('active-work source I/O boundary', () => {
       expect(result.focusPoint).toBe(null)
       expect(result.errors.join(' ')).toMatch(/is no point number/)
     }
+    // A PRESENT record with no point field at all is corruption too — the
+    // confirming pass of the same round caught this one still reading as
+    // success, which left `{}` indistinguishable from an absent source.
+    const fieldless = withFocus('{"note":"someone hand-edited this"}')
+    expect(fieldless.ok).toBe(false)
+    expect(fieldless.errors.join(' ')).toMatch(/carries no point at all/)
     // The two shapes `focus.mjs set` really writes stay readable.
     expect(withFocus('{"point":null,"note":"non-point work"}')).toMatchObject({ ok: true, focusPoint: null })
     expect(withFocus('{"point":700}')).toMatchObject({ ok: true, focusPoint: 700, points: [700] })

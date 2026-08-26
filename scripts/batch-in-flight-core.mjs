@@ -792,8 +792,9 @@ export function transferBlockMessage({ blockers = [] } = {}) {
  * THE TRANSFER IS A WRITE, SO IT MIGRATES (sixth cross-review): writing the
  * legacy evidence back unchanged handed the successor a declaration that had
  * lost its once-only migration, so each item leaves here with its resolved
- * point RECORDED (`withRecordedEvidencePoint`; an unresolvable item stays
- * byte-identical — never guessed at, never dropped).
+ * point RECORDED (`withRecordedEvidencePoint`; an unresolvable item records the
+ * answer "nobody could tell" as `point: null` — never guessed at, never
+ * dropped, and never left legacy for the next read to re-derive).
  */
 export function markTransferred({ declaration, bySid, now, checkpoints = [], runs = [], worktreeRef = () => null } = {}) {
   const { adopted: _superseded, ...rest } = declaration ?? {}

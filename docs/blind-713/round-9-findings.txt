@@ -175,3 +175,49 @@ DECLINED, with the reason recorded rather than averaged:
   make the board's active set disagree with the batch's own open set — the board would then
   demand a card for a point the resume hook refuses to work. The match is already confined to
   the `- [ ] N.` header, so a `DEFERRED` in a point's BODY does not reach it.
+
+## Pass 1, confirming round — two answered, one declined
+
+ANSWERED:
+
+- [P1] `readFocusPoint` still let a PRESENT record with no `point` field through as success,
+  so `{}` stayed indistinguishable from an absent source and contradicted the rule written
+  down one paragraph above it. Absent is now the only shape that answers "no focus"; a
+  present record owes either a positive integer or an explicit `null`, and a fieldless one
+  is named as such. The regression covers it.
+
+- [P2] Two comments still described the pre-migration behaviour: `transitionActiveDeclaration`
+  said an unattributable item "keeps standing UNCHANGED" and `markTransferred` said it "stays
+  byte-identical", although both now write `point: null` into it. Both say what they do.
+
+DECLINED, with the reason recorded rather than averaged:
+
+- [P2] "`.claude/mechanism-reviews.jsonl` mislabels the recorded passes: the entry whose
+  structured pass index is 2 says 'pass-6', the one with index 1 says 'pass-2'." DECLINED as
+  unfixable-in-place and not a defect of the record: the `subject` field is the COMMIT
+  SUBJECT, copied verbatim, and it was accurate when it was written. Pass indices are not
+  stable names — `review-sol.mjs` recuts the split over the END-STATE file set on every run,
+  so the same file set was pass 6, then pass 2, then pass 3, as files changed and the sizes
+  moved (this round went from 7 runnable passes to 8 while it ran). The structured `pass`
+  object records the index AND its file list, which is the reading that means something; the
+  subject records what the session called it that hour. Rewriting those subjects would mean
+  rebasing recorded, reviewed history to make a label agree with a number that is by
+  construction temporary. WHAT IS WORTH KEEPING is the trap itself: a commit subject naming a
+  pass index goes stale the moment the split is recut, so it should name what was reviewed
+  instead. Filed to the findings carrier rather than fixed here.
+
+## Pass 8 — the two guard wrappers, read by Opus 5 — both answered
+
+The two files are Sol's within this range (`1ee13a4a`, `6a55f54a`), so the independent
+reader is the Anthropic side; the verdict is recorded against `1ee13a4a`, whose content
+they still carry.
+
+- [P2] `dashboard-integrity-guard.mjs` read the focus point a SECOND time, leniently
+  (`Number.isInteger(focus.point) ? … : null`), two lines below the validated
+  `activeWork.focusPoint` it now gathers. The two answers agree for every input, so the copy
+  bought nothing and carried the exact fail-open pass 1 had just closed in the other reader —
+  the shape these rounds keep re-finding. One reading now feeds both checks.
+
+- [P3] The `parseNowCardPoint` fallback in `dashboard-guard.mjs --synced` is unreachable:
+  both parsers read the same bounded section, so an empty set implies a null first point.
+  Removed, and with it the import that only served it.

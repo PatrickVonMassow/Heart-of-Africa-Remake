@@ -33,15 +33,20 @@ const readJsonStrict = (path, { exists = existsSync, read = readFileSync } = {})
  * The focus record's point, or the error a record states but cannot mean.
  *
  * `focus.mjs set` writes either a positive integer or an explicit `null` (the
- * "-" focus, for non-point work), so anything else in that field is corruption.
- * Reading it as "no focus" made a malformed record indistinguishable from the
- * two genuinely absent sources, which silently retired the focus half of the
- * projection invariant while the fail-closed publish still passed — the exact
- * fail-open this boundary exists to prevent (ninth cross-vendor round, pass 1).
+ * "-" focus, for non-point work), so anything else in that field is corruption —
+ * INCLUDING no field at all, which the confirming pass of the same round caught
+ * still reading as success. Reading any of them as "no focus" made a malformed
+ * record indistinguishable from the two genuinely absent sources, which silently
+ * retired the focus half of the projection invariant while the fail-closed
+ * publish still passed — the exact fail-open this boundary exists to prevent
+ * (ninth cross-vendor round, pass 1 and its confirming pass). An ABSENT record
+ * is the one shape that still answers "no focus", because that is true.
  */
-const readFocusPoint = (value) => {
-  const point = value?.point
-  if (point === null || point === undefined) return { point: null, error: null }
+const readFocusPoint = ({ present, value }) => {
+  if (!present || !value) return { point: null, error: null }
+  const { point } = value
+  if (point === null) return { point: null, error: null }
+  if (point === undefined) return { point: null, error: 'the focus record carries no point at all' }
   if (!Number.isInteger(point) || point <= 0) {
     return { point: null, error: `the focus record names ${JSON.stringify(point)}, which is no point number` }
   }
@@ -76,7 +81,7 @@ export function gatherActiveWorkSource({
     }
     const declaration = readJsonStrict(declarationPath, { exists, read })
     const focus = readJsonStrict(focusPath, { exists, read })
-    const focusPoint = readFocusPoint(focus.value)
+    const focusPoint = readFocusPoint(focus)
     const sourceErrors = [declaration.error, focus.error, focusPoint.error].filter(Boolean)
     if (sourceErrors.length) {
       return { ok: false, points: [], focusPoint: null, errors: sourceErrors.map((error) => `active-work source: ${error}`) }
@@ -104,9 +109,10 @@ export function gatherActiveWorkSource({
  * plain focus write alike; the sixth round found the migration skipped on
  * the non-exit path, which left the once-only migration never happening
  * there). The exit then filters purely on that recorded field. An item that
- * cannot be attributed keeps standing UNCHANGED — no probe retires it; the
- * read side reports it loudly and names the explicit human command
- * (`batch-in-flight.mjs --clear`) as the only way out.
+ * cannot be attributed KEEPS STANDING — no probe retires it — and takes the
+ * answer "nobody could tell" with it as `point: null`, so the next read cannot
+ * re-derive a different one; the read side reports it loudly and names the
+ * explicit human command (`batch-in-flight.mjs --clear`) as the only way out.
  */
 export function transitionActiveDeclaration(
   declaration,
