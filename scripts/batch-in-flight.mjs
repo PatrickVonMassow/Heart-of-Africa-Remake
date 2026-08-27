@@ -749,9 +749,10 @@ export function checkAgentOutput(
 }
 
 /** Measure every OPEN feat/* checkout Git currently registers through the same
- * branch/worktree grace decision as `--agent-check`. A declared boundary agent
- * is marked recognised so a supported transfer can carry it into the successor;
- * every other recently moving checkout is an independent writer veto. */
+ * branch/worktree grace decision as `--agent-check`. The owner's declared agent
+ * is marked recognised on every successor path: durable agents survive an owner
+ * crash as well as a clean boundary. Every other recently moving checkout is an
+ * independent writer veto. */
 export function registeredFeatureWriters({
   cwd = REPO_ROOT,
   now = Date.now(),

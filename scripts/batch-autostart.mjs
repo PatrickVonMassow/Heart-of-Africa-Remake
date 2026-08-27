@@ -962,6 +962,9 @@ if (destination.action === 'wait' && destination.reason.startsWith('reserved')) 
 // pure (`judgePreviousSpawn`); this only gathers the three facts.
 if (state.lastSpawnAt > 0) {
   const previousSpawn = readJson(C('autostart-last.json'))
+  const attemptKey = typeof previousSpawn?.spawnToken === 'string' && previousSpawn.spawnToken
+    ? previousSpawn.spawnToken
+    : `spawn-at-${state.lastSpawnAt}-pid-${state.lastPid || 'unknown'}`
   const progressed = spawnProgressed({
     curHead,
     lastHead: state.lastHead,
@@ -993,6 +996,8 @@ if (state.lastSpawnAt > 0) {
     failCount: state.failCount || 0,
     quota: state.quota ?? null,
     now,
+    attemptKey,
+    accountedAttemptKey: state.accountedSpawnAttempt ?? null,
   })
   if (outcome.state === 'progress' && (state.failCount || 0) > 0) log(`previous spawn made progress — clearing failCount (${state.failCount})`)
   if (outcome.state === 'failed') log(`${v.reason} — failCount=${outcome.failCount}`)
@@ -1014,6 +1019,15 @@ if (state.lastSpawnAt > 0) {
   // rhythm can be measured out of it instead of assumed.
   if (outcome.note) log(outcome.note)
   state.failCount = outcome.failCount
+  if (outcome.accountedAttemptKey) state.accountedSpawnAttempt = outcome.accountedAttemptKey
+  else delete state.accountedSpawnAttempt
+  if (outcome.state === 'failed') {
+    state.lastWatchdogCause = { code: 'spawn-made-no-progress', reason: v.reason, at: now, attemptKey }
+  } else if (outcome.state === 'quota') {
+    state.lastWatchdogCause = { code: 'quota-refused-spawn', reason: v.reason, at: now, attemptKey }
+  } else if (outcome.state === 'progress') {
+    delete state.lastWatchdogCause
+  }
   // THE RETRY RUNG GOES WITH IT (point 445, four-eyes finding 2). `pauseAttempt`
   // counts the resumptions of ONE spell of trouble; a counter that survived a
   // recovery would make every park months later clockless on a ladder spent long
@@ -1085,7 +1099,12 @@ if (state.failCount >= RUNAWAY_FAIL_LIMIT) {
   // 3 h, then keeps probing at that cap. `pauseAttempt` is how many wakes this
   // stall has already had; the terminal rung records the scheduling choice for
   // retroactive veto instead of handing the batch to a person.
-  const plan = runawayRecoveryDecision({ failCount: state.failCount, attempt: state.pauseAttempt || 0, now })
+  const plan = runawayRecoveryDecision({
+    failCount: state.failCount,
+    attempt: state.pauseAttempt || 0,
+    now,
+    refusal: state.lastWatchdogCause ?? null,
+  })
   const when = `retry at ${new Date(plan.retryAfter).toISOString()}${plan.capped ? ' (capped probe)' : ''}`
   log(`RUNAWAY: ${state.failCount} spawns with no git progress — pausing the batch (${when}) and notifying`)
   if (plan.decisionRecord) {
@@ -1099,12 +1118,16 @@ if (state.failCount >= RUNAWAY_FAIL_LIMIT) {
   // past one. tmp + rename makes a half-written file unreachable.
   try {
     writeTextAtomic(C('batch-paused'), formatPauseRecord({
-      reason: `autostart watchdog: ${state.failCount} resurrections made no progress (auth expired? model flag? failing point? push failing?) — investigate; the launcher retries when the clock below runs out.`,
       ...plan,
       pausedAt: now,
     }))
   } catch { /* ignore */ }
-  await notify('Batch STALLED', `${state.failCount} headless resurrections made no progress since ${state.lastHead.slice(0, 7)}. Auto-probe scheduled (${when}); evidence and doctor run again on wake.`, 'urgent')
+  await notify(
+    'Batch STALLED',
+    `${state.failCount} headless resurrections made no progress since ${state.lastHead.slice(0, 7)}. ` +
+      `Last measured refusal: ${plan.measuredRefusal}. Auto-probe scheduled (${when}); evidence and doctor run again on wake.`,
+    'urgent',
+  )
   writeJsonAtomic(C('autostart-state.json'), { ...state })
   process.exit(0)
 }
@@ -1122,9 +1145,11 @@ const previousBatchWriters = state.writerObservations && typeof state.writerObse
 const fenceState = readFence()
 const featureWriterRegister = registeredFeatureWriters({
   now,
-  // A clean boundary explicitly transfers declared agents. Recognising those
-  // records keeps that supported overlap while every undeclared checkout vetoes.
-  declaration: trigger.kind === SUCCESSOR_TRIGGERS.BOUNDARY ? declaration : null,
+  // The declaration identifies the owner's own delegate independently of HOW a
+  // successor was requested. A daemon-owned delegate survives an owner crash;
+  // treating it as foreign on the watchdog path makes the dead owner immortal.
+  // The owner-lock verdict below remains the veto while that owner is alive.
+  declaration,
 })
 const ciWait = readJson(C('ci-status-guard-state.json'))?.ciWait ?? null
 const ciWaitAssessment = assessCiWait({ wait: ciWait, now, probePid })
@@ -1165,6 +1190,15 @@ let startDecision = successorStartDecision({
 state.writerObservations = batchWriters
 let verdict = startDecision.start ? 'spawn' : 'skip-alive'
 if (verdict === 'skip-alive') {
+  const waitOutcome = judgeSpawnOutcome({
+    verdict: 'refused',
+    failCount: state.failCount || 0,
+    quota: state.quota ?? null,
+    now,
+    accountedAttemptKey: state.accountedSpawnAttempt ?? null,
+  })
+  state.failCount = waitOutcome.failCount
+  state.lastWatchdogCause = { code: startDecision.code ?? 'owner-live', reason: startDecision.reason, at: now }
   let writerRecovered = false
   if (startDecision.code !== 'owner-live') {
     const previous = readJson(C('autostart-last.json')) ?? {}
@@ -1268,7 +1302,7 @@ if (verdict === 'skip-alive') {
         fenceState: readFence(),
         featureWriterRegister: registeredFeatureWriters({
           now,
-          declaration: trigger.kind === SUCCESSOR_TRIGGERS.BOUNDARY ? declaration : null,
+          declaration,
         }),
         probePid,
         now,
@@ -1441,6 +1475,19 @@ if (dispossessed) {
 const backoffMs = spawnBackoffMs({ failCount: state.failCount, quota: !!state.quota })
 const lastSpawn = readJson(C('autostart-last.json'))
 if (shouldWaitForSpawnBackoff({ triggerKind, lastSpawnAt: lastSpawn?.at, now, backoffMs })) {
+  const waitOutcome = judgeSpawnOutcome({
+    verdict: 'refused',
+    failCount: state.failCount || 0,
+    quota: state.quota ?? null,
+    now,
+    accountedAttemptKey: state.accountedSpawnAttempt ?? null,
+  })
+  state.failCount = waitOutcome.failCount
+  state.lastWatchdogCause = {
+    code: 'spawn-backoff',
+    reason: `the previous spawn is still inside its ${Math.round(backoffMs / 60000)} minute backoff`,
+    at: now,
+  }
   log(
     `skip: a spawn ${Math.round((now - lastSpawn.at) / 60000)} min ago is still claiming the lock ` +
       `(backoff ${Math.round(backoffMs / 60000)} min at failCount ${state.failCount || 0}` +
@@ -1458,8 +1505,16 @@ if (shouldWaitForSpawnBackoff({ triggerKind, lastSpawnAt: lastSpawn?.at, now, ba
 // catches that, one tick later, by refusing to call a breathing successor a success.
 const preflight = judgeSpawnPreflight({ probes: environmentProbes() })
 if (!preflight.ok) {
-  state.failCount = (state.failCount || 0) + 1
-  log(`PREFLIGHT REFUSED — not spawning: ${preflight.reason} (failCount=${state.failCount})`)
+  const waitOutcome = judgeSpawnOutcome({
+    verdict: 'refused',
+    failCount: state.failCount || 0,
+    quota: state.quota ?? null,
+    now,
+    accountedAttemptKey: state.accountedSpawnAttempt ?? null,
+  })
+  state.failCount = waitOutcome.failCount
+  state.lastWatchdogCause = { code: 'environment-preflight', reason: preflight.reason, at: now }
+  log(`PREFLIGHT REFUSED — not spawning: ${preflight.reason} (failCount unchanged at ${state.failCount})`)
   journal(ACTIVITY_EVENTS.SPAWN_FAILURE, {
     cause: 'environment-preflight',
     evidence: { reason: preflight.reason, probes: preflight.probes ?? [], retryAt: now + spawnBackoffMs({ failCount: state.failCount }) },

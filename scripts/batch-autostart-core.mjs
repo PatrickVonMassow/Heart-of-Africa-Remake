@@ -1259,10 +1259,20 @@ export function runawayRecoveryDecision({
   attempt = 0,
   now = Date.now(),
   ladder = PAUSE_RETRY_LADDER_MS,
+  refusal = null,
 } = {}) {
   const plan = planPause({ cause: 'runaway', attempt, now, ladder })
   const n = Number.isFinite(attempt) && attempt > 0 ? Math.floor(attempt) : 0
   const capped = !plan.clockless && n >= ladder.length
+  const oneLine = (value) => typeof value === 'string' && value.trim() ? value.trim().replace(/\s+/g, ' ') : null
+  const refusalCode = oneLine(refusal?.code)
+  const refusalReason = oneLine(refusal?.reason)
+  const measuredRefusal = refusalCode || refusalReason
+    ? [refusalCode, refusalReason].filter(Boolean).join(' — ')
+    : 'unavailable (no measured refusal was persisted)'
+  const reason =
+    `autostart watchdog: ${failCount} actual spawn attempts made no Git progress; ` +
+    `last measured refusal: ${measuredRefusal}. The launcher retries when the clock below runs out.`
   const decisionRecord = capped
     ? {
         title: 'Entscheidungsprotokoll: Runaway-Watchdog prüft am Zeitlimit weiter',
@@ -1274,7 +1284,7 @@ export function runawayRecoveryDecision({
           `und nenne den letzten zulässigen Start oder die stattdessen zu sperrende Fehlerklasse.`,
       }
     : null
-  return { ...plan, capped, decisionRecord }
+  return { ...plan, reason, measuredRefusal, capped, decisionRecord }
 }
 
 /**
@@ -1282,7 +1292,10 @@ export function runawayRecoveryDecision({
  * sits between `judgePreviousSpawn` and everything the tick does with its answer.
  *
  * Inputs: that verdict, the quota probe of the spawn's own output, the current
- * `failCount` and the standing quota record (or null).
+ * `failCount`, the standing quota record (or null), and optionally the stable
+ * key of the spawn being judged plus the key already accounted. The keys keep a
+ * terminal spawn from climbing the ladder again on later ticks which merely
+ * refused to start its successor.
  *
  * Returns { state, failCount, quota, pause, nextProbeMs, note }:
  *   state 'quota'    the limit refused the start — failCount UNTOUCHED, no pause,
@@ -1291,6 +1304,8 @@ export function runawayRecoveryDecision({
  *   state 'progress' work is happening; a standing quota record is cleared and
  *                    the MOMENT OF RESUMPTION is the note, so the real reset
  *                    rhythm can be read out of the log instead of assumed.
+ *   state 'wait'     this tick spawned nothing, or already accounted this spawn;
+ *                    failCount is UNTOUCHED.
  *   'pending'/'none' nothing concluded: everything is carried unchanged.
  */
 export function judgeSpawnOutcome({
@@ -1299,10 +1314,16 @@ export function judgeSpawnOutcome({
   failCount = 0,
   quota = null,
   now = Date.now(),
+  attemptKey = null,
+  accountedAttemptKey = null,
 } = {}) {
   const count = Number.isFinite(failCount) && failCount > 0 ? Math.floor(failCount) : 0
   const at = Number.isFinite(now) ? Number(now) : Date.now()
   const standing = quota && Number.isFinite(quota.since) ? quota : null
+  const attempted = typeof attemptKey === 'string' && attemptKey.trim() ? attemptKey.trim() : null
+  const accounted = typeof accountedAttemptKey === 'string' && accountedAttemptKey.trim()
+    ? accountedAttemptKey.trim()
+    : null
   const mins = (from) => Math.max(0, Math.round((at - from) / 60000))
 
   if (verdict === 'progress') {
@@ -1310,7 +1331,27 @@ export function judgeSpawnOutcome({
       ? `QUOTA BLOCK OVER: work resumed after ${standing.probes ?? 0} probe(s) over ${mins(standing.since)} min ` +
         `(the block was first seen at ${new Date(standing.since).toISOString()})`
       : null
-    return { state: 'progress', failCount: 0, quota: null, pause: false, nextProbeMs: spawnBackoffMs({ failCount: 0 }), note }
+    return {
+      state: 'progress',
+      failCount: 0,
+      quota: null,
+      pause: false,
+      nextProbeMs: spawnBackoffMs({ failCount: 0 }),
+      accountedAttemptKey: null,
+      note,
+    }
+  }
+
+  if (verdict === 'refused' || (verdict === 'failed' && attempted && attempted === accounted)) {
+    return {
+      state: 'wait',
+      failCount: count,
+      quota: standing,
+      pause: false,
+      nextProbeMs: spawnBackoffMs({ failCount: count, quota: !!standing }),
+      accountedAttemptKey: accounted,
+      note: null,
+    }
   }
 
   if (verdict === 'failed' && quotaHit && quotaHit.hit === true) {
@@ -1329,6 +1370,7 @@ export function judgeSpawnOutcome({
       quota: record,
       pause: false,
       nextProbeMs: spawnBackoffMs({ quota: true }),
+      accountedAttemptKey: attempted ?? accounted,
       note:
         `QUOTA BLOCK: the start was refused by the usage limit — probe ${probes}, blocked for ${mins(since)} min` +
         `${record.resetHint ? `, resets ${record.resetHint}` : ''}. No failure counted, no pause; ` +
@@ -1344,6 +1386,7 @@ export function judgeSpawnOutcome({
       quota: null, // whatever this is, it is not the limit
       pause: next >= RUNAWAY_FAIL_LIMIT,
       nextProbeMs: spawnBackoffMs({ failCount: next }),
+      accountedAttemptKey: attempted ?? accounted,
       note: standing ? 'the quota block ended in an ORDINARY failure — the ladder applies again' : null,
     }
   }
@@ -1354,6 +1397,7 @@ export function judgeSpawnOutcome({
     quota: standing,
     pause: false,
     nextProbeMs: spawnBackoffMs({ failCount: count, quota: !!standing }),
+    accountedAttemptKey: accounted,
     note: null,
   }
 }
