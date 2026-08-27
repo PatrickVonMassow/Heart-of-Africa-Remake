@@ -871,15 +871,63 @@
       "origin": "machine",
       "place": "last"
     },
+    "966": {
+      "at": "2026-08-27T08:54:11.722Z",
+      "why": "Delegates push from linked worktrees on every point; until the suite is fenced, each such push can rewrite the live ref store again — cannot wait behind the release.",
+      "origin": "machine",
+      "place": "ahead"
+    },
     "967": {
-      "at": "2026-08-27T08:34:03.806Z",
-      "why": "User instruction 27.08.2026, 10:21 ('Hole die Batch (ohne Forcierung) und mache das direkt.'): worked before 945 in the claiming window; moved to the queue head in the same turn.",
+      "at": "2026-08-27T08:54:11.623Z",
+      "why": "User instruction 27.08.2026, 10:21: claim the batch and fix the rejected header directly — user-asked, exempt from the release bar.",
+      "origin": "user",
+      "place": "ahead"
+    },
+    "968": {
+      "at": "2026-08-27T08:54:11.819Z",
+      "why": "False-gate nuisance with a loud-deferral workaround per incident; waits behind the release.",
       "origin": "machine",
       "place": "last"
     }
   },
+  "boundary": {
+    "at": "2026-08-21T00:55:14.962Z",
+    "points": [
+      336,
+      553,
+      596,
+      633,
+      659,
+      660,
+      663,
+      686,
+      687,
+      688,
+      689,
+      690,
+      691,
+      692,
+      708,
+      715,
+      719,
+      733,
+      734,
+      735,
+      736,
+      738,
+      739,
+      746,
+      747,
+      750,
+      759,
+      760,
+      762,
+      764
+    ],
+    "why": "The order standing in front of the release today is the arrangement that predates this rule; the four machine-filed points that had ranked themselves there were moved behind 174 first"
+  },
   "settled": {
-    "at": "2026-08-27T06:06:55.151Z",
+    "at": "2026-08-27T08:54:11.828Z",
     "points": [
       174,
       184,
@@ -1195,43 +1243,10 @@
       961,
       962,
       964,
-      965
+      965,
+      966,
+      967,
+      968
     ]
-  },
-  "boundary": {
-    "at": "2026-08-21T00:55:14.962Z",
-    "points": [
-      336,
-      553,
-      596,
-      633,
-      659,
-      660,
-      663,
-      686,
-      687,
-      688,
-      689,
-      690,
-      691,
-      692,
-      708,
-      715,
-      719,
-      733,
-      734,
-      735,
-      736,
-      738,
-      739,
-      746,
-      747,
-      750,
-      759,
-      760,
-      762,
-      764
-    ],
-    "why": "The order standing in front of the release today is the arrangement that predates this rule; the four machine-filed points that had ranked themselves there were moved behind 174 first"
   }
 }
