@@ -2562,6 +2562,21 @@ put it is the mistake this line exists to stop.
   standstill during live delegated work is not merely imprecise — it is the one statement the
   board exists to get right, and it is dictated to the session under end-of-session pressure, so
   a careful session copies it verbatim and publishes the falsehood.
+  IT HAPPENED AGAIN, SIX DAYS LATER, WORD FOR WORD (measured 27.08.2026, 02:40, at this session's
+  context watermark — 173 704 tokens against 122 000). `node scripts/batch-boundary.mjs --prepare
+  --context` again reported in ONE breath that "the declared in-flight work is transferable
+  (feat/957-contribution-scoped-review@0964ff44)" and again dictated a card ending "Hier läuft
+  nichts weiter.", while GPT-5.6 Sol was demonstrably still authoring point 957, five checkpoint
+  commits deep. Nothing about the source has moved: both return paths of the composer still append
+  the sentence with no reference to the in-flight state the very same command has just certified.
+  The card pairs it with "Kein Fenster hat den Stapel beansprucht", so for a reader on a phone the
+  two sentences together read as a full stop on the whole batch.
+  THE SESSION REFUSED THE DICTATION THIS TIME, which is the workaround and not the fix: the
+  published card names the lane that keeps running and the successor that adopts it. That is only
+  available to a session that stops to check the sentence it was handed — under end-of-session
+  pressure, and with the instruction saying "verbatim", the default remains publishing the
+  falsehood. Two occurrences with no code change between them make this a standing misreport, not
+  an incident.
   FINAL STATE: the closing sentence is bound to the in-flight state. Without transferable work it
   stays as it is; with transferable work the card names WHAT continues and that the successor
   takes it over.
