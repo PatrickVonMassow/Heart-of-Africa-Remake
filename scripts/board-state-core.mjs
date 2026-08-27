@@ -20,7 +20,7 @@
 // unit layer can exercise it without a live checkout.
 
 import { ALERT_RESET_MS } from './alert-escalation-core.mjs'
-import { measurementForRecord, measurementThatSettled } from './decision-log-core.mjs'
+import { measurementIsResolvable, measurementThatSettled } from './decision-log-core.mjs'
 
 /** The marker every derived state card carries. Nothing else may wear it. */
 export const DERIVED_STATE_KIND = 'derived'
@@ -73,9 +73,10 @@ export function pauseParagraph(pause) {
  * The paragraphs for the automatic decisions the batch made on its own: an alert
  * that stayed unanswered and was continued, and a corruption class that was
  * repaired. Both are RECORDS, so they are reported, never asked. A record with
- * a named measurement stays until that measurement has a newer clean result;
- * age alone proves nothing. An unmeasured record follows the ladder's own
- * staleness floor, even when no later alert happens to trigger ladder pruning.
+ * a resolvable named measurement stays until that measurement has a newer clean
+ * result; age alone proves nothing. An unmeasured or unresolvable record follows
+ * the ladder's own staleness floor, even when no later alert happens to trigger
+ * ladder pruning.
  *
  * A retroactive veto stays possible without a standing decision card: the record
  * names the channel (a chat or ntfy answer), which is where the user already
@@ -94,7 +95,7 @@ export function decisionParagraphs(ladder, { doctorState = null, now = Date.now(
         record &&
         trim(record.body) &&
         Number.isFinite(at) &&
-        (measurementForRecord(record) || (Number.isFinite(lastSentAt) && now - lastSentAt <= 2 * ALERT_RESET_MS)) &&
+        (measurementIsResolvable(record) || (Number.isFinite(lastSentAt) && now - lastSentAt <= 2 * ALERT_RESET_MS)) &&
         !measurementThatSettled(record, doctorState),
     )
     .sort((a, b) => b.at - a.at)

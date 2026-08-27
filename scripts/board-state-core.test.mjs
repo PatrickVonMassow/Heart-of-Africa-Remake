@@ -51,7 +51,7 @@ describe('decisionParagraphs — the continuation and corruption records', () =>
     expect(decisionParagraphs(old, { now: NOW })).toEqual(['Alte Entscheidung.'])
   })
 
-  it('applies the ladder staleness floor only to records without a measurement', () => {
+  it('applies the ladder staleness floor to records without a measurement', () => {
     const record = { at: NOW - 48 * 3600 * 1000, body: 'Automatische Entscheidung.' }
     const alert = (age, decision = record) => ({
       alerts: { k: { rung: 4, lastSentAt: NOW - age, record: decision } },
@@ -63,6 +63,17 @@ describe('decisionParagraphs — the continuation and corruption records', () =>
     expect(decisionParagraphs(alert(3 * ALERT_RESET_MS, { ...record, measurement }), { now: NOW })).toEqual([
       'Automatische Entscheidung.',
     ])
+  })
+
+  it('applies the ladder staleness floor to a measurement key with no resolver', () => {
+    const record = {
+      at: NOW - 48 * 3600 * 1000,
+      body: 'Entscheidung mit unbekannter Messung.',
+      measurement: { key: 'unknown-gate' },
+    }
+    const stale = { alerts: { k: { rung: 4, lastSentAt: NOW - 2 * ALERT_RESET_MS - 1, record } } }
+
+    expect(decisionParagraphs(stale, { now: NOW })).toEqual([])
   })
 
   it('keeps a decision whose named measurement has not been taken', () => {

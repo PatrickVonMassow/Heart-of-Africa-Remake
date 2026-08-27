@@ -81,10 +81,15 @@ export function measurementForRecord(record) {
   return explicitMeasurement(record) ?? legacyParallelMeasurement(record)
 }
 
+/** Whether this code knows how to obtain and interpret the named result. */
+export function measurementIsResolvable(record) {
+  return trim(measurementForRecord(record)?.key) === BATCH_DOCTOR_GATE_KEY
+}
+
 /** The clean result which expires `record`, or null while it still stands. */
 export function measurementThatSettled(record, doctorState) {
   const measurement = measurementForRecord(record)
-  if (!measurement || trim(measurement.key) !== BATCH_DOCTOR_GATE_KEY) return null
+  if (!measurementIsResolvable(record)) return null
 
   const decidedAt = finitePositive(record.at)
   if (!decidedAt) return null
