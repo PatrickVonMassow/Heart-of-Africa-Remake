@@ -1410,7 +1410,7 @@ keinen Träger hat. Gebucht als Punkt 956.
 
 ## Anhang A — Maschinell gepflegte Quellen-Übersicht
 
-Zuletzt aktualisiert: Donnerstag, 27.08.2026, 20:02 · Quellen-Fingerprint: `b55119cc07d0…`
+Zuletzt aktualisiert: Donnerstag, 27.08.2026, 21:17 · Quellen-Fingerprint: `b55119cc07d0…`
 
 Spalten heuristisch aus den Quellen abgeleitet (Anläufe = distinkte Datumsnennungen im Memory;
 Maßnahme = Guard-Skripte mit Namens-Treffer). Die inhaltliche Bewertung gehört der Prosa oben.
@@ -1513,7 +1513,7 @@ Maßnahme = Guard-Skripte mit Namens-Treffer). Die inhaltliche Bewertung gehört
 Erfasste Quellen: 92 Feedback-/Projekt-Memories · 57 Guard-/Hook-Skripte · 6 Revert-/Reapply-Commits · 111 Prozess-/Meta-TASKS-Punkte (davon 47 offen).
 
 <!-- RETRO-FINGERPRINT: b55119cc07d0c7b552d9d97f5f19af8811aa3bb0b1a346b93b42a48c9acc2ad2 -->
-<!-- RETRO-LAST-REFRESHED: 2026-08-27T18:02:37.547Z -->
+<!-- RETRO-LAST-REFRESHED: 2026-08-27T19:17:51.721Z -->
 <!-- AUTO-GENERATED:END -->
 
 ### 3.111 Ein Erfolg ist kein Beweis für den Weg, auf dem er zustande kam
@@ -4440,3 +4440,23 @@ Zeitfenster gebildete Vereinigung ist als Forderung zulässig, als ZUSCHREIBUNG 
 benannt als das, was sie ist (ungelesene Arbeit im Fenster), mit einem Besitzer, der nicht der
 Punkt ist. Und ein Tor, dessen Forderung schneller wächst, als sie erfüllt werden kann, hält
 niemanden auf außer dem, der arbeitet.
+
+### 3.205 Der einzige zulässige Gegenleser hatte kein Werkzeug, das ihn aufruft
+
+Ein Wächter forderte für zwei Dateien die Gegenlesung durch den anderen Anbieter. Der Prüf-Starter
+rechnete daraufhin selbst aus, wer sie lesen darf — und kam zu einem dritten Modell, weil der
+andere Anbieter inzwischen selbst an beiden Dateien geschrieben hatte und damit sein eigenes Werk
+läse. Der Satz, den er druckte, war korrekt und vollständig: „Die Gegenlesung gehört Modell X, und
+sie ist NICHT erledigt." Für Modell X existiert im Projekt kein Prüf-Starter. Es gibt einen für das
+Schreiben, keinen für das Lesen.
+
+Damit steht eine Forderung im Baum, die niemand erfüllen kann, ohne dass irgendwo ein Fehler
+sichtbar wäre: Der Wächter hat recht, der Prüf-Starter hat recht, die Rollenzuweisung ist die von
+der Regel vorgeschriebene — und trotzdem gibt es keinen ausführbaren Zug. Die Ausweichwege sind
+alle falsch: das Urteil des ausgeschlossenen Anbieters trotzdem eintragen, es von Hand behaupten,
+oder den Wächter umgehen. Jeder davon vernichtet genau die Unabhängigkeit, für die das Tor da ist.
+
+**Lehre:** Eine Regel, die eine ROLLE benennt, ist erst fertig, wenn es für jede Besetzung dieser
+Rolle auch den Weg gibt, sie auszuführen. Wo eine Rollenzuweisung auf ein Modell fallen kann, muss
+der Aufruf dieses Modells derselbe Befehl leisten — sonst ist die Fallback-Kette Papier, und sie
+fällt genau dann aus, wenn sie gebraucht wird: wenn der erste Leser befangen ist.

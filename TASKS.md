@@ -13051,6 +13051,36 @@ to land than a mechanism that needs a review.
   runs the real landing on a scratch board and ends with `dashboard-guard --synced` GREEN and no
   waiver recorded. A drill that recreates the aftermath instead of calling the landing does not
   count.
+  MEASURED AGAIN 27.08.2026, 20:31: the waiver did NOT settle it. The next session found
+  `[erledigt-missing]` still blocking for point 971 and had no route left either, so it wrote the
+  entry into the board file by hand — the very move this point forbids. Whatever shape is built
+  must therefore also cover a card that is ALREADY missing, not only the next landing.
   Criticality: med — it costs no correctness in the product, but it forces the emergency valve on an
   ordinary successful landing, and a valve used routinely stops being an alarm.
   Bundle: Chat & Tafel.
+
+- [ ] 977. The four-eyes fallback names a reviewer no command can start. MEASURED 27.08.2026,
+  21:10, on `main`. `mechanism-review-guard` owes an OPENAI reading of the anthropic-authored
+  contribution to `docs/analysis_de/vibe-coding-anleitung.md` and `scripts/guide-brevity-core.mjs`
+  at a commit that descends from `2dbce90`. `review-sol.mjs` computed the eligibility itself and
+  printed: "ROLE SWAP — GPT-5.6 Sol AUTHORED part of 16793dd, so it may not review it. The review is
+  Fable 5's, and it is NOT done." — GPT-5.6 Sol had meanwhile authored `14c7997` and `acb5ac0` in
+  those same files, so at their current end state it would read its own work.
+  BOTH MECHANISMS ARE RIGHT AND THERE IS NO RUNNABLE MOVE. `CLAUDE.md` §6 and
+  `scripts/mechanism-review.mjs` both state the fallback chain ("when Sol is unavailable the first
+  of Fable 5 / Opus 5 / Opus 4.8 that wrote no part of it"), and Opus 5 wrote `2dbce90` itself, so
+  the chain lands on Fable 5 — correctly. The project has `scripts/author-fable.mjs` for WRITING and
+  nothing for READING: there is no `review-fable.mjs`, and `review-sol.mjs` hands over only when Sol
+  is UNREACHABLE, not when it is INELIGIBLE. Every remaining exit is wrong: recording the excluded
+  vendor's verdict anyway, hand-typing a verdict, or bypassing the guard each destroys exactly the
+  independence the gate exists for.
+  FINAL STATE: every model the fallback chain can name is startable by the same kind of command as
+  the first one, and an INELIGIBLE first reader hands over the same way an unreachable one does —
+  so a role assignment the rules produce is always executable.
+  VERIFIABLE: Vitest over the pure handover decision — a range whose first-choice reviewer authored
+  part of the end state resolves to the next chain member AND yields a runnable command, and the
+  recorder accepts that model's verdict for exactly the files it read; plus the real reproduction,
+  the two files above, cleared without any vendor reading its own work.
+  Criticality: high — it is the four-eyes gate itself, and its only currently reachable exits are
+  the ones that fake independence.
+  Bundle: Vier-Augen.
