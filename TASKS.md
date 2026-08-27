@@ -12850,3 +12850,49 @@ to land than a mechanism that needs a review.
   a false board.
   Bundle: Chat & Tafel. It edits the board's derived now-section, which 963 does not touch, so the
   two may run beside each other.
+
+- [ ] 966. The unit suite run from a linked worktree writes into the LIVE repository. MEASURED
+  27.08.2026, 10:02-10:07: a `git push origin main` issued while the shell's working directory was
+  still inside the linked worktree `.claude/worktrees/point-945` ran `scripts/pre-push-gate.mjs`
+  there, and its `npm run test:unit` — together with a second, nested suite that
+  `scripts/batch-doctor.mjs --gate` started beside it — used the real repository as its fixture
+  instead of its temporary ones. In five minutes it (1) moved `refs/heads/main` off de051dad onto
+  fixture commits (`seed`, `Test two model trailers`, authored `t <t@t>` and `doctor
+  <doctor@test>`), (2) created 22 fixture branches in the live ref store (`clean-side`, `side`,
+  `wt`, `topic/live`, `fixture-linked`, `fixture-owner`, `feat/x`, `feat/403-x`, `feat/500-x`,
+  `feat/697-strand`, `feat/712-test`, `feat/900-something`, `feat/agent-1`,
+  `feat/branch-bulk-gap-range`, `feat/fresh-tree`, `feat/main-advanced-gap-range` and the
+  `feat/{581,733,898,899,901,938}-calibration-fixture` set), (3) rewrote `.git/config` — `core.bare`
+  to `true`, `core.hooksPath` from the versioned relative `scripts/git-hooks` to an absolute path,
+  plus a `[user]` identity that arrived first as `repository integrity test
+  <integrity@test.invalid>` and then as `test <test@example.invalid>`, (4) registered two `/tmp`
+  fixture worktrees in the real repository, and (5) left the point-945 worktree detached on a
+  fixture commit with an index that reported the whole tree deleted.
+  WHAT IT DID NOT COST: the push failed at its own gate (`failed to push some refs`), so nothing
+  reached GitHub, `origin/main` stayed at de051dad, and every real feature branch still matched its
+  remote. The checkout was repaired by hand in the same session — `main` back to its commit, the 22
+  fixture refs deleted, the config restored against `/backup/hoa/.git/config`, the fixture worktrees
+  pruned, the point-945 worktree reset to its pushed head fb7e5d23 — and the polluted reflog entries
+  in `.git/logs` were left in place as evidence.
+  WHAT IT COSTS: CLAUDE.md §6 has every delegated author run the gates inside its own worktree, so
+  the trigger is the ordinary case and not an exotic one, and the failure is silent — no gate went
+  red for it, the damage was found only because a follow-up `git branch --show-current` came back
+  empty. `scripts/repository-integrity.test.mjs` exists for exactly this class ("LIVE REPOSITORY
+  CHANGED WHILE UNIT SUITE RAN") and did not stop it.
+  SUSPECTED MECHANISM — named as a lead, NOT measured to a call site: `scripts/repo-paths.mjs`
+  resolves `repositoryRoot` to the worktree but `commonCheckoutRoot` deliberately maps a linked
+  worktree to the MAIN checkout, so a fixture helper that seeds or mutates "the repository" through
+  the common checkout writes into the live tree from a worktree while being indistinguishable from
+  cwd in the main checkout. The author measures the actual escaping call site before fixing it.
+  FINAL STATE: the unit suite, run from ANY linked worktree, leaves the live checkout byte-identical
+  — refs, `.git/config`, worktree registrations, worktree HEADs and index. The call site that
+  escapes into the common checkout is closed at the cause rather than fenced off test by test, and
+  the integrity detector fails the RUN that changed the live repository instead of passing while the
+  damage stands.
+  VERIFIABLE: Vitest — a case that snapshots the live checkout's refs, `.git/config` and worktree
+  list, drives the offending helper with cwd set to a linked worktree, and asserts the snapshot is
+  unchanged; and a case that asserts the integrity detector goes red when a fixture writes into the
+  common checkout.
+  Criticality: high — it silently rewrote `refs/heads/main` in the live repository, and every
+  delegated author runs this suite from a worktree.
+  Bundle: Urlaubsfestigkeit.
