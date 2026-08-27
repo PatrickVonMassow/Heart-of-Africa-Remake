@@ -185,7 +185,14 @@ export const LIMITS = {
   // fifty words as the audit counts them. The lesson's second half — an inherited environment
   // variable no call-site search can find — was deliberately NOT added: it is the long-form half and
   // lives in the retrospective.
-  maxLines: 477,
+  // RAISED 27.08.2026 by the measured net of TWO missing lessons, both FOLDED into existing text:
+  // omitted review material must be named to the judging model, with a suspicion's promotion
+  // criterion beside the root-cause rule; and neighbouring correct rules may forbid through their
+  // gap, so permission shares a sentence with its limit and the periodic review asks what no rule
+  // covers. The existing time-window rule and its last-n symptom remain intact beside the new
+  // review-material lesson. No standalone pitfall or project telling was added. Net: +6 lines /
+  // +70 words, exact fit.
+  maxLines: 483,
   // EXACT FIT, not headroom — corrected 30.07.2026 after the four-eyes review
   // pointed out that this comment had long stopped describing the numbers. The
   // rule above ("raised only by the measured size of genuinely new tips")
@@ -367,7 +374,9 @@ export const LIMITS = {
   // independent ATTEMPT to falsify and explicitly lets a true hypothesis survive it. Tightening
   // the surrounding narration pays for that precision, so the ceiling follows the measured guide
   // DOWN by two words, with no claim removed and no headroom added.
-  maxWords: 4271,
+  // 27.08.2026: the two folded lessons justified beside maxLines measure 4341 words, so this
+  // ceiling follows their +70-word net exactly; the guide has no unearned headroom.
+  maxWords: 4341,
   // A pitfall entry = the risk lines plus its prompt. Anything longer is a
   // story, not a tip.
   maxEntryLines: 11,
@@ -503,6 +512,10 @@ const ROOT_CAUSE_REQUIREMENTS = [
   {
     re: /\bWer den Auftrag vergibt\b[^.]*\bmisst\b[^.]*\bblind mit\b/iu,
     detail: 'Die Root-Cause-Meta-Regel verlangt keine blinde Gegenmessung durch den Auftraggeber',
+  },
+  {
+    re: /\bwelcher Befund\b[^.]*\bzur Tatsache macht\b/iu,
+    detail: 'Die Root-Cause-Meta-Regel nennt kein Beförderungskriterium für die Vermutung',
   },
 ]
 

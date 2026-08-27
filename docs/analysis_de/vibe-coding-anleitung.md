@@ -220,8 +220,11 @@ Die Ursache findest du durch **Zerlegen**, nicht durch Wiederholen.
   Start, was **lokal fertig, aber nirgends angekommen** ist.“
 
 - **Regeln und Wächter verrotten — nur merkt es niemand.** Eine Absicherung greift enger als ihr
-  Satz, oder weiter, und sperrt Unbeteiligte.
-  → *Prompt:* „Leg Satz und Code periodisch **nebeneinander**, zieh **den Code auf den Satz**."
+  Satz, oder weiter; mehrere richtige Regeln können durch ihre Lücke etwas verbieten — und Warten
+  sieht dabei wie Sorgfalt aus.
+  → *Prompt:* „Schreib die **Erlaubnis im selben Satz wie ihre Grenze**. Leg Satz und Code
+  periodisch **nebeneinander**, zieh **den Code auf den Satz**, und frag: **Welcher naheliegende
+  Fall wird von keiner Regel erfasst?**"
 
 - **Die Verweigerung nennt eine Abhilfe, die schadet, nie eintritt — oder längst getan ist.** Wer
   ihr folgt, steht schlechter da, wartet vergeblich oder wiederholt einen erledigten Schritt.
@@ -271,9 +274,11 @@ Die Ursache findest du durch **Zerlegen**, nicht durch Wiederholen.
   Ergebnis aus den Protokollen, nicht aus den Tests."
 
 - **Die Messung — und die Gegenprüfung — sah weniger, als sie behauptet.** Nur die letzten *n*
-  Einträge; nicht geliefert liest sich *grüner* als ein Fehlschlag.
+  Einträge; nicht geliefert liest sich *grüner* als ein Fehlschlag, still gekürzter Prüfstoff für
+  das Modell wie ein Mangel.
   → *Prompt:* „Leite das Fenster jeder Messung aus dem **Gegenstand** ab: nach Zeit, nie nach
-  Anzahl. Melde die **Abdeckung** mit; ein Urteil über halbem Material ist **Teilprüfung**."
+  Anzahl. Nenne dem **prüfenden Modell selbst** jedes weggelassene Material, nicht nur dem
+  Aufrufer, und melde die **Abdeckung**; ein Urteil über halbem Material ist **Teilprüfung**."
 
 - **„Läuft der noch?" mit „ist die Ausgabe frisch?" beantwortet.** Frische belegt nur, dass jemand
   gearbeitet *hat*.
@@ -445,7 +450,8 @@ Die Ursache findest du durch **Zerlegen**, nicht durch Wiederholen.
    Bestätigung.
    > *Prompt:* „Bevor du etwas Wiederkehrendes reparierst: schreib mir in 3–5 Sätzen die
    > **mechanische** Ursache — was genau war die Annahme, die brach? Steht die Ursache schon als
-   > Vermutung da, ist sie ein **Kandidat**: Versuche zuerst, sie unabhängig zu widerlegen.
+   > Vermutung da, ist sie ein **Kandidat**: Markiere sie als Vermutung und schreib vor dem Versuch,
+   > welcher Befund sie zur Tatsache macht. Versuche zuerst, sie unabhängig zu widerlegen.
    > Hält sie stand, darf sie wahr sein. Wer den Auftrag vergibt, misst **blind mit**."
 
 2. **Nutzer-Artefakte sind Verträge.** Was du festgelegt hast — Dashboard, Ausgabeformat,
