@@ -18,13 +18,22 @@ const now = Date.now()
 const progressAt = now - 2 * EMERGENCY_THRESHOLD_MS
 const sleeper = spawn(process.execPath, ['-e', 'setInterval(() => {}, 1000)'], { stdio: 'ignore', windowsHide: true })
 
-const reportAt = (end) => ({
-  window: { start: progressAt - 1, end },
-  timeline: [
-    { start: progressAt - 1, end: progressAt, className: ACTIVITY_CLASSES.FOREGROUND },
-    { start: progressAt, end, className: ACTIVITY_CLASSES.IDLE_OWNER },
-  ],
-})
+const reportAt = (end) => {
+  const timeline = []
+  for (let start = progressAt - 1; start < end; start += 5 * 60_000) {
+    timeline.push({
+      start,
+      end: Math.min(end, start + 5 * 60_000),
+      className: ACTIVITY_CLASSES.FOREGROUND,
+      cause: 'wedged-owner-keeps-making-tool-calls',
+    })
+  }
+  return {
+    window: { start: progressAt - 1, end },
+    batchProgress: [{ at: progressAt, kind: 'first-parent-commit' }],
+    timeline,
+  }
+}
 const commands = []
 const execute = (_exe, args) => { commands.push(args.join(' ')); return '' }
 
@@ -58,11 +67,12 @@ try {
     ownerTerminated: dead,
     restartAttempts: commands.filter((line) => /batch-autostart\.mjs/.test(line)).length,
     strikeRecords: rows.length,
+    busyActivityIgnored: soft.decision.progressAt === progressAt && hard.decision.progressAt === progressAt,
     restoredWithoutHuman: hard.restored && dead,
     measuredMs: Date.now() - now,
   }
   process.stdout.write(`${JSON.stringify(result)}\n`)
-  if (!result.restoredWithoutHuman || result.softAction !== 'soft-recover' || result.hardAction !== 'hard-recover' || result.strikeRecords !== 4) {
+  if (!result.restoredWithoutHuman || !result.busyActivityIgnored || result.softAction !== 'soft-recover' || result.hardAction !== 'hard-recover' || result.strikeRecords !== 4) {
     process.exitCode = 1
   }
 } catch (error) {
