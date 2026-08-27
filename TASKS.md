@@ -114,6 +114,21 @@ put it is the mistake this line exists to stop.
   432 files / 14045 tests — run with cwd in the MAIN checkout left refs, `.git/config` and the
   worktree list byte-identical against a snapshot taken immediately before it. The linked worktree
   is therefore the variable, not the suite's mere presence.
+  CAUSE MEASURED 27.08.2026, 13:05-13:18 in a disposable shared clone — it FALSIFIES the lead above.
+  The lead is wrong twice over. First, the full unit suite (432 files, 14056 tests) run with cwd in a
+  linked worktree of that clone left the clone's refs, `.git/config` and worktree list BYTE-IDENTICAL,
+  so `scripts/repo-paths.mjs` and its common checkout are not the escape. Second, the escape is an
+  INHERITED `GIT_DIR`: git exports `GIT_DIR` to a hook process ONLY when the push comes from a linked
+  worktree, and it exports it ABSOLUTE (`<repo>/.git/worktrees/<name>`); the same hook fired from the
+  MAIN checkout runs with `GIT_DIR` unset — measured, both directions. `GIT_DIR` is inherited by every
+  child of `scripts/pre-push-gate.mjs` and it OVERRIDES `-C`: measured, `GIT_DIR=<live> git -C /tmp/fx
+  init` left `/tmp/fx` without a `.git`, and `GIT_DIR=<live> git -C /tmp/fx branch fixture-escape-probe`
+  created that branch in the LIVE ref store. Every fixture in the suite scopes itself with `-C <tmpdir>`
+  and is defeated by it. One cause covers all five damage classes above, and it explains the control's
+  cleanliness exactly: the main-checkout hook has no `GIT_DIR` to inherit. The fix therefore belongs
+  where the child environment is built — the gate wrappers strip `GIT_DIR`, `GIT_WORK_TREE`,
+  `GIT_INDEX_FILE`, `GIT_COMMON_DIR` and `GIT_OBJECT_DIRECTORY` before spawning — not in `repo-paths`,
+  and not fixture by fixture.
   FINAL STATE: the unit suite, run from ANY linked worktree, leaves the live checkout byte-identical
   — refs, `.git/config`, worktree registrations, worktree HEADs and index. The call site that
   escapes into the common checkout is closed at the cause rather than fenced off test by test, and
