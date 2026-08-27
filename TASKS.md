@@ -13054,3 +13054,25 @@ to land than a mechanism that needs a review.
   Criticality: med — it costs no correctness in the product, but it forces the emergency valve on an
   ordinary successful landing, and a valve used routinely stops being an alarm.
   Bundle: Chat & Tafel.
+- [ ] 978. `done` accepts an empty card text and publishes the internal focus note instead.
+  MEASURED 27.08.2026, 22:26, at the landing of point 843. The command line the boundary itself
+  prints — `node scripts/board.mjs done <N> --none --text-stdin` — spends the single stdin text on the
+  HANDOVER reason, while the card text is a separate positional argument. A session following that
+  line verbatim leaves the card text empty; `closeCard` then falls back to the focus note, and the
+  Erledigt card on the board the user reads said "point 843: current work · Prüfung aufgezeichnet:
+  83542f6 → merge" — machine bookkeeping in the one place that is supposed to say what the point
+  delivered. Nothing refused it: an empty text is a legal argument and the fallback is silent.
+  THIS IS THE WRITE PATH, NOT THE MISSING-CARD PATH. Point 976 owns the card that never gets written
+  and the repair route for one that is already wrong or absent; this point owns only the moment the
+  card IS written with nothing to say. The two edit the same writer, so they are worked together on
+  one branch, 976 first, and never beside each other.
+  FINAL STATE: a done card is never published carrying the focus note. `done` refuses an empty card
+  text and names the argument that carries it, and the boundary prints a command line that carries
+  BOTH texts, so following it verbatim cannot produce this state.
+  VERIFIABLE: Vitest over the pure board projection — closing a card with no text is refused and the
+  refusal names the argument; no rendered Erledigt card ever contains the focus note; and a case reads
+  the line `batch-boundary.mjs --prepare` prints and finds both the card text and the handover reason
+  in it.
+  Criticality: low — nothing is lost, but the board is the user’s own artefact and it reads as machine
+  output at the one moment it should read as a result.
+  Bundle: Chat & Tafel.

@@ -451,12 +451,6 @@
       "origin": "machine",
       "place": "last"
     },
-    "843": {
-      "at": "2026-08-27T19:56:32.120Z",
-      "why": "Point 946 sits in front of the release at Criticality: high and may not be worked before this register lands; leaving 843 behind point 174 parks 946 with it.",
-      "origin": "machine",
-      "place": "ahead"
-    },
     "845": {
       "at": "2026-08-22T20:51:29.892Z",
       "why": "Machine-filed, low and cheap: it costs a false red on unrelated points, not lost work, so it waits behind the release like the other detector-hygiene findings of this evening.",
@@ -906,10 +900,52 @@
       "why": "Die Vier-Augen-Kette hat keinen ausfuehrbaren Zug mehr, sobald der erste Gegenleser befangen ist — das blockiert jedes Zugende, das einen Mechanismus beruehrt, und damit auch den Abschlussdurchlauf selbst.",
       "origin": "machine",
       "place": "ahead"
+    },
+    "978": {
+      "at": "2026-08-27T20:29:55.116Z",
+      "why": "Last is right: it is cosmetic on the board, it waits for point 976 which owns the same writer, and nothing about the release or the queue depends on it.",
+      "origin": "machine",
+      "place": "last"
     }
   },
+  "boundary": {
+    "at": "2026-08-21T00:55:14.962Z",
+    "points": [
+      336,
+      553,
+      596,
+      633,
+      659,
+      660,
+      663,
+      686,
+      687,
+      688,
+      689,
+      690,
+      691,
+      692,
+      708,
+      715,
+      719,
+      733,
+      734,
+      735,
+      736,
+      738,
+      739,
+      746,
+      747,
+      750,
+      759,
+      760,
+      762,
+      764
+    ],
+    "why": "The order standing in front of the release today is the arrangement that predates this rule; the four machine-filed points that had ranked themselves there were moved behind 174 first"
+  },
   "settled": {
-    "at": "2026-08-27T19:31:29.706Z",
+    "at": "2026-08-27T20:29:55.124Z",
     "points": [
       174,
       184,
@@ -1144,7 +1180,6 @@
       839,
       841,
       842,
-      843,
       845,
       847,
       849,
@@ -1231,43 +1266,8 @@
       974,
       975,
       976,
-      977
+      977,
+      978
     ]
-  },
-  "boundary": {
-    "at": "2026-08-21T00:55:14.962Z",
-    "points": [
-      336,
-      553,
-      596,
-      633,
-      659,
-      660,
-      663,
-      686,
-      687,
-      688,
-      689,
-      690,
-      691,
-      692,
-      708,
-      715,
-      719,
-      733,
-      734,
-      735,
-      736,
-      738,
-      739,
-      746,
-      747,
-      750,
-      759,
-      760,
-      762,
-      764
-    ],
-    "why": "The order standing in front of the release today is the arrangement that predates this rule; the four machine-filed points that had ranked themselves there were moved behind 174 first"
   }
 }
