@@ -4156,6 +4156,12 @@ Build order, chosen so no two parallel agents own the same file:
   unreachable AND the worktree excuse never lifts, so NO red this gate ever takes can be evidence,
   and its own verdict line ends `do NOT stop the batch on this`. That is the permanent-UNDECIDED
   state the paragraph above warns against, reached from both sides at once.
+  WHAT THE RED ACTUALLY WAS, since the excuse hid it: nothing. Re-run by hand the same hour, the
+  suite reported 430 files and 14 015 tests ALL PASSED and still exited 1, because the global
+  teardown of `scripts/repository-integrity.mjs` had seen a ref move — point 955. The moving ref
+  was this session creating the next point's own feature branch at 00:12:28Z, four seconds before
+  the run ended. So the load excuse was covering a false red from a different mechanism, and the
+  tree it refused to judge was entirely green: the two defects hand each other an alibi.
   VERIFIABLE: Vitest on the pure verdict — a red beside a worktree whose newest edit is hours
   old is BROKEN, not inconclusive; a red beside a worktree edited a minute ago stays
   inconclusive; the reason string names the deciding measurement. Plus, on the process probe: a
@@ -12650,6 +12656,22 @@ to land than a mechanism that needs a review.
   pre-push gate. The check's own message already names the legitimate case, and the pre-push gate's
   single re-run is what rescued tonight's push; that re-run is a fail-soft, not an answer, because it
   costs a full unit suite and reports SUSPECT.
+  IT IS NOT ONLY THE DELEGATED LANES — THE OWNER TRIPS IT ON EVERY POINT START (measured
+  27.08.2026, 00:09-00:12Z, on main `6edd81fd`, with NO authoring lane running yet). The chain,
+  end to end: `batch-doctor --gate` began `npm run test:unit` at 00:09:44Z; at 00:12:28Z the same
+  owner session created `feat/957-contribution-scoped-review`, which is the mandated FIRST step of
+  the next point; at 00:12:32Z the suite finished with 430 files and 14 015 tests ALL PASSED and
+  the teardown failed the run on `refs changed: refs/heads/feat/957-…`. So the exposure is not
+  confined to a busy evening of parallel authors: the owner's own `git worktree add` and its own
+  bookkeeping commit on `main` move a ref just as reliably, which puts every point start and every
+  cross-cutting commit in the window. Reproduced the same hour from a manual `npm run test:unit`,
+  again all 430 files green, exit 1 on the same teardown.
+  AND IT COMPOUNDS WITH 455, WHICH IS HOW THE GREEN TREE STAYED UNKNOWN. `batch-doctor` reads only
+  the exit code, so it saw a red; its load probe then excused that red as INCONCLUSIVE on "7 live
+  agent worktree(s)" that held no process and had not been written to for 3 to 14 days. A false red
+  from this point therefore collects a false excuse from 455, and neither mechanism ever learns
+  what was true — that the tree was entirely green. Whichever of the two is built first, its test
+  should name the other, because each one alone still leaves the pair silent.
   FINAL STATE: the teardown distinguishes TEST LEAKAGE into the live repository from a foreign
   branch's own progress. A ref that belongs to a declared in-flight lane, or any ref that is neither
   the running checkout's HEAD nor its branch, is not this suite's leakage and does not fail the run;
