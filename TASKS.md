@@ -77,54 +77,6 @@ then point 633 (the closing run), then point 174 (the tag). A newly appended poi
 kind is MOVED to the front in the same turn that files it; leaving it where append-and-defer
 put it is the mistake this line exists to stop.
 
-- [ ] 967. The card header's portrait stacking now reads worse than what it replaced — third round.
-  REPORTED by the user 27.08.2026, 10:15 with a portrait phone screenshot of the published board
-  taken at 10:08 (~412 CSS px), verbatim: "Zu 963: Das war schon der zweite Versuch und jetzt sieht
-  es noch schlimmer aus als vorher." This is the THIRD round of one complaint: 941 (57d6c47c) let
-  every header group wrap but left the outer columns unyielding; 963 (58fcc4d5, merged c6018a87 on
-  27.08. at 09:49) then forces all THREE header groups to `flex: 1 1 100%` UNCONDITIONALLY below the
-  board's 460px phone break. The screenshot shows what that costs: every card header becomes three
-  stacked full-width rows whatever it contains — number plus badge, then the title, then meta and
-  the disclosure marker right-aligned on a row of their own — even for a short done-card header that
-  fitted on one line. Cards grow tall and airy, the meta floats detached from its card, and the
-  board's compactness is gone.
-  WHY THE SUITE MISSED IT BOTH TIMES: nothing is geometrically cut off, and both attempts were
-  verified by overflow and cut-off assertions only. The complaint is aesthetic, which is the class
-  the `watch-for-aesthetic-oddities` rule exists for. 58fcc4d5's own message records that the
-  suite's hand-written stylesheet copy "is why the same complaint passed verification twice", fixes
-  exactly that, measures the published board at 360/390/414 — and still ships a rendering the user
-  rejects.
-  TWO FURTHER BLOCKERS, measured 27.08. while preparing this round (carrier addendum): the stacking
-  rule is not the only cause — `details:not(.sect)>summary>.t` carries `flex:1 1 18rem`
-  (`scripts/board-core.mjs`), and 18rem ≈ 288px exceeds a portrait card's whole content strip, so
-  flex line-breaking wraps EVERY title to its own row below ~460px even with the media rule deleted;
-  the phone break needs a content-driven title basis. And the suite itself constrains the fix:
-  `board-layout.mjs` asserts every title keeps ≥50% of its card width (stress cards included), which
-  a genuinely compact one-line header violates — that assertion must be reworked in the same commit
-  (a title either fits its content unclipped on one line OR keeps its 50% share).
-  FINAL STATE: a header group takes a full row only when its content needs one, so a short header
-  stays as compact as it was before the 460px rule. The authoring proposal — not a user instruction
-  — is number plus badge left and meta plus marker right on row one, with the title full-width
-  beneath, applied only when the one-line header does not fit. No regression on 941/963: nothing is
-  cut off or escapes its card, a long title and a long meta wrap their own text, and the
-  published-board portrait measurements at 360/390/414 stay green.
-  THE POINT DOES NOT CLOSE ON A GREEN SUITE ALONE: two formally green attempts were rejected by the
-  user's eye, so the third closes only after the user approves a portrait screenshot of the
-  candidate rendering — real board content, ~390px, showing one long-title card and one short
-  done-card. The 27.08. rejection makes the user the acceptance authority for this point.
-  VERIFIABLE: the suite gains the assertion class it lacks — an upper bound on header HEIGHT for a
-  SHORT header at portrait width, so unconditional stacking turns the suite red instead of needing a
-  fourth complaint; plus the existing 360/390/414 cut-off and wrap assertions against the published
-  board.
-  Criticality: high — it is the third round of the same rejected rendering, and the board is the
-  surface the user reads the batch on.
-  Author lane: fable — operator decision, user 27.08.2026, 10:21, verbatim: "Hole die Batch (ohne
-  Forcierung) und mache das direkt.", answering this session's offer to fix it here itself
-  ("dass ich das hier selbst fixe"); the serving session is Fable 5. Routing measured sol at round
-  0; review stays cross-vendor (Sol reads the diff, `scripts/review-sol.mjs`).
-  Bundle: Chat & Tafel. It edits the board's card-header CSS and `scripts/verify/board-layout.mjs`,
-  which 965 does not touch, so the two may run beside each other.
-
 - [ ] 945. A dead owner beside a live delegate wedges resurrection into the runaway pause. MEASURED
   26.08.2026, 12:44–16:30 (autostart.log): after the owner died without handover, its GPT-5.6 Sol
   delegate kept writing in the point worktree — by design, delegates are daemon-owned and survive
