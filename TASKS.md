@@ -13112,3 +13112,30 @@ to land than a mechanism that needs a review.
   Criticality: low — nothing is lost, but the board is the user’s own artefact and it reads as machine
   output at the one moment it should read as a result.
   Bundle: Chat & Tafel.
+
+- [ ] 980. The retrospective hands out the same section number to several lessons. MEASURED
+  27.08.2026, 23:50 on `main` at bfe14680 plus that turn's `retro-refresh`:
+  `docs/analysis_de/retrospektive-zusammenarbeit.md` carries 216 `### 3.x` sections and EIGHT of
+  those numbers are used more than once — `3.112` three times (lines 1530, 3761, 4292), `3.120`
+  four times, and `3.121`, `3.137`, `3.171`, `3.172`, `3.179`, `3.185` twice each. The number is
+  the document's own citation handle and it is cited from outside: work-order point 979 names
+  "retrospective section 3.112" as the evidence that a review dropped a real edit, and that
+  citation resolves to three different lessons, so it proves nothing. The prose also runs on
+  AFTER `## Anhang A` (line 1413) to line 4465, so the appendix no longer ends the file and the
+  next writer appends where the numbering is hardest to see.
+  FINAL STATE: every `### 3.x` number in the file names exactly one lesson, and a new duplicate
+  cannot be written. The renumbering is a one-off; the mechanism is the part that lasts, so a
+  check refuses a duplicated number the way `doc-budget` refuses an outgrown document, and it
+  names the offending number and both lines. Renumbering must not silently break an inbound
+  citation: every reference to a moved number — in `TASKS.md`, `docs/`, and the archive — moves
+  with it in the same commit, and the point reports which ones moved.
+  Consider as alternatives, and record why the chosen one wins: renumbering the later duplicates
+  to fresh numbers at the end; or dropping the numbers from the headings entirely and citing
+  lessons by their title, which no renumbering can break.
+  VERIFIABLE: Vitest over the pure check — a fixture document with a duplicated `### 3.x` is
+  refused and the message names the number and both line numbers, a clean fixture passes, and
+  the real file passes after the renumbering; plus a repository search that finds no citation of
+  a number this point moved without its new value.
+  Criticality: low — nothing breaks at runtime, but the document is our own evidence trail and a
+  handle that names three things names none.
+  Bundle: Dokumentation.
