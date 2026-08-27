@@ -27,6 +27,10 @@ const EPSILON = 0.5
 // two-part meta beside it.
 const STRESS_POINT = '9631'
 const STRESS_QUEUE_POINT = '9632'
+// The compactness probe (point 967): a header whose every part is short must
+// resolve to few rows — the stacked layout the user rejected spent three full
+// rows on it, one per group, whatever the content needed.
+const STRESS_SHORT_POINT = '9633'
 const STRESS_CARDS = `
 <details class="now"><summary><span class="num">${STRESS_POINT}</span><span class="t">Ein absichtlich langer Kartentitel, der im Hochformat mehrere Zeilen braucht und trotzdem vollständig lesbar bleiben muss</span><span class="right"><span class="pill">laufend</span><span class="meta">06:30 · ~08:30</span></span></summary>
   <div class="body"><p>Messkarte.</p></div>
@@ -34,10 +38,15 @@ const STRESS_CARDS = `
 <details><summary><span class="num">${STRESS_QUEUE_POINT}</span><span class="t">Kurz</span><span class="right"><span class="meta">06:30 · ~08:30 · überfällig seit gestern Abend · Nachtrag zur Schätzung dieses Punktes</span></span></summary>
   <div class="body"><p>Messkarte.</p></div>
 </details>
+<details><summary><span class="num">${STRESS_SHORT_POINT}</span><span class="t">Kurz</span><span class="right"><span class="meta">09:10 · 09:55</span></span></summary>
+  <div class="body"><p>Messkarte.</p></div>
+</details>
 `
 const STRESS_TASKS = `- [ ] ${STRESS_POINT}. A deliberately long current-card title
   Criticality: high — reviewed.
 - [ ] ${STRESS_QUEUE_POINT}. A queued card with a deliberately long meta
+  Criticality: medium — visible.
+- [ ] ${STRESS_SHORT_POINT}. A short done-card header that must stay compact
   Criticality: medium — visible.`
 
 // The declarations point 963 replaced. Appended after the shipped stylesheet,
@@ -47,6 +56,13 @@ const OLD_HEADER_RULES = `<style id="board-layout-control">
 details:not(.sect)>summary>.t{flex:1 1 12rem}
 details:not(.sect)>summary>.right{flex-wrap:nowrap}
 @media(max-width:460px){details:not(.sect)>summary:has(>.right)>.card-header-left,details:not(.sect)>summary:has(>.right)>.t,details:not(.sect)>summary:has(>.right)>.right{flex:0 1 auto}}
+</style>`
+
+// The declarations point 967 replaced: 963's unconditional stacking, which the
+// user rejected on sight. Geometrically clean, so only the compactness bound
+// can condemn it — this control proves that bound reads Chromium's geometry.
+const STACKED_HEADER_RULES = `<style id="board-layout-stacking-control">
+@media(max-width:460px){details:not(.sect)>summary:has(>.right)>.card-header-left,details:not(.sect)>summary:has(>.right)>.t,details:not(.sect)>summary:has(>.right)>.right{flex:1 1 100%}}
 </style>`
 
 // The base stylesheet of the published page. `.batch-dashboard.html` is a local
@@ -129,7 +145,7 @@ const measureBoard = async (page, html) => {
     })
   })
   return page.evaluate(
-    ([stressPoint, stressQueuePoint]) => {
+    ([stressPoint, stressQueuePoint, stressShortPoint]) => {
       const summaries = [...document.querySelectorAll('details:not(.sect) > summary')]
       const pointOf = (summary) => summary.querySelector('.num')?.textContent?.trim() ?? ''
       const named = (element) => element.className || element.tagName
@@ -146,7 +162,18 @@ const measureBoard = async (page, html) => {
         const title = summary.querySelector(':scope > .t')
         if (title) {
           const box = title.getBoundingClientRect()
-          titles.push({ point, width: box.width, share: box.width / card.width })
+          const lineHeight = Number.parseFloat(getComputedStyle(title).lineHeight)
+          titles.push({
+            point,
+            width: box.width,
+            share: box.width / card.width,
+            // A title that shows its whole content on a single unclipped line is
+            // compact, not squeezed — it needs no width share (point 967).
+            oneLine:
+              lineHeight > 0 &&
+              box.height < lineHeight * 1.6 &&
+              title.scrollWidth <= title.clientWidth + 1,
+          })
         }
 
         // Nothing in the header may leave its card, and nothing may be cut off:
@@ -189,17 +216,27 @@ const measureBoard = async (page, html) => {
       // against one title line, and the right column's meta against its own line
       // height — the second is the column breaking its content rather than
       // keeping one unbreakable row.
-      for (const point of [stressPoint, stressQueuePoint]) {
+      for (const point of [stressPoint, stressQueuePoint, stressShortPoint]) {
         const summary = summaries.find((entry) => pointOf(entry) === point)
         if (!summary) continue
         const title = summary.querySelector(':scope > .t')
         const lineHeight = title ? Number.parseFloat(getComputedStyle(title).lineHeight) : 0
         const meta = summary.querySelector(':scope > .right .meta')
         const metaLine = meta ? Number.parseFloat(getComputedStyle(meta).lineHeight) : 0
+        // Rows are counted over the summary's CONTENT box: its padding is
+        // constant per width and would otherwise blur the row arithmetic the
+        // compactness bounds below depend on.
+        const summaryStyle = getComputedStyle(summary)
+        const padding =
+          Number.parseFloat(summaryStyle.paddingTop) + Number.parseFloat(summaryStyle.paddingBottom)
+        const contentHeight = summary.getBoundingClientRect().height - padding
         lines[point] = {
           height: summary.getBoundingClientRect().height,
           lineHeight,
           rows: lineHeight > 0 ? summary.getBoundingClientRect().height / lineHeight : 0,
+          contentRows: lineHeight > 0 ? contentHeight / lineHeight : 0,
+          titleRows:
+            title && lineHeight > 0 ? title.getBoundingClientRect().height / lineHeight : 0,
           metaHeight: meta ? meta.getBoundingClientRect().height : 0,
           metaLine,
           metaRows: meta && metaLine > 0 ? meta.getBoundingClientRect().height / metaLine : 0,
@@ -214,14 +251,14 @@ const measureBoard = async (page, html) => {
         clipped,
         split,
         lines,
-        stressSeen: [stressPoint, stressQueuePoint].every((point) =>
+        stressSeen: [stressPoint, stressQueuePoint, stressShortPoint].every((point) =>
           summaries.some((summary) => pointOf(summary) === point),
         ),
         scrollWidth: root.scrollWidth,
         clientWidth: root.clientWidth,
       }
     },
-    [STRESS_POINT, STRESS_QUEUE_POINT],
+    [STRESS_POINT, STRESS_QUEUE_POINT, STRESS_SHORT_POINT],
   )
 }
 
@@ -263,9 +300,12 @@ try {
           .map((item) => `#${item.point} ${item.element} ${item.scroll}>${item.client}`)
           .join(', '),
       )
+      // A title is fine either way: it shows its whole content on one unclipped
+      // line (compact), or it holds a readable share of the card (point 967 —
+      // the flat share rule alone refused every compact one-line header).
       check(
-        `${at}: every title keeps at least ${Math.round(MIN_TITLE_SHARE * 100)}% of its card`,
-        measured.titles.every((title) => title.share >= MIN_TITLE_SHARE),
+        `${at}: every title fits one line or keeps ${Math.round(MIN_TITLE_SHARE * 100)}% of its card`,
+        measured.titles.every((title) => title.oneLine || title.share >= MIN_TITLE_SHARE),
         worst ? `worst #${worst.point} ${Math.round(worst.width)}px/${Math.round(worst.share * 100)}%` : 'no title',
       )
       check(
@@ -293,6 +333,31 @@ try {
         Boolean(longMeta) && longMeta.metaRows > 1.6,
         longMeta ? `${Math.round(longMeta.metaHeight)}px over ${Math.round(longMeta.metaLine)}px line` : 'not measured',
       )
+      // THE ASSERTION CLASS BOTH EARLIER ROUNDS LACKED (point 967): an upper
+      // bound on header HEIGHT. The stacked layout the user rejected was
+      // geometrically clean — every group on its own full row — so only a
+      // compactness bound can turn that regression red. A short header resolves
+      // to at most two content rows (side groups sharing one, the title on
+      // one), and a long header spends at most one extra row beside its title.
+      const short = measured.lines[STRESS_SHORT_POINT]
+      check(
+        `${at}: a short header stays within two content rows`,
+        Boolean(short) && short.contentRows < 2.7,
+        short ? `${short.contentRows.toFixed(2)} content rows` : 'not measured',
+      )
+      // 1.8 = one shared side row plus flex row-gaps. At 320px — the narrowest
+      // phone the board was ever read on — the published page's number+badge and
+      // pill+meta measurably cannot share one row, so each takes its own there:
+      // that is the content-driven break the point asks for, not stacking, and
+      // the bound admits one more row at that width alone.
+      const extraRowAllowance = width <= 320 ? 2.8 : 1.8
+      check(
+        `${at}: the long header spends at most one extra row beside its title`,
+        Boolean(stressed) && stressed.contentRows < stressed.titleRows + extraRowAllowance,
+        stressed
+          ? `${stressed.contentRows.toFixed(2)} content rows for ${stressed.titleRows.toFixed(2)} title rows`
+          : 'not measured',
+      )
       await page.close()
     }
   }
@@ -309,6 +374,22 @@ try {
       `${name}: the measurement rejects the old squeezed-header control at 360px`,
       broken.titles.some((title) => title.share < MIN_TITLE_SHARE) || broken.clipped.length > 0,
       worst ? `worst #${worst.point} ${Math.round(worst.width)}px/${Math.round(worst.share * 100)}%` : 'no title',
+    )
+    await page.close()
+  }
+
+  // Second control: 963's stacked layout, restored on top of the shipped CSS,
+  // must fall to the compactness bound alone.
+  for (const { name, html } of pages) {
+    const page = await browser.newPage({ viewport: { width: 390, height: 900 } })
+    const stacked = await measureBoard(page, `${html}\n${STACKED_HEADER_RULES}`)
+    const short = stacked.lines[STRESS_SHORT_POINT]
+    const long = stacked.lines[STRESS_POINT]
+    check(
+      `${name}: the compactness bound rejects the stacked-header control at 390px`,
+      (Boolean(short) && short.contentRows >= 2.7) ||
+        (Boolean(long) && long.contentRows >= long.titleRows + 1.8),
+      short ? `${short.contentRows.toFixed(2)} content rows on the short header` : 'not measured',
     )
     await page.close()
   }
