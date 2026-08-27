@@ -9,6 +9,13 @@
 // this suite renders is `.batch-dashboard.html` itself, passed through the same
 // `renderCardCriticalities` the publisher uses, so the CSS under test is the CSS
 // that ships.
+//
+// POINT 969 — the FOURTH round of the same complaint — moved the verdict from
+// "nothing is cut off" to "the header is three columns": the title shares its
+// line with the number group and the time group at every width, it is wider
+// than both of them together, and a header whose every part is short occupies a
+// single row. Those three are what a full-width title row cannot satisfy, and
+// each of them is proved against a restored control below.
 import { existsSync, readFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { chromium } from 'playwright'
@@ -18,7 +25,13 @@ import { renderCardCriticalities } from '../board-core.mjs'
 // The portrait widths the complaint names, plus the narrowest phone the board
 // has ever been read on.
 const WIDTHS = [320, 360, 390, 414]
-const MIN_TITLE_SHARE = 0.5
+// The three-column header of point 969 spends the card on three columns by
+// design, so the title can no longer own half of a 320px card once the number
+// group, the time group and the marker have taken their own content width. The
+// flat share is kept as a floor against a title crushed to a sliver; the rule
+// that carries the user's "CENTER, flexible and dominant" is the dominance
+// check below — the title must be wider than both side columns together.
+const MIN_TITLE_SHARE = 0.4
 const EPSILON = 0.5
 
 // Header content that no live card carries yet, so the regression is measured
@@ -27,9 +40,10 @@ const EPSILON = 0.5
 // two-part meta beside it.
 const STRESS_POINT = '9631'
 const STRESS_QUEUE_POINT = '9632'
-// The compactness probe (point 967): a header whose every part is short must
-// resolve to few rows — the stacked layout the user rejected spent three full
-// rows on it, one per group, whatever the content needed.
+// The compactness probe (points 967/969): a header whose every part is short
+// must resolve to ONE row — the stacked layout the user rejected spent a row per
+// group whatever the content needed, and 967's "at most two rows" was still
+// satisfied by exactly that.
 const STRESS_SHORT_POINT = '9633'
 // Coverage the review demanded (finding 5): a state card WITHOUT the number
 // wrapper — its title must stay above the right group — and a card with no
@@ -77,6 +91,7 @@ details:not(.sect)>summary>.right>*,details:not(.sect)>summary>.right .meta{whit
 // user rejected on sight. Geometrically clean, so only the compactness bound
 // can condemn it — this control proves that bound reads Chromium's geometry.
 const STACKED_HEADER_RULES = `<style id="board-layout-stacking-control">
+details:not(.sect)>summary{flex-wrap:wrap;row-gap:4px}
 @media(max-width:460px){details:not(.sect)>summary:has(>.right)>.card-header-left,details:not(.sect)>summary:has(>.right)>.t,details:not(.sect)>summary:has(>.right)>.right{flex:1 1 100%}}
 </style>`
 
@@ -169,6 +184,12 @@ const measureBoard = async (page, html) => {
       const overflow = []
       const clipped = []
       const split = []
+      // THE REJECTED RENDERING, MEASURED AS GEOMETRY (point 969): the title on a
+      // row of its own beneath the two side groups. Four rounds of this
+      // complaint were closed on suites that could not see it, because every
+      // bound they carried was satisfied by a clean full-width title row.
+      const stacked = []
+      const notDominant = []
       const lines = {}
 
       for (const summary of summaries) {
@@ -208,24 +229,36 @@ const measureBoard = async (page, html) => {
           }
         }
 
-        // A card whose header carries ordinary content keeps its two side
-        // columns on one line each. The stress cards are exempt: point 963
-        // requires a column to BREAK its own content when it must.
-        if (point === stressPoint || point === stressQueuePoint) continue
-        for (const selector of [':scope > .card-header-left', ':scope > .right']) {
-          const group = summary.querySelector(selector)
-          if (!group) continue
-          const children = [...group.children].map((child) => child.getBoundingClientRect())
-          for (let i = 1; i < children.length; i++) {
-            const previous = children[i - 1]
-            const current = children[i]
-            // Baseline-aligned text and a .72em badge have different tops. They
-            // share a line when their vertical intervals overlap, not when their
-            // top coordinates happen to be equal.
-            if (!(current.top < previous.bottom && current.bottom > previous.top)) {
-              split.push({ point, group: named(group) })
-              break
+        // THE THREE COLUMNS STAY COLUMNS. The title shares a line with the
+        // number group and with the time group at every width — their vertical
+        // intervals overlap. A column that stacks its OWN content is exactly
+        // what the point asks for and is not measured here; a title pushed onto
+        // a row below its neighbours is the rendering the user rejected four
+        // times, and it is what this records.
+        const leftGroup = summary.querySelector(':scope > .card-header-left')
+        const rightGroup = summary.querySelector(':scope > .right')
+        if (title) {
+          const titleBox = title.getBoundingClientRect()
+          for (const group of [leftGroup, rightGroup]) {
+            if (!group) continue
+            const box = group.getBoundingClientRect()
+            if (!(titleBox.top < box.bottom - 0.5 && titleBox.bottom > box.top + 0.5)) {
+              stacked.push({ point, group: named(group) })
             }
+          }
+          // …and the centre column dominates: it is wider than the two narrow
+          // columns beside it together. The stress cards are exempt — a header
+          // whose whole content is a four-letter title has nothing to dominate
+          // with, and its title is measured by the one-line rule instead.
+          const sideWidth =
+            (leftGroup?.getBoundingClientRect().width ?? 0) +
+            (rightGroup?.getBoundingClientRect().width ?? 0)
+          if (
+            point !== stressQueuePoint &&
+            point !== stressShortPoint &&
+            titleBox.width + 0.5 < sideWidth
+          ) {
+            notDominant.push({ point, title: Math.round(titleBox.width), sides: Math.round(sideWidth) })
           }
         }
       }
@@ -300,6 +333,8 @@ const measureBoard = async (page, html) => {
         overflow,
         clipped,
         split,
+        stacked,
+        notDominant,
         lines,
         stressSeen: [stressPoint, stressQueuePoint, stressShortPoint].every((point) =>
           summaries.some((summary) => pointOf(summary) === point),
@@ -369,11 +404,19 @@ try {
         worst ? `worst #${worst.point} ${Math.round(worst.width)}px/${Math.round(worst.share * 100)}%` : 'no title',
       )
       check(
-        `${at}: number/badge and status/time stay on one line each for ordinary cards`,
-        measured.split.length === 0,
-        measured.split
+        `${at}: the title shares its line with the number and the time column`,
+        measured.stacked.length === 0,
+        measured.stacked
           .slice(0, 6)
           .map((item) => `#${item.point} ${item.group}`)
+          .join(', '),
+      )
+      check(
+        `${at}: the title column is wider than both side columns together`,
+        measured.notDominant.length === 0,
+        measured.notDominant
+          .slice(0, 6)
+          .map((item) => `#${item.point} ${item.title}px vs ${item.sides}px`)
           .join(', '),
       )
       // The complaint itself: a long title beside a long meta must resolve to
@@ -393,16 +436,16 @@ try {
         Boolean(longMeta) && longMeta.metaRows > 1.6,
         longMeta ? `${Math.round(longMeta.metaHeight)}px over ${Math.round(longMeta.metaLine)}px line` : 'not measured',
       )
-      // THE ASSERTION CLASS BOTH EARLIER ROUNDS LACKED (point 967): an upper
-      // bound on header HEIGHT. The stacked layout the user rejected was
-      // geometrically clean — every group on its own full row — so only a
-      // compactness bound can turn that regression red. A short header resolves
-      // to at most two content rows (side groups sharing one, the title on
-      // one), and a long header spends at most one extra row beside its title.
+      // THE BOUND THAT NOW BITES (point 969). Point 967 wrote this as "at most
+      // two content rows", which is precisely what the rejected rendering
+      // spends: side groups on one row, title on the next. A header whose every
+      // part is short occupies ONE row at portrait width — number, badge,
+      // title, times and marker beside each other — so anything that stacks
+      // unconditionally is red here without a fifth complaint.
       const short = measured.lines[STRESS_SHORT_POINT]
       check(
-        `${at}: a short header stays within two content rows`,
-        Boolean(short) && short.contentRows < 2.7,
+        `${at}: a short header occupies a single content row`,
+        Boolean(short) && short.contentRows < 1.6,
         short ? `${short.contentRows.toFixed(2)} content rows` : 'not measured',
       )
       // 1.8 = one shared side row plus flex row-gaps. At 320px — the narrowest
@@ -454,8 +497,13 @@ try {
       const long = stacked.lines[STRESS_POINT]
       check(
         `${name}: the short-header bound rejects the stacked control at ${width}px`,
-        Boolean(short) && short.contentRows >= 2.7,
+        Boolean(short) && short.contentRows >= 1.6,
         short ? `${short.contentRows.toFixed(2)} content rows` : 'not measured',
+      )
+      check(
+        `${name}: the side-by-side rule rejects the stacked control at ${width}px`,
+        stacked.stacked.length > 0,
+        `${stacked.stacked.length} title(s) pushed off their neighbours' line`,
       )
       if (width === 390) {
         check(
