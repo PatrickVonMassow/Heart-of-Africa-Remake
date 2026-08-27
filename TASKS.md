@@ -12879,44 +12879,6 @@ to land than a mechanism that needs a review.
   artefact later readers trust without re-measuring.
   Bundle: Session- & Repo-Hygiene.
 
-- [ ] 973. The beginner guide owes today's cut-material lesson, and its currency was attested by
-  nobody. MEASURED 27.08.2026 at the guide-currency check, which fires whenever the retrospective's
-  sources move. Retrospective §3.203 landed the same evening with a lesson that transfers directly
-  to this guide's audience and appears nowhere in it: WHEN A TOOL SHORTENS THE MATERIAL IT HANDS A
-  MODEL, THE CUT MUST BE NAMED TO THE MODEL, not merely printed to the caller — otherwise absence
-  is indistinguishable from a defect, and the model's most honest answer is a fabricated finding.
-  It belongs beside the §3.112 clause the guide already carries about a suspected cause, because
-  today's case is that clause's POSITIVE counterpart: a suspicion marked AS a suspicion, carrying
-  its own promotion criterion, was recognised a day later instead of re-litigated — which is the
-  cheap half of the same rule and the half the guide never states.
-  WHY IT IS ITS OWN POINT AND NOT PART OF 971: 971 is being authored on
-  `feat/971-meta-rule-audit` and edits this exact file plus `scripts/guide-brevity-core.mjs`, so a
-  main-side edit would be the same-file collision CLAUDE.md §6 forbids. This point therefore runs
-  AFTER 971 lands and never beside it.
-  FINAL STATE:
-  - The lesson is in the guide, folded into an existing meta rule or as its own pitfall with its
-    prompt — whichever the audit 971 builds accepts.
-  - The SECOND missing lesson is in it too, added 27.08.2026 with retrospective §3.206: a rule
-    corpus can forbid BY OMISSION. Three rules each covered the neighbouring case and none covered
-    the one at hand, so every session read a prohibition none of them states and waited for a
-    permission the user had already given. Unlike a contradiction, a gap between three correct
-    rules is invisible on reading and errs towards waiting, which looks like diligence. The guide
-    carries no pitfall for it; the closest lines are about a promised exception never built and
-    about rules drifting from code, which are different failures. Its prompt belongs beside them:
-    write the permission into the SAME sentence as its limit, and make the periodic rule review
-    ask which obvious case NO rule covers.
-  - The exact-fit ceilings in `scripts/guide-brevity-core.mjs` are REMEASURED in the same commit,
-    with the reason recorded beside them, as that file's own contract requires.
-  - `node scripts/retro-refresh.mjs --guide-reviewed` is run only THEN. It was deliberately NOT run
-    on 27.08.2026: attesting currency while two review findings stand against the file and a third
-    lesson is missing signs a claim the measurement contradicts.
-  VERIFIABLE: the guide audit stays green at the remeasured ceilings, the meta-rule check 971 built
-  passes over the added text, and the currency attestation exists with its date.
-  Criticality: low — it costs no correctness, but a guide that silently keeps superseded advice is
-  the exact failure observed on 25.07.2026, when it taught a rule a day after the retrospective had
-  sharpened it and the user found it.
-  Bundle: Dokumentation.
-
 - [ ] 974. The criticality gate charges a high-criticality point with every file that landed near
   it, so it cannot converge while the batch works. MEASURED 27.08.2026, 18:40, on `main` at
   `9f66f8b`. `criticality-review-guard` named point 966 and said: "the recorded pass files do not
