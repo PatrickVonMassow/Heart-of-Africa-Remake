@@ -77,6 +77,70 @@ then point 633 (the closing run), then point 174 (the tag). A newly appended poi
 kind is MOVED to the front in the same turn that files it; leaving it where append-and-defer
 put it is the mistake this line exists to stop.
 
+- [ ] 843. A ruling the owner already gave is asked again, because the only place it lives is a
+  memory (measured 22.08.2026, 22:05, from the owner's own board message: "Ich hatte bereits vor
+  längerer Zeit festgelegt, dass du selbstständig - als letztes Mittel - die Obergrenze anlegen
+  sollst. Das vergisst du immer wieder. Etabliere mit einem Mechanismus, dass du mich das nicht
+  mehr fragst. Die bisherige Form, in der das hinterlegt ist, ist offensichtlich unzureichend.").
+  The card he was answering — "Anhebung der Anleitungs-Obergrenze: selbst entscheiden oder
+  zurücknehmen?" — asked him to confirm a decision he had already delegated on 10.08.2026
+  ("Frage mich in Zukunft allgemein nicht mehr bzgl. Anhebungen"). The ruling IS recorded, in the
+  auto-memory `doc-budget-shorten-dont-raise`, and the card was written anyway: a memory is read
+  when a session happens to recall it, and nothing REFUSES the question at the moment it is
+  asked. This is not the doc-ceiling rule's problem — that rule is written correctly. It is that
+  a settled ruling has no enforcing home, so every settled ruling in this repository can be
+  re-asked the same way.
+  FINAL STATE: settled owner rulings live in ONE tracked register, each carrying the ruling, the
+  date, the owner's verbatim words, and the terms that identify a question about it. `node
+  scripts/board.mjs vdzk-add` REFUSES a card whose title or question matches a registered ruling
+  and prints the ruling plus the action it already authorises, so the card cannot be written at
+  all; `decision-card-guard` judges the composed reply against the same register, so asking in
+  prose is refused by the same words. The doc-ceiling ruling is the register's first entry, and
+  the memory stops being the record and points at the register instead.
+  MATCHING MUST NOT GO BLIND EITHER WAY: a rewording of the same question is still refused, and a
+  question the register does not cover passes untouched — a register that swallows genuine
+  decisions costs more than the repetition it prevents. Where a match is uncertain, the refusal
+  names the ruling and lets the session state, in one line, why this question is NOT that one.
+  VERIFIABLE: Vitest over the pure matcher — the refused card verbatim, three rewordings of it,
+  and an unrelated decision card that must pass; a case proving the refusal prints the ruling's
+  own words; a repository check that every register entry carries date, verbatim wording and
+  terms; and the guard registered in `.claude/settings.json` under the authoritative inventory.
+  Criticality: medium — no work is lost, but the owner is asked to re-decide what he decided, and
+  he has now reported the same class twice.
+  Bundle: Chat & Tafel.
+
+- [ ] 902. A stated recommendation on a board card is a decision I may carry out. MEASURED
+  24.08.2026: the rule corpus a session loads says the opposite by omission. The memory
+  `no-standstill-decide-and-record` licenses deciding by own judgment only where NO card is
+  pending; `dashboard-vdzk-only-decisions` makes every decision request a card and says nothing
+  about who may close one; `CLAUDE.md` §6 says "unless durably authorized" without naming this
+  authorization. Result: the Zeiterfassung card, whose recommendation was already stated, waited
+  for a yes that only restated it, and its point 559 is still open.
+  USER RULING 24.08.2026, on the card "Zeiterfassung in der Arbeitsordnung: abschaffen oder
+  wiederbeleben?", quoting their own earlier answer "Mach es so, wie du es empfohlen hast": "Ja,
+  das sollst du künftig dürfen."
+  FINAL STATE: the standing authorization stands where a session reads it, with its scope drawn.
+  IN SCOPE: a "Von dir zu klären" card on which I have STATED a recommendation may be decided BY
+  that recommendation, carried out, and closed with the decision recorded — what, why, and what a
+  veto would change — the shape rung 3 of `no-standstill-decide-and-record` already prescribes for
+  doubt without a card. OUT OF SCOPE and unchanged: outward-facing or irreversible steps (tags,
+  publishes, force-pushes, deletions of user data) keep their own confirmation per the memories
+  `tags-only-on-request` and `version-release-process`; a card posing a genuine choice I did NOT
+  recommend on stays the user's.
+  (a) `CLAUDE.md` §6 carries ONE sentence naming this authorization at the existing "unless durably
+  authorized" clause of the "Act on settled judgment" bullet, naming scope AND boundary in the same
+  breath so no reading of it reaches a tag, a publish or a deletion.
+  (b) `docs/rule-corpus-audit.md` records the ruling dated 24.08.2026 with the user's wording, in
+  the row style the file uses for decided entries.
+  (c) The memory entry `recommendation-is-a-decision` is verified against the corpus after (a) and
+  (b) and linked from `no-standstill-decide-and-record`; write it if it is absent, with its
+  `MEMORY.md` index line.
+  VERIFIABLE: a repository search finds the authorization sentence in `CLAUDE.md` §6 and the dated
+  row in `docs/rule-corpus-audit.md`; the doc-budget guard and `npm run test:unit` stay green; and
+  the boundary clause stands in the same sentence as the grant.
+  Criticality: low — process hygiene, but it is what keeps a decided card from idling.
+  Bundle: Chat & Tafel.
+
 - [ ] 946. A VDZK card still parks an owner-decidable question; admissibility gets the point-864
   typing. Point 864 typed the `AWAITING-USER` point gate (`defer-for-user.mjs` refuses advisory
   reasons), but the CARD path kept accepting open questions: on 26.08.2026 the card "Vier-Augen-
@@ -10868,38 +10932,6 @@ to land than a mechanism that needs a review.
   slips past it unnoticed, which is exactly how the first one survived.
   Bundle: Session- & Repo-Hygiene.
 
-- [ ] 843. A ruling the owner already gave is asked again, because the only place it lives is a
-  memory (measured 22.08.2026, 22:05, from the owner's own board message: "Ich hatte bereits vor
-  längerer Zeit festgelegt, dass du selbstständig - als letztes Mittel - die Obergrenze anlegen
-  sollst. Das vergisst du immer wieder. Etabliere mit einem Mechanismus, dass du mich das nicht
-  mehr fragst. Die bisherige Form, in der das hinterlegt ist, ist offensichtlich unzureichend.").
-  The card he was answering — "Anhebung der Anleitungs-Obergrenze: selbst entscheiden oder
-  zurücknehmen?" — asked him to confirm a decision he had already delegated on 10.08.2026
-  ("Frage mich in Zukunft allgemein nicht mehr bzgl. Anhebungen"). The ruling IS recorded, in the
-  auto-memory `doc-budget-shorten-dont-raise`, and the card was written anyway: a memory is read
-  when a session happens to recall it, and nothing REFUSES the question at the moment it is
-  asked. This is not the doc-ceiling rule's problem — that rule is written correctly. It is that
-  a settled ruling has no enforcing home, so every settled ruling in this repository can be
-  re-asked the same way.
-  FINAL STATE: settled owner rulings live in ONE tracked register, each carrying the ruling, the
-  date, the owner's verbatim words, and the terms that identify a question about it. `node
-  scripts/board.mjs vdzk-add` REFUSES a card whose title or question matches a registered ruling
-  and prints the ruling plus the action it already authorises, so the card cannot be written at
-  all; `decision-card-guard` judges the composed reply against the same register, so asking in
-  prose is refused by the same words. The doc-ceiling ruling is the register's first entry, and
-  the memory stops being the record and points at the register instead.
-  MATCHING MUST NOT GO BLIND EITHER WAY: a rewording of the same question is still refused, and a
-  question the register does not cover passes untouched — a register that swallows genuine
-  decisions costs more than the repetition it prevents. Where a match is uncertain, the refusal
-  names the ruling and lets the session state, in one line, why this question is NOT that one.
-  VERIFIABLE: Vitest over the pure matcher — the refused card verbatim, three rewordings of it,
-  and an unrelated decision card that must pass; a case proving the refusal prints the ruling's
-  own words; a repository check that every register entry carries date, verbatim wording and
-  terms; and the guard registered in `.claude/settings.json` under the authoritative inventory.
-  Criticality: medium — no work is lost, but the owner is asked to re-decide what he decided, and
-  he has now reported the same class twice.
-  Bundle: Chat & Tafel.
-
 - [ ] 845. A unit test pins the size of a file that lives outside the repository, so an unrelated
   memory edit reddens the suite (measured 22.08.2026, 22:20, in the `point-834` worktree: `npm run
   test:unit` reported 12,851 passed, 5 skipped and ONE failure — `scripts/cut-account-core.test.mjs`,
@@ -11533,38 +11565,6 @@ to land than a mechanism that needs a review.
   VERIFIABLE: unit cases with a four-digit point in a title and in a body, and a fingerprint case
   that fails when only one budget excludes the comment.
   Criticality: low — one fuse dated at point 1000, one half-covered assertion.
-  Bundle: Chat & Tafel.
-
-- [ ] 902. A stated recommendation on a board card is a decision I may carry out. MEASURED
-  24.08.2026: the rule corpus a session loads says the opposite by omission. The memory
-  `no-standstill-decide-and-record` licenses deciding by own judgment only where NO card is
-  pending; `dashboard-vdzk-only-decisions` makes every decision request a card and says nothing
-  about who may close one; `CLAUDE.md` §6 says "unless durably authorized" without naming this
-  authorization. Result: the Zeiterfassung card, whose recommendation was already stated, waited
-  for a yes that only restated it, and its point 559 is still open.
-  USER RULING 24.08.2026, on the card "Zeiterfassung in der Arbeitsordnung: abschaffen oder
-  wiederbeleben?", quoting their own earlier answer "Mach es so, wie du es empfohlen hast": "Ja,
-  das sollst du künftig dürfen."
-  FINAL STATE: the standing authorization stands where a session reads it, with its scope drawn.
-  IN SCOPE: a "Von dir zu klären" card on which I have STATED a recommendation may be decided BY
-  that recommendation, carried out, and closed with the decision recorded — what, why, and what a
-  veto would change — the shape rung 3 of `no-standstill-decide-and-record` already prescribes for
-  doubt without a card. OUT OF SCOPE and unchanged: outward-facing or irreversible steps (tags,
-  publishes, force-pushes, deletions of user data) keep their own confirmation per the memories
-  `tags-only-on-request` and `version-release-process`; a card posing a genuine choice I did NOT
-  recommend on stays the user's.
-  (a) `CLAUDE.md` §6 carries ONE sentence naming this authorization at the existing "unless durably
-  authorized" clause of the "Act on settled judgment" bullet, naming scope AND boundary in the same
-  breath so no reading of it reaches a tag, a publish or a deletion.
-  (b) `docs/rule-corpus-audit.md` records the ruling dated 24.08.2026 with the user's wording, in
-  the row style the file uses for decided entries.
-  (c) The memory entry `recommendation-is-a-decision` is verified against the corpus after (a) and
-  (b) and linked from `no-standstill-decide-and-record`; write it if it is absent, with its
-  `MEMORY.md` index line.
-  VERIFIABLE: a repository search finds the authorization sentence in `CLAUDE.md` §6 and the dated
-  row in `docs/rule-corpus-audit.md`; the doc-budget guard and `npm run test:unit` stay green; and
-  the boundary clause stands in the same sentence as the grant.
-  Criticality: low — process hygiene, but it is what keeps a decided card from idling.
   Bundle: Chat & Tafel.
 
 - [ ] 904. Three findings the whole-range review found in the landed attempt lease. MEASURED
