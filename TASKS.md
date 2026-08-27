@@ -142,6 +142,39 @@ put it is the mistake this line exists to stop.
   delegated author runs this suite from a worktree.
   Bundle: Urlaubsfestigkeit.
 
+- [ ] 969. The card header is rejected a FOURTH time, and point 967 closed without the approval its
+  own spec demanded. REPORTED by the user 27.08.2026, 13:33 with a portrait phone screenshot taken
+  at 13:31 (~390 CSS px), verbatim: "Dashboard ist nach wie vor kaputt. Dieses Mal wirklich auf
+  meine Freigabe warten." This is the FOURTH round of ONE complaint — 941, then 963, then 967 — and
+  the second failure is procedural: 967's own spec made the user the acceptance authority and closed
+  "only after the user approves a portrait screenshot of the candidate rendering (real board
+  content, ~390px, one long-title card and one short done-card)". It was merged as d02e6720 at 12:03
+  and ticked done between 12:02 and 12:26 WITHOUT that approval ever being given. A green suite
+  closes nothing here; that was already the finding of the third round, and the third round then
+  closed on one anyway.
+  WHAT THE 13:31 SCREENSHOT SHOWS: every card — including the SHORT done-cards whose headers used to
+  fit on one line — renders number plus badge left, meta right, and the title on its own full-width
+  row beneath. That is precisely the unconditional stacking 967 was written to end: its FINAL STATE
+  demanded the full-width title row "only when the one-line header does not fit", and the shipped
+  rendering applies it always.
+  FINAL STATE: a short card header — number, badge, meta, marker and a short title — occupies ONE
+  line at ~390px, and the title drops to its own full-width row only when it genuinely does not fit
+  beside them. No regression on 941/963/967: nothing is cut off or escapes its card, a long title and
+  a long meta wrap their own text, and the published-board portrait measurements at 360/390/414 stay
+  green.
+  THE POINT DOES NOT CLOSE ON A GREEN SUITE, AND IT DOES NOT CLOSE ON THE AUTHOR'S OWN EYE. The
+  user's 13:33 instruction is binding and literal: produce the candidate portrait screenshot, put it
+  on the board as a decision card, and WAIT. The tick, the merge and the archive move happen after
+  the user's explicit approval and not before. Three rounds have now been closed on a verification
+  the user then rejected; a fourth self-approval is the defect, not the rendering.
+  VERIFIABLE: the suite gains what 967's own VERIFIABLE promised and did not deliver in a form that
+  bites — an upper bound on the HEIGHT of a SHORT header at portrait width, measured against the
+  PUBLISHED board rather than a hand-written stylesheet copy, so unconditional stacking turns the
+  suite red without a fifth complaint. Plus the existing 360/390/414 cut-off and wrap assertions.
+  Criticality: high — it is the fourth round of the same rejected rendering, the board is the surface
+  the user reads the batch on, and the closing rule of the previous round was broken.
+  Bundle: Chat & Tafel.
+
 - [ ] 946. A VDZK card still parks an owner-decidable question; admissibility gets the point-864
   typing. Point 864 typed the `AWAITING-USER` point gate (`defer-for-user.mjs` refuses advisory
   reasons), but the CARD path kept accepting open questions: on 26.08.2026 the card "Vier-Augen-
