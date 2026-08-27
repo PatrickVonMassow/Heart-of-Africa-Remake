@@ -12884,6 +12884,10 @@ to land than a mechanism that needs a review.
   worktree to the MAIN checkout, so a fixture helper that seeds or mutates "the repository" through
   the common checkout writes into the live tree from a worktree while being indistinguishable from
   cwd in the main checkout. The author measures the actual escaping call site before fixing it.
+  CONTROL MEASURED THE SAME MORNING, 10:13-10:24: the identical gate — `git push origin main`,
+  432 files / 14045 tests — run with cwd in the MAIN checkout left refs, `.git/config` and the
+  worktree list byte-identical against a snapshot taken immediately before it. The linked worktree
+  is therefore the variable, not the suite's mere presence.
   FINAL STATE: the unit suite, run from ANY linked worktree, leaves the live checkout byte-identical
   — refs, `.git/config`, worktree registrations, worktree HEADs and index. The call site that
   escapes into the common checkout is closed at the cause rather than fenced off test by test, and
