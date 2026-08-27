@@ -77,30 +77,6 @@ then point 633 (the closing run), then point 174 (the tag). A newly appended poi
 kind is MOVED to the front in the same turn that files it; leaving it where append-and-defer
 put it is the mistake this line exists to stop.
 
-- [ ] 945. A dead owner beside a live delegate wedges resurrection into the runaway pause. MEASURED
-  26.08.2026, 12:44–16:30 (autostart.log): after the owner died without handover, its GPT-5.6 Sol
-  delegate kept writing in the point worktree — by design, delegates are daemon-owned and survive
-  handover (CLAUDE.md §6) — and the successor decision in `batch-autostart-core.mjs` read that
-  activity as an unrecognized live feature-writer and refused every spawn (`registered-writer-live`).
-  Meanwhile the watchdog counted each refused tick as "previous spawn did NOT take over"
-  (failCount 1→3) although no new spawn had been attempted between counts, paused the batch as
-  RUNAWAY, resumed on the clock, ran the same loop, and paused again — over two hours of standstill
-  with the finished, pushed delegate work sitting there, until the user noticed.
-  FINAL STATE:
-  - A live registered writer whose owning session is dead does not veto the successor: the successor
-    spawns and adopts the in-flight work (`batch-in-flight --adopt`); only a writer beside a LIVE
-    owner vetoes.
-  - `failCount` counts only actual spawn attempts without progress; a refused tick is a wait, not a
-    fault, and can never reach the runaway limit on its own.
-  - A runaway pause marker names the concretely measured refusal cause of its ticks instead of four
-    guesses.
-  VERIFIABLE: Vitest over the successor decision — dead owner + live delegate yields start-and-adopt;
-  live owner + delegate yields the veto; a sequence of refused ticks leaves failCount untouched.
-  Criticality: high — it is the second half of the 26.08. standstill and recurs on every owner death
-  beside a running delegate.
-  Bundle: Urlaubsfestigkeit. It edits the successor decision and the watchdog counters 859 and 866
-  own, so it is worked with them, never beside them.
-
 - [ ] 966. The unit suite run from a linked worktree writes into the LIVE repository. MEASURED
   27.08.2026, 10:02-10:07: a `git push origin main` issued while the shell's working directory was
   still inside the linked worktree `.claude/worktrees/point-945` ran `scripts/pre-push-gate.mjs`
