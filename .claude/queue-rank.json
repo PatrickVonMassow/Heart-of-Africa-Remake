@@ -907,9 +907,9 @@
       "origin": "machine",
       "place": "last"
     },
-    "982": {
-      "at": "2026-08-27T22:51:16.869Z",
-      "why": "It holds an OPEN do-not-merge on main: the four-eyes gate blocks every turn end of every session until a descendant commit answers pass 2 of the e0654ac review, so no other point — the release included — can be landed while it stands.",
+    "983": {
+      "at": "2026-08-27T23:27:43.669Z",
+      "why": "It blocks every turn end of every session and prints a remedy no allowed model may run: the gate reports six cross-vendor-reviewed contributions as self-reviewed and tells Sol to review Sol's own commits, so nothing — the release included — can be landed while it stands.",
       "origin": "machine",
       "place": "ahead"
     }
@@ -951,7 +951,7 @@
     "why": "The order standing in front of the release today is the arrangement that predates this rule; the four machine-filed points that had ranked themselves there were moved behind 174 first"
   },
   "settled": {
-    "at": "2026-08-27T22:51:16.877Z",
+    "at": "2026-08-27T23:27:43.676Z",
     "points": [
       174,
       184,
@@ -1274,7 +1274,7 @@
       978,
       980,
       981,
-      982
+      983
     ]
   }
 }
