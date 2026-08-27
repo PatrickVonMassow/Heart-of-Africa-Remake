@@ -877,12 +877,6 @@
       "origin": "machine",
       "place": "last"
     },
-    "971": {
-      "at": "2026-08-27T12:32:21.514Z",
-      "why": "Medium urgency but behind the release: the unenforced guide rule loses no work while the release closes",
-      "origin": "machine",
-      "place": "last"
-    },
     "972": {
       "at": "2026-08-27T16:27:18.617Z",
       "why": "Es kostet eine Pruefrunde pro Vorkommen, aber nichts am Produkt; der Release-Vorrang der Verstaendigungsmechanik und die vor ihm liegenden Notfall- und Hygienepunkte wiegen schwerer, und 971 haelt die inhaltliche Haelfte bereits offen",
@@ -898,6 +892,12 @@
     "974": {
       "at": "2026-08-27T16:41:30.176Z",
       "why": "Es blockiert den Zugabschluss jeder Sitzung, wird aber nicht dadurch dringender, dass es vorgezogen wird: Der naechste Besitzer trifft es sofort und kann es dann mit frischem Kontext nehmen; die Punkte davor tragen den Release",
+      "origin": "machine",
+      "place": "last"
+    },
+    "975": {
+      "at": "2026-08-27T17:29:54.302Z",
+      "why": "Sie blockiert den Zugabschluss, wird aber nicht dadurch loesbarer, dass sie vorgezogen wird: Der naechste Besitzer trifft sie sofort und nimmt sie mit frischem Kontext; sie gehoert ausserdem zu 870 und wird mit ihm gearbeitet",
       "origin": "machine",
       "place": "last"
     }
@@ -939,7 +939,7 @@
     "why": "The order standing in front of the release today is the arrangement that predates this rule; the four machine-filed points that had ranked themselves there were moved behind 174 first"
   },
   "settled": {
-    "at": "2026-08-27T16:41:30.189Z",
+    "at": "2026-08-27T17:29:54.311Z",
     "points": [
       174,
       184,
@@ -1257,10 +1257,10 @@
       965,
       968,
       970,
-      971,
       972,
       973,
-      974
+      974,
+      975
     ]
   }
 }

@@ -13001,3 +13001,42 @@ to land than a mechanism that needs a review.
   provably false fact about a point, which is the failure class a gate exists to prevent rather than
   produce.
   Bundle: Session- & Repo-Hygiene.
+
+- [ ] 975. A four-eyes debt whose fix comes from the other vendor can be cleared by nobody.
+  MEASURED 27.08.2026, 19:15-19:20, on `main` at `3ec195a`. `mechanism-review-guard` holds
+  contribution `2dbce90` (authored by Claude Opus 5) under a standing GPT-5.6 Sol do-not-merge and
+  demands, verbatim: "record the re-review at a commit that DESCENDS from 2dbce90 — a verdict on
+  work that does not contain the fix answers nothing." The fix was authored by GPT-5.6 Sol as point
+  971 and landed at `3ec195a`. Running the demanded review at that descendant is REFUSED by the
+  harness itself, verbatim: "ROLE SWAP — GPT-5.6 Sol AUTHORED part of 3ec195a, so it may not
+  review it. The review is Opus 5's."
+  SO THE GATE DEMANDS A SOL VERDICT ON A STATE SOL MAY NOT READ, while an Opus 5 verdict on the
+  same state does not clear the entry, because `2dbce90` is Anthropic-authored and its second pair
+  of eyes must be the other vendor. Fable 5 does not resolve it: the switch is ON, but Fable is
+  Anthropic, so it is not cross-vendor for an Anthropic-authored contribution. Two Opus 5 verdicts
+  are already recorded and the gate is unchanged.
+  IT IS NOT THAT NOBODY LOOKED. Both vendors looked, each at the half it was allowed to see, and
+  the gate can still be cleared by neither — so it blocks every turn end indefinitely. It blocked
+  every single turn end of the session that measured it. This is the family of point 870 (a review
+  round that cannot be commissioned at all) reached from the opposite direction: there NO eligible
+  reviewer existed; here TWO exist and each is excluded from the state that would settle it.
+  MEASURED BESIDE IT, and its own small defect: a plain merge commit carries no `Co-Authored-By`
+  model trailer, so `mechanism-review.mjs --record` refuses it — "Unknown authorship is
+  unreviewable, not authorless" — and a verdict cannot be attached to the very commit that carries
+  the fix into `main`.
+  FINAL STATE — one of these, chosen by reading the guard rather than by taste:
+  - the original contribution's debt is settled by a CROSS-VENDOR verdict on the ORIGINAL diff plus
+    a permitted verdict on the FIX, counted as a pair; or
+  - a fix authored by the reviewing vendor TRANSFERS the debt to that vendor, discharged by the
+    first vendor reading the fix; or
+  - the guard records the exclusion the way `criticality-review-guard --record-unavailable` already
+    does, naming the exact files and why no vendor is eligible.
+  In every case: a gate no configured actor can clear must SAY so, rather than repeat an
+  instruction that cannot be followed.
+  VERIFIABLE: Vitest over the pure eligibility decision — a contribution by vendor A whose fix is
+  authored by vendor B reports a reachable route to clearance, and the case where no route exists
+  is reported as such rather than as an ordinary owed review; plus a case pinning that a commit
+  without a model trailer names its own unreviewability instead of failing the record silently.
+  Criticality: high — it is a blocking gate on every turn end with no reachable exit, which is the
+  hand-waiver decay point 734 describes, reached without even a hand waiver being available.
+  Bundle: Session- & Repo-Hygiene.
