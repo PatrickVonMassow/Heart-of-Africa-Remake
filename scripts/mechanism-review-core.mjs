@@ -1767,9 +1767,20 @@ export function evaluateMechanismReview({
     // way out stays honest and is always open: complete the recorded passes.
     // Only records that COMPOSE must be sound; the evidence of the split need
     // not be.
-    // File-scoped rows are split evidence too. Excluding them let a pass-less
-    // whole-range row stand beside a recorded 1/3 and bypass completeness.
-    const split = covering.some((r) => !legacyContributionShape(r) && passRow(r))
+    // File-scoped rows are split evidence too, but only for REMAINING FILE DEBT
+    // they name. Excluding them altogether let a pass-less whole-range row
+    // stand beside a recorded 1/3 on the same files and bypass completeness;
+    // treating them as range-global later let an unrelated descendant scope
+    // revoke an earlier cross-vendor review. A legacy non-file-scoped pass row
+    // still witnesses its whole covering range because it names no narrower
+    // boundary by which this gate could soundly cut that reach back.
+    const remainingFileDebt = new Set((commit.files ?? []).map(String))
+    const split = covering.some((r) =>
+      !legacyContributionShape(r) &&
+      passRow(r) &&
+      (!fileClaim(r) ||
+        (Array.isArray(r?.pass?.files) && r.pass.files.some((file) => remainingFileDebt.has(String(file))))),
+    )
     const besideSplit = split ? legacySound.filter((r) => !r?.pass) : []
     const valid = [
       ...(split ? [] : legacySound.filter((r) => !r?.pass)),
