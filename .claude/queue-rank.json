@@ -860,8 +860,8 @@
       "place": "last"
     },
     "963": {
-      "at": "2026-08-27T05:12:59.739Z",
-      "why": "The user's third report of the same header; it waits behind the communication points and the two standstill halves, but ahead of nothing else this bundle owes.",
+      "at": "2026-08-27T05:37:44.066Z",
+      "why": "User instruction 27.08.2026, 07:28 board chat ('Ziehe das vor.'): worked before 945 — his third report of the same header, moved to the queue head in the same turn that filed the order.",
       "origin": "machine",
       "place": "last"
     },
@@ -871,42 +871,6 @@
       "origin": "machine",
       "place": "last"
     }
-  },
-  "boundary": {
-    "at": "2026-08-21T00:55:14.962Z",
-    "points": [
-      336,
-      553,
-      596,
-      633,
-      659,
-      660,
-      663,
-      686,
-      687,
-      688,
-      689,
-      690,
-      691,
-      692,
-      708,
-      715,
-      719,
-      733,
-      734,
-      735,
-      736,
-      738,
-      739,
-      746,
-      747,
-      750,
-      759,
-      760,
-      762,
-      764
-    ],
-    "why": "The order standing in front of the release today is the arrangement that predates this rule; the four machine-filed points that had ranked themselves there were moved behind 174 first"
   },
   "settled": {
     "at": "2026-08-27T05:12:59.843Z",
@@ -1227,5 +1191,41 @@
       963,
       964
     ]
+  },
+  "boundary": {
+    "at": "2026-08-21T00:55:14.962Z",
+    "points": [
+      336,
+      553,
+      596,
+      633,
+      659,
+      660,
+      663,
+      686,
+      687,
+      688,
+      689,
+      690,
+      691,
+      692,
+      708,
+      715,
+      719,
+      733,
+      734,
+      735,
+      736,
+      738,
+      739,
+      746,
+      747,
+      750,
+      759,
+      760,
+      762,
+      764
+    ],
+    "why": "The order standing in front of the release today is the arrangement that predates this rule; the four machine-filed points that had ranked themselves there were moved behind 174 first"
   }
 }
