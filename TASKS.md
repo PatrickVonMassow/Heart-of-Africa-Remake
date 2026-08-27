@@ -12803,3 +12803,36 @@ to land than a mechanism that needs a review.
   Criticality: low — nothing is corrupted and no gate is bypassed, but it damages every log the
   project reads about itself, and it is one line of shell to prevent.
   Bundle: Session- & Repo-Hygiene.
+- [ ] 963. The board's closing card is written and then silently overwritten, so a session that
+  owes closing duties cannot get a card it may stand behind (MEASURED 27.08.2026 06:00 and 06:06 on
+  `main`, twice in a row: `node scripts/board.mjs closing 944 "<duties>"` reported "the board now
+  names point 944 and the closing duties still owed" and "The live page is updated", and both times
+  the now-section afterwards read `<p class="now-empty" data-state="idle">Gerade ist kein Punkt
+  nachweisbar in Arbeit.</p>`). `toClosingWork` builds the card and `writeStateCard` inserts it, but
+  the publish DERIVES the now-section from the owner focus plus the in-flight evidence and replaces
+  it. After a landing both derive to idle — the focus names the point it just closed, which is no
+  longer open, and the in-flight declaration is cleared — so the derivation always wins.
+  THE DISCRIMINATOR: the sibling card survives. `board.mjs none` writes `<details class="now"
+  data-state="idle">` and it stands; only `data-state="closing"` is replaced. So the derivation has
+  a source for idle and for an open point, and none for the closing state.
+  WHAT IT ACTUALLY BREAKS: the point-470 deny reads the published board, finds the idle claim, and
+  refuses every state-changing call. Point 544 built this card as the third way out of exactly that
+  state, and the deny still names it as a remedy that cannot be reached. Measured consequence today:
+  `git branch -d feat/944-owner-session-main-checkout` — the cleanup `land-point` skipped when its
+  board step failed — was refused three times, and `branch-hygiene-guard` then reported the two
+  merged leftovers as would-block, so the session could neither finish the duty nor end the turn.
+  It was only broken by hand-editing `.batch-dashboard.html` through the file-edit escape, which is
+  working AROUND the guard — the one thing point 544's own comment says this chain cannot afford.
+  FINAL STATE: the derived now-section knows the closing state as a third active-work source, so a
+  card written by `board.mjs closing` survives its own publish and every later republish until
+  `board.mjs none` replaces it. The source is durable rather than in-memory — a fresh process must
+  render the same card — and a closing card whose point is neither the last landed one nor open is
+  refused loudly rather than rendered.
+  VERIFIABLE: Vitest over the derivation — a closing card written after a landing survives a publish
+  and a second publish from a fresh read; the idle card still wins when no closing state is
+  recorded; `claimsNoCurrentWork` is false while the closing card stands, which is the property the
+  point-470 deny reads; and a regression case reproducing today's sequence end to end (land, focus
+  on the closed point, in-flight cleared, `closing`, publish, assert the card is still there).
+  Criticality: high — it deadlocks the session between two guards, and the only way out found today
+  was editing the board by hand.
+  Bundle: Chat & Tafel.
