@@ -12898,29 +12898,6 @@ to land than a mechanism that needs a review.
   Criticality: low — bookkeeping accuracy only; the four commits name allowed models either way.
   Bundle: Modell & Wächter.
 
-- [ ] 971. The delivered-hypothesis lesson landed with its rule unenforced. The cross-vendor
-  review of the landed guide commit (GPT-5.6 Sol, 27.08.2026, verdict do-not-merge, recorded in the
-  mechanism ledger; this point is the charge that answers it) returned three findings, of which the
-  third is REFUTED and recorded here so nobody re-litigates it.
-  (1) the guide's meta-rule says "Widerlege sie zuerst" — when the suspected cause is TRUE,
-  refutation is impossible, so the imperative falsely blocks valid work; it must demand an
-  independent ATTEMPT to falsify, not a successful refutation. (2) `scripts/guide-brevity-core.mjs`
-  only raised aggregate budgets, and `auditGuide()` pins the pitfall section's shape but nothing of
-  the meta-rule section, so deleting or weakening the new claim and spending its freed budget
-  elsewhere still passes — no check pins "falsify first" or the blind independent measurement.
-  (3) REFUTED BY MEASUREMENT: the reviewer charged the commit with carrying no retrospective
-  change, but the commit adds §3.112 — 39 lines of the lesson's long form; `review-sol.mjs` had
-  cut that file from the review material as non-material owner prose. Whether the drop note
-  reached the reviewer's material is UNMEASURED — a lead on the review harness, not a finding;
-  the next false absence-finding after a non-material cut makes it one.
-  FINAL STATE: the meta-rule demands a falsification attempt, and the audit pins the meta-rule's
-  semantic content the way it pins the pitfall section.
-  VERIFIABLE: Vitest over `auditGuide()` — the meta-rule section stripped of its falsification
-  content goes red, and the wording that a TRUE hypothesis survives the rule is asserted.
-  Criticality: med — a mechanism that counts as enforced while enforcing nothing is the failure
-  class the four-eyes gate exists to prevent.
-  Bundle: Dokumentation.
-
 - [ ] 972. A file cut from the review material reaches no manifest, so the reviewer reports its
   absence as a defect of the commit. THIS IS THE MEASUREMENT POINT 971 ASKED FOR and could not
   supply: 971 recorded the false absence-finding on `2dbce90` as a LEAD on the review harness,
