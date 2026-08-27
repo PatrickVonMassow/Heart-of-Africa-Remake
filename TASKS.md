@@ -134,6 +134,25 @@ put it is the mistake this line exists to stop.
   escapes into the common checkout is closed at the cause rather than fenced off test by test, and
   the integrity detector fails the RUN that changed the live repository instead of passing while the
   damage stands.
+  A SECOND ESCAPE ROUTE, MEASURED 27.08.2026 13:49:58 while this point was in work — the
+  `GIT_DIR` cause does NOT explain it. A probe running the unit suite inside a DISPOSABLE SHARED
+  CLONE's linked worktree, with `GIT_DIR` pointing at THAT CLONE, wrote `refs/heads/feat/x`
+  (e4e2924f, fixture history by `t <t@t>` and `guard hooks test <g@test.local>`) into the REAL
+  repository at `/workspace/hoa`. The timing is decisive: the session's own three gates in the
+  point-966 worktree finished at 13:47:24, the probe's suite ran 13:48–13:51:18, and the live ref
+  file was written at 13:49:58. The clone received its own full share of the damage at the same
+  time, so the `GIT_DIR` route was working as measured — and something else reached the live
+  checkout beside it. THE LIVE DAMAGE WAS ONE REF: `.git/config` and the worktree registrations were
+  byte-identical against the 13:11 snapshot. The ref was deleted, so its fixture trailers no longer
+  reach `git log --all` and the serving-model tripwire is clear.
+  LEADS, NAMED AS LEADS AND NOT MEASURED TO A CALL SITE: the probe's worktree carried a
+  `node_modules` SYMLINK into `/workspace/hoa`, so any resolution through a realpath'd module
+  location lands in the live checkout; and `repositoryRoot()`'s module-URL fallback resolves from
+  the script's own source location whenever cwd fails to identify a worktree — which is where the
+  incident's original suspicion pointed too. CONTROL: the same suite in the same clone worktree
+  WITHOUT `GIT_DIR` left both the clone and the live checkout untouched, so this route is not
+  always on. The author measures it before fixing it; the FINAL STATE above is not met while it
+  stands.
   VERIFIABLE: Vitest — a case that snapshots the live checkout's refs, `.git/config` and worktree
   list, drives the offending helper with cwd set to a linked worktree, and asserts the snapshot is
   unchanged; and a case that asserts the integrity detector goes red when a fixture writes into the
@@ -167,6 +186,20 @@ put it is the mistake this line exists to stop.
   on the board as a decision card, and WAIT. The tick, the merge and the archive move happen after
   the user's explicit approval and not before. Three rounds have now been closed on a verification
   the user then rejected; a fourth self-approval is the defect, not the rendering.
+  AUTHORITATIVE LAYOUT TARGET — the user's own Ist/Soll sketch, 27.08.2026 13:49 (portrait,
+  ~390px), which SUPERSEDES 967's FINAL-STATE proposal. There is to be NO full-width title row at
+  all; 967's "number plus badge left, meta right, title beneath" is precisely what the user does not
+  want. The card header is THREE COLUMNS: LEFT, narrow — the point number with the criticality badge
+  stacked directly beneath it; CENTER, flexible and dominant — the title, bold, wrapping over
+  several lines WITHIN ITS OWN COLUMN; RIGHT, narrow — the times stacked, start time with its
+  trailing separator and the disclosure marker beside it on top, estimated or actual end time
+  beneath. The outer columns stay narrow by stacking their own content vertically, which is what
+  gives the title the width. This applies to active and done cards alike.
+  AND THE STACKING IS CONTENT-DRIVEN EVERYWHERE — user addendum 27.08. 13:52. The left and right
+  columns wrap or stack ONLY under space pressure, exactly as the title column does. On a desktop
+  viewport with a short title the whole header often fits on ONE line — number, badge, title, times
+  and marker side by side — and it must then render as that one line. Nothing stacks
+  unconditionally at any breakpoint; every column wraps by its own content.
   VERIFIABLE: the suite gains what 967's own VERIFIABLE promised and did not deliver in a form that
   bites — an upper bound on the HEIGHT of a SHORT header at portrait width, measured against the
   PUBLISHED board rather than a hand-written stylesheet copy, so unconditional stacking turns the
