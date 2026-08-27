@@ -110,7 +110,7 @@ import { ACTIVITY_EVENTS, parseActivityJournal } from './batch-activity-journal-
 import { ownerActivityDecision } from './batch-ownership-core.mjs'
 import { acknowledgeCiWait } from './ci-status-guard.mjs'
 import { modelHandoffSpawn } from './model-handoff-core.mjs'
-import { REPO_ROOT } from './repo-paths.mjs'
+import { REPO_ROOT, requireMainCheckoutRoot } from './repo-paths.mjs'
 import { emergencyHandoffPrompt } from './batch-emergency-core.mjs'
 
 // IMPORT-PROOF (27.07.2026). Everything below runs at MODULE LOAD, so merely
@@ -128,9 +128,13 @@ if (!(process.argv[1] && import.meta.url === new URL(`file://${process.argv[1].r
 }
 
 const R = (p) => fileURLToPath(new URL(p, import.meta.url))
-// Script paths follow this checkout's source; batch-global state and every git
-// read follow the main checkout selected through Git's common worktree register.
-const REPO = REPO_ROOT
+// Script paths follow this checkout's source. Batch-global state, every git
+// read, and above all the OWNER SESSION'S cwd follow the verified main checkout.
+// An immediate boundary request may execute this file from a point worktree;
+// inheriting that cwd split dashboard state from publish/attest and killed the
+// owner on 26.08.2026. Failure to prove the main checkout is therefore fatal,
+// never permission to fall back to the point worktree.
+const REPO = requireMainCheckoutRoot({ checkoutRoot: REPO_ROOT })
 const SELF = fileURLToPath(import.meta.url)
 const C = (n) => join(REPO, '.claude', n)
 const LOG = C('autostart.log')

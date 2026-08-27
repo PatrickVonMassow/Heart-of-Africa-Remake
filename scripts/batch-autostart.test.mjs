@@ -665,12 +665,13 @@ describe('the launcher acts on the pause record', () => {
 describe('the launcher uses the canonical repository for batch-global state', () => {
   const source = readFileSync(resolve(process.cwd(), 'scripts', 'batch-autostart.mjs'), 'utf8')
 
-  it('takes REPO from repo-paths while retaining source-relative script lookup', () => {
-    expect(source).toMatch(/import \{ REPO_ROOT \} from '\.\/repo-paths\.mjs'/)
+  it('requires the verified main checkout while retaining source-relative script lookup', () => {
+    expect(source).toMatch(/import \{ REPO_ROOT, requireMainCheckoutRoot \} from '\.\/repo-paths\.mjs'/)
     expect(source).toMatch(/const R = \(p\) => fileURLToPath/)
-    expect(source).toMatch(/const REPO = REPO_ROOT/)
+    expect(source).toMatch(/const REPO = requireMainCheckoutRoot\(\{ checkoutRoot: REPO_ROOT \}\)/)
     expect(source).not.toMatch(/const REPO = R\('\.\.'\)/)
     expect(source).toMatch(/const C = \(n\) => join\(REPO, '\.claude', n\)/)
+    expect(source).toMatch(/buildSpawnOptions\(\{ cwd: REPO,/)
   })
 })
 
