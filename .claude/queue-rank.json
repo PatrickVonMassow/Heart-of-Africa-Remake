@@ -876,6 +876,24 @@
       "why": "False-gate nuisance with a loud-deferral workaround per incident; waits behind the release.",
       "origin": "machine",
       "place": "last"
+    },
+    "969": {
+      "at": "2026-08-27T12:32:21.348Z",
+      "why": "Fourth user report of the same portrait header defect (27.08.2026, 13:33), with the explicit order to wait for the user's approval before closing",
+      "origin": "user",
+      "place": "ahead"
+    },
+    "970": {
+      "at": "2026-08-27T12:32:21.429Z",
+      "why": "Low urgency: bookkeeping accuracy only, the four drifted commits name allowed models — waits behind the release",
+      "origin": "machine",
+      "place": "last"
+    },
+    "971": {
+      "at": "2026-08-27T12:32:21.514Z",
+      "why": "Medium urgency but behind the release: the unenforced guide rule loses no work while the release closes",
+      "origin": "machine",
+      "place": "last"
     }
   },
   "boundary": {
@@ -915,7 +933,7 @@
     "why": "The order standing in front of the release today is the arrangement that predates this rule; the four machine-filed points that had ranked themselves there were moved behind 174 first"
   },
   "settled": {
-    "at": "2026-08-27T11:19:55.551Z",
+    "at": "2026-08-27T12:32:21.522Z",
     "points": [
       174,
       184,
@@ -1232,7 +1250,10 @@
       964,
       965,
       966,
-      968
+      968,
+      969,
+      970,
+      971
     ]
   }
 }
