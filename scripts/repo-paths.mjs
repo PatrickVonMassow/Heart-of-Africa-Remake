@@ -18,6 +18,60 @@ import { statSync } from 'node:fs'
 import { basename, dirname, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 
+// Git exports these repository-local variables to hooks. In a main checkout
+// GIT_DIR is normally absent, but in a linked worktree it is an ABSOLUTE path
+// into the shared repository. Passing that environment to a child which runs
+// `git -C <fixture>` makes Git ignore the fixture and mutate the live ref store.
+// Ask Git for its own list so this follows the installed version; retain a
+// complete fallback because the safe answer when that read fails is still to
+// remove every repository identity we know about.
+const GIT_LOCAL_ENV_FALLBACK = [
+  'GIT_ALTERNATE_OBJECT_DIRECTORIES',
+  'GIT_CONFIG',
+  'GIT_CONFIG_PARAMETERS',
+  'GIT_CONFIG_COUNT',
+  'GIT_OBJECT_DIRECTORY',
+  'GIT_DIR',
+  'GIT_WORK_TREE',
+  'GIT_IMPLICIT_WORK_TREE',
+  'GIT_GRAFT_FILE',
+  'GIT_INDEX_FILE',
+  'GIT_NO_REPLACE_OBJECTS',
+  'GIT_REPLACE_REF_BASE',
+  'GIT_PREFIX',
+  'GIT_INTERNAL_SUPER_PREFIX',
+  'GIT_SHALLOW_FILE',
+  'GIT_COMMON_DIR',
+]
+
+export function gitLocalEnvironmentNames() {
+  try {
+    return execFileSync('git', ['rev-parse', '--local-env-vars'], {
+      encoding: 'utf8',
+      windowsHide: true,
+      stdio: ['ignore', 'pipe', 'ignore'],
+    })
+      .split(/\r?\n/)
+      .map((name) => name.trim())
+      .filter(Boolean)
+  } catch {
+    return GIT_LOCAL_ENV_FALLBACK
+  }
+}
+
+/** Environment for a child whose cwd/-C must choose its own repository. */
+export function withoutGitLocalEnvironment(env = process.env, names = gitLocalEnvironmentNames()) {
+  const clean = { ...env }
+  for (const name of new Set([...GIT_LOCAL_ENV_FALLBACK, ...(names ?? [])])) delete clean[name]
+  // `git -c` is encoded as a count plus numbered pairs. The count is in Git's
+  // list, but removing the pairs too prevents a future consumer from reviving
+  // stale command-local configuration after supplying a new count.
+  for (const name of Object.keys(clean)) {
+    if (/^GIT_CONFIG_(?:KEY|VALUE)_\d+$/.test(name)) delete clean[name]
+  }
+  return clean
+}
+
 const worktreeRoot = (cwd) => {
   try {
     return resolve(

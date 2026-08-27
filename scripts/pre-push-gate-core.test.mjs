@@ -495,6 +495,16 @@ describe('the gate is wired, not merely present', () => {
     expect(pkg.scripts.prepare).toContain('scripts/enable-hooks.mjs')
     expect(read('scripts/enable-hooks.mjs')).toContain('core.hooksPath')
   })
+
+  it('does not pass a hook inherited Git repository identity into either nested gate', () => {
+    const pushGate = read('scripts/pre-push-gate.mjs')
+    expect(pushGate).toContain('const GATE_ENV = withoutGitLocalEnvironment()')
+    expect(pushGate).toMatch(/spawnSync\(cmd, args,[\s\S]*?cwd: REPO_ROOT,[\s\S]*?env: GATE_ENV/)
+
+    const doctor = read('scripts/batch-doctor.mjs')
+    expect(doctor).toContain('const REPOSITORY_ENV = withoutGitLocalEnvironment()')
+    expect(doctor).toMatch(/execSync\(cmd, \{[^}]*cwd: REPO,[^}]*env: REPOSITORY_ENV/)
+  })
 })
 
 describe('the commands are the ones CI runs', () => {

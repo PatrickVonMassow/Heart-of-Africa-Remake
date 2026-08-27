@@ -1,10 +1,15 @@
 import { afterEach, describe, expect, it } from 'vitest'
 import { execFileSync } from 'node:child_process'
-import { existsSync, mkdtempSync, mkdirSync, rmSync } from 'node:fs'
+import { existsSync, mkdtempSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join, resolve } from 'node:path'
 import { pathToFileURL } from 'node:url'
-import { repositoryCommonRoot, repositoryRoot, requireMainCheckoutRoot } from './repo-paths.mjs'
+import {
+  repositoryCommonRoot,
+  repositoryRoot,
+  requireMainCheckoutRoot,
+  withoutGitLocalEnvironment,
+} from './repo-paths.mjs'
 
 describe('repositoryRoot', () => {
   const temporaryDirectories = []
@@ -60,6 +65,79 @@ describe('repositoryRoot', () => {
     expect(repositoryRoot({ explicitRoot: '', cwd: nested })).toBe(resolve(linked))
     expect(repositoryCommonRoot({ explicitRoot: '', cwd: nested })).toBe(resolve(repository))
     expect(repositoryCommonRoot({ explicitRoot: '', cwd: repository })).toBe(resolve(repository))
+  })
+
+  it('does not let a linked-worktree hook environment redirect a fixture helper into the common checkout', () => {
+    const parent = temporaryDirectory()
+    const repository = join(parent, 'main')
+    const linked = join(parent, 'linked')
+    const fixture = join(parent, 'fixture')
+    mkdirSync(repository)
+    mkdirSync(fixture)
+    execFileSync('git', ['-C', repository, 'init', '-q', '-b', 'main'], { windowsHide: true })
+    writeFileSync(join(repository, 'seed.txt'), 'live repository\n')
+    execFileSync('git', ['-C', repository, 'add', 'seed.txt'], { windowsHide: true })
+    execFileSync(
+      'git',
+      ['-C', repository, '-c', 'user.name=Fixture', '-c', 'user.email=fixture@example.invalid', 'commit', '-qm', 'seed'],
+      { windowsHide: true },
+    )
+    execFileSync('git', ['-C', repository, 'worktree', 'add', '-qb', 'fixture-linked', linked], { windowsHide: true })
+
+    const snapshot = () => ({
+      refs: execFileSync(
+        'git',
+        ['--git-dir', join(repository, '.git'), 'for-each-ref', '--format=%(refname)%00%(objectname)', 'refs/heads'],
+        { windowsHide: true },
+      ),
+      config: readFileSync(join(repository, '.git', 'config')),
+      worktrees: execFileSync('git', ['--git-dir', join(repository, '.git'), 'worktree', 'list', '--porcelain'], {
+        windowsHide: true,
+      }),
+    })
+    const before = snapshot()
+    const hookEnvironment = {
+      ...process.env,
+      GIT_DIR: execFileSync('git', ['-C', linked, 'rev-parse', '--absolute-git-dir'], {
+        encoding: 'utf8',
+        windowsHide: true,
+      }).trim(),
+      GIT_PREFIX: '',
+      GIT_CONFIG_COUNT: '1',
+      GIT_CONFIG_KEY_0: 'core.bare',
+      GIT_CONFIG_VALUE_0: 'true',
+    }
+    const cleanEnvironment = withoutGitLocalEnvironment(hookEnvironment)
+
+    // This is the measured escaping shape: the process starts in the linked
+    // worktree while a helper points Git at a temporary repository with -C.
+    // The helper must do real work in its fixture without changing the common
+    // checkout's refs, config or registrations by one byte.
+    execFileSync(
+      'git',
+      ['-C', fixture, 'init', '-q', '-b', 'main'],
+      { cwd: linked, env: cleanEnvironment, windowsHide: true },
+    )
+    execFileSync(
+      'git',
+      ['-C', fixture, '-c', 'user.name=Fixture', '-c', 'user.email=fixture@example.invalid', 'commit', '--allow-empty', '-qm', 'fixture seed'],
+      { cwd: linked, env: cleanEnvironment, windowsHide: true },
+    )
+    execFileSync('git', ['-C', fixture, 'branch', 'fixture-only'], {
+      cwd: linked,
+      env: cleanEnvironment,
+      windowsHide: true,
+    })
+
+    expect(snapshot()).toEqual(before)
+    expect(
+      execFileSync('git', ['-C', fixture, 'branch', '--format=%(refname:short)'], {
+        cwd: linked,
+        env: cleanEnvironment,
+        encoding: 'utf8',
+        windowsHide: true,
+      }),
+    ).toContain('fixture-only')
   })
 
   it('starts a batch owner in the main checkout when the launcher runs from a linked worktree', () => {
