@@ -73,6 +73,7 @@ Das Musterbeispiel sind die Chat-Zeitstempel: neun Eskalationsstufen, acht weich
 | 27.08. nachts | Neun Warnungen in einem Bereitschaftsbericht, neun davon falsch, aus zwei unabhängigen Quellen: Acht rechneten der delegierten Bahn die main-Commits der aufsichtführenden Sitzung an, die nur deshalb in ihrem Bereich lagen, weil der Auftrag den Merge von main verlangt; die neunte war die vierte Wiederholung der Fehldeutung, die ein ehrliches »6 übersprungen« als rotes Tor liest. Der Block, in dem ein echtes Rot stünde, hatte eine Trefferquote von null (§3.199, Punkte 962 und 729) |
 | 11.08. abends | Der VS-Code-Neustart nimmt den Devcontainer mit — die Batch-Sitzung und sechs Agenten sterben, nachdem ich das Gegenteil zugesichert hatte (§3.111); die Rechte-Rückfragen kamen weiter, weil `defaultMode` eine fortgesetzte Sitzung gar nicht mehr erreicht (§3.3) |
 | 27.08. | Vierte Runde derselben abgelehnten Kartenkopf-Darstellung: Der dritte Anlauf machte den Nutzer in seiner eigenen Abnahmebedingung zur entscheidenden Instanz und wurde trotzdem auf das eigene grüne Urteil gemergt und abgehakt — und die Schranke, die eine vierte Runde hätte verhindern sollen, war aus dem VORGESCHLAGENEN Zielbild abgeleitet und deshalb von genau der abgelehnten Darstellung erfüllt (§3.202, Punkte 967/969) |
+| 27.08. abends | Ein Veto der Gegenlesung stand auf `main`, dessen dritter Befund eine Erfindung des Prüfwerkzeugs war: Es schneidet die Retrospektive planmäßig aus dem Prüfstoff, druckt die Kürzung nur in die Konsole des Aufrufers und meldet in derselben Ausgabe »nichts weggelassen« — der Prüfer konnte »fehlt im Commit« von »fehlt in meiner Vorlage« nicht unterscheiden und klagte den Commit an. Der Schutzsatz dagegen gilt nur für eine aufgeteilte Prüfung, die ein Manifest schreibt (§3.203, Punkt 972) |
 
 Muster: Ab dem 22.07. explodiert die Commit-Rate (Delegation) — und genau dann häufen sich die Infrastruktur-Vorfälle. **Skalierung der Autonomie erzeugt eine eigene Problemklasse, die die Feature-Arbeit zeitweise überholt.**
 
@@ -1408,7 +1409,7 @@ keinen Träger hat. Gebucht als Punkt 956.
 
 ## Anhang A — Maschinell gepflegte Quellen-Übersicht
 
-Zuletzt aktualisiert: Donnerstag, 27.08.2026, 17:56 · Quellen-Fingerprint: `97e700ceb6b7…`
+Zuletzt aktualisiert: Donnerstag, 27.08.2026, 18:28 · Quellen-Fingerprint: `73e6e725a1f1…`
 
 Spalten heuristisch aus den Quellen abgeleitet (Anläufe = distinkte Datumsnennungen im Memory;
 Maßnahme = Guard-Skripte mit Namens-Treffer). Die inhaltliche Bewertung gehört der Prosa oben.
@@ -1509,8 +1510,8 @@ Maßnahme = Guard-Skripte mit Namens-Treffer). Die inhaltliche Bewertung gehört
 
 Erfasste Quellen: 91 Feedback-/Projekt-Memories · 57 Guard-/Hook-Skripte · 6 Revert-/Reapply-Commits · 111 Prozess-/Meta-TASKS-Punkte (davon 47 offen).
 
-<!-- RETRO-FINGERPRINT: 97e700ceb6b700a8cd773235fc66dd7c2b73240a0ed61fe0a829e01885f6b8ff -->
-<!-- RETRO-LAST-REFRESHED: 2026-08-27T15:56:07.623Z -->
+<!-- RETRO-FINGERPRINT: 73e6e725a1f1ea8e7c30e910d8a227201eb40fe6a2d7f9b56758c3c97c11a3b7 -->
+<!-- RETRO-LAST-REFRESHED: 2026-08-27T16:28:07.309Z -->
 <!-- AUTO-GENERATED:END -->
 
 ### 3.111 Ein Erfolg ist kein Beweis für den Weg, auf dem er zustande kam
@@ -4357,3 +4358,48 @@ kalibriert, nie aus dem eigenen Entwurf — und sie ist erst fertig, wenn eine K
 diesen Zustand wiederherstellt, an ihr scheitert. Und wo ein Punkt eine fremde Abnahmeinstanz
 benennt, ersetzt kein grünes Tor deren Freigabe: Das Tor sagt, dass geliefert werden DARF, nicht
 dass abgenommen IST.
+
+### 3.203 Der Prüfstoff wurde still gekürzt, und der Prüfer klagte die Kürzung als Mangel an
+
+Auf `main` stand ein Veto der Gegenlesung mit drei Befunden, dessen ausführliche Begründung nie
+festgehalten worden war — nur die Zusammenfassung einer Zeile. Der dritte Befund lautete, der
+Commit enthalte die versprochene Retrospektiv-Hälfte nicht. Er enthält sie: neununddreißig
+Zeilen, im selben Commit, im Diffstat sichtbar.
+
+Der Prüfer hatte sie nur nie gesehen. Das Prüfwerkzeug schneidet die Retrospektive planmäßig aus
+dem Prüfstoff — sie ist Nutzerprosa, von einem eigenen Wächter regiert und für eine einzelne
+Runde zu groß. Der Schnitt ist vertretbar. Was ihn zum Defekt macht, ist, dass er den Prüfer
+nicht erreicht: Die Kürzung wird in die Konsole des Aufrufers gedruckt, nicht in das Material,
+das das Modell liest. Die Deckungszeile derselben Ausgabe meldet »100 % … nichts weggelassen« —
+die geschnittene Datei ist aus dem eigenen Nenner herausgerechnet, und damit ist die Kürzung auch
+für den Aufrufer nicht mehr als eine Zeile, über die man hinwegliest.
+
+Der Schutz dagegen existiert und greift an genau dieser Stelle nicht. Der Prüfauftrag sagt dem
+Modell wörtlich, eine im MANIFEST als abwesend erklärte Datei sei nicht abgeschnitten und dürfe
+kein Urteil verhindern. Dieser Satz deckt den Fall, in dem eine Aufteilung die Datei einer
+anderen Runde zuweist — denn eine Aufteilung schreibt ein Manifest. Die Kürzung als
+»nicht prüfrelevant« schreibt keinen Manifest-Eintrag, also gilt der einzige Satz, der den
+Falschbefund verhindert hätte, ausgerechnet für den einzigen Fall nicht, der ihn braucht.
+
+Das Ergebnis ist kein übersehener Fehler, sondern ein **erfundener**. Ein Prüfer, dem Material
+fehlt, von dessen Fehlen er nichts weiß, hat keine Möglichkeit, zwischen »fehlt im Commit« und
+»fehlt in meiner Vorlage« zu unterscheiden; die redliche Antwort ist dann genau der Falschbefund,
+den er gibt. Die Kosten sind zweimal gemessen: ein stehendes Veto auf `main`, dessen dritter
+Befund eine Erfindung des Werkzeugs ist, eine volle zweite Runde, um das herauszufinden — sie
+erzeugte denselben Falschbefund wortgleich ein zweites Mal —, und ein Absatz im Arbeitsauftrag,
+dessen ganzer Zweck es ist, einen dritten Leser vom Wiederaufrollen abzuhalten. Der Falschbefund
+steht dauerhaft im Prüfbuch, dem Artefakt, dem spätere Leser ohne Nachmessung glauben.
+
+Bemerkenswert ist, wie der Punkt entstanden ist. Der vorige Lauf hatte die Ursache richtig
+vermutet und sich ausdrücklich verboten, sie als Befund zu buchen: unvermessen, ein Hinweis auf
+das Prüfgeschirr, und die Bedingung für seine Beförderung wurde gleich mitgeschrieben — der
+nächste Falschbefund nach einer stillen Kürzung macht ihn zum Punkt. Diese Bedingung trat einen
+Tag später ein und wurde erkannt, weil sie aufgeschrieben war. Das ist §3.112 mit umgekehrtem
+Vorzeichen: Eine Vermutung, die als Vermutung markiert und mit ihrem eigenen Messkriterium
+versehen wird, kostet nichts und zahlt sich aus; dieselbe Vermutung als Tatsache gebucht hätte
+einen Punkt gegen eine ungeprüfte Ursache erzeugt.
+
+**Lehre:** Was ein Werkzeug aus dem Prüfstoff nimmt, muss dem PRÜFER genannt werden, nicht dem
+Aufrufer — sonst ist die Abwesenheit für den Prüfer von einem Mangel nicht unterscheidbar, und
+seine redlichste Antwort ist ein Falschbefund. Und eine Deckungszahl, die das Weggelassene aus
+dem eigenen Nenner rechnet, meldet Vollständigkeit als Ergebnis der Kürzung.
