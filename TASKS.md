@@ -77,28 +77,6 @@ then point 633 (the closing run), then point 174 (the tag). A newly appended poi
 kind is MOVED to the front in the same turn that files it; leaving it where append-and-defer
 put it is the mistake this line exists to stop.
 
-- [ ] 944. The launcher starts the batch session inside a point worktree, so the board bookkeeping
-  splits. MEASURED 26.08.2026, 15:27, by the dying owner session itself (carrier finding): it was
-  spawned with cwd `/workspace/hoa/.claude/worktrees/point-941`; `repositoryRoot()` follows the cwd,
-  so every board command read and wrote `.claude/dashboard-state.json` IN THE WORKTREE while publish,
-  attest and focus landed in the main checkout — the Stop guard twice reported BATCH DASHBOARD NOT
-  REGISTERED although attest and `dashboard-guard --synced` had both reported green, and the worktree
-  has no `.batch-dashboard.html` at all, so board-publish cannot run there. The session wedged on
-  this split and died without a handover at 15:30; memory `session-cwd-stays-in-main-tree` names the
-  class. Predecessor sessions ran in the main checkout.
-  FINAL STATE:
-  - The launcher spawns every batch session with cwd in the main checkout, proven by a test on the
-    spawn path.
-  - OR the board bookkeeping resolves the common checkout (`commonCheckoutRoot` exists in
-    `repo-paths.mjs`) so a worktree cwd reads and writes the same state — one of the two, decided in
-    the point, with the other path refused loudly instead of splitting silently.
-  VERIFIABLE: Vitest on the chosen path; plus a regression case reproducing today's split (board
-  state written from a worktree cwd is seen by a main-checkout read).
-  Criticality: high — it kills owner sessions mid-flight and cost the 26.08. two-hour standstill its
-  first half.
-  Bundle: Urlaubsfestigkeit. It edits the launcher spawn path 859 and 612 own, so it is worked with
-  them, never beside them.
-
 - [ ] 945. A dead owner beside a live delegate wedges resurrection into the runaway pause. MEASURED
   26.08.2026, 12:44–16:30 (autostart.log): after the owner died without handover, its GPT-5.6 Sol
   delegate kept writing in the point worktree — by design, delegates are daemon-owned and survive
