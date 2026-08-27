@@ -15,6 +15,10 @@ import {
 } from './board-state-core.mjs'
 
 const NOW = Date.UTC(2026, 7, 25, 12, 0, 0)
+const measurement = {
+  key: 'batch-doctor-gate',
+  label: 'node scripts/batch-doctor.mjs --gate',
+}
 
 describe('pauseParagraph', () => {
   it('names the reason and the retry clock that will clear it', () => {
@@ -41,9 +45,52 @@ describe('decisionParagraphs — the continuation and corruption records', () =>
     expect(out).toEqual(['Der Batch läuft weiter, weil …'])
   })
 
-  it('drops a record once its alert has aged out — the card resolves itself', () => {
+  it('keeps an old record standing until its named measurement settles it', () => {
     const old = ladder({ at: NOW - 48 * 3600 * 1000, body: 'Alte Entscheidung.' })
-    expect(decisionParagraphs(old, { now: NOW })).toEqual([])
+    expect(decisionParagraphs(old, { now: NOW })).toEqual(['Alte Entscheidung.'])
+  })
+
+  it('keeps a decision whose named measurement has not been taken', () => {
+    const pending = ladder({ at: NOW - 60000, body: 'Parallel decision.', measurement })
+    expect(deriveStateCard({ ladder: pending, doctorState: {}, now: NOW })?.body).toBe('Parallel decision.')
+  })
+
+  it('expires the same decision after a newer clean measurement without deleting its trace', () => {
+    const record = { at: NOW - 60000, body: 'Parallel decision.', measurement }
+    const decided = ladder(record)
+    const doctorState = {
+      measurements: {
+        'batch-doctor-gate': {
+          lastRunAt: NOW,
+          lastVerdict: 'clean',
+          cleanAt: NOW,
+          cleanDetail: 'repo state CONSISTENT; every fast gate passed',
+        },
+      },
+    }
+    expect(deriveStateCard({ ladder: decided, doctorState, now: NOW })).toBeNull()
+    expect(decided.alerts['k-1'].record).toBe(record)
+    expect(doctorState.measurements['batch-doctor-gate'].cleanDetail).toMatch(/CONSISTENT/)
+  })
+
+  it('keeps the decision standing when its measurement came back dirty', () => {
+    const pending = ladder({ at: NOW - 60000, body: 'Parallel decision.', measurement })
+    const doctorState = {
+      measurements: {
+        'batch-doctor-gate': { lastRunAt: NOW, lastVerdict: 'dirty', lastDetail: 'lint failed' },
+      },
+    }
+    expect(deriveStateCard({ ladder: pending, doctorState, now: NOW })?.body).toBe('Parallel decision.')
+  })
+
+  it('expires the already-on-disk PARALLEL record from the legacy doctor proof', () => {
+    const decided = ladder({
+      at: NOW - 60000,
+      title: 'Entscheidungsprotokoll: Batch läuft weiter — PARALLEL batch sessions',
+      body: 'Automatische Entscheidung: Der Batch läuft weiter.',
+    })
+    const doctorState = { handledAt: NOW, satisfiedGate: 'abc123|other-session' }
+    expect(deriveStateCard({ ladder: decided, doctorState, now: NOW })).toBeNull()
   })
 
   it('reports nothing for an alert that carries no record, and never throws on junk', () => {

@@ -33,6 +33,7 @@ import { execFileSync } from 'node:child_process'
 import { dirname } from 'node:path'
 import { REPO_ROOT, repoPath } from './repo-paths.mjs'
 import { writeJsonAtomic } from './atomic-write.mjs'
+import { measurementForAlert } from './decision-log-core.mjs'
 import {
   PRIORITY_ORDER,
   advanceLadder,
@@ -109,17 +110,21 @@ function berlinStamp(now = new Date()) {
 // write that books the rung, and the board DERIVES its state card from that
 // ladder (scripts/board-state-core.mjs). Two consequences fall out of it: the
 // record can no longer fail separately from the rung it belongs to, and the card
-// stops existing when the alert is cleared or ages out — nobody has to remove it.
+// stops existing when the alert is cleared or its named measurement is clean —
+// nobody has to remove it.
 // The ntfy alert is untouched: that is the channel built for reaching the user,
 // and the retroactive veto is answered there or in the board chat.
 
 /** The durable record demanded by a generic alert's last rung. */
-export function continuationCardBody(title, message, decision, stamp) {
+export function continuationCardBody(title, message, decision, stamp, measurement = null) {
+  const measuredExpiry = measurement
+    ? `Messung: \`${measurement.label}\`; sobald sie sauber meldet, läuft diese Karte von selbst ab. `
+    : ''
   return (
     `Automatische Entscheidung [${stamp}]: Der Batch läuft trotz der wiederholt unbeantworteten Meldung ` +
     `„${title}“ weiter. Die Meldung lautete: ${message || '(ohne Nachricht)'}. ` +
     `Die Klasse „${decision?.alertClass ?? 'generic'}“ gehört nicht zur geschlossenen Korruptionsliste; ` +
-    `Warten wäre deshalb gefährlicher als Weiterarbeiten. ` +
+    `Warten wäre deshalb gefährlicher als Weiterarbeiten. ${measuredExpiry}` +
     `Retroaktives Veto: Antworte auf diese Karte mit „Veto“ und nenne den letzten zulässigen Commit oder Zeitraum. ` +
     `Der nächste Batch-Besitzer muss dann die seit dieser Entscheidung entstandenen Folgen als Wiederherstellungsarbeit ` +
     `prüfen und behandeln, bevor er neue Arbeit übernimmt.`
@@ -234,7 +239,13 @@ export async function escalate({
     let record = null
     if (decision.action === 'continue-and-record') {
       const stamp = berlinStamp(new Date(now))
-      record = { title: decision.decisionCard, body: continuationCardBody(title, message, decision, stamp), at: now }
+      const measurement = measurementForAlert({ title })
+      record = {
+        title: decision.decisionCard,
+        body: continuationCardBody(title, message, decision, stamp, measurement),
+        at: now,
+        ...(measurement ? { measurement } : {}),
+      }
       logLine(`[${k}] CONTINUING THE BATCH — ${decision.decisionCard} — ${decision.reason}`, logPath)
     }
 

@@ -9,14 +9,17 @@
 //
 // THE MECHANISM IS DERIVATION. Nothing writes a state card any more. The state
 // lives where it already lived — the pause marker, the alert ladder, the retry
-// state — and this module RE-DERIVES the board's state card from those three on
-// every board edit and every publish. That is what makes the card self-resolving:
+// state and the doctor's measurement — and this module RE-DERIVES the board's
+// state card from them on every board edit and every publish. That is what makes
+// the card self-resolving:
 // when `.claude/batch-paused` is removed the pause paragraph is simply not
 // derived again, so a condition that has passed cannot outlive itself on the
 // board and nobody has to remember to delete anything.
 //
-// PURE. The wrapper reads the three stores; every judgement is made here so the
+// PURE. The wrapper reads the four stores; every judgement is made here so the
 // unit layer can exercise it without a live checkout.
+
+import { measurementThatSettled } from './decision-log-core.mjs'
 
 /** The marker every derived state card carries. Nothing else may wear it. */
 export const DERIVED_STATE_KIND = 'derived'
@@ -68,17 +71,22 @@ export function pauseParagraph(pause) {
 /**
  * The paragraphs for the automatic decisions the batch made on its own: an alert
  * that stayed unanswered and was continued, and a corruption class that was
- * repaired. Both are RECORDS, so they are reported, never asked.
+ * repaired. Both are RECORDS, so they are reported, never asked. A record stays
+ * until its own named measurement has a newer clean result; age alone proves
+ * nothing.
  *
  * A retroactive veto stays possible without a standing decision card: the record
  * names the channel (a chat or ntfy answer), which is where the user already
  * reads and writes.
  */
-export function decisionParagraphs(ladder, { now = Date.now(), maxAgeMs = 24 * 3600 * 1000 } = {}) {
+export function decisionParagraphs(ladder, { doctorState = null } = {}) {
   const alerts = ladder?.alerts && typeof ladder.alerts === 'object' ? ladder.alerts : {}
   return Object.values(alerts)
     .map((entry) => ({ record: entry?.record ?? null, at: Number(entry?.record?.at ?? entry?.lastSentAt) }))
-    .filter(({ record, at }) => record && trim(record.body) && Number.isFinite(at) && now - at <= maxAgeMs)
+    .filter(
+      ({ record, at }) =>
+        record && trim(record.body) && Number.isFinite(at) && !measurementThatSettled(record, doctorState),
+    )
     .sort((a, b) => b.at - a.at)
     .map(({ record }) => trim(record.body))
 }
@@ -109,10 +117,10 @@ export function recoveryParagraphs(retryState, { now = Date.now() } = {}) {
  * the "Text-Tapete" the user has objected to. The strongest state names the card;
  * every standing item gets its own paragraph, newest first, capped.
  */
-export function deriveStateCard({ pause = null, ladder = null, retryState = null, now = Date.now() } = {}) {
+export function deriveStateCard({ pause = null, ladder = null, retryState = null, doctorState = null, now = Date.now() } = {}) {
   const paragraphs = [
     pauseParagraph(pause),
-    ...decisionParagraphs(ladder, { now }),
+    ...decisionParagraphs(ladder, { doctorState }),
     ...recoveryParagraphs(retryState, { now }),
   ].filter((paragraph) => trim(paragraph))
   if (paragraphs.length === 0) return null

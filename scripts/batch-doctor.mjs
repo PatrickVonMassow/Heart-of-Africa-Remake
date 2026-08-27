@@ -57,6 +57,8 @@ import {
 } from './batch-singleton.mjs'
 import { readMachine, listProcesses, repoMarker } from './verify/machine-load.mjs'
 import { COMMON_REPO_ROOT, REPO_ROOT, withoutGitLocalEnvironment } from './repo-paths.mjs'
+import { recordDoctorGateMeasurement } from './decision-log-core.mjs'
+import { writeJsonAtomic } from './atomic-write.mjs'
 
 // Batch authority state lives in the one checkout every linked worktree shares.
 const REPO = COMMON_REPO_ROOT() || fileURLToPath(new URL('..', import.meta.url))
@@ -394,6 +396,8 @@ function liveAgentWorktrees() {
 // --- Verdict -------------------------------------------------------------------
 
 const pendingRepair = needsRepair(plan) && !repair
+const measurementClean = gate && !pendingRepair && !gateFailed && !gateInconclusive && !alertsRemain
+if (gate) recordGateMeasurement(measurementClean)
 if (!pendingRepair && !gateFailed) {
   markAlertHandled()
   log('parallel alert marked handled')
@@ -439,5 +443,22 @@ function recordGateSatisfied() {
     log(`gate demand satisfied for HEAD ${head.slice(0, 8)} beside [${parallelSids.join(', ') || 'no other session'}]`)
   } catch (e) {
     log(`warn: could not record the gate satisfaction (${e && e.message}) — the demand simply stays live`)
+  }
+}
+
+function recordGateMeasurement(clean) {
+  try {
+    const statePath = DOCTOR_STATE_PATH
+    const state = existsSync(statePath) ? JSON.parse(readFileSync(statePath, 'utf8')) : {}
+    const detail = clean
+      ? 'repo state CONSISTENT; npm run test:unit, npm run build and npm run lint passed'
+      : gateInconclusive
+        ? 'the gate was inconclusive under machine load'
+        : 'the doctor or at least one fast gate reported findings'
+    const measured = recordDoctorGateMeasurement(state, { at: Date.now(), clean, detail })
+    writeJsonAtomic(statePath, measured)
+    log(`decision measurement batch-doctor-gate ${clean ? 'CLEAN' : 'DIRTY'} — ${detail}`)
+  } catch (e) {
+    log(`warn: could not record the doctor measurement (${e && e.message}) — every decision simply stays live`)
   }
 }
