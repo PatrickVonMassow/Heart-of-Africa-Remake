@@ -5243,6 +5243,15 @@ Build order, chosen so no two parallel agents own the same file:
   of the guide, and (1)–(4) are still the order to work them in.
   NOTE: the guide currency was attested on 29.07. against the sources of that day; the
   review found this gap and could not close it, which is what this point exists for.
+  ALSO OWED HERE (27.08.2026, found while landing point 969). Commit `2dbce90f` — the one that
+  delivered lesson (A) into the guide and the retrospective — is already on `main` and carries a
+  recorded DO-NOT-MERGE from GPT-5.6 Sol: a false-refusal imperative, no semantic enforcement of
+  the new rule, and no retrospective edit. Nothing answered it, so `mechanism-review-guard`
+  raises it at EVERY turn end, and until it is answered the rule COUNTS as enforced while it is
+  not — which is the state that guard exists to prevent. Answer the three named defects and
+  record the re-review at a commit that DESCENDS from `2dbce90`; a verdict on work that does not
+  contain the fix answers nothing. This is part of the same guide work, so it is done in this
+  point rather than in one of its own.
 
 - [ ] 451. The reply that sent its own flag (user 30.07.2026: "Was ist mit dem Chat los?" —
   two agent messages on the board read literally `--text-stdin`; bundle Chat & Tafel).

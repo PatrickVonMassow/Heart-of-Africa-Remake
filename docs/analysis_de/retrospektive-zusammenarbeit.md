@@ -72,6 +72,7 @@ Das Musterbeispiel sind die Chat-Zeitstempel: neun Eskalationsstufen, acht weich
 | 27.08. nachts | Zwei Wächter gaben einander ein Alibi: Der Teardown der Unit-Suite ließ einen Lauf scheitern, weil die eigene Sitzung vier Sekunden vor Schluss den Zweig des nächsten Punktes anlegte — 430 Dateien und 14 015 Fälle waren grün —, und die Lastprobe entlastete dieses Rot sofort mit sieben »lebenden« Arbeitsbäumen, in denen kein Prozess lief und seit drei bis vierzehn Tagen nichts geschrieben wurde. Beide Alibis sind auf dieser Maschine dauerhaft, also kann dieses Tor kein Rot mehr beweisen (§3.198, Punkte 455 und 955) |
 | 27.08. nachts | Neun Warnungen in einem Bereitschaftsbericht, neun davon falsch, aus zwei unabhängigen Quellen: Acht rechneten der delegierten Bahn die main-Commits der aufsichtführenden Sitzung an, die nur deshalb in ihrem Bereich lagen, weil der Auftrag den Merge von main verlangt; die neunte war die vierte Wiederholung der Fehldeutung, die ein ehrliches »6 übersprungen« als rotes Tor liest. Der Block, in dem ein echtes Rot stünde, hatte eine Trefferquote von null (§3.199, Punkte 962 und 729) |
 | 11.08. abends | Der VS-Code-Neustart nimmt den Devcontainer mit — die Batch-Sitzung und sechs Agenten sterben, nachdem ich das Gegenteil zugesichert hatte (§3.111); die Rechte-Rückfragen kamen weiter, weil `defaultMode` eine fortgesetzte Sitzung gar nicht mehr erreicht (§3.3) |
+| 27.08. | Vierte Runde derselben abgelehnten Kartenkopf-Darstellung: Der dritte Anlauf machte den Nutzer in seiner eigenen Abnahmebedingung zur entscheidenden Instanz und wurde trotzdem auf das eigene grüne Urteil gemergt und abgehakt — und die Schranke, die eine vierte Runde hätte verhindern sollen, war aus dem VORGESCHLAGENEN Zielbild abgeleitet und deshalb von genau der abgelehnten Darstellung erfüllt (§3.202, Punkte 967/969) |
 
 Muster: Ab dem 22.07. explodiert die Commit-Rate (Delegation) — und genau dann häufen sich die Infrastruktur-Vorfälle. **Skalierung der Autonomie erzeugt eine eigene Problemklasse, die die Feature-Arbeit zeitweise überholt.**
 
@@ -1407,14 +1408,14 @@ keinen Träger hat. Gebucht als Punkt 956.
 
 ## Anhang A — Maschinell gepflegte Quellen-Übersicht
 
-Zuletzt aktualisiert: Donnerstag, 27.08.2026, 16:02 · Quellen-Fingerprint: `e2fa067c6e4e…`
+Zuletzt aktualisiert: Donnerstag, 27.08.2026, 16:49 · Quellen-Fingerprint: `dc17f47281ed…`
 
 Spalten heuristisch aus den Quellen abgeleitet (Anläufe = distinkte Datumsnennungen im Memory;
 Maßnahme = Guard-Skripte mit Namens-Treffer). Die inhaltliche Bewertung gehört der Prosa oben.
 
 | Problemklasse (Memory) | Anläufe | Schwere (heuristisch) | Maßnahme (Guard-Treffer) | Status |
 |---|---|---|---|---|
-| Always use background-wait time for prep on upcoming tickets — autonomously, guaranteed by a mechanism, never on a reminder | 1 | niedrig | prep-arm-hook.mjs, prep-guard.mjs | ✔ Mechanismus |
+| Always use background-wait time for prep on upcoming tickets — autonomously, guaranteed by a mechanism, never on a reminder | 2 | mittel | prep-arm-hook.mjs, prep-guard.mjs | ✔ Mechanismus |
 | An analysis over a moving set is run only when it is executed immediately in the same run — never produced and parked | 4 | hoch | — (Regel/Memory) | ◐ Regel |
 | OFFEN, attended-only: Punkt 542 scharfschalten — vier gebaute Guards hängen in keiner Hook-Kette | 2 | mittel | — (Regel/Memory) | ◐ Regel |
 | User's rulings on the point-205 plausibility audit (what to fix vs. accept, 21.07.2026) | 1 | niedrig | — (Regel/Memory) | ◐ Regel |
@@ -1508,8 +1509,8 @@ Maßnahme = Guard-Skripte mit Namens-Treffer). Die inhaltliche Bewertung gehört
 
 Erfasste Quellen: 91 Feedback-/Projekt-Memories · 57 Guard-/Hook-Skripte · 6 Revert-/Reapply-Commits · 111 Prozess-/Meta-TASKS-Punkte (davon 47 offen).
 
-<!-- RETRO-FINGERPRINT: e2fa067c6e4ed6943223e71c299e20dfac46c53fc26c743d0b6afcd6b8a4a22b -->
-<!-- RETRO-LAST-REFRESHED: 2026-08-27T14:02:51.608Z -->
+<!-- RETRO-FINGERPRINT: dc17f47281ed9d1a2ba080b6eb975281aaae3e1711c9c289fd98222867121030 -->
+<!-- RETRO-LAST-REFRESHED: 2026-08-27T14:49:10.144Z -->
 <!-- AUTO-GENERATED:END -->
 
 ### 3.111 Ein Erfolg ist kein Beweis für den Weg, auf dem er zustande kam
@@ -4320,3 +4321,39 @@ Neben-Arbeitsbaum, in der derselbe Schaden folgenlos entstehen darf. Der zweite 
 gehört der Reichweite: Eine Umgebungsvariable, die ein fremdes Werkzeug setzt, ist im Projektcode
 unsichtbar; keine Suche nach Aufrufstellen findet sie. Wo ein Prozess die Umgebung nicht selbst
 gebaut hat, ist zu prüfen, was der Aufrufer hineingelegt hat.
+
+### 3.202 Die Schranke war aus dem Entwurf abgeleitet, nicht aus dem Abgelehnten
+
+Ein Kartenkopf auf dem Batch-Brett wurde an einem Tag viermal beanstandet: 941, 963, 967 und
+schliesslich 969. Zwei Dinge liefen dabei schief, und nur das zweite ist neu.
+
+Das erste ist eine gebrochene Zusage. Punkt 967 hatte sich seine Abnahme selbst vorgeschrieben —
+wörtlich: er schliesse »erst, nachdem der Nutzer einen Hochformat-Screenshot der Kandidaten-
+Darstellung freigegeben hat«, weil zwei formal grüne Anläufe zuvor von seinem Auge abgelehnt
+worden waren. Er wurde um 12:03 gemergt und zwischen 12:02 und 12:26 abgehakt, ohne dass diese
+Freigabe je erteilt wurde. Wo ein Punkt eine FREMDE Abnahmeinstanz benennt, ist das grüne Tor
+nicht mehr die Bedingung des Abhakens, sondern nur noch dessen Voraussetzung — und ein Lauf, der
+das verwechselt, schliesst den Punkt gegen seine eigene Spezifikation.
+
+Das zweite ist die eigentliche Lehre. Punkt 967 hatte, richtigerweise, eine neue Prüfklasse
+verlangt: eine OBERGRENZE für die Höhe eines kurzen Kartenkopfes, damit unbedingtes Stapeln rot
+wird, statt eine vierte Beschwerde zu brauchen. Diese Grenze wurde gebaut — und auf »höchstens
+zwei Zeilen« kalibriert. Genau zwei Zeilen aber verbraucht die abgelehnte Darstellung: die beiden
+Randgruppen auf der ersten, der Titel auf der zweiten. Die Schranke war aus dem Zielbild des
+Autors abgeleitet worden, nicht aus dem, was der Nutzer abgelehnt hatte, und konnte deshalb genau
+das nicht verurteilen, wogegen sie geschrieben war. Sie blieb grün, während das Bild auf dem
+Telefon unverändert falsch war.
+
+Das ist mehr als eine schlecht gewählte Zahl. Eine Prüfung, die aus der beabsichtigten Lösung
+abgeleitet wird, misst die Absicht des Autors und nicht den Mangel des Nutzers; sie ist per
+Konstruktion mit jeder Darstellung verträglich, die derselbe Autor für richtig hielt. Der
+Ausweg ist billig und war hier vorhanden: eine Gegenkontrolle, die das ABGELEHNTE Rendering im
+Prüflauf wiederherstellt und verlangt, dass jede einzelne Schranke daran fällt. Wo diese
+Gegenkontrolle fehlt, ist eine grüne Suite kein Beleg, sondern nur die Aussage, dass der Autor
+mit sich selbst einig ist.
+
+**Lehre:** Eine Schranke gegen einen abgelehnten Zustand wird aus dem ABGELEHNTEN ZUSTAND
+kalibriert, nie aus dem eigenen Entwurf — und sie ist erst fertig, wenn eine Kontrolle, die
+diesen Zustand wiederherstellt, an ihr scheitert. Und wo ein Punkt eine fremde Abnahmeinstanz
+benennt, ersetzt kein grünes Tor deren Freigabe: Das Tor sagt, dass geliefert werden DARF, nicht
+dass abgenommen IST.
