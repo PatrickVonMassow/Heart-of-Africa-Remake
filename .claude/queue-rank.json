@@ -906,6 +906,12 @@
       "why": "Last is right: it is cosmetic on the board, it waits for point 976 which owns the same writer, and nothing about the release or the queue depends on it.",
       "origin": "machine",
       "place": "last"
+    },
+    "979": {
+      "at": "2026-08-27T20:53:37.921Z",
+      "why": "The gate blocks every session's turn end while it stands, so no point — the release included — can be closed until it is answered.",
+      "origin": "machine",
+      "place": "ahead"
     }
   },
   "boundary": {
@@ -945,7 +951,7 @@
     "why": "The order standing in front of the release today is the arrangement that predates this rule; the four machine-filed points that had ranked themselves there were moved behind 174 first"
   },
   "settled": {
-    "at": "2026-08-27T20:29:55.124Z",
+    "at": "2026-08-27T20:53:37.929Z",
     "points": [
       174,
       184,
@@ -1267,7 +1273,8 @@
       975,
       976,
       977,
-      978
+      978,
+      979
     ]
   }
 }
