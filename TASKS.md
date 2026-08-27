@@ -9547,6 +9547,13 @@ to land than a mechanism that needs a review.
   false positive costs one line of explanation — does not survive a false positive that fires every
   single time: a warning that is always wrong trains the reader to skip the PROBLEMS block, which
   is where a real red would be. That raises the cost above the recorded "low".
+  AND AGAIN ON THE NEXT LANE, 27.08.2026, 02:50: the point 957 authoring run closed with "test:unit
+  GREEN (14,024 passed, 6 skipped); build GREEN; lint GREEN" and was flagged "it reports a gate as
+  anything but green". That is the fourth consecutive lane, and the suite's 6 skipped cases have
+  now been constant for two evenings, so the check has not produced a true positive in any observed
+  run. It arrived beside four false authorship flags from the same PROBLEMS block (the new point
+  below), which is exactly the compounding this entry predicts: the block was five sixths noise, and
+  the one line in it worth reading had to be found by hand.
   FINAL STATE:
   - THE PATTERN MATCHES FAILURE, NOT ABSENCE. `gatesProblem` reads a gate as not green on the
     words that mean a failure; a summary line reporting skipped cases beside passing ones is
@@ -9559,6 +9566,41 @@ to land than a mechanism that needs a review.
   passes a red one as green.
   Bundle: Modell & Wächter.
 
+- [ ] 962. The readiness check charges a delegated lane with the main commits its own brief told it
+  to merge in (measured 27.08.2026, 02:50, on the point 957 lane). `scripts/author-sol.mjs` closed
+  the run with nine PROBLEMS, and four of them were pairs about the same four commits: `87b6e94`,
+  `4baf452`, `1d25dc3` and `49453a8` "do not name GPT-5.6 Sol as author — this lane's commits must"
+  and are "not an interim rescue commit: the subject does not carry `[skip ci]`". All four are the
+  SUPERVISING session's own cross-cutting bookkeeping commits, written on `main`, correctly
+  trailered `Co-Authored-By: Claude Opus 5`, pushed and CI-green before the lane ever saw them.
+  They entered the lane's range because the author did what the delegation brief REQUIRES —
+  "merge `main` INTO your branch FIRST, then verify that tree" — twice, as "Merge current main
+  before acceptance".
+  CAUSE, read in the source: the loop in `scripts/author-sol-core.mjs` (around line 568) walks
+  every commit of `base..HEAD` and applies the lane's authorship and rescue-commit rules to each.
+  A merge makes another branch's history reachable from HEAD, so `base..HEAD` is not the lane's
+  CONTRIBUTION — it is the lane's contribution plus everything `main` did meanwhile. Since the
+  brief mandates that merge, the false flags fire on every correctly run lane whose point outlives
+  a single main commit, and they scale with how much the supervising session lands in parallel.
+  WHY IT IS NOT COSMETIC, and why it belongs beside 729: this run's PROBLEMS block held nine
+  entries, of which eight were false — these four pairs — and the ninth was 729's "6 skipped" false
+  positive. The block was ENTIRELY noise, and 729's own argument applies with full force: a warning
+  that is always wrong trains the supervising session to skip the one place a real red would be
+  announced. Two independent false-positive sources in one block is what makes it unreadable
+  rather than merely annoying.
+  FINAL STATE: the readiness check judges the lane's OWN commits. The set is derived so that
+  history reachable through a merge from the base branch is excluded — first-parent walk from HEAD
+  down to the merge base, or an equivalent that provably drops commits already contained in the
+  base branch — and a commit already present on `origin/main` is never charged to the lane under
+  any rule. What remains keeps today's authorship and rescue-commit demands unchanged.
+  VERIFIABLE: Vitest over the readiness reader — a branch with two own commits and a merge of three
+  foreign main commits reports problems for the two only; the same branch with a genuinely
+  mis-trailered own commit still reports it; and a case that FAILS if the selection reverts to a
+  plain `base..HEAD` list.
+  Criticality: medium — nothing is corrupted and no red passes as green, but it makes the delegated
+  lane's only automated readiness report unreadable, and it punishes the lane precisely for
+  following the merge-before-acceptance rule.
+  Bundle: Modell & Wächter.
 
 - [ ] 741. A carrier entry carries its writer's situation as though it were the finding's own
   (measured 19.08.2026, 18:47). The entry of 16:38 closed with "blocked until the batch is taken
