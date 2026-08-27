@@ -452,10 +452,10 @@
       "place": "last"
     },
     "843": {
-      "at": "2026-08-22T20:07:51.458Z",
-      "why": "Append-and-defer: der Besitzer hat den Mechanismus verlangt, aber keine Vorziehung; die Regel selbst gilt ab sofort auch ohne ihn",
+      "at": "2026-08-27T19:56:32.120Z",
+      "why": "Point 946 sits in front of the release at Criticality: high and may not be worked before this register lands; leaving 843 behind point 174 parks 946 with it.",
       "origin": "machine",
-      "place": "last"
+      "place": "ahead"
     },
     "845": {
       "at": "2026-08-22T20:51:29.892Z",
@@ -596,10 +596,10 @@
       "place": "last"
     },
     "902": {
-      "at": "2026-08-25T00:02:37.526Z",
-      "why": "Prozesshygiene mit niedriger Kritikalität: der Eintrag ändert nur Regeltext und einen Auditeintrag, blockiert nichts und hat keinen Vorläufer, der ihn nach vorn zieht",
+      "at": "2026-08-27T19:56:32.206Z",
+      "why": "Point 946 names this authorization among the points it must follow, so parking 902 behind point 174 parks the high-criticality card gate that stands in front of the release.",
       "origin": "machine",
-      "place": "last"
+      "place": "ahead"
     },
     "904": {
       "at": "2026-08-25T00:23:39.794Z",
@@ -907,42 +907,6 @@
       "origin": "machine",
       "place": "ahead"
     }
-  },
-  "boundary": {
-    "at": "2026-08-21T00:55:14.962Z",
-    "points": [
-      336,
-      553,
-      596,
-      633,
-      659,
-      660,
-      663,
-      686,
-      687,
-      688,
-      689,
-      690,
-      691,
-      692,
-      708,
-      715,
-      719,
-      733,
-      734,
-      735,
-      736,
-      738,
-      739,
-      746,
-      747,
-      750,
-      759,
-      760,
-      762,
-      764
-    ],
-    "why": "The order standing in front of the release today is the arrangement that predates this rule; the four machine-filed points that had ranked themselves there were moved behind 174 first"
   },
   "settled": {
     "at": "2026-08-27T19:31:29.706Z",
@@ -1269,5 +1233,41 @@
       976,
       977
     ]
+  },
+  "boundary": {
+    "at": "2026-08-21T00:55:14.962Z",
+    "points": [
+      336,
+      553,
+      596,
+      633,
+      659,
+      660,
+      663,
+      686,
+      687,
+      688,
+      689,
+      690,
+      691,
+      692,
+      708,
+      715,
+      719,
+      733,
+      734,
+      735,
+      736,
+      738,
+      739,
+      746,
+      747,
+      750,
+      759,
+      760,
+      762,
+      764
+    ],
+    "why": "The order standing in front of the release today is the arrangement that predates this rule; the four machine-filed points that had ranked themselves there were moved behind 174 first"
   }
 }
