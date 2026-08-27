@@ -350,12 +350,14 @@ describe('the real vibe-coding guide', () => {
     expect(metaRule).toContain('Wer den Auftrag vergibt, misst **blind mit**.')
   })
 
-  it('names omitted review material to the model that judges it', () => {
+  it('keeps the complete window rule while naming omitted review material to its judge', () => {
     const entries = parseEntries(sliceSection(guide, /Fallstrick/i))
     const measuredLess = entries.find((entry) =>
       entry.title.startsWith('Die Messung — und die Gegenprüfung — sah weniger'))
     const text = measuredLess?.lines.join(' ').replace(/\s+/g, ' ')
 
+    expect(text).toContain('Nur die letzten *n* Einträge')
+    expect(text).toContain('aus dem **Gegenstand** ab: nach Zeit, nie nach Anzahl.')
     expect(text).toContain('still gekürzter Prüfstoff für das Modell wie ein Mangel')
     expect(text).toContain(
       'Nenne dem **prüfenden Modell selbst** jedes weggelassene Material, nicht nur dem Aufrufer',

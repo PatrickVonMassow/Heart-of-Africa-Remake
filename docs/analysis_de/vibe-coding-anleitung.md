@@ -273,11 +273,12 @@ Die Ursache findest du durch **Zerlegen**, nicht durch Wiederholen.
   → *Prompt:* „Was aus mehreren Schritten besteht, spiel **einmal vollständig durch** und lies das
   Ergebnis aus den Protokollen, nicht aus den Tests."
 
-- **Die Messung — und die Gegenprüfung — sah weniger, als sie behauptet.** Nicht geliefert liest
-  sich *grüner* als ein Fehlschlag, still gekürzter Prüfstoff für das Modell wie ein Mangel.
-  → *Prompt:* „Leite das Fenster jeder Messung aus dem **Gegenstand** ab. Nenne dem **prüfenden
-  Modell selbst** jedes weggelassene Material, nicht nur dem Aufrufer, und melde die **Abdeckung**;
-  ein Urteil über halbem Material ist **Teilprüfung**."
+- **Die Messung — und die Gegenprüfung — sah weniger, als sie behauptet.** Nur die letzten *n*
+  Einträge; nicht geliefert liest sich *grüner* als ein Fehlschlag, still gekürzter Prüfstoff für
+  das Modell wie ein Mangel.
+  → *Prompt:* „Leite das Fenster jeder Messung aus dem **Gegenstand** ab: nach Zeit, nie nach
+  Anzahl. Nenne dem **prüfenden Modell selbst** jedes weggelassene Material, nicht nur dem
+  Aufrufer, und melde die **Abdeckung**; ein Urteil über halbem Material ist **Teilprüfung**."
 
 - **„Läuft der noch?" mit „ist die Ausgabe frisch?" beantwortet.** Frische belegt nur, dass jemand
   gearbeitet *hat*.

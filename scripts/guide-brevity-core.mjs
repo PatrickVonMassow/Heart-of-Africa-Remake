@@ -189,8 +189,10 @@ export const LIMITS = {
   // omitted review material must be named to the judging model, with a suspicion's promotion
   // criterion beside the root-cause rule; and neighbouring correct rules may forbid through their
   // gap, so permission shares a sentence with its limit and the periodic review asks what no rule
-  // covers. No standalone pitfall or project telling was added. Net: +5 lines / +60 words, exact fit.
-  maxLines: 482,
+  // covers. The existing time-window rule and its last-n symptom remain intact beside the new
+  // review-material lesson. No standalone pitfall or project telling was added. Net: +6 lines /
+  // +70 words, exact fit.
+  maxLines: 483,
   // EXACT FIT, not headroom — corrected 30.07.2026 after the four-eyes review
   // pointed out that this comment had long stopped describing the numbers. The
   // rule above ("raised only by the measured size of genuinely new tips")
@@ -372,9 +374,9 @@ export const LIMITS = {
   // independent ATTEMPT to falsify and explicitly lets a true hypothesis survive it. Tightening
   // the surrounding narration pays for that precision, so the ceiling follows the measured guide
   // DOWN by two words, with no claim removed and no headroom added.
-  // 27.08.2026: the two folded lessons justified beside maxLines measure 4331 words, so this
-  // ceiling follows their +60-word net exactly; the guide has no unearned headroom.
-  maxWords: 4331,
+  // 27.08.2026: the two folded lessons justified beside maxLines measure 4341 words, so this
+  // ceiling follows their +70-word net exactly; the guide has no unearned headroom.
+  maxWords: 4341,
   // A pitfall entry = the risk lines plus its prompt. Anything longer is a
   // story, not a tip.
   maxEntryLines: 11,
