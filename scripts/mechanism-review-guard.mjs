@@ -34,6 +34,7 @@ import { readRecords, verifyCarried } from './mechanism-review.mjs'
 import {
   CONTRIBUTION_DISPOSITION_KIND,
   CONTRIBUTION_SCOPE_BOUNDARY,
+  contributionRetiredBy,
   evaluateMechanismReview,
   formatMechanismReviewVerdict,
   LEGACY_CONTRIBUTION_BASELINE,
@@ -346,6 +347,33 @@ function rangeCommits(base, head, files) {
 }
 
 /**
+ * The pending contributions the gate still PLANS FOR — everything the evaluator
+ * has not already retired.
+ *
+ * Measured on the merge candidate 27.08.2026: the settled legacy range carries
+ * merge commits whose trailers name no vendor, so planning them put eight
+ * UNREVIEWABLE groups of settled history in front of the four contributions
+ * really owed — and the verdict prints the unreviewable branch INSTEAD of the
+ * runnable commands, hiding the finite plan this scoping exists to produce.
+ * What the evaluator skips, the plan skips, by the very same predicate.
+ */
+export function planningContributions(pendingCommits = [], records = []) {
+  const recordsBySha = new Map()
+  for (const record of records ?? []) {
+    const key = String(record?.sha ?? '')
+    if (!recordsBySha.has(key)) recordsBySha.set(key, [])
+    recordsBySha.get(key).push(record)
+  }
+  return (pendingCommits ?? []).filter(
+    (commit) =>
+      !contributionRetiredBy(
+        [...new Set(commit?.coveringRecordShas ?? [])].flatMap((sha) => recordsBySha.get(String(sha)) ?? []),
+        commit,
+      ),
+  )
+}
+
+/**
  * Everything the core needs — exported so the guard preflight judges the gate
  * from the SAME gathering the Stop hook uses rather than a second copy of this
  * git work, which would drift and hand back a false "clean". Read-only: arming
@@ -467,7 +495,8 @@ export function gatherMechanismReviewInputs({ sessionId = '', guardDuty = gather
 
   // Authorship is also contribution-local. Grouping the whole baseline range
   // by its last file writers was the same unbounded scope in another form.
-  const groups = pendingCommits.flatMap(
+  const plannedCommits = planningContributions(pendingCommits, records)
+  const groups = plannedCommits.flatMap(
     (commit) => planAuthorshipGroups({ commits: [commit], endStateFiles: commit.files }).groups,
   )
   const authorshipPlan = { groups, unreviewable: groups.filter((group) => !group.reviewer) }
@@ -493,7 +522,7 @@ export function gatherMechanismReviewInputs({ sessionId = '', guardDuty = gather
       endStateFiles: null,
     },
     commits,
-    debt: { outstanding: pendingCommits, invalidatedCoverage: [] },
+    debt: { outstanding: plannedCommits, invalidatedCoverage: [] },
     authorshipPlan,
   }
 }

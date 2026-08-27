@@ -17,6 +17,7 @@ import {
   mechanismLogCommand,
   parseMechanismLog,
   pendingReviewContributions,
+  planningContributions,
 } from './mechanism-review-guard.mjs'
 import {
   CONTRIBUTION_DISPOSITION_KIND,
@@ -567,5 +568,89 @@ describe('measureReviewGap', () => {
       }),
     ).toEqual({ gap: null, sizedPlan: null })
     expect(touched).toBe(false)
+  })
+})
+
+describe('the plan the gate prints names what is OWED, never what the range holds', () => {
+  // Measured on the merge candidate 27.08.2026, reviewing point 957: the
+  // contribution-scoped plan was built from EVERY pending commit, so 240
+  // settled contributions — merge commits among them, whose trailers name no
+  // vendor — arrived as UNREVIEWABLE groups. The verdict prints the
+  // unreviewable branch INSTEAD of the runnable commands, so the gate's own
+  // message hid the four owed contributions and their eight runnable passes.
+  const retirement = (sha) => ({
+    kind: CONTRIBUTION_DISPOSITION_KIND,
+    sha,
+    disposition: 'retired',
+    contributionDispositionVerified: true,
+  })
+
+  it('drops a retired contribution from the planning set by the evaluator’s own predicate', () => {
+    const retired = { sha: 'a'.repeat(40), files: ['scripts/x.mjs'], coveringRecordShas: ['a'.repeat(40)] }
+    const owed = { sha: 'b'.repeat(40), files: ['scripts/y.mjs'], coveringRecordShas: [] }
+    const planned = planningContributions([retired, owed], [retirement('a'.repeat(40))])
+    expect(planned.map((c) => c.sha)).toEqual(['b'.repeat(40)])
+  })
+
+  it('keeps a contribution whose retirement row was never verified from Git', () => {
+    const claimed = { sha: 'a'.repeat(40), files: ['scripts/x.mjs'], coveringRecordShas: ['a'.repeat(40)] }
+    const unverified = { ...retirement('a'.repeat(40)), contributionDispositionVerified: false }
+    expect(planningContributions([claimed], [unverified]).map((c) => c.sha)).toEqual(['a'.repeat(40)])
+  })
+
+  it('prints only the groups of the contributions the verdict reports', () => {
+    const owedSha = 'b'.repeat(40)
+    const verdict = evaluateMechanismReview({
+      baseline: 'base',
+      head: 'h'.repeat(40),
+      pendingCommits: [{ sha: owedSha, at: 1, files: ['scripts/y.mjs'], authorModel: 'GPT-5.6 Sol' }],
+      records: [],
+    })
+    const text = formatMechanismReviewVerdict(verdict, {
+      authorshipPlan: {
+        groups: [
+          {
+            vendor: 'openai',
+            reviewer: 'Opus 5',
+            reviewerVendor: 'anthropic',
+            files: ['scripts/y.mjs'],
+            commits: [owedSha],
+          },
+          {
+            vendor: 'openai',
+            reviewer: 'Opus 5',
+            reviewerVendor: 'anthropic',
+            files: ['scripts/settled.mjs'],
+            commits: ['c'.repeat(40)],
+          },
+        ],
+        unreviewable: [
+          {
+            files: ['scripts/settled-merge.mjs'],
+            commits: ['c'.repeat(40)],
+            unreviewableReason: 'authorship vendor is unknown',
+          },
+        ],
+      },
+    })
+    expect(text).toContain('scripts/y.mjs')
+    expect(text).not.toContain('scripts/settled.mjs')
+    // The settled merge commit must not turn the whole verdict into the
+    // UNREVIEWABLE branch, which suppresses the runnable-command guidance.
+    expect(text).not.toContain('scripts/settled-merge.mjs')
+    expect(text).not.toContain('UNREVIEWABLE')
+  })
+
+  it('narrows nothing when a finding names no commit, so a demand is never trimmed away', () => {
+    const verdict = evaluateMechanismReview({ baseline: 'b', head: 'h'.repeat(40), pendingCommits: [], records: [] })
+    const groups = [
+      { vendor: 'openai', reviewer: 'Opus 5', reviewerVendor: 'anthropic', files: ['scripts/y.mjs'], commits: ['d'.repeat(40)] },
+      { vendor: 'anthropic', reviewer: 'GPT-5.6 Sol', reviewerVendor: 'openai', files: ['scripts/z.mjs'], commits: ['e'.repeat(40)] },
+    ]
+    const text = formatMechanismReviewVerdict({ ...verdict, block: true, findings: [{ kind: 'no-review' }] }, {
+      authorshipPlan: { groups, unreviewable: [] },
+    })
+    expect(text).toContain('scripts/y.mjs')
+    expect(text).toContain('scripts/z.mjs')
   })
 })

@@ -1311,6 +1311,27 @@ export function reviewRecordWellFormed(record = {}, { commitAt = 0 } = {}) {
   return record.carried === undefined || record.carriedVerified === true
 }
 
+/**
+ * ONE FIXED MIGRATION, NOT A GENERAL WAIVER. Historical debt produced only by
+ * the retired baseline-wide scope is settled per contribution in the tracked
+ * ledger. The row's own claim buys nothing: the impure wrapper sets the
+ * verification stamp only after checking its exact schema and Git ancestry
+ * against CONTRIBUTION_SCOPE_BOUNDARY. Later contributions can never match.
+ *
+ * EXPORTED because a retired contribution must be invisible to EVERY demand the
+ * gate prints, not only to the finding loop: the guard reads it too, so its
+ * authorship plan cannot report settled history as unreviewable debt.
+ */
+export function contributionRetiredBy(coveringRecords = [], commit = {}) {
+  return (coveringRecords ?? []).some(
+    (record) =>
+      record?.kind === CONTRIBUTION_DISPOSITION_KIND &&
+      record?.disposition === 'retired' &&
+      record?.contributionDispositionVerified === true &&
+      String(record?.sha) === String(commit?.sha),
+  )
+}
+
 /** Current file artefacts synthesized from the pending history. */
 function pendingEndStateFiles(pendingCommits, endStateFiles) {
   if (endStateFiles === null || endStateFiles === undefined) return pendingCommits ?? []
@@ -1409,19 +1430,7 @@ export function evaluateMechanismReview({
   for (const pendingCommit of pendingEndStateFiles(pendingCommits, endStateFiles)) {
     let commit = pendingCommit
     const covering = [...new Set(commit?.coveringRecordShas ?? [])].flatMap((s) => bySha.get(String(s)) ?? [])
-    // ONE FIXED MIGRATION, NOT A GENERAL WAIVER. Historical debt produced only
-    // by the baseline-wide scope is retired per contribution in the tracked
-    // ledger. The row's own claim buys nothing: the impure wrapper sets the
-    // verification stamp only after checking its exact schema and Git ancestry
-    // against CONTRIBUTION_SCOPE_BOUNDARY. Later contributions can never match.
-    const retired = covering.some(
-      (record) =>
-        record?.kind === CONTRIBUTION_DISPOSITION_KIND &&
-        record?.disposition === 'retired' &&
-        record?.contributionDispositionVerified === true &&
-        String(record.sha) === String(commit.sha),
-    )
-    if (retired) continue
+    if (contributionRetiredBy(covering, commit)) continue
     // A record is only a review if it says who reviewed, how it ended AND what
     // was actually checked; a half-written line must not clear the gate. THE
     // GATE REVALIDATES THE ROW ITSELF, by the recorder's own rules (escalation
@@ -1753,8 +1762,28 @@ export function formatMechanismReviewVerdict(verdict, { authorshipPlan = null } 
       'seed the anchor and judge the complete range from it.',
     ].join('\n')
   }
-  const groups = Array.isArray(authorshipPlan?.groups) ? authorshipPlan.groups : []
-  const unreviewable = Array.isArray(authorshipPlan?.unreviewable) ? authorshipPlan.unreviewable : []
+  // THE PLAN NAMES WHAT IS OWED, NOT WHAT THE RANGE CONTAINS. The authorship
+  // plan is built over the whole pending range, so it also carries every
+  // contribution a recorded review already cleared. Measured on the merge
+  // candidate 27.08.2026: four owed contributions arrived under two hundred
+  // group lines of settled history. The groups are therefore narrowed to the
+  // contributions THIS verdict reports. A group naming no commit cannot be
+  // judged and is kept, and so is every group when any finding names no commit
+  // — this trims noise, it never drops a demand.
+  const owedShas = new Set(
+    (verdict.findings ?? []).map((finding) => String(finding?.commit?.sha ?? '')).filter(Boolean),
+  )
+  const narrowable =
+    (verdict.findings ?? []).length > 0 && (verdict.findings ?? []).every((finding) => finding?.commit?.sha)
+  const owedGroup = (group) =>
+    !narrowable ||
+    !Array.isArray(group?.commits) ||
+    !group.commits.length ||
+    group.commits.some((sha) => owedShas.has(String(sha)))
+  const groups = (Array.isArray(authorshipPlan?.groups) ? authorshipPlan.groups : []).filter(owedGroup)
+  const unreviewable = (Array.isArray(authorshipPlan?.unreviewable) ? authorshipPlan.unreviewable : []).filter(
+    owedGroup,
+  )
   const lines = [
     unreviewable.length
       ? 'FOUR-EYES GATE ON MECHANISMS — UNREVIEWABLE: an owed contribution has no eligible reviewer vendor.'
