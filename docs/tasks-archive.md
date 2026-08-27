@@ -24552,3 +24552,29 @@ Nummerierung bleiben deshalb identisch — hier wird nur verschoben, nie umgesch
   Criticality: med — a mechanism that counts as enforced while enforcing nothing is the failure
   class the four-eyes gate exists to prevent.
   Bundle: Dokumentation.
+
+- [x] 936. A decision log on the board has no end but the user's veto (the user asked on
+  26.08.2026 at 11:21 why the "Automatische Entscheidung" card was still on the dashboard). It is
+  not an open point but the record of a decision the alert escalation ladder took by itself on
+  26.08.2026 at 05:34 — alarm "PARALLEL batch sessions", rung 5, five unanswered sends: the batch
+  keeps running, with a retroactive veto offered. `deriveStateCard` in
+  `scripts/board-state-core.mjs` renders that card out of `.claude/resilience/alert-escalation.json`
+  for as long as a record stands there, and NOTHING ever takes the record out again. Meanwhile the
+  matter is measurably settled: `batch-doctor --gate` ran on 26.08.2026 at 08:32, reported "repo
+  state CONSISTENT" and marked the parallel alarm handled — so the decision was right and its risk
+  is refuted. The card stands anyway and reads to the user like an open matter.
+  FINAL STATE:
+  - A DECISION LOG NAMES THE MEASUREMENT that would justify or refute it, and EXPIRES BY ITSELF
+    once that measurement has been taken and is clean — here: the doctor run that clears the
+    parallel session. Until then it stands.
+  - THE USER'S VETO REMAINS THE SECOND WAY OUT, never the only one.
+  - AN EXPIRED RECORD LEAVES A TRACE: the decision and the measurement that ended it stay readable
+    where such decisions are recorded, so an expiry is not a deletion.
+  VERIFIABLE: Vitest over the pure projection — a record whose named measurement is missing still
+  renders its card, the same record with a clean measurement renders none, and a record whose
+  measurement came back dirty keeps standing. Plus the real proof: with the 08:32 doctor run on
+  disk the dashboard no longer carries the 05:34 card.
+  Criticality: low-medium — it costs no correctness, but a board that keeps a settled decision
+  standing teaches the reader to skip the section that is supposed to be the one place a real
+  decision is visible.
+  Bundle: Chat & Tafel.
