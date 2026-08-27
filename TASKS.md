@@ -113,40 +113,6 @@ put it is the mistake this line exists to stop.
   Urgency: it blocks the whole batch, so it is worked before every other open point.
   Bundle: Modell & Wächter.
 
-- [ ] 902. A stated recommendation on a board card is a decision I may carry out. MEASURED
-  24.08.2026: the rule corpus a session loads says the opposite by omission. The memory
-  `no-standstill-decide-and-record` licenses deciding by own judgment only where NO card is
-  pending; `dashboard-vdzk-only-decisions` makes every decision request a card and says nothing
-  about who may close one; `CLAUDE.md` §6 says "unless durably authorized" without naming this
-  authorization. Result: the Zeiterfassung card, whose recommendation was already stated, waited
-  for a yes that only restated it, and its point 559 is still open.
-  USER RULING 24.08.2026, on the card "Zeiterfassung in der Arbeitsordnung: abschaffen oder
-  wiederbeleben?", quoting their own earlier answer "Mach es so, wie du es empfohlen hast": "Ja,
-  das sollst du künftig dürfen."
-  FINAL STATE: the standing authorization stands where a session reads it, with its scope drawn.
-  IN SCOPE: a "Von dir zu klären" card on which I have STATED a recommendation may be decided BY
-  that recommendation, carried out, and closed with the decision recorded — what, why, and what a
-  veto would change — the shape rung 3 of `no-standstill-decide-and-record` already prescribes for
-  doubt without a card. OUT OF SCOPE and unchanged: outward-facing or irreversible steps (tags,
-  publishes, force-pushes, deletions of user data) keep their own confirmation per the memories
-  `tags-only-on-request` and `version-release-process`; a card posing a genuine choice I did NOT
-  recommend on stays the user's.
-  (a) `CLAUDE.md` §6 carries ONE sentence naming this authorization at the existing "unless durably
-  authorized" clause of the "Act on settled judgment" bullet, naming scope AND boundary in the same
-  breath so no reading of it reaches a tag, a publish or a deletion.
-  (b) `docs/rule-corpus-audit.md` records the ruling dated 24.08.2026 with the user's wording, in
-  the row style the file uses for decided entries.
-  (c) The memory entry `recommendation-is-a-decision` is verified against the corpus after (a) and
-  (b) and linked from `no-standstill-decide-and-record`; write it if it is absent, with its
-  `MEMORY.md` index line.
-  VERIFIABLE: a repository search finds the authorization sentence in `CLAUDE.md` §6 and the dated
-  row in `docs/rule-corpus-audit.md`; the doc-budget guard and `npm run test:unit` stay green; and
-  the boundary clause stands in the same sentence as the grant.
-  Criticality: low — process hygiene, but it is what keeps a decided card from idling.
-  Urgency: it blocks a lane — point 946 stands in front of the release at Criticality: high and
-  names this authorization among the points it must be worked after, so its lane waits on this one.
-  Bundle: Chat & Tafel.
-
 - [ ] 946. A VDZK card still parks an owner-decidable question; admissibility gets the point-864
   typing. Point 864 typed the `AWAITING-USER` point gate (`defer-for-user.mjs` refuses advisory
   reasons), but the CARD path kept accepting open questions: on 26.08.2026 the card "Vier-Augen-
