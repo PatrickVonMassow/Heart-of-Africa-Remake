@@ -1,8 +1,10 @@
 import { afterEach, beforeEach, describe, expect, inject, it } from 'vitest'
-import { execFileSync } from 'node:child_process'
+import { execFileSync, spawnSync } from 'node:child_process'
 import { appendFileSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs'
+import { createRequire } from 'node:module'
 import { tmpdir } from 'node:os'
-import { join } from 'node:path'
+import { dirname, join, resolve } from 'node:path'
+import { pathToFileURL } from 'node:url'
 import {
   assertRepositoryUnchanged,
   protectRepository,
@@ -15,9 +17,11 @@ import {
 describe('unit-suite repository integrity guard', () => {
   let repo
   let runGit
+  let temporaryDirectories
 
   beforeEach(() => {
     repo = mkdtempSync(join(tmpdir(), 'hoa-repository-integrity-'))
+    temporaryDirectories = [repo]
     runGit = (...args) =>
       execFileSync('git', ['-C', repo, '-c', 'commit.gpgsign=false', '-c', 'core.hooksPath=', ...args], {
         encoding: 'utf8',
@@ -31,7 +35,19 @@ describe('unit-suite repository integrity guard', () => {
     runGit('commit', '-q', '-m', 'seed fixture')
   })
 
-  afterEach(() => rmSync(repo, { recursive: true, force: true }))
+  afterEach(() => {
+    for (const directory of temporaryDirectories.reverse()) {
+      rmSync(directory, { recursive: true, force: true })
+    }
+  })
+
+  const addLinkedWorktree = (branch = 'integrity-linked') => {
+    const parent = mkdtempSync(join(tmpdir(), 'hoa-repository-integrity-linked-'))
+    temporaryDirectories.push(parent)
+    const linked = join(parent, 'linked')
+    runGit('worktree', 'add', '-qb', branch, linked)
+    return linked
+  }
 
   it('accepts a byte-identical repository', () => {
     const paths = repositoryStatePaths(repo)
@@ -96,6 +112,55 @@ describe('unit-suite repository integrity guard', () => {
       /head changed: "ref: refs\/heads\/main" -> "ref: refs\/heads\/escaped"/,
     )
   })
+
+  it('fails when the worktree registry changes', () => {
+    const verify = protectRepository(repo)
+    addLinkedWorktree()
+    expect(verify).toThrow(/worktree registrations changed/)
+  })
+
+  it('fails when any registered worktree HEAD or index changes', () => {
+    const linked = addLinkedWorktree()
+    const verify = protectRepository(repo)
+    const gitPath = (name) =>
+      execFileSync('git', ['-C', linked, 'rev-parse', '--path-format=absolute', '--git-path', name], {
+        encoding: 'utf8',
+        windowsHide: true,
+      }).trim()
+    writeFileSync(gitPath('HEAD'), 'ref: refs/heads/escaped-linked-head\n')
+    writeFileSync(gitPath('index'), 'escaped fixture index\n')
+    expect(verify).toThrow(/one or more worktree HEADs changed; one or more worktree indexes changed/)
+  })
+
+  it('makes the Vitest run red when a fixture writes into the common checkout', () => {
+    const linked = addLinkedWorktree('integrity-runner')
+    const detectorUrl = pathToFileURL(resolve('scripts/repository-integrity.mjs')).href
+    const vitestPackage = dirname(createRequire(import.meta.url).resolve('vitest'))
+    const vitestUrl = pathToFileURL(join(vitestPackage, 'dist', 'index.js')).href
+    const cli = join(vitestPackage, 'vitest.mjs')
+    writeFileSync(
+      join(linked, 'vitest.config.mjs'),
+      `export default { test: { environment: 'node', globalSetup: [${JSON.stringify(detectorUrl)}], include: ['escape.test.mjs'] } }\n`,
+    )
+    writeFileSync(
+      join(linked, 'escape.test.mjs'),
+      `import { execFileSync } from 'node:child_process'\n` +
+        `import { it } from ${JSON.stringify(vitestUrl)}\n` +
+        `it('writes through the shared ref store', () => {\n` +
+        `  execFileSync('git', ['-C', ${JSON.stringify(repo)}, 'branch', 'escaped-by-fixture'])\n` +
+        `})\n`,
+    )
+    const result = spawnSync(process.execPath, [cli, 'run', '--config', 'vitest.config.mjs'], {
+      cwd: linked,
+      encoding: 'utf8',
+      env: { ...process.env, NO_COLOR: '1' },
+      windowsHide: true,
+    })
+    const output = `${result.stdout ?? ''}${result.stderr ?? ''}`
+    expect(result.status).not.toBe(0)
+    expect(output).toContain('LIVE REPOSITORY CHANGED WHILE UNIT SUITE RAN')
+    expect(output).toContain('refs/heads/escaped-by-fixture')
+  }, 20_000)
 })
 
 // THE WIRING IS PART OF THE MECHANISM, so it is asserted here rather than left to
