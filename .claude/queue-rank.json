@@ -746,10 +746,10 @@
       "place": "last"
     },
     "936": {
-      "at": "2026-08-26T09:48:58.751Z",
-      "why": "Der Zustand ist gemessen widerlegt und die Karte kostet nur Aufmerksamkeit, keine Korrektheit — sie darf hinter der laufenden Brett- und Render-Arbeit stehen.",
-      "origin": "machine",
-      "place": "last"
+      "at": "2026-08-27T12:47:41.550Z",
+      "why": "User order of 27.08.2026, 14:43: the header-layout point runs next and this decision-card point directly after it",
+      "origin": "user",
+      "place": "ahead"
     },
     "937": {
       "at": "2026-08-26T09:48:58.834Z",
@@ -895,42 +895,6 @@
       "origin": "machine",
       "place": "last"
     }
-  },
-  "boundary": {
-    "at": "2026-08-21T00:55:14.962Z",
-    "points": [
-      336,
-      553,
-      596,
-      633,
-      659,
-      660,
-      663,
-      686,
-      687,
-      688,
-      689,
-      690,
-      691,
-      692,
-      708,
-      715,
-      719,
-      733,
-      734,
-      735,
-      736,
-      738,
-      739,
-      746,
-      747,
-      750,
-      759,
-      760,
-      762,
-      764
-    ],
-    "why": "The order standing in front of the release today is the arrangement that predates this rule; the four machine-filed points that had ranked themselves there were moved behind 174 first"
   },
   "settled": {
     "at": "2026-08-27T12:32:21.522Z",
@@ -1255,5 +1219,41 @@
       970,
       971
     ]
+  },
+  "boundary": {
+    "at": "2026-08-21T00:55:14.962Z",
+    "points": [
+      336,
+      553,
+      596,
+      633,
+      659,
+      660,
+      663,
+      686,
+      687,
+      688,
+      689,
+      690,
+      691,
+      692,
+      708,
+      715,
+      719,
+      733,
+      734,
+      735,
+      736,
+      738,
+      739,
+      746,
+      747,
+      750,
+      759,
+      760,
+      762,
+      764
+    ],
+    "why": "The order standing in front of the release today is the arrangement that predates this rule; the four machine-filed points that had ranked themselves there were moved behind 174 first"
   }
 }
