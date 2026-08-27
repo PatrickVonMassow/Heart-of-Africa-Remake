@@ -5190,12 +5190,12 @@ Build order, chosen so no two parallel agents own the same file:
   DOCS: design.md §21.1 already states it; name the parameter in the README's play
   links if that file lists them, so the shareable form is discoverable.
 
-- [ ] 422. The beginner guide is full, and three lessons are still outside it
+- [ ] 422. The beginner guide is full, and four lessons are still outside it
   (29.07.2026, found while doing the guide review the currency guard demands).
   `docs/analysis_de/vibe-coding-anleitung.md` sits at EXACTLY its budget — measured
   13.08.2026, 415 lines of 415 and 3677 words of 3677 (`scripts/guide-brevity-core.mjs`).
   The gate is right to hold it there: a beginner guide that grows without bound stops being
-  read, and a full guide makes every new lesson pay for its place. THREE lessons are still
+  read, and a full guide makes every new lesson pay for its place. FOUR lessons are still
   waiting, and each is a pitfall in the guide's own form:
   (A) changing WHERE or HOW something is delivered does not carry the old path's guarantees
   along, and what no test pins falls away SILENTLY — the page still loads, the tests stay
@@ -5218,6 +5218,14 @@ Build order, chosen so no two parallel agents own the same file:
   is this point's forcing function doing its job, not a reason to skip the lesson. The
   reverted wording stands verbatim in commit 9b484e41 and is the draft to fold in, not to
   invent a second time.
+  (D) a bar meant to stop a rejected state from returning was calibrated on the author's OWN
+  intended layout and was therefore satisfied by exactly that rejected state (27.08.2026,
+  retrospective §3.202, points 967/969): "at most two content rows" is what the rendering the
+  user had rejected spends. A check derived from the intended solution measures the author's
+  intention and not the user's complaint; it is compatible by construction with every rendering
+  its author thought right. Its prompt belongs beside the existing »Fehlalarm behoben« entry,
+  which is the same subject from the other side: calibrate a bar against the REJECTED state, and
+  treat it as unfinished until a control that RESTORES that state fails it.
   DECIDE AND DO, in this order: (1) read the guide whole and judge which existing entry is
   now the WEAKEST — the budget is a forcing function, so a new lesson earns its place by
   displacing one, not by widening the frame; (2) for (C) the cheapest displacement is
@@ -5239,7 +5247,7 @@ Build order, chosen so no two parallel agents own the same file:
   morning — commit 77d34781 paid a new pitfall out of six neighbouring entries instead of
   out of the ceiling. The 13.08. measurement is stale with it: the guide stands at 413 of
   415 lines and 3556 of 3677 words (measured 20.08.2026), so a small entry fits today
-  without displacing anything. Everything else here holds: the three lessons are still out
+  without displacing anything. Everything else here holds: the lessons are still out
   of the guide, and (1)–(4) are still the order to work them in.
   NOTE: the guide currency was attested on 29.07. against the sources of that day; the
   review found this gap and could not close it, which is what this point exists for.
