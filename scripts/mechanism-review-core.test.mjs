@@ -1115,6 +1115,7 @@ describe('evaluateMechanismReview', () => {
     })
     const answer = commit({
       sha: answerSha,
+      at: 1_787_000_004_000,
       authorModel: 'GPT-5.6 Sol',
       authorModels: ['GPT-5.6 Sol'],
       files,
@@ -1197,6 +1198,7 @@ describe('evaluateMechanismReview', () => {
     })
     const sameVendorAnswer = commit({
       sha: answerSha,
+      at: 1_787_000_004_000,
       authorModel: 'Claude Fable 5',
       authorModels: ['Claude Fable 5'],
       files: [file],
