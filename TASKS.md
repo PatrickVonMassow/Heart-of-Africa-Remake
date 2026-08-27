@@ -12956,7 +12956,7 @@ to land than a mechanism that needs a review.
   game-render paths that a clean full `polish` pass on WebGPU (06:35) and WebGL 2 (06:57) had
   already covered. But board-layout cannot answer that gate at all: it draws no game view, it
   launches `chromium` directly instead of going through `scripts/verify/_browser.mjs`, so it never
-  arms `render-verify-recorder.mjs`, and it writes NO screenshot — it measures
+  arms `render-verify-recorder.mjs`, and it never records a screenshot — it measures
   `getBoundingClientRect()` over the published board. I ran it green on both backends (66 pass each,
   0 fail, 0 console errors); neither run was recorded and neither covered anything. The gate could
   then only be answered by re-running an unrelated ~46-minute `polish` pass or by a deferral.
