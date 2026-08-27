@@ -319,7 +319,7 @@ function commitFacts(sha) {
  *    pure-ASCII octal escape and unquoteGitPath decodes it; what remains
  *    undecodable surfaces as U+FFFD, which the pass records can never name
  *    (parsePassFiles refuses it), so a conflated path can only ever DENY a
- *    clearance. (The -z range listing below never quotes, by design.)
+   *    clearance.
  *  - `--no-renames` closes the rename-out blindness: with rename detection on,
  *    `--name-only` reports only the DESTINATION, so renaming a guard to an
  *    ordinary path hid the mechanism's removal from the gate. Split into
@@ -327,14 +327,6 @@ function commitFacts(sha) {
  *    demands its review.
  */
 export { mechanismLogCommand }
-
-export const rangeFilesCommand = (base, sha) => [
-  'diff',
-  '--name-only',
-  '-z',
-  '--no-renames',
-  `${base}..${sha}`,
-]
 
 function rangeCommits(base, head, files) {
   const out = gitRawFile(mechanismLogCommand(base, head))

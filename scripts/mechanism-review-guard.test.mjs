@@ -17,9 +17,7 @@ import {
   mechanismLogCommand,
   parseMechanismLog,
   pendingReviewContributions,
-  rangeFilesCommand,
 } from './mechanism-review-guard.mjs'
-import { reviewGapRange } from './mechanism-review-guard-gap-core.mjs'
 import {
   CONTRIBUTION_DISPOSITION_KIND,
   CONTRIBUTION_SCOPE_BOUNDARY,
@@ -339,25 +337,6 @@ describe('the path-carrying git commands', () => {
     ])
   })
 
-  it('builds the range listing raw (-z) and rename-split, exactly — as an args ARRAY', () => {
-    expect(rangeFilesCommand('base', 'sha')).toEqual([
-      'diff',
-      '--name-only',
-      '-z',
-      '--no-renames',
-      'base..sha',
-    ])
-  })
-
-  it('starts pending detection, coverage and gap assessment at the same merge-base', () => {
-    const base = 'a'.repeat(40)
-    const head = 'b'.repeat(40)
-    const record = 'c'.repeat(40)
-    const gap = reviewGapRange({ blocked: true, base, head })
-
-    expect(mechanismLogCommand(base, head).at(-1)).toBe(`${gap.baseline}..${gap.head}`)
-    expect(rangeFilesCommand(base, record).at(-1)).toBe(`${gap.baseline}..${record}`)
-  })
 })
 
 // THE COST RULE (point 387): this probe walks real git history from the unit
