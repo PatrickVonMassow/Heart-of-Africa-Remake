@@ -81,4 +81,17 @@ describe('settled ruling matching', () => {
     )
     expect(verdict).toMatchObject({ block: true, match: { kind: 'certain' } })
   })
+
+  it('prefers a certain later entry over an uncertain earlier entry', () => {
+    const ruling = (id, terms) => ({ id, terms })
+    const group = (name, anyOf, anchor = false) => ({ name, anyOf, anchor })
+    const rulings = [
+      ruling('possible-first', [group('shared', ['shared anchor'], true), group('missing', ['absent'])]),
+      ruling('certain-second', [group('shared', ['shared anchor'], true), group('present', ['present'])]),
+    ]
+    expect(matchSettledRuling('Shared anchor and present.', rulings)).toMatchObject({
+      kind: 'certain',
+      ruling: { id: 'certain-second' },
+    })
+  })
 })

@@ -37,6 +37,7 @@ export function matchSettledRuling(text, rulings = SETTLED_OWNER_RULINGS) {
     .split(/\r?\n/)
     .filter((line) => !line.trimStart().toLowerCase().startsWith(`${NOT_SETTLED_PREFIX.toLowerCase()} `))
     .join('\n')
+  let uncertain = null
   for (const ruling of rulings) {
     const groups = Array.isArray(ruling?.terms) ? ruling.terms : []
     const matchedGroups = groups.filter(
@@ -45,11 +46,13 @@ export function matchSettledRuling(text, rulings = SETTLED_OWNER_RULINGS) {
     if (groups.length > 0 && matchedGroups.length === groups.length) {
       return { kind: 'certain', ruling, matchedGroups: matchedGroups.map((group) => group.name) }
     }
-    if (matchedGroups.some((group) => group.anchor === true)) {
-      return { kind: 'uncertain', ruling, matchedGroups: matchedGroups.map((group) => group.name) }
+    if (!uncertain && matchedGroups.some((group) => group.anchor === true)) {
+      uncertain = { kind: 'uncertain', ruling, matchedGroups: matchedGroups.map((group) => group.name) }
     }
   }
-  return null
+  // A possible hit earlier in the register must never hide a certain hit later.
+  // Order is editorial, not a precedence rule.
+  return uncertain
 }
 
 /** The only uncertain-match escape, deliberately visible in the card/reply. */
