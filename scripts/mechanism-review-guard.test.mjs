@@ -8,6 +8,7 @@
 import { describe, it, expect } from 'vitest'
 import { readFileSync } from 'node:fs'
 import {
+  attachContributionDispositions,
   attachCoverage,
   BASELINE_RECOVERY_ANCHOR,
   baselineFor,
@@ -15,10 +16,17 @@ import {
   measureReviewGap,
   mechanismLogCommand,
   parseMechanismLog,
+  pendingReviewContributions,
   rangeFilesCommand,
 } from './mechanism-review-guard.mjs'
 import { reviewGapRange } from './mechanism-review-guard-gap-core.mjs'
-import { evaluateMechanismReview, formatMechanismReviewVerdict } from './mechanism-review-core.mjs'
+import {
+  CONTRIBUTION_DISPOSITION_KIND,
+  CONTRIBUTION_SCOPE_BOUNDARY,
+  evaluateMechanismReview,
+  formatMechanismReviewVerdict,
+  LEGACY_RANGE_RETIREMENT_REASON,
+} from './mechanism-review-core.mjs'
 import { repoPath } from './repo-paths.mjs'
 
 describe('baselineFor', () => {
@@ -118,6 +126,51 @@ describe('historical ledger eras', () => {
       expect(verdict.findings.some((finding) => finding.kind === 'malformed-record'), shortSha).toBe(false)
       expect(formatMechanismReviewVerdict(verdict), shortSha).not.toContain('is malformed')
     }
+  })
+})
+
+describe('legacy contribution dispositions', () => {
+  const row = (over = {}) => ({
+    kind: CONTRIBUTION_DISPOSITION_KIND,
+    disposition: 'retired',
+    sha: 'a'.repeat(40),
+    scopeBoundary: CONTRIBUTION_SCOPE_BOUNDARY,
+    reason: LEGACY_RANGE_RETIREMENT_REASON,
+    measurement: {
+      measuredOn: '2026-08-26',
+      point: 943,
+      passesAtOpen: 45,
+      passesAtClose: 42,
+      passesOnMain: 115,
+    },
+    ...over,
+  })
+
+  it('stamps only the fixed historical retirement Git places before the boundary', () => {
+    const records = [row(), row({ sha: 'b'.repeat(40), disposition: 'reviewed' })]
+    attachContributionDispositions(records, (ancestor, boundary) => {
+      expect(boundary).toBe(CONTRIBUTION_SCOPE_BOUNDARY)
+      return ancestor === 'a'.repeat(40)
+    })
+    expect(records[0].contributionDispositionVerified).toBe(true)
+    expect(records[1].contributionDispositionVerified).toBeUndefined()
+  })
+
+  it('trusts none of the ledger row own boundary, measurement or prose', () => {
+    const altered = [
+      row({ scopeBoundary: 'b'.repeat(40) }),
+      row({ reason: 'please retire this' }),
+      row({ measurement: { ...row().measurement, passesOnMain: 114 } }),
+      row({ sha: 'future' }),
+    ]
+    attachContributionDispositions(altered, () => true)
+    expect(altered.every((record) => record.contributionDispositionVerified === undefined)).toBe(true)
+  })
+
+  it('removes a stale in-memory stamp before re-verifying', () => {
+    const forged = row({ contributionDispositionVerified: true })
+    attachContributionDispositions([forged], () => false)
+    expect(forged.contributionDispositionVerified).toBeUndefined()
   })
 })
 
@@ -242,6 +295,28 @@ describe('parseMechanismLog', () => {
 // ROUND-1 PASS 2, both path-transport findings: the flags are what make the
 // gate's view of the tree config-independent and rename-proof, so they are
 // pinned as the COMMANDS the wrapper actually builds.
+describe('pending review contributions', () => {
+  it('uses mechanism paths only to select a commit, then owes that commit own complete file set', () => {
+    const commits = [
+      {
+        sha: 'a'.repeat(40),
+        files: ['scripts/example-guard.mjs', 'src/ordinary.ts', 'TASKS.md'],
+        authorModels: ['GPT-5.6 Sol'],
+      },
+      { sha: 'b'.repeat(40), files: ['src/unrelated.ts'], authorModels: ['GPT-5.6 Sol'] },
+    ]
+    const pending = pendingReviewContributions(
+      commits,
+      ['example-guard.mjs'],
+      (sha) => `subject ${sha.slice(0, 1)}`,
+    )
+    expect(pending).toHaveLength(1)
+    expect(pending[0]).toMatchObject({ sha: 'a'.repeat(40), subject: 'subject a' })
+    expect(pending[0].mechanismFiles).toEqual(['scripts/example-guard.mjs'])
+    expect(pending[0].files).toEqual(['scripts/example-guard.mjs', 'src/ordinary.ts'])
+  })
+})
+
 describe('the path-carrying git commands', () => {
   // PINNED WHOLE, not by substring (round-2 pass 3): a `.toContain` still
   // passes with the option after `--`, after the revision, or overridden by a
@@ -420,99 +495,83 @@ describe('attachCoverage', () => {
 })
 
 describe('measureReviewGap', () => {
-  // The gap clause is the guard's only way out of an unassemblable range. Point
-  // 947 measured that a throw from review-sol.mjs's SIZING planner used to leave
-  // the ruling null and the guard blocking — no gap, no runnable review, session
-  // trapped. These cases drive the real helper the guard calls.
-  const gapRange = { base: 'b'.repeat(40), head: 'h'.repeat(40) }
-  const assessorSpy = (seen) => async (args) => {
-    seen.push(args)
-    return { gap: true, reason: 'range does not fit' }
+  const runnable = {
+    scope: 'contribution',
+    contributions: [{
+      sha: 'c'.repeat(40),
+      statTruncated: false,
+      passes: [{ index: 1, total: 1 }],
+      uncoverable: [],
+      unreviewable: [],
+    }],
   }
 
-  it('still rules on the gap when the sizing planner throws', async () => {
-    const seen = []
+  it('fails closed when the contribution planner throws', async () => {
     const { gap, sizedPlan } = await measureReviewGap({
-      gapRange,
-      sha: gapRange.head,
-      base: gapRange.base,
+      blocked: true,
       commits: [{ sha: 'c'.repeat(40) }],
-      standingRecords: 1,
-      // The module LOADS; its BUILDER throws — the shape the live defect had.
       loadPlanner: async () => ({
-        buildAuthorshipPassPlan: () => {
+        buildContributionPassPlan: () => {
           throw new Error('planPasses assembled nothing')
         },
       }),
-      loadAssessor: async () => ({ assessReviewGap: assessorSpy(seen) }),
     })
-    expect(gap).toEqual({ gap: true, reason: 'range does not fit' })
+    expect(gap).toMatchObject({ gap: false, reason: 'unmeasured' })
     expect(sizedPlan).toBe(null)
-    // The assessment runs UNSLICED rather than not at all.
-    expect(seen[0].sizedPlan).toBe(null)
-    expect(seen[0].standingRecords).toBe(1)
   })
 
-  it('still rules on the gap when the planner MODULE cannot be loaded', async () => {
-    const seen = []
+  it('fails closed when the planner module cannot be loaded', async () => {
     const { gap, sizedPlan } = await measureReviewGap({
-      gapRange,
-      sha: gapRange.head,
-      base: gapRange.base,
-      commits: [],
-      standingRecords: 0,
+      blocked: true,
+      commits: [{ sha: 'c'.repeat(40) }],
       loadPlanner: () => {
         throw new Error('review-sol.mjs is broken')
       },
-      loadAssessor: async () => ({ assessReviewGap: assessorSpy(seen) }),
     })
-    expect(gap.gap).toBe(true)
+    expect(gap).toMatchObject({ gap: false, reason: 'unmeasured' })
     expect(sizedPlan).toBe(null)
-    expect(seen[0].sizedPlan).toBe(null)
   })
 
-  it('passes the sized plan through when the planner works', async () => {
-    const seen = []
-    const plan = { passes: [{ index: 1 }] }
+  it('passes the contribution plan through when the planner works', async () => {
     const { gap, sizedPlan } = await measureReviewGap({
-      gapRange,
-      sha: gapRange.head,
-      base: gapRange.base,
-      commits: [],
-      standingRecords: 0,
-      loadPlanner: async () => ({ buildAuthorshipPassPlan: () => plan }),
-      loadAssessor: async () => ({ assessReviewGap: assessorSpy(seen) }),
+      blocked: true,
+      commits: [{ sha: 'c'.repeat(40) }],
+      loadPlanner: async () => ({ buildContributionPassPlan: () => runnable }),
     })
-    expect(sizedPlan).toBe(plan)
-    expect(seen[0].sizedPlan).toBe(plan)
-    expect(gap.gap).toBe(true)
+    expect(sizedPlan).toBe(runnable)
+    expect(gap).toMatchObject({ gap: false, reason: 'contributions-runnable' })
   })
 
-  it('rules NO gap when the ASSESSMENT itself fails — an unmeasured claim never waives the gate', async () => {
+  it('reports only a named contribution that no pass can assemble', async () => {
+    const impossible = {
+      scope: 'contribution',
+      contributions: [{
+        sha: 'd'.repeat(40),
+        subject: 'Huge contribution',
+        rawSize: 400_000,
+        budget: 200_000,
+        statTruncated: false,
+        passes: [],
+        uncoverable: [{ path: 'huge.mjs', reason: 'diff too large' }],
+        unreviewable: [],
+      }],
+    }
     const { gap } = await measureReviewGap({
-      gapRange,
-      sha: gapRange.head,
-      base: gapRange.base,
-      commits: [],
-      standingRecords: 0,
-      loadPlanner: async () => ({ buildAuthorshipPassPlan: () => ({}) }),
-      loadAssessor: () => {
-        throw new Error('gap module is broken')
-      },
+      blocked: true,
+      commits: [{ sha: 'd'.repeat(40) }],
+      loadPlanner: async () => ({ buildContributionPassPlan: () => impossible }),
     })
-    expect(gap).toBe(null)
+    expect(gap).toMatchObject({ gap: true, reason: 'contributions-unassemblable' })
+    expect(gap.report).toContain('dddddddddddd')
+    expect(gap.report).toContain('huge.mjs')
   })
 
-  it('measures nothing at all when the range is not blocked', async () => {
+  it('measures nothing at all when the verdict is not blocked', async () => {
     let touched = false
     expect(
       await measureReviewGap({
-        gapRange: null,
+        blocked: false,
         loadPlanner: () => {
-          touched = true
-          return {}
-        },
-        loadAssessor: () => {
           touched = true
           return {}
         },

@@ -104,6 +104,7 @@ import {
   outstandingFiles,
   parseRangeLog,
   planAuthorshipGroups,
+  reviewEndStateFiles,
 } from './mechanism-review-range-core.mjs'
 
 /** Where codex keeps the ChatGPT login, and where we park a copy of it. */
@@ -227,6 +228,12 @@ function gatherRange(sha, base, onlyPaths = null) {
   // A range DIFF (rather than per-commit patches) is what carries a merge
   // commit's conflict resolution, which `git log --patch` omits.
   const range = `${base}..${sha}`
+  // An explicit empty contribution scope is EMPTY, not the absence of a
+  // filter. Treating [] like null widens an excluded-only commit back to every
+  // path in it and recreates baseline-style debt at the smallest boundary.
+  if (Array.isArray(onlyPaths) && onlyPaths.length === 0) {
+    return { stat: '', patch: '', files: [], paths: [] }
+  }
   // NUL-SEPARATED, because the newline-separated form is QUOTED: a path with a
   // tab, a quote or a high byte in it arrives as `"scripts/x\ty.mjs"`, which no
   // `git show` resolves — the file then reached neither the content list nor a
@@ -385,11 +392,12 @@ export function buildAuthorshipPassPlan({
   commits = gatherAuthorshipCommits(sha, base),
   records = [],
   recordUsable = () => true,
+  paths = null,
 } = {}) {
   // The net range is authority for materiality. Commit history supplies only
   // authorship: a reverted path is absent, while a path touched eight times is
   // still one current artefact.
-  const fullRange = gatherRange(sha, base)
+  const fullRange = gatherRange(sha, base, paths)
   const authorship = planAuthorshipGroups({ commits, endStateFiles: fullRange.paths })
   const coverage = outstandingFiles({
     commits,
@@ -449,6 +457,100 @@ export function buildAuthorshipPassPlan({
     superseded: authorship.superseded,
     invalidatedCoverage: coverage.invalidatedCoverage,
   }
+}
+
+/**
+ * Plan each owed mechanism contribution against its own first-parent boundary.
+ * The baseline chooses HOW MANY entries arrive here and nothing else: material
+ * size, reviewer routing and pass numbering are all local to the immutable
+ * commit. A contribution that fits today therefore stays runnable even when a
+ * stale baseline has accumulated millions of unrelated characters around it.
+ */
+export function buildContributionPassPlan({ commits = [], buildPlan = buildAuthorshipPassPlan } = {}) {
+  const contributions = []
+  for (const commit of commits ?? []) {
+    const sha = String(commit?.sha ?? '')
+    const base = String(commit?.parentShas?.[0] ?? '')
+    const files = reviewEndStateFiles(commit?.files ?? [])
+    if (!sha || !base) {
+      contributions.push({
+        sha,
+        subject: String(commit?.subject ?? ''),
+        base,
+        files,
+        rawSize: null,
+        budget: MATERIAL_BUDGET_CHARS,
+        statTruncated: false,
+        passes: [],
+        uncoverable: [],
+        unreviewable: [],
+        planningError: 'the contribution has no resolvable first-parent boundary',
+      })
+      continue
+    }
+    const plan = buildPlan({ sha, base, commits: [commit], paths: files })
+    contributions.push({
+      ...plan,
+      sha,
+      subject: String(commit?.subject ?? ''),
+      base,
+      files,
+    })
+  }
+  return {
+    scope: 'contribution',
+    contributions,
+    passCount: contributions.reduce((sum, entry) => sum + entry.passes.length, 0),
+    rawSize: contributions.reduce(
+      (sum, entry) => sum + (Number.isFinite(Number(entry.rawSize)) ? Number(entry.rawSize) : 0),
+      0,
+    ),
+    budget: MATERIAL_BUDGET_CHARS,
+  }
+}
+
+/** The finite, directly runnable plan printed by the mechanism guard status. */
+export function formatContributionPassPlan(plan = {}) {
+  const entries = Array.isArray(plan?.contributions) ? plan.contributions : []
+  const lines = [
+    `contribution-scoped plan: ${entries.length} owed contribution(s), ${Number(plan?.passCount ?? 0)} runnable pass(es)`,
+  ]
+  for (const entry of entries) {
+    const label = `${String(entry.sha).slice(0, 7) || '<unknown>'}${entry.subject ? ` ${entry.subject}` : ''}`
+    if (entry.planningError) {
+      lines.push(`  UNMEASURED ${label} — ${entry.planningError}`)
+      continue
+    }
+    const recordable =
+      !entry.statTruncated &&
+      !(entry.uncoverable ?? []).length &&
+      !(entry.unreviewable ?? []).length &&
+      entry.passes.length > 0 &&
+      entry.passes.length <= MAX_PASS_TOTAL
+    if (recordable) {
+      lines.push(`  ${label} — ${entry.passes.length} runnable ${entry.passes.length === 1 ? 'pass' : 'passes'}:`)
+      for (const pass of entry.passes) {
+        const passFlag = entry.fits ? '' : ` --pass ${pass.index}`
+        lines.push(
+          `    node scripts/review-sol.mjs --sha ${entry.sha} --since ${entry.base} ` +
+            `--brief "<what to judge>"${passFlag}`,
+        )
+      }
+    }
+    for (const item of entry.uncoverable ?? []) {
+      lines.push(`  UNASSEMBLABLE ${label}: ${quotePassFile(item.path)} — ${item.reason || 'no pass can carry its complete diff'}`)
+    }
+    if (entry.statTruncated) lines.push(`  UNASSEMBLABLE ${label}: its diffstat exceeds one pass's fixed share`)
+    if (entry.passes.length > MAX_PASS_TOTAL) {
+      lines.push(`  UNASSEMBLABLE ${label}: ${entry.passes.length} passes exceed the recordable ${MAX_PASS_TOTAL}`)
+    }
+    for (const group of entry.unreviewable ?? []) {
+      lines.push(
+        `  UNREVIEWABLE ${label}: ${(group.files ?? []).map(quotePassFile).join(', ')} — ${group.unreviewableReason}`,
+      )
+    }
+  }
+  return lines.join('\n')
 }
 
 export function formatAuthorshipPlan(plan, { sha = '' } = {}) {

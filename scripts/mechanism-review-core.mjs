@@ -1756,7 +1756,7 @@ export function formatMechanismReviewVerdict(verdict, { authorshipPlan = null } 
   const unreviewable = Array.isArray(authorshipPlan?.unreviewable) ? authorshipPlan.unreviewable : []
   const lines = [
     unreviewable.length
-      ? 'FOUR-EYES GATE ON MECHANISMS — UNREVIEWABLE: this range contains contributions with no eligible reviewer vendor.'
+      ? 'FOUR-EYES GATE ON MECHANISMS — UNREVIEWABLE: an owed contribution has no eligible reviewer vendor.'
       : 'FOUR-EYES GATE ON MECHANISMS: a guard, gate or git hook changed here and no ' +
         'second model has recorded a review of it.',
     '',
@@ -1797,10 +1797,11 @@ export function formatMechanismReviewVerdict(verdict, { authorshipPlan = null } 
         lines.push(
           `      the review was split into ${p.total} passes over the FILE SET and only ${p.have} are on ` +
             `record — missing pass ${(p.missing ?? []).join(', ')}`,
-          '      A pass covers the files it named; the range is cleared when every pass is recorded:',
-          `      node scripts/review-sol.mjs --sha ${short(c.sha)} --brief "<what to judge>" --pass ${(p.missing ?? [])[0] ?? 1}`,
-          '      File debt is measured against the CURRENT END-STATE FILE: a complete scoped',
-          '      review at another covering sha also settles each current file that it names.',
+          '      A pass covers the files it named; the contribution is cleared when every pass is recorded:',
+          `      node scripts/review-sol.mjs --sha ${short(c.sha)} --since ${short(c.sha)}~1 ` +
+            `--brief "<what to judge>" --pass ${(p.missing ?? [])[0] ?? 1}`,
+          '      The contribution keeps its own immutable commit boundary; later baseline growth',
+          '      cannot widen this review or make a once-runnable pass disappear.',
         )
       }
       // COUNTING THE PASSES IS NOT COUNTING THE FILES. Passes that are all on
@@ -1856,7 +1857,7 @@ export function formatMechanismReviewVerdict(verdict, { authorshipPlan = null } 
     )
   }
   if (unreviewable.length) {
-    lines.push('', 'UNREVIEWABLE end-state files (none may be treated as an ordinary missing review):')
+    lines.push('', 'UNREVIEWABLE contribution files (none may be treated as an ordinary missing review):')
     for (const group of unreviewable) {
       lines.push(
         `  · ${(group.files ?? []).join(', ') || '<files unknown>'}: ` +
@@ -1869,20 +1870,18 @@ export function formatMechanismReviewVerdict(verdict, { authorshipPlan = null } 
       'authorship split with: node scripts/mechanism-review-guard.mjs --status',
     )
   } else if (groups.length > 1) {
-    lines.push('', 'This range MIXES AUTHORSHIP. Review it as these end-state file groups:')
+    lines.push('', 'The owed contributions MIX AUTHORSHIP. Review the contribution groups independently:')
     for (const group of groups) {
       lines.push(
-        `  · ${group.vendor || 'unknown'}-authored end-state files ` +
+        `  · ${group.vendor || 'unknown'}-authored contribution files ` +
           `→ ${group.reviewerVendor || 'unknown'} reviewer ${group.reviewer || '<none>'}: ` +
           `${(group.files ?? []).join(', ') || '<files unknown>'}`,
       )
     }
     lines.push(
       '',
-      'Ask the planner for the runnable pass commands; each recorded pass clears only its',
-      'listed files at their reviewed end state, so the two vendors accumulate independent coverage:',
-      '',
-      `  node scripts/review-sol.mjs --sha ${short(verdict.head) || '<sha>'} --brief "<what to judge>"`,
+      'Ask the guard status for the runnable contribution commands; each recorded pass clears',
+      'only its listed files at that commit boundary:',
       '',
       'Inspect the remaining file debt with: node scripts/mechanism-review-guard.mjs --status',
     )
@@ -1896,8 +1895,8 @@ export function formatMechanismReviewVerdict(verdict, { authorshipPlan = null } 
       '  node scripts/mechanism-review.mjs --record <sha> --model <name> \\',
       `      --verdict <${VERDICTS.join('|')}> --evidence "<one line>" --mode review`,
       '',
-      'One record covers every mechanism commit it contains, so reviewing the branch head is',
-      'enough. Inspect the gate with: node scripts/mechanism-review-guard.mjs --status',
+      'Each command printed by the guard status is bounded to one contribution and its parent.',
+      'Inspect the finite runnable plan with: node scripts/mechanism-review-guard.mjs --status',
     )
   }
   return lines.join('\n')
