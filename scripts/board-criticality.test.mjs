@@ -84,69 +84,79 @@ describe('derived card criticality badges', () => {
 
   })
 
-  it('keeps the disclosure marker in the non-wrapping estimate group', () => {
+  // POINT 969 — the marker belongs beside the FIRST line of the time column,
+  // not below it. The summary no longer wraps, so its own ::after is a fourth
+  // column that cannot be orphaned on a line of its own, and baseline alignment
+  // puts it next to the start time once the times stack. The suppression and
+  // the substitute marker inside the right group both go.
+  it('keeps the disclosure marker beside the first line of the time column', () => {
     const document = new JSDOM(rendered()).window.document
     const rules = [...document.querySelector('#board-criticality-style').sheet.cssRules]
     const declarations = (selector) => rules.find((rule) => rule.selectorText === selector)?.style
 
-    // The living board creates its marker as summary::after. Once the summary
-    // wraps, that pseudo-element is a fourth flex item and can occupy a line by
-    // itself. Suppress it only when there is a right-hand group, then recreate
-    // both marker states inside that group. Its nowrap rule makes estimate and
-    // marker one indivisible flex item at the summary level.
-    expect(declarations('details:not(.sect)>summary:has(>.right)::after')?.content).toBe('none')
-    expect(declarations('details:not(.sect)>summary>.right')?.flexWrap).toBe('nowrap')
-    expect(declarations('details:not(.sect)>summary>.right::after')?.content).toBe('"▸"')
-    expect(declarations('details:not(.sect)[open]>summary>.right::after')?.content).toBe('"▾"')
-  })
-
-  // POINT 963 — the third report of the same header. The group stays one flex
-  // line so the marker cannot be orphaned, but its CONTENT must break: a meta
-  // that outgrows its column wraps its own text instead of being squeezed.
-  it('lets both side columns break their own content', () => {
-    const document = new JSDOM(rendered()).window.document
-    const rules = [...document.querySelector('#board-criticality-style').sheet.cssRules]
-    const declarations = (selector) => rules.find((rule) => rule.selectorText === selector)?.style
-
-    for (const selector of ['.card-header-left>*', 'details:not(.sect)>summary>.right>*']) {
-      const style = declarations(selector)
-      expect(style, `${selector} carries no rule`).toBeTruthy()
-      expect(style.overflowWrap).toBe('anywhere')
-      expect(style.whiteSpace).toBe('normal')
-      expect(style.minWidth).toBe('0px')
+    const marker = declarations('details:not(.sect)>summary::after')
+    expect(marker?.content).toBe('"▸"')
+    expect(marker?.alignSelf).toBe('baseline')
+    expect(marker?.flexShrink).toBe('0')
+    expect(declarations('details:not(.sect)[open]>summary::after')?.content).toBe('"▾"')
+    for (const gone of [
+      'details:not(.sect)>summary:has(>.right)::after',
+      'details:not(.sect)>summary>.right::after',
+      'details:not(.sect)[open]>summary>.right::after',
+    ]) {
+      expect(declarations(gone), `${gone} still carries a rule`).toBeUndefined()
     }
   })
 
-  // POINT 967 — in portrait the header reflows into a compact shape instead of
-  // stacking every group: number and badge share the first row with the
-  // right-aligned meta, and only the title takes a full row beneath them.
-  it('reflows the header compactly on a phone-width viewport', () => {
+  // POINT 963/969 — a side column that outgrows its width must give way, but
+  // the two columns give way differently: the time column breaks its own TEXT,
+  // while the number column keeps number and badge intact and stacks them.
+  it('lets each side column give way in its own way', () => {
     const document = new JSDOM(rendered()).window.document
     const rules = [...document.querySelector('#board-criticality-style').sheet.cssRules]
     const declarations = (selector) => rules.find((rule) => rule.selectorText === selector)?.style
-    const portrait = rules.find((rule) => rule.media && [...rule.media].join(' ').includes('460px'))
-    expect(portrait, 'no portrait rule').toBeTruthy()
-    const portraitRule = (part) =>
-      [...portrait.cssRules].find((rule) => rule.selectorText.endsWith(part))
-    const left = portraitRule('>.card-header-left')?.style
-    expect(left?.order).toBe('0')
-    expect(left?.flexBasis).not.toBe('100%')
-    const right = portraitRule('>.right')
-    expect(right?.style.order).toBe('1')
-    expect(right?.style.marginLeft).toBe('auto')
-    expect(right?.style.flexBasis).not.toBe('100%')
-    const title = portraitRule('>.t')
-    expect(title?.style.order).toBe('2')
-    expect(title?.style.flexBasis).toBe('100%')
-    // A summary WITHOUT the number group keeps its native title-first order —
-    // reordering there would lift the timestamp above the title of the
-    // handover/state cards (point 967 review, finding 1).
-    for (const rule of [right, title]) {
-      expect(rule?.selectorText).toContain(':has(>.card-header-left)')
+
+    // `break-word` rather than `anywhere`: the column must break a meta that
+    // outgrows it, but its min-content stays a whole token, so a short estimate
+    // is never split into "~2,5" over "h" when the title pulls at the row.
+    const meta = declarations('details:not(.sect)>summary>.right>*')
+    expect(meta?.overflowWrap).toBe('break-word')
+    expect(meta?.whiteSpace).toBe('normal')
+    expect(meta?.minWidth).toBe('0px')
+
+    // The number and the badge are never broken mid-token; the COLUMN wraps
+    // between them, which is what puts the badge under the number.
+    const part = declarations('.card-header-left>*')
+    expect(part?.whiteSpace).toBe('nowrap')
+    expect(part?.overflowWrap).toBe('normal')
+    expect(part?.minWidth).toBe('auto')
+    expect(declarations('.card-header-left')?.flexWrap).toBe('wrap')
+  })
+
+  // POINT 969 — the header is three columns at EVERY width, and it stacks by
+  // content rather than at a breakpoint. A media rule in this sheet is the
+  // defect itself: the three rounds before this one each answered a squeezed
+  // title by reordering the groups below 460px, which is what the user rejected.
+  it('keeps three columns at every width and stacks only by content', () => {
+    const document = new JSDOM(rendered()).window.document
+    const rules = [...document.querySelector('#board-criticality-style').sheet.cssRules]
+    const declarations = (selector) => rules.find((rule) => rule.selectorText === selector)?.style
+
+    expect(rules.filter((rule) => rule.media), 'the sheet carries a breakpoint again').toHaveLength(0)
+    for (const rule of rules) {
+      expect(rule.style?.order ?? '', `${rule.selectorText} reorders the columns`).toBe('')
     }
-    // Above that width the title keeps a basis wide enough to be worth a shared
-    // row; below it the media rule takes over.
-    expect(declarations('details:not(.sect)>summary>.t')?.flexBasis).toBe('18rem')
+
+    // The row itself never wraps — the title cannot fall onto a row of its own.
+    expect(declarations('details:not(.sect)>summary')?.flexWrap).toBe('nowrap')
+    // Each column wraps its own content instead.
+    expect(declarations('.card-header-left')?.flexWrap).toBe('wrap')
+    expect(declarations('details:not(.sect)>summary>.right')?.flexWrap).toBe('wrap')
+    // The title is the greedy column: it grows into whatever is left, and its
+    // content-sized basis is what makes the outer columns yield first.
+    const title = declarations('details:not(.sect)>summary>.t')
+    expect(title?.flexGrow).toBe('1')
+    expect(title?.flexBasis).toBe('auto')
   })
 
   it('keeps old and decorated summary shapes readable and renders idempotently', () => {

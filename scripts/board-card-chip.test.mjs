@@ -113,15 +113,30 @@ describe('the numbered chip renders on a now-card as it does in the queue', () =
     expect(summaryRule).toContain('flex-wrap:nowrap')
     expect((css.match(/\.num\{([^}]*)\}/) ?? [])[1] ?? '').toContain('flex-shrink:0')
     const derived = (readFileSync(BOARD_FILE, 'utf8').match(/<style id="board-criticality-style">([\s\S]*?)<\/style>/) ?? [])[1] ?? ''
-    // Point 967 widened the wrap rule to every non-sect summary, so a chip
-    // group beside a card with no right column is never squeezed into breaking.
-    expect(derived).toContain('details:not(.sect)>summary{flex-wrap:wrap')
-    expect(derived).toContain('.card-header-left{display:inline-flex')
-    expect(derived).toContain('min-width:0;max-width:100%')
-    // The phone rule must not hide or reorder the left group.
-    const phone = (css.match(new RegExp(`@media\\(max-width:(\\d+)px\\)\\{([^}]*\\}[^{]*)*`)) ?? [])[0] ?? ''
-    expect(Number((phone.match(/max-width:(\d+)px/) ?? [])[1] ?? 0)).toBeGreaterThan(PHONE_WIDTH)
-    expect(phone).not.toContain('.num')
+    // Point 969 turned the header into three columns: the ROW no longer wraps,
+    // so the chip group can never be pushed onto a line of its own, and the
+    // group itself wraps instead — which is what puts the badge under the
+    // number when the row is too narrow for both.
+    expect(derived).toContain('details:not(.sect)>summary{flex-wrap:nowrap')
+    // Read the wrap off the CHIP GROUP'S OWN rule. A bare `toContain` was
+    // satisfied by the time column's rule and would have passed while the chip
+    // group regressed to `nowrap` (cross-vendor review 27.08.2026, finding 4).
+    const chipGroup = (derived.match(/\.card-header-left\{([^}]*)\}/) ?? [])[1] ?? ''
+    expect(chipGroup).toContain('display:inline-flex')
+    expect(chipGroup).toContain('flex-wrap:wrap')
+    // EVERY phone block, not just the first one, and the declaration matched by
+    // shape rather than by spelling — `order : 1` is as valid as `order:1`
+    // (cross-vendor review 27.08.2026, second round).
+    const phoneBlocks = [...css.matchAll(/@media\s*\(\s*max-width\s*:\s*(\d+)px\s*\)\s*\{((?:[^{}]*\{[^{}]*\})*[^{}]*)\}/g)]
+    expect(phoneBlocks.length, 'the board carries no phone block at all').toBeGreaterThan(0)
+    for (const [block, width, body] of phoneBlocks) {
+      expect(Number(width), `${width}px block`).toBeGreaterThan(PHONE_WIDTH)
+      // The phone rule must not hide the left group…
+      expect(body, `the ${width}px block reaches the chip`).not.toContain('.num')
+      // …and it may not REORDER the header either: the three columns stand
+      // number, title, time at every width (point 969).
+      expect(block, `the ${width}px block reorders the header`).not.toMatch(/(^|[;{\s])order\s*:/)
+    }
     // No rule scoped only to current work may change the shared grouping.
     for (const [, selector, body] of css.matchAll(/([^{}]+)\{([^{}]*)\}/g)) {
       if (!/\.now\b/.test(selector) || !/summary|\.t\b/.test(selector)) continue
