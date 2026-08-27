@@ -13068,3 +13068,32 @@ to land than a mechanism that needs a review.
   Criticality: medium — nothing breaks at runtime, but a session that follows a stale rule spends
   a whole point on the wrong lane, which is exactly what A1 and A2 describe.
   Bundle: Session- & Repo-Hygiene.
+
+- [ ] 984. Every landing writes its tick commit with the author model at the wrong vendor address.
+  MEASURED 28.08.2026: `git log --format='%h %s | %(trailers:key=Co-Authored-By,valueonly)'` over
+  the last five commits titled "Move the finished point out of the open work order" — 9bd20d3a,
+  4058fb8b, 47bbc9ac, d0c6a46d, af912498 — shows every one of them carrying
+  `GPT-5.6 Sol <noreply@anthropic.com>`. `scripts/land-point.mjs` takes the model NAME from
+  `--model` and pairs it with a fixed Anthropic no-reply address, so a Sol landing records an
+  OpenAI model at an Anthropic address.
+  WHAT IT COSTS: the trailer is the only machine-readable record of authorship, and the four-eyes
+  gate cuts reviewers by VENDOR. `mechanism-review.mjs --record` refuses such a commit outright —
+  measured this night: "an INDEPENDENT REVIEW cannot be proved for 9bd20d3: its commit names no
+  recognised model author in its Co-Authored-By trailers." Today the tick commit touches only
+  `TASKS.md` and `docs/tasks-archive.md`, so it is never a mechanism contribution and the damage
+  stays latent; the moment a landing commit touches a watched file, its review cannot be recorded
+  at it at all.
+  FINAL STATE: the address follows the model. One place derives the complete trailer from the
+  model name — the same allowlist spelling `scripts/model-guard-core.mjs` already exports through
+  `allowedTrailers()` — and `land-point.mjs` uses it instead of pairing a name with a constant.
+  A model the allowlist does not know is refused before the commit, never given a wrong address.
+  ALSO IN SCOPE: name every other writer of a model trailer that pairs a name with a fixed
+  address, and give them the same one source.
+  VERIFIABLE: Vitest over the pure derivation — each allowed model yields its own vendor's address
+  and an unknown model is refused; plus a repository search that finds no second place pairing a
+  model name with a hard-coded no-reply address. The five commits above stay as they are: history
+  is evidence, not a thing to rewrite.
+  Criticality: medium — latent today because the tick commit touches no watched file, but it
+  writes a false authorship record on every landing and would block a review outright the first
+  time that changes.
+  Bundle: Modell & Wächter.

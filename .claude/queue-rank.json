@@ -907,11 +907,11 @@
       "origin": "machine",
       "place": "last"
     },
-    "983": {
-      "at": "2026-08-27T23:27:43.669Z",
-      "why": "It blocks every turn end of every session and prints a remedy no allowed model may run: the gate reports six cross-vendor-reviewed contributions as self-reviewed and tells Sol to review Sol's own commits, so nothing — the release included — can be landed while it stands.",
+    "984": {
+      "at": "2026-08-27T23:57:37.745Z",
+      "why": "Latent: the tick commit touches only the work order and its archive, so the wrong address never reaches a mechanism contribution today — it is corrected in order, not ahead of the release.",
       "origin": "machine",
-      "place": "ahead"
+      "place": "last"
     }
   },
   "boundary": {
@@ -951,7 +951,7 @@
     "why": "The order standing in front of the release today is the arrangement that predates this rule; the four machine-filed points that had ranked themselves there were moved behind 174 first"
   },
   "settled": {
-    "at": "2026-08-27T23:27:43.676Z",
+    "at": "2026-08-27T23:57:37.753Z",
     "points": [
       174,
       184,
@@ -1274,7 +1274,7 @@
       978,
       980,
       981,
-      983
+      984
     ]
   }
 }
