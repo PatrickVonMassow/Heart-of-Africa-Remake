@@ -108,6 +108,14 @@ describe('decisionParagraphs — the continuation and corruption records', () =>
     expect(deriveStateCard({ ladder: decided, doctorState, now: NOW })).toBeNull()
   })
 
+  it('does not use legacy doctor proof for a record with its own named measurement', () => {
+    const body = 'Automatische Entscheidung: PARALLEL batch sessions laufen weiter.'
+    const decided = ladder({ at: NOW - 60000, body, measurement })
+    const doctorState = { handledAt: NOW, satisfiedGate: 'abc123|other-session' }
+
+    expect(decisionParagraphs(decided, { doctorState, now: NOW })).toEqual([body])
+  })
+
   it('reports nothing for an alert that carries no record, and never throws on junk', () => {
     expect(decisionParagraphs({ alerts: { k: { rung: 1, lastSentAt: NOW } } }, { now: NOW })).toEqual([])
     expect(decisionParagraphs(null, { now: NOW })).toEqual([])
