@@ -102,11 +102,12 @@ export function formatPassManifest(plan, pass) {
   const absentByDesign = new Map((pass?.absentByDesign ?? []).map((entry) => [entry.path, entry.reason]))
   const carried = pass?.files ?? []
   const unavailable = (plan?.unreviewable ?? []).flatMap((group) => group?.files ?? [])
+  const uncoverable = plan?.uncoverable ?? []
   const lines = [
     `=== REVIEW PASS ${index}/${total} — THE SHAPE OF THIS MATERIAL ===`,
     `This range is reviewed in ${total} runnable ${total === 1 ? 'pass' : 'passes'} over its REVIEWABLE FILE SET.`,
-    unavailable.length
-      ? 'Files for which no independent reviewer vendor exists are named separately below and remain owed.'
+    unavailable.length || uncoverable.length
+      ? 'Files no runnable pass can carry are named separately below and remain owed.'
       : 'The runnable passes together cover the complete changed file set.',
     'This material is ONE of those passes. The DIFFSTAT',
     'below describes the WHOLE range for context: it names files this pass deliberately omits.',
@@ -128,9 +129,9 @@ export function formatPassManifest(plan, pass) {
       for (const path of other.files ?? []) lines.push(`  · ${quotePassFile(path)} → pass ${other.index}/${total}`)
     }
   }
-  if ((plan?.uncoverable ?? []).length) {
+  if (uncoverable.length) {
     lines.push('BEYOND THE REACH OF ANY PASS — no round can hold these; NO pass covers them:')
-    for (const u of plan.uncoverable) {
+    for (const u of uncoverable) {
       lines.push(`  · ${quotePassFile(u.path)} — ${u.reason || 'no round can carry its complete diff'}`)
     }
   }

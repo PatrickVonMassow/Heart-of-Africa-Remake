@@ -171,6 +171,15 @@ export const ledgerAtUsable = (at) =>
 /** Where the tracked ledger sits inside ANY checkout of this repository. */
 export const LEDGER_RELATIVE_PATH = '.claude/mechanism-reviews.jsonl'
 
+/** The one-time ledger shape used to close debt created by the retired
+ * baseline-wide scope. The wrapper stamps matching rows only after Git proves
+ * their commit belongs to this fixed revision interval. */
+export const CONTRIBUTION_DISPOSITION_KIND = 'mechanism-contribution-disposition'
+export const LEGACY_CONTRIBUTION_BASELINE = '265712e40e6c31c81605c1279a01a320be7a8f70'
+export const CONTRIBUTION_SCOPE_BOUNDARY = '6edd81fd2e88586df0157b956c7eb7b530a65777'
+export const LEGACY_RANGE_RETIREMENT_REASON =
+  'legacy baseline-wide debt had no complete contribution-scoped review; measured 45 passes at open, 42 at close, and 115 on main'
+
 /**
  * The ledger of the checkout a command is ACTUALLY RUNNING IN (point 780).
  *
@@ -1302,6 +1311,27 @@ export function reviewRecordWellFormed(record = {}, { commitAt = 0 } = {}) {
   return record.carried === undefined || record.carriedVerified === true
 }
 
+/**
+ * ONE FIXED MIGRATION, NOT A GENERAL WAIVER. Historical debt produced only by
+ * the retired baseline-wide scope is settled per contribution in the tracked
+ * ledger. The row's own claim buys nothing: the impure wrapper sets the
+ * verification stamp only after checking its exact schema and Git ancestry
+ * against CONTRIBUTION_SCOPE_BOUNDARY. Later contributions can never match.
+ *
+ * EXPORTED because a retired contribution must be invisible to EVERY demand the
+ * gate prints, not only to the finding loop: the guard reads it too, so its
+ * authorship plan cannot report settled history as unreviewable debt.
+ */
+export function contributionRetiredBy(coveringRecords = [], commit = {}) {
+  return (coveringRecords ?? []).some(
+    (record) =>
+      record?.kind === CONTRIBUTION_DISPOSITION_KIND &&
+      record?.disposition === 'retired' &&
+      record?.contributionDispositionVerified === true &&
+      String(record?.sha) === String(commit?.sha),
+  )
+}
+
 /** Current file artefacts synthesized from the pending history. */
 function pendingEndStateFiles(pendingCommits, endStateFiles) {
   if (endStateFiles === null || endStateFiles === undefined) return pendingCommits ?? []
@@ -1400,6 +1430,7 @@ export function evaluateMechanismReview({
   for (const pendingCommit of pendingEndStateFiles(pendingCommits, endStateFiles)) {
     let commit = pendingCommit
     const covering = [...new Set(commit?.coveringRecordShas ?? [])].flatMap((s) => bySha.get(String(s)) ?? [])
+    if (contributionRetiredBy(covering, commit)) continue
     // A record is only a review if it says who reviewed, how it ended AND what
     // was actually checked; a half-written line must not clear the gate. THE
     // GATE REVALIDATES THE ROW ITSELF, by the recorder's own rules (escalation
@@ -1731,11 +1762,31 @@ export function formatMechanismReviewVerdict(verdict, { authorshipPlan = null } 
       'seed the anchor and judge the complete range from it.',
     ].join('\n')
   }
-  const groups = Array.isArray(authorshipPlan?.groups) ? authorshipPlan.groups : []
-  const unreviewable = Array.isArray(authorshipPlan?.unreviewable) ? authorshipPlan.unreviewable : []
+  // THE PLAN NAMES WHAT IS OWED, NOT WHAT THE RANGE CONTAINS. The authorship
+  // plan is built over the whole pending range, so it also carries every
+  // contribution a recorded review already cleared. Measured on the merge
+  // candidate 27.08.2026: four owed contributions arrived under two hundred
+  // group lines of settled history. The groups are therefore narrowed to the
+  // contributions THIS verdict reports. A group naming no commit cannot be
+  // judged and is kept, and so is every group when any finding names no commit
+  // — this trims noise, it never drops a demand.
+  const owedShas = new Set(
+    (verdict.findings ?? []).map((finding) => String(finding?.commit?.sha ?? '')).filter(Boolean),
+  )
+  const narrowable =
+    (verdict.findings ?? []).length > 0 && (verdict.findings ?? []).every((finding) => finding?.commit?.sha)
+  const owedGroup = (group) =>
+    !narrowable ||
+    !Array.isArray(group?.commits) ||
+    !group.commits.length ||
+    group.commits.some((sha) => owedShas.has(String(sha)))
+  const groups = (Array.isArray(authorshipPlan?.groups) ? authorshipPlan.groups : []).filter(owedGroup)
+  const unreviewable = (Array.isArray(authorshipPlan?.unreviewable) ? authorshipPlan.unreviewable : []).filter(
+    owedGroup,
+  )
   const lines = [
     unreviewable.length
-      ? 'FOUR-EYES GATE ON MECHANISMS — UNREVIEWABLE: this range contains contributions with no eligible reviewer vendor.'
+      ? 'FOUR-EYES GATE ON MECHANISMS — UNREVIEWABLE: an owed contribution has no eligible reviewer vendor.'
       : 'FOUR-EYES GATE ON MECHANISMS: a guard, gate or git hook changed here and no ' +
         'second model has recorded a review of it.',
     '',
@@ -1776,10 +1827,11 @@ export function formatMechanismReviewVerdict(verdict, { authorshipPlan = null } 
         lines.push(
           `      the review was split into ${p.total} passes over the FILE SET and only ${p.have} are on ` +
             `record — missing pass ${(p.missing ?? []).join(', ')}`,
-          '      A pass covers the files it named; the range is cleared when every pass is recorded:',
-          `      node scripts/review-sol.mjs --sha ${short(c.sha)} --brief "<what to judge>" --pass ${(p.missing ?? [])[0] ?? 1}`,
-          '      File debt is measured against the CURRENT END-STATE FILE: a complete scoped',
-          '      review at another covering sha also settles each current file that it names.',
+          '      A pass covers the files it named; the contribution is cleared when every pass is recorded:',
+          `      node scripts/review-sol.mjs --sha ${short(c.sha)} --since ${short(c.sha)}~1 ` +
+            `--brief "<what to judge>" --pass ${(p.missing ?? [])[0] ?? 1}`,
+          '      The contribution keeps its own immutable commit boundary; later baseline growth',
+          '      cannot widen this review or make a once-runnable pass disappear.',
         )
       }
       // COUNTING THE PASSES IS NOT COUNTING THE FILES. Passes that are all on
@@ -1835,7 +1887,7 @@ export function formatMechanismReviewVerdict(verdict, { authorshipPlan = null } 
     )
   }
   if (unreviewable.length) {
-    lines.push('', 'UNREVIEWABLE end-state files (none may be treated as an ordinary missing review):')
+    lines.push('', 'UNREVIEWABLE contribution files (none may be treated as an ordinary missing review):')
     for (const group of unreviewable) {
       lines.push(
         `  · ${(group.files ?? []).join(', ') || '<files unknown>'}: ` +
@@ -1848,20 +1900,18 @@ export function formatMechanismReviewVerdict(verdict, { authorshipPlan = null } 
       'authorship split with: node scripts/mechanism-review-guard.mjs --status',
     )
   } else if (groups.length > 1) {
-    lines.push('', 'This range MIXES AUTHORSHIP. Review it as these end-state file groups:')
+    lines.push('', 'The owed contributions MIX AUTHORSHIP. Review the contribution groups independently:')
     for (const group of groups) {
       lines.push(
-        `  · ${group.vendor || 'unknown'}-authored end-state files ` +
+        `  · ${group.vendor || 'unknown'}-authored contribution files ` +
           `→ ${group.reviewerVendor || 'unknown'} reviewer ${group.reviewer || '<none>'}: ` +
           `${(group.files ?? []).join(', ') || '<files unknown>'}`,
       )
     }
     lines.push(
       '',
-      'Ask the planner for the runnable pass commands; each recorded pass clears only its',
-      'listed files at their reviewed end state, so the two vendors accumulate independent coverage:',
-      '',
-      `  node scripts/review-sol.mjs --sha ${short(verdict.head) || '<sha>'} --brief "<what to judge>"`,
+      'Ask the guard status for the runnable contribution commands; each recorded pass clears',
+      'only its listed files at that commit boundary:',
       '',
       'Inspect the remaining file debt with: node scripts/mechanism-review-guard.mjs --status',
     )
@@ -1875,8 +1925,8 @@ export function formatMechanismReviewVerdict(verdict, { authorshipPlan = null } 
       '  node scripts/mechanism-review.mjs --record <sha> --model <name> \\',
       `      --verdict <${VERDICTS.join('|')}> --evidence "<one line>" --mode review`,
       '',
-      'One record covers every mechanism commit it contains, so reviewing the branch head is',
-      'enough. Inspect the gate with: node scripts/mechanism-review-guard.mjs --status',
+      'Each command printed by the guard status is bounded to one contribution and its parent.',
+      'Inspect the finite runnable plan with: node scripts/mechanism-review-guard.mjs --status',
     )
   }
   return lines.join('\n')

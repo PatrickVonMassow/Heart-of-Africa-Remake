@@ -8,6 +8,7 @@
 import { describe, it, expect } from 'vitest'
 import { readFileSync } from 'node:fs'
 import {
+  attachContributionDispositions,
   attachCoverage,
   BASELINE_RECOVERY_ANCHOR,
   baselineFor,
@@ -15,10 +16,17 @@ import {
   measureReviewGap,
   mechanismLogCommand,
   parseMechanismLog,
-  rangeFilesCommand,
+  pendingReviewContributions,
+  planningContributions,
 } from './mechanism-review-guard.mjs'
-import { reviewGapRange } from './mechanism-review-guard-gap-core.mjs'
-import { evaluateMechanismReview, formatMechanismReviewVerdict } from './mechanism-review-core.mjs'
+import {
+  CONTRIBUTION_DISPOSITION_KIND,
+  CONTRIBUTION_SCOPE_BOUNDARY,
+  LEGACY_CONTRIBUTION_BASELINE,
+  evaluateMechanismReview,
+  formatMechanismReviewVerdict,
+  LEGACY_RANGE_RETIREMENT_REASON,
+} from './mechanism-review-core.mjs'
 import { repoPath } from './repo-paths.mjs'
 
 describe('baselineFor', () => {
@@ -118,6 +126,60 @@ describe('historical ledger eras', () => {
       expect(verdict.findings.some((finding) => finding.kind === 'malformed-record'), shortSha).toBe(false)
       expect(formatMechanismReviewVerdict(verdict), shortSha).not.toContain('is malformed')
     }
+  })
+})
+
+describe('legacy contribution dispositions', () => {
+  const row = (over = {}) => ({
+    kind: CONTRIBUTION_DISPOSITION_KIND,
+    disposition: 'retired',
+    sha: 'a'.repeat(40),
+    scopeBoundary: CONTRIBUTION_SCOPE_BOUNDARY,
+    reason: LEGACY_RANGE_RETIREMENT_REASON,
+    measurement: {
+      measuredOn: '2026-08-26',
+      point: 943,
+      passesAtOpen: 45,
+      passesAtClose: 42,
+      passesOnMain: 115,
+    },
+    ...over,
+  })
+
+  it('stamps only the fixed historical retirement Git places inside the migration interval', () => {
+    const records = [row(), row({ sha: 'b'.repeat(40), disposition: 'reviewed' })]
+    attachContributionDispositions(records, (ancestor, descendant) => {
+      if (descendant === LEGACY_CONTRIBUTION_BASELINE) return false
+      expect(descendant).toBe(CONTRIBUTION_SCOPE_BOUNDARY)
+      return ancestor === 'a'.repeat(40)
+    })
+    expect(records[0].contributionDispositionVerified).toBe(true)
+    expect(records[1].contributionDispositionVerified).toBeUndefined()
+  })
+
+  it('trusts none of the ledger row own boundary, measurement or prose', () => {
+    const altered = [
+      row({ scopeBoundary: 'b'.repeat(40) }),
+      row({ reason: 'please retire this' }),
+      row({ measurement: { ...row().measurement, passesOnMain: 114 } }),
+      row({ sha: 'future' }),
+    ]
+    attachContributionDispositions(altered, () => true)
+    expect(altered.every((record) => record.contributionDispositionVerified === undefined)).toBe(true)
+  })
+
+  it('rejects a valid-shaped retirement already reachable from the confirmed baseline', () => {
+    const beforeBaseline = row()
+    attachContributionDispositions([beforeBaseline], (ancestor, descendant) =>
+      ancestor === beforeBaseline.sha && descendant === LEGACY_CONTRIBUTION_BASELINE,
+    )
+    expect(beforeBaseline.contributionDispositionVerified).toBeUndefined()
+  })
+
+  it('removes a stale in-memory stamp before re-verifying', () => {
+    const forged = row({ contributionDispositionVerified: true })
+    attachContributionDispositions([forged], () => false)
+    expect(forged.contributionDispositionVerified).toBeUndefined()
   })
 })
 
@@ -242,6 +304,28 @@ describe('parseMechanismLog', () => {
 // ROUND-1 PASS 2, both path-transport findings: the flags are what make the
 // gate's view of the tree config-independent and rename-proof, so they are
 // pinned as the COMMANDS the wrapper actually builds.
+describe('pending review contributions', () => {
+  it('uses mechanism paths only to select a commit, then owes that commit own complete file set', () => {
+    const commits = [
+      {
+        sha: 'a'.repeat(40),
+        files: ['scripts/example-guard.mjs', 'src/ordinary.ts', 'TASKS.md'],
+        authorModels: ['GPT-5.6 Sol'],
+      },
+      { sha: 'b'.repeat(40), files: ['src/unrelated.ts'], authorModels: ['GPT-5.6 Sol'] },
+    ]
+    const pending = pendingReviewContributions(
+      commits,
+      ['example-guard.mjs'],
+      (sha) => `subject ${sha.slice(0, 1)}`,
+    )
+    expect(pending).toHaveLength(1)
+    expect(pending[0]).toMatchObject({ sha: 'a'.repeat(40), subject: 'subject a' })
+    expect(pending[0].mechanismFiles).toEqual(['scripts/example-guard.mjs'])
+    expect(pending[0].files).toEqual(['scripts/example-guard.mjs', 'src/ordinary.ts'])
+  })
+})
+
 describe('the path-carrying git commands', () => {
   // PINNED WHOLE, not by substring (round-2 pass 3): a `.toContain` still
   // passes with the option after `--`, after the revision, or overridden by a
@@ -264,25 +348,6 @@ describe('the path-carrying git commands', () => {
     ])
   })
 
-  it('builds the range listing raw (-z) and rename-split, exactly — as an args ARRAY', () => {
-    expect(rangeFilesCommand('base', 'sha')).toEqual([
-      'diff',
-      '--name-only',
-      '-z',
-      '--no-renames',
-      'base..sha',
-    ])
-  })
-
-  it('starts pending detection, coverage and gap assessment at the same merge-base', () => {
-    const base = 'a'.repeat(40)
-    const head = 'b'.repeat(40)
-    const record = 'c'.repeat(40)
-    const gap = reviewGapRange({ blocked: true, base, head })
-
-    expect(mechanismLogCommand(base, head).at(-1)).toBe(`${gap.baseline}..${gap.head}`)
-    expect(rangeFilesCommand(base, record).at(-1)).toBe(`${gap.baseline}..${record}`)
-  })
 })
 
 // THE COST RULE (point 387): this probe walks real git history from the unit
@@ -420,104 +485,172 @@ describe('attachCoverage', () => {
 })
 
 describe('measureReviewGap', () => {
-  // The gap clause is the guard's only way out of an unassemblable range. Point
-  // 947 measured that a throw from review-sol.mjs's SIZING planner used to leave
-  // the ruling null and the guard blocking — no gap, no runnable review, session
-  // trapped. These cases drive the real helper the guard calls.
-  const gapRange = { base: 'b'.repeat(40), head: 'h'.repeat(40) }
-  const assessorSpy = (seen) => async (args) => {
-    seen.push(args)
-    return { gap: true, reason: 'range does not fit' }
+  const runnable = {
+    scope: 'contribution',
+    contributions: [{
+      sha: 'c'.repeat(40),
+      statTruncated: false,
+      passes: [{ index: 1, total: 1 }],
+      uncoverable: [],
+      unreviewable: [],
+    }],
   }
 
-  it('still rules on the gap when the sizing planner throws', async () => {
-    const seen = []
+  it('fails closed when the contribution planner throws', async () => {
     const { gap, sizedPlan } = await measureReviewGap({
-      gapRange,
-      sha: gapRange.head,
-      base: gapRange.base,
+      blocked: true,
       commits: [{ sha: 'c'.repeat(40) }],
-      standingRecords: 1,
-      // The module LOADS; its BUILDER throws — the shape the live defect had.
       loadPlanner: async () => ({
-        buildAuthorshipPassPlan: () => {
+        buildContributionPassPlan: () => {
           throw new Error('planPasses assembled nothing')
         },
       }),
-      loadAssessor: async () => ({ assessReviewGap: assessorSpy(seen) }),
     })
-    expect(gap).toEqual({ gap: true, reason: 'range does not fit' })
+    expect(gap).toMatchObject({ gap: false, reason: 'unmeasured' })
     expect(sizedPlan).toBe(null)
-    // The assessment runs UNSLICED rather than not at all.
-    expect(seen[0].sizedPlan).toBe(null)
-    expect(seen[0].standingRecords).toBe(1)
   })
 
-  it('still rules on the gap when the planner MODULE cannot be loaded', async () => {
-    const seen = []
+  it('fails closed when the planner module cannot be loaded', async () => {
     const { gap, sizedPlan } = await measureReviewGap({
-      gapRange,
-      sha: gapRange.head,
-      base: gapRange.base,
-      commits: [],
-      standingRecords: 0,
+      blocked: true,
+      commits: [{ sha: 'c'.repeat(40) }],
       loadPlanner: () => {
         throw new Error('review-sol.mjs is broken')
       },
-      loadAssessor: async () => ({ assessReviewGap: assessorSpy(seen) }),
     })
-    expect(gap.gap).toBe(true)
+    expect(gap).toMatchObject({ gap: false, reason: 'unmeasured' })
     expect(sizedPlan).toBe(null)
-    expect(seen[0].sizedPlan).toBe(null)
   })
 
-  it('passes the sized plan through when the planner works', async () => {
-    const seen = []
-    const plan = { passes: [{ index: 1 }] }
+  it('passes the contribution plan through when the planner works', async () => {
     const { gap, sizedPlan } = await measureReviewGap({
-      gapRange,
-      sha: gapRange.head,
-      base: gapRange.base,
-      commits: [],
-      standingRecords: 0,
-      loadPlanner: async () => ({ buildAuthorshipPassPlan: () => plan }),
-      loadAssessor: async () => ({ assessReviewGap: assessorSpy(seen) }),
+      blocked: true,
+      commits: [{ sha: 'c'.repeat(40) }],
+      loadPlanner: async () => ({ buildContributionPassPlan: () => runnable }),
     })
-    expect(sizedPlan).toBe(plan)
-    expect(seen[0].sizedPlan).toBe(plan)
-    expect(gap.gap).toBe(true)
+    expect(sizedPlan).toBe(runnable)
+    expect(gap).toMatchObject({ gap: false, reason: 'contributions-runnable' })
   })
 
-  it('rules NO gap when the ASSESSMENT itself fails — an unmeasured claim never waives the gate', async () => {
+  it('reports only a named contribution that no pass can assemble', async () => {
+    const impossible = {
+      scope: 'contribution',
+      contributions: [{
+        sha: 'd'.repeat(40),
+        subject: 'Huge contribution',
+        rawSize: 400_000,
+        budget: 200_000,
+        statTruncated: false,
+        passes: [],
+        uncoverable: [{ path: 'huge.mjs', reason: 'diff too large' }],
+        unreviewable: [],
+      }],
+    }
     const { gap } = await measureReviewGap({
-      gapRange,
-      sha: gapRange.head,
-      base: gapRange.base,
-      commits: [],
-      standingRecords: 0,
-      loadPlanner: async () => ({ buildAuthorshipPassPlan: () => ({}) }),
-      loadAssessor: () => {
-        throw new Error('gap module is broken')
-      },
+      blocked: true,
+      commits: [{ sha: 'd'.repeat(40) }],
+      loadPlanner: async () => ({ buildContributionPassPlan: () => impossible }),
     })
-    expect(gap).toBe(null)
+    expect(gap).toMatchObject({ gap: true, reason: 'contributions-unassemblable' })
+    expect(gap.report).toContain('dddddddddddd')
+    expect(gap.report).toContain('huge.mjs')
   })
 
-  it('measures nothing at all when the range is not blocked', async () => {
+  it('measures nothing at all when the verdict is not blocked', async () => {
     let touched = false
     expect(
       await measureReviewGap({
-        gapRange: null,
+        blocked: false,
         loadPlanner: () => {
-          touched = true
-          return {}
-        },
-        loadAssessor: () => {
           touched = true
           return {}
         },
       }),
     ).toEqual({ gap: null, sizedPlan: null })
     expect(touched).toBe(false)
+  })
+})
+
+describe('the plan the gate prints names what is OWED, never what the range holds', () => {
+  // Measured on the merge candidate 27.08.2026, reviewing point 957: the
+  // contribution-scoped plan was built from EVERY pending commit, so 240
+  // settled contributions — merge commits among them, whose trailers name no
+  // vendor — arrived as UNREVIEWABLE groups. The verdict prints the
+  // unreviewable branch INSTEAD of the runnable commands, so the gate's own
+  // message hid the four owed contributions and their eight runnable passes.
+  const retirement = (sha) => ({
+    kind: CONTRIBUTION_DISPOSITION_KIND,
+    sha,
+    disposition: 'retired',
+    contributionDispositionVerified: true,
+  })
+
+  it('drops a retired contribution from the planning set by the evaluator’s own predicate', () => {
+    const retired = { sha: 'a'.repeat(40), files: ['scripts/x.mjs'], coveringRecordShas: ['a'.repeat(40)] }
+    const owed = { sha: 'b'.repeat(40), files: ['scripts/y.mjs'], coveringRecordShas: [] }
+    const planned = planningContributions([retired, owed], [retirement('a'.repeat(40))])
+    expect(planned.map((c) => c.sha)).toEqual(['b'.repeat(40)])
+  })
+
+  it('keeps a contribution whose retirement row was never verified from Git', () => {
+    const claimed = { sha: 'a'.repeat(40), files: ['scripts/x.mjs'], coveringRecordShas: ['a'.repeat(40)] }
+    const unverified = { ...retirement('a'.repeat(40)), contributionDispositionVerified: false }
+    expect(planningContributions([claimed], [unverified]).map((c) => c.sha)).toEqual(['a'.repeat(40)])
+  })
+
+  it('prints only the groups of the contributions the verdict reports', () => {
+    const owedSha = 'b'.repeat(40)
+    const verdict = evaluateMechanismReview({
+      baseline: 'base',
+      head: 'h'.repeat(40),
+      pendingCommits: [{ sha: owedSha, at: 1, files: ['scripts/y.mjs'], authorModel: 'GPT-5.6 Sol' }],
+      records: [],
+    })
+    const text = formatMechanismReviewVerdict(verdict, {
+      authorshipPlan: {
+        groups: [
+          {
+            vendor: 'openai',
+            reviewer: 'Opus 5',
+            reviewerVendor: 'anthropic',
+            files: ['scripts/y.mjs'],
+            commits: [owedSha],
+          },
+          {
+            vendor: 'openai',
+            reviewer: 'Opus 5',
+            reviewerVendor: 'anthropic',
+            files: ['scripts/settled.mjs'],
+            commits: ['c'.repeat(40)],
+          },
+        ],
+        unreviewable: [
+          {
+            files: ['scripts/settled-merge.mjs'],
+            commits: ['c'.repeat(40)],
+            unreviewableReason: 'authorship vendor is unknown',
+          },
+        ],
+      },
+    })
+    expect(text).toContain('scripts/y.mjs')
+    expect(text).not.toContain('scripts/settled.mjs')
+    // The settled merge commit must not turn the whole verdict into the
+    // UNREVIEWABLE branch, which suppresses the runnable-command guidance.
+    expect(text).not.toContain('scripts/settled-merge.mjs')
+    expect(text).not.toContain('UNREVIEWABLE')
+  })
+
+  it('narrows nothing when a finding names no commit, so a demand is never trimmed away', () => {
+    const verdict = evaluateMechanismReview({ baseline: 'b', head: 'h'.repeat(40), pendingCommits: [], records: [] })
+    const groups = [
+      { vendor: 'openai', reviewer: 'Opus 5', reviewerVendor: 'anthropic', files: ['scripts/y.mjs'], commits: ['d'.repeat(40)] },
+      { vendor: 'anthropic', reviewer: 'GPT-5.6 Sol', reviewerVendor: 'openai', files: ['scripts/z.mjs'], commits: ['e'.repeat(40)] },
+    ]
+    const text = formatMechanismReviewVerdict({ ...verdict, block: true, findings: [{ kind: 'no-review' }] }, {
+      authorshipPlan: { groups, unreviewable: [] },
+    })
+    expect(text).toContain('scripts/y.mjs')
+    expect(text).toContain('scripts/z.mjs')
   })
 })
