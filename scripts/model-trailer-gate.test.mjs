@@ -58,6 +58,26 @@ describe('the commit-msg model-trailer gate', () => {
     }
   })
 
+  it('accepts the documented reviewer key and refuses an undocumented one', () => {
+    const documented = judge(
+      withTrailer(
+        'Co-Authored-By: Claude Opus 5 <noreply@anthropic.com>\n' +
+          'Reviewed-By: GPT-5.6 Sol <noreply@openai.com>',
+      ),
+    )
+    expect(documented.status, documented.stderr).toBe(0)
+
+    const undocumented = judge(
+      withTrailer(
+        'Co-Authored-By: Claude Opus 5 <noreply@anthropic.com>\n' +
+          'Reviewer: GPT-5.6 Sol <noreply@openai.com>',
+      ),
+    )
+    expect(undocumented.status).toBe(1)
+    expect(undocumented.stderr).toContain('undocumented-reviewer-trailer')
+    expect(undocumented.stderr).toContain('Reviewed-By: GPT-5.6 Sol <noreply@openai.com>')
+  })
+
   it('REFUSES the bare trailer that cost the batch a round, and says what to write', () => {
     const r = judge(withTrailer('Co-Authored-By: Claude <noreply@anthropic.com>'))
     expect(r.status).toBe(1)
@@ -139,14 +159,28 @@ describe('a real commit through the commit-msg hook', () => {
     }
   }
 
-  it('refuses the bare trailer and accepts the named one', () => {
+  it('refuses ambiguous trailers and accepts distinct author and reviewer keys', () => {
     inRepo((vcs) => {
       const refused = vcs('commit', '-m', 'A probe\n\nCo-Authored-By: Claude <noreply@anthropic.com>')
       expect(refused.status, `the hook let the bare trailer through: ${refused.stdout}`).not.toBe(0)
       expect(refused.stderr).toContain('unnamed-model-trailer')
       expect(vcs('log', '--oneline').stdout.trim()).toBe('')
 
-      const ok = vcs('commit', '-q', '-m', 'A probe\n\nCo-Authored-By: Claude Opus 5 <noreply@anthropic.com>')
+      const undocumented = vcs(
+        'commit',
+        '-m',
+        'A probe\n\nCo-Authored-By: Claude Opus 5 <noreply@anthropic.com>\nReviewer: GPT-5.6 Sol <noreply@openai.com>',
+      )
+      expect(undocumented.status, 'the hook accepted an undocumented reviewer key').not.toBe(0)
+      expect(undocumented.stderr).toContain('undocumented-reviewer-trailer')
+      expect(vcs('log', '--oneline').stdout.trim()).toBe('')
+
+      const ok = vcs(
+        'commit',
+        '-q',
+        '-m',
+        'A probe\n\nCo-Authored-By: Claude Opus 5 <noreply@anthropic.com>\nReviewed-By: GPT-5.6 Sol <noreply@openai.com>',
+      )
       expect(ok.status, `the hook refused a named trailer: ${ok.stderr}`).toBe(0)
       expect(vcs('log', '--oneline').stdout.trim()).not.toBe('')
     })
