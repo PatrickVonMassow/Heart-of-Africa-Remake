@@ -877,12 +877,6 @@
       "origin": "machine",
       "place": "ahead"
     },
-    "967": {
-      "at": "2026-08-27T08:54:11.623Z",
-      "why": "User instruction 27.08.2026, 10:21: claim the batch and fix the rejected header directly — user-asked, exempt from the release bar.",
-      "origin": "user",
-      "place": "ahead"
-    },
     "968": {
       "at": "2026-08-27T08:54:11.819Z",
       "why": "False-gate nuisance with a loud-deferral workaround per incident; waits behind the release.",
@@ -927,7 +921,7 @@
     "why": "The order standing in front of the release today is the arrangement that predates this rule; the four machine-filed points that had ranked themselves there were moved behind 174 first"
   },
   "settled": {
-    "at": "2026-08-27T08:54:11.828Z",
+    "at": "2026-08-27T10:42:01.976Z",
     "points": [
       174,
       184,
@@ -1245,7 +1239,6 @@
       964,
       965,
       966,
-      967,
       968
     ]
   }
