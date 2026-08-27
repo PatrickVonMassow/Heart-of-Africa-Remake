@@ -93,8 +93,11 @@ export const DOC_BUDGETS = [
     // may record its cross-vendor reviewer as a second model trailer. The commit
     // gate already permits two separately allowed lines; this closes the policy
     // ambiguity without changing that mechanism. The one-word margin remains.
+    // RAISED by the 28 measured words of the 24.08.2026 standing authorization:
+    // §6 must name both the VDZK recommendation grant and its boundary in the same
+    // sentence, so this binding rule cannot be replaced by a shorter pointer.
     maxLines: 193,
-    maxWords: 1332,
+    maxWords: 1360,
     // THE RATCHET SLACK, tightest in the project: this file is the per-turn cost of
     // every session and every subagent, so twenty words is the whole licence between
     // one cut and the next. A larger edit than that lowers the ceiling with it.

@@ -93,7 +93,10 @@ strategy and suite map: `scripts/verify/README.md`.
 - Answer repository questions with small command output. A blocked action means
   find the project command; never route the user through manual container work.
 - Act on settled judgment. Confirm before outward-facing or hard-to-reverse
-  steps unless durably authorized. Report failures, skips, and verified outcomes
+  steps unless durably authorized: a stated recommendation on a VDZK card
+  authorizes its decision, execution, and recorded closure (what, why, veto
+  effect), except tags, publishes, force-pushes, user-data deletions, and
+  unrecommended genuine choices. Report failures, skips, and verified outcomes
   faithfully.
 - Keep comments brief and factual; mark placeholders. When design is unclear,
   do not guess: add `// OPEN: …` and report it at the run end.
