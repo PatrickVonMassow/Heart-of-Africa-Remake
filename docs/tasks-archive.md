@@ -24200,3 +24200,52 @@ Nummerierung bleiben deshalb identisch — hier wird nur verschoben, nie umgesch
   Criticality: medium-high — it stops the batch on an outage nobody in the repository can fix, and
   the stop needs a human to clear.
   Bundle: Urlaubsfestigkeit. It is a stop-the-batch path and belongs to 947's sweep.
+
+- [x] 957. The four-eyes gate's baseline can outrun every review that could clear it, so the gate
+  lives suspended instead of enforcing. MEASURED 26.08.2026 while working point 943, which was cut
+  here: on main the confirmed baseline sits 226 mechanism commits back, and a review of that range
+  plans 115 passes over 15.1 million characters — its diffstat alone (27 948 characters) is past one
+  round's share, so `planPasses` assembles nothing and the gap clause suspends the gate. Under
+  suspension commits keep landing, so the range only grows: the debt compounds exactly while nobody
+  can pay it. One file makes it unarguable — `.claude/mechanism-reviews.jsonl`, this gate's own
+  ledger, whose diff across those commits is 489 311 characters and fits no round; over a normal
+  branch range the same file's diff is 10 765 characters and reviews fine. The demand is therefore
+  not too strict, it is scoped to the wrong thing: an unbounded RANGE rather than a contribution.
+  FINAL STATE:
+  - The review a contribution owes is BOUNDED BY THAT CONTRIBUTION, not by how far the baseline has
+    fallen behind. A commit's own change is reviewable the day it lands and stays reviewable; a
+    stale baseline may make the gate demand MORE reviews, never one that no round can hold.
+  - The gate's suspension becomes rare and named rather than permanent: after the change, main's
+    current range either assembles into runnable passes or names the exact contribution that cannot
+    be assembled — never a 15-million-character fog.
+  - The historical backlog reachable only through the old scoping gets a RECORDED disposition, per
+    contribution: reviewed, or retired with the measured reason the guard honours. Point 943's
+    measurement (45 passes at open, 42 at close, 115 on main's baseline) is the starting count.
+- ONE TEXT DEFECT MEASURED ON THE WAY, 26.08.2026, while cross-reading
+  `scripts/review-material-core.mjs`: `formatPassManifest` writes "The runnable passes together
+  cover the complete changed file set." whenever `plan.unreviewable` is empty — it never consults
+  `plan.uncoverable`. A plan with files BEYOND THE REACH OF ANY PASS therefore tells the reviewer
+  coverage is complete and lists what no pass covers two lines below, and the flattering sentence is
+  the one read first. It is the text a pass verdict's meaning rests on, so it belongs to this point:
+  make the sentence conditional on `unavailable.length` OR `(plan.uncoverable ?? []).length`, and say
+  that files no pass can carry remain owed.
+  VERIFIABLE: Vitest over the scoping decision — a contribution whose own material fits is owed and
+  runnable however far the baseline lags; a range whose accumulated material does not fit no longer
+  suspends the contributions inside it; plus the guard's own status on main's real range naming a
+  finite, runnable plan or a named unassemblable contribution.
+  THE DEBT COMPOUNDS, MEASURED TWICE A DAY APART — use this pair as the before/after evidence.
+  Point 943 read the gate on 26.08.2026: baseline 226 mechanism commits back, 15.1 million
+  characters, 115 planned passes. The same instrument on 27.08.2026, 02:35, on main `4baf4527`:
+  baseline `265712e` is now 240 mechanism commits back and the material measures 15 659 456
+  characters against the 200 000-character round budget. Fourteen commits and ~0.56 million
+  characters in one day, added while the gate was suspended and therefore while nothing could be
+  reviewed — which is the compounding this point argues, now measured rather than argued. The
+  unassemblable file is unchanged and still the only one: `.claude/mechanism-reviews.jsonl`, the
+  gate's own ledger, which no pass can hold even as a bare diff. FOUR do-not-merge records now
+  stand on the range with their re-review suspended for material; 943 is closed, so those four are
+  the debt this point inherits, and the recorded-disposition clause above is what has to settle
+  them. After the change, re-read the same instrument and report the third number.
+  Criticality: high — it is why the four-eyes gate on main enforces nothing today, and why point
+  943 could not close its third leg.
+  Bundle: Modell & Wächter. It rescopes what the mechanism gate demands, so it is worked before 916
+  changes what the ledger reader accepts, never beside it.
