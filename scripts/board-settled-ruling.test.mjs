@@ -23,6 +23,7 @@ describe('board vdzk-add settled-ruling admission', () => {
           cwd: ROOT,
           env: { ...process.env, HOA_REPO_ROOT: emptyRoot },
           encoding: 'utf8',
+          windowsHide: true,
           stdio: ['ignore', 'pipe', 'pipe'],
         },
       )
