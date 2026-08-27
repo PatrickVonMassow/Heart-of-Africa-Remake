@@ -775,12 +775,6 @@
       "origin": "machine",
       "place": "last"
     },
-    "945": {
-      "at": "2026-08-26T15:10:49.400Z",
-      "why": "It wedges every resurrection beside a live delegate; recurs on the next owner death, which happens weekly",
-      "origin": "machine",
-      "place": "ahead"
-    },
     "946": {
       "at": "2026-08-26T15:10:49.488Z",
       "why": "Enforcement half of the user's 26.08. no-standstill order; every parked question until then can stall the batch again",
@@ -921,7 +915,7 @@
     "why": "The order standing in front of the release today is the arrangement that predates this rule; the four machine-filed points that had ranked themselves there were moved behind 174 first"
   },
   "settled": {
-    "at": "2026-08-27T10:42:01.976Z",
+    "at": "2026-08-27T11:19:55.551Z",
     "points": [
       174,
       184,
@@ -1221,7 +1215,6 @@
       939,
       940,
       942,
-      945,
       946,
       948,
       949,
