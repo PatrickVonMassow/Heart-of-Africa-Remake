@@ -86,6 +86,8 @@
  *   quiet   — ordinary prose carrying the same words that must NOT fire; required
  *             for every 'sentence' entry, which is where the false positives live
  */
+import { NOT_SETTLED_PREFIX, settledRulingVerdict } from './settled-ruling-core.mjs'
+
 export const DECISION_PHRASES = Object.freeze(
   [
     // ---- the phrase IS the address: a second-person imperative, or it carries
@@ -557,6 +559,15 @@ export function evaluate({ replyText = null, vdzkTitles = null, cardAddedThisTur
   if (!Array.isArray(vdzkTitles)) return { block: false, reason: null }
   const ask = asksForDecision(replyText)
   if (!ask.asks) return { block: false, reason: null }
+  // A settled question is refused BEFORE the ordinary card-presence rule: a
+  // matching card would otherwise make the repeated ruling look legitimate.
+  // Judge only the asking sentences, so a status paragraph that merely reports
+  // a documentation budget cannot trigger the register.
+  const distinctions = replyText
+    .split(/\r?\n/)
+    .filter((line) => line.trimStart().toLowerCase().startsWith(`${NOT_SETTLED_PREFIX.toLowerCase()} `))
+  const settled = settledRulingVerdict([...ask.questions, ...distinctions].join('\n'))
+  if (settled.block) return { block: true, reason: settled.reason }
   if (cardAddedThisTurn) return { block: false, reason: null }
   const hit = matchingCard(ask.questions, vdzkTitles)
   if (hit) return { block: false, reason: null }
