@@ -77,43 +77,6 @@ then point 633 (the closing run), then point 174 (the tag). A newly appended poi
 kind is MOVED to the front in the same turn that files it; leaving it where append-and-defer
 put it is the mistake this line exists to stop.
 
-- [ ] 982. The reviewer trailer §6 allows cannot be told from an author trailer, so naming a
-  reviewer makes the commit unreviewable. MEASURED 28.08.2026 by the cross-vendor review of
-  e0654ac (recorded do-not-merge, pass 2/2): `modelsInTrailerField` in `scripts/review-sol-core.mjs`
-  returns EVERY model named in a commit's `Co-Authored-By` field and its own comment says that
-  answer is "who may not review this"; `scripts/model-guard-core.mjs` still opens with the claim
-  that the trailer "is the one mechanical record of WHO actually authored a commit". Both were
-  true until `CLAUDE.md` §6 gained "A commit may also name its cross-vendor reviewer in a second
-  model trailer" — and §6 names no separate key, so both lines are `Co-Authored-By` and nothing
-  can separate them.
-  WHAT IT COSTS, measured on this repository: three commits of 27./28.08.2026 (836b187b, fd02a519,
-  1f249750) are the first to use the clause, and each names one model of EACH vendor. Read as
-  authorship, they have an author from both vendors, so `reviewIdentityProblem` answers
-  `same-vendor` for every possible reviewer and `planAuthorshipGroups` can assign none: the
-  contribution is unreviewable by construction. That is the same shape as the jam point 979 had to
-  clear, one step earlier — a commit that can never be reviewed rather than a refusal that can
-  never be answered. Those three are ledger-only and reach no mechanism path today, which is why
-  this is measured before it bites and not after.
-  FINAL STATE: a commit can name its cross-vendor reviewer without becoming its own author, and
-  every reader of the trailers agrees which is which. `CLAUDE.md` §6 states the form once, the
-  commit gate accepts exactly that form, and `modelsInTrailerField` answers with the AUTHORS —
-  the reviewer is returned separately or not at all. The comment in `model-guard-core.mjs` says
-  what its record now proves.
-  Consider as alternatives, and record why the chosen one wins: a distinct trailer key for the
-  reviewer (`Reviewed-By:`), which is what git trailers are for and which no author reader can
-  mistake; a marked `Co-Authored-By` line; or dropping the clause from §6 and recording the
-  reviewer only in the ledger, where it already stands.
-  ALSO IN SCOPE: the three commits above are named in the chosen mechanism's own test as the
-  historical case, so whatever the fix, it states what those three mean.
-  VERIFIABLE: Vitest over the pure readers — a commit with an author trailer and a reviewer
-  trailer yields exactly one author and one reviewer; `reviewIdentityProblem` clears a reviewer of
-  the vendor named ONLY as reviewer; the commit gate accepts the documented form and refuses an
-  undocumented one; and the review of e0654ac's pass-2 files is answered at a descendant commit.
-  Criticality: high — it disarms the four-eyes gate in the direction that costs most: a
-  contribution nobody may review passes as one nobody has reviewed.
-  Urgency: it holds an open do-not-merge on `main`, so it is worked before the other open points.
-  Bundle: Modell & Wächter.
-
 - [ ] 946. A VDZK card still parks an owner-decidable question; admissibility gets the point-864
   typing. Point 864 typed the `AWAITING-USER` point gate (`defer-for-user.mjs` refuses advisory
   reasons), but the CARD path kept accepting open questions: on 26.08.2026 the card "Vier-Augen-
