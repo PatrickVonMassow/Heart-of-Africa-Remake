@@ -24296,3 +24296,28 @@ Nummerierung bleiben deshalb identisch — hier wird nur verschoben, nie umgesch
   palette change cannot quietly erase it again.
   Criticality: medium — the boundary is what tells the player where the settlement ends
   and the bird's-eye view resumes; §2.6 and criterion 15 both rest on it being legible.
+
+- [x] 963. A dashboard card header still does not wrap its two side columns (user 27.08.2026,
+  board chat 06:46: "Die linke und die rechte Spalte im Header einer Dashboard-Karte bricht nach
+  wie vor nicht um."). MEASURED in `.batch-dashboard.html`: the card `summary` itself wraps
+  (`details:not(.sect)>summary:has(>.right){flex-wrap:wrap}`) and the middle title is allowed to
+  break (`.t{flex:1 1 12rem;overflow-wrap:anywhere}`), but the two COLUMNS beside it cannot. The
+  right column is pinned `flex-wrap:nowrap`, so a `meta` reading like `06:30 · ~08:30` stays one
+  unbreakable row; the left column carries the number plus the criticality badge and is
+  `flex:0 1 auto`, so it shrinks to nothing before it breaks. On a narrow phone the header
+  therefore overflows sideways instead of reflowing, which is the third report of the same shape —
+  the previous two fixed the summary and the title and left the columns as they were.
+  FINAL STATE: at every viewport the project supports, and in portrait above all, a card header
+  reflows entirely inside its own width: both side columns break their own content when they must,
+  no part of the header is clipped or forces a horizontal scroll, and the number, the criticality
+  badge, the title and the meta stay individually readable rather than being shrunk to fit. The
+  fix is in the ONE dashboard structure, not per card, and the reading order of the header does
+  not change.
+  VERIFIABLE: a layout check over the rendered board at portrait widths (360 / 390 / 414 CSS px
+  among them) — every card header's own bounding box lies inside the page width, the document
+  never scrolls horizontally, and a header carrying a long meta and a long title resolves to more
+  than one line instead of overflowing. Plus a picture at one narrow width, since the complaint is
+  legibility and the measurement alone has now missed it twice.
+  Criticality: medium — the board is how the user reads the batch, and this is his third report of
+  it; nothing is corrupted, but the reading is.
+  Bundle: Chat & Tafel.
