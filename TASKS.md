@@ -12920,3 +12920,39 @@ to land than a mechanism that needs a review.
   Criticality: med — a mechanism that counts as enforced while enforcing nothing is the failure
   class the four-eyes gate exists to prevent.
   Bundle: Dokumentation.
+
+- [ ] 972. A file cut from the review material reaches no manifest, so the reviewer reports its
+  absence as a defect of the commit. THIS IS THE MEASUREMENT POINT 971 ASKED FOR and could not
+  supply: 971 recorded the false absence-finding on `2dbce90` as a LEAD on the review harness,
+  explicitly UNMEASURED, and named the condition that would promote it — "the next false
+  absence-finding after a non-material cut makes it one". MEASURED 27.08.2026, 18:1x, on that same
+  commit: a second, independent round over `e0fadb56..2dbce90` produced the identical false finding
+  a second time. `scripts/review-sol.mjs` printed its own cut verbatim — "DROPPED AS NON-MATERIAL:
+  docs/analysis_de/retrospektive-zusammenarbeit.md — owner retrospective prose; governed by
+  retro-currency-guard over retro-core, and past any single review round" — and then reported
+  "Coverage plan: 100% planned coverage (2/2 changed files); nothing dropped", counting the cut
+  file out of its own denominator. GPT-5.6 Sol, reading the material, wrote: "No manifest or
+  `retrospektive-zusammenarbeit.md` content is present, and nothing is marked truncated", and
+  charged the commit with carrying no retrospective half — while the commit adds §3.112, 39 lines
+  of exactly that half.
+  THE SAFEGUARD EXISTS AND MISSES THIS CASE BY CONSTRUCTION. The review prompt tells the reviewer:
+  "A file the manifest declares absent is NOT truncated: do not refuse a verdict over its absence."
+  That sentence protects a file a PASS SPLIT assigned elsewhere, because a split writes a manifest.
+  A NON-MATERIAL cut writes no manifest entry at all, so the one sentence that would have stopped
+  the false finding never applies to the only case that needs it.
+  COST, MEASURED TWICE: a do-not-merge standing on `main` whose third finding is an artefact of the
+  tool; a full re-review round spent discovering that; and point 971 carrying a refutation
+  paragraph whose only purpose is to stop a third reader re-litigating it.
+  FINAL STATE:
+  - A CUT FILE IS DECLARED TO THE READER, with the reason it was cut, in the same manifest that
+    declares a split-assigned file. Absence a reviewer was told about can never be read as a defect.
+  - THE COVERAGE LINE COUNTS WHAT IT DROPPED. "nothing dropped" beside a printed drop is the line
+    that made this invisible for two rounds; the denominator is the commit's changed files.
+  VERIFIABLE: Vitest over the pure plan/manifest projection — a range containing a non-material
+  file renders that file in the reviewer's manifest with its drop reason and reports it in the
+  coverage line, a range containing none renders a byte-identical manifest, and the existing
+  split-assignment declarations stay unchanged.
+  Criticality: med — it costs no correctness in the product, but it spends a full cross-vendor
+  round per occurrence and puts a fabricated finding into the permanent ledger, which is the one
+  artefact later readers trust without re-measuring.
+  Bundle: Session- & Repo-Hygiene.
