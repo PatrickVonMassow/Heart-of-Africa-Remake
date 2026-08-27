@@ -12900,3 +12900,61 @@ to land than a mechanism that needs a review.
   Criticality: high — it silently rewrote `refs/heads/main` in the live repository, and every
   delegated author runs this suite from a worktree.
   Bundle: Urlaubsfestigkeit.
+
+- [ ] 967. The card header's portrait stacking now reads worse than what it replaced — third round.
+  REPORTED by the user 27.08.2026, 10:15 with a portrait phone screenshot of the published board
+  taken at 10:08 (~412 CSS px), verbatim: "Zu 963: Das war schon der zweite Versuch und jetzt sieht
+  es noch schlimmer aus als vorher." This is the THIRD round of one complaint: 941 (57d6c47c) let
+  every header group wrap but left the outer columns unyielding; 963 (58fcc4d5, merged c6018a87 on
+  27.08. at 09:49) then forces all THREE header groups to `flex: 1 1 100%` UNCONDITIONALLY below the
+  board's 460px phone break. The screenshot shows what that costs: every card header becomes three
+  stacked full-width rows whatever it contains — number plus badge, then the title, then meta and
+  the disclosure marker right-aligned on a row of their own — even for a short done-card header that
+  fitted on one line. Cards grow tall and airy, the meta floats detached from its card, and the
+  board's compactness is gone.
+  WHY THE SUITE MISSED IT BOTH TIMES: nothing is geometrically cut off, and both attempts were
+  verified by overflow and cut-off assertions only. The complaint is aesthetic, which is the class
+  the `watch-for-aesthetic-oddities` rule exists for. 58fcc4d5's own message records that the
+  suite's hand-written stylesheet copy "is why the same complaint passed verification twice", fixes
+  exactly that, measures the published board at 360/390/414 — and still ships a rendering the user
+  rejects.
+  FINAL STATE: a header group takes a full row only when its content needs one, so a short header
+  stays as compact as it was before the 460px rule. The authoring proposal — not a user instruction
+  — is number plus badge left and meta plus marker right on row one, with the title full-width
+  beneath, applied only when the one-line header does not fit. No regression on 941/963: nothing is
+  cut off or escapes its card, a long title and a long meta wrap their own text, and the
+  published-board portrait measurements at 360/390/414 stay green.
+  THE POINT DOES NOT CLOSE ON A GREEN SUITE ALONE: two formally green attempts were rejected by the
+  user's eye, so the third closes only after the user approves a portrait screenshot of the
+  candidate rendering — real board content, ~390px, showing one long-title card and one short
+  done-card. The 27.08. rejection makes the user the acceptance authority for this point.
+  VERIFIABLE: the suite gains the assertion class it lacks — an upper bound on header HEIGHT for a
+  SHORT header at portrait width, so unconditional stacking turns the suite red instead of needing a
+  fourth complaint; plus the existing 360/390/414 cut-off and wrap assertions against the published
+  board.
+  Criticality: high — it is the third round of the same rejected rendering, and the board is the
+  surface the user reads the batch on.
+  Bundle: Chat & Tafel. It edits the board's card-header CSS and `scripts/verify/board-layout.mjs`,
+  which 965 does not touch, so the two may run beside each other.
+
+- [ ] 968. A render path that can never cover itself keeps the picture gate shut. MEASURED
+  27.08.2026, 10:26-10:35: `scripts/render-verify-core.mjs` counts every `scripts/verify/*.mjs`
+  outside its `NON_RENDER_VERIFY` list as a render path, so point 963's edit to
+  `scripts/verify/board-layout.mjs` reopened the picture gate for BOTH backends, on top of the
+  game-render paths that a clean full `polish` pass on WebGPU (06:35) and WebGL 2 (06:57) had
+  already covered. But board-layout cannot answer that gate at all: it draws no game view, it
+  launches `chromium` directly instead of going through `scripts/verify/_browser.mjs`, so it never
+  arms `render-verify-recorder.mjs`, and it writes NO screenshot — it measures
+  `getBoundingClientRect()` over the published board. I ran it green on both backends (66 pass each,
+  0 fail, 0 console errors); neither run was recorded and neither covered anything. The gate could
+  then only be answered by re-running an unrelated ~46-minute `polish` pass or by a deferral.
+  FINAL STATE: a browser suite that renders no game view and selects no GL backend is not a render
+  path, so editing it never opens the picture gate; and no suite can be classified as a render path
+  while being structurally unable to record a covering run — the two facts are decided by one rule
+  rather than by two lists that can drift apart.
+  VERIFIABLE: Vitest over the classifier — `scripts/verify/board-layout.mjs` is not a render path;
+  a suite that goes through `_browser.mjs` still is; and a case that asserts every path the
+  classifier calls a render path is reachable by a run the recorder can actually write.
+  Criticality: med — it does not lose work, but it blocks the picture gate behind a run that has
+  nothing to do with the change, which is how deferrals get written for the wrong reason.
+  Bundle: Testinfrastruktur.
