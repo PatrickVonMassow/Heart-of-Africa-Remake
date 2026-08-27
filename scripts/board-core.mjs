@@ -213,19 +213,34 @@ const CARD_TITLE_HEAD_SOURCE = (pointSource) =>
 const CARD_HEADER_LEFT_SOURCE =
   `<span class="${CARD_HEADER_LEFT_CLASS}">\\s*(<span class="num">\\s*\\d+\\s*<\\/span>)\\s*` +
   `(?:${CRITICALITY_BADGE_SOURCE})?<\\/span>`
+/**
+ * THE CARD HEADER IS THREE COLUMNS (point 969, user sketch 27.08.2026 13:49).
+ * LEFT the number with its criticality badge, CENTER the title, RIGHT the times
+ * with the disclosure marker beside them. The columns never reorder and the
+ * title never takes a full-width row of its own: the three rounds before this
+ * one (941, 963, 967) each answered a squeezed title by stacking the groups at a
+ * breakpoint, and the user rejected that rendering on sight every time.
+ *
+ * STACKING IS CONTENT-DRIVEN, NOT BREAKPOINT-DRIVEN (user addendum 13:52). Each
+ * column is its own wrapping flex line, so it breaks ITS OWN content only when
+ * the row is genuinely too narrow for it — a short header stays on one line at
+ * portrait width, and the same header on a desktop viewport stays on one line
+ * too. There is deliberately no @media rule here.
+ *
+ * The title is the greedy column: its `flex-basis:auto` makes its shrink share
+ * the largest, so under pressure the outer columns reach their own content
+ * width first and stack there, which is what hands the title the width.
+ */
 const CRITICALITY_STYLE = `<style id="${CRITICALITY_STYLE_ID}">
-.card-header-left{display:inline-flex;flex:0 1 auto;flex-wrap:wrap;align-items:baseline;gap:2px 9px;min-width:0;max-width:100%}
-.card-header-left>*{min-width:0;max-width:100%;white-space:normal;overflow-wrap:anywhere}
-details:not(.sect)>summary{flex-wrap:wrap;row-gap:4px;min-width:0;max-width:100%}
-details:not(.sect)>summary>.t{flex:1 1 18rem;min-width:0;max-width:100%;overflow-wrap:anywhere}
-details:not(.sect)>summary:has(>.right)::after{content:none}
-details:not(.sect)>summary>.right{display:inline-flex;justify-content:flex-end;align-items:baseline;flex:0 1 auto;flex-wrap:nowrap;column-gap:6px;min-width:0;max-width:100%;white-space:normal}
-details:not(.sect)>summary>.right>*{min-width:0;max-width:100%;white-space:normal;overflow-wrap:anywhere}
-details:not(.sect)>summary>.right .meta{min-width:0;max-width:100%;white-space:normal;overflow-wrap:anywhere}
-details:not(.sect)>summary>.right::after{content:"▸";flex:0 0 auto;margin-left:6px}
-details:not(.sect)[open]>summary>.right::after{content:"▾"}
-@media(max-width:460px){details:not(.sect)>summary:has(>.right)>.card-header-left{order:0;flex:0 1 auto}details:not(.sect)>summary:has(>.right):has(>.card-header-left)>.right{order:1;flex:0 1 auto;margin-left:auto}details:not(.sect)>summary:has(>.right):has(>.card-header-left)>.t{order:2;flex:1 1 100%}}
-.criticality{flex:0 1 auto;min-width:0;max-width:100%;overflow-wrap:anywhere;border:1px solid currentColor;border-radius:999px;padding:.08em .48em;font-size:.72em;font-weight:700;line-height:1.35}
+.card-header-left{display:inline-flex;flex:0 1 auto;flex-wrap:wrap;align-items:baseline;gap:0 8px;min-width:auto;max-width:100%}
+.card-header-left>*{min-width:auto;max-width:100%;white-space:nowrap;overflow-wrap:normal}
+details:not(.sect)>summary{flex-wrap:nowrap;align-items:baseline;column-gap:7px;row-gap:0;min-width:0;max-width:100%}
+details:not(.sect)>summary>.t{flex:1 1 auto;min-width:0;max-width:100%;overflow-wrap:anywhere}
+details:not(.sect)>summary>.right{display:inline-flex;flex:0 1 auto;flex-wrap:wrap;justify-content:flex-end;align-items:baseline;column-gap:6px;row-gap:0;min-width:min(100%,3.2rem);max-width:34%;margin-left:auto;padding-left:0;white-space:normal}
+details:not(.sect)>summary>.right>*{min-width:0;max-width:100%;white-space:normal;overflow-wrap:break-word}
+details:not(.sect)>summary::after{content:"▸";flex:0 0 auto;align-self:baseline;margin-left:4px}
+details:not(.sect)[open]>summary::after{content:"▾"}
+.criticality{flex:0 1 auto;min-width:auto;max-width:100%;white-space:nowrap;overflow-wrap:normal;border:1px solid currentColor;border-radius:999px;padding:.08em .48em;font-size:.72em;font-weight:700;line-height:1.35}
 .criticality-low{background:#dcebd9;color:#24511f}.criticality-med{background:#f3e4ad;color:#684e00}.criticality-high{background:#f3d1cb;color:#7a2115}
 </style>`
 
