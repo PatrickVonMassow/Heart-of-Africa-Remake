@@ -12846,3 +12846,32 @@ to land than a mechanism that needs a review.
   nothing else in the launcher ends it.
   Bundle: Urlaubsfestigkeit. It edits the successor tick that 945 also edits, so it is worked
   after it, never beside it.
+
+- [ ] 965. The closing card the board's own refusal prescribes cannot reach the page. MEASURED
+  27.08.2026 while handing over after point 581 landed: `board-claims-nothing-running` denies every
+  state-changing call while "Gerade keine laufende Arbeit" stands, and names three ways out, the
+  middle one being `node scripts/board.mjs closing <N>` — "for the state between the two: the point
+  is merged and TICKED, and its closing duties are still owed". That card never renders. With the
+  point CLOSED (581) the publish refuses outright: "the derived now-section could not be rendered
+  (active-work source unresolved: the owner focus names point 581, which is not open)". With an
+  OPEN point that is not evidenced in work (945, sitting in the queue) the command reports success
+  and writes the board file, but the derived now-section still renders "Gerade ist kein Punkt
+  nachweisbar in Arbeit" and the card is gone at the next publish.
+  WHAT IT COSTS: the state the card exists for is exactly the state in which the point is no longer
+  open — that is what "merged and TICKED" means — so the remedy is unavailable in every case it was
+  written for. The only way past the guard is then `board.mjs now`, which claims work that is not
+  running: the guard forces the false statement it exists to prevent, and the session's own
+  bookkeeping (retrospective, ranking, board stamp) cannot be committed until it does.
+  FINAL STATE: a closing card survives the now-section's derivation for the point it names, whether
+  that point is already ticked or merely not evidenced in work, and the publish renders it instead
+  of refusing or silently dropping it. The card reads as what it is — closing duties owed, not
+  active work — so neither the nothing-running guard nor a reader mistakes it for either
+  neighbouring state. `now` and `none` keep their present meanings untouched.
+  VERIFIABLE: Vitest over the derivation — a closing card for a ticked point renders, a closing
+  card for an open-but-unevidenced point renders, both survive a publish, and neither is turned
+  into a now-card or dropped; plus the guard's own remedy text is asserted against the set of
+  states the card actually serves, so the two cannot drift apart again.
+  Criticality: high — it blocks the handover path of every landed point, and its only workaround is
+  a false board.
+  Bundle: Chat & Tafel. It edits the board's derived now-section, which 963 does not touch, so the
+  two may run beside each other.

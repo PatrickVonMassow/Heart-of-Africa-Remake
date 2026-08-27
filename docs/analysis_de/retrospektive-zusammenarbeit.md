@@ -1407,7 +1407,7 @@ keinen Träger hat. Gebucht als Punkt 956.
 
 ## Anhang A — Maschinell gepflegte Quellen-Übersicht
 
-Zuletzt aktualisiert: Donnerstag, 27.08.2026, 07:13 · Quellen-Fingerprint: `09f5968c74ab…`
+Zuletzt aktualisiert: Donnerstag, 27.08.2026, 08:04 · Quellen-Fingerprint: `31932d74d0e5…`
 
 Spalten heuristisch aus den Quellen abgeleitet (Anläufe = distinkte Datumsnennungen im Memory;
 Maßnahme = Guard-Skripte mit Namens-Treffer). Die inhaltliche Bewertung gehört der Prosa oben.
@@ -1508,8 +1508,8 @@ Maßnahme = Guard-Skripte mit Namens-Treffer). Die inhaltliche Bewertung gehört
 
 Erfasste Quellen: 91 Feedback-/Projekt-Memories · 57 Guard-/Hook-Skripte · 6 Revert-/Reapply-Commits · 109 Prozess-/Meta-TASKS-Punkte (davon 47 offen).
 
-<!-- RETRO-FINGERPRINT: 09f5968c74ab4322c02051b131ae6dcf57112c85acb1e53651da92a218e54167 -->
-<!-- RETRO-LAST-REFRESHED: 2026-08-27T05:13:03.054Z -->
+<!-- RETRO-FINGERPRINT: 31932d74d0e5affa7ea5a09e5de6abf3d06854bcd7f7824d7b48737e5ddbcec7 -->
+<!-- RETRO-LAST-REFRESHED: 2026-08-27T06:04:55.029Z -->
 <!-- AUTO-GENERATED:END -->
 
 ### 3.111 Ein Erfolg ist kein Beweis für den Weg, auf dem er zustande kam

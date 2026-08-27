@@ -470,4 +470,4 @@ Die Ursache findest du durch **Zerlegen**, nicht durch Wiederholen.
 
 Sie ersetzt die Fallstricke oben nicht.
 
-<!-- GUIDE-FINGERPRINT: a26ea5f48a0bf6700a7adc5af3ac72a5a16d8f04062b3bee9bed7581e57aecb7 -->
+<!-- GUIDE-FINGERPRINT: 31932d74d0e5affa7ea5a09e5de6abf3d06854bcd7f7824d7b48737e5ddbcec7 -->
