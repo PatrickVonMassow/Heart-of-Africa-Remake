@@ -1122,9 +1122,11 @@ const previousBatchWriters = state.writerObservations && typeof state.writerObse
 const fenceState = readFence()
 const featureWriterRegister = registeredFeatureWriters({
   now,
-  // A clean boundary explicitly transfers declared agents. Recognising those
-  // records keeps that supported overlap while every undeclared checkout vetoes.
-  declaration: trigger.kind === SUCCESSOR_TRIGGERS.BOUNDARY ? declaration : null,
+  // The declaration identifies the owner's own delegate independently of HOW a
+  // successor was requested. A daemon-owned delegate survives an owner crash;
+  // treating it as foreign on the watchdog path makes the dead owner immortal.
+  // The owner-lock verdict below remains the veto while that owner is alive.
+  declaration,
 })
 const ciWait = readJson(C('ci-status-guard-state.json'))?.ciWait ?? null
 const ciWaitAssessment = assessCiWait({ wait: ciWait, now, probePid })
@@ -1268,7 +1270,7 @@ if (verdict === 'skip-alive') {
         fenceState: readFence(),
         featureWriterRegister: registeredFeatureWriters({
           now,
-          declaration: trigger.kind === SUCCESSOR_TRIGGERS.BOUNDARY ? declaration : null,
+          declaration,
         }),
         probePid,
         now,

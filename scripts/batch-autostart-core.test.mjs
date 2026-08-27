@@ -498,7 +498,7 @@ describe('the immediate successor decision — one door for every transport', ()
     expect(live.evidence.ownership.lock).toMatchObject({ sessionId: 'owner', assessmentReason: 'pid-alive' })
   })
 
-  it('makes recent registered feature output a named successor veto', () => {
+  it('makes recent unrecognised feature output a named successor veto', () => {
     const decision = start({
       featureWriterRegister: {
         readable: true,
@@ -513,6 +513,55 @@ describe('the immediate successor decision — one door for every transport', ()
       start: false,
       code: 'registered-writer-live',
       evidence: { ownership: { featureWriterRegister: { readable: true } } },
+    })
+  })
+
+  it('starts beside a live declared delegate once its owning session is dead, so the successor can adopt it', () => {
+    const delegate = {
+      branch: 'feat/945-delegate',
+      worktree: '/repo/.claude/worktrees/point-945',
+      recognized: true,
+      output: { verdict: 'alive', judgedOn: 'git', ageMs: 1_000 },
+    }
+    const decision = start({
+      lock: { sessionId: 'dead-owner', pid: 44, fence: 17 },
+      assessment: { alive: false, reason: 'pid-gone' },
+      featureWriterRegister: { readable: true, writers: [delegate] },
+    })
+
+    expect(decision).toMatchObject({
+      start: true,
+      code: 'start',
+      reservation: { trigger: SUCCESSOR_TRIGGERS.WATCHDOG },
+      evidence: {
+        ownership: {
+          lock: { sessionId: 'dead-owner', assessedAlive: false },
+          featureWriterRegister: { writers: [{ branch: 'feat/945-delegate', recognized: true }] },
+        },
+      },
+    })
+    expect(decision.reason).toContain('owner lock assessed inactive (pid-gone)')
+  })
+
+  it('still vetoes a live owner beside its declared delegate', () => {
+    const decision = start({
+      lock: { sessionId: 'live-owner', pid: 44, fence: 17 },
+      assessment: { alive: true, reason: 'pid-alive' },
+      featureWriterRegister: {
+        readable: true,
+        writers: [{
+          branch: 'feat/945-delegate',
+          worktree: '/repo/.claude/worktrees/point-945',
+          recognized: true,
+          output: { verdict: 'alive', judgedOn: 'git', ageMs: 1_000 },
+        }],
+      },
+    })
+
+    expect(decision).toMatchObject({
+      start: false,
+      code: 'owner-live',
+      evidence: { ownership: { lock: { sessionId: 'live-owner', assessedAlive: true } } },
     })
   })
 
