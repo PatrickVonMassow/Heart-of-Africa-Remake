@@ -118,12 +118,19 @@ describe('the numbered chip renders on a now-card as it does in the queue', () =
     // group itself wraps instead — which is what puts the badge under the
     // number when the row is too narrow for both.
     expect(derived).toContain('details:not(.sect)>summary{flex-wrap:nowrap')
-    expect(derived).toContain('.card-header-left{display:inline-flex')
-    expect(derived).toContain('flex-wrap:wrap')
+    // Read the wrap off the CHIP GROUP'S OWN rule. A bare `toContain` was
+    // satisfied by the time column's rule and would have passed while the chip
+    // group regressed to `nowrap` (cross-vendor review 27.08.2026, finding 4).
+    const chipGroup = (derived.match(/\.card-header-left\{([^}]*)\}/) ?? [])[1] ?? ''
+    expect(chipGroup).toContain('display:inline-flex')
+    expect(chipGroup).toContain('flex-wrap:wrap')
     // The phone rule must not hide or reorder the left group.
     const phone = (css.match(new RegExp(`@media\\(max-width:(\\d+)px\\)\\{([^}]*\\}[^{]*)*`)) ?? [])[0] ?? ''
     expect(Number((phone.match(/max-width:(\d+)px/) ?? [])[1] ?? 0)).toBeGreaterThan(PHONE_WIDTH)
     expect(phone).not.toContain('.num')
+    // …and it may not REORDER the header either: the three columns stand
+    // number, title, time at every width (point 969).
+    expect(phone).not.toContain('order:')
     // No rule scoped only to current work may change the shared grouping.
     for (const [, selector, body] of css.matchAll(/([^{}]+)\{([^{}]*)\}/g)) {
       if (!/\.now\b/.test(selector) || !/summary|\.t\b/.test(selector)) continue

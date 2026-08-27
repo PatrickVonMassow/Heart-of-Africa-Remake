@@ -25,6 +25,12 @@ import { renderCardCriticalities } from '../board-core.mjs'
 // The portrait widths the complaint names, plus the narrowest phone the board
 // has ever been read on.
 const WIDTHS = [320, 360, 390, 414]
+// BELOW the narrowest phone the board is read at, the three-column header can no
+// longer hold the share and row bounds — at 280px the title keeps under 40% of
+// its card. What must still hold there is that nothing escapes its card and
+// nothing is cut off, so the layout degrades by reflowing rather than by
+// overflowing (Sol review, finding 3, which asked what "every width" means).
+const CONTAINMENT_ONLY_WIDTHS = [240, 280]
 // The three-column header of point 969 spends the card on three columns by
 // design, so the title can no longer own half of a 320px card once the number
 // group, the time group and the marker have taken their own content width. The
@@ -93,6 +99,16 @@ details:not(.sect)>summary>.right>*,details:not(.sect)>summary>.right .meta{whit
 const STACKED_HEADER_RULES = `<style id="board-layout-stacking-control">
 details:not(.sect)>summary{flex-wrap:wrap;row-gap:4px}
 @media(max-width:460px){details:not(.sect)>summary:has(>.right)>.card-header-left,details:not(.sect)>summary:has(>.right)>.t,details:not(.sect)>summary:has(>.right)>.right{flex:1 1 100%}}
+</style>`
+
+// A THIRD CONTROL (Sol review, finding 2). The share floor must prove itself
+// WITHOUT help from the cut-off rule: the old-layout control makes the long meta
+// unbreakable, so clipping alone can satisfy it, and a title squeezed to a third
+// of its card while everything stays inside its box would have gone unnoticed.
+// This control only widens the time column — nothing is cut off, every column
+// still wraps its own content, and the title alone is starved.
+const SQUEEZED_HEADER_RULES = `<style id="board-layout-squeeze-control">
+details:not(.sect)>summary>.right{min-width:min(100%,9rem);max-width:70%}
 </style>`
 
 // The base stylesheet of the published page. `.batch-dashboard.html` is a local
@@ -190,15 +206,25 @@ const measureBoard = async (page, html) => {
       // bound they carried was satisfied by a clean full-width title row.
       const stacked = []
       const notDominant = []
+      // The columns must also stand in THIS order from left to right. Vertical
+      // overlap alone cannot see a swapped number and time column (Sol review,
+      // finding 4).
+      const outOfOrder = []
       const lines = {}
 
       for (const summary of summaries) {
         const card = summary.parentElement.getBoundingClientRect()
         const point = pointOf(summary)
         const title = summary.querySelector(':scope > .t')
+        let titleIsOneLine = false
         if (title) {
           const box = title.getBoundingClientRect()
           const lineHeight = Number.parseFloat(getComputedStyle(title).lineHeight)
+          titleIsOneLine =
+            lineHeight > 0 &&
+            box.height < lineHeight * 1.6 &&
+            title.scrollWidth <= title.clientWidth + 1 &&
+            title.scrollHeight <= title.clientHeight + 1
           titles.push({
             point,
             width: box.width,
@@ -207,11 +233,7 @@ const measureBoard = async (page, html) => {
             // compact, not squeezed — it needs no width share (point 967). Both
             // scroll axes are read: a one-line clamp hides its overflow BELOW
             // the line, not beside it (review finding 2).
-            oneLine:
-              lineHeight > 0 &&
-              box.height < lineHeight * 1.6 &&
-              title.scrollWidth <= title.clientWidth + 1 &&
-              title.scrollHeight <= title.clientHeight + 1,
+            oneLine: titleIsOneLine,
           })
         }
 
@@ -247,18 +269,23 @@ const measureBoard = async (page, html) => {
             }
           }
           // …and the centre column dominates: it is wider than the two narrow
-          // columns beside it together. The stress cards are exempt — a header
-          // whose whole content is a four-letter title has nothing to dominate
-          // with, and its title is measured by the one-line rule instead.
+          // columns beside it together. The ONLY exemption is a title that shows
+          // its whole content on one unclipped line — it has nothing to dominate
+          // with, and the one-line predicate already proves it is not squeezed.
+          // Exempting a card by NUMBER, as the first draft did, left the two
+          // synthetic short titles bounded by nothing at all (Sol review,
+          // finding 1).
           const sideWidth =
             (leftGroup?.getBoundingClientRect().width ?? 0) +
             (rightGroup?.getBoundingClientRect().width ?? 0)
-          if (
-            point !== stressQueuePoint &&
-            point !== stressShortPoint &&
-            titleBox.width + 0.5 < sideWidth
-          ) {
+          if (!titleIsOneLine && titleBox.width + 0.5 < sideWidth) {
             notDominant.push({ point, title: Math.round(titleBox.width), sides: Math.round(sideWidth) })
+          }
+          if (leftGroup && leftGroup.getBoundingClientRect().right > titleBox.left + 0.5) {
+            outOfOrder.push({ point, pair: 'number/title' })
+          }
+          if (rightGroup && titleBox.right > rightGroup.getBoundingClientRect().left + 0.5) {
+            outOfOrder.push({ point, pair: 'title/time' })
           }
         }
       }
@@ -335,6 +362,7 @@ const measureBoard = async (page, html) => {
         split,
         stacked,
         notDominant,
+        outOfOrder,
         lines,
         stressSeen: [stressPoint, stressQueuePoint, stressShortPoint].every((point) =>
           summaries.some((summary) => pointOf(summary) === point),
@@ -409,6 +437,14 @@ try {
         measured.stacked
           .slice(0, 6)
           .map((item) => `#${item.point} ${item.group}`)
+          .join(', '),
+      )
+      check(
+        `${at}: the columns stand number, title, time from left to right`,
+        measured.outOfOrder.length === 0,
+        measured.outOfOrder
+          .slice(0, 6)
+          .map((item) => `#${item.point} ${item.pair}`)
           .join(', '),
       )
       check(
@@ -514,6 +550,45 @@ try {
             : 'not measured',
         )
       }
+      await page.close()
+    }
+  }
+  // Third control: the SHARE floor alone, with nothing clipped. If this control
+  // ever passes the positive checks, the lowered 40% floor has stopped meaning
+  // anything (Sol review, finding 2).
+  for (const { name, html } of pages) {
+    const page = await browser.newPage({ viewport: { width: 360, height: 900 } })
+    const squeezed = await measureBoard(page, `${html}\n${SQUEEZED_HEADER_RULES}`)
+    const worst = worstTitle(squeezed)
+    check(
+      `${name}: the squeeze control starves the title without cutting anything off`,
+      squeezed.clipped.length === 0,
+      squeezed.clipped
+        .slice(0, 3)
+        .map((item) => `#${item.point} ${item.element}`)
+        .join(', '),
+    )
+    check(
+      `${name}: the ${Math.round(MIN_TITLE_SHARE * 100)}% floor rejects the squeeze control at 360px`,
+      squeezed.titles.some((title) => !title.oneLine && title.share < MIN_TITLE_SHARE),
+      worst ? `worst #${worst.point} ${Math.round(worst.width)}px/${Math.round(worst.share * 100)}%` : 'no title',
+    )
+    await page.close()
+  }
+
+  // Below the phone widths the board is read at, only containment is claimed —
+  // and it is MEASURED rather than assumed (Sol review, finding 3).
+  for (const { name, html } of pages) {
+    for (const width of CONTAINMENT_ONLY_WIDTHS) {
+      const page = await browser.newPage({ viewport: { width, height: 900 } })
+      const measured = await measureBoard(page, html)
+      check(
+        `${name} at ${width}px: the header still reflows instead of overflowing`,
+        measured.overflow.length === 0 &&
+          measured.clipped.length === 0 &&
+          measured.scrollWidth <= measured.clientWidth + 1,
+        `${measured.overflow.length} escape(s), ${measured.clipped.length} cut off, page ${measured.scrollWidth}/${measured.clientWidth}`,
+      )
       await page.close()
     }
   }
