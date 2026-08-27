@@ -24482,3 +24482,50 @@ Nummerierung bleiben deshalb identisch — hier wird nur verschoben, nie umgesch
   Criticality: high — it silently rewrote `refs/heads/main` in the live repository, and every
   delegated author runs this suite from a worktree.
   Bundle: Urlaubsfestigkeit.
+
+- [x] 969. The card header is rejected a FOURTH time, and point 967 closed without the approval its
+  own spec demanded. REPORTED by the user 27.08.2026, 13:33 with a portrait phone screenshot taken
+  at 13:31 (~390 CSS px), verbatim: "Dashboard ist nach wie vor kaputt. Dieses Mal wirklich auf
+  meine Freigabe warten." This is the FOURTH round of ONE complaint — 941, then 963, then 967 — and
+  the second failure is procedural: 967's own spec made the user the acceptance authority and closed
+  "only after the user approves a portrait screenshot of the candidate rendering (real board
+  content, ~390px, one long-title card and one short done-card)". It was merged as d02e6720 at 12:03
+  and ticked done between 12:02 and 12:26 WITHOUT that approval ever being given. A green suite
+  closes nothing here; that was already the finding of the third round, and the third round then
+  closed on one anyway.
+  WHAT THE 13:31 SCREENSHOT SHOWS: every card — including the SHORT done-cards whose headers used to
+  fit on one line — renders number plus badge left, meta right, and the title on its own full-width
+  row beneath. That is precisely the unconditional stacking 967 was written to end: its FINAL STATE
+  demanded the full-width title row "only when the one-line header does not fit", and the shipped
+  rendering applies it always.
+  FINAL STATE: a short card header — number, badge, meta, marker and a short title — occupies ONE
+  line at ~390px, and the title drops to its own full-width row only when it genuinely does not fit
+  beside them. No regression on 941/963/967: nothing is cut off or escapes its card, a long title and
+  a long meta wrap their own text, and the published-board portrait measurements at 360/390/414 stay
+  green.
+  THE POINT DOES NOT CLOSE ON A GREEN SUITE, AND IT DOES NOT CLOSE ON THE AUTHOR'S OWN EYE. The
+  user's 13:33 instruction is binding and literal: produce the candidate portrait screenshot, put it
+  on the board as a decision card, and WAIT. The tick, the merge and the archive move happen after
+  the user's explicit approval and not before. Three rounds have now been closed on a verification
+  the user then rejected; a fourth self-approval is the defect, not the rendering.
+  AUTHORITATIVE LAYOUT TARGET — the user's own Ist/Soll sketch, 27.08.2026 13:49 (portrait,
+  ~390px), which SUPERSEDES 967's FINAL-STATE proposal. There is to be NO full-width title row at
+  all; 967's "number plus badge left, meta right, title beneath" is precisely what the user does not
+  want. The card header is THREE COLUMNS: LEFT, narrow — the point number with the criticality badge
+  stacked directly beneath it; CENTER, flexible and dominant — the title, bold, wrapping over
+  several lines WITHIN ITS OWN COLUMN; RIGHT, narrow — the times stacked, start time with its
+  trailing separator and the disclosure marker beside it on top, estimated or actual end time
+  beneath. The outer columns stay narrow by stacking their own content vertically, which is what
+  gives the title the width. This applies to active and done cards alike.
+  AND THE STACKING IS CONTENT-DRIVEN EVERYWHERE — user addendum 27.08. 13:52. The left and right
+  columns wrap or stack ONLY under space pressure, exactly as the title column does. On a desktop
+  viewport with a short title the whole header often fits on ONE line — number, badge, title, times
+  and marker side by side — and it must then render as that one line. Nothing stacks
+  unconditionally at any breakpoint; every column wraps by its own content.
+  VERIFIABLE: the suite gains what 967's own VERIFIABLE promised and did not deliver in a form that
+  bites — an upper bound on the HEIGHT of a SHORT header at portrait width, measured against the
+  PUBLISHED board rather than a hand-written stylesheet copy, so unconditional stacking turns the
+  suite red without a fifth complaint. Plus the existing 360/390/414 cut-off and wrap assertions.
+  Criticality: high — it is the fourth round of the same rejected rendering, the board is the surface
+  the user reads the batch on, and the closing rule of the previous round was broken.
+  Bundle: Chat & Tafel.
