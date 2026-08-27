@@ -69,6 +69,7 @@ Das Musterbeispiel sind die Chat-Zeitstempel: neun Eskalationsstufen, acht weich
 | 24.08. mittags | Der delegierte Autor schrieb drei Commits um, die er bereits veroeffentlicht hatte: Sein Abschluss-Push scheiterte als non-fast-forward, und sein eigener Bericht meldete die fertige Arbeit als „nur lokal“ — obwohl die Baeume beider Seiten byte-identisch waren und sich nur eine Leerzeile im Commit-Text unterschied. Wer dem Bericht glaubt, sucht verlorene Arbeit, die nie verloren war; wer ihn ignoriert, uebersieht den echten Fall. Dieselbe Stunde zeigte die Kehrseite von der Gegenseite: Ein Tor-Lauf im Arbeitsbaum wurde rot, weil die pruefende Sitzung selbst waehrenddessen auf main committete — kein Test schlug fehl, nur der Teardown benannte die Ref-Bewegung |
 | 26.08. vormittags | Neun Gegenlesungsdurchgänge über die abgeleitete Board-Sektion fanden am Ende EINE Fehlerklasse — zweimal: Ein Beleg ohne zuordenbaren Punkt und ein Fokus-Eintrag, der etwas nennt, das keine Punktnummer ist, kamen beide als »kein Fokus« heraus, also Byte für Byte als die Antwort einer FEHLENDEN Quelle. Aus beschädigten Daten wurde so eine geprüfte Null (§3.185, Punkt 713) |
 | 26.08. mittags | Zwanzig Minuten nach der Landung verweigerte derselbe Mechanismus die Veröffentlichung des Boards an der Sitzungsgrenze: Die Ausnahme für das Kärtchen, das die Maschine selbst schreibt, galt nur im Zweig »es läuft etwas« und nie in seinem Spiegel (§3.186, Punkt 935) |
+| 27.08. nachts | Zwei Wächter gaben einander ein Alibi: Der Teardown der Unit-Suite ließ einen Lauf scheitern, weil die eigene Sitzung vier Sekunden vor Schluss den Zweig des nächsten Punktes anlegte — 430 Dateien und 14 015 Fälle waren grün —, und die Lastprobe entlastete dieses Rot sofort mit sieben »lebenden« Arbeitsbäumen, in denen kein Prozess lief und seit drei bis vierzehn Tagen nichts geschrieben wurde. Beide Alibis sind auf dieser Maschine dauerhaft, also kann dieses Tor kein Rot mehr beweisen (§3.198, Punkte 455 und 955) |
 | 11.08. abends | Der VS-Code-Neustart nimmt den Devcontainer mit — die Batch-Sitzung und sechs Agenten sterben, nachdem ich das Gegenteil zugesichert hatte (§3.111); die Rechte-Rückfragen kamen weiter, weil `defaultMode` eine fortgesetzte Sitzung gar nicht mehr erreicht (§3.3) |
 
 Muster: Ab dem 22.07. explodiert die Commit-Rate (Delegation) — und genau dann häufen sich die Infrastruktur-Vorfälle. **Skalierung der Autonomie erzeugt eine eigene Problemklasse, die die Feature-Arbeit zeitweise überholt.**
@@ -1405,7 +1406,7 @@ keinen Träger hat. Gebucht als Punkt 956.
 
 ## Anhang A — Maschinell gepflegte Quellen-Übersicht
 
-Zuletzt aktualisiert: Donnerstag, 27.08.2026, 01:58 · Quellen-Fingerprint: `6468cd65eb19…`
+Zuletzt aktualisiert: Donnerstag, 27.08.2026, 02:26 · Quellen-Fingerprint: `1bae2d84f648…`
 
 Spalten heuristisch aus den Quellen abgeleitet (Anläufe = distinkte Datumsnennungen im Memory;
 Maßnahme = Guard-Skripte mit Namens-Treffer). Die inhaltliche Bewertung gehört der Prosa oben.
@@ -1506,8 +1507,8 @@ Maßnahme = Guard-Skripte mit Namens-Treffer). Die inhaltliche Bewertung gehört
 
 Erfasste Quellen: 91 Feedback-/Projekt-Memories · 57 Guard-/Hook-Skripte · 6 Revert-/Reapply-Commits · 108 Prozess-/Meta-TASKS-Punkte (davon 47 offen).
 
-<!-- RETRO-FINGERPRINT: 6468cd65eb19788e3cbf2bb566eb514d3c1a7a86cb53eb6f4487fb99252afe2f -->
-<!-- RETRO-LAST-REFRESHED: 2026-08-26T23:58:08.273Z -->
+<!-- RETRO-FINGERPRINT: 1bae2d84f64808d874d3d8df1c4c8731e10d0c1190d6189f5544f4568106ef26 -->
+<!-- RETRO-LAST-REFRESHED: 2026-08-27T00:26:38.283Z -->
 <!-- AUTO-GENERATED:END -->
 
 ### 3.111 Ein Erfolg ist kein Beweis für den Weg, auf dem er zustande kam
@@ -4151,3 +4152,43 @@ und 729 gewandert, und jeder von ihnen macht seinen Punkt schärfer, statt ihn z
 **Lehre:** Ein Korpus, den niemand mehr im Kopf hält, braucht eine Maschine, die den Besitzer
 nennt, bevor eine neue Nummer entsteht. Solange die Suche Handarbeit ist, ist die Dublette kein
 Ausrutscher, sondern der Normalfall mit Verzögerung. Gebucht als Punkt 960.
+
+### 3.198 Zwei Wächter gaben einander ein Alibi, und der grüne Baum blieb unbekannt
+
+§3.191 beschreibt zwei Rettungsmechanismen, die einander verklemmen. Das ist der laute Fall: Es
+geht nichts mehr, also merkt es irgendwann jemand. In der Nacht zum 27.08.2026 stand derselbe
+Kompositionsfehler in seiner leisen Spiegelung da, und die ist teurer.
+
+Der Ablauf ist in vier Zeitstempeln erzählt. Um 00:09:44 startete das Schnell-Tor der Batch-Sprechstunde
+die Unit-Suite. Um 00:12:28 legte dieselbe Sitzung den Zweig für den nächsten Punkt an — der
+vorgeschriebene erste Handgriff jedes Punktes. Um 00:12:32 endete die Suite: 430 Dateien und
+14 015 Fälle **allesamt grün**, und danach ließ der globale Teardown den Lauf scheitern, weil sich
+während des Laufs eine Ref bewegt hatte. Das Tor las nur den Rückgabewert, sah ein Rot — und
+entlastete es sofort wieder als »nicht beurteilbar (Last), 7 lebende Agenten-Arbeitsbäume«. In
+keinem dieser sieben lief ein Prozess; ihre jüngsten Commits waren drei bis vierzehn Tage alt. Die
+Probe zählt schlicht jeden Pfad unterhalb des Arbeitsbaum-Verzeichnisses, ohne je nach einer
+Bearbeitung oder einem Prozess zu fragen.
+
+Beide Mechanismen sind einzeln längst gebucht, und beide haben für sich eine gute Begründung: Der
+Teardown soll Test-Leckage in das echte Repositorium finden, die Lastprobe soll verhindern, dass
+eine überlastete Maschine dem Code die Schuld gibt. Zusammen ergeben sie etwas, das keiner von
+beiden ist: ein falsches Rot, das ein falsches Alibi bekommt. Die Verklemmung aus §3.191 hält an;
+diese Paarung meldet »alles in Ordnung, mach weiter« und stimmt in keinem ihrer beiden Teile. Was
+tatsächlich zutraf — der Baum war vollständig grün — hat an diesem Abend kein Mechanismus erfahren,
+sondern erst eine Wiederholung von Hand.
+
+Dazu kommt, dass beide Alibis hier dauerhaft sind, nicht gelegentlich. Der Batch parkt Feature-Zweige
+als Normalzustand, also ist die Zahl der »lebenden« Arbeitsbäume nie null; und dieser Rechner hat
+keinen Grafiklast-Zähler, kann also die geforderte ruhige Messung ohnehin nicht liefern. Damit ist
+kein Rot, das dieses Tor je nimmt, ein Beweis — und seine eigene Urteilszeile endet mit der
+Anweisung, den Batch deswegen nicht anzuhalten. Der dritte Strang derselben Nacht schließt den
+Kreis: Die Statusabfrage, mit der man das nachsehen würde, antwortet der Sitzung, die die Sperre
+nachweislich hält, sie stehe zurück, weil eine andere Sitzung sie halte.
+
+**Lehre:** Die Kompositionsprüfung aus §3.191 braucht ihre zweite Frage. Nicht nur: Kann der eine
+den Zustand herstellen, in dem der andere dauerhaft verweigert? Sondern auch: Kann der eine ein
+Rot erzeugen, das der andere routinemäßig wegerklärt? Und jede Entlastungsklausel gehört daraufhin
+gemessen, ob sie auf dieser Maschine und in diesem Arbeitsstil überhaupt je wieder zugeht — eine
+Ausnahme, deren Bedingung im Normalbetrieb immer erfüllt ist, ist keine Ausnahme, sondern die
+Abschaltung des Wächters mit freundlicher Begründung. Gebucht als datierte Instanzen in den
+Punkten 455 und 955, die einander seither in ihren Tests namentlich nennen sollen.

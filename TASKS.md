@@ -109,6 +109,18 @@ put it is the mistake this line exists to stop.
   runnable however far the baseline lags; a range whose accumulated material does not fit no longer
   suspends the contributions inside it; plus the guard's own status on main's real range naming a
   finite, runnable plan or a named unassemblable contribution.
+  THE DEBT COMPOUNDS, MEASURED TWICE A DAY APART — use this pair as the before/after evidence.
+  Point 943 read the gate on 26.08.2026: baseline 226 mechanism commits back, 15.1 million
+  characters, 115 planned passes. The same instrument on 27.08.2026, 02:35, on main `4baf4527`:
+  baseline `265712e` is now 240 mechanism commits back and the material measures 15 659 456
+  characters against the 200 000-character round budget. Fourteen commits and ~0.56 million
+  characters in one day, added while the gate was suspended and therefore while nothing could be
+  reviewed — which is the compounding this point argues, now measured rather than argued. The
+  unassemblable file is unchanged and still the only one: `.claude/mechanism-reviews.jsonl`, the
+  gate's own ledger, which no pass can hold even as a bare diff. FOUR do-not-merge records now
+  stand on the range with their re-review suspended for material; 943 is closed, so those four are
+  the debt this point inherits, and the recorded-disposition clause above is what has to settle
+  them. After the change, re-read the same instrument and report the third number.
   Criticality: high — it is why the four-eyes gate on main enforces nothing today, and why point
   943 could not close its third leg.
   Bundle: Modell & Wächter. It rescopes what the mechanism gate demands, so it is worked before 916
