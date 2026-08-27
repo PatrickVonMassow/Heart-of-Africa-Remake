@@ -13000,6 +13000,12 @@ to land than a mechanism that needs a review.
   had landed meanwhile. A session that keeps working therefore never converges on this gate: it
   blocked EVERY turn end of the session that measured it, on files no lane could clear. That is the
   unclosable-window shape point 734 owns for the render gate, reached by a different road.
+  WATCHED IT GROW, IN ONE SESSION, WITHOUT ONE COMMIT OF POINT 966: the demand was ONE file at
+  18:20 (the review ledger), TWO at 18:40 once that was cleared, and SIX at 18:41 —
+  `.claude/queue-rank.json`, `TASKS.md`, `docs/work-packages.md`, `scripts/guide-brevity-core.mjs`
+  and the two documents — after three ordinary bookkeeping commits, one of which was THIS POINT
+  BEING FILED. Filing the report of the growth grew the demand. That is the measurement: the set
+  tracks the window, not the point, and the only way to hold it still is to stop working.
   TWO READINGS, AND THE POINT DECIDES BY MEASUREMENT, NOT BY TASTE:
   - either the ATTRIBUTION is wrong, and the union owed by a point is its OWN commits;
   - or the window union is deliberate and conservative — in which case the WORDING is wrong, because
