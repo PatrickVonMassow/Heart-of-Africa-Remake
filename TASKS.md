@@ -12815,7 +12815,7 @@ to land than a mechanism that needs a review.
   legibility and the measurement alone has now missed it twice.
   Criticality: medium — the board is how the user reads the batch, and this is his third report of
   it; nothing is corrupted, but the reading is.
-  Bundle: Board & Dashboard.
+  Bundle: Chat & Tafel.
 
 - [ ] 964. The launcher's stalled-writer recovery is unreachable, so only a DECLARED delegate can
   ever be recovered. MEASURED 27.08.2026 while reviewing point 945 on `scripts/batch-autostart.mjs`:

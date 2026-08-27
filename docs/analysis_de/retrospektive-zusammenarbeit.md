@@ -1407,7 +1407,7 @@ keinen Träger hat. Gebucht als Punkt 956.
 
 ## Anhang A — Maschinell gepflegte Quellen-Übersicht
 
-Zuletzt aktualisiert: Donnerstag, 27.08.2026, 06:17 · Quellen-Fingerprint: `a26ea5f48a0b…`
+Zuletzt aktualisiert: Donnerstag, 27.08.2026, 07:13 · Quellen-Fingerprint: `09f5968c74ab…`
 
 Spalten heuristisch aus den Quellen abgeleitet (Anläufe = distinkte Datumsnennungen im Memory;
 Maßnahme = Guard-Skripte mit Namens-Treffer). Die inhaltliche Bewertung gehört der Prosa oben.
@@ -1506,10 +1506,10 @@ Maßnahme = Guard-Skripte mit Namens-Treffer). Die inhaltliche Bewertung gehört
 | A pending batch claim HOLDS THE LAUNCHER BACK — withdraw it whenever the claiming window is left unattended | 2 | mittel | clear-claim-guard.mjs | ✔ Mechanismus |
 | Multi-agent workflows eat the session/weekly limit fast — verify findings INLINE, keep fan-outs small, warn the user with a cost estimate before any big workflow | 3 | mittel | doc-budget-guard.mjs | ✔ Mechanismus |
 
-Erfasste Quellen: 91 Feedback-/Projekt-Memories · 57 Guard-/Hook-Skripte · 6 Revert-/Reapply-Commits · 108 Prozess-/Meta-TASKS-Punkte (davon 46 offen).
+Erfasste Quellen: 91 Feedback-/Projekt-Memories · 57 Guard-/Hook-Skripte · 6 Revert-/Reapply-Commits · 109 Prozess-/Meta-TASKS-Punkte (davon 47 offen).
 
-<!-- RETRO-FINGERPRINT: a26ea5f48a0bf6700a7adc5af3ac72a5a16d8f04062b3bee9bed7581e57aecb7 -->
-<!-- RETRO-LAST-REFRESHED: 2026-08-27T04:17:01.581Z -->
+<!-- RETRO-FINGERPRINT: 09f5968c74ab4322c02051b131ae6dcf57112c85acb1e53651da92a218e54167 -->
+<!-- RETRO-LAST-REFRESHED: 2026-08-27T05:13:03.054Z -->
 <!-- AUTO-GENERATED:END -->
 
 ### 3.111 Ein Erfolg ist kein Beweis für den Weg, auf dem er zustande kam
@@ -4247,3 +4247,37 @@ Das ist dieselbe Regel, die für das gerenderte Bild längst gilt: nicht die Zah
 das Bild ansehen. Für Wächter, Berichte und Pläne gilt sie genauso, und die Gegenlesung ist die
 Stelle, an der sie greift — der Autor liest seine eigene Ausgabe als Bestätigung, der Fremde liest
 sie als Leser.
+
+### 3.201 Der Rettungsblock, den ein Nachbar-Commit noch am selben Tag abschnitt
+
+Beim Gegenlesen von Punkt 945 am 27.08.2026 fiel im Startvorgang des Nachfolgers ein Block auf,
+den nichts mehr erreicht. Im Zweig für „ich starte diesmal nicht" steht zuerst eine Abfrage, die
+jede Verweigerung außer der einen auf einen lebenden Besitzer protokolliert und den Prozess
+beendet. Alles danach läuft folglich nur noch für genau diese eine Verweigerung — und die nächste
+Zeile fragt, ob der Besitzer NICHT lebt. Beides zugleich ist unmöglich. Dahinter lag der gesamte
+Apparat, der einen festgefahrenen Schreiber löst: Wiederholungszähler, Journal-Einträge,
+Eskalationszeile, Widerruf der Schreibmarke und die Neuentscheidung danach.
+
+Die Datumsspur ist das Lehrreiche. Der Block wurde am 21.08.2026 gebaut, mit dem erklärten Zweck,
+eine festgefahrene Verweigerung „beim zweiten Tick" aufzulösen. Am selben Tag fügte ein zweiter
+Commit — der die Nachfolger-Starts an Übergabe und beaufsichtigtes Ende hängte — oberhalb davon
+den frühen Abbruch ein. Der zweite Commit war für sich richtig und tat genau, was sein Punkt
+verlangte. Er hat den ersten nicht verändert, nicht widersprochen und keinen Test rot gemacht: Die
+Tests des Bereichs prüfen den REINEN Entscheidungskern, und der Kern war weiter korrekt. Was
+niemand prüfte, war der Kontrollfluss der Umgebung, in der er aufgerufen wird. Sechs Tage lang
+stand ein Sicherheitsnetz im Code, auf das sich der Entwurf berief, und es hing an nichts.
+
+Bemerkenswert ist die Verbindung zu Punkt 945 selbst: Der macht — richtig — aus einer verweigerten
+Runde eine Wartestellung statt eines Fehlstarts, sodass der Runaway-Zähler dabei nicht mehr
+steigt. Vorher endete ein solcher Keil wenigstens im lauten Pausieren. Nachher endet er gar nicht
+mehr, denn das Einzige, was ihn noch gebrochen hätte, war der unerreichbare Block. Zwei je für
+sich korrekte Änderungen ergaben zusammen eine stille Endlosschleife.
+
+**Lehre:** Ein Test über den reinen Kern beweist nicht, dass der Kern noch AUFGERUFEN wird. Wo ein
+Commit oberhalb eines bestehenden Blocks einen Abbruch, eine Rückgabe oder eine Verzweigung
+einfügt, ist die Erreichbarkeit des Darunterliegenden die Sache, die geprüft gehört — und zwar
+mit einem Fall, der genau dort ankommen muss, nicht mit einem, der die Funktion daneben aufruft.
+Und wer eine Eskalation entschärft, muss nachsehen, ob die Auffanglinie darunter überhaupt noch
+existiert: Eine laute Fehlreaktion zu entfernen ist nur dann ein Fortschritt, wenn die leise
+Alternative nicht der Stillstand ist. Gebucht als Punkt 964, nach Punkt 945 zu bearbeiten, weil
+beide denselben Tick anfassen.

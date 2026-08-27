@@ -436,6 +436,14 @@ Die Ursache findest du durch **Zerlegen**, nicht durch Wiederholen.
   → *Prompt:* „Eine Entscheidung, die du selbst triffst, nennt die **Messung**, die sie stützen
   oder widerlegen würde, und **verfällt**, sobald diese Messung sauber vorliegt."
 
+- **Der grüne Test prüft den Kern, nicht ob er noch aufgerufen wird.** Ein späterer Commit setzt
+  oberhalb eines bestehenden Blocks einen Abbruch oder eine frühe Rückgabe ein. Der Block wird
+  unerreichbar, kein Test wird rot — denn die Tests rufen die Funktion direkt auf, nicht den Weg
+  dorthin. Bei uns hing ein Sicherheitsnetz sechs Tage lang an nichts.
+  → *Prompt:* „Wenn du oberhalb von bestehendem Code eine Verzweigung, ein return oder einen
+  Abbruch einfügst: nenn mir, was darunter dadurch **unerreichbar** wird, und schreib den Test so,
+  dass er **dort ankommen muss** — nicht so, dass er die Funktion daneben aufruft."
+
 ---
 
 ## Drei Meta-Regeln, die alles zusammenhalten
@@ -470,4 +478,4 @@ Die Ursache findest du durch **Zerlegen**, nicht durch Wiederholen.
 
 Sie ersetzt die Fallstricke oben nicht.
 
-<!-- GUIDE-FINGERPRINT: a26ea5f48a0bf6700a7adc5af3ac72a5a16d8f04062b3bee9bed7581e57aecb7 -->
+<!-- GUIDE-FINGERPRINT: 09f5968c74ab4322c02051b131ae6dcf57112c85acb1e53651da92a218e54167 -->
