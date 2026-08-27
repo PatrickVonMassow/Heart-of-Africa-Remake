@@ -74,6 +74,7 @@ Das Musterbeispiel sind die Chat-Zeitstempel: neun Eskalationsstufen, acht weich
 | 11.08. abends | Der VS-Code-Neustart nimmt den Devcontainer mit — die Batch-Sitzung und sechs Agenten sterben, nachdem ich das Gegenteil zugesichert hatte (§3.111); die Rechte-Rückfragen kamen weiter, weil `defaultMode` eine fortgesetzte Sitzung gar nicht mehr erreicht (§3.3) |
 | 27.08. | Vierte Runde derselben abgelehnten Kartenkopf-Darstellung: Der dritte Anlauf machte den Nutzer in seiner eigenen Abnahmebedingung zur entscheidenden Instanz und wurde trotzdem auf das eigene grüne Urteil gemergt und abgehakt — und die Schranke, die eine vierte Runde hätte verhindern sollen, war aus dem VORGESCHLAGENEN Zielbild abgeleitet und deshalb von genau der abgelehnten Darstellung erfüllt (§3.202, Punkte 967/969) |
 | 27.08. abends | Ein Veto der Gegenlesung stand auf `main`, dessen dritter Befund eine Erfindung des Prüfwerkzeugs war: Es schneidet die Retrospektive planmäßig aus dem Prüfstoff, druckt die Kürzung nur in die Konsole des Aufrufers und meldet in derselben Ausgabe »nichts weggelassen« — der Prüfer konnte »fehlt im Commit« von »fehlt in meiner Vorlage« nicht unterscheiden und klagte den Commit an. Der Schutzsatz dagegen gilt nur für eine aufgeteilte Prüfung, die ein Manifest schreibt (§3.203, Punkt 972) |
+| 27.08. abends | Dasselbe Kritikalitäts-Tor forderte binnen zwanzig Minuten erst eine, dann zwei, dann sechs gegenzulesende Dateien für einen Punkt, der in dieser Zeit keinen Commit hatte und keine der genannten Dateien je angefasst hat — die Vereinigung folgt dem Zeitfenster, nicht dem Punkt, und der Commit, der den Befund eintrug, hob die Forderung selbst mit an (§3.204, Punkt 974) |
 
 Muster: Ab dem 22.07. explodiert die Commit-Rate (Delegation) — und genau dann häufen sich die Infrastruktur-Vorfälle. **Skalierung der Autonomie erzeugt eine eigene Problemklasse, die die Feature-Arbeit zeitweise überholt.**
 
@@ -1409,7 +1410,7 @@ keinen Träger hat. Gebucht als Punkt 956.
 
 ## Anhang A — Maschinell gepflegte Quellen-Übersicht
 
-Zuletzt aktualisiert: Donnerstag, 27.08.2026, 18:37 · Quellen-Fingerprint: `68d5494a011d…`
+Zuletzt aktualisiert: Donnerstag, 27.08.2026, 18:42 · Quellen-Fingerprint: `663febf599e6…`
 
 Spalten heuristisch aus den Quellen abgeleitet (Anläufe = distinkte Datumsnennungen im Memory;
 Maßnahme = Guard-Skripte mit Namens-Treffer). Die inhaltliche Bewertung gehört der Prosa oben.
@@ -1510,8 +1511,8 @@ Maßnahme = Guard-Skripte mit Namens-Treffer). Die inhaltliche Bewertung gehört
 
 Erfasste Quellen: 91 Feedback-/Projekt-Memories · 57 Guard-/Hook-Skripte · 6 Revert-/Reapply-Commits · 111 Prozess-/Meta-TASKS-Punkte (davon 47 offen).
 
-<!-- RETRO-FINGERPRINT: 68d5494a011d85c67cdbe8c38409c80a954052354329856c64430f72aa7952c3 -->
-<!-- RETRO-LAST-REFRESHED: 2026-08-27T16:37:44.988Z -->
+<!-- RETRO-FINGERPRINT: 663febf599e6beede777827cb6bbbb67be18bfbbeea4a006ea16e6924fb9b2b4 -->
+<!-- RETRO-LAST-REFRESHED: 2026-08-27T16:42:26.422Z -->
 <!-- AUTO-GENERATED:END -->
 
 ### 3.111 Ein Erfolg ist kein Beweis für den Weg, auf dem er zustande kam
@@ -4403,3 +4404,38 @@ einen Punkt gegen eine ungeprüfte Ursache erzeugt.
 Aufrufer — sonst ist die Abwesenheit für den Prüfer von einem Mangel nicht unterscheidbar, und
 seine redlichste Antwort ist ein Falschbefund. Und eine Deckungszahl, die das Weggelassene aus
 dem eigenen Nenner rechnet, meldet Vollständigkeit als Ergebnis der Kürzung.
+
+### 3.204 Ein Tor, dessen Forderung mit dem Fenster wächst statt mit dem Punkt
+
+Das Kritikalitäts-Tor verlangt für einen abgehakten HIGH-Punkt die Gegenlesung „jeder Datei, die
+dieser Punkt geändert hat". An einem Abend im August war die Forderung dreimal eine andere: um
+18:20 eine Datei, um 18:40 zwei, um 18:41 sechs. Punkt 966, dem sie angerechnet wurden, hatte in
+dieser Zeit keinen einzigen Commit; dazwischen lagen drei gewöhnliche Buchhaltungs-Commits einer
+Sitzung, die nebenbei ihre Arbeitsaufträge fortschrieb. Nachgemessen über den zweiten Elternteil
+des Merges: Der Zweig des Punktes hatte von den genannten Dateien **keine** je angefasst.
+
+Das Tor rechnet also nicht die Dateien des Punktes zusammen, sondern alles, was seit seiner
+letzten grünen Basislinie im Baum gelandet ist. Für eine ruhende Sitzung ist das dasselbe. Für
+eine arbeitende ist es ein Ziel, das sich mit jedem Schritt entfernt: Die eine Datei, die dem
+Punkt wirklich gehörte, war in einer einzigen Runde abgedeckt — und genau diese Abdeckung machte
+zwei weitere sichtbar, die inzwischen gelandet waren. Der Gipfel des Vorgangs ist, dass die
+Meldung dieses Wachstums das Wachstum vergrößerte: Der Commit, der den Befund als Punkt einträgt,
+ist einer der drei, die die Forderung von zwei auf sechs hoben.
+
+Der konservative Gedanke dahinter ist nicht falsch. Was neben einem ungeprüften HIGH-Punkt landet,
+hat ebenfalls keinen zweiten Leser gehabt, und das darf ein Tor einfordern. Falsch ist, es als die
+Schuld DIESES PUNKTES auszusprechen. Der gedruckte Satz behauptet über fremde Arbeit etwas
+nachweislich Unwahres, und ein Leser, der ihm glaubt, sucht einen Zusammenhang, den es nicht gibt
+— er liest die Commits des Punktes durch und findet die Datei nicht, was ihn an seiner eigenen
+Messung zweifeln lässt, nicht am Tor.
+
+Die Form ist bekannt: Es ist dieselbe unschließbare Fensterlogik, die für das Bild-Tor als eigener
+Punkt gebucht ist — ein Tor, dessen einziger Ausgang die Handausnahme ist, verfällt zur
+Formalität. Sie ist hier über einen anderen Weg erreicht worden, und sie blockierte an jenem Abend
+buchstäblich jeden Zugabschluss, während die eine echte Schuld des Punktes längst beglichen war.
+
+**Lehre:** Was ein Tor fordert, muss dem gehören, dem es die Forderung stellt. Eine über ein
+Zeitfenster gebildete Vereinigung ist als Forderung zulässig, als ZUSCHREIBUNG nicht — sie wird
+benannt als das, was sie ist (ungelesene Arbeit im Fenster), mit einem Besitzer, der nicht der
+Punkt ist. Und ein Tor, dessen Forderung schneller wächst, als sie erfüllt werden kann, hält
+niemanden auf außer dem, der arbeitet.
