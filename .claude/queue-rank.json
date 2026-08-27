@@ -894,6 +894,12 @@
       "why": "Es haengt an 971: derselbe Dateisatz, also darf es erst danach laufen, und vor 971 liegen die Verstaendigungsmechanik und die Notfallpunkte, die den Release tragen",
       "origin": "machine",
       "place": "last"
+    },
+    "974": {
+      "at": "2026-08-27T16:41:30.176Z",
+      "why": "Es blockiert den Zugabschluss jeder Sitzung, wird aber nicht dadurch dringender, dass es vorgezogen wird: Der naechste Besitzer trifft es sofort und kann es dann mit frischem Kontext nehmen; die Punkte davor tragen den Release",
+      "origin": "machine",
+      "place": "last"
     }
   },
   "boundary": {
@@ -933,7 +939,7 @@
     "why": "The order standing in front of the release today is the arrangement that predates this rule; the four machine-filed points that had ranked themselves there were moved behind 174 first"
   },
   "settled": {
-    "at": "2026-08-27T16:37:07.412Z",
+    "at": "2026-08-27T16:41:30.189Z",
     "points": [
       174,
       184,
@@ -1253,7 +1259,8 @@
       970,
       971,
       972,
-      973
+      973,
+      974
     ]
   }
 }
