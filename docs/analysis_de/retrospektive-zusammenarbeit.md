@@ -1412,7 +1412,7 @@ keinen Träger hat. Gebucht als Punkt 956.
 
 ## Anhang A — Maschinell gepflegte Quellen-Übersicht
 
-Zuletzt aktualisiert: Donnerstag, 27.08.2026, 22:43 · Quellen-Fingerprint: `263aff7e09a9…`
+Zuletzt aktualisiert: Donnerstag, 27.08.2026, 23:53 · Quellen-Fingerprint: `89d535b84d83…`
 
 Spalten heuristisch aus den Quellen abgeleitet (Anläufe = distinkte Datumsnennungen im Memory;
 Maßnahme = Guard-Skripte mit Namens-Treffer). Die inhaltliche Bewertung gehört der Prosa oben.
@@ -1478,6 +1478,7 @@ Maßnahme = Guard-Skripte mit Namens-Treffer). Die inhaltliche Bewertung gehört
 | Direct pushes to main are approved despite GitHub's branch protection — never ask about switching to pull requests again | 1 | niedrig | push-arrival-guard.mjs | ✔ Mechanismus |
 | Order the TASKS/queue so known-bug fixes + user-requested extensions come BEFORE the big bug-FINDING / QA-framework tickets | 1 | niedrig | queue-order-guard.mjs | ✔ Mechanismus |
 | Console warning \"THREE.Clock deprecated, use THREE.Timer\" comes from R3F v9 internals — fix by updating @react-three/fiber once it migrates to Timer | 1 | niedrig | — (Regel/Memory) | ◐ Regel |
+| User ruling 24.08.2026: a stated recommendation on a VDZK card authorizes deciding by it, executing it, and closing it with what/why/veto recorded; no grant for tags, publishes, force-pushes, user-data deletion, or unrecommended genuine choices | 2 | mittel | decision-card-guard.mjs | ✔ Mechanismus |
 | Choose the browser-regression tier per task at my discretion (Vitest-only / Vitest+small / Vitest+large); the closing cycle ALWAYS runs Vitest+large | 1 | niedrig | — (Regel/Memory) | ◐ Regel |
 | Priority tiers for picking the next point — token-reduction work first, then the communication mechanic, then everything else; open branches before a fresh point | 2 | mittel | lock-release-hook.mjs, queue-order-guard.mjs | ✔ Mechanismus |
 | A declared \"intended residual\" is where real defects hide — legitimate only when the information to close it is genuinely not at hand | 1 | niedrig | — (Regel/Memory) | ◐ Regel |
@@ -1512,10 +1513,10 @@ Maßnahme = Guard-Skripte mit Namens-Treffer). Die inhaltliche Bewertung gehört
 | A pending batch claim HOLDS THE LAUNCHER BACK — withdraw it whenever the claiming window is left unattended | 2 | mittel | clear-claim-guard.mjs | ✔ Mechanismus |
 | Multi-agent workflows eat the session/weekly limit fast — verify findings INLINE, keep fan-outs small, warn the user with a cost estimate before any big workflow | 3 | mittel | doc-budget-guard.mjs | ✔ Mechanismus |
 
-Erfasste Quellen: 92 Feedback-/Projekt-Memories · 57 Guard-/Hook-Skripte · 6 Revert-/Reapply-Commits · 111 Prozess-/Meta-TASKS-Punkte (davon 47 offen).
+Erfasste Quellen: 93 Feedback-/Projekt-Memories · 57 Guard-/Hook-Skripte · 6 Revert-/Reapply-Commits · 112 Prozess-/Meta-TASKS-Punkte (davon 48 offen).
 
-<!-- RETRO-FINGERPRINT: 263aff7e09a9f433b248924bd156b7f11097be5f60f058e7f5a2e680ba92307f -->
-<!-- RETRO-LAST-REFRESHED: 2026-08-27T20:43:31.453Z -->
+<!-- RETRO-FINGERPRINT: 89d535b84d83940ad4ec09aefa64a742c38ea4c9d4349f4072622599a7ac8d0e -->
+<!-- RETRO-LAST-REFRESHED: 2026-08-27T21:53:36.069Z -->
 <!-- AUTO-GENERATED:END -->
 
 ### 3.111 Ein Erfolg ist kein Beweis für den Weg, auf dem er zustande kam
@@ -4462,3 +4463,32 @@ oder den Wächter umgehen. Jeder davon vernichtet genau die Unabhängigkeit, fü
 Rolle auch den Weg gibt, sie auszuführen. Wo eine Rollenzuweisung auf ein Modell fallen kann, muss
 der Aufruf dieses Modells derselbe Befehl leisten — sonst ist die Fallback-Kette Papier, und sie
 fällt genau dann aus, wenn sie gebraucht wird: wenn der erste Leser befangen ist.
+
+### 3.206 Der Regelbestand verbot durch Schweigen, und niemand merkte es
+
+Auf der Tafel stand eine Klärungskarte, unter der meine eigene Empfehlung bereits ausgeschrieben
+war. Der Nutzer hatte sie mit „Mach es so, wie du es empfohlen hast" beantwortet. Trotzdem blieb
+die Karte stehen und ihr Punkt offen — bis er am 24.08.2026 ausdrücklich nachlegen musste: „Ja,
+das sollst du künftig dürfen."
+
+Der interessante Teil ist, warum keine Sitzung von selbst weitergegangen ist. Es gab keine Regel,
+die es verboten hätte. Es gab drei Regeln, von denen jede den Nachbarfall traf und keine diesen:
+Das Memory `no-standstill-decide-and-record` erlaubt die eigene Entscheidung ausdrücklich für den
+Fall, dass KEINE Karte offen steht. `dashboard-vdzk-only-decisions` schreibt vor, dass jede
+Entscheidungsfrage eine Karte wird, und sagt nichts darüber, wer eine solche Karte wieder schließen
+darf. `CLAUDE.md` §6 nimmt „unless durably authorized" aus, ohne diese Autorisierung irgendwo zu
+benennen. Wer alle drei liest, liest ein Verbot — obwohl keine der drei es ausspricht.
+
+Das ist eine eigene Fehlerklasse, und sie ist teurer als ein Widerspruch. Ein Widerspruch fällt
+beim Lesen auf; eine Lücke zwischen drei zutreffenden Regeln fällt niemandem auf, weil jede
+einzelne stimmt. Sie wirkt außerdem in die vorsichtige Richtung: Im Zweifel wartet die Sitzung,
+und Warten sieht wie Sorgfalt aus, nicht wie ein Defekt. Gekostet hat es hier einen offenen Punkt
+und eine zweite Nachfrage an den Nutzer für eine Antwort, die er schon gegeben hatte.
+
+**Lehre:** Ein Regelbestand ist nicht erst dann falsch, wenn zwei Regeln sich widersprechen,
+sondern schon dann, wenn der Fall zwischen ihnen ungenannt bleibt — denn ungenannt heißt in der
+Praxis verboten. Deshalb gehört die Erlaubnis in dieselbe Regel wie die Einschränkung, in einem
+Satz: `CLAUDE.md` §6 nennt die Autorisierung jetzt genau dort, wo die Ausnahme „unless durably
+authorized" steht, und zieht ihre Grenze im selben Satz. Und die regelmäßige Durchsicht des
+Bestandes muss die Achse WIRKUNGSLOS um die Frage erweitern, welcher naheliegende Fall von keiner
+Regel getroffen wird — Lücken findet man nur, wenn man nach ihnen sucht.

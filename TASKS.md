@@ -12966,6 +12966,15 @@ to land than a mechanism that needs a review.
   FINAL STATE:
   - The lesson is in the guide, folded into an existing meta rule or as its own pitfall with its
     prompt — whichever the audit 971 builds accepts.
+  - The SECOND missing lesson is in it too, added 27.08.2026 with retrospective §3.206: a rule
+    corpus can forbid BY OMISSION. Three rules each covered the neighbouring case and none covered
+    the one at hand, so every session read a prohibition none of them states and waited for a
+    permission the user had already given. Unlike a contradiction, a gap between three correct
+    rules is invisible on reading and errs towards waiting, which looks like diligence. The guide
+    carries no pitfall for it; the closest lines are about a promised exception never built and
+    about rules drifting from code, which are different failures. Its prompt belongs beside them:
+    write the permission into the SAME sentence as its limit, and make the periodic rule review
+    ask which obvious case NO rule covers.
   - The exact-fit ceilings in `scripts/guide-brevity-core.mjs` are REMEASURED in the same commit,
     with the reason recorded beside them, as that file's own contract requires.
   - `node scripts/retro-refresh.mjs --guide-reviewed` is run only THEN. It was deliberately NOT run
