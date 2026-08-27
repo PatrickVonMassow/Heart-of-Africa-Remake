@@ -113,40 +113,6 @@ put it is the mistake this line exists to stop.
   Urgency: it blocks the whole batch, so it is worked before every other open point.
   Bundle: Modell & Wächter.
 
-- [ ] 902. A stated recommendation on a board card is a decision I may carry out. MEASURED
-  24.08.2026: the rule corpus a session loads says the opposite by omission. The memory
-  `no-standstill-decide-and-record` licenses deciding by own judgment only where NO card is
-  pending; `dashboard-vdzk-only-decisions` makes every decision request a card and says nothing
-  about who may close one; `CLAUDE.md` §6 says "unless durably authorized" without naming this
-  authorization. Result: the Zeiterfassung card, whose recommendation was already stated, waited
-  for a yes that only restated it, and its point 559 is still open.
-  USER RULING 24.08.2026, on the card "Zeiterfassung in der Arbeitsordnung: abschaffen oder
-  wiederbeleben?", quoting their own earlier answer "Mach es so, wie du es empfohlen hast": "Ja,
-  das sollst du künftig dürfen."
-  FINAL STATE: the standing authorization stands where a session reads it, with its scope drawn.
-  IN SCOPE: a "Von dir zu klären" card on which I have STATED a recommendation may be decided BY
-  that recommendation, carried out, and closed with the decision recorded — what, why, and what a
-  veto would change — the shape rung 3 of `no-standstill-decide-and-record` already prescribes for
-  doubt without a card. OUT OF SCOPE and unchanged: outward-facing or irreversible steps (tags,
-  publishes, force-pushes, deletions of user data) keep their own confirmation per the memories
-  `tags-only-on-request` and `version-release-process`; a card posing a genuine choice I did NOT
-  recommend on stays the user's.
-  (a) `CLAUDE.md` §6 carries ONE sentence naming this authorization at the existing "unless durably
-  authorized" clause of the "Act on settled judgment" bullet, naming scope AND boundary in the same
-  breath so no reading of it reaches a tag, a publish or a deletion.
-  (b) `docs/rule-corpus-audit.md` records the ruling dated 24.08.2026 with the user's wording, in
-  the row style the file uses for decided entries.
-  (c) The memory entry `recommendation-is-a-decision` is verified against the corpus after (a) and
-  (b) and linked from `no-standstill-decide-and-record`; write it if it is absent, with its
-  `MEMORY.md` index line.
-  VERIFIABLE: a repository search finds the authorization sentence in `CLAUDE.md` §6 and the dated
-  row in `docs/rule-corpus-audit.md`; the doc-budget guard and `npm run test:unit` stay green; and
-  the boundary clause stands in the same sentence as the grant.
-  Criticality: low — process hygiene, but it is what keeps a decided card from idling.
-  Urgency: it blocks a lane — point 946 stands in front of the release at Criticality: high and
-  names this authorization among the points it must be worked after, so its lane waits on this one.
-  Bundle: Chat & Tafel.
-
 - [ ] 946. A VDZK card still parks an owner-decidable question; admissibility gets the point-864
   typing. Point 864 typed the `AWAITING-USER` point gate (`defer-for-user.mjs` refuses advisory
   reasons), but the CARD path kept accepting open questions: on 26.08.2026 the card "Vier-Augen-
@@ -12966,6 +12932,15 @@ to land than a mechanism that needs a review.
   FINAL STATE:
   - The lesson is in the guide, folded into an existing meta rule or as its own pitfall with its
     prompt — whichever the audit 971 builds accepts.
+  - The SECOND missing lesson is in it too, added 27.08.2026 with retrospective §3.206: a rule
+    corpus can forbid BY OMISSION. Three rules each covered the neighbouring case and none covered
+    the one at hand, so every session read a prohibition none of them states and waited for a
+    permission the user had already given. Unlike a contradiction, a gap between three correct
+    rules is invisible on reading and errs towards waiting, which looks like diligence. The guide
+    carries no pitfall for it; the closest lines are about a promised exception never built and
+    about rules drifting from code, which are different failures. Its prompt belongs beside them:
+    write the permission into the SAME sentence as its limit, and make the periodic rule review
+    ask which obvious case NO rule covers.
   - The exact-fit ceilings in `scripts/guide-brevity-core.mjs` are REMEASURED in the same commit,
     with the reason recorded beside them, as that file's own contract requires.
   - `node scripts/retro-refresh.mjs --guide-reviewed` is run only THEN. It was deliberately NOT run
@@ -13112,3 +13087,30 @@ to land than a mechanism that needs a review.
   Criticality: low — nothing is lost, but the board is the user’s own artefact and it reads as machine
   output at the one moment it should read as a result.
   Bundle: Chat & Tafel.
+
+- [ ] 980. The retrospective hands out the same section number to several lessons. MEASURED
+  27.08.2026, 23:50 on `main` at bfe14680 plus that turn's `retro-refresh`:
+  `docs/analysis_de/retrospektive-zusammenarbeit.md` carries 216 `### 3.x` sections and EIGHT of
+  those numbers are used more than once — `3.112` three times (lines 1530, 3761, 4292), `3.120`
+  four times, and `3.121`, `3.137`, `3.171`, `3.172`, `3.179`, `3.185` twice each. The number is
+  the document's own citation handle and it is cited from outside: work-order point 979 names
+  "retrospective section 3.112" as the evidence that a review dropped a real edit, and that
+  citation resolves to three different lessons, so it proves nothing. The prose also runs on
+  AFTER `## Anhang A` (line 1413) to line 4465, so the appendix no longer ends the file and the
+  next writer appends where the numbering is hardest to see.
+  FINAL STATE: every `### 3.x` number in the file names exactly one lesson, and a new duplicate
+  cannot be written. The renumbering is a one-off; the mechanism is the part that lasts, so a
+  check refuses a duplicated number the way `doc-budget` refuses an outgrown document, and it
+  names the offending number and both lines. Renumbering must not silently break an inbound
+  citation: every reference to a moved number — in `TASKS.md`, `docs/`, and the archive — moves
+  with it in the same commit, and the point reports which ones moved.
+  Consider as alternatives, and record why the chosen one wins: renumbering the later duplicates
+  to fresh numbers at the end; or dropping the numbers from the headings entirely and citing
+  lessons by their title, which no renumbering can break.
+  VERIFIABLE: Vitest over the pure check — a fixture document with a duplicated `### 3.x` is
+  refused and the message names the number and both line numbers, a clean fixture passes, and
+  the real file passes after the renumbering; plus a repository search that finds no citation of
+  a number this point moved without its new value.
+  Criticality: low — nothing breaks at runtime, but the document is our own evidence trail and a
+  handle that names three things names none.
+  Bundle: Dokumentation.

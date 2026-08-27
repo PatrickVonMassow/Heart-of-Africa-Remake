@@ -14,7 +14,7 @@ assumptions.
 
 | Corpus part | Entries | Where |
 | --- | --- | --- |
-| Project memories | 66 + index | `~/.claude/projects/<key>/memory/` |
+| Project memories | 67 + index | `~/.claude/projects/<key>/memory/` |
 | Enforcers (guards, gates, hooks) | 27 | `scripts/*-guard.mjs`, `*-hook.mjs` |
 | Session-read rule documents | 3 | `CLAUDE.md`, `design.md`, `TASKS.md` preamble |
 | Derived advice documents | 2 | `docs/analysis_de/` (guide + retrospective) |
@@ -48,7 +48,7 @@ retired with its surviving insight.
 
 ---
 
-## A. Project memories (66)
+## A. Project memories (67)
 
 | # | Memory | Verdict | Finding (evidence) | Action | 2nd |
 | --- | --- | --- | --- | --- | --- |
@@ -118,7 +118,8 @@ retired with its surviving insight.
 | A64 | watch-for-aesthetic-oddities | STALE | Cites `docs/maximale-qs.md`; the file was renamed to `docs/maximum-qa.md` on 24.07 (everything git-tracked is English). A reader following the reference finds nothing. | Fix the reference. | |
 | A65 | webgpu-untestable-headless | OK | Content is the 19.07 correction and is right. Its NAME still asserts the withdrawn claim, which is what a skim reads. | Keep; note the naming trap (renaming a memory breaks 4 inbound links — not worth it). | |
 | A66 | workflows-token-budget | OK | | keep | |
-| A67 | MEMORY.md (index) | INEFFECTIVE | Two memories are not linked at all (`queue-order-fixes-before-finders`, `tasks-time-tracking`), so a session reading the index never learns they exist. **And the index is far staler than the first pass recorded** — the review found five more wrong lines that no memory row would have caught, because the index paraphrases rather than quotes: the F7 key, a zoom range of "0.25–0.5" that appears nowhere else, "gate being built" for a shipped guard, "being built into point 184" for a shipped WebGPU lane, "task DISABLED … singleton being built" for a re-enabled task, and a dashboard path that moved. The index is a SECOND copy of 66 rules and drifts like any copy. | Fix all of them; add the two links; add a pointer to this audit. Longer term the index is a candidate for generation from the memories' own `description` fields rather than hand-paraphrase. | ≠ → adopted, scope widened |
+| A67 | recommendation-is-a-decision | OK | User ruling **24.08.2026**, on “Zeiterfassung in der Arbeitsordnung: abschaffen oder wiederbeleben?”, after “Mach es so, wie du es empfohlen hast”: “Ja, das sollst du künftig dürfen.” `CLAUDE.md` §6 grants decision, execution, and recorded closure by a stated recommendation while keeping tags, publishes, force-pushes, user-data deletions, and unrecommended genuine choices outside that same sentence's authorization. | keep; verified against the session-read rule and linked from `no-standstill-decide-and-record` | |
+| A68 | MEMORY.md (index) | INEFFECTIVE | Two memories are not linked at all (`queue-order-fixes-before-finders`, `tasks-time-tracking`), so a session reading the index never learns they exist. **And the index is far staler than the first pass recorded** — the review found five more wrong lines that no memory row would have caught, because the index paraphrases rather than quotes: the F7 key, a zoom range of "0.25–0.5" that appears nowhere else, "gate being built" for a shipped guard, "being built into point 184" for a shipped WebGPU lane, "task DISABLED … singleton being built" for a re-enabled task, and a dashboard path that moved. The index is a SECOND copy of 66 rules and drifts like any copy. | Fix all of them; add the two links; add a pointer to this audit. Longer term the index is a candidate for generation from the memories' own `description` fields rather than hand-paraphrase. | ≠ → adopted, scope widened |
 
 ## B. Session-read rule documents
 
