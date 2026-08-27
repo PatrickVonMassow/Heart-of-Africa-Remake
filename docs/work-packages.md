@@ -127,6 +127,9 @@ change) and 449 last, because the drill is what makes the others more than a cla
 - **888** — the reviewer trailer that reads as authorship. Like 887 it lives in the
   review machinery rather than in any lane, and it changes a rule in CLAUDE.md §6, so
   every bundle's work would have to wait on a decision that is not that bundle's.
+- **977** — the four-eyes fallback that names a reviewer no command can start. Like 887 and
+  888 it is a property of the review machinery rather than of any lane, and every bundle would
+  otherwise wait on a gate that is not its own.
 - **285**.
 - **393** — sequenced behind 264, so it moves with that point rather than with a
   bundle.

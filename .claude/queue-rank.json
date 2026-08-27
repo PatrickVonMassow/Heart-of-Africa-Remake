@@ -745,12 +745,6 @@
       "origin": "machine",
       "place": "last"
     },
-    "936": {
-      "at": "2026-08-27T12:47:41.550Z",
-      "why": "User order of 27.08.2026, 14:43: the header-layout point runs next and this decision-card point directly after it",
-      "origin": "user",
-      "place": "ahead"
-    },
     "937": {
       "at": "2026-08-26T09:48:58.834Z",
       "why": "Das Aufraeumen nach der Landung hat mit branch-hygiene-guard eine Rueckfallebene, deshalb steht der Punkt hinter der laufenden Arbeit, aber vor den bewusst zurueckgestellten Altpunkten.",
@@ -906,6 +900,12 @@
       "why": "Es kostet keine Korrektheit und hat mit dem Notventil einen benannten Ausweg; die Punkte davor tragen den Release",
       "origin": "machine",
       "place": "last"
+    },
+    "977": {
+      "at": "2026-08-27T19:31:29.698Z",
+      "why": "Die Vier-Augen-Kette hat keinen ausfuehrbaren Zug mehr, sobald der erste Gegenleser befangen ist — das blockiert jedes Zugende, das einen Mechanismus beruehrt, und damit auch den Abschlussdurchlauf selbst.",
+      "origin": "machine",
+      "place": "ahead"
     }
   },
   "boundary": {
@@ -945,7 +945,7 @@
     "why": "The order standing in front of the release today is the arrangement that predates this rule; the four machine-filed points that had ranked themselves there were moved behind 174 first"
   },
   "settled": {
-    "at": "2026-08-27T17:32:42.894Z",
+    "at": "2026-08-27T19:31:29.706Z",
     "points": [
       174,
       184,
@@ -1239,7 +1239,6 @@
       932,
       933,
       934,
-      936,
       937,
       938,
       939,
@@ -1267,7 +1266,8 @@
       973,
       974,
       975,
-      976
+      976,
+      977
     ]
   }
 }
