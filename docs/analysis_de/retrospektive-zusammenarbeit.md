@@ -70,6 +70,7 @@ Das Musterbeispiel sind die Chat-Zeitstempel: neun Eskalationsstufen, acht weich
 | 26.08. vormittags | Neun Gegenlesungsdurchgänge über die abgeleitete Board-Sektion fanden am Ende EINE Fehlerklasse — zweimal: Ein Beleg ohne zuordenbaren Punkt und ein Fokus-Eintrag, der etwas nennt, das keine Punktnummer ist, kamen beide als »kein Fokus« heraus, also Byte für Byte als die Antwort einer FEHLENDEN Quelle. Aus beschädigten Daten wurde so eine geprüfte Null (§3.185, Punkt 713) |
 | 26.08. mittags | Zwanzig Minuten nach der Landung verweigerte derselbe Mechanismus die Veröffentlichung des Boards an der Sitzungsgrenze: Die Ausnahme für das Kärtchen, das die Maschine selbst schreibt, galt nur im Zweig »es läuft etwas« und nie in seinem Spiegel (§3.186, Punkt 935) |
 | 27.08. nachts | Zwei Wächter gaben einander ein Alibi: Der Teardown der Unit-Suite ließ einen Lauf scheitern, weil die eigene Sitzung vier Sekunden vor Schluss den Zweig des nächsten Punktes anlegte — 430 Dateien und 14 015 Fälle waren grün —, und die Lastprobe entlastete dieses Rot sofort mit sieben »lebenden« Arbeitsbäumen, in denen kein Prozess lief und seit drei bis vierzehn Tagen nichts geschrieben wurde. Beide Alibis sind auf dieser Maschine dauerhaft, also kann dieses Tor kein Rot mehr beweisen (§3.198, Punkte 455 und 955) |
+| 27.08. nachts | Neun Warnungen in einem Bereitschaftsbericht, neun davon falsch, aus zwei unabhängigen Quellen: Acht rechneten der delegierten Bahn die main-Commits der aufsichtführenden Sitzung an, die nur deshalb in ihrem Bereich lagen, weil der Auftrag den Merge von main verlangt; die neunte war die vierte Wiederholung der Fehldeutung, die ein ehrliches »6 übersprungen« als rotes Tor liest. Der Block, in dem ein echtes Rot stünde, hatte eine Trefferquote von null (§3.199, Punkte 962 und 729) |
 | 11.08. abends | Der VS-Code-Neustart nimmt den Devcontainer mit — die Batch-Sitzung und sechs Agenten sterben, nachdem ich das Gegenteil zugesichert hatte (§3.111); die Rechte-Rückfragen kamen weiter, weil `defaultMode` eine fortgesetzte Sitzung gar nicht mehr erreicht (§3.3) |
 
 Muster: Ab dem 22.07. explodiert die Commit-Rate (Delegation) — und genau dann häufen sich die Infrastruktur-Vorfälle. **Skalierung der Autonomie erzeugt eine eigene Problemklasse, die die Feature-Arbeit zeitweise überholt.**
@@ -1406,7 +1407,7 @@ keinen Träger hat. Gebucht als Punkt 956.
 
 ## Anhang A — Maschinell gepflegte Quellen-Übersicht
 
-Zuletzt aktualisiert: Donnerstag, 27.08.2026, 02:26 · Quellen-Fingerprint: `1bae2d84f648…`
+Zuletzt aktualisiert: Donnerstag, 27.08.2026, 02:59 · Quellen-Fingerprint: `b21c58fb8a48…`
 
 Spalten heuristisch aus den Quellen abgeleitet (Anläufe = distinkte Datumsnennungen im Memory;
 Maßnahme = Guard-Skripte mit Namens-Treffer). Die inhaltliche Bewertung gehört der Prosa oben.
@@ -1507,8 +1508,8 @@ Maßnahme = Guard-Skripte mit Namens-Treffer). Die inhaltliche Bewertung gehört
 
 Erfasste Quellen: 91 Feedback-/Projekt-Memories · 57 Guard-/Hook-Skripte · 6 Revert-/Reapply-Commits · 108 Prozess-/Meta-TASKS-Punkte (davon 47 offen).
 
-<!-- RETRO-FINGERPRINT: 1bae2d84f64808d874d3d8df1c4c8731e10d0c1190d6189f5544f4568106ef26 -->
-<!-- RETRO-LAST-REFRESHED: 2026-08-27T00:26:38.283Z -->
+<!-- RETRO-FINGERPRINT: b21c58fb8a481f33b6a72f71eba471de47c4f48aa056d63a8d434b347bc0a568 -->
+<!-- RETRO-LAST-REFRESHED: 2026-08-27T00:59:45.872Z -->
 <!-- AUTO-GENERATED:END -->
 
 ### 3.111 Ein Erfolg ist kein Beweis für den Weg, auf dem er zustande kam
@@ -4192,3 +4193,32 @@ gemessen, ob sie auf dieser Maschine und in diesem Arbeitsstil überhaupt je wie
 Ausnahme, deren Bedingung im Normalbetrieb immer erfüllt ist, ist keine Ausnahme, sondern die
 Abschaltung des Wächters mit freundlicher Begründung. Gebucht als datierte Instanzen in den
 Punkten 455 und 955, die einander seither in ihren Tests namentlich nennen sollen.
+
+### 3.199 Neun Warnungen, neun davon falsch — der Kanal war das Problem, nicht der Ton
+
+§3.198 handelt von zwei Mechanismen, die einander entlasten und deshalb schweigen. Dieselbe
+Nacht lieferte die entgegengesetzte Störung im selben Haus: einen Kanal, der so laut ist, dass
+niemand mehr hinhört.
+
+Der Bereitschaftsbericht des delegierten Autorenlaufs für Punkt 957 schloss mit neun PROBLEMEN.
+Alle neun waren falsch, und sie kamen aus zwei unabhängigen Quellen. Acht betrafen vier Commits,
+die die aufsichtführende Sitzung selbst auf `main` geschrieben hatte, ordentlich mit ihrem
+Modell-Trailer versehen, gepusht und mit grüner CI — sie lagen nur deshalb im Bereich der Bahn,
+weil der Auftrag genau das vorschreibt: erst `main` hereinmergen, dann den fertigen Baum prüfen.
+Der Prüfer läuft über `base..HEAD`, und ein Merge macht die halbe Geschichte des anderen Zweiges
+von HEAD aus erreichbar. Die neunte war die längst bekannte Fehldeutung, die eine ehrliche
+Meldung „6 übersprungen" als nicht-grünes Tor liest — inzwischen die vierte Bahn in Folge, ohne
+in einem einzigen beobachteten Lauf richtig gelegen zu haben.
+
+Das Bemerkenswerte ist nicht, dass ein Prüfer die falsche Menge misst; das ist eine gewöhnliche
+Verwechslung von Beitrag und Bereich, und derselbe Denkfehler steckt in dem Punkt, den die Bahn
+gerade bearbeitet hat. Bemerkenswert ist die Rechnung darüber: Der Block, in dem ein echtes Rot
+angekündigt würde, hatte in diesem Lauf eine Trefferquote von null. Wer ihn zweimal so sieht,
+liest ihn beim dritten Mal nicht mehr — und genau dann steht das eine, das zählt, darin.
+
+**Lehre:** Eine Warnung ist kein Gewinn an sich, sie hat Kosten, und der Preis wird beim Leser
+bezahlt. Zwei unabhängige Fehlalarm-Quellen in einem Block sind nicht doppelt so schlimm wie
+eine, sondern etwas anderes: Sie machen den Kanal unbrauchbar. Deshalb gehört zu jeder Prüfung
+die Messung, wie oft sie in echten Läufen richtig lag — und eine, die in keinem beobachteten Lauf
+je richtig lag, wird abgeschaltet oder repariert, nie „erklärt". Gebucht als Punkt 962, gemeinsam
+mit dem älteren Punkt 729 zu bearbeiten, weil beide denselben Leser bedienen.
