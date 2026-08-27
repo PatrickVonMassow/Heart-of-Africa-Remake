@@ -12444,6 +12444,12 @@ to land than a mechanism that needs a review.
   declaring an unrelated point as current work, and it is still a false state on the phone.
   ALSO IN THE FINAL STATE: the publish gate resolves the closing state instead of refusing it, so
   the escape and the publication stop excluding each other.
+  A SIXTH INSTANCE, 27.08.2026 04:28-04:35 after landing point 957, shows the fifth instance's
+  escape holding and its price unchanged: with the focus at `-` the closing card was written twice
+  and dropped twice, `focus.mjs set 957` on the ticked point made it render, and the two branch
+  deletions then went through — but `board-publish.mjs` refused that same state, so the phone kept
+  the pre-closing page for the duration. Five days, six instances, no new shape: this is the
+  routine end of every landing, not an edge case.
   VERIFIABLE: Vitest over the projection — a closing card for a just-ticked point survives the
   publish step that removes an ordinary numbered card for the same point; and over the gate — the
   three cleanup calls are permitted while the idle card stands, an unrelated state-changing call is
