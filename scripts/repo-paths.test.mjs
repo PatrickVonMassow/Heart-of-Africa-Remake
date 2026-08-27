@@ -1,10 +1,10 @@
 import { afterEach, describe, expect, it } from 'vitest'
 import { execFileSync } from 'node:child_process'
-import { mkdtempSync, mkdirSync, rmSync } from 'node:fs'
+import { existsSync, mkdtempSync, mkdirSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join, resolve } from 'node:path'
 import { pathToFileURL } from 'node:url'
-import { repositoryCommonRoot, repositoryRoot } from './repo-paths.mjs'
+import { repositoryCommonRoot, repositoryRoot, requireMainCheckoutRoot } from './repo-paths.mjs'
 
 describe('repositoryRoot', () => {
   const temporaryDirectories = []
@@ -60,6 +60,78 @@ describe('repositoryRoot', () => {
     expect(repositoryRoot({ explicitRoot: '', cwd: nested })).toBe(resolve(linked))
     expect(repositoryCommonRoot({ explicitRoot: '', cwd: nested })).toBe(resolve(repository))
     expect(repositoryCommonRoot({ explicitRoot: '', cwd: repository })).toBe(resolve(repository))
+  })
+
+  it('starts a batch owner in the main checkout when the launcher runs from a linked worktree', () => {
+    const parent = temporaryDirectory()
+    const repository = join(parent, 'main')
+    const linked = join(parent, 'linked')
+    mkdirSync(repository)
+    execFileSync('git', ['-C', repository, 'init', '-q'], { windowsHide: true })
+    execFileSync(
+      'git',
+      ['-C', repository, '-c', 'user.name=Fixture', '-c', 'user.email=fixture@example.invalid', 'commit', '--allow-empty', '-qm', 'init'],
+      { windowsHide: true },
+    )
+    execFileSync('git', ['-C', repository, 'worktree', 'add', '-qb', 'fixture-owner', linked], { windowsHide: true })
+    mkdirSync(join(repository, '.claude'))
+
+    const pathsUrl = pathToFileURL(resolve('scripts/repo-paths.mjs')).href
+    const dashboardUrl = pathToFileURL(resolve('scripts/dashboard-state.mjs')).href
+    const session = `
+      import { mergeState, REPO_ROOT } from ${JSON.stringify(dashboardUrl)}
+      mergeState({ writtenByOwnerAt: process.cwd() })
+      process.stdout.write(JSON.stringify({ cwd: process.cwd(), repoRoot: REPO_ROOT }))
+    `
+    const launcher = `
+      import { spawnSync } from 'node:child_process'
+      import { requireMainCheckoutRoot } from ${JSON.stringify(pathsUrl)}
+      const root = requireMainCheckoutRoot()
+      const child = spawnSync(process.execPath, ['--input-type=module', '--eval', ${JSON.stringify(session)}], {
+        cwd: root,
+        env: process.env,
+        encoding: 'utf8',
+        windowsHide: true,
+      })
+      if (child.status !== 0) throw new Error(child.stderr || 'owner session failed')
+      process.stdout.write(child.stdout)
+    `
+    const env = { ...process.env }
+    delete env.HOA_REPO_ROOT
+    const owner = JSON.parse(
+      execFileSync(process.execPath, ['--input-type=module', '--eval', launcher], {
+        cwd: linked,
+        env,
+        encoding: 'utf8',
+        windowsHide: true,
+      }),
+    )
+
+    expect(owner).toEqual({ cwd: resolve(repository), repoRoot: resolve(repository) })
+    const reader = `
+      import { readJson, STATE_PATH } from ${JSON.stringify(dashboardUrl)}
+      process.stdout.write(JSON.stringify(readJson(STATE_PATH)))
+    `
+    const state = JSON.parse(
+      execFileSync(process.execPath, ['--input-type=module', '--eval', reader], {
+        cwd: repository,
+        env,
+        encoding: 'utf8',
+        windowsHide: true,
+      }),
+    )
+    expect(state.writtenByOwnerAt).toBe(resolve(repository))
+    expect(existsSync(join(linked, '.claude', 'dashboard-state.json'))).toBe(false)
+  })
+
+  it('refuses when the common checkout is not a verifiable working tree', () => {
+    const checkout = temporaryDirectory()
+    const gitDirectory = temporaryDirectory()
+    execFileSync('git', ['init', '-q', '--separate-git-dir', gitDirectory, checkout], { windowsHide: true })
+
+    expect(() => requireMainCheckoutRoot({ explicitRoot: '', cwd: checkout })).toThrow(
+      /main checkout could not be verified.*refusing to start a batch owner/,
+    )
   })
 
   it('defers and memoizes common-checkout discovery while reusing the resolved repository root', () => {

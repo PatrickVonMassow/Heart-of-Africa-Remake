@@ -14,6 +14,7 @@
 // Git worktree containing cwd. The module URL is the compatibility fallback
 // when cwd does not identify a worktree.
 import { execFileSync } from 'node:child_process'
+import { statSync } from 'node:fs'
 import { basename, dirname, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 
@@ -73,6 +74,30 @@ export function repositoryRoot({ explicitRoot = process.env.HOA_REPO_ROOT, cwd =
 export function repositoryCommonRoot({ checkoutRoot = '', ...rootOptions } = {}) {
   const checkout = checkoutRoot || repositoryRoot(rootOptions)
   return checkout ? commonCheckoutRoot(checkout) : ''
+}
+
+/**
+ * The verified main working tree, for processes which must never inherit a
+ * linked worktree as their repository identity.
+ *
+ * `repositoryCommonRoot` deliberately falls back to the supplied checkout for
+ * callers whose shared state can remain usable in unusual Git layouts. A batch
+ * owner cannot: starting it in a linked worktree splits ordinary repository
+ * state from the main checkout. Require the resolved root to contain the real
+ * `.git` directory, and refuse loudly when Git cannot provide that guarantee.
+ */
+export function requireMainCheckoutRoot({ checkoutRoot = '', ...rootOptions } = {}) {
+  const checkout = checkoutRoot || repositoryRoot(rootOptions)
+  const common = checkout ? repositoryCommonRoot({ checkoutRoot: checkout }) : ''
+  try {
+    if (common && statSync(resolve(common, '.git')).isDirectory()) return common
+  } catch {
+    // The error below owns the actionable refusal.
+  }
+  throw new Error(
+    `the main checkout could not be verified from ${checkout || '<unknown checkout>'} — ` +
+      'refusing to start a batch owner in a linked worktree',
+  )
 }
 
 export const REPO_ROOT = repositoryRoot()
