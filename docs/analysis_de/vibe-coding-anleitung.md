@@ -441,12 +441,12 @@ Die Ursache findest du durch **Zerlegen**, nicht durch Wiederholen.
 ## Drei Meta-Regeln, die alles zusammenhalten
 
 1. **Root-Cause vor Fix.** Ursachennotizen ohne Ausrede sind der Rohstoff guter Mechanismen. Und
-   eine im Ticket schon **vermutete** Ursache ist der gefährlichste Rohstoff: Der Ausführende sucht
-   ab da nach ihrer Bestätigung.
+   eine im Ticket **vermutete** Ursache ist gefährlicher Rohstoff: Der Ausführende sucht dann ihre
+   Bestätigung.
    > *Prompt:* „Bevor du etwas Wiederkehrendes reparierst: schreib mir in 3–5 Sätzen die
    > **mechanische** Ursache — was genau war die Annahme, die brach? Steht die Ursache schon als
-   > Vermutung da, ist sie ein **Kandidat**: Widerlege sie zuerst. Wer den Auftrag vergibt, misst
-   > **blind mit**, statt auf die Messung des Ausführenden zu warten."
+   > Vermutung da, ist sie ein **Kandidat**: Versuche zuerst, sie unabhängig zu widerlegen.
+   > Hält sie stand, darf sie wahr sein. Wer den Auftrag vergibt, misst **blind mit**."
 
 2. **Nutzer-Artefakte sind Verträge.** Was du festgelegt hast — Dashboard, Ausgabeformat,
    Board-Struktur — wird nicht eigenmächtig umgebaut.

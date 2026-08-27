@@ -7,9 +7,10 @@
 // into a chronicle, because every new lesson feels worth its own paragraph.
 //
 // So the brevity is MEASURED, not intended: a total budget, a per-pitfall
-// budget, a demand that every pitfall ends in an actionable prompt, and a
-// detector for the project-specific markers that signal a war story leaking in
-// (dates, point numbers, repo paths, the project's own tech and nouns).
+// budget, a demand that every pitfall ends in an actionable prompt, a semantic
+// contract for the falsification meta-rule, and a detector for the
+// project-specific markers that signal a war story leaking in (dates, point
+// numbers, repo paths, the project's own tech and nouns).
 //
 // Side-effect free. The wrapper (guide-brevity-guard.mjs) reads the file and is
 // fail-open; guide-brevity-core.test.mjs pins this logic AND audits the real
@@ -362,9 +363,11 @@ export const LIMITS = {
   // 27.08.2026: tonight's lesson — where a tool's OUTPUT is the product, read it at the real
   // corpus — cost twenty words in the first pitfall, and the three meta rules it was taken from
   // gave up twenty-two, so the ceiling follows the measurement DOWN by two.
-  // 27.08.2026: the refute-the-suspicion clause in the root-cause meta rule costs fifty words; see
-  // the line ceiling above for the measurement and why the lesson's second half stayed out.
-  maxWords: 4273,
+  // 27.08.2026: the suspicion clause was corrected after review: the rule now demands an
+  // independent ATTEMPT to falsify and explicitly lets a true hypothesis survive it. Tightening
+  // the surrounding narration pays for that precision, so the ceiling follows the measured guide
+  // DOWN by two words, with no claim removed and no headroom added.
+  maxWords: 4271,
   // A pitfall entry = the risk lines plus its prompt. Anything longer is a
   // story, not a tip.
   maxEntryLines: 11,
@@ -485,6 +488,23 @@ export function strayLines(sectionLines) {
 }
 
 const ACTION_RE = /→\s*\*(?:Prompt|Mechanismus)\s*:\*/
+const ROOT_CAUSE_RULE_RE = /^1\.\s+\*\*Root-Cause vor Fix\.\*\*/
+const NUMBERED_META_RULE_RE = /^\d+\.\s+\*\*/
+
+const ROOT_CAUSE_REQUIREMENTS = [
+  {
+    re: /\bVersuch\w*\b[^.]*\bzuerst\b[^.]*\bunabhängig\b[^.]*\bwiderleg\w*/iu,
+    detail: 'Die Root-Cause-Meta-Regel verlangt keinen ersten unabhängigen Widerlegungsversuch',
+  },
+  {
+    re: /\bHält sie stand, darf sie wahr sein\b/iu,
+    detail: 'Die Root-Cause-Meta-Regel sagt nicht, dass eine wahre Hypothese den Versuch übersteht',
+  },
+  {
+    re: /\bWer den Auftrag vergibt\b[^.]*\bmisst\b[^.]*\bblind mit\b/iu,
+    detail: 'Die Root-Cause-Meta-Regel verlangt keine blinde Gegenmessung durch den Auftraggeber',
+  },
+]
 
 /**
  * Audit the guide. Returns { ok, violations: [{ kind, line, detail }] }.
@@ -544,6 +564,30 @@ export function auditGuide(text, limits = LIMITS) {
     push('stray-prose', line, `„${l.trim().slice(0, 60)}…" gehört zu keinem Fallstrick-Eintrag`)
   }
 
+  // The aggregate budgets cannot protect a claim: deleting a meta-rule and
+  // spending its words elsewhere would still fit. Scope these checks to the
+  // first numbered rule so scattering the right words across neighbouring
+  // rules cannot manufacture compliance.
+  const metaSection = sliceSection(src, /Drei Meta-Regeln/i)
+  const rootCauseStart = metaSection.findIndex(({ text: l }) => ROOT_CAUSE_RULE_RE.test(l))
+  if (rootCauseStart < 0) {
+    push('meta-rule', metaSection[0]?.line ?? 1, 'Meta-Regel „Root-Cause vor Fix" nicht gefunden')
+  } else {
+    const nextRuleOffset = metaSection
+      .slice(rootCauseStart + 1)
+      .findIndex(({ text: l }) => NUMBERED_META_RULE_RE.test(l))
+    const rootCauseEnd = nextRuleOffset < 0
+      ? metaSection.length
+      : rootCauseStart + 1 + nextRuleOffset
+    const rootCauseLines = metaSection.slice(rootCauseStart, rootCauseEnd)
+    const rootCauseText = rootCauseLines.map(({ text: l }) => l).join(' ').replace(/\s+/g, ' ')
+    const rootCauseLine = rootCauseLines[0].line
+
+    for (const requirement of ROOT_CAUSE_REQUIREMENTS) {
+      if (!requirement.re.test(rootCauseText)) push('meta-rule', rootCauseLine, requirement.detail)
+    }
+  }
+
   for (const entry of entries) {
     if (entry.lines.length > limits.maxEntryLines) {
       push(
@@ -574,10 +618,10 @@ export function formatViolations(violations) {
     .map((v) => `  · Zeile ${v.line} [${v.kind}]: ${v.detail}`)
     .join('\n')
   return (
-    'VIBE-CODING-ANLEITUNG ZU LANG / ZU PROJEKTSPEZIFISCH ' +
+    'VIBE-CODING-ANLEITUNG VERLETZT IHREN KURZFORM-VERTRAG ' +
     `(${violations.length} Verstoß/Verstöße):\n${body}\n` +
-    'Die Anleitung ist eine KURZE Einsteiger-Anleitung: pro Fallstrick ein bis zwei ' +
-    'Sätze Risiko, dann der Prompt. Ausführliche Projekterfahrung gehört nach ' +
+    'Die Anleitung ist eine KURZE Einsteiger-Anleitung: Pflichtaussagen und Struktur ' +
+    'bleiben erhalten; ausführliche Projekterfahrung gehört nach ' +
     'docs/analysis_de/retrospektive-zusammenarbeit.md — kürze dort hinüber, statt das ' +
     'Budget zu erhöhen. Prüfen mit: node scripts/guide-brevity-guard.mjs --status'
   )

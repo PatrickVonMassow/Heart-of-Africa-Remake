@@ -1410,7 +1410,7 @@ keinen Träger hat. Gebucht als Punkt 956.
 
 ## Anhang A — Maschinell gepflegte Quellen-Übersicht
 
-Zuletzt aktualisiert: Donnerstag, 27.08.2026, 18:42 · Quellen-Fingerprint: `663febf599e6…`
+Zuletzt aktualisiert: Donnerstag, 27.08.2026, 20:02 · Quellen-Fingerprint: `b55119cc07d0…`
 
 Spalten heuristisch aus den Quellen abgeleitet (Anläufe = distinkte Datumsnennungen im Memory;
 Maßnahme = Guard-Skripte mit Namens-Treffer). Die inhaltliche Bewertung gehört der Prosa oben.
@@ -1467,6 +1467,7 @@ Maßnahme = Guard-Skripte mit Namens-Treffer). Die inhaltliche Bewertung gehört
 | The batch-owning session is a headless successor the launcher spawned — the user cannot see, reach or close it; never ask them to | 1 | niedrig | — (Regel/Memory) | ◐ Regel |
 | User order 23.08.2026: a lasting standstill must NEVER happen — self-recovery over alerting, no stop that waits on a user card; decide by own judgment and record the decision in the board state section, never as a decision card (vetoed three times) | 5 | hoch | — (Regel/Memory) | ◐ Regel |
 | Parallel batch sessions are spawned by the HoA-Batch-Autostart scheduled task after a reboot; the advisory lock never stopped it — a hard singleton is being built | 2 | mittel | — (Regel/Memory) | ◐ Regel |
+| A `pgrep -f` wait loop matches its own shell command line, so it never exits — anchor on the process, not the pattern | 1 | niedrig | — (Regel/Memory) | ◐ Regel |
 | Always take the point boundary autonomously at a closed point — never ask the user whether to hand over or /clear | 1 | niedrig | point-proof-guard.mjs | ✔ Mechanismus |
 | Per-point QA runs scoped (Vitest always, browser suites by diff mapping, flake-retry single suites) — WATCHDOG duty to report any bug that slips through | 3 | mittel | — (Regel/Memory) | ◐ Regel |
 | Edits to .claude/settings.json and .git/hooks ALWAYS trigger a permission prompt (harness safety layer, allowlist cannot override); never schedule such work for unattended night batches | 1 | niedrig | — (Regel/Memory) | ◐ Regel |
@@ -1509,10 +1510,10 @@ Maßnahme = Guard-Skripte mit Namens-Treffer). Die inhaltliche Bewertung gehört
 | A pending batch claim HOLDS THE LAUNCHER BACK — withdraw it whenever the claiming window is left unattended | 2 | mittel | clear-claim-guard.mjs | ✔ Mechanismus |
 | Multi-agent workflows eat the session/weekly limit fast — verify findings INLINE, keep fan-outs small, warn the user with a cost estimate before any big workflow | 3 | mittel | doc-budget-guard.mjs | ✔ Mechanismus |
 
-Erfasste Quellen: 91 Feedback-/Projekt-Memories · 57 Guard-/Hook-Skripte · 6 Revert-/Reapply-Commits · 111 Prozess-/Meta-TASKS-Punkte (davon 47 offen).
+Erfasste Quellen: 92 Feedback-/Projekt-Memories · 57 Guard-/Hook-Skripte · 6 Revert-/Reapply-Commits · 111 Prozess-/Meta-TASKS-Punkte (davon 47 offen).
 
-<!-- RETRO-FINGERPRINT: 663febf599e6beede777827cb6bbbb67be18bfbbeea4a006ea16e6924fb9b2b4 -->
-<!-- RETRO-LAST-REFRESHED: 2026-08-27T16:42:26.422Z -->
+<!-- RETRO-FINGERPRINT: b55119cc07d0c7b552d9d97f5f19af8811aa3bb0b1a346b93b42a48c9acc2ad2 -->
+<!-- RETRO-LAST-REFRESHED: 2026-08-27T18:02:37.547Z -->
 <!-- AUTO-GENERATED:END -->
 
 ### 3.111 Ein Erfolg ist kein Beweis für den Weg, auf dem er zustande kam

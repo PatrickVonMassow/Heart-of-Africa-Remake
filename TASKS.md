@@ -11144,6 +11144,15 @@ to land than a mechanism that needs a review.
   waived. The only route offered is a point-bound unavailable receipt, which records "nobody could
   review this" when the truth is "the trailer misdescribed who did what" — the receipt is a wrong
   reason on the record, not merely an inconvenience.
+  A THIRD TIME, 27.08.2026, 20:0x, and this one shows the cost is not only a waiver: the commit
+  answering a merge-with-fixes on `scripts/tasks-spec-guard.mjs` named its cross-vendor reviewer
+  in the second trailer, exactly as §6 invites, and the four-eyes gate immediately reported the
+  contribution UNREVIEWABLE — "every configured reviewer vendor authored part of this
+  contribution" — on work one vendor had written and the other had just read. The trailer was
+  removed from the commit message to get past it, with the reason written into the message and the
+  verdict left where it is machine-readable, in the review ledger. So the rule is now being
+  followed in the breach: the credit §6 offers costs a blocked turn end, and the honest record of
+  who reviewed what survives only because a SECOND place holds it.
   FINAL STATE: the planner's authorship read distinguishes the authoring trailer from a reviewer
   credit on commits that carry both (the ledger's own review record for the commit, or the §6 rule
   that the second model trailer names the reviewer, decides which is which); a genuinely mixed-vendor
@@ -12898,29 +12907,6 @@ to land than a mechanism that needs a review.
   Criticality: low — bookkeeping accuracy only; the four commits name allowed models either way.
   Bundle: Modell & Wächter.
 
-- [ ] 971. The delivered-hypothesis lesson landed with its rule unenforced. The cross-vendor
-  review of the landed guide commit (GPT-5.6 Sol, 27.08.2026, verdict do-not-merge, recorded in the
-  mechanism ledger; this point is the charge that answers it) returned three findings, of which the
-  third is REFUTED and recorded here so nobody re-litigates it.
-  (1) the guide's meta-rule says "Widerlege sie zuerst" — when the suspected cause is TRUE,
-  refutation is impossible, so the imperative falsely blocks valid work; it must demand an
-  independent ATTEMPT to falsify, not a successful refutation. (2) `scripts/guide-brevity-core.mjs`
-  only raised aggregate budgets, and `auditGuide()` pins the pitfall section's shape but nothing of
-  the meta-rule section, so deleting or weakening the new claim and spending its freed budget
-  elsewhere still passes — no check pins "falsify first" or the blind independent measurement.
-  (3) REFUTED BY MEASUREMENT: the reviewer charged the commit with carrying no retrospective
-  change, but the commit adds §3.112 — 39 lines of the lesson's long form; `review-sol.mjs` had
-  cut that file from the review material as non-material owner prose. Whether the drop note
-  reached the reviewer's material is UNMEASURED — a lead on the review harness, not a finding;
-  the next false absence-finding after a non-material cut makes it one.
-  FINAL STATE: the meta-rule demands a falsification attempt, and the audit pins the meta-rule's
-  semantic content the way it pins the pitfall section.
-  VERIFIABLE: Vitest over `auditGuide()` — the meta-rule section stripped of its falsification
-  content goes red, and the wording that a TRUE hypothesis survives the rule is asserted.
-  Criticality: med — a mechanism that counts as enforced while enforcing nothing is the failure
-  class the four-eyes gate exists to prevent.
-  Bundle: Dokumentation.
-
 - [ ] 972. A file cut from the review material reaches no manifest, so the reviewer reports its
   absence as a defect of the commit. THIS IS THE MEASUREMENT POINT 971 ASKED FOR and could not
   supply: 971 recorded the false absence-finding on `2dbce90` as a LEAD on the review harness,
@@ -13024,3 +13010,73 @@ to land than a mechanism that needs a review.
   provably false fact about a point, which is the failure class a gate exists to prevent rather than
   produce.
   Bundle: Session- & Repo-Hygiene.
+
+- [ ] 975. A four-eyes debt whose fix comes from the other vendor can be cleared by nobody.
+  MEASURED 27.08.2026, 19:15-19:20, on `main` at `3ec195a`. `mechanism-review-guard` holds
+  contribution `2dbce90` (authored by Claude Opus 5) under a standing GPT-5.6 Sol do-not-merge and
+  demands, verbatim: "record the re-review at a commit that DESCENDS from 2dbce90 — a verdict on
+  work that does not contain the fix answers nothing." The fix was authored by GPT-5.6 Sol as point
+  971 and landed at `3ec195a`. Running the demanded review at that descendant is REFUSED by the
+  harness itself, verbatim: "ROLE SWAP — GPT-5.6 Sol AUTHORED part of 3ec195a, so it may not
+  review it. The review is Opus 5's."
+  SO THE GATE DEMANDS A SOL VERDICT ON A STATE SOL MAY NOT READ, while an Opus 5 verdict on the
+  same state does not clear the entry, because `2dbce90` is Anthropic-authored and its second pair
+  of eyes must be the other vendor. Fable 5 does not resolve it: the switch is ON, but Fable is
+  Anthropic, so it is not cross-vendor for an Anthropic-authored contribution. Two Opus 5 verdicts
+  are already recorded and the gate is unchanged.
+  IT IS NOT THAT NOBODY LOOKED. Both vendors looked, each at the half it was allowed to see, and
+  the gate can still be cleared by neither — so it blocks every turn end indefinitely. It blocked
+  every single turn end of the session that measured it. This is the family of point 870 (a review
+  round that cannot be commissioned at all) reached from the opposite direction: there NO eligible
+  reviewer existed; here TWO exist and each is excluded from the state that would settle it.
+  MEASURED BESIDE IT, and its own small defect: a plain merge commit carries no `Co-Authored-By`
+  model trailer, so `mechanism-review.mjs --record` refuses it — "Unknown authorship is
+  unreviewable, not authorless" — and a verdict cannot be attached to the very commit that carries
+  the fix into `main`.
+  FINAL STATE — one of these, chosen by reading the guard rather than by taste:
+  - the original contribution's debt is settled by a CROSS-VENDOR verdict on the ORIGINAL diff plus
+    a permitted verdict on the FIX, counted as a pair; or
+  - a fix authored by the reviewing vendor TRANSFERS the debt to that vendor, discharged by the
+    first vendor reading the fix; or
+  - the guard records the exclusion the way `criticality-review-guard --record-unavailable` already
+    does, naming the exact files and why no vendor is eligible.
+  In every case: a gate no configured actor can clear must SAY so, rather than repeat an
+  instruction that cannot be followed.
+  VERIFIABLE: Vitest over the pure eligibility decision — a contribution by vendor A whose fix is
+  authored by vendor B reports a reachable route to clearance, and the case where no route exists
+  is reported as such rather than as an ordinary owed review; plus a case pinning that a commit
+  without a model trailer names its own unreviewability instead of failing the record silently.
+  Criticality: high — it is a blocking gate on every turn end with no reachable exit, which is the
+  hand-waiver decay point 734 describes, reached without even a hand waiver being available.
+  Bundle: Session- & Repo-Hygiene.
+
+- [ ] 976. A point landed by the command loses every route to its own Erledigt card. MEASURED
+  27.08.2026, 19:35-19:45, while landing point 971 with `scripts/land-point.mjs`. The landing runs
+  merge, gate, tick, archive, push, board publish and cleanup, and reports each green. It does NOT
+  create the point's Erledigt card, and by finishing it destroys every route that could:
+  - the tick closes the point, so the next `board-queue.mjs` rebuild drops its QUEUE card;
+  - the board publish drops its NOW card;
+  - `toDone` refuses without a now-card ("no current-work card for point 971"),
+    `promote` and `now` refuse without a queue card ("no queue card for point 971"), and
+    `queue` refuses without any card at all ("point 971 is nowhere on the board").
+  `dashboard-guard --synced` then blocks with `[erledigt-missing]`, and the only exit left is the
+  emergency `--waive-audit`, which is what this landing had to use. Hand-writing the markup is not
+  an option and must not become one: `renderDoneEntry` in `scripts/board-core.mjs` is documented as
+  the single writer of that markup, and a hand edit of this board is the failure of retrospective §3.45.
+  THE ORDER IS THE TRAP, and nothing states it. `board.mjs done <point>` must run BEFORE the
+  landing, while the now-card still exists. A session that follows the standing instruction — which
+  says the landing "fuehrt die ganze Kette aus" and names board publish among its steps — reasonably
+  reads the board as handled, lands, and only then discovers the card cannot be made any more.
+  FINAL STATE: either the landing WRITES the Erledigt card itself, from the now-card it is about to
+  remove, so the documented one-command chain really is complete; or it REFUSES to start until the
+  card exists, naming `board.mjs done <point>` as the missing step. A third acceptable shape is a
+  repair route that builds the card from the archived block through the single writer, so a landing
+  that already happened is recoverable without a waiver.
+  VERIFIABLE: a Vitest case over the pure board projection — a landed point has exactly one Erledigt
+  card built by `renderDoneEntry`, with the now-card's own start time preserved; plus a drill that
+  runs the real landing on a scratch board and ends with `dashboard-guard --synced` GREEN and no
+  waiver recorded. A drill that recreates the aftermath instead of calling the landing does not
+  count.
+  Criticality: med — it costs no correctness in the product, but it forces the emergency valve on an
+  ordinary successful landing, and a valve used routinely stops being an alarm.
+  Bundle: Chat & Tafel.
