@@ -1145,6 +1145,39 @@ describe('evaluateMechanismReview', () => {
     })
 
     expect(verdict.block).toBe(false)
+
+    const siblingReview = evaluateMechanismReview({
+      baseline: 'b',
+      head: answerSha,
+      pendingCommits: [refused, answer],
+      records: [refusal, { ...answerClearance, containedShas: new Set([answerSha]) }],
+    })
+    expect(siblingReview.findings.find((finding) => finding.commit.sha === refusedSha)?.kind).toBe('do-not-merge')
+
+    const partialAnswer = evaluateMechanismReview({
+      baseline: 'b',
+      head: answerSha,
+      pendingCommits: [refused, { ...answer, files: [files[0]] }],
+      records: [refusal, answerClearance],
+    })
+    expect(partialAnswer.findings.find((finding) => finding.commit.sha === refusedSha)?.commit.files).toEqual([
+      files[1],
+    ])
+
+    const splitClaim = {
+      ...answerClearance,
+      at: answerClearance.at + 1,
+      pass: { index: 1, total: 2, files: [files[0]], endState: answerSha },
+    }
+    const incompleteAnswer = evaluateMechanismReview({
+      baseline: 'b',
+      head: answerSha,
+      pendingCommits: [refused, answer],
+      records: [refusal, answerClearance, splitClaim],
+    })
+    expect(incompleteAnswer.findings.find((finding) => finding.commit.sha === refusedSha)?.kind).toBe(
+      'do-not-merge',
+    )
   })
 
   it('keeps the refusal open when the cross-vendor clearance has no measured answering commit', () => {
