@@ -36,6 +36,7 @@ import {
   CONTRIBUTION_SCOPE_BOUNDARY,
   evaluateMechanismReview,
   formatMechanismReviewVerdict,
+  LEGACY_CONTRIBUTION_BASELINE,
   mechanismPathsIn,
   LEGACY_RANGE_RETIREMENT_REASON,
   modelFromTrailers,
@@ -192,6 +193,7 @@ export function attachContributionDispositions(
       row.reason !== LEGACY_RANGE_RETIREMENT_REASON ||
       !exactMeasurement ||
       !/^[0-9a-f]{40}$/.test(String(row.sha ?? '')) ||
+      isAncestor(row.sha, LEGACY_CONTRIBUTION_BASELINE) ||
       !isAncestor(row.sha, CONTRIBUTION_SCOPE_BOUNDARY)
     ) continue
     row.contributionDispositionVerified = true

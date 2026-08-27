@@ -173,8 +173,9 @@ export const LEDGER_RELATIVE_PATH = '.claude/mechanism-reviews.jsonl'
 
 /** The one-time ledger shape used to close debt created by the retired
  * baseline-wide scope. The wrapper stamps matching rows only after Git proves
- * their commit is at or before the fixed migration boundary. */
+ * their commit belongs to this fixed revision interval. */
 export const CONTRIBUTION_DISPOSITION_KIND = 'mechanism-contribution-disposition'
+export const LEGACY_CONTRIBUTION_BASELINE = '265712e40e6c31c81605c1279a01a320be7a8f70'
 export const CONTRIBUTION_SCOPE_BOUNDARY = '6edd81fd2e88586df0157b956c7eb7b530a65777'
 export const LEGACY_RANGE_RETIREMENT_REASON =
   'legacy baseline-wide debt had no complete contribution-scoped review; measured 45 passes at open, 42 at close, and 115 on main'

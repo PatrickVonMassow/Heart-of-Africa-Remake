@@ -21,6 +21,7 @@ import {
 import {
   CONTRIBUTION_DISPOSITION_KIND,
   CONTRIBUTION_SCOPE_BOUNDARY,
+  LEGACY_CONTRIBUTION_BASELINE,
   evaluateMechanismReview,
   formatMechanismReviewVerdict,
   LEGACY_RANGE_RETIREMENT_REASON,
@@ -144,10 +145,11 @@ describe('legacy contribution dispositions', () => {
     ...over,
   })
 
-  it('stamps only the fixed historical retirement Git places before the boundary', () => {
+  it('stamps only the fixed historical retirement Git places inside the migration interval', () => {
     const records = [row(), row({ sha: 'b'.repeat(40), disposition: 'reviewed' })]
-    attachContributionDispositions(records, (ancestor, boundary) => {
-      expect(boundary).toBe(CONTRIBUTION_SCOPE_BOUNDARY)
+    attachContributionDispositions(records, (ancestor, descendant) => {
+      if (descendant === LEGACY_CONTRIBUTION_BASELINE) return false
+      expect(descendant).toBe(CONTRIBUTION_SCOPE_BOUNDARY)
       return ancestor === 'a'.repeat(40)
     })
     expect(records[0].contributionDispositionVerified).toBe(true)
@@ -163,6 +165,14 @@ describe('legacy contribution dispositions', () => {
     ]
     attachContributionDispositions(altered, () => true)
     expect(altered.every((record) => record.contributionDispositionVerified === undefined)).toBe(true)
+  })
+
+  it('rejects a valid-shaped retirement already reachable from the confirmed baseline', () => {
+    const beforeBaseline = row()
+    attachContributionDispositions([beforeBaseline], (ancestor, descendant) =>
+      ancestor === beforeBaseline.sha && descendant === LEGACY_CONTRIBUTION_BASELINE,
+    )
+    expect(beforeBaseline.contributionDispositionVerified).toBeUndefined()
   })
 
   it('removes a stale in-memory stamp before re-verifying', () => {

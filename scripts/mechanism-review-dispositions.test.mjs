@@ -4,11 +4,11 @@ import { describe, expect, it } from 'vitest'
 import {
   CONTRIBUTION_DISPOSITION_KIND,
   CONTRIBUTION_SCOPE_BOUNDARY,
+  LEGACY_CONTRIBUTION_BASELINE,
   LEGACY_RANGE_RETIREMENT_REASON,
 } from './mechanism-review-core.mjs'
 import {
   attachContributionDispositions,
-  BASELINE_RECOVERY_ANCHOR,
   pendingReviewContributions,
 } from './mechanism-review-guard.mjs'
 import { mechanismLogCommand, parseRangeLog } from './mechanism-review-range-core.mjs'
@@ -21,8 +21,8 @@ const rows = readFileSync('.claude/mechanism-reviews.jsonl', 'utf8')
 const dispositions = rows.filter((row) => row.kind === CONTRIBUTION_DISPOSITION_KIND)
 
 describe('the recorded legacy contribution disposition', () => {
-  it('names every mechanism contribution from the recovery anchor through the migration boundary exactly once', () => {
-    const raw = execFileSync('git', mechanismLogCommand(BASELINE_RECOVERY_ANCHOR, CONTRIBUTION_SCOPE_BOUNDARY), {
+  it('names every mechanism contribution from the confirmed baseline through the migration boundary exactly once', () => {
+    const raw = execFileSync('git', mechanismLogCommand(LEGACY_CONTRIBUTION_BASELINE, CONTRIBUTION_SCOPE_BOUNDARY), {
       encoding: 'utf8',
       windowsHide: true,
     })
@@ -34,10 +34,10 @@ describe('the recorded legacy contribution disposition', () => {
   })
 
   it('records the measured 45/42/115 backlog and a finite reviewed-or-retired answer for each contribution', () => {
-    expect(dispositions).toHaveLength(52)
-    expect(dispositions.filter((row) => row.disposition === 'reviewed')).toHaveLength(24)
+    expect(dispositions).toHaveLength(240)
+    expect(dispositions.filter((row) => row.disposition === 'reviewed')).toHaveLength(79)
     const retired = dispositions.filter((row) => row.disposition === 'retired')
-    expect(retired).toHaveLength(28)
+    expect(retired).toHaveLength(161)
     for (const row of dispositions) {
       expect(row.scopeBoundary).toBe(CONTRIBUTION_SCOPE_BOUNDARY)
       expect(['reviewed', 'retired']).toContain(row.disposition)
