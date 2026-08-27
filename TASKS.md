@@ -12985,3 +12985,42 @@ to land than a mechanism that needs a review.
   the exact failure observed on 25.07.2026, when it taught a rule a day after the retrospective had
   sharpened it and the user found it.
   Bundle: Dokumentation.
+
+- [ ] 974. The criticality gate charges a high-criticality point with every file that landed near
+  it, so it cannot converge while the batch works. MEASURED 27.08.2026, 18:40, on `main` at
+  `9f66f8b`. `criticality-review-guard` named point 966 and said: "the recorded pass files do not
+  cover every file this point changed. Still uncovered: `docs/analysis_de/retrospektive-
+  zusammenarbeit.md`, `docs/analysis_de/vibe-coding-anleitung.md`". Point 966's own branch
+  `feat/966-worktree-suite-escape` touched NEITHER file — checked over the merge's second parent,
+  empty result. The guide was changed by `2dbce90`, `b379eecc` and `dfae52bb`; the retrospective by
+  the docs commits of the session that hit the gate. All of them merely LANDED in the window since
+  the guard's baseline `3ccb57c`.
+  THE SET GROWS WITH EVERY COMMIT. The one file that really was point 966's — the review ledger —
+  was cleared in a single round at 18:40, and clearing it immediately revealed two more files that
+  had landed meanwhile. A session that keeps working therefore never converges on this gate: it
+  blocked EVERY turn end of the session that measured it, on files no lane could clear. That is the
+  unclosable-window shape point 734 owns for the render gate, reached by a different road.
+  WATCHED IT GROW, IN ONE SESSION, WITHOUT ONE COMMIT OF POINT 966: the demand was ONE file at
+  18:20 (the review ledger), TWO at 18:40 once that was cleared, and SIX at 18:41 —
+  `.claude/queue-rank.json`, `TASKS.md`, `docs/work-packages.md`, `scripts/guide-brevity-core.mjs`
+  and the two documents — after three ordinary bookkeeping commits, one of which was THIS POINT
+  BEING FILED. Filing the report of the growth grew the demand. That is the measurement: the set
+  tracks the window, not the point, and the only way to hold it still is to stop working.
+  TWO READINGS, AND THE POINT DECIDES BY MEASUREMENT, NOT BY TASTE:
+  - either the ATTRIBUTION is wrong, and the union owed by a point is its OWN commits;
+  - or the window union is deliberate and conservative — in which case the WORDING is wrong, because
+    "every file this point changed" is a false statement about work the point never touched, and a
+    reader who believes it hunts for a connection that does not exist.
+  Read the guard before choosing: a conservative union has a real purpose — a file that landed while
+  a HIGH point stood uncleared has had no second reader either — but then it is not the POINT's debt
+  and must not be reported as such.
+  FINAL STATE: what the gate demands is either provably the point's own changed set, or is named for
+  what it is (unread work in the window) with an owner that is not the point; and in both cases a
+  session that commits ordinary bookkeeping can reach a green gate.
+  VERIFIABLE: Vitest over the pure attribution — a point whose branch touched files A and B owes A
+  and B and not C, where C landed in the same window from another branch; and the reported sentence
+  matches whichever union is chosen.
+  Criticality: high — it is a blocking gate on every turn end, and its present message asserts a
+  provably false fact about a point, which is the failure class a gate exists to prevent rather than
+  produce.
+  Bundle: Session- & Repo-Hygiene.
