@@ -900,6 +900,12 @@
       "why": "Sie blockiert den Zugabschluss, wird aber nicht dadurch loesbarer, dass sie vorgezogen wird: Der naechste Besitzer trifft sie sofort und nimmt sie mit frischem Kontext; sie gehoert ausserdem zu 870 und wird mit ihm gearbeitet",
       "origin": "machine",
       "place": "last"
+    },
+    "976": {
+      "at": "2026-08-27T17:32:42.887Z",
+      "why": "Es kostet keine Korrektheit und hat mit dem Notventil einen benannten Ausweg; die Punkte davor tragen den Release",
+      "origin": "machine",
+      "place": "last"
     }
   },
   "boundary": {
@@ -939,7 +945,7 @@
     "why": "The order standing in front of the release today is the arrangement that predates this rule; the four machine-filed points that had ranked themselves there were moved behind 174 first"
   },
   "settled": {
-    "at": "2026-08-27T17:29:54.311Z",
+    "at": "2026-08-27T17:32:42.894Z",
     "points": [
       174,
       184,
@@ -1260,7 +1266,8 @@
       972,
       973,
       974,
-      975
+      975,
+      976
     ]
   }
 }

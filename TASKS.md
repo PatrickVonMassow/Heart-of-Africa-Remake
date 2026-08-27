@@ -13040,3 +13040,34 @@ to land than a mechanism that needs a review.
   Criticality: high — it is a blocking gate on every turn end with no reachable exit, which is the
   hand-waiver decay point 734 describes, reached without even a hand waiver being available.
   Bundle: Session- & Repo-Hygiene.
+
+- [ ] 976. A point landed by the command loses every route to its own Erledigt card. MEASURED
+  27.08.2026, 19:35-19:45, while landing point 971 with `scripts/land-point.mjs`. The landing runs
+  merge, gate, tick, archive, push, board publish and cleanup, and reports each green. It does NOT
+  create the point's Erledigt card, and by finishing it destroys every route that could:
+  - the tick closes the point, so the next `board-queue.mjs` rebuild drops its QUEUE card;
+  - the board publish drops its NOW card;
+  - `toDone` refuses without a now-card ("no current-work card for point 971"),
+    `promote` and `now` refuse without a queue card ("no queue card for point 971"), and
+    `queue` refuses without any card at all ("point 971 is nowhere on the board").
+  `dashboard-guard --synced` then blocks with `[erledigt-missing]`, and the only exit left is the
+  emergency `--waive-audit`, which is what this landing had to use. Hand-writing the markup is not
+  an option and must not become one: `renderDoneEntry` in `scripts/board-core.mjs` is documented as
+  the single writer of that markup, and a hand edit of this board is the failure of §3.45.
+  THE ORDER IS THE TRAP, and nothing states it. `board.mjs done <point>` must run BEFORE the
+  landing, while the now-card still exists. A session that follows the standing instruction — which
+  says the landing "fuehrt die ganze Kette aus" and names board publish among its steps — reasonably
+  reads the board as handled, lands, and only then discovers the card cannot be made any more.
+  FINAL STATE: either the landing WRITES the Erledigt card itself, from the now-card it is about to
+  remove, so the documented one-command chain really is complete; or it REFUSES to start until the
+  card exists, naming `board.mjs done <point>` as the missing step. A third acceptable shape is a
+  repair route that builds the card from the archived block through the single writer, so a landing
+  that already happened is recoverable without a waiver.
+  VERIFIABLE: a Vitest case over the pure board projection — a landed point has exactly one Erledigt
+  card built by `renderDoneEntry`, with the now-card's own start time preserved; plus a drill that
+  runs the real landing on a scratch board and ends with `dashboard-guard --synced` GREEN and no
+  waiver recorded. A drill that recreates the aftermath instead of calling the landing does not
+  count.
+  Criticality: med — it costs no correctness in the product, but it forces the emergency valve on an
+  ordinary successful landing, and a valve used routinely stops being an alarm.
+  Bundle: Chat & Tafel.
