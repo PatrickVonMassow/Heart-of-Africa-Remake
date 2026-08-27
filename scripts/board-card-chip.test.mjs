@@ -113,11 +113,13 @@ describe('the numbered chip renders on a now-card as it does in the queue', () =
     expect(summaryRule).toContain('flex-wrap:nowrap')
     expect((css.match(/\.num\{([^}]*)\}/) ?? [])[1] ?? '').toContain('flex-shrink:0')
     const derived = (readFileSync(BOARD_FILE, 'utf8').match(/<style id="board-criticality-style">([\s\S]*?)<\/style>/) ?? [])[1] ?? ''
-    // Point 967 widened the wrap rule to every non-sect summary, so a chip
-    // group beside a card with no right column is never squeezed into breaking.
-    expect(derived).toContain('details:not(.sect)>summary{flex-wrap:wrap')
+    // Point 969 turned the header into three columns: the ROW no longer wraps,
+    // so the chip group can never be pushed onto a line of its own, and the
+    // group itself wraps instead — which is what puts the badge under the
+    // number when the row is too narrow for both.
+    expect(derived).toContain('details:not(.sect)>summary{flex-wrap:nowrap')
     expect(derived).toContain('.card-header-left{display:inline-flex')
-    expect(derived).toContain('min-width:0;max-width:100%')
+    expect(derived).toContain('flex-wrap:wrap')
     // The phone rule must not hide or reorder the left group.
     const phone = (css.match(new RegExp(`@media\\(max-width:(\\d+)px\\)\\{([^}]*\\}[^{]*)*`)) ?? [])[0] ?? ''
     expect(Number((phone.match(/max-width:(\d+)px/) ?? [])[1] ?? 0)).toBeGreaterThan(PHONE_WIDTH)
