@@ -107,6 +107,9 @@ put it is the mistake this line exists to stop.
   terms; and the guard registered in `.claude/settings.json` under the authoritative inventory.
   Criticality: medium — no work is lost, but the owner is asked to re-decide what he decided, and
   he has now reported the same class twice.
+  Urgency: it blocks a lane — point 946 stands in front of the release at Criticality: high, and its
+  own spec requires it to be worked after this register, because both rewrite the same card
+  admissibility. Until this lands, that lane cannot be opened.
   Bundle: Chat & Tafel.
 
 - [ ] 902. A stated recommendation on a board card is a decision I may carry out. MEASURED
@@ -139,6 +142,8 @@ put it is the mistake this line exists to stop.
   row in `docs/rule-corpus-audit.md`; the doc-budget guard and `npm run test:unit` stay green; and
   the boundary clause stands in the same sentence as the grant.
   Criticality: low — process hygiene, but it is what keeps a decided card from idling.
+  Urgency: it blocks a lane — point 946 stands in front of the release at Criticality: high and
+  names this authorization among the points it must be worked after, so its lane waits on this one.
   Bundle: Chat & Tafel.
 
 - [ ] 946. A VDZK card still parks an owner-decidable question; admissibility gets the point-864
