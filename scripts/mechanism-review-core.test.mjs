@@ -1616,6 +1616,29 @@ describe('evaluateMechanismReview', () => {
       expect(v.findings[0].kind).toBe('self-review')
     })
 
+    it.each([
+      ['missing', undefined],
+      ['a string', MECH],
+    ])('still poisons a pass-less review when a descendant file claim has %s pass.files', (_shape, files) => {
+      const descendant = 'd'.repeat(40)
+      const malformedPass = { index: 1, total: 2, endState: descendant }
+      if (files !== undefined) malformedPass.files = files
+      const v = evaluateMechanismReview({
+        baseline: 'b',
+        head: 'h',
+        pendingCommits: [commit({ coveringRecordShas: ['c'.repeat(40), descendant] })],
+        records: [
+          record({ at: MERGE_ACCOUNTING_SINCE + 1000 }),
+          record({
+            sha: descendant,
+            pass: malformedPass,
+            at: MERGE_ACCOUNTING_SINCE + 2000,
+          }),
+        ],
+      })
+      expect(v.block).toBe(true)
+    })
+
     it('still clears a COMPLETE split beside a pass-less record at another covering sha', () => {
       const v = evaluateMechanismReview({
         baseline: 'b',
