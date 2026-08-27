@@ -100,6 +100,41 @@ describe('derived card criticality badges', () => {
     expect(declarations('details:not(.sect)[open]>summary>.right::after')?.content).toBe('"▾"')
   })
 
+  // POINT 963 — the third report of the same header. The group stays one flex
+  // line so the marker cannot be orphaned, but its CONTENT must break: a meta
+  // that outgrows its column wraps its own text instead of being squeezed.
+  it('lets both side columns break their own content', () => {
+    const document = new JSDOM(rendered()).window.document
+    const rules = [...document.querySelector('#board-criticality-style').sheet.cssRules]
+    const declarations = (selector) => rules.find((rule) => rule.selectorText === selector)?.style
+
+    for (const selector of ['.card-header-left>*', 'details:not(.sect)>summary>.right>*']) {
+      const style = declarations(selector)
+      expect(style, `${selector} carries no rule`).toBeTruthy()
+      expect(style.overflowWrap).toBe('anywhere')
+      expect(style.whiteSpace).toBe('normal')
+      expect(style.minWidth).toBe('0px')
+    }
+  })
+
+  // …and in portrait the three groups each take a full row, so a title is never
+  // squeezed into the strip a number and a badge leave over.
+  it('stacks the header groups on a phone-width viewport', () => {
+    const document = new JSDOM(rendered()).window.document
+    const rules = [...document.querySelector('#board-criticality-style').sheet.cssRules]
+    const declarations = (selector) => rules.find((rule) => rule.selectorText === selector)?.style
+    const portrait = rules.find((rule) => rule.media && [...rule.media].join(' ').includes('460px'))
+    expect(portrait, 'no portrait rule').toBeTruthy()
+    const stacked = [...portrait.cssRules][0]
+    for (const group of ['>.card-header-left', '>.t', '>.right']) {
+      expect(stacked.selectorText).toContain(group)
+    }
+    expect(stacked.style.flexBasis).toBe('100%')
+    // Above that width the title keeps a basis wide enough to be worth a shared
+    // row; below it the media rule takes over.
+    expect(declarations('details:not(.sect)>summary>.t')?.flexBasis).toBe('18rem')
+  })
+
   it('keeps old and decorated summary shapes readable and renders idempotently', () => {
     const once = rendered()
     expect(renderCardCriticalities(once, tasks)).toBe(once)
