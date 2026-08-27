@@ -31,6 +31,10 @@ const STRESS_QUEUE_POINT = '9632'
 // resolve to few rows — the stacked layout the user rejected spent three full
 // rows on it, one per group, whatever the content needed.
 const STRESS_SHORT_POINT = '9633'
+// Coverage the review demanded (finding 5): a state card WITHOUT the number
+// wrapper — its title must stay above the right group — and a card with no
+// right group at all, which keeps the summary's native marker.
+const STRESS_BARE_POINT = '9634'
 const STRESS_CARDS = `
 <details class="now"><summary><span class="num">${STRESS_POINT}</span><span class="t">Ein absichtlich langer Kartentitel, der im Hochformat mehrere Zeilen braucht und trotzdem vollständig lesbar bleiben muss</span><span class="right"><span class="pill">laufend</span><span class="meta">06:30 · ~08:30</span></span></summary>
   <div class="body"><p>Messkarte.</p></div>
@@ -41,21 +45,32 @@ const STRESS_CARDS = `
 <details><summary><span class="num">${STRESS_SHORT_POINT}</span><span class="t">Kurz</span><span class="right"><span class="meta">09:10 · 09:55</span></span></summary>
   <div class="body"><p>Messkarte.</p></div>
 </details>
+<details class="now" data-state="idle"><summary><span class="t">Gerade keine laufende Arbeit — Zustandskarte ohne Nummerngruppe</span><span class="right"><span class="meta">10:00</span></span></summary>
+  <div class="body"><p>Messkarte.</p></div>
+</details>
+<details><summary><span class="num">${STRESS_BARE_POINT}</span><span class="t">Ohne rechte Gruppe bleibt der native Marker dieser Karte stehen</span></summary>
+  <div class="body"><p>Messkarte.</p></div>
+</details>
 `
 const STRESS_TASKS = `- [ ] ${STRESS_POINT}. A deliberately long current-card title
   Criticality: high — reviewed.
 - [ ] ${STRESS_QUEUE_POINT}. A queued card with a deliberately long meta
   Criticality: medium — visible.
 - [ ] ${STRESS_SHORT_POINT}. A short done-card header that must stay compact
-  Criticality: medium — visible.`
+  Criticality: medium — visible.
+- [ ] ${STRESS_BARE_POINT}. A card without a right group keeps its native marker
+  Criticality: low — reversible.`
 
 // The declarations point 963 replaced. Appended after the shipped stylesheet,
-// this restores exactly the old behaviour and is the negative control: it proves
-// the verdict below reads Chromium's geometry rather than merely finding text.
+// this restores the old behaviour — INCLUDING the unbreakable meta and the
+// source order the shipped sheet later replaced, which the shipped child rules
+// would otherwise mask — and is the negative control: it proves the verdict
+// below reads Chromium's geometry rather than merely finding text.
 const OLD_HEADER_RULES = `<style id="board-layout-control">
 details:not(.sect)>summary>.t{flex:1 1 12rem}
 details:not(.sect)>summary>.right{flex-wrap:nowrap}
-@media(max-width:460px){details:not(.sect)>summary:has(>.right)>.card-header-left,details:not(.sect)>summary:has(>.right)>.t,details:not(.sect)>summary:has(>.right)>.right{flex:0 1 auto}}
+details:not(.sect)>summary>.right>*,details:not(.sect)>summary>.right .meta{white-space:nowrap}
+@media(max-width:460px){details:not(.sect)>summary:has(>.right)>.card-header-left,details:not(.sect)>summary:has(>.right)>.t,details:not(.sect)>summary:has(>.right)>.right{flex:0 1 auto;order:0}}
 </style>`
 
 // The declarations point 967 replaced: 963's unconditional stacking, which the
@@ -145,7 +160,7 @@ const measureBoard = async (page, html) => {
     })
   })
   return page.evaluate(
-    ([stressPoint, stressQueuePoint, stressShortPoint]) => {
+    ([stressPoint, stressQueuePoint, stressShortPoint, stressBarePoint]) => {
       const summaries = [...document.querySelectorAll('details:not(.sect) > summary')]
       const pointOf = (summary) => summary.querySelector('.num')?.textContent?.trim() ?? ''
       const named = (element) => element.className || element.tagName
@@ -168,11 +183,14 @@ const measureBoard = async (page, html) => {
             width: box.width,
             share: box.width / card.width,
             // A title that shows its whole content on a single unclipped line is
-            // compact, not squeezed — it needs no width share (point 967).
+            // compact, not squeezed — it needs no width share (point 967). Both
+            // scroll axes are read: a one-line clamp hides its overflow BELOW
+            // the line, not beside it (review finding 2).
             oneLine:
               lineHeight > 0 &&
               box.height < lineHeight * 1.6 &&
-              title.scrollWidth <= title.clientWidth + 1,
+              title.scrollWidth <= title.clientWidth + 1 &&
+              title.scrollHeight <= title.clientHeight + 1,
           })
         }
 
@@ -243,8 +261,31 @@ const measureBoard = async (page, html) => {
         }
       }
 
+      // Summaries WITHOUT the number wrapper (state/handover cards): the
+      // portrait reorder may not reach them, so their title stays above the
+      // right group (review findings 1 and 5).
+      const bare = summaries.filter(
+        (summary) =>
+          !summary.querySelector(':scope > .card-header-left') &&
+          summary.querySelector(':scope > .t') &&
+          summary.querySelector(':scope > .right'),
+      )
+      const bareTitleBelowRight = []
+      for (const summary of bare) {
+        const titleBox = summary.querySelector(':scope > .t').getBoundingClientRect()
+        const rightBox = summary.querySelector(':scope > .right').getBoundingClientRect()
+        // Sharing a row is fine (title first in flow); the violation is the
+        // title starting on a LATER row than the right group.
+        if (titleBox.top >= rightBox.bottom - 0.5) {
+          bareTitleBelowRight.push(summary.querySelector(':scope > .t').textContent.trim().slice(0, 40))
+        }
+      }
+
       const root = document.documentElement
       return {
+        bareCount: bare.length,
+        bareTitleBelowRight,
+        barePointSeen: summaries.some((summary) => pointOf(summary) === stressBarePoint),
         cardCount: summaries.length,
         titles,
         overflow,
@@ -258,7 +299,7 @@ const measureBoard = async (page, html) => {
         clientWidth: root.clientWidth,
       }
     },
-    [STRESS_POINT, STRESS_QUEUE_POINT, STRESS_SHORT_POINT],
+    [STRESS_POINT, STRESS_QUEUE_POINT, STRESS_SHORT_POINT, STRESS_BARE_POINT],
   )
 }
 
@@ -275,9 +316,14 @@ try {
       const at = `${name} at ${width}px`
 
       check(
-        `${at}: the rendered board carries its cards and both stress headers`,
-        measured.cardCount > 0 && measured.stressSeen,
-        `${measured.cardCount} card(s)`,
+        `${at}: the rendered board carries its cards and every stress header`,
+        measured.cardCount > 0 && measured.stressSeen && measured.barePointSeen && measured.bareCount > 0,
+        `${measured.cardCount} card(s), ${measured.bareCount} without a number group`,
+      )
+      check(
+        `${at}: a card without a number group keeps its title above the right group`,
+        measured.bareTitleBelowRight.length === 0,
+        measured.bareTitleBelowRight.slice(0, 3).join(', '),
       )
       check(
         `${at}: no header part leaves its card`,
@@ -370,28 +416,44 @@ try {
     // fragment, and a control that lands nowhere silently proves nothing.
     const broken = await measureBoard(page, `${html}\n${OLD_HEADER_RULES}`)
     const worst = worstTitle(broken)
+    // The control must fall to the SAME predicate the positive check uses —
+    // a compact one-line title may no longer stand in for a squeezed one
+    // (review finding 3).
     check(
       `${name}: the measurement rejects the old squeezed-header control at 360px`,
-      broken.titles.some((title) => title.share < MIN_TITLE_SHARE) || broken.clipped.length > 0,
+      broken.titles.some((title) => !title.oneLine && title.share < MIN_TITLE_SHARE) ||
+        broken.clipped.length > 0,
       worst ? `worst #${worst.point} ${Math.round(worst.width)}px/${Math.round(worst.share * 100)}%` : 'no title',
     )
     await page.close()
   }
 
   // Second control: 963's stacked layout, restored on top of the shipped CSS,
-  // must fall to the compactness bound alone.
+  // must fall to the compactness bounds — EACH bound proves itself (review
+  // finding 4): the short bound at both widths, including 320px where the long
+  // bound's allowance is wider, and the long bound at 390px.
   for (const { name, html } of pages) {
-    const page = await browser.newPage({ viewport: { width: 390, height: 900 } })
-    const stacked = await measureBoard(page, `${html}\n${STACKED_HEADER_RULES}`)
-    const short = stacked.lines[STRESS_SHORT_POINT]
-    const long = stacked.lines[STRESS_POINT]
-    check(
-      `${name}: the compactness bound rejects the stacked-header control at 390px`,
-      (Boolean(short) && short.contentRows >= 2.7) ||
-        (Boolean(long) && long.contentRows >= long.titleRows + 1.8),
-      short ? `${short.contentRows.toFixed(2)} content rows on the short header` : 'not measured',
-    )
-    await page.close()
+    for (const width of [320, 390]) {
+      const page = await browser.newPage({ viewport: { width, height: 900 } })
+      const stacked = await measureBoard(page, `${html}\n${STACKED_HEADER_RULES}`)
+      const short = stacked.lines[STRESS_SHORT_POINT]
+      const long = stacked.lines[STRESS_POINT]
+      check(
+        `${name}: the short-header bound rejects the stacked control at ${width}px`,
+        Boolean(short) && short.contentRows >= 2.7,
+        short ? `${short.contentRows.toFixed(2)} content rows` : 'not measured',
+      )
+      if (width === 390) {
+        check(
+          `${name}: the long-header bound rejects the stacked control at 390px`,
+          Boolean(long) && long.contentRows >= long.titleRows + 1.8,
+          long
+            ? `${long.contentRows.toFixed(2)} content rows for ${long.titleRows.toFixed(2)} title rows`
+            : 'not measured',
+        )
+      }
+      await page.close()
+    }
   }
 } finally {
   await browser.close()

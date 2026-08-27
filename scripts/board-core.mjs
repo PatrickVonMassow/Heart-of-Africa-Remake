@@ -216,7 +216,7 @@ const CARD_HEADER_LEFT_SOURCE =
 const CRITICALITY_STYLE = `<style id="${CRITICALITY_STYLE_ID}">
 .card-header-left{display:inline-flex;flex:0 1 auto;flex-wrap:wrap;align-items:baseline;gap:2px 9px;min-width:0;max-width:100%}
 .card-header-left>*{min-width:0;max-width:100%;white-space:normal;overflow-wrap:anywhere}
-details:not(.sect)>summary:has(>.right){flex-wrap:wrap;row-gap:4px;min-width:0;max-width:100%}
+details:not(.sect)>summary{flex-wrap:wrap;row-gap:4px;min-width:0;max-width:100%}
 details:not(.sect)>summary>.t{flex:1 1 18rem;min-width:0;max-width:100%;overflow-wrap:anywhere}
 details:not(.sect)>summary:has(>.right)::after{content:none}
 details:not(.sect)>summary>.right{display:inline-flex;justify-content:flex-end;align-items:baseline;flex:0 1 auto;flex-wrap:nowrap;column-gap:6px;min-width:0;max-width:100%;white-space:normal}
@@ -224,7 +224,7 @@ details:not(.sect)>summary>.right>*{min-width:0;max-width:100%;white-space:norma
 details:not(.sect)>summary>.right .meta{min-width:0;max-width:100%;white-space:normal;overflow-wrap:anywhere}
 details:not(.sect)>summary>.right::after{content:"▸";flex:0 0 auto;margin-left:6px}
 details:not(.sect)[open]>summary>.right::after{content:"▾"}
-@media(max-width:460px){details:not(.sect)>summary:has(>.right)>.card-header-left{order:0;flex:0 1 auto}details:not(.sect)>summary:has(>.right)>.right{order:1;flex:0 1 auto;margin-left:auto}details:not(.sect)>summary:has(>.right)>.t{order:2;flex:1 1 100%}}
+@media(max-width:460px){details:not(.sect)>summary:has(>.right)>.card-header-left{order:0;flex:0 1 auto}details:not(.sect)>summary:has(>.right):has(>.card-header-left)>.right{order:1;flex:0 1 auto;margin-left:auto}details:not(.sect)>summary:has(>.right):has(>.card-header-left)>.t{order:2;flex:1 1 100%}}
 .criticality{flex:0 1 auto;min-width:0;max-width:100%;overflow-wrap:anywhere;border:1px solid currentColor;border-radius:999px;padding:.08em .48em;font-size:.72em;font-weight:700;line-height:1.35}
 .criticality-low{background:#dcebd9;color:#24511f}.criticality-med{background:#f3e4ad;color:#684e00}.criticality-high{background:#f3d1cb;color:#7a2115}
 </style>`

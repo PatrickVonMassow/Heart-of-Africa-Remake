@@ -126,18 +126,24 @@ describe('derived card criticality badges', () => {
     const declarations = (selector) => rules.find((rule) => rule.selectorText === selector)?.style
     const portrait = rules.find((rule) => rule.media && [...rule.media].join(' ').includes('460px'))
     expect(portrait, 'no portrait rule').toBeTruthy()
-    const portraitDeclarations = (part) =>
-      [...portrait.cssRules].find((rule) => rule.selectorText.endsWith(part))?.style
-    const left = portraitDeclarations('>.card-header-left')
+    const portraitRule = (part) =>
+      [...portrait.cssRules].find((rule) => rule.selectorText.endsWith(part))
+    const left = portraitRule('>.card-header-left')?.style
     expect(left?.order).toBe('0')
     expect(left?.flexBasis).not.toBe('100%')
-    const right = portraitDeclarations('>.right')
-    expect(right?.order).toBe('1')
-    expect(right?.marginLeft).toBe('auto')
-    expect(right?.flexBasis).not.toBe('100%')
-    const title = portraitDeclarations('>.t')
-    expect(title?.order).toBe('2')
-    expect(title?.flexBasis).toBe('100%')
+    const right = portraitRule('>.right')
+    expect(right?.style.order).toBe('1')
+    expect(right?.style.marginLeft).toBe('auto')
+    expect(right?.style.flexBasis).not.toBe('100%')
+    const title = portraitRule('>.t')
+    expect(title?.style.order).toBe('2')
+    expect(title?.style.flexBasis).toBe('100%')
+    // A summary WITHOUT the number group keeps its native title-first order —
+    // reordering there would lift the timestamp above the title of the
+    // handover/state cards (point 967 review, finding 1).
+    for (const rule of [right, title]) {
+      expect(rule?.selectorText).toContain(':has(>.card-header-left)')
+    }
     // Above that width the title keeps a basis wide enough to be worth a shared
     // row; below it the media rule takes over.
     expect(declarations('details:not(.sect)>summary>.t')?.flexBasis).toBe('18rem')
