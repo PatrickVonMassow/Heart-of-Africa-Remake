@@ -24758,3 +24758,42 @@ Nummerierung bleiben deshalb identisch — hier wird nur verschoben, nie umgesch
   contribution nobody may review passes as one nobody has reviewed.
   Urgency: it holds an open do-not-merge on `main`, so it is worked before the other open points.
   Bundle: Modell & Wächter.
+
+- [x] 983. One file-scoped pass record turns every earlier cross-vendor review in its range into a
+  self-review. MEASURED 28.08.2026 on `main` at 4058fb8: the four-eyes gate reports 7 outstanding
+  contributions, six of them GPT-5.6 Sol commits that each carry a recorded CROSS-VENDOR review by
+  Claude Opus 5 — and it reports them as `self-review`, "the only review on record is from GPT-5.6
+  Sol's vendor". The SAME ledger read from a detached checkout of an ancestor, where the guard
+  falls back to the older baseline, reports 0 outstanding.
+  THE CAUSE IS MEASURED, not suspected (cross-vendor diagnosis, GPT-5.6 Sol): in
+  `scripts/mechanism-review-core.mjs` the split witness is range-global —
+  `const split = covering.some((r) => !legacyContributionShape(r) && passRow(r))` (line 1772) —
+  and the very next lines drop every pass-less record when it is true:
+  `...(split ? [] : legacySound.filter((r) => !r?.pass))`. The two file-scoped pass rows recorded
+  at e0654ac name only `docs/maximum-qa.md`, `docs/sol-routing.md`, `scripts/author-*`,
+  `scripts/batch-*`, `scripts/model-guard-core.mjs`, `scripts/review-sol-core.mjs` and
+  `scripts/sol-share-core.mjs` — and e0654ac is a git DESCENDANT of every commit above, so those
+  rows count as split evidence for contributions whose files they never touch. The pass-less
+  Claude reviews at 0c2083b8 and 828e382b are deleted from `valid`, the Sol rows remain in
+  `selfReviews`, and `!valid.length` then reports a self-review of work that was in fact read
+  cross-vendor.
+  WHY IT IS THE WORST DIRECTION: it does not let unreviewed work through, it takes REVIEWED work
+  back — and the remedy it prints (`review-sol.mjs` on a Sol-authored commit) is one no allowed
+  model may perform, so the gate blocks every turn end with a plan nobody can run. That is the
+  jam of point 979 again, from a different direction.
+  FINAL STATE: split evidence is scoped to the files it names. A file-scoped pass row witnesses an
+  oversized range only for a contribution whose remaining file debt it INTERSECTS; a legacy
+  non-file-scoped pass row keeps its present range-global reach, which is the reading its own
+  comment block defends. The comment above line 1772 records why the widening is cut back, so the
+  next reader does not widen it again.
+  VERIFIABLE: Vitest over the pure core — a file-scoped pass row at a descendant sha naming
+  DISJOINT files leaves an earlier pass-less cross-vendor review valid, while one naming an
+  INTERSECTING file still poisons it exactly as today; the five widenings the existing comment
+  block defends each keep a case; and on the live repository the guard reports 0 outstanding
+  contributions for the six commits named above while e0654ac keeps its own open refusal.
+  Criticality: high — the gate revokes reviews that were performed, and prints a remedy that
+  cannot be run.
+  Urgency: it blocks every turn end of every session, so it is worked before every other open
+  point.
+  Bundle: Modell & Wächter. It edits the same evaluation core as 979 did, so it is never worked
+  beside another point touching that file.
