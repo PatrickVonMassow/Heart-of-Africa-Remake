@@ -888,6 +888,12 @@
       "why": "Es kostet eine Pruefrunde pro Vorkommen, aber nichts am Produkt; der Release-Vorrang der Verstaendigungsmechanik und die vor ihm liegenden Notfall- und Hygienepunkte wiegen schwerer, und 971 haelt die inhaltliche Haelfte bereits offen",
       "origin": "machine",
       "place": "last"
+    },
+    "973": {
+      "at": "2026-08-27T16:37:07.399Z",
+      "why": "Es haengt an 971: derselbe Dateisatz, also darf es erst danach laufen, und vor 971 liegen die Verstaendigungsmechanik und die Notfallpunkte, die den Release tragen",
+      "origin": "machine",
+      "place": "last"
     }
   },
   "boundary": {
@@ -927,7 +933,7 @@
     "why": "The order standing in front of the release today is the arrangement that predates this rule; the four machine-filed points that had ranked themselves there were moved behind 174 first"
   },
   "settled": {
-    "at": "2026-08-27T16:27:18.639Z",
+    "at": "2026-08-27T16:37:07.412Z",
     "points": [
       174,
       184,
@@ -1246,7 +1252,8 @@
       968,
       970,
       971,
-      972
+      972,
+      973
     ]
   }
 }
