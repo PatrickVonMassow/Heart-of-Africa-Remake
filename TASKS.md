@@ -11198,6 +11198,15 @@ to land than a mechanism that needs a review.
   VERIFIABLE: with `CLAUDE_SESSION_ID` unset, `node scripts/board.mjs vdzk-keep "<title>" --session
   <id>` succeeds; without either the id or the flag it still refuses; and the command the Stop hook
   prints carries the id.
+  MEASURED AGAIN 27.08.2026, 17:35 (chat-responder session 3d9865da), which widens the point by one
+  script and one cause: `scripts/vdzk-answer.mjs` refuses the same way ("cannot identify this
+  session's active user message"), and the fallback the guard state was meant to provide does not
+  work either — `.claude/decision-card-guard-state.json` knows 28 sessions, so it is ambiguous. The
+  session got through only by reading its own id out of the scratchpad path in its system prompt and
+  exporting it by hand; every answering session pays that detour again, and one that does not find it
+  leaves the decision cards standing — the exact state the hook exists to prevent. So the fix covers
+  BOTH scripts, and the fallback is named: the newest guard-state session that carries an active user
+  message, or the id read from the session path.
   Criticality: medium — no product behaviour, but a prescribed command that cannot be run teaches the
   session to work around its own tooling.
   Bundle: Chat & Tafel.
