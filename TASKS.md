@@ -12914,3 +12914,24 @@ to land than a mechanism that needs a review.
   Criticality: med — a mechanism that counts as enforced while enforcing nothing is the failure
   class the four-eyes gate exists to prevent.
   Bundle: Dokumentation.
+
+- [ ] 972. The render gate demands a picture from a suite that draws none, so a whole class of
+  paths can only ever be deferred. MEASURED 27.08.2026 while landing point 969.
+  `scripts/verify/board-layout.mjs` is a SUITE script for the batch board — an HTML page with no
+  WebGPU/WebGL surface — and its receipts read `frames: 0/0`. `isRenderPath` accepts it and
+  `isBackendSensitivePath` then demands a covering run on BOTH backends; but a run that renders no
+  frame never satisfies `runVerdict(...).covers`, so the gate stayed red after green runs on
+  WebGPU **and** WebGL 2 at the same HEAD, and the only way past it was
+  `render-verify-guard.mjs --defer`. A deferral is a logged exception, so a path that can be
+  cleared no other way turns the loud escape into routine — which is exactly how a gate stops
+  being read.
+  FINAL STATE: a changed path whose covering suite produces no frames is judged by that suite's
+  own green run rather than by a picture, on the one lane it has; the both-backend demand keeps
+  applying to every path that does draw. The deferral stays for the case it was written for.
+  VERIFIABLE: Vitest over the core — a frameless suite's green run COVERS its path, a frame-bearing
+  path still needs both lanes, and the board-layout case that had to be deferred today comes out
+  clean without one.
+  Criticality: medium — no product behaviour, but an escape hatch that becomes the normal route
+  costs the gate its meaning.
+  Bundle: Testinfrastruktur. It edits `scripts/render-verify-core.mjs`, which point 734 also
+  reaches, so the two are not worked beside each other.
