@@ -2995,6 +2995,17 @@ put it is the mistake this line exists to stop.
   »stands down: another live session owns the batch lock«. Cost that turn: before landing point 897
   the outstanding DO-NOT-MERGE that `guard-preflight` names could not be checked for merge-blocking
   through `--status`, and had to be settled by reading the lock file by hand.
+  STILL STANDING 27.08.2026, 02:20, AND THE `--session` FLAG DOES NOT EXIST. The owning session
+  (`4f0a2cc4-…`, its live pid 3448131 and `fence: 814` in `.claude/batch-lock.json`) asked `node
+  scripts/branch-hygiene-guard.mjs --status` and was told »steht zurück — another live session owns
+  the batch lock«. Repeating it WITH `--session <the owning id>` returned the identical line: the
+  flag this point's FINAL STATE calls for is not parsed by that guard at all, so the workaround the
+  earlier instances imply is not available either. Only `echo '{"session_id":"…"}' | node
+  scripts/branch-hygiene-guard.mjs --status` answered truthfully — »sauber (clean)«. The cause is
+  visible in the source and is the shared one: `scripts/branch-hygiene-guard.mjs` resolves its id
+  from `readFileSync(0, 'utf8')` alone and passes `''` on to `heldByOtherLiveOwner`. Cost that turn:
+  the merge-ends-the-branch backstop could not be read while seven feature worktrees stood parked,
+  which is exactly the state it exists to judge.
   Criticality: medium — no product defect, but it silently withholds a reading two governing
   documents ask for.
   Bundle: Session- & Repo-Hygiene.
@@ -4131,6 +4142,20 @@ Build order, chosen so no two parallel agents own the same file:
   If the measurement shows a quiet reading is unreachable here, the criterion names the
   substitute evidence (CPU and load average, with the worktree and own-process rules above) that
   a quiet verdict may rest on, so both verdicts keep a reachable green.
+  BOTH HALVES MEASURED TOGETHER, 27.08.2026, 00:12, on main `6edd81fd`, and the gate is now
+  structurally suspended rather than occasionally wrong. `node scripts/batch-doctor.mjs --gate`
+  reported `npm run test:unit FAILED but the verdict is INCONCLUSIVE (load) — 7 live agent
+  worktree(s)` and, in the same line, `GPU load NOT measured (no sysfs gpu_busy_percent, no
+  nvidia-smi)`. Neither excuse held: `ps` over all seven worktree paths found NO process in any of
+  them, and their newest commits are 3, 4, 8, 9, 9, 12 and 14 days old — parked branches, i.e.
+  precisely the debris case this point already rules out. `liveAgentWorktrees()` in
+  `scripts/batch-doctor.mjs` takes every path under `worktrees/` straight from `git worktree list
+  --porcelain` and asks neither for a recent edit nor for a process, so while this batch parks
+  feature branches — its normal state — `isEvidenceGrade()` can never return true. Add the host's
+  permanently missing GPU counter and the two clauses close on each other: the quiet reading is
+  unreachable AND the worktree excuse never lifts, so NO red this gate ever takes can be evidence,
+  and its own verdict line ends `do NOT stop the batch on this`. That is the permanent-UNDECIDED
+  state the paragraph above warns against, reached from both sides at once.
   VERIFIABLE: Vitest on the pure verdict — a red beside a worktree whose newest edit is hours
   old is BROKEN, not inconclusive; a red beside a worktree edited a minute ago stays
   inconclusive; the reason string names the deciding measurement. Plus, on the process probe: a
