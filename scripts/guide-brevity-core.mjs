@@ -174,7 +174,17 @@ export const LIMITS = {
   // promised way out.
   // 27.08.2026: the output-is-the-product clause joined the first pitfall while three over-long
   // meta rules gave up their narration, so the ceiling follows the measurement DOWN by two.
-  maxLines: 473,
+  // RAISED 27.08.2026 by exactly the measured size of ONE genuinely new tip: a cause the ticket
+  // already NAMES as a suspicion is the most dangerous raw material, because the executor searches
+  // for its confirmation from then on — so it is a candidate to be refuted first, and whoever hands
+  // the task out measures BLIND ALONGSIDE instead of waiting for the executor's measurement. Measured
+  // that morning: a work order's suspected cause was falsified in a disposable clone, and the real
+  // one sat an environment layer below the project code. It was FOLDED into the root-cause meta rule,
+  // which already demands the mechanical cause, rather than opening a new pitfall — four lines and
+  // fifty words as the audit counts them. The lesson's second half — an inherited environment
+  // variable no call-site search can find — was deliberately NOT added: it is the long-form half and
+  // lives in the retrospective.
+  maxLines: 477,
   // EXACT FIT, not headroom — corrected 30.07.2026 after the four-eyes review
   // pointed out that this comment had long stopped describing the numbers. The
   // rule above ("raised only by the measured size of genuinely new tips")
@@ -352,7 +362,9 @@ export const LIMITS = {
   // 27.08.2026: tonight's lesson — where a tool's OUTPUT is the product, read it at the real
   // corpus — cost twenty words in the first pitfall, and the three meta rules it was taken from
   // gave up twenty-two, so the ceiling follows the measurement DOWN by two.
-  maxWords: 4223,
+  // 27.08.2026: the refute-the-suspicion clause in the root-cause meta rule costs fifty words; see
+  // the line ceiling above for the measurement and why the lesson's second half stayed out.
+  maxWords: 4273,
   // A pitfall entry = the risk lines plus its prompt. Anything longer is a
   // story, not a tip.
   maxEntryLines: 11,

@@ -1407,7 +1407,7 @@ keinen Träger hat. Gebucht als Punkt 956.
 
 ## Anhang A — Maschinell gepflegte Quellen-Übersicht
 
-Zuletzt aktualisiert: Donnerstag, 27.08.2026, 12:43 · Quellen-Fingerprint: `a9e2ddc28505…`
+Zuletzt aktualisiert: Donnerstag, 27.08.2026, 13:26 · Quellen-Fingerprint: `b20e28841faa…`
 
 Spalten heuristisch aus den Quellen abgeleitet (Anläufe = distinkte Datumsnennungen im Memory;
 Maßnahme = Guard-Skripte mit Namens-Treffer). Die inhaltliche Bewertung gehört der Prosa oben.
@@ -1508,8 +1508,8 @@ Maßnahme = Guard-Skripte mit Namens-Treffer). Die inhaltliche Bewertung gehört
 
 Erfasste Quellen: 91 Feedback-/Projekt-Memories · 57 Guard-/Hook-Skripte · 6 Revert-/Reapply-Commits · 111 Prozess-/Meta-TASKS-Punkte (davon 48 offen).
 
-<!-- RETRO-FINGERPRINT: a9e2ddc285051af70b7c0daecb441527db6654a005178fe421fd7c5fd47e6693 -->
-<!-- RETRO-LAST-REFRESHED: 2026-08-27T10:43:48.108Z -->
+<!-- RETRO-FINGERPRINT: b20e28841faa9f38400b5b48759f13e582ab4aa39e9a110b8cbdd0dfeb9a7c84 -->
+<!-- RETRO-LAST-REFRESHED: 2026-08-27T11:26:34.981Z -->
 <!-- AUTO-GENERATED:END -->
 
 ### 3.111 Ein Erfolg ist kein Beweis für den Weg, auf dem er zustande kam
@@ -4281,3 +4281,42 @@ Und wer eine Eskalation entschärft, muss nachsehen, ob die Auffanglinie darunte
 existiert: Eine laute Fehlreaktion zu entfernen ist nur dann ein Fortschritt, wenn die leise
 Alternative nicht der Stillstand ist. Gebucht als Punkt 964, nach Punkt 945 zu bearbeiten, weil
 beide denselben Tick anfassen.
+
+### 3.112 Eine unvermessene Vermutung im Arbeitsauftrag wird vom Delegierten als Tatsache gebaut
+
+Punkt 966 hielt den Vorfall vom 27.08.2026 fest, bei dem ein Prüflauf aus einem Neben-Arbeitsbaum
+`refs/heads/main` verschob, 22 Fixture-Zweige anlegte und `.git/config` umschrieb. Der Punkt war
+sauber geschrieben: Er trennte ausdrücklich, was gemessen war, von dem, was nur vermutet wurde, und
+schrieb dem Autor sogar auf, die Ursache selbst zu messen. Die Vermutung lautete, `repo-paths.mjs`
+bilde einen Neben-Arbeitsbaum absichtlich auf den Hauptbaum ab, und eine Fixture schreibe darüber
+in die lebende Ablage.
+
+Diese Vermutung war falsch — und zwar so, dass eine Reparatur an ihr das Loch offen gelassen hätte.
+Die Gegenmessung in einer Wegwerf-Kopie brauchte zwei Läufe: Die volle Unit-Suite mit
+Arbeitsverzeichnis in einem Neben-Arbeitsbaum ließ Referenzen, `.git/config` und Arbeitsbaumliste
+jener Kopie byte-identisch, womit `repo-paths.mjs` ausschied. Die tatsächliche Ursache liegt eine
+Schicht tiefer und außerhalb des Projektcodes: Git exportiert `GIT_DIR` an einen Hook-Prozess nur
+dann, wenn der Push aus einem Neben-Arbeitsbaum kommt, und exportiert ihn absolut. Diese Variable
+erbt jedes Kind des Gate-Wrappers, und sie schlägt das `-C <tmpdir>`, mit dem sich jede einzelne
+Fixture der Suite absichert. Eine Ursache erklärt alle fünf Schadensklassen des Vorfalls — und sie
+erklärt auch, warum der Kontrolllauf im Hauptbaum sauber blieb: Dort setzt Git die Variable gar
+nicht erst.
+
+Das Gefährliche ist nicht die falsche Vermutung, sondern ihre Stellung im Text. Der delegierte
+Autor bekommt sie in seiner Auftragsbeschreibung geliefert, in derselben Schriftgröße wie das
+Gemessene, und der Satz »miss die Ursache selbst« steht neben einer fertigen, plausiblen, gut
+begründeten Antwort. Eine gelieferte Hypothese ist keine neutrale Ausgangslage: Sie lenkt die
+Suche, sie verengt sie, und sie bekommt die Beweislast in die falsche Richtung — der Autor sucht
+nach Bestätigung statt nach der Ursache. Genau deshalb verlangt CLAUDE.md §6 für aufzählende und
+diagnostizierende Arbeit den blinden Parallelbetrieb: zwei Modelle aus denselben Eingaben zu je
+einem vollständigen eigenen Ergebnis, und erst danach der Abgleich.
+
+**Lehre:** Wo ein Punkt eine Ursache nur VERMUTET, ist die Vermutung ein zu prüfender Kandidat und
+kein Ausgangspunkt — und die Prüfung gehört VOR die Reparatur, nicht in die Gegenlesung danach.
+Wer den Punkt vergibt, misst deshalb blind mit, statt auf die Messung des Autors zu warten: Das
+kostet einen Lauf und erspart eine ganze Autorenrunde an der falschen Stelle. Und die Messung
+selbst braucht einen sicheren Ort — hier eine geteilte Wegwerf-Kopie samt eigenem
+Neben-Arbeitsbaum, in der derselbe Schaden folgenlos entstehen darf. Der zweite Teil der Lehre
+gehört der Reichweite: Eine Umgebungsvariable, die ein fremdes Werkzeug setzt, ist im Projektcode
+unsichtbar; keine Suche nach Aufrufstellen findet sie. Wo ein Prozess die Umgebung nicht selbst
+gebaut hat, ist zu prüfen, was der Aufrufer hineingelegt hat.
