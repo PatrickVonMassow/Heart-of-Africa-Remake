@@ -818,14 +818,15 @@ export const balance: BalanceConfig = {
   // roughly three metres past the waterline, well inside the drawn shallows.
   bankWadeDepth: 0.7,
   placeEdgeBand: {
-    // Calibratable: ~3 m of give-way reads as a soft change underfoot at walking
-    // pace without turning into a stripe, and 0.4 m of wander bows the outline
-    // visibly. The wander is bounded by the band's VISIBLE FALL rather than its
-    // full width (work-order 581) — the fall is now about the middle metre of
-    // those 3 m, and a warp that pushed the true boundary out of it would mislead.
-    widthM: 3,
+    // Calibratable: ~8 m of give-way at a slightly softened 0.8 strength —
+    // tuned by the operator in play on 27.08.2026: the wider, gentler ramp
+    // reads as trodden ground giving way rather than a stripe. 0.4 m of wander
+    // bows the outline visibly; the wander stays bounded by the band's VISIBLE
+    // FALL rather than its full width (work-order 581), and a warp that pushed
+    // the true boundary out of that fall would mislead.
+    widthM: 8,
     wanderM: 0.4,
-    strength: 1,
+    strength: 0.8,
   },
   bloodStain: {
     // Calibratable: the base patch keeps the size point 267 shipped, and a

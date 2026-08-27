@@ -162,15 +162,17 @@ describe('the wander stays inside its tolerance (it may look natural, it may not
 
   it('the shipped calibration keeps the band a give-way, not a stripe', () => {
     expect(balance.placeEdgeBand.widthM).toBeGreaterThan(1)
-    expect(balance.placeEdgeBand.widthM).toBeLessThanOrEqual(6)
+    // The operator tuned the band to 8 m in play on 27.08.2026 and judged it a
+    // give-way at that width; the sanity cap admits exactly that ruling.
+    expect(balance.placeEdgeBand.widthM).toBeLessThanOrEqual(8)
     expect(clampWander(balance.placeEdgeBand.wanderM, balance.placeEdgeBand.widthM))
       .toBeCloseTo(balance.placeEdgeBand.wanderM, 6)
     expect(balance.placeEdgeBand.wanderM).toBeGreaterThan(0)
-    // The fall stays a give-way a walker crosses in a stride or two, never a
-    // hairline: about the middle metre of the shipped 3 m band.
+    // The fall stays a give-way a walker crosses in a couple of strides, never
+    // a hairline — with the 8 m band that is just under three metres.
     const fall = balance.placeEdgeBand.widthM * EDGE_CORE_HALF * 2
     expect(fall).toBeGreaterThan(0.5)
-    expect(fall).toBeLessThan(2)
+    expect(fall).toBeLessThan(3)
   })
 
   it('the ramp is monotone: further out never reads MORE swept', () => {
