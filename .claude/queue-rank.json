@@ -847,12 +847,6 @@
       "origin": "machine",
       "place": "last"
     },
-    "957": {
-      "at": "2026-08-26T20:57:19.045Z",
-      "why": "The four-eyes gate on main enforces nothing while it stands suspended, so every landing between now and the release is unguarded - waiting for the release means shipping a version whose whole guard chain was never cross-read.",
-      "origin": "machine",
-      "place": "ahead"
-    },
     "958": {
       "at": "2026-08-26T22:39:56.623Z",
       "why": "It is the measured hole in the double safety the user ordered on 26.08.2026 as point 947 — the emergency lane cannot see a busy wedge, so the very state the order forbids can still stand until the release",
@@ -916,7 +910,7 @@
     "why": "The order standing in front of the release today is the arrangement that predates this rule; the four machine-filed points that had ranked themselves there were moved behind 174 first"
   },
   "settled": {
-    "at": "2026-08-27T01:12:59.254Z",
+    "at": "2026-08-27T02:43:12.704Z",
     "points": [
       174,
       184,
@@ -1228,7 +1222,6 @@
       954,
       955,
       956,
-      957,
       958,
       959,
       960,
