@@ -811,6 +811,8 @@ Der Nutzer fragte mitten in der Arbeit, warum die Antworten die ganze Zeit auf E
 
 Das eigentlich Lehrreiche liegt eine Ebene höher. Der Bestand war am 30.07. vollständig geprüft worden, und die Sprachregel steht dort als „OK" mit **leerer Befundspalte**. Diese Prüfung fragte nämlich, ob der Regel*text* noch stimmt — nicht, ob die Regel *gemessen* wird. Und der Wächter, der genau für diese Frage gebaut wurde, hat dieselbe blinde Stelle von der anderen Seite: Er beweist, dass jeder verdrahtete Durchsetzer feuern **kann** (34 von 34 an diesem Tag), und sagt nichts über eine Regel, die nie einen bekommen hat. Zwischen beiden Prüfungen liegt genau der Spalt, in den diese Regel gefallen ist.
 
+**Vierter Anlauf, 27.08.2026 — dieselbe Regel, eine Dimension weiter.** Der Nutzer fragte diesmal nicht nach der Sprache, sondern nach der Anrede: „Warum siezt du mich auf einmal? Hinterlege, dass du mich duzen sollst." Der Regeltext war nicht falsch, er war nur wieder nicht durchgesetzt — und er ist dabei gewachsen: Neben der Sprache steht jetzt das Register. Der Befund von damals hält unverändert. Eine Suche über alle Wächter-Skripte findet bis heute keinen einzigen, der den fertigen Antworttext auf Sprache oder Anrede liest, während der Zeitstempel-Wächter daneben in derselben Zeit kein einziges Mal durchgerutscht ist. Die Ergänzung wurde erneut nur ins Gedächtnis geschrieben, weil das immer noch der einzige Ort ist, den diese Regel hat — der zweite zulässige Ausgang der Lehre unten, mit Begründung als bewusst nicht durchgesetzt zu vermerken, ist damit stillschweigend gewählt worden, ohne dass ihn je jemand aufgeschrieben hätte.
+
 **Lehre:** Eine Regelprüfung braucht die Achse „was misst das eigentlich?" neben „stimmt der Text noch?". Wo die Antwort „nichts" lautet, gibt es genau zwei zulässige Ausgänge — ein Mechanismus wird gebaut, oder die Regel wird **mit Begründung** als bewusst nicht durchgesetzt vermerkt. Ein stilles „OK" ist der dritte, und der ist derselbe Fehler wie §3.16, nur eine Ebene früher: Er lässt eine Regel als durchgesetzt gelten, bevor sie es je war.
 
 ### 3.82 Der Vergleichsstand, der die Startlogik mit dem Verglichenen teilt
@@ -1410,7 +1412,7 @@ keinen Träger hat. Gebucht als Punkt 956.
 
 ## Anhang A — Maschinell gepflegte Quellen-Übersicht
 
-Zuletzt aktualisiert: Donnerstag, 27.08.2026, 21:17 · Quellen-Fingerprint: `b55119cc07d0…`
+Zuletzt aktualisiert: Donnerstag, 27.08.2026, 21:57 · Quellen-Fingerprint: `846cd0f3d385…`
 
 Spalten heuristisch aus den Quellen abgeleitet (Anläufe = distinkte Datumsnennungen im Memory;
 Maßnahme = Guard-Skripte mit Namens-Treffer). Die inhaltliche Bewertung gehört der Prosa oben.
@@ -1455,7 +1457,7 @@ Maßnahme = Guard-Skripte mit Namens-Treffer). Die inhaltliche Bewertung gehört
 | Two test layers — Vitest (jsdom) for logic/store/HUD, Playwright for browser-only; add a test per new feature on the right layer | 1 | niedrig | — (Regel/Memory) | ◐ Regel |
 | STANDING RULE: design.md §19.14 (climate) and §19.15 (peoples) — the research→game implementation records — must be updated in the SAME commit whenever the climate or people rendering changes; peoples-1890 §8 / climate-1890 §9 are pointers | 1 | niedrig | — (Regel/Memory) | ◐ Regel |
 | All journal texts (de + en) must carry emotional voice markup; English read-aloud runs via Kokoro TTS | 1 | niedrig | — (Regel/Memory) | ◐ Regel |
-| Immer auf Deutsch mit dem Nutzer kommunizieren | 3 | mittel | — (Regel/Memory) | ◐ Regel |
+| Immer auf Deutsch mit dem Nutzer kommunizieren, und immer in der Du-Form — nie siezen | 4 | hoch | — (Regel/Memory) | ◐ Regel |
 | After every change, npm run lint (oxlint) and npm audit must be clean — zero lint errors/warnings, zero CVEs. Standing user directive. | 1 | niedrig | — (Regel/Memory) | ◐ Regel |
 | hoa PERMANENT process — delegate as much implementation as possible to worktree-isolated subagents; keep only picture-verify + merge at the main session; run a pool of parallel agents on non-overlapping files | 4 | hoch | — (Regel/Memory) | ◐ Regel |
 | The \"Maximum QA\" QA process and the \"new demo\" trigger (append it + closing + increment tag + publish) | 2 | mittel | — (Regel/Memory) | ◐ Regel |
@@ -1512,8 +1514,8 @@ Maßnahme = Guard-Skripte mit Namens-Treffer). Die inhaltliche Bewertung gehört
 
 Erfasste Quellen: 92 Feedback-/Projekt-Memories · 57 Guard-/Hook-Skripte · 6 Revert-/Reapply-Commits · 111 Prozess-/Meta-TASKS-Punkte (davon 47 offen).
 
-<!-- RETRO-FINGERPRINT: b55119cc07d0c7b552d9d97f5f19af8811aa3bb0b1a346b93b42a48c9acc2ad2 -->
-<!-- RETRO-LAST-REFRESHED: 2026-08-27T19:17:51.721Z -->
+<!-- RETRO-FINGERPRINT: 846cd0f3d385915a612cc3cfc44a648b0b94b997a3cdd73424556b8771ce7657 -->
+<!-- RETRO-LAST-REFRESHED: 2026-08-27T19:57:34.581Z -->
 <!-- AUTO-GENERATED:END -->
 
 ### 3.111 Ein Erfolg ist kein Beweis für den Weg, auf dem er zustande kam
