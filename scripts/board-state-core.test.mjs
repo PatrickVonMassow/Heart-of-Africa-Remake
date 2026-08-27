@@ -4,6 +4,7 @@
 // condition behind it is gone.
 import { describe, expect, it } from 'vitest'
 
+import { ALERT_RESET_MS } from './alert-escalation-core.mjs'
 import {
   AUTOMATIC_DECISION_TITLE,
   MAX_STATE_PARAGRAPHS,
@@ -46,8 +47,22 @@ describe('decisionParagraphs — the continuation and corruption records', () =>
   })
 
   it('keeps an old record standing until its named measurement settles it', () => {
-    const old = ladder({ at: NOW - 48 * 3600 * 1000, body: 'Alte Entscheidung.' })
+    const old = ladder({ at: NOW - 48 * 3600 * 1000, body: 'Alte Entscheidung.', measurement })
     expect(decisionParagraphs(old, { now: NOW })).toEqual(['Alte Entscheidung.'])
+  })
+
+  it('applies the ladder staleness floor only to records without a measurement', () => {
+    const record = { at: NOW - 48 * 3600 * 1000, body: 'Automatische Entscheidung.' }
+    const alert = (age, decision = record) => ({
+      alerts: { k: { rung: 4, lastSentAt: NOW - age, record: decision } },
+    })
+
+    expect(decisionParagraphs(alert(2 * ALERT_RESET_MS + 1), { now: NOW })).toEqual([])
+    expect(decisionParagraphs(alert(2 * ALERT_RESET_MS + 1, { ...record, measurement: {} }), { now: NOW })).toEqual([])
+    expect(decisionParagraphs(alert(11 * 3600 * 1000), { now: NOW })).toEqual(['Automatische Entscheidung.'])
+    expect(decisionParagraphs(alert(3 * ALERT_RESET_MS, { ...record, measurement }), { now: NOW })).toEqual([
+      'Automatische Entscheidung.',
+    ])
   })
 
   it('keeps a decision whose named measurement has not been taken', () => {

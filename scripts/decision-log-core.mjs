@@ -70,12 +70,16 @@ const legacyParallelMeasurement = (record) => {
   return /\bparallel batch sessions\b/i.test(text) ? BATCH_DOCTOR_GATE_MEASUREMENT : null
 }
 
+/** The measurement named by a decision, including the legacy PARALLEL shape. */
+export function measurementForRecord(record) {
+  if (!record || typeof record !== 'object') return null
+  const explicit = record.measurement && typeof record.measurement === 'object' ? record.measurement : null
+  return explicit && trim(explicit.key) ? explicit : legacyParallelMeasurement(record)
+}
+
 /** The clean result which expires `record`, or null while it still stands. */
 export function measurementThatSettled(record, doctorState) {
-  if (!record || typeof record !== 'object') return null
-  const measurement = record.measurement && typeof record.measurement === 'object'
-    ? record.measurement
-    : legacyParallelMeasurement(record)
+  const measurement = measurementForRecord(record)
   if (!measurement || trim(measurement.key) !== BATCH_DOCTOR_GATE_KEY) return null
 
   const decidedAt = finitePositive(record.at)
