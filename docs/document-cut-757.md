@@ -88,7 +88,7 @@ tokenizer, not `wc`, because a ceiling is only confirmed against the counter tha
 
 | document | landed | ceiling | headroom |
 | --- | --- | --- | --- |
-| `CLAUDE.md` | 193 lines / 1,345 words / 9,891 B | 193 / 1,363 | **0 lines**, 18 words |
+| `CLAUDE.md` | 193 lines / 1,352 words / 9,969 B | 193 / 1,363 | **0 lines**, 11 words |
 | `MEMORY.md` | 50 lines / 789 words / 6,287 B | 50 / 789 | **0 lines**, 0 words |
 | global `CLAUDE.md` | 6 lines / 33 words / 236 B | 6 / 36 | **0 lines**, 3 words |
 

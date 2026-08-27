@@ -245,7 +245,7 @@
 | `model-guard-core.mjs` | Pure decision core of the serving-model tripwire (point 309). | — |
 | `model-guard.mjs` | Stop hook (point 309): catch a silently DEGRADED serving model at its FIRST commit. | — |
 | `model-handoff-core.mjs` | Pure state machine for a forbidden-serving-model handoff. | — |
-| `model-trailer-gate.mjs` | The commit-msg gate on the AUTHORING-MODEL trailer (points 397 b / 425 a). | — |
+| `model-trailer-gate.mjs` | The commit-msg gate on author and reviewer MODEL trailers (points 397 b / 425 a / 982). | — |
 | `module-link-check.builtin-fixture.mjs` | FIXTURE, never loaded by anything that runs: `readFileSyc` is a typo, and `node:fs` does not export it. | — |
 | `module-link-check.default-fixture.mjs` | FIXTURE, never loaded by anything that runs: `module-link-check.mjs` has no default export, so node refuses this file at link time exactly as it refuses a missing named one. | — |
 | `module-link-check.fixture.mjs` | FIXTURE, never imported by anything that runs. | — |
