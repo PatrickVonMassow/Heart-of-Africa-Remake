@@ -10,7 +10,9 @@ import { join, resolve } from 'node:path'
 import { describe, it, expect } from 'vitest'
 import {
   criticalityGapPlan,
+  decideContributionReviewGap,
   decideReviewGap,
+  formatContributionReviewGap,
   formatCriticalityGap,
   formatReviewGap,
   guardOutcome,
@@ -20,6 +22,73 @@ import {
 } from './mechanism-review-guard-gap-core.mjs'
 
 const material = await import('./review-material-core.mjs').catch(() => null)
+
+describe('contribution-scoped review gaps', () => {
+  const contribution = (sha, over = {}) => ({
+    sha,
+    subject: `Contribution ${sha}`,
+    rawSize: 1200,
+    budget: REVIEW_GAP_BUDGET_CHARS,
+    statTruncated: false,
+    passes: [{ index: 1, total: 1 }],
+    uncoverable: [],
+    unreviewable: [],
+    ...over,
+  })
+
+  it('keeps a fitting contribution runnable however far the baseline range lags', () => {
+    const decision = decideContributionReviewGap({
+      blocked: true,
+      plan: {
+        // This aggregate was the old decision input. It is intentionally huge
+        // and uncoverable; the contribution plans, not this range, now rule.
+        rawSize: 15_100_000,
+        uncoverable: [{ path: '.claude/mechanism-reviews.jsonl' }],
+        contributions: [contribution('a'.repeat(40))],
+      },
+    })
+    expect(decision).toMatchObject({ gap: false, reason: 'contributions-runnable' })
+    expect(decision.contributions).toEqual(['a'.repeat(40)])
+  })
+
+  it('never suspends runnable contributions inside an accumulated unassemblable range', () => {
+    const impossible = contribution('b'.repeat(40), {
+      rawSize: 500_000,
+      passes: [],
+      uncoverable: [{ path: 'huge.patch', reason: 'complete diff exceeds one round' }],
+    })
+    const decision = decideContributionReviewGap({
+      blocked: true,
+      plan: { contributions: [impossible, contribution('c'.repeat(40))] },
+    })
+    expect(decision.gap).toBe(false)
+    expect(decision.reason).toBe('contributions-runnable')
+    expect(decision.unassemblable.map((entry) => entry.sha)).toEqual(['b'.repeat(40)])
+  })
+
+  it('suspends only a finite named set of individually unassemblable contributions', () => {
+    const impossible = contribution('d'.repeat(40), {
+      rawSize: 500_000,
+      passes: [],
+      uncoverable: [{ path: 'huge.patch', reason: 'complete diff exceeds one round' }],
+    })
+    const decision = decideContributionReviewGap({ blocked: true, plan: { contributions: [impossible] } })
+    expect(decision).toMatchObject({ gap: true, reason: 'contributions-unassemblable' })
+    const text = formatContributionReviewGap(decision)
+    expect(text).toContain('dddddddddddd')
+    expect(text).toContain('huge.patch')
+    expect(text).not.toContain('15.1')
+  })
+
+  it('fails closed on malformed plans and unavailable reviewer authorship', () => {
+    expect(decideContributionReviewGap({ blocked: true, plan: { contributions: [{}] } }).reason).toBe('unmeasured')
+    const unavailable = contribution('e'.repeat(40), { passes: [], unreviewable: [{ files: ['guard.mjs'] }] })
+    expect(decideContributionReviewGap({ blocked: true, plan: { contributions: [unavailable] } })).toMatchObject({
+      gap: false,
+      reason: 'unreviewable-authorship',
+    })
+  })
+})
 
 it('keeps the shell-expansion proof on a Windows CI runner', () => {
   const workflow = readFileSync(resolve(process.cwd(), '.github/workflows/ci.yml'), 'utf8')

@@ -10,6 +10,7 @@ import { resolve } from 'node:path'
 import {
   BLIND_PARALLEL,
   BLOCKING_VERDICT,
+  CONTRIBUTION_DISPOSITION_KIND,
   AUTHORSHIP_CHECK_SINCE,
   VERIFIED_REVIEWER_SINCE,
   evaluateMechanismReview,
@@ -422,6 +423,31 @@ describe('evaluateMechanismReview', () => {
     expect(text).toMatch(/FOUR-EYES GATE ON MECHANISMS/)
     expect(text).toContain('scripts/pre-push-gate-core.mjs')
     expect(text).toMatch(/mechanism-review\.mjs --record/)
+  })
+
+  it('honours only a wrapper-verified retirement at the exact contribution sha', () => {
+    const pending = commit({ coveringRecordShas: ['c'.repeat(40)] })
+    const retired = {
+      kind: CONTRIBUTION_DISPOSITION_KIND,
+      disposition: 'retired',
+      sha: pending.sha,
+      contributionDispositionVerified: true,
+    }
+    expect(
+      evaluateMechanismReview({ baseline: 'b', head: 'h', pendingCommits: [pending], records: [retired] }),
+    ).toMatchObject({ block: false, clear: true, findings: [] })
+
+    for (const changed of [
+      { contributionDispositionVerified: false },
+      { sha: 'd'.repeat(40) },
+      { disposition: 'reviewed' },
+    ]) {
+      const row = { ...retired, ...changed }
+      expect(
+        evaluateMechanismReview({ baseline: 'b', head: 'h', pendingCommits: [pending], records: [row] }).block,
+        JSON.stringify(changed),
+      ).toBe(true)
+    }
   })
 
   it('requires every new review row to record an agreement or explicit unverified authorship claim', () => {

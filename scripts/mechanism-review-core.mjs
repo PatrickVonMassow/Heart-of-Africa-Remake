@@ -171,6 +171,14 @@ export const ledgerAtUsable = (at) =>
 /** Where the tracked ledger sits inside ANY checkout of this repository. */
 export const LEDGER_RELATIVE_PATH = '.claude/mechanism-reviews.jsonl'
 
+/** The one-time ledger shape used to close debt created by the retired
+ * baseline-wide scope. The wrapper stamps matching rows only after Git proves
+ * their commit is at or before the fixed migration boundary. */
+export const CONTRIBUTION_DISPOSITION_KIND = 'mechanism-contribution-disposition'
+export const CONTRIBUTION_SCOPE_BOUNDARY = '6edd81fd2e88586df0157b956c7eb7b530a65777'
+export const LEGACY_RANGE_RETIREMENT_REASON =
+  'legacy baseline-wide debt had no complete contribution-scoped review; measured 45 passes at open, 42 at close, and 115 on main'
+
 /**
  * The ledger of the checkout a command is ACTUALLY RUNNING IN (point 780).
  *
@@ -1400,6 +1408,19 @@ export function evaluateMechanismReview({
   for (const pendingCommit of pendingEndStateFiles(pendingCommits, endStateFiles)) {
     let commit = pendingCommit
     const covering = [...new Set(commit?.coveringRecordShas ?? [])].flatMap((s) => bySha.get(String(s)) ?? [])
+    // ONE FIXED MIGRATION, NOT A GENERAL WAIVER. Historical debt produced only
+    // by the baseline-wide scope is retired per contribution in the tracked
+    // ledger. The row's own claim buys nothing: the impure wrapper sets the
+    // verification stamp only after checking its exact schema and Git ancestry
+    // against CONTRIBUTION_SCOPE_BOUNDARY. Later contributions can never match.
+    const retired = covering.some(
+      (record) =>
+        record?.kind === CONTRIBUTION_DISPOSITION_KIND &&
+        record?.disposition === 'retired' &&
+        record?.contributionDispositionVerified === true &&
+        String(record.sha) === String(commit.sha),
+    )
+    if (retired) continue
     // A record is only a review if it says who reviewed, how it ended AND what
     // was actually checked; a half-written line must not clear the gate. THE
     // GATE REVALIDATES THE ROW ITSELF, by the recorder's own rules (escalation

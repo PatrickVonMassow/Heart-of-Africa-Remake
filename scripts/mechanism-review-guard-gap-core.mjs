@@ -40,6 +40,100 @@ export const REVIEW_GAP_BUDGET_CHARS = 200_000
 export const REVIEW_GAP_MAX_PASS_TOTAL = 256
 
 /**
+ * Rule on plans measured at contribution boundaries. The stale baseline is
+ * deliberately absent: it may increase how many entries are owed, but it has
+ * no power to change whether any one entry can be assembled.
+ *
+ * A gap is reported only when EVERY owed contribution is positively measured
+ * as unassemblable. One runnable contribution keeps enforcement blocking even
+ * beside a hundred unassemblable siblings. An unreviewable authorship slice is
+ * also not a material gap: its verified unavailable-receipt route remains owed.
+ */
+export function decideContributionReviewGap({ blocked = false, plan = null } = {}) {
+  if (!blocked) return { gap: false, reason: 'clear', contributions: [] }
+  if (!plan || !Array.isArray(plan.contributions) || !plan.contributions.length) {
+    return { gap: false, reason: 'unmeasured', detail: 'no contribution-scoped plan was supplied' }
+  }
+
+  const runnable = []
+  const unassemblable = []
+  for (const entry of plan.contributions) {
+    const passes = entry?.passes
+    const uncoverable = entry?.uncoverable
+    const unreviewable = entry?.unreviewable
+    if (
+      typeof entry?.sha !== 'string' || !entry.sha ||
+      !Array.isArray(passes) || !Array.isArray(uncoverable) || !Array.isArray(unreviewable) ||
+      typeof entry?.statTruncated !== 'boolean'
+    ) {
+      return { gap: false, reason: 'unmeasured', detail: 'a contribution plan is malformed' }
+    }
+    if (unreviewable.length) {
+      return {
+        gap: false,
+        reason: 'unreviewable-authorship',
+        contributions: [entry.sha],
+        detail: 'a verified unavailable disposition remains owed',
+      }
+    }
+    const recordable =
+      !entry.statTruncated &&
+      uncoverable.length === 0 &&
+      passes.length >= 1 &&
+      passes.length <= REVIEW_GAP_MAX_PASS_TOTAL
+    if (recordable) runnable.push(entry.sha)
+    else {
+      const named = uncoverable.every((item) => typeof item?.path === 'string' && item.path)
+      const positivelyUnassemblable =
+        named && (entry.statTruncated || uncoverable.length > 0 || passes.length > REVIEW_GAP_MAX_PASS_TOTAL)
+      if (!positivelyUnassemblable) {
+        return { gap: false, reason: 'unmeasured', detail: `contribution ${entry.sha} has no complete planning ruling` }
+      }
+      unassemblable.push({
+        sha: entry.sha,
+        subject: String(entry.subject ?? ''),
+        measuredChars: entry.rawSize,
+        budget: entry.budget,
+        statTruncated: entry.statTruncated,
+        uncoverable: uncoverable.map((item) => ({ path: item.path, reason: String(item.reason ?? '') })),
+        passCount: passes.length,
+      })
+    }
+  }
+  if (runnable.length) {
+    return { gap: false, reason: 'contributions-runnable', contributions: runnable, unassemblable }
+  }
+  return { gap: true, reason: 'contributions-unassemblable', contributions: unassemblable }
+}
+
+/** Name the exact immutable contributions whose own material cannot travel. */
+export function formatContributionReviewGap(decision = {}) {
+  const entries = Array.isArray(decision?.contributions) ? decision.contributions : []
+  const lines = [
+    'mechanism-review-guard: CONTRIBUTION REVIEW GAP — every still-owed contribution is individually unassemblable:',
+  ]
+  for (const entry of entries) {
+    lines.push(
+      `  ${String(entry.sha).slice(0, 12)}${entry.subject ? ` ${entry.subject}` : ''}: ` +
+        `${Number.isFinite(Number(entry.measuredChars)) ? `${entry.measuredChars} characters` : 'size unavailable'} ` +
+        `against the ${entry.budget}-character round budget`,
+    )
+    if (entry.statTruncated) lines.push('    its diffstat alone exceeds the share every pass can carry')
+    if (entry.passCount > REVIEW_GAP_MAX_PASS_TOTAL) {
+      lines.push(`    it needs ${entry.passCount} passes, beyond the recordable ${REVIEW_GAP_MAX_PASS_TOTAL}`)
+    }
+    for (const item of entry.uncoverable ?? []) {
+      lines.push(`    ${item.path} — ${item.reason || 'no pass can carry its complete diff'}`)
+    }
+  }
+  lines.push(
+    '  This turn may end, but no contribution is cleared. A stale baseline may add more owed',
+    '  contributions; any one whose own material is runnable immediately restores blocking.',
+  )
+  return lines.join('\n')
+}
+
+/**
  * The one range the mechanism guard may submit for a gap ruling. `base` is the
  * merge-base already used to find pending commits and measure pass coverage;
  * the stored baseline is deliberately not an input here because it may sit on
