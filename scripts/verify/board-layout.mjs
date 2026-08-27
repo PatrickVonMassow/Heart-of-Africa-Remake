@@ -247,7 +247,15 @@ const measureBoard = async (page, html) => {
             overflow.push({ point, element: named(element) })
           }
           if (element.clientWidth > 0 && element.scrollWidth > element.clientWidth + 1) {
-            clipped.push({ point, element: named(element), scroll: element.scrollWidth, client: element.clientWidth })
+            clipped.push({ point, element: named(element), axis: 'w', scroll: element.scrollWidth, client: element.clientWidth })
+          }
+          // BOTH AXES. A one-line clamp or a fixed height hides its overflow
+          // BELOW the line, not beside it, so a width-only reading calls a
+          // vertically cut header clean (cross-vendor review 27.08.2026,
+          // second round — it makes the squeeze and containment controls mean
+          // what they say).
+          if (element.clientHeight > 0 && element.scrollHeight > element.clientHeight + 1) {
+            clipped.push({ point, element: named(element), axis: 'h', scroll: element.scrollHeight, client: element.clientHeight })
           }
         }
 
@@ -420,7 +428,7 @@ try {
         measured.clipped.length === 0,
         measured.clipped
           .slice(0, 6)
-          .map((item) => `#${item.point} ${item.element} ${item.scroll}>${item.client}`)
+          .map((item) => `#${item.point} ${item.element} ${item.axis} ${item.scroll}>${item.client}`)
           .join(', '),
       )
       // A title is fine either way: it shows its whole content on one unclipped

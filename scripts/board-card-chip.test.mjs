@@ -124,13 +124,19 @@ describe('the numbered chip renders on a now-card as it does in the queue', () =
     const chipGroup = (derived.match(/\.card-header-left\{([^}]*)\}/) ?? [])[1] ?? ''
     expect(chipGroup).toContain('display:inline-flex')
     expect(chipGroup).toContain('flex-wrap:wrap')
-    // The phone rule must not hide or reorder the left group.
-    const phone = (css.match(new RegExp(`@media\\(max-width:(\\d+)px\\)\\{([^}]*\\}[^{]*)*`)) ?? [])[0] ?? ''
-    expect(Number((phone.match(/max-width:(\d+)px/) ?? [])[1] ?? 0)).toBeGreaterThan(PHONE_WIDTH)
-    expect(phone).not.toContain('.num')
-    // …and it may not REORDER the header either: the three columns stand
-    // number, title, time at every width (point 969).
-    expect(phone).not.toContain('order:')
+    // EVERY phone block, not just the first one, and the declaration matched by
+    // shape rather than by spelling — `order : 1` is as valid as `order:1`
+    // (cross-vendor review 27.08.2026, second round).
+    const phoneBlocks = [...css.matchAll(/@media\s*\(\s*max-width\s*:\s*(\d+)px\s*\)\s*\{((?:[^{}]*\{[^{}]*\})*[^{}]*)\}/g)]
+    expect(phoneBlocks.length, 'the board carries no phone block at all').toBeGreaterThan(0)
+    for (const [block, width, body] of phoneBlocks) {
+      expect(Number(width), `${width}px block`).toBeGreaterThan(PHONE_WIDTH)
+      // The phone rule must not hide the left group…
+      expect(body, `the ${width}px block reaches the chip`).not.toContain('.num')
+      // …and it may not REORDER the header either: the three columns stand
+      // number, title, time at every width (point 969).
+      expect(block, `the ${width}px block reorders the header`).not.toMatch(/(^|[;{\s])order\s*:/)
+    }
     // No rule scoped only to current work may change the shared grouping.
     for (const [, selector, body] of css.matchAll(/([^{}]+)\{([^{}]*)\}/g)) {
       if (!/\.now\b/.test(selector) || !/summary|\.t\b/.test(selector)) continue
