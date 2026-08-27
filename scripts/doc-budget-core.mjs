@@ -89,10 +89,10 @@ export const DOC_BUDGETS = [
     // branch of forty commits that stood 658 behind `main`. The rule has no other
     // authority and no guard, so it returns and the ceiling follows it by exactly
     // its own size.
-    // RAISED by the 13 measured words of the §6 reviewer-trailer rule: a commit
-    // may record its cross-vendor reviewer as a second model trailer. The commit
-    // gate already permits two separately allowed lines; this closes the policy
-    // ambiguity without changing that mechanism. The one-word margin remains.
+    // RAISED by the 13 measured words of the original §6 reviewer-trailer rule.
+    // Point 982 replaces its ambiguous second Co-Authored-By line with the
+    // distinct Reviewed-By key inside the standing ceiling, so every Git author
+    // reader excludes the reviewer without a heuristic. The margin remains.
     // RAISED by the 31 measured words of the 24.08.2026 standing authorization:
     // §6 must name both the VDZK recommendation grant and its boundary in the same
     // sentence, so this binding rule cannot be replaced by a shorter pointer.

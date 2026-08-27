@@ -25,6 +25,7 @@
 import { BLIND_REVIEWER, blindReviewerAdmission, modelFromTrailers, sameModel, VERDICTS } from './mechanism-review-core.mjs'
 import { fableIsOn } from './fable-switch-core.mjs'
 import { mainCheckoutFrom } from './main-checkout-core.mjs'
+import { modelTrailerIdentities } from './model-guard-core.mjs'
 import {
   assembleMaterial,
   formatPassFiles,
@@ -662,7 +663,9 @@ export function newFilePathsIn(patch) {
 }
 
 /**
- * EVERY model named in one commit's `Co-Authored-By` field, not just the first.
+ * EVERY AUTHOR model named in one commit's `Co-Authored-By` field, not just the
+ * first. Reviewer identity lives under `Reviewed-By` and never reaches this
+ * field, so naming a reviewer cannot disqualify that reviewer as an author.
  *
  * `modelFromTrailers` deliberately returns the FIRST Claude co-author, which is
  * the right answer for "who wrote this" but the wrong one for "who may not
@@ -675,6 +678,11 @@ export function modelsInTrailerField(field) {
     .split(';')
     .map((part) => modelFromTrailers(part))
     .filter(Boolean)
+}
+
+/** The author and reviewer models in a complete commit message, by trailer key. */
+export function modelsInCommitMessage(message) {
+  return modelTrailerIdentities(message)
 }
 
 /**

@@ -5,6 +5,7 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import {
   allowedTrailers,
+  allowedReviewerTrailers,
   backupRefsIn,
   classifyTrailer,
   coAuthorTrailers,
@@ -20,8 +21,10 @@ import {
   judgeTrailer,
   modelNameIn,
   modelNamesIn,
+  modelTrailerIdentities,
   parseLogLine,
   POLICY_NEUTRAL,
+  reviewerTrailers,
   splitTrailerField,
 } from './model-guard-core.mjs'
 import { RECENT_LOG_FORMAT } from './model-guard.mjs'
@@ -552,6 +555,38 @@ describe('evaluateCommitTrailers (the commit-msg gate)', () => {
     for (const t of allowedTrailers(POLICY_NEUTRAL)) {
       expect(evaluateCommitTrailers(msg(t), POLICY_NEUTRAL).block, t).toBe(false)
     }
+  })
+
+  it('keeps a documented reviewer separate from the author and validates both', () => {
+    const message = msg(
+      'Co-Authored-By: Claude Opus 5 <noreply@anthropic.com>',
+      'Reviewed-By: GPT-5.6 Sol <noreply@openai.com>',
+    )
+    expect(modelTrailerIdentities(message)).toEqual({ authors: ['Opus 5'], reviewers: ['GPT 5.6 Sol'] })
+    expect(reviewerTrailers(message)).toEqual(['GPT-5.6 Sol <noreply@openai.com>'])
+    expect(evaluateCommitTrailers(message, POLICY_NEUTRAL).block).toBe(false)
+    expect(allowedReviewerTrailers(POLICY_NEUTRAL)).toContain(
+      'Reviewed-By: GPT-5.6 Sol <noreply@openai.com>',
+    )
+  })
+
+  it('refuses undocumented or malformed reviewer model trailers', () => {
+    const undocumented = evaluateCommitTrailers(
+      msg(
+        'Co-Authored-By: Claude Opus 5 <noreply@anthropic.com>',
+        'Reviewer: GPT-5.6 Sol <noreply@openai.com>',
+      ),
+      POLICY_NEUTRAL,
+    )
+    expect(undocumented.block).toBe(true)
+    expect(undocumented.findings[0].rule).toBe('undocumented-reviewer-trailer')
+
+    const unnamed = evaluateCommitTrailers(
+      msg('Reviewed-By: Claude <noreply@anthropic.com>'),
+      POLICY_NEUTRAL,
+    )
+    expect(unnamed.block).toBe(true)
+    expect(unnamed.findings[0].rule).toBe('unnamed-model-reviewer-trailer')
   })
 
   it('rejects the bare trailer', () => {
