@@ -3,26 +3,21 @@
 // batch stands although workable points exist, whether ordinary recovery has
 // already been tried against this same standstill, and what the successor
 // session must be told. scripts/batch-emergency.mjs does the acting.
-import { ACTIVITY_CLASSES } from './batch-standstill-core.mjs'
-
 export const EMERGENCY_THRESHOLD_MS = 60 * 60 * 1000
 export const EMERGENCY_COOLDOWN_MS = 45 * 60 * 1000
-
-export const ADVANCING_CLASSES = new Set([
-  ACTIVITY_CLASSES.FOREGROUND,
-  ACTIVITY_CLASSES.DELEGATED,
-  ACTIVITY_CLASSES.VERIFICATION,
-  ACTIVITY_CLASSES.CI_WAIT,
-  ACTIVITY_CLASSES.HANDOVER,
+export const BATCH_PROGRESS_KINDS = new Set([
+  'first-parent-commit',
+  'committed-boundary',
+  'delegated-branch-moved',
 ])
 
 export function latestProgressAt(report = {}) {
   const start = Number(report?.window?.start)
+  const end = Number(report?.window?.end)
   let latest = Number.isFinite(start) ? start : null
-  for (const interval of report?.timeline ?? []) {
-    if (ADVANCING_CLASSES.has(interval?.className) && Number.isFinite(interval?.end)) {
-      latest = latest === null ? interval.end : Math.max(latest, interval.end)
-    }
+  for (const event of report?.batchProgress ?? []) {
+    if (!BATCH_PROGRESS_KINDS.has(event?.kind) || !Number.isFinite(event?.at) || (Number.isFinite(end) && event.at > end)) continue
+    latest = latest === null ? event.at : Math.max(latest, event.at)
   }
   return latest
 }

@@ -6,6 +6,7 @@ import {
   autostartEvidence,
   autostartLastEvidence,
   boundaryMarkerEvidence,
+  delegatedBranchProgress,
   markerBoundary,
   pauseMarkerEvidence,
   transcriptEvidence,
@@ -57,15 +58,49 @@ describe('standstill report inputs', () => {
   it('turns committed boundaries and pause markers into explicit state', () => {
     const start = Date.parse('2026-08-21T08:00:00Z')
     const end = start + 60 * 60_000
-    expect(boundaryMarkerEvidence(JSON.stringify({
+    const boundary = boundaryMarkerEvidence(JSON.stringify({
       at: start, phase: 'committed', cause: 'point', sessionId: 's1', point: 809,
-    }), { end }).intervals).toEqual([
+    }), { end })
+    expect(boundary.intervals).toEqual([
       expect.objectContaining({ start, end, className: ACTIVITY_CLASSES.HANDOVER }),
     ])
+    expect(boundary.batchProgress).toEqual([{ at: start, kind: 'committed-boundary', point: 809 }])
+    expect(boundaryMarkerEvidence(JSON.stringify({ at: start, phase: 'prepared', point: 809 }), { end }).batchProgress).toEqual([])
     const pause = pauseMarkerEvidence('reason: asked to stop\ncause: user-stop\nretry-after: never\n', { start, end })
     expect(pause.intervals).toEqual([
       expect.objectContaining({ start, end, className: ACTIVITY_CLASSES.BLOCKED_USER, cause: 'user-stop' }),
     ])
+  })
+
+  it('counts only a measured delegated branch tip, not the declaration itself', () => {
+    const movedAt = Date.parse('2026-08-21T08:30:00Z')
+    const declaration = JSON.stringify({
+      at: movedAt - 10_000,
+      evidence: [
+        { kind: 'branch', ref: 'feat/958-work', point: 958 },
+        { kind: 'log', path: '/tmp/chatty.log', point: 958 },
+      ],
+    })
+    expect(delegatedBranchProgress(declaration, {
+      start: movedAt - 60_000,
+      end: movedAt + 60_000,
+      tipOf: (item) => item.kind === 'branch' ? { at: movedAt, sha: 'a'.repeat(40) } : null,
+    })).toEqual([{
+      at: movedAt, kind: 'delegated-branch-moved', sha: 'a'.repeat(40), point: 958,
+    }])
+    expect(delegatedBranchProgress(declaration, {
+      start: movedAt + 1,
+      end: movedAt + 60_000,
+      tipOf: () => ({ at: movedAt, sha: 'a'.repeat(40) }),
+    })).toEqual([])
+    expect(delegatedBranchProgress('', {
+      records: [{ event: 'delegated-finish', evidence: { items: [{ kind: 'branch', ref: 'feat/958-work', point: 958 }] } }],
+      start: movedAt - 60_000,
+      end: movedAt + 60_000,
+      tipOf: () => ({ at: movedAt, sha: 'b'.repeat(40) }),
+    })).toEqual([{
+      at: movedAt, kind: 'delegated-branch-moved', sha: 'b'.repeat(40), point: 958,
+    }])
   })
 
   it('renders threshold, evidence, totals, and UTC bounds', () => {

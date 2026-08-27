@@ -104,7 +104,7 @@ named owner. Only S-12 is allowed to stop the whole batch.
 | S-16 | Missing queue cards and board-first refusal form a mutual board-write block. | **In place:** `board-queue.mjs import/set` is the sanctioned missing-card writer and board mutation ordering keeps that exit reachable. |
 | S-17 | Lane/coupling exclusions leave open points but no named candidate. | **Direct fix:** compute the exclusion set, name the first non-excluded point, or emit a standstill event. The emergency workable set ignores dead in-flight claims. |
 | S-18 | A required finding cannot reach its normal tracked carrier. | **Direct fix:** provide a durable fallback sink outside guarded writers and replay it later. Emergency intents/outcomes demonstrate the required atomic-local-sink shape. |
-| S-19 | A live-but-wedged owner suppresses the responder because liveness is mistaken for progress. | **In place:** the emergency decision uses bounded advancing intervals, never process presence, and acts after the measured hour. |
+| S-19 | A live-but-wedged owner suppresses the responder because liveness is mistaken for progress. | **In place:** the emergency clock advances only on explicit batch progress (a first-parent main commit, committed boundary, or moved delegated branch tip), never process presence or foreground tool activity, and acts after the measured hour. |
 | S-20 | An abandoned claim suppresses launch for its whole lease. | **In place:** claim assessment expires inactive claims; emergency containment remains independent of the claimant session. |
 | S-21 | Unrelated artefact writes renew a dead in-flight declaration. | **Direct fix:** bind renewal to the declared process/work identity rather than branch/log movement; the emergency progress classifier admits only bounded work intervals. |
 | S-22 | Cleanup removes a worktree beneath a live delegate. | **In place:** cleanup refuses a live process and names its pid; hard recovery first proves and terminates exact process incarnations, then lets doctor perform recoverable cleanup. |
@@ -133,7 +133,11 @@ an empty workable queue, recent measured progress, or a reasoned future clock in
 `local/batch-emergency-veto.json`. Every strike writes an atomic intent before
 acting and an outcome afterward to `local/batch-emergency-state.json`, with the
 append history in `local/batch-emergency-strikes.jsonl`; both records print the
-exact `--veto … --until …` route.
+exact `--veto … --until …` route. For this decision, measured progress means a
+durable batch event: a first-parent commit on `main` (including a landed point),
+a committed boundary, or a delegated branch-tip commit. The activity timeline
+remains diagnostic; tool calls, verification output, waits, and process presence
+cannot renew the emergency clock.
 
 The first hour-without-progress strike is soft: doctor repair followed by a
 normal restart. A hard strike is legal only when that recorded strike exists and

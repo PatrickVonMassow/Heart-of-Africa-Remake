@@ -94,8 +94,8 @@ export function markerBoundary(text = '') {
 
 export function boundaryMarkerEvidence(text = '', { end } = {}) {
   let marker
-  try { marker = JSON.parse(text) } catch { return { intervals: [], boundaries: [] } }
-  if (!finite(marker?.at)) return { intervals: [], boundaries: [] }
+  try { marker = JSON.parse(text) } catch { return { intervals: [], boundaries: [], batchProgress: [] } }
+  if (!finite(marker?.at)) return { intervals: [], boundaries: [], batchProgress: [] }
   const interval = marker.phase === 'committed'
     ? evidenceInterval({
         start: marker.at, end, className: ACTIVITY_CLASSES.HANDOVER,
@@ -103,7 +103,62 @@ export function boundaryMarkerEvidence(text = '', { end } = {}) {
         evidence: { session: marker.sessionId ?? null, point: marker.point ?? null, phase: marker.phase },
       })
     : null
-  return { intervals: [interval].filter(Boolean), boundaries: [marker.at] }
+  const progress = marker.phase === 'committed'
+    ? { at: marker.at, kind: 'committed-boundary', point: marker.point ?? null }
+    : null
+  return { intervals: [interval].filter(Boolean), boundaries: [marker.at], batchProgress: [progress].filter(Boolean) }
+}
+
+function delegatedTip(item, { repo } = {}) {
+  const address = item?.kind === 'branch' ? String(item.ref ?? '').trim() : String(item?.path ?? '').trim()
+  if (!repo || !address) return null
+  const args = item.kind === 'branch'
+    ? ['-C', repo, 'rev-parse', `${address}^{commit}`]
+    : ['-C', address, 'rev-parse', 'HEAD^{commit}']
+  try {
+    const sha = execFileSync('git', args, {
+      encoding: 'utf8', windowsHide: true, timeout: 8000,
+      stdio: ['ignore', 'pipe', 'ignore'],
+    }).trim()
+    if (!/^[0-9a-f]{40}$/i.test(sha)) return null
+    // A tip already contained by main is counted by the first-parent source.
+    // Only an independently moved delegate branch belongs in this source.
+    try {
+      execFileSync('git', ['-C', repo, 'merge-base', '--is-ancestor', sha, 'main'], {
+        windowsHide: true, timeout: 8000, stdio: 'ignore',
+      })
+      return null
+    } catch (error) {
+      if (error?.status !== 1) return null
+    }
+    const seconds = Number(execFileSync('git', ['-C', repo, 'show', '-s', '--format=%ct', sha], {
+      encoding: 'utf8', windowsHide: true, timeout: 8000,
+      stdio: ['ignore', 'pipe', 'ignore'],
+    }).trim())
+    return Number.isFinite(seconds) && seconds > 0 ? { at: seconds * 1000, sha } : null
+  } catch {
+    return null
+  }
+}
+
+/** A declaration is not progress. Only a commit at the named delegated output
+ * is, and only while that tip is not already represented on main. */
+export function delegatedBranchProgress(text = '', { repo, records = [], start = -Infinity, end = Infinity, tipOf = delegatedTip } = {}) {
+  let declaration
+  try { declaration = JSON.parse(text) } catch { declaration = null }
+  const events = []
+  const seen = new Set()
+  const historical = records
+    .filter((record) => record?.event === 'delegated-start' || record?.event === 'delegated-finish')
+    .flatMap((record) => record?.evidence?.items ?? [])
+  for (const item of [...(declaration?.evidence ?? []), ...historical]) {
+    if (item?.kind !== 'branch' && item?.kind !== 'worktree') continue
+    const tip = tipOf(item, { repo })
+    if (!finite(tip?.at) || !/^[0-9a-f]{40}$/i.test(tip?.sha) || tip.at < start || tip.at > end || seen.has(tip.sha)) continue
+    seen.add(tip.sha)
+    events.push({ at: tip.at, kind: 'delegated-branch-moved', sha: tip.sha, point: item.point ?? null })
+  }
+  return events
 }
 
 export function pauseMarkerEvidence(text = '', { start, end } = {}) {
@@ -227,6 +282,7 @@ export function declaredInputPaths(repo, transcriptPaths = [], ref = 'main') {
     autostartLast: join(repo, '.claude', 'autostart-last.json'),
     boundaryLog: join(repo, '.claude', 'boundary.log'),
     boundaryMarker: join(repo, '.claude', 'batch-boundary.json'),
+    inFlight: join(repo, '.claude', 'batch-in-flight.json'),
     pauseMarker: join(repo, '.claude', 'batch-paused'),
     verificationRecords: join(repo, 'local', 'verify-logs', '*.run.json'),
     sessionTranscripts: transcriptPaths,
