@@ -109,6 +109,18 @@ put it is the mistake this line exists to stop.
   runnable however far the baseline lags; a range whose accumulated material does not fit no longer
   suspends the contributions inside it; plus the guard's own status on main's real range naming a
   finite, runnable plan or a named unassemblable contribution.
+  THE DEBT COMPOUNDS, MEASURED TWICE A DAY APART — use this pair as the before/after evidence.
+  Point 943 read the gate on 26.08.2026: baseline 226 mechanism commits back, 15.1 million
+  characters, 115 planned passes. The same instrument on 27.08.2026, 02:35, on main `4baf4527`:
+  baseline `265712e` is now 240 mechanism commits back and the material measures 15 659 456
+  characters against the 200 000-character round budget. Fourteen commits and ~0.56 million
+  characters in one day, added while the gate was suspended and therefore while nothing could be
+  reviewed — which is the compounding this point argues, now measured rather than argued. The
+  unassemblable file is unchanged and still the only one: `.claude/mechanism-reviews.jsonl`, the
+  gate's own ledger, which no pass can hold even as a bare diff. FOUR do-not-merge records now
+  stand on the range with their re-review suspended for material; 943 is closed, so those four are
+  the debt this point inherits, and the recorded-disposition clause above is what has to settle
+  them. After the change, re-read the same instrument and report the third number.
   Criticality: high — it is why the four-eyes gate on main enforces nothing today, and why point
   943 could not close its third leg.
   Bundle: Modell & Wächter. It rescopes what the mechanism gate demands, so it is worked before 916
@@ -2995,6 +3007,17 @@ put it is the mistake this line exists to stop.
   »stands down: another live session owns the batch lock«. Cost that turn: before landing point 897
   the outstanding DO-NOT-MERGE that `guard-preflight` names could not be checked for merge-blocking
   through `--status`, and had to be settled by reading the lock file by hand.
+  STILL STANDING 27.08.2026, 02:20, AND THE `--session` FLAG DOES NOT EXIST. The owning session
+  (`4f0a2cc4-…`, its live pid 3448131 and `fence: 814` in `.claude/batch-lock.json`) asked `node
+  scripts/branch-hygiene-guard.mjs --status` and was told »steht zurück — another live session owns
+  the batch lock«. Repeating it WITH `--session <the owning id>` returned the identical line: the
+  flag this point's FINAL STATE calls for is not parsed by that guard at all, so the workaround the
+  earlier instances imply is not available either. Only `echo '{"session_id":"…"}' | node
+  scripts/branch-hygiene-guard.mjs --status` answered truthfully — »sauber (clean)«. The cause is
+  visible in the source and is the shared one: `scripts/branch-hygiene-guard.mjs` resolves its id
+  from `readFileSync(0, 'utf8')` alone and passes `''` on to `heldByOtherLiveOwner`. Cost that turn:
+  the merge-ends-the-branch backstop could not be read while seven feature worktrees stood parked,
+  which is exactly the state it exists to judge.
   Criticality: medium — no product defect, but it silently withholds a reading two governing
   documents ask for.
   Bundle: Session- & Repo-Hygiene.
@@ -4131,6 +4154,26 @@ Build order, chosen so no two parallel agents own the same file:
   If the measurement shows a quiet reading is unreachable here, the criterion names the
   substitute evidence (CPU and load average, with the worktree and own-process rules above) that
   a quiet verdict may rest on, so both verdicts keep a reachable green.
+  BOTH HALVES MEASURED TOGETHER, 27.08.2026, 00:12, on main `6edd81fd`, and the gate is now
+  structurally suspended rather than occasionally wrong. `node scripts/batch-doctor.mjs --gate`
+  reported `npm run test:unit FAILED but the verdict is INCONCLUSIVE (load) — 7 live agent
+  worktree(s)` and, in the same line, `GPU load NOT measured (no sysfs gpu_busy_percent, no
+  nvidia-smi)`. Neither excuse held: `ps` over all seven worktree paths found NO process in any of
+  them, and their newest commits are 3, 4, 8, 9, 9, 12 and 14 days old — parked branches, i.e.
+  precisely the debris case this point already rules out. `liveAgentWorktrees()` in
+  `scripts/batch-doctor.mjs` takes every path under `worktrees/` straight from `git worktree list
+  --porcelain` and asks neither for a recent edit nor for a process, so while this batch parks
+  feature branches — its normal state — `isEvidenceGrade()` can never return true. Add the host's
+  permanently missing GPU counter and the two clauses close on each other: the quiet reading is
+  unreachable AND the worktree excuse never lifts, so NO red this gate ever takes can be evidence,
+  and its own verdict line ends `do NOT stop the batch on this`. That is the permanent-UNDECIDED
+  state the paragraph above warns against, reached from both sides at once.
+  WHAT THE RED ACTUALLY WAS, since the excuse hid it: nothing. Re-run by hand the same hour, the
+  suite reported 430 files and 14 015 tests ALL PASSED and still exited 1, because the global
+  teardown of `scripts/repository-integrity.mjs` had seen a ref move — point 955. The moving ref
+  was this session creating the next point's own feature branch at 00:12:28Z, four seconds before
+  the run ended. So the load excuse was covering a false red from a different mechanism, and the
+  tree it refused to judge was entirely green: the two defects hand each other an alibi.
   VERIFIABLE: Vitest on the pure verdict — a red beside a worktree whose newest edit is hours
   old is BROKEN, not inconclusive; a red beside a worktree edited a minute ago stays
   inconclusive; the reason string names the deciding measurement. Plus, on the process probe: a
@@ -12625,6 +12668,22 @@ to land than a mechanism that needs a review.
   pre-push gate. The check's own message already names the legitimate case, and the pre-push gate's
   single re-run is what rescued tonight's push; that re-run is a fail-soft, not an answer, because it
   costs a full unit suite and reports SUSPECT.
+  IT IS NOT ONLY THE DELEGATED LANES — THE OWNER TRIPS IT ON EVERY POINT START (measured
+  27.08.2026, 00:09-00:12Z, on main `6edd81fd`, with NO authoring lane running yet). The chain,
+  end to end: `batch-doctor --gate` began `npm run test:unit` at 00:09:44Z; at 00:12:28Z the same
+  owner session created `feat/957-contribution-scoped-review`, which is the mandated FIRST step of
+  the next point; at 00:12:32Z the suite finished with 430 files and 14 015 tests ALL PASSED and
+  the teardown failed the run on `refs changed: refs/heads/feat/957-…`. So the exposure is not
+  confined to a busy evening of parallel authors: the owner's own `git worktree add` and its own
+  bookkeeping commit on `main` move a ref just as reliably, which puts every point start and every
+  cross-cutting commit in the window. Reproduced the same hour from a manual `npm run test:unit`,
+  again all 430 files green, exit 1 on the same teardown.
+  AND IT COMPOUNDS WITH 455, WHICH IS HOW THE GREEN TREE STAYED UNKNOWN. `batch-doctor` reads only
+  the exit code, so it saw a red; its load probe then excused that red as INCONCLUSIVE on "7 live
+  agent worktree(s)" that held no process and had not been written to for 3 to 14 days. A false red
+  from this point therefore collects a false excuse from 455, and neither mechanism ever learns
+  what was true — that the tree was entirely green. Whichever of the two is built first, its test
+  should name the other, because each one alone still leaves the pair silent.
   FINAL STATE: the teardown distinguishes TEST LEAKAGE into the live repository from a foreign
   branch's own progress. A ref that belongs to a declared in-flight lane, or any ref that is neither
   the running checkout's HEAD nor its branch, is not this suite's leakage and does not fail the run;
