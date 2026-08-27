@@ -56,6 +56,38 @@ describe('a reply that asks the user to decide, with no card for it, BLOCKS', ()
   })
 })
 
+describe('a reply cannot re-ask a settled owner ruling', () => {
+  const repeated = 'Soll ich die Anleitungs-Obergrenze selbst anheben oder sollst du das freigeben?'
+
+  it('blocks with the registered ruling even when a matching card already stands', () => {
+    const v = evaluate({
+      replyText: repeated,
+      vdzkTitles: ['Anleitungs-Obergrenze anheben'],
+    })
+    expect(v.block).toBe(true)
+    expect(v.reason).toContain('Settled owner ruling "documentation-ceiling-increases"')
+    expect(v.reason).toContain('Frage mich in Zukunft allgemein nicht mehr bzgl. Anhebungen')
+  })
+
+  it('lets an unrelated decision continue through the existing card rule', () => {
+    expect(evaluate({
+      replyText: 'Soll die Obergrenze für parallele Autoren von vier auf sechs steigen?',
+      vdzkTitles: ['Obergrenze für parallele Autoren'],
+    })).toEqual({ block: false, reason: null })
+  })
+
+  it('accepts the one-line distinction for an uncertain match, then still requires its card', () => {
+    const reply =
+      'Welcher Wert soll für das Doc-Budget gelten?\n' +
+      'Not settled ruling documentation-ceiling-increases: This asks for the current measured value, not permission to change it.'
+    expect(evaluate({ replyText: reply, vdzkTitles: ['Aktueller Wert: Doc-Budget'] })).toEqual({
+      block: false,
+      reason: null,
+    })
+    expect(evaluate({ replyText: reply, vdzkTitles: [] }).reason).toContain('Decision-card rule')
+  })
+})
+
 describe('a card for the question lets the turn end', () => {
   it('passes when a VDZK card title shares a topic word with the question', () => {
     const v = evaluate({ replyText: TYPOGRAPHY_ASK, vdzkTitles: ['Kartenschrift: enge, weite oder gemischte Variante'] })

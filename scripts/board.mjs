@@ -78,6 +78,7 @@ import { readDeclaration, writeDeclaration } from './batch-in-flight.mjs'
 import { transitionActiveDeclaration } from './active-work-source.mjs'
 import { withBoardEditLock } from './board-edit-lock.mjs'
 import { readTasksAll } from './tasks-source.mjs'
+import { settledRulingVerdict } from './settled-ruling-core.mjs'
 
 const BOARD = resolve(REPO_ROOT, '.batch-dashboard.html')
 const PUBLISH_SCRIPT = 'scripts/board-publish.mjs'
@@ -392,7 +393,10 @@ try {
     if (!title || (words.length === 0 && !stdinText.trim())) {
       throw new Error('usage: board.mjs vdzk-add [--automated] "<title>" "<question>"|--text-stdin')
     }
-    edit((html) => addVdzk(html, title, textOf(words), { automated }), `open question added: ${title}`)
+    const question = textOf(words)
+    const settled = settledRulingVerdict(`${title}\n${question}`)
+    if (settled.block) throw new Error(`vdzk-add REFUSED — ${settled.reason}`)
+    edit((html) => addVdzk(html, title, question, { automated }), `open question added: ${title}`)
   } else if (cmd === 'vdzk-remove') {
     const fragment = textOf(rest)
     if (!fragment) throw new Error('usage: board.mjs vdzk-remove "<title>"|--text-stdin')
