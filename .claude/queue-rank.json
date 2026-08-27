@@ -859,12 +859,6 @@
       "origin": "machine",
       "place": "last"
     },
-    "963": {
-      "at": "2026-08-27T06:04:51.491Z",
-      "why": "User instruction 27.08.2026, 07:28 in the board chat: 'Ziehe das vor.' — his third report of the same card header, pulled ahead by name.",
-      "origin": "user",
-      "place": "ahead"
-    },
     "964": {
       "at": "2026-08-27T05:12:59.834Z",
       "why": "It edits the successor tick 945 also edits, so it can only follow it — last is where it belongs until 945 has landed.",
@@ -876,43 +870,13 @@
       "why": "Blocking and tagged high, but it is the handover path rather than the release, so it keeps the place the work order gives it behind the points already ranked.",
       "origin": "machine",
       "place": "last"
+    },
+    "967": {
+      "at": "2026-08-27T08:34:03.806Z",
+      "why": "User instruction 27.08.2026, 10:21 ('Hole die Batch (ohne Forcierung) und mache das direkt.'): worked before 945 in the claiming window; moved to the queue head in the same turn.",
+      "origin": "machine",
+      "place": "last"
     }
-  },
-  "boundary": {
-    "at": "2026-08-21T00:55:14.962Z",
-    "points": [
-      336,
-      553,
-      596,
-      633,
-      659,
-      660,
-      663,
-      686,
-      687,
-      688,
-      689,
-      690,
-      691,
-      692,
-      708,
-      715,
-      719,
-      733,
-      734,
-      735,
-      736,
-      738,
-      739,
-      746,
-      747,
-      750,
-      759,
-      760,
-      762,
-      764
-    ],
-    "why": "The order standing in front of the release today is the arrangement that predates this rule; the four machine-filed points that had ranked themselves there were moved behind 174 first"
   },
   "settled": {
     "at": "2026-08-27T06:06:55.151Z",
@@ -1230,9 +1194,44 @@
       960,
       961,
       962,
-      963,
       964,
       965
     ]
+  },
+  "boundary": {
+    "at": "2026-08-21T00:55:14.962Z",
+    "points": [
+      336,
+      553,
+      596,
+      633,
+      659,
+      660,
+      663,
+      686,
+      687,
+      688,
+      689,
+      690,
+      691,
+      692,
+      708,
+      715,
+      719,
+      733,
+      734,
+      735,
+      736,
+      738,
+      739,
+      746,
+      747,
+      750,
+      759,
+      760,
+      762,
+      764
+    ],
+    "why": "The order standing in front of the release today is the arrangement that predates this rule; the four machine-filed points that had ranked themselves there were moved behind 174 first"
   }
 }
