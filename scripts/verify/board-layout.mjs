@@ -70,7 +70,7 @@ const OLD_HEADER_RULES = `<style id="board-layout-control">
 details:not(.sect)>summary>.t{flex:1 1 12rem}
 details:not(.sect)>summary>.right{flex-wrap:nowrap}
 details:not(.sect)>summary>.right>*,details:not(.sect)>summary>.right .meta{white-space:nowrap}
-@media(max-width:460px){details:not(.sect)>summary:has(>.right)>.card-header-left,details:not(.sect)>summary:has(>.right)>.t,details:not(.sect)>summary:has(>.right)>.right{flex:0 1 auto;order:0}}
+@media(max-width:460px){details:not(.sect)>summary:has(>.right)>.card-header-left,details:not(.sect)>summary:has(>.right):has(>.card-header-left)>.t,details:not(.sect)>summary:has(>.right):has(>.card-header-left)>.right{flex:0 1 auto;order:0}}
 </style>`
 
 // The declarations point 967 replaced: 963's unconditional stacking, which the
@@ -281,11 +281,20 @@ const measureBoard = async (page, html) => {
         }
       }
 
+      // The card with no right group keeps the summary's NATIVE marker — read
+      // the computed pseudo-element, not the stylesheet text, so a broader
+      // suppression rule cannot pass unseen (confirming review, finding 2).
+      const bareSummary = summaries.find((summary) => pointOf(summary) === stressBarePoint)
+      const nativeMarker = bareSummary
+        ? getComputedStyle(bareSummary, '::after').content
+        : ''
+
       const root = document.documentElement
       return {
         bareCount: bare.length,
         bareTitleBelowRight,
         barePointSeen: summaries.some((summary) => pointOf(summary) === stressBarePoint),
+        nativeMarker,
         cardCount: summaries.length,
         titles,
         overflow,
@@ -324,6 +333,11 @@ try {
         `${at}: a card without a number group keeps its title above the right group`,
         measured.bareTitleBelowRight.length === 0,
         measured.bareTitleBelowRight.slice(0, 3).join(', '),
+      )
+      check(
+        `${at}: a card without a right group keeps its native disclosure marker`,
+        measured.nativeMarker.includes('▸') || measured.nativeMarker.includes('▾'),
+        `computed content ${measured.nativeMarker || '(empty)'}`,
       )
       check(
         `${at}: no header part leaves its card`,
