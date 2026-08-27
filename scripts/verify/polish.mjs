@@ -2949,6 +2949,12 @@ if (section('settlement-edge')) {
   // by only 0.3 m, which is the number to look at first if the offsets or the
   // band's width are ever recalibrated.
   const kinds = [
+    // THE CASE THE USER REPORTED (point 581) LEADS. His frame was the Bambara
+    // village: pale sand inside, pale sand outside, the master strength already
+    // at its ceiling and the line still unreadable. A roster that measures three
+    // other kinds and not this one cannot say the report is answered, so the
+    // sand-on-sand village is measured and PHOTOGRAPHED like the rest.
+    { id: 'bambara-village', shoot: { name: '581-sand-village-edge-band', label: 'the swept Bambara village ground giving way at the edge' } },
     { id: 'maasai-village', shoot: { name: '488-village-edge-band', label: 'the swept village ground giving way at the edge' } },
     { id: 'capetown', shoot: { name: '488-port-edge-band', label: 'the port ground giving way at the edge' } },
     { id: 'giza', shoot: { name: '488-monument-edge-band', label: 'the monument plateau giving way at the edge' } },

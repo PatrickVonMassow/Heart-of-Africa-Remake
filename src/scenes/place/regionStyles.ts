@@ -100,6 +100,14 @@ export interface RegionPlaceStyle {
   dwellingCount: number
 }
 
+/** A port's own ground, the same triple a region style carries: pebbled sandy
+ *  earth, one palette for every harbour town rather than the region's. */
+export const PORT_GROUND: [string, string, string] = ['#dcc99c', '#c4ad7c', '#b59a6b']
+
+/** The walkable Giza plateau: warm, granular DESERT SAND matched to the travel
+ *  desert biome (point 273), drawn in the ground material's `sand` mode. */
+export const MONUMENT_GROUND: [string, string, string] = ['#e0c489', '#d3b578', '#c2a05e']
+
 export const REGION_PLACE_STYLES: Record<RegionId, RegionPlaceStyle> = {
   // Sahara/Nubia: tight adobe quarters with flat roofs along narrow lanes,
   // date palms, pale trodden sand paths.

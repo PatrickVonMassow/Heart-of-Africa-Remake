@@ -821,6 +821,61 @@ describe('derived now-section membership', () => {
   })
 })
 
+// The closing card is a STATE the publish projection must carry (point 544;
+// regression via point 713): it wears the chip of a point that is ticked by
+// design, and reading that chip as numbered work made the render delete the
+// one card whose whole job is to stand after the tick — board.mjs closing
+// reported success while the published board claimed idleness, and the
+// board-first gate then denied every closing duty.
+describe('the closing card survives the derived publish projection', () => {
+  const closingBoard = (extra = '') =>
+    toClosingWork(fullBoard({ now: extra }), 967, {
+      subject: 'Kompakter Kartenkopf',
+      reason: 'Branch-Cleanup und Punktgrenze stehen noch aus.',
+      stamp: '12:16',
+    })
+
+  it('keeps the closing card byte for byte and adds no empty element', () => {
+    const { html, comparison } = projectNowForPublish(closingBoard(), { ok: true, points: [], focusPoint: null })
+    expect(html).toContain('data-state="closing"')
+    expect(html).toContain('Branch-Cleanup und Punktgrenze stehen noch aus.')
+    expect(html).not.toContain(NOW_EMPTY_STATE_MARKUP)
+    expect(comparison).toMatchObject({ ok: true, closingCards: 1, extra: [], unknown: [] })
+    expect(claimsNoCurrentWork(html)).toBe(false)
+    expect(claimsClosingWork(html)).toBe(true)
+  })
+
+  it('lets the focus still naming the ticked point be represented by its closing card', () => {
+    const { comparison } = projectNowForPublish(closingBoard(), { ok: true, points: [], focusPoint: 967 })
+    expect(comparison).toMatchObject({ ok: true, focusUnrepresented: false, focusMisplaced: false })
+  })
+
+  it('refuses to render active work beside the standing closing card', () => {
+    const beside = closingBoard()
+    expect(() => reconcileNowProjection(beside, [700]))
+      .toThrow(/beside the standing closing card/)
+    expect(compareNowProjection(beside, [700])).toMatchObject({ ok: false, closingBesideWork: true })
+  })
+
+  it('normalises a duplicated closing card to one and refuses the stack in the comparison', () => {
+    const single = closingBoard()
+    const card = closingWorkCards(single)[0]
+    const doubled = single.replace(card, card + card)
+    expect(compareNowProjection(doubled, [])).toMatchObject({ ok: false, duplicateClosing: true })
+    const { html, comparison } = projectNowForPublish(doubled, { ok: true, points: [], focusPoint: null })
+    expect(closingWorkCards(html)).toHaveLength(1)
+    expect(comparison).toMatchObject({ ok: true })
+  })
+
+  it('still refuses the empty element stacked beside the closing card', () => {
+    const stacked = closingBoard().replace(
+      '<details class="now" data-state="closing"',
+      `${NOW_EMPTY_STATE_MARKUP}\n<details class="now" data-state="closing"`,
+    )
+    expect(compareNowProjection(stacked, [])).toMatchObject({ ok: false })
+  })
+})
+
 // Point 410: the shell is what broke the umlauts, so the text must be able to
 // skip it. These cases pin the seam between the argv and the stdin path.
 describe('resolveCardText — the way German prose gets in', () => {

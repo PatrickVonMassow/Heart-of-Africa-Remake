@@ -24271,3 +24271,101 @@ Nummerierung bleiben deshalb identisch — hier wird nur verschoben, nie umgesch
   first half.
   Bundle: Urlaubsfestigkeit. It edits the launcher spawn path 859 and 612 own, so it is worked with
   them, never beside them.
+
+- [x] 581. The settlement boundary is too faint, and its slider is already at the ceiling
+  (user 09.08.2026, F6 report `local/bugreports/DorfgrenzeSchlechtErkennbar.zip`: "Die
+  Dorfgrenze ist zu schlecht erkennbar. Der Kontrast muss höher sein"). MEASURED from his
+  state: `placeEdgeBand` stands at the shipped defaults, `widthM: 3`, `wanderM: 0.9`,
+  `strength: 1` — and `strength` is documented as "0 (invisible) .. 1 (the full per-kind
+  look)". He is therefore already looking at the STRONGEST edge the game can draw, and it
+  is not enough. This is not a calibration miss: there is no knob left to turn, so the
+  per-kind look itself carries too little contrast against the ground it sits on.
+  FINAL STATE: the boundary READS at a glance from inside the settlement, at the walking
+  pace and eye height the player actually has, in every settlement kind and on the ground
+  colours they stand on — the Bambara village's pale sand is the case that failed, so it
+  is the case that must be shown to work. The contrast comes from the band's own design
+  (value against the surrounding ground, not hue alone — the report is from a sand-on-sand
+  village), and it stays a give-way rather than becoming a painted stripe: the §2.6 look
+  is a threshold the player reads, not a fence. `strength: 1` remains the full look, so
+  the ceiling moves with the design rather than being raised past it.
+  VERIFIABLE: the PICTURE decides, since the complaint is legibility — a first-person
+  frame from inside the settlement at the boundary in at least the Bambara village and
+  one contrasting settlement kind, on BOTH backends, judged by looking. Plus a pure test
+  pinning the contrast the design settles on (the band's value against the sampled ground
+  value stays above the chosen minimum for every settlement kind), so a later ground or
+  palette change cannot quietly erase it again.
+  Criticality: medium — the boundary is what tells the player where the settlement ends
+  and the bird's-eye view resumes; §2.6 and criterion 15 both rest on it being legible.
+
+- [x] 963. A dashboard card header still does not wrap its two side columns (user 27.08.2026,
+  board chat 06:46: "Die linke und die rechte Spalte im Header einer Dashboard-Karte bricht nach
+  wie vor nicht um."). MEASURED in `.batch-dashboard.html`: the card `summary` itself wraps
+  (`details:not(.sect)>summary:has(>.right){flex-wrap:wrap}`) and the middle title is allowed to
+  break (`.t{flex:1 1 12rem;overflow-wrap:anywhere}`), but the two COLUMNS beside it cannot. The
+  right column is pinned `flex-wrap:nowrap`, so a `meta` reading like `06:30 · ~08:30` stays one
+  unbreakable row; the left column carries the number plus the criticality badge and is
+  `flex:0 1 auto`, so it shrinks to nothing before it breaks. On a narrow phone the header
+  therefore overflows sideways instead of reflowing, which is the third report of the same shape —
+  the previous two fixed the summary and the title and left the columns as they were.
+  FINAL STATE: at every viewport the project supports, and in portrait above all, a card header
+  reflows entirely inside its own width: both side columns break their own content when they must,
+  no part of the header is clipped or forces a horizontal scroll, and the number, the criticality
+  badge, the title and the meta stay individually readable rather than being shrunk to fit. The
+  fix is in the ONE dashboard structure, not per card, and the reading order of the header does
+  not change.
+  VERIFIABLE: a layout check over the rendered board at portrait widths (360 / 390 / 414 CSS px
+  among them) — every card header's own bounding box lies inside the page width, the document
+  never scrolls horizontally, and a header carrying a long meta and a long title resolves to more
+  than one line instead of overflowing. Plus a picture at one narrow width, since the complaint is
+  legibility and the measurement alone has now missed it twice.
+  Criticality: medium — the board is how the user reads the batch, and this is his third report of
+  it; nothing is corrupted, but the reading is.
+  Bundle: Chat & Tafel.
+
+- [x] 967. The card header's portrait stacking now reads worse than what it replaced — third round.
+  REPORTED by the user 27.08.2026, 10:15 with a portrait phone screenshot of the published board
+  taken at 10:08 (~412 CSS px), verbatim: "Zu 963: Das war schon der zweite Versuch und jetzt sieht
+  es noch schlimmer aus als vorher." This is the THIRD round of one complaint: 941 (57d6c47c) let
+  every header group wrap but left the outer columns unyielding; 963 (58fcc4d5, merged c6018a87 on
+  27.08. at 09:49) then forces all THREE header groups to `flex: 1 1 100%` UNCONDITIONALLY below the
+  board's 460px phone break. The screenshot shows what that costs: every card header becomes three
+  stacked full-width rows whatever it contains — number plus badge, then the title, then meta and
+  the disclosure marker right-aligned on a row of their own — even for a short done-card header that
+  fitted on one line. Cards grow tall and airy, the meta floats detached from its card, and the
+  board's compactness is gone.
+  WHY THE SUITE MISSED IT BOTH TIMES: nothing is geometrically cut off, and both attempts were
+  verified by overflow and cut-off assertions only. The complaint is aesthetic, which is the class
+  the `watch-for-aesthetic-oddities` rule exists for. 58fcc4d5's own message records that the
+  suite's hand-written stylesheet copy "is why the same complaint passed verification twice", fixes
+  exactly that, measures the published board at 360/390/414 — and still ships a rendering the user
+  rejects.
+  TWO FURTHER BLOCKERS, measured 27.08. while preparing this round (carrier addendum): the stacking
+  rule is not the only cause — `details:not(.sect)>summary>.t` carries `flex:1 1 18rem`
+  (`scripts/board-core.mjs`), and 18rem ≈ 288px exceeds a portrait card's whole content strip, so
+  flex line-breaking wraps EVERY title to its own row below ~460px even with the media rule deleted;
+  the phone break needs a content-driven title basis. And the suite itself constrains the fix:
+  `board-layout.mjs` asserts every title keeps ≥50% of its card width (stress cards included), which
+  a genuinely compact one-line header violates — that assertion must be reworked in the same commit
+  (a title either fits its content unclipped on one line OR keeps its 50% share).
+  FINAL STATE: a header group takes a full row only when its content needs one, so a short header
+  stays as compact as it was before the 460px rule. The authoring proposal — not a user instruction
+  — is number plus badge left and meta plus marker right on row one, with the title full-width
+  beneath, applied only when the one-line header does not fit. No regression on 941/963: nothing is
+  cut off or escapes its card, a long title and a long meta wrap their own text, and the
+  published-board portrait measurements at 360/390/414 stay green.
+  THE POINT DOES NOT CLOSE ON A GREEN SUITE ALONE: two formally green attempts were rejected by the
+  user's eye, so the third closes only after the user approves a portrait screenshot of the
+  candidate rendering — real board content, ~390px, showing one long-title card and one short
+  done-card. The 27.08. rejection makes the user the acceptance authority for this point.
+  VERIFIABLE: the suite gains the assertion class it lacks — an upper bound on header HEIGHT for a
+  SHORT header at portrait width, so unconditional stacking turns the suite red instead of needing a
+  fourth complaint; plus the existing 360/390/414 cut-off and wrap assertions against the published
+  board.
+  Criticality: high — it is the third round of the same rejected rendering, and the board is the
+  surface the user reads the batch on.
+  Author lane: fable — operator decision, user 27.08.2026, 10:21, verbatim: "Hole die Batch (ohne
+  Forcierung) und mache das direkt.", answering this session's offer to fix it here itself
+  ("dass ich das hier selbst fixe"); the serving session is Fable 5. Routing measured sol at round
+  0; review stays cross-vendor (Sol reads the diff, `scripts/review-sol.mjs`).
+  Bundle: Chat & Tafel. It edits the board's card-header CSS and `scripts/verify/board-layout.mjs`,
+  which 965 does not touch, so the two may run beside each other.

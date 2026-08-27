@@ -215,13 +215,16 @@ const CARD_HEADER_LEFT_SOURCE =
   `(?:${CRITICALITY_BADGE_SOURCE})?<\\/span>`
 const CRITICALITY_STYLE = `<style id="${CRITICALITY_STYLE_ID}">
 .card-header-left{display:inline-flex;flex:0 1 auto;flex-wrap:wrap;align-items:baseline;gap:2px 9px;min-width:0;max-width:100%}
-details:not(.sect)>summary:has(>.right){flex-wrap:wrap;min-width:0;max-width:100%}
-details:not(.sect)>summary>.t{flex:1 1 12rem;min-width:0;max-width:100%;overflow-wrap:anywhere}
+.card-header-left>*{min-width:0;max-width:100%;white-space:normal;overflow-wrap:anywhere}
+details:not(.sect)>summary{flex-wrap:wrap;row-gap:4px;min-width:0;max-width:100%}
+details:not(.sect)>summary>.t{flex:1 1 18rem;min-width:0;max-width:100%;overflow-wrap:anywhere}
 details:not(.sect)>summary:has(>.right)::after{content:none}
-details:not(.sect)>summary>.right{display:inline-flex;align-items:baseline;flex:0 1 auto;flex-wrap:nowrap;min-width:0;max-width:100%;white-space:normal}
+details:not(.sect)>summary>.right{display:inline-flex;justify-content:flex-end;align-items:baseline;flex:0 1 auto;flex-wrap:nowrap;column-gap:6px;min-width:0;max-width:100%;white-space:normal}
+details:not(.sect)>summary>.right>*{min-width:0;max-width:100%;white-space:normal;overflow-wrap:anywhere}
 details:not(.sect)>summary>.right .meta{min-width:0;max-width:100%;white-space:normal;overflow-wrap:anywhere}
 details:not(.sect)>summary>.right::after{content:"▸";flex:0 0 auto;margin-left:6px}
 details:not(.sect)[open]>summary>.right::after{content:"▾"}
+@media(max-width:460px){details:not(.sect)>summary:has(>.right)>.card-header-left{order:0;flex:0 1 auto}details:not(.sect)>summary:has(>.right):has(>.card-header-left)>.right{order:1;flex:0 1 auto;margin-left:auto}details:not(.sect)>summary:has(>.right):has(>.card-header-left)>.t{order:2;flex:1 1 100%}}
 .criticality{flex:0 1 auto;min-width:0;max-width:100%;overflow-wrap:anywhere;border:1px solid currentColor;border-radius:999px;padding:.08em .48em;font-size:.72em;font-weight:700;line-height:1.35}
 .criticality-low{background:#dcebd9;color:#24511f}.criticality-med{background:#f3e4ad;color:#684e00}.criticality-high{background:#f3d1cb;color:#7a2115}
 </style>`
@@ -630,6 +633,18 @@ function projectedNowCards(html) {
   })
 }
 
+/**
+ * A card that REALLY is the closing state (point 544): the marker AND the
+ * composed closing title. It carries its point's chip since point 655, and that
+ * point is TICKED by design — so the projection and the comparison must judge
+ * it as a state card, never as numbered work whose point has no active record.
+ * Reading it as work made the point-713 render delete the one card whose whole
+ * job is to stand after the tick.
+ */
+function isTrulyClosingCard(card) {
+  return /data-state="closing"/.test(String(card ?? '')) && isTrulyStateCard(card, 'closing')
+}
+
 const pointsInSection = (html, key) => {
   try {
     const { from, end } = sectionBounds(html, key)
@@ -673,7 +688,13 @@ export function compareNowProjection(html, expectedPoints, { knownPoints = null,
       return { ok: false, error: 'the expected active-point set is malformed', missing: [], extra: [], duplicates: [] }
     }
     const cards = projectedNowCards(html)
-    const actual = cards.filter((card) => card.point != null).map((card) => card.point)
+    // THE CLOSING CARD IS A STATE, NOT WORK (point 544; regression via point
+    // 713): counted into the numbered membership it turned "extra"/"unknown"
+    // the moment its point was ticked — which is the only moment it exists.
+    const closingCards = cards.filter((card) => isTrulyClosingCard(card.html))
+    const actual = cards
+      .filter((card) => card.point != null && !isTrulyClosingCard(card.html))
+      .map((card) => card.point)
     const counts = new Map()
     for (const point of actual) counts.set(point, (counts.get(point) ?? 0) + 1)
     const expectedSet = new Set(expected)
@@ -707,10 +728,13 @@ export function compareNowProjection(html, expectedPoints, { knownPoints = null,
     // agree about the same thing or neither means anything.
     const focused = Number(focusPoint)
     const focusChecked = Number.isInteger(focused) && focused > 0
+    // A focus still naming the just-ticked point is REPRESENTED by its closing
+    // card — the card names exactly that point.
     const focusUnrepresented = focusChecked && !actualSet.has(focused)
-    const focusMisplaced = focusChecked && !focusUnrepresented && actual[0] !== focused
+      && !closingCards.some((card) => card.point === focused)
+    const focusMisplaced = focusChecked && focusUnrepresented === false && actualSet.has(focused) && actual[0] !== focused
     const emptyStateCount = (nowSectionSlice(html).text.match(emptyStatePattern()) ?? []).length
-    const unnumbered = cards.filter((card) => card.point == null)
+    const unnumbered = cards.filter((card) => card.point == null && !isTrulyClosingCard(card.html))
     const unnumberedCards = unnumbered.length
     const idleCards = unnumbered.filter((card) => isTrulyStateCard(card.html, 'idle')).length
     const handoverCards = unnumbered.filter((card) => isHandoverCard(card.html)).length
@@ -744,14 +768,26 @@ export function compareNowProjection(html, expectedPoints, { knownPoints = null,
     // zero claim out, so damaged machine state was blessed instead of refused.
     // This module renders exactly one; a second is never something it wrote.
     const duplicateDerived = derivedCards > 1
+    // The closing card is the THIRD honest zero-work form (point 544): while it
+    // stands, neither the idle card nor the empty element may — and beside
+    // expected active work it is the same contradiction the idle card would be.
+    const closingClaim = closingCards.length > 0
+    const closingBesideWork = expected.length > 0 && closingClaim
+    const duplicateClosing = closingCards.length > 1
     const emptyStateWrong = expected.length === 0
       ? (idleCards === 1
-          ? emptyStateCount !== 0 || claimCards !== 1
-          : emptyStateCount !== 1 || claimCards > 0)
+          ? emptyStateCount !== 0 || claimCards !== 1 || closingClaim
+          : closingClaim
+            ? emptyStateCount !== 0 || claimCards > 0
+            : emptyStateCount !== 1 || claimCards > 0)
       : emptyStateCount > 0 || idleCards > 0 || strayCards > 0
     return {
       ok: !missing.length && !extra.length && !duplicates.length && !unknown.length && !crossSection.length
-        && !emptyStateWrong && !duplicateDerived && !focusUnrepresented && !focusMisplaced,
+        && !emptyStateWrong && !duplicateDerived && !focusUnrepresented && !focusMisplaced
+        && !closingBesideWork && !duplicateClosing,
+      closingBesideWork,
+      duplicateClosing,
+      closingCards: closingCards.length,
       duplicateDerived,
       focusPoint: focusChecked ? focused : null,
       focusUnrepresented,
@@ -836,12 +872,24 @@ export function reconcileNowProjection(
     throw new Error('board: active-point projection is malformed')
   }
   const cards = projectedNowCards(source)
-  const numbered = cards.filter((card) => card.point != null)
+  // The closing card is a STATE (point 544): it carries the chip of a point
+  // that is ticked by design, so reading it as numbered work made this render
+  // delete it silently (regression via point 713). It is kept like the idle
+  // handover card — and refused beside active work, like the idle card.
+  const closingCards = cards.filter((card) => isTrulyClosingCard(card.html))
+  if (expected.length > 0 && closingCards.length > 0) {
+    throw new Error(
+      `board: refusing to render active point(s) ${expected.join(', ')} beside the standing closing ` +
+        'card — the board would contradict itself in one screen. Promote the work through board.mjs ' +
+        '(now/done --next), which replaces the state card.',
+    )
+  }
+  const numbered = cards.filter((card) => card.point != null && !isTrulyClosingCard(card.html))
   const counts = new Map()
   for (const card of numbered) counts.set(card.point, (counts.get(card.point) ?? 0) + 1)
   const conflicts = [...counts].filter(([, count]) => count > 1).map(([point]) => point)
   if (conflicts.length) throw new Error(`board: conflicting current-work copies for point(s) ${conflicts.join(', ')}`)
-  const unnumbered = cards.filter((card) => card.point == null)
+  const unnumbered = cards.filter((card) => card.point == null && !isTrulyClosingCard(card.html))
   // …and the derived state card is not one of them (point 935): it is exempt
   // beside active work for reasons that hold just as well beside none, and
   // refusing it here made the board unpublishable at every session boundary
@@ -950,8 +998,16 @@ export function reconcileNowProjection(
 
   const now = { ...bounds, text: source.slice(bounds.from, bounds.end) }
   let derivedKept = 0
+  let closingKept = 0
   let remainder = now.text
     .replace(/<details class="now"[^>]*>[\s\S]*?<\/details>\s*/g, (card) => {
+      // The closing card survives byte for byte — ONE of them (the beside-work
+      // contradiction threw above, so expected is empty here); a duplicate is
+      // damaged state and normalised away like a stacked derived card.
+      if (isTrulyClosingCard(card)) {
+        closingKept += 1
+        return closingKept > 1 ? '' : card
+      }
       const summary = (card.match(/<summary>([\s\S]*?)<\/summary>/) ?? [])[1] ?? ''
       const { chip, legacy } = summaryPoint(summary)
       if (chip != null || legacy != null) return ''
@@ -981,7 +1037,9 @@ export function reconcileNowProjection(
     // machine decision suppressed the empty element and the comparison then
     // found no zero claim at all. "Nothing is running" and "this is what the
     // machine decided" are two statements, and the reader is owed both.
-    const claims = unnumbered.some((card) => isTrulyStateCard(card.html, 'idle'))
+    // …and the closing card is the third honest zero-work form (point 544):
+    // while it stands, adding the empty element would stack two claims.
+    const claims = unnumbered.some((card) => isTrulyStateCard(card.html, 'idle')) || closingCards.length > 0
     if (!claims) remainder = remainder ? `${remainder}\n${NOW_EMPTY_STATE_MARKUP}` : NOW_EMPTY_STATE_MARKUP
   }
   else remainder = `${ordered.map((card) => card.html).join('')}${remainder ? `\n${remainder}` : ''}`.trimEnd()

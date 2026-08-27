@@ -101,6 +101,56 @@ put it is the mistake this line exists to stop.
   Bundle: Urlaubsfestigkeit. It edits the successor decision and the watchdog counters 859 and 866
   own, so it is worked with them, never beside them.
 
+- [ ] 966. The unit suite run from a linked worktree writes into the LIVE repository. MEASURED
+  27.08.2026, 10:02-10:07: a `git push origin main` issued while the shell's working directory was
+  still inside the linked worktree `.claude/worktrees/point-945` ran `scripts/pre-push-gate.mjs`
+  there, and its `npm run test:unit` — together with a second, nested suite that
+  `scripts/batch-doctor.mjs --gate` started beside it — used the real repository as its fixture
+  instead of its temporary ones. In five minutes it (1) moved `refs/heads/main` off de051dad onto
+  fixture commits (`seed`, `Test two model trailers`, authored `t <t@t>` and `doctor
+  <doctor@test>`), (2) created 22 fixture branches in the live ref store (`clean-side`, `side`,
+  `wt`, `topic/live`, `fixture-linked`, `fixture-owner`, `feat/x`, `feat/403-x`, `feat/500-x`,
+  `feat/697-strand`, `feat/712-test`, `feat/900-something`, `feat/agent-1`,
+  `feat/branch-bulk-gap-range`, `feat/fresh-tree`, `feat/main-advanced-gap-range` and the
+  `feat/{581,733,898,899,901,938}-calibration-fixture` set), (3) rewrote `.git/config` — `core.bare`
+  to `true`, `core.hooksPath` from the versioned relative `scripts/git-hooks` to an absolute path,
+  plus a `[user]` identity that arrived first as `repository integrity test
+  <integrity@test.invalid>` and then as `test <test@example.invalid>`, (4) registered two `/tmp`
+  fixture worktrees in the real repository, and (5) left the point-945 worktree detached on a
+  fixture commit with an index that reported the whole tree deleted.
+  WHAT IT DID NOT COST: the push failed at its own gate (`failed to push some refs`), so nothing
+  reached GitHub, `origin/main` stayed at de051dad, and every real feature branch still matched its
+  remote. The checkout was repaired by hand in the same session — `main` back to its commit, the 22
+  fixture refs deleted, the config restored against `/backup/hoa/.git/config`, the fixture worktrees
+  pruned, the point-945 worktree reset to its pushed head fb7e5d23 — and the polluted reflog entries
+  in `.git/logs` were left in place as evidence.
+  WHAT IT COSTS: CLAUDE.md §6 has every delegated author run the gates inside its own worktree, so
+  the trigger is the ordinary case and not an exotic one, and the failure is silent — no gate went
+  red for it, the damage was found only because a follow-up `git branch --show-current` came back
+  empty. `scripts/repository-integrity.test.mjs` exists for exactly this class ("LIVE REPOSITORY
+  CHANGED WHILE UNIT SUITE RAN") and did not stop it.
+  SUSPECTED MECHANISM — named as a lead, NOT measured to a call site: `scripts/repo-paths.mjs`
+  resolves `repositoryRoot` to the worktree but `commonCheckoutRoot` deliberately maps a linked
+  worktree to the MAIN checkout, so a fixture helper that seeds or mutates "the repository" through
+  the common checkout writes into the live tree from a worktree while being indistinguishable from
+  cwd in the main checkout. The author measures the actual escaping call site before fixing it.
+  CONTROL MEASURED THE SAME MORNING, 10:13-10:24: the identical gate — `git push origin main`,
+  432 files / 14045 tests — run with cwd in the MAIN checkout left refs, `.git/config` and the
+  worktree list byte-identical against a snapshot taken immediately before it. The linked worktree
+  is therefore the variable, not the suite's mere presence.
+  FINAL STATE: the unit suite, run from ANY linked worktree, leaves the live checkout byte-identical
+  — refs, `.git/config`, worktree registrations, worktree HEADs and index. The call site that
+  escapes into the common checkout is closed at the cause rather than fenced off test by test, and
+  the integrity detector fails the RUN that changed the live repository instead of passing while the
+  damage stands.
+  VERIFIABLE: Vitest — a case that snapshots the live checkout's refs, `.git/config` and worktree
+  list, drives the offending helper with cwd set to a linked worktree, and asserts the snapshot is
+  unchanged; and a case that asserts the integrity detector goes red when a fixture writes into the
+  common checkout.
+  Criticality: high — it silently rewrote `refs/heads/main` in the live repository, and every
+  delegated author runs this suite from a worktree.
+  Bundle: Urlaubsfestigkeit.
+
 - [ ] 946. A VDZK card still parks an owner-decidable question; admissibility gets the point-864
   typing. Point 864 typed the `AWAITING-USER` point gate (`defer-for-user.mjs` refuses advisory
   reasons), but the CARD path kept accepting open questions: on 26.08.2026 the card "Vier-Augen-
@@ -229,31 +279,6 @@ put it is the mistake this line exists to stop.
   busy wedge is the shape this batch has actually produced.
   Bundle: Urlaubsfestigkeit. It changes the same decision core as 947's lane, so it does not run
   beside another point touching `scripts/batch-emergency-core.mjs`.
-
-- [ ] 581. The settlement boundary is too faint, and its slider is already at the ceiling
-  (user 09.08.2026, F6 report `local/bugreports/DorfgrenzeSchlechtErkennbar.zip`: "Die
-  Dorfgrenze ist zu schlecht erkennbar. Der Kontrast muss höher sein"). MEASURED from his
-  state: `placeEdgeBand` stands at the shipped defaults, `widthM: 3`, `wanderM: 0.9`,
-  `strength: 1` — and `strength` is documented as "0 (invisible) .. 1 (the full per-kind
-  look)". He is therefore already looking at the STRONGEST edge the game can draw, and it
-  is not enough. This is not a calibration miss: there is no knob left to turn, so the
-  per-kind look itself carries too little contrast against the ground it sits on.
-  FINAL STATE: the boundary READS at a glance from inside the settlement, at the walking
-  pace and eye height the player actually has, in every settlement kind and on the ground
-  colours they stand on — the Bambara village's pale sand is the case that failed, so it
-  is the case that must be shown to work. The contrast comes from the band's own design
-  (value against the surrounding ground, not hue alone — the report is from a sand-on-sand
-  village), and it stays a give-way rather than becoming a painted stripe: the §2.6 look
-  is a threshold the player reads, not a fence. `strength: 1` remains the full look, so
-  the ceiling moves with the design rather than being raised past it.
-  VERIFIABLE: the PICTURE decides, since the complaint is legibility — a first-person
-  frame from inside the settlement at the boundary in at least the Bambara village and
-  one contrasting settlement kind, on BOTH backends, judged by looking. Plus a pure test
-  pinning the contrast the design settles on (the band's value against the sampled ground
-  value stays above the chosen minimum for every settlement kind), so a later ground or
-  palette change cannot quietly erase it again.
-  Criticality: medium — the boundary is what tells the player where the settlement ends
-  and the bird's-eye view resumes; §2.6 and criterion 15 both rest on it being legible.
 
 - [ ] 925. The durable lane is built but neither measured nor journalled, and its failure
   matrix does not touch the real path. Point 676 landed the whole plane — bounded dispatch,
@@ -12756,7 +12781,6 @@ to land than a mechanism that needs a review.
   Bundle: Chat & Tafel.
 
 
-
 - [ ] 960. A filed finding is never checked against the work order, so with 313 open points the
   cheapest mistake is to write a point that already exists (MEASURED 27.08.2026 01:35-01:50, while
   closing point 953). Four items were carried that turn. The board-closing wedge, recorded through
@@ -12816,3 +12840,85 @@ to land than a mechanism that needs a review.
   Criticality: low — nothing is corrupted and no gate is bypassed, but it damages every log the
   project reads about itself, and it is one line of shell to prevent.
   Bundle: Session- & Repo-Hygiene.
+
+
+- [ ] 964. The launcher's stalled-writer recovery is unreachable, so only a DECLARED delegate can
+  ever be recovered. MEASURED 27.08.2026 while reviewing point 945 on `scripts/batch-autostart.mjs`:
+  inside `if (verdict === 'skip-alive')` the first branch is `if (startDecision.code !== 'owner-live')
+  { … log('skip: successor decision refused …'); bail() }`, and `bail()` writes the state and calls
+  `process.exit`. Everything after it therefore runs only when the code IS `owner-live` — but the
+  very next line is `if (!lock || assessment.alive !== true)`, which `owner-live` contradicts by
+  definition. The whole block behind it is dead: the `verdictRepeat` episode counter, the
+  `WRITER_VETO` journal entries, the `ESCALATING: … blocked launcher recovery for N min` line, the
+  `retireBatchWriter` / `revokeWriterFence` recovery and the second `successorStartDecision` that
+  was meant to re-decide after it. It was reachable when it was built (`d621b742`, 21.08.2026,
+  "Recover stalled writer vetoes on the second tick") and was cut off the same day by `387e7a46`
+  ("Start successors at handover and supervised exit"), which added the early bail above it.
+  WHY IT MATTERS: point 945 stops a DECLARED delegate from vetoing a successor beside a dead owner.
+  An UNDECLARED live checkout — an agent that died before declaring, a stray worktree, a delegate
+  whose declaration expired — still vetoes with code `registered-writer-live`, and since 945 that
+  refusal correctly no longer touches `failCount`, so it can never reach the runaway pause either.
+  This block was the only thing that would have broken such a wedge, and it cannot run.
+  FINAL STATE: a repeated refusal that is NOT `owner-live` reaches the writer-recovery episode —
+  its repeat counter, its journal entries, its escalation line and its fence revocation — and the
+  re-decision that follows it, while a single refusal still just waits and a live owner still
+  vetoes untouched. Whatever the early bail was protecting (the `autostart-last.json` decision
+  record it writes) keeps happening on the path that still needs it.
+  VERIFIABLE: Vitest over the tick — a repeated `registered-writer-live` refusal beside an absent
+  or dead owner lock reaches the escalation and revokes the writer's fence, one such refusal does
+  not, an `owner-live` refusal never does, and the decision record is written in every case.
+  Criticality: high — it is the same standstill class as 945 with the declaration missing, and
+  nothing else in the launcher ends it.
+  Bundle: Urlaubsfestigkeit. It edits the successor tick that 945 also edits, so it is worked
+  after it, never beside it.
+
+- [ ] 965. The closing card the board's own refusal prescribes cannot reach the page. MEASURED
+  27.08.2026 while handing over after point 581 landed: `board-claims-nothing-running` denies every
+  state-changing call while "Gerade keine laufende Arbeit" stands, and names three ways out, the
+  middle one being `node scripts/board.mjs closing <N>` — "for the state between the two: the point
+  is merged and TICKED, and its closing duties are still owed". That card never renders. With the
+  point CLOSED (581) the publish refuses outright: "the derived now-section could not be rendered
+  (active-work source unresolved: the owner focus names point 581, which is not open)". With an
+  OPEN point that is not evidenced in work (945, sitting in the queue) the command reports success
+  and writes the board file, but the derived now-section still renders "Gerade ist kein Punkt
+  nachweisbar in Arbeit" and the card is gone at the next publish.
+  WHAT IT COSTS: the state the card exists for is exactly the state in which the point is no longer
+  open — that is what "merged and TICKED" means — so the remedy is unavailable in every case it was
+  written for. The only way past the guard is then `board.mjs now`, which claims work that is not
+  running: the guard forces the false statement it exists to prevent, and the session's own
+  bookkeeping (retrospective, ranking, board stamp) cannot be committed until it does.
+  FINAL STATE: a closing card survives the now-section's derivation for the point it names, whether
+  that point is already ticked or merely not evidenced in work, and the publish renders it instead
+  of refusing or silently dropping it. The card reads as what it is — closing duties owed, not
+  active work — so neither the nothing-running guard nor a reader mistakes it for either
+  neighbouring state. `now` and `none` keep their present meanings untouched.
+  VERIFIABLE: Vitest over the derivation — a closing card for a ticked point renders, a closing
+  card for an open-but-unevidenced point renders, both survive a publish, and neither is turned
+  into a now-card or dropped; plus the guard's own remedy text is asserted against the set of
+  states the card actually serves, so the two cannot drift apart again.
+  Criticality: high — it blocks the handover path of every landed point, and its only workaround is
+  a false board.
+  Bundle: Chat & Tafel. It edits the board's derived now-section, which 963 does not touch, so the
+  two may run beside each other.
+
+- [ ] 968. A render path that can never cover itself keeps the picture gate shut. MEASURED
+  27.08.2026, 10:26-10:35: `scripts/render-verify-core.mjs` counts every `scripts/verify/*.mjs`
+  outside its `NON_RENDER_VERIFY` list as a render path, so point 963's edit to
+  `scripts/verify/board-layout.mjs` reopened the picture gate for BOTH backends, on top of the
+  game-render paths that a clean full `polish` pass on WebGPU (06:35) and WebGL 2 (06:57) had
+  already covered. But board-layout cannot answer that gate at all: it draws no game view, it
+  launches `chromium` directly instead of going through `scripts/verify/_browser.mjs`, so it never
+  arms `render-verify-recorder.mjs`, and it never records a screenshot — it measures
+  `getBoundingClientRect()` over the published board. I ran it green on both backends (66 pass each,
+  0 fail, 0 console errors); neither run was recorded and neither covered anything. The gate could
+  then only be answered by re-running an unrelated ~46-minute `polish` pass or by a deferral.
+  FINAL STATE: a browser suite that renders no game view and selects no GL backend is not a render
+  path, so editing it never opens the picture gate; and no suite can be classified as a render path
+  while being structurally unable to record a covering run — the two facts are decided by one rule
+  rather than by two lists that can drift apart.
+  VERIFIABLE: Vitest over the classifier — `scripts/verify/board-layout.mjs` is not a render path;
+  a suite that goes through `_browser.mjs` still is; and a case that asserts every path the
+  classifier calls a render path is reachable by a run the recorder can actually write.
+  Criticality: med — it does not lose work, but it blocks the picture gate behind a run that has
+  nothing to do with the change, which is how deferrals get written for the wrong reason.
+  Bundle: Testinfrastruktur.

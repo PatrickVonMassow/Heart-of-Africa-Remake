@@ -100,6 +100,55 @@ describe('derived card criticality badges', () => {
     expect(declarations('details:not(.sect)[open]>summary>.right::after')?.content).toBe('"▾"')
   })
 
+  // POINT 963 — the third report of the same header. The group stays one flex
+  // line so the marker cannot be orphaned, but its CONTENT must break: a meta
+  // that outgrows its column wraps its own text instead of being squeezed.
+  it('lets both side columns break their own content', () => {
+    const document = new JSDOM(rendered()).window.document
+    const rules = [...document.querySelector('#board-criticality-style').sheet.cssRules]
+    const declarations = (selector) => rules.find((rule) => rule.selectorText === selector)?.style
+
+    for (const selector of ['.card-header-left>*', 'details:not(.sect)>summary>.right>*']) {
+      const style = declarations(selector)
+      expect(style, `${selector} carries no rule`).toBeTruthy()
+      expect(style.overflowWrap).toBe('anywhere')
+      expect(style.whiteSpace).toBe('normal')
+      expect(style.minWidth).toBe('0px')
+    }
+  })
+
+  // POINT 967 — in portrait the header reflows into a compact shape instead of
+  // stacking every group: number and badge share the first row with the
+  // right-aligned meta, and only the title takes a full row beneath them.
+  it('reflows the header compactly on a phone-width viewport', () => {
+    const document = new JSDOM(rendered()).window.document
+    const rules = [...document.querySelector('#board-criticality-style').sheet.cssRules]
+    const declarations = (selector) => rules.find((rule) => rule.selectorText === selector)?.style
+    const portrait = rules.find((rule) => rule.media && [...rule.media].join(' ').includes('460px'))
+    expect(portrait, 'no portrait rule').toBeTruthy()
+    const portraitRule = (part) =>
+      [...portrait.cssRules].find((rule) => rule.selectorText.endsWith(part))
+    const left = portraitRule('>.card-header-left')?.style
+    expect(left?.order).toBe('0')
+    expect(left?.flexBasis).not.toBe('100%')
+    const right = portraitRule('>.right')
+    expect(right?.style.order).toBe('1')
+    expect(right?.style.marginLeft).toBe('auto')
+    expect(right?.style.flexBasis).not.toBe('100%')
+    const title = portraitRule('>.t')
+    expect(title?.style.order).toBe('2')
+    expect(title?.style.flexBasis).toBe('100%')
+    // A summary WITHOUT the number group keeps its native title-first order —
+    // reordering there would lift the timestamp above the title of the
+    // handover/state cards (point 967 review, finding 1).
+    for (const rule of [right, title]) {
+      expect(rule?.selectorText).toContain(':has(>.card-header-left)')
+    }
+    // Above that width the title keeps a basis wide enough to be worth a shared
+    // row; below it the media rule takes over.
+    expect(declarations('details:not(.sect)>summary>.t')?.flexBasis).toBe('18rem')
+  })
+
   it('keeps old and decorated summary shapes readable and renders idempotently', () => {
     const once = rendered()
     expect(renderCardCriticalities(once, tasks)).toBe(once)
