@@ -174,7 +174,21 @@ export function protectRepository(root = process.cwd()) {
  *  wiring is the failure this whole family exists to prevent. */
 export const WIRED_KEY = 'repositoryIntegrityWired'
 
+const scrubRunnerGitEnvironment = () => {
+  const clean = withoutGitLocalEnvironment()
+  for (const name of Object.keys(process.env)) {
+    if (!(name in clean)) delete process.env[name]
+  }
+}
+
 export function setup(project) {
+  // Global setup runs in Vitest's main process before its workers start. A
+  // linked-worktree hook supplies GIT_DIR as an absolute path, and workers
+  // otherwise inherit it: every fixture's `git -C <tmpdir>` then targets the
+  // live repository instead. Remove Git's entire repository-local identity at
+  // this one suite-wide boundary so every present and future gate caller is
+  // safe; the wrapper-level clean environments remain defence in depth.
+  scrubRunnerGitEnvironment()
   project?.provide?.(WIRED_KEY, true)
   return protectRepository(project?.config?.root ?? process.cwd())
 }

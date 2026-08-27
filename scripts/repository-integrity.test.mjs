@@ -161,6 +161,54 @@ describe('unit-suite repository integrity guard', () => {
     expect(output).toContain('LIVE REPOSITORY CHANGED WHILE UNIT SUITE RAN')
     expect(output).toContain('refs/heads/escaped-by-fixture')
   }, 20_000)
+
+  it('scrubs a linked-worktree GIT_DIR before fixture workers can inherit it', () => {
+    const linked = addLinkedWorktree('integrity-polluted-runner')
+    const fixture = mkdtempSync(join(tmpdir(), 'hoa-repository-integrity-fixture-'))
+    temporaryDirectories.push(fixture)
+    const detectorUrl = pathToFileURL(resolve('scripts/repository-integrity.mjs')).href
+    const vitestPackage = dirname(createRequire(import.meta.url).resolve('vitest'))
+    const vitestUrl = pathToFileURL(join(vitestPackage, 'dist', 'index.js')).href
+    const cli = join(vitestPackage, 'vitest.mjs')
+    writeFileSync(
+      join(linked, 'vitest.config.mjs'),
+      `export default { test: { environment: 'node', globalSetup: [${JSON.stringify(detectorUrl)}], include: ['polluted.test.mjs'] } }\n`,
+    )
+    writeFileSync(
+      join(linked, 'polluted.test.mjs'),
+      `import { execFileSync } from 'node:child_process'\n` +
+        `import { it } from ${JSON.stringify(vitestUrl)}\n` +
+        `it('keeps Git fixture work inside the fixture', () => {\n` +
+        `  const fixture = ${JSON.stringify(fixture)}\n` +
+        `  execFileSync('git', ['-C', fixture, 'init', '-q', '-b', 'main'])\n` +
+        `  execFileSync('git', ['-C', fixture, '-c', 'user.name=Fixture', '-c', 'user.email=fixture@example.invalid', 'commit', '--allow-empty', '-qm', 'seed'])\n` +
+        `  execFileSync('git', ['-C', fixture, 'branch', 'fixture-only'])\n` +
+        `})\n`,
+    )
+    const paths = repositoryStatePaths(repo)
+    const before = repositoryState(paths)
+    const pollutedEnvironment = {
+      ...process.env,
+      GIT_DIR: execFileSync('git', ['-C', linked, 'rev-parse', '--absolute-git-dir'], {
+        encoding: 'utf8',
+        windowsHide: true,
+      }).trim(),
+      GIT_PREFIX: '',
+    }
+    const result = spawnSync(process.execPath, [cli, 'run', '--config', 'vitest.config.mjs'], {
+      cwd: linked,
+      encoding: 'utf8',
+      env: pollutedEnvironment,
+      windowsHide: true,
+    })
+    const output = `${result.stdout ?? ''}${result.stderr ?? ''}`
+
+    expect(result.status, output).toBe(0)
+    expect(() => assertRepositoryUnchanged(before, repositoryState(paths))).not.toThrow()
+    expect(runGit('--git-dir', join(fixture, '.git'), 'show-ref', '--verify', 'refs/heads/fixture-only')).toContain(
+      'refs/heads/fixture-only',
+    )
+  }, 20_000)
 })
 
 // THE WIRING IS PART OF THE MECHANISM, so it is asserted here rather than left to
