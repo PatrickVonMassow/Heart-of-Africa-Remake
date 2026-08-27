@@ -362,9 +362,11 @@ export const LIMITS = {
   // 27.08.2026: tonight's lesson — where a tool's OUTPUT is the product, read it at the real
   // corpus — cost twenty words in the first pitfall, and the three meta rules it was taken from
   // gave up twenty-two, so the ceiling follows the measurement DOWN by two.
-  // 27.08.2026: the refute-the-suspicion clause in the root-cause meta rule costs fifty words; see
-  // the line ceiling above for the measurement and why the lesson's second half stayed out.
-  maxWords: 4273,
+  // 27.08.2026: the suspicion clause was corrected after review: the rule now demands an
+  // independent ATTEMPT to falsify and explicitly lets a true hypothesis survive it. Tightening
+  // the surrounding narration pays for that precision, so the ceiling follows the measured guide
+  // DOWN by two words, with no claim removed and no headroom added.
+  maxWords: 4271,
   // A pitfall entry = the risk lines plus its prompt. Anything longer is a
   // story, not a tip.
   maxEntryLines: 11,
