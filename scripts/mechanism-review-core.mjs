@@ -297,15 +297,136 @@ const containedBy = (record, sha) => {
 const descendsFrom = (record, earlier) =>
   String(record?.sha ?? '') !== String(earlier?.sha ?? '') && containedBy(record, earlier?.sha)
 
-const openRefusalsIn = (records = []) => {
+const commitAuthors = (commit = {}) => {
+  const authors = Array.isArray(commit.authorModels)
+    ? commit.authorModels
+    : [commit.authorModel ?? commit.authoredBy].filter(Boolean)
+  return authors.map((author) => String(author ?? '').trim()).filter(Boolean)
+}
+
+/**
+ * Files on a refusing contribution which a later contribution by the refusing
+ * vendor demonstrably fixed and had read by the other vendor.
+ *
+ * This belongs at refusal evaluation, not in `review-sol`'s authorship cut.
+ * Changing the planner per contribution could OFFER a Sol pass for the old
+ * Claude contribution, but it could not make the gate accept the Claude review
+ * of Sol's answering commit; the command and the decision would still disagree.
+ * Here both file-scoped and legacy refusal paths consume the same ledger fact.
+ *
+ * The exception is a CHAIN, never a waiver. Each link is machine-checkable:
+ * the answering commit is later, is authored wholly by the vendor that made the
+ * refusal, touches the refused file, and has an exact-sha code review whose
+ * measured ancestry contains the refusal. That review is judged against the
+ * ANSWER'S authors, so the original author may clear Sol's fix without being
+ * allowed to review their own original contribution.
+ */
+const filesClearedByRefusingVendor = (refusal, { commits = [], records = [], files = [] } = {}) => {
+  const refusingVendor = modelVendor(refusal?.model)
+  if (refusingVendor === 'unknown') return new Set()
+  const required = new Set((files ?? []).map(String))
+  const cleared = new Set()
+
+  for (const answer of commits ?? []) {
+    const answerSha = String(answer?.sha ?? '')
+    const authors = commitAuthors(answer)
+    const allAnswerFiles = [...new Set((answer?.files ?? []).map(String))]
+    const answerFiles = allAnswerFiles.filter((file) => required.has(file))
+    if (
+      !answerSha ||
+      answerSha === String(refusal?.sha ?? '') ||
+      !answerFiles.length ||
+      !authors.length ||
+      authors.some((author) => modelVendor(author) !== refusingVendor) ||
+      typeof answer?.at !== 'number' ||
+      !Number.isFinite(answer.at) ||
+      Number(answer.at) <= Number(refusal?.at)
+    ) {
+      continue
+    }
+
+    // Exact-sha is the ancestry proof for the ANSWERING COMMIT itself. A later
+    // merge record containing two sibling commits would prove that the review
+    // descends from the refusal, but not that the purported answer does.
+    const exactCovering = (records ?? []).filter(
+      (record) =>
+        String(record?.sha ?? '') === answerSha &&
+        Number(record?.at) > Number(refusal?.at) &&
+        containedBy(record, refusal?.sha),
+    )
+    const ownReadings = exactCovering.filter(
+      (record) =>
+        reviewRecordWellFormed(record, { commitAt: answer.at }) &&
+        attestsToCodeReading(record) &&
+        !reviewIdentityProblem(record.model, answer),
+    )
+    if (!ownReadings.length) continue
+
+    const refusalShaped = (record) =>
+      typeof record?.verdict === 'string' && record.verdict.trim().toLowerCase() === BLOCKING_VERDICT
+    if (exactCovering.some((record) => refusalShaped(record) && !reviewRecordWellFormed(record, { commitAt: answer.at }))) {
+      continue
+    }
+
+    // A same-sha re-record never answers a refusal. Apply that boundary to the
+    // answering commit too: any sound refusal on its exact state prevents that
+    // state from participating in a clean chain.
+    const refusedFiles = new Set()
+    for (const reading of ownReadings.filter((record) => String(record.verdict) === BLOCKING_VERDICT)) {
+      const scopedFiles = Array.isArray(reading?.pass?.files) ? reading.pass.files.map(String) : allAnswerFiles
+      for (const file of allAnswerFiles) if (scopedFiles.includes(file)) refusedFiles.add(file)
+    }
+
+    const reviewed = new Set()
+    const passClaims = ownReadings.filter((record) => record?.pass !== undefined && record?.pass !== null)
+    const splitClaimed = exactCovering.some((record) => record?.pass !== undefined && record?.pass !== null)
+    if (!splitClaimed) {
+      if (ownReadings.some((record) => String(record.verdict) !== BLOCKING_VERDICT)) {
+        for (const file of allAnswerFiles) if (!refusedFiles.has(file)) reviewed.add(file)
+      }
+    } else {
+      // Scoped 1/1 rows clear exactly what they name. Larger splits count only
+      // as a complete composition, with their worst verdict, just as in the
+      // main evaluation path; a pass-less sibling cannot bypass a recorded
+      // split, even when the claim itself is malformed or same-vendor.
+      for (const reading of passClaims) {
+        if (
+          Number(reading?.pass?.index) === 1 &&
+          Number(reading?.pass?.total) === 1 &&
+          String(reading?.pass?.endState ?? '') === answerSha &&
+          Array.isArray(reading?.pass?.files) &&
+          String(reading.verdict) !== BLOCKING_VERDICT
+        ) {
+          for (const file of allAnswerFiles) {
+            if (reading.pass.files.map(String).includes(file) && !refusedFiles.has(file)) reviewed.add(file)
+          }
+        }
+      }
+      for (const composition of passComposition(passClaims, { expect: allAnswerFiles })) {
+        if (!composition.complete || worstVerdict(composition.records) === BLOCKING_VERDICT) continue
+        for (const file of allAnswerFiles) if (!refusedFiles.has(file)) reviewed.add(file)
+      }
+    }
+    if (allAnswerFiles.length && allAnswerFiles.every((file) => reviewed.has(file))) {
+      for (const file of answerFiles) cleared.add(file)
+    }
+  }
+
+  return cleared
+}
+
+const openRefusalsIn = (records = [], chain = {}) => {
   const clearing = records.filter((record) => String(record.verdict) !== BLOCKING_VERDICT)
-  return records.filter(
-    (refusal) =>
-      String(refusal.verdict) === BLOCKING_VERDICT &&
-      !clearing.some(
-        (answer) => Number(answer.at) > Number(refusal.at) && descendsFrom(answer, refusal),
-      ),
-  )
+  const requiredFiles = [...new Set((chain.files ?? []).map(String))]
+  return records.filter((refusal) => {
+    if (String(refusal.verdict) !== BLOCKING_VERDICT) return false
+    const directlyAnswered = clearing.some(
+      (answer) => Number(answer.at) > Number(refusal.at) && descendsFrom(answer, refusal),
+    )
+    if (directlyAnswered) return false
+    const chainClearance = filesClearedByRefusingVendor(refusal, chain)
+    return !requiredFiles.length || requiredFiles.some((file) => !chainClearance.has(file))
+  })
 }
 
 /** The family words of a model this project would recognise. */
@@ -1553,12 +1674,14 @@ export function evaluateMechanismReview({
         remainingFiles.push(file)
         continue
       }
-      const open = openRefusalsIn(rows)
+      const open = openRefusalsIn(rows, {
+        commits: pendingCommits,
+        records: covering,
+        files: [file],
+      })
       if (open.length) {
         const latest = open.reduce((a, b) => (Number(b.at) >= Number(a.at) ? b : a))
         scopedRefusal = !scopedRefusal || Number(latest.at) >= Number(scopedRefusal.at) ? latest : scopedRefusal
-        remainingFiles.push(file)
-      } else if (!rows.some((row) => String(row.verdict) !== BLOCKING_VERDICT)) {
         remainingFiles.push(file)
       }
     }
@@ -1719,7 +1842,11 @@ export function evaluateMechanismReview({
     // `containedShas`) and handed in as data; a clearing record whose fact is
     // missing answers nothing — no ancestry fact, no clearance — and a
     // same-sha re-record fixes nothing, exactly as at the sibling gate.
-    const open = openRefusalsIn(valid)
+    const open = openRefusalsIn(valid, {
+      commits: pendingCommits,
+      records: covering,
+      files: commit.files,
+    })
     if (open.length) {
       const latest = open.reduce((a, b) => (Number(b.at ?? 0) >= Number(a.at ?? 0) ? b : a))
       findings.push({ kind: 'do-not-merge', commit, records: [latest] })

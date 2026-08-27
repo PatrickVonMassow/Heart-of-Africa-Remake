@@ -24613,3 +24613,73 @@ Nummerierung bleiben deshalb identisch — hier wird nur verschoben, nie umgesch
   own spec requires it to be worked after this register, because both rewrite the same card
   admissibility. Until this lands, that lane cannot be opened.
   Bundle: Chat & Tafel.
+
+- [x] 902. A stated recommendation on a board card is a decision I may carry out. MEASURED
+  24.08.2026: the rule corpus a session loads says the opposite by omission. The memory
+  `no-standstill-decide-and-record` licenses deciding by own judgment only where NO card is
+  pending; `dashboard-vdzk-only-decisions` makes every decision request a card and says nothing
+  about who may close one; `CLAUDE.md` §6 says "unless durably authorized" without naming this
+  authorization. Result: the Zeiterfassung card, whose recommendation was already stated, waited
+  for a yes that only restated it, and its point 559 is still open.
+  USER RULING 24.08.2026, on the card "Zeiterfassung in der Arbeitsordnung: abschaffen oder
+  wiederbeleben?", quoting their own earlier answer "Mach es so, wie du es empfohlen hast": "Ja,
+  das sollst du künftig dürfen."
+  FINAL STATE: the standing authorization stands where a session reads it, with its scope drawn.
+  IN SCOPE: a "Von dir zu klären" card on which I have STATED a recommendation may be decided BY
+  that recommendation, carried out, and closed with the decision recorded — what, why, and what a
+  veto would change — the shape rung 3 of `no-standstill-decide-and-record` already prescribes for
+  doubt without a card. OUT OF SCOPE and unchanged: outward-facing or irreversible steps (tags,
+  publishes, force-pushes, deletions of user data) keep their own confirmation per the memories
+  `tags-only-on-request` and `version-release-process`; a card posing a genuine choice I did NOT
+  recommend on stays the user's.
+  (a) `CLAUDE.md` §6 carries ONE sentence naming this authorization at the existing "unless durably
+  authorized" clause of the "Act on settled judgment" bullet, naming scope AND boundary in the same
+  breath so no reading of it reaches a tag, a publish or a deletion.
+  (b) `docs/rule-corpus-audit.md` records the ruling dated 24.08.2026 with the user's wording, in
+  the row style the file uses for decided entries.
+  (c) The memory entry `recommendation-is-a-decision` is verified against the corpus after (a) and
+  (b) and linked from `no-standstill-decide-and-record`; write it if it is absent, with its
+  `MEMORY.md` index line.
+  VERIFIABLE: a repository search finds the authorization sentence in `CLAUDE.md` §6 and the dated
+  row in `docs/rule-corpus-audit.md`; the doc-budget guard and `npm run test:unit` stay green; and
+  the boundary clause stands in the same sentence as the grant.
+  Criticality: low — process hygiene, but it is what keeps a decided card from idling.
+  Urgency: it blocks a lane — point 946 stands in front of the release at Criticality: high and
+  names this authorization among the points it must be worked after, so its lane waits on this one.
+  Bundle: Chat & Tafel.
+
+- [x] 979. The mechanism gate holds a `do-not-merge` that no command it offers can answer, and it
+  blocks every turn end. MEASURED 27.08.2026, 22:45. `mechanism-review-guard` reports contribution
+  2dbce90 (`docs/analysis_de/vibe-coding-anleitung.md`, `scripts/guide-brevity-core.mjs`, authored by
+  Claude Opus 5) as refused by GPT-5.6 Sol, and demands the re-review "at a commit that DESCENDS from
+  2dbce90". Three measured facts make that demand unsatisfiable:
+  (1) `openRefusalsIn` in `scripts/mechanism-review-core.mjs` clears a refusal only through a record
+  whose sha DIFFERS from the refusal's and whose `containedShas` hold it — so the guard's OWN printed
+  plan, `review-sol --sha 2dbce90 --since e0fadb56`, records at the same sha and clears nothing.
+  (2) `reviewIdentityProblem` rejects every anthropic reviewer for this contribution, so only a Sol
+  pass can clear it.
+  (3) `planAuthorshipGroups` cuts passes by the END-STATE author of each file. The answering fixes
+  (14c79975, acb5ac0e) are Sol's own, so `scripts/guide-brevity-core.mjs` now ends in an openai
+  author and every plan containing 2dbce90 assigns that file an ANTHROPIC reviewer — measured:
+  `review-sol --sha acb5ac0e --since 2dbce90~1` prints "pass 1/6 → anthropic reviewer Opus 5" with
+  that file in it. No range on this history puts a Sol reviewer on it.
+  The substance is not in doubt: Sol's three findings were answered by Sol-authored commits that
+  Claude reviewed cross-vendor (records at 14c7997 and acb5ac0), and the third finding ("no
+  retrospective edit") was wrong on its face — 2dbce90 added retrospective section 3.112, which the
+  review dropped as non-material before Sol could see it. Only the LEDGER cannot say so.
+  FINAL STATE: a refusal answered by the refusing vendor's OWN later authorship of the same mechanism
+  files, itself cleared cross-vendor, is expressible and clears the contribution — without weakening
+  the rule that no vendor reviews its own work. The route is a recorded, measured chain, never a
+  waiver: the answering commits descend from the refusal, touch its files, and carry their own sound
+  clearance by the OTHER vendor.
+  Consider as alternatives, and record why the chosen one wins: teaching `openRefusalsIn` this chain;
+  or giving `review-sol` a per-CONTRIBUTION reviewer cut, so a pass that exists to clear contribution
+  X is assigned a vendor independent of X's author rather than of the file's end-state author.
+  VERIFIABLE: Vitest over the pure core — the refusal on a fixture shaped like 2dbce90 clears through
+  the chain and stays open without it; a same-sha re-record still clears nothing; a refusal answered
+  by the SAME vendor that authored the refused commit still stays open. And on the live repository the
+  guard reports no outstanding contribution afterwards.
+  Criticality: high — the gate blocks every turn end of every session while it stands, and the
+  context-boundary deferral is the only reason the batch still moves.
+  Urgency: it blocks the whole batch, so it is worked before every other open point.
+  Bundle: Modell & Wächter.
