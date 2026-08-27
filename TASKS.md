@@ -13053,7 +13053,7 @@ to land than a mechanism that needs a review.
   `dashboard-guard --synced` then blocks with `[erledigt-missing]`, and the only exit left is the
   emergency `--waive-audit`, which is what this landing had to use. Hand-writing the markup is not
   an option and must not become one: `renderDoneEntry` in `scripts/board-core.mjs` is documented as
-  the single writer of that markup, and a hand edit of this board is the failure of §3.45.
+  the single writer of that markup, and a hand edit of this board is the failure of retrospective §3.45.
   THE ORDER IS THE TRAP, and nothing states it. `board.mjs done <point>` must run BEFORE the
   landing, while the now-card still exists. A session that follows the standing instruction — which
   says the landing "fuehrt die ganze Kette aus" and names board publish among its steps — reasonably
