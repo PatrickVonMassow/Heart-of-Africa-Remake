@@ -172,7 +172,9 @@ export const LIMITS = {
   // test the escape a guard NAMES, it can report success and still do nothing — needed no words at
   // all: "Die Ausnahme existiert nur in der Verweigerung" already demands a test that WALKS the
   // promised way out.
-  maxLines: 475,
+  // 27.08.2026: the output-is-the-product clause joined the first pitfall while three over-long
+  // meta rules gave up their narration, so the ceiling follows the measurement DOWN by two.
+  maxLines: 473,
   // EXACT FIT, not headroom — corrected 30.07.2026 after the four-eyes review
   // pointed out that this comment had long stopped describing the numbers. The
   // rule above ("raised only by the measured size of genuinely new tips")
@@ -347,7 +349,10 @@ export const LIMITS = {
   // 26.08.2026, late: the growing-duty lesson (§3.194) was ADDED and six older entries gave up
   // their narration for it, so the ceiling follows the measurement DOWN by forty-six — the guide
   // is shorter than before it learned tonight's class.
-  maxWords: 4225,
+  // 27.08.2026: tonight's lesson — where a tool's OUTPUT is the product, read it at the real
+  // corpus — cost twenty words in the first pitfall, and the three meta rules it was taken from
+  // gave up twenty-two, so the ceiling follows the measurement DOWN by two.
+  maxWords: 4223,
   // A pitfall entry = the risk lines plus its prompt. Anything longer is a
   // story, not a tip.
   maxEntryLines: 11,

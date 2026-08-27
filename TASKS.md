@@ -11165,6 +11165,14 @@ to land than a mechanism that needs a review.
   remediation — assemble a cross-vendor review of the whole range — that provably cannot be
   performed and that the guard does not actually demand. So the repair belongs to the SHARED
   judgment, not to the one liveness probe.
+  A THIRD TIME 27.08.2026, 04:00 on `main` at `b2f5e9be`, while landing point 957:
+  `guard-preflight --for merge` printed `mechanism-review-guard would-block: FOUR-EYES GATE ON
+  MECHANISMS — UNREVIEWABLE` and listed two ordinary reviewable findings beneath it, while the same
+  guard's own hook invocation reported `REVIEW GAP` over 15,660,677 characters and exited 0. Two
+  guards, three measurements in five days. It matters for the repair that point 957 removes the gap
+  this instance rests on: the divergence is a property of the SPLIT between the shared
+  gather-and-decide and the run path, so it outlives every particular cause and cannot be closed by
+  fixing those one at a time.
   WHY IT MATTERS: the named remediation cannot clear the condition it is offered for. Only the
   ageing-out of the stale liveness window clears it, and a session that believes the advice pays a
   full unit/build/lint gate — measured ~140 s — for every repetition. A preflight that disagrees

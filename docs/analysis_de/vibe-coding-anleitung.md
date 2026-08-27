@@ -152,7 +152,9 @@ Die Ursache findest du durch **Zerlegen**, nicht durch Wiederholen.
   bewirkt hätte, statt sie aufzurufen — und ist für immer grün.
   → *Prompt:* „Eine sichtbare Änderung ist erst fertig, wenn sie am **echten gerenderten Bild**
   geprüft wurde. Zu jeder Prüfung: **Welche Zeile ruft die Sache auf — und was bliebe grün, wenn
-  sie kaputt wäre?** Zeit darf ein Test abkürzen, den **Aufruf** nie.“ *(Sieht das richtig aus?)*
+  sie kaputt wäre?** Zeit darf ein Test abkürzen, den **Aufruf** nie. Ist die **Ausgabe** das
+  Produkt — Urteil, Plan, Anleitung —, lies sie am **echten Bestand**, nie nur an selbstgebauten
+  Eingaben.“ *(Sieht das richtig aus?)*
 - **Neue Features zerbrechen alte.** Eine Änderung repariert X und bricht das unbeobachtete Y.
   → *Prompt:* „Etabliere einen Mechanismus, der jede Mechanik auch im **Danach-Zustand** prüft und
   nach jedem Zusammenführen die schnelle Testschicht erzwingt. Bau ‚Invarianten' ein, die im
@@ -438,24 +440,20 @@ Die Ursache findest du durch **Zerlegen**, nicht durch Wiederholen.
 
 ## Drei Meta-Regeln, die alles zusammenhalten
 
-1. **Root-Cause vor Fix.** Ausreden-freie Ursachennotizen sind der Rohstoff, aus dem
-   gute Mechanismen entstehen.
+1. **Root-Cause vor Fix.** Ursachennotizen ohne Ausrede sind der Rohstoff guter Mechanismen.
    > *Prompt:* „Bevor du etwas Wiederkehrendes reparierst: schreib mir in 3–5 Sätzen die
    > **mechanische** Ursache — was genau war die Annahme, die brach?"
 
-2. **Nutzer-Artefakte sind Verträge.** Ein Dashboard, ein Ausgabeformat, eine Board-
-   Struktur, die du festgelegt hast: nicht eigenmächtig umbauen, Änderungen nur als
-   Vorschlag.
+2. **Nutzer-Artefakte sind Verträge.** Was du festgelegt hast — Dashboard, Ausgabeformat,
+   Board-Struktur — wird nicht eigenmächtig umgebaut.
    > *Prompt:* „Struktur von Dingen, die ich festgelegt habe, friert ein. Schlag
    > Änderungen vor, setz sie nicht ungefragt um."
 
-3. **Parallel arbeiten geht nur mit Isolierung.** Die Grenze setzt der **Haupt-Agent**: bei
-   ihm endet jeder Strang, und je mehr Fremdstoff sein Kontext aufnimmt, desto schlechter
-   urteilt er. Verlass dich nie auf „nur lesen".
-   > *Prompt:* „Arbeite jede Aufgabe auf einem eigenen Feature-Branch mit eigener
-   > Arbeitskopie und führe sie erst nach `main`, wenn sie verifiziert ist — auch ein nur
-   > lesender Helfer bekommt eine eigene. Teile parallele Aufgaben so auf, dass sie **nicht
-   > dieselben Dateien** anfassen, und arbeite an höchstens **drei** gleichzeitig."
+3. **Parallel arbeiten geht nur mit Isolierung.** Die Grenze setzt der **Haupt-Agent**: bei ihm
+   endet jeder Strang, und je mehr Fremdstoff sein Kontext aufnimmt, desto schlechter urteilt er.
+   > *Prompt:* „Arbeite jede Aufgabe auf eigenem Feature-Branch mit eigener Arbeitskopie — auch ein
+   > nur lesender Helfer —, führe sie erst verifiziert nach `main`, teile parallele Aufgaben so,
+   > dass sie **nicht dieselben Dateien** anfassen, und arbeite an höchstens **drei** gleichzeitig."
 
    *(Aufschlag ≈ 10–25 % je zusätzlichem Strang, geschätzt — Nacharbeit + Aufsicht)*
 
@@ -472,4 +470,4 @@ Die Ursache findest du durch **Zerlegen**, nicht durch Wiederholen.
 
 Sie ersetzt die Fallstricke oben nicht.
 
-<!-- GUIDE-FINGERPRINT: b21c58fb8a481f33b6a72f71eba471de47c4f48aa056d63a8d434b347bc0a568 -->
+<!-- GUIDE-FINGERPRINT: 885905bb69dbad8caf62a16ed3ae0ba8ee080c30f8014daf494c265d6c6a8ecc -->

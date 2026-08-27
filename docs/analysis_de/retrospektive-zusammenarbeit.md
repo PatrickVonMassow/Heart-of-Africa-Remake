@@ -1407,7 +1407,7 @@ keinen Träger hat. Gebucht als Punkt 956.
 
 ## Anhang A — Maschinell gepflegte Quellen-Übersicht
 
-Zuletzt aktualisiert: Donnerstag, 27.08.2026, 02:59 · Quellen-Fingerprint: `b21c58fb8a48…`
+Zuletzt aktualisiert: Donnerstag, 27.08.2026, 04:03 · Quellen-Fingerprint: `885905bb69db…`
 
 Spalten heuristisch aus den Quellen abgeleitet (Anläufe = distinkte Datumsnennungen im Memory;
 Maßnahme = Guard-Skripte mit Namens-Treffer). Die inhaltliche Bewertung gehört der Prosa oben.
@@ -1508,8 +1508,8 @@ Maßnahme = Guard-Skripte mit Namens-Treffer). Die inhaltliche Bewertung gehört
 
 Erfasste Quellen: 91 Feedback-/Projekt-Memories · 57 Guard-/Hook-Skripte · 6 Revert-/Reapply-Commits · 108 Prozess-/Meta-TASKS-Punkte (davon 47 offen).
 
-<!-- RETRO-FINGERPRINT: b21c58fb8a481f33b6a72f71eba471de47c4f48aa056d63a8d434b347bc0a568 -->
-<!-- RETRO-LAST-REFRESHED: 2026-08-27T00:59:45.872Z -->
+<!-- RETRO-FINGERPRINT: 885905bb69dbad8caf62a16ed3ae0ba8ee080c30f8014daf494c265d6c6a8ecc -->
+<!-- RETRO-LAST-REFRESHED: 2026-08-27T02:03:49.290Z -->
 <!-- AUTO-GENERATED:END -->
 
 ### 3.111 Ein Erfolg ist kein Beweis für den Weg, auf dem er zustande kam
@@ -4222,3 +4222,28 @@ eine, sondern etwas anderes: Sie machen den Kanal unbrauchbar. Deshalb gehört z
 die Messung, wie oft sie in echten Läufen richtig lag — und eine, die in keinem beobachteten Lauf
 je richtig lag, wird abgeschaltet oder repariert, nie „erklärt". Gebucht als Punkt 962, gemeinsam
 mit dem älteren Punkt 729 zu bearbeiten, weil beide denselben Leser bedienen.
+
+### 3.200 Die grünen Gates des Autors sehen nicht, was das Tor sagt
+
+Am 27.08.2026 lag der Umbau des Vier-Augen-Tores fertig und mit grünen eigenen Gates da: Build,
+Lint und die volle Unit-Schicht liefen durch, die neuen Fälle prüften jede Verzweigung der
+Entscheidungslogik einzeln. Die anbieterfremde Gegenlesung fand trotzdem einen echten Fehler — und
+zwar keinen in dem, was das Tor ENTSCHEIDET, sondern in dem, was es SAGT. Der gedruckte Prüfplan
+wurde über den ganzen offenen Bereich gebaut statt über die noch offenen Beiträge, sodass 240
+längst erledigte Beiträge acht „unprüfbar"-Gruppen lieferten; das Urteil druckt diesen Zweig
+ANSTELLE der lauffähigen Befehle. Blockiert hat es nichts, geprüft hat es korrekt — es verbarg nur
+genau den endlichen Plan, den dieser Umbau herstellen sollte.
+
+Warum keine Prüfung das fand: Die Unit-Fälle stellen ihre Eingaben selbst her, und in einer
+selbstgebauten Eingabe gibt es keine 240 Altbeiträge. Der Fehler entsteht erst aus der ECHTEN
+Geschichte des Depots, und er zeigt sich nur, wenn ein Mensch die Ausgabe des Werkzeugs am echten
+Merge-Kandidaten liest. Gefunden wurde er in dem Moment, in dem der Prüfer das Instrument einmal
+laufen ließ und die Meldung von oben nach unten las, statt sie zu greppen.
+
+**Lehre:** Wo die Ausgabe eines Werkzeugs das Produkt ist — ein Urteil, ein Plan, eine Anleitung
+für den nächsten Schritt —, ist der grüne Testlauf nicht die Abnahme. Die Abnahme ist, das Ding
+einmal am echten Bestand laufen zu lassen und zu lesen, was ein Leser tatsächlich vor sich hat.
+Das ist dieselbe Regel, die für das gerenderte Bild längst gilt: nicht die Zahl prüfen, sondern
+das Bild ansehen. Für Wächter, Berichte und Pläne gilt sie genauso, und die Gegenlesung ist die
+Stelle, an der sie greift — der Autor liest seine eigene Ausgabe als Bestätigung, der Fremde liest
+sie als Leser.
