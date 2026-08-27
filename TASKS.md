@@ -11144,6 +11144,15 @@ to land than a mechanism that needs a review.
   waived. The only route offered is a point-bound unavailable receipt, which records "nobody could
   review this" when the truth is "the trailer misdescribed who did what" — the receipt is a wrong
   reason on the record, not merely an inconvenience.
+  A THIRD TIME, 27.08.2026, 20:0x, and this one shows the cost is not only a waiver: the commit
+  answering a merge-with-fixes on `scripts/tasks-spec-guard.mjs` named its cross-vendor reviewer
+  in the second trailer, exactly as §6 invites, and the four-eyes gate immediately reported the
+  contribution UNREVIEWABLE — "every configured reviewer vendor authored part of this
+  contribution" — on work one vendor had written and the other had just read. The trailer was
+  removed from the commit message to get past it, with the reason written into the message and the
+  verdict left where it is machine-readable, in the review ledger. So the rule is now being
+  followed in the breach: the credit §6 offers costs a blocked turn end, and the honest record of
+  who reviewed what survives only because a SECOND place holds it.
   FINAL STATE: the planner's authorship read distinguishes the authoring trailer from a reviewer
   credit on commits that carry both (the ledger's own review record for the commit, or the §6 rule
   that the second model trailer names the reviewer, decides which is which); a genuinely mixed-vendor
