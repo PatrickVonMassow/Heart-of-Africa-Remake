@@ -884,8 +884,8 @@
       "place": "last"
     },
     "972": {
-      "at": "2026-08-27T15:55:44.504Z",
-      "why": "It is a gate defect with a working escape (the logged deferral), so it costs no lane today; it stands behind the release with the other guard defects and beside 734, which edits the same core.",
+      "at": "2026-08-27T16:27:18.617Z",
+      "why": "Es kostet eine Pruefrunde pro Vorkommen, aber nichts am Produkt; der Release-Vorrang der Verstaendigungsmechanik und die vor ihm liegenden Notfall- und Hygienepunkte wiegen schwerer, und 971 haelt die inhaltliche Haelfte bereits offen",
       "origin": "machine",
       "place": "last"
     }
@@ -927,7 +927,7 @@
     "why": "The order standing in front of the release today is the arrangement that predates this rule; the four machine-filed points that had ranked themselves there were moved behind 174 first"
   },
   "settled": {
-    "at": "2026-08-27T15:55:44.512Z",
+    "at": "2026-08-27T16:27:18.639Z",
     "points": [
       174,
       184,
