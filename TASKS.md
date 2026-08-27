@@ -12816,3 +12816,58 @@ to land than a mechanism that needs a review.
   Criticality: low — nothing is corrupted and no gate is bypassed, but it damages every log the
   project reads about itself, and it is one line of shell to prevent.
   Bundle: Session- & Repo-Hygiene.
+
+- [ ] 963. A dashboard card header still does not wrap its two side columns (user 27.08.2026,
+  board chat 06:46: "Die linke und die rechte Spalte im Header einer Dashboard-Karte bricht nach
+  wie vor nicht um."). MEASURED in `.batch-dashboard.html`: the card `summary` itself wraps
+  (`details:not(.sect)>summary:has(>.right){flex-wrap:wrap}`) and the middle title is allowed to
+  break (`.t{flex:1 1 12rem;overflow-wrap:anywhere}`), but the two COLUMNS beside it cannot. The
+  right column is pinned `flex-wrap:nowrap`, so a `meta` reading like `06:30 · ~08:30` stays one
+  unbreakable row; the left column carries the number plus the criticality badge and is
+  `flex:0 1 auto`, so it shrinks to nothing before it breaks. On a narrow phone the header
+  therefore overflows sideways instead of reflowing, which is the third report of the same shape —
+  the previous two fixed the summary and the title and left the columns as they were.
+  FINAL STATE: at every viewport the project supports, and in portrait above all, a card header
+  reflows entirely inside its own width: both side columns break their own content when they must,
+  no part of the header is clipped or forces a horizontal scroll, and the number, the criticality
+  badge, the title and the meta stay individually readable rather than being shrunk to fit. The
+  fix is in the ONE dashboard structure, not per card, and the reading order of the header does
+  not change.
+  VERIFIABLE: a layout check over the rendered board at portrait widths (360 / 390 / 414 CSS px
+  among them) — every card header's own bounding box lies inside the page width, the document
+  never scrolls horizontally, and a header carrying a long meta and a long title resolves to more
+  than one line instead of overflowing. Plus a picture at one narrow width, since the complaint is
+  legibility and the measurement alone has now missed it twice.
+  Criticality: medium — the board is how the user reads the batch, and this is his third report of
+  it; nothing is corrupted, but the reading is.
+  Bundle: Board & Dashboard.
+
+- [ ] 964. The launcher's stalled-writer recovery is unreachable, so only a DECLARED delegate can
+  ever be recovered. MEASURED 27.08.2026 while reviewing point 945 on `scripts/batch-autostart.mjs`:
+  inside `if (verdict === 'skip-alive')` the first branch is `if (startDecision.code !== 'owner-live')
+  { … log('skip: successor decision refused …'); bail() }`, and `bail()` writes the state and calls
+  `process.exit`. Everything after it therefore runs only when the code IS `owner-live` — but the
+  very next line is `if (!lock || assessment.alive !== true)`, which `owner-live` contradicts by
+  definition. The whole block behind it is dead: the `verdictRepeat` episode counter, the
+  `WRITER_VETO` journal entries, the `ESCALATING: … blocked launcher recovery for N min` line, the
+  `retireBatchWriter` / `revokeWriterFence` recovery and the second `successorStartDecision` that
+  was meant to re-decide after it. It was reachable when it was built (`d621b742`, 21.08.2026,
+  "Recover stalled writer vetoes on the second tick") and was cut off the same day by `387e7a46`
+  ("Start successors at handover and supervised exit"), which added the early bail above it.
+  WHY IT MATTERS: point 945 stops a DECLARED delegate from vetoing a successor beside a dead owner.
+  An UNDECLARED live checkout — an agent that died before declaring, a stray worktree, a delegate
+  whose declaration expired — still vetoes with code `registered-writer-live`, and since 945 that
+  refusal correctly no longer touches `failCount`, so it can never reach the runaway pause either.
+  This block was the only thing that would have broken such a wedge, and it cannot run.
+  FINAL STATE: a repeated refusal that is NOT `owner-live` reaches the writer-recovery episode —
+  its repeat counter, its journal entries, its escalation line and its fence revocation — and the
+  re-decision that follows it, while a single refusal still just waits and a live owner still
+  vetoes untouched. Whatever the early bail was protecting (the `autostart-last.json` decision
+  record it writes) keeps happening on the path that still needs it.
+  VERIFIABLE: Vitest over the tick — a repeated `registered-writer-live` refusal beside an absent
+  or dead owner lock reaches the escalation and revokes the writer's fence, one such refusal does
+  not, an `owner-live` refusal never does, and the decision record is written in every case.
+  Criticality: high — it is the same standstill class as 945 with the declaration missing, and
+  nothing else in the launcher ends it.
+  Bundle: Urlaubsfestigkeit. It edits the successor tick that 945 also edits, so it is worked
+  after it, never beside it.
