@@ -589,12 +589,6 @@
       "origin": "machine",
       "place": "last"
     },
-    "902": {
-      "at": "2026-08-27T19:56:32.206Z",
-      "why": "Point 946 names this authorization among the points it must follow, so parking 902 behind point 174 parks the high-criticality card gate that stands in front of the release.",
-      "origin": "machine",
-      "place": "ahead"
-    },
     "904": {
       "at": "2026-08-25T00:23:39.794Z",
       "why": "Letzter Platz ist richtig: die drei Befunde liegen in bereits gelandetem Code, blockieren keine offene Spur und keinen Release-Schritt",
@@ -907,15 +901,15 @@
       "origin": "machine",
       "place": "last"
     },
-    "979": {
-      "at": "2026-08-27T20:53:37.921Z",
-      "why": "The gate blocks every session's turn end while it stands, so no point — the release included — can be closed until it is answered.",
-      "origin": "machine",
-      "place": "ahead"
-    },
     "980": {
       "at": "2026-08-27T21:49:24.065Z",
       "why": "Low-criticality documentation hygiene with no lane waiting on it: the duplicate numbers mislead a citation, they break nothing at runtime, so it stands behind the guard and gameplay work already ranked ahead of it.",
+      "origin": "machine",
+      "place": "last"
+    },
+    "981": {
+      "at": "2026-08-27T22:26:47.483Z",
+      "why": "Medium-criticality corpus hygiene that blocks no lane: the two confirmed routing contradictions are already overridden by the code, which decides the lane, so a session cannot act on them where it counts — it stands behind the release work and the guard points ahead of it.",
       "origin": "machine",
       "place": "last"
     }
@@ -957,7 +951,7 @@
     "why": "The order standing in front of the release today is the arrangement that predates this rule; the four machine-filed points that had ranked themselves there were moved behind 174 first"
   },
   "settled": {
-    "at": "2026-08-27T21:49:24.072Z",
+    "at": "2026-08-27T22:26:47.491Z",
     "points": [
       174,
       184,
@@ -1224,7 +1218,6 @@
       899,
       900,
       901,
-      902,
       904,
       905,
       906,
@@ -1280,8 +1273,8 @@
       976,
       977,
       978,
-      979,
-      980
+      980,
+      981
     ]
   }
 }

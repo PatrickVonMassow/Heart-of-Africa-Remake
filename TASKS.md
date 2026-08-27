@@ -13078,3 +13078,31 @@ to land than a mechanism that needs a review.
   Criticality: low — nothing breaks at runtime, but the document is our own evidence trail and a
   handle that names three things names none.
   Bundle: Dokumentation.
+
+- [ ] 981. Fifteen rule-corpus findings of the 28.08.2026 cross-vendor review are recorded and
+  unfixed. MEASURED 28.08.2026 by `rule-review-guard`, which came due when the corpus grew from
+  127 to 137 entries; the reading was commissioned cross-vendor over the complete memory corpus
+  plus `CLAUDE.md` and the two per-turn hooks, and its sixteen findings are section H of
+  `docs/rule-corpus-audit.md`. A16 was answered in the same turn. Three were spot-checked against
+  the files and confirmed, which is what makes the rest credible: `provider-volume-strategy.md`
+  still routes the hard cases to Fable (A1), `maximal-delegation.md` still says an implementation
+  agent runs Opus 5 "whatever the difficulty" (A2), and `dashboard-multiple-now-cards.md` carries
+  the same `parseNowCardPoints` sentence twice (A13). The corpus is read by every session, so a
+  rule that contradicts the code is followed anyway — that is the whole reason the axis
+  CONTRADICTORY exists.
+  FINAL STATE: every row of section H is either fixed or marked in the table as accepted with its
+  reason, and the table records which. Each fix is checked against the CODE it claims to describe,
+  never against neighbouring prose. Rows naming a script claim to verify (A3 on
+  `scripts/dashboard-guard-core.mjs`, A4/A5 on `scripts/decision-card-guard-core.mjs` and
+  `scripts/dashboard-card-topic-guard.mjs`, A6 on `assertRepositoryUnchanged`) are decided by
+  reading that script, and where the code is right and the memory wrong, the memory moves.
+  A WITHDRAWN rule keeps its surviving insight and a pointer; it is never silently deleted.
+  WHAT IS NOT IN SCOPE: A12 proposes reducing five dashboard memories to pointers behind one
+  binding contract. That is a corpus restructuring, not a fix; it is decided in this point and,
+  if adopted, filed as its own point rather than done in passing.
+  VERIFIABLE: `node scripts/rule-review.mjs --status` reports the corpus reviewed at the new
+  count; a repository search finds no surviving copy of the two dead routing sentences (A1, A2);
+  the duplicated sentence (A13) occurs once; and `npm run test:unit` stays green.
+  Criticality: medium — nothing breaks at runtime, but a session that follows a stale rule spends
+  a whole point on the wrong lane, which is exactly what A1 and A2 describe.
+  Bundle: Session- & Repo-Hygiene.
