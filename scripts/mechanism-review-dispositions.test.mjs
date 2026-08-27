@@ -20,8 +20,38 @@ const rows = readFileSync('.claude/mechanism-reviews.jsonl', 'utf8')
   .map((line) => JSON.parse(line))
 const dispositions = rows.filter((row) => row.kind === CONTRIBUTION_DISPOSITION_KIND)
 
+// THE MIGRATION INTERVAL MUST BE IN THIS CLONE, and in CI it is not: the job
+// checks out at fetch-depth 2 on purpose (.github/workflows/ci.yml documents why
+// deeper reddened it), so `265712e..6edd81fd` is not a revision range there and
+// every ancestry probe answers false. MEASURED 27.08.2026 on CI run 33034091057,
+// which reddened for the checkout and not for the code — the two cases below then
+// asserted a history the runner had never been given. Like the four-eyes-artefact
+// and queue-calibration audits, they SKIP there and say why; every full clone runs
+// them. What must never happen is the third shape: passing because the probe
+// answered false. The guard itself is fail-closed on exactly this — an unreachable
+// commit verifies no retirement — so a shallow checkout under-clears, never over-clears.
+const historyReachable = (() => {
+  try {
+    execFileSync(
+      'git',
+      ['merge-base', '--is-ancestor', LEGACY_CONTRIBUTION_BASELINE, CONTRIBUTION_SCOPE_BOUNDARY],
+      { windowsHide: true },
+    )
+    return true
+  } catch {
+    return false
+  }
+})()
+if (!historyReachable) {
+  console.warn(
+    'mechanism-review-dispositions: SKIPPED the two history cases — ' +
+      `${LEGACY_CONTRIBUTION_BASELINE.slice(0, 7)}..${CONTRIBUTION_SCOPE_BOUNDARY.slice(0, 7)} is not in this ` +
+      'clone (shallow checkout); a full clone runs them',
+  )
+}
+
 describe('the recorded legacy contribution disposition', () => {
-  it('names every mechanism contribution from the confirmed baseline through the migration boundary exactly once', () => {
+  it.skipIf(!historyReachable)('names every mechanism contribution from the confirmed baseline through the migration boundary exactly once', () => {
     const raw = execFileSync('git', mechanismLogCommand(LEGACY_CONTRIBUTION_BASELINE, CONTRIBUTION_SCOPE_BOUNDARY), {
       encoding: 'utf8',
       windowsHide: true,
@@ -54,7 +84,7 @@ describe('the recorded legacy contribution disposition', () => {
     }
   })
 
-  it('lets the guard re-verify every retirement from Git, not from the ledger claim', () => {
+  it.skipIf(!historyReachable)('lets the guard re-verify every retirement from Git, not from the ledger claim', () => {
     const copies = dispositions.map((row) => structuredClone(row))
     attachContributionDispositions(copies)
     const retired = copies.filter((row) => row.disposition === 'retired')
