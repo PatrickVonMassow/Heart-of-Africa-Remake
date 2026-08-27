@@ -153,6 +153,11 @@ put it is the mistake this line exists to stop.
   WITHOUT `GIT_DIR` left both the clone and the live checkout untouched, so this route is not
   always on. The author measures it before fixing it; the FINAL STATE above is not met while it
   stands.
+  TRIPWIRE RESOLVED 27.08.2026, 14:15, by the recorded Fable 5 verification lane: the offending
+  fixture commit (`47c8032`, trailer `Claude Haiku 4.5`) is contained by NO ref — orphaned residue
+  of the 13:49 leak, awaiting gc — and `git log --all` since 26.08. names only allowed authors, so
+  the baseline may advance on that session's transcript proof. This changes nothing about the
+  FINAL STATE: the second escape route stands unmeasured.
   VERIFIABLE: Vitest — a case that snapshots the live checkout's refs, `.git/config` and worktree
   list, drives the offending helper with cwd set to a linked worktree, and asserts the snapshot is
   unchanged; and a case that asserts the integrity detector goes red when a fixture writes into the
@@ -12979,3 +12984,40 @@ to land than a mechanism that needs a review.
   Criticality: med — it does not lose work, but it blocks the picture gate behind a run that has
   nothing to do with the change, which is how deferrals get written for the wrong reason.
   Bundle: Testinfrastruktur.
+
+- [ ] 970. Canonical model trailers are not enforced at commit time. MEASURED 27.08.2026, 14:14, in
+  the tripwire trailer sweep (`git log --all --since 2026-08-26`): two commits carry
+  `Opus 5 <noreply@anthropic.com>` without the `Claude` prefix (8d5ab62b, 77e58d20) and two carry
+  `GPT-5.6 Sol <noreply@anthropic.com>` under the wrong vendor domain (6ee9f114, 7475a484; the
+  canonical spelling is `noreply@openai.com`). All four name ALLOWED models — form drift, not a
+  policy breach — but the serving-model guard and every commit-proxy analysis match trailers
+  textually, so a drifted spelling silently falls out of counts, reviews and the model-usage
+  record.
+  FINAL STATE: the versioned commit hook knows the canonical `Co-Authored-By` string of every model
+  in the policy and refuses a commit whose model trailer matches a policy model only loosely
+  (missing prefix, wrong vendor domain, renamed variant), naming the canonical spelling in its
+  refusal; the four historical commits stay as they are — no history rewrite.
+  VERIFIABLE: Vitest over the hook's checker — every canonical string passes, and each measured
+  drift form is refused with a message naming the canonical spelling.
+  Criticality: low — bookkeeping accuracy only; the four commits name allowed models either way.
+  Bundle: Modell & Wächter.
+
+- [ ] 971. The delivered-hypothesis lesson landed unenforced and half-delivered. The cross-vendor
+  review of the landed guide commit (GPT-5.6 Sol, 27.08.2026, verdict do-not-merge, recorded in the
+  mechanism ledger; this point is the charge that answers it) returned three findings:
+  (1) the guide's meta-rule says "Widerlege sie zuerst" — when the suspected cause is TRUE,
+  refutation is impossible, so the imperative falsely blocks valid work; it must demand an
+  independent ATTEMPT to falsify, not a successful refutation. (2) `scripts/guide-brevity-core.mjs`
+  only raised aggregate budgets, and `auditGuide()` pins the pitfall section's shape but nothing of
+  the meta-rule section, so deleting or weakening the new claim and spending its freed budget
+  elsewhere still passes — no check pins "falsify first" or the blind independent measurement.
+  (3) the change asserts the environment-layer half of the lesson "lives in the retrospective",
+  but the commit carries no retrospective change, so the claim points at prose that does not exist.
+  FINAL STATE: the meta-rule demands a falsification attempt; the audit pins the meta-rule's
+  semantic content the way it pins the pitfall section; and the retrospective either carries the
+  environment-layer half or the guide stops claiming it does.
+  VERIFIABLE: Vitest over `auditGuide()` — the meta-rule section stripped of its falsification
+  content goes red, and the wording that a TRUE hypothesis survives the rule is asserted.
+  Criticality: med — a mechanism that counts as enforced while enforcing nothing is the failure
+  class the four-eyes gate exists to prevent.
+  Bundle: Dokumentation.
