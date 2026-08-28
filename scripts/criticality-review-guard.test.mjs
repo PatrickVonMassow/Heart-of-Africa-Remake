@@ -139,6 +139,35 @@ describe('point file-set measurement', () => {
     expect(files).toEqual(['scripts/lease.mjs', 'scripts/lease.test.mjs'])
   })
 
+  // ONE BOUNDARY (28.08.2026): `review-sol` structurally refuses to put the work
+  // order, its archive or the retrospective in a pass, so a point whose measured
+  // file set picked one of them up could never reach a complete composition,
+  // whatever was reviewed. The gate reads the planner's exclusion list.
+  it('leaves out the paths no review round may carry', () => {
+    const reviewed = 'c'.repeat(40)
+    const landing = 'c'.repeat(40)
+    const side = 'd'.repeat(40)
+    const files = measurePointFilesWithoutCommission(893, reviewed, {
+      isAncestor: () => false,
+      run: (args) => {
+        if (args[0] === 'log') {
+          return `\x1e${landing}\x1f${'a'.repeat(40)} ${side}\x1fMerge branch 'feat/893-attempt-lease-fencing'\n`
+        }
+        if (args[0] === 'diff') {
+          return [
+            'scripts/lease.mjs',
+            'TASKS.md',
+            'docs/tasks-archive.md',
+            'docs/analysis_de/retrospektive-zusammenarbeit.md',
+          ].join('\0')
+        }
+        throw new Error(`unexpected command: ${args.join(' ')}`)
+      },
+    })
+
+    expect(files).toEqual(['scripts/lease.mjs'])
+  })
+
   it('uses a landing merge to recover the lane base for an earlier branch review', () => {
     const first = 'a'.repeat(40)
     const reviewed = 'b'.repeat(40)

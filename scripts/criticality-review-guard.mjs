@@ -39,7 +39,7 @@ import { isMainModule } from './is-main.mjs'
 import { heldByOtherLiveOwner } from './batch-singleton.mjs'
 import { appendRecord, readRecords, verifyCarried } from './mechanism-review.mjs'
 import { modelsFromTrailers } from './mechanism-review-core.mjs'
-import { parseRangeLog, planAuthorshipGroups } from './mechanism-review-range-core.mjs'
+import { parseRangeLog, planAuthorshipGroups, reviewEndStateFiles } from './mechanism-review-range-core.mjs'
 import { parsePassFiles, quotePassFile, unquoteGitPath } from './review-material-core.mjs'
 import {
   ancestorIndex,
@@ -140,7 +140,14 @@ export const pointLaneCommitsCommand = (ref, exclude = TICK_BRANCH) => [
   String(exclude),
 ]
 
-const uniqueFiles = (raw) => [...new Set(String(raw).split('\0').filter(Boolean))]
+// THE SAME BOUNDARY THE PLANNER USES (`reviewEndStateFiles`). The gate demanded
+// coverage of paths `review-sol` structurally refuses to put in a pass — the work
+// order, its archive, the retrospective — so a HIGH point whose file set had
+// picked one of them up could never reach a complete composition, whatever was
+// reviewed. The exclusion list already says why those documents have their own
+// enforcement instead; consuming it here is what makes gate, coverage demand and
+// planner agree, which is what that list was written to guarantee.
+const uniqueFiles = (raw) => reviewEndStateFiles(String(raw).split('\0').filter(Boolean))
 
 const ancestorOrEqual = (a, b, isAncestor) => Boolean(a && b && (a === b || isAncestor(a, b)))
 
