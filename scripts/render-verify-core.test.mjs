@@ -736,6 +736,39 @@ describe('chargeFor — the ledger charges NARROWLY', () => {
     const narrow = [{ point: 4, match: /goat/i, detailMatch: shaped, why: 'malformed detail' }]
     expect(chargeFor({ ...red('the goat stance'), detail: 'anything at all' }, { ledger: narrow })).toBeNull()
   })
+
+  // THE ENTRY'S OWN `test` DECIDES NOTHING (review finding, 28.08.2026, round
+  // 13). An object carrying two plausible strings AND a `test` reached the
+  // matcher itself, so the ledger entry — not the pattern it names — answered
+  // whether a red was charged. A forged matcher could charge every red, and an
+  // alternating one could charge a red at record time and refuse the same red
+  // when the record was re-read.
+  it('never lets a forged matcher answer for its own pattern', () => {
+    // Says true to everything, while its strings name a pattern that matches
+    // nothing here. The compiled pattern wins, so nothing is charged.
+    const forged = { source: 'nothing-like-this-check', flags: '', test: () => true }
+    expect(chargeFor(red('the goat stance'), { ledger: [{ point: 3, match: forged, why: 'forged' }] })).toBeNull()
+    // And the mirror: a matcher that says false while its strings DO match is
+    // ignored just as completely, so the charge stands.
+    const sullen = { source: 'goat', flags: 'i', test: () => false }
+    expect(chargeFor(red('the goat stance'), { ledger: [{ point: 3, match: sullen, why: 'sullen' }] })?.point).toBe(3)
+    // An ALTERNATING matcher is the stateful case reached by another road: the
+    // same red must answer the same way however often it is asked.
+    let flip = false
+    const alternating = { source: 'goat', flags: '', test: () => (flip = !flip) }
+    const entry = [{ point: 3, match: alternating, why: 'alternating' }]
+    const asked = [1, 2, 3, 4].map(() => chargeFor(red('the goat stance'), { ledger: entry })?.point ?? null)
+    expect(asked).toEqual([3, 3, 3, 3])
+  })
+
+  // A REAL REGEX NEVER HAS AN EMPTY SOURCE (`new RegExp('').source` is
+  // `'(?:)'`), so an entry that carries one is malformed — and the empty
+  // pattern matches EVERY name, which is the catch-all this contract forbids.
+  it('refuses an EMPTY pattern source rather than charging everything', () => {
+    expect(chargeFor(red('a check nobody filed'), { ledger: [{ point: 3, match: { source: '', flags: '' } }] })).toBeNull()
+    // The genuine empty regex still behaves as the regex it is.
+    expect(chargeFor(red('a check nobody filed'), { ledger: [{ point: 3, match: new RegExp('') }] })?.point).toBe(3)
+  })
 })
 
 describe('runVerdict — clean, accounted for, or red', () => {
@@ -1248,6 +1281,74 @@ describe('evaluate — a red is not closed by the runs that FOLLOWED it (point 6
 // 640's three closings all need the red's identity, and a truncated recording has
 // none — so it blocked every later render change until somebody hand-wrote a
 // --defer, which is the waiver the charge ledger exists to abolish.
+// THE IDENTITY A SIGNATURE BINDS BY, SPECIFIED HERE AND NOT BY ITS PRODUCER
+// (review finding, 28.08.2026, round 13). Every closure test builds its `run`
+// field with `runIdentity` itself, so the function was its own oracle: an
+// identity of the wrong width, or one that stopped reading the reds, would have
+// kept all of them green while binding one signature to several records.
+describe('runIdentity — the content identity a closure names one record by', () => {
+  /** One fixed record, so the digest below is a VALUE and not a restatement. */
+  const fixture = {
+    backend: 'webgpu',
+    suite: 'settings',
+    at: 1500,
+    exit: 1,
+    asserted: true,
+    reds: [{ name: 'the goat stance', key: 'the-goat-stance', kind: 'check', point: null }],
+  }
+
+  it('is 128 bits of hex, pinned to a value', () => {
+    // Pinned deliberately: a silent change of digest or of the canonical text
+    // it is taken over invalidates every signature already on disk, and this
+    // is the line that says so out loud.
+    expect(runIdentity(fixture)).toBe('3910f0dcae369a6c4c3f787dc621fb3c')
+    expect(runIdentity(fixture)).toMatch(/^[0-9a-f]{32}$/)
+  })
+
+  it('is canonical — key order and a round trip through disk change nothing', () => {
+    const reordered = {
+      reds: [{ point: null, kind: 'check', key: 'the-goat-stance', name: 'the goat stance' }],
+      asserted: true,
+      exit: 1,
+      at: 1500,
+      suite: 'settings',
+      backend: 'webgpu',
+    }
+    expect(runIdentity(reordered)).toBe(runIdentity(fixture))
+    expect(runIdentity(JSON.parse(JSON.stringify(fixture)))).toBe(runIdentity(fixture))
+  })
+
+  // THE RESIDUAL IS PART OF THE IDENTITY. Two records of the same suite, the
+  // same backend and the same stamp that differ only in what they RECORDED are
+  // different runs, and one signature must not close both.
+  it('separates records that differ ONLY in their reds', () => {
+    const charged = { ...fixture, reds: [{ ...fixture.reds[0], point: 506 }] }
+    const renamed = { ...fixture, reds: [{ ...fixture.reds[0], name: 'the goat stance held' }] }
+    const detailed = { ...fixture, reds: [{ ...fixture.reds[0], detail: 'worst goat 2 at 3.00 m' }] }
+    const extra = { ...fixture, reds: [...fixture.reds, { name: 'a second red', key: 'a-second-red', kind: 'check', point: null }] }
+    const none = { ...fixture, reds: [] }
+    const ids = [charged, renamed, detailed, extra, none].map((r) => runIdentity(r))
+    expect(new Set([...ids, runIdentity(fixture)]).size).toBe(6)
+  })
+
+  it('separates records that share a stamp but differ anywhere else', () => {
+    const otherSuite = { ...fixture, suite: 'polish' }
+    const otherBackend = { ...fixture, backend: 'webgl' }
+    const startedInstead = { ...fixture, at: undefined, startedAt: 1500 }
+    const ids = [otherSuite, otherBackend, startedInstead].map((r) => runIdentity(r))
+    expect(new Set([...ids, runIdentity(fixture)]).size).toBe(4)
+  })
+
+  it('answers null for a non-record and never throws', () => {
+    expect(runIdentity(null)).toBeNull()
+    expect(runIdentity('a string')).toBeNull()
+    expect(runIdentity(7)).toBeNull()
+    const circular = { backend: 'webgpu' }
+    circular.self = circular
+    expect(() => runIdentity(circular)).not.toThrow()
+  })
+})
+
 describe('an INCOMPLETE RECORDING is its own class, and has its own way out (point 734)', () => {
   const openPoints = [506, 546]
   // The two shapes on file: what the recorder writes TODAY (the field), and what

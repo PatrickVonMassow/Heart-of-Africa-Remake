@@ -18,6 +18,8 @@
 // every failing check and console error in it charged to an OPEN work-order
 // point. The two are never conflated — see runVerdict.
 
+import { createHash } from 'node:crypto'
+
 import { RED_CHARGES } from './render-verify-charges.mjs'
 import { scopeMandatoryDuty } from './mandatory-duty-core.mjs'
 
@@ -211,18 +213,40 @@ export function chargeablePoints(text) {
  * `{ global: true, test() {} }` passed it, and the clone branch then built
  * `new RegExp(undefined, '')` — the EMPTY pattern, which matches EVERY name. A
  * broken entry did not charge nothing; it charged everything, which is the
- * exact opposite of the contract `chargeFor` states below. So a pattern is
- * usable only if it really carries the two strings a regex is rebuilt from,
- * duck-typed rather than by `instanceof` so a regex from another realm (a
- * worker, a vm context) still counts. Total: anything else matches nothing.
+ * exact opposite of the contract `chargeFor` states below.
+ *
+ * AND THE ENTRY'S OWN `test` IS NEVER CALLED (review finding, 28.08.2026,
+ * round 13). Testing through the object the ledger handed in left the ANSWER in
+ * that object's gift: anything carrying two strings and a function could return
+ * true for every name, or alternate between calls, which is the same
+ * call-order-dependent charge the `g`/`y` strip above exists to abolish —
+ * reached by a different road. So the pattern is only ever a SOURCE of a regex,
+ * never a matcher: a fresh `RegExp` is built from its two strings, minus the
+ * stateful flags, and THAT does the testing. A real regex behaves exactly as
+ * before (its `source`/`flags` rebuild it identically), a regex from another
+ * realm — a worker, a vm context — still counts because nothing is asked of its
+ * prototype, and a forged or stateful matcher can now influence only which
+ * pattern is compiled, which is all a ledger entry was ever allowed to say.
+ *
+ * An EMPTY source is refused with it: a real `RegExp` never has one (`new
+ * RegExp('').source` is `'(?:)'`), so `{ source: '', flags: '' }` is a
+ * malformed entry wearing the match-everything pattern. Total: anything else
+ * matches nothing.
  */
-function patternHits(pattern, value) {
-  if (!pattern || typeof pattern.test !== 'function') return false
-  if (typeof pattern.source !== 'string' || typeof pattern.flags !== 'string') return false
-  if (pattern.global === true || pattern.sticky === true) {
-    return new RegExp(pattern.source, pattern.flags.replace(/[gy]/g, '')).test(value)
+function usableRegex(pattern) {
+  if (!pattern) return null
+  if (typeof pattern.source !== 'string' || typeof pattern.flags !== 'string') return null
+  if (pattern.source === '') return null
+  try {
+    return new RegExp(pattern.source, pattern.flags.replace(/[gy]/g, ''))
+  } catch {
+    return null
   }
-  return pattern.test(value)
+}
+
+function patternHits(pattern, value) {
+  const re = usableRegex(pattern)
+  return re === null ? false : re.test(value)
 }
 
 export function chargeFor(red, options) {
@@ -631,37 +655,36 @@ function canonicalText(value) {
  * canonical text, so no field a writer controls can be changed without the
  * identity moving with it.
  *
- * WHAT 64 BITS DO NOT PROVE (review finding, 28.08.2026, which corrected the
- * earlier "records that hash together are observationally indistinguishable").
- * This reduces UNBOUNDED text to 64 non-cryptographic bits, so collisions exist
- * by counting alone, and `signedClosureFor` treats hash equality as sufficient
- * authorisation. The honest statement is the one-directional one: records that
- * differ hash apart with overwhelming probability, never with certainty.
+ * WHY THE DIGEST IS CRYPTOGRAPHIC (review finding, 28.08.2026, round 13). The
+ * first version reduced unbounded text to 64 bits of FNV — chosen to keep this
+ * core arithmetic-only — and `signedClosureFor` treats identity equality as
+ * SUFFICIENT AUTHORISATION to close a record. Two properties are therefore
+ * load-bearing, and 64 non-cryptographic bits had neither: a collision must not
+ * be reachable by accident (birthday reach ~2^32 records, which is a bound
+ * nobody should have to argue about), and it must not be reachable on purpose —
+ * FNV is trivially invertible, so a writer who controls any field of a record
+ * can steer it onto another record's identity and have that one's signature
+ * close it.
  *
- * WHAT A COLLISION CAN COST, at worst: one written evidence sentence disposing
- * of a SECOND run that nobody read — it would have to be of the same suite and
- * the same backend, open in the same 40-run window, and hash into the same 64
- * bits. It can cost no coverage in either direction: a signature never makes a
- * run cover a backend, and it never touches a red the run recorded. The
- * identity stays the content, deliberately — the decision and its full residual
- * are recorded at the signing site in render-verify-guard.mjs.
+ * SHA-256 truncated to 128 bits answers both by construction, and costs one
+ * Node built-in import in a file that already imports two modules and runs only
+ * under Node (the Stop hook and Vitest; `scripts/verify/_browser.mjs` imports it
+ * beside Playwright, never into a page). No stored closure predates this — the
+ * identity moved before any was written to `.claude/render-verify-state.json` —
+ * so nothing is invalidated by the change.
+ *
+ * WHAT THE IDENTITY STILL DOES NOT DO, unchanged: a signature never makes a run
+ * cover a backend, and it never touches a red the run recorded. The identity is
+ * the record's WHOLE canonical content, so no field a writer controls can be
+ * changed without the identity moving with it — the decision and its full
+ * residual are recorded at the signing site in render-verify-guard.mjs.
  *
  * Null for a non-record; never throws (the wrapper's fail-open depends on it).
  */
 export function runIdentity(run) {
   if (!run || typeof run !== 'object') return null
   try {
-    const s = canonicalText(run)
-    // FNV-1a over the text, twice with decorrelated accumulators — 64 identity
-    // bits from pure arithmetic, because this core must stay import-free.
-    let h1 = 0x811c9dc5
-    let h2 = (0x811c9dc5 ^ 0x5bd1e995) >>> 0
-    for (let i = 0; i < s.length; i++) {
-      const c = s.charCodeAt(i)
-      h1 = Math.imul(h1 ^ c, 0x01000193) >>> 0
-      h2 = (Math.imul(h2 ^ c, 0x01000193) + 0x9e3779b9) >>> 0
-    }
-    return h1.toString(16).padStart(8, '0') + h2.toString(16).padStart(8, '0')
+    return createHash('sha256').update(canonicalText(run), 'utf8').digest('hex').slice(0, 32)
   } catch {
     return null
   }
