@@ -13352,3 +13352,34 @@ to land than a mechanism that needs a review.
   Criticality: medium — it does not corrupt anything, but it is the delegated run's only defect
   report, and today it cries wolf.
   Bundle: Modell & Wächter.
+- [ ] 1002. A legitimate verification run longer than an hour now earns an emergency strike.
+  MEASURED 28.08.2026 while cross-reading point 958: the emergency clock was narrowed to durable
+  batch progress alone — `BATCH_PROGRESS_KINDS` in `scripts/batch-emergency-core.mjs` admits a
+  first-parent `main` commit, a committed boundary and a moved delegated branch tip, and nothing
+  else. That is what point 958 ordered and it closes the busy-wedge hole. It also removes the
+  protection the old `ADVANCING_CLASSES` gave the VERIFICATION and CI_WAIT classes: an owner that
+  is doing exactly the right thing — one whole-suite run, no commit while it runs — presents the
+  same evidence as a wedge. `node scripts/verify/run-wait.mjs --plan large` reports 80m 48s for the
+  20 suites over both backends against `EMERGENCY_THRESHOLD_MS` of 60 minutes, so the honest LARGE
+  run at the end of every closing outlives the threshold and takes a soft strike: doctor repair
+  plus a restart, which kills the run it interrupted. The clocked veto in
+  `local/batch-emergency-veto.json` exists but nothing sets it, so the protection is a manual step
+  no runbook names.
+  FINAL STATE:
+  - A NAMED, BOUNDED, LIVE VERIFICATION RUN SUSPENDS THE CLOCK — not the VERIFICATION activity
+    class again, but the run's own progress lease: the wrapper already writes `*.run.json` beside
+    its log and `run-wait.mjs` already reads its terminal receipt. A lease that has stopped
+    advancing, expired, or belongs to a dead process protects nothing.
+  - THE BUSY WEDGE STAYS CLOSED. Tool activity, process presence and a stale lease must still fail
+    to renew the clock; only a lease that is measurably alive may.
+  - THE DOCUMENT SAYS SO. `docs/batch-autonomy.md` names the suspension beside S-19, because the
+    S-19 wording is the only place a reader learns what the clock measures.
+  VERIFIABLE: Vitest over `emergencyDecision` — a report whose window holds no batch progress for
+  ninety minutes but a live, advancing verification lease stands the lane down; the same report
+  with the lease expired, stale or process-dead strikes exactly as today; and every existing busy
+  and quiet wedge case stays green. Plus the chaos drill extended: a wedged owner holding a stale
+  lease is still recovered without human action.
+  Criticality: high — it is a self-inflicted kill on the batch's own closing run, in the lane whose
+  whole purpose is to keep the batch alive unattended.
+  Bundle: Urlaubsfestigkeit. It changes the same decision core as 947 and 958, so it does not run
+  beside another point touching `scripts/batch-emergency-core.mjs`.
