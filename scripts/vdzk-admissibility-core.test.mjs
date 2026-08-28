@@ -21,6 +21,19 @@ describe('the typed authority', () => {
     expect(userOwnedCategory('This concerns the content of design.md.')).toBe('')
   })
 
+  // BOTH HALVES OF ONE DEFECT (cross-vendor review, GPT-5.6 Sol, 28.08.2026): a
+  // card that merely QUOTES the label as content granted itself the authority it
+  // was quoting, and the renderer then deleted that quoted line out of the card,
+  // so the user read a question with one of its own options missing.
+  it('grants no authority to a label quoted inside the card, and keeps that line visible', () => {
+    const quoting =
+      'Soll die Karte den Marker erklären, oder soll sie ihn weglassen?\n' +
+      'User-owned category: design-content. — genau diese Zeile ist gemeint.'
+    expect(userOwnedCategory(quoting)).toBe('')
+    expect(judge(quoting).ok).toBe(false)
+    expect(withoutCategoryLine(quoting)).toBe(quoting)
+  })
+
   it('names every category from the brief as a closed key', () => {
     expect(USER_OWNED_CATEGORIES).toEqual({
       'design-content': 'content of design.md',
@@ -128,11 +141,9 @@ describe('the live automated callers stay admissible', () => {
 // The tag is authority for the gate, never prose for the reader: the board is
 // German, and the card the user opens must not lead with an English key.
 describe('withoutCategoryLine', () => {
-  it('drops the tag and leaves the question itself untouched', () => {
+  it('drops the leading tag and leaves the question itself untouched', () => {
     expect(withoutCategoryLine('User-owned category: design-content.\nSoll §13.4 nachziehen?'))
       .toBe('Soll §13.4 nachziehen?')
-    expect(withoutCategoryLine('Vorwort.\nUser-owned category: release-tag.\nTaggen oder warten?'))
-      .toBe('Vorwort.\nTaggen oder warten?')
   })
 
   it('leaves a card without a tag exactly as it is', () => {

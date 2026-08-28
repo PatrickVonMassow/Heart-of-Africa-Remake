@@ -19,8 +19,14 @@ export const USER_OWNED_CATEGORIES = Object.freeze({
 })
 
 const CATEGORY_LABEL = 'User-owned category'
+// ANCHORED TO THE FIRST LINE, and nowhere else (cross-vendor review, GPT-5.6 Sol,
+// 28.08.2026). An unanchored tag was BOTH halves of one defect: a question that
+// merely QUOTES the label as visible content granted itself the authority it was
+// quoting, and `withoutCategoryLine` then deleted that content line out of the
+// rendered card — a card silently missing one of its own options. The tag is a
+// header, so it is read as one; the refusal already says "begin the body with".
 const CATEGORY_RE = new RegExp(
-  `(?:^|\\n)\\s*${CATEGORY_LABEL}:\\s*(${Object.keys(USER_OWNED_CATEGORIES).join('|')})\\s*\\.(?:\\s|$)`,
+  `^\\s*${CATEGORY_LABEL}:\\s*(${Object.keys(USER_OWNED_CATEGORIES).join('|')})\\s*\\.(?:\\s|$)`,
   'i',
 )
 
@@ -38,7 +44,7 @@ export function userOwnedCategory(text) {
  * gets, and for the same reason.
  */
 export function withoutCategoryLine(text) {
-  return String(text ?? '').replace(CATEGORY_RE, (match) => (match.startsWith('\n') ? '\n' : ''))
+  return String(text ?? '').replace(CATEGORY_RE, '')
 }
 
 /**
