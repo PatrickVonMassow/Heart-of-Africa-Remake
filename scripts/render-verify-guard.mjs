@@ -696,7 +696,7 @@ if (arg === 'status' || arg === '--status') {
       const verdict = run ? runVerdict(run, { openPoints }) : null
       console.log(
         run
-          ? `  ${b.padEnd(6)} covered by ${run.suite} at ${new Date(run.at).toISOString()} ` +
+          ? `  ${b.padEnd(6)} covered by ${run.suite} at ${isoText(runStamp(run) ?? run.at)} ` +
               `(${
                 verdict.status === 'accounted'
                   ? `ACCOUNTED FOR, not clean: exit ${run.exit}, ` +
@@ -722,7 +722,7 @@ if (arg === 'status' || arg === '--status') {
     for (const r of openIncomplete) {
       console.log(
         `⚠ INCOMPLETE RECORDING (not an unexplained red): ${r.backend}/${r.suite} ` +
-          `@${isoText(r.at)} (id ${runIdentity(r)}) — ${droppedLinesOf(r)} result line(s) dropped by the ` +
+          `@${isoText(runStamp(r) ?? r.at)} (id ${runIdentity(r)}) — ${droppedLinesOf(r)} result line(s) dropped by the ` +
           'capture cap. Re-run the suite, or sign it off: node scripts/render-verify-guard.mjs ' +
           `--incomplete "${r.backend}/${r.suite}" --evidence "<why>"`,
       )
@@ -739,7 +739,7 @@ if (arg === 'status' || arg === '--status') {
     // (review finding, 28.08.2026, where the message said otherwise).
     for (const r of openCrashedRuns(state)) {
       console.log(
-        `⚠ CRASHED RUN (not an unexplained red): ${r.backend}/${r.suite} @${isoText(r.at)} ` +
+        `⚠ CRASHED RUN (not an unexplained red): ${r.backend}/${r.suite} @${isoText(runStamp(r) ?? r.at)} ` +
           `(id ${runIdentity(r)}) — the run died rather than reported, so nothing in it can be ` +
           'explained or charged. A re-run judges the picture but does NOT remove this record: fix ' +
           'the CAUSE (the render edit moves the window past it), or read its kept log ' +
@@ -757,7 +757,7 @@ if (arg === 'status' || arg === '--status') {
     for (const r of runs) {
       const v = runVerdict(r, { openPoints })
       console.log(
-        `  ${new Date(Number(r.at ?? 0)).toISOString()}  ${String(r.backend).padEnd(6)} ` +
+        `  ${isoText(runStamp(r) ?? r.at)}  ${String(r.backend).padEnd(6)} ` +
           `${String(r.suite).padEnd(14)} exit ${r.exit} asserted=${r.asserted === true} ` +
           `level=${r.featureLevel ?? '-'} shots=${r.screenshotCount ?? 0} ` +
           `${v.status}${v.charges.length ? ` (${v.charges.map((c) => `→${c.point}`).join(' ')})` : ''}`,

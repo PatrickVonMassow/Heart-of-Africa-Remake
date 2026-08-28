@@ -10,7 +10,10 @@
 // error, which the Stop hook lets fall through to its outer catch — stop allowed,
 // state untouched, gate still pending on the next turn.
 import { describe, it, expect } from 'vitest'
-import { execSync } from 'node:child_process'
+import { execFileSync, execSync } from 'node:child_process'
+import { mkdtempSync, mkdirSync, writeFileSync, rmSync } from 'node:fs'
+import { tmpdir } from 'node:os'
+import { join } from 'node:path'
 import {
   BaselineDiffError,
   commitMissing,
@@ -505,5 +508,73 @@ describe('commitMissing runs a real git probe (no injection)', () => {
     const head = execSync('git rev-parse HEAD', { windowsHide: true, encoding: 'utf8' }).trim()
     expect(commitMissing(head)).toBe(false)
     expect(commitMissing('0'.repeat(40))).toBe(true)
+  })
+})
+
+// THE STATUS COMMAND ITSELF, NOT A HELPER THAT RESEMBLES IT (review finding,
+// 28.08.2026, round 13). `isoText` was covered while `--status` bypassed it: the
+// open-broken lines read `r.at` without the `startedAt` fallback, and the recent-
+// run table rendered `new Date(Number(r.at ?? 0))` directly — 1970 for a record
+// that was never dated, and a thrown RangeError for one whose stamp is out of
+// range, which aborts the WHOLE inspection just when it is needed. So this drives
+// the real CLI over a real state file.
+describe('render-verify-guard --status — what it prints about a run it cannot date', () => {
+  const GUARD = join(process.cwd(), 'scripts', 'render-verify-guard.mjs')
+
+  /** A throwaway checkout: HOA_REPO_ROOT points every path helper at it, so the
+   *  real .claude/render-verify-state.json is never read or written. */
+  const inTempRepo = (state) => {
+    const root = mkdtempSync(join(tmpdir(), 'hoa-render-status-'))
+    try {
+      execFileSync('git', ['init', '-q', '-b', 'main'], { cwd: root })
+      execFileSync('git', ['-c', 'user.email=t@t', '-c', 'user.name=t', 'commit', '-q', '--allow-empty', '-m', 'root'], { cwd: root })
+      mkdirSync(join(root, '.claude'), { recursive: true })
+      writeFileSync(join(root, '.claude', 'render-verify-state.json'), JSON.stringify(state))
+      return execFileSync(process.execPath, [GUARD, '--status'], {
+        cwd: root,
+        env: { ...process.env, HOA_REPO_ROOT: root },
+        encoding: 'utf8',
+      })
+    } finally {
+      rmSync(root, { recursive: true, force: true })
+    }
+  }
+
+  const marker = { name: '115 further result line(s) exceeded the capture cap', key: 'capture-truncated', kind: 'check', point: null }
+
+  it('says undated for a record with no stamp, and never prints the epoch', () => {
+    const out = inTempRepo({
+      runs: [
+        { backend: 'webgpu', suite: 'settings', exit: 1, reds: [marker] },
+        { backend: 'webgl', suite: 'startup', exit: 1, crashed: true, reds: [] },
+      ],
+    })
+    expect(out).toMatch(/INCOMPLETE RECORDING \(not an unexplained red\)/)
+    expect(out).toMatch(/CRASHED RUN \(not an unexplained red\)/)
+    expect(out).toMatch(/@undated/)
+    expect(out).not.toMatch(/1970-01-01/)
+  })
+
+  it('falls back to startedAt where only that was measured', () => {
+    const out = inTempRepo({
+      runs: [{ backend: 'webgpu', suite: 'settings', startedAt: 1500, exit: 1, reds: [marker] }],
+    })
+    expect(out).toMatch(/@1970-01-01T00:00:01\.500Z/)
+    expect(out).not.toMatch(/@undated/)
+  })
+
+  // The whole inspection used to die here: `new Date(out-of-range).toISOString()`
+  // throws, and the recent-run table renders every record in the window.
+  it('survives an unreadable stamp instead of aborting the inspection', () => {
+    const out = inTempRepo({
+      runs: [
+        { backend: 'webgpu', suite: 'settings', at: Number.MAX_SAFE_INTEGER, exit: 1, reds: [marker] },
+        { backend: 'webgl', suite: 'startup', at: 2000, exit: 0, asserted: true },
+      ],
+    })
+    expect(out).toMatch(/t=9007199254740991/)
+    // …and the run AFTER it is still printed, which is the point of surviving.
+    expect(out).toMatch(/recent runs \(2 of 2\)/)
+    expect(out).toMatch(/startup/)
   })
 })

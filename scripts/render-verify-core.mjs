@@ -473,6 +473,14 @@ function pointSet(openPoints) {
  *  BLOCK MESSAGE — a throw there costs the gate its verdict (the wrapper would
  *  fail open and allow the very turn it meant to stop). Total. */
 function isoOf(at) {
+  // A RUN WITH NO MEASURED STAMP IS SAID TO HAVE NONE (review finding,
+  // 28.08.2026, round 13). `number(null)` is 0, so an undated record was
+  // reported as `1970-01-01T00:00:00.000Z` — a time nobody ever measured,
+  // stated in the same breath as the ones that were, and a reader who went
+  // looking for that run's log found nothing at that hour. The CLI's `isoText`
+  // has said `undated` since the sixth round; this is the same rule inside the
+  // decision, where the block message is built.
+  if (at === null || at === undefined || at === '') return 'undated'
   try {
     const iso = new Date(number(at)).toISOString()
     return iso
@@ -1133,7 +1141,16 @@ export function unexplainedRuns(runs, since, options) {
   const out = []
   for (const r of Array.isArray(runs) ? runs : []) {
     if (!r || typeof r !== 'object') continue
-    const at = finite(r.at) ?? 0
+    // THE STAMP STAYS MISSING WHERE IT WAS NEVER MEASURED (review finding,
+    // 28.08.2026, round 13). Folding it to 0 made every undated record claim
+    // 1970 in the block message, and — worse — made all the undated records of
+    // one suite and backend EQUAL, so the lookup below picked whichever came
+    // first and could report another run's residual as this one's.
+    const at = runStamp(r)
+    // The identity is what a reader of this list matches an entry back to its
+    // record by. It is the record's whole content, so two entries are the same
+    // entry only when the runs really are the same run.
+    const id = runIdentity(r)
 
     // A red is carried until its own suite is shown green on newer code. Runs
     // that saw the current code are judged directly; older ones only leave the
@@ -1177,6 +1194,7 @@ export function unexplainedRuns(runs, since, options) {
         backend,
         suite,
         at,
+        id,
         status: 'crashed',
         unaccounted: verdict.unaccounted,
         reds: verdict.unaccounted.map((u) => u.name),
@@ -1228,6 +1246,7 @@ export function unexplainedRuns(runs, since, options) {
           backend,
           suite,
           at,
+          id,
           status: 'incomplete',
           droppedLines: droppedLinesOf(r),
           unaccounted: verdict.unaccounted,
@@ -1249,6 +1268,7 @@ export function unexplainedRuns(runs, since, options) {
         backend,
         suite,
         at,
+        id,
         status: residual.status,
         unaccounted: unowned.map((red) => ({
           name: text(red?.name) || '(unnamed red)',
@@ -1292,6 +1312,7 @@ export function unexplainedRuns(runs, since, options) {
       backend,
       suite,
       at,
+      id,
       // The residual's own class where the crash was signed off: `clean` is a
       // reading of the exit code, never of what the record still holds.
       status: postCrash ? postCrash.status : verdict.status,
@@ -1299,7 +1320,10 @@ export function unexplainedRuns(runs, since, options) {
       reds: names.length > 0 ? names : ['(unnamed red)'],
     })
   }
-  return out.sort((a, b) => a.at - b.at)
+  // Undated records sort LAST rather than to the epoch: they cannot be placed
+  // among the measured ones, and pretending they are the oldest put them at the
+  // head of every message.
+  return out.sort((a, b) => (a.at ?? Infinity) - (b.at ?? Infinity))
 }
 
 /** The most recent run of `backend` since `since`, covering or not — what the
@@ -1641,8 +1665,14 @@ export function evaluate(input) {
     // named the truncation and advised a second signature, which resolves
     // nothing (review, 19.08.2026).
     const suiteName = run.suite ?? 'unknown'
+    // MATCHED BY THE RECORD'S IDENTITY, NOT BY ITS STAMP (review finding,
+    // 28.08.2026, round 13). Two runs of one suite and backend that both lack a
+    // readable stamp folded to the same 0 and were indistinguishable here, so
+    // this could hand the reader a DIFFERENT run's residual under the name of
+    // the one it was explaining. The identity is the whole record.
+    const runId = runIdentity(run)
     const reported = unexplained.find(
-      (u) => u.backend === b && u.suite === suiteName && u.at === (finite(run.at) ?? 0),
+      (u) => u.backend === b && u.suite === suiteName && u.id !== null && u.id === runId,
     )
     // A crashed run is named by its own paragraph below while it still blocks;
     // signed off, it simply leaves the backend uncovered — quoting its synthetic
