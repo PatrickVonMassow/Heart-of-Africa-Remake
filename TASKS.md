@@ -232,6 +232,52 @@ put it is the mistake this line exists to stop.
   Bundle: Urlaubsfestigkeit. It changes the same decision core as 947's lane, so it does not run
   beside another point touching `scripts/batch-emergency-core.mjs`.
 
+- [ ] 985. Looking at a delegated worktree resets its liveness clock, so a dead author reads as alive.
+  MEASURED 28.08.2026: the OS launcher started this session because no batch writer was running.
+  Point 946's Sol author had died 21 minutes earlier together with the session that spawned it
+  (parent pid 468309 gone, `mayStartDaemon()` false so no daemon owned it, no `author-sol` process
+  anywhere, `local/sol-946.log` frozen on its start banner, and the branch carrying only the
+  commission commit). `batch-in-flight.mjs --agent-check` nevertheless answered
+  `DO NOT REPLACE THIS AGENT — work output 21 min old (git metadata)`, and after one ordinary
+  read-only `git -C <worktree> status` it answered `work output 1 min old`. Isolated in a scratch
+  worktree: age the whole gitdir to two hours, probe (`worktreeActiveAt` reports 2 h, source
+  `git metadata`), run `git status --short --branch`, probe again — 68 ms. Nothing had written to
+  that checkout; `git status` rewrites the index to refresh its stat cache, and
+  `worktreeActiveAt` stats `<gitdir>/index` as work output.
+  WHAT IT COSTS: the probe contaminates the evidence it judges on. `worktreeFilesActiveAt` shells
+  out `git status --porcelain -z` inside the very call, so each `--agent-check` leaves the stamp
+  fresh for the next one, and the runbook's own instruction — look at the worktree before you
+  judge a child — is what keeps the verdict at `alive`. A dead author can therefore hold the
+  `alive` verdict indefinitely while the batch waits on it; tonight it held for 21 minutes and
+  only direct process evidence broke the tie. The code states the opposite invariant in two
+  places: `OUTPUT_KINDS` claims "a reader cannot fake that half: looking at a checkout does not
+  rewrite the files in it", and `porcelainPaths` claims the git-metadata fallback "can only
+  UNDER-report freshness, never invent it". Both are false for `index`.
+  FINAL STATE: no stamp a READER can write may carry an `alive` verdict. `index` leaves the
+  git-metadata set; what remains is what only a WRITER moves — `HEAD`, `COMMIT_EDITMSG`, and the
+  branch tip — plus the working files, which a reader genuinely cannot touch. Where only
+  reader-writable metadata is fresh, the verdict is `unmeasurable`, never `alive`: silence is not
+  death, but neither is an echo of the checker's own call. The two comments above are corrected
+  to what the code then actually guarantees.
+  ALSO IN SCOPE: name every other liveness or progress signal that stats a path an observer
+  writes — the standstill journal's advancing-worktree evidence and the in-flight declaration's
+  `worktree` evidence kind both read this same stamp.
+  VERIFIABLE: Vitest over the pure verdict — a gitdir whose only fresh stamp is `index` yields
+  `unmeasurable` rather than `alive`, while a fresh `COMMIT_EDITMSG`, a fresh branch tip, and a
+  fresh working file each still yield `alive`; plus a CLI-level regression over a real scratch
+  worktree that ages the gitdir, runs `git status`, and asserts the verdict did NOT become
+  `alive`. That last test must call the probe itself — a fixture that recreates the aftermath
+  would stay green over exactly this bug.
+  Criticality: high — it is the sensor the whole unattended batch uses to decide whether a
+  delegated lane is still working, it fails toward "keep waiting", and its failure is sustained
+  by the act of checking.
+  IT MUST NOT UNDO POINT 504's DIRECTION. 504 states, for the whole liveness verdict, that the
+  probe ERRS TOWARD ALIVE at every tie, because a wrong "dead" costs two writers in one worktree.
+  That rule assumes the freshness it weighs is real. This point does not weaken it: it removes a
+  stamp that carries no information at all, so what 504 breaks ties on stays untouched.
+  Bundle: Urlaubsfestigkeit. It reads the same liveness core as 958's emergency lane and 504's
+  verdict, so it does not run beside either.
+
 - [ ] 925. The durable lane is built but neither measured nor journalled, and its failure
   matrix does not touch the real path. Point 676 landed the whole plane — bounded dispatch,
   checkpoint barrier, two-phase boundary, successor reconciliation, landing journal, board
@@ -12623,6 +12669,16 @@ to land than a mechanism that needs a review.
   branch's own progress. A ref that belongs to a declared in-flight lane, or any ref that is neither
   the running checkout's HEAD nor its branch, is not this suite's leakage and does not fail the run;
   what remains — the running checkout's own refs, the index, the working tree — still fails loud.
+  MEASURED A THIRD TIME 28.08.2026, 02:52, AND THE RE-RUN DID NOT RESCUE IT. A cross-cutting
+  `main` push ran the pre-push gate twice; BOTH runs were red on this teardown and neither named a
+  failing test — "unit ran 435 files / 14110 tests and its summary named NO failing test, yet the
+  runner exited non-zero" — while the delegated Sol lane for point 946 committed
+  `4f044565 -> ca139085` during the first run and `ca139085 -> d11c541c` during the second. So the
+  single re-run this point calls a fail-soft is not one: a lane that commits every few minutes
+  reds both runs, and the gate then reads that as "the re-run did not clear it, so it blocks". The
+  push only went through on a later manual attempt that happened to fall in a quiet window. Add to
+  the final state that the gate's verdict NAMES a teardown red over foreign activity as an
+  environment condition and says which lane collided, rather than reporting it as a blocking red.
   VERIFIABLE: Vitest over the decision — a moved foreign branch passes, a moved own HEAD fails, and
   an undeclared foreign ref is reported by name rather than silently allowed.
   Criticality: medium-high — it turns every parallel authoring evening into red gates that hide real
@@ -13097,83 +13153,3 @@ to land than a mechanism that needs a review.
   writes a false authorship record on every landing and would block a review outright the first
   time that changes.
   Bundle: Modell & Wächter.
-
-- [ ] 985. Looking at a delegated worktree resets its liveness clock, so a dead author reads as alive.
-  MEASURED 28.08.2026: the OS launcher started this session because no batch writer was running.
-  Point 946's Sol author had died 21 minutes earlier together with the session that spawned it
-  (parent pid 468309 gone, `mayStartDaemon()` false so no daemon owned it, no `author-sol` process
-  anywhere, `local/sol-946.log` frozen on its start banner, and the branch carrying only the
-  commission commit). `batch-in-flight.mjs --agent-check` nevertheless answered
-  `DO NOT REPLACE THIS AGENT — work output 21 min old (git metadata)`, and after one ordinary
-  read-only `git -C <worktree> status` it answered `work output 1 min old`. Isolated in a scratch
-  worktree: age the whole gitdir to two hours, probe (`worktreeActiveAt` reports 2 h, source
-  `git metadata`), run `git status --short --branch`, probe again — 68 ms. Nothing had written to
-  that checkout; `git status` rewrites the index to refresh its stat cache, and
-  `worktreeActiveAt` stats `<gitdir>/index` as work output.
-  WHAT IT COSTS: the probe contaminates the evidence it judges on. `worktreeFilesActiveAt` shells
-  out `git status --porcelain -z` inside the very call, so each `--agent-check` leaves the stamp
-  fresh for the next one, and the runbook's own instruction — look at the worktree before you
-  judge a child — is what keeps the verdict at `alive`. A dead author can therefore hold the
-  `alive` verdict indefinitely while the batch waits on it; tonight it held for 21 minutes and
-  only direct process evidence broke the tie. The code states the opposite invariant in two
-  places: `OUTPUT_KINDS` claims "a reader cannot fake that half: looking at a checkout does not
-  rewrite the files in it", and `porcelainPaths` claims the git-metadata fallback "can only
-  UNDER-report freshness, never invent it". Both are false for `index`.
-  FINAL STATE: no stamp a READER can write may carry an `alive` verdict. `index` leaves the
-  git-metadata set; what remains is what only a WRITER moves — `HEAD`, `COMMIT_EDITMSG`, and the
-  branch tip — plus the working files, which a reader genuinely cannot touch. Where only
-  reader-writable metadata is fresh, the verdict is `unmeasurable`, never `alive`: silence is not
-  death, but neither is an echo of the checker's own call. The two comments above are corrected
-  to what the code then actually guarantees.
-  ALSO IN SCOPE: name every other liveness or progress signal that stats a path an observer
-  writes — the standstill journal's advancing-worktree evidence and the in-flight declaration's
-  `worktree` evidence kind both read this same stamp.
-  VERIFIABLE: Vitest over the pure verdict — a gitdir whose only fresh stamp is `index` yields
-  `unmeasurable` rather than `alive`, while a fresh `COMMIT_EDITMSG`, a fresh branch tip, and a
-  fresh working file each still yield `alive`; plus a CLI-level regression over a real scratch
-  worktree that ages the gitdir, runs `git status`, and asserts the verdict did NOT become
-  `alive`. That last test must call the probe itself — a fixture that recreates the aftermath
-  would stay green over exactly this bug.
-  Criticality: high — it is the sensor the whole unattended batch uses to decide whether a
-  delegated lane is still working, it fails toward "keep waiting", and its failure is sustained
-  by the act of checking.
-  Bundle: Urlaubsfestigkeit. It reads the same liveness core as 958's emergency lane, so it does
-  not run beside it.
-
-- [ ] 986. The unit suite's repository guard cannot tell a delegated author from test leakage, so it reds the owner's every push.
-  MEASURED 28.08.2026: a cross-cutting `main` commit could not be pushed. The pre-push fast gate
-  ran `test:unit` twice, both times red, both times with the SAME teardown error and no failing
-  test: "LIVE REPOSITORY CHANGED WHILE UNIT SUITE RAN: refs changed:
-  refs/heads/feat/946-vdzk-admissibility 4f044565 -> ca139085; worktree registrations changed; one
-  or more worktree indexes changed", then on the re-run "ca139085 -> d11c541c". Those are the
-  authoring commits of the delegated Sol lane for point 946, made in its own worktree while the
-  suite ran. The gate itself reported "unit ran 435 files / 14110 tests and its summary named NO
-  failing test, yet the runner exited non-zero".
-  WHAT IT COSTS: `assertRepositoryUnchanged` compares EVERY ref, worktree registration, worktree
-  HEAD and worktree index of the shared repository, and a delegated author moves all of those by
-  design. Maximal delegation keeps up to three authoring lanes committing continuously, and the
-  unit suite runs about 190 s, so the owner's mandatory pre-push gate is red for as long as the
-  batch is doing what it is supposed to do. The owner cannot land its own bookkeeping while any
-  author works — the two standing operating modes exclude each other. The retry rule makes it
-  worse rather than better: the second run is red for the same reason and is then read as
-  "the re-run did not clear it, so it blocks".
-  FINAL STATE: the guard protects the checkout the suite RUNS IN, not the whole repository. Refs,
-  HEADs and indexes belonging to OTHER registered worktrees are outside the suite's blast radius
-  and are excluded from the comparison — a suite that cannot write there cannot leak there. What
-  stays in scope is the running checkout's own HEAD, index, config and the refs no other worktree
-  owns. Where a change genuinely cannot be attributed to a registered foreign worktree, the guard
-  reds exactly as it does today.
-  ALSO IN SCOPE: the fast gate's verdict distinguishes a red the suite PRODUCED from a red its
-  teardown raised over concurrent foreign activity; the latter is named as an environment
-  condition, per CLAUDE.md §7.2's "fail soft for environment/staging transients and loud for
-  product defects", and says which lane collided.
-  VERIFIABLE: Vitest over the pure comparison — a snapshot pair differing ONLY in a foreign
-  worktree's ref, HEAD and index passes, while the same difference on the running checkout's own
-  HEAD, index or config still throws, and a ref no worktree claims still throws. Plus a CLI-level
-  regression that registers a second worktree, commits in it between the two snapshots, and
-  asserts the guard stays green. The existing leakage tests in
-  `scripts/repository-integrity.test.mjs` must stay green unchanged — they are what proves the
-  narrowing did not blind the guard.
-  Criticality: high — it blocks the owner's push whenever delegation is running, which is the
-  normal state of the batch, and it does so with a red that carries no failing test.
-  Bundle: Testinfrastruktur.

@@ -1412,7 +1412,7 @@ keinen Träger hat. Gebucht als Punkt 956.
 
 ## Anhang A — Maschinell gepflegte Quellen-Übersicht
 
-Zuletzt aktualisiert: Freitag, 28.08.2026, 02:10 · Quellen-Fingerprint: `61ceb769c877…`
+Zuletzt aktualisiert: Freitag, 28.08.2026, 03:07 · Quellen-Fingerprint: `be3169182a62…`
 
 Spalten heuristisch aus den Quellen abgeleitet (Anläufe = distinkte Datumsnennungen im Memory;
 Maßnahme = Guard-Skripte mit Namens-Treffer). Die inhaltliche Bewertung gehört der Prosa oben.
@@ -1513,10 +1513,10 @@ Maßnahme = Guard-Skripte mit Namens-Treffer). Die inhaltliche Bewertung gehört
 | A pending batch claim HOLDS THE LAUNCHER BACK — withdraw it whenever the claiming window is left unattended | 2 | mittel | clear-claim-guard.mjs | ✔ Mechanismus |
 | Multi-agent workflows eat the session/weekly limit fast — verify findings INLINE, keep fan-outs small, warn the user with a cost estimate before any big workflow | 3 | mittel | doc-budget-guard.mjs | ✔ Mechanismus |
 
-Erfasste Quellen: 93 Feedback-/Projekt-Memories · 57 Guard-/Hook-Skripte · 6 Revert-/Reapply-Commits · 112 Prozess-/Meta-TASKS-Punkte (davon 48 offen).
+Erfasste Quellen: 93 Feedback-/Projekt-Memories · 57 Guard-/Hook-Skripte · 6 Revert-/Reapply-Commits · 113 Prozess-/Meta-TASKS-Punkte (davon 49 offen).
 
-<!-- RETRO-FINGERPRINT: 61ceb769c877f45557f9ae52e16602ae30f18d722233ff28643f4b87d6fb24b1 -->
-<!-- RETRO-LAST-REFRESHED: 2026-08-28T00:10:07.083Z -->
+<!-- RETRO-FINGERPRINT: be3169182a6213c94f55a0e76e91ef84b8043659d9f64d70cc27da2517705249 -->
+<!-- RETRO-LAST-REFRESHED: 2026-08-28T01:07:55.867Z -->
 <!-- AUTO-GENERATED:END -->
 
 ### 3.111 Ein Erfolg ist kein Beweis für den Weg, auf dem er zustande kam
@@ -4492,3 +4492,44 @@ Satz: `CLAUDE.md` §6 nennt die Autorisierung jetzt genau dort, wo die Ausnahme 
 authorized" steht, und zieht ihre Grenze im selben Satz. Und die regelmäßige Durchsicht des
 Bestandes muss die Achse WIRKUNGSLOS um die Frage erweitern, welcher naheliegende Fall von keiner
 Regel getroffen wird — Lücken findet man nur, wenn man nach ihnen sucht.
+
+### 3.207 Das Messgerät schrieb den Wert, den es gleich darauf ablas
+
+In der Nacht zum 28.08.2026 startete der Betriebssystem-Wecker eine Sitzung, weil kein
+Batch-Schreiber mehr lief. Die Autoren-Bahn für Punkt 946 war 21 Minuten zuvor mit der Sitzung
+gestorben, die sie erzeugt hatte: Elternprozess weg, dauerhafte Lane abgeschaltet, kein
+Autorenprozess im System, das Ausgabe-Log auf dem Startbanner eingefroren, der Zweig nur mit dem
+Auftragseintrag. Der Fühler, den der Runbook für genau diese Frage vorschreibt, antwortete
+trotzdem: *DO NOT REPLACE THIS AGENT — work output 21 min old.* Beim zweiten Nachsehen war die
+Antwort nicht älter, sondern jünger: *work output 1 min old.*
+
+Die Ursache ist kein Rundungsfehler, sondern eine Rückkopplung. `worktreeActiveAt` liest als
+Lebenszeichen unter anderem die Änderungszeit von `<gitdir>/index` — und ein rein lesendes
+`git status` schreibt genau diese Datei neu, weil Git dabei seinen Stat-Cache auffrischt. In einem
+isolierten Arbeitsordner nachgestellt: den ganzen Git-Ordner auf zwei Stunden gealtert, gemessen —
+zwei Stunden; ein `git status --short --branch` dazwischen; erneut gemessen — 68 Millisekunden.
+Niemand hatte in diesen Ordner geschrieben. Der Fühler ruft `git status` obendrein selbst auf, also
+hält jede Prüfung die nächste frisch. Wer häufiger nachsieht, bekommt einen lebendigeren Toten.
+
+Zwei Dinge machen das besonders teuer. Erstens behauptet der Code an zwei Stellen ausdrücklich das
+Gegenteil — „a reader cannot fake that half: looking at a checkout does not rewrite the files in
+it" und die Metadaten könnten Frische „only UNDER-report … never invent". Wer die Kommentare liest,
+hört auf zu zweifeln. Zweitens greift hier die sonst richtige Regel aus Punkt 504, dass der Fühler
+im Zweifel auf LEBT entscheidet, weil ein falsches „tot" zwei Schreiber in einen Ordner setzt.
+Diese Regel setzt voraus, dass die Frische, die sie abwägt, echt ist. Ist sie ein Echo des eigenen
+Aufrufs, gibt es keinen Zweifel abzuwägen — der Fühler entscheidet gegen eine Messung, die er
+selbst erzeugt hat, und die Batch wartet auf jemanden, der nie wiederkommt.
+
+Am selben Abend zeigte sich die Spiegelform derselben Klasse. Der Integritäts-Wächter des
+Unit-Laufs vergleicht alle Zweige und Arbeitsordner des Repositorys und meldete zweimal rot — ohne
+einen einzigen fehlgeschlagenen Test unter 14110 —, weil der delegierte Autor währenddessen
+commitete, also genau das tat, wofür er angesetzt war. Dort erklärt das Messgerät legitime Arbeit
+zur Verunreinigung; hier erklärt es die eigene Berührung zur Arbeit. Beides sind Instrumente, deren
+Messbereich den Beobachter einschließt.
+
+**Lehre:** Ein Lebenszeichen darf nur aus einer Quelle stammen, die der Beobachter nicht selbst
+beschreiben kann. Bei jedem Fühler gehört deshalb die Frage in den Entwurf, was passiert, wenn man
+ihn zweimal hintereinander aufruft — bewegt sich sein Messwert dabei, misst er sich selbst. Und wo
+ein Kommentar diese Unabhängigkeit ausdrücklich behauptet, muss ein Test sie beweisen: Die
+Behauptung im Kommentar war hier älter als der Defekt und hat ihn genau deshalb überlebt.
+Festgehalten als Punkt 985 (Fühler) und 955 (Wächter).
