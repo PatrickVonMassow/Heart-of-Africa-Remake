@@ -2,7 +2,7 @@
 // loop against an isolated repository so a bare --transferable cannot skip the
 // option that follows it, and assert what is actually persisted.
 import { spawnSync } from 'node:child_process'
-import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, statSync, utimesSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join, resolve } from 'node:path'
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
@@ -252,5 +252,53 @@ describe('batch-in-flight — durable adoption CLI flags', () => {
     expect(result.stderr).toMatch(/declared point 713 .* names point 999 .* disagree/)
     expect(result.stderr).toContain('Nothing recorded.')
     expect(existsSync(inFlightPath())).toBe(false)
+  })
+
+  it('does not call an agent alive after an ordinary git status refreshes only reader metadata', () => {
+    const checkout = join(root, 'observed-worktree')
+    mkdirSync(checkout)
+    const git = (...argv) =>
+      spawnSync('git', ['-C', checkout, ...argv], {
+        encoding: 'utf8',
+        env: { ...process.env, GIT_CONFIG_GLOBAL: '/dev/null', GIT_CONFIG_SYSTEM: '/dev/null' },
+        windowsHide: true,
+        stdio: ['ignore', 'pipe', 'pipe'],
+      })
+    expect(git('init', '-q', '--initial-branch=main').status).toBe(0)
+    writeFileSync(join(checkout, 'work.txt'), 'finished work\n')
+    expect(git('add', 'work.txt').status).toBe(0)
+    expect(git('-c', 'user.name=Fixture', '-c', 'user.email=fixture@example.invalid', 'commit', '-q', '-m', 'work').status).toBe(0)
+
+    // Recreate the measured failure, not merely its aftermath: the writer stamps
+    // are two hours old, then a real read-only status call refreshes the index's
+    // stat cache. Touching the tracked file's mtime without changing its bytes
+    // makes that refresh deterministic while leaving the checkout clean.
+    const old = new Date(Date.now() - 2 * 60 * 60_000)
+    for (const rel of ['.git', '.git/index', '.git/HEAD', '.git/COMMIT_EDITMSG']) {
+      utimesSync(join(checkout, rel), old, old)
+    }
+    const current = new Date()
+    utimesSync(join(checkout, 'work.txt'), current, current)
+    expect(git('status', '--short', '--branch').status).toBe(0)
+    expect(Date.now() - statSync(join(checkout, '.git', 'index')).mtimeMs).toBeLessThan(60_000)
+
+    // The real CLI calls worktreeActiveAt itself. Under the old candidate set the
+    // refreshed index produced `agent-alive` and exit 1; writer-only metadata
+    // measures the old HEAD/COMMIT_EDITMSG and permits replacement instead.
+    const result = spawnSync(process.execPath, [CLI, '--agent-check', '--worktree', checkout], {
+      encoding: 'utf8',
+      env: {
+        ...process.env,
+        HOA_REPO_ROOT: root,
+        HOA_ALERT_ESCALATION: 'off',
+        HOA_ACTIVITY_JOURNAL_PATH: journalPath(),
+      },
+      stdio: ['ignore', 'pipe', 'pipe'],
+      windowsHide: true,
+    })
+
+    expect(result.status, result.stderr).toBe(0)
+    expect(result.stdout).toContain('"verdict": "quiet"')
+    expect(result.stdout).not.toContain('"verdict": "alive"')
   })
 })

@@ -49,6 +49,7 @@ import {
   assessTransfer,
   checkEvidence,
   combineWorktreeStamps,
+  writerGitMetadataAt,
   worktreeStamp,
   describeInFlight,
   markTransferred,
@@ -359,11 +360,10 @@ const stampOf = (p) => {
  * `git status --porcelain -z` names exactly the paths that are dirty or new —
  * cheaper than walking a checkout, and it already respects `.gitignore`, so
  * `node_modules/` and `dist/` never enter. Three flags carry weight:
- *   · `--no-optional-locks` keeps OUR OWN look from becoming the evidence —
- *     without it git may refresh (and rewrite) the index, which is the
- *     contamination point 434 (5b) names. The caller additionally stats the git
- *     metadata BEFORE calling this, so even a git that ignored the flag could not
- *     backdate the other half.
+ *   · `--no-optional-locks` keeps the observation read-side where Git supports
+ *     that promise. A Git that nevertheless refreshes the index still cannot
+ *     become the evidence: `worktreeActiveAt` excludes both the index and the
+ *     gitdir mtime from its writer-only metadata half.
  *   · `--untracked-files=all` is stated rather than assumed, and it is ALL rather
  *     than `normal` for a measured reason (four-eyes review, findings 5 and its
  *     re-check): a global or repo `status.showUntrackedFiles=no` would otherwise
@@ -427,12 +427,13 @@ export function worktreeFilesActiveAt(root, { limit } = {}) {
  *
  * TWO SOURCES, AND THE VERDICT SAYS WHICH ONE ANSWERED (point 434 (5b)):
  *   · GIT METADATA — a worktree's `.git` is a FILE pointing at
- *     `…/.git/worktrees/<name>`; that directory carries the index, HEAD and
- *     COMMIT_EDITMSG a working agent rewrites on every commit. This dates the last
- *     git OPERATION, which is why it alone read a mid-edit agent as `quiet`.
+ *     `…/.git/worktrees/<name>`; only HEAD and COMMIT_EDITMSG are dated. A commit
+ *     or checkout/ref move writes them; an observer's `git status` may rewrite
+ *     `index` and the gitdir mtime, so neither reader-writable path is eligible.
  *   · WORKING FILES — the newest dirty/new path (see `worktreeFilesActiveAt`).
- * The metadata is stat'd FIRST, before anything shells out, so this probe cannot
- * date its own call.
+ * These are shared by the in-flight declaration's `worktree` evidence, the
+ * delegated-agent/registered-writer verdict, and every progress or cleanup reader
+ * of this probe; none can turn its own observation into an `alive` stamp.
  */
 export function worktreeActiveAt(path) {
   const root = String(path ?? '').trim()
@@ -450,10 +451,10 @@ export function worktreeActiveAt(path) {
     return null // no checkout there any more
   }
   if (!gitdir) return null
-  const stamps = [gitdir, join(gitdir, 'index'), join(gitdir, 'HEAD'), join(gitdir, 'COMMIT_EDITMSG')]
-    .map(stampOf)
-    .filter((v) => typeof v === 'number')
-  const gitAt = stamps.length ? Math.max(...stamps) : null
+  const gitAt = writerGitMetadataAt({
+    headAt: stampOf(join(gitdir, 'HEAD')),
+    commitEditAt: stampOf(join(gitdir, 'COMMIT_EDITMSG')),
+  })
   return combineWorktreeStamps({ gitAt, filesAt: worktreeFilesActiveAt(root) })
 }
 

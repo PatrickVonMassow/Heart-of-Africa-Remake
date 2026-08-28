@@ -209,13 +209,11 @@ function headContainedIn(head, target, { cwd = REPO_ROOT } = {}) {
  * THE LIVENESS EVIDENCE THE CLEANUP DECISION IS TAKEN ON — the I/O half of
  * `land-cleanup-core.mjs`. One record per worktree path.
  *
- * THE ORDER OF THE TWO PROBES IS LOAD-BEARING. `worktreeActiveAt` dates the
- * newest of the git metadata and the working files; a `git status` REFRESHES the
- * index, so asking about dirtiness first would make this command's own look the
- * evidence that something just happened there — every tree would then read as
- * live and nothing would ever be cleaned up. The freshness is taken first, and
- * the status runs with `--no-optional-locks` so it does not rewrite the index at
- * all (the same flag `batch-in-flight.mjs` uses, for the same reason).
+ * `worktreeActiveAt` dates writer-only Git metadata and working files. Its index
+ * and gitdir mtimes are deliberately excluded because this function's following
+ * `git status` may refresh them; the observer's own look therefore cannot become
+ * cleanup liveness evidence. The status still runs with `--no-optional-locks` to
+ * keep the read side non-mutating where Git supports it.
  *
  * SUBMODULES ARE NOT IGNORED (review finding 5). The status ran with
  * `--ignore-submodules=all`, which is a defensible cost saving for a liveness
