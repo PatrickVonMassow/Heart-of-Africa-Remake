@@ -64,6 +64,13 @@ describe('the chain itself', () => {
     expect(MERGE_ARGS).not.toContain('--ff-only')
   })
 
+  it('installs the append-only ledger driver for the merge invocation', () => {
+    expect(MERGE_ARGS.indexOf('-c')).toBeLessThan(MERGE_ARGS.indexOf('merge'))
+    expect(MERGE_ARGS).toContain(
+      'merge.hoaMechanismLedger.driver=node scripts/mechanism-review-merge.mjs %O %A %B %P',
+    )
+  })
+
   it('gives every step a label, and every label a step', () => {
     for (const s of LANDING_STEPS) expect(stepLabel(s.id)).toBe(s.label)
     expect(stepLabel('nonesuch')).toBe('nonesuch')

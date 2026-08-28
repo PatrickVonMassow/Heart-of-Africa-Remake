@@ -91,7 +91,15 @@ export const VERDICT = Object.freeze({
  * would apply is also the case that costs nothing today, and the gate after the
  * merge is mandatory either way, so nothing is traded away for it.
  */
-export const MERGE_ARGS = Object.freeze(['merge', '--no-ff', '--no-edit'])
+export const MERGE_ARGS = Object.freeze([
+  '-c',
+  'merge.hoaMechanismLedger.name=append-only mechanism review ledger',
+  '-c',
+  'merge.hoaMechanismLedger.driver=node scripts/mechanism-review-merge.mjs %O %A %B %P',
+  'merge',
+  '--no-ff',
+  '--no-edit',
+])
 
 // ── The commit that makes the tick durable ───────────────────────────────────
 

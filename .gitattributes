@@ -3,5 +3,9 @@
 # endings on checkout/stage — and never warns "LF will be replaced by CRLF".
 * text=auto eol=lf
 
+# The review ledger is append-only. Its named driver verifies that both sides
+# only appended to the ancestor before it unions and orders their JSONL rows.
+.claude/mechanism-reviews.jsonl merge=hoaMechanismLedger
+
 # Binary assets: never touch.
 *.png binary
