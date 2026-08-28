@@ -74,15 +74,20 @@ export function referenceList(text) {
   // escape, `a#12` and `##12` neither. A blacklist would have to know every one
   // of those; the whitelist has to know only where a reference may stand.
   //
-  // A REFERENCE MUST BE A NUMBER THIS READER CAN TELL APART (round-eleven
-  // review finding). "Any run of digits" is the contract, but `Number` collapses
-  // everything past 2^53: `#9007199254740992` and `#9007199254740993` become the
-  // same value, so two different references would read as one point and could be
-  // reported as a duplicate home. A run that does not survive the conversion is
-  // not a point number, and the reader drops it rather than aliasing it.
+  // ONLY A RUN THAT COMES BACK UNCHANGED (round-eleven and round-twelve review
+  // findings). "Any run of digits" is the contract, but `Number` collapses
+  // everything past 2^53: `#9007199254740993` becomes `#9007199254740992`, so
+  // two different references would read as one point and could be reported as a
+  // point standing in two homes. Refusing every run above the safe range was the
+  // wrong cut — it threw away `#9007199254740992`, which converts exactly, and a
+  // legitimate home would have been reported missing. So the run is kept exactly
+  // when the number spells it back: aliasing is impossible, and no reference that
+  // survives the conversion is lost. Leading zeros are a spelling, not a
+  // different number, and are normalised before the comparison.
   return [...String(text ?? '').matchAll(/(?<=^|[\s,([*_])(?<!\]\()#(\d+)(?![0-9A-Za-z#])/g)]
-    .map((m) => Number(m[1]))
-    .filter((n) => Number.isSafeInteger(n))
+    .map((m) => ({ digits: m[1].replace(/^0+(?=\d)/, ''), value: Number(m[1]) }))
+    .filter(({ digits, value }) => String(value) === digits)
+    .map(({ value }) => value)
 }
 
 /**
@@ -128,14 +133,22 @@ export function parseUnbundled(md) {
   // use (`- **285** — reason` and `- 285 — reason`) and read a leading span, and
   // a third spelling would have gone unread and reported its point as drift. The
   // marker needs no spelling.
+  // THE ENTRY IS NUMBERED WHERE IT STANDS (round-twelve review finding). A
+  // duplicate is fixed by deleting one of two entries, so the number a message
+  // prints has to be the bullet a reader counts in the document — not the
+  // ordinal among the bullets that happened to parse, which shifts by one for
+  // every prose bullet standing in front of it.
+  let ordinal = 0
   for (const line of section.split('\n')) {
     const m = line.match(/^[-*]\s+(.+)$/)
     if (!m) continue
+    ordinal += 1
     const body = m[1].trim()
     const nums = referenceList(body)
     if (!nums.length) continue
     for (const n of nums) points.add(n)
     bullets.push({
+      index: ordinal,
       points: nums,
       reason: body
         .replace(/^(?:\*\*)?#\d+(?:[,\s]+#\d+)*(?:\*\*)?/, '')
@@ -185,7 +198,8 @@ export function duplicateHomes(openSet, bundles, unbundled) {
   const bullets = Array.isArray(unbundled?.bullets) ? unbundled.bullets : null
   if (bullets) {
     bullets.forEach((bullet, i) => {
-      for (const n of bullet.points ?? []) add(n, `"Not bundled" bullet ${i + 1}`)
+      const where = `"Not bundled" bullet ${bullet.index ?? i + 1}`
+      for (const n of bullet.points ?? []) add(n, where)
     })
   } else {
     const set = unbundled instanceof Set ? unbundled : unbundled?.points

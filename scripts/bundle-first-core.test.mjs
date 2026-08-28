@@ -84,9 +84,14 @@ describe('referenceList — the cell marks its references', () => {
   // (round-eleven review finding): past 2^53 two different runs collapse onto
   // the same value, and two references reading as one point would be reported
   // as a point standing in two homes.
-  it('drops a digit run no number can tell apart', () => {
-    expect(referenceList('#9007199254740992, #9007199254740993, #350')).toEqual([350])
+  it('drops a digit run no number can spell back, and keeps every one it can', () => {
+    // 2^53 converts exactly and stays a reference; 2^53+1 does not and would
+    // have aliased onto it.
+    expect(referenceList('#9007199254740992')).toEqual([9007199254740992])
+    expect(referenceList('#9007199254740993, #350')).toEqual([350])
     expect(referenceList('#9007199254740991')).toEqual([9007199254740991])
+    // A leading zero is a spelling of the same number, not a different one.
+    expect(referenceList('#0350')).toEqual([350])
   })
 
   it('reads no half-marked or embedded number', () => {
@@ -307,6 +312,18 @@ describe('evaluate — the rule', () => {
   // exemption section used to be read as one union, so a point written into two
   // bullets counted as one placement and the message could not say which two
   // entries to look at.
+  it('numbers an exemption entry where it stands, not among the ones that parsed', () => {
+    const withProse = workPackages({
+      bundles: [['Dorfleben', 'A', '#350']],
+      unbundled: ['- **Urlaubsfestigkeit** was cut later and lists nothing.', '- **#285**.', '- **#285** again.'],
+    })
+    const v = evaluate({ tasksMd: tasks([350, 285]), workPackagesMd: withProse })
+    expect(v.block).toBe(true)
+    expect(v.duplicates).toEqual([
+      { point: 285, homes: ['"Not bundled" bullet 2', '"Not bundled" bullet 3'] },
+    ])
+  })
+
   it('BLOCKS a point written into TWO exemption bullets, naming both', () => {
     const twice = workPackages({
       bundles: [['Dorfleben', 'A', '#350']],
@@ -435,9 +452,12 @@ describe('the real docs/work-packages.md', () => {
 
     const tail = md.slice(md.indexOf(UNBUNDLED_MARKER))
     const end = tail.indexOf('\n## ')
-    // Every bullet of the section, whatever it is written like: an entry in
-    // another shape has to make this red rather than disappear from both sides.
-    const listed = (end < 0 ? tail : tail.slice(0, end)).split('\n').filter((line) => /^[-*]\s/.test(line))
+    // WIDER THAN THE PARSER ON PURPOSE (round-twelve review finding): the count
+    // takes every Markdown bullet marker and any indentation, while the parser
+    // reads only a flush `-` or `*`. An entry written `+ #285` or indented under
+    // another one therefore makes this red instead of disappearing from the
+    // parser and its own count together.
+    const listed = (end < 0 ? tail : tail.slice(0, end)).split('\n').filter((line) => /^\s*[-*+]\s/.test(line))
     expect(listed.length).toBeGreaterThan(5)
     expect(parseUnbundled(md).bullets).toHaveLength(listed.length)
   })
@@ -496,18 +516,23 @@ describe('the real docs/work-packages.md', () => {
   it('gives every open point exactly one home', () => {
     const open = parseOpenPoints(readFileSync(repoPath('TASKS.md'), 'utf8'))
     expect(open.size).toBeGreaterThan(100)
-    const homes = new Map()
-    for (const bundle of parseBundles(md)) {
-      for (const n of bundle.points) if (open.has(n)) homes.set(n, [...(homes.get(n) ?? []), bundle.id])
-    }
-    for (const n of parseUnbundled(md).points) {
-      if (open.has(n)) homes.set(n, [...(homes.get(n) ?? []), 'Not bundled'])
-    }
-    // Every open point has A home, so the count below cannot pass on an empty
-    // map (review finding), and none has two.
-    expect(homes.size).toBe(open.size)
-    const twice = [...homes].filter(([, where]) => where.length > 1)
-    expect(twice.map(([n, where]) => `${n}: ${where.join(' + ')}`)).toEqual([])
+    const bundles = parseBundles(md)
+    const exemptions = parseUnbundled(md)
+
+    // AT LEAST ONE: nothing open is unplaced.
+    expect(unplacedPoints(open, bundles, exemptions.points)).toEqual([])
+    // AND AT MOST ONE, read the way the guard reads it (round-twelve review
+    // finding): building the map out of the parsers' SETS threw a repeat inside
+    // one cell or across two bullets away before it could be counted, so the
+    // real document could acquire either duplication and this test would still
+    // pass. `duplicateHomes` is the production reading and sees both.
+    expect(
+      duplicateHomes(open, bundles, exemptions).map((d) => `${d.point}: ${d.homes.join(' + ')}`),
+    ).toEqual([])
+    // And the map is not empty — every open point really was looked at.
+    const placed = new Set(exemptions.points)
+    for (const bundle of bundles) for (const n of bundle.points) placed.add(n)
+    expect([...open].filter((n) => placed.has(n))).toHaveLength(open.size)
   })
 
   // THE HOME IS THE RIGHT ONE, not merely a single one — and EVERY open point
