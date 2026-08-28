@@ -85,6 +85,14 @@ describe('referenceList — the cell marks its references', () => {
     expect(referenceList('##350')).toEqual([])
     expect(referenceList('the points are 350 and 351')).toEqual([])
   })
+
+  // THE BOUNDARIES ARE MARKDOWN'S (review finding). Two shapes that carry a `#`
+  // and are not references, and one that is a reference and used to be missed.
+  it('is not fooled by an HTML entity or an anchor, and reads an emphasised marker', () => {
+    expect(referenceList('a brace written as &#123; in the cell')).toEqual([])
+    expect(referenceList('see [the section](#123) for the reason')).toEqual([])
+    expect(referenceList('__#123__ and *#124*')).toEqual([123, 124])
+  })
 })
 
 describe('parseBundles', () => {

@@ -57,7 +57,12 @@ export const UNBUNDLED_MARKER = '**Not bundled**'
  * itself and has no such edge.
  */
 export function referenceList(text) {
-  return [...String(text ?? '').matchAll(/(?<![\w#])#(\d+)(?![\w#])/g)].map((m) => Number(m[1]))
+  // THE BOUNDARIES ARE MARKDOWN'S, not `\\w`'s (review finding). An underscore
+  // BELONGS to the marker's surroundings — `__#123__` is an emphasised
+  // reference — while `&` and a link destination `](#123)` must not open one,
+  // and `&#123;` is an HTML entity rather than a point.
+  return [...String(text ?? '').matchAll(/(?<![0-9A-Za-z&#])(?<!\]\()#(\d+)(?![0-9A-Za-z#])/g)]
+    .map((m) => Number(m[1]))
 }
 
 /**
