@@ -192,7 +192,19 @@ export const LIMITS = {
   // covers. The existing time-window rule and its last-n symptom remain intact beside the new
   // review-material lesson. No standalone pitfall or project telling was added. Net: +6 lines /
   // +70 words, exact fit.
-  maxLines: 483,
+  // RAISED 28.08.2026 by the measured size of ONE genuinely new lesson: a monitor that reads a
+  // value its own checking refreshes, so a dead process looks alive and looks fresher the more
+  // often you ask. It is neither the environment-dependent test (green for the wrong checkout),
+  // nor the permissive loader (green over a program that will not start), nor the shared-generator
+  // yardstick (both sides inherit one defect): here the OBSERVER writes the measurement it then
+  // reads. The decision a reader copies is to call any monitor twice in a row and distrust a
+  // reading that moves. Written first at ten lines with a five-line risk over the four-line
+  // budget, then cut to five with a two-line risk before the raise, as the shortening step this
+  // rule demands; the neighbouring entries were read for redundancy and none could be cut without
+  // dropping a claim. What remains is +6 lines / +61 words against the measured 483 / 4341, and
+  // the ceilings move by exactly that to 489 / 4402, with zero slack. Not escalated to the user,
+  // under his general withdrawal of ask-before-raising of 10.08.2026.
+  maxLines: 489,
   // EXACT FIT, not headroom — corrected 30.07.2026 after the four-eyes review
   // pointed out that this comment had long stopped describing the numbers. The
   // rule above ("raised only by the measured size of genuinely new tips")
@@ -376,7 +388,9 @@ export const LIMITS = {
   // DOWN by two words, with no claim removed and no headroom added.
   // 27.08.2026: the two folded lessons justified beside maxLines measure 4341 words, so this
   // ceiling follows their +70-word net exactly; the guide has no unearned headroom.
-  maxWords: 4341,
+  // 28.08.2026: the self-measuring-monitor lesson justified beside maxLines measures 4402 words,
+  // so this ceiling follows its +61-word net exactly; the guide keeps no unearned headroom.
+  maxWords: 4402,
   // A pitfall entry = the risk lines plus its prompt. Anything longer is a
   // story, not a tip.
   maxEntryLines: 11,

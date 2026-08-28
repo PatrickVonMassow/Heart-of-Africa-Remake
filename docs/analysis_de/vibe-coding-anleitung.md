@@ -155,15 +155,11 @@ Die Ursache findest du durch **Zerlegen**, nicht durch Wiederholen.
   sie kaputt wäre?** Zeit darf ein Test abkürzen, den **Aufruf** nie. Ist die **Ausgabe** das
   Produkt — Urteil, Plan, Anleitung —, lies sie am **echten Bestand**, nie nur an selbstgebauten
   Eingaben.“ *(Sieht das richtig aus?)*
-- **Der Fühler misst sich selbst.** Eine Überwachung liest einen Wert, den schon ihr eigenes
-  Nachsehen erneuert — dann wirkt ein toter Vorgang lebendig, und je öfter du prüfst, desto
-  lebendiger. Hier lag ein abgestürzter Helfer 21 Minuten tot da, während die Anzeige bei jedem
-  Blick frischer wurde: Das bloße Hineinschauen in seinen Arbeitsordner erneuerte den Zeitstempel,
-  an dem sein Leben abgelesen wurde.
-  → *Prompt:* „Ein Lebenszeichen darf nur aus einer Quelle kommen, die der **Beobachter nicht
-  selbst beschreibt**. Ruf jede Überwachung **zweimal hintereinander** auf: Bewegt sich ihr Messwert
-  dabei, misst sie sich selbst. Und wo ein Kommentar behauptet, eine Messung sei unabhängig, **lass
-  einen Test das beweisen** — die Behauptung überlebt sonst den Defekt.“
+- **Der Fühler misst sich selbst.** Eine Überwachung liest einen Wert, den ihr eigenes Nachsehen
+  erneuert — dann wirkt ein toter Vorgang lebendig, und je öfter du prüfst, desto lebendiger.
+  → *Prompt:* „Ein Lebenszeichen darf nur aus einer Quelle kommen, die der **Beobachter nicht selbst
+  beschreibt**. Ruf jede Überwachung **zweimal hintereinander** auf: Bewegt sich ihr Messwert dabei,
+  misst sie sich selbst.“
 
 - **Neue Features zerbrechen alte.** Eine Änderung repariert X und bricht das unbeobachtete Y.
   → *Prompt:* „Etabliere einen Mechanismus, der jede Mechanik auch im **Danach-Zustand** prüft und
