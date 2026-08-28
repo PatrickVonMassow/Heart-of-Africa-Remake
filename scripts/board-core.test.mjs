@@ -1169,8 +1169,10 @@ describe('parseDoneArgs — the flags behind one closing call', () => {
 // decision asked of the user STANDS there had to be hand-edited into the HTML —
 // and `decision-card-guard`'s remedy could not name a command.
 describe('addVdzk — a decision asked of the user gets a card', () => {
+  const designQuestion = (question) => `User-owned category: design-content.\n${question}`
+
   it('puts the card at the TOP of the section, with the title alone in the header', () => {
-    const out = addVdzk(fullBoard({ vdzk: vdzkEntry('Ältere Frage') }), 'Kartenschrift wählen', 'Enge, weite oder gemischte Variante?')
+    const out = addVdzk(fullBoard({ vdzk: vdzkEntry('Ältere Frage') }), 'Kartenschrift wählen', designQuestion('Enge, weite oder gemischte Variante?'))
     const { sections } = sliceSections(out)
     const cards = parseCards(sections['Von dir zu klären'])
     expect(cards.map((c) => c.title)).toEqual(['Kartenschrift wählen', 'Ältere Frage'])
@@ -1185,30 +1187,38 @@ describe('addVdzk — a decision asked of the user gets a card', () => {
     // The guard's remedy hands out a literal "<Titel der Frage>", and an
     // unescaped `<` produced a card whose title parses as empty — an invisible
     // open question (four-eyes review 30.07.2026).
-    const out = addVdzk(fullBoard({}), '<Titel der Frage>', 'A & B <oder> C?')
+    const out = addVdzk(fullBoard({}), '<Titel der Frage>', designQuestion('Soll die Fassung A & B <oder> C gelten?'))
     const cards = parseCards(sliceSections(out).sections['Von dir zu klären'])
     expect(cards[0].title).toBe('&lt;Titel der Frage&gt;')
     expect(cards[0].body).toContain('&amp;')
   })
 
-  it('REFUSES an automated status report and names the section it belongs in (point 749)', () => {
+  it('REFUSES a status report from either call shape and names the section it belongs in', () => {
     const b = fullBoard({ vdzk: '' })
     const report = 'Der Batch hat sich selbst pausiert, weil ein Alarm fünfmal unbeantwortet blieb.'
-    expect(() => addVdzk(b, 'Batch pausiert', report, { automated: true })).toThrow(/not a user decision/)
+    expect(() => addVdzk(b, 'Batch pausiert', report, { automated: true })).toThrow(/not an admissible user decision/)
     expect(() => addVdzk(b, 'Batch pausiert', report, { automated: true })).toThrow(/Woran ich gerade arbeite/)
-    // A session's own judgement is not second-guessed — the flag is what a SCRIPT
-    // declares about itself, and `decision-card-guard` holds sessions to the rule.
-    expect(addVdzk(b, 'Batch pausiert', report)).toContain('Batch pausiert')
+    expect(() => addVdzk(b, 'Batch pausiert', report)).toThrow(/User-owned category/)
   })
 
-  it('admits an automated card that names a choice and its options', () => {
+  it('admits the point-864 decision record from an automated caller', () => {
     const out = addVdzk(
       fullBoard({ vdzk: '' }),
-      'Rasterung der Höhenkarte',
-      'Deine Möglichkeiten: die Entscheidung stehen lassen, oder sie zurücknehmen — antworte „Veto Rasterung".',
+      'Entscheidungsprotokoll: Rasterung der Höhenkarte',
+      'Entscheidung: Die Höhenkarte wird neu gerastert. Evidenz: Die Messung ist eindeutig. ' +
+        'Folge: Die neue Rasterung wird bereits verwendet. Deine Möglichkeiten: die Entscheidung stehen lassen, ' +
+        'oder sie zurücknehmen — exakte Veto-Aktion: antworte „Veto Rasterung".',
       { automated: true },
     )
-    expect(out).toContain('Rasterung der Höhenkarte')
+    expect(out).toContain('Entscheidungsprotokoll: Rasterung der Höhenkarte')
+  })
+
+  it('judges the authority tag but keeps it off the German card', () => {
+    const out = addVdzk(fullBoard({}), 'Kartenschrift wählen', designQuestion('Soll die enge oder die weite Variante gelten?'))
+    const cards = parseCards(sliceSections(out).sections['Von dir zu klären'])
+    expect(cards[0].body).toContain('Soll die enge oder die weite Variante gelten?')
+    expect(cards[0].body).not.toContain('User-owned category')
+    expect(cards[0].body).not.toContain('design-content')
   })
 
   it('refuses a card with no title or no question — an empty card asks nothing', () => {
@@ -1218,12 +1228,12 @@ describe('addVdzk — a decision asked of the user gets a card', () => {
   })
 
   it('refuses a title that already stands, names it, and accepts a distinguishable one', () => {
-    const once = addVdzk(fullBoard({}), 'Kartenschrift wählen', 'Welche Variante?')
-    expect(() => addVdzk(once, 'Kartenschrift wählen', 'Dieselbe Frage noch einmal.')).toThrow(
+    const once = addVdzk(fullBoard({}), 'Kartenschrift wählen', designQuestion('Soll die enge oder die weite Variante gelten?'))
+    expect(() => addVdzk(once, 'Kartenschrift wählen', designQuestion('Soll dieselbe enge oder weite Variante gelten?'))).toThrow(
       /"Kartenschrift wählen" already stands/,
     )
 
-    const distinct = addVdzk(once, 'Kartenschrift für Überschriften wählen', 'Welche Variante?')
+    const distinct = addVdzk(once, 'Kartenschrift für Überschriften wählen', designQuestion('Soll die enge oder die weite Variante gelten?'))
     const cards = parseCards(sliceSections(distinct).sections['Von dir zu klären'])
     expect(cards.map((card) => card.title)).toEqual([
       'Kartenschrift für Überschriften wählen',
@@ -1232,7 +1242,7 @@ describe('addVdzk — a decision asked of the user gets a card', () => {
   })
 
   it('never touches another section', () => {
-    const out = addVdzk(fullBoard({ queue: queueEntry(372, 'Ein Befehl', '~2 h') }), 'Eine Frage', 'Wie weiter?')
+    const out = addVdzk(fullBoard({ queue: queueEntry(372, 'Ein Befehl', '~2 h') }), 'Eine Frage', designQuestion('Soll die erste oder die zweite Fassung gelten?'))
     const { sections } = sliceSections(out)
     expect(parseCards(sections['Warteschlange']).map((c) => c.title)).toEqual(['Ein Befehl'])
     expect(parseCards(sections['Von dir zu klären']).map((c) => c.title)).toEqual(['Eine Frage'])

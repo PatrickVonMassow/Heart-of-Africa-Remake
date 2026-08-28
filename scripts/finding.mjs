@@ -31,7 +31,7 @@
 import { appendFileSync, existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs'
 import { execFileSync } from 'node:child_process'
 import { dirname } from 'node:path'
-import { blockedCardTitle } from './board-queue-core.mjs'
+import { blockedCardBody, blockedCardTitle } from './board-queue-core.mjs'
 import { carrierEntry, malformedEntries, markDrained, parseCarrier } from './findings-core.mjs'
 import { carrierPath, memoryIndexPath } from './findings-paths.mjs'
 import {
@@ -276,7 +276,7 @@ if (has('--blocked')) {
     const out = execFileSync(
       process.execPath,
       ['scripts/board.mjs', 'vdzk-add', '--automated', blockedCardTitle(hits[0].title), '--text-stdin'],
-      { cwd: REPO_ROOT, encoding: 'utf8', windowsHide: true, input: `${why}\n\nDie Anfrage liegt im Träger und wird nicht in den Arbeitsauftrag übernommen, solange das so bleibt. Deine Möglichkeiten: den Befund als Punkt aufnehmen, oder ihn verwerfen.\n` },
+      { cwd: REPO_ROOT, encoding: 'utf8', windowsHide: true, input: blockedCardBody(why) },
     )
     console.log(out.trim().split('\n')[0])
   } catch (e) {

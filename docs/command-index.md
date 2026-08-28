@@ -331,7 +331,7 @@
 | `user-gate-core.mjs` | THE TYPED USER GATE — advice continues; only a real confirmation waits. | — |
 | `user-said-core.mjs` | WHAT THE USER SAID, AND WHEN — the pure half of scripts/user-said.mjs. | — |
 | `user-said.mjs` | WHAT THE USER SAID, AND WHEN — the CLI half. | usage: node scripts/user-said.mjs [--grep <regex>] [--since <iso\|90m\|6h\|2d\|07:31>] |
-| `vdzk-admissibility-core.mjs` | WHAT AN AUTOMATED PATH MAY PUT UNDER "VON DIR ZU KLÄREN" (point 749). | — |
+| `vdzk-admissibility-core.mjs` | WHAT MAY STAND UNDER "VON DIR ZU KLÄREN". | — |
 | `vdzk-answer.mjs` | Carrier for an answer written into a session that may not edit the board. | usage: vdzk-answer.mjs --applied "<fragment><br>usage: vdzk-answer.mjs "<fragment>" --answer "<what the user decided> |
 | `verify-bringup.mjs` | Host bring-up for the browser verification (point 475): `npm run verify:bringup`. | — |
 | `wait-marker-core.mjs` | THE WAIT MARKER A HOOK SETS (point 592) — the pure decision half. | — |

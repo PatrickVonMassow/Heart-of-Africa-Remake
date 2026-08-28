@@ -384,11 +384,8 @@ try {
     // inbox he writes into, not a board he reads. `decision-card-guard` blocks a
     // turn whose reply asks for a decision with no card standing for it, and this
     // is the command its remedy names.
-    // A SCRIPT DECLARES ITSELF WITH --automated (point 749). Four of them used to
-    // file status reports here; the flag routes the card through the
-    // admissibility rule, which refuses anything that is not a named choice and
-    // says where batch state belongs instead.
-    const automated = rest.includes('--automated')
+    // `--automated` remains accepted for existing callers, but no longer selects
+    // a stricter path: every card reaches the same typed admissibility rule.
     const [title, ...words] = rest.filter((arg) => arg !== '--automated')
     if (!title || (words.length === 0 && !stdinText.trim())) {
       throw new Error('usage: board.mjs vdzk-add [--automated] "<title>" "<question>"|--text-stdin')
@@ -396,7 +393,7 @@ try {
     const question = textOf(words)
     const settled = settledRulingVerdict(`${title}\n${question}`)
     if (settled.block) throw new Error(`vdzk-add REFUSED — ${settled.reason}`)
-    edit((html) => addVdzk(html, title, question, { automated }), `open question added: ${title}`)
+    edit((html) => addVdzk(html, title, question), `open question added: ${title}`)
   } else if (cmd === 'vdzk-remove') {
     const fragment = textOf(rest)
     if (!fragment) throw new Error('usage: board.mjs vdzk-remove "<title>"|--text-stdin')
