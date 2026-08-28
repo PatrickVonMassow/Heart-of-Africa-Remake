@@ -21,6 +21,7 @@ import {
   openCrashedRuns,
   closureArgs,
   retainedClosures,
+  isoText,
 } from './render-verify-guard.mjs'
 import { incompleteClosureFor, crashClosureFor, runIdentity } from './render-verify-core.mjs'
 
@@ -401,6 +402,24 @@ describe('openIncompleteRuns — what the sign-off may close', () => {
       expect(draft.choices).toHaveLength(2)
       // …and naming one of them by that stamp resolves it, undated record included.
       expect(incompleteClosureDraft(state, { ...signed, at: '2500' }).closure.at).toBe(2500)
+    })
+
+    // WHAT THE HUMAN IS TOLD ABOUT AN UNDATED RUN (review finding, 28.08.2026).
+    // Matching one was covered; the line the sign-off and --status PRINT about
+    // it was not — and `Number(null)` is 0, so it claimed the run happened at
+    // 1970-01-01T00:00:00.000Z, a measurement nobody ever took.
+    it('renders a run with no readable stamp as undated, not as the epoch', () => {
+      const undated = { backend: 'webgpu', suite: 'settings', exit: 1, reds: [LEGACY_MARKER] }
+      const draft = incompleteClosureDraft({ runs: [undated] }, signed)
+      expect(draft.error).toBeUndefined()
+      expect(draft.closure.at).toBeNull()
+      expect(isoText(draft.closure.at)).toBe('undated')
+      expect(isoText(undefined)).toBe('undated')
+      // A real stamp still reads as its time, and an unreadable one shows
+      // itself instead of being rendered into a date.
+      expect(isoText(1500)).toBe('1970-01-01T00:00:01.500Z')
+      expect(isoText('whenever')).toBe('t=whenever')
+      expect(isoText(Number.MAX_SAFE_INTEGER)).toMatch(/^t=/)
     })
 
     it('is total on a missing state and missing options', () => {

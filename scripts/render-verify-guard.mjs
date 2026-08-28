@@ -322,11 +322,24 @@ export function retainedClosures(closures, runs, limit = MAX_SIGNED_CLOSURES) {
   return list.filter((_, i) => keep[i])
 }
 
-/** A run's timestamp for a human, never throwing: `toISOString()` dies on a
- *  finite but out-of-range number, and these come off disk. */
+/**
+ * A run's timestamp for a human, never throwing: `toISOString()` dies on a
+ * finite but out-of-range number, and these come off disk.
+ *
+ * AN UNDATED RUN READS AS UNDATED (review finding, 28.08.2026). A record with
+ * no readable stamp is deliberately supported — that is why the closure binds
+ * by content and not by a time — but `Number(null)` is 0, so the sign-off line
+ * and `--status` printed it as `1970-01-01T00:00:00.000Z`: a time nobody ever
+ * measured, stated in the same breath as the ones that were. Missing is now
+ * said as missing, and an unreadable value still shows itself raw rather than
+ * being rendered into a date.
+ */
 export function isoText(at) {
+  if (at === null || at === undefined || at === '') return 'undated'
+  const ms = Number(at)
+  if (!Number.isFinite(ms)) return `t=${String(at)}`
   try {
-    return new Date(Number(at)).toISOString()
+    return new Date(ms).toISOString()
   } catch {
     return `t=${String(at)}`
   }
