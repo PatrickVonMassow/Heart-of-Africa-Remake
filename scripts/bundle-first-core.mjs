@@ -85,8 +85,13 @@ export function referenceList(text) {
   // survives the conversion is lost. Leading zeros are a spelling, not a
   // different number, and are normalised before the comparison.
   return [...String(text ?? '').matchAll(/(?<=^|[\s,([*_])(?<!\]\()#(\d+)(?![0-9A-Za-z#])/g)]
-    .map((m) => ({ digits: m[1].replace(/^0+(?=\d)/, ''), value: Number(m[1]) }))
-    .filter(({ digits, value }) => String(value) === digits)
+    .map((m) => ({ digits: m[1], value: Number(m[1]) }))
+    // COMPARED AS INTEGERS, NOT AS TEXT (round-thirteen review finding): a
+    // number's own spelling switches to exponential past 10^21, so a text
+    // comparison threw away `#1000000000000000000000`, which converts exactly.
+    // BigInt compares the values themselves and cares about neither the
+    // notation nor a leading zero.
+    .filter(({ digits, value }) => Number.isInteger(value) && BigInt(value) === BigInt(digits))
     .map(({ value }) => value)
 }
 
@@ -140,7 +145,12 @@ export function parseUnbundled(md) {
   // every prose bullet standing in front of it.
   let ordinal = 0
   for (const line of section.split('\n')) {
-    const m = line.match(/^[-*]\s+(.+)$/)
+    // EVERY MARKDOWN BULLET, NOT THE TWO THIS SECTION HAPPENS TO USE
+    // (round-thirteen review finding): `+` is a list marker like `-` and `*`,
+    // and up to three spaces of indentation still opens a top-level item. A
+    // bullet the reader does not see is a bullet whose exemption does not
+    // count AND a bullet the numbering skips, so both halves ride on this line.
+    const m = line.match(/^ {0,3}[-*+]\s+(.+)$/)
     if (!m) continue
     ordinal += 1
     const body = m[1].trim()

@@ -92,6 +92,12 @@ describe('referenceList — the cell marks its references', () => {
     expect(referenceList('#9007199254740991')).toEqual([9007199254740991])
     // A leading zero is a spelling of the same number, not a different one.
     expect(referenceList('#0350')).toEqual([350])
+    // And so is exponential notation: past 10^21 a number spells ITSELF
+    // differently, which is no reason to lose a reference that converts
+    // exactly (round-thirteen review finding).
+    expect(referenceList('#1000000000000000000000')).toEqual([1e21])
+    // A run too long to be any integer is not a reference at all.
+    expect(referenceList(`#${'9'.repeat(400)}`)).toEqual([])
   })
 
   it('reads no half-marked or embedded number', () => {
@@ -196,6 +202,28 @@ describe('parseUnbundled', () => {
     )
     expect([...points]).toEqual([285])
     expect(bullets[0].points).toEqual([285])
+  })
+
+  // EVERY MARKDOWN BULLET MARKER (round-thirteen review finding): a `+` bullet
+  // or one indented under the paragraph is a list item like any other, and one
+  // the reader does not see is an exemption that does not count and a numbering
+  // that has shifted.
+  it('reads a `+` bullet and an indented one, and numbers them where they stand', () => {
+    const { points, bullets } = parseUnbundled(
+      workPackages({ unbundled: ['+ **#285** — the leak hunt.', '  - **#393**.', '- **#174** — a release.'] }),
+    )
+    expect([...points].sort((a, b) => a - b)).toEqual([174, 285, 393])
+    expect(bullets.map((b) => b.index)).toEqual([1, 2, 3])
+  })
+
+  // A MARKER ALONE ON ITS LINE stays unread, and that is the SAFE direction:
+  // the reader places nothing, so the points under it are reported as unplaced
+  // and the guard BLOCKS. Nothing hides — a reader is sent to look
+  // (round-thirteen review finding; the shape itself is point 1004's).
+  it('reads nothing from a bullet whose marker stands alone on its line', () => {
+    const md = workPackages({ unbundled: ['-', '  **#285** — the leak hunt.'] })
+    expect(parseUnbundled(md).points.size).toBe(0)
+    expect(evaluate({ tasksMd: tasks([285]), workPackagesMd: md }).block).toBe(true)
   })
 
   it('ignores a prose bullet that starts with no number', () => {
@@ -457,7 +485,9 @@ describe('the real docs/work-packages.md', () => {
     // reads only a flush `-` or `*`. An entry written `+ #285` or indented under
     // another one therefore makes this red instead of disappearing from the
     // parser and its own count together.
-    const listed = (end < 0 ? tail : tail.slice(0, end)).split('\n').filter((line) => /^\s*[-*+]\s/.test(line))
+    const listed = (end < 0 ? tail : tail.slice(0, end))
+      .split('\n')
+      .filter((line) => /^\s*[-*+](\s|$)/.test(line))
     expect(listed.length).toBeGreaterThan(5)
     expect(parseUnbundled(md).bullets).toHaveLength(listed.length)
   })
