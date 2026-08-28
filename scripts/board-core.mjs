@@ -2163,15 +2163,16 @@ export function parseClosingArgs(rest) {
  * name a command. The card carries a TITLE ONLY in its collapsed header, per the
  * board's binding structure, and the body says what is to be decided.
  */
-export function addVdzk(html, title, text, { automated = false } = {}) {
-  // AN AUTOMATED CALLER IS HELD TO THE RULE, NOT REMINDED OF IT (point 749). A
-  // script has no judgement to apply, so the board asks for the two things that
-  // make a card a decision — it asks, and it names the options — and refuses
-  // anything else with the place its information does belong.
-  if (automated) {
-    const verdict = judgeAutomatedCard({ title, body: text })
-    if (!verdict.ok) throw new Error(verdict.reason)
-  }
+export function addVdzk(html, title, text) {
+  // EVERY CALLER IS HELD TO THE SAME TYPED AUTHORITY. `--automated` used to be
+  // the enforcement boundary, which left a direct vdzk-add call able to park an
+  // owner-decidable question. The pure judge now stands at the lowest writer.
+  // Keep the specific empty-field errors: they name the visible damage better
+  // than the general admissibility refusal does.
+  if (!String(title ?? '').trim()) throw new Error('board: vdzk-add needs a title — the collapsed card shows nothing else')
+  if (!String(text ?? '').trim()) throw new Error('board: vdzk-add needs the question itself as the card body')
+  const verdict = judgeAutomatedCard({ title, body: text })
+  if (!verdict.ok) throw new Error(verdict.reason)
   // ESCAPED, unlike the other card builders (four-eyes review 30.07.2026): the
   // guard's remedy line hands out a literal `"<Titel der Frage>"` placeholder, so
   // a paste of it is the LIKELY first call — and an unescaped `<` produces a card
@@ -2179,8 +2180,6 @@ export function addVdzk(html, title, text, { automated = false } = {}) {
   const esc = (s) => String(s ?? '').trim().replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
   const head = esc(title)
   const body = renderCardBody(text, { escape: esc })
-  if (!head) throw new Error('board: vdzk-add needs a title — the collapsed card shows nothing else')
-  if (!body) throw new Error('board: vdzk-add needs the question itself as the card body')
   const { from, end } = sectionBounds(html, 'vdzk')
   const section = html.slice(from, end)
   const standing = [...section.matchAll(/<details>\s*<summary><span class="t">[\s\S]*?<\/details>\s*/g)]
