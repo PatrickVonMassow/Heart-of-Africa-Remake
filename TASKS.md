@@ -13288,3 +13288,32 @@ to land than a mechanism that needs a review.
   Criticality: high — it blocks the turn end of a landed point, which is the state the batch cannot
   leave on its own.
   Bundle: Session- & Repo-Hygiene.
+- [ ] 999. The review ledger's physical order does not follow its `at` stamps, so a reader that
+  trusts append order reads it wrong. MEASURED 28.08.2026 on `main` at 168805d5, answering the
+  Opus 4.8 pass-7 refusal of point 734 (`.claude/mechanism-reviews.jsonl`, record `at`
+  1787940688907): eight of 1462 rows carry an `at` earlier than the row above them — six
+  `authoring-commission` rows and two `review` rows, the largest step backwards 8.7 days
+  (line 1351, a 19.08. review sitting behind 28.08. rows) and the next 1.3 days (line 933).
+  WHY IT IS STRUCTURAL AND NOT A LEFTOVER: point 988's union driver
+  (`scripts/mechanism-review-merge-core.mjs:99-100`) sorts the rows a single merge APPENDS and
+  preserves the ancestor prefix untouched. A branch appends its commission row on the day it is
+  cut and merges days later, so the row is correctly placed inside its own merge and permanently
+  behind rows `main` gained meanwhile. Every landing therefore adds new disorder that no later
+  landing can repair, and point 988 — which promised `at` order in its VERIFIABLE clause — is
+  closed.
+  WHAT IT COSTS: the ledger is the four-eyes evidence file. Nothing measured today mis-reads it —
+  its consumers compare `at` by value — but the file's own contract says the rows are in `at`
+  order, and the first consumer that trusts that (a scan that stops early, a "latest wins" walk, a
+  bisect) reads a review or a receipt that is not there. It is also the reason a hand-resolved
+  conflict cannot be checked against a simple rule.
+  FINAL STATE: either the file is ordered by `at` and the union driver keeps it ordered across the
+  ancestor prefix as well, or the contract is corrected where it is written — the driver's own
+  comment, `.gitattributes` and point 988's archived VERIFIABLE clause stop promising an order the
+  mechanism does not produce, and every consumer that could depend on it is named.
+  VERIFIABLE: Vitest over the ledger — a check that reads `.claude/mechanism-reviews.jsonl` and
+  fails on a row whose `at` precedes its predecessor (after the chosen final state is in place),
+  plus a merge case where the ancestor prefix already holds a late row and the driver's result is
+  judged against the decided contract.
+  Criticality: medium — it corrupts nothing today, but it is the evidence file the four-eyes gate
+  rests on, and its stated order is not the order it has.
+  Bundle: Modell & Wächter.
