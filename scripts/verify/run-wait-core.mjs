@@ -85,19 +85,20 @@ export const SUITE_FRAMES = Object.freeze({
 })
 
 /**
- * Suites whose RUNTIME the cost measurement never recorded: `docs` is a pure
- * Node check that opens no browser (the recorder never logs it), and
- * `startup`/`report`/`crossbrowser` predate the recording window. They are
- * NAMED rather than silently treated as zero — an estimate that quietly omits a
- * suite is how a wait comes out too short and the poll loop returns.
+ * Suites whose RUNTIME the cost measurement never recorded: `docs` opens no
+ * browser, `board-layout` was added after the measurement, and
+ * `startup`/`report`/`crossbrowser` predate the recording window. They are NAMED
+ * rather than silently treated as zero — an estimate that quietly omits a suite
+ * is how a wait comes out too short and the poll loop returns.
  */
-export const UNMEASURED_SUITES = Object.freeze(['docs', 'startup', 'report', 'crossbrowser'])
+export const UNMEASURED_SUITES = Object.freeze(['docs', 'board-layout', 'startup', 'report', 'crossbrowser'])
 
 /**
  * Their FRAME counts, which — unlike their runtimes — can be established by
  * reading the suite: `startup` takes exactly one shutter frame
  * (`142-startup-picture-live`, scripts/verify/startup.mjs), and `docs`,
- * `report` and `crossbrowser` take none. Kept apart from SUITE_RUNTIME_S's
+ * `board-layout`, `report` and `crossbrowser` take none. Kept apart from
+ * SUITE_RUNTIME_S's
  * table so the lockstep test can hold that table to the document verbatim
  * while these stay counted from the source.
  *
@@ -105,7 +106,7 @@ export const UNMEASURED_SUITES = Object.freeze(['docs', 'startup', 'report', 'cr
  * expected, and a permanent false alarm is how a reader learns to skip the one
  * line that would have caught a missing picture.
  */
-export const COUNTED_SUITE_FRAMES = Object.freeze({ docs: 0, startup: 1, report: 0, crossbrowser: 0 })
+export const COUNTED_SUITE_FRAMES = Object.freeze({ docs: 0, 'board-layout': 0, startup: 1, report: 0, crossbrowser: 0 })
 
 /** When the runtime/shot table was measured — printed with a frames verdict, so
  *  a reader can tell "the table is older than the suites" from "a suite stopped

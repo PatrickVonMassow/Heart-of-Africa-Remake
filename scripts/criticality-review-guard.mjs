@@ -39,7 +39,7 @@ import { isMainModule } from './is-main.mjs'
 import { heldByOtherLiveOwner } from './batch-singleton.mjs'
 import { appendRecord, readRecords, verifyCarried } from './mechanism-review.mjs'
 import { modelsFromTrailers } from './mechanism-review-core.mjs'
-import { parseRangeLog, planAuthorshipGroups } from './mechanism-review-range-core.mjs'
+import { parseRangeLog, planAuthorshipGroups, reviewEndStateFiles } from './mechanism-review-range-core.mjs'
 import { parsePassFiles, quotePassFile, unquoteGitPath } from './review-material-core.mjs'
 import {
   ancestorIndex,
@@ -140,7 +140,14 @@ export const pointLaneCommitsCommand = (ref, exclude = TICK_BRANCH) => [
   String(exclude),
 ]
 
-const uniqueFiles = (raw) => [...new Set(String(raw).split('\0').filter(Boolean))]
+// THE SAME BOUNDARY THE PLANNER USES (`reviewEndStateFiles`). The gate demanded
+// coverage of paths `review-sol` structurally refuses to put in a pass — the work
+// order, its archive, the retrospective — so a HIGH point whose file set had
+// picked one of them up could never reach a complete composition, whatever was
+// reviewed. The exclusion list already says why those documents have their own
+// enforcement instead; consuming it here is what makes gate, coverage demand and
+// planner agree, which is what that list was written to guarantee.
+const uniqueFiles = (raw) => reviewEndStateFiles(String(raw).split('\0').filter(Boolean))
 
 const ancestorOrEqual = (a, b, isAncestor) => Boolean(a && b && (a === b || isAncestor(a, b)))
 
@@ -289,9 +296,14 @@ export function pointAuthorship(commissionSha, reviewSha) {
     return { ...commit, authorModels: modelsFromTrailers(trailers), parentAuthorModels }
   })
   const plan = planAuthorshipGroups({ commits: attributed })
+  // BOTH SETS GO THROUGH THE PLANNER'S BOUNDARY (cross-vendor review, GPT-5.6 Sol,
+  // 28.08.2026). The ordinary measurement was routed through it and this one was
+  // not, so an unavailable receipt could still claim the work order or the
+  // retrospective as an unreviewable file — a clearance for paths no round was
+  // ever owed, written into the append-only ledger.
   return {
-    pointFiles: [...new Set(attributed.flatMap((commit) => commit.files))],
-    unavailableFiles: [...new Set(plan.unreviewable.flatMap((group) => group.files))],
+    pointFiles: reviewEndStateFiles(attributed.flatMap((commit) => commit.files)),
+    unavailableFiles: reviewEndStateFiles(plan.unreviewable.flatMap((group) => group.files)),
   }
 }
 
@@ -346,7 +358,10 @@ export function buildUnavailableReceipt({
   } catch (error) {
     return { ok: false, errors: [`Git could not measure point ${number}'s unavailable files: ${error?.message ?? error}`] }
   }
-  const actual = [...new Set((measured?.unavailableFiles ?? []).map(String).filter(Boolean))]
+  // Filtered HERE too, not only inside the measurement: this is the consumer that
+  // writes the clearance, and a receipt naming an excluded path would grant one
+  // for a review nothing was ever owed.
+  const actual = reviewEndStateFiles((measured?.unavailableFiles ?? []).map(String).filter(Boolean))
   if (!actual.length) {
     return { ok: false, errors: [`Git measures no unavailable files for point ${number} at ${full.slice(0, 7)}`] }
   }

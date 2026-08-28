@@ -81,15 +81,15 @@ does not exist.
 
 ## Ceilings confirmed against the landed files
 
-Measured 20.08.2026 on merged `main` with `measure()` from
-`scripts/doc-budget-core.mjs` — the guard's OWN tokenizer, not `wc`, because a
-ceiling is only confirmed against the counter that enforces it.
+Initially measured 20.08.2026 on merged `main`; living rows remeasured
+27.08.2026 with `measure()` from `scripts/doc-budget-core.mjs` — the guard's OWN
+tokenizer, not `wc`, because a ceiling is only confirmed against the counter that enforces it.
 `evaluateDocBudgets()` reports no findings, so all three hold.
 
 | document | landed | ceiling | headroom |
 | --- | --- | --- | --- |
-| `CLAUDE.md` | 190 lines / 1,314 words / 9,649 B | 193 / 1,332 | **3 lines**, 18 words |
-| `MEMORY.md` | 49 lines / 765 words / 6,062 B | 49 / 768 | **0 lines**, 3 words |
+| `CLAUDE.md` | 193 lines / 1,352 words / 9,969 B | 193 / 1,363 | **0 lines**, 11 words |
+| `MEMORY.md` | 50 lines / 789 words / 6,287 B | 50 / 789 | **0 lines**, 0 words |
 | global `CLAUDE.md` | 6 lines / 33 words / 236 B | 6 / 36 | **0 lines**, 3 words |
 
 They hold, but two of them hold with nothing to spare, and that is the finding
@@ -114,10 +114,11 @@ and the count moved twice within the hour. On 21.08.2026 it moved again: a new
 memory took the file one line and twenty words over both ceilings, and the room
 was made rather than the wall — two hooks about the same GitHub credential were
 merged into one entry and two more were tightened. On 23.08.2026 one new standing order of the user took it a
-line further, and on 24.08.2026 two more topics did — a lesson about drills that
-recreate the step they claim to prove, and the user's ruling that a point which
-stops converging is split rather than iterated. Each raise moved both ceilings by
-exactly the measured hook it bought, with the reason beside it in the code.
+line further, and on 24.08.2026 three more topics did — a lesson about drills
+that recreate the step they claim to prove, the user's ruling that a point which
+stops converging is split rather than iterated, and the authorization to execute
+a stated card recommendation. Each raise moved both ceilings by exactly the
+measured hook it bought, with the reason beside it in the code.
 The row above is the reading after the newest of those, not the merge-day one,
 and it shows what the pressure looks like from close up: zero headroom, for a
 file designed to gain a line per memory. The next raise should cut a retired
@@ -128,8 +129,10 @@ cut put one rule back that had left the file without an enforcer ("Keep branches
 short"). That reading was 192 lines / 1,318 words, with a 193 / 1,319 ceiling
 that followed the restored rule by exactly the four words it costs. On
 23.08.2026 §6 gained the 13-word rule permitting a second model trailer for the
-cross-vendor reviewer. Its word ceiling rose by those 13 words, preserving one
-word of headroom; its unchanged line ceiling is now exact.
+cross-vendor reviewer. On 24.08.2026 the stated-recommendation authorization
+added 31 words because its grant and boundary must stand in one sentence. Its
+word ceiling rose by exactly those words, preserving 18 words of headroom; its
+unchanged line ceiling is now exact.
 The global stub is GONE: the user released it in the same ruling and it was
 deleted on 20.08.2026 (backup `local/global-CLAUDE-before-deletion-20-08-2026.md`),
 so its row is history and `doc-budget-guard` simply skips a budget whose file no

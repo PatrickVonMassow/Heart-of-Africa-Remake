@@ -1,8 +1,8 @@
 // THE READER SIDE OF THE DERIVED BOARD STATE (point 749).
 //
-// It reads the three stores the batch already keeps — the pause marker, the alert
-// ladder, the child-retry state — and hands them to the pure derivation. Kept
-// apart from `board-state-core.mjs` so the judgement stays testable without a
+// It reads the four stores the batch already keeps — the pause marker, the alert
+// ladder, the child-retry state and the doctor's measurements — and hands them
+// to the pure derivation. Kept apart from `board-state-core.mjs` so the judgement stays testable without a
 // live checkout, and apart from `alert-escalation.mjs`/`child-retry.mjs` so the
 // board does not import a module that notifies, pauses or spawns on the way in.
 //
@@ -16,13 +16,14 @@ import { existsSync, readFileSync } from 'node:fs'
 import { applyDerivedStateCard } from './board-core.mjs'
 import { deriveStateCard } from './board-state-core.mjs'
 import { parsePauseRecord } from './batch-pause-core.mjs'
-import { repoPath } from './repo-paths.mjs'
+import { commonRepoPath, repoPath } from './repo-paths.mjs'
 
-/** The three stores, named once. The owning scripts name them too; a reader that
+/** The stores, named once. The owning scripts name them too; a reader that
  *  guessed a path would silently derive nothing at all. */
 export const PAUSE_PATH = repoPath('.claude/batch-paused')
 export const LADDER_PATH = repoPath('.claude/resilience/alert-escalation.json')
 export const RETRY_STATE_PATH = repoPath('.claude/resilience/child-retry.json')
+export const DOCTOR_STATE_PATH = commonRepoPath('.claude/doctor-state.json')
 
 /** JSON, or null — an unreadable store is one paragraph fewer, never a failure. */
 function readJson(path) {
@@ -54,12 +55,14 @@ export function currentStateCard({
   pausePath = PAUSE_PATH,
   ladderPath = LADDER_PATH,
   retryPath = RETRY_STATE_PATH,
+  doctorPath = DOCTOR_STATE_PATH,
   now = Date.now(),
 } = {}) {
   return deriveStateCard({
     pause: readPause({ path: pausePath }),
     ladder: readJson(ladderPath),
     retryState: readJson(retryPath),
+    doctorState: readJson(doctorPath),
     now,
   })
 }

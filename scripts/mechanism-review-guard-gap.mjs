@@ -19,6 +19,8 @@
 import { execFileSync } from 'node:child_process'
 import { REPO_ROOT } from './repo-paths.mjs'
 import { decideReviewGap, formatReviewGap, REVIEW_GAP_BUDGET_CHARS } from './mechanism-review-guard-gap-core.mjs'
+import { reviewEndStateFiles } from './mechanism-review-range-core.mjs'
+import { isBinaryPatchSection, patchSectionMap } from './review-material-core.mjs'
 
 // The patch of a jammed range is megabytes by definition here — the default
 // 1 MiB pipe would throw ENOBUFS and turn every measurement into 'unmeasured'.
@@ -86,11 +88,23 @@ export function measureReviewMaterial({ baseline, head, run = runGitArgs }) {
   let patch
   let paths
   try {
-    stat = run(['diff', '--stat', range])
-    // The same external-driver hardening as gatherRange (round-4 pass 7): the
-    // measurement must weigh git's own patch, not a substituted one.
-    patch = run(['diff', '--no-ext-diff', '--no-textconv', range])
-    paths = run(['diff', '--name-only', '-z', range]).split('\0').filter(Boolean)
+    // Use the SAME end-state boundary as the gate and runnable-pass planner.
+    // Measuring the raw range here reintroduced excluded work-order documents
+    // through the gap clause and suspended the gate before its real passes
+    // could run — a second, contradictory file-set policy in the same guard.
+    paths = reviewEndStateFiles(
+      run(['diff', '--name-only', '-z', range]).split('\0').filter(Boolean),
+    )
+    const pathspec = ['--', ...paths]
+    if (paths.length) {
+      stat = run(['diff', '--stat', range, ...pathspec])
+      // The same external-driver hardening as gatherRange (round-4 pass 7): the
+      // measurement must weigh git's own patch, not a substituted one.
+      patch = run(['diff', '--no-ext-diff', '--no-textconv', range, ...pathspec])
+    } else {
+      stat = ''
+      patch = ''
+    }
   } catch (e) {
     // Recognised on the ERROR ITSELF, not only on the internal helper's tag,
     // so an injected runner (the unit layer) and the real one rule alike —
@@ -104,7 +118,25 @@ export function measureReviewMaterial({ baseline, head, run = runGitArgs }) {
   }
   const files = []
   let measuredChars = stat.length + patch.length
+  // PRICE A BINARY THE WAY IT IS DELIVERED (point 943, measured 26.08.2026).
+  // The material a reviewer receives never carries a binary body: the packer
+  // substitutes a one-line "FILE BODY ABSENT BY DESIGN — binary" header, and
+  // deliberately so, that the file may not silently vanish. This measurement
+  // read the blob anyway and charged its megabytes, so 22 screenshots made a
+  // range look 32.5 million characters wide when its deliverable material was
+  // half that — a gap ruled over material nobody would ever have been sent.
+  // The section decides it, exactly as the packer decides it; a path with no
+  // section is unknown here and is read as before.
+  const sections = patchSectionMap(patch)
   for (const path of paths) {
+    const section = sections.get(path)
+    if (section !== undefined && isBinaryPatchSection(section)) {
+      // Empty body: what the packer would send is the header alone, which it
+      // charges itself. Nothing is dropped from the demand — the path stays in
+      // `files`, and the plan still owes a pass that names it.
+      files.push({ path, text: '' })
+      continue
+    }
     // THE BLOB'S SIZE IS ASKED BEFORE ITS BYTES (landing-round pass 3): `git
     // show` on a big-enough blob overflowed the buffer, ruled 'unmeasured'
     // and blocked forever. cat-file -s answers in a dozen characters; a blob
@@ -157,6 +189,7 @@ export async function assessReviewGap({
   baseline,
   head,
   standingRecords = 0,
+  sizedPlan = null,
   // Injectable for the unit layer only — production callers pass neither.
   run = runGitArgs,
   loadTool = () => import('./review-material-core.mjs'),
@@ -170,9 +203,33 @@ export async function assessReviewGap({
   }
 
   let planner = null
+  // The gate's real plan cuts by independent reviewer BEFORE it cuts by size.
+  // Prefer that measured plan when the caller has it: feeding all vendors into
+  // one plan makes the whole-range diffstat recur in every hypothetical pass
+  // and can report an impossible gap beside fully runnable authorship slices.
+  if (
+    sizedPlan &&
+    Array.isArray(sizedPlan.passes) &&
+    Array.isArray(sizedPlan.uncoverable) &&
+    typeof sizedPlan.statTruncated === 'boolean'
+  ) {
+    const maxPasses = Number(sizedPlan.maxPassTotal) || 256
+    const hasRoute = sizedPlan.passes.length > 0 || (sizedPlan.unreviewable ?? []).length > 0
+    planner = {
+      available: true,
+      fits: sizedPlan.fits === true,
+      covers:
+        !sizedPlan.statTruncated &&
+        sizedPlan.uncoverable.length === 0 &&
+        hasRoute &&
+        sizedPlan.passes.length <= maxPasses,
+      uncoverable: sizedPlan.uncoverable.map((u) => u.path),
+      budget: sizedPlan.budget,
+    }
+  }
   // A PROVEN OVERSIZE PLANS NOTHING: the parts were never read whole, so no
   // splitter can be consulted — the core rules on the floor alone.
-  if (measured && !measured.oversizeProven) {
+  if (!planner && measured && !measured.oversizeProven) {
     // A SPLITTER THAT CANNOT LOAD IS A MEASUREMENT FAILURE, whatever the
     // failure (second landing round, pass 4): the gate chain requires the
     // module, so absence and breakage rule alike — 'unmeasured', which blocks.

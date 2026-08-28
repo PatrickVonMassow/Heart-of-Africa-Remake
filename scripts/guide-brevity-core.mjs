@@ -7,9 +7,10 @@
 // into a chronicle, because every new lesson feels worth its own paragraph.
 //
 // So the brevity is MEASURED, not intended: a total budget, a per-pitfall
-// budget, a demand that every pitfall ends in an actionable prompt, and a
-// detector for the project-specific markers that signal a war story leaking in
-// (dates, point numbers, repo paths, the project's own tech and nouns).
+// budget, a demand that every pitfall ends in an actionable prompt, a semantic
+// contract for the falsification meta-rule, and a detector for the
+// project-specific markers that signal a war story leaking in (dates, point
+// numbers, repo paths, the project's own tech and nouns).
 //
 // Side-effect free. The wrapper (guide-brevity-guard.mjs) reads the file and is
 // fail-open; guide-brevity-core.test.mjs pins this logic AND audits the real
@@ -150,7 +151,65 @@ export const LIMITS = {
   // SHRINK and called the raise inconsistent, correctly for the range it was given; the range was
   // the reviewer's brief, not the code. Split a change like this again and give the reviewer the
   // whole span, because a ratchet can only be judged against the state before the change began.
-  maxLines: 467,
+  // RAISED 26.08.2026 by the measured NET of one genuinely new tip (§3.188): a decision the tool
+  // takes for itself is written to the board and NOTHING ever retires it, so a notice whose risk a
+  // later measurement refuted keeps standing until the user takes it down. Its sibling class of the
+  // same session (§3.187, the escape hatch a second mechanism removes in the same operation) needed
+  // NO entry of its own — it was FOLDED into "Die Ausnahme existiert nur in der Verweigerung",
+  // which already carries the promised-but-unbuilt special path, and the fold added the missing
+  // half (a test that WALKS the way out) inside the existing four lines. Two neighbouring entries
+  // were tightened to pay the rest back. NO CLAIM WAS DROPPED, and the fold proved it the hard
+  // way: a first attempt shortened the folded entry past its pinned check question, and the suite
+  // that pins every entry's claim caught it — the question is back and cost the line it saves.
+  // Net: six lines and fifty-four words, which is the new tip plus the fold's added half.
+  // RAISED 27.08.2026 by the measured net of two genuinely new claims (§3.195 and §3.196), both
+  // FOLDED rather than given entries of their own: what a rescue TIMER must measure — the outcome,
+  // a commit or a finished step, never the busyness of the thing it is there to catch, because a
+  // session wedged in a loop keeps making tool calls and holds the clock open forever — and that
+  // every guard must name the ONE movement that satisfies it, checked against every other guard.
+  // Both went into "Der autonome Lauf bleibt stehen", which already carries rescue mechanisms that
+  // wedge each other and the second independent timer. Drafted as two standalone entries at
+  // +12 lines / +121 words, the fold brought that down to +2 / +26. The third claim of that night —
+  // test the escape a guard NAMES, it can report success and still do nothing — needed no words at
+  // all: "Die Ausnahme existiert nur in der Verweigerung" already demands a test that WALKS the
+  // promised way out.
+  // 27.08.2026: the output-is-the-product clause joined the first pitfall while three over-long
+  // meta rules gave up their narration, so the ceiling follows the measurement DOWN by two.
+  // RAISED 27.08.2026 by exactly the measured size of ONE genuinely new tip: a cause the ticket
+  // already NAMES as a suspicion is the most dangerous raw material, because the executor searches
+  // for its confirmation from then on — so it is a candidate to be refuted first, and whoever hands
+  // the task out measures BLIND ALONGSIDE instead of waiting for the executor's measurement. Measured
+  // that morning: a work order's suspected cause was falsified in a disposable clone, and the real
+  // one sat an environment layer below the project code. It was FOLDED into the root-cause meta rule,
+  // which already demands the mechanical cause, rather than opening a new pitfall — four lines and
+  // fifty words as the audit counts them. The lesson's second half — an inherited environment
+  // variable no call-site search can find — was deliberately NOT added: it is the long-form half and
+  // lives in the retrospective.
+  // RAISED 27.08.2026 by the measured net of TWO missing lessons, both FOLDED into existing text:
+  // omitted review material must be named to the judging model, with a suspicion's promotion
+  // criterion beside the root-cause rule; and neighbouring correct rules may forbid through their
+  // gap, so permission shares a sentence with its limit and the periodic review asks what no rule
+  // covers. The existing time-window rule and its last-n symptom remain intact beside the new
+  // review-material lesson. No standalone pitfall or project telling was added. Net: +6 lines /
+  // +70 words, exact fit.
+  // RAISED 28.08.2026 by the measured size of ONE genuinely new lesson: a monitor that reads a
+  // value its own checking refreshes, so a dead process looks alive and looks fresher the more
+  // often you ask. It is neither the environment-dependent test (green for the wrong checkout),
+  // nor the permissive loader (green over a program that will not start), nor the shared-generator
+  // yardstick (both sides inherit one defect): here the OBSERVER writes the measurement it then
+  // reads. The decision a reader copies is to re-measure a QUIESCED subject with and without a
+  // look in between — two moving reads alone prove nothing, since a live subject moves them too,
+  // a correction the cross-vendor review of this very commit required. Written first at ten lines
+  // with a five-line risk over the four-line
+  // budget, then cut to five with a two-line risk before the raise, as the shortening step this
+  // rule demands; the neighbouring entries were read for redundancy and none could be cut without
+  // dropping a claim. What remains is +6 lines / +64 words against the measured 483 / 4341, and
+  // the ceilings move by exactly that to 489 / 4405, with zero slack. Three of those words are the
+  // cross-vendor correction itself: naming the quiesced subject and the with/without-look control
+  // costs more than the unsound one-liner it replaces, and the entry was tightened a SECOND time
+  // (the risk clause and the prompt both) before those three were taken. Not escalated to the
+  // user, under his general withdrawal of ask-before-raising of 10.08.2026.
+  maxLines: 489,
   // EXACT FIT, not headroom — corrected 30.07.2026 after the four-eyes review
   // pointed out that this comment had long stopped describing the numbers. The
   // rule above ("raised only by the measured size of genuinely new tips")
@@ -319,7 +378,25 @@ export const LIMITS = {
   // eighteen.
   // 26.08.2026: the folded fixture-derivation clause above measures 4196, so the word ceiling
   // follows the measurement UP by thirty-four — the raise the same entry justifies, no headroom.
-  maxWords: 4196,
+  // 26.08.2026, evening: the mutually-wedging-recovery lesson was folded INTO the standstill
+  // pitfall and the fixture-derivation clause moved fully to the retrospective (§3.190 carries
+  // it), so the ceiling follows the measurement DOWN by five words — a tightening, no raise.
+  // 26.08.2026, late: the growing-duty lesson (§3.194) was ADDED and six older entries gave up
+  // their narration for it, so the ceiling follows the measurement DOWN by forty-six — the guide
+  // is shorter than before it learned tonight's class.
+  // 27.08.2026: tonight's lesson — where a tool's OUTPUT is the product, read it at the real
+  // corpus — cost twenty words in the first pitfall, and the three meta rules it was taken from
+  // gave up twenty-two, so the ceiling follows the measurement DOWN by two.
+  // 27.08.2026: the suspicion clause was corrected after review: the rule now demands an
+  // independent ATTEMPT to falsify and explicitly lets a true hypothesis survive it. Tightening
+  // the surrounding narration pays for that precision, so the ceiling follows the measured guide
+  // DOWN by two words, with no claim removed and no headroom added.
+  // 27.08.2026: the two folded lessons justified beside maxLines measure 4341 words, so this
+  // ceiling follows their +70-word net exactly; the guide has no unearned headroom.
+  // 28.08.2026: the self-measuring-monitor lesson justified beside maxLines measures 4405 words
+  // after its review correction, so this ceiling follows its +64-word net exactly; the guide keeps
+  // no unearned headroom.
+  maxWords: 4405,
   // A pitfall entry = the risk lines plus its prompt. Anything longer is a
   // story, not a tip.
   maxEntryLines: 11,
@@ -440,6 +517,27 @@ export function strayLines(sectionLines) {
 }
 
 const ACTION_RE = /→\s*\*(?:Prompt|Mechanismus)\s*:\*/
+const ROOT_CAUSE_RULE_RE = /^1\.\s+\*\*Root-Cause vor Fix\.\*\*/
+const NUMBERED_META_RULE_RE = /^\d+\.\s+\*\*/
+
+const ROOT_CAUSE_REQUIREMENTS = [
+  {
+    re: /\bVersuch\w*\b[^.]*\bzuerst\b[^.]*\bunabhängig\b[^.]*\bwiderleg\w*/iu,
+    detail: 'Die Root-Cause-Meta-Regel verlangt keinen ersten unabhängigen Widerlegungsversuch',
+  },
+  {
+    re: /\bHält sie stand, darf sie wahr sein\b/iu,
+    detail: 'Die Root-Cause-Meta-Regel sagt nicht, dass eine wahre Hypothese den Versuch übersteht',
+  },
+  {
+    re: /\bWer den Auftrag vergibt\b[^.]*\bmisst\b[^.]*\bblind mit\b/iu,
+    detail: 'Die Root-Cause-Meta-Regel verlangt keine blinde Gegenmessung durch den Auftraggeber',
+  },
+  {
+    re: /\bwelcher Befund\b[^.]*\bzur Tatsache macht\b/iu,
+    detail: 'Die Root-Cause-Meta-Regel nennt kein Beförderungskriterium für die Vermutung',
+  },
+]
 
 /**
  * Audit the guide. Returns { ok, violations: [{ kind, line, detail }] }.
@@ -499,6 +597,30 @@ export function auditGuide(text, limits = LIMITS) {
     push('stray-prose', line, `„${l.trim().slice(0, 60)}…" gehört zu keinem Fallstrick-Eintrag`)
   }
 
+  // The aggregate budgets cannot protect a claim: deleting a meta-rule and
+  // spending its words elsewhere would still fit. Scope these checks to the
+  // first numbered rule so scattering the right words across neighbouring
+  // rules cannot manufacture compliance.
+  const metaSection = sliceSection(src, /Drei Meta-Regeln/i)
+  const rootCauseStart = metaSection.findIndex(({ text: l }) => ROOT_CAUSE_RULE_RE.test(l))
+  if (rootCauseStart < 0) {
+    push('meta-rule', metaSection[0]?.line ?? 1, 'Meta-Regel „Root-Cause vor Fix" nicht gefunden')
+  } else {
+    const nextRuleOffset = metaSection
+      .slice(rootCauseStart + 1)
+      .findIndex(({ text: l }) => NUMBERED_META_RULE_RE.test(l))
+    const rootCauseEnd = nextRuleOffset < 0
+      ? metaSection.length
+      : rootCauseStart + 1 + nextRuleOffset
+    const rootCauseLines = metaSection.slice(rootCauseStart, rootCauseEnd)
+    const rootCauseText = rootCauseLines.map(({ text: l }) => l).join(' ').replace(/\s+/g, ' ')
+    const rootCauseLine = rootCauseLines[0].line
+
+    for (const requirement of ROOT_CAUSE_REQUIREMENTS) {
+      if (!requirement.re.test(rootCauseText)) push('meta-rule', rootCauseLine, requirement.detail)
+    }
+  }
+
   for (const entry of entries) {
     if (entry.lines.length > limits.maxEntryLines) {
       push(
@@ -529,10 +651,10 @@ export function formatViolations(violations) {
     .map((v) => `  · Zeile ${v.line} [${v.kind}]: ${v.detail}`)
     .join('\n')
   return (
-    'VIBE-CODING-ANLEITUNG ZU LANG / ZU PROJEKTSPEZIFISCH ' +
+    'VIBE-CODING-ANLEITUNG VERLETZT IHREN KURZFORM-VERTRAG ' +
     `(${violations.length} Verstoß/Verstöße):\n${body}\n` +
-    'Die Anleitung ist eine KURZE Einsteiger-Anleitung: pro Fallstrick ein bis zwei ' +
-    'Sätze Risiko, dann der Prompt. Ausführliche Projekterfahrung gehört nach ' +
+    'Die Anleitung ist eine KURZE Einsteiger-Anleitung: Pflichtaussagen und Struktur ' +
+    'bleiben erhalten; ausführliche Projekterfahrung gehört nach ' +
     'docs/analysis_de/retrospektive-zusammenarbeit.md — kürze dort hinüber, statt das ' +
     'Budget zu erhöhen. Prüfen mit: node scripts/guide-brevity-guard.mjs --status'
   )

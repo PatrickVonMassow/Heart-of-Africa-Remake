@@ -344,7 +344,9 @@ export function duplicateDonePoints(dashboardHtml) {
   // the cross-section false positive this function claims to avoid.
   const next = html.indexOf('<details class="sect">', at)
   const section = html.slice(at, next < 0 ? html.length : next)
-  const points = [...section.matchAll(/<details>\s*<summary><span class="num">\s*(\d+)\s*<\/span>/g)].map(
+  const points = [...section.matchAll(
+    /<details>\s*<summary>(?:<span class="card-header-left">\s*)?<span class="num">\s*(\d+)\s*<\/span>/g,
+  )].map(
     (m) => m[1],
   )
   const seen = new Set()

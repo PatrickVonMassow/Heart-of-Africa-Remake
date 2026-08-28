@@ -131,7 +131,7 @@ export const BLOCKING_PATTERNS = Object.freeze([
  * point the rule exists to place behind the release, so a match is dropped when
  * a negation stands close in front of it.
  */
-const NEGATION_CUE = /\b(?:not|never|nothing|cannot|can't|won't|doesn't|without|neither|nor|no)\b/i
+const NEGATION_CUE = /\b(?:not|never|nothing|cannot|can't|won't|doesn't|neither|nor|no)\b/i
 
 /** How far around a match a negation can still be looking at it. */
 const NEGATION_WINDOW = 60
@@ -187,6 +187,19 @@ const AFTER_END = new RegExp(`[.;:!?—,]|\\b(?:${CONNECTOR}|as|after|before|${P
  */
 const NEGATIVE_IDIOM = /\b(?:under no circumstances?|in no case|in no way|at no point|by no means|on no account)\b/i
 
+/** A blocking phrase posed rather than asserted. A cue must govern the phrase
+ * in the same comma-free clause: "if it blocks the release" and "it would
+ * block the release" are hypotheses, while "it cannot be deferred because it
+ * blocks the release" states the block after a connector. */
+const HYPOTHETICAL_BEFORE = /\b(?:if|whether|would|could|might|may)\b[^,.!?;:—]{0,40}$/i
+
+/** True only when this occurrence belongs to the question ending next. */
+function questionedOccurrence(text, matchEnd) {
+  const tail = text.slice(matchEnd)
+  const boundary = tail.search(/[.!?]/)
+  return boundary >= 0 && tail[boundary] === '?'
+}
+
 function clauseAfter(text, at) {
   const window = text.slice(at, at + NEGATION_WINDOW)
   const end = window.search(AFTER_END)
@@ -202,22 +215,22 @@ function clauseAfter(text, at) {
  * stating neither is not high — that is the whole decision, and it is the reason
  * the answer cannot be argued into the record by whoever files the point.
  *
- * THE RESIDUAL, STATED EXACTLY (cross-vendor review, fourth and fifth pass).
- * This reads English prose by cue, and no cue list closes every construction: a
- * denial split across sentences — "Does it block the release? No." — still reads
- * as a claim. What that costs, precisely:
- *   - for a point with NO front decision recorded, nothing at all beyond wording:
- *     a false high only moves the refusal from `not-high` to `unrecorded`, and
- *     the gate still demands an explicit `--ahead` decision before anything
- *     stands in front of the release;
- *   - for a point that ALREADY holds one, the false reading keeps that placement
- *     alive after the body changed to a denial. That is the real edge, and it is
- *     the narrow one: it needs a point that earned the front and was then
- *     rewritten into something unurgent, and what answers it is the diff of a
- *     tracked record and a work order under review — the same answer this file
- *     gives to every hand-edit question.
- * The claim used to be the flat "a wrong reading cannot let a point through",
- * which was true only of the first case; the fifth pass was right to refuse it.
+ * Grammar matters in both directions. A denial attached to the phrase removes
+ * it; a precondition describing what happens without a fix does not. Questions
+ * and hypothetical clauses are mentions rather than assertions.
+ *
+ * THE RESIDUAL, STATED EXACTLY (cross-vendor review, 26.08.2026). The next
+ * sentence-ending `?` is the only information this narrow cue reader has, so an
+ * ASSERTION followed by a question in the same sentence — "It blocks the
+ * release — is that acceptable?" — is misread as a mention. The direction is a
+ * false NOT-HIGH: without a recorded front decision the gate still refuses the
+ * point (as `not-high`, instead of the `unrecorded` reason the true reading
+ * would produce); with a recorded front decision it invalidates that decision
+ * and makes the point move behind the release unless its body carries the
+ * explicit `Criticality: high` tag. The missing information is grammatical
+ * scope: punctuation alone cannot say whether the question governs the earlier
+ * assertion. That conservative cost is accepted because an ambiguous reading
+ * demands evidence rather than excusing a machine-filed point.
  */
 export function statesHighUrgency(body) {
   const raw = String(body ?? '')
@@ -233,6 +246,13 @@ export function statesHighUrgency(body) {
       // condition's own "cannot" must not read as a denial of the condition.
       const before = text.slice(Math.max(0, m.index - NEGATION_WINDOW), m.index)
       if (NEGATION_BEFORE.test(before)) continue
+      // "Without a fix, it blocks …" is a condition for the asserted block,
+      // not a denial. `without` was once in NEGATION_BEFORE and crossed the
+      // comma through three filler words, producing an unsupported refusal.
+      // It is deliberately absent from NEGATION_CUE; actual hypotheses and
+      // questions are rejected by their own grammatical shapes here.
+      if (HYPOTHETICAL_BEFORE.test(before)) continue
+      if (questionedOccurrence(text, m.index + m[0].length)) continue
       const after = text.slice(m.index + m[0].length, m.index + m[0].length + NEGATION_WINDOW)
       if (NEGATION_CUE.test(clauseAfter(text, m.index + m[0].length))) continue
       // …and the idioms, which a boundary would otherwise cut the denial out of.

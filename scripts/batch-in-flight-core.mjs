@@ -208,11 +208,11 @@ export const EVIDENCE_KINDS = ['pid', 'branch', 'worktree', 'log']
  * A LOG is the weakest of the four: an agent that works without printing looks
  * exactly like one that died. A PID is stronger but says only that a process
  * exists, not that it is producing anything. A BRANCH and a WORKTREE are the
- * work's own OUTPUT — they move only when something real happened, and they go
- * quiet on their own the moment it stops. So they are the PRIMARY evidence: a
- * silent log beside moving output never supports the conclusion "dead", and
- * output that is still moving needs no deadline to stay honest (see
- * `assessInFlight`).
+ * work's own OUTPUT — after `worktreeActiveAt` excludes reader-writable Git
+ * metadata, they move only when something real happened and go quiet on their
+ * own the moment it stops. So they are the PRIMARY evidence: a silent log beside
+ * moving output never supports the conclusion "dead", and output that is still
+ * moving needs no deadline to stay honest (see `assessInFlight`).
  *
  * THE CAVEAT THAT WAS NAMED HERE IS NOW ANSWERED (point 434 (5b), 30.07.2026).
  * `worktreeActiveAt` used to stat exactly four GIT paths — the gitdir, `index`,
@@ -221,15 +221,30 @@ export const EVIDENCE_KINDS = ['pid', 'branch', 'worktree', 'log']
  * twenty minutes without running a git command read as `quiet` (measured live: the
  * same worktree said "quiet for 21 min" while its agent was mid-edit), while a
  * supervisor's own `git status` on that worktree refreshed the index and made the
- * observer's look the evidence. It now also dates the newest WORKING FILE, and the
- * verdict says WHICH of the two it read (`combineWorktreeStamps`). A reader cannot
- * fake that half: looking at a checkout does not rewrite the files in it.
+ * observer's look the evidence. It now dates only writer-moved Git metadata plus
+ * the newest WORKING FILE, and the verdict says WHICH of the two it read
+ * (`combineWorktreeStamps`). Neither half includes a stamp an ordinary reader can
+ * refresh.
  */
 export const OUTPUT_KINDS = new Set(['branch', 'worktree'])
 
 /** How a worktree stamp names where it came from. Both are asked; the NEWEST of
  *  the two carries the verdict, and its name goes into the detail string. */
 export const WORKTREE_SOURCE = { files: 'working files', git: 'git metadata' }
+
+/**
+ * THE NEWEST GIT STAMP ONLY A WRITER MOVES. PURE.
+ *
+ * `git status` may rewrite both the index and the containing gitdir while doing
+ * nothing to the checkout. They are intentionally not read here, even when a
+ * caller includes `indexAt` or `gitdirAt` in the object. HEAD and COMMIT_EDITMSG
+ * remain: checkout/ref movement writes the first, and a commit writes the second.
+ */
+export function writerGitMetadataAt(stamps = {}) {
+  const candidates = [stamps?.headAt, stamps?.commitEditAt]
+    .filter((value) => typeof value === 'number' && Number.isFinite(value))
+  return candidates.length ? Math.max(...candidates) : null
+}
 
 /**
  * THE NEWEST OF THE TWO WORKTREE STAMPS, AND WHICH ONE IT WAS. PURE.
@@ -275,7 +290,8 @@ export function worktreeStamp(value) {
  * `limit` bounds the work: a checkout with thousands of dirty paths must not turn a
  * liveness probe into a tree walk. `git status` sorts by PATH, not by mtime, so a
  * checkout dirtier than the limit can miss the newest file — the caller then falls
- * back to the git metadata, which can only UNDER-report freshness, never invent it.
+ * back to writer-only git metadata. That can only UNDER-report freshness, never
+ * invent it: reader-writable `index` and gitdir mtimes are not candidates.
  *
  * The path is taken verbatim: `-z` exists precisely so nothing is quoted or
  * escaped, and trimming it would corrupt the (legal) path that begins or ends with

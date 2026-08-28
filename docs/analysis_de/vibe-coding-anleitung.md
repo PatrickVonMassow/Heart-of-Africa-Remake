@@ -151,11 +151,16 @@ Die Ursache findest du durch **Zerlegen**, nicht durch Wiederholen.
 - **Grüner Test, falsches Bild.** Er prüfte einen Hilfswert oder *stellt her*, was die Handlung
   bewirkt hätte, statt sie aufzurufen — und ist für immer grün.
   → *Prompt:* „Eine sichtbare Änderung ist erst fertig, wenn sie am **echten gerenderten Bild**
-  unter einer erreichbaren Bedingung geprüft wurde. Zu jeder Prüfung: **Welche Zeile ruft die
-  Sache auf — und was bliebe grün, wenn sie völlig kaputt wäre?** Vergehende Zeit darf ein Test
-  abkürzen, den **Aufruf** nie. Und wo die Prüfung gegen eine Datei läuft, die es im Projekt
-  wirklich gibt, **leite die Testdaten aus ihr ab, statt sie nachzubauen** — ein Nachbau prüft
-  die Vorstellung davon und wird zuverlässig grün.“ *(≈ 1,5x.)* *(Sieht das richtig aus?)*
+  geprüft wurde. Zu jeder Prüfung: **Welche Zeile ruft die Sache auf — und was bliebe grün, wenn
+  sie kaputt wäre?** Zeit darf ein Test abkürzen, den **Aufruf** nie. Ist die **Ausgabe** das
+  Produkt — Urteil, Plan, Anleitung —, lies sie am **echten Bestand**, nie nur an selbstgebauten
+  Eingaben.“ *(Sieht das richtig aus?)*
+- **Der Fühler misst sich selbst.** Eine Überwachung liest einen Wert, den ihr Nachsehen selbst
+  erneuert — ein toter Vorgang wirkt lebendig, und je öfter du prüfst, desto lebendiger.
+  → *Prompt:* „Ein Lebenszeichen darf nur aus einer Quelle kommen, die der **Beobachter nicht
+  beschreibt**. Prüf das am **stillgelegten** Gegenstand, mit und ohne Blick dazwischen: Bewegt
+  **erst der Blick** den Wert, misst sie sich selbst.“
+
 - **Neue Features zerbrechen alte.** Eine Änderung repariert X und bricht das unbeobachtete Y.
   → *Prompt:* „Etabliere einen Mechanismus, der jede Mechanik auch im **Danach-Zustand** prüft und
   nach jedem Zusammenführen die schnelle Testschicht erzwingt. Bau ‚Invarianten' ein, die im
@@ -195,19 +200,21 @@ Die Ursache findest du durch **Zerlegen**, nicht durch Wiederholen.
   → *Prompt:* „Stell zu Sitzungsbeginn fest, **welches Modell tatsächlich antwortet**, und halte es
   gegen die erlaubte Reihe. Steht es außerhalb, **halte an und melde**."
 
-- **Der autonome Lauf bleibt stehen — still oder wartend.** Beides gleich teuer, wenn du weg bist.
-  → *Prompt:* „Bleib **nie mit einer Rückfrage stehen**: Annahme treffen, festhalten, weitergehen."
+- **Der autonome Lauf bleibt stehen — still oder wartend.** Beides teuer, wenn du weg bist —
+  auch durch Rettungsmechanismen, die einzeln das Richtige tun und einander verklemmen.
+  → *Prompt:* „Bleib **nie mit einer Rückfrage stehen**: Annahme treffen, festhalten, weitergehen.
+  Prüfe Rettung **paarweise** — jeder Wächter nennt die eine Bewegung, die ihn erfüllt —, zähle nur
+  **Versuchtes**, sichere mit **zweitem, eigenem Zeitgeber**, und lass den am **Ergebnis** messen,
+  nie an der Betriebsamkeit dessen, den er auffangen soll."
 
 - **Kommunikation verfehlt.** Zu technisch, zu lang, an der Zielgruppe vorbei.
   → *Prompt:* „Beschreibe Bugs und Status in der Zielgruppensprache — Symptom zuerst, fürs
   Handy lesbar — und halte Format und Sprache auf **allen** Ausgaben ein."
 
 - **Test und Wächter hingen an ihrer Umgebung, nicht am Verhalten.** Sie messen dein Repository
-  statt deinen Code; von Hand nachgeprüft bestätigt sich der Fehler selbst, denn dein Aufruf erbt
-  dasselbe Verzeichnis.
+  statt deinen Code — von Hand nachgeprüft bestätigt sich der Fehler selbst.
   → *Prompt:* „Jede Prüfung bekommt ihre Pfade **eingespritzt**; was fürs **ganze Projekt** gilt,
-  wird an **einer** Stelle gelesen — wahr wegen des Codes, nie wegen des Checkouts. Grün bei dir
-  und rot im Haken? Lass die Bedingung aus **beiden** Wurzeln laufen."
+  wird an **einer** Stelle gelesen. Grün bei dir, rot im Haken? Lass es aus **beiden** Wurzeln laufen."
 
 - **Messung und Vorschau verunreinigt.** Halbfertiges gilt als ‚fertig'.
   → *Prompt:* „Hol mein Urteil am **veröffentlichten** Stand ein, nie an einem Zwischenzweig, und
@@ -219,8 +226,11 @@ Die Ursache findest du durch **Zerlegen**, nicht durch Wiederholen.
   Start, was **lokal fertig, aber nirgends angekommen** ist.“
 
 - **Regeln und Wächter verrotten — nur merkt es niemand.** Eine Absicherung greift enger als ihr
-  Satz, oder weiter, und sperrt Unbeteiligte.
-  → *Prompt:* „Leg Satz und Code periodisch **nebeneinander**, zieh **den Code auf den Satz**."
+  Satz, oder weiter; mehrere richtige Regeln können durch ihre Lücke etwas verbieten — und Warten
+  sieht dabei wie Sorgfalt aus.
+  → *Prompt:* „Schreib die **Erlaubnis im selben Satz wie ihre Grenze**. Leg Satz und Code
+  periodisch **nebeneinander**, zieh **den Code auf den Satz**, und frag: **Welcher naheliegende
+  Fall wird von keiner Regel erfasst?**"
 
 - **Die Verweigerung nennt eine Abhilfe, die schadet, nie eintritt — oder längst getan ist.** Wer
   ihr folgt, steht schlechter da, wartet vergeblich oder wiederholt einen erledigten Schritt.
@@ -270,9 +280,11 @@ Die Ursache findest du durch **Zerlegen**, nicht durch Wiederholen.
   Ergebnis aus den Protokollen, nicht aus den Tests."
 
 - **Die Messung — und die Gegenprüfung — sah weniger, als sie behauptet.** Nur die letzten *n*
-  Einträge; nicht geliefert liest sich *grüner* als ein Fehlschlag.
+  Einträge; nicht geliefert liest sich *grüner* als ein Fehlschlag, still gekürzter Prüfstoff für
+  das Modell wie ein Mangel.
   → *Prompt:* „Leite das Fenster jeder Messung aus dem **Gegenstand** ab: nach Zeit, nie nach
-  Anzahl. Melde die **Abdeckung** mit; ein Urteil über halbem Material ist **Teilprüfung**."
+  Anzahl. Nenne dem **prüfenden Modell selbst** jedes weggelassene Material, nicht nur dem
+  Aufrufer, und melde die **Abdeckung**; ein Urteil über halbem Material ist **Teilprüfung**."
 
 - **„Läuft der noch?" mit „ist die Ausgabe frisch?" beantwortet.** Frische belegt nur, dass jemand
   gearbeitet *hat*.
@@ -328,16 +340,14 @@ Die Ursache findest du durch **Zerlegen**, nicht durch Wiederholen.
   Fähigkeit, bitte **einmal um sie** — nie um ihre Ausführung."
 
 - **Nicht jedes Rot ist deins — und manches war nie eines.** Eine Prüfung, die nur „rot" und
-  „grün" kennt, schiebt Fremdes dir zu; ein *geerbtes* Rot kann ein Abbruch auf altem Stand sein.
+  „grün" kennt, schiebt Fremdes dir zu.
   → *Prompt:* „Sag bei jedem Rot zuerst, **wo die Ursache liegt** — lief überhaupt ein eigener
-  Schritt? Liegt sie außerhalb, nenn den **echten Griff**. Was du nicht selbst gemessen hast, ist
-  eine **Behauptung** — nachmessen, nicht reparieren."
+  Schritt? Was du nicht selbst gemessen hast, ist eine **Behauptung**."
 
 - **Die Reparatur nimmt den Reparierenden mit.** Wer die Leitung repariert, auf der er sitzt,
   verliert die nächste Reparatur mit; ein abgebrochener Lauf räumt nicht weg, was er hinterlässt.
   → *Prompt:* „Änderst du deine eigene Umgebung: Gibt es eine **kleinere Handlung**, die nur
-  **ergänzt**? Lass jeden Neuaufbau nach **offen** scheitern — und frag: **Wer räumt auf, wenn der
-  Aufräumende nicht mehr da ist?**"
+  **ergänzt**? Und: **Wer räumt auf, wenn der Aufräumende nicht mehr da ist?**"
 
 - **Verschlucken sieht aus wie Erfolg — ein nie gestartetes Werkzeug wie ein strenges.**
   → *Prompt:* „Ein Ersatzwert im `catch` gilt nur, wenn er zu **weniger** Aktion führt.
@@ -405,49 +415,61 @@ Die Ursache findest du durch **Zerlegen**, nicht durch Wiederholen.
 
 - **Ein Auftrag, den du einer laufenden Sitzung nur zurufst, stirbt mit ihr.**
   → *Prompt:* „Was eine Sitzung überdauern soll, gehört in eine Datei, die dein Werkzeug beim
-  nächsten Start selbst liest. Ein Zuruf ist ein Hinweis, nie ein Auftrag."
+  nächsten Start liest. Ein Zuruf ist ein Hinweis, nie ein Auftrag."
 
-- **Die Ausnahme existiert nur in der Verweigerung.** Ein Mechanismus verspricht einen Sonderweg,
-  baut aber weder Zustand noch Befehl dafür.
-  → *Prompt:* „Baue jede zugesagte Ausnahme als eigenen Zustand und Befehl. Prüffrage: Kann der
-  ehrlichste Wortlaut der Ausnahme meine eigene Prüfung bestehen?"
+- **Die Ausnahme existiert nur in der Verweigerung.** Ein Mechanismus verspricht einen Sonderweg
+  und baut ihn nicht.
+  → *Prompt:* „Baue jede zugesagte Ausnahme als eigenen Zustand und Befehl, und schreib einen Test,
+  der sie **geht**. Prüffrage: Kann der ehrlichste Wortlaut der Ausnahme meine eigene Prüfung
+  bestehen?"
 
 - **Zwei Helfer, ein Projekt — und der zweite merkt es nie.** Startet dein Werkzeug automatisch
-  nach, geht eine zweite Sitzung neben der laufenden auf — beide haben beim Start ehrlich gefragt.
+  nach, geht eine zweite Sitzung neben der laufenden auf.
   → *Prompt:* „Nimm eine **Sperre mit laufender Nummer**, die einen kleineren Anspruch **abweist**,
-  und stell die Besitzfrage **vor jedem Schreibvorgang** neu — nicht nur beim Start."
+  und stell die Besitzfrage **vor jedem Schreibvorgang** neu."
 
 - **Die neue Pflicht verurteilt die alten Einträge.** Der verschärfte Prüfer liest den ganzen
   Bestand und erklärt korrekt entstandene Altdaten für gefälscht.
   → *Prompt:* „Eine Pflicht in einer Prüfung, die Altbestände liest, sagt **ab wann** sie gilt."
 
 - **Der Wächter tritt zurück — und hört dabei auf zu messen.** Wer fremde Arbeit nicht anfassen
-  darf, nennt nur noch den Grund, nichts zu tun — und ist blind, wo die Sperre immer belegt ist.
-  → *Prompt:* „Zurücktreten heißt **nicht handeln**, nie **nicht wissen**. Berichte den gemessenen
-  Zustand auch dann, wenn du nichts ändern darfst. Lesen kollidiert mit nichts.“
+  darf, nennt nur noch den Grund, nichts zu tun.
+  → *Prompt:* „Zurücktreten heißt **nicht handeln**, nie **nicht wissen**. Lesen kollidiert mit
+  nichts.“
+
+- **Die Pflicht wächst schneller, als du sie erfüllen kannst.** Verlangt eine Prüfung „alles seit
+  dem letzten Mal", wird sie unerfüllbar und setzt sich aus — der Rückstand wächst währenddessen.
+  → *Prompt:* „Binde jede Prüfpflicht an den **einzelnen Beitrag**, nie an einen offenen Zeitraum.
+  Sieht eine Pflicht unerfüllbar aus, prüf zuerst dein **Messgerät**."
+
+- **Das Protokoll ohne Verfallsdatum wird zum Dauerplakat.** Was dein Werkzeug über die eigene
+  Entscheidung aufschreibt, nimmt niemand je wieder heraus.
+  → *Prompt:* „Eine Entscheidung, die du selbst triffst, nennt die **Messung**, die sie stützen
+  oder widerlegen würde, und **verfällt**, sobald diese Messung sauber vorliegt."
 
 ---
 
 ## Drei Meta-Regeln, die alles zusammenhalten
 
-1. **Root-Cause vor Fix.** Ausreden-freie Ursachennotizen sind der Rohstoff, aus dem
-   gute Mechanismen entstehen.
+1. **Root-Cause vor Fix.** Ursachennotizen ohne Ausrede sind der Rohstoff guter Mechanismen. Und
+   eine im Ticket **vermutete** Ursache ist gefährlicher Rohstoff: Der Ausführende sucht dann ihre
+   Bestätigung.
    > *Prompt:* „Bevor du etwas Wiederkehrendes reparierst: schreib mir in 3–5 Sätzen die
-   > **mechanische** Ursache — was genau war die Annahme, die brach?"
+   > **mechanische** Ursache — was genau war die Annahme, die brach? Steht die Ursache schon als
+   > Vermutung da, ist sie ein **Kandidat**: Markiere sie als Vermutung und schreib vor dem Versuch,
+   > welcher Befund sie zur Tatsache macht. Versuche zuerst, sie unabhängig zu widerlegen.
+   > Hält sie stand, darf sie wahr sein. Wer den Auftrag vergibt, misst **blind mit**."
 
-2. **Nutzer-Artefakte sind Verträge.** Ein Dashboard, ein Ausgabeformat, eine Board-
-   Struktur, die du festgelegt hast: nicht eigenmächtig umbauen, Änderungen nur als
-   Vorschlag.
+2. **Nutzer-Artefakte sind Verträge.** Was du festgelegt hast — Dashboard, Ausgabeformat,
+   Board-Struktur — wird nicht eigenmächtig umgebaut.
    > *Prompt:* „Struktur von Dingen, die ich festgelegt habe, friert ein. Schlag
    > Änderungen vor, setz sie nicht ungefragt um."
 
-3. **Parallel arbeiten geht nur mit Isolierung.** Die Grenze setzt der **Haupt-Agent**: bei
-   ihm endet jeder Strang, und je mehr Fremdstoff sein Kontext aufnimmt, desto schlechter
-   urteilt er. Verlass dich nie auf „nur lesen".
-   > *Prompt:* „Arbeite jede Aufgabe auf einem eigenen Feature-Branch mit eigener
-   > Arbeitskopie und führe sie erst nach `main`, wenn sie verifiziert ist — auch ein nur
-   > lesender Helfer bekommt eine eigene. Teile parallele Aufgaben so auf, dass sie **nicht
-   > dieselben Dateien** anfassen, und arbeite an höchstens **drei** gleichzeitig."
+3. **Parallel arbeiten geht nur mit Isolierung.** Die Grenze setzt der **Haupt-Agent**: bei ihm
+   endet jeder Strang, und je mehr Fremdstoff sein Kontext aufnimmt, desto schlechter urteilt er.
+   > *Prompt:* „Arbeite jede Aufgabe auf eigenem Feature-Branch mit eigener Arbeitskopie — auch ein
+   > nur lesender Helfer —, führe sie erst verifiziert nach `main`, teile parallele Aufgaben so,
+   > dass sie **nicht dieselben Dateien** anfassen, und arbeite an höchstens **drei** gleichzeitig."
 
    *(Aufschlag ≈ 10–25 % je zusätzlichem Strang, geschätzt — Nacharbeit + Aufsicht)*
 
@@ -464,4 +486,4 @@ Die Ursache findest du durch **Zerlegen**, nicht durch Wiederholen.
 
 Sie ersetzt die Fallstricke oben nicht.
 
-<!-- GUIDE-FINGERPRINT: d92c289fcbe1094f5edec78568297bae83db0a9d6cd617ff3372451140a2a171 -->
+<!-- GUIDE-FINGERPRINT: 424f7a81903a893e11dec39978d808cc322692c3bc94ab9e9df34bcf485045a1 -->

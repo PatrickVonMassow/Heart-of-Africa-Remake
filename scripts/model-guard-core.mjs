@@ -1,8 +1,9 @@
-// Pure decision core of the serving-model tripwire (point 309). rule:model-policy@840f3e46
+// Pure decision core of the serving-model tripwire (point 309). rule:model-policy@d0b43947
 // On 24.07.2026 the session silently degraded to Haiku 4.5 and merged defective work; the
-// Co-Authored-By trailer in `git log` is the one mechanical record of WHO
-// actually authored a commit. This module only decides — no I/O; the gathering
-// and blocking live in the fail-open wrapper scripts/model-guard.mjs.
+// The Co-Authored-By field in `git log` is the mechanical record of which MODEL
+// authored a commit. A reviewer uses the distinct Reviewed-By key and therefore
+// never enters this author record. This module only decides — no I/O; the
+// gathering and blocking live in the fail-open wrapper scripts/model-guard.mjs.
 //
 // Model policy (users 25.07.2026 / 18.08.2026): ONLY Opus 5 (the serving
 // session, and the author of the points whose verification is the work and
@@ -43,10 +44,10 @@
 // straight through. The name is therefore parsed out first and matched WHOLE,
 // and a trailer claiming more than one model is a finding rather than a pass on
 // its first allowed name: ONE TRAILER names exactly one model.
-// THE COMMIT may carry TWO (point 854): CLAUDE.md §6 lets it name its
-// cross-vendor reviewer in a second model trailer, so the trailers are judged
-// SEPARATELY and the commit passes when every model named is allowed. Reducing
-// them to one string is what once raised a breach on an allowed pair.
+// THE COMMIT may carry SEVERAL AUTHORS (point 854), so the trailers are judged
+// SEPARATELY and the commit passes when every author model named is allowed.
+// Reducing them to one string is what once raised a breach on an allowed pair.
+// A cross-vendor reviewer is not an author and uses Reviewed-By (point 982).
 
 import { fableIsOn, fableRefusalReason } from './fable-switch-core.mjs'
 
@@ -352,6 +353,16 @@ export function allowedTrailers(fableState) {
   ])
 }
 
+/**
+ * The documented reviewer forms use a distinct key but the same model roster.
+ * `Reviewed-By` wins over a marked co-author because every Git author-field
+ * reader would still ingest the latter; it wins over ledger-only identity
+ * because the commit keeps its local provenance without conflating roles.
+ */
+export function allowedReviewerTrailers(fableState) {
+  return Object.freeze(allowedTrailers(fableState).map((trailer) => trailer.replace(/^Co-Authored-By:/, 'Reviewed-By:')))
+}
+
 /** The authoring lanes in one phrase, generated for the same refusal surface. */
 export function allowedModelsPhrase(fableState) {
   return admitsFable(fableState)
@@ -371,11 +382,49 @@ export function coAuthorTrailers(message) {
   return out
 }
 
+/** The `Reviewed-By` values in a commit message, kept separate from authors. */
+export function reviewerTrailers(message) {
+  const out = []
+  for (const line of String(message ?? '').split(/\r?\n/)) {
+    if (line.startsWith('#')) continue
+    const m = /^[ \t]*reviewed-by:[ \t]*(.+?)[ \t]*$/i.exec(line)
+    if (m) out.push(m[1])
+  }
+  return out
+}
+
 /**
- * May this commit MESSAGE be committed? Every Claude co-author trailer must name
- * a model from the allowlist. A human co-author is not model evidence and is
- * ignored, and a message with no Claude trailer at all is not this gate's
- * business (a merge, or a commit made outside the agent tooling).
+ * Model identities carried by the two documented commit-message keys.
+ *
+ * The role comes only from the key. In particular, a second Co-Authored-By line
+ * remains a second author: an old ambiguous line cannot be reclassified from
+ * its value or order without inventing evidence the commit does not contain.
+ */
+export function modelTrailerIdentities(message) {
+  const names = (trailers) =>
+    trailers.flatMap((trailer) => splitTrailerField(trailer).flatMap((part) => modelNamesIn(part)))
+  return { authors: names(coAuthorTrailers(message)), reviewers: names(reviewerTrailers(message)) }
+}
+
+/** Reviewer-looking model trailers which do not use the documented key. */
+function undocumentedReviewerTrailers(message) {
+  const out = []
+  for (const line of String(message ?? '').split(/\r?\n/)) {
+    if (line.startsWith('#')) continue
+    const m = /^[ \t]*([a-z][a-z-]*review[a-z-]*|review[a-z-]*):[ \t]*(.+?)[ \t]*$/i.exec(line)
+    if (!m || /^reviewed-by$/i.test(m[1])) continue
+    if (modelNamesIn(m[2]).length || CLAUDE_TRAILER.test(m[2]) || MODEL_VENDOR_ADDRESS.test(m[2])) {
+      out.push({ key: m[1], value: m[2] })
+    }
+  }
+  return out
+}
+
+/**
+ * May this commit MESSAGE be committed? Every model author or reviewer trailer
+ * must name one model from the allowlist. A human co-author is not model
+ * evidence and is ignored, and a message with no model trailer at all is not
+ * this gate's business (a merge, or a commit made outside the agent tooling).
  *
  * A trailer LINE is split exactly as the Stop hook splits the log field, so the
  * two can never disagree: what this gate lets through can never turn up as a
@@ -391,35 +440,53 @@ export function evaluateCommitTrailers(message, fableState) {
   const switchRefusal = fableState !== undefined && !admitsFable(fableState) ? fableRefusalReason(fableState) : ''
   const findings = []
   try {
-    for (const trailer of coAuthorTrailers(message)) {
-      for (const part of splitTrailerField(trailer)) {
-        const { verdict, names } = judgeTrailer(part, fableState)
-        if (verdict === 'unidentified' && names.length > 1) {
-          findings.push({
-            rule: 'multiple-model-trailer',
-            trailer,
-            detail: `names ${names.length} models (${names.join(', ')}) — a commit has ONE authoring model, so this shows none of them`,
-          })
-        } else if (verdict === 'unidentified') {
-          findings.push({
-            rule: 'unnamed-model-trailer',
-            trailer,
-            detail: 'names no model — it cannot show that an allowed model wrote this commit',
-          })
-        } else if (verdict === 'forbidden') {
-          const fableDetail = names.some((name) => FABLE_ALLOWED.test(name)) && switchRefusal ? `; ${switchRefusal}` : ''
-          findings.push({
-            rule: 'forbidden-model-trailer',
-            trailer,
-            detail: `names a model outside the allowlist (read as "${names.join(' + ')}"; only ${phrase} may author here${fableDetail})`,
-          })
+    for (const [role, values] of [
+      ['author', coAuthorTrailers(message)],
+      ['reviewer', reviewerTrailers(message)],
+    ]) {
+      for (const trailer of values) {
+        for (const part of splitTrailerField(trailer)) {
+          const { verdict, names } = judgeTrailer(part, fableState)
+          if (verdict === 'unidentified' && names.length > 1) {
+            findings.push({
+              rule: role === 'author' ? 'multiple-model-trailer' : 'multiple-model-reviewer-trailer',
+              trailer,
+              detail: `names ${names.length} models (${names.join(', ')}) — one ${role} trailer must identify one model`,
+            })
+          } else if (verdict === 'unidentified') {
+            findings.push({
+              rule: role === 'author' ? 'unnamed-model-trailer' : 'unnamed-model-reviewer-trailer',
+              trailer,
+              detail: `names no model — it cannot identify the commit's ${role}`,
+            })
+          } else if (verdict === 'forbidden') {
+            const fableDetail = names.some((name) => FABLE_ALLOWED.test(name)) && switchRefusal ? `; ${switchRefusal}` : ''
+            findings.push({
+              rule: role === 'author' ? 'forbidden-model-trailer' : 'forbidden-model-reviewer-trailer',
+              trailer,
+              detail: `names a model outside the allowlist (read as "${names.join(' + ')}"; only ${phrase} may ${role === 'author' ? 'author' : 'review'} here${fableDetail})`,
+            })
+          }
         }
       }
+    }
+    for (const trailer of undocumentedReviewerTrailers(message)) {
+      findings.push({
+        rule: 'undocumented-reviewer-trailer',
+        trailer: `${trailer.key}: ${trailer.value}`,
+        detail: 'reviewer model identity uses exactly the Reviewed-By key',
+      })
     }
   } catch {
     /* fail-open: a broken gate must never make the tree uncommittable */
   }
-  return { block: findings.length > 0, findings, allowedTrailers: trailers, allowedModelsPhrase: phrase }
+  return {
+    block: findings.length > 0,
+    findings,
+    allowedTrailers: trailers,
+    allowedReviewerTrailers: allowedReviewerTrailers(fableState),
+    allowedModelsPhrase: phrase,
+  }
 }
 
 /** The refusal, naming every offender and the exact trailer to write instead. */
@@ -436,6 +503,10 @@ export function formatCommitTrailerVerdict(verdict) {
     'Write your own model:',
     '',
     ...(verdict.allowedTrailers ?? allowedTrailers()).map((t) => `    ${t}`),
+    '',
+    'Name a cross-vendor reviewer only with the distinct reviewer key:',
+    '',
+    ...(verdict.allowedReviewerTrailers ?? allowedReviewerTrailers()).map((t) => `    ${t}`),
     '',
     'The `(1M context)` suffix is fine. If you do not know which model you are:',
     '',

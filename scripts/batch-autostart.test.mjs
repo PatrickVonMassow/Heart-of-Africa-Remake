@@ -89,6 +89,7 @@ describe('the launcher uses the pure spawn builders', () => {
     expect(source).toMatch(/modelHandoffSpawn\(readJson\(C\('model-guard-handoff\.json'\)\), now\)/)
     expect(code).toMatch(/model:\s*modelHandoff\.model, fallbackModel:\s*modelHandoff\.fallbackModel/)
     expect(code).toMatch(/const prompt = modelHandoff\?\.prompt/)
+    expect(code).toMatch(/emergencyHandoffPrompt\(readJson\(join\(REPO, 'local', 'batch-emergency-state\.json'\)\)\)/)
   })
 
   it('never builds a spawn environment in CODE — the core owns that policy', () => {
@@ -550,12 +551,17 @@ describe('the launcher treats a quota block as a waiting state', () => {
 
   it('the fail counter and the quota record come from the PURE verdict, never from arithmetic here', () => {
     expect(code).toMatch(/state\.failCount\s*=\s*outcome\.failCount/)
-    // The old `state.failCount = (state.failCount || 0) + 1` in the judge block is
-    // what made a usage limit indistinguishable from a broken machine.
-    expect(code.match(/state\.failCount\s*=\s*\(state\.failCount\s*\|\|\s*0\)\s*\+\s*1/g) ?? []).toHaveLength(1)
-    expect(code, 'the preflight refusal is the ONLY place that still counts a failure itself').toMatch(
-      /PREFLIGHT REFUSED/,
-    )
+    expect(code).toMatch(/attemptKey,\s*accountedAttemptKey:\s*state\.accountedSpawnAttempt/)
+    expect(code.match(/state\.failCount\s*=\s*\(state\.failCount\s*\|\|\s*0\)\s*\+\s*1/g) ?? []).toHaveLength(0)
+  })
+
+  it('treats every pre-spawn refusal as a wait and records its measured cause', () => {
+    expect(code.match(/judgeSpawnOutcome\(\{\s*verdict:\s*'refused'/g)?.length).toBeGreaterThanOrEqual(3)
+    const start = code.indexOf('if (!preflight.ok)')
+    const preflight = code.slice(start, code.indexOf('const repaired =', start))
+    expect(preflight).toMatch(/verdict:\s*'refused'/)
+    expect(preflight).toMatch(/lastWatchdogCause\s*=\s*\{\s*code:\s*'environment-preflight'/)
+    expect(preflight).not.toMatch(/failCount[^\n]*\+\s*1/)
   })
 
   it('the runaway brake reads the shared threshold, so it cannot drift from the decision', () => {
@@ -649,6 +655,8 @@ describe('the launcher acts on the pause record', () => {
     const block = codeLines.slice(brake, brake + 32).join('\n')
     expect(block).toMatch(/runawayRecoveryDecision\(\{/)
     expect(block).toMatch(/formatPauseRecord\(\{/)
+    expect(block).toMatch(/refusal:\s*state\.lastWatchdogCause/)
+    expect(block).not.toMatch(/auth expired|model flag|failing point|push failing/)
     expect(block).not.toMatch(/board(Card|NowCard)\(/)
     expect(block).not.toMatch(/no restart clock|a human is needed/)
   })
@@ -664,12 +672,13 @@ describe('the launcher acts on the pause record', () => {
 describe('the launcher uses the canonical repository for batch-global state', () => {
   const source = readFileSync(resolve(process.cwd(), 'scripts', 'batch-autostart.mjs'), 'utf8')
 
-  it('takes REPO from repo-paths while retaining source-relative script lookup', () => {
-    expect(source).toMatch(/import \{ REPO_ROOT \} from '\.\/repo-paths\.mjs'/)
+  it('requires the verified main checkout while retaining source-relative script lookup', () => {
+    expect(source).toMatch(/import \{ REPO_ROOT, requireMainCheckoutRoot \} from '\.\/repo-paths\.mjs'/)
     expect(source).toMatch(/const R = \(p\) => fileURLToPath/)
-    expect(source).toMatch(/const REPO = REPO_ROOT/)
+    expect(source).toMatch(/const REPO = requireMainCheckoutRoot\(\{ checkoutRoot: REPO_ROOT \}\)/)
     expect(source).not.toMatch(/const REPO = R\('\.\.'\)/)
     expect(source).toMatch(/const C = \(n\) => join\(REPO, '\.claude', n\)/)
+    expect(source).toMatch(/buildSpawnOptions\(\{ cwd: REPO,/)
   })
 })
 
@@ -679,7 +688,8 @@ describe('the launcher consults registered feature writers before spawning', () 
   it('passes the measured register through both the initial and recovery decisions', () => {
     expect(source).toMatch(/const featureWriterRegister = registeredFeatureWriters\(/)
     expect(source.match(/featureWriterRegister[:,]/g)?.length).toBeGreaterThanOrEqual(2)
-    expect(source).toMatch(/registeredFeatureWriters\(\{[\s\S]{0,180}?SUCCESSOR_TRIGGERS\.BOUNDARY/)
+    expect(source.match(/registeredFeatureWriters\(\{[\s\S]{0,80}?declaration[,\s]/g)).toHaveLength(2)
+    expect(source).not.toMatch(/declaration:\s*trigger\.kind\s*===\s*SUCCESSOR_TRIGGERS\.BOUNDARY/)
   })
 })
 

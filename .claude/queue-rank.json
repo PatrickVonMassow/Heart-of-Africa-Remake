@@ -12,12 +12,6 @@
       "origin": "user",
       "place": "last"
     },
-    "581": {
-      "at": "2026-08-23T08:37:05.342Z",
-      "why": "Nutzeranweisung 23.08.2026, 10:36 (Board-Chat): 581 direkt vor 686 schieben",
-      "origin": "user",
-      "place": "ahead"
-    },
     "596": {
       "at": "2026-08-21T16:06:01.515Z",
       "why": "User ruling 21.08.2026 (only the communication mechanic, then 633 and the release 174): queued directly behind 174. It makes a running tail visible; the tail points it targets are render work that follows the release.",
@@ -457,12 +451,6 @@
       "origin": "machine",
       "place": "last"
     },
-    "843": {
-      "at": "2026-08-22T20:07:51.458Z",
-      "why": "Append-and-defer: der Besitzer hat den Mechanismus verlangt, aber keine Vorziehung; die Regel selbst gilt ab sofort auch ohne ihn",
-      "origin": "machine",
-      "place": "last"
-    },
     "845": {
       "at": "2026-08-22T20:51:29.892Z",
       "why": "Machine-filed, low and cheap: it costs a false red on unrelated points, not lost work, so it waits behind the release like the other detector-hygiene findings of this evening.",
@@ -598,12 +586,6 @@
     "898": {
       "at": "2026-08-24T14:37:17.169Z",
       "why": "Maschinell abgelegter Befund mittlerer Dringlichkeit — steht hinter dem Release, weil er weder den Stapel anhaelt noch eine Spur blockiert",
-      "origin": "machine",
-      "place": "last"
-    },
-    "902": {
-      "at": "2026-08-25T00:02:37.526Z",
-      "why": "Prozesshygiene mit niedriger Kritikalität: der Eintrag ändert nur Regeltext und einen Auditeintrag, blockiert nichts und hat keinen Vorläufer, der ihn nach vorn zieht",
       "origin": "machine",
       "place": "last"
     },
@@ -751,11 +733,191 @@
       "origin": "machine",
       "place": "last"
     },
-    "935": {
-      "at": "2026-08-26T08:39:57.862Z",
-      "why": "Der Punkt steht bereits ueber --ahead vor dem Release; seine Blockposition am Ende des Arbeitsauftrags ist richtig, weil er noch in dieser Sitzung gebaut und gelandet wird.",
+    "937": {
+      "at": "2026-08-26T09:48:58.834Z",
+      "why": "Das Aufraeumen nach der Landung hat mit branch-hygiene-guard eine Rueckfallebene, deshalb steht der Punkt hinter der laufenden Arbeit, aber vor den bewusst zurueckgestellten Altpunkten.",
       "origin": "machine",
       "place": "last"
+    },
+    "939": {
+      "at": "2026-08-26T10:10:38.893Z",
+      "why": "Ein einzelner Lauf mit einer Umgebungsstoerung; er faellt aus dem Fenster, sobald startup wieder gruen laeuft, deshalb steht er hinter der Arbeit, die das Tor selbst betrifft.",
+      "origin": "machine",
+      "place": "last"
+    },
+    "940": {
+      "at": "2026-08-26T10:42:56.933Z",
+      "why": "Maschinell gefiled und hoch eingestuft, aber es ueberholt die Auslieferung nicht: Der Verlustpfad braucht eine handgeschriebene Karte in genau der fremden Gestalt, und 930 raeumt denselben Bereich ohnehin auf.",
+      "origin": "machine",
+      "place": "last"
+    },
+    "942": {
+      "at": "2026-08-26T11:11:20.225Z",
+      "why": "Es blockiert nur, wenn ein hoch eingestufter Punkt ein offenes Do-not-merge traegt; heute ist der Weg von Hand gangbar und dokumentiert, deshalb steht es hinter der Auslieferung.",
+      "origin": "machine",
+      "place": "last"
+    },
+    "948": {
+      "at": "2026-08-26T17:21:21.643Z",
+      "why": "The forensic question behind it is worth answering carefully, but the red itself is repaired and nothing is blocked by it today — it stands behind the user-ordered standstill work.",
+      "origin": "machine",
+      "place": "last"
+    },
+    "949": {
+      "at": "2026-08-26T17:21:21.728Z",
+      "why": "The one measured instance is repaired; what is left is a sweep of the class, which is thorough work rather than urgent work and must not displace the user-ordered standstill points.",
+      "origin": "machine",
+      "place": "last"
+    },
+    "950": {
+      "at": "2026-08-26T17:21:21.812Z",
+      "why": "Repaired and green; the remaining work is enumerating the other parsers, which nothing waits on.",
+      "origin": "machine",
+      "place": "last"
+    },
+    "951": {
+      "at": "2026-08-26T17:21:21.903Z",
+      "why": "The suites run again; the two residual threads are quality of verdict, not a block, so they stand behind the user-ordered work.",
+      "origin": "machine",
+      "place": "last"
+    },
+    "952": {
+      "at": "2026-08-26T17:21:21.992Z",
+      "why": "The suite is green and its subject is correct today — the defect is only that it would stay green after the subject moved, so it has no urgency.",
+      "origin": "machine",
+      "place": "last"
+    },
+    "954": {
+      "at": "2026-08-26T18:37:44.563Z",
+      "why": "Behind 952 by its own text: the suite that must measure the visible break reads a copy of the stylesheet until 952 fixes it, and the board is readable today — nothing before the release waits on this.",
+      "origin": "machine",
+      "place": "last"
+    },
+    "955": {
+      "at": "2026-08-26T18:39:09.960Z",
+      "why": "Behind the queue's front: the pre-push gate's own single re-run already carries it, so it costs a suite rather than a standstill, and the front is held by the standstill and review-backlog points that block landings outright.",
+      "origin": "machine",
+      "place": "last"
+    },
+    "956": {
+      "at": "2026-08-26T18:39:10.069Z",
+      "why": "Behind the queue's front: the ledger hole is real but static — nothing new lands while 943 blocks every merge, so no further merge-with-fixes debt can accrue before this point is reached.",
+      "origin": "machine",
+      "place": "last"
+    },
+    "958": {
+      "at": "2026-08-26T22:39:56.623Z",
+      "why": "It is the measured hole in the double safety the user ordered on 26.08.2026 as point 947 — the emergency lane cannot see a busy wedge, so the very state the order forbids can still stand until the release",
+      "origin": "machine",
+      "place": "ahead"
+    },
+    "959": {
+      "at": "2026-08-26T23:56:43.522Z",
+      "why": "It is board reporting truth, not a stop-the-batch path, so it stays behind the guard wedges at the front of the queue.",
+      "origin": "machine",
+      "place": "last"
+    },
+    "960": {
+      "at": "2026-08-26T23:56:43.600Z",
+      "why": "It saves an authoring round per finding but blocks nothing; the wedges ahead of it stop the batch outright.",
+      "origin": "machine",
+      "place": "last"
+    },
+    "961": {
+      "at": "2026-08-26T23:56:43.680Z",
+      "why": "Low criticality and one line of shell to fix; nothing ahead of it waits on this.",
+      "origin": "machine",
+      "place": "last"
+    },
+    "964": {
+      "at": "2026-08-27T05:12:59.834Z",
+      "why": "It edits the successor tick 945 also edits, so it can only follow it — last is where it belongs until 945 has landed.",
+      "origin": "machine",
+      "place": "last"
+    },
+    "965": {
+      "at": "2026-08-27T06:06:55.143Z",
+      "why": "Blocking and tagged high, but it is the handover path rather than the release, so it keeps the place the work order gives it behind the points already ranked.",
+      "origin": "machine",
+      "place": "last"
+    },
+    "968": {
+      "at": "2026-08-27T08:54:11.819Z",
+      "why": "False-gate nuisance with a loud-deferral workaround per incident; waits behind the release.",
+      "origin": "machine",
+      "place": "last"
+    },
+    "970": {
+      "at": "2026-08-27T12:32:21.429Z",
+      "why": "Low urgency: bookkeeping accuracy only, the four drifted commits name allowed models — waits behind the release",
+      "origin": "machine",
+      "place": "last"
+    },
+    "972": {
+      "at": "2026-08-27T16:27:18.617Z",
+      "why": "Es kostet eine Pruefrunde pro Vorkommen, aber nichts am Produkt; der Release-Vorrang der Verstaendigungsmechanik und die vor ihm liegenden Notfall- und Hygienepunkte wiegen schwerer, und 971 haelt die inhaltliche Haelfte bereits offen",
+      "origin": "machine",
+      "place": "last"
+    },
+    "974": {
+      "at": "2026-08-27T16:41:30.176Z",
+      "why": "Es blockiert den Zugabschluss jeder Sitzung, wird aber nicht dadurch dringender, dass es vorgezogen wird: Der naechste Besitzer trifft es sofort und kann es dann mit frischem Kontext nehmen; die Punkte davor tragen den Release",
+      "origin": "machine",
+      "place": "last"
+    },
+    "975": {
+      "at": "2026-08-27T17:29:54.302Z",
+      "why": "Sie blockiert den Zugabschluss, wird aber nicht dadurch loesbarer, dass sie vorgezogen wird: Der naechste Besitzer trifft sie sofort und nimmt sie mit frischem Kontext; sie gehoert ausserdem zu 870 und wird mit ihm gearbeitet",
+      "origin": "machine",
+      "place": "last"
+    },
+    "976": {
+      "at": "2026-08-27T17:32:42.887Z",
+      "why": "Es kostet keine Korrektheit und hat mit dem Notventil einen benannten Ausweg; die Punkte davor tragen den Release",
+      "origin": "machine",
+      "place": "last"
+    },
+    "978": {
+      "at": "2026-08-27T20:29:55.116Z",
+      "why": "Last is right: it is cosmetic on the board, it waits for point 976 which owns the same writer, and nothing about the release or the queue depends on it.",
+      "origin": "machine",
+      "place": "last"
+    },
+    "980": {
+      "at": "2026-08-27T21:49:24.065Z",
+      "why": "Low-criticality documentation hygiene with no lane waiting on it: the duplicate numbers mislead a citation, they break nothing at runtime, so it stands behind the guard and gameplay work already ranked ahead of it.",
+      "origin": "machine",
+      "place": "last"
+    },
+    "981": {
+      "at": "2026-08-27T22:26:47.483Z",
+      "why": "Medium-criticality corpus hygiene that blocks no lane: the two confirmed routing contradictions are already overridden by the code, which decides the lane, so a session cannot act on them where it counts — it stands behind the release work and the guard points ahead of it.",
+      "origin": "machine",
+      "place": "last"
+    },
+    "984": {
+      "at": "2026-08-27T23:57:37.745Z",
+      "why": "Latent: the tick commit touches only the work order and its archive, so the wrong address never reaches a mechanism contribution today — it is corrected in order, not ahead of the release.",
+      "origin": "machine",
+      "place": "last"
+    },
+    "986": {
+      "at": "2026-08-28T03:28:55.650Z",
+      "why": "It wastes review rounds without risking correctness, and the measurement it edits is owned by two points that come first.",
+      "origin": "machine",
+      "place": "last"
+    },
+    "987": {
+      "at": "2026-08-28T05:37:05.415Z",
+      "why": "Low, fail-closed and diagnostic-only — last is exactly right; it misleads a reader's diagnosis, never the gate.",
+      "origin": "machine",
+      "place": "last"
+    },
+    "988": {
+      "at": "2026-08-28T05:37:27.833Z",
+      "why": "Every landing runs into it: nine of the last thirty merges stopped on this file, and the standing repair is a hand edit of the four-eyes evidence whose most obvious form silently deletes recorded reviews — the release ships through those same landings.",
+      "origin": "machine",
+      "place": "ahead"
     }
   },
   "boundary": {
@@ -763,7 +925,6 @@
     "points": [
       336,
       553,
-      581,
       596,
       633,
       659,
@@ -796,7 +957,7 @@
     "why": "The order standing in front of the release today is the arrangement that predates this rule; the four machine-filed points that had ranked themselves there were moved behind 174 first"
   },
   "settled": {
-    "at": "2026-08-26T08:39:57.869Z",
+    "at": "2026-08-28T05:37:27.840Z",
     "points": [
       174,
       184,
@@ -905,7 +1066,6 @@
       570,
       574,
       575,
-      581,
       591,
       596,
       599,
@@ -1032,7 +1192,6 @@
       839,
       841,
       842,
-      843,
       845,
       847,
       849,
@@ -1065,7 +1224,6 @@
       899,
       900,
       901,
-      902,
       904,
       905,
       906,
@@ -1091,7 +1249,39 @@
       932,
       933,
       934,
-      935
+      937,
+      938,
+      939,
+      940,
+      942,
+      948,
+      949,
+      950,
+      951,
+      952,
+      954,
+      955,
+      956,
+      958,
+      959,
+      960,
+      961,
+      962,
+      964,
+      965,
+      968,
+      970,
+      972,
+      974,
+      975,
+      976,
+      978,
+      980,
+      981,
+      984,
+      986,
+      987,
+      988
     ]
   }
 }

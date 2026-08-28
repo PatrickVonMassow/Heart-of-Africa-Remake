@@ -6,7 +6,7 @@ import { readFile } from 'node:fs/promises'
 import { describe, it, expect } from 'vitest'
 import {
   DEFAULT_BACKEND, DEV_SUITES, SMALL_SUITES, WEBGL_ONLY_SUITES,
-  laneFor, needsGpuBackendProbe, parseArgs, planBackends, selectBackend, skippedSuites, suitesFor,
+  laneFor, needsDevServer, needsGpuBackendProbe, parseArgs, planBackends, selectBackend, skippedSuites, suitesFor,
 } from './tiers.mjs'
 
 describe('tier sets (point 173)', () => {
@@ -38,9 +38,15 @@ describe('GPU backend preflight selection', () => {
     expect(needsGpuBackendProbe([], { preview: true })).toBe(true)
   })
 
-  it('keeps pure Node and non-browser gate selections GPU-independent', () => {
+  it('keeps GPU-independent selections out of the renderer preflight', () => {
     expect(needsGpuBackendProbe(['docs'])).toBe(false)
+    expect(needsGpuBackendProbe(['board-layout'])).toBe(false)
     expect(needsGpuBackendProbe([])).toBe(false)
+  })
+
+  it('runs the self-contained board layout without starting the game server', () => {
+    expect(needsDevServer(['board-layout'])).toBe(false)
+    expect(SMALL_SUITES).toContain('board-layout')
   })
 
   it('is wired before the dev server and browser-suite loop', async () => {

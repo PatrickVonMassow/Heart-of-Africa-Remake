@@ -10,6 +10,7 @@ import { resolve } from 'node:path'
 import {
   BLIND_PARALLEL,
   BLOCKING_VERDICT,
+  CONTRIBUTION_DISPOSITION_KIND,
   AUTHORSHIP_CHECK_SINCE,
   VERIFIED_REVIEWER_SINCE,
   evaluateMechanismReview,
@@ -424,6 +425,31 @@ describe('evaluateMechanismReview', () => {
     expect(text).toMatch(/mechanism-review\.mjs --record/)
   })
 
+  it('honours only a wrapper-verified retirement at the exact contribution sha', () => {
+    const pending = commit({ coveringRecordShas: ['c'.repeat(40)] })
+    const retired = {
+      kind: CONTRIBUTION_DISPOSITION_KIND,
+      disposition: 'retired',
+      sha: pending.sha,
+      contributionDispositionVerified: true,
+    }
+    expect(
+      evaluateMechanismReview({ baseline: 'b', head: 'h', pendingCommits: [pending], records: [retired] }),
+    ).toMatchObject({ block: false, clear: true, findings: [] })
+
+    for (const changed of [
+      { contributionDispositionVerified: false },
+      { sha: 'd'.repeat(40) },
+      { disposition: 'reviewed' },
+    ]) {
+      const row = { ...retired, ...changed }
+      expect(
+        evaluateMechanismReview({ baseline: 'b', head: 'h', pendingCommits: [pending], records: [row] }).block,
+        JSON.stringify(changed),
+      ).toBe(true)
+    }
+  })
+
   it('requires every new review row to record an agreement or explicit unverified authorship claim', () => {
     const base = record({ at: AUTHORSHIP_CHECK_SINCE + 1 })
     delete base.reviewerAuthorship
@@ -629,10 +655,10 @@ describe('evaluateMechanismReview', () => {
         unreviewable: [],
       },
     })
-    expect(text).toContain('MIXES AUTHORSHIP')
-    expect(text).toContain('anthropic-authored end-state files → openai reviewer GPT-5.6 Sol')
-    expect(text).toContain('openai-authored end-state files → anthropic reviewer Opus 5')
-    expect(text).toContain('review-sol.mjs --sha hhhhhhh')
+    expect(text).toContain('MIX AUTHORSHIP')
+    expect(text).toContain('anthropic-authored contribution files → openai reviewer GPT-5.6 Sol')
+    expect(text).toContain('openai-authored contribution files → anthropic reviewer Opus 5')
+    expect(text).toContain('mechanism-review-guard.mjs --status')
     expect(text).not.toContain('reviewing the branch head is enough')
   })
 
@@ -780,7 +806,7 @@ describe('evaluateMechanismReview', () => {
         records: [oldSplit, wrongFile],
       })
       expect(stillOwed.findings[0].kind).toBe('incomplete-passes')
-      expect(formatMechanismReviewVerdict(stillOwed)).toContain('CURRENT END-STATE FILE')
+      expect(formatMechanismReviewVerdict(stillOwed)).toContain('immutable commit boundary')
     })
 
     it('refuses a record timestamped before the commit it claims to read', () => {
@@ -1074,6 +1100,168 @@ describe('evaluateMechanismReview', () => {
       ],
     })
     expect(v.block).toBe(false)
+  })
+
+  it('clears a refusal through fixes authored by its reviewer and cleared by the other vendor', () => {
+    const refusedSha = 'c'.repeat(40)
+    const answerSha = 'd'.repeat(40)
+    const files = ['docs/guide.md', 'scripts/guide-brevity-core.mjs']
+    const refused = commit({
+      sha: refusedSha,
+      authorModel: 'Claude Opus 5',
+      authorModels: ['Claude Opus 5'],
+      files,
+      coveringRecordShas: [refusedSha, answerSha],
+    })
+    const answer = commit({
+      sha: answerSha,
+      at: 1_787_000_004_000,
+      authorModel: 'GPT-5.6 Sol',
+      authorModels: ['GPT-5.6 Sol'],
+      files,
+      coveringRecordShas: [answerSha],
+    })
+    const refusal = record({
+      sha: refusedSha,
+      verdict: 'do-not-merge',
+      at: 1_787_000_001_000,
+      containedShas: new Set([refusedSha]),
+      pass: { index: 1, total: 1, files, endState: refusedSha },
+    })
+    const answerClearance = record({
+      sha: answerSha,
+      model: 'Claude Opus 5',
+      authoredBy: 'GPT-5.6 Sol',
+      verdict: 'merge',
+      at: 1_787_000_005_000,
+      containedShas: new Set([answerSha, refusedSha]),
+    })
+
+    const verdict = evaluateMechanismReview({
+      baseline: 'b',
+      head: answerSha,
+      pendingCommits: [refused, answer],
+      records: [refusal, answerClearance],
+    })
+
+    expect(verdict.block).toBe(false)
+
+    const siblingReview = evaluateMechanismReview({
+      baseline: 'b',
+      head: answerSha,
+      pendingCommits: [refused, answer],
+      records: [refusal, { ...answerClearance, containedShas: new Set([answerSha]) }],
+    })
+    expect(siblingReview.findings.find((finding) => finding.commit.sha === refusedSha)?.kind).toBe('do-not-merge')
+
+    const partialAnswer = evaluateMechanismReview({
+      baseline: 'b',
+      head: answerSha,
+      pendingCommits: [refused, { ...answer, files: [files[0]] }],
+      records: [refusal, answerClearance],
+    })
+    expect(partialAnswer.findings.find((finding) => finding.commit.sha === refusedSha)?.commit.files).toEqual([
+      files[1],
+    ])
+
+    const splitClaim = {
+      ...answerClearance,
+      at: answerClearance.at + 1,
+      pass: { index: 1, total: 2, files: [files[0]], endState: answerSha },
+    }
+    const incompleteAnswer = evaluateMechanismReview({
+      baseline: 'b',
+      head: answerSha,
+      pendingCommits: [refused, answer],
+      records: [refusal, answerClearance, splitClaim],
+    })
+    expect(incompleteAnswer.findings.find((finding) => finding.commit.sha === refusedSha)?.kind).toBe(
+      'do-not-merge',
+    )
+  })
+
+  it('keeps the refusal open when the cross-vendor clearance has no measured answering commit', () => {
+    const refusedSha = 'c'.repeat(40)
+    const answerSha = 'd'.repeat(40)
+    const files = ['docs/guide.md', 'scripts/guide-brevity-core.mjs']
+    const refused = commit({
+      sha: refusedSha,
+      authorModel: 'Claude Opus 5',
+      authorModels: ['Claude Opus 5'],
+      files,
+      coveringRecordShas: [refusedSha, answerSha],
+    })
+    const refusal = record({
+      sha: refusedSha,
+      verdict: 'do-not-merge',
+      at: 1_787_000_001_000,
+      containedShas: new Set([refusedSha]),
+      pass: { index: 1, total: 1, files, endState: refusedSha },
+    })
+    const ungroundedClearance = record({
+      sha: answerSha,
+      model: 'Claude Opus 5',
+      authoredBy: 'GPT-5.6 Sol',
+      verdict: 'merge',
+      at: 1_787_000_005_000,
+      containedShas: new Set([answerSha, refusedSha]),
+    })
+
+    const verdict = evaluateMechanismReview({
+      baseline: 'b',
+      head: answerSha,
+      pendingCommits: [refused],
+      records: [refusal, ungroundedClearance],
+    })
+
+    expect(verdict.block).toBe(true)
+    expect(verdict.findings[0].kind).toBe('do-not-merge')
+  })
+
+  it('does not turn same-vendor authorship and review into a refusal answer', () => {
+    const refusedSha = 'c'.repeat(40)
+    const answerSha = 'd'.repeat(40)
+    const file = 'scripts/guide-brevity-core.mjs'
+    const refused = commit({
+      sha: refusedSha,
+      authorModel: 'Claude Opus 5',
+      authorModels: ['Claude Opus 5'],
+      files: [file],
+      coveringRecordShas: [refusedSha, answerSha],
+    })
+    const sameVendorAnswer = commit({
+      sha: answerSha,
+      at: 1_787_000_004_000,
+      authorModel: 'Claude Fable 5',
+      authorModels: ['Claude Fable 5'],
+      files: [file],
+      coveringRecordShas: [answerSha],
+    })
+    const refusal = record({
+      sha: refusedSha,
+      verdict: 'do-not-merge',
+      at: 1_787_000_001_000,
+      containedShas: new Set([refusedSha]),
+      pass: { index: 1, total: 1, files: [file], endState: refusedSha },
+    })
+    const selfReview = record({
+      sha: answerSha,
+      model: 'Claude Opus 5',
+      authoredBy: 'Claude Fable 5',
+      verdict: 'merge',
+      at: 1_787_000_005_000,
+      containedShas: new Set([answerSha, refusedSha]),
+    })
+
+    const verdict = evaluateMechanismReview({
+      baseline: 'b',
+      head: answerSha,
+      pendingCommits: [refused, sameVendorAnswer],
+      records: [refusal, selfReview],
+    })
+
+    expect(verdict.block).toBe(true)
+    expect(verdict.findings.find((finding) => finding.commit.sha === refusedSha)?.kind).toBe('do-not-merge')
   })
 
   it('never lets a spec examination answer a do-not-merge, even at a descendant sha', () => {
@@ -1385,6 +1573,70 @@ describe('evaluateMechanismReview', () => {
       })
       expect(v.block).toBe(true)
       expect(v.findings[0].kind).toBe('incomplete-passes')
+    })
+
+    it('keeps a pass-less review when a descendant file-scoped split is disjoint from the remaining debt', () => {
+      const descendant = 'd'.repeat(40)
+      const scopedPass = (index) => record({
+        sha: descendant,
+        pass: {
+          index,
+          total: 2,
+          files: [`docs/review-scope-${index}.md`],
+          endState: descendant,
+        },
+        at: MERGE_ACCOUNTING_SINCE + 2000 + index,
+      })
+      const v = evaluateMechanismReview({
+        baseline: 'b',
+        head: 'h',
+        pendingCommits: [commit({ coveringRecordShas: ['c'.repeat(40), descendant] })],
+        records: [record({ at: MERGE_ACCOUNTING_SINCE + 1000 }), scopedPass(1), scopedPass(2)],
+      })
+      expect(v.block).toBe(false)
+    })
+
+    it('still poisons a pass-less review when a descendant file-scoped split intersects the remaining debt', () => {
+      const descendant = 'd'.repeat(40)
+      const v = evaluateMechanismReview({
+        baseline: 'b',
+        head: 'h',
+        pendingCommits: [commit({ coveringRecordShas: ['c'.repeat(40), descendant] })],
+        records: [
+          record({ at: MERGE_ACCOUNTING_SINCE + 1000 }),
+          record({
+            sha: descendant,
+            model: 'Claude Opus 5',
+            pass: { index: 1, total: 2, files: [MECH], endState: descendant },
+            at: MERGE_ACCOUNTING_SINCE + 2000,
+          }),
+        ],
+      })
+      expect(v.block).toBe(true)
+      expect(v.findings[0].kind).toBe('self-review')
+    })
+
+    it.each([
+      ['missing', undefined],
+      ['a string', MECH],
+    ])('still poisons a pass-less review when a descendant file claim has %s pass.files', (_shape, files) => {
+      const descendant = 'd'.repeat(40)
+      const malformedPass = { index: 1, total: 2, endState: descendant }
+      if (files !== undefined) malformedPass.files = files
+      const v = evaluateMechanismReview({
+        baseline: 'b',
+        head: 'h',
+        pendingCommits: [commit({ coveringRecordShas: ['c'.repeat(40), descendant] })],
+        records: [
+          record({ at: MERGE_ACCOUNTING_SINCE + 1000 }),
+          record({
+            sha: descendant,
+            pass: malformedPass,
+            at: MERGE_ACCOUNTING_SINCE + 2000,
+          }),
+        ],
+      })
+      expect(v.block).toBe(true)
     })
 
     it('still clears a COMPLETE split beside a pass-less record at another covering sha', () => {

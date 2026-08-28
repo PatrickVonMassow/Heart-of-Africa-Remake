@@ -32,26 +32,29 @@ import { isMainModule } from './is-main.mjs'
 import { heldByOtherLiveOwner } from './batch-singleton.mjs'
 import { readRecords, verifyCarried } from './mechanism-review.mjs'
 import {
-  attestsToCodeReading,
+  CONTRIBUTION_DISPOSITION_KIND,
+  CONTRIBUTION_SCOPE_BOUNDARY,
+  contributionRetiredBy,
   evaluateMechanismReview,
   formatMechanismReviewVerdict,
+  LEGACY_CONTRIBUTION_BASELINE,
   mechanismPathsIn,
+  LEGACY_RANGE_RETIREMENT_REASON,
   modelFromTrailers,
   modelsFromTrailers,
-  reviewRecordWellFormed,
-  reviewIdentityProblem,
 } from './mechanism-review-core.mjs'
 import {
-  commitsForFiles,
-  formatInvalidatedCoverage,
   mechanismLogCommand,
-  outstandingFiles,
   parseRangeLog as parseWholeRangeLog,
   planAuthorshipGroups,
-  summarizeReviewDebt,
+  reviewEndStateFiles,
 } from './mechanism-review-range-core.mjs'
 import { quotePassFile, unquoteGitPath } from './review-material-core.mjs'
-import { guardOutcome, reviewGapRange } from './mechanism-review-guard-gap-core.mjs'
+import {
+  decideContributionReviewGap,
+  formatContributionReviewGap,
+  guardOutcome,
+} from './mechanism-review-guard-gap-core.mjs'
 import { gatherGuardDutyContext } from './guard-duty.mjs'
 
 const PAUSE = repoPath('.claude/batch-paused')
@@ -130,6 +133,73 @@ function writeBaseline(branch, head) {
 export function baselineFor(state, branch) {
   const map = state?.baselines ?? {}
   return map[branch] ?? map.main ?? state?.baseline ?? null
+}
+
+// Size only the contributions the evaluator still says are owed. A stale
+// baseline increases this list but never enters a contribution's material, so
+// accumulated history cannot turn a runnable commit into a review gap. Planner
+// failure stays fail-closed: an unmeasured contribution earns no suspension.
+export async function measureReviewGap({
+  blocked = false,
+  commits = [],
+  loadPlanner = () => import('./review-sol.mjs'),
+}) {
+  if (!blocked) return { gap: null, sizedPlan: null }
+  let sizedPlan = null
+  try {
+    const { buildContributionPassPlan } = await loadPlanner()
+    sizedPlan = buildContributionPassPlan({ commits })
+  } catch {
+    /* no measured contribution plan — the decision below fails closed */
+  }
+  const decision = decideContributionReviewGap({ blocked, plan: sizedPlan })
+  const gap = {
+    ...decision,
+    report: decision.gap ? formatContributionReviewGap(decision) : '',
+  }
+  return { gap, sizedPlan }
+}
+
+/**
+ * Re-derive the one-time historical retirement stamp from immutable Git facts.
+ * A hand-edited ledger row cannot choose its own boundary, counts or reason;
+ * later contributions are ineligible even when they copy the complete shape.
+ */
+export function attachContributionDispositions(
+  records = [],
+  isAncestor = (ancestor, descendant) => {
+    try {
+      execFileSync('git', ['merge-base', '--is-ancestor', ancestor, descendant], {
+        windowsHide: true,
+        cwd: REPO_ROOT,
+      })
+      return true
+    } catch {
+      return false
+    }
+  },
+) {
+  for (const row of records ?? []) delete row.contributionDispositionVerified
+  for (const row of records ?? []) {
+    if (row?.kind !== CONTRIBUTION_DISPOSITION_KIND || row?.disposition !== 'retired') continue
+    const measured = row.measurement
+    const exactMeasurement =
+      measured?.measuredOn === '2026-08-26' &&
+      measured?.point === 943 &&
+      measured?.passesAtOpen === 45 &&
+      measured?.passesAtClose === 42 &&
+      measured?.passesOnMain === 115
+    if (
+      row.scopeBoundary !== CONTRIBUTION_SCOPE_BOUNDARY ||
+      row.reason !== LEGACY_RANGE_RETIREMENT_REASON ||
+      !exactMeasurement ||
+      !/^[0-9a-f]{40}$/.test(String(row.sha ?? '')) ||
+      isAncestor(row.sha, LEGACY_CONTRIBUTION_BASELINE) ||
+      !isAncestor(row.sha, CONTRIBUTION_SCOPE_BOUNDARY)
+    ) continue
+    row.contributionDispositionVerified = true
+  }
+  return records
 }
 
 /**
@@ -215,6 +285,18 @@ export function parseMechanismLog(out, files) {
     .filter((commit) => commit.files.length)
 }
 
+/** Select mechanism contributions without shrinking their review file set. */
+export function pendingReviewContributions(commits = [], files = [], subjectFor = () => '') {
+  return (commits ?? [])
+    .filter((commit) => (commit.mechanismFiles ?? mechanismPathsIn(commit.files, { scriptFiles: files })).length)
+    .map((commit) => ({
+      ...commit,
+      mechanismFiles: commit.mechanismFiles ?? mechanismPathsIn(commit.files, { scriptFiles: files }),
+      subject: subjectFor(commit.sha),
+      files: reviewEndStateFiles(commit.files),
+    }))
+}
+
 /**
  * The free-text facts of ONE commit — its subject and its co-author trailers —
  * each through its own single-format `git show`, so no separator exists for a
@@ -240,7 +322,7 @@ function commitFacts(sha) {
  *    pure-ASCII octal escape and unquoteGitPath decodes it; what remains
  *    undecodable surfaces as U+FFFD, which the pass records can never name
  *    (parsePassFiles refuses it), so a conflated path can only ever DENY a
- *    clearance. (The -z range listing below never quotes, by design.)
+   *    clearance.
  *  - `--no-renames` closes the rename-out blindness: with rename detection on,
  *    `--name-only` reports only the DESTINATION, so renaming a guard to an
  *    ordinary path hid the mechanism's removal from the gate. Split into
@@ -248,14 +330,6 @@ function commitFacts(sha) {
  *    demands its review.
  */
 export { mechanismLogCommand }
-
-export const rangeFilesCommand = (base, sha) => [
-  'diff',
-  '--name-only',
-  '-z',
-  '--no-renames',
-  `${base}..${sha}`,
-]
 
 function rangeCommits(base, head, files) {
   const out = gitRawFile(mechanismLogCommand(base, head))
@@ -270,6 +344,33 @@ function rangeCommits(base, head, files) {
       mechanismFiles: mechanismPathsIn(commit.files, { scriptFiles: files }),
     }
   })
+}
+
+/**
+ * The pending contributions the gate still PLANS FOR — everything the evaluator
+ * has not already retired.
+ *
+ * Measured on the merge candidate 27.08.2026: the settled legacy range carries
+ * merge commits whose trailers name no vendor, so planning them put eight
+ * UNREVIEWABLE groups of settled history in front of the four contributions
+ * really owed — and the verdict prints the unreviewable branch INSTEAD of the
+ * runnable commands, hiding the finite plan this scoping exists to produce.
+ * What the evaluator skips, the plan skips, by the very same predicate.
+ */
+export function planningContributions(pendingCommits = [], records = []) {
+  const recordsBySha = new Map()
+  for (const record of records ?? []) {
+    const key = String(record?.sha ?? '')
+    if (!recordsBySha.has(key)) recordsBySha.set(key, [])
+    recordsBySha.get(key).push(record)
+  }
+  return (pendingCommits ?? []).filter(
+    (commit) =>
+      !contributionRetiredBy(
+        [...new Set(commit?.coveringRecordShas ?? [])].flatMap((sha) => recordsBySha.get(String(sha)) ?? []),
+        commit,
+      ),
+  )
 }
 
 /**
@@ -331,9 +432,7 @@ export function gatherMechanismReviewInputs({ sessionId = '', guardDuty = gather
   if (base !== head) {
     try {
       commits = rangeCommits(base, head, scriptFiles())
-      pendingCommits = commits
-        .filter((commit) => commit.mechanismFiles.length)
-        .map((commit) => ({ ...commit, subject: commitFacts(commit.sha).subject, files: commit.mechanismFiles }))
+      pendingCommits = pendingReviewContributions(commits, scriptFiles(), (sha) => commitFacts(sha).subject)
     } catch (e) {
       // ONLY a baseline that is genuinely GONE may move the gate. A baseline
       // rebased away or gc'd makes the range undiffable forever, and falling
@@ -375,9 +474,7 @@ export function gatherMechanismReviewInputs({ sessionId = '', guardDuty = gather
         /* the raw range below decides */
       }
       commits = base === head ? [] : rangeCommits(base, head, scriptFiles())
-      pendingCommits = commits
-        .filter((commit) => commit.mechanismFiles.length)
-        .map((commit) => ({ ...commit, subject: commitFacts(commit.sha).subject, files: commit.mechanismFiles }))
+      pendingCommits = pendingReviewContributions(commits, scriptFiles(), (sha) => commitFacts(sha).subject)
     }
   }
 
@@ -388,48 +485,21 @@ export function gatherMechanismReviewInputs({ sessionId = '', guardDuty = gather
   // turn end is a hook people switch off.
   // Carried rows are RE-MEASURED on every read (delta rounds, 18.08.2026):
   // the blob-identity stamp is the wrapper's, never the ledger's own word.
-  let endStateFiles = null
-  try {
-    endStateFiles = gitRawFile(rangeFilesCommand(base, head)).split('\0').filter(Boolean)
-  } catch {
-    // An unmeasured end state can only demand more below; it never drops a path.
-  }
-  const records = verifyCarried(attachCoverage({
+  const records = attachContributionDispositions(verifyCarried(attachCoverage({
     pendingCommits,
     allRecords: pendingCommits.length ? readRecords() : [],
     effective,
     head,
     revList: (rev) => git(`rev-list ${rev} --not ${effective}`),
-    // WHAT A RECORD AT THAT SHA WOULD CLEAR — every file of its range, not only
-    // the pending commits' mechanism paths (escalation round, passes 1 and 2):
-    // this parser keeps only mechanism paths, so a pass composition judged
-    // against them alone could read complete while ordinary files of the
-    // reviewed range were in no pass — a whole-range clearance over files
-    // nobody read. `-z` hands the paths over raw, exactly as gatherRange and
-    // the pass records spell them. FROM THE SAME MERGE-BASE as the pending
-    // commits (round-3 pass 3): diffing from the raw stored baseline describes
-    // a DIFFERENT file set on a branch whose baseline is no ancestor —
-    // main-only changes leak in, identical branch changes vanish — so the
-    // completeness demand and the detection would talk about different ranges.
-    rangeFiles: (sha) => gitRawFile(rangeFilesCommand(base, sha)).split('\0').filter(Boolean),
-  }))
+  })))
 
-  // A scoped pass advances the end-state files it actually read. The remaining
-  // file list is both the gate's debt and the next pass plan's input; a cleared
-  // file therefore never returns merely because HEAD moved elsewhere.
-  const debt = outstandingFiles({
-    commits,
-    endStateFiles,
-    records,
-    recordUsable: (record, commit) =>
-      reviewRecordWellFormed(record, { commitAt: commit?.at }) &&
-      attestsToCodeReading(record) &&
-      !reviewIdentityProblem(record.model, commit),
-  })
-  const authorshipPlan = planAuthorshipGroups({
-    commits: commitsForFiles(debt.outstanding),
-    endStateFiles: debt.outstanding.map((artefact) => artefact.file),
-  })
+  // Authorship is also contribution-local. Grouping the whole baseline range
+  // by its last file writers was the same unbounded scope in another form.
+  const plannedCommits = planningContributions(pendingCommits, records)
+  const groups = plannedCommits.flatMap(
+    (commit) => planAuthorshipGroups({ commits: [commit], endStateFiles: commit.files }).groups,
+  )
+  const authorshipPlan = { groups, unreviewable: groups.filter((group) => !group.reviewer) }
 
   return {
     applicable: true,
@@ -449,10 +519,10 @@ export function gatherMechanismReviewInputs({ sessionId = '', guardDuty = gather
       sessionId,
       fence: guardDuty({ sessionId }),
       authorshipPlan,
-      endStateFiles,
+      endStateFiles: null,
     },
     commits,
-    debt,
+    debt: { outstanding: plannedCommits, invalidatedCoverage: [] },
     authorshipPlan,
   }
 }
@@ -558,54 +628,30 @@ if (isMainModule(import.meta.url)) {
       process.exit(0)
     }
 
-    // THE GAP CLAUSE (point 714, c06a02d2): while the range's material CANNOT
-    // be assembled for review at all, demanding that review traps the session
-    // — so a blocking turn first MEASURES the range against the budget. A gap
-    // is reported and the turn may end; the block resumes the moment the
-    // material fits or splits into coverable passes. Loaded lazily: the common
-    // clear turn measures nothing, and a failed assessment rules NO gap — an
-    // unmeasured claim never waives the gate. It fires for BOTH block shapes —
-    // no record at all, and a standing do-not-merge whose re-review the range
-    // cannot deliver (the trap's second door, measured 18.08.2026) — keyed on
-    // the measurement alone, never on what a verdict's prose said; the count of
-    // standing refusals travels into the report from the STRUCTURED findings.
-    let gap = null
-    const gapRange = reviewGapRange({
-      blocked: verdict.block,
-      base: gathered.rangeBase,
-      head: gathered.head,
-    })
-    if (gapRange) {
-      try {
-        const { assessReviewGap } = await import('./mechanism-review-guard-gap.mjs')
-        gap = await assessReviewGap({
-          ...gapRange,
-          standingRecords: (verdict.findings ?? []).filter((f) => f.kind === 'do-not-merge').length,
-        })
-      } catch {
-        /* no ruling — the block below stands */
-      }
+    // THE GAP CLAUSE NOW MEASURES EACH OWED CONTRIBUTION IN ISOLATION. The
+    // baseline decides how many findings exist, never how much material one
+    // finding carries. One runnable commit keeps blocking; only an entirely
+    // measured list of individually unassemblable commits may report a gap.
+    const owedBySha = new Map()
+    for (const finding of verdict.findings ?? []) {
+      const commit = finding?.commit
+      if (commit?.sha && !owedBySha.has(commit.sha)) owedBySha.set(commit.sha, commit)
     }
+    const owedContributions = [...owedBySha.values()]
+    const { gap, sizedPlan: sizedGapPlan } = await measureReviewGap({
+      blocked: verdict.block,
+      commits: owedContributions,
+    })
     const outcome = guardOutcome({ blocked: verdict.block, gap })
 
     if (status) {
-      let statusPlan = null
-      if (gathered.rangeBase && gathered.head && (gathered.debt?.outstanding ?? []).length) {
+      let statusPlan = sizedGapPlan
+      if (owedContributions.length) {
         try {
-          // Use the SAME authorship-then-size planner that prints the runnable
-          // review-sol commands. Counting authorship groups alone understates
-          // the debt whenever one group needs several budget-sized rounds.
-          // What this counts is ROUNDS FOR THE STILL-OWED CONTRIBUTIONS, freshly
-          // planned — not the pass NUMBERING of the whole range, which review-sol
-          // keeps stable per commit so a recorded pass number never shifts. The
-          // two differ by construction: on 18.08.2026 the owed debt was one round
-          // here while review-sol still listed it as four of its fifteen passes.
-          const { buildAuthorshipPassPlan } = await import('./review-sol.mjs')
-          statusPlan = buildAuthorshipPassPlan({
-            sha: gathered.head,
-            base: gathered.rangeBase,
-            commits: commitsForFiles(gathered.debt.outstanding),
-          })
+          if (!statusPlan) {
+            const { buildContributionPassPlan } = await import('./review-sol.mjs')
+            statusPlan = buildContributionPassPlan({ commits: owedContributions })
+          }
         } catch {
           /* the status names an unavailable plan instead of inventing a count */
         }
@@ -623,23 +669,11 @@ if (isMainModule(import.meta.url)) {
             `${c.coveringRecordShas.length} covering review(s)`,
         )
       }
-      const debtStatus = summarizeReviewDebt({ outstanding: gathered.debt?.outstanding, sizedPlan: statusPlan })
-      console.log(`outstanding review passes: ${debtStatus.passCount ?? '<plan unavailable>'}`)
-      const outstandingMaterial = debtStatus.materialChars === null
-        ? '<measurement unavailable>'
-        : `${debtStatus.materialChars} characters`
-      console.log(
-        `outstanding material: ${outstandingMaterial}`,
-      )
-      for (const group of debtStatus.groups.length ? debtStatus.groups : gathered.authorshipPlan?.groups ?? []) {
-        console.log(
-          `  ${group.vendor ?? 'authored'} end-state files → ` +
-            `${group.reviewer ? `${group.reviewerVendor} reviewer ${group.reviewer}` : `UNREVIEWABLE — ${group.unreviewableReason}`}: ` +
-            `${group.files.map((f) => quotePassFile(f)).join(', ')}`,
-        )
-      }
-      if ((gathered.debt?.invalidatedCoverage ?? []).length) {
-        console.log(formatInvalidatedCoverage(gathered.debt.invalidatedCoverage, { quoteFile: quotePassFile }))
+      console.log(`outstanding review contributions: ${owedContributions.length}`)
+      console.log(`outstanding review passes: ${statusPlan?.passCount ?? '<plan unavailable>'}`)
+      if (statusPlan) {
+        const { formatContributionPassPlan } = await import('./review-sol.mjs')
+        console.log(formatContributionPassPlan(statusPlan))
       }
       if (outcome.action === 'report-gap') console.log(`\n${gap.report}`)
       else console.log(

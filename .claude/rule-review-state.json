@@ -1,7 +1,7 @@
 {
-  "lastReviewedAt": 1787169043535,
-  "reviewedCount": 127,
-  "evidence": "Cross-vendor Durchsicht des ganzen Bestands (GPT-5.6 Sol, effort high, 19.08.2026, 247 s) über CLAUDE.md, MEMORY.md, dashboard-reminder-hook.mjs und batch-resume-hook.mjs auf allen sechs Achsen, jede Regel gegen den Code geprüft. 23 Befunde: vier WIRKUNGSLOS im Code (Lock ohne Sitzungskennung, ungebundene Startfreigabe, nie stattfindende Serving-Modell-Pruefung, nicht-atomarer Reminder-Hook-Write), neunzehn WIDERSPRUECHLICH/VERALTET in den Texten. Alle 23 sind als Arbeitspunkt 754 im Work Order abgelegt, nach Gruppen sortiert; Commit f89b1f1a.",
+  "lastReviewedAt": 1787869627657,
+  "reviewedCount": 137,
+  "evidence": "Cross-vendor reading (GPT-5.6 Sol, effort high, scripts/ask-sol.mjs --kind audit) of the COMPLETE corpus on the guard's six axes: 96 memory files including MEMORY.md, CLAUDE.md, the per-prompt dashboard reminder hook, the session-start resume hook, and section A of docs/rule-corpus-audit.md, in the guard's own read-first order. FOUND: 16 findings, recorded verbatim as section H of docs/rule-corpus-audit.md with the claim each one makes about a script it could not read. VERIFIED against the files, not against neighbouring prose: A1 (provider-volume-strategy still routes hard cases to Fable), A2 (maximal-delegation still says an implementation agent runs Opus 5 whatever the difficulty) and A13 (dashboard-multiple-now-cards carries the parseNowCardPoints sentence twice) — all three confirmed. CHANGED this turn: A16 answered — fable-sparingly now leads with the operative routing and marks the two withdrawn rules as withdrawn; all twelve model-policy echoes read against the current CLAUDE.md §6 wording and re-stamped after the reviewer-trailer clause moved the rule hash. FILED: the remaining fifteen as work-order point 981, ranked and bundled, each to be decided against the code it describes.",
   "history": [
     {
       "at": "2026-07-25T18:02:18.088Z",
@@ -32,6 +32,11 @@
       "at": "2026-08-19T19:50:43.535Z",
       "entryCount": 127,
       "evidence": "Cross-vendor Durchsicht des ganzen Bestands (GPT-5.6 Sol, effort high, 19.08.2026, 247 s) über CLAUDE.md, MEMORY.md, dashboard-reminder-hook.mjs und batch-resume-hook.mjs auf allen sechs Achsen, jede Regel gegen den Code geprüft. 23 Befunde: vier WIRKUNGSLOS im Code (Lock ohne Sitzungskennung, ungebundene Startfreigabe, nie stattfindende Serving-Modell-Pruefung, nicht-atomarer Reminder-Hook-Write), neunzehn WIDERSPRUECHLICH/VERALTET in den Texten. Alle 23 sind als Arbeitspunkt 754 im Work Order abgelegt, nach Gruppen sortiert; Commit f89b1f1a."
+    },
+    {
+      "at": "2026-08-27T22:27:07.657Z",
+      "entryCount": 137,
+      "evidence": "Cross-vendor reading (GPT-5.6 Sol, effort high, scripts/ask-sol.mjs --kind audit) of the COMPLETE corpus on the guard's six axes: 96 memory files including MEMORY.md, CLAUDE.md, the per-prompt dashboard reminder hook, the session-start resume hook, and section A of docs/rule-corpus-audit.md, in the guard's own read-first order. FOUND: 16 findings, recorded verbatim as section H of docs/rule-corpus-audit.md with the claim each one makes about a script it could not read. VERIFIED against the files, not against neighbouring prose: A1 (provider-volume-strategy still routes hard cases to Fable), A2 (maximal-delegation still says an implementation agent runs Opus 5 whatever the difficulty) and A13 (dashboard-multiple-now-cards carries the parseNowCardPoints sentence twice) — all three confirmed. CHANGED this turn: A16 answered — fable-sparingly now leads with the operative routing and marks the two withdrawn rules as withdrawn; all twelve model-policy echoes read against the current CLAUDE.md §6 wording and re-stamped after the reviewer-trailer clause moved the rule hash. FILED: the remaining fifteen as work-order point 981, ranked and bundled, each to be decided against the code it describes."
     }
   ]
 }

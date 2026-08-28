@@ -15,7 +15,7 @@ import { AUTOMATIC_DECISION_TITLE, DERIVED_STATE_KIND, PAUSED_TITLE } from './bo
 import { criticalityOf, parsePointBlocks } from './criticality-review-guard-core.mjs'
 // The admissibility rule for a card written by a script, kept beside the guard's
 // own notion of "this asks the user" rather than restated here.
-import { judgeAutomatedCard } from './vdzk-admissibility-core.mjs'
+import { judgeAutomatedCard, withoutCategoryLine } from './vdzk-admissibility-core.mjs'
 
 export { namesFollowOnWork }
 
@@ -201,8 +201,46 @@ const CRITICALITY_BADGE_RE =
 const CRITICALITY_BADGE_SOURCE =
   '<span\\s+class="criticality(?:\\s+criticality-(?:low|med|high))?"[^>]*>[\\s\\S]*?<\\/span>\\s*'
 const CRITICALITY_STYLE_ID = 'board-criticality-style'
+const CARD_HEADER_LEFT_CLASS = 'card-header-left'
+// A published board persists this visual wrapper around every numeric chip.
+// Raw card readers must match it in place: flattening a copy would invalidate
+// the source offsets used by archive and section slicing consumers.
+const CARD_HEADER_LEFT_PREFIX_SOURCE = `(?:<span class="${CARD_HEADER_LEFT_CLASS}">\\s*)?`
+const CARD_NUMBER_SOURCE = (pointSource) =>
+  `${CARD_HEADER_LEFT_PREFIX_SOURCE}<span class="num">\\s*${pointSource}\\s*<\\/span>`
+const CARD_TITLE_HEAD_SOURCE = (pointSource) =>
+  `${CARD_NUMBER_SOURCE(pointSource)}\\s*(?:${CRITICALITY_BADGE_SOURCE})?(?:<\\/span>\\s*)?<span class="t">`
+const CARD_HEADER_LEFT_SOURCE =
+  `<span class="${CARD_HEADER_LEFT_CLASS}">\\s*(<span class="num">\\s*\\d+\\s*<\\/span>)\\s*` +
+  `(?:${CRITICALITY_BADGE_SOURCE})?<\\/span>`
+/**
+ * THE CARD HEADER IS THREE COLUMNS (point 969, user sketch 27.08.2026 13:49).
+ * LEFT the number with its criticality badge, CENTER the title, RIGHT the times
+ * with the disclosure marker beside them. The columns never reorder and the
+ * title never takes a full-width row of its own: the three rounds before this
+ * one (941, 963, 967) each answered a squeezed title by stacking the groups at a
+ * breakpoint, and the user rejected that rendering on sight every time.
+ *
+ * STACKING IS CONTENT-DRIVEN, NOT BREAKPOINT-DRIVEN (user addendum 13:52). Each
+ * column is its own wrapping flex line, so it breaks ITS OWN content only when
+ * the row is genuinely too narrow for it — a short header stays on one line at
+ * portrait width, and the same header on a desktop viewport stays on one line
+ * too. There is deliberately no @media rule here.
+ *
+ * The title is the greedy column: its `flex-basis:auto` makes its shrink share
+ * the largest, so under pressure the outer columns reach their own content
+ * width first and stack there, which is what hands the title the width.
+ */
 const CRITICALITY_STYLE = `<style id="${CRITICALITY_STYLE_ID}">
-.criticality{flex-shrink:0;border:1px solid currentColor;border-radius:999px;padding:.08em .48em;font-size:.72em;font-weight:700;line-height:1.35}
+.card-header-left{display:inline-flex;flex:0 1 auto;flex-wrap:wrap;align-items:baseline;gap:0 8px;min-width:auto;max-width:100%}
+.card-header-left>*{min-width:auto;max-width:100%;white-space:nowrap;overflow-wrap:normal}
+details:not(.sect)>summary{flex-wrap:nowrap;align-items:baseline;column-gap:7px;row-gap:0;min-width:0;max-width:100%}
+details:not(.sect)>summary>.t{flex:1 1 auto;min-width:0;max-width:100%;overflow-wrap:anywhere}
+details:not(.sect)>summary>.right{display:inline-flex;flex:0 1 auto;flex-wrap:wrap;justify-content:flex-end;align-items:baseline;column-gap:6px;row-gap:0;min-width:min(100%,3.2rem);max-width:34%;margin-left:auto;padding-left:0;white-space:normal}
+details:not(.sect)>summary>.right>*{min-width:0;max-width:100%;white-space:normal;overflow-wrap:break-word}
+details:not(.sect)>summary::after{content:"▸";flex:0 0 auto;align-self:baseline;margin-left:4px}
+details:not(.sect)[open]>summary::after{content:"▾"}
+.criticality{flex:0 1 auto;min-width:auto;max-width:100%;white-space:nowrap;overflow-wrap:normal;border:1px solid currentColor;border-radius:999px;padding:.08em .48em;font-size:.72em;font-weight:700;line-height:1.35}
 .criticality-low{background:#dcebd9;color:#24511f}.criticality-med{background:#f3e4ad;color:#684e00}.criticality-high{background:#f3d1cb;color:#7a2115}
 </style>`
 
@@ -210,6 +248,16 @@ const criticalityBadge = (level) =>
   level && CRITICALITY_LABELS[level]
     ? `<span class="criticality criticality-${level}">${CRITICALITY_LABELS[level]}</span>`
     : ''
+
+/**
+ * Flatten the derived visual group before a card editor applies its strict,
+ * head-anchored transformations. The published board groups number + badge so
+ * flex wrapping cannot split them into different columns; the editing grammar
+ * deliberately continues to use its older, simple number/title sequence.
+ */
+export function unwrapCardHeaderGroups(html) {
+  return String(html ?? '').replace(new RegExp(CARD_HEADER_LEFT_SOURCE, 'g'), '$1')
+}
 
 /**
  * Derive every numbered card's criticality badge from the work order.
@@ -224,17 +272,17 @@ export function renderCardCriticalities(html, tasksText) {
   const levels = new Map(
     parsePointBlocks(tasksText).map((point) => [String(point.n), criticalityOf(point.body).level]),
   )
-  let badges = 0
+  let groups = 0
   let out = String(html ?? '').replace(/<summary>([\s\S]*?)<\/summary>/g, (whole, summary) => {
-    const { chip } = summaryPoint(summary)
+    const flat = unwrapCardHeaderGroups(summary)
+    const { chip } = summaryPoint(flat)
     if (chip == null) return whole
-    const clean = summary.replace(CRITICALITY_BADGE_RE, '')
+    const clean = flat.replace(CRITICALITY_BADGE_RE, '')
     const badge = criticalityBadge(levels.get(chip))
-    if (!badge) return `<summary>${clean}</summary>`
-    badges += 1
+    groups += 1
     return `<summary>${clean.replace(
       new RegExp(`^(\\s*<span class="num">\\s*${chip}\\s*</span>)`),
-      `$1${badge}`,
+      `<span class="${CARD_HEADER_LEFT_CLASS}">$1${badge}</span>`,
     )}</summary>`
   })
 
@@ -246,7 +294,7 @@ export function renderCardCriticalities(html, tasksText) {
     'g',
   )
   out = out.replace(styleRe, '')
-  if (!badges) return out
+  if (!groups) return out
   if (out.includes('</head>')) return out.replace('</head>', `${CRITICALITY_STYLE}\n</head>`)
   // The live headless board starts with BOM, title, metadata and its own
   // stylesheet. That stylesheet's first `</style>` is an unambiguous landmark
@@ -396,11 +444,7 @@ export function dropStrayNowCards(html) {
  */
 export function summaryPoint(summary) {
   const text = String(summary ?? '')
-  const chip = text.match(
-    new RegExp(
-      `^\\s*<span class="num">\\s*(\\d+)\\s*</span>\\s*(?:${CRITICALITY_BADGE_SOURCE})?<span class="t">`,
-    ),
-  )
+  const chip = text.match(new RegExp(`^\\s*${CARD_TITLE_HEAD_SOURCE('(\\d+)')}`))
   if (chip) return { chip: chip[1], legacy: null }
   const legacy = text.match(new RegExp(`^\\s*<span class="t">\\s*(\\d+)\\s*${DASH}`))
   return { chip: null, legacy: legacy ? legacy[1] : null }
@@ -415,7 +459,7 @@ export function stripPointPrefix(title, point) {
 
 /** The queue card for `point`, or null. Exported so the caller can check first. */
 export function queueCard(html, point) {
-  const re = new RegExp(`<details>\\s*<summary><span class="num">${point}</span>[\\s\\S]*?</details>\\s*`)
+  const re = new RegExp(`<details>\\s*<summary>${CARD_NUMBER_SOURCE(point)}[\\s\\S]*?</details>\\s*`)
   const m = String(html ?? '').match(re)
   return m ? m[0] : null
 }
@@ -549,7 +593,7 @@ function sectionBounds(html, key) {
  * unreplaceable in the first place.
  */
 const NOW_HEAD = (point) =>
-  `<details class="now"[^>]*>\\s*<summary>\\s*(?:<span class="num">\\s*${point}\\s*</span>|<span class="t">\\s*${point}\\s*${DASH})`
+  `<details class="now"[^>]*>\\s*<summary>\\s*(?:${CARD_NUMBER_SOURCE(point)}|<span class="t">\\s*${point}\\s*${DASH})`
 
 /** The current-work card for `point`, or null. Searched in its own section. */
 export function nowCard(html, point) {
@@ -604,6 +648,18 @@ function projectedNowCards(html) {
   })
 }
 
+/**
+ * A card that REALLY is the closing state (point 544): the marker AND the
+ * composed closing title. It carries its point's chip since point 655, and that
+ * point is TICKED by design — so the projection and the comparison must judge
+ * it as a state card, never as numbered work whose point has no active record.
+ * Reading it as work made the point-713 render delete the one card whose whole
+ * job is to stand after the tick.
+ */
+function isTrulyClosingCard(card) {
+  return /data-state="closing"/.test(String(card ?? '')) && isTrulyStateCard(card, 'closing')
+}
+
 const pointsInSection = (html, key) => {
   try {
     const { from, end } = sectionBounds(html, key)
@@ -647,7 +703,13 @@ export function compareNowProjection(html, expectedPoints, { knownPoints = null,
       return { ok: false, error: 'the expected active-point set is malformed', missing: [], extra: [], duplicates: [] }
     }
     const cards = projectedNowCards(html)
-    const actual = cards.filter((card) => card.point != null).map((card) => card.point)
+    // THE CLOSING CARD IS A STATE, NOT WORK (point 544; regression via point
+    // 713): counted into the numbered membership it turned "extra"/"unknown"
+    // the moment its point was ticked — which is the only moment it exists.
+    const closingCards = cards.filter((card) => isTrulyClosingCard(card.html))
+    const actual = cards
+      .filter((card) => card.point != null && !isTrulyClosingCard(card.html))
+      .map((card) => card.point)
     const counts = new Map()
     for (const point of actual) counts.set(point, (counts.get(point) ?? 0) + 1)
     const expectedSet = new Set(expected)
@@ -681,10 +743,13 @@ export function compareNowProjection(html, expectedPoints, { knownPoints = null,
     // agree about the same thing or neither means anything.
     const focused = Number(focusPoint)
     const focusChecked = Number.isInteger(focused) && focused > 0
+    // A focus still naming the just-ticked point is REPRESENTED by its closing
+    // card — the card names exactly that point.
     const focusUnrepresented = focusChecked && !actualSet.has(focused)
-    const focusMisplaced = focusChecked && !focusUnrepresented && actual[0] !== focused
+      && !closingCards.some((card) => card.point === focused)
+    const focusMisplaced = focusChecked && focusUnrepresented === false && actualSet.has(focused) && actual[0] !== focused
     const emptyStateCount = (nowSectionSlice(html).text.match(emptyStatePattern()) ?? []).length
-    const unnumbered = cards.filter((card) => card.point == null)
+    const unnumbered = cards.filter((card) => card.point == null && !isTrulyClosingCard(card.html))
     const unnumberedCards = unnumbered.length
     const idleCards = unnumbered.filter((card) => isTrulyStateCard(card.html, 'idle')).length
     const handoverCards = unnumbered.filter((card) => isHandoverCard(card.html)).length
@@ -718,14 +783,26 @@ export function compareNowProjection(html, expectedPoints, { knownPoints = null,
     // zero claim out, so damaged machine state was blessed instead of refused.
     // This module renders exactly one; a second is never something it wrote.
     const duplicateDerived = derivedCards > 1
+    // The closing card is the THIRD honest zero-work form (point 544): while it
+    // stands, neither the idle card nor the empty element may — and beside
+    // expected active work it is the same contradiction the idle card would be.
+    const closingClaim = closingCards.length > 0
+    const closingBesideWork = expected.length > 0 && closingClaim
+    const duplicateClosing = closingCards.length > 1
     const emptyStateWrong = expected.length === 0
       ? (idleCards === 1
-          ? emptyStateCount !== 0 || claimCards !== 1
-          : emptyStateCount !== 1 || claimCards > 0)
+          ? emptyStateCount !== 0 || claimCards !== 1 || closingClaim
+          : closingClaim
+            ? emptyStateCount !== 0 || claimCards > 0
+            : emptyStateCount !== 1 || claimCards > 0)
       : emptyStateCount > 0 || idleCards > 0 || strayCards > 0
     return {
       ok: !missing.length && !extra.length && !duplicates.length && !unknown.length && !crossSection.length
-        && !emptyStateWrong && !duplicateDerived && !focusUnrepresented && !focusMisplaced,
+        && !emptyStateWrong && !duplicateDerived && !focusUnrepresented && !focusMisplaced
+        && !closingBesideWork && !duplicateClosing,
+      closingBesideWork,
+      duplicateClosing,
+      closingCards: closingCards.length,
       duplicateDerived,
       focusPoint: focusChecked ? focused : null,
       focusUnrepresented,
@@ -810,12 +887,24 @@ export function reconcileNowProjection(
     throw new Error('board: active-point projection is malformed')
   }
   const cards = projectedNowCards(source)
-  const numbered = cards.filter((card) => card.point != null)
+  // The closing card is a STATE (point 544): it carries the chip of a point
+  // that is ticked by design, so reading it as numbered work made this render
+  // delete it silently (regression via point 713). It is kept like the idle
+  // handover card — and refused beside active work, like the idle card.
+  const closingCards = cards.filter((card) => isTrulyClosingCard(card.html))
+  if (expected.length > 0 && closingCards.length > 0) {
+    throw new Error(
+      `board: refusing to render active point(s) ${expected.join(', ')} beside the standing closing ` +
+        'card — the board would contradict itself in one screen. Promote the work through board.mjs ' +
+        '(now/done --next), which replaces the state card.',
+    )
+  }
+  const numbered = cards.filter((card) => card.point != null && !isTrulyClosingCard(card.html))
   const counts = new Map()
   for (const card of numbered) counts.set(card.point, (counts.get(card.point) ?? 0) + 1)
   const conflicts = [...counts].filter(([, count]) => count > 1).map(([point]) => point)
   if (conflicts.length) throw new Error(`board: conflicting current-work copies for point(s) ${conflicts.join(', ')}`)
-  const unnumbered = cards.filter((card) => card.point == null)
+  const unnumbered = cards.filter((card) => card.point == null && !isTrulyClosingCard(card.html))
   // …and the derived state card is not one of them (point 935): it is exempt
   // beside active work for reasons that hold just as well beside none, and
   // refusing it here made the board unpublishable at every session boundary
@@ -924,8 +1013,16 @@ export function reconcileNowProjection(
 
   const now = { ...bounds, text: source.slice(bounds.from, bounds.end) }
   let derivedKept = 0
+  let closingKept = 0
   let remainder = now.text
     .replace(/<details class="now"[^>]*>[\s\S]*?<\/details>\s*/g, (card) => {
+      // The closing card survives byte for byte — ONE of them (the beside-work
+      // contradiction threw above, so expected is empty here); a duplicate is
+      // damaged state and normalised away like a stacked derived card.
+      if (isTrulyClosingCard(card)) {
+        closingKept += 1
+        return closingKept > 1 ? '' : card
+      }
       const summary = (card.match(/<summary>([\s\S]*?)<\/summary>/) ?? [])[1] ?? ''
       const { chip, legacy } = summaryPoint(summary)
       if (chip != null || legacy != null) return ''
@@ -955,7 +1052,9 @@ export function reconcileNowProjection(
     // machine decision suppressed the empty element and the comparison then
     // found no zero claim at all. "Nothing is running" and "this is what the
     // machine decided" are two statements, and the reader is owed both.
-    const claims = unnumbered.some((card) => isTrulyStateCard(card.html, 'idle'))
+    // …and the closing card is the third honest zero-work form (point 544):
+    // while it stands, adding the empty element would stack two claims.
+    const claims = unnumbered.some((card) => isTrulyStateCard(card.html, 'idle')) || closingCards.length > 0
     if (!claims) remainder = remainder ? `${remainder}\n${NOW_EMPTY_STATE_MARKUP}` : NOW_EMPTY_STATE_MARKUP
   }
   else remainder = `${ordered.map((card) => card.html).join('')}${remainder ? `\n${remainder}` : ''}`.trimEnd()
@@ -1208,7 +1307,8 @@ function doneBounds(html) {
 }
 
 /** An Erledigt card, matched inside the section alone. */
-const DONE_CARD_RE = /<details>\s*<summary><span class="num">\s*(\d+)\s*<\/span>[\s\S]*?<\/details>\n?/g
+const DONE_CARD_RE =
+  new RegExp(`<details>\\s*<summary>${CARD_NUMBER_SOURCE('(\\d+)')}[\\s\\S]*?<\\/details>\\n?`, 'g')
 
 /** Every Erledigt card as `{ point, text, at }`, in document order (newest first). */
 export function doneEntries(html) {
@@ -1941,11 +2041,7 @@ export function toClosingWork(html, point, { subject, reason, stamp = berlinStam
  */
 export function pointSubject(html, point) {
   const doc = String(html ?? '')
-  const chip = doc.match(
-    new RegExp(
-      `<span class="num">${point}</span>\\s*(?:${CRITICALITY_BADGE_SOURCE})?<span class="t">${TITLE_TEXT}</span>`,
-    ),
-  )
+  const chip = doc.match(new RegExp(`${CARD_TITLE_HEAD_SOURCE(point)}${TITLE_TEXT}</span>`))
   const legacy = chip ? null : doc.match(new RegExp(`<span class="t">${point}\\s*${DASH}\\s*${TITLE_TEXT}</span>`))
   const text = stripClosingStage((chip ?? legacy ?? [])[1])
   return text || null
@@ -2067,23 +2163,28 @@ export function parseClosingArgs(rest) {
  * name a command. The card carries a TITLE ONLY in its collapsed header, per the
  * board's binding structure, and the body says what is to be decided.
  */
-export function addVdzk(html, title, text, { automated = false } = {}) {
-  // AN AUTOMATED CALLER IS HELD TO THE RULE, NOT REMINDED OF IT (point 749). A
-  // script has no judgement to apply, so the board asks for the two things that
-  // make a card a decision — it asks, and it names the options — and refuses
-  // anything else with the place its information does belong.
-  if (automated) {
-    const verdict = judgeAutomatedCard({ title, body: text })
-    if (!verdict.ok) throw new Error(verdict.reason)
-  }
+export function addVdzk(html, title, text) {
+  // EVERY CALLER IS HELD TO THE SAME TYPED AUTHORITY. `--automated` used to be
+  // the enforcement boundary, which left a direct vdzk-add call able to park an
+  // owner-decidable question. The pure judge now stands at the lowest writer.
+  // Keep the specific empty-field errors: they name the visible damage better
+  // than the general admissibility refusal does.
+  if (!String(title ?? '').trim()) throw new Error('board: vdzk-add needs a title — the collapsed card shows nothing else')
+  if (!String(text ?? '').trim()) throw new Error('board: vdzk-add needs the question itself as the card body')
+  const verdict = judgeAutomatedCard({ title, body: text })
+  if (!verdict.ok) throw new Error(verdict.reason)
   // ESCAPED, unlike the other card builders (four-eyes review 30.07.2026): the
   // guard's remedy line hands out a literal `"<Titel der Frage>"` placeholder, so
   // a paste of it is the LIKELY first call — and an unescaped `<` produces a card
   // whose title parses as empty, i.e. an invisible open question.
   const esc = (s) => String(s ?? '').trim().replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
   const head = esc(title)
-  const body = renderCardBody(text, { escape: esc })
-  if (!head) throw new Error('board: vdzk-add needs a title — the collapsed card shows nothing else')
+  // THE AUTHORITY TAG IS JUDGED, THEN DROPPED. It selects the user-owned
+  // category for the gate above; on the rendered card it would be English jargon
+  // in front of a German question, addressed to the writer rather than the
+  // reader. The refusals stay reachable either way — the tag is read from the
+  // caller's text, not from the card.
+  const body = renderCardBody(withoutCategoryLine(text), { escape: esc })
   if (!body) throw new Error('board: vdzk-add needs the question itself as the card body')
   const { from, end } = sectionBounds(html, 'vdzk')
   const section = html.slice(from, end)
@@ -2129,6 +2230,7 @@ export function removeVdzk(html, fragment) {
  */
 export function setCardStatus(html, point, text, stamp = berlinStamp()) {
   if (typeof html !== 'string' || !html) throw new Error('board: empty document')
+  html = unwrapCardHeaderGroups(html)
   if (!/^\d+$/.test(String(point))) throw new Error(`board: not a point number: ${point}`)
   if (!text || !String(text).trim()) throw new Error('board: refusing to write an empty status')
   // BOUNDED TO ITS OWN CARD (four-eyes review, 12.08.2026). The run to the body
@@ -2156,6 +2258,7 @@ export function setCardStatus(html, point, text, stamp = berlinStamp()) {
  */
 export function setCardTitle(html, point, title) {
   if (typeof html !== 'string' || !html) throw new Error('board: empty document')
+  html = unwrapCardHeaderGroups(html)
   if (!/^\d+$/.test(String(point))) throw new Error(`board: not a point number: ${point}`)
   const text = String(title ?? '').trim()
   if (!text) throw new Error('board: refusing to write an empty title')
@@ -2178,7 +2281,7 @@ export function setCardTitle(html, point, title) {
   // gate reads as a false closing marker.
   const now = nowSectionSlice(html, { whenMissing: 'document' })
   const closingMarked = new RegExp(
-    `<details class="now"[^>]*data-state="closing"[^>]*>\\s*<summary>[\\s\\S]*?<span class="num">\\s*${point}\\s*</span>`,
+    `<details class="now"[^>]*data-state="closing"[^>]*>\\s*<summary>[\\s\\S]*?${CARD_NUMBER_SOURCE(point)}`,
   ).test(now.text)
   // A CLOSING SHAPE IS THE CLOSING STATE (four-eyes review, 12.08.2026). Writing
   // that title onto an ordinary card would produce the unmarked closing card the
@@ -2193,8 +2296,7 @@ export function setCardTitle(html, point, title) {
   }
   const bare = escapeCardTitle(closingMarked ? closingCardTitle(stripPointPrefix(text, point)) : stripPointPrefix(text, point))
   const chipRe = new RegExp(
-    `(<details class="now"[^>]*>\\s*<summary>\\s*<span class="num">\\s*${point}\\s*</span>\\s*` +
-      `(?:${CRITICALITY_BADGE_SOURCE})?<span class="t">)` +
+    `(<details class="now"[^>]*>\\s*<summary>\\s*${CARD_TITLE_HEAD_SOURCE(point)})` +
       `(?:(?!</span>)[\\s\\S])*(</span>)`,
   )
   if (chipRe.test(now.text)) {
@@ -2217,8 +2319,7 @@ export function setCardTitle(html, point, title) {
   // command reports success either way. The Erledigt section is history; a
   // retitle there is a hand edit's business, not this command's.
   const queueRe = new RegExp(
-    `(<summary><span class="num">${point}</span>\\s*(?:${CRITICALITY_BADGE_SOURCE})?` +
-      `<span class="t">)(?:(?!</span>)[\\s\\S])*(</span>)`,
+    `(<summary>${CARD_TITLE_HEAD_SOURCE(point)})(?:(?!</span>)[\\s\\S])*(</span>)`,
   )
   try {
     const { from, end } = sectionBounds(html, 'queue')

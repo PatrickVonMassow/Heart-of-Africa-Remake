@@ -1,6 +1,7 @@
 import { execFileSync } from 'node:child_process'
-import { readFileSync } from 'node:fs'
+import { readdirSync, readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
+import { withoutGitLocalEnvironment } from './repo-paths.mjs'
 
 const git = (root, args) =>
   execFileSync('git', ['-C', root, ...args], {
@@ -8,6 +9,13 @@ const git = (root, args) =>
     windowsHide: true,
     stdio: ['ignore', 'pipe', 'pipe'],
   }).trim()
+
+const isolatedGit = (args) =>
+  execFileSync('git', args, {
+    windowsHide: true,
+    env: withoutGitLocalEnvironment(),
+    stdio: ['ignore', 'pipe', 'pipe'],
+  })
 
 /** Locate the exact shared config and checkout-local HEAD before tests run. */
 export function repositoryStatePaths(root = process.cwd()) {
@@ -17,6 +25,34 @@ export function repositoryStatePaths(root = process.cwd()) {
   return { checkout, commonDir, configPath: resolve(commonDir, 'config'), headPath }
 }
 
+const worktreeAdministrativeDirectories = (commonDir) => {
+  const found = [['main', commonDir]]
+  try {
+    const worktreesDir = resolve(commonDir, 'worktrees')
+    for (const entry of readdirSync(worktreesDir, { withFileTypes: true })
+      .filter((candidate) => candidate.isDirectory())
+      .sort((a, b) => a.name.localeCompare(b.name))) {
+      found.push([`worktrees/${entry.name}`, resolve(worktreesDir, entry.name)])
+    }
+  } catch {
+    // A repository with no linked worktrees has no worktrees/ directory.
+  }
+  return found
+}
+
+const administrativeFileState = (commonDir, name) =>
+  Buffer.from(
+    JSON.stringify(
+      worktreeAdministrativeDirectories(commonDir).map(([key, directory]) => {
+        try {
+          return [key, readFileSync(resolve(directory, name)).toString('base64')]
+        } catch {
+          return [key, null]
+        }
+      }),
+    ),
+  )
+
 /** Byte-for-byte state whose mutation makes a unit run unsafe.
  *
  * Remote-tracking refs are deliberately outside the boundary: the authoring
@@ -24,21 +60,13 @@ export function repositoryStatePaths(root = process.cwd()) {
  * same shared repository. Fixture damage has always landed under refs/heads;
  * those are the refs a local git command can move without network activity. */
 export function repositoryState(paths) {
-  const refs = execFileSync(
-    'git',
+  const refs = isolatedGit(
     ['--git-dir', paths.commonDir, 'for-each-ref', '--format=%(refname)%00%(objectname)', 'refs/heads'],
-    {
-      windowsHide: true,
-      stdio: ['ignore', 'pipe', 'pipe'],
-    },
   )
   const config = readFileSync(paths.configPath)
   let configEntries
   try {
-    configEntries = execFileSync('git', ['config', '--file', paths.configPath, '--null', '--list'], {
-      windowsHide: true,
-      stdio: ['ignore', 'pipe', 'pipe'],
-    })
+    configEntries = isolatedGit(['config', '--file', paths.configPath, '--null', '--list'])
   } catch {
     configEntries = null
   }
@@ -47,6 +75,9 @@ export function repositoryState(paths) {
     config,
     configEntries,
     head: readFileSync(paths.headPath),
+    worktrees: isolatedGit(['--git-dir', paths.commonDir, 'worktree', 'list', '--porcelain', '-z']),
+    worktreeHeads: administrativeFileState(paths.commonDir, 'HEAD'),
+    worktreeIndexes: administrativeFileState(paths.commonDir, 'index'),
   }
 }
 
@@ -115,6 +146,9 @@ export function assertRepositoryUnchanged(before, after) {
   if (changed(before, after, 'head')) {
     details.push(`head changed: ${headValue(before)} -> ${headValue(after)}`)
   }
+  if (changed(before, after, 'worktrees')) details.push('worktree registrations changed')
+  if (changed(before, after, 'worktreeHeads')) details.push('one or more worktree HEADs changed')
+  if (changed(before, after, 'worktreeIndexes')) details.push('one or more worktree indexes changed')
   if (details.length === 0) return
   throw new Error(
     `LIVE REPOSITORY CHANGED WHILE UNIT SUITE RAN: ${details.join('; ')}. ` +
@@ -140,7 +174,21 @@ export function protectRepository(root = process.cwd()) {
  *  wiring is the failure this whole family exists to prevent. */
 export const WIRED_KEY = 'repositoryIntegrityWired'
 
+const scrubRunnerGitEnvironment = () => {
+  const clean = withoutGitLocalEnvironment()
+  for (const name of Object.keys(process.env)) {
+    if (!(name in clean)) delete process.env[name]
+  }
+}
+
 export function setup(project) {
+  // Global setup runs in Vitest's main process before its workers start. A
+  // linked-worktree hook supplies GIT_DIR as an absolute path, and workers
+  // otherwise inherit it: every fixture's `git -C <tmpdir>` then targets the
+  // live repository instead. Remove Git's entire repository-local identity at
+  // this one suite-wide boundary so every present and future gate caller is
+  // safe; the wrapper-level clean environments remain defence in depth.
+  scrubRunnerGitEnvironment()
   project?.provide?.(WIRED_KEY, true)
   return protectRepository(project?.config?.root ?? process.cwd())
 }

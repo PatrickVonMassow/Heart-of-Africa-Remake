@@ -2,23 +2,61 @@
 //
 // A convergent review judges the range's artefact at HEAD, not every historical
 // version that led there. Each net-changed path therefore appears once, routed
-// by the author of its final change. Intermediate versions are named as
+// around every model that contributed to that retained end-state path. Intermediate versions are named as
 // superseded, and paths whose final state equals the base are dropped.
-import { sameModel } from './mechanism-review-core.mjs'
+import { independentReviewProblem, sameModel } from './mechanism-review-core.mjs'
 import { passComposition } from './review-material-core.mjs'
 
 export const REVIEWER_CANDIDATES = Object.freeze(['GPT-5.6 Sol', 'Opus 5', 'Fable 5', 'Opus 4.8'])
 export const UNREVIEWABLE_NARROWING_REMEDY =
   'Review every runnable pass and record the exact measured remainder with the criticality-review-unavailable command printed by review-sol.'
 export const NO_ELIGIBLE_REVIEWER_REASON =
-  `every configured reviewer vendor authored part of this contribution. ${UNREVIEWABLE_NARROWING_REMEDY}`
+  `every configured reviewer model authored part of this contribution. ${UNREVIEWABLE_NARROWING_REMEDY}`
 export const UNKNOWN_AUTHOR_REVIEWER_REASON =
   `authorship vendor is unknown, so no reviewer can prove cross-vendor independence. ${UNREVIEWABLE_NARROWING_REMEDY}`
+
+// THE FOUR-EYES GATE IS ON MECHANISMS, NOT ON THE WORK ORDER (cross-vendor
+// decision, 26.08.2026). TASKS.md and its archive are the owner's and user's
+// own work-order text; making a second vendor read their million-character
+// end state buys no mechanism assurance and can make every review round
+// impossible. They already have their own enforcement: tasks-spec-guard,
+// queue-order-guard, tasks-archive-guard and bundle-first-guard govern the two
+// documents, while doc-budget-guard governs TASKS.md's always-read preamble.
+// Keep this decision at the one end-state artefact boundary all planners use.
+export const REVIEW_END_STATE_EXCLUSIONS = Object.freeze({
+  'TASKS.md':
+    'work-order text; governed by tasks-spec-guard, queue-order-guard, tasks-archive-guard, bundle-first-guard, and doc-budget-guard over its preamble',
+  'docs/tasks-archive.md':
+    'work-order archive; governed by tasks-spec-guard, queue-order-guard, tasks-archive-guard, and bundle-first-guard',
+  // The German retrospective, same class as the work order: owner prose with
+  // its own enforcement (retro-currency-guard over retro-core), past 400 000
+  // characters and growing, and no mechanism assurance comes from a second
+  // vendor reading it whole.
+  'docs/analysis_de/retrospektive-zusammenarbeit.md':
+    'owner retrospective prose; governed by retro-currency-guard over retro-core, and past any single review round',
+})
 
 const uniq = (xs) => [
   ...new Set((xs ?? []).filter((value) => value !== null && value !== undefined && String(value)).map(String)),
 ]
 const keyFor = (sha, file) => `${String(sha)}\0${String(file)}`
+
+/**
+ * Why this end-state path is outside the mechanism gate's reach, or null when it
+ * belongs to the reviewable file set. ONE boundary, so the gate, its coverage
+ * demand, the gap measurement and the pass planner never disagree about what a
+ * review is owed for.
+ */
+export function reviewEndStateExclusion(file) {
+  const path = String(file ?? '')
+  if (Object.hasOwn(REVIEW_END_STATE_EXCLUSIONS, path)) return REVIEW_END_STATE_EXCLUSIONS[path]
+  return null
+}
+
+/** The range paths which belong to the mechanism-review end-state file set. */
+export function reviewEndStateFiles(files = []) {
+  return uniq(files).filter((file) => reviewEndStateExclusion(file) === null)
+}
 
 // CONTROL CHARACTERS, NOT PRINTABLE MARKERS (round-4 pass 3, and the reason
 // this parser must keep them): a printable sentinel is a legal path substring,
@@ -139,19 +177,11 @@ export function eligibleReviewer(authors = [], candidates = REVIEWER_CANDIDATES)
   // assignment made from absence.
   if (!writtenBy.length) return ''
   if (writtenBy.some((author) => vendorOf(author) === 'unknown')) return ''
-  const vendors = new Set(writtenBy.map(vendorOf))
-  // Cross-VENDOR means the candidate's vendor authored NONE of the group. A
-  // commit co-authored by both vendors has no eligible reviewer in this chain,
-  // even when a different model at one of those vendors did not personally
-  // author it. Calling that model eligible would reduce four eyes to a model-id
-  // distinction exactly where the repository rule requires vendor separation.
-  return (
-    (candidates ?? []).find((candidate) => {
-      if (writtenBy.some((author) => sameModel(candidate, author))) return false
-      const candidateVendor = vendorOf(candidate)
-      return candidateVendor !== 'unknown' && !vendors.has(candidateVendor)
-    }) ?? ''
-  )
+  // The roster order preserves the cross-vendor preference: Claude-only work
+  // lands on Sol, Sol-only work on Claude. Where BOTH vendors contributed,
+  // vendor separation is impossible; the documented fallback is then the
+  // first exact model that wrote no part of the end state.
+  return (candidates ?? []).find((candidate) => !writtenBy.some((author) => sameModel(candidate, author))) ?? ''
 }
 
 const reviewerFields = (authors, candidates) => {
@@ -198,9 +228,8 @@ export function endStateArtefacts({ commits = [], endStateFiles = null } = {}) {
   // null preserves the useful pure-function default: callers without a measured
   // net diff plan every touched path. An explicit list is authoritative, and an
   // explicit empty list means the whole range reverted to its base state.
-  const material = endStateFiles === null
-    ? new Set(byFile.keys())
-    : new Set(uniq(endStateFiles))
+  const requested = endStateFiles === null ? [...byFile.keys()] : uniq(endStateFiles)
+  const material = new Set(reviewEndStateFiles(requested))
   const artefacts = []
   const dropped = []
   const superseded = []
@@ -208,13 +237,18 @@ export function endStateArtefacts({ commits = [], endStateFiles = null } = {}) {
     if (!material.has(file)) {
       dropped.push({
         file,
-        reason: 'end state identical to the base',
+        reason: reviewEndStateExclusion(file) ?? 'end state identical to the base',
         commits: changes.map((change) => change.sha),
       })
       continue
     }
     const latest = changes.at(-1)
-    const authors = latest.authors
+    // END-STATE AUTHORSHIP IS THE UNION OF CONTRIBUTORS TO THE PATH, not only
+    // the last commit that touched it. A later copy edit does not erase code or
+    // prose an earlier model left in the file; selecting that earlier model as
+    // reviewer would make it read its own retained work (point 977's measured
+    // guide/brevity reproduction).
+    const authors = uniq(changes.flatMap((change) => change.authors))
     const vendors = uniq(authors.map(vendorOf))
     artefacts.push({
       file,
@@ -384,13 +418,11 @@ export function outstandingFiles({
     for (const artefact of state.artefacts) {
       if (!files.includes(artefact.file)) continue
       const latestChange = artefact.changes.at(-1)
-      const reviewerVendor = vendorOf(record.model)
       const coversEndState =
         recordUsable(record, latestChange.commit) &&
         contained(record, artefact.endStateSha) &&
-        reviewerVendor !== 'unknown' &&
         !artefact.vendors.includes('unknown') &&
-        !artefact.vendors.includes(reviewerVendor)
+        !independentReviewProblem(record, { authorModels: artefact.authors })
       if (!coversEndState) {
         // Count only coverage the replaced contribution model really accepted.
         // A malformed row, an unrelated file name or a self-review did not grow

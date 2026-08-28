@@ -13,6 +13,9 @@ const inventoryDocument = readFileSync(join(ROOT, INVENTORY_PATH), 'utf8')
 const inventory = inventoryDocument.match(
   /## Human-wait inventory and standing autonomy rule \(23\.08\.2026\)([\s\S]*?)\n## The layered mechanisms/,
 )?.[1] ?? ''
+const sweep = inventoryDocument.match(
+  /### Blind standstill sweep and composition check[^\n]*\n([\s\S]*?)\n### Follow-up point boundaries/,
+)?.[1] ?? ''
 
 function filesBelow(dir) {
   const out = []
@@ -86,6 +89,7 @@ const HUMAN_WAIT_FILES = [
   'scripts/permission-autogrant-core.mjs',
   'scripts/review-sol-core.mjs',
   'scripts/user-gate-core.mjs',
+  'scripts/vdzk-admissibility-core.mjs',
 ]
 
 const EXPECTED_ROW_IDS = [
@@ -151,5 +155,18 @@ describe('batch autonomy human-wait inventory', () => {
     expect(prose).toContain('genuinely outward-facing or hard to reverse')
     expect(prose).toContain('Ambiguity falls toward continuation, not confirmation')
     expect(prose).toContain('A question card is a record for later veto, not a lock on the queue')
+  })
+
+  it('carries the accounted 947 fold, every disposition, and the independent fallback contract', () => {
+    const rows = sweep.split(/\r?\n/).filter((line) => /^\| S-\d{2} \|/.test(line))
+    expect(rows.map((line) => line.split('|')[1].trim())).toEqual(
+      Array.from({ length: 27 }, (_, index) => `S-${String(index + 1).padStart(2, '0')}`),
+    )
+    for (const row of rows) expect(row).toMatch(/\*\*(?:In place|Direct fix|Composition rule|INSURMOUNTABLE|Closed here|Closed by double safety)/)
+    expect(sweep).toMatch(/23 A \+ 18 B → 27 union entries; all 41 inputs accounted for/)
+    expect(sweep).toContain('HoA-Batch-Emergency')
+    expect(sweep).toContain('scripts/batch-emergency-drill.mjs')
+    expect(sweep).toContain('local/batch-emergency-veto.json')
+    expect(rows.filter((row) => /\*\*INSURMOUNTABLE:/.test(row))).toHaveLength(1)
   })
 })

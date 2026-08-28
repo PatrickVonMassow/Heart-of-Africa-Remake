@@ -269,6 +269,28 @@ async function fetchRuns(repo, headSha) {
   }
 }
 
+/** Dispatch the one failed-jobs re-run selected by the pure classifier. A 201
+ * is GitHub's acknowledgement; every other result leaves the outage fail-soft
+ * but does not invent a wait that nobody dispatched. */
+async function dispatchFailedJobsRerun(repo, runId) {
+  if (!runId) return false
+  const token = readToken()
+  if (!token) return false
+  const res = await httpsRequest(
+    `https://api.github.com/repos/${repo}/actions/runs/${runId}/rerun-failed-jobs`,
+    {
+      method: 'POST',
+      headers: {
+        Accept: 'application/vnd.github+json',
+        Authorization: `Bearer ${token}`,
+        'User-Agent': 'hoa-ci-status-guard',
+        'X-GitHub-Api-Version': '2022-11-28',
+      },
+    },
+  )
+  return res?.status === 201
+}
+
 /**
  * PROOF, not assumption: did anything under `.github/workflows/` change between
  * the last run of this workflow that GitHub carried to a verdict and HEAD?
@@ -501,10 +523,11 @@ function pushReflog() {
  *  each classified for WHERE its fault lies, so an outage cannot be mistaken for
  *  our own breakage (points 526/528). Returns the chosen classification, whether
  *  every red is unactionable, and the famine clocks to keep. */
-async function judgeRed(repo, { sha, runs, classification, famine, now }) {
+async function judgeRed(repo, { sha, runs, classification, famine, now, rerunWait = null, allowRerun = true }) {
   const reds = failedRuns(runs, sha)
   const judged = []
   const stillFamished = {}
+  let dispatchedWait = null
   for (const red of reds.length > 0 ? reds : [classification]) {
     const jobs = await fetchJobs(repo, red.runId)
     const failed = failedJobNames(jobs)
@@ -512,15 +535,32 @@ async function judgeRed(repo, { sha, runs, classification, famine, now }) {
       red.workflowName === PAGES_WORKFLOW && failed.length > 0 && failed.every((name) => name === 'deploy')
         ? await fetchPagesBlockers(repo)
         : null
+    const rerunKey = `${red.runId}:${red.runAttempt ?? 1}`
+    const alreadyDispatched = rerunWait?.rerunKey === rerunKey
     const cause = classifyFailureCause({
       workflowName: red.workflowName,
+      runStatus: 'completed',
+      runAttempt: red.runAttempt,
       conclusion: red.conclusion,
       jobs,
+      alreadyDispatched,
       pagesBlockers,
       workflowsUntouched: await workflowsUntouchedSince(repo, runs, red, sha),
       famineSince: Number(famine[red.workflowName]) || 0,
       now,
     })
+    if (cause.neverStarted === true) {
+      const accepted = alreadyDispatched || (allowRerun && cause.rerunFailedJobs === true && await dispatchFailedJobsRerun(repo, red.runId))
+      if (accepted && !dispatchedWait) {
+        dispatchedWait = {
+          ...red,
+          state: 'pending',
+          conclusion: null,
+          runAttempt: (red.runAttempt ?? 1) + 1,
+          rerunKey,
+        }
+      }
+    }
     if (cause.actionable === false) stillFamished[red.workflowName] = Number(famine[red.workflowName]) || now
     judged.push({ ...red, ...cause })
   }
@@ -530,6 +570,7 @@ async function judgeRed(repo, { sha, runs, classification, famine, now }) {
     classification: judged.find((c) => c.actionable !== false) ?? judged[0],
     standDown: judged.every((c) => c.actionable === false),
     stillFamished,
+    rerunWait: dispatchedWait,
     // Every workflow this call actually judged, so the sweep can CLEAR the
     // waiver clock of one that is no longer dying the famine way.
     judgedWorkflows: judged.map((c) => c.workflowName),
@@ -624,7 +665,7 @@ export async function gatherCiStatusInputs({ sessionId = '', readOnly = false } 
     famine,
     now,
     fetchRuns: (sha) => fetchRuns(repo, sha),
-    judgeRed: (args) => judgeRed(repo, args),
+    judgeRed: (args) => judgeRed(repo, { ...args, rerunWait: state.ciWait, allowRerun: !readOnly }),
     notify: readOnly
       ? async () => {}
       : ({ target, classification, standDown }) =>
@@ -802,11 +843,19 @@ async function observeDurableWait(wakeToken) {
           classification,
           famine,
           now: observedAt,
+          rerunWait: wait,
         })
         classification = judged.classification ?? classification
         standDown = judged.standDown === true
         famine = { ...famine, ...(judged.stillFamished ?? {}) }
+        if (standDown && judged.rerunWait?.state === 'pending') {
+          classification = judged.rerunWait
+        }
       } catch { /* an undecidable red remains a repository repair path */ }
+      if (classification.state === 'pending') {
+        await new Promise((resolve) => setTimeout(resolve, ciWaitBackoffMs(wait)))
+        continue
+      }
       await notifyCiRed(ciRedAlertMessage({ target: { ref: wait.ref, sha: wait.sha }, classification, standDown }))
     }
 

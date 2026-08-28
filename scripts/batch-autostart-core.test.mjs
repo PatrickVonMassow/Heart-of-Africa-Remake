@@ -498,7 +498,7 @@ describe('the immediate successor decision — one door for every transport', ()
     expect(live.evidence.ownership.lock).toMatchObject({ sessionId: 'owner', assessmentReason: 'pid-alive' })
   })
 
-  it('makes recent registered feature output a named successor veto', () => {
+  it('makes recent unrecognised feature output a named successor veto', () => {
     const decision = start({
       featureWriterRegister: {
         readable: true,
@@ -513,6 +513,55 @@ describe('the immediate successor decision — one door for every transport', ()
       start: false,
       code: 'registered-writer-live',
       evidence: { ownership: { featureWriterRegister: { readable: true } } },
+    })
+  })
+
+  it('starts beside a live declared delegate once its owning session is dead, so the successor can adopt it', () => {
+    const delegate = {
+      branch: 'feat/945-delegate',
+      worktree: '/repo/.claude/worktrees/point-945',
+      recognized: true,
+      output: { verdict: 'alive', judgedOn: 'git', ageMs: 1_000 },
+    }
+    const decision = start({
+      lock: { sessionId: 'dead-owner', pid: 44, fence: 17 },
+      assessment: { alive: false, reason: 'pid-gone' },
+      featureWriterRegister: { readable: true, writers: [delegate] },
+    })
+
+    expect(decision).toMatchObject({
+      start: true,
+      code: 'start',
+      reservation: { trigger: SUCCESSOR_TRIGGERS.WATCHDOG },
+      evidence: {
+        ownership: {
+          lock: { sessionId: 'dead-owner', assessedAlive: false },
+          featureWriterRegister: { writers: [{ branch: 'feat/945-delegate', recognized: true }] },
+        },
+      },
+    })
+    expect(decision.reason).toContain('owner lock assessed inactive (pid-gone)')
+  })
+
+  it('still vetoes a live owner beside its declared delegate', () => {
+    const decision = start({
+      lock: { sessionId: 'live-owner', pid: 44, fence: 17 },
+      assessment: { alive: true, reason: 'pid-alive' },
+      featureWriterRegister: {
+        readable: true,
+        writers: [{
+          branch: 'feat/945-delegate',
+          worktree: '/repo/.claude/worktrees/point-945',
+          recognized: true,
+          output: { verdict: 'alive', judgedOn: 'git', ageMs: 1_000 },
+        }],
+      },
+    })
+
+    expect(decision).toMatchObject({
+      start: false,
+      code: 'owner-live',
+      evidence: { ownership: { lock: { sessionId: 'live-owner', assessedAlive: true } } },
     })
   })
 
@@ -1204,6 +1253,22 @@ describe('runawayRecoveryDecision — a spent watchdog keeps probing', () => {
       expect(d.decisionRecord.body).toMatch(/Retroaktives Veto/)
     }
   })
+
+  it('puts the measured refusal in the pause reason instead of speculative guesses', () => {
+    const d = runawayRecoveryDecision({
+      failCount: 3,
+      attempt: 0,
+      now: NOW,
+      refusal: {
+        code: 'registered-writer-live',
+        reason: 'recent registered feature-writer activity measured for feat/945-delegate',
+      },
+    })
+    expect(d.reason).toContain(
+      'last measured refusal: registered-writer-live — recent registered feature-writer activity measured for feat/945-delegate',
+    )
+    expect(d.reason).not.toMatch(/auth expired|model flag|failing point|push failing/)
+  })
 })
 
 // --- A QUOTA BLOCK IS A WAITING STATE, NOT A FAILURE (point 444) --------------
@@ -1313,6 +1378,62 @@ describe('judgeSpawnOutcome — the limit gets its own state', () => {
     expect(ladder.map((r) => r.nextProbeMs)).toEqual([20, 40, 80].map((m) => m * 60_000))
     expect(ladder.slice(0, -1).every((r) => r.pause === false)).toBe(true)
     expect(ladder.at(-1).pause).toBe(true)
+  })
+
+  it('counts each actual spawn attempt once, while a sequence of refused ticks never moves failCount', () => {
+    let failCount = 0
+    let accountedAttemptKey = null
+    for (const attemptKey of ['spawn-a', 'spawn-b']) {
+      const failed = judgeSpawnOutcome({
+        verdict: 'failed',
+        quotaHit: { hit: false },
+        failCount,
+        attemptKey,
+        accountedAttemptKey,
+        now: NOW,
+      })
+      failCount = failed.failCount
+      accountedAttemptKey = failed.accountedAttemptKey
+    }
+    expect(failCount).toBe(2)
+
+    for (let tick = 0; tick < RUNAWAY_FAIL_LIMIT + 4; tick += 1) {
+      const refused = judgeSpawnOutcome({
+        verdict: 'refused',
+        failCount,
+        attemptKey: 'never-spawned',
+        accountedAttemptKey,
+        now: NOW + tick,
+      })
+      expect(refused).toMatchObject({ state: 'wait', failCount: 2, pause: false })
+      failCount = refused.failCount
+      accountedAttemptKey = refused.accountedAttemptKey
+    }
+    expect(failCount).toBe(2)
+  })
+
+  it('does not count the same failed spawn again on ticks which could not start a replacement', () => {
+    const first = judgeSpawnOutcome({
+      verdict: 'failed',
+      quotaHit: { hit: false },
+      failCount: 0,
+      attemptKey: 'spawn-a',
+      now: NOW,
+    })
+    expect(first).toMatchObject({ state: 'failed', failCount: 1, accountedAttemptKey: 'spawn-a' })
+
+    let repeat = first
+    for (let tick = 0; tick < RUNAWAY_FAIL_LIMIT + 4; tick += 1) {
+      repeat = judgeSpawnOutcome({
+        verdict: 'failed',
+        quotaHit: { hit: false },
+        failCount: repeat.failCount,
+        attemptKey: 'spawn-a',
+        accountedAttemptKey: repeat.accountedAttemptKey,
+        now: NOW + tick,
+      })
+      expect(repeat).toMatchObject({ state: 'wait', failCount: 1, pause: false })
+    }
   })
 
   it('an unprobed failure (no quota lookup at all) is an ordinary failure', () => {

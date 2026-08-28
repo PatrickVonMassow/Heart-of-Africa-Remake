@@ -30,7 +30,18 @@ const entry = (title, riskLines, withPrompt = true) =>
 const filler = Array.from({ length: LIMITS.minEntries }, (_, i) =>
   `- **Füller ${i}** Ein Risiko.\n  → *Prompt:* „Etabliere einen Mechanismus."`,
 )
-const rawDoc = (...entries) => `# Titel\n\n## Die häufigsten Fallstricke\n\n${entries.join('\n\n')}\n`
+const metaRules = `## Drei Meta-Regeln, die alles zusammenhalten
+
+1. **Root-Cause vor Fix.** Eine vermutete Ursache ist ein Kandidat.
+   > *Prompt:* „Versuche zuerst, sie unabhängig zu widerlegen.
+   > Schreib vorher, welcher Befund sie zur Tatsache macht.
+   > Hält sie stand, darf sie wahr sein. Wer den Auftrag vergibt, misst **blind mit**."
+
+2. **Nutzer-Artefakte sind Verträge.** Ändere ihre Struktur nicht ungefragt.
+
+3. **Parallel arbeiten geht nur mit Isolierung.** Trenne die Arbeitskopien.`
+const rawDoc = (...entries) =>
+  `# Titel\n\n## Die häufigsten Fallstricke\n\n${entries.join('\n\n')}\n\n${metaRules}\n`
 const doc = (...entries) => rawDoc(...entries, ...filler)
 
 describe('auditGuide — budgets', () => {
@@ -153,6 +164,72 @@ describe('auditGuide — structural sanity', () => {
   })
 })
 
+describe('auditGuide — falsification meta-rule', () => {
+  it('fails when the root-cause rule loses its independent falsification attempt', () => {
+    const weakened = doc(entry('A', 2)).replace(
+      'Versuche zuerst, sie unabhängig zu widerlegen.',
+      'Bestätige die Vermutung zuerst.',
+    )
+    const { ok, violations } = auditGuide(weakened)
+
+    expect(ok).toBe(false)
+    expect(violations).toContainEqual(expect.objectContaining({
+      kind: 'meta-rule',
+      detail: expect.stringContaining('unabhängigen Widerlegungsversuch'),
+    }))
+  })
+
+  it('fails when a true hypothesis is no longer allowed to survive the attempt', () => {
+    const weakened = doc(entry('A', 2)).replace(
+      'Hält sie stand, darf sie wahr sein.',
+      'Danach muss die Hypothese verworfen werden.',
+    )
+
+    expect(auditGuide(weakened).violations).toContainEqual(expect.objectContaining({
+      kind: 'meta-rule',
+      detail: expect.stringContaining('wahre Hypothese'),
+    }))
+  })
+
+  it('fails when the assigning party no longer measures blindly alongside', () => {
+    const weakened = doc(entry('A', 2)).replace(
+      'Wer den Auftrag vergibt, misst **blind mit**.',
+      'Wer den Auftrag vergibt, wartet auf das Ergebnis.',
+    )
+
+    expect(auditGuide(weakened).violations).toContainEqual(expect.objectContaining({
+      kind: 'meta-rule',
+      detail: expect.stringContaining('blinde Gegenmessung'),
+    }))
+  })
+
+  it('fails when a suspicion loses its promotion criterion', () => {
+    const weakened = doc(entry('A', 2)).replace(
+      'Schreib vorher, welcher Befund sie zur Tatsache macht.',
+      'Prüfe die Vermutung später noch einmal.',
+    )
+
+    expect(auditGuide(weakened).violations).toContainEqual(expect.objectContaining({
+      kind: 'meta-rule',
+      detail: expect.stringContaining('Beförderungskriterium'),
+    }))
+  })
+
+  it('does not accept the required words when they are moved to a neighbouring rule', () => {
+    const misplaced = doc(entry('A', 2))
+      .replace('Versuche zuerst, sie unabhängig zu widerlegen.', 'Prüfe die Vermutung.')
+      .replace(
+        '2. **Nutzer-Artefakte sind Verträge.**',
+        '2. **Nutzer-Artefakte sind Verträge.** Versuche zuerst, sie unabhängig zu widerlegen.',
+      )
+
+    expect(auditGuide(misplaced).violations).toContainEqual(expect.objectContaining({
+      kind: 'meta-rule',
+      detail: expect.stringContaining('unabhängigen Widerlegungsversuch'),
+    }))
+  })
+})
+
 describe('auditGuide — budget boundaries', () => {
   it('allows a risk exactly at the limit and rejects one line more', () => {
     expect(auditGuide(doc(entry('Grenze', LIMITS.maxRiskLines))).violations
@@ -259,6 +336,44 @@ describe('the real vibe-coding guide', () => {
     expect(byTitle['Die Ausnahme existiert nur in der Verweigerung.']).toContain(
       'Kann der ehrlichste Wortlaut der Ausnahme meine eigene Prüfung bestehen?',
     )
+  })
+
+  it('lets a true suspected cause survive the required falsification attempt', () => {
+    const metaRule = sliceSection(guide, /Drei Meta-Regeln/i)
+      .map(({ text }) => text)
+      .join(' ')
+      .replace(/\s+/g, ' ')
+
+    expect(metaRule).toContain('Versuche zuerst, sie unabhängig zu widerlegen.')
+    expect(metaRule).toContain('welcher Befund sie zur Tatsache macht.')
+    expect(metaRule).toContain('Hält sie stand, darf sie wahr sein.')
+    expect(metaRule).toContain('Wer den Auftrag vergibt, misst **blind mit**.')
+  })
+
+  it('keeps the complete window rule while naming omitted review material to its judge', () => {
+    const entries = parseEntries(sliceSection(guide, /Fallstrick/i))
+    const measuredLess = entries.find((entry) =>
+      entry.title.startsWith('Die Messung — und die Gegenprüfung — sah weniger'))
+    const text = measuredLess?.lines.join(' ').replace(/\s+/g, ' ')
+
+    expect(text).toContain('Nur die letzten *n* Einträge')
+    expect(text).toContain('aus dem **Gegenstand** ab: nach Zeit, nie nach Anzahl.')
+    expect(text).toContain('still gekürzter Prüfstoff für das Modell wie ein Mangel')
+    expect(text).toContain(
+      'Nenne dem **prüfenden Modell selbst** jedes weggelassene Material, nicht nur dem Aufrufer',
+    )
+  })
+
+  it('puts a permission beside its limit and reviews cases no rule covers', () => {
+    const entries = parseEntries(sliceSection(guide, /Fallstrick/i))
+    const ruleDrift = entries.find((entry) =>
+      entry.title.startsWith('Regeln und Wächter verrotten'))
+    const text = ruleDrift?.lines.join(' ').replace(/\s+/g, ' ')
+
+    expect(text).toContain('mehrere richtige Regeln können durch ihre Lücke etwas verbieten')
+    expect(text).toContain('Warten sieht dabei wie Sorgfalt aus')
+    expect(text).toContain('**Erlaubnis im selben Satz wie ihre Grenze**')
+    expect(text).toContain('**Welcher naheliegende Fall wird von keiner Regel erfasst?**')
   })
 
   it('sets both ceilings to the guard\'s exact measured size', () => {

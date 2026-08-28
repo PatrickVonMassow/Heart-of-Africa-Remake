@@ -18,6 +18,7 @@ import { execFileSync } from 'node:child_process'
 import { dirname, isAbsolute, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { tryWriteJsonAtomic } from '../atomic-write.mjs'
+import { REPO_ROOT } from '../repo-paths.mjs'
 
 const HERE = dirname(fileURLToPath(import.meta.url))
 export const ROOT = join(HERE, '..', '..')
@@ -28,9 +29,18 @@ export const FRAME_DIR = join(ROOT, 'verification')
 /** A written frame, as opposed to the README that shares the directory. */
 const FRAME_FILE = /\.(png|jpg|jpeg)$/i
 
+/** The checkout whose RUNS this process is speaking about. The module's own
+ *  location is the wrong answer for a fixture: a test that executes a script
+ *  from this checkout with cwd and HOA_REPO_ROOT in a temporary repository
+ *  would read the LIVE checkout's run records. That is how the attended
+ *  context-ceiling hook found a running verification during its own unit run
+ *  and swallowed the notice its test was asserting (measured 26.08.2026).
+ *  Resolved once per process, so no hook pays a git call per invocation. */
+const RUN_ROOT = REPO_ROOT || ROOT
+
 /** The log directory the wrapper writes into (VERIFY_LOG_DIR overrides it). */
 export function logDir(env = process.env) {
-  return env.VERIFY_LOG_DIR ? join(ROOT, env.VERIFY_LOG_DIR) : join(ROOT, 'local', 'verify-logs')
+  return env.VERIFY_LOG_DIR ? join(RUN_ROOT, env.VERIFY_LOG_DIR) : join(RUN_ROOT, 'local', 'verify-logs')
 }
 
 /** The record sits beside its log and carries its name, so the two can never

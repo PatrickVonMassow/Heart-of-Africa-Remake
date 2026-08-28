@@ -297,8 +297,8 @@ Vitest+SMALL / Vitest+LARGE; the **closing cycle ALWAYS runs LARGE**):
 
 | Tier | Command | Backend | Browser suites | Preview |
 |------|---------|---------|----------------|---------|
-| **SMALL** (everyday gate) | `npm run test:small` | WebGPU | `docs, i18n, flow, health, events, collision, voice` — fast, low-flake, core coverage (doc/i18n consistency, the one E2E core loop, health/events/collision, TTS) | no |
-| **LARGE** (default) | `npm test` / `npm run test:large` | WebGL 2, then WebGPU | **all 18** — SMALL plus the heavier scene/geometry/screenshot suites (`world, handwriting, polish, gamepad, touch, settings, invariants`), `startup` (the point-337 loading-picture freeze budget), `benchmark` (the in-game F8 measurement run), `report` (the F6 bug-report archive, whose PNG member is decoded and checked for real scene content) and `enrichments` (the wildlife/atmosphere staging, which carries the rotating family flakes) | yes |
+| **SMALL** (everyday gate) | `npm run test:small` | WebGPU | `docs, board-layout, i18n, flow, health, events, collision, voice` — fast, low-flake, core coverage (doc/board/i18n consistency, the one E2E core loop, health/events/collision, TTS) | no |
+| **LARGE** (default) | `npm test` / `npm run test:large` | WebGL 2, then WebGPU | **all 19** — SMALL plus the heavier scene/geometry/screenshot suites (`world, handwriting, polish, gamepad, touch, settings, invariants`), `startup` (the point-337 loading-picture freeze budget), `benchmark` (the in-game F8 measurement run), `report` (the F6 bug-report archive, whose PNG member is decoded and checked for real scene content) and `enrichments` (the wildlife/atmosphere staging, which carries the rotating family flakes) | yes |
 
 Both tiers run the same Vitest + build + lint preflight. SMALL is a strict subset
 of `DEV_SUITES`; keep it that way. New heavy or flaky browser scenarios join
@@ -971,9 +971,10 @@ fails soft: a triage aid must never turn a readable red into a crashed run. The
 suite result stays the gate — `--strict` is there for a caller that wants a
 non-zero exit on a real regression.
 
-`docs` is a pure-Node suite, so it needs no server on either side
-(`SERVERLESS_SUITES` in `tiers.mjs`; a `docs`-only run starts no vite at all) and
-the baseline runs the baseline tree's OWN copy of it.
+`docs` is a pure-Node suite and `board-layout` renders self-contained board HTML
+in bundled Chromium, so neither needs the game server on either side
+(`SERVERLESS_SUITES` in `tiers.mjs`). The baseline runs the baseline tree's OWN
+copy of either one.
 
 ## What a fix must PROVE (point 589)
 

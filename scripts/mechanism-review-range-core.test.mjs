@@ -7,6 +7,9 @@ import {
   eligibleReviewer,
   outstandingFiles,
   planAuthorshipGroups,
+  REVIEW_END_STATE_EXCLUSIONS,
+  reviewEndStateExclusion,
+  reviewEndStateFiles,
   summarizeReviewDebt,
   vendorOf,
 } from './mechanism-review-range-core.mjs'
@@ -16,6 +19,46 @@ const sha = (letter) => letter.repeat(40)
 const commit = (id, authorModel, files) => ({ sha: sha(id), authorModel, files })
 
 describe('authorship-cut mechanism review planning', () => {
+  it('owes no pass for a range touching only the two work-order documents', () => {
+    const files = ['TASKS.md', 'docs/tasks-archive.md']
+    const plan = planAuthorshipGroups({
+      commits: [commit('a', 'GPT-5.6 Sol', files)],
+      endStateFiles: files,
+    })
+    expect(reviewEndStateFiles(files)).toEqual([])
+    expect(plan.groups).toEqual([])
+    expect(plan.artefacts).toEqual([])
+    expect(plan.dropped).toEqual(
+      files.map((file) => expect.objectContaining({ file, reason: REVIEW_END_STATE_EXCLUSIONS[file] })),
+    )
+  })
+
+  it('owes no pass for the retrospective, which has its own guard and no round can hold', () => {
+    const ledger = '.claude/mechanism-reviews.jsonl'
+    // The LEDGER is deliberately NOT excluded (Sol, review of 334f7c6 and
+    // cd1c16e): a deleted or rewritten row is a real change somebody must read,
+    // and an appended one is where a hand-written forgery would sit.
+    expect(reviewEndStateExclusion(ledger)).toBe(null)
+    expect(reviewEndStateFiles([ledger])).toEqual([ledger])
+    const retro = 'docs/analysis_de/retrospektive-zusammenarbeit.md'
+    expect(reviewEndStateFiles([retro])).toEqual([])
+    expect(reviewEndStateExclusion(retro)).toMatch(/retro-currency-guard/)
+  })
+
+  it('still owes the mechanism beside an excluded work-order document', () => {
+    const mechanism = 'scripts/four-eyes-guard.mjs'
+    const plan = planAuthorshipGroups({
+      commits: [commit('a', 'GPT-5.6 Sol', ['TASKS.md', mechanism])],
+      endStateFiles: ['TASKS.md', mechanism],
+    })
+    expect(plan.groups).toEqual([
+      expect.objectContaining({ files: [mechanism], reviewer: 'Opus 5' }),
+    ])
+    expect(plan.dropped).toEqual([
+      expect.objectContaining({ file: 'TASKS.md', reason: REVIEW_END_STATE_EXCLUSIONS['TASKS.md'] }),
+    ])
+  })
+
   it('groups single-vendor files and names an other-vendor reviewer', () => {
     const plan = planAuthorshipGroups({
       commits: [
@@ -34,19 +77,20 @@ describe('authorship-cut mechanism review planning', () => {
     ])
   })
 
-  it('keeps a historically mixed-vendor file as one artefact routed by its final author', () => {
+  it('keeps a historically mixed-vendor file whole and routes around every contributor', () => {
     const file = 'scripts/shared-guard.mjs'
     const plan = planAuthorshipGroups({
       commits: [commit('a', 'Claude Opus 5', [file]), commit('b', 'GPT-5.6 Sol', [file])],
     })
-    expect(plan.mixedFiles).toEqual([])
+    expect(plan.mixedFiles).toEqual([file])
     expect(plan.groups).toEqual([
       expect.objectContaining({
         kind: 'files',
-        vendor: 'openai',
+        vendor: 'anthropic+openai',
+        authors: ['Claude Opus 5', 'GPT-5.6 Sol'],
         commits: [sha('a'), sha('b')],
         files: [file],
-        reviewer: 'Opus 5',
+        reviewer: 'Fable 5',
       }),
     ])
   })
@@ -88,11 +132,11 @@ describe('authorship-cut mechanism review planning', () => {
     })
     expect(plan.groups[0].reviewer).toBe('')
     expect(plan.groups[0].reviewerVendor).toBe('')
-    expect(plan.groups[0].unreviewableReason).toMatch(/every configured reviewer vendor authored part/)
+    expect(plan.groups[0].unreviewableReason).toMatch(/every configured reviewer model authored part/)
     expect(plan.unreviewable).toEqual([plan.groups[0]])
   })
 
-  it('reports a contribution co-authored by both vendors as unreviewable', () => {
+  it('routes a contribution co-authored by both vendors to the first exact non-author', () => {
     const plan = planAuthorshipGroups({
       commits: [
         {
@@ -103,11 +147,10 @@ describe('authorship-cut mechanism review planning', () => {
       ],
     })
     expect(plan.groups[0]).toMatchObject({
-      reviewer: '',
-      reviewerVendor: '',
-      unreviewableReason: expect.stringMatching(/every configured reviewer vendor authored part/),
+      reviewer: 'Fable 5',
+      reviewerVendor: 'anthropic',
     })
-    expect(plan.unreviewable).toEqual([plan.groups[0]])
+    expect(plan.unreviewable).toEqual([])
   })
 
   it('splits a mixed-authorship range and names the eligible vendor for each part', () => {
@@ -150,18 +193,20 @@ describe('authorship-cut mechanism review planning', () => {
   })
 
   it('attributes a trailerless merge to the contribution at its merged-parent tip', () => {
-    const ledger = '.claude/mechanism-reviews.jsonl'
+    // Any ordinary carried file — the subject here is merge attribution, not
+    // which paths the gate demands.
+    const carried = 'scripts/carried-notes.md'
     const plan = planAuthorshipGroups({
       commits: [
         { ...commit('a', 'GPT-5.6 Sol', ['sol-only']), parentShas: [] },
-        { ...commit('b', 'Claude Opus 5', [ledger]), parentShas: [] },
-        { sha: sha('c'), parentShas: [sha('a'), sha('b')], files: [ledger] },
+        { ...commit('b', 'Claude Opus 5', [carried]), parentShas: [] },
+        { sha: sha('c'), parentShas: [sha('a'), sha('b')], files: [carried] },
       ],
     })
     expect(plan.groups).toEqual([
       expect.objectContaining({ files: ['sol-only'], commits: [sha('a')], reviewer: 'Opus 5' }),
       expect.objectContaining({
-        files: [ledger],
+        files: [carried],
         commits: [sha('b'), sha('c')],
         authors: ['Claude Opus 5'],
         reviewer: 'GPT-5.6 Sol',
@@ -193,6 +238,7 @@ describe('authorship-cut mechanism review planning', () => {
   it('requires the other vendor even when another same-vendor model is not an author', () => {
     expect(eligibleReviewer(['Claude Fable 5'])).toBe('GPT-5.6 Sol')
     expect(eligibleReviewer(['GPT-5.6 Sol'])).toBe('Opus 5')
+    expect(eligibleReviewer(['GPT-5.6 Sol', 'Claude Opus 5'])).toBe('Fable 5')
     expect(vendorOf('Claude Opus 5 <noreply@anthropic.com>')).toBe('anthropic')
   })
 })

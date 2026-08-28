@@ -152,30 +152,36 @@ put it is the mistake this line exists to stop.
   into a formality.
   Bundle: Session- & Repo-Hygiene.
 
-- [ ] 581. The settlement boundary is too faint, and its slider is already at the ceiling
-  (user 09.08.2026, F6 report `local/bugreports/DorfgrenzeSchlechtErkennbar.zip`: "Die
-  Dorfgrenze ist zu schlecht erkennbar. Der Kontrast muss höher sein"). MEASURED from his
-  state: `placeEdgeBand` stands at the shipped defaults, `widthM: 3`, `wanderM: 0.9`,
-  `strength: 1` — and `strength` is documented as "0 (invisible) .. 1 (the full per-kind
-  look)". He is therefore already looking at the STRONGEST edge the game can draw, and it
-  is not enough. This is not a calibration miss: there is no knob left to turn, so the
-  per-kind look itself carries too little contrast against the ground it sits on.
-  FINAL STATE: the boundary READS at a glance from inside the settlement, at the walking
-  pace and eye height the player actually has, in every settlement kind and on the ground
-  colours they stand on — the Bambara village's pale sand is the case that failed, so it
-  is the case that must be shown to work. The contrast comes from the band's own design
-  (value against the surrounding ground, not hue alone — the report is from a sand-on-sand
-  village), and it stays a give-way rather than becoming a painted stripe: the §2.6 look
-  is a threshold the player reads, not a fence. `strength: 1` remains the full look, so
-  the ceiling moves with the design rather than being raised past it.
-  VERIFIABLE: the PICTURE decides, since the complaint is legibility — a first-person
-  frame from inside the settlement at the boundary in at least the Bambara village and
-  one contrasting settlement kind, on BOTH backends, judged by looking. Plus a pure test
-  pinning the contrast the design settles on (the band's value against the sampled ground
-  value stays above the chosen minimum for every settlement kind), so a later ground or
-  palette change cannot quietly erase it again.
-  Criticality: medium — the boundary is what tells the player where the settlement ends
-  and the bird's-eye view resumes; §2.6 and criterion 15 both rest on it being legible.
+- [ ] 958. The independent emergency lane reads a session's own tool calls as batch progress, so a
+  BUSY wedge never reaches it. MEASURED 27.08.2026 while cross-reading the lane point 947 built:
+  `scripts/batch-emergency-core.mjs` puts `ACTIVITY_CLASSES.FOREGROUND` into `ADVANCING_CLASSES`,
+  and `latestProgressAt` takes the latest END of any advancing interval. By the standstill
+  classifier's own definition an interval is FOREGROUND on nothing more than a timestamped
+  session-linked tool call. So an owner wedged in a BUSY loop — a poll loop, a guard refusal it
+  keeps retrying, an agent re-reading the same files — keeps emitting foreground intervals, the
+  progress boundary keeps moving, and `emergencyDecision` never reaches its one-hour threshold. The
+  lane therefore covers the QUIET wedge only, while `docs/batch-autonomy.md` S-19 claims it covers
+  the live-but-wedged owner because it "uses bounded advancing intervals, never process presence".
+  That claim is true about process presence and false about tool activity, and the busy shape is
+  measured in this repository: the poll-loop rule of 28.07.2026 records a chain of 437 answers for
+  one word.
+  FINAL STATE:
+  - PROGRESS FOR THIS DECISION IS BATCH PROGRESS, not session activity: a first-parent commit on
+    `main`, a landed point, a committed boundary, a delegated branch that moved. Foreground tool
+    activity may at most soften a strike; it may never reset the clock on its own.
+  - THE DOCUMENT SAYS WHICH OF THE TWO IT MEASURES. `docs/batch-autonomy.md` S-19 is corrected in
+    the same commit, because its present wording is what makes the gap invisible.
+  - THE QUIET CASE IS NOT LOST. A wedge with no activity at all must still strike exactly as it
+    does today; the change may only ADD the busy case.
+  VERIFIABLE: Vitest over `emergencyDecision` — a timeline of unbroken FOREGROUND intervals with no
+  batch-level advance for longer than the threshold still strikes; a real batch advance inside the
+  threshold still stands the lane down; and the existing quiet-wedge cases stay green. Plus the
+  chaos drill extended to the busy shape: a wedged owner that keeps making tool calls is recovered
+  without human action.
+  Criticality: high — it is the hole in the double safety the user ordered on 26.08.2026, and the
+  busy wedge is the shape this batch has actually produced.
+  Bundle: Urlaubsfestigkeit. It changes the same decision core as 947's lane, so it does not run
+  beside another point touching `scripts/batch-emergency-core.mjs`.
 
 - [ ] 925. The durable lane is built but neither measured nor journalled, and its failure
   matrix does not touch the real path. Point 676 landed the whole plane — bounded dispatch,
@@ -1217,6 +1223,38 @@ put it is the mistake this line exists to stop.
   that /v0.3/ and /poc/ serve the new state, and FREEZE the tag: it is never
   re-pointed.
 
+
+- [ ] 938. Three recorded `enrichments` reds name a TICKED point, so nothing can ever own them
+  (measured 26.08.2026 on `.claude/render-verify-state.json` while answering point 734's sixth
+  round). The `webgpu/enrichments` runs of 17.08.2026 08:46, 09:07 and 09:26 each carry the same
+  unaccounted check red — "the streamed dressing does not grow over a session at a fixed anchor
+  (point 278)" — recorded with `point=null` and `featureLevel=compatibility`. That check is point
+  278's own live witness, and 278 is TICKED. Under the charge-expiry rule a charge dies with its
+  point, so this red has NO owner it could ever be charged to: the ledger requires an OPEN point,
+  and point 734's retroactive route — proven in the same round by a Vitest case, a new
+  `RED_CHARGES` entry reaching the blocking question of a run already on disk — has nothing to bind
+  it to. This is exactly the "unowned product defect" hole point 734's own text names, met in the
+  wild for the first time.
+  DECIDE BY MEASUREMENT, NOT BY TASTE — the two readings are opposite and only one can be true:
+  either the dressing-growth regression 278 fixed is BACK (the check is right and the game is
+  wrong), or the check is stale on the compatibility feature level, where the adapter's own
+  streaming behaviour differs from the core lane it was written against (the check is wrong and the
+  game is fine). Every one of the three recorded runs is `featureLevel=compatibility`, which is a
+  reason to suspect the second and no proof of it.
+  FINAL STATE:
+  - THE MEASUREMENT IS TAKEN FIRST: the fixed-anchor instance count is re-measured on BOTH feature
+    levels, and the verdict names which of the two readings the numbers support.
+  - THE RED GETS AN OWNER EITHER WAY. If the regression is back, this point owns it and fixes it.
+    If the check is stale, this point re-scopes the check and says so where it is written.
+  - THE THREE STORED RUNS STOP BLOCKING WITHOUT A DEFERRAL, through one ledger entry scoped
+    `suite=enrichments`, `backend=webgpu`, `kind=check` — which is precisely what point 734's
+    retroactive route exists for, and this point is its first real user.
+  VERIFIABLE: the re-measurement with its numbers on both feature levels; the Vitest witness of
+  whichever half turns out to be wrong; and `node scripts/render-verify-guard.mjs --status` on a
+  quiet machine showing the three 17.08. runs accounted for with no `--defer`.
+  Criticality: medium-high — a red nobody can own is the one state the charge ledger cannot
+  express, and it blocks the render window for as long as it stands.
+  Bundle: Steuerung & Performance.
 
 - [ ] 899. `board-first-guard` locks a delegated author out of its own worktree. MEASURED
   24.08.2026 by the delegated author of point 893. The guard means to exempt a delegated worktree —
@@ -2381,6 +2419,21 @@ put it is the mistake this line exists to stop.
   standstill during live delegated work is not merely imprecise — it is the one statement the
   board exists to get right, and it is dictated to the session under end-of-session pressure, so
   a careful session copies it verbatim and publishes the falsehood.
+  IT HAPPENED AGAIN, SIX DAYS LATER, WORD FOR WORD (measured 27.08.2026, 02:40, at this session's
+  context watermark — 173 704 tokens against 122 000). `node scripts/batch-boundary.mjs --prepare
+  --context` again reported in ONE breath that "the declared in-flight work is transferable
+  (feat/957-contribution-scoped-review@0964ff44)" and again dictated a card ending "Hier läuft
+  nichts weiter.", while GPT-5.6 Sol was demonstrably still authoring point 957, five checkpoint
+  commits deep. Nothing about the source has moved: both return paths of the composer still append
+  the sentence with no reference to the in-flight state the very same command has just certified.
+  The card pairs it with "Kein Fenster hat den Stapel beansprucht", so for a reader on a phone the
+  two sentences together read as a full stop on the whole batch.
+  THE SESSION REFUSED THE DICTATION THIS TIME, which is the workaround and not the fix: the
+  published card names the lane that keeps running and the successor that adopts it. That is only
+  available to a session that stops to check the sentence it was handed — under end-of-session
+  pressure, and with the instruction saying "verbatim", the default remains publishing the
+  falsehood. Two occurrences with no code change between them make this a standing misreport, not
+  an incident.
   FINAL STATE: the closing sentence is bound to the in-flight state. Without transferable work it
   stays as it is; with transferable work the card names WHAT continues and that the successor
   takes it over.
@@ -2826,6 +2879,17 @@ put it is the mistake this line exists to stop.
   »stands down: another live session owns the batch lock«. Cost that turn: before landing point 897
   the outstanding DO-NOT-MERGE that `guard-preflight` names could not be checked for merge-blocking
   through `--status`, and had to be settled by reading the lock file by hand.
+  STILL STANDING 27.08.2026, 02:20, AND THE `--session` FLAG DOES NOT EXIST. The owning session
+  (`4f0a2cc4-…`, its live pid 3448131 and `fence: 814` in `.claude/batch-lock.json`) asked `node
+  scripts/branch-hygiene-guard.mjs --status` and was told »steht zurück — another live session owns
+  the batch lock«. Repeating it WITH `--session <the owning id>` returned the identical line: the
+  flag this point's FINAL STATE calls for is not parsed by that guard at all, so the workaround the
+  earlier instances imply is not available either. Only `echo '{"session_id":"…"}' | node
+  scripts/branch-hygiene-guard.mjs --status` answered truthfully — »sauber (clean)«. The cause is
+  visible in the source and is the shared one: `scripts/branch-hygiene-guard.mjs` resolves its id
+  from `readFileSync(0, 'utf8')` alone and passes `''` on to `heldByOtherLiveOwner`. Cost that turn:
+  the merge-ends-the-branch backstop could not be read while seven feature worktrees stood parked,
+  which is exactly the state it exists to judge.
   Criticality: medium — no product defect, but it silently withholds a reading two governing
   documents ask for.
   Bundle: Session- & Repo-Hygiene.
@@ -3962,6 +4026,26 @@ Build order, chosen so no two parallel agents own the same file:
   If the measurement shows a quiet reading is unreachable here, the criterion names the
   substitute evidence (CPU and load average, with the worktree and own-process rules above) that
   a quiet verdict may rest on, so both verdicts keep a reachable green.
+  BOTH HALVES MEASURED TOGETHER, 27.08.2026, 00:12, on main `6edd81fd`, and the gate is now
+  structurally suspended rather than occasionally wrong. `node scripts/batch-doctor.mjs --gate`
+  reported `npm run test:unit FAILED but the verdict is INCONCLUSIVE (load) — 7 live agent
+  worktree(s)` and, in the same line, `GPU load NOT measured (no sysfs gpu_busy_percent, no
+  nvidia-smi)`. Neither excuse held: `ps` over all seven worktree paths found NO process in any of
+  them, and their newest commits are 3, 4, 8, 9, 9, 12 and 14 days old — parked branches, i.e.
+  precisely the debris case this point already rules out. `liveAgentWorktrees()` in
+  `scripts/batch-doctor.mjs` takes every path under `worktrees/` straight from `git worktree list
+  --porcelain` and asks neither for a recent edit nor for a process, so while this batch parks
+  feature branches — its normal state — `isEvidenceGrade()` can never return true. Add the host's
+  permanently missing GPU counter and the two clauses close on each other: the quiet reading is
+  unreachable AND the worktree excuse never lifts, so NO red this gate ever takes can be evidence,
+  and its own verdict line ends `do NOT stop the batch on this`. That is the permanent-UNDECIDED
+  state the paragraph above warns against, reached from both sides at once.
+  WHAT THE RED ACTUALLY WAS, since the excuse hid it: nothing. Re-run by hand the same hour, the
+  suite reported 430 files and 14 015 tests ALL PASSED and still exited 1, because the global
+  teardown of `scripts/repository-integrity.mjs` had seen a ref move — point 955. The moving ref
+  was this session creating the next point's own feature branch at 00:12:28Z, four seconds before
+  the run ended. So the load excuse was covering a false red from a different mechanism, and the
+  tree it refused to judge was entirely green: the two defects hand each other an alibi.
   VERIFIABLE: Vitest on the pure verdict — a red beside a worktree whose newest edit is hours
   old is BROKEN, not inconclusive; a red beside a worktree edited a minute ago stays
   inconclusive; the reason string names the deciding measurement. Plus, on the process probe: a
@@ -5010,12 +5094,12 @@ Build order, chosen so no two parallel agents own the same file:
   DOCS: design.md §21.1 already states it; name the parameter in the README's play
   links if that file lists them, so the shareable form is discoverable.
 
-- [ ] 422. The beginner guide is full, and three lessons are still outside it
+- [ ] 422. The beginner guide is full, and four lessons are still outside it
   (29.07.2026, found while doing the guide review the currency guard demands).
   `docs/analysis_de/vibe-coding-anleitung.md` sits at EXACTLY its budget — measured
   13.08.2026, 415 lines of 415 and 3677 words of 3677 (`scripts/guide-brevity-core.mjs`).
   The gate is right to hold it there: a beginner guide that grows without bound stops being
-  read, and a full guide makes every new lesson pay for its place. THREE lessons are still
+  read, and a full guide makes every new lesson pay for its place. FOUR lessons are still
   waiting, and each is a pitfall in the guide's own form:
   (A) changing WHERE or HOW something is delivered does not carry the old path's guarantees
   along, and what no test pins falls away SILENTLY — the page still loads, the tests stay
@@ -5038,6 +5122,14 @@ Build order, chosen so no two parallel agents own the same file:
   is this point's forcing function doing its job, not a reason to skip the lesson. The
   reverted wording stands verbatim in commit 9b484e41 and is the draft to fold in, not to
   invent a second time.
+  (D) a bar meant to stop a rejected state from returning was calibrated on the author's OWN
+  intended layout and was therefore satisfied by exactly that rejected state (27.08.2026,
+  retrospective §3.202, points 967/969): "at most two content rows" is what the rendering the
+  user had rejected spends. A check derived from the intended solution measures the author's
+  intention and not the user's complaint; it is compatible by construction with every rendering
+  its author thought right. Its prompt belongs beside the existing »Fehlalarm behoben« entry,
+  which is the same subject from the other side: calibrate a bar against the REJECTED state, and
+  treat it as unfinished until a control that RESTORES that state fails it.
   DECIDE AND DO, in this order: (1) read the guide whole and judge which existing entry is
   now the WEAKEST — the budget is a forcing function, so a new lesson earns its place by
   displacing one, not by widening the frame; (2) for (C) the cheapest displacement is
@@ -5059,10 +5151,19 @@ Build order, chosen so no two parallel agents own the same file:
   morning — commit 77d34781 paid a new pitfall out of six neighbouring entries instead of
   out of the ceiling. The 13.08. measurement is stale with it: the guide stands at 413 of
   415 lines and 3556 of 3677 words (measured 20.08.2026), so a small entry fits today
-  without displacing anything. Everything else here holds: the three lessons are still out
+  without displacing anything. Everything else here holds: the lessons are still out
   of the guide, and (1)–(4) are still the order to work them in.
   NOTE: the guide currency was attested on 29.07. against the sources of that day; the
   review found this gap and could not close it, which is what this point exists for.
+  ALSO OWED HERE (27.08.2026, found while landing point 969). Commit `2dbce90f` — the one that
+  delivered lesson (A) into the guide and the retrospective — is already on `main` and carries a
+  recorded DO-NOT-MERGE from GPT-5.6 Sol: a false-refusal imperative, no semantic enforcement of
+  the new rule, and no retrospective edit. Nothing answered it, so `mechanism-review-guard`
+  raises it at EVERY turn end, and until it is answered the rule COUNTS as enforced while it is
+  not — which is the state that guard exists to prevent. Answer the three named defects and
+  record the re-review at a commit that DESCENDS from `2dbce90`; a verdict on work that does not
+  contain the fix answers nothing. This is part of the same guide work, so it is done in this
+  point rather than in one of its own.
 
 - [ ] 451. The reply that sent its own flag (user 30.07.2026: "Was ist mit dem Chat los?" —
   two agent messages on the board read literally `--text-stdin`; bundle Chat & Tafel).
@@ -8452,6 +8553,17 @@ to land than a mechanism that needs a review.
   other landmarks (Khartoum, Lake Victoria, Kilimanjaro, the Congo mouth, Cape Town, Lake
   Chad) pass in the same run, so it is not the shutter and not the projection: those refuse
   correctly, which is why this was caught at all.
+  MEASURED AGAIN 26.08.2026 on `main` at f178ea6d, and it decides the question above: the
+  SAME failure, word for word — "its subject is not in the rendered picture: off the left and
+  bottom edge of the frame" — now reds on `11-worldmodel-khartoum-confluence` instead, twice
+  including the suite's own retry, in two separate sittings, the second on a quiet machine.
+  The other six landmarks pass, and `world` on WebGL 2 writes all seven green in the same
+  sitting. Khartoum was one of the six that PASSED on 11.08., so this is not a placement
+  change at one site: the signature ROTATES between landmarks, which is the second of the two
+  causes this point had to choose between. It is therefore an unsettled jump, and the fix is
+  the one point 514 already states for its own instance — the wait after a jump POLLS the
+  camera having arrived rather than counting milliseconds. Both frames are charged to this
+  point in `scripts/render-verify-charges.mjs`, each scoped to `world`/WebGPU.
   FINAL STATE: the cause is NAMED with evidence — the jump to (-17.9, 25.9) not settling
   before the shutter opens, a camera clamp at that latitude, or a real placement change —
   and fixed at that cause. If it is timing, the frame waits on the STATE the jump reaches,
@@ -9301,6 +9413,21 @@ to land than a mechanism that needs a review.
   cases — which this suite always does — is classified as a non-green gate. Both of today's
   authoring runs tripped it while their gates were green, and the supervising session then looks
   for a cause that does not exist.
+  STILL TRUE 27.08.2026, and now it fires on EVERY leg: all three authoring legs of point 953
+  reported "test:unit green (430 files, 14,008 passed, 6 skipped); build green; lint green" and
+  "test:unit passed (14,010 tests, 6 skipped); build passed; lint passed", and all three were
+  flagged "it reports a gate as anything but green". The suite has carried 6 skipped tests all
+  evening, so no truthful report of it can pass this check. The module's own justification — a
+  false positive costs one line of explanation — does not survive a false positive that fires every
+  single time: a warning that is always wrong trains the reader to skip the PROBLEMS block, which
+  is where a real red would be. That raises the cost above the recorded "low".
+  AND AGAIN ON THE NEXT LANE, 27.08.2026, 02:50: the point 957 authoring run closed with "test:unit
+  GREEN (14,024 passed, 6 skipped); build GREEN; lint GREEN" and was flagged "it reports a gate as
+  anything but green". That is the fourth consecutive lane, and the suite's 6 skipped cases have
+  now been constant for two evenings, so the check has not produced a true positive in any observed
+  run. It arrived beside four false authorship flags from the same PROBLEMS block (the new point
+  below), which is exactly the compounding this entry predicts: the block was five sixths noise, and
+  the one line in it worth reading had to be found by hand.
   FINAL STATE:
   - THE PATTERN MATCHES FAILURE, NOT ABSENCE. `gatesProblem` reads a gate as not green on the
     words that mean a failure; a summary line reporting skipped cases beside passing ones is
@@ -9313,6 +9440,41 @@ to land than a mechanism that needs a review.
   passes a red one as green.
   Bundle: Modell & Wächter.
 
+- [ ] 962. The readiness check charges a delegated lane with the main commits its own brief told it
+  to merge in (measured 27.08.2026, 02:50, on the point 957 lane). `scripts/author-sol.mjs` closed
+  the run with nine PROBLEMS, and four of them were pairs about the same four commits: `87b6e94`,
+  `4baf452`, `1d25dc3` and `49453a8` "do not name GPT-5.6 Sol as author — this lane's commits must"
+  and are "not an interim rescue commit: the subject does not carry `[skip ci]`". All four are the
+  SUPERVISING session's own cross-cutting bookkeeping commits, written on `main`, correctly
+  trailered `Co-Authored-By: Claude Opus 5`, pushed and CI-green before the lane ever saw them.
+  They entered the lane's range because the author did what the delegation brief REQUIRES —
+  "merge `main` INTO your branch FIRST, then verify that tree" — twice, as "Merge current main
+  before acceptance".
+  CAUSE, read in the source: the loop in `scripts/author-sol-core.mjs` (around line 568) walks
+  every commit of `base..HEAD` and applies the lane's authorship and rescue-commit rules to each.
+  A merge makes another branch's history reachable from HEAD, so `base..HEAD` is not the lane's
+  CONTRIBUTION — it is the lane's contribution plus everything `main` did meanwhile. Since the
+  brief mandates that merge, the false flags fire on every correctly run lane whose point outlives
+  a single main commit, and they scale with how much the supervising session lands in parallel.
+  WHY IT IS NOT COSMETIC, and why it belongs beside 729: this run's PROBLEMS block held nine
+  entries, of which eight were false — these four pairs — and the ninth was 729's "6 skipped" false
+  positive. The block was ENTIRELY noise, and 729's own argument applies with full force: a warning
+  that is always wrong trains the supervising session to skip the one place a real red would be
+  announced. Two independent false-positive sources in one block is what makes it unreadable
+  rather than merely annoying.
+  FINAL STATE: the readiness check judges the lane's OWN commits. The set is derived so that
+  history reachable through a merge from the base branch is excluded — first-parent walk from HEAD
+  down to the merge base, or an equivalent that provably drops commits already contained in the
+  base branch — and a commit already present on `origin/main` is never charged to the lane under
+  any rule. What remains keeps today's authorship and rescue-commit demands unchanged.
+  VERIFIABLE: Vitest over the readiness reader — a branch with two own commits and a merge of three
+  foreign main commits reports problems for the two only; the same branch with a genuinely
+  mis-trailered own commit still reports it; and a case that FAILS if the selection reverts to a
+  plain `base..HEAD` list.
+  Criticality: medium — nothing is corrupted and no red passes as green, but it makes the delegated
+  lane's only automated readiness report unreadable, and it punishes the lane precisely for
+  following the merge-before-acceptance rule.
+  Bundle: Modell & Wächter.
 
 - [ ] 741. A carrier entry carries its writer's situation as though it were the finding's own
   (measured 19.08.2026, 18:47). The entry of 16:38 closed with "blocked until the batch is taken
@@ -10657,38 +10819,6 @@ to land than a mechanism that needs a review.
   slips past it unnoticed, which is exactly how the first one survived.
   Bundle: Session- & Repo-Hygiene.
 
-- [ ] 843. A ruling the owner already gave is asked again, because the only place it lives is a
-  memory (measured 22.08.2026, 22:05, from the owner's own board message: "Ich hatte bereits vor
-  längerer Zeit festgelegt, dass du selbstständig - als letztes Mittel - die Obergrenze anlegen
-  sollst. Das vergisst du immer wieder. Etabliere mit einem Mechanismus, dass du mich das nicht
-  mehr fragst. Die bisherige Form, in der das hinterlegt ist, ist offensichtlich unzureichend.").
-  The card he was answering — "Anhebung der Anleitungs-Obergrenze: selbst entscheiden oder
-  zurücknehmen?" — asked him to confirm a decision he had already delegated on 10.08.2026
-  ("Frage mich in Zukunft allgemein nicht mehr bzgl. Anhebungen"). The ruling IS recorded, in the
-  auto-memory `doc-budget-shorten-dont-raise`, and the card was written anyway: a memory is read
-  when a session happens to recall it, and nothing REFUSES the question at the moment it is
-  asked. This is not the doc-ceiling rule's problem — that rule is written correctly. It is that
-  a settled ruling has no enforcing home, so every settled ruling in this repository can be
-  re-asked the same way.
-  FINAL STATE: settled owner rulings live in ONE tracked register, each carrying the ruling, the
-  date, the owner's verbatim words, and the terms that identify a question about it. `node
-  scripts/board.mjs vdzk-add` REFUSES a card whose title or question matches a registered ruling
-  and prints the ruling plus the action it already authorises, so the card cannot be written at
-  all; `decision-card-guard` judges the composed reply against the same register, so asking in
-  prose is refused by the same words. The doc-ceiling ruling is the register's first entry, and
-  the memory stops being the record and points at the register instead.
-  MATCHING MUST NOT GO BLIND EITHER WAY: a rewording of the same question is still refused, and a
-  question the register does not cover passes untouched — a register that swallows genuine
-  decisions costs more than the repetition it prevents. Where a match is uncertain, the refusal
-  names the ruling and lets the session state, in one line, why this question is NOT that one.
-  VERIFIABLE: Vitest over the pure matcher — the refused card verbatim, three rewordings of it,
-  and an unrelated decision card that must pass; a case proving the refusal prints the ruling's
-  own words; a repository check that every register entry carries date, verbatim wording and
-  terms; and the guard registered in `.claude/settings.json` under the authoritative inventory.
-  Criticality: medium — no work is lost, but the owner is asked to re-decide what he decided, and
-  he has now reported the same class twice.
-  Bundle: Chat & Tafel.
-
 - [ ] 845. A unit test pins the size of a file that lives outside the repository, so an unrelated
   memory edit reddens the suite (measured 22.08.2026, 22:20, in the `point-834` worktree: `npm run
   test:unit` reported 12,851 passed, 5 skipped and ONE failure — `scripts/cut-account-core.test.mjs`,
@@ -10877,6 +11007,14 @@ to land than a mechanism that needs a review.
   remediation — assemble a cross-vendor review of the whole range — that provably cannot be
   performed and that the guard does not actually demand. So the repair belongs to the SHARED
   judgment, not to the one liveness probe.
+  A THIRD TIME 27.08.2026, 04:00 on `main` at `b2f5e9be`, while landing point 957:
+  `guard-preflight --for merge` printed `mechanism-review-guard would-block: FOUR-EYES GATE ON
+  MECHANISMS — UNREVIEWABLE` and listed two ordinary reviewable findings beneath it, while the same
+  guard's own hook invocation reported `REVIEW GAP` over 15,660,677 characters and exited 0. Two
+  guards, three measurements in five days. It matters for the repair that point 957 removes the gap
+  this instance rests on: the divergence is a property of the SPLIT between the shared
+  gather-and-decide and the run path, so it outlives every particular cause and cannot be closed by
+  fixing those one at a time.
   WHY IT MATTERS: the named remediation cannot clear the condition it is offered for. Only the
   ageing-out of the stale liveness window clears it, and a session that believes the advice pays a
   full unit/build/lint gate — measured ~140 s — for every repetition. A preflight that disagrees
@@ -10925,6 +11063,15 @@ to land than a mechanism that needs a review.
   waived. The only route offered is a point-bound unavailable receipt, which records "nobody could
   review this" when the truth is "the trailer misdescribed who did what" — the receipt is a wrong
   reason on the record, not merely an inconvenience.
+  A THIRD TIME, 27.08.2026, 20:0x, and this one shows the cost is not only a waiver: the commit
+  answering a merge-with-fixes on `scripts/tasks-spec-guard.mjs` named its cross-vendor reviewer
+  in the second trailer, exactly as §6 invites, and the four-eyes gate immediately reported the
+  contribution UNREVIEWABLE — "every configured reviewer vendor authored part of this
+  contribution" — on work one vendor had written and the other had just read. The trailer was
+  removed from the commit message to get past it, with the reason written into the message and the
+  verdict left where it is machine-readable, in the review ledger. So the rule is now being
+  followed in the breach: the credit §6 offers costs a blocked turn end, and the honest record of
+  who reviewed what survives only because a SECOND place holds it.
   FINAL STATE: the planner's authorship read distinguishes the authoring trailer from a reviewer
   credit on commits that carry both (the ledger's own review record for the commit, or the §6 rule
   that the second model trailer names the reviewer, decides which is which); a genuinely mixed-vendor
@@ -10979,6 +11126,15 @@ to land than a mechanism that needs a review.
   VERIFIABLE: with `CLAUDE_SESSION_ID` unset, `node scripts/board.mjs vdzk-keep "<title>" --session
   <id>` succeeds; without either the id or the flag it still refuses; and the command the Stop hook
   prints carries the id.
+  MEASURED AGAIN 27.08.2026, 17:35 (chat-responder session 3d9865da), which widens the point by one
+  script and one cause: `scripts/vdzk-answer.mjs` refuses the same way ("cannot identify this
+  session's active user message"), and the fallback the guard state was meant to provide does not
+  work either — `.claude/decision-card-guard-state.json` knows 28 sessions, so it is ambiguous. The
+  session got through only by reading its own id out of the scratchpad path in its system prompt and
+  exporting it by hand; every answering session pays that detour again, and one that does not find it
+  leaves the decision cards standing — the exact state the hook exists to prevent. So the fix covers
+  BOTH scripts, and the fallback is named: the newest guard-state session that carries an active user
+  message, or the id read from the session path.
   Criticality: medium — no product behaviour, but a prescribed command that cannot be run teaches the
   session to work around its own tooling.
   Bundle: Chat & Tafel.
@@ -11298,38 +11454,6 @@ to land than a mechanism that needs a review.
   Criticality: low — one fuse dated at point 1000, one half-covered assertion.
   Bundle: Chat & Tafel.
 
-- [ ] 902. A stated recommendation on a board card is a decision I may carry out. MEASURED
-  24.08.2026: the rule corpus a session loads says the opposite by omission. The memory
-  `no-standstill-decide-and-record` licenses deciding by own judgment only where NO card is
-  pending; `dashboard-vdzk-only-decisions` makes every decision request a card and says nothing
-  about who may close one; `CLAUDE.md` §6 says "unless durably authorized" without naming this
-  authorization. Result: the Zeiterfassung card, whose recommendation was already stated, waited
-  for a yes that only restated it, and its point 559 is still open.
-  USER RULING 24.08.2026, on the card "Zeiterfassung in der Arbeitsordnung: abschaffen oder
-  wiederbeleben?", quoting their own earlier answer "Mach es so, wie du es empfohlen hast": "Ja,
-  das sollst du künftig dürfen."
-  FINAL STATE: the standing authorization stands where a session reads it, with its scope drawn.
-  IN SCOPE: a "Von dir zu klären" card on which I have STATED a recommendation may be decided BY
-  that recommendation, carried out, and closed with the decision recorded — what, why, and what a
-  veto would change — the shape rung 3 of `no-standstill-decide-and-record` already prescribes for
-  doubt without a card. OUT OF SCOPE and unchanged: outward-facing or irreversible steps (tags,
-  publishes, force-pushes, deletions of user data) keep their own confirmation per the memories
-  `tags-only-on-request` and `version-release-process`; a card posing a genuine choice I did NOT
-  recommend on stays the user's.
-  (a) `CLAUDE.md` §6 carries ONE sentence naming this authorization at the existing "unless durably
-  authorized" clause of the "Act on settled judgment" bullet, naming scope AND boundary in the same
-  breath so no reading of it reaches a tag, a publish or a deletion.
-  (b) `docs/rule-corpus-audit.md` records the ruling dated 24.08.2026 with the user's wording, in
-  the row style the file uses for decided entries.
-  (c) The memory entry `recommendation-is-a-decision` is verified against the corpus after (a) and
-  (b) and linked from `no-standstill-decide-and-record`; write it if it is absent, with its
-  `MEMORY.md` index line.
-  VERIFIABLE: a repository search finds the authorization sentence in `CLAUDE.md` §6 and the dated
-  row in `docs/rule-corpus-audit.md`; the doc-budget guard and `npm run test:unit` stay green; and
-  the boundary clause stands in the same sentence as the grant.
-  Criticality: low — process hygiene, but it is what keeps a decided card from idling.
-  Bundle: Chat & Tafel.
-
 - [ ] 904. Three findings the whole-range review found in the landed attempt lease. MEASURED
   25.08.2026 by the cross-vendor whole-range review of `cfcf276` (GPT-5.6 Sol, recorded
   `do-not-merge`, receipt `ef56a7ed1736542f`), which read the complete lease core, all 772 test
@@ -11404,6 +11528,13 @@ to land than a mechanism that needs a review.
   `8e0a2341`/`c6988d8c`/`293ae43d` with a `Rescue:` body, and `git diff HEAD origin/…` was EMPTY —
   identical trees, different parents. The closing report again said the work was local-only, and the
   main session recovered it by resetting the local branch onto the remote tip it already matched.
+  A THIRD INSTANCE, measured 27.08.2026 01:15-01:19 on `feat/953-never-started-ci-red`: the
+  wrapper pushed the leg's two commits at 01:15:17, and at 01:18:49 the local branch carried two
+  commits with the same subjects, a byte-identical tree (`91fd8e7b…` on both sides) and different
+  SHAs, so the final push was rejected and the closing report again said the work was local-only.
+  The main session recovered the same way as on 25.08. — proving the trees identical, then resetting
+  onto the remote tip — which is a hand-measured escape, not a path, and the only push that would
+  have "worked" from that state is a force push over the wrapper's own publication.
   FINAL STATE: the interim push reconciles a rewritten branch through the same lease-gated
   compare-and-swap the wrapper already uses for checkpoints — a rejected push is re-observed, an
   already-contained head is accepted, and a head that legitimately supersedes the remote is pushed
@@ -12091,32 +12222,6 @@ to land than a mechanism that needs a review.
   means.
   Bundle: Session- & Repo-Hygiene.
 
-- [ ] 936. A decision log on the board has no end but the user's veto (the user asked on
-  26.08.2026 at 11:21 why the "Automatische Entscheidung" card was still on the dashboard). It is
-  not an open point but the record of a decision the alert escalation ladder took by itself on
-  26.08.2026 at 05:34 — alarm "PARALLEL batch sessions", rung 5, five unanswered sends: the batch
-  keeps running, with a retroactive veto offered. `deriveStateCard` in
-  `scripts/board-state-core.mjs` renders that card out of `.claude/resilience/alert-escalation.json`
-  for as long as a record stands there, and NOTHING ever takes the record out again. Meanwhile the
-  matter is measurably settled: `batch-doctor --gate` ran on 26.08.2026 at 08:32, reported "repo
-  state CONSISTENT" and marked the parallel alarm handled — so the decision was right and its risk
-  is refuted. The card stands anyway and reads to the user like an open matter.
-  FINAL STATE:
-  - A DECISION LOG NAMES THE MEASUREMENT that would justify or refute it, and EXPIRES BY ITSELF
-    once that measurement has been taken and is clean — here: the doctor run that clears the
-    parallel session. Until then it stands.
-  - THE USER'S VETO REMAINS THE SECOND WAY OUT, never the only one.
-  - AN EXPIRED RECORD LEAVES A TRACE: the decision and the measurement that ended it stay readable
-    where such decisions are recorded, so an expiry is not a deletion.
-  VERIFIABLE: Vitest over the pure projection — a record whose named measurement is missing still
-  renders its card, the same record with a clean measurement renders none, and a record whose
-  measurement came back dirty keeps standing. Plus the real proof: with the 08:32 doctor run on
-  disk the dashboard no longer carries the 05:34 card.
-  Criticality: low-medium — it costs no correctness, but a board that keeps a settled decision
-  standing teaches the reader to skip the section that is supposed to be the one place a real
-  decision is visible.
-  Bundle: Chat & Tafel.
-
 - [ ] 937. After a landing the board's closing state is unreachable, and it blocks the branch
   cleanup (measured 26.08.2026, 11:32-11:34, immediately after point 935 landed). The point-470
   board gate refuses every state-changing call while the card "Gerade keine laufende Arbeit"
@@ -12137,12 +12242,868 @@ to land than a mechanism that needs a review.
   - THE POST-LANDING CLEANUP PASSES THE GATE. Removing the local branch, the remote branch and the
     worktree belongs in the list of calls the point-470 gate lets through as part of the session
     end; today it names only `batch-boundary`, `focus`, `board-publish` and the work-order tick.
+  - THE LANDING DOES NOT WEDGE ITSELF. Measured again on 26.08.2026 at point 941: `land-point` ran
+    merge, gate, tick, archive and push, then failed at its `board` step, because the publish
+    refused a focus that named 941 — the point its own tick had just closed. The repair,
+    `board.mjs done 941 --none`, archived the card and put the idle statement back up, at which
+    point `board-first-guard` blocked everything that was left, `land-point`'s cleanup step
+    included. So either the cleanup step runs BEFORE the board step, or the board step tolerates
+    the point it has just closed; the point decides which and says why. Net effect on the day: the
+    branch, the remote branch and the worktree of point 941 stayed standing, and only
+    `branch-hygiene-guard` noticed.
+  THE SAME WEDGE AT THE SESSION END — a THIRD instance, measured 26.08.2026 19:39 while taking
+  the context-watermark boundary, and distinct from the two above because the card here is the
+  UNNUMBERED handover card, which the projection keeps. `batch-boundary --prepare` dictates that
+  card verbatim, `board.mjs none` puts it up, and from that moment the point-470 gate refuses every
+  state-changing call. Its escape list names `batch-boundary`, the focus stamp, `board-publish` and
+  the work-order tick — but NOT `git push`. With one commit still unpushed, which is the ordinary
+  state (the boundary itself does not push; there is no push path in `batch-boundary.mjs` or its
+  core), the session sits between two binding rules: push after every commit, and do not claim
+  running work while the handover card stands. The way through cost five extra calls: put the work
+  card back up, push, return the point to the queue, write the handover card again, publish and
+  attest again. WORSE, and stated nowhere: the gate judges a whole bundled call by any
+  state-changing SEGMENT in it, so `board.mjs now` chained with the push in one shell command is
+  refused as a unit and the card never goes up — the two must be separate calls.
+  ALSO IN THE FINAL STATE:
+  - `git push` joins the session-ending escape list beside `batch-boundary`, the focus stamp and
+    `board-publish`. A push publishes no claim about running work; it only makes the last commit
+    durable, which is the very thing the boundary exists to guarantee. Alternatively the boundary
+    pushes before it dictates the card — but then it must say so.
+  - THE REFUSAL SAYS that a bundled call is judged segment by segment, so the reader does not
+    lose a round trip discovering it.
+  A FOURTH INSTANCE, measured live 27.08.2026 00:04-00:07 while landing point 947, settles what the
+  escape is worth: `board.mjs closing 947` REPORTED SUCCESS — "the board gate lets those duties
+  through" — and wrote the card to `.claude/dashboard-state.json`, but the now-projection dropped it
+  because 947 was no longer open, so `.batch-dashboard.html` kept rendering
+  `<p class="now-empty" data-state="idle">` and the very next `git branch -D` was refused with the
+  identical message. Repeating the command does not help: the write succeeds every time and the
+  projection discards it every time. Even `node scripts/land-point.mjs --help` was refused, because
+  the gate judges the segment and not what the segment would do. The session was then wedged between
+  `board-first-guard`, which forbade the cleanup, and `branch-hygiene-guard`, which forbade the turn
+  end until the cleanup had happened — union entry S-10 in `docs/batch-autonomy.md`, reached through
+  S-05. The only way out was to declare an UNRELATED open point as current work, which is a false
+  claim on the board the user reads. That is the cost this point removes.
+  A FIFTH INSTANCE, measured 27.08.2026 01:35-01:41 while landing point 953, names the escape that
+  works today and what it costs. With the focus at `-` the run reproduced the fourth instance
+  exactly. But with `focus.mjs set 953` put back on the TICKED point, `board.mjs closing 953` DOES
+  write the card into `.batch-dashboard.html` — the file then holds
+  `<details class="now" data-state="closing">`, and the point-470 gate lets the branch deletion, the
+  work-order append and the retrospective refresh through — while `board-publish.mjs` refuses that
+  same state outright ("active-work source unresolved: the owner focus names point 953, which is not
+  open"). So the wedge opens at the price of a board FILE that no longer matches the PUBLISHED page
+  for the length of the closing work, which is the hour the user reads it. That is better than
+  declaring an unrelated point as current work, and it is still a false state on the phone.
+  ALSO IN THE FINAL STATE: the publish gate resolves the closing state instead of refusing it, so
+  the escape and the publication stop excluding each other.
+  A SIXTH INSTANCE, 27.08.2026 04:28-04:35 after landing point 957, shows the fifth instance's
+  escape holding and its price unchanged: with the focus at `-` the closing card was written twice
+  and dropped twice, `focus.mjs set 957` on the ticked point made it render, and the two branch
+  deletions then went through — but `board-publish.mjs` refused that same state, so the phone kept
+  the pre-closing page for the duration. Five days, six instances, no new shape: this is the
+  routine end of every landing, not an edge case.
+  A SEVENTH INSTANCE, 27.08.2026 06:00-06:10 after landing point 944, adds the DISCRIMINATOR the
+  repair needs and a worse escape than the fifth found. With the focus at `-` the closing card was
+  again written twice and dropped twice — but its SIBLING survives: `board.mjs none` writes
+  `<details class="now" data-state="idle">` and that card stands through publish after publish,
+  while only `data-state="closing"` is removed. So the projection is not blind to hand-written state
+  cards in general; it has a source for idle and for an open point and NONE for the closing state,
+  which is exactly the gap to close. Refused three times here: `git branch -d`, and — new — a
+  `python3` heredoc that would have edited the board file, because the gate classifies the
+  INTERPRETER and not the target. What finally opened it was editing `.batch-dashboard.html` through
+  the file-edit escape the gate does grant, which is a worse exit than the fifth instance's
+  `focus.mjs set`: it leaves no board command in the trail at all. `land-point` failed at its board
+  step again, so its cleanup step never ran and the local and remote branch of 944 had to be removed
+  by hand afterwards.
   VERIFIABLE: Vitest over the projection — a closing card for a just-ticked point survives the
   publish step that removes an ordinary numbered card for the same point; and over the gate — the
   three cleanup calls are permitted while the idle card stands, an unrelated state-changing call is
   still refused. Plus the real proof: the sequence that failed three times on 26.08. runs through
   in one go.
-  Criticality: medium — it leaves merged branches alive behind every landing and pushes the work
-  onto a backstop guard, and it makes a documented way out of a documented state a dead letter.
+  Criticality: high — raised 27.08.2026 after the fourth instance wedged a session outright: the
+  documented escape is a dead letter, the two guards forbid each other's only satisfying mutation,
+  and the only exit left was a false board claim. It also leaves merged branches alive behind every
+  landing and pushes that work onto a backstop guard.
   Bundle: Chat & Tafel. It touches the same board projection as 930 and 935 and must not run
   beside them.
+
+- [ ] 939. The 19.08. `webgpu/startup` red is a dev-server transient with no owner (measured
+  26.08.2026 on `.claude/render-verify-state.json` while answering point 734's sixth round). The
+  run of 19.08.2026 12:09:17 carries one unaccounted console red: "Failed to load resource: the
+  server responded with a status of 504 (Outdated Optimize Dep)" — Vite's dependency optimizer
+  re-bundling in the middle of the run. By CLAUDE.md's own classification that is an
+  ENVIRONMENT/STAGING transient, which fails soft, and not a product defect; but the recorder
+  captured it as an ordinary console red, no open point owns it, and the ledger may not charge an
+  unfiled red. So a transient that the rules say to fail soft on blocks the gate exactly as a
+  product defect would.
+  FINAL STATE:
+  - THE LANE STOPS PRODUCING THIS RED. The dev server is warmed before the suite starts, so the
+    optimizer has re-bundled before the first navigation rather than during it.
+  - THE CAPTURE KNOWS THE DIFFERENCE. This exact 504 signature is classified as environment rather
+    than product where the console capture decides, and the run says which it saw — a soft-failing
+    transient must not be indistinguishable from a defect in the record.
+  - THE STORED RUN GETS ITS DISPOSITION through the retroactive route point 734 provides, so it
+    stops blocking without a `--defer`.
+  VERIFIABLE: Vitest over the console classification — the exact 504 text is read as environment,
+  a neighbouring 504 from the app itself is NOT; a warm-up whose absence reproduces the red at
+  least once; and the stored 19.08. run accounted for in `--status`.
+  Criticality: medium — one run, one line, but it is the cheapest possible demonstration that the
+  gate cannot tell a broken machine from a broken game, and that confusion is what makes a red
+  gate get waved through.
+  Bundle: Session- & Repo-Hygiene.
+
+- [ ] 940. The derived state card is authenticated by a shape that is not the writer's (cross-vendor
+  four-eyes review 26.08.2026, GPT-5.6 Sol at effort high, two passes over the landed range of point
+  935; receipts `f55c5ec3de6e859a` and `654d0d5c3f81a977`, both DO-NOT-MERGE, recorded in the
+  ledger). The review ran AFTER the landing, because the five rounds of that point were recorded
+  without a point number and the criticality gate could not attribute them; the findings are
+  therefore against code that is already on `main`, and this point owns them.
+  THE TWO FINDINGS:
+  - `scripts/board-core.mjs`: the regex that grants a card DERIVED identity does not check the
+    writer's actual opening-tag shape. It also accepts `class="nowhere"`, `x-data-state="derived"`,
+    and even an attribute whose VALUE contains the string, e.g.
+    `data-note='data-state="derived"'`. With the expected summary, such a hand-written card is
+    exempted by reconciliation and comparison — and `stripDerivedStateCard` can then silently
+    DELETE it. That is the loss point 930 exists to prevent, reached through the door this point's
+    own round opened.
+  - `scripts/board-core.test.mjs`: the suite cannot catch it. The "impostor" case lacks
+    `data-state="derived"` altogether, and every marked negative case adds point-looking content, so
+    a recognizer built on "marker plus title plus no number-like markup" passes the whole suite.
+    There is no marked, unnumbered, NON-writer-shaped case at all.
+  FINAL STATE:
+  - IDENTITY IS THE WRITER'S EXACT SHAPE: class TOKEN boundaries and attribute NAME boundaries are
+    required before a card is granted derived identity, so a value that merely contains the string
+    grants nothing.
+  - THE SUITE PROVES IT BY MUTATION: cases are built by mutating a card that
+    `applyDerivedStateCard` actually produced — an extra `<span class="note">…</span>`, a malformed
+    meta wrapper, a look-alike attribute — and BOTH comparison and reconciliation must reject each
+    one. A blacklist that only knows number-like markup must fail these cases.
+  VERIFIABLE: Vitest — each of the three accepted look-alike shapes is rejected as an identity, the
+  genuine writer output is still accepted, and a mutated genuine card is rejected by comparison AND
+  by reconciliation. Plus the negative control: the old regex fails the new cases.
+  Criticality: high — it is the one path on which the board silently deletes text a session wrote,
+  and it sits in the mechanism that publishes every handover.
+  Bundle: Chat & Tafel. It edits the same board projection as 930, 936 and 937 and must not run
+  beside them.
+
+- [ ] 942. The criticality gate's second way out has no command that writes it (measured 26.08.2026
+  while clearing point 935's gate). `criticality-review-guard-core.mjs` reads an append-only ledger
+  row of kind `review-findings-filed` — the receipt that transfers every finding of a refused review
+  to open work-order points — and the refusal message names it as one of two durable answers. Nothing
+  in `scripts/` writes that row: `grep -rn findingPoints scripts/*.mjs` finds only the reader and the
+  test fixtures. `mechanism-review.mjs --record` cannot produce it (it writes a verdict row), and
+  `criticality-review-guard.mjs --record-unavailable` writes the OTHER kind and says so. So a session
+  whose refusal is honestly filed must hand-append JSON to a tracked ledger — which is exactly the
+  hand-edited audit record every guard here exists to abolish — or stay blocked. It was hand-appended
+  once today, with both receipts naming point 940; that is the evidence, not a precedent.
+  Same class as point 937: a documented way out that no command can take.
+  FINAL STATE:
+  - THE RECEIPT HAS A COMMAND, beside the one that records a verdict and the one that records an
+    unavailable reviewer, and the refusal message prints it filled in — point, sha, model, the
+    review's own timestamp, and the point numbers that now carry the findings.
+  - IT REFUSES WHAT THE READER REFUSES, at the moment of writing rather than at the next gate: a
+    receipt naming no point, a closed point, or a review that does not exist is rejected with the
+    reason, so the ledger cannot take a row the gate will not honour.
+  - THE HAND-APPENDED ROWS OF 26.08.2026 ARE VALIDATED by the new command's own reader and left in
+    place if they pass; a receipt is history and is not rewritten.
+  VERIFIABLE: Vitest over the writer — a valid receipt round-trips through the gate's reader and
+  clears its refusal; each of the three invalid shapes is refused with its own reason; and the two
+  rows written by hand today pass. Plus a grep-level assertion that the refusal message names a
+  command that exists.
+  Criticality: medium-high — it is a gate on every high-criticality landing whose only reachable
+  answer today is a hand-edited ledger, and a hand-edited audit record is worth less than no gate.
+  Bundle: Modell & Wächter.
+
+- [ ] 948. A red vitest type-check reached `main` and blocked every tier for every point (measured
+  26.08.2026, 17:39, on `main` fe9ee0dc). `tsc -p tsconfig.vitest.json` failed with three errors:
+  two implicit-any `.mjs` imports in `fableEscalationDoc.test.ts` and `fauna.test.ts`, and one
+  `FootPlantBodyPose` call missing `y`. The verify tier stops at `test-types`, so NO point could
+  reach its suites until 928faee1 repaired it. The repair is landed; the CLASS is not. The open
+  question is how the landing gates of the points that introduced those imports and that call
+  reported green — either they never ran the vitest tier, or the type-check was skipped for them.
+  FINAL STATE:
+  - THE GATE'S OWN RECORD ANSWERS IT. For each of the three offending commits it is established
+    from the recorded run whether `test-types` ran, was skipped, or was never reached, and the
+    finding names which of the three it was. A gate whose record cannot answer that question is
+    itself the defect.
+  - THE HOLE THAT LET IT THROUGH IS CLOSED, wherever the answer puts it: a tier that reports green
+    while `test-types` did not run, a landing that accepts such a record, or a skip path that no
+    longer has a reason to exist.
+  VERIFIABLE: Vitest over the tier's own reporting — a run in which `test-types` did not execute
+  cannot produce a green verdict, and the record it writes names the omission. Plus the historical
+  proof: the three commits are classified from their stored records, not from a re-run.
+  Criticality: high — it is a repository-wide stop, it hit every point at once, and the mechanism
+  that should have caught it reported green.
+  Bundle: Testinfrastruktur.
+
+- [ ] 949. A module that resolves repository paths from `import.meta.url` sends a fixture's reads
+  and writes back into the live checkout (measured 26.08.2026, 17:57). `scripts/verify/run-record.mjs`
+  derived its log directory from the module's own location, so the fixture repository that
+  `scripts/dashboard-reminder-hook.test.mjs` builds — `HOA_REPO_ROOT` plus cwd both in a temp dir —
+  still saw the LIVE verify run. Both of that test's cases were therefore red in every tier run
+  since 1e4a25b9 (22.08.2026) and green standalone; a red that appears only inside the gate is the
+  hardest kind to see. Repaired in 6e30025f for that one module. The CLASS is the point: every
+  module that resolves repository paths from `import.meta.url` instead of `repo-paths.mjs` can do
+  the same thing, and a fixture that reads live state is a test that proves nothing.
+  FINAL STATE:
+  - THE SWEEP IS DONE AND NAMED: every `scripts/` module that derives a repository path from
+    `import.meta.url` is enumerated, and each is either moved onto `repo-paths.mjs` or carries a
+    written reason why its own location is the honest source.
+  - IT CANNOT COME BACK: a guard refuses a new repository-path resolution from `import.meta.url` in
+    the paths the sweep cleared, and names `repo-paths.mjs` in the refusal.
+  VERIFIABLE: Vitest — a fixture repository built in a temp dir sees ONLY its own state for each
+  swept module (the negative control being the pre-6e30025f behaviour, which must fail the case);
+  and the guard refuses a planted `import.meta.url` path resolution in a cleared file.
+  Criticality: high — it silently converts fixtures into readers of live state, and it hid two red
+  cases inside the gate for four days.
+  Bundle: Testinfrastruktur.
+
+- [ ] 950. A documentation cut and the guard that parses that documentation must land in one commit
+  (measured 26.08.2026, 18:16). a3a04322 (21.08.2026) cut `CLAUDE.md` §7.1 down to number plus
+  title and made the shared numbering the reference. `scripts/verify/docs.mjs` kept looking for the
+  removed `Detail:` / `Evidence:` pointer lines and reported all six pointer rules red in every
+  SMALL and LARGE run since. Repaired in 9501a7f4 by judging the companion documents by their
+  numbering. The doc-consistency suite is exactly the mechanism that should have REFUSED the cut,
+  and instead it broke on it.
+  FINAL STATE:
+  - THE REMAINING PARSERS ARE ENUMERATED: every guard and suite that parses a shape of `CLAUDE.md`,
+    `design.md` or the work-order preamble is listed with the shape it expects, and each expectation
+    is checked against the document as it stands today.
+  - A CUT THAT ORPHANS A PARSER IS REFUSED at the commit that makes it, naming the parser and the
+    shape it still expects — so the pair lands together or not at all.
+  VERIFIABLE: Vitest — a planted cut that removes a parsed shape is refused with the parser named,
+  and the same cut accompanied by the parser's update passes; plus the historical case, where
+  a3a04322's tree is refused and 9501a7f4's is accepted.
+  Criticality: medium-high — it left six documentation rules red in every browser tier for five
+  days, and the guard that broke is the one that exists to prevent exactly this.
+  Bundle: Dokumentation.
+
+- [ ] 951. Three verification suites navigated into a 90 MB CDN download, and one of them died
+  saying nothing at all (measured 26.08.2026, 18:25, with a request probe). `flow`, `world` and
+  `preview` navigate with `waitUntil: 'networkidle'` while `speech.ts` pre-warms the Kokoro model at
+  game start; the only request still open at the 30 s timeout was the model body on
+  `us.aws.cdn.hf.co`. `flow` died UNCLASSIFIED — no FAIL line at all — in both attempts of every
+  run, so its red said nothing about the code. `handwriting.mjs` had already met and documented the
+  same cause; the remedy, consuming the cache `voice.mjs` records, is now in all four. TWO THREADS
+  STAY OPEN, and they are this point:
+  FINAL STATE:
+  - THE CACHE ACTUALLY SERVES. `voice` reported `hits:0 misses:12` against a cache marked COMPLETE
+    on 04.08.2026; in strict mode a complete cache must serve, so the recorded keys are established
+    against the assets the app really requests, and either the keys or the recording are corrected.
+    The measured result is `hits:12 misses:0`, or a written reason why a miss is legitimate.
+  - A SUITE THAT REPORTS ZERO CHECKS IS A LOUDER VERDICT THAN ONE THAT FAILS A CHECK. An
+    unclassified death is reported as its own kind, distinct from a failure, and it never passes as
+    a plain red whose cause is left to the reader.
+  VERIFIABLE: the `voice` run's own hit/miss counters against the COMPLETE cache; and Vitest over
+  the verdict layer — a suite that completes zero checks produces the unclassified verdict with its
+  own text, while a suite that fails one check keeps the ordinary failure verdict.
+  Criticality: medium-high — it cost three suites their meaning and one of them reported nothing at
+  all, which is the worst thing a verification lane can do.
+  Bundle: Testinfrastruktur.
+
+- [ ] 952. The board-layout suite measures a COPY of the board stylesheet, so the pressure it calls
+  its proof can go away without the suite noticing (measured 26.08.2026, 18:42, on the suite point
+  941 delivered). `scripts/verify/board-layout.mjs` renders a hand-written fixture whose
+  `BOARD_STYLE` duplicates the published board's base rules; only the wrap itself comes from
+  board-core's injected `CRITICALITY_STYLE`, which is imported and therefore real. The fixture's own
+  comment calls the nowrap rules "the pressure that exposed the defect" — but if those rules change
+  in the board template, the suite keeps measuring the OLD pressure and stays green over a board
+  that no longer has the defect's precondition, or that has grown a new one.
+  FINAL STATE: the suite reads the base rules from the same source the board writes them from, so
+  the fixture cannot drift from the published page. Where a rule genuinely cannot be imported, the
+  duplication is named in the file with the reason and a check that the two still agree.
+  VERIFIABLE: Vitest or the suite itself — a change to the board template's base rules is visible in
+  the fixture without editing the fixture, proven by mutating the template in a temp tree and
+  measuring that the rendered fixture follows; and the 941 wrap case still passes.
+  Criticality: medium — the suite is green today and its subject is correct today; the defect is
+  that it would stay green after the subject moved.
+  Bundle: Chat & Tafel.
+
+- [ ] 954. The board header's outer groups still never break, so a phone squeezes the title while
+  the number and the time stamps keep their full width (user report 26.08.2026, 19:54, phone Chrome
+  at ~412 CSS px and desktop Firefox; confirmed by direct question at 20:03). Point 941 set out to
+  end exactly that picture — "Auch die linke und die rechte Spalte sollen umbrechen können" — and
+  its acceptance holds as written: measured tonight against the LIVE board content (board branch
+  fetched 19:57, rendered in headless system Chrome at 412 px and 610 px) the 941 style block is
+  present and active, nothing overflows and no horizontal scroll appears. The gap is in the
+  mechanism. `details:not(.sect)>summary>.right` is `flex-wrap: nowrap`, so the time group can never
+  break INSIDE itself; it only drops as one whole block onto the next flex line, which happens only
+  at the rare width where it no longer fits beside the title's 12rem minimum (card 943 tonight).
+  `.card-header-left` may wrap, but as a `flex: 0 1 auto` item in a wrapping row it is never
+  squeezed below its one-line base width at any realistic viewport, so the badge never moves under
+  its number. Net effect on a phone: a narrow title column beside two fixed groups with dead space
+  under them.
+  FINAL STATE: at narrow widths the outer groups actually yield. The right group stacks its stamps
+  (the `nowrap` goes; each individual stamp stays unsplittable) and gives up its slot on the first
+  header line before the title is squeezed below a readable width; the left group's badge may sit
+  under its number at the same pressure.
+  VERIFIABLE: the browser suite measures the VISIBLE break — the right group occupying more than one
+  line, or sitting beneath the title — at a phone width with a card carrying two time stamps, and it
+  measures it on the REAL published stylesheet rather than a fixture copy, so this point is worked
+  after 952 or takes that fix with it.
+  Criticality: medium — the board is readable today; what fails is the phone picture the request
+  asked for.
+  Bundle: Chat & Tafel.
+
+- [ ] 955. The unit gate refuses while a delegated author commits, so the push gate goes red for no
+  defect (measured 26.08.2026, 20:33, with two Sol authoring lanes running).
+  `scripts/repository-integrity.mjs` asserts in the Vitest GLOBAL TEARDOWN that no ref moved while
+  the unit suite ran, and it fails the whole run when one did: "LIVE REPOSITORY CHANGED WHILE UNIT
+  SUITE RAN: refs changed: refs/heads/feat/943-…". Delegated authors commit on their own branches
+  every few minutes BY DESIGN — `author-sol.mjs` pushes the branch for them — so every unit run that
+  overlaps a busy lane dies, which is every run the owner makes while lanes are busy and every
+  pre-push gate. The check's own message already names the legitimate case, and the pre-push gate's
+  single re-run is what rescued tonight's push; that re-run is a fail-soft, not an answer, because it
+  costs a full unit suite and reports SUSPECT.
+  IT IS NOT ONLY THE DELEGATED LANES — THE OWNER TRIPS IT ON EVERY POINT START (measured
+  27.08.2026, 00:09-00:12Z, on main `6edd81fd`, with NO authoring lane running yet). The chain,
+  end to end: `batch-doctor --gate` began `npm run test:unit` at 00:09:44Z; at 00:12:28Z the same
+  owner session created `feat/957-contribution-scoped-review`, which is the mandated FIRST step of
+  the next point; at 00:12:32Z the suite finished with 430 files and 14 015 tests ALL PASSED and
+  the teardown failed the run on `refs changed: refs/heads/feat/957-…`. So the exposure is not
+  confined to a busy evening of parallel authors: the owner's own `git worktree add` and its own
+  bookkeeping commit on `main` move a ref just as reliably, which puts every point start and every
+  cross-cutting commit in the window. Reproduced the same hour from a manual `npm run test:unit`,
+  again all 430 files green, exit 1 on the same teardown.
+  AND IT COMPOUNDS WITH 455, WHICH IS HOW THE GREEN TREE STAYED UNKNOWN. `batch-doctor` reads only
+  the exit code, so it saw a red; its load probe then excused that red as INCONCLUSIVE on "7 live
+  agent worktree(s)" that held no process and had not been written to for 3 to 14 days. A false red
+  from this point therefore collects a false excuse from 455, and neither mechanism ever learns
+  what was true — that the tree was entirely green. Whichever of the two is built first, its test
+  should name the other, because each one alone still leaves the pair silent.
+  FINAL STATE: the teardown distinguishes TEST LEAKAGE into the live repository from a foreign
+  branch's own progress. A ref that belongs to a declared in-flight lane, or any ref that is neither
+  the running checkout's HEAD nor its branch, is not this suite's leakage and does not fail the run;
+  what remains — the running checkout's own refs, the index, the working tree — still fails loud.
+  MEASURED A THIRD TIME 28.08.2026, 02:52, AND THE RE-RUN DID NOT RESCUE IT. A cross-cutting
+  `main` push ran the pre-push gate twice; BOTH runs were red on this teardown and neither named a
+  failing test — "unit ran 435 files / 14110 tests and its summary named NO failing test, yet the
+  runner exited non-zero" — while the delegated Sol lane for point 946 committed
+  `4f044565 -> ca139085` during the first run and `ca139085 -> d11c541c` during the second. So the
+  single re-run this point calls a fail-soft is not one: a lane that commits every few minutes
+  reds both runs, and the gate then reads that as "the re-run did not clear it, so it blocks". The
+  push only went through on a later manual attempt that happened to fall in a quiet window. Add to
+  the final state that the gate's verdict NAMES a teardown red over foreign activity as an
+  environment condition and says which lane collided, rather than reporting it as a blocking red.
+  VERIFIABLE: Vitest over the decision — a moved foreign branch passes, a moved own HEAD fails, and
+  an undeclared foreign ref is reported by name rather than silently allowed.
+  Criticality: medium-high — it turns every parallel authoring evening into red gates that hide real
+  reds among false ones.
+  Bundle: Urlaubsfestigkeit.
+
+- [ ] 956. A merge-with-fixes verdict leaves its named fix owed, and nothing tracks it (measured
+  26.08.2026 while reading the review ledger for point 943). `.claude/mechanism-reviews.jsonl`
+  records `92cbc0e` ("Refuse a repeated flag, and make the legacy fixture discriminate", Claude Opus
+  5) as reviewed by GPT-5.6 Sol with verdict `merge-with-fixes` and the named finding "repeated help
+  flags bypass the new rejection logic" in `scripts/defer-for-user.mjs`. The commit is long since on
+  main, the fix was never made, and no guard can see the debt — `merge-with-fixes` CLEARS the
+  four-eyes gate by design, so the owed half simply disappears. That is a hole in the whole review
+  machinery, not one forgotten fix.
+  FINAL STATE: the named fix of `92cbc0e` is made and its confirming pass recorded; and a
+  `merge-with-fixes` verdict carries its owed fixes as a debt the guard reports until each is
+  answered by a recorded pass at a descendant commit, so no future verdict of that kind can vanish
+  the same way. Every `merge-with-fixes` already in the ledger is re-measured once and reported.
+  VERIFIABLE: Vitest over the debt reader — a merge-with-fixes with no descendant answering pass is
+  reported, one with such a pass is clear; plus the guard's own status naming the re-measured
+  historical set.
+  Criticality: medium-high — it is the second silent hole found in the four-eyes ledger in one
+  evening, and it invalidates part of what the gate claims to guarantee.
+  Bundle: Urlaubsfestigkeit.
+
+- [ ] 959. A done card reports the last run's start and end, so a point worked over several
+  sessions understates what it cost (MEASURED 27.08.2026 ~01:20 on the landed points 943 — card
+  22:06-22:50 against a first branch commit at 26.08. 19:59 — and 947 — card 23:39-00:04 against
+  19:53). Mechanism: `board-core.mjs` `toQueue` turns a now-card's span into a bare `~h` estimate
+  when a point goes back to the Warteschlange, and `toNow`/`promoteToNow` stamp a FRESH
+  `berlinStamp()` start on resumption, so the final card shows only the last run. The
+  earliest-start merge in `toDone` protects only points that already HAD a done card (the point-700
+  rule); the requeue path has no equivalent, and the true span survives only in git, where
+  `measure-point-cost` reads `firstBranchCommitAt`.
+  USER RULING 27.08.2026 (verbatim): »Stattdessen die erste Startzeit anzugeben, könnte auch zu
+  falschen Schlüssen führen, weil ein Punkt evtl. in einem Zwischenstand für längere Zeit in der
+  Warteschlange geparkt wird. Am besten wäre dann wohl, bei erledigten Punkten anstatt Start- und
+  Endzeit die Bearbeitungsdauer anzugeben - also die Zeit in Stunden, die er sich in Arbeit befunden
+  hat.« So the fix is NOT to preserve the first start.
+  FINAL STATE: a done card reports the ACCUMULATED IN-WORK DURATION — the time the point stood as
+  current work, summed over every run, with queue-parked time excluded — instead of a start·end
+  pair. `toQueue` records the elapsed span it already computes as worked-so-far in the queue card's
+  meta beside the estimate, `toNow` carries it onto the fresh now-card, and `toDone` adds the final
+  run and renders one duration. Every consumer of the start·end meta moves in the same change:
+  `doneStart`, `earliestStart`, `withStart`, `mergeDoneDuplicates` and the `spanHours` recovery,
+  plus the queue-meta stamp-shape audit.
+  VERIFIABLE: Vitest over the card transitions — a point parked once and resumed once reports the
+  sum of both runs and not the last, a point never parked reports its single run unchanged, and the
+  parked interval itself is excluded; plus the stamp-shape audit accepting the extended queue meta.
+  The dateless stamps stop being ambiguous for display, because a duration needs no date.
+  Criticality: medium — it is board truth, and the number it prints is the one the batch is judged
+  by.
+  Bundle: Chat & Tafel.
+
+
+- [ ] 960. A filed finding is never checked against the work order, so with 313 open points the
+  cheapest mistake is to write a point that already exists (MEASURED 27.08.2026 01:35-01:50, while
+  closing point 953). Four items were carried that turn. The board-closing wedge, recorded through
+  `scripts/finding.mjs --record` and drained as a new point, was already owned by point 937 — which
+  records the same wedge with three earlier instances and had been raised to high the night before.
+  Two further points written from tonight's own measurements duplicated point 906 (a delegated
+  run's push rejected non-fast-forward after it rewrote its own published history) and point 729
+  (`gatesProblem` reading Vitest's truthful "6 skipped" as a red gate); both were caught only
+  because a retrospective paragraph happened to name their owner. One item — the done-card duration
+  — was genuinely new and became point 959. So three of four were duplicates, and nothing in the
+  path from `--record` through `--drain` to the append asks the one question that would have found
+  them.
+  WHY IT IS NOT A DISCIPLINE PROBLEM: 313 open points is past what any reader holds, the titles are
+  English while findings are recorded in German, and the same defect is described from a different
+  angle each time it recurs — so a literal title match finds nothing while the owner sits in plain
+  sight. The correct instance note (this turn wrote three of those, into 937, 906 and 729) is
+  cheap; discovering that it is the correct shape is what costs.
+  FINAL STATE: recording and draining a finding both answer "who already owns this?" with machine
+  output. `finding.mjs --record` and `--drain` print the closest open points — matched over point
+  text and not only titles, across the two languages the corpus is written in — with the line
+  numbers to read, and the drain names an owner candidate before it offers the append. A finding
+  whose owner is found is folded into that point as a dated instance rather than filed anew; the
+  command says which of the two it did. `scripts/tasks-source.mjs` is the reader, so open and
+  closed points are both searched — a class closed last week must not be re-filed either.
+  VERIFIABLE: Vitest over the matcher against THIS turn's four measured items — the board-closing
+  finding names 937, the push-rejection text names 906, the skipped-gate text names 729, and the
+  done-card text names no owner; plus a case that the German finding text still finds its English
+  point, and one that a genuinely new finding is not forced onto a weak match.
+  Criticality: medium — it wastes an authoring round each time it lands, and a duplicate point that
+  is NOT caught splits one defect's evidence across two numbers, which is how a fix comes to stand
+  on half its measurements.
+  Bundle: Session- & Repo-Hygiene.
+
+- [ ] 961. The `commit-msg` hook checks two properties of a message and not its SHAPE, so a body
+  written without the blank line after the subject lands as a 400-character subject (MEASURED
+  27.08.2026 01:55 on `main`: `be148161` carries a 372-character subject and `e31fec7b` a
+  460-character one, both because the heredoc that wrote them omitted the empty line git uses to
+  separate subject from body — `git log -1 --format=%b` returns only the trailer on both). The hook
+  (`scripts/git-hooks/commit-msg`) asks `commit-scope-guard` about `[skip ci]`/`Rescue:` and
+  `model-trailer-gate` about the authoring model; nothing looks at the first line. The two commits
+  are on the remote, and rewriting published `main` history to repair a subject line would cost
+  more than the defect, so they stay as the measurement.
+  WHAT IT ACTUALLY BREAKS: every `--oneline` reading — the retrospective's source table, the board's
+  commit listings, `land-point`'s report, the standstill report's first-parent walk — renders one
+  commit as a paragraph, and the body that should have carried the reasoning is not a body at all,
+  so `%b` consumers see only the trailer.
+  FINAL STATE: the hook refuses a message whose subject exceeds a stated ceiling, and it names the
+  missing blank line as the likely cause when the message has no body at all — the failure this
+  point measured is not "a long subject" in the abstract but "a body glued to the subject", and the
+  refusal that does not say so sends the author trimming words instead of adding a newline. The
+  ceiling is written down where the other message rules are, and a genuinely long single-line
+  subject with no body is refused the same way; nothing is silently truncated or rewritten.
+  VERIFIABLE: Vitest over the message check — the two measured messages are refused with the
+  blank-line diagnosis, a normal subject-plus-body message passes, a subject just under and just
+  over the ceiling decide opposite ways, and a message the other two gates already refuse is not
+  double-reported.
+  Criticality: low — nothing is corrupted and no gate is bypassed, but it damages every log the
+  project reads about itself, and it is one line of shell to prevent.
+  Bundle: Session- & Repo-Hygiene.
+
+
+- [ ] 964. The launcher's stalled-writer recovery is unreachable, so only a DECLARED delegate can
+  ever be recovered. MEASURED 27.08.2026 while reviewing point 945 on `scripts/batch-autostart.mjs`:
+  inside `if (verdict === 'skip-alive')` the first branch is `if (startDecision.code !== 'owner-live')
+  { … log('skip: successor decision refused …'); bail() }`, and `bail()` writes the state and calls
+  `process.exit`. Everything after it therefore runs only when the code IS `owner-live` — but the
+  very next line is `if (!lock || assessment.alive !== true)`, which `owner-live` contradicts by
+  definition. The whole block behind it is dead: the `verdictRepeat` episode counter, the
+  `WRITER_VETO` journal entries, the `ESCALATING: … blocked launcher recovery for N min` line, the
+  `retireBatchWriter` / `revokeWriterFence` recovery and the second `successorStartDecision` that
+  was meant to re-decide after it. It was reachable when it was built (`d621b742`, 21.08.2026,
+  "Recover stalled writer vetoes on the second tick") and was cut off the same day by `387e7a46`
+  ("Start successors at handover and supervised exit"), which added the early bail above it.
+  WHY IT MATTERS: point 945 stops a DECLARED delegate from vetoing a successor beside a dead owner.
+  An UNDECLARED live checkout — an agent that died before declaring, a stray worktree, a delegate
+  whose declaration expired — still vetoes with code `registered-writer-live`, and since 945 that
+  refusal correctly no longer touches `failCount`, so it can never reach the runaway pause either.
+  This block was the only thing that would have broken such a wedge, and it cannot run.
+  FINAL STATE: a repeated refusal that is NOT `owner-live` reaches the writer-recovery episode —
+  its repeat counter, its journal entries, its escalation line and its fence revocation — and the
+  re-decision that follows it, while a single refusal still just waits and a live owner still
+  vetoes untouched. Whatever the early bail was protecting (the `autostart-last.json` decision
+  record it writes) keeps happening on the path that still needs it.
+  VERIFIABLE: Vitest over the tick — a repeated `registered-writer-live` refusal beside an absent
+  or dead owner lock reaches the escalation and revokes the writer's fence, one such refusal does
+  not, an `owner-live` refusal never does, and the decision record is written in every case.
+  Criticality: high — it is the same standstill class as 945 with the declaration missing, and
+  nothing else in the launcher ends it.
+  Bundle: Urlaubsfestigkeit. It edits the successor tick that 945 also edits, so it is worked
+  after it, never beside it.
+
+- [ ] 965. The closing card the board's own refusal prescribes cannot reach the page. MEASURED
+  27.08.2026 while handing over after point 581 landed: `board-claims-nothing-running` denies every
+  state-changing call while "Gerade keine laufende Arbeit" stands, and names three ways out, the
+  middle one being `node scripts/board.mjs closing <N>` — "for the state between the two: the point
+  is merged and TICKED, and its closing duties are still owed". That card never renders. With the
+  point CLOSED (581) the publish refuses outright: "the derived now-section could not be rendered
+  (active-work source unresolved: the owner focus names point 581, which is not open)". With an
+  OPEN point that is not evidenced in work (945, sitting in the queue) the command reports success
+  and writes the board file, but the derived now-section still renders "Gerade ist kein Punkt
+  nachweisbar in Arbeit" and the card is gone at the next publish.
+  WHAT IT COSTS: the state the card exists for is exactly the state in which the point is no longer
+  open — that is what "merged and TICKED" means — so the remedy is unavailable in every case it was
+  written for. The only way past the guard is then `board.mjs now`, which claims work that is not
+  running: the guard forces the false statement it exists to prevent, and the session's own
+  bookkeeping (retrospective, ranking, board stamp) cannot be committed until it does.
+  FINAL STATE: a closing card survives the now-section's derivation for the point it names, whether
+  that point is already ticked or merely not evidenced in work, and the publish renders it instead
+  of refusing or silently dropping it. The card reads as what it is — closing duties owed, not
+  active work — so neither the nothing-running guard nor a reader mistakes it for either
+  neighbouring state. `now` and `none` keep their present meanings untouched.
+  VERIFIABLE: Vitest over the derivation — a closing card for a ticked point renders, a closing
+  card for an open-but-unevidenced point renders, both survive a publish, and neither is turned
+  into a now-card or dropped; plus the guard's own remedy text is asserted against the set of
+  states the card actually serves, so the two cannot drift apart again.
+  Criticality: high — it blocks the handover path of every landed point, and its only workaround is
+  a false board.
+  Bundle: Chat & Tafel. It edits the board's derived now-section, which 963 does not touch, so the
+  two may run beside each other.
+
+- [ ] 968. A render path that can never cover itself keeps the picture gate shut. MEASURED
+  27.08.2026, 10:26-10:35: `scripts/render-verify-core.mjs` counts every `scripts/verify/*.mjs`
+  outside its `NON_RENDER_VERIFY` list as a render path, so point 963's edit to
+  `scripts/verify/board-layout.mjs` reopened the picture gate for BOTH backends, on top of the
+  game-render paths that a clean full `polish` pass on WebGPU (06:35) and WebGL 2 (06:57) had
+  already covered. But board-layout cannot answer that gate at all: it draws no game view, it
+  launches `chromium` directly instead of going through `scripts/verify/_browser.mjs`, so it never
+  arms `render-verify-recorder.mjs`, and it never records a screenshot — it measures
+  `getBoundingClientRect()` over the published board. I ran it green on both backends (66 pass each,
+  0 fail, 0 console errors); neither run was recorded and neither covered anything. The gate could
+  then only be answered by re-running an unrelated ~46-minute `polish` pass or by a deferral.
+  FINAL STATE: a browser suite that renders no game view and selects no GL backend is not a render
+  path, so editing it never opens the picture gate; and no suite can be classified as a render path
+  while being structurally unable to record a covering run — the two facts are decided by one rule
+  rather than by two lists that can drift apart.
+  VERIFIABLE: Vitest over the classifier — `scripts/verify/board-layout.mjs` is not a render path;
+  a suite that goes through `_browser.mjs` still is; and a case that asserts every path the
+  classifier calls a render path is reachable by a run the recorder can actually write.
+  MEASURED AGAIN 27.08.2026, 17:50 while landing point 969, which shows the cost is recurring and
+  not a one-off: the same edit to the same suite reopened the gate, green runs on WebGPU AND
+  WebGL 2 at the same HEAD (132 checks each) covered nothing, and the only way past was a logged
+  deferral — the second one this file has needed in a day. That is the failure mode: the loud
+  escape becomes the routine route and stops being read. It also cost a duplicate point (972),
+  written before the bundle check found this one — the fourth time that has happened.
+  Criticality: med — it does not lose work, but it blocks the picture gate behind a run that has
+  nothing to do with the change, which is how deferrals get written for the wrong reason.
+  Bundle: Testinfrastruktur.
+
+- [ ] 970. Canonical model trailers are not enforced at commit time. MEASURED 27.08.2026, 14:14, in
+  the tripwire trailer sweep (`git log --all --since 2026-08-26`): two commits carry
+  `Opus 5 <noreply@anthropic.com>` without the `Claude` prefix (8d5ab62b, 77e58d20) and two carry
+  `GPT-5.6 Sol <noreply@anthropic.com>` under the wrong vendor domain (6ee9f114, 7475a484; the
+  canonical spelling is `noreply@openai.com`). All four name ALLOWED models — form drift, not a
+  policy breach — but the serving-model guard and every commit-proxy analysis match trailers
+  textually, so a drifted spelling silently falls out of counts, reviews and the model-usage
+  record.
+  FINAL STATE: the versioned commit hook knows the canonical `Co-Authored-By` string of every model
+  in the policy and refuses a commit whose model trailer matches a policy model only loosely
+  (missing prefix, wrong vendor domain, renamed variant), naming the canonical spelling in its
+  refusal; the four historical commits stay as they are — no history rewrite.
+  VERIFIABLE: Vitest over the hook's checker — every canonical string passes, and each measured
+  drift form is refused with a message naming the canonical spelling.
+  Criticality: low — bookkeeping accuracy only; the four commits name allowed models either way.
+  Bundle: Modell & Wächter.
+
+- [ ] 972. A file cut from the review material reaches no manifest, so the reviewer reports its
+  absence as a defect of the commit. THIS IS THE MEASUREMENT POINT 971 ASKED FOR and could not
+  supply: 971 recorded the false absence-finding on `2dbce90` as a LEAD on the review harness,
+  explicitly UNMEASURED, and named the condition that would promote it — "the next false
+  absence-finding after a non-material cut makes it one". MEASURED 27.08.2026, 18:1x, on that same
+  commit: a second, independent round over `e0fadb56..2dbce90` produced the identical false finding
+  a second time. `scripts/review-sol.mjs` printed its own cut verbatim — "DROPPED AS NON-MATERIAL:
+  docs/analysis_de/retrospektive-zusammenarbeit.md — owner retrospective prose; governed by
+  retro-currency-guard over retro-core, and past any single review round" — and then reported
+  "Coverage plan: 100% planned coverage (2/2 changed files); nothing dropped", counting the cut
+  file out of its own denominator. GPT-5.6 Sol, reading the material, wrote: "No manifest or
+  `retrospektive-zusammenarbeit.md` content is present, and nothing is marked truncated", and
+  charged the commit with carrying no retrospective half — while the commit adds §3.112, 39 lines
+  of exactly that half.
+  THE SAFEGUARD EXISTS AND MISSES THIS CASE BY CONSTRUCTION. The review prompt tells the reviewer:
+  "A file the manifest declares absent is NOT truncated: do not refuse a verdict over its absence."
+  That sentence protects a file a PASS SPLIT assigned elsewhere, because a split writes a manifest.
+  A NON-MATERIAL cut writes no manifest entry at all, so the one sentence that would have stopped
+  the false finding never applies to the only case that needs it.
+  COST, MEASURED TWICE: a do-not-merge standing on `main` whose third finding is an artefact of the
+  tool; a full re-review round spent discovering that; and point 971 carrying a refutation
+  paragraph whose only purpose is to stop a third reader re-litigating it.
+  FINAL STATE:
+  - A CUT FILE IS DECLARED TO THE READER, with the reason it was cut, in the same manifest that
+    declares a split-assigned file. Absence a reviewer was told about can never be read as a defect.
+  - THE COVERAGE LINE COUNTS WHAT IT DROPPED. "nothing dropped" beside a printed drop is the line
+    that made this invisible for two rounds; the denominator is the commit's changed files.
+  VERIFIABLE: Vitest over the pure plan/manifest projection — a range containing a non-material
+  file renders that file in the reviewer's manifest with its drop reason and reports it in the
+  coverage line, a range containing none renders a byte-identical manifest, and the existing
+  split-assignment declarations stay unchanged.
+  Criticality: med — it costs no correctness in the product, but it spends a full cross-vendor
+  round per occurrence and puts a fabricated finding into the permanent ledger, which is the one
+  artefact later readers trust without re-measuring.
+  Bundle: Session- & Repo-Hygiene.
+
+- [ ] 974. The criticality gate charges a high-criticality point with every file that landed near
+  it, so it cannot converge while the batch works. MEASURED 27.08.2026, 18:40, on `main` at
+  `9f66f8b`. `criticality-review-guard` named point 966 and said: "the recorded pass files do not
+  cover every file this point changed. Still uncovered: `docs/analysis_de/retrospektive-
+  zusammenarbeit.md`, `docs/analysis_de/vibe-coding-anleitung.md`". Point 966's own branch
+  `feat/966-worktree-suite-escape` touched NEITHER file — checked over the merge's second parent,
+  empty result. The guide was changed by `2dbce90`, `b379eecc` and `dfae52bb`; the retrospective by
+  the docs commits of the session that hit the gate. All of them merely LANDED in the window since
+  the guard's baseline `3ccb57c`.
+  THE SET GROWS WITH EVERY COMMIT. The one file that really was point 966's — the review ledger —
+  was cleared in a single round at 18:40, and clearing it immediately revealed two more files that
+  had landed meanwhile. A session that keeps working therefore never converges on this gate: it
+  blocked EVERY turn end of the session that measured it, on files no lane could clear. That is the
+  unclosable-window shape point 734 owns for the render gate, reached by a different road.
+  WATCHED IT GROW, IN ONE SESSION, WITHOUT ONE COMMIT OF POINT 966: the demand was ONE file at
+  18:20 (the review ledger), TWO at 18:40 once that was cleared, and SIX at 18:41 —
+  `.claude/queue-rank.json`, `TASKS.md`, `docs/work-packages.md`, `scripts/guide-brevity-core.mjs`
+  and the two documents — after three ordinary bookkeeping commits, one of which was THIS POINT
+  BEING FILED. Filing the report of the growth grew the demand. That is the measurement: the set
+  tracks the window, not the point, and the only way to hold it still is to stop working.
+  TWO READINGS, AND THE POINT DECIDES BY MEASUREMENT, NOT BY TASTE:
+  - either the ATTRIBUTION is wrong, and the union owed by a point is its OWN commits;
+  - or the window union is deliberate and conservative — in which case the WORDING is wrong, because
+    "every file this point changed" is a false statement about work the point never touched, and a
+    reader who believes it hunts for a connection that does not exist.
+  Read the guard before choosing: a conservative union has a real purpose — a file that landed while
+  a HIGH point stood uncleared has had no second reader either — but then it is not the POINT's debt
+  and must not be reported as such.
+  FINAL STATE: what the gate demands is either provably the point's own changed set, or is named for
+  what it is (unread work in the window) with an owner that is not the point; and in both cases a
+  session that commits ordinary bookkeeping can reach a green gate.
+  VERIFIABLE: Vitest over the pure attribution — a point whose branch touched files A and B owes A
+  and B and not C, where C landed in the same window from another branch; and the reported sentence
+  matches whichever union is chosen.
+  Criticality: high — it is a blocking gate on every turn end, and its present message asserts a
+  provably false fact about a point, which is the failure class a gate exists to prevent rather than
+  produce.
+  Bundle: Session- & Repo-Hygiene.
+
+- [ ] 975. A four-eyes debt whose fix comes from the other vendor can be cleared by nobody.
+  MEASURED 27.08.2026, 19:15-19:20, on `main` at `3ec195a`. `mechanism-review-guard` holds
+  contribution `2dbce90` (authored by Claude Opus 5) under a standing GPT-5.6 Sol do-not-merge and
+  demands, verbatim: "record the re-review at a commit that DESCENDS from 2dbce90 — a verdict on
+  work that does not contain the fix answers nothing." The fix was authored by GPT-5.6 Sol as point
+  971 and landed at `3ec195a`. Running the demanded review at that descendant is REFUSED by the
+  harness itself, verbatim: "ROLE SWAP — GPT-5.6 Sol AUTHORED part of 3ec195a, so it may not
+  review it. The review is Opus 5's."
+  SO THE GATE DEMANDS A SOL VERDICT ON A STATE SOL MAY NOT READ, while an Opus 5 verdict on the
+  same state does not clear the entry, because `2dbce90` is Anthropic-authored and its second pair
+  of eyes must be the other vendor. Fable 5 does not resolve it: the switch is ON, but Fable is
+  Anthropic, so it is not cross-vendor for an Anthropic-authored contribution. Two Opus 5 verdicts
+  are already recorded and the gate is unchanged.
+  IT IS NOT THAT NOBODY LOOKED. Both vendors looked, each at the half it was allowed to see, and
+  the gate can still be cleared by neither — so it blocks every turn end indefinitely. It blocked
+  every single turn end of the session that measured it. This is the family of point 870 (a review
+  round that cannot be commissioned at all) reached from the opposite direction: there NO eligible
+  reviewer existed; here TWO exist and each is excluded from the state that would settle it.
+  MEASURED BESIDE IT, and its own small defect: a plain merge commit carries no `Co-Authored-By`
+  model trailer, so `mechanism-review.mjs --record` refuses it — "Unknown authorship is
+  unreviewable, not authorless" — and a verdict cannot be attached to the very commit that carries
+  the fix into `main`.
+  FINAL STATE — one of these, chosen by reading the guard rather than by taste:
+  - the original contribution's debt is settled by a CROSS-VENDOR verdict on the ORIGINAL diff plus
+    a permitted verdict on the FIX, counted as a pair; or
+  - a fix authored by the reviewing vendor TRANSFERS the debt to that vendor, discharged by the
+    first vendor reading the fix; or
+  - the guard records the exclusion the way `criticality-review-guard --record-unavailable` already
+    does, naming the exact files and why no vendor is eligible.
+  In every case: a gate no configured actor can clear must SAY so, rather than repeat an
+  instruction that cannot be followed.
+  VERIFIABLE: Vitest over the pure eligibility decision — a contribution by vendor A whose fix is
+  authored by vendor B reports a reachable route to clearance, and the case where no route exists
+  is reported as such rather than as an ordinary owed review; plus a case pinning that a commit
+  without a model trailer names its own unreviewability instead of failing the record silently.
+  Criticality: high — it is a blocking gate on every turn end with no reachable exit, which is the
+  hand-waiver decay point 734 describes, reached without even a hand waiver being available.
+  Bundle: Session- & Repo-Hygiene.
+
+- [ ] 976. A point landed by the command loses every route to its own Erledigt card. MEASURED
+  27.08.2026, 19:35-19:45, while landing point 971 with `scripts/land-point.mjs`. The landing runs
+  merge, gate, tick, archive, push, board publish and cleanup, and reports each green. It does NOT
+  create the point's Erledigt card, and by finishing it destroys every route that could:
+  - the tick closes the point, so the next `board-queue.mjs` rebuild drops its QUEUE card;
+  - the board publish drops its NOW card;
+  - `toDone` refuses without a now-card ("no current-work card for point 971"),
+    `promote` and `now` refuse without a queue card ("no queue card for point 971"), and
+    `queue` refuses without any card at all ("point 971 is nowhere on the board").
+  `dashboard-guard --synced` then blocks with `[erledigt-missing]`, and the only exit left is the
+  emergency `--waive-audit`, which is what this landing had to use. Hand-writing the markup is not
+  an option and must not become one: `renderDoneEntry` in `scripts/board-core.mjs` is documented as
+  the single writer of that markup, and a hand edit of this board is the failure of retrospective §3.45.
+  THE ORDER IS THE TRAP, and nothing states it. `board.mjs done <point>` must run BEFORE the
+  landing, while the now-card still exists. A session that follows the standing instruction — which
+  says the landing "fuehrt die ganze Kette aus" and names board publish among its steps — reasonably
+  reads the board as handled, lands, and only then discovers the card cannot be made any more.
+  FINAL STATE: either the landing WRITES the Erledigt card itself, from the now-card it is about to
+  remove, so the documented one-command chain really is complete; or it REFUSES to start until the
+  card exists, naming `board.mjs done <point>` as the missing step. A third acceptable shape is a
+  repair route that builds the card from the archived block through the single writer, so a landing
+  that already happened is recoverable without a waiver.
+  VERIFIABLE: a Vitest case over the pure board projection — a landed point has exactly one Erledigt
+  card built by `renderDoneEntry`, with the now-card's own start time preserved; plus a drill that
+  runs the real landing on a scratch board and ends with `dashboard-guard --synced` GREEN and no
+  waiver recorded. A drill that recreates the aftermath instead of calling the landing does not
+  count.
+  MEASURED AGAIN 27.08.2026, 20:31: the waiver did NOT settle it. The next session found
+  `[erledigt-missing]` still blocking for point 971 and had no route left either, so it wrote the
+  entry into the board file by hand — the very move this point forbids. Whatever shape is built
+  must therefore also cover a card that is ALREADY missing, not only the next landing.
+  Criticality: med — it costs no correctness in the product, but it forces the emergency valve on an
+  ordinary successful landing, and a valve used routinely stops being an alarm.
+  Bundle: Chat & Tafel.
+- [ ] 978. `done` accepts an empty card text and publishes the internal focus note instead.
+  MEASURED 27.08.2026, 22:26, at the landing of point 843. The command line the boundary itself
+  prints — `node scripts/board.mjs done <N> --none --text-stdin` — spends the single stdin text on the
+  HANDOVER reason, while the card text is a separate positional argument. A session following that
+  line verbatim leaves the card text empty; `closeCard` then falls back to the focus note, and the
+  Erledigt card on the board the user reads said "point 843: current work · Prüfung aufgezeichnet:
+  83542f6 → merge" — machine bookkeeping in the one place that is supposed to say what the point
+  delivered. Nothing refused it: an empty text is a legal argument and the fallback is silent.
+  THIS IS THE WRITE PATH, NOT THE MISSING-CARD PATH. Point 976 owns the card that never gets written
+  and the repair route for one that is already wrong or absent; this point owns only the moment the
+  card IS written with nothing to say. The two edit the same writer, so they are worked together on
+  one branch, 976 first, and never beside each other.
+  FINAL STATE: a done card is never published carrying the focus note. `done` refuses an empty card
+  text and names the argument that carries it, and the boundary prints a command line that carries
+  BOTH texts, so following it verbatim cannot produce this state.
+  VERIFIABLE: Vitest over the pure board projection — closing a card with no text is refused and the
+  refusal names the argument; no rendered Erledigt card ever contains the focus note; and a case reads
+  the line `batch-boundary.mjs --prepare` prints and finds both the card text and the handover reason
+  in it.
+  Criticality: low — nothing is lost, but the board is the user’s own artefact and it reads as machine
+  output at the one moment it should read as a result.
+  Bundle: Chat & Tafel.
+
+- [ ] 980. The retrospective hands out the same section number to several lessons. MEASURED
+  27.08.2026, 23:50 on `main` at bfe14680 plus that turn's `retro-refresh`:
+  `docs/analysis_de/retrospektive-zusammenarbeit.md` carries 216 `### 3.x` sections and EIGHT of
+  those numbers are used more than once — `3.112` three times (lines 1530, 3761, 4292), `3.120`
+  four times, and `3.121`, `3.137`, `3.171`, `3.172`, `3.179`, `3.185` twice each. The number is
+  the document's own citation handle and it is cited from outside: work-order point 979 names
+  "retrospective section 3.112" as the evidence that a review dropped a real edit, and that
+  citation resolves to three different lessons, so it proves nothing. The prose also runs on
+  AFTER `## Anhang A` (line 1413) to line 4465, so the appendix no longer ends the file and the
+  next writer appends where the numbering is hardest to see.
+  FINAL STATE: every `### 3.x` number in the file names exactly one lesson, and a new duplicate
+  cannot be written. The renumbering is a one-off; the mechanism is the part that lasts, so a
+  check refuses a duplicated number the way `doc-budget` refuses an outgrown document, and it
+  names the offending number and both lines. Renumbering must not silently break an inbound
+  citation: every reference to a moved number — in `TASKS.md`, `docs/`, and the archive — moves
+  with it in the same commit, and the point reports which ones moved.
+  Consider as alternatives, and record why the chosen one wins: renumbering the later duplicates
+  to fresh numbers at the end; or dropping the numbers from the headings entirely and citing
+  lessons by their title, which no renumbering can break.
+  VERIFIABLE: Vitest over the pure check — a fixture document with a duplicated `### 3.x` is
+  refused and the message names the number and both line numbers, a clean fixture passes, and
+  the real file passes after the renumbering; plus a repository search that finds no citation of
+  a number this point moved without its new value.
+  Criticality: low — nothing breaks at runtime, but the document is our own evidence trail and a
+  handle that names three things names none.
+  Bundle: Dokumentation.
+
+- [ ] 981. Fifteen rule-corpus findings of the 28.08.2026 cross-vendor review are recorded and
+  unfixed. MEASURED 28.08.2026 by `rule-review-guard`, which came due when the corpus grew from
+  127 to 137 entries; the reading was commissioned cross-vendor over the complete memory corpus
+  plus `CLAUDE.md` and the two per-turn hooks, and its sixteen findings are section H of
+  `docs/rule-corpus-audit.md`. A16 was answered in the same turn. Three were spot-checked against
+  the files and confirmed, which is what makes the rest credible: `provider-volume-strategy.md`
+  still routes the hard cases to Fable (A1), `maximal-delegation.md` still says an implementation
+  agent runs Opus 5 "whatever the difficulty" (A2), and `dashboard-multiple-now-cards.md` carries
+  the same `parseNowCardPoints` sentence twice (A13). The corpus is read by every session, so a
+  rule that contradicts the code is followed anyway — that is the whole reason the axis
+  CONTRADICTORY exists.
+  FINAL STATE: every row of section H is either fixed or marked in the table as accepted with its
+  reason, and the table records which. Each fix is checked against the CODE it claims to describe,
+  never against neighbouring prose. Rows naming a script claim to verify (A3 on
+  `scripts/dashboard-guard-core.mjs`, A4/A5 on `scripts/decision-card-guard-core.mjs` and
+  `scripts/dashboard-card-topic-guard.mjs`, A6 on `assertRepositoryUnchanged`) are decided by
+  reading that script, and where the code is right and the memory wrong, the memory moves.
+  A WITHDRAWN rule keeps its surviving insight and a pointer; it is never silently deleted.
+  WHAT IS NOT IN SCOPE: A12 proposes reducing five dashboard memories to pointers behind one
+  binding contract. That is a corpus restructuring, not a fix; it is decided in this point and,
+  if adopted, filed as its own point rather than done in passing.
+  VERIFIABLE: `node scripts/rule-review.mjs --status` reports the corpus reviewed at the new
+  count; a repository search finds no surviving copy of the two dead routing sentences (A1, A2);
+  the duplicated sentence (A13) occurs once; and `npm run test:unit` stays green.
+  Criticality: medium — nothing breaks at runtime, but a session that follows a stale rule spends
+  a whole point on the wrong lane, which is exactly what A1 and A2 describe.
+  Bundle: Session- & Repo-Hygiene.
+
+- [ ] 984. Every landing writes its tick commit with the author model at the wrong vendor address.
+  MEASURED 28.08.2026: `git log --format='%h %s | %(trailers:key=Co-Authored-By,valueonly)'` over
+  the last five commits titled "Move the finished point out of the open work order" — 9bd20d3a,
+  4058fb8b, 47bbc9ac, d0c6a46d, af912498 — shows every one of them carrying
+  `GPT-5.6 Sol <noreply@anthropic.com>`. `scripts/land-point.mjs` takes the model NAME from
+  `--model` and pairs it with a fixed Anthropic no-reply address, so a Sol landing records an
+  OpenAI model at an Anthropic address.
+  WHAT IT COSTS: the trailer is the only machine-readable record of authorship, and the four-eyes
+  gate cuts reviewers by VENDOR. `mechanism-review.mjs --record` refuses such a commit outright —
+  measured this night: "an INDEPENDENT REVIEW cannot be proved for 9bd20d3: its commit names no
+  recognised model author in its Co-Authored-By trailers." Today the tick commit touches only
+  `TASKS.md` and `docs/tasks-archive.md`, so it is never a mechanism contribution and the damage
+  stays latent; the moment a landing commit touches a watched file, its review cannot be recorded
+  at it at all.
+  FINAL STATE: the address follows the model. One place derives the complete trailer from the
+  model name — the same allowlist spelling `scripts/model-guard-core.mjs` already exports through
+  `allowedTrailers()` — and `land-point.mjs` uses it instead of pairing a name with a constant.
+  A model the allowlist does not know is refused before the commit, never given a wrong address.
+  ALSO IN SCOPE: name every other writer of a model trailer that pairs a name with a fixed
+  address, and give them the same one source.
+  VERIFIABLE: Vitest over the pure derivation — each allowed model yields its own vendor's address
+  and an unknown model is refused; plus a repository search that finds no second place pairing a
+  model name with a hard-coded no-reply address. The five commits above stay as they are: history
+  is evidence, not a thing to rewrite.
+  Criticality: medium — latent today because the tick commit touches no watched file, but it
+  writes a false authorship record on every landing and would block a review outright the first
+  time that changes.
+  Bundle: Modell & Wächter.
+
+- [ ] 986. The criticality gate charges a point for every main commit that landed beside it.
+  MEASURED 28.08.2026 on point 946: `measurePointFilesWithoutCommission` derives a point's file
+  set as the first-parent diff from its lane's base commit to the reviewed sha. A HIGH point whose
+  cross-vendor round refuses twice answers those findings on `main`, AFTER its merge — so the
+  reviewed sha moves forward on main, and every unrelated commit that landed between the lane's
+  base and that sha is charged to the point. The gate then demanded pass coverage for
+  `.claude/queue-rank.json`, `docs/work-packages.md` and `docs/analysis_de/vibe-coding-anleitung.md`
+  — all of them the previous session's guide-ceiling work, already read cross-vendor under their own
+  commits.
+  WHAT IT COSTS: two extra review rounds, spent re-reading another point's finished work under this
+  point's number. The cost grows with the distance between a lane's base and the answer to its last
+  finding, which is exactly the shape a difficult HIGH point takes; and a re-read of an already
+  answered range re-raises findings that were settled, which is worse than the wasted round.
+  FINAL STATE: the measured file set is the union of the point's OWN lane commits plus the later
+  commits that touch the files those commits changed — never every first-parent commit in the
+  interval. `pointLaneCommitsCommand` already computes the lane, so the fact is available where the
+  measurement is made.
+  VERIFIABLE: Vitest over the pure measurement with an injected Git — a lane of two commits with
+  three unrelated main commits landing between base and reviewed sha yields the lane's files alone;
+  a later commit on main that touches one of the lane's files IS charged; a later commit touching
+  only other files is not.
+  Criticality: medium — it wastes review rounds and re-litigates settled findings, but it errs on
+  the side of demanding more review rather than less.
+  Bundle: Modell & Wächter.
+
+- [ ] 987. A verified Claude review receipt with no text result is blamed on the wrong model.
+  MEASURED 28.08.2026 while cross-reading point 977. `checkClaudeResultFile` in
+  `scripts/mechanism-review.mjs` returns `status: 'disagreement'` on every failure path where
+  `parsed.answerModel` is truthy. `parseClaudeResultOutput` in `scripts/fable-switch-core.mjs`
+  sets `answerModel` from the usage row whose counters match the top-level `usage`, and it sets
+  it BEFORE it checks that `value.result` is a string. So a receipt whose top-level answer really
+  was written by the claimed reviewer, but which carries no text result, is reported as
+  "a different model answered" instead of "this receipt cannot be verified".
+  WHAT IT COSTS: nothing is waved through — both statuses refuse the record, so the change is
+  fail-closed and no independence is faked. The cost is the reason text a later reader acts on:
+  `disagreement` accuses the routed model of not having answered and sends the operator hunting a
+  routing fault, while the real fault is a truncated or empty receipt. `reverifyReviewerAgreement`
+  carries the same mislabel onto a stored record, turning a standing `agreement` into a permanent
+  accusation against a model that did nothing wrong.
+  FINAL STATE: a receipt whose named model matched and which failed only on a missing or
+  non-string `result` yields `unverified`, not `disagreement`. `disagreement` stays reserved for
+  what it claims — a receipt whose top-level answer is attributed to some OTHER model.
+  VERIFIABLE: Vitest over the pure check with an injected receipt file — a receipt naming the
+  claimed model but carrying no `result` string yields `unverified`; a receipt whose single
+  counter-matching row names a different model still yields `disagreement`; an intact receipt
+  still yields `agreement`.
+  Criticality: low — it is fail-closed and misleads only the diagnosis, never the gate.
+  Bundle: Modell & Wächter.

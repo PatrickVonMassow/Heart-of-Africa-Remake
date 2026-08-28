@@ -10,7 +10,9 @@ import { join, resolve } from 'node:path'
 import { describe, it, expect } from 'vitest'
 import {
   criticalityGapPlan,
+  decideContributionReviewGap,
   decideReviewGap,
+  formatContributionReviewGap,
   formatCriticalityGap,
   formatReviewGap,
   guardOutcome,
@@ -20,6 +22,73 @@ import {
 } from './mechanism-review-guard-gap-core.mjs'
 
 const material = await import('./review-material-core.mjs').catch(() => null)
+
+describe('contribution-scoped review gaps', () => {
+  const contribution = (sha, over = {}) => ({
+    sha,
+    subject: `Contribution ${sha}`,
+    rawSize: 1200,
+    budget: REVIEW_GAP_BUDGET_CHARS,
+    statTruncated: false,
+    passes: [{ index: 1, total: 1 }],
+    uncoverable: [],
+    unreviewable: [],
+    ...over,
+  })
+
+  it('keeps a fitting contribution runnable however far the baseline range lags', () => {
+    const decision = decideContributionReviewGap({
+      blocked: true,
+      plan: {
+        // This aggregate was the old decision input. It is intentionally huge
+        // and uncoverable; the contribution plans, not this range, now rule.
+        rawSize: 15_100_000,
+        uncoverable: [{ path: '.claude/mechanism-reviews.jsonl' }],
+        contributions: [contribution('a'.repeat(40))],
+      },
+    })
+    expect(decision).toMatchObject({ gap: false, reason: 'contributions-runnable' })
+    expect(decision.contributions).toEqual(['a'.repeat(40)])
+  })
+
+  it('never suspends runnable contributions inside an accumulated unassemblable range', () => {
+    const impossible = contribution('b'.repeat(40), {
+      rawSize: 500_000,
+      passes: [],
+      uncoverable: [{ path: 'huge.patch', reason: 'complete diff exceeds one round' }],
+    })
+    const decision = decideContributionReviewGap({
+      blocked: true,
+      plan: { contributions: [impossible, contribution('c'.repeat(40))] },
+    })
+    expect(decision.gap).toBe(false)
+    expect(decision.reason).toBe('contributions-runnable')
+    expect(decision.unassemblable.map((entry) => entry.sha)).toEqual(['b'.repeat(40)])
+  })
+
+  it('suspends only a finite named set of individually unassemblable contributions', () => {
+    const impossible = contribution('d'.repeat(40), {
+      rawSize: 500_000,
+      passes: [],
+      uncoverable: [{ path: 'huge.patch', reason: 'complete diff exceeds one round' }],
+    })
+    const decision = decideContributionReviewGap({ blocked: true, plan: { contributions: [impossible] } })
+    expect(decision).toMatchObject({ gap: true, reason: 'contributions-unassemblable' })
+    const text = formatContributionReviewGap(decision)
+    expect(text).toContain('dddddddddddd')
+    expect(text).toContain('huge.patch')
+    expect(text).not.toContain('15.1')
+  })
+
+  it('fails closed on malformed plans and unavailable reviewer authorship', () => {
+    expect(decideContributionReviewGap({ blocked: true, plan: { contributions: [{}] } }).reason).toBe('unmeasured')
+    const unavailable = contribution('e'.repeat(40), { passes: [], unreviewable: [{ files: ['guard.mjs'] }] })
+    expect(decideContributionReviewGap({ blocked: true, plan: { contributions: [unavailable] } })).toMatchObject({
+      gap: false,
+      reason: 'unreviewable-authorship',
+    })
+  })
+})
 
 it('keeps the shell-expansion proof on a Windows CI runner', () => {
   const workflow = readFileSync(resolve(process.cwd(), '.github/workflows/ci.yml'), 'utf8')
@@ -412,12 +481,79 @@ describe('assessReviewGap — the wrapper cannot waive on its own failure (round
     })
     const range = `${'a'.repeat(40)}..${'b'.repeat(40)}`
     expect(seen).toEqual([
-      ['diff', '--stat', range],
-      ['diff', '--no-ext-diff', '--no-textconv', range],
       ['diff', '--name-only', '-z', range],
+      ['diff', '--stat', range, '--', 'big.md'],
+      ['diff', '--no-ext-diff', '--no-textconv', range, '--', 'big.md'],
       ['cat-file', '-s', `${'b'.repeat(40)}:big.md`],
       ['show', `${'b'.repeat(40)}:big.md`],
     ])
+  })
+
+  it('measures only the mechanism beside an excluded work-order document', async () => {
+    const seen = []
+    const run = (args) => {
+      seen.push(args)
+      if (args.includes('--name-only')) return 'TASKS.md\0scripts/x-guard.mjs\0'
+      if (args.includes('--stat')) return 'stat'
+      if (args[0] === 'diff') return 'diff --git a/scripts/x-guard.mjs b/scripts/x-guard.mjs\n+x'
+      if (args[0] === 'cat-file') return '4'
+      if (args[0] === 'show') return 'body'
+      return ''
+    }
+    const { assessReviewGap } = await import('./mechanism-review-guard-gap.mjs')
+    const decision = await assessReviewGap({
+      baseline: 'a'.repeat(40),
+      head: 'b'.repeat(40),
+      run,
+      loadTool: () => import('./review-material-core.mjs'),
+    })
+    expect(decision.gap).toBe(false)
+    expect(seen.some((args) => args.join(' ').includes('TASKS.md'))).toBe(false)
+    expect(seen.filter((args) => args[0] === 'diff' && !args.includes('--name-only'))).toEqual([
+      expect.arrayContaining(['--', 'scripts/x-guard.mjs']),
+      expect.arrayContaining(['--', 'scripts/x-guard.mjs']),
+    ])
+    expect(seen).toContainEqual(['show', `${'b'.repeat(40)}:scripts/x-guard.mjs`])
+  })
+
+  it('prices a binary the way the packer delivers it, and never reads its bytes', async () => {
+    // Point 943: the packer substitutes a one-line ABSENT BY DESIGN header for a
+    // binary body. This measurement used to `git show` the blob and charge its
+    // megabytes, so 22 screenshots made a range look 32.5M characters wide
+    // against a deliverable half that size — a gap ruled over material nobody
+    // would ever have been sent. The path stays IN the demand; only its price
+    // changes.
+    const seen = []
+    const withBinary = (args) => {
+      seen.push(args)
+      if (args.includes('--name-only')) return 'verification/shot.png\0scripts/x-guard.mjs\0'
+      if (args.includes('--stat')) return 'stat'
+      if (args[0] === 'diff') {
+        return [
+          'diff --git a/verification/shot.png b/verification/shot.png',
+          'index 1111111..2222222 100644',
+          'Binary files a/verification/shot.png and b/verification/shot.png differ',
+          'diff --git a/scripts/x-guard.mjs b/scripts/x-guard.mjs',
+          'index 3333333..4444444 100644',
+          '--- a/scripts/x-guard.mjs',
+          '+++ b/scripts/x-guard.mjs',
+          '@@ -1 +1,2 @@',
+          '+x',
+        ].join('\n')
+      }
+      if (args[0] === 'cat-file') return '4'
+      if (args[0] === 'show') return 'body'
+      return ''
+    }
+    const { measureReviewMaterial } = await import('./mechanism-review-guard-gap.mjs')
+    const m = measureReviewMaterial({ baseline: 'a'.repeat(40), head: 'b'.repeat(40), run: withBinary })
+    expect(m.files.map((f) => f.path)).toEqual(['verification/shot.png', 'scripts/x-guard.mjs'])
+    expect(m.files[0].text).toBe('')
+    // Neither its size nor its bytes were ever asked for.
+    expect(seen.some((a) => a[0] === 'show' && a[1].includes('shot.png'))).toBe(false)
+    expect(seen.some((a) => a[0] === 'cat-file' && a[1].includes('shot.png'))).toBe(false)
+    // The text file beside it is read exactly as before.
+    expect(seen).toContainEqual(['show', `${'b'.repeat(40)}:scripts/x-guard.mjs`])
   })
 
   it('an overflowed range reading rules a PROVEN floor, never unmeasured (landing-round pass 3)', async () => {
@@ -571,6 +707,26 @@ describe('assessReviewGap — the wrapper cannot waive on its own failure (round
           MATERIAL_BUDGET_CHARS: REVIEW_GAP_BUDGET_CHARS,
           planPasses: () => ({ statTruncated: false, uncoverable: [], passes: [{}, {}] }),
         }),
+    })
+    expect(d.gap).toBe(false)
+    expect(d.reason).toBe('splits')
+  })
+
+  it('uses the gate’s authorship-sized plan instead of inventing an unsliced gap', async () => {
+    const { assessReviewGap } = await import('./mechanism-review-guard-gap.mjs')
+    const d = await assessReviewGap({
+      baseline: 'a'.repeat(40),
+      head: 'b'.repeat(40),
+      run: bigRun,
+      sizedPlan: {
+        fits: false,
+        passes: [{}, {}],
+        uncoverable: [],
+        unreviewable: [],
+        statTruncated: false,
+        budget: REVIEW_GAP_BUDGET_CHARS,
+      },
+      loadTool: () => Promise.reject(new Error('the unsliced planner must not rule')),
     })
     expect(d.gap).toBe(false)
     expect(d.reason).toBe('splits')

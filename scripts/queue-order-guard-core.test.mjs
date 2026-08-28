@@ -18,7 +18,9 @@ import {
   unrankedAppendProblem,
   evaluate,
   openPointBodies,
+  releaseBoundaryProblemFrom,
 } from './queue-order-guard-core.mjs'
+import { parseRankRecord } from './queue-rank-core.mjs'
 
 /** Minimal dashboard in the real board's markup (queue cards + now-card + Erledigt). */
 function boardHtml({ nowTitle = '210 — Meereskante', nowBody = 'Status: in Arbeit.', queue = [], done = [209] } = {}) {
@@ -686,6 +688,18 @@ describe('rule 1d — the release boundary (point 789)', () => {
     const r = evaluate({ dashboardHtml: '', tasksMd: order(900, MEDIUM), rankRecordJson: unarmed })
     expect(r.block).toBe(true)
     expect(r.reason).toContain('RELEASE BOUNDARY NOT ARMED')
+  })
+
+  it('judges a normalized parsed record directly, including its null optional parts', () => {
+    const parsed = parseRankRecord(JSON.stringify({
+      ranked: {},
+      settled: { at: '2026-08-10T09:00:00.000Z', points: [RELEASE_TAG_POINT] },
+      boundary: { at: '2026-08-21T00:00:00.000Z', why: 'the frozen front', points: [] },
+    }))
+    expect(parsed).toMatchObject({ torn: false, ranked: {}, settled: expect.any(Object), boundary: expect.any(Object) })
+    const result = releaseBoundaryProblemFrom(order(900, MEDIUM), parsed)
+    expect(result.breaches).toEqual([{ point: 900, cause: 'not-high' }])
+    expect(result.reason).toContain('MACHINE-FILED POINT IN FRONT OF THE RELEASE')
   })
 
   it('grandfathers a point the FROZEN front names, and nothing else', () => {

@@ -10,7 +10,7 @@
 // repetition.
 
 import * as THREE from 'three/webgpu'
-import { edgeBandUniforms, sweptNode } from './edgeBand'
+import { SWEPT_PATCH_MEAN, edgeBandUniforms, sweptNode } from './edgeBand'
 import { seasonTintNode, wetGroundColor, wetGroundRoughness } from './seasonTint'
 import {
   cameraViewMatrix,
@@ -281,6 +281,15 @@ export function createNoisyMaterial(opts: NoisyMaterialOptions): THREE.MeshStand
   return m
 }
 
+/**
+ * How much of the dark blotch colour the ground's patch mottling ever mixes in.
+ * Sand (the open Giza plateau) keeps far less of it, so it reads as even desert
+ * sand rather than a pebbled field (point 273). Exported because the settlement
+ * edge's contrast model measures against the ground's MEAN colour, which this
+ * weight decides (work-order 581) — one number, not two that can drift.
+ */
+export const GROUND_PATCH_WEIGHT = { earth: 0.5, sand: 0.14 } as const
+
 export interface GroundPathOptions {
   /** Grayscale mask texture: white where a trodden path runs. */
   mask: THREE.Texture
@@ -328,9 +337,14 @@ export function createGroundMaterial(
   // there is no second pass and no drawn ring.
   const swept = sweptNode()
   // Textural: the open ground keeps its blotchy dark patches, the swept inside
-  // loses them (trodden and swept even).
-  let col = mix(even, color(patch), cells.oneMinus().pow(3).mul(sand ? 0.14 : 0.5))
-  col = mix(col, even, swept.mul(edgeBandUniforms.mottle))
+  // loses them (trodden and swept even). It is levelled to the mottling's MEAN,
+  // not to the unblotched colour (work-order 581): sweeping evens a ground, it
+  // does not bleach it, and mixing to the bright colour used to give the swept
+  // side back most of the darkening the tone step had just applied.
+  const patchWeight = sand ? GROUND_PATCH_WEIGHT.sand : GROUND_PATCH_WEIGHT.earth
+  let col = mix(even, color(patch), cells.oneMinus().pow(3).mul(patchWeight))
+  const levelled = mix(even, color(patch), float(patchWeight * SWEPT_PATCH_MEAN))
+  col = mix(col, levelled, swept.mul(edgeBandUniforms.mottle))
   const pathMask = (() => {
     if (!paths) return float(0)
     // Mask canvas maps the square ±extent around the place origin.
@@ -358,7 +372,15 @@ export function createGroundMaterial(
   // the dry-season straw as in the rains and the edge cannot bleach away
   // (design.md §19.13; `sweptGroundColor` is its CPU mirror).
   const sweptTone = float(1).sub(swept.mul(edgeBandUniforms.tone))
-  m.colorNode = wetGroundColor(seasonTintNode(col).mul(sweptTone).mul(surfaceStructure('ground')))
+  // The dust beaten out of a daily-walked yard (work-order 581): the swept side
+  // is drawn toward its OWN grey before it is darkened. It moves no brightness —
+  // the grey is the colour's weighted luma — so the value step above stays the
+  // whole value step, and a sand-coloured village gets a second, chromatic cue
+  // where value alone had little to work with.
+  const tinted = seasonTintNode(col)
+  const dust = tinted.r.mul(0.35).add(tinted.g.mul(0.5)).add(tinted.b.mul(0.15))
+  const dusted = mix(tinted, vec3(dust, dust, dust), swept.mul(edgeBandUniforms.desat))
+  m.colorNode = wetGroundColor(dusted.mul(sweptTone).mul(surfaceStructure('ground')))
   // Baked micro-relief; trodden paths are worn flat (the tangent deflection
   // fades where the mask is strong). Sand keeps a softer, finer grain so the
   // open plateau reads as smooth desert sand rather than a pebbled field. The

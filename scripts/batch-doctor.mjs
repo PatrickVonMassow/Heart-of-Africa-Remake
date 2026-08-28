@@ -56,12 +56,18 @@ import {
   DOCTOR_STATE_PATH,
 } from './batch-singleton.mjs'
 import { readMachine, listProcesses, repoMarker } from './verify/machine-load.mjs'
-import { COMMON_REPO_ROOT, REPO_ROOT } from './repo-paths.mjs'
+import { COMMON_REPO_ROOT, REPO_ROOT, withoutGitLocalEnvironment } from './repo-paths.mjs'
+import { recordDoctorGateMeasurement } from './decision-log-core.mjs'
+import { writeJsonAtomic } from './atomic-write.mjs'
 
 // Batch authority state lives in the one checkout every linked worktree shares.
 const REPO = COMMON_REPO_ROOT() || fileURLToPath(new URL('..', import.meta.url))
 // The checkout this process was invoked from; evidence only, never authority.
 const CHECKOUT_ROOT = REPO_ROOT
+// The doctor can itself be started from a hook or another Git child. Its
+// authority intentionally lives in the common checkout, but inherited GIT_DIR
+// must not override that cwd or leak onwards into the nested fast-gate suite.
+const REPOSITORY_ENV = withoutGitLocalEnvironment()
 const LOG = join(REPO, '.claude', 'doctor.log')
 const repair = process.argv.includes('--repair')
 const gate = process.argv.includes('--gate')
@@ -81,6 +87,7 @@ const git = (args, opts = {}) =>
     windowsHide: true,
     cwd: REPO,
     encoding: 'utf8',
+    env: REPOSITORY_ENV,
     timeout: opts.timeout ?? 30000,
     stdio: ['ignore', 'pipe', 'pipe'],
   }).trim()
@@ -356,7 +363,7 @@ if (gate) {
     let failed = false
     try {
       log(`gate: running ${cmd} …`)
-      execSync(cmd, { windowsHide: true, cwd: REPO, stdio: 'pipe', timeout: 15 * 60 * 1000 })
+      execSync(cmd, { windowsHide: true, cwd: REPO, env: REPOSITORY_ENV, stdio: 'pipe', timeout: 15 * 60 * 1000 })
       log(`gate: ${cmd} PASSED`)
     } catch {
       failed = true
@@ -389,6 +396,8 @@ function liveAgentWorktrees() {
 // --- Verdict -------------------------------------------------------------------
 
 const pendingRepair = needsRepair(plan) && !repair
+const measurementClean = gate && !pendingRepair && !gateFailed && !gateInconclusive && !alertsRemain
+if (gate) recordGateMeasurement(measurementClean)
 if (!pendingRepair && !gateFailed) {
   markAlertHandled()
   log('parallel alert marked handled')
@@ -434,5 +443,22 @@ function recordGateSatisfied() {
     log(`gate demand satisfied for HEAD ${head.slice(0, 8)} beside [${parallelSids.join(', ') || 'no other session'}]`)
   } catch (e) {
     log(`warn: could not record the gate satisfaction (${e && e.message}) — the demand simply stays live`)
+  }
+}
+
+function recordGateMeasurement(clean) {
+  try {
+    const statePath = DOCTOR_STATE_PATH
+    const state = existsSync(statePath) ? JSON.parse(readFileSync(statePath, 'utf8')) : {}
+    const detail = clean
+      ? 'repo state CONSISTENT; npm run test:unit, npm run build and npm run lint passed'
+      : gateInconclusive
+        ? 'the gate was inconclusive under machine load'
+        : 'the doctor or at least one fast gate reported findings'
+    const measured = recordDoctorGateMeasurement(state, { at: Date.now(), clean, detail })
+    writeJsonAtomic(statePath, measured)
+    log(`decision measurement batch-doctor-gate ${clean ? 'CLEAN' : 'DIRTY'} — ${detail}`)
+  } catch (e) {
+    log(`warn: could not record the doctor measurement (${e && e.message}) — every decision simply stays live`)
   }
 }

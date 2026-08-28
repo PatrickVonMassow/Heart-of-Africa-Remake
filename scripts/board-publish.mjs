@@ -42,7 +42,14 @@ import { resolve } from 'node:path'
 import { writeTextAtomic } from './atomic-write.mjs'
 import { withDerivedState } from './board-state.mjs'
 import { REPO_ROOT, STATE_PATH, readJson, mergeState } from './dashboard-state.mjs'
-import { normaliseLineEndings, projectNowForPublish, refreshFooter, renderCardCriticalities, upgradeNowCards } from './board-core.mjs'
+import {
+  normaliseLineEndings,
+  projectNowForPublish,
+  refreshFooter,
+  renderCardCriticalities,
+  unwrapCardHeaderGroups,
+  upgradeNowCards,
+} from './board-core.mjs'
 import { gatherActiveWorkSource, openPointNumbers } from './active-work-source.mjs'
 import { BOARD_EDIT_LOCK_PATH, withBoardEditLock } from './board-edit-lock.mjs'
 import { currentSetting, settingProblemLine } from './sol-share.mjs'
@@ -231,7 +238,7 @@ const fail = (reason) => {
   const original = readFileSync(boardFile, 'utf8')
   const tasksText = readFileSync(tasksPath, 'utf8')
   const { open } = parseTasks(tasksText)
-  let repoBytes = original
+  let repoBytes = unwrapCardHeaderGroups(original)
 
   try {
     repoBytes = projectNowForPublish(repoBytes, gatherActiveWorkSource({ tasksText }), {

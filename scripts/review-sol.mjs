@@ -52,7 +52,9 @@ import { currentSetting, settingProblemLine } from './sol-share.mjs'
 import { routeFor } from './sol-share-core.mjs'
 import { currentFableState } from './fable-switch.mjs'
 import { readRecords, verifyCarried } from './mechanism-review.mjs'
-import { mergeProblem, reviewRecordWellFormed } from './mechanism-review-core.mjs'
+import { mergeProblem, reviewRecordWellFormed, sameModel } from './mechanism-review-core.mjs'
+import { authoringClaudeArgs } from './author-fable-core.mjs'
+import { parseClaudeAskOutput } from './ask-sol-core.mjs'
 import {
   addedFilesAreCoveredByPatch,
   buildReviewPrompt,
@@ -64,6 +66,7 @@ import {
   decideReview,
   OUTCOME,
   formatReviewReport,
+  formatReviewerCommand,
   isUnknownModelRefusal,
   modelsInTrailerField,
   newFilePathsIn,
@@ -71,6 +74,7 @@ import {
   probeFreshness,
   PROBE_MAX_AGE_MS,
   REVIEW_TIMEOUT_MS,
+  reviewerDescriptor,
   savedAuthPathFrom,
   solAuthored,
   SOL_MODEL_ID,
@@ -104,6 +108,7 @@ import {
   outstandingFiles,
   parseRangeLog,
   planAuthorshipGroups,
+  reviewEndStateFiles,
 } from './mechanism-review-range-core.mjs'
 
 /** Where codex keeps the ChatGPT login, and where we park a copy of it. */
@@ -227,6 +232,12 @@ function gatherRange(sha, base, onlyPaths = null) {
   // A range DIFF (rather than per-commit patches) is what carries a merge
   // commit's conflict resolution, which `git log --patch` omits.
   const range = `${base}..${sha}`
+  // An explicit empty contribution scope is EMPTY, not the absence of a
+  // filter. Treating [] like null widens an excluded-only commit back to every
+  // path in it and recreates baseline-style debt at the smallest boundary.
+  if (Array.isArray(onlyPaths) && onlyPaths.length === 0) {
+    return { stat: '', patch: '', files: [], paths: [] }
+  }
   // NUL-SEPARATED, because the newline-separated form is QUOTED: a path with a
   // tab, a quote or a high byte in it arrives as `"scripts/x\ty.mjs"`, which no
   // `git show` resolves — the file then reached neither the content list nor a
@@ -385,11 +396,12 @@ export function buildAuthorshipPassPlan({
   commits = gatherAuthorshipCommits(sha, base),
   records = [],
   recordUsable = () => true,
+  paths = null,
 } = {}) {
   // The net range is authority for materiality. Commit history supplies only
   // authorship: a reverted path is absent, while a path touched eight times is
   // still one current artefact.
-  const fullRange = gatherRange(sha, base)
+  const fullRange = gatherRange(sha, base, paths)
   const authorship = planAuthorshipGroups({ commits, endStateFiles: fullRange.paths })
   const coverage = outstandingFiles({
     commits,
@@ -449,6 +461,100 @@ export function buildAuthorshipPassPlan({
     superseded: authorship.superseded,
     invalidatedCoverage: coverage.invalidatedCoverage,
   }
+}
+
+/**
+ * Plan each owed mechanism contribution against its own first-parent boundary.
+ * The baseline chooses HOW MANY entries arrive here and nothing else: material
+ * size, reviewer routing and pass numbering are all local to the immutable
+ * commit. A contribution that fits today therefore stays runnable even when a
+ * stale baseline has accumulated millions of unrelated characters around it.
+ */
+export function buildContributionPassPlan({ commits = [], buildPlan = buildAuthorshipPassPlan } = {}) {
+  const contributions = []
+  for (const commit of commits ?? []) {
+    const sha = String(commit?.sha ?? '')
+    const base = String(commit?.parentShas?.[0] ?? '')
+    const files = reviewEndStateFiles(commit?.files ?? [])
+    if (!sha || !base) {
+      contributions.push({
+        sha,
+        subject: String(commit?.subject ?? ''),
+        base,
+        files,
+        rawSize: null,
+        budget: MATERIAL_BUDGET_CHARS,
+        statTruncated: false,
+        passes: [],
+        uncoverable: [],
+        unreviewable: [],
+        planningError: 'the contribution has no resolvable first-parent boundary',
+      })
+      continue
+    }
+    const plan = buildPlan({ sha, base, commits: [commit], paths: files })
+    contributions.push({
+      ...plan,
+      sha,
+      subject: String(commit?.subject ?? ''),
+      base,
+      files,
+    })
+  }
+  return {
+    scope: 'contribution',
+    contributions,
+    passCount: contributions.reduce((sum, entry) => sum + entry.passes.length, 0),
+    rawSize: contributions.reduce(
+      (sum, entry) => sum + (Number.isFinite(Number(entry.rawSize)) ? Number(entry.rawSize) : 0),
+      0,
+    ),
+    budget: MATERIAL_BUDGET_CHARS,
+  }
+}
+
+/** The finite, directly runnable plan printed by the mechanism guard status. */
+export function formatContributionPassPlan(plan = {}) {
+  const entries = Array.isArray(plan?.contributions) ? plan.contributions : []
+  const lines = [
+    `contribution-scoped plan: ${entries.length} owed contribution(s), ${Number(plan?.passCount ?? 0)} runnable pass(es)`,
+  ]
+  for (const entry of entries) {
+    const label = `${String(entry.sha).slice(0, 7) || '<unknown>'}${entry.subject ? ` ${entry.subject}` : ''}`
+    if (entry.planningError) {
+      lines.push(`  UNMEASURED ${label} — ${entry.planningError}`)
+      continue
+    }
+    const recordable =
+      !entry.statTruncated &&
+      !(entry.uncoverable ?? []).length &&
+      !(entry.unreviewable ?? []).length &&
+      entry.passes.length > 0 &&
+      entry.passes.length <= MAX_PASS_TOTAL
+    if (recordable) {
+      lines.push(`  ${label} — ${entry.passes.length} runnable ${entry.passes.length === 1 ? 'pass' : 'passes'}:`)
+      for (const pass of entry.passes) {
+        const passFlag = entry.fits ? '' : ` --pass ${pass.index}`
+        lines.push(
+          `    node scripts/review-sol.mjs --sha ${entry.sha} --since ${entry.base} ` +
+            `--brief "<what to judge>"${passFlag}`,
+        )
+      }
+    }
+    for (const item of entry.uncoverable ?? []) {
+      lines.push(`  UNASSEMBLABLE ${label}: ${quotePassFile(item.path)} — ${item.reason || 'no pass can carry its complete diff'}`)
+    }
+    if (entry.statTruncated) lines.push(`  UNASSEMBLABLE ${label}: its diffstat exceeds one pass's fixed share`)
+    if (entry.passes.length > MAX_PASS_TOTAL) {
+      lines.push(`  UNASSEMBLABLE ${label}: ${entry.passes.length} passes exceed the recordable ${MAX_PASS_TOTAL}`)
+    }
+    for (const group of entry.unreviewable ?? []) {
+      lines.push(
+        `  UNREVIEWABLE ${label}: ${(group.files ?? []).map(quotePassFile).join(', ')} — ${group.unreviewableReason}`,
+      )
+    }
+  }
+  return lines.join('\n')
 }
 
 export function formatAuthorshipPlan(plan, { sha = '' } = {}) {
@@ -671,6 +777,66 @@ export function runCodex({ prompt, input = '', modelId = SOL_MODEL_ID, timeoutMs
   }
 }
 
+/** Run one explicitly selected Claude reviewer with no tools, no persistence
+ *  and no fallback substitution. Its raw result JSON is retained outside Git
+ *  so the recorder can verify the top-level model before granting credit. */
+export function runClaudeReviewer({ prompt, input = '', reviewer, timeoutMs = REVIEW_TIMEOUT_MS, spawn = spawnSync } = {}) {
+  const args = authoringClaudeArgs({ modelId: reviewer.id, prompt })
+  const dangerous = args.indexOf('--dangerously-skip-permissions')
+  if (dangerous >= 0) args.splice(dangerous, 1)
+  args.push(
+    '--permission-mode', 'dontAsk',
+    '--tools', '',
+    '--safe-mode',
+    '--no-session-persistence',
+    '--prompt-suggestions', 'false',
+    '--effort', reviewer.effort,
+  )
+  const res = spawn('claude', args, {
+    cwd: REPO_ROOT,
+    encoding: 'utf8',
+    windowsHide: true,
+    input,
+    timeout: timeoutMs,
+    maxBuffer: 128 * 1024 * 1024,
+  })
+  const modelResult = parseClaudeAskOutput(res.stdout, reviewer)
+  const timedOut = res.error?.code === 'ETIMEDOUT' || res.signal != null
+  const cause = res.error
+    ? `Claude could not complete the review: ${res.error.message}`
+    : timedOut
+      ? 'Claude timed out before the review completed'
+      : res.status !== 0
+        ? `Claude exited with code ${res.status}: ${String(res.stderr ?? '').trim().split('\n').slice(-1)[0] || 'no detail'}`
+        : !modelResult.ok
+          ? modelResult.error
+          : ''
+  let resultPath = ''
+  if (!cause) {
+    mkdirSync(STATE_DIR, { recursive: true })
+    const id = createHash('sha256').update(String(res.stdout)).digest('hex').slice(0, 16)
+    resultPath = join(STATE_DIR, `review-claude-${id}.json`)
+    writeFileSync(resultPath, res.stdout, { mode: 0o600 })
+    chmodSync(resultPath, 0o600)
+  }
+  return {
+    ok: !cause,
+    cause,
+    finalMessage: modelResult.result,
+    modelResult,
+    exitCode: res.status,
+    timedOut,
+    resultPath,
+    modelAt: new Date().toISOString(),
+    sentInput: input,
+    transportError: res.error
+      ? `the spawn layer reported ${String(res.error.code ?? res.error.message ?? 'an error')} before the run completed`
+      : timedOut
+        ? 'the run was killed on its time budget, mid-stream'
+        : '',
+  }
+}
+
 /** The receipt of the last passed model-id probe (see probeFreshness). */
 export const PROBE_RECEIPT_FILE = join(STATE_DIR, 'review-sol-probe.json')
 
@@ -848,9 +1014,9 @@ function restoreLogin() {
 
 export const usage = () =>
   [
-    'usage: node scripts/review-sol.mjs --sha <sha> --brief "<what to judge>" \\',
+    'usage: node scripts/review-sol.mjs [--reviewer sol|fable|opus|opus48] --sha <sha> --brief "<what to judge>" \\',
     '           [--mode review|blind-parallel] [--point <N>] [--since <ref>] [--timeout <ms>] \\',
-    '           [--pass <k>]',
+    '           [--pass <k>] [--file <current end-state path>]…',
     '       node scripts/review-sol.mjs --probe            (is -m honoured?)',
     '       node scripts/review-sol.mjs --save-login | --restore-login',
     '',
@@ -862,6 +1028,8 @@ export const usage = () =>
     'commit ships the current content of the files it touches.',
     'An explicit --since that narrows a fitting range records one scoped 1/1 pass whose',
     'file list and reviewed sha clear exactly the end-state artefacts that round read.',
+    '--file narrows only the current end-state material, not its history: reviewer eligibility',
+    'still includes every contributor to that path in the full --since range.',
     'Recorded scoped files remain cleared until those files change; later commits touching',
     'only other files leave them clear. No carry record or carry planning flag is needed.',
     'A commit written to answer a recorded finding owes a confirming clean pass only for',
@@ -882,6 +1050,8 @@ if (isMainModule(import.meta.url)) {
     const i = argv.indexOf(name)
     return i >= 0 && i + 1 < argv.length && !argv[i + 1].startsWith('--') ? argv[i + 1] : ''
   }
+  const flags = (name) => argv.map((arg, index) => arg === name ? argv[index + 1] : null)
+    .filter((value) => value && !value.startsWith('--'))
   try {
     if (argv.includes('--save-login')) process.exit(saveLogin())
     if (argv.includes('--restore-login')) process.exit(restoreLogin())
@@ -892,8 +1062,16 @@ if (isMainModule(import.meta.url)) {
     const mode = flag('--mode') || 'review'
     const point = flag('--point')
     const timeoutMs = Number(flag('--timeout')) || REVIEW_TIMEOUT_MS
+    const reviewerFlag = flag('--reviewer')
+    const selectedFiles = [...new Set(flags('--file'))]
+    const requestedReviewer = reviewerFlag ? reviewerDescriptor(reviewerFlag) : null
     if (!sha || !brief) {
       console.error('review-sol: --sha and --brief are both required.\n')
+      console.error(usage())
+      process.exit(2)
+    }
+    if (reviewerFlag && !requestedReviewer) {
+      console.error('review-sol: --reviewer must be one of sol, fable, opus, opus48.\n')
       console.error(usage())
       process.exit(2)
     }
@@ -980,6 +1158,7 @@ if (isMainModule(import.meta.url)) {
       sha: full,
       base,
       records,
+      paths: selectedFiles.length ? selectedFiles : null,
       recordUsable: (record, commit) => reviewRecordWellFormed(record, { commitAt: commit?.at }) && !mergeProblem(record, commit),
     })
     console.error(formatAuthorshipPlan(plan, { sha: full }))
@@ -1012,12 +1191,53 @@ if (isMainModule(import.meta.url)) {
     // A FITTING BUT NARROWED RANGE IS ONE SCOPED PASS. Its file list and record
     // sha are the exact end-state boundary the old pass-less row could not express.
     // A full branch-range review stays pass-less for ledger compatibility.
-    const pass = plan.fits ? (partialFor(base) ? selected : null) : selected
+    const pass = plan.fits ? (selectedFiles.length || partialFor(base) ? selected : null) : selected
     const rangeAuthors = selected
       ? selected.authors
       : [...new Set(plan.passes.flatMap((candidate) => candidate.authors ?? []))]
+    if (!selected) {
+      console.error('review-sol: REFUSING to spend a round on the whole range — run one of the authored passes above.')
+      process.exit(4)
+    }
+    const commandFor = (decision) => formatReviewerCommand({
+      model: decision?.model,
+      sha: full,
+      brief,
+      mode,
+      point,
+      since: sinceFlag,
+      timeout: flag('--timeout'),
+      pass: passFlag,
+      files: selectedFiles,
+    })
 
-    if (routeFor('review', share.setting) !== 'sol') {
+    let targetReviewer = requestedReviewer ?? reviewerDescriptor(SOL_MODEL_NAME)
+    let handover = ''
+    if (requestedReviewer?.runtime === 'claude') {
+      handover = solAuthored(rangeAuthors) ? 'sol-authored' : 'sol-unavailable'
+      const routed = decideReview({
+        outcome: {
+          ok: false,
+          kind: handover === 'sol-authored' ? OUTCOME.SELF_REVIEW : OUTCOME.UNREACHABLE,
+          cause: handover === 'sol-authored' ? causeTextFor(OUTCOME.SELF_REVIEW) : 'the preferred reader was unavailable',
+        },
+        parsed: { ok: false },
+        authorModel: rangeAuthors,
+        fableState,
+      })
+      if (!routed.model || !sameModel(routed.model, requestedReviewer.name)) {
+        console.error(
+          `review-sol: --reviewer ${requestedReviewer.key} is not this range's first eligible handover; ` +
+            `the route names ${routed.model || 'nobody'}.`,
+        )
+        process.exit(2)
+      }
+    } else if (requestedReviewer && solAuthored(rangeAuthors)) {
+      console.error(`review-sol: ${SOL_MODEL_NAME} authored part of this range and may not review it.`)
+      process.exit(2)
+    }
+
+    if (!requestedReviewer && routeFor('review', share.setting) !== 'sol') {
       const decision = decideReview({
         outcome: { ok: false, kind: OUTCOME.SWITCHED_OFF, cause: causeTextFor(OUTCOME.SWITCHED_OFF) },
         parsed: { ok: false },
@@ -1044,6 +1264,7 @@ if (isMainModule(import.meta.url)) {
           shortfall: pass ? null : planShortfall(plan),
           plan,
           pass,
+          reviewerCommand: commandFor(decision),
         }),
       )
       process.exit(3)
@@ -1053,7 +1274,7 @@ if (isMainModule(import.meta.url)) {
     // call is paid for (point 667). Sol AUTHORS now, and a review it may not
     // give is not worth an allowance: a Sol-authored range goes straight to the
     // Claude reviewer that also runs the suites, judges the picture and lands.
-    if (solAuthored(rangeAuthors)) {
+    if (!requestedReviewer && solAuthored(rangeAuthors)) {
       const decision = decideReview({
         outcome: { ok: false, kind: OUTCOME.SELF_REVIEW, cause: causeTextFor(OUTCOME.SELF_REVIEW) },
         parsed: { ok: false },
@@ -1072,18 +1293,14 @@ if (isMainModule(import.meta.url)) {
           shortfall: pass ? null : planShortfall(plan),
           plan,
           pass,
+          reviewerCommand: commandFor(decision),
         }),
       )
       process.exit(3)
     }
 
-    if (!selected) {
-      console.error('review-sol: REFUSING to spend a round on the whole range — run one of the authored passes above.')
-      process.exit(4)
-    }
-
     console.error(
-      `review-sol: asking ${SOL_MODEL_NAME} (effort ${SOL_REASONING_EFFORT}) to review ${full.slice(0, 7)} …`,
+      `review-sol: asking ${targetReviewer.name} (effort ${targetReviewer.effort}) to review ${full.slice(0, 7)} …`,
     )
     // THE IDENTITY IS PROVEN BEFORE THE REVIEW, NOT MENTIONED AFTER IT (second
     // cross-vendor round). Nothing in a run's output names the model that
@@ -1092,7 +1309,7 @@ if (isMainModule(import.meta.url)) {
     // was printed either way. The probe therefore RUNS when its receipt is
     // missing or stale, and a failed probe stops the review before a word of it
     // can be attributed to a model that may not have written it.
-    if (!ensureModelProven()) {
+    if (targetReviewer.runtime === 'codex' && !ensureModelProven()) {
       console.error('review-sol: the model id is not proven honoured — refusing to attribute a review to it.')
       process.exit(2)
     }
@@ -1116,12 +1333,15 @@ if (isMainModule(import.meta.url)) {
       `  material: ${assembly.size} characters of diff and file content ` +
         `(${base.slice(0, 7)}..${full.slice(0, 7)}${pass ? `, pass ${pass.index}/${pass.total}` : ''})`,
     )
-    const run = runCodex({
+    const request = {
       prompt: buildReviewPrompt({ sha: full, brief, mode, pass, receipt: assembly.receipt }),
       input: assembly.text,
       timeoutMs,
-    })
-    const outcome = classifyOutcome(run)
+    }
+    const run = targetReviewer.runtime === 'codex'
+      ? runCodex(request)
+      : runClaudeReviewer({ ...request, reviewer: targetReviewer })
+    const outcome = targetReviewer.runtime === 'codex' ? classifyOutcome(run) : run
     // The RECEIPT is demanded back (finding 8): the token stands only on the
     // material's last line, so an answer that cannot repeat it is a run whose
     // material is not proven read — no verdict, and therefore no record.
@@ -1137,16 +1357,58 @@ if (isMainModule(import.meta.url)) {
     // WHO AUTHORED IT decides who may review it if Sol is unavailable: no model
     // can review its own commit (see fallbackReviewerFor), and the record
     // covers the whole range, so every author in it counts.
-    const decision = decideReview({ outcome, parsed, authorModel: rangeAuthors, shortfall, fableState })
+    const decision = targetReviewer.runtime === 'codex'
+      ? decideReview({ outcome, parsed, authorModel: rangeAuthors, shortfall, fableState })
+      : outcome.ok && parsed.ok
+        ? {
+            model: targetReviewer.name,
+            ranBy: targetReviewer.name,
+            verdict: parsed.verdict,
+            evidence: parsed.evidence,
+            fellBack: false,
+            ready: shortfall === null,
+            kind: OUTCOME.OK,
+            cause: '',
+          }
+        : {
+            model: targetReviewer.name,
+            ranBy: '',
+            verdict: '',
+            evidence: '',
+            fellBack: true,
+            ready: false,
+            kind: outcome.ok ? OUTCOME.NO_VERDICT : OUTCOME.ERROR_EXIT,
+            cause: outcome.ok ? parsed.error : outcome.cause,
+          }
     // THE FINDINGS ARE THE POINT, not the verdict word: a `do-not-merge` whose
     // reasons were never printed cannot be acted on, and the evidence line the
     // ledger carries is one sentence by design. So the reviewer's whole answer
     // is printed above the record command.
     const said = String(run.finalMessage ?? '').trim()
     if (said) {
-      console.log(`--- ${SOL_MODEL_NAME} said ---\n${said}\n--- end of review ---\n`)
+      console.log(`--- ${targetReviewer.name} said ---\n${said}\n--- end of review ---\n`)
     }
-    console.log(formatReviewReport({ decision, sha: full, mode, point, partial, shortfall, plan, pass }))
+    if (targetReviewer.runtime === 'claude' && decision.fellBack) {
+      console.log(
+        `review-sol: ${targetReviewer.name} did not deliver a recordable review of ${full.slice(0, 7)}: ` +
+          `${decision.cause || 'no usable verdict'}.\n  The review is NOT done; no record command is printed.`,
+      )
+      process.exit(3)
+    }
+    console.log(formatReviewReport({
+      decision,
+      sha: full,
+      mode,
+      point,
+      partial,
+      shortfall,
+      plan,
+      pass,
+      modelAt: run.modelAt,
+      modelResult: run.resultPath,
+      handover,
+      reviewerCommand: commandFor(decision),
+    }))
     // Round N goes on the board while round N+1 runs: fifteen rounds in one turn
     // used to leave the page standing on finished work for hours.
     // OPTIONAL bookkeeping, imported lazily and swallowed whole: this command

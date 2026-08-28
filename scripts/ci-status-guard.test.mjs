@@ -47,4 +47,13 @@ describe('the CI guard wires the durable observer', () => {
     expect(code).toMatch(/export function acknowledgeCiWait\(wakeToken/)
     expect(code).toMatch(/acknowledgeCiWaitState\(current, wakeToken, \{ now \}\)/)
   })
+
+  it('dispatches only failed jobs and feeds the accepted re-run into the durable wait', () => {
+    expect(code).toMatch(/actions\/runs\/\$\{runId\}\/rerun-failed-jobs/)
+    expect(code).toMatch(/method: 'POST'/)
+    expect(code).toMatch(/res\?\.status === 201/)
+    expect(code).toMatch(/rerunWait: state\.ciWait/)
+    expect(code).toMatch(/allowRerun: !readOnly/)
+    expect(code).toMatch(/standDown && judged\.rerunWait\?\.state === 'pending'/)
+  })
 })

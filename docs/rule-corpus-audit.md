@@ -14,7 +14,7 @@ assumptions.
 
 | Corpus part | Entries | Where |
 | --- | --- | --- |
-| Project memories | 66 + index | `~/.claude/projects/<key>/memory/` |
+| Project memories | 67 + index | `~/.claude/projects/<key>/memory/` |
 | Enforcers (guards, gates, hooks) | 27 | `scripts/*-guard.mjs`, `*-hook.mjs` |
 | Session-read rule documents | 3 | `CLAUDE.md`, `design.md`, `TASKS.md` preamble |
 | Derived advice documents | 2 | `docs/analysis_de/` (guide + retrospective) |
@@ -48,7 +48,7 @@ retired with its surviving insight.
 
 ---
 
-## A. Project memories (66)
+## A. Project memories (67)
 
 | # | Memory | Verdict | Finding (evidence) | Action | 2nd |
 | --- | --- | --- | --- | --- | --- |
@@ -118,7 +118,8 @@ retired with its surviving insight.
 | A64 | watch-for-aesthetic-oddities | STALE | Cites `docs/maximale-qs.md`; the file was renamed to `docs/maximum-qa.md` on 24.07 (everything git-tracked is English). A reader following the reference finds nothing. | Fix the reference. | |
 | A65 | webgpu-untestable-headless | OK | Content is the 19.07 correction and is right. Its NAME still asserts the withdrawn claim, which is what a skim reads. | Keep; note the naming trap (renaming a memory breaks 4 inbound links — not worth it). | |
 | A66 | workflows-token-budget | OK | | keep | |
-| A67 | MEMORY.md (index) | INEFFECTIVE | Two memories are not linked at all (`queue-order-fixes-before-finders`, `tasks-time-tracking`), so a session reading the index never learns they exist. **And the index is far staler than the first pass recorded** — the review found five more wrong lines that no memory row would have caught, because the index paraphrases rather than quotes: the F7 key, a zoom range of "0.25–0.5" that appears nowhere else, "gate being built" for a shipped guard, "being built into point 184" for a shipped WebGPU lane, "task DISABLED … singleton being built" for a re-enabled task, and a dashboard path that moved. The index is a SECOND copy of 66 rules and drifts like any copy. | Fix all of them; add the two links; add a pointer to this audit. Longer term the index is a candidate for generation from the memories' own `description` fields rather than hand-paraphrase. | ≠ → adopted, scope widened |
+| A67 | recommendation-is-a-decision | OK | User ruling **24.08.2026**, on “Zeiterfassung in der Arbeitsordnung: abschaffen oder wiederbeleben?”, after “Mach es so, wie du es empfohlen hast”: “Ja, das sollst du künftig dürfen.” `CLAUDE.md` §6 grants decision, execution, and recorded closure by a stated recommendation while keeping tags, publishes, force-pushes, user-data deletions, and unrecommended genuine choices outside that same sentence's authorization. | keep; verified against the session-read rule and linked from `no-standstill-decide-and-record` | |
+| A68 | MEMORY.md (index) | INEFFECTIVE | Two memories are not linked at all (`queue-order-fixes-before-finders`, `tasks-time-tracking`), so a session reading the index never learns they exist. **And the index is far staler than the first pass recorded** — the review found five more wrong lines that no memory row would have caught, because the index paraphrases rather than quotes: the F7 key, a zoom range of "0.25–0.5" that appears nowhere else, "gate being built" for a shipped guard, "being built into point 184" for a shipped WebGPU lane, "task DISABLED … singleton being built" for a re-enabled task, and a dashboard path that moved. The index is a SECOND copy of 66 rules and drifts like any copy. | Fix all of them; add the two links; add a pointer to this audit. Longer term the index is a candidate for generation from the memories' own `description` fields rather than hand-paraphrase. | ≠ → adopted, scope widened |
 
 ## B. Session-read rule documents
 
@@ -270,3 +271,40 @@ kept for disputes rather than paid on every turn.
 - The v0.2 closing skipped legacy cleanup; any subsequent cleanup would therefore
   have missed the regression run. The ordered `CLOSING_STEPS` sequence now owns
   the rule instead of prose recollection.
+
+## H. Second pass — GPT-5.6 Sol, 28.08.2026
+
+The rule corpus had grown from 127 to 137 entries since the 19.08.2026 review, so
+`rule-review-guard` came due. The reading was commissioned cross-vendor (`ask-sol.mjs
+--kind audit`) over the complete memory corpus — 96 files including `MEMORY.md` — plus
+`CLAUDE.md`, the per-prompt dashboard reminder hook, the session-start resume hook and
+section A of this document, on the six axes the guard names. Sol could not read the
+scripts it names; each row therefore states the claim to verify against the code, and the
+three spot-checked below were confirmed in the files before this section was written.
+
+SPOT-CHECKED, all three confirmed: A1 (`provider-volume-strategy.md` line 21 still routes
+the hard cases to Fable), A2 (`maximal-delegation.md` line 18 still reads “**Opus 5**,
+whatever the difficulty”) and A13 (`dashboard-multiple-now-cards.md` carries the
+`parseNowCardPoints` sentence exactly twice). A16 was answered in the same turn: the Fable
+memory now leads with the operative routing and marks the withdrawn parts as withdrawn.
+
+| # | Rule | Axis | Finding and smallest fix |
+| --- | --- | --- | --- |
+| A1 | `provider-volume-strategy.md` | CURRENT/CONTRADICTORY | “Sol authors the mechanical/mid points, Fable the hard cases” contradicts `hard-cases-go-to-sol.md` (“hard… goes STRAIGHT TO GPT-5.6 Sol”) and `fable-sparingly.md` (Fable only by point tag or review-round escalation); binding copy is CLAUDE.md §6, and `scripts/author-routing-core.mjs` must be tested to return `sol` for hard/HIGH and `fable` only at its threshold; mark the stale routing paragraph WITHDRAWN and replace it with a pointer. |
+| A2 | `maximal-delegation.md` | OBSOLETE/CONTRADICTORY | the first bullet says every implementation agent “runs Opus 5, whatever the difficulty,” contradicting the later 18.08 Sol-author rule and its claim that `author-routing-core` sends hard/HIGH work to Sol; remove that policy copy, retain the delegation insight, point to CLAUDE.md §6, and verify both SessionStart resume instruction strings contain no “Opus 5 whatever the difficulty” echo. |
+| A3 | `no-standstill-decide-and-record.md` | INEFFECTIVE/CONTRADICTORY | “record the decision … in the board’s state/protocol section” names a section that cannot exist under `batch-dashboard-artifact.md` (“Exactly FOUR sections” and “NO other sections”); verify `scripts/dashboard-guard-core.mjs` rejects such a fifth section, then name an existing legal destination such as the affected point’s card instead. |
+| A4 | `batch-dashboard-artifact.md` | CONTRADICTORY | section 2 requires a VDZK card whenever the user must act, explicitly including verification, while `dashboard-vdzk-only-decisions.md` says the section holds “ONLY … DECIDE/CLARIFY” items and excludes aesthetic verification; binding copy should distinguish required user actions from optional feedback, and tests for `scripts/decision-card-guard.mjs` should cover a required non-decision action. |
+| A5 | `batch-dashboard-artifact.md` | CONTRADICTORY/INEFFECTIVE | the now-card must name “which points I’m prepping,” but `dashboard-card-single-topic.md` forbids any card from referencing another point and says `dashboard-card-topic-guard.mjs` rejects known foreign point numbers; remove the demand to identify queued point numbers in the current card or define and test an explicit narrow exception. |
+| A6 | `always-prep-during-waits.md` | CONTRADICTORY | its opening procedure requires updating the dashboard queue estimate during a long validation, but its UNIT paragraph says `assertRepositoryUnchanged` makes a dashboard publish/worktree change fail the suite and commands the tree to remain still; add a UNIT-specific rule to record only read-only prep during the run and defer the board edit/publish until the result is consumed. |
+| A7 | `process-scoped-regression.md` | CONTRADICTORY/CURRENT | item 2 says “kill any orphaned vite on :5173 (often the user’s dev server),” while item 7 says to leave the user’s `:5173` untouched; replace port-based killing with PID/parent/launch-record ownership verification and state unambiguously that an unowned user server is never killed. |
+| A8 | `brief-driven-delegation.md` | OBSOLETE | “one editing command → the Artifact publish (tool-bound) → `node scripts/board.mjs attest`” contradicts `batch-dashboard-artifact.md`, which says the artifact is RETIRED and the current path is scripted Pages publishing plus `dashboard-guard --synced`; mark the old loop WITHDRAWN, preserve only the board-CLI insight, and point to the binding board contract. |
+| A9 | `new-tasks-append-and-defer.md` | CONTRADICTORY | “append … at the end” and work it only after existing work conflicts with the newer `release-order-communication-first.md` command to move token/communication points to the checklist front in the same turn; make the newer tier rule the explicit scheduling exception while preserving append order only for number allocation/history. |
+| A10 | `doc-budget-shorten-dont-raise.md` | CONTRADICTORY | remedy 4 permits a self-decided, justified ceiling raise as a last resort, but “How to apply” says absolutely “do NOT edit the budget constant” and iterate until OK; qualify the latter as “until remedies 1–3 are exhausted,” then require the recorded reason for remedy 4. |
+| A11 | `MEMORY.md` | CURRENT/CONTRADICTORY | the index says “update peoples-1890 §8 and climate-1890 §9 with related rendering changes,” while `implementation-sections-current.md` says those are only pointers and the live records are `design.md` §§19.14–19.15; change the index summary to name the design sections and describe the research files as pointers. |
+| A12 | `batch-dashboard-artifact.md` | REDUNDANT/CLEAN | it declares itself the one binding board contract and says “Nothing else restates it,” yet full normative copies remain in `dashboard-all-open-points-in-queue.md`, `dashboard-multiple-now-cards.md`, `dashboard-no-auto-open.md`, `dashboard-card-single-topic.md`, and `dashboard-vdzk-only-decisions.md`; keep this file binding and reduce the others to WITHDRAWN historical insight plus pointers and mechanism-specific facts. |
+| A13 | `dashboard-multiple-now-cards.md` | CLEAN/REDUNDANT | the sentence beginning “BUILT: `parseNowCardPoints` in `scripts/dashboard-guard-core.mjs`…” appears twice consecutively and identically; delete the second occurrence. |
+| A14 | `no-other-window-to-close.md` | REDUNDANT | its owner-window rule is restated almost wholesale in the later indexed section “THE SHARPEST CASE OF THIS IS THE OWNER WINDOW” inside `blocked-action-find-the-project-command.md`; make that later indexed section binding, migrate the standalone file’s unique forced-takeover safety detail there, and mark this file WITHDRAWN with a pointer. |
+| A15 | `provider-volume-strategy.md` | CONTRADICTORY/CLEAN | after stating that Anthropic is one shared pool and the Fable bar “splits the VIEW, not the budget,” the same file still says “Fable is always the scarcest pool”; replace all pool language with “the shared Anthropic pool is scarce; the Fable bar is a usage breakdown,” preserving the measured-dashboard insight. |
+| A16 | `fable-sparingly.md` | CLEAN | “Two parts of the old … rule are DEAD” immediately introduces item 1, “Difficulty is no reason to reach for Fable,” as “LIVE AGAIN,” forcing the reader through incompatible lifecycle labels before reaching the current rule; rewrite the section directly as “hard/HIGH → Sol; Fable only by explicit lane or escalation threshold” and move the historical reversal into a WITHDRAWN note. |
+
+Filed as work-order point 981; A16 is already answered.

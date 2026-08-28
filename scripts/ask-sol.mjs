@@ -29,7 +29,10 @@ import { classifyOutcome, MATERIAL_BUDGET_CHARS, REVIEW_TIMEOUT_MS, SOL_MODEL_NA
 import { ensureModelProven, runCodex } from './review-sol.mjs'
 import { currentSetting, settingProblemLine } from './sol-share.mjs'
 import { routeFor } from './sol-share-core.mjs'
-import { buildAskPrompt, formatAnswerReport, formatAskMaterial, formatUnavailable, KINDS, normaliseKind, parseAnswer } from './ask-sol-core.mjs'
+import { currentFableState } from './fable-switch.mjs'
+import { fableIsOn } from './fable-switch-core.mjs'
+import { authoringClaudeArgs } from './author-fable-core.mjs'
+import { buildAskPrompt, formatAnswerReport, formatAskMaterial, formatUnavailable, KINDS, normaliseKind, parseAnswer, parseClaudeAskOutput, resolveAskModel } from './ask-sol-core.mjs'
 
 /** One git read that never throws — a missing range is reported, not fatal. */
 function git(args) {
@@ -81,16 +84,52 @@ export function gatherSections({ stdin = '', logs = [], diff = '', files = [] } 
 
 export const usage = () =>
   [
-    'usage: node scripts/ask-sol.mjs --kind <' + KINDS.join('|') + '> --brief "<the question>" \\',
+    'usage: node scripts/ask-sol.mjs [--model sol|fable|opus|opus48] --kind <' + KINDS.join('|') + '> --brief "<the question>" \\',
     '           [--file <path>]… [--log <path>]… [--diff <range>] [--timeout <ms>] [--anyway] [--json]',
     '',
     'Material also comes from stdin. Nothing is fetched by the model: this container cannot',
     'create user namespaces, so everything it may look at must travel with the request.',
-    `Runs on ${SOL_MODEL_NAME} at reasoning effort ${SOL_REASONING_EFFORT}; ${SOL_MODEL_NAME} AUTHORS NOTHING —`,
-    'the answer is text a Claude session acts on. Where the share switch routes this kind to',
-    'Claude, the command refuses (exit 3) unless --anyway is given.',
+    `Defaults to ${SOL_MODEL_NAME} at reasoning effort ${SOL_REASONING_EFFORT}; every target AUTHORS NOTHING —`,
+    'the answer is text another session acts on. Sol obeys the share switch; Fable obeys the',
+    'Fable switch. A routed refusal exits 3 unless --anyway is allowed for that route.',
     '  node scripts/sol-share.mjs --status   # what goes where right now',
   ].join('\n')
+
+/** Run a Claude-family ask with no tools and prove the serving model from the
+ * CLI's modelUsage receipt. Material travels on stdin, never through a read tool. */
+export function runClaudeAsk({ prompt, input = '', model, timeoutMs = REVIEW_TIMEOUT_MS, spawn = spawnSync } = {}) {
+  const args = authoringClaudeArgs({ modelId: model.id, prompt })
+  const dangerous = args.indexOf('--dangerously-skip-permissions')
+  if (dangerous >= 0) args.splice(dangerous, 1)
+  args.push(
+    '--permission-mode', 'dontAsk',
+    '--tools', '',
+    '--safe-mode',
+    '--no-session-persistence',
+    '--prompt-suggestions', 'false',
+    '--effort', model.effort,
+  )
+  const res = spawn('claude', args, {
+    cwd: REPO_ROOT,
+    encoding: 'utf8',
+    windowsHide: true,
+    input,
+    timeout: timeoutMs,
+    maxBuffer: 128 * 1024 * 1024,
+  })
+  const modelResult = parseClaudeAskOutput(res.stdout, model)
+  const timedOut = res.error?.code === 'ETIMEDOUT' || res.signal != null
+  const cause = res.error
+    ? `Claude could not complete the ask: ${res.error.message}`
+    : timedOut
+      ? 'Claude timed out before the ask completed'
+      : res.status !== 0
+        ? `Claude exited with code ${res.status}: ${String(res.stderr ?? '').trim().split('\n').slice(-1)[0] || 'no detail'}`
+        : !modelResult.ok
+          ? modelResult.error
+          : ''
+  return { ok: !cause, cause, finalMessage: modelResult.result, modelResult, exitCode: res.status, timedOut }
+}
 
 if (isMainModule(import.meta.url)) {
   const argv = process.argv.slice(2)
@@ -107,8 +146,14 @@ if (isMainModule(import.meta.url)) {
     }
     const kind = normaliseKind(flag('--kind'))
     const brief = flag('--brief')
+    const model = resolveAskModel(flag('--model') || 'sol')
     if (!kind || !brief) {
       console.error(`ask-sol: --kind (one of ${KINDS.join(', ')}) and --brief are both required.\n`)
+      console.error(usage())
+      process.exit(2)
+    }
+    if (!model) {
+      console.error('ask-sol: --model must be one of sol, fable, opus, opus48.\n')
       console.error(usage())
       process.exit(2)
     }
@@ -117,14 +162,24 @@ if (isMainModule(import.meta.url)) {
     // override — deliberate, because the whole purpose of the switch is that nobody
     // spends the scarce allowance by habit.
     const share = currentSetting()
-    // A fallback nobody is told about is a setting nobody chose (second cross-vendor round).
-    if (share.problem) console.error(settingProblemLine(share, 'ask-sol'))
-    if (routeFor(kind, share.setting) !== 'sol' && !argv.includes('--anyway')) {
-      console.error(
-        `ask-sol: the share switch is at \`${share.setting}\`, which routes ${kind} to Claude — not asking ${SOL_MODEL_NAME}.\n` +
-          `  Do it in the Claude chain, or: node scripts/sol-share.mjs --more   (override once with --anyway)`,
-      )
-      process.exit(3)
+    if (model.key === 'sol') {
+      // A fallback nobody is told about is a setting nobody chose (second cross-vendor round).
+      if (share.problem) console.error(settingProblemLine(share, 'ask-sol'))
+      if (routeFor(kind, share.setting) !== 'sol' && !argv.includes('--anyway')) {
+        console.error(
+          `ask-sol: the share switch is at \`${share.setting}\`, which routes ${kind} to Claude — not asking ${SOL_MODEL_NAME}.\n` +
+            `  Do it in the Claude chain, or: node scripts/sol-share.mjs --more   (override once with --anyway)`,
+        )
+        process.exit(3)
+      }
+    }
+    if (model.key === 'fable') {
+      const fable = currentFableState()
+      if (!fable.ok) throw new Error(fable.problem)
+      if (!fableIsOn(fable)) {
+        console.error(`ask-sol: ${model.name} is switched off — node scripts/fable-switch.mjs --status`)
+        process.exit(3)
+      }
     }
 
     // THE MATERIAL IS GATHERED BEFORE THE PROBE (cross-vendor review, 12.08.2026): a
@@ -158,25 +213,26 @@ if (isMainModule(import.meta.url)) {
     // The identity is PROVEN before a word is attributed to Sol: nothing in a run's
     // output names the model that answered, so the whole attribution rests on the server
     // refusing an unknown id (see review-sol.mjs --probe).
-    if (!ensureModelProven({ who: 'ask-sol' })) {
+    if (model.runtime === 'codex' && !ensureModelProven({ who: 'ask-sol' })) {
       console.error(`ask-sol: the model id is not proven honoured — refusing to attribute an answer to ${SOL_MODEL_NAME}.`)
       process.exit(2)
     }
-    console.error(`ask-sol: asking ${SOL_MODEL_NAME} (effort ${SOL_REASONING_EFFORT}) for a ${kind} — ${material.length} characters of material …`)
+    console.error(`ask-sol: asking ${model.name} (effort ${model.effort}) for a ${kind} — ${material.length} characters of material …`)
 
     const startedAt = Date.now()
-    const run = runCodex({
-      prompt: buildAskPrompt({ kind, brief }),
+    const request = {
+      prompt: buildAskPrompt({ kind, brief, modelName: model.name }),
       input: material,
       timeoutMs: Number(flag('--timeout')) || REVIEW_TIMEOUT_MS,
-    })
-    const outcome = classifyOutcome(run)
+    }
+    const run = model.runtime === 'codex' ? runCodex(request) : runClaudeAsk({ ...request, model })
+    const outcome = model.runtime === 'codex' ? classifyOutcome(run) : run
     const parsed = outcome.ok ? parseAnswer({ kind, text: run.finalMessage }) : { ok: false, error: '' }
     const elapsedMs = Date.now() - startedAt
 
     if (!parsed.ok) {
       const cause = outcome.ok ? `the run produced no usable answer (${parsed.error})` : outcome.cause
-      console.error(formatUnavailable({ kind, cause, setting: share.setting }))
+      console.error(formatUnavailable({ kind, cause, setting: share.setting, modelName: model.name }))
       if (String(run.finalMessage ?? '').trim()) {
         console.error(`--- what came back, unusable as it is ---\n${String(run.finalMessage).trim()}\n--- end ---`)
       }
@@ -186,11 +242,11 @@ if (isMainModule(import.meta.url)) {
     // THE WHOLE ANSWER IS PRINTED, not only its shape: a cause without the reasoning
     // behind it cannot be acted on, and this is the only place the reader sees it.
     const said = String(run.finalMessage ?? '').trim()
-    if (said && !asJson) console.log(`--- ${SOL_MODEL_NAME} said ---\n${said}\n--- end ---\n`)
+    if (said && !asJson) console.log(`--- ${model.name} said ---\n${said}\n--- end ---\n`)
     if (asJson) {
-      console.log(JSON.stringify({ kind, model: SOL_MODEL_NAME, effort: SOL_REASONING_EFFORT, elapsedMs, setting: share.setting, ...parsed, raw: said }, null, 2))
+      console.log(JSON.stringify({ kind, model: model.name, effort: model.effort, elapsedMs, setting: share.setting, ...parsed, raw: said }, null, 2))
     } else {
-      console.log(formatAnswerReport({ kind, parsed, elapsedMs }))
+      console.log(formatAnswerReport({ kind, parsed, elapsedMs, modelName: model.name, effort: model.effort }))
     }
     process.exit(0)
   } catch (e) {

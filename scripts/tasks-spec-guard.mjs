@@ -19,6 +19,17 @@ const TASKS = repoPath('TASKS.md')
 const PAUSE = repoPath('.claude/batch-paused')
 export const BASELINE_PATH = repoPath('.claude/tasks-spec-guard-baseline.json')
 
+// MEASURED 27.08.2026: `TASKS.md` crossed 1 MiB and every read of it through
+// execSync began failing with ENOBUFS — Node's default maxBuffer is exactly
+// 1 MiB, so the work order growing by one ordinary point took this guard out
+// and, through it, the whole preflight. The limit is stated rather than
+// inherited: the work order is meant to grow, and a ceiling nobody wrote down
+// is one nobody raises in time.
+// The raise is SCOPED to the reads that carry the work order (the four-eyes
+// review of this change found the first attempt widened every git call): a
+// bound is protective wherever the output is meant to stay small, and a
+// rev-parse or merge-base that suddenly returned megabytes should still fail.
+const TASKS_MAX_BUFFER = 256 * 1024 * 1024
 const git = (cmd) => execSync(`git ${cmd}`, { windowsHide: true, cwd: REPO_ROOT, encoding: 'utf8' }).trim()
 
 function readBaselineState() {
@@ -66,6 +77,7 @@ function tasksAt(revision) {
     windowsHide: true,
     cwd: REPO_ROOT,
     encoding: 'utf8',
+    maxBuffer: TASKS_MAX_BUFFER,
   })
 }
 

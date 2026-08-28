@@ -1,4 +1,4 @@
-// The commit-msg gate on the AUTHORING-MODEL trailer (points 397 b / 425 a).
+// The commit-msg gate on author and reviewer MODEL trailers (points 397 b / 425 a / 982).
 //
 //   node scripts/model-trailer-gate.mjs --message <file>
 //
@@ -10,8 +10,10 @@
 // it cost a research pass. The Stop guard is the net under history; this is the
 // grip that keeps the ambiguous commit out of it in the first place.
 //
-// Decision logic: model-guard-core.mjs (pure, Vitest-covered). This wrapper only
-// reads the message file and prints the refusal. FAIL-OPEN on an internal error,
+// Co-Authored-By is authorship; Reviewed-By is review. The distinct keys keep a
+// reviewer out of every author reader. Decision logic: model-guard-core.mjs
+// (pure, Vitest-covered). This wrapper only reads the message file and prints
+// the refusal. FAIL-OPEN on an internal error,
 // like every gate here — a broken gate must never make the tree uncommittable —
 // while a real finding fails CLOSED, which is the whole point.
 import { readFileSync } from 'node:fs'

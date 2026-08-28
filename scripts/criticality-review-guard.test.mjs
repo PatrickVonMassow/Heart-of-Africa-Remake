@@ -139,6 +139,74 @@ describe('point file-set measurement', () => {
     expect(files).toEqual(['scripts/lease.mjs', 'scripts/lease.test.mjs'])
   })
 
+  // ONE BOUNDARY (28.08.2026): `review-sol` structurally refuses to put the work
+  // order, its archive or the retrospective in a pass, so a point whose measured
+  // file set picked one of them up could never reach a complete composition,
+  // whatever was reviewed. The gate reads the planner's exclusion list.
+  // The receipt path measured its own set and skipped the boundary (cross-vendor
+  // review, GPT-5.6 Sol): a clearance could then be written for the work order or
+  // the retrospective — paths no review round was ever owed for.
+  it('never lets an unavailable receipt claim a path outside the review boundary', () => {
+    const sha = 'a'.repeat(40)
+    const built = buildUnavailableReceipt({
+      sha,
+      point: 893,
+      files: ['scripts/lease.mjs', 'TASKS.md'],
+      reason: 'every configured reviewer vendor authored part of this contribution',
+      records: [{ kind: 'authoring-commission', point: 893, sha: 'b'.repeat(40), at: 1 }],
+      resolveSha: () => sha,
+      isAncestor: () => true,
+      measure: () => ({ unavailableFiles: ['scripts/lease.mjs', 'TASKS.md'] }),
+    })
+
+    expect(built.ok).toBe(false)
+    expect(built.errors.join(' ')).toContain('scripts/lease.mjs')
+    expect(built.errors.join(' ')).not.toContain('TASKS.md')
+  })
+
+  it('writes the receipt for the measured set once the excluded paths are gone', () => {
+    const sha = 'a'.repeat(40)
+    const built = buildUnavailableReceipt({
+      sha,
+      point: 893,
+      files: ['scripts/lease.mjs'],
+      reason: 'every configured reviewer vendor authored part of this contribution',
+      records: [{ kind: 'authoring-commission', point: 893, sha: 'b'.repeat(40), at: 1 }],
+      resolveSha: () => sha,
+      isAncestor: () => true,
+      measure: () => ({ unavailableFiles: ['scripts/lease.mjs', 'docs/tasks-archive.md'] }),
+      now: 1_700_000_000_000,
+    })
+
+    expect(built.ok).toBe(true)
+    expect(built.record.files).toEqual(['scripts/lease.mjs'])
+  })
+
+  it('leaves out the paths no review round may carry', () => {
+    const reviewed = 'c'.repeat(40)
+    const landing = 'c'.repeat(40)
+    const side = 'd'.repeat(40)
+    const files = measurePointFilesWithoutCommission(893, reviewed, {
+      isAncestor: () => false,
+      run: (args) => {
+        if (args[0] === 'log') {
+          return `\x1e${landing}\x1f${'a'.repeat(40)} ${side}\x1fMerge branch 'feat/893-attempt-lease-fencing'\n`
+        }
+        if (args[0] === 'diff') {
+          return [
+            'scripts/lease.mjs',
+            'TASKS.md',
+            'docs/tasks-archive.md',
+            'docs/analysis_de/retrospektive-zusammenarbeit.md',
+          ].join('\0')
+        }
+        throw new Error(`unexpected command: ${args.join(' ')}`)
+      },
+    })
+
+    expect(files).toEqual(['scripts/lease.mjs'])
+  })
+
   it('uses a landing merge to recover the lane base for an earlier branch review', () => {
     const first = 'a'.repeat(40)
     const reviewed = 'b'.repeat(40)
@@ -607,7 +675,7 @@ describe('the unavailable-receipt CLI', { timeout: 30_000 }, () => {
       expect(
         runGit(
           'commit', '-q', '-m',
-          'Add a both-vendor contribution\n\nCo-Authored-By: GPT-5.6 Sol <noreply@openai.com>\nCo-Authored-By: Claude Opus 5 <noreply@anthropic.com>',
+          'Add a contribution by every configured reader\n\nCo-Authored-By: GPT-5.6 Sol <noreply@openai.com>\nCo-Authored-By: Claude Opus 5 <noreply@anthropic.com>\nCo-Authored-By: Claude Fable 5 <noreply@anthropic.com>\nCo-Authored-By: Claude Opus 4.8 <noreply@anthropic.com>',
         ).status,
       ).toBe(0)
       const head = runGit('rev-parse', 'HEAD').stdout.trim()
@@ -615,7 +683,7 @@ describe('the unavailable-receipt CLI', { timeout: 30_000 }, () => {
       const args = [
         '--record-unavailable', head,
         '--point', '870',
-        '--reason', 'both configured vendors authored this contribution',
+        '--reason', 'every configured reviewer authored this contribution',
       ]
       const wrong = spawnSync(process.execPath, [command, ...args, '--files', 'src/wrong.mjs'], {
         windowsHide: true,

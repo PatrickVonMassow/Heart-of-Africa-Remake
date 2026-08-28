@@ -6,6 +6,7 @@ import { boardHtml } from './dashboard-guard-fixtures.mjs'
 
 const tasks = (...points) => points.map((point) => `- [ ] ${point}. Open`).join('\n')
 const questionTitles = (html) => parseCards(sliceSections(html).sections['Von dir zu klären']).map((card) => card.title)
+const designQuestion = (question) => `User-owned category: design-content.\n${question}`
 
 function harness(
   initialHtml,
@@ -46,8 +47,8 @@ describe('runBoardEdit — publish preflight and honest partial failure', () => 
 
     edit((html) => html, 'metadata refreshed')
 
-    expect(state.html).toContain('criticality-low">niedrig</span><span class="t">Task 204</span>')
-    expect(state.html).toContain('criticality-high">hoch</span><span class="t">Done 209</span>')
+    expect(state.html).toContain('criticality-low">niedrig</span></span><span class="t">Task 204</span>')
+    expect(state.html).toContain('criticality-high">hoch</span></span><span class="t">Done 209</span>')
   })
 
   // Ninth cross-vendor round: when the ACTIVE-WORK RECORD is the stage that
@@ -59,7 +60,7 @@ describe('runBoardEdit — publish preflight and honest partial failure', () => 
       throw new Error('declaration write refused')
     })
 
-    const result = edit((html) => addVdzk(html, 'Kartenschrift wählen', 'Welche Variante?'))
+    const result = edit((html) => addVdzk(html, 'Kartenschrift wählen', designQuestion('Soll die enge oder die weite Variante gelten?')))
 
     expect(result).toMatchObject({ written: true, published: false })
     expect(state.writes).toBe(1)
@@ -73,7 +74,7 @@ describe('runBoardEdit — publish preflight and honest partial failure', () => 
   it('refuses a knowably incomplete board before writing or publishing', () => {
     const { state, edit } = harness(boardHtml(), tasks(210, 211, 204, 703))
 
-    expect(() => edit((html) => addVdzk(html, 'Kartenschrift wählen', 'Welche Variante?'))).toThrow(
+    expect(() => edit((html) => addVdzk(html, 'Kartenschrift wählen', designQuestion('Soll die enge oder die weite Variante gelten?')))).toThrow(
       /precondition refused before writing.*703/,
     )
     expect(state.writes).toBe(0)
@@ -88,7 +89,7 @@ describe('runBoardEdit — publish preflight and honest partial failure', () => 
     const { state, edit } = harness(boardHtml(), tasks(210, 211, 204), () => {
       throw refusal
     })
-    const addQuestion = (html) => addVdzk(html, 'Kartenschrift wählen', 'Welche Variante?')
+    const addQuestion = (html) => addVdzk(html, 'Kartenschrift wählen', designQuestion('Soll die enge oder die weite Variante gelten?'))
 
     expect(edit(addQuestion)).toMatchObject({ written: true, published: false })
     expect(state.stderr[0]).toBe('BOARD FILE WRITTEN — open question added: Kartenschrift wählen')
@@ -104,7 +105,7 @@ describe('runBoardEdit — publish preflight and honest partial failure', () => 
       throw refusal
     })
 
-    edit((html) => addVdzk(html, 'Eine neue Frage', 'Wie weiter?'), 'open question added: Eine neue Frage')
+    edit((html) => addVdzk(html, 'Eine neue Frage', designQuestion('Soll die erste oder die zweite Fassung gelten?')), 'open question added: Eine neue Frage')
     expect(state.stderr).toEqual([
       'BOARD FILE WRITTEN — open question added: Eine neue Frage',
       'REFUSED\nremedy line one\nremedy line two',
@@ -120,7 +121,7 @@ describe('runBoardEdit — publish preflight and honest partial failure', () => 
       () => { order.push('publish'); return 'board PUBLISHED' },
       () => order.push('active-source'),
     )
-    edit((html) => addVdzk(html, 'Eine Frage', 'Wie weiter?'))
+    edit((html) => addVdzk(html, 'Eine Frage', designQuestion('Soll die erste oder die zweite Fassung gelten?')))
     expect(order).toEqual(['active-source', 'publish'])
   })
 

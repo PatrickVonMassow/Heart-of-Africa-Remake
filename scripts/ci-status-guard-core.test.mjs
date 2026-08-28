@@ -530,6 +530,34 @@ describe('renewable durable CI wait', () => {
     })
   })
 
+  it('gives a newly dispatched attempt a fresh deadline without replacing its observer', () => {
+    const original = renewCiWait(null, {
+      ...observation(NOW - WAIT_BUDGET_MS - 1),
+      classification: { ...observation(NOW).classification, runAttempt: 1 },
+      observedAt: NOW - WAIT_BUDGET_MS,
+    }, { now: NOW - WAIT_BUDGET_MS, makeWakeToken: () => 'wake-original' })
+    const observing = { ...original, observer: { pid: 123, startedAt: NOW - WAIT_BUDGET_MS } }
+    const rerunObservedAt = NOW + 1
+    const rerun = renewCiWait(observing, {
+      ...observation(NOW - WAIT_BUDGET_MS - 1),
+      classification: {
+        ...observation(NOW).classification,
+        runAttempt: 2,
+        rerunKey: '32462093487:1',
+      },
+      observedAt: rerunObservedAt,
+    }, { now: rerunObservedAt, makeWakeToken: () => 'must-not-replace' })
+
+    expect(rerun).toMatchObject({
+      runAttempt: 2,
+      rerunKey: '32462093487:1',
+      budgetStartedAt: rerunObservedAt,
+      deadline: rerunObservedAt + WAIT_BUDGET_MS,
+      wakeToken: 'wake-original',
+      observer: observing.observer,
+    })
+  })
+
   it('keeps observing past the interaction deadline and preserves a terminal result for recovery', () => {
     const wait = renewCiWait(null, observation(NOW - WAIT_BUDGET_MS), { now: NOW, makeWakeToken: () => 'wake-1' })
     const stillPending = observeCiWait(wait, { state: 'pending' }, { now: NOW + 1 })
@@ -636,7 +664,7 @@ describe('pruneShaCache', () => {
 
 // The sweep itself: all I/O injected, so what is asked, what is cached, what
 // blocks and what alerts is decided here and pinned without a network.
-async function sweep({ targets, runsBySha = {}, standDown = false, ...rest }) {
+async function sweep({ targets, runsBySha = {}, standDown = false, rerunWait = null, ...rest }) {
   const asked = []
   const alerts = []
   const result = await sweepTargets({
@@ -650,6 +678,7 @@ async function sweep({ targets, runsBySha = {}, standDown = false, ...rest }) {
     judgeRed: async ({ classification }) => ({
       classification: { ...classification, cause: 'repository', detail: 'the failing job is "gate"', actionable: !standDown },
       standDown,
+      rerunWait,
       stillFamished: standDown ? { CI: NOW } : {},
       judgedWorkflows: ['CI'],
     }),
@@ -759,6 +788,65 @@ describe('sweepTargets', () => {
     expect(again.observations).toEqual([
       expect.objectContaining({ previousState: 'pending', verdict: 'wait' }),
     ])
+  })
+
+  it('WAITS on the dispatched failed-jobs re-run instead of caching the transient red', async () => {
+    const rerunWait = {
+      state: 'pending',
+      runId: 42,
+      runAttempt: 2,
+      workflowName: 'Deploy to GitHub Pages',
+      rerunKey: '42:1',
+    }
+    const got = await sweep({
+      targets: [headTarget],
+      runsBySha: { [HEAD]: redRun(HEAD) },
+      standDown: true,
+      rerunWait,
+    })
+    expect(got.decision).toContain('NOT yet concluded')
+    expect(got.cache[HEAD]).toMatchObject({ state: 'pending', runId: 42 })
+    expect(got.observations).toEqual([
+      expect.objectContaining({ classification: rerunWait, verdict: 'wait' }),
+    ])
+  })
+
+  it('gives a dispatched re-run a NEW wait budget even when the sha push is old', async () => {
+    const oldTarget = { ...headTarget, at: NOW - WAIT_BUDGET_MS - 1 }
+    const rerunWait = {
+      state: 'pending',
+      runId: 42,
+      runAttempt: 2,
+      workflowName: 'Deploy to GitHub Pages',
+      rerunKey: '42:1',
+    }
+    const dispatched = await sweep({
+      targets: [oldTarget],
+      runsBySha: { [HEAD]: redRun(HEAD) },
+      standDown: true,
+      rerunWait,
+    })
+    expect(dispatched.cache[HEAD]).toMatchObject({
+      state: 'pending',
+      firstSeenAt: NOW,
+      budgetStartedAt: NOW,
+    })
+
+    // Recheck after the API cache expires: target.at is still the old push
+    // time, but the just-dispatched attempt has nearly its whole budget left.
+    const nextSweep = await sweepTargets({
+      targets: [oldTarget],
+      cache: dispatched.cache,
+      now: NOW + RECHECK_MS + 1,
+      fetchRuns: async () => pendingRun(HEAD),
+      judgeRed: async () => {
+        throw new Error('an unfinished re-run is not red')
+      },
+      notify: async () => {},
+    })
+    expect(nextSweep.decision).toContain('NOT yet concluded')
+    expect(nextSweep.failedOpen).toEqual([])
+    expect(nextSweep.cache[HEAD]).toMatchObject({ budgetStartedAt: NOW })
   })
 
   it('the wait has a CEILING — past it the guard fails open, says so, and KEEPS asking', async () => {

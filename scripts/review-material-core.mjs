@@ -102,11 +102,12 @@ export function formatPassManifest(plan, pass) {
   const absentByDesign = new Map((pass?.absentByDesign ?? []).map((entry) => [entry.path, entry.reason]))
   const carried = pass?.files ?? []
   const unavailable = (plan?.unreviewable ?? []).flatMap((group) => group?.files ?? [])
+  const uncoverable = plan?.uncoverable ?? []
   const lines = [
     `=== REVIEW PASS ${index}/${total} — THE SHAPE OF THIS MATERIAL ===`,
     `This range is reviewed in ${total} runnable ${total === 1 ? 'pass' : 'passes'} over its REVIEWABLE FILE SET.`,
-    unavailable.length
-      ? 'Files for which no independent reviewer vendor exists are named separately below and remain owed.'
+    unavailable.length || uncoverable.length
+      ? 'Files no runnable pass can carry are named separately below and remain owed.'
       : 'The runnable passes together cover the complete changed file set.',
     'This material is ONE of those passes. The DIFFSTAT',
     'below describes the WHOLE range for context: it names files this pass deliberately omits.',
@@ -128,9 +129,11 @@ export function formatPassManifest(plan, pass) {
       for (const path of other.files ?? []) lines.push(`  · ${quotePassFile(path)} → pass ${other.index}/${total}`)
     }
   }
-  if ((plan?.uncoverable ?? []).length) {
+  if (uncoverable.length) {
     lines.push('BEYOND THE REACH OF ANY PASS — no round can hold these; NO pass covers them:')
-    for (const u of plan.uncoverable) lines.push(`  · ${quotePassFile(u.path)}`)
+    for (const u of uncoverable) {
+      lines.push(`  · ${quotePassFile(u.path)} — ${u.reason || 'no round can carry its complete diff'}`)
+    }
   }
   if (unavailable.length) {
     lines.push('UNAVAILABLE TO THE REVIEWER CHAIN — this pass does not cover these files:')
@@ -873,7 +876,15 @@ export function planPasses({ stat = '', patch = '', files = [], budget = MATERIA
       const oversized = frame + sectionLen > room
       const undeliverable = oversized || sectionLen === 0
       if (undeliverable) {
-        uncoverable.push({ path: entry.path, patchChars: sectionLen, contentChars: entry.content.length })
+        uncoverable.push({
+          path: entry.path,
+          patchChars: sectionLen,
+          contentChars: entry.content.length,
+          reason: sectionLen === 0
+            ? 'the measured range contains no complete diff section for this path'
+            : `its complete diff plus required frame needs ${frame + sectionLen} characters, ` +
+              `but one round has ${room} available after shared material`,
+        })
         continue
       }
       // An alias whose section the CURRENT pass already carries costs it no
@@ -1076,7 +1087,8 @@ export function formatBudgetNotice(plan, { sha = '', command = 'node scripts/rev
       lines.push(
         '  BEYOND REACH — no round can hold these, not even their diff alone:',
         ...plan.uncoverable.map(
-          (u) => `    ${quotePassFile(u.path)} (diff ${u.patchChars}, content ${u.contentChars} characters)`,
+          (u) => `    ${quotePassFile(u.path)} — ${u.reason || 'no round can carry its complete diff'} ` +
+            `(diff ${u.patchChars}, content ${u.contentChars} characters)`,
         ),
       )
     }
@@ -1102,7 +1114,10 @@ export function formatBudgetNotice(plan, { sha = '', command = 'node scripts/rev
   if (plan.uncoverable.length) {
     lines.push(
       '  BEYOND REACH — no round can hold these, not even their diff alone:',
-      ...plan.uncoverable.map((u) => `    ${quotePassFile(u.path)} (diff ${u.patchChars}, content ${u.contentChars} characters)`),
+      ...plan.uncoverable.map(
+        (u) => `    ${quotePassFile(u.path)} — ${u.reason || 'no round can carry its complete diff'} ` +
+          `(diff ${u.patchChars}, content ${u.contentChars} characters)`,
+      ),
       '  They are covered by NO pass. Split the change itself, or review them by another means',
       '  and say so — a record that names them would be claiming a reading nobody did.',
     )
@@ -1195,7 +1210,10 @@ function passLines(shortfall, plan) {
     lines.push(
       '  BEYOND REACH — no pass can hold these, not even their diff alone, so no record may',
       '  name them at all:',
-      ...beyond.map((u) => `    ${quotePassFile(u.path)} (diff ${u.patchChars}, content ${u.contentChars} characters)`),
+      ...beyond.map(
+        (u) => `    ${quotePassFile(u.path)} — ${u.reason || 'no round can carry its complete diff'} ` +
+          `(diff ${u.patchChars}, content ${u.contentChars} characters)`,
+      ),
     )
   }
   return lines
