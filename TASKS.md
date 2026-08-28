@@ -13218,4 +13218,34 @@ to land than a mechanism that needs a review.
   fails for any entry whose evidence text names a feature level the entry does not carry.
   Criticality: medium — an unscoped charge excuses the defect the player sees with evidence taken
   from a lane the player never runs.
+  Bundle: Session- & Repo-Hygiene.- [ ] 993. A writer veto with a known expiry does not wake the launcher when it expires, and never
+  asks whether the writer is still alive. MEASURED 28.08.2026 on the 12:18-12:48 standstill. The
+  predecessor ended its point boundary at 12:18 and point 811's immediate handover DID fire (`early
+  tick — ownership ENDED (handed-over) — ticking now`, `.claude/batch-launcher.log` 10:18:20Z). The
+  successor start decision refused with code `registered-writer-live` for
+  `feat/734-red-capture-cap`: `checkAgentOutput` judges that worktree on git metadata against a
+  30-minute grace (`graceMs` 1800000, `registeredFeatureWriters` in `scripts/batch-in-flight.mjs`),
+  and its newest write was the 12:06 commit `094179d4`. The veto therefore aged out at 12:36 — a
+  moment the refusal already knows EXACTLY, because the grace and the measured age are both in its
+  own evidence. Nothing woke at 12:36; the next 900-second recovery tick at 12:48 measured 42 min,
+  called the writer quiet and spawned the successor. Twelve of the thirty lost minutes are pure
+  tick quantisation on an expiry the refusal could have scheduled itself, and the same shape is on
+  record in the archive of point 809 ("the successor started six minutes after a veto aged out,
+  because a tick came round then").
+  THE SHARPER HALF: the probe never asks whether the writer's PROCESS still exists. The 734 author
+  was an Agent-tool child of the session that ended at 12:18, so it was certainly dead from 12:18
+  on — and a dead writer still vetoed for another 18 minutes of file-age grace.
+  NOT COVERED BY POINT 964: that point restores the repeated-refusal escalation, which would have
+  re-decided at the 12:33 tick and saved about 15 of the 30 minutes. It is still tick-driven and
+  still cannot see that the veto's own clock runs out at 12:36.
+  FINAL STATE: a refusal that names an expiry SCHEDULES the wake-up for that moment instead of
+  waiting for the next tick to notice; and a registered writer whose pid is measurably gone is not
+  granted file-age grace at all — a dead writer vetoes nothing. Liveness is measured, never
+  inferred: an unreadable probe stays "unknown" and keeps the grace, which is the cautious
+  direction.
+  VERIFIABLE: Vitest over the start decision — a refusal carrying a known grace reports the exact
+  UTC moment it expires, and a writer whose declared pid does not exist is refused no grace while
+  an unreadable pid keeps it; plus the launcher scheduling that moment rather than its interval.
+  Criticality: medium — it costs the batch a quarter-hour per handover in the ordinary case, and
+  the standstill journal records this as its own class.
   Bundle: Session- & Repo-Hygiene.
