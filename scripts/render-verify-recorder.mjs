@@ -393,6 +393,17 @@ export function tapOutput(state, streams = [[process.stdout, false], [process.st
             : carry + chunk.slice(from, from + Math.min(segment, LINE_PROBE_CHARS - carry.length))
         if (isErr && CRASH_LINE.test(head)) state.crashed = true
         if (KEPT_LINE.test(head)) refuse()
+        // AND A STDERR LINE THE PROBE COULD NOT DECIDE IS A LOST LINE (review
+        // finding, 28.08.2026, round 23). `CRASH_LINE`'s stack-frame alternative
+        // needs the trailing `:line:column`, which a pathological path can push
+        // past the probe — so such a line was neither marked a crash nor counted
+        // as dropped, and the run kept neither closure route. It cannot be read
+        // and it cannot be ruled out, so it is recorded as what it is: a result
+        // the recording lost. Naming it a CRASH instead would say the process
+        // died, which nobody measured. The headline alternative is unaffected —
+        // it decides within the first characters — and a line this long is
+        // pathological in any case.
+        else if (isErr && !CRASH_LINE.test(head)) refuse()
       } else {
         handle(isErr, carry + chunk.slice(from, nl))
       }

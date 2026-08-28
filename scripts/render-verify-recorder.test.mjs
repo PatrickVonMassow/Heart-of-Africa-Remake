@@ -505,6 +505,57 @@ describe('tapOutput — observe-only', () => {
     expect(state.droppedLines).toBe(2)
   })
 
+  // THE CHARACTER BUDGET IS THE RUN'S TOO (review finding, 28.08.2026, round
+  // 23). Every MAX_CAPTURE_CHARS case wrote to stdout alone, so a per-stream
+  // implementation allowing twice the advertised capture would have passed.
+  it('spends ONE character budget across stdout and stderr together', () => {
+    const { state, out, err } = tapped()
+    const sized = (i, width) => {
+      const head = `ERR: page error ${tag(i)} `
+      return head + 'y'.repeat(width - head.length)
+    }
+    for (let i = 0; i < 63; i++) (i % 2 === 0 ? out : err).write(`${sized(i, MAX_LINE_CHARS)}\n`)
+    const room = MAX_CAPTURE_CHARS - state.lines.join('\n').length - 1
+    expect(room).toBeGreaterThan(0)
+    err.write(`${sized(900, room)}\n`)
+    expect(state.lines.join('\n').length).toBe(MAX_CAPTURE_CHARS)
+    expect(state.droppedLines ?? 0).toBe(0)
+    // Full to the character, the next line is refused on EITHER stream.
+    out.write(`${sized(901, 200)}\n`)
+    expect(state.droppedLines).toBe(1)
+  })
+
+  // AND THE EXACT PER-LINE BOUNDARY HOLDS WHEN THE NEWLINE ARRIVES SEPARATELY
+  // (review finding, 28.08.2026, round 23). One case delivers an exact-size line
+  // whole and the other adds text past the cap; neither shows that a pending
+  // carry filled to exactly the cap is still ACCEPTED when its newline follows.
+  it('keeps an exact-size line whose newline arrives in a later write', () => {
+    const { state, out } = tapped()
+    out.write(`ERR: ${'z'.repeat(MAX_LINE_CHARS - 'ERR: '.length)}`)
+    out.write('\n')
+    expect(state.lines).toHaveLength(1)
+    expect(state.lines[0]).toHaveLength(MAX_LINE_CHARS)
+    expect(state.droppedLines ?? 0).toBe(0)
+  })
+
+  // AND A STDERR LINE THE PROBE COULD NOT DECIDE IS A LOST LINE (review finding,
+  // 28.08.2026, round 23). CRASH_LINE's stack-frame alternative needs the
+  // trailing :line:column, which a pathological path pushes past the probe — so
+  // such a line was neither marked a crash nor counted as dropped, and the run
+  // kept neither closure route.
+  it('records an undecidable overlong stderr line as a lost line, not as a crash', () => {
+    const { state, err } = tapped()
+    err.write(`    at run (/${'d'.repeat(MAX_LINE_CHARS)}/polish.mjs:89:7)\n`)
+    expect(state.crashed).toBe(false)
+    expect(state.droppedLines).toBe(1)
+    expect(state.lines).toHaveLength(0)
+    // A headline decides within the probe, so it is still a crash and not a loss.
+    const other = tapped()
+    other.err.write(`TimeoutError: ${'x'.repeat(MAX_LINE_CHARS)}\n`)
+    expect(other.state.crashed).toBe(true)
+    expect(other.state.droppedLines ?? 0).toBe(0)
+  })
+
   // A line WITHIN the per-line budget that brings nothing new costs nothing,
   // however long it is — counting it would be a FALSE truncation, and a false
   // truncation blocks the gate.

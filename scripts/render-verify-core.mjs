@@ -1372,8 +1372,11 @@ export function unexplainedRuns(runs, since, options) {
           name: text(red?.name) || '(unnamed red)',
           point: Number.isInteger(red?.point) ? red.point : null,
         })),
-        reds: unowned.map((red) => text(red?.name)).filter(Boolean),
-        redKeys: unowned.filter((red) => text(red?.name)).map(redKeyOf),
+        // A NAMELESS RED KEEPS ITS PLACE HERE TOO (review finding, 28.08.2026,
+        // round 23): dropping it took it out of the deferral's count, and the
+        // rest of the gate has called such a red "(unnamed red)" all along.
+        reds: unowned.map((red) => text(red?.name) || '(unnamed red)'),
+        redKeys: unowned.map(redKeyOf),
       })
       continue
     }
@@ -1405,8 +1408,11 @@ export function unexplainedRuns(runs, since, options) {
     // entry, and a caller counting those would report two reds as one.
     const open_ =
       unowned ?? (verdict.status === 'suspect' ? residualOf(r).reds : postCrash ? postCrash.reds : verdict.unaccounted)
-    const named = open_.filter((x) => text(x?.name))
-    const names = named.map((x) => text(x?.name))
+    // EVERY ENTRY, NAMED OR NOT (review finding, 28.08.2026, round 23). The
+    // filter dropped the unnamed ones outright, so a run carrying a named and an
+    // unnamed red reported one waved cost instead of two — and several unnamed
+    // ones collapsed into the single fallback below.
+    const names = open_.map((x) => text(x?.name) || '(unnamed red)')
     // What is REPORTED is what is still open — never the verdict's own list,
     // which still holds the reds a charge has since taken over: quoting one of
     // those as the blocker would name the wrong red and count one too many.
@@ -1422,7 +1428,7 @@ export function unexplainedRuns(runs, since, options) {
       status: postCrash ? postCrash.status : verdict.status,
       unaccounted: stillOpen.length > 0 ? stillOpen : verdict.unaccounted,
       reds: names.length > 0 ? names : ['(unnamed red)'],
-      redKeys: names.length > 0 ? named.map(redKeyOf) : ['red|(unnamed red)'],
+      redKeys: names.length > 0 ? open_.map(redKeyOf) : [redKeyOf({ name: '(unnamed red)' })],
     })
   }
   // Undated records sort LAST rather than to the epoch: they cannot be placed

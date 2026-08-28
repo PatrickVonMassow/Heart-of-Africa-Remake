@@ -806,6 +806,34 @@ describe('render-verify-guard --status — what it prints about a run it cannot 
     expect(out).not.toMatch(/already answered by the later covering/)
   })
 
+  // A RECORD BLOCKS AS ONE CLASS AT A TIME (review finding, 28.08.2026, round
+  // 23). A truncation whose lost part has been re-recorded can still be blocked
+  // by a red it DID record — and the incomplete line then said "BLOCKING NOW"
+  // about the truncation, which is not what is stopping anything.
+  it('says of a re-recorded truncation that its RED is what still blocks', () => {
+    const at = Date.now()
+    const out = inTempRepo(
+      {
+        runs: [
+          {
+            backend: 'webgpu',
+            suite: 'settings',
+            at,
+            exit: 1,
+            truncated: true,
+            droppedLines: 115,
+            reds: [{ name: 'a check nobody filed', kind: 'check', point: null }],
+          },
+          { backend: 'webgpu', suite: 'settings', at: at + 1000, exit: 0, asserted: true },
+        ],
+      },
+      { pending: true },
+    )
+    expect(out).toMatch(/INCOMPLETE RECORDING \(not an unexplained red\).*what still blocks this record is its red/)
+    expect(out).not.toMatch(/INCOMPLETE RECORDING \(not an unexplained red\).*BLOCKING NOW/)
+    expect(out).toMatch(/unaccounted red: webgpu\/settings .*BLOCKING NOW/)
+  })
+
   it('falls back to startedAt where only that was measured', () => {
     const out = inTempRepo({
       runs: [{ backend: 'webgpu', suite: 'settings', startedAt: 1500, exit: 1, reds: [marker] }],

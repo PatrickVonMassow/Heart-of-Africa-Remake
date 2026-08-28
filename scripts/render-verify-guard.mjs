@@ -751,8 +751,15 @@ if (arg === 'status' || arg === '--status') {
       if (paths.length === 0) return 'not blocking — no render path is pending at this HEAD'
       return 'outside the current window — owed, not blocking'
     }
-    const blocksNow = (r) => {
-      if (blockingIds.has(runIdentity(r))) return 'BLOCKING NOW'
+    /** What the open list says about this record, by class — so a TRUNCATION
+     *  whose lost part has been answered is not reported as blocking because a
+     *  red it recorded still is (review finding, 28.08.2026, round 23). */
+    const openStatusOf = (id) => openRecords.find((u) => u.id === id)?.status ?? null
+    const blocksNow = (r, asClass = null) => {
+      const id = runIdentity(r)
+      const open = blockingIds.has(id) ? openStatusOf(id) : null
+      if (open && (asClass === null || open === asClass)) return 'BLOCKING NOW'
+      if (open) return `not blocking as this class — what still blocks this record is its ${open}`
       // A RECORD WHOSE LOST MEASUREMENT WAS RETAKEN IS ANSWERED, not merely old
       // (round 19), and that is true of the record whatever the gate is doing —
       // so it is said before the gate's own two reasons.
@@ -841,7 +848,7 @@ if (arg === 'status' || arg === '--status') {
     for (const r of openIncomplete) {
       console.log(
         `⚠ INCOMPLETE RECORDING (not an unexplained red): ${r.backend}/${r.suite} ` +
-          `@${isoText(runStamp(r) ?? r.at)} (id ${runIdentity(r)}, ${blocksNow(r)}) — ${droppedLinesOf(r)} result line(s) dropped by the ` +
+          `@${isoText(runStamp(r) ?? r.at)} (id ${runIdentity(r)}, ${blocksNow(r, 'incomplete')}) — ${droppedLinesOf(r)} result line(s) dropped by the ` +
           'capture cap. Re-run the suite, or sign it off: node scripts/render-verify-guard.mjs ' +
           `--incomplete "${r.backend}/${r.suite}" --evidence "<why>"`,
       )
@@ -859,7 +866,7 @@ if (arg === 'status' || arg === '--status') {
     for (const r of openCrashedRuns(state)) {
       console.log(
         `⚠ CRASHED RUN (not an unexplained red): ${r.backend}/${r.suite} @${isoText(runStamp(r) ?? r.at)} ` +
-          `(id ${runIdentity(r)}, ${blocksNow(r)}) — the run died rather than reported. THE CRASH ITSELF carries no ` +
+          `(id ${runIdentity(r)}, ${blocksNow(r, 'crashed')}) — the run died rather than reported. THE CRASH ITSELF carries no ` +
           'red anybody can own, so the three closings of point 640 cannot reach it — but a red the ' +
           'run PRINTED BEFORE it died was really observed and still closes those three ordinary ' +
           'ways (review finding, 28.08.2026, round 17: this line used to say nothing in the run ' +

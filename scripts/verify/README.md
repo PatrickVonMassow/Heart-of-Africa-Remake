@@ -1432,8 +1432,12 @@ Records already on file (the two truncated `webgpu/settings` runs of
 recording class remains: `runVerdict` answers `incomplete` — a class of its
 own, covering nothing — and the guard names it apart from an unexplained red
 in EVERY branch of its block message, so nobody hunts a defect that was never
-captured. Two things lift it, and neither is the ledger (a charge needs the
-red's identity, and the lost part has none):
+captured. Two things CLOSE it, and neither is the ledger (a charge needs the
+red's identity, and the lost part has none). The loud `--defer` remains what
+it is everywhere else — the hand waiver that carries a whole record past the
+gate, this class included, and names in the state file every red it waved; it
+closes nothing and is not one of the two (round 23, which read the list as
+claiming otherwise):
 
 1. **A real re-recording** — a COVERING run of the same suite on the same
    backend, later than the broken one and on code since the last render edit.

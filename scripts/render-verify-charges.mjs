@@ -324,7 +324,7 @@ export const RED_CHARGES = [
     // measured sentences are the same in both halves now, which couples them:
     // the root's detail must name multisampling, and each downstream sentence
     // must name its own object.
-    match: /GPUValidationError: The texture format \(TextureFormat::RGBA16Float\) does not sup/i,
+    match: /^console error: THREE\.WebGPURenderer: Uncaptured WebGPU GPUValidationError: The texture format \(TextureFormat::RGBA16Float\) does not sup/i,
     // AND THE ROOT IS READ OFF THE DETAIL, WHERE ITS SENTENCE SURVIVES WHOLE
     // (review finding, 28.08.2026, round 20). The stored NAME keeps 120
     // normalised characters and the root sentence is 137, so it ends at
@@ -360,8 +360,26 @@ export const RED_CHARGES = [
       'different alternative. Read off the two 13.08.2026 webgpu/settings records, where both ' +
       'attachments print this sentence beside the root. On the core adapter, on WebGL 2, in ' +
       'another suite or as a CHECK it stays a real red, and the charge dies with point 514.',
-    match: /GPUValidationError: \[Invalid Texture "(output|normal)-msaa"\] is invalid due to a previous/i,
-    detailMatch: /GPUValidationError: \[Invalid Texture "(output|normal)-msaa"\] is invalid due to a previous error/i,
+    match: /^console error: THREE\.WebGPURenderer: Uncaptured WebGPU GPUValidationError: \[Invalid Texture "output-msaa"\] is invalid due to a previous/i,
+    detailMatch: /GPUValidationError: \[Invalid Texture "output-msaa"\] is invalid due to a previous error/i,
+  },
+  {
+    // ONE ATTACHMENT PER ENTRY (review finding, 28.08.2026, round 23). The two
+    // names shared one alternation, and `match` and `detailMatch` choose from it
+    // independently — so an OUTPUT name passed the narrow half on a NORMAL
+    // detail, which is the same crossing round 22 split the three sentences to
+    // prevent, one level down.
+    point: 514,
+    suite: 'settings',
+    backend: 'webgpu',
+    featureLevel: 'compatibility',
+    kind: 'console',
+    why:
+      'THE SECOND MSAA ATTACHMENT, split from the first 28.08.2026 (round 23) so its name and ' +
+      'its measured sentence cannot be satisfied by the other one. Everything else is the entry ' +
+      'above: the same lane, the same measured cascade, the same expiry with point 514.',
+    match: /^console error: THREE\.WebGPURenderer: Uncaptured WebGPU GPUValidationError: \[Invalid Texture "normal-msaa"\] is invalid due to a previous/i,
+    detailMatch: /GPUValidationError: \[Invalid Texture "normal-msaa"\] is invalid due to a previous error/i,
   },
   {
     point: 514,
@@ -378,8 +396,12 @@ export const RED_CHARGES = [
       'uncharged in the same record: a charge reads ONE red and never the run around it, which ' +
       'is POINT 990. On core, on WebGL 2, in another suite or as a CHECK it stays a real red, ' +
       'and the charge dies with point 514.',
-    match: /GPUValidationError: \[Invalid TextureView\] is invalid due to a previous error/i,
-    detailMatch: /GPUValidationError: \[Invalid TextureView\] is invalid due to a previous error/i,
+    // ANCHORED AT THE STORED IDENTITY (review finding, 28.08.2026, round 23).
+    // Unanchored, it matched the sentence wherever it appeared — including
+    // inside an `Async render pipeline creation failed` message, which this
+    // entry's own evidence says has no owner and must stay red.
+    match: /^console error: THREE\.WebGPURenderer: Uncaptured WebGPU GPUValidationError: \[Invalid TextureView\] is invalid due to a previous error/i,
+    detailMatch: /^THREE\.WebGPURenderer: Uncaptured WebGPU GPUValidationError: \[Invalid TextureView\] is invalid due to a previous error/i,
   },
   {
     point: 568,

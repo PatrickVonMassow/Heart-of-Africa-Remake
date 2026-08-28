@@ -1435,8 +1435,30 @@ describe('runIdentity — the content identity a closure names one record by', (
     const crashedToo = { ...fixture, crashed: true }
     const truncatedToo = { ...fixture, truncated: true, droppedLines: 115 }
     const droppedMore = { ...fixture, truncated: true, droppedLines: 116 }
-    const ids = [otherSuite, otherBackend, startedInstead, crashedToo, truncatedToo, droppedMore].map((r) => runIdentity(r))
-    expect(new Set([...ids, runIdentity(fixture)]).size).toBe(7)
+    // EVERY FIELD A CLOSURE OR A COVERAGE READING TURNS ON (review finding,
+    // 28.08.2026, round 23): six selected ones left the claim "the identity is
+    // the whole record" untested for the rest.
+    const otherExit = { ...fixture, exit: 2 }
+    const otherLevel = { ...fixture, featureLevel: 'core' }
+    const otherShots = { ...fixture, screenshotCount: 3 }
+    const otherSuspect = { ...fixture, suspect: true, suspectOf: [{ name: 'the first attempt', kind: 'check' }] }
+    const otherReds = { ...fixture, reds: [{ name: 'a check nobody owns', key: 'k', kind: 'check', point: null }] }
+    const otherPartial = { ...fixture, partial: true, section: 'boot' }
+    const ids = [
+      otherSuite,
+      otherBackend,
+      startedInstead,
+      crashedToo,
+      truncatedToo,
+      droppedMore,
+      otherExit,
+      otherLevel,
+      otherShots,
+      otherSuspect,
+      otherReds,
+      otherPartial,
+    ].map((r) => runIdentity(r))
+    expect(new Set([...ids, runIdentity(fixture)]).size).toBe(13)
   })
 
   // THE TWO DERIVATIONS ARE HELD TOGETHER BY A CASE (review finding, 28.08.2026,
@@ -2270,6 +2292,28 @@ describe('a CRASHED run is its own class, and has its own signed way out (point 
     expect(result.wavedCount).toBe(2)
   })
 
+  // AND EVERY BRANCH KEEPS ITS NAMELESS REDS (review finding, 28.08.2026, round
+  // 23). The crash branch was repaired in round 22; the ordinary one still
+  // dropped them outright, so a run carrying a named and an unnamed red reported
+  // one waved cost instead of two.
+  it('counts a nameless red beside a named one in an ORDINARY run', () => {
+    const mixed = redRun('webgpu', 1500, [
+      red('a check nobody owns'),
+      { name: '', key: '', kind: 'check', point: null },
+      { name: '', key: 'another', kind: 'console', point: null },
+    ])
+    const found = unexplainedRuns([mixed], 1000, { openPoints })
+    expect(found[0].reds).toEqual(['a check nobody owns', '(unnamed red)', '(unnamed red)'])
+    const result = evaluate(
+      renderChange({
+        runs: [mixed],
+        deferral: { head: 'def5678', reason: 'the lane was software', at: 1700 },
+        openPoints,
+      }),
+    )
+    expect(result.wavedCount).toBe(3)
+  })
+
   // A crash that did NOT truncate says nothing about a lost recording.
   it('says nothing about a lost recording where none was lost', () => {
     const only = crashedRun('webgpu', 1500, { reds: [red('a check nobody owns')] })
@@ -2877,6 +2921,36 @@ describe('the shipped charge ledger', () => {
         'THREE.WebGPURenderer: Uncaptured WebGPU GPUValidationError: [Invalid TextureView] is invalid due to a previous error.',
     }
     expect(chargeFor(crossed, scoped)).toBeNull()
+  })
+
+  // EACH ATTACHMENT AND EACH SENTENCE ANSWERS FOR ITSELF (review finding,
+  // 28.08.2026, round 23). The two MSAA names shared one alternation, and the
+  // two halves choose from it independently — so an OUTPUT name passed the
+  // narrow half on a NORMAL detail. And the TextureView sentence was unanchored,
+  // so it matched inside an async-pipeline message this entry's own evidence
+  // says has no owner.
+  it('does not let one MSAA attachment satisfy the other one\u2019s detail', () => {
+    const scoped = { suite: 'settings', backend: 'webgpu', kind: 'console', featureLevel: 'compatibility' }
+    const sentence = (tex) =>
+      `THREE.WebGPURenderer: Uncaptured WebGPU GPUValidationError: [Invalid Texture "${tex}"] is invalid due to a previous error.`
+    for (const tex of ['output-msaa', 'normal-msaa']) {
+      expect(chargeFor(failedChecks(`ERR: ${sentence(tex)}`)[0], scoped).point, tex).toBe(514)
+    }
+    const crossed = { ...failedChecks(`ERR: ${sentence('output-msaa')}`)[0], detail: sentence('normal-msaa') }
+    expect(chargeFor(crossed, scoped)).toBeNull()
+  })
+
+  it('leaves the async-pipeline message uncharged though it quotes the cascade sentence', () => {
+    const scoped = { suite: 'settings', backend: 'webgpu', kind: 'console', featureLevel: 'compatibility' }
+    const asyncForm = failedChecks(
+      'ERR: THREE.WebGPURenderer: Async render pipeline creation failed (renderPipeline_x): [Invalid TextureView] is invalid due to a previous error.',
+    )[0]
+    expect(chargeFor(asyncForm, scoped)).toBeNull()
+    // While the measured form, at the start of the stored name, still charges.
+    const measured = failedChecks(
+      'ERR: THREE.WebGPURenderer: Uncaptured WebGPU GPUValidationError: [Invalid TextureView] is invalid due to a previous error.',
+    )[0]
+    expect(chargeFor(measured, scoped).point).toBe(514)
   })
 
   it('charges the fixed render-target leak to NOBODY — a mended red is a red again', () => {
