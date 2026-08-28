@@ -3,8 +3,10 @@
 // A text or `union` driver cannot distinguish two legitimate appends from an
 // edit to an existing review. This resolver can: each tip must contain the
 // ancestor byte-for-byte as its prefix, followed only by complete JSONL rows.
-// Only then are the raw rows unioned and ordered by their `at` stamps. The raw
-// spelling is retained so the merge cannot rewrite evidence while parsing it.
+// Only then are the appended raw rows unioned and ordered by their `at` stamps.
+// The ancestor stays byte-for-byte first and in its recorded order: it is the
+// history future append-only checks must continue to recognize. Raw spelling is
+// retained throughout so the merge cannot rewrite evidence while parsing it.
 
 export class LedgerMergeError extends Error {
   constructor(message) {
@@ -47,9 +49,10 @@ function assertAppendOnly(base, tip, side) {
 /**
  * Resolve the three blobs Git hands to a custom merge driver.
  *
- * The returned text has one copy of every raw record found on either tip.
- * Sorting uses the raw row as the tie-breaker so reversing ours/theirs cannot
- * change the merge result when two records have the same millisecond stamp.
+ * The returned text starts with the unchanged ancestor, followed by the union
+ * of both appended tails. Sorting applies only to those tails and uses the raw
+ * row as the tie-breaker, so reversing ours/theirs cannot change the merge
+ * result when two records have the same millisecond stamp.
  */
 export function mergeMechanismReviewLedger({ ancestor = '', current = '', other = '' } = {}) {
   const baseRows = rowsOf(ancestor, 'ancestor')
@@ -58,17 +61,18 @@ export function mergeMechanismReviewLedger({ ancestor = '', current = '', other 
   assertAppendOnly(baseRows, currentRows, 'current tip')
   assertAppendOnly(baseRows, otherRows, 'other tip')
 
-  const unique = [...new Set([...currentRows, ...otherRows])]
-  const records = unique.map((line) => ({ line, at: JSON.parse(line).at }))
+  const appendedRows = [
+    ...currentRows.slice(baseRows.length),
+    ...otherRows.slice(baseRows.length),
+  ]
+  const uniqueAppends = [...new Set(appendedRows)]
+  const records = uniqueAppends.map((line) => ({ line, at: JSON.parse(line).at }))
   records.sort((a, b) => a.at - b.at || (a.line < b.line ? -1 : a.line > b.line ? 1 : 0))
 
-  const outputRows = records.map(({ line }) => line)
+  const outputRows = [...baseRows, ...records.map(({ line }) => line)]
   const output = new Set(outputRows)
   for (const line of [...currentRows, ...otherRows]) {
     if (!output.has(line)) throw new LedgerMergeError('internal error: the union omitted an input row')
-  }
-  if (output.size !== outputRows.length) {
-    throw new LedgerMergeError('internal error: the union contains a duplicate row')
   }
   return outputRows.length ? `${outputRows.join('\n')}\n` : ''
 }

@@ -102,6 +102,38 @@ describe('the append-only review-ledger merge', () => {
     git(repo, ['merge', '--abort'])
   })
 
+  it('preserves an out-of-order ancestor across consecutive merges from older forks', () => {
+    const repo = fixture()
+    const newerAncestor = row('newer-ancestor', 300)
+    const skewedAncestor = row('skewed-ancestor', 100)
+    const ancestor = [newerAncestor, skewedAncestor]
+    const firstAppend = row('first-append', 500)
+    const secondAppend = row('second-append', 400)
+    const fromMain = row('main-append', 600)
+    write(repo, ancestor)
+    commit(repo, 'seed the clock-skewed ledger')
+
+    git(repo, ['checkout', '-q', '-b', 'first'])
+    write(repo, [...ancestor, firstAppend])
+    commit(repo, 'append the first branch review')
+    git(repo, ['checkout', '-q', 'main'])
+    git(repo, ['checkout', '-q', '-b', 'second'])
+    write(repo, [...ancestor, secondAppend])
+    commit(repo, 'append the second branch review')
+    git(repo, ['checkout', '-q', 'main'])
+    write(repo, [...ancestor, fromMain])
+    commit(repo, 'append the main review')
+
+    git(repo, [...MERGE_ARGS, 'first'])
+    expect(readFileSync(join(repo, LEDGER), 'utf8').startsWith(`${ancestor.join('\n')}\n`)).toBe(true)
+
+    git(repo, [...MERGE_ARGS, 'second'])
+    const lines = readFileSync(join(repo, LEDGER), 'utf8').trimEnd().split('\n')
+    expect(lines).toEqual([...ancestor, secondAppend, firstAppend, fromMain])
+    expect(git(repo, ['show', '-s', '--format=%P', 'HEAD']).split(' ')).toHaveLength(2)
+    expect(git(repo, ['status', '--porcelain'])).toBe('')
+  })
+
   it('refuses deletion, reordering and malformed appended JSON before producing output', () => {
     const a = row('a', 100)
     const b = row('b', 200)
