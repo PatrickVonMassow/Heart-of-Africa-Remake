@@ -13406,8 +13406,17 @@ to land than a mechanism that needs a review.
   - THE FAIL DIRECTION IS COMPLETE. `evaluate` allows a missing table and a missing exemption
     marker; a table whose rows parse while their cells do not is the remaining shape, and it
     allows too.
+  - THE BEFORE-SNAPSHOT IS ANCHORED TO THE DOCUMENT IT CLAIMS (round twelve, 29.08.2026).
+    `scripts/fixtures/work-packages-placed-before-1003.json` names the pre-migration document by
+    sha and is pinned only by its own content — the prose reader's noise, which the marked reader
+    cannot produce. That refutes a regeneration from today's reader, but it does not tie the
+    reading to the named document: running the old reader over the MIGRATED document would keep
+    plenty of noise too. Anchoring it needs a decision this point makes and records — a checked-in
+    copy of the pre-migration `docs/work-packages.md` plus a frozen copy of the reader of
+    `11f3163`, against a `git show` the unit suite must not do while point 966 stands.
   VERIFIABLE: Vitest over the reader for each named context, a case where the two authorities
-  disagree and the test names the point, and a fixture whose rows parse into empty cells.
+  disagree and the test names the point, a fixture whose rows parse into empty cells, and the
+  before-snapshot reproduced from the named document by the frozen reader.
   Criticality: medium — the guard errs toward allow, so what is left under-reports drift rather
   than blocking work; the membership defect that opened the range is answered on the branch.
   Bundle: Session- & Repo-Hygiene.
