@@ -1938,6 +1938,31 @@ describe('the shipped charge ledger', () => {
       if (c.backend) expect(BACKENDS).toContain(c.backend)
       if (c.kind) expect(['check', 'console']).toContain(c.kind)
       if (c.detailMatch) expect(c.detailMatch).toBeInstanceOf(RegExp)
+      // NO STATEFUL FLAG (review finding, 28.08.2026): `g` and `y` keep
+      // `lastIndex` across calls, so one entry would alternate between owning a
+      // red and missing it, by call order alone.
+      for (const re of [c.match, c.detailMatch]) {
+        if (!re) continue
+        expect(re.global).toBe(false)
+        expect(re.sticky).toBe(false)
+      }
+    }
+  })
+
+  // The backstop for a ledger handed in by a caller rather than shipped here:
+  // a stateful pattern must still answer the same for every red it is asked
+  // about, and answer the same at record time and on the re-read.
+  it('answers a stateful ledger regex identically on every red it is asked about', () => {
+    const ledger = [{
+      point: 506,
+      match: /goat stance/g,
+      detailMatch: /the planted foot/g,
+      why: 'a hand-passed ledger whose author reached for the g flag',
+    }]
+    const one = { ...red('the goat stance again'), detail: 'the planted foot slid' }
+    const two = { ...red('the goat stance once more'), detail: 'the planted foot slid' }
+    for (const r of [one, two, one, two]) {
+      expect(chargeFor(r, { suite: 'polish', backend: 'webgpu', ledger })?.point).toBe(506)
     }
   })
 

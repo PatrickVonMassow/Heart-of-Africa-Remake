@@ -194,6 +194,27 @@ export function chargeablePoints(text) {
  * `owned()`'s, when a later ledger is asked whether it owns a red already on
  * disk. Total: a malformed entry matches nothing rather than throwing.
  */
+/**
+ * A LEDGER PATTERN TESTED STATELESSLY (review finding, 28.08.2026). A regex
+ * carrying `g` or `y` keeps its `lastIndex` between calls, so the SAME entry
+ * matched one red and missed the next, and a record's charge at record time
+ * disagreed with the same record re-read afterwards — a silent alternation
+ * between accounted for and blocking, decided by call order.
+ *
+ * The flag is stripped into a fresh regex rather than reset in place: the ledger
+ * entry is shared data, and mutating a caller's object here would only move the
+ * surprise. The shape test in render-verify-core.test.mjs refuses such a flag in
+ * the shipped ledger as well, so this stays a backstop for a hand-passed one.
+ * Total: anything that is not a usable matcher matches nothing.
+ */
+function patternHits(pattern, value) {
+  if (!pattern || typeof pattern.test !== 'function') return false
+  if (pattern.global === true || pattern.sticky === true) {
+    return new RegExp(pattern.source, String(pattern.flags ?? '').replace(/[gy]/g, '')).test(value)
+  }
+  return pattern.test(value)
+}
+
 export function chargeFor(red, options) {
   const { suite = '', backend = '', featureLevel = null, ledger = RED_CHARGES } = options ?? {}
   const name = text(red?.name)
@@ -221,7 +242,7 @@ export function chargeFor(red, options) {
       // strict direction. (`red?.kind && …` here let a kindless record slip
       // through a console charge — round-5 review, 19.08.2026.)
       if (charge.kind && red?.kind !== charge.kind) continue
-      if (!charge.match?.test?.(name)) continue
+      if (!patternHits(charge.match, name)) continue
       // Some checks have more than one red cause behind the same stable label.
       // Such a charge must name the measured signature in the detail instead
       // of swallowing every future failure of that check.
@@ -235,7 +256,7 @@ export function chargeFor(red, options) {
       // stays loudly uncharged and closes the three ordinary ways. A broad
       // `match` entry is unaffected, because it never claimed to read a
       // measurement in the first place.
-      if (charge.detailMatch && (red?.detailVaried === true || !charge.detailMatch?.test?.(detail))) continue
+      if (charge.detailMatch && (red?.detailVaried === true || !patternHits(charge.detailMatch, detail))) continue
       return charge
     } catch {
       /* a broken ledger entry charges nothing — the red stays unaccounted */
