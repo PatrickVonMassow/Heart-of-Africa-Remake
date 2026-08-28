@@ -877,12 +877,6 @@
       "origin": "machine",
       "place": "last"
     },
-    "977": {
-      "at": "2026-08-27T19:31:29.698Z",
-      "why": "Die Vier-Augen-Kette hat keinen ausfuehrbaren Zug mehr, sobald der erste Gegenleser befangen ist — das blockiert jedes Zugende, das einen Mechanismus beruehrt, und damit auch den Abschlussdurchlauf selbst.",
-      "origin": "machine",
-      "place": "ahead"
-    },
     "978": {
       "at": "2026-08-27T20:29:55.116Z",
       "why": "Last is right: it is cosmetic on the board, it waits for point 976 which owns the same writer, and nothing about the release or the queue depends on it.",
@@ -907,17 +901,23 @@
       "origin": "machine",
       "place": "last"
     },
-    "985": {
-      "at": "2026-08-28T01:07:11.681Z",
-      "why": "It is the sensor the unattended batch waits on and it fails toward 'keep waiting': measured tonight as a 21-minute standstill that only the process table broke, so during the fortnight the release is meant to survive it can park the batch indefinitely — the same no-standstill class the user put before the release on 26.08.2026.",
-      "origin": "machine",
-      "place": "ahead"
-    },
     "986": {
       "at": "2026-08-28T03:28:55.650Z",
       "why": "It wastes review rounds without risking correctness, and the measurement it edits is owned by two points that come first.",
       "origin": "machine",
       "place": "last"
+    },
+    "987": {
+      "at": "2026-08-28T05:37:05.415Z",
+      "why": "Low, fail-closed and diagnostic-only — last is exactly right; it misleads a reader's diagnosis, never the gate.",
+      "origin": "machine",
+      "place": "last"
+    },
+    "988": {
+      "at": "2026-08-28T05:37:27.833Z",
+      "why": "Every landing runs into it: nine of the last thirty merges stopped on this file, and the standing repair is a hand edit of the four-eyes evidence whose most obvious form silently deletes recorded reviews — the release ships through those same landings.",
+      "origin": "machine",
+      "place": "ahead"
     }
   },
   "boundary": {
@@ -957,7 +957,7 @@
     "why": "The order standing in front of the release today is the arrangement that predates this rule; the four machine-filed points that had ranked themselves there were moved behind 174 first"
   },
   "settled": {
-    "at": "2026-08-28T03:28:55.658Z",
+    "at": "2026-08-28T05:37:27.840Z",
     "points": [
       174,
       184,
@@ -1275,13 +1275,13 @@
       974,
       975,
       976,
-      977,
       978,
       980,
       981,
       984,
-      985,
-      986
+      986,
+      987,
+      988
     ]
   }
 }
