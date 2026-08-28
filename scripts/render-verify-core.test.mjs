@@ -24,6 +24,7 @@ import {
   chargeablePoints,
   chargeFor,
   chargeReds,
+  markVariedDetails,
   runVerdict,
   formatSuspectEnv,
   parseSuspectEnv,
@@ -1140,6 +1141,52 @@ describe('evaluate — a red is not closed by the runs that FOLLOWED it (point 6
 
     // And it still does not COVER: the stamp the record carries is null.
     expect(coveringRun([stored], 'webgpu', 1000, { openPoints })).toBeNull()
+  })
+
+  // THE SAME ROUTE FOR A MEASUREMENT THAT DID NOT HOLD STILL (review finding,
+  // 28.08.2026). The recorder test carries this case; the CORE test file did
+  // not, and a review pass that reads the core alone would have kept every
+  // carried case green against an implementation that ignores `detailVaried`.
+  // The capture holds ONE line per identity, so a check that failed twice with
+  // two different measurements reaches the record as one red carrying the
+  // FIRST. A narrow charge that happened to match that reading must refuse it,
+  // or the second, unowned observation vanishes behind the charge.
+  it('refuses a NARROW charge on a record whose measurement VARIED, and blocks the gate with it', () => {
+    const check = 'FAIL  no child walks without getting anywhere — worst child 1 at '
+    const first = `${check}22.2s, 1.42 m walked inside 0.31 m`
+    // What the tap saw: the same identity printing a second, different line.
+    const varied = new Set(failedChecks(`${check}9.1s, 0.02 m walked inside 0.44 m`).map((c) => `${c.kind}:${c.key}`))
+    const reds = chargeReds(markVariedDetails(failedChecks(first), varied), {
+      suite: 'polish',
+      backend: 'webgpu',
+      ledger: [],
+    })
+    expect(reds).toHaveLength(1)
+    expect(reds[0].detailVaried).toBe(true)
+    const stored = redRun('webgpu', 1500, reds, { suite: 'polish' })
+    const runs = [stored, run('webgpu', 2000), run('webgl', 2100)]
+    const narrow = [{
+      point: 506,
+      suite: 'polish',
+      backend: 'webgpu',
+      kind: 'check',
+      match: /no child walks without getting anywhere/i,
+      detailMatch: /1\.42 m walked inside 0\.31 m/i,
+      why: 'the one reading that survived the capture',
+    }]
+    // The narrow entry matches the kept reading exactly, and still owns nothing.
+    expect(chargeFor(reds[0], { suite: 'polish', backend: 'webgpu', ledger: narrow })).toBeNull()
+    expect(unexplainedRuns([stored], 1000, { openPoints, ledger: narrow })).toHaveLength(1)
+    expect(evaluate(renderChange({ runs, openPoints, ledger: narrow })).decision).toBe('block')
+
+    // The CONTROL: the very same entry owns the very same red once the record
+    // no longer says the measurement moved — so it is the mark that refuses it.
+    const held = redRun('webgpu', 1500, chargeReds(failedChecks(first), { suite: 'polish', backend: 'webgpu', ledger: [] }), { suite: 'polish' })
+    expect(evaluate(renderChange({ runs: [held, run('webgpu', 2000), run('webgl', 2100)], openPoints, ledger: narrow })).decision).toBe('allow')
+
+    // And a BROAD entry is unaffected: it never claimed to read a measurement.
+    const broad = [{ ...narrow[0], detailMatch: undefined }]
+    expect(evaluate(renderChange({ runs, openPoints, ledger: broad })).decision).toBe('allow')
   })
 
   it('does NOT talk a CRASH away with a charge — a run that died judged no picture', () => {
