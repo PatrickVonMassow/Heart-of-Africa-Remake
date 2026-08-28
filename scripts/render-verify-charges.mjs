@@ -52,6 +52,8 @@ export const RED_CHARGES = [
   {
     point: 733,
     suite: 'startup',
+    backend: 'webgpu',
+    featureLevel: 'compatibility',
     kind: 'check',
     match: /loading picture never freezes longer than the balance budget/i,
     why:
@@ -63,7 +65,14 @@ export const RED_CHARGES = [
       'blocked thread ~3.3 s, ~2.3 s inside one animation frame): the readings sit within 7 % of ' +
       'each other at load average 3.1-4.7, where a load artefact scatters, so it is reproducible ' +
       'and not the machine. 733 owns naming whether the freeze belongs to the app or to the ' +
-      'compatibility adapter the restored lane rides, and the charge dies with that point.',
+      'compatibility adapter the restored lane rides, and the charge dies with that point. ' +
+      'SCOPED TO THAT LANE 28.08.2026 (cross-vendor review): the entry carried neither backend ' +
+      'nor level while its own evidence names one restored compatibility adapter, so it would ' +
+      'have excused the same freeze on WebGL 2 and on the core adapter, where nobody has ever ' +
+      'measured it. Both recorded reds — the two webgpu/startup runs of 19.08.2026 12:09 — carry ' +
+      'featureLevel=compatibility, so the narrowing takes no evidence away; and should the freeze ' +
+      'turn out to be the product rather than the lane, it stays a real red on the unmeasured ' +
+      'lanes until someone runs them.',
   },
   {
     point: 694,
@@ -157,6 +166,7 @@ export const RED_CHARGES = [
     point: 642,
     suite: 'polish',
     backend: 'webgpu',
+    featureLevel: 'compatibility',
     kind: 'check',
     // SCOPED TO THE MEASURED ASSERTION, not to the walker's label (cross-vendor
     // review of c33b031, finding 2). The label prefix alone matched every future
@@ -171,13 +181,18 @@ export const RED_CHARGES = [
       'hardware-backed and WebGPU reports compatibility level. What causes the difference is ' +
       'UNMEASURED, and point 725 disputes the artefact reading altogether, so this entry now ' +
       'excuses a red whose explanation is open. ' +
-      'Backend-scoped on purpose: on the WebGL 2 lane this check stays a real red.',
+      'Backend-scoped on purpose: on the WebGL 2 lane this check stays a real red. ' +
+      'LEVEL-SCOPED 28.08.2026 (cross-vendor review) for the reason the entry already states ' +
+      'itself: the refutation rests on the measured lane reporting COMPATIBILITY, so the same ' +
+      'check on a core adapter was never measured and stays red. Both recorded reds — the two ' +
+      'webgpu/polish runs of 17.08.2026 — carry featureLevel=compatibility.',
   },
   {
     point: 514,
     suite: 'settings',
     backend: 'webgpu',
     featureLevel: 'compatibility',
+    kind: 'check',
     why:
       'THE LANE, NOT THE PRODUCT — point 514 §5/§6 already owns this family in prose; this is ' +
       'the machine-readable half, added 13.08.2026 when it stood between a DOM-only change and ' +
@@ -194,7 +209,12 @@ export const RED_CHARGES = [
       'apart, and `baseline-classify` labelled 16 of 17 of these pre-existing (09.08.2026). ' +
       'Backend-scoped and suite-scoped on purpose: on WebGL 2 each of these stays a real red, and ' +
       'the charge dies with point 514, which must decide whether the lane records these as ' +
-      'UNAVAILABLE rather than red.',
+      'UNAVAILABLE rather than red. ' +
+      'KIND-SCOPED 28.08.2026 (cross-vendor review): every name this entry lists is a CHECK the ' +
+      'suite prints, the console side of the same cascade has its own entry below with its own ' +
+      'signature, and unscoped this one would have excused a console red carrying one of these ' +
+      'texts — a red nobody measured. Measured before the change: no red in the recorded window ' +
+      'matches this pattern at all, so nothing accounted for today stops being.',
     match:
       /(TRAA (off again|toggle stress)|F9 low|Graphics levels|the leak block produced no OTHER|first-person ground shows micro-detail)/i,
   },

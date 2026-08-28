@@ -2294,8 +2294,43 @@ describe('the shipped charge ledger', () => {
   // pairing this case exists for did not.
   it('charges the goat-stance red to a DIFFERENT point on each lane', () => {
     const goat = red('settlement walker (goat): the planted foot holds its ground spot')
-    expect(chargeFor(goat, { suite: 'polish', backend: 'webgpu' }).point).toBe(642)
+    expect(chargeFor(goat, { suite: 'polish', backend: 'webgpu', featureLevel: 'compatibility' }).point).toBe(642)
     expect(chargeFor(goat, { suite: 'polish', backend: 'webgl' })).toBeNull()
+  })
+
+  // THE ENTRY RESTS ON THE LANE IT MEASURED (review finding, 28.08.2026). Its
+  // own evidence says the refutation holds because the measured WebGPU lane
+  // reports COMPATIBILITY — so the core adapter the player runs was never
+  // measured, and the same check there is a red nobody has explained.
+  it('leaves the goat stance a real red on the core adapter and on a run that recorded no level', () => {
+    const goat = red('settlement walker (goat): the planted foot holds its ground spot')
+    expect(chargeFor(goat, { suite: 'polish', backend: 'webgpu', featureLevel: 'core' })).toBeNull()
+    expect(chargeFor(goat, { suite: 'polish', backend: 'webgpu' })).toBeNull()
+  })
+
+  // THE STARTUP FREEZE CARRIED NEITHER BACKEND NOR LEVEL (review finding,
+  // 28.08.2026), while its evidence names exactly one restored compatibility
+  // adapter — so it would have excused the same freeze on WebGL 2 and on core,
+  // where nobody has ever measured it. Both recorded reds carry that level.
+  it('charges the startup freeze to the restored compatibility lane alone', () => {
+    const freeze = red('the loading picture never freezes longer than the balance budget (4000 ms, design.md §21.2)')
+    const scoped = { suite: 'startup', backend: 'webgpu', kind: 'check' }
+    expect(chargeFor(freeze, { ...scoped, featureLevel: 'compatibility' }).point).toBe(733)
+    expect(chargeFor(freeze, { ...scoped, featureLevel: 'core' })).toBeNull()
+    expect(chargeFor(freeze, { ...scoped })).toBeNull()
+    expect(chargeFor(freeze, { suite: 'startup', backend: 'webgl', kind: 'check', featureLevel: 'compatibility' })).toBeNull()
+  })
+
+  // THE MSAA CHECK ENTRY HELD NO KIND (review finding, 28.08.2026). Every name
+  // it lists is a check the suite prints; the console side of the same cascade
+  // has its own entry and its own signature. Unscoped, a console red carrying
+  // one of these texts — which nobody measured — would have been excused.
+  it('charges the MSAA cascade CHECK names as checks, never as console errors', () => {
+    const scoped = { suite: 'settings', backend: 'webgpu', featureLevel: 'compatibility' }
+    for (const name of ['TRAA off again: no new console errors', 'F9 low: the frame still draws']) {
+      expect(chargeFor(red(name, null, 'check'), scoped).point).toBe(514)
+      expect(chargeFor(red(name, null, 'console'), scoped)).toBeNull()
+    }
   })
 
   // The entry excuses the assertion that was MEASURED, never the walker it was
