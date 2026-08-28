@@ -131,11 +131,11 @@ describe('authorship-cut mechanism review planning', () => {
     })
     expect(plan.groups[0].reviewer).toBe('')
     expect(plan.groups[0].reviewerVendor).toBe('')
-    expect(plan.groups[0].unreviewableReason).toMatch(/every configured reviewer vendor authored part/)
+    expect(plan.groups[0].unreviewableReason).toMatch(/every configured reviewer model authored part/)
     expect(plan.unreviewable).toEqual([plan.groups[0]])
   })
 
-  it('reports a contribution co-authored by both vendors as unreviewable', () => {
+  it('routes a contribution co-authored by both vendors to the first exact non-author', () => {
     const plan = planAuthorshipGroups({
       commits: [
         {
@@ -146,11 +146,10 @@ describe('authorship-cut mechanism review planning', () => {
       ],
     })
     expect(plan.groups[0]).toMatchObject({
-      reviewer: '',
-      reviewerVendor: '',
-      unreviewableReason: expect.stringMatching(/every configured reviewer vendor authored part/),
+      reviewer: 'Fable 5',
+      reviewerVendor: 'anthropic',
     })
-    expect(plan.unreviewable).toEqual([plan.groups[0]])
+    expect(plan.unreviewable).toEqual([])
   })
 
   it('splits a mixed-authorship range and names the eligible vendor for each part', () => {
@@ -238,6 +237,7 @@ describe('authorship-cut mechanism review planning', () => {
   it('requires the other vendor even when another same-vendor model is not an author', () => {
     expect(eligibleReviewer(['Claude Fable 5'])).toBe('GPT-5.6 Sol')
     expect(eligibleReviewer(['GPT-5.6 Sol'])).toBe('Opus 5')
+    expect(eligibleReviewer(['GPT-5.6 Sol', 'Claude Opus 5'])).toBe('Fable 5')
     expect(vendorOf('Claude Opus 5 <noreply@anthropic.com>')).toBe('anthropic')
   })
 })

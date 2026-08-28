@@ -30,7 +30,7 @@ import {
   verifyHalfAuthors,
 } from './mechanism-review.mjs'
 import { LEDGER_RELATIVE_PATH, MODES, VERDICTS } from './mechanism-review-core.mjs'
-import { writeState as writeFableState } from './fable-switch-core.mjs'
+import { readState as readFableState, writeState as writeFableState } from './fable-switch-core.mjs'
 
 const SCRIPT = resolve(process.cwd(), 'scripts', 'mechanism-review.mjs')
 const FABLE_FILES = ['fable-switch.mjs', 'fable-switch-core.mjs', 'atomic-write.mjs', 'git-tracked.mjs']
@@ -1445,6 +1445,68 @@ describe('the mode round-trips into the ledger', () => {
       expect(back).toHaveLength(1)
       expect(back[0].mode).toBeUndefined()
     })
+  })
+})
+
+describe('a routed Claude reviewer round-trips its model proof and exact file scope', () => {
+  it('accepts Fable only as the first non-author after Sol became ineligible', () => {
+    const dir = mkdtempSync(join(tmpdir(), 'hoa-review-result-'))
+    try {
+      const resultPath = join(dir, 'result.json')
+      writeFileSync(resultPath, JSON.stringify({
+        session_id: 'review-session-977',
+        result: 'VERDICT: merge\nEVIDENCE: read the complete guide and brevity core end states',
+        usage: { input_tokens: 7, output_tokens: 4, cache_read_input_tokens: 0, cache_creation_input_tokens: 90 },
+        modelUsage: {
+          'claude-haiku-4-5': { inputTokens: 20, outputTokens: 1, cacheReadInputTokens: 0, cacheCreationInputTokens: 0 },
+          'claude-fable-5': { inputTokens: 7, outputTokens: 4, cacheReadInputTokens: 0, cacheCreationInputTokens: 90 },
+        },
+      }))
+      const fableState = readFableState(JSON.stringify(writeFableState('on', {
+        why: 'the routed reviewer is available', by: 'test', now: 1,
+      })))
+      const built = buildRecord({
+        sha: '9'.repeat(40),
+        model: 'Fable 5',
+        modelAt: '2026-08-28T05:00:00.000Z',
+        modelResult: resultPath,
+        handover: 'sol-authored',
+        verdict: 'merge',
+        evidence: 'read the complete guide and brevity core end states',
+        mode: 'review',
+        pass: '1/1',
+        passFiles: 'docs/analysis_de/vibe-coding-anleitung.md,scripts/guide-brevity-core.mjs',
+        now: Date.parse('2026-08-28T05:00:01.000Z'),
+        fableState,
+        resolve: () => ({
+          sha: '9'.repeat(40),
+          subject: 'mixed end state',
+          authoredBy: 'GPT-5.6 Sol <noreply@openai.com>',
+          authors: ['GPT-5.6 Sol', 'Claude Opus 5'],
+          at: Date.parse('2026-08-28T04:00:00.000Z'),
+        }),
+      })
+      expect(built.ok, built.errors?.join('\n')).toBe(true)
+      expect(built.record).toMatchObject({
+        model: 'Fable 5',
+        handover: 'sol-authored',
+        handoverChain: ['Opus 5', 'Fable 5', 'Opus 4.8'],
+        reviewerAuthorship: {
+          status: 'agreement',
+          actualModel: 'claude-fable-5',
+          proof: 'claude-result',
+          resultPath,
+        },
+        pass: {
+          index: 1,
+          total: 1,
+          files: ['docs/analysis_de/vibe-coding-anleitung.md', 'scripts/guide-brevity-core.mjs'],
+          endState: '9'.repeat(40),
+        },
+      })
+    } finally {
+      rmSync(dir, { recursive: true, force: true })
+    }
   })
 })
 

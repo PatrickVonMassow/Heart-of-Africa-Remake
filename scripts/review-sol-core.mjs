@@ -831,6 +831,9 @@ export function formatRecordCommand({
   mode = 'review',
   point = '',
   pass = null,
+  modelAt = '',
+  modelResult = '',
+  handover = '',
 } = {}) {
   const parts = [
     'node scripts/mechanism-review.mjs',
@@ -841,6 +844,9 @@ export function formatRecordCommand({
     `--mode ${mode}`,
   ]
   if (String(point ?? '').trim()) parts.push(`--point ${String(point).trim()}`)
+  if (String(modelAt).trim()) parts.push(`--model-at ${q(modelAt)}`)
+  if (String(modelResult).trim()) parts.push(`--model-result ${q(modelResult)}`)
+  if (String(handover).trim()) parts.push(`--handover ${String(handover).trim()}`)
   // A PASS RECORD NAMES WHAT IT ACTUALLY READ (points 714 and 737). The record's
   // sha is the end state at which those files were read; no commit boundaries
   // travel, because intermediate file states are not review artefacts.
@@ -867,6 +873,10 @@ export function formatReviewReport({
   shortfall,
   plan = null,
   pass = null,
+  modelAt = '',
+  modelResult = '',
+  handover = '',
+  reviewerCommand = '',
 } = {}) {
   // THE REPORT RESTS ON decision.ready, NEVER ON A PARAMETER'S DEFAULT (fourth
   // cross-vendor round, pass 3). decideReview answers ready:false for a round
@@ -949,6 +959,9 @@ export function formatReviewReport({
     mode,
     point,
     pass,
+    modelAt,
+    modelResult,
+    handover,
   })
   // Every pass says exactly what its record clears. Passes run in any order, so
   // the remainder is discovered from the ledger rather than a guessed number.
@@ -960,13 +973,15 @@ export function formatReviewReport({
       ]
     : []
   if (!decision.fellBack) {
+    const ranBy = decision.ranBy || SOL_MODEL_NAME
+    const detail = sameModel(ranBy, SOL_MODEL_NAME) ? ` (effort ${SOL_REASONING_EFFORT})` : ''
     const scope = pass
       ? Number(pass.total) === 1
         ? ` (SCOPED PASS — ${(pass.files ?? []).length} end-state file(s))`
         : ` (PASS ${pass.index}/${pass.total} — ${(pass.files ?? []).length} file(s) of a range too large for one round)`
       : ''
     return [
-      `review-sol: ${SOL_MODEL_NAME} (effort ${SOL_REASONING_EFFORT}) reviewed ${String(sha).slice(0, 7)} → ${decision.verdict}${scope}`,
+      `review-sol: ${ranBy}${detail} reviewed ${String(sha).slice(0, 7)} → ${decision.verdict}${scope}`,
       `  ${decision.evidence}`,
       ...(plan ? ['', formatReviewCoverage(plan, pass)] : []),
       '',
@@ -994,9 +1009,9 @@ export function formatReviewReport({
     return [
       `review-sol: ROLE SWAP — ${SOL_MODEL_NAME} AUTHORED part of ${String(sha).slice(0, 7)}, so it may not review it.`,
       `  The review is ${who}'s, which also runs the suites, judges the picture and lands the point.`,
-      '  Record what IT says — never a verdict this command invented:',
+      reviewerCommand ? '  Start that reader with the same bounded request:' : '  Record what IT says — never a verdict this command invented:',
       '',
-      `     ${cmd}`,
+      `     ${reviewerCommand || cmd}`,
       ...passWarning,
     ].join('\n')
   }
@@ -1025,15 +1040,15 @@ export function formatReviewReport({
       "  was read — the whole round's material was lost with the run.",
       `  The review is NOT done — it is ${who}'s now. Hand it the commit and the brief above;`,
       '  it reads the range itself, and only what IT actually read may be recorded.',
+      ...(reviewerCommand ? ['', `     ${reviewerCommand}`] : []),
     ].join('\n')
   }
   return [
     `review-sol: FALLBACK — ${SOL_MODEL_NAME} did not review ${String(sha).slice(0, 7)}: ${decision.cause}.`,
     `  The review is NOT done. Hand it to ${who} and record what IT says:`,
     '',
-    `  1. give ${who} the commit and the brief above,`,
-    `  2. then record its verdict — never this command's:`,
-    `     ${cmd}`,
+    reviewerCommand ? `  Start it: ${reviewerCommand}` : `  1. give ${who} the commit and the brief above,`,
+    ...(reviewerCommand ? [] : [`  2. then record its verdict — never this command's:`, `     ${cmd}`]),
     ...passWarning,
   ].join('\n')
 }

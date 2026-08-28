@@ -15,6 +15,45 @@ export const OPUS_MODEL_ID = 'claude-opus-5[1m]'
 export const FABLE_MODEL_ID = 'claude-fable-5'
 export const OPUS_FALLBACK_MODEL_ID = 'claude-opus-4-8[1m]'
 
+/** Read Claude Code's single-result JSON and identify the TOP-LEVEL answer
+ * model by the usage counters shared with exactly one modelUsage row. */
+export function parseClaudeResultOutput(text, expected = {}) {
+  let value
+  try {
+    value = JSON.parse(String(text ?? '').trim())
+  } catch (error) {
+    return { ok: false, result: '', models: [], error: `Claude returned no readable result JSON: ${error.message}` }
+  }
+  const usage = value?.usage ?? {}
+  const rows = Object.entries(value?.modelUsage ?? {})
+  const normal = (name) => String(name ?? '').toLowerCase().replace(/\[.*?\]/g, '').replace(/[^a-z0-9]+/g, '-')
+  const answers = rows.filter(([, row]) =>
+    Number(row?.inputTokens) === Number(usage.input_tokens) &&
+    Number(row?.outputTokens) === Number(usage.output_tokens) &&
+    Number(row?.cacheReadInputTokens ?? 0) === Number(usage.cache_read_input_tokens ?? 0) &&
+    Number(row?.cacheCreationInputTokens ?? 0) === Number(usage.cache_creation_input_tokens ?? 0),
+  )
+  const answerModel = answers.length === 1 ? answers[0][0] : ''
+  const wanted = answers.find(([name, row]) =>
+    normal(name) === normal(expected.id) || normal(row?.canonicalModel) === normal(expected.id),
+  )
+  const models = rows.map(([name]) => name)
+  if (!wanted) {
+    return {
+      ok: false,
+      result: typeof value?.result === 'string' ? value.result : '',
+      models,
+      answerModel,
+      sessionId: String(value?.session_id ?? ''),
+      error: `Claude's top-level answer was not attributed to ${expected.name ?? expected.id}; usage named ${models.join(', ') || 'no model'}`,
+    }
+  }
+  if (typeof value?.result !== 'string') {
+    return { ok: false, result: '', models, answerModel, sessionId: String(value?.session_id ?? ''), error: 'Claude returned no text result' }
+  }
+  return { ok: true, result: value.result, models, answerModel: wanted[0], sessionId: String(value?.session_id ?? ''), error: '' }
+}
+
 const MAX_TIMESTAMP = 8.64e15
 
 /** The state file in the MAIN checkout, even when called from a worktree. */

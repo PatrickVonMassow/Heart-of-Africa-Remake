@@ -23,7 +23,7 @@ import { resolve } from 'node:path'
 // allowlist's own answer (scripts/model-guard-core.mjs, which imports nothing),
 // so "who authored this" cannot drift from "who may author at all".
 import { modelNamesIn } from './model-guard-core.mjs'
-import { isSwitchFallbackReason, mergeFallbackReason, mergerModel } from './fable-switch-core.mjs'
+import { fableIsOn, isSwitchFallbackReason, mergeFallbackReason, mergerModel } from './fable-switch-core.mjs'
 // …and how a review split into PASSES over the file set composes back into a
 // coverage (point 714). Both the recorder and this gate ask the same module, so
 // what may be WRITTEN and what CLEARS cannot drift apart.
@@ -281,6 +281,58 @@ export function reviewIdentityProblem(reviewer, commit = {}) {
   return named.some((author) => modelVendor(author) === reviewerVendor) ? 'same-vendor' : ''
 }
 
+/** The two reasons the preferred OpenAI reader can legitimately yield to the
+ *  Claude chain. They are explicit because a same-vendor review without a
+ *  handover would otherwise bypass the cross-vendor preference by assertion. */
+export const REVIEW_HANDOVERS = Object.freeze(['sol-authored', 'sol-unavailable'])
+export const SOL_UNAVAILABLE_REVIEW_CHAIN = Object.freeze(['Fable 5', 'Opus 5', 'Opus 4.8'])
+export const SOL_AUTHORED_REVIEW_CHAIN = Object.freeze(['Opus 5', 'Fable 5', 'Opus 4.8'])
+
+/** The chain in force for a handover at record time. */
+export function handoverChainFor(reason, fableState) {
+  const chain = reason === 'sol-authored'
+    ? SOL_AUTHORED_REVIEW_CHAIN
+    : reason === 'sol-unavailable'
+      ? SOL_UNAVAILABLE_REVIEW_CHAIN
+      : []
+  if (!chain.length) return Object.freeze([])
+  if (fableState === undefined || fableIsOn(fableState)) return Object.freeze([...chain])
+  return Object.freeze(chain.filter((model) => !sameModel(model, 'Fable 5')))
+}
+
+/** What is wrong with a recorded handover, or ''. The selected fallback must
+ *  be the first chain member that authored no part of the range. */
+export function reviewHandoverProblem({ reviewer = '', authors = [], handover = '', chain = null } = {}) {
+  const reason = String(handover ?? '').trim()
+  if (!REVIEW_HANDOVERS.includes(reason)) return 'missing-or-unknown-handover'
+  const named = (Array.isArray(authors) ? authors : [authors]).map(String).filter(Boolean)
+  if (!named.length || named.some((author) => modelVendor(author) === 'unknown')) return 'unknown-author'
+  const candidates = Array.isArray(chain) && chain.length ? chain.map(String) : handoverChainFor(reason)
+  if (!candidates.length) return 'empty-handover-chain'
+  if (reason === 'sol-authored' && !named.some((author) => sameModel(author, 'GPT-5.6 Sol'))) {
+    return 'sol-was-not-an-author'
+  }
+  if (reason === 'sol-unavailable' && named.some((author) => sameModel(author, 'GPT-5.6 Sol'))) {
+    return 'sol-authorship-requires-role-swap'
+  }
+  const expected = candidates.find((candidate) => !named.some((author) => sameModel(candidate, author))) ?? ''
+  if (!expected) return 'every-handover-model-authored'
+  return sameModel(expected, reviewer) ? '' : `expected-${expected}`
+}
+
+/** The gate's complete independence ruling for one record. A valid, explicit
+ *  handover is the sole exception to the preferred cross-vendor boundary. */
+export function independentReviewProblem(record = {}, commit = {}) {
+  const ordinary = reviewIdentityProblem(record?.model, commit)
+  if (ordinary !== 'same-vendor') return ordinary
+  return reviewHandoverProblem({
+    reviewer: record?.model,
+    authors: commit?.authorModels ?? commit?.authors ?? [commit?.authorModel ?? commit?.authoredBy].filter(Boolean),
+    handover: record?.handover,
+    chain: record?.handoverChain,
+  })
+}
+
 /** Only a convergent reading of the changed code can cover that code. */
 export function attestsToCodeReading(record = {}) {
   return String(record.mode ?? '').trim() === 'review' && !String(record.specExamination ?? '').trim()
@@ -358,7 +410,7 @@ const filesClearedByRefusingVendor = (refusal, { commits = [], records = [], fil
       (record) =>
         reviewRecordWellFormed(record, { commitAt: answer.at }) &&
         attestsToCodeReading(record) &&
-        !reviewIdentityProblem(record.model, answer),
+        !independentReviewProblem(record, answer),
     )
     if (!ownReadings.length) continue
 
@@ -817,6 +869,8 @@ export const FLAG_SPEC = Object.freeze({
   '--model': true,
   '--model-at': true,
   '--model-transcript': true,
+  '--model-result': true,
+  '--handover': true,
   '--verdict': true,
   '--evidence': true,
   '--point': true,
@@ -852,6 +906,8 @@ const VALUE_KEY = Object.freeze({
   '--model': 'model',
   '--model-at': 'modelAt',
   '--model-transcript': 'modelTranscript',
+  '--model-result': 'modelResult',
+  '--handover': 'handover',
   '--verdict': 'verdict',
   '--evidence': 'evidence',
   '--point': 'point',
@@ -1237,6 +1293,8 @@ export function validateRecord({
   pass,
   passFiles,
   fableState,
+  handover,
+  handoverChain,
 } = {}) {
   const errors = []
   errors.push(...validateMode({ mode, framing }).errors)
@@ -1314,11 +1372,20 @@ export function validateRecord({
     } else if (identity === 'unknown-reviewer') {
       errors.push(`the claimed reviewer "${String(model).trim()}" has no recognised vendor, so independence cannot be proved`)
     } else if (identity === 'same-vendor') {
-      errors.push(
-        `a SAME-VENDOR REVIEW is refused: ${short(sha)} was authored by ` +
-          `"${(Array.isArray(authors) ? authors : [authoredBy]).filter(Boolean).join(', ')}" and ` +
-          `"${String(model).trim()}" is from that vendor. Four eyes requires the other vendor.`,
-      )
+      const namedAuthors = (Array.isArray(authors) ? authors : [authoredBy]).filter(Boolean)
+      const handoverProblem = reviewHandoverProblem({
+        reviewer: model,
+        authors: namedAuthors,
+        handover,
+        chain: handoverChain ?? handoverChainFor(handover, fableState),
+      })
+      if (handoverProblem) {
+        errors.push(
+          `a SAME-VENDOR REVIEW is refused: ${short(sha)} was authored by ` +
+            `"${namedAuthors.join(', ')}" and "${String(model).trim()}" is from that vendor; ` +
+            `the review has no valid first-eligible handover (${handoverProblem}).`,
+        )
+      }
     }
   }
   if (Number(commitAt) > 0 && ledgerAtUsable(Number(commitAt)) && ledgerAtUsable(at) && Number(at) < Number(commitAt)) {
@@ -1594,7 +1661,7 @@ export function evaluateMechanismReview({
     // than MERGE_ACCOUNTING_SINCE are grandfathered by DATE; treating a MISSING
     // field as legacy is what let an edited row simply omit it.
     const selfReviews = wellFormed.filter(
-      (r) => attestsToCodeReading(r) && reviewIdentityProblem(r.model, commit),
+      (r) => attestsToCodeReading(r) && independentReviewProblem(r, commit),
     )
     // COVERAGE MEANS ONE THING ON EVERY PATH: a well-formed, convergent reading
     // of this code by a vendor that authored none of it. A spec examination
@@ -1602,7 +1669,7 @@ export function evaluateMechanismReview({
     // producing and folding lists. Neither attests to reading this commit, so
     // neither joins `sound` or answers a refusal.
     const sound = wellFormed.filter(
-      (r) => attestsToCodeReading(r) && !reviewIdentityProblem(r.model, commit),
+      (r) => attestsToCodeReading(r) && !independentReviewProblem(r, commit),
     )
 
     // END-STATE FILE PASSES CLEAR WHAT THEY READ. The record's own sha is the

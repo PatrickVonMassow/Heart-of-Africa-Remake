@@ -45,6 +45,7 @@ import { accountUnion, formatAccounting, parseListText, summaryLine, validateInp
 import {
   BLIND_PARALLEL,
   formatArgErrors,
+  handoverChainFor,
   KNOWN_FLAGS,
   ledgerPathFrom,
   modelFromTrailers,
@@ -60,6 +61,15 @@ import {
 } from './mechanism-review-core.mjs'
 import { quotePassFile } from './review-material-core.mjs'
 import { currentFableState } from './fable-switch.mjs'
+import {
+  FABLE_MODEL,
+  FABLE_MODEL_ID,
+  OPUS_FALLBACK_MODEL,
+  OPUS_FALLBACK_MODEL_ID,
+  OPUS_MODEL,
+  OPUS_MODEL_ID,
+  parseClaudeResultOutput,
+} from './fable-switch-core.mjs'
 import { authorshipRefusesPermission } from './authorship-check-core.mjs'
 import { checkAuthorshipFile } from './authorship-check-io.mjs'
 
@@ -169,7 +179,7 @@ export function reviewerVendorProblems(model, authorship = {}) {
   // may not ride a carry onto a new commit.
   if (status === 'agreement') {
     const anchored =
-      String(authorship?.transcript ?? '').trim() &&
+      String(authorship?.transcript ?? authorship?.resultPath ?? '').trim() &&
       typeof authorship?.artefactAt === 'number' &&
       Number.isFinite(authorship.artefactAt) &&
       authorship.artefactAt > 0 &&
@@ -209,6 +219,43 @@ export function reviewerVendorProblems(model, authorship = {}) {
     }
   }
   return []
+}
+
+/** Verify the single-result receipt emitted by the read-only Claude CLI. The
+ *  top-level model is tied to the result by its exact usage counters; auxiliary
+ *  classifier calls neither grant nor spoil reviewer credit. */
+export function checkClaudeResultFile({ claimedModel = '', artefactAt = '', resultPath = '' } = {}) {
+  const descriptor = [
+    { key: 'fable', name: FABLE_MODEL, id: FABLE_MODEL_ID, runtime: 'claude' },
+    { key: 'opus', name: OPUS_MODEL, id: OPUS_MODEL_ID, runtime: 'claude' },
+    { key: 'opus48', name: OPUS_FALLBACK_MODEL, id: OPUS_FALLBACK_MODEL_ID, runtime: 'claude' },
+  ].find((entry) => sameModel(entry.name, claimedModel))
+  const at = Date.parse(String(artefactAt ?? '')) || Number(artefactAt) || null
+  if (!descriptor || descriptor.runtime !== 'claude') {
+    return { status: 'unverified', claimedModel, actualModel: '', artefactAt: at, reason: 'the claimed model is not a Claude reviewer' }
+  }
+  let raw
+  try {
+    raw = readFileSync(resultPath, 'utf8')
+  } catch (error) {
+    return {
+      status: 'unverified', claimedModel, actualModel: '', artefactAt: at, resultPath: resultPath || null,
+      reason: `cannot read Claude result ${resultPath || '(none)'}: ${(error && error.message) || error}`,
+    }
+  }
+  const parsed = parseClaudeResultOutput(raw, descriptor)
+  const base = {
+    claimedModel,
+    actualModel: parsed.answerModel || '',
+    artefactAt: at,
+    messageAt: at,
+    messageId: parsed.sessionId || `claude-result:${descriptor.key}`,
+    resultPath,
+    proof: 'claude-result',
+  }
+  if (parsed.ok) return { ...base, status: 'agreement', reason: 'the Claude result usage identifies the selected top-level model' }
+  if (parsed.answerModel) return { ...base, status: 'disagreement', reason: parsed.error }
+  return { ...base, status: 'unverified', reason: parsed.error }
 }
 
 /** A spelling no canonicalization may silently repair: dot segments and
@@ -393,15 +440,16 @@ export function verifyHalfAuthors(record, { committedHalf = committedHalfModel, 
  *  transcripts, and rotting every old review into a refusal would punish age,
  *  not forgery. The remaining gap — a claim naming a transcript that never
  *  existed — is work-order point 880's. */
-export function reverifyReviewerAgreement(record, { check = checkAuthorshipFile } = {}) {
+export function reverifyReviewerAgreement(
+  record,
+  { check = checkAuthorshipFile, checkResult = checkClaudeResultFile } = {},
+) {
   const claim = record?.reviewerAuthorship
   if (!claim || claim.status !== 'agreement') return claim
-  if (!claim.transcript || claim.artefactAt == null) return claim
-  const fresh = check({
-    claimedModel: claim.claimedModel,
-    artefactAt: claim.artefactAt,
-    transcriptPath: claim.transcript,
-  })
+  if ((!claim.transcript && !claim.resultPath) || claim.artefactAt == null) return claim
+  const fresh = claim.proof === 'claude-result'
+    ? checkResult({ claimedModel: claim.claimedModel, artefactAt: claim.artefactAt, resultPath: claim.resultPath })
+    : check({ claimedModel: claim.claimedModel, artefactAt: claim.artefactAt, transcriptPath: claim.transcript })
   if (fresh.status !== 'disagreement') return claim
   return { ...claim, status: 'disagreement', actualModel: fresh.actualModel, reason: fresh.reason }
 }
@@ -512,6 +560,8 @@ export function buildRecord({
   model = '',
   modelAt = '',
   modelTranscript = '',
+  modelResult = '',
+  handover = '',
   verdict = '',
   evidence = '',
   point = '',
@@ -592,10 +642,10 @@ export function buildRecord({
   // A CARRY IS ITS OWN FLOW (delta rounds, 18.08.2026): everything but the
   // sha, the pass scope and the point comes verified from the source reading.
   if (String(carriedFrom ?? '').trim()) {
-    if (String(modelAt ?? '').trim() || String(modelTranscript ?? '').trim()) {
+    if (String(modelAt ?? '').trim() || String(modelTranscript ?? '').trim() || String(modelResult ?? '').trim()) {
       return {
         ok: false,
-        errors: ['--carried-from copies the source review identity and cannot carry fresh --model-at/--model-transcript evidence'],
+        errors: ['--carried-from copies the source review identity and cannot carry fresh --model-at/--model-transcript/--model-result evidence'],
       }
     }
     return buildCarriedRecord({
@@ -841,11 +891,13 @@ export function buildRecord({
     : [model, ...(commit.authors?.length ? commit.authors : [commit.authoredBy])]
   // This identity grants the second-model permission, so it is evidence-backed
   // wherever the transcript still exists. Expired evidence stays explicit.
-  const reviewerAuthorship = checkAuthorshipFile({
-    claimedModel: model,
-    artefactAt: modelAt,
-    transcriptPath: modelTranscript,
-  })
+  if (String(modelTranscript).trim() && String(modelResult).trim()) {
+    return { ok: false, errors: ['pass one reviewer identity source: --model-transcript or --model-result, not both'] }
+  }
+  const reviewerAuthorship = String(modelResult).trim()
+    ? checkClaudeResultFile({ claimedModel: model, artefactAt: modelAt, resultPath: modelResult })
+    : checkAuthorshipFile({ claimedModel: model, artefactAt: modelAt, transcriptPath: modelTranscript })
+  const handoverChain = handoverChainFor(handover, fableState)
   const merge = resolveMergePolicy({
     mode,
     mergedBy,
@@ -875,6 +927,8 @@ export function buildRecord({
     accounting: receipt,
     pass,
     passFiles,
+    handover,
+    handoverChain,
   })
   const errors = [...merge.errors, ...check.errors]
   // A REFUSAL HAS TO SAY WHAT IT READ. Where the halves were not handed over, every
@@ -905,6 +959,9 @@ export function buildRecord({
   // silent debt the recording session believes settled.
   if (!authorshipRefusesPermission(reviewerAuthorship)) {
     for (const problem of reviewerVendorProblems(model, reviewerAuthorship)) errors.push(problem)
+  }
+  if (String(handover).trim() && reviewerAuthorship.status !== 'agreement') {
+    errors.push('a fallback review needs verified reviewer identity; the handover cannot rest on an unverified model claim')
   }
   if (Number(commit.at) > 0 && now < Number(commit.at)) {
     errors.push(
@@ -947,6 +1004,8 @@ export function buildRecord({
         ...(reviewerAuthorship.messageId ? { messageId: reviewerAuthorship.messageId } : {}),
         ...(reviewerAuthorship.sidechain ? { sidechain: true } : {}),
         ...(reviewerAuthorship.transcript ? { transcript: reviewerAuthorship.transcript } : {}),
+        ...(reviewerAuthorship.resultPath ? { resultPath: reviewerAuthorship.resultPath } : {}),
+        ...(reviewerAuthorship.proof ? { proof: reviewerAuthorship.proof } : {}),
         ...(reviewerAuthorship.reason ? { reason: reviewerAuthorship.reason } : {}),
       },
       verdict: String(verdict).trim(),
@@ -956,6 +1015,7 @@ export function buildRecord({
       // missing mode as unknown rather than invalid — the ledger is tracked and
       // outlives the CLI that wrote it.
       mode: String(mode).trim(),
+      ...(String(handover).trim() ? { handover: String(handover).trim(), handoverChain } : {}),
       ...(String(framing).trim() ? { framing: String(framing).trim() } : {}),
       ...(String(authorFraming).trim() ? { authorFraming: String(authorFraming).trim() } : {}),
       ...(String(specExamination).trim() ? { specExamination: String(specExamination).trim() } : {}),
@@ -1283,7 +1343,8 @@ export function resolveCommit(sha, { run = git } = {}) {
 export const usage = () =>
   `usage: node scripts/mechanism-review.mjs --record <sha> --model <name> ` +
   `--verdict <${VERDICTS.join('|')}> --evidence "<one line>" \\\n` +
-  `           [--model-at <ISO timestamp> --model-transcript <session.jsonl>] \\\n` +
+  `           [--model-at <ISO timestamp> (--model-transcript <session.jsonl> | --model-result <result.json>)] \\\n` +
+  `           [--handover <sol-authored|sol-unavailable>] \\\n` +
   `           --mode <${MODES.join('|')}> [--framing "<one line>"] [--point <N>]\n` +
   `           [--author-framing "<one line>" | --spec-examination <sound|amended>]\n` +
   `           [--merged-by "<switch-selected model>"] --accounting "<the blind-merge summary line>" \\\n` +
@@ -1409,7 +1470,9 @@ if (isMainModule(import.meta.url)) {
       process.exit(0)
     }
 
-    const fableState = parsed.values.mode === 'blind-parallel' ? currentFableState() : undefined
+    const fableState = parsed.values.mode === 'blind-parallel' || parsed.values.handover
+      ? currentFableState()
+      : undefined
     if (fableState && !fableState.ok) throw new Error(fableState.problem)
     const built = buildRecord({ ...parsed.values, fableState })
     if (!built.ok) {

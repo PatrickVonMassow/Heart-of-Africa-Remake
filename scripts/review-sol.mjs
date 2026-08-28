@@ -52,7 +52,9 @@ import { currentSetting, settingProblemLine } from './sol-share.mjs'
 import { routeFor } from './sol-share-core.mjs'
 import { currentFableState } from './fable-switch.mjs'
 import { readRecords, verifyCarried } from './mechanism-review.mjs'
-import { mergeProblem, reviewRecordWellFormed } from './mechanism-review-core.mjs'
+import { mergeProblem, reviewRecordWellFormed, sameModel } from './mechanism-review-core.mjs'
+import { authoringClaudeArgs } from './author-fable-core.mjs'
+import { parseClaudeAskOutput } from './ask-sol-core.mjs'
 import {
   addedFilesAreCoveredByPatch,
   buildReviewPrompt,
@@ -64,6 +66,7 @@ import {
   decideReview,
   OUTCOME,
   formatReviewReport,
+  formatReviewerCommand,
   isUnknownModelRefusal,
   modelsInTrailerField,
   newFilePathsIn,
@@ -71,6 +74,7 @@ import {
   probeFreshness,
   PROBE_MAX_AGE_MS,
   REVIEW_TIMEOUT_MS,
+  reviewerDescriptor,
   savedAuthPathFrom,
   solAuthored,
   SOL_MODEL_ID,
@@ -773,6 +777,66 @@ export function runCodex({ prompt, input = '', modelId = SOL_MODEL_ID, timeoutMs
   }
 }
 
+/** Run one explicitly selected Claude reviewer with no tools, no persistence
+ *  and no fallback substitution. Its raw result JSON is retained outside Git
+ *  so the recorder can verify the top-level model before granting credit. */
+export function runClaudeReviewer({ prompt, input = '', reviewer, timeoutMs = REVIEW_TIMEOUT_MS, spawn = spawnSync } = {}) {
+  const args = authoringClaudeArgs({ modelId: reviewer.id, prompt })
+  const dangerous = args.indexOf('--dangerously-skip-permissions')
+  if (dangerous >= 0) args.splice(dangerous, 1)
+  args.push(
+    '--permission-mode', 'dontAsk',
+    '--tools', '',
+    '--safe-mode',
+    '--no-session-persistence',
+    '--prompt-suggestions', 'false',
+    '--effort', reviewer.effort,
+  )
+  const res = spawn('claude', args, {
+    cwd: REPO_ROOT,
+    encoding: 'utf8',
+    windowsHide: true,
+    input,
+    timeout: timeoutMs,
+    maxBuffer: 128 * 1024 * 1024,
+  })
+  const modelResult = parseClaudeAskOutput(res.stdout, reviewer)
+  const timedOut = res.error?.code === 'ETIMEDOUT' || res.signal != null
+  const cause = res.error
+    ? `Claude could not complete the review: ${res.error.message}`
+    : timedOut
+      ? 'Claude timed out before the review completed'
+      : res.status !== 0
+        ? `Claude exited with code ${res.status}: ${String(res.stderr ?? '').trim().split('\n').slice(-1)[0] || 'no detail'}`
+        : !modelResult.ok
+          ? modelResult.error
+          : ''
+  let resultPath = ''
+  if (!cause) {
+    mkdirSync(STATE_DIR, { recursive: true })
+    const id = createHash('sha256').update(String(res.stdout)).digest('hex').slice(0, 16)
+    resultPath = join(STATE_DIR, `review-claude-${id}.json`)
+    writeFileSync(resultPath, res.stdout, { mode: 0o600 })
+    chmodSync(resultPath, 0o600)
+  }
+  return {
+    ok: !cause,
+    cause,
+    finalMessage: modelResult.result,
+    modelResult,
+    exitCode: res.status,
+    timedOut,
+    resultPath,
+    modelAt: new Date().toISOString(),
+    sentInput: input,
+    transportError: res.error
+      ? `the spawn layer reported ${String(res.error.code ?? res.error.message ?? 'an error')} before the run completed`
+      : timedOut
+        ? 'the run was killed on its time budget, mid-stream'
+        : '',
+  }
+}
+
 /** The receipt of the last passed model-id probe (see probeFreshness). */
 export const PROBE_RECEIPT_FILE = join(STATE_DIR, 'review-sol-probe.json')
 
@@ -950,7 +1014,7 @@ function restoreLogin() {
 
 export const usage = () =>
   [
-    'usage: node scripts/review-sol.mjs --sha <sha> --brief "<what to judge>" \\',
+    'usage: node scripts/review-sol.mjs [--reviewer sol|fable|opus|opus48] --sha <sha> --brief "<what to judge>" \\',
     '           [--mode review|blind-parallel] [--point <N>] [--since <ref>] [--timeout <ms>] \\',
     '           [--pass <k>]',
     '       node scripts/review-sol.mjs --probe            (is -m honoured?)',
@@ -994,8 +1058,15 @@ if (isMainModule(import.meta.url)) {
     const mode = flag('--mode') || 'review'
     const point = flag('--point')
     const timeoutMs = Number(flag('--timeout')) || REVIEW_TIMEOUT_MS
+    const reviewerFlag = flag('--reviewer')
+    const requestedReviewer = reviewerFlag ? reviewerDescriptor(reviewerFlag) : null
     if (!sha || !brief) {
       console.error('review-sol: --sha and --brief are both required.\n')
+      console.error(usage())
+      process.exit(2)
+    }
+    if (reviewerFlag && !requestedReviewer) {
+      console.error('review-sol: --reviewer must be one of sol, fable, opus, opus48.\n')
       console.error(usage())
       process.exit(2)
     }
@@ -1118,8 +1189,48 @@ if (isMainModule(import.meta.url)) {
     const rangeAuthors = selected
       ? selected.authors
       : [...new Set(plan.passes.flatMap((candidate) => candidate.authors ?? []))]
+    if (!selected) {
+      console.error('review-sol: REFUSING to spend a round on the whole range — run one of the authored passes above.')
+      process.exit(4)
+    }
+    const commandFor = (decision) => formatReviewerCommand({
+      model: decision?.model,
+      sha: full,
+      brief,
+      mode,
+      point,
+      since: sinceFlag,
+      timeout: flag('--timeout'),
+      pass: passFlag,
+    })
 
-    if (routeFor('review', share.setting) !== 'sol') {
+    let targetReviewer = requestedReviewer ?? reviewerDescriptor(SOL_MODEL_NAME)
+    let handover = ''
+    if (requestedReviewer?.runtime === 'claude') {
+      handover = solAuthored(rangeAuthors) ? 'sol-authored' : 'sol-unavailable'
+      const routed = decideReview({
+        outcome: {
+          ok: false,
+          kind: handover === 'sol-authored' ? OUTCOME.SELF_REVIEW : OUTCOME.UNREACHABLE,
+          cause: handover === 'sol-authored' ? causeTextFor(OUTCOME.SELF_REVIEW) : 'the preferred reader was unavailable',
+        },
+        parsed: { ok: false },
+        authorModel: rangeAuthors,
+        fableState,
+      })
+      if (!routed.model || !sameModel(routed.model, requestedReviewer.name)) {
+        console.error(
+          `review-sol: --reviewer ${requestedReviewer.key} is not this range's first eligible handover; ` +
+            `the route names ${routed.model || 'nobody'}.`,
+        )
+        process.exit(2)
+      }
+    } else if (requestedReviewer && solAuthored(rangeAuthors)) {
+      console.error(`review-sol: ${SOL_MODEL_NAME} authored part of this range and may not review it.`)
+      process.exit(2)
+    }
+
+    if (!requestedReviewer && routeFor('review', share.setting) !== 'sol') {
       const decision = decideReview({
         outcome: { ok: false, kind: OUTCOME.SWITCHED_OFF, cause: causeTextFor(OUTCOME.SWITCHED_OFF) },
         parsed: { ok: false },
@@ -1146,6 +1257,7 @@ if (isMainModule(import.meta.url)) {
           shortfall: pass ? null : planShortfall(plan),
           plan,
           pass,
+          reviewerCommand: commandFor(decision),
         }),
       )
       process.exit(3)
@@ -1155,7 +1267,7 @@ if (isMainModule(import.meta.url)) {
     // call is paid for (point 667). Sol AUTHORS now, and a review it may not
     // give is not worth an allowance: a Sol-authored range goes straight to the
     // Claude reviewer that also runs the suites, judges the picture and lands.
-    if (solAuthored(rangeAuthors)) {
+    if (!requestedReviewer && solAuthored(rangeAuthors)) {
       const decision = decideReview({
         outcome: { ok: false, kind: OUTCOME.SELF_REVIEW, cause: causeTextFor(OUTCOME.SELF_REVIEW) },
         parsed: { ok: false },
@@ -1174,18 +1286,14 @@ if (isMainModule(import.meta.url)) {
           shortfall: pass ? null : planShortfall(plan),
           plan,
           pass,
+          reviewerCommand: commandFor(decision),
         }),
       )
       process.exit(3)
     }
 
-    if (!selected) {
-      console.error('review-sol: REFUSING to spend a round on the whole range — run one of the authored passes above.')
-      process.exit(4)
-    }
-
     console.error(
-      `review-sol: asking ${SOL_MODEL_NAME} (effort ${SOL_REASONING_EFFORT}) to review ${full.slice(0, 7)} …`,
+      `review-sol: asking ${targetReviewer.name} (effort ${targetReviewer.effort}) to review ${full.slice(0, 7)} …`,
     )
     // THE IDENTITY IS PROVEN BEFORE THE REVIEW, NOT MENTIONED AFTER IT (second
     // cross-vendor round). Nothing in a run's output names the model that
@@ -1194,7 +1302,7 @@ if (isMainModule(import.meta.url)) {
     // was printed either way. The probe therefore RUNS when its receipt is
     // missing or stale, and a failed probe stops the review before a word of it
     // can be attributed to a model that may not have written it.
-    if (!ensureModelProven()) {
+    if (targetReviewer.runtime === 'codex' && !ensureModelProven()) {
       console.error('review-sol: the model id is not proven honoured — refusing to attribute a review to it.')
       process.exit(2)
     }
@@ -1218,12 +1326,15 @@ if (isMainModule(import.meta.url)) {
       `  material: ${assembly.size} characters of diff and file content ` +
         `(${base.slice(0, 7)}..${full.slice(0, 7)}${pass ? `, pass ${pass.index}/${pass.total}` : ''})`,
     )
-    const run = runCodex({
+    const request = {
       prompt: buildReviewPrompt({ sha: full, brief, mode, pass, receipt: assembly.receipt }),
       input: assembly.text,
       timeoutMs,
-    })
-    const outcome = classifyOutcome(run)
+    }
+    const run = targetReviewer.runtime === 'codex'
+      ? runCodex(request)
+      : runClaudeReviewer({ ...request, reviewer: targetReviewer })
+    const outcome = targetReviewer.runtime === 'codex' ? classifyOutcome(run) : run
     // The RECEIPT is demanded back (finding 8): the token stands only on the
     // material's last line, so an answer that cannot repeat it is a run whose
     // material is not proven read — no verdict, and therefore no record.
@@ -1239,16 +1350,58 @@ if (isMainModule(import.meta.url)) {
     // WHO AUTHORED IT decides who may review it if Sol is unavailable: no model
     // can review its own commit (see fallbackReviewerFor), and the record
     // covers the whole range, so every author in it counts.
-    const decision = decideReview({ outcome, parsed, authorModel: rangeAuthors, shortfall, fableState })
+    const decision = targetReviewer.runtime === 'codex'
+      ? decideReview({ outcome, parsed, authorModel: rangeAuthors, shortfall, fableState })
+      : outcome.ok && parsed.ok
+        ? {
+            model: targetReviewer.name,
+            ranBy: targetReviewer.name,
+            verdict: parsed.verdict,
+            evidence: parsed.evidence,
+            fellBack: false,
+            ready: shortfall === null,
+            kind: OUTCOME.OK,
+            cause: '',
+          }
+        : {
+            model: targetReviewer.name,
+            ranBy: '',
+            verdict: '',
+            evidence: '',
+            fellBack: true,
+            ready: false,
+            kind: outcome.ok ? OUTCOME.NO_VERDICT : OUTCOME.ERROR_EXIT,
+            cause: outcome.ok ? parsed.error : outcome.cause,
+          }
     // THE FINDINGS ARE THE POINT, not the verdict word: a `do-not-merge` whose
     // reasons were never printed cannot be acted on, and the evidence line the
     // ledger carries is one sentence by design. So the reviewer's whole answer
     // is printed above the record command.
     const said = String(run.finalMessage ?? '').trim()
     if (said) {
-      console.log(`--- ${SOL_MODEL_NAME} said ---\n${said}\n--- end of review ---\n`)
+      console.log(`--- ${targetReviewer.name} said ---\n${said}\n--- end of review ---\n`)
     }
-    console.log(formatReviewReport({ decision, sha: full, mode, point, partial, shortfall, plan, pass }))
+    if (targetReviewer.runtime === 'claude' && decision.fellBack) {
+      console.log(
+        `review-sol: ${targetReviewer.name} did not deliver a recordable review of ${full.slice(0, 7)}: ` +
+          `${decision.cause || 'no usable verdict'}.\n  The review is NOT done; no record command is printed.`,
+      )
+      process.exit(3)
+    }
+    console.log(formatReviewReport({
+      decision,
+      sha: full,
+      mode,
+      point,
+      partial,
+      shortfall,
+      plan,
+      pass,
+      modelAt: run.modelAt,
+      modelResult: run.resultPath,
+      handover,
+      reviewerCommand: commandFor(decision),
+    }))
     // Round N goes on the board while round N+1 runs: fifteen rounds in one turn
     // used to leave the page standing on finished work for hours.
     // OPTIONAL bookkeeping, imported lazily and swallowed whole: this command
