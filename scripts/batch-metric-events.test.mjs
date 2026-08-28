@@ -17,6 +17,15 @@ describe('fenced production metric recording', () => {
     const result = await recordMetricEvents({ repoDir: '/repo', batchId: 'b', sessionId: 's', fence: 7, events, request })
     expect(result.ok).toBe(true)
     expect(result.recorded.map((item) => item.eventId)).toEqual(events.map(metricEventId))
-    expect(metricEventsFromJournal(entries).map(({ eventId, fence, seq, ...event }) => event)).toEqual(events)
+    expect(metricEventsFromJournal(entries).map((event) => ({
+      kind: event.kind,
+      at: event.at,
+      ...(event.startedAt === undefined ? {} : { startedAt: event.startedAt }),
+      ...(event.endedAt === undefined ? {} : { endedAt: event.endedAt }),
+      ...(event.eligibleLanes === undefined ? {} : { eligibleLanes: event.eligibleLanes }),
+      ...(event.runningLanes === undefined ? {} : { runningLanes: event.runningLanes }),
+      ...(event.requestedAt === undefined ? {} : { requestedAt: event.requestedAt }),
+      ...(event.acknowledgedAt === undefined ? {} : { acknowledgedAt: event.acknowledgedAt }),
+    }))).toEqual(events)
   })
 })

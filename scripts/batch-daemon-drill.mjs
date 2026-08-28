@@ -614,7 +614,7 @@ const REAL_FAILURE_SCENARIOS = new Set([
 async function realFailureScenario(scenario, pure) {
   const checks = [{ name: 'the cheap decision-layer check passes beneath the real drill', ok: pure.ok === true, detail: pure.checks?.map((item) => item.detail).filter(Boolean).join('; ') ?? '' }]
   const check = (name, ok, detail = '') => checks.push({ name, ok: ok === true, detail })
-  const { sandbox, originDir, repo, worktree } = buildSandbox()
+  const { sandbox, repo, worktree } = buildSandbox()
   const batchId = `failure-${scenario}`
   const sessionId = `session-${scenario}`
   const lockPath = join(repo, '.claude', 'batch-lock.json')
