@@ -13139,3 +13139,41 @@ to land than a mechanism that needs a review.
   by the act of checking.
   Bundle: Urlaubsfestigkeit. It reads the same liveness core as 958's emergency lane, so it does
   not run beside it.
+
+- [ ] 986. The unit suite's repository guard cannot tell a delegated author from test leakage, so it reds the owner's every push.
+  MEASURED 28.08.2026: a cross-cutting `main` commit could not be pushed. The pre-push fast gate
+  ran `test:unit` twice, both times red, both times with the SAME teardown error and no failing
+  test: "LIVE REPOSITORY CHANGED WHILE UNIT SUITE RAN: refs changed:
+  refs/heads/feat/946-vdzk-admissibility 4f044565 -> ca139085; worktree registrations changed; one
+  or more worktree indexes changed", then on the re-run "ca139085 -> d11c541c". Those are the
+  authoring commits of the delegated Sol lane for point 946, made in its own worktree while the
+  suite ran. The gate itself reported "unit ran 435 files / 14110 tests and its summary named NO
+  failing test, yet the runner exited non-zero".
+  WHAT IT COSTS: `assertRepositoryUnchanged` compares EVERY ref, worktree registration, worktree
+  HEAD and worktree index of the shared repository, and a delegated author moves all of those by
+  design. Maximal delegation keeps up to three authoring lanes committing continuously, and the
+  unit suite runs about 190 s, so the owner's mandatory pre-push gate is red for as long as the
+  batch is doing what it is supposed to do. The owner cannot land its own bookkeeping while any
+  author works — the two standing operating modes exclude each other. The retry rule makes it
+  worse rather than better: the second run is red for the same reason and is then read as
+  "the re-run did not clear it, so it blocks".
+  FINAL STATE: the guard protects the checkout the suite RUNS IN, not the whole repository. Refs,
+  HEADs and indexes belonging to OTHER registered worktrees are outside the suite's blast radius
+  and are excluded from the comparison — a suite that cannot write there cannot leak there. What
+  stays in scope is the running checkout's own HEAD, index, config and the refs no other worktree
+  owns. Where a change genuinely cannot be attributed to a registered foreign worktree, the guard
+  reds exactly as it does today.
+  ALSO IN SCOPE: the fast gate's verdict distinguishes a red the suite PRODUCED from a red its
+  teardown raised over concurrent foreign activity; the latter is named as an environment
+  condition, per CLAUDE.md §7.2's "fail soft for environment/staging transients and loud for
+  product defects", and says which lane collided.
+  VERIFIABLE: Vitest over the pure comparison — a snapshot pair differing ONLY in a foreign
+  worktree's ref, HEAD and index passes, while the same difference on the running checkout's own
+  HEAD, index or config still throws, and a ref no worktree claims still throws. Plus a CLI-level
+  regression that registers a second worktree, commits in it between the two snapshots, and
+  asserts the guard stays green. The existing leakage tests in
+  `scripts/repository-integrity.test.mjs` must stay green unchanged — they are what proves the
+  narrowing did not blind the guard.
+  Criticality: high — it blocks the owner's push whenever delegation is running, which is the
+  normal state of the batch, and it does so with a red that carries no failing test.
+  Bundle: Testinfrastruktur.
