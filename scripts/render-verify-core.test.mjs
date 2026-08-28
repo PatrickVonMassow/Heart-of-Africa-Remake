@@ -39,7 +39,7 @@ import {
   TRUNCATED_KIND,
 } from './render-verify-core.mjs'
 import { RED_CHARGES } from './render-verify-charges.mjs'
-import { failedChecks } from './verify/baseline-classify-core.mjs'
+import { checkKey, failedChecks } from './verify/baseline-classify-core.mjs'
 import { readTasksAll } from './tasks-source.mjs'
 
 const VERIFY_DIR = join(dirname(fileURLToPath(import.meta.url)), 'verify')
@@ -1061,12 +1061,30 @@ describe('evaluate — a red is not closed by the runs that FOLLOWED it (point 6
   // Pinned on the exact shape of the stored 13.08.2026 webgpu/settings records:
   // console reds carrying `point: null`, the feature level recorded.
   it('a run ALREADY on disk changes its disposition when the ledger gains its entry — but never becomes coverage', () => {
-    const stored = redRun(
-      'webgpu',
-      1500,
-      [red('console error: THREE.WebGPURenderer: Uncaptured WebGPU GPUValidationError: [Invalid TextureView] is invalid due to a previous error.', null, 'console')],
-      { suite: 'settings', featureLevel: 'compatibility' },
-    )
+    // A RECORDER-SHAPED RECORD, NOT A HAND-WRITTEN ONE (review finding,
+    // 28.08.2026). The fixture used to build the red through the local `red()`
+    // helper, which normalises nothing, so the end-to-end case could have been
+    // running against a name no recorder writes. The line below is copied
+    // verbatim out of local/verify-baseline-logs/settings-baseline-*.log and
+    // taken through the recorder's own parse and charge instead.
+    const line =
+      'ERR: THREE.WebGPURenderer: Uncaptured WebGPU GPUValidationError: [Invalid TextureView] is invalid due to a previous error.'
+    const reds = chargeReds(failedChecks(line), { suite: 'settings', backend: 'webgpu', ledger: [] })
+    expect(reds).toHaveLength(1)
+    expect(reds[0].kind).toBe('console')
+    expect(reds[0].point).toBeNull()
+    // What the recorder really stores: the error TEXT normalised to at most 120
+    // characters behind the `console error: ` prefix, and the key derived from
+    // that name rather than from the printed line. MEASURED against the 45
+    // distinct console errors in the recorded settings logs: this variant of
+    // the storm is 132 characters and survives whole, while the
+    // `Invalid Texture "output-msaa"` variant of the SAME cascade is cut at 135
+    // before the word "error" — which is why the ledger names that one by its
+    // own alternative rather than by the shared sentence.
+    expect(reds[0].name.length).toBe(132)
+    expect(reds[0].name).toMatch(/is invalid due to a previous error\.$/)
+    expect(reds[0].key).toBe(checkKey(reds[0].name))
+    const stored = redRun('webgpu', 1500, reds, { suite: 'settings', featureLevel: 'compatibility' })
     expect(unexplainedRuns([stored], 1000, { openPoints, ledger: [] })).toHaveLength(1)
     const ledger = [{
       point: 506,
