@@ -391,10 +391,11 @@ function signedClosureDraft(state, options, family) {
   // and the two coincide for anything a real lane can produce (review question,
   // 28.08.2026): `runIdentity` hashes the WHOLE record canonically — both
   // stamps, the exit, the screenshot count, every red — so two runs that really
-  // happened differ in it. Records that do NOT differ are the same measurement
-  // written twice, about which nobody could say two different things, and one
-  // disposition is the honest answer rather than a demand for two identical
-  // sentences. Pinned in render-verify-guard.test.mjs.
+  // happened differ in it, barring the hash collision named below. Records that
+  // do NOT differ are the same measurement written twice, about which nobody
+  // could say two different things, and one disposition is the honest answer
+  // rather than a demand for two identical sentences. Pinned in
+  // render-verify-guard.test.mjs.
   //
   // DECIDED, NOT ARGUED (review finding, 28.08.2026, which refused the argument
   // above and asked for a mechanism). The mechanism that would decide it is a
@@ -411,10 +412,15 @@ function signedClosureDraft(state, options, family) {
   //     never makes a run cover a backend, so the worst case is one evidence
   //     sentence disposing of two byte-identical records of the same
   //     measurement.
-  // WHAT REMAINS TRUE, PLAINLY: two runs that really happened, in the same
-  // millisecond on both stamps and identical in every other field, are one
-  // identity here, and one signature closes both. Filed as its own point rather
-  // than settled by this comment.
+  // WHAT REMAINS TRUE, PLAINLY — two residuals, not one:
+  //   - two runs that really happened, in the same millisecond on both stamps
+  //     and identical in every other field, are one identity here;
+  //   - and `runIdentity` is 64 non-cryptographic bits over unbounded text, so
+  //     two DIFFERENT records can collide into one identity as well. That is
+  //     unlikely, not impossible, and hash equality is what authorises the
+  //     signature — so it is named rather than treated as proof.
+  // In both cases one signature closes both records. Filed as its own point
+  // rather than settled by this comment.
   const distinct = new Set(open.map((r) => runIdentity(r)))
   if (distinct.size > 1) {
     return {

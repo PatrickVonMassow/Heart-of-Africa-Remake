@@ -627,10 +627,26 @@ function canonicalText(value) {
  * — the matcher keyed on `runStamp`, which falls back `at` → `startedAt`, so a
  * closure written for `{at: 100}` also closed a DIFFERENT run `{startedAt: 100}`
  * of the same suite, and two parallel runs sharing a millisecond were not
- * separable at all. Content is: two records that differ in ANY field hash apart,
- * and records that hash together are observationally indistinguishable — no
- * signature could tell them apart by any reading. Null for a non-record; never
- * throws (the wrapper's fail-open depends on it).
+ * separable at all. Content is: the hash is taken over the record's whole
+ * canonical text, so no field a writer controls can be changed without the
+ * identity moving with it.
+ *
+ * WHAT 64 BITS DO NOT PROVE (review finding, 28.08.2026, which corrected the
+ * earlier "records that hash together are observationally indistinguishable").
+ * This reduces UNBOUNDED text to 64 non-cryptographic bits, so collisions exist
+ * by counting alone, and `signedClosureFor` treats hash equality as sufficient
+ * authorisation. The honest statement is the one-directional one: records that
+ * differ hash apart with overwhelming probability, never with certainty.
+ *
+ * WHAT A COLLISION CAN COST, at worst: one written evidence sentence disposing
+ * of a SECOND run that nobody read — it would have to be of the same suite and
+ * the same backend, open in the same 40-run window, and hash into the same 64
+ * bits. It can cost no coverage in either direction: a signature never makes a
+ * run cover a backend, and it never touches a red the run recorded. The
+ * identity stays the content, deliberately — the decision and its full residual
+ * are recorded at the signing site in render-verify-guard.mjs.
+ *
+ * Null for a non-record; never throws (the wrapper's fail-open depends on it).
  */
 export function runIdentity(run) {
   if (!run || typeof run !== 'object') return null
