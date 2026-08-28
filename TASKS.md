@@ -13250,3 +13250,27 @@ to land than a mechanism that needs a review.
   Criticality: medium — it costs the batch a quarter-hour per handover in the ordinary case, and
   the standstill journal records this as its own class.
   Bundle: Session- & Repo-Hygiene.
+- [ ] 995. Three charge-ledger entries cannot be narrowed to the failure mode their own evidence
+  names, because the reds they account for were recorded before the record kept a measurement.
+  MEASURED 28.08.2026 by the twenty-second and twenty-fourth cross-vendor rounds of point 734. The
+  point-627 Khartoum entry, the point-938 dressing entry and the point-514 enrichment-frame entry
+  each excuse a named frame or check on the compatibility lane, while their evidence covers ONE way
+  that frame reds — "its subject is not in the rendered picture", the stale-dressing growth. The
+  instrument that would say so is `detailMatch` in `scripts/render-verify-charges.mjs`, and it is
+  out of reach: read that day, all ten reds those entries account for carry an EMPTY detail, because
+  the record only began keeping the printed measurement on 28.08.2026 under point 734. Adding the
+  narrow half today withdraws a standing charge and blocks the render set on evidence that has not
+  changed.
+  WHAT IT COSTS: until it lands, each of the three excuses ANY failure of the frame or check it
+  names on its lane — a different defect in the same frame is owned by a point that never measured
+  it, which is the failure mode the charge ledger exists to make impossible. The three entries say
+  so in their own text and name this point.
+  FINAL STATE: each of the three reds is recorded again on the lane its evidence names, so the
+  record carries the measurement; the entry then names the failure mode with `detailMatch`, and the
+  ledger-shape case asserts that an entry whose evidence names a failure mode carries one.
+  VERIFIABLE: Vitest over `chargeFor` — the measured failure charges to its point and a DIFFERENT
+  failure of the same frame on the same lane stays uncharged; plus the recorded runs showing a
+  non-empty detail on each of the three reds.
+  Criticality: medium — it is the last width left in the ledger after point 734 scoped every entry
+  to its lane, and it can only be closed by measurement, not by a rewrite.
+  Bundle: Session- & Repo-Hygiene.
