@@ -57,11 +57,15 @@ export const UNBUNDLED_MARKER = '**Not bundled**'
  * itself and has no such edge.
  */
 export function referenceList(text) {
-  // THE BOUNDARIES ARE MARKDOWN'S, not `\\w`'s (review finding). An underscore
-  // BELONGS to the marker's surroundings — `__#123__` is an emphasised
-  // reference — while `&` and a link destination `](#123)` must not open one,
-  // and `&#123;` is an HTML entity rather than a point.
-  return [...String(text ?? '').matchAll(/(?<![0-9A-Za-z&#])(?<!\]\()#(\d+)(?![0-9A-Za-z#])/g)]
+  // THE MARKER OPENS WHERE A REFERENCE CAN OPEN, and the set of places is
+  // NAMED rather than subtracted (review findings): the start of the cell, or
+  // after whitespace, a comma, or the emphasis and grouping characters Markdown
+  // puts in front of one — `(#12`, `**#12**`, `__#12__`, `*#12*`, `[#12`. Every
+  // other neighbour makes it something else: `&#123;` is an entity, `/x#12` a
+  // URL fragment, `](#12)` a link anchor, `` `#12` `` a code span, `\\#12` an
+  // escape, `a#12` and `##12` neither. A blacklist would have to know every one
+  // of those; the whitelist has to know only where a reference may stand.
+  return [...String(text ?? '').matchAll(/(?<=^|[\s,([*_])(?<!\]\()#(\d+)(?![0-9A-Za-z#])/g)]
     .map((m) => Number(m[1]))
 }
 

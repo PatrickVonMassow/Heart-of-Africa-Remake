@@ -86,12 +86,26 @@ describe('referenceList — the cell marks its references', () => {
     expect(referenceList('the points are 350 and 351')).toEqual([])
   })
 
-  // THE BOUNDARIES ARE MARKDOWN'S (review finding). Two shapes that carry a `#`
-  // and are not references, and one that is a reference and used to be missed.
-  it('is not fooled by an HTML entity or an anchor, and reads an emphasised marker', () => {
+  // THE MARKER OPENS ONLY WHERE A REFERENCE CAN OPEN (review findings). Every
+  // Markdown shape that carries a `#` and is not a reference, beside the ones
+  // that are.
+  it('reads a reference in every place one may stand', () => {
+    expect(referenceList('#123')).toEqual([123])
+    expect(referenceList('#123, #124 #125')).toEqual([123, 124, 125])
+    expect(referenceList('**#123**, __#124__, *#125*, (#126), [#127]')).toEqual([123, 124, 125, 126, 127])
+    expect(referenceList('- #285 — the leak hunt.')).toEqual([285])
+    expect(referenceList('#393.')).toEqual([393])
+  })
+
+  it('reads none of the Markdown shapes that merely carry a hash', () => {
     expect(referenceList('a brace written as &#123; in the cell')).toEqual([])
     expect(referenceList('see [the section](#123) for the reason')).toEqual([])
-    expect(referenceList('__#123__ and *#124*')).toEqual([123, 124])
+    expect(referenceList('https://example.com/page#123')).toEqual([])
+    expect(referenceList('a code span `#123` in the prose')).toEqual([])
+    expect(referenceList('an escaped \\#123')).toEqual([])
+    expect(referenceList('a#350')).toEqual([])
+    expect(referenceList('#350a')).toEqual([])
+    expect(referenceList('##350')).toEqual([])
   })
 })
 
@@ -334,11 +348,15 @@ describe('the real docs/work-packages.md', () => {
     expect(twice.map(([n, where]) => `${n}: ${where.join(' + ')}`)).toEqual([])
   })
 
-  // THE HOME IS THE RIGHT ONE, not merely a single one (review finding of the
-  // sixth round: the coverage and count checks cannot see a point filed under
-  // the wrong bundle). A point's own spec names its bundle, so the table is
-  // measured against the work order rather than against itself.
-  it('files every open point under the bundle its own spec names', () => {
+  // THE HOME IS THE RIGHT ONE, not merely a single one — and EVERY open point
+  // is judged, with nothing skipped (review findings over several rounds: a
+  // count can be met by other points, and a `continue` is a silent pass). Each
+  // point has an outside authority and the test says which: its own spec names
+  // a bundle, or the document BEFORE the migration carried it in a list
+  // position. Nothing is measured against the migrated document itself, and the
+  // two authorities together must cover the whole open set.
+  it('files every open point where its authority says, and has an authority for each', () => {
+    const measured = JSON.parse(readFileSync(repoPath('scripts/fixtures/work-packages-placed-before-1003.json'), 'utf8'))
     const tasksMd = readFileSync(repoPath('TASKS.md'), 'utf8')
     const open = parseOpenPoints(tasksMd)
     expect(open.size).toBeGreaterThan(100)
@@ -350,91 +368,37 @@ describe('the real docs/work-packages.md', () => {
       if (current !== null) blocks.set(current, `${blocks.get(current)}\n${line}`)
     }
     const bundles = parseBundles(md)
-    const home = new Map()
-    for (const bundle of bundles) for (const n of bundle.points) home.set(n, bundle.id)
-    const unbundled = parseUnbundled(md).points
+    const filed = new Map()
+    for (const bundle of bundles) for (const n of bundle.points) filed.set(n, bundle.id)
+    for (const n of parseUnbundled(md).points) filed.set(n, 'Not bundled')
 
-    let checked = 0
+    const bySpec = []
+    const byPriorList = []
+    const withoutAuthority = []
     const wrong = []
-    for (const n of open) {
+    for (const n of [...open].sort((a, b) => a - b)) {
       const named = /^\s*Bundle:\s*(.+?)\s*$/m.exec(blocks.get(n) ?? '')
-      if (!named) continue
-      // The line often continues into prose about coupling, so the bundle is
-      // the NAME the line starts with.
-      const bundle = bundles.find((b) => named[1].startsWith(b.name))
-      if (!bundle) continue
-      checked += 1
-      const filed = home.get(n) ?? (unbundled.has(n) ? 'Not bundled' : 'nowhere')
-      if (filed !== bundle.id) wrong.push(`${n}: spec says ${bundle.id}, table says ${filed}`)
-    }
-    // The floor is MEASURED, not derived from the same parse (review finding:
-    // counting the checked set against itself is a tautology), and it is the
-    // measurement ITSELF — 176 open points named a bundle of this table on
-    // 28.08.2026. A slacker floor would permit exactly the regression it exists
-    // to catch (review finding of the round after). Specs are only ever added.
-    expect(checked).toBeGreaterThanOrEqual(176)
-    expect(wrong).toEqual([])
-  })
-
-  // AND THE POINTS WHOSE SPEC NAMES NO BUNDLE (review finding). Their outside
-  // authority is the document as it stood BEFORE the migration: each of them
-  // already stood in a bundle's list position there, and the migration was only
-  // allowed to keep it where it was. Asking the migrated cell whether it names
-  // the point answers itself — the marker is in the cell (review finding of the
-  // round after), so the measurement is the fixture's list positions.
-  it('leaves a point whose spec names no bundle in the bundle that already listed it', () => {
-    const measured = JSON.parse(readFileSync(repoPath('scripts/fixtures/work-packages-placed-before-1003.json'), 'utf8'))
-    const tasksMd = readFileSync(repoPath('TASKS.md'), 'utf8')
-    const open = parseOpenPoints(tasksMd)
-    expect(open.size).toBeGreaterThan(100)
-    const blocks = new Map()
-    let current = null
-    for (const line of tasksMd.split('\n')) {
-      const m = /^- \[( |x)\] (\d+)\./.exec(line)
-      if (m) { current = Number(m[2]); blocks.set(current, line); continue }
-      if (current !== null) blocks.set(current, `${blocks.get(current)}\n${line}`)
-    }
-    const bundles = parseBundles(md)
-    const unbundled = parseUnbundled(md).points
-
-    let checked = 0
-    const moved = []
-    for (const bundle of bundles) {
-      for (const n of bundle.points) {
-        if (!open.has(n) || unbundled.has(n)) continue
-        const named = /^\s*Bundle:\s*(.+?)\s*$/m.exec(blocks.get(n) ?? '')
-        if (named && bundles.some((b) => named[1].startsWith(b.name))) continue
-        const listedThen = measured.listedIn[String(n)]
-        if (!listedThen) continue // appended after the measurement — nothing to compare against
-        checked += 1
-        if (!listedThen.includes(bundle.id)) {
-          moved.push(`${n}: filed under ${bundle.id}, listed then in ${listedThen.join(', ')}`)
-        }
-      }
-    }
-    expect(checked).toBeGreaterThanOrEqual(100)
-    expect(moved).toEqual([])
-  })
-
-  // AND THE ONE TRANSITION THE LOOP ABOVE SKIPS (review finding): a point that
-  // left a bundle for the exemption list. It is skipped there because it has no
-  // bundle to compare, so it is compared here — against the same measurement.
-  it('exempts only points the document already exempted', () => {
-    const measured = JSON.parse(readFileSync(repoPath('scripts/fixtures/work-packages-placed-before-1003.json'), 'utf8'))
-    const open = parseOpenPoints(readFileSync(repoPath('TASKS.md'), 'utf8'))
-    expect(open.size).toBeGreaterThan(100)
-    let checked = 0
-    const newlyExempt = []
-    for (const n of parseUnbundled(md).points) {
-      if (!open.has(n)) continue
+      // The line often runs on into prose about coupling, so the bundle is the
+      // NAME it starts with.
+      const spec = named ? bundles.find((b) => named[1].startsWith(b.name)) : null
       const listedThen = measured.listedIn[String(n)]
-      if (!listedThen) continue // appended after the measurement
-      checked += 1
-      if (!listedThen.includes('Not bundled')) {
-        newlyExempt.push(`${n}: exempt today, listed then in ${listedThen.join(', ')}`)
+      if (spec) {
+        bySpec.push(n)
+        if (filed.get(n) !== spec.id) wrong.push(`${n}: spec says ${spec.id}, table says ${filed.get(n) ?? 'nowhere'}`)
+      } else if (listedThen) {
+        byPriorList.push(n)
+        if (!listedThen.includes(filed.get(n))) {
+          wrong.push(`${n}: filed under ${filed.get(n) ?? 'nowhere'}, listed then in ${listedThen.join(', ')}`)
+        }
+      } else {
+        withoutAuthority.push(n)
       }
     }
-    expect(checked).toBeGreaterThan(5)
-    expect(newlyExempt).toEqual([])
+    expect(wrong).toEqual([])
+    // NOTHING WAS SKIPPED: the two authorities partition the whole open set, so
+    // there is no bucket a wrong home could fall into unjudged.
+    expect(withoutAuthority).toEqual([])
+    expect(bySpec.length + byPriorList.length).toBe(open.size)
+    expect(bySpec.length).toBeGreaterThanOrEqual(176)
   })
 })
