@@ -358,6 +358,27 @@ export function isoText(at) {
  *  record still says `crashed`. Once its crash is signed off, the lost lines are
  *  all that is left of it — and they had no signing route at all, so the record
  *  was either stuck or, worse, cleared with its reds unread. */
+/** Was this record's lost measurement RETAKEN — is there a later COVERING run of
+ *  the same suite and backend (review finding, 28.08.2026, round 19)? Read for
+ *  the status label only, never to remove a record from the sign-off list: the
+ *  gate's own re-recording test additionally requires the later run to have seen
+ *  code since the last render edit, so a record can be answered by this reading
+ *  and still be blocking by the gate's. Withholding its signature would strand
+ *  it; saying "outside the window" about it would misdescribe it. */
+export function reRecordedBy(state, r) {
+  const runs = Array.isArray(state?.runs) ? state.runs : []
+  const when = runStamp(r)
+  if (when === null) return null
+  return (
+    runs.find((later) => {
+      if (!later || later === r || later.partial === true) return false
+      if (later.backend !== r.backend || later.suite !== r.suite) return false
+      const laterAt = runStamp(later)
+      return laterAt !== null && laterAt > when && runVerdict(later).covers
+    }) ?? null
+  )
+}
+
 export function openIncompleteRuns(state) {
   const runs = Array.isArray(state?.runs) ? state.runs : []
   return runs.filter(
@@ -775,8 +796,17 @@ if (arg === 'status' || arg === '--status') {
     // line owes the reader instead is whether it blocks right now, and that is
     // what `blocksNow` says.
     const blockingIds = new Set(openRecords.map((u) => u.id))
-    const blocksNow = (r) =>
-      blockingIds.has(runIdentity(r)) ? 'BLOCKING NOW' : 'outside the current window — owed, not blocking'
+    const blocksNow = (r) => {
+      if (blockingIds.has(runIdentity(r))) return 'BLOCKING NOW'
+      // THREE STATES, NOT TWO (review finding, 28.08.2026, round 19). A record
+      // whose lost measurement was RETAKEN is answered, not merely old, and
+      // calling it "outside the window" sent the reader to sign something that
+      // needed no signature.
+      const retaken = reRecordedBy(state, r)
+      return retaken
+        ? `already answered by the later covering ${retaken.suite} run @${isoText(runStamp(retaken) ?? retaken.at)} — signing it changes nothing`
+        : 'outside the current window — owed, not blocking'
+    }
     const openIncomplete = openIncompleteRuns(state)
     for (const r of openIncomplete) {
       console.log(

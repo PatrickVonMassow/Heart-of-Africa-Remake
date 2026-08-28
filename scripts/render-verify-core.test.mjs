@@ -2304,6 +2304,25 @@ describe('a CRASHED run is its own class, and has its own signed way out (point 
     expect(missing.reason).not.toMatch(/UNACCOUNTED red\(s\) — "the run ended in a crash/)
   })
 
+  // AND A SIGNED CRASH'S RESIDUAL RED IS NAMED THERE TOO (review finding,
+  // 28.08.2026, round 19). The crash branch of the block message returned
+  // unconditionally, so once the crash was signed and a red the run printed
+  // before it died still stood, the one thing really blocking that backend went
+  // unnamed: the crash paragraph no longer applied, the crash sentence must not
+  // be quoted, and nothing was left to say.
+  it('names the red a SIGNED crash still leaves behind the missing backend', () => {
+    const r = crashedRun('webgpu', 1500, { reds: [red('a check nobody owns')] })
+    const result = evaluate(
+      renderChange({ runs: [r, run('webgl', 2100)], openPoints, crashClosures: [crashClosure(r)] }),
+    )
+    expect(result.decision).toBe('block')
+    expect(result.reason).toMatch(/UNACCOUNTED red\(s\) — "a check nobody owns"/)
+    // Never the crash sentence, and never the "already signed off, so it
+    // neither blocks nor proves anything" line — it does block.
+    expect(result.reason).not.toMatch(/"the run ended in a crash/)
+    expect(result.reason).not.toMatch(/neither blocks nor proves anything/)
+  })
+
   it('is total on malformed closures', () => {
     const r = crashedRun('webgpu', 1500)
     expect(() => unexplainedRuns([r], 1000, { openPoints, crashClosures: [null, 7, {}] })).not.toThrow()
@@ -2712,6 +2731,26 @@ describe('the shipped charge ledger', () => {
       'THREE.WebGPURenderer: Async render pipeline creation failed (renderPipeline_x): [Invalid TextureView] is invalid due to a previous error.',
     ]
     for (const t of foreign) expect(asStored(t).point, t).toBeNull()
+  })
+
+  // THE MSAA TEXTURE ALTERNATIVE CARRIES ITS SENTENCE, NOT THE OBJECT NAME
+  // (review finding, 28.08.2026, round 19). `Invalid Texture "output-msaa"` is
+  // an ordinary WebGPU object name: any future defect touching either
+  // attachment would have printed it and been charged here retroactively.
+  it('charges the MSAA attachment errors through their sentence, never through the object name', () => {
+    const scoped = { suite: 'settings', backend: 'webgpu', kind: 'console', featureLevel: 'compatibility' }
+    const stored = (tex) =>
+      red(
+        `console error: ${`THREE.WebGPURenderer: Uncaptured WebGPU GPUValidationError: [Invalid Texture "${tex}"] is invalid due to a previous error.`.slice(0, 120)}`,
+        null,
+        'console',
+      )
+    for (const tex of ['output-msaa', 'normal-msaa']) {
+      expect(chargeFor(stored(tex), scoped).point, tex).toBe(514)
+    }
+    // A different fault naming the same attachment is not the measured cascade.
+    const elsewhere = red('console error: resize failed while releasing Invalid Texture "output-msaa" mid-frame', null, 'console')
+    expect(chargeFor(elsewhere, scoped)).toBeNull()
   })
 
   it('charges the RGBA16Float family only through the EVIDENCED validation error, never the bare format name', () => {

@@ -1237,6 +1237,16 @@ export function unexplainedRuns(runs, since, options) {
       // truncation marker, so without this the deferral named the crash and the
       // reds the run got out, and said nothing about the lines nobody read.
       const printedBeforeCrash = residualOf(r).reds.filter((red) => text(red?.name))
+      // AND THEY ARE REPORTED UNFILTERED BY THE LEDGER, deliberately (review
+      // finding, 28.08.2026, round 19, which read the missing `owned` filter as
+      // an inconsistency with the two paths beside it). A charge is exactly what
+      // a crashed run cannot carry — `runVerdict` answers `charges: []` for it
+      // at any time — so a red printed before the crash has no owner while the
+      // crash stands, and a deferral that carried it away really did carry an
+      // unowned red away. Filtering here would report it as accounted for by a
+      // charge that never applied. Once the crash is SIGNED the ledger reaches
+      // those reds again, and the residual path below filters them there.
+      //
       // The two CLASS sentences speak about this record; the reds speak for
       // themselves. So the sentences are keyed per record and the reds are not.
       const crashClass = [
@@ -1789,8 +1799,17 @@ export function evaluate(input) {
           `${b}: the last run (${suiteName}) CRASHED, but that record is already signed off as ` +
             'unreadable, so it neither blocks nor proves anything. This backend simply has no covering run yet.',
         )
+        continue
       }
-      continue
+      // Still an OPEN crash: its own paragraph names it below, and repeating it
+      // here would only bury the other backends.
+      if (reported.status === 'crashed') continue
+      // SIGNED, AND A RED IT PRINTED BEFORE IT DIED STILL STANDS (review
+      // finding, 28.08.2026, round 19). This `continue` was unconditional, so
+      // the one thing really blocking the backend went unnamed: the crash
+      // paragraph had stopped applying, the crash sentence must not be quoted,
+      // and nothing was left to say. It falls through now and reports THAT red,
+      // exactly as the incomplete branch beside it does.
     }
     if (verdict.status === 'incomplete') {
       // Still an open incomplete recording: the paragraph below names it as its
@@ -1812,7 +1831,15 @@ export function evaluate(input) {
     // ONLY the incomplete fall-through reads the reported entry: every other
     // family's verdict sentence is the one to print (a suspect run's entry
     // carries the first attempt's raw check names, not the sentence about them).
-    const open_ = verdict.status === 'incomplete' && reported ? reported.unaccounted : verdict.unaccounted
+    // ONLY the two record classes read the reported entry — the truncation whose
+    // residual red still stands, and the signed crash whose residual red still
+    // stands. Every other family's verdict sentence is the one to print (a
+    // suspect run's entry carries the first attempt's raw check names, not the
+    // sentence about them).
+    const open_ =
+      reported && (verdict.status === 'incomplete' || run.crashed === true)
+        ? reported.unaccounted
+        : verdict.unaccounted
     const named = open_
       .slice(0, 3)
       .map((u) => (u.point === null ? `"${u.name}" (charged to nothing)` : `"${u.name}" (point ${u.point} is not open)`))

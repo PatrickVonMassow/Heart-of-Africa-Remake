@@ -455,6 +455,27 @@ describe('openCrashedRuns / crashClosureDraft — the crash sign-off', () => {
     expect(openCrashedRuns(state).map((r) => r.at)).toEqual([2500])
   })
 
+  // THE RESIDUAL, EXERCISED RATHER THAN ONLY DESCRIBED (review finding,
+  // 28.08.2026, round 19). Two BYTE-IDENTICAL records are one content identity,
+  // so the draft does not see two open runs and one signature disposes of both.
+  // This is the state POINT 991 owns — a record-time `runId` the identity
+  // prefers — and the case is here so the day it changes, it changes visibly.
+  it('treats two byte-identical records as one identity, which point 991 owns', () => {
+    const one = crashed(1500)
+    const twin = crashed(1500)
+    expect(runIdentity(one)).toBe(runIdentity(twin))
+    // The draft signs without asking which — there is nothing to tell them apart.
+    const draft = crashClosureDraft({ runs: [one, twin] }, signed)
+    expect(draft.error).toBeUndefined()
+    // And the one signature covers both records, because they are one content.
+    expect(crashClosureFor(one, [draft.closure])).toEqual(draft.closure)
+    expect(crashClosureFor(twin, [draft.closure])).toEqual(draft.closure)
+    expect(openCrashedRuns({ runs: [one, twin], crashClosures: [draft.closure] })).toEqual([])
+    // One field apart, they are two runs again and the draft refuses to guess.
+    const different = crashClosureDraft({ runs: [one, crashed(1500, { screenshotCount: 1 })] }, signed)
+    expect(different.error).toMatch(/matches 2 open crashed runs/)
+  })
+
   it('writes a closure that really MATCHES the run — and only that run', () => {
     const a = crashed(1500)
     const b = crashed(1500, { screenshotCount: 3 })
@@ -687,6 +708,20 @@ describe('render-verify-guard --status — what it prints about a run it cannot 
       runs: [{ backend: 'webgpu', suite: 'startup', at: 1500, exit: 1, crashed: true, reds: [] }],
     })
     expect(out).toMatch(/CRASHED RUN \(not an unexplained red\).*BLOCKING NOW/)
+  })
+
+  // A RECORD WHOSE MEASUREMENT WAS RETAKEN IS ANSWERED, NOT MERELY OLD (review
+  // finding, 28.08.2026, round 19). Calling it "outside the window" sent the
+  // reader to sign something that needed no signature.
+  it('says of a re-recorded truncation that it is already answered', () => {
+    const out = inTempRepo({
+      runs: [
+        { backend: 'webgpu', suite: 'settings', at: 1500, exit: 0, truncated: true, droppedLines: 115 },
+        { backend: 'webgpu', suite: 'settings', at: 1600, exit: 0, asserted: true },
+      ],
+    })
+    expect(out).toMatch(/already answered by the later covering settings run/)
+    expect(out).not.toMatch(/outside the current window/)
   })
 
   it('falls back to startedAt where only that was measured', () => {

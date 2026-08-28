@@ -9,7 +9,7 @@
 // yet exits non-zero exactly like a reported failure.
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { execFileSync } from 'node:child_process'
-import { MAX_CAPTURE_CHARS, MAX_LINE_CHARS, MAX_RED_IDENTITIES, tapOutput } from './render-verify-recorder.mjs'
+import { DECODE_WINDOW_BYTES, MAX_CAPTURE_CHARS, MAX_LINE_CHARS, MAX_RED_IDENTITIES, tapOutput } from './render-verify-recorder.mjs'
 
 /** Text that is distinct in LETTERS, so the parser's own normalisation (digits,
  *  hex runs and URLs are folded away) cannot collapse it. That is exactly the
@@ -369,6 +369,86 @@ describe('tapOutput — observe-only', () => {
     flush()
     expect(state.lines.join('\n')).toContain('café ☕')
     expect(state.lines.join('\n')).not.toContain('\uFFFD')
+  })
+
+  // EVERY ARRAYBUFFER VIEW IS READ AS BYTES (review finding, 28.08.2026, round
+  // 19). A DataView has no `subarray` and fell through to `toString`, so a whole
+  // write became the one line "[object DataView]" — past every budget, and with
+  // nothing marking the run.
+  it('reads a DataView write as the bytes it is, not as its toString', () => {
+    const { state, out, flush } = tapped()
+    const bytes = Buffer.from('ERR: page error from a DataView write\n', 'utf8')
+    out.write(new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength))
+    flush()
+    expect(state.lines).toEqual(['ERR: page error from a DataView write'])
+  })
+
+  // AND THE WINDOW WALKS BYTES, NOT ELEMENTS. A view of wider elements measures
+  // its `length` in elements, so the decode window advanced twice or four times
+  // the bytes it advertises.
+  it('decodes a wide-element view by its byteLength', () => {
+    const { state, out, flush } = tapped()
+    const text = 'ERR: page error carried in sixteen-bit elements\n'
+    const bytes = Buffer.from(text, 'utf8')
+    const even = bytes.byteLength % 2 === 0 ? bytes : Buffer.concat([bytes, Buffer.from(' ')])
+    out.write(new Uint16Array(new Uint8Array(even).buffer))
+    flush()
+    expect(state.lines.join('\n')).toContain('page error carried in sixteen-bit elements')
+  })
+
+  // AND THE DECODE WINDOW IS A WINDOW. One write larger than DECODE_WINDOW_BYTES
+  // must come out whole, characters intact across every window boundary — the
+  // proof that bounding the decode did not cost the content.
+  it('decodes a write far larger than one window without losing a character', () => {
+    const { state, out, flush } = tapped()
+    // Multi-byte characters at every offset, so a window boundary is bound to
+    // land inside one of them.
+    const body = 'ü☕é'.repeat(40000)
+    out.write(Buffer.from(`ERR: page error ${body}\n`, 'utf8'))
+    flush()
+    expect(Buffer.byteLength(body, 'utf8')).toBeGreaterThan(DECODE_WINDOW_BYTES * 3)
+    expect(state.lines.join('\n')).not.toContain('\uFFFD')
+    expect(state.droppedLines).toBe(1)
+  })
+
+  // AND THE DECODERS ARE PER STREAM. Two interleaved half-characters, one on
+  // each stream, must each reassemble with their own half and not with the
+  // other's — a single shared decoder would splice them together.
+  it('keeps a decoder per stream, so two split characters do not splice', () => {
+    const { state, out, err, flush } = tapped()
+    const a = Buffer.from('ERR: out says café\n', 'utf8')
+    const b = Buffer.from('ERR: err says naïve\n', 'utf8')
+    const cutA = a.indexOf(Buffer.from('é', 'utf8')) + 1
+    const cutB = b.indexOf(Buffer.from('ï', 'utf8')) + 1
+    out.write(a.subarray(0, cutA))
+    err.write(b.subarray(0, cutB))
+    out.write(a.subarray(cutA))
+    err.write(b.subarray(cutB))
+    flush()
+    expect(state.lines).toEqual(['ERR: out says café', 'ERR: err says naïve'])
+  })
+
+  // AND THE DECODER IS CLOSED AT THE FLUSH (review finding, 28.08.2026, round
+  // 19). Bytes held back for a character the last write cut in half live in the
+  // DECODER, not in the pending text, so flushing without closing it dropped
+  // them without a trace — from the very line a dying process leaves behind.
+  // The half character cannot be recovered, and it must not vanish either: the
+  // close marks it, which is what the record then carries.
+  it('marks a final character cut in half rather than dropping it silently', () => {
+    const { state, out, flush } = tapped()
+    const line = Buffer.from('ERR: the last word is café', 'utf8')
+    out.write(line.subarray(0, line.length - 1))
+    flush()
+    expect(state.lines).toEqual(['ERR: the last word is caf\uFFFD'])
+  })
+
+  // And a character that arrived WHOLE, with only the newline missing, reaches
+  // the record intact — the ordinary shape of a line cut short by a crash.
+  it('keeps a whole final character on a line that never got its newline', () => {
+    const { state, out, flush } = tapped()
+    out.write(Buffer.from('ERR: the last word is café', 'utf8'))
+    flush()
+    expect(state.lines).toEqual(['ERR: the last word is café'])
   })
 
   // A line WITHIN the per-line budget that brings nothing new costs nothing,
@@ -763,15 +843,39 @@ describe('the armed recorder — the REAL wiring, not a stand-in', () => {
   it('calls a run whose recorded reds are all charged incomplete, not accounted for', async () => {
     const run = await armed('polish', 'compatibility')
     process.stdout.write('FAIL  settlement walker (goat): the planted foot holds its ground spot — 0.967\n')
-    for (let i = 0; i < MAX_RED_IDENTITIES + 7; i++) {
-      process.stdout.write(`ERR: page error in span ${tag(i)}\n`)
-    }
+    // ONE refused line, and EVERY recorded red charged — otherwise the verdict
+    // would be red for the uncharged ones and the boundary would never be
+    // reached (review finding, 28.08.2026, round 19). The per-line budget is the
+    // cheapest way to refuse exactly one line while keeping the record small.
+    process.stdout.write(`ERR: ${'z'.repeat(MAX_LINE_CHARS + 10)}\n`)
     const record = run.exit(1)
     expect(record.truncated).toBe(true)
-    expect(record.reds.some((r) => r.point === 642)).toBe(true)
+    expect(record.droppedLines).toBe(1)
+    expect(record.reds.map((r) => r.point)).toEqual([642])
+    // Charged throughout, this record would read ACCOUNTED FOR and COVER its
+    // backend. The lines the cap ate are exactly the ones nobody could charge.
+    expect(runVerdict({ ...record, truncated: undefined, droppedLines: undefined }, { openPoints })).toMatchObject({
+      status: 'accounted',
+      covers: true,
+    })
     const verdict = runVerdict(record, { openPoints })
     expect(verdict.status).toBe('incomplete')
     expect(verdict.covers).toBe(false)
+  })
+
+  // THE VARIED-MEASUREMENT REFUSAL, THROUGH THE REAL EXIT HANDLER (review
+  // finding, 28.08.2026, round 19). The case below it recreates the recorder's
+  // own ordering by hand — charge, then mark — and would pass even if the real
+  // handler charged before applying the mark. Only the armed run can say.
+  it('stores a NARROW charge as unowned when the check printed two measurements', async () => {
+    const run = await armed('polish', 'compatibility')
+    process.stdout.write('FAIL  no child walks without getting anywhere — worst child 1 at 22.2s, 1.42 m walked inside 0.31 m\n')
+    process.stdout.write('FAIL  no child walks without getting anywhere — worst child 4 at 51.0s, 0.02 m walked inside 0.30 m\n')
+    const record = run.exit(1)
+    expect(record.reds).toHaveLength(1)
+    expect(record.reds[0].detailVaried).toBe(true)
+    expect(record.reds[0].point).toBeNull()
+    expect(runVerdict(record, { openPoints: [694] }).status).toBe('red')
   })
 
   // And the other half of that rule, unchanged: a genuinely green run prints no

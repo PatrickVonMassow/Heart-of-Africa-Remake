@@ -172,7 +172,7 @@ export const MAX_LINE_CHARS = 64 * 1024
 /** How many BYTES of one write are decoded at a time. A window, so an enormous
  *  Buffer never becomes an enormous string before a budget has looked at it —
  *  and wide enough that an ordinary write is decoded in one pass. */
-const DECODE_WINDOW_BYTES = 64 * 1024
+export const DECODE_WINDOW_BYTES = 64 * 1024
 
 /** The newline `lines.join('\n')` will put BEFORE this line (review finding,
  *  28.08.2026, round 17). The budget bounds the buffer the parser is handed, and
@@ -420,14 +420,26 @@ export function tapOutput(state, streams = [[process.stdout, false], [process.st
    * Decoding each chunk on its own turned such a character into U+FFFD.
    */
   const decoders = new Map()
-  const feedBytes = (stream, isErr, bytes) => {
+  const decoderFor = (stream) => {
     let decoder = decoders.get(stream)
     if (!decoder) {
       decoder = new StringDecoder('utf8')
       decoders.set(stream, decoder)
     }
-    for (let i = 0; i < bytes.length; i += DECODE_WINDOW_BYTES) {
-      const piece = decoder.write(bytes.subarray(i, Math.min(i + DECODE_WINDOW_BYTES, bytes.length)))
+    return decoder
+  }
+  const feedBytes = (stream, isErr, view) => {
+    // EVERY VIEW IS READ AS BYTES (review finding, 28.08.2026, round 19). A
+    // `DataView` has no `subarray` and fell through to `toString`, which yields
+    // "[object DataView]" — a whole write reduced to one meaningless line, past
+    // every budget and without marking the run. And a view of wider elements
+    // measures its `length` in ELEMENTS, so the window walked twice or four
+    // times the bytes it advertises. One Uint8Array over the same memory answers
+    // both: no copy, byte indices, and `byteLength` is the real size.
+    const bytes = new Uint8Array(view.buffer, view.byteOffset, view.byteLength)
+    const decoder = decoderFor(stream)
+    for (let i = 0; i < bytes.byteLength; i += DECODE_WINDOW_BYTES) {
+      const piece = decoder.write(bytes.subarray(i, Math.min(i + DECODE_WINDOW_BYTES, bytes.byteLength)))
       if (piece) take(stream, isErr, piece)
     }
   }
@@ -441,7 +453,7 @@ export function tapOutput(state, streams = [[process.stdout, false], [process.st
         // did fail, measured under the jsdom environment, and every split
         // character came out as U+FFFD.
         if (typeof chunk === 'string') take(stream, isErr, chunk)
-        else if (ArrayBuffer.isView(chunk) && typeof chunk.subarray === 'function') feedBytes(stream, isErr, chunk)
+        else if (ArrayBuffer.isView(chunk)) feedBytes(stream, isErr, chunk)
         else if (chunk != null) take(stream, isErr, chunk.toString?.('utf8') ?? '')
       } catch {
         /* never let the bookkeeping disturb the suite's own output */
@@ -452,6 +464,15 @@ export function tapOutput(state, streams = [[process.stdout, false], [process.st
   /** The last line of a stream carries no newline when a process dies mid-write;
    *  flushing at exit is what makes that line readable at all. */
   return () => {
+    // THE DECODER IS CLOSED FIRST (review finding, 28.08.2026, round 19). Bytes
+    // held back for a character the last write cut in half live in the decoder,
+    // not in `pending` — flushing the pending text without them dropped the tail
+    // of the final line, which is exactly the line a dying process leaves.
+    for (const [stream, decoder] of decoders) {
+      const rest = decoder.end()
+      if (rest) take(stream, isErrOf.get(stream) === true, rest)
+    }
+    decoders.clear()
     for (const stream of [...pending.keys()]) {
       if (!pending.get(stream)) continue
       // The appended newline turns the remainder into a whole line for `take`,

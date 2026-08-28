@@ -265,6 +265,15 @@ export const RED_CHARGES = [
     // console kind, and the compatibility feature level — and the fact that the
     // charge dies with point 514.
     //
+    // AND THE MSAA TEXTURE ALTERNATIVE CARRIES ITS SENTENCE (review finding,
+    // 28.08.2026, round 19). It read the OBJECT NAME alone — `Invalid Texture
+    // "output-msaa"` — which any future defect touching either attachment would
+    // have printed, and it would have been charged here retroactively. More of
+    // the measured text fits: the stored name keeps 15 + 120 characters, and the
+    // whole sentence is 127, so `… is invalid due to a previous` survives the
+    // cut for both attachment names. The alternative is that, and a downstream
+    // sentence about either texture from any OTHER validation error stays red.
+    //
     // THE THREE GENERIC ALTERNATIVES ARE REPLACED BY THE CASCADE'S OWN
     // SIGNATURE (review finding, 28.08.2026). `Invalid TextureView` and
     // `Invalid CommandBuffer from CommandEncoder` are ordinary WebGPU object
@@ -293,7 +302,7 @@ export const RED_CHARGES = [
     // red in the 40-run window matches any of the three, so nothing accounted
     // for today stops being.
     match:
-      /(GPUValidationError: The texture format \(TextureFormat::RGBA16Float\) does not sup|Invalid Texture "(output|normal)-msaa"|GPUValidationError: \[Invalid TextureView\] is invalid due to a previous error)/i,
+      /(GPUValidationError: The texture format \(TextureFormat::RGBA16Float\) does not sup|GPUValidationError: \[Invalid Texture "(output|normal)-msaa"\] is invalid due to a previous|GPUValidationError: \[Invalid TextureView\] is invalid due to a previous error)/i,
   },
   {
     point: 568,
