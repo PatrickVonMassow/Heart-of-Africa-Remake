@@ -13274,3 +13274,28 @@ to land than a mechanism that needs a review.
   Criticality: medium — it is the last width left in the ledger after point 734 scoped every entry
   to its lane, and it can only be closed by measurement, not by a rewrite.
   Bundle: Session- & Repo-Hygiene.
+- [ ] 996. A result line arriving as malformed bytes is stored under a name the suite never
+  printed, and the record still reads complete. MEASURED 28.08.2026 by the twenty-seventh and
+  twenty-eighth cross-vendor rounds of point 734. The tap decodes byte writes through a
+  `StringDecoder` (`feedBytes` in `scripts/render-verify-recorder.mjs`), which substitutes U+FFFD
+  for any sequence it cannot read — there and then, not at `end()`. A `FAIL` or `ERR:` line
+  carrying such a sequence therefore reaches `record.reds` under an identity nothing can match a
+  charge or a closure to, while `truncated` stays unset and the run counts as a complete recording.
+  Point 734 marks the other half — the INCOMPLETE tail `end()` surfaces — because that one is
+  exact.
+  WHY IT IS ITS OWN POINT AND NOT A LINE IN 734: marking this needs telling a SUBSTITUTED U+FFFD
+  from one the suite legitimately printed. Round 27 counted substitutions against the EF BF BD the
+  decoded window itself carried, and round 28 measured what that costs — a legitimate U+FFFD split
+  across two decode windows or two writes is emitted in the later piece, whose bytes no longer
+  carry the sequence, so the count reports a substitution that never happened and calls a sound run
+  INCOMPLETE. A false truncation blocks the render set, which is the failure point 734 exists to
+  end, so the marking was withdrawn and the reason pinned by a Vitest case.
+  FINAL STATE: the tap can say whether a decode really substituted — a fatal `TextDecoder` in
+  streaming mode, a decoder that reports it, or a per-stream accounting that survives a split — and
+  a result line that was substituted marks the run as an incomplete recording, while a line that
+  merely PRINTS U+FFFD marks nothing.
+  VERIFIABLE: Vitest over the real tap — malformed bytes inside a result line set `droppedLines`,
+  a legitimate U+FFFD split across two writes does not, and neither does one delivered whole.
+  Criticality: low — it needs a suite to emit malformed UTF-8, which none has; it is filed because
+  the silent rename is exactly what point 734 forbids everywhere else.
+  Bundle: Session- & Repo-Hygiene.
