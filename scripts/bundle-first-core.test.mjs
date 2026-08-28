@@ -399,6 +399,29 @@ describe('evaluate — the rule', () => {
 })
 
 describe('evaluate — the fail-open exits', () => {
+  // A FAIL-OPEN SAYS SO (round-fourteen review finding). Every exit below
+  // returns the same DECISION as a clean document, and `--status` reported the
+  // invariant as verified for all of them; `checked` is what tells the two
+  // apart, so it is asserted beside the decision rather than on its own.
+  it('marks every allowed-without-judging exit as NOT checked', () => {
+    const renamed = workPackages({ bundles: [['Dorfleben', 'A', '#350']] }).replace(BUNDLES_HEADING, '## The packages')
+    for (const inputs of [
+      { tasksMd: tasks([540]), workPackagesMd: '' },
+      { tasksMd: tasks([350, 285]), workPackagesMd: renamed },
+      { tasksMd: '', workPackagesMd: workPackages() },
+    ]) {
+      const v = evaluate(inputs)
+      expect(v.block, JSON.stringify(inputs).slice(0, 60)).toBe(false)
+      expect(v.checked, JSON.stringify(inputs).slice(0, 60)).toBe(false)
+    }
+    // And a document it really did read reports the opposite.
+    const clean = workPackages({ bundles: [['Dorfleben', 'A', '#350']], unbundled: ['- **#285**.'] })
+    expect(evaluate({ tasksMd: tasks([350, 285]), workPackagesMd: clean })).toMatchObject({
+      block: false,
+      checked: true,
+    })
+  })
+
   it('allows an unreadable or absent work-packages file', () => {
     expect(evaluate({ tasksMd: tasks([540]), workPackagesMd: '' }).block).toBe(false)
     expect(evaluate({ tasksMd: tasks([540]) }).block).toBe(false)
@@ -480,11 +503,12 @@ describe('the real docs/work-packages.md', () => {
 
     const tail = md.slice(md.indexOf(UNBUNDLED_MARKER))
     const end = tail.indexOf('\n## ')
-    // WIDER THAN THE PARSER ON PURPOSE (round-twelve review finding): the count
-    // takes every Markdown bullet marker and any indentation, while the parser
-    // reads only a flush `-` or `*`. An entry written `+ #285` or indented under
-    // another one therefore makes this red instead of disappearing from the
-    // parser and its own count together.
+    // WIDER THAN THE PARSER ON PURPOSE (round-twelve and round-fourteen review
+    // findings): the parser reads every bullet marker up to three spaces in,
+    // and this count takes ANY indentation and a marker standing alone at the
+    // end of its line as well. A list item in a shape the parser cannot read
+    // therefore makes this red instead of disappearing from the parser and its
+    // own count together.
     const listed = (end < 0 ? tail : tail.slice(0, end))
       .split('\n')
       .filter((line) => /^\s*[-*+](\s|$)/.test(line))

@@ -49,7 +49,18 @@ if (isMainModule(import.meta.url)) {
         process.exit(0)
       }
       const result = evaluate(gathered.inputs)
-      console.log(result.block ? result.reason : 'bundle-first-guard: every open point has exactly one home.')
+      // A FAIL-OPEN IS NOT A PASS (round-fourteen review finding): `block:
+      // false` also comes back for a document this reader could not read, and
+      // reporting the invariant as verified there is the one sentence an
+      // operator would trust without looking.
+      console.log(
+        result.block
+          ? result.reason
+          : result.checked
+            ? 'bundle-first-guard: every open point has exactly one home.'
+            : 'bundle-first-guard: NOT CHECKED — docs/work-packages.md or the work order could not be read as ' +
+              'a bundle table with a "Not bundled" list, so the guard allows without having judged membership.',
+      )
       process.exit(0)
     }
 

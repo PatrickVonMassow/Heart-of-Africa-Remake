@@ -34,6 +34,12 @@
 //
 // FAIL DIRECTION: allow. An unreadable or restructured work-packages file, an
 // empty work order, any throw — all allow. The wrapper is fail-open on top.
+//
+// AND IT SAYS SO. `checked` separates "allowed because everything is placed"
+// from "allowed because nothing could be read" (round-fourteen review finding):
+// they are the same DECISION and a very different statement, and `--status`
+// used to report the verified invariant for both — so a restructured document
+// answered with the sentence an operator reads as proof.
 import { parseOpenPoints } from './queue-order-guard-core.mjs'
 
 /** The heading that opens the bundle table, and the one that closes the section. */
@@ -246,24 +252,24 @@ export const MAX_NAMED = 40
 /** Top-level decision on the two raw file contents. Total: any bad input → allow. */
 export function evaluate({ tasksMd, workPackagesMd } = {}) {
   try {
-    if (typeof workPackagesMd !== 'string' || !workPackagesMd.trim()) return { block: false, reason: '' }
+    if (typeof workPackagesMd !== 'string' || !workPackagesMd.trim()) return { block: false, checked: false, reason: '' }
     const bundles = parseBundles(workPackagesMd)
     // No parseable bundle table means the document was restructured, not that
     // every point is unbundled. A guard must never block on its own parse miss.
-    if (!bundles.length) return { block: false, reason: '' }
+    if (!bundles.length) return { block: false, checked: false, reason: '' }
     // The same holds for a PARTIAL restructure (review finding): with the
     // exemption marker renamed, the rows still parse while every exemption goes
     // unread, and each deliberately unbundled point would be reported as drift.
     // Half a document read is a parse miss too.
-    if (!workPackagesMd.includes(UNBUNDLED_MARKER)) return { block: false, reason: '' }
+    if (!workPackagesMd.includes(UNBUNDLED_MARKER)) return { block: false, checked: false, reason: '' }
 
     const open = parseOpenPoints(tasksMd)
-    if (open.size === 0) return { block: false, reason: '' }
+    if (open.size === 0) return { block: false, checked: false, reason: '' }
 
     const exemptions = parseUnbundled(workPackagesMd)
     const missing = unplacedPoints(open, bundles, exemptions.points)
     const duplicates = duplicateHomes(open, bundles, exemptions)
-    if (!missing.length && !duplicates.length) return { block: false, reason: '' }
+    if (!missing.length && !duplicates.length) return { block: false, checked: true, reason: '' }
 
     const parts = []
     if (missing.length) {
@@ -291,11 +297,12 @@ export function evaluate({ tasksMd, workPackagesMd } = {}) {
     }
     return {
       block: true,
+      checked: true,
       missing,
       duplicates,
       reason: `BUNDLE MEMBERSHIP DRIFTED: ${parts.join(' ')}`,
     }
   } catch {
-    return { block: false, reason: '' } // total by contract — the wrapper's fail-open must not depend on luck
+    return { block: false, checked: false, reason: '' } // total by contract — the wrapper's fail-open must not depend on luck
   }
 }
