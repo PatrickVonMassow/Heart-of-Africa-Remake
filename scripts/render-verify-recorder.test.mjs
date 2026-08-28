@@ -106,6 +106,35 @@ describe('tapOutput — observe-only', () => {
     ])
   })
 
+  // A `console errors: <texts>` SUMMARY LINE CARRIES SEVERAL REDS (review
+  // finding, 28.08.2026). Keying it by its FIRST parsed error collapsed two
+  // such lines that shared that first one: the second line left the buffer, and
+  // the reds only it carried never reached failedChecks — gone without being
+  // fixed, charged or filed, and not even marked as varied.
+  it('keeps two summary lines that share a first error but carry different further ones', () => {
+    const { state, out } = tapped()
+    out.write("console errors: ['the shared first error', 'the second error']\n")
+    out.write("console errors: ['the shared first error', 'a THIRD error only this line saw']\n")
+    expect(state.lines).toHaveLength(2)
+    // Every red of both lines survives into the accounting the guard reads.
+    expect(failedChecks(state.lines.join('\n')).map((c) => c.name)).toEqual([
+      'console error: the shared first error',
+      'console error: the second error',
+      'console error: a THIRD error only this line saw',
+    ])
+    // A summary line that repeats identically is still chatter, kept once.
+    out.write("console errors: ['the shared first error', 'the second error']\n")
+    expect(state.lines).toHaveLength(2)
+    // And a single-red line keys exactly as it always did — one entry per
+    // identity, whichever of the two line shapes carried it.
+    const single = tapped()
+    single.out.write('ERR: the shared first error\n')
+    single.out.write("console errors: ['the shared first error']\n")
+    expect(single.state.lines).toHaveLength(1)
+    expect(consoleErrorChecks(single.state.lines[0])).toHaveLength(1)
+    expect(parseCheckLines(single.state.lines[0])).toEqual([])
+  })
+
   it('joins a line split across two writes', () => {
     const { state, out } = tapped()
     out.write('FAIL  a check ')

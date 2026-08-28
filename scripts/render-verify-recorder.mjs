@@ -115,14 +115,32 @@ const KEPT_LINE = /^(?:FAIL\s{2,}|ERR:|console errors:|CONSOLE ERRORS:)/
  *  accounted for. A false positive only makes the gate stricter. */
 const CRASH_LINE = /^\s+at .+:\d+:\d+|^(?:Uncaught\s+)?\w*Error(?::|\b)/
 
-/** A kept result line's IDENTITY, as the parser will compute it — the check key
- *  for a `FAIL` line, the normalised console key for an `ERR:`/`console errors:`
- *  line. A line neither parses is its own identity, which is exactly the old
- *  behaviour for anything the parser cannot read. Total. */
+/**
+ * A kept result line's IDENTITY, as the parser will compute it — the check key
+ * for a `FAIL` line, the normalised console key for an `ERR:` line.
+ *
+ * ALL OF THEM, NOT THE FIRST (review finding, 28.08.2026). A `console errors:
+ * <texts>` summary line carries SEVERAL reds, and keying the whole line by its
+ * FIRST parsed error collapsed two such lines that happened to share it: the
+ * second line was dropped from the buffer, so the reds only IT carried never
+ * reached `failedChecks()` and disappeared without being fixed, charged or
+ * filed — and `variedKeys` marked only the shared first key, so nothing even
+ * said a reading had been lost. The identity is therefore the whole parsed SET,
+ * in order, which keys a one-red line exactly as before and keeps two summary
+ * lines apart whenever they differ in any of their reds.
+ *
+ * The bound holds: the parts are the parser's own normalised keys (counters and
+ * URLs folded away), so a per-frame line still collapses to one entry, and a
+ * summary line's key is bounded by the distinct errors the suite reported.
+ *
+ * A line the parser cannot read is its own identity, which is exactly the old
+ * behaviour. Total.
+ */
 function resultKey(line) {
   try {
-    const [parsed] = [...parseCheckLines(line), ...consoleErrorChecks(line)]
-    return parsed?.key ? `${parsed.kind}:${parsed.key}` : line
+    const parsed = [...parseCheckLines(line), ...consoleErrorChecks(line)]
+    if (parsed.length === 0 || parsed.some((p) => !p?.key)) return line
+    return parsed.map((p) => `${p.kind}:${p.key}`).join(' + ')
   } catch {
     return line
   }
