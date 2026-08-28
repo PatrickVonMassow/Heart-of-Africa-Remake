@@ -152,6 +152,29 @@ put it is the mistake this line exists to stop.
   into a formality.
   Bundle: Session- & Repo-Hygiene.
 
+- [ ] 993. A run that crashed but exited 0 is recorded as fully clean and COVERS a backend.
+  MEASURED 28.08.2026 while answering the eleventh review round of point 734, in
+  `scripts/render-verify-recorder.mjs`: the tap sets `state.crashed = true` the moment a stderr
+  line matches `CRASH_LINE`, but the record is written with `...(exit !== 0 ? { reds, crashed:
+  armed.crashed } : {})`. A run whose stack reached the tap while the process still ended with
+  code 0 therefore stores neither its reds nor its crash flag — the record is indistinguishable
+  from a clean one, and an asserted clean run COVERS its backend.
+  WHAT IT COSTS: point 734 gave the crashed run its own signed disposition precisely because a
+  crash may not be mistaken for a green. This path skips the disposition entirely: the crash is
+  not merely unexplained, it is invisible, and the run is then counted as the picture proof for a
+  render change. The comment at the tap says a false positive "only makes the gate stricter",
+  which is true on the `exit !== 0` path and false on this one — the same flag makes the gate
+  LOOSER here, because the record it produces is a green.
+  FINAL STATE: the crash observation is recorded independently of the exit code, and a record
+  carrying it is never coverage: it takes the crashed run's signed way out like any other. The
+  tap's comment states which way each direction of the flag actually moves the gate.
+  VERIFIABLE: Vitest at the recorder — a run whose stderr matched `CRASH_LINE` and whose process
+  exited 0 stores `crashed: true` and its reds, and `runVerdict`/coverage refuse it as a clean
+  covering run; a run with neither is unaffected; the ordinary crashed-and-nonzero run keeps
+  today's record shape exactly.
+  Criticality: high — it is the one path on which the render gate accepts a crash as its picture
+  proof.
+  Bundle: Session- & Repo-Hygiene.
 - [ ] 958. The independent emergency lane reads a session's own tool calls as batch progress, so a
   BUSY wedge never reaches it. MEASURED 27.08.2026 while cross-reading the lane point 947 built:
   `scripts/batch-emergency-core.mjs` puts `ACTIVITY_CLASSES.FOREGROUND` into `ADVANCING_CLASSES`,
@@ -13129,3 +13152,70 @@ to land than a mechanism that needs a review.
   case proving the written value satisfies `auditDashboard` where the old one did not.
   Criticality: low — it costs turns and tempts a stale estimate; it hides no defect.
   Bundle: Chat & Tafel.
+- [ ] 990. A red charge cannot verify the ROOT its downstream sentence points back to.
+  MEASURED 28.08.2026 while answering the eleventh review round of point 734. `chargeFor` in
+  `scripts/render-verify-core.mjs` is handed ONE red — name, key, kind, detail — plus the run's
+  suite, backend and feature level. It never sees the run's other reds. The point-514 console
+  entry in `scripts/render-verify-charges.mjs` excuses a WebGPU cascade message that says "is
+  invalid due to a previous error", i.e. a message whose whole meaning is "something else already
+  failed"; the round-11 finding showed the entry's claim to be self-limiting was false, because
+  nothing checks that the ROOT is present and still uncharged in the same record.
+  WHAT IT COSTS: the entry was narrowed to the object name the storm was measured on, which
+  closes the hole for today's ledger but not the class. Any future charge that wants to own a
+  downstream message must either name the exact object it was measured on — losing every variant
+  the record cuts at 135 characters — or own a standalone message whose root is gone or already
+  excused.
+  FINAL STATE: a ledger entry may declare a ROOT it depends on, and such a charge fires only
+  where that root is a red of the SAME record and is itself uncharged. The matching therefore
+  reads the run, not the single red; the recorder charges at record time as it does today, and
+  `owned()` re-reads with the same rule.
+  VERIFIABLE: Vitest over `chargeFor`/`chargeReds` — a root-scoped entry owns the downstream red
+  in a record that also carries its root, owns nothing in a record carrying the downstream
+  message alone, and owns nothing where the root is itself charged away.
+  Criticality: medium — it decides whether a lane cascade can be excused without excusing an
+  unrelated defect that borrowed its wording.
+  Bundle: Session- & Repo-Hygiene.
+- [ ] 991. A run record has no identity of its own, so indistinguishable records share one
+  signature. MEASURED 28.08.2026, rounds 11 and 12 of point 734, which refused the argument that
+  two real runs always differ in their millisecond stamps and asked for a mechanism.
+  `runIdentity` in `scripts/render-verify-core.mjs` hashes the record's whole canonical CONTENT
+  (the round-5 decision) into 64 non-cryptographic bits, and `signedClosureDraft` in
+  `scripts/render-verify-guard.mjs` de-duplicates the open runs by it and signs `open[0]`. Two
+  records are therefore one identity in TWO ways: byte-identical content — one run written twice,
+  or two runs that really happened in the same millisecond on both stamps with the same head,
+  exit, screenshot list and reds — and a hash collision between records that differ.
+  WHAT IT COSTS: no coverage — a signed closure never makes a run cover a backend — so the worst
+  case is one evidence sentence disposing of two records that were not the same measurement. It
+  was decided on 28.08.2026 to keep CONTENT and state both residuals at the site, because a
+  record-time id reaches no record already on disk and the fallback would reintroduce the two
+  disagreeing identities the fifth round removed.
+  FINAL STATE: the recorder writes a unique `runId` at record time; `runIdentity` prefers it and
+  falls back to the content hash for a record written without one; the closure route names one
+  and only one record either way, and the CLI's `--run <id>` keeps working for both shapes.
+  VERIFIABLE: Vitest — two records identical in every other field but carrying different `runId`
+  values are two open runs the draft refuses to sign blind and offers by id; a record without a
+  `runId` still closes by its content hash; an existing closure on file still matches the record
+  it was written for.
+  Criticality: low — it costs no coverage and both families it serves are legacy classes.
+  Bundle: Session- & Repo-Hygiene.
+- [ ] 992. The compatibility-lane console charge is not scoped to the lane it was measured on.
+  MEASURED 28.08.2026 by the twelfth cross-vendor round of point 734. The point-514 entry for
+  `enrichments` in `scripts/render-verify-charges.mjs` states in its own evidence that what it
+  excuses is the WebGPU COMPATIBILITY lane's missing MSAA, but the entry carries no
+  `featureLevel: 'compatibility'` field. `chargeFor` only compares a feature level when the entry
+  names one, so the entry excuses the identical frame red on the CORE adapter as well — the
+  adapter the player actually runs.
+  WHAT IT COSTS: the neighbouring `settings` entry was scoped to its lane by the review of
+  19.08.2026 for exactly this reason, and this one was left standing. So a genuine core-adapter
+  regression in the enrichment frames is silently owned by point 514 and never blocks, which is
+  the failure mode the whole charge ledger is built to make impossible.
+  FINAL STATE: the entry names the feature level its evidence names, or its evidence is rewritten
+  to state — with a measurement — that the red really does occur on both adapters and is one
+  defect. Every other entry in the ledger is checked the same way in the same commit: an entry
+  whose evidence names a lane and whose shape does not is a defect, not a style question.
+  VERIFIABLE: Vitest over `chargeFor` — the enrichment red charges to 514 on the compatibility
+  lane and stays UNCHARGED on a core-adapter run of the same suite; plus a ledger-shape case that
+  fails for any entry whose evidence text names a feature level the entry does not carry.
+  Criticality: medium — an unscoped charge excuses the defect the player sees with evidence taken
+  from a lane the player never runs.
+  Bundle: Session- & Repo-Hygiene.

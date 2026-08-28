@@ -918,6 +918,30 @@
       "why": "Low, cosmetic-cost and self-contained: it costs a few turns per estimate change and hides no defect, so it stands behind everything already settled and behind the release.",
       "origin": "machine",
       "place": "last"
+    },
+    "990": {
+      "at": "2026-08-28T10:02:50.536Z",
+      "why": "Behind the queue: it is the residual of a decision taken deliberately, it cannot be worked before 734 lands, and today's ledger has no entry left that needs it.",
+      "origin": "machine",
+      "place": "last"
+    },
+    "991": {
+      "at": "2026-08-28T10:02:50.626Z",
+      "why": "Behind the queue: low criticality, costs no coverage, and both record families it would serve are legacy classes no current run can produce.",
+      "origin": "machine",
+      "place": "last"
+    },
+    "992": {
+      "at": "2026-08-28T10:02:50.712Z",
+      "why": "Behind the queue: it needs 734's ledger work landed first, and the wrongly excused red is in the enrichment frames rather than in a gate that blocks.",
+      "origin": "machine",
+      "place": "last"
+    },
+    "993": {
+      "at": "2026-08-28T10:02:54.928Z",
+      "why": "It is the one path on which the render gate accepts a crash as its picture proof, so every render landing before the release could be resting on a run that never reported — including the release's own closing screenshots.",
+      "origin": "machine",
+      "place": "ahead"
     }
   },
   "boundary": {
@@ -957,7 +981,7 @@
     "why": "The order standing in front of the release today is the arrangement that predates this rule; the four machine-filed points that had ranked themselves there were moved behind 174 first"
   },
   "settled": {
-    "at": "2026-08-28T08:56:17.371Z",
+    "at": "2026-08-28T10:02:54.937Z",
     "points": [
       174,
       184,
@@ -1281,7 +1305,11 @@
       984,
       986,
       987,
-      989
+      989,
+      990,
+      991,
+      992,
+      993
     ]
   }
 }
