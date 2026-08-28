@@ -143,6 +143,45 @@ describe('point file-set measurement', () => {
   // order, its archive or the retrospective in a pass, so a point whose measured
   // file set picked one of them up could never reach a complete composition,
   // whatever was reviewed. The gate reads the planner's exclusion list.
+  // The receipt path measured its own set and skipped the boundary (cross-vendor
+  // review, GPT-5.6 Sol): a clearance could then be written for the work order or
+  // the retrospective — paths no review round was ever owed for.
+  it('never lets an unavailable receipt claim a path outside the review boundary', () => {
+    const sha = 'a'.repeat(40)
+    const built = buildUnavailableReceipt({
+      sha,
+      point: 893,
+      files: ['scripts/lease.mjs', 'TASKS.md'],
+      reason: 'every configured reviewer vendor authored part of this contribution',
+      records: [{ kind: 'authoring-commission', point: 893, sha: 'b'.repeat(40), at: 1 }],
+      resolveSha: () => sha,
+      isAncestor: () => true,
+      measure: () => ({ unavailableFiles: ['scripts/lease.mjs', 'TASKS.md'] }),
+    })
+
+    expect(built.ok).toBe(false)
+    expect(built.errors.join(' ')).toContain('scripts/lease.mjs')
+    expect(built.errors.join(' ')).not.toContain('TASKS.md')
+  })
+
+  it('writes the receipt for the measured set once the excluded paths are gone', () => {
+    const sha = 'a'.repeat(40)
+    const built = buildUnavailableReceipt({
+      sha,
+      point: 893,
+      files: ['scripts/lease.mjs'],
+      reason: 'every configured reviewer vendor authored part of this contribution',
+      records: [{ kind: 'authoring-commission', point: 893, sha: 'b'.repeat(40), at: 1 }],
+      resolveSha: () => sha,
+      isAncestor: () => true,
+      measure: () => ({ unavailableFiles: ['scripts/lease.mjs', 'docs/tasks-archive.md'] }),
+      now: 1_700_000_000_000,
+    })
+
+    expect(built.ok).toBe(true)
+    expect(built.record.files).toEqual(['scripts/lease.mjs'])
+  })
+
   it('leaves out the paths no review round may carry', () => {
     const reviewed = 'c'.repeat(40)
     const landing = 'c'.repeat(40)

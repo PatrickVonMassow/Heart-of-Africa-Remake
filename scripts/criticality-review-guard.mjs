@@ -296,9 +296,14 @@ export function pointAuthorship(commissionSha, reviewSha) {
     return { ...commit, authorModels: modelsFromTrailers(trailers), parentAuthorModels }
   })
   const plan = planAuthorshipGroups({ commits: attributed })
+  // BOTH SETS GO THROUGH THE PLANNER'S BOUNDARY (cross-vendor review, GPT-5.6 Sol,
+  // 28.08.2026). The ordinary measurement was routed through it and this one was
+  // not, so an unavailable receipt could still claim the work order or the
+  // retrospective as an unreviewable file — a clearance for paths no round was
+  // ever owed, written into the append-only ledger.
   return {
-    pointFiles: [...new Set(attributed.flatMap((commit) => commit.files))],
-    unavailableFiles: [...new Set(plan.unreviewable.flatMap((group) => group.files))],
+    pointFiles: reviewEndStateFiles(attributed.flatMap((commit) => commit.files)),
+    unavailableFiles: reviewEndStateFiles(plan.unreviewable.flatMap((group) => group.files)),
   }
 }
 
@@ -353,7 +358,10 @@ export function buildUnavailableReceipt({
   } catch (error) {
     return { ok: false, errors: [`Git could not measure point ${number}'s unavailable files: ${error?.message ?? error}`] }
   }
-  const actual = [...new Set((measured?.unavailableFiles ?? []).map(String).filter(Boolean))]
+  // Filtered HERE too, not only inside the measurement: this is the consumer that
+  // writes the clearance, and a receipt naming an excluded path would grant one
+  // for a review nothing was ever owed.
+  const actual = reviewEndStateFiles((measured?.unavailableFiles ?? []).map(String).filter(Boolean))
   if (!actual.length) {
     return { ok: false, errors: [`Git measures no unavailable files for point ${number} at ${full.slice(0, 7)}`] }
   }
