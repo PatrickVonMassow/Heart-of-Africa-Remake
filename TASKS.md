@@ -13224,3 +13224,39 @@ to land than a mechanism that needs a review.
   Criticality: low — it needs a suite to emit malformed UTF-8, which none has; it is filed because
   the silent rename is exactly what point 734 forbids everywhere else.
   Bundle: Session- & Repo-Hygiene.
+- [ ] 997. The queue order for the context work rests on three readings that do not carry it, and
+  the two measurements that would decide it are missing. MEASURED 28.08.2026 from a user question
+  (why 73 % of usage still sits above 150k context) and CROSS-READ the same day by GPT-5.6 Sol
+  (effort high, 32,185 characters of material: the seven point texts 746/759/747/553/932/901/705
+  verbatim plus six measurements, 11 entries in 159 s).
+  WHAT HELD: the problem sits in the upper half of a session, not at its floor — point 757 lowered
+  the start floor from 61,372 to about 41k, while the session peak median is 186,233 against a
+  122,000 watermark that refuses nothing (`context-fence-guard --status`: mode observe, armed
+  false; `.claude/context-fence-observations.jsonl` holds 10,941 lines it never acted on). Point
+  759 is a binding precondition of arming anything: without the worktree stand-down, a sharp fence
+  measures every worktree agent against its parent session and blocks Sol authoring and
+  cross-vendor review again. And points 901 and 705 belong near the front.
+  WHAT SOL REFUTED, and this point owns re-deriving: (A7) point 747 is not a counter-mover — only
+  its RAISING branch is, while the same point carries the per-unit cap, the re-check DURING an
+  admitted unit, the quantile correction, the rollback, and the very measure that lowers the
+  floor's orientation share; (A1) a sharp fence is not a ceiling — it refuses START work and
+  writes, while reads, commit, push, merge, land-point, board and boundary stay open, so point 932
+  alone guarantees no saved turn; (A4) the BEFORE/AFTER comparison of `scripts/measure-context-cost.mjs`
+  carries no causal claim at 4,823 BEFORE turns from 47 sessions against 101,315 AFTER turns from
+  803 sessions, with the full reckoning worsening while the top-level one improves; (A5) "it arises
+  entirely at the top" is stronger than the distribution shows, since turn shares can be carried by
+  a few very long sessions; (A11) the 10,941 observation lines quantify neither preventable calls
+  nor sessions nor tokens.
+  FINAL STATE: the frequency of the incident class point 901 answers and of the board publishes
+  point 705 answers is COUNTED over a stated window, so each is a rate rather than one anecdote; a
+  balanced BEFORE base for `measure-context-cost.mjs` is built (comparable session and subagent
+  composition, stated how) and the point-757 effect is re-read against it; and the fence
+  observations are classified into preventable calls, sessions and tokens, which point 932 requires
+  before any switch. The queue order for 746/759/747/553/932/901/705 is then set by those numbers
+  and recorded with them — Sol's proposal, 901 -> 746 -> 759 -> 553 -> 932, is the hypothesis to
+  test, not the conclusion.
+  VERIFIABLE: the counts, the balanced base and the classification exist as command output, and the
+  recorded order names which number decided each position.
+  Criticality: medium — it decides where a large share of the account's spend goes, and the current
+  order rests on readings a cross-vendor audit refuted.
+  Bundle: Session- & Repo-Hygiene.
