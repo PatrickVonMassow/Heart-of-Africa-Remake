@@ -19,26 +19,39 @@ export const USER_OWNED_CATEGORIES = Object.freeze({
 })
 
 const CATEGORY_LABEL = 'User-owned category'
-// ANCHORED TO THE FIRST LINE, and nowhere else (cross-vendor review, GPT-5.6 Sol,
-// 28.08.2026). An unanchored tag was BOTH halves of one defect: a question that
-// merely QUOTES the label as visible content granted itself the authority it was
-// quoting, and `withoutCategoryLine` then deleted that content line out of the
-// rendered card — a card silently missing one of its own options. The tag is a
-// header, so it is read as one; the refusal already says "begin the body with".
-// The tag also OWNS ITS LINE: a trailing `(?:\s|$)` accepted an ordinary space,
-// so a first line that quoted the marker and then went on with the question
-// ("User-owned category: design-content. — dieser Marker ist Option A.") still
-// granted authority and still lost its opening words to the stripper (second
-// cross-vendor round, GPT-5.6 Sol). Only a line break or the end of the body
-// closes the tag now.
+// THE TAG IS A HEADER AT COLUMN ZERO, and every gap inside it is HORIZONTAL
+// (three cross-vendor rounds, GPT-5.6 Sol, 28.08.2026). Each loosening was the
+// same defect wearing a different hat: a card that merely QUOTES the marker
+// granted itself the authority it was quoting, and `withoutCategoryLine` then
+// deleted the quoted text out of the rendered card — a question reaching the
+// user with one of its own options missing. `(?:^|\n)` let the quotation sit
+// anywhere; `^\s*` let it sit under a blank line or a Markdown indent; a
+// trailing `\s` let the first line carry the marker and then keep talking.
+// Column zero after one normalisation, horizontal gaps only, and a line break
+// or the end of the body to close it — nothing else is the tag.
 const CATEGORY_RE = new RegExp(
-  `^\\s*${CATEGORY_LABEL}:\\s*(${Object.keys(USER_OWNED_CATEGORIES).join('|')})\\s*\\.[ \\t]*(?:\\r?\\n|$)`,
+  `^${CATEGORY_LABEL}:[ \\t]*(${Object.keys(USER_OWNED_CATEGORIES).join('|')})[ \\t]*\\.[ \\t]*(?:\\r?\\n|$)`,
   'i',
 )
 
+/**
+ * ONE reading of the card body for all three of judge, tag and stripper. They
+ * disagreed while only the judge trimmed: a body behind a leading newline was
+ * granted authority the stripper then refused to remove, so the English tag
+ * reached the German card.
+ *
+ * The LEADING edge is deliberately left alone — trimming it would hand column
+ * zero back to an indented quotation, which is the hole this normalisation was
+ * introduced to close. A BOM is an encoding artefact rather than indentation,
+ * so it alone is dropped.
+ */
+export function normaliseCardBody(text) {
+  return String(text ?? '').replace(/^\uFEFF/, '').replace(/\s+$/, '')
+}
+
 /** A selected category key, or ''. Descriptions and unknown keys grant no authority. */
 export function userOwnedCategory(text) {
-  return String(text ?? '').match(CATEGORY_RE)?.[1]?.toLowerCase() ?? ''
+  return normaliseCardBody(text).match(CATEGORY_RE)?.[1]?.toLowerCase() ?? ''
 }
 
 /**
@@ -50,7 +63,7 @@ export function userOwnedCategory(text) {
  * gets, and for the same reason.
  */
 export function withoutCategoryLine(text) {
-  return String(text ?? '').replace(CATEGORY_RE, '')
+  return normaliseCardBody(text).replace(CATEGORY_RE, '')
 }
 
 /**
@@ -76,7 +89,7 @@ export function namesOptions(text) {
  */
 export function isAdvisoryDecisionRecord({ title, body } = {}) {
   const head = String(title ?? '').trim()
-  const text = String(body ?? '').trim()
+  const text = normaliseCardBody(body)
   return (
     /^Entscheidungsprotokoll:/i.test(head) &&
     /(?:^|[.!?]\s+)Entscheidung:\s*\S/i.test(text) &&
@@ -102,8 +115,8 @@ const decisionRecordPattern =
  */
 export function judgeAutomatedCard({ title, body } = {}) {
   const head = String(title ?? '').trim()
-  const text = String(body ?? '').trim()
-  if (!head || !text) {
+  const text = normaliseCardBody(body)
+  if (!head || !text.trim()) {
     return { ok: false, reason: 'board: a decision card needs both a title and a body' }
   }
   if (isAdvisoryDecisionRecord({ title: head, body: text })) return { ok: true, reason: null }

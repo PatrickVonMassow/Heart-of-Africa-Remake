@@ -7,6 +7,7 @@ import {
   isAdvisoryDecisionRecord,
   judgeAutomatedCard,
   namesOptions,
+  normaliseCardBody,
   userOwnedCategory,
   withoutCategoryLine,
 } from './vdzk-admissibility-core.mjs'
@@ -36,6 +37,29 @@ describe('the typed authority', () => {
     expect(userOwnedCategory(quoting)).toBe('')
     expect(judge(quoting).ok).toBe(false)
     expect(withoutCategoryLine(quoting)).toBe(quoting)
+  })
+
+  // THIRD ROUND (GPT-5.6 Sol): a leading `\s*` re-opened the same door for an
+  // INDENTED quotation and for one sitting under a blank line, and the interior
+  // gaps could span newlines. The tag stands at column zero after one
+  // normalisation, and every gap inside it is horizontal.
+  it.each([
+    ['a Markdown-indented quotation', '    User-owned category: design-content.\nSoll ich A oder B?'],
+    ['a quotation under a blank line', '\n\n  User-owned category: design-content.\nSoll ich A oder B?'],
+    ['a header broken across lines', 'User-owned category:\ndesign-content.\nSoll ich A oder B?'],
+  ])('grants no authority to %s, and deletes none of it', (_shape, quoting) => {
+    expect(userOwnedCategory(quoting)).toBe('')
+    expect(judge(quoting).ok).toBe(false)
+    expect(withoutCategoryLine(quoting)).toBe(normaliseCardBody(quoting))
+  })
+
+  // The judge used to trim while the stripper did not, so a body behind a
+  // leading newline was granted authority whose tag then stayed on the card.
+  it('reads the same body in the judge, the tag and the stripper', () => {
+    const padded = '\ufeffUser-owned category: release-tag.\nSoll ich taggen oder warten?\n'
+    expect(userOwnedCategory(padded)).toBe('release-tag')
+    expect(judge(padded).ok).toBe(true)
+    expect(withoutCategoryLine(padded)).toBe('Soll ich taggen oder warten?')
   })
 
   it('accepts the tag when it owns its line, with or without a trailing newline', () => {
