@@ -40,7 +40,7 @@ afterEach(() => {
 
 /** Arm a FRESH recorder instance (the module keeps one armed run per process)
  *  under a chosen suite name, and return the record its exit handler writes. */
-async function armed(suite = 'polish') {
+async function armed(suite = 'polish', featureLevel = null) {
   vi.resetModules()
   const mod = await import('./render-verify-recorder.mjs')
   const argv = process.argv[1]
@@ -49,6 +49,10 @@ async function armed(suite = 'polish') {
   // exactly as in a real run but never reach the terminal.
   process.stdout.write = () => true
   mod.armRunRecorder('webgpu')
+  // The WebGPU feature level the run came up at, recorded the way assertBackend
+  // records it. A ledger entry scoped to the compatibility lane is unreachable
+  // without it, which is the point of the scope.
+  if (featureLevel) mod.markBackendAsserted(featureLevel)
   process.argv[1] = argv
   return {
     /** Fire the real exit handler and read what THIS instance recorded. */
@@ -272,6 +276,47 @@ describe('tapOutput — observe-only', () => {
     expect(state.lines.join('\n').length).toBeLessThanOrEqual(MAX_CAPTURE_CHARS)
   })
 
+  // THE BUDGET BOUNDS THE BUFFER THE PARSER IS HANDED, AND THAT BUFFER IS THE
+  // JOINED TEXT (review finding, 28.08.2026, round 17). Weighing each line alone
+  // ignored the newline `join` puts between them, so many small lines each just
+  // under the ceiling carried the parsed buffer one character per line past it.
+  // The case above cannot see it — its lines are 32 KB each, so its handful of
+  // newlines disappears in the rounding.
+  it('counts the newlines it will join with, so a budget filled EXACTLY cannot overrun it', () => {
+    const { state, out } = tapped()
+    // Lines that divide the budget exactly: 128 of them sum to MAX_CAPTURE_CHARS
+    // to the character, which is where the missing newlines showed. Each mints
+    // one fresh identity, so the identity ceiling (500) is never the binding one.
+    const fits = 128
+    const width = MAX_CAPTURE_CHARS / fits
+    const line = (i) => {
+      const head = `ERR: page error ${tag(i)} `
+      return head + 'y'.repeat(width - head.length)
+    }
+    for (let i = 0; i < fits + 4; i++) {
+      expect(line(i).length).toBe(width)
+      out.write(`${line(i)}\n`)
+    }
+    expect(state.droppedLines).toBeGreaterThan(0)
+    expect(state.lines.join('\n').length).toBeLessThanOrEqual(MAX_CAPTURE_CHARS)
+  })
+
+  // THE EXACT-CAP CARRY (review finding, 28.08.2026, round 17). A pending line
+  // filled to exactly MAX_LINE_CHARS and completed by a LATER write is the one
+  // shape that built its probe head out of the whole carry plus a fresh probe
+  // slice — past the very cap the branch enforces. The refusal it produces must
+  // be the same single one, and the stream must recover.
+  it('refuses a line whose carry is filled to exactly the cap by an earlier write', () => {
+    const { state, out } = tapped()
+    out.write(`ERR: ${'z'.repeat(MAX_LINE_CHARS - 'ERR: '.length)}`)
+    out.write('the rest of a line that was already full\n')
+    expect(state.lines).toHaveLength(0)
+    expect(state.droppedLines).toBe(1)
+    out.write('ERR: an ordinary error after it\n')
+    expect(state.lines).toEqual(['ERR: an ordinary error after it'])
+    expect(state.droppedLines).toBe(1)
+  })
+
   // A line WITHIN the per-line budget that brings nothing new costs nothing,
   // however long it is — counting it would be a FALSE truncation, and a false
   // truncation blocks the gate.
@@ -399,7 +444,11 @@ describe('the captured lines charge the way the guard reads them', () => {
     out.write('ERR: [ASSERT] render-resource-leak — renderTargets grew back at place:maasai-village: 19 -> 22\n')
     out.write('FAIL  a NEW check nobody has filed — 3 of 4\n')
     flush()
-    const reds = chargeReds(failedChecks(state.lines.join('\n')), { suite: 'polish', backend: 'webgpu' })
+    const reds = chargeReds(failedChecks(state.lines.join('\n')), {
+      suite: 'polish',
+      backend: 'webgpu',
+      featureLevel: 'compatibility',
+    })
     const pointOf = (needle) => reds.find((r) => r.name.includes(needle))?.point
     expect(reds.length).toBe(3)
     expect(pointOf('settlement walker (goat)')).toBe(642)
@@ -484,8 +533,12 @@ describe('the captured lines charge the way the guard reads them', () => {
 
   it('charges a red to nothing outside the suite its evidence was taken in (F2)', () => {
     const line = 'FAIL  settlement walker (goat): the planted foot holds its ground spot — 0.967'
-    expect(chargeReds(failedChecks(line), { suite: 'flow', backend: 'webgpu' }).map((r) => r.point)).toEqual([null])
-    expect(chargeReds(failedChecks(line), { suite: 'polish', backend: 'webgpu' }).map((r) => r.point)).toEqual([642])
+    const lane = { backend: 'webgpu', featureLevel: 'compatibility' }
+    expect(chargeReds(failedChecks(line), { suite: 'flow', ...lane }).map((r) => r.point)).toEqual([null])
+    expect(chargeReds(failedChecks(line), { suite: 'polish', ...lane }).map((r) => r.point)).toEqual([642])
+    // Nor outside the LANE it was taken on: the entry rests on the measured
+    // compatibility adapter, so the core one the player runs stays red.
+    expect(chargeReds(failedChecks(line), { suite: 'polish', backend: 'webgpu', featureLevel: 'core' }).map((r) => r.point)).toEqual([null])
   })
 })
 
@@ -493,13 +546,27 @@ describe('the armed recorder — the REAL wiring, not a stand-in', () => {
   const openPoints = [642]
 
   it('records a red run with its charged reds, and the run then accounts', async () => {
-    const run = await armed('polish')
+    const run = await armed('polish', 'compatibility')
     process.stdout.write('FAIL  settlement walker (goat): the planted foot holds its ground spot — 0.967\n')
     const record = run.exit(1)
     expect(record.exit).toBe(1)
     expect(record.crashed).toBe(false)
+    expect(record.featureLevel).toBe('compatibility')
     expect(record.reds.map((r) => r.point)).toEqual([642])
     expect(runVerdict(record, { openPoints }).status).toBe('accounted')
+  })
+
+  // THE SAME RUN ON THE ADAPTER THE PLAYER USES (review finding, 28.08.2026,
+  // round 17). The entry rests on the measured compatibility lane, so the red
+  // it excuses there is unexplained on core — end to end through the real tap,
+  // not only through chargeFor.
+  it('leaves the same red unaccounted when the run came up on the core adapter', async () => {
+    const run = await armed('polish', 'core')
+    process.stdout.write('FAIL  settlement walker (goat): the planted foot holds its ground spot — 0.967\n')
+    const record = run.exit(1)
+    expect(record.featureLevel).toBe('core')
+    expect(record.reds.map((r) => r.point)).toEqual([null])
+    expect(runVerdict(record, { openPoints }).status).toBe('red')
   })
 
   it('marks a run whose process raised an uncaught exception, and that run never accounts (F1)', async () => {
@@ -605,21 +672,36 @@ describe('the armed recorder — the REAL wiring, not a stand-in', () => {
     expect(runVerdict(record, { openPoints }).status).toBe('incomplete')
   })
 
-  // A green run records no reds at all, so red lines it dropped cost it
-  // nothing — calling it incomplete would block a genuinely passing run. The
-  // refusal is still WRITTEN, though (review finding, 28.08.2026, round 16):
-  // this was the one place where a drop went unrecorded, which contradicts the
-  // rule that nothing is refused quietly. The verdict turns on `truncated`, and
-  // that is what a green run does not carry.
-  it('records what an exit-0 run refused, and still never calls it incomplete', async () => {
+  // AN EXIT CODE OF 0 DOES NOT MAKE A LOST RECORDING COMPLETE (review finding,
+  // 28.08.2026, round 17, overturning round 16). Round 16 read a refused line as
+  // chatter the accounting never wanted. It is not: `refuse()` is reached only
+  // from a RESULT line — a `FAIL`, an `ERR:`, a `console errors:` summary — so
+  // this record says the process ended 0 while its own output carried result
+  // lines nobody read. Calling that clean made it count as picture COVERAGE,
+  // which is the worst thing an unread recording can be taken for.
+  it('calls an exit-0 run that dropped RESULT lines an incomplete recording', async () => {
     const run = await armed('polish')
     for (let i = 0; i < MAX_RED_IDENTITIES + 7; i++) {
       process.stdout.write(`ERR: page error in span ${tag(i)}\n`)
     }
     const record = run.exit(0)
     expect(record.droppedLines).toBe(7)
+    expect(record.truncated).toBe(true)
+    expect(isIncompleteRecording(record)).toBe(true)
+    expect(runVerdict(record, { openPoints }).status).toBe('incomplete')
+    expect(runVerdict(record, { openPoints }).covers).toBe(false)
+  })
+
+  // And the other half of that rule, unchanged: a genuinely green run prints no
+  // result line at all, so it can never reach a budget and is never marked.
+  it('leaves a green run whose chatter never reached a budget completely clean', async () => {
+    const run = await armed('polish')
+    for (let i = 0; i < MAX_RED_IDENTITIES + 7; i++) {
+      process.stdout.write(`PASS  a check that held ${tag(i)}\n`)
+    }
+    const record = run.exit(0)
+    expect(record.droppedLines).toBeUndefined()
     expect(record.truncated).toBeUndefined()
-    expect(isIncompleteRecording(record)).toBe(false)
     expect(runVerdict(record, { openPoints }).status).toBe('clean')
     expect(runVerdict(record, { openPoints }).covers).toBe(true)
   })

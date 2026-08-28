@@ -168,6 +168,12 @@ export const MAX_RED_IDENTITIES = 500
 export const MAX_CAPTURE_CHARS = 4 * 1024 * 1024
 export const MAX_LINE_CHARS = 64 * 1024
 
+/** The newline `lines.join('\n')` will put BEFORE this line (review finding,
+ *  28.08.2026, round 17). The budget bounds the buffer the parser is handed, and
+ *  that buffer is the joined text — counting the line alone let a set of lines
+ *  each just under the ceiling exceed it by one character per line. */
+const separatorFor = (kept) => (kept > 0 ? 1 : 0)
+
 /** How much of an OVERLONG line is copied to decide what it is. Both probes —
  *  `KEPT_LINE` and `CRASH_LINE` — are anchored at the line's start, so this
  *  prefix answers them and the rest of the line is never materialised. */
@@ -305,7 +311,7 @@ export function tapOutput(state, streams = [[process.stdout, false], [process.st
     if (
       fresh.length > 0 &&
       (keptIds.size + keptRaw.size + fresh.length > MAX_RED_IDENTITIES ||
-        keptChars + line.length > MAX_CAPTURE_CHARS)
+        keptChars + line.length + separatorFor(state.lines.length) > MAX_CAPTURE_CHARS)
     ) {
       refuse()
       return
@@ -329,7 +335,7 @@ export function tapOutput(state, streams = [[process.stdout, false], [process.st
     if (fresh.length === 0) return
     if (parts === null) keptRaw.add(line)
     else for (const id of fresh) keptIds.add(id)
-    keptChars += line.length
+    keptChars += line.length + separatorFor(state.lines.length)
     state.lines.push(line)
   }
   /**
@@ -361,7 +367,16 @@ export function tapOutput(state, streams = [[process.stdout, false], [process.st
       const damaged = overlong.delete(stream)
       const segment = nl - from
       if (damaged || carry.length + segment > MAX_LINE_CHARS) {
-        const head = carry + chunk.slice(from, from + Math.min(segment, LINE_PROBE_CHARS))
+        // BOUNDED BY THE PROBE BUDGET, NOT BY THE CARRY (review finding,
+        // 28.08.2026, round 17). A pending line already at MAX_LINE_CHARS,
+        // completed by a later chunk, built a head of MAX_LINE_CHARS +
+        // LINE_PROBE_CHARS — past the very cap the branch exists to enforce.
+        // Both probes are anchored at the line's start, so the first
+        // LINE_PROBE_CHARS answer them and nothing beyond is ever copied.
+        const head =
+          carry.length >= LINE_PROBE_CHARS
+            ? carry.slice(0, LINE_PROBE_CHARS)
+            : carry + chunk.slice(from, from + Math.min(segment, LINE_PROBE_CHARS - carry.length))
         if (isErr && CRASH_LINE.test(head)) state.crashed = true
         if (KEPT_LINE.test(head)) refuse()
       } else {
@@ -583,16 +598,19 @@ export function armRunRecorder(backend) {
           // signed closure disposes of it, which is the whole way out a
           // truncated run has.
           //
-          // A GREEN RUN IS NOT ONE, AND SAYS SO ANYWAY (review finding,
-          // 28.08.2026, round 16). Only a RED run carries `truncated`, because a
-          // run that exited 0 records no reds at all: the lines it refused were
-          // never evidence the accounting reads, so nothing was lost and calling
-          // it incomplete would block a genuinely green run. But the refusal
-          // must not vanish either — that was the one place a drop went
-          // unrecorded — so the COUNT is written whatever the exit code, and it
-          // is the `truncated` field alone that the verdict turns on.
-          ...(armed.droppedLines > 0 ? { droppedLines: armed.droppedLines } : {}),
-          ...(exit !== 0 && armed.droppedLines > 0 ? { truncated: true } : {}),
+          // WHATEVER ITS EXIT CODE (review finding, 28.08.2026, round 17,
+          // overturning the round-16 carve-out). Round 16 exempted an exit-0 run
+          // on the argument that "the lines it refused were never evidence the
+          // accounting reads", and that argument is measurably false: `refuse()`
+          // is reached ONLY from a line matching `KEPT_LINE` — a suite's own
+          // `FAIL`, an `ERR:`, a `console errors:` summary. Chatter never
+          // reaches a budget at all, so a genuinely green run cannot be marked
+          // incomplete by this line: it prints no result line to drop. What the
+          // carve-out really exempted was the opposite case — a process that
+          // ended 0 while its output carried result lines nobody read — and
+          // that run then counted as picture COVERAGE, which is the worst thing
+          // an unread recording can be mistaken for.
+          ...(armed.droppedLines > 0 ? { droppedLines: armed.droppedLines, truncated: true } : {}),
         })
       } catch {
         /* never fail a suite over the bookkeeping */
