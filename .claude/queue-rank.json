@@ -960,6 +960,12 @@
       "why": "It is the measurement that decides where the context points go, and the points it would reorder sit far ahead of it — it moves when the user rules on that order.",
       "origin": "machine",
       "place": "last"
+    },
+    "998": {
+      "at": "2026-08-28T18:21:01.392Z",
+      "why": "It blocks the turn end of a landed point, so it stands where the machine filed it only until the user moves it forward.",
+      "origin": "machine",
+      "place": "last"
     }
   },
   "boundary": {
@@ -998,7 +1004,7 @@
     "why": "The order standing in front of the release today is the arrangement that predates this rule; the four machine-filed points that had ranked themselves there were moved behind 174 first"
   },
   "settled": {
-    "at": "2026-08-28T17:49:08.768Z",
+    "at": "2026-08-28T18:21:01.400Z",
     "points": [
       174,
       184,
@@ -1329,7 +1335,8 @@
       994,
       995,
       996,
-      997
+      997,
+      998
     ]
   }
 }

@@ -13260,3 +13260,31 @@ to land than a mechanism that needs a review.
   Criticality: medium — it decides where a large share of the account's spend goes, and the current
   order rests on readings a cross-vendor audit refuted.
   Bundle: Session- & Repo-Hygiene.
+- [ ] 998. The mechanism gate bills a merged contribution PER COMMIT, so a long branch owes
+  hundreds of review calls for work already reviewed at its end state. MEASURED 28.08.2026 after
+  point 734 landed: `mechanism-review-guard` names 59 contribution commits, each split into 7
+  passes over the file set, each missing 5 — roughly 295 review runs. The same nine files had just
+  been reviewed FOURTEEN times at successive end states, and once more as a whole-range round over
+  `395be985^1..3d9f4b16` whose seven passes are on record with two clean verdicts. None of that
+  clears a single contribution, because the guard binds a pass to the commit boundary it was
+  recorded at ("the contribution keeps its own immutable commit boundary").
+  WHY THE PER-COMMIT READING IS WRONG HERE: `review-sol.mjs` itself drops intermediate states — it
+  reported 34 superseded states of one file inside this range and reviews "the current file once",
+  because a commit ships the CURRENT content of the files it touches. The guard asks for exactly
+  what the planner refuses to spend a round on. So the two halves of one mechanism disagree about
+  what a review covers, and the disagreement only bites on a branch long enough that nobody can
+  pay it.
+  WHAT IT COSTS: a point that is merged, ticked and green cannot end its session — the gate blocks
+  the turn end, and the only routes left are a hand-recorded receipt or leaving the batch standing.
+  It is the same family as points 856, 870 and 983, which each found the planner and the guard
+  reading one question differently.
+  FINAL STATE: a contribution is cleared by a pass that covers its files at ANY end state in the
+  range that contains it, which is what the planner already computes — or, if the per-commit
+  boundary is kept deliberately, the guard says so where it is set, and the planner offers a
+  bounded route that a session can actually run for a range of this size.
+  VERIFIABLE: Vitest over the guard's clearing rule — a whole-range pass record covering a file
+  clears every contribution in that range that touches only cleared files, and a contribution
+  touching a file no pass covered stays owed; plus the point-734 range as a fixture.
+  Criticality: high — it blocks the turn end of a landed point, which is the state the batch cannot
+  leave on its own.
+  Bundle: Session- & Repo-Hygiene.
