@@ -44,7 +44,10 @@ export const UNBUNDLED_MARKER = '**Not bundled**'
  * is allow.
  */
 const MONTH = String.raw`Januar|Februar|März|Maerz|April|Mai|Juni|Juli|August|September|Oktober|November|Dezember|January|February|March|May|June|July|October|December`
-const MONTH_YEAR = new RegExp(String.raw`\b(?:\d{1,2}\.?\s+)?(?:${MONTH})\s+\d{4}\b`, 'g')
+// The optional leading day is bounded to a REAL day (1-31), so an arbitrary
+// number in front of a month name is not swallowed as one.
+const DAY = String.raw`(?:0?[1-9]|[12]\d|3[01])`
+const MONTH_YEAR = new RegExp(String.raw`\b(?:${DAY}\.?\s+)?(?:${MONTH})\s+\d{4}\b`, 'g')
 
 const stripDates = (s) => String(s ?? '')
   .replace(/\b\d{1,2}\.\d{1,2}\.\d{4}\b/g, ' ')
