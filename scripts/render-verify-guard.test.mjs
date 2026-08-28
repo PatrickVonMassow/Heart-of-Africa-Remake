@@ -606,6 +606,58 @@ describe('render-verify-guard --status — what it prints about a run it cannot 
   // on an exit-0 run — the shape point 734 itself introduced. Nothing drove the
   // real `--incomplete` command with it, so an unclosable current-shape record
   // would have passed this suite in silence.
+  // AND THE GUARDING DECISION ITSELF, not only what --status prints about it
+  // (review finding, 28.08.2026, round 25). The sign-off cases drove --status
+  // and --incomplete; neither is the command that BLOCKS, so "never reads as a
+  // pass" was a claim no case here had tested. This runs the real no-option
+  // guard on a real pending render change with a current-shape exit-0 record
+  // that asserted its backend — the shape closest to a pass there is.
+  it('BLOCKS through the real no-option guard on a current-shape exit-0 truncation', () => {
+    const now = Date.now()
+    const root = mkdtempSync(join(tmpdir(), 'hoa-render-block-'))
+    try {
+      execFileSync('git', ['init', '-q', '-b', 'main'], { cwd: root, windowsHide: true })
+      execFileSync('git', ['-c', 'user.email=t@t', '-c', 'user.name=t', 'commit', '-q', '--allow-empty', '-m', 'root'], { cwd: root, windowsHide: true })
+      const cleared = execFileSync('git', ['rev-parse', 'HEAD'], { cwd: root, encoding: 'utf8', windowsHide: true }).trim()
+      mkdirSync(join(root, 'src', 'scenes'), { recursive: true })
+      writeFileSync(join(root, 'src', 'scenes', 'water.ts'), 'export const rim = 1\n')
+      execFileSync('git', ['add', '-A'], { cwd: root, windowsHide: true })
+      execFileSync('git', ['-c', 'user.email=t@t', '-c', 'user.name=t', 'commit', '-q', '-m', 'a render change'], { cwd: root, windowsHide: true })
+      mkdirSync(join(root, '.claude'), { recursive: true })
+      writeFileSync(
+        join(root, '.claude', 'render-verify-state.json'),
+        JSON.stringify({
+          clearedHeads: { main: cleared },
+          runs: [
+            // Everything a covering run has — exit 0, the backend asserted,
+            // screenshots — except a complete recording. Both are stamped after
+            // the render edit, so WebGL 2 really covers and the block is about
+            // this one record rather than about a missing run.
+            { backend: 'webgpu', suite: 'settings', at: now, exit: 0, asserted: true, screenshotCount: 9, truncated: true, droppedLines: 115 },
+            { backend: 'webgl', suite: 'settings', at: now + 1000, exit: 0, asserted: true, screenshotCount: 9 },
+          ],
+        }),
+      )
+      const out = execFileSync(process.execPath, [GUARD], {
+        cwd: root,
+        env: { ...process.env, HOA_REPO_ROOT: root },
+        encoding: 'utf8',
+        input: '{}',
+        windowsHide: true,
+      })
+      const decision = JSON.parse(out)
+      expect(decision.decision).toBe('block')
+      // It blocks on the WEBGPU backend, whose only run lost output — and names
+      // the record as what it is rather than as a red to hunt.
+      expect(decision.reason).toMatch(/NOT VERIFIED ON WEBGPU/)
+      expect(decision.reason).toMatch(/INCOMPLETE RECORDING — NOT AN UNEXPLAINED RED/)
+      expect(decision.reason).toMatch(/115 line\(s\) dropped/)
+      expect(decision.reason).toMatch(/never counted as a green/)
+    } finally {
+      rmSync(root, { recursive: true, force: true })
+    }
+  })
+
   it('signs off a CURRENT-SHAPE exit-0 truncation through the real --incomplete command', () => {
     const record = { backend: 'webgpu', suite: 'settings', at: 1500, exit: 0, truncated: true, droppedLines: 115 }
     const [before, signed, after] = runCli({ runs: [record] }, [

@@ -17,7 +17,7 @@ import { DECODE_WINDOW_BYTES, MAX_CAPTURE_CHARS, MAX_LINE_CHARS, MAX_RED_IDENTIT
  *  a fresh red identity every time it prints, and no parser can fold it. */
 const tag = (i) => String(i).replace(/\d/g, (d) => 'abcdefghij'[Number(d)])
 import { consoleErrorChecks, failedChecks, parseCheckLines } from './verify/baseline-classify-core.mjs'
-import { RETRY_ENV, chargeFor, chargeReds, droppedLinesOf, formatSuspectEnv, isIncompleteRecording, markVariedDetails, runVerdict } from './render-verify-core.mjs'
+import { RETRY_ENV, chargeFor, chargeReds, droppedLinesOf, formatSuspectEnv, isIncompleteRecording, markVariedDetails, runIdentity, runVerdict, unexplainedRuns } from './render-verify-core.mjs'
 
 // The record is stubbed, not written: these cases exercise the REAL arming and
 // the REAL exit handler, and a test must never append to the checkout's own
@@ -1073,6 +1073,37 @@ describe('the armed recorder — the REAL wiring, not a stand-in', () => {
     expect(record.reds[0].detailVaried).toBe(true)
     expect(record.reds[0].point).toBeNull()
     expect(runVerdict(record, { openPoints: [694] }).status).toBe('red')
+  })
+
+  // AND IT KEEPS WHAT IT DID RECORD (review finding, 28.08.2026, round 25). A
+  // budget-hit run that still exited 0 kept only the truncation fields, so once
+  // its lost part was signed off the reds it DID capture were gone —
+  // unchargeable, unfileable, blocking nothing.
+  it('keeps the reds an exit-0 truncation captured, so the signed-off run still owes them', async () => {
+    const run = await armed('polish', 'compatibility')
+    process.stdout.write('ERR: a console error the suite tolerated\n')
+    for (let i = 0; i < MAX_RED_IDENTITIES + 7; i++) {
+      process.stdout.write(`ERR: page error in span ${tag(i)}\n`)
+    }
+    const record = run.exit(0)
+    expect(record.truncated).toBe(true)
+    expect(record.reds.length).toBe(MAX_RED_IDENTITIES)
+    expect(record.reds.map((r) => r.name)).toContain('console error: a console error the suite tolerated')
+    // Signed off as an incomplete recording, the run is judged by what it still
+    // holds — through the route that really judges it, not by stripping the
+    // fields — and every one of those reds is unowned, so it keeps blocking.
+    const closure = {
+      run: runIdentity(record),
+      backend: record.backend,
+      suite: record.suite,
+      at: record.at ?? null,
+      droppedLines: record.droppedLines,
+      evidence: 'local/verify-logs/ holds the whole run; the flood was the dev server',
+    }
+    const open = unexplainedRuns([record], 0, { openPoints: [642], incompleteClosures: [closure] })
+    expect(open).toHaveLength(1)
+    expect(open[0].status).toBe('red')
+    expect(open[0].reds.length).toBeGreaterThan(1)
   })
 
   // And the other half of that rule, unchanged: a genuinely green run prints no

@@ -2899,9 +2899,14 @@ describe('the shipped charge ledger', () => {
   it('charges the MSAA checks only where their name BEGINS, not wherever it appears', () => {
     const scoped = { suite: 'settings', backend: 'webgpu', kind: 'check', featureLevel: 'compatibility' }
     expect(chargeFor(red('Graphics levels: no new console errors across the F9 cycle'), scoped).point).toBe(514)
-    // The same words inside a different check are a red nobody measured.
+    // The same words inside a different check are a red nobody measured…
     expect(chargeFor(red('the settings panel restores Graphics levels after a reload'), scoped)).toBeNull()
     expect(chargeFor(red('a later check mentioning F9 low in passing'), scoped)).toBeNull()
+    // …and so is a future check that merely BEGINS with the same words (review
+    // finding, 28.08.2026, round 25): the measured labels carry a colon, and
+    // anchoring at the first words alone would have charged these.
+    expect(chargeFor(red('Graphics levels and their labels survive a reload'), scoped)).toBeNull()
+    expect(chargeFor(red('F9 low power mode is offered on this adapter'), scoped)).toBeNull()
   })
 
   // AND A NARROW HALF IS COUPLED TO THE ALTERNATIVE IT BELONGS TO (review
@@ -2977,6 +2982,21 @@ describe('the shipped charge ledger', () => {
     )
     expect(chargeFor(measured, scoped).point).toBe(939)
     expect(chargeFor(red('console error: the bundler logged Outdated Optimize Dep while idle', null, 'console'), scoped)).toBeNull()
+  })
+
+  // AND THE FALLS FRAME IS NARROWED TO THE FAILURE MODE ITS EVIDENCE NAMES
+  // (review finding, 28.08.2026, round 25). It accounts for no recorded red
+  // today, so reading the detail costs nothing — unlike the three entries point
+  // 995 owns, where it would withdraw a standing charge.
+  it('charges the falls frame only for the failure its evidence measured', () => {
+    const scoped = { suite: 'world', backend: 'webgpu', kind: 'check', featureLevel: 'compatibility' }
+    const measured = {
+      ...red('frame 15-worldmodel-victoria-falls'),
+      detail: 'its subject is not in the rendered picture: off the left and bottom edge of the frame',
+    }
+    expect(chargeFor(measured, scoped).point).toBe(627)
+    const different = { ...red('frame 15-worldmodel-victoria-falls'), detail: 'the frame is a solid black plate' }
+    expect(chargeFor(different, scoped)).toBeNull()
   })
 
   it('charges the fixed render-target leak to NOBODY — a mended red is a red again', () => {

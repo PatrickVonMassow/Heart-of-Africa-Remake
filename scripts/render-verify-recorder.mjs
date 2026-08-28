@@ -654,8 +654,18 @@ export function armRunRecorder(backend) {
         // it is charged HERE, at record time, against the ledger as it stood
         // when the run happened. A later ledger edit therefore cannot bless a
         // run after the fact — it takes a fresh run, which is the point.
+        // PARSED FOR A RUN THAT LOST OUTPUT TOO, not only for a failing one
+        // (review finding, 28.08.2026, round 25). A run that hit a budget and
+        // still exited 0 has result lines in the buffer, and skipping the parse
+        // threw them away before the record was written — so the reds it DID
+        // capture could never be charged, filed or blocked on afterwards, which
+        // is the half-recording this point forbids through the other door.
+        //
+        // An ordinary exit-0 run is untouched: it dropped nothing, so nothing in
+        // it went unread, and reading its tolerated console lines as reds would
+        // redden every run the suite itself passed.
         let reds = []
-        if (exit !== 0) {
+        if (exit !== 0 || armed.droppedLines > 0) {
           try {
             const output = armed.lines.join('\n')
             // The keys the TAP saw print two different measurements — the buffer
@@ -694,7 +704,19 @@ export function armRunRecorder(backend) {
           // so this list is the run's red SET — never its chatter. A cap that
           // silently discarded observed reds is the half-recording the point
           // forbids; the ceiling below says so out loud instead.
-          ...(exit !== 0 ? { reds, crashed: armed.crashed } : {}),
+          // EVERY RED A LOST RECORDING KEPT, whatever its exit code (review
+          // finding, 28.08.2026, round 25). A budget-hit run that still exited 0
+          // wrote only `truncated`/`droppedLines`, so once its lost part was
+          // signed off the reds it DID capture were gone — unchargeable,
+          // unfileable, blocking nothing. An ordinary exit-0 run reaches this
+          // line with an empty list and is written exactly as before.
+          //
+          // `crashed` still travels only with a non-zero exit. A record that
+          // reached CRASH_LINE while its process ended 0 is POINT 993, which
+          // owns that reading; changing it here would answer a different point
+          // in this one's commit.
+          ...(reds.length > 0 ? { reds } : {}),
+          ...(exit !== 0 ? { crashed: armed.crashed } : {}),
           // A RUN THAT HIT A BUDGET IS AN INCOMPLETE RECORDING, and says how
           // much it refused — `runVerdict` then answers `incomplete` and the
           // signed closure disposes of it, which is the whole way out a

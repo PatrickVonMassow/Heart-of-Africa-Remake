@@ -235,7 +235,7 @@ export const RED_CHARGES = [
     // before the change: no red in the recorded window matches this pattern at
     // all, so nothing accounted for today stops being.
     match:
-      /^(TRAA (off again|toggle stress)|F9 low|Graphics levels|the leak block produced no OTHER|first-person ground shows micro-detail)/i,
+      /^(TRAA (off again|toggle stress):|F9 low:|Graphics levels:|the leak block produced no OTHER|first-person ground shows micro-detail)/i,
   },
   {
     point: 514,
@@ -453,6 +453,14 @@ export const RED_CHARGES = [
     featureLevel: 'compatibility',
     kind: 'check',
     match: /^frame 15-worldmodel-victoria-falls\b/i,
+    // NARROWED TO THE MEASURED FAILURE MODE (review finding, 28.08.2026, round
+    // 25). Its evidence covers one way this frame reds — the subject missing
+    // from the rendered picture — and unlike the three entries point 995 owns,
+    // this one accounts for no recorded red today, so reading the detail costs
+    // nothing and a different failure of the same frame stays a real red. A
+    // record written before the detail was kept carries none and is out of
+    // reach, which is the honest answer and not a charge.
+    detailMatch: /subject is not in the rendered picture/i,
     why:
       'Measured 11.08.2026 on main at 3f639f0d: the falls frame reds as "subject not in the ' +
       'rendered picture", twice including the suite own retry, while the six other landmark ' +
@@ -561,7 +569,7 @@ export const RED_CHARGES = [
       'webgpu/settings entries above and for the same reason: the evidence names a lane fault, so ' +
       'unscoped this entry would retroactively excuse the same frame on the CORE adapter the player ' +
       'runs, where it stays a real red. The narrowing changes no evidence — the 17.08.2026 08:25 ' +
-      'record was re-read that day and carries featureLevel=compatibility.' +
+      'record was re-read that day and carries featureLevel=compatibility. ' +
       'AND THE FAILURE MODE STAYS UNNARROWED for the reason the point-627 entry above states in ' +
       'full (cross-vendor review, 28.08.2026, round 22): the reds this entry accounts for were ' +
       'recorded before the record kept a detail and carry none, so the narrow half would ' +
