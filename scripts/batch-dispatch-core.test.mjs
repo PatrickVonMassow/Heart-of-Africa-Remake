@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { authorizeQueue, dispatchDecision, updateReasonInterval } from './batch-dispatch-core.mjs'
+import { authorizeQueue, dispatchDecision, dispatchMetricEvents, openReasonIntervalFromEvents, updateReasonInterval } from './batch-dispatch-core.mjs'
 
 const sha = 'a'.repeat(40)
 const job = (point, dependencies = [], extra = {}) => ({
@@ -49,5 +49,25 @@ describe('bounded authorized dispatch', () => {
     const closed = updateReasonInterval({ open: repeated.open, decision: { underutilized: false }, at: 250 })
     expect(closed.closed.durationMs).toBe(150)
     expect(closed.open).toBeNull()
+  })
+
+  it('journals one open reason, measures its elapsed utilization, and closes it on recovery', () => {
+    const pressured = dispatchDecision({ queue: [job(1), job(2), job(3)], resources: { ok: false } })
+    const first = dispatchMetricEvents({ decision: pressured, at: 100 })
+    expect(first.events.filter((event) => event.kind === 'dispatch-reason')).toEqual([
+      expect.objectContaining({ phase: 'open', reasonCode: 'resource-headroom', startedAt: 100 }),
+    ])
+    const second = dispatchMetricEvents({ events: first.events, decision: pressured, at: 175 })
+    expect(second.events.filter((event) => event.kind === 'dispatch-reason')).toEqual([])
+    expect(second.events).toContainEqual(expect.objectContaining({
+      kind: 'lane-utilization', startedAt: 100, endedAt: 175, eligibleLanes: 3, runningLanes: 0, reasonCode: 'resource-headroom',
+    }))
+    const history = [...first.events, ...second.events]
+    expect(openReasonIntervalFromEvents(history)).toMatchObject({ reasonCode: 'resource-headroom', startedAt: 100 })
+    const recovered = dispatchMetricEvents({ events: history, decision: dispatchDecision({ queue: [job(1), job(2), job(3)] }), at: 250 })
+    expect(recovered.events.filter((event) => event.kind === 'dispatch-reason')).toEqual([
+      expect.objectContaining({ phase: 'closed', startedAt: 100, endedAt: 250, durationMs: 150 }),
+    ])
+    expect(openReasonIntervalFromEvents([...history, ...recovered.events])).toBeNull()
   })
 })
