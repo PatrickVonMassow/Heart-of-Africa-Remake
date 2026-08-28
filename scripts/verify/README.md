@@ -1250,7 +1250,7 @@ than reported — `uncaughtExceptionMonitor` catches that, because node prints a
 uncaught exception straight to fd 2 where no tapped stream write can see it.
 `--defer` stays for what genuinely cannot be judged headless.
 
-### Red lines are NEVER dropped — the cap is gone (point 734)
+### A red line is never dropped quietly — the cap is a stated budget (point 734)
 
 The recorder used to cap its capture at 400 result lines and its record at 60
 reds. A run past either cap was HALF-RECORDED — a fragment of its red set plus
@@ -1330,7 +1330,10 @@ repeating ONE error a million times brings a single identity, so it fit — and
 the retained string then grew with the page's output rather than with its red
 set, which is the exhausted process the ceiling exists to prevent. Two more
 budgets sit beside it and are refused the same loud way: `MAX_CAPTURE_CHARS`
-(4 MB of kept text in total) and `MAX_LINE_CHARS` (64 KB for one line, which
+(4 Mi CHARACTERS of kept text in total — code units, not bytes: the same text
+is larger in memory as UTF-16 and larger again on disk as UTF-8, so this bounds
+what the tap RETAINS rather than promising a megabyte figure) and
+`MAX_LINE_CHARS` (64 Ki characters for one line, which
 also caps the tap's partial-line buffer — a line whose middle had to be dropped
 is refused when its newline arrives, never parsed as a stump). The identity
 ceiling and the total budget are asked only of a line that would be KEPT: one

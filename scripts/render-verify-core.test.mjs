@@ -1385,11 +1385,21 @@ describe('an INCOMPLETE RECORDING is its own class, and has its own way out (poi
   /** The synthetic entry the recorder unshifts for the lines the cap ate, in the
    *  kind no charge may name. */
   const truncationNow = truncationMarker(115, TRUNCATED_KIND)
-  /** EXACTLY what the recorder writes today: the field, the count, the synthetic
-   *  entry FIRST and the reds that DID fit in the buffer behind it. Built this
-   *  way since the review of 19.08.2026 — the fixture carried the field alone, so
-   *  no case drove a production-shaped record through a closure or a re-run. */
+  /** EXACTLY what the recorder writes today: the FIELDS, and behind them the
+   *  reds that did fit in the buffer. No synthetic entry — the recorder stopped
+   *  writing one when the truncation became a field, and a fixture that keeps
+   *  it cannot show whether the logic still leans on the marker (review finding,
+   *  28.08.2026, round 15; the doc here claimed the current shape while building
+   *  the old one). The two marker shapes keep their own fixtures below. */
   const truncatedNow = (backend, at, observed = [red('a check that DID fit in the buffer')], overrides = {}) =>
+    redRun(backend, at, [...observed], {
+      truncated: true,
+      droppedLines: 115,
+      ...overrides,
+    })
+  /** The intermediate shape: the field AND the synthetic entry in the kind no
+   *  charge may name. Kept because `isTruncationEntry` still recognises it. */
+  const truncatedWithMarker = (backend, at, observed = [red('a check that DID fit in the buffer')], overrides = {}) =>
     redRun(backend, at, [truncationNow, ...observed], {
       truncated: true,
       droppedLines: 115,
@@ -1411,8 +1421,18 @@ describe('an INCOMPLETE RECORDING is its own class, and has its own way out (poi
     evidence,
   })
 
-  it('recognises both record shapes, and reads how much was lost', () => {
+  it('recognises every record shape, and reads how much was lost', () => {
     expect(isIncompleteRecording(truncatedNow('webgpu', 1500))).toBe(true)
+    // The intermediate shape — field AND synthetic entry — and the legacy one,
+    // which carries the entry alone. Both are still on file.
+    expect(isIncompleteRecording(truncatedWithMarker('webgpu', 1500))).toBe(true)
+    expect(droppedLinesOf(truncatedWithMarker('webgpu', 1500))).toBe(115)
+    // It blocks as an incomplete recording, and the marker itself is never a
+    // red anybody has to explain — signed off, only the observed red is left.
+    const withMarker = truncatedWithMarker('webgpu', 1500)
+    expect(unexplainedRuns([withMarker], 1000, { openPoints })[0].status).toBe('incomplete')
+    const closed = unexplainedRuns([withMarker], 1000, { openPoints, incompleteClosures: [closureOf(withMarker)] })
+    expect(closed[0].reds).toEqual(['a check that DID fit in the buffer'])
     expect(isIncompleteRecording(truncatedLegacy('webgpu', 1500))).toBe(true)
     expect(isIncompleteRecording(redRun('webgpu', 1500, [red('an ordinary red')]))).toBe(false)
     expect(droppedLinesOf(truncatedNow('webgpu', 1500))).toBe(115)
