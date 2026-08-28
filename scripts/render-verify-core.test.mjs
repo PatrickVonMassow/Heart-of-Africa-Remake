@@ -1212,6 +1212,28 @@ describe('an INCOMPLETE RECORDING is its own class, and has its own way out (poi
     expect(droppedLinesOf(run('webgpu', 1500))).toBe(0)
   })
 
+  // THE MARKER IS A SHAPE, NOT A KEY (review finding, 28.08.2026). `checkKey`
+  // lowercases and collapses a printed label, so the stable key
+  // `capture-truncated` is an identity a real check can parse to — and a red
+  // wearing it was dropped from the residual and closed by an incomplete
+  // signature, i.e. laundered by the next sign-off. Only the marker's own name
+  // form counts with that key.
+  it('refuses an OBSERVED red that merely parses to the marker\'s key', () => {
+    const impostor = { name: 'capture truncated', key: 'capture-truncated', kind: 'check', point: null }
+    const observed = redRun('webgpu', 1500, [impostor])
+    expect(isIncompleteRecording(observed)).toBe(false)
+    expect(runVerdict(observed, { openPoints }).status).toBe('red')
+    // It blocks as the red it is, and no incomplete signature reaches it.
+    const found = unexplainedRuns([observed], 1000, {
+      openPoints,
+      incompleteClosures: [closureOf(observed)],
+    })
+    expect(found.map((u) => u.status)).toEqual(['red'])
+    expect(found[0].reds).toEqual(['capture truncated'])
+    // The real marker — the recorder's own name form — is unaffected.
+    expect(isIncompleteRecording(truncatedLegacy('webgpu', 1500))).toBe(true)
+  })
+
   it('classifies a capped run as INCOMPLETE, never as an unexplained red', () => {
     for (const r of [truncatedNow('webgpu', 1500), truncatedLegacy('webgpu', 1500)]) {
       const verdict = runVerdict(r, { openPoints })

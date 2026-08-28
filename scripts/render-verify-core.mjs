@@ -516,10 +516,28 @@ export function isIncompleteRecording(run) {
   return reds.some(isTruncationEntry)
 }
 
-/** The synthetic entry that STANDS FOR the lines the cap ate — not a red anybody
- *  observed, and the one entry a sign-off closes. */
+/** The name form the recorder gave that entry, and nothing else did. */
+const TRUNCATION_NAME = /^\d+\s+further result line\(s\) exceeded the capture cap\b/
+
+/**
+ * The synthetic entry that STANDS FOR the lines the cap ate — not a red anybody
+ * observed, and the one entry a sign-off closes.
+ *
+ * THE LEGACY KEY IS NOT ENOUGH ON ITS OWN (review finding, 28.08.2026).
+ * `capture-truncated` is an identity the PARSER CAN REACH: `checkKey` lowercases
+ * and collapses a printed check label, so a suite printing `FAIL  Capture
+ * truncated` — or anything else keying to that text — would hand a genuinely
+ * observed red the marker's identity. Such a red is dropped from the residual
+ * and closed by an incomplete signature, i.e. laundered by the next
+ * re-recording or sign-off. So the legacy key counts only together with the
+ * marker's OWN name form, which the recorder wrote and a check label does not
+ * have. The `truncated` KIND needs no such guard: it sits outside the two kinds
+ * a record may store (`chargeReds` writes 'check' or 'console'), so nothing a
+ * parse produces can carry it. Total.
+ */
 function isTruncationEntry(red) {
-  return red?.key === 'capture-truncated' || red?.kind === TRUNCATED_KIND
+  if (red?.kind === TRUNCATED_KIND) return true
+  return red?.key === 'capture-truncated' && TRUNCATION_NAME.test(text(red?.name))
 }
 
 /**
