@@ -395,6 +395,26 @@ function signedClosureDraft(state, options, family) {
   // written twice, about which nobody could say two different things, and one
   // disposition is the honest answer rather than a demand for two identical
   // sentences. Pinned in render-verify-guard.test.mjs.
+  //
+  // DECIDED, NOT ARGUED (review finding, 28.08.2026, which refused the argument
+  // above and asked for a mechanism). The mechanism that would decide it is a
+  // unique id WRITTEN AT RECORD TIME; it is not adopted here, for three
+  // measured reasons, and the residual is named rather than hidden:
+  //   - it reaches no record already on disk, so the content reading would have
+  //     to stay as the fallback — and TWO identities for one run is exactly the
+  //     defect the round-5 review fixed, where a signature closed a record the
+  //     other reading did not name;
+  //   - the two families this draft serves (a crash, a lost recording) are
+  //     legacy classes: no run recorded since the capture cap was removed can
+  //     be an incomplete recording at all;
+  //   - and the collision costs no coverage in either direction — a signature
+  //     never makes a run cover a backend, so the worst case is one evidence
+  //     sentence disposing of two byte-identical records of the same
+  //     measurement.
+  // WHAT REMAINS TRUE, PLAINLY: two runs that really happened, in the same
+  // millisecond on both stamps and identical in every other field, are one
+  // identity here, and one signature closes both. Filed as its own point rather
+  // than settled by this comment.
   const distinct = new Set(open.map((r) => runIdentity(r)))
   if (distinct.size > 1) {
     return {
