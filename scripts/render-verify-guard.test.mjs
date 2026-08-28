@@ -526,14 +526,15 @@ describe('render-verify-guard --status — what it prints about a run it cannot 
   const inTempRepo = (state) => {
     const root = mkdtempSync(join(tmpdir(), 'hoa-render-status-'))
     try {
-      execFileSync('git', ['init', '-q', '-b', 'main'], { cwd: root })
-      execFileSync('git', ['-c', 'user.email=t@t', '-c', 'user.name=t', 'commit', '-q', '--allow-empty', '-m', 'root'], { cwd: root })
+      execFileSync('git', ['init', '-q', '-b', 'main'], { cwd: root, windowsHide: true })
+      execFileSync('git', ['-c', 'user.email=t@t', '-c', 'user.name=t', 'commit', '-q', '--allow-empty', '-m', 'root'], { cwd: root, windowsHide: true })
       mkdirSync(join(root, '.claude'), { recursive: true })
       writeFileSync(join(root, '.claude', 'render-verify-state.json'), JSON.stringify(state))
       return execFileSync(process.execPath, [GUARD, '--status'], {
         cwd: root,
         env: { ...process.env, HOA_REPO_ROOT: root },
         encoding: 'utf8',
+        windowsHide: true,
       })
     } finally {
       rmSync(root, { recursive: true, force: true })
