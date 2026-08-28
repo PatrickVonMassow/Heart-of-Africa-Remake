@@ -786,6 +786,21 @@ describe('render-verify-guard --status — what it prints about a run it cannot 
     expect(out).not.toMatch(/BLOCKING NOW/)
   })
 
+  // A CRASH IS NEVER "ALREADY ANSWERED" (review finding, 28.08.2026, round 21).
+  // A lost MEASUREMENT is answered by taking it again; a crash is not, and the
+  // guard says so in the paragraph directly above — "a re-run judges the picture
+  // but does NOT remove this record".
+  it('never calls a crashed record answered by a later covering run', () => {
+    const out = inTempRepo({
+      runs: [
+        { backend: 'webgpu', suite: 'startup', at: 1500, exit: 1, crashed: true, reds: [] },
+        { backend: 'webgpu', suite: 'startup', at: 1600, exit: 0, asserted: true },
+      ],
+    })
+    expect(out).toMatch(/CRASHED RUN \(not an unexplained red\)/)
+    expect(out).not.toMatch(/already answered by the later covering/)
+  })
+
   it('falls back to startedAt where only that was measured', () => {
     const out = inTempRepo({
       runs: [{ backend: 'webgpu', suite: 'settings', startedAt: 1500, exit: 1, reds: [marker] }],

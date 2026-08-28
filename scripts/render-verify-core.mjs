@@ -1428,6 +1428,15 @@ function redKeyOf(red) {
   // ONE red: the first attempt's stored key and the marker's derived key are the
   // same string, so the pair is still one failure and not two.
   const key = text(red?.key) || derivedRedKey(text(red?.name))
+  // AND THE DETAIL IS DELIBERATELY OUT OF IT (review finding, 28.08.2026, round
+  // 21, which read its absence as collapsing two different failures into one).
+  // Within ONE record a kind+key appears exactly once — the tap keeps one line
+  // per identity and marks a second, different reading with `detailVaried` — so
+  // there is nothing to collapse there. ACROSS records, the same check failing
+  // twice with two measurements is one failure the list names once, and that is
+  // the very collapse the retry pair needs: the marker naming a first attempt
+  // carries no detail at all, so a detail in the key would report every real
+  // retry as two waved reds instead of one.
   return `${kind}|${key}|${text(red?.name)}`
 }
 

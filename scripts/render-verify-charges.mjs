@@ -217,6 +217,12 @@ export const RED_CHARGES = [
       'Backend-scoped and suite-scoped on purpose: on WebGL 2 each of these stays a real red, and ' +
       'the charge dies with point 514, which must decide whether the lane records these as ' +
       'UNAVAILABLE rather than red. ' +
+      'AND WHAT IT STILL CANNOT ASK, NAMED BY ITS OWNER (cross-vendor review, 28.08.2026, round ' +
+      '21): the entry excuses these six CHECKS on the measured lane without being able to verify ' +
+      'that the MSAA cascade is what reddened them, because a charge reads ONE red and never the ' +
+      'run around it. That is POINT 990, which owns giving a charge a reading of the whole ' +
+      'record; until it lands, suite, backend, level and kind are the whole of this scope, and ' +
+      'the charge dies with point 514 in any case. ' +
       'KIND-SCOPED 28.08.2026 (cross-vendor review): every name this entry lists is a CHECK the ' +
       'suite prints, the console side of the same cascade has its own entry below with its own ' +
       'signature, and unscoped this one would have excused a console red carrying one of these ' +
@@ -293,7 +299,10 @@ export const RED_CHARGES = [
     // form, never the async-pipeline one), so a downstream sentence from any
     // other object stays a real red. Verifying the root in the record needs a
     // charge that can read the whole run, which this mechanism does not have;
-    // that is filed as its own point rather than argued away here.
+    // that is POINT 990, which owns it, rather than something argued away here.
+    // Round 21 raised the same reading again: until 990 lands, suite, backend,
+    // the compatibility level, the console kind and the measured sentence are
+    // the whole of this scope, and the charge dies with point 514 in any case.
     //
     // `Async render pipeline creation failed` is dropped outright: point 734
     // records that it has NO owning point in the work order and must be given

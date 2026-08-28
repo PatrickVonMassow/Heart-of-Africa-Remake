@@ -27,15 +27,24 @@ vi.mock('./render-verify-state.mjs', () => ({
   recordRun: (run) => recorded.push(run),
 }))
 
-// The armed cases drive the REAL tap on process.stdout, so the pre-test write is
-// saved and restored: a test must neither print a suite's fake output into the
-// run log nor leave a wrapper behind for the next one.
+// The armed cases drive the REAL tap, so the pre-test writes are saved and
+// restored: a test must neither print a suite's fake output into the run log nor
+// leave a wrapper behind for the next one.
+//
+// BOTH STREAMS (review finding, 28.08.2026, round 21). `armRunRecorder` wraps
+// stderr as well, and only stdout was put back — so every armed case left its
+// stderr tap installed and the next one wrote its crash lines into a stale
+// recorder instance, which is the opposite of the fresh real wiring these cases
+// claim.
 let stdoutWrite = null
+let stderrWrite = null
 beforeEach(() => {
   stdoutWrite = process.stdout.write
+  stderrWrite = process.stderr.write
 })
 afterEach(() => {
   process.stdout.write = stdoutWrite
+  process.stderr.write = stderrWrite
 })
 
 /** Arm a FRESH recorder instance (the module keeps one armed run per process)

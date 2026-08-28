@@ -811,7 +811,13 @@ if (arg === 'status' || arg === '--status') {
       // A RECORD WHOSE LOST MEASUREMENT WAS RETAKEN IS ANSWERED, not merely old
       // (round 19), and that is true of the record whatever the gate is doing —
       // so it is said before the gate's own two reasons.
-      const retaken = reRecordedBy(state, r, { openPoints })
+      //
+      // OF A TRUNCATION ONLY (review finding, 28.08.2026, round 21). A lost
+      // MEASUREMENT is answered by taking it again; a CRASH is not, and the
+      // guard says so everywhere else — "a re-run judges the picture but does
+      // NOT remove this record". Reading the same sentence over a crashed record
+      // contradicted the paragraph directly above it.
+      const retaken = r?.crashed === true ? null : reRecordedBy(state, r, { openPoints })
       if (retaken) {
         return `already answered by the later covering ${retaken.suite} run @${isoText(runStamp(retaken) ?? retaken.at)} — signing it changes nothing`
       }
