@@ -1413,7 +1413,7 @@ keinen Träger hat. Gebucht als Punkt 956.
 
 ## Anhang A — Maschinell gepflegte Quellen-Übersicht
 
-Zuletzt aktualisiert: Freitag, 28.08.2026, 22:44 · Quellen-Fingerprint: `3ab91a86555f…`
+Zuletzt aktualisiert: Samstag, 29.08.2026, 00:16 · Quellen-Fingerprint: `7eab817803cc…`
 
 Spalten heuristisch aus den Quellen abgeleitet (Anläufe = distinkte Datumsnennungen im Memory;
 Maßnahme = Guard-Skripte mit Namens-Treffer). Die inhaltliche Bewertung gehört der Prosa oben.
@@ -1451,7 +1451,7 @@ Maßnahme = Guard-Skripte mit Namens-Treffer). Die inhaltliche Bewertung gehört
 | Work at High effort by default; the user reserves Extra high for research and design decisions, not implementation | 4 | hoch | — (Regel/Memory) | ◐ Regel |
 | Write idiomatic English in all English text (README, code comments, commit messages) — no German calques like 'stand' for a version | 1 | niedrig | — (Regel/Memory) | ◐ Regel |
 | Fable is NOT the default lane because its volume is the scarcest; difficulty is no reason for it either (since 18.08.2026 hard cases go straight to Sol), and review is cross-vendor, not Fable-by-default | 4 | hoch | — (Regel/Memory) | ◐ Regel |
-| Findings recorded by a session that could not write the work order — carry each into TASKS.md, then mark it drained | 33 | hoch | findings-guard.mjs | ✔ Mechanismus |
+| Findings recorded by a session that could not write the work order — carry each into TASKS.md, then mark it drained | 34 | hoch | findings-guard.mjs | ✔ Mechanismus |
 | A recurring lookup gets a script; never pull raw transcripts, listings, or logs into context to answer it | 1 | niedrig | — (Regel/Memory) | ◐ Regel |
 | Past the 150k context watermark, FINISH the step and hand over — never start a suite, an agent or a point after it; the user raised the cost twice (13.08. and 17.08.2026) | 2 | mittel | — (Regel/Memory) | ◐ Regel |
 | User 18.08.2026: hard, complex, error-prone and HIGH-criticality points are AUTHORED by GPT-5.6 Sol directly — Opus 5 authors only what is left, and Fable authors only a point that tags its lane or one the router escalates | 4 | hoch | — (Regel/Memory) | ◐ Regel |
@@ -1516,8 +1516,8 @@ Maßnahme = Guard-Skripte mit Namens-Treffer). Die inhaltliche Bewertung gehört
 
 Erfasste Quellen: 93 Feedback-/Projekt-Memories · 57 Guard-/Hook-Skripte · 6 Revert-/Reapply-Commits · 113 Prozess-/Meta-TASKS-Punkte (davon 47 offen).
 
-<!-- RETRO-FINGERPRINT: 3ab91a86555f8b42b925f341baeff236b4fb3092f6e1ae0aa16be095a034e920 -->
-<!-- RETRO-LAST-REFRESHED: 2026-08-28T20:44:15.688Z -->
+<!-- RETRO-FINGERPRINT: 7eab817803ccb4d84abe81e0f08b7b0c468536fe0070e6c2d43f3c6368f8c658 -->
+<!-- RETRO-LAST-REFRESHED: 2026-08-28T22:16:43.901Z -->
 <!-- AUTO-GENERATED:END -->
 
 ### 3.111 Ein Erfolg ist kein Beweis für den Weg, auf dem er zustande kam
@@ -4646,3 +4646,31 @@ hat. Eine Spezifikation nennt, was hineingehört; sie nennt nie, was still herau
 bei jeder Verengung: *Wer hat sich bisher auf die Breite verlassen, ohne dass es irgendwo steht?*
 Die Antwort gehört als eigener Punkt in den Arbeitsauftrag, bevor die Verengung landet — nicht
 erst, nachdem sie einmal zugeschlagen hat.
+
+### 3.211 Neun Runden, jede Ablehnung kleiner als die davor — und keine war die letzte
+
+In der Nacht auf den 29.08.2026 hat das Vier-Augen-Tor am Bündelleser neun
+herstellerübergreifende Runden verbraucht. Die erste Ablehnung traf einen echten Defekt: Der
+Leser nahm jede ein- bis vierstellige Zahl aus 39 KB Prosa für eine Punktnummer und zog vorher
+bekannte Datumsformen ab. Die neunte lautete, eine Unicode-Ziffer in einer Code-Spanne könne
+theoretisch platzieren. Dazwischen wurde jede einzelne Ablehnung beantwortet, und jede Antwort
+verdiente eine neue: die führende Liste öffnete mit einem Datum, die Marke stieß an eine
+HTML-Entität, der Beweis maß das Dokument gegen sich selbst, die Zählung verglich eine Menge mit
+sich selbst. Keine dieser Ablehnungen war falsch. Der Punkt, um den es ging, war selbst aus
+genau diesem Muster entstanden: Vier frühere Runden hatten ihn als eigenen Auftragspunkt
+hinterlassen, weil sie nicht konvergierten.
+
+Angehalten hat nicht das Urteil, sondern ein Zähler: Der Wiederholungs-Wächter meldete den
+neunten Commit in Folge am selben Mechanismus gegen ein gemessenes Maximum von acht. Ohne ihn
+wäre die Sitzung in eine zehnte Runde gegangen, denn jede einzelne Runde ist für sich begründet
+— genau das macht die Schleife so schwer zu verlassen. Erschwerend kommt hinzu, dass das Tor
+jedes Zug-Ende verweigert, solange die Ablehnung steht: Der Stapel kommt an keinem Punkt vorbei,
+nicht nur an diesem, und der Ausweg, den das Tor nennt — beheben und nachprüfen lassen — ist
+derselbe Weg, der neun Mal nicht ans Ziel führte.
+
+**Lehre:** Ein Tor, das Runden fordert, braucht eine Zahl, ab der die verbleibende Lücke ein
+eigener Punkt ist statt einer weiteren Runde. Ohne diese Grenze misst das Tor nicht mehr die
+Qualität der Arbeit, sondern die Ausdauer der Sitzung, und ein Rest, der mit jeder Runde kleiner
+wird, ist kein Fortschritt, sondern eine Asymptote. Prüffrage bei jeder Gegenlese: *Ist der
+Befund dieser Runde kleiner als der der vorigen — und wenn ja, warum ist er dann noch eine Runde
+und nicht ein Punkt?*

@@ -799,12 +799,6 @@
       "origin": "machine",
       "place": "last"
     },
-    "958": {
-      "at": "2026-08-26T22:39:56.623Z",
-      "why": "It is the measured hole in the double safety the user ordered on 26.08.2026 as point 947 — the emergency lane cannot see a busy wedge, so the very state the order forbids can still stand until the release",
-      "origin": "machine",
-      "place": "ahead"
-    },
     "959": {
       "at": "2026-08-26T23:56:43.522Z",
       "why": "It is board reporting truth, not a stop-the-batch path, so it stays behind the guard wedges at the front of the queue.",
@@ -990,6 +984,12 @@
       "why": "The guard errs toward allow, so it under-reports drift instead of blocking work — last is right until the release is cut.",
       "origin": "machine",
       "place": "last"
+    },
+    "1004": {
+      "at": "2026-08-28T22:16:28.449Z",
+      "why": "Der Rest von 1003 betrifft den Markdown-Kontext des Lesers, nicht die Zugehörigkeit; er wartet hinter 1003 selbst und hinter der Freigabe.",
+      "origin": "machine",
+      "place": "last"
     }
   },
   "boundary": {
@@ -1028,7 +1028,7 @@
     "why": "The order standing in front of the release today is the arrangement that predates this rule; the four machine-filed points that had ranked themselves there were moved behind 174 first"
   },
   "settled": {
-    "at": "2026-08-28T20:22:45.217Z",
+    "at": "2026-08-28T22:16:28.457Z",
     "points": [
       174,
       184,
@@ -1332,7 +1332,6 @@
       954,
       955,
       956,
-      958,
       959,
       960,
       961,
@@ -1364,7 +1363,8 @@
       1000,
       1001,
       1002,
-      1003
+      1003,
+      1004
     ]
   }
 }
