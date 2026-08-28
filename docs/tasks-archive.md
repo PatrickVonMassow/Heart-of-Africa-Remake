@@ -24797,3 +24797,26 @@ Nummerierung bleiben deshalb identisch — hier wird nur verschoben, nie umgesch
   point.
   Bundle: Modell & Wächter. It edits the same evaluation core as 979 did, so it is never worked
   beside another point touching that file.
+
+- [x] 946. A VDZK card still parks an owner-decidable question; admissibility gets the point-864
+  typing. Point 864 typed the `AWAITING-USER` point gate (`defer-for-user.mjs` refuses advisory
+  reasons), but the CARD path kept accepting open questions: on 26.08.2026 the card "Vier-Augen-
+  Rückstand: würde ich als eigenen Punkt vorziehen — oder anders priorisiert?" stood on the board
+  with the owner's own recommendation inside it, waiting for the user. The user's standing order of
+  26.08.2026, 16:47 (verbatim: "löse solche Probleme immer nach deinem Ermessen. Stelle per
+  Mechanismus sicher, dass das immer passiert und für so etwas nicht die Batch angehalten wird. Für
+  solche Details brauche ich auch nicht gefragt zu werden.") closes the class.
+  FINAL STATE:
+  - `vdzk-add` (and the admissibility core behind it) refuses a card whose question is
+    owner-decidable — prioritization, ordering, splitting, internal process detail — unless it
+    records the decision already taken and acting, with the veto as the user's only action
+    (the Entscheidungsprotokoll pattern of point 864).
+  - An open question remains admissible only for the named user-owned categories: design.md content,
+    releases/tags, scope extensions, money/permissions, deletion of user data — the card names its
+    category and the refusal message teaches the pattern.
+  VERIFIABLE: Vitest over admissibility — today's card text is refused with the pattern named; the
+  same text carrying a recorded decision is accepted; each user-owned category example is accepted.
+  Criticality: high — it is the enforcement half of the user's no-standstill order on the one path
+  point 864 did not reach.
+  Bundle: Chat & Tafel. It edits the decision-card gate 843 and 902 also reach, so it is worked
+  after them, never beside them.
