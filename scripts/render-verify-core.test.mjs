@@ -1067,6 +1067,47 @@ describe('evaluate — a red is not closed by the runs that FOLLOWED it (point 6
     expect(coveringRun([stored], 'webgpu', 1000, { openPoints })).toBeNull()
   })
 
+  // THE SAME QUESTION FOR THE NARROWEST ENTRY, END TO END (review finding,
+  // 28.08.2026). The case above proves retroactivity for `match`; a unit check
+  // of `chargeFor` proves nothing about the path a record actually travels, so
+  // the whole route is walked here — the recorder's own parse and charge, then
+  // unexplainedRuns, then evaluate — with an entry that can only fire on the
+  // measurement the record keeps.
+  it('reaches a stored red through the WHOLE gate with a detailMatch entry, not just chargeFor', () => {
+    const line =
+      'FAIL  no child walks without getting anywhere — worst child 1 at 0.29 % of its own judged ' +
+      'time — worst child 1 at 22.2s, 1.42 m walked inside 0.31 m  [--section=children-motion]'
+    // Recorded when NO ledger owned it, exactly as a run written before the entry.
+    const reds = chargeReds(failedChecks(line), { suite: 'polish', backend: 'webgpu', ledger: [] })
+    expect(reds.map((r) => r.point)).toEqual([null])
+    const stored = redRun('webgpu', 1500, reds, { suite: 'polish' })
+
+    // Without the entry the run blocks, and the gate blocks with it.
+    expect(unexplainedRuns([stored], 1000, { openPoints, ledger: [] })).toHaveLength(1)
+    expect(evaluate(renderChange({ runs: [stored, run('webgpu', 2000), run('webgl', 2100)], openPoints, ledger: [] })).decision).toBe('block')
+
+    // The entry written TODAY reaches the record written yesterday.
+    const ledger = [{
+      point: 506,
+      suite: 'polish',
+      backend: 'webgpu',
+      kind: 'check',
+      match: /no child walks without getting anywhere/i,
+      detailMatch: /1\.42 m walked inside 0\.31 m/i,
+      why: 'the signature this red really printed',
+    }]
+    expect(unexplainedRuns([stored], 1000, { openPoints, ledger })).toEqual([])
+    expect(evaluate(renderChange({ runs: [stored, run('webgpu', 2000), run('webgl', 2100)], openPoints, ledger })).decision).toBe('allow')
+
+    // An entry whose signature the record does NOT carry still owns nothing —
+    // the detail is read, not waved through because it exists.
+    const wrong = [{ ...ledger[0], detailMatch: /9\.99 m walked inside 0\.01 m/i }]
+    expect(unexplainedRuns([stored], 1000, { openPoints, ledger: wrong })).toHaveLength(1)
+
+    // And it still does not COVER: the stamp the record carries is null.
+    expect(coveringRun([stored], 'webgpu', 1000, { openPoints })).toBeNull()
+  })
+
   it('does NOT talk a CRASH away with a charge — a run that died judged no picture', () => {
     const ledger = [{ point: 506, match: /goat/, why: 'the software lane cannot draw fast enough' }]
     const crashed = redRun('webgpu', 1500, [red('goat stance', 506)], { crashed: true })
