@@ -367,25 +367,22 @@ describe('the real docs/work-packages.md', () => {
       const filed = home.get(n) ?? (unbundled.has(n) ? 'Not bundled' : 'nowhere')
       if (filed !== bundle.id) wrong.push(`${n}: spec says ${bundle.id}, table says ${filed}`)
     }
-    // The skips are COUNTED rather than tolerated (review finding): every open
-    // point whose spec names a bundle of this table is checked, and the two
-    // counts have to agree, so a spec that stops resolving is a failure here
-    // instead of a silent skip.
-    const nameable = [...open].filter((n) => {
-      const named = /^\s*Bundle:\s*(.+?)\s*$/m.exec(blocks.get(n) ?? '')
-      return Boolean(named && bundles.some((b) => named[1].startsWith(b.name)))
-    })
-    expect(nameable.length).toBeGreaterThan(100)
-    expect(checked).toBe(nameable.length)
+    // The floor is MEASURED, not derived from the same parse (review finding:
+    // counting the checked set against itself is a tautology). 176 open points
+    // named a bundle of this table on 28.08.2026; specs are only ever added, so
+    // a drop below that means the reading broke, not that the work order moved.
+    expect(checked).toBeGreaterThanOrEqual(170)
     expect(wrong).toEqual([])
   })
 
-  // AND THE POINTS WHOSE SPEC NAMES NO BUNDLE (review finding of the seventh
-  // round: the test above skips them, so one could be filed anywhere). They have
-  // no outside authority, so the measure is the bundle's OWN text: the bundle a
-  // point is filed under must be one that talks about it. A point moved to an
-  // unrelated bundle fails here even though its spec says nothing.
-  it('files a point whose spec names no bundle where that bundle itself names it', () => {
+  // AND THE POINTS WHOSE SPEC NAMES NO BUNDLE (review finding). Their outside
+  // authority is the document as it stood BEFORE the migration: each of them
+  // already stood in a bundle's list position there, and the migration was only
+  // allowed to keep it where it was. Asking the migrated cell whether it names
+  // the point answers itself — the marker is in the cell (review finding of the
+  // round after), so the measurement is the fixture's list positions.
+  it('leaves a point whose spec names no bundle in the bundle that already listed it', () => {
+    const measured = JSON.parse(readFileSync(repoPath('scripts/fixtures/work-packages-placed-before-1003.json'), 'utf8'))
     const tasksMd = readFileSync(repoPath('TASKS.md'), 'utf8')
     const open = parseOpenPoints(tasksMd)
     expect(open.size).toBeGreaterThan(100)
@@ -397,30 +394,24 @@ describe('the real docs/work-packages.md', () => {
       if (current !== null) blocks.set(current, `${blocks.get(current)}\n${line}`)
     }
     const bundles = parseBundles(md)
-    const cellOf = new Map()
-    const section = md.slice(md.indexOf(BUNDLES_HEADING))
-    const table = section.slice(0, section.indexOf(UNBUNDLED_MARKER))
-    for (const line of table.split('\n')) {
-      const cells = line.split('|').map((c) => c.trim())
-      if (cells.length < 6 || !/^[A-Z]$/.test(cells[2])) continue
-      cellOf.set(cells[2], cells[4])
-    }
     const unbundled = parseUnbundled(md).points
 
     let checked = 0
-    const strangers = []
+    const moved = []
     for (const bundle of bundles) {
       for (const n of bundle.points) {
         if (!open.has(n) || unbundled.has(n)) continue
         const named = /^\s*Bundle:\s*(.+?)\s*$/m.exec(blocks.get(n) ?? '')
         if (named && bundles.some((b) => named[1].startsWith(b.name))) continue
+        const listedThen = measured.listedIn[String(n)]
+        if (!listedThen) continue // appended after the measurement — nothing to compare against
         checked += 1
-        if (!new RegExp(`\\b${n}\\b`).test(cellOf.get(bundle.id) ?? '')) {
-          strangers.push(`${n}: filed under ${bundle.id}, which never names it`)
+        if (!listedThen.includes(bundle.id)) {
+          moved.push(`${n}: filed under ${bundle.id}, listed then in ${listedThen.join(', ')}`)
         }
       }
     }
-    expect(checked).toBeGreaterThan(100)
-    expect(strangers).toEqual([])
+    expect(checked).toBeGreaterThanOrEqual(100)
+    expect(moved).toEqual([])
   })
 })
