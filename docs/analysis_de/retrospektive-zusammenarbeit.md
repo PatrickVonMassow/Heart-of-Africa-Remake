@@ -1412,7 +1412,7 @@ keinen Träger hat. Gebucht als Punkt 956.
 
 ## Anhang A — Maschinell gepflegte Quellen-Übersicht
 
-Zuletzt aktualisiert: Freitag, 28.08.2026, 07:24 · Quellen-Fingerprint: `424f7a81903a…`
+Zuletzt aktualisiert: Freitag, 28.08.2026, 10:33 · Quellen-Fingerprint: `dbb61c72b704…`
 
 Spalten heuristisch aus den Quellen abgeleitet (Anläufe = distinkte Datumsnennungen im Memory;
 Maßnahme = Guard-Skripte mit Namens-Treffer). Die inhaltliche Bewertung gehört der Prosa oben.
@@ -1515,8 +1515,8 @@ Maßnahme = Guard-Skripte mit Namens-Treffer). Die inhaltliche Bewertung gehört
 
 Erfasste Quellen: 93 Feedback-/Projekt-Memories · 57 Guard-/Hook-Skripte · 6 Revert-/Reapply-Commits · 113 Prozess-/Meta-TASKS-Punkte (davon 48 offen).
 
-<!-- RETRO-FINGERPRINT: 424f7a81903a893e11dec39978d808cc322692c3bc94ab9e9df34bcf485045a1 -->
-<!-- RETRO-LAST-REFRESHED: 2026-08-28T05:24:32.202Z -->
+<!-- RETRO-FINGERPRINT: dbb61c72b70453fafb2be700bc01630ce46e3b6b1cb192d86b50ec394d82a445 -->
+<!-- RETRO-LAST-REFRESHED: 2026-08-28T08:33:51.550Z -->
 <!-- AUTO-GENERATED:END -->
 
 ### 3.111 Ein Erfolg ist kein Beweis für den Weg, auf dem er zustande kam
@@ -4567,3 +4567,31 @@ lesen sie" ist erst wahr, wenn ein Test sie für jeden Leser prüft, nicht wenn 
 verspricht. Ein Tor, dessen Forderung kein Befehl erfüllen kann, ist kein strenges Tor, sondern
 ein kaputtes. Festgehalten in derselben Nacht als Reparatur beider Pfade; was das Tor darüber
 hinaus fälschlich einem Punkt zuschreibt, steht als Punkt 986 im Arbeitsauftrag.
+
+### 3.209 Die Begründung widerlegte sich im eigenen Dokument, vier Runden lang unbemerkt
+
+Am 28.08.2026 wurde beim Gegenlesen von Punkt 734 ein Sicherheitsargument gekippt, das seit dem
+19.08. in unserem eigenen Text stand — von einem Prüfer, der zum ersten Mal die GANZE Datei in
+einem Pass vor sich hatte. Die Behauptung: die Aufzeichnung sei begrenzt, weil sie jede
+UNTERSCHIEDLICHE Ergebniszeile nur einmal behält, und die Menge unterschiedlicher Zeilen sei durch
+die Prüfungen der Suite gedeckelt; unbegrenzt sei allein die Wiederholung. Drei Abschnitte weiter
+unten stand, in derselben Datei und von uns selbst geschrieben, der Gegenbeweis: ein Fehler, der
+pro Bild mit hochzählendem Text erscheint, erzeugt jedes Mal eine neue unterschiedliche Zeile.
+Beide Sätze waren wahr aufgeschrieben und schlossen einander aus. Die Folge war nicht akademisch:
+Der Puffer wächst, bis der Prozess am Speicher stirbt — und ein gestorbener Lauf wird als Absturz
+verbucht, für den es eine Unterschrift gibt, die ihn schließt. Der teuerste Weg, einen Lauf voller
+beobachteter Fehler loszuwerden, führte durch das Sicherheitsargument selbst.
+
+Warum vier Runden nichts fanden: Der Prüfstoff wird nach Größe in Pässe geschnitten, und die
+beiden Sätze lagen in verschiedenen Pässen — der eine im Code-Kommentar des Rekorders, der andere
+in der Prosa des README. Jeder Pass las eine Hälfte und fand sie in sich schlüssig. Erst als die
+Prosa allein einen ganzen Pass füllte, standen beide Sätze demselben Leser gegenüber. Der zweite
+Grund liegt bei uns: Die widerlegende Zeile hatten wir in einer FRÜHEREN Runde als Begründung für
+eine ANDERE Regel geschrieben, ohne zu prüfen, was sie über die ältere Behauptung sagt.
+
+**Lehre:** Prosa ist bei uns tragender Teil des Mechanismus, nicht sein Beiwerk — und ein
+Widerspruch INNERHALB der Prosa ist ein Befund über den Code, nicht über den Stil. Wer eine neue
+Begründung schreibt, prüft sie gegen die Behauptungen, die im selben Dokument schon stehen; und
+wer den Prüfstoff nach Größe schneidet, muss wissen, dass ein Widerspruch über die Schnittkante
+hinweg für jeden einzelnen Pass unsichtbar ist. Prüffrage beim Schreiben einer Rechtfertigung:
+*Widerlegt dieser Satz etwas, das ich weiter oben behauptet habe?*
