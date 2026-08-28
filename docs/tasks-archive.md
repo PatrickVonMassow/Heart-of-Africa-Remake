@@ -24922,3 +24922,78 @@ Nummerierung bleiben deshalb identisch — hier wird nur verschoben, nie umgesch
   Criticality: high — it is the four-eyes evidence file, and the standing repair instruction is a
   hand edit whose most obvious form deletes recorded reviews.
   Bundle: Modell & Wächter.
+
+- [x] 734. A run whose reds exceed the capture cap can never be closed, so it blocks the render
+  set forever (measured 19.08.2026 while landing point 732). `render-verify-guard` blocked with
+  12 unexplained red runs, the oldest from 17.08.2026 — `webgpu/enrichments` from 08:25 on, and
+  two `webgpu/settings` runs carrying 10 and 11 unaccounted reds. Those two say verbatim:
+  `115 further result line(s) exceeded the capture cap — this run's reds were NOT all read`.
+  THAT IS THE TRAP. Point 640 gives a red exactly three ways to close: name and fix its CAUSE,
+  CHARGE it to the open point that owns it, or make it an open point. All three require knowing
+  WHAT the red was — and a run that never recorded its reds cannot supply that, by construction.
+  Such a run is therefore unclosable, and because the guard's window is "since the last render
+  edit", it blocks EVERY later change to the render set indefinitely. The only way past it is the
+  hand-written `--defer`, which is precisely the "gate routinely overridden by hand" that the
+  charge ledger (point 550) was built to abolish. It was deferred on 19.08.2026 with that reason
+  named, so point 732 could land; the defer is a logged exception, not a pass.
+  IT WAS ALREADY MEASURED ONCE, IN AN EARLIER WINDOW (14.08.2026, 04:20, on `main` at b4c0bc36
+  while closing point 666): eleven recorded runs failed with nothing to explain them, and they
+  belonged to no work that session did — `settings`
+  on WebGPU (13.08., 15:24 and 23:19-23:22, 18-19 reds each), `collision` on WebGPU (3 reds),
+  `flow` on WebGPU ("the run ended in a crash, not in its own report") and `settings` on WebGL 2 —
+  and four of them carried the same cap line, `103 further result line(s) exceeded the capture
+  cap`. The gate was DEFERRED on 14.08.2026 for one purpose, to let point 666 land, which is the
+  valve working as designed and no closing at all — the same hand waiver this point exists to make
+  unnecessary, taken five days before the deferral of 19.08. above.
+  THOSE ELEVEN RUNS ARE EACH STILL OWED A DISPOSITION, one apiece and not one of them another
+  deferral: cause named and fixed, charged to the open point that owns it, or filed as its own
+  point, exactly the three ways point 640 allows. The reds among them that are real product
+  defects are named with their owner — the TRAA/MSAA path (point 514), the first-person ground
+  micro-detail (already owned by point 603), and the WebGPU async render-pipeline console error,
+  which has NO owning point in the work order today (searched 20.08.2026) and must be given one
+  the moment a run reproduces it; an unowned product defect is the hole this whole point is about —
+  and a run whose reds were provably never recorded is closed AS an incomplete recording under
+  this point's own way out below, which is a disposition and not a waiver. That the set has since
+  left the guard's window (the oldest run blocking on 19.08. is from 17.08.) ends the blockage,
+  never the obligation, and it proves the trap is not one week's accident.
+  THE CAUSE FIX IS PARTLY ELSEWHERE: point 460 persists every suite's complete output to
+  `local/verify-logs/`, which is what makes a red readable at all. This point decides what a run
+  whose reds were never recorded IS, and how it leaves the guard.
+  FINAL STATE:
+  - THE CAP CANNOT PRODUCE AN UNCLOSABLE RUN. Either a run that would truncate its result lines
+    FAILS LOUDLY as an incomplete recording rather than half-recording itself, or the cap stops
+    applying to RED lines — they are the few lines whose loss costs everything, and a run's reds
+    are bounded by its checks, not by its chatter. Which of the two is chosen is decided by
+    measurement of how large a real red set actually gets, not by taste.
+  - AN ALREADY-BROKEN RUN HAS A NAMED WAY OUT that is not a silent waiver: a run whose reds are
+    provably unrecorded is closable AS THAT — recorded as an incomplete recording, with the
+    evidence, so it stops blocking without ever being mistaken for a green.
+  - THE GUARD SAYS WHICH IT IS. Today it reports "unexplained red" for a run that has no
+    explanation to give, which sends the reader hunting for a defect that was never captured. An
+    incomplete recording must be named as one, distinct from a red nobody has explained yet.
+  - THE DISPOSITION MUST REACH RUNS ALREADY RECORDED (measured 26.08.2026). A ledger entry is
+    applied when a run is RECORDED, not when it is judged: `red.point` is written onto the stored
+    red, and `runVerdict` only reads it back. Extending `RED_CHARGES` therefore reclassifies
+    NOTHING that is already in `.claude/render-verify-state.json`, so for a window that is already
+    red the only exits left are fixing the cause — which merely moves the window — and the hand
+    `--defer`. A crashed run is worse still: `runVerdict` returns `charges: []` for
+    `crashed === true`, so it can carry no charge at any time. This point's own VERIFIABLE below
+    promises that the 17.08. runs stop blocking WITHOUT a deferral, and that promise cannot be
+    kept by better recording alone — the disposition has to be applicable retroactively to runs
+    already on disk. Counted that day across the 40 recorded runs: 22 distinct unaccounted reds,
+    all from 13.-19.08.2026, of which the whole `webgpu/settings` console storm cascades from one
+    root that point 514 owns ("is invalid due to a previous error" verbatim), two are this point's
+    own cap lines, and eight are crashes that no ledger can ever take.
+  VERIFIABLE: Vitest over the pure decision — a run whose result lines hit the cap is classified
+  as an incomplete recording and not as an unexplained red; a genuinely unexplained red still
+  blocks; a closed incomplete recording no longer blocks a later render edit. Plus the real proof:
+  the 17.08. runs stop blocking without a `--defer`.
+  Plus at the RECORDER: a Vitest case proving that a run past the cap still carries a chargeable
+  NAME for every red it reports — a red whose name is gone can be charged by nobody, which is the
+  whole trap — and `node scripts/render-verify-guard.mjs --status` on a quiet machine showing no
+  unexplained run left in the window.
+  Criticality: high — it is the release branch's picture gate: while it stands, every turn either
+  blocks or waves reds through with a deferral, which is how a real regression slips past. It
+  breaks no player-visible behaviour itself, but a gate whose only exit is a hand waiver decays
+  into a formality.
+  Bundle: Session- & Repo-Hygiene.
