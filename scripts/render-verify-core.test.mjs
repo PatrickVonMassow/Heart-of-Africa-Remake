@@ -722,6 +722,20 @@ describe('chargeFor — the ledger charges NARROWLY', () => {
     expect(() => chargeFor(red('x'), { ledger: broken })).not.toThrow()
     expect(chargeFor(red('x'), { ledger: broken }).point).toBe(2)
   })
+
+  // A MALFORMED ENTRY CHARGES NOTHING — NOT EVERYTHING (review finding,
+  // 28.08.2026). A `test` function alone was enough to reach the stateless
+  // clone, where a missing `source` became `new RegExp(undefined, '')`: the
+  // EMPTY pattern, which matches every name there is. One typo in a
+  // hand-passed ledger therefore owned the whole run.
+  it('charges nothing through a pattern that only LOOKS like a regex', () => {
+    const shaped = { global: true, test: () => true }
+    expect(chargeFor(red('a check nobody filed'), { ledger: [{ point: 3, match: shaped, why: 'malformed' }] })).toBeNull()
+    // The same for the narrow half: a broken `detailMatch` must not turn the
+    // narrowest entry the ledger has into a catch-all either.
+    const narrow = [{ point: 4, match: /goat/i, detailMatch: shaped, why: 'malformed detail' }]
+    expect(chargeFor({ ...red('the goat stance'), detail: 'anything at all' }, { ledger: narrow })).toBeNull()
+  })
 })
 
 describe('runVerdict — clean, accounted for, or red', () => {

@@ -205,12 +205,22 @@ export function chargeablePoints(text) {
  * entry is shared data, and mutating a caller's object here would only move the
  * surprise. The shape test in render-verify-core.test.mjs refuses such a flag in
  * the shipped ledger as well, so this stays a backstop for a hand-passed one.
- * Total: anything that is not a usable matcher matches nothing.
+ *
+ * AND A MALFORMED PATTERN MATCHES NOTHING (review finding, 28.08.2026). A
+ * `test` function was too weak a shape test: a plain object like
+ * `{ global: true, test() {} }` passed it, and the clone branch then built
+ * `new RegExp(undefined, '')` — the EMPTY pattern, which matches EVERY name. A
+ * broken entry did not charge nothing; it charged everything, which is the
+ * exact opposite of the contract `chargeFor` states below. So a pattern is
+ * usable only if it really carries the two strings a regex is rebuilt from,
+ * duck-typed rather than by `instanceof` so a regex from another realm (a
+ * worker, a vm context) still counts. Total: anything else matches nothing.
  */
 function patternHits(pattern, value) {
   if (!pattern || typeof pattern.test !== 'function') return false
+  if (typeof pattern.source !== 'string' || typeof pattern.flags !== 'string') return false
   if (pattern.global === true || pattern.sticky === true) {
-    return new RegExp(pattern.source, String(pattern.flags ?? '').replace(/[gy]/g, '')).test(value)
+    return new RegExp(pattern.source, pattern.flags.replace(/[gy]/g, '')).test(value)
   }
   return pattern.test(value)
 }
