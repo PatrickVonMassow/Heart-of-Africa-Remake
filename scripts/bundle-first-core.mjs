@@ -32,13 +32,34 @@ import { parseOpenPoints } from './queue-order-guard-core.mjs'
 export const BUNDLES_HEADING = '## The bundles'
 export const UNBUNDLED_MARKER = '**Not bundled**'
 
-/** Dates (`30.07.2026`) carry numbers that are not point numbers. */
-const stripDates = (s) => String(s ?? '').replace(/\b\d{1,2}\.\d{1,2}\.\d{4}\b/g, ' ')
+/**
+ * Dates carry numbers that are not point numbers: `30.07.2026`, `2026-08-28`,
+ * and `24. August 2026`. The year is only stripped INSIDE a date shape — a bare
+ * `2026` stays a candidate, because point numbers reach that range eventually
+ * and a reader that deletes them would report a placed point as unbundled.
+ *
+ * Residual, deliberately not chased: a bare four-digit token that is not
+ * date-shaped (`1440 px`, `seit 2026`) counts as a point number. It can only
+ * mislead where it equals an OPEN point number, and this guard's fail direction
+ * is allow.
+ */
+const MONTH = String.raw`Januar|Februar|März|Maerz|April|Mai|Juni|Juli|August|September|Oktober|November|Dezember|January|February|March|May|June|July|October|December`
+// The optional leading day is bounded to a REAL day (1-31), so an arbitrary
+// number in front of a month name is not swallowed as one.
+const DAY = String.raw`(?:0?[1-9]|[12]\d|3[01])`
+const MONTH_YEAR = new RegExp(String.raw`\b(?:${DAY}\.?\s+)?(?:${MONTH})\s+\d{4}\b`, 'g')
 
-/** Point numbers in a cell or bullet: 1–3 digits, dates removed first. */
+const stripDates = (s) => String(s ?? '')
+  .replace(/\b\d{1,2}\.\d{1,2}\.\d{4}\b/g, ' ')
+  .replace(/\b\d{4}-\d{2}-\d{2}\b/g, ' ')
+  .replace(MONTH_YEAR, ' ')
+
+/** Point numbers in a cell or bullet: up to 4 digits, dates removed first. The
+ * work order passed 999 on 28.08.2026, and a 3-digit reader silently reports
+ * every point beyond it as unbundled. */
 export function numbersIn(text) {
   const out = []
-  for (const m of stripDates(text).matchAll(/\b(\d{1,3})\b/g)) out.push(Number(m[1]))
+  for (const m of stripDates(text).matchAll(/\b(\d{1,4})\b/g)) out.push(Number(m[1]))
   return out
 }
 

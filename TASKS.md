@@ -77,29 +77,6 @@ then point 633 (the closing run), then point 174 (the tag). A newly appended poi
 kind is MOVED to the front in the same turn that files it; leaving it where append-and-defer
 put it is the mistake this line exists to stop.
 
-- [ ] 993. A run that crashed but exited 0 is recorded as fully clean and COVERS a backend.
-  MEASURED 28.08.2026 while answering the eleventh review round of point 734, in
-  `scripts/render-verify-recorder.mjs`: the tap sets `state.crashed = true` the moment a stderr
-  line matches `CRASH_LINE`, but the record is written with `...(exit !== 0 ? { reds, crashed:
-  armed.crashed } : {})`. A run whose stack reached the tap while the process still ended with
-  code 0 therefore stores neither its reds nor its crash flag — the record is indistinguishable
-  from a clean one, and an asserted clean run COVERS its backend.
-  WHAT IT COSTS: point 734 gave the crashed run its own signed disposition precisely because a
-  crash may not be mistaken for a green. This path skips the disposition entirely: the crash is
-  not merely unexplained, it is invisible, and the run is then counted as the picture proof for a
-  render change. The comment at the tap says a false positive "only makes the gate stricter",
-  which is true on the `exit !== 0` path and false on this one — the same flag makes the gate
-  LOOSER here, because the record it produces is a green.
-  FINAL STATE: the crash observation is recorded independently of the exit code, and a record
-  carrying it is never coverage: it takes the crashed run's signed way out like any other. The
-  tap's comment states which way each direction of the flag actually moves the gate.
-  VERIFIABLE: Vitest at the recorder — a run whose stderr matched `CRASH_LINE` and whose process
-  exited 0 stores `crashed: true` and its reds, and `runVerdict`/coverage refuse it as a clean
-  covering run; a run with neither is unaffected; the ordinary crashed-and-nonzero run keeps
-  today's record shape exactly.
-  Criticality: high — it is the one path on which the render gate accepts a crash as its picture
-  proof.
-  Bundle: Session- & Repo-Hygiene.
 - [ ] 958. The independent emergency lane reads a session's own tool calls as batch progress, so a
   BUSY wedge never reaches it. MEASURED 27.08.2026 while cross-reading the lane point 947 built:
   `scripts/batch-emergency-core.mjs` puts `ACTIVITY_CLASSES.FOREGROUND` into `ADVANCING_CLASSES`,
@@ -176,6 +153,38 @@ put it is the mistake this line exists to stop.
   Criticality: high — it decides whether the durable lane may be switched on at all, and every
   claim that unlocks it is currently carried by a green flag rather than by a measurement.
   Bundle: Session- & Repo-Hygiene.
+
+- [ ] 1002. A legitimate verification run longer than an hour now earns an emergency strike.
+  MEASURED 28.08.2026 while cross-reading point 958: the emergency clock was narrowed to durable
+  batch progress alone — `BATCH_PROGRESS_KINDS` in `scripts/batch-emergency-core.mjs` admits a
+  first-parent `main` commit, a committed boundary and a moved delegated branch tip, and nothing
+  else. That is what point 958 ordered and it closes the busy-wedge hole. It also removes the
+  protection the old `ADVANCING_CLASSES` gave the VERIFICATION and CI_WAIT classes: an owner that
+  is doing exactly the right thing — one whole-suite run, no commit while it runs — presents the
+  same evidence as a wedge. `node scripts/verify/run-wait.mjs --plan large` reports 80m 48s for the
+  20 suites over both backends against `EMERGENCY_THRESHOLD_MS` of 60 minutes, so the honest LARGE
+  run at the end of every closing outlives the threshold and takes a soft strike: doctor repair
+  plus a restart, which kills the run it interrupted. The clocked veto in
+  `local/batch-emergency-veto.json` exists but nothing sets it, so the protection is a manual step
+  no runbook names.
+  FINAL STATE:
+  - A NAMED, BOUNDED, LIVE VERIFICATION RUN SUSPENDS THE CLOCK — not the VERIFICATION activity
+    class again, but the run's own progress lease: the wrapper already writes `*.run.json` beside
+    its log and `run-wait.mjs` already reads its terminal receipt. A lease that has stopped
+    advancing, expired, or belongs to a dead process protects nothing.
+  - THE BUSY WEDGE STAYS CLOSED. Tool activity, process presence and a stale lease must still fail
+    to renew the clock; only a lease that is measurably alive may.
+  - THE DOCUMENT SAYS SO. `docs/batch-autonomy.md` names the suspension beside S-19, because the
+    S-19 wording is the only place a reader learns what the clock measures.
+  VERIFIABLE: Vitest over `emergencyDecision` — a report whose window holds no batch progress for
+  ninety minutes but a live, advancing verification lease stands the lane down; the same report
+  with the lease expired, stale or process-dead strikes exactly as today; and every existing busy
+  and quiet wedge case stays green. Plus the chaos drill extended: a wedged owner holding a stale
+  lease is still recovered without human action.
+  Criticality: high — it is a self-inflicted kill on the batch's own closing run, in the lane whose
+  whole purpose is to keep the batch alive unattended.
+  Bundle: Urlaubsfestigkeit. It changes the same decision core as 947 and 958, so it does not run
+  beside another point touching `scripts/batch-emergency-core.mjs`.
 
 - [ ] 686. The taught language is five concepts, and the chief's message is four of them (user
   13.08.2026, playing the deployed communication slice).
@@ -9204,11 +9213,11 @@ to land than a mechanism that needs a review.
   recorded pass advances the per-contribution baseline — but the reading itself is multi-session
   work nobody has run, and once 721's planner covered a range the point-714 gap clause stopped
   degrading the block: the gate hard-blocks every turn end for a debt no single session can clear.
-  TWO ranges are therefore owed, each unblocked at the time by 721's rule 5 ("or the range is
+  THREE ranges are therefore owed, each unblocked at the time by 721's rule 5 ("or the range is
   explicitly re-baselined with a written justification naming every file that re-baselining leaves
   unread"), each justification and full unread-file list living in
-  `.claude/mechanism-review-baseline.json` beside the baseline it moved, and THIS point is both
-  justifications' tracked half:
+  `.claude/mechanism-review-baseline.json` beside the baseline it moved, and THIS point is every
+  justification's tracked half:
   - `762de1c..b8baae0` — five weeks of guard work; measured 18.08.2026 after 721 landed: 34
     outstanding passes, ~3.4M characters.
   - `53feef3..ee195c7` — point 712's own 46 commits; measured 18.08.2026, 22:55: 65 outstanding
@@ -9218,8 +9227,16 @@ to land than a mechanism that needs a review.
     fix, and until it lands any guard range past a handful of commits re-creates this debt. 712's
     substance had six cross-vendor rounds and its fixes are in the tree — what the ledger lacks is
     Sol's clearing read of the FIXED content at the boundaries its round-5/6 refusals named.
+  - `a7ae14a..70f19c4` — point 734's 60 mechanism contributions; measured 28.08.2026, 21:10: the
+    guard bills each one a 7-pass split of which 5 are missing, roughly 295 passes for nine files.
+    Unlike the two ranges above, this material WAS read cross-vendor at its end state — the
+    whole-range round over `395be985^1..3d9f4b16` recorded a complete 7/7 split (Sol passes 1-6,
+    Opus 4.8 pass 7) over all nine mechanism files, and the four defects it left standing are open
+    points 991, 996, 998 and 999. What is genuinely unread here is only `.claude/queue-rank.json`
+    and `docs/work-packages.md`. The per-commit billing that makes the rest unpayable is point 998,
+    and this range is the fixture its VERIFIABLE clause names.
   FINAL STATE:
-  - Every file the two re-baselines left unread is read in authorship-cut passes against its own
+  - Every file the re-baselines left unread is read in authorship-cut passes against its own
     range and recorded (`node scripts/review-sol.mjs --sha <head> --since <base>` plans them; the
     reviewer per pass is the planner's, cross-vendor by construction), or is explicitly
     retired here with a reason (a doc file whose content is not a mechanism — CLAUDE.md, TASKS.md,
@@ -11395,8 +11412,13 @@ to land than a mechanism that needs a review.
   against a hundred-word fixture, so the word half of that invariant passes whether or not the
   comment is excluded. Related, not a defect today: `measureGuide` drops a line only when it STARTS
   with `<!--`, so a multi-line comment's continuation and closing lines would count.
-  FINAL STATE: point numbers are parsed without a digit ceiling; the JSDoc matches the code; the
-  fingerprint case tightens both budgets; and a multi-line comment is excluded whole.
+  (3) `scripts/board-queue-core.mjs:440,441` carries the same two capped readers for the board's
+  own prose rewrite. AMENDED 28.08.2026: the fuse is no longer dated — the work order passed 999,
+  and the third site of this class, `numbersIn` in `scripts/bundle-first-core.mjs`, reported points
+  1000-1002 as unbundled until it was widened to four digits in the same hour.
+  FINAL STATE: point numbers are parsed without a digit ceiling at every site named here; the JSDoc
+  matches the code; the fingerprint case tightens both budgets; and a multi-line comment is
+  excluded whole.
   VERIFIABLE: unit cases with a four-digit point in a title and in a body, and a fingerprint case
   that fails when only one budget excludes the comment.
   Criticality: low — one fuse dated at point 1000, one half-covered assertion.
@@ -13287,4 +13309,110 @@ to land than a mechanism that needs a review.
   touching a file no pass covered stays owed; plus the point-734 range as a fixture.
   Criticality: high — it blocks the turn end of a landed point, which is the state the batch cannot
   leave on its own.
+  Bundle: Session- & Repo-Hygiene.
+- [ ] 999. The review ledger's physical order does not follow its `at` stamps, so a reader that
+  trusts append order reads it wrong. MEASURED 28.08.2026 on `main` at 168805d5, answering the
+  Opus 4.8 pass-7 refusal of point 734 (`.claude/mechanism-reviews.jsonl`, record `at`
+  1787940688907): eight of 1462 rows carry an `at` earlier than the row above them — six
+  `authoring-commission` rows and two `review` rows, the largest step backwards 8.7 days
+  (line 1351, a 19.08. review sitting behind 28.08. rows) and the next 1.3 days (line 933).
+  WHY IT IS STRUCTURAL AND NOT A LEFTOVER: point 988's union driver
+  (`scripts/mechanism-review-merge-core.mjs:99-100`) sorts the rows a single merge APPENDS and
+  preserves the ancestor prefix untouched. A branch appends its commission row on the day it is
+  cut and merges days later, so the row is correctly placed inside its own merge and permanently
+  behind rows `main` gained meanwhile. Every landing therefore adds new disorder that no later
+  landing can repair, and point 988 — which promised `at` order in its VERIFIABLE clause — is
+  closed.
+  WHAT IT COSTS: the ledger is the four-eyes evidence file. Nothing measured today mis-reads it —
+  its consumers compare `at` by value — but the file's own contract says the rows are in `at`
+  order, and the first consumer that trusts that (a scan that stops early, a "latest wins" walk, a
+  bisect) reads a review or a receipt that is not there. It is also the reason a hand-resolved
+  conflict cannot be checked against a simple rule.
+  FINAL STATE: either the file is ordered by `at` and the union driver keeps it ordered across the
+  ancestor prefix as well, or the contract is corrected where it is written — the driver's own
+  comment, `.gitattributes` and point 988's archived VERIFIABLE clause stop promising an order the
+  mechanism does not produce, and every consumer that could depend on it is named.
+  VERIFIABLE: Vitest over the ledger — a check that reads `.claude/mechanism-reviews.jsonl` and
+  fails on a row whose `at` precedes its predecessor (after the chosen final state is in place),
+  plus a merge case where the ancestor prefix already holds a late row and the driver's result is
+  judged against the decided contract.
+  Criticality: medium — it corrupts nothing today, but it is the evidence file the four-eyes gate
+  rests on, and its stated order is not the order it has.
+  Bundle: Modell & Wächter.
+- [ ] 1000. Two waved-red cases still construct a console identity the recorder cannot mint, and
+  their names still claim the production pair. MEASURED 28.08.2026 by the cross-vendor pass 3 of 4
+  over `5775d7f0` (GPT-5.6 Sol, verdict merge-with-fixes, `.claude/mechanism-reviews.jsonl`):
+  "two still claim recorder realism while directly constructing console identities the recorder
+  cannot produce". 5775d7f0 answered the same objection for the FIRST of the three cases by
+  rewriting its name and its comment, and for the SECOND by rewriting its fixture to the
+  recorder-reachable `console errors: <name>` shape — but not both halves for both. In
+  `scripts/render-verify-core.test.mjs` the case at line 1057 still pairs
+  `red('the eaves column', null, 'check')` with `red('the eaves column', null, 'console')`, and a
+  console pseudo-check ALWAYS carries the `console error: ` prefix, so that console identity is one
+  no recorder run produces; the case at line 1579 carries the reachable fixture under the old name
+  "counts a check and a console error of the same wording in a LIFTED truncation too", which states
+  exactly the production pair its own comment retracts.
+  WHAT IT COSTS: nothing in production — the kind in the deferral key is real defence for a record
+  that reaches the gate from elsewhere (a hand-written state file, a foreign checkout). What is
+  wrong is what the suite CLAIMS: a reader takes these two cases as proof that the recorder mints
+  the pair, and would not look again if a later recorder change made the shape genuinely
+  unreachable or genuinely reachable. A test that says more than it shows is the failure this
+  file's own round-17 and round-18 findings were about.
+  FINAL STATE: every case that exercises the kind half of the key says, in its NAME, that it drives
+  two reds of the same wording and different KIND — never "a check and a console error" — and
+  either uses a recorder-reachable identity or states in one line that it is deliberately a foreign
+  record and why. Whichever of the two forms each case takes, name, comment and fixture agree.
+  VERIFIABLE: Vitest over `scripts/render-verify-core.test.mjs` — the cases keep proving what they
+  proved (the waved count stays 2 in both the ordinary and the lifted-truncation branch), and a
+  reading of the file finds no case name that promises a check/console pair.
+  Criticality: low — it is a truthfulness defect in the suite, not a defect in the mechanism.
+  Bundle: Session- & Repo-Hygiene.
+- [ ] 1001. The Sol authoring lane judges commits it only MERGED IN as its own lane's work.
+  MEASURED 28.08.2026 on the point-993 and point-925 runs: `author-sol`'s closing PROBLEMS list
+  named `00503eb6`, `8531d597` and `6ed9f73c` — commits authored by Claude Opus 5 on `main`, which
+  the branch had merged in — as "does not name GPT-5.6 Sol as its author, this lane's commits must"
+  and as "is not an interim rescue commit: its subject does not carry [skip ci]". The point-925 run
+  reported the same about `00503eb`. Both runs were otherwise sound, and the point-993 run's PROBLEMS
+  list consisted of NOTHING BUT these false positives plus one misparse of its own green GATES line.
+  WHAT IT COSTS: the list is the one place a landing session is told what went wrong in a delegated
+  run. Every entry it invents is an entry the reader must refute by hand, and a run whose complaints
+  are all false reads as a run with problems — so the next real entry is read with the same shrug.
+  The lane's own model-authorship rule is also stated wrongly by it: a merged main commit is not
+  this lane's commit and never had to name Sol.
+  FINAL STATE: the lane judges exactly the commits it authored — the ones it recorded itself, or the
+  first-parent commits since the branch point, never what a `main` sync brought along — and the
+  GATES-line check reads a report of three green gates as green.
+  VERIFIABLE: Vitest over the closing report — a branch whose history contains a merge of `main`
+  carrying foreign-authored commits produces a PROBLEMS list naming none of them, while a genuinely
+  mis-trailered commit the lane itself wrote is still named; plus a green three-gate GATES line that
+  the check passes.
+  Criticality: medium — it does not corrupt anything, but it is the delegated run's only defect
+  report, and today it cries wolf.
+  Bundle: Modell & Wächter.
+- [ ] 1003. The bundle membership check reads point numbers out of free prose, and no date filter
+  settles it. MEASURED 28.08.2026 across four cross-vendor review rounds on
+  `scripts/bundle-first-core.mjs` — `4c4b61f`, `0e52672`, `9ff620f`, `11f3163`, every one reviewed
+  by GPT-5.6 Sol and every one refused. `numbersIn` takes each 1-to-4-digit token in a bundle's
+  points cell for a point number and subtracts date shapes first. Each round closed the form the
+  round before had named and earned a new one: the bare year deleted real point numbers 1900-2099,
+  the optional leading day swallowed any number standing in front of a month name, and what is left
+  after bounding both is inherent — a four-digit QUANTITY in prose (`1440 px`) counts as a point,
+  and any date form the strip list does not know leaves its numbers behind. The cause is that the
+  cell stopped being a list: it carries paragraphs of prose per bundle, and a regular expression
+  over prose cannot tell a reference from a measurement.
+  FINAL STATE:
+  - THE CELL SAYS WHICH NUMBERS ARE REFERENCES. A bundle's points are read from an explicit,
+    machine-readable form — a leading number list ahead of the prose, or a marker around each
+    reference — and never from arbitrary prose. The prose stays readable for a human.
+  - NO DIGIT CEILING AND NO DATE GUESSING. Once the reader stops reading prose it needs neither a
+    strip list nor a digit bound, and the class of defect that produced the four refusals is gone
+    rather than narrowed.
+  - THE MIGRATION IS MECHANICAL AND PROVEN: the existing table converts with no membership change,
+    shown by comparing the placed set before and after over the real `docs/work-packages.md`.
+  VERIFIABLE: Vitest over the reader — a cell whose prose contains a date, a four-digit quantity and
+  a number standing in front of a month name yields exactly the referenced points and nothing else;
+  plus a conversion case proving the placed set of the real `docs/work-packages.md` is identical
+  before and after.
+  Criticality: medium — the guard's fail direction is allow, so it under-reports drift rather than
+  blocking work; but it is the only check that keeps the bundle scheme matching the open set.
   Bundle: Session- & Repo-Hygiene.

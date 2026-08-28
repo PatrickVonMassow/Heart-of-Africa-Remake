@@ -47,6 +47,11 @@ describe('numbersIn', () => {
   it('reads point numbers and never a date', () => {
     expect(numbersIn('350, 351, 394 — the rest landed 30.07.2026 (308, 410)')).toEqual([350, 351, 394, 308, 410])
     expect(numbersIn('cut on 29.07.2026')).toEqual([])
+    expect(numbersIn('958, 1000, 1002')).toEqual([958, 1000, 1002])
+    expect(numbersIn('gemessen 2026-08-28 am 24. August 2026')).toEqual([])
+    expect(numbersIn('1002 (measured 2026-08-28, filed August 2026)')).toEqual([1002])
+    expect(numbersIn('point 2026 belongs to this bundle')).toEqual([2026])
+    expect(numbersIn('97 August 2026 and 44 May 2026 name points')).toEqual([97, 44])
     expect(numbersIn('')).toEqual([])
     expect(numbersIn(null)).toEqual([])
   })
