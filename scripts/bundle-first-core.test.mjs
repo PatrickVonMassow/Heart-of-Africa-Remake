@@ -280,6 +280,9 @@ describe('the real docs/work-packages.md', () => {
     for (const bullet of parseUnbundled(md).bullets) for (const n of bullet.points) legacyPlaced.add(n)
 
     const open = parseOpenPoints(readFileSync(repoPath('TASKS.md'), 'utf8'))
+    // Without this the whole comparison passes vacuously on an unreadable or
+    // restructured work order — two empty sets are equal (review finding).
+    expect(open.size).toBeGreaterThan(100)
     const bundles = parseBundles(md)
     const unbundled = parseUnbundled(md).points
     const before = [...open].filter((n) => !legacyPlaced.has(n)).sort((a, b) => a - b)
@@ -295,6 +298,7 @@ describe('the real docs/work-packages.md', () => {
   // membership canonical, which makes the invariant checkable — here.
   it('gives every open point exactly one home', () => {
     const open = parseOpenPoints(readFileSync(repoPath('TASKS.md'), 'utf8'))
+    expect(open.size).toBeGreaterThan(100)
     const homes = new Map()
     for (const bundle of parseBundles(md)) {
       for (const n of bundle.points) if (open.has(n)) homes.set(n, [...(homes.get(n) ?? []), bundle.id])
@@ -304,5 +308,42 @@ describe('the real docs/work-packages.md', () => {
     }
     const twice = [...homes].filter(([, where]) => where.length > 1)
     expect(twice.map(([n, where]) => `${n}: ${where.join(' + ')}`)).toEqual([])
+  })
+
+  // THE HOME IS THE RIGHT ONE, not merely a single one (review finding of the
+  // sixth round: the coverage and count checks cannot see a point filed under
+  // the wrong bundle). A point's own spec names its bundle, so the table is
+  // measured against the work order rather than against itself.
+  it('files every open point under the bundle its own spec names', () => {
+    const tasksMd = readFileSync(repoPath('TASKS.md'), 'utf8')
+    const open = parseOpenPoints(tasksMd)
+    expect(open.size).toBeGreaterThan(100)
+    const blocks = new Map()
+    let current = null
+    for (const line of tasksMd.split('\n')) {
+      const m = /^- \[( |x)\] (\d+)\./.exec(line)
+      if (m) { current = Number(m[2]); blocks.set(current, line); continue }
+      if (current !== null) blocks.set(current, `${blocks.get(current)}\n${line}`)
+    }
+    const bundles = parseBundles(md)
+    const home = new Map()
+    for (const bundle of bundles) for (const n of bundle.points) home.set(n, bundle.id)
+    const unbundled = parseUnbundled(md).points
+
+    let checked = 0
+    const wrong = []
+    for (const n of open) {
+      const named = /^\s*Bundle:\s*(.+?)\s*$/m.exec(blocks.get(n) ?? '')
+      if (!named) continue
+      // The line often continues into prose about coupling, so the bundle is
+      // the NAME the line starts with.
+      const bundle = bundles.find((b) => named[1].startsWith(b.name))
+      if (!bundle) continue
+      checked += 1
+      const filed = home.get(n) ?? (unbundled.has(n) ? 'Not bundled' : 'nowhere')
+      if (filed !== bundle.id) wrong.push(`${n}: spec says ${bundle.id}, table says ${filed}`)
+    }
+    expect(checked).toBeGreaterThan(100)
+    expect(wrong).toEqual([])
   })
 })
