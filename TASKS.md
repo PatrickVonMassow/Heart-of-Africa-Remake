@@ -183,52 +183,6 @@ put it is the mistake this line exists to stop.
   Bundle: Urlaubsfestigkeit. It changes the same decision core as 947's lane, so it does not run
   beside another point touching `scripts/batch-emergency-core.mjs`.
 
-- [ ] 985. Looking at a delegated worktree resets its liveness clock, so a dead author reads as alive.
-  MEASURED 28.08.2026: the OS launcher started this session because no batch writer was running.
-  Point 946's Sol author had died 21 minutes earlier together with the session that spawned it
-  (parent pid 468309 gone, `mayStartDaemon()` false so no daemon owned it, no `author-sol` process
-  anywhere, `local/sol-946.log` frozen on its start banner, and the branch carrying only the
-  commission commit). `batch-in-flight.mjs --agent-check` nevertheless answered
-  `DO NOT REPLACE THIS AGENT — work output 21 min old (git metadata)`, and after one ordinary
-  read-only `git -C <worktree> status` it answered `work output 1 min old`. Isolated in a scratch
-  worktree: age the whole gitdir to two hours, probe (`worktreeActiveAt` reports 2 h, source
-  `git metadata`), run `git status --short --branch`, probe again — 68 ms. Nothing had written to
-  that checkout; `git status` rewrites the index to refresh its stat cache, and
-  `worktreeActiveAt` stats `<gitdir>/index` as work output.
-  WHAT IT COSTS: the probe contaminates the evidence it judges on. `worktreeFilesActiveAt` shells
-  out `git status --porcelain -z` inside the very call, so each `--agent-check` leaves the stamp
-  fresh for the next one, and the runbook's own instruction — look at the worktree before you
-  judge a child — is what keeps the verdict at `alive`. A dead author can therefore hold the
-  `alive` verdict indefinitely while the batch waits on it; tonight it held for 21 minutes and
-  only direct process evidence broke the tie. The code states the opposite invariant in two
-  places: `OUTPUT_KINDS` claims "a reader cannot fake that half: looking at a checkout does not
-  rewrite the files in it", and `porcelainPaths` claims the git-metadata fallback "can only
-  UNDER-report freshness, never invent it". Both are false for `index`.
-  FINAL STATE: no stamp a READER can write may carry an `alive` verdict. `index` leaves the
-  git-metadata set; what remains is what only a WRITER moves — `HEAD`, `COMMIT_EDITMSG`, and the
-  branch tip — plus the working files, which a reader genuinely cannot touch. Where only
-  reader-writable metadata is fresh, the verdict is `unmeasurable`, never `alive`: silence is not
-  death, but neither is an echo of the checker's own call. The two comments above are corrected
-  to what the code then actually guarantees.
-  ALSO IN SCOPE: name every other liveness or progress signal that stats a path an observer
-  writes — the standstill journal's advancing-worktree evidence and the in-flight declaration's
-  `worktree` evidence kind both read this same stamp.
-  VERIFIABLE: Vitest over the pure verdict — a gitdir whose only fresh stamp is `index` yields
-  `unmeasurable` rather than `alive`, while a fresh `COMMIT_EDITMSG`, a fresh branch tip, and a
-  fresh working file each still yield `alive`; plus a CLI-level regression over a real scratch
-  worktree that ages the gitdir, runs `git status`, and asserts the verdict did NOT become
-  `alive`. That last test must call the probe itself — a fixture that recreates the aftermath
-  would stay green over exactly this bug.
-  Criticality: high — it is the sensor the whole unattended batch uses to decide whether a
-  delegated lane is still working, it fails toward "keep waiting", and its failure is sustained
-  by the act of checking.
-  IT MUST NOT UNDO POINT 504's DIRECTION. 504 states, for the whole liveness verdict, that the
-  probe ERRS TOWARD ALIVE at every tie, because a wrong "dead" costs two writers in one worktree.
-  That rule assumes the freshness it weighs is real. This point does not weaken it: it removes a
-  stamp that carries no information at all, so what 504 breaks ties on stays untouched.
-  Bundle: Urlaubsfestigkeit. It reads the same liveness core as 958's emergency lane and 504's
-  verdict, so it does not run beside either.
-
 - [ ] 925. The durable lane is built but neither measured nor journalled, and its failure
   matrix does not touch the real path. Point 676 landed the whole plane — bounded dispatch,
   checkpoint barrier, two-phase boundary, successor reconciliation, landing journal, board
