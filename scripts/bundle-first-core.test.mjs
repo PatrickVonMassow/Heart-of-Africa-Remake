@@ -368,10 +368,11 @@ describe('the real docs/work-packages.md', () => {
       if (filed !== bundle.id) wrong.push(`${n}: spec says ${bundle.id}, table says ${filed}`)
     }
     // The floor is MEASURED, not derived from the same parse (review finding:
-    // counting the checked set against itself is a tautology). 176 open points
-    // named a bundle of this table on 28.08.2026; specs are only ever added, so
-    // a drop below that means the reading broke, not that the work order moved.
-    expect(checked).toBeGreaterThanOrEqual(170)
+    // counting the checked set against itself is a tautology), and it is the
+    // measurement ITSELF — 176 open points named a bundle of this table on
+    // 28.08.2026. A slacker floor would permit exactly the regression it exists
+    // to catch (review finding of the round after). Specs are only ever added.
+    expect(checked).toBeGreaterThanOrEqual(176)
     expect(wrong).toEqual([])
   })
 
@@ -413,5 +414,27 @@ describe('the real docs/work-packages.md', () => {
     }
     expect(checked).toBeGreaterThanOrEqual(100)
     expect(moved).toEqual([])
+  })
+
+  // AND THE ONE TRANSITION THE LOOP ABOVE SKIPS (review finding): a point that
+  // left a bundle for the exemption list. It is skipped there because it has no
+  // bundle to compare, so it is compared here — against the same measurement.
+  it('exempts only points the document already exempted', () => {
+    const measured = JSON.parse(readFileSync(repoPath('scripts/fixtures/work-packages-placed-before-1003.json'), 'utf8'))
+    const open = parseOpenPoints(readFileSync(repoPath('TASKS.md'), 'utf8'))
+    expect(open.size).toBeGreaterThan(100)
+    let checked = 0
+    const newlyExempt = []
+    for (const n of parseUnbundled(md).points) {
+      if (!open.has(n)) continue
+      const listedThen = measured.listedIn[String(n)]
+      if (!listedThen) continue // appended after the measurement
+      checked += 1
+      if (!listedThen.includes('Not bundled')) {
+        newlyExempt.push(`${n}: exempt today, listed then in ${listedThen.join(', ')}`)
+      }
+    }
+    expect(checked).toBeGreaterThan(5)
+    expect(newlyExempt).toEqual([])
   })
 })
