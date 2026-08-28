@@ -1412,7 +1412,7 @@ keinen Träger hat. Gebucht als Punkt 956.
 
 ## Anhang A — Maschinell gepflegte Quellen-Übersicht
 
-Zuletzt aktualisiert: Freitag, 28.08.2026, 14:03 · Quellen-Fingerprint: `2c7d88b73616…`
+Zuletzt aktualisiert: Freitag, 28.08.2026, 20:27 · Quellen-Fingerprint: `90cddae67d92…`
 
 Spalten heuristisch aus den Quellen abgeleitet (Anläufe = distinkte Datumsnennungen im Memory;
 Maßnahme = Guard-Skripte mit Namens-Treffer). Die inhaltliche Bewertung gehört der Prosa oben.
@@ -1515,8 +1515,8 @@ Maßnahme = Guard-Skripte mit Namens-Treffer). Die inhaltliche Bewertung gehört
 
 Erfasste Quellen: 93 Feedback-/Projekt-Memories · 57 Guard-/Hook-Skripte · 6 Revert-/Reapply-Commits · 113 Prozess-/Meta-TASKS-Punkte (davon 48 offen).
 
-<!-- RETRO-FINGERPRINT: 2c7d88b7361621b9514ef3b0c25d77305f2b2810c93d653637320e41912ee575 -->
-<!-- RETRO-LAST-REFRESHED: 2026-08-28T12:03:38.634Z -->
+<!-- RETRO-FINGERPRINT: 90cddae67d920ffbee228b0d677b78cfe9e4eab900ebf58cbd7376e510979f70 -->
+<!-- RETRO-LAST-REFRESHED: 2026-08-28T18:27:30.380Z -->
 <!-- AUTO-GENERATED:END -->
 
 ### 3.111 Ein Erfolg ist kein Beweis für den Weg, auf dem er zustande kam
@@ -4288,6 +4288,30 @@ Und wer eine Eskalation entschärft, muss nachsehen, ob die Auffanglinie darunte
 existiert: Eine laute Fehlreaktion zu entfernen ist nur dann ein Fortschritt, wenn die leise
 Alternative nicht der Stillstand ist. Gebucht als Punkt 964, nach Punkt 945 zu bearbeiten, weil
 beide denselben Tick anfassen.
+
+### 3.200 Vierzehn Prüfrunden auf demselben Modul, und der Endzustand stand schon nach der ersten
+
+Punkt 734 lief am 28.08.2026 durch vierzehn herstellerfremde Prüfrunden — von der 17. bis zur 30.,
+rund neunzig Befunde. Der im Arbeitsauftrag geforderte Endzustand war schon nach der 17. Runde
+erfüllt: Ein Lauf, der eine Ergebniszeile verworfen hat, gilt unabhängig vom Rückgabewert als
+unvollständige Aufnahme und ist unterschrieben schließbar. Alles danach war echte, aber immer
+feinere Arbeit an derselben Stelle: Muster enger fassen, Testfälle schärfen, eine Markierung
+einführen und zwei Runden später wieder zurücknehmen, weil sie einen gesunden Lauf fälschlich als
+unvollständig gemeldet hätte. Zweimal habe ich in einer Runde repariert, was die Runde davor
+eingebaut hatte.
+
+Gestoppt hat das nicht die Einsicht, sondern eine Messung: Der Wächter meldete, dass neun
+aufeinanderfolgende Commits dieser Sitzung dasselbe Modul anfassen, wo acht das gemessene normale
+Maximum sind. Das ist die verlässlichere Kennzahl. Eine Prüfrunde, die Befunde liefert, fühlt sich
+immer nach Fortschritt an — sie liefert ja etwas —, und genau deshalb taugt „die Runde war nicht
+leer" nicht als Abbruchkriterium.
+
+**Lehre:** Der Abbruch einer Prüfschleife gehört an den ENDZUSTAND des Punktes, nicht an die
+Leerheit der nächsten Runde. Ist der geforderte Endzustand erfüllt und belegt, dann ist ein
+weiterer Befund entweder ein Defekt, der einen eigenen Punkt bekommt, oder eine Verfeinerung, die
+niemand bestellt hat. Beides ist ein Grund zu landen, keiner ist ein Grund weiterzumachen. Und wer
+in einer Runde zurücknimmt, was er in der vorigen eingebaut hat, hat den Beleg dafür schon in der
+Hand.
 
 ### 3.112 Eine unvermessene Vermutung im Arbeitsauftrag wird vom Delegierten als Tatsache gebaut
 
