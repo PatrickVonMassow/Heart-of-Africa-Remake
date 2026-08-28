@@ -228,6 +228,20 @@ describe('evaluate — the fail-open exits', () => {
     expect(evaluate({ tasksMd: tasks([540]), workPackagesMd: null }).block).toBe(false)
   })
 
+  it('allows the OTHER half-restructure — the exemptions parse, the table heading does not', () => {
+    const renamed = workPackages({
+      bundles: [['Dorfleben', 'A', '#350']],
+      unbundled: ['- **#285** — the leak hunt.'],
+    }).replace(BUNDLES_HEADING, '## The work packages')
+    expect(evaluate({ tasksMd: tasks([350, 285]), workPackagesMd: renamed }).block).toBe(false)
+  })
+
+  it('allows a table whose rows changed shape while both headings stand', () => {
+    const reshaped = workPackages({ bundles: [['Dorfleben', 'A', '#350']] })
+      .replace('| **Dorfleben** | A |', '- **Dorfleben** (A):')
+    expect(evaluate({ tasksMd: tasks([350, 351]), workPackagesMd: reshaped }).block).toBe(false)
+  })
+
   it('allows a PARTIALLY restructured document — the rows parse, the exemptions do not', () => {
     const renamed = workPackages({
       bundles: [['Dorfleben', 'A', '#350']],
@@ -269,42 +283,33 @@ describe('the real docs/work-packages.md', () => {
     expect(parseUnbundled(md).points.size).toBeGreaterThan(0)
   })
 
-  // THE MIGRATION CHANGED NO MEMBERSHIP (point 1003). The reader that stood
-  // before it is reproduced here — the only place it still exists — and the two
-  // are compared over the REAL document and the REAL work order. What the old
-  // prose reader placed of the OPEN set, the explicit list places too; the
-  // numbers it drops are the ones that were never points at all.
-  it('places exactly what the prose reader placed, over the real work order', () => {
-    const MONTH = String.raw`Januar|Februar|März|Maerz|April|Mai|Juni|Juli|August|September|Oktober|November|Dezember|January|February|March|May|June|July|October|December`
-    const DAY = String.raw`(?:0?[1-9]|[12]\d|3[01])`
-    const MONTH_YEAR = new RegExp(String.raw`\b(?:${DAY}\.?\s+)?(?:${MONTH})\s+\d{4}\b`, 'g')
-    const legacyNumbersIn = (text) => {
-      const stripped = String(text ?? '')
-        .replace(/\b\d{1,2}\.\d{1,2}\.\d{4}\b/g, ' ')
-        .replace(/\b\d{4}-\d{2}-\d{2}\b/g, ' ')
-        .replace(MONTH_YEAR, ' ')
-      return [...stripped.matchAll(/\b(\d{1,4})\b/g)].map((m) => Number(m[1]))
-    }
-    const legacyPlaced = new Set()
-    const section = md.slice(md.indexOf(BUNDLES_HEADING))
-    const table = section.slice(0, section.indexOf(UNBUNDLED_MARKER))
-    for (const line of table.split('\n')) {
-      const cells = line.split('|').map((c) => c.trim())
-      if (cells.length < 6 || !/^[A-Z]$/.test(cells[2])) continue
-      for (const n of legacyNumbersIn(cells[4])) legacyPlaced.add(n)
-    }
-    for (const bullet of parseUnbundled(md).bullets) for (const n of bullet.points) legacyPlaced.add(n)
-
+  // THE MIGRATION CHANGED NO MEMBERSHIP (point 1003). What the prose reader
+  // placed the day before the migration is a MEASUREMENT, and it is kept as one
+  // — reproducing that reader here would read the MIGRATED cells and prove
+  // nothing (review finding). The fixture is never regenerated; it ages out on
+  // its own, because a point that closes leaves the open set on both sides.
+  it('still places every point the prose reader placed and the work order still has open', () => {
+    const measured = JSON.parse(readFileSync(repoPath('scripts/fixtures/work-packages-placed-before-1003.json'), 'utf8'))
     const open = parseOpenPoints(readFileSync(repoPath('TASKS.md'), 'utf8'))
-    // Without this the whole comparison passes vacuously on an unreadable or
-    // restructured work order — two empty sets are equal (review finding).
     expect(open.size).toBeGreaterThan(100)
+    const placedThen = measured.placed.filter((n) => open.has(n))
+    // The old reader placed 609 numbers, most of which were never points; what
+    // matters is the OPEN ones, and there must still be a real set of them.
+    expect(placedThen.length).toBeGreaterThan(100)
+
     const bundles = parseBundles(md)
-    const unbundled = parseUnbundled(md).points
-    const before = [...open].filter((n) => !legacyPlaced.has(n)).sort((a, b) => a - b)
-    const after = unplacedPoints(open, bundles, unbundled)
-    expect(after).toEqual(before)
-    expect(after).toEqual([])
+    const placedNow = new Set(parseUnbundled(md).points)
+    for (const bundle of bundles) for (const n of bundle.points) placedNow.add(n)
+    expect(placedThen.filter((n) => !placedNow.has(n))).toEqual([])
+
+    // And nothing OPEN is placed today that the measurement does not carry —
+    // except points appended after it, which no earlier document could hold.
+    const measuredMax = Math.max(...measured.placed)
+    const gained = [...open].filter((n) => placedNow.has(n) && !measured.placed.includes(n) && n <= measuredMax)
+    expect(gained).toEqual([])
+
+    // Everything open is placed, which is the guard's own verdict.
+    expect(unplacedPoints(open, bundles, placedNow)).toEqual([])
   })
 
   // EXACTLY ONE BUNDLE (the document's own invariant, review finding of the
@@ -322,6 +327,9 @@ describe('the real docs/work-packages.md', () => {
     for (const n of parseUnbundled(md).points) {
       if (open.has(n)) homes.set(n, [...(homes.get(n) ?? []), 'Not bundled'])
     }
+    // Every open point has A home, so the count below cannot pass on an empty
+    // map (review finding), and none has two.
+    expect(homes.size).toBe(open.size)
     const twice = [...homes].filter(([, where]) => where.length > 1)
     expect(twice.map(([n, where]) => `${n}: ${where.join(' + ')}`)).toEqual([])
   })
@@ -359,7 +367,16 @@ describe('the real docs/work-packages.md', () => {
       const filed = home.get(n) ?? (unbundled.has(n) ? 'Not bundled' : 'nowhere')
       if (filed !== bundle.id) wrong.push(`${n}: spec says ${bundle.id}, table says ${filed}`)
     }
-    expect(checked).toBeGreaterThan(100)
+    // The skips are COUNTED rather than tolerated (review finding): every open
+    // point whose spec names a bundle of this table is checked, and the two
+    // counts have to agree, so a spec that stops resolving is a failure here
+    // instead of a silent skip.
+    const nameable = [...open].filter((n) => {
+      const named = /^\s*Bundle:\s*(.+?)\s*$/m.exec(blocks.get(n) ?? '')
+      return Boolean(named && bundles.some((b) => named[1].startsWith(b.name)))
+    })
+    expect(nameable.length).toBeGreaterThan(100)
+    expect(checked).toBe(nameable.length)
     expect(wrong).toEqual([])
   })
 
