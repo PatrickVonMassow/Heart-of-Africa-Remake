@@ -135,6 +135,35 @@ describe('tapOutput — observe-only', () => {
     expect(parseCheckLines(single.state.lines[0])).toEqual([])
   })
 
+  // ...AND THE VARIED MEASUREMENT IS ASKED PER RED, NOT PER LINE (review
+  // finding, 28.08.2026). Two summary lines with DIFFERENT membership have two
+  // different composite keys, so both are kept and the line comparison never
+  // ran — while `failedChecks` still keeps only the FIRST reading of the error
+  // they share. That second reading was lost with nothing marking it, which is
+  // exactly the silent loss this mechanism exists to prevent.
+  it('marks a shared error whose measurement varied between two differently-made lines', () => {
+    const { state, out } = tapped()
+    out.write("console errors: ['the shared error at frame 1: 1.42 m', 'the second error']\n")
+    out.write("console errors: ['the shared error at frame 4: 0.02 m', 'a THIRD error only this line saw']\n")
+    // Both lines are kept — their membership differs — so every red survives.
+    expect(state.lines).toHaveLength(2)
+    const reds = markVariedDetails(failedChecks(state.lines.join('\n')), state.variedKeys)
+    // The shared error reached the record ONCE, carrying the first reading.
+    const shared = reds.filter((r) => r.name.includes('the shared error at frame'))
+    expect(shared).toHaveLength(1)
+    expect(shared[0].detail).toContain('1.42 m')
+    // ...and it is marked, so a narrow charge refuses it instead of owning it
+    // on the one reading that survived.
+    expect(shared[0].detailVaried).toBe(true)
+    const narrow = [{ point: 999, match: /the shared error/i, detailMatch: /1\.42 m/, why: 'the first reading' }]
+    expect(chargeFor(shared[0], { ledger: narrow })).toBeNull()
+    // The reds that printed once are NOT marked — the mark is per red identity,
+    // never a property of the line they arrived on.
+    for (const r of reds.filter((x) => !x.name.includes('the shared error at frame'))) {
+      expect(r.detailVaried, r.name).toBeUndefined()
+    }
+  })
+
   it('joins a line split across two writes', () => {
     const { state, out } = tapped()
     out.write('FAIL  a check ')

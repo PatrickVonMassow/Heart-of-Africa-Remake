@@ -116,33 +116,33 @@ const KEPT_LINE = /^(?:FAIL\s{2,}|ERR:|console errors:|CONSOLE ERRORS:)/
 const CRASH_LINE = /^\s+at .+:\d+:\d+|^(?:Uncaught\s+)?\w*Error(?::|\b)/
 
 /**
- * A kept result line's IDENTITY, as the parser will compute it — the check key
- * for a `FAIL` line, the normalised console key for an `ERR:` line.
+ * A kept result line's REDS, each as the identity the accounting downstream
+ * uses (`<kind>:<key>`, the form `markVariedDetails` reads) and the observation
+ * it printed under it. Null when the parser cannot read the line, which then
+ * stands for itself — exactly the old behaviour. Total.
  *
- * ALL OF THEM, NOT THE FIRST (review finding, 28.08.2026). A `console errors:
- * <texts>` summary line carries SEVERAL reds, and keying the whole line by its
- * FIRST parsed error collapsed two such lines that happened to share it: the
- * second line was dropped from the buffer, so the reds only IT carried never
- * reached `failedChecks()` and disappeared without being fixed, charged or
- * filed — and `variedKeys` marked only the shared first key, so nothing even
- * said a reading had been lost. The identity is therefore the whole parsed SET,
- * in order, which keys a one-red line exactly as before and keeps two summary
- * lines apart whenever they differ in any of their reds.
+ * The line's own buffer identity is these parts JOINED — ALL OF THEM, NOT THE
+ * FIRST (review finding, 28.08.2026). A `console errors: <texts>` summary line
+ * carries SEVERAL reds, and keying the whole line by its FIRST parsed error
+ * collapsed two such lines that happened to share it: the second line was
+ * dropped from the buffer, so the reds only IT carried never reached
+ * `failedChecks()` and disappeared without being fixed, charged or filed.
  *
- * The bound holds: the parts are the parser's own normalised keys (counters and
- * URLs folded away), so a per-frame line still collapses to one entry, and a
- * summary line's key is bounded by the distinct errors the suite reported.
- *
- * A line the parser cannot read is its own identity, which is exactly the old
- * behaviour. Total.
+ * The bound holds either way: the parts are the parser's own normalised keys
+ * (counters and URLs folded away), so a per-frame line still collapses onto one
+ * identity however many times it prints, and a summary line's composite is
+ * bounded by the distinct errors the suite reported.
  */
-function resultKey(line) {
+function resultParts(line) {
   try {
     const parsed = [...parseCheckLines(line), ...consoleErrorChecks(line)]
-    if (parsed.length === 0 || parsed.some((p) => !p?.key)) return line
-    return parsed.map((p) => `${p.kind}:${p.key}`).join(' + ')
+    if (parsed.length === 0 || parsed.some((p) => !p?.key)) return null
+    // The measurement is what the RECORD would keep for this red — its name and
+    // its detail — so "it printed differently the second time" is asked of
+    // exactly the two fields a charge can read.
+    return parsed.map((p) => ({ id: `${p.kind}:${p.key}`, seen: `${p.name}\u0000${p.detail ?? ''}` }))
   } catch {
-    return line
+    return null
   }
 }
 
@@ -167,25 +167,39 @@ export function tapOutput(state, streams = [[process.stdout, false], [process.st
   // the parser's own (`failedChecks` de-duplicates by it anyway), so collapsing
   // here changes no verdict while bounding the buffer by the suite's checks
   // instead of by its chatter.
-  const firstOfKey = new Map()
+  const keptKeys = new Set()
+  // A VARIED MEASUREMENT IS A FACT ABOUT ONE RED, NOT ABOUT A LINE (review
+  // finding, 28.08.2026). Marking the LINE's composite key missed the case the
+  // whole mechanism exists for: `[A(reading 1), B]` followed by `[A(reading 2),
+  // C]` are two DIFFERENT composite keys, so both lines are kept and nothing
+  // was ever compared — yet `failedChecks` still de-duplicates A by its own key
+  // and keeps only reading 1, so reading 2 was lost silently and a narrow
+  // charge could then own A on the reading that happened to survive. (The
+  // composite key also matched nothing downstream, where `markVariedDetails`
+  // asks per red identity.) So the first observation of each PARSED identity is
+  // remembered, and a later, different one marks that identity. Bounded the
+  // same way the buffer is: one entry per distinct red.
+  const firstSeenOfPart = new Map()
   const take = (stream, isErr, text) => {
     const lines = ((pending.get(stream) ?? '') + text).split('\n')
     pending.set(stream, lines.pop() ?? '')
     for (const line of lines) {
       if (isErr && CRASH_LINE.test(line)) state.crashed = true
       if (!KEPT_LINE.test(line)) continue
-      const key = resultKey(line)
-      const first = firstOfKey.get(key)
-      if (first === undefined) {
-        firstOfKey.set(key, line)
-        state.lines.push(line)
-        continue
+      const parts = resultParts(line)
+      for (const part of parts ?? []) {
+        const seen = firstSeenOfPart.get(part.id)
+        if (seen === undefined) firstSeenOfPart.set(part.id, part.seen)
+        // The SAME red printed with a DIFFERENT measurement. The record can hold
+        // only one, so the difference is remembered as a fact about that red: a
+        // narrow charge then refuses it instead of owning it on the single
+        // reading that survived.
+        else if (seen !== part.seen && state.variedKeys instanceof Set) state.variedKeys.add(part.id)
       }
-      // The SAME red printed with a DIFFERENT measurement. The record can hold
-      // only one, so the difference is remembered as a fact about the key: a
-      // narrow charge then refuses this red instead of owning it on the single
-      // reading that survived.
-      if (first !== line && state.variedKeys instanceof Set) state.variedKeys.add(key)
+      const key = parts === null ? line : parts.map((p) => p.id).join(' + ')
+      if (keptKeys.has(key)) continue
+      keptKeys.add(key)
+      state.lines.push(line)
     }
   }
   const isErrOf = new Map(streams)
