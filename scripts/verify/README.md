@@ -1281,6 +1281,23 @@ new record can therefore never truncate: every observed red keeps its identity
 and stays closable the three ordinary ways of point 640, whatever the flood
 around it.
 
+### The record keeps the MEASUREMENT, so a charge can be applied afterwards
+
+A stored red used to be `name`/`key`/`kind`/`point` and nothing else. That was
+enough for a `match` charge, which reads the name — and never enough for a
+`detailMatch` charge, which reads the printed measurement: re-read from disk the
+detail was always empty, so the ledger's narrowest instrument could only ever
+fire while a run was being written. Measured 28.08.2026: all 17 reds in the
+state window carried key/kind/name/point and no detail, so the entry scoped to
+the point-694 children signature reached none of them.
+
+The record now keeps the detail too, bounded at 200 characters, and `chargeReds`
+evaluates the charge against the STORED red rather than against the unbounded
+parse — so what was matched is exactly what was kept, and a signature past the
+bound matches at record time no more than it does afterwards. Reds recorded
+before this repair carry no detail and stay out of a `detailMatch` entry's
+reach; that information was never written down and nothing can recover it.
+
 ### The records written before that fix (the legacy `incomplete` class)
 
 Records already on file (the two truncated `webgpu/settings` runs of

@@ -237,13 +237,35 @@ export function chargeFor(red, options) {
 export function chargeReds(reds, options) {
   const { suite = '', backend = '', featureLevel = null, ledger = RED_CHARGES } = options ?? {}
   return (Array.isArray(reds) ? reds : []).map((red) => {
-    const charge = chargeFor(red, { suite, backend, featureLevel, ledger })
-    return {
-      name: text(red?.name).slice(0, 200),
+    // THE RECORD IS WHAT IS CHARGED, AND THE RECORD KEEPS THE MEASUREMENT
+    // (point 734). Both halves of that sentence answer the same defect.
+    //
+    // The record used to keep name/key/kind/point and DROP the detail, so a
+    // `detailMatch` charge — the narrowest kind the ledger has — could only ever
+    // fire at record time: re-read afterwards, `chargeFor` saw an empty detail
+    // and refused, which made the retroactive reading `owned()` performs a
+    // guaranteed miss for exactly the entries scoped most carefully (measured
+    // 28.08.2026: all 17 recorded reds carried key/kind/name/point and no
+    // detail). Keeping the detail is what lets a ledger entry written TODAY own
+    // a red recorded YESTERDAY, which is the retroactivity this point promises.
+    //
+    // And the charge is evaluated against the STORED shape, not against the
+    // parse it came from: name and detail are bounded here, so charging the
+    // unbounded parse could stamp a point that the stored red can never
+    // reproduce. What was matched is exactly what was kept.
+    const stored = {
+      name: text(red?.name).slice(0, MAX_RED_NAME_LEN),
       key: red?.key ?? '',
       kind: red?.kind === 'console' ? 'console' : 'check',
-      point: charge ? charge.point : null,
+      point: null,
     }
+    // Absent rather than empty: a red that printed no measurement adds no field,
+    // so records of reds that never had one keep the shape they always had.
+    const detail = text(red?.detail).slice(0, MAX_RED_DETAIL_LEN)
+    if (detail) stored.detail = detail
+    const charge = chargeFor(stored, { suite, backend, featureLevel, ledger })
+    stored.point = charge ? charge.point : null
+    return stored
   })
 }
 
@@ -266,6 +288,14 @@ const MAX_SUSPECT_NAMES = 8
  *  what was never carried cannot be charged, and must keep the run blocked. */
 export const TRUNCATED_KIND = 'truncated'
 const MAX_SUSPECT_NAME_LEN = 200
+/** How much of a red's printed name and measurement the record keeps. The
+ *  record is a durable file that every later judgment re-reads, so both are
+ *  bounded — and a `detailMatch` signature therefore has to sit inside the
+ *  first MAX_RED_DETAIL_LEN characters of the printed detail. That is not a
+ *  hidden trap: `chargeReds` charges the TRUNCATED text, so a signature past
+ *  the bound matches at record time no more than it does afterwards. */
+const MAX_RED_NAME_LEN = 200
+const MAX_RED_DETAIL_LEN = 200
 
 /** A value as text, or '' — `String(x)` itself throws on an object whose
  *  toString does, and these two must be total on whatever a suite printed. */

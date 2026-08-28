@@ -176,6 +176,20 @@ describe('the captured lines charge the way the guard reads them', () => {
     expect(pointOf('a NEW check nobody has filed')).toBeNull()
   })
 
+  it('keeps the printed measurement on the stored red, through the real tap', () => {
+    // A red that reaches the record carries the MEASUREMENT it printed, not
+    // only its name (point 734, review finding F1). Without it the ledger's
+    // narrowest instrument — `detailMatch` — could never be applied to a run
+    // already on disk, so an entry written today reached nothing recorded
+    // yesterday, which is the retroactivity this point exists to deliver.
+    const { state, out, flush } = tapped()
+    out.write('FAIL  no child walks without getting anywhere — worst child 1 at 22.2s, 1.42 m walked inside 0.31 m\n')
+    flush()
+    const [stored] = chargeReds(failedChecks(state.lines.join('\n')), { suite: 'polish', backend: 'webgpu' })
+    expect(stored.detail).toContain('1.42 m walked inside 0.31 m')
+    expect(stored.point).toBe(694)
+  })
+
   it('charges the same output to the OTHER point on the other lane, where the goat red is real', () => {
     // The WebGPU entry disclaims the hardware lane in its own words, so a
     // hardware-lane occurrence is charged to nobody and blocks. Charging it to

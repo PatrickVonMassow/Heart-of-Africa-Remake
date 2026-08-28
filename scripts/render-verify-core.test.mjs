@@ -1825,17 +1825,17 @@ describe('the shipped charge ledger', () => {
     expect(chargeFor(measured, { suite: 'polish', backend: 'webgpu' })).toBeNull()
   })
 
-  it('a detailMatch charge fires at RECORD time and can never be applied afterwards', () => {
-    // MEASURED 14.08.2026, through the real parser and the real recorder path.
-    // A suite prints `FAIL  <name> — <detail>`; failedChecks parses the detail
-    // out, so chargeReds CAN read it and stamps the point. What it then STORES
-    // is name/key/kind/point — the detail is dropped, and 0 of 99 recorded reds
-    // carry one. So the ledger's promise that a charge "counts at once, no
-    // re-run needed" holds for `match` and NOT for `detailMatch`: a red that was
-    // already recorded can never be charged retroactively, which is why a
-    // WebGPU children red of 14.08.2026 stayed unexplained after its entry was
-    // written. Point 694 owns the repair. Fail-safe either way — an unmatched
-    // red stays loudly uncharged, it is never blessed.
+  it('a detailMatch charge reaches a red that was RECORDED BEFORE its entry existed', () => {
+    // MEASURED 14.08.2026, through the real parser and the real recorder path,
+    // and REPAIRED 28.08.2026 (point 734, review finding F1). A suite prints
+    // `FAIL  <name> — <detail>`; failedChecks parses the detail out, so
+    // chargeReds can read it and stamp the point. What it STORED used to be
+    // name/key/kind/point alone — the detail was dropped, 0 of 99 recorded reds
+    // carried one — so `owned()` re-reading the ledger over a stored red always
+    // saw an empty detail and refused. The ledger's promise that a charge
+    // "counts at once, no re-run needed" therefore held for `match` and NOT for
+    // `detailMatch`, the narrowest kind it has, which is why a WebGPU children
+    // red of 14.08.2026 stayed unexplained after its entry was written.
     const line =
       'FAIL  no child walks without getting anywhere — worst child 1 at 0.29 % of its own judged ' +
       'time — worst child 1 at 22.2s, 1.42 m walked inside 0.31 m  [--section=children-motion]'
@@ -1846,16 +1846,47 @@ describe('the shipped charge ledger', () => {
     const [stored] = chargeReds([parsed], { suite: 'polish', backend: 'webgpu' })
     expect(stored.point).toBe(694)
 
-    // What survives into the record carries no detail.
-    expect(stored.detail).toBeUndefined()
+    // AND THE MEASUREMENT SURVIVES INTO THE RECORD, which is what makes the
+    // charge re-readable at all.
+    expect(stored.detail).toContain('1.42 m walked inside 0.31 m')
 
-    // AND THE CASE THAT ACTUALLY BIT: a red recorded BEFORE the entry existed —
-    // uncharged, and without the detail the new entry would need. Adding the
-    // entry afterwards cannot reach it, however the ledger now reads.
+    // THE CASE THAT ACTUALLY BIT: a red recorded BEFORE the entry existed —
+    // uncharged then, because the ledger of that day owned nothing. Reading the
+    // ledger over the STORED red today now reaches it, and that is the
+    // retroactivity point 734 promises.
     const [beforeTheRule] = chargeReds([parsed], { suite: 'polish', backend: 'webgpu', ledger: [] })
     expect(beforeTheRule.point).toBeNull()
-    expect(beforeTheRule.detail).toBeUndefined()
-    expect(chargeFor(beforeTheRule, { suite: 'polish', backend: 'webgpu' })).toBeNull()
+    expect(beforeTheRule.detail).toContain('1.42 m walked inside 0.31 m')
+    expect(chargeFor(beforeTheRule, { suite: 'polish', backend: 'webgpu' })?.point).toBe(694)
+
+    // A RED THAT PRINTED NO MEASUREMENT ADDS NO FIELD — records of such reds
+    // keep exactly the shape they have always had.
+    const [plain] = chargeReds([{ name: 'frame 11-worldmodel-khartoum-confluence', kind: 'check' }], {
+      suite: 'world',
+      backend: 'webgpu',
+    })
+    expect(plain.detail).toBeUndefined()
+  })
+
+  it('charges the STORED red, so a signature past the record\u2019s bound matches at neither time', () => {
+    // The record is bounded (200 characters of detail), and the charge is
+    // evaluated against that bounded text. Were the unbounded parse charged
+    // instead, a signature sitting past the bound would stamp a point at record
+    // time that the stored red could never reproduce — the record would claim an
+    // owner nothing can re-derive. Both readings say the same thing here.
+    const ledger = [{ point: 694, suite: 'polish', kind: 'check', match: /flooded check/i, detailMatch: /BURIED SIGNATURE/ }]
+    const red = {
+      name: 'flooded check',
+      key: 'flooded check',
+      kind: 'check',
+      detail: `${'x'.repeat(300)} BURIED SIGNATURE`,
+    }
+    // The parse would match; the record cannot keep the signature.
+    expect(chargeFor(red, { suite: 'polish', backend: 'webgpu', ledger })?.point).toBe(694)
+    const [stored] = chargeReds([red], { suite: 'polish', backend: 'webgpu', ledger })
+    expect(stored.detail).toHaveLength(200)
+    expect(stored.point).toBeNull()
+    expect(chargeFor(stored, { suite: 'polish', backend: 'webgpu', ledger })).toBeNull()
   })
 
   it('charges the same composition on the OTHER backend to the same owner, by its own signature', () => {
