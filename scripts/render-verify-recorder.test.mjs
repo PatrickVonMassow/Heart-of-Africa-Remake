@@ -10,8 +10,8 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { execFileSync } from 'node:child_process'
 import { tapOutput } from './render-verify-recorder.mjs'
-import { failedChecks } from './verify/baseline-classify-core.mjs'
-import { RETRY_ENV, chargeReds, formatSuspectEnv, runVerdict } from './render-verify-core.mjs'
+import { consoleErrorChecks, failedChecks, parseCheckLines } from './verify/baseline-classify-core.mjs'
+import { RETRY_ENV, chargeFor, chargeReds, formatSuspectEnv, markVariedDetails, runVerdict } from './render-verify-core.mjs'
 
 // The record is stubbed, not written: these cases exercise the REAL arming and
 // the REAL exit handler, and a test must never append to the checkout's own
@@ -188,6 +188,38 @@ describe('the captured lines charge the way the guard reads them', () => {
     const [stored] = chargeReds(failedChecks(state.lines.join('\n')), { suite: 'polish', backend: 'webgpu' })
     expect(stored.detail).toContain('1.42 m walked inside 0.31 m')
     expect(stored.point).toBe(694)
+  })
+
+  it('refuses a NARROW charge when the same check printed two different measurements', () => {
+    // The record holds one entry per check key, so the second measurement of a
+    // check that failed twice is dropped (review finding, 28.08.2026). If a
+    // signature matched the FIRST one, the second — which nothing owns — would
+    // disappear behind the charge. It is marked instead, and the narrow charge
+    // refuses it: loudly uncharged beats quietly excused.
+    const { state, out, flush } = tapped()
+    out.write('FAIL  no child walks without getting anywhere — worst child 1 at 22.2s, 1.42 m walked inside 0.31 m\n')
+    out.write('FAIL  no child walks without getting anywhere — worst child 4 at 51.0s, 0.02 m walked inside 0.30 m\n')
+    flush()
+    const output = state.lines.join('\n')
+    const observed = [...parseCheckLines(output), ...consoleErrorChecks(output)]
+    const [stored] = chargeReds(markVariedDetails(failedChecks(output), observed), { suite: 'polish', backend: 'webgpu' })
+    expect(stored.detailVaried).toBe(true)
+    expect(stored.point).toBeNull()
+    // The mark survives to the RE-READ, or owned() would charge afterwards what
+    // the recorder refused.
+    expect(chargeFor(stored, { suite: 'polish', backend: 'webgpu' })).toBeNull()
+
+    // One measurement, one reading: the ordinary case is untouched.
+    const single = tapped()
+    single.out.write('FAIL  no child walks without getting anywhere — worst child 1 at 22.2s, 1.42 m walked inside 0.31 m\n')
+    single.flush()
+    const one = single.state.lines.join('\n')
+    const [ok] = chargeReds(
+      markVariedDetails(failedChecks(one), [...parseCheckLines(one), ...consoleErrorChecks(one)]),
+      { suite: 'polish', backend: 'webgpu' },
+    )
+    expect(ok.detailVaried).toBeUndefined()
+    expect(ok.point).toBe(694)
   })
 
   it('charges the same output to the OTHER point on the other lane, where the goat red is real', () => {

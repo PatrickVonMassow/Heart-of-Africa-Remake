@@ -379,6 +379,15 @@ function signedClosureDraft(state, options, family) {
   // Several matches that are one and the same CONTENT are one identity — sign
   // it once. Distinct contents are distinct judgments: refuse, and offer each
   // by the id that separates them even where their stamps cannot.
+  //
+  // "ONE SIGNATURE PER RUN" IS THEREFORE ONE SIGNATURE PER RECORDED CONTENT,
+  // and the two coincide for anything a real lane can produce (review question,
+  // 28.08.2026): `runIdentity` hashes the WHOLE record canonically — both
+  // stamps, the exit, the screenshot count, every red — so two runs that really
+  // happened differ in it. Records that do NOT differ are the same measurement
+  // written twice, about which nobody could say two different things, and one
+  // disposition is the honest answer rather than a demand for two identical
+  // sentences. Pinned in render-verify-guard.test.mjs.
   const distinct = new Set(open.map((r) => runIdentity(r)))
   if (distinct.size > 1) {
     return {

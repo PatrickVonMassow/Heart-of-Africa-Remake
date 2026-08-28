@@ -165,14 +165,53 @@ describe('the Stop hook re-baselines on that error and only that one', () => {
 // state the guard reads, so a closure can only ever name a run that is really
 // recorded and not already signed off.
 describe('openIncompleteRuns — what the sign-off may close', () => {
-  const truncated = (at) => ({
+  // THE MARKER AS IT WAS REALLY WRITTEN TO DISK, in both shapes (review
+  // finding, 28.08.2026: the fixture carried the new `kind` AND the legacy key,
+  // so it satisfied both branches at once and proved neither). The records this
+  // path exists for are the LEGACY ones — a plain `check` under the stable key,
+  // which is what the recorder wrote before the cap was removed — while the
+  // `truncated` kind is what a record would carry had it been written after it.
+  const LEGACY_MARKER = { name: "115 further result line(s) exceeded the capture cap — this run's reds were NOT all read", key: 'capture-truncated', kind: 'check', point: null }
+  const KIND_MARKER = { name: '115 further result line(s) exceeded the capture cap', key: 'a key nothing special', kind: 'truncated', point: null }
+  const truncatedWith = (marker) => (at) => ({
     backend: 'webgpu',
     suite: 'settings',
     at,
     exit: 1,
-    reds: [{ name: "115 further result line(s) exceeded the capture cap — this run's reds were NOT all read", key: 'capture-truncated', kind: 'truncated', point: null }],
+    reds: [marker],
   })
+  const truncated = truncatedWith(LEGACY_MARKER)
   const ordinary = (at) => ({ backend: 'webgpu', suite: 'polish', at, exit: 1, reds: [{ name: 'a real red', kind: 'check', point: null }] })
+
+  it('reads BOTH recorded marker shapes — the legacy check and the truncated kind', () => {
+    for (const [what, make] of [['legacy', truncatedWith(LEGACY_MARKER)], ['kind', truncatedWith(KIND_MARKER)]]) {
+      const r = make(1500)
+      expect(openIncompleteRuns({ runs: [r] }).map((x) => x.at), what).toEqual([1500])
+      const draft = incompleteClosureDraft({ runs: [r] }, { selector: 'webgpu/settings', evidence: 'the kept log stops mid-line' })
+      expect(draft.closure?.run, what).toBe(runIdentity(r))
+    }
+  })
+
+  // "One signature per run" is one signature per recorded CONTENT, and the two
+  // coincide for anything a lane can really produce (review question,
+  // 28.08.2026): runIdentity hashes the whole record, so two runs that really
+  // happened differ in it and are refused as two judgments; a record written
+  // twice is one measurement and takes one disposition.
+  it('signs two DIFFERENT open runs apart, and the same content once', () => {
+    const a = truncated(1500)
+    const b = truncated(1600)
+    expect(runIdentity(a)).not.toBe(runIdentity(b))
+    const two = incompleteClosureDraft({ runs: [a, b] }, { selector: 'webgpu/settings', evidence: 'e' })
+    expect(two.closure).toBeUndefined()
+    expect(two.error).toMatch(/matches 2 open incomplete recordings/)
+    expect(two.choices).toHaveLength(2)
+    // The same content twice is ONE identity and one signature — and that one
+    // signature closes both copies, because they are the same measurement.
+    const twice = incompleteClosureDraft({ runs: [a, { ...a }] }, { selector: 'webgpu/settings', evidence: 'e' })
+    expect(twice.error).toBeUndefined()
+    expect(twice.closure.run).toBe(runIdentity(a))
+    expect(openIncompleteRuns({ runs: [a, { ...a }], incompleteClosures: [twice.closure] })).toEqual([])
+  })
 
   it('lists the truncated runs and nothing else', () => {
     const open = openIncompleteRuns({ runs: [truncated(1500), ordinary(1600), { backend: 'webgl', suite: 'x', at: 1700, exit: 0 }] })

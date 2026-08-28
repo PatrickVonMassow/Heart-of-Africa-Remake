@@ -40,9 +40,9 @@ import { spawnSync } from 'node:child_process'
 import { readdirSync, statSync } from 'node:fs'
 import { fileURLToPath } from 'node:url'
 import { recordRun } from './render-verify-state.mjs'
-import { failedChecks } from './verify/baseline-classify-core.mjs'
+import { consoleErrorChecks, failedChecks, parseCheckLines } from './verify/baseline-classify-core.mjs'
 import { SECTION_ENV, sectionGateWasBuilt } from './verify/sections.mjs'
-import { RETRY_ENV, chargeReds, parseSuspectReds } from './render-verify-core.mjs'
+import { RETRY_ENV, chargeReds, markVariedDetails, parseSuspectReds } from './render-verify-core.mjs'
 
 // Resolved from this module's own location where that is possible, with a
 // working-directory fallback: under the test runner `import.meta.url` is not
@@ -286,7 +286,13 @@ export function armRunRecorder(backend) {
         let reds = []
         if (exit !== 0) {
           try {
-            reds = chargeReds(failedChecks(armed.lines.join('\n')), {
+            const output = armed.lines.join('\n')
+            // The WHOLE parsed set, before the de-duplication by key — a check
+            // that failed twice with two different measurements must reach the
+            // record marked as such, or a narrow charge would own the one
+            // reading it matched and lose the other (review, 28.08.2026).
+            const observed = [...parseCheckLines(output), ...consoleErrorChecks(output)]
+            reds = chargeReds(markVariedDetails(failedChecks(output), observed), {
               suite: armed.suite,
               backend: armed.backend,
               // The WebGPU feature level this run really came up at, so a charge

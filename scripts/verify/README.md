@@ -1298,6 +1298,16 @@ bound matches at record time no more than it does afterwards. Reds recorded
 before this repair carry no detail and stay out of a `detailMatch` entry's
 reach; that information was never written down and nothing can recover it.
 
+**A measurement that varied inside one run cannot be signed for.** The record
+holds one entry per check key, so a check that failed twice printing two
+different measurements keeps the first — and a signature matching that one
+would have owned the key while the second, unowned observation disappeared. The
+collapse stays (keeping every distinct detail re-opens exactly the unbounded
+growth the cap removal ended: a per-frame error whose text carries a counter
+mints a new detail every frame), so the recorder marks such a red instead and
+the narrow charge refuses it. Loudly uncharged beats quietly excused; a broad
+`match` entry is unaffected, because it never claimed to read a measurement.
+
 ### Owning and covering are two questions, and each has ONE answer
 
 - **Does an open point own this red?** Read the ledger AS IT STANDS NOW.

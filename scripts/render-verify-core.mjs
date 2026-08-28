@@ -225,13 +225,54 @@ export function chargeFor(red, options) {
       // Some checks have more than one red cause behind the same stable label.
       // Such a charge must name the measured signature in the detail instead
       // of swallowing every future failure of that check.
-      if (charge.detailMatch && !charge.detailMatch?.test?.(detail)) continue
+      //
+      // AND A MEASUREMENT THAT VARIED WITHIN THE RUN CANNOT BE SIGNED FOR
+      // (review finding, 28.08.2026). The record holds ONE entry per check key,
+      // so a check that failed twice with two different measurements keeps only
+      // the first. If a signature matched that one, the other observation —
+      // which nothing owns — would vanish behind the charge. The recorder marks
+      // such a red instead, and here the narrow charge simply refuses it: it
+      // stays loudly uncharged and closes the three ordinary ways. A broad
+      // `match` entry is unaffected, because it never claimed to read a
+      // measurement in the first place.
+      if (charge.detailMatch && (red?.detailVaried === true || !charge.detailMatch?.test?.(detail))) continue
       return charge
     } catch {
       /* a broken ledger entry charges nothing — the red stays unaccounted */
     }
   }
   return null
+}
+
+/**
+ * MARK THE REDS WHOSE MEASUREMENT VARIED WITHIN ONE RUN (review finding,
+ * 28.08.2026). `failedChecks` keeps ONE entry per check key — the first — so a
+ * check that failed twice printing two different measurements reaches the
+ * record as a single red carrying the first one. A `detailMatch` signature that
+ * happened to match that first reading would then own the whole key, and the
+ * second, unowned observation would be gone without anybody deciding anything.
+ *
+ * The collapse itself is deliberate and stays: identity is the key, and keeping
+ * every distinct detail would re-open the unbounded growth the capture cap was
+ * removed to end — a per-frame error whose text carries a counter mints a new
+ * detail every frame. So the record keeps the first measurement AND the fact
+ * that it was not the only one, and the narrow charge refuses such a red.
+ *
+ * `observed` is the run's WHOLE parsed result set (before the de-duplication),
+ * `reds` the de-duplicated failures. Total: unreadable input marks nothing.
+ */
+export function markVariedDetails(reds, observed) {
+  const seen = new Map()
+  for (const o of Array.isArray(observed) ? observed : []) {
+    if (!o || o.status !== 'FAIL') continue
+    const key = text(o.key)
+    if (!seen.has(key)) seen.set(key, new Set())
+    seen.get(key).add(text(o.detail).slice(0, MAX_RED_DETAIL_LEN))
+  }
+  return (Array.isArray(reds) ? reds : []).map((red) => {
+    const details = seen.get(text(red?.key))
+    return details && details.size > 1 ? { ...red, detailVaried: true } : red
+  })
 }
 
 /** Every red of a run, each with the point it is charged to (null: nothing owns
@@ -266,6 +307,10 @@ export function chargeReds(reds, options) {
     // so records of reds that never had one keep the shape they always had.
     const detail = text(red?.detail).slice(0, MAX_RED_DETAIL_LEN)
     if (detail) stored.detail = detail
+    // Kept on the record, because the reading has to survive to the re-read:
+    // otherwise `owned()` would charge afterwards exactly the red the recorder
+    // refused to charge.
+    if (red?.detailVaried === true) stored.detailVaried = true
     const charge = chargeFor(stored, { suite, backend, featureLevel, ledger })
     stored.point = charge ? charge.point : null
     return stored
