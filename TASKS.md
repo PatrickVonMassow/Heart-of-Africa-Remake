@@ -13107,3 +13107,25 @@ to land than a mechanism that needs a review.
   still yields `agreement`.
   Criticality: low — it is fail-closed and misleads only the diagnosis, never the gate.
   Bundle: Modell & Wächter.
+- [ ] 989. A current-work card's ESTIMATE has no board command, so changing it costs two focus
+  transitions. MEASURED 28.08.2026 while working point 734. `dashboard-guard`'s `now-eta-soon`
+  audit refuses the stop until the card carries a realistic new `~HH:MM`, and `scripts/board.mjs`
+  has no command that writes one: `now` takes the estimate from the QUEUE card, `promote` refuses
+  a point that is already current work, and `title` writes the title alone. The only route left
+  is `queue` then `promote` — two focus transitions, two publishes, and a window in which the
+  board shows no current work at all, for what is a one-field edit. It is exactly the gap point
+  439 closed for the TITLE, left open for the estimate printed beside it.
+  WHAT IT COSTS: the detour is not merely clumsy. `queue` declares the focus EMPTY and `promote`
+  declares it again, so every guard that reads the focus sees the point leave and re-enter the
+  board for a timestamp change; a reader refreshing in that window sees a batch with nothing in
+  hand. The pressure is toward the cheaper wrong move — leaving a stale estimate standing, which
+  is the broken promise the audit exists to prevent.
+  FINAL STATE: one command writes the estimate of a card that is already current work, without
+  touching the focus — `node scripts/board.mjs eta <point> "<times>"`, or an `--eta` option on
+  `status`. It writes the meta chip and the queue data the same way `title` writes both, so a
+  queue rebuild does not undo it, and it refuses a point that has no current-work card.
+  VERIFIABLE: Vitest over the pure edit — the estimate of an existing now-card changes while its
+  title, body and stamp stay; the focus record is untouched; an unknown point is refused. Plus a
+  case proving the written value satisfies `auditDashboard` where the old one did not.
+  Criticality: low — it costs turns and tempts a stale estimate; it hides no defect.
+  Bundle: Chat & Tafel.

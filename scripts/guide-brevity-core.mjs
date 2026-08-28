@@ -209,7 +209,21 @@ export const LIMITS = {
   // costs more than the unsound one-liner it replaces, and the entry was tightened a SECOND time
   // (the risk clause and the prompt both) before those three were taken. Not escalated to the
   // user, under his general withdrawal of ask-before-raising of 10.08.2026.
-  maxLines: 489,
+  //
+  // 28.08.2026, one genuinely new lesson: a justification that refutes itself inside its own
+  // document. A safety argument and its own counter-example stood three sections apart in one
+  // file, and four cross-vendor rounds saw one half each, because the material is cut into passes
+  // by SIZE — so the contradiction was invisible to every single pass. The transferable prompt is
+  // to check a new justification against what the same document already claims, and to read a
+  // contradiction in the prose as a finding about the CODE. Written first at five lines with a
+  // three-clause risk half, then cut to five with a two-clause one and the prompt folded into a
+  // single sentence, as the shortening step this rule demands. The neighbouring entries were read
+  // for redundancy: the closest is the "priority in prose does not act" entry, which is about a
+  // rule nothing enforces, not about two claims contradicting each other, and neither could be
+  // cut without dropping a claim. Net +6 lines / +57 words against the measured 489 / 4405, and
+  // the ceilings move by exactly that to 495 / 4462, with zero slack. Not escalated to the user,
+  // under the same general withdrawal of 10.08.2026.
+  maxLines: 495,
   // EXACT FIT, not headroom — corrected 30.07.2026 after the four-eyes review
   // pointed out that this comment had long stopped describing the numbers. The
   // rule above ("raised only by the measured size of genuinely new tips")
@@ -396,7 +410,7 @@ export const LIMITS = {
   // 28.08.2026: the self-measuring-monitor lesson justified beside maxLines measures 4405 words
   // after its review correction, so this ceiling follows its +64-word net exactly; the guide keeps
   // no unearned headroom.
-  maxWords: 4405,
+  maxWords: 4462,
   // A pitfall entry = the risk lines plus its prompt. Anything longer is a
   // story, not a tip.
   maxEntryLines: 11,

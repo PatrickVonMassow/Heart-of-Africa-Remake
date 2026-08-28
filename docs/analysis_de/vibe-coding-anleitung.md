@@ -334,6 +334,12 @@ Die Ursache findest du durch **Zerlegen**, nicht durch Wiederholen.
   eine Prüfung fehl. Priorisiere das **Ziel** — und sag bei jeder Sortierregel, was mit dem
   **Altbestand** geschieht: nachräumen oder liegen lassen."
 
+- **Die Begründung, die sich im eigenen Dokument widerlegt.** Ein Sicherheitsargument und sein
+  Gegenbeweis standen drei Abschnitte auseinander; vier Prüfrunden sahen je eine Hälfte, weil der
+  Prüfstoff nach Größe geschnitten wird.
+  → *Prompt:* „Prüf jede Rechtfertigung gegen das, was im selben Dokument schon behauptet wird —
+  ein **Widerspruch in der Prosa** ist ein Befund über den **Code**."
+
 - **Blockiert heißt nicht: du bist dran.** Fehlt eine Berechtigung, bekommst du gern einen
   Befehl gereicht — oft einen, der gar nicht funktionieren kann.
   → *Prompt:* „Ein Schritt in deiner Umgebung gehört dir; **miss** erst, ob er trägt. Fehlt eine
@@ -486,4 +492,4 @@ Die Ursache findest du durch **Zerlegen**, nicht durch Wiederholen.
 
 Sie ersetzt die Fallstricke oben nicht.
 
-<!-- GUIDE-FINGERPRINT: 424f7a81903a893e11dec39978d808cc322692c3bc94ab9e9df34bcf485045a1 -->
+<!-- GUIDE-FINGERPRINT: dbb61c72b70453fafb2be700bc01630ce46e3b6b1cb192d86b50ec394d82a445 -->
