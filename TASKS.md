@@ -13130,3 +13130,28 @@ to land than a mechanism that needs a review.
   writes a false authorship record on every landing and would block a review outright the first
   time that changes.
   Bundle: Modell & Wächter.
+
+- [ ] 986. The criticality gate charges a point for every main commit that landed beside it.
+  MEASURED 28.08.2026 on point 946: `measurePointFilesWithoutCommission` derives a point's file
+  set as the first-parent diff from its lane's base commit to the reviewed sha. A HIGH point whose
+  cross-vendor round refuses twice answers those findings on `main`, AFTER its merge — so the
+  reviewed sha moves forward on main, and every unrelated commit that landed between the lane's
+  base and that sha is charged to the point. The gate then demanded pass coverage for
+  `.claude/queue-rank.json`, `docs/work-packages.md` and `docs/analysis_de/vibe-coding-anleitung.md`
+  — all of them the previous session's guide-ceiling work, already read cross-vendor under their own
+  commits.
+  WHAT IT COSTS: two extra review rounds, spent re-reading another point's finished work under this
+  point's number. The cost grows with the distance between a lane's base and the answer to its last
+  finding, which is exactly the shape a difficult HIGH point takes; and a re-read of an already
+  answered range re-raises findings that were settled, which is worse than the wasted round.
+  FINAL STATE: the measured file set is the union of the point's OWN lane commits plus the later
+  commits that touch the files those commits changed — never every first-parent commit in the
+  interval. `pointLaneCommitsCommand` already computes the lane, so the fact is available where the
+  measurement is made.
+  VERIFIABLE: Vitest over the pure measurement with an injected Git — a lane of two commits with
+  three unrelated main commits landing between base and reviewed sha yields the lane's files alone;
+  a later commit on main that touches one of the lane's files IS charged; a later commit touching
+  only other files is not.
+  Criticality: medium — it wastes review rounds and re-litigates settled findings, but it errs on
+  the side of demanding more review rather than less.
+  Bundle: Modell & Wächter.
