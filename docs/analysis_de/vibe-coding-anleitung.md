@@ -335,10 +335,10 @@ Die Ursache findest du durch **Zerlegen**, nicht durch Wiederholen.
   **Altbestand** geschieht: nachräumen oder liegen lassen."
 
 - **Die Begründung, die sich im eigenen Dokument widerlegt.** Ein Sicherheitsargument und sein
-  Gegenbeweis standen in derselben Datei, drei Abschnitte auseinander, und vier Prüfrunden sahen
-  nur je eine Hälfte — weil der Prüfstoff nach Größe geschnitten wird.
-  → *Prompt:* „Wenn du eine Rechtfertigung schreibst, prüf sie gegen das, was im selben Dokument
-  schon behauptet wird. Ein **Widerspruch in der Prosa** ist ein Befund über den **Code**."
+  Gegenbeweis standen drei Abschnitte auseinander; vier Prüfrunden sahen je eine Hälfte, weil der
+  Prüfstoff nach Größe geschnitten wird.
+  → *Prompt:* „Prüf jede Rechtfertigung gegen das, was im selben Dokument schon behauptet wird —
+  ein **Widerspruch in der Prosa** ist ein Befund über den **Code**."
 
 - **Blockiert heißt nicht: du bist dran.** Fehlt eine Berechtigung, bekommst du gern einen
   Befehl gereicht — oft einen, der gar nicht funktionieren kann.
