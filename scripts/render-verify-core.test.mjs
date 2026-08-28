@@ -2198,6 +2198,32 @@ describe('the shipped charge ledger', () => {
     }
   })
 
+  // THE DOWNSTREAM SENTENCE IS OWNED ONLY FOR THE OBJECT IT WAS MEASURED ON
+  // (review finding, 28.08.2026). A charge reads ONE red, never the run, so
+  // nothing can verify that the ROOT the sentence points back to is present and
+  // still uncharged in the same record — which made the bare sentence own any
+  // standalone downstream message on this lane wholesale.
+  it('owns the cascade sentence only under the measured object name', () => {
+    const scoped = { suite: 'settings', backend: 'webgpu', kind: 'console', featureLevel: 'compatibility' }
+    // Recorder-shaped, from the ERR: lines of local/verify-baseline-logs.
+    const asStored = (text_) =>
+      chargeReds(failedChecks(`ERR: ${text_}`), { ...scoped, ledger: RED_CHARGES })[0]
+    const measured = [
+      'THREE.WebGPURenderer: Uncaptured WebGPU GPUValidationError: [Invalid TextureView] is invalid due to a previous error.',
+      'THREE.WebGPURenderer: Uncaptured WebGPU GPUValidationError: [Invalid Texture "output-msaa"] is invalid due to a previous error.',
+      'THREE.WebGPURenderer: Uncaptured WebGPU GPUValidationError: [Invalid Texture "normal-msaa"] is invalid due to a previous error.',
+    ]
+    for (const t of measured) expect(asStored(t).point, t).toBe(514)
+    // A downstream sentence from ANOTHER object, and the async-pipeline form
+    // point 734 says must be FILED rather than owned: both stay real reds.
+    const foreign = [
+      'THREE.WebGPURenderer: Uncaptured WebGPU GPUValidationError: [Invalid BindGroup] is invalid due to a previous error.',
+      'THREE.WebGPURenderer: Uncaptured WebGPU GPUValidationError: [Invalid CommandBuffer from CommandEncoder "renderContext_1"] is invalid due to a previous error.',
+      'THREE.WebGPURenderer: Async render pipeline creation failed (renderPipeline_x): [Invalid TextureView] is invalid due to a previous error.',
+    ]
+    for (const t of foreign) expect(asStored(t).point, t).toBeNull()
+  })
+
   it('charges the RGBA16Float family only through the EVIDENCED validation error, never the bare format name', () => {
     const scoped = { suite: 'settings', backend: 'webgpu', featureLevel: 'compatibility' }
     // The recorded wording — cut at "sup" by the 120-char name normalisation.

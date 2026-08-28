@@ -226,18 +226,38 @@ export const RED_CHARGES = [
     // fault on this lane is NOT the measured cascade and must stay red
     // (round-5 review, 19.08.2026).
     //
+    // AND WHAT THAT ALTERNATIVE DOES NOT COVER, PLAINLY (review finding,
+    // 28.08.2026): it ends at `does not sup` because that is where the STORED
+    // NAME ends — measured over the 45 distinct console identities in
+    // local/verify-baseline-logs, every one of these texts is 138-165
+    // characters and the record keeps 15 + 120. The operation that would
+    // distinguish this validation error from another RGBA16Float
+    // unsupported-operation cascade is therefore not in the record at all, so
+    // such a cascade on this lane WOULD be charged here. What holds the entry
+    // narrow instead is the rest of its scope — this suite, this backend, the
+    // console kind, and the compatibility feature level — and the fact that the
+    // charge dies with point 514.
+    //
     // THE THREE GENERIC ALTERNATIVES ARE REPLACED BY THE CASCADE'S OWN
     // SIGNATURE (review finding, 28.08.2026). `Invalid TextureView` and
     // `Invalid CommandBuffer from CommandEncoder` are ordinary WebGPU object
     // names: they say nothing about a cause, and a charge reads ONE red at a
     // time, so an unrelated settings defect printing either would have been
-    // charged here retroactively. What the recorded storm actually carries —
-    // and what point 734 quotes verbatim — is `is invalid due to a previous
-    // error`, which is not wording but a STATEMENT: this error is downstream of
-    // one already reported. That is exactly what may be excused, and it is
-    // self-limiting, because the ROOT it points back to is a red of its own and
-    // nothing here charges it: a different root on this lane blocks the run
-    // through its own text whatever its downstream says.
+    // charged here retroactively.
+    //
+    // THE DOWNSTREAM SENTENCE IS NOT SELF-LIMITING, AND THIS ENTRY NO LONGER
+    // CLAIMS IT IS (review finding, 28.08.2026). The earlier wording argued
+    // that `is invalid due to a previous error` may be owned wholesale because
+    // the ROOT it points back to is a red of its own that nothing here charges.
+    // A charge sees ONE red, never the run, so nothing verifies that the root
+    // is present and still uncharged in the SAME record — a lone downstream
+    // message, with its root gone or already excused, was owned outright. The
+    // alternative is therefore cut down to the object name the storm was
+    // MEASURED with (`[Invalid TextureView]`, in the uncaptured-validation
+    // form, never the async-pipeline one), so a downstream sentence from any
+    // other object stays a real red. Verifying the root in the record needs a
+    // charge that can read the whole run, which this mechanism does not have;
+    // that is filed as its own point rather than argued away here.
     //
     // `Async render pipeline creation failed` is dropped outright: point 734
     // records that it has NO owning point in the work order and must be given
@@ -246,7 +266,7 @@ export const RED_CHARGES = [
     // red in the 40-run window matches any of the three, so nothing accounted
     // for today stops being.
     match:
-      /(GPUValidationError: The texture format \(TextureFormat::RGBA16Float\) does not sup|Invalid Texture "(output|normal)-msaa"|is invalid due to a previous error)/i,
+      /(GPUValidationError: The texture format \(TextureFormat::RGBA16Float\) does not sup|Invalid Texture "(output|normal)-msaa"|GPUValidationError: \[Invalid TextureView\] is invalid due to a previous error)/i,
   },
   {
     point: 568,
