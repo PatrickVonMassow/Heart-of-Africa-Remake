@@ -1213,6 +1213,14 @@ describe('addVdzk — a decision asked of the user gets a card', () => {
     expect(out).toContain('Entscheidungsprotokoll: Rasterung der Höhenkarte')
   })
 
+  it('judges the authority tag but keeps it off the German card', () => {
+    const out = addVdzk(fullBoard({}), 'Kartenschrift wählen', designQuestion('Soll die enge oder die weite Variante gelten?'))
+    const cards = parseCards(sliceSections(out).sections['Von dir zu klären'])
+    expect(cards[0].body).toContain('Soll die enge oder die weite Variante gelten?')
+    expect(cards[0].body).not.toContain('User-owned category')
+    expect(cards[0].body).not.toContain('design-content')
+  })
+
   it('refuses a card with no title or no question — an empty card asks nothing', () => {
     const b = fullBoard({ vdzk: '' })
     expect(() => addVdzk(b, '', 'Die Frage.')).toThrow(/needs a title/)

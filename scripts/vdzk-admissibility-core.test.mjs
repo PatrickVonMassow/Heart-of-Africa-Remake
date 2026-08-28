@@ -1,11 +1,14 @@
 import { describe, expect, it } from 'vitest'
 
+import { blockedCardBody, blockedCardTitle } from './board-queue-core.mjs'
+import { advisoryDecisionCard } from './user-gate-core.mjs'
 import {
   USER_OWNED_CATEGORIES,
   isAdvisoryDecisionRecord,
   judgeAutomatedCard,
   namesOptions,
   userOwnedCategory,
+  withoutCategoryLine,
 } from './vdzk-admissibility-core.mjs'
 
 const judge = (body, title = 'Eine Karte') => judgeAutomatedCard({ title, body })
@@ -93,5 +96,46 @@ describe('judgeAutomatedCard — the five user-owned categories', () => {
     expect(judge('', 'Titel').ok).toBe(false)
     expect(judge('Optionen: A oder B.', '').ok).toBe(false)
     expect(judge(typedQuestion('scope-extension', 'Optionen: Mobil oder Desktop.')).ok).toBe(false)
+  })
+})
+
+// THE TWO SCRIPTS THAT ACTUALLY WRITE CARDS. Widening the gate from `--automated`
+// to every writer put both of them under a rule they were never adapted to, and
+// the branch's first draft dropped the very test that had covered one of them:
+// `finding.mjs --blocked` was refused outright, so a deposited finding stayed
+// pending with no card — the parking that escape hatch exists to prevent. These
+// judge the card each caller BUILDS, not a paraphrase of it.
+describe('the live automated callers stay admissible', () => {
+  it('admits the blocked-finding card as a scope-extension question', () => {
+    const title = blockedCardTitle('Der Träger meldet einen Befund ohne Punkt')
+    const body = blockedCardBody('Der Befund braucht eine Grundsatzentscheidung.')
+    expect(userOwnedCategory(body)).toBe('scope-extension')
+    expect(judgeAutomatedCard({ title, body }).ok).toBe(true)
+  })
+
+  it('admits the self-decided record `defer-for-user` writes', () => {
+    const card = advisoryDecisionCard(946, {
+      decision: 'Der Punkt läuft ohne Rückfrage weiter',
+      evidence: 'Die Messung vom 28.08.2026',
+      consequence: 'Die Warteschlange steht nicht still',
+      vetoAction: 'antworte „Veto 946“',
+    })
+    expect(card.ok).toBe(true)
+    expect(judgeAutomatedCard({ title: card.title, body: card.body }).ok).toBe(true)
+  })
+})
+
+// The tag is authority for the gate, never prose for the reader: the board is
+// German, and the card the user opens must not lead with an English key.
+describe('withoutCategoryLine', () => {
+  it('drops the tag and leaves the question itself untouched', () => {
+    expect(withoutCategoryLine('User-owned category: design-content.\nSoll §13.4 nachziehen?'))
+      .toBe('Soll §13.4 nachziehen?')
+    expect(withoutCategoryLine('Vorwort.\nUser-owned category: release-tag.\nTaggen oder warten?'))
+      .toBe('Vorwort.\nTaggen oder warten?')
+  })
+
+  it('leaves a card without a tag exactly as it is', () => {
+    expect(withoutCategoryLine('Nur eine Frage, oder?')).toBe('Nur eine Frage, oder?')
   })
 })

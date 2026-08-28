@@ -30,6 +30,18 @@ export function userOwnedCategory(text) {
 }
 
 /**
+ * The same text with the category line removed. The tag is MACHINE-READABLE
+ * AUTHORITY, not card content: the board is German prose the user reads on a
+ * phone, and an English `User-owned category: scope-extension.` line in front of
+ * every admissible question is jargon aimed at the writer, not at the reader. It
+ * is judged and then dropped — the same treatment the settled-ruling escape line
+ * gets, and for the same reason.
+ */
+export function withoutCategoryLine(text) {
+  return String(text ?? '').replace(CATEGORY_RE, (match) => (match.startsWith('\n') ? '\n' : ''))
+}
+
+/**
  * Two alternatives, spelled out. A card must still tell the user what decision
  * the selected category leaves to them; the category is authority, not content.
  */

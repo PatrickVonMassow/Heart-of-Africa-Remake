@@ -15,7 +15,7 @@ import { AUTOMATIC_DECISION_TITLE, DERIVED_STATE_KIND, PAUSED_TITLE } from './bo
 import { criticalityOf, parsePointBlocks } from './criticality-review-guard-core.mjs'
 // The admissibility rule for a card written by a script, kept beside the guard's
 // own notion of "this asks the user" rather than restated here.
-import { judgeAutomatedCard } from './vdzk-admissibility-core.mjs'
+import { judgeAutomatedCard, withoutCategoryLine } from './vdzk-admissibility-core.mjs'
 
 export { namesFollowOnWork }
 
@@ -2179,7 +2179,13 @@ export function addVdzk(html, title, text) {
   // whose title parses as empty, i.e. an invisible open question.
   const esc = (s) => String(s ?? '').trim().replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
   const head = esc(title)
-  const body = renderCardBody(text, { escape: esc })
+  // THE AUTHORITY TAG IS JUDGED, THEN DROPPED. It selects the user-owned
+  // category for the gate above; on the rendered card it would be English jargon
+  // in front of a German question, addressed to the writer rather than the
+  // reader. The refusals stay reachable either way — the tag is read from the
+  // caller's text, not from the card.
+  const body = renderCardBody(withoutCategoryLine(text), { escape: esc })
+  if (!body) throw new Error('board: vdzk-add needs the question itself as the card body')
   const { from, end } = sectionBounds(html, 'vdzk')
   const section = html.slice(from, end)
   const standing = [...section.matchAll(/<details>\s*<summary><span class="t">[\s\S]*?<\/details>\s*/g)]
