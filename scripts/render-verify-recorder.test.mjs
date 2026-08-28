@@ -179,6 +179,39 @@ describe('tapOutput — observe-only', () => {
     expect(state.droppedLines).toBe(40)
   })
 
+  // ONE LINE CAN CARRY AS MANY REDS AS THE PAGE PRINTED (review finding,
+  // 28.08.2026, round 14). Asking "is the buffer full yet" and then adding every
+  // fresh identity the line brought was no ceiling: a single `console errors:
+  // [...]` summary could take the buffer, and the record with it, arbitrarily
+  // far past the limit without ever marking the run incomplete. The line is
+  // weighed whole.
+  it('refuses a single summary line that alone would exceed the ceiling', () => {
+    const { state, out } = tapped()
+    const many = Array.from({ length: MAX_RED_IDENTITIES + 10 }, (_, i) => `'error ${tag(i)}'`).join(', ')
+    out.write(`console errors: [${many}]\n`)
+    // Nothing was kept — the line does not fit — and the refusal is LOUD.
+    expect(state.lines).toHaveLength(0)
+    expect(state.droppedLines).toBe(1)
+    // A line that DOES fit is still kept whole afterwards.
+    out.write("console errors: ['a red that fits']\n")
+    expect(state.lines).toHaveLength(1)
+  })
+
+  it('never lets the kept identities exceed the ceiling across several fat lines', () => {
+    const { state, out } = tapped()
+    const chunk = (from, n) => Array.from({ length: n }, (_, i) => `'error ${tag(from + i)}'`).join(', ')
+    out.write(`console errors: [${chunk(0, 400)}]\n`)
+    out.write(`console errors: [${chunk(400, 400)}]\n`)
+    // The second line's 400 fresh identities do not fit beside the first's 400.
+    expect(state.lines).toHaveLength(1)
+    expect(state.droppedLines).toBe(1)
+    expect(failedChecks(state.lines.join('\n')).length).toBe(400)
+    // …and a small line that still fits is taken.
+    out.write(`console errors: [${chunk(800, 50)}]\n`)
+    expect(failedChecks(state.lines.join('\n')).length).toBe(450)
+    expect(state.droppedLines).toBe(1)
+  })
+
   // ...AND THE VARIED MEASUREMENT IS ASKED PER RED, NOT PER LINE (review
   // finding, 28.08.2026). Two summary lines with DIFFERENT membership have two
   // different composite keys, so both are kept and the line comparison never
@@ -454,6 +487,22 @@ describe('the armed recorder — the REAL wiring, not a stand-in', () => {
     // the three closings of point 640 reachable for them.
     expect(record.reds.every((r) => typeof r.name === 'string' && r.name.length > 0)).toBe(true)
     expect(new Set(record.reds.map((r) => r.key)).size).toBe(MAX_RED_IDENTITIES)
+  })
+
+  // …and the same at the RECORD, which is where the unbounded growth would
+  // actually have been paid for: `record.reds` is re-parsed from the kept lines,
+  // so a fat line kept past the ceiling would put every red it carried on disk.
+  it('keeps record.reds under the ceiling when the reds arrive on fat summary lines', async () => {
+    const run = await armed('polish')
+    const chunk = (from, n) => Array.from({ length: n }, (_, i) => `'error ${tag(from + i)}'`).join(', ')
+    process.stdout.write(`console errors: [${chunk(0, 400)}]\n`)
+    process.stdout.write(`console errors: [${chunk(400, 400)}]\n`)
+    const record = run.exit(1)
+    expect(record.reds.length).toBe(400)
+    expect(record.reds.length).toBeLessThanOrEqual(MAX_RED_IDENTITIES)
+    expect(record.truncated).toBe(true)
+    expect(record.droppedLines).toBe(1)
+    expect(runVerdict(record, { openPoints }).status).toBe('incomplete')
   })
 
   // A green run records no reds at all, so red lines it dropped cost it

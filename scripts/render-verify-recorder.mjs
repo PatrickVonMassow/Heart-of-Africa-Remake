@@ -137,9 +137,10 @@ const KEPT_LINE = /^(?:FAIL\s{2,}|ERR:|console errors:|CONSOLE ERRORS:)/
  * process dies, and a crash record is precisely what turns a run full of
  * observed reds into one a signature can close without anybody reading them.
  *
- * A single line may carry several new identities, so the kept set can end at
- * most one line's worth of parts above the ceiling. That slack is deliberate:
- * refusing a line PART-WAY would store a red the record cannot account for.
+ * The kept set never exceeds it. A line carrying several new identities is
+ * weighed whole and refused whole, because a line kept PART-WAY would store
+ * reds the record cannot account for — and a refusal is loud, so nothing is
+ * lost quietly either way.
  */
 export const MAX_RED_IDENTITIES = 500
 
@@ -229,7 +230,6 @@ export function tapOutput(state, streams = [[process.stdout, false], [process.st
       if (isErr && CRASH_LINE.test(line)) state.crashed = true
       if (!KEPT_LINE.test(line)) continue
       const parts = resultParts(line)
-      const full = keptIds.size + keptRaw.size >= MAX_RED_IDENTITIES
       for (const part of parts ?? []) {
         const seen = firstSeenOfPart.get(part.id)
         // The varied-measurement map is bounded by the same ceiling, or it
@@ -255,7 +255,18 @@ export function tapOutput(state, streams = [[process.stdout, false], [process.st
       // lines it refused, `runVerdict` answers `incomplete`, and the signed
       // way out of render-verify-core.mjs disposes of it. Silently discarding
       // them is exactly the trap the point exists to close.
-      if (full) {
+      //
+      // ASKED OF WHAT THE LINE WOULD ADD, NOT OF THE BUFFER BEFORE IT (review
+      // finding, 28.08.2026, round 14). Testing "is the buffer full yet" and
+      // then adding every fresh identity the line carried was no ceiling at all:
+      // a `console errors: [...]` summary holds as many reds as the page
+      // printed, so ONE such line could take the buffer — and `record.reds`
+      // with it — arbitrarily far past the limit without ever marking the run
+      // incomplete. A line is now weighed WHOLE: it is kept only if all of its
+      // fresh identities fit, and refused as one if they do not. Refusing a
+      // line part-way is not on offer, because the record would then hold reds
+      // it cannot account for; refusing it whole is loud, which is the contract.
+      if (keptIds.size + keptRaw.size + fresh.length > MAX_RED_IDENTITIES) {
         state.droppedLines = (Number.isFinite(state.droppedLines) ? state.droppedLines : 0) + 1
         continue
       }

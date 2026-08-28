@@ -1312,7 +1312,13 @@ So the bound is stated rather than hoped for: `MAX_RED_IDENTITIES` (500 in
 `scripts/render-verify-recorder.mjs`) distinct reds per run — fifteen times the
 worst distinct set ever recorded, so no run this project has produced comes near
 it. Past it the buffer stops growing and **the run is recorded as an INCOMPLETE
-RECORDING**, carrying the count of the lines it refused. That is the spec's
+RECORDING**, carrying the count of the lines it refused. A line is weighed
+WHOLE against the ceiling — a `console errors:` summary carries as many reds as
+the page printed, and asking whether the buffer was full BEFORE adding all of
+them let one such line take the record arbitrarily far past the limit without
+marking anything (round 14). A line whose fresh identities do not all fit is
+refused as one, which is loud; keeping it part-way would store reds the record
+cannot account for. That is the spec's
 OTHER option, applied where the first one runs out: a run either records its
 reds completely, or fails loudly as an incomplete recording — it never
 half-records itself and calls the result a red set. The incomplete class
