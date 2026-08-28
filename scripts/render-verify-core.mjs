@@ -453,6 +453,12 @@ export function runStamp(run) {
   return finite(run?.at) ?? finite(run?.startedAt)
 }
 
+/** The same reading as a SORTABLE number: a record nobody dated ranks below
+ *  every dated one rather than at the epoch, where it used to tie with them. */
+function stampRank(run) {
+  return runStamp(run) ?? -Infinity
+}
+
 /** A chargeable-point set built from whatever a caller handed in. `[...x]` THROWS
  *  on a truthy non-iterable, and this runs inside the gate's decision: an
  *  exception here reaches the wrapper, which fails OPEN and allows the turn the
@@ -1010,7 +1016,10 @@ export function coveringRun(runs, backend, since, options) {
     if (!runVerdict(r, { openPoints }).covers) continue
     if (featureLevel && r.featureLevel !== featureLevel) continue
     if (!sawCodeSince(r, since)) continue
-    if (!best || number(r.at) > number(best.at)) best = r
+    // RANKED BY THE STAMP A RUN CAN BE NAMED BY (review finding, 28.08.2026,
+    // round 14). `number(r.at)` is 0 for a record dated only by `startedAt`, so
+    // such a run lost to every older one and the gate read the wrong "latest".
+    if (!best || stampRank(r) > stampRank(best)) best = r
   }
   return best
 }
@@ -1337,7 +1346,7 @@ export function latestRun(runs, backend, since) {
     // before the edit tested the old code, so quoting its red as "why the last
     // attempt did not count" would point at the wrong code.
     if (!sawCodeSince(r, since)) continue
-    if (!best || number(r.at) > number(best.at)) best = r
+    if (!best || stampRank(r) > stampRank(best)) best = r
   }
   return best
 }
@@ -1635,7 +1644,7 @@ export function evaluate(input) {
       if (!run) continue
       const verdict = runVerdict(run, opts)
       if (verdict.status !== 'accounted') continue
-      accounted.push({ backend: b, suite: run.suite ?? 'unknown', at: run.at ?? 0, charges: verdict.charges })
+      accounted.push({ backend: b, suite: run.suite ?? 'unknown', at: runStamp(run), charges: verdict.charges })
     }
     return accounted.length > 0
       ? { decision: 'allow', clear: true, accounted }

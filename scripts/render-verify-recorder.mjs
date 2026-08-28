@@ -230,24 +230,24 @@ export function tapOutput(state, streams = [[process.stdout, false], [process.st
       if (isErr && CRASH_LINE.test(line)) state.crashed = true
       if (!KEPT_LINE.test(line)) continue
       const parts = resultParts(line)
-      for (const part of parts ?? []) {
-        const seen = firstSeenOfPart.get(part.id)
-        // The varied-measurement map is bounded by the same ceiling, or it
-        // becomes the unbounded structure the rest of this guards against.
-        if (seen === undefined) {
-          if (firstSeenOfPart.size < MAX_RED_IDENTITIES) firstSeenOfPart.set(part.id, part.seen)
-        }
-        // The SAME red printed with a DIFFERENT measurement. The record can hold
-        // only one, so the difference is remembered as a fact about that red: a
-        // narrow charge then refuses it instead of owning it on the single
-        // reading that survived.
-        else if (seen !== part.seen && state.variedKeys instanceof Set) state.variedKeys.add(part.id)
-      }
-      // What this line would ADD. Nothing new means pure repetition: every red
-      // it carries is already in the buffer, under a line that was kept, so
-      // dropping it loses no observation and is not a truncation.
-      const fresh = parts === null ? (keptRaw.has(line) ? [] : [line]) : parts.map((p) => p.id).filter((id) => !keptIds.has(id))
-      if (fresh.length === 0) continue
+      // What this line would ADD, counted as IDENTITIES and not as parts
+      // (review finding, 28.08.2026, round 14). A summary that prints the same
+      // red five hundred times carries five hundred parts and exactly one new
+      // identity; counting the parts made such a line exceed the ceiling and
+      // marked an ordinary repeated-error run incomplete, which is a FALSE
+      // truncation — and a false truncation blocks the render set, the very
+      // failure this point exists to end.
+      const fresh =
+        parts === null
+          ? (keptRaw.has(line) ? [] : [line])
+          : [...new Set(parts.map((p) => p.id).filter((id) => !keptIds.has(id)))]
+      // THE CEILING IS DECIDED BEFORE ANYTHING IS REMEMBERED (review finding,
+      // 28.08.2026, round 14). The varied-measurement map used to be filled
+      // first, so a REFUSED line could fill it to the brim without a single line
+      // being kept — and then a later, kept red found no room in it, so its
+      // second, different reading was dropped as repetition with nothing marking
+      // it, and a narrow charge could own that red on the one reading that
+      // survived. Exactly the silent loss the mark exists to prevent.
       // THE CEILING, AND WHY IT IS LOUD (review finding, 28.08.2026, round 13).
       // Beyond it the buffer stops growing and the RUN IS MARKED INCOMPLETE —
       // the loud failure this point's final state names as the alternative to an
@@ -266,10 +266,30 @@ export function tapOutput(state, streams = [[process.stdout, false], [process.st
       // fresh identities fit, and refused as one if they do not. Refusing a
       // line part-way is not on offer, because the record would then hold reds
       // it cannot account for; refusing it whole is loud, which is the contract.
-      if (keptIds.size + keptRaw.size + fresh.length > MAX_RED_IDENTITIES) {
+      if (fresh.length > 0 && keptIds.size + keptRaw.size + fresh.length > MAX_RED_IDENTITIES) {
         state.droppedLines = (Number.isFinite(state.droppedLines) ? state.droppedLines : 0) + 1
         continue
       }
+      // A line that is kept, or dropped as pure repetition, still has its
+      // measurement read: repetition is exactly where a second, DIFFERENT
+      // reading of an already-kept red shows up.
+      for (const part of parts ?? []) {
+        const seen = firstSeenOfPart.get(part.id)
+        // The map now only ever learns identities that were KEPT, so it is
+        // bounded by the ceiling itself; the size guard stays as a backstop.
+        if (seen === undefined) {
+          if (firstSeenOfPart.size < MAX_RED_IDENTITIES) firstSeenOfPart.set(part.id, part.seen)
+        }
+        // The SAME red printed with a DIFFERENT measurement. The record can hold
+        // only one, so the difference is remembered as a fact about that red: a
+        // narrow charge then refuses it instead of owning it on the single
+        // reading that survived.
+        else if (seen !== part.seen && state.variedKeys instanceof Set) state.variedKeys.add(part.id)
+      }
+      // Nothing new means pure repetition: every red the line carries is already
+      // in the buffer under a line that was kept, so dropping it loses no
+      // observation and is not a truncation.
+      if (fresh.length === 0) continue
       if (parts === null) keptRaw.add(line)
       else for (const id of fresh) keptIds.add(id)
       state.lines.push(line)

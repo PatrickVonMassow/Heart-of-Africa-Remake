@@ -1318,7 +1318,12 @@ the page printed, and asking whether the buffer was full BEFORE adding all of
 them let one such line take the record arbitrarily far past the limit without
 marking anything (round 14). A line whose fresh identities do not all fit is
 refused as one, which is loud; keeping it part-way would store reds the record
-cannot account for. That is the spec's
+cannot account for. What is weighed are its IDENTITIES, not its parts: a summary
+that prints the same red five hundred times brings exactly one, and counting the
+parts turned an ordinary repeated-error run into a FALSE incomplete recording —
+which blocks the render set in precisely the way this point exists to end. And
+the ceiling is decided before anything is remembered, so a refused line cannot
+fill the varied-measurement map and leave a later, kept red unwatched. That is the spec's
 OTHER option, applied where the first one runs out: a run either records its
 reds completely, or fails loudly as an incomplete recording — it never
 half-records itself and calls the result a red set. The incomplete class

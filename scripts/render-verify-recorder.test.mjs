@@ -212,6 +212,41 @@ describe('tapOutput — observe-only', () => {
     expect(state.droppedLines).toBe(1)
   })
 
+  // A REPEATED RED IS ONE IDENTITY, HOWEVER OFTEN THE LINE PRINTS IT (review
+  // finding, 28.08.2026, round 14). Counting the line's PARTS instead of its
+  // identities made an ordinary repeated-error summary exceed the ceiling and
+  // marked the run incomplete — a FALSE truncation, which blocks the render set
+  // exactly the way this point exists to stop.
+  it('counts one repeated red once against the ceiling', () => {
+    const { state, out } = tapped()
+    const same = Array.from({ length: MAX_RED_IDENTITIES + 100 }, () => "'the one page error'").join(', ')
+    out.write(`console errors: [${same}]\n`)
+    expect(state.lines).toHaveLength(1)
+    expect(state.droppedLines ?? 0).toBe(0)
+    expect(failedChecks(state.lines.join('\n'))).toHaveLength(1)
+  })
+
+  // A REFUSED LINE REMEMBERS NOTHING (review finding, 28.08.2026, round 14).
+  // The varied-measurement map used to be filled before the ceiling was
+  // consulted, so a refused line could fill it without a single line being
+  // kept; a later, kept red then found no room in it, and its second, different
+  // reading was dropped as repetition with nothing marking it — so a narrow
+  // charge could own that red on the one reading that survived.
+  it('does not let a refused line starve the variation tracking of a kept red', () => {
+    const { state, out } = tapped()
+    const many = Array.from({ length: MAX_RED_IDENTITIES + 10 }, (_, i) => `'refused ${tag(i)}'`).join(', ')
+    out.write(`console errors: [${many}]\n`)
+    expect(state.lines).toHaveLength(0)
+    expect(state.droppedLines).toBe(1)
+    // A red that arrives afterwards is kept, and its measurement IS watched.
+    out.write('ERR: the kept error at frame 1: 1.42 m\n')
+    out.write('ERR: the kept error at frame 4: 0.02 m\n')
+    expect(state.lines).toHaveLength(1)
+    const reds = markVariedDetails(failedChecks(state.lines.join('\n')), state.variedKeys)
+    expect(reds).toHaveLength(1)
+    expect(reds[0].detailVaried).toBe(true)
+  })
+
   // ...AND THE VARIED MEASUREMENT IS ASKED PER RED, NOT PER LINE (review
   // finding, 28.08.2026). Two summary lines with DIFFERENT membership have two
   // different composite keys, so both are kept and the line comparison never
