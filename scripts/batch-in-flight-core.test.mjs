@@ -33,6 +33,7 @@ import {
   combineWorktreeStamps,
   porcelainPaths,
   registeredFeatureWorktrees,
+  writerGitMetadataAt,
   worktreeStamp,
   describeInFlight,
   evidenceVerdict,
@@ -482,6 +483,22 @@ describe('the worktree stamp reads BOTH sources and says which one answered', ()
     expect(combineWorktreeStamps()).toBe(null)
   })
 
+  it('only writer-moved stamps can carry the pure alive verdict', () => {
+    // A reader can refresh both of these with `git status`; neither is output.
+    const readerOnly = writerGitMetadataAt({ gitdirAt: NOW, indexAt: NOW })
+    expect(readerOnly).toBe(null)
+    expect(agentOutputVerdict({ worktreeAt: combineWorktreeStamps({ gitAt: readerOnly }), now: NOW }))
+      .toMatchObject({ verdict: 'unmeasurable', judgedOn: 'none' })
+
+    const commitEditAt = writerGitMetadataAt({ commitEditAt: NOW - 1000 })
+    expect(agentOutputVerdict({ worktreeAt: combineWorktreeStamps({ gitAt: commitEditAt }), now: NOW }))
+      .toMatchObject({ verdict: 'alive', judgedOn: 'git' })
+    expect(agentOutputVerdict({ branchTipAt: NOW - 1000, now: NOW }))
+      .toMatchObject({ verdict: 'alive', judgedOn: 'git' })
+    expect(agentOutputVerdict({ worktreeAt: combineWorktreeStamps({ filesAt: NOW - 1000 }), now: NOW }))
+      .toMatchObject({ verdict: 'alive', judgedOn: 'git' })
+  })
+
   it('worktreeStamp accepts both shapes and refuses everything else', () => {
     expect(worktreeStamp(12)).toEqual({ at: 12, source: null })
     expect(worktreeStamp({ at: 12, source: 'working files' })).toEqual({ at: 12, source: 'working files' })
@@ -700,6 +717,22 @@ describe('worktreeActiveAt against a REAL checkout (its own temp repo, never thi
       const item = checkEvidence({ kind: 'worktree', path: dir }, { now: Date.now(), worktreeActiveAt })
       expect(item.ok).toBe(false)
       expect(item.detail).toContain('newest: git metadata')
+    } finally {
+      rmSync(dir, { recursive: true, force: true })
+    }
+  })
+
+  it('a fresh COMMIT_EDITMSG remains writer evidence', () => {
+    const dir = mkdtempSync(join(tmpdir(), 'hoa-wt-commit-edit-'))
+    try {
+      seedRepo(dir)
+      backdate(dir, 40 * 60 * 1000)
+      const now = new Date()
+      utimesSync(join(dir, '.git', 'COMMIT_EDITMSG'), now, now)
+
+      const stamp = worktreeActiveAt(dir)
+      expect(stamp.source).toBe('git metadata')
+      expect(checkEvidence({ kind: 'worktree', path: dir }, { now: Date.now(), worktreeActiveAt }).ok).toBe(true)
     } finally {
       rmSync(dir, { recursive: true, force: true })
     }
