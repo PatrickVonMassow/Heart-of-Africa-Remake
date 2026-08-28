@@ -187,9 +187,12 @@ export function chargeablePoints(text) {
 
 /**
  * The ledger entry that owns this red, or null. `red` is one entry of the run
- * record's `reds` — `{ name, kind }` as the recorder wrote it — and `suite` /
- * `backend` are the run's own, so a charge scoped to one lane cannot excuse the
- * other. Total: a malformed entry matches nothing rather than throwing.
+ * record's `reds` — `{ name, key, kind }` plus the `detail` the record keeps
+ * (point 734) as the recorder wrote it — and `suite` / `backend` are the run's
+ * own, so a charge scoped to one lane cannot excuse the other. The same call
+ * answers both readings: the recorder's, while the run is written, and
+ * `owned()`'s, when a later ledger is asked whether it owns a red already on
+ * disk. Total: a malformed entry matches nothing rather than throwing.
  */
 export function chargeFor(red, options) {
   const { suite = '', backend = '', featureLevel = null, ledger = RED_CHARGES } = options ?? {}
@@ -894,6 +897,22 @@ export function coveringRun(runs, backend, since, options) {
  * could only be satisfied by editing a render file would have left those two
  * routes nominal.
  *
+ * COVERING IS READ AS IT WAS RECORDED — ONE RULE, EVERY CALLER (review finding,
+ * 28.08.2026). The two readings above are different QUESTIONS, not two moods of
+ * the same one, and each has exactly one answer here:
+ *   - `owned()` — "does an open point own this red?" — reads today's ledger,
+ *     and it is the only reading that does.
+ *   - `runVerdict(...).covers` — "did this run verify the picture?" — reads the
+ *     charge the record carries and NOTHING else. `coveringRun` never handed it
+ *     a ledger; `shownGone` and `reRecorded` did, and the argument was silently
+ *     dead, so the mechanism read as if a ledger edit could make a past run
+ *     cover a backend. It cannot, and now it does not say it can.
+ * The consequence is stated rather than hidden: a run whose reds only became
+ * owned AFTER it was recorded neither covers a backend nor retakes a lost
+ * reading — but its reds stop blocking through `owned()`, which is the route
+ * point 640 gives them. Coverage is a claim about pixels somebody looked at,
+ * and no edit to a ledger file makes anybody look.
+ *
  * Total: never throws on partial input.
  */
 export function unexplainedRuns(runs, since, options) {
@@ -920,7 +939,10 @@ export function unexplainedRuns(runs, since, options) {
         later.backend === r.backend &&
         later.suite === r.suite &&
         sawCodeSince(later, from) &&
-        runVerdict(later, { openPoints, ledger }).covers,
+        // NO LEDGER HERE, DELIBERATELY — see COVERING IS READ AS IT WAS
+        // RECORDED below. This asks whether a run VERIFIED the picture, and
+        // that is not a claim a text edit may create.
+        runVerdict(later, { openPoints }).covers,
     )
   }
   /**
@@ -941,7 +963,9 @@ export function unexplainedRuns(runs, since, options) {
       if (later.backend !== r.backend || later.suite !== r.suite) return false
       const laterAt = runStamp(later)
       if (laterAt === null || laterAt <= when) return false
-      return sawCodeSince(later, from) && runVerdict(later, { openPoints, ledger }).covers
+      // NO LEDGER HERE EITHER, for the same reason: the lost reading is retaken
+      // by a run that COVERED, not by one a later ledger edit would now excuse.
+      return sawCodeSince(later, from) && runVerdict(later, { openPoints }).covers
     })
   }
   const open = pointSet(openPoints)

@@ -1298,6 +1298,23 @@ bound matches at record time no more than it does afterwards. Reds recorded
 before this repair carry no detail and stay out of a `detailMatch` entry's
 reach; that information was never written down and nothing can recover it.
 
+### Owning and covering are two questions, and each has ONE answer
+
+- **Does an open point own this red?** Read the ledger AS IT STANDS NOW.
+  Charging a red, or filing the point that owns it and charging it there, is how
+  point 640's ways (2) and (3) are taken, and a rule that could only be
+  satisfied by editing a render file would leave both nominal.
+- **Did this run verify the picture?** Read the charge the RECORD carries, and
+  nothing else. No ledger edit makes a finished run cover a backend, and none
+  retakes a lost reading: coverage is a claim about pixels somebody looked at.
+
+The second rule now holds for every caller. `unexplainedRuns` used to hand
+`runVerdict` a ledger through two of its helpers, which the function never read
+— a dead argument that described a mechanism nobody had built (review finding,
+28.08.2026). The consequence is stated rather than hidden: a run whose reds only
+became owned after it was recorded neither covers a backend nor re-records a
+truncation, while its reds stop blocking through the first rule.
+
 ### The records written before that fix (the legacy `incomplete` class)
 
 Records already on file (the two truncated `webgpu/settings` runs of

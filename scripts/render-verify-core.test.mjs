@@ -1315,6 +1315,30 @@ describe('an INCOMPLETE RECORDING is its own class, and has its own way out (poi
     expect(unexplainedRuns([broken, again], 1000, { openPoints })).toEqual([])
   })
 
+  // ONE RULE FOR COVERING, EVERY CALLER (review finding F2, 28.08.2026).
+  // `shownGone` and `reRecorded` used to hand `runVerdict` a `ledger` that it
+  // never destructured — a dead argument that read as if a later ledger edit
+  // could make a past run cover a backend and thereby retake a lost reading.
+  // It cannot: coverage is a claim about pixels somebody looked at. The red in
+  // the candidate run stops BLOCKING through `owned()` all the same, so the two
+  // readings stay different questions rather than contradicting answers.
+  it('a candidate run owned only by TODAY\u2019s ledger does not re-record a truncation', () => {
+    const broken = { ...truncatedLegacy('webgpu', 1500), suite: 'polish' }
+    // Recorded uncharged (point: null), the way a run written before the entry is.
+    const candidate = redRun('webgpu', 2000, [red('the goat stance', null)], { suite: 'polish' })
+    const ledger = [{ point: 506, match: /the goat stance/, why: 'written after both runs were recorded' }]
+
+    // The candidate covers on neither reading — its own charge stamp is null.
+    expect(runVerdict(candidate, { openPoints }).covers).toBe(false)
+    expect(runVerdict(candidate, { openPoints, ledger }).covers).toBe(false)
+
+    // So the truncation is NOT lifted, and it is still reported as incomplete.
+    const still = unexplainedRuns([broken, candidate], 1000, { openPoints, ledger })
+    expect(still.map((u) => u.status)).toEqual(['incomplete'])
+    // And the candidate's own red is not among the blockers: the ledger owns it.
+    expect(still).toHaveLength(1)
+  })
+
   // The re-run stops at exactly the same line as the signature: it closes the
   // LOST part, never a red the run really recorded. Letting it skip the
   // accounting laundered every red in a truncated run (review, 19.08.2026).
