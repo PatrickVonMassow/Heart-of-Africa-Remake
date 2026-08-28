@@ -405,6 +405,13 @@ export function tapOutput(state, streams = [[process.stdout, false], [process.st
           carry.length >= LINE_PROBE_CHARS
             ? carry.slice(0, LINE_PROBE_CHARS)
             : carry + chunk.slice(from, from + Math.min(segment, LINE_PROBE_CHARS - carry.length))
+        // THE OVERLONG LINE CLEARS THE SUBSTITUTION MARK TOO (review finding,
+        // 28.08.2026, whole-range pass 4). Only `handle` cleared it, and this
+        // branch never reaches `handle` — so an incomplete character in an
+        // overlong CHATTER line left the mark armed, and the next ordinary
+        // result line was charged for a loss that was not its own. A false
+        // truncation, which is the failure this point exists to end.
+        substituted.delete(stream)
         if (isErr && CRASH_LINE.test(head)) state.crashed = true
         if (KEPT_LINE.test(head)) refuse()
         // AND AN OVERLONG STDERR LINE THE PROBE COULD NOT DECIDE IS A LOST LINE

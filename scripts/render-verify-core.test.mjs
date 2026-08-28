@@ -1032,11 +1032,26 @@ describe('evaluate — a red is not closed by the runs that FOLLOWED it (point 6
     expect(result.waved.map((w) => w.name)).toEqual(['the goat stance', 'the eaves column'])
   })
 
-  // ONE RED IS ITS KIND AND ITS NAME (review finding, 28.08.2026, round 17).
-  // Keyed by the name alone, a failing check and a console error printing the
-  // same text collapsed into one waved entry and one count — two observations
-  // reported as one, which is the understatement this list exists to prevent.
-  it('counts a check and a console error of the SAME wording as two waved reds', () => {
+  // ONE RED IS ITS KIND AND ITS NAME (review finding, 28.08.2026, round 17,
+  // corrected in the whole-range pass 3). Keyed by the name alone, two reds of
+  // the same text collapse into one waved entry and one count — two
+  // observations reported as one, which is the understatement this list exists
+  // to prevent. The RECORDER cannot make that pair: a console pseudo-check
+  // always carries the `console error: ` prefix, so its name differs from any
+  // check's. The kind in the key is therefore defence for a record that reaches
+  // the gate from somewhere else — a hand-written state file, a foreign
+  // checkout — and this case drives the two shapes the parser really mints from
+  // one line, which the count must keep apart on their own.
+  it('counts two reds of the same wording and different kind as two', () => {
+    // The RECORDER cannot mint this pair — a console pseudo-check always carries
+    // the `console error: ` prefix, so its name differs from any check's (review
+    // finding, 28.08.2026, whole-range pass 3, which read the fixture as
+    // unreachable and was right). The kind in the key is defence for a record
+    // that reaches the gate from somewhere else: a hand-written state file, a
+    // foreign checkout, a shape a later recorder change makes possible. Keyed by
+    // the name alone these two collapse into one waved entry and one count —
+    // two observations reported as one, which is the understatement this list
+    // exists to prevent.
     const twoKinds = redRun('webgpu', 1500, [
       red('the eaves column', null, 'check'),
       red('the eaves column', null, 'console'),
@@ -1556,14 +1571,19 @@ describe('an INCOMPLETE RECORDING is its own class, and has its own way out (poi
   })
 
   // A LIFTED TRUNCATION CARRIES ITS KEYS TOO (review finding, 28.08.2026, round
-  // 18). Without them the deferral fell back to the name alone, so a check and a
-  // console error of the same wording collapsed into one waved entry — in the
+  // 18). Without them the deferral fell back to the name alone, so two reds of
+  // the same wording and different kind collapsed into one waved entry — in the
   // one branch where the lost part is already forgiven and only the recorded
-  // reds are left to pay for.
+  // reds are left to pay for. As above, the recorder cannot mint that pair; the
+  // keys defend a record that reaches the gate from somewhere else.
   it('counts a check and a console error of the same wording in a LIFTED truncation too', () => {
     const record = truncatedNow('webgpu', 1500, [
-      red('the eaves column', null, 'check'),
-      red('the eaves column', null, 'console'),
+      // RECORDER-REACHABLE SHAPES (review finding, 28.08.2026, whole-range pass
+      // 3): a console pseudo-check always carries the `console error: ` prefix,
+      // so a bare console red of a check's wording is a shape the recorder
+      // cannot produce, and asserting over it proved nothing about records.
+      red('console errors: the eaves column', null, 'check'),
+      red('console errors: the eaves column', null, 'console'),
     ])
     const later = { ...run('webgpu', 2000), suite: record.suite }
     const found = unexplainedRuns([record, later], 1000, { openPoints })
@@ -2148,8 +2168,11 @@ describe('a CRASHED run is its own class, and has its own signed way out (point 
   })
 
   // AND THE TWO LISTS ARE JOINED BY IDENTITY, NOT BY NAME (review finding,
-  // 28.08.2026, round 18). A check and a console error printing the same text
-  // are two observations; a name-only set discarded the record's own.
+  // 28.08.2026, round 18). Two reds of the same text and different kind are two
+  // observations, and a name-only set discarded the record's own. The recorder
+  // cannot mint this pair — a console pseudo-check always carries its prefix —
+  // so this is the same defence for a record that reaches the gate from
+  // somewhere else (whole-range pass 3).
   it('keeps a console red the first attempt reported as a check of the same wording', () => {
     const crashedRetry = {
       ...crashedRun('webgpu', 1500, { reds: [red('the eaves column', null, 'console')] }),

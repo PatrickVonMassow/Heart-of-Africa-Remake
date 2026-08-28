@@ -168,12 +168,6 @@
       "why": "Direkt hinter 732, das den Befund erst sichtbar gemacht hat: Solange startup rot ist, ist die Suite rot, an der jeder andere Lauf gemessen wird.",
       "place": "last"
     },
-    "734": {
-      "at": "2026-08-21T16:06:00.065Z",
-      "why": "User ruling 21.08.2026 (only the communication mechanic, then 633 and the release 174), second rule: feat/734-red-capture-cap carries 20 commits, and 8 of its 9 files have moved on main, so it decays fastest of the standing branches.",
-      "origin": "user",
-      "place": "ahead"
-    },
     "735": {
       "at": "2026-08-21T16:06:01.356Z",
       "why": "User ruling 21.08.2026 (only the communication mechanic, then 633 and the release 174): queued directly behind 174. Its own criticality note prices review rounds at 0.5 percent of the ten-point token ledger, so the saving is explicitly not marked.",
@@ -942,6 +936,30 @@
       "why": "It is the one path on which the render gate accepts a crash as its picture proof, so every render landing before the release could be resting on a run that never reported — including the release's own closing screenshots.",
       "origin": "machine",
       "place": "ahead"
+    },
+    "994": {
+      "at": "2026-08-28T17:49:08.512Z",
+      "why": "A launcher latency defect belongs with the other handover-acceleration work, not ahead of the release order; it costs minutes, not correctness.",
+      "origin": "machine",
+      "place": "last"
+    },
+    "995": {
+      "at": "2026-08-28T17:49:08.594Z",
+      "why": "It cannot be worked until those reds are recorded again, so its place is behind the work that produces new runs.",
+      "origin": "machine",
+      "place": "last"
+    },
+    "996": {
+      "at": "2026-08-28T17:49:08.678Z",
+      "why": "It needs a suite to emit malformed UTF-8, which none has; last is where an unreached hole belongs.",
+      "origin": "machine",
+      "place": "last"
+    },
+    "997": {
+      "at": "2026-08-28T17:49:08.760Z",
+      "why": "It is the measurement that decides where the context points go, and the points it would reorder sit far ahead of it — it moves when the user rules on that order.",
+      "origin": "machine",
+      "place": "last"
     }
   },
   "boundary": {
@@ -965,7 +983,6 @@
       715,
       719,
       733,
-      734,
       735,
       736,
       738,
@@ -981,7 +998,7 @@
     "why": "The order standing in front of the release today is the arrangement that predates this rule; the four machine-filed points that had ranked themselves there were moved behind 174 first"
   },
   "settled": {
-    "at": "2026-08-28T10:02:54.937Z",
+    "at": "2026-08-28T17:49:08.768Z",
     "points": [
       174,
       184,
@@ -1159,7 +1176,6 @@
       728,
       729,
       733,
-      734,
       735,
       736,
       738,
@@ -1309,7 +1325,11 @@
       990,
       991,
       992,
-      993
+      993,
+      994,
+      995,
+      996,
+      997
     ]
   }
 }

@@ -519,6 +519,22 @@ describe('tapOutput — observe-only', () => {
     expect(state.droppedLines ?? 0).toBe(0)
   })
 
+  // AND AN OVERLONG LINE CLEARS THE MARK IT PASSES (review finding, 28.08.2026,
+  // whole-range pass 4). Only a completed line cleared it, and an overlong one
+  // never reaches that path — so an incomplete character in overlong CHATTER
+  // left the mark armed, and the NEXT ordinary result line was charged for a
+  // loss that was not its own.
+  it('does not charge a later result line for a substitution an overlong line carried', () => {
+    const { state, err } = tapped()
+    // The mark is per stream, so the later result line is on the SAME one.
+    const cut = Buffer.from('vite dev server ready at café', 'utf8')
+    err.write(cut.subarray(0, cut.length - 1))
+    err.write(`${'x'.repeat(MAX_LINE_CHARS)}\n`)
+    err.write('ERR: an ordinary page error afterwards\n')
+    expect(state.lines).toEqual(['ERR: an ordinary page error afterwards'])
+    expect(state.droppedLines ?? 0).toBe(0)
+  })
+
   // The same when a STRING write follows the cut bytes rather than the flush.
   it('marks the substitution when a string write drains the decoder', () => {
     const { state, out, flush } = tapped()
