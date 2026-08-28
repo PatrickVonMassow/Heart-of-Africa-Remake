@@ -884,6 +884,10 @@ describe('render-verify-guard --status — what it prints about a run it cannot 
       })
       expect(out).toMatch(/an active deferral covers this HEAD/)
       expect(out).not.toMatch(/BLOCKING NOW/)
+      // AND THE SAME FIXTURE WITHOUT THE DEFERRAL BLOCKS (review finding,
+      // 28.08.2026, round 28): a negative assertion that would hold anyway
+      // proves nothing about the reason it names.
+      expect(inTempRepo({ runs }, { pending: true })).toMatch(/BLOCKING NOW/)
     } finally {
       rmSync(root, { recursive: true, force: true })
     }
