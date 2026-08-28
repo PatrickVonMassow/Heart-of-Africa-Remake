@@ -5,7 +5,7 @@
 // case, and the recorded model is asserted to follow the RUN rather than the
 // preference in both directions.
 import { describe, expect, it } from 'vitest'
-import { validateRecord, VERDICTS } from './mechanism-review-core.mjs'
+import { reviewIdentityProblem, validateRecord, VERDICTS } from './mechanism-review-core.mjs'
 import {
   addedFilesAreCoveredByPatch,
   buildReviewPrompt,
@@ -14,12 +14,15 @@ import {
   coverageDecision,
   decideReview,
   fallbackReviewerFor,
+  FALLBACK_CHAIN,
   FALLBACK_MODEL_NAME,
   formatRecordCommand,
+  formatReviewerCommand,
   formatReviewMaterial,
   formatReviewReport,
   isUnknownModelRefusal,
   modelsInTrailerField,
+  modelsInCommitMessage,
   newFilePathsIn,
   OUTCOME,
   parseVerdict,
@@ -30,6 +33,8 @@ import {
   CLAUDE_REVIEW_CHAIN,
   solAuthored,
   SECOND_FALLBACK_MODEL_NAME,
+  reviewerDescriptor,
+  REVIEWER_ROSTER,
   SOL_MODEL_ID,
   SOL_MODEL_NAME,
   SOL_REASONING_EFFORT,
@@ -303,6 +308,36 @@ describe('parseVerdict — only a real verdict is a verdict', () => {
 })
 
 describe('decideReview — the recorded model follows the RUN, never the preference', () => {
+  it('maps every model either review chain can name to this runnable command', () => {
+    expect(REVIEWER_ROSTER.map(({ name }) => name)).toEqual([
+      'GPT-5.6 Sol',
+      'Fable 5',
+      'Opus 5',
+      'Opus 4.8',
+    ])
+    for (const model of [...FALLBACK_CHAIN, ...CLAUDE_REVIEW_CHAIN]) {
+      const reviewer = reviewerDescriptor(model)
+      expect(reviewer, model).toMatchObject({ name: model, runtime: 'claude' })
+      expect(formatReviewerCommand({ model, sha: 'a'.repeat(40), brief: 'read both end-state files' })).toContain(
+        `--reviewer ${reviewer.key}`,
+      )
+    }
+  })
+
+  it('turns the real mixed-author ineligibility into a runnable Fable command', () => {
+    const decision = decideReview({
+      ...okRun(),
+      authorModel: ['GPT-5.6 Sol', 'Claude Opus 5'],
+    })
+    expect(decision).toMatchObject({ model: 'Fable 5', kind: OUTCOME.SELF_REVIEW, ready: false })
+    expect(formatReviewerCommand({
+      model: decision.model,
+      sha: '16793dd'.padEnd(40, '0'),
+      brief: 'read the guide and brevity core at their end state',
+      point: 977,
+    })).toMatch(/^node scripts\/review-sol\.mjs --reviewer fable /)
+  })
+
   it('a reachable Sol reviews, and is recorded as the reviewer', () => {
     const d = decideReview(okRun())
     expect(d).toMatchObject({ model: SOL_MODEL_NAME, fellBack: false, ready: true, verdict: 'merge' })
@@ -373,6 +408,45 @@ describe('decideReview — the recorded model follows the RUN, never the prefere
     expect(modelsInTrailerField(field)).toHaveLength(2)
     expect(fallbackReviewerFor(modelsInTrailerField(field))).toBe('Opus 4.8')
     expect(modelsInTrailerField('Patrick <p@example.com>')).toEqual([])
+  })
+
+  it('reads the reviewer separately, so reviewer credit is not authorship', () => {
+    const identities = modelsInCommitMessage(
+      'Separate review identity\n\n' +
+        'Co-Authored-By: Claude Opus 5 <noreply@anthropic.com>\n' +
+        'Reviewed-By: GPT-5.6 Sol <noreply@openai.com>\n',
+    )
+    expect(identities).toEqual({ authors: ['Opus 5'], reviewers: ['GPT 5.6 Sol'] })
+    expect(reviewIdentityProblem(identities.reviewers[0], { authorModels: identities.authors })).toBe('')
+  })
+
+  it('treats the three pre-fix reviewer credits as ambiguous co-authorship, never inferred review', () => {
+    // These immutable ledger-only commits intended Sol as reviewer and Opus 5
+    // as author. Their shared Co-Authored-By key cannot prove that intent, so
+    // the ledger remains their reviewer record and trailer readers correctly
+    // treat both lines as authorship. New commits use Reviewed-By instead.
+    for (const [sha, lines] of [
+      [
+        '836b187bf5c92d086c603e0fe4ba9a09a7408547',
+        ['GPT-5.6 Sol <noreply@openai.com>', 'Claude Opus 5 <noreply@anthropic.com>'],
+      ],
+      [
+        'fd02a519a03e1680f1c6c5b182987c42b4b3424d',
+        ['GPT-5.6 Sol <noreply@openai.com>', 'Claude Opus 5 <noreply@anthropic.com>'],
+      ],
+      [
+        '1f24975053368939872dd1182bf71860e783a7ce',
+        ['Claude Opus 5 <noreply@anthropic.com>', 'GPT-5.6 Sol <noreply@openai.com>'],
+      ],
+    ]) {
+      const identities = modelsInCommitMessage(
+        `${sha}\n\n` +
+          lines.map((line) => `Co-Authored-By: ${line}`).join('\n') +
+          '\n',
+      )
+      expect(new Set(identities.authors), sha).toEqual(new Set(['Opus 5', 'GPT 5.6 Sol']))
+      expect(identities.reviewers, sha).toEqual([])
+    }
   })
 
   it('names NOBODY when every model in the chain authored part of the range', () => {

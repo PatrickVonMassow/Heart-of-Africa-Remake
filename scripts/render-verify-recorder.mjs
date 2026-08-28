@@ -36,13 +36,14 @@
 // Observe-only and total: every step is wrapped so the bookkeeping can NEVER
 // fail a verify suite.
 import { basename, join, resolve } from 'node:path'
+import { StringDecoder } from 'node:string_decoder'
 import { spawnSync } from 'node:child_process'
 import { readdirSync, statSync } from 'node:fs'
 import { fileURLToPath } from 'node:url'
 import { recordRun } from './render-verify-state.mjs'
-import { failedChecks } from './verify/baseline-classify-core.mjs'
+import { consoleErrorChecks, failedChecks, parseCheckLines } from './verify/baseline-classify-core.mjs'
 import { SECTION_ENV, sectionGateWasBuilt } from './verify/sections.mjs'
-import { RETRY_ENV, chargeReds, parseSuspectReds } from './render-verify-core.mjs'
+import { RETRY_ENV, chargeReds, markVariedDetails, parseSuspectReds } from './render-verify-core.mjs'
 
 // Resolved from this module's own location where that is possible, with a
 // working-directory fallback: under the test runner `import.meta.url` is not
@@ -76,19 +77,152 @@ const CHECKOUT_DIR = (() => {
  *  the triage lane, so the two can never drift into different readings of a red. */
 const KEPT_LINE = /^(?:FAIL\s{2,}|ERR:|console errors:|CONSOLE ERRORS:)/
 
-/** A cap, because the buffer lives for the whole run: 400 result lines is far
- *  more than any suite's failing half and bounds the memory either way. */
-const MAX_KEPT_LINES = 400
+/**
+ * THE CAP ON RED LINES IS A STATED BUDGET, NOT A SILENT ONE (point 734; the
+ * heading read "NO CAP ON RED LINES" until round 16, which is what the three
+ * budgets below stopped being true of). The old 400-line cap existed
+ * because a page error that repeats per frame prints one `ERR:` line per
+ * OCCURRENCE — but a run that hit it was HALF-RECORDED: a fragment of its red
+ * set plus a truncation marker, which no closing of point 640 can reach (all
+ * three need the red's identity), so the run was unclosable by construction and
+ * blocked the render set until a hand-written --defer.
+ *
+ * MEASURED 19.08.2026 (re-taken for this fix; scripts/verify/README.md carries
+ * the full numbers): the red SET is small — the worst run on record printed 521
+ * result lines but only 33 DISTINCT ones, every recorded run holds at most 19
+ * parsed reds, and every non-cascade log carries ≤ 12 result lines. What runs
+ * away is REPETITION, never the set: reds are bounded by the suite's checks and
+ * its distinct console errors.
+ *
+ * SO THE BUFFER IS BOUNDED BY THE RED'S IDENTITY, NOT BY THE LINE (review
+ * finding, 28.08.2026). Keeping each distinct LINE was not a bound at all: a
+ * per-frame error whose text carries a counter prints a NEW distinct line every
+ * frame, so the buffer grew without limit — and an exhausted process dies,
+ * which turns a run full of observed reds into a crash record that a signature
+ * can then close. Keeping each distinct KEY is the real bound: the key is what
+ * `failedChecks` de-duplicates by anyway, so no verdict changes, and the count
+ * is bounded by the suite's own checks.
+ *
+ * The first line of each key is kept, because it carries the measurement a
+ * charge may read. A LATER line of the same key that differs is not kept — and
+ * not forgotten either: its key is recorded as VARIED, which makes a narrow
+ * `detailMatch` charge refuse the red rather than own it on the one reading it
+ * happened to match.
+ *
+ * AND THE IDENTITY IS NOT A BOUND BY ITSELF (review finding, 28.08.2026, round
+ * 13). "Bounded by the suite's checks and its distinct console errors" is true
+ * of the checks, whose labels are written in the suite's source and are
+ * therefore finite — and NOT true of the console errors, which carry whatever
+ * text the page produced. The parser folds counters and URLs away, which
+ * answers the per-frame counter the old line cap was built for; it cannot fold
+ * away a UUID, a hash, a generated path or a stack address, and each of those
+ * mints a fresh identity every time it prints. The measured numbers below are
+ * evidence about the logs that exist, never a bound on the ones that do not.
+ *
+ * SO THE BOUND IS AN EXPLICIT CEILING, AND EXCEEDING IT IS LOUD. Up to
+ * MAX_RED_IDENTITIES distinct reds the run is recorded in full; past it the
+ * buffer stops growing and the record says INCOMPLETE RECORDING, with the count
+ * of the lines it refused. That is this point's own final state taken at its
+ * word: a run either records its reds completely, or FAILS LOUDLY as an
+ * incomplete recording — never half-records itself. The class therefore stays
+ * alive for new records too, which is what gives it a signed way out
+ * (render-verify-core.mjs) instead of a hand-written deferral.
+ */
 
-/** How many charged reds one record keeps — a bound on the state file, which
- *  holds 40 runs. See the sort below: only a CHARGED red is ever dropped. */
-const MAX_RECORDED_REDS = 60
+/**
+ * How many DISTINCT reds one run may record before its recording is declared
+ * incomplete. Set against the measurement, not against taste: every recorded run
+ * holds at most 19 parsed reds, the worst log on record printed 521 result lines
+ * carrying 33 distinct ones, and every non-cascade log carries at most 12. The
+ * ceiling is fifteen times that worst distinct set, so no run this project has
+ * ever produced comes near it, while a page erroring with fresh text per frame
+ * is stopped with a bounded record instead of a dead process — an exhausted
+ * process dies, and a crash record is precisely what turns a run full of
+ * observed reds into one a signature can close without anybody reading them.
+ *
+ * The kept set never exceeds it. A line carrying several new identities is
+ * weighed whole and refused whole, because a line kept PART-WAY would store
+ * reds the record cannot account for — and a refusal is loud, so nothing is
+ * lost quietly either way.
+ */
+export const MAX_RED_IDENTITIES = 500
+
+/**
+ * AND THE SAME QUESTION ABOUT TEXT (review finding, 28.08.2026, round 14). A
+ * ceiling on IDENTITIES bounds how many reds a run can record and nothing about
+ * how long its lines are: a `console errors: [...]` summary repeating ONE error
+ * a million times brings a single identity, so it was kept whole — and the
+ * retained string, the partial-line buffer it arrived in and the parse over it
+ * all grew with the page's output rather than with its red set.
+ *
+ * So the capture carries two character budgets beside the identity ceiling, and
+ * all three are refused the same LOUD way: a line that does not fit is counted
+ * and the run is recorded incomplete. The numbers sit far above any measured run
+ * — the worst log on record holds 521 result lines, and a result line is a check
+ * label with a measurement — while bounding the tap's memory at a few megabytes.
+ *
+ * MAX_LINE_CHARS is judged BEFORE the line is parsed, so it is the one budget
+ * that also applies to a repetition: telling repetition apart means parsing the
+ * very line whose size is the problem, and a result line of this length is
+ * pathological however often its content has been seen.
+ */
+export const MAX_CAPTURE_CHARS = 4 * 1024 * 1024
+export const MAX_LINE_CHARS = 64 * 1024
+
+/** How many BYTES of one write are decoded at a time. A window, so an enormous
+ *  Buffer never becomes an enormous string before a budget has looked at it —
+ *  and wide enough that an ordinary write is decoded in one pass. */
+export const DECODE_WINDOW_BYTES = 64 * 1024
+
+/** The newline `lines.join('\n')` will put BEFORE this line (review finding,
+ *  28.08.2026, round 17). The budget bounds the buffer the parser is handed, and
+ *  that buffer is the joined text — counting the line alone let a set of lines
+ *  each just under the ceiling exceed it by one character per line. */
+const separatorFor = (kept) => (kept > 0 ? 1 : 0)
+
+/** How much of an OVERLONG line is copied to decide what it is. Both probes —
+ *  `KEPT_LINE` and `CRASH_LINE` — are anchored at the line's start, so this
+ *  prefix answers them and the rest of the line is never materialised. */
+const LINE_PROBE_CHARS = 4096
 
 /** Stderr that says the process did not end on its own terms — a stack frame or
  *  a bare `…Error:` headline. A run that CRASHED explains nothing about the
  *  picture, however many of its reds are charged, so it never counts as
  *  accounted for. A false positive only makes the gate stricter. */
 const CRASH_LINE = /^\s+at .+:\d+:\d+|^(?:Uncaught\s+)?\w*Error(?::|\b)/
+
+/** Where a stack frame BEGINS. `CRASH_LINE` can only confirm one from its
+ *  trailing `:line:column`, which an overlong line puts past the probe — so this
+ *  is what says "this might be a crash frame and I cannot tell", the one stderr
+ *  shape a cut line must not be quiet about. */
+const CRASH_FRAME_START = /^\s+at \S/
+
+/**
+ * A kept result line's REDS, each as the identity the accounting downstream
+ * uses (`<kind>:<key>`, the form `markVariedDetails` reads) and the observation
+ * it printed under it. Null when the parser cannot read the line, which then
+ * stands for itself — exactly the old behaviour. Total.
+ *
+ * ALL of them, never the first (review finding, 28.08.2026). A `console errors:
+ * <texts>` summary line carries SEVERAL reds, and keying the whole line by its
+ * FIRST parsed error collapsed two such lines that happened to share it: the
+ * second line was dropped from the buffer, so the reds only IT carried never
+ * reached `failedChecks()` and disappeared without being fixed, charged or
+ * filed. The buffer keeps a line for the identities it BRINGS — the parts are
+ * asked one by one, and their combination is never a key of its own (round 13).
+ */
+function resultParts(line) {
+  try {
+    const parsed = [...parseCheckLines(line), ...consoleErrorChecks(line)]
+    if (parsed.length === 0 || parsed.some((p) => !p?.key)) return null
+    // The measurement is what the RECORD would keep for this red — its name and
+    // its detail — so "it printed differently the second time" is asked of
+    // exactly the two fields a charge can read.
+    return parsed.map((p) => ({ id: `${p.kind}:${p.key}`, seen: `${p.name}\u0000${p.detail ?? ''}` }))
+  } catch {
+    return null
+  }
+}
 
 let armed = null
 
@@ -106,22 +240,315 @@ let armed = null
  */
 export function tapOutput(state, streams = [[process.stdout, false], [process.stderr, true]]) {
   const pending = new Map()
-  const take = (stream, isErr, text) => {
-    const lines = ((pending.get(stream) ?? '') + text).split('\n')
-    pending.set(stream, lines.pop() ?? '')
-    for (const line of lines) {
-      if (isErr && CRASH_LINE.test(line)) state.crashed = true
-      if (!KEPT_LINE.test(line)) continue
-      if (state.lines.length < MAX_KEPT_LINES) state.lines.push(line)
-      else state.dropped = (state.dropped ?? 0) + 1
+  // Each result IDENTITY is kept ONCE, in first-seen order — the first line
+  // that CARRIES it, which holds the measurement a charge may match on. The
+  // identity is the parser's own (`failedChecks` de-duplicates by it anyway),
+  // so collapsing here changes no verdict.
+  //
+  // KEYED BY THE IDENTITIES, NOT BY THEIR COMBINATION (review finding,
+  // 28.08.2026, round 13). Keying a line by its parts JOINED bounded nothing:
+  // `[A,B]`, `[A,C]`, `[B,C]` are three distinct composites over two identities,
+  // so a suite whose summary lines vary their grouping minted new keys without
+  // ever printing a new red — combinatorially many of them. A line now earns its
+  // place only by carrying an identity nothing kept yet; a line whose reds are
+  // all already represented is dropped as the pure repetition it is, and the
+  // parse downstream still finds those reds inside the lines that WERE kept.
+  const keptIds = new Set()
+  // The lines the parser could not read at all. They stand for themselves, so
+  // they get their own slots — under the same ceiling, since an unparseable
+  // result line is exactly the kind that can carry changing text.
+  const keptRaw = new Set()
+  // The text already kept, against MAX_CAPTURE_CHARS.
+  let keptChars = 0
+  // Streams whose PENDING remainder outgrew MAX_LINE_CHARS: the middle of that
+  // line is gone, so the line is refused when its newline finally arrives
+  // rather than parsed as if it were whole.
+  const overlong = new Set()
+  // A VARIED MEASUREMENT IS A FACT ABOUT ONE RED, NOT ABOUT A LINE (review
+  // finding, 28.08.2026). Marking the LINE's composite key missed the case the
+  // whole mechanism exists for: `[A(reading 1), B]` followed by `[A(reading 2),
+  // C]` are two DIFFERENT composite keys, so both lines are kept and nothing
+  // was ever compared — yet `failedChecks` still de-duplicates A by its own key
+  // and keeps only reading 1, so reading 2 was lost silently and a narrow
+  // charge could then own A on the reading that happened to survive. (The
+  // composite key also matched nothing downstream, where `markVariedDetails`
+  // asks per red identity.) So the first observation of each PARSED identity is
+  // remembered, and a later, different one marks that identity. Bounded the
+  // same way the buffer is: one entry per distinct red.
+  const firstSeenOfPart = new Map()
+  /** Streams whose decoder had to substitute for bytes it never received. The
+   *  mark is charged by the result line it lands in and cleared by any line. */
+  const substituted = new Set()
+  const refuse = () => {
+    state.droppedLines = (Number.isFinite(state.droppedLines) ? state.droppedLines : 0) + 1
+  }
+  /**
+   * One completed line, already known to be within MAX_LINE_CHARS. Returns
+   * nothing; every budget past the line's own size is decided here.
+   */
+  const handle = (isErr, line, stream = null) => {
+    if (isErr && CRASH_LINE.test(line)) state.crashed = true
+    // A SUBSTITUTED CHARACTER COSTS THE ACCOUNTING ONLY INSIDE A RESULT LINE
+    // (review finding, 28.08.2026, round 30). The mark is cleared by the line it
+    // belongs to either way: it stands for one line's loss, never for the run's.
+    const renamed = stream !== null && substituted.delete(stream)
+    if (!KEPT_LINE.test(line)) return
+    if (renamed) refuse()
+    // THE PARSE OF ONE LINE IS BOUNDED BY THE LINE (review finding, 28.08.2026,
+    // round 20, which read the identity budget as arriving too late). It does
+    // arrive after the parse, and the parse cannot run away: `handle` is reached
+    // only for a line already within MAX_LINE_CHARS, so a summary carrying five
+    // hundred small errors is bounded by 64 Ki of text, not by their number. The
+    // identity budget bounds what is REMEMBERED across a whole run, which is the
+    // quantity that grows without limit; the per-line budget is what bounds the
+    // transient, and it is asked first.
+    const parts = resultParts(line)
+    // What this line would ADD, counted as IDENTITIES and not as parts (review
+    // finding, 28.08.2026, round 14). A summary that prints the same red five
+    // hundred times carries five hundred parts and exactly one new identity;
+    // counting the parts made such a line exceed the ceiling and marked an
+    // ordinary repeated-error run incomplete, which is a FALSE truncation — and
+    // a false truncation blocks the render set, the very failure this point
+    // exists to end.
+    const fresh =
+      parts === null
+        ? (keptRaw.has(line) ? [] : [line])
+        : [...new Set(parts.map((p) => p.id).filter((id) => !keptIds.has(id)))]
+    // THE BUDGETS ARE DECIDED BEFORE ANYTHING IS REMEMBERED (review finding,
+    // 28.08.2026, round 14). The varied-measurement map used to be filled
+    // first, so a REFUSED line could fill it to the brim without a single line
+    // being kept — and then a later, kept red found no room in it, so its
+    // second, different reading was dropped as repetition with nothing marking
+    // it, and a narrow charge could own that red on the one reading that
+    // survived. Exactly the silent loss the mark exists to prevent.
+    //
+    // AND THEY ARE ASKED OF WHAT THE LINE WOULD ADD, NOT OF THE BUFFER BEFORE
+    // IT. Testing "is the buffer full yet" and then adding every fresh identity
+    // the line carried was no ceiling at all: ONE summary line could take the
+    // buffer — and `record.reds` with it — arbitrarily far past the limit
+    // without marking the run incomplete. A line is weighed WHOLE: kept only if
+    // all of its fresh identities and its text fit, refused as one if they do
+    // not. Refusing part-way is not on offer, because the record would then
+    // hold reds it cannot account for; refusing whole is LOUD, which is the
+    // contract — the record says how many lines it refused, `runVerdict`
+    // answers `incomplete`, and the signed way out of render-verify-core.mjs
+    // disposes of it.
+    //
+    // Only of a line that would be KEPT, though: one bringing nothing new is
+    // dropped as repetition, and counting that would be a false truncation.
+    if (
+      fresh.length > 0 &&
+      (keptIds.size + keptRaw.size + fresh.length > MAX_RED_IDENTITIES ||
+        keptChars + line.length + separatorFor(state.lines.length) > MAX_CAPTURE_CHARS)
+    ) {
+      refuse()
+      return
     }
+    // A line that is kept, or dropped as pure repetition, still has its
+    // measurement read: repetition is exactly where a second, DIFFERENT reading
+    // of an already-kept red shows up.
+    for (const part of parts ?? []) {
+      const seen = firstSeenOfPart.get(part.id)
+      // The map only ever learns identities that were KEPT, so it is bounded by
+      // the ceiling itself; the size guard stays as a backstop.
+      if (seen === undefined) {
+        if (firstSeenOfPart.size < MAX_RED_IDENTITIES) firstSeenOfPart.set(part.id, part.seen)
+      }
+      // The SAME red printed with a DIFFERENT measurement. The record can hold
+      // only one, so the difference is remembered as a fact about that red: a
+      // narrow charge then refuses it instead of owning it on the single reading
+      // that survived.
+      else if (seen !== part.seen && state.variedKeys instanceof Set) state.variedKeys.add(part.id)
+    }
+    if (fresh.length === 0) return
+    if (parts === null) keptRaw.add(line)
+    else for (const id of fresh) keptIds.add(id)
+    keptChars += line.length + separatorFor(state.lines.length)
+    state.lines.push(line)
+  }
+  /**
+   * SCANNED, NOT SPLIT (review finding, 28.08.2026, round 16). Building
+   * `(pending + chunk).split('\n')` materialised the WHOLE write and every line
+   * in it before any budget was consulted, so one enormous write — or one write
+   * carrying millions of short lines — exhausted the process before it could
+   * produce the closable incomplete record this point is about. The chunk is now
+   * walked newline by newline, and nothing beyond one line is ever held.
+   *
+   * AN OVERLONG LINE IS NEVER MATERIALISED AT ALL. Both probes — is this a
+   * result line, is this a crash frame — are ANCHORED at the line's start, so a
+   * bounded prefix answers them, and a line past MAX_LINE_CHARS is refused from
+   * that prefix without the rest of it ever being copied.
+   *
+   * A LINE THAT NEVER ENDS IS NOT BUFFERED FOREVER either: the remainder is
+   * capped at MAX_LINE_CHARS, and the line whose middle was cut is refused when
+   * its newline finally arrives rather than parsed as if it had come whole. The
+   * refusal is therefore the same however the process chunked its writes.
+   */
+  const take = (stream, isErr, chunk) => {
+    let carry = pending.get(stream) ?? ''
+    let from = 0
+    for (;;) {
+      const nl = chunk.indexOf('\n', from)
+      if (nl === -1) break
+      // True only for the line that carries the cut remainder: the flag is
+      // cleared by the first line to complete after it.
+      const damaged = overlong.delete(stream)
+      const segment = nl - from
+      if (damaged || carry.length + segment > MAX_LINE_CHARS) {
+        // BOUNDED BY THE PROBE BUDGET, NOT BY THE CARRY (review finding,
+        // 28.08.2026, round 17). A pending line already at MAX_LINE_CHARS,
+        // completed by a later chunk, built a head of MAX_LINE_CHARS +
+        // LINE_PROBE_CHARS — past the very cap the branch exists to enforce.
+        // Both probes are anchored at the line's start, so the first
+        // LINE_PROBE_CHARS answer them and nothing beyond is ever copied.
+        const head =
+          carry.length >= LINE_PROBE_CHARS
+            ? carry.slice(0, LINE_PROBE_CHARS)
+            : carry + chunk.slice(from, from + Math.min(segment, LINE_PROBE_CHARS - carry.length))
+        // THE OVERLONG LINE CLEARS THE SUBSTITUTION MARK TOO (review finding,
+        // 28.08.2026, whole-range pass 4). Only `handle` cleared it, and this
+        // branch never reaches `handle` — so an incomplete character in an
+        // overlong CHATTER line left the mark armed, and the next ordinary
+        // result line was charged for a loss that was not its own. A false
+        // truncation, which is the failure this point exists to end.
+        substituted.delete(stream)
+        if (isErr && CRASH_LINE.test(head)) state.crashed = true
+        if (KEPT_LINE.test(head)) refuse()
+        // AND AN OVERLONG STDERR LINE THE PROBE COULD NOT DECIDE IS A LOST LINE
+        // (review findings, 28.08.2026, rounds 23, 24 and 29). `CRASH_LINE`'s
+        // stack-frame alternative needs the trailing `:line:column`, which a
+        // pathological path pushes past the probe — so a line that BEGINS like a
+        // stack frame and is too long to keep can be neither confirmed a crash
+        // nor ruled out, and it used to leave the run with no closure route at
+        // all. It is recorded as what it is: a result the recording lost.
+        //
+        // Only that line, though (round 29, correcting round 24's wider reading).
+        // A head that fully matches `CRASH_LINE` is DECIDED — the crash is
+        // marked, and nothing about the accounting was lost; that such a run can
+        // still exit 0 without its crash reaching the record is POINT 993, not
+        // this. And ordinary stderr chatter is decided too: it is neither a
+        // result line nor a crash frame, so cutting it costs the accounting
+        // nothing, and calling a green run incomplete over it would be the false
+        // truncation this point exists to end.
+        else if (isErr && CRASH_FRAME_START.test(head) && !CRASH_LINE.test(head)) refuse()
+      } else {
+        handle(isErr, carry + chunk.slice(from, nl), stream)
+      }
+      carry = ''
+      from = nl + 1
+    }
+    if (from < chunk.length) {
+      // NOT ONE CHARACTER PAST THE CAP (review finding, 28.08.2026, round 20).
+      // The old reading copied `room + 1` and then trimmed, so the buffer really
+      // did hold MAX_LINE_CHARS + 1 for an instant — past the budget this branch
+      // exists to enforce. What is left of the chunk is already known from its
+      // LENGTH, so the overflow is decided by arithmetic and nothing beyond the
+      // cap is ever copied.
+      const room = MAX_LINE_CHARS - carry.length
+      const rest = chunk.length - from
+      if (room > 0) carry += chunk.slice(from, from + Math.min(rest, room))
+      if (rest > room) overlong.add(stream)
+    }
+    pending.set(stream, carry)
   }
   const isErrOf = new Map(streams)
+  /**
+   * A BYTE CHUNK IS DECODED IN BOUNDED WINDOWS (review finding, 28.08.2026,
+   * round 18). `chunk.toString('utf8')` built the WHOLE write as a fresh string
+   * before any budget was consulted, so one enormous Buffer could exhaust the
+   * process without ever producing the closable incomplete record this point is
+   * about — the same failure the line-by-line scan fixed for strings, through
+   * the other door. A string chunk needs no such treatment: `take` walks it and
+   * never copies beyond one line.
+   *
+   * The decoder is PER STREAM and kept, because a multi-byte character split
+   * across two writes — or across two windows of one write — must reassemble.
+   * Decoding each chunk on its own turned such a character into U+FFFD.
+   */
+  const decoders = new Map()
+  /**
+   * BYTES HELD BACK ARE RELEASED BEFORE A STRING OVERTAKES THEM (review finding,
+   * 28.08.2026, round 20). A Buffer write ending mid-character leaves those
+   * bytes in the decoder; a STRING write then went straight to `take`, so the
+   * string completed the line WITHOUT the half character and the decoder's tail
+   * arrived afterwards as text of its own — a stored red silently renamed, with
+   * nothing marking the recording. Closing the decoder first puts the two back
+   * in the order the process wrote them; the half character cannot be recovered
+   * and is marked, exactly as it is at the flush.
+   */
+  const drainDecoder = (stream, isErr) => {
+    const decoder = decoders.get(stream)
+    if (!decoder) return
+    decoders.delete(stream)
+    const rest = decoder.end()
+    if (!rest) return
+    // AND THE SUBSTITUTION IS RECORDED AS THE LOSS IT IS — IF IT LANDS IN A
+    // RESULT LINE (review findings, 28.08.2026, rounds 26 and 30). `end()`
+    // returns text only when bytes were held back for a character that never
+    // completed, and what it returns stands in their place, so a final `FAIL` or
+    // `ERR:` could be stored under an identity the suite never printed while the
+    // record read complete. Round 26 marked it outright, and round 30 measured
+    // what that costs: a dangling byte in ordinary CHATTER then turned a sound
+    // run into an incomplete recording, which is the false truncation this point
+    // exists to end. So the substitution is REMEMBERED here and charged by
+    // `handle`, which is where a line is known to be a result line at all.
+    substituted.add(stream)
+    take(stream, isErr, rest)
+  }
+  const decoderFor = (stream) => {
+    let decoder = decoders.get(stream)
+    if (!decoder) {
+      decoder = new StringDecoder('utf8')
+      decoders.set(stream, decoder)
+    }
+    return decoder
+  }
+  const feedBytes = (stream, isErr, view) => {
+    // EVERY VIEW IS READ AS BYTES (review finding, 28.08.2026, round 19). A
+    // `DataView` has no `subarray` and fell through to `toString`, which yields
+    // "[object DataView]" — a whole write reduced to one meaningless line, past
+    // every budget and without marking the run. And a view of wider elements
+    // measures its `length` in ELEMENTS, so the window walked twice or four
+    // times the bytes it advertises. One Uint8Array over the same memory answers
+    // both: no copy, byte indices, and `byteLength` is the real size.
+    const bytes = new Uint8Array(view.buffer, view.byteOffset, view.byteLength)
+    const decoder = decoderFor(stream)
+    for (let i = 0; i < bytes.byteLength; i += DECODE_WINDOW_BYTES) {
+      const piece = decoder.write(bytes.subarray(i, Math.min(i + DECODE_WINDOW_BYTES, bytes.byteLength)))
+      // A MALFORMED BYTE SEQUENCE IS NOT MARKED HERE, and the reason is measured
+      // (review findings, 28.08.2026, rounds 27 and 28). `write()` substitutes
+      // U+FFFD for bytes it cannot decode, so a result line arriving as bytes
+      // could be stored under an identity the suite never printed — the same
+      // silent rename the incomplete TAIL is marked for at `end()`. Round 27
+      // marked it by counting substitutions against the EF BF BD the window
+      // itself carried, and round 28 measured what that costs: a LEGITIMATE
+      // U+FFFD split across two windows or two writes is emitted in the later
+      // piece, whose bytes no longer carry the sequence, so the count reports a
+      // substitution that never happened and the run is called incomplete for
+      // nothing. A FALSE truncation blocks the render set, which is the failure
+      // this whole point exists to end — so it is not made here. The remaining
+      // rename is POINT 996, which owns deciding it where the decision can be
+      // exact.
+      if (piece) take(stream, isErr, piece)
+    }
+  }
   for (const [stream, isErr] of streams) {
     const original = stream.write.bind(stream)
     stream.write = (chunk, ...rest) => {
       try {
-        take(stream, isErr, typeof chunk === 'string' ? chunk : (chunk?.toString?.('utf8') ?? ''))
+        // `ArrayBuffer.isView`, never `instanceof Uint8Array`: the tap runs in
+        // whatever realm the suite brought, and a Buffer minted in another one
+        // fails the instance test while being exactly the thing to decode. It
+        // did fail, measured under the jsdom environment, and every split
+        // character came out as U+FFFD.
+        if (typeof chunk === 'string') {
+          drainDecoder(stream, isErr)
+          take(stream, isErr, chunk)
+        } else if (ArrayBuffer.isView(chunk)) feedBytes(stream, isErr, chunk)
+        else if (chunk != null) {
+          drainDecoder(stream, isErr)
+          take(stream, isErr, chunk.toString?.('utf8') ?? '')
+        }
       } catch {
         /* never let the bookkeeping disturb the suite's own output */
       }
@@ -131,6 +558,20 @@ export function tapOutput(state, streams = [[process.stdout, false], [process.st
   /** The last line of a stream carries no newline when a process dies mid-write;
    *  flushing at exit is what makes that line readable at all. */
   return () => {
+    // THE DECODER IS CLOSED FIRST (review finding, 28.08.2026, round 19). Bytes
+    // held back for a character the last write cut in half live in the decoder,
+    // not in `pending` — flushing the pending text without them dropped the tail
+    // of the final line, which is exactly the line a dying process leaves.
+    for (const [stream, decoder] of decoders) {
+      const rest = decoder.end()
+      if (!rest) continue
+      // The same at the flush: a character the last write cut in half is a lost
+      // RESULT — charged by `handle`, and only where the line is one (review
+      // findings, 28.08.2026, rounds 26 and 30).
+      substituted.add(stream)
+      take(stream, isErrOf.get(stream) === true, rest)
+    }
+    decoders.clear()
     for (const stream of [...pending.keys()]) {
       if (!pending.get(stream)) continue
       // The appended newline turns the remainder into a whole line for `take`,
@@ -221,12 +662,12 @@ export function armRunRecorder(backend) {
       // The run's own result lines and whether it died rather than reported
       // (point 550) — the raw material of the red accounting below.
       lines: [],
+      // The keys whose measurement did NOT hold still within this run.
+      variedKeys: new Set(),
+      // Result lines the ceiling refused — each one carried a red nothing else
+      // in the buffer stands for, so a run with any is recorded INCOMPLETE.
+      droppedLines: 0,
       crashed: false,
-      // Result lines the capture cap refused. They become one synthetic
-      // UNACCOUNTED red below: a dropped line may have been the one red nobody
-      // has filed, and a cap that can silently delete it turns the flood into a
-      // way to clear the gate.
-      dropped: 0,
     }
     const flush = tapOutput(armed)
     // THE REAL CRASH PATH (four-eyes finding F1). Node prints an uncaught
@@ -255,36 +696,47 @@ export function armRunRecorder(backend) {
             `NOTE  ${armed.suite} consulted no section gate, so it ran WHOLE — but ${SECTION_ENV}=${armed.section} is set, so this run is recorded PARTIAL and proves no coverage. Unset it.`,
           )
         }
+        // THE TAIL LINE IS READ WHATEVER THE EXIT CODE (review, 19.08.2026).
+        // A stream's last line carries no newline when the process dies
+        // mid-write; flushed here, before anything is judged, so the red
+        // accounting below reads the complete capture — an unterminated last
+        // `FAIL` is a red like any other.
+        try {
+          flush()
+        } catch {
+          /* never fail a suite over the bookkeeping */
+        }
         // A green run has nothing to account for; only a RED one is charged, and
         // it is charged HERE, at record time, against the ledger as it stood
         // when the run happened. A later ledger edit therefore cannot bless a
         // run after the fact — it takes a fresh run, which is the point.
+        // PARSED FOR A RUN THAT LOST OUTPUT TOO, not only for a failing one
+        // (review finding, 28.08.2026, round 25). A run that hit a budget and
+        // still exited 0 has result lines in the buffer, and skipping the parse
+        // threw them away before the record was written — so the reds it DID
+        // capture could never be charged, filed or blocked on afterwards, which
+        // is the half-recording this point forbids through the other door.
+        //
+        // An ordinary exit-0 run is untouched: it dropped nothing, so nothing in
+        // it went unread, and reading its tolerated console lines as reds would
+        // redden every run the suite itself passed.
         let reds = []
-        if (exit !== 0) {
+        if (exit !== 0 || armed.droppedLines > 0) {
           try {
-            flush()
-            reds = chargeReds(failedChecks(armed.lines.join('\n')), {
+            const output = armed.lines.join('\n')
+            // The keys the TAP saw print two different measurements — the buffer
+            // keeps only the first, so a narrow charge must not own the red on
+            // that one reading (review, 28.08.2026).
+            reds = chargeReds(markVariedDetails(failedChecks(output), armed.variedKeys), {
               suite: armed.suite,
               backend: armed.backend,
+              // The WebGPU feature level this run really came up at, so a charge
+              // written for the compatibility lane cannot excuse the core
+              // adapter the player runs (point 505 + review, 19.08.2026).
+              featureLevel: armed.featureLevel,
             })
-            // UNACCOUNTED reds first, so the cap below can only ever drop a
-            // charged one. Truncation must never be able to turn a red run into
-            // an accounted-for one; losing a charge only costs detail in the
-            // report (a stable sort keeps each group's own order).
-            reds.sort((a, b) => (a.point === null ? 0 : 1) - (b.point === null ? 0 : 1))
           } catch {
             /* unparseable output — no red is charged, so the run stays red */
-          }
-          // A capture that lost lines cannot claim to have read the run's reds:
-          // one synthetic UNACCOUNTED red, first in the list so no truncation
-          // can drop it either.
-          if (armed.dropped > 0) {
-            reds.unshift({
-              name: `${armed.dropped} further result line(s) exceeded the capture cap — this run's reds were NOT all read`,
-              key: 'capture-truncated',
-              kind: 'check',
-              point: null,
-            })
           }
         }
         recordRun({
@@ -303,7 +755,42 @@ export function armRunRecorder(backend) {
           screenshots: shots.slice(0, 12),
           ...(armed.section ? { partial: true, section: armed.section } : {}),
           ...(armed.suspectOf.length ? { suspect: true, suspectOf: armed.suspectOf } : {}),
-          ...(exit !== 0 ? { reds: reds.slice(0, MAX_RECORDED_REDS), crashed: armed.crashed } : {}),
+          // EVERY red the ceiling allowed (point 734): the capture keeps one
+          // entry per DISTINCT red identity and the parser de-duplicates by key,
+          // so this list is the run's red SET — never its chatter. A cap that
+          // silently discarded observed reds is the half-recording the point
+          // forbids; the ceiling below says so out loud instead.
+          // EVERY RED A LOST RECORDING KEPT, whatever its exit code (review
+          // finding, 28.08.2026, round 25). A budget-hit run that still exited 0
+          // wrote only `truncated`/`droppedLines`, so once its lost part was
+          // signed off the reds it DID capture were gone — unchargeable,
+          // unfileable, blocking nothing. An ordinary exit-0 run reaches this
+          // line with an empty list and is written exactly as before.
+          //
+          // `crashed` still travels only with a non-zero exit. A record that
+          // reached CRASH_LINE while its process ended 0 is POINT 993, which
+          // owns that reading; changing it here would answer a different point
+          // in this one's commit.
+          ...(reds.length > 0 ? { reds } : {}),
+          ...(exit !== 0 ? { crashed: armed.crashed } : {}),
+          // A RUN THAT HIT A BUDGET IS AN INCOMPLETE RECORDING, and says how
+          // much it refused — `runVerdict` then answers `incomplete` and the
+          // signed closure disposes of it, which is the whole way out a
+          // truncated run has.
+          //
+          // WHATEVER ITS EXIT CODE (review finding, 28.08.2026, round 17,
+          // overturning the round-16 carve-out). Round 16 exempted an exit-0 run
+          // on the argument that "the lines it refused were never evidence the
+          // accounting reads", and that argument is measurably false: `refuse()`
+          // is reached ONLY from a line matching `KEPT_LINE` — a suite's own
+          // `FAIL`, an `ERR:`, a `console errors:` summary. Chatter never
+          // reaches a budget at all, so a genuinely green run cannot be marked
+          // incomplete by this line: it prints no result line to drop. What the
+          // carve-out really exempted was the opposite case — a process that
+          // ended 0 while its output carried result lines nobody read — and
+          // that run then counted as picture COVERAGE, which is the worst thing
+          // an unread recording can be mistaken for.
+          ...(armed.droppedLines > 0 ? { droppedLines: armed.droppedLines, truncated: true } : {}),
         })
       } catch {
         /* never fail a suite over the bookkeeping */

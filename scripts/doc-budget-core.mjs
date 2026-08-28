@@ -89,12 +89,15 @@ export const DOC_BUDGETS = [
     // branch of forty commits that stood 658 behind `main`. The rule has no other
     // authority and no guard, so it returns and the ceiling follows it by exactly
     // its own size.
-    // RAISED by the 13 measured words of the §6 reviewer-trailer rule: a commit
-    // may record its cross-vendor reviewer as a second model trailer. The commit
-    // gate already permits two separately allowed lines; this closes the policy
-    // ambiguity without changing that mechanism. The one-word margin remains.
+    // RAISED by the 13 measured words of the original §6 reviewer-trailer rule.
+    // Point 982 replaces its ambiguous second Co-Authored-By line with the
+    // distinct Reviewed-By key inside the standing ceiling, so every Git author
+    // reader excludes the reviewer without a heuristic. The margin remains.
+    // RAISED by the 31 measured words of the 24.08.2026 standing authorization:
+    // §6 must name both the VDZK recommendation grant and its boundary in the same
+    // sentence, so this binding rule cannot be replaced by a shorter pointer.
     maxLines: 193,
-    maxWords: 1332,
+    maxWords: 1363,
     // THE RATCHET SLACK, tightest in the project: this file is the per-turn cost of
     // every session and every subagent, so twenty words is the whole licence between
     // one cut and the next. A larger edit than that lowers the ceiling with it.
@@ -129,8 +132,11 @@ export const DOC_BUDGETS = [
     // Two raises in one day is the ratchet working, not failing: each bought a
     // new topic, neither a longer telling of an old one — but the next raise
     // should cut a retired entry instead.
-    maxLines: 49,
-    maxWords: 768,
+    // RAISED on 27.08.2026 by the 21-word hook for the user's 24.08.2026 ruling:
+    // a stated VDZK recommendation is a decision the session may execute and
+    // record. This is a new authorization, not a longer telling of standstill.
+    maxLines: 50,
+    maxWords: 789,
     maxEntryWords: 22,
     // Fifteen words: an index of one-hook lines, where a whole new entry is ~20 words —
     // so the slack cannot hide one, and re-wording an existing hook is free.

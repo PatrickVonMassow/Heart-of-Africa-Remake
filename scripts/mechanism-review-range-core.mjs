@@ -2,16 +2,16 @@
 //
 // A convergent review judges the range's artefact at HEAD, not every historical
 // version that led there. Each net-changed path therefore appears once, routed
-// by the author of its final change. Intermediate versions are named as
+// around every model that contributed to that retained end-state path. Intermediate versions are named as
 // superseded, and paths whose final state equals the base are dropped.
-import { sameModel } from './mechanism-review-core.mjs'
+import { independentReviewProblem, sameModel } from './mechanism-review-core.mjs'
 import { passComposition } from './review-material-core.mjs'
 
 export const REVIEWER_CANDIDATES = Object.freeze(['GPT-5.6 Sol', 'Opus 5', 'Fable 5', 'Opus 4.8'])
 export const UNREVIEWABLE_NARROWING_REMEDY =
   'Review every runnable pass and record the exact measured remainder with the criticality-review-unavailable command printed by review-sol.'
 export const NO_ELIGIBLE_REVIEWER_REASON =
-  `every configured reviewer vendor authored part of this contribution. ${UNREVIEWABLE_NARROWING_REMEDY}`
+  `every configured reviewer model authored part of this contribution. ${UNREVIEWABLE_NARROWING_REMEDY}`
 export const UNKNOWN_AUTHOR_REVIEWER_REASON =
   `authorship vendor is unknown, so no reviewer can prove cross-vendor independence. ${UNREVIEWABLE_NARROWING_REMEDY}`
 
@@ -177,19 +177,11 @@ export function eligibleReviewer(authors = [], candidates = REVIEWER_CANDIDATES)
   // assignment made from absence.
   if (!writtenBy.length) return ''
   if (writtenBy.some((author) => vendorOf(author) === 'unknown')) return ''
-  const vendors = new Set(writtenBy.map(vendorOf))
-  // Cross-VENDOR means the candidate's vendor authored NONE of the group. A
-  // commit co-authored by both vendors has no eligible reviewer in this chain,
-  // even when a different model at one of those vendors did not personally
-  // author it. Calling that model eligible would reduce four eyes to a model-id
-  // distinction exactly where the repository rule requires vendor separation.
-  return (
-    (candidates ?? []).find((candidate) => {
-      if (writtenBy.some((author) => sameModel(candidate, author))) return false
-      const candidateVendor = vendorOf(candidate)
-      return candidateVendor !== 'unknown' && !vendors.has(candidateVendor)
-    }) ?? ''
-  )
+  // The roster order preserves the cross-vendor preference: Claude-only work
+  // lands on Sol, Sol-only work on Claude. Where BOTH vendors contributed,
+  // vendor separation is impossible; the documented fallback is then the
+  // first exact model that wrote no part of the end state.
+  return (candidates ?? []).find((candidate) => !writtenBy.some((author) => sameModel(candidate, author))) ?? ''
 }
 
 const reviewerFields = (authors, candidates) => {
@@ -251,7 +243,12 @@ export function endStateArtefacts({ commits = [], endStateFiles = null } = {}) {
       continue
     }
     const latest = changes.at(-1)
-    const authors = latest.authors
+    // END-STATE AUTHORSHIP IS THE UNION OF CONTRIBUTORS TO THE PATH, not only
+    // the last commit that touched it. A later copy edit does not erase code or
+    // prose an earlier model left in the file; selecting that earlier model as
+    // reviewer would make it read its own retained work (point 977's measured
+    // guide/brevity reproduction).
+    const authors = uniq(changes.flatMap((change) => change.authors))
     const vendors = uniq(authors.map(vendorOf))
     artefacts.push({
       file,
@@ -421,13 +418,11 @@ export function outstandingFiles({
     for (const artefact of state.artefacts) {
       if (!files.includes(artefact.file)) continue
       const latestChange = artefact.changes.at(-1)
-      const reviewerVendor = vendorOf(record.model)
       const coversEndState =
         recordUsable(record, latestChange.commit) &&
         contained(record, artefact.endStateSha) &&
-        reviewerVendor !== 'unknown' &&
         !artefact.vendors.includes('unknown') &&
-        !artefact.vendors.includes(reviewerVendor)
+        !independentReviewProblem(record, { authorModels: artefact.authors })
       if (!coversEndState) {
         // Count only coverage the replaced contribution model really accepted.
         // A malformed row, an unrelated file name or a self-review did not grow

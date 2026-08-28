@@ -84,7 +84,7 @@ export function gatherSections({ stdin = '', logs = [], diff = '', files = [] } 
 
 export const usage = () =>
   [
-    'usage: node scripts/ask-sol.mjs [--model sol|fable|opus] --kind <' + KINDS.join('|') + '> --brief "<the question>" \\',
+    'usage: node scripts/ask-sol.mjs [--model sol|fable|opus|opus48] --kind <' + KINDS.join('|') + '> --brief "<the question>" \\',
     '           [--file <path>]… [--log <path>]… [--diff <range>] [--timeout <ms>] [--anyway] [--json]',
     '',
     'Material also comes from stdin. Nothing is fetched by the model: this container cannot',
@@ -153,7 +153,7 @@ if (isMainModule(import.meta.url)) {
       process.exit(2)
     }
     if (!model) {
-      console.error('ask-sol: --model must be one of sol, fable, opus.\n')
+      console.error('ask-sol: --model must be one of sol, fable, opus, opus48.\n')
       console.error(usage())
       process.exit(2)
     }

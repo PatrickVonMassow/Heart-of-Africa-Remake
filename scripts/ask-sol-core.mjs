@@ -18,7 +18,15 @@
 // Side-effect free: the process spawn, the material gathering and the printing belong to
 // scripts/ask-sol.mjs. Pinned by ask-sol-core.test.mjs.
 
-import { FABLE_MODEL, FABLE_MODEL_ID, OPUS_MODEL, OPUS_MODEL_ID } from './fable-switch-core.mjs'
+import {
+  FABLE_MODEL,
+  FABLE_MODEL_ID,
+  OPUS_FALLBACK_MODEL,
+  OPUS_FALLBACK_MODEL_ID,
+  OPUS_MODEL,
+  OPUS_MODEL_ID,
+  parseClaudeResultOutput,
+} from './fable-switch-core.mjs'
 import { blindReviewerAdmission, charStripped, MATERIAL_BUDGET_CHARS, rawFieldValue, SOL_MODEL_ID, SOL_MODEL_NAME, stripDecoration, SOL_REASONING_EFFORT } from './review-sol-core.mjs'
 
 export { MATERIAL_BUDGET_CHARS, SOL_MODEL_NAME, SOL_REASONING_EFFORT }
@@ -29,6 +37,7 @@ export const ASK_MODELS = Object.freeze({
   sol: Object.freeze({ key: 'sol', name: SOL_MODEL_NAME, id: SOL_MODEL_ID, runtime: 'codex', effort: SOL_REASONING_EFFORT }),
   fable: Object.freeze({ key: 'fable', name: FABLE_MODEL, id: FABLE_MODEL_ID, runtime: 'claude', effort: 'high' }),
   opus: Object.freeze({ key: 'opus', name: OPUS_MODEL, id: OPUS_MODEL_ID, runtime: 'claude', effort: 'high' }),
+  opus48: Object.freeze({ key: 'opus48', name: OPUS_FALLBACK_MODEL, id: OPUS_FALLBACK_MODEL_ID, runtime: 'claude', effort: 'high' }),
 })
 
 /** A supported model descriptor, or null. Sol remains the compatibility default. */
@@ -41,37 +50,7 @@ export function resolveAskModel(value = 'sol') {
  * answer. Current Claude Code also reports a small Haiku classifier call in
  * modelUsage; the answer model is the row whose token counters equal `usage`,
  * not every auxiliary model the CLI happened to consult. */
-export function parseClaudeAskOutput(text, expected = {}) {
-  let value
-  try {
-    value = JSON.parse(String(text ?? '').trim())
-  } catch (error) {
-    return { ok: false, result: '', models: [], error: `Claude returned no readable result JSON: ${error.message}` }
-  }
-  const usage = value?.usage ?? {}
-  const rows = Object.entries(value?.modelUsage ?? {})
-  const normal = (name) => String(name ?? '').toLowerCase().replace(/\[.*?\]/g, '').replace(/[^a-z0-9]+/g, '-')
-  const wanted = rows.find(([name, row]) =>
-    (normal(name) === normal(expected.id) || normal(row?.canonicalModel) === normal(expected.id)) &&
-    Number(row?.inputTokens) === Number(usage.input_tokens) &&
-    Number(row?.outputTokens) === Number(usage.output_tokens) &&
-    Number(row?.cacheReadInputTokens ?? 0) === Number(usage.cache_read_input_tokens ?? 0) &&
-    Number(row?.cacheCreationInputTokens ?? 0) === Number(usage.cache_creation_input_tokens ?? 0),
-  )
-  const models = rows.map(([name]) => name)
-  if (!wanted) {
-    return {
-      ok: false,
-      result: typeof value?.result === 'string' ? value.result : '',
-      models,
-      error: `Claude's top-level answer was not attributed to ${expected.name ?? expected.id}; usage named ${models.join(', ') || 'no model'}`,
-    }
-  }
-  if (typeof value?.result !== 'string') {
-    return { ok: false, result: '', models, error: 'Claude returned no text result' }
-  }
-  return { ok: true, result: value.result, models, answerModel: wanted[0], error: '' }
-}
+export const parseClaudeAskOutput = parseClaudeResultOutput
 
 /** The kinds of work this command carries. All of them are pure text. */
 export const KINDS = Object.freeze(['diagnose', 'audit', 'enumerate', 'explain'])

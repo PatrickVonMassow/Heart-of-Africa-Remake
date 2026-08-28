@@ -89,6 +89,7 @@ const HUMAN_WAIT_FILES = [
   'scripts/permission-autogrant-core.mjs',
   'scripts/review-sol-core.mjs',
   'scripts/user-gate-core.mjs',
+  'scripts/vdzk-admissibility-core.mjs',
 ]
 
 const EXPECTED_ROW_IDS = [

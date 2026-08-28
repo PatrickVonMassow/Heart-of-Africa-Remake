@@ -43,7 +43,7 @@ export const BG_WAIT_CEILING_DEFAULT = '0'
 import { OPUS_MODEL_ID, servingFallbackModelId } from './fable-switch-core.mjs'
 import { PAUSE_RETRY_LADDER_MS, planPause } from './batch-pause-core.mjs'
 
-/** Model policy (CLAUDE.md §6). rule:model-policy@840f3e46
+/** Model policy (CLAUDE.md §6). rule:model-policy@d0b43947
  *  The session starts on Opus 5. Its one CLI fallback is the next member of the
  *  chain reported by scripts/fable-switch.mjs; the model guard enforces that
  *  same allowlist from inside the spawned session. */

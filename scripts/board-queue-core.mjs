@@ -463,6 +463,23 @@ export function blockedCardTitle(title) {
 }
 
 /**
+ * The body of that same card. It carries the typed authority the board's
+ * admissibility rule demands: whether a deposited finding becomes a work-order
+ * point is an EXTENSION OF THE COMMISSIONED SCOPE, which is one of the closed
+ * user-owned categories — so this question may stay open where a prioritisation
+ * question may not. The body is kept HERE rather than inline at the caller
+ * because the gate that judges it is unit-tested against this exact text; a card
+ * shape that lives in a CLI script is a shape no test can reach.
+ */
+export function blockedCardBody(why) {
+  return (
+    `User-owned category: scope-extension.\n${String(why ?? '').trim()}\n\n` +
+    'Die Anfrage liegt im Träger und wird nicht in den Arbeitsauftrag übernommen, solange das so bleibt. ' +
+    'Deine Möglichkeiten: den Befund als Punkt aufnehmen, oder ihn verwerfen.\n'
+  )
+}
+
+/**
  * The card naming the pending requests, or '' when none wait (an empty card
  * would be a permanent fixture saying nothing, and the audit refuses an empty
  * body anyway). The meta is the named "no estimate yet" marker: a deposit that

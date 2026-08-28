@@ -247,6 +247,32 @@ describe('escalate — the full climb, on real files', () => {
     expect(readFileSync(h.logPath, 'utf8')).toMatch(/CONTINUING THE BATCH/)
   })
 
+  it('names the clean doctor gate that expires a PARALLEL decision', async () => {
+    const h = harness()
+    const key = 'parallel'
+    writeLadder({
+      alerts: {
+        [key]: {
+          rung: ALERT_PAUSE_RUNG,
+          lastSentAt: T0 - ALERT_GAPS_MS[ALERT_PAUSE_RUNG],
+          firstSentAt: T0 - 300 * MIN_MS,
+          sends: ALERT_PAUSE_RUNG,
+        },
+      },
+    }, h.ladderPath)
+    const result = await escalate({
+      title: 'PARALLEL batch sessions',
+      message: 'A second live session is running tools in the repo beside the owner.',
+      key,
+      env: {},
+      now: T0,
+      ...h,
+    })
+    expect(result.record?.measurement).toMatchObject({ key: 'batch-doctor-gate', evidence: '.claude/doctor.log' })
+    expect(result.record?.body).toMatch(/batch-doctor\.mjs --gate.*von selbst ab/)
+    expect(result.record?.body).toMatch(/Retroaktives Veto/)
+  })
+
   it('books the rung and its record in ONE write — the record cannot fail on its own', async () => {
     // Point 749 removed the second write this case used to cover: the record went
     // to the board through `vdzk-add`, and a failed board call held the ladder on

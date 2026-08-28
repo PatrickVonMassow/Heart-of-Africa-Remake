@@ -28,6 +28,7 @@ describe('the kinds', () => {
     expect(resolveAskModel('fable')).toMatchObject({ runtime: 'claude', name: 'Fable 5', id: 'claude-fable-5' })
     expect(resolveAskModel('opus')).toMatchObject({ runtime: 'claude', name: 'Opus 5' })
     expect(resolveAskModel('sonnet')).toBeNull()
+    expect(resolveAskModel('opus48')).toMatchObject({ name: 'Opus 4.8', id: 'claude-opus-4-8[1m]' })
   })
 
   it('are the four read-only ones, each with a task and an answer shape', () => {

@@ -23,7 +23,7 @@ import { resolve } from 'node:path'
 // allowlist's own answer (scripts/model-guard-core.mjs, which imports nothing),
 // so "who authored this" cannot drift from "who may author at all".
 import { modelNamesIn } from './model-guard-core.mjs'
-import { isSwitchFallbackReason, mergeFallbackReason, mergerModel } from './fable-switch-core.mjs'
+import { fableIsOn, isSwitchFallbackReason, mergeFallbackReason, mergerModel } from './fable-switch-core.mjs'
 // …and how a review split into PASSES over the file set composes back into a
 // coverage (point 714). Both the recorder and this gate ask the same module, so
 // what may be WRITTEN and what CLEARS cannot drift apart.
@@ -281,6 +281,58 @@ export function reviewIdentityProblem(reviewer, commit = {}) {
   return named.some((author) => modelVendor(author) === reviewerVendor) ? 'same-vendor' : ''
 }
 
+/** The two reasons the preferred OpenAI reader can legitimately yield to the
+ *  Claude chain. They are explicit because a same-vendor review without a
+ *  handover would otherwise bypass the cross-vendor preference by assertion. */
+export const REVIEW_HANDOVERS = Object.freeze(['sol-authored', 'sol-unavailable'])
+export const SOL_UNAVAILABLE_REVIEW_CHAIN = Object.freeze(['Fable 5', 'Opus 5', 'Opus 4.8'])
+export const SOL_AUTHORED_REVIEW_CHAIN = Object.freeze(['Opus 5', 'Fable 5', 'Opus 4.8'])
+
+/** The chain in force for a handover at record time. */
+export function handoverChainFor(reason, fableState) {
+  const chain = reason === 'sol-authored'
+    ? SOL_AUTHORED_REVIEW_CHAIN
+    : reason === 'sol-unavailable'
+      ? SOL_UNAVAILABLE_REVIEW_CHAIN
+      : []
+  if (!chain.length) return Object.freeze([])
+  if (fableState === undefined || fableIsOn(fableState)) return Object.freeze([...chain])
+  return Object.freeze(chain.filter((model) => !sameModel(model, 'Fable 5')))
+}
+
+/** What is wrong with a recorded handover, or ''. The selected fallback must
+ *  be the first chain member that authored no part of the range. */
+export function reviewHandoverProblem({ reviewer = '', authors = [], handover = '', chain = null } = {}) {
+  const reason = String(handover ?? '').trim()
+  if (!REVIEW_HANDOVERS.includes(reason)) return 'missing-or-unknown-handover'
+  const named = (Array.isArray(authors) ? authors : [authors]).map(String).filter(Boolean)
+  if (!named.length || named.some((author) => modelVendor(author) === 'unknown')) return 'unknown-author'
+  const candidates = Array.isArray(chain) && chain.length ? chain.map(String) : handoverChainFor(reason)
+  if (!candidates.length) return 'empty-handover-chain'
+  if (reason === 'sol-authored' && !named.some((author) => sameModel(author, 'GPT-5.6 Sol'))) {
+    return 'sol-was-not-an-author'
+  }
+  if (reason === 'sol-unavailable' && named.some((author) => sameModel(author, 'GPT-5.6 Sol'))) {
+    return 'sol-authorship-requires-role-swap'
+  }
+  const expected = candidates.find((candidate) => !named.some((author) => sameModel(candidate, author))) ?? ''
+  if (!expected) return 'every-handover-model-authored'
+  return sameModel(expected, reviewer) ? '' : `expected-${expected}`
+}
+
+/** The gate's complete independence ruling for one record. A valid, explicit
+ *  handover is the sole exception to the preferred cross-vendor boundary. */
+export function independentReviewProblem(record = {}, commit = {}) {
+  const ordinary = reviewIdentityProblem(record?.model, commit)
+  if (ordinary !== 'same-vendor') return ordinary
+  return reviewHandoverProblem({
+    reviewer: record?.model,
+    authors: commit?.authorModels ?? commit?.authors ?? [commit?.authorModel ?? commit?.authoredBy].filter(Boolean),
+    handover: record?.handover,
+    chain: record?.handoverChain,
+  })
+}
+
 /** Only a convergent reading of the changed code can cover that code. */
 export function attestsToCodeReading(record = {}) {
   return String(record.mode ?? '').trim() === 'review' && !String(record.specExamination ?? '').trim()
@@ -297,15 +349,136 @@ const containedBy = (record, sha) => {
 const descendsFrom = (record, earlier) =>
   String(record?.sha ?? '') !== String(earlier?.sha ?? '') && containedBy(record, earlier?.sha)
 
-const openRefusalsIn = (records = []) => {
+const commitAuthors = (commit = {}) => {
+  const authors = Array.isArray(commit.authorModels)
+    ? commit.authorModels
+    : [commit.authorModel ?? commit.authoredBy].filter(Boolean)
+  return authors.map((author) => String(author ?? '').trim()).filter(Boolean)
+}
+
+/**
+ * Files on a refusing contribution which a later contribution by the refusing
+ * vendor demonstrably fixed and had read by the other vendor.
+ *
+ * This belongs at refusal evaluation, not in `review-sol`'s authorship cut.
+ * Changing the planner per contribution could OFFER a Sol pass for the old
+ * Claude contribution, but it could not make the gate accept the Claude review
+ * of Sol's answering commit; the command and the decision would still disagree.
+ * Here both file-scoped and legacy refusal paths consume the same ledger fact.
+ *
+ * The exception is a CHAIN, never a waiver. Each link is machine-checkable:
+ * the answering commit is later, is authored wholly by the vendor that made the
+ * refusal, touches the refused file, and has an exact-sha code review whose
+ * measured ancestry contains the refusal. That review is judged against the
+ * ANSWER'S authors, so the original author may clear Sol's fix without being
+ * allowed to review their own original contribution.
+ */
+const filesClearedByRefusingVendor = (refusal, { commits = [], records = [], files = [] } = {}) => {
+  const refusingVendor = modelVendor(refusal?.model)
+  if (refusingVendor === 'unknown') return new Set()
+  const required = new Set((files ?? []).map(String))
+  const cleared = new Set()
+
+  for (const answer of commits ?? []) {
+    const answerSha = String(answer?.sha ?? '')
+    const authors = commitAuthors(answer)
+    const allAnswerFiles = [...new Set((answer?.files ?? []).map(String))]
+    const answerFiles = allAnswerFiles.filter((file) => required.has(file))
+    if (
+      !answerSha ||
+      answerSha === String(refusal?.sha ?? '') ||
+      !answerFiles.length ||
+      !authors.length ||
+      authors.some((author) => modelVendor(author) !== refusingVendor) ||
+      typeof answer?.at !== 'number' ||
+      !Number.isFinite(answer.at) ||
+      Number(answer.at) <= Number(refusal?.at)
+    ) {
+      continue
+    }
+
+    // Exact-sha is the ancestry proof for the ANSWERING COMMIT itself. A later
+    // merge record containing two sibling commits would prove that the review
+    // descends from the refusal, but not that the purported answer does.
+    const exactCovering = (records ?? []).filter(
+      (record) =>
+        String(record?.sha ?? '') === answerSha &&
+        Number(record?.at) > Number(refusal?.at) &&
+        containedBy(record, refusal?.sha),
+    )
+    const ownReadings = exactCovering.filter(
+      (record) =>
+        reviewRecordWellFormed(record, { commitAt: answer.at }) &&
+        attestsToCodeReading(record) &&
+        !independentReviewProblem(record, answer),
+    )
+    if (!ownReadings.length) continue
+
+    const refusalShaped = (record) =>
+      typeof record?.verdict === 'string' && record.verdict.trim().toLowerCase() === BLOCKING_VERDICT
+    if (exactCovering.some((record) => refusalShaped(record) && !reviewRecordWellFormed(record, { commitAt: answer.at }))) {
+      continue
+    }
+
+    // A same-sha re-record never answers a refusal. Apply that boundary to the
+    // answering commit too: any sound refusal on its exact state prevents that
+    // state from participating in a clean chain.
+    const refusedFiles = new Set()
+    for (const reading of ownReadings.filter((record) => String(record.verdict) === BLOCKING_VERDICT)) {
+      const scopedFiles = Array.isArray(reading?.pass?.files) ? reading.pass.files.map(String) : allAnswerFiles
+      for (const file of allAnswerFiles) if (scopedFiles.includes(file)) refusedFiles.add(file)
+    }
+
+    const reviewed = new Set()
+    const passClaims = ownReadings.filter((record) => record?.pass !== undefined && record?.pass !== null)
+    const splitClaimed = exactCovering.some((record) => record?.pass !== undefined && record?.pass !== null)
+    if (!splitClaimed) {
+      if (ownReadings.some((record) => String(record.verdict) !== BLOCKING_VERDICT)) {
+        for (const file of allAnswerFiles) if (!refusedFiles.has(file)) reviewed.add(file)
+      }
+    } else {
+      // Scoped 1/1 rows clear exactly what they name. Larger splits count only
+      // as a complete composition, with their worst verdict, just as in the
+      // main evaluation path; a pass-less sibling cannot bypass a recorded
+      // split, even when the claim itself is malformed or same-vendor.
+      for (const reading of passClaims) {
+        if (
+          Number(reading?.pass?.index) === 1 &&
+          Number(reading?.pass?.total) === 1 &&
+          String(reading?.pass?.endState ?? '') === answerSha &&
+          Array.isArray(reading?.pass?.files) &&
+          String(reading.verdict) !== BLOCKING_VERDICT
+        ) {
+          for (const file of allAnswerFiles) {
+            if (reading.pass.files.map(String).includes(file) && !refusedFiles.has(file)) reviewed.add(file)
+          }
+        }
+      }
+      for (const composition of passComposition(passClaims, { expect: allAnswerFiles })) {
+        if (!composition.complete || worstVerdict(composition.records) === BLOCKING_VERDICT) continue
+        for (const file of allAnswerFiles) if (!refusedFiles.has(file)) reviewed.add(file)
+      }
+    }
+    if (allAnswerFiles.length && allAnswerFiles.every((file) => reviewed.has(file))) {
+      for (const file of answerFiles) cleared.add(file)
+    }
+  }
+
+  return cleared
+}
+
+const openRefusalsIn = (records = [], chain = {}) => {
   const clearing = records.filter((record) => String(record.verdict) !== BLOCKING_VERDICT)
-  return records.filter(
-    (refusal) =>
-      String(refusal.verdict) === BLOCKING_VERDICT &&
-      !clearing.some(
-        (answer) => Number(answer.at) > Number(refusal.at) && descendsFrom(answer, refusal),
-      ),
-  )
+  const requiredFiles = [...new Set((chain.files ?? []).map(String))]
+  return records.filter((refusal) => {
+    if (String(refusal.verdict) !== BLOCKING_VERDICT) return false
+    const directlyAnswered = clearing.some(
+      (answer) => Number(answer.at) > Number(refusal.at) && descendsFrom(answer, refusal),
+    )
+    if (directlyAnswered) return false
+    const chainClearance = filesClearedByRefusingVendor(refusal, chain)
+    return !requiredFiles.length || requiredFiles.some((file) => !chainClearance.has(file))
+  })
 }
 
 /** The family words of a model this project would recognise. */
@@ -696,6 +869,8 @@ export const FLAG_SPEC = Object.freeze({
   '--model': true,
   '--model-at': true,
   '--model-transcript': true,
+  '--model-result': true,
+  '--handover': true,
   '--verdict': true,
   '--evidence': true,
   '--point': true,
@@ -731,6 +906,8 @@ const VALUE_KEY = Object.freeze({
   '--model': 'model',
   '--model-at': 'modelAt',
   '--model-transcript': 'modelTranscript',
+  '--model-result': 'modelResult',
+  '--handover': 'handover',
   '--verdict': 'verdict',
   '--evidence': 'evidence',
   '--point': 'point',
@@ -1116,6 +1293,8 @@ export function validateRecord({
   pass,
   passFiles,
   fableState,
+  handover,
+  handoverChain,
 } = {}) {
   const errors = []
   errors.push(...validateMode({ mode, framing }).errors)
@@ -1193,11 +1372,29 @@ export function validateRecord({
     } else if (identity === 'unknown-reviewer') {
       errors.push(`the claimed reviewer "${String(model).trim()}" has no recognised vendor, so independence cannot be proved`)
     } else if (identity === 'same-vendor') {
-      errors.push(
-        `a SAME-VENDOR REVIEW is refused: ${short(sha)} was authored by ` +
-          `"${(Array.isArray(authors) ? authors : [authoredBy]).filter(Boolean).join(', ')}" and ` +
-          `"${String(model).trim()}" is from that vendor. Four eyes requires the other vendor.`,
-      )
+      const namedAuthors = (Array.isArray(authors) ? authors : [authoredBy]).filter(Boolean)
+      // A scoped pass is routed from the accumulated authorship of its FILES,
+      // while the recorder can resolve only the pass's end-state commit. It
+      // therefore validates the durable facts available here (known handover,
+      // verified exact non-self model); the gate recomputes first eligibility
+      // from the complete file history before this row clears anything.
+      const deferredPassHandover = String(pass ?? '').trim() && REVIEW_HANDOVERS.includes(String(handover ?? '').trim())
+      const exactSelf = namedAuthors.some((author) => sameModel(author, model))
+      const handoverProblem = deferredPassHandover
+        ? exactSelf ? 'reviewer-authored-the-end-state-commit' : ''
+        : reviewHandoverProblem({
+            reviewer: model,
+            authors: namedAuthors,
+            handover,
+            chain: handoverChain ?? handoverChainFor(handover, fableState),
+          })
+      if (handoverProblem) {
+        errors.push(
+          `a SAME-VENDOR REVIEW is refused: ${short(sha)} was authored by ` +
+            `"${namedAuthors.join(', ')}" and "${String(model).trim()}" is from that vendor; ` +
+            `the review has no valid first-eligible handover (${handoverProblem}).`,
+        )
+      }
     }
   }
   if (Number(commitAt) > 0 && ledgerAtUsable(Number(commitAt)) && ledgerAtUsable(at) && Number(at) < Number(commitAt)) {
@@ -1473,7 +1670,7 @@ export function evaluateMechanismReview({
     // than MERGE_ACCOUNTING_SINCE are grandfathered by DATE; treating a MISSING
     // field as legacy is what let an edited row simply omit it.
     const selfReviews = wellFormed.filter(
-      (r) => attestsToCodeReading(r) && reviewIdentityProblem(r.model, commit),
+      (r) => attestsToCodeReading(r) && independentReviewProblem(r, commit),
     )
     // COVERAGE MEANS ONE THING ON EVERY PATH: a well-formed, convergent reading
     // of this code by a vendor that authored none of it. A spec examination
@@ -1481,7 +1678,7 @@ export function evaluateMechanismReview({
     // producing and folding lists. Neither attests to reading this commit, so
     // neither joins `sound` or answers a refusal.
     const sound = wellFormed.filter(
-      (r) => attestsToCodeReading(r) && !reviewIdentityProblem(r.model, commit),
+      (r) => attestsToCodeReading(r) && !independentReviewProblem(r, commit),
     )
 
     // END-STATE FILE PASSES CLEAR WHAT THEY READ. The record's own sha is the
@@ -1553,12 +1750,14 @@ export function evaluateMechanismReview({
         remainingFiles.push(file)
         continue
       }
-      const open = openRefusalsIn(rows)
+      const open = openRefusalsIn(rows, {
+        commits: pendingCommits,
+        records: covering,
+        files: [file],
+      })
       if (open.length) {
         const latest = open.reduce((a, b) => (Number(b.at) >= Number(a.at) ? b : a))
         scopedRefusal = !scopedRefusal || Number(latest.at) >= Number(scopedRefusal.at) ? latest : scopedRefusal
-        remainingFiles.push(file)
-      } else if (!rows.some((row) => String(row.verdict) !== BLOCKING_VERDICT)) {
         remainingFiles.push(file)
       }
     }
@@ -1644,9 +1843,22 @@ export function evaluateMechanismReview({
     // way out stays honest and is always open: complete the recorded passes.
     // Only records that COMPOSE must be sound; the evidence of the split need
     // not be.
-    // File-scoped rows are split evidence too. Excluding them let a pass-less
-    // whole-range row stand beside a recorded 1/3 and bypass completeness.
-    const split = covering.some((r) => !legacyContributionShape(r) && passRow(r))
+    // File-scoped rows are split evidence too, but only for REMAINING FILE DEBT
+    // they name. Excluding them altogether let a pass-less whole-range row
+    // stand beside a recorded 1/3 on the same files and bypass completeness;
+    // treating them as range-global later let an unrelated descendant scope
+    // revoke an earlier cross-vendor review. A legacy non-file-scoped pass row,
+    // or a malformed file claim without a readable file list, still witnesses
+    // its whole covering range because it names no narrower boundary by which
+    // this gate could soundly cut that reach back.
+    const remainingFileDebt = new Set((commit.files ?? []).map(String))
+    const split = covering.some((r) =>
+      !legacyContributionShape(r) &&
+      passRow(r) &&
+      (!fileClaim(r) ||
+        !Array.isArray(r?.pass?.files) ||
+        r.pass.files.some((file) => remainingFileDebt.has(String(file)))),
+    )
     const besideSplit = split ? legacySound.filter((r) => !r?.pass) : []
     const valid = [
       ...(split ? [] : legacySound.filter((r) => !r?.pass)),
@@ -1719,7 +1931,11 @@ export function evaluateMechanismReview({
     // `containedShas`) and handed in as data; a clearing record whose fact is
     // missing answers nothing — no ancestry fact, no clearance — and a
     // same-sha re-record fixes nothing, exactly as at the sibling gate.
-    const open = openRefusalsIn(valid)
+    const open = openRefusalsIn(valid, {
+      commits: pendingCommits,
+      records: covering,
+      files: commit.files,
+    })
     if (open.length) {
       const latest = open.reduce((a, b) => (Number(b.at ?? 0) >= Number(a.at ?? 0) ? b : a))
       findings.push({ kind: 'do-not-merge', commit, records: [latest] })

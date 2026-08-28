@@ -79,7 +79,7 @@ strategy and suite map: `scripts/verify/README.md`.
   participates in authoring, serving, commit trailers, or blind merging.
   Serving models outside its reported chain pause the batch. Every commit names
   its author model in a `Co-Authored-By` trailer.
-  A commit may also name its cross-vendor reviewer in a second model trailer.
+  A commit may name its cross-vendor reviewer in a distinct `Reviewed-By: <allowed model> <model vendor no-reply address>` trailer, never `Co-Authored-By`.
 - **Four eyes has two modes.** Divergent work runs blind-parallel from identical
   inputs, then a third model merges and counts ids through `scripts/blind-merge.mjs`.
   Convergent work reviews the artefact before its rationale. Prefer cross-vendor
@@ -93,8 +93,11 @@ strategy and suite map: `scripts/verify/README.md`.
 - Answer repository questions with small command output. A blocked action means
   find the project command; never route the user through manual container work.
 - Act on settled judgment. Confirm before outward-facing or hard-to-reverse
-  steps unless durably authorized. Report failures, skips, and verified outcomes
-  faithfully.
+  steps unless durably authorized: a stated recommendation on a “Von dir zu
+  klären” card authorizes its decision, execution, and recorded closure (what,
+  why, veto effect), except tags, publishes, force-pushes, user-data deletions,
+  and unrecommended genuine choices. Report failures, skips, and verified
+  outcomes faithfully.
 - Keep comments brief and factual; mark placeholders. When design is unclear,
   do not guess: add `// OPEN: …` and report it at the run end.
 

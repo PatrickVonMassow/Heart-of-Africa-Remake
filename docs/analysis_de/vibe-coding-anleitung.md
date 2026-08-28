@@ -155,6 +155,12 @@ Die Ursache findest du durch **Zerlegen**, nicht durch Wiederholen.
   sie kaputt wäre?** Zeit darf ein Test abkürzen, den **Aufruf** nie. Ist die **Ausgabe** das
   Produkt — Urteil, Plan, Anleitung —, lies sie am **echten Bestand**, nie nur an selbstgebauten
   Eingaben.“ *(Sieht das richtig aus?)*
+- **Der Fühler misst sich selbst.** Eine Überwachung liest einen Wert, den ihr Nachsehen selbst
+  erneuert — ein toter Vorgang wirkt lebendig, und je öfter du prüfst, desto lebendiger.
+  → *Prompt:* „Ein Lebenszeichen darf nur aus einer Quelle kommen, die der **Beobachter nicht
+  beschreibt**. Prüf das am **stillgelegten** Gegenstand, mit und ohne Blick dazwischen: Bewegt
+  **erst der Blick** den Wert, misst sie sich selbst.“
+
 - **Neue Features zerbrechen alte.** Eine Änderung repariert X und bricht das unbeobachtete Y.
   → *Prompt:* „Etabliere einen Mechanismus, der jede Mechanik auch im **Danach-Zustand** prüft und
   nach jedem Zusammenführen die schnelle Testschicht erzwingt. Bau ‚Invarianten' ein, die im
@@ -220,8 +226,11 @@ Die Ursache findest du durch **Zerlegen**, nicht durch Wiederholen.
   Start, was **lokal fertig, aber nirgends angekommen** ist.“
 
 - **Regeln und Wächter verrotten — nur merkt es niemand.** Eine Absicherung greift enger als ihr
-  Satz, oder weiter, und sperrt Unbeteiligte.
-  → *Prompt:* „Leg Satz und Code periodisch **nebeneinander**, zieh **den Code auf den Satz**."
+  Satz, oder weiter; mehrere richtige Regeln können durch ihre Lücke etwas verbieten — und Warten
+  sieht dabei wie Sorgfalt aus.
+  → *Prompt:* „Schreib die **Erlaubnis im selben Satz wie ihre Grenze**. Leg Satz und Code
+  periodisch **nebeneinander**, zieh **den Code auf den Satz**, und frag: **Welcher naheliegende
+  Fall wird von keiner Regel erfasst?**"
 
 - **Die Verweigerung nennt eine Abhilfe, die schadet, nie eintritt — oder längst getan ist.** Wer
   ihr folgt, steht schlechter da, wartet vergeblich oder wiederholt einen erledigten Schritt.
@@ -271,9 +280,11 @@ Die Ursache findest du durch **Zerlegen**, nicht durch Wiederholen.
   Ergebnis aus den Protokollen, nicht aus den Tests."
 
 - **Die Messung — und die Gegenprüfung — sah weniger, als sie behauptet.** Nur die letzten *n*
-  Einträge; nicht geliefert liest sich *grüner* als ein Fehlschlag.
+  Einträge; nicht geliefert liest sich *grüner* als ein Fehlschlag, still gekürzter Prüfstoff für
+  das Modell wie ein Mangel.
   → *Prompt:* „Leite das Fenster jeder Messung aus dem **Gegenstand** ab: nach Zeit, nie nach
-  Anzahl. Melde die **Abdeckung** mit; ein Urteil über halbem Material ist **Teilprüfung**."
+  Anzahl. Nenne dem **prüfenden Modell selbst** jedes weggelassene Material, nicht nur dem
+  Aufrufer, und melde die **Abdeckung**; ein Urteil über halbem Material ist **Teilprüfung**."
 
 - **„Läuft der noch?" mit „ist die Ausgabe frisch?" beantwortet.** Frische belegt nur, dass jemand
   gearbeitet *hat*.
@@ -322,6 +333,12 @@ Die Ursache findest du durch **Zerlegen**, nicht durch Wiederholen.
   → *Prompt:* „Trag Priorisiertes dort ein, wo gearbeitet wird; laufen beide auseinander, schlägt
   eine Prüfung fehl. Priorisiere das **Ziel** — und sag bei jeder Sortierregel, was mit dem
   **Altbestand** geschieht: nachräumen oder liegen lassen."
+
+- **Die Begründung, die sich im eigenen Dokument widerlegt.** Ein Sicherheitsargument und sein
+  Gegenbeweis standen drei Abschnitte auseinander; vier Prüfrunden sahen je eine Hälfte, weil der
+  Prüfstoff nach Größe geschnitten wird.
+  → *Prompt:* „Prüf jede Rechtfertigung gegen das, was im selben Dokument schon behauptet wird —
+  ein **Widerspruch in der Prosa** ist ein Befund über den **Code**."
 
 - **Blockiert heißt nicht: du bist dran.** Fehlt eine Berechtigung, bekommst du gern einen
   Befehl gereicht — oft einen, der gar nicht funktionieren kann.
@@ -441,12 +458,13 @@ Die Ursache findest du durch **Zerlegen**, nicht durch Wiederholen.
 ## Drei Meta-Regeln, die alles zusammenhalten
 
 1. **Root-Cause vor Fix.** Ursachennotizen ohne Ausrede sind der Rohstoff guter Mechanismen. Und
-   eine im Ticket schon **vermutete** Ursache ist der gefährlichste Rohstoff: Der Ausführende sucht
-   ab da nach ihrer Bestätigung.
+   eine im Ticket **vermutete** Ursache ist gefährlicher Rohstoff: Der Ausführende sucht dann ihre
+   Bestätigung.
    > *Prompt:* „Bevor du etwas Wiederkehrendes reparierst: schreib mir in 3–5 Sätzen die
    > **mechanische** Ursache — was genau war die Annahme, die brach? Steht die Ursache schon als
-   > Vermutung da, ist sie ein **Kandidat**: Widerlege sie zuerst. Wer den Auftrag vergibt, misst
-   > **blind mit**, statt auf die Messung des Ausführenden zu warten."
+   > Vermutung da, ist sie ein **Kandidat**: Markiere sie als Vermutung und schreib vor dem Versuch,
+   > welcher Befund sie zur Tatsache macht. Versuche zuerst, sie unabhängig zu widerlegen.
+   > Hält sie stand, darf sie wahr sein. Wer den Auftrag vergibt, misst **blind mit**."
 
 2. **Nutzer-Artefakte sind Verträge.** Was du festgelegt hast — Dashboard, Ausgabeformat,
    Board-Struktur — wird nicht eigenmächtig umgebaut.
@@ -474,4 +492,4 @@ Die Ursache findest du durch **Zerlegen**, nicht durch Wiederholen.
 
 Sie ersetzt die Fallstricke oben nicht.
 
-<!-- GUIDE-FINGERPRINT: 97e700ceb6b700a8cd773235fc66dd7c2b73240a0ed61fe0a829e01885f6b8ff -->
+<!-- GUIDE-FINGERPRINT: 90cddae67d920ffbee228b0d677b78cfe9e4eab900ebf58cbd7376e510979f70 -->
