@@ -1021,7 +1021,9 @@ describe('a range SOL authored', () => {
       model: 'Fable 5',
       verdict: 'merge',
       handover: 'sol-authored',
-      reviewerAuthorship: { status: 'agreement', actualModel: 'claude-fable-5', proof: 'claude-result' },
+      reviewerAuthorship: {
+        status: 'agreement', actualModel: 'Fable 5', servedModel: 'claude-fable-5', proof: 'claude-result',
+      },
     })
   })
 })

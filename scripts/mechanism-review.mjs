@@ -246,7 +246,8 @@ export function checkClaudeResultFile({ claimedModel = '', artefactAt = '', resu
   const parsed = parseClaudeResultOutput(raw, descriptor)
   const base = {
     claimedModel,
-    actualModel: parsed.answerModel || '',
+    actualModel: parsed.ok ? descriptor.name : parsed.answerModel || '',
+    ...(parsed.answerModel ? { servedModel: parsed.answerModel } : {}),
     artefactAt: at,
     messageAt: at,
     messageId: parsed.sessionId || `claude-result:${descriptor.key}`,
@@ -995,6 +996,7 @@ export function buildRecord({
         status: reviewerAuthorship.status,
         claimedModel: reviewerAuthorship.claimedModel,
         ...(reviewerAuthorship.actualModel ? { actualModel: reviewerAuthorship.actualModel } : {}),
+        ...(reviewerAuthorship.servedModel ? { servedModel: reviewerAuthorship.servedModel } : {}),
         ...(reviewerAuthorship.artefactAt != null
           ? { artefactAt: reviewerAuthorship.artefactAt, artefactAtIso: new Date(reviewerAuthorship.artefactAt).toISOString() }
           : {}),

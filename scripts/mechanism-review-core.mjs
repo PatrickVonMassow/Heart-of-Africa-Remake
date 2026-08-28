@@ -1373,12 +1373,21 @@ export function validateRecord({
       errors.push(`the claimed reviewer "${String(model).trim()}" has no recognised vendor, so independence cannot be proved`)
     } else if (identity === 'same-vendor') {
       const namedAuthors = (Array.isArray(authors) ? authors : [authoredBy]).filter(Boolean)
-      const handoverProblem = reviewHandoverProblem({
-        reviewer: model,
-        authors: namedAuthors,
-        handover,
-        chain: handoverChain ?? handoverChainFor(handover, fableState),
-      })
+      // A scoped pass is routed from the accumulated authorship of its FILES,
+      // while the recorder can resolve only the pass's end-state commit. It
+      // therefore validates the durable facts available here (known handover,
+      // verified exact non-self model); the gate recomputes first eligibility
+      // from the complete file history before this row clears anything.
+      const deferredPassHandover = String(pass ?? '').trim() && REVIEW_HANDOVERS.includes(String(handover ?? '').trim())
+      const exactSelf = namedAuthors.some((author) => sameModel(author, model))
+      const handoverProblem = deferredPassHandover
+        ? exactSelf ? 'reviewer-authored-the-end-state-commit' : ''
+        : reviewHandoverProblem({
+            reviewer: model,
+            authors: namedAuthors,
+            handover,
+            chain: handoverChain ?? handoverChainFor(handover, fableState),
+          })
       if (handoverProblem) {
         errors.push(
           `a SAME-VENDOR REVIEW is refused: ${short(sha)} was authored by ` +
