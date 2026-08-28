@@ -6,18 +6,18 @@ import { controlRequest } from './batch-daemon.mjs'
 
 export const metricEventId = (event) => `metric-${checksumOf(event)}`
 
-export async function recordMetricEvent({ repoDir, batchId, sessionId, fence, event, request = controlRequest } = {}) {
+export async function recordMetricEvent({ repoDir, batchId, sessionId, fence, event, eventId = null, request = controlRequest } = {}) {
   if (!sessionId || !Number.isInteger(fence)) return { ok: false, reason: 'metric recording is fenced: sessionId and integer fence are required' }
   if (!event || typeof event.kind !== 'string' || !event.kind || !Number.isFinite(event.at)) {
     return { ok: false, reason: 'a metric event has a kind and finite event time' }
   }
-  const eventId = metricEventId(event)
+  const stableEventId = eventId ?? metricEventId(event)
   const reply = await request({
     repoDir,
     batchId,
-    request: { cmd: 'record-metric', sessionId, fence, payload: { batchId, eventId, event } },
+    request: { cmd: 'record-metric', sessionId, fence, payload: { batchId, eventId: stableEventId, event } },
   })
-  return reply.ok ? { ok: true, eventId, reply } : { ok: false, eventId, reason: reply.reason ?? 'the daemon refused the metric' }
+  return reply.ok ? { ok: true, eventId: stableEventId, reply } : { ok: false, eventId: stableEventId, reason: reply.reason ?? 'the daemon refused the metric' }
 }
 
 export async function recordMetricEvents(options = {}) {

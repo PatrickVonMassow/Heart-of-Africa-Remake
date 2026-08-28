@@ -583,7 +583,7 @@ async function serve(args) {
           // head that moved past the push both leave commits only the old
           // worktree holds, and transferring would lose them.
           const clean = ack.pushedOk === true && ack.dirty === false && ack.aheadOfPush !== true
-          answers.push({ attemptId, acknowledged: true, transferable: clean, sha: ack.sha ?? null, dirty: ack.dirty === true, pushedOk: ack.pushedOk === true })
+          answers.push({ attemptId, acknowledged: true, acknowledgedAt: ack.at, transferable: clean, sha: ack.sha ?? null, dirty: ack.dirty === true, pushedOk: ack.pushedOk === true })
         }
         return { ok: true, requestId, answers }
       }),

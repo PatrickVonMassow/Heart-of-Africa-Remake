@@ -44,6 +44,7 @@ import {
 import { worktreeActiveAt } from './batch-in-flight.mjs'
 import { probePid, readOwnerLock } from './batch-singleton.mjs'
 import { acquireLandingLock, assertLandingReady, recordLandingStage, releaseLandingLock } from './batch-landing-journal.mjs'
+import { recordMetricEvent } from './batch-metric-events.mjs'
 import {
   GATE_COMMANDS,
   LandingError,
@@ -867,6 +868,17 @@ async function main(argv) {
       if (!boardRecorded.ok) throw new LandingError(`landing journal refused board evidence: ${boardRecorded.reason}`, { step: 'board' })
       const landed = recordLandingStage({ repoDir: REPO_ROOT, batchId, stage: 'landed', evidence: { at: Date.now(), mergeSha: git(['rev-parse', 'HEAD^']) } })
       if (!landed.ok) throw new LandingError(`landing journal refused terminal evidence: ${landed.reason}`, { step: 'board' })
+      const landingMetric = await recordMetricEvent({
+        repoDir: REPO_ROOT, batchId, sessionId: landingClaimant.sessionId, fence: landingClaimant.fence, eventId: `landing-${landingId}`,
+        event: {
+          kind: 'landing', at: landed.transaction.stages.landed.at,
+          pointId: landed.transaction.pointId,
+          landingId: landed.transaction.landingId,
+          startedAt: landed.transaction.stages.candidate.at,
+          landedAt: landed.transaction.stages.landed.at,
+        },
+      })
+      if (!landingMetric.ok) throw new LandingError(`landing metric failed: ${landingMetric.reason}`, { step: 'board' })
       const released = releaseLandingLock({ repoDir: REPO_ROOT, batchId, claimant: landingClaimant })
       if (!released.ok) throw new LandingError(`landing completed but its lock remains: ${released.reason}`, { step: 'board' })
     }

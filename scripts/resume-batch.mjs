@@ -21,8 +21,9 @@ import { dispatchOnce } from './batch-dispatch.mjs'
 import { openStateStore, readJournal, writeReceipt } from './batch-state.mjs'
 import { readJsonIfAny } from './detached-agent.mjs'
 import { join } from 'node:path'
+import { recordMetricEvent } from './batch-metric-events.mjs'
 
-export async function resumeBatch({ repoDir = REPO_ROOT, batchId, sessionId = null, refill = true, dispatch = dispatchOnce } = {}) {
+export async function resumeBatch({ repoDir = REPO_ROOT, batchId, sessionId = null, refill = true, dispatch = dispatchOnce, recordMetric = recordMetricEvent, now = Date.now } = {}) {
   const report = gatherEvidence({ repoDir, batchId })
   const adoptions = []
   const store = openStateStore({ repoDir, batchId })
@@ -60,6 +61,7 @@ export async function resumeBatch({ repoDir = REPO_ROOT, batchId, sessionId = nu
 
   const reconciled = !reconcileExitRed(report) && boundary.ok && adoptions.every((adoption) => adoption.ok)
   let successorReceipt = null
+  let boundaryMetric = null
   let refillResult = null
   if (reconciled) {
     successorReceipt = writeReceipt(store, `successor-${report.lock.fence}`, {
@@ -68,7 +70,19 @@ export async function resumeBatch({ repoDir = REPO_ROOT, batchId, sessionId = nu
     })
     if (!successorReceipt.ok) {
       refillResult = { ok: false, reason: `successor-ready receipt failed: ${successorReceipt.reason}` }
-    } else if (refill) {
+    } else {
+      const successorReadyAt = now()
+      boundaryMetric = await recordMetric({
+        repoDir, batchId, sessionId, fence: report.lock.fence, eventId: `boundary-${boundary.requestId}`,
+        event: {
+          kind: 'boundary', at: successorReadyAt, requestId: boundary.requestId,
+          markerAt: marker?.at, successorReadyAt,
+          carriedWorkers: report.lanes.filter((lane) => lane.reading === 'running').length,
+        },
+      })
+      if (!boundaryMetric.ok) refillResult = { ok: false, reason: `boundary metric failed: ${boundaryMetric.reason}` }
+    }
+    if (!refillResult && refill) {
       refillResult = await dispatch({ repoDir, batchId, sessionId, fence: report.lock.fence })
     }
   }
@@ -79,6 +93,7 @@ export async function resumeBatch({ repoDir = REPO_ROOT, batchId, sessionId = nu
     daemonLive,
     adoptions,
     successorReceipt,
+    boundaryMetric,
     refillResult,
     nextSteps: [
       ...(report.pair.action.startsWith('reconcile-workers') ? ['the daemon record is cold: reconcile its lanes, then apply the release with batch-reconcile --apply'] : []),
@@ -103,7 +118,7 @@ if (isMainModule(import.meta.url)) {
     // GREEN MEANS RESOLVED: an UNKNOWN publication, a cold daemon record whose
     // workers still await reconciliation, quarantined evidence and a refused
     // refill are all unresolved startup — automation must see red for each.
-    const red = reconcileExitRed(result) || !result.boundary.ok || result.adoptions.some((a) => !a.ok) || result.successorReceipt?.ok === false || result.refillResult?.ok === false
+    const red = reconcileExitRed(result) || !result.boundary.ok || result.adoptions.some((a) => !a.ok) || result.successorReceipt?.ok === false || result.boundaryMetric?.ok === false || result.refillResult?.ok === false
     process.exit(red ? 1 : 0)
   })
 }
