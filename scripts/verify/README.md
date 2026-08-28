@@ -1375,8 +1375,12 @@ red's identity, and the lost part has none):
 
 A CRASH is the one verdict no ledger can ever reach: `runVerdict` returns no
 charges for it, deliberately — a run that died rather than reported judged no
-picture, so there is nothing in it to fix, charge or file, and extending
-`RED_CHARGES` reclassifies nothing. Eight of the recorded 13.–19.08.2026 runs
+picture, so THE CRASH ITSELF is nothing anyone can fix, charge or file, and
+extending `RED_CHARGES` reclassifies it not at all. That is the DISPOSITION of
+the crash, and it says nothing about the reds the run printed BEFORE it died:
+those were really observed, they keep blocking, and they close the three
+ordinary ways — exactly as the paragraph below spells out. Eight of the
+recorded 13.–19.08.2026 runs
 are exactly this shape, and inside the window their only exit was the hand
 `--defer`. The guard now names a crash as its own class — **not** an
 "unexplained red" to hunt — in the status view and in every branch of its

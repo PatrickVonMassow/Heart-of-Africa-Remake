@@ -673,7 +673,9 @@ export function incompleteClosureFor(run, closures) {
  * THE CLOSURE THAT A CRASHED RUN HAS AND A RED DOES NOT (point 734, sixth
  * round). A crash is the one verdict no ledger can ever reach: `runVerdict`
  * returns `charges: []` for it, deliberately — a run that died rather than
- * reported judged no picture, so there is nothing in it to charge, fix or file.
+ * reported judged no picture, so THE CRASH ITSELF is nothing anyone can charge,
+ * fix or file — which says nothing about the reds the run printed before it
+ * died, and those close the three ordinary ways (see afterCrashClosure).
  * Point 640's three closings all need a red's identity, and a crash has none to
  * give; before this, a crashed run inside the window could only leave through
  * the hand `--defer`, which is the waiver this whole point exists to abolish.
