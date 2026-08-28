@@ -24,6 +24,14 @@
 // prose per bullet would make the guard block on a formatting nicety instead of
 // on the drift it exists to catch.
 //
+// AND EXACTLY ONE HOME, both directions. The document says "exactly one", and
+// the guard long checked only that a point had AT LEAST one: the memberships
+// were unioned, so a point standing in two bundles could never fail. That was
+// the only safe reading while the reader guessed numbers out of prose, because
+// another bundle's prose naming a point placed it there; with marked
+// references the membership is canonical and the second direction is checked
+// too (round-ten review finding on point 1003).
+//
 // FAIL DIRECTION: allow. An unreadable or restructured work-packages file, an
 // empty work order, any throw — all allow. The wrapper is fail-open on top.
 import { parseOpenPoints } from './queue-order-guard-core.mjs'
@@ -134,6 +142,44 @@ export function unplacedPoints(openSet, bundles, unbundled) {
   return [...open].filter((n) => !placed.has(n)).sort((a, b) => a - b)
 }
 
+/**
+ * Open points with MORE THAN ONE home — the second half of the invariant this
+ * document states about itself ("exactly once"), and the round-ten review
+ * finding. `unplacedPoints` unions the memberships, so it can only ever see a
+ * point with NO home: a point standing in two bundle rows, or in a bundle and
+ * in "Not bundled", passed it silently and the guard reported no drift. While
+ * the reader guessed numbers out of prose the union was the only safe reading,
+ * because another bundle's prose naming a point would have placed it there;
+ * marked references make the membership canonical, which makes the other half
+ * checkable too.
+ *
+ * Each entry names WHERE the point stands, because a duplicate is fixed by
+ * deleting one of the two references and the reader has to be told which two.
+ */
+export function duplicateHomes(openSet, bundles, unbundled) {
+  const open = openSet instanceof Set ? openSet : new Set()
+  const homes = new Map()
+  const add = (n, home) => {
+    if (!open.has(n)) return
+    homes.set(n, [...(homes.get(n) ?? []), home])
+  }
+  for (const b of bundles || []) for (const n of b.points) add(n, b.id)
+  for (const n of unbundled instanceof Set ? unbundled : []) add(n, 'Not bundled')
+  return [...homes.entries()]
+    .filter(([, where]) => where.length > 1)
+    .map(([point, where]) => ({ point, homes: where }))
+    .sort((a, b) => a.point - b.point)
+}
+
+/** The remedy for a point standing in two homes: one copy, same reason. */
+export function duplicateRemedy(duplicates) {
+  return (
+    `delete the reference that does not belong, so ${duplicates.length === 1 ? 'it' : 'each of them'} stands in ` +
+    'exactly one bundle row or in the "Not bundled" list — the split follows SHARED FILES, so two homes say two ' +
+    'different things about what may run in parallel. Then re-run: node scripts/bundle-first-guard.mjs --status'
+  )
+}
+
 /** The remedy sentence, one copy, so the guard and its `--status` agree. */
 export function bundleRemedy(missing) {
   return (
@@ -166,19 +212,38 @@ export function evaluate({ tasksMd, workPackagesMd } = {}) {
 
     const { points: unbundled } = parseUnbundled(workPackagesMd)
     const missing = unplacedPoints(open, bundles, unbundled)
-    if (!missing.length) return { block: false, reason: '' }
+    const duplicates = duplicateHomes(open, bundles, unbundled)
+    if (!missing.length && !duplicates.length) return { block: false, reason: '' }
 
-    const named = missing.slice(0, MAX_NAMED).join(', ')
-    const more = missing.length > MAX_NAMED ? ` … and ${missing.length - MAX_NAMED} more` : ''
+    const parts = []
+    if (missing.length) {
+      const named = missing.slice(0, MAX_NAMED).join(', ')
+      const more = missing.length > MAX_NAMED ? ` … and ${missing.length - MAX_NAMED} more` : ''
+      parts.push(
+        `${missing.length} open point(s) appear in no bundle of docs/work-packages.md and in no ` +
+        `"Not bundled" entry — ${named}${more}. A new finding JOINS an existing bundle (memory ` +
+        'bundle-first-not-new-point); a standalone point is the exception, and the bundle scheme is only ' +
+        'worth having while it matches the open set — it drifted within an hour of being written because ' +
+        `nothing compared the two. So: ${bundleRemedy(missing)}`,
+      )
+    }
+    if (duplicates.length) {
+      const named = duplicates
+        .slice(0, MAX_NAMED)
+        .map((d) => `${d.point} (${d.homes.join(' and ')})`)
+        .join(', ')
+      const more = duplicates.length > MAX_NAMED ? ` … and ${duplicates.length - MAX_NAMED} more` : ''
+      parts.push(
+        `${duplicates.length} open point(s) stand in more than one home — ${named}${more}. The document ` +
+        'states of itself that every open point appears there EXACTLY once, and two homes contradict each ' +
+        `other about which points must not run in parallel. So: ${duplicateRemedy(duplicates)}`,
+      )
+    }
     return {
       block: true,
       missing,
-      reason:
-        `BUNDLE MEMBERSHIP DRIFTED: ${missing.length} open point(s) appear in no bundle of ` +
-        `docs/work-packages.md and in no "Not bundled" entry — ${named}${more}. A new finding JOINS an ` +
-        'existing bundle (memory bundle-first-not-new-point); a standalone point is the exception, and the ' +
-        'bundle scheme is only worth having while it matches the open set — it drifted within an hour of ' +
-        `being written because nothing compared the two. So: ${bundleRemedy(missing)}`,
+      duplicates,
+      reason: `BUNDLE MEMBERSHIP DRIFTED: ${parts.join(' ')}`,
     }
   } catch {
     return { block: false, reason: '' } // total by contract — the wrapper's fail-open must not depend on luck

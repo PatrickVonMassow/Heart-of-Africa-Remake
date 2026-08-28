@@ -15,6 +15,7 @@ import {
   parseBundles,
   parseUnbundled,
   unplacedPoints,
+  duplicateHomes,
   evaluate,
 } from './bundle-first-core.mjs'
 
@@ -166,6 +167,23 @@ describe('parseUnbundled', () => {
     expect(evaluate({ tasksMd: tasks([350, 285]), workPackagesMd: wp }).block).toBe(false)
   })
 
+  // THE EXEMPTION BULLET IS PROSE TOO (round-ten review finding): the bundle
+  // cells were proved against dates, quantities and code spans, the exemption
+  // reasons never were — and they run through the SAME reader, so a regression
+  // confined to them would have gone unseen. A number the reason merely
+  // mentions may not exempt a point from its bundle.
+  it('reads nothing out of an exemption REASON, whatever the reason contains', () => {
+    const { points, bullets } = parseUnbundled(
+      workPackages({
+        unbundled: [
+          '- **#285** — measured 2026-08-28 at 1440 px over 96 files; `#350` is a code span and 471 is prose.',
+        ],
+      }),
+    )
+    expect([...points]).toEqual([285])
+    expect(bullets[0].points).toEqual([285])
+  })
+
   it('ignores a prose bullet that starts with no number', () => {
     const { points } = parseUnbundled(workPackages({ unbundled: ['- **Urlaubsfestigkeit** was cut later.'] }))
     expect(points.size).toBe(0)
@@ -184,6 +202,32 @@ describe('unplacedPoints', () => {
 
   it('tolerates missing arguments', () => {
     expect(unplacedPoints(null, null, null)).toEqual([])
+  })
+})
+
+// THE OTHER HALF OF "EXACTLY ONCE" (round-ten review finding). `unplacedPoints`
+// unions the memberships and can therefore only see a point with NO home; these
+// cases are the ones it cannot see.
+describe('duplicateHomes', () => {
+  it('names a point standing in two bundle rows, and where it stands', () => {
+    const bundles = [{ id: 'A', points: new Set([350, 351]) }, { id: 'J', points: new Set([351]) }]
+    expect(duplicateHomes(new Set([350, 351]), bundles, new Set())).toEqual([{ point: 351, homes: ['A', 'J'] }])
+  })
+
+  it('names a point standing in a bundle AND in the exemption list', () => {
+    const bundles = [{ id: 'A', points: new Set([285]) }]
+    expect(duplicateHomes(new Set([285]), bundles, new Set([285]))).toEqual([
+      { point: 285, homes: ['A', 'Not bundled'] },
+    ])
+  })
+
+  it('says nothing about a CLOSED point named twice — only the open set is the measure', () => {
+    const bundles = [{ id: 'A', points: new Set([200]) }, { id: 'J', points: new Set([200]) }]
+    expect(duplicateHomes(new Set([350]), bundles, new Set([200]))).toEqual([])
+  })
+
+  it('tolerates missing arguments', () => {
+    expect(duplicateHomes(null, null, null)).toEqual([])
   })
 })
 
@@ -224,6 +268,43 @@ describe('evaluate — the rule', () => {
   it('ignores CLOSED and DEFERRED points — only the open set is the measure', () => {
     const md = tasks([350], [900]) + '\n- [ ] 901. Parked DEFERRED until the tag.'
     expect(evaluate({ tasksMd: md, workPackagesMd: wp }).block).toBe(false)
+  })
+
+  it('BLOCKS a point standing in two bundle rows, and names both homes', () => {
+    const twice = workPackages({
+      bundles: [['Dorfleben', 'A', '#350, #351'], ['Modell & Wächter', 'J', '#351']],
+      unbundled: ['- **#285**.'],
+    })
+    const v = evaluate({ tasksMd: tasks([350, 351, 285]), workPackagesMd: twice })
+    expect(v.block).toBe(true)
+    expect(v.missing).toEqual([])
+    expect(v.duplicates).toEqual([{ point: 351, homes: ['A', 'J'] }])
+    expect(v.reason).toMatch(/351 \(A and J\)/)
+    expect(v.reason).toMatch(/EXACTLY once/)
+  })
+
+  it('BLOCKS a point that is both bundled and exempted', () => {
+    const both = workPackages({
+      bundles: [['Dorfleben', 'A', '#350, #285']],
+      unbundled: ['- **#285** — the leak hunt.'],
+    })
+    const v = evaluate({ tasksMd: tasks([350, 285]), workPackagesMd: both })
+    expect(v.block).toBe(true)
+    expect(v.duplicates).toEqual([{ point: 285, homes: ['A', 'Not bundled'] }])
+    expect(v.reason).toMatch(/285 \(A and Not bundled\)/)
+  })
+
+  it('reports an unplaced point and a doubled one in the SAME verdict', () => {
+    const twice = workPackages({
+      bundles: [['Dorfleben', 'A', '#350, #351'], ['Modell & Wächter', 'J', '#351']],
+      unbundled: ['- **#285**.'],
+    })
+    const v = evaluate({ tasksMd: tasks([350, 351, 285, 999]), workPackagesMd: twice })
+    expect(v.block).toBe(true)
+    expect(v.missing).toEqual([999])
+    expect(v.duplicates).toEqual([{ point: 351, homes: ['A', 'J'] }])
+    expect(v.reason).toMatch(/999/)
+    expect(v.reason).toMatch(/351 \(A and J\)/)
   })
 
   it('truncates a long list instead of printing a wall', () => {
@@ -297,11 +378,54 @@ describe('the real docs/work-packages.md', () => {
     expect(parseUnbundled(md).points.size).toBeGreaterThan(0)
   })
 
+  // A COUNT, NOT A FLOOR (round-ten review finding). "More than five bundles"
+  // passes while half the table goes unread, and every completeness check below
+  // filters to OPEN points — so a row holding only closed points could vanish
+  // from the reader's view without a single case turning red. These two counts
+  // come from the document's own shape, so a row or a bullet that stops parsing
+  // is a failure rather than a silence.
+  it('parses EVERY bundle row and EVERY exemption bullet the document writes', () => {
+    const section = md.slice(md.indexOf(BUNDLES_HEADING), md.indexOf(UNBUNDLED_MARKER))
+    const rows = section.split('\n').filter((line) => /^\|\s*\*\*[^|]+\*\*\s*\|\s*[A-Z]\s*\|/.test(line))
+    expect(rows.length).toBeGreaterThan(5)
+    expect(parseBundles(md)).toHaveLength(rows.length)
+
+    const tail = md.slice(md.indexOf(UNBUNDLED_MARKER))
+    const end = tail.indexOf('\n## ')
+    const listed = (end < 0 ? tail : tail.slice(0, end))
+      .split('\n')
+      .filter((line) => /^[-*]\s+(?:\*\*)?#\d/.test(line))
+    expect(listed.length).toBeGreaterThan(0)
+    expect(parseUnbundled(md).bullets).toHaveLength(listed.length)
+  })
+
   // THE MIGRATION CHANGED NO MEMBERSHIP (point 1003). What the prose reader
   // placed the day before the migration is a MEASUREMENT, and it is kept as one
   // — reproducing that reader here would read the MIGRATED cells and prove
   // nothing (review finding). The fixture is never regenerated; it ages out on
   // its own, because a point that closes leaves the open set on both sides.
+  // THE FIXTURE IS A MEASUREMENT, AND IT SAYS SO ITSELF (round-ten review
+  // finding). Its header is prose and proves nothing; what proves its
+  // provenance is its CONTENT. The prose reader took every 1-to-4-digit token
+  // in a cell, so its reading is full of numbers that were never points —
+  // ordinals, quantities, the leftovers of dates. The marker reader cannot
+  // produce a single one of them, so a fixture regenerated from today's reader
+  // could not carry them and the comparison below would be tautological. These
+  // two assertions are what makes it not one.
+  it('carries the prose reader\'s own noise, which the marked reader cannot produce', () => {
+    const measured = JSON.parse(readFileSync(repoPath('scripts/fixtures/work-packages-placed-before-1003.json'), 'utf8'))
+    expect(measured.document).toMatch(/^[0-9a-f]{40}$/)
+
+    const placedNow = new Set(parseUnbundled(md).points)
+    for (const bundle of parseBundles(md)) for (const n of bundle.points) placedNow.add(n)
+
+    const noise = measured.placed.filter((n) => !placedNow.has(n))
+    expect(noise.length).toBeGreaterThan(100)
+    // Numbers no work-order point ever carried: the work order starts well
+    // above 100, so these can only come from prose.
+    expect(measured.placed.filter((n) => n < 100).length).toBeGreaterThan(10)
+  })
+
   it('still places every point the prose reader placed and the work order still has open', () => {
     const measured = JSON.parse(readFileSync(repoPath('scripts/fixtures/work-packages-placed-before-1003.json'), 'utf8'))
     const open = parseOpenPoints(readFileSync(repoPath('TASKS.md'), 'utf8'))

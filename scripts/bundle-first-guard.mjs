@@ -49,7 +49,7 @@ if (isMainModule(import.meta.url)) {
         process.exit(0)
       }
       const result = evaluate(gathered.inputs)
-      console.log(result.block ? result.reason : 'bundle-first-guard: every open point is placed.')
+      console.log(result.block ? result.reason : 'bundle-first-guard: every open point has exactly one home.')
       process.exit(0)
     }
 
