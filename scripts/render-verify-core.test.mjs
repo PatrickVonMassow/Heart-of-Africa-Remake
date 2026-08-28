@@ -1717,6 +1717,41 @@ describe('a CRASHED run is its own class, and has its own signed way out (point 
     expect(unexplainedRuns([bare], 1000, { openPoints, crashClosures: [crashClosure(bare)] })).toEqual([])
   })
 
+  // THE SAME LINE, HELD AGAINST AN `exit: 0` RECORD (review finding,
+  // 28.08.2026). A stack can reach CRASH_LINE — or uncaughtExceptionMonitor can
+  // fire — while the process still ends 0. Signing that crash used to erase the
+  // whole record: `afterCrashClosure` clears `crashed`, `runVerdict` then took
+  // the clean-exit branch BEFORE it read the reds, answered `clean`, and
+  // unexplainedRuns dropped the run with every red it had printed.
+  it('does not let a signed crash on an exit-0 record erase the reds it printed', () => {
+    const r = crashedRun('webgpu', 1500, { exit: 0, reds: [red('a check nobody owns', null)] })
+    // Unsigned, the crash is what blocks — unchanged.
+    expect(unexplainedRuns([r], 1000, { openPoints }).map((u) => u.status)).toEqual(['crashed'])
+    // Signed, the observed red stands in its place instead of vanishing.
+    const residual = unexplainedRuns([r], 1000, { openPoints, crashClosures: [crashClosure(r)] })
+    expect(residual.map((u) => u.status)).toEqual(['red'])
+    expect(residual[0].reds).toEqual(['a check nobody owns'])
+    // …and it still holds the gate, named as itself.
+    const gate = evaluate(
+      renderChange({
+        runs: [r, { ...run('webgpu', 2000), suite: 'startup' }, run('webgl', 2100)],
+        openPoints,
+        crashClosures: [crashClosure(r)],
+      }),
+    )
+    expect(gate.decision).toBe('block')
+    expect(gate.reason).toMatch(/a check nobody owns/)
+    // The three ordinary closings still work on it, and an exit-0 crash with
+    // nothing in it is still closed by its signature alone.
+    const owned_ = crashedRun('webgpu', 1500, { exit: 0, reds: [red('goat stance', 506)] })
+    expect(unexplainedRuns([owned_], 1000, { openPoints, crashClosures: [crashClosure(owned_)] })).toEqual([])
+    const bare = crashedRun('webgpu', 1500, { exit: 0 })
+    expect(unexplainedRuns([bare], 1000, { openPoints, crashClosures: [crashClosure(bare)] })).toEqual([])
+    // AND THE CLEAN-EXIT BRANCH KEEPS ITS OWN JOB: a record that never crashed
+    // is still read by its exit code, not dragged into the list by its reds.
+    expect(unexplainedRuns([{ ...r, crashed: false }], 1000, { openPoints })).toEqual([])
+  })
+
   it('a signed-off crash still covers NOTHING — the backend needs a real run', () => {
     const r = crashedRun('webgpu', 1500)
     const closures = [crashClosure(r)]

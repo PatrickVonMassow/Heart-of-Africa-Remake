@@ -1055,7 +1055,19 @@ export function unexplainedRuns(runs, since, options) {
     const effective = afterCrashClosure(r, crashClosures)
     const signedCrash = effective !== r
     const verdict = runVerdict(effective, { openPoints })
-    if (verdict.status !== 'red' && verdict.status !== 'suspect' && verdict.status !== 'incomplete') continue
+    const blocking =
+      verdict.status === 'red' || verdict.status === 'suspect' || verdict.status === 'incomplete'
+    // A SIGNED CRASH IS JUDGED BY ITS RESIDUAL, NEVER BY THE EXIT CODE (review
+    // finding, 28.08.2026). `runVerdict` answers `clean` on exit 0 BEFORE it
+    // looks at the reds — right for an ordinary run, and an erasure here: a
+    // record that reached CRASH_LINE while its process still ended 0 keeps
+    // every red it printed, and taking the clean-exit branch dropped the whole
+    // record, which is exactly what the crash-residual rule exists to prevent.
+    // So the post-crash reading asks the residual DIRECTLY instead of borrowing
+    // that precedence. The clean-exit branch keeps its own job untouched: an
+    // unsigned run, and a signed one with nothing left in it, still leave here.
+    const postCrash = blocking || !signedCrash ? null : residualOf(effective)
+    if (!blocking && (postCrash === null || postCrash.reds.length === 0)) continue
     const suite = typeof r.suite === 'string' && r.suite ? r.suite : 'unknown'
     const backend = typeof r.backend === 'string' ? r.backend : 'unknown'
     // The WebGPU feature level this run really came up at, so a charge scoped to
@@ -1155,7 +1167,15 @@ export function unexplainedRuns(runs, since, options) {
     // Only red and suspect runs reach this point — a crash took its own branch
     // above, where the ledger can never touch it.
     let unowned = null
-    const observed = verdict.status === 'suspect' ? suspectRedsOf(r) : Array.isArray(r.reds) ? r.reds : []
+    // The post-crash residual where there is one — the reds the record still
+    // holds, read by the run's own class — and otherwise the verdict's own.
+    const observed = postCrash
+      ? postCrash.reds
+      : verdict.status === 'suspect'
+        ? suspectRedsOf(r)
+        : Array.isArray(r.reds)
+          ? r.reds
+          : []
     if (observed.length > 0) {
       // Only the reds NOBODY owns are still open. Counting the whole run's
       // reds would report a charged one as waved through beside its
@@ -1166,7 +1186,8 @@ export function unexplainedRuns(runs, since, options) {
     // The individual reds, NOT the one sentence runVerdict writes about them: a
     // suspect run's whole first attempt is summarised into a single unaccounted
     // entry, and a caller counting those would report two reds as one.
-    const open_ = unowned ?? (verdict.status === 'suspect' ? suspectRedsOf(r) : verdict.unaccounted)
+    const open_ =
+      unowned ?? (verdict.status === 'suspect' ? suspectRedsOf(r) : postCrash ? postCrash.reds : verdict.unaccounted)
     const names = open_.map((x) => text(x?.name)).filter(Boolean)
     // What is REPORTED is what is still open — never the verdict's own list,
     // which still holds the reds a charge has since taken over: quoting one of
@@ -1177,7 +1198,9 @@ export function unexplainedRuns(runs, since, options) {
       backend,
       suite,
       at,
-      status: verdict.status,
+      // The residual's own class where the crash was signed off: `clean` is a
+      // reading of the exit code, never of what the record still holds.
+      status: postCrash ? postCrash.status : verdict.status,
       unaccounted: stillOpen.length > 0 ? stillOpen : verdict.unaccounted,
       reds: names.length > 0 ? names : ['(unnamed red)'],
     })
