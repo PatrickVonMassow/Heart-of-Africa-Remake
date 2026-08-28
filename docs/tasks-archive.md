@@ -24997,3 +24997,27 @@ Nummerierung bleiben deshalb identisch — hier wird nur verschoben, nie umgesch
   breaks no player-visible behaviour itself, but a gate whose only exit is a hand waiver decays
   into a formality.
   Bundle: Session- & Repo-Hygiene.
+
+- [x] 993. A run that crashed but exited 0 is recorded as fully clean and COVERS a backend.
+  MEASURED 28.08.2026 while answering the eleventh review round of point 734, in
+  `scripts/render-verify-recorder.mjs`: the tap sets `state.crashed = true` the moment a stderr
+  line matches `CRASH_LINE`, but the record is written with `...(exit !== 0 ? { reds, crashed:
+  armed.crashed } : {})`. A run whose stack reached the tap while the process still ended with
+  code 0 therefore stores neither its reds nor its crash flag — the record is indistinguishable
+  from a clean one, and an asserted clean run COVERS its backend.
+  WHAT IT COSTS: point 734 gave the crashed run its own signed disposition precisely because a
+  crash may not be mistaken for a green. This path skips the disposition entirely: the crash is
+  not merely unexplained, it is invisible, and the run is then counted as the picture proof for a
+  render change. The comment at the tap says a false positive "only makes the gate stricter",
+  which is true on the `exit !== 0` path and false on this one — the same flag makes the gate
+  LOOSER here, because the record it produces is a green.
+  FINAL STATE: the crash observation is recorded independently of the exit code, and a record
+  carrying it is never coverage: it takes the crashed run's signed way out like any other. The
+  tap's comment states which way each direction of the flag actually moves the gate.
+  VERIFIABLE: Vitest at the recorder — a run whose stderr matched `CRASH_LINE` and whose process
+  exited 0 stores `crashed: true` and its reds, and `runVerdict`/coverage refuse it as a clean
+  covering run; a run with neither is unaffected; the ordinary crashed-and-nonzero run keeps
+  today's record shape exactly.
+  Criticality: high — it is the one path on which the render gate accepts a crash as its picture
+  proof.
+  Bundle: Session- & Repo-Hygiene.
