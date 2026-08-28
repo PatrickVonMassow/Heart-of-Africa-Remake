@@ -456,7 +456,17 @@ export function tapOutput(state, streams = [[process.stdout, false], [process.st
     if (!decoder) return
     decoders.delete(stream)
     const rest = decoder.end()
-    if (rest) take(stream, isErr, rest)
+    if (!rest) return
+    // AND THE SUBSTITUTION IS RECORDED AS THE LOSS IT IS (review finding,
+    // 28.08.2026, round 26). `end()` returns text only when bytes were held back
+    // for a character that never completed, and what it returns is U+FFFD in
+    // their place. The line still reaches the record — under an identity that is
+    // not the one the suite printed — so a final `FAIL` or `ERR:` could be
+    // stored renamed while the record read complete. It cannot be recovered and
+    // it must not be quiet: the run is marked as having lost output, which is
+    // the closable class this point exists to give it.
+    take(stream, isErr, rest)
+    refuse()
   }
   const decoderFor = (stream) => {
     let decoder = decoders.get(stream)
@@ -513,7 +523,11 @@ export function tapOutput(state, streams = [[process.stdout, false], [process.st
     // of the final line, which is exactly the line a dying process leaves.
     for (const [stream, decoder] of decoders) {
       const rest = decoder.end()
-      if (rest) take(stream, isErrOf.get(stream) === true, rest)
+      if (!rest) continue
+      // The same at the flush: a character the last write cut in half is a lost
+      // result, not a silent rename (review finding, 28.08.2026, round 26).
+      take(stream, isErrOf.get(stream) === true, rest)
+      refuse()
     }
     decoders.clear()
     for (const stream of [...pending.keys()]) {

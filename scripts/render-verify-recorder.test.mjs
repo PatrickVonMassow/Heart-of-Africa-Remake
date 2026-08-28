@@ -443,6 +443,7 @@ describe('tapOutput — observe-only', () => {
     // moved: no line begins with the decoder's tail.
     expect(state.lines).toHaveLength(1)
     expect(state.lines[0]).toBe('ERR: the caf\uFFFD failed to draw')
+    expect(state.droppedLines).toBe(1)
   })
 
   // AND THE DECODERS ARE PER STREAM. Two interleaved half-characters, one on
@@ -474,6 +475,22 @@ describe('tapOutput — observe-only', () => {
     out.write(line.subarray(0, line.length - 1))
     flush()
     expect(state.lines).toEqual(['ERR: the last word is caf\uFFFD'])
+    // AND THE RECORD SAYS SO (review finding, 28.08.2026, round 26). The line
+    // reaches the record under an identity the suite never printed, so a run
+    // that lets it through as complete is exactly the silent half-recording this
+    // point forbids.
+    expect(state.droppedLines).toBe(1)
+  })
+
+  // The same when a STRING write follows the cut bytes rather than the flush.
+  it('marks the substitution when a string write drains the decoder', () => {
+    const { state, out, flush } = tapped()
+    const bytes = Buffer.from('ERR: the café pane', 'utf8')
+    out.write(bytes.subarray(0, bytes.indexOf(Buffer.from('é', 'utf8')) + 1))
+    out.write(' failed to draw\n')
+    flush()
+    expect(state.lines).toEqual(['ERR: the caf\uFFFD failed to draw'])
+    expect(state.droppedLines).toBe(1)
   })
 
   // And a character that arrived WHOLE, with only the newline missing, reaches

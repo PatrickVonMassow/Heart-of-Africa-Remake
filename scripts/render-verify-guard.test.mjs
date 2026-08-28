@@ -667,9 +667,43 @@ describe('render-verify-guard --status — what it prints about a run it cannot 
     ])
     expect(before).toMatch(/INCOMPLETE RECORDING \(not an unexplained red\).*115 result line\(s\) dropped/)
     expect(signed).toMatch(/INCOMPLETE RECORDING SIGNED OFF: webgpu\/settings/)
-    // Signed, it stops being listed as open — and never reads as a pass.
+    // Signed, it stops being listed as open.
     expect(after).not.toMatch(/⚠ INCOMPLETE RECORDING \(not an unexplained red\)/)
     expect(after).toMatch(/signed-off incomplete recording: webgpu\/settings/)
+    // AND IT STILL DOES NOT READ AS A PASS (review finding, 28.08.2026, round
+    // 26). Removing the open warning is not that claim: the record must not
+    // become COVERAGE either, and only the command that blocks can say so.
+    expect(after).toMatch(/webgpu settings\s+exit 0 .*incomplete/)
+  })
+
+  // A CRASH-PLUS-TRUNCATION IN THE SHAPE THE RECORDER WRITES TODAY (review
+  // finding, 28.08.2026, round 26). The combined case in this suite is built
+  // from the LEGACY synthetic marker, and the current-shape cases exercise the
+  // two families separately — so nothing proved that a newly recorded run which
+  // both died and lost output can take --crashed and then --incomplete instead
+  // of staying unclosable, which is the trap this whole point is about.
+  it('closes a CURRENT-SHAPE crash-plus-truncation with both signatures, in order', () => {
+    const record = { backend: 'webgpu', suite: 'settings', at: 1500, exit: 1, crashed: true, truncated: true, droppedLines: 115, reds: [] }
+    const [asCrash, signedCrash, asIncomplete, signedIncomplete, after] = runCli({ runs: [record] }, [
+      ['--status'],
+      ['--crashed', 'webgpu/settings', '--evidence', 'local/verify-logs/ shows SIGKILL at frame 3; the run wrote no report'],
+      ['--status'],
+      ['--incomplete', 'webgpu/settings', '--evidence', 'local/verify-logs/ holds the whole run; the flood was the dev server'],
+      ['--status'],
+    ])
+    // A crash outranks the truncation, so only the crash is offered first…
+    expect(asCrash).toMatch(/⚠ CRASHED RUN \(not an unexplained red\)/)
+    expect(asCrash).not.toMatch(/⚠ INCOMPLETE RECORDING \(not an unexplained red\)/)
+    expect(signedCrash).toMatch(/CRASHED RUN SIGNED OFF: webgpu\/settings/)
+    // …and the LOST RECORDING is what the same record still owes afterwards.
+    expect(asIncomplete).toMatch(/⚠ INCOMPLETE RECORDING \(not an unexplained red\).*115 result line\(s\) dropped/)
+    expect(asIncomplete).not.toMatch(/⚠ CRASHED RUN \(not an unexplained red\)/)
+    expect(signedIncomplete).toMatch(/INCOMPLETE RECORDING SIGNED OFF: webgpu\/settings/)
+    // Both signed, nothing is open — and the record still covers no backend.
+    expect(after).not.toMatch(/⚠ (CRASHED RUN|INCOMPLETE RECORDING) \(not an unexplained red\)/)
+    expect(after).toMatch(/signed-off crashed run: webgpu\/settings/)
+    expect(after).toMatch(/signed-off incomplete recording: webgpu\/settings/)
+    expect(after).toMatch(/webgpu\s+NOT covered since the last render edit/)
   })
 
   it('signs off a CURRENT-SHAPE crashed run through the real --crashed command', () => {
