@@ -77,7 +77,9 @@ const CHECKOUT_DIR = (() => {
 const KEPT_LINE = /^(?:FAIL\s{2,}|ERR:|console errors:|CONSOLE ERRORS:)/
 
 /**
- * NO CAP ON RED LINES, BY MEASUREMENT (point 734). The old 400-line cap existed
+ * THE CAP ON RED LINES IS A STATED BUDGET, NOT A SILENT ONE (point 734; the
+ * heading read "NO CAP ON RED LINES" until round 16, which is what the three
+ * budgets below stopped being true of). The old 400-line cap existed
  * because a page error that repeats per frame prints one `ERR:` line per
  * OCCURRENCE — but a run that hit it was HALF-RECORDED: a fragment of its red
  * set plus a truncation marker, which no closing of point 640 can reach (all
@@ -165,6 +167,11 @@ export const MAX_RED_IDENTITIES = 500
  */
 export const MAX_CAPTURE_CHARS = 4 * 1024 * 1024
 export const MAX_LINE_CHARS = 64 * 1024
+
+/** How much of an OVERLONG line is copied to decide what it is. Both probes —
+ *  `KEPT_LINE` and `CRASH_LINE` — are anchored at the line's start, so this
+ *  prefix answers them and the rest of the line is never materialised. */
+const LINE_PROBE_CHARS = 4096
 
 /** Stderr that says the process did not end on its own terms — a stack frame or
  *  a bare `…Error:` headline. A run that CRASHED explains nothing about the
@@ -254,126 +261,128 @@ export function tapOutput(state, streams = [[process.stdout, false], [process.st
   const refuse = () => {
     state.droppedLines = (Number.isFinite(state.droppedLines) ? state.droppedLines : 0) + 1
   }
-  const take = (stream, isErr, text) => {
-    // A LINE THAT NEVER ENDS IS NOT BUFFERED FOREVER. Whatever a process writes
-    // without a newline accumulates here, so the remainder is capped and the
-    // damaged line refused when it completes — the same loud disposal a refused
-    // line gets, never a silently truncated line parsed as if it were whole.
-    const damaged = overlong.has(stream)
-    const lines = ((pending.get(stream) ?? '') + text).split('\n')
-    let rest = lines.pop() ?? ''
-    if (rest.length > MAX_LINE_CHARS) {
-      rest = rest.slice(0, MAX_LINE_CHARS)
-      overlong.add(stream)
-    } else if (lines.length > 0) {
-      overlong.delete(stream)
+  /**
+   * One completed line, already known to be within MAX_LINE_CHARS. Returns
+   * nothing; every budget past the line's own size is decided here.
+   */
+  const handle = (isErr, line) => {
+    if (isErr && CRASH_LINE.test(line)) state.crashed = true
+    if (!KEPT_LINE.test(line)) return
+    const parts = resultParts(line)
+    // What this line would ADD, counted as IDENTITIES and not as parts (review
+    // finding, 28.08.2026, round 14). A summary that prints the same red five
+    // hundred times carries five hundred parts and exactly one new identity;
+    // counting the parts made such a line exceed the ceiling and marked an
+    // ordinary repeated-error run incomplete, which is a FALSE truncation — and
+    // a false truncation blocks the render set, the very failure this point
+    // exists to end.
+    const fresh =
+      parts === null
+        ? (keptRaw.has(line) ? [] : [line])
+        : [...new Set(parts.map((p) => p.id).filter((id) => !keptIds.has(id)))]
+    // THE BUDGETS ARE DECIDED BEFORE ANYTHING IS REMEMBERED (review finding,
+    // 28.08.2026, round 14). The varied-measurement map used to be filled
+    // first, so a REFUSED line could fill it to the brim without a single line
+    // being kept — and then a later, kept red found no room in it, so its
+    // second, different reading was dropped as repetition with nothing marking
+    // it, and a narrow charge could own that red on the one reading that
+    // survived. Exactly the silent loss the mark exists to prevent.
+    //
+    // AND THEY ARE ASKED OF WHAT THE LINE WOULD ADD, NOT OF THE BUFFER BEFORE
+    // IT. Testing "is the buffer full yet" and then adding every fresh identity
+    // the line carried was no ceiling at all: ONE summary line could take the
+    // buffer — and `record.reds` with it — arbitrarily far past the limit
+    // without marking the run incomplete. A line is weighed WHOLE: kept only if
+    // all of its fresh identities and its text fit, refused as one if they do
+    // not. Refusing part-way is not on offer, because the record would then
+    // hold reds it cannot account for; refusing whole is LOUD, which is the
+    // contract — the record says how many lines it refused, `runVerdict`
+    // answers `incomplete`, and the signed way out of render-verify-core.mjs
+    // disposes of it.
+    //
+    // Only of a line that would be KEPT, though: one bringing nothing new is
+    // dropped as repetition, and counting that would be a false truncation.
+    if (
+      fresh.length > 0 &&
+      (keptIds.size + keptRaw.size + fresh.length > MAX_RED_IDENTITIES ||
+        keptChars + line.length > MAX_CAPTURE_CHARS)
+    ) {
+      refuse()
+      return
     }
-    pending.set(stream, rest)
-    for (let i = 0; i < lines.length; i++) {
-      const line = lines[i]
-      if (isErr && CRASH_LINE.test(line)) state.crashed = true
-      // Only the FIRST completed line can be the damaged one — it is the
-      // remainder the cap cut, and everything after it arrived whole.
-      if (i === 0 && damaged) {
-        if (KEPT_LINE.test(line)) refuse()
-        continue
+    // A line that is kept, or dropped as pure repetition, still has its
+    // measurement read: repetition is exactly where a second, DIFFERENT reading
+    // of an already-kept red shows up.
+    for (const part of parts ?? []) {
+      const seen = firstSeenOfPart.get(part.id)
+      // The map only ever learns identities that were KEPT, so it is bounded by
+      // the ceiling itself; the size guard stays as a backstop.
+      if (seen === undefined) {
+        if (firstSeenOfPart.size < MAX_RED_IDENTITIES) firstSeenOfPart.set(part.id, part.seen)
       }
-      if (!KEPT_LINE.test(line)) continue
-      // THE SIZE IS JUDGED BEFORE THE PARSE (review finding, 28.08.2026, round
-      // 15). Asking it afterwards let a whole newline-terminated line arrive in
-      // ONE write and build its parsed array and identity set first — so the
-      // limit refused the line only once the memory it was meant to prevent had
-      // already been allocated. It is therefore the one budget asked of EVERY
-      // result line, repetition included: deciding whether a line is repetition
-      // means parsing exactly the line whose size is the problem.
-      //
-      // That also makes the refusal independent of how the process chunked its
-      // writes. An overlong line assembled across several writes is damaged by
-      // the pending cap and refused above; one delivered whole is refused here;
-      // both count the same. A result line beyond this size is pathological in
-      // any case — the measured worst is a check label with a measurement.
-      if (line.length > MAX_LINE_CHARS) {
-        refuse()
-        continue
-      }
-      const parts = resultParts(line)
-      // What this line would ADD, counted as IDENTITIES and not as parts
-      // (review finding, 28.08.2026, round 14). A summary that prints the same
-      // red five hundred times carries five hundred parts and exactly one new
-      // identity; counting the parts made such a line exceed the ceiling and
-      // marked an ordinary repeated-error run incomplete, which is a FALSE
-      // truncation — and a false truncation blocks the render set, the very
-      // failure this point exists to end.
-      const fresh =
-        parts === null
-          ? (keptRaw.has(line) ? [] : [line])
-          : [...new Set(parts.map((p) => p.id).filter((id) => !keptIds.has(id)))]
-      // THE CEILING IS DECIDED BEFORE ANYTHING IS REMEMBERED (review finding,
-      // 28.08.2026, round 14). The varied-measurement map used to be filled
-      // first, so a REFUSED line could fill it to the brim without a single line
-      // being kept — and then a later, kept red found no room in it, so its
-      // second, different reading was dropped as repetition with nothing marking
-      // it, and a narrow charge could own that red on the one reading that
-      // survived. Exactly the silent loss the mark exists to prevent.
-      // THE CEILING, AND WHY IT IS LOUD (review finding, 28.08.2026, round 13).
-      // Beyond it the buffer stops growing and the RUN IS MARKED INCOMPLETE —
-      // the loud failure this point's final state names as the alternative to an
-      // uncapped buffer, never a silent half-recording: the record says how many
-      // lines it refused, `runVerdict` answers `incomplete`, and the signed
-      // way out of render-verify-core.mjs disposes of it. Silently discarding
-      // them is exactly the trap the point exists to close.
-      //
-      // ASKED OF WHAT THE LINE WOULD ADD, NOT OF THE BUFFER BEFORE IT (review
-      // finding, 28.08.2026, round 14). Testing "is the buffer full yet" and
-      // then adding every fresh identity the line carried was no ceiling at all:
-      // a `console errors: [...]` summary holds as many reds as the page
-      // printed, so ONE such line could take the buffer — and `record.reds`
-      // with it — arbitrarily far past the limit without ever marking the run
-      // incomplete. A line is now weighed WHOLE: it is kept only if all of its
-      // fresh identities fit, and refused as one if they do not. Refusing a
-      // line part-way is not on offer, because the record would then hold reds
-      // it cannot account for; refusing it whole is loud, which is the contract.
-      // BOTH BUDGETS, ASKED THE SAME WAY. The identity ceiling bounds how many
-      // reds the record can hold; the character budget bounds how much TEXT the
-      // tap holds to carry them, which a line repeating one identity a million
-      // times would otherwise leave unbounded.
-      // The remaining budgets are asked only of a line that would be KEPT: one
-      // bringing nothing new is dropped as repetition, and counting that as a
-      // refusal would be a false truncation — which blocks the render set in
-      // exactly the way this point exists to end.
-      const wouldNotFit =
-        fresh.length > 0 &&
-        (keptIds.size + keptRaw.size + fresh.length > MAX_RED_IDENTITIES ||
-          keptChars + line.length > MAX_CAPTURE_CHARS)
-      if (wouldNotFit) {
-        refuse()
-        continue
-      }
-      // A line that is kept, or dropped as pure repetition, still has its
-      // measurement read: repetition is exactly where a second, DIFFERENT
-      // reading of an already-kept red shows up.
-      for (const part of parts ?? []) {
-        const seen = firstSeenOfPart.get(part.id)
-        // The map now only ever learns identities that were KEPT, so it is
-        // bounded by the ceiling itself; the size guard stays as a backstop.
-        if (seen === undefined) {
-          if (firstSeenOfPart.size < MAX_RED_IDENTITIES) firstSeenOfPart.set(part.id, part.seen)
-        }
-        // The SAME red printed with a DIFFERENT measurement. The record can hold
-        // only one, so the difference is remembered as a fact about that red: a
-        // narrow charge then refuses it instead of owning it on the single
-        // reading that survived.
-        else if (seen !== part.seen && state.variedKeys instanceof Set) state.variedKeys.add(part.id)
-      }
-      // Nothing new means pure repetition: every red the line carries is already
-      // in the buffer under a line that was kept, so dropping it loses no
-      // observation and is not a truncation.
-      if (fresh.length === 0) continue
-      if (parts === null) keptRaw.add(line)
-      else for (const id of fresh) keptIds.add(id)
-      keptChars += line.length
-      state.lines.push(line)
+      // The SAME red printed with a DIFFERENT measurement. The record can hold
+      // only one, so the difference is remembered as a fact about that red: a
+      // narrow charge then refuses it instead of owning it on the single reading
+      // that survived.
+      else if (seen !== part.seen && state.variedKeys instanceof Set) state.variedKeys.add(part.id)
     }
+    if (fresh.length === 0) return
+    if (parts === null) keptRaw.add(line)
+    else for (const id of fresh) keptIds.add(id)
+    keptChars += line.length
+    state.lines.push(line)
+  }
+  /**
+   * SCANNED, NOT SPLIT (review finding, 28.08.2026, round 16). Building
+   * `(pending + chunk).split('\n')` materialised the WHOLE write and every line
+   * in it before any budget was consulted, so one enormous write — or one write
+   * carrying millions of short lines — exhausted the process before it could
+   * produce the closable incomplete record this point is about. The chunk is now
+   * walked newline by newline, and nothing beyond one line is ever held.
+   *
+   * AN OVERLONG LINE IS NEVER MATERIALISED AT ALL. Both probes — is this a
+   * result line, is this a crash frame — are ANCHORED at the line's start, so a
+   * bounded prefix answers them, and a line past MAX_LINE_CHARS is refused from
+   * that prefix without the rest of it ever being copied.
+   *
+   * A LINE THAT NEVER ENDS IS NOT BUFFERED FOREVER either: the remainder is
+   * capped at MAX_LINE_CHARS, and the line whose middle was cut is refused when
+   * its newline finally arrives rather than parsed as if it had come whole. The
+   * refusal is therefore the same however the process chunked its writes.
+   */
+  const take = (stream, isErr, chunk) => {
+    let carry = pending.get(stream) ?? ''
+    let from = 0
+    for (;;) {
+      const nl = chunk.indexOf('\n', from)
+      if (nl === -1) break
+      // True only for the line that carries the cut remainder: the flag is
+      // cleared by the first line to complete after it.
+      const damaged = overlong.delete(stream)
+      const segment = nl - from
+      if (damaged || carry.length + segment > MAX_LINE_CHARS) {
+        const head = carry + chunk.slice(from, from + Math.min(segment, LINE_PROBE_CHARS))
+        if (isErr && CRASH_LINE.test(head)) state.crashed = true
+        if (KEPT_LINE.test(head)) refuse()
+      } else {
+        handle(isErr, carry + chunk.slice(from, nl))
+      }
+      carry = ''
+      from = nl + 1
+    }
+    if (from < chunk.length) {
+      const room = MAX_LINE_CHARS - carry.length
+      // One character past the cap is enough to KNOW it overflowed, and is all
+      // that is ever copied beyond it.
+      if (room > 0) carry += chunk.slice(from, from + room + 1)
+      if (carry.length > MAX_LINE_CHARS) {
+        carry = carry.slice(0, MAX_LINE_CHARS)
+        overlong.add(stream)
+      } else if (room <= 0) {
+        overlong.add(stream)
+      }
+    }
+    pending.set(stream, carry)
   }
   const isErrOf = new Map(streams)
   for (const [stream, isErr] of streams) {
@@ -569,15 +578,21 @@ export function armRunRecorder(backend) {
           // silently discarded observed reds is the half-recording the point
           // forbids; the ceiling below says so out loud instead.
           ...(exit !== 0 ? { reds, crashed: armed.crashed } : {}),
-          // A RUN THAT HIT THE CEILING IS AN INCOMPLETE RECORDING, and says how
+          // A RUN THAT HIT A BUDGET IS AN INCOMPLETE RECORDING, and says how
           // much it refused — `runVerdict` then answers `incomplete` and the
           // signed closure disposes of it, which is the whole way out a
-          // truncated run has. Only a RED run can carry it: a run that exited 0
-          // records no reds at all, so dropped red lines cost it nothing and
-          // calling it incomplete would block a genuinely green run.
-          ...(exit !== 0 && armed.droppedLines > 0
-            ? { truncated: true, droppedLines: armed.droppedLines }
-            : {}),
+          // truncated run has.
+          //
+          // A GREEN RUN IS NOT ONE, AND SAYS SO ANYWAY (review finding,
+          // 28.08.2026, round 16). Only a RED run carries `truncated`, because a
+          // run that exited 0 records no reds at all: the lines it refused were
+          // never evidence the accounting reads, so nothing was lost and calling
+          // it incomplete would block a genuinely green run. But the refusal
+          // must not vanish either — that was the one place a drop went
+          // unrecorded — so the COUNT is written whatever the exit code, and it
+          // is the `truncated` field alone that the verdict turns on.
+          ...(armed.droppedLines > 0 ? { droppedLines: armed.droppedLines } : {}),
+          ...(exit !== 0 && armed.droppedLines > 0 ? { truncated: true } : {}),
         })
       } catch {
         /* never fail a suite over the bookkeeping */

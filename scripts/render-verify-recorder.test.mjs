@@ -515,10 +515,13 @@ describe('the armed recorder — the REAL wiring, not a stand-in', () => {
     expect(runVerdict(record, { openPoints }).status).toBe('red')
   })
 
-  // Point 734, the chosen half: red lines are NEVER dropped. A per-frame flood
+  // Point 734, the chosen half: repetition never costs a red. A per-frame flood
   // of one identical error used to overflow the 400-line buffer and turn the run
   // into a half-recorded fragment; now repetition collapses at the capture and
-  // every observed red keeps its identity, so no record is ever "incomplete".
+  // every observed red keeps its identity, so a flood like this one produces no
+  // truncation at all. (A run really past the stated budgets does — loudly, and
+  // the cases above pin that; "no record is ever incomplete" stopped being true
+  // when the budgets were added in round 13.)
   it('keeps every observed red under a per-frame flood — no truncation, no marker (point 734)', async () => {
     const run = await armed('polish')
     for (let i = 0; i < 420; i++) {
@@ -603,16 +606,22 @@ describe('the armed recorder — the REAL wiring, not a stand-in', () => {
   })
 
   // A green run records no reds at all, so red lines it dropped cost it
-  // nothing — calling it incomplete would block a genuinely passing run.
-  it('never calls an exit-0 run incomplete, however much it printed', async () => {
+  // nothing — calling it incomplete would block a genuinely passing run. The
+  // refusal is still WRITTEN, though (review finding, 28.08.2026, round 16):
+  // this was the one place where a drop went unrecorded, which contradicts the
+  // rule that nothing is refused quietly. The verdict turns on `truncated`, and
+  // that is what a green run does not carry.
+  it('records what an exit-0 run refused, and still never calls it incomplete', async () => {
     const run = await armed('polish')
     for (let i = 0; i < MAX_RED_IDENTITIES + 7; i++) {
       process.stdout.write(`ERR: page error in span ${tag(i)}\n`)
     }
     const record = run.exit(0)
+    expect(record.droppedLines).toBe(7)
     expect(record.truncated).toBeUndefined()
-    expect(record.droppedLines).toBeUndefined()
+    expect(isIncompleteRecording(record)).toBe(false)
     expect(runVerdict(record, { openPoints }).status).toBe('clean')
+    expect(runVerdict(record, { openPoints }).covers).toBe(true)
   })
 
   // The finding the old cap could not survive (round 5, finding 4): hundreds of

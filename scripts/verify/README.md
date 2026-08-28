@@ -1272,9 +1272,13 @@ console errors. (The earlier reading, "red lines are exactly the unbounded
 ones, so they cannot go uncapped", conflated occurrences with identities.)
 
 So the spec's option "the cap stops applying to RED lines" was chosen — for the
-range every measured run lives in. The tap keeps ONE line per result IDENTITY,
-in first-seen order (the first occurrence keeps the detail a `detailMatch`
-charge reads); the parser de-duplicates by that same key anyway, so collapsing
+range every measured run lives in. The tap keeps a line only when it brings a
+result IDENTITY nothing has kept yet — so the first occurrence of each red is
+retained, with the detail a `detailMatch` charge reads, and a line whose reds
+are all already represented is dropped. (Not "one line per identity": a line
+introducing `B` is kept even though it also carries the already-kept `A`, so `A`
+may appear on several kept lines. What is bounded is the identity SET, not the
+line count.) The parser de-duplicates by that same key anyway, so collapsing
 here changes no verdict. The record then stores the whole red set. Every
 observed red keeps its identity and stays closable the three ordinary ways of
 point 640, whatever the flood around it.
@@ -1309,9 +1313,10 @@ measurements above are evidence about the logs that exist. They are not a bound
 on the ones that do not, and this document previously read them as one.
 
 So the bound is stated rather than hoped for: `MAX_RED_IDENTITIES` (500 in
-`scripts/render-verify-recorder.mjs`) distinct reds per run — fifteen times the
-worst distinct set ever recorded, so no run this project has produced comes near
-it. Past it the buffer stops growing and **the run is recorded as an INCOMPLETE
+`scripts/render-verify-recorder.mjs`) distinct reds per run — more than
+twenty-six times the largest red set ever recorded (19), and fifteen times the
+33 distinct result LINES of the worst log, which is the other number above and
+not the same one. No run this project has produced comes near it. Past it the buffer stops growing and **the run is recorded as an INCOMPLETE
 RECORDING**, carrying the count of the lines it refused. A line is weighed
 WHOLE against the ceiling — a `console errors:` summary carries as many reds as
 the page printed, and asking whether the buffer was full BEFORE adding all of
@@ -1330,10 +1335,10 @@ repeating ONE error a million times brings a single identity, so it fit — and
 the retained string then grew with the page's output rather than with its red
 set, which is the exhausted process the ceiling exists to prevent. Two more
 budgets sit beside it and are refused the same loud way: `MAX_CAPTURE_CHARS`
-(4 Mi CHARACTERS of kept text in total — code units, not bytes: the same text
-is larger in memory as UTF-16 and larger again on disk as UTF-8, so this bounds
-what the tap RETAINS rather than promising a megabyte figure) and
-`MAX_LINE_CHARS` (64 Ki characters for one line, which
+(4 Mi UTF-16 code units of kept text in total — what `String.length` counts, so
+it bounds what the tap RETAINS and promises no byte figure: the same text takes
+twice that in memory, and more or less again as UTF-8 depending on the script it
+is written in) and `MAX_LINE_CHARS` (64 Ki code units for one line, which
 also caps the tap's partial-line buffer — a line whose middle had to be dropped
 is refused when its newline arrives, never parsed as a stump). The identity
 ceiling and the total budget are asked only of a line that would be KEPT: one
@@ -1341,7 +1346,10 @@ bringing nothing new is dropped as repetition, because counting that would be a
 false truncation. The PER-LINE limit is the exception, asked of every result
 line and asked BEFORE it is parsed (round 15) — telling repetition apart means
 parsing exactly the line whose size is the problem, and asking afterwards
-allocated the memory the limit exists to prevent. It also makes the refusal
+allocated the memory the limit exists to prevent. The chunk is scanned newline
+by newline rather than split (round 16), and an overlong line is judged from a
+bounded prefix — both probes are anchored at the line's start — so it is refused
+without ever being copied whole. It also makes the refusal
 independent of how the process chunked its writes, which otherwise decided
 whether the same output was a truncation. That is the spec's
 OTHER option, applied where the first one runs out: a run either records its
@@ -1351,9 +1359,12 @@ therefore stays reachable for new records too, which is what gives such a run a
 signed way out (`--incomplete`) instead of the hand-written `--defer` this
 point exists to abolish.
 
-Only a RED run can carry it. A run that exits 0 records no reds at all, so red
-lines it dropped cost it nothing, and calling it incomplete would block a
-genuinely green run.
+Only a RED run carries the truncation. A run that exits 0 records no reds at
+all, so the lines it refused were never evidence the accounting reads, and
+calling it incomplete would block a genuinely green run. The COUNT is written
+whatever the exit code, though (round 16): the refusal must not be the one drop
+that goes unrecorded, and it is the `truncated` field alone the verdict turns
+on.
 
 ### The record keeps the MEASUREMENT, so a charge can be applied afterwards
 

@@ -457,9 +457,10 @@ function signedClosureDraft(state, options, family) {
   //     defect the round-5 review fixed, where a signature closed a record the
   //     other reading did not name;
   //   - the two families this draft serves are RARE: a crash, and a recording
-  //     that hit MAX_RED_IDENTITIES — which no run this project has produced
-  //     comes near, the ceiling being fifteen times the worst distinct red set
-  //     ever measured (round 14; before it, the class was legacy outright);
+  //     that hit one of the recorder's stated budgets — MAX_RED_IDENTITIES,
+  //     MAX_CAPTURE_CHARS or MAX_LINE_CHARS, each set far above anything this
+  //     project has produced (rounds 14 and 15; before them, the class was
+  //     legacy outright);
   //   - and the collision costs no coverage in either direction — a signature
   //     never makes a run cover a backend, so the worst case is one evidence
   //     sentence disposing of two byte-identical records of the same

@@ -256,8 +256,8 @@ describe('openIncompleteRuns — what the sign-off may close', () => {
   // coincide for anything a lane can really produce (review question,
   // 28.08.2026): runIdentity hashes the whole record, so two runs that really
   // happened differ in it and are refused as two judgments; a record written
-  // twice is one measurement and takes one disposition. The hash is 64
-  // non-cryptographic bits, so "differ" holds with overwhelming probability
+  // twice is one measurement and takes one disposition. The hash is a 128-bit
+  // truncated SHA-256, so "differ" holds with overwhelming probability
   // rather than with certainty — the residual is stated at the signing site.
   it('signs two DIFFERENT open runs apart, and the same content once', () => {
     const a = truncated(1500)
