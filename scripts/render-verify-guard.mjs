@@ -483,8 +483,9 @@ function signedClosureDraft(state, options, family) {
   //     text (round 13, which replaced 64 bits of FNV). Two DIFFERENT records
   //     colliding is therefore not reachable by accident and not steerable on
   //     purpose, which is what hash equality authorising a signature requires.
-  // The first case remains: one signature closes both such records. Filed as
-  // its own point rather than settled by this comment.
+  // The first case remains: one signature closes both such records. It is filed
+  // as POINT 991 — a record-time `runId` the identity prefers, with the content
+  // hash kept for every record already on disk — rather than settled here.
   const distinct = new Set(open.map((r) => runIdentity(r)))
   if (distinct.size > 1) {
     return {
@@ -749,13 +750,38 @@ if (arg === 'status' || arg === '--status') {
         )
       }
     }
+    // EVERY OPEN RECORD IS NAMED, not only the one standing behind an uncovered
+    // backend (review finding, 28.08.2026, round 18). The per-backend line above
+    // is skipped the moment a LATER run covers that backend — while `evaluate`
+    // keeps blocking on the earlier record all the same, so the inspection said
+    // "covered" about a gate that was shut. The reds and suspects are listed
+    // here; the two record classes have their own sections below.
+    for (const u of openRecords) {
+      if (u.status !== 'red' && u.status !== 'suspect') continue
+      console.log(
+        `⚠ ${classOf(u)}: ${u.backend}/${u.suite} @${isoText(u.at)} (id ${u.id}) — ` +
+          u.unaccounted.map((x) => `"${x.name}"${x.point === null ? '' : ` (point ${x.point} is not open)`}`).join('; '),
+      )
+    }
     // Broken RECORDINGS, listed apart from the reds (point 734): they are not
     // defects to hunt, they are runs whose evidence was truncated away.
+    //
+    // DELIBERATELY WINDOW-FREE (review finding, 28.08.2026, round 18, which read
+    // it as staleness). `openIncompleteRuns` and `openCrashedRuns` ignore
+    // `since` on purpose: point 734 says a record that has left the guard's
+    // window has lost its BLOCKAGE and not its obligation, and the sign-off CLI
+    // reads the same two functions — window-scoping them would make an older
+    // record unsignable, which is the trap this point exists to end. What each
+    // line owes the reader instead is whether it blocks right now, and that is
+    // what `blocksNow` says.
+    const blockingIds = new Set(openRecords.map((u) => u.id))
+    const blocksNow = (r) =>
+      blockingIds.has(runIdentity(r)) ? 'BLOCKING NOW' : 'outside the current window — owed, not blocking'
     const openIncomplete = openIncompleteRuns(state)
     for (const r of openIncomplete) {
       console.log(
         `⚠ INCOMPLETE RECORDING (not an unexplained red): ${r.backend}/${r.suite} ` +
-          `@${isoText(runStamp(r) ?? r.at)} (id ${runIdentity(r)}) — ${droppedLinesOf(r)} result line(s) dropped by the ` +
+          `@${isoText(runStamp(r) ?? r.at)} (id ${runIdentity(r)}, ${blocksNow(r)}) — ${droppedLinesOf(r)} result line(s) dropped by the ` +
           'capture cap. Re-run the suite, or sign it off: node scripts/render-verify-guard.mjs ' +
           `--incomplete "${r.backend}/${r.suite}" --evidence "<why>"`,
       )
@@ -773,7 +799,7 @@ if (arg === 'status' || arg === '--status') {
     for (const r of openCrashedRuns(state)) {
       console.log(
         `⚠ CRASHED RUN (not an unexplained red): ${r.backend}/${r.suite} @${isoText(runStamp(r) ?? r.at)} ` +
-          `(id ${runIdentity(r)}) — the run died rather than reported. THE CRASH ITSELF carries no ` +
+          `(id ${runIdentity(r)}, ${blocksNow(r)}) — the run died rather than reported. THE CRASH ITSELF carries no ` +
           'red anybody can own, so the three closings of point 640 cannot reach it — but a red the ' +
           'run PRINTED BEFORE it died was really observed and still closes those three ordinary ' +
           'ways (review finding, 28.08.2026, round 17: this line used to say nothing in the run ' +

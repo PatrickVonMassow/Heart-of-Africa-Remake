@@ -541,6 +541,63 @@ describe('render-verify-guard --status — what it prints about a run it cannot 
     }
   }
 
+  /** The same throwaway checkout, but every argv is run in order against the
+   *  REAL CLI and each output is returned. This is the only route that proves
+   *  the signing commands work on the record shape the recorder writes today —
+   *  the helper drafts are pure functions and cannot show that (review finding,
+   *  28.08.2026, round 18). */
+  const runCli = (state, argvs) => {
+    const root = mkdtempSync(join(tmpdir(), 'hoa-render-cli-'))
+    try {
+      execFileSync('git', ['init', '-q', '-b', 'main'], { cwd: root, windowsHide: true })
+      execFileSync('git', ['-c', 'user.email=t@t', '-c', 'user.name=t', 'commit', '-q', '--allow-empty', '-m', 'root'], { cwd: root, windowsHide: true })
+      mkdirSync(join(root, '.claude'), { recursive: true })
+      writeFileSync(join(root, '.claude', 'render-verify-state.json'), JSON.stringify(state))
+      return argvs.map((argv) =>
+        execFileSync(process.execPath, [GUARD, ...argv], {
+          cwd: root,
+          env: { ...process.env, HOA_REPO_ROOT: root },
+          encoding: 'utf8',
+          windowsHide: true,
+        }),
+      )
+    } finally {
+      rmSync(root, { recursive: true, force: true })
+    }
+  }
+
+  // THE RECORD SHAPE THE RECORDER WRITES TODAY, THROUGH THE REAL COMMAND
+  // (review finding, 28.08.2026, round 18). Every incomplete fixture in this
+  // suite carried the LEGACY synthetic marker in `reds`, while the recorder now
+  // writes top-level `truncated`/`droppedLines` and may write no `reds` at all
+  // on an exit-0 run — the shape point 734 itself introduced. Nothing drove the
+  // real `--incomplete` command with it, so an unclosable current-shape record
+  // would have passed this suite in silence.
+  it('signs off a CURRENT-SHAPE exit-0 truncation through the real --incomplete command', () => {
+    const record = { backend: 'webgpu', suite: 'settings', at: 1500, exit: 0, truncated: true, droppedLines: 115 }
+    const [before, signed, after] = runCli({ runs: [record] }, [
+      ['--status'],
+      ['--incomplete', 'webgpu/settings', '--evidence', 'local/verify-logs/ holds the whole run; the flood was the dev server'],
+      ['--status'],
+    ])
+    expect(before).toMatch(/INCOMPLETE RECORDING \(not an unexplained red\).*115 result line\(s\) dropped/)
+    expect(signed).toMatch(/INCOMPLETE RECORDING SIGNED OFF: webgpu\/settings/)
+    // Signed, it stops being listed as open — and never reads as a pass.
+    expect(after).not.toMatch(/⚠ INCOMPLETE RECORDING \(not an unexplained red\)/)
+    expect(after).toMatch(/signed-off incomplete recording: webgpu\/settings/)
+  })
+
+  it('signs off a CURRENT-SHAPE crashed run through the real --crashed command', () => {
+    const record = { backend: 'webgpu', suite: 'startup', at: 1500, exit: 1, crashed: true, reds: [] }
+    const [signed, after] = runCli({ runs: [record] }, [
+      ['--crashed', 'webgpu/startup', '--evidence', 'local/verify-logs/ shows SIGKILL at frame 3; the run wrote no report'],
+      ['--status'],
+    ])
+    expect(signed).toMatch(/CRASHED RUN SIGNED OFF: webgpu\/startup/)
+    expect(after).not.toMatch(/⚠ CRASHED RUN \(not an unexplained red\)/)
+    expect(after).toMatch(/signed-off crashed run: webgpu\/startup/)
+  })
+
   const marker = { name: '115 further result line(s) exceeded the capture cap', key: 'capture-truncated', kind: 'check', point: null }
 
   it('says undated for a record with no stamp, and never prints the epoch', () => {
@@ -603,6 +660,33 @@ describe('render-verify-guard --status — what it prints about a run it cannot 
     expect(out).toMatch(/THE CRASH ITSELF carries no red anybody can own/)
     expect(out).toMatch(/PRINTED BEFORE it died was really observed and still closes those three/)
     expect(out).not.toMatch(/nothing in it can be explained or charged/)
+  })
+
+  // EVERY OPEN RECORD IS NAMED, not only the one behind an UNCOVERED backend
+  // (review finding, 28.08.2026, round 18). The per-backend line is skipped the
+  // moment a later run covers that backend — while the gate keeps blocking on
+  // the earlier record all the same, so the inspection said "covered" about a
+  // gate that was shut.
+  it('names an open red that a later covering run hides from the per-backend line', () => {
+    const out = inTempRepo({
+      runs: [
+        { backend: 'webgpu', suite: 'polish', at: 1500, exit: 1, reds: [{ name: 'a check nobody filed', kind: 'check', point: null }] },
+        { backend: 'webgpu', suite: 'polish', at: 1600, exit: 0, asserted: true },
+      ],
+    })
+    expect(out).toMatch(/covered by polish/)
+    expect(out).toMatch(/unaccounted red: webgpu\/polish .* "a check nobody filed"/)
+  })
+
+  // AND EACH RECORD CLASS SAYS WHETHER IT BLOCKS RIGHT NOW. The two sign-off
+  // families are deliberately window-free — a record that left the window lost
+  // its blockage, never its obligation, and the CLI reads the same lists — so
+  // the line owes the reader that difference instead of hiding it.
+  it('says of each crashed record whether it is blocking now', () => {
+    const out = inTempRepo({
+      runs: [{ backend: 'webgpu', suite: 'startup', at: 1500, exit: 1, crashed: true, reds: [] }],
+    })
+    expect(out).toMatch(/CRASHED RUN \(not an unexplained red\).*BLOCKING NOW/)
   })
 
   it('falls back to startedAt where only that was measured', () => {

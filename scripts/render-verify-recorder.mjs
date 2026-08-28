@@ -36,6 +36,7 @@
 // Observe-only and total: every step is wrapped so the bookkeeping can NEVER
 // fail a verify suite.
 import { basename, join, resolve } from 'node:path'
+import { StringDecoder } from 'node:string_decoder'
 import { spawnSync } from 'node:child_process'
 import { readdirSync, statSync } from 'node:fs'
 import { fileURLToPath } from 'node:url'
@@ -167,6 +168,11 @@ export const MAX_RED_IDENTITIES = 500
  */
 export const MAX_CAPTURE_CHARS = 4 * 1024 * 1024
 export const MAX_LINE_CHARS = 64 * 1024
+
+/** How many BYTES of one write are decoded at a time. A window, so an enormous
+ *  Buffer never becomes an enormous string before a budget has looked at it —
+ *  and wide enough that an ordinary write is decoded in one pass. */
+const DECODE_WINDOW_BYTES = 64 * 1024
 
 /** The newline `lines.join('\n')` will put BEFORE this line (review finding,
  *  28.08.2026, round 17). The budget bounds the buffer the parser is handed, and
@@ -400,11 +406,43 @@ export function tapOutput(state, streams = [[process.stdout, false], [process.st
     pending.set(stream, carry)
   }
   const isErrOf = new Map(streams)
+  /**
+   * A BYTE CHUNK IS DECODED IN BOUNDED WINDOWS (review finding, 28.08.2026,
+   * round 18). `chunk.toString('utf8')` built the WHOLE write as a fresh string
+   * before any budget was consulted, so one enormous Buffer could exhaust the
+   * process without ever producing the closable incomplete record this point is
+   * about — the same failure the line-by-line scan fixed for strings, through
+   * the other door. A string chunk needs no such treatment: `take` walks it and
+   * never copies beyond one line.
+   *
+   * The decoder is PER STREAM and kept, because a multi-byte character split
+   * across two writes — or across two windows of one write — must reassemble.
+   * Decoding each chunk on its own turned such a character into U+FFFD.
+   */
+  const decoders = new Map()
+  const feedBytes = (stream, isErr, bytes) => {
+    let decoder = decoders.get(stream)
+    if (!decoder) {
+      decoder = new StringDecoder('utf8')
+      decoders.set(stream, decoder)
+    }
+    for (let i = 0; i < bytes.length; i += DECODE_WINDOW_BYTES) {
+      const piece = decoder.write(bytes.subarray(i, Math.min(i + DECODE_WINDOW_BYTES, bytes.length)))
+      if (piece) take(stream, isErr, piece)
+    }
+  }
   for (const [stream, isErr] of streams) {
     const original = stream.write.bind(stream)
     stream.write = (chunk, ...rest) => {
       try {
-        take(stream, isErr, typeof chunk === 'string' ? chunk : (chunk?.toString?.('utf8') ?? ''))
+        // `ArrayBuffer.isView`, never `instanceof Uint8Array`: the tap runs in
+        // whatever realm the suite brought, and a Buffer minted in another one
+        // fails the instance test while being exactly the thing to decode. It
+        // did fail, measured under the jsdom environment, and every split
+        // character came out as U+FFFD.
+        if (typeof chunk === 'string') take(stream, isErr, chunk)
+        else if (ArrayBuffer.isView(chunk) && typeof chunk.subarray === 'function') feedBytes(stream, isErr, chunk)
+        else if (chunk != null) take(stream, isErr, chunk.toString?.('utf8') ?? '')
       } catch {
         /* never let the bookkeeping disturb the suite's own output */
       }

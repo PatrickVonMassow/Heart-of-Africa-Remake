@@ -124,6 +124,7 @@ export const RED_CHARGES = [
     point: 694,
     suite: 'polish',
     backend: 'webgpu',
+    featureLevel: 'compatibility',
     kind: 'check',
     match: /no child walks without getting anywhere/i,
     detailMatch: /worst child \d+ at \d+\.\d+s, 1\.42 m walked inside 0\.31 m/i,
@@ -149,7 +150,13 @@ export const RED_CHARGES = [
       'measured number cannot cover a stochastic artefact: this run minted a new one. Both ' +
       'entries are the STOPGAP that keeps the release branch honest until point 694 replaces ' +
       'them with an answer that holds for a SHAPE (a marginal single-event exceedance) rather ' +
-      'than for a number, and on both backends.',
+      'than for a number, and on both backends.' +
+      'SCOPED TO THE COMPATIBILITY LEVEL 28.08.2026 (cross-vendor review), with every other ' +
+      'WebGPU entry: an entry may excuse only the lane its evidence measured, and on the CORE ' +
+      'adapter the player runs this red stays real. Measured that day across the 40 recorded ' +
+      'runs: every WebGPU run that recorded a level recorded COMPATIBILITY and no core-level ' +
+      'run has ever been written here, and no red this entry accounts for today sits on a run ' +
+      'whose level went unrecorded — so the narrowing withdraws no charge that stands.',
   },
   {
     // RE-POINTED 20.08.2026: point 506 was folded into 642, and a charge to a ticked point
@@ -304,13 +311,20 @@ export const RED_CHARGES = [
     point: 568,
     suite: 'polish',
     backend: 'webgpu',
+    featureLevel: 'compatibility',
     kind: 'check',
     match: /water beyond the plate.s rim is the SAME water/i,
     why:
       'The SAME rotation, measured on WebGPU 13.08.2026. Listed as its own entry rather than by ' +
       'dropping the backend field (cross-vendor review, 13.08.2026): the evidence names two ' +
       'lanes, so the charge names those two and a third backend added tomorrow is uncharged ' +
-      'until someone measures it there.',
+      'until someone measures it there.' +
+      'SCOPED TO THE COMPATIBILITY LEVEL 28.08.2026 (cross-vendor review), with every other ' +
+      'WebGPU entry: an entry may excuse only the lane its evidence measured, and on the CORE ' +
+      'adapter the player runs this red stays real. Measured that day across the 40 recorded ' +
+      'runs: every WebGPU run that recorded a level recorded COMPATIBILITY and no core-level ' +
+      'run has ever been written here, and no red this entry accounts for today sits on a run ' +
+      'whose level went unrecorded — so the narrowing withdraws no charge that stands.',
   },
   {
     point: 570,
@@ -328,6 +342,7 @@ export const RED_CHARGES = [
     point: 627,
     suite: 'world',
     backend: 'webgpu',
+    featureLevel: 'compatibility',
     kind: 'check',
     match: /15-worldmodel-victoria-falls/i,
     why:
@@ -335,12 +350,19 @@ export const RED_CHARGES = [
       'rendered picture", twice including the suite own retry, while the six other landmark ' +
       'frames of the same run pass — and the SAME suite on WebGL 2 passes all seven in the same ' +
       'sitting, so the charge is scoped to WebGPU and a WebGL 2 red stays a real red. Point 627 ' +
-      'owns it until the cause — an unsettled jump or a real placement change — is named.',
+      'owns it until the cause — an unsettled jump or a real placement change — is named.' +
+      'SCOPED TO THE COMPATIBILITY LEVEL 28.08.2026 (cross-vendor review), with every other ' +
+      'WebGPU entry: an entry may excuse only the lane its evidence measured, and on the CORE ' +
+      'adapter the player runs this red stays real. Measured that day across the 40 recorded ' +
+      'runs: every WebGPU run that recorded a level recorded COMPATIBILITY and no core-level ' +
+      'run has ever been written here, and no red this entry accounts for today sits on a run ' +
+      'whose level went unrecorded — so the narrowing withdraws no charge that stands.',
   },
   {
     point: 627,
     suite: 'world',
     backend: 'webgpu',
+    featureLevel: 'compatibility',
     kind: 'check',
     match: /11-worldmodel-khartoum-confluence/i,
     why:
@@ -350,12 +372,19 @@ export const RED_CHARGES = [
       'twice including the suite own retry, while the six other landmark frames pass and the same ' +
       'suite on WebGL 2 passes all seven in the same sitting. The signature has ROTATED from one ' +
       'landmark to another, which decides the second of the two causes point 627 had to choose ' +
-      'between, and it stays 627 until the unsettled jump is fixed at its cause.',
+      'between, and it stays 627 until the unsettled jump is fixed at its cause.' +
+      'SCOPED TO THE COMPATIBILITY LEVEL 28.08.2026 (cross-vendor review), with every other ' +
+      'WebGPU entry: an entry may excuse only the lane its evidence measured, and on the CORE ' +
+      'adapter the player runs this red stays real. Measured that day across the 40 recorded ' +
+      'runs: every WebGPU run that recorded a level recorded COMPATIBILITY and no core-level ' +
+      'run has ever been written here, and no red this entry accounts for today sits on a run ' +
+      'whose level went unrecorded — so the narrowing withdraws no charge that stands.',
   },
   {
     point: 938,
     suite: 'enrichments',
     backend: 'webgpu',
+    featureLevel: 'compatibility',
     kind: 'check',
     match: /streamed dressing does not grow over a session at a fixed anchor/i,
     why:
@@ -363,12 +392,19 @@ export const RED_CHARGES = [
       'red with point=null, because the check names point 278 and 278 is TICKED — a charge dies ' +
       'with its point, so the red had no owner it could be charged to. Point 938 was opened for ' +
       'exactly this red and is the owner until it settles whether the check or the dressing is ' +
-      'stale.',
+      'stale.' +
+      'SCOPED TO THE COMPATIBILITY LEVEL 28.08.2026 (cross-vendor review), with every other ' +
+      'WebGPU entry: an entry may excuse only the lane its evidence measured, and on the CORE ' +
+      'adapter the player runs this red stays real. Measured that day across the 40 recorded ' +
+      'runs: every WebGPU run that recorded a level recorded COMPATIBILITY and no core-level ' +
+      'run has ever been written here, and no red this entry accounts for today sits on a run ' +
+      'whose level went unrecorded — so the narrowing withdraws no charge that stands.',
   },
   {
     point: 939,
     suite: 'startup',
     backend: 'webgpu',
+    featureLevel: 'compatibility',
     kind: 'console',
     match: /Outdated Optimize Dep/i,
     why:
@@ -376,7 +412,13 @@ export const RED_CHARGES = [
       'red — Vite re-bundling its dependency optimizer in the middle of the run, an environment ' +
       'transient by CLAUDE.md own classification and not a product defect, captured by the ' +
       'recorder as an ordinary console red. Point 939 was opened for exactly this red and owns it ' +
-      'until the lane is made immune or the text is classified as environment.',
+      'until the lane is made immune or the text is classified as environment.' +
+      'SCOPED TO THE COMPATIBILITY LEVEL 28.08.2026 (cross-vendor review), with every other ' +
+      'WebGPU entry: an entry may excuse only the lane its evidence measured, and on the CORE ' +
+      'adapter the player runs this red stays real. Measured that day across the 40 recorded ' +
+      'runs: every WebGPU run that recorded a level recorded COMPATIBILITY and no core-level ' +
+      'run has ever been written here, and no red this entry accounts for today sits on a run ' +
+      'whose level went unrecorded — so the narrowing withdraws no charge that stands.',
   },
   {
     point: 514,

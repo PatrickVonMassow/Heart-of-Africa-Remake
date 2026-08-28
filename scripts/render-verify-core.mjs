@@ -635,8 +635,11 @@ function residualOf(run) {
     // returned, the first attempt first and this record's own after it, with a
     // name already named not repeated.
     const first = suspectRedsOf(run)
-    const named = new Set(first.map((red) => text(red?.name)))
-    return { status: 'suspect', reds: [...first, ...own.filter((red) => !named.has(text(red?.name)))] }
+    // BY IDENTITY, NOT BY NAME ALONE (review finding, 28.08.2026, round 18): a
+    // check and a console error printing the same text are two observations, and
+    // a name-only set discarded the second of them.
+    const named = new Set(first.map(redKeyOf))
+    return { status: 'suspect', reds: [...first, ...own.filter((red) => !named.has(redKeyOf(red)))] }
   }
   return { status: 'red', reds: own }
 }
@@ -1234,8 +1237,12 @@ export function unexplainedRuns(runs, since, options) {
       // truncation marker, so without this the deferral named the crash and the
       // reds the run got out, and said nothing about the lines nobody read.
       const printedBeforeCrash = residualOf(r).reds.filter((red) => text(red?.name))
-      const alsoLost = isIncompleteRecording(r) ? [{ name: incompleteSentence(r), kind: TRUNCATED_KIND }] : []
-      const crashOpen = [...verdict.unaccounted, ...alsoLost, ...printedBeforeCrash]
+      // The two CLASS sentences speak about this record; the reds speak for
+      // themselves. So the sentences are keyed per record and the reds are not.
+      const crashClass = [
+        ...verdict.unaccounted.map((u) => ({ name: u.name, kind: 'crashed' })),
+        ...(isIncompleteRecording(r) ? [{ name: incompleteSentence(r), kind: TRUNCATED_KIND }] : []),
+      ]
       out.push({
         backend,
         suite,
@@ -1243,8 +1250,11 @@ export function unexplainedRuns(runs, since, options) {
         id,
         status: 'crashed',
         unaccounted: verdict.unaccounted,
-        reds: crashOpen.map((x) => text(x?.name)),
-        redKeys: crashOpen.map(redKeyOf),
+        reds: [...crashClass, ...printedBeforeCrash].map((x) => text(x?.name)),
+        redKeys: [
+          ...crashClass.map((x) => recordKeyOf(x, id)),
+          ...printedBeforeCrash.map(redKeyOf),
+        ],
       })
       continue
     }
@@ -1298,7 +1308,10 @@ export function unexplainedRuns(runs, since, options) {
         // nobody owns. Charged ones stay out: a red an open point already owns
         // was never part of the bypass.
         const stillOpen = residualOf(r).reds.filter((red) => !owned(red, suite, backend, level))
-        const lostAndOpen = [...verdict.unaccounted, ...stillOpen]
+        // The lost-recording sentence speaks about THIS record — two truncated
+        // records of the same suite print it identically and each owes its own
+        // disposition — so it is keyed per record; the reds it kept are not.
+        const lost = verdict.unaccounted.map((u) => ({ name: u.name, kind: TRUNCATED_KIND }))
         out.push({
           backend,
           suite,
@@ -1307,8 +1320,8 @@ export function unexplainedRuns(runs, since, options) {
           status: 'incomplete',
           droppedLines: droppedLinesOf(r),
           unaccounted: verdict.unaccounted,
-          reds: lostAndOpen.map((x) => text(x?.name)),
-          redKeys: lostAndOpen.map(redKeyOf),
+          reds: [...lost, ...stillOpen].map((x) => text(x?.name)),
+          redKeys: [...lost.map((x) => recordKeyOf(x, id)), ...stillOpen.map(redKeyOf)],
         })
         continue
       }
@@ -1333,6 +1346,7 @@ export function unexplainedRuns(runs, since, options) {
           point: Number.isInteger(red?.point) ? red.point : null,
         })),
         reds: unowned.map((red) => text(red?.name)).filter(Boolean),
+        redKeys: unowned.filter((red) => text(red?.name)).map(redKeyOf),
       })
       continue
     }
@@ -1398,6 +1412,17 @@ export function unexplainedRuns(runs, since, options) {
 function redKeyOf(red) {
   const kind = text(red?.kind) || 'red'
   return `${kind}|${text(red?.name)}`
+}
+
+/** The key for a sentence that speaks about ONE RECORD rather than about a red —
+ *  the crash sentence, the lost-recording sentence (review finding, 28.08.2026,
+ *  round 18). Two crashed records of the same suite print the identical
+ *  sentence, and each is its own thing to dispose of, so each is counted: the
+ *  record's identity is part of the key. A RED is deliberately keyed WITHOUT it,
+ *  because a real retry leaves two records of the one failure and counting both
+ *  would report one red as two. */
+function recordKeyOf(entry, id) {
+  return `${redKeyOf(entry)}|record ${id}`
 }
 
 /** The most recent run of `backend` since `since`, covering or not — what the

@@ -317,6 +317,60 @@ describe('tapOutput — observe-only', () => {
     expect(state.droppedLines).toBe(1)
   })
 
+  // AND THE ADVERTISED BUDGETS ARE REACHED, NOT MISSED BY ONE (review finding,
+  // 28.08.2026, round 18). Proving a capture stays UNDER its ceiling says
+  // nothing about premature refusal: a tap that stopped a thousand characters
+  // early would pass that assertion and lose reds nobody asked it to lose. So
+  // the capture is filled to the character and the exactly-full state is
+  // ASSERTED accepted, and only the line after it is refused.
+  it('accepts a capture filled to exactly the budget, and refuses only the line after it', () => {
+    const { state, out } = tapped()
+    const sized = (i, width) => {
+      const head = `ERR: page error ${tag(i)} `
+      return head + 'y'.repeat(width - head.length)
+    }
+    for (let i = 0; i < 63; i++) out.write(`${sized(i, MAX_LINE_CHARS)}\n`)
+    // One more line, sized to the character so the joined text lands exactly on
+    // the ceiling — the separator it will be joined with included.
+    const room = MAX_CAPTURE_CHARS - state.lines.join('\n').length - 1
+    expect(room).toBeGreaterThan(0)
+    expect(room).toBeLessThanOrEqual(MAX_LINE_CHARS)
+    out.write(`${sized(900, room)}\n`)
+    expect(state.lines.join('\n').length).toBe(MAX_CAPTURE_CHARS)
+    expect(state.droppedLines ?? 0).toBe(0)
+    // Full to the character, the next result line is refused — loudly.
+    out.write(`${sized(901, 200)}\n`)
+    expect(state.droppedLines).toBe(1)
+    expect(state.lines.join('\n').length).toBe(MAX_CAPTURE_CHARS)
+  })
+
+  // The same for the PER-LINE budget: a line of exactly MAX_LINE_CHARS is kept.
+  it('keeps a line of exactly the per-line budget, and refuses the one character past it', () => {
+    const { state, out } = tapped()
+    out.write(`ERR: ${'z'.repeat(MAX_LINE_CHARS - 'ERR: '.length)}\n`)
+    expect(state.lines).toHaveLength(1)
+    expect(state.lines[0]).toHaveLength(MAX_LINE_CHARS)
+    expect(state.droppedLines ?? 0).toBe(0)
+    out.write(`ERR: ${'w'.repeat(MAX_LINE_CHARS - 'ERR: '.length + 1)}\n`)
+    expect(state.lines).toHaveLength(1)
+    expect(state.droppedLines).toBe(1)
+  })
+
+  // A BYTE CHUNK IS DECODED IN BOUNDED WINDOWS, and the decoder is kept per
+  // stream (review finding, 28.08.2026, round 18). Decoding each write on its
+  // own turned a multi-byte character split across two writes into U+FFFD, and
+  // built the whole write as a fresh string before any budget looked at it.
+  it('reassembles a character split across two byte writes', () => {
+    const { state, out, flush } = tapped()
+    const bytes = Buffer.from('ERR: page error in the café ☕ pane\n', 'utf8')
+    const cut = bytes.indexOf(Buffer.from('☕', 'utf8')) + 1
+    out.write(bytes.subarray(0, cut))
+    out.write(bytes.subarray(cut))
+    flush()
+    expect(state.lines.join('\n')).toContain('café ☕')
+    expect(state.lines.join('\n')).not.toContain('\uFFFD')
+  })
+
   // A line WITHIN the per-line budget that brings nothing new costs nothing,
   // however long it is — counting it would be a FALSE truncation, and a false
   // truncation blocks the gate.
@@ -467,7 +521,11 @@ describe('the captured lines charge the way the guard reads them', () => {
     const { state, out, flush } = tapped()
     out.write('FAIL  no child walks without getting anywhere — worst child 1 at 22.2s, 1.42 m walked inside 0.31 m\n')
     flush()
-    const [stored] = chargeReds(failedChecks(state.lines.join('\n')), { suite: 'polish', backend: 'webgpu' })
+    const [stored] = chargeReds(failedChecks(state.lines.join('\n')), {
+      suite: 'polish',
+      backend: 'webgpu',
+      featureLevel: 'compatibility',
+    })
     expect(stored.detail).toContain('1.42 m walked inside 0.31 m')
     expect(stored.point).toBe(694)
   })
@@ -487,7 +545,11 @@ describe('the captured lines charge the way the guard reads them', () => {
     expect(state.lines).toHaveLength(1)
     expect(state.variedKeys.size).toBe(1)
     const output = state.lines.join('\n')
-    const [stored] = chargeReds(markVariedDetails(failedChecks(output), state.variedKeys), { suite: 'polish', backend: 'webgpu' })
+    const [stored] = chargeReds(markVariedDetails(failedChecks(output), state.variedKeys), {
+      suite: 'polish',
+      backend: 'webgpu',
+      featureLevel: 'compatibility',
+    })
     expect(stored.detailVaried).toBe(true)
     expect(stored.point).toBeNull()
     // The mark survives to the RE-READ, or owned() would charge afterwards what
@@ -502,6 +564,7 @@ describe('the captured lines charge the way the guard reads them', () => {
     const [ok] = chargeReds(markVariedDetails(failedChecks(one), single.state.variedKeys), {
       suite: 'polish',
       backend: 'webgpu',
+      featureLevel: 'compatibility',
     })
     expect(ok.detailVaried).toBeUndefined()
     expect(ok.point).toBe(694)
@@ -690,6 +753,25 @@ describe('the armed recorder — the REAL wiring, not a stand-in', () => {
     expect(isIncompleteRecording(record)).toBe(true)
     expect(runVerdict(record, { openPoints }).status).toBe('incomplete')
     expect(runVerdict(record, { openPoints }).covers).toBe(false)
+  })
+
+  // A LOST RECORDING OUTRANKS AN ACCOUNTED-FOR RUN (review finding, 28.08.2026,
+  // round 18): the class boundary had no real-wiring case. A run whose every
+  // recorded red is charged to an open point would otherwise read `accounted`
+  // and COVER its backend — while the lines the cap ate are exactly the ones
+  // nobody could charge, which is the whole reason this class exists.
+  it('calls a run whose recorded reds are all charged incomplete, not accounted for', async () => {
+    const run = await armed('polish', 'compatibility')
+    process.stdout.write('FAIL  settlement walker (goat): the planted foot holds its ground spot — 0.967\n')
+    for (let i = 0; i < MAX_RED_IDENTITIES + 7; i++) {
+      process.stdout.write(`ERR: page error in span ${tag(i)}\n`)
+    }
+    const record = run.exit(1)
+    expect(record.truncated).toBe(true)
+    expect(record.reds.some((r) => r.point === 642)).toBe(true)
+    const verdict = runVerdict(record, { openPoints })
+    expect(verdict.status).toBe('incomplete')
+    expect(verdict.covers).toBe(false)
   })
 
   // And the other half of that rule, unchanged: a genuinely green run prints no

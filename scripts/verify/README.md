@@ -1283,6 +1283,15 @@ here changes no verdict. The record then stores the whole red set. Every
 observed red keeps its identity and stays closable the three ordinary ways of
 point 640, whatever the flood around it.
 
+**As far as its budgets reach, and no further** (round 18). That guarantee holds
+for a run in which no result line was refused, which is every run this project
+has produced — and the three budgets below exist precisely because a run can
+exceed them. When one is reached the line is refused WHOLE, so a red carried only
+by that line has no recorded identity and none of the three ordinary closings can
+reach it. That run is not a red set with a hole in it: it is an INCOMPLETE
+RECORDING, a class of its own with its own signed way out, and the count of
+refused lines is what says so.
+
 **The bound is the identity, not the line** (review finding, 28.08.2026). The
 first version of this kept each distinct LINE, which is no bound at all: a
 per-frame error whose text carries a counter — `renderTargets grew back … 19 ->

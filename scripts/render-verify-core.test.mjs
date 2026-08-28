@@ -718,8 +718,14 @@ describe('chargeFor — the ledger charges NARROWLY', () => {
     const catchAll = [{ point: 546, match: /further result line/i, why: 'a hostile catch-all' }]
     expect(chargeFor(truncationMarker(115, TRUNCATED_KIND), { ledger: catchAll })).toBeNull()
     expect(chargeFor(truncationMarker(115, 'check'), { ledger: catchAll })).toBeNull()
-    // The KIND alone must say it too, for a record that carried no stable key.
-    expect(chargeFor({ name: 'lines were dropped', key: 'x', kind: TRUNCATED_KIND, point: null }, { ledger: catchAll })).toBeNull()
+    // The KIND alone must say it too, for a record that carried no stable key —
+    // and the case must be one the ledger WOULD otherwise own (review finding,
+    // 28.08.2026, round 18). The old fixture was named "lines were dropped",
+    // which the catch-all pattern does not match, so it stayed uncharged whether
+    // the kind was read or ignored and proved nothing about the kind at all.
+    const namedLikeTheMarker = { name: '115 further result line(s) exceeded the capture cap', key: 'x', point: null }
+    expect(chargeFor({ ...namedLikeTheMarker, kind: 'check' }, { ledger: catchAll })?.point).toBe(546)
+    expect(chargeFor({ ...namedLikeTheMarker, kind: TRUNCATED_KIND }, { ledger: catchAll })).toBeNull()
   })
 
   it('survives a broken ledger entry rather than throwing', () => {
@@ -1043,6 +1049,42 @@ describe('evaluate — a red is not closed by the runs that FOLLOWED it (point 6
     )
     expect(result.wavedCount).toBe(2)
     expect(result.waved.map((w) => w.name)).toEqual(['the eaves column', 'the eaves column'])
+  })
+
+  // A SENTENCE ABOUT ONE RECORD IS COUNTED PER RECORD (review finding,
+  // 28.08.2026, round 18). Two crashed records of the same suite print the
+  // identical crash sentence and each owes its own disposition, so a key without
+  // the record's identity reported two bypassed records as one. A RED stays
+  // keyed WITHOUT it, because a real retry leaves two records of one failure.
+  it('counts the crash sentence of each crashed record, and one red across a retry pair', () => {
+    const crashedTwice = [
+      { backend: 'webgpu', suite: 'startup', at: 1500, exit: 1, crashed: true, reds: [] },
+      { backend: 'webgpu', suite: 'startup', at: 1600, exit: 1, crashed: true, reds: [] },
+    ]
+    const twice = evaluate(
+      renderChange({
+        runs: crashedTwice,
+        deferral: { head: 'def5678', reason: 'the lane died twice', at: 1700 },
+        openPoints,
+      }),
+    )
+    expect(twice.wavedCount).toBe(2)
+    // And the retry pair, unchanged: one failure, one waved red.
+    const first = redRun('webgpu', 1500, [red('the eaves column')])
+    const retry = {
+      ...run('webgpu', 1600),
+      suite: first.suite,
+      suspect: true,
+      suspectOf: [{ name: 'the eaves column', kind: 'check' }],
+    }
+    const pair = evaluate(
+      renderChange({
+        runs: [first, retry],
+        deferral: { head: 'def5678', reason: 'the lane was software', at: 1700 },
+        openPoints,
+      }),
+    )
+    expect(pair.wavedCount).toBe(1)
   })
 
   it('keeps the TRUE count when the named list hits its cap', () => {
@@ -1383,8 +1425,17 @@ describe('runIdentity — the content identity a closure names one record by', (
     const otherSuite = { ...fixture, suite: 'polish' }
     const otherBackend = { ...fixture, backend: 'webgl' }
     const startedInstead = { ...fixture, at: undefined, startedAt: 1500 }
-    const ids = [otherSuite, otherBackend, startedInstead].map((r) => runIdentity(r))
-    expect(new Set([...ids, runIdentity(fixture)]).size).toBe(4)
+    // THE CLOSURE-CRITICAL FIELDS BELONG IN THIS SET (review finding,
+    // 28.08.2026, round 18). Suite, backend and stamp are what a SELECTOR reads;
+    // what a SIGNATURE disposes of is decided by `crashed`, `truncated` and the
+    // count of lines the cap ate. An identity blind to those would let one
+    // evidence sentence close a record that lost different output — the very
+    // thing binding a closure to content is for.
+    const crashedToo = { ...fixture, crashed: true }
+    const truncatedToo = { ...fixture, truncated: true, droppedLines: 115 }
+    const droppedMore = { ...fixture, truncated: true, droppedLines: 116 }
+    const ids = [otherSuite, otherBackend, startedInstead, crashedToo, truncatedToo, droppedMore].map((r) => runIdentity(r))
+    expect(new Set([...ids, runIdentity(fixture)]).size).toBe(7)
   })
 
   it('answers null for a non-record and never throws', () => {
@@ -1462,6 +1513,29 @@ describe('an INCOMPLETE RECORDING is its own class, and has its own way out (poi
       "the capture cap dropped 115 result line(s) — this run's reds were NOT all recorded, so nothing in it can be explained",
       'a check nobody owns',
     ])
+  })
+
+  // A LIFTED TRUNCATION CARRIES ITS KEYS TOO (review finding, 28.08.2026, round
+  // 18). Without them the deferral fell back to the name alone, so a check and a
+  // console error of the same wording collapsed into one waved entry — in the
+  // one branch where the lost part is already forgiven and only the recorded
+  // reds are left to pay for.
+  it('counts a check and a console error of the same wording in a LIFTED truncation too', () => {
+    const record = truncatedNow('webgpu', 1500, [
+      red('the eaves column', null, 'check'),
+      red('the eaves column', null, 'console'),
+    ])
+    const later = { ...run('webgpu', 2000), suite: record.suite }
+    const found = unexplainedRuns([record, later], 1000, { openPoints })
+    expect(found.map((u) => u.status)).toEqual(['red'])
+    const result = evaluate(
+      renderChange({
+        runs: [record, later],
+        deferral: { head: 'def5678', reason: 'the flood was the dev server', at: 2100 },
+        openPoints,
+      }),
+    )
+    expect(result.wavedCount).toBe(2)
   })
 
   /** A closure AS THE CLI WRITES IT: bound to one record's content identity
@@ -2026,6 +2100,23 @@ describe('a CRASHED run is its own class, and has its own signed way out (point 
     ])
   })
 
+  // AND THE TWO LISTS ARE JOINED BY IDENTITY, NOT BY NAME (review finding,
+  // 28.08.2026, round 18). A check and a console error printing the same text
+  // are two observations; a name-only set discarded the record's own.
+  it('keeps a console red the first attempt reported as a check of the same wording', () => {
+    const crashedRetry = {
+      ...crashedRun('webgpu', 1500, { reds: [red('the eaves column', null, 'console')] }),
+      exit: 0,
+      suspect: true,
+      suspectOf: [{ name: 'the eaves column', kind: 'check' }],
+    }
+    expect(unexplainedRuns([crashedRetry], 1000, { openPoints })[0].reds).toEqual([
+      'the run ended in a crash, not in its own report',
+      'the eaves column',
+      'the eaves column',
+    ])
+  })
+
   // The cross-family locks: each signature closes only what it names.
   it('an INCOMPLETE closure does not lift a crash, and a CRASH closure does not lift a mere truncation', () => {
     const truncation = truncationMarker(9, 'check')
@@ -2393,6 +2484,20 @@ describe('the shipped charge ledger', () => {
   // THE OWNER MOVED 20.08.2026: point 506 was folded into 642, which carries its
   // mechanism, and a charge to a ticked point expires. The number changed; the
   // pairing this case exists for did not.
+  // THE INVARIANT THAT ENDS THIS FINDING RATHER THAN ANSWERING IT AGAIN (review
+  // finding, 28.08.2026, rounds 17 and 18, which named nine such entries between
+  // them). Every WebGPU entry rests on a measurement taken on THIS host, where
+  // every run that recorded a level recorded COMPATIBILITY and no core-level run
+  // has ever been written — so an entry without a level would excuse, on the
+  // core adapter the player runs, a red nobody has ever measured there. The
+  // field is meaningless on WebGL, so a WebGL entry must not carry one.
+  it('scopes every WebGPU entry to a feature level, and no WebGL entry to any', () => {
+    for (const c of RED_CHARGES) {
+      if (c.backend === 'webgpu') expect(c.featureLevel, `point ${c.point} / ${c.suite}`).toBe('compatibility')
+      else expect(c.featureLevel, `point ${c.point} / ${c.suite}`).toBeUndefined()
+    }
+  })
+
   it('charges the goat-stance red to a DIFFERENT point on each lane', () => {
     const goat = red('settlement walker (goat): the planted foot holds its ground spot')
     expect(chargeFor(goat, { suite: 'polish', backend: 'webgpu', featureLevel: 'compatibility' }).point).toBe(642)
@@ -2482,7 +2587,7 @@ describe('the shipped charge ledger', () => {
     expect(parsed.detail).toContain('1.42 m walked inside 0.31 m')
 
     // At record time the charge sees the detail and stamps the owner.
-    const [stored] = chargeReds([parsed], { suite: 'polish', backend: 'webgpu' })
+    const [stored] = chargeReds([parsed], { suite: 'polish', backend: 'webgpu', featureLevel: 'compatibility' })
     expect(stored.point).toBe(694)
 
     // AND THE MEASUREMENT SURVIVES INTO THE RECORD, which is what makes the
@@ -2493,10 +2598,13 @@ describe('the shipped charge ledger', () => {
     // uncharged then, because the ledger of that day owned nothing. Reading the
     // ledger over the STORED red today now reaches it, and that is the
     // retroactivity point 734 promises.
-    const [beforeTheRule] = chargeReds([parsed], { suite: 'polish', backend: 'webgpu', ledger: [] })
+    const lane = { suite: 'polish', backend: 'webgpu', featureLevel: 'compatibility' }
+    const [beforeTheRule] = chargeReds([parsed], { ...lane, ledger: [] })
     expect(beforeTheRule.point).toBeNull()
     expect(beforeTheRule.detail).toContain('1.42 m walked inside 0.31 m')
-    expect(chargeFor(beforeTheRule, { suite: 'polish', backend: 'webgpu' })?.point).toBe(694)
+    expect(chargeFor(beforeTheRule, lane)?.point).toBe(694)
+    // …on the lane it was measured on, and nowhere else.
+    expect(chargeFor(beforeTheRule, { ...lane, featureLevel: 'core' })).toBeNull()
 
     // A RED THAT PRINTED NO MEASUREMENT ADDS NO FIELD — records of such reds
     // keep exactly the shape they have always had.
@@ -2535,14 +2643,14 @@ describe('the shipped charge ledger', () => {
     // 694 must replace them both with a rule about the SHAPE.
     const child = (detail) => ({ ...red('no child walks without getting anywhere'), detail })
     const onWebgpu = child('worst child 1 at 0.29 % — worst child 1 at 22.2s, 1.42 m walked inside 0.31 m')
-    expect(chargeFor(onWebgpu, { suite: 'polish', backend: 'webgpu' }).point).toBe(694)
-    // Not on the other backend, and no blanket over the check itself.
+    const lane = { suite: 'polish', backend: 'webgpu', featureLevel: 'compatibility' }
+    expect(chargeFor(onWebgpu, lane).point).toBe(694)
+    // Not on the other backend, not on the core adapter, and no blanket over the
+    // check itself.
     expect(chargeFor(onWebgpu, { suite: 'polish', backend: 'webgl' })).toBeNull()
+    expect(chargeFor(onWebgpu, { ...lane, featureLevel: 'core' })).toBeNull()
     expect(
-      chargeFor(child('worst child 2 at 18.4 % — worst child 2 at 3.0s, 9.10 m walked inside 0.12 m'), {
-        suite: 'polish',
-        backend: 'webgpu',
-      }),
+      chargeFor(child('worst child 2 at 18.4 % — worst child 2 at 3.0s, 9.10 m walked inside 0.12 m'), lane),
     ).toBeNull()
   })
 
