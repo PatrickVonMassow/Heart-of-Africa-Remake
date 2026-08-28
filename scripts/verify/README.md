@@ -1271,13 +1271,13 @@ frame — never the set: reds are bounded by the suite's checks and its distinct
 console errors. (The earlier reading, "red lines are exactly the unbounded
 ones, so they cannot go uncapped", conflated occurrences with identities.)
 
-So the spec's option "the cap stops applying to RED lines" was chosen, and the
-other one deleted. The tap keeps ONE line per result IDENTITY, in first-seen
-order (the first occurrence keeps the detail a `detailMatch` charge reads); the
-parser de-duplicates by that same key anyway, so collapsing here changes no
-verdict. The record then stores the whole red set, uncapped. A new record can
-therefore never truncate: every observed red keeps its identity and stays
-closable the three ordinary ways of point 640, whatever the flood around it.
+So the spec's option "the cap stops applying to RED lines" was chosen — for the
+range every measured run lives in. The tap keeps ONE line per result IDENTITY,
+in first-seen order (the first occurrence keeps the detail a `detailMatch`
+charge reads); the parser de-duplicates by that same key anyway, so collapsing
+here changes no verdict. The record then stores the whole red set. Every
+observed red keeps its identity and stays closable the three ordinary ways of
+point 640, whatever the flood around it.
 
 **The bound is the identity, not the line** (review finding, 28.08.2026). The
 first version of this kept each distinct LINE, which is no bound at all: a
@@ -1286,8 +1286,43 @@ per-frame error whose text carries a counter — `renderTargets grew back … 19
 grew without limit, and an exhausted process dies. That failure mode is the
 worst one available here: a run full of observed reds becomes a crash record,
 and a crash has a signature that closes it. Keying by the parsed identity (the
-console normalisation folds the counter away) bounds the buffer by the suite's
-own checks, which is what the measurement above actually says is small.
+console normalisation folds counters, hex runs and URLs away) collapses that
+flood onto one red.
+
+**And a line's parts are never a key of their own** (round 13). The identity was
+briefly the parts JOINED, which is a key over COMBINATIONS: `[A,B]`, `[A,C]`,
+`[B,C]` are three keys over two reds, so a suite that varies how it groups its
+`console errors:` summary lines mints combinatorially many keys without printing
+a new red. A line now earns its slot by carrying an identity nothing kept yet;
+one whose reds are all already represented is dropped as the repetition it is,
+and the parse still finds those reds inside the lines that were kept.
+
+**The identity is not a bound by itself, so there is an explicit ceiling**
+(review finding, 28.08.2026, round 13). "Bounded by the suite's checks and its
+distinct console errors" is true of the checks — their labels are written in the
+suite's source and are finite — and NOT true of the console errors, which carry
+whatever text the page produced. The normalisation folds counters, hex runs and
+URLs away, which is exactly the per-frame case the old line cap existed for; it
+cannot fold away a generated word, a symbol name or a message assembled from
+changing data, and each of those mints a fresh identity every print. The
+measurements above are evidence about the logs that exist. They are not a bound
+on the ones that do not, and this document previously read them as one.
+
+So the bound is stated rather than hoped for: `MAX_RED_IDENTITIES` (500 in
+`scripts/render-verify-recorder.mjs`) distinct reds per run — fifteen times the
+worst distinct set ever recorded, so no run this project has produced comes near
+it. Past it the buffer stops growing and **the run is recorded as an INCOMPLETE
+RECORDING**, carrying the count of the lines it refused. That is the spec's
+OTHER option, applied where the first one runs out: a run either records its
+reds completely, or fails loudly as an incomplete recording — it never
+half-records itself and calls the result a red set. The incomplete class
+therefore stays reachable for new records too, which is what gives such a run a
+signed way out (`--incomplete`) instead of the hand-written `--defer` this
+point exists to abolish.
+
+Only a RED run can carry it. A run that exits 0 records no reds at all, so red
+lines it dropped cost it nothing, and calling it incomplete would block a
+genuinely green run.
 
 ### The record keeps the MEASUREMENT, so a charge can be applied afterwards
 

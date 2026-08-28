@@ -9,9 +9,15 @@
 // yet exits non-zero exactly like a reported failure.
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { execFileSync } from 'node:child_process'
-import { tapOutput } from './render-verify-recorder.mjs'
+import { MAX_RED_IDENTITIES, tapOutput } from './render-verify-recorder.mjs'
+
+/** Text that is distinct in LETTERS, so the parser's own normalisation (digits,
+ *  hex runs and URLs are folded away) cannot collapse it. That is exactly the
+ *  content the ceiling exists for: a page error carrying a generated word mints
+ *  a fresh red identity every time it prints, and no parser can fold it. */
+const tag = (i) => String(i).replace(/\d/g, (d) => 'abcdefghij'[Number(d)])
 import { consoleErrorChecks, failedChecks, parseCheckLines } from './verify/baseline-classify-core.mjs'
-import { RETRY_ENV, chargeFor, chargeReds, formatSuspectEnv, markVariedDetails, runVerdict } from './render-verify-core.mjs'
+import { RETRY_ENV, chargeFor, chargeReds, droppedLinesOf, formatSuspectEnv, isIncompleteRecording, markVariedDetails, runVerdict } from './render-verify-core.mjs'
 
 // The record is stubbed, not written: these cases exercise the REAL arming and
 // the REAL exit handler, and a test must never append to the checkout's own
@@ -133,6 +139,44 @@ describe('tapOutput — observe-only', () => {
     expect(single.state.lines).toHaveLength(1)
     expect(consoleErrorChecks(single.state.lines[0])).toHaveLength(1)
     expect(parseCheckLines(single.state.lines[0])).toEqual([])
+  })
+
+  // THE COMBINATION IS NOT AN IDENTITY (review finding, 28.08.2026, round 13).
+  // Keying a line by its parts JOINED made `[A,B]`, `[A,C]`, `[B,C]` three keys
+  // over two reds, so a suite that varies how it groups its summary lines minted
+  // combinatorially many keys without ever printing a new red. A line now earns
+  // its slot only by bringing an identity nothing kept yet.
+  it('drops a line whose reds are ALL already kept, and does not call that a truncation', () => {
+    const { state, out } = tapped()
+    out.write("console errors: ['error A', 'error B']\n")
+    out.write("console errors: ['error A', 'error C']\n")
+    // Every red of this third line is already in the buffer under a kept line.
+    out.write("console errors: ['error B', 'error C']\n")
+    expect(state.lines).toHaveLength(2)
+    // Nothing was LOST, so nothing is truncated — dropping pure repetition is
+    // not a half-recording, and the counter is never even reached.
+    expect(state.droppedLines ?? 0).toBe(0)
+    expect(failedChecks(state.lines.join('\n')).map((c) => c.name)).toEqual([
+      'console error: error A',
+      'console error: error B',
+      'console error: error C',
+    ])
+  })
+
+  // THE CEILING, AND THAT IT IS LOUD (review finding, 28.08.2026, round 13).
+  // "Bounded by the suite's checks and its distinct console errors" holds for
+  // the checks and not for the errors: a page erroring with a UUID, a hash or a
+  // generated path mints a fresh identity every print, which the parser cannot
+  // fold away. Past the ceiling the buffer stops and the run says INCOMPLETE
+  // RECORDING — the loud failure, never a silent half-recording.
+  it('stops at the ceiling and counts what it refused', () => {
+    const { state, out } = tapped()
+    for (let i = 0; i < MAX_RED_IDENTITIES + 40; i++) out.write(`ERR: page error in span ${tag(i)}\n`)
+    expect(state.lines).toHaveLength(MAX_RED_IDENTITIES)
+    expect(state.droppedLines).toBe(40)
+    // Repetition of an already-kept red still costs nothing after the ceiling.
+    out.write(`ERR: page error in span ${tag(0)}\n`)
+    expect(state.droppedLines).toBe(40)
   })
 
   // ...AND THE VARIED MEASUREMENT IS ASKED PER RED, NOT PER LINE (review
@@ -389,6 +433,40 @@ describe('the armed recorder — the REAL wiring, not a stand-in', () => {
     // charge may own this red on the single reading that survived.
     expect(record.reds[0].detailVaried).toBe(true)
     expect(runVerdict(record, { openPoints }).status).toBe('red')
+  })
+
+  it('records a run that hit the ceiling as an INCOMPLETE RECORDING with its way out', async () => {
+    const run = await armed('polish')
+    for (let i = 0; i < MAX_RED_IDENTITIES + 7; i++) {
+      process.stdout.write(`ERR: page error in span ${tag(i)}\n`)
+    }
+    const record = run.exit(1)
+    expect(record.truncated).toBe(true)
+    expect(record.droppedLines).toBe(7)
+    expect(droppedLinesOf(record)).toBe(7)
+    expect(isIncompleteRecording(record)).toBe(true)
+    // The record stays BOUNDED — that is the whole point of the ceiling.
+    expect(record.reds.length).toBe(MAX_RED_IDENTITIES)
+    // And it leaves the guard by the incomplete class, not as an unexplained
+    // red and not through a hand-written deferral.
+    expect(runVerdict(record, { openPoints }).status).toBe('incomplete')
+    // EVERY red it DID record keeps its chargeable name, which is what makes
+    // the three closings of point 640 reachable for them.
+    expect(record.reds.every((r) => typeof r.name === 'string' && r.name.length > 0)).toBe(true)
+    expect(new Set(record.reds.map((r) => r.key)).size).toBe(MAX_RED_IDENTITIES)
+  })
+
+  // A green run records no reds at all, so red lines it dropped cost it
+  // nothing — calling it incomplete would block a genuinely passing run.
+  it('never calls an exit-0 run incomplete, however much it printed', async () => {
+    const run = await armed('polish')
+    for (let i = 0; i < MAX_RED_IDENTITIES + 7; i++) {
+      process.stdout.write(`ERR: page error in span ${tag(i)}\n`)
+    }
+    const record = run.exit(0)
+    expect(record.truncated).toBeUndefined()
+    expect(record.droppedLines).toBeUndefined()
+    expect(runVerdict(record, { openPoints }).status).toBe('clean')
   })
 
   // The finding the old cap could not survive (round 5, finding 4): hundreds of

@@ -104,10 +104,44 @@ const KEPT_LINE = /^(?:FAIL\s{2,}|ERR:|console errors:|CONSOLE ERRORS:)/
  * charge may read. A LATER line of the same key that differs is not kept — and
  * not forgotten either: its key is recorded as VARIED, which makes a narrow
  * `detailMatch` charge refuse the red rather than own it on the one reading it
- * happened to match. A recorded run can therefore never be an INCOMPLETE
- * RECORDING again; that class remains only for the records written before this
- * fix (render-verify-core.mjs reads them).
+ * happened to match.
+ *
+ * AND THE IDENTITY IS NOT A BOUND BY ITSELF (review finding, 28.08.2026, round
+ * 13). "Bounded by the suite's checks and its distinct console errors" is true
+ * of the checks, whose labels are written in the suite's source and are
+ * therefore finite — and NOT true of the console errors, which carry whatever
+ * text the page produced. The parser folds counters and URLs away, which
+ * answers the per-frame counter the old line cap was built for; it cannot fold
+ * away a UUID, a hash, a generated path or a stack address, and each of those
+ * mints a fresh identity every time it prints. The measured numbers below are
+ * evidence about the logs that exist, never a bound on the ones that do not.
+ *
+ * SO THE BOUND IS AN EXPLICIT CEILING, AND EXCEEDING IT IS LOUD. Up to
+ * MAX_RED_IDENTITIES distinct reds the run is recorded in full; past it the
+ * buffer stops growing and the record says INCOMPLETE RECORDING, with the count
+ * of the lines it refused. That is this point's own final state taken at its
+ * word: a run either records its reds completely, or FAILS LOUDLY as an
+ * incomplete recording — never half-records itself. The class therefore stays
+ * alive for new records too, which is what gives it a signed way out
+ * (render-verify-core.mjs) instead of a hand-written deferral.
  */
+
+/**
+ * How many DISTINCT reds one run may record before its recording is declared
+ * incomplete. Set against the measurement, not against taste: every recorded run
+ * holds at most 19 parsed reds, the worst log on record printed 521 result lines
+ * carrying 33 distinct ones, and every non-cascade log carries at most 12. The
+ * ceiling is fifteen times that worst distinct set, so no run this project has
+ * ever produced comes near it, while a page erroring with fresh text per frame
+ * is stopped with a bounded record instead of a dead process — an exhausted
+ * process dies, and a crash record is precisely what turns a run full of
+ * observed reds into one a signature can close without anybody reading them.
+ *
+ * A single line may carry several new identities, so the kept set can end at
+ * most one line's worth of parts above the ceiling. That slack is deliberate:
+ * refusing a line PART-WAY would store a red the record cannot account for.
+ */
+export const MAX_RED_IDENTITIES = 500
 
 /** Stderr that says the process did not end on its own terms — a stack frame or
  *  a bare `…Error:` headline. A run that CRASHED explains nothing about the
@@ -121,17 +155,13 @@ const CRASH_LINE = /^\s+at .+:\d+:\d+|^(?:Uncaught\s+)?\w*Error(?::|\b)/
  * it printed under it. Null when the parser cannot read the line, which then
  * stands for itself — exactly the old behaviour. Total.
  *
- * The line's own buffer identity is these parts JOINED — ALL OF THEM, NOT THE
- * FIRST (review finding, 28.08.2026). A `console errors: <texts>` summary line
- * carries SEVERAL reds, and keying the whole line by its FIRST parsed error
- * collapsed two such lines that happened to share it: the second line was
- * dropped from the buffer, so the reds only IT carried never reached
- * `failedChecks()` and disappeared without being fixed, charged or filed.
- *
- * The bound holds either way: the parts are the parser's own normalised keys
- * (counters and URLs folded away), so a per-frame line still collapses onto one
- * identity however many times it prints, and a summary line's composite is
- * bounded by the distinct errors the suite reported.
+ * ALL of them, never the first (review finding, 28.08.2026). A `console errors:
+ * <texts>` summary line carries SEVERAL reds, and keying the whole line by its
+ * FIRST parsed error collapsed two such lines that happened to share it: the
+ * second line was dropped from the buffer, so the reds only IT carried never
+ * reached `failedChecks()` and disappeared without being fixed, charged or
+ * filed. The buffer keeps a line for the identities it BRINGS — the parts are
+ * asked one by one, and their combination is never a key of its own (round 13).
  */
 function resultParts(line) {
   try {
@@ -162,12 +192,24 @@ let armed = null
  */
 export function tapOutput(state, streams = [[process.stdout, false], [process.stderr, true]]) {
   const pending = new Map()
-  // Each result IDENTITY is kept ONCE, in first-seen order — the first line of
-  // that key, which carries the measurement a charge may match on. The key is
-  // the parser's own (`failedChecks` de-duplicates by it anyway), so collapsing
-  // here changes no verdict while bounding the buffer by the suite's checks
-  // instead of by its chatter.
-  const keptKeys = new Set()
+  // Each result IDENTITY is kept ONCE, in first-seen order — the first line
+  // that CARRIES it, which holds the measurement a charge may match on. The
+  // identity is the parser's own (`failedChecks` de-duplicates by it anyway),
+  // so collapsing here changes no verdict.
+  //
+  // KEYED BY THE IDENTITIES, NOT BY THEIR COMBINATION (review finding,
+  // 28.08.2026, round 13). Keying a line by its parts JOINED bounded nothing:
+  // `[A,B]`, `[A,C]`, `[B,C]` are three distinct composites over two identities,
+  // so a suite whose summary lines vary their grouping minted new keys without
+  // ever printing a new red — combinatorially many of them. A line now earns its
+  // place only by carrying an identity nothing kept yet; a line whose reds are
+  // all already represented is dropped as the pure repetition it is, and the
+  // parse downstream still finds those reds inside the lines that WERE kept.
+  const keptIds = new Set()
+  // The lines the parser could not read at all. They stand for themselves, so
+  // they get their own slots — under the same ceiling, since an unparseable
+  // result line is exactly the kind that can carry changing text.
+  const keptRaw = new Set()
   // A VARIED MEASUREMENT IS A FACT ABOUT ONE RED, NOT ABOUT A LINE (review
   // finding, 28.08.2026). Marking the LINE's composite key missed the case the
   // whole mechanism exists for: `[A(reading 1), B]` followed by `[A(reading 2),
@@ -187,18 +229,38 @@ export function tapOutput(state, streams = [[process.stdout, false], [process.st
       if (isErr && CRASH_LINE.test(line)) state.crashed = true
       if (!KEPT_LINE.test(line)) continue
       const parts = resultParts(line)
+      const full = keptIds.size + keptRaw.size >= MAX_RED_IDENTITIES
       for (const part of parts ?? []) {
         const seen = firstSeenOfPart.get(part.id)
-        if (seen === undefined) firstSeenOfPart.set(part.id, part.seen)
+        // The varied-measurement map is bounded by the same ceiling, or it
+        // becomes the unbounded structure the rest of this guards against.
+        if (seen === undefined) {
+          if (firstSeenOfPart.size < MAX_RED_IDENTITIES) firstSeenOfPart.set(part.id, part.seen)
+        }
         // The SAME red printed with a DIFFERENT measurement. The record can hold
         // only one, so the difference is remembered as a fact about that red: a
         // narrow charge then refuses it instead of owning it on the single
         // reading that survived.
         else if (seen !== part.seen && state.variedKeys instanceof Set) state.variedKeys.add(part.id)
       }
-      const key = parts === null ? line : parts.map((p) => p.id).join(' + ')
-      if (keptKeys.has(key)) continue
-      keptKeys.add(key)
+      // What this line would ADD. Nothing new means pure repetition: every red
+      // it carries is already in the buffer, under a line that was kept, so
+      // dropping it loses no observation and is not a truncation.
+      const fresh = parts === null ? (keptRaw.has(line) ? [] : [line]) : parts.map((p) => p.id).filter((id) => !keptIds.has(id))
+      if (fresh.length === 0) continue
+      // THE CEILING, AND WHY IT IS LOUD (review finding, 28.08.2026, round 13).
+      // Beyond it the buffer stops growing and the RUN IS MARKED INCOMPLETE —
+      // the loud failure this point's final state names as the alternative to an
+      // uncapped buffer, never a silent half-recording: the record says how many
+      // lines it refused, `runVerdict` answers `incomplete`, and the signed
+      // way out of render-verify-core.mjs disposes of it. Silently discarding
+      // them is exactly the trap the point exists to close.
+      if (full) {
+        state.droppedLines = (Number.isFinite(state.droppedLines) ? state.droppedLines : 0) + 1
+        continue
+      }
+      if (parts === null) keptRaw.add(line)
+      else for (const id of fresh) keptIds.add(id)
       state.lines.push(line)
     }
   }
@@ -309,6 +371,9 @@ export function armRunRecorder(backend) {
       lines: [],
       // The keys whose measurement did NOT hold still within this run.
       variedKeys: new Set(),
+      // Result lines the ceiling refused — each one carried a red nothing else
+      // in the buffer stands for, so a run with any is recorded INCOMPLETE.
+      droppedLines: 0,
       crashed: false,
     }
     const flush = tapOutput(armed)
@@ -387,13 +452,21 @@ export function armRunRecorder(backend) {
           screenshots: shots.slice(0, 12),
           ...(armed.section ? { partial: true, section: armed.section } : {}),
           ...(armed.suspectOf.length ? { suspect: true, suspectOf: armed.suspectOf } : {}),
-          // EVERY red, uncapped (point 734): the capture keeps one entry per
-          // DISTINCT line and the parser de-duplicates by key, so this list is
-          // the run's red SET — bounded by its checks and distinct console
-          // errors (measured maximum on record: 19), never by its chatter. A
-          // cap here silently discarded observed reds, which is the
-          // half-recording the point forbids.
+          // EVERY red the ceiling allowed (point 734): the capture keeps one
+          // entry per DISTINCT red identity and the parser de-duplicates by key,
+          // so this list is the run's red SET — never its chatter. A cap that
+          // silently discarded observed reds is the half-recording the point
+          // forbids; the ceiling below says so out loud instead.
           ...(exit !== 0 ? { reds, crashed: armed.crashed } : {}),
+          // A RUN THAT HIT THE CEILING IS AN INCOMPLETE RECORDING, and says how
+          // much it refused — `runVerdict` then answers `incomplete` and the
+          // signed closure disposes of it, which is the whole way out a
+          // truncated run has. Only a RED run can carry it: a run that exited 0
+          // records no reds at all, so dropped red lines cost it nothing and
+          // calling it incomplete would block a genuinely green run.
+          ...(exit !== 0 && armed.droppedLines > 0
+            ? { truncated: true, droppedLines: armed.droppedLines }
+            : {}),
         })
       } catch {
         /* never fail a suite over the bookkeeping */
