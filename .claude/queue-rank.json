@@ -757,12 +757,6 @@
       "origin": "machine",
       "place": "last"
     },
-    "946": {
-      "at": "2026-08-26T15:10:49.488Z",
-      "why": "Enforcement half of the user's 26.08. no-standstill order; every parked question until then can stall the batch again",
-      "origin": "machine",
-      "place": "ahead"
-    },
     "948": {
       "at": "2026-08-26T17:21:21.643Z",
       "why": "The forensic question behind it is worth answering carefully, but the red itself is repaired and nothing is blocked by it today — it stands behind the user-ordered standstill work.",
@@ -918,6 +912,12 @@
       "why": "It is the sensor the unattended batch waits on and it fails toward 'keep waiting': measured tonight as a 21-minute standstill that only the process table broke, so during the fortnight the release is meant to survive it can park the batch indefinitely — the same no-standstill class the user put before the release on 26.08.2026.",
       "origin": "machine",
       "place": "ahead"
+    },
+    "986": {
+      "at": "2026-08-28T03:28:55.650Z",
+      "why": "It wastes review rounds without risking correctness, and the measurement it edits is owned by two points that come first.",
+      "origin": "machine",
+      "place": "last"
     }
   },
   "boundary": {
@@ -957,7 +957,7 @@
     "why": "The order standing in front of the release today is the arrangement that predates this rule; the four machine-filed points that had ranked themselves there were moved behind 174 first"
   },
   "settled": {
-    "at": "2026-08-28T01:07:11.688Z",
+    "at": "2026-08-28T03:28:55.658Z",
     "points": [
       174,
       184,
@@ -1254,7 +1254,6 @@
       939,
       940,
       942,
-      946,
       948,
       949,
       950,
@@ -1281,7 +1280,8 @@
       980,
       981,
       984,
-      985
+      985,
+      986
     ]
   }
 }

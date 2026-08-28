@@ -1412,7 +1412,7 @@ keinen Träger hat. Gebucht als Punkt 956.
 
 ## Anhang A — Maschinell gepflegte Quellen-Übersicht
 
-Zuletzt aktualisiert: Freitag, 28.08.2026, 03:07 · Quellen-Fingerprint: `be3169182a62…`
+Zuletzt aktualisiert: Freitag, 28.08.2026, 05:29 · Quellen-Fingerprint: `fe8190aed040…`
 
 Spalten heuristisch aus den Quellen abgeleitet (Anläufe = distinkte Datumsnennungen im Memory;
 Maßnahme = Guard-Skripte mit Namens-Treffer). Die inhaltliche Bewertung gehört der Prosa oben.
@@ -1450,7 +1450,7 @@ Maßnahme = Guard-Skripte mit Namens-Treffer). Die inhaltliche Bewertung gehört
 | Work at High effort by default; the user reserves Extra high for research and design decisions, not implementation | 4 | hoch | — (Regel/Memory) | ◐ Regel |
 | Write idiomatic English in all English text (README, code comments, commit messages) — no German calques like 'stand' for a version | 1 | niedrig | — (Regel/Memory) | ◐ Regel |
 | Fable is NOT the default lane because its volume is the scarcest; difficulty is no reason for it either (since 18.08.2026 hard cases go straight to Sol), and review is cross-vendor, not Fable-by-default | 4 | hoch | — (Regel/Memory) | ◐ Regel |
-| Findings recorded by a session that could not write the work order — carry each into TASKS.md, then mark it drained | 32 | hoch | findings-guard.mjs | ✔ Mechanismus |
+| Findings recorded by a session that could not write the work order — carry each into TASKS.md, then mark it drained | 33 | hoch | findings-guard.mjs | ✔ Mechanismus |
 | A recurring lookup gets a script; never pull raw transcripts, listings, or logs into context to answer it | 1 | niedrig | — (Regel/Memory) | ◐ Regel |
 | Past the 150k context watermark, FINISH the step and hand over — never start a suite, an agent or a point after it; the user raised the cost twice (13.08. and 17.08.2026) | 2 | mittel | — (Regel/Memory) | ◐ Regel |
 | User 18.08.2026: hard, complex, error-prone and HIGH-criticality points are AUTHORED by GPT-5.6 Sol directly — Opus 5 authors only what is left, and Fable authors only a point that tags its lane or one the router escalates | 4 | hoch | — (Regel/Memory) | ◐ Regel |
@@ -1515,8 +1515,8 @@ Maßnahme = Guard-Skripte mit Namens-Treffer). Die inhaltliche Bewertung gehört
 
 Erfasste Quellen: 93 Feedback-/Projekt-Memories · 57 Guard-/Hook-Skripte · 6 Revert-/Reapply-Commits · 113 Prozess-/Meta-TASKS-Punkte (davon 49 offen).
 
-<!-- RETRO-FINGERPRINT: be3169182a6213c94f55a0e76e91ef84b8043659d9f64d70cc27da2517705249 -->
-<!-- RETRO-LAST-REFRESHED: 2026-08-28T01:07:55.867Z -->
+<!-- RETRO-FINGERPRINT: fe8190aed0401d423bfc47012ee4a80585beaab727a519c9124e896f12b22a60 -->
+<!-- RETRO-LAST-REFRESHED: 2026-08-28T03:29:01.369Z -->
 <!-- AUTO-GENERATED:END -->
 
 ### 3.111 Ein Erfolg ist kein Beweis für den Weg, auf dem er zustande kam
@@ -4533,3 +4533,37 @@ ihn zweimal hintereinander aufruft — bewegt sich sein Messwert dabei, misst er
 ein Kommentar diese Unabhängigkeit ausdrücklich behauptet, muss ein Test sie beweisen: Die
 Behauptung im Kommentar war hier älter als der Defekt und hat ihn genau deshalb überlebt.
 Festgehalten als Punkt 985 (Fühler) und 955 (Wächter).
+
+### 3.208 Zwei Mechanismen teilten eine Regel, und nur einer las sie
+
+In der Nacht zum 28.08.2026 stand Punkt 946 gemergt, abgehakt und gepusht — und das
+Kritikalitäts-Tor ließ die Sitzung trotzdem nicht enden. Es verlangte Prüfrunden für
+`TASKS.md`, `docs/tasks-archive.md` und die Retrospektive selbst. Genau diese drei Dateien
+schließt `scripts/mechanism-review-range-core.mjs` seit dem 26.08.2026 aus jedem Prüflauf aus,
+mit einer eigenen, cross-vendor beschlossenen Begründung: Es sind die Dokumente des Nutzers und
+des Besitzers, sie haben eigene Wächter, und ein zweiter Anbieter, der ihren Millionen-Zeichen-
+Endzustand liest, kauft keine Mechanismus-Sicherheit. Der Kommentar über der Ausschlussliste sagt
+wörtlich, sie sei die EINE Grenze, „so the gate, its coverage demand, the gap measurement and the
+pass planner never disagree about what a review is owed for".
+
+Der Planer las sie. Das Tor nicht. Es maß seinen Dateisatz direkt aus Git und forderte Deckung für
+jeden Pfad darin — also auch für Pfade, die der einzige Befehl, der eine Prüfrunde ausführen kann,
+strukturell nie in einen Durchgang legt. Das Ergebnis ist eine Forderung ohne Antwort: Kein
+Prüflauf der Welt konnte diese Zusammensetzung vervollständigen, egal wie viel tatsächlich gelesen
+wurde. Der Punkt war fertig, geprüft und dreifach gegengelesen — und blieb hängen.
+
+Die Klasse ist nicht »Regel falsch«, sondern **eine Regel, die an zwei Stellen gebraucht und nur
+an einer gelesen wird**. Sie ist besonders zäh, weil beide Seiten für sich stimmig sind: Der
+Planer tut das Richtige, das Tor tut das Richtige, und erst ihr Zusammentreffen erzeugt eine
+Forderung, die niemand erfüllen kann. Und sie tarnt sich als Strenge — ein Tor, das mehr verlangt,
+sieht nach Sorgfalt aus, bis man misst, dass das Verlangte unerreichbar ist. Die Gegenprobe des
+zweiten Anbieters fand dann sofort die Spiegelstelle: Auch der Quittungspfad für unprüfbare
+Dateien maß an derselben Grenze vorbei und hätte eine Freigabe für Pfade schreiben können, für die
+nie eine Prüfung geschuldet war.
+
+**Lehre:** Wer eine geteilte Regel als Liste oder Funktion an EINER Stelle festschreibt, muss jede
+Stelle, die sie braucht, auch durch sie hindurchführen — und die Behauptung „eine Grenze, alle
+lesen sie" ist erst wahr, wenn ein Test sie für jeden Leser prüft, nicht wenn ein Kommentar sie
+verspricht. Ein Tor, dessen Forderung kein Befehl erfüllen kann, ist kein strenges Tor, sondern
+ein kaputtes. Festgehalten in derselben Nacht als Reparatur beider Pfade; was das Tor darüber
+hinaus fälschlich einem Punkt zuschreibt, steht als Punkt 986 im Arbeitsauftrag.
