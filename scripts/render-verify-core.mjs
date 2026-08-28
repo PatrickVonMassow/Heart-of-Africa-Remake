@@ -18,6 +18,8 @@
 // every failing check and console error in it charged to an OPEN work-order
 // point. The two are never conflated — see runVerdict.
 
+import { createHash } from 'node:crypto'
+
 import { RED_CHARGES } from './render-verify-charges.mjs'
 import { scopeMandatoryDuty } from './mandatory-duty-core.mjs'
 
@@ -187,26 +189,108 @@ export function chargeablePoints(text) {
 
 /**
  * The ledger entry that owns this red, or null. `red` is one entry of the run
- * record's `reds` — `{ name, kind }` as the recorder wrote it — and `suite` /
- * `backend` are the run's own, so a charge scoped to one lane cannot excuse the
- * other. Total: a malformed entry matches nothing rather than throwing.
+ * record's `reds` — `{ name, key, kind }` plus the `detail` the record keeps
+ * (point 734) as the recorder wrote it — and `suite` / `backend` are the run's
+ * own, so a charge scoped to one lane cannot excuse the other. The same call
+ * answers both readings: the recorder's, while the run is written, and
+ * `owned()`'s, when a later ledger is asked whether it owns a red already on
+ * disk. Total: a malformed entry matches nothing rather than throwing.
  */
+/**
+ * A LEDGER PATTERN TESTED STATELESSLY (review finding, 28.08.2026). A regex
+ * carrying `g` or `y` keeps its `lastIndex` between calls, so the SAME entry
+ * matched one red and missed the next, and a record's charge at record time
+ * disagreed with the same record re-read afterwards — a silent alternation
+ * between accounted for and blocking, decided by call order.
+ *
+ * The flag is stripped into a fresh regex rather than reset in place: the ledger
+ * entry is shared data, and mutating a caller's object here would only move the
+ * surprise. The shape test in render-verify-core.test.mjs refuses such a flag in
+ * the shipped ledger as well, so this stays a backstop for a hand-passed one.
+ *
+ * AND A MALFORMED PATTERN MATCHES NOTHING (review finding, 28.08.2026). A
+ * `test` function was too weak a shape test: a plain object like
+ * `{ global: true, test() {} }` passed it, and the clone branch then built
+ * `new RegExp(undefined, '')` — the EMPTY pattern, which matches EVERY name. A
+ * broken entry did not charge nothing; it charged everything, which is the
+ * exact opposite of the contract `chargeFor` states below.
+ *
+ * AND THE ENTRY'S OWN `test` IS NEVER CALLED (review finding, 28.08.2026,
+ * round 13). Testing through the object the ledger handed in left the ANSWER in
+ * that object's gift: anything carrying two strings and a function could return
+ * true for every name, or alternate between calls, which is the same
+ * call-order-dependent charge the `g`/`y` strip above exists to abolish —
+ * reached by a different road. So the pattern is only ever a SOURCE of a regex,
+ * never a matcher: a fresh `RegExp` is built from its two strings, minus the
+ * stateful flags, and THAT does the testing. A real regex behaves exactly as
+ * before (its `source`/`flags` rebuild it identically), a regex from another
+ * realm — a worker, a vm context — still counts because nothing is asked of its
+ * prototype, and a forged or stateful matcher can now influence only which
+ * pattern is compiled, which is all a ledger entry was ever allowed to say.
+ *
+ * An EMPTY source is refused with it: a real `RegExp` never has one (`new
+ * RegExp('').source` is `'(?:)'`), so `{ source: '', flags: '' }` is a
+ * malformed entry wearing the match-everything pattern. Total: anything else
+ * matches nothing.
+ */
+function usableRegex(pattern) {
+  if (!pattern) return null
+  if (typeof pattern.source !== 'string' || typeof pattern.flags !== 'string') return null
+  if (pattern.source === '') return null
+  try {
+    return new RegExp(pattern.source, pattern.flags.replace(/[gy]/g, ''))
+  } catch {
+    return null
+  }
+}
+
+function patternHits(pattern, value) {
+  const re = usableRegex(pattern)
+  return re === null ? false : re.test(value)
+}
+
 export function chargeFor(red, options) {
-  const { suite = '', backend = '', ledger = RED_CHARGES } = options ?? {}
+  const { suite = '', backend = '', featureLevel = null, ledger = RED_CHARGES } = options ?? {}
   const name = text(red?.name)
   const detail = text(red?.detail)
   if (!name) return null
+  // A truncation entry stands for lines NOBODY captured, in either record shape
+  // — the `truncated` kind, or the legacy marker whose kind is 'check' under the
+  // stable key. What was never read can be owned by nothing, however broad a
+  // ledger regex is (round-5 hardening, 19.08.2026).
+  if (isTruncationEntry(red)) return null
   for (const charge of Array.isArray(ledger) ? ledger : []) {
     try {
       if (!charge || !Number.isInteger(charge.point)) continue
       if (charge.suite && charge.suite !== suite) continue
       if (charge.backend && charge.backend !== backend) continue
-      if (charge.kind && red?.kind && charge.kind !== red.kind) continue
-      if (!charge.match?.test?.(name)) continue
+      // A charge may scope to ONE WebGPU feature level (point 505): the
+      // compatibility lane loses MSAA, so a red that is that lane's own fault
+      // must not be excused on the core adapter the player runs. An entry that
+      // names a level and a run that never recorded one do not match — an
+      // unrecorded level is not evidence of the lane (review, 19.08.2026).
+      if (charge.featureLevel && charge.featureLevel !== featureLevel) continue
+      // A kind-scoped charge matches ONLY a red that CARRIES that kind. Every
+      // red written since point 550 does; one that carries none is not evidence
+      // of the kind the charge was scoped to, so it stays unmatched — the
+      // strict direction. (`red?.kind && …` here let a kindless record slip
+      // through a console charge — round-5 review, 19.08.2026.)
+      if (charge.kind && red?.kind !== charge.kind) continue
+      if (!patternHits(charge.match, name)) continue
       // Some checks have more than one red cause behind the same stable label.
       // Such a charge must name the measured signature in the detail instead
       // of swallowing every future failure of that check.
-      if (charge.detailMatch && !charge.detailMatch?.test?.(detail)) continue
+      //
+      // AND A MEASUREMENT THAT VARIED WITHIN THE RUN CANNOT BE SIGNED FOR
+      // (review finding, 28.08.2026). The record holds ONE entry per check key,
+      // so a check that failed twice with two different measurements keeps only
+      // the first. If a signature matched that one, the other observation —
+      // which nothing owns — would vanish behind the charge. The recorder marks
+      // such a red instead, and here the narrow charge simply refuses it: it
+      // stays loudly uncharged and closes the three ordinary ways. A broad
+      // `match` entry is unaffected, because it never claimed to read a
+      // measurement in the first place.
+      if (charge.detailMatch && (red?.detailVaried === true || !patternHits(charge.detailMatch, detail))) continue
       return charge
     } catch {
       /* a broken ledger entry charges nothing — the red stays unaccounted */
@@ -215,19 +299,72 @@ export function chargeFor(red, options) {
   return null
 }
 
+/**
+ * MARK THE REDS WHOSE MEASUREMENT VARIED WITHIN ONE RUN (review finding,
+ * 28.08.2026). The capture keeps ONE line per result identity — the first — so a
+ * check that failed twice printing two different measurements reaches the
+ * record as a single red carrying the first one. A `detailMatch` signature that
+ * happened to match that first reading would then own the whole key, and the
+ * second, unowned observation would be gone without anybody deciding anything.
+ *
+ * The collapse itself is deliberate and stays: it is what BOUNDS the capture at
+ * all, since a per-frame error whose text carries a counter mints a new distinct
+ * line every frame. So the capture keeps the first measurement AND the fact that
+ * it was not the only one, and the narrow charge refuses such a red.
+ *
+ * `variedKeys` is what the TAP measured — the identities it saw print a second,
+ * DIFFERENT line — because the buffer is bounded by identity and the second
+ * reading no longer exists downstream. Entries are `<kind>:<key>`, the form the
+ * tap writes. Total: unreadable input marks nothing.
+ */
+export function markVariedDetails(reds, variedKeys) {
+  const varied = variedKeys instanceof Set ? variedKeys : new Set(Array.isArray(variedKeys) ? variedKeys : [])
+  if (varied.size === 0) return Array.isArray(reds) ? reds : []
+  return (Array.isArray(reds) ? reds : []).map((red) => {
+    const kind = red?.kind === 'console' ? 'console' : 'check'
+    return varied.has(`${kind}:${text(red?.key)}`) ? { ...red, detailVaried: true } : red
+  })
+}
+
 /** Every red of a run, each with the point it is charged to (null: nothing owns
  *  it). Written into the run record at record time, so the record itself names
  *  what was charged and a later ledger edit cannot bless a run after the fact. */
 export function chargeReds(reds, options) {
-  const { suite = '', backend = '', ledger = RED_CHARGES } = options ?? {}
+  const { suite = '', backend = '', featureLevel = null, ledger = RED_CHARGES } = options ?? {}
   return (Array.isArray(reds) ? reds : []).map((red) => {
-    const charge = chargeFor(red, { suite, backend, ledger })
-    return {
-      name: text(red?.name).slice(0, 200),
+    // THE RECORD IS WHAT IS CHARGED, AND THE RECORD KEEPS THE MEASUREMENT
+    // (point 734). Both halves of that sentence answer the same defect.
+    //
+    // The record used to keep name/key/kind/point and DROP the detail, so a
+    // `detailMatch` charge — the narrowest kind the ledger has — could only ever
+    // fire at record time: re-read afterwards, `chargeFor` saw an empty detail
+    // and refused, which made the retroactive reading `owned()` performs a
+    // guaranteed miss for exactly the entries scoped most carefully (measured
+    // 28.08.2026: all 17 recorded reds carried key/kind/name/point and no
+    // detail). Keeping the detail is what lets a ledger entry written TODAY own
+    // a red recorded YESTERDAY, which is the retroactivity this point promises.
+    //
+    // And the charge is evaluated against the STORED shape, not against the
+    // parse it came from: name and detail are bounded here, so charging the
+    // unbounded parse could stamp a point that the stored red can never
+    // reproduce. What was matched is exactly what was kept.
+    const stored = {
+      name: text(red?.name).slice(0, MAX_RED_NAME_LEN),
       key: red?.key ?? '',
       kind: red?.kind === 'console' ? 'console' : 'check',
-      point: charge ? charge.point : null,
+      point: null,
     }
+    // Absent rather than empty: a red that printed no measurement adds no field,
+    // so records of reds that never had one keep the shape they always had.
+    const detail = text(red?.detail).slice(0, MAX_RED_DETAIL_LEN)
+    if (detail) stored.detail = detail
+    // Kept on the record, because the reading has to survive to the re-read:
+    // otherwise `owned()` would charge afterwards exactly the red the recorder
+    // refused to charge.
+    if (red?.detailVaried === true) stored.detailVaried = true
+    const charge = chargeFor(stored, { suite, backend, featureLevel, ledger })
+    stored.point = charge ? charge.point : null
+    return stored
   })
 }
 
@@ -250,6 +387,14 @@ const MAX_SUSPECT_NAMES = 8
  *  what was never carried cannot be charged, and must keep the run blocked. */
 export const TRUNCATED_KIND = 'truncated'
 const MAX_SUSPECT_NAME_LEN = 200
+/** How much of a red's printed name and measurement the record keeps. The
+ *  record is a durable file that every later judgment re-reads, so both are
+ *  bounded — and a `detailMatch` signature therefore has to sit inside the
+ *  first MAX_RED_DETAIL_LEN characters of the printed detail. That is not a
+ *  hidden trap: `chargeReds` charges the TRUNCATED text, so a signature past
+ *  the bound matches at record time no more than it does afterwards. */
+const MAX_RED_NAME_LEN = 200
+const MAX_RED_DETAIL_LEN = 200
 
 /** A value as text, or '' — `String(x)` itself throws on an object whose
  *  toString does, and these two must be total on whatever a suite printed. */
@@ -258,6 +403,95 @@ function text(value) {
     return String(value ?? '')
   } catch {
     return ''
+  }
+}
+
+/** A value as a finite number, or null — `Number(x)` itself THROWS on a symbol,
+ *  and every record here is read off disk. Total, and it keeps "unreadable"
+ *  DISTINCT from 0: collapsing both to zero made two records with no timestamp
+ *  read as the same run (review finding, 19.08.2026). */
+function finite(value) {
+  try {
+    if (typeof value === 'number') return Number.isFinite(value) ? value : null
+    // A NUMERIC STRING is readable; nothing else is. `Number()` turns null, ''
+    // and false into 0, which made two records with NO timestamp read as the
+    // same run and an `exit: null` read as a clean pass (review, 19.08.2026).
+    if (typeof value === 'string' && value.trim() !== '') {
+      const n = Number(value)
+      return Number.isFinite(n) ? n : null
+    }
+    return null
+  } catch {
+    return null
+  }
+}
+
+/** The same, with 0 where nothing is readable — for the places a missing number
+ *  genuinely means none (a line count, an ordering key). */
+function number(value) {
+  return finite(value) ?? 0
+}
+
+/** A run's exit code, with 1 where none can be read. Unreadable means FAILED,
+ *  never 0: a record whose exit cannot be parsed must not read as a clean pass. */
+function exitOf(run) {
+  return finite(run?.exit) ?? 1
+}
+
+/**
+ * THE TIMESTAMP A RUN CAN BE NAMED BY, or null (point 734). One reading in one
+ * place, because two of them disagreeing is how a run stops being closable: the
+ * signature route keyed on `at` alone while the re-recording route already fell
+ * back to `startedAt`, so a record whose `at` is unreadable could be signed for —
+ * the CLI even reported success — and the closure then matched nothing.
+ *
+ * Null stays null and is never folded to 0: a record with NO readable stamp
+ * cannot be named at all, and pretending otherwise let one signature close a
+ * different run (review, 19.08.2026).
+ */
+export function runStamp(run) {
+  return finite(run?.at) ?? finite(run?.startedAt)
+}
+
+/** The same reading as a SORTABLE number: a record nobody dated ranks below
+ *  every dated one rather than at the epoch, where it used to tie with them. */
+function stampRank(run) {
+  return runStamp(run) ?? -Infinity
+}
+
+/** A chargeable-point set built from whatever a caller handed in. `[...x]` THROWS
+ *  on a truthy non-iterable, and this runs inside the gate's decision: an
+ *  exception here reaches the wrapper, which fails OPEN and allows the turn the
+ *  gate meant to stop. Total; an unreadable set charges nothing, which is the
+ *  strict direction. */
+function pointSet(openPoints) {
+  try {
+    if (Array.isArray(openPoints)) return new Set(openPoints)
+    if (!openPoints) return new Set()
+    return new Set([...openPoints])
+  } catch {
+    return new Set()
+  }
+}
+
+/** A timestamp as an ISO string, or a plain readable fallback: `toISOString()`
+ *  THROWS on a finite but out-of-range number, and it is called while BUILDING A
+ *  BLOCK MESSAGE — a throw there costs the gate its verdict (the wrapper would
+ *  fail open and allow the very turn it meant to stop). Total. */
+function isoOf(at) {
+  // A RUN WITH NO MEASURED STAMP IS SAID TO HAVE NONE (review finding,
+  // 28.08.2026, round 13). `number(null)` is 0, so an undated record was
+  // reported as `1970-01-01T00:00:00.000Z` — a time nobody ever measured,
+  // stated in the same breath as the ones that were, and a reader who went
+  // looking for that run's log found nothing at that hour. The CLI's `isoText`
+  // has said `undated` since the sixth round; this is the same rule inside the
+  // decision, where the block message is built.
+  if (at === null || at === undefined || at === '') return 'undated'
+  try {
+    const iso = new Date(number(at)).toISOString()
+    return iso
+  } catch {
+    return `t=${text(at)}`
   }
 }
 
@@ -331,7 +565,280 @@ export function suspectRedsOf(run) {
 }
 
 /**
- * WHAT ONE RECORDED RUN IS WORTH (point 550). Five verdicts, and the difference
+ * DID THE CAPTURE CAP EAT THIS RUN'S REDS (point 734)? Two readings, because the
+ * records outlive the field: the recorder now says `truncated: true` outright,
+ * and a record written before it did carries the synthetic red under the stable
+ * key `capture-truncated`. Either one means the same thing — the run printed
+ * more result lines than the buffer holds, so what the record lists is a
+ * FRAGMENT of its red set and not the set.
+ *
+ * Deliberately reads the run's OWN reds only. A SUSPECT run's `suspectOf` marker
+ * can carry its own truncation note ("further red(s) … were NOT carried"), but
+ * that is the retry marker running out of room — the first attempt has a full
+ * record of its own, and mistaking the two would excuse a run whose reds ARE all
+ * on file. Total: never throws on a malformed record.
+ */
+export function isIncompleteRecording(run) {
+  if (!run || typeof run !== 'object') return false
+  if (run.truncated === true) return true
+  const reds = Array.isArray(run.reds) ? run.reds : []
+  return reds.some(isTruncationEntry)
+}
+
+/** The name form the recorder gave that entry, and nothing else did. */
+const TRUNCATION_NAME = /^\d+\s+further result line\(s\) exceeded the capture cap\b/
+
+/**
+ * The synthetic entry that STANDS FOR the lines the cap ate — not a red anybody
+ * observed, and the one entry a sign-off closes.
+ *
+ * THE LEGACY KEY IS NOT ENOUGH ON ITS OWN (review finding, 28.08.2026).
+ * `capture-truncated` is an identity the PARSER CAN REACH: `checkKey` lowercases
+ * and collapses a printed check label, so a suite printing `FAIL  Capture
+ * truncated` — or anything else keying to that text — would hand a genuinely
+ * observed red the marker's identity. Such a red is dropped from the residual
+ * and closed by an incomplete signature, i.e. laundered by the next
+ * re-recording or sign-off. So the legacy key counts only together with the
+ * marker's OWN name form, which the recorder wrote and a check label does not
+ * have. The `truncated` KIND needs no such guard: it sits outside the two kinds
+ * a record may store (`chargeReds` writes 'check' or 'console'), so nothing a
+ * parse produces can carry it. Total.
+ */
+function isTruncationEntry(red) {
+  if (red?.kind === TRUNCATED_KIND) return true
+  return red?.key === 'capture-truncated' && TRUNCATION_NAME.test(text(red?.name))
+}
+
+/**
+ * WHAT A LIFTED TRUNCATION LEAVES BEHIND — the run judged by ORDINARY semantics,
+ * as if it had never truncated (review, 19.08.2026). Reading `r.reds` alone here
+ * lost a whole class: a SUSPECT run exited 0 and therefore carries NO reds of its
+ * own, because its real failure is the FIRST attempt's, held in `suspectOf`. So a
+ * truncated run that also passed on the retry dropped its first attempt's reds
+ * the moment the truncation was lifted, and left the list silently.
+ *
+ * The synthetic truncation entry is removed — it stands for what nobody
+ * recorded, which is exactly the part that was closed. The SUSPECT marker's own
+ * overflow note is NOT that entry (it means the retry marker ran out of room,
+ * and the first attempt has a full record of its own), so it survives here and
+ * stays unowned, as it does in the ordinary path. Total.
+ */
+function residualOf(run) {
+  const own = (Array.isArray(run?.reds) ? run.reds : []).filter((red) => !isTruncationEntry(red))
+  if (run?.suspect === true && exitOf(run) === 0) {
+    // A SUSPECT RECORD MAY STILL CARRY REDS OF ITS OWN (review finding,
+    // 28.08.2026, round 17). The premise above — a run that exited 0 recorded
+    // nothing — holds for an ORDINARY retry and fails for the one record that
+    // reached CRASH_LINE while its process still ended 0: that record keeps
+    // every red it printed before dying, and substituting the first attempt's
+    // marker for them threw those observations away. Both are real, so both are
+    // returned, the first attempt first and this record's own after it, with a
+    // name already named not repeated.
+    const first = suspectRedsOf(run)
+    // BY IDENTITY, NOT BY NAME ALONE (review finding, 28.08.2026, round 18): a
+    // check and a console error printing the same text are two observations, and
+    // a name-only set discarded the second of them.
+    const named = new Set(first.map(redKeyOf))
+    return { status: 'suspect', reds: [...first, ...own.filter((red) => !named.has(redKeyOf(red)))] }
+  }
+  return { status: 'red', reds: own }
+}
+
+/** WHAT A LOST RECORDING IS CALLED, in one sentence with its measured count.
+ *  Shared, because a crashed run that ALSO truncated must name the lost
+ *  recording in the same words the incomplete class uses (review finding,
+ *  28.08.2026, round 17) — a deferral that named the crash and the reds it got
+ *  out, but not the lines nobody read, still understated what it waved. */
+function incompleteSentence(run) {
+  const dropped = droppedLinesOf(run)
+  return (
+    `the capture cap dropped ${dropped > 0 ? `${dropped} ` : ''}result line(s) — this run's reds ` +
+    'were NOT all recorded, so nothing in it can be explained'
+  )
+}
+
+/** How many result lines the cap swallowed, as the record knows it — the number
+ *  the new field carries, or the one the old synthetic red states in its text.
+ *  0 when the run is not truncated or the count cannot be read. */
+export function droppedLinesOf(run) {
+  // `Number(x)` THROWS on a symbol, and these records come off disk and out of a
+  // suite's exit handler — total means total (review finding, 19.08.2026).
+  const n = number(run?.droppedLines)
+  if (n > 0) return Math.trunc(n)
+  const reds = Array.isArray(run?.reds) ? run.reds : []
+  for (const red of reds) {
+    if (!isTruncationEntry(red)) continue
+    const m = /^(\d+)\s+further result line/.exec(text(red?.name))
+    if (m) return Number(m[1])
+  }
+  return 0
+}
+
+/** A value as canonical JSON text — object keys sorted recursively, so the same
+ *  record read twice off disk canonicalises identically whatever a writer's key
+ *  order was. Non-JSON leaves (symbols, functions) read as null, the same
+ *  collapse JSON.stringify performs. */
+function canonicalText(value) {
+  if (value === null || typeof value !== 'object') return JSON.stringify(value) ?? 'null'
+  if (Array.isArray(value)) return `[${value.map(canonicalText).join(',')}]`
+  const keys = Object.keys(value).sort()
+  return `{${keys.map((k) => `${JSON.stringify(k)}:${canonicalText(value[k])}`).join(',')}}`
+}
+
+/**
+ * THE IDENTITY A CLOSURE NAMES A RUN BY (point 734, round-5 review): a hash of
+ * the record's WHOLE canonical content, as hex text. A stamp was not an identity
+ * — the matcher keyed on `runStamp`, which falls back `at` → `startedAt`, so a
+ * closure written for `{at: 100}` also closed a DIFFERENT run `{startedAt: 100}`
+ * of the same suite, and two parallel runs sharing a millisecond were not
+ * separable at all. Content is: the hash is taken over the record's whole
+ * canonical text, so no field a writer controls can be changed without the
+ * identity moving with it.
+ *
+ * WHY THE DIGEST IS CRYPTOGRAPHIC (review finding, 28.08.2026, round 13). The
+ * first version reduced unbounded text to 64 bits of FNV — chosen to keep this
+ * core arithmetic-only — and `signedClosureFor` treats identity equality as
+ * SUFFICIENT AUTHORISATION to close a record. Two properties are therefore
+ * load-bearing, and 64 non-cryptographic bits had neither: a collision must not
+ * be reachable by accident (birthday reach ~2^32 records, which is a bound
+ * nobody should have to argue about), and it must not be reachable on purpose —
+ * FNV is trivially invertible, so a writer who controls any field of a record
+ * can steer it onto another record's identity and have that one's signature
+ * close it.
+ *
+ * SHA-256 truncated to 128 bits answers both by construction, and costs one
+ * Node built-in import in a file that already imports two modules and runs only
+ * under Node (the Stop hook and Vitest; `scripts/verify/_browser.mjs` imports it
+ * beside Playwright, never into a page). No stored closure predates this — the
+ * identity moved before any was written to `.claude/render-verify-state.json` —
+ * so nothing is invalidated by the change.
+ *
+ * WHAT THE IDENTITY STILL DOES NOT DO, unchanged: a signature never makes a run
+ * cover a backend, and it never touches a red the run recorded. The identity is
+ * the record's WHOLE canonical content, so no field a writer controls can be
+ * changed without the identity moving with it — the decision and its full
+ * residual are recorded at the signing site in render-verify-guard.mjs.
+ *
+ * Null for a non-record; never throws (the wrapper's fail-open depends on it).
+ */
+export function runIdentity(run) {
+  if (!run || typeof run !== 'object') return null
+  try {
+    return createHash('sha256').update(canonicalText(run), 'utf8').digest('hex').slice(0, 32)
+  } catch {
+    return null
+  }
+}
+
+/**
+ * THE CLOSURE THAT AN INCOMPLETE RECORDING HAS AND A RED DOES NOT (point 734).
+ * A red closes by its CAUSE — fixed, charged, or filed as a point (point 640) —
+ * and all three need to know WHAT the red was. A truncated run cannot supply
+ * that by construction, so those three routes are shut and the only exit left
+ * was the hand-written `--defer`: the very waiver the charge ledger exists to
+ * abolish. Most records that carry it are the ones written before the line cap
+ * was removed — but the class is not legacy: a run past the recorder's stated
+ * budgets (MAX_RED_IDENTITIES and the two character limits) is recorded
+ * incomplete on purpose, which is the loud half of this point's final state and
+ * needs exactly this way out.
+ *
+ * So the incompleteness gets its own closure, which is not a waiver, and the
+ * limits are what make that true:
+ *   - it is signed for ONE RECORD by its content identity (`run: runIdentity`),
+ *     so a signature can neither close a second, different run that shares a
+ *     stamp nor be pre-written for a future one;
+ *   - it carries WRITTEN EVIDENCE, and a closure without any closes nothing;
+ *   - it NEVER makes the run cover a backend: runVerdict still answers
+ *     `incomplete`, so the backend still needs a real covering run;
+ *   - and it closes ONLY THE PART NOBODY CAN KNOW. The reds the run DID record
+ *     were really observed, so they keep blocking exactly as any other red and
+ *     close by the three ways of point 640. That is the difference between this
+ *     and the waiver it replaces (review finding, 19.08.2026): flooding a suite's
+ *     output on purpose hides nothing, because every red that reached the record
+ *     still stands.
+ */
+export function incompleteClosureFor(run, closures) {
+  return signedClosureFor(run, closures)
+}
+
+/**
+ * THE CLOSURE THAT A CRASHED RUN HAS AND A RED DOES NOT (point 734, sixth
+ * round). A crash is the one verdict no ledger can ever reach: `runVerdict`
+ * returns `charges: []` for it, deliberately — a run that died rather than
+ * reported judged no picture, so THE CRASH ITSELF is nothing anyone can charge,
+ * fix or file — which says nothing about the reds the run printed before it
+ * died, and those close the three ordinary ways (see afterCrashClosure).
+ * Point 640's three closings all need a red's identity, and a crash has none to
+ * give; before this, a crashed run inside the window could only leave through
+ * the hand `--defer`, which is the waiver this whole point exists to abolish.
+ *
+ * So the crash gets the SAME signed route the broken recording has, with the
+ * same limits — one record by content identity, written evidence, never
+ * coverage — and it stops at the SAME line: it closes the crash sentence, and
+ * every red the run got out before it died stays standing, to be fixed, charged
+ * or filed like any other observation (review finding, 28.08.2026, which
+ * corrected the earlier "it closes the whole record"). The gate does not READ
+ * those reds while the crash is open — only the crash sentence blocks, and no
+ * charge may lift it — but not reading them is not erasing them. The signature
+ * states exactly "we read the kept log; the run died; there is no report here
+ * to judge", which is a disposition and not a pass: `runVerdict` still answers
+ * `red` with the crash sentence, and the backend still needs a real covering
+ * run.
+ *
+ * Kept as its own list (`crashClosures` beside `incompleteClosures`) rather
+ * than one shared pool, so a signature written for the one class can never be
+ * read as the other's — a crashed run that ALSO truncated stays refused by the
+ * incomplete draft (a crash outranks the truncation, round-5 review) and is
+ * signed as what it is: a crash.
+ */
+export function crashClosureFor(run, closures) {
+  return signedClosureFor(run, closures)
+}
+
+/**
+ * THE RECORD AS IT IS JUDGED ONCE ITS CRASH IS SIGNED OFF (review finding,
+ * 28.08.2026). The signature closes the CRASH READING and nothing else, so what
+ * the record positively holds — a lost recording, the reds it printed before it
+ * died — is judged exactly as it would be in a run that never crashed. Without
+ * this, a run that crashed AND truncated was stuck: the crash outranks the
+ * truncation, so `openIncompleteRuns` never offered it the `--incomplete`
+ * route, and its lost lines could be reached by no signature at all.
+ *
+ * Returns the run itself where there is nothing to lift, so a caller may
+ * compare by reference. The COPY is for judging only — never hand it to a
+ * closure lookup, whose identity is the record's real content.
+ */
+export function afterCrashClosure(run, crashClosures) {
+  if (run?.crashed !== true) return run
+  return crashClosureFor(run, crashClosures) ? { ...run, crashed: false } : run
+}
+
+/** The shared binding rules of both signed closures. Total; null closes nothing. */
+function signedClosureFor(run, closures) {
+  if (!run || typeof run !== 'object') return null
+  const id = runIdentity(run)
+  if (id === null) return null
+  for (const c of Array.isArray(closures) ? closures : []) {
+    try {
+      if (!c || c.backend !== run.backend || c.suite !== run.suite) continue
+      // THE SIGNATURE BINDS BY CONTENT, never by a stamp: `runStamp` equality
+      // let one closure hit both a run named by `at` and a different one named
+      // only by `startedAt` (round-5 review, 19.08.2026). A closure that names
+      // no identity closes nothing — the strict direction.
+      if (typeof c.run !== 'string' || c.run === '' || c.run !== id) continue
+      // The evidence IS the mechanism: an entry that carries none is a silent
+      // waiver wearing a closure's shape, so it closes nothing.
+      if (!text(c.evidence).trim()) continue
+      return c
+    } catch {
+      /* a malformed closure closes nothing — the run keeps blocking */
+    }
+  }
+  return null
+}
+
+/**
+ * WHAT ONE RECORDED RUN IS WORTH (point 550). Six verdicts, and the difference
  * between the first two must stay visible everywhere it is reported:
  *
  *   clean     — exit 0. The picture was judged and nothing was red.
@@ -346,6 +853,14 @@ export function suspectRedsOf(run) {
  *               so the record says nothing about the rest. Judged FIRST, before
  *               the exit code, because its exit code is exactly what must not
  *               clear the gate.
+ *   incomplete— THE CAPTURE CAP ATE ITS REDS (point 734): the run printed more
+ *               result lines than the recorder's buffer holds, so its red list is
+ *               a fragment and no reader can say what it found. Judged before the
+ *               exit code, like partial, because an exit 0 whose result lines were
+ *               dropped is exactly a pass nobody read. It is NOT an unexplained
+ *               red — there is nothing to explain, only a recording to redo — and
+ *               it closes by its own signed route (incompleteClosureFor), never by
+ *               the three ways of point 640, which all need the red's identity.
  *   suspect   — it PASSED ON THE RETRY (point 640): the first attempt of the same
  *               suite failed, and nothing about the second run explains why. "It
  *               worked the next time" is consistent with a fixed defect, a rare
@@ -380,7 +895,32 @@ export function runVerdict(run, options) {
       unaccounted: [{ name: `the run covered only section ${which} of the suite (--section)`, point: null }],
     }
   }
-  if (run.suspect === true && Number(run.exit) === 0) {
+  // A CRASH OUTRANKS EVERY OTHER READING. A run that died rather than reported
+  // judged no picture, and nothing may explain it away — not a charge, not a
+  // later green, and not the incomplete-recording sign-off either: judged BELOW
+  // truncation, a crashed run that also flooded its output could be lifted by one
+  // signature (review, 19.08.2026). Only `partial` still comes first, because a
+  // --section probe is nobody's evidence in either direction.
+  if (run.crashed === true) {
+    return {
+      status: 'red',
+      covers: false,
+      charges: [],
+      unaccounted: [{ name: 'the run ended in a crash, not in its own report', point: null }],
+    }
+  }
+  // Judged before the exit code and before the reds, because BOTH are unreadable
+  // here: the red list is a fragment of the run's red set, and an exit 0 that
+  // dropped result lines is a pass nobody read.
+  if (isIncompleteRecording(run)) {
+    return {
+      status: 'incomplete',
+      covers: false,
+      charges: [],
+      unaccounted: [{ name: incompleteSentence(run), point: null }],
+    }
+  }
+  if (run.suspect === true && exitOf(run) === 0) {
     const names = suspectRedsOf(run).map((r) => r.name)
     const which = names.length ? names.map((n) => `"${n}"`).join('; ') : SUSPECT_UNNAMED
     return {
@@ -395,15 +935,7 @@ export function runVerdict(run, options) {
       ],
     }
   }
-  if (Number(run.exit) === 0) return { status: 'clean', covers: true, charges: [], unaccounted: [] }
-  if (run.crashed === true) {
-    return {
-      status: 'red',
-      covers: false,
-      charges: [],
-      unaccounted: [{ name: 'the run ended in a crash, not in its own report', point: null }],
-    }
-  }
+  if (exitOf(run) === 0) return { status: 'clean', covers: true, charges: [], unaccounted: [] }
   const reds = Array.isArray(run.reds) ? run.reds : []
   if (reds.length === 0) {
     return {
@@ -413,7 +945,7 @@ export function runVerdict(run, options) {
       unaccounted: [{ name: 'the run failed without reporting a single red', point: null }],
     }
   }
-  const open = new Set(Array.isArray(openPoints) ? openPoints : openPoints ? [...openPoints] : [])
+  const open = pointSet(openPoints)
   const charges = []
   const unaccounted = []
   for (const red of reds) {
@@ -492,10 +1024,8 @@ export function sawCodeSince(run, since) {
   // No edit time known (or none at all): the freshness question does not apply,
   // and the guard's fail-open posture says accept rather than invent a window.
   if (from <= 0) return true
-  const started = Number(run?.startedAt)
-  const ended = Number(run?.at)
-  const when = Number.isFinite(started) ? started : ended
-  return Number.isFinite(when) && when >= from
+  const when = finite(run?.startedAt) ?? finite(run?.at)
+  return when !== null && when >= from
 }
 
 export function coveringRun(runs, backend, since, options) {
@@ -507,7 +1037,10 @@ export function coveringRun(runs, backend, since, options) {
     if (!runVerdict(r, { openPoints }).covers) continue
     if (featureLevel && r.featureLevel !== featureLevel) continue
     if (!sawCodeSince(r, since)) continue
-    if (!best || Number(r.at ?? 0) > Number(best.at ?? 0)) best = r
+    // RANKED BY THE STAMP A RUN CAN BE NAMED BY (review finding, 28.08.2026,
+    // round 14). `number(r.at)` is 0 for a record dated only by `startedAt`, so
+    // such a run lost to every older one and the gate read the wrong "latest".
+    if (!best || stampRank(r) > stampRank(best)) best = r
   }
   return best
 }
@@ -552,10 +1085,26 @@ export function coveringRun(runs, backend, since, options) {
  * could only be satisfied by editing a render file would have left those two
  * routes nominal.
  *
+ * COVERING IS READ AS IT WAS RECORDED — ONE RULE, EVERY CALLER (review finding,
+ * 28.08.2026). The two readings above are different QUESTIONS, not two moods of
+ * the same one, and each has exactly one answer here:
+ *   - `owned()` — "does an open point own this red?" — reads today's ledger,
+ *     and it is the only reading that does.
+ *   - `runVerdict(...).covers` — "did this run verify the picture?" — reads the
+ *     charge the record carries and NOTHING else. `coveringRun` never handed it
+ *     a ledger; `shownGone` and `reRecorded` did, and the argument was silently
+ *     dead, so the mechanism read as if a ledger edit could make a past run
+ *     cover a backend. It cannot, and now it does not say it can.
+ * The consequence is stated rather than hidden: a run whose reds only became
+ * owned AFTER it was recorded neither covers a backend nor retakes a lost
+ * reading — but its reds stop blocking through `owned()`, which is the route
+ * point 640 gives them. Coverage is a claim about pixels somebody looked at,
+ * and no edit to a ledger file makes anybody look.
+ *
  * Total: never throws on partial input.
  */
 export function unexplainedRuns(runs, since, options) {
-  const { openPoints = null, ledger = RED_CHARGES } = options ?? {}
+  const { openPoints = null, ledger = RED_CHARGES, incompleteClosures = null, crashClosures = null } = options ?? {}
   const from = Number.isFinite(since) ? since : 0
   const all = Array.isArray(runs) ? runs : []
   /**
@@ -569,8 +1118,8 @@ export function unexplainedRuns(runs, since, options) {
    * can resolve it.
    */
   const shownGone = (r) => {
-    const when = Number(r?.startedAt ?? r?.at)
-    if (!Number.isFinite(when) || from <= when) return false
+    const when = finite(r?.startedAt) ?? finite(r?.at)
+    if (when === null || from <= when) return false
     return all.some(
       (later) =>
         later &&
@@ -578,52 +1127,292 @@ export function unexplainedRuns(runs, since, options) {
         later.backend === r.backend &&
         later.suite === r.suite &&
         sawCodeSince(later, from) &&
-        runVerdict(later, { openPoints, ledger }).covers,
+        // NO LEDGER HERE, DELIBERATELY — see COVERING IS READ AS IT WAS
+        // RECORDED below. This asks whether a run VERIFIED the picture, and
+        // that is not a claim a text edit may create.
+        runVerdict(later, { openPoints }).covers,
     )
   }
-  const open = new Set(Array.isArray(openPoints) ? openPoints : openPoints ? [...openPoints] : [])
+  /**
+   * WAS THE LOST MEASUREMENT TAKEN AGAIN (point 734)? A covering run of the SAME
+   * suite on the SAME backend, later than this one and on code since the last
+   * render edit. Deliberately NOT the rule for a red — a red is an observation
+   * and no later green un-observes it — but a truncated recording observed
+   * nothing to keep: it is a reading that was lost, and a reading is redone.
+   */
+  const reRecorded = (r) => {
+    // WITHOUT A READABLE TIMESTAMP, NOTHING CAN BE SHOWN TO BE LATER. Folding an
+    // unreadable `at` to 0 let any dated covering run "re-record" an undated
+    // truncation (review, 19.08.2026).
+    const when = runStamp(r)
+    if (when === null) return false
+    return all.some((later) => {
+      if (!later || later === r || later.partial === true) return false
+      if (later.backend !== r.backend || later.suite !== r.suite) return false
+      const laterAt = runStamp(later)
+      if (laterAt === null || laterAt <= when) return false
+      // NO LEDGER HERE EITHER, for the same reason: the lost reading is retaken
+      // by a run that COVERED, not by one a later ledger edit would now excuse.
+      return sawCodeSince(later, from) && runVerdict(later, { openPoints }).covers
+    })
+  }
+  const open = pointSet(openPoints)
   /** Is this red owned by an OPEN point — by the charge it was recorded with, or
    *  by one the ledger carries today? */
-  const owned = (red, suite, backend) => {
-    // Reds that never reached the record cannot be owned by anything.
-    if (red?.kind === TRUNCATED_KIND) return false
+  const owned = (red, suite, backend, featureLevel) => {
+    // Reds that never reached the record cannot be owned by anything — in
+    // either shape a record may carry the marker (kind, or the legacy key).
+    if (isTruncationEntry(red)) return false
     const recorded = Number.isInteger(red?.point) ? red.point : null
     if (recorded !== null && open.has(recorded)) return true
-    const now = chargeFor(red, { suite, backend, ledger })
+    const now = chargeFor(red, { suite, backend, featureLevel, ledger })
     return !!now && open.has(now.point)
   }
   const out = []
   for (const r of Array.isArray(runs) ? runs : []) {
     if (!r || typeof r !== 'object') continue
-    const at = Number(r.at ?? 0)
-    if (!Number.isFinite(at)) continue
+    // THE STAMP STAYS MISSING WHERE IT WAS NEVER MEASURED (review finding,
+    // 28.08.2026, round 13). Folding it to 0 made every undated record claim
+    // 1970 in the block message, and — worse — made all the undated records of
+    // one suite and backend EQUAL, so the lookup below picked whichever came
+    // first and could report another run's residual as this one's.
+    const at = runStamp(r)
+    // The identity is what a reader of this list matches an entry back to its
+    // record by. It is the record's whole content, so two entries are the same
+    // entry only when the runs really are the same run.
+    const id = runIdentity(r)
+
     // A red is carried until its own suite is shown green on newer code. Runs
     // that saw the current code are judged directly; older ones only leave the
     // list once that demonstration exists.
     if (!sawCodeSince(r, from) && shownGone(r)) continue
-    const verdict = runVerdict(r, { openPoints })
-    if (verdict.status !== 'red' && verdict.status !== 'suspect') continue
+    // THE EFFECTIVE READING. A signed crash stops being the crash sentence and
+    // becomes whatever the record still holds — an incomplete recording, its
+    // own reds, or nothing.
+    const effective = afterCrashClosure(r, crashClosures)
+    const signedCrash = effective !== r
+    const verdict = runVerdict(effective, { openPoints })
+    const blocking =
+      verdict.status === 'red' || verdict.status === 'suspect' || verdict.status === 'incomplete'
+    // A SIGNED CRASH IS JUDGED BY ITS RESIDUAL, NEVER BY THE EXIT CODE (review
+    // finding, 28.08.2026). `runVerdict` answers `clean` on exit 0 BEFORE it
+    // looks at the reds — right for an ordinary run, and an erasure here: a
+    // record that reached CRASH_LINE while its process still ended 0 keeps
+    // every red it printed, and taking the clean-exit branch dropped the whole
+    // record, which is exactly what the crash-residual rule exists to prevent.
+    // So the post-crash reading asks the residual DIRECTLY instead of borrowing
+    // that precedence. The clean-exit branch keeps its own job untouched: an
+    // unsigned run, and a signed one with nothing left in it, still leave here.
+    const postCrash = blocking || !signedCrash ? null : residualOf(effective)
+    if (!blocking && (postCrash === null || postCrash.reds.length === 0)) continue
     const suite = typeof r.suite === 'string' && r.suite ? r.suite : 'unknown'
     const backend = typeof r.backend === 'string' ? r.backend : 'unknown'
-    // A crash explains nothing about the picture whatever its reds say, so it is
-    // never talked away by the ledger — runVerdict says so and this must not
-    // undo it.
-    let unowned = null
-    if (r.crashed !== true) {
-      const reds = verdict.status === 'suspect' ? suspectRedsOf(r) : Array.isArray(r.reds) ? r.reds : []
-      if (reds.length > 0) {
-        // Only the reds NOBODY owns are still open. Counting the whole run's
-        // reds would report a charged one as waved through beside its
-        // unexplained neighbour.
-        unowned = reds.filter((red) => !owned(red, suite, backend))
-        if (unowned.length === 0) continue
+    // The WebGPU feature level this run really came up at, so a charge scoped to
+    // the compatibility lane cannot excuse the core adapter the player runs.
+    const level = r.featureLevel === 'core' || r.featureLevel === 'compatibility' ? r.featureLevel : null
+    // A CRASHED RUN IS ITS OWN CLASS TOO (point 734, sixth round), judged here
+    // in runVerdict's own precedence — above the truncation, below the partial
+    // probe. Reported apart from the reds, because calling it an "unexplained
+    // red" sends the reader hunting a defect the run never reported; and lifted
+    // by exactly ONE thing, the signed crash closure. Not by the ledger (a
+    // crash carries no charge at any time), not by a later green of the same
+    // suite (the recorded rounds pinned that a crash inside the window is not
+    // talked away by the runs that followed it — the way out is the explicit,
+    // evidenced signature or the deferral, never silence).
+    if (r.crashed === true && !signedCrash) {
+      // THE CRASH SENTENCE BLOCKS; THE REDS PRINTED BEFORE THE CRASH ARE CARRIED
+      // BESIDE IT (review finding, 28.08.2026). `unaccounted` stays the crash
+      // alone — it is the one thing the reader is told to dispose of, and naming
+      // a check there would send them hunting the defect the crash paragraph
+      // forbids. But `reds` is what a DEFERRAL enumerates as its waved-through
+      // cost, and reading only the crash sentence there understated that cost by
+      // every check the suite had already printed FAIL for before it died. Those
+      // observations are real, they leave with the deferral, and a bypass whose
+      // cost is invisible is one nobody weighs. Read through `residualOf` so the
+      // synthetic truncation marker — which stands for what nobody recorded — is
+      // not quoted as a red anybody could act on.
+      //
+      // AND THE LOST RECORDING BESIDE THEM, where the run truncated as well
+      // (review finding, 28.08.2026, round 17): `residualOf` strips the
+      // truncation marker, so without this the deferral named the crash and the
+      // reds the run got out, and said nothing about the lines nobody read.
+      // A NAMELESS RED IS STILL A RED (review finding, 28.08.2026, round 22).
+      // Dropping the entries whose name is empty took them out of the count as
+      // well, so a deferral over a crashed run understated what it waved by
+      // exactly the reds nobody could name — and the ordinary path has called
+      // such a red "(unnamed red)" all along.
+      const printedBeforeCrash = residualOf(r).reds.map((red) => ({
+        ...red,
+        name: text(red?.name) || '(unnamed red)',
+      }))
+      // AND THEY ARE REPORTED UNFILTERED BY THE LEDGER, deliberately (review
+      // finding, 28.08.2026, rounds 19 and 22, which read the missing `owned`
+      // filter as an inconsistency with the two paths beside it). A charge is
+      // exactly what a crashed run cannot carry — `runVerdict` answers
+      // `charges: []` for it at any time — so a red printed before the crash has
+      // no owner while the crash stands, and a deferral that carried it away
+      // really did carry an unowned red away. Filtering here would report it as
+      // accounted for by a charge that never applied. Once the crash is SIGNED
+      // the ledger reaches those reds again, and the residual path below filters
+      // them there.
+      //
+      // ROUND 22 SHARPENED THE OBJECTION — the same red is filtered as owned
+      // once the crash is signed, so the two readings disagree. They do, and the
+      // difference is the SIGNATURE, which is the whole mechanism: a deferral
+      // does not sign anything. It carries the record past the gate with its
+      // crash still open, and while that crash is open no charge reaches any red
+      // in it. Saying otherwise would make the deferral cheaper on paper than it
+      // is in fact, which is the one thing this list exists to prevent.
+      //
+      // The two CLASS sentences speak about this record; the reds speak for
+      // themselves. So the sentences are keyed per record and the reds are not.
+      const crashClass = [
+        ...verdict.unaccounted.map((u) => ({ name: u.name, kind: 'crashed' })),
+        ...(isIncompleteRecording(r) ? [{ name: incompleteSentence(r), kind: TRUNCATED_KIND }] : []),
+      ]
+      out.push({
+        backend,
+        suite,
+        at,
+        id,
+        status: 'crashed',
+        unaccounted: verdict.unaccounted,
+        reds: [...crashClass, ...printedBeforeCrash].map((x) => text(x?.name)),
+        redKeys: [
+          ...crashClass.map((x) => recordKeyOf(x, id)),
+          ...printedBeforeCrash.map(redKeyOf),
+        ],
+      })
+      continue
+    }
+    // SIGNED — AND THE SIGNATURE CLOSES THE CRASH, NEVER A RED THE RUN GOT OUT
+    // BEFORE IT DIED, AND NEVER A RECORDING THAT WAS ALSO LOST (review
+    // findings, 28.08.2026). The closure used to drop the WHOLE record on the
+    // argument that a crashed run's reds "have never blocked on their own".
+    // True of the mechanism, and the wrong conclusion: a check the suite printed
+    // FAIL for was really observed, and point 640 gives that observation three
+    // closings, none of which is "the process died afterwards". So the record
+    // falls through to the ordinary branches below and is judged as any run
+    // would be — with ONE thing subtracted, right here: a signed crash that
+    // recorded no red AND lost no output is closed. "It failed without
+    // reporting a single red" is only the crash restated, and the crash is
+    // exactly what was signed for; leaving it in would have made the signature
+    // unable to close anything. A crash that ALSO truncated is not that case,
+    // however empty its red list: it lost lines, which is a second thing to
+    // dispose of, and the `isIncompleteRecording` guard below keeps it owing
+    // the second signature.
+    if (signedCrash && !isIncompleteRecording(r) && residualOf(r).reds.length === 0) continue
+    // AN INCOMPLETE RECORDING IS ITS OWN CLASS (point 734), reported apart from
+    // the reds so the guard can name it as what it is. Two things lift it, and
+    // NEITHER is the ledger — a charge needs the red's identity, and the lost
+    // part has none to give:
+    if (verdict.status === 'incomplete') {
+      // TWO ROUTES LIFT THE TRUNCATION, AND NEITHER LIFTS A RED.
+      //
+      // (1) A REAL RE-RECORDING: a COVERING run of the same suite on the same
+      // backend, later than this one and on code since the last render edit.
+      // That is not the fourth closing point 640 forbids, and the difference is
+      // the whole reason this class exists — a RED is an observation no later
+      // green un-observes, while a truncation is a MEASUREMENT THAT WAS LOST,
+      // and a lost measurement is answered by taking it again. Without this the
+      // advertised "re-run the suite" remedy did nothing inside the current
+      // window, which left the signature as the only exit (review, 19.08.2026).
+      //
+      // (2) The SIGNED CLOSURE, for a recording that cannot be redone.
+      //
+      // Both stop at the SAME line: they close what nobody could record, never
+      // what the run did record. Letting the re-run skip the accounting below
+      // would have laundered every red in the truncated run — the same hole the
+      // signature had, through the other door (review, 19.08.2026).
+      const lifted = reRecorded(r) || incompleteClosureFor(r, incompleteClosures)
+      if (!lifted) {
+        // THE REDS THE RUN DID RECORD ARE NAMED BESIDE THE LOST ONES (review
+        // finding, 28.08.2026, round 17) — the same line the crash branch above
+        // holds. `unaccounted` stays the one sentence a reader must dispose of,
+        // because the lost part is what blocks and nothing in the record can
+        // explain it. But a DEFERRAL waves the whole record through, and
+        // reporting only that sentence hid every red the run really printed and
+        // nobody owns. Charged ones stay out: a red an open point already owns
+        // was never part of the bypass.
+        const stillOpen = residualOf(r).reds.filter((red) => !owned(red, suite, backend, level))
+        // The lost-recording sentence speaks about THIS record — two truncated
+        // records of the same suite print it identically and each owes its own
+        // disposition — so it is keyed per record; the reds it kept are not.
+        const lost = verdict.unaccounted.map((u) => ({ name: u.name, kind: TRUNCATED_KIND }))
+        out.push({
+          backend,
+          suite,
+          at,
+          id,
+          status: 'incomplete',
+          droppedLines: droppedLinesOf(r),
+          unaccounted: verdict.unaccounted,
+          reds: [...lost, ...stillOpen].map((x) => text(x?.name)),
+          redKeys: [...lost.map((x) => recordKeyOf(x, id)), ...stillOpen.map(redKeyOf)],
+        })
+        continue
       }
+      // LIFTED — but only the unknowable part. What the run DID record was
+      // really observed, so it is judged here exactly like any other red:
+      // charged reds are accounted for, an unowned one keeps blocking and closes
+      // the three ordinary ways. This is what stops either route being a waiver:
+      // a flood cannot bury a red that reached the file. And the residual is read
+      // by the run's OWN class — a truncated run that also passed on the RETRY
+      // keeps its first attempt's reds, which reading `r.reds` had thrown away.
+      const residual = residualOf(r)
+      const unowned = residual.reds.filter((red) => !owned(red, suite, backend, level))
+      if (unowned.length === 0) continue
+      out.push({
+        backend,
+        suite,
+        at,
+        id,
+        status: residual.status,
+        unaccounted: unowned.map((red) => ({
+          name: text(red?.name) || '(unnamed red)',
+          point: Number.isInteger(red?.point) ? red.point : null,
+        })),
+        // A NAMELESS RED KEEPS ITS PLACE HERE TOO (review finding, 28.08.2026,
+        // round 23): dropping it took it out of the deferral's count, and the
+        // rest of the gate has called such a red "(unnamed red)" all along.
+        reds: unowned.map((red) => text(red?.name) || '(unnamed red)'),
+        redKeys: unowned.map(redKeyOf),
+      })
+      continue
+    }
+    // Only red and suspect runs reach this point — a crash took its own branch
+    // above, where the ledger can never touch it.
+    let unowned = null
+    // The post-crash residual where there is one — the reds the record still
+    // holds, read by the run's own class — and otherwise the verdict's own.
+    // A SUSPECT RECORD IS READ THROUGH `residualOf` TOO (review finding,
+    // 28.08.2026, round 17): it returns the first attempt's reds AND any this
+    // record kept of its own, which is the same list for an ordinary retry and
+    // the whole difference for one that reached CRASH_LINE while exiting 0.
+    const observed = postCrash
+      ? postCrash.reds
+      : verdict.status === 'suspect'
+        ? residualOf(r).reds
+        : Array.isArray(r.reds)
+          ? r.reds
+          : []
+    if (observed.length > 0) {
+      // Only the reds NOBODY owns are still open. Counting the whole run's
+      // reds would report a charged one as waved through beside its
+      // unexplained neighbour.
+      unowned = observed.filter((red) => !owned(red, suite, backend, level))
+      if (unowned.length === 0) continue
     }
     // The individual reds, NOT the one sentence runVerdict writes about them: a
     // suspect run's whole first attempt is summarised into a single unaccounted
     // entry, and a caller counting those would report two reds as one.
-    const open_ = unowned ?? (verdict.status === 'suspect' ? suspectRedsOf(r) : verdict.unaccounted)
-    const names = open_.map((x) => text(x?.name)).filter(Boolean)
+    const open_ =
+      unowned ?? (verdict.status === 'suspect' ? residualOf(r).reds : postCrash ? postCrash.reds : verdict.unaccounted)
+    // EVERY ENTRY, NAMED OR NOT (review finding, 28.08.2026, round 23). The
+    // filter dropped the unnamed ones outright, so a run carrying a named and an
+    // unnamed red reported one waved cost instead of two — and several unnamed
+    // ones collapsed into the single fallback below.
+    const names = open_.map((x) => text(x?.name) || '(unnamed red)')
     // What is REPORTED is what is still open — never the verdict's own list,
     // which still holds the reds a charge has since taken over: quoting one of
     // those as the blocker would name the wrong red and count one too many.
@@ -633,12 +1422,65 @@ export function unexplainedRuns(runs, since, options) {
       backend,
       suite,
       at,
-      status: verdict.status,
+      id,
+      // The residual's own class where the crash was signed off: `clean` is a
+      // reading of the exit code, never of what the record still holds.
+      status: postCrash ? postCrash.status : verdict.status,
       unaccounted: stillOpen.length > 0 ? stillOpen : verdict.unaccounted,
       reds: names.length > 0 ? names : ['(unnamed red)'],
+      redKeys: names.length > 0 ? open_.map(redKeyOf) : [redKeyOf({ name: '(unnamed red)' })],
     })
   }
-  return out.sort((a, b) => a.at - b.at)
+  // Undated records sort LAST rather than to the epoch: they cannot be placed
+  // among the measured ones, and pretending they are the oldest put them at the
+  // head of every message.
+  return out.sort((a, b) => (a.at ?? Infinity) - (b.at ?? Infinity))
+}
+
+/** THE KEY ONE RED IS COUNTED BY when a deferral says what it waved (review
+ *  finding, 28.08.2026, round 17). The name alone collapsed two different reds
+ *  that happen to print the same text — a failing check and a console error of
+ *  that name are two observations, and counting them as one understates the
+ *  bypass. The kind is part of the identity wherever the record carries one. */
+function redKeyOf(red) {
+  const kind = text(red?.kind) || 'red'
+  // THE STORED KEY IS PART OF THE IDENTITY (review finding, 28.08.2026, round
+  // 20) — with the parser's own derivation standing in where a record carries
+  // none, because a retry marker names its first attempt without one. Deriving
+  // it rather than leaving it blank is what keeps the retry pair collapsing to
+  // ONE red: the first attempt's stored key and the marker's derived key are the
+  // same string, so the pair is still one failure and not two.
+  const key = text(red?.key) || derivedRedKey(text(red?.name))
+  // AND THE DETAIL IS DELIBERATELY OUT OF IT (review finding, 28.08.2026, round
+  // 21, which read its absence as collapsing two different failures into one).
+  // Within ONE record a kind+key appears exactly once — the tap keeps one line
+  // per identity and marks a second, different reading with `detailVaried` — so
+  // there is nothing to collapse there. ACROSS records, the same check failing
+  // twice with two measurements is one failure the list names once, and that is
+  // the very collapse the retry pair needs: the marker naming a first attempt
+  // carries no detail at all, so a detail in the key would report every real
+  // retry as two waved reds instead of one.
+  return `${kind}|${key}|${text(red?.name)}`
+}
+
+/** `checkKey`'s derivation, kept HERE rather than imported (round 20). This
+ *  module may not reach into `scripts/verify/`: the guard harness copies the
+ *  top-level scripts alone, because copying that directory would pull in the
+ *  browser suites — so an import there makes every guard unspawnable. The two
+ *  are held together by a Vitest case that asks both. */
+export function derivedRedKey(name) {
+  return String(name).replace(/\s+/g, ' ').trim().toLowerCase().replace(/\d+(?:[.,]\d+)?/g, '#')
+}
+
+/** The key for a sentence that speaks about ONE RECORD rather than about a red —
+ *  the crash sentence, the lost-recording sentence (review finding, 28.08.2026,
+ *  round 18). Two crashed records of the same suite print the identical
+ *  sentence, and each is its own thing to dispose of, so each is counted: the
+ *  record's identity is part of the key. A RED is deliberately keyed WITHOUT it,
+ *  because a real retry leaves two records of the one failure and counting both
+ *  would report one red as two. */
+function recordKeyOf(entry, id) {
+  return `${redKeyOf(entry)}|record ${id}`
 }
 
 /** The most recent run of `backend` since `since`, covering or not — what the
@@ -652,7 +1494,7 @@ export function latestRun(runs, backend, since) {
     // before the edit tested the old code, so quoting its red as "why the last
     // attempt did not count" would point at the wrong code.
     if (!sawCodeSince(r, since)) continue
-    if (!best || Number(r.at ?? 0) > Number(best.at ?? 0)) best = r
+    if (!best || stampRank(r) > stampRank(best)) best = r
   }
   return best
 }
@@ -720,6 +1562,59 @@ export function suggestSuite(runs, changedRenderPaths) {
   return 'enrichments'
 }
 
+/** The block-message paragraph that names incomplete recordings AS such — used
+ *  by BOTH branches of evaluate() (point 734, round-5 finding 3): with backend
+ *  coverage still missing, the message read only each backend's LATEST run, so
+ *  an older unclosed incomplete recording plus a later genuine red reported as
+ *  the red alone and the broken recording stayed invisible until the red was
+ *  fixed — one blocker wearing the other's message. */
+function incompleteRecordingParagraph(incomplete) {
+  const named = incomplete
+    .slice(0, 3)
+    .map(
+      (u) =>
+        `${u.backend}/${u.suite} @${isoOf(u.at)}` +
+        (u.droppedLines > 0 ? ` (${u.droppedLines} line(s) dropped)` : ''),
+    )
+    .join(' | ')
+  return (
+    `INCOMPLETE RECORDING — NOT AN UNEXPLAINED RED: ${incomplete.length} recorded run(s) printed more ` +
+    `result lines than the capture buffer holds — ${named}${incomplete.length > 3 ? ', …' : ''}. Do NOT ` +
+    'hunt a defect in them: what they list is a FRAGMENT of their red set, so the three closings of ' +
+    'point 640 cannot apply — all three need the red\'s identity, and this record has none. RE-RUN the ' +
+    'suite to get a real recording; where that is impossible, sign the recording off as broken: ' +
+    'node scripts/render-verify-guard.mjs --incomplete "<backend>/<suite>" --evidence "<why it cannot ' +
+    'be re-recorded>". That closure signs off the LOST PART of the recording — never the picture, and ' +
+    'never a red the run did record, which keeps blocking until it is fixed, charged or filed. The ' +
+    'backend still needs a covering run, and a signed-off recording is never counted as a green.'
+  )
+}
+
+/** The block-message paragraph that names crashed runs AS crashes (point 734,
+ *  sixth round): the gate used to report one as an unexplained red, which sends
+ *  the reader hunting a defect the run never reported — a crashed run judged no
+ *  picture and holds nothing to explain, and its way out is its own. */
+function crashedRunParagraph(crashed) {
+  const named = crashed
+    .slice(0, 3)
+    .map((u) => `${u.backend}/${u.suite} @${isoOf(u.at)}`)
+    .join(' | ')
+  return (
+    `CRASHED RUN — NOT AN UNEXPLAINED RED, AND NEVER A JUDGED PICTURE: ${crashed.length} recorded ` +
+    `run(s) died rather than reported — ${named}${crashed.length > 3 ? ', …' : ''}. Do NOT hunt a ` +
+    'defect in them and do NOT charge them: the crash itself carries no red anybody can own, so the ' +
+    'three closings of point 640 cannot reach it. RE-RUN the suite for a real judgment of the ' +
+    'picture — but the re-run does NOT remove this record: a crash is an observed failure, and no ' +
+    'later green un-observes it, exactly as with a red. THIS RECORD leaves the list two ways: its ' +
+    'CAUSE is named and fixed (the render edit moves the window past it and its own suite then comes ' +
+    'up covering), or you READ the kept log (local/verify-logs/, point 460) and sign the record off ' +
+    'as unreadable: node scripts/render-verify-guard.mjs --crashed "<backend>/<suite>" --evidence ' +
+    '"<what the log shows>". That signature closes the CRASH, never the picture and never a red the ' +
+    'run printed before it died — the run still covers no backend, and a signed-off crash is never ' +
+    'a pass.'
+  )
+}
+
 const ALLOW = { decision: 'allow' }
 
 /**
@@ -776,6 +1671,8 @@ export function evaluate(input) {
     deferral = null,
     openPoints = null,
     ledger = RED_CHARGES,
+    incompleteClosures = null,
+    crashClosures = null,
     fence = null,
     sessionId = '',
   } = input ?? {}
@@ -791,7 +1688,7 @@ export function evaluate(input) {
   }
 
   const since = Number.isFinite(latestChangeAt) ? latestChangeAt : 0
-  const opts = { openPoints, ledger }
+  const opts = { openPoints, ledger, incompleteClosures, crashClosures }
   // Two backends only where the two backends can DIFFER; otherwise one passing
   // run is the whole proof, and the second is a picture inspection bought for
   // nothing (user 26.07.2026).
@@ -820,12 +1717,18 @@ export function evaluate(input) {
     // same failure — the first attempt's red one and the retry's SUSPECT one,
     // which carries the same check names — and counting both would report one
     // failure as two.
+    // AND ONE RED IS ITS KIND AND ITS NAME (review finding, 28.08.2026, round
+    // 17). Keyed by the name alone, a failing check and a console error printing
+    // the same text collapsed into one waved entry and one count — two
+    // observations reported as one, which is the understatement this list exists
+    // to prevent. `redKeys` carries the kind wherever the record has one.
     const waved = []
     const seen = new Set()
     let wavedCount = 0
     for (const u of unexplained) {
-      for (const name of u.reds) {
-        const key = `${u.backend}|${u.suite}|${name}`
+      for (let i = 0; i < u.reds.length; i++) {
+        const name = u.reds[i]
+        const key = `${u.backend}|${u.suite}|${u.redKeys?.[i] ?? name}`
         if (seen.has(key)) continue
         seen.add(key)
         wavedCount++
@@ -850,28 +1753,40 @@ export function evaluate(input) {
   // (Where a backend is missing too, the message below says so with the same
   // three ways out — this one is for the case the old gate waved through.)
   if (missing.length === 0 && unexplained.length > 0) {
-    const named = unexplained
-      .slice(0, 3)
-      .map((u) => {
-        const what = u.status === 'suspect' ? 'passed only on the RETRY' : `${u.unaccounted.length} unaccounted red(s)`
-        const first = u.unaccounted[0]?.name
-        return `${u.backend}/${u.suite}: ${what}${first ? ` — "${first}"` : ''}`
-      })
-      .join(' | ')
-    return scopeRenderVerification({
-      decision: 'block',
-      reason:
-        `UNEXPLAINED RED SINCE THE LAST RENDER EDIT: ${unexplained.length} recorded run(s) failed and nothing ` +
-        `says why — ${named}${unexplained.length > 3 ? ', …' : ''}. A LATER GREEN DOES NOT CLOSE IT (point 640): ` +
-        'three greens are consistent with a fixed defect, a rare one, a timing race and an idle machine alike. ' +
-        'A red closes in exactly THREE ways: (1) its CAUSE is named and FIXED — the fix edits the code, which ' +
-        'moves this window past the red; (2) it is CHARGED in scripts/render-verify-charges.mjs to the OPEN ' +
-        'point that owns it — the charge counts at once, no re-run needed; (3) it becomes an OPEN ' +
-        'point of its own, charged there. Is it load? MEASURE it: ' +
-        `node scripts/throttle-probe.mjs ${unexplained[0].suite} --section=<name> --runs 8. If the cause lies ` +
-        'outside the render set (a fixed helper, a dead dev server), say so loudly instead: ' +
-        'node scripts/render-verify-guard.mjs --defer "<reason>".',
-    }, { fence, sessionId })
+    // THE THREE FAMILIES ARE NAMED APART (point 734). An incomplete recording —
+    // and a crash — sent the reader hunting for a defect that was never
+    // captured, because the gate called each an unexplained red; both are the
+    // opposite, a record with nothing in it to explain, and each has its own
+    // way out.
+    const incomplete = unexplained.filter((u) => u.status === 'incomplete')
+    const crashed = unexplained.filter((u) => u.status === 'crashed')
+    const reds = unexplained.filter((u) => u.status !== 'incomplete' && u.status !== 'crashed')
+    const parts = []
+    if (reds.length > 0) {
+      const named = reds
+        .slice(0, 3)
+        .map((u) => {
+          const what = u.status === 'suspect' ? 'passed only on the RETRY' : `${u.unaccounted.length} unaccounted red(s)`
+          const first = u.unaccounted[0]?.name
+          return `${u.backend}/${u.suite}: ${what}${first ? ` — "${first}"` : ''}`
+        })
+        .join(' | ')
+      parts.push(
+        `UNEXPLAINED RED SINCE THE LAST RENDER EDIT: ${reds.length} recorded run(s) failed and nothing ` +
+          `says why — ${named}${reds.length > 3 ? ', …' : ''}. A LATER GREEN DOES NOT CLOSE IT (point 640): ` +
+          'three greens are consistent with a fixed defect, a rare one, a timing race and an idle machine alike. ' +
+          'A red closes in exactly THREE ways: (1) its CAUSE is named and FIXED — the fix edits the code, which ' +
+          'moves this window past the red; (2) it is CHARGED in scripts/render-verify-charges.mjs to the OPEN ' +
+          'point that owns it — the charge counts at once, no re-run needed; (3) it becomes an OPEN ' +
+          'point of its own, charged there. Is it load? MEASURE it: ' +
+          `node scripts/throttle-probe.mjs ${reds[0].suite} --section=<name> --runs 8. If the cause lies ` +
+          'outside the render set (a fixed helper, a dead dev server), say so loudly instead: ' +
+          'node scripts/render-verify-guard.mjs --defer "<reason>".',
+      )
+    }
+    if (crashed.length > 0) parts.push(crashedRunParagraph(crashed))
+    if (incomplete.length > 0) parts.push(incompleteRecordingParagraph(incomplete))
+    return scopeRenderVerification({ decision: 'block', reason: parts.join(' ') }, { fence, sessionId })
   }
 
   if (missing.length === 0) {
@@ -883,12 +1798,20 @@ export function evaluate(input) {
       if (!run) continue
       const verdict = runVerdict(run, opts)
       if (verdict.status !== 'accounted') continue
-      accounted.push({ backend: b, suite: run.suite ?? 'unknown', at: run.at ?? 0, charges: verdict.charges })
+      accounted.push({ backend: b, suite: run.suite ?? 'unknown', at: runStamp(run), charges: verdict.charges })
     }
     return accounted.length > 0
       ? { decision: 'allow', clear: true, accounted }
       : { decision: 'allow', clear: true }
   }
+
+  // EVERY unclosed incomplete recording in the window, named AS one whatever
+  // else is blocking (round-5 finding 3): reading only each backend's LATEST
+  // run reported an older broken recording as invisible behind a later genuine
+  // red, which violates the rule that the guard says WHICH it is. The crashed
+  // class gets the same visibility for the same reason (sixth round).
+  const incompleteInWindow = unexplained.filter((u) => u.status === 'incomplete')
+  const crashedInWindow = unexplained.filter((u) => u.status === 'crashed')
 
   // WHY the last attempt on a missing backend did not count — the actionable
   // half of the block message: an unaccounted red is either a real finding, or a
@@ -899,13 +1822,84 @@ export function evaluate(input) {
     if (!run) continue
     const verdict = runVerdict(run, opts)
     if (verdict.unaccounted.length === 0) continue
-    const named = verdict.unaccounted
+    // WHAT IS REALLY STILL BLOCKING THIS RUN — the entry unexplainedRuns wrote,
+    // not the raw verdict. A truncated run whose truncation has been lifted can
+    // still be blocked by a red it DID record, and quoting the verdict there
+    // named the truncation and advised a second signature, which resolves
+    // nothing (review, 19.08.2026).
+    const suiteName = run.suite ?? 'unknown'
+    // MATCHED BY THE RECORD'S IDENTITY, NOT BY ITS STAMP (review finding,
+    // 28.08.2026, round 13). Two runs of one suite and backend that both lack a
+    // readable stamp folded to the same 0 and were indistinguishable here, so
+    // this could hand the reader a DIFFERENT run's residual under the name of
+    // the one it was explaining. The identity is the whole record.
+    const runId = runIdentity(run)
+    const reported = unexplained.find(
+      (u) => u.backend === b && u.suite === suiteName && u.id !== null && u.id === runId,
+    )
+    // A crashed run is named by its own paragraph below while it still blocks;
+    // signed off, it simply leaves the backend uncovered — quoting its synthetic
+    // "unaccounted red" here sent the reader hunting a defect the run never
+    // reported (sixth round; the same rule the incomplete class already has).
+    if (run.crashed === true && verdict.status === 'red') {
+      if (!reported) {
+        whyNot.push(
+          `${b}: the last run (${suiteName}) CRASHED, but that record is already signed off as ` +
+            'unreadable, so it neither blocks nor proves anything. This backend simply has no covering run yet.',
+        )
+        continue
+      }
+      // Still an OPEN crash — or a signed one whose record ALSO truncated, which
+      // the incomplete paragraph names below (review finding, 28.08.2026, round
+      // 20: falling through there labelled the lost-recording sentence an
+      // "UNACCOUNTED red", repeated it in that paragraph and offered the three
+      // red closings, none of which can reach a line nobody recorded). Either
+      // way its own paragraph says it, and repeating it here would only bury the
+      // other backends.
+      if (reported.status === 'crashed' || reported.status === 'incomplete') continue
+      // SIGNED, AND A RED IT PRINTED BEFORE IT DIED STILL STANDS (review
+      // finding, 28.08.2026, round 19). This `continue` was unconditional, so
+      // the one thing really blocking the backend went unnamed: the crash
+      // paragraph had stopped applying, the crash sentence must not be quoted,
+      // and nothing was left to say. It falls through now and reports THAT red,
+      // exactly as the incomplete branch beside it does.
+    }
+    if (verdict.status === 'incomplete') {
+      // Still an open incomplete recording: the paragraph below names it as its
+      // own class, so saying it here again would only bury the other backends.
+      if (reported && reported.status === 'incomplete') continue
+      // Its truncation is already answered (re-recorded or signed off) and no
+      // residual red blocks — the backend simply has no covering run yet.
+      if (!reported) {
+        whyNot.push(
+          `${b}: the last run (${suiteName}) recorded INCOMPLETELY, but its truncation is already ` +
+            'answered, so it neither blocks nor proves anything. This backend simply has no covering run yet.',
+        )
+        continue
+      }
+      // Lifted, but a red the run DID record still stands — fall through and
+      // report THAT red, never the truncation (a second signature resolves
+      // nothing).
+    }
+    // ONLY the incomplete fall-through reads the reported entry: every other
+    // family's verdict sentence is the one to print (a suspect run's entry
+    // carries the first attempt's raw check names, not the sentence about them).
+    // ONLY the two record classes read the reported entry — the truncation whose
+    // residual red still stands, and the signed crash whose residual red still
+    // stands. Every other family's verdict sentence is the one to print (a
+    // suspect run's entry carries the first attempt's raw check names, not the
+    // sentence about them).
+    const open_ =
+      reported && (verdict.status === 'incomplete' || run.crashed === true)
+        ? reported.unaccounted
+        : verdict.unaccounted
+    const named = open_
       .slice(0, 3)
       .map((u) => (u.point === null ? `"${u.name}" (charged to nothing)` : `"${u.name}" (point ${u.point} is not open)`))
       .join('; ')
     whyNot.push(
-      `${b}: the last run (${run.suite ?? 'unknown'}) failed with ${verdict.unaccounted.length} ` +
-        `UNACCOUNTED red(s) — ${named}${verdict.unaccounted.length > 3 ? ', …' : ''}`,
+      `${b}: the last run (${suiteName}) failed with ${open_.length} ` +
+        `UNACCOUNTED red(s) — ${named}${open_.length > 3 ? ', …' : ''}`,
     )
   }
 
@@ -943,6 +1937,11 @@ export function evaluate(input) {
         : '') +
       'ONLY if one backend genuinely cannot be judged headless (e.g. a washed-out ' +
       'WebGPU frame — that is a FINDING, not a pass), record a loud deferral: ' +
-      'node scripts/render-verify-guard.mjs --defer "<reason>".',
+      'node scripts/render-verify-guard.mjs --defer "<reason>".' +
+      // Named in THIS branch too: a crash and an incomplete recording must
+      // never hide behind a missing backend or a later red (round-5 finding 3;
+      // the crashed class since the sixth round).
+      (crashedInWindow.length > 0 ? ` ${crashedRunParagraph(crashedInWindow)}` : '') +
+      (incompleteInWindow.length > 0 ? ` ${incompleteRecordingParagraph(incompleteInWindow)}` : ''),
   }, { fence, sessionId })
 }
