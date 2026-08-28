@@ -1003,7 +1003,10 @@ describe('a range SOL authored', () => {
 
   it('runs Fable for the mixed Sol/Opus end state and the recorder accepts exactly that routed verdict', () => {
     writeFileSync(join(dir, 'calls.log'), '')
-    const r = run(['--reviewer', 'fable', '--sha', unreviewableSha, '--point', '977', '--brief', 'judge the mixed end state'])
+    const r = run([
+      '--reviewer', 'fable', '--sha', unreviewableSha, '--point', '977', '--brief', 'judge the mixed end state',
+      '--file', 'unreviewable.txt',
+    ])
     expect(r.status, `${r.stdout}${r.stderr}`).toBe(0)
     expect(calls()).toEqual(['claude-fable-5'])
     const command = splitCommand(recordCommandIn(r.stdout))
@@ -1021,6 +1024,7 @@ describe('a range SOL authored', () => {
       model: 'Fable 5',
       verdict: 'merge',
       handover: 'sol-authored',
+      pass: { index: 1, total: 1, files: ['unreviewable.txt'], endState: unreviewableSha },
       reviewerAuthorship: {
         status: 'agreement', actualModel: 'Fable 5', servedModel: 'claude-fable-5', proof: 'claude-result',
       },

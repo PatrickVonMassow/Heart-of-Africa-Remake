@@ -795,6 +795,7 @@ export function formatReviewerCommand({
   since = '',
   timeout = '',
   pass = '',
+  files = [],
 } = {}) {
   const reviewer = reviewerDescriptor(model)
   if (!reviewer || !sha || !String(brief).trim()) return ''
@@ -809,6 +810,7 @@ export function formatReviewerCommand({
   if (String(since).trim()) parts.push(`--since ${String(since).trim()}`)
   if (String(timeout).trim()) parts.push(`--timeout ${String(timeout).trim()}`)
   if (String(pass).trim()) parts.push(`--pass ${String(pass).trim()}`)
+  for (const file of Array.isArray(files) ? files : []) parts.push(`--file ${q(file)}`)
   return parts.join(' ')
 }
 

@@ -1016,7 +1016,7 @@ export const usage = () =>
   [
     'usage: node scripts/review-sol.mjs [--reviewer sol|fable|opus|opus48] --sha <sha> --brief "<what to judge>" \\',
     '           [--mode review|blind-parallel] [--point <N>] [--since <ref>] [--timeout <ms>] \\',
-    '           [--pass <k>]',
+    '           [--pass <k>] [--file <current end-state path>]…',
     '       node scripts/review-sol.mjs --probe            (is -m honoured?)',
     '       node scripts/review-sol.mjs --save-login | --restore-login',
     '',
@@ -1028,6 +1028,8 @@ export const usage = () =>
     'commit ships the current content of the files it touches.',
     'An explicit --since that narrows a fitting range records one scoped 1/1 pass whose',
     'file list and reviewed sha clear exactly the end-state artefacts that round read.',
+    '--file narrows only the current end-state material, not its history: reviewer eligibility',
+    'still includes every contributor to that path in the full --since range.',
     'Recorded scoped files remain cleared until those files change; later commits touching',
     'only other files leave them clear. No carry record or carry planning flag is needed.',
     'A commit written to answer a recorded finding owes a confirming clean pass only for',
@@ -1048,6 +1050,8 @@ if (isMainModule(import.meta.url)) {
     const i = argv.indexOf(name)
     return i >= 0 && i + 1 < argv.length && !argv[i + 1].startsWith('--') ? argv[i + 1] : ''
   }
+  const flags = (name) => argv.map((arg, index) => arg === name ? argv[index + 1] : null)
+    .filter((value) => value && !value.startsWith('--'))
   try {
     if (argv.includes('--save-login')) process.exit(saveLogin())
     if (argv.includes('--restore-login')) process.exit(restoreLogin())
@@ -1059,6 +1063,7 @@ if (isMainModule(import.meta.url)) {
     const point = flag('--point')
     const timeoutMs = Number(flag('--timeout')) || REVIEW_TIMEOUT_MS
     const reviewerFlag = flag('--reviewer')
+    const selectedFiles = [...new Set(flags('--file'))]
     const requestedReviewer = reviewerFlag ? reviewerDescriptor(reviewerFlag) : null
     if (!sha || !brief) {
       console.error('review-sol: --sha and --brief are both required.\n')
@@ -1153,6 +1158,7 @@ if (isMainModule(import.meta.url)) {
       sha: full,
       base,
       records,
+      paths: selectedFiles.length ? selectedFiles : null,
       recordUsable: (record, commit) => reviewRecordWellFormed(record, { commitAt: commit?.at }) && !mergeProblem(record, commit),
     })
     console.error(formatAuthorshipPlan(plan, { sha: full }))
@@ -1185,7 +1191,7 @@ if (isMainModule(import.meta.url)) {
     // A FITTING BUT NARROWED RANGE IS ONE SCOPED PASS. Its file list and record
     // sha are the exact end-state boundary the old pass-less row could not express.
     // A full branch-range review stays pass-less for ledger compatibility.
-    const pass = plan.fits ? (partialFor(base) ? selected : null) : selected
+    const pass = plan.fits ? (selectedFiles.length || partialFor(base) ? selected : null) : selected
     const rangeAuthors = selected
       ? selected.authors
       : [...new Set(plan.passes.flatMap((candidate) => candidate.authors ?? []))]
@@ -1202,6 +1208,7 @@ if (isMainModule(import.meta.url)) {
       since: sinceFlag,
       timeout: flag('--timeout'),
       pass: passFlag,
+      files: selectedFiles,
     })
 
     let targetReviewer = requestedReviewer ?? reviewerDescriptor(SOL_MODEL_NAME)
