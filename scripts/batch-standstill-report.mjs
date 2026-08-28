@@ -15,6 +15,7 @@ import {
   autostartEvidence,
   autostartLastEvidence,
   boundaryMarkerEvidence,
+  delegatedBranchProgress,
   declaredInputPaths,
   firstParentCommitTimes,
   readJournal,
@@ -73,6 +74,7 @@ export function gatherStandstillReport({ repo, ref = 'main', start, end, thresho
   const autoLast = autostartLastEvidence(readText(paths.autostartLast))
   const boundaryEvents = timestampedLogBoundaries(readText(paths.boundaryLog)).map((entry) => entry.at)
   const boundaryMarker = boundaryMarkerEvidence(readText(paths.boundaryMarker), { end })
+  const delegatedProgress = delegatedBranchProgress(readText(paths.inFlight), { repo, records: journal.records, start, end })
   const pauseMarker = pauseMarkerEvidence(readText(paths.pauseMarker), { start, end })
   const verification = verificationRecordEvidence(resolve(repo, 'local', 'verify-logs'), { start, end })
   const transcripts = paths.sessionTranscripts.map((path) => transcriptEvidence(readText(path), { session: path.split(/[\\/]/).at(-1)?.replace(/\.jsonl$/, '') }))
@@ -99,6 +101,11 @@ export function gatherStandstillReport({ repo, ref = 'main', start, end, thresho
     inputs: paths,
     inputHealth: { journalRecords: journal.records.length, rejectedJournalLines: journal.rejected, transcriptFiles: paths.sessionTranscripts.length },
     commitGaps: gaps,
+    batchProgress: [
+      ...commits.map((at) => ({ at, kind: 'first-parent-commit' })),
+      ...boundaryMarker.batchProgress,
+      ...delegatedProgress,
+    ].sort((a, b) => a.at - b.at),
     timeline,
     reportedIntervals,
     totals,

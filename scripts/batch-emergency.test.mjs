@@ -25,6 +25,7 @@ const fixture = () => {
       workablePoints: [947], paused: false, veto: null, state: {},
       report: {
         window: { start: progressAt - 1, end: now },
+        batchProgress: [{ at: progressAt, kind: 'first-parent-commit' }],
         timeline: [
           { start: progressAt - 1, end: progressAt, className: ACTIVITY_CLASSES.FOREGROUND },
           { start: progressAt, end: now, className: ACTIVITY_CLASSES.IDLE_OWNER },

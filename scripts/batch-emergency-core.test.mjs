@@ -14,6 +14,7 @@ const NOW = Date.parse('2026-08-26T20:00:00Z')
 const progressAt = NOW - 2 * EMERGENCY_THRESHOLD_MS
 const report = (className = ACTIVITY_CLASSES.NO_WORKER) => ({
   window: { start: progressAt - EMERGENCY_THRESHOLD_MS, end: NOW },
+  batchProgress: [{ at: progressAt, kind: 'first-parent-commit' }],
   timeline: [
     { start: progressAt - 1000, end: progressAt, className: ACTIVITY_CLASSES.FOREGROUND },
     { start: progressAt, end: NOW, className },
@@ -28,9 +29,9 @@ describe('the independent emergency decision', () => {
     expect(activeVeto({ reason: 'expired', until: NOW - 1 }, NOW)).toBe(false)
   })
 
-  it('does nothing while measured progress is inside the hour', () => {
+  it('stands down when a real batch advance is inside the hour', () => {
     const recent = report()
-    recent.timeline[0].end = NOW - EMERGENCY_THRESHOLD_MS + 1
+    recent.batchProgress[0].at = NOW - EMERGENCY_THRESHOLD_MS + 1
     expect(emergencyDecision({ now: NOW, report: recent, workablePoints: [947] })).toMatchObject({
       action: 'observe', strike: false, reason: 'progress-within-threshold',
     })
@@ -48,7 +49,7 @@ describe('the independent emergency decision', () => {
       action: 'hard-recover', strike: true, reason: 'batch-still-stalled-after-recorded-recovery',
     })
     const moved = report()
-    moved.timeline[0].end = progressAt + 1
+    moved.batchProgress[0].at = progressAt + 1
     expect(emergencyDecision({ now: NOW, report: moved, workablePoints: [947], state }).action).toBe('soft-recover')
   })
 
@@ -58,16 +59,37 @@ describe('the independent emergency decision', () => {
     expect(emergencyDecision({ now: NOW, report: {}, workablePoints: [947] }).reason).toBe('no-bounded-evidence-window')
   })
 
-  it('takes the latest end of real advancing work, never owner presence', () => {
+  it('takes only explicit batch progress, never session activity or owner presence', () => {
     expect(latestProgressAt(report(ACTIVITY_CLASSES.IDLE_OWNER))).toBe(progressAt)
     expect(latestProgressAt({
       window: { start: 1 },
+      batchProgress: [
+        { at: 5, kind: 'first-parent-commit' },
+        { at: 8, kind: 'delegated-branch-moved' },
+        { at: 99, kind: ACTIVITY_CLASSES.FOREGROUND },
+      ],
       timeline: [
         { end: 4, className: ACTIVITY_CLASSES.FOREGROUND },
-        { end: 8, className: ACTIVITY_CLASSES.VERIFICATION },
+        { end: 10, className: ACTIVITY_CLASSES.VERIFICATION },
         { end: 12, className: ACTIVITY_CLASSES.IDLE_OWNER },
       ],
     })).toBe(8)
+    expect(latestProgressAt({
+      window: { start: 1 },
+      timeline: Object.values(ACTIVITY_CLASSES).map((className, index) => ({ end: index + 2, className })),
+    })).toBe(1)
+  })
+
+  it('strikes an owner that stays busy without moving the batch', () => {
+    const busy = report(ACTIVITY_CLASSES.FOREGROUND)
+    busy.timeline = Array.from({ length: 12 }, (_, index) => ({
+      start: progressAt + index * 10 * 60_000,
+      end: progressAt + (index + 1) * 10 * 60_000,
+      className: ACTIVITY_CLASSES.FOREGROUND,
+    }))
+    expect(emergencyDecision({ now: NOW, report: busy, workablePoints: [947] })).toMatchObject({
+      action: 'soft-recover', strike: true, progressAt,
+    })
   })
 
   it('records the strike, evidence, outcome phase and exact veto command', () => {
