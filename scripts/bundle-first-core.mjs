@@ -32,8 +32,22 @@ import { parseOpenPoints } from './queue-order-guard-core.mjs'
 export const BUNDLES_HEADING = '## The bundles'
 export const UNBUNDLED_MARKER = '**Not bundled**'
 
-/** Dates (`30.07.2026`) carry numbers that are not point numbers. */
-const stripDates = (s) => String(s ?? '').replace(/\b\d{1,2}\.\d{1,2}\.\d{4}\b/g, ' ')
+/**
+ * Dates carry numbers that are not point numbers: `30.07.2026`, `2026-08-28`,
+ * and the bare year in `August 2026`. The year form matters since the reader
+ * below went to four digits — without it every date in a bundle's prose could
+ * mark a point of that number as placed.
+ *
+ * DIRECTION: stripping can only make a point look UNBUNDLED, which the guard
+ * reports out loud; it can never invent a placement. Residual, deliberately not
+ * chased: a bare four-digit QUANTITY in prose (`1440 px`) is indistinguishable
+ * from a point number and would count as one — it can only mislead where it
+ * collides with an open point number, and this guard's fail direction is allow.
+ */
+const stripDates = (s) => String(s ?? '')
+  .replace(/\b\d{1,2}\.\d{1,2}\.\d{4}\b/g, ' ')
+  .replace(/\b\d{4}-\d{2}-\d{2}\b/g, ' ')
+  .replace(/\b(?:19|20)\d{2}\b/g, ' ')
 
 /** Point numbers in a cell or bullet: up to 4 digits, dates removed first. The
  * work order passed 999 on 28.08.2026, and a 3-digit reader silently reports
