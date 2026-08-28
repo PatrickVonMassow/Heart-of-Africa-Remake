@@ -24892,3 +24892,33 @@ Nummerierung bleiben deshalb identisch — hier wird nur verschoben, nie umgesch
   stamp that carries no information at all, so what 504 breaks ties on stays untouched.
   Bundle: Urlaubsfestigkeit. It reads the same liveness core as 958's emergency lane and 504's
   verdict, so it does not run beside either.
+
+- [x] 988. Every second landing hand-resolves the same conflict in the append-only review ledger.
+  MEASURED 28.08.2026 while landing points 977 and 985: both merges failed at `land-point.mjs`'s
+  merge step with `CONFLICT (content): Merge conflict in .claude/mechanism-reviews.jsonl`, and
+  nine of the last thirty merge commits on `main` already record a conflict in that same file.
+  The cause is structural, not accidental. `.claude/mechanism-reviews.jsonl` is APPEND-ONLY: a
+  feature branch appends its authoring commission and its review records, `main` appends the
+  reviews recorded for other branches, and both append at the end of the file. Git sees two sets
+  of added lines at one position and cannot know that their union — not either side — is the
+  correct result. `.gitattributes` exists but names the ledger nowhere, so the default text merge
+  runs and every landing pays for it.
+  WHAT IT COSTS: `land-point.mjs` stops at its first step and prints "merge by hand, resolve the
+  conflict CAREFULLY". A human or an agent then edits a 1300-line machine-written JSONL file by
+  hand — which is exactly where a review record can be dropped, duplicated or reordered, and the
+  ledger is the evidence the four-eyes gate rests on. Resolving it by taking one side silently
+  DELETES recorded reviews; the conflict is only safe to resolve as the union, and nothing in the
+  repository says so at the point where the resolver stands.
+  FINAL STATE: a landing does not stop on this file. The union of both sides is produced without a
+  hand edit — a `merge=union`-style attribute for the ledger, or a named merge driver that unions
+  the lines and orders them by their `at` stamp — and the result is validated: every line still
+  parses as JSON and no line present on either side is missing. Where a real conflict exists that a
+  union cannot express, the landing still stops, loudly.
+  VERIFIABLE: Vitest over the resolution with two constructed branch tips that each append distinct
+  records — the merged ledger contains every record from both sides exactly once, in `at` order,
+  and every line parses; a tip that MODIFIES an existing line rather than appending still conflicts
+  rather than being silently unioned. Plus the real reproduction: two branches that both append,
+  merged without a hand edit.
+  Criticality: high — it is the four-eyes evidence file, and the standing repair instruction is a
+  hand edit whose most obvious form deletes recorded reviews.
+  Bundle: Modell & Wächter.
