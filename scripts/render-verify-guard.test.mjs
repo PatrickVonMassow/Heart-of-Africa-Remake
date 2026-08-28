@@ -709,6 +709,11 @@ describe('render-verify-guard --status — what it prints about a run it cannot 
     })
     expect(out).toMatch(/covered by polish/)
     expect(out).toMatch(/unaccounted red: webgpu\/polish .* "a check nobody filed"/)
+    // AND IT SAYS WHETHER IT IS BLOCKING (review finding, 28.08.2026, round 22).
+    // Nothing is pending here, so this record is OWED and stopping nothing — a
+    // bare warning said the opposite.
+    expect(out).toMatch(/unaccounted red: webgpu\/polish .*no render path is pending at this HEAD/)
+    expect(out).not.toMatch(/unaccounted red: webgpu\/polish .*BLOCKING NOW/)
   })
 
   // AND EACH RECORD CLASS SAYS WHETHER IT BLOCKS RIGHT NOW. The two sign-off

@@ -1236,16 +1236,33 @@ export function unexplainedRuns(runs, since, options) {
       // (review finding, 28.08.2026, round 17): `residualOf` strips the
       // truncation marker, so without this the deferral named the crash and the
       // reds the run got out, and said nothing about the lines nobody read.
-      const printedBeforeCrash = residualOf(r).reds.filter((red) => text(red?.name))
+      // A NAMELESS RED IS STILL A RED (review finding, 28.08.2026, round 22).
+      // Dropping the entries whose name is empty took them out of the count as
+      // well, so a deferral over a crashed run understated what it waved by
+      // exactly the reds nobody could name — and the ordinary path has called
+      // such a red "(unnamed red)" all along.
+      const printedBeforeCrash = residualOf(r).reds.map((red) => ({
+        ...red,
+        name: text(red?.name) || '(unnamed red)',
+      }))
       // AND THEY ARE REPORTED UNFILTERED BY THE LEDGER, deliberately (review
-      // finding, 28.08.2026, round 19, which read the missing `owned` filter as
-      // an inconsistency with the two paths beside it). A charge is exactly what
-      // a crashed run cannot carry — `runVerdict` answers `charges: []` for it
-      // at any time — so a red printed before the crash has no owner while the
-      // crash stands, and a deferral that carried it away really did carry an
-      // unowned red away. Filtering here would report it as accounted for by a
-      // charge that never applied. Once the crash is SIGNED the ledger reaches
-      // those reds again, and the residual path below filters them there.
+      // finding, 28.08.2026, rounds 19 and 22, which read the missing `owned`
+      // filter as an inconsistency with the two paths beside it). A charge is
+      // exactly what a crashed run cannot carry — `runVerdict` answers
+      // `charges: []` for it at any time — so a red printed before the crash has
+      // no owner while the crash stands, and a deferral that carried it away
+      // really did carry an unowned red away. Filtering here would report it as
+      // accounted for by a charge that never applied. Once the crash is SIGNED
+      // the ledger reaches those reds again, and the residual path below filters
+      // them there.
+      //
+      // ROUND 22 SHARPENED THE OBJECTION — the same red is filtered as owned
+      // once the crash is signed, so the two readings disagree. They do, and the
+      // difference is the SIGNATURE, which is the whole mechanism: a deferral
+      // does not sign anything. It carries the record past the gate with its
+      // crash still open, and while that crash is open no charge reaches any red
+      // in it. Saying otherwise would make the deferral cheaper on paper than it
+      // is in fact, which is the one thing this list exists to prevent.
       //
       // The two CLASS sentences speak about this record; the reds speak for
       // themselves. So the sentences are keyed per record and the reds are not.

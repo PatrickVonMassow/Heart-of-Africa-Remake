@@ -228,8 +228,14 @@ export const RED_CHARGES = [
       'signature, and unscoped this one would have excused a console red carrying one of these ' +
       'texts — a red nobody measured. Measured before the change: no red in the recorded window ' +
       'matches this pattern at all, so nothing accounted for today stops being.',
+    // ANCHORED AT THE NAME'S START (review finding, 28.08.2026, round 22). The
+    // fragments floated free, so "Graphics levels" inside any future settings
+    // check would have been charged here. A stored CHECK name is the label the
+    // suite printed, so its start is exactly where these six begin. Measured
+    // before the change: no red in the recorded window matches this pattern at
+    // all, so nothing accounted for today stops being.
     match:
-      /(TRAA (off again|toggle stress)|F9 low|Graphics levels|the leak block produced no OTHER|first-person ground shows micro-detail)/i,
+      /^(TRAA (off again|toggle stress)|F9 low|Graphics levels|the leak block produced no OTHER|first-person ground shows micro-detail)/i,
   },
   {
     point: 514,
@@ -310,8 +316,15 @@ export const RED_CHARGES = [
     // defect the point says to file. Measured before the change: no recorded
     // red in the 40-run window matches any of the three, so nothing accounted
     // for today stops being.
-    match:
-      /(GPUValidationError: The texture format \(TextureFormat::RGBA16Float\) does not sup|GPUValidationError: \[Invalid Texture "(output|normal)-msaa"\] is invalid due to a previous|GPUValidationError: \[Invalid TextureView\] is invalid due to a previous error)/i,
+    // ONE ALTERNATIVE, ONE DETAIL — SO THEY CANNOT CROSS (review finding,
+    // 28.08.2026, round 22). `match` and `detailMatch` are asked
+    // independently, so a red whose NAME was the RGBA16Float root could pass the
+    // narrow half on an `Invalid TextureView` sentence somewhere else in its
+    // detail — the opposite of what the root alternative claims to require. The
+    // measured sentences are the same in both halves now, which couples them:
+    // the root's detail must name multisampling, and each downstream sentence
+    // must name its own object.
+    match: /GPUValidationError: The texture format \(TextureFormat::RGBA16Float\) does not sup/i,
     // AND THE ROOT IS READ OFF THE DETAIL, WHERE ITS SENTENCE SURVIVES WHOLE
     // (review finding, 28.08.2026, round 20). The stored NAME keeps 120
     // normalised characters and the root sentence is 137, so it ends at
@@ -324,7 +337,49 @@ export const RED_CHARGES = [
     // within the run. A record written before the detail was kept carries none
     // and is out of this entry's reach — the information was never written down,
     // which is the honest answer and not a charge.
-    detailMatch: /(RGBA16Float\) does not support multisampling|Invalid Texture "(output|normal)-msaa"|Invalid TextureView)/i,
+    detailMatch: /GPUValidationError: The texture format \(TextureFormat::RGBA16Float\) does not support multisampling/i,
+  },
+  // THE TWO DOWNSTREAM SENTENCES GET THEIR OWN ENTRIES (review finding,
+  // 28.08.2026, round 22). One entry cannot pair a name alternative with a
+  // detail alternative: `match` and `detailMatch` are asked independently, so a
+  // red NAMED for the root passed the narrow half on a TextureView sentence
+  // somewhere else in its detail — the opposite of what the root claims to
+  // require. Split, each alternative is coupled to its own detail by
+  // construction. Everything else about them is the entry above: the same lane,
+  // the same measured cascade, the same expiry with point 514, and the same
+  // limit point 990 owns.
+  {
+    point: 514,
+    suite: 'settings',
+    backend: 'webgpu',
+    featureLevel: 'compatibility',
+    kind: 'console',
+    why:
+      'THE MSAA ATTACHMENT HALF of the cascade the entry above describes in full, split out ' +
+      '28.08.2026 (round 22) so its name and its measured sentence cannot be satisfied by a ' +
+      'different alternative. Read off the two 13.08.2026 webgpu/settings records, where both ' +
+      'attachments print this sentence beside the root. On the core adapter, on WebGL 2, in ' +
+      'another suite or as a CHECK it stays a real red, and the charge dies with point 514.',
+    match: /GPUValidationError: \[Invalid Texture "(output|normal)-msaa"\] is invalid due to a previous/i,
+    detailMatch: /GPUValidationError: \[Invalid Texture "(output|normal)-msaa"\] is invalid due to a previous error/i,
+  },
+  {
+    point: 514,
+    suite: 'settings',
+    backend: 'webgpu',
+    featureLevel: 'compatibility',
+    kind: 'console',
+    why:
+      'THE TEXTURE-VIEW HALF of the same cascade, split out 28.08.2026 (round 22) for the same ' +
+      'reason. It is the ONE downstream object name the storm was measured with, in the ' +
+      'uncaptured-validation form and never the async-pipeline one — that form has no owning ' +
+      'point and must be FILED the moment a run reproduces it, which is what point 734 says. ' +
+      'What this entry still cannot ask is whether the root it points back to is present and ' +
+      'uncharged in the same record: a charge reads ONE red and never the run around it, which ' +
+      'is POINT 990. On core, on WebGL 2, in another suite or as a CHECK it stays a real red, ' +
+      'and the charge dies with point 514.',
+    match: /GPUValidationError: \[Invalid TextureView\] is invalid due to a previous error/i,
+    detailMatch: /GPUValidationError: \[Invalid TextureView\] is invalid due to a previous error/i,
   },
   {
     point: 568,
@@ -375,7 +430,7 @@ export const RED_CHARGES = [
     backend: 'webgpu',
     featureLevel: 'compatibility',
     kind: 'check',
-    match: /15-worldmodel-victoria-falls/i,
+    match: /^frame 15-worldmodel-victoria-falls\b/i,
     why:
       'Measured 11.08.2026 on main at 3f639f0d: the falls frame reds as "subject not in the ' +
       'rendered picture", twice including the suite own retry, while the six other landmark ' +
@@ -395,7 +450,7 @@ export const RED_CHARGES = [
     backend: 'webgpu',
     featureLevel: 'compatibility',
     kind: 'check',
-    match: /11-worldmodel-khartoum-confluence/i,
+    match: /^frame 11-worldmodel-khartoum-confluence\b/i,
     why:
       'Measured 26.08.2026 on main at f178ea6d, on a quiet machine, four runs across two ' +
       'sittings: the Khartoum frame reds with the SAME wording as the falls frame of 11.08. — ' +
@@ -409,7 +464,14 @@ export const RED_CHARGES = [
       'adapter the player runs this red stays real. Measured that day across the 40 recorded ' +
       'runs: every WebGPU run that recorded a level recorded COMPATIBILITY and no core-level ' +
       'run has ever been written here, and no red this entry accounts for today sits on a run ' +
-      'whose level went unrecorded — so the narrowing withdraws no charge that stands.',
+      'whose level went unrecorded — so the narrowing withdraws no charge that stands. ' +
+      'AND THE FAILURE MODE STAYS UNNARROWED, MEASURED (cross-vendor review, 28.08.2026, round ' +
+      '22, which asked for it): the evidence covers one way this frame reds, and a `detailMatch` ' +
+      'is the instrument that would say so — but the reds this entry accounts for were recorded ' +
+      'BEFORE the record kept a detail, and carry none. Read that day: every one of them has an ' +
+      'empty detail, so adding the narrow half today would withdraw a standing charge and block ' +
+      'the render set on evidence that has not changed. It becomes narrowable the first time ' +
+      'this red is recorded again, with its measurement.',
   },
   {
     point: 938,
@@ -417,19 +479,23 @@ export const RED_CHARGES = [
     backend: 'webgpu',
     featureLevel: 'compatibility',
     kind: 'check',
-    match: /streamed dressing does not grow over a session at a fixed anchor/i,
+    match: /^the streamed dressing does not grow over a session at a fixed anchor/i,
     why:
       'Measured 26.08.2026: five recorded webgpu/enrichments runs of 17.08.2026 carry this check ' +
       'red with point=null, because the check names point 278 and 278 is TICKED — a charge dies ' +
       'with its point, so the red had no owner it could be charged to. Point 938 was opened for ' +
       'exactly this red and is the owner until it settles whether the check or the dressing is ' +
-      'stale.' +
+      'stale. ' +
       'SCOPED TO THE COMPATIBILITY LEVEL 28.08.2026 (cross-vendor review), with every other ' +
       'WebGPU entry: an entry may excuse only the lane its evidence measured, and on the CORE ' +
       'adapter the player runs this red stays real. Measured that day across the 40 recorded ' +
       'runs: every WebGPU run that recorded a level recorded COMPATIBILITY and no core-level ' +
       'run has ever been written here, and no red this entry accounts for today sits on a run ' +
-      'whose level went unrecorded — so the narrowing withdraws no charge that stands.',
+      'whose level went unrecorded — so the narrowing withdraws no charge that stands. ' +
+      'AND THE FAILURE MODE STAYS UNNARROWED for the reason the point-627 entry above states in ' +
+      'full (cross-vendor review, 28.08.2026, round 22): the reds this entry accounts for were ' +
+      'recorded before the record kept a detail and carry none, so the narrow half would ' +
+      'withdraw a standing charge today. Measured that day, empty on every one of them.',
   },
   {
     point: 939,
@@ -457,7 +523,7 @@ export const RED_CHARGES = [
     backend: 'webgpu',
     featureLevel: 'compatibility',
     kind: 'check',
-    match: /72-water-victoria-falls/i,
+    match: /^frame 72-water-victoria-falls\b/i,
     why:
       'Measured 26.08.2026 on the recorded state: the webgpu/enrichments run of 17.08.2026 08:25 ' +
       'carries this frame red unaccounted. Point 514 already names this exact frame missing its ' +
@@ -468,7 +534,11 @@ export const RED_CHARGES = [
       'webgpu/settings entries above and for the same reason: the evidence names a lane fault, so ' +
       'unscoped this entry would retroactively excuse the same frame on the CORE adapter the player ' +
       'runs, where it stays a real red. The narrowing changes no evidence — the 17.08.2026 08:25 ' +
-      'record was re-read that day and carries featureLevel=compatibility.',
+      'record was re-read that day and carries featureLevel=compatibility.' +
+      'AND THE FAILURE MODE STAYS UNNARROWED for the reason the point-627 entry above states in ' +
+      'full (cross-vendor review, 28.08.2026, round 22): the reds this entry accounts for were ' +
+      'recorded before the record kept a detail and carry none, so the narrow half would ' +
+      'withdraw a standing charge today. Measured that day, empty on every one of them.',
   },
   {
     point: 603,

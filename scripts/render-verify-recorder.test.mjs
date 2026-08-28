@@ -485,6 +485,26 @@ describe('tapOutput — observe-only', () => {
     expect(state.lines).toEqual(['ERR: the last word is café'])
   })
 
+  // THE BUDGETS ARE THE RUN'S, NOT EACH STREAM'S (review finding, 28.08.2026,
+  // round 22). Every budget case wrote to stdout alone, so a per-stream
+  // implementation allowing twice the advertised ceiling would have passed the
+  // whole suite. The identities are split across both streams here, and the one
+  // ceiling still holds over the pair.
+  it('spends ONE identity budget across stdout and stderr together', () => {
+    const { state, out, err } = tapped()
+    for (let i = 0; i < MAX_RED_IDENTITIES; i++) {
+      const stream = i % 2 === 0 ? out : err
+      stream.write(`ERR: page error in span ${tag(i)}\n`)
+    }
+    expect(state.lines).toHaveLength(MAX_RED_IDENTITIES)
+    expect(state.droppedLines ?? 0).toBe(0)
+    // One past the ceiling, on either stream, is refused.
+    err.write(`ERR: page error in span ${tag(MAX_RED_IDENTITIES)}\n`)
+    out.write(`ERR: page error in span ${tag(MAX_RED_IDENTITIES + 1)}\n`)
+    expect(state.lines).toHaveLength(MAX_RED_IDENTITIES)
+    expect(state.droppedLines).toBe(2)
+  })
+
   // A line WITHIN the per-line budget that brings nothing new costs nothing,
   // however long it is — counting it would be a FALSE truncation, and a false
   // truncation blocks the gate.
@@ -781,6 +801,29 @@ describe('the armed recorder — the REAL wiring, not a stand-in', () => {
     expect(runVerdict(record, { openPoints }).status).toBe('red')
     expect(runVerdict(record, { openPoints }).unaccounted[0].name).toMatch(/crash/)
     expect(isIncompleteRecording(record)).toBe(true)
+  })
+
+  // THE REAL STDERR WIRING (review finding, 28.08.2026, round 22). Every armed
+  // case wrote to stdout, so `armRunRecorder` could have omitted or miswired
+  // stderr capture entirely without failing this suite — while stderr is where
+  // the crash frames arrive, which is the one signal the crash class rests on.
+  it('captures a stack trace written to the REAL stderr, and the reds beside it', async () => {
+    const before = process.stderr.write
+    const run = await armed('polish')
+    const stderrWasWrapped = process.stderr.write !== before
+    const wrapper = process.stderr.write
+    // The sink goes UNDER the tap, exactly as armed() does for stdout, so the
+    // fake stack never reaches the terminal while the tap still sees it.
+    process.stderr.write = (chunk, ...rest) => {
+      wrapper.call(process.stderr, chunk, ...rest)
+      return true
+    }
+    process.stderr.write('TimeoutError: page.waitForFunction: Timeout 300000ms exceeded\n    at run (/x/polish.mjs:89:7)\n')
+    process.stdout.write('FAIL  a check the suite got out before it died — 0.4\n')
+    const record = run.exit(1)
+    expect(stderrWasWrapped).toBe(true)
+    expect(record.crashed).toBe(true)
+    expect(record.reds.map((r) => r.name)).toEqual(['a check the suite got out before it died'])
   })
 
   it('marks a run whose process raised an uncaught exception, and that run never accounts (F1)', async () => {

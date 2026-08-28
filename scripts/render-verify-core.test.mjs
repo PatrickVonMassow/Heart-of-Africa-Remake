@@ -2251,6 +2251,25 @@ describe('a CRASHED run is its own class, and has its own signed way out (point 
     ])
   })
 
+  // A NAMELESS RED IS STILL A RED (review finding, 28.08.2026, round 22).
+  // Dropping the entries whose name is empty took them out of the COUNT as well,
+  // so a deferral over a crashed run understated what it waved by exactly the
+  // reds nobody could name — and the ordinary path has called such a red
+  // "(unnamed red)" all along.
+  it('counts a nameless red a crashed run printed, under the name the rest of the gate gives it', () => {
+    const nameless = crashedRun('webgpu', 1500, { reds: [{ name: '', key: '', kind: 'check', point: null }] })
+    const found = unexplainedRuns([nameless], 1000, { openPoints })
+    expect(found[0].reds).toEqual(['the run ended in a crash, not in its own report', '(unnamed red)'])
+    const result = evaluate(
+      renderChange({
+        runs: [nameless],
+        deferral: { head: 'def5678', reason: 'the lane died mid-suite', at: 1700 },
+        openPoints,
+      }),
+    )
+    expect(result.wavedCount).toBe(2)
+  })
+
   // A crash that did NOT truncate says nothing about a lost recording.
   it('says nothing about a lost recording where none was lost', () => {
     const only = crashedRun('webgpu', 1500, { reds: [red('a check nobody owns')] })
@@ -2821,10 +2840,43 @@ describe('the shipped charge ledger', () => {
   // entry none of its evidence.
   it('charges the Victoria Falls frame to the COMPATIBILITY lane only, never to the core adapter', () => {
     const scoped = { suite: 'enrichments', backend: 'webgpu', kind: 'check' }
-    const frame = red('72-water-victoria-falls: the frame shows its subject')
+    // The stored name a frame check really carries (round 22 anchored the entry).
+    const frame = red('frame 72-water-victoria-falls')
     expect(chargeFor(frame, { ...scoped, featureLevel: 'compatibility' }).point).toBe(514)
     expect(chargeFor(frame, { ...scoped, featureLevel: 'core' })).toBeNull()
     expect(chargeFor(frame, scoped)).toBeNull()
+  })
+
+  // A LEDGER PATTERN IS ANCHORED WHERE THE MEASURED NAME BEGINS (review finding,
+  // 28.08.2026, round 22). The six MSAA check fragments floated free, so
+  // "Graphics levels" inside ANY future settings check would have been charged
+  // here. A stored check name is the label the suite printed, so its start is
+  // exactly where these six begin.
+  it('charges the MSAA checks only where their name BEGINS, not wherever it appears', () => {
+    const scoped = { suite: 'settings', backend: 'webgpu', kind: 'check', featureLevel: 'compatibility' }
+    expect(chargeFor(red('Graphics levels: no new console errors across the F9 cycle'), scoped).point).toBe(514)
+    // The same words inside a different check are a red nobody measured.
+    expect(chargeFor(red('the settings panel restores Graphics levels after a reload'), scoped)).toBeNull()
+    expect(chargeFor(red('a later check mentioning F9 low in passing'), scoped)).toBeNull()
+  })
+
+  // AND A NARROW HALF IS COUPLED TO THE ALTERNATIVE IT BELONGS TO (review
+  // finding, 28.08.2026, round 22). `match` and `detailMatch` are asked
+  // independently, so a red NAMED for the RGBA16Float root could pass the narrow
+  // half on an unrelated cascade sentence elsewhere in its detail — the opposite
+  // of what the root alternative claims to require.
+  it('does not let one cascade sentence satisfy another alternative\u2019s detail', () => {
+    const scoped = { suite: 'settings', backend: 'webgpu', kind: 'console', featureLevel: 'compatibility' }
+    const crossed = {
+      ...red(
+        'console error: THREE.WebGPURenderer: Uncaptured WebGPU GPUValidationError: The texture format (TextureFormat::RGBA16Float) does not sup',
+        null,
+        'console',
+      ),
+      detail:
+        'THREE.WebGPURenderer: Uncaptured WebGPU GPUValidationError: [Invalid TextureView] is invalid due to a previous error.',
+    }
+    expect(chargeFor(crossed, scoped)).toBeNull()
   })
 
   it('charges the fixed render-target leak to NOBODY — a mended red is a red again', () => {

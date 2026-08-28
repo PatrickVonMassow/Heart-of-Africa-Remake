@@ -736,6 +736,40 @@ if (arg === 'status' || arg === '--status') {
       incompleteClosures: state.incompleteClosures,
       crashClosures: state.crashClosures,
     })
+    // WHETHER THE GATE IS ARMED AT ALL DECIDES WHETHER ANYTHING BLOCKS (review
+    // finding, 28.08.2026, round 20). With no pending render path `since` is 0,
+    // so every historical record enters the open list — and calling each of them
+    // "BLOCKING NOW" while the gate has nothing to block was the opposite of the
+    // truth. An active deferral at this HEAD says the same for the other reason.
+    const deferred = Boolean(state.deferral && state.deferral.head === head)
+    const armed = paths.length > 0 && !deferred
+    const blockingIds = new Set(armed ? openRecords.map((u) => u.id) : [])
+    /** The same three states for an entry that already knows its identity. */
+    const blocksNowById = (id) => {
+      if (blockingIds.has(id)) return 'BLOCKING NOW'
+      if (deferred) return 'not blocking — an active deferral covers this HEAD'
+      if (paths.length === 0) return 'not blocking — no render path is pending at this HEAD'
+      return 'outside the current window — owed, not blocking'
+    }
+    const blocksNow = (r) => {
+      if (blockingIds.has(runIdentity(r))) return 'BLOCKING NOW'
+      // A RECORD WHOSE LOST MEASUREMENT WAS RETAKEN IS ANSWERED, not merely old
+      // (round 19), and that is true of the record whatever the gate is doing —
+      // so it is said before the gate's own two reasons.
+      //
+      // OF A TRUNCATION ONLY (review finding, 28.08.2026, round 21). A lost
+      // MEASUREMENT is answered by taking it again; a CRASH is not, and the
+      // guard says so everywhere else — "a re-run judges the picture but does
+      // NOT remove this record". Reading the same sentence over a crashed record
+      // contradicted the paragraph directly above it.
+      const retaken = r?.crashed === true ? null : reRecordedBy(state, r, { openPoints })
+      if (retaken) {
+        return `already answered by the later covering ${retaken.suite} run @${isoText(runStamp(retaken) ?? retaken.at)} — signing it changes nothing`
+      }
+      if (deferred) return 'not blocking — an active deferral covers this HEAD'
+      if (paths.length === 0) return 'not blocking — no render path is pending at this HEAD'
+      return 'outside the current window — owed, not blocking'
+    }
     for (const b of BACKENDS) {
       const run = coveringRun(state.runs, b, since, { openPoints })
       const verdict = run ? runVerdict(run, { openPoints }) : null
@@ -783,7 +817,12 @@ if (arg === 'status' || arg === '--status') {
     for (const u of openRecords) {
       if (u.status !== 'red' && u.status !== 'suspect') continue
       console.log(
-        `⚠ ${classOf(u)}: ${u.backend}/${u.suite} @${isoText(u.at)} (id ${u.id}) — ` +
+        // EACH ONE SAYS WHETHER IT IS BLOCKING (review finding, 28.08.2026,
+        // round 22). With nothing pending — or with a deferral covering this
+        // HEAD — the window is the whole history, so these are records that are
+        // OWED and not records that are stopping anything, and a bare warning
+        // said the opposite. The two record classes below carry the same line.
+        `⚠ ${classOf(u)}: ${u.backend}/${u.suite} @${isoText(u.at)} (id ${u.id}, ${blocksNowById(u.id)}) — ` +
           u.unaccounted.map((x) => `"${x.name}"${x.point === null ? '' : ` (point ${x.point} is not open)`}`).join('; '),
       )
     }
@@ -798,33 +837,6 @@ if (arg === 'status' || arg === '--status') {
     // record unsignable, which is the trap this point exists to end. What each
     // line owes the reader instead is whether it blocks right now, and that is
     // what `blocksNow` says.
-    // WHETHER THE GATE IS ARMED AT ALL DECIDES WHETHER ANYTHING BLOCKS (review
-    // finding, 28.08.2026, round 20). With no pending render path `since` is 0,
-    // so every historical record enters the open list — and calling each of them
-    // "BLOCKING NOW" while the gate has nothing to block was the opposite of the
-    // truth. An active deferral at this HEAD says the same for the other reason.
-    const deferred = Boolean(state.deferral && state.deferral.head === head)
-    const armed = paths.length > 0 && !deferred
-    const blockingIds = new Set(armed ? openRecords.map((u) => u.id) : [])
-    const blocksNow = (r) => {
-      if (blockingIds.has(runIdentity(r))) return 'BLOCKING NOW'
-      // A RECORD WHOSE LOST MEASUREMENT WAS RETAKEN IS ANSWERED, not merely old
-      // (round 19), and that is true of the record whatever the gate is doing —
-      // so it is said before the gate's own two reasons.
-      //
-      // OF A TRUNCATION ONLY (review finding, 28.08.2026, round 21). A lost
-      // MEASUREMENT is answered by taking it again; a CRASH is not, and the
-      // guard says so everywhere else — "a re-run judges the picture but does
-      // NOT remove this record". Reading the same sentence over a crashed record
-      // contradicted the paragraph directly above it.
-      const retaken = r?.crashed === true ? null : reRecordedBy(state, r, { openPoints })
-      if (retaken) {
-        return `already answered by the later covering ${retaken.suite} run @${isoText(runStamp(retaken) ?? retaken.at)} — signing it changes nothing`
-      }
-      if (deferred) return 'not blocking — an active deferral covers this HEAD'
-      if (paths.length === 0) return 'not blocking — no render path is pending at this HEAD'
-      return 'outside the current window — owed, not blocking'
-    }
     const openIncomplete = openIncompleteRuns(state)
     for (const r of openIncomplete) {
       console.log(
