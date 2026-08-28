@@ -77,37 +77,6 @@ then point 633 (the closing run), then point 174 (the tag). A newly appended poi
 kind is MOVED to the front in the same turn that files it; leaving it where append-and-defer
 put it is the mistake this line exists to stop.
 
-- [ ] 958. The independent emergency lane reads a session's own tool calls as batch progress, so a
-  BUSY wedge never reaches it. MEASURED 27.08.2026 while cross-reading the lane point 947 built:
-  `scripts/batch-emergency-core.mjs` puts `ACTIVITY_CLASSES.FOREGROUND` into `ADVANCING_CLASSES`,
-  and `latestProgressAt` takes the latest END of any advancing interval. By the standstill
-  classifier's own definition an interval is FOREGROUND on nothing more than a timestamped
-  session-linked tool call. So an owner wedged in a BUSY loop — a poll loop, a guard refusal it
-  keeps retrying, an agent re-reading the same files — keeps emitting foreground intervals, the
-  progress boundary keeps moving, and `emergencyDecision` never reaches its one-hour threshold. The
-  lane therefore covers the QUIET wedge only, while `docs/batch-autonomy.md` S-19 claims it covers
-  the live-but-wedged owner because it "uses bounded advancing intervals, never process presence".
-  That claim is true about process presence and false about tool activity, and the busy shape is
-  measured in this repository: the poll-loop rule of 28.07.2026 records a chain of 437 answers for
-  one word.
-  FINAL STATE:
-  - PROGRESS FOR THIS DECISION IS BATCH PROGRESS, not session activity: a first-parent commit on
-    `main`, a landed point, a committed boundary, a delegated branch that moved. Foreground tool
-    activity may at most soften a strike; it may never reset the clock on its own.
-  - THE DOCUMENT SAYS WHICH OF THE TWO IT MEASURES. `docs/batch-autonomy.md` S-19 is corrected in
-    the same commit, because its present wording is what makes the gap invisible.
-  - THE QUIET CASE IS NOT LOST. A wedge with no activity at all must still strike exactly as it
-    does today; the change may only ADD the busy case.
-  VERIFIABLE: Vitest over `emergencyDecision` — a timeline of unbroken FOREGROUND intervals with no
-  batch-level advance for longer than the threshold still strikes; a real batch advance inside the
-  threshold still stands the lane down; and the existing quiet-wedge cases stay green. Plus the
-  chaos drill extended to the busy shape: a wedged owner that keeps making tool calls is recovered
-  without human action.
-  Criticality: high — it is the hole in the double safety the user ordered on 26.08.2026, and the
-  busy wedge is the shape this batch has actually produced.
-  Bundle: Urlaubsfestigkeit. It changes the same decision core as 947's lane, so it does not run
-  beside another point touching `scripts/batch-emergency-core.mjs`.
-
 - [ ] 925. The durable lane is built but neither measured nor journalled, and its failure
   matrix does not touch the real path. Point 676 landed the whole plane — bounded dispatch,
   checkpoint barrier, two-phase boundary, successor reconciliation, landing journal, board
