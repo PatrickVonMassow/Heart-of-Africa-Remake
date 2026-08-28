@@ -9204,11 +9204,11 @@ to land than a mechanism that needs a review.
   recorded pass advances the per-contribution baseline — but the reading itself is multi-session
   work nobody has run, and once 721's planner covered a range the point-714 gap clause stopped
   degrading the block: the gate hard-blocks every turn end for a debt no single session can clear.
-  TWO ranges are therefore owed, each unblocked at the time by 721's rule 5 ("or the range is
+  THREE ranges are therefore owed, each unblocked at the time by 721's rule 5 ("or the range is
   explicitly re-baselined with a written justification naming every file that re-baselining leaves
   unread"), each justification and full unread-file list living in
-  `.claude/mechanism-review-baseline.json` beside the baseline it moved, and THIS point is both
-  justifications' tracked half:
+  `.claude/mechanism-review-baseline.json` beside the baseline it moved, and THIS point is every
+  justification's tracked half:
   - `762de1c..b8baae0` — five weeks of guard work; measured 18.08.2026 after 721 landed: 34
     outstanding passes, ~3.4M characters.
   - `53feef3..ee195c7` — point 712's own 46 commits; measured 18.08.2026, 22:55: 65 outstanding
@@ -9218,8 +9218,16 @@ to land than a mechanism that needs a review.
     fix, and until it lands any guard range past a handful of commits re-creates this debt. 712's
     substance had six cross-vendor rounds and its fixes are in the tree — what the ledger lacks is
     Sol's clearing read of the FIXED content at the boundaries its round-5/6 refusals named.
+  - `a7ae14a..70f19c4` — point 734's 60 mechanism contributions; measured 28.08.2026, 21:10: the
+    guard bills each one a 7-pass split of which 5 are missing, roughly 295 passes for nine files.
+    Unlike the two ranges above, this material WAS read cross-vendor at its end state — the
+    whole-range round over `395be985^1..3d9f4b16` recorded a complete 7/7 split (Sol passes 1-6,
+    Opus 4.8 pass 7) over all nine mechanism files, and the four defects it left standing are open
+    points 991, 996, 998 and 999. What is genuinely unread here is only `.claude/queue-rank.json`
+    and `docs/work-packages.md`. The per-commit billing that makes the rest unpayable is point 998,
+    and this range is the fixture its VERIFIABLE clause names.
   FINAL STATE:
-  - Every file the two re-baselines left unread is read in authorship-cut passes against its own
+  - Every file the re-baselines left unread is read in authorship-cut passes against its own
     range and recorded (`node scripts/review-sol.mjs --sha <head> --since <base>` plans them; the
     reviewer per pass is the planner's, cross-vendor by construction), or is explicitly
     retired here with a reason (a doc file whose content is not a mechanism — CLAUDE.md, TASKS.md,
