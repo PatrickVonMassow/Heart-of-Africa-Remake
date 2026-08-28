@@ -1427,8 +1427,10 @@ forever, because the raw record still says `crashed` after the crash is signed
 signature at all. A signed crash is now judged as what the record still holds:
 the lost recording becomes an incomplete recording with its own route, and any
 red the run printed before it died stands. A signed crash that recorded nothing
-is closed by that one signature, because "it failed without reporting a red" is
-only the crash restated.
+AND lost nothing is closed by that one signature alone, because "it failed
+without reporting a red" is only the crash restated — but a run that also
+truncated has lost output whether or not it printed a red, so it owes the
+second signature exactly like any other, and one is not enough for it.
 
 **And a flag is not a value.** `--evidence --run <id>` used to yield the literal
 `--run` as the written evidence, which the draft — handed a non-empty string —

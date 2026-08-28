@@ -1169,9 +1169,13 @@ export function unexplainedRuns(runs, since, options) {
     // closings, none of which is "the process died afterwards". So the record
     // falls through to the ordinary branches below and is judged as any run
     // would be — with ONE thing subtracted, right here: a signed crash that
-    // recorded nothing at all is closed. "It failed without reporting a single
-    // red" is only the crash restated, and the crash is exactly what was signed
-    // for; leaving it in would have made the signature unable to close anything.
+    // recorded no red AND lost no output is closed. "It failed without
+    // reporting a single red" is only the crash restated, and the crash is
+    // exactly what was signed for; leaving it in would have made the signature
+    // unable to close anything. A crash that ALSO truncated is not that case,
+    // however empty its red list: it lost lines, which is a second thing to
+    // dispose of, and the `isIncompleteRecording` guard below keeps it owing
+    // the second signature.
     if (signedCrash && !isIncompleteRecording(r) && residualOf(r).reds.length === 0) continue
     // AN INCOMPLETE RECORDING IS ITS OWN CLASS (point 734), reported apart from
     // the reds so the guard can name it as what it is. Two things lift it, and
