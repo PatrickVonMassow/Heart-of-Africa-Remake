@@ -1614,10 +1614,10 @@ describe('a CRASHED run is its own class, and has its own signed way out (point 
         incompleteClosures: [crashClosure(crashedAndTruncated)],
       }),
     ).toHaveLength(1)
-    // …while the crash signature closes the whole record: a crashed run
-    // CONCLUDED nothing, so there is no completed observation left to preserve
-    // — unlike a truncated run, which finished, and whose recorded reds stand
-    // past its own closure.
+    // …while the crash signature closes this whole record — not because a crash
+    // erases observations (it does not: see the next case), but because the one
+    // entry this record carries is the truncation marker, and what nobody
+    // recorded is owned by nobody in either family.
     expect(
       unexplainedRuns([crashedAndTruncated], 1000, {
         openPoints,
@@ -1629,6 +1629,27 @@ describe('a CRASHED run is its own class, and has its own signed way out (point 
     expect(
       unexplainedRuns([merelyTruncated], 1000, { openPoints, crashClosures: [crashClosure(merelyTruncated)] }).map((u) => u.status),
     ).toEqual(['incomplete'])
+  })
+
+  // The signature closes the CRASH, and stops at the same line the incomplete
+  // closure stops at (review finding, 28.08.2026): the crash branch used to
+  // `continue` over the whole record once signed, so a check the suite really
+  // printed FAIL for vanished with it — neither fixed, charged, nor filed.
+  it('signs off the crash and NOT a red the run printed before it died', () => {
+    const withRed = crashedRun('webgpu', 1500, { reds: [red('a check nobody owns', null)] })
+    const closures = [crashClosure(withRed)]
+    // Unsigned, the CRASH is what blocks — the red is not hunted for.
+    expect(unexplainedRuns([withRed], 1000, { openPoints }).map((u) => u.status)).toEqual(['crashed'])
+    // Signed, the crash sentence is gone and the observed red stands in its place.
+    const residual = unexplainedRuns([withRed], 1000, { openPoints, crashClosures: closures })
+    expect(residual.map((u) => u.status)).toEqual(['red'])
+    expect(residual[0].reds).toEqual(['a check nobody owns'])
+    // Charged to an open point, that red is accounted for and the record clears.
+    const owned_ = crashedRun('webgpu', 1500, { reds: [red('goat stance', 506)] })
+    expect(unexplainedRuns([owned_], 1000, { openPoints, crashClosures: [crashClosure(owned_)] })).toEqual([])
+    // And a crashed run that printed nothing behaves exactly as it always has.
+    const bare = crashedRun('webgpu', 1500)
+    expect(unexplainedRuns([bare], 1000, { openPoints, crashClosures: [crashClosure(bare)] })).toEqual([])
   })
 
   it('a signed-off crash still covers NOTHING — the backend needs a real run', () => {

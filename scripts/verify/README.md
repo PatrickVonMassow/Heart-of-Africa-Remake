@@ -1369,21 +1369,33 @@ node scripts/render-verify-guard.mjs --crashed "<backend>/<suite>" [--at <iso|ms
 ```
 
 Same binding rules as `--incomplete` (one record by content identity, written
-evidence, ambiguity refused), one honest difference: the closure lifts the
-**whole record**. A truncated run CONCLUDED, so the reds it did record are
-completed observations and keep blocking past its closure; a crashed run never
-concluded, and the gate has never read its fragmentary output as evidence in
-either direction — only the crash sentence blocks. The signature states
-exactly "we read the kept log (`local/verify-logs/`, point 460); the run died;
-there is no report here to judge", which is a disposition and never coverage:
-`runVerdict` still answers red, the backend still needs a real covering run,
-and a signed-off crash is never a pass. The two closure families live in
-separate lists (`crashClosures` beside `incompleteClosures`), so neither
-signature can ever serve the other — a run that crashed AND truncated is
-refused by the `--incomplete` draft (a crash outranks the truncation) and is
-signed as what it is: a crash. No later green lifts a crash inside the window
-either; the way out is the re-run judged on its own record, the signature, or
-the loud deferral — never silence.
+evidence, ambiguity refused), and the closure stops at exactly the same line:
+it closes the CRASH, never a red the run got out before it died. That is not
+where it started — the branch used to drop the whole record on the argument
+that a crashed run's fragmentary reds "never blocked on their own". True of the
+mechanism and the wrong conclusion (review finding, 28.08.2026): a check the
+suite printed FAIL for was really observed, and point 640 gives that
+observation three closings, of which "the process died afterwards" is not one.
+So a signed crash now stops the crash sentence and leaves any recorded red
+standing, to be fixed, charged or filed like any other. It only ever ADDS
+blockers, and a crashed run that printed nothing behaves as it always did.
+
+The signature states exactly "we read the kept log (`local/verify-logs/`, point
+460); the run died; there is no report here to judge", which is a disposition
+and never coverage: `runVerdict` still answers red, the backend still needs a
+real covering run, and a signed-off crash is never a pass. The two closure
+families live in separate lists (`crashClosures` beside `incompleteClosures`),
+so neither signature can ever serve the other — a run that crashed AND
+truncated is refused by the `--incomplete` draft (a crash outranks the
+truncation) and is signed as what it is: a crash.
+
+**A re-run does not remove a crashed record**, and the guard no longer says it
+does (same review finding — the message advertised a remedy the code does not
+implement). A crash is an observed failure and no later green un-observes it,
+exactly as with a red: the record leaves the list when its CAUSE is named and
+fixed — the render edit moves the window past it and its own suite then comes
+up covering — or through the signature, or through the loud deferral. Never
+through silence, and never through repetition.
 
 ## The world seed is pinned AT THE LAUNCHER (points 549/557)
 

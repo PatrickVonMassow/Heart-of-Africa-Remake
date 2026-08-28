@@ -1004,11 +1004,7 @@ export function unexplainedRuns(runs, since, options) {
     // crash carries no charge at any time), not by a later green of the same
     // suite (the recorded rounds pinned that a crash inside the window is not
     // talked away by the runs that followed it — the way out is the explicit,
-    // evidenced signature or the deferral, never silence). The closure lifts
-    // the WHOLE record: a crashed run concluded nothing, and its fragmentary
-    // reds have never blocked on their own (only the crash sentence does), so
-    // there is no residual observation left standing to preserve — see
-    // crashClosureFor for the whole argument.
+    // evidenced signature or the deferral, never silence).
     if (r.crashed === true) {
       if (!crashClosureFor(r, crashClosures)) {
         out.push({
@@ -1019,7 +1015,32 @@ export function unexplainedRuns(runs, since, options) {
           unaccounted: verdict.unaccounted,
           reds: verdict.unaccounted.map((u) => u.name),
         })
+        continue
       }
+      // SIGNED — AND THE SIGNATURE CLOSES THE CRASH, NEVER A RED THE RUN GOT
+      // OUT BEFORE IT DIED (review finding, 28.08.2026). The closure used to
+      // drop the WHOLE record on the argument that a crashed run's reds "have
+      // never blocked on their own". True of the mechanism, and the wrong
+      // conclusion: a check the suite printed FAIL for was really observed, and
+      // point 640 gives that observation three closings, none of which is "the
+      // process died afterwards". Signing the crash therefore stops the crash
+      // sentence and nothing else — exactly the line the incomplete recording
+      // stops at, and for the same reason. Fail-safe: this only ever ADDS
+      // blockers, and a run with no reds behaves as it did.
+      const residual = residualOf(r)
+      const unowned = residual.reds.filter((red) => !owned(red, suite, backend, level))
+      if (unowned.length === 0) continue
+      out.push({
+        backend,
+        suite,
+        at,
+        status: residual.status,
+        unaccounted: unowned.map((red) => ({
+          name: text(red?.name) || '(unnamed red)',
+          point: Number.isInteger(red?.point) ? red.point : null,
+        })),
+        reds: unowned.map((red) => text(red?.name)).filter(Boolean),
+      })
       continue
     }
     // AN INCOMPLETE RECORDING IS ITS OWN CLASS (point 734), reported apart from
@@ -1231,12 +1252,16 @@ function crashedRunParagraph(crashed) {
   return (
     `CRASHED RUN — NOT AN UNEXPLAINED RED, AND NEVER A JUDGED PICTURE: ${crashed.length} recorded ` +
     `run(s) died rather than reported — ${named}${crashed.length > 3 ? ', …' : ''}. Do NOT hunt a ` +
-    'defect in them and do NOT charge them: a crash carries no red anybody can own, so the three ' +
-    'closings of point 640 cannot reach it. RE-RUN the suite for a real judgment; where the crash is ' +
-    'the end of the story, READ the kept log (local/verify-logs/, point 460) and sign the record off ' +
+    'defect in them and do NOT charge them: the crash itself carries no red anybody can own, so the ' +
+    'three closings of point 640 cannot reach it. RE-RUN the suite for a real judgment of the ' +
+    'picture — but the re-run does NOT remove this record: a crash is an observed failure, and no ' +
+    'later green un-observes it, exactly as with a red. THIS RECORD leaves the list two ways: its ' +
+    'CAUSE is named and fixed (the render edit moves the window past it and its own suite then comes ' +
+    'up covering), or you READ the kept log (local/verify-logs/, point 460) and sign the record off ' +
     'as unreadable: node scripts/render-verify-guard.mjs --crashed "<backend>/<suite>" --evidence ' +
-    '"<what the log shows>". That signature closes the RECORD, never the picture — the run still ' +
-    'covers no backend, and a signed-off crash is never a pass.'
+    '"<what the log shows>". That signature closes the CRASH, never the picture and never a red the ' +
+    'run printed before it died — the run still covers no backend, and a signed-off crash is never ' +
+    'a pass.'
   )
 }
 

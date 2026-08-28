@@ -612,15 +612,18 @@ if (arg === 'status' || arg === '--status') {
       )
     }
     // Crashed runs, listed apart for the same reason (sixth round): there is no
-    // defect to hunt in them and no red to charge — a run that died judged no
-    // picture, and its way out is the re-run or the signed crash closure.
+    // defect to hunt in the crash itself and no red to charge — a run that died
+    // judged no picture. Its way out is the fixed CAUSE or the signed closure;
+    // a bare re-run is a judgment of the picture and leaves this record standing
+    // (review finding, 28.08.2026, where the message said otherwise).
     for (const r of openCrashedRuns(state)) {
       console.log(
         `⚠ CRASHED RUN (not an unexplained red): ${r.backend}/${r.suite} @${isoText(r.at)} ` +
           `(id ${runIdentity(r)}) — the run died rather than reported, so nothing in it can be ` +
-          'explained or charged. Re-run the suite, or read its kept log (local/verify-logs/) and ' +
-          `sign it off: node scripts/render-verify-guard.mjs --crashed "${r.backend}/${r.suite}" ` +
-          '--evidence "<what the log shows>"',
+          'explained or charged. A re-run judges the picture but does NOT remove this record: fix ' +
+          'the CAUSE (the render edit moves the window past it), or read its kept log ' +
+          '(local/verify-logs/) and sign it off: node scripts/render-verify-guard.mjs ' +
+          `--crashed "${r.backend}/${r.suite}" --evidence "<what the log shows>"`,
       )
     }
     for (const c of Array.isArray(state.crashClosures) ? state.crashClosures : []) {
