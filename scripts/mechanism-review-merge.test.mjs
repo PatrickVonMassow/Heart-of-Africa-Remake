@@ -10,6 +10,11 @@ import { REPO_ROOT } from './repo-paths.mjs'
 const LEDGER = join('.claude', 'mechanism-reviews.jsonl')
 const sandboxes = []
 const row = (id, at) => JSON.stringify({ id, at, atIso: new Date(at).toISOString() })
+const occurrences = (rows) => {
+  const counts = new Map()
+  for (const line of rows) counts.set(line, (counts.get(line) ?? 0) + 1)
+  return counts
+}
 
 const gitEnv = {
   ...process.env,
@@ -134,6 +139,37 @@ describe('the append-only review-ledger merge', () => {
     expect(git(repo, ['status', '--porcelain'])).toBe('')
   })
 
+  it('keeps every duplicate from the real ledger ancestor through a Git merge', () => {
+    const repo = fixture()
+    const ancestorText = readFileSync(join(REPO_ROOT, LEDGER), 'utf8')
+    const ancestor = ancestorText.trimEnd().split('\n')
+    const ancestorCounts = occurrences(ancestor)
+    const duplicates = [...ancestorCounts].filter(([, count]) => count > 1)
+    const latestAt = Math.max(...ancestor.map((line) => JSON.parse(line).at))
+    const fromFeature = row('real-ledger-feature', latestAt + 1)
+    const fromMain = row('real-ledger-main', latestAt + 2)
+    expect(duplicates.length).toBeGreaterThan(0)
+    write(repo, ancestor)
+    commit(repo, 'seed the real review ledger')
+
+    git(repo, ['checkout', '-q', '-b', 'feature'])
+    write(repo, [...ancestor, fromFeature])
+    commit(repo, 'append the feature review')
+    git(repo, ['checkout', '-q', 'main'])
+    write(repo, [...ancestor, fromMain])
+    commit(repo, 'append the main review')
+
+    git(repo, [...MERGE_ARGS, 'feature'])
+    const mergedText = readFileSync(join(repo, LEDGER), 'utf8')
+    const merged = mergedText.trimEnd().split('\n')
+    const mergedCounts = occurrences(merged)
+    expect(mergedText.startsWith(ancestorText)).toBe(true)
+    expect(merged).toHaveLength(ancestor.length + 2)
+    for (const [line, count] of duplicates) expect(mergedCounts.get(line)).toBe(count)
+    expect(merged.slice(ancestor.length)).toEqual([fromFeature, fromMain])
+    expect(git(repo, ['status', '--porcelain'])).toBe('')
+  })
+
   it('refuses deletion, reordering and malformed appended JSON before producing output', () => {
     const a = row('a', 100)
     const b = row('b', 200)
@@ -147,7 +183,7 @@ describe('the append-only review-ledger merge', () => {
     ).toThrow(/not JSON/)
   })
 
-  it('deduplicates identical records and gives equal timestamps a side-independent order', () => {
+  it('uses maximum multiplicity and gives equal timestamps a side-independent order', () => {
     const base = row('base', 100)
     const left = row('z-left', 200)
     const right = row('a-right', 200)
@@ -160,5 +196,11 @@ describe('the append-only review-ledger merge', () => {
       other: `${base}\n${left}\n`,
     })
     expect(duplicated.trimEnd().split('\n')).toEqual([base, left])
+    const repeated = mergeMechanismReviewLedger({
+      ancestor: `${base}\n`,
+      current: `${base}\n${left}\n${left}\n`,
+      other: `${base}\n${left}\n`,
+    })
+    expect(repeated.trimEnd().split('\n')).toEqual([base, left, left])
   })
 })
