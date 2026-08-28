@@ -978,6 +978,18 @@
       "why": "Report noise in the delegation lane; it costs reading time, not correctness, so it waits behind the release order the user set.",
       "origin": "machine",
       "place": "last"
+    },
+    "1002": {
+      "at": "2026-08-28T20:01:44.334Z",
+      "why": "The release's own closing run is a LARGE pass measured at 80m 48s against a 60-minute emergency threshold, so leaving this behind point 174 means the lane strikes the very run that would cut the release.",
+      "origin": "machine",
+      "place": "ahead"
+    },
+    "1003": {
+      "at": "2026-08-28T20:22:45.209Z",
+      "why": "The guard errs toward allow, so it under-reports drift instead of blocking work — last is right until the release is cut.",
+      "origin": "machine",
+      "place": "last"
     }
   },
   "boundary": {
@@ -1016,7 +1028,7 @@
     "why": "The order standing in front of the release today is the arrangement that predates this rule; the four machine-filed points that had ranked themselves there were moved behind 174 first"
   },
   "settled": {
-    "at": "2026-08-28T19:38:30.665Z",
+    "at": "2026-08-28T20:22:45.217Z",
     "points": [
       174,
       184,
@@ -1350,7 +1362,9 @@
       998,
       999,
       1000,
-      1001
+      1001,
+      1002,
+      1003
     ]
   }
 }

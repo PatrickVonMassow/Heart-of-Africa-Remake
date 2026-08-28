@@ -75,6 +75,7 @@ Das Musterbeispiel sind die Chat-Zeitstempel: neun Eskalationsstufen, acht weich
 | 27.08. | Vierte Runde derselben abgelehnten Kartenkopf-Darstellung: Der dritte Anlauf machte den Nutzer in seiner eigenen Abnahmebedingung zur entscheidenden Instanz und wurde trotzdem auf das eigene grüne Urteil gemergt und abgehakt — und die Schranke, die eine vierte Runde hätte verhindern sollen, war aus dem VORGESCHLAGENEN Zielbild abgeleitet und deshalb von genau der abgelehnten Darstellung erfüllt (§3.202, Punkte 967/969) |
 | 27.08. abends | Ein Veto der Gegenlesung stand auf `main`, dessen dritter Befund eine Erfindung des Prüfwerkzeugs war: Es schneidet die Retrospektive planmäßig aus dem Prüfstoff, druckt die Kürzung nur in die Konsole des Aufrufers und meldet in derselben Ausgabe »nichts weggelassen« — der Prüfer konnte »fehlt im Commit« von »fehlt in meiner Vorlage« nicht unterscheiden und klagte den Commit an. Der Schutzsatz dagegen gilt nur für eine aufgeteilte Prüfung, die ein Manifest schreibt (§3.203, Punkt 972) |
 | 27.08. abends | Dasselbe Kritikalitäts-Tor forderte binnen zwanzig Minuten erst eine, dann zwei, dann sechs gegenzulesende Dateien für einen Punkt, der in dieser Zeit keinen Commit hatte und keine der genannten Dateien je angefasst hat — die Vereinigung folgt dem Zeitfenster, nicht dem Punkt, und der Commit, der den Befund eintrug, hob die Forderung selbst mit an (§3.204, Punkt 974) |
+| 28.08. abends | Die Notfall-Uhr des unbeaufsichtigten Stapels wurde genau wie bestellt auf nachweisbaren Fortschritt verengt — und verlor dabei einen Schutz, den nie jemand aufgeschrieben hatte: Der ehrliche Abschluss-Prüflauf über beide Backends dauert gemessen 80 min 48 s gegen eine Schwelle von 60 Minuten und sieht seither aus wie ein Hänger, den die Rettungsroutine unterbricht. Kein Test wurde rot; der Schutz war vorhanden, nicht zugesichert (§3.210, Punkt 1002) |
 
 Muster: Ab dem 22.07. explodiert die Commit-Rate (Delegation) — und genau dann häufen sich die Infrastruktur-Vorfälle. **Skalierung der Autonomie erzeugt eine eigene Problemklasse, die die Feature-Arbeit zeitweise überholt.**
 
@@ -1412,7 +1413,7 @@ keinen Träger hat. Gebucht als Punkt 956.
 
 ## Anhang A — Maschinell gepflegte Quellen-Übersicht
 
-Zuletzt aktualisiert: Freitag, 28.08.2026, 20:27 · Quellen-Fingerprint: `90cddae67d92…`
+Zuletzt aktualisiert: Freitag, 28.08.2026, 22:02 · Quellen-Fingerprint: `1f04899adb04…`
 
 Spalten heuristisch aus den Quellen abgeleitet (Anläufe = distinkte Datumsnennungen im Memory;
 Maßnahme = Guard-Skripte mit Namens-Treffer). Die inhaltliche Bewertung gehört der Prosa oben.
@@ -1515,8 +1516,8 @@ Maßnahme = Guard-Skripte mit Namens-Treffer). Die inhaltliche Bewertung gehört
 
 Erfasste Quellen: 93 Feedback-/Projekt-Memories · 57 Guard-/Hook-Skripte · 6 Revert-/Reapply-Commits · 113 Prozess-/Meta-TASKS-Punkte (davon 48 offen).
 
-<!-- RETRO-FINGERPRINT: 90cddae67d920ffbee228b0d677b78cfe9e4eab900ebf58cbd7376e510979f70 -->
-<!-- RETRO-LAST-REFRESHED: 2026-08-28T18:27:30.380Z -->
+<!-- RETRO-FINGERPRINT: 1f04899adb04bd40b670423d8274f781185edc28e76977fc48badc5f1950806e -->
+<!-- RETRO-LAST-REFRESHED: 2026-08-28T20:02:25.655Z -->
 <!-- AUTO-GENERATED:END -->
 
 ### 3.111 Ein Erfolg ist kein Beweis für den Weg, auf dem er zustande kam
@@ -4619,3 +4620,29 @@ Begründung schreibt, prüft sie gegen die Behauptungen, die im selben Dokument 
 wer den Prüfstoff nach Größe schneidet, muss wissen, dass ein Widerspruch über die Schnittkante
 hinweg für jeden einzelnen Pass unsichtbar ist. Prüffrage beim Schreiben einer Rechtfertigung:
 *Widerlegt dieser Satz etwas, das ich weiter oben behauptet habe?*
+### 3.210 Die richtige Verengung nahm einen Schutz mit, den nie jemand benannt hatte
+
+Am 28.08.2026 wurde die Notfall-Uhr des unbeaufsichtigten Stapels genau so verengt, wie es
+bestellt war: Sie zählt nur noch nachweisbaren Fortschritt am Stapel — einen Commit auf `main`,
+eine gesetzte Sitzungsgrenze, einen bewegten delegierten Zweig — und nicht länger die
+Werkzeugaufrufe der Sitzung selbst. Der Grund war zwingend: Ein Besitzer, der in einer Schleife
+festhängt, erzeugt lückenlos Aktivität, und die Uhr lief deshalb nie ab. Die Änderung schließt
+diesen Fall, ist getestet und wird im Chaos-Drill an einem echten Prozess vorgeführt.
+
+Was die alte, zu weite Definition nebenbei geschützt hatte, stand nirgends: Ein ehrlicher langer
+Prüflauf zählte als Fortschritt, weil er zufällig unter dieselbe Klasse fiel. Nach der Verengung
+sieht er aus wie ein Hänger. Gemessen dauert die vollständige Suite über beide Backends 80 Minuten
+und 48 Sekunden, die Schwelle liegt bei 60 — der Abschlusslauf, mit dem jede Auslieferung endet,
+würde also von genau der Reparatur unterbrochen, die den Stapel am Leben halten soll. Kein Test
+wäre rot geworden, und die Spezifikation des Punktes war vollständig erfüllt: Der Schutz war nie
+zugesichert, nur vorhanden.
+
+Gefunden hat ihn die herstellerübergreifende Gegenlese, nicht der Autor und nicht das Tor — dieselbe
+Stellung wie in §3.121, nur andersherum: Dort überlebte ein Defekt in einer erklärten Restlücke,
+hier in einer nie erklärten Selbstverständlichkeit.
+
+**Lehre:** Wer ein Signal verengt, entfernt jeden Schutz, den die alte Weite unbenannt mitgetragen
+hat. Eine Spezifikation nennt, was hineingehört; sie nennt nie, was still herausfällt. Prüffrage
+bei jeder Verengung: *Wer hat sich bisher auf die Breite verlassen, ohne dass es irgendwo steht?*
+Die Antwort gehört als eigener Punkt in den Arbeitsauftrag, bevor die Verengung landet — nicht
+erst, nachdem sie einmal zugeschlagen hat.
