@@ -13218,7 +13218,8 @@ to land than a mechanism that needs a review.
   fails for any entry whose evidence text names a feature level the entry does not carry.
   Criticality: medium — an unscoped charge excuses the defect the player sees with evidence taken
   from a lane the player never runs.
-  Bundle: Session- & Repo-Hygiene.- [ ] 993. A writer veto with a known expiry does not wake the launcher when it expires, and never
+  Bundle: Session- & Repo-Hygiene.
+- [ ] 994. A writer veto with a known expiry does not wake the launcher when it expires, and never
   asks whether the writer is still alive. MEASURED 28.08.2026 on the 12:18-12:48 standstill. The
   predecessor ended its point boundary at 12:18 and point 811's immediate handover DID fire (`early
   tick — ownership ENDED (handed-over) — ticking now`, `.claude/batch-launcher.log` 10:18:20Z). The
