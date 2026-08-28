@@ -47,6 +47,7 @@ describe('numbersIn', () => {
   it('reads point numbers and never a date', () => {
     expect(numbersIn('350, 351, 394 — the rest landed 30.07.2026 (308, 410)')).toEqual([350, 351, 394, 308, 410])
     expect(numbersIn('cut on 29.07.2026')).toEqual([])
+    expect(numbersIn('958, 1000, 1002')).toEqual([958, 1000, 1002])
     expect(numbersIn('')).toEqual([])
     expect(numbersIn(null)).toEqual([])
   })

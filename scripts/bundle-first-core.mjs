@@ -35,10 +35,12 @@ export const UNBUNDLED_MARKER = '**Not bundled**'
 /** Dates (`30.07.2026`) carry numbers that are not point numbers. */
 const stripDates = (s) => String(s ?? '').replace(/\b\d{1,2}\.\d{1,2}\.\d{4}\b/g, ' ')
 
-/** Point numbers in a cell or bullet: 1–3 digits, dates removed first. */
+/** Point numbers in a cell or bullet: up to 4 digits, dates removed first. The
+ * work order passed 999 on 28.08.2026, and a 3-digit reader silently reports
+ * every point beyond it as unbundled. */
 export function numbersIn(text) {
   const out = []
-  for (const m of stripDates(text).matchAll(/\b(\d{1,3})\b/g)) out.push(Number(m[1]))
+  for (const m of stripDates(text).matchAll(/\b(\d{1,4})\b/g)) out.push(Number(m[1]))
   return out
 }
 
