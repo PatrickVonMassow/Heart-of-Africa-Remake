@@ -19,6 +19,7 @@ import {
   crashClosureDraft,
   openIncompleteRuns,
   openCrashedRuns,
+  closureArgs,
 } from './render-verify-guard.mjs'
 import { incompleteClosureFor, crashClosureFor, runIdentity } from './render-verify-core.mjs'
 
@@ -171,8 +172,12 @@ describe('openIncompleteRuns — what the sign-off may close', () => {
   // path exists for are the LEGACY ones — a plain `check` under the stable key,
   // which is what the recorder wrote before the cap was removed — while the
   // `truncated` kind is what a record would carry had it been written after it.
-  const LEGACY_MARKER = { name: "115 further result line(s) exceeded the capture cap — this run's reds were NOT all read", key: 'capture-truncated', kind: 'check', point: null }
-  const KIND_MARKER = { name: '115 further result line(s) exceeded the capture cap', key: 'a key nothing special', kind: 'truncated', point: null }
+  const marker = (kind) => ({ name: "115 further result line(s) exceeded the capture cap — this run's reds were NOT all read", key: 'capture-truncated', kind, point: null })
+  const LEGACY_MARKER = marker('check')
+  const MODERN_MARKER = marker('truncated')
+  // Not a record shape but a BRANCH probe: a marker recognised by its kind
+  // alone, so the two halves of isTruncationEntry are told apart.
+  const KIND_ONLY = { name: 'lines were dropped', key: 'a key nothing special', kind: 'truncated', point: null }
   const truncatedWith = (marker) => (at) => ({
     backend: 'webgpu',
     suite: 'settings',
@@ -183,8 +188,58 @@ describe('openIncompleteRuns — what the sign-off may close', () => {
   const truncated = truncatedWith(LEGACY_MARKER)
   const ordinary = (at) => ({ backend: 'webgpu', suite: 'polish', at, exit: 1, reds: [{ name: 'a real red', kind: 'check', point: null }] })
 
-  it('reads BOTH recorded marker shapes — the legacy check and the truncated kind', () => {
-    for (const [what, make] of [['legacy', truncatedWith(LEGACY_MARKER)], ['kind', truncatedWith(KIND_MARKER)]]) {
+  // THE ONE DOOR NO TEST WENT THROUGH (review finding, 28.08.2026): every case
+  // handed the draft a ready string, so the argv parsing was unexercised — and
+  // it treated the NEXT FLAG as a value, which turned an evidence-less
+  // invocation into a signed record whose written reason was "--run".
+  it('refuses to read a following FLAG as a value, so an evidence-less sign-off is refused', () => {
+    expect(closureArgs(['webgpu/startup', '--evidence', '--run', 'abc123'])).toEqual({
+      selector: 'webgpu/startup',
+      evidence: '',
+      at: '',
+      run: 'abc123',
+    })
+    // Refused where it counts: the draft sees no evidence and writes nothing.
+    const r = truncated(1500)
+    const args = closureArgs(['webgpu/settings', '--evidence', '--at', '1500'])
+    const draft = incompleteClosureDraft({ runs: [r] }, args)
+    expect(draft.closure).toBeUndefined()
+    expect(draft.error).toMatch(/--evidence .* is required/)
+    // And an ordinary invocation still reads exactly as before.
+    expect(closureArgs(['webgpu/settings', '--evidence', 'the kept log stops mid-line', '--at', '1500'])).toEqual({
+      selector: 'webgpu/settings',
+      evidence: 'the kept log stops mid-line',
+      at: '1500',
+      run: '',
+    })
+    // An evidence text that reads like the selector does not steal it.
+    expect(closureArgs(['--evidence', 'webgpu/settings', 'webgpu/settings']).selector).toBe('webgpu/settings')
+  })
+
+  // A run that BOTH crashed and truncated was excluded from this list forever,
+  // because the raw record still says `crashed` (review finding, 28.08.2026).
+  // Its lost lines could then be reached by no signature at all.
+  it('offers the incomplete route once the CRASH has been signed off', () => {
+    const both = { ...truncated(1500), crashed: true }
+    const crashClosure = { run: runIdentity(both), backend: 'webgpu', suite: 'settings', at: 1500, evidence: 'the kept log shows the browser died' }
+    // Unsigned: the crash outranks it and no incomplete closure is offered.
+    expect(openIncompleteRuns({ runs: [both] })).toEqual([])
+    // Signed: the lost recording is what is left, and it can be signed for.
+    const open = openIncompleteRuns({ runs: [both], crashClosures: [crashClosure] })
+    expect(open.map((r) => r.at)).toEqual([1500])
+    const draft = incompleteClosureDraft(
+      { runs: [both], crashClosures: [crashClosure] },
+      { selector: 'webgpu/settings', evidence: 'the capture was cut where the process died' },
+    )
+    expect(draft.closure?.run).toBe(runIdentity(both))
+  })
+
+  it('reads BOTH recorded marker shapes — and the kind on its own', () => {
+    for (const [what, make] of [
+      ['legacy', truncatedWith(LEGACY_MARKER)],
+      ['modern', truncatedWith(MODERN_MARKER)],
+      ['kind only', truncatedWith(KIND_ONLY)],
+    ]) {
       const r = make(1500)
       expect(openIncompleteRuns({ runs: [r] }).map((x) => x.at), what).toEqual([1500])
       const draft = incompleteClosureDraft({ runs: [r] }, { selector: 'webgpu/settings', evidence: 'the kept log stops mid-line' })

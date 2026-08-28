@@ -225,8 +225,28 @@ export const RED_CHARGES = [
     // normalisation) — never the bare format name: a different RGBA16Float
     // fault on this lane is NOT the measured cascade and must stay red
     // (round-5 review, 19.08.2026).
+    //
+    // THE THREE GENERIC ALTERNATIVES ARE REPLACED BY THE CASCADE'S OWN
+    // SIGNATURE (review finding, 28.08.2026). `Invalid TextureView` and
+    // `Invalid CommandBuffer from CommandEncoder` are ordinary WebGPU object
+    // names: they say nothing about a cause, and a charge reads ONE red at a
+    // time, so an unrelated settings defect printing either would have been
+    // charged here retroactively. What the recorded storm actually carries —
+    // and what point 734 quotes verbatim — is `is invalid due to a previous
+    // error`, which is not wording but a STATEMENT: this error is downstream of
+    // one already reported. That is exactly what may be excused, and it is
+    // self-limiting, because the ROOT it points back to is a red of its own and
+    // nothing here charges it: a different root on this lane blocks the run
+    // through its own text whatever its downstream says.
+    //
+    // `Async render pipeline creation failed` is dropped outright: point 734
+    // records that it has NO owning point in the work order and must be given
+    // one the moment a run reproduces it, so owning it here would bury the very
+    // defect the point says to file. Measured before the change: no recorded
+    // red in the 40-run window matches any of the three, so nothing accounted
+    // for today stops being.
     match:
-      /(GPUValidationError: The texture format \(TextureFormat::RGBA16Float\) does not sup|Invalid Texture "(output|normal)-msaa"|Invalid TextureView|Invalid CommandBuffer from CommandEncoder|Async render pipeline creation failed)/i,
+      /(GPUValidationError: The texture format \(TextureFormat::RGBA16Float\) does not sup|Invalid Texture "(output|normal)-msaa"|is invalid due to a previous error)/i,
   },
   {
     point: 568,

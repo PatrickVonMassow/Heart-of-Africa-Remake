@@ -602,6 +602,22 @@ describe('NON_RENDER_VERIFY matches the actual scripts/verify/ tree', () => {
 /** A red as the recorder writes it into the run record. */
 const red = (name, point = null, kind = 'check') => ({ name, key: name.toLowerCase(), kind, point })
 
+/**
+ * THE TRUNCATION MARKER EXACTLY AS THE RECORDER WROTE IT, defined ONCE so the
+ * cases cannot drift into two different "production" shapes (review finding,
+ * 28.08.2026 — one fixture had shortened the name, and the tests that claimed to
+ * drive the real record through a closure were driving a stand-in). Both shapes
+ * carry the same name and the same stable key; only the KIND changed, when the
+ * `truncated` kind was introduced. Nothing writes either one any more: the cap
+ * is gone, so these are the records already on file.
+ */
+const truncationMarker = (dropped, kind) => ({
+  name: `${dropped} further result line(s) exceeded the capture cap — this run's reds were NOT all read`,
+  key: 'capture-truncated',
+  kind,
+  point: null,
+})
+
 /** A RED run carrying reds — the shape evaluate()/coveringRun() judge. */
 const redRun = (backend, at, reds, overrides = {}) => ({
   backend,
@@ -694,10 +710,10 @@ describe('chargeFor — the ledger charges NARROWLY', () => {
     // entry broad enough to match the marker's own wording. The legacy shape
     // carries kind 'check' under the stable key, so the kind alone cannot say it.
     const catchAll = [{ point: 546, match: /further result line/i, why: 'a hostile catch-all' }]
-    const modern = { name: '115 further result line(s) exceeded the capture cap', key: 'capture-truncated', kind: TRUNCATED_KIND, point: null }
-    const legacy = { name: '115 further result line(s) exceeded the capture cap — this run\'s reds were NOT all read', key: 'capture-truncated', kind: 'check', point: null }
-    expect(chargeFor(modern, { ledger: catchAll })).toBeNull()
-    expect(chargeFor(legacy, { ledger: catchAll })).toBeNull()
+    expect(chargeFor(truncationMarker(115, TRUNCATED_KIND), { ledger: catchAll })).toBeNull()
+    expect(chargeFor(truncationMarker(115, 'check'), { ledger: catchAll })).toBeNull()
+    // The KIND alone must say it too, for a record that carried no stable key.
+    expect(chargeFor({ name: 'lines were dropped', key: 'x', kind: TRUNCATED_KIND, point: null }, { ledger: catchAll })).toBeNull()
   })
 
   it('survives a broken ledger entry rather than throwing', () => {
@@ -1160,7 +1176,7 @@ describe('an INCOMPLETE RECORDING is its own class, and has its own way out (poi
   // the runs of 13.08.2026 are the second kind and must be recognised.
   /** The synthetic entry the recorder unshifts for the lines the cap ate, in the
    *  kind no charge may name. */
-  const truncationNow = { name: "115 further result line(s) exceeded the capture cap — this run's reds were NOT all read", key: 'capture-truncated', kind: TRUNCATED_KIND, point: null }
+  const truncationNow = truncationMarker(115, TRUNCATED_KIND)
   /** EXACTLY what the recorder writes today: the field, the count, the synthetic
    *  entry FIRST and the reds that DID fit in the buffer behind it. Built this
    *  way since the review of 19.08.2026 — the fixture carried the field alone, so
@@ -1171,7 +1187,7 @@ describe('an INCOMPLETE RECORDING is its own class, and has its own way out (poi
       droppedLines: 115,
       ...overrides,
     })
-  const truncationEntry = { name: "115 further result line(s) exceeded the capture cap — this run's reds were NOT all read", key: 'capture-truncated', kind: 'check', point: null }
+  const truncationEntry = truncationMarker(115, 'check')
   /** A record from before the field existed, carrying ONLY the truncation. */
   const truncatedLegacy = (backend, at) => redRun(backend, at, [truncationEntry])
   /** The same, but it also recorded a red it really did observe. */
@@ -1645,7 +1661,7 @@ describe('a CRASHED run is its own class, and has its own signed way out (point 
 
   // The cross-family locks: each signature closes only what it names.
   it('an INCOMPLETE closure does not lift a crash, and a CRASH closure does not lift a mere truncation', () => {
-    const truncation = { name: "9 further result line(s) exceeded the capture cap — this run's reds were NOT all read", key: 'capture-truncated', kind: 'check', point: null }
+    const truncation = truncationMarker(9, 'check')
     const crashedAndTruncated = crashedRun('webgpu', 1500, { reds: [truncation] })
     // The incomplete signature bounces off the crash (round-5 order: a crash
     // outranks the truncation, and no one signature may serve both families)…
@@ -1655,14 +1671,22 @@ describe('a CRASHED run is its own class, and has its own signed way out (point 
         incompleteClosures: [crashClosure(crashedAndTruncated)],
       }),
     ).toHaveLength(1)
-    // …while the crash signature closes this whole record — not because a crash
-    // erases observations (it does not: see the next case), but because the one
-    // entry this record carries is the truncation marker, and what nobody
-    // recorded is owned by nobody in either family.
+    // …and the CRASH signature closes the crash, leaving the LOST RECORDING
+    // exactly where it was (review finding, 28.08.2026). This record used to
+    // vanish on the crash signature alone, which meant the run that both died
+    // and lost lines was cleared by a signature that spoke about neither. Each
+    // family signs its own sentence, so this record now needs both.
+    const afterCrash = unexplainedRuns([crashedAndTruncated], 1000, {
+      openPoints,
+      crashClosures: [crashClosure(crashedAndTruncated)],
+    })
+    expect(afterCrash.map((u) => u.status)).toEqual(['incomplete'])
+    // With BOTH signatures it is closed — and only then.
     expect(
       unexplainedRuns([crashedAndTruncated], 1000, {
         openPoints,
         crashClosures: [crashClosure(crashedAndTruncated)],
+        incompleteClosures: [crashClosure(crashedAndTruncated)],
       }),
     ).toEqual([])
     // And a truncated run that did NOT crash is untouched by a crash closure.
@@ -1998,7 +2022,9 @@ describe('the shipped charge ledger', () => {
   // `settings` is that lane's own; on a CORE adapter each of those texts would be
   // a real defect, and three of them are generic WebGPU wording.
   it('charges the compatibility lane\'s MSAA cascade only where the run recorded that LEVEL', () => {
-    const cascade = red('console error: THREE.WebGPURenderer: Uncaptured WebGPU GPUValidationError: [Invalid TextureView] is invalid', null, 'console')
+    // The recorded storm's own text: an error that SAYS it is downstream of one
+    // already reported. The bare object name is not it — see the case below.
+    const cascade = red('console error: THREE.WebGPURenderer: Uncaptured WebGPU GPUValidationError: [Invalid TextureView] is invalid due to a previous error.', null, 'console')
     const scoped = { suite: 'settings', backend: 'webgpu', kind: 'console' }
     expect(chargeFor(cascade, { ...scoped, featureLevel: 'compatibility' }).point).toBe(514)
     // The player's adapter, and a run that never recorded a level, are not it.
@@ -2007,6 +2033,22 @@ describe('the shipped charge ledger', () => {
     // And still not another suite, backend or kind.
     expect(chargeFor(cascade, { suite: 'polish', backend: 'webgpu', kind: 'console', featureLevel: 'compatibility' })).toBeNull()
     expect(chargeFor(cascade, { suite: 'settings', backend: 'webgl', kind: 'console', featureLevel: 'compatibility' })).toBeNull()
+  })
+
+  // A charge reads ONE red at a time, so a generic object name could never tell
+  // the measured cascade from an unrelated defect printing the same sentence
+  // (review finding, 28.08.2026). What may be excused is a red that STATES it is
+  // downstream — self-limiting, because the root it points back to is a red of
+  // its own that nothing here charges.
+  it('does NOT charge the bare cascade object names, nor the async pipeline error nobody owns', () => {
+    const scoped = { suite: 'settings', backend: 'webgpu', kind: 'console', featureLevel: 'compatibility' }
+    for (const t of [
+      'console error: THREE.WebGPURenderer: Uncaptured WebGPU GPUValidationError: [Invalid TextureView] is invalid',
+      'console error: Invalid CommandBuffer from CommandEncoder',
+      'console error: Async render pipeline creation failed',
+    ]) {
+      expect(chargeFor(red(t, null, 'console'), scoped), t).toBeNull()
+    }
   })
 
   it('charges the RGBA16Float family only through the EVIDENCED validation error, never the bare format name', () => {

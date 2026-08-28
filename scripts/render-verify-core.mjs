@@ -246,32 +246,28 @@ export function chargeFor(red, options) {
 
 /**
  * MARK THE REDS WHOSE MEASUREMENT VARIED WITHIN ONE RUN (review finding,
- * 28.08.2026). `failedChecks` keeps ONE entry per check key — the first — so a
+ * 28.08.2026). The capture keeps ONE line per result identity — the first — so a
  * check that failed twice printing two different measurements reaches the
  * record as a single red carrying the first one. A `detailMatch` signature that
  * happened to match that first reading would then own the whole key, and the
  * second, unowned observation would be gone without anybody deciding anything.
  *
- * The collapse itself is deliberate and stays: identity is the key, and keeping
- * every distinct detail would re-open the unbounded growth the capture cap was
- * removed to end — a per-frame error whose text carries a counter mints a new
- * detail every frame. So the record keeps the first measurement AND the fact
- * that it was not the only one, and the narrow charge refuses such a red.
+ * The collapse itself is deliberate and stays: it is what BOUNDS the capture at
+ * all, since a per-frame error whose text carries a counter mints a new distinct
+ * line every frame. So the capture keeps the first measurement AND the fact that
+ * it was not the only one, and the narrow charge refuses such a red.
  *
- * `observed` is the run's WHOLE parsed result set (before the de-duplication),
- * `reds` the de-duplicated failures. Total: unreadable input marks nothing.
+ * `variedKeys` is what the TAP measured — the identities it saw print a second,
+ * DIFFERENT line — because the buffer is bounded by identity and the second
+ * reading no longer exists downstream. Entries are `<kind>:<key>`, the form the
+ * tap writes. Total: unreadable input marks nothing.
  */
-export function markVariedDetails(reds, observed) {
-  const seen = new Map()
-  for (const o of Array.isArray(observed) ? observed : []) {
-    if (!o || o.status !== 'FAIL') continue
-    const key = text(o.key)
-    if (!seen.has(key)) seen.set(key, new Set())
-    seen.get(key).add(text(o.detail).slice(0, MAX_RED_DETAIL_LEN))
-  }
+export function markVariedDetails(reds, variedKeys) {
+  const varied = variedKeys instanceof Set ? variedKeys : new Set(Array.isArray(variedKeys) ? variedKeys : [])
+  if (varied.size === 0) return Array.isArray(reds) ? reds : []
   return (Array.isArray(reds) ? reds : []).map((red) => {
-    const details = seen.get(text(red?.key))
-    return details && details.size > 1 ? { ...red, detailVaried: true } : red
+    const kind = red?.kind === 'console' ? 'console' : 'check'
+    return varied.has(`${kind}:${text(red?.key)}`) ? { ...red, detailVaried: true } : red
   })
 }
 
@@ -645,15 +641,16 @@ export function incompleteClosureFor(run, closures) {
  *
  * So the crash gets the SAME signed route the broken recording has, with the
  * same limits — one record by content identity, written evidence, never
- * coverage — and one honest difference: it closes the WHOLE record, not a
- * residual. A truncated run CONCLUDED, so the reds it did record are completed
- * observations and keep blocking past its closure; a crashed run never
- * concluded, and the gate has always refused to read its fragmentary output as
- * evidence in either direction (its recorded reds have never blocked — only the
- * crash sentence does — and no charge may lift it). The signature states
- * exactly that: "we read the kept log; the run died; there is no report here to
- * judge." A disposition, not a pass: `runVerdict` still answers `red` with the
- * crash sentence, and the backend still needs a real covering run.
+ * coverage — and it stops at the SAME line: it closes the crash sentence, and
+ * every red the run got out before it died stays standing, to be fixed, charged
+ * or filed like any other observation (review finding, 28.08.2026, which
+ * corrected the earlier "it closes the whole record"). The gate does not READ
+ * those reds while the crash is open — only the crash sentence blocks, and no
+ * charge may lift it — but not reading them is not erasing them. The signature
+ * states exactly "we read the kept log; the run died; there is no report here
+ * to judge", which is a disposition and not a pass: `runVerdict` still answers
+ * `red` with the crash sentence, and the backend still needs a real covering
+ * run.
  *
  * Kept as its own list (`crashClosures` beside `incompleteClosures`) rather
  * than one shared pool, so a signature written for the one class can never be
@@ -663,6 +660,24 @@ export function incompleteClosureFor(run, closures) {
  */
 export function crashClosureFor(run, closures) {
   return signedClosureFor(run, closures)
+}
+
+/**
+ * THE RECORD AS IT IS JUDGED ONCE ITS CRASH IS SIGNED OFF (review finding,
+ * 28.08.2026). The signature closes the CRASH READING and nothing else, so what
+ * the record positively holds — a lost recording, the reds it printed before it
+ * died — is judged exactly as it would be in a run that never crashed. Without
+ * this, a run that crashed AND truncated was stuck: the crash outranks the
+ * truncation, so `openIncompleteRuns` never offered it the `--incomplete`
+ * route, and its lost lines could be reached by no signature at all.
+ *
+ * Returns the run itself where there is nothing to lift, so a caller may
+ * compare by reference. The COPY is for judging only — never hand it to a
+ * closure lookup, whose identity is the record's real content.
+ */
+export function afterCrashClosure(run, crashClosures) {
+  if (run?.crashed !== true) return run
+  return crashClosureFor(run, crashClosures) ? { ...run, crashed: false } : run
 }
 
 /** The shared binding rules of both signed closures. Total; null closes nothing. */
@@ -1034,7 +1049,12 @@ export function unexplainedRuns(runs, since, options) {
     // that saw the current code are judged directly; older ones only leave the
     // list once that demonstration exists.
     if (!sawCodeSince(r, from) && shownGone(r)) continue
-    const verdict = runVerdict(r, { openPoints })
+    // THE EFFECTIVE READING. A signed crash stops being the crash sentence and
+    // becomes whatever the record still holds — an incomplete recording, its
+    // own reds, or nothing.
+    const effective = afterCrashClosure(r, crashClosures)
+    const signedCrash = effective !== r
+    const verdict = runVerdict(effective, { openPoints })
     if (verdict.status !== 'red' && verdict.status !== 'suspect' && verdict.status !== 'incomplete') continue
     const suite = typeof r.suite === 'string' && r.suite ? r.suite : 'unknown'
     const backend = typeof r.backend === 'string' ? r.backend : 'unknown'
@@ -1050,44 +1070,30 @@ export function unexplainedRuns(runs, since, options) {
     // suite (the recorded rounds pinned that a crash inside the window is not
     // talked away by the runs that followed it — the way out is the explicit,
     // evidenced signature or the deferral, never silence).
-    if (r.crashed === true) {
-      if (!crashClosureFor(r, crashClosures)) {
-        out.push({
-          backend,
-          suite,
-          at,
-          status: 'crashed',
-          unaccounted: verdict.unaccounted,
-          reds: verdict.unaccounted.map((u) => u.name),
-        })
-        continue
-      }
-      // SIGNED — AND THE SIGNATURE CLOSES THE CRASH, NEVER A RED THE RUN GOT
-      // OUT BEFORE IT DIED (review finding, 28.08.2026). The closure used to
-      // drop the WHOLE record on the argument that a crashed run's reds "have
-      // never blocked on their own". True of the mechanism, and the wrong
-      // conclusion: a check the suite printed FAIL for was really observed, and
-      // point 640 gives that observation three closings, none of which is "the
-      // process died afterwards". Signing the crash therefore stops the crash
-      // sentence and nothing else — exactly the line the incomplete recording
-      // stops at, and for the same reason. Fail-safe: this only ever ADDS
-      // blockers, and a run with no reds behaves as it did.
-      const residual = residualOf(r)
-      const unowned = residual.reds.filter((red) => !owned(red, suite, backend, level))
-      if (unowned.length === 0) continue
+    if (r.crashed === true && !signedCrash) {
       out.push({
         backend,
         suite,
         at,
-        status: residual.status,
-        unaccounted: unowned.map((red) => ({
-          name: text(red?.name) || '(unnamed red)',
-          point: Number.isInteger(red?.point) ? red.point : null,
-        })),
-        reds: unowned.map((red) => text(red?.name)).filter(Boolean),
+        status: 'crashed',
+        unaccounted: verdict.unaccounted,
+        reds: verdict.unaccounted.map((u) => u.name),
       })
       continue
     }
+    // SIGNED — AND THE SIGNATURE CLOSES THE CRASH, NEVER A RED THE RUN GOT OUT
+    // BEFORE IT DIED, AND NEVER A RECORDING THAT WAS ALSO LOST (review
+    // findings, 28.08.2026). The closure used to drop the WHOLE record on the
+    // argument that a crashed run's reds "have never blocked on their own".
+    // True of the mechanism, and the wrong conclusion: a check the suite printed
+    // FAIL for was really observed, and point 640 gives that observation three
+    // closings, none of which is "the process died afterwards". So the record
+    // falls through to the ordinary branches below and is judged as any run
+    // would be — with ONE thing subtracted, right here: a signed crash that
+    // recorded nothing at all is closed. "It failed without reporting a single
+    // red" is only the crash restated, and the crash is exactly what was signed
+    // for; leaving it in would have made the signature unable to close anything.
+    if (signedCrash && !isIncompleteRecording(r) && residualOf(r).reds.length === 0) continue
     // AN INCOMPLETE RECORDING IS ITS OWN CLASS (point 734), reported apart from
     // the reds so the guard can name it as what it is. Two things lift it, and
     // NEITHER is the ledger — a charge needs the red's identity, and the lost
@@ -1280,8 +1286,9 @@ function incompleteRecordingParagraph(incomplete) {
     'point 640 cannot apply — all three need the red\'s identity, and this record has none. RE-RUN the ' +
     'suite to get a real recording; where that is impossible, sign the recording off as broken: ' +
     'node scripts/render-verify-guard.mjs --incomplete "<backend>/<suite>" --evidence "<why it cannot ' +
-    'be re-recorded>". That closure discards the RECORD, never the picture — the backend still needs a ' +
-    'covering run, and it is never counted as a green.'
+    'be re-recorded>". That closure signs off the LOST PART of the recording — never the picture, and ' +
+    'never a red the run did record, which keeps blocking until it is fixed, charged or filed. The ' +
+    'backend still needs a covering run, and a signed-off recording is never counted as a green.'
   )
 }
 

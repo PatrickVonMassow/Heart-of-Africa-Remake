@@ -88,13 +88,25 @@ const KEPT_LINE = /^(?:FAIL\s{2,}|ERR:|console errors:|CONSOLE ERRORS:)/
  * the full numbers): the red SET is small — the worst run on record printed 521
  * result lines but only 33 DISTINCT ones, every recorded run holds at most 19
  * parsed reds, and every non-cascade log carries ≤ 12 result lines. What runs
- * away is REPETITION of identical lines, never the set. So the buffer keeps
- * each DISTINCT line ONCE (first occurrence, which keeps its detail): identity
- * is never dropped, and memory is bounded by the distinct set — a subset of
- * output the suite already printed. The parser (failedChecks) de-duplicates by
- * key anyway, so collapsing repeats changes no verdict. A recorded run can
- * therefore never be an INCOMPLETE RECORDING again; that class remains only for
- * the records written before this fix (render-verify-core.mjs reads them).
+ * away is REPETITION, never the set: reds are bounded by the suite's checks and
+ * its distinct console errors.
+ *
+ * SO THE BUFFER IS BOUNDED BY THE RED'S IDENTITY, NOT BY THE LINE (review
+ * finding, 28.08.2026). Keeping each distinct LINE was not a bound at all: a
+ * per-frame error whose text carries a counter prints a NEW distinct line every
+ * frame, so the buffer grew without limit — and an exhausted process dies,
+ * which turns a run full of observed reds into a crash record that a signature
+ * can then close. Keeping each distinct KEY is the real bound: the key is what
+ * `failedChecks` de-duplicates by anyway, so no verdict changes, and the count
+ * is bounded by the suite's own checks.
+ *
+ * The first line of each key is kept, because it carries the measurement a
+ * charge may read. A LATER line of the same key that differs is not kept — and
+ * not forgotten either: its key is recorded as VARIED, which makes a narrow
+ * `detailMatch` charge refuse the red rather than own it on the one reading it
+ * happened to match. A recorded run can therefore never be an INCOMPLETE
+ * RECORDING again; that class remains only for the records written before this
+ * fix (render-verify-core.mjs reads them).
  */
 
 /** Stderr that says the process did not end on its own terms — a stack frame or
@@ -102,6 +114,19 @@ const KEPT_LINE = /^(?:FAIL\s{2,}|ERR:|console errors:|CONSOLE ERRORS:)/
  *  picture, however many of its reds are charged, so it never counts as
  *  accounted for. A false positive only makes the gate stricter. */
 const CRASH_LINE = /^\s+at .+:\d+:\d+|^(?:Uncaught\s+)?\w*Error(?::|\b)/
+
+/** A kept result line's IDENTITY, as the parser will compute it — the check key
+ *  for a `FAIL` line, the normalised console key for an `ERR:`/`console errors:`
+ *  line. A line neither parses is its own identity, which is exactly the old
+ *  behaviour for anything the parser cannot read. Total. */
+function resultKey(line) {
+  try {
+    const [parsed] = [...parseCheckLines(line), ...consoleErrorChecks(line)]
+    return parsed?.key ? `${parsed.kind}:${parsed.key}` : line
+  } catch {
+    return line
+  }
+}
 
 let armed = null
 
@@ -119,20 +144,30 @@ let armed = null
  */
 export function tapOutput(state, streams = [[process.stdout, false], [process.stderr, true]]) {
   const pending = new Map()
-  // Each DISTINCT result line is kept ONCE, in first-seen order (the first
-  // occurrence carries the detail a charge may match on). Repetition is what a
-  // per-frame error flood multiplies, and it is chatter: the parser already
-  // de-duplicates by key, so dropping repeats loses no red's identity — while
-  // the old line cap did, which made a flooded run unclosable (point 734).
-  const seenLines = new Set()
+  // Each result IDENTITY is kept ONCE, in first-seen order — the first line of
+  // that key, which carries the measurement a charge may match on. The key is
+  // the parser's own (`failedChecks` de-duplicates by it anyway), so collapsing
+  // here changes no verdict while bounding the buffer by the suite's checks
+  // instead of by its chatter.
+  const firstOfKey = new Map()
   const take = (stream, isErr, text) => {
     const lines = ((pending.get(stream) ?? '') + text).split('\n')
     pending.set(stream, lines.pop() ?? '')
     for (const line of lines) {
       if (isErr && CRASH_LINE.test(line)) state.crashed = true
-      if (!KEPT_LINE.test(line) || seenLines.has(line)) continue
-      seenLines.add(line)
-      state.lines.push(line)
+      if (!KEPT_LINE.test(line)) continue
+      const key = resultKey(line)
+      const first = firstOfKey.get(key)
+      if (first === undefined) {
+        firstOfKey.set(key, line)
+        state.lines.push(line)
+        continue
+      }
+      // The SAME red printed with a DIFFERENT measurement. The record can hold
+      // only one, so the difference is remembered as a fact about the key: a
+      // narrow charge then refuses this red instead of owning it on the single
+      // reading that survived.
+      if (first !== line && state.variedKeys instanceof Set) state.variedKeys.add(key)
     }
   }
   const isErrOf = new Map(streams)
@@ -240,6 +275,8 @@ export function armRunRecorder(backend) {
       // The run's own result lines and whether it died rather than reported
       // (point 550) — the raw material of the red accounting below.
       lines: [],
+      // The keys whose measurement did NOT hold still within this run.
+      variedKeys: new Set(),
       crashed: false,
     }
     const flush = tapOutput(armed)
@@ -287,12 +324,10 @@ export function armRunRecorder(backend) {
         if (exit !== 0) {
           try {
             const output = armed.lines.join('\n')
-            // The WHOLE parsed set, before the de-duplication by key — a check
-            // that failed twice with two different measurements must reach the
-            // record marked as such, or a narrow charge would own the one
-            // reading it matched and lose the other (review, 28.08.2026).
-            const observed = [...parseCheckLines(output), ...consoleErrorChecks(output)]
-            reds = chargeReds(markVariedDetails(failedChecks(output), observed), {
+            // The keys the TAP saw print two different measurements — the buffer
+            // keeps only the first, so a narrow charge must not own the red on
+            // that one reading (review, 28.08.2026).
+            reds = chargeReds(markVariedDetails(failedChecks(output), armed.variedKeys), {
               suite: armed.suite,
               backend: armed.backend,
               // The WebGPU feature level this run really came up at, so a charge

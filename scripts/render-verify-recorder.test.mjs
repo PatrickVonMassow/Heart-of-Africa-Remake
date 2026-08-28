@@ -67,7 +67,8 @@ function fakeStream() {
 }
 
 function tapped() {
-  const state = { lines: [], crashed: false }
+  // The real armed shape: the tap records varied identities beside the lines.
+  const state = { lines: [], variedKeys: new Set(), crashed: false }
   const out = fakeStream()
   const err = fakeStream()
   const flush = tapOutput(state, [
@@ -200,9 +201,12 @@ describe('the captured lines charge the way the guard reads them', () => {
     out.write('FAIL  no child walks without getting anywhere — worst child 1 at 22.2s, 1.42 m walked inside 0.31 m\n')
     out.write('FAIL  no child walks without getting anywhere — worst child 4 at 51.0s, 0.02 m walked inside 0.30 m\n')
     flush()
+    // The buffer kept ONE line for the key — and remembered that a second,
+    // different one came.
+    expect(state.lines).toHaveLength(1)
+    expect(state.variedKeys.size).toBe(1)
     const output = state.lines.join('\n')
-    const observed = [...parseCheckLines(output), ...consoleErrorChecks(output)]
-    const [stored] = chargeReds(markVariedDetails(failedChecks(output), observed), { suite: 'polish', backend: 'webgpu' })
+    const [stored] = chargeReds(markVariedDetails(failedChecks(output), state.variedKeys), { suite: 'polish', backend: 'webgpu' })
     expect(stored.detailVaried).toBe(true)
     expect(stored.point).toBeNull()
     // The mark survives to the RE-READ, or owned() would charge afterwards what
@@ -214,10 +218,10 @@ describe('the captured lines charge the way the guard reads them', () => {
     single.out.write('FAIL  no child walks without getting anywhere — worst child 1 at 22.2s, 1.42 m walked inside 0.31 m\n')
     single.flush()
     const one = single.state.lines.join('\n')
-    const [ok] = chargeReds(
-      markVariedDetails(failedChecks(one), [...parseCheckLines(one), ...consoleErrorChecks(one)]),
-      { suite: 'polish', backend: 'webgpu' },
-    )
+    const [ok] = chargeReds(markVariedDetails(failedChecks(one), single.state.variedKeys), {
+      suite: 'polish',
+      backend: 'webgpu',
+    })
     expect(ok.detailVaried).toBeUndefined()
     expect(ok.point).toBe(694)
   })
@@ -302,6 +306,31 @@ describe('the armed recorder — the REAL wiring, not a stand-in', () => {
     // An ordinary red, closable the three ordinary ways — never 'incomplete'.
     expect(runVerdict(record, { openPoints }).status).toBe('red')
     expect(runVerdict(record, { openPoints }).covers).toBe(false)
+  })
+
+  // THE FLOOD THAT IS NOT REPETITION (review finding, 28.08.2026). Keeping each
+  // distinct LINE was no bound at all: a per-frame error whose text carries a
+  // counter prints a new distinct line every frame, so the buffer grew without
+  // limit — and an exhausted process DIES, which turns a run full of observed
+  // reds into a crash record that a signature can then close. The bound is the
+  // red's IDENTITY, which the parser normalises the counter out of.
+  it('bounds the buffer by the red\'s identity, not by the line, under a counting flood', async () => {
+    const run = await armed('polish')
+    for (let i = 0; i < 500; i++) {
+      process.stdout.write(
+        `ERR: [ASSERT] render-resource-leak — renderTargets grew back at place:maasai-village: ${19 + i} -> ${22 + i}\n`,
+      )
+    }
+    const record = run.exit(1)
+    // ONE red, not five hundred — and no truncation, because nothing was lost
+    // that the record does not name.
+    expect(record.reds).toHaveLength(1)
+    expect(record.truncated).toBeUndefined()
+    expect(record.reds[0].name).toMatch(/render-resource-leak/)
+    // And the run says so: the measurement did not hold still, so no narrow
+    // charge may own this red on the single reading that survived.
+    expect(record.reds[0].detailVaried).toBe(true)
+    expect(runVerdict(record, { openPoints }).status).toBe('red')
   })
 
   // The finding the old cap could not survive (round 5, finding 4): hundreds of

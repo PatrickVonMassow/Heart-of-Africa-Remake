@@ -58,6 +58,7 @@ import {
   isIncompleteRecording,
   incompleteClosureFor,
   crashClosureFor,
+  afterCrashClosure,
   droppedLinesOf,
   runStamp,
   runIdentity,
@@ -298,13 +299,19 @@ export function isoText(at) {
  *  (round-5 review, 19.08.2026): a run that truncated AND crashed stays `red`
  *  (a crash outranks everything) and one that truncated on a `--section` probe
  *  stays `partial` (it blocks nobody) — offering either a closure would let the
- *  CLI report a sign-off that lifts nothing. */
+ *  CLI report a sign-off that lifts nothing.
+ *
+ *  AND THE CRASH CLOSURE IS PART OF THAT READING (review finding, 28.08.2026).
+ *  A run that crashed AND truncated was excluded here FOREVER, because the raw
+ *  record still says `crashed`. Once its crash is signed off, the lost lines are
+ *  all that is left of it — and they had no signing route at all, so the record
+ *  was either stuck or, worse, cleared with its reds unread. */
 export function openIncompleteRuns(state) {
   const runs = Array.isArray(state?.runs) ? state.runs : []
   return runs.filter(
     (r) =>
       isIncompleteRecording(r) &&
-      runVerdict(r).status === 'incomplete' &&
+      runVerdict(afterCrashClosure(r, state?.crashClosures)).status === 'incomplete' &&
       !incompleteClosureFor(r, state?.incompleteClosures),
   )
 }
@@ -472,36 +479,63 @@ if (arg === '--defer') {
 // run reported nothing at all. Before this, the only exit was a hand-written
 // --defer, i.e. the waiver the charge ledger exists to abolish. This signs the
 // RECORD off instead — and only that: it clears NO backend, and it names
-// exactly ONE run, so two broken runs need two signatures with two reasons. For
-// a truncation the reds the run DID record keep blocking and close the ordinary
-// ways; a crash concluded nothing, so its signature closes the whole record —
-// the two live in separate lists precisely so neither signature can ever serve
-// the other family (round-5 order: a crash outranks the truncation).
+// exactly ONE run, so two broken runs need two signatures with two reasons.
+// EACH SIGNATURE CLOSES ITS OWN SENTENCE AND NOTHING ELSE: the reds a run did
+// record keep blocking and close the ordinary ways in BOTH families, and a run
+// that crashed AND truncated needs both signatures. The two live in separate
+// lists precisely so neither can ever serve the other (round-5 order: a crash
+// outranks the truncation, so the crash is signed first).
 // Ambiguity is REFUSED rather than resolved (review finding, 19.08.2026): a
 // selector matching several open runs prints each with its own --run, and a
 // record whose timestamp is unreadable is refused as well — a signature that can
 // name no run closes none, and saying so beats reporting a success that binds
 // nothing. The judgment itself is the draft pair above, so it is testable
 // without a state file.
-if (arg === '--incomplete' || arg === '--crashed') {
-  try {
-    const rest = process.argv.slice(3)
-    const valueOf = (flag) => {
-      const i = rest.indexOf(flag)
-      return i === -1 ? '' : String(rest[i + 1] ?? '').trim()
-    }
-    const consumed = new Set()
-    for (const flag of ['--evidence', '--at', '--run']) {
-      const i = rest.indexOf(flag)
-      if (i !== -1) consumed.add(i).add(i + 1)
-    }
-    const evidence = valueOf('--evidence')
-    const at = valueOf('--at')
-    const runSel = valueOf('--run')
+/**
+ * THE SIGN-OFF'S ARGUMENTS, read from the raw argv tail. Pure and exported for
+ * the same reason the drafts are: the CLI's whole judgment has to be testable,
+ * and this half was not — every case called the draft with a ready string, so
+ * the parser was the one door no test went through (review finding,
+ * 28.08.2026).
+ *
+ * A FLAG IS NOT A VALUE. `--evidence --run <id>` used to yield the literal
+ * "--run" as the written evidence, and the draft, handed a non-empty string,
+ * signed the record on it: a sign-off with no reason at all. A flag following
+ * `--evidence` now leaves it EMPTY, which the draft refuses, and the flag stays
+ * visible to itself and to the positional selector. Total.
+ */
+export function closureArgs(rest) {
+  const argv = (Array.isArray(rest) ? rest : []).map((a) => String(a ?? ''))
+  const valueOf = (flag) => {
+    const i = argv.indexOf(flag)
+    if (i === -1) return ''
+    const next = String(argv[i + 1] ?? '').trim()
+    return next.startsWith('--') ? '' : next
+  }
+  const consumed = new Set()
+  for (const flag of ['--evidence', '--at', '--run']) {
+    const i = argv.indexOf(flag)
+    if (i === -1) continue
+    consumed.add(i)
+    // Only a real value is consumed; a following FLAG belongs to itself, and
+    // marking it consumed would also hide it from the positional selector.
+    const next = argv[i + 1]
+    if (typeof next === 'string' && !next.startsWith('--')) consumed.add(i + 1)
+  }
+  return {
+    evidence: valueOf('--evidence'),
+    at: valueOf('--at'),
+    run: valueOf('--run'),
     // Positional selector = the first argument that is neither a flag nor a
     // value another flag consumed, found by INDEX: comparing by value would drop
     // the selector whenever an evidence text happened to read the same.
-    const selector = rest.find((a, i) => !consumed.has(i) && !a.startsWith('--')) ?? ''
+    selector: argv.find((a, i) => !consumed.has(i) && !a.startsWith('--')) ?? '',
+  }
+}
+
+if (arg === '--incomplete' || arg === '--crashed') {
+  try {
+    const { evidence, at, run: runSel, selector } = closureArgs(process.argv.slice(3))
     const state = readRenderState() ?? {}
     const crashed = arg === '--crashed'
     const draft = (crashed ? crashClosureDraft : incompleteClosureDraft)(state, { selector, at, run: runSel, evidence })
@@ -522,8 +556,10 @@ if (arg === '--incomplete' || arg === '--crashed') {
     console.log(
       crashed
         ? `⚠ CRASHED RUN SIGNED OFF: ${closure.backend}/${closure.suite} @${isoText(closure.at)} — ` +
-            `"${closure.evidence}". This closes the RECORD, not the picture: the run judged nothing, ` +
-            'still covers no backend and is never a pass. Re-run the suite at the first chance.'
+            `"${closure.evidence}". This closes the CRASH, not the picture and not what the run did ` +
+            'record: any red it printed before it died still blocks until it is fixed, charged or ' +
+            'filed, and a recording it also lost still needs --incomplete. The run covers no backend ' +
+            'and is never a pass. Re-run the suite at the first chance.'
         : `⚠ INCOMPLETE RECORDING SIGNED OFF: ${closure.backend}/${closure.suite} @${isoText(closure.at)} ` +
             `(${closure.droppedLines} result line(s) dropped) — "${closure.evidence}". This closes the RECORD, not the ` +
             'picture: the run still covers no backend and is never a pass, and every red it DID record still ' +

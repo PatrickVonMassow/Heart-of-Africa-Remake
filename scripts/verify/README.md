@@ -1272,14 +1272,22 @@ console errors. (The earlier reading, "red lines are exactly the unbounded
 ones, so they cannot go uncapped", conflated occurrences with identities.)
 
 So the spec's option "the cap stops applying to RED lines" was chosen, and the
-other one deleted. The tap keeps each DISTINCT result line ONCE, in first-seen
-order (the first occurrence keeps the detail a `detailMatch` charge reads);
-the parser de-duplicates by key anyway, so collapsing repeats changes no
-verdict, and memory is bounded by the distinct set — a subset of output the
-suite already printed. The record then stores the whole red set, uncapped. A
-new record can therefore never truncate: every observed red keeps its identity
-and stays closable the three ordinary ways of point 640, whatever the flood
-around it.
+other one deleted. The tap keeps ONE line per result IDENTITY, in first-seen
+order (the first occurrence keeps the detail a `detailMatch` charge reads); the
+parser de-duplicates by that same key anyway, so collapsing here changes no
+verdict. The record then stores the whole red set, uncapped. A new record can
+therefore never truncate: every observed red keeps its identity and stays
+closable the three ordinary ways of point 640, whatever the flood around it.
+
+**The bound is the identity, not the line** (review finding, 28.08.2026). The
+first version of this kept each distinct LINE, which is no bound at all: a
+per-frame error whose text carries a counter — `renderTargets grew back … 19 ->
+22`, then `20 -> 23` — prints a NEW distinct line every frame, so the buffer
+grew without limit, and an exhausted process dies. That failure mode is the
+worst one available here: a run full of observed reds becomes a crash record,
+and a crash has a signature that closes it. Keying by the parsed identity (the
+console normalisation folds the counter away) bounds the buffer by the suite's
+own checks, which is what the measurement above actually says is small.
 
 ### The record keeps the MEASUREMENT, so a charge can be applied afterwards
 
@@ -1406,6 +1414,23 @@ exactly as with a red: the record leaves the list when its CAUSE is named and
 fixed — the render edit moves the window past it and its own suite then comes
 up covering — or through the signature, or through the loud deferral. Never
 through silence, and never through repetition.
+
+**A run that crashed AND truncated needs BOTH signatures.** The crash outranks
+the truncation, so while the crash is open the record is not offered the
+`--incomplete` route at all — and it used to be excluded from that route
+forever, because the raw record still says `crashed` after the crash is signed
+(review finding, 28.08.2026). Its lost lines could then be reached by no
+signature at all. A signed crash is now judged as what the record still holds:
+the lost recording becomes an incomplete recording with its own route, and any
+red the run printed before it died stands. A signed crash that recorded nothing
+is closed by that one signature, because "it failed without reporting a red" is
+only the crash restated.
+
+**And a flag is not a value.** `--evidence --run <id>` used to yield the literal
+`--run` as the written evidence, which the draft — handed a non-empty string —
+signed the record on. The argument reading is now its own exported function
+(`closureArgs`) with its own cases, because it was the one door in this CLI that
+no test went through.
 
 ## The world seed is pinned AT THE LAUNCHER (points 549/557)
 
