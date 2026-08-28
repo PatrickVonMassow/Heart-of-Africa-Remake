@@ -710,8 +710,11 @@ export function runIdentity(run) {
  * and all three need to know WHAT the red was. A truncated run cannot supply
  * that by construction, so those three routes are shut and the only exit left
  * was the hand-written `--defer`: the very waiver the charge ledger exists to
- * abolish. Since the recorder stopped capping red lines, no NEW record can
- * truncate — this closure exists for the records written before that fix.
+ * abolish. Most records that carry it are the ones written before the line cap
+ * was removed — but the class is not legacy: a run past the recorder's stated
+ * budgets (MAX_RED_IDENTITIES and the two character limits) is recorded
+ * incomplete on purpose, which is the loud half of this point's final state and
+ * needs exactly this way out.
  *
  * So the incompleteness gets its own closure, which is not a waiver, and the
  * limits are what make that true:

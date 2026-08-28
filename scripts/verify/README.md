@@ -1332,10 +1332,15 @@ set, which is the exhausted process the ceiling exists to prevent. Two more
 budgets sit beside it and are refused the same loud way: `MAX_CAPTURE_CHARS`
 (4 MB of kept text in total) and `MAX_LINE_CHARS` (64 KB for one line, which
 also caps the tap's partial-line buffer — a line whose middle had to be dropped
-is refused when its newline arrives, never parsed as a stump). Every budget is
-asked only of a line that would be KEPT: one bringing nothing new is dropped as
-repetition whatever its size, because counting that would be a false
-truncation. That is the spec's
+is refused when its newline arrives, never parsed as a stump). The identity
+ceiling and the total budget are asked only of a line that would be KEPT: one
+bringing nothing new is dropped as repetition, because counting that would be a
+false truncation. The PER-LINE limit is the exception, asked of every result
+line and asked BEFORE it is parsed (round 15) — telling repetition apart means
+parsing exactly the line whose size is the problem, and asking afterwards
+allocated the memory the limit exists to prevent. It also makes the refusal
+independent of how the process chunked its writes, which otherwise decided
+whether the same output was a truncation. That is the spec's
 OTHER option, applied where the first one runs out: a run either records its
 reds completely, or fails loudly as an incomplete recording — it never
 half-records itself and calls the result a red set. The incomplete class

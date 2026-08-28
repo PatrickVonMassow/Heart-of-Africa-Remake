@@ -272,30 +272,41 @@ describe('tapOutput — observe-only', () => {
     expect(state.lines.join('\n').length).toBeLessThanOrEqual(MAX_CAPTURE_CHARS)
   })
 
-  // A line that brings nothing new costs nothing, however long it is — counting
-  // it would be a FALSE truncation, and a false truncation blocks the gate.
-  it('drops a huge REPETITION for free, without calling it a truncation', () => {
+  // A line WITHIN the per-line budget that brings nothing new costs nothing,
+  // however long it is — counting it would be a FALSE truncation, and a false
+  // truncation blocks the gate.
+  it('drops a long REPETITION for free, without calling it a truncation', () => {
     const { state, out } = tapped()
     out.write('ERR: the one page error\n')
-    out.write(`ERR: the one page error${' '.repeat(MAX_LINE_CHARS + 10)}\n`)
+    out.write(`ERR: the one page error${' '.repeat(Math.floor(MAX_LINE_CHARS / 2))}\n`)
     expect(state.lines).toHaveLength(1)
     expect(state.droppedLines ?? 0).toBe(0)
   })
 
-  // A process that writes without a newline accumulates in the tap's pending
-  // buffer. The remainder is capped and the damaged line refused when its
-  // newline finally arrives — never parsed as if it had arrived whole.
-  it('refuses a line whose middle it had to drop, rather than parsing a stump', () => {
-    const { state, out } = tapped()
-    out.write('ERR: the beginning of a line that never ends')
-    for (let i = 0; i < 4; i++) out.write('z'.repeat(MAX_LINE_CHARS / 2))
-    out.write('\n')
-    expect(state.lines).toHaveLength(0)
-    expect(state.droppedLines).toBe(1)
-    // The stream recovers: the next whole line is kept normally.
-    out.write('ERR: an ordinary error after the flood\n')
-    expect(state.lines).toEqual(['ERR: an ordinary error after the flood'])
-    expect(state.droppedLines).toBe(1)
+  // AND THE REFUSAL DOES NOT DEPEND ON HOW THE PROCESS CHUNKED ITS WRITES
+  // (review finding, 28.08.2026, round 15). An overlong line assembled across
+  // several writes is damaged by the pending cap and refused; one delivered
+  // whole was dropped for free where its content happened to be repetition, so
+  // the same output was a truncation or not depending on the write boundaries.
+  // The per-line budget is now asked of every result line, before it is parsed.
+  it('refuses an overlong line the same way however it arrived', () => {
+    const whole = tapped()
+    whole.out.write(`ERR: page error${'z'.repeat(MAX_LINE_CHARS)}\n`)
+    expect(whole.state.lines).toHaveLength(0)
+    expect(whole.state.droppedLines).toBe(1)
+
+    const split = tapped()
+    split.out.write('ERR: page error')
+    for (let i = 0; i < 4; i++) split.out.write('z'.repeat(MAX_LINE_CHARS / 2))
+    split.out.write('\n')
+    expect(split.state.lines).toHaveLength(0)
+    expect(split.state.droppedLines).toBe(1)
+    // Both streams recover: the next whole line is kept normally.
+    for (const t of [whole, split]) {
+      t.out.write('ERR: an ordinary error after the flood\n')
+      expect(t.state.lines).toEqual(['ERR: an ordinary error after the flood'])
+      expect(t.state.droppedLines).toBe(1)
+    }
   })
 
   // ...AND THE VARIED MEASUREMENT IS ASKED PER RED, NOT PER LINE (review

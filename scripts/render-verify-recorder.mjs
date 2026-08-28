@@ -152,11 +152,16 @@ export const MAX_RED_IDENTITIES = 500
  * retained string, the partial-line buffer it arrived in and the parse over it
  * all grew with the page's output rather than with its red set.
  *
- * So the capture carries a character budget beside the identity ceiling, and
- * both are refused the same LOUD way: a line that does not fit is counted and
- * the run is recorded incomplete. The numbers sit far above any measured run —
- * the worst log on record holds 521 result lines, and a result line is a check
+ * So the capture carries two character budgets beside the identity ceiling, and
+ * all three are refused the same LOUD way: a line that does not fit is counted
+ * and the run is recorded incomplete. The numbers sit far above any measured run
+ * — the worst log on record holds 521 result lines, and a result line is a check
  * label with a measurement — while bounding the tap's memory at a few megabytes.
+ *
+ * MAX_LINE_CHARS is judged BEFORE the line is parsed, so it is the one budget
+ * that also applies to a repetition: telling repetition apart means parsing the
+ * very line whose size is the problem, and a result line of this length is
+ * pathological however often its content has been seen.
  */
 export const MAX_CAPTURE_CHARS = 4 * 1024 * 1024
 export const MAX_LINE_CHARS = 64 * 1024
@@ -274,6 +279,23 @@ export function tapOutput(state, streams = [[process.stdout, false], [process.st
         continue
       }
       if (!KEPT_LINE.test(line)) continue
+      // THE SIZE IS JUDGED BEFORE THE PARSE (review finding, 28.08.2026, round
+      // 15). Asking it afterwards let a whole newline-terminated line arrive in
+      // ONE write and build its parsed array and identity set first — so the
+      // limit refused the line only once the memory it was meant to prevent had
+      // already been allocated. It is therefore the one budget asked of EVERY
+      // result line, repetition included: deciding whether a line is repetition
+      // means parsing exactly the line whose size is the problem.
+      //
+      // That also makes the refusal independent of how the process chunked its
+      // writes. An overlong line assembled across several writes is damaged by
+      // the pending cap and refused above; one delivered whole is refused here;
+      // both count the same. A result line beyond this size is pathological in
+      // any case — the measured worst is a check label with a measurement.
+      if (line.length > MAX_LINE_CHARS) {
+        refuse()
+        continue
+      }
       const parts = resultParts(line)
       // What this line would ADD, counted as IDENTITIES and not as parts
       // (review finding, 28.08.2026, round 14). A summary that prints the same
@@ -315,14 +337,14 @@ export function tapOutput(state, streams = [[process.stdout, false], [process.st
       // reds the record can hold; the character budget bounds how much TEXT the
       // tap holds to carry them, which a line repeating one identity a million
       // times would otherwise leave unbounded.
-      // Every budget is asked only of a line that would be KEPT: one bringing
-      // nothing new is dropped as repetition whatever its size, and counting
-      // that as a refusal would be a false truncation.
+      // The remaining budgets are asked only of a line that would be KEPT: one
+      // bringing nothing new is dropped as repetition, and counting that as a
+      // refusal would be a false truncation — which blocks the render set in
+      // exactly the way this point exists to end.
       const wouldNotFit =
         fresh.length > 0 &&
         (keptIds.size + keptRaw.size + fresh.length > MAX_RED_IDENTITIES ||
-          keptChars + line.length > MAX_CAPTURE_CHARS ||
-          line.length > MAX_LINE_CHARS)
+          keptChars + line.length > MAX_CAPTURE_CHARS)
       if (wouldNotFit) {
         refuse()
         continue
