@@ -19,7 +19,7 @@ import {
 } from './bundle-first-core.mjs'
 
 /** The real document's shape, so a fixture cannot drift away from it. */
-function workPackages({ bundles = [['Dorfleben', 'A', '350, 351']], unbundled = ['- **285** — the leak hunt.'] } = {}) {
+function workPackages({ bundles = [['Dorfleben', 'A', '#350, #351']], unbundled = ['- **#285** — the leak hunt.'] } = {}) {
   const rows = bundles.map(([name, id, points]) => `| **${name}** | ${id} | What it is | ${points} |`).join('\n')
   return `# Work packages (bundles)
 
@@ -44,36 +44,46 @@ Kommunikation first.
 const tasks = (open, done = []) =>
   [...open.map((n) => `- [ ] ${n}. Open point ${n}.`), ...done.map((n) => `- [x] ${n}. Done point ${n}.`)].join('\n')
 
-describe('referenceList — the cell declares, the reader never guesses', () => {
-  it('reads the opening list and stops at the first thing that is not one', () => {
-    expect(referenceList('350, 351, 394 (the rest landed 30.07.2026 — 308, 410)')).toEqual([350, 351, 394])
-    expect(referenceList('958, 1000, 1002')).toEqual([958, 1000, 1002])
-    expect(referenceList('  442 443\t450 ')).toEqual([442, 443, 450])
+describe('referenceList — the cell marks its references', () => {
+  it('reads the marked numbers and nothing else', () => {
+    expect(referenceList('#350, #351, #394 (the rest landed 30.07.2026 — 308, 410)')).toEqual([350, 351, 394])
+    expect(referenceList('#958, #1000, #1002')).toEqual([958, 1000, 1002])
+    expect(referenceList('  #442 #443\t#450 ')).toEqual([442, 443, 450])
     expect(referenceList('')).toEqual([])
     expect(referenceList(null)).toEqual([])
   })
 
-  // THE THREE SHAPES THE FOUR REFUSED ROUNDS COULD NOT SETTLE (point 1003):
-  // a date, a four-digit quantity, and a number standing in front of a month
-  // name. None of them is read any more, because none of them is in the list.
-  it('reads nothing at all out of the prose behind the list', () => {
-    const cell = '884, 1002 (measured 2026-08-28 and on 24. August 2026: the header ran 1440 px wide, ' +
+  // THE THREE SHAPES THE FOUR REFUSED ROUNDS COULD NOT SETTLE (point 1003): a
+  // date, a four-digit quantity, and a number standing in front of a month name.
+  // None of them carries the marker, so none of them is read — and the reader
+  // needs neither a strip list nor a digit bound to say so.
+  it('reads nothing out of the prose, wherever the prose stands', () => {
+    const cell = '#884, #1002 (measured 2026-08-28 and on 24. August 2026: the header ran 1440 px wide, ' +
       'and 97 August 2026 named nothing — see 999 and point 2026)'
     expect(referenceList(cell)).toEqual([884, 1002])
   })
 
-  // NO DIGIT CEILING (the reason the reader was widened in the first place) and
-  // no strip list: a reference is any run of digits, of any length.
-  it('has neither a digit bound nor a date filter left', () => {
-    expect(referenceList('7, 42, 999, 1000, 12345')).toEqual([7, 42, 999, 1000, 12345])
-    expect(referenceList('2026, 1900 — years that really are point numbers')).toEqual([2026, 1900])
+  // A LEADING LIST WOULD NOT HAVE BEEN ENOUGH (fifth-round review finding): a
+  // cell that OPENS with a date or a measurement opens with digits, and a
+  // position-based reader places 2026, 30 and 1440 out of them.
+  it('places nothing for a cell that opens with a date or a measurement', () => {
+    expect(referenceList('2026-08-28 — the day the reader was widened')).toEqual([])
+    expect(referenceList('30.07.2026 the scheme was cut')).toEqual([])
+    expect(referenceList('1440 px wide, measured on the wide zoom')).toEqual([])
   })
 
-  // A CELL THAT DOES NOT OPEN WITH ITS LIST PLACES NOTHING. That is the whole
-  // contract: the guard then reports the drift instead of guessing a member out
-  // of the prose, and the author writes the number where it belongs.
-  it('places nothing when the cell opens with prose', () => {
-    expect(referenceList('the points of this bundle are 350 and 351')).toEqual([])
+  // NO DIGIT CEILING (the reason the reader was widened in the first place): a
+  // reference is the marker and any run of digits, of any length.
+  it('has neither a digit bound nor a date filter left', () => {
+    expect(referenceList('#7, #42, #999, #1000, #12345')).toEqual([7, 42, 999, 1000, 12345])
+    expect(referenceList('#2026, #1900 — years that really are point numbers')).toEqual([2026, 1900])
+  })
+
+  it('reads no half-marked or embedded number', () => {
+    expect(referenceList('a#350')).toEqual([])
+    expect(referenceList('#350a')).toEqual([])
+    expect(referenceList('##350')).toEqual([])
+    expect(referenceList('the points are 350 and 351')).toEqual([])
   })
 })
 
@@ -82,15 +92,15 @@ describe('parseBundles', () => {
     const bundles = parseBundles(
       workPackages({
         bundles: [
-          ['Dorfleben', 'A', '350, 351, 356'],
-          ['Modell & Wächter', 'J', '432, 437 — the rest landed 30.07.2026 (298, 306)'],
+          ['Dorfleben', 'A', '#350, #351, #356'],
+          ['Modell & Wächter', 'J', '#432, #437 — the rest landed 30.07.2026 (298, 306)'],
         ],
       }),
     )
     expect(bundles.map((b) => b.id)).toEqual(['A', 'J'])
     expect(bundles[0].name).toBe('Dorfleben')
-    // 298 and 306 stand in the PROSE, so they are not members of this bundle:
-    // the cell's own list is what places a point (point 1003).
+    // 298 and 306 stand unmarked in the PROSE, so they are not members of this
+    // bundle: the marker is what places a point (point 1003).
     expect([...bundles[1].points].sort((a, b) => a - b)).toEqual([432, 437])
   })
 
@@ -109,20 +119,20 @@ describe('parseBundles', () => {
 describe('parseUnbundled', () => {
   it('reads each bullet with the reason beside it', () => {
     const { points, bullets } = parseUnbundled(
-      workPackages({ unbundled: ['- **184, 200, 203** — the big audits.', '- **174** — a release.'] }),
+      workPackages({ unbundled: ['- **#184, #200, #203** — the big audits.', '- **#174** — a release.'] }),
     )
     expect([...points].sort((a, b) => a - b)).toEqual([174, 184, 200, 203])
     expect(bullets[0].reason).toBe('the big audits.')
   })
 
   it('accepts a bare listing — the section heading carries the reasons', () => {
-    const { points } = parseUnbundled(workPackages({ unbundled: ['- **285**.'] }))
+    const { points } = parseUnbundled(workPackages({ unbundled: ['- **#285**.'] }))
     expect([...points]).toEqual([285])
   })
 
-  it('reads the PLAIN bullet spelling too, so a plainly written exemption is not drift', () => {
+  it('reads a bullet whose markers are not bold, so a plainly written exemption is not drift', () => {
     const { points, bullets } = parseUnbundled(
-      workPackages({ unbundled: ['- 285 — the leak hunt.', '- 174, 224 — releases.', '- 393.'] }),
+      workPackages({ unbundled: ['- #285 — the leak hunt.', '- #174, #224 — releases.', '- #393.'] }),
     )
     expect([...points].sort((a, b) => a - b)).toEqual([174, 224, 285, 393])
     expect(bullets[0].reason).toBe('the leak hunt.')
@@ -130,7 +140,7 @@ describe('parseUnbundled', () => {
   })
 
   it('passes a point exempted in the plain spelling', () => {
-    const wp = workPackages({ bundles: [['Dorfleben', 'A', '350']], unbundled: ['- 285 — the leak hunt.'] })
+    const wp = workPackages({ bundles: [['Dorfleben', 'A', '#350']], unbundled: ['- #285 — the leak hunt.'] })
     expect(evaluate({ tasksMd: tasks([350, 285]), workPackagesMd: wp }).block).toBe(false)
   })
 
@@ -158,10 +168,10 @@ describe('unplacedPoints', () => {
 describe('evaluate — the rule', () => {
   const wp = workPackages({
     bundles: [
-      ['Dorfleben', 'A', '350, 351'],
-      ['Modell & Wächter', 'J', '432, 437'],
+      ['Dorfleben', 'A', '#350, #351'],
+      ['Modell & Wächter', 'J', '#432, #437'],
     ],
-    unbundled: ['- **285** — the leak hunt, it sweeps the whole codebase.'],
+    unbundled: ['- **#285** — the leak hunt, it sweeps the whole codebase.'],
   })
 
   it('passes an appended point that joined a bundle', () => {
@@ -183,7 +193,7 @@ describe('evaluate — the rule', () => {
 
   it('catches a point that silently LEFT a bundle — the full open set is reconciled', () => {
     // 351 is open and was in bundle A; the scheme no longer mentions it.
-    const shrunk = workPackages({ bundles: [['Dorfleben', 'A', '350']], unbundled: ['- **285**.'] })
+    const shrunk = workPackages({ bundles: [['Dorfleben', 'A', '#350']], unbundled: ['- **#285**.'] })
     const v = evaluate({ tasksMd: tasks([350, 351]), workPackagesMd: shrunk })
     expect(v.block).toBe(true)
     expect(v.missing).toEqual([351])
@@ -276,5 +286,23 @@ describe('the real docs/work-packages.md', () => {
     const after = unplacedPoints(open, bundles, unbundled)
     expect(after).toEqual(before)
     expect(after).toEqual([])
+  })
+
+  // EXACTLY ONE BUNDLE (the document's own invariant, review finding of the
+  // fifth round). The prose reader placed a point wherever another bundle's
+  // prose happened to name it, and `unplacedPoints` unions the memberships, so
+  // a point in two bundles could never fail. Marked references make the
+  // membership canonical, which makes the invariant checkable — here.
+  it('gives every open point exactly one home', () => {
+    const open = parseOpenPoints(readFileSync(repoPath('TASKS.md'), 'utf8'))
+    const homes = new Map()
+    for (const bundle of parseBundles(md)) {
+      for (const n of bundle.points) if (open.has(n)) homes.set(n, [...(homes.get(n) ?? []), bundle.id])
+    }
+    for (const n of parseUnbundled(md).points) {
+      if (open.has(n)) homes.set(n, [...(homes.get(n) ?? []), 'Not bundled'])
+    }
+    const twice = [...homes].filter(([, where]) => where.length > 1)
+    expect(twice.map(([n, where]) => `${n}: ${where.join(' + ')}`)).toEqual([])
   })
 })

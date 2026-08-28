@@ -33,11 +33,10 @@ export const BUNDLES_HEADING = '## The bundles'
 export const UNBUNDLED_MARKER = '**Not bundled**'
 
 /**
- * THE CELL SAYS WHICH NUMBERS ARE REFERENCES (point 1003). A bundle's Points
- * cell and a "Not bundled" bullet OPEN with an explicit reference list — bare
- * numbers separated by commas and whitespace — and the reader stops at the
- * first character that is not one of those. Everything after that is PROSE and
- * is never read.
+ * THE CELL MARKS ITS REFERENCES (point 1003). A point number in a bundle's
+ * Points cell or in a "Not bundled" bullet counts as a reference only where it
+ * is written `#123`. Everything else in the cell is prose the reader does not
+ * look at, whatever it contains.
  *
  * WHY THE PROSE IS NOT READ AT ALL. The reader used to take every 1-to-4-digit
  * token in the whole cell and subtract known date shapes first. Four
@@ -47,15 +46,18 @@ export const UNBUNDLED_MARKER = '**Not bundled**'
  * leading day swallowed the number standing in front of a month name, and what
  * remained was inherent — a four-digit QUANTITY in prose counts as a point, and
  * any date form the strip list does not know leaves its numbers behind. A
- * regular expression over prose cannot tell a reference from a measurement. So
- * the cell declares instead of the reader guessing, and with the guessing gone
- * the strip list and the digit bound go with it: a reference is any run of
- * digits, of any length.
+ * regular expression over prose cannot tell a reference from a measurement, so
+ * the CELL says which numbers are references and the reader stops guessing.
+ * With the guessing gone the strip list and the digit bound go with it: a
+ * reference is `#` and any run of digits, of any length.
+ *
+ * A LEADING LIST WOULD NOT HAVE BEEN ENOUGH (five-round review finding): a cell
+ * that OPENS with `2026-08-28` or `1440 px` opens with digits, so a
+ * position-based rule places 2026 and 1440. The marker sits ON the reference
+ * itself and has no such edge.
  */
 export function referenceList(text) {
-  const m = /^[\s,]*(\d+(?:[\s,]+\d+)*)/.exec(String(text ?? ''))
-  if (!m) return []
-  return m[1].split(/[\s,]+/).filter(Boolean).map(Number)
+  return [...String(text ?? '').matchAll(/(?<![\w#])#(\d+)(?![\w#])/g)].map((m) => Number(m[1]))
 }
 
 /**
@@ -92,22 +94,25 @@ export function parseUnbundled(md) {
   const section = nextHeading < 0 ? rest : rest.slice(0, nextHeading)
   const points = new Set()
   const bullets = []
+  // A bullet's exemptions are its MARKED references, wherever in the bullet they
+  // stand — the old reader had to know the two spellings the section happens to
+  // use (`- **285** — reason` and `- 285 — reason`) and read a leading span, and
+  // a third spelling would have gone unread and reported its point as drift. The
+  // marker needs no spelling.
   for (const line of section.split('\n')) {
     const m = line.match(/^[-*]\s+(.+)$/)
     if (!m) continue
-    // Both spellings the section uses: the bold `- **285** — reason` and the
-    // plain `- 285 — reason`. Reading only the bold one would leave a plainly
-    // written exemption unread, and its point would report as drift — a false
-    // block, which is the one thing this guard may not do.
-    const rest = m[1].trim()
-    const bold = rest.match(/^\*\*([^*]+)\*\*([\s\S]*)$/)
-    const plain = bold ? null : rest.match(/^([0-9][0-9,\s]*)([\s\S]*)$/)
-    const shape = bold || plain
-    if (!shape) continue
-    const nums = referenceList(shape[1])
+    const body = m[1].trim()
+    const nums = referenceList(body)
     if (!nums.length) continue
     for (const n of nums) points.add(n)
-    bullets.push({ points: nums, reason: shape[2].replace(/^[\s—–.-]+/, '').trim() })
+    bullets.push({
+      points: nums,
+      reason: body
+        .replace(/^(?:\*\*)?#\d+(?:[,\s]+#\d+)*(?:\*\*)?/, '')
+        .replace(/^[\s—–.-]+/, '')
+        .trim(),
+    })
   }
   return { points, bullets }
 }
