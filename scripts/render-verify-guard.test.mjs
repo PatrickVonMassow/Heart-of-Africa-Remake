@@ -849,7 +849,11 @@ describe('render-verify-guard --status — what it prints about a run it cannot 
   // the line owes the reader that difference instead of hiding it.
   it('says of each crashed record whether it is blocking now', () => {
     const runs = [{ backend: 'webgpu', suite: 'startup', at: 1500, exit: 1, crashed: true, reds: [] }]
-    // Armed: a render change is pending, and this record is inside the window.
+    // ARMED, and the record still blocks though it PREDATES the render change
+    // (the claim corrected in round 29): a recorded failure is carried until its
+    // own suite comes up covering on newer code, so an older record is what the
+    // gate stands on until somebody re-runs it. That is the whole reason a
+    // stale record has to be closable at all.
     expect(inTempRepo({ runs }, { pending: true })).toMatch(/CRASHED RUN \(not an unexplained red\).*BLOCKING NOW/)
     // Unarmed: with nothing pending the gate blocks nobody, and calling the same
     // record "BLOCKING NOW" was the opposite of the truth (round 20).

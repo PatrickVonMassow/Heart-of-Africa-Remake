@@ -276,6 +276,9 @@ export function tapOutput(state, streams = [[process.stdout, false], [process.st
   // remembered, and a later, different one marks that identity. Bounded the
   // same way the buffer is: one entry per distinct red.
   const firstSeenOfPart = new Map()
+  /** Streams whose decoder had to substitute for bytes it never received. The
+   *  mark is charged by the result line it lands in and cleared by any line. */
+  const substituted = new Set()
   const refuse = () => {
     state.droppedLines = (Number.isFinite(state.droppedLines) ? state.droppedLines : 0) + 1
   }
@@ -283,9 +286,14 @@ export function tapOutput(state, streams = [[process.stdout, false], [process.st
    * One completed line, already known to be within MAX_LINE_CHARS. Returns
    * nothing; every budget past the line's own size is decided here.
    */
-  const handle = (isErr, line) => {
+  const handle = (isErr, line, stream = null) => {
     if (isErr && CRASH_LINE.test(line)) state.crashed = true
+    // A SUBSTITUTED CHARACTER COSTS THE ACCOUNTING ONLY INSIDE A RESULT LINE
+    // (review finding, 28.08.2026, round 30). The mark is cleared by the line it
+    // belongs to either way: it stands for one line's loss, never for the run's.
+    const renamed = stream !== null && substituted.delete(stream)
     if (!KEPT_LINE.test(line)) return
+    if (renamed) refuse()
     // THE PARSE OF ONE LINE IS BOUNDED BY THE LINE (review finding, 28.08.2026,
     // round 20, which read the identity budget as arriving too late). It does
     // arrive after the parse, and the parse cannot run away: `handle` is reached
@@ -417,7 +425,7 @@ export function tapOutput(state, streams = [[process.stdout, false], [process.st
         // truncation this point exists to end.
         else if (isErr && CRASH_FRAME_START.test(head) && !CRASH_LINE.test(head)) refuse()
       } else {
-        handle(isErr, carry + chunk.slice(from, nl))
+        handle(isErr, carry + chunk.slice(from, nl), stream)
       }
       carry = ''
       from = nl + 1
@@ -467,16 +475,18 @@ export function tapOutput(state, streams = [[process.stdout, false], [process.st
     decoders.delete(stream)
     const rest = decoder.end()
     if (!rest) return
-    // AND THE SUBSTITUTION IS RECORDED AS THE LOSS IT IS (review finding,
-    // 28.08.2026, round 26). `end()` returns text only when bytes were held back
-    // for a character that never completed, and what it returns is U+FFFD in
-    // their place. The line still reaches the record — under an identity that is
-    // not the one the suite printed — so a final `FAIL` or `ERR:` could be
-    // stored renamed while the record read complete. It cannot be recovered and
-    // it must not be quiet: the run is marked as having lost output, which is
-    // the closable class this point exists to give it.
+    // AND THE SUBSTITUTION IS RECORDED AS THE LOSS IT IS — IF IT LANDS IN A
+    // RESULT LINE (review findings, 28.08.2026, rounds 26 and 30). `end()`
+    // returns text only when bytes were held back for a character that never
+    // completed, and what it returns stands in their place, so a final `FAIL` or
+    // `ERR:` could be stored under an identity the suite never printed while the
+    // record read complete. Round 26 marked it outright, and round 30 measured
+    // what that costs: a dangling byte in ordinary CHATTER then turned a sound
+    // run into an incomplete recording, which is the false truncation this point
+    // exists to end. So the substitution is REMEMBERED here and charged by
+    // `handle`, which is where a line is known to be a result line at all.
+    substituted.add(stream)
     take(stream, isErr, rest)
-    refuse()
   }
   const decoderFor = (stream) => {
     let decoder = decoders.get(stream)
@@ -549,9 +559,10 @@ export function tapOutput(state, streams = [[process.stdout, false], [process.st
       const rest = decoder.end()
       if (!rest) continue
       // The same at the flush: a character the last write cut in half is a lost
-      // result, not a silent rename (review finding, 28.08.2026, round 26).
+      // RESULT — charged by `handle`, and only where the line is one (review
+      // findings, 28.08.2026, rounds 26 and 30).
+      substituted.add(stream)
       take(stream, isErrOf.get(stream) === true, rest)
-      refuse()
     }
     decoders.clear()
     for (const stream of [...pending.keys()]) {

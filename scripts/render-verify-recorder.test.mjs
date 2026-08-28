@@ -507,6 +507,18 @@ describe('tapOutput — observe-only', () => {
     expect(split.state.droppedLines ?? 0).toBe(0)
   })
 
+  // AND CHATTER COSTS NOTHING (review finding, 28.08.2026, round 30). A dangling
+  // byte in an ordinary stderr line used to turn a sound run into an incomplete
+  // recording, which is the false truncation this point exists to end.
+  it('does not mark a substitution that lands in ordinary chatter', () => {
+    const { state, err, flush } = tapped()
+    const line = Buffer.from('vite dev server ready at café', 'utf8')
+    err.write(line.subarray(0, line.length - 1))
+    flush()
+    expect(state.lines).toHaveLength(0)
+    expect(state.droppedLines ?? 0).toBe(0)
+  })
+
   // The same when a STRING write follows the cut bytes rather than the flush.
   it('marks the substitution when a string write drains the decoder', () => {
     const { state, out, flush } = tapped()
@@ -1155,6 +1167,30 @@ describe('the armed recorder — the REAL wiring, not a stand-in', () => {
     expect(open).toHaveLength(1)
     expect(open[0].status).toBe('red')
     expect(open[0].reds.length).toBeGreaterThan(1)
+  })
+
+  // AND THE NAMED WAY OUT REALLY OPENS FOR AN ALREADY-RECORDED RUN (review
+  // finding, 28.08.2026, round 30). Every closure case at this level fed a
+  // record that must stay red, so nothing here showed a matching disposition
+  // RELEASING an incomplete-only run — the promise this point makes.
+  it('releases an already-recorded incomplete-only run once its lost part is signed', async () => {
+    const run = await armed('polish', 'compatibility')
+    process.stdout.write(`ERR: ${'z'.repeat(MAX_LINE_CHARS + 10)}\n`)
+    const record = run.exit(1)
+    expect(record.truncated).toBe(true)
+    expect(record.reds ?? []).toEqual([])
+    // Unsigned it blocks as an incomplete recording…
+    expect(unexplainedRuns([record], 0, { openPoints: [642] }).map((u) => u.status)).toEqual(['incomplete'])
+    // …and the signature that names THIS record closes it, leaving nothing.
+    const closure = {
+      run: runIdentity(record),
+      backend: record.backend,
+      suite: record.suite,
+      at: record.at ?? null,
+      droppedLines: record.droppedLines,
+      evidence: 'local/verify-logs/ holds the whole run; the line was one enormous page error',
+    }
+    expect(unexplainedRuns([record], 0, { openPoints: [642], incompleteClosures: [closure] })).toEqual([])
   })
 
   // And the other half of that rule, unchanged: a genuinely green run prints no
