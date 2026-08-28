@@ -580,15 +580,13 @@ describe('tapOutput — observe-only', () => {
     expect(state.droppedLines ?? 0).toBe(0)
   })
 
-  // EVERY OVERLONG STDERR LINE IS A LOST LINE (review finding, 28.08.2026, round
-  // 23, corrected in round 24). Stderr is where the crash evidence arrives, and
-  // a line cut at the per-line budget is evidence nobody read: CRASH_LINE's
-  // stack-frame alternative needs the trailing :line:column, which a
-  // pathological path pushes past the probe. Refusing only the UNDECIDABLE ones
-  // left a crash frame short enough to recognise but too long to keep recorded
-  // as if nothing had been cut — and on exit 0 the crash flag is not written
-  // either, so such a run came out looking complete.
-  it('records every overlong stderr line as a lost line, decidable or not', () => {
+  // AN OVERLONG STDERR LINE THE PROBE COULD NOT DECIDE IS A LOST LINE (review
+  // findings, 28.08.2026, rounds 23, 24 and 29). CRASH_LINE's stack-frame
+  // alternative needs the trailing :line:column, which a pathological path
+  // pushes past the probe — so a line that BEGINS like a stack frame and is too
+  // long to keep can be neither confirmed a crash nor ruled out, and it used to
+  // leave the run with no closure route at all.
+  it('records an UNDECIDABLE overlong stack frame as a lost line', () => {
     const { state, err } = tapped()
     err.write(`    at run (/${'d'.repeat(MAX_LINE_CHARS)}/polish.mjs:89:7)\n`)
     // The tail that would say "crash" is past the probe, so nothing claims the
@@ -596,12 +594,23 @@ describe('tapOutput — observe-only', () => {
     expect(state.crashed).toBe(false)
     expect(state.droppedLines).toBe(1)
     expect(state.lines).toHaveLength(0)
-    // A headline DOES decide within the probe: the crash is marked, and the cut
-    // line is still recorded as lost, which is the closure route it needs.
-    const other = tapped()
-    other.err.write(`TimeoutError: ${'x'.repeat(MAX_LINE_CHARS)}\n`)
-    expect(other.state.crashed).toBe(true)
-    expect(other.state.droppedLines).toBe(1)
+  })
+
+  // AND ONLY THAT LINE (round 29, correcting round 24's wider reading). A
+  // headline DECIDES within the probe, and ordinary chatter is decided too —
+  // calling a green run incomplete over either would be the false truncation
+  // this point exists to end.
+  it('marks neither a decided crash headline nor ordinary chatter as a loss', () => {
+    const headline = tapped()
+    headline.err.write(`TimeoutError: ${'x'.repeat(MAX_LINE_CHARS)}\n`)
+    expect(headline.state.crashed).toBe(true)
+    expect(headline.state.droppedLines ?? 0).toBe(0)
+
+    const chatter = tapped()
+    chatter.err.write(`vite dev server ready ${'x'.repeat(MAX_LINE_CHARS)}\n`)
+    expect(chatter.state.crashed).toBe(false)
+    expect(chatter.state.droppedLines ?? 0).toBe(0)
+    expect(chatter.state.lines).toHaveLength(0)
   })
 
   // AND THE RUN THAT SHOWED IT: a recognisable crash frame, too long to keep,

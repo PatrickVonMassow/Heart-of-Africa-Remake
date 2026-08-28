@@ -1972,7 +1972,8 @@ describe('an INCOMPLETE RECORDING is its own class, and has its own way out (poi
     expect(result.reason).not.toMatch(/sign the recording off/)
   })
 
-  it('is total on malformed closures and records', () => {
+  // The same reading: these are CALLER inputs, not shapes a JSON file holds.
+  it('is total on malformed closures and records, whatever a caller hands it', () => {
     const broken = truncatedLegacy('webgpu', 1500)
     expect(() => unexplainedRuns([broken], 1000, { openPoints, incompleteClosures: [null, 7, {}] })).not.toThrow()
     expect(unexplainedRuns([broken], 1000, { openPoints, incompleteClosures: [null, 7, {}] })).toHaveLength(1)
@@ -1989,7 +1990,13 @@ describe('an INCOMPLETE RECORDING is its own class, and has its own way out (poi
   // decision reaches the wrapper, which fails OPEN and allows the very turn the
   // gate meant to stop. `Number()` throws on a symbol and `[...x]` on a truthy
   // non-iterable, and both sit on the decision path (review, 19.08.2026).
-  it('never throws on a record or a point set that a JSON file could really hold', () => {
+  // NOT ONLY WHAT JSON CAN HOLD (review finding, 28.08.2026, round 29, which
+  // read the title as claiming that). A symbol never comes off disk; it comes
+  // from a CALLER — the recorder hands these functions live values, a test or a
+  // future guard may hand them anything, and `Number(symbol)` throws where a
+  // `null` merely reads as absent. The point is the totality of the decision
+  // path, so the hostile value is the one that would take the gate down.
+  it('never throws on a record or a point set, whatever a caller hands it', () => {
     const nasty = { backend: 'webgpu', suite: 'polish', at: Symbol('t'), startedAt: Symbol('s'), exit: Symbol('e'), reds: [red('x')] }
     expect(() => runVerdict(nasty, { openPoints })).not.toThrow()
     expect(() => unexplainedRuns([nasty], 1000, { openPoints })).not.toThrow()

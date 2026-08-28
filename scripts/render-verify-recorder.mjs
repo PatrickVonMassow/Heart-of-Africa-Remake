@@ -191,6 +191,12 @@ const LINE_PROBE_CHARS = 4096
  *  accounted for. A false positive only makes the gate stricter. */
 const CRASH_LINE = /^\s+at .+:\d+:\d+|^(?:Uncaught\s+)?\w*Error(?::|\b)/
 
+/** Where a stack frame BEGINS. `CRASH_LINE` can only confirm one from its
+ *  trailing `:line:column`, which an overlong line puts past the probe — so this
+ *  is what says "this might be a crash frame and I cannot tell", the one stderr
+ *  shape a cut line must not be quiet about. */
+const CRASH_FRAME_START = /^\s+at \S/
+
 /**
  * A kept result line's REDS, each as the identity the accounting downstream
  * uses (`<kind>:<key>`, the form `markVariedDetails` reads) and the observation
@@ -393,19 +399,23 @@ export function tapOutput(state, streams = [[process.stdout, false], [process.st
             : carry + chunk.slice(from, from + Math.min(segment, LINE_PROBE_CHARS - carry.length))
         if (isErr && CRASH_LINE.test(head)) state.crashed = true
         if (KEPT_LINE.test(head)) refuse()
-        // AND EVERY OVERLONG STDERR LINE IS A LOST LINE (review finding,
-        // 28.08.2026, round 23, corrected in round 24). Stderr is where the
-        // crash evidence arrives, and a line cut at the per-line budget is
-        // evidence nobody read: `CRASH_LINE`'s stack-frame alternative needs the
-        // trailing `:line:column`, which a pathological path pushes past the
-        // probe. Round 23 refused only the lines the probe could not decide,
-        // which left the decidable ones — a crash frame short enough to
-        // recognise but too long to keep — recorded as if nothing had been cut:
-        // on exit 0 the crash flag is not written either, so such a run came out
-        // looking complete. The head still sets the crash flag where it decides;
-        // the LOSS is recorded either way, which is the closure route the run
-        // would otherwise have none of.
-        else if (isErr) refuse()
+        // AND AN OVERLONG STDERR LINE THE PROBE COULD NOT DECIDE IS A LOST LINE
+        // (review findings, 28.08.2026, rounds 23, 24 and 29). `CRASH_LINE`'s
+        // stack-frame alternative needs the trailing `:line:column`, which a
+        // pathological path pushes past the probe — so a line that BEGINS like a
+        // stack frame and is too long to keep can be neither confirmed a crash
+        // nor ruled out, and it used to leave the run with no closure route at
+        // all. It is recorded as what it is: a result the recording lost.
+        //
+        // Only that line, though (round 29, correcting round 24's wider reading).
+        // A head that fully matches `CRASH_LINE` is DECIDED — the crash is
+        // marked, and nothing about the accounting was lost; that such a run can
+        // still exit 0 without its crash reaching the record is POINT 993, not
+        // this. And ordinary stderr chatter is decided too: it is neither a
+        // result line nor a crash frame, so cutting it costs the accounting
+        // nothing, and calling a green run incomplete over it would be the false
+        // truncation this point exists to end.
+        else if (isErr && CRASH_FRAME_START.test(head) && !CRASH_LINE.test(head)) refuse()
       } else {
         handle(isErr, carry + chunk.slice(from, nl))
       }
