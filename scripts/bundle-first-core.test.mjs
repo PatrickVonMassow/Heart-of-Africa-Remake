@@ -80,6 +80,15 @@ describe('referenceList — the cell marks its references', () => {
     expect(referenceList('#2026, #1900 — years that really are point numbers')).toEqual([2026, 1900])
   })
 
+  // A RUN OF DIGITS IS ONLY A REFERENCE WHILE IT SURVIVES BEING A NUMBER
+  // (round-eleven review finding): past 2^53 two different runs collapse onto
+  // the same value, and two references reading as one point would be reported
+  // as a point standing in two homes.
+  it('drops a digit run no number can tell apart', () => {
+    expect(referenceList('#9007199254740992, #9007199254740993, #350')).toEqual([350])
+    expect(referenceList('#9007199254740991')).toEqual([9007199254740991])
+  })
+
   it('reads no half-marked or embedded number', () => {
     expect(referenceList('a#350')).toEqual([])
     expect(referenceList('#350a')).toEqual([])
@@ -290,8 +299,36 @@ describe('evaluate — the rule', () => {
     })
     const v = evaluate({ tasksMd: tasks([350, 285]), workPackagesMd: both })
     expect(v.block).toBe(true)
-    expect(v.duplicates).toEqual([{ point: 285, homes: ['A', 'Not bundled'] }])
-    expect(v.reason).toMatch(/285 \(A and Not bundled\)/)
+    expect(v.duplicates).toEqual([{ point: 285, homes: ['A', '"Not bundled" bullet 1'] }])
+    expect(v.reason).toMatch(/285 \(A and "Not bundled" bullet 1\)/)
+  })
+
+  // EVERY OCCURRENCE, NOT EVERY CONTAINER (round-eleven review finding). The
+  // exemption section used to be read as one union, so a point written into two
+  // bullets counted as one placement and the message could not say which two
+  // entries to look at.
+  it('BLOCKS a point written into TWO exemption bullets, naming both', () => {
+    const twice = workPackages({
+      bundles: [['Dorfleben', 'A', '#350']],
+      unbundled: ['- **#285** — the leak hunt.', '- **#393**.', '- **#285** — filed again by another session.'],
+    })
+    const v = evaluate({ tasksMd: tasks([350, 285, 393]), workPackagesMd: twice })
+    expect(v.block).toBe(true)
+    expect(v.missing).toEqual([])
+    expect(v.duplicates).toEqual([
+      { point: 285, homes: ['"Not bundled" bullet 1', '"Not bundled" bullet 3'] },
+    ])
+    expect(v.reason).toMatch(/bullet 1 and "Not bundled" bullet 3/)
+  })
+
+  it('BLOCKS a point written TWICE into the same bundle cell', () => {
+    const twice = workPackages({
+      bundles: [['Dorfleben', 'A', '#350, #351, #350']],
+      unbundled: ['- **#285**.'],
+    })
+    const v = evaluate({ tasksMd: tasks([350, 351, 285]), workPackagesMd: twice })
+    expect(v.block).toBe(true)
+    expect(v.duplicates).toEqual([{ point: 350, homes: ['A', 'A'] }])
   })
 
   it('reports an unplaced point and a doubled one in the SAME verdict', () => {
@@ -386,24 +423,25 @@ describe('the real docs/work-packages.md', () => {
   // is a failure rather than a silence.
   it('parses EVERY bundle row and EVERY exemption bullet the document writes', () => {
     const section = md.slice(md.indexOf(BUNDLES_HEADING), md.indexOf(UNBUNDLED_MARKER))
-    const rows = section.split('\n').filter((line) => /^\|\s*\*\*[^|]+\*\*\s*\|\s*[A-Z]\s*\|/.test(line))
-    expect(rows.length).toBeGreaterThan(5)
-    expect(parseBundles(md)).toHaveLength(rows.length)
+    // COUNTED BY THE SHAPE OF THE DOCUMENT, NOT BY THE PARSER'S OWN RULE
+    // (round-eleven review finding): a count that recognises exactly what the
+    // parser recognises goes blind wherever the parser does. Every table line
+    // is a row here, and only the header and its separator may fail to parse.
+    const tableLines = section.split('\n').filter((line) => line.trimStart().startsWith('|'))
+    const separators = tableLines.filter((line) => /^\|[\s|:-]+$/.test(line.trim()))
+    expect(separators).toHaveLength(1)
+    expect(tableLines.length).toBeGreaterThan(7)
+    expect(parseBundles(md)).toHaveLength(tableLines.length - 2)
 
     const tail = md.slice(md.indexOf(UNBUNDLED_MARKER))
     const end = tail.indexOf('\n## ')
-    const listed = (end < 0 ? tail : tail.slice(0, end))
-      .split('\n')
-      .filter((line) => /^[-*]\s+(?:\*\*)?#\d/.test(line))
-    expect(listed.length).toBeGreaterThan(0)
+    // Every bullet of the section, whatever it is written like: an entry in
+    // another shape has to make this red rather than disappear from both sides.
+    const listed = (end < 0 ? tail : tail.slice(0, end)).split('\n').filter((line) => /^[-*]\s/.test(line))
+    expect(listed.length).toBeGreaterThan(5)
     expect(parseUnbundled(md).bullets).toHaveLength(listed.length)
   })
 
-  // THE MIGRATION CHANGED NO MEMBERSHIP (point 1003). What the prose reader
-  // placed the day before the migration is a MEASUREMENT, and it is kept as one
-  // — reproducing that reader here would read the MIGRATED cells and prove
-  // nothing (review finding). The fixture is never regenerated; it ages out on
-  // its own, because a point that closes leaves the open set on both sides.
   // THE FIXTURE IS A MEASUREMENT, AND IT SAYS SO ITSELF (round-ten review
   // finding). Its header is prose and proves nothing; what proves its
   // provenance is its CONTENT. The prose reader took every 1-to-4-digit token

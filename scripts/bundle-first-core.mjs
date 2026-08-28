@@ -73,8 +73,16 @@ export function referenceList(text) {
   // URL fragment, `](#12)` a link anchor, `` `#12` `` a code span, `\\#12` an
   // escape, `a#12` and `##12` neither. A blacklist would have to know every one
   // of those; the whitelist has to know only where a reference may stand.
+  //
+  // A REFERENCE MUST BE A NUMBER THIS READER CAN TELL APART (round-eleven
+  // review finding). "Any run of digits" is the contract, but `Number` collapses
+  // everything past 2^53: `#9007199254740992` and `#9007199254740993` become the
+  // same value, so two different references would read as one point and could be
+  // reported as a duplicate home. A run that does not survive the conversion is
+  // not a point number, and the reader drops it rather than aliasing it.
   return [...String(text ?? '').matchAll(/(?<=^|[\s,([*_])(?<!\]\()#(\d+)(?![0-9A-Za-z#])/g)]
     .map((m) => Number(m[1]))
+    .filter((n) => Number.isSafeInteger(n))
 }
 
 /**
@@ -96,7 +104,11 @@ export function parseBundles(md) {
     if (cells.length < 6) continue
     const [, name, id, , points] = cells
     if (!/^[A-Z]$/.test(id)) continue
-    bundles.push({ name: name.replace(/\*/g, '').trim(), id, points: new Set(referenceList(points)) })
+    // `list` keeps the references IN ORDER and with their repeats, so a point
+    // named twice in one cell is still two placements; `points` stays the set
+    // every membership question is asked of.
+    const list = referenceList(points)
+    bundles.push({ name: name.replace(/\*/g, '').trim(), id, points: new Set(list), list })
   }
   return bundles
 }
@@ -163,8 +175,22 @@ export function duplicateHomes(openSet, bundles, unbundled) {
     if (!open.has(n)) return
     homes.set(n, [...(homes.get(n) ?? []), home])
   }
-  for (const b of bundles || []) for (const n of b.points) add(n, b.id)
-  for (const n of unbundled instanceof Set ? unbundled : []) add(n, 'Not bundled')
+  // EVERY OCCURRENCE IS A PLACEMENT, not every container (round-eleven review
+  // finding). Reading the bundle's SET and the exemption section's union made
+  // two "Not bundled" bullets naming the same point — or one cell naming it
+  // twice — read as a single placement, and left the message unable to say
+  // which two entries to look at. So each occurrence is counted where it
+  // stands, and each home names the entry a reader can go and delete.
+  for (const b of bundles || []) for (const n of b.list ?? [...b.points]) add(n, b.id)
+  const bullets = Array.isArray(unbundled?.bullets) ? unbundled.bullets : null
+  if (bullets) {
+    bullets.forEach((bullet, i) => {
+      for (const n of bullet.points ?? []) add(n, `"Not bundled" bullet ${i + 1}`)
+    })
+  } else {
+    const set = unbundled instanceof Set ? unbundled : unbundled?.points
+    for (const n of set instanceof Set ? set : []) add(n, 'Not bundled')
+  }
   return [...homes.entries()]
     .filter(([, where]) => where.length > 1)
     .map(([point, where]) => ({ point, homes: where }))
@@ -210,9 +236,9 @@ export function evaluate({ tasksMd, workPackagesMd } = {}) {
     const open = parseOpenPoints(tasksMd)
     if (open.size === 0) return { block: false, reason: '' }
 
-    const { points: unbundled } = parseUnbundled(workPackagesMd)
-    const missing = unplacedPoints(open, bundles, unbundled)
-    const duplicates = duplicateHomes(open, bundles, unbundled)
+    const exemptions = parseUnbundled(workPackagesMd)
+    const missing = unplacedPoints(open, bundles, exemptions.points)
+    const duplicates = duplicateHomes(open, bundles, exemptions)
     if (!missing.length && !duplicates.length) return { block: false, reason: '' }
 
     const parts = []
