@@ -104,6 +104,13 @@ describe('the flag surface', () => {
     expect(usage()).toContain('later commit to')
     expect(usage()).toContain('commit touching only other')
   })
+
+  it('documents ineligibility as the same executable handover as unavailability', () => {
+    const text = usage()
+    expect(text).toContain('unavailable or ineligible')
+    expect(text).toContain('first eligible model in the required chain')
+    expect(text).not.toContain('the OTHER vendor')
+  })
 })
 
 describe('a junk spelling is judged by the PLATFORM separators', () => {

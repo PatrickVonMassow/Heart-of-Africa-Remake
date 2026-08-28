@@ -1387,9 +1387,10 @@ export const usage = () =>
   `       read is byte-identical there: the recorder verifies the blob identity and the\n` +
   `       source reading, and COPIES its verdict/model/evidence — do not pass them. The\n` +
   `       gates re-verify the blobs on every read; a changed file refuses the carry.\n` +
-  `\nWHO REVIEWS (CLAUDE.md §6): the OTHER vendor, never an author of the range.\n` +
-  `       Claude authored it → GPT-5.6 Sol at reasoning effort high, and when Sol is\n` +
-  `       unavailable the first of Fable 5 / Opus 5 / Opus 4.8 that wrote no part of it.\n` +
+  `\nWHO REVIEWS (CLAUDE.md §6): the first eligible model in the required chain, never\n` +
+  `       an author of the range. Claude authored it → GPT-5.6 Sol at reasoning effort\n` +
+  `       high, and when Sol is unavailable or ineligible the first of Fable 5 / Opus 5 /\n` +
+  `       Opus 4.8 that wrote no part of it.\n` +
   `       SOL authored it → the first of Opus 5 / Fable 5 / Opus 4.8 that wrote no part\n` +
   `       of it, which also runs the suites, judges the picture and lands the point.\n` +
   `       Run it — never a hand-typed codex line — with:\n` +
