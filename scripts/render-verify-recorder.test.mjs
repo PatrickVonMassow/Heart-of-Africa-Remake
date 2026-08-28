@@ -57,6 +57,7 @@ async function armed(suite = 'polish', featureLevel = null) {
   // A sink UNDER the tap: the tap wraps this, so the test's lines are captured
   // exactly as in a real run but never reach the terminal.
   process.stdout.write = () => true
+  process.stderr.write = () => true
   mod.armRunRecorder('webgpu')
   // The WebGPU feature level the run came up at, recorded the way assertBackend
   // records it. A ledger entry scoped to the compatibility lane is unreachable
@@ -986,6 +987,42 @@ describe('the armed recorder — the REAL wiring, not a stand-in', () => {
     expect(stderrWasWrapped).toBe(true)
     expect(record.crashed).toBe(true)
     expect(record.reds.map((r) => r.name)).toEqual(['a check the suite got out before it died'])
+    // The ordinary non-zero crash keeps the record shape the guard already
+    // consumes; making the crash observation exit-code independent must not
+    // rename or add another disposition field here.
+    expect(Object.keys(record).sort()).toEqual([
+      'asserted',
+      'at',
+      'backend',
+      'crashed',
+      'dirty',
+      'exit',
+      'featureLevel',
+      'head',
+      'reds',
+      'screenshotCount',
+      'screenshots',
+      'startedAt',
+      'suite',
+    ])
+  })
+
+  // A stack can reach the stderr tap even when the process ultimately exits 0.
+  // The observation, not the exit code, decides whether this record is a crash:
+  // otherwise it is indistinguishable from the clean record pinned below and
+  // can cover the backend whose picture it never finished judging.
+  it('records an exit-0 stderr crash with its reds and refuses it as coverage', async () => {
+    const run = await armed('polish')
+    process.stderr.write(
+      'TimeoutError: page.waitForFunction: Timeout 300000ms exceeded\n    at run (/x/polish.mjs:89:7)\n',
+    )
+    process.stdout.write('FAIL  a check the suite got out before it died — 0.4\n')
+    const record = run.exit(0)
+
+    expect(record.exit).toBe(0)
+    expect(record.crashed).toBe(true)
+    expect(record.reds.map((r) => r.name)).toEqual(['a check the suite got out before it died'])
+    expect(runVerdict(record, { openPoints })).toMatchObject({ status: 'red', covers: false })
   })
 
   it('marks a run whose process raised an uncaught exception, and that run never accounts (F1)', async () => {
@@ -1272,6 +1309,7 @@ describe('the armed recorder — the REAL wiring, not a stand-in', () => {
     const run = await armed('polish')
     const record = run.exit(0)
     expect(record.exit).toBe(0)
+    expect(record.crashed).toBeUndefined()
     expect(record.reds).toBeUndefined()
     expect(runVerdict(record, { openPoints }).status).toBe('clean')
   })

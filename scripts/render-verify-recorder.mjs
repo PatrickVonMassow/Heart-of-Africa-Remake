@@ -188,7 +188,9 @@ const LINE_PROBE_CHARS = 4096
 /** Stderr that says the process did not end on its own terms — a stack frame or
  *  a bare `…Error:` headline. A run that CRASHED explains nothing about the
  *  picture, however many of its reds are charged, so it never counts as
- *  accounted for. A false positive only makes the gate stricter. */
+ *  accounted for. A false positive makes the gate stricter by refusing a run
+ *  that reported; a false negative makes it looser and, on exit 0, could let a
+ *  crash count as clean picture coverage. */
 const CRASH_LINE = /^\s+at .+:\d+:\d+|^(?:Uncaught\s+)?\w*Error(?::|\b)/
 
 /** Where a stack frame BEGINS. `CRASH_LINE` can only confirm one from its
@@ -721,7 +723,7 @@ export function armRunRecorder(backend) {
         // it went unread, and reading its tolerated console lines as reds would
         // redden every run the suite itself passed.
         let reds = []
-        if (exit !== 0 || armed.droppedLines > 0) {
+        if (exit !== 0 || armed.crashed || armed.droppedLines > 0) {
           try {
             const output = armed.lines.join('\n')
             // The keys the TAP saw print two different measurements — the buffer
@@ -767,12 +769,13 @@ export function armRunRecorder(backend) {
           // unfileable, blocking nothing. An ordinary exit-0 run reaches this
           // line with an empty list and is written exactly as before.
           //
-          // `crashed` still travels only with a non-zero exit. A record that
-          // reached CRASH_LINE while its process ended 0 is POINT 993, which
-          // owns that reading; changing it here would answer a different point
-          // in this one's commit.
           ...(reds.length > 0 ? { reds } : {}),
-          ...(exit !== 0 ? { crashed: armed.crashed } : {}),
+          // THE OBSERVATION IS INDEPENDENT OF THE EXIT CODE. A crash that
+          // nevertheless exits 0 is still a crash, and this flag is what sends
+          // it through the signed crash disposition instead of letting it
+          // count as clean picture coverage. Non-zero runs keep their existing
+          // explicit boolean; ordinary exit-0 runs keep omitting the field.
+          ...(exit !== 0 || armed.crashed ? { crashed: armed.crashed } : {}),
           // A RUN THAT HIT A BUDGET IS AN INCOMPLETE RECORDING, and says how
           // much it refused — `runVerdict` then answers `incomplete` and the
           // signed closure disposes of it, which is the whole way out a
