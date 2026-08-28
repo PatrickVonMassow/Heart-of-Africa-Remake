@@ -197,13 +197,18 @@ export const LIMITS = {
   // often you ask. It is neither the environment-dependent test (green for the wrong checkout),
   // nor the permissive loader (green over a program that will not start), nor the shared-generator
   // yardstick (both sides inherit one defect): here the OBSERVER writes the measurement it then
-  // reads. The decision a reader copies is to call any monitor twice in a row and distrust a
-  // reading that moves. Written first at ten lines with a five-line risk over the four-line
+  // reads. The decision a reader copies is to re-measure a QUIESCED subject with and without a
+  // look in between — two moving reads alone prove nothing, since a live subject moves them too,
+  // a correction the cross-vendor review of this very commit required. Written first at ten lines
+  // with a five-line risk over the four-line
   // budget, then cut to five with a two-line risk before the raise, as the shortening step this
   // rule demands; the neighbouring entries were read for redundancy and none could be cut without
-  // dropping a claim. What remains is +6 lines / +61 words against the measured 483 / 4341, and
-  // the ceilings move by exactly that to 489 / 4402, with zero slack. Not escalated to the user,
-  // under his general withdrawal of ask-before-raising of 10.08.2026.
+  // dropping a claim. What remains is +6 lines / +64 words against the measured 483 / 4341, and
+  // the ceilings move by exactly that to 489 / 4405, with zero slack. Three of those words are the
+  // cross-vendor correction itself: naming the quiesced subject and the with/without-look control
+  // costs more than the unsound one-liner it replaces, and the entry was tightened a SECOND time
+  // (the risk clause and the prompt both) before those three were taken. Not escalated to the
+  // user, under his general withdrawal of ask-before-raising of 10.08.2026.
   maxLines: 489,
   // EXACT FIT, not headroom — corrected 30.07.2026 after the four-eyes review
   // pointed out that this comment had long stopped describing the numbers. The
@@ -388,9 +393,10 @@ export const LIMITS = {
   // DOWN by two words, with no claim removed and no headroom added.
   // 27.08.2026: the two folded lessons justified beside maxLines measure 4341 words, so this
   // ceiling follows their +70-word net exactly; the guide has no unearned headroom.
-  // 28.08.2026: the self-measuring-monitor lesson justified beside maxLines measures 4402 words,
-  // so this ceiling follows its +61-word net exactly; the guide keeps no unearned headroom.
-  maxWords: 4402,
+  // 28.08.2026: the self-measuring-monitor lesson justified beside maxLines measures 4405 words
+  // after its review correction, so this ceiling follows its +64-word net exactly; the guide keeps
+  // no unearned headroom.
+  maxWords: 4405,
   // A pitfall entry = the risk lines plus its prompt. Anything longer is a
   // story, not a tip.
   maxEntryLines: 11,
