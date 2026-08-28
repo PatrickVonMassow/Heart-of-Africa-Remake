@@ -25,8 +25,14 @@ const CATEGORY_LABEL = 'User-owned category'
 // quoting, and `withoutCategoryLine` then deleted that content line out of the
 // rendered card — a card silently missing one of its own options. The tag is a
 // header, so it is read as one; the refusal already says "begin the body with".
+// The tag also OWNS ITS LINE: a trailing `(?:\s|$)` accepted an ordinary space,
+// so a first line that quoted the marker and then went on with the question
+// ("User-owned category: design-content. — dieser Marker ist Option A.") still
+// granted authority and still lost its opening words to the stripper (second
+// cross-vendor round, GPT-5.6 Sol). Only a line break or the end of the body
+// closes the tag now.
 const CATEGORY_RE = new RegExp(
-  `^\\s*${CATEGORY_LABEL}:\\s*(${Object.keys(USER_OWNED_CATEGORIES).join('|')})\\s*\\.(?:\\s|$)`,
+  `^\\s*${CATEGORY_LABEL}:\\s*(${Object.keys(USER_OWNED_CATEGORIES).join('|')})\\s*\\.[ \\t]*(?:\\r?\\n|$)`,
   'i',
 )
 

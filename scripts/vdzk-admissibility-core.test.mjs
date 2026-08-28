@@ -25,6 +25,25 @@ describe('the typed authority', () => {
   // card that merely QUOTES the label as content granted itself the authority it
   // was quoting, and the renderer then deleted that quoted line out of the card,
   // so the user read a question with one of its own options missing.
+  // THE FIRST LINE IS THE HARDER HALF (second cross-vendor round, GPT-5.6 Sol):
+  // a quotation that OPENS the body used to satisfy the anchor, because the tag
+  // was closed by any whitespace — so the card gained authority and lost its own
+  // opening words to the stripper.
+  it('grants no authority to a first line that quotes the label and then keeps talking', () => {
+    const quoting =
+      'User-owned category: design-content. — genau dieser Marker ist Option A. ' +
+      'Soll die Karte ihn erklären, oder soll sie ihn weglassen?'
+    expect(userOwnedCategory(quoting)).toBe('')
+    expect(judge(quoting).ok).toBe(false)
+    expect(withoutCategoryLine(quoting)).toBe(quoting)
+  })
+
+  it('accepts the tag when it owns its line, with or without a trailing newline', () => {
+    expect(userOwnedCategory('User-owned category: release-tag.\nTaggen oder warten?')).toBe('release-tag')
+    expect(userOwnedCategory('User-owned category: release-tag.  \r\nTaggen oder warten?')).toBe('release-tag')
+    expect(userOwnedCategory('User-owned category: release-tag.')).toBe('release-tag')
+  })
+
   it('grants no authority to a label quoted inside the card, and keeps that line visible', () => {
     const quoting =
       'Soll die Karte den Marker erklären, oder soll sie ihn weglassen?\n' +
