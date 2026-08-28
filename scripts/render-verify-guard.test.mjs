@@ -556,6 +556,55 @@ describe('render-verify-guard --status — what it prints about a run it cannot 
     expect(out).not.toMatch(/1970-01-01/)
   })
 
+  // THE PER-BACKEND LINE READS THE CLASSIFICATION THE GATE READS (review
+  // finding, 28.08.2026, round 17). It used to call every unaccounted entry of
+  // the last run an "unaccounted red" — the crash sentence and the
+  // lost-recording sentence included, the two classes this point exists to tell
+  // apart — and it consulted no signature, so a record already signed off was
+  // reported as an open red for as long as it stayed the last run.
+  it('names the last run by its own class, not as an unaccounted red', () => {
+    const out = inTempRepo({
+      runs: [
+        { backend: 'webgpu', suite: 'startup', at: 1500, exit: 1, crashed: true, reds: [] },
+        { backend: 'webgl', suite: 'settings', at: 1600, exit: 1, reds: [marker] },
+      ],
+    })
+    expect(out).toMatch(/CRASHED RUN \(not an unexplained red\) in the last startup run/)
+    expect(out).toMatch(/INCOMPLETE RECORDING \(not an unexplained red\) in the last settings run/)
+    expect(out).not.toMatch(/unaccounted red in the last (startup|settings) run/)
+  })
+
+  it('stops reporting a signed-off record as an open red', () => {
+    const crashed = { backend: 'webgpu', suite: 'startup', at: 1500, exit: 1, crashed: true, reds: [] }
+    const out = inTempRepo({
+      runs: [crashed],
+      crashClosures: [
+        {
+          run: runIdentity(crashed),
+          backend: 'webgpu',
+          suite: 'startup',
+          at: 1500,
+          evidence: 'local/verify-logs/: SIGKILL at frame 3; the run wrote no report',
+        },
+      ],
+    })
+    expect(out).toMatch(/signed-off crashed run: webgpu\/startup/)
+    expect(out).not.toMatch(/in the last startup run/)
+  })
+
+  // AND THE OPEN-CRASH PARAGRAPH DOES NOT CONTRADICT THE SIGN-OFF MESSAGE
+  // (review finding, 28.08.2026, round 17). It said nothing in the run could be
+  // explained or charged, while the sign-off says every red the run printed
+  // before it died still blocks until it is fixed, charged or filed.
+  it('says the crash carries no red, and that the reds it printed still close the ordinary ways', () => {
+    const out = inTempRepo({
+      runs: [{ backend: 'webgpu', suite: 'startup', at: 1500, exit: 1, crashed: true, reds: [] }],
+    })
+    expect(out).toMatch(/THE CRASH ITSELF carries no red anybody can own/)
+    expect(out).toMatch(/PRINTED BEFORE it died was really observed and still closes those three/)
+    expect(out).not.toMatch(/nothing in it can be explained or charged/)
+  })
+
   it('falls back to startedAt where only that was measured', () => {
     const out = inTempRepo({
       runs: [{ backend: 'webgpu', suite: 'settings', startedAt: 1500, exit: 1, reds: [marker] }],

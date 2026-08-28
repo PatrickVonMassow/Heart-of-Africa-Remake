@@ -1025,6 +1025,26 @@ describe('evaluate — a red is not closed by the runs that FOLLOWED it (point 6
     expect(result.waved.map((w) => w.name)).toEqual(['the goat stance', 'the eaves column'])
   })
 
+  // ONE RED IS ITS KIND AND ITS NAME (review finding, 28.08.2026, round 17).
+  // Keyed by the name alone, a failing check and a console error printing the
+  // same text collapsed into one waved entry and one count — two observations
+  // reported as one, which is the understatement this list exists to prevent.
+  it('counts a check and a console error of the SAME wording as two waved reds', () => {
+    const twoKinds = redRun('webgpu', 1500, [
+      red('the eaves column', null, 'check'),
+      red('the eaves column', null, 'console'),
+    ])
+    const result = evaluate(
+      renderChange({
+        runs: [twoKinds],
+        deferral: { head: 'def5678', reason: 'the lane was software', at: 1700 },
+        openPoints,
+      }),
+    )
+    expect(result.wavedCount).toBe(2)
+    expect(result.waved.map((w) => w.name)).toEqual(['the eaves column', 'the eaves column'])
+  })
+
   it('keeps the TRUE count when the named list hits its cap', () => {
     const many = redRun('webgpu', 1500, Array.from({ length: 25 }, (_, i) => red(`nobody filed number ${i}`)))
     const result = evaluate(
@@ -1411,6 +1431,39 @@ describe('an INCOMPLETE RECORDING is its own class, and has its own way out (poi
   /** The same, but it also recorded a red it really did observe. */
   const truncatedWithRed = (backend, at, name = 'console error: THREE.WebGPURenderer: Uncaptured WebGPU GPUValidationError') =>
     redRun(backend, at, [truncationEntry, red(name, null, 'console')])
+  // THE REDS AN UNLIFTED TRUNCATION DID RECORD ARE NAMED BESIDE THE LOST ONES
+  // (review finding, 28.08.2026, round 17). The record used to report only the
+  // cap sentence, so a DEFERRAL — which waves the whole record through — paid
+  // for one thing and carried away every red the run really printed.
+  it('names the reds an unlifted truncation did record, so a deferral pays for them too', () => {
+    const record = truncatedNow('webgpu', 1500, [red('a check nobody owns'), red('the goat stance', 506)])
+    const found = unexplainedRuns([record], 1000, { openPoints })
+    expect(found).toHaveLength(1)
+    expect(found[0].status).toBe('incomplete')
+    // The blocking sentence is still the lost recording alone: one thing to
+    // dispose of, and nothing in the record can explain it.
+    expect(found[0].unaccounted).toHaveLength(1)
+    expect(found[0].unaccounted[0].name).toMatch(/capture cap dropped 115 result line/)
+    // The COST, though, is the lost recording plus every red nobody owns. The
+    // goat stance is charged to an open point, so it was never part of a bypass.
+    expect(found[0].reds).toEqual([
+      "the capture cap dropped 115 result line(s) — this run's reds were NOT all recorded, so nothing in it can be explained",
+      'a check nobody owns',
+    ])
+    const result = evaluate(
+      renderChange({
+        runs: [record],
+        deferral: { head: 'def5678', reason: 'the host lost its browser mid-suite', at: 1700 },
+        openPoints,
+      }),
+    )
+    expect(result.wavedCount).toBe(2)
+    expect(result.waved.map((w) => w.name)).toEqual([
+      "the capture cap dropped 115 result line(s) — this run's reds were NOT all recorded, so nothing in it can be explained",
+      'a check nobody owns',
+    ])
+  })
+
   /** A closure AS THE CLI WRITES IT: bound to one record's content identity
    *  (round-5 review, 19.08.2026 — a stamp was not an identity). */
   const closureOf = (run_, evidence = 'the host cannot run a browser suite (point 732)') => ({
@@ -1942,6 +1995,37 @@ describe('a CRASHED run is its own class, and has its own signed way out (point 
     expect(unexplainedRuns([withRed, later], 1000, { openPoints }).map((u) => u.status)).toEqual(['crashed'])
   })
 
+  // A SUSPECT RECORD MAY STILL CARRY REDS OF ITS OWN (review finding,
+  // 28.08.2026, round 17). "A run that exited 0 recorded nothing" holds for an
+  // ordinary retry and fails for the record that reached CRASH_LINE while its
+  // process still ended 0: that record keeps every red it printed before dying,
+  // and substituting the first attempt's marker for them threw them away.
+  it('keeps the own reds of a crashed retry record beside the first attempt', () => {
+    const crashedRetry = {
+      ...crashedRun('webgpu', 1500, { reds: [red('what it printed before dying')] }),
+      exit: 0,
+      suspect: true,
+      suspectOf: [{ name: 'what the first attempt failed on', kind: 'check' }],
+    }
+    // Unsigned it is a crash, and the cost it carries names both observations.
+    const found = unexplainedRuns([crashedRetry], 1000, { openPoints })
+    expect(found.map((u) => u.status)).toEqual(['crashed'])
+    expect(found[0].reds).toEqual([
+      'the run ended in a crash, not in its own report',
+      'what the first attempt failed on',
+      'what it printed before dying',
+    ])
+    // Signed, the crash sentence goes and both observations stay.
+    const residual = unexplainedRuns([crashedRetry], 1000, {
+      openPoints,
+      crashClosures: [crashClosure(crashedRetry)],
+    })
+    expect(residual[0].reds).toEqual([
+      'what the first attempt failed on',
+      'what it printed before dying',
+    ])
+  })
+
   // The cross-family locks: each signature closes only what it names.
   it('an INCOMPLETE closure does not lift a crash, and a CRASH closure does not lift a mere truncation', () => {
     const truncation = truncationMarker(9, 'check')
@@ -2039,12 +2123,29 @@ describe('a CRASHED run is its own class, and has its own signed way out (point 
     ])
   })
 
-  // The synthetic truncation marker is NOT a red anybody can act on — it stands
-  // for the lines nobody recorded — so it never enters that list.
-  it('does not quote the truncation marker as a red the crash printed', () => {
+  // The synthetic truncation marker is NOT quoted as a red anybody can act on —
+  // it stands for the lines nobody recorded. But the LOST RECORDING is still
+  // named, in the words the incomplete class uses (review finding, 28.08.2026,
+  // round 17): a deferral that named the crash and the reds the run got out, and
+  // said nothing about the lines nobody read, still understated what it waved.
+  it('names the lost recording beside the crash, and never the marker itself', () => {
     const both = crashedRun('webgpu', 1500, { reds: [truncationMarker(9, 'check'), red('a check nobody owns')] })
     const found = unexplainedRuns([both], 1000, { openPoints })
     expect(found[0].reds).toEqual([
+      'the run ended in a crash, not in its own report',
+      "the capture cap dropped 9 result line(s) — this run's reds were NOT all recorded, so nothing in it can be explained",
+      'a check nobody owns',
+    ])
+    // The blocking sentence is still the crash alone: one thing to dispose of.
+    expect(found[0].unaccounted.map((u) => u.name)).toEqual([
+      'the run ended in a crash, not in its own report',
+    ])
+  })
+
+  // A crash that did NOT truncate says nothing about a lost recording.
+  it('says nothing about a lost recording where none was lost', () => {
+    const only = crashedRun('webgpu', 1500, { reds: [red('a check nobody owns')] })
+    expect(unexplainedRuns([only], 1000, { openPoints })[0].reds).toEqual([
       'the run ended in a crash, not in its own report',
       'a check nobody owns',
     ])

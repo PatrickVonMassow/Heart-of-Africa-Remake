@@ -624,11 +624,34 @@ function isTruncationEntry(red) {
  * stays unowned, as it does in the ordinary path. Total.
  */
 function residualOf(run) {
+  const own = (Array.isArray(run?.reds) ? run.reds : []).filter((red) => !isTruncationEntry(red))
   if (run?.suspect === true && exitOf(run) === 0) {
-    return { status: 'suspect', reds: suspectRedsOf(run) }
+    // A SUSPECT RECORD MAY STILL CARRY REDS OF ITS OWN (review finding,
+    // 28.08.2026, round 17). The premise above — a run that exited 0 recorded
+    // nothing — holds for an ORDINARY retry and fails for the one record that
+    // reached CRASH_LINE while its process still ended 0: that record keeps
+    // every red it printed before dying, and substituting the first attempt's
+    // marker for them threw those observations away. Both are real, so both are
+    // returned, the first attempt first and this record's own after it, with a
+    // name already named not repeated.
+    const first = suspectRedsOf(run)
+    const named = new Set(first.map((red) => text(red?.name)))
+    return { status: 'suspect', reds: [...first, ...own.filter((red) => !named.has(text(red?.name)))] }
   }
-  const reds = (Array.isArray(run?.reds) ? run.reds : []).filter((red) => !isTruncationEntry(red))
-  return { status: 'red', reds }
+  return { status: 'red', reds: own }
+}
+
+/** WHAT A LOST RECORDING IS CALLED, in one sentence with its measured count.
+ *  Shared, because a crashed run that ALSO truncated must name the lost
+ *  recording in the same words the incomplete class uses (review finding,
+ *  28.08.2026, round 17) — a deferral that named the crash and the reds it got
+ *  out, but not the lines nobody read, still understated what it waved. */
+function incompleteSentence(run) {
+  const dropped = droppedLinesOf(run)
+  return (
+    `the capture cap dropped ${dropped > 0 ? `${dropped} ` : ''}result line(s) — this run's reds ` +
+    'were NOT all recorded, so nothing in it can be explained'
+  )
 }
 
 /** How many result lines the cap swallowed, as the record knows it — the number
@@ -887,19 +910,11 @@ export function runVerdict(run, options) {
   // here: the red list is a fragment of the run's red set, and an exit 0 that
   // dropped result lines is a pass nobody read.
   if (isIncompleteRecording(run)) {
-    const dropped = droppedLinesOf(run)
     return {
       status: 'incomplete',
       covers: false,
       charges: [],
-      unaccounted: [
-        {
-          name:
-            `the capture cap dropped ${dropped > 0 ? `${dropped} ` : ''}result line(s) — this run's reds ` +
-            'were NOT all recorded, so nothing in it can be explained',
-          point: null,
-        },
-      ],
+      unaccounted: [{ name: incompleteSentence(run), point: null }],
     }
   }
   if (run.suspect === true && exitOf(run) === 0) {
@@ -1213,9 +1228,14 @@ export function unexplainedRuns(runs, since, options) {
       // cost is invisible is one nobody weighs. Read through `residualOf` so the
       // synthetic truncation marker — which stands for what nobody recorded — is
       // not quoted as a red anybody could act on.
-      const printedBeforeCrash = residualOf(r)
-        .reds.map((x) => text(x?.name))
-        .filter(Boolean)
+      //
+      // AND THE LOST RECORDING BESIDE THEM, where the run truncated as well
+      // (review finding, 28.08.2026, round 17): `residualOf` strips the
+      // truncation marker, so without this the deferral named the crash and the
+      // reds the run got out, and said nothing about the lines nobody read.
+      const printedBeforeCrash = residualOf(r).reds.filter((red) => text(red?.name))
+      const alsoLost = isIncompleteRecording(r) ? [{ name: incompleteSentence(r), kind: TRUNCATED_KIND }] : []
+      const crashOpen = [...verdict.unaccounted, ...alsoLost, ...printedBeforeCrash]
       out.push({
         backend,
         suite,
@@ -1223,7 +1243,8 @@ export function unexplainedRuns(runs, since, options) {
         id,
         status: 'crashed',
         unaccounted: verdict.unaccounted,
-        reds: [...verdict.unaccounted.map((u) => u.name), ...printedBeforeCrash],
+        reds: crashOpen.map((x) => text(x?.name)),
+        redKeys: crashOpen.map(redKeyOf),
       })
       continue
     }
@@ -1268,6 +1289,16 @@ export function unexplainedRuns(runs, since, options) {
       // signature had, through the other door (review, 19.08.2026).
       const lifted = reRecorded(r) || incompleteClosureFor(r, incompleteClosures)
       if (!lifted) {
+        // THE REDS THE RUN DID RECORD ARE NAMED BESIDE THE LOST ONES (review
+        // finding, 28.08.2026, round 17) — the same line the crash branch above
+        // holds. `unaccounted` stays the one sentence a reader must dispose of,
+        // because the lost part is what blocks and nothing in the record can
+        // explain it. But a DEFERRAL waves the whole record through, and
+        // reporting only that sentence hid every red the run really printed and
+        // nobody owns. Charged ones stay out: a red an open point already owns
+        // was never part of the bypass.
+        const stillOpen = residualOf(r).reds.filter((red) => !owned(red, suite, backend, level))
+        const lostAndOpen = [...verdict.unaccounted, ...stillOpen]
         out.push({
           backend,
           suite,
@@ -1276,7 +1307,8 @@ export function unexplainedRuns(runs, since, options) {
           status: 'incomplete',
           droppedLines: droppedLinesOf(r),
           unaccounted: verdict.unaccounted,
-          reds: verdict.unaccounted.map((u) => u.name),
+          reds: lostAndOpen.map((x) => text(x?.name)),
+          redKeys: lostAndOpen.map(redKeyOf),
         })
         continue
       }
@@ -1309,10 +1341,14 @@ export function unexplainedRuns(runs, since, options) {
     let unowned = null
     // The post-crash residual where there is one — the reds the record still
     // holds, read by the run's own class — and otherwise the verdict's own.
+    // A SUSPECT RECORD IS READ THROUGH `residualOf` TOO (review finding,
+    // 28.08.2026, round 17): it returns the first attempt's reds AND any this
+    // record kept of its own, which is the same list for an ordinary retry and
+    // the whole difference for one that reached CRASH_LINE while exiting 0.
     const observed = postCrash
       ? postCrash.reds
       : verdict.status === 'suspect'
-        ? suspectRedsOf(r)
+        ? residualOf(r).reds
         : Array.isArray(r.reds)
           ? r.reds
           : []
@@ -1327,8 +1363,9 @@ export function unexplainedRuns(runs, since, options) {
     // suspect run's whole first attempt is summarised into a single unaccounted
     // entry, and a caller counting those would report two reds as one.
     const open_ =
-      unowned ?? (verdict.status === 'suspect' ? suspectRedsOf(r) : postCrash ? postCrash.reds : verdict.unaccounted)
-    const names = open_.map((x) => text(x?.name)).filter(Boolean)
+      unowned ?? (verdict.status === 'suspect' ? residualOf(r).reds : postCrash ? postCrash.reds : verdict.unaccounted)
+    const named = open_.filter((x) => text(x?.name))
+    const names = named.map((x) => text(x?.name))
     // What is REPORTED is what is still open — never the verdict's own list,
     // which still holds the reds a charge has since taken over: quoting one of
     // those as the blocker would name the wrong red and count one too many.
@@ -1344,12 +1381,23 @@ export function unexplainedRuns(runs, since, options) {
       status: postCrash ? postCrash.status : verdict.status,
       unaccounted: stillOpen.length > 0 ? stillOpen : verdict.unaccounted,
       reds: names.length > 0 ? names : ['(unnamed red)'],
+      redKeys: names.length > 0 ? named.map(redKeyOf) : ['red|(unnamed red)'],
     })
   }
   // Undated records sort LAST rather than to the epoch: they cannot be placed
   // among the measured ones, and pretending they are the oldest put them at the
   // head of every message.
   return out.sort((a, b) => (a.at ?? Infinity) - (b.at ?? Infinity))
+}
+
+/** THE KEY ONE RED IS COUNTED BY when a deferral says what it waved (review
+ *  finding, 28.08.2026, round 17). The name alone collapsed two different reds
+ *  that happen to print the same text — a failing check and a console error of
+ *  that name are two observations, and counting them as one understates the
+ *  bypass. The kind is part of the identity wherever the record carries one. */
+function redKeyOf(red) {
+  const kind = text(red?.kind) || 'red'
+  return `${kind}|${text(red?.name)}`
 }
 
 /** The most recent run of `backend` since `since`, covering or not — what the
@@ -1586,12 +1634,18 @@ export function evaluate(input) {
     // same failure — the first attempt's red one and the retry's SUSPECT one,
     // which carries the same check names — and counting both would report one
     // failure as two.
+    // AND ONE RED IS ITS KIND AND ITS NAME (review finding, 28.08.2026, round
+    // 17). Keyed by the name alone, a failing check and a console error printing
+    // the same text collapsed into one waved entry and one count — two
+    // observations reported as one, which is the understatement this list exists
+    // to prevent. `redKeys` carries the kind wherever the record has one.
     const waved = []
     const seen = new Set()
     let wavedCount = 0
     for (const u of unexplained) {
-      for (const name of u.reds) {
-        const key = `${u.backend}|${u.suite}|${name}`
+      for (let i = 0; i < u.reds.length; i++) {
+        const name = u.reds[i]
+        const key = `${u.backend}|${u.suite}|${u.redKeys?.[i] ?? name}`
         if (seen.has(key)) continue
         seen.add(key)
         wavedCount++

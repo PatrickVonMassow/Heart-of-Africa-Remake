@@ -59,6 +59,7 @@ import {
   incompleteClosureFor,
   crashClosureFor,
   afterCrashClosure,
+  unexplainedRuns,
   droppedLinesOf,
   runStamp,
   runIdentity,
@@ -371,6 +372,16 @@ export function openIncompleteRuns(state) {
  *  stays `partial` and blocks nobody), and are not yet signed off. What the
  *  `--crashed` sign-off may see — same discipline as openIncompleteRuns: the
  *  CLI can only ever name a run that is really recorded and still blocking. */
+/** WHAT ONE OPEN RECORD IS CALLED in the status report — the same three classes
+ *  the gate blocks with, never "unaccounted red" for all of them (review
+ *  finding, 28.08.2026, round 17). */
+function classOf(entry) {
+  if (entry?.status === 'incomplete') return 'INCOMPLETE RECORDING (not an unexplained red)'
+  if (entry?.status === 'crashed') return 'CRASHED RUN (not an unexplained red)'
+  if (entry?.status === 'suspect') return 'SUSPECT run — it passed only on the retry'
+  return 'unaccounted red'
+}
+
 export function openCrashedRuns(state) {
   const runs = Array.isArray(state?.runs) ? state.runs : []
   return runs.filter(
@@ -695,6 +706,11 @@ if (arg === 'status' || arg === '--status') {
     console.log(`pending render paths: ${paths.length ? paths.join(', ') : '(none)'}`)
     const since = paths.length ? latestChangeAt(paths, head, base) : 0
     const openPoints = chargeablePoints(readTasksAll())
+    const openRecords = unexplainedRuns(state.runs, since, {
+      openPoints,
+      incompleteClosures: state.incompleteClosures,
+      crashClosures: state.crashClosures,
+    })
     for (const b of BACKENDS) {
       const run = coveringRun(state.runs, b, since, { openPoints })
       const verdict = run ? runVerdict(run, { openPoints }) : null
@@ -711,12 +727,25 @@ if (arg === 'status' || arg === '--status') {
           : `  ${b.padEnd(6)} NOT covered since the last render edit`,
       )
       if (run) continue
+      // THE STATUS LINE READS THE CLASSIFICATION THE GATE READS (review finding,
+      // 28.08.2026, round 17). It used to call every unaccounted entry of the
+      // last run an "unaccounted red" — the crash sentence and the
+      // lost-recording sentence included, the two classes this point exists to
+      // tell apart — and it consulted no signature, so a record already signed
+      // off was still reported as an open red. Both readings now come from
+      // `unexplainedRuns`, which is what actually blocks.
       const last = latestRun(state.runs, b, since)
-      const why = last ? runVerdict(last, { openPoints }) : null
-      for (const u of why?.unaccounted ?? []) {
+      if (!last) continue
+      const entry = openRecords.find((u) => u.id === runIdentity(last))
+      if (!entry) continue
+      for (const u of entry.unaccounted) {
         console.log(
-          `         unaccounted red in the last ${last.suite} run: "${u.name}"` +
-            (u.point === null ? ' (charged to nothing)' : ` (point ${u.point} is not open)`),
+          `         ${classOf(entry)} in the last ${last.suite} run: "${u.name}"` +
+            (entry.status !== 'red'
+              ? ''
+              : u.point === null
+                ? ' (charged to nothing)'
+                : ` (point ${u.point} is not open)`),
         )
       }
     }
@@ -744,10 +773,14 @@ if (arg === 'status' || arg === '--status') {
     for (const r of openCrashedRuns(state)) {
       console.log(
         `⚠ CRASHED RUN (not an unexplained red): ${r.backend}/${r.suite} @${isoText(runStamp(r) ?? r.at)} ` +
-          `(id ${runIdentity(r)}) — the run died rather than reported, so nothing in it can be ` +
-          'explained or charged. A re-run judges the picture but does NOT remove this record: fix ' +
-          'the CAUSE (the render edit moves the window past it), or read its kept log ' +
-          '(local/verify-logs/) and sign it off: node scripts/render-verify-guard.mjs ' +
+          `(id ${runIdentity(r)}) — the run died rather than reported. THE CRASH ITSELF carries no ` +
+          'red anybody can own, so the three closings of point 640 cannot reach it — but a red the ' +
+          'run PRINTED BEFORE it died was really observed and still closes those three ordinary ' +
+          'ways (review finding, 28.08.2026, round 17: this line used to say nothing in the run ' +
+          'could be explained or charged, which the sign-off message directly contradicts). A ' +
+          're-run judges the picture but does NOT remove this record: fix the CAUSE (the render ' +
+          'edit moves the window past it), or read its kept log (local/verify-logs/) and sign the ' +
+          'CRASH off: node scripts/render-verify-guard.mjs ' +
           `--crashed "${r.backend}/${r.suite}" --evidence "<what the log shows>"`,
       )
     }

@@ -1336,9 +1336,11 @@ the retained string then grew with the page's output rather than with its red
 set, which is the exhausted process the ceiling exists to prevent. Two more
 budgets sit beside it and are refused the same loud way: `MAX_CAPTURE_CHARS`
 (4 Mi UTF-16 code units of kept text in total — what `String.length` counts, so
-it bounds what the tap RETAINS and promises no byte figure: the same text takes
-twice that in memory, and more or less again as UTF-8 depending on the script it
-is written in) and `MAX_LINE_CHARS` (64 Ki code units for one line, which
+it bounds what the tap RETAINS and promises no byte figure at all: an engine may
+store the same string one byte per character or two, and its UTF-8 form is
+different again depending on the script it is written in — it counts the JOINED
+text, newlines included, because the joined text is what the parser is handed)
+and `MAX_LINE_CHARS` (64 Ki code units for one line, which
 also caps the tap's partial-line buffer — a line whose middle had to be dropped
 is refused when its newline arrives, never parsed as a stump). The identity
 ceiling and the total budget are asked only of a line that would be KEPT: one
@@ -1359,12 +1361,16 @@ therefore stays reachable for new records too, which is what gives such a run a
 signed way out (`--incomplete`) instead of the hand-written `--defer` this
 point exists to abolish.
 
-Only a RED run carries the truncation. A run that exits 0 records no reds at
-all, so the lines it refused were never evidence the accounting reads, and
-calling it incomplete would block a genuinely green run. The COUNT is written
-whatever the exit code, though (round 16): the refusal must not be the one drop
-that goes unrecorded, and it is the `truncated` field alone the verdict turns
-on.
+A dropped result line marks the recording whatever the exit code said (round
+17, overturning round 16's carve-out for an exit-0 run). That carve-out rested
+on reading a refused line as chatter the accounting never wanted, and the tap
+says otherwise: a line is refused only when it matches `KEPT_LINE` — a suite's
+own `FAIL`, an `ERR:`, a `console errors:` summary. Ordinary output never
+reaches a budget, so a genuinely green run cannot be marked by this rule; it
+prints no result line to drop. What the carve-out really exempted was the
+opposite case — a process that ended 0 while its own output carried result lines
+nobody read — and that run then counted as picture COVERAGE, which is the worst
+thing an unread recording can be taken for.
 
 ### The record keeps the MEASUREMENT, so a charge can be applied afterwards
 
@@ -1508,6 +1514,28 @@ AND lost nothing is closed by that one signature alone, because "it failed
 without reporting a red" is only the crash restated — but a run that also
 truncated has lost output whether or not it printed a red, so it owes the
 second signature exactly like any other, and one is not enough for it.
+
+**What a DEFERRAL pays for is the whole record, so it names the whole record**
+(round 17). The waved-through list used to read only the one sentence each class
+blocks with — the crash sentence, the lost-recording sentence — so a deferral
+over a crashed or truncated run carried away every red the run really printed
+with nothing naming them, and a bypass whose cost is invisible is one nobody
+weighs. The blocking sentence is unchanged, because it is the one thing a reader
+must dispose of; the COST beside it now names that sentence, the lost recording
+where the run also truncated, and every printed red no open point owns. One red
+is its kind and its name there: a failing check and a console error printing the
+same text are two observations, and counting them as one understated the bypass.
+
+**And `--status` reads the classification the gate reads** (round 17). Its
+per-backend line called every unaccounted entry of the last run an "unaccounted
+red" — the crash and lost-recording sentences included, the two classes this
+point exists to tell apart — and it consulted no signature, so a record already
+signed off was still reported as an open red for as long as it stayed the last
+run. Both readings come from `unexplainedRuns`, which is what actually blocks.
+The open-crash paragraph no longer says nothing in the run can be explained or
+charged either: the CRASH carries no red anybody can own, and a red the run
+printed before it died still closes the three ordinary ways — which is what the
+sign-off message had been saying all along.
 
 **And a flag is not a value.** `--evidence --run <id>` used to yield the literal
 `--run` as the written evidence, which the draft — handed a non-empty string —
