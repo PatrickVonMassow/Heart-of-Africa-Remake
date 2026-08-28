@@ -393,17 +393,19 @@ export function tapOutput(state, streams = [[process.stdout, false], [process.st
             : carry + chunk.slice(from, from + Math.min(segment, LINE_PROBE_CHARS - carry.length))
         if (isErr && CRASH_LINE.test(head)) state.crashed = true
         if (KEPT_LINE.test(head)) refuse()
-        // AND A STDERR LINE THE PROBE COULD NOT DECIDE IS A LOST LINE (review
-        // finding, 28.08.2026, round 23). `CRASH_LINE`'s stack-frame alternative
-        // needs the trailing `:line:column`, which a pathological path can push
-        // past the probe — so such a line was neither marked a crash nor counted
-        // as dropped, and the run kept neither closure route. It cannot be read
-        // and it cannot be ruled out, so it is recorded as what it is: a result
-        // the recording lost. Naming it a CRASH instead would say the process
-        // died, which nobody measured. The headline alternative is unaffected —
-        // it decides within the first characters — and a line this long is
-        // pathological in any case.
-        else if (isErr && !CRASH_LINE.test(head)) refuse()
+        // AND EVERY OVERLONG STDERR LINE IS A LOST LINE (review finding,
+        // 28.08.2026, round 23, corrected in round 24). Stderr is where the
+        // crash evidence arrives, and a line cut at the per-line budget is
+        // evidence nobody read: `CRASH_LINE`'s stack-frame alternative needs the
+        // trailing `:line:column`, which a pathological path pushes past the
+        // probe. Round 23 refused only the lines the probe could not decide,
+        // which left the decidable ones — a crash frame short enough to
+        // recognise but too long to keep — recorded as if nothing had been cut:
+        // on exit 0 the crash flag is not written either, so such a run came out
+        // looking complete. The head still sets the crash flag where it decides;
+        // the LOSS is recorded either way, which is the closure route the run
+        // would otherwise have none of.
+        else if (isErr) refuse()
       } else {
         handle(isErr, carry + chunk.slice(from, nl))
       }

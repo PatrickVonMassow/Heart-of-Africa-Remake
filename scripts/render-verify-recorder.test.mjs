@@ -538,22 +538,49 @@ describe('tapOutput — observe-only', () => {
     expect(state.droppedLines ?? 0).toBe(0)
   })
 
-  // AND A STDERR LINE THE PROBE COULD NOT DECIDE IS A LOST LINE (review finding,
-  // 28.08.2026, round 23). CRASH_LINE's stack-frame alternative needs the
-  // trailing :line:column, which a pathological path pushes past the probe — so
-  // such a line was neither marked a crash nor counted as dropped, and the run
-  // kept neither closure route.
-  it('records an undecidable overlong stderr line as a lost line, not as a crash', () => {
+  // EVERY OVERLONG STDERR LINE IS A LOST LINE (review finding, 28.08.2026, round
+  // 23, corrected in round 24). Stderr is where the crash evidence arrives, and
+  // a line cut at the per-line budget is evidence nobody read: CRASH_LINE's
+  // stack-frame alternative needs the trailing :line:column, which a
+  // pathological path pushes past the probe. Refusing only the UNDECIDABLE ones
+  // left a crash frame short enough to recognise but too long to keep recorded
+  // as if nothing had been cut — and on exit 0 the crash flag is not written
+  // either, so such a run came out looking complete.
+  it('records every overlong stderr line as a lost line, decidable or not', () => {
     const { state, err } = tapped()
     err.write(`    at run (/${'d'.repeat(MAX_LINE_CHARS)}/polish.mjs:89:7)\n`)
+    // The tail that would say "crash" is past the probe, so nothing claims the
+    // process died — but the loss is on the record.
     expect(state.crashed).toBe(false)
     expect(state.droppedLines).toBe(1)
     expect(state.lines).toHaveLength(0)
-    // A headline decides within the probe, so it is still a crash and not a loss.
+    // A headline DOES decide within the probe: the crash is marked, and the cut
+    // line is still recorded as lost, which is the closure route it needs.
     const other = tapped()
     other.err.write(`TimeoutError: ${'x'.repeat(MAX_LINE_CHARS)}\n`)
     expect(other.state.crashed).toBe(true)
-    expect(other.state.droppedLines ?? 0).toBe(0)
+    expect(other.state.droppedLines).toBe(1)
+  })
+
+  // AND THE RUN THAT SHOWED IT: a recognisable crash frame, too long to keep,
+  // on a process that still ended 0 (review finding, 28.08.2026, round 24). The
+  // record came out looking complete — no reds, no crash flag, nothing dropped —
+  // which is the silent half-recording this point exists to end.
+  it('records an exit-0 run whose overlong crash frame was cut as INCOMPLETE', async () => {
+    const run = await armed('polish')
+    const before = process.stderr.write
+    const wrapper = process.stderr.write
+    process.stderr.write = (chunk, ...rest) => {
+      wrapper.call(process.stderr, chunk, ...rest)
+      return true
+    }
+    process.stderr.write(`    at run (/${'d'.repeat(MAX_LINE_CHARS)}/polish.mjs:89:7)\n`)
+    process.stderr.write = before
+    const record = run.exit(0)
+    expect(record.droppedLines).toBe(1)
+    expect(record.truncated).toBe(true)
+    expect(runVerdict(record, { openPoints: [642] }).status).toBe('incomplete')
+    expect(runVerdict(record, { openPoints: [642] }).covers).toBe(false)
   })
 
   // A line WITHIN the per-line budget that brings nothing new costs nothing,
@@ -579,9 +606,14 @@ describe('tapOutput — observe-only', () => {
     expect(whole.state.lines).toHaveLength(0)
     expect(whole.state.droppedLines).toBe(1)
 
+    // THE SAME LINE, TO THE CHARACTER (review finding, 28.08.2026, round 24).
+    // The split case used to append twice as much text as the whole one, so a
+    // chunk-dependent bug near the boundary could pass on the length difference
+    // rather than on the invariance the case claims.
     const split = tapped()
+    const body = 'z'.repeat(MAX_LINE_CHARS)
     split.out.write('ERR: page error')
-    for (let i = 0; i < 4; i++) split.out.write('z'.repeat(MAX_LINE_CHARS / 2))
+    for (let i = 0; i < 4; i++) split.out.write(body.slice((i * body.length) / 4, ((i + 1) * body.length) / 4))
     split.out.write('\n')
     expect(split.state.lines).toHaveLength(0)
     expect(split.state.droppedLines).toBe(1)
@@ -996,8 +1028,8 @@ describe('the armed recorder — the REAL wiring, not a stand-in', () => {
     expect(record.droppedLines).toBe(7)
     expect(record.truncated).toBe(true)
     expect(isIncompleteRecording(record)).toBe(true)
-    expect(runVerdict(record, { openPoints }).status).toBe('incomplete')
-    expect(runVerdict(record, { openPoints }).covers).toBe(false)
+    expect(runVerdict(record, { openPoints: [642] }).status).toBe('incomplete')
+    expect(runVerdict(record, { openPoints: [642] }).covers).toBe(false)
   })
 
   // A LOST RECORDING OUTRANKS AN ACCOUNTED-FOR RUN (review finding, 28.08.2026,

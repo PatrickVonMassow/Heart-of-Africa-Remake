@@ -1279,9 +1279,10 @@ are all already represented is dropped. (Not "one line per identity": a line
 introducing `B` is kept even though it also carries the already-kept `A`, so `A`
 may appear on several kept lines. What is bounded is the identity SET, not the
 line count.) The parser de-duplicates by that same key anyway, so collapsing
-here changes no verdict. The record then stores the whole red set. Every
-observed red keeps its identity and stays closable the three ordinary ways of
-point 640, whatever the flood around it.
+here changes no verdict. The record then stores the whole red set of a run that
+refused no result line: every red it observed keeps its identity and stays
+closable the three ordinary ways of point 640, whatever the flood around it. A
+run that DID refuse one is a different thing, and the next paragraph says what.
 
 **As far as its budgets reach, and no further** (round 18). That guarantee holds
 for a run in which no result line was refused, which is every run this project

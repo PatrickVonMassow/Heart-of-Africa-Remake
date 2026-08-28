@@ -2953,6 +2953,32 @@ describe('the shipped charge ledger', () => {
     expect(chargeFor(measured, scoped).point).toBe(514)
   })
 
+  // A NARROW HALF IS ANCHORED WHERE THE STORED DETAIL BEGINS (review finding,
+  // 28.08.2026, round 24). Unanchored, an expected sentence appearing anywhere
+  // later in an unrelated detail satisfied the charge — the same crossing the
+  // name half was anchored against.
+  it('does not charge a cascade whose measured sentence only appears later in its detail', () => {
+    const scoped = { suite: 'settings', backend: 'webgpu', kind: 'console', featureLevel: 'compatibility' }
+    const root =
+      'THREE.WebGPURenderer: Uncaptured WebGPU GPUValidationError: The texture format (TextureFormat::RGBA16Float) does not support multisampling.'
+    expect(chargeFor(failedChecks(`ERR: ${root}`)[0], scoped).point).toBe(514)
+    const buried = { ...failedChecks(`ERR: ${root}`)[0], detail: `a wrapper said: ${root}` }
+    expect(chargeFor(buried, scoped)).toBeNull()
+  })
+
+  // AND THE VITE OPTIMIZER RED IS THE MEASURED MESSAGE, not the fragment
+  // (review finding, 28.08.2026, round 24).
+  it('charges the Vite optimizer red only under the wording that was recorded', () => {
+    const scoped = { suite: 'startup', backend: 'webgpu', kind: 'console', featureLevel: 'compatibility' }
+    const measured = red(
+      'console error: Failed to load resource: the server responded with a status of 504 (Outdated Optimize Dep)',
+      null,
+      'console',
+    )
+    expect(chargeFor(measured, scoped).point).toBe(939)
+    expect(chargeFor(red('console error: the bundler logged Outdated Optimize Dep while idle', null, 'console'), scoped)).toBeNull()
+  })
+
   it('charges the fixed render-target leak to NOBODY — a mended red is a red again', () => {
     // Point 546 released the bird's-eye cascade shadow maps and its entry left
     // the ledger with the tick. Should the leak ever come back, it must count

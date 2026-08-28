@@ -337,7 +337,7 @@ export const RED_CHARGES = [
     // within the run. A record written before the detail was kept carries none
     // and is out of this entry's reach — the information was never written down,
     // which is the honest answer and not a charge.
-    detailMatch: /GPUValidationError: The texture format \(TextureFormat::RGBA16Float\) does not support multisampling/i,
+    detailMatch: /^THREE\.WebGPURenderer: Uncaptured WebGPU GPUValidationError: The texture format \(TextureFormat::RGBA16Float\) does not support multisampling/i,
   },
   // THE TWO DOWNSTREAM SENTENCES GET THEIR OWN ENTRIES (review finding,
   // 28.08.2026, round 22). One entry cannot pair a name alternative with a
@@ -361,7 +361,7 @@ export const RED_CHARGES = [
       'attachments print this sentence beside the root. On the core adapter, on WebGL 2, in ' +
       'another suite or as a CHECK it stays a real red, and the charge dies with point 514.',
     match: /^console error: THREE\.WebGPURenderer: Uncaptured WebGPU GPUValidationError: \[Invalid Texture "output-msaa"\] is invalid due to a previous/i,
-    detailMatch: /GPUValidationError: \[Invalid Texture "output-msaa"\] is invalid due to a previous error/i,
+    detailMatch: /^THREE\.WebGPURenderer: Uncaptured WebGPU GPUValidationError: \[Invalid Texture "output-msaa"\] is invalid due to a previous error/i,
   },
   {
     // ONE ATTACHMENT PER ENTRY (review finding, 28.08.2026, round 23). The two
@@ -379,7 +379,7 @@ export const RED_CHARGES = [
       'its measured sentence cannot be satisfied by the other one. Everything else is the entry ' +
       'above: the same lane, the same measured cascade, the same expiry with point 514.',
     match: /^console error: THREE\.WebGPURenderer: Uncaptured WebGPU GPUValidationError: \[Invalid Texture "normal-msaa"\] is invalid due to a previous/i,
-    detailMatch: /GPUValidationError: \[Invalid Texture "normal-msaa"\] is invalid due to a previous error/i,
+    detailMatch: /^THREE\.WebGPURenderer: Uncaptured WebGPU GPUValidationError: \[Invalid Texture "normal-msaa"\] is invalid due to a previous error/i,
   },
   {
     point: 514,
@@ -493,7 +493,8 @@ export const RED_CHARGES = [
       'BEFORE the record kept a detail, and carry none. Read that day: every one of them has an ' +
       'empty detail, so adding the narrow half today would withdraw a standing charge and block ' +
       'the render set on evidence that has not changed. It becomes narrowable the first time ' +
-      'this red is recorded again, with its measurement.',
+      'this red is recorded again, with its measurement. It is POINT 995, which owns re-recording ' +
+      'these reds so the narrow half becomes reachable at all.',
   },
   {
     point: 938,
@@ -517,7 +518,8 @@ export const RED_CHARGES = [
       'AND THE FAILURE MODE STAYS UNNARROWED for the reason the point-627 entry above states in ' +
       'full (cross-vendor review, 28.08.2026, round 22): the reds this entry accounts for were ' +
       'recorded before the record kept a detail and carry none, so the narrow half would ' +
-      'withdraw a standing charge today. Measured that day, empty on every one of them.',
+      'withdraw a standing charge today. Measured that day, empty on every one of them. POINT 995 ' +
+      'owns it.',
   },
   {
     point: 939,
@@ -525,7 +527,10 @@ export const RED_CHARGES = [
     backend: 'webgpu',
     featureLevel: 'compatibility',
     kind: 'console',
-    match: /Outdated Optimize Dep/i,
+    // ANCHORED AT THE STORED IDENTITY (review finding, 28.08.2026, round 24):
+    // the fragment floated free, so any future startup console red quoting it
+    // would have been charged here.
+    match: /^console error: Failed to load resource: the server responded with a status of 504 \(Outdated Optimize Dep\)/i,
     why:
       'Measured 26.08.2026: the webgpu/startup run of 19.08.2026 12:09:17 carries this one console ' +
       'red — Vite re-bundling its dependency optimizer in the middle of the run, an environment ' +
@@ -560,7 +565,8 @@ export const RED_CHARGES = [
       'AND THE FAILURE MODE STAYS UNNARROWED for the reason the point-627 entry above states in ' +
       'full (cross-vendor review, 28.08.2026, round 22): the reds this entry accounts for were ' +
       'recorded before the record kept a detail and carry none, so the narrow half would ' +
-      'withdraw a standing charge today. Measured that day, empty on every one of them.',
+      'withdraw a standing charge today. Measured that day, empty on every one of them. POINT 995 ' +
+      'owns it.',
   },
   {
     point: 603,
