@@ -20,6 +20,7 @@ import {
   openIncompleteRuns,
   openCrashedRuns,
   closureArgs,
+  retainedClosures,
 } from './render-verify-guard.mjs'
 import { incompleteClosureFor, crashClosureFor, runIdentity } from './render-verify-core.mjs'
 
@@ -268,6 +269,32 @@ describe('openIncompleteRuns — what the sign-off may close', () => {
     expect(twice.error).toBeUndefined()
     expect(twice.closure.run).toBe(runIdentity(a))
     expect(openIncompleteRuns({ runs: [a, { ...a }], incompleteClosures: [twice.closure] })).toEqual([])
+  })
+
+  // A SIGNATURE MUST NOT BE UNDONE BY BOOKKEEPING (review finding, 28.08.2026).
+  // The cap evicted closures in SIGNING order while runs are evicted in
+  // RECORDING order, so a run still inside the window could lose its closure
+  // and silently reappear as an open, unsigned recording.
+  it('keeps the closure of a run the window still holds, whenever it was signed', () => {
+    const runs = Array.from({ length: 40 }, (_, i) => truncated(1000 + i))
+    const sign = (r) => ({ run: runIdentity(r), backend: 'webgpu', suite: 'settings', at: 1, evidence: 'no browser on this host' })
+    // Signed newest first, the other thirty-nine afterwards — an ordinary
+    // session that worked through the backlog after dealing with today's run.
+    const newest = runs[39]
+    const closures = [newest, ...runs.slice(0, 39)].map(sign)
+    // A forty-first run is recorded and signed: the RUN window drops the oldest
+    // run, so its closure is the one that can lift nothing any more.
+    const later = truncated(2000)
+    const window_ = [...runs.slice(1), later]
+    const kept = retainedClosures([...closures, sign(later)], window_)
+    expect(kept).toHaveLength(40)
+    expect(kept.some((c) => c.run === runIdentity(newest))).toBe(true)
+    expect(kept.some((c) => c.run === runIdentity(runs[0]))).toBe(false)
+    // What that is FOR: no run of the window turns back into an open one.
+    expect(openIncompleteRuns({ runs: window_, incompleteClosures: kept })).toEqual([])
+    // Under the cap nothing is evicted at all, whatever a closure names.
+    const few = [sign(runs[0]), sign(truncated(9999))]
+    expect(retainedClosures(few, window_)).toEqual(few)
   })
 
   it('lists the truncated runs and nothing else', () => {

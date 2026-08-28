@@ -284,6 +284,44 @@ export function gatherRenderVerifyInputs({ sessionId = '', deps = {} } = {}) {
  *  holds 40, so a closure older than that names a run nobody can see. */
 const MAX_SIGNED_CLOSURES = 40
 
+/**
+ * WHICH SIGNED CLOSURES SURVIVE THE CAP (review finding, 28.08.2026). Dropping
+ * the OLDEST-SIGNED one was the wrong order: runs are evicted in RECORDING
+ * order, and the two orders are unrelated. Sign the newest of forty runs first
+ * and the other thirty-nine afterwards, then record and sign a forty-first, and
+ * the first eviction takes the newest run's closure — that run is still inside
+ * the window, so it silently became an OPEN run again, which is a sign-off
+ * undone by bookkeeping alone.
+ *
+ * Retention follows the RUNS instead: a closure naming a run the window still
+ * holds is kept, and one naming a run nobody can see any more is what goes
+ * first — it can lift nothing. Only if the closures naming live runs alone
+ * exceed the cap does the oldest of THEM go, which no ordinary state reaches
+ * (both lists are capped at forty). Total: unreadable runs make every closure
+ * evictable, which is the old, cautious behaviour.
+ */
+export function retainedClosures(closures, runs, limit = MAX_SIGNED_CLOSURES) {
+  const list = (Array.isArray(closures) ? closures : []).filter((c) => c && typeof c === 'object')
+  if (list.length <= limit) return list
+  const live = new Set()
+  for (const r of Array.isArray(runs) ? runs : []) {
+    const id = runIdentity(r)
+    if (typeof id === 'string') live.add(id)
+  }
+  const keep = list.map(() => true)
+  let over = list.length - limit
+  // Two passes: the closures whose run has left the window, then — only if that
+  // was not enough — the rest, each pass oldest-signed first.
+  for (const orphansPass of [true, false]) {
+    for (let i = 0; i < list.length && over > 0; i++) {
+      if (!keep[i] || !live.has(list[i].run) !== orphansPass) continue
+      keep[i] = false
+      over--
+    }
+  }
+  return list.filter((_, i) => keep[i])
+}
+
 /** A run's timestamp for a human, never throwing: `toISOString()` dies on a
  *  finite but out-of-range number, and these come off disk. */
 export function isoText(at) {
@@ -576,8 +614,7 @@ if (arg === '--incomplete' || arg === '--crashed') {
     }
     const { closure } = draft
     const key = crashed ? 'crashClosures' : 'incompleteClosures'
-    const closures = (Array.isArray(state[key]) ? state[key] : []).concat([closure])
-    while (closures.length > MAX_SIGNED_CLOSURES) closures.shift()
+    const closures = retainedClosures((Array.isArray(state[key]) ? state[key] : []).concat([closure]), state.runs)
     mergeRenderState({ [key]: closures })
     console.log(
       crashed
