@@ -9,7 +9,7 @@
 | `alert-escalation-core.mjs` | THE ESCALATION LADDER (point 434, the remainder of part 1) — the pure half. | — |
 | `alert-escalation.mjs` | THE ESCALATION LADDER (point 434, remainder of part 1) — the I/O half. | — |
 | `ask-sol-core.mjs` | THE READ-ONLY PATH TO THE OTHER VENDOR, GENERALISED BEYOND REVIEWS (point 654, A1). | — |
-| `ask-sol.mjs` | ASK THE OTHER VENDOR FOR PURE TEXT WORK (work-order point 654, A1). | usage: node scripts/ask-sol.mjs [--model sol\|fable\|opus] --kind <' + KINDS.join('\|') + '> --brief "<the question>" \\ |
+| `ask-sol.mjs` | ASK THE OTHER VENDOR FOR PURE TEXT WORK (work-order point 654, A1). | usage: node scripts/ask-sol.mjs [--model sol\|fable\|opus\|opus48] --kind <' + KINDS.join('\|') + '> --brief "<the question>" \\ |
 | `assertionHealth.mjs` | Pure detector for assertions that CANNOT FAIL. | — |
 | `atomic-write.mjs` | Atomic JSON writes that survive a Windows moment (point 388, first live finding 28.07.2026). | — |
 | `attended-context-notice.mjs` | Durable once-per-session state for the attended context-ceiling notice. | — |
@@ -298,7 +298,7 @@
 | `retro-sources.mjs` | Shared fs/git source collector for the retrospective-currency toolchain (retro-refresh.mjs + retro-currency-guard.mjs). | — |
 | `review-material-core.mjs` | WHAT A REVIEW ROUND ACTUALLY CARRIED — the material budget, its accounting, and the passes a range too large is cut into (work-order point 714). | — |
 | `review-sol-core.mjs` | Pure decision core of the CROSS-VENDOR four-eyes review (work-order point 624). | — |
-| `review-sol.mjs` | THE ONE COMMAND FOR A CROSS-VENDOR FOUR-EYES REVIEW (work-order point 624). | usage: node scripts/review-sol.mjs --sha <sha> --brief "<what to judge>" \\ |
+| `review-sol.mjs` | THE ONE COMMAND FOR A CROSS-VENDOR FOUR-EYES REVIEW (work-order point 624). | usage: node scripts/review-sol.mjs [--reviewer sol\|fable\|opus\|opus48] --sha <sha> --brief "<what to judge>" \\ |
 | `rule-echo-core.mjs` | WHEN A RULE CHANGES, EVERY PLACE THAT RESTATES IT MUST CHANGE WITH IT. | — |
 | `rule-echo-guard.mjs` | Stop hook: a rule that moved drags its restatements with it (user 17.08.2026). | — |
 | `rule-echo.mjs` | THE COMMAND BESIDE THE RULE-ECHO GUARD (user 17.08.2026). | usage: node scripts/rule-echo.mjs --status |

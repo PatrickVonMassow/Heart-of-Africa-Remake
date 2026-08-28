@@ -675,7 +675,7 @@ describe('the unavailable-receipt CLI', { timeout: 30_000 }, () => {
       expect(
         runGit(
           'commit', '-q', '-m',
-          'Add a both-vendor contribution\n\nCo-Authored-By: GPT-5.6 Sol <noreply@openai.com>\nCo-Authored-By: Claude Opus 5 <noreply@anthropic.com>',
+          'Add a contribution by every configured reader\n\nCo-Authored-By: GPT-5.6 Sol <noreply@openai.com>\nCo-Authored-By: Claude Opus 5 <noreply@anthropic.com>\nCo-Authored-By: Claude Fable 5 <noreply@anthropic.com>\nCo-Authored-By: Claude Opus 4.8 <noreply@anthropic.com>',
         ).status,
       ).toBe(0)
       const head = runGit('rev-parse', 'HEAD').stdout.trim()
@@ -683,7 +683,7 @@ describe('the unavailable-receipt CLI', { timeout: 30_000 }, () => {
       const args = [
         '--record-unavailable', head,
         '--point', '870',
-        '--reason', 'both configured vendors authored this contribution',
+        '--reason', 'every configured reviewer authored this contribution',
       ]
       const wrong = spawnSync(process.execPath, [command, ...args, '--files', 'src/wrong.mjs'], {
         windowsHide: true,

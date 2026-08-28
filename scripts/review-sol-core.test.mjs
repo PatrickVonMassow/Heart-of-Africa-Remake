@@ -14,8 +14,10 @@ import {
   coverageDecision,
   decideReview,
   fallbackReviewerFor,
+  FALLBACK_CHAIN,
   FALLBACK_MODEL_NAME,
   formatRecordCommand,
+  formatReviewerCommand,
   formatReviewMaterial,
   formatReviewReport,
   isUnknownModelRefusal,
@@ -31,6 +33,8 @@ import {
   CLAUDE_REVIEW_CHAIN,
   solAuthored,
   SECOND_FALLBACK_MODEL_NAME,
+  reviewerDescriptor,
+  REVIEWER_ROSTER,
   SOL_MODEL_ID,
   SOL_MODEL_NAME,
   SOL_REASONING_EFFORT,
@@ -304,6 +308,36 @@ describe('parseVerdict — only a real verdict is a verdict', () => {
 })
 
 describe('decideReview — the recorded model follows the RUN, never the preference', () => {
+  it('maps every model either review chain can name to this runnable command', () => {
+    expect(REVIEWER_ROSTER.map(({ name }) => name)).toEqual([
+      'GPT-5.6 Sol',
+      'Fable 5',
+      'Opus 5',
+      'Opus 4.8',
+    ])
+    for (const model of [...FALLBACK_CHAIN, ...CLAUDE_REVIEW_CHAIN]) {
+      const reviewer = reviewerDescriptor(model)
+      expect(reviewer, model).toMatchObject({ name: model, runtime: 'claude' })
+      expect(formatReviewerCommand({ model, sha: 'a'.repeat(40), brief: 'read both end-state files' })).toContain(
+        `--reviewer ${reviewer.key}`,
+      )
+    }
+  })
+
+  it('turns the real mixed-author ineligibility into a runnable Fable command', () => {
+    const decision = decideReview({
+      ...okRun(),
+      authorModel: ['GPT-5.6 Sol', 'Claude Opus 5'],
+    })
+    expect(decision).toMatchObject({ model: 'Fable 5', kind: OUTCOME.SELF_REVIEW, ready: false })
+    expect(formatReviewerCommand({
+      model: decision.model,
+      sha: '16793dd'.padEnd(40, '0'),
+      brief: 'read the guide and brevity core at their end state',
+      point: 977,
+    })).toMatch(/^node scripts\/review-sol\.mjs --reviewer fable /)
+  })
+
   it('a reachable Sol reviews, and is recorded as the reviewer', () => {
     const d = decideReview(okRun())
     expect(d).toMatchObject({ model: SOL_MODEL_NAME, fellBack: false, ready: true, verdict: 'merge' })

@@ -79,6 +79,7 @@ const SCRIPT_FILES = [
   'fable-switch.mjs',
   'fable-switch-core.mjs',
   'ask-sol-core.mjs',
+  'author-fable-core.mjs',
   'atomic-write.mjs',
 ]
 
@@ -161,6 +162,29 @@ const answer = receipt + (process.env.STUB_ANSWER || 'VERDICT: merge\\nEVIDENCE:
 if (out) writeFileSync(out, answer)
 process.stdout.write(answer)
 process.exit(0)
+`
+
+/** A read-only Claude reviewer whose result proves the requested top-level model. */
+const CLAUDE_STUB = `#!/usr/bin/env node
+const { readFileSync, writeFileSync, appendFileSync } = require('node:fs')
+const argv = process.argv.slice(2)
+const model = argv[argv.indexOf('--model') + 1]
+let stdin = ''
+try { stdin = readFileSync(0, 'utf8') } catch {}
+writeFileSync(process.env.STUB_STDIN, stdin)
+appendFileSync(process.env.STUB_LOG, model + '\\n')
+const token = /=== END OF MATERIAL — RECEIPT ([0-9a-f]+) ===/.exec(stdin)
+const answer = (token ? 'RECEIPT: ' + token[1] + '\\n' : '') +
+  'VERDICT: merge\\nEVIDENCE: read the complete bounded end-state files and their patch'
+process.stdout.write(JSON.stringify({
+  session_id: 'fixture-review-session',
+  result: answer,
+  usage: { input_tokens: 7, output_tokens: 4, cache_read_input_tokens: 0, cache_creation_input_tokens: 90 },
+  modelUsage: {
+    'claude-haiku-4-5': { inputTokens: 20, outputTokens: 1, cacheReadInputTokens: 0, cacheCreationInputTokens: 0 },
+    [model]: { inputTokens: 7, outputTokens: 4, cacheReadInputTokens: 0, cacheCreationInputTokens: 90, canonicalModel: model },
+  },
+}))
 `
 
 /**
@@ -285,6 +309,8 @@ beforeAll(() => {
 
   writeFileSync(join(stubDir, 'codex'), STUB)
   chmodSync(join(stubDir, 'codex'), 0o755)
+  writeFileSync(join(stubDir, 'claude'), CLAUDE_STUB)
+  chmodSync(join(stubDir, 'claude'), 0o755)
   // Windows cannot execute an extensionless shebang script, and this suite makes
   // Windows-specific assertions elsewhere (four-eyes finding, 11.08.2026).
   if (process.platform === 'win32') {
@@ -777,22 +803,21 @@ describe('the guards around the run', () => {
     expect(r.stderr).toMatch(/--since/)
   })
 
-  it('names the verified receipt route when no reviewer vendor is eligible', () => {
+  it('prints a runnable Fable handover when both vendors but not every model authored', () => {
     const r = run(['--sha', unreviewableSha, '--brief', 'judge it', '--point', '870'])
-    expect(r.status).toBe(4)
-    expect(r.stderr).toMatch(/UNREVIEWABLE/)
-    expect(r.stderr).toContain('criticality-review-guard.mjs --record-unavailable')
-    expect(r.stderr).toContain('--point 870')
-    expect(r.stderr).toContain('--files "unreviewable.txt"')
+    expect(r.status).toBe(3)
+    expect(r.stdout).toContain('node scripts/review-sol.mjs --reviewer fable')
+    expect(r.stdout).toContain('--point 870')
+    expect(r.stderr).not.toMatch(/UNREVIEWABLE/)
   })
 
   it('plans and runs the reviewable pass while naming the unavailable remainder', () => {
     const planned = run(['--sha', partlyReviewableSha, '--brief', 'judge what can be reviewed'])
     expect(planned.status).toBe(4)
-    expect(planned.stderr).toContain('1 RUNNABLE PASS')
+    expect(planned.stderr).toContain('2 RUNNABLE PASSES')
     expect(planned.stderr).toContain('reviewable.txt')
-    expect(planned.stderr).toContain('UNREVIEWABLE: unavailable.txt')
-    expect(planned.stderr).toContain('50% planned coverage (1/2 changed files)')
+    expect(planned.stderr).toContain('unavailable.txt')
+    expect(planned.stderr).toContain('100% planned coverage (2/2 changed files)')
 
     provenId()
     const reviewed = run([
@@ -802,13 +827,14 @@ describe('the guards around the run', () => {
     ])
     expect(reviewed.status, reviewed.stderr).toBe(0)
     const printed = recordCommandIn(reviewed.stdout)
-    expect(printed).toContain('--pass 1/1')
+    expect(printed).toContain('--pass 1/2')
     expect(printed).toContain('--pass-files "reviewable.txt"')
     expect(printed).not.toContain('unavailable.txt')
     expect(reviewed.stdout).toContain('Coverage: PARTIAL REVIEW — 50% of changed files (1/2)')
     const sent = readFileSync(join(dir, 'stdin.txt'), 'utf8')
     expect(sent).toContain('reviewable.txt')
-    expect(sent).toContain('UNAVAILABLE TO THE REVIEWER CHAIN')
+    expect(sent).toContain('ABSENT BY DESIGN')
+    expect(sent).toContain('pass 2/2')
     expect(sent).toContain('unavailable.txt')
     expect(sent).not.toContain('written by both authoring lanes')
   })
@@ -950,19 +976,59 @@ describe('the saved login', () => {
 // POINT 667: Sol authors too, so the command must recognise the range it may not
 // judge — and must recognise it BEFORE it spends an allowance on it.
 describe('a range SOL authored', () => {
-  it('refuses to review its own work, spends no codex call, and names the Claude reviewer', () => {
+  it('refuses to review its own work, spends no codex call, and prints the runnable Claude reviewer', () => {
     writeFileSync(join(dir, 'calls.log'), '')
     const r = run(['--sha', solSha, '--point', '667', '--brief', 'judge the authoring lane'])
     expect(r.status, r.stderr).toBe(3)
     expect(r.stdout).toMatch(/ROLE SWAP/)
     expect(r.stdout).toMatch(/AUTHORED part of/)
-    expect(r.stdout).toContain('--model "Opus 5"')
+    expect(r.stdout).toContain('node scripts/review-sol.mjs --reviewer opus')
     // Not one call — not even the model-id probe: the question is answered from
     // the trailers, and paying for a review Sol may not give is the waste this
     // ordering exists to prevent.
     expect(calls()).toEqual([])
-    // And no verdict is invented: the record command still carries the placeholder.
-    expect(r.stdout).toMatch(/--verdict <merge\|/)
+    expect(r.stdout).not.toContain('mechanism-review.mjs --record')
+  })
+
+  it('starts the selected Opus reader and prints a record command with its model receipt', () => {
+    writeFileSync(join(dir, 'calls.log'), '')
+    const r = run(['--reviewer', 'opus', '--sha', solSha, '--point', '667', '--brief', 'judge the authoring lane'])
+    expect(r.status, `${r.stdout}${r.stderr}`).toBe(0)
+    expect(calls()).toEqual(['claude-opus-5[1m]'])
+    expect(r.stdout).toContain('Opus 5 reviewed')
+    expect(r.stdout).toContain('--model "Opus 5"')
+    expect(r.stdout).toContain('--model-result')
+    expect(r.stdout).toContain('--handover sol-authored')
+  })
+
+  it('runs Fable for the mixed Sol/Opus end state and the recorder accepts exactly that routed verdict', () => {
+    writeFileSync(join(dir, 'calls.log'), '')
+    const r = run([
+      '--reviewer', 'fable', '--sha', unreviewableSha, '--point', '977', '--brief', 'judge the mixed end state',
+      '--file', 'unreviewable.txt',
+    ])
+    expect(r.status, `${r.stdout}${r.stderr}`).toBe(0)
+    expect(calls()).toEqual(['claude-fable-5'])
+    const command = splitCommand(recordCommandIn(r.stdout))
+    expect(command.slice(0, 2)).toEqual(['node', 'scripts/mechanism-review.mjs'])
+    const recorded = spawnSync(process.execPath, command.slice(1), {
+      cwd: repo,
+      encoding: 'utf8',
+      windowsHide: true,
+      env: hermeticEnv({ FABLE_SWITCH_FILE: fableOnFile }),
+    })
+    expect(recorded.status, `${recorded.stdout}${recorded.stderr}`).toBe(0)
+    const row = JSON.parse(readFileSync(join(repo, '.claude', 'mechanism-reviews.jsonl'), 'utf8').trim().split('\n').at(-1))
+    expect(row).toMatchObject({
+      sha: unreviewableSha,
+      model: 'Fable 5',
+      verdict: 'merge',
+      handover: 'sol-authored',
+      pass: { index: 1, total: 1, files: ['unreviewable.txt'], endState: unreviewableSha },
+      reviewerAuthorship: {
+        status: 'agreement', actualModel: 'Fable 5', servedModel: 'claude-fable-5', proof: 'claude-result',
+      },
+    })
   })
 })
 
@@ -1025,37 +1091,34 @@ describe('a modified gitlink', () => {
 // scope as a completed Sol round; the placeholder still prevents recording a
 // verdict nobody gave.
 describe('a narrowed --since on the early routes', () => {
-  it('prints a scoped record template at claude-only while --since narrows the range', () => {
+  it('prints a scoped runnable reader at claude-only while --since narrows the range', () => {
     const shareFile = join(dir, 'sol-share.json')
     writeFileSync(shareFile, JSON.stringify({ setting: 'claude-only' }))
     writeFileSync(join(dir, 'calls.log'), '')
     const r = run(['--sha', headSha, '--since', `${headSha}~1`, '--brief', 'judge it'], { SOL_SHARE_FILE: shareFile })
     expect(r.status).toBe(3)
-    const printed = recordCommandIn(r.stdout)
-    expect(printed).toContain('--pass 1/1')
-    expect(printed).toContain('--pass-files "added.txt"')
-    expect(printed).not.toContain('--pass-commits')
+    expect(r.stdout).toContain('node scripts/review-sol.mjs --reviewer fable')
+    expect(r.stdout).toContain(`--since ${headSha}~1`)
     expect(readFileSync(join(dir, 'calls.log'), 'utf8').trim()).toBe('')
     rmSync(shareFile, { force: true })
   })
 
-  it('prints a scoped record template for a narrowed Sol-authored range too', () => {
+  it('prints a scoped runnable reader for a narrowed Sol-authored range too', () => {
     writeFileSync(join(dir, 'calls.log'), '')
     const r = run(['--sha', solHeadSha, '--since', `${solHeadSha}~1`, '--brief', 'judge it'])
     expect(r.status).toBe(3)
-    const printed = recordCommandIn(r.stdout)
-    expect(printed).toContain('--pass 1/1')
-    expect(printed).toContain('--pass-files "sol2.txt"')
-    expect(printed).not.toContain('--pass-commits')
+    expect(r.stdout).toContain('node scripts/review-sol.mjs --reviewer opus')
+    expect(r.stdout).toContain(`--since ${solHeadSha}~1`)
     expect(calls()).toEqual([])
   })
 
-  it('still hands over the full template when no --since narrows the early route', () => {
+  it('still hands over the full runnable command when no --since narrows the early route', () => {
     // The refusal is about the narrowing, not about the hand-over itself.
     writeFileSync(join(dir, 'calls.log'), '')
     const r = run(['--sha', solHeadSha, '--brief', 'judge it'])
     expect(r.status).toBe(3)
-    expect(recordCommandIn(r.stdout)).toContain('--verdict <merge|')
+    expect(r.stdout).toContain('node scripts/review-sol.mjs --reviewer opus')
+    expect(r.stdout).not.toContain('--since')
   })
 })
 
@@ -1161,19 +1224,15 @@ describe('a range too large for one round', () => {
     expect([...files].sort()).toEqual(['bulk-a.txt', 'bulk-b.txt'])
   })
 
-  // THE HAND-OVER PATHS SPEND NO ROUND AND STILL OFFER A RECORD (cross-vendor
-  // review, second round): both printed a whole-range template while nobody had
-  // measured whether the range is reviewable in one round at all.
+  // A split range must select a pass before any reviewer is started or handed
+  // over; there is no honest whole-range command for material that does not fit.
   it('offers no whole-range record when SOL authored a range too large, and names the passes', () => {
     writeFileSync(join(dir, 'calls.log'), '')
     const r = run(['--sha', bulkSolSha, '--brief', 'judge the bulk Sol range'])
-    expect(r.status, r.stderr).toBe(3)
-    expect(r.stdout).toMatch(/ROLE SWAP/)
-    // The reviewer is still named — a refusal that drops it leaves nobody owning
-    // the review.
-    expect(r.stdout).toContain('Opus 5')
-    expect(r.stdout).toContain('does not fit ONE review round')
-    expect(r.stdout).toContain('--pass 1')
+    expect(r.status, r.stderr).toBe(4)
+    expect(r.stderr).toContain('2 RUNNABLE PASSES')
+    expect(r.stderr).toContain('reviewer Opus 5')
+    expect(r.stderr).toContain('--pass 1')
     expect(r.stdout).not.toContain('mechanism-review.mjs --record')
     expect(calls()).toEqual([])
   })
@@ -1183,10 +1242,9 @@ describe('a range too large for one round', () => {
     writeFileSync(shareFile, JSON.stringify({ setting: 'claude-only' }))
     writeFileSync(join(dir, 'calls.log'), '')
     const r = run(['--sha', bulkSha, '--brief', 'judge the bulk range'], { SOL_SHARE_FILE: shareFile })
-    expect(r.status).toBe(3)
-    expect(r.stdout).toMatch(/claude-only/)
-    expect(r.stdout).toContain('does not fit ONE review round')
-    expect(r.stdout).toContain('bulk-a.txt')
+    expect(r.status).toBe(4)
+    expect(r.stderr).toContain('2 RUNNABLE PASSES')
+    expect(r.stderr).toContain('bulk-a.txt')
     expect(r.stdout).not.toContain('mechanism-review.mjs --record')
     expect(calls()).toEqual([])
     rmSync(shareFile, { force: true })
@@ -1204,12 +1262,8 @@ describe('a range too large for one round', () => {
     })
     expect(r.status).toBe(3)
     expect(r.stdout).toMatch(/claude-only/)
-    expect(r.stdout).toContain('--pass 1/2')
-    // The scope is PARSED, not merely present (round-3 pass 6): a hand-off
-    // whose record command covered both bulk files would satisfy a bare
-    // toContain. Pass 1 of this fixture holds exactly the first bulk file.
-    const passFiles = /--pass-files "([^"]*)"/.exec(r.stdout)?.[1]
-    expect(passFiles).toBe('bulk-a.txt')
+    expect(r.stdout).toContain('--pass 1')
+    expect(r.stdout).toContain('--reviewer fable')
     // The hand-off template carries the not-cleared warning and the ledger
     // pointer too (round-5 pass 6) — a fallback pass template without it read
     // like a cleared range.
@@ -1230,14 +1284,14 @@ describe('a range too large for one round', () => {
     rmSync(shareFile, { force: true })
   })
 
-  it('still hands over a record command where the range DOES fit', () => {
+  it('still hands over a runnable reader command where the range DOES fit', () => {
     // The refusal is about the material, not about the hand-over: a small range
     // must keep its ready-to-run template.
     const shareFile = join(dir, 'sol-share.json')
     writeFileSync(shareFile, JSON.stringify({ setting: 'claude-only' }))
     const r = run(['--sha', headSha, '--brief', 'judge the ordinary range'], { SOL_SHARE_FILE: shareFile })
     expect(r.status).toBe(3)
-    expect(recordCommandIn(r.stdout)).toContain('--verdict <merge|')
+    expect(r.stdout).toContain('node scripts/review-sol.mjs --reviewer fable')
     rmSync(shareFile, { force: true })
   })
 

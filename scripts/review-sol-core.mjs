@@ -23,7 +23,12 @@
 // scripts/review-sol.mjs. Pinned by review-sol-core.test.mjs.
 
 import { BLIND_REVIEWER, blindReviewerAdmission, modelFromTrailers, sameModel, VERDICTS } from './mechanism-review-core.mjs'
-import { fableIsOn } from './fable-switch-core.mjs'
+import {
+  FABLE_MODEL_ID,
+  OPUS_FALLBACK_MODEL_ID,
+  OPUS_MODEL_ID,
+  fableIsOn,
+} from './fable-switch-core.mjs'
 import { mainCheckoutFrom } from './main-checkout-core.mjs'
 import { modelTrailerIdentities } from './model-guard-core.mjs'
 import {
@@ -70,6 +75,22 @@ export const FALLBACK_CHAIN = Object.freeze([FALLBACK_MODEL_NAME, SECOND_FALLBAC
  * point, which is the main authoring session's job. So it starts at Opus 5.
  */
 export const CLAUDE_REVIEW_CHAIN = Object.freeze(['Opus 5', 'Fable 5', 'Opus 4.8'])
+
+/** Every reviewer the policy can name, including the exact CLI identity needed
+ *  to start it. Keeping the executable roster beside the decision chains makes
+ *  an assignment incomplete unless it is runnable. */
+export const REVIEWER_ROSTER = Object.freeze([
+  Object.freeze({ key: 'sol', name: SOL_MODEL_NAME, id: SOL_MODEL_ID, runtime: 'codex', effort: SOL_REASONING_EFFORT }),
+  Object.freeze({ key: 'fable', name: FALLBACK_MODEL_NAME, id: FABLE_MODEL_ID, runtime: 'claude', effort: 'high' }),
+  Object.freeze({ key: 'opus', name: SECOND_FALLBACK_MODEL_NAME, id: OPUS_MODEL_ID, runtime: 'claude', effort: 'high' }),
+  Object.freeze({ key: 'opus48', name: 'Opus 4.8', id: OPUS_FALLBACK_MODEL_ID, runtime: 'claude', effort: 'high' }),
+])
+
+/** The executable identity for a policy model name/key/id, or null. */
+export function reviewerDescriptor(value = '') {
+  const raw = String(value ?? '').trim()
+  return REVIEWER_ROSTER.find((entry) => entry.key === raw.toLowerCase() || entry.id === raw || sameModel(entry.name, raw)) ?? null
+}
 
 /** A review candidate chain with the shared switch applied. */
 export function availableReviewChain(chain, fableState) {
@@ -762,6 +783,37 @@ export function savedAuthPathFrom(gitCommonDir, repoRoot, { sep = '/' } = {}) {
 /** Shell-quote one value for the record command line we print. */
 const q = (s) => `"${String(s ?? '').replace(/(["\\$`])/g, '\\$1')}"`
 
+/** A ready-to-run invocation of this same reviewer command for any roster
+ *  member. The caller supplies the already-bounded request; no prose handoff
+ *  has to be translated back into flags by a human. */
+export function formatReviewerCommand({
+  model = '',
+  sha = '',
+  brief = '',
+  mode = 'review',
+  point = '',
+  since = '',
+  timeout = '',
+  pass = '',
+  files = [],
+} = {}) {
+  const reviewer = reviewerDescriptor(model)
+  if (!reviewer || !sha || !String(brief).trim()) return ''
+  const parts = [
+    'node scripts/review-sol.mjs',
+    `--reviewer ${reviewer.key}`,
+    `--sha ${String(sha)}`,
+    `--brief ${q(brief)}`,
+    `--mode ${String(mode || 'review')}`,
+  ]
+  if (String(point).trim()) parts.push(`--point ${String(point).trim()}`)
+  if (String(since).trim()) parts.push(`--since ${String(since).trim()}`)
+  if (String(timeout).trim()) parts.push(`--timeout ${String(timeout).trim()}`)
+  if (String(pass).trim()) parts.push(`--pass ${String(pass).trim()}`)
+  for (const file of Array.isArray(files) ? files : []) parts.push(`--file ${q(file)}`)
+  return parts.join(' ')
+}
+
 /** Shortest readable form of a sha — and unchanged for anything that is not one. */
 const short = (s) => (/^[0-9a-f]{7,40}$/i.test(String(s ?? '')) ? String(s).slice(0, 7) : String(s ?? ''))
 
@@ -781,6 +833,9 @@ export function formatRecordCommand({
   mode = 'review',
   point = '',
   pass = null,
+  modelAt = '',
+  modelResult = '',
+  handover = '',
 } = {}) {
   const parts = [
     'node scripts/mechanism-review.mjs',
@@ -791,6 +846,9 @@ export function formatRecordCommand({
     `--mode ${mode}`,
   ]
   if (String(point ?? '').trim()) parts.push(`--point ${String(point).trim()}`)
+  if (String(modelAt).trim()) parts.push(`--model-at ${q(modelAt)}`)
+  if (String(modelResult).trim()) parts.push(`--model-result ${q(modelResult)}`)
+  if (String(handover).trim()) parts.push(`--handover ${String(handover).trim()}`)
   // A PASS RECORD NAMES WHAT IT ACTUALLY READ (points 714 and 737). The record's
   // sha is the end state at which those files were read; no commit boundaries
   // travel, because intermediate file states are not review artefacts.
@@ -817,6 +875,10 @@ export function formatReviewReport({
   shortfall,
   plan = null,
   pass = null,
+  modelAt = '',
+  modelResult = '',
+  handover = '',
+  reviewerCommand = '',
 } = {}) {
   // THE REPORT RESTS ON decision.ready, NEVER ON A PARAMETER'S DEFAULT (fourth
   // cross-vendor round, pass 3). decideReview answers ready:false for a round
@@ -899,6 +961,9 @@ export function formatReviewReport({
     mode,
     point,
     pass,
+    modelAt,
+    modelResult,
+    handover,
   })
   // Every pass says exactly what its record clears. Passes run in any order, so
   // the remainder is discovered from the ledger rather than a guessed number.
@@ -910,13 +975,15 @@ export function formatReviewReport({
       ]
     : []
   if (!decision.fellBack) {
+    const ranBy = decision.ranBy || SOL_MODEL_NAME
+    const detail = sameModel(ranBy, SOL_MODEL_NAME) ? ` (effort ${SOL_REASONING_EFFORT})` : ''
     const scope = pass
       ? Number(pass.total) === 1
         ? ` (SCOPED PASS — ${(pass.files ?? []).length} end-state file(s))`
         : ` (PASS ${pass.index}/${pass.total} — ${(pass.files ?? []).length} file(s) of a range too large for one round)`
       : ''
     return [
-      `review-sol: ${SOL_MODEL_NAME} (effort ${SOL_REASONING_EFFORT}) reviewed ${String(sha).slice(0, 7)} → ${decision.verdict}${scope}`,
+      `review-sol: ${ranBy}${detail} reviewed ${String(sha).slice(0, 7)} → ${decision.verdict}${scope}`,
       `  ${decision.evidence}`,
       ...(plan ? ['', formatReviewCoverage(plan, pass)] : []),
       '',
@@ -944,9 +1011,9 @@ export function formatReviewReport({
     return [
       `review-sol: ROLE SWAP — ${SOL_MODEL_NAME} AUTHORED part of ${String(sha).slice(0, 7)}, so it may not review it.`,
       `  The review is ${who}'s, which also runs the suites, judges the picture and lands the point.`,
-      '  Record what IT says — never a verdict this command invented:',
+      reviewerCommand ? '  Start that reader with the same bounded request:' : '  Record what IT says — never a verdict this command invented:',
       '',
-      `     ${cmd}`,
+      `     ${reviewerCommand || cmd}`,
       ...passWarning,
     ].join('\n')
   }
@@ -975,15 +1042,15 @@ export function formatReviewReport({
       "  was read — the whole round's material was lost with the run.",
       `  The review is NOT done — it is ${who}'s now. Hand it the commit and the brief above;`,
       '  it reads the range itself, and only what IT actually read may be recorded.',
+      ...(reviewerCommand ? ['', `     ${reviewerCommand}`] : []),
     ].join('\n')
   }
   return [
     `review-sol: FALLBACK — ${SOL_MODEL_NAME} did not review ${String(sha).slice(0, 7)}: ${decision.cause}.`,
     `  The review is NOT done. Hand it to ${who} and record what IT says:`,
     '',
-    `  1. give ${who} the commit and the brief above,`,
-    `  2. then record its verdict — never this command's:`,
-    `     ${cmd}`,
+    reviewerCommand ? `  Start it: ${reviewerCommand}` : `  1. give ${who} the commit and the brief above,`,
+    ...(reviewerCommand ? [] : [`  2. then record its verdict — never this command's:`, `     ${cmd}`]),
     ...passWarning,
   ].join('\n')
 }
