@@ -9,7 +9,7 @@
 // yet exits non-zero exactly like a reported failure.
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { execFileSync } from 'node:child_process'
-import { MAX_RED_IDENTITIES, tapOutput } from './render-verify-recorder.mjs'
+import { MAX_CAPTURE_CHARS, MAX_LINE_CHARS, MAX_RED_IDENTITIES, tapOutput } from './render-verify-recorder.mjs'
 
 /** Text that is distinct in LETTERS, so the parser's own normalisation (digits,
  *  hex runs and URLs are folded away) cannot collapse it. That is exactly the
@@ -245,6 +245,57 @@ describe('tapOutput — observe-only', () => {
     const reds = markVariedDetails(failedChecks(state.lines.join('\n')), state.variedKeys)
     expect(reds).toHaveLength(1)
     expect(reds[0].detailVaried).toBe(true)
+  })
+
+  // AN IDENTITY CEILING IS NOT A MEMORY BOUND (review finding, 28.08.2026,
+  // round 14). A summary repeating ONE error a million times brings a single
+  // identity, so it was kept whole — and the retained string grew with the
+  // page's output rather than with its red set, which is the exhausted process
+  // the whole ceiling exists to prevent.
+  it('refuses a single line longer than a line may be, and says so', () => {
+    const { state, out } = tapped()
+    out.write(`ERR: ${'x'.repeat(MAX_LINE_CHARS + 10)}\n`)
+    expect(state.lines).toHaveLength(0)
+    expect(state.droppedLines).toBe(1)
+  })
+
+  it('stops at the character budget even while identities are still free', () => {
+    const { state, out } = tapped()
+    // Each line brings ONE new identity and half a line's worth of text, so the
+    // budget runs out after about 128 of them — long before the 500 identities.
+    const body = 'y'.repeat(Math.floor(MAX_LINE_CHARS / 2))
+    const fits = Math.floor(MAX_CAPTURE_CHARS / MAX_LINE_CHARS) * 2
+    for (let i = 0; i < fits + 40; i++) out.write(`ERR: page error ${tag(i)} ${body}\n`)
+    expect(state.lines.length).toBeLessThan(fits + 40)
+    expect(state.lines.length).toBeGreaterThan(fits / 2)
+    expect(state.droppedLines).toBeGreaterThan(0)
+    expect(state.lines.join('\n').length).toBeLessThanOrEqual(MAX_CAPTURE_CHARS)
+  })
+
+  // A line that brings nothing new costs nothing, however long it is — counting
+  // it would be a FALSE truncation, and a false truncation blocks the gate.
+  it('drops a huge REPETITION for free, without calling it a truncation', () => {
+    const { state, out } = tapped()
+    out.write('ERR: the one page error\n')
+    out.write(`ERR: the one page error${' '.repeat(MAX_LINE_CHARS + 10)}\n`)
+    expect(state.lines).toHaveLength(1)
+    expect(state.droppedLines ?? 0).toBe(0)
+  })
+
+  // A process that writes without a newline accumulates in the tap's pending
+  // buffer. The remainder is capped and the damaged line refused when its
+  // newline finally arrives — never parsed as if it had arrived whole.
+  it('refuses a line whose middle it had to drop, rather than parsing a stump', () => {
+    const { state, out } = tapped()
+    out.write('ERR: the beginning of a line that never ends')
+    for (let i = 0; i < 4; i++) out.write('z'.repeat(MAX_LINE_CHARS / 2))
+    out.write('\n')
+    expect(state.lines).toHaveLength(0)
+    expect(state.droppedLines).toBe(1)
+    // The stream recovers: the next whole line is kept normally.
+    out.write('ERR: an ordinary error after the flood\n')
+    expect(state.lines).toEqual(['ERR: an ordinary error after the flood'])
+    expect(state.droppedLines).toBe(1)
   })
 
   // ...AND THE VARIED MEASUREMENT IS ASKED PER RED, NOT PER LINE (review

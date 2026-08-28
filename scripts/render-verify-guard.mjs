@@ -456,9 +456,10 @@ function signedClosureDraft(state, options, family) {
   //     to stay as the fallback — and TWO identities for one run is exactly the
   //     defect the round-5 review fixed, where a signature closed a record the
   //     other reading did not name;
-  //   - the two families this draft serves (a crash, a lost recording) are
-  //     legacy classes: no run recorded since the capture cap was removed can
-  //     be an incomplete recording at all;
+  //   - the two families this draft serves are RARE: a crash, and a recording
+  //     that hit MAX_RED_IDENTITIES — which no run this project has produced
+  //     comes near, the ceiling being fifteen times the worst distinct red set
+  //     ever measured (round 14; before it, the class was legacy outright);
   //   - and the collision costs no coverage in either direction — a signature
   //     never makes a run cover a backend, so the worst case is one evidence
   //     sentence disposing of two byte-identical records of the same
@@ -466,12 +467,12 @@ function signedClosureDraft(state, options, family) {
   // WHAT REMAINS TRUE, PLAINLY — two residuals, not one:
   //   - two runs that really happened, in the same millisecond on both stamps
   //     and identical in every other field, are one identity here;
-  //   - and `runIdentity` is 64 non-cryptographic bits over unbounded text, so
-  //     two DIFFERENT records can collide into one identity as well. That is
-  //     unlikely, not impossible, and hash equality is what authorises the
-  //     signature — so it is named rather than treated as proof.
-  // In both cases one signature closes both records. Filed as its own point
-  // rather than settled by this comment.
+  //   - `runIdentity` is a 128-bit truncated SHA-256 over the record's canonical
+  //     text (round 13, which replaced 64 bits of FNV). Two DIFFERENT records
+  //     colliding is therefore not reachable by accident and not steerable on
+  //     purpose, which is what hash equality authorising a signature requires.
+  // The first case remains: one signature closes both such records. Filed as
+  // its own point rather than settled by this comment.
   const distinct = new Set(open.map((r) => runIdentity(r)))
   if (distinct.size > 1) {
     return {
@@ -563,11 +564,13 @@ if (arg === '--defer') {
 // lists precisely so neither can ever serve the other (round-5 order: a crash
 // outranks the truncation, so the crash is signed first).
 // Ambiguity is REFUSED rather than resolved (review finding, 19.08.2026): a
-// selector matching several open runs prints each with its own --run, and a
-// record whose timestamp is unreadable is refused as well — a signature that can
-// name no run closes none, and saying so beats reporting a success that binds
-// nothing. The judgment itself is the draft pair above, so it is testable
-// without a state file.
+// selector matching several open runs prints each with its own --run, and
+// saying so beats reporting a success that binds nothing. A record whose
+// timestamp is unreadable is NOT refused — it is named by its `--run` identity
+// or by being the only open one of its suite and backend, which is the whole
+// reason the closure binds by content rather than by a stamp (round 14; this
+// note still described the pre-identity behaviour). The judgment itself is the
+// draft pair above, so it is testable without a state file.
 /**
  * THE SIGN-OFF'S ARGUMENTS, read from the raw argv tail. Pure and exported for
  * the same reason the drafts are: the CLI's whole judgment has to be testable,

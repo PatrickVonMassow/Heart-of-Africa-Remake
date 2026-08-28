@@ -144,6 +144,23 @@ const KEPT_LINE = /^(?:FAIL\s{2,}|ERR:|console errors:|CONSOLE ERRORS:)/
  */
 export const MAX_RED_IDENTITIES = 500
 
+/**
+ * AND THE SAME QUESTION ABOUT TEXT (review finding, 28.08.2026, round 14). A
+ * ceiling on IDENTITIES bounds how many reds a run can record and nothing about
+ * how long its lines are: a `console errors: [...]` summary repeating ONE error
+ * a million times brings a single identity, so it was kept whole — and the
+ * retained string, the partial-line buffer it arrived in and the parse over it
+ * all grew with the page's output rather than with its red set.
+ *
+ * So the capture carries a character budget beside the identity ceiling, and
+ * both are refused the same LOUD way: a line that does not fit is counted and
+ * the run is recorded incomplete. The numbers sit far above any measured run —
+ * the worst log on record holds 521 result lines, and a result line is a check
+ * label with a measurement — while bounding the tap's memory at a few megabytes.
+ */
+export const MAX_CAPTURE_CHARS = 4 * 1024 * 1024
+export const MAX_LINE_CHARS = 64 * 1024
+
 /** Stderr that says the process did not end on its own terms — a stack frame or
  *  a bare `…Error:` headline. A run that CRASHED explains nothing about the
  *  picture, however many of its reds are charged, so it never counts as
@@ -211,6 +228,12 @@ export function tapOutput(state, streams = [[process.stdout, false], [process.st
   // they get their own slots — under the same ceiling, since an unparseable
   // result line is exactly the kind that can carry changing text.
   const keptRaw = new Set()
+  // The text already kept, against MAX_CAPTURE_CHARS.
+  let keptChars = 0
+  // Streams whose PENDING remainder outgrew MAX_LINE_CHARS: the middle of that
+  // line is gone, so the line is refused when its newline finally arrives
+  // rather than parsed as if it were whole.
+  const overlong = new Set()
   // A VARIED MEASUREMENT IS A FACT ABOUT ONE RED, NOT ABOUT A LINE (review
   // finding, 28.08.2026). Marking the LINE's composite key missed the case the
   // whole mechanism exists for: `[A(reading 1), B]` followed by `[A(reading 2),
@@ -223,11 +246,33 @@ export function tapOutput(state, streams = [[process.stdout, false], [process.st
   // remembered, and a later, different one marks that identity. Bounded the
   // same way the buffer is: one entry per distinct red.
   const firstSeenOfPart = new Map()
+  const refuse = () => {
+    state.droppedLines = (Number.isFinite(state.droppedLines) ? state.droppedLines : 0) + 1
+  }
   const take = (stream, isErr, text) => {
+    // A LINE THAT NEVER ENDS IS NOT BUFFERED FOREVER. Whatever a process writes
+    // without a newline accumulates here, so the remainder is capped and the
+    // damaged line refused when it completes — the same loud disposal a refused
+    // line gets, never a silently truncated line parsed as if it were whole.
+    const damaged = overlong.has(stream)
     const lines = ((pending.get(stream) ?? '') + text).split('\n')
-    pending.set(stream, lines.pop() ?? '')
-    for (const line of lines) {
+    let rest = lines.pop() ?? ''
+    if (rest.length > MAX_LINE_CHARS) {
+      rest = rest.slice(0, MAX_LINE_CHARS)
+      overlong.add(stream)
+    } else if (lines.length > 0) {
+      overlong.delete(stream)
+    }
+    pending.set(stream, rest)
+    for (let i = 0; i < lines.length; i++) {
+      const line = lines[i]
       if (isErr && CRASH_LINE.test(line)) state.crashed = true
+      // Only the FIRST completed line can be the damaged one — it is the
+      // remainder the cap cut, and everything after it arrived whole.
+      if (i === 0 && damaged) {
+        if (KEPT_LINE.test(line)) refuse()
+        continue
+      }
       if (!KEPT_LINE.test(line)) continue
       const parts = resultParts(line)
       // What this line would ADD, counted as IDENTITIES and not as parts
@@ -266,8 +311,20 @@ export function tapOutput(state, streams = [[process.stdout, false], [process.st
       // fresh identities fit, and refused as one if they do not. Refusing a
       // line part-way is not on offer, because the record would then hold reds
       // it cannot account for; refusing it whole is loud, which is the contract.
-      if (fresh.length > 0 && keptIds.size + keptRaw.size + fresh.length > MAX_RED_IDENTITIES) {
-        state.droppedLines = (Number.isFinite(state.droppedLines) ? state.droppedLines : 0) + 1
+      // BOTH BUDGETS, ASKED THE SAME WAY. The identity ceiling bounds how many
+      // reds the record can hold; the character budget bounds how much TEXT the
+      // tap holds to carry them, which a line repeating one identity a million
+      // times would otherwise leave unbounded.
+      // Every budget is asked only of a line that would be KEPT: one bringing
+      // nothing new is dropped as repetition whatever its size, and counting
+      // that as a refusal would be a false truncation.
+      const wouldNotFit =
+        fresh.length > 0 &&
+        (keptIds.size + keptRaw.size + fresh.length > MAX_RED_IDENTITIES ||
+          keptChars + line.length > MAX_CAPTURE_CHARS ||
+          line.length > MAX_LINE_CHARS)
+      if (wouldNotFit) {
+        refuse()
         continue
       }
       // A line that is kept, or dropped as pure repetition, still has its
@@ -292,6 +349,7 @@ export function tapOutput(state, streams = [[process.stdout, false], [process.st
       if (fresh.length === 0) continue
       if (parts === null) keptRaw.add(line)
       else for (const id of fresh) keptIds.add(id)
+      keptChars += line.length
       state.lines.push(line)
     }
   }

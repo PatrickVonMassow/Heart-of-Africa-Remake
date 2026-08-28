@@ -1323,7 +1323,19 @@ that prints the same red five hundred times brings exactly one, and counting the
 parts turned an ordinary repeated-error run into a FALSE incomplete recording —
 which blocks the render set in precisely the way this point exists to end. And
 the ceiling is decided before anything is remembered, so a refused line cannot
-fill the varied-measurement map and leave a later, kept red unwatched. That is the spec's
+fill the varied-measurement map and leave a later, kept red unwatched.
+
+**And an identity ceiling is not a memory bound** (round 14). A summary
+repeating ONE error a million times brings a single identity, so it fit — and
+the retained string then grew with the page's output rather than with its red
+set, which is the exhausted process the ceiling exists to prevent. Two more
+budgets sit beside it and are refused the same loud way: `MAX_CAPTURE_CHARS`
+(4 MB of kept text in total) and `MAX_LINE_CHARS` (64 KB for one line, which
+also caps the tap's partial-line buffer — a line whose middle had to be dropped
+is refused when its newline arrives, never parsed as a stump). Every budget is
+asked only of a line that would be KEPT: one bringing nothing new is dropped as
+repetition whatever its size, because counting that would be a false
+truncation. That is the spec's
 OTHER option, applied where the first one runs out: a run either records its
 reds completely, or fails loudly as an incomplete recording — it never
 half-records itself and calls the result a red set. The incomplete class

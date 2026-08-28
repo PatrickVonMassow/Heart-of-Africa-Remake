@@ -609,8 +609,13 @@ const red = (name, point = null, kind = 'check') => ({ name, key: name.toLowerCa
  * 28.08.2026 — one fixture had shortened the name, and the tests that claimed to
  * drive the real record through a closure were driving a stand-in). Both shapes
  * carry the same name and the same stable key; only the KIND changed, when the
- * `truncated` kind was introduced. Nothing writes either one any more: the cap
- * is gone, so these are the records already on file.
+ * `truncated` kind was introduced.
+ *
+ * These are the records ALREADY ON FILE. Today's recorder writes the truncation
+ * as a FIELD (`truncated: true, droppedLines: N`) when a run passes
+ * MAX_RED_IDENTITIES — the class is alive, it is simply no longer written as a
+ * synthetic red (round 14; an earlier version of this comment said the cap was
+ * gone outright, which stopped being true when the ceiling was added).
  */
 const truncationMarker = (dropped, kind) => ({
   name: `${dropped} further result line(s) exceeded the capture cap — this run's reds were NOT all read`,
