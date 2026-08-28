@@ -62,6 +62,11 @@ const REQUIRED_CHECKS = [
   'the shutdown was journalled under the successor fence',
 ]
 
+const REAL_FAILURE_SCENARIOS = new Set([
+  'worker-crash', 'stall', 'push-failure', 'dirty-worktree',
+  'marker-deletion', 'daemon-restart', 'checkpoint-timeout',
+])
+
 describe('the documented drill entrypoint', () => {
   it('refuses an unknown scenario instead of passing it silently', async () => {
     const res = await runDrill({ scenario: 'made-up' })
@@ -81,9 +86,14 @@ describe('the documented drill entrypoint', () => {
     expect(result.scenario).toBe(scenario)
     expect(result.checks?.length).toBeGreaterThan(0)
     expect(result.checks?.every((item) => item.ok), JSON.stringify(result, null, 2)).toBe(true)
+    if (REAL_FAILURE_SCENARIOS.has(scenario)) {
+      expect(result.mode).toBe('real-path')
+      expect(result.checks[0].name).toMatch(/cheap decision-layer check/)
+      expect(result.checks.some((item) => /real|actual|SIGKILL|stopped|dirtied|deleting/.test(item.name))).toBe(true)
+    }
     expect(result.ok).toBe(true)
     expect(ran.code, ran.stderr).toBe(0)
-  })
+  }, 30_000)
 
   it('parent-death: daemon and worker survive the killed session and a fresh session adopts them', async () => {
     const ran = await drillCli('--scenario', 'parent-death')

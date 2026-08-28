@@ -23,7 +23,7 @@
 // checkout is refused by startDaemon itself, and that refusal is pinned by
 // scripts/batch-daemon.test.mjs.
 import { execFileSync, spawn } from 'node:child_process'
-import { closeSync, mkdirSync, mkdtempSync, openSync, readFileSync, rmSync, renameSync, writeFileSync } from 'node:fs'
+import { closeSync, existsSync, mkdirSync, mkdtempSync, openSync, readFileSync, rmSync, renameSync, unlinkSync, utimesSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { isMainModule } from './is-main.mjs'
@@ -35,6 +35,8 @@ import { openStateStore, readJournal } from './batch-state.mjs'
 import { attemptPaths, readJsonIfAny } from './detached-agent.mjs'
 import { controlRequest, startDaemon, writeLockCopy } from './batch-daemon.mjs'
 import { resumeBatch } from './resume-batch.mjs'
+import { gatherEvidence } from './batch-reconcile.mjs'
+import { successorBoundaryVerdict } from './batch-reconcile-core.mjs'
 
 const BATCH = 'parent-death-drill'
 const FENCE_BEFORE = 7
@@ -601,6 +603,128 @@ async function waitForNewSha({ originDir, since, timeoutMs }) {
   }
 }
 
+const REAL_FAILURE_SCENARIOS = new Set([
+  'worker-crash', 'stall', 'push-failure', 'dirty-worktree',
+  'marker-deletion', 'daemon-restart', 'checkpoint-timeout',
+])
+
+/** Exercise the named failure through a real drill daemon, its real detached
+ * stub worker, and the same durable files production reconciliation reads.
+ * The pure matrix remains the first, cheap check; it is never the proof. */
+async function realFailureScenario(scenario, pure) {
+  const checks = [{ name: 'the cheap decision-layer check passes beneath the real drill', ok: pure.ok === true, detail: pure.checks?.map((item) => item.detail).filter(Boolean).join('; ') ?? '' }]
+  const check = (name, ok, detail = '') => checks.push({ name, ok: ok === true, detail })
+  const { sandbox, originDir, repo, worktree } = buildSandbox()
+  const batchId = `failure-${scenario}`
+  const sessionId = `session-${scenario}`
+  const lockPath = join(repo, '.claude', 'batch-lock.json')
+  const fencePath = join(repo, '.claude', 'batch-fence.json')
+  let daemonRecord = null
+  let workerHolder = null
+  let workerStopped = false
+  const request = (cmd, payload = {}, timeoutMs = 5000) => controlRequest({
+    repoDir: repo, batchId, timeoutMs,
+    request: { cmd, sessionId, fence: readJsonIfAny(lockPath)?.fence, payload: { batchId, ...payload } },
+  })
+  try {
+    const acquired = acquire(sessionId, {
+      lockPath, fencePath, pid: process.pid, pidStartedAt: processStartTime(process.pid),
+    })
+    check('a real coordinator acquired the sandbox fence', acquired === 'acquired', String(acquired))
+    const started = await startDaemon({ repoDir: repo, batchId, drill: true })
+    daemonRecord = started.record ?? null
+    check('a real daemon process started and claimed durable state', started.ok === true && probePid(daemonRecord?.pid).exists === true, started.reason ?? '')
+    if (!started.ok) return { ok: false, mode: 'real-path', scenario, checks }
+    const copied = writeLockCopy({ repoDir: repo, record: daemonRecord, sessionId })
+    check('the coordinator recorded the real daemon identity', copied.ok === true, copied.reason ?? '')
+
+    const needsWorker = !['marker-deletion', 'daemon-restart'].includes(scenario)
+    if (needsWorker) {
+      const launched = await request('start-attempt', {
+        pointId: 'p-drill', attemptId: 'a-drill', branch: 'feat/drill', worktree, adapter: 'stub',
+      }, 10_000)
+      check('the daemon spawned the real detached worker', launched.ok === true && Number.isInteger(launched.result?.pid), launched.reason ?? '')
+      const store = openStateStore({ repoDir: repo, batchId })
+      const paths = attemptPaths(join(store.dir, 'attempts', 'a-drill'))
+      const deadline = Date.now() + 10_000
+      while ((!existsSync(paths.heartbeatPath) || !readJsonIfAny(paths.leasePath)?.lease?.holder) && Date.now() < deadline) await sleep(100)
+      workerHolder = readJsonIfAny(paths.leasePath)?.lease?.holder ?? null
+      check('the worker wrote its real lease and heartbeat files', Boolean(workerHolder) && existsSync(paths.heartbeatPath), JSON.stringify(workerHolder))
+
+      if (scenario === 'worker-crash') {
+        process.kill(workerHolder.pid, 'SIGKILL')
+        const deadBy = Date.now() + 5000
+        while (probePid(workerHolder.pid).exists && Date.now() < deadBy) await sleep(100)
+        const lane = gatherEvidence({ repoDir: repo, batchId }).lanes.find((item) => item.attemptId === 'a-drill')
+        check('SIGKILLing the actual worker makes production reconciliation alert it as missing', lane?.reading === 'missing' && lane?.alert === true, lane?.reason ?? '')
+      } else if (scenario === 'stall') {
+        process.kill(workerHolder.pid, 'SIGSTOP')
+        workerStopped = true
+        const stale = new Date(Date.now() - 11 * 60 * 1000)
+        utimesSync(paths.heartbeatPath, stale, stale)
+        const lane = gatherEvidence({ repoDir: repo, batchId }).lanes.find((item) => item.attemptId === 'a-drill')
+        check('stopping the actual worker and aging its heartbeat makes production reconciliation report stalled', lane?.reading === 'stalled' && lane?.alert === true, lane?.reason ?? '')
+      } else if (scenario === 'push-failure') {
+        git(['remote', 'set-url', 'origin', join(sandbox, 'missing-origin.git')], worktree)
+        const reply = await request('request-checkpoint', { requestId: 'push-failure', waitMs: 5000 }, 10_000)
+        const answer = reply.result?.answers?.find((item) => item.attemptId === 'a-drill')
+        check('the real worker checkpoint attempts a push and reports the broken remote', reply.ok === true && answer?.acknowledged === true && answer?.pushedOk === false && answer?.transferable === false, JSON.stringify(answer ?? reply))
+      } else if (scenario === 'dirty-worktree') {
+        writeFileSync(join(worktree, 'uncommitted-drill.txt'), 'dirty\n')
+        const reply = await request('request-checkpoint', { requestId: 'dirty-worktree', waitMs: 5000 }, 10_000)
+        const answer = reply.result?.answers?.find((item) => item.attemptId === 'a-drill')
+        check('the real worker checkpoint reads the dirtied worktree and blocks transfer', reply.ok === true && answer?.acknowledged === true && answer?.dirty === true && answer?.transferable === false, JSON.stringify(answer ?? reply))
+      } else if (scenario === 'checkpoint-timeout') {
+        process.kill(workerHolder.pid, 'SIGSTOP')
+        workerStopped = true
+        const reply = await request('request-checkpoint', { requestId: 'checkpoint-timeout', waitMs: 250 }, 5000)
+        const answer = reply.result?.answers?.find((item) => item.attemptId === 'a-drill')
+        check('the real stopped worker misses the daemon checkpoint deadline and remains non-transferable', reply.ok === true && answer?.acknowledged === false && answer?.transferable === false, JSON.stringify(answer ?? reply))
+      }
+    } else if (scenario === 'marker-deletion') {
+      const fence = readJsonIfAny(lockPath).fence
+      const sealed = await request('seal-boundary', { requestId: 'deleted-marker' })
+      const markerPath = join(repo, '.claude', 'batch-boundary.json')
+      writeFileSync(markerPath, `${JSON.stringify({ kind: 'durable-batch-boundary', phase: 'committed', batchId, fence, requestId: 'deleted-marker', at: Date.now() })}\n`)
+      unlinkSync(markerPath)
+      const journal = readJournal(openStateStore({ repoDir: repo, batchId }))
+      const sealedFence = journal.entries.filter((entry) => entry.kind === 'command' && entry.name === 'seal-boundary').at(-1)?.fence ?? null
+      const verdict = successorBoundaryVerdict({ marker: null, batchId, lock: readJsonIfAny(lockPath), sealedFence })
+      check('deleting the real marker after the daemon seal makes successor reconciliation quarantine the boundary', sealed.ok === true && verdict.ok === false && verdict.quarantine === true && /marker deletion/.test(verdict.reason), verdict.reason)
+    } else if (scenario === 'daemon-restart') {
+      const firstPid = daemonRecord.pid
+      const firstGeneration = daemonRecord.generation
+      const down = await request('shutdown', { drain: true }, 10_000)
+      const store = openStateStore({ repoDir: repo, batchId })
+      const stoppedBy = Date.now() + 5000
+      while (existsSync(store.daemonRecordPath) && Date.now() < stoppedBy) await sleep(100)
+      const restarted = await startDaemon({ repoDir: repo, batchId, drill: true })
+      daemonRecord = restarted.record ?? daemonRecord
+      const journal = readJournal(store)
+      check('the real daemon restarts on its durable journal with the same generation and a new process', down.ok === true && restarted.ok === true && daemonRecord.pid !== firstPid && daemonRecord.generation === firstGeneration && journal.entries.filter((entry) => entry.kind === 'daemon-lifecycle' && entry.event === 'start').length === 2, restarted.reason ?? '')
+      writeLockCopy({ repoDir: repo, record: daemonRecord, sessionId })
+    }
+    return { ok: checks.every((item) => item.ok), mode: 'real-path', scenario, checks }
+  } catch (error) {
+    check('the real-path drill completed without an infrastructure exception', false, error?.stack ?? String(error))
+    return { ok: false, mode: 'real-path', scenario, checks }
+  } finally {
+    if (workerStopped && workerHolder?.pid && probePid(workerHolder.pid).exists) {
+      try { process.kill(workerHolder.pid, 'SIGCONT') } catch { /* already gone */ }
+    }
+    try { await request('shutdown', { drain: true }, 10_000) } catch { /* daemon may be the injected failure */ }
+    await sleep(300)
+    for (const identity of [workerHolder, daemonRecord]) {
+      if (!identity?.pid) continue
+      const probe = probePid(identity.pid)
+      if (probe.exists && Number.isFinite(identity.pidStartedAt) && Math.abs((probe.startedAt ?? 0) - identity.pidStartedAt) <= PROCESS_START_TOLERANCE_MS) {
+        try { process.kill(identity.pid, 'SIGKILL') } catch { /* already gone */ }
+      }
+    }
+    rmSync(sandbox, { recursive: true, force: true })
+  }
+}
+
 /** `neuterEpoch` is the NEGATIVE CONTROL: the same scenario against a real
  *  daemon whose epoch enforcement is off (a drill-only startDaemon/serve flag).
  *  Such a run must come back red at the two stale-refusal checks — a drill
@@ -608,7 +732,10 @@ async function waitForNewSha({ originDir, since, timeoutMs }) {
 export async function runDrill({ scenario, keep = false, neuterEpoch = false } = {}) {
   if (scenario === 'parent-death') return parentDeathScenario({ keep, neuterEpoch })
   const { FAILURE_DRILL_SCENARIOS, runFailureDrill } = await import('./batch-daemon-failure-drills.mjs')
-  if (FAILURE_DRILL_SCENARIOS.includes(scenario)) return runFailureDrill(scenario)
+  if (FAILURE_DRILL_SCENARIOS.includes(scenario)) {
+    const pure = runFailureDrill(scenario)
+    return REAL_FAILURE_SCENARIOS.has(scenario) ? realFailureScenario(scenario, pure) : pure
+  }
   return { ok: false, reason: `unknown scenario: ${String(scenario)}; known scenarios: parent-death, ${FAILURE_DRILL_SCENARIOS.join(', ')}` }
 }
 
