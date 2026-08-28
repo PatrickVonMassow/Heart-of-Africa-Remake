@@ -9204,11 +9204,11 @@ to land than a mechanism that needs a review.
   recorded pass advances the per-contribution baseline — but the reading itself is multi-session
   work nobody has run, and once 721's planner covered a range the point-714 gap clause stopped
   degrading the block: the gate hard-blocks every turn end for a debt no single session can clear.
-  TWO ranges are therefore owed, each unblocked at the time by 721's rule 5 ("or the range is
+  THREE ranges are therefore owed, each unblocked at the time by 721's rule 5 ("or the range is
   explicitly re-baselined with a written justification naming every file that re-baselining leaves
   unread"), each justification and full unread-file list living in
-  `.claude/mechanism-review-baseline.json` beside the baseline it moved, and THIS point is both
-  justifications' tracked half:
+  `.claude/mechanism-review-baseline.json` beside the baseline it moved, and THIS point is every
+  justification's tracked half:
   - `762de1c..b8baae0` — five weeks of guard work; measured 18.08.2026 after 721 landed: 34
     outstanding passes, ~3.4M characters.
   - `53feef3..ee195c7` — point 712's own 46 commits; measured 18.08.2026, 22:55: 65 outstanding
@@ -9218,8 +9218,16 @@ to land than a mechanism that needs a review.
     fix, and until it lands any guard range past a handful of commits re-creates this debt. 712's
     substance had six cross-vendor rounds and its fixes are in the tree — what the ledger lacks is
     Sol's clearing read of the FIXED content at the boundaries its round-5/6 refusals named.
+  - `a7ae14a..70f19c4` — point 734's 60 mechanism contributions; measured 28.08.2026, 21:10: the
+    guard bills each one a 7-pass split of which 5 are missing, roughly 295 passes for nine files.
+    Unlike the two ranges above, this material WAS read cross-vendor at its end state — the
+    whole-range round over `395be985^1..3d9f4b16` recorded a complete 7/7 split (Sol passes 1-6,
+    Opus 4.8 pass 7) over all nine mechanism files, and the four defects it left standing are open
+    points 991, 996, 998 and 999. What is genuinely unread here is only `.claude/queue-rank.json`
+    and `docs/work-packages.md`. The per-commit billing that makes the rest unpayable is point 998,
+    and this range is the fixture its VERIFIABLE clause names.
   FINAL STATE:
-  - Every file the two re-baselines left unread is read in authorship-cut passes against its own
+  - Every file the re-baselines left unread is read in authorship-cut passes against its own
     range and recorded (`node scripts/review-sol.mjs --sha <head> --since <base>` plans them; the
     reviewer per pass is the planner's, cross-vendor by construction), or is explicitly
     retired here with a reason (a doc file whose content is not a mechanism — CLAUDE.md, TASKS.md,
@@ -13287,4 +13295,61 @@ to land than a mechanism that needs a review.
   touching a file no pass covered stays owed; plus the point-734 range as a fixture.
   Criticality: high — it blocks the turn end of a landed point, which is the state the batch cannot
   leave on its own.
+  Bundle: Session- & Repo-Hygiene.
+- [ ] 999. The review ledger's physical order does not follow its `at` stamps, so a reader that
+  trusts append order reads it wrong. MEASURED 28.08.2026 on `main` at 168805d5, answering the
+  Opus 4.8 pass-7 refusal of point 734 (`.claude/mechanism-reviews.jsonl`, record `at`
+  1787940688907): eight of 1462 rows carry an `at` earlier than the row above them — six
+  `authoring-commission` rows and two `review` rows, the largest step backwards 8.7 days
+  (line 1351, a 19.08. review sitting behind 28.08. rows) and the next 1.3 days (line 933).
+  WHY IT IS STRUCTURAL AND NOT A LEFTOVER: point 988's union driver
+  (`scripts/mechanism-review-merge-core.mjs:99-100`) sorts the rows a single merge APPENDS and
+  preserves the ancestor prefix untouched. A branch appends its commission row on the day it is
+  cut and merges days later, so the row is correctly placed inside its own merge and permanently
+  behind rows `main` gained meanwhile. Every landing therefore adds new disorder that no later
+  landing can repair, and point 988 — which promised `at` order in its VERIFIABLE clause — is
+  closed.
+  WHAT IT COSTS: the ledger is the four-eyes evidence file. Nothing measured today mis-reads it —
+  its consumers compare `at` by value — but the file's own contract says the rows are in `at`
+  order, and the first consumer that trusts that (a scan that stops early, a "latest wins" walk, a
+  bisect) reads a review or a receipt that is not there. It is also the reason a hand-resolved
+  conflict cannot be checked against a simple rule.
+  FINAL STATE: either the file is ordered by `at` and the union driver keeps it ordered across the
+  ancestor prefix as well, or the contract is corrected where it is written — the driver's own
+  comment, `.gitattributes` and point 988's archived VERIFIABLE clause stop promising an order the
+  mechanism does not produce, and every consumer that could depend on it is named.
+  VERIFIABLE: Vitest over the ledger — a check that reads `.claude/mechanism-reviews.jsonl` and
+  fails on a row whose `at` precedes its predecessor (after the chosen final state is in place),
+  plus a merge case where the ancestor prefix already holds a late row and the driver's result is
+  judged against the decided contract.
+  Criticality: medium — it corrupts nothing today, but it is the evidence file the four-eyes gate
+  rests on, and its stated order is not the order it has.
+  Bundle: Modell & Wächter.
+- [ ] 1000. Two waved-red cases still construct a console identity the recorder cannot mint, and
+  their names still claim the production pair. MEASURED 28.08.2026 by the cross-vendor pass 3 of 4
+  over `5775d7f0` (GPT-5.6 Sol, verdict merge-with-fixes, `.claude/mechanism-reviews.jsonl`):
+  "two still claim recorder realism while directly constructing console identities the recorder
+  cannot produce". 5775d7f0 answered the same objection for the FIRST of the three cases by
+  rewriting its name and its comment, and for the SECOND by rewriting its fixture to the
+  recorder-reachable `console errors: <name>` shape — but not both halves for both. In
+  `scripts/render-verify-core.test.mjs` the case at line 1057 still pairs
+  `red('the eaves column', null, 'check')` with `red('the eaves column', null, 'console')`, and a
+  console pseudo-check ALWAYS carries the `console error: ` prefix, so that console identity is one
+  no recorder run produces; the case at line 1579 carries the reachable fixture under the old name
+  "counts a check and a console error of the same wording in a LIFTED truncation too", which states
+  exactly the production pair its own comment retracts.
+  WHAT IT COSTS: nothing in production — the kind in the deferral key is real defence for a record
+  that reaches the gate from elsewhere (a hand-written state file, a foreign checkout). What is
+  wrong is what the suite CLAIMS: a reader takes these two cases as proof that the recorder mints
+  the pair, and would not look again if a later recorder change made the shape genuinely
+  unreachable or genuinely reachable. A test that says more than it shows is the failure this
+  file's own round-17 and round-18 findings were about.
+  FINAL STATE: every case that exercises the kind half of the key says, in its NAME, that it drives
+  two reds of the same wording and different KIND — never "a check and a console error" — and
+  either uses a recorder-reachable identity or states in one line that it is deliberately a foreign
+  record and why. Whichever of the two forms each case takes, name, comment and fixture agree.
+  VERIFIABLE: Vitest over `scripts/render-verify-core.test.mjs` — the cases keep proving what they
+  proved (the waved count stays 2 in both the ordinary and the lifted-truncation branch), and a
+  reading of the file finds no case name that promises a check/console pair.
+  Criticality: low — it is a truthfulness defect in the suite, not a defect in the mechanism.
   Bundle: Session- & Repo-Hygiene.
