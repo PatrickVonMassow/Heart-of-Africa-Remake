@@ -174,6 +174,26 @@ export const MAX_LINE_CHARS = 64 * 1024
  *  and wide enough that an ordinary write is decoded in one pass. */
 export const DECODE_WINDOW_BYTES = 64 * 1024
 
+/** How many times `needle` occurs in `text`. */
+function countOf(text, needle) {
+  let n = 0
+  for (let i = text.indexOf(needle); i !== -1; i = text.indexOf(needle, i + needle.length)) n++
+  return n
+}
+
+/** How many U+FFFD characters this byte window really carries — EF BF BD — as
+ *  opposed to ones the decoder substituted for bytes it could not read. */
+function replacementBytesIn(bytes) {
+  let n = 0
+  for (let i = 0; i + 2 < bytes.byteLength; i++) {
+    if (bytes[i] === 0xef && bytes[i + 1] === 0xbf && bytes[i + 2] === 0xbd) {
+      n++
+      i += 2
+    }
+  }
+  return n
+}
+
 /** The newline `lines.join('\n')` will put BEFORE this line (review finding,
  *  28.08.2026, round 17). The budget bounds the buffer the parser is handed, and
  *  that buffer is the joined text — counting the line alone let a set of lines
@@ -487,8 +507,20 @@ export function tapOutput(state, streams = [[process.stdout, false], [process.st
     const bytes = new Uint8Array(view.buffer, view.byteOffset, view.byteLength)
     const decoder = decoderFor(stream)
     for (let i = 0; i < bytes.byteLength; i += DECODE_WINDOW_BYTES) {
-      const piece = decoder.write(bytes.subarray(i, Math.min(i + DECODE_WINDOW_BYTES, bytes.byteLength)))
-      if (piece) take(stream, isErr, piece)
+      const window = bytes.subarray(i, Math.min(i + DECODE_WINDOW_BYTES, bytes.byteLength))
+      const piece = decoder.write(window)
+      if (!piece) continue
+      // MALFORMED BYTES ARE A LOST RESULT TOO (review finding, 28.08.2026, round
+      // 27). `write()` substitutes U+FFFD for a byte sequence it cannot decode,
+      // there and then — only the INCOMPLETE tail reaches `end()`. So a result
+      // line arriving as bytes could be stored under an identity the suite never
+      // printed while the record read complete, which is the same silent rename
+      // the tail already answers for. A substitution is counted only where the
+      // window did not itself carry that character: U+FFFD is EF BF BD in UTF-8,
+      // and a suite is free to print it.
+      const substituted = countOf(piece, '\uFFFD') - replacementBytesIn(window)
+      if (substituted > 0) refuse()
+      take(stream, isErr, piece)
     }
   }
   for (const [stream, isErr] of streams) {

@@ -482,6 +482,26 @@ describe('tapOutput — observe-only', () => {
     expect(state.droppedLines).toBe(1)
   })
 
+  // MALFORMED BYTES ARE A LOST RESULT TOO (review finding, 28.08.2026, round
+  // 27). `write()` substitutes U+FFFD for a sequence it cannot decode there and
+  // then — only the incomplete TAIL reaches `end()` — so a result line arriving
+  // as bytes could be stored under an identity the suite never printed while the
+  // record read complete.
+  it('marks a byte sequence the decoder could not read, and not one the suite printed', () => {
+    const { state, out, flush } = tapped()
+    out.write(Buffer.concat([Buffer.from('ERR: page error ', 'utf8'), Buffer.from([0xff, 0xfe]), Buffer.from(' here\n', 'utf8')]))
+    flush()
+    expect(state.lines.join('')).toContain('\uFFFD')
+    expect(state.droppedLines).toBeGreaterThan(0)
+    // A run that PRINTS the replacement character loses nothing and is not
+    // marked: U+FFFD is EF BF BD in UTF-8, and a suite may print it.
+    const clean = tapped()
+    clean.out.write(Buffer.from('ERR: page error \uFFFD here\n', 'utf8'))
+    clean.flush()
+    expect(clean.state.lines).toEqual(['ERR: page error \uFFFD here'])
+    expect(clean.state.droppedLines ?? 0).toBe(0)
+  })
+
   // The same when a STRING write follows the cut bytes rather than the flush.
   it('marks the substitution when a string write drains the decoder', () => {
     const { state, out, flush } = tapped()

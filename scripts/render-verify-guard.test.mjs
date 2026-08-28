@@ -579,11 +579,19 @@ describe('render-verify-guard --status — what it prints about a run it cannot 
    *  the signing commands work on the record shape the recorder writes today —
    *  the helper drafts are pure functions and cannot show that (review finding,
    *  28.08.2026, round 18). */
-  const runCli = (state, argvs) => {
+  const runCli = (state, argvs, { pending = false } = {}) => {
     const root = mkdtempSync(join(tmpdir(), 'hoa-render-cli-'))
     try {
       execFileSync('git', ['init', '-q', '-b', 'main'], { cwd: root, windowsHide: true })
       execFileSync('git', ['-c', 'user.email=t@t', '-c', 'user.name=t', 'commit', '-q', '--allow-empty', '-m', 'root'], { cwd: root, windowsHide: true })
+      if (pending) {
+        const cleared = execFileSync('git', ['rev-parse', 'HEAD'], { cwd: root, encoding: 'utf8', windowsHide: true }).trim()
+        mkdirSync(join(root, 'src', 'scenes'), { recursive: true })
+        writeFileSync(join(root, 'src', 'scenes', 'water.ts'), 'export const rim = 1\n')
+        execFileSync('git', ['add', '-A'], { cwd: root, windowsHide: true })
+        execFileSync('git', ['-c', 'user.email=t@t', '-c', 'user.name=t', 'commit', '-q', '-m', 'a render change'], { cwd: root, windowsHide: true })
+        state = { ...state, clearedHeads: { main: cleared } }
+      }
       mkdirSync(join(root, '.claude'), { recursive: true })
       writeFileSync(join(root, '.claude', 'render-verify-state.json'), JSON.stringify(state))
       return argvs.map((argv) =>
@@ -591,6 +599,7 @@ describe('render-verify-guard --status — what it prints about a run it cannot 
           cwd: root,
           env: { ...process.env, HOA_REPO_ROOT: root },
           encoding: 'utf8',
+          input: argv.length === 0 ? '{}' : undefined,
           windowsHide: true,
         }),
       )
@@ -670,10 +679,42 @@ describe('render-verify-guard --status — what it prints about a run it cannot 
     // Signed, it stops being listed as open.
     expect(after).not.toMatch(/⚠ INCOMPLETE RECORDING \(not an unexplained red\)/)
     expect(after).toMatch(/signed-off incomplete recording: webgpu\/settings/)
-    // AND IT STILL DOES NOT READ AS A PASS (review finding, 28.08.2026, round
-    // 26). Removing the open warning is not that claim: the record must not
-    // become COVERAGE either, and only the command that blocks can say so.
+    // AND IT STILL DOES NOT READ AS A PASS (review finding, 28.08.2026, rounds
+    // 26 and 27). Removing the open warning is not that claim, and neither is
+    // the status table: the record must not become COVERAGE, and only the
+    // command that BLOCKS can say so — after the signature, not before it.
     expect(after).toMatch(/webgpu settings\s+exit 0 .*incomplete/)
+    const inWindow = { backend: 'webgpu', suite: 'settings', at: Date.now(), exit: 0, asserted: true, screenshotCount: 9, truncated: true, droppedLines: 115 }
+    const [signedAgain, blocked] = runCli(
+      { runs: [inWindow] },
+      [
+        ['--incomplete', 'webgpu/settings', '--evidence', 'local/verify-logs/ holds the whole run; the flood was the dev server'],
+        [],
+      ],
+      { pending: true },
+    )
+    expect(signedAgain).toMatch(/INCOMPLETE RECORDING SIGNED OFF/)
+    const decision = JSON.parse(blocked)
+    expect(decision.decision).toBe('block')
+    expect(decision.reason).toMatch(/NOT VERIFIED ON EITHER BACKEND/)
+  })
+
+  // AND THE POSITIVE SIDE OF THE SAME ROUTE (review finding, 28.08.2026, round
+  // 27): a signed record with NO residual red really does leave the open list.
+  // Every closure case here supplied unowned reds, so an implementation that
+  // turned every matched closure into a red would have passed them all.
+  it('closes a truncation that recorded nothing else, and leaves the list empty', () => {
+    const record = { backend: 'webgpu', suite: 'settings', at: 1500, exit: 1, truncated: true, droppedLines: 115, reds: [] }
+    const [before, signed, after] = runCli({ runs: [record] }, [
+      ['--status'],
+      ['--incomplete', 'webgpu/settings', '--evidence', 'local/verify-logs/ holds the whole run; the flood was the dev server'],
+      ['--status'],
+    ])
+    expect(before).toMatch(/⚠ INCOMPLETE RECORDING \(not an unexplained red\)/)
+    expect(signed).toMatch(/INCOMPLETE RECORDING SIGNED OFF/)
+    expect(after).not.toMatch(/⚠ INCOMPLETE RECORDING \(not an unexplained red\)/)
+    expect(after).not.toMatch(/⚠ unaccounted red/)
+    expect(after).toMatch(/signed-off incomplete recording: webgpu\/settings/)
   })
 
   // A CRASH-PLUS-TRUNCATION IN THE SHAPE THE RECORDER WRITES TODAY (review
