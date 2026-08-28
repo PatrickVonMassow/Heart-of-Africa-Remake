@@ -365,7 +365,7 @@ export function isoText(at) {
  *  code since the last render edit, so a record can be answered by this reading
  *  and still be blocking by the gate's. Withholding its signature would strand
  *  it; saying "outside the window" about it would misdescribe it. */
-export function reRecordedBy(state, r) {
+export function reRecordedBy(state, r, options) {
   const runs = Array.isArray(state?.runs) ? state.runs : []
   const when = runStamp(r)
   if (when === null) return null
@@ -374,7 +374,10 @@ export function reRecordedBy(state, r) {
       if (!later || later === r || later.partial === true) return false
       if (later.backend !== r.backend || later.suite !== r.suite) return false
       const laterAt = runStamp(later)
-      return laterAt !== null && laterAt > when && runVerdict(later).covers
+      // WITH THE OPEN POINTS IN HAND (review finding, 28.08.2026, round 20):
+      // without them an ACCOUNTED-FOR run — a red run whose every red is charged
+      // — reads as uncovering here, while the gate counts it as coverage.
+      return laterAt !== null && laterAt > when && runVerdict(later, options ?? {}).covers
     }) ?? null
   )
 }
@@ -795,17 +798,26 @@ if (arg === 'status' || arg === '--status') {
     // record unsignable, which is the trap this point exists to end. What each
     // line owes the reader instead is whether it blocks right now, and that is
     // what `blocksNow` says.
-    const blockingIds = new Set(openRecords.map((u) => u.id))
+    // WHETHER THE GATE IS ARMED AT ALL DECIDES WHETHER ANYTHING BLOCKS (review
+    // finding, 28.08.2026, round 20). With no pending render path `since` is 0,
+    // so every historical record enters the open list — and calling each of them
+    // "BLOCKING NOW" while the gate has nothing to block was the opposite of the
+    // truth. An active deferral at this HEAD says the same for the other reason.
+    const deferred = Boolean(state.deferral && state.deferral.head === head)
+    const armed = paths.length > 0 && !deferred
+    const blockingIds = new Set(armed ? openRecords.map((u) => u.id) : [])
     const blocksNow = (r) => {
       if (blockingIds.has(runIdentity(r))) return 'BLOCKING NOW'
-      // THREE STATES, NOT TWO (review finding, 28.08.2026, round 19). A record
-      // whose lost measurement was RETAKEN is answered, not merely old, and
-      // calling it "outside the window" sent the reader to sign something that
-      // needed no signature.
-      const retaken = reRecordedBy(state, r)
-      return retaken
-        ? `already answered by the later covering ${retaken.suite} run @${isoText(runStamp(retaken) ?? retaken.at)} — signing it changes nothing`
-        : 'outside the current window — owed, not blocking'
+      // A RECORD WHOSE LOST MEASUREMENT WAS RETAKEN IS ANSWERED, not merely old
+      // (round 19), and that is true of the record whatever the gate is doing —
+      // so it is said before the gate's own two reasons.
+      const retaken = reRecordedBy(state, r, { openPoints })
+      if (retaken) {
+        return `already answered by the later covering ${retaken.suite} run @${isoText(runStamp(retaken) ?? retaken.at)} — signing it changes nothing`
+      }
+      if (deferred) return 'not blocking — an active deferral covers this HEAD'
+      if (paths.length === 0) return 'not blocking — no render path is pending at this HEAD'
+      return 'outside the current window — owed, not blocking'
     }
     const openIncomplete = openIncompleteRuns(state)
     for (const r of openIncomplete) {
@@ -853,7 +865,12 @@ if (arg === 'status' || arg === '--status') {
         `  ${isoText(runStamp(r) ?? r.at)}  ${String(r.backend).padEnd(6)} ` +
           `${String(r.suite).padEnd(14)} exit ${r.exit} asserted=${r.asserted === true} ` +
           `level=${r.featureLevel ?? '-'} shots=${r.screenshotCount ?? 0} ` +
-          `${v.status}${v.charges.length ? ` (${v.charges.map((c) => `→${c.point}`).join(' ')})` : ''}`,
+          // THE RECORD'S OWN CLASS, not the raw verdict (review finding,
+          // 28.08.2026, round 20): `runVerdict` answers `red` for a crashed
+          // record, and printing that here contradicted the CRASHED RUN
+          // paragraph three lines up in the same report.
+          `${r.crashed === true && v.status === 'red' ? 'crashed' : v.status}` +
+          `${v.charges.length ? ` (${v.charges.map((c) => `→${c.point}`).join(' ')})` : ''}`,
       )
     }
     process.exit(0)

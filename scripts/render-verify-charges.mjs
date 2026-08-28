@@ -303,6 +303,19 @@ export const RED_CHARGES = [
     // for today stops being.
     match:
       /(GPUValidationError: The texture format \(TextureFormat::RGBA16Float\) does not sup|GPUValidationError: \[Invalid Texture "(output|normal)-msaa"\] is invalid due to a previous|GPUValidationError: \[Invalid TextureView\] is invalid due to a previous error)/i,
+    // AND THE ROOT IS READ OFF THE DETAIL, WHERE ITS SENTENCE SURVIVES WHOLE
+    // (review finding, 28.08.2026, round 20). The stored NAME keeps 120
+    // normalised characters and the root sentence is 137, so it ends at
+    // `does not sup` — which any OTHER unsupported-operation error on the same
+    // format would also produce, and the entry conceded as much rather than
+    // fixing it. The stored DETAIL keeps 200 raw characters, so the word that
+    // tells them apart is on the record after all. The narrow half is asked only
+    // of the root alternative; a red whose detail says a different unsupported
+    // operation is refused and stays red, and so is one whose measurement varied
+    // within the run. A record written before the detail was kept carries none
+    // and is out of this entry's reach — the information was never written down,
+    // which is the honest answer and not a charge.
+    detailMatch: /(RGBA16Float\) does not support multisampling|Invalid Texture "(output|normal)-msaa"|Invalid TextureView)/i,
   },
   {
     point: 568,

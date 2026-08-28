@@ -401,14 +401,39 @@ describe('tapOutput — observe-only', () => {
   // proof that bounding the decode did not cost the content.
   it('decodes a write far larger than one window without losing a character', () => {
     const { state, out, flush } = tapped()
+    // MANY LINES, EACH WITHIN THE PER-LINE BUDGET (review finding, 28.08.2026,
+    // round 20). One enormous line would be refused, and asserting "no
+    // replacement character" over the empty result that leaves proves nothing.
     // Multi-byte characters at every offset, so a window boundary is bound to
     // land inside one of them.
-    const body = 'ü☕é'.repeat(40000)
-    out.write(Buffer.from(`ERR: page error ${body}\n`, 'utf8'))
+    const line = (i) => `ERR: page error ${tag(i)} ${'ü☕é'.repeat(200)}`
+    const lines = 200
+    const whole = Buffer.from(`${Array.from({ length: lines }, (_, i) => line(i)).join('\n')}\n`, 'utf8')
+    expect(whole.byteLength).toBeGreaterThan(DECODE_WINDOW_BYTES * 3)
+    out.write(whole)
     flush()
-    expect(Buffer.byteLength(body, 'utf8')).toBeGreaterThan(DECODE_WINDOW_BYTES * 3)
+    expect(state.lines).toHaveLength(lines)
+    expect(state.lines[0]).toBe(line(0))
+    expect(state.lines.at(-1)).toBe(line(lines - 1))
     expect(state.lines.join('\n')).not.toContain('\uFFFD')
-    expect(state.droppedLines).toBe(1)
+    expect(state.droppedLines ?? 0).toBe(0)
+  })
+
+  // A STRING WRITE MUST NOT OVERTAKE BYTES THE DECODER STILL HOLDS (review
+  // finding, 28.08.2026, round 20). A Buffer write ending mid-character leaves
+  // those bytes in the decoder; the string then completed the line WITHOUT the
+  // half character, and the decoder's tail arrived afterwards as text of its
+  // own — a stored red silently renamed, with nothing marking the recording.
+  it('keeps a string write behind the bytes an earlier Buffer write left half-read', () => {
+    const { state, out, flush } = tapped()
+    const bytes = Buffer.from('ERR: the café pane', 'utf8')
+    out.write(bytes.subarray(0, bytes.indexOf(Buffer.from('é', 'utf8')) + 1))
+    out.write(' failed to draw\n')
+    flush()
+    // The half character is marked where it really was, and nothing after it
+    // moved: no line begins with the decoder's tail.
+    expect(state.lines).toHaveLength(1)
+    expect(state.lines[0]).toBe('ERR: the caf\uFFFD failed to draw')
   })
 
   // AND THE DECODERS ARE PER STREAM. Two interleaved half-characters, one on
@@ -592,6 +617,22 @@ describe('the captured lines charge the way the guard reads them', () => {
     expect(pointOf('a NEW check nobody has filed')).toBeNull()
   })
 
+  // AND THROUGH THE REAL EXIT HANDLER (review finding, 28.08.2026, round 20).
+  // The case below builds the stored red by hand from the tap's lines, so it
+  // would pass even if the recorder dropped the detail on its way to the record
+  // — which is the exact defect this whole section is about.
+  it('writes the printed measurement into the RECORD, through the real exit handler', async () => {
+    const run = await armed('polish', 'compatibility')
+    process.stdout.write('FAIL  no child walks without getting anywhere — worst child 1 at 22.2s, 1.42 m walked inside 0.31 m\n')
+    const record = run.exit(1)
+    expect(record.reds).toHaveLength(1)
+    expect(record.reds[0].detail).toContain('1.42 m walked inside 0.31 m')
+    expect(record.reds[0].point).toBe(694)
+    // And the stored red is chargeable again when it is RE-READ from the record,
+    // which is the retroactivity the detail exists for.
+    expect(chargeFor(record.reds[0], { suite: 'polish', backend: 'webgpu', featureLevel: 'compatibility' })?.point).toBe(694)
+  })
+
   it('keeps the printed measurement on the stored red, through the real tap', () => {
     // A red that reaches the record carries the MEASUREMENT it printed, not
     // only its name (point 734, review finding F1). Without it the ledger's
@@ -710,6 +751,27 @@ describe('the armed recorder — the REAL wiring, not a stand-in', () => {
     expect(record.featureLevel).toBe('core')
     expect(record.reds.map((r) => r.point)).toEqual([null])
     expect(runVerdict(record, { openPoints }).status).toBe('red')
+  })
+
+  // THE TRUNCATION-VERSUS-CRASH BOUNDARY, ON THE REAL WIRING (review finding,
+  // 28.08.2026, round 20). The suite models an exhausted process as one that
+  // DIES, and a run that both refused a result line and then died is exactly
+  // that shape — yet no case combined the two. A crash outranks the truncation,
+  // so the record blocks as a crash and still owes the second signature for the
+  // lines nobody read.
+  it('records a run that refused a line AND then died as a crash that also lost output', async () => {
+    const run = await armed('polish')
+    process.stdout.write('FAIL  settlement walker (goat): the planted foot holds its ground spot — 0.967\n')
+    process.stdout.write(`ERR: ${'z'.repeat(MAX_LINE_CHARS + 10)}\n`)
+    process.emit('uncaughtExceptionMonitor', new Error('page.waitForFunction: Timeout 300000ms exceeded'))
+    const record = run.exit(1)
+    expect(record.crashed).toBe(true)
+    expect(record.truncated).toBe(true)
+    expect(record.droppedLines).toBe(1)
+    // The crash outranks the truncation: that is what runVerdict answers.
+    expect(runVerdict(record, { openPoints }).status).toBe('red')
+    expect(runVerdict(record, { openPoints }).unaccounted[0].name).toMatch(/crash/)
+    expect(isIncompleteRecording(record)).toBe(true)
   })
 
   it('marks a run whose process raised an uncaught exception, and that run never accounts (F1)', async () => {

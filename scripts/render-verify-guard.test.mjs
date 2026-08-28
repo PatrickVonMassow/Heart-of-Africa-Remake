@@ -544,11 +544,23 @@ describe('render-verify-guard --status — what it prints about a run it cannot 
 
   /** A throwaway checkout: HOA_REPO_ROOT points every path helper at it, so the
    *  real .claude/render-verify-state.json is never read or written. */
-  const inTempRepo = (state) => {
+  /** `pending: true` leaves a real render change behind the baseline, so the
+   *  gate is ARMED — without it `since` is 0, every historical record enters the
+   *  open list and none of them is blocking anything (review finding,
+   *  28.08.2026, round 20). */
+  const inTempRepo = (state, { pending = false } = {}) => {
     const root = mkdtempSync(join(tmpdir(), 'hoa-render-status-'))
     try {
       execFileSync('git', ['init', '-q', '-b', 'main'], { cwd: root, windowsHide: true })
       execFileSync('git', ['-c', 'user.email=t@t', '-c', 'user.name=t', 'commit', '-q', '--allow-empty', '-m', 'root'], { cwd: root, windowsHide: true })
+      if (pending) {
+        const cleared = execFileSync('git', ['rev-parse', 'HEAD'], { cwd: root, encoding: 'utf8', windowsHide: true }).trim()
+        mkdirSync(join(root, 'src', 'scenes'), { recursive: true })
+        writeFileSync(join(root, 'src', 'scenes', 'water.ts'), 'export const rim = 1\n')
+        execFileSync('git', ['add', '-A'], { cwd: root, windowsHide: true })
+        execFileSync('git', ['-c', 'user.email=t@t', '-c', 'user.name=t', 'commit', '-q', '-m', 'a render change'], { cwd: root, windowsHide: true })
+        state = { ...state, clearedHeads: { main: cleared } }
+      }
       mkdirSync(join(root, '.claude'), { recursive: true })
       writeFileSync(join(root, '.claude', 'render-verify-state.json'), JSON.stringify(state))
       return execFileSync(process.execPath, [GUARD, '--status'], {
@@ -704,16 +716,65 @@ describe('render-verify-guard --status — what it prints about a run it cannot 
   // its blockage, never its obligation, and the CLI reads the same lists — so
   // the line owes the reader that difference instead of hiding it.
   it('says of each crashed record whether it is blocking now', () => {
+    const runs = [{ backend: 'webgpu', suite: 'startup', at: 1500, exit: 1, crashed: true, reds: [] }]
+    // Armed: a render change is pending, and this record is inside the window.
+    expect(inTempRepo({ runs }, { pending: true })).toMatch(/CRASHED RUN \(not an unexplained red\).*BLOCKING NOW/)
+    // Unarmed: with nothing pending the gate blocks nobody, and calling the same
+    // record "BLOCKING NOW" was the opposite of the truth (round 20).
+    const idle = inTempRepo({ runs })
+    expect(idle).toMatch(/CRASHED RUN \(not an unexplained red\).*no render path is pending/)
+    expect(idle).not.toMatch(/BLOCKING NOW/)
+  })
+
+  // And an active deferral at this HEAD says it for the other reason.
+  it('says a deferral covers the HEAD rather than calling the record blocking', () => {
+    const runs = [{ backend: 'webgpu', suite: 'startup', at: 1500, exit: 1, crashed: true, reds: [] }]
+    const root = mkdtempSync(join(tmpdir(), 'hoa-render-defer-'))
+    try {
+      execFileSync('git', ['init', '-q', '-b', 'main'], { cwd: root, windowsHide: true })
+      execFileSync('git', ['-c', 'user.email=t@t', '-c', 'user.name=t', 'commit', '-q', '--allow-empty', '-m', 'root'], { cwd: root, windowsHide: true })
+      const cleared = execFileSync('git', ['rev-parse', 'HEAD'], { cwd: root, encoding: 'utf8', windowsHide: true }).trim()
+      mkdirSync(join(root, 'src', 'scenes'), { recursive: true })
+      writeFileSync(join(root, 'src', 'scenes', 'water.ts'), 'export const rim = 1\n')
+      execFileSync('git', ['add', '-A'], { cwd: root, windowsHide: true })
+      execFileSync('git', ['-c', 'user.email=t@t', '-c', 'user.name=t', 'commit', '-q', '-m', 'a render change'], { cwd: root, windowsHide: true })
+      const head = execFileSync('git', ['rev-parse', 'HEAD'], { cwd: root, encoding: 'utf8', windowsHide: true }).trim()
+      mkdirSync(join(root, '.claude'), { recursive: true })
+      writeFileSync(
+        join(root, '.claude', 'render-verify-state.json'),
+        JSON.stringify({ runs, clearedHeads: { main: cleared }, deferral: { head, reason: 'the lane cannot come up here', at: 1700 } }),
+      )
+      const out = execFileSync(process.execPath, [GUARD, '--status'], {
+        cwd: root,
+        env: { ...process.env, HOA_REPO_ROOT: root },
+        encoding: 'utf8',
+        windowsHide: true,
+      })
+      expect(out).toMatch(/an active deferral covers this HEAD/)
+      expect(out).not.toMatch(/BLOCKING NOW/)
+    } finally {
+      rmSync(root, { recursive: true, force: true })
+    }
+  })
+
+  // AND THE RECENT-RUNS TABLE NAMES THE RECORD'S CLASS (review finding,
+  // 28.08.2026, round 20). It printed the raw verdict, so a crashed record read
+  // `red` three lines under the paragraph calling it a crash.
+  it('names a crashed record as crashed in the recent-runs table', () => {
     const out = inTempRepo({
       runs: [{ backend: 'webgpu', suite: 'startup', at: 1500, exit: 1, crashed: true, reds: [] }],
     })
-    expect(out).toMatch(/CRASHED RUN \(not an unexplained red\).*BLOCKING NOW/)
+    expect(out).toMatch(/startup\s+exit 1 .*crashed/)
   })
 
   // A RECORD WHOSE MEASUREMENT WAS RETAKEN IS ANSWERED, NOT MERELY OLD (review
   // finding, 28.08.2026, round 19). Calling it "outside the window" sent the
   // reader to sign something that needed no signature.
   it('says of a re-recorded truncation that it is already answered', () => {
+    // Nothing pending, so nothing blocks — and the RECORD is still answered,
+    // which is a fact about the record and not about the gate. Said before the
+    // gate's own two reasons, because it is the one that tells the reader not to
+    // reach for a signature.
     const out = inTempRepo({
       runs: [
         { backend: 'webgpu', suite: 'settings', at: 1500, exit: 0, truncated: true, droppedLines: 115 },
@@ -722,6 +783,7 @@ describe('render-verify-guard --status — what it prints about a run it cannot 
     })
     expect(out).toMatch(/already answered by the later covering settings run/)
     expect(out).not.toMatch(/outside the current window/)
+    expect(out).not.toMatch(/BLOCKING NOW/)
   })
 
   it('falls back to startedAt where only that was measured', () => {

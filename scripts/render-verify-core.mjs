@@ -1421,7 +1421,23 @@ export function unexplainedRuns(runs, since, options) {
  *  bypass. The kind is part of the identity wherever the record carries one. */
 function redKeyOf(red) {
   const kind = text(red?.kind) || 'red'
-  return `${kind}|${text(red?.name)}`
+  // THE STORED KEY IS PART OF THE IDENTITY (review finding, 28.08.2026, round
+  // 20) — with the parser's own derivation standing in where a record carries
+  // none, because a retry marker names its first attempt without one. Deriving
+  // it rather than leaving it blank is what keeps the retry pair collapsing to
+  // ONE red: the first attempt's stored key and the marker's derived key are the
+  // same string, so the pair is still one failure and not two.
+  const key = text(red?.key) || derivedRedKey(text(red?.name))
+  return `${kind}|${key}|${text(red?.name)}`
+}
+
+/** `checkKey`'s derivation, kept HERE rather than imported (round 20). This
+ *  module may not reach into `scripts/verify/`: the guard harness copies the
+ *  top-level scripts alone, because copying that directory would pull in the
+ *  browser suites — so an import there makes every guard unspawnable. The two
+ *  are held together by a Vitest case that asks both. */
+export function derivedRedKey(name) {
+  return String(name).replace(/\s+/g, ' ').trim().toLowerCase().replace(/\d+(?:[.,]\d+)?/g, '#')
 }
 
 /** The key for a sentence that speaks about ONE RECORD rather than about a red —
@@ -1801,9 +1817,14 @@ export function evaluate(input) {
         )
         continue
       }
-      // Still an OPEN crash: its own paragraph names it below, and repeating it
-      // here would only bury the other backends.
-      if (reported.status === 'crashed') continue
+      // Still an OPEN crash — or a signed one whose record ALSO truncated, which
+      // the incomplete paragraph names below (review finding, 28.08.2026, round
+      // 20: falling through there labelled the lost-recording sentence an
+      // "UNACCOUNTED red", repeated it in that paragraph and offered the three
+      // red closings, none of which can reach a line nobody recorded). Either
+      // way its own paragraph says it, and repeating it here would only bury the
+      // other backends.
+      if (reported.status === 'crashed' || reported.status === 'incomplete') continue
       // SIGNED, AND A RED IT PRINTED BEFORE IT DIED STILL STANDS (review
       // finding, 28.08.2026, round 19). This `continue` was unconditional, so
       // the one thing really blocking the backend went unnamed: the crash

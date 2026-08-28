@@ -280,6 +280,14 @@ export function tapOutput(state, streams = [[process.stdout, false], [process.st
   const handle = (isErr, line) => {
     if (isErr && CRASH_LINE.test(line)) state.crashed = true
     if (!KEPT_LINE.test(line)) return
+    // THE PARSE OF ONE LINE IS BOUNDED BY THE LINE (review finding, 28.08.2026,
+    // round 20, which read the identity budget as arriving too late). It does
+    // arrive after the parse, and the parse cannot run away: `handle` is reached
+    // only for a line already within MAX_LINE_CHARS, so a summary carrying five
+    // hundred small errors is bounded by 64 Ki of text, not by their number. The
+    // identity budget bounds what is REMEMBERED across a whole run, which is the
+    // quantity that grows without limit; the per-line budget is what bounds the
+    // transient, and it is asked first.
     const parts = resultParts(line)
     // What this line would ADD, counted as IDENTITIES and not as parts (review
     // finding, 28.08.2026, round 14). A summary that prints the same red five
@@ -392,16 +400,16 @@ export function tapOutput(state, streams = [[process.stdout, false], [process.st
       from = nl + 1
     }
     if (from < chunk.length) {
+      // NOT ONE CHARACTER PAST THE CAP (review finding, 28.08.2026, round 20).
+      // The old reading copied `room + 1` and then trimmed, so the buffer really
+      // did hold MAX_LINE_CHARS + 1 for an instant — past the budget this branch
+      // exists to enforce. What is left of the chunk is already known from its
+      // LENGTH, so the overflow is decided by arithmetic and nothing beyond the
+      // cap is ever copied.
       const room = MAX_LINE_CHARS - carry.length
-      // One character past the cap is enough to KNOW it overflowed, and is all
-      // that is ever copied beyond it.
-      if (room > 0) carry += chunk.slice(from, from + room + 1)
-      if (carry.length > MAX_LINE_CHARS) {
-        carry = carry.slice(0, MAX_LINE_CHARS)
-        overlong.add(stream)
-      } else if (room <= 0) {
-        overlong.add(stream)
-      }
+      const rest = chunk.length - from
+      if (room > 0) carry += chunk.slice(from, from + Math.min(rest, room))
+      if (rest > room) overlong.add(stream)
     }
     pending.set(stream, carry)
   }
@@ -420,6 +428,23 @@ export function tapOutput(state, streams = [[process.stdout, false], [process.st
    * Decoding each chunk on its own turned such a character into U+FFFD.
    */
   const decoders = new Map()
+  /**
+   * BYTES HELD BACK ARE RELEASED BEFORE A STRING OVERTAKES THEM (review finding,
+   * 28.08.2026, round 20). A Buffer write ending mid-character leaves those
+   * bytes in the decoder; a STRING write then went straight to `take`, so the
+   * string completed the line WITHOUT the half character and the decoder's tail
+   * arrived afterwards as text of its own — a stored red silently renamed, with
+   * nothing marking the recording. Closing the decoder first puts the two back
+   * in the order the process wrote them; the half character cannot be recovered
+   * and is marked, exactly as it is at the flush.
+   */
+  const drainDecoder = (stream, isErr) => {
+    const decoder = decoders.get(stream)
+    if (!decoder) return
+    decoders.delete(stream)
+    const rest = decoder.end()
+    if (rest) take(stream, isErr, rest)
+  }
   const decoderFor = (stream) => {
     let decoder = decoders.get(stream)
     if (!decoder) {
@@ -452,9 +477,14 @@ export function tapOutput(state, streams = [[process.stdout, false], [process.st
         // fails the instance test while being exactly the thing to decode. It
         // did fail, measured under the jsdom environment, and every split
         // character came out as U+FFFD.
-        if (typeof chunk === 'string') take(stream, isErr, chunk)
-        else if (ArrayBuffer.isView(chunk)) feedBytes(stream, isErr, chunk)
-        else if (chunk != null) take(stream, isErr, chunk.toString?.('utf8') ?? '')
+        if (typeof chunk === 'string') {
+          drainDecoder(stream, isErr)
+          take(stream, isErr, chunk)
+        } else if (ArrayBuffer.isView(chunk)) feedBytes(stream, isErr, chunk)
+        else if (chunk != null) {
+          drainDecoder(stream, isErr)
+          take(stream, isErr, chunk.toString?.('utf8') ?? '')
+        }
       } catch {
         /* never let the bookkeeping disturb the suite's own output */
       }

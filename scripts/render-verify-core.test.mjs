@@ -36,6 +36,7 @@ import {
   crashClosureFor,
   droppedLinesOf,
   runIdentity,
+  derivedRedKey,
   SUSPECT_UNNAMED,
   TRUNCATED_KIND,
 } from './render-verify-core.mjs'
@@ -1438,6 +1439,23 @@ describe('runIdentity — the content identity a closure names one record by', (
     expect(new Set([...ids, runIdentity(fixture)]).size).toBe(7)
   })
 
+  // THE TWO DERIVATIONS ARE HELD TOGETHER BY A CASE (review finding, 28.08.2026,
+  // round 20). `redKeyOf` needs the parser's key for a red that carries none,
+  // and this module may not import it: the guard harness copies the top-level
+  // scripts alone, so a reach into scripts/verify/ makes every guard
+  // unspawnable. So the derivation is duplicated, and asked of both here.
+  it('derives a red key exactly as the parser does', () => {
+    for (const name of [
+      'the goat stance',
+      'FAIL  worst child 1 at 22.2s, 1.42 m walked inside 0.31 m',
+      '  Mixed   CASE   and   spacing  ',
+      'console error: renderTargets grew back at place:maasai-village: 19 -> 22',
+      '',
+    ]) {
+      expect(derivedRedKey(name), name).toBe(checkKey(name))
+    }
+  })
+
   it('answers null for a non-record and never throws', () => {
     expect(runIdentity(null)).toBeNull()
     expect(runIdentity('a string')).toBeNull()
@@ -2680,7 +2698,11 @@ describe('the shipped charge ledger', () => {
   it('charges the compatibility lane\'s MSAA cascade only where the run recorded that LEVEL', () => {
     // The recorded storm's own text: an error that SAYS it is downstream of one
     // already reported. The bare object name is not it — see the case below.
-    const cascade = red('console error: THREE.WebGPURenderer: Uncaptured WebGPU GPUValidationError: [Invalid TextureView] is invalid due to a previous error.', null, 'console')
+    // RECORDER-SHAPED, because the entry's narrow half reads the stored DETAIL
+    // and a hand-built red carries none (review finding, 28.08.2026, round 20).
+    const cascade = failedChecks(
+      'ERR: THREE.WebGPURenderer: Uncaptured WebGPU GPUValidationError: [Invalid TextureView] is invalid due to a previous error.',
+    )[0]
     const scoped = { suite: 'settings', backend: 'webgpu', kind: 'console' }
     expect(chargeFor(cascade, { ...scoped, featureLevel: 'compatibility' }).point).toBe(514)
     // The player's adapter, and a run that never recorded a level, are not it.
@@ -2740,31 +2762,38 @@ describe('the shipped charge ledger', () => {
   it('charges the MSAA attachment errors through their sentence, never through the object name', () => {
     const scoped = { suite: 'settings', backend: 'webgpu', kind: 'console', featureLevel: 'compatibility' }
     const stored = (tex) =>
-      red(
-        `console error: ${`THREE.WebGPURenderer: Uncaptured WebGPU GPUValidationError: [Invalid Texture "${tex}"] is invalid due to a previous error.`.slice(0, 120)}`,
-        null,
-        'console',
-      )
+      failedChecks(
+        `ERR: THREE.WebGPURenderer: Uncaptured WebGPU GPUValidationError: [Invalid Texture "${tex}"] is invalid due to a previous error.`,
+      )[0]
     for (const tex of ['output-msaa', 'normal-msaa']) {
       expect(chargeFor(stored(tex), scoped).point, tex).toBe(514)
     }
     // A different fault naming the same attachment is not the measured cascade.
-    const elsewhere = red('console error: resize failed while releasing Invalid Texture "output-msaa" mid-frame', null, 'console')
+    const elsewhere = failedChecks('ERR: resize failed while releasing Invalid Texture "output-msaa" mid-frame')[0]
     expect(chargeFor(elsewhere, scoped)).toBeNull()
   })
 
   it('charges the RGBA16Float family only through the EVIDENCED validation error, never the bare format name', () => {
     const scoped = { suite: 'settings', backend: 'webgpu', featureLevel: 'compatibility' }
-    // The recorded wording — cut at "sup" by the 120-char name normalisation.
-    const evidenced = red(
-      'console error: THREE.WebGPURenderer: Uncaptured WebGPU GPUValidationError: The texture format (TextureFormat::RGBA16Float) does not sup',
-      null,
-      'console',
+    // Recorder-shaped: the NAME is cut at "sup" by the 120-char normalisation,
+    // and the DETAIL keeps 200 raw characters — which is where the word that
+    // tells this root from another unsupported operation survives (round 20).
+    const stored = (t) => failedChecks(`ERR: ${t}`)[0]
+    const evidenced = stored(
+      'THREE.WebGPURenderer: Uncaptured WebGPU GPUValidationError: The texture format (TextureFormat::RGBA16Float) does not support multisampling.',
     )
+    expect(evidenced.name).toMatch(/does not sup$/)
     expect(chargeFor(evidenced, scoped).point).toBe(514)
+    // ANOTHER unsupported operation on the same format reaches the SAME stored
+    // name and must still stay a real red — that is what the detail is read for.
+    const otherOperation = stored(
+      'THREE.WebGPURenderer: Uncaptured WebGPU GPUValidationError: The texture format (TextureFormat::RGBA16Float) does not support storage binding.',
+    )
+    expect(otherOperation.name).toBe(evidenced.name)
+    expect(chargeFor(otherOperation, scoped)).toBeNull()
     // A DIFFERENT RGBA16Float fault on the same lane is not the measured
     // cascade and must stay a real red (round-5 review, 19.08.2026).
-    const other = red('console error: RGBA16Float storage binding is not allowed in this bind group', null, 'console')
+    const other = stored('RGBA16Float storage binding is not allowed in this bind group')
     expect(chargeFor(other, scoped)).toBeNull()
   })
 
