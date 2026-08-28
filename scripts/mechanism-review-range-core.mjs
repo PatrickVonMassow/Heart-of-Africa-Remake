@@ -2,7 +2,7 @@
 //
 // A convergent review judges the range's artefact at HEAD, not every historical
 // version that led there. Each net-changed path therefore appears once, routed
-// by the author of its final change. Intermediate versions are named as
+// around every model that contributed to that retained end-state path. Intermediate versions are named as
 // superseded, and paths whose final state equals the base are dropped.
 import { independentReviewProblem, sameModel } from './mechanism-review-core.mjs'
 import { passComposition } from './review-material-core.mjs'
@@ -243,7 +243,12 @@ export function endStateArtefacts({ commits = [], endStateFiles = null } = {}) {
       continue
     }
     const latest = changes.at(-1)
-    const authors = latest.authors
+    // END-STATE AUTHORSHIP IS THE UNION OF CONTRIBUTORS TO THE PATH, not only
+    // the last commit that touched it. A later copy edit does not erase code or
+    // prose an earlier model left in the file; selecting that earlier model as
+    // reviewer would make it read its own retained work (point 977's measured
+    // guide/brevity reproduction).
+    const authors = uniq(changes.flatMap((change) => change.authors))
     const vendors = uniq(authors.map(vendorOf))
     artefacts.push({
       file,

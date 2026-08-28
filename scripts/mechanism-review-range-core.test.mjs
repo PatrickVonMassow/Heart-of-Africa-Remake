@@ -77,19 +77,20 @@ describe('authorship-cut mechanism review planning', () => {
     ])
   })
 
-  it('keeps a historically mixed-vendor file as one artefact routed by its final author', () => {
+  it('keeps a historically mixed-vendor file whole and routes around every contributor', () => {
     const file = 'scripts/shared-guard.mjs'
     const plan = planAuthorshipGroups({
       commits: [commit('a', 'Claude Opus 5', [file]), commit('b', 'GPT-5.6 Sol', [file])],
     })
-    expect(plan.mixedFiles).toEqual([])
+    expect(plan.mixedFiles).toEqual([file])
     expect(plan.groups).toEqual([
       expect.objectContaining({
         kind: 'files',
-        vendor: 'openai',
+        vendor: 'anthropic+openai',
+        authors: ['Claude Opus 5', 'GPT-5.6 Sol'],
         commits: [sha('a'), sha('b')],
         files: [file],
-        reviewer: 'Opus 5',
+        reviewer: 'Fable 5',
       }),
     ])
   })
