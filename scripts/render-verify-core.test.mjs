@@ -2000,6 +2000,56 @@ describe('a CRASHED run is its own class, and has its own signed way out (point 
     expect(unexplainedRuns([bare], 1000, { openPoints, crashClosures: [crashClosure(bare)] })).toEqual([])
   })
 
+  // THE UNSIGNED CRASH CARRIES ITS PRINTED REDS INTO THE DEFERRAL RECORD
+  // (review finding, 28.08.2026). The crash sentence is what BLOCKS and what
+  // the reader is told to dispose of — that stays. But the entry's `reds` is
+  // what a deferral enumerates as its waved-through cost, and reporting only
+  // the crash sentence there understated that cost by every check the suite had
+  // really printed FAIL for: those observations left with the deferral and
+  // nothing ever named them.
+  it('an UNSIGNED crash still names the reds it printed, so a deferral cannot wave them through in silence', () => {
+    const withRed = crashedRun('webgpu', 1500, {
+      reds: [red('a check nobody owns'), red('a second nobody owns')],
+    })
+    // The blocking sentence is unchanged: one crash, no defect to hunt.
+    const found = unexplainedRuns([withRed], 1000, { openPoints })
+    expect(found.map((u) => u.status)).toEqual(['crashed'])
+    expect(found[0].unaccounted.map((u) => u.name)).toEqual([
+      'the run ended in a crash, not in its own report',
+    ])
+    // And the record names what it really saw, crash sentence first.
+    expect(found[0].reds).toEqual([
+      'the run ended in a crash, not in its own report',
+      'a check nobody owns',
+      'a second nobody owns',
+    ])
+    // Which is what the deferral has to pay for: three, not one.
+    const result = evaluate(
+      renderChange({
+        runs: [withRed],
+        deferral: { head: 'def5678', reason: 'the lane died mid-suite', at: 1700 },
+        openPoints,
+      }),
+    )
+    expect(result.wavedCount).toBe(3)
+    expect(result.waved.map((w) => w.name)).toEqual([
+      'the run ended in a crash, not in its own report',
+      'a check nobody owns',
+      'a second nobody owns',
+    ])
+  })
+
+  // The synthetic truncation marker is NOT a red anybody can act on — it stands
+  // for the lines nobody recorded — so it never enters that list.
+  it('does not quote the truncation marker as a red the crash printed', () => {
+    const both = crashedRun('webgpu', 1500, { reds: [truncationMarker(9, 'check'), red('a check nobody owns')] })
+    const found = unexplainedRuns([both], 1000, { openPoints })
+    expect(found[0].reds).toEqual([
+      'the run ended in a crash, not in its own report',
+      'a check nobody owns',
+    ])
+  })
+
   // THE SAME LINE, HELD AGAINST AN `exit: 0` RECORD (review finding,
   // 28.08.2026). A stack can reach CRASH_LINE — or uncaughtExceptionMonitor can
   // fire — while the process still ends 0. Signing that crash used to erase the
@@ -2448,6 +2498,21 @@ describe('the shipped charge ledger', () => {
       expect(chargeFor(red(name), { ...scoped, featureLevel: 'core' })).toBeNull()
       expect(chargeFor(red(name), scoped)).toBeNull()
     }
+  })
+
+  // THE THIRD 514 ENTRY WAS THE ONE DOOR STILL OPEN (review finding,
+  // 28.08.2026). Its own evidence names the WebGPU COMPATIBILITY lane — the
+  // frame missing its subject there while WebGL 2 drew it minutes apart — but
+  // it carried no level, so it would have retroactively excused the same frame
+  // on the core adapter the player runs. The 17.08.2026 08:25 record it was
+  // measured on carries featureLevel=compatibility, so the narrowing costs the
+  // entry none of its evidence.
+  it('charges the Victoria Falls frame to the COMPATIBILITY lane only, never to the core adapter', () => {
+    const scoped = { suite: 'enrichments', backend: 'webgpu', kind: 'check' }
+    const frame = red('72-water-victoria-falls: the frame shows its subject')
+    expect(chargeFor(frame, { ...scoped, featureLevel: 'compatibility' }).point).toBe(514)
+    expect(chargeFor(frame, { ...scoped, featureLevel: 'core' })).toBeNull()
+    expect(chargeFor(frame, scoped)).toBeNull()
   })
 
   it('charges the fixed render-target leak to NOBODY — a mended red is a red again', () => {

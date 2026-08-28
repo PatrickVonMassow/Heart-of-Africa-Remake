@@ -362,6 +362,7 @@ export const RED_CHARGES = [
     point: 514,
     suite: 'enrichments',
     backend: 'webgpu',
+    featureLevel: 'compatibility',
     kind: 'check',
     match: /72-water-victoria-falls/i,
     why:
@@ -369,7 +370,12 @@ export const RED_CHARGES = [
       'carries this frame red unaccounted. Point 514 already names this exact frame missing its ' +
       'subject on the WebGPU compatibility lane while the WebGL 2 run of the same suite minutes ' +
       'apart did not, and its final state — the wait after a jump polling the camera arrival ' +
-      'instead of counting milliseconds — is the cause this red has; it is 514 until that lands.',
+      'instead of counting milliseconds — is the cause this red has; it is 514 until that lands. ' +
+      'SCOPED TO THE COMPATIBILITY LEVEL 28.08.2026 (cross-vendor review), like the two ' +
+      'webgpu/settings entries above and for the same reason: the evidence names a lane fault, so ' +
+      'unscoped this entry would retroactively excuse the same frame on the CORE adapter the player ' +
+      'runs, where it stays a real red. The narrowing changes no evidence — the 17.08.2026 08:25 ' +
+      'record was re-read that day and carries featureLevel=compatibility.',
   },
   {
     point: 603,

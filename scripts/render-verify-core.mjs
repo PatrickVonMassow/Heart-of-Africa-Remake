@@ -1202,6 +1202,20 @@ export function unexplainedRuns(runs, since, options) {
     // talked away by the runs that followed it — the way out is the explicit,
     // evidenced signature or the deferral, never silence).
     if (r.crashed === true && !signedCrash) {
+      // THE CRASH SENTENCE BLOCKS; THE REDS PRINTED BEFORE THE CRASH ARE CARRIED
+      // BESIDE IT (review finding, 28.08.2026). `unaccounted` stays the crash
+      // alone — it is the one thing the reader is told to dispose of, and naming
+      // a check there would send them hunting the defect the crash paragraph
+      // forbids. But `reds` is what a DEFERRAL enumerates as its waved-through
+      // cost, and reading only the crash sentence there understated that cost by
+      // every check the suite had already printed FAIL for before it died. Those
+      // observations are real, they leave with the deferral, and a bypass whose
+      // cost is invisible is one nobody weighs. Read through `residualOf` so the
+      // synthetic truncation marker — which stands for what nobody recorded — is
+      // not quoted as a red anybody could act on.
+      const printedBeforeCrash = residualOf(r)
+        .reds.map((x) => text(x?.name))
+        .filter(Boolean)
       out.push({
         backend,
         suite,
@@ -1209,7 +1223,7 @@ export function unexplainedRuns(runs, since, options) {
         id,
         status: 'crashed',
         unaccounted: verdict.unaccounted,
-        reds: verdict.unaccounted.map((u) => u.name),
+        reds: [...verdict.unaccounted.map((u) => u.name), ...printedBeforeCrash],
       })
       continue
     }
