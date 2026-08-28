@@ -966,6 +966,18 @@
       "why": "It blocks the turn end of a landed point, so it stands where the machine filed it only until the user moves it forward.",
       "origin": "machine",
       "place": "last"
+    },
+    "999": {
+      "at": "2026-08-28T19:12:02.362Z",
+      "why": "It corrupts nothing today and blocks no gate, so it stays behind the release order the user set (communication, then 633, then 174); it is filed where the append put it because that is also where it belongs.",
+      "origin": "machine",
+      "place": "last"
+    },
+    "1000": {
+      "at": "2026-08-28T19:15:41.884Z",
+      "why": "A truthfulness defect in the suite with no production effect; it waits behind the release order the user set.",
+      "origin": "machine",
+      "place": "last"
     }
   },
   "boundary": {
@@ -1004,7 +1016,7 @@
     "why": "The order standing in front of the release today is the arrangement that predates this rule; the four machine-filed points that had ranked themselves there were moved behind 174 first"
   },
   "settled": {
-    "at": "2026-08-28T18:21:01.400Z",
+    "at": "2026-08-28T19:15:41.892Z",
     "points": [
       174,
       184,
@@ -1336,7 +1348,9 @@
       995,
       996,
       997,
-      998
+      998,
+      999,
+      1000
     ]
   }
 }

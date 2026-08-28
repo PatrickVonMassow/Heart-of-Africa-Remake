@@ -13325,3 +13325,31 @@ to land than a mechanism that needs a review.
   Criticality: medium — it corrupts nothing today, but it is the evidence file the four-eyes gate
   rests on, and its stated order is not the order it has.
   Bundle: Modell & Wächter.
+- [ ] 1000. Two waved-red cases still construct a console identity the recorder cannot mint, and
+  their names still claim the production pair. MEASURED 28.08.2026 by the cross-vendor pass 3 of 4
+  over `5775d7f0` (GPT-5.6 Sol, verdict merge-with-fixes, `.claude/mechanism-reviews.jsonl`):
+  "two still claim recorder realism while directly constructing console identities the recorder
+  cannot produce". 5775d7f0 answered the same objection for the FIRST of the three cases by
+  rewriting its name and its comment, and for the SECOND by rewriting its fixture to the
+  recorder-reachable `console errors: <name>` shape — but not both halves for both. In
+  `scripts/render-verify-core.test.mjs` the case at line 1057 still pairs
+  `red('the eaves column', null, 'check')` with `red('the eaves column', null, 'console')`, and a
+  console pseudo-check ALWAYS carries the `console error: ` prefix, so that console identity is one
+  no recorder run produces; the case at line 1579 carries the reachable fixture under the old name
+  "counts a check and a console error of the same wording in a LIFTED truncation too", which states
+  exactly the production pair its own comment retracts.
+  WHAT IT COSTS: nothing in production — the kind in the deferral key is real defence for a record
+  that reaches the gate from elsewhere (a hand-written state file, a foreign checkout). What is
+  wrong is what the suite CLAIMS: a reader takes these two cases as proof that the recorder mints
+  the pair, and would not look again if a later recorder change made the shape genuinely
+  unreachable or genuinely reachable. A test that says more than it shows is the failure this
+  file's own round-17 and round-18 findings were about.
+  FINAL STATE: every case that exercises the kind half of the key says, in its NAME, that it drives
+  two reds of the same wording and different KIND — never "a check and a console error" — and
+  either uses a recorder-reachable identity or states in one line that it is deliberately a foreign
+  record and why. Whichever of the two forms each case takes, name, comment and fixture agree.
+  VERIFIABLE: Vitest over `scripts/render-verify-core.test.mjs` — the cases keep proving what they
+  proved (the waved count stays 2 in both the ordinary and the lifted-truncation branch), and a
+  reading of the file finds no case name that promises a check/console pair.
+  Criticality: low — it is a truthfulness defect in the suite, not a defect in the mechanism.
+  Bundle: Session- & Repo-Hygiene.
