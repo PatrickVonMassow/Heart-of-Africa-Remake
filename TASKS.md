@@ -13083,3 +13083,27 @@ to land than a mechanism that needs a review.
   Criticality: medium — it wastes review rounds and re-litigates settled findings, but it errs on
   the side of demanding more review rather than less.
   Bundle: Modell & Wächter.
+
+- [ ] 987. A verified Claude review receipt with no text result is blamed on the wrong model.
+  MEASURED 28.08.2026 while cross-reading point 977. `checkClaudeResultFile` in
+  `scripts/mechanism-review.mjs` returns `status: 'disagreement'` on every failure path where
+  `parsed.answerModel` is truthy. `parseClaudeResultOutput` in `scripts/fable-switch-core.mjs`
+  sets `answerModel` from the usage row whose counters match the top-level `usage`, and it sets
+  it BEFORE it checks that `value.result` is a string. So a receipt whose top-level answer really
+  was written by the claimed reviewer, but which carries no text result, is reported as
+  "a different model answered" instead of "this receipt cannot be verified".
+  WHAT IT COSTS: nothing is waved through — both statuses refuse the record, so the change is
+  fail-closed and no independence is faked. The cost is the reason text a later reader acts on:
+  `disagreement` accuses the routed model of not having answered and sends the operator hunting a
+  routing fault, while the real fault is a truncated or empty receipt. `reverifyReviewerAgreement`
+  carries the same mislabel onto a stored record, turning a standing `agreement` into a permanent
+  accusation against a model that did nothing wrong.
+  FINAL STATE: a receipt whose named model matched and which failed only on a missing or
+  non-string `result` yields `unverified`, not `disagreement`. `disagreement` stays reserved for
+  what it claims — a receipt whose top-level answer is attributed to some OTHER model.
+  VERIFIABLE: Vitest over the pure check with an injected receipt file — a receipt naming the
+  claimed model but carrying no `result` string yields `unverified`; a receipt whose single
+  counter-matching row names a different model still yields `disagreement`; an intact receipt
+  still yields `agreement`.
+  Criticality: low — it is fail-closed and misleads only the diagnosis, never the gate.
+  Bundle: Modell & Wächter.
