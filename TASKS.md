@@ -13385,3 +13385,29 @@ to land than a mechanism that needs a review.
   Criticality: medium — the guard's fail direction is allow, so it under-reports drift rather than
   blocking work; but it is the only check that keeps the bundle scheme matching the open set.
   Bundle: Session- & Repo-Hygiene.
+- [ ] 1004. Nine review rounds settled the bundle reader's membership and left its Markdown
+  context unsettled. MEASURED 28./29.08.2026 on branch `feat/1003-explicit-bundle-points`,
+  commits `790264d`..`fd0fcf4`, nine cross-vendor rounds by GPT-5.6 Sol. Point 1003 replaced the
+  prose-guessing reader with an explicit `#123` marker and migrated `docs/work-packages.md` to one
+  home per open point, measured against a checked-in reading of the document that preceded it. The
+  findings shrank round by round — from "the reader guesses point numbers out of prose" to "a
+  Unicode digit inside a code span could place" — but never reached zero, and
+  `repair-loop-guard` fired on the ninth consecutive commit against a measured maximum of eight.
+  Membership is not what is left open: the branch's reader is strictly narrower than the one on
+  `main`, every open point has exactly one home, and the migration is proven against the day
+  before it.
+  FINAL STATE:
+  - THE MARKER'S OPENING POSITIONS COVER MORE THAN ASCII. `referenceList` whitelists the places a
+    reference may open; a Unicode digit and the nested code/emphasis contexts the whitelist has
+    not been measured against are judged and either read or refused deliberately.
+  - A DISAGREEMENT BETWEEN THE TWO AUTHORITIES IS REPORTED, NOT DECIDED. The home proof prefers a
+    point's stated bundle over the list position it held before the migration; where the two
+    disagree the test says so instead of silently taking the first.
+  - THE FAIL DIRECTION IS COMPLETE. `evaluate` allows a missing table and a missing exemption
+    marker; a table whose rows parse while their cells do not is the remaining shape, and it
+    allows too.
+  VERIFIABLE: Vitest over the reader for each named context, a case where the two authorities
+  disagree and the test names the point, and a fixture whose rows parse into empty cells.
+  Criticality: medium — the guard errs toward allow, so what is left under-reports drift rather
+  than blocking work; the membership defect that opened the range is answered on the branch.
+  Bundle: Session- & Repo-Hygiene.
