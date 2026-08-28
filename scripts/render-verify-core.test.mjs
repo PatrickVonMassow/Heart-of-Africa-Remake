@@ -1200,16 +1200,35 @@ describe('evaluate — a red is not closed by the runs that FOLLOWED it (point 6
   // or the second, unowned observation vanishes behind the charge.
   it('refuses a NARROW charge on a record whose measurement VARIED, and blocks the gate with it', () => {
     const check = 'FAIL  no child walks without getting anywhere — worst child 1 at '
-    const first = `${check}22.2s, 1.42 m walked inside 0.31 m`
-    // What the tap saw: the same identity printing a second, different line.
+    // A SECOND, STABLE red in the same record — printed once, never varying.
+    const sibling = 'FAIL  the goat stance holds — worst goat 2 at 3.00 m'
+    const siblingLedger = [{
+      point: 546,
+      suite: 'polish',
+      backend: 'webgpu',
+      kind: 'check',
+      match: /the goat stance holds/i,
+      detailMatch: /worst goat 2 at 3\.00 m/i,
+      why: 'the reading that did hold still',
+    }]
+    const first = `${check}22.2s, 1.42 m walked inside 0.31 m\n${sibling}`
+    // What the tap saw: the same identity printing a second, different line —
+    // and ONLY that identity.
     const varied = new Set(failedChecks(`${check}9.1s, 0.02 m walked inside 0.44 m`).map((c) => `${c.kind}:${c.key}`))
     const reds = chargeReds(markVariedDetails(failedChecks(first), varied), {
       suite: 'polish',
       backend: 'webgpu',
       ledger: [],
     })
-    expect(reds).toHaveLength(1)
-    expect(reds[0].detailVaried).toBe(true)
+    expect(reds).toHaveLength(2)
+    // PER RED, NOT PER RUN (review finding, 28.08.2026, round 13). With a single
+    // red in the fixture, a run-wide "some measurement moved" flag would pass
+    // this case just as well. The sibling printed ONCE, so its own narrow charge
+    // must still apply while the varied one's is refused.
+    const [movedRed, stableRed] = reds
+    expect(movedRed.detailVaried).toBe(true)
+    expect(stableRed.detailVaried).toBeUndefined()
+    expect(chargeFor(stableRed, { suite: 'polish', backend: 'webgpu', ledger: siblingLedger })?.point).toBe(546)
     const stored = redRun('webgpu', 1500, reds, { suite: 'polish' })
     const runs = [stored, run('webgpu', 2000), run('webgl', 2100)]
     const narrow = [{
@@ -1222,18 +1241,22 @@ describe('evaluate — a red is not closed by the runs that FOLLOWED it (point 6
       why: 'the one reading that survived the capture',
     }]
     // The narrow entry matches the kept reading exactly, and still owns nothing.
-    expect(chargeFor(reds[0], { suite: 'polish', backend: 'webgpu', ledger: narrow })).toBeNull()
-    expect(unexplainedRuns([stored], 1000, { openPoints, ledger: narrow })).toHaveLength(1)
-    expect(evaluate(renderChange({ runs, openPoints, ledger: narrow })).decision).toBe('block')
+    expect(chargeFor(movedRed, { suite: 'polish', backend: 'webgpu', ledger: narrow })).toBeNull()
+    const withSibling = [...narrow, ...siblingLedger]
+    const still = unexplainedRuns([stored], 1000, { openPoints, ledger: withSibling })
+    expect(still).toHaveLength(1)
+    // ONLY the varied red is left unaccounted — the stable sibling is charged.
+    expect(still[0].reds).toEqual(['no child walks without getting anywhere'])
+    expect(evaluate(renderChange({ runs, openPoints, ledger: withSibling })).decision).toBe('block')
 
     // The CONTROL: the very same entry owns the very same red once the record
     // no longer says the measurement moved — so it is the mark that refuses it.
     const held = redRun('webgpu', 1500, chargeReds(failedChecks(first), { suite: 'polish', backend: 'webgpu', ledger: [] }), { suite: 'polish' })
-    expect(evaluate(renderChange({ runs: [held, run('webgpu', 2000), run('webgl', 2100)], openPoints, ledger: narrow })).decision).toBe('allow')
+    expect(evaluate(renderChange({ runs: [held, run('webgpu', 2000), run('webgl', 2100)], openPoints, ledger: [...narrow, ...siblingLedger] })).decision).toBe('allow')
 
     // And a BROAD entry is unaffected: it never claimed to read a measurement.
     const broad = [{ ...narrow[0], detailMatch: undefined }]
-    expect(evaluate(renderChange({ runs, openPoints, ledger: broad })).decision).toBe('allow')
+    expect(evaluate(renderChange({ runs, openPoints, ledger: [...broad, ...siblingLedger] })).decision).toBe('allow')
   })
 
   it('does NOT talk a CRASH away with a charge — a run that died judged no picture', () => {
@@ -1840,6 +1863,39 @@ describe('a CRASHED run is its own class, and has its own signed way out (point 
     const r = crashedRun('webgpu', 1500)
     expect(unexplainedRuns([r], 1000, { openPoints })).toHaveLength(1)
     expect(unexplainedRuns([r], 1000, { openPoints, crashClosures: [crashClosure(r)] })).toEqual([])
+  })
+
+  // A CLOSURE IS RETAINED BY THE RUN IT NAMES, NOT BY WHEN IT WAS SIGNED
+  // (review finding, 28.08.2026, round 13). Every closure in these fixtures was
+  // stamped 9999 against a window opening at 1000, so "signed long before the
+  // window" was never actually tried — and the decision must not read
+  // `closedAt` at all: the run it names is either still in the window or gone
+  // with it, and the moment of signing says nothing either way.
+  it('lifts its run however old the signature is, and even with no signing stamp at all', () => {
+    const r = crashedRun('webgpu', 1500)
+    const ancient = { ...crashClosure(r), closedAt: 1 }
+    const unstamped = { ...crashClosure(r) }
+    delete unstamped.closedAt
+    expect(unexplainedRuns([r], 1000, { openPoints, crashClosures: [ancient] })).toEqual([])
+    expect(unexplainedRuns([r], 1000, { openPoints, crashClosures: [unstamped] })).toEqual([])
+    // And the mirror: a signature stamped in the future lifts no OTHER run.
+    const another = crashedRun('webgpu', 1600)
+    expect(unexplainedRuns([another], 1000, { openPoints, crashClosures: [{ ...crashClosure(r), closedAt: 1e15 }] })).toHaveLength(1)
+  })
+
+  // WHAT THE BLOCK MESSAGE SAYS ABOUT A RUN NOBODY DATED (review finding,
+  // 28.08.2026, round 13). The undated fixtures were all signed off in the same
+  // breath, so no assertion ever read the sentence written about one while it
+  // still blocks — and `number(null)` is 0, so it claimed 1970.
+  it('names an undated blocking run as undated, never as the epoch', () => {
+    const undated = { backend: 'webgpu', suite: 'startup', exit: 1, crashed: true, reds: [] }
+    const found = unexplainedRuns([undated], 1000, { openPoints })
+    expect(found).toHaveLength(1)
+    expect(found[0].at).toBeNull()
+    const result = evaluate(renderChange({ runs: [undated, run('webgl', 2100)], openPoints }))
+    expect(result.decision).toBe('block')
+    expect(result.reason).toMatch(/webgpu\/startup @undated/)
+    expect(result.reason).not.toMatch(/1970-01-01/)
   })
 
   it('binds by content identity — a closure for another run, or without evidence, lifts nothing', () => {
