@@ -107,6 +107,7 @@ describe('the activation interlock', () => {
       expect(step.green, `step ${n}`).toBe(true)
       expect(step.evidence, `step ${n}`).toMatch(/\S/)
     }
+    expect(DURABLE_LANE_STEPS[12].evidence).toMatch(/real daemon, worker, remote, worktree, marker, restart, and checkpoint-timeout drills/)
   })
 })
 
