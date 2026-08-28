@@ -33,34 +33,29 @@ export const BUNDLES_HEADING = '## The bundles'
 export const UNBUNDLED_MARKER = '**Not bundled**'
 
 /**
- * Dates carry numbers that are not point numbers: `30.07.2026`, `2026-08-28`,
- * and `24. August 2026`. The year is only stripped INSIDE a date shape — a bare
- * `2026` stays a candidate, because point numbers reach that range eventually
- * and a reader that deletes them would report a placed point as unbundled.
+ * THE CELL SAYS WHICH NUMBERS ARE REFERENCES (point 1003). A bundle's Points
+ * cell and a "Not bundled" bullet OPEN with an explicit reference list — bare
+ * numbers separated by commas and whitespace — and the reader stops at the
+ * first character that is not one of those. Everything after that is PROSE and
+ * is never read.
  *
- * Residual, deliberately not chased: a bare four-digit token that is not
- * date-shaped (`1440 px`, `seit 2026`) counts as a point number. It can only
- * mislead where it equals an OPEN point number, and this guard's fail direction
- * is allow.
+ * WHY THE PROSE IS NOT READ AT ALL. The reader used to take every 1-to-4-digit
+ * token in the whole cell and subtract known date shapes first. Four
+ * cross-vendor review rounds refused that on 28.08.2026 (`4c4b61f`, `0e52672`,
+ * `9ff620f`, `11f3163`), and each round closed the form the round before had
+ * named and earned a new one: a bare year deleted real point numbers, a bounded
+ * leading day swallowed the number standing in front of a month name, and what
+ * remained was inherent — a four-digit QUANTITY in prose counts as a point, and
+ * any date form the strip list does not know leaves its numbers behind. A
+ * regular expression over prose cannot tell a reference from a measurement. So
+ * the cell declares instead of the reader guessing, and with the guessing gone
+ * the strip list and the digit bound go with it: a reference is any run of
+ * digits, of any length.
  */
-const MONTH = String.raw`Januar|Februar|März|Maerz|April|Mai|Juni|Juli|August|September|Oktober|November|Dezember|January|February|March|May|June|July|October|December`
-// The optional leading day is bounded to a REAL day (1-31), so an arbitrary
-// number in front of a month name is not swallowed as one.
-const DAY = String.raw`(?:0?[1-9]|[12]\d|3[01])`
-const MONTH_YEAR = new RegExp(String.raw`\b(?:${DAY}\.?\s+)?(?:${MONTH})\s+\d{4}\b`, 'g')
-
-const stripDates = (s) => String(s ?? '')
-  .replace(/\b\d{1,2}\.\d{1,2}\.\d{4}\b/g, ' ')
-  .replace(/\b\d{4}-\d{2}-\d{2}\b/g, ' ')
-  .replace(MONTH_YEAR, ' ')
-
-/** Point numbers in a cell or bullet: up to 4 digits, dates removed first. The
- * work order passed 999 on 28.08.2026, and a 3-digit reader silently reports
- * every point beyond it as unbundled. */
-export function numbersIn(text) {
-  const out = []
-  for (const m of stripDates(text).matchAll(/\b(\d{1,4})\b/g)) out.push(Number(m[1]))
-  return out
+export function referenceList(text) {
+  const m = /^[\s,]*(\d+(?:[\s,]+\d+)*)/.exec(String(text ?? ''))
+  if (!m) return []
+  return m[1].split(/[\s,]+/).filter(Boolean).map(Number)
 }
 
 /**
@@ -82,7 +77,7 @@ export function parseBundles(md) {
     if (cells.length < 6) continue
     const [, name, id, , points] = cells
     if (!/^[A-Z]$/.test(id)) continue
-    bundles.push({ name: name.replace(/\*/g, '').trim(), id, points: new Set(numbersIn(points)) })
+    bundles.push({ name: name.replace(/\*/g, '').trim(), id, points: new Set(referenceList(points)) })
   }
   return bundles
 }
@@ -109,7 +104,7 @@ export function parseUnbundled(md) {
     const plain = bold ? null : rest.match(/^([0-9][0-9,\s]*)([\s\S]*)$/)
     const shape = bold || plain
     if (!shape) continue
-    const nums = numbersIn(shape[1])
+    const nums = referenceList(shape[1])
     if (!nums.length) continue
     for (const n of nums) points.add(n)
     bullets.push({ points: nums, reason: shape[2].replace(/^[\s—–.-]+/, '').trim() })

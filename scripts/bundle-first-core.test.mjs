@@ -7,10 +7,11 @@
 import { describe, it, expect } from 'vitest'
 import { readFileSync } from 'node:fs'
 import { repoPath } from './repo-paths.mjs'
+import { parseOpenPoints } from './queue-order-guard-core.mjs'
 import {
   BUNDLES_HEADING,
   UNBUNDLED_MARKER,
-  numbersIn,
+  referenceList,
   parseBundles,
   parseUnbundled,
   unplacedPoints,
@@ -43,17 +44,36 @@ Kommunikation first.
 const tasks = (open, done = []) =>
   [...open.map((n) => `- [ ] ${n}. Open point ${n}.`), ...done.map((n) => `- [x] ${n}. Done point ${n}.`)].join('\n')
 
-describe('numbersIn', () => {
-  it('reads point numbers and never a date', () => {
-    expect(numbersIn('350, 351, 394 — the rest landed 30.07.2026 (308, 410)')).toEqual([350, 351, 394, 308, 410])
-    expect(numbersIn('cut on 29.07.2026')).toEqual([])
-    expect(numbersIn('958, 1000, 1002')).toEqual([958, 1000, 1002])
-    expect(numbersIn('gemessen 2026-08-28 am 24. August 2026')).toEqual([])
-    expect(numbersIn('1002 (measured 2026-08-28, filed August 2026)')).toEqual([1002])
-    expect(numbersIn('point 2026 belongs to this bundle')).toEqual([2026])
-    expect(numbersIn('97 August 2026 and 44 May 2026 name points')).toEqual([97, 44])
-    expect(numbersIn('')).toEqual([])
-    expect(numbersIn(null)).toEqual([])
+describe('referenceList — the cell declares, the reader never guesses', () => {
+  it('reads the opening list and stops at the first thing that is not one', () => {
+    expect(referenceList('350, 351, 394 (the rest landed 30.07.2026 — 308, 410)')).toEqual([350, 351, 394])
+    expect(referenceList('958, 1000, 1002')).toEqual([958, 1000, 1002])
+    expect(referenceList('  442 443\t450 ')).toEqual([442, 443, 450])
+    expect(referenceList('')).toEqual([])
+    expect(referenceList(null)).toEqual([])
+  })
+
+  // THE THREE SHAPES THE FOUR REFUSED ROUNDS COULD NOT SETTLE (point 1003):
+  // a date, a four-digit quantity, and a number standing in front of a month
+  // name. None of them is read any more, because none of them is in the list.
+  it('reads nothing at all out of the prose behind the list', () => {
+    const cell = '884, 1002 (measured 2026-08-28 and on 24. August 2026: the header ran 1440 px wide, ' +
+      'and 97 August 2026 named nothing — see 999 and point 2026)'
+    expect(referenceList(cell)).toEqual([884, 1002])
+  })
+
+  // NO DIGIT CEILING (the reason the reader was widened in the first place) and
+  // no strip list: a reference is any run of digits, of any length.
+  it('has neither a digit bound nor a date filter left', () => {
+    expect(referenceList('7, 42, 999, 1000, 12345')).toEqual([7, 42, 999, 1000, 12345])
+    expect(referenceList('2026, 1900 — years that really are point numbers')).toEqual([2026, 1900])
+  })
+
+  // A CELL THAT DOES NOT OPEN WITH ITS LIST PLACES NOTHING. That is the whole
+  // contract: the guard then reports the drift instead of guessing a member out
+  // of the prose, and the author writes the number where it belongs.
+  it('places nothing when the cell opens with prose', () => {
+    expect(referenceList('the points of this bundle are 350 and 351')).toEqual([])
   })
 })
 
@@ -69,7 +89,9 @@ describe('parseBundles', () => {
     )
     expect(bundles.map((b) => b.id)).toEqual(['A', 'J'])
     expect(bundles[0].name).toBe('Dorfleben')
-    expect([...bundles[1].points].sort((a, b) => a - b)).toEqual([298, 306, 432, 437])
+    // 298 and 306 stand in the PROSE, so they are not members of this bundle:
+    // the cell's own list is what places a point (point 1003).
+    expect([...bundles[1].points].sort((a, b) => a - b)).toEqual([432, 437])
   })
 
   it('returns nothing when the bundles heading is absent', () => {
@@ -219,5 +241,40 @@ describe('the real docs/work-packages.md', () => {
       expect(b.points.size, b.id).toBeGreaterThan(0)
     }
     expect(parseUnbundled(md).points.size).toBeGreaterThan(0)
+  })
+
+  // THE MIGRATION CHANGED NO MEMBERSHIP (point 1003). The reader that stood
+  // before it is reproduced here — the only place it still exists — and the two
+  // are compared over the REAL document and the REAL work order. What the old
+  // prose reader placed of the OPEN set, the explicit list places too; the
+  // numbers it drops are the ones that were never points at all.
+  it('places exactly what the prose reader placed, over the real work order', () => {
+    const MONTH = String.raw`Januar|Februar|März|Maerz|April|Mai|Juni|Juli|August|September|Oktober|November|Dezember|January|February|March|May|June|July|October|December`
+    const DAY = String.raw`(?:0?[1-9]|[12]\d|3[01])`
+    const MONTH_YEAR = new RegExp(String.raw`\b(?:${DAY}\.?\s+)?(?:${MONTH})\s+\d{4}\b`, 'g')
+    const legacyNumbersIn = (text) => {
+      const stripped = String(text ?? '')
+        .replace(/\b\d{1,2}\.\d{1,2}\.\d{4}\b/g, ' ')
+        .replace(/\b\d{4}-\d{2}-\d{2}\b/g, ' ')
+        .replace(MONTH_YEAR, ' ')
+      return [...stripped.matchAll(/\b(\d{1,4})\b/g)].map((m) => Number(m[1]))
+    }
+    const legacyPlaced = new Set()
+    const section = md.slice(md.indexOf(BUNDLES_HEADING))
+    const table = section.slice(0, section.indexOf(UNBUNDLED_MARKER))
+    for (const line of table.split('\n')) {
+      const cells = line.split('|').map((c) => c.trim())
+      if (cells.length < 6 || !/^[A-Z]$/.test(cells[2])) continue
+      for (const n of legacyNumbersIn(cells[4])) legacyPlaced.add(n)
+    }
+    for (const bullet of parseUnbundled(md).bullets) for (const n of bullet.points) legacyPlaced.add(n)
+
+    const open = parseOpenPoints(readFileSync(repoPath('TASKS.md'), 'utf8'))
+    const bundles = parseBundles(md)
+    const unbundled = parseUnbundled(md).points
+    const before = [...open].filter((n) => !legacyPlaced.has(n)).sort((a, b) => a - b)
+    const after = unplacedPoints(open, bundles, unbundled)
+    expect(after).toEqual(before)
+    expect(after).toEqual([])
   })
 })
