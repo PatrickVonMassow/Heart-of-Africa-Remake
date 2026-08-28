@@ -13330,3 +13330,25 @@ to land than a mechanism that needs a review.
   reading of the file finds no case name that promises a check/console pair.
   Criticality: low — it is a truthfulness defect in the suite, not a defect in the mechanism.
   Bundle: Session- & Repo-Hygiene.
+- [ ] 1001. The Sol authoring lane judges commits it only MERGED IN as its own lane's work.
+  MEASURED 28.08.2026 on the point-993 and point-925 runs: `author-sol`'s closing PROBLEMS list
+  named `00503eb6`, `8531d597` and `6ed9f73c` — commits authored by Claude Opus 5 on `main`, which
+  the branch had merged in — as "does not name GPT-5.6 Sol as its author, this lane's commits must"
+  and as "is not an interim rescue commit: its subject does not carry [skip ci]". The point-925 run
+  reported the same about `00503eb`. Both runs were otherwise sound, and the point-993 run's PROBLEMS
+  list consisted of NOTHING BUT these false positives plus one misparse of its own green GATES line.
+  WHAT IT COSTS: the list is the one place a landing session is told what went wrong in a delegated
+  run. Every entry it invents is an entry the reader must refute by hand, and a run whose complaints
+  are all false reads as a run with problems — so the next real entry is read with the same shrug.
+  The lane's own model-authorship rule is also stated wrongly by it: a merged main commit is not
+  this lane's commit and never had to name Sol.
+  FINAL STATE: the lane judges exactly the commits it authored — the ones it recorded itself, or the
+  first-parent commits since the branch point, never what a `main` sync brought along — and the
+  GATES-line check reads a report of three green gates as green.
+  VERIFIABLE: Vitest over the closing report — a branch whose history contains a merge of `main`
+  carrying foreign-authored commits produces a PROBLEMS list naming none of them, while a genuinely
+  mis-trailered commit the lane itself wrote is still named; plus a green three-gate GATES line that
+  the check passes.
+  Criticality: medium — it does not corrupt anything, but it is the delegated run's only defect
+  report, and today it cries wolf.
+  Bundle: Modell & Wächter.

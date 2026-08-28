@@ -931,12 +931,6 @@
       "origin": "machine",
       "place": "last"
     },
-    "993": {
-      "at": "2026-08-28T10:02:54.928Z",
-      "why": "It is the one path on which the render gate accepts a crash as its picture proof, so every render landing before the release could be resting on a run that never reported — including the release's own closing screenshots.",
-      "origin": "machine",
-      "place": "ahead"
-    },
     "994": {
       "at": "2026-08-28T17:49:08.512Z",
       "why": "A launcher latency defect belongs with the other handover-acceleration work, not ahead of the release order; it costs minutes, not correctness.",
@@ -978,6 +972,12 @@
       "why": "A truthfulness defect in the suite with no production effect; it waits behind the release order the user set.",
       "origin": "machine",
       "place": "last"
+    },
+    "1001": {
+      "at": "2026-08-28T19:38:30.654Z",
+      "why": "Report noise in the delegation lane; it costs reading time, not correctness, so it waits behind the release order the user set.",
+      "origin": "machine",
+      "place": "last"
     }
   },
   "boundary": {
@@ -1016,7 +1016,7 @@
     "why": "The order standing in front of the release today is the arrangement that predates this rule; the four machine-filed points that had ranked themselves there were moved behind 174 first"
   },
   "settled": {
-    "at": "2026-08-28T19:15:41.892Z",
+    "at": "2026-08-28T19:38:30.665Z",
     "points": [
       174,
       184,
@@ -1343,14 +1343,14 @@
       990,
       991,
       992,
-      993,
       994,
       995,
       996,
       997,
       998,
       999,
-      1000
+      1000,
+      1001
     ]
   }
 }
