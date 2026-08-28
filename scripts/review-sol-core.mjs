@@ -23,7 +23,12 @@
 // scripts/review-sol.mjs. Pinned by review-sol-core.test.mjs.
 
 import { BLIND_REVIEWER, blindReviewerAdmission, modelFromTrailers, sameModel, VERDICTS } from './mechanism-review-core.mjs'
-import { fableIsOn } from './fable-switch-core.mjs'
+import {
+  FABLE_MODEL_ID,
+  OPUS_FALLBACK_MODEL_ID,
+  OPUS_MODEL_ID,
+  fableIsOn,
+} from './fable-switch-core.mjs'
 import { mainCheckoutFrom } from './main-checkout-core.mjs'
 import { modelTrailerIdentities } from './model-guard-core.mjs'
 import {
@@ -70,6 +75,22 @@ export const FALLBACK_CHAIN = Object.freeze([FALLBACK_MODEL_NAME, SECOND_FALLBAC
  * point, which is the main authoring session's job. So it starts at Opus 5.
  */
 export const CLAUDE_REVIEW_CHAIN = Object.freeze(['Opus 5', 'Fable 5', 'Opus 4.8'])
+
+/** Every reviewer the policy can name, including the exact CLI identity needed
+ *  to start it. Keeping the executable roster beside the decision chains makes
+ *  an assignment incomplete unless it is runnable. */
+export const REVIEWER_ROSTER = Object.freeze([
+  Object.freeze({ key: 'sol', name: SOL_MODEL_NAME, id: SOL_MODEL_ID, runtime: 'codex', effort: SOL_REASONING_EFFORT }),
+  Object.freeze({ key: 'fable', name: FALLBACK_MODEL_NAME, id: FABLE_MODEL_ID, runtime: 'claude', effort: 'high' }),
+  Object.freeze({ key: 'opus', name: SECOND_FALLBACK_MODEL_NAME, id: OPUS_MODEL_ID, runtime: 'claude', effort: 'high' }),
+  Object.freeze({ key: 'opus48', name: 'Opus 4.8', id: OPUS_FALLBACK_MODEL_ID, runtime: 'claude', effort: 'high' }),
+])
+
+/** The executable identity for a policy model name/key/id, or null. */
+export function reviewerDescriptor(value = '') {
+  const raw = String(value ?? '').trim()
+  return REVIEWER_ROSTER.find((entry) => entry.key === raw.toLowerCase() || entry.id === raw || sameModel(entry.name, raw)) ?? null
+}
 
 /** A review candidate chain with the shared switch applied. */
 export function availableReviewChain(chain, fableState) {
@@ -761,6 +782,35 @@ export function savedAuthPathFrom(gitCommonDir, repoRoot, { sep = '/' } = {}) {
 
 /** Shell-quote one value for the record command line we print. */
 const q = (s) => `"${String(s ?? '').replace(/(["\\$`])/g, '\\$1')}"`
+
+/** A ready-to-run invocation of this same reviewer command for any roster
+ *  member. The caller supplies the already-bounded request; no prose handoff
+ *  has to be translated back into flags by a human. */
+export function formatReviewerCommand({
+  model = '',
+  sha = '',
+  brief = '',
+  mode = 'review',
+  point = '',
+  since = '',
+  timeout = '',
+  pass = '',
+} = {}) {
+  const reviewer = reviewerDescriptor(model)
+  if (!reviewer || !sha || !String(brief).trim()) return ''
+  const parts = [
+    'node scripts/review-sol.mjs',
+    `--reviewer ${reviewer.key}`,
+    `--sha ${String(sha)}`,
+    `--brief ${q(brief)}`,
+    `--mode ${String(mode || 'review')}`,
+  ]
+  if (String(point).trim()) parts.push(`--point ${String(point).trim()}`)
+  if (String(since).trim()) parts.push(`--since ${String(since).trim()}`)
+  if (String(timeout).trim()) parts.push(`--timeout ${String(timeout).trim()}`)
+  if (String(pass).trim()) parts.push(`--pass ${String(pass).trim()}`)
+  return parts.join(' ')
+}
 
 /** Shortest readable form of a sha — and unchanged for anything that is not one. */
 const short = (s) => (/^[0-9a-f]{7,40}$/i.test(String(s ?? '')) ? String(s).slice(0, 7) : String(s ?? ''))

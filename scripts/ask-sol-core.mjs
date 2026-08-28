@@ -18,7 +18,14 @@
 // Side-effect free: the process spawn, the material gathering and the printing belong to
 // scripts/ask-sol.mjs. Pinned by ask-sol-core.test.mjs.
 
-import { FABLE_MODEL, FABLE_MODEL_ID, OPUS_MODEL, OPUS_MODEL_ID } from './fable-switch-core.mjs'
+import {
+  FABLE_MODEL,
+  FABLE_MODEL_ID,
+  OPUS_FALLBACK_MODEL,
+  OPUS_FALLBACK_MODEL_ID,
+  OPUS_MODEL,
+  OPUS_MODEL_ID,
+} from './fable-switch-core.mjs'
 import { blindReviewerAdmission, charStripped, MATERIAL_BUDGET_CHARS, rawFieldValue, SOL_MODEL_ID, SOL_MODEL_NAME, stripDecoration, SOL_REASONING_EFFORT } from './review-sol-core.mjs'
 
 export { MATERIAL_BUDGET_CHARS, SOL_MODEL_NAME, SOL_REASONING_EFFORT }
@@ -29,6 +36,7 @@ export const ASK_MODELS = Object.freeze({
   sol: Object.freeze({ key: 'sol', name: SOL_MODEL_NAME, id: SOL_MODEL_ID, runtime: 'codex', effort: SOL_REASONING_EFFORT }),
   fable: Object.freeze({ key: 'fable', name: FABLE_MODEL, id: FABLE_MODEL_ID, runtime: 'claude', effort: 'high' }),
   opus: Object.freeze({ key: 'opus', name: OPUS_MODEL, id: OPUS_MODEL_ID, runtime: 'claude', effort: 'high' }),
+  opus48: Object.freeze({ key: 'opus48', name: OPUS_FALLBACK_MODEL, id: OPUS_FALLBACK_MODEL_ID, runtime: 'claude', effort: 'high' }),
 })
 
 /** A supported model descriptor, or null. Sol remains the compatibility default. */
