@@ -220,6 +220,14 @@ describe('evaluate — the fail-open exits', () => {
     expect(evaluate({ tasksMd: tasks([540]), workPackagesMd: null }).block).toBe(false)
   })
 
+  it('allows a PARTIALLY restructured document — the rows parse, the exemptions do not', () => {
+    const renamed = workPackages({
+      bundles: [['Dorfleben', 'A', '#350']],
+      unbundled: ['- **#285** — the leak hunt.'],
+    }).replace(UNBUNDLED_MARKER, '**Deliberately outside a bundle**')
+    expect(evaluate({ tasksMd: tasks([350, 285]), workPackagesMd: renamed }).block).toBe(false)
+  })
+
   it('allows a RESTRUCTURED document — a parse miss is not a drift finding', () => {
     expect(evaluate({ tasksMd: tasks([540]), workPackagesMd: '# Work packages\n\nrewritten, no table' }).block).toBe(
       false,
@@ -345,5 +353,49 @@ describe('the real docs/work-packages.md', () => {
     }
     expect(checked).toBeGreaterThan(100)
     expect(wrong).toEqual([])
+  })
+
+  // AND THE POINTS WHOSE SPEC NAMES NO BUNDLE (review finding of the seventh
+  // round: the test above skips them, so one could be filed anywhere). They have
+  // no outside authority, so the measure is the bundle's OWN text: the bundle a
+  // point is filed under must be one that talks about it. A point moved to an
+  // unrelated bundle fails here even though its spec says nothing.
+  it('files a point whose spec names no bundle where that bundle itself names it', () => {
+    const tasksMd = readFileSync(repoPath('TASKS.md'), 'utf8')
+    const open = parseOpenPoints(tasksMd)
+    expect(open.size).toBeGreaterThan(100)
+    const blocks = new Map()
+    let current = null
+    for (const line of tasksMd.split('\n')) {
+      const m = /^- \[( |x)\] (\d+)\./.exec(line)
+      if (m) { current = Number(m[2]); blocks.set(current, line); continue }
+      if (current !== null) blocks.set(current, `${blocks.get(current)}\n${line}`)
+    }
+    const bundles = parseBundles(md)
+    const cellOf = new Map()
+    const section = md.slice(md.indexOf(BUNDLES_HEADING))
+    const table = section.slice(0, section.indexOf(UNBUNDLED_MARKER))
+    for (const line of table.split('\n')) {
+      const cells = line.split('|').map((c) => c.trim())
+      if (cells.length < 6 || !/^[A-Z]$/.test(cells[2])) continue
+      cellOf.set(cells[2], cells[4])
+    }
+    const unbundled = parseUnbundled(md).points
+
+    let checked = 0
+    const strangers = []
+    for (const bundle of bundles) {
+      for (const n of bundle.points) {
+        if (!open.has(n) || unbundled.has(n)) continue
+        const named = /^\s*Bundle:\s*(.+?)\s*$/m.exec(blocks.get(n) ?? '')
+        if (named && bundles.some((b) => named[1].startsWith(b.name))) continue
+        checked += 1
+        if (!new RegExp(`\\b${n}\\b`).test(cellOf.get(bundle.id) ?? '')) {
+          strangers.push(`${n}: filed under ${bundle.id}, which never names it`)
+        }
+      }
+    }
+    expect(checked).toBeGreaterThan(100)
+    expect(strangers).toEqual([])
   })
 })

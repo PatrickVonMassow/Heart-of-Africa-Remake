@@ -146,6 +146,11 @@ export function evaluate({ tasksMd, workPackagesMd } = {}) {
     // No parseable bundle table means the document was restructured, not that
     // every point is unbundled. A guard must never block on its own parse miss.
     if (!bundles.length) return { block: false, reason: '' }
+    // The same holds for a PARTIAL restructure (review finding): with the
+    // exemption marker renamed, the rows still parse while every exemption goes
+    // unread, and each deliberately unbundled point would be reported as drift.
+    // Half a document read is a parse miss too.
+    if (!workPackagesMd.includes(UNBUNDLED_MARKER)) return { block: false, reason: '' }
 
     const open = parseOpenPoints(tasksMd)
     if (open.size === 0) return { block: false, reason: '' }
