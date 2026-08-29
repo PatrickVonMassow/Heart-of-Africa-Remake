@@ -475,11 +475,23 @@ export function blockedCardTitle(title) {
  * shape that lives in a CLI script is a shape no test can reach.
  */
 export function blockedCardBody(why) {
-  // `why` is deposited by the foreign session just like its title. Run it
-  // through the same guard-neutralisation without a title-length cap; otherwise
-  // an uncapped `Punkt N` / `(N)` reference can make the owner's VDZK card fail
-  // the topic guard on prose the owner never authored.
-  const safeWhy = boardSafeTitle(why, { maxLength: Number.POSITIVE_INFINITY })
+  // `why` is BODY prose, not a title: preserve its paragraphs, paths, section
+  // references and revisions. Only the two point-reference shapes read by the
+  // topic guard are neutralised (plus the shell transliterations the board
+  // audit rejects). A title-shaped whitespace collapse here once fused a
+  // deposited multi-paragraph reason back into the wall the prose guards ban.
+  const neutralizeParagraph = (paragraph) =>
+    String(paragraph)
+      .replace(/[A-Za-zÄÖÜäöüß]+/g, repairTransliteration)
+      .replace(/\b(punkt|point)\s+(\d+)\b/gi, '$1 Nr. $2')
+      .replace(/\((\d{2,})\)/g, '[$1]')
+      .trim()
+  const safeWhy = String(why ?? '')
+    .trim()
+    .split(/\r?\n[ \t\r]*\n+/)
+    .map(neutralizeParagraph)
+    .filter(Boolean)
+    .join('\n\n')
   return (
     `User-owned category: scope-extension.\n${safeWhy}\n\n` +
     'Die Anfrage liegt im Träger und wird nicht in den Arbeitsauftrag übernommen, solange das so bleibt. ' +

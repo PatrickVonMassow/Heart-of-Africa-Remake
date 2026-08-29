@@ -968,9 +968,17 @@ describe('the pending-request card', () => {
   })
 
   it('neutralises the foreign reason before the owner publishes its card', () => {
-    const body = blockedCardBody('Bitte fuer Punkt 1004 pruefen (1004) scripts/finding.mjs')
-    expect(body).toContain('Bitte für Punkt Nr. 1004 prüfen [1004] finding')
-    expect(body).not.toMatch(/\bPunkt 1004\b|\(1004\)|scripts\/|\.mjs/)
+    const body = blockedCardBody(
+      'Bitte fuer Punkt 1004 pruefen (1004) in scripts/finding.mjs, §6 und ab12345.\n\n' +
+        'Der zweite Absatz erklärt, warum die Entscheidung getrennt bleiben muss.',
+    )
+    expect(body).toContain('Bitte für Punkt Nr. 1004 prüfen [1004] in scripts/finding.mjs, §6 und ab12345.')
+    expect(body).toContain('\n\nDer zweite Absatz erklärt')
+    expect(body).not.toMatch(/\bPunkt 1004\b|\(1004\)/)
+    expect(body).toContain('scripts/finding.mjs')
+    expect(body).toContain('§6')
+    expect(body).toContain('ab12345')
+    expect(paragraphs(body)).toHaveLength(3)
     expect(findTransliterations(body)).toEqual([])
     const html =
       '<h2>Von dir zu klären</h2><details><summary><span class="t">Anfrage nicht übernehmbar</span></summary>' +
