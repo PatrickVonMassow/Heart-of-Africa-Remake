@@ -25112,3 +25112,46 @@ Nummerierung bleiben deshalb identisch — hier wird nur verschoben, nie umgesch
   whole purpose is to keep the batch alive unattended.
   Bundle: Urlaubsfestigkeit. It changes the same decision core as 947 and 958, so it does not run
   beside another point touching `scripts/batch-emergency-core.mjs`.
+
+- [x] 884. Two dated fuses in the board and guide guards. MEASURED 24.08.2026 by the cross-vendor
+  reviews of `52c8ad1` and `267ff5e`:
+  (1) `scripts/dashboard-card-topic-guard-core.mjs:82,100` — both reference forms cap the point
+  number at three digits, and the spelled form's trailing `\b` keeps `\d{1,3}` from matching inside
+  a four-digit number. Probed: a card body saying "Punkt 1000" yields no foreign reference, and a
+  card titled `1000 — Titel` parses as owning no point at all, so the guard goes blind the moment
+  the work order passes 999. The highest point today is 884. Its JSDoc at `:104` also promises the
+  references in order of first appearance while the code sorts them numerically.
+  (2) `scripts/guide-brevity-core.test.mjs:164-170` — the case titled "leaves the fingerprint
+  comment out of BOTH budgets" tightens only `maxLines` and leaves `maxWords` at the full ceiling
+  against a hundred-word fixture, so the word half of that invariant passes whether or not the
+  comment is excluded. Related, not a defect today: `measureGuide` drops a line only when it STARTS
+  with `<!--`, so a multi-line comment's continuation and closing lines would count.
+  (3) `scripts/board-queue-core.mjs:440,441` carries the same two capped readers for the board's
+  own prose rewrite. AMENDED 28.08.2026: the fuse is no longer dated — the work order passed 999,
+  and a third site of this class, `numbersIn` in `scripts/bundle-first-core.mjs`, reported points
+  1000-1002 as unbundled until it was widened to four digits in the same hour. SUPERSEDED
+  29.08.2026 by the spec examination of this point: point 1003 replaced that prose reader with an
+  explicit machine-readable marker and landed, so `bundle-first-core.mjs` is no longer a
+  digit-ceiling reader and is NOT work for this point. Neither are the four refusals it earned
+  (`4c4b61f`, `0e52672`, `9ff620f`, `11f3163`): they attacked the superseded regex approach and
+  what still stands of them is point 1004. What remains under (3) is `board-queue-core.mjs` alone.
+  (4) THE FOURTH SITE IS NOW BLOCKING THE BATCH. MEASURED 29.08.2026 landing point 1003:
+  `parseCards` in `scripts/dashboard-guard-core.mjs:308,312` applies `MAX_POINT = 999` to BOTH its
+  readings, so the `class="num"` field — which the board itself writes and which holds nothing but
+  the card's own point numbers — goes blind at 1000. The consistency audit therefore reports
+  `erledigt-missing` for a done card it is looking straight at, and `dashboard-guard --synced`
+  refuses to attest. It does not wait itself out: `doneSeen` advances only over points that HAVE a
+  card, so the finding returns at every turn end and EVERY four-digit landing hangs behind a
+  hand-written waiver. The bound protects nothing on the structured field; on the free TITLE text,
+  where a year could pose as a point, it does — so the two readings must part company.
+  FINAL STATE: point numbers are parsed without a digit ceiling at the three readers that remain —
+  `dashboard-card-topic-guard-core.mjs`, `board-queue-core.mjs` and `dashboard-guard-core.mjs` —
+  with the bound kept only where the text it reads is free prose; the JSDoc matches the code; the
+  fingerprint case tightens both budgets; and a multi-line comment is excluded whole. The prose
+  reader in `bundle-first-core.mjs` is neither restored nor re-reviewed here.
+  VERIFIABLE: unit cases with a four-digit point in a title and in a body, a done card whose number
+  is four digits passing the consistency audit with no waiver, and a fingerprint case that fails
+  when only one budget excludes the comment.
+  Criticality: high — site (4) blocks the attestation of every turn end that follows a four-digit
+  landing, and the only way past it today is a waiver that never clears.
+  Bundle: Chat & Tafel.
