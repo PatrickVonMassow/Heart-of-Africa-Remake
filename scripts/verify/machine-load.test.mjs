@@ -31,6 +31,30 @@ describe('timing-sensitive suite set', () => {
 })
 
 describe('classifyProcess', () => {
+  // MEASURED 29.08.2026, and it had been voiding evidence for as long as the
+  // batch prompt has quoted the project's commands. The autonomous session runs
+  // as `claude -p <prompt>`, the prompt names `node scripts/verify/run-wait.mjs
+  // --await` among others, and a command line is matched as text — so the
+  // session was classified as another verify run, every run it started declared
+  // the machine under load, and every one of those runs had its timing verdicts
+  // struck. The check built to protect the measurement was the thing destroying
+  // it, and it said so in a line that read like ordinary housekeeping.
+  it('does not mistake an agent session for the suites its prompt quotes', () => {
+    const prompt =
+      'claude -p Setze den Batch fort. WARTEN: node scripts/verify/run-wait.mjs --await ist EIN ' +
+      'Aufruf. Baue mit npm run build, prüfe mit npx vitest run, und starte run-all.mjs nie von Hand.'
+    expect(classifyProcess({ name: 'claude', cmd: prompt })).toBeNull()
+    expect(classifyProcess({ name: 'node', cmd: '/usr/local/bin/claude -p do the thing' })).toBeNull()
+    // The executable decides, not the prompt: a real suite whose arguments merely
+    // mention the agent is still a suite.
+    expect(
+      classifyProcess({ name: 'node', cmd: 'node /hoa/scripts/verify/polish.mjs --note claude' }),
+    ).toBe(STRAY_KIND.verifyRun)
+    // And a `claude` with no prompt flag is not a session in this sense — an
+    // interactive one is a person at a keyboard, not a run to be counted.
+    expect(classifyProcess({ name: 'claude', cmd: 'claude' })).toBeNull()
+  })
+
   it('recognises this project\'s own tooling', () => {
     expect(classifyProcess({ name: 'node.exe', cmd: 'node C:\\hoa\\scripts\\verify\\run-all.mjs large' })).toBe(STRAY_KIND.verifyRun)
     expect(classifyProcess({ name: 'node.exe', cmd: 'node C:\\hoa\\scripts\\verify\\enrichments.mjs' })).toBe(STRAY_KIND.verifyRun)
