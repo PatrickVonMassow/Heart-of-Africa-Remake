@@ -904,6 +904,10 @@ describe('the pending-request card', () => {
     expect(boardSafeTitle('point 10000')).toBe('point Nr. 10000')
   })
 
+  it('deliberately neutralises a parenthesized year like any point-shaped token', () => {
+    expect(boardSafeTitle('Bilanz (2026) prüfen')).toBe('Bilanz [Nr. 2026] prüfen')
+  })
+
   it('truncates a long title rather than filling the card with one', () => {
     const t = boardSafeTitle('Ein sehr langer Titel, der auf einem Telefon niemals in eine Zeile passen würde')
     expect(t.length).toBeLessThanOrEqual(60)

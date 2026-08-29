@@ -421,6 +421,8 @@ export function repairTransliteration(word) {
  * point reference would block the owner's turn end on the conciseness and
  * card-topic guards, for text it never wrote. Neutralising it here keeps the
  * meaning readable and the guards satisfied by construction.
+ * Deliberate cost: any parenthesized 2+ digit token is neutralised, so a year
+ * such as `(2026)` becomes `[Nr. 2026]`; this publisher cannot know TASKS here.
  */
 export function boardSafeTitle(title, { maxLength = 60 } = {}) {
   let t = String(title ?? '').replace(/\s+/g, ' ').trim()
