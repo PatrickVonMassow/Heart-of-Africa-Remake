@@ -25052,3 +25052,31 @@ Nummerierung bleiben deshalb identisch — hier wird nur verschoben, nie umgesch
   busy wedge is the shape this batch has actually produced.
   Bundle: Urlaubsfestigkeit. It changes the same decision core as 947's lane, so it does not run
   beside another point touching `scripts/batch-emergency-core.mjs`.
+
+- [x] 1003. The bundle membership check reads point numbers out of free prose, and no date filter
+  settles it. MEASURED 28.08.2026 across four cross-vendor review rounds on
+  `scripts/bundle-first-core.mjs` — `4c4b61f`, `0e52672`, `9ff620f`, `11f3163`, every one reviewed
+  by GPT-5.6 Sol and every one refused. `numbersIn` takes each 1-to-4-digit token in a bundle's
+  points cell for a point number and subtracts date shapes first. Each round closed the form the
+  round before had named and earned a new one: the bare year deleted real point numbers 1900-2099,
+  the optional leading day swallowed any number standing in front of a month name, and what is left
+  after bounding both is inherent — a four-digit QUANTITY in prose (`1440 px`) counts as a point,
+  and any date form the strip list does not know leaves its numbers behind. The cause is that the
+  cell stopped being a list: it carries paragraphs of prose per bundle, and a regular expression
+  over prose cannot tell a reference from a measurement.
+  FINAL STATE:
+  - THE CELL SAYS WHICH NUMBERS ARE REFERENCES. A bundle's points are read from an explicit,
+    machine-readable form — a leading number list ahead of the prose, or a marker around each
+    reference — and never from arbitrary prose. The prose stays readable for a human.
+  - NO DIGIT CEILING AND NO DATE GUESSING. Once the reader stops reading prose it needs neither a
+    strip list nor a digit bound, and the class of defect that produced the four refusals is gone
+    rather than narrowed.
+  - THE MIGRATION IS MECHANICAL AND PROVEN: the existing table converts with no membership change,
+    shown by comparing the placed set before and after over the real `docs/work-packages.md`.
+  VERIFIABLE: Vitest over the reader — a cell whose prose contains a date, a four-digit quantity and
+  a number standing in front of a month name yields exactly the referenced points and nothing else;
+  plus a conversion case proving the placed set of the real `docs/work-packages.md` is identical
+  before and after.
+  Criticality: medium — the guard's fail direction is allow, so it under-reports drift rather than
+  blocking work; but it is the only check that keeps the bundle scheme matching the open set.
+  Bundle: Session- & Repo-Hygiene.
