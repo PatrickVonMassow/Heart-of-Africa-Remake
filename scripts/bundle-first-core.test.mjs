@@ -745,7 +745,22 @@ describe('the real docs/work-packages.md', () => {
       )
       expect(failedOpen.stdout.trim()).toMatch(/NOT CHECKED/)
 
-      // The other branch, from the same checkout, is the stand-down sentence.
+      // The other branch, from the same checkout, is the stand-down sentence —
+      // and every way into it exits 0 and says which one it took. The reader
+      // resolves its paths against the checkout it is GIVEN, so a checkout
+      // missing either document is answered rather than thrown at.
+      rmSync(join(root, 'TASKS.md'))
+      const noWorkOrder = run()
+      expect(noWorkOrder.status).toBe(0)
+      expect(noWorkOrder.stdout.trim()).toBe('bundle-first-guard: not applicable — no TASKS.md in this checkout')
+
+      rmSync(join(root, 'docs'), { recursive: true })
+      const noDocument = run()
+      expect(noDocument.status).toBe(0)
+      expect(noDocument.stdout.trim()).toBe(
+        'bundle-first-guard: not applicable — no docs/work-packages.md in this checkout',
+      )
+
       mkdirSync(join(root, '.claude'), { recursive: true })
       writeFileSync(join(root, '.claude', 'batch-paused'), '')
       const stoodDown = run()

@@ -19,23 +19,32 @@ import { heldByOtherLiveOwner } from './batch-singleton.mjs'
 import { isMainModule } from './is-main.mjs'
 import { repoPath } from './repo-paths.mjs'
 
-const TASKS = repoPath('TASKS.md')
-const WORK_PACKAGES = repoPath('docs/work-packages.md')
-const PAUSE = repoPath('.claude/batch-paused')
+// RESOLVED ON USE, NEVER AT IMPORT (cross-vendor review finding): a path
+// resolved at module scope is computed BEFORE the try below and its throw would
+// leave the process nonzero instead of allowing the stop. Every call site of
+// this reader stands inside a fail-open, so this is where the resolution
+// belongs. What remains out of this file's reach is another module's own
+// top-level initialisation, which no try here can enclose.
+const guardPaths = () => ({
+  tasks: repoPath('TASKS.md'),
+  workPackages: repoPath('docs/work-packages.md'),
+  pause: repoPath('.claude/batch-paused'),
+})
 
 /** The guard's I/O half, shared with the preflight (point 365 D). */
 export function gatherBundleFirstInputs({ sessionId = '' } = {}) {
-  if (existsSync(PAUSE)) return { applicable: false, why: 'the batch is paused' }
+  const { tasks, workPackages, pause } = guardPaths()
+  if (existsSync(pause)) return { applicable: false, why: 'the batch is paused' }
   if (heldByOtherLiveOwner(sessionId)) {
     return { applicable: false, why: 'another live session owns the batch lock', cause: 'not-lock-owner' }
   }
-  if (!existsSync(WORK_PACKAGES)) return { applicable: false, why: 'no docs/work-packages.md in this checkout' }
-  if (!existsSync(TASKS)) return { applicable: false, why: 'no TASKS.md in this checkout' }
+  if (!existsSync(workPackages)) return { applicable: false, why: 'no docs/work-packages.md in this checkout' }
+  if (!existsSync(tasks)) return { applicable: false, why: 'no TASKS.md in this checkout' }
   return {
     applicable: true,
     inputs: {
-      tasksMd: readFileSync(TASKS, 'utf8'),
-      workPackagesMd: readFileSync(WORK_PACKAGES, 'utf8'),
+      tasksMd: readFileSync(tasks, 'utf8'),
+      workPackagesMd: readFileSync(workPackages, 'utf8'),
     },
   }
 }
