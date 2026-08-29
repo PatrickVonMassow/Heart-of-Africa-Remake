@@ -16,6 +16,7 @@ import {
   parseUnbundled,
   unplacedPoints,
   duplicateHomes,
+  statusLine,
   evaluate,
 } from './bundle-first-core.mjs'
 
@@ -268,6 +269,13 @@ describe('duplicateHomes', () => {
     expect(duplicateHomes(new Set([350]), bundles, new Set([200]))).toEqual([])
   })
 
+  it('counts the ENTRY, not the sighting — a repeat inside one home is one home', () => {
+    const bundles = [{ id: 'A', points: new Set([350]), list: [350, 350] }]
+    expect(duplicateHomes(new Set([350]), bundles, new Set())).toEqual([])
+    const bullets = { points: new Set([285]), bullets: [{ index: 1, points: [285, 285] }] }
+    expect(duplicateHomes(new Set([285]), [], bullets)).toEqual([])
+  })
+
   it('tolerates missing arguments', () => {
     expect(duplicateHomes(null, null, null)).toEqual([])
   })
@@ -366,14 +374,27 @@ describe('evaluate — the rule', () => {
     expect(v.reason).toMatch(/bullet 1 and "Not bundled" bullet 3/)
   })
 
-  it('BLOCKS a point written TWICE into the same bundle cell', () => {
+  // A REPEAT INSIDE ONE ENTRY IS NOT A SECOND HOME (round-fifteen review
+  // finding). Counting sightings rather than entries made `#350, #350` in one
+  // cell block a document whose point has exactly one home — the guard
+  // blocking on a formatting nicety instead of on the drift it exists to catch.
+  it('passes a point written twice into the SAME bundle cell — one entry is one home', () => {
     const twice = workPackages({
       bundles: [['Dorfleben', 'A', '#350, #351, #350']],
       unbundled: ['- **#285**.'],
     })
-    const v = evaluate({ tasksMd: tasks([350, 351, 285]), workPackagesMd: twice })
-    expect(v.block).toBe(true)
-    expect(v.duplicates).toEqual([{ point: 350, homes: ['A', 'A'] }])
+    expect(evaluate({ tasksMd: tasks([350, 351, 285]), workPackagesMd: twice })).toMatchObject({
+      block: false,
+      checked: true,
+    })
+  })
+
+  it('passes a point named twice inside ONE exemption bullet', () => {
+    const twice = workPackages({
+      bundles: [['Dorfleben', 'A', '#350']],
+      unbundled: ['- **#285**, and #285 again in the same reason.'],
+    })
+    expect(evaluate({ tasksMd: tasks([350, 285]), workPackagesMd: twice }).block).toBe(false)
   })
 
   it('reports an unplaced point and a doubled one in the SAME verdict', () => {
@@ -409,6 +430,24 @@ describe('evaluate — the fail-open exits', () => {
       { tasksMd: tasks([540]), workPackagesMd: '' },
       { tasksMd: tasks([350, 285]), workPackagesMd: renamed },
       { tasksMd: '', workPackagesMd: workPackages() },
+      // The other half-restructure: the rows parse, the exemption marker was
+      // renamed (round-fifteen review finding — this shape was allowed but
+      // never asserted as unjudged).
+      {
+        tasksMd: tasks([350, 285]),
+        workPackagesMd: workPackages({ bundles: [['Dorfleben', 'A', '#350']] }).replace(
+          UNBUNDLED_MARKER,
+          '**Deliberately outside a bundle**',
+        ),
+      },
+      // And a table whose rows no longer have the table's shape.
+      {
+        tasksMd: tasks([350, 351]),
+        workPackagesMd: workPackages({ bundles: [['Dorfleben', 'A', '#350']] }).replace(
+          '| **Dorfleben** | A |',
+          '- **Dorfleben** (A):',
+        ),
+      },
     ]) {
       const v = evaluate(inputs)
       expect(v.block, JSON.stringify(inputs).slice(0, 60)).toBe(false)
@@ -464,6 +503,30 @@ describe('evaluate — the fail-open exits', () => {
   it('allows rather than throwing on rubbish input', () => {
     expect(evaluate().block).toBe(false)
     expect(evaluate({ tasksMd: 42, workPackagesMd: 42 }).block).toBe(false)
+  })
+})
+
+// WHAT --status SAYS is a decision, and it lives in the core so a case can
+// reach it (round-fifteen review finding): the wrapper used to choose between
+// the two sentences itself, where reverting the choice left every test green.
+describe('statusLine', () => {
+  it('reports the invariant only where it was measured', () => {
+    expect(statusLine({ block: false, checked: true })).toMatch(/exactly one home/)
+  })
+
+  it('names a fail-open instead of claiming the invariant', () => {
+    const line = statusLine({ block: false, checked: false })
+    expect(line).toMatch(/NOT CHECKED/)
+    expect(line).not.toMatch(/exactly one home\./)
+  })
+
+  it('prints the block reason itself when there is one', () => {
+    expect(statusLine({ block: true, reason: 'BUNDLE MEMBERSHIP DRIFTED: 1 open point' })).toMatch(/DRIFTED/)
+  })
+
+  it('treats an absent verdict as unjudged rather than as a pass', () => {
+    expect(statusLine(null)).toMatch(/NOT CHECKED/)
+    expect(statusLine({})).toMatch(/NOT CHECKED/)
   })
 })
 
@@ -567,6 +630,24 @@ describe('the real docs/work-packages.md', () => {
   // prose happened to name it, and `unplacedPoints` unions the memberships, so
   // a point in two bundles could never fail. Marked references make the
   // membership canonical, which makes the invariant checkable — here.
+  it('prints through the core, so the CLI cannot answer with a sentence of its own', async () => {
+    const { spawnSync } = await import('node:child_process')
+    const res = spawnSync(process.execPath, [repoPath('scripts/bundle-first-guard.mjs'), '--status'], {
+      encoding: 'utf8',
+      windowsHide: true,
+    })
+    expect(res.status).toBe(0)
+    const expected = statusLine(
+      evaluate({
+        tasksMd: readFileSync(repoPath('TASKS.md'), 'utf8'),
+        workPackagesMd: md,
+      }),
+    )
+    // The guard stands down for a paused batch or a foreign lock owner; that
+    // line is the only other thing it may print.
+    if (!/not applicable/.test(res.stdout)) expect(res.stdout.trim()).toBe(expected)
+  })
+
   it('gives every open point exactly one home', () => {
     const open = parseOpenPoints(readFileSync(repoPath('TASKS.md'), 'utf8'))
     expect(open.size).toBeGreaterThan(100)

@@ -202,14 +202,18 @@ export function duplicateHomes(openSet, bundles, unbundled) {
   const homes = new Map()
   const add = (n, home) => {
     if (!open.has(n)) return
-    homes.set(n, [...(homes.get(n) ?? []), home])
+    homes.set(n, (homes.get(n) ?? new Set()).add(home))
   }
-  // EVERY OCCURRENCE IS A PLACEMENT, not every container (round-eleven review
-  // finding). Reading the bundle's SET and the exemption section's union made
-  // two "Not bundled" bullets naming the same point — or one cell naming it
-  // twice — read as a single placement, and left the message unable to say
-  // which two entries to look at. So each occurrence is counted where it
-  // stands, and each home names the entry a reader can go and delete.
+  // EVERY ENTRY IS A HOME, and a repeat INSIDE one entry is not a second one
+  // (round-eleven and round-fifteen review findings). Reading the bundle's SET
+  // and the exemption section's union made two "Not bundled" bullets naming the
+  // same point read as a single placement, and left the message unable to say
+  // which two entries to look at — so each entry is now counted where it
+  // stands, and names itself. But `#123, #123` in ONE cell is still ONE home:
+  // counting occurrences there would block a document whose point has exactly
+  // one home, which is the guard blocking on a formatting nicety instead of on
+  // the drift it exists to catch. Hence a set of entries, not a list of
+  // sightings.
   for (const b of bundles || []) for (const n of b.list ?? [...b.points]) add(n, b.id)
   const bullets = Array.isArray(unbundled?.bullets) ? unbundled.bullets : null
   if (bullets) {
@@ -222,9 +226,25 @@ export function duplicateHomes(openSet, bundles, unbundled) {
     for (const n of set instanceof Set ? set : []) add(n, 'Not bundled')
   }
   return [...homes.entries()]
-    .filter(([, where]) => where.length > 1)
-    .map(([point, where]) => ({ point, homes: where }))
+    .filter(([, where]) => where.size > 1)
+    .map(([point, where]) => ({ point, homes: [...where] }))
     .sort((a, b) => a.point - b.point)
+}
+
+/**
+ * What `--status` prints, decided HERE rather than in the wrapper
+ * (round-fifteen review finding): the wrapper used to choose the sentence
+ * itself, so the difference between a measured invariant and a fail-open lived
+ * in the one place no unit case could reach. Now the wrapper prints this and
+ * both branches are covered.
+ */
+export function statusLine(result) {
+  if (result?.block) return result.reason
+  if (result?.checked) return 'bundle-first-guard: every open point has exactly one home.'
+  return (
+    'bundle-first-guard: NOT CHECKED — docs/work-packages.md or the work order could not be read as a bundle ' +
+    'table with a "Not bundled" list, so the guard allows without having judged membership.'
+  )
 }
 
 /** The remedy for a point standing in two homes: one copy, same reason. */

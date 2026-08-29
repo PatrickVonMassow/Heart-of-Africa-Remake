@@ -14,7 +14,7 @@
 //
 //   node scripts/bundle-first-guard.mjs --status
 import { readFileSync, existsSync } from 'node:fs'
-import { evaluate } from './bundle-first-core.mjs'
+import { evaluate, statusLine } from './bundle-first-core.mjs'
 import { heldByOtherLiveOwner } from './batch-singleton.mjs'
 import { isMainModule } from './is-main.mjs'
 import { repoPath } from './repo-paths.mjs'
@@ -49,18 +49,10 @@ if (isMainModule(import.meta.url)) {
         process.exit(0)
       }
       const result = evaluate(gathered.inputs)
-      // A FAIL-OPEN IS NOT A PASS (round-fourteen review finding): `block:
-      // false` also comes back for a document this reader could not read, and
-      // reporting the invariant as verified there is the one sentence an
-      // operator would trust without looking.
-      console.log(
-        result.block
-          ? result.reason
-          : result.checked
-            ? 'bundle-first-guard: every open point has exactly one home.'
-            : 'bundle-first-guard: NOT CHECKED — docs/work-packages.md or the work order could not be read as ' +
-              'a bundle table with a "Not bundled" list, so the guard allows without having judged membership.',
-      )
+      // The sentence is the core's (round-fifteen review finding): a fail-open
+      // and a measured invariant are the same DECISION and a very different
+      // statement, and that difference belongs where a unit case can reach it.
+      console.log(statusLine(result))
       process.exit(0)
     }
 
