@@ -1,4 +1,5 @@
-import { readFileSync } from 'node:fs'
+import { mkdtempSync, readFileSync, rmSync, utimesSync, writeFileSync } from 'node:fs'
+import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { describe, expect, it } from 'vitest'
 import { ACTIVITY_CLASSES, classifyTimeline, commitGapSummary, evidenceInterval, timelineTotals } from './batch-standstill-core.mjs'
@@ -10,6 +11,7 @@ import {
   markerBoundary,
   pauseMarkerEvidence,
   transcriptEvidence,
+  verificationRecordEvidence,
 } from './batch-standstill-inputs.mjs'
 import { parseWindow, renderStandstillReport } from './batch-standstill-report.mjs'
 
@@ -101,6 +103,40 @@ describe('standstill report inputs', () => {
     })).toEqual([{
       at: movedAt, kind: 'delegated-branch-moved', sha: 'b'.repeat(40), point: 958,
     }])
+  })
+
+  it('turns an advancing named run into a bounded lease only with live process identity', () => {
+    const dir = mkdtempSync(join(tmpdir(), 'hoa-verification-lease-'))
+    const now = Date.parse('2026-08-21T10:00:00Z')
+    const startedAt = now - 80 * 60_000
+    const progressAt = now - 60_000
+    const log = join(dir, 'large.log')
+    const recordPath = `${log}.run.json`
+    try {
+      writeFileSync(log, 'PASS  world\n')
+      utimesSync(log, progressAt / 1000, progressAt / 1000)
+      writeFileSync(recordPath, JSON.stringify({
+        command: 'verify --plan large', log, status: 'running', startedAt, pid: 4242,
+      }))
+      const result = verificationRecordEvidence(dir, {
+        start: startedAt - 1,
+        end: now,
+        processAlive: (record, path) => record.pid === 4242 && path === recordPath,
+      })
+      expect(result.leases).toEqual([{
+        record: recordPath,
+        log,
+        command: 'verify --plan large',
+        status: 'running',
+        startedAt,
+        progressAt,
+        leaseUntil: progressAt + 15 * 60_000,
+        pid: 4242,
+        processAlive: true,
+      }])
+    } finally {
+      rmSync(dir, { recursive: true, force: true })
+    }
   })
 
   it('renders threshold, evidence, totals, and UTC bounds', () => {

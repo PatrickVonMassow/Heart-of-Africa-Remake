@@ -3,12 +3,13 @@
 // by HoA-Batch-Emergency, not by an owner, launcher, or recovery session.
 import { appendFileSync, existsSync, mkdirSync, readFileSync } from 'node:fs'
 import { execFileSync } from 'node:child_process'
-import { dirname, join } from 'node:path'
+import { dirname, isAbsolute, join, resolve } from 'node:path'
 import { randomUUID } from 'node:crypto'
 import { isMainModule } from './is-main.mjs'
 import { REPO_ROOT } from './repo-paths.mjs'
 import { writeJsonAtomic } from './atomic-write.mjs'
 import { gatherStandstillReport } from './batch-standstill-report.mjs'
+import { runRecordFor } from './batch-in-flight.mjs'
 import { openPointsOf, frontCandidates } from './board-queue-core.mjs'
 import { gateSets } from './user-gate-core.mjs'
 import {
@@ -97,7 +98,14 @@ function defaultInputs({ repo, now, thresholdMs }) {
     paused: existsSync(join(repo, '.claude', 'batch-paused')),
     veto: readJson(join(repo, 'local', 'batch-emergency-veto.json')),
     state: readJson(join(repo, 'local', 'batch-emergency-state.json')) ?? {},
-    report: gatherStandstillReport({ repo, ref: 'main', start: now - 4 * thresholdMs, end: now, thresholdMs }),
+    report: gatherStandstillReport({
+      repo, ref: 'main', start: now - 4 * thresholdMs, end: now, thresholdMs,
+      verificationProcessAlive: (record) => {
+        if (typeof record?.log !== 'string' || !record.log.trim()) return false
+        const log = isAbsolute(record.log) ? record.log : resolve(repo, record.log)
+        return runRecordFor(log)?.alive === true
+      },
+    }),
   }
 }
 

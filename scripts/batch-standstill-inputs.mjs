@@ -185,9 +185,10 @@ function recordFiles(dir) {
 /** Finished named runs are explicit verification intervals. A running record is
  * accepted only to the last output-log progress plus a renewable lease, and the
  * interval never exceeds that lease. */
-export function verificationRecordEvidence(dir, { start, end, leaseMs = 15 * 60_000 } = {}) {
+export function verificationRecordEvidence(dir, { start, end, leaseMs = 15 * 60_000, processAlive: processAliveProbe } = {}) {
   const intervals = []
   const boundaries = []
+  const leases = []
   for (const path of recordFiles(dir)) {
     let record
     try { record = JSON.parse(readFileSync(path, 'utf8')) } catch { continue }
@@ -197,7 +198,7 @@ export function verificationRecordEvidence(dir, { start, end, leaseMs = 15 * 60_
     let progressAt = null
     const logPath = typeof record.log === 'string' ? (record.log.startsWith('/') ? record.log : join(dir, basename(record.log))) : null
     if (record.status === 'running' && logPath) {
-      try { progressAt = statSync(logPath).mtimeMs } catch { /* no progress proof */ }
+      try { progressAt = Math.max(began, statSync(logPath).mtimeMs) } catch { /* no progress proof */ }
       finished = finite(progressAt) ? Math.min(end, progressAt + leaseMs) : NaN
     }
     if (!finite(finished) || finished <= began) continue
@@ -209,9 +210,24 @@ export function verificationRecordEvidence(dir, { start, end, leaseMs = 15 * 60_
         progressAt, result: record.status === 'finished' ? { exitCode: record.exitCode, finishedAt: record.finishedAt } : null,
       },
     }))
+    if (record.status === 'running' && finite(progressAt)) {
+      let processAlive = false
+      try { processAlive = processAliveProbe?.(record, path) === true } catch { /* no identity proof */ }
+      leases.push({
+        record: path,
+        log: record.log ?? null,
+        command: record.command ?? null,
+        status: record.status,
+        startedAt: began,
+        progressAt,
+        leaseUntil: progressAt + leaseMs,
+        pid: record.pid ?? null,
+        processAlive,
+      })
+    }
     boundaries.push(began, finished)
   }
-  return { intervals: intervals.filter(Boolean), boundaries }
+  return { intervals: intervals.filter(Boolean), boundaries, leases }
 }
 
 function transcriptTimestamp(row) {
