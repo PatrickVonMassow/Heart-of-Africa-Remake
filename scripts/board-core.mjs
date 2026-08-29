@@ -8,6 +8,7 @@
 // the writer and readers would drift apart. Both imported modules are leaves,
 // so the direction cannot become a cycle.
 import { QUEUE_STUB_META, parseNowCardPoints } from './dashboard-guard-core.mjs'
+import { pointOwnershipFromTitle } from './dashboard-point-reader-core.mjs'
 import { namesFollowOnWork } from './handover-card-contract.mjs'
 // The derived state card's vocabulary lives beside the derivation itself, so the
 // renderer here and the module that decides WHAT to report cannot drift apart.
@@ -638,11 +639,13 @@ function cardBodyText(card) {
 }
 
 /** Every complete current-work card in section order, with its exact bytes. */
-function projectedNowCards(html) {
+function projectedNowCards(html, knownPoints = []) {
   const section = nowSectionSlice(html).text
   return [...section.matchAll(/<details class="now"[^>]*>[\s\S]*?<\/details>\s*/g)].map((match) => {
     const summary = (match[0].match(/<summary>([\s\S]*?)<\/summary>/) ?? [])[1] ?? ''
-    const { chip, legacy } = summaryPoint(summary)
+    const { chip } = summaryPoint(summary)
+    const title = (summary.match(new RegExp(`<span class="t">${TITLE_TEXT}</span>`)) ?? [])[1]
+    const legacy = pointOwnershipFromTitle(title, { knownPoints, allowUnseparatedSingle: true }).points[0] ?? null
     const rawPoint = chip ?? legacy
     return { point: rawPoint == null ? null : Number(rawPoint), html: match[0], at: match.index }
   })
@@ -702,7 +705,8 @@ export function compareNowProjection(html, expectedPoints, { knownPoints = null,
     if (expected.some((n) => !Number.isInteger(n) || n <= 0) || new Set(expected).size !== expected.length) {
       return { ok: false, error: 'the expected active-point set is malformed', missing: [], extra: [], duplicates: [] }
     }
-    const cards = projectedNowCards(html)
+    const expectedKnown = knownPoints instanceof Set ? new Set([...knownPoints, ...expected]) : new Set(expected)
+    const cards = projectedNowCards(html, expectedKnown)
     // THE CLOSING CARD IS A STATE, NOT WORK (point 544; regression via point
     // 713): counted into the numbered membership it turned "extra"/"unknown"
     // the moment its point was ticked — which is the only moment it exists.
@@ -886,7 +890,7 @@ export function reconcileNowProjection(
   if (expected.some((n) => !Number.isInteger(n) || n <= 0) || new Set(expected).size !== expected.length) {
     throw new Error('board: active-point projection is malformed')
   }
-  const cards = projectedNowCards(source)
+  const cards = projectedNowCards(source, new Set(expected))
   // The closing card is a STATE (point 544): it carries the chip of a point
   // that is ticked by design, so reading it as numbered work made this render
   // delete it silently (regression via point 713). It is kept like the idle

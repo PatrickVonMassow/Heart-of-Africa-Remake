@@ -34,6 +34,7 @@
 // The remedies' publish steps come from scripts/board-remedy.mjs — one copy.
 import { REPUBLISH } from './board-remedy.mjs'
 import { gatedPoints } from './user-gate-core.mjs'
+import { pointNumbersFromChip, pointOwnershipFromTitle, taskPointNumbers } from './dashboard-point-reader-core.mjs'
 import {
   FINDER_POINTS,
   QUEUE_REBUILD_CMD,
@@ -111,7 +112,8 @@ const stripTags = (html) => html.replace(/<[^>]*>/g, ' ')
 /**
  * Warteschlange cards in DOCUMENT ORDER: [{point, text}]. Anchored on the
  * section header (not any mention — the dashboard-guard lesson of 22.07.2026);
- * cards are `<details>` blocks with `<span class="num">N</span>`.
+ * cards are `<details>` blocks with structured `.num` chips. A compound chip
+ * contributes each owner in chip order, matching the shared dashboard reader.
  */
 export function parseQueueCards(html) {
   if (typeof html !== 'string') return []
@@ -121,8 +123,8 @@ export function parseQueueCards(html) {
   const queueHtml = html.slice(qStart, qEnd < 0 ? undefined : qEnd)
   const cards = []
   for (const chunk of queueHtml.split(/<details\b/).slice(1)) {
-    const m = chunk.match(/class="num">\s*(\d+)/)
-    if (m) cards.push({ point: Number(m[1]), text: stripTags(chunk) })
+    const chip = (chunk.match(/class="num">\s*([^<]*?)\s*</) ?? [])[1]
+    for (const point of pointNumbersFromChip(chip)) cards.push({ point, text: stripTags(chunk) })
   }
   return cards
 }
@@ -147,12 +149,12 @@ function nowSection(html) {
  * was reported against 610 — the section's FIRST point — sending the reader to an
  * innocent card with full confidence. Each card is judged on its own text.
  */
-export function parseNowCards(html) {
+export function parseNowCards(html, options = {}) {
   const section = nowSection(html)
   if (section === null) return []
   const cards = []
   for (const chunk of section.split(/<details\b/).slice(1)) {
-    cards.push({ point: nowCardPoint(chunk), text: stripTags(chunk) })
+    cards.push({ point: nowCardPoint(chunk, options), text: stripTags(chunk) })
   }
   return cards
 }
@@ -162,24 +164,28 @@ export function parseNowCards(html) {
  * a card written before that — the leading number of its title. Null for the
  * unnumbered handover card and any other non-point work.
  */
-function nowCardPoint(chunk) {
-  const m = chunk.match(/class="num">\s*(\d+)/) ?? chunk.match(/class="t">\s*(\d+)/)
-  return m ? Number(m[1]) : null
+function nowCardPoint(chunk, options) {
+  const chip = chunk.match(/class="num">\s*([^<]*?)\s*</)
+  const chipPoint = chip ? pointNumbersFromChip(chip[1])[0] : null
+  if (chipPoint != null) return chipPoint
+  const title = (chunk.match(/class="t">\s*([^<]*)/) ?? [])[1]
+  return pointOwnershipFromTitle(title, options).points[0] ?? null
 }
 
 /**
  * The now-SECTION as {point, text} — a probe for "does this board have a now
  * section at all", which is all `dashboard-integrity-guard-core` asks of it.
  *
- * Its text is the WHOLE section and its point the first number in it, so it must
- * never be used to attribute a card's words to a point: use `parseNowCards`
- * above. Both exist on purpose; collapsing them re-creates the mix-up.
+ * Its text is the WHOLE section and its point belongs to the FIRST card (or is
+ * null when that card is unnumbered), so it must never be used to attribute a
+ * card's words to a point: use `parseNowCards` above. Both exist on purpose;
+ * collapsing them re-creates the mix-up.
  */
-export function parseNowCard(html) {
+export function parseNowCard(html, options = {}) {
   const section = nowSection(html)
   if (section === null) return null
-  const m = section.match(/class="(?:num|t)">\s*(\d+)/)
-  return { point: m ? Number(m[1]) : null, text: stripTags(section) }
+  const [first] = parseNowCards(html, options)
+  return { point: first?.point ?? null, text: stripTags(section) }
 }
 
 /**
@@ -429,7 +435,9 @@ export function evaluate({ dashboardHtml, tasksMd, rankRecordJson } = {}) {
     // EACH now-card with its OWN text: the section carries one card per point in
     // parallel work, and judging it as one card attributed every claim in it to
     // the first point — which sent the reader to an innocent card.
-    const nowCards = parseNowCards(dashboardHtml).filter((c) => c.point != null)
+    const nowCards = parseNowCards(dashboardHtml, { knownPoints: taskPointNumbers(tasksMd) }).filter(
+      (c) => c.point != null,
+    )
     const claims = falseDoneClaims([...cards, ...nowCards], open)
     if (claims.length) {
       problems.push(

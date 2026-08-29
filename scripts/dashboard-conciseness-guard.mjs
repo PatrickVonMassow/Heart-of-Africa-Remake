@@ -11,9 +11,12 @@ import { isMainModule } from './is-main.mjs'
 import { evaluate } from './dashboard-conciseness-guard-core.mjs'
 import { heldByOtherLiveOwner } from './batch-singleton.mjs'
 import { CAUSE } from './guard-preflight-core.mjs'
+import { readTasksAll } from './tasks-source.mjs'
+import { taskPointNumbers } from './dashboard-point-reader-core.mjs'
 
 const DASHBOARD = repoPath('.batch-dashboard.html')
 const PAUSE = repoPath('.claude/batch-paused')
+const TASKS = repoPath('TASKS.md')
 
 /**
  * Everything the core needs — exported so the guard preflight predicts this gate
@@ -27,7 +30,14 @@ export function gatherDashboardConcisenessInputs({ sessionId = '' } = {}) {
   }
   // No board yet — dashboard-guard owns that case.
   if (!existsSync(DASHBOARD)) return { applicable: false, why: 'no dashboard file in this checkout' }
-  return { applicable: true, inputs: { dashboardHtml: readFileSync(DASHBOARD, 'utf8') } }
+  let knownPoints = new Set()
+  try {
+    knownPoints = taskPointNumbers(readTasksAll(TASKS))
+  } catch {
+    // Point provenance only improves the offender label; unreadable TASKS must
+    // not suppress the conciseness checks the dashboard alone can support.
+  }
+  return { applicable: true, inputs: { dashboardHtml: readFileSync(DASHBOARD, 'utf8'), knownPoints } }
 }
 
 if (isMainModule(import.meta.url)) {

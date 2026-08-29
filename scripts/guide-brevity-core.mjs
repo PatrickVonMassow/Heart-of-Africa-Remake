@@ -448,8 +448,67 @@ export const PROJECT_MARKERS = [
 
 /** Measure exactly the body that the guide budget governs. */
 export function measureGuide(text) {
-  const lines = String(text ?? '').replace(/\r\n/g, '\n').split('\n')
-  const body = lines.filter((line) => !/^<!--/.test(line.trim()))
+  let source = String(text ?? '').replace(/\r\n/g, '\n')
+  // COMPLETE comments are bookkeeping and disappear below. An unmatched
+  // opener is malformed syntax, not a licence to hide the rest of the guide:
+  // remove that opener and measure its entire would-be comment tail as prose.
+  // Subsequent openers are inside that malformed tail under HTML's non-nesting
+  // comment rules, so they are neutralised too instead of starting a new hole.
+  let cursor = 0
+  let unmatchedStart = -1
+  while (cursor < source.length) {
+    const start = source.indexOf('<!--', cursor)
+    if (start < 0) break
+    const end = source.indexOf('-->', start + 4)
+    if (end < 0) {
+      unmatchedStart = start
+      break
+    }
+    cursor = end + 3
+  }
+  if (unmatchedStart >= 0) {
+    // Replace, do not delete: deletion can join `<!-` on the left to `-` on
+    // the right and manufacture a fresh `<!--` at either replacement seam.
+    // A space also keeps `word<!--more` as two measured words.
+    source =
+      source.slice(0, unmatchedStart) +
+      ' ' +
+      source.slice(unmatchedStart + 4).replaceAll('<!--', ' ')
+  }
+  const lines = source.split('\n')
+  const body = []
+  let inComment = false
+  for (const line of lines) {
+    let rest = line
+    let visible = ''
+    let touchedComment = false
+    while (rest || inComment) {
+      if (inComment) {
+        touchedComment = true
+        const end = rest.indexOf('-->')
+        if (end < 0) {
+          rest = ''
+          break
+        }
+        rest = rest.slice(end + 3)
+        inComment = false
+        continue
+      }
+      const start = rest.indexOf('<!--')
+      if (start < 0) {
+        visible += rest
+        rest = ''
+        break
+      }
+      touchedComment = true
+      visible += rest.slice(0, start)
+      rest = rest.slice(start + 4)
+      inComment = true
+    }
+    // A bookkeeping comment contributes neither physical lines nor words. If
+    // a line also carries real guide text, retain that visible fragment.
+    if (!touchedComment || visible.trim()) body.push(visible)
+  }
   return {
     lines: body.length,
     words: body.join(' ').split(/\s+/).filter(Boolean).length,

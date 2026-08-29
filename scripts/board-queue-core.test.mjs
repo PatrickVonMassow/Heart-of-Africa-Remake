@@ -34,6 +34,7 @@ import {
   parseTaskTitles,
   queueEntries,
   queueOrder,
+  blockedCardBody,
   blockedCardTitle,
   boardSafeTitle,
   renderQueueCard,
@@ -61,7 +62,7 @@ const confirmationLine = (point, title = 'GATED', stamp = '2026-07-29') =>
 const board = (queue) => `<title>B</title>
 <main><h1>Dashboard</h1>
 <details class="sect"><summary><h2>Woran ich gerade arbeite</h2></summary>
-<details class="now"><summary><span class="t">210 — Arbeit</span>
+<details class="now"><summary><span class="num">210</span><span class="t">Arbeit</span>
 <span class="right"><span class="meta">09:00 · bis ~23:00</span></span></summary>
 <div class="body"><p>Status (Stand 09:00): läuft.</p></div></details>
 </details>
@@ -75,6 +76,17 @@ ${queue}
 <p class="archive-link">Ältere im <a href="https://example.invalid/archiv">Archiv</a>.</p>
 </details>
 </main>`
+
+// Occurrence-level reader for generator assertions. The production parser
+// intentionally returns a Set, which is right for coverage checks but cannot
+// prove that a queue card was rendered exactly once.
+const queuePointOccurrences = (html) => {
+  const start = html.indexOf('<h2>Warteschlange')
+  if (start < 0) return []
+  const end = html.indexOf('<h2>', start + 1)
+  const section = html.slice(start, end < 0 ? undefined : end)
+  return [...section.matchAll(/class="num">\s*(\d+)/g)].map((m) => Number(m[1]))
+}
 
 describe('normaliseQueueData — a hand-editable file must degrade, never throw', () => {
   it('keeps the prose and drops everything hostile', () => {
@@ -278,7 +290,7 @@ describe('buildQueueSection — the projection replaces the section, nothing els
     expect(html).toContain('>Neu<')
     expect(html).not.toContain('>alt<')
     expect(html).toContain('<h2>Erledigt</h2>')
-    expect(html).toContain('210 — Arbeit')
+    expect(html).toContain('<span class="num">210</span><span class="t">Arbeit</span>')
     expect(html).toContain('archive-link')
   })
   it('says so loudly when there is no Warteschlange to project into', () => {
@@ -382,6 +394,17 @@ describe('the one-time import from a hand-written board', () => {
   })
   it('returns an empty projection rather than throwing on a board with no queue', () => {
     expect(importQueueFromHtml('<main></main>')).toEqual({ points: {} })
+  })
+
+  it('imports every owner from a compound chip through the shared chip reader', () => {
+    const html = board(
+      '<details><summary><span class="num">1000·1003</span><span class="t">Verbund</span>' +
+        '<span class="meta">~2 h</span></summary><div class="body"><p>Gemeinsamer Text.</p></div></details>',
+    )
+    const { points } = importQueueFromHtml(html)
+    expect(Object.keys(points)).toEqual(['1000', '1003'])
+    expect(points[1000]).toEqual({ title: 'Verbund', body: ['Gemeinsamer Text.'], estimate: '~2 h' })
+    expect(points[1003]).toEqual(points[1000])
   })
 
   // POINT 530: the round trip data → board → data is what destroyed 46 cards.
@@ -769,7 +792,7 @@ describe('the rendered queue — one flat list, no bundle left in the markup', (
   it('lists every open point exactly ONCE, in the queue order the cards are read in', () => {
     const open = [465, 439, 184, 295, RELEASE_TAG_POINT]
     const { html, entries } = built(open)
-    const rendered = [...html.matchAll(/class="num">(\d+)</g)].map((m) => Number(m[1]))
+    const rendered = queuePointOccurrences(html)
     expect(rendered).toEqual(entries.map((e) => e.point))
     expect(new Set(rendered).size).toBe(rendered.length)
     expect(rendered.slice().sort((a, b) => a - b)).toEqual(open.slice().sort((a, b) => a - b))
@@ -782,8 +805,7 @@ describe('the rendered queue — one flat list, no bundle left in the markup', (
   // 10.08.2026 and the published board kept showing the old plan.
   it('re-sequencing the work order re-sequences the rendered cards, nothing else edited', () => {
     const data = { points: { 439: { title: 'A', body: 'Eins.' }, 465: { title: 'B', body: 'Zwei.' } } }
-    const cards = (open) =>
-      [...built(open, data).html.matchAll(/class="num">(\d+)</g)].map((m) => Number(m[1]))
+    const cards = (open) => queuePointOccurrences(built(open, data).html)
     expect(cards([439, 465, 295])).toEqual([439, 465, 295])
     expect(cards([295, 465, 439])).toEqual([295, 465, 439])
   })
@@ -796,8 +818,9 @@ describe('the rendered queue — one flat list, no bundle left in the markup', (
     const tasks = readFileSync(resolve(REPO_ROOT, 'TASKS.md'), 'utf8')
     const open = openPointsOf(tasks)
     const { html } = buildQueueSection(board(''), { open, titles: parseTaskTitles(tasks) })
-    const rendered = [...html.matchAll(/class="num">(\d+)</g)].map((m) => Number(m[1]))
+    const rendered = queuePointOccurrences(html)
     expect(rendered.slice().sort((a, b) => a - b)).toEqual(open.slice().sort((a, b) => a - b))
+    expect(new Set(rendered).size).toBe(rendered.length)
     expect(html).not.toContain('class="group"')
   })
 
@@ -900,6 +923,23 @@ describe('the pending-request card', () => {
     expect(t).not.toMatch(/\(462\)/)
   })
 
+  it('neutralises uncapped point references without rewriting only a numeric prefix', () => {
+    expect(boardSafeTitle('Punkt 1000 folgt (1003)')).toBe('Punkt Nr. 1000 folgt [1003]')
+    expect(boardSafeTitle('point 10000')).toBe('point Nr. 10000')
+    const card = renderRequestsCard([
+      { at: '2026-07-30T20:11:00.000Z', title: 'Punkt 1000 folgt (1003)', route: 'tasks' },
+    ])
+    const html = `<h2>Warteschlange</h2>${card}<h2>Erledigt</h2>`
+    expect(card).toContain('<div class="body">')
+    const unsafe = html.replace('Punkt Nr. 1000', 'Punkt 1000').replace('[1003]', '(1003)')
+    expect(evaluateTopic({ dashboardHtml: unsafe, tasksText: '- [ ] 1000. A\n- [ ] 1003. B\n' }).block).toBe(true)
+    expect(evaluateTopic({ dashboardHtml: html, tasksText: '- [ ] 1000. A\n- [ ] 1003. B\n' }).block).toBe(false)
+  })
+
+  it('neutralises a parenthesized year without falsely labelling it as a point', () => {
+    expect(boardSafeTitle('Bilanz (2026) prüfen')).toBe('Bilanz [2026] prüfen')
+  })
+
   it('truncates a long title rather than filling the card with one', () => {
     const t = boardSafeTitle('Ein sehr langer Titel, der auf einem Telefon niemals in eine Zeile passen würde')
     expect(t.length).toBeLessThanOrEqual(60)
@@ -939,6 +979,34 @@ describe('the pending-request card', () => {
     expect(safe).not.toMatch(/scripts\/|\.mjs/)
     expect(safe).not.toMatch(/\bPunkt 465\b/)
     expect(safe).not.toMatch(/\(465\)/)
+  })
+
+  it('neutralises the foreign reason before the owner publishes its card', () => {
+    const body = blockedCardBody(
+      'Bitte fuer Punkt 1004 pruefen (1004) in scripts/finding.mjs, §6 und ab12345.\n\n' +
+        'Der zweite Absatz erklärt, warum die Entscheidung getrennt bleiben muss.',
+    )
+    expect(body).toContain('Bitte für Punkt Nr. 1004 prüfen [1004] in scripts/finding.mjs, §6 und ab12345.')
+    expect(body).toContain('\n\nDer zweite Absatz erklärt')
+    expect(body).not.toMatch(/\bPunkt 1004\b|\(1004\)/)
+    expect(body).toContain('scripts/finding.mjs')
+    expect(body).toContain('§6')
+    expect(body).toContain('ab12345')
+    expect(paragraphs(body)).toHaveLength(3)
+    expect(findTransliterations(body)).toEqual([])
+    const html =
+      '<h2>Von dir zu klären</h2><details><summary><span class="t">Anfrage nicht übernehmbar</span></summary>' +
+      `<div class="body"><p>${body}</p></div></details><h2>Warteschlange</h2>`
+    expect(evaluateTopic({ dashboardHtml: html, tasksText: '- [ ] 1004. Vierstelliger Punkt.\n' }).block).toBe(false)
+  })
+
+  it('repairs prose without rewriting transliterated file paths or URLs', () => {
+    const reason =
+      'Bitte fuer scripts/fuehrung-pruefen.mjs und C:\\tmp\\zurueck.md pruefen; ' +
+      'Details: https://example.invalid/fuer/pruefung.'
+    const body = blockedCardBody(reason)
+    expect(body).toContain('Bitte für scripts/fuehrung-pruefen.mjs und C:\\tmp\\zurueck.md prüfen;')
+    expect(body).toContain('https://example.invalid/fuer/pruefung.')
   })
 
   it('keeps a hostile title out of the audit on the real card', () => {

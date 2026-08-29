@@ -241,9 +241,44 @@ describe('auditGuide — budget boundaries', () => {
   it('leaves the fingerprint comment out of BOTH budgets', () => {
     const d = doc(entry('A', 2))
     const withFp = `${d}<!-- GUIDE-FINGERPRINT: ${'a'.repeat(64)} -->\n`
-    const tight = { ...LIMITS, maxLines: d.split('\n').length, minEntries: 1 }
+    const measured = measureGuide(d)
+    const tight = { ...LIMITS, maxLines: measured.lines, maxWords: measured.words, minEntries: 1 }
     expect(auditGuide(d, tight).violations.filter((v) => v.kind === 'length')).toHaveLength(0)
     expect(auditGuide(withFp, tight).violations.filter((v) => v.kind === 'length')).toHaveLength(0)
+  })
+
+  it('leaves every line and word of a multi-line bookkeeping comment out of both budgets', () => {
+    const d = doc(entry('A', 2))
+    const withFp = `${d}<!-- GUIDE-FINGERPRINT:\n${'bookkeeping '.repeat(100)}\n\n-->\n`
+    expect(measureGuide(withFp)).toEqual(measureGuide(d))
+  })
+
+  it('counts every line and word after an unterminated comment opener', () => {
+    const malformed = 'line one\nline two <!--\nline three\nline four\n'
+    expect(measureGuide(malformed)).toEqual(measureGuide('line one\nline two \nline three\nline four\n'))
+    expect(measureGuide(malformed)).toEqual({ lines: 5, words: 8 })
+  })
+
+  it('cannot re-form an unterminated opener across its own excision seam', () => {
+    const malformed = 'A <!-<!---rest of the guide'
+    expect(measureGuide(malformed)).toEqual(measureGuide('A <!- -rest of the guide'))
+    expect(measureGuide(malformed)).toEqual({ lines: 1, words: 6 })
+  })
+
+  it('keeps word boundaries while neutralising every opener in a malformed tail', () => {
+    const malformed = 'word<!--more <!-<!---rest'
+    expect(measureGuide(malformed)).toEqual(measureGuide('word more <!- -rest'))
+    expect(measureGuide(malformed)).toEqual({ lines: 1, words: 4 })
+  })
+
+  it('retains visible words before a comment that opens mid-line', () => {
+    const measured = measureGuide('keep these words <!-- hidden\nstill hidden\n-->')
+    expect(measured).toEqual({ lines: 1, words: 3 })
+  })
+
+  it('retains visible words after a comment that closes mid-line', () => {
+    const measured = measureGuide('<!-- hidden\nstill hidden --> keep these words')
+    expect(measured).toEqual({ lines: 1, words: 3 })
   })
 })
 

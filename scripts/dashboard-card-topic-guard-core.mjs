@@ -16,7 +16,7 @@
 // reference a TASKS point other than the card's own. A reference counts ONLY
 // in these explicit, predictable forms (case-insensitive):
 //   (a) "Punkt N" / "point N"        — the spelled-out form;
-//   (b) "(N)" with N a 2-3 digit number — the bare parenthesized form that
+//   (b) "(N)" with N a 2+ digit number — the bare parenthesized form that
 //       carried the 272 regression ("(246)", "(266)"). Single-digit "(1)" is
 //       NEVER a point reference: it is the enumeration/inventory convention
 //       ("(1) Schrift-Norden … (4) Signal-Osten" on the live board), while
@@ -27,10 +27,11 @@
 // A card without an own number (typical for "Von dir zu klären") owns nothing,
 // so ANY known-point reference in it is a cross-reference — a question card
 // states a decision, it does not report on a point. Everything else — counts
-// ("15 neue Tests"), dates ("31.12.1895"), times ("14:54"), years ("1890"),
+// ("15 neue Tests"), dates ("31.12.1895"), times ("14:54"), bare years ("1890"),
 // versions ("v0.2"), §-refs ("§19.8"), slashed screenshot pairs ("129/130"),
-// bare numbers and commit hashes — stays untouched by construction: no extra
-// exemption list, the two match forms are simply that tight.
+// bare numbers and commit hashes — stays untouched by construction. A year in
+// parentheses has the same lexical shape as a point reference and is therefore
+// scanned, but the known-TASKS gate below keeps an ordinary year inert.
 // THE UNNUMBERED STATE CARDS ARE EXEMPT (point 544). "Gerade keine laufende
 // Arbeit" and "Abschlussarbeiten zum gerade beendeten Punkt" own no point number
 // BY DESIGN, and the rule above reads a card without one as owning nothing — so
@@ -42,6 +43,7 @@
 // titles live.
 import { isStateCardTitle } from './board-core.mjs'
 import { REPUBLISH } from './board-remedy.mjs'
+import { pointNumbersFromChip, pointOwnershipFromTitle } from './dashboard-point-reader-core.mjs'
 
 const stripTags = (html) => html.replace(/<[^>]*>/g, ' ')
 
@@ -68,25 +70,36 @@ function sectionSlice(html, marker) {
 }
 
 /**
- * The `<details>` cards of one section as [{where, point, title, bodyHtml}].
+ * The `<details>` cards of one section as
+ * [{where, point, ownedPoints, title, bodyHtml}].
  * The own point comes from `<span class="num">N</span>` (queue) or a now-card
- * title starting `NNN — …` / `NNN - …`; null for cards without one (VDZK,
- * process cards). Cards without a body block are skipped (nothing to scan).
+ * title starting with the separator-qualified form the dashboard audit reads,
+ * including `NN: …` and compound `NN+NN — …` ownership. `point` is the sole
+ * owner or null for compound/unnumbered cards; `ownedPoints` carries the full
+ * set used by the topic decision. Plain hyphens are not title separators:
+ * accepting them turns a count such as `1 - 2 Tage` into false ownership.
+ * Cards without a body block are skipped.
  */
-export function parseCards(sectionHtml, where) {
+export function parseCards(sectionHtml, where, options = {}) {
   if (typeof sectionHtml !== 'string' || typeof where !== 'string') return []
   const cards = []
   for (const chunk of sectionHtml.split(/<details\b/).slice(1)) {
-    const num = chunk.match(/class="num">\s*(\d+)/)
+    const num = chunk.match(/class="num">\s*([^<]*?)\s*</)
     const title = chunk.match(/class="t">\s*([^<]*)/)
-    const titleNum = title && title[1].match(/^\s*(\d{2,3})\s*[—-]/)
+    let ownedPoints = []
+    if (num) {
+      ownedPoints = pointNumbersFromChip(num[1])
+    } else if (title) {
+      ownedPoints = pointOwnershipFromTitle(title[1], options).points
+    }
     const body =
       chunk.match(/<div class="body">([\s\S]*?)<\/div>\s*<\/details>/) ||
       chunk.match(/<div class="body">([\s\S]*)$/)
     if (!body) continue
     cards.push({
       where,
-      point: num ? Number(num[1]) : titleNum ? Number(titleNum[1]) : null,
+      point: ownedPoints.length === 1 ? ownedPoints[0] : null,
+      ownedPoints,
       title: title ? title[1].trim() : '',
       bodyHtml: body[1],
     })
@@ -95,23 +108,27 @@ export function parseCards(sectionHtml, where) {
 }
 
 // The two — and only two — reference forms (see the header comment): the
-// spelled-out "Punkt/point N" and the parenthesized 2-3 digit "(NN)"/"(NNN)".
-const SPELLED_REF_RE = /\b(?:punkt|point)\s+(\d{1,3})\b/gi
-const PAREN_REF_RE = /\((\d{2,3})\)/g
+// spelled-out "Punkt/point N" and the parenthesized 2+ digit "(NN…)".
+const SPELLED_REF_RE = /\b(?:punkt|point)\s+(\d+)\b/gi
+const PAREN_REF_RE = /\((\d{2,})\)/g
 
 /**
- * The foreign-point numbers referenced in one card body, deduplicated and in
- * order of first appearance. `ownPoint` may be null (then every known-point
+ * The foreign-point numbers referenced in one card body, deduplicated and
+ * sorted numerically. `ownPoint` may be null (then every known-point
  * reference is foreign). Total: bad input yields [].
  */
 export function foreignRefs(bodyHtml, ownPoint, known) {
   if (typeof bodyHtml !== 'string' || !(known instanceof Set)) return []
   const text = stripTags(bodyHtml)
   const refs = []
+  const owned =
+    ownPoint instanceof Set
+      ? ownPoint
+      : new Set(Array.isArray(ownPoint) ? ownPoint : ownPoint == null ? [] : [ownPoint])
   for (const re of [SPELLED_REF_RE, PAREN_REF_RE]) {
     for (const m of text.matchAll(re)) {
       const n = Number(m[1])
-      if (known.has(n) && n !== ownPoint && !refs.includes(n)) refs.push(n)
+      if (known.has(n) && !owned.has(n) && !refs.includes(n)) refs.push(n)
     }
   }
   return refs.sort((a, b) => a - b)
@@ -124,16 +141,16 @@ export function foreignRefs(bodyHtml, ownPoint, known) {
 export function topicViolations(html, known) {
   if (typeof html !== 'string' || !(known instanceof Set)) return []
   const cards = [
-    ...parseCards(sectionSlice(html, 'Woran ich gerade arbeite'), 'now'),
-    ...parseCards(sectionSlice(html, 'Von dir zu klären'), 'question'),
-    ...parseCards(sectionSlice(html, '<h2>Warteschlange'), 'queue'),
+    ...parseCards(sectionSlice(html, 'Woran ich gerade arbeite'), 'now', { knownPoints: known }),
+    ...parseCards(sectionSlice(html, 'Von dir zu klären'), 'question', { knownPoints: known }),
+    ...parseCards(sectionSlice(html, '<h2>Warteschlange'), 'queue', { knownPoints: known }),
   ]
   const violations = []
   for (const card of cards) {
     // The two state cards deliberately speak across a point boundary: closing
     // names the point just ended, and handover names the one picked up next.
     if (isStateCardTitle(card.title)) continue
-    for (const ref of foreignRefs(card.bodyHtml, card.point, known)) {
+    for (const ref of foreignRefs(card.bodyHtml, card.ownedPoints, known)) {
       violations.push({ where: card.where, point: card.point, title: card.title, ref })
     }
   }

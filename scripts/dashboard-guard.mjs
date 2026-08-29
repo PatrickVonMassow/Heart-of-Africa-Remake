@@ -57,6 +57,7 @@ import { heldByOtherLiveOwner, readOwnerLock } from './batch-singleton.mjs'
 import { openFingerprintOfTasks, syncedPublishPatch } from './board-currency-core.mjs'
 import { specSnapshots } from './dashboard-integrity-guard-core.mjs'
 import { readTasksAll } from './tasks-source.mjs'
+import { taskPointNumbers } from './dashboard-point-reader-core.mjs'
 import { isMainModule } from './is-main.mjs'
 import { PUBLISH_CMD } from './board-remedy.mjs'
 
@@ -120,11 +121,13 @@ export function gatherDashboardInputs({ sessionId = '' } = {}) {
       ? Number(activity.lastToolAt ?? 0)
       : 0
 
+  const tasksText = readTasksAll(TASKS)
   return {
     applicable: true,
     inputs: {
       paused: existsSync(PAUSE),
-      ...parseTasks(readTasksAll(TASKS)),
+      ...parseTasks(tasksText),
+      knownPoints: taskPointNumbers(tasksText),
       marker,
       markerFileExists,
       head: head(),
@@ -182,11 +185,14 @@ if (RUN_AS_SCRIPT && process.argv[2] === '--synced') {
 
   // VALIDATE FIRST (point 313): a board that fails the consistency audit can
   // not be attested — nothing is written, the violations are the work list.
-  const { open, done } = parseTasks(readTasksAll(TASKS))
+  const tasksText = readTasksAll(TASKS)
+  const { open, done } = parseTasks(tasksText)
+  const knownPoints = taskPointNumbers(tasksText)
   const priorState = readJson(STATE_PATH) ?? {}
   const violations = auditDashboard(readFileSync(p, 'utf8'), {
     open,
     done,
+    knownPoints,
     doneSeen: priorState.doneSeen ?? null,
     nowMinutes: berlinMinutes(),
     etaRevisions: priorState.etaRevisions ?? null,
@@ -309,7 +315,7 @@ if (RUN_AS_SCRIPT && process.argv[2] === '--synced') {
   try {
     const focus = readJson(FOCUS_PATH)
     const reviewedHtml = readFileSync(p, 'utf8')
-    const nowPoints = parseNowCardPoints(reviewedHtml)
+    const nowPoints = parseNowCardPoints(reviewedHtml, { knownPoints })
     if (focus && (focus.point == null || nowPoints.has(focus.point))) {
       writeJsonAtomic(FOCUS_PATH, { ...focus, confirmedAt: Date.now() })
       removeFile(PENDING_PATH)
