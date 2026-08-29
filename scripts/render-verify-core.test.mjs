@@ -3014,9 +3014,23 @@ describe('the shipped charge ledger', () => {
     // entry would have excused them too.
     expect(chargeFor(withDetail(composite, 'hoa-state-2026-08-29-42.png, hoa-state-2026-08-29-42.txt'), scoped)).toBeNull()
     expect(chargeFor(withDetail(composite, 'hoa-state-2026-08-29-42.json, hoa-state-2026-08-29-42.txt'), scoped)).toBeNull()
+    // THE LOST-STATE CASE HAD TO BE WRITTEN WITHOUT A SECOND REASON TO FAIL
+    // (cross-vendor review, GPT-5.6 Sol, 30.08.2026): the two lines above also
+    // lose the overlay or carry a picture, so each stayed null through a
+    // CONSTRAINT OTHER than the state lookahead — and the entry's state
+    // lookahead was in fact satisfied by the overlay's own `.json`. This detail
+    // keeps overlay and description and drops state and picture, so it is null
+    // only while the state member is required in its own right.
+    expect(
+      chargeFor(withDetail(composite, 'hoa-state-2026-08-29-42-overlay.json, hoa-state-2026-08-29-42.txt'), scoped),
+    ).toBeNull()
     // While the two checks that name the picture themselves need no detail.
     expect(chargeFor(red('the archive carries a screenshot'), scoped).point).toBe(927)
     expect(chargeFor(red('member hoa-state-2026-08-29-42.png is present'), scoped).point).toBe(927)
+    // ANY OTHER PNG MEMBER IS A RED NOBODY HAS MEASURED: the wildcard that used
+    // to stand here accepted every `member <anything>.png is present` the report
+    // suite might grow (cross-vendor review, GPT-5.6 Sol, 30.08.2026).
+    expect(chargeFor(red('member thumbnail.png is present'), scoped)).toBeNull()
   })
 
   it('excuses the timestamp row only where the red names the missing capability', () => {
@@ -3030,6 +3044,18 @@ describe('the shipped charge ledger', () => {
     // names no capability at all, is deliberately not excused either.
     expect(chargeFor(withDetail('WebGPU: real GPU timestamps were measured for every row', '0/33 rows, reason "the pass recorded no queries"'), scoped)).toBeNull()
     expect(chargeFor(withDetail('WebGPU: real GPU timestamps were measured for the low-preset rows too', '0/3 low rows with gpu'), scoped)).toBeNull()
+    // AND THE REASON MAY NOT RIDE ALONG WITH A SECOND FAILURE: unanchored, the
+    // detail below carried the known capability gap AND a genuinely different
+    // fault and was still excused (cross-vendor review, GPT-5.6 Sol, 30.08.2026).
+    expect(
+      chargeFor(
+        withDetail(
+          'WebGPU: real GPU timestamps were measured for every row',
+          '0/33 rows, reason "adapter without the timestamp-query feature" and 4 rows reported a negative median',
+        ),
+        scoped,
+      ),
+    ).toBeNull()
   })
 
   it('lets the benchmark cascade charge cover that sentence ALONE', () => {
@@ -3042,6 +3068,10 @@ describe('the shipped charge ledger', () => {
     // detail is anchored at both ends, so the assertion cannot become a blanket.
     expect(chargeFor(withDetail('no console errors', `${sentence} TypeError: x is not a function`), scoped)).toBeNull()
     expect(chargeFor(withDetail('no console errors', 'TypeError: x is not a function'), scoped)).toBeNull()
+    // BOTH ends: the two lines above only witness the TRAILING anchor, so the
+    // leading one could have been dropped with every assertion still green
+    // (cross-vendor review, GPT-5.6 Sol, 30.08.2026).
+    expect(chargeFor(withDetail('no console errors', `TypeError: x is not a function ${sentence}`), scoped)).toBeNull()
   })
 
   it('charges the crossing to 698 only while the round actually opens runs', () => {
@@ -3057,6 +3087,36 @@ describe('the shipped charge ledger', () => {
     // crossing merely falls outside the window.
     const noRun = density.replace('[run×16 part×72 roam×307]', '[part×72 roam×323]')
     expect(chargeFor(withDetail('the children walk PAST the traveller', noRun), scoped)).toBeNull()
+  })
+
+  it('charges the label fusion to 1010 only in the single-frame shape it measured', () => {
+    const scoped = { suite: 'polish', backend: 'webgl', kind: 'check' }
+    const withDetail = (name, detail) => ({ ...red(name), detail })
+    const name = 'no two Ctrl labels fuse in the village crowd (point 628)'
+    // WHAT 1010 MEASURED: one frame of ninety, deeper than the unreadable bar,
+    // and the retry green — the loaded-host suspicion the point owes a probe for.
+    const measured =
+      '1/90 frames held a pair fused beyond 6 px (allowed 4), deepest 19 px ' +
+      '["Ada"×"Njoro" 14×12 px], 4–7 labels across the sample — as deep as the 18 px unreadable bar'
+    expect(chargeFor(withDetail(name, measured), scoped).point).toBe(1010)
+    // A SUSTAINED FUSION IS A DIFFERENT DEFECT and must stay red: without a
+    // detail constraint the bare check name charged this away too.
+    expect(chargeFor(withDetail(name, measured.replace('1/90', '37/90')), scoped)).toBeNull()
+    // So must a red that never crossed the unreadable bar — there the crowd is
+    // over its allowed share of fused frames, which is not what 1010 observed.
+    expect(
+      chargeFor(
+        withDetail(
+          name,
+          '7/90 frames held a pair fused beyond 6 px (allowed 4), deepest 9 px, 4–7 labels across the sample',
+        ),
+        scoped,
+      ),
+    ).toBeNull()
+    // And a sample that never held the crowd proves nothing about fusion at all.
+    expect(
+      chargeFor(withDetail(name, 'the crowd did not hold: as few as 1 label(s) in a sampled frame (peak 6) — under the 2-label floor, nothing proven'), scoped),
+    ).toBeNull()
   })
 
   it('leaves the async-pipeline message uncharged, though its family now has a point', () => {
