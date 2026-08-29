@@ -26,6 +26,7 @@ some prose mentioning 123. without the checkbox form
 - [x] 246. Crocodile fix.
 - [x] 266. Trample crush sound.
 - [ ] 1000. First four-digit point.
+- [ ] 1003. Second four-digit point.
 `
 
 /** Minimal dashboard in the real board's markup (now + questions + queue + done). */
@@ -48,7 +49,7 @@ ${done.map(card).join('\n')}
 
 describe('knownPoints', () => {
   it('collects every `- [ ] N.` / `- [x] N.` line and nothing else', () => {
-    expect([...knownPoints(TASKS_SAMPLE)].sort((a, b) => a - b)).toEqual([1, 92, 246, 266, 272, 1000])
+    expect([...knownPoints(TASKS_SAMPLE)].sort((a, b) => a - b)).toEqual([1, 92, 246, 266, 272, 1000, 1003])
   })
 
   it('is total on non-string input', () => {
@@ -225,6 +226,13 @@ describe('evaluate', () => {
     expect(r.reason).toContain('now-card "272" references point 246')
     expect(r.reason).toContain('now-card "272" references point 266')
     expect(r.reason).toContain('--synced')
+  })
+
+  it('blocks a four-digit foreign reference through the TASKS-to-evaluate entry point', () => {
+    const html = boardHtml({ now: [{ n: 1000, body: '<p>Folgt Punkt 1003.</p>' }] })
+    const r = evaluate({ dashboardHtml: html, tasksText: TASKS_SAMPLE })
+    expect(r.block).toBe(true)
+    expect(r.reason).toContain('now-card "1000" references point 1003')
   })
 
   it('allows a clean board and is total on missing input', () => {
