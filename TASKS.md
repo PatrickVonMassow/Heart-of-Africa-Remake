@@ -13313,7 +13313,17 @@ to land than a mechanism that needs a review.
   touching a file no pass covered stays owed; plus the point-734 range as a fixture.
   Criticality: high — it blocks the turn end of a landed point, which is the state the batch cannot
   leave on its own.
-  Bundle: Session- & Repo-Hygiene.
+  Bundle: Session- & Repo-Hygiene.  MEASURED AGAIN, ON A THREE-COMMIT RANGE, 30.08.2026 — the shape does not need a long branch.
+  A charge-ledger change on `main` took FIVE cross-vendor rounds (GPT-5.6 Sol, effort high), each
+  finding something real, and after all five the gate still reports `missing pass 2, 3` for
+  `ffc9c23`, `a7e9ce5` and `2ae7931`. Those passes would re-read the SAME end-state file,
+  `scripts/render-verify-core.test.mjs` at some 175k characters, once per commit — and a scoped
+  end-state round over exactly that file is already on record. Six further rounds would read the
+  same bytes six more times.
+  WHY IT MATTERED THAT NIGHT rather than being academic: the user had just reported the Anthropic
+  quota nearly exhausted and asked for load to move to OpenAI, so redundant reviewer rounds spend
+  the one budget that was left. The residue was filed here rather than bought.
+
 - [ ] 999. The review ledger's physical order does not follow its `at` stamps, so a reader that
   trusts append order reads it wrong. MEASURED 28.08.2026 on `main` at 168805d5, answering the
   Opus 4.8 pass-7 refusal of point 734 (`.claude/mechanism-reviews.jsonl`, record `at`
