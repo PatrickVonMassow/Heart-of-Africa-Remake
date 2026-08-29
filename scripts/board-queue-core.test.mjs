@@ -76,6 +76,17 @@ ${queue}
 </details>
 </main>`
 
+// Occurrence-level reader for generator assertions. The production parser
+// intentionally returns a Set, which is right for coverage checks but cannot
+// prove that a queue card was rendered exactly once.
+const queuePointOccurrences = (html) => {
+  const start = html.indexOf('<h2>Warteschlange')
+  if (start < 0) return []
+  const end = html.indexOf('<h2>', start + 1)
+  const section = html.slice(start, end < 0 ? undefined : end)
+  return [...section.matchAll(/class="num">\s*(\d+)/g)].map((m) => Number(m[1]))
+}
+
 describe('normaliseQueueData — a hand-editable file must degrade, never throw', () => {
   it('keeps the prose and drops everything hostile', () => {
     const d = normaliseQueueData({ points: { 5: { body: ' b ' }, 0: { body: 'n' }, z: {} } })
@@ -769,7 +780,7 @@ describe('the rendered queue — one flat list, no bundle left in the markup', (
   it('lists every open point exactly ONCE, in the queue order the cards are read in', () => {
     const open = [465, 439, 184, 295, RELEASE_TAG_POINT]
     const { html, entries } = built(open)
-    const rendered = [...parseQueuePoints(html)]
+    const rendered = queuePointOccurrences(html)
     expect(rendered).toEqual(entries.map((e) => e.point))
     expect(new Set(rendered).size).toBe(rendered.length)
     expect(rendered.slice().sort((a, b) => a - b)).toEqual(open.slice().sort((a, b) => a - b))
@@ -795,8 +806,9 @@ describe('the rendered queue — one flat list, no bundle left in the markup', (
     const tasks = readFileSync(resolve(REPO_ROOT, 'TASKS.md'), 'utf8')
     const open = openPointsOf(tasks)
     const { html } = buildQueueSection(board(''), { open, titles: parseTaskTitles(tasks) })
-    const rendered = [...parseQueuePoints(html)]
+    const rendered = queuePointOccurrences(html)
     expect(rendered.slice().sort((a, b) => a - b)).toEqual(open.slice().sort((a, b) => a - b))
+    expect(new Set(rendered).size).toBe(rendered.length)
     expect(html).not.toContain('class="group"')
   })
 
