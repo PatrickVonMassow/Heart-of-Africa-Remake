@@ -253,6 +253,7 @@ describe('four-digit point lifecycle', () => {
     const source = fullBoard({
       now: nowEntry(1000, 'Großer Abschluss', '10:00 · ~12:00'),
       queue: queueEntry(1001, 'Großer Nachfolger', '~2 h'),
+      done: '<p class="archive-link">\u00c4ltere im <a href="https://example.invalid/archiv">Archiv</a>.</p>\n',
     })
     const out = closeCard(source, 1000, {
       text: 'Fertig.',
@@ -263,15 +264,39 @@ describe('four-digit point lifecycle', () => {
     expect(doneCards(out, 1000)).toHaveLength(1)
     expect(parseNowCardPoints(out)).toEqual(new Set([1001]))
     expect(queueCard(out, 1001)).toBeNull()
+    const structureBefore = new Set(structureViolations(source).map((v) => v.code))
+    expect(structureViolations(out).map((v) => v.code).filter((code) => !structureBefore.has(code))).toEqual([])
+    const auditBefore = new Set(
+      auditDashboard(source, { open: [1000, 1001], done: [], doneSeen: [] }).map((v) => v.code),
+    )
+    expect(
+      auditDashboard(out, { open: [1001], done: [1000], doneSeen: [] })
+        .map((v) => v.code)
+        .filter((code) => !auditBefore.has(code)),
+    ).toEqual([])
   })
 
   it('writes four-digit closing work from the queued subject', () => {
-    const out = toClosingWork(fullBoard({ queue: queueEntry(1000, 'Großer Abschluss', '~2 h') }), 1000, {
+    const queued = fullBoard({
+      queue: queueEntry(1000, 'Großer Abschluss', '~2 h'),
+      done: '<p class="archive-link">Ältere im <a href="https://example.invalid/archiv">Archiv</a>.</p>\n',
+    })
+    const running = toNow(queued, 1000, 'Läuft.', { stamp: '10:00' })
+    const board = toDone(running, 1000, { text: 'Zusammengeführt.', end: '12:15' })
+    const out = toClosingWork(board, 1000, {
       reason: 'Das Vier-Augen-Protokoll fehlt noch.',
       stamp: '12:20',
     })
     expect(out).toContain('<span class="num">1000</span><span class="t">Großer Abschluss: Abschlussarbeiten</span>')
     expect(parseNowCardPoints(out)).toEqual(new Set([1000]))
+    const structureBefore = new Set(structureViolations(board).map((v) => v.code))
+    expect(structureViolations(out).map((v) => v.code).filter((code) => !structureBefore.has(code))).toEqual([])
+    const auditBefore = new Set(auditDashboard(board, { open: [], done: [1000] }).map((v) => v.code))
+    expect(
+      auditDashboard(out, { open: [], done: [1000] })
+        .map((v) => v.code)
+        .filter((code) => !auditBefore.has(code)),
+    ).toEqual([])
   })
 
   it('retitles and upgrades four-digit legacy now-cards without losing ownership', () => {
