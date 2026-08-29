@@ -135,7 +135,7 @@ describe('run-logged default launch — the run-identity re-exec (point 700, Sol
         'verification-start',
         'verification-finish',
       ])
-      expect(journal.records).toEqual(journal.records.map((event) => expect.objectContaining({
+      expect(journal.records).toEqual(journal.records.map(() => expect.objectContaining({
         pid: record.pid,
         cause: 'named-verification-run',
         evidence: expect.objectContaining({
