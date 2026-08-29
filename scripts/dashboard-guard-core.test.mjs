@@ -140,16 +140,18 @@ describe('parseKlaerungPoints', () => {
     })
     expect([...parseKlaerungPoints(html)].sort()).toEqual([206, 210])
   })
-  it('does not invent a VDZK point from a date, count, year, or four-digit free title', () => {
+  it('does not invent a VDZK point from a date or hyphenated count', () => {
     const html = boardHtml({
       klaerungExtra: [
         '2026-07-25 — Rückblick',
         '5-Minuten-Check — Aufwand',
-        '1890 — Kartenstand',
-        '1003 — Vierstelliger Punkt ohne Nummern-Chip',
       ],
     })
     expect(parseKlaerungPoints(html)).toEqual(new Set())
+  })
+  it('reads an uncapped point from the chip-less VDZK title shape', () => {
+    const html = boardHtml({ klaerungExtra: ['1003 — Vierstelliger Punkt ohne Nummern-Chip'] })
+    expect(parseKlaerungPoints(html)).toEqual(new Set([1003]))
   })
   it('does not pick up now-card, queue, or Erledigt titles', () => {
     // No VDZK cards at all — nothing from the surrounding sections leaks in.
@@ -282,6 +284,22 @@ describe('evaluate — one section per point ("Von dir zu klären" overlaps)', (
       green({ open: [210, 211, 204, 206], html: boardHtml({ queue: [211, 204], klaerung: [206] }) }),
     )
     expect(r.decision).toBe('allow')
+  })
+  it('counts a four-digit point that lives ONLY under "Von dir zu klären"', () => {
+    const r = evaluate(
+      green({ open: [210, 211, 204, 1003], html: boardHtml({ klaerung: [1003] }) }),
+    )
+    expect(r.decision).toBe('allow')
+  })
+  it('still detects a four-digit VDZK overlap with another open section', () => {
+    const r = evaluate(
+      green({
+        open: [210, 211, 204, 1003],
+        html: boardHtml({ queue: [211, 204, 1003], klaerung: [1003] }),
+      }),
+    )
+    expect(r.decision).toBe('block')
+    expect(r.reason).toMatch(/VON DIR ZU KLÄREN.*1003.*Warteschlange/)
   })
   it('ignores no-number VDZK cards (never point-tied)', () => {
     const r = evaluate(green({ html: boardHtml({ klaerungExtra: ['ntfy-Topic abonnieren'] }) }))

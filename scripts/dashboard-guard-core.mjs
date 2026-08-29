@@ -106,12 +106,11 @@ export function parseQueuePoints(html) {
  * Point numbers of the "Von dir zu klären" cards (items blocked on the user).
  * Anchored on the SECTION HEADER like parseQueuePoints, and reading only the
  * LEADING number of each card TITLE (`<span class="t">226 — …`) — never every
- * digit. Because this is free title text rather than a numeric `.num` field,
- * the number remains capped at 999 and must end at an en/em dash or colon; a
- * year, date, count, or four-digit point cannot pose as a clarification-card
- * owner. Cards without a qualifying leading number (the ntfy subscription,
- * the communication-system question) yield nothing. Empty Set on non-string
- * input or a missing section.
+ * digit. The number must end at an en/em dash or colon, which excludes ISO
+ * dates and hyphenated counts without imposing a digit ceiling that would hide
+ * a real four-digit point. Cards without a qualifying leading number (the ntfy
+ * subscription, the communication-system question) yield nothing. Empty Set
+ * on non-string input or a missing section.
  */
 export function parseKlaerungPoints(html) {
   const points = new Set()
@@ -121,8 +120,7 @@ export function parseKlaerungPoints(html) {
   const kEnd = html.indexOf('<h2>', kStart + 1)
   const sectionHtml = html.slice(kStart, kEnd < 0 ? undefined : kEnd)
   for (const m of sectionHtml.matchAll(/class="t">\s*(\d+)\s*[—–:]/g)) {
-    const point = Number(m[1])
-    if (point <= 999) points.add(point)
+    points.add(Number(m[1]))
   }
   return points
 }
