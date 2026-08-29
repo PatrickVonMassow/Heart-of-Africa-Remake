@@ -141,10 +141,13 @@ cannot renew the emergency clock. A named verification run is the sole clock
 suspension: `scripts/verify/run-logged.mjs` writes its `*.run.json` and emits an
 append-only progress event only when it consumes output; the latest such event
 renews a 15-minute lease, and the emergency lane proves that the record still
-names the live wrapper process. Rewriting `startedAt` or touching the output log
-emits no event and buys no time. This lease never changes the last durable-progress
-boundary. No fresh output, an expired bound, a terminal receipt, or a dead/reused
-process withdraws the suspension, so a busy wedge still strikes.
+names the live wrapper process. Each renewal is capped at 15 minutes and the
+whole suspension ends two hours after `startedAt`: this admits the measured
+80m48s two-backend LARGE run with margin but gives a chatty retry loop an
+arithmetic end. Rewriting `startedAt` or touching the output log emits no event
+and buys no time. This lease never changes the last durable-progress boundary.
+No fresh output, an expired bound, a terminal receipt, or a dead/reused process
+withdraws the suspension, so a busy wedge still strikes.
 
 The first hour-without-progress strike is soft: doctor repair followed by a
 normal restart. A hard strike is legal only when that recorded strike exists and

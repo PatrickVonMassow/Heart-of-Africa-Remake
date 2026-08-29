@@ -4,6 +4,7 @@ import {
   EMERGENCY_COOLDOWN_MS,
   EMERGENCY_THRESHOLD_MS,
   VERIFICATION_LEASE_MS,
+  VERIFICATION_SUSPENSION_MAX_MS,
   activeVerificationLease,
   activeVeto,
   emergencyDecision,
@@ -131,6 +132,33 @@ describe('the independent emergency decision', () => {
     expect(emergencyDecision({ now: NOW, report: overdue, workablePoints: [1002] })).toMatchObject({
       action: 'soft-recover', strike: true, reason: 'batch-stalled-past-threshold',
       progressAt: NOW - 90 * 60_000,
+    })
+  })
+
+  it('caps repeated verification renewals at two hours from the run start', () => {
+    const overdue = report(ACTIVITY_CLASSES.VERIFICATION)
+    const startedAt = NOW - VERIFICATION_SUSPENSION_MAX_MS
+    overdue.verificationLeases = [{
+      record: '/repo/local/verify-logs/large.log.run.json',
+      command: 'verify --plan large',
+      status: 'running',
+      startedAt,
+      progressAt: NOW - 1000,
+      leaseUntil: NOW - 1000 + VERIFICATION_LEASE_MS,
+      processAlive: true,
+    }]
+    expect(activeVerificationLease(overdue, NOW)).toBeNull()
+    expect(emergencyDecision({ now: NOW, report: overdue, workablePoints: [1002] })).toMatchObject({
+      action: 'soft-recover', strike: true, reason: 'batch-stalled-past-threshold',
+    })
+
+    const beforeCeiling = NOW - 1
+    overdue.verificationLeases[0].startedAt = beforeCeiling - VERIFICATION_SUSPENSION_MAX_MS + 1
+    overdue.verificationLeases[0].progressAt = beforeCeiling - 1000
+    overdue.verificationLeases[0].leaseUntil = overdue.verificationLeases[0].progressAt + VERIFICATION_LEASE_MS
+    expect(activeVerificationLease(overdue, beforeCeiling)).toMatchObject({
+      leaseUntil: NOW,
+      suspensionUntil: NOW,
     })
   })
 

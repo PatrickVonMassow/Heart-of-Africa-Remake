@@ -6,6 +6,9 @@
 export const EMERGENCY_THRESHOLD_MS = 60 * 60 * 1000
 export const EMERGENCY_COOLDOWN_MS = 45 * 60 * 1000
 export const VERIFICATION_LEASE_MS = 15 * 60 * 1000
+// The measured two-backend LARGE run is 80m48s. Two hours admits that run and
+// ordinary variance, but a chatty retry loop still reaches an arithmetic end.
+export const VERIFICATION_SUSPENSION_MAX_MS = 2 * EMERGENCY_THRESHOLD_MS
 export const BATCH_PROGRESS_KINDS = new Set([
   'first-parent-commit',
   'committed-boundary',
@@ -36,7 +39,12 @@ export function activeVeto(veto, now = Date.now()) {
  * particular, a stale progress sample cannot be rescued by an arbitrary future
  * `leaseUntil` value.
  */
-export function activeVerificationLease(report = {}, now = Date.now(), leaseMs = VERIFICATION_LEASE_MS) {
+export function activeVerificationLease(
+  report = {},
+  now = Date.now(),
+  leaseMs = VERIFICATION_LEASE_MS,
+  suspensionMaxMs = VERIFICATION_SUSPENSION_MAX_MS,
+) {
   let active = null
   const windowEnd = Number(report?.window?.end)
   for (const lease of report?.verificationLeases ?? []) {
@@ -50,7 +58,13 @@ export function activeVerificationLease(report = {}, now = Date.now(), leaseMs =
     if (progressAt < startedAt || progressAt > now || (Number.isFinite(windowEnd) && progressAt > windowEnd)) continue
     if (leaseUntil <= now || leaseUntil <= progressAt || leaseUntil - progressAt > leaseMs) continue
     if (now - progressAt >= leaseMs) continue
-    if (!active || progressAt > active.progressAt) active = { ...lease, startedAt, progressAt, leaseUntil }
+    const suspensionUntil = startedAt + suspensionMaxMs
+    if (!Number.isFinite(suspensionUntil) || now >= suspensionUntil) continue
+    const effectiveUntil = Math.min(leaseUntil, suspensionUntil)
+    if (effectiveUntil <= now) continue
+    if (!active || progressAt > active.progressAt) {
+      active = { ...lease, startedAt, progressAt, leaseUntil: effectiveUntil, suspensionUntil }
+    }
   }
   return active
 }
