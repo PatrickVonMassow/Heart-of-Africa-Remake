@@ -12446,6 +12446,16 @@ to land than a mechanism that needs a review.
   pre-push gate. The check's own message already names the legitimate case, and the pre-push gate's
   single re-run is what rescued tonight's push; that re-run is a fail-soft, not an answer, because it
   costs a full unit suite and reports SUSPECT.
+  AND IT KILLS A FULL REGRESSION, NOT ONLY A UNIT RUN (measured 29.08.2026, 19:21-19:32, on
+  `feat/687-roam-bound-fixes` with NO lane running at all). The LARGE run's own `unit` stage went
+  red on `keeps both a shared clone and its live source unchanged with clone-local GIT_DIR` — "one
+  or more worktree indexes changed" — because the SAME session was doing its ordinary main-branch
+  bookkeeping while the suite ran: one commit and one push at 19:22, plus board publishes. Nothing
+  was wrong with the code and nothing leaked; the run simply overlapped the owner writing down what
+  the run was for. The cost is not one suite but eighty-five minutes of both-backend regression
+  thrown away, and the only way to avoid it today is a rule no guard enforces: touch no ref while a
+  LARGE runs. That rule is unworkable in practice, because a LARGE is exactly when there is time for
+  bookkeeping.
   IT IS NOT ONLY THE DELEGATED LANES — THE OWNER TRIPS IT ON EVERY POINT START (measured
   27.08.2026, 00:09-00:12Z, on main `6edd81fd`, with NO authoring lane running yet). The chain,
   end to end: `batch-doctor --gate` began `npm run test:unit` at 00:09:44Z; at 00:12:28Z the same
