@@ -13366,3 +13366,61 @@ to land than a mechanism that needs a review.
   blocks every turn end of the batch, and the escaped-pipe shape is the one path on which the guard
   reports a measured invariant it did not measure.
   Bundle: Session- & Repo-Hygiene.
+
+- [ ] 1005. Bookkeeping without a point has no card, and `board-first-guard` locks the owner out
+  of work `CLAUDE.md` expressly allows (measured 29.08.2026 09:35–09:45, narrowed 10:16).
+  `CLAUDE.md` §6 states "Small cross-cutting bookkeeping may land on `main`". The board has no
+  card for that state. MEASURED: while "Gerade keine laufende Arbeit" stands in the section
+  "Woran ich gerade arbeite", `board-first-guard` refuses EVERY state-changing call — `git
+  branch --show-current` and `git add TASKS.md` were both blocked — and offers exactly three
+  remedies: `board.mjs now <N>`, `board.mjs closing <N>`, or stopping.
+  THE NARROWED GAP. The second remedy does cover one case: `node scripts/board.mjs closing <N>`
+  writes a card for "the point is merged and ticked, its closing work is still owed", is
+  expressly not a stop claim, and after `board.mjs closing 884` the previously twice-refused
+  `git add .claude/mechanism-reviews.jsonl` passed. What remains is bookkeeping where NO point
+  was merged at all — the user-ordered re-ranking of the work order belongs to no point and
+  closes none, so neither `now <N>` nor `closing <N>` fits.
+  RULED OUT, each read: `board.mjs focus - "<note>"` accepts the point number `-`
+  (`scripts/board.mjs:443`) and republishes, but does NOT replace the idleness card — the guard
+  kept blocking unchanged afterwards. `board.mjs none` writes that same idleness claim
+  (`NO_CURRENT_WORK_TITLE`, `scripts/board-core.mjs:1439`). `promoteToNow`
+  (`scripts/board-core.mjs:477`) throws without an existing queue card, so it cannot create a
+  point-less card. `scripts/board-first-core.mjs` and `scripts/board-first-guard.mjs` carry no
+  exemption list and no bypass lever (a grep for `HOA_` variables is empty). The stopgap used on
+  the day was `board.mjs promote 932`, the only command that lets the card title be written
+  freely — the number badge said 932 while title and body truthfully described the re-ranking.
+  It also consumes that point's queue card until the next rebuild.
+  FINAL STATE: either a current-work card WITHOUT a point number — the number badge is dropped,
+  the title names the activity — that `board-first-guard` accepts as "something is running", or
+  the guard's three remedies name expressly what the owner is to do in this case instead.
+  VERIFIABLE: a unit case that the point-less card satisfies `board-first-core`'s
+  "work is declared" condition, a case that the board renders it without a number badge and
+  without disturbing the four-section structure, and a case over the guard's refusal text that
+  the named remedy actually reaches the state it promises; plus `npm run test:unit`, lint, build.
+  Criticality: medium — it does not lose work, but it forces the owner to let the board claim a
+  point activity that is not running in order to commit work the build order allows.
+  Bundle: Session- & Repo-Hygiene.
+
+- [ ] 1006. A later same-vendor clearance over the same files silently displaces the earlier
+  cross-vendor read in the mechanism ledger (measured 29.08.2026 while paying off inherited
+  debt). Two Claude counter-readings of the Sol commits `29ab77a` and `de1b9f8` were recorded in
+  `.claude/mechanism-reviews.jsonl`. A LATER Sol clearance covering the same files (`0b5770c`)
+  displaced them: the gate then reported "the only review on record is from GPT-5.6 Sol's
+  vendor, a same-vendor review is not independent" although the independent reading stood in the
+  ledger. Only re-recording the Claude reads AFTER the Sol clearance cleared the gate.
+  WHY IT MATTERS: the ledger is the four-eyes evidence. A per-file "last clearance wins"
+  resolution means whoever lets two vendors clear the same files in sequence loses the older
+  clearance silently — and the loss shows up as a refusal that a re-record papers over, which is
+  exactly the shape that trains an operator to re-record rather than to ask what was lost.
+  FINAL STATE: the ledger's file-level resolution keeps every independent reading of a file
+  rather than the newest one, so an existing cross-vendor read continues to satisfy the gate
+  after a same-vendor clearance over the same files; where a genuinely superseding clearance is
+  intended, it says so explicitly rather than by arriving later.
+  VERIFIABLE: a unit case over the ledger reader that a cross-vendor read recorded BEFORE a
+  same-vendor clearance of the same files still satisfies the independence condition, a case
+  that an explicitly superseding record does replace its predecessor, and a regression case
+  reproducing the measured `29ab77a`/`de1b9f8`/`0b5770c` sequence; plus `npm run test:unit`,
+  lint, build.
+  Criticality: high — while it stands, genuine independent review evidence can be lost without a
+  message, and the gate's refusal reads as a missing review rather than a displaced one.
+  Bundle: Session- & Repo-Hygiene.
