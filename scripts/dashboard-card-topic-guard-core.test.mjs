@@ -86,24 +86,20 @@ describe('parseCards', () => {
     expect(topicViolations(`<h2>Woran ich gerade arbeite</h2>${section}`, KNOWN)).toEqual([])
   })
 
-  it('does not invent ownership from an ISO date or a single-digit effort title', () => {
+  it('does not invent ownership from an ISO date and accepts a spaced legacy hyphen', () => {
     const section = `
 <details><summary><span class="t">2026-07-25 — Rückblick</span></summary><div class="body">Kurz.</div></details>
 <details><summary><span class="t">1 - 2 Tage Aufwand</span></summary><div class="body">Punkt 1.</div></details>`
-    expect(parseCards(section, 'now').map((c) => c.point)).toEqual([null, null])
-    expect(topicViolations(`<h2>Woran ich gerade arbeite</h2>${section}`, KNOWN)).toMatchObject([
-      { where: 'now', point: null, ref: 1 },
-    ])
+    expect(parseCards(section, 'now').map((c) => c.point)).toEqual([null, 1])
+    expect(topicViolations(`<h2>Woran ich gerade arbeite</h2>${section}`, KNOWN)).toEqual([])
   })
 
-  it('records that a plain-hyphen title is unsupported and therefore owns no point', () => {
+  it('keeps a plain-hyphen card reference on its own topic', () => {
     const section =
       '<details><summary><span class="t">1000 - Arbeit</span></summary>' +
       '<div class="body">Punkt 1000.</div></details>'
-    expect(parseCards(section, 'now').map((c) => c.point)).toEqual([null])
-    expect(topicViolations(`<h2>Woran ich gerade arbeite</h2>${section}`, KNOWN)).toMatchObject([
-      { where: 'now', point: null, title: '1000 - Arbeit', ref: 1000 },
-    ])
+    expect(parseCards(section, 'now').map((c) => c.point)).toEqual([1000])
+    expect(topicViolations(`<h2>Woran ich gerade arbeite</h2>${section}`, KNOWN)).toEqual([])
   })
 
   it('is total on malformed input', () => {
