@@ -11385,12 +11385,23 @@ to land than a mechanism that needs a review.
   own prose rewrite. AMENDED 28.08.2026: the fuse is no longer dated — the work order passed 999,
   and the third site of this class, `numbersIn` in `scripts/bundle-first-core.mjs`, reported points
   1000-1002 as unbundled until it was widened to four digits in the same hour.
-  FINAL STATE: point numbers are parsed without a digit ceiling at every site named here; the JSDoc
-  matches the code; the fingerprint case tightens both budgets; and a multi-line comment is
-  excluded whole.
-  VERIFIABLE: unit cases with a four-digit point in a title and in a body, and a fingerprint case
-  that fails when only one budget excludes the comment.
-  Criticality: low — one fuse dated at point 1000, one half-covered assertion.
+  (4) THE FOURTH SITE IS NOW BLOCKING THE BATCH. MEASURED 29.08.2026 landing point 1003:
+  `parseCards` in `scripts/dashboard-guard-core.mjs:308,312` applies `MAX_POINT = 999` to BOTH its
+  readings, so the `class="num"` field — which the board itself writes and which holds nothing but
+  the card's own point numbers — goes blind at 1000. The consistency audit therefore reports
+  `erledigt-missing` for a done card it is looking straight at, and `dashboard-guard --synced`
+  refuses to attest. It does not wait itself out: `doneSeen` advances only over points that HAVE a
+  card, so the finding returns at every turn end and EVERY four-digit landing hangs behind a
+  hand-written waiver. The bound protects nothing on the structured field; on the free TITLE text,
+  where a year could pose as a point, it does — so the two readings must part company.
+  FINAL STATE: point numbers are parsed without a digit ceiling at every site named here, with the
+  bound kept only where the text it reads is free prose; the JSDoc matches the code; the
+  fingerprint case tightens both budgets; and a multi-line comment is excluded whole.
+  VERIFIABLE: unit cases with a four-digit point in a title and in a body, a done card whose number
+  is four digits passing the consistency audit with no waiver, and a fingerprint case that fails
+  when only one budget excludes the comment.
+  Criticality: high — site (4) blocks the attestation of every turn end that follows a four-digit
+  landing, and the only way past it today is a waiver that never clears.
   Bundle: Chat & Tafel.
 
 - [ ] 904. Three findings the whole-range review found in the landed attempt lease. MEASURED
