@@ -90,16 +90,16 @@ export function emergencyDecision({
   if (!Number.isFinite(progressAt)) {
     return { action: 'observe', reason: 'no-bounded-evidence-window', strike: false }
   }
+  const stalledMs = Math.max(0, now - progressAt)
+  if (stalledMs < thresholdMs) {
+    return { action: 'observe', reason: 'progress-within-threshold', strike: false, progressAt, stalledMs }
+  }
   const verificationLease = activeVerificationLease(report, now)
   if (verificationLease) {
     return {
       action: 'stand-down', reason: 'live-verification-lease', strike: false,
-      progressAt, verificationLease,
+      progressAt, stalledMs, verificationLease,
     }
-  }
-  const stalledMs = Math.max(0, now - progressAt)
-  if (stalledMs < thresholdMs) {
-    return { action: 'observe', reason: 'progress-within-threshold', strike: false, progressAt, stalledMs }
   }
   if (Number.isFinite(state?.lastStrikeAt) && now - state.lastStrikeAt < cooldownMs) {
     return { action: 'observe', reason: 'strike-cooldown', strike: false, progressAt, stalledMs }

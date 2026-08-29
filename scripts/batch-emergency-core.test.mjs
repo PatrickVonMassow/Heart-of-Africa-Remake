@@ -114,6 +114,23 @@ describe('the independent emergency decision', () => {
     })
   })
 
+  it('keeps ordinary in-threshold progress observable even with a live verification lease', () => {
+    const healthy = report(ACTIVITY_CLASSES.VERIFICATION)
+    healthy.batchProgress[0].at = NOW - EMERGENCY_THRESHOLD_MS + 1
+    healthy.verificationLeases = [{
+      record: '/repo/local/verify-logs/large.log.run.json',
+      command: 'verify --plan large',
+      status: 'running',
+      startedAt: NOW - 10 * 60_000,
+      progressAt: NOW - 1000,
+      leaseUntil: NOW - 1000 + VERIFICATION_LEASE_MS,
+      processAlive: true,
+    }]
+    expect(emergencyDecision({ now: NOW, report: healthy, workablePoints: [1002] })).toMatchObject({
+      action: 'observe', strike: false, reason: 'progress-within-threshold',
+    })
+  })
+
   it.each([
     ['expired', { progressAt: NOW - 60_000, leaseUntil: NOW - 1, processAlive: true }],
     ['stale', { progressAt: NOW - VERIFICATION_LEASE_MS - 1, leaseUntil: NOW + 60_000, processAlive: true }],
