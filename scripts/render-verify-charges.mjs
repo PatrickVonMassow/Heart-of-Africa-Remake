@@ -634,6 +634,14 @@ export const RED_CHARGES = [
     featureLevel: 'compatibility',
     kind: 'check',
     match: /^the children walk PAST the traveller/i,
+    // DETAIL-SCOPED 30.08.2026 (cross-vendor review, GPT-5.6 Sol, do-not-merge
+    // finding 4): the name alone charged EVERY future failure of this check,
+    // including one caused by a round that no longer plays at all — which is the
+    // opposite of what 698 owns. 698's claim is DENSITY: the round runs, and the
+    // crossing merely does not fall inside the window. So the detail must show the
+    // round opening runs at all; a window that never reached the `run` phase is a
+    // different defect and stays a real red.
+    detailMatch: /crossed his line;[\s\S]*phases \[[^\]]*run×/i,
     why:
       'THE USER DECIDED THIS ONE BY NAME. Measured 17.08.2026 on this same branch and filed as '
       + 'point 698, whose first line records the ruling: land the bank round as it stands and '
@@ -653,8 +661,30 @@ export const RED_CHARGES = [
     backend: 'webgpu',
     featureLevel: 'compatibility',
     kind: 'console',
+    // NARROWED 30.08.2026 (cross-vendor review, GPT-5.6 Sol, do-not-merge
+    // finding 1). The alternatives used to end at the bare prefixes, so ANY
+    // pipeline or command-buffer failure on this lane was charged away — the
+    // opposite of what this entry claims about itself. Each now carries the
+    // DOWNSTREAM OBJECT the cascade prints: the async form is excused only when
+    // what it failed on is an invalid TEXTURE, and the command buffer only when
+    // the encoder it came from is a renderContext. An invalid BindGroup or
+    // ShaderModule under the same prefix stays a real red.
+    //
+    // WHY THE BOUND SITS AT `[Invalid Tex` AND NOT ONE CHARACTER FURTHER: a
+    // stored console name is normalised to 120 characters, and for the longest
+    // object measured — `renderPipeline_MeshStandardNodeMaterial_1006` — the cut
+    // lands exactly there. `[Invalid Text` would stop matching the very red this
+    // entry was written for.
+    //
+    // AND WHY NOT THE UNTRUNCATED DETAIL, WHICH CARRIES THE WHOLE SENTENCE: these
+    // seven texts share ONE derived key while carrying SEVEN different pipeline
+    // objects, so the recorder marks the detail VARIED and refuses any
+    // detailMatch against it — that safeguard working, not failing. The name is
+    // therefore the whole of what this record can be asked, and what stays
+    // unasked is exactly POINT 990's subject: a charge cannot verify the root its
+    // downstream sentence points back to.
     match:
-      /^console error: THREE\.WebGPURenderer: (Async render pipeline creation failed|Uncaptured WebGPU GPUValidationError: \[Invalid CommandBuffer from CommandEncoder)/i,
+      /^console error: THREE\.WebGPURenderer: (Async render pipeline creation failed \(renderPipeline_[^)]+\): \[Invalid Tex|Uncaptured WebGPU GPUValidationError: \[Invalid CommandBuffer from CommandEncoder "renderContext_)/i,
     why:
       'THE THIRD DOOR OF THE SAME CASCADE, filed as point 1011 on 29.08.2026. The 514 console '
       + 'entry above already names "the invalid msaa-texture/view/command-buffer and '
@@ -674,6 +704,13 @@ export const RED_CHARGES = [
     featureLevel: 'compatibility',
     kind: 'check',
     match: /^WebGPU: real GPU timestamps were measured for/i,
+    // NARROWED 30.08.2026 (cross-vendor review, GPT-5.6 Sol, do-not-merge finding
+    // 2): the feature level does NOT test the capability, so on a compatibility
+    // adapter that DOES expose `timestamp-query` a genuine timestamp regression
+    // would have been charged here. The excuse now rests on the red's own stated
+    // reason and on nothing else. The low-preset row prints no such reason and is
+    // therefore NOT excused: it stays a real red, which is 1012's to close.
+    detailMatch: /adapter without the timestamp-query feature/i,
     why:
       'A CHECK THAT CANNOT PASS ON THE LANE IT RUNS ON, filed as point 1012 on 29.08.2026. Both '
       + 'attempts of the 29.08.2026 LARGE run on feat/687-roam-bound-fixes read 0/33 rows and 0/3 '
@@ -691,7 +728,13 @@ export const RED_CHARGES = [
     featureLevel: 'compatibility',
     kind: 'check',
     match: /^no console errors$/i,
-    detailMatch: /RGBA16Float\) does not support multisampling/i,
+    // ANCHORED AT BOTH ENDS 30.08.2026 (cross-vendor review, GPT-5.6 Sol,
+    // do-not-merge finding 3): unanchored, a "no console errors" red carrying the
+    // known sentence PLUS a brand-new console error still matched, so the entry
+    // did not keep what it promised to keep. The detail must be that sentence and
+    // nothing more.
+    detailMatch:
+      /^THREE\.WebGPURenderer: Uncaptured WebGPU GPUValidationError: The texture format \(TextureFormat::RGBA16Float\) does not support multisampling\.?$/i,
     why:
       'THE MSAA CASCADE REACHING A FOURTH SUITE, charged 29.08.2026. This is the same lane fault '
       + 'point 514 §5 owns, arriving in the benchmark suite instead of settings: both attempts of '
