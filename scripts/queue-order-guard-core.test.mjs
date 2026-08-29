@@ -130,6 +130,16 @@ describe('parseQueueCards / parseNowCard', () => {
     expect(parseNowCard(chipBoard).point).toBe(210)
     expect(parseNowCards(chipBoard).map((c) => c.point)).toEqual([210])
   })
+  it('falls back to the legacy title when a present chip is empty or nonnumeric', () => {
+    for (const chip of ['', 'CI']) {
+      const malformedChip = html.replace(
+        '<span class="t">210 —',
+        `<span class="num">${chip}</span><span class="t">210 —`,
+      )
+      expect(parseNowCard(malformedChip).point).toBe(210)
+      expect(parseNowCards(malformedChip).map((card) => card.point)).toEqual([210])
+    }
+  })
   it('uses provenance for a bare year and rejects a leading clock time', () => {
     const year = boardHtml({ nowTitle: '2026 — Jahresrückblick' })
     expect(parseNowCard(year).point).toBeNull()

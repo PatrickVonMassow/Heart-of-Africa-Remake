@@ -165,7 +165,8 @@ export function parseNowCards(html, options = {}) {
  */
 function nowCardPoint(chunk, options) {
   const chip = chunk.match(/class="num">\s*([^<]*?)\s*</)
-  if (chip) return pointNumbersFromChip(chip[1])[0] ?? null
+  const chipPoint = chip ? pointNumbersFromChip(chip[1])[0] : null
+  if (chipPoint != null) return chipPoint
   const title = (chunk.match(/class="t">\s*([^<]*)/) ?? [])[1]
   return pointOwnershipFromTitle(title, options).points[0] ?? null
 }
