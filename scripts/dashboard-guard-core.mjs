@@ -303,13 +303,15 @@ export function parseCards(sectionHtml) {
   const cards = []
   if (typeof sectionHtml !== 'string') return cards
   // Split a compound point field into its numbers ("232·233·234", "92+94",
-  // "71/72"); a sub-delivery marker ("203A", "CI", "✓") yields none. Bounded by
-  // MAX_POINT so a date or a count in a title cannot pose as a point number.
-  const MAX_POINT = 999
-  const numbers = (raw) =>
+  // "71/72"); a sub-delivery marker ("203A", "CI", "✓") yields none. The
+  // machine-written `.num` field contains only point numbers and is uncapped.
+  // A leading number recovered from free title text stays capped so a year or
+  // count cannot pose as a point number.
+  const MAX_TITLE_POINT = 999
+  const numbers = (raw, maxPoint = Number.POSITIVE_INFINITY) =>
     String(raw)
       .split(/[+·/\s]+/)
-      .filter((n) => /^\d+$/.test(n) && Number(n) <= MAX_POINT)
+      .filter((n) => /^\d+$/.test(n) && Number(n) <= maxPoint)
       .map(Number)
   for (const part of sectionHtml.split(/<details/).slice(1)) {
     const summary = (part.match(/<summary>([\s\S]*?)<\/summary>/) ?? [])[1] ?? ''
@@ -332,7 +334,7 @@ export function parseCards(sectionHtml) {
     // Leading title number(s), separated from the text by a dash or colon —
     // never a plain hyphen, which would read "2026-07-25 —" as point 2026.
     const t = (summary.match(/class="t">\s*([\d+·/ ]*\d)\s*[—–:]/) ?? [])[1]
-    if (t) for (const n of numbers(t)) points.add(n)
+    if (t) for (const n of numbers(t, MAX_TITLE_POINT)) points.add(n)
     // The full title comes along so a violation can NAME the card it means; a
     // point number alone is no help on a card that has none.
     const title = ((summary.match(/class="t">([^<]*)</) ?? [])[1] ?? '').trim()

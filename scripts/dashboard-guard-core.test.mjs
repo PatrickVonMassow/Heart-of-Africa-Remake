@@ -485,6 +485,12 @@ describe('sliceSections / parseCards', () => {
     expect(parseCards(card('92+94'))[0].points).toEqual([92, 94])
     expect(parseCards(card('71/72'))[0].points).toEqual([71, 72])
   })
+  it('uncaps the structured .num field while keeping the free-title ceiling', () => {
+    const structured = '<details><summary><span class="num">1003</span><span class="t">Done</span></summary><div class="body">x</div></details>'
+    const freeTitle = '<details><summary><span class="t">1003 — Jahresrückblick</span></summary><div class="body">x</div></details>'
+    expect(parseCards(structured)[0].points).toEqual([1003])
+    expect(parseCards(freeTitle)[0].points).toEqual([])
+  })
   it('reads no phantom point from a date, a count or a year in a title', () => {
     const card = (t) => `<details><summary><span class="t">${t}</span></summary><div class="body">x</div></details>`
     expect(parseCards(card('2026-07-25 — Rückblick'))[0].points).toEqual([])
@@ -517,6 +523,10 @@ describe('auditDashboard — the 25.07 witnesses', () => {
     expect(codes(boardHtml(), { done: [209, 262] })).toContain('erledigt-missing')
     // …and passes once its card exists.
     expect(codes(boardHtml({ done: [209, 262] }), { done: [209, 262] })).not.toContain('erledigt-missing')
+  })
+  it('accepts a four-digit newly ticked point whose Erledigt card is present, without a waiver', () => {
+    const input = { ...base, done: [209, 1003], doneSeen: [209] }
+    expect(auditDashboard(boardHtml({ done: input.done }), input)).toEqual([])
   })
   it('grandfathers pre-guard history: no baseline yet → no new-tick complaints', () => {
     expect(codes(boardHtml(), { done: [209, 262, 273, 293, 305], doneSeen: null })).not.toContain('erledigt-missing')
