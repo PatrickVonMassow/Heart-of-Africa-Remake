@@ -3,13 +3,14 @@
 // SIGKILLed mid-authoring — must keep passing, and an unknown scenario must be
 // refused rather than reported as a passed nothing.
 import { execFile, execFileSync } from 'node:child_process'
-import { mkdtempSync, writeFileSync, rmSync } from 'node:fs'
+import { existsSync, mkdtempSync, writeFileSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { promisify } from 'node:util'
 import { describe, it, expect } from 'vitest'
 import { runDrill, staleProbeRefused, expectedStaleRefusal, branchPreserved } from './batch-daemon-drill.mjs'
 import { startDaemon } from './batch-daemon.mjs'
+import { probePid } from './batch-singleton.mjs'
 import { validateMutation } from './batch-schema-core.mjs'
 import { FAILURE_DRILL_SCENARIOS } from './batch-daemon-failure-drills.mjs'
 
@@ -93,6 +94,27 @@ describe('the documented drill entrypoint', () => {
     }
     expect(result.ok).toBe(true)
     expect(ran.code, ran.stderr).toBe(0)
+  }, 30_000)
+
+  it.each([
+    { path: 'passing', flags: [], expectedCode: 0 },
+    { path: 'failing', flags: ['--inject-failure'], expectedCode: 1 },
+  ])('$path real-path completion leaves neither its daemon nor its sandbox alive', async ({ flags, expectedCode }) => {
+    const ran = await drillCli('--scenario', 'marker-deletion', ...flags)
+    const result = JSON.parse(ran.stdout)
+    expect(ran.code, ran.stderr).toBe(expectedCode)
+    expect(result.ok).toBe(expectedCode === 0)
+    if (expectedCode !== 0) {
+      expect(result.checks.filter((item) => !item.ok).map((item) => item.name)).toContain('the injected teardown-path expectation passes')
+    }
+
+    // These are the exact resources disclosed by this run, after its finally
+    // block completed — not a process-name scan or /tmp glob that could see a
+    // different batch session's drill.
+    expect(result.resources?.daemon?.pid).toBeTypeOf('number')
+    expect(probePid(result.resources.daemon.pid).exists).toBe(false)
+    expect(result.resources?.sandbox).toMatch(/daemon-sandbox-/)
+    expect(existsSync(result.resources.sandbox)).toBe(false)
   }, 30_000)
 
   it('parent-death: daemon and worker survive the killed session and a fresh session adopts them', async () => {

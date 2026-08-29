@@ -202,7 +202,7 @@ export function branchPreserved({ tipBefore = null, tipAfter = null, beforeIsAnc
 }
 
 function buildSandbox() {
-  const sandbox = mkdtempSync(join(tmpdir(), 'parent-death-'))
+  const sandbox = mkdtempSync(join(tmpdir(), 'daemon-sandbox-'))
   const originDir = join(sandbox, 'origin.git')
   const repo = join(sandbox, 'repo')
   const worktree = join(sandbox, 'wt')
@@ -611,7 +611,7 @@ const REAL_FAILURE_SCENARIOS = new Set([
 /** Exercise the named failure through a real drill daemon, its real detached
  * stub worker, and the same durable files production reconciliation reads.
  * The pure matrix remains the first, cheap check; it is never the proof. */
-async function realFailureScenario(scenario, pure) {
+async function realFailureScenario(scenario, pure, { injectFailure = false } = {}) {
   const checks = [{ name: 'the cheap decision-layer check passes beneath the real drill', ok: pure.ok === true, detail: pure.checks?.map((item) => item.detail).filter(Boolean).join('; ') ?? '' }]
   const check = (name, ok, detail = '') => checks.push({ name, ok: ok === true, detail })
   const { sandbox, repo, worktree } = buildSandbox()
@@ -622,6 +622,10 @@ async function realFailureScenario(scenario, pure) {
   let daemonRecord = null
   let workerHolder = null
   let workerStopped = false
+  // Returned as evidence, but never used to judge teardown. The caller can
+  // independently probe the exact path and recorded process this run created;
+  // a global /tmp scan would couple concurrent batch drills to one another.
+  const resources = { sandbox, daemon: null }
   const request = (cmd, payload = {}, timeoutMs = 5000) => controlRequest({
     repoDir: repo, batchId, timeoutMs,
     request: { cmd, sessionId, fence: readJsonIfAny(lockPath)?.fence, payload: { batchId, ...payload } },
@@ -633,6 +637,7 @@ async function realFailureScenario(scenario, pure) {
     check('a real coordinator acquired the sandbox fence', acquired === 'acquired', String(acquired))
     const started = await startDaemon({ repoDir: repo, batchId, drill: true })
     daemonRecord = started.record ?? null
+    resources.daemon = daemonRecord
     check('a real daemon process started and claimed durable state', started.ok === true && probePid(daemonRecord?.pid).exists === true, started.reason ?? '')
     if (!started.ok) return { ok: false, mode: 'real-path', scenario, checks }
     const copied = writeLockCopy({ repoDir: repo, record: daemonRecord, sessionId })
@@ -704,10 +709,11 @@ async function realFailureScenario(scenario, pure) {
       check('the real daemon restarts on its durable journal with the same generation and a new process', down.ok === true && restarted.ok === true && daemonRecord.pid !== firstPid && daemonRecord.generation === firstGeneration && journal.entries.filter((entry) => entry.kind === 'daemon-lifecycle' && entry.event === 'start').length === 2, restarted.reason ?? '')
       writeLockCopy({ repoDir: repo, record: daemonRecord, sessionId })
     }
-    return { ok: checks.every((item) => item.ok), mode: 'real-path', scenario, checks }
+    if (injectFailure) check('the injected teardown-path expectation passes', false, 'deliberate drill failure')
+    return { ok: checks.every((item) => item.ok), mode: 'real-path', scenario, checks, resources }
   } catch (error) {
     check('the real-path drill completed without an infrastructure exception', false, error?.stack ?? String(error))
-    return { ok: false, mode: 'real-path', scenario, checks }
+    return { ok: false, mode: 'real-path', scenario, checks, resources }
   } finally {
     if (workerStopped && workerHolder?.pid && probePid(workerHolder.pid).exists) {
       try { process.kill(workerHolder.pid, 'SIGCONT') } catch { /* already gone */ }
@@ -729,12 +735,12 @@ async function realFailureScenario(scenario, pure) {
  *  daemon whose epoch enforcement is off (a drill-only startDaemon/serve flag).
  *  Such a run must come back red at the two stale-refusal checks — a drill
  *  that stays green over it does not call the thing it claims to prove. */
-export async function runDrill({ scenario, keep = false, neuterEpoch = false } = {}) {
+export async function runDrill({ scenario, keep = false, neuterEpoch = false, injectFailure = false } = {}) {
   if (scenario === 'parent-death') return parentDeathScenario({ keep, neuterEpoch })
   const { FAILURE_DRILL_SCENARIOS, runFailureDrill } = await import('./batch-daemon-failure-drills.mjs')
   if (FAILURE_DRILL_SCENARIOS.includes(scenario)) {
     const pure = runFailureDrill(scenario)
-    return REAL_FAILURE_SCENARIOS.has(scenario) ? realFailureScenario(scenario, pure) : pure
+    return REAL_FAILURE_SCENARIOS.has(scenario) ? realFailureScenario(scenario, pure, { injectFailure }) : pure
   }
   return { ok: false, reason: `unknown scenario: ${String(scenario)}; known scenarios: parent-death, ${FAILURE_DRILL_SCENARIOS.join(', ')}` }
 }
@@ -752,6 +758,7 @@ if (isMainModule(import.meta.url)) {
       scenario: argv.includes('--scenario') ? argv[argv.indexOf('--scenario') + 1] : 'parent-death',
       keep: argv.includes('--keep'),
       neuterEpoch: argv.includes('--neuter-epoch'),
+      injectFailure: argv.includes('--inject-failure'),
     }).then((result) => {
       console.log(JSON.stringify(result, null, 2))
       process.exit(result.ok ? 0 : 1)
