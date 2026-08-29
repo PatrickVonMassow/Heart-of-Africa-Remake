@@ -302,9 +302,9 @@ describe('four-digit point lifecycle', () => {
     expect(parseNowCardPoints(out)).toEqual(new Set([1000]))
     const structureBefore = new Set(structureViolations(board).map((v) => v.code))
     expect(structureViolations(out).map((v) => v.code).filter((code) => !structureBefore.has(code))).toEqual([])
-    const auditBefore = new Set(auditDashboard(board, { open: [], done: [1000] }).map((v) => v.code))
+    const auditBefore = new Set(auditDashboard(board, { open: [], done: [1000], doneSeen: [] }).map((v) => v.code))
     expect(
-      auditDashboard(out, { open: [], done: [1000] })
+      auditDashboard(out, { open: [], done: [1000], doneSeen: [] })
         .map((v) => v.code)
         .filter((code) => !auditBefore.has(code)),
     ).toEqual([])
