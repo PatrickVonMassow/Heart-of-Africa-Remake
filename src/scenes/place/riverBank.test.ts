@@ -11,6 +11,7 @@ import {
   BANK_MIN_GAP,
   BANK_SHALLOWS_SPAN,
   BANK_SHORE_HALF,
+  bankPlayRocks,
   bankWaterDepth,
   buildRiverBank,
   type PlaceRiverBank,
@@ -305,6 +306,69 @@ describe('a bank exists only where the geography carries one', () => {
       const layout = buildLayout(place.id, SEED)
       expect(layout.radius, place.id).toBeGreaterThan(0)
       if (place.kind !== 'village') expect(layout.bank, place.id).toBeNull()
+    }
+  })
+})
+
+// THE CHILDREN'S RUNNING LANE IS WALKABLE END TO END (work-order 687,
+// cross-vendor review 29.08.2026). The round needs a clear corridor between the
+// two play rocks, and the lane test that keeps it clear used to guard the LOOSE
+// DRESSING alone — flora and boulders — so the guarantee held against those and
+// against nothing else. A hut, a compound fence or one of the hard-placed
+// village props reaching into it would have stood there, and a child would have
+// spent the run phase driving at solid geometry while the phase clock ran.
+//
+// This reads the SHIPPED collider set rather than the predicates the placement
+// was built from, so it sees whatever put a body there — including the fire pit,
+// the loom and the life-spot props, which never pass through `isFree` at all and
+// which the rule therefore cannot catch. Measured 29.08.2026 it is clear across
+// sixty river layouts for two independent reasons: the rule now refuses the
+// lane, and the bank lies where the buildings do not go. Its worth is the day
+// either of those stops being true.
+describe('nothing solid stands in the children`s running lane (work-order 687)', () => {
+  it('sweeps the lane between the play rocks against the full collider set', () => {
+    let checked = 0
+    for (const id of ['bambara-village', 'maasai-village', 'swahili-village']) {
+      for (let seed = 1; seed <= 60; seed++) {
+        const layout = buildLayout(id, seed)
+        const rocks = layout.playRocks
+        if (!rocks) continue
+        checked++
+        const a = rocks.upstream
+        const b = rocks.downstream
+        for (let t = 0; t <= 1.0001; t += 0.02) {
+          const x = a.x + (b.x - a.x) * t
+          const z = a.z + (b.z - a.z) * t
+          // The rocks themselves are the lane's ENDS and are meant to be solid;
+          // what must stay clear is the running ground between them.
+          if (Math.hypot(x - a.x, z - a.z) < rocks.r + 0.35) continue
+          if (Math.hypot(x - b.x, z - b.z) < rocks.r + 0.35) continue
+          expect(
+            standingClear(layout.colliders, x, z, WALKER_RADIUS),
+            `${id} seed ${seed}: a body stands ${(t * 100).toFixed(0)} % along the lane`,
+          ).toBe(true)
+        }
+      }
+    }
+    // The sweep is worthless if it found no lane to sweep.
+    expect(checked).toBeGreaterThan(0)
+  })
+
+  // AND THE STAGE IS THE ONE THE BANK ACTUALLY SETTLED ON. The play rocks are
+  // derived from the bank points, and `settleBankPoints` may pull those inland
+  // afterwards, so a stage read before the settling and a bank read after it are
+  // two different geometries. Measured today the settling moves nothing at all,
+  // which is exactly why the layout re-derives rather than trusts: a divergence
+  // with no symptom is one nobody finds until a player stands in it.
+  it('returns play rocks derived from the SETTLED bank, not the one before it', () => {
+    for (const id of ['bambara-village', 'maasai-village', 'swahili-village']) {
+      for (let seed = 1; seed <= 40; seed++) {
+        const layout = buildLayout(id, seed)
+        if (!layout.bank || !layout.playRocks) continue
+        const fromSettled = bankPlayRocks(layout.bank)
+        expect(layout.playRocks.upstream, `${id} seed ${seed}`).toEqual(fromSettled.upstream)
+        expect(layout.playRocks.downstream, `${id} seed ${seed}`).toEqual(fromSettled.downstream)
+      }
     }
   })
 })

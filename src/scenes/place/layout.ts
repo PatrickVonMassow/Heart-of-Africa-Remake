@@ -479,6 +479,15 @@ export function buildLayout(placeId: string, seed: number): PlaceLayout {
     if (!standsOnGroundPlate(bank, x, z, ownR)) return false
     // No body grows THROUGH a fence (work-order 604) — see `clearOfFences`.
     if (!clearOfFences(x, z, ownR)) return false
+    // AND NOTHING SOLID STANDS IN THE CHILDREN'S RUNNING LANE (work-order 687,
+    // cross-vendor review 29.08.2026). The lane test used to guard the loose
+    // dressing alone, so the round's guaranteed-width corridor was guaranteed
+    // against flora and boulders and against nothing else: a hut or a compound
+    // fence reaching into it would have stood there, and a child would have spent
+    // the run phase driving at it. Measured before the rule went in, nothing did
+    // — the bank lies where the buildings do not go — which is the reason to
+    // MAKE it true rather than to keep relying on it.
+    if (inBankPlayLane(playRocks, x, z, ownR)) return false
     // Window clearance (design.md §2.6): no wall pressed against a neighbour —
     // every pair of building bodies keeps at least a 0.9 m free gap.
     return dwellings.every((d) => Math.hypot(x - d.x, z - d.z) > Math.max(margin * 0.55, ownR + 0.9) + d.r)
@@ -1188,7 +1197,13 @@ export function buildLayout(placeId: string, seed: number): PlaceLayout {
   for (const t of flora) colliders.push({ x: t.x, z: t.z, r: 0.45 })
   for (const [x, z, s] of rocks) colliders.push({ x, z, r: 0.35 + s * 0.5 })
   if (teachingStone) colliders.push({ x: teachingStone.x, z: teachingStone.z, r: teachingStone.r })
+  // The two entries the play rocks occupy are remembered, because the stage they
+  // draw is derived from bank points that have not settled yet: once they have,
+  // the settled pair is written back into these same slots rather than appended
+  // a second time.
+  const playRockSlots: number[] = []
   if (playRocks) {
+    playRockSlots.push(colliders.length, colliders.length + 1)
     colliders.push({ x: playRocks.upstream.x, z: playRocks.upstream.z, r: playRocks.r })
     colliders.push({ x: playRocks.downstream.x, z: playRocks.downstream.z, r: playRocks.r })
   }
@@ -1232,7 +1247,29 @@ export function buildLayout(placeId: string, seed: number): PlaceLayout {
   // be ground the figure fits on against the full collider set — the water wall
   // and whatever the dressing dropped near the shore included.
   if (bank) {
-    settleBankPoints(bank, (x, z) => spawnPointFree(colliders, x, z, WALKER_RADIUS))
+    // THE PLAY ROCKS ARE OUT OF THE PROBE, and have to be: they are derived from
+    // the very endpoints being settled and move with them, so letting them block
+    // the search would have an endpoint refuse a step because of a rock that
+    // would have taken the same step. Left in, the silent three-metre search can
+    // run out without finding free ground that was there all along.
+    const staged = new Set(playRockSlots)
+    const probe = playRockSlots.length ? colliders.filter((_, i) => !staged.has(i)) : colliders
+    settleBankPoints(bank, (x, z) => spawnPointFree(probe, x, z, WALKER_RADIUS))
+    // AND THE STAGE FOLLOWS THE BANK IT IS DERIVED FROM. Settling may pull the
+    // endpoints inland; the play rocks were computed before it, so trusting them
+    // afterwards would leave the round's stage and the villagers' bank as two
+    // geometries that agree only by luck. Measured 29.08.2026 the settling moves
+    // nothing — every river layout, forty seeds each, zero movement — which is
+    // exactly why this is re-derived rather than trusted: a divergence that never
+    // happens has no symptom until the day it does, and then it is a player
+    // standing between two banks.
+    if (playRocks) {
+      const settled = bankPlayRocks(bank)
+      playRocks.upstream = settled.upstream
+      playRocks.downstream = settled.downstream
+      colliders[playRockSlots[0]] = { x: settled.upstream.x, z: settled.upstream.z, r: playRocks.r }
+      colliders[playRockSlots[1]] = { x: settled.downstream.x, z: settled.downstream.z, r: playRocks.r }
+    }
   }
 
   // The ground work is a target a villager walks INTO, so it obeys the same
