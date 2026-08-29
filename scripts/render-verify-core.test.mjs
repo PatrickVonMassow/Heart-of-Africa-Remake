@@ -2857,7 +2857,15 @@ describe('the shipped charge ledger', () => {
       'THREE.WebGPURenderer: Uncaptured WebGPU GPUValidationError: [Invalid CommandBuffer from CommandEncoder "renderContext_1"] is invalid due to a previous error.',
       'THREE.WebGPURenderer: Async render pipeline creation failed (renderPipeline_x): [Invalid TextureView] is invalid due to a previous error.',
     ]
-    for (const t of stillRed) expect(asStored(t)?.point ?? null, t).toBeNull()
+    // THE RED MUST EXIST BEFORE ITS CHARGE MAY BE NULL (cross-vendor review,
+    // GPT-5.6 Sol, 30.08.2026): `?.point ?? null` would have passed just as well
+    // if parsing or recording stopped producing a red at all, which is a
+    // regression this pin is supposed to catch, not hide.
+    for (const t of stillRed) {
+      const stored = asStored(t)
+      expect(stored, t).toBeTruthy()
+      expect(stored.point, t).toBeNull()
+    }
   })
 
   // THE MSAA TEXTURE ALTERNATIVE CARRIES ITS SENTENCE, NOT THE OBJECT NAME
