@@ -140,6 +140,17 @@ describe('parseKlaerungPoints', () => {
     })
     expect([...parseKlaerungPoints(html)].sort()).toEqual([206, 210])
   })
+  it('does not invent a VDZK point from a date, count, year, or four-digit free title', () => {
+    const html = boardHtml({
+      klaerungExtra: [
+        '2026-07-25 — Rückblick',
+        '5-Minuten-Check — Aufwand',
+        '1890 — Kartenstand',
+        '1003 — Vierstelliger Punkt ohne Nummern-Chip',
+      ],
+    })
+    expect(parseKlaerungPoints(html)).toEqual(new Set())
+  })
   it('does not pick up now-card, queue, or Erledigt titles', () => {
     // No VDZK cards at all — nothing from the surrounding sections leaks in.
     expect(parseKlaerungPoints(boardHtml()).size).toBe(0)
