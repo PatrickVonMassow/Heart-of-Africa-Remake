@@ -15,7 +15,7 @@ import {
 import { CLOSING_WORK_TITLE, NO_CURRENT_WORK_TITLE } from './board-core.mjs'
 
 /** Known-point set covering the numbers the cases below reference. */
-const KNOWN = new Set([1, 13, 92, 188, 244, 246, 266, 272])
+const KNOWN = new Set([1, 13, 92, 188, 244, 246, 266, 272, 1000, 1003])
 
 const TASKS_SAMPLE = `# TASKS
 - [x] 1. First point ever.
@@ -25,6 +25,7 @@ const TASKS_SAMPLE = `# TASKS
 some prose mentioning 123. without the checkbox form
 - [x] 246. Crocodile fix.
 - [x] 266. Trample crush sound.
+- [ ] 1000. First four-digit point.
 `
 
 /** Minimal dashboard in the real board's markup (now + questions + queue + done). */
@@ -47,7 +48,7 @@ ${done.map(card).join('\n')}
 
 describe('knownPoints', () => {
   it('collects every `- [ ] N.` / `- [x] N.` line and nothing else', () => {
-    expect([...knownPoints(TASKS_SAMPLE)].sort((a, b) => a - b)).toEqual([1, 92, 246, 266, 272])
+    expect([...knownPoints(TASKS_SAMPLE)].sort((a, b) => a - b)).toEqual([1, 92, 246, 266, 272, 1000])
   })
 
   it('is total on non-string input', () => {
@@ -68,6 +69,12 @@ describe('parseCards', () => {
     expect(queue.map((c) => c.point)).toEqual([244])
   })
 
+  it('reads an uncapped own point from a now-card title', () => {
+    const html = boardHtml({ now: [{ n: 1000, body: '<p>Kurz.</p>' }] })
+    const now = parseCards(html.slice(html.indexOf('Woran ich'), html.indexOf('<h2>Von dir')), 'now')
+    expect(now.map((c) => c.point)).toEqual([1000])
+  })
+
   it('is total on malformed input', () => {
     expect(parseCards(null, 'queue')).toEqual([])
     expect(parseCards('<details><summary>kein body</summary></details>', 'now')).toEqual([])
@@ -78,6 +85,11 @@ describe('foreignRefs', () => {
   it('finds parenthesized and spelled-out foreign points, deduplicated and sorted', () => {
     const body = '<p>Der Krokodil-Fix (246) und der Geräusch-Fix (266) sind gelandet, siehe Punkt 244 und nochmal (246).</p>'
     expect(foreignRefs(body, 272, KNOWN)).toEqual([244, 246, 266])
+  })
+
+  it('finds four-digit references without matching a known point inside a longer number', () => {
+    expect(foreignRefs('<p>Punkt 1000 und (1003).</p>', 272, KNOWN)).toEqual([1000, 1003])
+    expect(foreignRefs('<p>Punkt 10000 und (10030).</p>', 272, KNOWN)).toEqual([])
   })
 
   it('never flags the card own number', () => {
@@ -117,6 +129,14 @@ describe('topicViolations', () => {
       queue: [{ n: 246, body: '<p>Der Fix (246) ist gebaut — Punkt 246 wartet auf die Prüfung.</p>' }],
     })
     expect(topicViolations(html, KNOWN)).toEqual([])
+  })
+
+  it('keeps a four-digit now-card on topic and flags its four-digit foreign reference', () => {
+    const own = boardHtml({ now: [{ n: 1000, body: '<p>Punkt 1000 bleibt auf der eigenen Karte.</p>' }] })
+    expect(topicViolations(own, KNOWN)).toEqual([])
+
+    const foreign = boardHtml({ now: [{ n: 1000, body: '<p>Folgt Punkt 1003.</p>' }] })
+    expect(topicViolations(foreign, KNOWN)).toMatchObject([{ where: 'now', point: 1000, ref: 1003 }])
   })
 
   it('flags "Punkt N"/"point N" to a foreign point in now and queue cards', () => {

@@ -16,7 +16,7 @@
 // reference a TASKS point other than the card's own. A reference counts ONLY
 // in these explicit, predictable forms (case-insensitive):
 //   (a) "Punkt N" / "point N"        — the spelled-out form;
-//   (b) "(N)" with N a 2-3 digit number — the bare parenthesized form that
+//   (b) "(N)" with N a 2+ digit number — the bare parenthesized form that
 //       carried the 272 regression ("(246)", "(266)"). Single-digit "(1)" is
 //       NEVER a point reference: it is the enumeration/inventory convention
 //       ("(1) Schrift-Norden … (4) Signal-Osten" on the live board), while
@@ -70,7 +70,7 @@ function sectionSlice(html, marker) {
 /**
  * The `<details>` cards of one section as [{where, point, title, bodyHtml}].
  * The own point comes from `<span class="num">N</span>` (queue) or a now-card
- * title starting `NNN — …` / `NNN - …`; null for cards without one (VDZK,
+ * title starting `N — …` / `N - …`; null for cards without one (VDZK,
  * process cards). Cards without a body block are skipped (nothing to scan).
  */
 export function parseCards(sectionHtml, where) {
@@ -79,7 +79,7 @@ export function parseCards(sectionHtml, where) {
   for (const chunk of sectionHtml.split(/<details\b/).slice(1)) {
     const num = chunk.match(/class="num">\s*(\d+)/)
     const title = chunk.match(/class="t">\s*([^<]*)/)
-    const titleNum = title && title[1].match(/^\s*(\d{2,3})\s*[—-]/)
+    const titleNum = title && title[1].match(/^\s*(\d+)\s*[—-]/)
     const body =
       chunk.match(/<div class="body">([\s\S]*?)<\/div>\s*<\/details>/) ||
       chunk.match(/<div class="body">([\s\S]*)$/)
@@ -95,13 +95,13 @@ export function parseCards(sectionHtml, where) {
 }
 
 // The two — and only two — reference forms (see the header comment): the
-// spelled-out "Punkt/point N" and the parenthesized 2-3 digit "(NN)"/"(NNN)".
-const SPELLED_REF_RE = /\b(?:punkt|point)\s+(\d{1,3})\b/gi
-const PAREN_REF_RE = /\((\d{2,3})\)/g
+// spelled-out "Punkt/point N" and the parenthesized 2+ digit "(NN…)".
+const SPELLED_REF_RE = /\b(?:punkt|point)\s+(\d+)\b/gi
+const PAREN_REF_RE = /\((\d{2,})\)/g
 
 /**
- * The foreign-point numbers referenced in one card body, deduplicated and in
- * order of first appearance. `ownPoint` may be null (then every known-point
+ * The foreign-point numbers referenced in one card body, deduplicated and
+ * sorted numerically. `ownPoint` may be null (then every known-point
  * reference is foreign). Total: bad input yields [].
  */
 export function foreignRefs(bodyHtml, ownPoint, known) {
