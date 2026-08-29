@@ -3,7 +3,8 @@ import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'nod
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { calculateBatchMetrics, sealSamplingPlan } from './batch-metrics-core.mjs'
+import { sealSamplingPlan } from './batch-metrics-core.mjs'
+import { appendJournalEntry, openStateStore } from './batch-state.mjs'
 import { flagChange } from './durable-lane-flag-core.mjs'
 import { parseTrialArgs, runTrial } from './batch-trial.mjs'
 
@@ -70,12 +71,20 @@ describe('verdict-gated durable lane trial command', () => {
 
   it('refuses a plan sealed after the first measured event before reaching the flag', () => {
     const repoDir = makeRepo()
-    const events = [{ kind: 'landing', at: 100, pointId: '1', startedAt: 90, landedAt: 100 }]
     const late = sealSamplingPlan({ method: 'fixed', batchMix: ['hard'], eligibleIntervals: [], exclusions: [], sealedAt: 101 })
+    const store = openStateStore({ repoDir, batchId: 'trial-late' })
+    expect(appendJournalEntry(store, { seq: 1, fence: 7, kind: 'fence-transition' }).ok).toBe(true)
+    expect(appendJournalEntry(store, {
+      seq: 2, fence: 7, kind: 'command', name: 'record-metric', key: 'late-plan',
+      payload: { eventId: 'late-plan', event: { kind: 'sampling-plan', at: 101, plan: late.plan, planHash: late.planHash } },
+    }).ok).toBe(true)
+    expect(appendJournalEntry(store, {
+      seq: 3, fence: 7, kind: 'command', name: 'record-metric', key: 'earlier-measurement',
+      payload: { eventId: 'earlier-measurement', event: { kind: 'landing', at: 100, pointId: '1', startedAt: 90, landedAt: 100 } },
+    }).ok).toBe(true)
     const change = vi.fn(flagChange)
     const result = runTrial({
       repoDir, batchId: 'trial-late', baselinePath: 'baseline.json', reportPath: 'late.json', changeFlag: change,
-      durableReader: () => calculateBatchMetrics({ events, plan: late.plan, planHash: late.planHash }),
     })
     expect(result).toMatchObject({ ok: false, reason: 'sampling plan was sealed after the measured interval began' })
     expect(change).not.toHaveBeenCalled()
