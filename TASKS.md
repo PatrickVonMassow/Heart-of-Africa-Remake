@@ -11383,8 +11383,13 @@ to land than a mechanism that needs a review.
   with `<!--`, so a multi-line comment's continuation and closing lines would count.
   (3) `scripts/board-queue-core.mjs:440,441` carries the same two capped readers for the board's
   own prose rewrite. AMENDED 28.08.2026: the fuse is no longer dated — the work order passed 999,
-  and the third site of this class, `numbersIn` in `scripts/bundle-first-core.mjs`, reported points
-  1000-1002 as unbundled until it was widened to four digits in the same hour.
+  and a third site of this class, `numbersIn` in `scripts/bundle-first-core.mjs`, reported points
+  1000-1002 as unbundled until it was widened to four digits in the same hour. SUPERSEDED
+  29.08.2026 by the spec examination of this point: point 1003 replaced that prose reader with an
+  explicit machine-readable marker and landed, so `bundle-first-core.mjs` is no longer a
+  digit-ceiling reader and is NOT work for this point. Neither are the four refusals it earned
+  (`4c4b61f`, `0e52672`, `9ff620f`, `11f3163`): they attacked the superseded regex approach and
+  what still stands of them is point 1004. What remains under (3) is `board-queue-core.mjs` alone.
   (4) THE FOURTH SITE IS NOW BLOCKING THE BATCH. MEASURED 29.08.2026 landing point 1003:
   `parseCards` in `scripts/dashboard-guard-core.mjs:308,312` applies `MAX_POINT = 999` to BOTH its
   readings, so the `class="num"` field — which the board itself writes and which holds nothing but
@@ -11394,9 +11399,11 @@ to land than a mechanism that needs a review.
   card, so the finding returns at every turn end and EVERY four-digit landing hangs behind a
   hand-written waiver. The bound protects nothing on the structured field; on the free TITLE text,
   where a year could pose as a point, it does — so the two readings must part company.
-  FINAL STATE: point numbers are parsed without a digit ceiling at every site named here, with the
-  bound kept only where the text it reads is free prose; the JSDoc matches the code; the
-  fingerprint case tightens both budgets; and a multi-line comment is excluded whole.
+  FINAL STATE: point numbers are parsed without a digit ceiling at the three readers that remain —
+  `dashboard-card-topic-guard-core.mjs`, `board-queue-core.mjs` and `dashboard-guard-core.mjs` —
+  with the bound kept only where the text it reads is free prose; the JSDoc matches the code; the
+  fingerprint case tightens both budgets; and a multi-line comment is excluded whole. The prose
+  reader in `bundle-first-core.mjs` is neither restored nor re-reviewed here.
   VERIFIABLE: unit cases with a four-digit point in a title and in a body, a done card whose number
   is four digits passing the consistency audit with no waiver, and a fingerprint case that fails
   when only one budget excludes the comment.
