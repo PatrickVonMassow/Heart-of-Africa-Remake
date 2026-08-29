@@ -4,7 +4,7 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { ACTIVITY_CLASSES } from './batch-standstill-core.mjs'
 import { EMERGENCY_COOLDOWN_MS, EMERGENCY_THRESHOLD_MS } from './batch-emergency-core.mjs'
-import { restartOutcome, runEmergency, terminateLockedOwner } from './batch-emergency.mjs'
+import { restartOutcome, runEmergency, terminateLockedOwner, verificationProcessAlive } from './batch-emergency.mjs'
 
 const dirs = []
 afterEach(() => {
@@ -119,5 +119,16 @@ describe('restart identity', () => {
     expect(restartOutcome({ execute, platform: 'win32' })).toMatchObject({ step: 'start-primary-scheduled-task', ok: true })
     expect(execute.mock.calls[0][0]).toBe('powershell')
     expect(execute.mock.calls[0][1].join(' ')).toMatch(/Start-ScheduledTask.*HoA-Batch-Autostart/)
+  })
+})
+
+describe('verification process identity', () => {
+  it('probes the already-resolved log and accepts only an explicit live verdict', () => {
+    const log = '/repo/local/verify-logs/large.log'
+    const runRecord = vi.fn(() => ({ alive: true }))
+    expect(verificationProcessAlive({}, '/ignored.run.json', log, { runRecord })).toBe(true)
+    expect(runRecord).toHaveBeenCalledWith(log)
+    expect(verificationProcessAlive({}, '', log, { runRecord: () => ({ alive: false }) })).toBe(false)
+    expect(verificationProcessAlive({}, '', log, { runRecord: () => { throw new Error('unreadable') } })).toBe(false)
   })
 })

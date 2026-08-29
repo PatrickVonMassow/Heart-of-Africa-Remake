@@ -1,7 +1,7 @@
 import { execFileSync } from 'node:child_process'
 import { existsSync, readFileSync, readdirSync } from 'node:fs'
 import { homedir } from 'node:os'
-import { basename, join } from 'node:path'
+import { isAbsolute, join, resolve, win32 } from 'node:path'
 import { parseActivityJournal } from './batch-activity-journal-core.mjs'
 import { ACTIVITY_EVENTS } from './batch-activity-journal-core.mjs'
 import { ACTIVITY_CLASSES, evidenceInterval } from './batch-standstill-core.mjs'
@@ -183,6 +183,15 @@ function recordFiles(dir) {
   }
 }
 
+/** Resolve the log ONCE for both progress attribution and process identity.
+ * Run records store repository-relative display paths; native and Windows
+ * absolute spellings are already complete and must not be rebased. */
+export function resolveVerificationLog(recordLog, { repo } = {}) {
+  if (typeof recordLog !== 'string' || !recordLog.trim()) return null
+  if (isAbsolute(recordLog) || win32.isAbsolute(recordLog)) return recordLog
+  return typeof repo === 'string' && repo.trim() ? resolve(repo, recordLog) : null
+}
+
 function emittedVerificationProgress(records, record, path, end) {
   let latest = null
   for (const event of records ?? []) {
@@ -202,7 +211,7 @@ function emittedVerificationProgress(records, record, path, end) {
  * lease, and the interval never exceeds that lease. A timestamp-only touch of
  * either adjacent file emits no event and therefore proves no progress. */
 export function verificationRecordEvidence(dir, {
-  start, end, leaseMs = 15 * 60_000, records = [], processAlive: processAliveProbe,
+  repo, start, end, leaseMs = 15 * 60_000, records = [], processAlive: processAliveProbe,
 } = {}) {
   const intervals = []
   const boundaries = []
@@ -214,7 +223,7 @@ export function verificationRecordEvidence(dir, {
     if (!finite(began)) continue
     let finished = Number(record?.finishedAt)
     let progressAt = null
-    const logPath = typeof record.log === 'string' ? (record.log.startsWith('/') ? record.log : join(dir, basename(record.log))) : null
+    const logPath = resolveVerificationLog(record.log, { repo })
     if (record.status === 'running' && logPath) {
       progressAt = emittedVerificationProgress(records, record, path, end)
       finished = finite(progressAt) ? Math.min(end, progressAt + leaseMs) : NaN
@@ -230,7 +239,7 @@ export function verificationRecordEvidence(dir, {
     }))
     if (record.status === 'running' && finite(progressAt)) {
       let processAlive = false
-      try { processAlive = processAliveProbe?.(record, path) === true } catch { /* no identity proof */ }
+      try { processAlive = processAliveProbe?.(record, path, logPath) === true } catch { /* no identity proof */ }
       leases.push({
         record: path,
         log: record.log ?? null,

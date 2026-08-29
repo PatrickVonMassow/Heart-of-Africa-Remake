@@ -1,4 +1,4 @@
-import { mkdtempSync, readFileSync, rmSync, utimesSync, writeFileSync } from 'node:fs'
+import { mkdirSync, mkdtempSync, readFileSync, rmSync, utimesSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { describe, expect, it } from 'vitest'
@@ -11,6 +11,7 @@ import {
   delegatedBranchProgress,
   markerBoundary,
   pauseMarkerEvidence,
+  resolveVerificationLog,
   transcriptEvidence,
   verificationRecordEvidence,
 } from './batch-standstill-inputs.mjs'
@@ -192,6 +193,37 @@ describe('standstill report inputs', () => {
       expect(result.intervals).toEqual([])
     } finally {
       rmSync(dir, { recursive: true, force: true })
+    }
+  })
+
+  it('uses one repository-relative log path for progress and liveness', () => {
+    const repo = mkdtempSync(join(tmpdir(), 'hoa-verification-path-'))
+    const dir = join(repo, 'local', 'verify-logs')
+    const end = Date.parse('2026-08-21T10:00:00Z')
+    const startedAt = end - 60_000
+    const log = join(dir, 'large.log')
+    const recordPath = `${log}.run.json`
+    try {
+      mkdirSync(dir, { recursive: true })
+      writeFileSync(log, 'output\n')
+      writeFileSync(recordPath, JSON.stringify({
+        command: 'verify --plan large', log: 'local/verify-logs/large.log', status: 'running', startedAt, pid: 4242,
+      }))
+      let probedLog = null
+      const result = verificationRecordEvidence(dir, {
+        repo,
+        start: startedAt - 1,
+        end,
+        records: [verificationProgress({ at: end - 1000, path: recordPath, startedAt })],
+        processAlive: (_record, _path, logPath) => { probedLog = logPath; return logPath === log },
+      })
+      expect(probedLog).toBe(log)
+      expect(result.leases[0]).toMatchObject({ processAlive: true })
+      expect(resolveVerificationLog('C:\\repo\\local\\verify-logs\\large.log', { repo })).toBe(
+        'C:\\repo\\local\\verify-logs\\large.log',
+      )
+    } finally {
+      rmSync(repo, { recursive: true, force: true })
     }
   })
 

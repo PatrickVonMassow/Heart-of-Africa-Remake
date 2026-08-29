@@ -3,7 +3,7 @@
 // by HoA-Batch-Emergency, not by an owner, launcher, or recovery session.
 import { appendFileSync, existsSync, mkdirSync, readFileSync } from 'node:fs'
 import { execFileSync } from 'node:child_process'
-import { dirname, isAbsolute, join, resolve } from 'node:path'
+import { dirname, join } from 'node:path'
 import { randomUUID } from 'node:crypto'
 import { isMainModule } from './is-main.mjs'
 import { REPO_ROOT } from './repo-paths.mjs'
@@ -27,6 +27,14 @@ export { EMERGENCY_INTERVAL_MINUTES, EMERGENCY_SCRIPT_PATH, EMERGENCY_TASK_NAME 
 export const EMERGENCY_STATE_PATH = join(REPO_ROOT, 'local', 'batch-emergency-state.json')
 export const EMERGENCY_LOG_PATH = join(REPO_ROOT, 'local', 'batch-emergency-strikes.jsonl')
 export const EMERGENCY_VETO_PATH = join(REPO_ROOT, 'local', 'batch-emergency-veto.json')
+
+/** The report resolves a run's log once and hands this exact path to both the
+ * progress evidence and identity probe. Only runRecordFor's positive identity
+ * verdict is live; false, null and exceptions all fail closed. */
+export function verificationProcessAlive(_record, _recordPath, logPath, { runRecord = runRecordFor } = {}) {
+  if (typeof logPath !== 'string' || !logPath.trim()) return false
+  try { return runRecord(logPath)?.alive === true } catch { return false }
+}
 
 const readJson = (path) => {
   try { return JSON.parse(readFileSync(path, 'utf8')) } catch { return null }
@@ -100,11 +108,7 @@ function defaultInputs({ repo, now, thresholdMs }) {
     state: readJson(join(repo, 'local', 'batch-emergency-state.json')) ?? {},
     report: gatherStandstillReport({
       repo, ref: 'main', start: now - 4 * thresholdMs, end: now, thresholdMs,
-      verificationProcessAlive: (record) => {
-        if (typeof record?.log !== 'string' || !record.log.trim()) return false
-        const log = isAbsolute(record.log) ? record.log : resolve(repo, record.log)
-        return runRecordFor(log)?.alive === true
-      },
+      verificationProcessAlive,
     }),
   }
 }
