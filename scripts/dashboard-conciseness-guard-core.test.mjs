@@ -92,6 +92,11 @@ describe('parseCards', () => {
     expect(parseCards(section, 'now')[0].point).toBeNull()
     expect(parseCards(section, 'now', { knownPoints: [2026] })[0].point).toBe(2026)
   })
+  it('does not mislabel a compound card as belonging to only its first point', () => {
+    const html = boardHtml({ now: [{ t: '1000+1003 — Verbund', body: '<p>Kurz.</p>' }] })
+    const section = html.slice(html.indexOf('Woran ich'), html.indexOf('<h2>Von dir'))
+    expect(parseCards(section, 'now', { knownPoints: [1000, 1003] })[0].point).toBeNull()
+  })
 })
 
 describe('concisenessOffenders', () => {

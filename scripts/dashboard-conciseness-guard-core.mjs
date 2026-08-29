@@ -74,7 +74,7 @@ export function parseCards(sectionHtml, where, options = {}) {
     if (!body) continue
     cards.push({
       where,
-      point: ownedPoints[0] ?? null,
+      point: ownedPoints.length === 1 ? ownedPoints[0] : null,
       title: title ? title[1].trim() : '',
       // The card's own opening tag, so a rule can ask what KIND of card it is.
       kind: (chunk.match(/^[^>]*data-state="([^"]*)"/) ?? [])[1] ?? null,
