@@ -1413,7 +1413,7 @@ keinen Träger hat. Gebucht als Punkt 956.
 
 ## Anhang A — Maschinell gepflegte Quellen-Übersicht
 
-Zuletzt aktualisiert: Samstag, 29.08.2026, 10:16 · Quellen-Fingerprint: `a9d5f56caf6d…`
+Zuletzt aktualisiert: Samstag, 29.08.2026, 11:45 · Quellen-Fingerprint: `e7b9e518a2d7…`
 
 Spalten heuristisch aus den Quellen abgeleitet (Anläufe = distinkte Datumsnennungen im Memory;
 Maßnahme = Guard-Skripte mit Namens-Treffer). Die inhaltliche Bewertung gehört der Prosa oben.
@@ -1514,10 +1514,10 @@ Maßnahme = Guard-Skripte mit Namens-Treffer). Die inhaltliche Bewertung gehört
 | A pending batch claim HOLDS THE LAUNCHER BACK — withdraw it whenever the claiming window is left unattended | 2 | mittel | clear-claim-guard.mjs | ✔ Mechanismus |
 | Multi-agent workflows eat the session/weekly limit fast — verify findings INLINE, keep fan-outs small, warn the user with a cost estimate before any big workflow | 3 | mittel | doc-budget-guard.mjs | ✔ Mechanismus |
 
-Erfasste Quellen: 93 Feedback-/Projekt-Memories · 57 Guard-/Hook-Skripte · 6 Revert-/Reapply-Commits · 113 Prozess-/Meta-TASKS-Punkte (davon 47 offen).
+Erfasste Quellen: 93 Feedback-/Projekt-Memories · 57 Guard-/Hook-Skripte · 6 Revert-/Reapply-Commits · 114 Prozess-/Meta-TASKS-Punkte (davon 48 offen).
 
-<!-- RETRO-FINGERPRINT: a9d5f56caf6d218d3786b52f8f5d125f32d9ecd21b5522c73fc4c99553beba10 -->
-<!-- RETRO-LAST-REFRESHED: 2026-08-29T08:16:39.764Z -->
+<!-- RETRO-FINGERPRINT: e7b9e518a2d70eff1593e3bcac172db4a597465a445efb4596887ca5d4689a06 -->
+<!-- RETRO-LAST-REFRESHED: 2026-08-29T09:45:36.536Z -->
 <!-- AUTO-GENERATED:END -->
 
 ### 3.111 Ein Erfolg ist kein Beweis für den Weg, auf dem er zustande kam
@@ -4674,3 +4674,53 @@ Qualität der Arbeit, sondern die Ausdauer der Sitzung, und ein Rest, der mit je
 wird, ist kein Fortschritt, sondern eine Asymptote. Prüffrage bei jeder Gegenlese: *Ist der
 Befund dieser Runde kleiner als der der vorigen — und wenn ja, warum ist er dann noch eine Runde
 und nicht ein Punkt?*
+
+### 3.212 Die Vorrichtung las die Uhr, bevor es das gab, was sie beschreiben sollte
+
+Am 29.08.2026 fiel ein Fall in `scripts/render-verify-guard.test.mjs` auf CI rot, der lokal
+grün lief — mit demselben Quelltext. Die Ursache ist keine Langsamkeit und keine Last, sondern
+eine Bruchkante zwischen zwei Zeitauflösungen. Der Fall las `Date.now()`, baute danach ein
+Wegwerf-Repository (`git init`, zwei Commits) und schrieb den gelesenen Millisekundenwert als
+Aufnahmezeitpunkt in einen Datensatz, der die Render-Änderung ABDECKEN sollte. Das Fenster des
+Wächters kommt aber aus `git log --format=%ct` — GANZE SEKUNDEN. Lag der Uhrenwert spät in
+seiner Sekunde, rutschte der Commit in die nächste, und der Datensatz war plötzlich älter als
+die Änderung, die er abdecken sollte: Der Wächter las die abgeschnittene Aufnahme als „bereits
+durch den späteren Lauf beantwortet" statt als „ihr Rot blockiert weiterhin". Der Fall
+scheiterte also an dem Sekundenbruchteil, den die Uhr zufällig trug. Direkt nachgestellt:
+16 ms vor der Commit-Sekunde kippt die Ausgabe, auf der Sekunde und danach hält sie. Die Kur
+ist dieselbe wie beim Befund über den alternden Wert: Der Zustand wird als FUNKTION der Uhr
+geschrieben, die die Vorrichtung nach ihrem letzten Git-Aufruf liest, so dass `at >= since`
+durch Konstruktion gilt. Bemerkenswert ist, dass genau dieser Fehler in derselben Datei schon
+einmal behoben und ausführlich kommentiert worden war — für einen anderen Fall, zwanzig Zeilen
+weiter oben.
+
+**Lehre:** Eine Vorrichtung, die einen Zeitpunkt behauptet, muss ihn NACH dem Aufbau dessen
+lesen, was sie beschreibt — und wo zwei Auflösungen aufeinandertreffen (Millisekunden gegen
+Git-Sekunden), entscheidet immer die gröbere über die Vergleichbarkeit. Ein Test, der lokal
+grün und auf einem anderen Rechner rot ist, misst in der Regel nicht die Maschine, sondern die
+eigene Verankerung. Prüffrage bei jedem Fixture mit „jetzt": *Woher weiß dieser Wert, dass er
+nach dem liegt, was er abdecken soll — oder hofft er es nur?*
+
+### 3.213 Der Merge-Treiber existiert nur innerhalb der Landung
+
+Am selben Tag kollidierte ein gewöhnliches `git merge main` in einem Delegierten-Worktree auf
+`.claude/mechanism-reviews.jsonl`, der Beweisdatei der Vier-Augen-Regel. `.gitattributes`
+nennt für diese Datei einen eigenen Treiber (`merge=hoaMechanismLedger`) — aber
+`scripts/mechanism-review-merge.mjs` sagt in seinen eigenen ersten Zeilen, dass dieser Treiber
+„transient von `scripts/land-point.mjs`" konfiguriert wird, und `git config --get-regexp
+'^merge\.'` im Checkout ist leer. Jeder Merge, der KEINE Landung ist, fällt also auf den
+Textmerge zurück und wird von Hand aufgelöst. Die von Hand gemachte Auflösung vereinigte die
+Zeilen und entdoppelte sie — und ließ damit drei Zeilen fallen, die `main` doppelt führt.
+Verloren ging kein einziger Datensatz, aber Vielfachheit ist genau das, was die Suite des
+Treibers zusichert: Die Regel, die das Haus prüft, wurde über den Weg gebrochen, den das Haus
+offen lässt. Der Treiber hätte diesen Merge ohnehin verweigert, aus einem zweiten Grund, der
+festgehalten gehört: Die Zweigspitze war gegenüber ihrem eigenen Vorfahren schon nicht mehr
+rein anfügend — eine frühere Handauflösung hatte eine Zeile in der Mitte eingefügt und eine
+andere entfernt. Eine Handauflösung macht die nächste unprüfbar.
+
+**Lehre:** Eine Datei, deren Zusammenführung eine eigene Regel hat, braucht diesen Treiber
+dort, wo sie zusammengeführt wird — nicht nur in dem einen Befehl, der ihn gerade zufällig
+setzt. Ein Mechanismus, der nur innerhalb eines Kommandos existiert, ist für jeden Weg
+daneben nicht vorhanden, und die Handarbeit, die dann einspringt, verletzt die Zusicherung
+still. Prüffrage bei jedem transient gesetzten Mechanismus: *Was passiert auf dem Weg, der
+ihn nicht setzt — und merkt es jemand?*
