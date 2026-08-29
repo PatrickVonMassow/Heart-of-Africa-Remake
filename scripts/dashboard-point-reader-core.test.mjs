@@ -14,6 +14,8 @@ describe('pointOwnershipFromTitle — the one free-title ownership grammar', () 
     ['date', '2026-07-25 — Rückblick', [2026], []],
     ['clock time', '14:54 — Nachtrag', [14], []],
     ['hyphenated count', '1 - 2 Tage Aufwand', [1, 2], []],
+    ['comma count', '1, 2 Tage Aufwand', [1, 2], []],
+    ['word-joined count', '1 und 2 Tage Aufwand', [1, 2], []],
     ['plain-hyphen title', '465 - Arbeit', [465], []],
     ['colon point', '313: Arbeit', [], [313]],
     ['compound title', '287+288 — Verbundarbeit', [], [287, 288]],

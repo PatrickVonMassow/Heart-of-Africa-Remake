@@ -36,6 +36,7 @@ export function pointOwnershipFromTitle(raw, options = {}) {
   const known = asKnownSet(options?.knownPoints)
   const points = []
   let cursor = 0
+  let compoundNeedsTitleSeparator = false
 
   const takeNumber = () => {
     const match = title.slice(cursor).match(/^(\d+)(?![\w%.]|:\d|-\d)/)
@@ -49,6 +50,7 @@ export function pointOwnershipFromTitle(raw, options = {}) {
   for (;;) {
     const separator = title.slice(cursor).match(/^\s*(?:[+·/,&]|und)\s*/i)
     if (!separator) break
+    if (/^(?:,|&|und)$/i.test(separator[0].trim())) compoundNeedsTitleSeparator = true
     const beforeSeparator = cursor
     cursor += separator[0].length
     if (!takeNumber()) {
@@ -59,6 +61,9 @@ export function pointOwnershipFromTitle(raw, options = {}) {
 
   const titleSeparator = title.slice(cursor).match(/^\s*(?:[—–]|:(?!\d))\s*/)
   if (points.length === 1 && !titleSeparator && options?.allowUnseparatedSingle !== true) {
+    return { points: [], prefixEnd: 0 }
+  }
+  if (points.length > 1 && compoundNeedsTitleSeparator && !titleSeparator) {
     return { points: [], prefixEnd: 0 }
   }
   if (titleSeparator) cursor += titleSeparator[0].length
