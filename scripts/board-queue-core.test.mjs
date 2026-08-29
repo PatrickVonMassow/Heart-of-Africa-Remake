@@ -915,6 +915,11 @@ describe('the pending-request card', () => {
   it('neutralises uncapped point references without rewriting only a numeric prefix', () => {
     expect(boardSafeTitle('Punkt 1000 folgt (1003)')).toBe('Punkt Nr. 1000 folgt [1003]')
     expect(boardSafeTitle('point 10000')).toBe('point Nr. 10000')
+    const card = renderRequestsCard([
+      { at: '2026-07-30T20:11:00.000Z', title: 'Punkt 1000 folgt (1003)', route: 'tasks' },
+    ])
+    const html = `<h2>Warteschlange</h2>${card}<h2>Erledigt</h2>`
+    expect(evaluateTopic({ dashboardHtml: html, tasksText: '- [ ] 1000. A\n- [ ] 1003. B\n' }).block).toBe(false)
   })
 
   it('neutralises a parenthesized year without falsely labelling it as a point', () => {

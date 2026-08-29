@@ -27,10 +27,11 @@
 // A card without an own number (typical for "Von dir zu klären") owns nothing,
 // so ANY known-point reference in it is a cross-reference — a question card
 // states a decision, it does not report on a point. Everything else — counts
-// ("15 neue Tests"), dates ("31.12.1895"), times ("14:54"), years ("1890"),
+// ("15 neue Tests"), dates ("31.12.1895"), times ("14:54"), bare years ("1890"),
 // versions ("v0.2"), §-refs ("§19.8"), slashed screenshot pairs ("129/130"),
-// bare numbers and commit hashes — stays untouched by construction: no extra
-// exemption list, the two match forms are simply that tight.
+// bare numbers and commit hashes — stays untouched by construction. A year in
+// parentheses has the same lexical shape as a point reference and is therefore
+// scanned, but the known-TASKS gate below keeps an ordinary year inert.
 // THE UNNUMBERED STATE CARDS ARE EXEMPT (point 544). "Gerade keine laufende
 // Arbeit" and "Abschlussarbeiten zum gerade beendeten Punkt" own no point number
 // BY DESIGN, and the rule above reads a card without one as owning nothing — so
