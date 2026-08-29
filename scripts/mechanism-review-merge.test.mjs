@@ -139,10 +139,15 @@ describe('the append-only review-ledger merge', () => {
     expect(git(repo, ['status', '--porcelain'])).toBe('')
   })
 
-  it('keeps every duplicate from the real ledger ancestor through a Git merge', () => {
+  it('keeps every duplicate from a real-ledger-shaped ancestor through a Git merge', () => {
     const repo = fixture()
-    const ancestorText = readFileSync(join(REPO_ROOT, LEDGER), 'utf8')
-    const ancestor = ancestorText.trimEnd().split('\n')
+    const realAncestor = readFileSync(join(REPO_ROOT, LEDGER), 'utf8').trimEnd().split('\n')
+    // Current main legitimately has no exact duplicate row. The merge rule must
+    // nevertheless preserve multiplicity if history contains one, so make that
+    // condition part of this fixture instead of requiring production evidence
+    // to remain accidentally duplicated forever.
+    const ancestor = [realAncestor[0], ...realAncestor]
+    const ancestorText = `${ancestor.join('\n')}\n`
     const ancestorCounts = occurrences(ancestor)
     const duplicates = [...ancestorCounts].filter(([, count]) => count > 1)
     const latestAt = Math.max(...ancestor.map((line) => JSON.parse(line).at))
