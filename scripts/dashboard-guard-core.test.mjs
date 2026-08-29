@@ -708,6 +708,7 @@ describe('auditDashboard — the 25.07 witnesses', () => {
       .replace('class="t">Erste Karte', 'class="t">2026 — Erste Karte')
       .replace('class="t">Zweite Karte', 'class="t">2026 — Zweite Karte')
     expect(codes(html, { open: [2026, 211, 204] })).toContain('dup-in-section')
+    expect(codes(html, { open: [2026, 211, 204], knownPoints: new Set() })).toContain('dup-in-section')
   })
   it('keeps a four-digit DEFERRED point in the free-title provenance set', () => {
     const html = boardHtml({ nowCards: ['Erste Karte', 'Zweite Karte'] })

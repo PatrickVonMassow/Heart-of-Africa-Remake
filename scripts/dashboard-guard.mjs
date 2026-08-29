@@ -315,7 +315,7 @@ if (RUN_AS_SCRIPT && process.argv[2] === '--synced') {
   try {
     const focus = readJson(FOCUS_PATH)
     const reviewedHtml = readFileSync(p, 'utf8')
-    const nowPoints = parseNowCardPoints(reviewedHtml, { knownPoints: taskPointNumbers(readTasksAll(TASKS)) })
+    const nowPoints = parseNowCardPoints(reviewedHtml, { knownPoints })
     if (focus && (focus.point == null || nowPoints.has(focus.point))) {
       writeJsonAtomic(FOCUS_PATH, { ...focus, confirmedAt: Date.now() })
       removeFile(PENDING_PATH)

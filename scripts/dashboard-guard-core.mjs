@@ -556,9 +556,10 @@ export function auditDashboard(html, input = {}) {
   // TASKS is the authority that distinguishes an uncapped four-digit legacy
   // point from a free-title year. Machine-written `.num` fields need no such
   // context and remain unconditionally uncapped.
-  const knownPoints = input?.knownPoints instanceof Set
-    ? input.knownPoints
-    : new Set(Array.isArray(input?.knownPoints) ? input.knownPoints : [...open, ...done])
+  const suppliedKnown = input?.knownPoints instanceof Set
+    ? [...input.knownPoints]
+    : Array.isArray(input?.knownPoints) ? input.knownPoints : []
+  const knownPoints = new Set([...open, ...done, ...suppliedKnown])
   const cardOptions = { knownPoints }
   const nowCards = parseCards(sections[SECTION_TITLES[0]] ?? '', cardOptions)
   const vdzkCards = parseCards(sections[SECTION_TITLES[1]] ?? '', cardOptions)
@@ -872,7 +873,10 @@ export function evaluate(input) {
     )
   }
 
-  const pointOptions = { knownPoints: input?.knownPoints ?? [...open, ...done] }
+  const suppliedKnown = input?.knownPoints instanceof Set
+    ? [...input.knownPoints]
+    : Array.isArray(input?.knownPoints) ? input.knownPoints : []
+  const pointOptions = { knownPoints: new Set([...open, ...done, ...suppliedKnown]) }
   const queued = parseQueuePoints(html)
   const nowPoints = parseNowCardPoints(html, pointOptions)
   const klaerung = parseKlaerungPoints(html, pointOptions)
