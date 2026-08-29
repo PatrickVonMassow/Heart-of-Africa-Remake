@@ -105,7 +105,7 @@ if (isMainModule(import.meta.url)) {
   // --status: print the gathered state and the verdict (manual inspection).
   if (process.argv[2] === '--status') {
     const state = currentState()
-    const cards = readCards()
+    const cards = readCards(state.knownPoints)
     const result = evaluate({ cards, state, paused: existsSync(PAUSE) })
     console.log(JSON.stringify({ cards, state, result }, null, 2))
     process.exit(0)

@@ -55,6 +55,13 @@ const state = (over = {}) => ({
 })
 
 describe('parseCardTitle / cardTitle', () => {
+  it('keeps the manual status drive on the same provenance as the hook', () => {
+    const source = readFileSync(resolve(process.cwd(), 'scripts', 'dashboard-sync.mjs'), 'utf8')
+    const statusBranch = source.slice(source.indexOf("process.argv[2] === '--status'"), source.indexOf('// Stop-hook mode.'))
+    expect(statusBranch).toContain('readCards(state.knownPoints)')
+    expect(statusBranch).not.toMatch(/readCards\(\)/)
+  })
+
   it('extracts the leading point of »306 — Closing-Completeness-Guard«', () => {
     const c = parseCardTitle('306 — Closing-Completeness-Guard')
     expect(c.point).toBe(306)
