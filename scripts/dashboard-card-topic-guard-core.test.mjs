@@ -97,14 +97,12 @@ describe('parseCards', () => {
     expect(parseCards(section, 'now', { knownPoints: [2026] })[0].ownedPoints).toEqual([2026])
   })
 
-  it('does not turn a sub-delivery chip prefix into ownership', () => {
+  it('attributes a sub-delivery chip to its base point', () => {
     const section =
       '<details><summary><span class="num">203A</span><span class="t">Teil</span></summary>' +
-      '<div class="body">Punkt 1003.</div></details>'
-    expect(parseCards(section, 'now')[0].ownedPoints).toEqual([])
-    expect(topicViolations(`<h2>Woran ich gerade arbeite</h2>${section}`, KNOWN)).toMatchObject([
-      { where: 'now', point: null, title: 'Teil', ref: 1003 },
-    ])
+      '<div class="body">Punkt 203.</div></details>'
+    expect(parseCards(section, 'now')[0].ownedPoints).toEqual([203])
+    expect(topicViolations(`<h2>Woran ich gerade arbeite</h2>${section}`, KNOWN)).toEqual([])
   })
 
   it('does not invent ownership from an ISO date or a hyphenated count', () => {

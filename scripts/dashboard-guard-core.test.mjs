@@ -568,9 +568,9 @@ describe('sliceSections / parseCards', () => {
       '<details><summary><span class="t">313: D</span></summary><div class="body">x</div></details>'
     expect(parseCards(html).flatMap((c) => c.points)).toEqual([262, 287, 288, 232, 233, 234, 313])
   })
-  it('does NOT read a sub-delivery .num like "203A" as a point number', () => {
+  it('reads a sub-delivery .num like "203A" as its base point', () => {
     const html = '<details><summary><span class="num">203A</span><span class="t">Teil</span></summary><div class="body">x</div></details>'
-    expect(parseCards(html)[0].points).toEqual([])
+    expect(parseCards(html)[0].points).toEqual([203])
   })
   it('splits a COMPOUND .num the real board writes ("232·233·234", "92+94", "71/72")', () => {
     const card = (num) => `<details><summary><span class="num">${num}</span><span class="t">X</span></summary><div class="body">x</div></details>`

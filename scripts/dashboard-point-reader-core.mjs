@@ -10,8 +10,9 @@ export function pointNumbersFromChip(raw) {
   if (typeof raw !== 'string' && typeof raw !== 'number') return []
   return String(raw)
     .split(/[+·/\s]+/)
-    .filter((part) => /^\d+$/.test(part))
-    .map(Number)
+    .map((part) => part.match(/^(\d+)(?:[a-z]+)?$/i))
+    .filter(Boolean)
+    .map((match) => Number(match[1]))
 }
 
 /**

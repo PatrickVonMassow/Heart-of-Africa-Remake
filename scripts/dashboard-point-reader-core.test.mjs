@@ -39,6 +39,11 @@ describe('structured point provenance', () => {
     expect(pointNumbersFromChip('1000·1003/10000')).toEqual([1000, 1003, 10000])
   })
 
+  it('attributes a suffixed sub-delivery chip to its base point', () => {
+    expect(pointNumbersFromChip('203A')).toEqual([203])
+    expect(pointNumbersFromChip('CI')).toEqual([])
+  })
+
   it('collects DEFERRED checkbox points for the free-title provenance gate', () => {
     expect(taskPointNumbers('- [ ] 2026. Later DEFERRED until release\n- [x] 1003. Done\nprose 999.')).toEqual(
       new Set([2026, 1003]),

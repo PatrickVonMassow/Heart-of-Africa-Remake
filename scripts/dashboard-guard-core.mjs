@@ -312,8 +312,8 @@ export function sliceSections(html) {
 
 /**
  * Parse one section's cards → [{open, meta, body, points}]. Point numbers come
- * from `.num` spans holding a PURE number (a "203A" sub-delivery `.num` is no
- * point) plus a leading `.t` number incl. the compound forms of the real board
+ * from `.num` spans holding structured numbers (a "203A" sub-delivery belongs
+ * to point 203) plus a leading `.t` number incl. the compound forms of the real board
  * ("287+288 —", "232·233·234 —", "71/72 —", "313: …") — Opus plan-review
  * hardening 6.
  */
@@ -321,7 +321,8 @@ export function parseCards(sectionHtml, options = {}) {
   const cards = []
   if (typeof sectionHtml !== 'string') return cards
   // Split a compound point field into its numbers ("232·233·234", "92+94",
-  // "71/72"); a sub-delivery marker ("203A", "CI", "✓") yields none. The
+  // "71/72"); a suffixed sub-delivery marker ("203A") belongs to its base
+  // point, while a nonnumeric marker ("CI", "✓") yields none. The
   // machine-written `.num` field contains only point numbers and is uncapped.
   // A four-digit number recovered from FREE title text is ambiguous with a
   // year (`2026 — Jahresrückblick`). It counts only when TASKS context confirms
