@@ -209,9 +209,9 @@ describe('the independent emergency decision', () => {
       record: '/repo/large.log.run.json', command: 'verify --plan large',
       progressAt: NOW - 1000, leaseUntil: NOW + 1000, windowEnd: NOW - 2000,
     }],
-    ['future-dated sample without a window end', {
+    ['future-dated sample', {
       record: '/repo/large.log.run.json', command: 'verify --plan large',
-      progressAt: NOW + 1, leaseUntil: NOW + 1000,
+      progressAt: NOW + 1, leaseUntil: NOW + 1000, windowEnd: NOW + 60_000,
     }],
   ])('rejects a verification lease with %s', (_case, fields) => {
     const overdue = report(ACTIVITY_CLASSES.VERIFICATION)
