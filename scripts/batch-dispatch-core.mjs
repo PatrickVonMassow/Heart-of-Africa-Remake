@@ -129,3 +129,55 @@ export function updateReasonInterval({ open = null, decision, at } = {}) {
     open: Object.freeze({ reasonCode: decision.reasonCode, startedAt: at, observedAt: at, active: decision.active, eligible: decision.eligible }),
   }
 }
+
+/** Recover the one currently open dispatch reason from its append-only metric
+ * events. A close only closes the interval it names; malformed or stale closes
+ * cannot erase a newer open interval. */
+export function openReasonIntervalFromEvents(events = []) {
+  let open = null
+  for (const event of events) {
+    if (event?.kind !== 'dispatch-reason') continue
+    if (event.phase === 'open' && Number.isFinite(event.startedAt) && DISPATCH_REASON_CODES.includes(event.reasonCode)) {
+      open = Object.freeze({
+        reasonCode: event.reasonCode,
+        startedAt: event.startedAt,
+        observedAt: event.observedAt ?? event.startedAt,
+        active: event.active,
+        eligible: event.eligible,
+      })
+    } else if (event.phase === 'closed' && open && event.startedAt === open.startedAt && event.reasonCode === open.reasonCode) {
+      open = null
+    }
+  }
+  return open
+}
+
+/** Build the append-only metrics for one completed dispatch observation. The
+ * previous observation owns the elapsed interval up to `at`; the current one
+ * becomes the durable starting point for the next dispatch. */
+export function dispatchMetricEvents({ events = [], decision, at } = {}) {
+  if (!decision?.ok || !Number.isFinite(at)) return { ok: false, reason: 'dispatch metrics need a successful decision and finite observation time' }
+  const previous = [...events].reverse().find((event) => event?.kind === 'dispatch-observation') ?? null
+  const open = openReasonIntervalFromEvents(events)
+  const reason = updateReasonInterval({ open, decision, at })
+  if (!reason.ok) return reason
+  const recorded = []
+  if (previous && Number.isFinite(previous.at) && at >= previous.at) {
+    recorded.push(Object.freeze({
+      kind: 'lane-utilization', at, startedAt: previous.at, endedAt: at,
+      eligibleLanes: previous.eligibleLanes, runningLanes: previous.runningLanes,
+      reasonCode: previous.reasonCode ?? null,
+    }))
+  }
+  if (reason.closed) recorded.push(Object.freeze({ kind: 'dispatch-reason', phase: 'closed', at, ...reason.closed }))
+  if (reason.open && (!open || reason.open.startedAt !== open.startedAt || reason.open.reasonCode !== open.reasonCode)) {
+    recorded.push(Object.freeze({ kind: 'dispatch-reason', phase: 'open', at, ...reason.open }))
+  }
+  recorded.push(Object.freeze({
+    kind: 'dispatch-observation', at,
+    eligibleLanes: decision.eligible,
+    runningLanes: decision.projected,
+    reasonCode: decision.underutilized ? decision.reasonCode : null,
+  }))
+  return { ok: true, events: Object.freeze(recorded), open: reason.open }
+}

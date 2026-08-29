@@ -583,7 +583,7 @@ async function serve(args) {
           // head that moved past the push both leave commits only the old
           // worktree holds, and transferring would lose them.
           const clean = ack.pushedOk === true && ack.dirty === false && ack.aheadOfPush !== true
-          answers.push({ attemptId, acknowledged: true, transferable: clean, sha: ack.sha ?? null, dirty: ack.dirty === true, pushedOk: ack.pushedOk === true })
+          answers.push({ attemptId, acknowledged: true, acknowledgedAt: ack.at, transferable: clean, sha: ack.sha ?? null, dirty: ack.dirty === true, pushedOk: ack.pushedOk === true })
         }
         return { ok: true, requestId, answers }
       }),
@@ -1181,7 +1181,7 @@ function parseArgs(argv) {
   for (let i = 1; i < argv.length; i += 1) {
     const flag = argv[i]
     if (!flag.startsWith('--')) continue
-    const bare = ['--drill', '--drain', '--keep', '--neuter-epoch']
+    const bare = ['--drill', '--drain', '--keep', '--neuter-epoch', '--inject-failure']
     if (bare.includes(flag)) args[flag.slice(2)] = true
     else {
       args[flag.slice(2)] = argv[i + 1]
@@ -1256,7 +1256,12 @@ async function main() {
     // this module, and a static edge back would be a cycle — and the serving
     // process has no business loading drill code at all.
     const { runDrill } = await import('./batch-daemon-drill.mjs')
-    const result = await runDrill({ scenario: args.scenario ?? 'parent-death', keep: args.keep === true, neuterEpoch: args['neuter-epoch'] === true })
+    const result = await runDrill({
+      scenario: args.scenario ?? 'parent-death',
+      keep: args.keep === true,
+      neuterEpoch: args['neuter-epoch'] === true,
+      injectFailure: args['inject-failure'] === true,
+    })
     console.log(JSON.stringify(result, null, 2))
     process.exit(result.ok ? 0 : 1)
   }

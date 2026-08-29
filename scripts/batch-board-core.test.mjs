@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { batchBoardText, projectBatchBoard } from './batch-board-core.mjs'
+import { DAEMON_POOL_CAP } from './batch-daemon-core.mjs'
 
 describe('durable batch board projection', () => {
   it('shows every lane, heartbeat age, ETA, epoch, backlog, queue, and boundary', () => {
@@ -13,6 +14,7 @@ describe('durable batch board projection', () => {
       queue: [{ pointId: '3' }], boundary: { state: 'committed', markerPresent: true, sealed: true, successorReady: true },
     })
     expect(projected).toMatchObject({ ok: true, active: 1, backlog: 1, queueDepth: 1, red: false })
+    expect(projected.cap).toBe(DAEMON_POOL_CAP)
     expect(projected.lanes).toHaveLength(2)
     expect(projected.lanes[0].heartbeatAgeMs).toBe(1000)
     expect(batchBoardText(projected)).toMatch(/epoch 8 · lanes 1\/3 · backlog 1 · queue 1/)

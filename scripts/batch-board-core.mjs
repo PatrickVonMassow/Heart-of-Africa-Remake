@@ -2,6 +2,8 @@
 // canonical data projection; board ownership/publishing remains serial in the
 // main session and never becomes a worker mutation.
 
+import { DAEMON_POOL_CAP } from './batch-daemon-core.mjs'
+
 export const BATCH_ALERT_KINDS = Object.freeze([
   'stalled-worker', 'missing-successor', 'marker-deletion', 'rejected-old-epoch', 'quarantined-evidence',
 ])
@@ -46,7 +48,7 @@ export function projectBatchBoard({ batchId, lanes = [], daemon = null, coordina
     daemon: { state: daemon?.state ?? daemon?.record?.state ?? 'unknown', generation: daemon?.generation ?? daemon?.record?.generation ?? null },
     lanes: projectedLanes,
     active,
-    cap: 3,
+    cap: DAEMON_POOL_CAP,
     backlog,
     queueDepth: Array.isArray(queue) ? queue.length : 0,
     boundary: boundary ?? { state: 'none' },

@@ -6,22 +6,39 @@ import { REPO_ROOT } from './repo-paths.mjs'
 import { controlRequest } from './batch-daemon.mjs'
 import { openStateStore, writeReceipt } from './batch-state.mjs'
 import { daemonCheckpointVerdict, DEFAULT_CHECKPOINT_TIMEOUT_MS } from './batch-checkpoint-core.mjs'
+import { recordMetricEvent } from './batch-metric-events.mjs'
 
 export const checkpointRequestId = () => `checkpoint-${Date.now()}-${randomBytes(6).toString('hex')}`
 
-export async function requestCheckpoint({ repoDir, batchId, sessionId, fence, requestId = checkpointRequestId(), timeoutMs = DEFAULT_CHECKPOINT_TIMEOUT_MS } = {}) {
+export async function requestCheckpoint({
+  repoDir, batchId, sessionId, fence, requestId = checkpointRequestId(), timeoutMs = DEFAULT_CHECKPOINT_TIMEOUT_MS,
+  request = controlRequest, recordMetric = recordMetricEvent, now = Date.now,
+  openStore = openStateStore, writeDurableReceipt = writeReceipt,
+} = {}) {
   if (!sessionId || !Number.isInteger(fence)) return { ok: false, verdict: 'invalid', reason: 'checkpoint is fenced: sessionId and integer fence are required' }
-  const reply = await controlRequest({
+  const requestedAt = now()
+  const reply = await request({
     repoDir, batchId, timeoutMs: timeoutMs + 5000,
     request: { cmd: 'request-checkpoint', sessionId, fence, payload: { batchId, requestId, waitMs: timeoutMs } },
   })
   if (!reply.ok) return { ok: false, verdict: 'blocked', requestId, reason: reply.reason }
   const result = reply.result ?? reply
   const verdict = daemonCheckpointVerdict({ requestId, answers: result.answers })
-  const store = openStateStore({ repoDir, batchId })
-  const receipt = writeReceipt(store, requestId, { kind: 'checkpoint', batchId, fence, at: Date.now(), verdict })
+  const completedAt = now()
+  const store = openStore({ repoDir, batchId })
+  const receipt = writeDurableReceipt(store, requestId, { kind: 'checkpoint', batchId, fence, at: completedAt, verdict })
   if (!receipt.ok) return { ok: false, verdict: 'blocked', requestId, reason: `checkpoint receipt failed: ${receipt.reason}`, checkpoint: verdict }
-  return { ...verdict, receipt }
+  const acknowledged = (result.answers ?? []).map((answer) => answer?.acknowledgedAt).filter(Number.isFinite)
+  const metric = await recordMetric({
+    repoDir, batchId, sessionId, fence, request, eventId: `checkpoint-${requestId}`,
+    event: {
+      kind: 'checkpoint', at: completedAt, requestId, requestedAt,
+      acknowledgedAt: acknowledged.length ? Math.max(...acknowledged) : completedAt,
+      lanes: (result.answers ?? []).length, transferable: verdict.ok === true,
+    },
+  })
+  if (!metric.ok) return { ok: false, verdict: 'blocked', requestId, reason: `checkpoint metric failed: ${metric.reason}`, checkpoint: verdict, receipt, metric }
+  return { ...verdict, receipt, metric }
 }
 
 function parse(argv) {

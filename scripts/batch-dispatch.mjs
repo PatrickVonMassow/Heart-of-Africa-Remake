@@ -6,8 +6,10 @@ import { join, resolve } from 'node:path'
 import { isMainModule } from './is-main.mjs'
 import { REPO_ROOT } from './repo-paths.mjs'
 import { controlRequest } from './batch-daemon.mjs'
-import { openStateStore } from './batch-state.mjs'
-import { dispatchDecision } from './batch-dispatch-core.mjs'
+import { openStateStore, readJournal } from './batch-state.mjs'
+import { dispatchDecision, dispatchMetricEvents } from './batch-dispatch-core.mjs'
+import { metricEventsFromJournal } from './batch-metrics-core.mjs'
+import { recordMetricEvents } from './batch-metric-events.mjs'
 
 export function readAuthorizedQueue(path) {
   try {
@@ -18,18 +20,21 @@ export function readAuthorizedQueue(path) {
   }
 }
 
-export async function dispatchOnce({ repoDir, batchId, sessionId, fence, queuePath = null, adapters = ['sol'] } = {}) {
+export async function dispatchOnce({
+  repoDir, batchId, sessionId, fence, queuePath = null, adapters = ['sol'],
+  request = controlRequest, openStore = openStateStore, readDurableJournal = readJournal, now = Date.now,
+} = {}) {
   if (!sessionId || !Number.isInteger(fence)) return { ok: false, reason: 'dispatch is fenced: sessionId and integer fence are required' }
-  const store = openStateStore({ repoDir, batchId })
+  const store = openStore({ repoDir, batchId })
   const authorized = readAuthorizedQueue(queuePath ?? join(store.dir, 'queue.json'))
   if (!authorized.ok) return authorized
-  const status = await controlRequest({ repoDir, batchId, request: { cmd: 'status' }, timeoutMs: 3000 })
+  const status = await request({ repoDir, batchId, request: { cmd: 'status' }, timeoutMs: 3000 })
   if (!status.ok) return { ok: false, reason: `daemon status failed: ${status.reason}` }
   const decision = dispatchDecision({ queue: authorized.queue, attempts: status.result?.attempts ?? status.attempts ?? [], adapters })
   if (!decision.ok) return decision
   const started = []
   for (const entry of decision.selected) {
-    const reply = await controlRequest({
+    const reply = await request({
       repoDir,
       batchId,
       request: {
@@ -50,7 +55,22 @@ export async function dispatchOnce({ repoDir, batchId, sessionId, fence, queuePa
     started.push({ pointId: entry.pointId, attemptId: entry.attemptId, reply })
     if (!reply.ok) break
   }
-  return { ok: started.every((item) => item.reply.ok), decision, started }
+  const failedStart = started.find((item) => !item.reply.ok)
+  const observedDecision = failedStart
+    ? { ...decision, projected: decision.active + started.filter((item) => item.reply.ok).length, reasonCode: 'durability-failure', underutilized: true }
+    : decision
+  const journal = readDurableJournal(store)
+  if (journal.verdict !== 'ok') return { ok: false, reason: 'dispatch metrics require a readable durable journal', decision: observedDecision, started }
+  const measured = dispatchMetricEvents({ events: metricEventsFromJournal(journal.entries), decision: observedDecision, at: now() })
+  if (!measured.ok) return { ok: false, reason: measured.reason, decision: observedDecision, started }
+  const metrics = await recordMetricEvents({ repoDir, batchId, sessionId, fence, events: measured.events, request })
+  return {
+    ok: started.every((item) => item.reply.ok) && metrics.ok,
+    ...(metrics.ok ? {} : { reason: `dispatch metric failed: ${metrics.reason}` }),
+    decision: observedDecision,
+    started,
+    metrics,
+  }
 }
 
 function argsOf(argv) {

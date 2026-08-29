@@ -36,7 +36,7 @@ export const DURABLE_LANE_STEPS = Object.freeze({
   4: Object.freeze({ title: 'transferable declarations and fencing', green: true, evidence: 'attempt lease and epoch fencing suites' }),
   8: Object.freeze({ title: 'successor startup and reconciliation', green: true, evidence: 'successor boundary, reconciliation, and adoption suites' }),
   9: Object.freeze({ title: 'crash-recoverable serial landing', green: true, evidence: 'staged landing recovery and serial lock suites' }),
-  12: Object.freeze({ title: 'staged failure trials', green: true, evidence: 'parent-death negative control and complete daemon failure matrix' }),
+  12: Object.freeze({ title: 'staged failure trials', green: true, evidence: 'parent-death negative control plus real daemon, worker, remote, worktree, marker, restart, and checkpoint-timeout drills' }),
 })
 
 /** The steps without which survivability may not be CLAIMED, and therefore may not
