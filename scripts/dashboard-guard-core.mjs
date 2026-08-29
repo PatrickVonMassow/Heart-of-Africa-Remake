@@ -308,14 +308,18 @@ export function sliceSections(html) {
  * ("287+288 —", "232·233·234 —", "71/72 —", "313: …") — Opus plan-review
  * hardening 6.
  */
-export function parseCards(sectionHtml) {
+export function parseCards(sectionHtml, { knownPoints = [] } = {}) {
   const cards = []
   if (typeof sectionHtml !== 'string') return cards
   // Split a compound point field into its numbers ("232·233·234", "92+94",
   // "71/72"); a sub-delivery marker ("203A", "CI", "✓") yields none. The
   // machine-written `.num` field contains only point numbers and is uncapped.
-  // A leading number recovered from title text is separator-qualified rather
-  // than digit-capped, so real four-digit legacy cards remain visible.
+  // A four-digit number recovered from FREE title text is ambiguous with a
+  // year (`2026 — Jahresrückblick`). It counts only when TASKS context confirms
+  // that exact point; this is a provenance check, not a numeric ceiling. Other
+  // lengths remain separator-qualified, and the structured field stays the
+  // authoritative uncapped form.
+  const known = knownPoints instanceof Set ? knownPoints : new Set(Array.isArray(knownPoints) ? knownPoints : [])
   const numbers = (raw) =>
     String(raw)
       .split(/[+·/\s]+/)
@@ -342,7 +346,11 @@ export function parseCards(sectionHtml) {
     // Leading title number(s), separated from the text by a dash or colon —
     // never a plain hyphen, which would read "2026-07-25 —" as point 2026.
     const t = (summary.match(/class="t">\s*([\d+·/ ]*\d)\s*[—–:]/) ?? [])[1]
-    if (t) for (const n of numbers(t)) points.add(n)
+    if (t) {
+      for (const n of numbers(t)) {
+        if (!/^\d{4}$/.test(String(n)) || known.has(n)) points.add(n)
+      }
+    }
     // The full title comes along so a violation can NAME the card it means; a
     // point number alone is no help on a card that has none.
     const title = ((summary.match(/class="t">([^<]*)</) ?? [])[1] ?? '').trim()
@@ -544,10 +552,15 @@ export function auditDashboard(html, input = {}) {
     })
   }
 
-  const nowCards = parseCards(sections[SECTION_TITLES[0]] ?? '')
-  const vdzkCards = parseCards(sections[SECTION_TITLES[1]] ?? '')
-  const queueCards = parseCards(sections[SECTION_TITLES[2]] ?? '')
-  const erledigtCards = parseCards(sections[SECTION_TITLES[3]] ?? '')
+  // TASKS is the authority that distinguishes an uncapped four-digit legacy
+  // point from a free-title year. Machine-written `.num` fields need no such
+  // context and remain unconditionally uncapped.
+  const knownPoints = new Set([...open, ...done])
+  const cardOptions = { knownPoints }
+  const nowCards = parseCards(sections[SECTION_TITLES[0]] ?? '', cardOptions)
+  const vdzkCards = parseCards(sections[SECTION_TITLES[1]] ?? '', cardOptions)
+  const queueCards = parseCards(sections[SECTION_TITLES[2]] ?? '', cardOptions)
+  const erledigtCards = parseCards(sections[SECTION_TITLES[3]] ?? '', cardOptions)
 
   // DUPLICATE TITLE — a retry after a half-applied board command once put the
   // same question on the board twice. Point-number checks cannot catch an

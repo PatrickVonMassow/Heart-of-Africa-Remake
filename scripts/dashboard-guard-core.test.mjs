@@ -522,21 +522,23 @@ describe('sliceSections / parseCards', () => {
     expect(parseCards(card('92+94'))[0].points).toEqual([92, 94])
     expect(parseCards(card('71/72'))[0].points).toEqual([71, 72])
   })
-  it('reads four-digit ownership from both the structured chip and a legacy title', () => {
+  it('reads four-digit ownership from a structured chip or a TASKS-confirmed legacy title', () => {
     const structured = '<details><summary><span class="num">1003</span><span class="t">Done</span></summary><div class="body">x</div></details>'
     const freeTitle = '<details><summary><span class="t">1003 — Jahresrückblick</span></summary><div class="body">x</div></details>'
     expect(parseCards(structured)[0].points).toEqual([1003])
-    expect(parseCards(freeTitle)[0].points).toEqual([1003])
+    expect(parseCards(freeTitle, { knownPoints: new Set([1003]) })[0].points).toEqual([1003])
   })
-  it('reads no phantom point from a date, a hyphenated count or an unseparated year', () => {
+  it('reads no phantom point from a date, a hyphenated count or a free-title year', () => {
     const card = (t) => `<details><summary><span class="t">${t}</span></summary><div class="body">x</div></details>`
     expect(parseCards(card('2026-07-25 — Rückblick'))[0].points).toEqual([])
     expect(parseCards(card('5-Minuten-Check — X'))[0].points).toEqual([])
     expect(parseCards(card('1890er Namen für Landmarken'))[0].points).toEqual([])
+    expect(parseCards(card('2026 — Jahresrückblick'))[0].points).toEqual([])
+    expect(parseCards(card('1890: Kalenderstopp'))[0].points).toEqual([])
   })
-  it('treats any separator-qualified number as ownership because years and uncapped points are indistinguishable', () => {
-    const html = '<details><summary><span class="t">1890 — Kartenstand</span></summary><div class="body">x</div></details>'
-    expect(parseCards(html)[0].points).toEqual([1890])
+  it('uses TASKS provenance rather than a ceiling for an ambiguous four-digit title', () => {
+    const html = '<details><summary><span class="t">2026 — Echter Punkt</span></summary><div class="body">x</div></details>'
+    expect(parseCards(html, { knownPoints: [2026] })[0].points).toEqual([2026])
   })
   it('reads a body that starts with a container child (no false empty-body)', () => {
     const html =
@@ -624,6 +626,18 @@ describe('auditDashboard — the 25.07 witnesses', () => {
 
   it('WITNESS duplicate: the same point on two cards of ONE open section blocks', () => {
     expect(codes(boardHtml({ queue: [211, 211, 204] }))).toContain('dup-in-section')
+  })
+  it('does not invent a duplicate point from repeated free-title years', () => {
+    const html = boardHtml({ nowCards: ['Jahresrückblick', 'Kalenderstand'] })
+      .replace('class="t">Jahresrückblick', 'class="t">2026 — Jahresrückblick')
+      .replace('class="t">Kalenderstand', 'class="t">2026 — Kalenderstand')
+    expect(codes(html)).not.toContain('dup-in-section')
+  })
+  it('still audits a TASKS-confirmed four-digit legacy point without a ceiling', () => {
+    const html = boardHtml({ nowCards: ['Erste Karte', 'Zweite Karte'] })
+      .replace('class="t">Erste Karte', 'class="t">2026 — Erste Karte')
+      .replace('class="t">Zweite Karte', 'class="t">2026 — Zweite Karte')
+    expect(codes(html, { open: [2026, 211, 204] })).toContain('dup-in-section')
   })
   it('but Erledigt may hold several delivery cards for one point (the real point-206 case)', () => {
     expect(codes(boardHtml({ done: [206, 206, 209] }))).not.toContain('dup-in-section')
