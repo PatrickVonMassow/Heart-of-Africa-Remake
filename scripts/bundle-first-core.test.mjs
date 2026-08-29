@@ -209,12 +209,14 @@ describe('parseUnbundled', () => {
   // or one indented under the paragraph is a list item like any other, and one
   // the reader does not see is an exemption that does not count and a numbering
   // that has shifted.
-  it('reads a `+` bullet and an indented one, and numbers them where they stand', () => {
+  it('reads a `+`, a `*` and an indented bullet, and numbers them where they stand', () => {
     const { points, bullets } = parseUnbundled(
-      workPackages({ unbundled: ['+ **#285** — the leak hunt.', '  - **#393**.', '- **#174** — a release.'] }),
+      workPackages({
+        unbundled: ['+ **#285** — the leak hunt.', '* **#512** — the asterisk.', '  - **#393**.', '- **#174** — a release.'],
+      }),
     )
-    expect([...points].sort((a, b) => a - b)).toEqual([174, 285, 393])
-    expect(bullets.map((b) => b.index)).toEqual([1, 2, 3])
+    expect([...points].sort((a, b) => a - b)).toEqual([174, 285, 393, 512])
+    expect(bullets.map((b) => b.index)).toEqual([1, 2, 3, 4])
   })
 
   // A MARKER ALONE ON ITS LINE stays unread, and that is the SAFE direction:
@@ -430,6 +432,15 @@ describe('evaluate — the rule', () => {
 })
 
 describe('evaluate — the fail-open exits', () => {
+  // A FAIL-OPEN PINS BOTH HALVES OF THE DECISION (round-eighteen review
+  // finding): asserting only `block` lets a fail-open regress to
+  // `{ block: false, checked: true }`, where `statusLine` then reports the
+  // invariant as MEASURED on a document nothing measured.
+  const failsOpen = (result) => expect({ block: result.block, checked: result.checked }).toEqual({
+    block: false,
+    checked: false,
+  })
+
   // A FAIL-OPEN SAYS SO (round-fourteen review finding). Every exit below
   // returns the same DECISION as a clean document, and `--status` reported the
   // invariant as verified for all of them; `checked` is what tells the two
@@ -489,13 +500,13 @@ describe('evaluate — the fail-open exits', () => {
       bundles: [['Dorfleben', 'A', '#350']],
       unbundled: ['- **#285** — the leak hunt.'],
     }).replace(BUNDLES_HEADING, '## The work packages')
-    expect(evaluate({ tasksMd: tasks([350, 285]), workPackagesMd: renamed }).block).toBe(false)
+    failsOpen(evaluate({ tasksMd: tasks([350, 285]), workPackagesMd: renamed }))
   })
 
   it('allows a table whose rows changed shape while both headings stand', () => {
     const reshaped = workPackages({ bundles: [['Dorfleben', 'A', '#350']] })
       .replace('| **Dorfleben** | A |', '- **Dorfleben** (A):')
-    expect(evaluate({ tasksMd: tasks([350, 351]), workPackagesMd: reshaped }).block).toBe(false)
+    failsOpen(evaluate({ tasksMd: tasks([350, 351]), workPackagesMd: reshaped }))
   })
 
   it('allows a PARTIALLY restructured document — the rows parse, the exemptions do not', () => {
@@ -503,23 +514,21 @@ describe('evaluate — the fail-open exits', () => {
       bundles: [['Dorfleben', 'A', '#350']],
       unbundled: ['- **#285** — the leak hunt.'],
     }).replace(UNBUNDLED_MARKER, '**Deliberately outside a bundle**')
-    expect(evaluate({ tasksMd: tasks([350, 285]), workPackagesMd: renamed }).block).toBe(false)
+    failsOpen(evaluate({ tasksMd: tasks([350, 285]), workPackagesMd: renamed }))
   })
 
   it('allows a RESTRUCTURED document — a parse miss is not a drift finding', () => {
-    expect(evaluate({ tasksMd: tasks([540]), workPackagesMd: '# Work packages\n\nrewritten, no table' }).block).toBe(
-      false,
-    )
+    failsOpen(evaluate({ tasksMd: tasks([540]), workPackagesMd: '# Work packages\n\nrewritten, no table' }))
   })
 
-  it('allows an empty or unreadable work order', () => {
-    expect(evaluate({ tasksMd: '', workPackagesMd: workPackages() }).block).toBe(false)
-    expect(evaluate({ tasksMd: null, workPackagesMd: workPackages() }).block).toBe(false)
+  it('allows an empty or unreadable work order, and says it measured nothing', () => {
+    failsOpen(evaluate({ tasksMd: '', workPackagesMd: workPackages() }))
+    failsOpen(evaluate({ tasksMd: null, workPackagesMd: workPackages() }))
   })
 
-  it('allows rather than throwing on rubbish input', () => {
-    expect(evaluate().block).toBe(false)
-    expect(evaluate({ tasksMd: 42, workPackagesMd: 42 }).block).toBe(false)
+  it('allows rather than throwing on rubbish input, and says it measured nothing', () => {
+    failsOpen(evaluate())
+    failsOpen(evaluate({ tasksMd: 42, workPackagesMd: 42 }))
   })
 })
 
@@ -692,22 +701,59 @@ describe('the real docs/work-packages.md', () => {
   // membership canonical, which makes the invariant checkable — here.
   it('prints through the core, so the CLI cannot answer with a sentence of its own', async () => {
     const { spawnSync } = await import('node:child_process')
-    const { gatherBundleFirstInputs } = await import('./bundle-first-guard.mjs')
-    // The environment is judged by the SAME function the wrapper judges it by,
-    // never by reading the output the assertion is about (round-sixteen review
-    // finding — a test that decides from its own subject's answer can be talked
-    // out of running). Both branches are asserted; neither is skipped.
-    const gathered = gatherBundleFirstInputs({ sessionId: 'status-run' })
-    const res = spawnSync(process.execPath, [repoPath('scripts/bundle-first-guard.mjs'), '--status'], {
-      encoding: 'utf8',
-      windowsHide: true,
-    })
-    expect(res.status).toBe(0)
-    expect(res.stdout.trim()).toBe(
-      gathered.applicable
-        ? statusLine(evaluate({ tasksMd: readFileSync(repoPath('TASKS.md'), 'utf8'), workPackagesMd: md }))
-        : `bundle-first-guard: not applicable — ${gathered.why}`,
-    )
+    const { mkdtempSync, mkdirSync, writeFileSync, rmSync } = await import('node:fs')
+    const { tmpdir } = await import('node:os')
+    const { join } = await import('node:path')
+    const { withoutGitLocalEnvironment } = await import('./repo-paths.mjs')
+
+    // BOTH BRANCHES, NEITHER OF THEM CONDITIONAL (round-eighteen review
+    // finding): judging the LIVE checkout made applicability depend on whether
+    // this run happens to own the batch lock, so the delegation branch could go
+    // unexercised — reverting the wrapper's `statusLine(result)` to a sentence
+    // of its own left the suite green. The run gets its own checkout instead,
+    // and `HOA_REPO_ROOT` is what every path in the wrapper resolves from, the
+    // batch lock included.
+    const root = mkdtempSync(join(tmpdir(), 'bundle-first-cli-'))
+    try {
+      const tasksMd = tasks([350, 285])
+      const workPackagesMd = workPackages()
+      mkdirSync(join(root, 'docs'), { recursive: true })
+      writeFileSync(join(root, 'TASKS.md'), tasksMd)
+      writeFileSync(join(root, 'docs', 'work-packages.md'), workPackagesMd)
+      const run = () =>
+        spawnSync(process.execPath, [repoPath('scripts/bundle-first-guard.mjs'), '--status'], {
+          encoding: 'utf8',
+          windowsHide: true,
+          env: { ...withoutGitLocalEnvironment(process.env), HOA_REPO_ROOT: root },
+        })
+
+      const measured = run()
+      expect(measured.stderr).toBe('')
+      expect(measured.status).toBe(0)
+      expect(measured.stdout.trim()).toBe(statusLine(evaluate({ tasksMd, workPackagesMd })))
+      expect(measured.stdout.trim()).toMatch(/exactly one home/)
+
+      // ON MORE THAN ONE DOCUMENT, because a wrapper that answers with a
+      // sentence of its own gets the clean case right by accident. The same
+      // checkout with an unreadable work order is a fail-open, and there the
+      // wrapper's own sentence and the core's differ.
+      writeFileSync(join(root, 'TASKS.md'), '# Work order\n\nnothing open\n')
+      const failedOpen = run()
+      expect(failedOpen.status).toBe(0)
+      expect(failedOpen.stdout.trim()).toBe(
+        statusLine(evaluate({ tasksMd: '# Work order\n\nnothing open\n', workPackagesMd })),
+      )
+      expect(failedOpen.stdout.trim()).toMatch(/NOT CHECKED/)
+
+      // The other branch, from the same checkout, is the stand-down sentence.
+      mkdirSync(join(root, '.claude'), { recursive: true })
+      writeFileSync(join(root, '.claude', 'batch-paused'), '')
+      const stoodDown = run()
+      expect(stoodDown.status).toBe(0)
+      expect(stoodDown.stdout.trim()).toBe('bundle-first-guard: not applicable — the batch is paused')
+    } finally {
+      rmSync(root, { recursive: true, force: true })
+    }
   })
 
   it('gives every open point exactly one home', () => {
