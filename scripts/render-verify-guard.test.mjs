@@ -622,7 +622,6 @@ describe('render-verify-guard --status — what it prints about a run it cannot 
   // guard on a real pending render change with a current-shape exit-0 record
   // that asserted its backend — the shape closest to a pass there is.
   it('BLOCKS through the real no-option guard on a current-shape exit-0 truncation', () => {
-    const now = Date.now()
     const root = mkdtempSync(join(tmpdir(), 'hoa-render-block-'))
     try {
       execFileSync('git', ['init', '-q', '-b', 'main'], { cwd: root, windowsHide: true })
@@ -633,6 +632,14 @@ describe('render-verify-guard --status — what it prints about a run it cannot 
       execFileSync('git', ['add', '-A'], { cwd: root, windowsHide: true })
       execFileSync('git', ['-c', 'user.email=t@t', '-c', 'user.name=t', 'commit', '-q', '-m', 'a render change'], { cwd: root, windowsHide: true })
       mkdirSync(join(root, '.claude'), { recursive: true })
+      // STAMPED AFTER THE EDIT, NOT BEFORE THE FIXTURE (CI red 29.08.2026):
+      // the clock was read before `git init`, the root commit, the mkdir and
+      // the write, so on a runner where that setup takes longer than a second
+      // the WebGL run was older than the render file it had to cover, the
+      // decision fell back to "NOT VERIFIED ON EITHER BACKEND", and the case
+      // failed for the speed of the machine. Reading it here puts both runs
+      // after the edit by construction, whatever the setup cost.
+      const now = Date.now()
       writeFileSync(
         join(root, '.claude', 'render-verify-state.json'),
         JSON.stringify({
