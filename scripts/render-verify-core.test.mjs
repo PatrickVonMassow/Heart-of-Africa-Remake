@@ -2631,7 +2631,11 @@ describe('the shipped charge ledger', () => {
   it('charges the goat-stance red to a DIFFERENT point on each lane', () => {
     const goat = red('settlement walker (goat): the planted foot holds its ground spot')
     expect(chargeFor(goat, { suite: 'polish', backend: 'webgpu', featureLevel: 'compatibility' }).point).toBe(642)
-    expect(chargeFor(goat, { suite: 'polish', backend: 'webgl' })).toBeNull()
+    // THE LANE MUST BE THE ONLY THING THAT DIFFERS (cross-vendor review, GPT-5.6
+    // Sol, 30.08.2026): without the level this observation was null for TWO
+    // reasons at once — the next case already proves a missing level alone does
+    // it — so 642 could have been widened across lanes with this pin still green.
+    expect(chargeFor(goat, { suite: 'polish', backend: 'webgl', featureLevel: 'compatibility' })).toBeNull()
   })
 
   // THE ENTRY RESTS ON THE LANE IT MEASURED (review finding, 28.08.2026). Its
