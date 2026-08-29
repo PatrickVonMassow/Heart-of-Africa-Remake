@@ -42,6 +42,7 @@ const DEFAULTS = {
   walkerUnstuckSeconds: balance.walkerUnstuckSeconds,
   unstuck: { ...balance.unstuck },
   tag: { ...balance.villageLife.tag },
+  bankGame: { ...balance.villageLife.bankGame },
   childSpeech: { ...balance.villageLife.childSpeech },
   adultErrands: { ...balance.villageLife.adultErrands },
   separation: { ...balance.villageLife.separation },
@@ -131,6 +132,7 @@ afterEach(() => {
   balance.walkerUnstuckSeconds = DEFAULTS.walkerUnstuckSeconds
   Object.assign(balance.unstuck, DEFAULTS.unstuck)
   Object.assign(balance.villageLife.tag, DEFAULTS.tag)
+  Object.assign(balance.villageLife.bankGame, DEFAULTS.bankGame)
   Object.assign(balance.villageLife.childSpeech, DEFAULTS.childSpeech)
   Object.assign(balance.villageLife.adultErrands, DEFAULTS.adultErrands)
   Object.assign(balance.villageLife.separation, DEFAULTS.separation)
@@ -255,6 +257,17 @@ describe('DebugMenu editable fields write through to balance (settings.mjs fillF
     { label: en.debug.tagBreakOff, read: () => balance.villageLife.tag.breakOff, value: 0.25 },
     { label: en.debug.tagPressure, read: () => balance.villageLife.tag.pressureDistance, value: 7 },
     { label: en.debug.tagPlayRadius, read: () => balance.villageLife.tag.playRadius, value: 12 },
+    // The children's round at the bank (point 687), one from each family its
+    // nineteen controls fall into: a PHASE length, a DISTANCE, a PACE and one of
+    // the roaming bounds. Until 29.08.2026 the nineteen were only ever asserted
+    // to EXIST — a control wired to nothing, or to the wrong field, passed —
+    // and `bankGame` was missing from the restore below, so the first case to
+    // exercise one would have leaked its value into every case after it
+    // (cross-vendor review).
+    { label: en.debug.bankGather, read: () => balance.villageLife.bankGame.gatherSeconds, value: 9 },
+    { label: en.debug.bankDodgeDistance, read: () => balance.villageLife.bankGame.dodgeDistance, value: 5 },
+    { label: en.debug.bankWalkPace, read: () => balance.villageLife.bankGame.walkPace, value: 1.4 },
+    { label: en.debug.bankRoamGuard, read: () => balance.villageLife.bankGame.roamGuardSeconds, value: 30 },
     // What the children SAY at that game (point 481): the rate of the staged
     // situations, the life of the action that follows and the refusal chance.
     { label: en.debug.childSpeechInterval, read: () => balance.villageLife.childSpeech.intervalSeconds, value: 9 },

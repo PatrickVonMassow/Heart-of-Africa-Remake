@@ -372,3 +372,47 @@ describe('nothing solid stands in the children`s running lane (work-order 687)',
     }
   })
 })
+
+// THE THREE RIVER PLACES STAY FAR ENOUGH APART TO BE TOLD APART (points
+// 686/687). The village teaches RIVER, UPSTREAM and DOWNSTREAM by WHERE a
+// figure stands and walks, so if two of the named points sit within one
+// arrival's reach of each other, a walk up the stretch also reads as a walk to
+// the water and the direction cannot be learned from the picture at all.
+//
+// This assertion existed and was DELETED with `adultErrands.test.ts` when the
+// six-concept catalogue went (cross-vendor review, 29.08.2026: it was the only
+// check of the separation on the REAL layout, and nothing replaced it). It is
+// restored here, where the bank itself lives, so it no longer depends on a
+// catalogue that may be rebuilt or dropped again. The 2.6 m is the reach the
+// retired `placeOf` counted as standing AT a place; the constant went with its
+// module, so it is written down here with what it means rather than imported
+// from something that no longer exists.
+describe('the river places can be told apart (points 686/687)', () => {
+  const AT_PLACE_REACH = 2.6
+  it('keeps bank, upstream and downstream more than one arrival apart', () => {
+    let checked = 0
+    for (const id of ['bambara-village', 'maasai-village', 'swahili-village']) {
+      for (let seed = 1; seed <= 40; seed++) {
+        const layout = buildLayout(id, seed)
+        const bank = layout.bank
+        if (!bank) continue
+        checked++
+        const named: Array<[string, { x: number; z: number }]> = [
+          ['bank', bank.bank],
+          ['upstream', bank.upstream],
+          ['downstream', bank.downstream],
+        ]
+        for (let i = 0; i < named.length; i++) {
+          for (let j = i + 1; j < named.length; j++) {
+            const d = Math.hypot(named[i][1].x - named[j][1].x, named[i][1].z - named[j][1].z)
+            expect(
+              d,
+              `${id} seed ${seed}: ${named[i][0]} and ${named[j][0]} are ${d.toFixed(2)} m apart`,
+            ).toBeGreaterThan(AT_PLACE_REACH * 2)
+          }
+        }
+      }
+    }
+    expect(checked).toBeGreaterThan(0)
+  })
+})

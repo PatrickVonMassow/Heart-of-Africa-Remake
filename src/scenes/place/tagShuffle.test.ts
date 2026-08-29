@@ -975,7 +975,20 @@ type PenClearance = 'wall-band' | 'clear-yard'
 /** Whether a pen can be placed without putting a sibling on its wall. The old
  *  construction required every sibling outside a much larger clear yard; the
  *  corrected construction admits one already inside the pen while still
- *  keeping every sibling clear of the blocked annulus. */
+ *  keeping every sibling clear of the blocked annulus.
+ *
+ *  THE TWO EDGES ARE NOT SYMMETRIC, and this is the honest reading of it
+ *  (cross-vendor review, 29.08.2026). The OUTER edge carries the body radius;
+ *  the INNER one does not, so a sibling whose centre is inside the wall circle
+ *  counts as inside the yard even where its own body overlaps the wall. That is
+ *  weaker than "clear of the blocked annulus" sounds, and it is deliberate:
+ *  MEASURED with the body margin on both edges, the construction yields 6 valid
+ *  placements where this fixture needs more than 10, and the three assertions
+ *  pinned to the resulting trace — worst share, least judged child, rescues per
+ *  child-minute — all fall with it. The sharper rule is therefore affordable
+ *  only together with a longer trace and a re-measurement of those three
+ *  numbers, which is a re-baseline and not a comment fix. Until then the rule is
+ *  written down as it really is rather than described as something stricter. */
 function penHasClearWall(
   children: ReadonlyArray<{ x: number; z: number }>,
   penned: number,
