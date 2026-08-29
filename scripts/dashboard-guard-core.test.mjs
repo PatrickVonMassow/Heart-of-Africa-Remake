@@ -134,6 +134,9 @@ describe('parseQueuePoints', () => {
     expect([...set].sort()).toEqual([204, 211])
     expect(set.has(209)).toBe(false)
   })
+  it('reads a four-digit queue point directly', () => {
+    expect(parseQueuePoints(boardHtml({ queue: [1003] }))).toEqual(new Set([1003]))
+  })
   it('is empty on missing section / non-string input', () => {
     expect(parseQueuePoints('<p>no board</p>').size).toBe(0)
     expect(parseQueuePoints(null).size).toBe(0)
@@ -202,6 +205,12 @@ describe('evaluate — registration and freshness (pre-existing invariants)', ()
     expect(r.decision).toBe('block')
     expect(r.reason).toMatch(/STALE.*209/)
   })
+  it('blocks a four-digit ticked point still sitting in the Warteschlange', () => {
+    const html = boardHtml({ queue: [211, 204, 1003] })
+    const r = evaluate(green({ html, done: [209, 1003] }))
+    expect(r.decision).toBe('block')
+    expect(r.reason).toMatch(/STALE.*1003/)
+  })
   it('blocks an open point missing from queue and now-card', () => {
     const r = evaluate(green({ open: [210, 211, 204, 184] }))
     expect(r.decision).toBe('block')
@@ -214,6 +223,18 @@ describe('evaluate — registration and freshness (pre-existing invariants)', ()
     const r = evaluate(green({ html }))
     expect(r.decision).toBe('block')
     expect(r.reason).toMatch(/DOUBLE-LISTS.*210/)
+  })
+  it('blocks a four-digit point double-listed in the now-card AND the Warteschlange', () => {
+    const html = boardHtml({ nowPoint: 1003, queue: [1003, 211, 204] })
+    const r = evaluate(
+      green({
+        html,
+        open: [1003, 211, 204],
+        focus: { point: 1003, note: 'four-digit work', setAt: 1000, confirmedAt: 1000 },
+      }),
+    )
+    expect(r.decision).toBe('block')
+    expect(r.reason).toMatch(/DOUBLE-LISTS.*1003/)
   })
   it('allows the now-card point when it is NOT also in the queue', () => {
     const r = evaluate(green({ html: boardHtml({ nowPoint: 210, queue: [211, 204] }) }))
