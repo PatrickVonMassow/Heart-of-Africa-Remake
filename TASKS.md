@@ -13759,3 +13759,47 @@ to land than a mechanism that needs a review.
   Criticality: medium — it spends no correctness, but an exhausted vendor stops the batch outright,
   and the only lever we have today makes the session boundary the tuning knob for cost.
   Bundle: Session- & Repo-Hygiene.
+
+- [ ] 1015. Half the red-charge table still names a check by its prefix and excuses whatever
+  else fails under that name (cross-vendor review, GPT-5.6 Sol at effort high, 30.08.2026,
+  reading the complete `RED_CHARGES` end state at `2ae7931`).
+  The four charges tonight's review named on the entries it had CHANGED are closed
+  (`6f1144e`, each narrowing mutation-checked). What it also found, reading the whole table
+  rather than the diff, is that the same fault runs through entries nobody touched tonight:
+  a `match` that is a bare check-name prefix with no `detailMatch` charges EVERY future
+  failure of that check to a point that measured exactly one of them.
+  Named by the review, verbatim in substance:
+  - `point: 514`'s settings entry carries six bare prefixes — `TRAA off again:`,
+    `TRAA toggle stress:`, `F9 low:`, `Graphics levels:`, `the leak block produced no OTHER`,
+    and `first-person ground shows micro-detail` — while its own `why` admits the entry
+    cannot verify the cause it charges. Its `^frame 72-water-victoria-falls\b` is the same
+    shape.
+  - `point: 627`'s `^frame 11-worldmodel-khartoum-confluence\b` and both `point: 938`
+    entries' `^the streamed dressing…` end at no check-name boundary and constrain no
+    detail.
+  - The unanchored, detail-free fragments at `point: 733`, `642`, `568` (both lanes), `570`
+    and `603` are broader still: each can match its words anywhere inside ANOTHER check's
+    label.
+  - `point: 568`'s `plate.s` is an unescaped dot, so it accepts any character between
+    `plate` and `s`.
+  - `point: 1009` omits both `backend` and `featureLevel` although its `why` says the six
+    reds were measured on WebGL 2, so it swallows an unmeasured WebGPU/core red that shares
+    the check name and has a lane-specific cause.
+  ALSO OWED, from the same review's pass over the pins: `point: 733`'s startup freeze and
+  `point: 514`'s Victoria-Falls enrichments have NO distinct-red negative at all — their
+  cases repeat the excused red on another lane or level, so widening either matcher inside
+  its charged tuple leaves every assertion green. And the three `point: 995` entries have no
+  semantic pin naming 995; the generic schema loop does not test their matching behaviour.
+  FINAL STATE: every entry in `RED_CHARGES` either ends at a check-name boundary and matches
+  a name that cannot grow siblings, or carries a `detailMatch` anchored at both ends to the
+  shape its `why` describes. Every entry has at least one negative proving a neighbouring
+  red of the same check stays red, and each such negative is MUTATION-CHECKED: removing the
+  narrowing it claims to prove must turn the suite red. Where an entry's evidence cannot
+  support any narrowing — the recorder stores a varied or truncated detail — the charge is
+  WITHDRAWN and the red stays real, as the point-1011 family already was.
+  VERIFIABLE: `scripts/render-verify-core.test.mjs` gains a per-entry negative and the
+  mutation record for it; a table-wide case asserts that no entry combines a prefix `match`
+  with no `detailMatch`; plus `npm run test:unit`, lint, build.
+  Criticality: high — a charge that swallows an unmeasured red is the one failure mode the
+  whole mechanism exists to prevent, and it currently hides behind a green gate.
+  Bundle: Session- & Repo-Hygiene.
