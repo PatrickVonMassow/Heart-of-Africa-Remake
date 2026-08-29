@@ -58,9 +58,10 @@ export function parseNowCardPoints(html) {
   // a card that has both, and a Set makes the double read harmless. Legacy
   // titles use the same separator-qualified compound grammar as the audit;
   // this keeps an ISO date or a hyphenated count from becoming ownership.
-  for (const m of section.matchAll(/class="num">\s*(\d+)/g)) points.add(Number(m[1]))
-  for (const m of section.matchAll(/class="t">\s*([\d+·/ ]*\d)\s*[—–:]/g)) {
-    for (const n of m[1].split(/[+·/\s]+/)) if (/^\d+$/.test(n)) points.add(Number(n))
+  const owner = /class="num">\s*(\d+)|class="t">\s*([\d+·/ ]*\d)\s*[—–:]/g
+  for (const m of section.matchAll(owner)) {
+    if (m[1]) points.add(Number(m[1]))
+    else for (const n of m[2].split(/[+·/\s]+/)) if (/^\d+$/.test(n)) points.add(Number(n))
   }
   return points
 }

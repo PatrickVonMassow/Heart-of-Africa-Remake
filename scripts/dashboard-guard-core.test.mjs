@@ -92,6 +92,10 @@ describe('parseNowCardPoints', () => {
     const html = boardHtml({ nowCards: ['1003+1004 — Verbundarbeit', '2026-07-25 — Rückblick'] })
     expect(parseNowCardPoints(html)).toEqual(new Set([1003, 1004]))
   })
+  it('preserves document order across mixed chip and legacy-title cards', () => {
+    const html = boardHtml({ nowCards: ['1003 — Altform', 226, '1004 — Altform'] })
+    expect([...parseNowCardPoints(html)]).toEqual([1003, 226, 1004])
+  })
   it('stays section-bounded: numbered VDZK/queue cards never leak in', () => {
     const html = boardHtml({ nowCards: ['Automatik absichern'], klaerung: [206], queue: [211, 204] })
     expect(parseNowCardPoints(html).size).toBe(0)
