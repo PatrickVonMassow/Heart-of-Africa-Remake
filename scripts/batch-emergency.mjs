@@ -88,6 +88,10 @@ export function terminateLockedOwner(lock, { execute = execFileSync, kill = proc
     if (process.platform === 'win32') {
       execute('taskkill.exe', ['/PID', String(lock.pid), '/T', '/F'], { windowsHide: true, timeout: 30_000, stdio: 'ignore' })
     } else {
+      // Deliberately exact-pid only. POSIX descendant termination needs a
+      // separately proved process tree; see docs/batch-autonomy.md. The
+      // verification lease still has a two-hour aggregate ceiling, but a
+      // living orphan wrapper can satisfy identity until then.
       kill(lock.pid, 'SIGTERM')
     }
     return { step: 'terminate-owner', ok: true, pid: lock.pid }

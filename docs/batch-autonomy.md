@@ -159,6 +159,15 @@ Wholesale worktree deletion was rejected: the repository doctor already knows
 which cleanup is recoverable, while blind deletion is how uncommitted work was
 lost on 11.08.2026.
 
+One platform asymmetry remains explicit. Windows hard recovery uses
+`taskkill.exe /T`, while POSIX `terminateLockedOwner` sends `SIGTERM` only to
+each recorded batch pid; it does not yet prove and terminate that pid's whole
+descendant tree. A verification wrapper and its child can therefore outlive the
+recorded batch owner, leaving a `running` record whose wrapper still satisfies
+the identity probe. The two-hour suspension ceiling prevents an indefinite
+hold, but it does not remove that temporary orphan suspension; a general POSIX
+tree-kill needs its own process-tree identity proof before it is safe to add.
+
 `scripts/batch-emergency-drill.mjs` is the Urlaubsfestigkeit proof. It calls the
 real `runEmergency`, creates a real wedged owner process, measures the soft strike
 failing to restore progress, then observes the hard strike terminate it and make
