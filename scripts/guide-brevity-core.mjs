@@ -448,7 +448,28 @@ export const PROJECT_MARKERS = [
 
 /** Measure exactly the body that the guide budget governs. */
 export function measureGuide(text) {
-  const lines = String(text ?? '').replace(/\r\n/g, '\n').split('\n')
+  let source = String(text ?? '').replace(/\r\n/g, '\n')
+  // COMPLETE comments are bookkeeping and disappear below. An unmatched
+  // opener is malformed syntax, not a licence to hide the rest of the guide:
+  // remove that opener and measure its entire would-be comment tail as prose.
+  // Subsequent openers are inside that malformed tail under HTML's non-nesting
+  // comment rules, so they are neutralised too instead of starting a new hole.
+  let cursor = 0
+  let unmatchedStart = -1
+  while (cursor < source.length) {
+    const start = source.indexOf('<!--', cursor)
+    if (start < 0) break
+    const end = source.indexOf('-->', start + 4)
+    if (end < 0) {
+      unmatchedStart = start
+      break
+    }
+    cursor = end + 3
+  }
+  if (unmatchedStart >= 0) {
+    source = source.slice(0, unmatchedStart) + source.slice(unmatchedStart + 4).replaceAll('<!--', '')
+  }
+  const lines = source.split('\n')
   const body = []
   let inComment = false
   for (const line of lines) {

@@ -252,6 +252,12 @@ describe('auditGuide — budget boundaries', () => {
     const withFp = `${d}<!-- GUIDE-FINGERPRINT:\n${'bookkeeping '.repeat(100)}\n\n-->\n`
     expect(measureGuide(withFp)).toEqual(measureGuide(d))
   })
+
+  it('counts every line and word after an unterminated comment opener', () => {
+    const malformed = 'line one\nline two <!--\nline three\nline four\n'
+    expect(measureGuide(malformed)).toEqual(measureGuide('line one\nline two \nline three\nline four\n'))
+    expect(measureGuide(malformed)).toEqual({ lines: 5, words: 8 })
+  })
 })
 
 describe('parsing helpers', () => {
