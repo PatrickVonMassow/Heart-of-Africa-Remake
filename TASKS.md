@@ -13551,3 +13551,33 @@ to land than a mechanism that needs a review.
   Criticality: medium — it loses no code and no save, but it silently changes the world and the
   random source of any session that measured itself, and it has stood unowned in every LARGE run.
   Bundle: Session- & Repo-Hygiene.
+
+- [ ] 1010. The Ctrl-label fusion check names a point that is closed, so its red has no owner
+  (measured 29.08.2026 in the LARGE run on `feat/687-roam-bound-fixes`, WebGL 2).
+  `scripts/verify/polish.mjs`, section `ctrl-actor-labels`, failed once with "no two Ctrl labels
+  fuse in the village crowd (point 628) — 1/90 frames held a pair fused beyond 6 px (allowed 4),
+  deepest 19 px (`Villager`×`Villager` 22×19 px), 21-24 labels across the sample — as deep as the
+  18 px unreadable bar", and passed on the retry with 200 checks. Recorded SUSPECT, which covers
+  nothing.
+  IT CANNOT BE CHARGED WHERE IT POINTS: point 628 is TICKED and lives in `docs/tasks-archive.md`,
+  and a charge dies with its point by construction. `scripts/render-verify-charges.mjs` holds no
+  entry for it and no open point names label overlap, so this red rides along unowned — the same
+  shape the point-938 charge already records for a check that names the ticked point 278.
+  WHAT IS AND IS NOT MEASURED. Measured: one frame in ninety, one pair, 19 px of overlap against a
+  6 px bar, on a check that passed completely on the very next attempt. NOT measured, and named
+  here rather than assumed: this session ran `batch-doctor --gate` — a full unit suite, a build and
+  a lint — between 19:52 and 19:55, and the failing attempt fell in roughly that window, so
+  self-inflicted load is a plausible cause and nothing more. `node scripts/throttle-probe.mjs
+  polish --section=ctrl-actor-labels --runs 8` is the instrument that would settle it, and it has
+  not been run.
+  FINAL STATE: the check has an owner. Either the fusion is real at this crowd density and the
+  layer is fixed or its bar restated with the measurement behind it, or the throttle probe shows it
+  is load and the check is made robust against a loaded host rather than left to flake. Whichever
+  it is, the entry it needs — an open point or a charge — exists, so a run that hits it again says
+  whose it is instead of reporting a SUSPECT nobody can close.
+  VERIFIABLE: the throttle probe's eight runs with their spread; and after the decision, either the
+  section green over eight consecutive runs on a loaded host, or a charge entry naming this point
+  with the measurement that justifies it.
+  Criticality: low — it loses nothing and blocks nothing, but an unowned red teaches the reader to
+  skip the report, which is the habit every other charge in that table exists to prevent.
+  Bundle: Session- & Repo-Hygiene.
