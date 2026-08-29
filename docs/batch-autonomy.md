@@ -150,6 +150,13 @@ that invocation. A newly invoked wrapper writes a new record with its own
 two-hour bound; retries across records are not aggregated. Rewriting `startedAt`
 or touching the output log emits no event and buys no time. This lease never
 changes the last durable-progress boundary.
+`startedAt` is the wrapper's wall-clock start, so queueing or lock waits inside
+that invocation consume the same per-record allowance as test execution. The
+lease also depends on a valid `.claude/batch-activity.jsonl`: if the journal is
+missing, rotated, truncated, or its progress line is rejected, the report has
+no fresh progress evidence and withdraws the suspension. Both choices fail in
+the conservative direction rather than letting unverifiable activity hide a
+wedge.
 No fresh output, an expired bound, a terminal receipt, a dead process, or a PID
 whose command line no longer names the recorded wrapper and log withdraws the
 suspension, so a busy wedge still strikes.
