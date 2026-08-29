@@ -20,20 +20,18 @@ import { isMainModule } from './is-main.mjs'
 import { repoPath } from './repo-paths.mjs'
 
 // RESOLVED ON USE, NEVER AT IMPORT (cross-vendor review finding): a path
-// resolved at module scope is computed BEFORE the try below and its throw would
+// resolved at module scope is computed BEFORE the try below, so its throw would
 // leave the process nonzero instead of allowing the stop. Every call site of
-// this reader stands inside a fail-open, so this is where the resolution
-// belongs. What remains out of this file's reach is another module's own
-// top-level initialisation, which no try here can enclose.
-const guardPaths = () => ({
-  tasks: repoPath('TASKS.md'),
-  workPackages: repoPath('docs/work-packages.md'),
-  pause: repoPath('.claude/batch-paused'),
-})
-
+// this reader stands inside a fail-open, which is where the resolution belongs.
+// `resolvePath` is the seam that makes the placement PROVABLE rather than
+// merely stated: an injected resolver can only be reached if the resolution
+// really happens on the call. What no try in this file can enclose is another
+// module's own top-level initialisation.
 /** The guard's I/O half, shared with the preflight (point 365 D). */
-export function gatherBundleFirstInputs({ sessionId = '' } = {}) {
-  const { tasks, workPackages, pause } = guardPaths()
+export function gatherBundleFirstInputs({ sessionId = '', resolvePath = repoPath } = {}) {
+  const tasks = resolvePath('TASKS.md')
+  const workPackages = resolvePath('docs/work-packages.md')
+  const pause = resolvePath('.claude/batch-paused')
   if (existsSync(pause)) return { applicable: false, why: 'the batch is paused' }
   if (heldByOtherLiveOwner(sessionId)) {
     return { applicable: false, why: 'another live session owns the batch lock', cause: 'not-lock-owner' }

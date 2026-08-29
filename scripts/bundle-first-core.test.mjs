@@ -556,6 +556,56 @@ describe('statusLine', () => {
   })
 })
 
+// THE FAIL-OPEN BOUNDARY (round-nineteen review finding): the wrapper resolved
+// its three checkout paths at module scope, where a throw runs BEFORE the try
+// that owes the allow and leaves the process nonzero. Both halves are pinned
+// here — that the resolution happens on the CALL, and that a throw inside it
+// still allows the stop and exits 0.
+describe('bundle-first-guard — the fail-open boundary', () => {
+  it('resolves its checkout paths on the call, not at import', async () => {
+    const { gatherBundleFirstInputs } = await import('./bundle-first-guard.mjs')
+    // Reachable ONLY if the resolution happens here: a module-scope resolution
+    // ran at import and no resolver this case supplies could ever be called.
+    expect(() =>
+      gatherBundleFirstInputs({
+        resolvePath: () => {
+          throw new Error('no checkout')
+        },
+      }),
+    ).toThrow('no checkout')
+  })
+
+  it('allows the stop and exits 0 when reading the checkout throws', async () => {
+    const { spawnSync } = await import('node:child_process')
+    const { mkdtempSync, mkdirSync, writeFileSync, rmSync } = await import('node:fs')
+    const { tmpdir } = await import('node:os')
+    const { join } = await import('node:path')
+    const { withoutGitLocalEnvironment } = await import('./repo-paths.mjs')
+
+    const root = mkdtempSync(join(tmpdir(), 'bundle-first-open-'))
+    try {
+      // TASKS.md as a DIRECTORY: it exists, so the reader passes both existence
+      // checks and throws EISDIR where only the wrapper's own try can catch it.
+      mkdirSync(join(root, 'docs'), { recursive: true })
+      writeFileSync(join(root, 'docs', 'work-packages.md'), workPackages())
+      mkdirSync(join(root, 'TASKS.md'))
+      const env = { ...withoutGitLocalEnvironment(process.env), HOA_REPO_ROOT: root }
+      const guard = repoPath('scripts/bundle-first-guard.mjs')
+
+      const status = spawnSync(process.execPath, [guard, '--status'], { encoding: 'utf8', windowsHide: true, env })
+      expect(status.status).toBe(0)
+      expect(status.stderr).toMatch(/allowing stop/)
+
+      // And the hook path itself allows: exit 0 with no block decision written.
+      const hook = spawnSync(process.execPath, [guard], { encoding: 'utf8', windowsHide: true, env, input: '{}' })
+      expect(hook.status).toBe(0)
+      expect(hook.stdout).toBe('')
+    } finally {
+      rmSync(root, { recursive: true, force: true })
+    }
+  })
+})
+
 describe('the real docs/work-packages.md', () => {
   const md = readFileSync(repoPath('docs/work-packages.md'), 'utf8')
 
