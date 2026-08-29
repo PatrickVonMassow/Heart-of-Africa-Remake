@@ -32,8 +32,9 @@ export function pointNumbersFromChip(raw) {
  */
 export function pointOwnershipFromTitle(raw, options = {}) {
   if (typeof raw !== 'string') return { points: [], prefixEnd: 0 }
+  const config = options && typeof options === 'object' ? options : {}
   const title = raw.trimStart()
-  const known = asKnownSet(options?.knownPoints)
+  const known = asKnownSet(config.knownPoints)
   const points = []
   let cursor = 0
   let compoundNeedsTitleSeparator = false
@@ -60,7 +61,7 @@ export function pointOwnershipFromTitle(raw, options = {}) {
   }
 
   const titleSeparator = title.slice(cursor).match(/^\s*(?:[—–]|:(?!\d))\s*/)
-  if (points.length === 1 && !titleSeparator && options?.allowUnseparatedSingle !== true) {
+  if (points.length === 1 && !titleSeparator && config.allowUnseparatedSingle !== true) {
     return { points: [], prefixEnd: 0 }
   }
   if (points.length > 1 && compoundNeedsTitleSeparator && !titleSeparator) {

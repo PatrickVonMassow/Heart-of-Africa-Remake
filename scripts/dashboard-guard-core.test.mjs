@@ -584,6 +584,14 @@ describe('sliceSections / parseCards', () => {
     expect(parseCards(structured)[0].points).toEqual([1003])
     expect(parseCards(freeTitle, { knownPoints: new Set([1003]) })[0].points).toEqual([1003])
   })
+  it('keeps every shared-reader call total when options are explicitly null', () => {
+    const now = boardHtml({ nowCards: ['210 — Titel'] })
+    const clarification = boardHtml({ klaerungExtra: ['210 — Frage'] })
+    expect(parseNowCardPoints(now, null)).toEqual(new Set([210]))
+    expect(parseKlaerungPoints(clarification, null)).toContain(210)
+    expect(parseCards('<details><summary><span class="t">210 — Titel</span></summary></details>', null)[0].points)
+      .toEqual([210])
+  })
   it('reads no phantom point from a date, a hyphenated count or a free-title year', () => {
     const card = (t) => `<details><summary><span class="t">${t}</span></summary><div class="body">x</div></details>`
     expect(parseCards(card('2026-07-25 — Rückblick'))[0].points).toEqual([])
