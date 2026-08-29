@@ -79,11 +79,22 @@ describe('parseCards', () => {
   it('aligns colon and compound ownership with the dashboard audit', () => {
     const section = `
 <details><summary><span class="t">1000: Einzelarbeit</span></summary><div class="body">Punkt 1000.</div></details>
-<details><summary><span class="t">1000+1003 — Verbundarbeit</span></summary><div class="body">Punkt 1000 und Punkt 1003.</div></details>`
+<details><summary><span class="t">1000+1003 — Verbundarbeit</span></summary><div class="body">Punkt 1000 und Punkt 1003.</div></details>
+<details><summary><span class="num">1000·1003</span><span class="t">Chip-Verbund</span></summary><div class="body">Punkt 1000 und Punkt 1003.</div></details>`
     const cards = parseCards(section, 'now')
-    expect(cards.map((c) => c.point)).toEqual([1000, null])
-    expect(cards.map((c) => c.ownedPoints)).toEqual([[1000], [1000, 1003]])
+    expect(cards.map((c) => c.point)).toEqual([1000, null, null])
+    expect(cards.map((c) => c.ownedPoints)).toEqual([[1000], [1000, 1003], [1000, 1003]])
     expect(topicViolations(`<h2>Woran ich gerade arbeite</h2>${section}`, KNOWN)).toEqual([])
+  })
+
+  it('does not turn a sub-delivery chip prefix into ownership', () => {
+    const section =
+      '<details><summary><span class="num">203A</span><span class="t">Teil</span></summary>' +
+      '<div class="body">Punkt 1003.</div></details>'
+    expect(parseCards(section, 'now')[0].ownedPoints).toEqual([])
+    expect(topicViolations(`<h2>Woran ich gerade arbeite</h2>${section}`, KNOWN)).toMatchObject([
+      { where: 'now', point: null, title: 'Teil', ref: 1003 },
+    ])
   })
 
   it('does not invent ownership from an ISO date and accepts a spaced legacy hyphen', () => {

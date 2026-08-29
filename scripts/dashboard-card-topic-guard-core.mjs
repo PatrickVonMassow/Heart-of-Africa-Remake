@@ -82,11 +82,16 @@ export function parseCards(sectionHtml, where) {
   if (typeof sectionHtml !== 'string' || typeof where !== 'string') return []
   const cards = []
   for (const chunk of sectionHtml.split(/<details\b/).slice(1)) {
-    const num = chunk.match(/class="num">\s*(\d+)/)
+    const num = chunk.match(/class="num">\s*([^<]*?)\s*</)
     const title = chunk.match(/class="t">\s*([^<]*)/)
     const titleField = title && title[1].match(/^\s*([\d+·/ ]*\d)(?:\s*[—–:]|\s+-\s+)/)
     let ownedPoints = []
-    if (num) ownedPoints = [Number(num[1])]
+    if (num) {
+      ownedPoints = num[1]
+        .split(/[+·/\s]+/)
+        .filter((n) => /^\d+$/.test(n))
+        .map(Number)
+    }
     else if (titleField) {
       ownedPoints = titleField[1]
         .split(/[+·/\s]+/)
