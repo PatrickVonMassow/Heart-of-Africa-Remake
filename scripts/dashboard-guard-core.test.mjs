@@ -36,6 +36,7 @@ import {
 
 import { boardHtml, green } from './dashboard-guard-fixtures.mjs'
 import { renderQueueCard } from './board-queue-core.mjs'
+import { taskPointNumbers } from './dashboard-point-reader-core.mjs'
 
 
 describe('parseTasks', () => {
@@ -696,6 +697,14 @@ describe('auditDashboard — the 25.07 witnesses', () => {
       .replace('class="t">Erste Karte', 'class="t">2026 — Erste Karte')
       .replace('class="t">Zweite Karte', 'class="t">2026 — Zweite Karte')
     expect(codes(html, { open: [2026, 211, 204] })).toContain('dup-in-section')
+  })
+  it('keeps a four-digit DEFERRED point in the free-title provenance set', () => {
+    const html = boardHtml({ nowCards: ['Erste Karte', 'Zweite Karte'] })
+      .replace('class="t">Erste Karte', 'class="t">2026 — Erste Karte')
+      .replace('class="t">Zweite Karte', 'class="t">2026 — Zweite Karte')
+    const knownPoints = taskPointNumbers('- [ ] 2026. Später DEFERRED bis zum Release')
+    expect(knownPoints).toEqual(new Set([2026]))
+    expect(codes(html, { knownPoints })).toContain('dup-in-section')
   })
   it('but Erledigt may hold several delivery cards for one point (the real point-206 case)', () => {
     expect(codes(boardHtml({ done: [206, 206, 209] }))).not.toContain('dup-in-section')
