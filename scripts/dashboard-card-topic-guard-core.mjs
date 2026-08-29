@@ -75,8 +75,8 @@ function sectionSlice(html, marker) {
  * title starting with the separator-qualified form the dashboard audit reads,
  * including `NN: …` and compound `NN+NN — …` ownership. `point` is the sole
  * owner or null for compound/unnumbered cards; `ownedPoints` carries the full
- * set used by the topic decision. A spaced plain hyphen is accepted for legacy
- * titles (`465 - Arbeit`); an ISO date's unspaced hyphen remains ineligible.
+ * set used by the topic decision. Plain hyphens are not title separators:
+ * accepting them turns a count such as `1 - 2 Tage` into false ownership.
  * Cards without a body block are skipped.
  */
 export function parseCards(sectionHtml, where) {
@@ -85,7 +85,7 @@ export function parseCards(sectionHtml, where) {
   for (const chunk of sectionHtml.split(/<details\b/).slice(1)) {
     const num = chunk.match(/class="num">\s*([^<]*?)\s*</)
     const title = chunk.match(/class="t">\s*([^<]*)/)
-    const titleField = title && title[1].match(/^\s*([\d+·/ ]*\d)(?:\s*[—–:]|\s+-\s+)/)
+    const titleField = title && title[1].match(/^\s*([\d+·/ ]*\d)\s*[—–:]/)
     let ownedPoints = []
     if (num) {
       ownedPoints = num[1]
