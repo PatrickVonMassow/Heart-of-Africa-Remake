@@ -13358,8 +13358,8 @@ to land than a mechanism that needs a review.
   Criticality: medium — it does not corrupt anything, but it is the delegated run's only defect
   report, and today it cries wolf.
   Bundle: Modell & Wächter.
-- [ ] 1004. Nine review rounds settled the bundle reader's membership and left its Markdown
-  context unsettled. MEASURED 28./29.08.2026 on branch `feat/1003-explicit-bundle-points`,
+- [ ] 1004. Nineteen review rounds settled the bundle reader and left five findings standing,
+  one of them a REFUSAL on the landed range. MEASURED 28./29.08.2026 on branch `feat/1003-explicit-bundle-points`,
   commits `790264d`..`fd0fcf4`, nine cross-vendor rounds by GPT-5.6 Sol. Point 1003 replaced the
   prose-guessing reader with an explicit `#123` marker and migrated `docs/work-packages.md` to one
   home per open point, measured against a checked-in reading of the document that preceded it. The
@@ -13387,9 +13387,28 @@ to land than a mechanism that needs a review.
     plenty of noise too. Anchoring it needs a decision this point makes and records — a checked-in
     copy of the pre-migration `docs/work-packages.md` plus a frozen copy of the reader of
     `11f3163`, against a `git show` the unit suite must not do while point 966 stands.
+  - THE ESCAPED PIPE DOES NOT SWALLOW A REFERENCE (round-twenty, GPT-5.6 Sol, verdict
+    MERGE-WITH-FIXES on `88d90cd`). `parseBundles` splits a row on `|` without knowing Markdown, so
+    a Points cell writing `prose \| #123` splits there and the marked reference behind it is
+    dropped. If that point also stands in another row or bullet, its real second home escapes and
+    `evaluate` returns `checked: true` with no drift — the one shape where the guard reports a
+    measured invariant it did not measure.
+  - THE SUITE PINS WHAT THE READER ACTUALLY DOES (round-twenty, GPT-5.6 Sol, verdict
+    DO-NOT-MERGE on `88d90cd` — this refusal STANDS on `main` and the four-eyes gate blocks every
+    turn end until a re-review at a commit that DESCENDS from `88d90cd` answers it). Three gaps:
+    the bullet-marker case never exercises `*`, so removing asterisk support alone leaves the suite
+    green; the CLI delegation case runs only one of its two branches, so reverting the wrapper's
+    `statusLine` delegation is unexercised whenever the guard is inapplicable, and the case must
+    FORCE an applicable environment; and the fail-open inputs `tasksMd: null`, `evaluate()` and
+    `tasksMd: 42` assert `block` alone, so a regression to `checked: true` would let the status
+    line claim a measurement that never happened.
   VERIFIABLE: Vitest over the reader for each named context, a case where the two authorities
-  disagree and the test names the point, a fixture whose rows parse into empty cells, and the
-  before-snapshot reproduced from the named document by the frozen reader.
-  Criticality: medium — the guard errs toward allow, so what is left under-reports drift rather
-  than blocking work; the membership defect that opened the range is answered on the branch.
+  disagree and the test names the point, a fixture whose rows parse into empty cells, the
+  before-snapshot reproduced from the named document by the frozen reader, a Points cell with an
+  escaped pipe in front of a marked reference, an asterisk bullet, a forced-applicable CLI
+  delegation case, and `checked` asserted beside `block` on every fail-open input; plus the
+  recorded re-review that clears the standing refusal.
+  Criticality: high — the refusal on `88d90cd` is not advisory: while it stands the four-eyes gate
+  blocks every turn end of the batch, and the escaped-pipe shape is the one path on which the guard
+  reports a measured invariant it did not measure.
   Bundle: Session- & Repo-Hygiene.
