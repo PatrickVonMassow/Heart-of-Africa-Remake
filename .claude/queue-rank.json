@@ -984,42 +984,13 @@
       "why": "Last is right: it is a measurement campaign of real durable-lane days, not code, and it can only start once the apparatus point 925 landed is exercised — it waits on operating time, not on queue position.",
       "origin": "machine",
       "place": "last"
+    },
+    "1009": {
+      "at": "2026-08-29T17:57:14.248Z",
+      "why": "It reddens every full regression until it is fixed, but it is charged to itself now, so it blocks no landing and waits behind the communication strand rather than in front of it.",
+      "origin": "machine",
+      "place": "last"
     }
-  },
-  "boundary": {
-    "at": "2026-08-21T00:55:14.962Z",
-    "points": [
-      336,
-      553,
-      596,
-      633,
-      659,
-      660,
-      663,
-      686,
-      687,
-      688,
-      689,
-      690,
-      691,
-      692,
-      708,
-      715,
-      719,
-      733,
-      735,
-      736,
-      738,
-      739,
-      746,
-      747,
-      750,
-      759,
-      760,
-      762,
-      764
-    ],
-    "why": "The order standing in front of the release today is the arrangement that predates this rule; the four machine-filed points that had ranked themselves there were moved behind 174 first"
   },
   "settled": {
     "at": "2026-08-29T10:05:59.917Z",
@@ -1359,5 +1330,40 @@
       1006,
       1007
     ]
+  },
+  "boundary": {
+    "at": "2026-08-21T00:55:14.962Z",
+    "points": [
+      336,
+      553,
+      596,
+      633,
+      659,
+      660,
+      663,
+      686,
+      687,
+      688,
+      689,
+      690,
+      691,
+      692,
+      708,
+      715,
+      719,
+      733,
+      735,
+      736,
+      738,
+      739,
+      746,
+      747,
+      750,
+      759,
+      760,
+      762,
+      764
+    ],
+    "why": "The order standing in front of the release today is the arrangement that predates this rule; the four machine-filed points that had ranked themselves there were moved behind 174 first"
   }
 }
