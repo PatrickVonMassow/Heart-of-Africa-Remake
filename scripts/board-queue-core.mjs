@@ -54,6 +54,7 @@ import { normaliseLineEndings } from './board-core.mjs'
 import { SINGLE_PARAGRAPH_WORD_BUDGET, WORD_BUDGET } from './dashboard-conciseness-guard-core.mjs'
 import { gateSets } from './user-gate-core.mjs'
 import { INHERITED_ESTIMATE_NOTE, inheritedEstimate } from './queue-calibration-core.mjs'
+import { pointNumbersFromChip } from './dashboard-point-reader-core.mjs'
 // The pool cap is the width of the queue's front (point 712) — three slots,
 // three candidates. It is IMPORTED rather than restated: a second 3 in this file
 // would be a second home for the number CLAUDE.md §6 states.
@@ -621,9 +622,9 @@ export function importQueueFromHtml(html) {
   const points = {}
   for (const chunk of section.split(/<details\b/).slice(1)) {
     const summary = (chunk.match(/<summary>([\s\S]*?)<\/summary>/) ?? [])[1] ?? ''
-    const num = summary.match(/class="num">\s*(\d+)\s*</)
-    if (!num) continue
-    const point = Number(num[1])
+    const chip = (summary.match(/class="num">\s*([^<]*?)\s*</) ?? [])[1]
+    const cardPoints = pointNumbersFromChip(chip)
+    if (!cardPoints.length) continue
     const title = (summary.match(/class="t">([\s\S]*?)<\/span>/) ?? [])[1] ?? ''
     const metaRaw = (summary.match(/class="meta">([^<]*)</) ?? [])[1] ?? ''
     const bodyHtml = (chunk.match(/<div class="body[^"]*">([\s\S]*)$/) ?? [])[1] ?? ''
@@ -642,7 +643,7 @@ export function importQueueFromHtml(html) {
     // Importing it would freeze the inheritance and let calibration multiply a
     // value derived from that same calibration a second time.
     const isInherited = meta.includes(INHERITED_ESTIMATE_NOTE)
-    points[point] = {
+    const entry = {
       gated: isGated || undefined,
       // UNESCAPED, like the body (four-eyes finding 2): the card renders its
       // title through `esc`, so storing it as read would put `&amp;amp;` on the
@@ -655,6 +656,7 @@ export function importQueueFromHtml(html) {
       body: body.length && body.join(' ') !== QUEUE_STUB_BODY ? body : null,
       estimate: meta && meta !== QUEUE_STUB_META && !isGated && !isInherited ? meta : null,
     }
+    for (const point of cardPoints) points[point] = { ...entry, body: entry.body ? [...entry.body] : null }
   }
   return { points }
 }

@@ -396,6 +396,17 @@ describe('the one-time import from a hand-written board', () => {
     expect(importQueueFromHtml('<main></main>')).toEqual({ points: {} })
   })
 
+  it('imports every owner from a compound chip through the shared chip reader', () => {
+    const html = board(
+      '<details><summary><span class="num">1000·1003</span><span class="t">Verbund</span>' +
+        '<span class="meta">~2 h</span></summary><div class="body"><p>Gemeinsamer Text.</p></div></details>',
+    )
+    const { points } = importQueueFromHtml(html)
+    expect(Object.keys(points)).toEqual(['1000', '1003'])
+    expect(points[1000]).toEqual({ title: 'Verbund', body: ['Gemeinsamer Text.'], estimate: '~2 h' })
+    expect(points[1003]).toEqual(points[1000])
+  })
+
   // POINT 530: the round trip data → board → data is what destroyed 46 cards.
   it('keeps every rendered <p> as its own paragraph', () => {
     const body = ['Erster Absatz.', 'Zweiter Absatz.', 'Dritter Absatz.']
