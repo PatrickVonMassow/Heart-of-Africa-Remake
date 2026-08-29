@@ -934,5 +934,14 @@ describe('the real docs/work-packages.md', () => {
     719, 722, 841, 887, 888, 904
     ])
     expect(byPriorList.filter((n) => !LEGACY_AUTHORITY.has(n))).toEqual([])
+    // AND THE LIST IS TRIMMED WHEN A POINT EARNS ITS OWN LINE (review finding):
+    // a frozen allowlist alone lets an entry LEAVE and RETURN unseen — gain a
+    // `Bundle:` line, then lose it again, and the second fall-back is still
+    // allowlisted. So an entry that is still OPEN must still be relying on the
+    // legacy authority: the moment it earns its own line, this case demands the
+    // number be struck from the list above, and it can never come back.
+    // Landing is the one way out that costs nothing — a landed point is no
+    // longer open, which is why this is bounded by `open`.
+    expect([...LEGACY_AUTHORITY].filter((n) => open.has(n) && !byPriorList.includes(n))).toEqual([])
   })
 })
