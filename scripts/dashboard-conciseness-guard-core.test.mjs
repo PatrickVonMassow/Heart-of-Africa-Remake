@@ -4,6 +4,8 @@
 // exemptions (Erledigt / Von dir zu klären), and totality on malformed input
 // (the wrapper's fail-open depends on the core never throwing).
 import { describe, it, expect } from 'vitest'
+import { readFileSync } from 'node:fs'
+import { resolve } from 'node:path'
 import {
   WORD_BUDGET,
   TECH_TOKEN_BUDGET,
@@ -63,6 +65,12 @@ describe('cardStats', () => {
 })
 
 describe('parseCards', () => {
+  it('wires TASKS provenance into the production wrapper', () => {
+    const source = readFileSync(resolve(process.cwd(), 'scripts', 'dashboard-conciseness-guard.mjs'), 'utf8')
+    expect(source).toContain('knownPoints = taskPointNumbers(readTasksAll(TASKS))')
+    expect(source).toContain('inputs: { dashboardHtml: readFileSync(DASHBOARD, \'utf8\'), knownPoints }')
+  })
+
   it('reads the point from class="num" (queue) or the leading title number (now)', () => {
     const html = boardHtml({
       now: [{ n: 244, body: '<p>Kurz.</p>' }],
