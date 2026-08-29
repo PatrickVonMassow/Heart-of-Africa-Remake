@@ -364,72 +364,38 @@ put it is the mistake this line exists to stop.
   Nutzer, 13.08.2026 22:36: »Die Kinder spielen nicht permanent … Irgendwann ruft eines RIVER und zeigt auf den Fluss. Dann laufen alle dort hin und spielen das Spiel. Das Kind, das RIVER gerufen hat, ist dann zu Beginn der Fänger.«
   Nutzer, 13.08.2026 23:11: »Man sollte meinen, dass die Kinder etwas Angst/Respekt vor mir als fremder Erwachsener haben, anstatt mich fast umzurennen.«
   Nutzer, 13.08.2026 20:51: »Beim Kinderspiel kann ich auch nichts lernen. Ich erkenne da kein Fangspiel. Für mich laufen die Kinder mehr oder weniger zufällig hin und her (wenn sie mal nicht festhängen) und werfen mit Anweisungen um sich, die dem Spiel nicht dienlich sind. Ursprünglich war es mal ein Fangspiel, bei dem einer die anderen fangen muss und der Gefangene dadurch zum Fänger wird. Durch die ganzen neuen Situationen, die zur Erklärung der Kommunikationskonzepte COME, THERE, FOLLOW, usw. hinzugekommen sind, ist das Kinderspiel völlig verwässert. Das Herumschicken wirkt wie zum Selbstzweck eingeführt und macht das Fangspiel nicht mehr erkennbar.«
-  CROSS-VENDOR REVIEW OF THE LANDING (29.08.2026, 16 passes over `main..de7e175` on
-  `feat/687-roam-bound-fixes`, cut by per-file authorship: GPT-5.6 Sol read the Claude-authored
-  files, Opus 4.8 the Sol-authored ones). THE ROUND ITSELF CAME BACK CLEAN: pass 16 traced
-  bankGame.ts's state machine and its multi-seed hand-stepped tests against §1-§4 — caller becomes
-  catcher, ROCK as a class via tap plus boulder plus arrival, UPSTREAM/DOWNSTREAM detached by the
-  parting, roam bounded, shut-leg refusal, null-route walk-at-goal, crouched child held — and
-  recorded merge, its one gap the untested `roamGuardSeconds` abandon branch; pass 15 merge on
-  PlaceLife.tsx's wiring, passes 2 and 11 merge on lexicon.ts and PlaceScene.tsx. THE THREE
-  do-not-merge VERDICTS ALL FELL ON THE SUPPORTING WORK, and they are what this point owes:
-  - `src/scenes/place/routing.ts:164-251` — `findPlaceRoute` substitutes a nearby free cell for a
-    blocked goal, then ALWAYS appends the original blocked `to`, so it can return a NON-NULL route
-    whose last leg is impossible. A goal inside a collider but within four rings of free ground
-    produces exactly that, and a caller whose arrival radius is smaller than the obstruction drives
-    at it for the whole phase instead of being told there is no route — which is precisely what
-    bankGame.ts's null-route handling exists to catch. `routing.test.ts:108-137` cannot see it: the
-    grid already requires `standingClear` and `navRestrict` already requires `onGround`, so it
-    recomputes those predicates on cells it marked free, exercising no real route and no leg.
-  - `src/scenes/place/layout.ts:378,1067,1075,1188,1234` — `inBankPlayLane` is called ONCE, and only
-    for loose flora and rocks; dwellings, fences and fixed props are placed without it, so a
-    compound fence or a hut may stand in the 3 m running corridor the round relies on. And
-    `playRocks` is derived at :385 from the UNSETTLED bank, while `settleBankPoints` runs at :1235
-    over a collider set that already contains the play rocks (:1192): after a settling move the
-    bank and the play-rock stage no longer share one geometry, and an endpoint obstructed for its
-    first metre cannot move through the nearby play rock, so the silent three-metre search can end
-    without free ground.
-  - `docs/acceptance-evidence.md` §15 still carries "THE CHILDREN PLAY A GAME OF TAG" and "AT THAT
-    GAME THE CHILDREN TEACH THE SIX GENERAL CONCEPTS", plus a "Verifiable" line claiming live
-    coverage from the deleted `childSituations.test.ts`. It contradicts §7 of the same document —
-    a false evidence chain the closing would read.
-  - `scripts/verify/polish.mjs` — the browser layer's own bank-round checks are weaker than their
-    wording: the `crossers` loop walks EVERY sample regardless of `s.phase`, so a crossing during
-    walk-back or roam satisfies "the children walk PAST the traveller"; `perChildMinute` is a GROUP
-    average, so one child stuck at `walked === 0` passes while the others carry it (its stated
-    reason — a tagged child holds its crouch — exempts a TAGGED child, not every child);
-    `played >= 0.9 * LANE_WINDOW_S && phases.size >= 2` in bambara-village alone does not
-    close call -> runs -> walk -> roam; two labels say the rocks are seen "from the start line"
-    while the stance is 25 % of the stretch back and 13 % aside; and the errand tripwire's comment
-    claims a max-over-samples read proves absence "either way" when that holds only for a
-    cumulative counter, which the same comment says is not guaranteed. NOTE: the run-phase-only
-    crossing and the per-child whole-cycle reading over all four river layouts DO exist and were
-    confirmed sound in pass 3 — they live in `src/scenes/place/tagShuffle.test.ts` over a 120 s
-    window, not in polish.mjs. Its one defect is `penHasClearWall`, whose inner edge lacks the
-    body-radius margin its outer edge and its own comment carry.
-  SMALLER, EACH POINTED AT A LINE: `speaking.test.ts:19` binds `RIVER_UTTERANCE` to
-  `utteranceOf('ROCK')` (as does `ROCK_UTTERANCE` two lines down), so the file's one tone assertion
-  pins ROCK under RIVER's name and RIVER is exercised nowhere; `scripts/verify/settings.mjs:705`
-  names a check "one shape for every word" over only FOUR atoms, omitting DOWNSTREAM;
-  `verifySuiteUtterances.test.ts:20` matches single-quoted literals only and scans comments, so a
-  double-quoted or template utterance is invisible while a commented-out one satisfies the
-  must-speak test; nothing anywhere pins the three river places more than one arrival radius apart
-  since the deletion of `adultErrands.test.ts` took the only `AT_PLACE_RADIUS * 2` assertion with it
-  (`longestStall` IS re-pinned in tagShuffle.test.ts:856 and polish.mjs, and the `errands-silent`
-  and `child-speech-silent` alarms were retired deliberately with the reason written into
-  scripts/verify/README.md:1045 — only `longestHold` has no replacement); `DebugMenu.test.tsx:874`
-  proves the 19 bank-game controls EXIST but never that one acts, and neither DEFAULTS nor
-  afterEach restores `balance.villageLife.bankGame`; `Dialogs.test.tsx:318` does not tie NO_READING
-  to ROCK in particular; `balance.ts` carries three rationale comments contradicted by the values
-  beside them (dodge "six metres"/"six metres" against `dodgeDistance` 7 and `dodgeReach` 3,
-  `utteranceGapSeconds` "0.35 s" against `syllableSeconds` 0.3, and a surviving "five-syllable
-  atom" against point 686's four); `chiefReply.ts:7` still says "three runs of syllables" for a
-  two-concept phrase; `de.ts:1072` has the drums name the boulder "higher than a man, alone, and
-  unique", which the four-word message cannot say and which makes ROCK read as one boulder's name
-  against point 686 item 1; `en.ts:582` calls the gather phase a "walk to the bank" where §1 has
-  the group RUN; `design.md` §8 still calls the §13.2 glossary "the placeholder under review in
-  §13.4" after the rewrite stopped reviewing it; and `isWellFormed`'s docstring still says "usable as a
-  concept" after the clause that made that true was dropped.
+  CROSS-VENDOR REVIEW OF THE LANDING (29.08.2026, 16 passes over `main..de7e175`, cut by per-file
+  authorship: GPT-5.6 Sol read the Claude-authored files, Opus 4.8 the Sol-authored ones). THE
+  ROUND ITSELF CAME BACK CLEAN — pass 16 traced bankGame.ts's state machine and its multi-seed
+  hand-stepped tests against §1-§4 and recorded merge, its one gap the untested `roamGuardSeconds`
+  abandon branch; passes 15, 2 and 11 merge on PlaceLife.tsx, lexicon.ts and PlaceScene.tsx. All
+  three do-not-merge verdicts fell on the SUPPORTING work, and ALL SIXTEEN FINDINGS ARE ANSWERED on
+  the branch (`9c17272` `ab53909` `6e92f9f` `7c87fd6` `6e89540`), each mutation-checked where a
+  mutation was possible. In one line each, with the detail in those commits:
+  - `findPlaceRoute` could return a route whose last leg ended inside a collider instead of saying
+    NO ROUTE, and the case meant to catch that recomputed the predicates the grid was built from.
+    The grid now records WHY a cell is unfree, so water is still walked into and rock is not.
+  - The children's running lane was guarded against loose dressing only, and the play-rock stage was
+    derived from a bank that had not settled — with the play rocks themselves in the set deciding
+    whether it could. Both were true by luck; they are true by construction now, at no cost in
+    placement.
+  - `docs/acceptance-evidence.md` §15 still described the twelve situations and six concepts the
+    rebuild deleted, and named a suite that no longer exists.
+  - The browser checks outran their own wording: a crossing counted in any phase, a group average
+    that hid a starved child, two labels naming a camera stance the suite does not take, and a
+    tripwire comment claiming a proof its mechanism cannot give.
+  - Smaller, each pointed at a line: `speaking.test.ts` pinned ROCK's tones under RIVER's name;
+    `settings.mjs` said "every word" over four of five; the literal sweep saw single quotes only and
+    read comments as speech; nothing pinned the three river places apart since the errand suite was
+    deleted; the nineteen bank controls were proven to exist and never to act, with no restore
+    entry; `Dialogs.test.tsx` did not tie NO_READING to ROCK; the journal had the drums name the
+    boulder "taller than a man, alone"; a gather phase was labelled a walk where the group runs;
+    and `balance.ts`, `chiefReply.ts`, `lexicon.ts` and `design.md` §8 each carried a number or a
+    pointer that outlived what it described.
+  ONE FINDING IS NOT FIXED AND SAYS SO: `penHasClearWall`'s inner edge carries no body radius, so a
+  sibling on the wall counts as inside the yard. Correcting it yields 6 valid placements where the
+  fixture needs more than 10, and three assertions pinned to that trace fall with it — affordable
+  only with a longer trace and a re-measurement of those three numbers.
   THE FULL REGRESSION OF 29.08.2026 (`npm test` on `de7e175`, WebGL 2, 91m 09s, 131 frames): RED,
   so the WebGPU pass never started. Four of twenty suites failed, none of them this rebuild's:
   - `settings` — "first-person ground shows micro-detail (edge energy)", laplacian mean 1.07, the
