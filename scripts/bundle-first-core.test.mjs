@@ -615,10 +615,28 @@ describe('the real docs/work-packages.md', () => {
     // Inserted on its own line after the marker's line, so the bullet is a
     // bullet rather than a continuation of the sentence that introduces them.
     const afterMarkerLine = tail.indexOf('\n') + 1
-    for (const bullet of ['+ **#999** — another shape.', '  - **#999**.', '-']) {
-      const doc = `${base}${tail.slice(0, afterMarkerLine)}\n${bullet}\n${tail.slice(afterMarkerLine)}`
+    // The indentation case sits BEYOND the parser's three-space rule
+    // (round-eighteen review finding): two spaces is a shape the parser reads,
+    // so it would have proved nothing about the oracle being wider. Four spaces
+    // is a code block to Markdown and to the parser, and still a line the
+    // oracle has to see. Each case asserts BOTH halves — the oracle counts one
+    // more, the parser reads exactly as many as before.
+    const withBullet = (bullet) => `${base}${tail.slice(0, afterMarkerLine)}\n${bullet}\n${tail.slice(afterMarkerLine)}`
+    // BEYOND THE PARSER'S REACH (round-eighteen review finding): two spaces is
+    // a shape the parser reads, so it proved nothing about the oracle being
+    // wider. Four spaces is a code block to Markdown and to the parser, and a
+    // marker alone on its line carries no reference — both are lines only the
+    // oracle sees, and the parser must read exactly as many entries as before.
+    for (const bullet of ['    - **#999**.', '-']) {
+      const doc = withBullet(bullet)
       expect(structuralCounts(doc).bullets.length, bullet).toBe(structuralCounts(md).bullets.length + 1)
+      expect(parseUnbundled(doc).bullets, bullet).toHaveLength(parseUnbundled(md).bullets.length)
     }
+    // And a `+` bullet is a shape BOTH read since round thirteen, so here the
+    // two counts have to move together.
+    const plus = withBullet('+ **#999** — another shape.')
+    expect(structuralCounts(plus).bullets.length).toBe(structuralCounts(md).bullets.length + 1)
+    expect(parseUnbundled(plus).bullets).toHaveLength(parseUnbundled(md).bullets.length + 1)
   })
 
   // THE FIXTURE IS A MEASUREMENT, AND IT SAYS SO ITSELF (round-ten review
