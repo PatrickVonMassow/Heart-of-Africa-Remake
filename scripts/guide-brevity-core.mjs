@@ -449,7 +449,39 @@ export const PROJECT_MARKERS = [
 /** Measure exactly the body that the guide budget governs. */
 export function measureGuide(text) {
   const lines = String(text ?? '').replace(/\r\n/g, '\n').split('\n')
-  const body = lines.filter((line) => !/^<!--/.test(line.trim()))
+  const body = []
+  let inComment = false
+  for (const line of lines) {
+    let rest = line
+    let visible = ''
+    let touchedComment = false
+    while (rest || inComment) {
+      if (inComment) {
+        touchedComment = true
+        const end = rest.indexOf('-->')
+        if (end < 0) {
+          rest = ''
+          break
+        }
+        rest = rest.slice(end + 3)
+        inComment = false
+        continue
+      }
+      const start = rest.indexOf('<!--')
+      if (start < 0) {
+        visible += rest
+        rest = ''
+        break
+      }
+      touchedComment = true
+      visible += rest.slice(0, start)
+      rest = rest.slice(start + 4)
+      inComment = true
+    }
+    // A bookkeeping comment contributes neither physical lines nor words. If
+    // a line also carries real guide text, retain that visible fragment.
+    if (!touchedComment || visible.trim()) body.push(visible)
+  }
   return {
     lines: body.length,
     words: body.join(' ').split(/\s+/).filter(Boolean).length,

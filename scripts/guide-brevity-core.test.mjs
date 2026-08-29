@@ -241,9 +241,16 @@ describe('auditGuide — budget boundaries', () => {
   it('leaves the fingerprint comment out of BOTH budgets', () => {
     const d = doc(entry('A', 2))
     const withFp = `${d}<!-- GUIDE-FINGERPRINT: ${'a'.repeat(64)} -->\n`
-    const tight = { ...LIMITS, maxLines: d.split('\n').length, minEntries: 1 }
+    const measured = measureGuide(d)
+    const tight = { ...LIMITS, maxLines: measured.lines, maxWords: measured.words, minEntries: 1 }
     expect(auditGuide(d, tight).violations.filter((v) => v.kind === 'length')).toHaveLength(0)
     expect(auditGuide(withFp, tight).violations.filter((v) => v.kind === 'length')).toHaveLength(0)
+  })
+
+  it('leaves every line and word of a multi-line bookkeeping comment out of both budgets', () => {
+    const d = doc(entry('A', 2))
+    const withFp = `${d}<!-- GUIDE-FINGERPRINT:\n${'bookkeeping '.repeat(100)}\n\n-->\n`
+    expect(measureGuide(withFp)).toEqual(measureGuide(d))
   })
 })
 
