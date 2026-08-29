@@ -453,14 +453,6 @@ Die Ursache findest du durch **Zerlegen**, nicht durch Wiederholen.
   → *Prompt:* „Eine Entscheidung, die du selbst triffst, nennt die **Messung**, die sie stützen
   oder widerlegen würde, und **verfällt**, sobald diese Messung sauber vorliegt."
 
-- **Der Test ist bei dir grün und auf dem Server rot.** Meist misst er nicht die Maschine,
-  sondern seine eigene Verankerung: Er liest „jetzt", baut danach erst den Gegenstand auf, den
-  dieses „jetzt" abdecken soll, und vergleicht am Ende gegen eine gröbere Uhr (Git zählt in
-  ganzen Sekunden). Je nachdem, wo in der Sekunde der Lauf startet, kippt das Ergebnis.
-  → *Prompt:* „Lies jeden Zeitwert **nach** dem Aufbau dessen, was er beschreibt, nie davor. Wo
-  zwei Auflösungen aufeinandertreffen, richte dich nach der **gröberen**. Und bevor du einen
-  roten Lauf für einen Zufall hältst: stell ihn nach, indem du die Bedingung selbst herstellst."
-
 ---
 
 ## Drei Meta-Regeln, die alles zusammenhalten
@@ -500,4 +492,4 @@ Die Ursache findest du durch **Zerlegen**, nicht durch Wiederholen.
 
 Sie ersetzt die Fallstricke oben nicht.
 
-<!-- GUIDE-FINGERPRINT: e7b9e518a2d70eff1593e3bcac172db4a597465a445efb4596887ca5d4689a06 -->
+<!-- GUIDE-FINGERPRINT: a9d5f56caf6d218d3786b52f8f5d125f32d9ecd21b5522c73fc4c99553beba10 -->
