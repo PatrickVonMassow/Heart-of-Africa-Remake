@@ -3001,6 +3001,24 @@ describe('the shipped charge ledger', () => {
   // is the one failure mode a charge must never have. These pin the narrow half
   // AND the measured half together: an entry that stops matching its own
   // evidence is as broken as one that matches everything.
+  it('charges the archive composite only in the picture-loss shape', () => {
+    const scoped = { suite: 'report', backend: 'webgpu', kind: 'check', featureLevel: 'compatibility' }
+    const withDetail = (name, detail) => ({ ...red(name), detail })
+    const composite = 'the archive holds picture, state, overlay and description'
+    // WHAT 927 MEASURED: the three non-picture members present, no picture.
+    expect(
+      chargeFor(withDetail(composite, 'hoa-state-2026-08-29-42.json, hoa-state-2026-08-29-42-overlay.json, hoa-state-2026-08-29-42.txt'), scoped).point,
+    ).toBe(927)
+    // A LOST STATE OR A LOST OVERLAY IS A DEFECT NOBODY HAS MEASURED, and this
+    // check reports all four members through one name — so without the detail the
+    // entry would have excused them too.
+    expect(chargeFor(withDetail(composite, 'hoa-state-2026-08-29-42.png, hoa-state-2026-08-29-42.txt'), scoped)).toBeNull()
+    expect(chargeFor(withDetail(composite, 'hoa-state-2026-08-29-42.json, hoa-state-2026-08-29-42.txt'), scoped)).toBeNull()
+    // While the two checks that name the picture themselves need no detail.
+    expect(chargeFor(red('the archive carries a screenshot'), scoped).point).toBe(927)
+    expect(chargeFor(red('member hoa-state-2026-08-29-42.png is present'), scoped).point).toBe(927)
+  })
+
   it('excuses the timestamp row only where the red names the missing capability', () => {
     const scoped = { suite: 'benchmark', backend: 'webgpu', kind: 'check', featureLevel: 'compatibility' }
     const withDetail = (name, detail) => ({ ...red(name), detail })

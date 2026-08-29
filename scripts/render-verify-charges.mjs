@@ -714,8 +714,12 @@ export const RED_CHARGES = [
     backend: 'webgpu',
     featureLevel: 'compatibility',
     kind: 'check',
-    match:
-      /^(the archive holds picture, state, overlay and description|member .*\.png is present|the archive carries a screenshot)$/i,
+    // SPLIT FROM THE COMPOSITE CHECK 30.08.2026 (cross-vendor review, GPT-5.6
+    // Sol): these two name the PICTURE in their own text — one names the missing
+    // `.png` member, the other says the archive carries no screenshot — so the
+    // name alone is the evidence. The composite check below is a different case
+    // and gets its own entry.
+    match: /^(member .*\.png is present|the archive carries a screenshot)$/i,
     why:
       'POINT 927 OWNS THIS RED IN FULL AND IN ITS OWN WORDS: "The F6 bug report hands the user an '
       + 'archive WITHOUT the picture", measured 26.08.2026 on main (f14cf8e9) via '
@@ -731,6 +735,36 @@ export const RED_CHARGES = [
       + 'there. This entry accounts for the red; it does '
       + 'not soften it — 927 is criticality HIGH and the archive is a broken channel to the user '
       + 'until it lands.',
+  },
+  {
+    point: 927,
+    suite: 'report',
+    backend: 'webgpu',
+    featureLevel: 'compatibility',
+    kind: 'check',
+    match: /^the archive holds picture, state, overlay and description$/i,
+    // THE COMPOSITE CHECK NEEDS ITS DETAIL, and this is why it is a separate
+    // entry (cross-vendor review, GPT-5.6 Sol, 30.08.2026). "the archive holds
+    // picture, state, overlay and description" fails whenever ANY of those four
+    // members is missing — but point 927 owns exactly one of those failures, the
+    // missing PICTURE. An archive that lost its state or its overlay is a defect
+    // nobody has measured and must stay red.
+    //
+    // The detail lists the members the archive DID hold, so the picture-loss
+    // shape is: the other three present, and no `.png` anywhere in the list.
+    detailMatch: /^(?!.*\.png)(?=.*\.json)(?=.*-overlay\.json)(?=.*\.txt).*$/i,
+    why:
+      'THE SAME DEFECT POINT 927 OWNS, READ THROUGH THE ONE CHECK THAT CAN ALSO FAIL FOR ANOTHER ' +
+      'REASON. 927 measured a WebGPU archive holding its `.json`, `-overlay.json` and `.txt` and ' +
+      'NOTHING ELSE — "the zip holds only .json, -overlay.json and .txt" are its own words — and ' +
+      'the LARGE run of 29.08.2026 on feat/687-roam-bound-fixes reproduced exactly that, twice, ' +
+      'the detail naming those three members and no picture. ' +
+      'DETAIL-SCOPED, unlike its sibling entry: the two checks there name the picture themselves, ' +
+      'while this one is a composite over four members and would otherwise have excused a lost ' +
+      'STATE or a lost OVERLAY — failures nobody has measured and 927 does not own. ' +
+      'Backend- and level-scoped for the reasons the sibling entry states, and the charge dies ' +
+      'with 927, which is criticality HIGH: the archive is a broken channel to the user until it ' +
+      'lands.',
   },
   {
     point: 1010,
