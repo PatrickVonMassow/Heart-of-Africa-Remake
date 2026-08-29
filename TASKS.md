@@ -13615,12 +13615,14 @@ to land than a mechanism that needs a review.
   [Invalid TextureView] is invalid due to a previous error` and `Uncaptured WebGPU
   GPUValidationError: [Invalid CommandBuffer from CommandEncoder "renderContext_11/_14/_32/_42"]
   is invalid due to a previous error`.
-  THE CAUSE IS ALREADY OWNED, THE SYMPTOMS ARE NOT. Point 514 §5 owns the root: on the
-  compatibility lane the MSAA fallback cannot exist, `RGBA16Float does not support multisampling`
-  arrives as an uncaptured GPUValidationError, and everything above is its downstream. The
-  existing 514 console entry says so in its own `why` — it lists "the invalid
-  msaa-texture/view/command-buffer and async-pipeline errors" as the cascade — but its four
-  `match` patterns cover only `RGBA16Float ... does not sup`, `[Invalid Texture "output-msaa"]`,
+  A CAUSE IS SUSPECTED AND NOT ESTABLISHED — and the difference is the whole of this point.
+  Point 514 §5 describes a root that would explain these: on the compatibility lane the MSAA
+  fallback cannot exist, `RGBA16Float does not support multisampling` arrives as an uncaptured
+  GPUValidationError, and its own `why` already lists "the invalid msaa-texture/view/command-buffer
+  and async-pipeline errors" as that cascade. But NOTHING IN THE RECORD TIES THESE TWO TEXTS TO
+  THAT ROOT: a charge reads one red and never the run around it, so the connection is a reading,
+  not a measurement. What IS measured is only this: two compatibility-level WebGPU runs of
+  29.08.2026 emitted both texts, and 514's four `match` patterns cover only `RGBA16Float ... does not sup`, `[Invalid Texture "output-msaa"]`,
   `[Invalid Texture "normal-msaa"]` and `[Invalid TextureView] is invalid due to a previous error`.
   The two texts above begin differently, so the anchored patterns never reach them and the same
   measured lane fault blocks the gate through a third door.
