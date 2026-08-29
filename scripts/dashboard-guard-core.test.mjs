@@ -690,6 +690,9 @@ describe('auditDashboard — the 25.07 witnesses', () => {
     const html = boardHtml({ nowCards: ['Jahresrückblick', 'Kalenderstand'] })
       .replace('class="t">Jahresrückblick', 'class="t">2026 — Jahresrückblick')
       .replace('class="t">Kalenderstand', 'class="t">2026 — Kalenderstand')
+    expect(html).toContain('class="t">2026 — Jahresrückblick')
+    expect(html).toContain('class="t">2026 — Kalenderstand')
+    expect(html.match(/class="t">2026 —/g)).toHaveLength(2)
     expect(codes(html)).not.toContain('dup-in-section')
   })
   it('still audits a TASKS-confirmed four-digit legacy point without a ceiling', () => {
