@@ -117,12 +117,12 @@ export function parseQueuePoints(html) {
 /**
  * Point numbers of the "Von dir zu klären" cards (items blocked on the user).
  * Anchored on the SECTION HEADER like parseQueuePoints, and reading only the
- * LEADING number of each card TITLE (`<span class="t">226 — …`) — never every
- * digit. The number must end at an en/em dash or colon, which excludes ISO
- * dates and hyphenated counts without imposing a digit ceiling that would hide
- * a real four-digit point. Cards without a qualifying leading number (the ntfy
- * subscription, the communication-system question) yield nothing. Empty Set
- * on non-string input or a missing section.
+ * leading ownership prefix of each card TITLE — a separator-qualified single
+ * point (`226 — …`) or an explicit compound run (`1003+1004 — …`), never
+ * incidental digits in the prose. The shared grammar excludes dates, clocks
+ * and counts and requires TASKS provenance for a four-digit free-title token.
+ * Cards without a qualifying prefix yield nothing. Empty Set on non-string
+ * input or a missing section.
  */
 export function parseKlaerungPoints(html, options = {}) {
   const points = new Set()

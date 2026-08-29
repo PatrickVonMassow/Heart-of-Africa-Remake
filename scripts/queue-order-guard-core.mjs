@@ -175,9 +175,10 @@ function nowCardPoint(chunk, options) {
  * The now-SECTION as {point, text} — a probe for "does this board have a now
  * section at all", which is all `dashboard-integrity-guard-core` asks of it.
  *
- * Its text is the WHOLE section and its point the first number in it, so it must
- * never be used to attribute a card's words to a point: use `parseNowCards`
- * above. Both exist on purpose; collapsing them re-creates the mix-up.
+ * Its text is the WHOLE section and its point belongs to the FIRST card (or is
+ * null when that card is unnumbered), so it must never be used to attribute a
+ * card's words to a point: use `parseNowCards` above. Both exist on purpose;
+ * collapsing them re-creates the mix-up.
  */
 export function parseNowCard(html, options = {}) {
   const section = nowSection(html)
