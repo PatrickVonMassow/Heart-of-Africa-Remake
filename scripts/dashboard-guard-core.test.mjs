@@ -88,6 +88,10 @@ describe('parseNowCardPoints', () => {
     const set = parseNowCardPoints(boardHtml({ nowCards: [226, 'Closing-Zyklus'] }))
     expect([...set]).toEqual([226])
   })
+  it('reads uncapped and compound legacy title ownership without accepting a date', () => {
+    const html = boardHtml({ nowCards: ['1003+1004 — Verbundarbeit', '2026-07-25 — Rückblick'] })
+    expect(parseNowCardPoints(html)).toEqual(new Set([1003, 1004]))
+  })
   it('stays section-bounded: numbered VDZK/queue cards never leak in', () => {
     const html = boardHtml({ nowCards: ['Automatik absichern'], klaerung: [206], queue: [211, 204] })
     expect(parseNowCardPoints(html).size).toBe(0)
@@ -149,9 +153,9 @@ describe('parseKlaerungPoints', () => {
     })
     expect(parseKlaerungPoints(html)).toEqual(new Set())
   })
-  it('reads an uncapped point from the chip-less VDZK title shape', () => {
-    const html = boardHtml({ klaerungExtra: ['1003 — Vierstelliger Punkt ohne Nummern-Chip'] })
-    expect(parseKlaerungPoints(html)).toEqual(new Set([1003]))
+  it('reads uncapped and compound points from the chip-less VDZK title shape', () => {
+    const html = boardHtml({ klaerungExtra: ['1003+1004 — Vierstellige Punkte ohne Nummern-Chip'] })
+    expect(parseKlaerungPoints(html)).toEqual(new Set([1003, 1004]))
   })
   it('does not pick up now-card, queue, or Erledigt titles', () => {
     // No VDZK cards at all — nothing from the surrounding sections leaks in.
@@ -514,18 +518,21 @@ describe('sliceSections / parseCards', () => {
     expect(parseCards(card('92+94'))[0].points).toEqual([92, 94])
     expect(parseCards(card('71/72'))[0].points).toEqual([71, 72])
   })
-  it('uncaps the structured .num field while keeping the free-title ceiling', () => {
+  it('reads four-digit ownership from both the structured chip and a legacy title', () => {
     const structured = '<details><summary><span class="num">1003</span><span class="t">Done</span></summary><div class="body">x</div></details>'
     const freeTitle = '<details><summary><span class="t">1003 — Jahresrückblick</span></summary><div class="body">x</div></details>'
     expect(parseCards(structured)[0].points).toEqual([1003])
-    expect(parseCards(freeTitle)[0].points).toEqual([])
+    expect(parseCards(freeTitle)[0].points).toEqual([1003])
   })
-  it('reads no phantom point from a date, a count or a year in a title', () => {
+  it('reads no phantom point from a date, a hyphenated count or an unseparated year', () => {
     const card = (t) => `<details><summary><span class="t">${t}</span></summary><div class="body">x</div></details>`
     expect(parseCards(card('2026-07-25 — Rückblick'))[0].points).toEqual([])
     expect(parseCards(card('5-Minuten-Check — X'))[0].points).toEqual([])
-    expect(parseCards(card('1890 — Kartenstand'))[0].points).toEqual([])
     expect(parseCards(card('1890er Namen für Landmarken'))[0].points).toEqual([])
+  })
+  it('treats any separator-qualified number as ownership because years and uncapped points are indistinguishable', () => {
+    const html = '<details><summary><span class="t">1890 — Kartenstand</span></summary><div class="body">x</div></details>'
+    expect(parseCards(html)[0].points).toEqual([1890])
   })
   it('reads a body that starts with a container child (no false empty-body)', () => {
     const html =

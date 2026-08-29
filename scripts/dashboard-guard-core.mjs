@@ -54,9 +54,14 @@ export function parseNowCardPoints(html) {
   // a non-numeric now-card read the VDZK 206 card as its point).
   const nextH2 = html.indexOf('<h2>', nowStart + 1)
   const section = html.slice(nowStart, nextH2 < 0 ? undefined : nextH2)
-  // BOTH SHAPES, one pass: the chip and the legacy title number carry the same
-  // value on a card that has both, and a Set makes the double read harmless.
-  for (const m of section.matchAll(/class="(?:num|t)">\s*(\d+)/g)) points.add(Number(m[1]))
+  // BOTH SHAPES: the chip and the legacy title number carry the same value on
+  // a card that has both, and a Set makes the double read harmless. Legacy
+  // titles use the same separator-qualified compound grammar as the audit;
+  // this keeps an ISO date or a hyphenated count from becoming ownership.
+  for (const m of section.matchAll(/class="num">\s*(\d+)/g)) points.add(Number(m[1]))
+  for (const m of section.matchAll(/class="t">\s*([\d+·/ ]*\d)\s*[—–:]/g)) {
+    for (const n of m[1].split(/[+·/\s]+/)) if (/^\d+$/.test(n)) points.add(Number(n))
+  }
   return points
 }
 
@@ -119,8 +124,8 @@ export function parseKlaerungPoints(html) {
   if (kStart < 0) return points
   const kEnd = html.indexOf('<h2>', kStart + 1)
   const sectionHtml = html.slice(kStart, kEnd < 0 ? undefined : kEnd)
-  for (const m of sectionHtml.matchAll(/class="t">\s*(\d+)\s*[—–:]/g)) {
-    points.add(Number(m[1]))
+  for (const m of sectionHtml.matchAll(/class="t">\s*([\d+·/ ]*\d)\s*[—–:]/g)) {
+    for (const n of m[1].split(/[+·/\s]+/)) if (/^\d+$/.test(n)) points.add(Number(n))
   }
   return points
 }
@@ -308,13 +313,12 @@ export function parseCards(sectionHtml) {
   // Split a compound point field into its numbers ("232·233·234", "92+94",
   // "71/72"); a sub-delivery marker ("203A", "CI", "✓") yields none. The
   // machine-written `.num` field contains only point numbers and is uncapped.
-  // A leading number recovered from free title text stays capped so a year or
-  // count cannot pose as a point number.
-  const MAX_TITLE_POINT = 999
-  const numbers = (raw, maxPoint = Number.POSITIVE_INFINITY) =>
+  // A leading number recovered from title text is separator-qualified rather
+  // than digit-capped, so real four-digit legacy cards remain visible.
+  const numbers = (raw) =>
     String(raw)
       .split(/[+·/\s]+/)
-      .filter((n) => /^\d+$/.test(n) && Number(n) <= maxPoint)
+      .filter((n) => /^\d+$/.test(n))
       .map(Number)
   for (const part of sectionHtml.split(/<details/).slice(1)) {
     const summary = (part.match(/<summary>([\s\S]*?)<\/summary>/) ?? [])[1] ?? ''
@@ -337,7 +341,7 @@ export function parseCards(sectionHtml) {
     // Leading title number(s), separated from the text by a dash or colon —
     // never a plain hyphen, which would read "2026-07-25 —" as point 2026.
     const t = (summary.match(/class="t">\s*([\d+·/ ]*\d)\s*[—–:]/) ?? [])[1]
-    if (t) for (const n of numbers(t, MAX_TITLE_POINT)) points.add(n)
+    if (t) for (const n of numbers(t)) points.add(n)
     // The full title comes along so a violation can NAME the card it means; a
     // point number alone is no help on a card that has none.
     const title = ((summary.match(/class="t">([^<]*)</) ?? [])[1] ?? '').trim()

@@ -68,12 +68,14 @@ function sectionSlice(html, marker) {
 }
 
 /**
- * The `<details>` cards of one section as [{where, point, title, bodyHtml}].
+ * The `<details>` cards of one section as
+ * [{where, point, ownedPoints, title, bodyHtml}].
  * The own point comes from `<span class="num">N</span>` (queue) or a now-card
- * title starting `NN — …` / `NN – …`; null for cards without one (VDZK,
- * process cards). The 2+ digit floor preserves the board's single-digit list
- * convention, and a plain hyphen is excluded so an ISO date cannot own its
- * leading year. Cards without a body block are skipped (nothing to scan).
+ * title starting with the separator-qualified form the dashboard audit reads,
+ * including `NN: …` and compound `NN+NN — …` ownership. `point` is the sole
+ * owner or null for compound/unnumbered cards; `ownedPoints` carries the full
+ * set used by the topic decision. A plain hyphen is excluded so an ISO date
+ * cannot own its leading year. Cards without a body block are skipped.
  */
 export function parseCards(sectionHtml, where) {
   if (typeof sectionHtml !== 'string' || typeof where !== 'string') return []
@@ -81,14 +83,23 @@ export function parseCards(sectionHtml, where) {
   for (const chunk of sectionHtml.split(/<details\b/).slice(1)) {
     const num = chunk.match(/class="num">\s*(\d+)/)
     const title = chunk.match(/class="t">\s*([^<]*)/)
-    const titleNum = title && title[1].match(/^\s*(\d{2,})\s*[—–]/)
+    const titleField = title && title[1].match(/^\s*([\d+·/ ]*\d)\s*[—–:]/)
+    let ownedPoints = []
+    if (num) ownedPoints = [Number(num[1])]
+    else if (titleField) {
+      ownedPoints = titleField[1]
+        .split(/[+·/\s]+/)
+        .filter((n) => /^\d+$/.test(n))
+        .map(Number)
+    }
     const body =
       chunk.match(/<div class="body">([\s\S]*?)<\/div>\s*<\/details>/) ||
       chunk.match(/<div class="body">([\s\S]*)$/)
     if (!body) continue
     cards.push({
       where,
-      point: num ? Number(num[1]) : titleNum ? Number(titleNum[1]) : null,
+      point: ownedPoints.length === 1 ? ownedPoints[0] : null,
+      ownedPoints,
       title: title ? title[1].trim() : '',
       bodyHtml: body[1],
     })
@@ -110,10 +121,14 @@ export function foreignRefs(bodyHtml, ownPoint, known) {
   if (typeof bodyHtml !== 'string' || !(known instanceof Set)) return []
   const text = stripTags(bodyHtml)
   const refs = []
+  const owned =
+    ownPoint instanceof Set
+      ? ownPoint
+      : new Set(Array.isArray(ownPoint) ? ownPoint : ownPoint == null ? [] : [ownPoint])
   for (const re of [SPELLED_REF_RE, PAREN_REF_RE]) {
     for (const m of text.matchAll(re)) {
       const n = Number(m[1])
-      if (known.has(n) && n !== ownPoint && !refs.includes(n)) refs.push(n)
+      if (known.has(n) && !owned.has(n) && !refs.includes(n)) refs.push(n)
     }
   }
   return refs.sort((a, b) => a - b)
@@ -135,7 +150,7 @@ export function topicViolations(html, known) {
     // The two state cards deliberately speak across a point boundary: closing
     // names the point just ended, and handover names the one picked up next.
     if (isStateCardTitle(card.title)) continue
-    for (const ref of foreignRefs(card.bodyHtml, card.point, known)) {
+    for (const ref of foreignRefs(card.bodyHtml, card.ownedPoints, known)) {
       violations.push({ where: card.where, point: card.point, title: card.title, ref })
     }
   }

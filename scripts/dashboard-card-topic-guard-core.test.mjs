@@ -76,6 +76,16 @@ describe('parseCards', () => {
     expect(now.map((c) => c.point)).toEqual([1000])
   })
 
+  it('aligns colon and compound ownership with the dashboard audit', () => {
+    const section = `
+<details><summary><span class="t">1000: Einzelarbeit</span></summary><div class="body">Punkt 1000.</div></details>
+<details><summary><span class="t">1000+1003 — Verbundarbeit</span></summary><div class="body">Punkt 1000 und Punkt 1003.</div></details>`
+    const cards = parseCards(section, 'now')
+    expect(cards.map((c) => c.point)).toEqual([1000, null])
+    expect(cards.map((c) => c.ownedPoints)).toEqual([[1000], [1000, 1003]])
+    expect(topicViolations(`<h2>Woran ich gerade arbeite</h2>${section}`, KNOWN)).toEqual([])
+  })
+
   it('does not invent ownership from an ISO date or a single-digit effort title', () => {
     const section = `
 <details><summary><span class="t">2026-07-25 — Rückblick</span></summary><div class="body">Kurz.</div></details>
@@ -83,6 +93,16 @@ describe('parseCards', () => {
     expect(parseCards(section, 'now').map((c) => c.point)).toEqual([null, null])
     expect(topicViolations(`<h2>Woran ich gerade arbeite</h2>${section}`, KNOWN)).toMatchObject([
       { where: 'now', point: null, ref: 1 },
+    ])
+  })
+
+  it('records that a plain-hyphen title is unsupported and therefore owns no point', () => {
+    const section =
+      '<details><summary><span class="t">1000 - Arbeit</span></summary>' +
+      '<div class="body">Punkt 1000.</div></details>'
+    expect(parseCards(section, 'now').map((c) => c.point)).toEqual([null])
+    expect(topicViolations(`<h2>Woran ich gerade arbeite</h2>${section}`, KNOWN)).toMatchObject([
+      { where: 'now', point: null, title: '1000 - Arbeit', ref: 1000 },
     ])
   })
 
