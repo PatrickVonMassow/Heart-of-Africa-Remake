@@ -43,6 +43,7 @@
 // titles live.
 import { isStateCardTitle } from './board-core.mjs'
 import { REPUBLISH } from './board-remedy.mjs'
+import { pointNumbersFromChip, pointOwnershipFromTitle } from './dashboard-point-reader-core.mjs'
 
 const stripTags = (html) => html.replace(/<[^>]*>/g, ' ')
 
@@ -79,25 +80,17 @@ function sectionSlice(html, marker) {
  * accepting them turns a count such as `1 - 2 Tage` into false ownership.
  * Cards without a body block are skipped.
  */
-export function parseCards(sectionHtml, where) {
+export function parseCards(sectionHtml, where, options = {}) {
   if (typeof sectionHtml !== 'string' || typeof where !== 'string') return []
   const cards = []
   for (const chunk of sectionHtml.split(/<details\b/).slice(1)) {
     const num = chunk.match(/class="num">\s*([^<]*?)\s*</)
     const title = chunk.match(/class="t">\s*([^<]*)/)
-    const titleField = title && title[1].match(/^\s*([\d+·/ ]*\d)\s*[—–:]/)
     let ownedPoints = []
     if (num) {
-      ownedPoints = num[1]
-        .split(/[+·/\s]+/)
-        .filter((n) => /^\d+$/.test(n))
-        .map(Number)
-    }
-    else if (titleField) {
-      ownedPoints = titleField[1]
-        .split(/[+·/\s]+/)
-        .filter((n) => /^\d+$/.test(n))
-        .map(Number)
+      ownedPoints = pointNumbersFromChip(num[1])
+    } else if (title) {
+      ownedPoints = pointOwnershipFromTitle(title[1], options).points
     }
     const body =
       chunk.match(/<div class="body">([\s\S]*?)<\/div>\s*<\/details>/) ||
@@ -148,9 +141,9 @@ export function foreignRefs(bodyHtml, ownPoint, known) {
 export function topicViolations(html, known) {
   if (typeof html !== 'string' || !(known instanceof Set)) return []
   const cards = [
-    ...parseCards(sectionSlice(html, 'Woran ich gerade arbeite'), 'now'),
-    ...parseCards(sectionSlice(html, 'Von dir zu klären'), 'question'),
-    ...parseCards(sectionSlice(html, '<h2>Warteschlange'), 'queue'),
+    ...parseCards(sectionSlice(html, 'Woran ich gerade arbeite'), 'now', { knownPoints: known }),
+    ...parseCards(sectionSlice(html, 'Von dir zu klären'), 'question', { knownPoints: known }),
+    ...parseCards(sectionSlice(html, '<h2>Warteschlange'), 'queue', { knownPoints: known }),
   ]
   const violations = []
   for (const card of cards) {

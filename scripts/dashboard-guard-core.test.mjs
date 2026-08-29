@@ -77,6 +77,14 @@ describe('parseNowCardPoint', () => {
   it('reads the FIRST of several parallel now-cards (back-compat view)', () => {
     expect(parseNowCardPoint(boardHtml({ nowCards: [226, 211] }))).toBe(226)
   })
+  it('rejects a bare year unless TASKS provenance confirms the four-digit point', () => {
+    const html = boardHtml({ nowPoint: null, nowTitle: 'Platzhalter' }).replace(
+      '<span class="t">Platzhalter</span>',
+      '<span class="t">2026 — Jahresrückblick</span>',
+    )
+    expect(parseNowCardPoint(html)).toBeNull()
+    expect(parseNowCardPoint(html, { knownPoints: [2026] })).toBe(2026)
+  })
 })
 
 describe('parseNowCardPoints', () => {
@@ -89,8 +97,18 @@ describe('parseNowCardPoints', () => {
     expect([...set]).toEqual([226])
   })
   it('reads uncapped and compound legacy title ownership without accepting a date', () => {
-    const html = boardHtml({ nowCards: ['1003+1004 — Verbundarbeit', '2026-07-25 — Rückblick'] })
-    expect(parseNowCardPoints(html)).toEqual(new Set([1003, 1004]))
+    const html = boardHtml({ nowCards: ['Verbundarbeit', 'Rückblick'] })
+      .replace('<span class="t">Verbundarbeit</span>', '<span class="t">1003+1004 — Verbundarbeit</span>')
+      .replace('<span class="t">Rückblick</span>', '<span class="t">2026-07-25 — Rückblick</span>')
+    expect(html).not.toContain('<span class="num">1003</span>')
+    expect(parseNowCardPoints(html, { knownPoints: [1003, 1004] })).toEqual(new Set([1003, 1004]))
+  })
+  it('rejects a bare year and clock time unless provenance proves the year is a point', () => {
+    const html = boardHtml({ nowCards: ['Jahr', 'Uhrzeit'] })
+      .replace('<span class="t">Jahr</span>', '<span class="t">2026 — Jahresrückblick</span>')
+      .replace('<span class="t">Uhrzeit</span>', '<span class="t">14:54 — Nachtrag</span>')
+    expect(parseNowCardPoints(html)).toEqual(new Set())
+    expect(parseNowCardPoints(html, { knownPoints: [2026, 14] })).toEqual(new Set([2026]))
   })
   it('preserves document order across mixed chip and legacy-title cards', () => {
     const html = boardHtml({ nowCards: ['1003 — Altform', 226, '1004 — Altform'] })
@@ -111,6 +129,13 @@ describe('parseNowCardPoints', () => {
       '<div class="body"><p>Kurzstand.</p></div></details>'
     const html = boardHtml({ nowCards: [226] }).replace('<h2>Woran ich gerade arbeite</h2></summary>', `<h2>Woran ich gerade arbeite</h2></summary>\n${chip}`)
     expect([...parseNowCardPoints(html)].sort((a, b) => a - b)).toEqual([226, 655])
+  })
+  it('reads every point from a compound numbered chip', () => {
+    const chip =
+      '<details class="now"><summary><span class="num">1003·1004</span>' +
+      '<span class="t">Verbundarbeit</span></summary><div class="body"><p>Kurz.</p></div></details>'
+    const html = boardHtml({ nowPoint: null }).replace('<h2>Woran ich gerade arbeite</h2></summary>', `<h2>Woran ich gerade arbeite</h2></summary>\n${chip}`)
+    expect(parseNowCardPoints(html)).toEqual(new Set([1003, 1004]))
   })
   it('is empty on a missing section and non-string input', () => {
     expect(parseNowCardPoints('<h2>Warteschlange</h2>').size).toBe(0)
@@ -137,6 +162,10 @@ describe('parseQueuePoints', () => {
   it('reads a four-digit queue point directly', () => {
     expect(parseQueuePoints(boardHtml({ queue: [1003] }))).toEqual(new Set([1003]))
   })
+  it('reads every point from a compound queue chip', () => {
+    const html = boardHtml({ queue: [211] }).replace('<span class="num">211</span>', '<span class="num">1003·1004</span>')
+    expect(parseQueuePoints(html)).toEqual(new Set([1003, 1004]))
+  })
   it('is empty on missing section / non-string input', () => {
     expect(parseQueuePoints('<p>no board</p>').size).toBe(0)
     expect(parseQueuePoints(null).size).toBe(0)
@@ -160,9 +189,14 @@ describe('parseKlaerungPoints', () => {
     })
     expect(parseKlaerungPoints(html)).toEqual(new Set())
   })
+  it('rejects a bare year and clock time unless TASKS provenance confirms the year', () => {
+    const html = boardHtml({ klaerungExtra: ['2026 — Jahresrückblick', '14:54 — Nachtrag'] })
+    expect(parseKlaerungPoints(html)).toEqual(new Set())
+    expect(parseKlaerungPoints(html, { knownPoints: [2026, 14] })).toEqual(new Set([2026]))
+  })
   it('reads uncapped and compound points from the chip-less VDZK title shape', () => {
     const html = boardHtml({ klaerungExtra: ['1003+1004 — Vierstellige Punkte ohne Nummern-Chip'] })
-    expect(parseKlaerungPoints(html)).toEqual(new Set([1003, 1004]))
+    expect(parseKlaerungPoints(html, { knownPoints: [1003, 1004] })).toEqual(new Set([1003, 1004]))
   })
   it('does not pick up now-card, queue, or Erledigt titles', () => {
     // No VDZK cards at all — nothing from the surrounding sections leaks in.

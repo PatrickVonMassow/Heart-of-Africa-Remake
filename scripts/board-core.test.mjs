@@ -234,7 +234,9 @@ const vdzkEntry = (title) =>
 
 describe('four-digit point lifecycle', () => {
   it('returns a legacy title-only now-card to the queue', () => {
-    const out = toQueue(fullBoard({ now: nowEntry(1000, 'Große Übergabe', '10:00 · ~12:00') }), 1000)
+    const source = fullBoard({ now: nowEntry(1000, 'Große Übergabe', '10:00 · ~12:00') })
+    expect(parseNowCardPoints(source, { knownPoints: [1000] })).toEqual(new Set([1000]))
+    const out = toQueue(source, 1000)
     expect(out).toContain('<span class="num">1000</span><span class="t">Große Übergabe</span>')
     expect(parseQueuePoints(out)).toEqual(new Set([1000]))
     expect(parseNowCardPoints(out)).toEqual(new Set())

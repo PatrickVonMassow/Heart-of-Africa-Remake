@@ -103,6 +103,18 @@ describe('parseCardTitle / cardTitle', () => {
     expect(parseCardTitle('0.2 nachgezogen').points).toEqual([])
   })
 
+  it('uses TASKS provenance to distinguish a bare year from a four-digit point', () => {
+    expect(parseCardTitle('2026 — Jahresrückblick').points).toEqual([])
+    expect(parseCardTitle('2026 — Echter Punkt', { knownPoints: [2026] })).toMatchObject({
+      point: 2026,
+      points: [2026],
+      label: 'Echter Punkt',
+    })
+    expect(parseCardTitle('2026-07-25 — Rückblick', { knownPoints: [2026] }).points).toEqual([])
+    expect(nowCardTitles(boardHtml(['2026 — Jahresrückblick']))[0].point).toBeNull()
+    expect(nowCardTitles(boardHtml(['2026 — Echter Punkt']), { knownPoints: [2026] })[0].point).toBe(2026)
+  })
+
   it('cardTitle reads the FIRST now-card of the real markup, never the meta time or other sections', () => {
     const c = cardTitle(boardHtml(['306 — Closing-Completeness-Guard', '308 — Sync-Guard']))
     expect(c.point).toBe(306)

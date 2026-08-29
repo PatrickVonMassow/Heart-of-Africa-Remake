@@ -72,7 +72,9 @@ describe('parseCards', () => {
 
   it('reads an uncapped own point from a now-card title', () => {
     const html = boardHtml({ now: [{ n: 1000, body: '<p>Kurz.</p>' }] })
-    const now = parseCards(html.slice(html.indexOf('Woran ich'), html.indexOf('<h2>Von dir')), 'now')
+    const now = parseCards(html.slice(html.indexOf('Woran ich'), html.indexOf('<h2>Von dir')), 'now', {
+      knownPoints: KNOWN,
+    })
     expect(now.map((c) => c.point)).toEqual([1000])
   })
 
@@ -81,10 +83,18 @@ describe('parseCards', () => {
 <details><summary><span class="t">1000: Einzelarbeit</span></summary><div class="body">Punkt 1000.</div></details>
 <details><summary><span class="t">1000+1003 — Verbundarbeit</span></summary><div class="body">Punkt 1000 und Punkt 1003.</div></details>
 <details><summary><span class="num">1000·1003</span><span class="t">Chip-Verbund</span></summary><div class="body">Punkt 1000 und Punkt 1003.</div></details>`
-    const cards = parseCards(section, 'now')
+    const cards = parseCards(section, 'now', { knownPoints: KNOWN })
     expect(cards.map((c) => c.point)).toEqual([1000, null, null])
     expect(cards.map((c) => c.ownedPoints)).toEqual([[1000], [1000, 1003], [1000, 1003]])
     expect(topicViolations(`<h2>Woran ich gerade arbeite</h2>${section}`, KNOWN)).toEqual([])
+  })
+
+  it('uses provenance to distinguish a bare year from a four-digit point', () => {
+    const section =
+      '<details><summary><span class="t">2026 — Jahresrückblick</span></summary>' +
+      '<div class="body">Punkt 1003.</div></details>'
+    expect(parseCards(section, 'now')[0].ownedPoints).toEqual([])
+    expect(parseCards(section, 'now', { knownPoints: [2026] })[0].ownedPoints).toEqual([2026])
   })
 
   it('does not turn a sub-delivery chip prefix into ownership', () => {

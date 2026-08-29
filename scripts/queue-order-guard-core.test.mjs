@@ -130,6 +130,14 @@ describe('parseQueueCards / parseNowCard', () => {
     expect(parseNowCard(chipBoard).point).toBe(210)
     expect(parseNowCards(chipBoard).map((c) => c.point)).toEqual([210])
   })
+  it('uses provenance for a bare year and rejects a leading clock time', () => {
+    const year = boardHtml({ nowTitle: '2026 — Jahresrückblick' })
+    expect(parseNowCard(year).point).toBeNull()
+    expect(parseNowCards(year).map((card) => card.point)).toEqual([null])
+    expect(parseNowCard(year, { knownPoints: [2026] }).point).toBe(2026)
+    expect(parseNowCards(year, { knownPoints: [2026] }).map((card) => card.point)).toEqual([2026])
+    expect(parseNowCard(boardHtml({ nowTitle: '14:54 — Nachtrag' }), { knownPoints: [14] }).point).toBeNull()
+  })
   it('is total on missing sections / non-string input', () => {
     expect(parseQueueCards('<p>no board</p>')).toEqual([])
     expect(parseQueueCards(null)).toEqual([])

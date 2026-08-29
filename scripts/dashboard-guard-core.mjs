@@ -11,6 +11,7 @@
 // Every remedy below names the publish steps from scripts/board-remedy.mjs —
 // one copy, so a transport change cannot leave a block pointing at a dead path.
 import { PUBLISH_CMD, REPUBLISH, SYNCED_CMD } from './board-remedy.mjs'
+import { pointNumbersFromChip, pointOwnershipFromTitle } from './dashboard-point-reader-core.mjs'
 
 /** A focus confirmation older than this, with tool work after it, must be re-affirmed. */
 export const FOCUS_FRESH_MS = 30 * 60 * 1000
@@ -42,7 +43,7 @@ export function parseTasks(text) {
  * title has no leading number (non-point work) contributes nothing. Empty Set
  * on a missing section or non-string input.
  */
-export function parseNowCardPoints(html) {
+export function parseNowCardPoints(html, options = {}) {
   const points = new Set()
   if (typeof html !== 'string') return points
   const nowStart = html.indexOf('Woran ich gerade arbeite')
@@ -54,14 +55,17 @@ export function parseNowCardPoints(html) {
   // a non-numeric now-card read the VDZK 206 card as its point).
   const nextH2 = html.indexOf('<h2>', nowStart + 1)
   const section = html.slice(nowStart, nextH2 < 0 ? undefined : nextH2)
-  // BOTH SHAPES: the chip and the legacy title number carry the same value on
-  // a card that has both, and a Set makes the double read harmless. Legacy
-  // titles use the same separator-qualified compound grammar as the audit;
-  // this keeps an ISO date or a hyphenated count from becoming ownership.
-  const owner = /class="num">\s*(\d+)|class="t">\s*([\d+·/ ]*\d)\s*[—–:]/g
-  for (const m of section.matchAll(owner)) {
-    if (m[1]) points.add(Number(m[1]))
-    else for (const n of m[2].split(/[+·/\s]+/)) if (/^\d+$/.test(n)) points.add(Number(n))
+  // BOTH SHAPES: a machine-written chip is unambiguous; a legacy free title
+  // goes through the house-wide provenance-aware grammar. Per-card parsing
+  // also keeps compound chips intact instead of reading only their first item.
+  for (const part of section.split(/<details\b/).slice(1)) {
+    const summary = (part.match(/<summary>([\s\S]*?)<\/summary>/) ?? [])[1] ?? ''
+    if (!summary || /<h2[\s>]/.test(summary)) continue
+    for (const chip of summary.matchAll(/class="num">\s*([^<]*?)\s*</g)) {
+      for (const point of pointNumbersFromChip(chip[1])) points.add(point)
+    }
+    const title = (summary.match(/class="t">\s*([^<]*)/) ?? [])[1]
+    for (const point of pointOwnershipFromTitle(title, options).points) points.add(point)
   }
   return points
 }
@@ -71,8 +75,8 @@ export function parseNowCardPoints(html) {
  * null. Kept for the wrapper/focus tooling; the guard invariants themselves
  * use the full parseNowCardPoints Set.
  */
-export function parseNowCardPoint(html) {
-  for (const n of parseNowCardPoints(html)) return n
+export function parseNowCardPoint(html, options = {}) {
+  for (const n of parseNowCardPoints(html, options)) return n
   return null
 }
 
@@ -104,7 +108,9 @@ export function parseQueuePoints(html) {
   if (qStart < 0) return queued
   const qEnd = html.indexOf('<h2>', qStart + 1)
   const queueHtml = html.slice(qStart, qEnd < 0 ? undefined : qEnd)
-  for (const m of queueHtml.matchAll(/class="num">\s*(\d+)/g)) queued.add(Number(m[1]))
+  for (const m of queueHtml.matchAll(/class="num">\s*([^<]*?)\s*</g)) {
+    for (const point of pointNumbersFromChip(m[1])) queued.add(point)
+  }
   return queued
 }
 
@@ -118,15 +124,18 @@ export function parseQueuePoints(html) {
  * subscription, the communication-system question) yield nothing. Empty Set
  * on non-string input or a missing section.
  */
-export function parseKlaerungPoints(html) {
+export function parseKlaerungPoints(html, options = {}) {
   const points = new Set()
   if (typeof html !== 'string') return points
   const kStart = html.indexOf('<h2>Von dir zu klären')
   if (kStart < 0) return points
   const kEnd = html.indexOf('<h2>', kStart + 1)
   const sectionHtml = html.slice(kStart, kEnd < 0 ? undefined : kEnd)
-  for (const m of sectionHtml.matchAll(/class="t">\s*([\d+·/ ]*\d)\s*[—–:]/g)) {
-    for (const n of m[1].split(/[+·/\s]+/)) if (/^\d+$/.test(n)) points.add(Number(n))
+  for (const part of sectionHtml.split(/<details\b/).slice(1)) {
+    const summary = (part.match(/<summary>([\s\S]*?)<\/summary>/) ?? [])[1] ?? ''
+    if (!summary || /<h2[\s>]/.test(summary)) continue
+    const title = (summary.match(/class="t">\s*([^<]*)/) ?? [])[1]
+    for (const point of pointOwnershipFromTitle(title, options).points) points.add(point)
   }
   return points
 }
@@ -320,12 +329,6 @@ export function parseCards(sectionHtml, options = {}) {
   // lengths remain separator-qualified, and the structured field stays the
   // authoritative uncapped form.
   const knownPoints = options?.knownPoints ?? []
-  const known = knownPoints instanceof Set ? knownPoints : new Set(Array.isArray(knownPoints) ? knownPoints : [])
-  const numbers = (raw) =>
-    String(raw)
-      .split(/[+·/\s]+/)
-      .filter((n) => /^\d+$/.test(n))
-      .map(Number)
   for (const part of sectionHtml.split(/<details/).slice(1)) {
     const summary = (part.match(/<summary>([\s\S]*?)<\/summary>/) ?? [])[1] ?? ''
     // A collapsible SECTION wrapper is not a card: its summary holds the <h2>
@@ -343,15 +346,11 @@ export function parseCards(sectionHtml, options = {}) {
       .replace(/\s+/g, ' ')
       .trim()
     const points = new Set()
-    for (const m of summary.matchAll(/class="num">\s*([^<]*?)\s*</g)) for (const n of numbers(m[1])) points.add(n)
-    // Leading title number(s), separated from the text by a dash or colon —
-    // never a plain hyphen, which would read "2026-07-25 —" as point 2026.
-    const t = (summary.match(/class="t">\s*([\d+·/ ]*\d)\s*[—–:]/) ?? [])[1]
-    if (t) {
-      for (const n of numbers(t)) {
-        if (!/^\d{4}$/.test(String(n)) || known.has(n)) points.add(n)
-      }
+    for (const m of summary.matchAll(/class="num">\s*([^<]*?)\s*</g)) {
+      for (const point of pointNumbersFromChip(m[1])) points.add(point)
     }
+    const titleText = (summary.match(/class="t">\s*([^<]*)/) ?? [])[1]
+    for (const point of pointOwnershipFromTitle(titleText, { knownPoints }).points) points.add(point)
     // The full title comes along so a violation can NAME the card it means; a
     // point number alone is no help on a card that has none.
     const title = ((summary.match(/class="t">([^<]*)</) ?? [])[1] ?? '').trim()
@@ -556,7 +555,9 @@ export function auditDashboard(html, input = {}) {
   // TASKS is the authority that distinguishes an uncapped four-digit legacy
   // point from a free-title year. Machine-written `.num` fields need no such
   // context and remain unconditionally uncapped.
-  const knownPoints = new Set([...open, ...done])
+  const knownPoints = input?.knownPoints instanceof Set
+    ? input.knownPoints
+    : new Set(Array.isArray(input?.knownPoints) ? input.knownPoints : [...open, ...done])
   const cardOptions = { knownPoints }
   const nowCards = parseCards(sections[SECTION_TITLES[0]] ?? '', cardOptions)
   const vdzkCards = parseCards(sections[SECTION_TITLES[1]] ?? '', cardOptions)
@@ -870,9 +871,10 @@ export function evaluate(input) {
     )
   }
 
+  const pointOptions = { knownPoints: input?.knownPoints ?? [...open, ...done] }
   const queued = parseQueuePoints(html)
-  const nowPoints = parseNowCardPoints(html)
-  const klaerung = parseKlaerungPoints(html)
+  const nowPoints = parseNowCardPoints(html, pointOptions)
+  const klaerung = parseKlaerungPoints(html, pointOptions)
 
   // (3) NO STALE QUEUE ITEM — a ticked point must not still sit in the Warteschlange.
   const stale = done.filter((n) => queued.has(n))
@@ -1019,6 +1021,7 @@ export function evaluate(input) {
   const violations = auditDashboard(html, {
     open,
     done,
+    knownPoints: input?.knownPoints,
     doneSeen: marker.doneSeen,
     nowMinutes,
     // The per-session revision count the attestation persists (point 411) — and

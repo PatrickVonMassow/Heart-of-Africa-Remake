@@ -22,7 +22,7 @@ function boardHtml({ now = [], questions = [], queue = [], done = [] } = {}) {
   const card = ({ n, t = 'Titel', body }) =>
     `<details>\n  <summary>${n != null ? `<span class="num">${n}</span>` : ''}<span class="t">${t}</span></summary>\n  <div class="body">${body}</div>\n</details>`
   const nowCard = ({ n, t = 'Titel', body }) =>
-    `<details class="now" open>\n  <summary><span class="t">${n != null ? `${n} ` : ''}${t}</span></summary>\n  <div class="body">${body}</div>\n</details>`
+    `<details class="now" open>\n  <summary><span class="t">${n != null ? `${n} — ` : ''}${t}</span></summary>\n  <div class="body">${body}</div>\n</details>`
   return `<main><h1>Dashboard</h1>
 <h2>Woran ich gerade arbeite</h2>
 ${now.map(nowCard).join('\n')}
@@ -77,6 +77,12 @@ describe('parseCards', () => {
   it('is total on malformed input', () => {
     expect(parseCards(null, 'queue')).toEqual([])
     expect(parseCards('<details><summary>kein body</summary></details>', 'queue')).toEqual([])
+  })
+  it('uses the shared provenance rule for ambiguous four-digit titles', () => {
+    const html = boardHtml({ now: [{ t: '2026 — Jahresrückblick', body: '<p>Kurz.</p>' }] })
+    const section = html.slice(html.indexOf('Woran ich'), html.indexOf('<h2>Von dir'))
+    expect(parseCards(section, 'now')[0].point).toBeNull()
+    expect(parseCards(section, 'now', { knownPoints: [2026] })[0].point).toBe(2026)
   })
 })
 
