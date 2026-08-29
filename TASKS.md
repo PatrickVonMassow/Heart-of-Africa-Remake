@@ -420,6 +420,29 @@ put it is the mistake this line exists to stop.
   `startup`, `report`, `preview` green. The loading-picture freeze that reddened the aborted 10:40
   run passed here — that run had declared its own machine loaded and its timing verdicts void, so
   it was the load. The WebGPU half of the two-backend obligation is still owed.
+  WHAT THE 29.08.2026 WEBGPU RUN LEFT OWED (measured on `feat/687-roam-bound-fixes`, LARGE,
+  90 m 52 s, exit 1). Every red of that run now names an open point and `render-verify-guard
+  --status` reports no unaccounted red on the branch — the freeze to 733, world's frame 11 to 627,
+  the crossing to 698, enrichments' frame 72 and the MSAA cascade to 514, the picture-less bug
+  report to 927, the Ctrl labels to 1010, the benchmark's borrowed world to 1009, and the three
+  that had no point at all to 1011, 1012 and 1013. THREE THINGS STILL BLOCK THE LANDING:
+  - THE WEBGL 2 HALF WAS NEVER RUN. The run requested `backends: ["webgpu","webgl"]`
+    (`local/verify-logs/2026-08-29T19-31-59-213-large.log.run.json`) and its receipt records
+    `backends: ["WebGPU"]` — run-all stops at the first red backend. LARGE owes the complete
+    WebGL 2 regression lane (CLAUDE.md §7.2), so this run does not satisfy it.
+  - FOUR RUN RECORDS CARRY `crashed: true` AND CANNOT BE SIGNED OFF FROM THE KEPT LOG.
+    `webgpu/world` (19:37, 19:38) and `webgpu/enrichments` (20:51, 20:53) are marked crashed in
+    `.claude/render-verify-state.json` while each stored its reds and each is charged (627, 514).
+    `render-verify-recorder` sets the flag from a `CRASH_LINE` on STDERR; `scripts/verify/run-logged.mjs`
+    merges stderr into the log but writes only lines its `select()` keeps, so the kept log is a
+    FILTERED view and cannot evidence the absence of that line. The sign-off the guard asks for
+    ("what the log shows") therefore cannot be given honestly from the material that exists, and
+    it was deliberately NOT given on 29.08.2026. Either the recorder keeps the line that set the
+    flag, or the run is re-taken with the raw stream retained.
+  - SIX FRAMES ARE MISSING, 88 of 94, and which suite stopped short is not established. The
+    shutter's refusals (world's frame 11 twice, enrichments' frame 72 twice) and the
+    `687-bank-game-traveller` frame that never fired — the run phase held only 16 of 395 samples
+    in the 45 s window — are a plausible but UNMEASURED account of the shortfall.
   Refs: src/scenes/place/tagGame.ts, src/scenes/place/childSituations.ts, src/scenes/place/PlaceLife.tsx, src/scenes/place/lifeSpots.ts, src/scenes/place/layout.ts, src/config/balance.ts
   Bundle: Dorfleben.
 
@@ -1867,6 +1890,16 @@ put it is the mistake this line exists to stop.
   Criticality: medium — nothing is red today, but it fires on the next memory written, and it
   fires inside the guard that is supposed to protect the very document being edited.
   Bundle: Session- & Repo-Hygiene.
+  IT HAS NOW HAPPENED, TO THE BEGINNER GUIDE (measured 30.08.2026). The night's work produced a
+  new problem class for `docs/analysis_de/vibe-coding-anleitung.md` — an over-broad exception is a
+  receipt rather than a disposition, and a withdrawal must drag every place that copied its
+  reasoning — and the guide stood at EXACTLY its 495-line budget, so the shortest honest wording of
+  it (two entries, 14 lines) was refused by `guide-brevity-guard`. The analysis went into
+  `retrospektive-zusammenarbeit.md` §3.216, which is where the guard points, and the guide itself
+  was REVERTED rather than the budget raised. So the lesson exists and the beginner-facing document
+  that should carry it does not, which is this point's own prediction happening: the check blocked
+  exactly the turn that wanted to write it. Whatever headroom this point gives, that entry is the
+  first thing owed to the guide.
 
 - [ ] 760. The launcher's own CLI can lose its native binary, and the arming probe cannot see it
   (measured 20.08.2026). The global `@anthropic-ai/claude-code` install stood with NO native
@@ -13280,7 +13313,17 @@ to land than a mechanism that needs a review.
   touching a file no pass covered stays owed; plus the point-734 range as a fixture.
   Criticality: high — it blocks the turn end of a landed point, which is the state the batch cannot
   leave on its own.
-  Bundle: Session- & Repo-Hygiene.
+  Bundle: Session- & Repo-Hygiene.  MEASURED AGAIN, ON A THREE-COMMIT RANGE, 30.08.2026 — the shape does not need a long branch.
+  A charge-ledger change on `main` took FIVE cross-vendor rounds (GPT-5.6 Sol, effort high), each
+  finding something real, and after all five the gate still reports `missing pass 2, 3` for
+  `ffc9c23`, `a7e9ce5` and `2ae7931`. Those passes would re-read the SAME end-state file,
+  `scripts/render-verify-core.test.mjs` at some 175k characters, once per commit — and a scoped
+  end-state round over exactly that file is already on record. Six further rounds would read the
+  same bytes six more times.
+  WHY IT MATTERED THAT NIGHT rather than being academic: the user had just reported the Anthropic
+  quota nearly exhausted and asked for load to move to OpenAI, so redundant reviewer rounds spend
+  the one budget that was left. The residue was filed here rather than bought.
+
 - [ ] 999. The review ledger's physical order does not follow its `at` stamps, so a reader that
   trusts append order reads it wrong. MEASURED 28.08.2026 on `main` at 168805d5, answering the
   Opus 4.8 pass-7 refusal of point 734 (`.claude/mechanism-reviews.jsonl`, record `at`
@@ -13592,12 +13635,14 @@ to land than a mechanism that needs a review.
   [Invalid TextureView] is invalid due to a previous error` and `Uncaptured WebGPU
   GPUValidationError: [Invalid CommandBuffer from CommandEncoder "renderContext_11/_14/_32/_42"]
   is invalid due to a previous error`.
-  THE CAUSE IS ALREADY OWNED, THE SYMPTOMS ARE NOT. Point 514 §5 owns the root: on the
-  compatibility lane the MSAA fallback cannot exist, `RGBA16Float does not support multisampling`
-  arrives as an uncaptured GPUValidationError, and everything above is its downstream. The
-  existing 514 console entry says so in its own `why` — it lists "the invalid
-  msaa-texture/view/command-buffer and async-pipeline errors" as the cascade — but its four
-  `match` patterns cover only `RGBA16Float ... does not sup`, `[Invalid Texture "output-msaa"]`,
+  A CAUSE IS SUSPECTED AND NOT ESTABLISHED — and the difference is the whole of this point.
+  Point 514 §5 describes a root that would explain these: on the compatibility lane the MSAA
+  fallback cannot exist, `RGBA16Float does not support multisampling` arrives as an uncaptured
+  GPUValidationError, and its own `why` already lists "the invalid msaa-texture/view/command-buffer
+  and async-pipeline errors" as that cascade. But NOTHING IN THE RECORD TIES THESE TWO TEXTS TO
+  THAT ROOT: a charge reads one red and never the run around it, so the connection is a reading,
+  not a measurement. What IS measured is only this: two compatibility-level WebGPU runs of
+  29.08.2026 emitted both texts, and 514's four `match` patterns cover only `RGBA16Float ... does not sup`, `[Invalid Texture "output-msaa"]`,
   `[Invalid Texture "normal-msaa"]` and `[Invalid TextureView] is invalid due to a previous error`.
   The two texts above begin differently, so the anchored patterns never reach them and the same
   measured lane fault blocks the gate through a third door.
@@ -13606,10 +13651,26 @@ to land than a mechanism that needs a review.
   `featureLevel: 'compatibility'`, `kind: 'console'` — or the lane records the MSAA family as
   UNAVAILABLE rather than red, which is the decision point 514 owes anyway. Scope stays narrow on
   purpose: on a CORE adapter, the one the player runs, each of these stays a real red.
+  A CHARGE WAS WRITTEN FOR THIS AND WITHDRAWN, 30.08.2026 — read this before writing another.
+  Two cross-vendor rounds (GPT-5.6 Sol, effort high) returned do-not-merge on every pattern tried,
+  and the second one named why the family cannot be charged from the record as it stands:
+  - The stored console NAME is normalised to 120 characters. For the longest object measured,
+    `renderPipeline_MeshStandardNodeMaterial_1006`, the cut lands at `[Invalid Tex` — BEFORE the
+    cascade's own marker, `is invalid due to a previous error`. So the name can carry the prefix
+    and the downstream object's first letters, and nothing that establishes the root.
+  - The untruncated DETAIL does carry the whole sentence, but these seven texts share ONE derived
+    key while naming SEVEN different pipeline objects, so the recorder marks the detail VARIED and
+    refuses any `detailMatch` against it. That safeguard is working, not failing.
+  Every pattern that still matched the measured reds therefore also matched an unrelated pipeline
+  or command-buffer failure on the same lane — which is the one property a charge must never have.
+  FILING THIS POINT IS THE DISPOSITION; an over-broad charge would not be one. The reds stay REAL
+  REDS and the render gate stays blocked on them until this point or point 990 lands, and 990 is
+  the one that would make a charge writable at all: it owns letting an entry declare the ROOT its
+  downstream sentence depends on. This point should be worked AFTER 990 for that reason.
   VERIFIABLE: the `settings` suite's recorded console reds on a compatibility-level WebGPU run are
   all accounted for by `node scripts/render-verify-guard.mjs --status`; and a Vitest case in
-  `render-verify-core.test.mjs` that each new pattern matches the measured text and does NOT match
-  the same wording without the cascade's signature.
+  `render-verify-core.test.mjs` that whatever mechanism closes them matches the measured text and
+  does NOT match the same wording without the cascade's signature.
   Criticality: medium — it loses nothing and the cause is known, but a red nobody owns teaches the
   reader to skip the whole report, which is the habit every charge in that table exists to prevent.
   Bundle: Session- & Repo-Hygiene.
@@ -13662,3 +13723,39 @@ to land than a mechanism that needs a review.
   Criticality: low - a single mis-scored hunt in sixteen, invisible to the player, but it makes an
   ecology check report a fault it may not have found.
   Bundle: Tierverhalten.
+
+- [ ] 1014. The Anthropic share of the batch has no lever left except ending the session (user
+  29.08.2026, 22:07 board chat: "Das Anthropic-Volumen ist fast erschöpft, das von OpenAI wurde
+  gerade zurückgesetzt. Verschiebe so viel Last wie möglich auf OpenAI").
+  MEASURED THE SAME NIGHT: `sol-share --status` already stands at `prefer-sol`, which routes every
+  read-only kind AND the authoring of every point the cut does not keep here to GPT-5.6 Sol. What
+  remains on Anthropic is what CLAUDE.md §6 never routes away — the browser suites, the picture
+  judgment, the landing, the main-session bookkeeping — plus the SERVING model itself, which is the
+  largest consumer of the four and has no switch at all.
+  THE ONE STRUCTURAL LEVER IS BUILT BUT NOT RUNNING. A durable, daemon-owned Sol author survives a
+  session handover; an Agent-tool child does not, and blocks the point boundary it is caught by.
+  That lane is point 834, and 834 IS LANDED AND TICKED — it merged as `feat/834-takeover-drills`
+  (b8f169f7) and its machinery stands on `main`: `scripts/batch-daemon.mjs`,
+  `scripts/detached-agent.mjs`, `scripts/batch-dispatch.mjs`. (Corrected 30.08.2026: this point
+  first claimed 834 was unlanded, on the strength of a branch NAME rather than a measurement, and
+  the user caught it. The branch `feat/834-durable-authoring-lane` does still exist with 122
+  commits off `main`, but it is BEHIND main rather than ahead of it — a stale leftover from before
+  the point was recut. That is its own hygiene item, not evidence about the lane.)
+  WHAT IS MISSING IS A RUNNING DAEMON, measured 30.08.2026: there is no control socket
+  (`.git/codex-batches/<batch>/control.sock` does not exist) and no state store for any batch id in
+  this repository, so `batch-dispatch.mjs` has nothing to submit a start-attempt to. So today every
+  delegated authoring run is bound to a live Anthropic session, and the only way to spend less
+  Anthropic volume is to end that session sooner — which trades one cost for another, because a
+  fresh session re-reads the board, the work order and the branch state before it can act.
+  FINAL STATE: the share is steerable by measurement rather than by ending sessions. The batch can
+  say what it spent per vendor over a window, the serving model's own share is part of that
+  number, and the durable lane is actually SERVING, so authoring survives a handover instead of
+  pinning a session open. What that needs is the daemon's operating story — who starts it, under
+  whose supervision it survives a session end, and how a batch id and its authorized queue come to
+  exist — decided from the measurement rather than assumed here.
+  VERIFIABLE: a per-vendor spend figure for a named window that includes the serving model; and a
+  delegated authoring run that outlives the session which commissioned it, adopted by the next one
+  through the boundary that already exists.
+  Criticality: medium — it spends no correctness, but an exhausted vendor stops the batch outright,
+  and the only lever we have today makes the session boundary the tuning knob for cost.
+  Bundle: Session- & Repo-Hygiene.

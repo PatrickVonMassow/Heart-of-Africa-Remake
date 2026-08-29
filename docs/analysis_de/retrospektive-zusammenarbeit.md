@@ -77,6 +77,7 @@ Das Musterbeispiel sind die Chat-Zeitstempel: neun Eskalationsstufen, acht weich
 | 27.08. abends | Ein Veto der Gegenlesung stand auf `main`, dessen dritter Befund eine Erfindung des Prüfwerkzeugs war: Es schneidet die Retrospektive planmäßig aus dem Prüfstoff, druckt die Kürzung nur in die Konsole des Aufrufers und meldet in derselben Ausgabe »nichts weggelassen« — der Prüfer konnte »fehlt im Commit« von »fehlt in meiner Vorlage« nicht unterscheiden und klagte den Commit an. Der Schutzsatz dagegen gilt nur für eine aufgeteilte Prüfung, die ein Manifest schreibt (§3.203, Punkt 972) |
 | 27.08. abends | Dasselbe Kritikalitäts-Tor forderte binnen zwanzig Minuten erst eine, dann zwei, dann sechs gegenzulesende Dateien für einen Punkt, der in dieser Zeit keinen Commit hatte und keine der genannten Dateien je angefasst hat — die Vereinigung folgt dem Zeitfenster, nicht dem Punkt, und der Commit, der den Befund eintrug, hob die Forderung selbst mit an (§3.204, Punkt 974) |
 | 28.08. abends | Die Notfall-Uhr des unbeaufsichtigten Stapels wurde genau wie bestellt auf nachweisbaren Fortschritt verengt — und verlor dabei einen Schutz, den nie jemand aufgeschrieben hatte: Der ehrliche Abschluss-Prüflauf über beide Backends dauert gemessen 80 min 48 s gegen eine Schwelle von 60 Minuten und sieht seither aus wie ein Hänger, den die Rettungsroutine unterbricht. Kein Test wurde rot; der Schutz war vorhanden, nicht zugesichert (§3.210, Punkt 1002) |
+| 29.08. nachts | Ein Wächter verlangt einen Beleg aus einem Protokoll, das ihn wegwirft: Vier Laufaufzeichnungen tragen die Absturzmarke, gesetzt aus der Fehlerausgabe — das aufbewahrte Protokoll ist eine gefilterte Sicht und kann ihr Fehlen nicht belegen. Nicht freigezeichnet, sondern in den blockierten Punkt geschrieben (§3.215); derselbe Lauf ließ drei Rots ohne jeden Punkt zurück, obwohl die Tafelkarten dafür schon standen (Punkte 1011-1013); drei Gegenlesungsrunden über die Buchungstabelle endeten damit, eine geschriebene Buchung ZURÜCKZUZIEHEN statt sie enger zu fassen — kein Muster konnte das gemessene Rot von seinen Nachbarn trennen (§3.216); und eine Behauptung über einen gelandeten Punkt kam aus einem BRANCHNAMEN statt aus einer Messung, gefunden vom Nutzer in zwei Sätzen |
 
 Muster: Ab dem 22.07. explodiert die Commit-Rate (Delegation) — und genau dann häufen sich die Infrastruktur-Vorfälle. **Skalierung der Autonomie erzeugt eine eigene Problemklasse, die die Feature-Arbeit zeitweise überholt.**
 
@@ -1414,7 +1415,7 @@ keinen Träger hat. Gebucht als Punkt 956.
 
 ## Anhang A — Maschinell gepflegte Quellen-Übersicht
 
-Zuletzt aktualisiert: Samstag, 29.08.2026, 19:57 · Quellen-Fingerprint: `acc97b2da3d9…`
+Zuletzt aktualisiert: Sonntag, 30.08.2026, 01:02 · Quellen-Fingerprint: `212726edb7a0…`
 
 Spalten heuristisch aus den Quellen abgeleitet (Anläufe = distinkte Datumsnennungen im Memory;
 Maßnahme = Guard-Skripte mit Namens-Treffer). Die inhaltliche Bewertung gehört der Prosa oben.
@@ -1515,10 +1516,10 @@ Maßnahme = Guard-Skripte mit Namens-Treffer). Die inhaltliche Bewertung gehört
 | A pending batch claim HOLDS THE LAUNCHER BACK — withdraw it whenever the claiming window is left unattended | 2 | mittel | clear-claim-guard.mjs | ✔ Mechanismus |
 | Multi-agent workflows eat the session/weekly limit fast — verify findings INLINE, keep fan-outs small, warn the user with a cost estimate before any big workflow | 3 | mittel | doc-budget-guard.mjs | ✔ Mechanismus |
 
-Erfasste Quellen: 93 Feedback-/Projekt-Memories · 57 Guard-/Hook-Skripte · 6 Revert-/Reapply-Commits · 114 Prozess-/Meta-TASKS-Punkte (davon 48 offen).
+Erfasste Quellen: 93 Feedback-/Projekt-Memories · 57 Guard-/Hook-Skripte · 6 Revert-/Reapply-Commits · 115 Prozess-/Meta-TASKS-Punkte (davon 49 offen).
 
-<!-- RETRO-FINGERPRINT: acc97b2da3d9b6c03049ea09cb43fce0f32dc29a78fbcb4ad7f0107f4801ed07 -->
-<!-- RETRO-LAST-REFRESHED: 2026-08-29T17:57:55.661Z -->
+<!-- RETRO-FINGERPRINT: 212726edb7a02f2dab72337bff5279d9392e71e08692423b135deec5ef6742b4 -->
+<!-- RETRO-LAST-REFRESHED: 2026-08-29T23:02:04.662Z -->
 <!-- AUTO-GENERATED:END -->
 
 ### 3.111 Ein Erfolg ist kein Beweis für den Weg, auf dem er zustande kam
@@ -4764,3 +4765,71 @@ kein Aufruf. Und ein Tor, das aus einer wahren Beobachtung („eine Referenz hat
 eine falsche Schlussfolgerung zieht („also ist der Lauf ungültig"), darf diese Kosten nicht
 still verbuchen, sondern muss nennen, was es nicht unterscheiden kann — sonst zahlt der Batch
 die Rechnung dauerhaft, ohne dass sie je jemandem auffällt.
+
+### 3.215 Der Wächter verlangt einen Beleg aus einem Protokoll, das ihn wegwirft
+
+Der WebGPU-LARGE-Durchgang der Nacht ließ vier Laufaufzeichnungen mit der Marke
+`crashed: true` zurück — `webgpu/world` zweimal, `webgpu/enrichments` zweimal.
+Die Marke blockiert die Landung, und der Wächter nennt den Ausweg selbst: das
+aufbewahrte Protokoll lesen und den Absturz freizeichnen, mit »was das Protokoll
+zeigt« als Beleg.
+
+Das Protokoll kann es nicht zeigen. Die Marke wird im Recorder von einer
+Stack-Zeile auf der FEHLERAUSGABE gesetzt (`CRASH_LINE`). `run-logged.mjs` führt
+stdout und stderr zusammen, schreibt aber nur, was seine eigene Auswahl behält —
+das aufbewahrte Protokoll ist also eine GEFILTERTE Sicht. Beide Suiten haben
+darin je zweimal vollständig berichtet, mit genau einem Rot, beide gebucht. Kein
+Stack, keine Fehlerzeile. Und genau daraus folgt nichts: Die Abwesenheit in einer
+gefilterten Sicht belegt keine Abwesenheit im Original.
+
+**Die Klasse ist neu und allgemeiner als dieser eine Wächter: Eine Regel verlangt
+einen Beleg aus einem Artefakt, das absichtlich gebaut wurde, um genau diesen
+Beleg wegzuwerfen.** Der Ausweg sieht dabei völlig gangbar aus — es GIBT ein
+Protokoll, es ist lesbar, und wer nicht nachsieht, wie es entsteht, hält das
+Fehlen der Zeile für den Befund. Der bequeme Fehler ist hier nicht das Übersehen,
+sondern das Unterschreiben: Eine Freizeichnung mit »im Protokoll steht nichts
+davon« wäre formal korrekt ausgefüllt und inhaltlich wertlos gewesen, und sie
+hätte die Marke für immer aus dem Weg geräumt.
+
+Die Sitzung hat deshalb NICHT freigezeichnet und den Befund stattdessen in den
+Punkt geschrieben, den er blockiert. Die Heilung gehört auf die Erzeugerseite:
+Wer eine Marke setzt, hebt die Zeile auf, die sie gesetzt hat. Ein Wächter, der
+einen Beleg fordert, den das System nicht aufbewahrt, lässt nur zwei Ausgänge —
+eine Unterschrift ohne Deckung oder einen dauerhaft blockierten Zweig —, und
+beide sind schlechter als die Zeile mitzuschreiben.
+
+### 3.216 Eine zu weite Buchung ist keine Erledigung — Zurückziehen ist eine
+
+Die Bauordnung gibt einem roten Prüflauf genau drei Ausgänge: Ursache beheben,
+auf den offenen Punkt buchen, der ihn besitzt, oder als eigenen Punkt anlegen.
+In dieser Nacht sah es so aus, als seien Ausgang zwei und drei dasselbe: Punkt
+1011 wurde für zwei Konsolenfehler der WebGPU-Kompatibilitätsbahn angelegt, und
+gleich dazu eine Buchung geschrieben, die auf ihn zeigt — sonst meldet das Tor
+das Rot weiter als unzugeordnet.
+
+Drei Gegenlesungsrunden (GPT-5.6 Sol, effort high) haben diese Buchung dreimal
+mit do-not-merge zurückgewiesen, und jedes Mal mit demselben, richtigen Kern:
+Das Muster traf die gemessenen Rots — und daneben jeden fremden Pipeline- oder
+Befehlspuffer-Fehler derselben Bahn. Jede Verengung scheiterte an einer harten
+Grenze des Datensatzes: Der gespeicherte Konsolenname wird auf 120 Zeichen
+normalisiert und endet beim längsten gemessenen Objekt VOR dem Kennzeichen, das
+diese Fehler überhaupt erst als Folgemeldungen ausweist; und die ungekürzte
+Fassung ist unbenutzbar, weil sich sieben verschiedene Pipeline-Objekte einen
+abgeleiteten Schlüssel teilen und der Rekorder das Feld deshalb als uneinheitlich
+markiert — die Sicherung arbeitet, sie versagt nicht.
+
+**Daraus folgt die Lehre, und sie ist unbequem: Eine Buchung, die ihr gemessenes
+Rot nicht von dessen Nachbarn trennen kann, ist keine Erledigung, sondern eine
+Quittung.** Der Punkt anzulegen erledigt das Rot im Sinne der Regel; die Buchung
+dazu tut es nicht, sie räumt nur das Tor frei. Die Sitzung hat die Buchung
+deshalb wieder herausgenommen, die Rots rot gelassen und den ganzen Grund in den
+Punkt geschrieben — samt der Reihenfolge, dass er hinter jenem Punkt gehört, der
+einer Buchung erst erlaubt, ihre Ursache zu benennen.
+
+Der Rückfall lauert nicht beim Schreiben, sondern beim Aufräumen danach: Nach der
+Rücknahme stand die zurückgezogene Begründung noch an drei anderen Stellen —
+in der Bündelprosa, in der Rangfolge-Begründung und im ersten Satz des Punktes
+selbst. Alle drei behaupteten weiter die Ursache, die die Rücknahme gerade nicht
+mehr behaupten wollte. Die vierte Runde hat genau das gefunden. **Eine Rücknahme
+ist erst vollständig, wenn auch jede Stelle mitkommt, die von ihr abgeschrieben
+hat.**

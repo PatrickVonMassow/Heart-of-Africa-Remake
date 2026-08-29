@@ -634,6 +634,17 @@ export const RED_CHARGES = [
     featureLevel: 'compatibility',
     kind: 'check',
     match: /^the children walk PAST the traveller/i,
+    // DETAIL-SCOPED 30.08.2026 (cross-vendor review, GPT-5.6 Sol, do-not-merge
+    // finding 4): the name alone charged EVERY future failure of this check,
+    // including one caused by a round that no longer plays at all — which is the
+    // opposite of what 698 owns. 698's claim is DENSITY: the round runs, and the
+    // crossing merely does not fall inside the window. So the detail must show the
+    // round opening runs at all; a window that never reached the `run` phase is a
+    // different defect and stays a real red.
+    // A POSITIVE COUNT, not merely the word (cross-vendor review, GPT-5.6 Sol,
+    // round 2): `run×0` satisfied `run×` and would have charged away exactly
+    // the broken round this narrowing exists to keep red.
+    detailMatch: /crossed his line;[\s\S]*phases \[[^\]]*run×[1-9]/i,
     why:
       'THE USER DECIDED THIS ONE BY NAME. Measured 17.08.2026 on this same branch and filed as '
       + 'point 698, whose first line records the ruling: land the bank round as it stands and '
@@ -648,32 +659,19 @@ export const RED_CHARGES = [
       + '698, and on a CORE adapter this check was never measured and stays a real red.',
   },
   {
-    point: 1011,
-    suite: 'settings',
-    backend: 'webgpu',
-    featureLevel: 'compatibility',
-    kind: 'console',
-    match:
-      /^console error: THREE\.WebGPURenderer: (Async render pipeline creation failed|Uncaptured WebGPU GPUValidationError: \[Invalid CommandBuffer from CommandEncoder)/i,
-    why:
-      'THE THIRD DOOR OF THE SAME CASCADE, filed as point 1011 on 29.08.2026. The 514 console '
-      + 'entry above already names "the invalid msaa-texture/view/command-buffer and '
-      + 'async-pipeline errors" as the downstream of the RGBA16Float MSAA fault, but its four '
-      + 'anchored patterns start at texts these two never carry, so both rode along unaccounted '
-      + 'through the whole LARGE run of 29.08.2026 on feat/687-roam-bound-fixes — twice, on both '
-      + 'recorded webgpu/settings runs, each carrying featureLevel=compatibility. '
-      + 'The two alternatives name the START of the measured texts and nothing wider: an async '
-      + 'pipeline failure or an invalid command buffer that is NOT this cascade still reds. '
-      + 'Scoped to suite, backend, level and kind for the reason its siblings are: on the CORE '
-      + 'adapter the player runs, each of these stays a real red, and the charge dies with 1011.',
-  },
-  {
     point: 1012,
     suite: 'benchmark',
     backend: 'webgpu',
     featureLevel: 'compatibility',
     kind: 'check',
     match: /^WebGPU: real GPU timestamps were measured for/i,
+    // NARROWED 30.08.2026 (cross-vendor review, GPT-5.6 Sol, do-not-merge finding
+    // 2): the feature level does NOT test the capability, so on a compatibility
+    // adapter that DOES expose `timestamp-query` a genuine timestamp regression
+    // would have been charged here. The excuse now rests on the red's own stated
+    // reason and on nothing else. The low-preset row prints no such reason and is
+    // therefore NOT excused: it stays a real red, which is 1012's to close.
+    detailMatch: /adapter without the timestamp-query feature/i,
     why:
       'A CHECK THAT CANNOT PASS ON THE LANE IT RUNS ON, filed as point 1012 on 29.08.2026. Both '
       + 'attempts of the 29.08.2026 LARGE run on feat/687-roam-bound-fixes read 0/33 rows and 0/3 '
@@ -691,7 +689,13 @@ export const RED_CHARGES = [
     featureLevel: 'compatibility',
     kind: 'check',
     match: /^no console errors$/i,
-    detailMatch: /RGBA16Float\) does not support multisampling/i,
+    // ANCHORED AT BOTH ENDS 30.08.2026 (cross-vendor review, GPT-5.6 Sol,
+    // do-not-merge finding 3): unanchored, a "no console errors" red carrying the
+    // known sentence PLUS a brand-new console error still matched, so the entry
+    // did not keep what it promised to keep. The detail must be that sentence and
+    // nothing more.
+    detailMatch:
+      /^THREE\.WebGPURenderer: Uncaptured WebGPU GPUValidationError: The texture format \(TextureFormat::RGBA16Float\) does not support multisampling\.?$/i,
     why:
       'THE MSAA CASCADE REACHING A FOURTH SUITE, charged 29.08.2026. This is the same lane fault '
       + 'point 514 §5 owns, arriving in the benchmark suite instead of settings: both attempts of '
@@ -710,8 +714,12 @@ export const RED_CHARGES = [
     backend: 'webgpu',
     featureLevel: 'compatibility',
     kind: 'check',
-    match:
-      /^(the archive holds picture, state, overlay and description|member .*\.png is present|the archive carries a screenshot)$/i,
+    // SPLIT FROM THE COMPOSITE CHECK 30.08.2026 (cross-vendor review, GPT-5.6
+    // Sol): these two name the PICTURE in their own text — one names the missing
+    // `.png` member, the other says the archive carries no screenshot — so the
+    // name alone is the evidence. The composite check below is a different case
+    // and gets its own entry.
+    match: /^(member .*\.png is present|the archive carries a screenshot)$/i,
     why:
       'POINT 927 OWNS THIS RED IN FULL AND IN ITS OWN WORDS: "The F6 bug report hands the user an '
       + 'archive WITHOUT the picture", measured 26.08.2026 on main (f14cf8e9) via '
@@ -727,6 +735,36 @@ export const RED_CHARGES = [
       + 'there. This entry accounts for the red; it does '
       + 'not soften it — 927 is criticality HIGH and the archive is a broken channel to the user '
       + 'until it lands.',
+  },
+  {
+    point: 927,
+    suite: 'report',
+    backend: 'webgpu',
+    featureLevel: 'compatibility',
+    kind: 'check',
+    match: /^the archive holds picture, state, overlay and description$/i,
+    // THE COMPOSITE CHECK NEEDS ITS DETAIL, and this is why it is a separate
+    // entry (cross-vendor review, GPT-5.6 Sol, 30.08.2026). "the archive holds
+    // picture, state, overlay and description" fails whenever ANY of those four
+    // members is missing — but point 927 owns exactly one of those failures, the
+    // missing PICTURE. An archive that lost its state or its overlay is a defect
+    // nobody has measured and must stay red.
+    //
+    // The detail lists the members the archive DID hold, so the picture-loss
+    // shape is: the other three present, and no `.png` anywhere in the list.
+    detailMatch: /^(?!.*\.png)(?=.*\.json)(?=.*-overlay\.json)(?=.*\.txt).*$/i,
+    why:
+      'THE SAME DEFECT POINT 927 OWNS, READ THROUGH THE ONE CHECK THAT CAN ALSO FAIL FOR ANOTHER ' +
+      'REASON. 927 measured a WebGPU archive holding its `.json`, `-overlay.json` and `.txt` and ' +
+      'NOTHING ELSE — "the zip holds only .json, -overlay.json and .txt" are its own words — and ' +
+      'the LARGE run of 29.08.2026 on feat/687-roam-bound-fixes reproduced exactly that, twice, ' +
+      'the detail naming those three members and no picture. ' +
+      'DETAIL-SCOPED, unlike its sibling entry: the two checks there name the picture themselves, ' +
+      'while this one is a composite over four members and would otherwise have excused a lost ' +
+      'STATE or a lost OVERLAY — failures nobody has measured and 927 does not own. ' +
+      'Backend- and level-scoped for the reasons the sibling entry states, and the charge dies ' +
+      'with 927, which is criticality HIGH: the archive is a broken channel to the user until it ' +
+      'lands.',
   },
   {
     point: 1010,

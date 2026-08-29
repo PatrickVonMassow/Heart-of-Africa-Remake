@@ -2843,17 +2843,29 @@ describe('the shipped charge ledger', () => {
     expect(
       asStored('THREE.WebGPURenderer: Uncaptured WebGPU GPUValidationError: [Invalid BindGroup] is invalid due to a previous error.').point,
     ).toBeNull()
-    // THE TWO FORMS POINT 734 SAID MUST BE FILED NOW HAVE THEIR POINT (29.08.2026).
-    // 734 required the async-pipeline error be "given [an owning point] the moment
-    // a run reproduces it"; the LARGE run of 29.08.2026 reproduced it twice, and
-    // point 1011 was filed for it and for the command-buffer form beside it. They
-    // are charged THERE, never to 514 — the root's owner keeps only what it
-    // measured, and the encoder's number is a run-local counter no charge may read.
-    const filed = [
+    // THE TWO FORMS POINT 734 SAID MUST BE FILED HAVE THEIR POINT (1011, filed
+    // 29.08.2026) AND STILL NO CHARGE — deliberately. A charge for them was
+    // WRITTEN and then WITHDRAWN on 30.08.2026 after two cross-vendor rounds: the
+    // stored console name is cut at 120 characters before the cascade's own
+    // marker, and these texts share one derived key across seven pipeline
+    // objects, so the recorder marks their detail VARIED and no detailMatch may
+    // read it. Every pattern that matched the measured reds therefore also
+    // matched an unrelated pipeline or command-buffer failure on the same lane.
+    // Filing the point is a disposition; an over-broad charge is not. They stay
+    // REAL REDS until point 990 lets a charge name the root it depends on.
+    const stillRed = [
       'THREE.WebGPURenderer: Uncaptured WebGPU GPUValidationError: [Invalid CommandBuffer from CommandEncoder "renderContext_1"] is invalid due to a previous error.',
       'THREE.WebGPURenderer: Async render pipeline creation failed (renderPipeline_x): [Invalid TextureView] is invalid due to a previous error.',
     ]
-    for (const t of filed) expect(asStored(t).point, t).toBe(1011)
+    // THE RED MUST EXIST BEFORE ITS CHARGE MAY BE NULL (cross-vendor review,
+    // GPT-5.6 Sol, 30.08.2026): `?.point ?? null` would have passed just as well
+    // if parsing or recording stopped producing a red at all, which is a
+    // regression this pin is supposed to catch, not hide.
+    for (const t of stillRed) {
+      const stored = asStored(t)
+      expect(stored, t).toBeTruthy()
+      expect(stored.point, t).toBeNull()
+    }
   })
 
   // THE MSAA TEXTURE ALTERNATIVE CARRIES ITS SENTENCE, NOT THE OBJECT NAME
@@ -2983,21 +2995,84 @@ describe('the shipped charge ledger', () => {
     expect(chargeFor(crossed, scoped)).toBeNull()
   })
 
-  it('charges the async-pipeline message to its OWN point, never to the root it quotes', () => {
+  // THE FOUR NARROWINGS THE CROSS-VENDOR REVIEW OF 30.08.2026 REQUIRED
+  // (GPT-5.6 Sol, do-not-merge on ffc9c23). Each entry had been written against
+  // the red it was measured on and matched a WIDER family than that red — which
+  // is the one failure mode a charge must never have. These pin the narrow half
+  // AND the measured half together: an entry that stops matching its own
+  // evidence is as broken as one that matches everything.
+  it('charges the archive composite only in the picture-loss shape', () => {
+    const scoped = { suite: 'report', backend: 'webgpu', kind: 'check', featureLevel: 'compatibility' }
+    const withDetail = (name, detail) => ({ ...red(name), detail })
+    const composite = 'the archive holds picture, state, overlay and description'
+    // WHAT 927 MEASURED: the three non-picture members present, no picture.
+    expect(
+      chargeFor(withDetail(composite, 'hoa-state-2026-08-29-42.json, hoa-state-2026-08-29-42-overlay.json, hoa-state-2026-08-29-42.txt'), scoped).point,
+    ).toBe(927)
+    // A LOST STATE OR A LOST OVERLAY IS A DEFECT NOBODY HAS MEASURED, and this
+    // check reports all four members through one name — so without the detail the
+    // entry would have excused them too.
+    expect(chargeFor(withDetail(composite, 'hoa-state-2026-08-29-42.png, hoa-state-2026-08-29-42.txt'), scoped)).toBeNull()
+    expect(chargeFor(withDetail(composite, 'hoa-state-2026-08-29-42.json, hoa-state-2026-08-29-42.txt'), scoped)).toBeNull()
+    // While the two checks that name the picture themselves need no detail.
+    expect(chargeFor(red('the archive carries a screenshot'), scoped).point).toBe(927)
+    expect(chargeFor(red('member hoa-state-2026-08-29-42.png is present'), scoped).point).toBe(927)
+  })
+
+  it('excuses the timestamp row only where the red names the missing capability', () => {
+    const scoped = { suite: 'benchmark', backend: 'webgpu', kind: 'check', featureLevel: 'compatibility' }
+    const withDetail = (name, detail) => ({ ...red(name), detail })
+    const named = withDetail('WebGPU: real GPU timestamps were measured for every row', '0/33 rows, reason "adapter without the timestamp-query feature"')
+    expect(chargeFor(named, scoped).point).toBe(1012)
+    // THE SAME CHECK WITHOUT THAT REASON IS A REAL REGRESSION. The feature level
+    // does not test the capability, so a compatibility adapter that DOES expose
+    // timestamp-query must keep this red — and the low-preset row, whose detail
+    // names no capability at all, is deliberately not excused either.
+    expect(chargeFor(withDetail('WebGPU: real GPU timestamps were measured for every row', '0/33 rows, reason "the pass recorded no queries"'), scoped)).toBeNull()
+    expect(chargeFor(withDetail('WebGPU: real GPU timestamps were measured for the low-preset rows too', '0/3 low rows with gpu'), scoped)).toBeNull()
+  })
+
+  it('lets the benchmark cascade charge cover that sentence ALONE', () => {
+    const scoped = { suite: 'benchmark', backend: 'webgpu', kind: 'check', featureLevel: 'compatibility' }
+    const sentence =
+      'THREE.WebGPURenderer: Uncaptured WebGPU GPUValidationError: The texture format (TextureFormat::RGBA16Float) does not support multisampling.'
+    const withDetail = (name, detail) => ({ ...red(name), detail })
+    expect(chargeFor(withDetail('no console errors', sentence), scoped).point).toBe(514)
+    // A NEW CONSOLE ERROR RIDING ALONG WITH THE KNOWN ONE IS NOT EXCUSED: the
+    // detail is anchored at both ends, so the assertion cannot become a blanket.
+    expect(chargeFor(withDetail('no console errors', `${sentence} TypeError: x is not a function`), scoped)).toBeNull()
+    expect(chargeFor(withDetail('no console errors', 'TypeError: x is not a function'), scoped)).toBeNull()
+  })
+
+  it('charges the crossing to 698 only while the round actually opens runs', () => {
+    const scoped = { suite: 'polish', backend: 'webgpu', kind: 'check', featureLevel: 'compatibility' }
+    const density =
+      'from one side of him to the other — 0 of 4 crossed his line; along the lane (0 = his line) ' +
+      '[-11..25@1, -10..22@1, -24..0@1, -11..14@1] m, walked [67, 67, 67, 68] m, phases ' +
+      '[run×16 part×72 roam×307] over 45s played, 3 tagged'
+    const withDetail = (name, detail) => ({ ...red(name), detail })
+    expect(chargeFor(withDetail('the children walk PAST the traveller', density), scoped).point).toBe(698)
+    // A WINDOW THAT NEVER REACHED THE RUN PHASE IS A BROKEN ROUND, NOT THE
+    // DENSITY 698 owns — point 698's claim is that the round runs and the
+    // crossing merely falls outside the window.
+    const noRun = density.replace('[run×16 part×72 roam×307]', '[part×72 roam×323]')
+    expect(chargeFor(withDetail('the children walk PAST the traveller', noRun), scoped)).toBeNull()
+  })
+
+  it('leaves the async-pipeline message uncharged, though its family now has a point', () => {
     const scoped = { suite: 'settings', backend: 'webgpu', kind: 'console', featureLevel: 'compatibility' }
     const asyncForm = failedChecks(
       'ERR: THREE.WebGPURenderer: Async render pipeline creation failed (renderPipeline_x): [Invalid TextureView] is invalid due to a previous error.',
     )[0]
-    expect(chargeFor(asyncForm, scoped).point).toBe(1011)
+    expect(chargeFor(asyncForm, scoped)).toBeNull()
     // While the measured form, at the start of the stored name, still charges.
     const measured = failedChecks(
       'ERR: THREE.WebGPURenderer: Uncaptured WebGPU GPUValidationError: [Invalid TextureView] is invalid due to a previous error.',
     )[0]
     expect(chargeFor(measured, scoped).point).toBe(514)
-    // AND THE ANCHOR STILL HOLDS: the point-1011 pattern begins at the renderer's
-    // own prefix, so the bare wording — the shape an unrelated defect prints —
-    // is charged by neither entry. This is the over-reach the pins above exist
-    // for, and filing the point did not widen it.
+    // AND THE BARE WORDINGS STAY UNCHARGED TOO — the shape an unrelated defect
+    // prints. This is the over-reach the pins above exist for, and filing point
+    // 1011 for the family did not widen it by one character.
     for (const bare of ['console error: Async render pipeline creation failed', 'console error: Invalid CommandBuffer from CommandEncoder']) {
       expect(chargeFor(red(bare, null, 'console'), scoped), bare).toBeNull()
     }
