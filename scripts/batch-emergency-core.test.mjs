@@ -162,6 +162,39 @@ describe('the independent emergency decision', () => {
     })
   })
 
+  it.each([
+    ['self-serving future bound', {
+      record: '/repo/local/verify-logs/large.log.run.json', command: 'verify --plan large',
+      progressAt: NOW - 1000, leaseUntil: NOW + 10 * VERIFICATION_LEASE_MS,
+    }],
+    ['unnamed record', { record: '', command: 'verify --plan large', progressAt: NOW - 1000, leaseUntil: NOW + 1000 }],
+    ['unnamed command', { record: '/repo/large.log.run.json', command: ' ', progressAt: NOW - 1000, leaseUntil: NOW + 1000 }],
+    ['sample beyond the window', {
+      record: '/repo/large.log.run.json', command: 'verify --plan large', progressAt: NOW + 1, leaseUntil: NOW + 1000,
+    }],
+  ])('rejects a verification lease with %s', (_case, fields) => {
+    const overdue = report(ACTIVITY_CLASSES.VERIFICATION)
+    overdue.verificationLeases = [{
+      status: 'running', startedAt: NOW - 60_000, processAlive: true, ...fields,
+    }]
+    expect(activeVerificationLease(overdue, NOW)).toBeNull()
+  })
+
+  it('selects the freshest valid lease when several runs are present', () => {
+    const overdue = report(ACTIVITY_CLASSES.VERIFICATION)
+    const lease = (name, sampledAgo) => ({
+      record: `/repo/local/verify-logs/${name}.log.run.json`,
+      command: `verify ${name}`,
+      status: 'running',
+      startedAt: NOW - 60 * 60_000,
+      progressAt: NOW - sampledAgo,
+      leaseUntil: NOW - sampledAgo + VERIFICATION_LEASE_MS,
+      processAlive: true,
+    })
+    overdue.verificationLeases = [lease('older', 2 * 60_000), lease('newer', 1000)]
+    expect(activeVerificationLease(overdue, NOW)).toMatchObject({ command: 'verify newer', progressAt: NOW - 1000 })
+  })
+
   it('records the strike, evidence, outcome phase and exact veto command', () => {
     const decision = emergencyDecision({ now: NOW, report: report(), workablePoints: [947] })
     expect(strikeRecord({ id: 's1', decision, at: NOW, phase: 'intent' })).toMatchObject({

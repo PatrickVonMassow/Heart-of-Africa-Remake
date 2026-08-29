@@ -227,6 +227,32 @@ describe('standstill report inputs', () => {
     }
   })
 
+  it.each([
+    ['negative', () => false],
+    ['throwing', () => { throw new Error('probe failed') }],
+  ])('records processAlive false for a %s identity probe', (_case, processAlive) => {
+    const dir = mkdtempSync(join(tmpdir(), 'hoa-verification-dead-'))
+    const end = Date.parse('2026-08-21T10:00:00Z')
+    const startedAt = end - 60_000
+    const log = join(dir, 'large.log')
+    const recordPath = `${log}.run.json`
+    try {
+      writeFileSync(log, 'output\n')
+      writeFileSync(recordPath, JSON.stringify({
+        command: 'verify --plan large', log, status: 'running', startedAt, pid: 4242,
+      }))
+      const result = verificationRecordEvidence(dir, {
+        start: startedAt - 1,
+        end,
+        records: [verificationProgress({ at: end - 1000, path: recordPath, startedAt })],
+        processAlive,
+      })
+      expect(result.leases).toEqual([expect.objectContaining({ processAlive: false })])
+    } finally {
+      rmSync(dir, { recursive: true, force: true })
+    }
+  })
+
   it('renders threshold, evidence, totals, and UTC bounds', () => {
     const start = Date.parse('2026-08-21T08:00:00Z')
     const report = {

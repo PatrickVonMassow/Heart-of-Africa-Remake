@@ -3,13 +3,13 @@
 // hard strike, with an actual wedged child process as the owner. All files and
 // command effects stay inside a temporary fixture.
 import { spawn } from 'node:child_process'
-import { mkdtempSync, readFileSync, rmSync } from 'node:fs'
+import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { ACTIVITY_CLASSES } from './batch-standstill-core.mjs'
 import { EMERGENCY_COOLDOWN_MS, EMERGENCY_THRESHOLD_MS } from './batch-emergency-core.mjs'
 import { probePid } from './batch-singleton.mjs'
-import { runEmergency } from './batch-emergency.mjs'
+import { runEmergency, verificationProcessAlive } from './batch-emergency.mjs'
 
 const dir = mkdtempSync(join(tmpdir(), 'hoa-emergency-drill-'))
 const statePath = join(dir, 'state.json')
@@ -17,6 +17,16 @@ const logPath = join(dir, 'strikes.jsonl')
 const now = Date.now()
 const progressAt = now - 2 * EMERGENCY_THRESHOLD_MS
 const sleeper = spawn(process.execPath, ['-e', 'setInterval(() => {}, 1000)'], { stdio: 'ignore', windowsHide: true })
+const verificationScript = join(dir, 'run-logged.mjs')
+const verificationLog = join(dir, 'probe.log')
+writeFileSync(verificationScript, 'setInterval(() => {}, 1000)\n')
+writeFileSync(verificationLog, 'measured output\n')
+const verificationSleeper = spawn(process.execPath, [verificationScript, '--log-file', verificationLog], {
+  stdio: 'ignore', windowsHide: true,
+})
+writeFileSync(`${verificationLog}.run.json`, JSON.stringify({
+  pid: verificationSleeper.pid, log: verificationLog, status: 'running',
+}))
 
 const reportAt = (end) => {
   const timeline = []
@@ -52,6 +62,12 @@ try {
   const identity = probePid(sleeper.pid)
   if (!identity.exists || !Number.isFinite(identity.startedAt)) throw new Error('could not prove the chaos owner process')
   const lock = { sessionId: 'chaos-wedged-owner', pid: sleeper.pid, pidStartedAt: identity.startedAt, fence: 3 }
+  let liveVerificationProbe = false
+  const probeDeadline = Date.now() + 2000
+  while (!liveVerificationProbe && Date.now() < probeDeadline) {
+    liveVerificationProbe = verificationProcessAlive({}, `${verificationLog}.run.json`, verificationLog)
+    if (!liveVerificationProbe) await new Promise((resolve) => setTimeout(resolve, 10))
+  }
   const common = { statePath, logPath, execute, getLock: () => lock, getProcesses: () => ({}), revoke: () => ({ revoked: true, reason: 'drill-revoked' }), releaseLock: () => true }
   const soft = runEmergency({
     ...common,
@@ -79,12 +95,12 @@ try {
     restartAttempts: commands.filter((line) => /batch-autostart\.mjs/.test(line)).length,
     strikeRecords: rows.length,
     busyActivityIgnored: soft.decision.progressAt === progressAt && hard.decision.progressAt === progressAt,
-    staleLeaseIgnored: soft.decision.reason === 'batch-stalled-past-threshold' && hard.decision.reason === 'batch-still-stalled-after-recorded-recovery',
+    liveVerificationProbe,
     restoredWithoutHuman: hard.restored && dead,
     measuredMs: Date.now() - now,
   }
   process.stdout.write(`${JSON.stringify(result)}\n`)
-  if (!result.restoredWithoutHuman || !result.busyActivityIgnored || !result.staleLeaseIgnored || result.softAction !== 'soft-recover' || result.hardAction !== 'hard-recover' || result.strikeRecords !== 4) {
+  if (!result.restoredWithoutHuman || !result.busyActivityIgnored || !result.liveVerificationProbe || result.softAction !== 'soft-recover' || result.hardAction !== 'hard-recover' || result.strikeRecords !== 4) {
     process.exitCode = 1
   }
 } catch (error) {
@@ -92,5 +108,6 @@ try {
   process.exitCode = 1
 } finally {
   try { process.kill(sleeper.pid, 'SIGKILL') } catch { /* already ended by the real strike */ }
+  try { process.kill(verificationSleeper.pid, 'SIGKILL') } catch { /* already ended */ }
   rmSync(dir, { recursive: true, force: true })
 }

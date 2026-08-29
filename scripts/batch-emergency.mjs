@@ -97,7 +97,9 @@ export function terminateLockedOwner(lock, { execute = execFileSync, kill = proc
   }
 }
 
-function defaultInputs({ repo, now, thresholdMs }) {
+export function defaultInputs({
+  repo, now, thresholdMs, gather = gatherStandstillReport, runRecord = runRecordFor,
+}) {
   const tasksText = readFileSync(join(repo, 'TASKS.md'), 'utf8')
   const open = openPointsOf(tasksText)
   const workablePoints = frontCandidates({ open, gates: gateSets(tasksText), inFlight: [], count: open.length })
@@ -106,9 +108,10 @@ function defaultInputs({ repo, now, thresholdMs }) {
     paused: existsSync(join(repo, '.claude', 'batch-paused')),
     veto: readJson(join(repo, 'local', 'batch-emergency-veto.json')),
     state: readJson(join(repo, 'local', 'batch-emergency-state.json')) ?? {},
-    report: gatherStandstillReport({
+    report: gather({
       repo, ref: 'main', start: now - 4 * thresholdMs, end: now, thresholdMs,
-      verificationProcessAlive,
+      verificationProcessAlive: (record, recordPath, logPath) =>
+        verificationProcessAlive(record, recordPath, logPath, { runRecord }),
     }),
   }
 }

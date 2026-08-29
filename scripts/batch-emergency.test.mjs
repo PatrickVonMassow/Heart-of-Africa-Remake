@@ -1,10 +1,10 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { mkdtempSync, readFileSync, rmSync } from 'node:fs'
+import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { ACTIVITY_CLASSES } from './batch-standstill-core.mjs'
 import { EMERGENCY_COOLDOWN_MS, EMERGENCY_THRESHOLD_MS } from './batch-emergency-core.mjs'
-import { restartOutcome, runEmergency, terminateLockedOwner, verificationProcessAlive } from './batch-emergency.mjs'
+import { defaultInputs, restartOutcome, runEmergency, terminateLockedOwner, verificationProcessAlive } from './batch-emergency.mjs'
 
 const dirs = []
 afterEach(() => {
@@ -130,5 +130,26 @@ describe('verification process identity', () => {
     expect(runRecord).toHaveBeenCalledWith(log)
     expect(verificationProcessAlive({}, '', log, { runRecord: () => ({ alive: false }) })).toBe(false)
     expect(verificationProcessAlive({}, '', log, { runRecord: () => { throw new Error('unreadable') } })).toBe(false)
+  })
+
+  it('wires the resolved report path into the real default input probe', () => {
+    const repo = mkdtempSync(join(tmpdir(), 'hoa-emergency-inputs-'))
+    dirs.push(repo)
+    writeFileSync(join(repo, 'TASKS.md'), '')
+    const log = join(repo, 'local', 'verify-logs', 'large.log')
+    const runRecord = vi.fn(() => ({ alive: true }))
+    let alive = false
+    defaultInputs({
+      repo,
+      now: Date.now(),
+      thresholdMs: EMERGENCY_THRESHOLD_MS,
+      runRecord,
+      gather: ({ verificationProcessAlive: probe }) => {
+        alive = probe({}, `${log}.run.json`, log)
+        return {}
+      },
+    })
+    expect(alive).toBe(true)
+    expect(runRecord).toHaveBeenCalledWith(log)
   })
 })
