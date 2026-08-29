@@ -13581,3 +13581,84 @@ to land than a mechanism that needs a review.
   Criticality: low — it loses nothing and blocks nothing, but an unowned red teaches the reader to
   skip the report, which is the habit every other charge in that table exists to prevent.
   Bundle: Session- & Repo-Hygiene.
+
+- [ ] 1011. The WebGPU compatibility lane throws five console errors in every run that no charge
+  names (measured 29.08.2026 in the LARGE run on `feat/687-roam-bound-fixes`, WebGPU,
+  recorded featureLevel=compatibility, twice in the same run).
+  `scripts/verify/settings.mjs` records two console pseudo-checks that `scripts/render-verify-charges.mjs`
+  does not match: `THREE.WebGPURenderer: Async render pipeline creation failed
+  (renderPipeline_ShadowMaterial_1867 / _1868, renderPipeline_MeshStandardMaterial_25 / _1005,
+  renderPipeline_MeshStandardNodeMaterial_999 / _1006, renderPipeline_RenderPipeline_9350):
+  [Invalid TextureView] is invalid due to a previous error` and `Uncaptured WebGPU
+  GPUValidationError: [Invalid CommandBuffer from CommandEncoder "renderContext_11/_14/_32/_42"]
+  is invalid due to a previous error`.
+  THE CAUSE IS ALREADY OWNED, THE SYMPTOMS ARE NOT. Point 514 §5 owns the root: on the
+  compatibility lane the MSAA fallback cannot exist, `RGBA16Float does not support multisampling`
+  arrives as an uncaptured GPUValidationError, and everything above is its downstream. The
+  existing 514 console entry says so in its own `why` — it lists "the invalid
+  msaa-texture/view/command-buffer and async-pipeline errors" as the cascade — but its four
+  `match` patterns cover only `RGBA16Float ... does not sup`, `[Invalid Texture "output-msaa"]`,
+  `[Invalid Texture "normal-msaa"]` and `[Invalid TextureView] is invalid due to a previous error`.
+  The two texts above begin differently, so the anchored patterns never reach them and the same
+  measured lane fault blocks the gate through a third door.
+  FINAL STATE: every console error of this cascade that the compatibility lane emits is either
+  matched by a charge scoped exactly as its siblings are — `suite: 'settings'`, `backend: 'webgpu'`,
+  `featureLevel: 'compatibility'`, `kind: 'console'` — or the lane records the MSAA family as
+  UNAVAILABLE rather than red, which is the decision point 514 owes anyway. Scope stays narrow on
+  purpose: on a CORE adapter, the one the player runs, each of these stays a real red.
+  VERIFIABLE: the `settings` suite's recorded console reds on a compatibility-level WebGPU run are
+  all accounted for by `node scripts/render-verify-guard.mjs --status`; and a Vitest case in
+  `render-verify-core.test.mjs` that each new pattern matches the measured text and does NOT match
+  the same wording without the cascade's signature.
+  Criticality: medium — it loses nothing and the cause is known, but a red nobody owns teaches the
+  reader to skip the whole report, which is the habit every charge in that table exists to prevent.
+  Bundle: Session- & Repo-Hygiene.
+
+- [ ] 1012. The measurement runs demand GPU timestamps from an adapter that has none (measured
+  29.08.2026 in the LARGE run on `feat/687-roam-bound-fixes`, WebGPU, recorded
+  featureLevel=compatibility, twice in the same run).
+  Two checks of `scripts/verify/benchmark.mjs` fail: `WebGPU: real GPU timestamps were measured
+  for every row - 0/33 rows, reason "adapter without the timestamp-query feature"` and `WebGPU:
+  real GPU timestamps were measured for the low-preset rows too - 0/3 low rows with gpu`. The red
+  text states its own cause: the adapter does not expose `timestamp-query`, so no run on this lane
+  can ever turn these two green. Point 1009 already records that "the two WebGPU timestamp rows
+  fail on the baseline in the same run and belong to the same lane", but 1009's subject is the
+  benchmark BORROWING the world and not giving it back - its final state and its verifiable list
+  name only the five restored settings and `Math.random`, so the timestamp pair rides along in its
+  prose without an owner that can close it.
+  FINAL STATE: a capability the host does not have is reported as UNAVAILABLE, not as a failure.
+  The benchmark asks the adapter for `timestamp-query` before it asserts on timestamps; where the
+  feature is absent the two checks record the absence by name and the run stays green on that
+  count. On an adapter that DOES expose the feature a missing timestamp stays a real red - the
+  point removes a false verdict, never the assertion.
+  VERIFIABLE: the two named checks report UNAVAILABLE with the adapter's feature list on the
+  measured compatibility lane and the `benchmark` suite no longer reds on them; a Vitest case that
+  an adapter reporting `timestamp-query` still fails the checks when rows carry no GPU time, so the
+  assertion survives where it can be asked.
+  Criticality: low - it costs no code and no data, but it is a check that cannot pass on the lane
+  it runs on, which is a red trained to be ignored.
+  Bundle: Session- & Repo-Hygiene.
+
+- [ ] 1013. A cheetah hunts in central Africa, where the food web does not provide for it
+  (measured 29.08.2026, `enrichments` suite, section `predator-food-web`).
+  The check `every predator fits the region and period` failed once with
+  `{"count":16,"familyHunts":0,"distinctPrey":["zebra","warthog","antelope"],"distinctPredators":
+  ["lion","cheetah","hyena","leopard"],"preyMismatch":[],"predMismatch":[{"predator":"cheetah",
+  "region":"central"}],"webMismatch":[]}` - one mismatch out of sixteen hunts, and the prey side
+  clean.
+  TWO READINGS, AND ONLY ONE CAN BE RIGHT. Read from the code and NOT measured: the check may read
+  the region where the hunter BRINGS THE PREY DOWN rather than where it set off, so a long chase
+  across a region boundary reports an origin nobody meant. The counter-reading - that the species
+  is genuinely placed where its food web does not carry it - stays open, because the two regions
+  have never been logged side by side. Nothing here is settled by inspection; the measurement
+  decides.
+  FINAL STATE: the hunt carries both regions - where it began and where it ended - and the check
+  asks the one it means, stated in its own text so a later reader cannot re-derive it wrongly. If
+  the placement turns out to be the real fault, the species table is corrected instead and the
+  check stays as it is.
+  VERIFIABLE: a logged sample of hunts crossing a region boundary showing both regions per hunt;
+  the `enrichments` section green over the seeds that produced the mismatch; and a Vitest case
+  pinning which region the check asks and why.
+  Criticality: low - a single mis-scored hunt in sixteen, invisible to the player, but it makes an
+  ecology check report a fault it may not have found.
+  Bundle: Tierverhalten.
