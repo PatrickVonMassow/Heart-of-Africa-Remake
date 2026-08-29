@@ -3,6 +3,8 @@ import { ACTIVITY_CLASSES } from './batch-standstill-core.mjs'
 import {
   EMERGENCY_COOLDOWN_MS,
   EMERGENCY_THRESHOLD_MS,
+  VERIFICATION_LEASE_MS,
+  activeVerificationLease,
   activeVeto,
   emergencyDecision,
   emergencyHandoffPrompt,
@@ -89,6 +91,46 @@ describe('the independent emergency decision', () => {
     }))
     expect(emergencyDecision({ now: NOW, report: busy, workablePoints: [947] })).toMatchObject({
       action: 'soft-recover', strike: true, progressAt,
+    })
+  })
+
+  it('suspends the old durable-progress clock for one named, advancing, live verification run', () => {
+    const overdue = report(ACTIVITY_CLASSES.VERIFICATION)
+    overdue.batchProgress[0].at = NOW - 90 * 60_000
+    overdue.verificationLeases = [{
+      record: '/repo/local/verify-logs/large.log.run.json',
+      command: 'verify --plan large',
+      status: 'running',
+      startedAt: NOW - 80 * 60_000,
+      progressAt: NOW - 60_000,
+      leaseUntil: NOW - 60_000 + VERIFICATION_LEASE_MS,
+      processAlive: true,
+    }]
+    expect(emergencyDecision({ now: NOW, report: overdue, workablePoints: [1002] })).toMatchObject({
+      action: 'stand-down', strike: false, reason: 'live-verification-lease',
+      progressAt: NOW - 90 * 60_000,
+      verificationLease: { command: 'verify --plan large', progressAt: NOW - 60_000 },
+    })
+  })
+
+  it.each([
+    ['expired', { progressAt: NOW - 60_000, leaseUntil: NOW - 1, processAlive: true }],
+    ['stale', { progressAt: NOW - VERIFICATION_LEASE_MS - 1, leaseUntil: NOW + 60_000, processAlive: true }],
+    ['process-dead', { progressAt: NOW - 60_000, leaseUntil: NOW + 60_000, processAlive: false }],
+  ])('strikes exactly as before when a verification lease is %s', (_case, fields) => {
+    const overdue = report(ACTIVITY_CLASSES.VERIFICATION)
+    overdue.batchProgress[0].at = NOW - 90 * 60_000
+    overdue.verificationLeases = [{
+      record: '/repo/local/verify-logs/large.log.run.json',
+      command: 'verify --plan large',
+      status: 'running',
+      startedAt: NOW - 100 * 60_000,
+      ...fields,
+    }]
+    expect(activeVerificationLease(overdue, NOW)).toBeNull()
+    expect(emergencyDecision({ now: NOW, report: overdue, workablePoints: [1002] })).toMatchObject({
+      action: 'soft-recover', strike: true, reason: 'batch-stalled-past-threshold',
+      progressAt: NOW - 90 * 60_000,
     })
   })
 

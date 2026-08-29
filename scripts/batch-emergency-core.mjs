@@ -5,6 +5,7 @@
 // session must be told. scripts/batch-emergency.mjs does the acting.
 export const EMERGENCY_THRESHOLD_MS = 60 * 60 * 1000
 export const EMERGENCY_COOLDOWN_MS = 45 * 60 * 1000
+export const VERIFICATION_LEASE_MS = 15 * 60 * 1000
 export const BATCH_PROGRESS_KINDS = new Set([
   'first-parent-commit',
   'committed-boundary',
@@ -29,6 +30,32 @@ export function activeVeto(veto, now = Date.now()) {
 }
 
 /**
+ * A named verification run suspends this tick; it does not become batch
+ * progress. The IO half measures the adjacent run record, output-log mtime and
+ * process identity, while this pure half makes the evidence self-bounding. In
+ * particular, a stale progress sample cannot be rescued by an arbitrary future
+ * `leaseUntil` value.
+ */
+export function activeVerificationLease(report = {}, now = Date.now(), leaseMs = VERIFICATION_LEASE_MS) {
+  let active = null
+  const windowEnd = Number(report?.window?.end)
+  for (const lease of report?.verificationLeases ?? []) {
+    const startedAt = Number(lease?.startedAt)
+    const progressAt = Number(lease?.progressAt)
+    const leaseUntil = Number(lease?.leaseUntil)
+    const named = typeof lease?.record === 'string' && lease.record.trim().length > 0 &&
+      typeof lease?.command === 'string' && lease.command.trim().length > 0
+    if (!named || lease?.status !== 'running' || lease?.processAlive !== true) continue
+    if (![startedAt, progressAt, leaseUntil].every(Number.isFinite)) continue
+    if (progressAt < startedAt || progressAt > now || (Number.isFinite(windowEnd) && progressAt > windowEnd)) continue
+    if (leaseUntil <= now || leaseUntil <= progressAt || leaseUntil - progressAt > leaseMs) continue
+    if (now - progressAt >= leaseMs) continue
+    if (!active || progressAt > active.progressAt) active = { ...lease, startedAt, progressAt, leaseUntil }
+  }
+  return active
+}
+
+/**
  * Decide one independent timer tick. A first strike is deliberately soft. A
  * hard strike is licensed only by a recorded earlier strike against the SAME
  * last-progress boundary: that is the proof that ordinary recovery ran and did
@@ -48,6 +75,13 @@ export function emergencyDecision({
   const progressAt = latestProgressAt(report)
   if (!Number.isFinite(progressAt)) {
     return { action: 'observe', reason: 'no-bounded-evidence-window', strike: false }
+  }
+  const verificationLease = activeVerificationLease(report, now)
+  if (verificationLease) {
+    return {
+      action: 'stand-down', reason: 'live-verification-lease', strike: false,
+      progressAt, verificationLease,
+    }
   }
   const stalledMs = Math.max(0, now - progressAt)
   if (stalledMs < thresholdMs) {
