@@ -33,7 +33,7 @@ import { pointNumbersFromChip, pointOwnershipFromTitle } from './dashboard-point
  *  auto-created `worktree-agent-…` branches carry no point. */
 export function branchPoint(branch) {
   if (typeof branch !== 'string') return null
-  const m = branch.match(/^[a-z]+\/(\d{1,4})-/i)
+  const m = branch.match(/^[a-z]+\/(\d+)-/i)
   return m ? Number(m[1]) : null
 }
 

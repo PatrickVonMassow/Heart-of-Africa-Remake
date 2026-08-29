@@ -163,6 +163,7 @@ describe('reality parsing', () => {
   it('branchPoint reads feat/chore point slugs and nothing else', () => {
     expect(branchPoint('feat/306-cleanup')).toBe(306)
     expect(branchPoint('fix/12-water')).toBe(12)
+    expect(branchPoint('feat/10000-uncapped')).toBe(10000)
     expect(branchPoint('main')).toBeNull()
     expect(branchPoint('chore/closing-cleanup')).toBeNull()
     expect(branchPoint('worktree-agent-a72f2b')).toBeNull()
