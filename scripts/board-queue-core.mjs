@@ -437,8 +437,8 @@ export function boardSafeTitle(title, { maxLength = 60 } = {}) {
     .replace(/\b[\w-]+\.(?:mjs|cjs|ts|tsx|js|md)\b/g, (m) => stem(m))
     .replace(/§\s*/g, 'Abschnitt ')
     .replace(/\b[0-9a-f]{7,40}\b/g, (m) => (/\d/.test(m) ? 'Rev.' : m))
-    .replace(/\b(punkt|point)\s+(\d{1,3})\b/gi, '$1 Nr. $2')
-    .replace(/\((\d{2,3})\)/g, '[Nr. $1]')
+    .replace(/\b(punkt|point)\s+(\d+)\b/gi, '$1 Nr. $2')
+    .replace(/\((\d{2,})\)/g, '[Nr. $1]')
     .replace(/\s+/g, ' ')
     .trim()
   return t.length > maxLength ? `${t.slice(0, maxLength - 1).trimEnd()}…` : t

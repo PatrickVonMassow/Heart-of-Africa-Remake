@@ -900,6 +900,11 @@ describe('the pending-request card', () => {
     expect(t).not.toMatch(/\(462\)/)
   })
 
+  it('neutralises uncapped point references without rewriting only a numeric prefix', () => {
+    expect(boardSafeTitle('Punkt 1000 folgt (1003)')).toBe('Punkt Nr. 1000 folgt [Nr. 1003]')
+    expect(boardSafeTitle('point 10000')).toBe('point Nr. 10000')
+  })
+
   it('truncates a long title rather than filling the card with one', () => {
     const t = boardSafeTitle('Ein sehr langer Titel, der auf einem Telefon niemals in eine Zeile passen würde')
     expect(t.length).toBeLessThanOrEqual(60)
