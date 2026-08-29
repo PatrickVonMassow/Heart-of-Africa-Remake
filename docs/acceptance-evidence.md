@@ -1257,8 +1257,10 @@ in the real walk loop and the place is left within 1.5 m of the drawn line
 (`scripts/verify/polish.mjs`, screenshots 488-village-edge-band /
 488-port-edge-band / 488-monument-edge-band).
 
-THE CHILDREN PLAY A GAME OF TAG (§19.10, points 480/351). One of them is IT and
-chases the others; whoever is caught becomes the new IT, and any number plays.
+THE CHILDREN PLAY A GAME OF TAG (§19.10, points 480/351) WHERE THE SETTLEMENT
+STANDS ON NO RIVER. Since the five-word rebuild a riverside village plays the
+bank round instead (§7), and this chase is what the children play everywhere
+else. One of them is IT and chases the others; whoever is caught becomes the new IT, and any number plays.
 It is a CHASE, not a route — nothing here holds a ring, an orbit or a tour of
 waypoints, because a path is periodic and the eye reads it within two passes.
 STAMINA is what makes it legible: every child carries a sprint reserve, and the
@@ -1313,35 +1315,23 @@ against the built fabric (`src/scenes/place/lifeSpots.test.ts` pins that for
 every shipped village) (`scripts/verify/polish.mjs`, screenshot
 480-village-tag).
 
-AT THAT GAME THE CHILDREN TEACH THE SIX GENERAL CONCEPTS (§13.4,
-docs/communication-poc-spec.md, point 481). Twelve situations, two per concept:
-one atomic utterance, the gesture the speaker makes while it says it, and the
-ACTION that visibly follows — a child calls the others in (COME), sends one to a
-named spot (GO_THERE), asks another along as it runs (FOLLOW), names where it
-stands (HERE), points something out beyond the ground (THERE) and refuses (NO).
-Nothing is ever translated: the meaning lives in what happens next. The two
-look-alikes are staged apart, because otherwise they teach nothing — COME is
-spoken by a child STANDING STILL against FOLLOW's caller running away, and THERE
-by a child after whom NOBODY moves against GO_THERE, which always ends in the
-addressee walking to the spot. The scheduler is a fair queue (the least-staged
-castable situation goes next), so nothing starves inside a visit; a refusal is
-offered out of turn as the answer to the call just spoken, and the freshly-tagged
-child's HERE as a moment whose state is gone within seconds. The group plays on
-its own ground — the largest disc on the bearing furthest from every fixed adult
-vignette whose whole area still clears them by the §13.4 hearing radius — so
-among the children the player hears the children and among the adults the adults.
-The chase carries out what was said: the situation decides a runner's direction,
-the chase keeps the collisions, the stamina and the floor pace, and between
-rounds that claim is what moves anyone at all. Rate, action life, errand pace and
-refusal chance are calibratable (`balance.villageLife.childSpeech`) and
-debug-editable in both languages, as is the play radius.
-Verifiable: pure Vitest on the catalogue and the scheduler
-(`src/scenes/place/childSituations.test.ts`) — one atom per situation and it is
-the concept's own; a gesture and a following action on every one; every concept
-in more than one situation, and heard in at least two DIFFERENT ones over a
-driven visit; every situation staged within a visit; both staged contrasts; the
-refusals only ever as answers, cancelling what the child was told; the errands
-really carried out and every one of them expiring.
+THE CHASE ITSELF TEACHES NOTHING, AND SAYS SO (points 686/687). It once carried
+twelve staged situations teaching six general concepts — COME, GO_THERE, FOLLOW,
+HERE, THERE and NO — and the user could learn nothing from them: "Ich erkenne da
+kein Fangspiel … Das Herumschicken wirkt wie zum Selbstzweck eingeführt". The
+diagnosis was that the design had forced six lessons onto a game that cannot
+carry them, and the rebuild replaced all of it with FIVE words taught in two
+places (§7): the children's bank round, and the adults at their own work. The
+catalogue is therefore GONE, not merely unused — `childSituations.ts` keeps its
+exported types and stages nothing, and the twelve-situation suite that pinned the
+old curriculum was deleted with the curriculum. What replaced it is the bank
+round, and its evidence stands under §7 rather than being restated here.
+Verifiable: `src/scenes/place/mutedTeaching.test.ts` asserts that the adapter
+stages NOTHING — the one claim this paragraph now makes — and the browser tripwire
+in `scripts/verify/polish.mjs` goes red the moment anything is staged again, so
+the emptiness is measured live and not merely asserted in a unit. Point 688 fills
+the adults' half; when it lands, this paragraph is replaced by what they teach,
+not extended.
 THE VILLAGE'S PRODUCERS ARE ALARMED FOR THE LONG RUN (point 589): the children's
 play at the chase and their speech at the bank round each carry a watch of
 the dev-assert channel's long-run family (`watchProducer`,

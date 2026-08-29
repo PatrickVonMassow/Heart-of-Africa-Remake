@@ -4049,7 +4049,7 @@ if (section('children-bank-game')) {
         `${r.foot ? `${r.foot.x.toFixed(2)}/${r.foot.y.toFixed(2)}` : 'behind the camera'}, ` +
         `${r.px} px, first surface ${Number.isFinite(r.ratio) ? r.ratio.toFixed(2) : '∞'}×@${r.what}`
       check(
-        'both play rocks stand in the rendered frame from the start line (point 687)',
+        'both play rocks stand in the rendered frame from a spectator`s stance at the upstream end (point 687)',
         seen.near.inFrame && seen.far.inFrame,
         `${describeRock('near', seen.near)}; ${describeRock('far', seen.far)} ` +
           `[${seen.viewport.w}x${seen.viewport.h}]`,
@@ -4074,7 +4074,9 @@ if (section('children-bank-game')) {
       )
       await frame('687-bank-play-rocks', {
         local: { x: stood.far.x, y: stood.r * 0.5, z: stood.far.z },
-        label: `both play rocks from the start line (stretch ${stood.stretch.toFixed(1)} m)`,
+        label:
+          `both play rocks seen from a quarter of the stretch back of the upstream rock and ` +
+          `an eighth of it aside (stretch ${stood.stretch.toFixed(1)} m)`,
       })
     }
 
@@ -4183,6 +4185,11 @@ if (section('children-bank-game')) {
       // a headless frame buys wildly different amounts of game per machine, and
       // this one has to span a run, the regroup walk and the next run.
       const LANE_WINDOW_S = 45
+      // What counts as "went nowhere" over that window. A child that walked less
+      // than half a metre in forty-five seconds of play did not walk; anything
+      // above it is a slow child, which is a different complaint and not this
+      // check's.
+      const LANE_STARVED_M = 0.5
       // How near a child has to come before the picture below is worth taking:
       // close enough that the frame shows him and the runner together, wide
       // enough that the shot is not waiting on the single closest pass of the
@@ -4214,7 +4221,10 @@ if (section('children-bank-game')) {
             bodyRadius: t.bodyRadius,
             px: p.x,
             pz: p.z,
-            c: t.children.map((k) => ({ x: k.x, z: k.z, walked: k.walked })),
+            // `held` is the settlement's own word for a stillness that was ORDERED —
+            // the tagged child holding its crouch — as against one that just happened.
+            // The starvation check below cannot be written without it.
+            c: t.children.map((k) => ({ x: k.x, z: k.z, walked: k.walked, held: k.held })),
           }
         })
         laneClock = s.clock
@@ -4262,18 +4272,43 @@ if (section('children-bank-game')) {
       const played = tail && head ? tail.playedClock - head.playedClock : 0
       const walked = Array.from({ length: kids }, (_, k) => tail.c[k].walked - head.c[k].walked)
       // A GAME, not a group standing about with the phases ticking over it: the
-      // cycle must advance AND the legs must carry the group at the walking floor
-      // the child-motion metric already sets (m per child-minute). A tagged child
-      // legitimately holds its crouch, so the floor is asked of the GROUP.
+      // cycle must ADVANCE — two distinct phases inside the window — and the legs
+      // must carry the group at the walking floor the child-motion metric already
+      // sets (m per child-minute). This is a LIVENESS check and says no more: two
+      // phases are a run followed by a walk-back, not a closed
+      // call -> runs -> walk -> roam, and it watches one village. The whole cycle
+      // in every river layout, per child, is measured where it belongs — the
+      // replay in `src/scenes/place/tagShuffle.test.ts` over a 120 s window.
       const groupWalked = walked.reduce((a, b) => a + b, 0)
       const perChildMinute = played > 0 && kids > 0 ? groupWalked / kids / (played / 60) : 0
+      // AND NOT ONE CHILD STARVED INSIDE THAT AVERAGE (cross-vendor review,
+      // 29.08.2026). The floor above is asked of the GROUP, for the good reason
+      // that a tagged child legitimately holds its crouch — but that reason
+      // excuses a child the round HELD, not every child, and a group average
+      // hides one standing at zero while the others carry it. The settlement
+      // says which stillness was ordered, so the two are told apart here rather
+      // than guessed: a child never held over the whole window has to have got
+      // somewhere. The bar is deliberately low — this is a starvation detector,
+      // not a second pace gate.
+      const heldEver = Array.from({ length: kids }, (_, k) => lane.some((s) => s.c[k]?.held))
+      const starved = []
+      for (let k = 0; k < kids; k++) {
+        if (!heldEver[k] && walked[k] <= LANE_STARVED_M) starved.push(k)
+      }
       check(
         'the round goes on with him planted in it, rather than halting at him',
-        played >= LANE_WINDOW_S * 0.9 && phases.size >= 2 && perChildMinute > CHILD_MOTION.walkFloor,
+        played >= LANE_WINDOW_S * 0.9 &&
+          phases.size >= 2 &&
+          perChildMinute > CHILD_MOTION.walkFloor &&
+          starved.length === 0,
         `${played.toFixed(1)}s of ${LANE_WINDOW_S}s played over ${lane.length} samples, phases ` +
           `[${[...phases].join(', ')}], ${kids} children walked ` +
           `[${walked.map((m) => m.toFixed(1)).join(', ')}] m = ${perChildMinute.toFixed(1)} m per ` +
-          `child-minute (floor ${CHILD_MOTION.walkFloor}), ${tail.tags - head.tags} tagged`,
+          `child-minute (floor ${CHILD_MOTION.walkFloor}), ${tail.tags - head.tags} tagged` +
+          (starved.length
+            ? ` — STARVED: child(ren) ${starved.join(', ')} walked at most ${LANE_STARVED_M} m and were never held, ` +
+              `so their stillness was not the crouch`
+            : ''),
       )
       // WALKED AROUND, not merely near: a child counts as having passed him when
       // it goes from one side of him to the other along the lane's own axis, with
@@ -4295,9 +4330,22 @@ if (section('children-bank-game')) {
           if (along < lo) lo = along
           if (along > hi) hi = along
           if (gap < nearest) nearest = gap
+          // The body separation is judged over EVERY phase — a child may not walk
+          // through him while roaming any more than while running.
           if (gap < minGap) {
             minGap = gap
             closestAt = s.phase
+          }
+          // THE CROSSING IS NOT (cross-vendor review, 29.08.2026). What this
+          // section claims is that the RUN carries the group past a planted
+          // figure; a child that stays on one side throughout every run and
+          // wanders past him afterwards, while the group walks back or roams,
+          // proves nothing of the sort. So the side-swap is accumulated inside
+          // the run phase only, and the side is forgotten on leaving it, which
+          // also stops two separate runs being welded into one crossing.
+          if (s.phase !== 'run') {
+            side = 0
+            continue
           }
           if (along > 1 || along < -1) {
             const now = along > 0 ? 1 : -1
@@ -4431,8 +4479,14 @@ if (section('adult-errands')) {
     // of a counter it does not own. Keeping only the final snapshot would prove
     // "nothing was staged" only if `staged` were guaranteed cumulative and the
     // settlement were guaranteed not to remount; taking the LARGEST value each
-    // key ever showed proves it either way, and a situation that appeared and
-    // vanished between two samples still leaves its mark.
+    // key ever showed survives a reset and a remount alike.
+    // WHAT IT DOES NOT SURVIVE, said plainly because the comment used to claim
+    // otherwise (cross-vendor review, 29.08.2026): a situation that is staged and
+    // cleared ENTIRELY BETWEEN two samples is never observed, and no maximum over
+    // observations can recover it. The bound this check really carries is that a
+    // staged situation persists at least one sampling interval — which the
+    // scheduler's own 0.8 s against this loop's two frames gives with room to
+    // spare, but which is an assumption about the producer and not a proof.
     //
     // What is proven: over this window no situation counter ever rose above zero,
     // no villager was ever seen carrying an errand, and none was ever at the
