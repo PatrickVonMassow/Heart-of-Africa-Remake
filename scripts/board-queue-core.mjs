@@ -485,13 +485,13 @@ export function blockedCardBody(why) {
     const protectedTokens = []
     const prose = String(paragraph).replace(
       /\b[a-z][a-z0-9+.-]*:\/\/[^\s]+|(?:\b[A-Za-z]:)?(?:[\wÄÖÜäöüß.-]+[\\/])+[\wÄÖÜäöüß.-]+|\b[\wÄÖÜäöüß-]+\.(?:mjs|cjs|ts|tsx|js|md)\b/gi,
-      (token) => `\0${protectedTokens.push(token) - 1}\0`,
+      (token) => `\uE000${protectedTokens.push(token) - 1}\uE001`,
     )
     return prose
       .replace(/[A-Za-zÄÖÜäöüß]+/g, repairTransliteration)
       .replace(/\b(punkt|point)\s+(\d+)\b/gi, '$1 Nr. $2')
       .replace(/\((\d{2,})\)/g, '[$1]')
-      .replace(/\0(\d+)\0/g, (_marker, index) => protectedTokens[Number(index)])
+      .replace(/\uE000(\d+)\uE001/g, (_marker, index) => protectedTokens[Number(index)])
       .trim()
   }
   const safeWhy = String(why ?? '')
