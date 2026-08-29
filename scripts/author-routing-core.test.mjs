@@ -6,16 +6,30 @@
 // regression case rather than as a remembered exception.
 import { describe, expect, it } from 'vitest'
 import {
+  AUTHORING_FRAMINGS,
+  AUTHORING_COMMISSION_KIND,
+  authorRoundHistory,
   authorLaneFor,
+  FABLE_ESCALATION_ROUNDS,
+  formatAuthorRoundHistory,
   formatLaneReport,
   HARD_MARKERS,
   LANE_MODEL,
   LANES,
   laneTagIn,
+  nextAuthoringStep,
+  SPEC_EXAMINATION_ROUND,
+  specExaminerFor,
+  unsuccessfulReviewRounds,
   VERIFICATION_MARKERS,
 } from './author-routing-core.mjs'
+import { readState, writeState } from './fable-switch-core.mjs'
 
-const lane = (body, extra = {}) => authorLaneFor({ body, ...extra }).lane
+const fable = (state) => readState(JSON.stringify(writeState(state, { why: 'test decision', by: 'test', now: 1 })))
+const OFF = fable('off')
+const ON = fable('on')
+const decision = (input = {}) => authorLaneFor({ fableState: OFF, ...input })
+const lane = (body, extra = {}) => decision({ body, ...extra }).lane
 
 describe('authorLaneFor — which lane authors a point', () => {
   it('sends the mechanical and mid-difficulty work to Sol, which is the point', () => {
@@ -23,10 +37,10 @@ describe('authorLaneFor — which lane authors a point', () => {
     expect(lane('The board card says "stand" for a point nobody is working on. Say what it is.')).toBe('sol')
     // No signal at all is the mechanical case, not a reason to hold the work back.
     expect(lane('')).toBe('sol')
-    expect(authorLaneFor()).toMatchObject({ lane: 'sol', model: 'GPT-5.6 Sol' })
+    expect(decision()).toMatchObject({ lane: 'sol', model: 'GPT-5.6 Sol' })
   })
 
-  it('keeps the hard cases with Opus, in CLAUDE.md §6’s own words (user 17.08.2026)', () => {
+  it('sends the hard cases straight to Sol, in CLAUDE.md §6’s own words (user 18.08.2026)', () => {
     for (const body of [
       'This is difficult: the lock is taken twice.',
       'A complex rebuild of the launcher.',
@@ -36,16 +50,21 @@ describe('authorLaneFor — which lane authors a point', () => {
       'A deadlock between the hook and the gate.',
       'A migration of every recorded review row.',
     ]) {
-      expect(lane(body), body).toBe('opus')
+      expect(lane(body), body).toBe('sol')
     }
-    expect(authorLaneFor({ body: 'A complex rebuild.' }).why[0]).toMatch(/hard case \(complex\)/)
-    // The hard cases are no longer routed to Fable from the start: its weekly
-    // pool is the scarcest, and Fable is now reached only by the re-work branch.
-    expect(authorLaneFor({ body: 'A complex rebuild.' }).why[0]).toMatch(/stay with Opus/)
+    expect(decision({ body: 'A complex rebuild.' }).why[0]).toMatch(/hard case \(complex\)/)
+    // Neither of the two lanes this used to take: not Fable from the start (its
+    // weekly pool is the scarcest, 17.08.) and no longer held back for Opus.
+    expect(decision({ body: 'A complex rebuild.' }).why[0]).toMatch(/straight to Sol/)
+    // AND IT OUTRANKS THE VERIFICATION LANE (user 18.08.2026, asked explicitly):
+    // a hard picture point is authored by Sol too — the main session judges the
+    // picture whoever wrote the code, so only the authoring moves.
+    expect(lane('A complex screenshot problem on both backends.')).toBe('sol')
   })
 
   it('treats a HIGH-criticality tag as a hard case by definition', () => {
-    expect(lane('Anything at all.', { criticality: 'high' })).toBe('opus')
+    expect(lane('Anything at all.', { criticality: 'high' })).toBe('sol')
+    expect(lane('The screenshot must hold.', { criticality: 'high' })).toBe('sol')
     // …and med/low/none leave the decision to the text.
     expect(lane('Anything at all.', { criticality: 'med' })).toBe('sol')
     expect(lane('Anything at all.', { criticality: 'low' })).toBe('sol')
@@ -79,28 +98,55 @@ describe('authorLaneFor — which lane authors a point', () => {
     expect(lane('Claude judges the picture. The picture shows a black horizon on WebGL.')).toBe('opus')
   })
 
-  it('moves work that came back from Sol with findings to Fable, above every other signal', () => {
-    expect(lane('A screenshot point.', { reworked: true })).toBe('fable')
-    expect(lane('Something mechanical.', { reworked: true })).toBe('fable')
-    expect(authorLaneFor({ body: 'x', reworked: true }).why[0]).toMatch(/after a re-work/)
-    // ABOVE THE TAG TOO (cross-vendor review of point 667, P1): the order used to
-    // return the tag first, so `Author lane: sol` plus a failed re-work stayed
-    // with Sol while the comment claimed rework outranked everything.
-    expect(lane('Something mechanical.\nAuthor lane: sol', { reworked: true })).toBe('fable')
-    expect(lane('A picture point.\nAuthor lane: opus', { reworked: true })).toBe('fable')
-    // The caller's explicit override is the ONE thing above it: a human saying
-    // "this one, in that lane" is not a signal to be outvoted.
-    expect(lane('x', { reworked: true, override: 'sol' })).toBe('sol')
+  it('keeps every pre-boundary rework in the lane its other signals demand', () => {
+    for (let reworkRounds = 0; reworkRounds < FABLE_ESCALATION_ROUNDS; reworkRounds += 1) {
+      expect(lane('Something mechanical.', { reworkRounds }), `ordinary round ${reworkRounds}`).toBe('sol')
+      expect(
+        lane('A complex screenshot problem.', { criticality: 'high', reworkRounds }),
+        `hard/HIGH round ${reworkRounds}`,
+      ).toBe('sol')
+      expect(lane('A screenshot point.', { reworkRounds }), `verification round ${reworkRounds}`).toBe('opus')
+    }
+  })
+
+  it('sends nothing to Fable at the boundary while the switch refuses it', () => {
+    const reworkRounds = FABLE_ESCALATION_ROUNDS
+    // Past the threshold the point stays in the lane its other signals demand.
+    expect(lane('Something mechanical.', { reworkRounds })).toBe('sol')
+    expect(lane('A complex screenshot problem.', { criticality: 'high', reworkRounds })).toBe('sol')
+    expect(lane('Something mechanical.\nAuthor lane: sol', { reworkRounds })).toBe('sol')
+    expect(lane('A picture point.\nAuthor lane: opus', { reworkRounds })).toBe('opus')
+    expect(lane('x', { reworkRounds, override: 'sol' })).toBe('sol')
+    // Neither explicit door bypasses the one shared decision.
+    expect(decision({ body: 'x\nAuthor lane: fable', reworkRounds: 0 })).toMatchObject({ lane: '', refused: true })
+    expect(decision({ body: 'x', reworkRounds: 0, override: 'fable' })).toMatchObject({ lane: '', refused: true })
+  })
+
+  it('names the switch at every crossed round instead of hiding the boundary', () => {
+    for (const reworkRounds of [FABLE_ESCALATION_ROUNDS, FABLE_ESCALATION_ROUNDS + 7]) {
+      const why = decision({ body: 'x', reworkRounds }).why
+      expect(why[0]).toBe('mechanical or mid-difficulty, and nothing marks it otherwise')
+      expect(why[1]).toContain('node scripts/fable-switch.mjs --status')
+      expect(why[1]).toContain('test decision')
+    }
+    // Below the threshold nothing is said about it at all.
+    expect(decision({ body: 'x', reworkRounds: FABLE_ESCALATION_ROUNDS - 1 }).why).toHaveLength(1)
+  })
+
+  it('admits the tag, override, and automatic boundary while the switch allows Fable', () => {
+    expect(authorLaneFor({ body: 'x\nAuthor lane: fable', fableState: ON })).toMatchObject({ lane: 'fable', refused: false })
+    expect(authorLaneFor({ body: 'x', override: 'fable', fableState: ON })).toMatchObject({ lane: 'fable' })
+    expect(authorLaneFor({ body: 'x', reworkRounds: FABLE_ESCALATION_ROUNDS, fableState: ON })).toMatchObject({ lane: 'fable' })
   })
 
   it('lets a point name its own lane, and a caller override even that', () => {
     expect(lane('A complex rebuild.\nAuthor lane: sol')).toBe('sol')
-    expect(lane('Something mechanical.\nAuthor lane: fable')).toBe('fable')
+    expect(authorLaneFor({ body: 'Something mechanical.\nAuthor lane: fable', fableState: ON }).lane).toBe('fable')
     expect(lane('Something mechanical.\nAuthor lane: opus')).toBe('opus')
     expect(lane('A complex rebuild.\nAuthor lane: sol', { override: 'opus' })).toBe('opus')
     // An override that is not a lane is no override at all.
     expect(lane('Something mechanical.', { override: 'haiku' })).toBe('sol')
-    expect(authorLaneFor({ body: 'x', override: 'FABLE' }).lane).toBe('fable')
+    expect(authorLaneFor({ body: 'x', override: 'FABLE', fableState: ON }).lane).toBe('fable')
   })
 
   it('reads a tag only as a LINE of its own, never inside a sentence', () => {
@@ -148,30 +194,286 @@ describe('authorLaneFor — which lane authors a point', () => {
   })
 
   it('names the subjects its own comments promise (cross-vendor P1)', () => {
-    // The list claimed locks and state migration and held only the noun.
-    expect(lane('The batch lock is taken twice.')).toBe('opus')
-    expect(lane('Migrating every recorded review row.')).toBe('opus')
-    // …and "visually inspect" is how half the render points are written.
+    // The list claimed locks and state migration and held only the noun. They
+    // are hard subjects, so since 18.08.2026 they answer `sol` — the marker
+    // still fires, only the lane it feeds changed.
+    expect(lane('The batch lock is taken twice.')).toBe('sol')
+    expect(lane('Migrating every recorded review row.')).toBe('sol')
+    // …and "visually inspect" is how half the render points are written, which
+    // is the verification lane and stays with the main session.
     expect(lane('Visually inspect the horizon banding.')).toBe('opus')
   })
 
   it('reports every signal it saw, not only the deciding one', () => {
-    const d = authorLaneFor({ body: 'A complex screenshot problem.', criticality: 'med' })
-    expect(d.signals).toMatchObject({ criticality: 'med', reworked: false })
+    const d = decision({ body: 'A complex screenshot problem.', criticality: 'med' })
+    expect(d.signals).toMatchObject({ criticality: 'med', reworkRounds: 0 })
     expect(d.signals.hard).toEqual(['complex'])
     expect(d.signals.verification).toEqual(['screenshot'])
-    // Hard and verification now answer alike — both stay with Opus — but the
-    // signals are still reported separately, so a dispatcher sees which fired.
-    expect(d.lane).toBe('opus')
+    // The two signals now answer DIFFERENTLY, and the order decides: hard wins,
+    // so this point is Sol's while the verification signal is still reported.
+    expect(d.lane).toBe('sol')
   })
 
   it('answers for every lane and cannot be handed something it throws on', () => {
     for (const l of LANES) expect(LANE_MODEL[l]).toBeTruthy()
     for (const body of [null, undefined, 42, {}, []]) {
-      expect(LANES).toContain(authorLaneFor({ body }).lane)
+      expect(LANES).toContain(decision({ body }).lane)
     }
     expect(HARD_MARKERS.length).toBeGreaterThan(0)
     expect(VERIFICATION_MARKERS.length).toBeGreaterThan(0)
+  })
+})
+
+describe('unsuccessfulReviewRounds — completed ledger evidence only', () => {
+  it('returns zero without records and counts only non-passing reviews for this point', () => {
+    expect(unsuccessfulReviewRounds([], 726)).toBe(0)
+    expect(
+      unsuccessfulReviewRounds(
+        [
+          { point: 726, mode: 'review', verdict: 'merge' },
+          { point: 726, mode: 'review', verdict: 'merge-with-fixes' },
+          { point: 726, mode: 'review', verdict: 'do-not-merge' },
+          { point: 725, mode: 'review', verdict: 'do-not-merge' },
+          { point: 726, mode: 'blind-parallel', verdict: 'do-not-merge' },
+        ],
+        726,
+      ),
+    ).toBe(2)
+  })
+
+  it('does not turn aborted or short material into an unsuccessful round', () => {
+    expect(
+      unsuccessfulReviewRounds(
+        [
+          { point: 726, mode: 'review', verdict: 'do-not-merge', aborted: true },
+          { point: 726, mode: 'review', verdict: 'do-not-merge', shortfall: { missing: ['x'] } },
+          { point: 726, mode: 'review', verdict: 'do-not-merge', completed: false },
+          { point: 726, mode: 'review', kind: 'shortfall' },
+        ],
+        726,
+      ),
+    ).toBe(0)
+  })
+})
+
+describe('re-authoring rounds — decorrelated before Fable', () => {
+  const failed = (extra = {}) => ({
+    point: 727,
+    mode: 'review',
+    verdict: 'do-not-merge',
+    evidence: 'the reviewer found a concrete remaining defect',
+    ...extra,
+  })
+  const commissioned = (round, authorFraming = '') => ({
+    point: 727,
+    kind: AUTHORING_COMMISSION_KIND,
+    round,
+    authorFraming,
+  })
+
+  it('commissions a point with no record as round zero, and round one without a framing', () => {
+    const initial = nextAuthoringStep({ records: [], point: 727 })
+    expect(initial).toMatchObject({ kind: 'commission', round: 0, framing: '' })
+
+    const first = nextAuthoringStep({ records: [failed()], point: 727 })
+    expect(first).toMatchObject({ kind: 'commission', round: 1, framing: '' })
+  })
+
+  it('decorrelates every ordinary round after the first from the one before it', () => {
+    const records = [failed(), failed()]
+    let preceding = ''
+    for (let round = 2; round <= FABLE_ESCALATION_ROUNDS - 2; round += 1) {
+      const step = nextAuthoringStep({ records, point: 727 })
+      expect(step).toMatchObject({ kind: 'commission', round })
+      expect(AUTHORING_FRAMINGS).toContain(step.framing)
+      expect(step.framing).not.toBe(preceding)
+      records.push(failed({ authorFraming: step.framing }))
+      preceding = step.framing
+    }
+  })
+
+  it('reports an unframed or repeated later record as a repeat, not a fresh attempt', () => {
+    const firstFraming = AUTHORING_FRAMINGS[0]
+    const history = authorRoundHistory(
+      [
+        failed(),
+        failed(),
+        failed({ authorFraming: firstFraming }),
+        failed({ authorFraming: firstFraming }),
+      ],
+      727,
+    )
+    expect(history.unsuccessfulRounds).toBe(4)
+    expect(history.freshRounds).toBe(3)
+    expect(history.rounds.map((round) => round.repeat)).toEqual([
+      '',
+      '',
+      '',
+      'the author framing repeats the preceding fresh round',
+    ])
+    const next = nextAuthoringStep({
+      records: [
+        failed(),
+        failed(),
+        failed({ authorFraming: firstFraming }),
+        failed({ authorFraming: firstFraming }),
+      ],
+      point: 727,
+    })
+    expect(next).toMatchObject({ kind: 'commission', round: 4 })
+    expect(next.framing).not.toBe(firstFraming)
+  })
+
+  it('counts every pre-mechanism review as a fresh attempt', () => {
+    const records = Array.from({ length: 11 }, () => failed())
+    const history = authorRoundHistory(records, 727)
+    expect(history.unsuccessfulRounds).toBe(11)
+    expect(history.freshRounds).toBe(11)
+    expect(history.rounds.every((round) => !round.repeat)).toBe(true)
+  })
+
+  it('uses the durable commission when the later review omits its confirmation flag', () => {
+    const history = authorRoundHistory(
+      [failed(), failed(), commissioned(2, AUTHORING_FRAMINGS[0]), failed()],
+      727,
+    )
+    expect(history.freshRounds).toBe(3)
+    expect(history.rounds.at(-1)).toMatchObject({
+      commissioned: true,
+      framing: AUTHORING_FRAMINGS[0],
+      repeat: '',
+    })
+  })
+
+  it('still reports a governed later round whose commission carried no framing', () => {
+    const records = [failed(), failed(), commissioned(2, AUTHORING_FRAMINGS[0]), failed(), commissioned(3), failed()]
+    const history = authorRoundHistory(records, 727)
+    expect(history.unsuccessfulRounds).toBe(4)
+    expect(history.freshRounds).toBe(3)
+    expect(history.rounds.at(-1).repeat).toBe('no author framing was recorded')
+
+    const next = nextAuthoringStep({ records, point: 727 })
+    expect(next).toMatchObject({ kind: 'commission', round: 4 })
+    expect(next.framing).toBe(AUTHORING_FRAMINGS[1])
+    records.push(commissioned(4, next.framing), failed())
+    expect(authorRoundHistory(records, 727)).toMatchObject({ unsuccessfulRounds: 5, freshRounds: 4 })
+    expect(nextAuthoringStep({ records, point: 727 })).toMatchObject({ kind: 'spec-examination', round: 5 })
+  })
+
+  it('moves past an over-framed baseline round on the following ledger row', () => {
+    const records = [commissioned(0, AUTHORING_FRAMINGS[0]), failed(), commissioned(1), failed()]
+    const history = authorRoundHistory(records, 727)
+    expect(history.freshRounds).toBe(1)
+    expect(history.rounds[0].repeat).toBe('rounds zero and one must carry no author framing')
+    expect(history.rounds[1]).toMatchObject({ freshRound: 1, repeat: '' })
+    expect(nextAuthoringStep({ records, point: 727 })).toMatchObject({ kind: 'commission', round: 2 })
+  })
+
+  it('counts only the known hostile-tester framings as fresh later attempts', () => {
+    const history = authorRoundHistory(
+      [failed(), failed(), failed({ authorFraming: 'Take another ordinary look at the same implementation.' })],
+      727,
+    )
+    expect(history.freshRounds).toBe(2)
+    expect(history.rounds.at(-1).repeat).toMatch(/no recognized hostile-tester framing/)
+  })
+
+  it('returns the examination step immediately before the threshold, once only', () => {
+    const records = [failed()]
+    let framing = ''
+    while (authorRoundHistory(records, 727).freshRounds < SPEC_EXAMINATION_ROUND) {
+      const step = nextAuthoringStep({ records, point: 727 })
+      framing = step.framing
+      records.push(failed({ ...(framing ? { authorFraming: framing } : {}) }))
+    }
+    const examination = nextAuthoringStep({ records, point: 727 })
+    expect(examination).toMatchObject({ kind: 'spec-examination', round: SPEC_EXAMINATION_ROUND })
+    expect(examination.reason).toContain(`threshold of ${FABLE_ESCALATION_ROUNDS}`)
+
+    records.push({
+      point: 727,
+      mode: 'review',
+      verdict: 'merge',
+      specExamination: 'sound',
+      evidence: 'the point and its generated brief are consistent with all findings',
+    })
+    const after = nextAuthoringStep({ records, point: 727 })
+    expect(after).toMatchObject({ kind: 'commission', round: SPEC_EXAMINATION_ROUND })
+    expect(after.framing).not.toBe(framing)
+  })
+
+  it('moves every boundary when the one escalation constant moves', () => {
+    const alternateThreshold = FABLE_ESCALATION_ROUNDS + 3
+    const records = [failed()]
+    while (authorRoundHistory(records, 727).freshRounds < alternateThreshold - 1) {
+      const step = nextAuthoringStep({ records, point: 727, escalationRounds: alternateThreshold })
+      expect(step.kind).toBe('commission')
+      records.push(failed({ ...(step.framing ? { authorFraming: step.framing } : {}) }))
+    }
+    expect(nextAuthoringStep({ records, point: 727, escalationRounds: alternateThreshold })).toMatchObject({
+      kind: 'spec-examination',
+      round: alternateThreshold - 1,
+    })
+  })
+
+  it('applies a numeric history override to the step boundary without inventing records', () => {
+    expect(
+      nextAuthoringStep({ records: [], point: 727, reworkRounds: FABLE_ESCALATION_ROUNDS - 1 }),
+    ).toMatchObject({ kind: 'spec-examination', round: FABLE_ESCALATION_ROUNDS - 1 })
+  })
+
+  it('renders the count, every framing or repeat, and the examination as one reading', () => {
+    const history = authorRoundHistory(
+      [
+        failed(),
+        failed(),
+        failed({ authorFraming: AUTHORING_FRAMINGS[0] }),
+        commissioned(3),
+        failed(),
+        {
+          point: 727,
+          mode: 'review',
+          verdict: 'merge',
+          specExamination: 'sound',
+          evidence: 'the difficulty is real',
+        },
+      ],
+      727,
+    )
+    const report = formatAuthorRoundHistory(history)
+    expect(report).toContain('4 unsuccessful round(s); 3 fresh attempt(s)')
+    expect(report).toContain(`round 2: framing — ${AUTHORING_FRAMINGS[0]}`)
+    expect(report).toContain('ledger review 4: REPEAT — no author framing was recorded')
+    expect(report).toContain('spec examination: sound — the difficulty is real')
+  })
+
+  it('routes the examination to the vendor that did not author the rounds, never Fable', () => {
+    expect(specExaminerFor({ rounds: [{ authoredBy: 'GPT-5.6 Sol <noreply@openai.com>' }] })).toMatchObject({
+      vendor: 'claude',
+      model: 'Opus 5',
+      route: 'claude-read',
+    })
+    expect(specExaminerFor({ rounds: [{ authoredBy: 'Claude Opus 5 <noreply@anthropic.com>' }] })).toMatchObject({
+      vendor: 'sol',
+      model: 'GPT-5.6 Sol',
+      route: 'ask-sol',
+    })
+  })
+
+  it('does not accept a malformed, aborted or same-vendor examination as the one reading', () => {
+    const solRound = failed({ authoredBy: 'GPT-5.6 Sol <noreply@openai.com>' })
+    const examination = (extra = {}) => ({
+      point: 727,
+      mode: 'review',
+      verdict: 'merge',
+      model: 'Opus 5',
+      specExamination: 'sound',
+      evidence: 'the point and brief agree with every finding',
+      ...extra,
+    })
+    expect(authorRoundHistory([solRound, examination({ aborted: true })], 727).examination).toBeNull()
+    expect(authorRoundHistory([solRound, examination({ model: 'GPT-5.6 Sol' })], 727).examination).toBeNull()
+    expect(authorRoundHistory([solRound, examination()], 727).examination).toMatchObject({ specExamination: 'sound' })
   })
 })
 
@@ -183,7 +485,7 @@ describe('formatLaneReport', () => {
       { number: 3, lane: 'opus', why: ['picture'] },
     ]
     const text = formatLaneReport(rows)
-    expect(text.split('\n')[0]).toBe('author-routing: 3 open point(s) — sol 2 · fable 0 · opus 1')
+    expect(text.split('\n')[0]).toBe('author-routing: 3 open point(s) — sol 2 · fable 0 · opus 1 · blocked 0')
     expect(text).toMatch(/ {4}1 {2}sol {4}mechanical/)
     expect(formatLaneReport()).toContain('0 open point(s)')
   })

@@ -6,15 +6,14 @@
 // (point 387, 30.07.2026). Asking about HEAD alone let 26 red runs on `main`
 // and thirteen red branch runs stand unseen for three weeks: the owning
 // session's HEAD was green while every push of a delegated agent's branch
-// failed, and a delegated agent pushes under the parent's session id. So this
-// sweeps every ref the repository pushed inside the window — named from the
-// local push reflog, never from an API sweep over branches — and a push does not
-// count as landed until the run for that exact sha has CONCLUDED green. An
-// unfinished run is a WAIT, not a pass; a ref that no longer exists is dropped;
-// the alert goes out once per (ref, sha). Answers that can never change are
-// cached per sha in .claude/ci-status-guard-state.json, so the common turn — the
-// one that pushed nothing new — costs no API call at all. The decision logic
-// lives in ci-status-guard-core.mjs (pure, Vitest-covered).
+// failed. So this observes every ref the repository pushed inside the window —
+// named from the local push reflog, never from an API sweep over branches. Main
+// and a branch offered back for landing gate on a concluded green run; a branch
+// whose author is still declared in flight is reported without owning the
+// supervisor's turn end. The exemption ends with that declaration. A ref that
+// no longer exists is dropped, and terminal answers are cached per sha so the
+// common turn costs no API call. The decision logic lives in
+// ci-status-guard-core.mjs (pure, Vitest-covered).
 //
 // Fail-OPEN above all: CI pending, no run yet, token missing, offline, non-200,
 // any internal error → allow, so the guard can never freeze a session. All
@@ -26,35 +25,157 @@
 // (Layer B), which fires on the gate verdict even with no session running — and
 // on a `feat/**` branch it fires where this guard cannot, since that run
 // concludes green by design (point 513) and only its verdict knows better.
-import { readFileSync, existsSync } from 'node:fs'
-import { execFileSync } from 'node:child_process'
+import { readFileSync, existsSync, mkdirSync, rmSync, statSync } from 'node:fs'
+import { execFileSync, spawn } from 'node:child_process'
+import { randomUUID } from 'node:crypto'
 import { request } from 'node:https'
-import { fileURLToPath } from 'node:url'
 import { readJson, writeJsonAtomic } from './dashboard-state.mjs'
+import { REPO_ROOT, repoPath } from './repo-paths.mjs'
 import {
+  acknowledgeCiWaitState,
+  blockReason,
+  ciWaitBackoffMs,
+  ciWaitIdentity,
+  classifyRuns,
   failedRuns,
+  ciRedAlertMessage,
   notifiedFromState,
   pruneFamine,
   pruneNotifiedRefs,
   pruneShaCache,
   pushedRefsFromReflog,
   refTargets,
+  selectCiTargets,
+  reconcileCiWait,
+  renewCiWait,
+  observeCiWait,
   sweepTargets,
 } from './ci-status-guard-core.mjs'
-import { JOBS_PAGE_SIZE, classifyFailureCause, jobsComplete, moreJobPages } from './ci-failure-cause-core.mjs'
-import { heldByOtherLiveOwner } from './batch-singleton.mjs'
+import {
+  JOBS_PAGE_SIZE,
+  PAGES_WORKFLOW,
+  classifyFailureCause,
+  failedJobNames,
+  jobsComplete,
+  moreJobPages,
+} from './ci-failure-cause-core.mjs'
+import {
+  INSPECT_LIMIT,
+  blockingDeployments,
+  candidateDeployments,
+} from './pages-deploy-unblock-core.mjs'
+import { heldByOtherLiveOwner, probePid, readOwnerLock } from './batch-singleton.mjs'
+import { assessCiWait } from './batch-in-flight-core.mjs'
+import { gatherInFlight, worktreeBranch } from './batch-in-flight.mjs'
+import { isMainModule } from './is-main.mjs'
+import { emitActivity } from './batch-activity-journal.mjs'
+import { ACTIVITY_EVENTS } from './batch-activity-journal-core.mjs'
 
-const REPO_ROOT = fileURLToPath(new URL('..', import.meta.url))
-const PAUSE = fileURLToPath(new URL('../.claude/batch-paused', import.meta.url))
-const STATE = fileURLToPath(new URL('../.claude/ci-status-guard-state.json', import.meta.url))
-const NTFY_TOPIC_FILE = fileURLToPath(new URL('../.claude/ntfy-topic', import.meta.url))
+const PAUSE = repoPath('.claude/batch-paused')
+const STATE = repoPath('.claude/ci-status-guard-state.json')
+const STATE_LOCK = repoPath('.claude/ci-status-guard-state.lock')
+const SELF = repoPath('scripts/ci-status-guard.mjs')
+const AUTOSTART = repoPath('scripts/batch-autostart.mjs')
+const NTFY_TOPIC_FILE = repoPath('.claude/ntfy-topic')
 // The PAT lives OUTSIDE version control; candidates in preference order. Read
 // at call time, never logged. Missing token → unauthenticated (public repo,
 // lower rate limit) → still works; API failure → fail-open.
 const TOKEN_PATHS = [
-  fileURLToPath(new URL('../.secrets/github-token', import.meta.url)),
+  repoPath('.secrets/github-token'),
   'C:\\Users\\Patri\\.claude\\projects\\c--Users-Patri-Documents-Developing-hoa\\.secrets\\github-token',
 ]
+
+const waitSync = (ms) => Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, ms)
+
+/** Serialise cache and durable-wait changes made by Stop hooks and the detached
+ * observer. The observer performs network I/O outside this lock; only one small
+ * read/modify/atomic-write sits inside it. */
+function mutateState(mutator, { now = Date.now(), waitMs = 2000 } = {}) {
+  const deadline = now + waitMs
+  while (true) {
+    try {
+      mkdirSync(STATE_LOCK)
+      break
+    } catch (error) {
+      if (error?.code !== 'EEXIST') throw error
+      try {
+        if (now - statSync(STATE_LOCK).mtimeMs > 30_000) rmSync(STATE_LOCK, { recursive: true, force: true })
+      } catch { /* retry */ }
+      if (Date.now() >= deadline) throw new Error('timed out acquiring CI state lock')
+      waitSync(5)
+    }
+  }
+  try {
+    const current = readJson(STATE) ?? {}
+    const next = mutator(current)
+    writeJsonAtomic(STATE, next && typeof next === 'object' ? next : current)
+    return next
+  } finally {
+    rmSync(STATE_LOCK, { recursive: true, force: true })
+  }
+}
+
+function startWaitObserver(wait) {
+  const assessment = assessCiWait({ wait, probePid })
+  if (!assessment.pending || !assessment.repair) return false
+  try {
+    const child = spawn(process.execPath, [SELF, '--observe', wait.wakeToken], {
+      cwd: REPO_ROOT,
+      detached: true,
+      windowsHide: true,
+      stdio: 'ignore',
+    })
+    child.unref()
+    return true
+  } catch {
+    return false
+  }
+}
+
+function requestSuccessor(wait) {
+  try {
+    const child = spawn(process.execPath, [
+      AUTOSTART,
+      '--immediate',
+      '--cause', 'ci-terminal',
+      '--wake-token', wait.wakeToken,
+      '--ci-result', wait.terminal?.verdict ?? wait.state,
+    ], {
+      cwd: REPO_ROOT,
+      detached: true,
+      windowsHide: true,
+      stdio: 'ignore',
+    })
+    child.unref()
+    return true
+  } catch {
+    return false
+  }
+}
+
+/** Keep the event-driven wake alive through a still-running predecessor. The
+ * first request is immediate; later attempts use the same bounded backoff as CI
+ * observation. A pause suppresses requests without erasing terminal truth. */
+async function wakeSuccessorUntilRecovered(wait) {
+  while (true) {
+    const current = readJson(STATE)?.ciWait
+    if (!current?.terminal || current.wakeToken !== wait.wakeToken) return
+    if (!existsSync(PAUSE)) requestSuccessor(current)
+    await new Promise((resolve) => setTimeout(resolve, ciWaitBackoffMs(current)))
+  }
+}
+
+/** Consume terminal wake state only after a successor was actually spawned.
+ * Failed/refused launches leave it intact for watchdog recovery. */
+export function acknowledgeCiWait(wakeToken, { now = Date.now() } = {}) {
+  let acknowledged = false
+  mutateState((current) => {
+    const result = acknowledgeCiWaitState(current, wakeToken, { now })
+    acknowledged = result.acknowledged
+    return result.state
+  })
+  return acknowledged
+}
 
 function git(args) {
   return execFileSync('git', args, {
@@ -148,6 +269,28 @@ async function fetchRuns(repo, headSha) {
   }
 }
 
+/** Dispatch the one failed-jobs re-run selected by the pure classifier. A 201
+ * is GitHub's acknowledgement; every other result leaves the outage fail-soft
+ * but does not invent a wait that nobody dispatched. */
+async function dispatchFailedJobsRerun(repo, runId) {
+  if (!runId) return false
+  const token = readToken()
+  if (!token) return false
+  const res = await httpsRequest(
+    `https://api.github.com/repos/${repo}/actions/runs/${runId}/rerun-failed-jobs`,
+    {
+      method: 'POST',
+      headers: {
+        Accept: 'application/vnd.github+json',
+        Authorization: `Bearer ${token}`,
+        'User-Agent': 'hoa-ci-status-guard',
+        'X-GitHub-Api-Version': '2022-11-28',
+      },
+    },
+  )
+  return res?.status === 201
+}
+
 /**
  * PROOF, not assumption: did anything under `.github/workflows/` change between
  * the last run of this workflow that GitHub carried to a verdict and HEAD?
@@ -205,7 +348,7 @@ async function workflowsUntouchedSince(repo, runs, runClassification, head) {
  *  scope widens rather than narrows on doubt. */
 function callsAReusableWorkflow(path) {
   try {
-    return /uses:\s*\.\/\.github\/workflows\//.test(readFileSync(new URL(`../${path}`, import.meta.url), 'utf8'))
+    return /uses:\s*\.\/\.github\/workflows\//.test(readFileSync(repoPath(path), 'utf8'))
   } catch {
     return true
   }
@@ -277,6 +420,49 @@ async function fetchJobs(repo, runId) {
   return jobsComplete({ fetched: jobs.length, totalCount }) ? jobs : null
 }
 
+/** Read-only proof of which Pages deployments can still be holding the queue.
+ * `[]` is returned only when the complete probe proves there is no blocker;
+ * null means the API could not decide, and keeps the conservative old refusal. */
+async function fetchPagesBlockers(repo) {
+  const headers = {
+    Accept: 'application/vnd.github+json',
+    'User-Agent': 'hoa-ci-status-guard',
+    'X-GitHub-Api-Version': '2022-11-28',
+  }
+  const token = readToken()
+  if (token) headers.Authorization = `Bearer ${token}`
+  const listed = await httpsRequest(
+    `https://api.github.com/repos/${repo}/deployments?environment=github-pages&per_page=${INSPECT_LIMIT}`,
+    { headers },
+  )
+  if (!listed || listed.status !== 200) return null
+  let candidates
+  try {
+    candidates = candidateDeployments(JSON.parse(listed.body))
+  } catch {
+    return null
+  }
+  const inspected = []
+  for (const candidate of candidates) {
+    const res = await httpsRequest(
+      `https://api.github.com/repos/${repo}/pages/deployments/${candidate.sha}`,
+      { headers },
+    )
+    if (!res) return null
+    if (res.status === 404) {
+      inspected.push({ ...candidate, status: 'not_found' })
+      continue
+    }
+    if (res.status !== 200) return null
+    try {
+      inspected.push({ ...candidate, status: JSON.parse(res.body)?.status ?? '' })
+    } catch {
+      return null
+    }
+  }
+  return blockingDeployments(inspected)
+}
+
 /** ntfy push, same channel as scripts/notify.mjs but via node:https (see top).
  *  Silent no-op without a configured topic; failures never break the guard. */
 async function notifyCiRed(message) {
@@ -337,19 +523,44 @@ function pushReflog() {
  *  each classified for WHERE its fault lies, so an outage cannot be mistaken for
  *  our own breakage (points 526/528). Returns the chosen classification, whether
  *  every red is unactionable, and the famine clocks to keep. */
-async function judgeRed(repo, { sha, runs, classification, famine, now }) {
+async function judgeRed(repo, { sha, runs, classification, famine, now, rerunWait = null, allowRerun = true }) {
   const reds = failedRuns(runs, sha)
   const judged = []
   const stillFamished = {}
+  let dispatchedWait = null
   for (const red of reds.length > 0 ? reds : [classification]) {
+    const jobs = await fetchJobs(repo, red.runId)
+    const failed = failedJobNames(jobs)
+    const pagesBlockers =
+      red.workflowName === PAGES_WORKFLOW && failed.length > 0 && failed.every((name) => name === 'deploy')
+        ? await fetchPagesBlockers(repo)
+        : null
+    const rerunKey = `${red.runId}:${red.runAttempt ?? 1}`
+    const alreadyDispatched = rerunWait?.rerunKey === rerunKey
     const cause = classifyFailureCause({
       workflowName: red.workflowName,
+      runStatus: 'completed',
+      runAttempt: red.runAttempt,
       conclusion: red.conclusion,
-      jobs: await fetchJobs(repo, red.runId),
+      jobs,
+      alreadyDispatched,
+      pagesBlockers,
       workflowsUntouched: await workflowsUntouchedSince(repo, runs, red, sha),
       famineSince: Number(famine[red.workflowName]) || 0,
       now,
     })
+    if (cause.neverStarted === true) {
+      const accepted = alreadyDispatched || (allowRerun && cause.rerunFailedJobs === true && await dispatchFailedJobsRerun(repo, red.runId))
+      if (accepted && !dispatchedWait) {
+        dispatchedWait = {
+          ...red,
+          state: 'pending',
+          conclusion: null,
+          runAttempt: (red.runAttempt ?? 1) + 1,
+          rerunKey,
+        }
+      }
+    }
     if (cause.actionable === false) stillFamished[red.workflowName] = Number(famine[red.workflowName]) || now
     judged.push({ ...red, ...cause })
   }
@@ -359,26 +570,36 @@ async function judgeRed(repo, { sha, runs, classification, famine, now }) {
     classification: judged.find((c) => c.actionable !== false) ?? judged[0],
     standDown: judged.every((c) => c.actionable === false),
     stillFamished,
+    rerunWait: dispatchedWait,
     // Every workflow this call actually judged, so the sweep can CLEAR the
     // waiver clock of one that is no longer dying the famine way.
     judgedWorkflows: judged.map((c) => c.workflowName),
   }
 }
 
-/** Returns the block-decision JSON string, or null to allow. */
-async function main() {
-  let sid = ''
-  try {
-    sid = JSON.parse(readFileSync(0, 'utf8')).session_id || ''
-  } catch {
-    /* no/non-JSON stdin (manual run) — CI state is global truth, not session-local */
+/** The wrapper's own CI gathering, shared with guard-preflight. `readOnly` still
+ * asks GitHub — that network verdict is the point — but bypasses the terminal
+ * cache and performs no state write or ntfy alert. */
+export async function gatherCiStatusInputs({ sessionId = '', readOnly = false } = {}) {
+  if (existsSync(PAUSE)) return { applicable: false, why: 'the batch is paused' }
+  if (heldByOtherLiveOwner(sessionId)) {
+    return {
+      applicable: false,
+      why: 'another live session owns the batch lock',
+      cause: 'not-lock-owner',
+    }
   }
 
-  if (existsSync(PAUSE)) return null // user-paused: no batch duty in flight
-  if (heldByOtherLiveOwner(sid)) return null // hard singleton: a non-owner session stands down — no batch duty
-
   const repo = githubRepo()
-  if (!repo) return null
+  if (!repo) {
+    return {
+      applicable: false,
+      cause: 'not-judged',
+      why:
+        'the GitHub repository could not be resolved. Action: repair the `origin` remote, then run ' +
+        '`node scripts/ci-status-guard.mjs` in this turn.',
+    }
+  }
 
   const now = Date.now()
   const head = git(['rev-parse', 'HEAD'])
@@ -387,21 +608,55 @@ async function main() {
   // can expire. Kept per workflow name, not per sha: the very failure mode is one
   // workflow dying identically across commit after commit.
   const famine = pruneFamine(state.famine, now)
-  const cache = pruneShaCache(state.shas, now)
+  const cache = readOnly ? {} : pruneShaCache(state.shas, now)
   const existingRefs = remoteRefNames()
   const notified = pruneNotifiedRefs(notifiedFromState(state), existingRefs)
+
+  // The declaration is assessed through the same liveness probes as the wait
+  // guard. A stale file does not exempt a branch; a live worktree-only
+  // declaration still resolves to the branch it is authoring.
+  let liveAuthorBranches = []
+  try {
+    const inFlight = gatherInFlight(sessionId, { now, includeSlots: false })
+    if (inFlight.live) {
+      for (const item of inFlight.declaration?.evidence ?? []) {
+        if (item?.kind === 'branch' && item.ref) liveAuthorBranches.push(item.ref)
+        if (item?.kind === 'worktree' && item.path) {
+          const branch = worktreeBranch(item.path)
+          if (branch) liveAuthorBranches.push(branch)
+        }
+      }
+    }
+  } catch {
+    // Unknown liveness is not permission to skip a landing gate.
+    liveAuthorBranches = []
+  }
 
   // EVERY REF THIS REPOSITORY PUSHED, not just HEAD (point 387). The list comes
   // from the local push reflog: a delegated agent's branch push lands in the
   // shared reflog, so the owning session sees the work it is responsible for
   // without asking the API about a single branch it did not push.
-  const targets = refTargets({
-    pushed: pushedRefsFromReflog(pushReflog(), { now }),
-    existingRefs,
-    headSha: head,
-    headPushed: isPushed(head),
+  const targets = selectCiTargets({
+    targets: refTargets({
+      pushed: pushedRefsFromReflog(pushReflog(), { now }),
+      existingRefs,
+      headSha: head,
+      headPushed: isPushed(head),
+    }),
+    liveAuthorBranches,
   })
-  if (targets.length === 0) return null // nothing pushed → no API call at all
+  const reported = targets.filter((target) => target.disposition === 'report')
+  if (!readOnly && reported.length > 0) {
+    console.error(
+      `ci-status-guard reports without blocking while the author is declared in flight: ${reported
+        .map((target) => `${target.ref} ${String(target.sha).slice(0, 7)}`)
+        .join('; ')}`,
+    )
+  }
+  if (targets.length === 0) {
+    if (!readOnly) startWaitObserver(state.ciWait)
+    return { applicable: true, inputs: { decision: null, failedOpen: [] } }
+  }
 
   const swept = await sweepTargets({
     targets,
@@ -410,41 +665,272 @@ async function main() {
     famine,
     now,
     fetchRuns: (sha) => fetchRuns(repo, sha),
-    judgeRed: (args) => judgeRed(repo, args),
-    notify: ({ target, classification, standDown }) =>
-      notifyCiRed(
-        `CI failed for pushed ${target.ref} ${String(target.sha).slice(0, 7)}: "${classification.workflowName}" ` +
-          `run ${classification.runId} (${classification.conclusion}, cause: ${classification.cause}` +
-          `${standDown ? ', nothing in the repository can clear it' : ''}). ${classification.url ?? ''}` +
-          // Once the outage waiver has expired, the alert stops saying "nothing
-          // to do" and NAMES the reading only a push can fix.
-          (classification.escalate ? ` ${classification.detail}. ${classification.remedy}` : ''),
-      ),
+    judgeRed: (args) => judgeRed(repo, { ...args, rerunWait: state.ciWait, allowRerun: !readOnly }),
+    notify: readOnly
+      ? async () => {}
+      : ({ target, classification, standDown }) =>
+          notifyCiRed(ciRedAlertMessage({ target, classification, standDown })),
   })
 
-  if (swept.dirty || JSON.stringify(state.notifiedRefs ?? {}) !== JSON.stringify(swept.notified)) {
-    writeJsonAtomic(STATE, {
-      famine: swept.famine,
-      shas: swept.cache,
-      notifiedRefs: swept.notified,
-      notifiedAt: now,
+  let durableWait = state.ciWait ?? null
+  if (!readOnly) {
+    const persisted = mutateState((current) => {
+      const observations = (swept.observations ?? []).filter((item) => item?.target?.disposition !== 'report')
+      const prior = current.ciWait ?? null
+      const nextWait = reconcileCiWait(prior, observations, { now, makeWakeToken: randomUUID })
+      const staleAgainstTerminal = prior?.terminal && observations.some((item) =>
+        ciWaitIdentity(item) === prior.identity && item?.classification?.state === 'pending')
+      return {
+        ...current,
+        famine: swept.famine,
+        shas: staleAgainstTerminal ? current.shas : swept.cache,
+        notifiedRefs: swept.notified,
+        notifiedAt: now,
+        ciWait: nextWait,
+      }
     })
+    durableWait = persisted?.ciWait ?? null
+
+    const owner = readOwnerLock()
+    for (const observation of (swept.observations ?? []).filter((item) => item?.target?.disposition !== 'report')) {
+      const observedState = observation.classification?.state
+      const event = observedState === 'pending'
+        ? (observation.previousState === 'pending' ? ACTIVITY_EVENTS.CI_WAIT_OBSERVATION : ACTIVITY_EVENTS.CI_WAIT_START)
+        : ACTIVITY_EVENTS.CI_WAIT_FINISH
+      const ownsWait = ciWaitIdentity(observation) === durableWait?.identity
+      emitActivity({
+        event,
+        at: observation.observedAt,
+        session: sessionId || null,
+        pid: owner?.sessionId === sessionId ? owner.pid ?? null : process.pid,
+        pidStartedAt: owner?.sessionId === sessionId
+          ? owner.pidStartedAt ?? null
+          : Date.now() - Math.round(process.uptime() * 1000),
+        generation: owner?.sessionId === sessionId ? owner.fence ?? null : null,
+        cause: `github-actions-${observedState}`,
+        evidence: {
+          id: `ci:${observation.target?.ref ?? 'unknown'}:${observation.target?.sha ?? 'unknown'}`,
+          ref: observation.target?.ref ?? null,
+          sha: observation.target?.sha ?? null,
+          workflow: observation.classification?.workflowName ?? null,
+          runId: observation.classification?.runId ?? null,
+          firstObservationAt: ownsWait ? durableWait.firstObservationAt : observation.observedAt,
+          lastObservationAt: observation.observedAt,
+          deadline: ownsWait ? durableWait.deadline : null,
+          wakeToken: ownsWait ? durableWait.wakeToken : null,
+          leaseUntil: observedState === 'pending' ? observation.observedAt + 2 * 60_000 : null,
+          terminal: observedState === 'pending' ? null : { state: observedState, verdict: observation.verdict },
+        },
+      })
+    }
+    startWaitObserver(durableWait)
   }
 
   // A fail-open SAYS why (point 387): a silently swallowed API error is
   // indistinguishable from a green, which is the confusion this point ends.
   if (swept.failedOpen.length > 0) {
-    console.error(`ci-status-guard allowed the stop without a verdict for: ${swept.failedOpen.join('; ')}`)
+    if (!readOnly) {
+      console.error(`ci-status-guard allowed the stop without a verdict for: ${swept.failedOpen.join('; ')}`)
+    }
+    if (!swept.decision) {
+      return {
+        applicable: false,
+        cause: 'not-judged',
+        why:
+          `${swept.failedOpen.join('; ')}. Action: restore GitHub/API access and run ` +
+          '`node scripts/ci-status-guard.mjs` again in this turn.',
+      }
+    }
   }
-  return swept.decision ? JSON.stringify({ decision: 'block', reason: swept.decision }) : null
+  return { applicable: true, inputs: { decision: swept.decision, failedOpen: swept.failedOpen } }
 }
 
-// No process.exit after awaits (libuv teardown race on Windows) — print the
-// decision and let the loop drain; any error allows the stop (fail-open).
-main()
-  .then((decision) => {
-    if (decision) process.stdout.write(decision)
+/** Claim and run the renewable observer. Its ownership is stored on the wait,
+ * not in process memory, so a duplicate spawn loses harmlessly and a launcher
+ * restart can replace a dead observer without replacing the wake token. */
+async function observeDurableWait(wakeToken) {
+  if (typeof wakeToken !== 'string' || !wakeToken) return
+  const startedAt = probePid(process.pid)?.startedAt ?? Date.now() - Math.round(process.uptime() * 1000)
+  let claimed = false
+  mutateState((current) => {
+    const wait = current.ciWait
+    const assessment = assessCiWait({ wait, probePid })
+    if (!assessment.pending || wait.wakeToken !== wakeToken) return current
+    if (assessment.observerAlive && wait.observer?.pid !== process.pid) return current
+    claimed = true
+    return { ...current, ciWait: { ...wait, observer: { pid: process.pid, startedAt } } }
   })
-  .catch((e) => {
+  if (!claimed) return
+
+  let repo
+  try { repo = githubRepo() } catch { return }
+  if (!repo) return
+
+  while (true) {
+    const snapshot = readJson(STATE) ?? {}
+    const wait = snapshot.ciWait
+    if (wait?.state !== 'pending' || wait?.wakeToken !== wakeToken || wait?.observer?.pid !== process.pid) return
+
+    const runs = await fetchRuns(repo, wait.sha)
+    if (!runs) {
+      await new Promise((resolve) => setTimeout(resolve, ciWaitBackoffMs(wait)))
+      continue
+    }
+    let classification = classifyRuns(runs, wait.sha)
+    const observedAt = Date.now()
+    if (classification.state === 'pending') {
+      const observation = {
+        target: { ref: wait.ref, sha: wait.sha },
+        classification,
+        firstSeenAt: wait.firstObservationAt,
+        observedAt,
+      }
+      let renewed = null
+      mutateState((current) => {
+        if (current.ciWait?.wakeToken !== wakeToken || current.ciWait?.state !== 'pending') return current
+        const sameRun = ciWaitIdentity(observation) === current.ciWait.identity
+        renewed = renewCiWait(sameRun ? current.ciWait : null, observation, {
+          now: observedAt,
+          // A re-run changes run id but not the observer's obligation.
+          makeWakeToken: () => wakeToken,
+        }) ?? current.ciWait
+        if (!sameRun) {
+          renewed = {
+            ...renewed,
+            firstObservationAt: current.ciWait.firstObservationAt,
+            deadline: current.ciWait.deadline,
+          }
+        }
+        renewed = { ...renewed, observer: { pid: process.pid, startedAt } }
+        return { ...current, ciWait: renewed }
+      })
+      if (!renewed) return
+      emitActivity({
+        event: ACTIVITY_EVENTS.CI_WAIT_OBSERVATION,
+        at: observedAt,
+        pid: process.pid,
+        pidStartedAt: startedAt,
+        cause: 'github-actions-pending-observer',
+        evidence: {
+          id: `ci:${renewed.ref}:${renewed.sha}`,
+          ref: renewed.ref,
+          sha: renewed.sha,
+          workflow: renewed.workflow,
+          runId: renewed.runId,
+          firstObservationAt: renewed.firstObservationAt,
+          lastObservationAt: renewed.lastObservationAt,
+          deadline: renewed.deadline,
+          wakeToken,
+          leaseUntil: observedAt + ciWaitBackoffMs(renewed) + 5_000,
+          terminal: null,
+        },
+      })
+      await new Promise((resolve) => setTimeout(resolve, ciWaitBackoffMs(renewed)))
+      continue
+    }
+    if (classification.state !== 'success' && classification.state !== 'failed') {
+      await new Promise((resolve) => setTimeout(resolve, ciWaitBackoffMs(wait)))
+      continue
+    }
+
+    let standDown = false
+    let famine = snapshot.famine ?? {}
+    if (classification.state === 'failed') {
+      try {
+        const judged = await judgeRed(repo, {
+          sha: wait.sha,
+          runs,
+          classification,
+          famine,
+          now: observedAt,
+          rerunWait: wait,
+        })
+        classification = judged.classification ?? classification
+        standDown = judged.standDown === true
+        famine = { ...famine, ...(judged.stillFamished ?? {}) }
+        if (standDown && judged.rerunWait?.state === 'pending') {
+          classification = judged.rerunWait
+        }
+      } catch { /* an undecidable red remains a repository repair path */ }
+      if (classification.state === 'pending') {
+        await new Promise((resolve) => setTimeout(resolve, ciWaitBackoffMs(wait)))
+        continue
+      }
+      await notifyCiRed(ciRedAlertMessage({ target: { ref: wait.ref, sha: wait.sha }, classification, standDown }))
+    }
+
+    let finished = null
+    mutateState((current) => {
+      if (current.ciWait?.wakeToken !== wakeToken || current.ciWait?.state !== 'pending') return current
+      finished = observeCiWait(current.ciWait, classification, { now: observedAt })
+      const reason = classification.state === 'failed' && !standDown
+        ? blockReason(classification, wait.sha, wait.ref)
+        : null
+      return {
+        ...current,
+        famine,
+        shas: {
+          ...(current.shas ?? {}),
+          [wait.sha]: {
+            state: classification.state,
+            firstSeenAt: wait.firstObservationAt,
+            checkedAt: observedAt,
+            ...(reason ? { reason } : {}),
+          },
+        },
+        notifiedRefs: classification.state === 'failed'
+          ? { ...(current.notifiedRefs ?? {}), [wait.ref]: wait.sha }
+          : current.notifiedRefs,
+        notifiedAt: observedAt,
+        ciWait: finished,
+      }
+    })
+    if (!finished) return
+    emitActivity({
+      event: ACTIVITY_EVENTS.CI_WAIT_FINISH,
+      at: observedAt,
+      pid: process.pid,
+      pidStartedAt: startedAt,
+      cause: `github-actions-${classification.state}-observer`,
+      evidence: {
+        id: `ci:${finished.ref}:${finished.sha}`,
+        ref: finished.ref,
+        sha: finished.sha,
+        workflow: finished.workflow,
+        runId: finished.runId,
+        firstObservationAt: finished.firstObservationAt,
+        lastObservationAt: finished.lastObservationAt,
+        deadline: finished.deadline,
+        wakeToken,
+        leaseUntil: null,
+        terminal: finished.terminal,
+      },
+    })
+    await wakeSuccessorUntilRecovered(finished)
+    return
+  }
+}
+
+async function main() {
+  let sessionId = ''
+  try {
+    sessionId = JSON.parse(readFileSync(0, 'utf8')).session_id || ''
+  } catch {
+    /* no/non-JSON stdin (manual run) — CI state is global truth, not session-local */
+  }
+  const gathered = await gatherCiStatusInputs({ sessionId })
+  const decision = gathered.applicable ? gathered.inputs?.decision : null
+  if (decision) process.stdout.write(JSON.stringify({ decision: 'block', reason: decision }))
+}
+
+if (isMainModule(import.meta.url) && process.argv[2] === '--observe') {
+  observeDurableWait(process.argv[3]).catch((e) => {
+    console.error(`ci-status observer error: ${e && e.message}`)
+  })
+} else if (isMainModule(import.meta.url)) {
+  // No process.exit after awaits (libuv teardown race on Windows) — print the
+  // decision and let the loop drain; any error allows the stop (fail-open).
+  main().catch((e) => {
     console.error(`ci-status-guard error (allowing stop): ${e && e.message}`)
   })
+}

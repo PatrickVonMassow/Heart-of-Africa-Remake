@@ -38,7 +38,7 @@
 import { execFileSync, spawnSync } from 'node:child_process'
 import { existsSync, readFileSync, readdirSync } from 'node:fs'
 import { join, resolve } from 'node:path'
-import { REPO_ROOT } from './repo-paths.mjs'
+import { REPO_ROOT, withoutGitLocalEnvironment } from './repo-paths.mjs'
 import { tryWriteJsonAtomic } from './atomic-write.mjs'
 import {
   DROP_ACK_ENV,
@@ -60,7 +60,17 @@ import {
   withTestFileBaseline,
 } from './pre-push-gate-core.mjs'
 
-const git = (args) => execFileSync('git', args, { windowsHide: true, cwd: REPO_ROOT, encoding: 'utf8' })
+// A linked-worktree pre-push hook arrives with GIT_DIR set to the worktree's
+// absolute administrative directory. It must select THIS checkout while the
+// wrapper resolves its paths, but it must not cross the process boundary: Git
+// gives GIT_DIR precedence over every fixture's `git -C <temporary repo>`.
+const GATE_ENV = withoutGitLocalEnvironment()
+const git = (args) => execFileSync('git', args, {
+  windowsHide: true,
+  cwd: REPO_ROOT,
+  encoding: 'utf8',
+  env: GATE_ENV,
+})
 
 /**
  * Files a pushed range touches; EMPTY when the range cannot be resolved — and
@@ -95,7 +105,7 @@ function readLoadLevel({ when } = {}) {
   const started = Date.now()
   try {
     const res = spawnSync(process.execPath, [resolve(REPO_ROOT, 'scripts/verify/machine-load.mjs'), '--json'], {
-      cwd: REPO_ROOT, encoding: 'utf8', timeout: 30000, maxBuffer: 8 * 1024 * 1024, windowsHide: true,
+      cwd: REPO_ROOT, env: GATE_ENV, encoding: 'utf8', timeout: 30000, maxBuffer: 8 * 1024 * 1024, windowsHide: true,
     })
     const parsed = JSON.parse(res.stdout ?? '')
     const seconds = ((Date.now() - started) / 1000).toFixed(1)
@@ -268,6 +278,7 @@ try {
       const run = spawnSync(cmd, args, {
         windowsHide: true,
         cwd: REPO_ROOT,
+        env: GATE_ENV,
         stdio: capture ? ['inherit', 'pipe', 'pipe'] : 'inherit',
         ...(capture ? { encoding: 'utf8', maxBuffer: 64 * 1024 * 1024 } : {}),
         shell: process.platform === 'win32',

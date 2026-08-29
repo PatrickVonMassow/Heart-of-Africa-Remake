@@ -3,10 +3,9 @@
 // The number chip has existed in the Warteschlange since the board did, and the
 // user reads that section on a phone every day — so its phone rendering is
 // proven by use. What is NEW is a chip inside a `<details class="now">` summary,
-// and the risk that carries is a layout one: a card whose chip is squeezed out,
-// wrapped onto its own line, or hidden by a rule written for the current-work
-// section would put the number back out of the reader's sight, which is exactly
-// the defect this point ends.
+// and the risk that carries is a layout one: a card whose chip is squeezed out
+// or hidden by a rule written for the current-work section would put the number
+// back out of the reader's sight, which is exactly the defect this point ends.
 //
 // WHY NOT A BROWSER. The board's stylesheet lives in `.batch-dashboard.html`,
 // which is git-ignored — the board is one living file, never checked out — so a
@@ -22,12 +21,14 @@ import { resolve } from 'node:path'
 import { JSDOM } from 'jsdom'
 import { describe, expect, it } from 'vitest'
 import { REPO_ROOT } from './repo-paths.mjs'
-import { toClosingWork, toNoCurrentWork, toNow } from './board-core.mjs'
+import { renderCardCriticalities, toClosingWork, toNoCurrentWork, toNow } from './board-core.mjs'
 import { REQUIRED_SECTIONS } from './board-structure-core.mjs'
 
 const PHONE_WIDTH = 390 // an iPhone-class viewport, well under the 460 px break
 /** The living board. Git-ignored, so the stylesheet half is SKIPPED where it is absent. */
 const BOARD_FILE = resolve(REPO_ROOT, '.batch-dashboard.html')
+const TASKS = '- [ ] 655. Card metadata\n  Criticality: high — visible.'
+const render = (html) => renderCardCriticalities(html, TASKS)
 
 const sect = (title, body) => `<details class="sect"><summary><h2>${title}</h2></summary>\n${body}\n</details>`
 const queueCard = (n, title) =>
@@ -56,19 +57,21 @@ function summaryShape(html, selector) {
 
 describe('the numbered chip renders on a now-card as it does in the queue', () => {
   it('gives the now-card the SAME summary structure as the queue card', () => {
-    const promoted = toNow(board(), 655, 'Läuft.', { stamp: '09:00' })
+    const promoted = render(toNow(board(), 655, 'Läuft.', { stamp: '09:00' }))
     const nowShape = summaryShape(promoted, 'details.now')
-    expect(nowShape[0]).toBe('span.num')
+    expect(nowShape[0]).toBe('span.card-header-left')
     expect(nowShape[1]).toBe('span.t')
+    expect(nowShape[2]).toBe('span.right')
     // Element for element the shape the phone already renders every day.
-    expect(nowShape).toEqual(summaryShape(board(), 'details.sect:nth-of-type(3) details'))
+    expect(nowShape).toEqual(summaryShape(render(board()), 'details.sect:nth-of-type(3) details'))
   })
 
   it('shows the number and the subject as separate, non-empty nodes', () => {
-    const promoted = toNow(board(), 655, 'Läuft.', { stamp: '09:00' })
+    const promoted = render(toNow(board(), 655, 'Läuft.', { stamp: '09:00' }))
     const dom = new JSDOM(`<!doctype html><html><body>${promoted}</body></html>`)
     const summary = dom.window.document.querySelector('details.now > summary')
-    expect(summary.querySelector('span.num').textContent.trim()).toBe('655')
+    expect(summary.querySelector('.card-header-left > span.num').textContent.trim()).toBe('655')
+    expect(summary.querySelector('.card-header-left > span.criticality').textContent.trim()).toBe('hoch')
     expect(summary.querySelector('span.t').textContent.trim()).toBe('Jede Karte nennt ihren Punkt')
     // The chip is not repeated inside the title — the reader must not read the
     // number twice on one line.
@@ -76,13 +79,13 @@ describe('the numbered chip renders on a now-card as it does in the queue', () =
   })
 
   it('carries the chip on the closing card too, and none on the handover card', () => {
-    const closing = toClosingWork(board(), 655, { reason: 'Vier-Augen fehlt.', stamp: '23:40' })
+    const closing = render(toClosingWork(board(), 655, { reason: 'Vier-Augen fehlt.', stamp: '23:40' }))
     const dom = new JSDOM(`<!doctype html><html><body>${closing}</body></html>`)
     const summary = dom.window.document.querySelector('details.now > summary')
     expect(summary.querySelector('span.num').textContent.trim()).toBe('655')
     expect(summary.querySelector('span.t').textContent).toContain('Abschlussarbeiten')
 
-    const handover = toNoCurrentWork(board(), 'Der Nachfolger nimmt Punkt 656.', { stamp: '23:55' })
+    const handover = render(toNoCurrentWork(board(), 'Der Nachfolger nimmt Punkt 656.', { stamp: '23:55' }))
     const idle = new JSDOM(`<!doctype html><html><body>${handover}</body></html>`)
     const head = idle.window.document.querySelector('details.now > summary')
     expect(head.querySelector('span.num')).toBeNull()
@@ -102,24 +105,43 @@ describe('the numbered chip renders on a now-card as it does in the queue', () =
         /display\s*:\s*none|visibility\s*:\s*hidden|font-size\s*:\s*0(?![.\d])/,
       )
     }
-    // …and the summary is the flex row that puts chip and title side by side,
-    // with the chip refusing to shrink.
+    // …and the base summary remains the flex row that puts the groups in order.
+    // The derived stylesheet opts card summaries into wrapping and keeps number
+    // plus criticality inside one left-hand flex group.
     const summaryRule = (css.match(/\bsummary\{([^}]*)\}/) ?? [])[1] ?? ''
     expect(summaryRule).toContain('display:flex')
     expect(summaryRule).toContain('flex-wrap:nowrap')
     expect((css.match(/\.num\{([^}]*)\}/) ?? [])[1] ?? '').toContain('flex-shrink:0')
-    // The phone break must not reach the chip at all.
-    const phone = (css.match(new RegExp(`@media\\(max-width:(\\d+)px\\)\\{([^}]*\\}[^{]*)*`)) ?? [])[0] ?? ''
-    expect(Number((phone.match(/max-width:(\d+)px/) ?? [])[1] ?? 0)).toBeGreaterThan(PHONE_WIDTH)
-    expect(phone).not.toContain('.num')
-    // AND NO RULE SCOPED TO THE CURRENT-WORK SECTION MAY RELAY IT (four-eyes
-    // review, 12.08.2026): the DOM comparison above cannot see an ancestor rule
-    // like `.now summary{flex-wrap:wrap}`, which would push the chip onto its own
-    // line only inside the section this point is about.
+    const derived = (readFileSync(BOARD_FILE, 'utf8').match(/<style id="board-criticality-style">([\s\S]*?)<\/style>/) ?? [])[1] ?? ''
+    // Point 969 turned the header into three columns: the ROW no longer wraps,
+    // so the chip group can never be pushed onto a line of its own, and the
+    // group itself wraps instead — which is what puts the badge under the
+    // number when the row is too narrow for both.
+    expect(derived).toContain('details:not(.sect)>summary{flex-wrap:nowrap')
+    // Read the wrap off the CHIP GROUP'S OWN rule. A bare `toContain` was
+    // satisfied by the time column's rule and would have passed while the chip
+    // group regressed to `nowrap` (cross-vendor review 27.08.2026, finding 4).
+    const chipGroup = (derived.match(/\.card-header-left\{([^}]*)\}/) ?? [])[1] ?? ''
+    expect(chipGroup).toContain('display:inline-flex')
+    expect(chipGroup).toContain('flex-wrap:wrap')
+    // EVERY phone block, not just the first one, and the declaration matched by
+    // shape rather than by spelling — `order : 1` is as valid as `order:1`
+    // (cross-vendor review 27.08.2026, second round).
+    const phoneBlocks = [...css.matchAll(/@media\s*\(\s*max-width\s*:\s*(\d+)px\s*\)\s*\{((?:[^{}]*\{[^{}]*\})*[^{}]*)\}/g)]
+    expect(phoneBlocks.length, 'the board carries no phone block at all').toBeGreaterThan(0)
+    for (const [block, width, body] of phoneBlocks) {
+      expect(Number(width), `${width}px block`).toBeGreaterThan(PHONE_WIDTH)
+      // The phone rule must not hide the left group…
+      expect(body, `the ${width}px block reaches the chip`).not.toContain('.num')
+      // …and it may not REORDER the header either: the three columns stand
+      // number, title, time at every width (point 969).
+      expect(block, `the ${width}px block reorders the header`).not.toMatch(/(^|[;{\s])order\s*:/)
+    }
+    // No rule scoped only to current work may change the shared grouping.
     for (const [, selector, body] of css.matchAll(/([^{}]+)\{([^{}]*)\}/g)) {
       if (!/\.now\b/.test(selector) || !/summary|\.t\b/.test(selector)) continue
       expect(body, `${selector.trim()} relays the current-work summary`).not.toMatch(
-        /flex-wrap\s*:\s*wrap|display\s*:\s*(block|grid)|flex-direction\s*:\s*column/,
+        /display\s*:\s*(block|grid)|flex-direction\s*:\s*column/,
       )
     }
   })

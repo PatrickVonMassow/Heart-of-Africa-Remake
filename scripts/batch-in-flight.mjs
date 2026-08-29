@@ -7,8 +7,8 @@
 //                                    [--worktree PATH]… [--log PATH]…
 //   node scripts/batch-in-flight.mjs --status   what the Stop hook would decide
 //   node scripts/batch-in-flight.mjs --clear    the wait is over
-//   node scripts/batch-in-flight.mjs --agent-check [--worktree PATH] [--branch REF]
-//                                    [--log PATH]
+//   node scripts/batch-in-flight.mjs --agent-check [--worktree PATH]… [--branch REF]…
+//                                    [--log PATH]…
 //                                    may this delegated agent be REPLACED? Exit 0
 //                                    yes, exit 1 no. Run it IMMEDIATELY before
 //                                    the respawn (point 434 (5)).
@@ -49,9 +49,12 @@ import {
   assessTransfer,
   checkEvidence,
   combineWorktreeStamps,
+  writerGitMetadataAt,
+  worktreeStamp,
   describeInFlight,
   markTransferred,
   porcelainPaths,
+  registeredFeatureWorktrees,
   respawnDecision,
   selfReferentialEvidence,
   slotReasonDecision,
@@ -59,18 +62,82 @@ import {
   statusVerdict,
   transferBlockMessage,
   closingFreezeActive,
+  declaredAgentProbe,
+  standDownBoundaryDecision,
+  successorAgentOrientation,
   declaredAgentCount,
   openPointSpecs,
   waitEtaRefusal,
+  openBranchSlots,
+  pointOfBranch,
+  withRecordedEvidencePoint,
+  unattributableEvidenceAlerts,
+  parseCommissionRecord,
+  COMMISSION_RECORD_PATH,
   IN_FLIGHT_MAX_AGE_MS,
   POOL_CAP,
   RESPAWN_GRACE_MS,
 } from './batch-in-flight-core.mjs'
 import { readTasksOpen, TASKS_PATH } from './tasks-source.mjs'
-import { boardFilePath } from './dashboard-state.mjs'
+import { durableBlock } from './batch-adoption-core.mjs'
+import { boardFilePath, FOCUS_PATH, readJson } from './dashboard-state.mjs'
 import { berlinMinutes } from './dashboard-guard.mjs'
+import { emitActivity } from './batch-activity-journal.mjs'
+import { ACTIVITY_EVENTS } from './batch-activity-journal-core.mjs'
 
 export { IN_FLIGHT_PATH }
+
+/**
+ * The point a delegated activity event belongs to — READ, never re-derived
+ * (sixth cross-vendor round). This used to run its own regex over the ref or
+ * path, so a declaration that recorded 713 could emit its start and finish
+ * events under a different number, or under none at all when the evidence
+ * named no digits. The mapping is written down at every write path; the exit
+ * and the journal both read that one record.
+ */
+function delegatedPoint(declaration) {
+  const evidence = declaration?.evidence ?? []
+  // THE EVENT NAMES THE STRAND IT FIRES ON (eighth cross-vendor round), AND
+  // ONLY WHEN THE STRANDS AGREE (ninth): `emitDelegated` fires on branch and
+  // worktree evidence, so a pid or log item — which carries the OWNER's focus
+  // point — must never decide the event's point just by standing first. The
+  // strands are the only items asked, and they have to answer with ONE point:
+  // an unnumbered strand beside a numbered one, or two strands naming
+  // different points, is an attribution nobody recorded, and guessing it
+  // stamps a delegate's start and finish under a number it never worked. The
+  // ordinary shape — one branch plus its own worktree — names one point and is
+  // unaffected.
+  const strands = evidence.filter((item) => item?.kind === 'branch' || item?.kind === 'worktree')
+  if (strands.length === 0) return null
+  const points = new Set(
+    strands.map((item) => (Number.isInteger(item?.point) && item.point > 0 ? item.point : null)),
+  )
+  return points.size === 1 ? [...points][0] : null
+}
+
+function emitDelegated(event, declaration, { at = Date.now(), result = null } = {}) {
+  const evidence = Array.isArray(declaration?.evidence) ? declaration.evidence : []
+  if (!evidence.some((item) => item?.kind === 'branch' || item?.kind === 'worktree')) return false
+  const lock = readOwnerLock()
+  return emitActivity({
+    event,
+    at,
+    session: declaration.sessionId ?? lock?.sessionId ?? null,
+    point: delegatedPoint(declaration),
+    pid: declaration.pid ?? lock?.pid ?? null,
+    pidStartedAt: declaration.pidStartedAt ?? lock?.pidStartedAt ?? null,
+    generation: lock?.fence ?? null,
+    cause: 'declared-agent-work',
+    evidence: {
+      id: `delegated:${declaration.sessionId ?? 'unknown'}:${declaration.at ?? 'unknown'}`,
+      waitingOn: declaration.waitingOn ?? null,
+      items: evidence,
+      startedAt: declaration.at ?? null,
+      leaseUntil: (declaration.at ?? at) + maxAgeMs(),
+      result,
+    },
+  })
+}
 
 /** The calibratable maximum age, HOA_IN_FLIGHT_MAX_MIN in minutes. Reading it
  *  here (not in the core) keeps the decision function pure and testable. */
@@ -101,6 +168,38 @@ export function clearDeclaration(path = IN_FLIGHT_PATH) {
   }
 }
 
+/**
+ * Stamp one newly-declared evidence item with the point the board projects.
+ *
+ * A DECLARED point wins over the branch name, and a contradiction between them
+ * is REFUSED (sixth cross-vendor round): `--point 713 --branch feat/999-work`
+ * silently recorded 999, while the CLI's own message told the caller to put
+ * `--point` before the item. A branch name is a GUESS about which point the
+ * work belongs to; `--point` is a STATEMENT of it, and where the two disagree
+ * only the declaring human knows which was meant.
+ *
+ * The OWNER FOCUS is not such a statement, so it keeps yielding to the name:
+ * that is how one session declares several strands at once — the focus names
+ * the session's own point, and each delegated branch or worktree names its own.
+ * `declared` is what tells the two sources apart.
+ */
+export function tagEvidencePoint(
+  item,
+  { currentPoint = null, declared = false, worktreeRef = null, phase = 'authoring' } = {},
+) {
+  const raw = Number(currentPoint)
+  const stated = Number.isInteger(raw) && raw > 0 ? raw : null
+  const named = item?.ref ?? worktreeRef ?? null
+  const derived = pointOfBranch(named)
+  if (declared && stated != null && derived != null && derived !== stated) {
+    throw new Error(
+      `the declared point ${stated} and "${named}" — which names point ${derived} — disagree. ` +
+        'Declare one point for this item: drop the --point, or name evidence that belongs to it.',
+    )
+  }
+  return { ...item, point: declared ? stated ?? derived : derived ?? stated, phase }
+}
+
 // --- The probes ----------------------------------------------------------------
 
 /**
@@ -129,6 +228,122 @@ export function refTipAt(ref, { cwd = REPO_ROOT } = {}) {
   }
 }
 
+/**
+ * WHICH `feat/*` BRANCHES STAND OPEN (point 712)? `{ readable, branches }`, each
+ * branch `{ ref, tipAt, behind }`.
+ *
+ * "Open" is "not contained in `main`" — a merged branch is debris that
+ * `branch-hygiene-guard` sweeps, not a slot somebody is holding. Local and
+ * remote spellings are both asked for and folded into one by the pure core, so a
+ * branch pushed but not checked out here still counts.
+ *
+ * The behind-count costs one `rev-list` per branch and is only asked for where
+ * the refusal will print it; the Stop-hook path needs the COUNT alone. Any git
+ * failure answers `readable: false` — a branch list nobody could read is not
+ * evidence of anything, and the decision fails open on it.
+ */
+export function openFeatBranches({ cwd = REPO_ROOT, base = 'main', behind = false, behindProbe = commitsBehind } = {}) {
+  let out = ''
+  try {
+    out = execFileSync(
+      'git',
+      [
+        'for-each-ref',
+        '--no-merged',
+        base,
+        '--format=%(refname:short)\t%(committerdate:unix)\t%(objectname)',
+        'refs/heads/feat',
+        'refs/remotes/origin/feat',
+      ],
+      { windowsHide: true, cwd, encoding: 'utf8', timeout: 15000, stdio: ['ignore', 'pipe', 'ignore'] },
+    )
+  } catch {
+    return { readable: false, branches: [] }
+  }
+  const branches = []
+  for (const line of out.split(/\r?\n/)) {
+    const [ref, stamp, tip] = line.split('\t')
+    if (!ref || !ref.trim()) continue
+    const secs = Number(stamp)
+    const behindCount = behind ? behindProbe(ref.trim(), { cwd, base }) : null
+    // A requested behind-count is part of the census contract, not optional
+    // decoration. If one rev-list fails, returning `readable: true` would permit
+    // a refusal whose required branch detail cannot be printed.
+    if (behind && !Number.isFinite(behindCount)) return { readable: false, branches: [] }
+    branches.push({
+      ref: ref.trim(),
+      tipAt: Number.isFinite(secs) && secs > 0 ? secs * 1000 : null,
+      // The TIP is what a park is measured against — the committer date is only
+      // the fallback, and it is a second coarse and forgeable by a rebase.
+      tip: String(tip ?? '').trim(),
+      behind: behindCount,
+    })
+  }
+  return { readable: true, branches }
+}
+
+/** The commit a branch points at right now, or '' where git cannot say. It is
+ *  the baseline a park is recorded with. */
+export function branchTip(ref, { cwd = REPO_ROOT } = {}) {
+  const name = String(ref ?? '').trim()
+  if (!name || /[\s~^:?*[\]\\]/.test(name)) return ''
+  try {
+    return execFileSync('git', ['rev-parse', '--verify', '--quiet', `${name}^{commit}`], {
+      windowsHide: true,
+      cwd,
+      encoding: 'utf8',
+      timeout: 8000,
+      stdio: ['ignore', 'pipe', 'ignore'],
+    }).trim()
+  } catch {
+    return ''
+  }
+}
+
+/** Where the commissioning record lives, resolved once. */
+export const COMMISSION_RECORD_FILE = resolve(REPO_ROOT, COMMISSION_RECORD_PATH)
+
+/** The recorded overrides and parks. A missing file is an EMPTY record, not a
+ *  torn one — nothing recorded yet is the ordinary state.
+ *
+ *  A file that EXISTS and cannot be read is torn, though, and saying otherwise
+ *  is how a recorded override silently stops excusing its point (Sol, review of
+ *  3078d166): the two states looked identical, so a permissions fault or a
+ *  half-written file produced a refusal instead of the fail-open the rest of the
+ *  chain takes. `torn` is what the guard fails open on. */
+export function readCommissionRecord(path = COMMISSION_RECORD_FILE) {
+  try {
+    return parseCommissionRecord(readFileSync(path, 'utf8'))
+  } catch (e) {
+    return e && e.code === 'ENOENT' ? parseCommissionRecord('') : { overrides: {}, parked: {}, torn: true }
+  }
+}
+
+/** Store it back. Atomic, like every other state file this batch keeps. */
+export function writeCommissionRecord(record, path = COMMISSION_RECORD_FILE) {
+  writeJsonAtomic(path, { overrides: record?.overrides ?? {}, parked: record?.parked ?? {} })
+}
+
+/** How many commits `base` holds that this branch does not — the cost of not
+ *  landing it. Null where git cannot say. */
+export function commitsBehind(ref, { cwd = REPO_ROOT, base = 'main' } = {}) {
+  const name = String(ref ?? '').trim()
+  if (!name || /[\s~^:?*[\]\\]/.test(name)) return null
+  try {
+    const out = execFileSync('git', ['rev-list', '--count', `${name}..${base}`], {
+      windowsHide: true,
+      cwd,
+      encoding: 'utf8',
+      timeout: 8000,
+      stdio: ['ignore', 'pipe', 'ignore'],
+    }).trim()
+    const n = Number(out)
+    return Number.isFinite(n) && n >= 0 ? n : null
+  } catch {
+    return null
+  }
+}
+
 const stampOf = (p) => {
   try {
     return statSync(p).mtimeMs
@@ -145,11 +360,10 @@ const stampOf = (p) => {
  * `git status --porcelain -z` names exactly the paths that are dirty or new —
  * cheaper than walking a checkout, and it already respects `.gitignore`, so
  * `node_modules/` and `dist/` never enter. Three flags carry weight:
- *   · `--no-optional-locks` keeps OUR OWN look from becoming the evidence —
- *     without it git may refresh (and rewrite) the index, which is the
- *     contamination point 434 (5b) names. The caller additionally stats the git
- *     metadata BEFORE calling this, so even a git that ignored the flag could not
- *     backdate the other half.
+ *   · `--no-optional-locks` keeps the observation read-side where Git supports
+ *     that promise. A Git that nevertheless refreshes the index still cannot
+ *     become the evidence: `worktreeActiveAt` excludes both the index and the
+ *     gitdir mtime from its writer-only metadata half.
  *   · `--untracked-files=all` is stated rather than assumed, and it is ALL rather
  *     than `normal` for a measured reason (four-eyes review, findings 5 and its
  *     re-check): a global or repo `status.showUntrackedFiles=no` would otherwise
@@ -213,12 +427,13 @@ export function worktreeFilesActiveAt(root, { limit } = {}) {
  *
  * TWO SOURCES, AND THE VERDICT SAYS WHICH ONE ANSWERED (point 434 (5b)):
  *   · GIT METADATA — a worktree's `.git` is a FILE pointing at
- *     `…/.git/worktrees/<name>`; that directory carries the index, HEAD and
- *     COMMIT_EDITMSG a working agent rewrites on every commit. This dates the last
- *     git OPERATION, which is why it alone read a mid-edit agent as `quiet`.
+ *     `…/.git/worktrees/<name>`; only HEAD and COMMIT_EDITMSG are dated. A commit
+ *     or checkout/ref move writes them; an observer's `git status` may rewrite
+ *     `index` and the gitdir mtime, so neither reader-writable path is eligible.
  *   · WORKING FILES — the newest dirty/new path (see `worktreeFilesActiveAt`).
- * The metadata is stat'd FIRST, before anything shells out, so this probe cannot
- * date its own call.
+ * These are shared by the in-flight declaration's `worktree` evidence, the
+ * delegated-agent/registered-writer verdict, and every progress or cleanup reader
+ * of this probe; none can turn its own observation into an `alive` stamp.
  */
 export function worktreeActiveAt(path) {
   const root = String(path ?? '').trim()
@@ -236,10 +451,10 @@ export function worktreeActiveAt(path) {
     return null // no checkout there any more
   }
   if (!gitdir) return null
-  const stamps = [gitdir, join(gitdir, 'index'), join(gitdir, 'HEAD'), join(gitdir, 'COMMIT_EDITMSG')]
-    .map(stampOf)
-    .filter((v) => typeof v === 'number')
-  const gitAt = stamps.length ? Math.max(...stamps) : null
+  const gitAt = writerGitMetadataAt({
+    headAt: stampOf(join(gitdir, 'HEAD')),
+    commitEditAt: stampOf(join(gitdir, 'COMMIT_EDITMSG')),
+  })
   return combineWorktreeStamps({ gitAt, filesAt: worktreeFilesActiveAt(root) })
 }
 
@@ -417,15 +632,39 @@ export function runningBranchFiles(evidence = [], { cwd = REPO_ROOT } = {}) {
  * pure (`slotReasonDecision`); this gathers the four facts. Anything unreadable ends
  * as "no demand" — the lower bound on the pool is worth a nudge, never a wedge.
  */
-export function gatherSlots(declaration, { cwd = REPO_ROOT, tasksPath = TASKS_PATH } = {}) {
+export function gatherSlots(
+  declaration,
+  { cwd = REPO_ROOT, tasksPath = TASKS_PATH, recordProbe = readCommissionRecord } = {},
+) {
   try {
+    const record = recordProbe()
+    // The parks are occupancy input. A torn record is not an empty set of
+    // parks; carry the unreadable state into the same pure decision that carries
+    // an unreadable branch census, so the status report and refusal path agree.
+    if (record?.torn === true) return slotReasonDecision({ recordReadable: false })
     const evidence = Array.isArray(declaration?.evidence) ? declaration.evidence : []
     const running = runningBranchFiles(evidence, { cwd })
     // No readable running-file set means the overlap question cannot be answered, and
     // an unanswerable question is not a reason to demand anything.
     if (running.length === 0) return { needsReason: false, slotsFree: 0, agents: 0, candidates: [], why: 'overlap-unknown' }
+    // What OCCUPIES a slot is the open branch (point 712). The demand and the
+    // commissioning refusal must read the same occupancy, or they trap the
+    // session between them: nine branches open and one agent running would
+    // otherwise demand a fourth point that the refusal denies.
+    //
+    // AND THE UNREADABLE CASE IS CARRIED, not dropped. Throwing `readable` away
+    // fed an EMPTY branch list into the decision, so a git that could not be
+    // questioned looked exactly like a repository with no open branch and could
+    // demand work for slots nobody had counted (Sol, review of 91d88f9a).
+    const branchProbe = openFeatBranches({ cwd })
     return slotReasonDecision({
       agents: declaredAgentCount(evidence),
+      openBranches: openBranchSlots({
+        branches: branchProbe.branches,
+        parked: record.parked,
+      }).count,
+      branchesReadable: branchProbe.readable,
+      recordReadable: record?.torn !== true,
       openPoints: openPointSpecs(readTasksOpen(tasksPath)),
       runningFiles: running,
       reason: declaration?.slotsFree ?? '',
@@ -438,7 +677,10 @@ export function gatherSlots(declaration, { cwd = REPO_ROOT, tasksPath = TASKS_PA
   }
 }
 
-export function gatherInFlight(sid, { now = Date.now(), lockPath = LOCK_PATH, env = process.env } = {}) {
+export function gatherInFlight(
+  sid,
+  { now = Date.now(), lockPath = LOCK_PATH, env = process.env, includeSlots = true } = {},
+) {
   const path = statePathsFor(lockPath).inFlightPath
   const declaration = readDeclaration(path)
   if (!declaration) {
@@ -457,8 +699,10 @@ export function gatherInFlight(sid, { now = Date.now(), lockPath = LOCK_PATH, en
   })
   // Only worth asking for a wait that would otherwise be allowed: a declaration that
   // is not live blocks anyway, and paying two git calls to explain a block nobody is
-  // getting would be waste on the Stop hook's path.
-  const slots = assessment.live ? gatherSlots(declaration) : null
+  // getting would be waste on the Stop hook's path. Callers that only need declaration
+  // liveness can omit the slot census too; that census walks the work order and branch
+  // diffs, none of which changes whether the declaration itself is live.
+  const slots = assessment.live && includeSlots ? gatherSlots(declaration) : null
   return { declaration, ...assessment, slots }
 }
 
@@ -472,15 +716,157 @@ export function gatherInFlight(sid, { now = Date.now(), lockPath = LOCK_PATH, en
  * being run AGAIN in the seconds before the spawn: on 30.07.2026 the branch tip
  * moved one minute before the replacement was started.
  */
-export function checkAgentOutput({ worktree = null, branch = null, log = null, now = Date.now(), graceMs } = {}) {
+export function checkAgentOutput(
+  {
+    worktree = null,
+    branch = null,
+    log = null,
+    pids = [],
+    now = Date.now(),
+    graceMs,
+    worktreeProbe = worktreeActiveAt,
+    branchProbe = refTipAt,
+    logProbe = mtimeOf,
+    pidProbe = probePid,
+  } = {},
+) {
+  const many = (value) => (Array.isArray(value) ? value : value ? [value] : [])
+  const newestNumber = (values) => {
+    const nums = values.filter((value) => typeof value === 'number' && Number.isFinite(value))
+    return nums.length ? Math.max(...nums) : null
+  }
+  const worktreeStamps = many(worktree).map((path) => worktreeStamp(worktreeProbe(path))).filter(Boolean)
+  const newestWorktree = worktreeStamps.reduce((newest, stamp) => (!newest || stamp.at > newest.at ? stamp : newest), null)
+  const processEvidence = many(pids).map((item) => checkEvidence(item, { now, probePid: pidProbe }))
   const output = agentOutputVerdict({
-    worktreeAt: worktree ? worktreeActiveAt(worktree) : null,
-    branchTipAt: branch ? refTipAt(branch) : null,
-    logAt: log ? mtimeOf(log) : null,
+    worktreeAt: newestWorktree,
+    branchTipAt: newestNumber(many(branch).map((ref) => branchProbe(ref))),
+    logAt: newestNumber(many(log).map((path) => logProbe(path))),
+    processEvidence,
     now,
     ...(Number.isFinite(graceMs) && graceMs > 0 ? { graceMs } : {}),
   })
   return { output, ...respawnDecision({ output }) }
+}
+
+/** Measure every OPEN feat/* checkout Git currently registers through the same
+ * branch/worktree grace decision as `--agent-check`. The owner's declared agent
+ * is marked recognised on every successor path: durable agents survive an owner
+ * crash as well as a clean boundary. Every other recently moving checkout is an
+ * independent writer veto. */
+export function registeredFeatureWriters({
+  cwd = REPO_ROOT,
+  now = Date.now(),
+  declaration = null,
+  exec = execFileSync,
+  check = checkAgentOutput,
+  openProbe = openFeatBranches,
+} = {}) {
+  let trees
+  try {
+    const porcelain = exec('git', ['worktree', 'list', '--porcelain'], {
+      windowsHide: true,
+      cwd,
+      encoding: 'utf8',
+      timeout: 15000,
+      stdio: ['ignore', 'pipe', 'ignore'],
+    })
+    trees = registeredFeatureWorktrees(porcelain)
+  } catch {
+    return { readable: false, writers: [], reason: 'git-worktree-register-unreadable' }
+  }
+  const open = openProbe({ cwd })
+  if (!open.readable) return { readable: false, writers: [], reason: 'open-feature-branches-unreadable' }
+  const openRefs = new Set(open.branches.map((item) => item.ref).filter((ref) => ref.startsWith('feat/')))
+  const declared = declaredAgentProbe(declaration)
+  const declaredBranches = new Set(declared.branches.map((ref) => String(ref).replace(/^refs\/heads\//, '')))
+  const declaredPaths = new Set(declared.worktrees.map((path) => resolve(String(path))))
+  const writers = trees
+    .filter((tree) => openRefs.has(tree.branch))
+    .map((tree) => {
+      const measured = check({ worktree: tree.path, branch: tree.branch, now })
+      return {
+        branch: tree.branch,
+        worktree: tree.path,
+        recognized: declaredBranches.has(tree.branch) || declaredPaths.has(resolve(tree.path)),
+        output: measured.output ?? null,
+        reason: measured.reason ?? null,
+        detail: measured.detail ?? null,
+      }
+    })
+  if (writers.some((writer) => writer.output?.verdict === 'unmeasurable')) {
+    return { readable: false, writers, reason: 'registered-feature-output-unmeasurable' }
+  }
+  return { readable: true, writers, reason: 'measured' }
+}
+
+const commandValue = (value) => JSON.stringify(String(value))
+
+/** The exact combined `--agent-check` command for one declaration. */
+export function declaredAgentCheckCommand(declaration) {
+  const probe = declaredAgentProbe(declaration)
+  const args = [
+    ...probe.worktrees.flatMap((value) => ['--worktree', commandValue(value)]),
+    ...probe.branches.flatMap((value) => ['--branch', commandValue(value)]),
+    ...probe.logs.flatMap((value) => ['--log', commandValue(value)]),
+  ]
+  return args.length ? `node scripts/batch-in-flight.mjs --agent-check ${args.join(' ')}` : ''
+}
+
+/**
+ * The declaration is the source of truth for `--agent-check`. Explicit output
+ * addresses remain useful for one-off checks, but they augment the recorded
+ * addresses instead of replacing them. A recorded pid comes along only when
+ * every explicit address is already in that declaration: one combined verdict
+ * cannot truthfully apply agent A's pid refutation to foreign agent B output.
+ * We drop pids for that mixed probe instead of splitting the printed verdict,
+ * because its purpose is to answer all named output with one replacement
+ * decision; separate verdicts could again call one quiet address dead while
+ * another address in the same requested probe is moving.
+ */
+export function agentCheckDeclaration(declaration, { worktrees = [], branches = [], logs = [] } = {}) {
+  const base = declaration && typeof declaration === 'object' ? declaration : {}
+  const recordedEvidence = Array.isArray(base.evidence) ? base.evidence : []
+  const key = (item) => {
+    if (item?.kind === 'worktree' || item?.kind === 'log') return `${item.kind}:${String(item.path ?? '').trim()}`
+    if (item?.kind === 'branch') return `branch:${String(item.ref ?? '').trim()}`
+    return null
+  }
+  const explicitEvidence = [
+    ...worktrees.map((path) => ({ kind: 'worktree', path })),
+    ...branches.map((ref) => ({ kind: 'branch', ref })),
+    ...logs.map((path) => ({ kind: 'log', path })),
+  ]
+  const recordedAddresses = new Set(recordedEvidence.map(key).filter(Boolean))
+  const hasForeignAddress = explicitEvidence.some((item) => !recordedAddresses.has(key(item)))
+  const evidence = recordedEvidence.filter((item) => !hasForeignAddress || item?.kind !== 'pid')
+  const seen = new Set(evidence.map(key).filter(Boolean))
+  const add = (item) => {
+    const identity = key(item)
+    if (!identity || seen.has(identity)) return
+    seen.add(identity)
+    evidence.push(item)
+  }
+  for (const item of explicitEvidence) add(item)
+  return { ...base, evidence }
+}
+
+/** Ask every declared child output through the same verdict as `--agent-check`. */
+export function checkDeclaredAgentOutput(declaration, opts = {}) {
+  const probe = declaredAgentProbe(declaration)
+  const command = declaredAgentCheckCommand(declaration)
+  if (!probe.agent) return { checked: false, command, output: null, respawn: false, reason: 'no-declared-agent', detail: '' }
+  return {
+    checked: true,
+    command,
+    ...checkAgentOutput({
+      worktree: probe.worktrees,
+      branch: probe.branches,
+      log: probe.logs,
+      pids: probe.pids,
+      ...opts,
+    }),
+  }
 }
 
 // --- The transferable adoption record (point 675, defeat 2) ---------------------
@@ -819,12 +1205,95 @@ export function gatherHandoverTransfer(sid, { cwd = REPO_ROOT, lockPath = LOCK_P
     note: `the declared in-flight work is transferable (${summary})`,
     commit: () => {
       writeDeclaration(
-        markTransferred({ declaration, bySid: sid, now, checkpoints: assessment.checkpoints, runs: assessment.runs }),
+        markTransferred({
+          declaration,
+          bySid: sid,
+          now,
+          checkpoints: assessment.checkpoints,
+          runs: assessment.runs,
+          // The transfer is a write, so it migrates (sixth cross-review): a
+          // legacy item leaves with its resolved point RECORDED.
+          worktreeRef: (p) => worktreeBranch(p, { cwd }),
+        }),
         path,
       )
       return summary
     },
   }
+}
+
+/**
+ * TURN A NON-OWNER STOP INTO THE OLD OWNER'S BOUNDARY (point 716).
+ *
+ * The pure decision distinguishes a plain stand-down from a live/unknown child.
+ * This wrapper asks the existing agent-output verdict and the existing transfer
+ * gatherer, then commits only the declaration that still names `sid`. A failed
+ * or uncheckpointed transfer is returned as a block: ending the parent there is
+ * the work-loss path this boundary closes.
+ */
+export function gatherStandDownBoundary(
+  sid,
+  { cwd = REPO_ROOT, lockPath = LOCK_PATH, now = Date.now(), agentProbes = {} } = {},
+) {
+  const path = statePathsFor(lockPath).inFlightPath
+  const declaration = readDeclaration(path)
+  if (!declaration && existsSync(path)) {
+    return {
+      action: 'block',
+      reason: 'declaration-unreadable',
+      declaration: null,
+      agentCheck: { reason: 'output-unmeasurable', detail: 'the in-flight declaration could not be read' },
+      command: 'node scripts/batch-in-flight.mjs --status',
+      message: 'the in-flight declaration exists but could not be read',
+    }
+  }
+  const agentCheck = checkDeclaredAgentOutput(declaration, { now, ...agentProbes })
+  const transfer = gatherHandoverTransfer(sid, { cwd, lockPath, now })
+  const decision = standDownBoundaryDecision({
+    sid,
+    declaration,
+    agentCheck,
+    transfer: { available: typeof transfer.commit === 'function', blocked: transfer.blocked === true },
+  })
+  if (decision.action !== 'transfer') {
+    return { ...decision, declaration, agentCheck, command: agentCheck.command, message: transfer.message ?? '' }
+  }
+  try {
+    const summary = transfer.commit()
+    return {
+      action: 'transferred',
+      reason: decision.reason,
+      declaration: readDeclaration(path),
+      agentCheck,
+      command: agentCheck.command,
+      summary,
+      message: '',
+    }
+  } catch (error) {
+    return {
+      action: 'block',
+      reason: 'transfer-write-failed',
+      declaration,
+      agentCheck,
+      command: agentCheck.command,
+      message: String(error?.message ?? error),
+    }
+  }
+}
+
+/** Child-aware orientation for a session that now owns the batch. */
+export function gatherSuccessorAgentOrientation(sid, { lockPath = LOCK_PATH, now = Date.now(), agentProbes = {} } = {}) {
+  const path = statePathsFor(lockPath).inFlightPath
+  const declaration = readDeclaration(path)
+  if (!declaration && existsSync(path)) {
+    return (
+      'PREDECESSOR CHILD STATE UNKNOWN: the in-flight declaration exists but could not be read. The lock does not ' +
+      'answer for children, so do not call an agent dead. Inspect `node scripts/batch-in-flight.mjs --status`, then ' +
+      'probe each named worktree/branch with `node scripts/batch-in-flight.mjs --agent-check`.'
+    )
+  }
+  const agentCheck = checkDeclaredAgentOutput(declaration, { now, ...agentProbes })
+  return successorAgentOrientation({ declaration, sid, agentCheck, command: agentCheck.command })
 }
 
 /**
@@ -899,14 +1368,17 @@ export function selfAdoptionRefusal({ declaration, marker, sid, now = Date.now()
  * under the adopting session's own identity, so every existing probe
  * (`gatherInFlight`, the launcher) keeps working on it unchanged.
  */
-export function adoptTransferred(sid, { cwd = REPO_ROOT, lockPath = LOCK_PATH, now = Date.now() } = {}) {
+export function adoptTransferred(
+  sid,
+  { cwd = REPO_ROOT, lockPath = LOCK_PATH, now = Date.now(), probeSet = probes } = {},
+) {
   const path = statePathsFor(lockPath).inFlightPath
   const declaration = readDeclaration(path)
   if (!declaration || !declaration.transfer) return { adopted: false, reason: 'no-transferred-declaration', alerts: [] }
   const self = selfAdoptionRefusal({ declaration, marker: readBoundaryMarker(lockPath), sid, now })
   if (self) return { adopted: false, reason: self.reason, alerts: [self.alert] }
   const evidence = Array.isArray(declaration.evidence) ? declaration.evidence : []
-  const items = evidence.map((e) => checkEvidence(e, { now, ...probes }))
+  const items = evidence.map((e) => checkEvidence(e, { now, ...probeSet }))
   const checkpointStates = (declaration.transfer.checkpoints ?? []).map((c) => {
     const cp = c?.ref ? checkpointOf(c.ref, { cwd }) : null
     return {
@@ -919,18 +1391,43 @@ export function adoptTransferred(sid, { cwd = REPO_ROOT, lockPath = LOCK_PATH, n
   const assessment = adoptionAssessment({ items, checkpointStates })
   if (!assessment.adopt) return { adopted: false, reason: 'refused', alerts: assessment.alerts }
   const lock = readOwnerLock(lockPath)
-  writeDeclaration(
-    {
-      ...declaration,
-      sessionId: sid,
-      pid: typeof lock?.pid === 'number' ? lock.pid : null,
-      pidStartedAt: typeof lock?.pidStartedAt === 'number' ? lock.pidStartedAt : null,
-      at: now,
-      evidence: evidence.filter((_, i) => items[i]?.ok === true),
-      adopted: { from: declaration.transfer.by || declaration.sessionId || null, at: now },
-    },
-    path,
-  )
+  // Adoption is a WRITE, so it migrates: a legacy item that still resolves
+  // gets its point RECORDED here, and the legacy form does not survive the
+  // handover (fifth cross-vendor round — the assignment is written down,
+  // never re-guessed at the exit).
+  const worktreeRef = (p) => worktreeBranch(p, { cwd })
+  const keptEvidence = evidence
+    .filter((_, i) => items[i]?.ok === true)
+    .map((e) => withRecordedEvidencePoint(e, { worktreeRef }))
+  // A kept item that stays unattributable after the migration REFUSES the
+  // adoption BEFORE anything is written (seventh cross-review): the sixth
+  // round only said it out loud beside `adopted: true`, so the CLI printed
+  // ADOPTED and exited 0 while the read side discarded the whole record one
+  // look later. Nothing is stripped here either — the item may be the only
+  // trace of running work, so a human attributes or clears it, exactly as
+  // the alert says.
+  const unattributable = unattributableEvidenceAlerts(keptEvidence, {
+    worktreeRef,
+    declarationPhase: declaration.phase,
+  })
+  if (unattributable.length > 0) {
+    return {
+      adopted: false,
+      reason: 'unattributable-evidence',
+      alerts: [...assessment.alerts, ...unattributable],
+    }
+  }
+  const adopted = {
+    ...declaration,
+    sessionId: sid,
+    pid: typeof lock?.pid === 'number' ? lock.pid : null,
+    pidStartedAt: typeof lock?.pidStartedAt === 'number' ? lock.pidStartedAt : null,
+    at: now,
+    evidence: keptEvidence,
+    adopted: { from: declaration.transfer.by || declaration.sessionId || null, at: now },
+  }
+  writeDeclaration(adopted, path)
+  emitDelegated(ACTIVITY_EVENTS.DELEGATED_START, adopted, { at: now })
   return {
     adopted: true,
     reason: 'adopted',
@@ -995,9 +1492,10 @@ if (isMain) {
     process.exit(1)
   }
   const usage =
-    'usage: node scripts/batch-in-flight.mjs --waiting-on "<what>" [--pid N] [--branch REF] ' +
-    '[--worktree PATH] [--log PATH] [--slots-free "<why the free pool slots stay free>"] | --status | --clear | ' +
-    '--agent-check [--worktree PATH] [--branch REF] [--log PATH] | --handover-check | --adopt'
+    'usage: node scripts/batch-in-flight.mjs --waiting-on "<what>" [--point N] [--pid N] [--branch REF] ' +
+    '[--worktree PATH] [--log PATH] [--slots-free "<why the free pool slots stay free>"] ' +
+    '[--durable-batch ID --durable-point ID --durable-attempt ID [--transferable]] | --status | --clear | ' +
+    '--agent-check [--worktree PATH]… [--branch REF]… [--log PATH]… | --handover-check | --adopt'
 
   if (argv[0] === '--handover-check') {
     // May the boundary hand the declared work to a successor (point 675)?
@@ -1026,6 +1524,15 @@ if (isMain) {
       if (a.reason === 'own-commit' || a.reason === 'own-transfer' || a.reason === 'sealed-commit') {
         fail('ADOPTION REFUSED — this record is not this session\'s to adopt; see the alert above for the way forward.')
       }
+      if (a.reason === 'unattributable-evidence') {
+        fail(
+          'ADOPTION REFUSED — the transferred declaration carries live evidence that resolves to NO point ' +
+            '(named above), and adopting it would only move the refusal to the next read. LOOK at each named ' +
+            'item yourself; then clear the record (`node scripts/batch-in-flight.mjs --clear`, withdrawing the ' +
+            'boundary first if it refuses) and RE-DECLARE what is really running with its point ' +
+            '(`--waiting-on "…" --point N …`). Nothing was adopted, nothing written.',
+        )
+      }
       fail(
         a.reason === 'no-transferred-declaration'
           ? 'no transferred declaration exists — nothing to adopt.'
@@ -1042,21 +1549,35 @@ if (isMain) {
     )
     process.exit(0)
   } else if (argv[0] === '--agent-check') {
-    const opt = (name) => {
-      const i = argv.indexOf(name)
-      return i >= 0 && i + 1 < argv.length ? argv[i + 1] : null
-    }
-    const worktree = opt('--worktree')
-    const branch = opt('--branch')
-    const log = opt('--log')
-    if (!worktree && !branch && !log) {
+    const opts = (name) =>
+      argv.flatMap((value, i) => (value === name && i + 1 < argv.length ? [argv[i + 1]] : []))
+    const worktrees = opts('--worktree')
+    const branches = opts('--branch')
+    const logs = opts('--log')
+    const declaration = agentCheckDeclaration(readDeclaration(), { worktrees, branches, logs })
+    const recorded = declaredAgentProbe(declaration)
+    if (!recorded.agent) {
       fail(
-        'nothing to check. Name what the agent PRODUCES — its worktree (--worktree PATH) and/or its branch ' +
-          `(--branch REF); --log PATH may ride along but never decides.\n${usage}`,
+        'nothing to check. Record what the agent produces in the in-flight declaration, or name its worktree ' +
+          '(--worktree PATH) and/or branch (--branch REF); --log PATH may ride along but never decides.\n' +
+          usage,
       )
     }
-    const r = checkAgentOutput({ worktree, branch, log })
-    console.log(JSON.stringify({ worktree, branch, log, graceMs: RESPAWN_GRACE_MS, ...r }, null, 2))
+    const r = checkDeclaredAgentOutput(declaration)
+    console.log(
+      JSON.stringify(
+        {
+          worktrees: recorded.worktrees,
+          branches: recorded.branches,
+          logs: recorded.logs,
+          pids: recorded.pids.map(({ pid, startedAt, label }) => ({ pid, startedAt, ...(label ? { label } : {}) })),
+          graceMs: RESPAWN_GRACE_MS,
+          ...r,
+        },
+        null,
+        2,
+      ),
+    )
     if (r.respawn) {
       console.log(
         `\nA REPLACEMENT IS PERMITTED: ${r.detail} (judged on ${r.judgedOn}). Re-run this exact command in the ` +
@@ -1074,7 +1595,8 @@ if (isMain) {
     )
     process.exit(1)
   } else if (argv[0] === '--clear') {
-    const refusal = transferredMutationRefusal({ declaration: readDeclaration(), marker: readBoundaryMarker() })
+    const prior = readDeclaration()
+    const refusal = transferredMutationRefusal({ declaration: prior, marker: readBoundaryMarker() })
     if (refusal) fail(refusal)
     clearDeclaration()
     // …and the lease extension the declaration bought (point 556). The lock must
@@ -1083,6 +1605,7 @@ if (isMain) {
     // to condition it on is just a stale field. The lease ITSELF is left where it
     // stands — pulling it back would shorten a window the owner is entitled to.
     clearDeclaredWait(sid)
+    emitDelegated(ACTIVITY_EVENTS.DELEGATED_FINISH, prior, { result: 'cleared' })
     console.log('in-flight declaration cleared — the ordinary "do not stop the batch" rule applies again.')
   } else if (argv[0] === '--status' || argv.length === 0) {
     const g = gatherInFlight(sid)
@@ -1110,46 +1633,97 @@ if (isMain) {
     if (commitRefusal) fail(commitRefusal)
     const evidence = []
     let slotsFreeReason = ''
-    for (let i = 2; i < argv.length; i += 2) {
-      const flag = argv[i]
-      const value = argv[i + 1]
-      if (value === undefined) fail(`${flag} needs a value.\n${usage}`)
-      if (flag === '--slots-free') {
-        // Point 427: not evidence, a REASON. It answers "why do the free pool slots
-        // stay free", and the guard demands it only when they demonstrably could not.
-        slotsFreeReason = String(value).trim()
-        if (!slotsFreeReason) fail(`--slots-free needs a reason for the idle pool slots.\n${usage}`)
-        continue
-      }
-      if (flag === '--pid') {
-        // The start time is recorded WITH the pid, so a later probe can tell the
-        // same process from a stranger that inherited the number.
-        const pid = Number(value)
-        const probe = Number.isInteger(pid) && pid > 0 ? probePid(pid) : { exists: false, startedAt: null }
-        if (probe.exists === true && typeof probe.startedAt !== 'number') {
-          fail(
-            `the start time of pid ${pid} could not be established, so a reused pid could later pass as this ` +
-              'process. Declare something else instead (--log <the file the run writes to> is the closest ' +
-              'equivalent). Nothing recorded.',
-          )
+    const focus = readJson(FOCUS_PATH)
+    const ownerFocusPoint = Number.isInteger(focus?.point) && focus.point > 0 ? focus.point : null
+    let currentPoint = ownerFocusPoint
+    let pointDeclared = false
+    // The durable-lane adoption record (point 834, union M17): stable batch,
+    // point and attempt identities plus an explicit transferable flag. The
+    // block is all-or-nothing; batch-adoption-core refuses half of one.
+    const durableFields = {}
+    let transferableFlag = null
+    // A refused ATTRIBUTION is a refused declaration, not a stack trace: the
+    // stamping throws when the declared point and the named branch disagree,
+    // and the caller gets the same one-line refusal every other bad option
+    // gets, with nothing written.
+    try {
+      for (let i = 2; i < argv.length; i += 2) {
+        const flag = argv[i]
+        if (flag === '--transferable') {
+          // A bare flag: it consumes no value, so step back by one.
+          transferableFlag = true
+          i -= 1
+          continue
         }
-        evidence.push({ kind: 'pid', pid, startedAt: probe.startedAt })
+        const value = argv[i + 1]
+        if (value === undefined) fail(`${flag} needs a value.\n${usage}`)
+        if (flag === '--point') {
+          const point = Number(value)
+          if (!Number.isInteger(point) || point <= 0) fail(`--point needs a positive work-order point, got "${value}".\n${usage}`)
+          currentPoint = point
+          pointDeclared = true
+          continue
+        }
+        if (flag === '--durable-batch' || flag === '--durable-point' || flag === '--durable-attempt') {
+          durableFields[flag.slice('--durable-'.length)] = String(value).trim()
+          continue
+        }
+        if (flag === '--slots-free') {
+          // Point 427: not evidence, a REASON. It answers "why do the free pool slots
+          // stay free", and the guard demands it only when they demonstrably could not.
+          slotsFreeReason = String(value).trim()
+          if (!slotsFreeReason) fail(`--slots-free needs a reason for the idle pool slots.\n${usage}`)
+          continue
+        }
+        if (flag === '--pid') {
+          // The start time is recorded WITH the pid, so a later probe can tell the
+          // same process from a stranger that inherited the number.
+          const pid = Number(value)
+          const probe = Number.isInteger(pid) && pid > 0 ? probePid(pid) : { exists: false, startedAt: null }
+          if (probe.exists === true && typeof probe.startedAt !== 'number') {
+            fail(
+              `the start time of pid ${pid} could not be established, so a reused pid could later pass as this ` +
+                'process. Declare something else instead (--log <the file the run writes to> is the closest ' +
+                'equivalent). Nothing recorded.',
+            )
+          }
+          evidence.push(tagEvidencePoint({ kind: 'pid', pid, startedAt: probe.startedAt }, { currentPoint, declared: pointDeclared, phase: 'verification' }))
+        }
+        // WHAT IS STORED IS WHAT THE LAUNCHER WILL PROBE (second four-eyes review,
+        // 28.07.2026, finding B). Both of the following used to be recorded raw:
+        //   - a REF, so `@`, `heads/main` and `main@{0}` — every one of them a
+        //     spelling of something eternally fresh — walked past the refusal below
+        //     and then answered "still moving" forever. Git resolves it, git's
+        //     answer is what gets refused, and git's answer is what gets stored.
+        //   - a PATH, which `normPath` only cleans up and never RESOLVES, so
+        //     `--worktree .` from the repo root, `<root>/.` and `<root>/../hoa` all
+        //     named the checkout itself without being recognised as it. And a
+        //     relative path is meaningless to the launcher anyway: it probes from
+        //     its own cwd, not from the one the declaration was written in.
+        else if (flag === '--branch') {
+          const ref = resolveRefName(value) ?? value
+          evidence.push(tagEvidencePoint({ kind: 'branch', ref }, { currentPoint, declared: pointDeclared }))
+        }
+        else if (flag === '--worktree') {
+          const path = absPath(value)
+          const ref = worktreeBranch(path)
+          evidence.push(tagEvidencePoint({ kind: 'worktree', path }, { currentPoint, declared: pointDeclared, worktreeRef: ref }))
+        }
+        else if (flag === '--log') {
+          evidence.push(tagEvidencePoint({ kind: 'log', path: absPath(value) }, { currentPoint, declared: pointDeclared, phase: 'verification' }))
+        }
+        else fail(`unknown option "${flag}".\n${usage}`)
       }
-      // WHAT IS STORED IS WHAT THE LAUNCHER WILL PROBE (second four-eyes review,
-      // 28.07.2026, finding B). Both of the following used to be recorded raw:
-      //   - a REF, so `@`, `heads/main` and `main@{0}` — every one of them a
-      //     spelling of something eternally fresh — walked past the refusal below
-      //     and then answered "still moving" forever. Git resolves it, git's
-      //     answer is what gets refused, and git's answer is what gets stored.
-      //   - a PATH, which `normPath` only cleans up and never RESOLVES, so
-      //     `--worktree .` from the repo root, `<root>/.` and `<root>/../hoa` all
-      //     named the checkout itself without being recognised as it. And a
-      //     relative path is meaningless to the launcher anyway: it probes from
-      //     its own cwd, not from the one the declaration was written in.
-      else if (flag === '--branch') evidence.push({ kind: 'branch', ref: resolveRefName(value) ?? value })
-      else if (flag === '--worktree') evidence.push({ kind: 'worktree', path: absPath(value) })
-      else if (flag === '--log') evidence.push({ kind: 'log', path: absPath(value) })
-      else fail(`unknown option "${flag}".\n${usage}`)
+    } catch (e) {
+      fail(`${e.message}\nNothing recorded.`)
+    }
+    const untagged = evidence.filter((item) => !Number.isInteger(item.point) || item.point <= 0)
+    if (untagged.length) {
+      fail(
+        `${untagged.length} evidence item(s) name no point, so the board could not derive which now-card they ` +
+          'require. Declare the owner focus first (`node scripts/focus.mjs set <N> "<what>"`) or put `--point <N>` ' +
+          'before the item. Nothing recorded.',
+      )
     }
     // Evidence that cannot go quiet is refused HERE (four-eyes review
     // 28.07.2026): the repo root is git-active whenever the session runs any git
@@ -1185,6 +1759,30 @@ if (isMain) {
           'batch. Nothing recorded.',
       )
     }
+    // The all-or-nothing durable block: its process identity is the declared
+    // --pid evidence, because a successor adopts by pid AND start time (M17) —
+    // naming an attempt without its process would leave exactly the guess this
+    // record exists to remove.
+    let durable = null
+    if (transferableFlag !== null || Object.keys(durableFields).length > 0) {
+      const pidEvidence = evidence.find((e) => e.kind === 'pid')
+      if (!pidEvidence) {
+        fail(
+          'a durable adoption record identifies its worker process: declare --pid <worker pid> beside ' +
+            '--durable-batch/--durable-point/--durable-attempt. Nothing recorded.',
+        )
+      }
+      const built = durableBlock({
+        batchId: durableFields.batch,
+        pointId: durableFields.point,
+        attemptId: durableFields.attempt,
+        pid: pidEvidence.pid,
+        pidStartedAt: pidEvidence.startedAt,
+        transferable: transferableFlag === true,
+      })
+      if (!built.ok) fail(`${built.reason}. Nothing recorded.`)
+      durable = built.durable
+    }
     const now = Date.now()
     const declaration = {
       v: 1,
@@ -1195,10 +1793,15 @@ if (isMain) {
       pidStartedAt: typeof lock.pidStartedAt === 'number' ? lock.pidStartedAt : null,
       at: now,
       waitingOn,
+      focusPoint: ownerFocusPoint,
       evidence,
       // Empty string when not given, so the decision sees "no reason" rather than
       // an absent field it has to interpret (point 427).
       slotsFree: slotsFreeReason,
+      // Absent for today's declarations; present only where a daemon-owned run
+      // was declared adoptable (point 834). Nothing below reads it yet — the
+      // successor tooling of step 8 does.
+      ...(durable ? { durable } : {}),
     }
     // Verify NOW, so a typo is caught here and not at a turn end that then blocks
     // with a reason nobody expected.
@@ -1230,6 +1833,7 @@ if (isMain) {
     const etaRefusal = waitEtaRefusal({ html: boardHtml, nowMinutes: berlinMinutes() })
     if (etaRefusal) fail(etaRefusal)
     writeDeclaration(declaration)
+    emitDelegated(ACTIVITY_EVENTS.DELEGATED_START, declaration, { at: now })
     // THE DECLARATION EXTENDS THE LEASE (point 556, and the piece
     // docs/batch-resilience.md §3 left explicitly unbuilt: "nothing yet WRITES a
     // longer lease when work is declared"). This is the answer to the incident of
@@ -1259,6 +1863,13 @@ if (isMain) {
         'must still be moving), so re-declare after every change and clear it with --clear when the ' +
         'wait is over. The batch lock stays HELD: no successor is spawned, this session is still the batch.',
     )
+    // A declared wait is visible to the launcher but left no trace on the board.
+    // OPTIONAL bookkeeping, imported lazily and swallowed whole: this command
+    // must still run where the board stack is absent — the CLI fixtures build a
+    // minimal repo — and a board that cannot follow must never fail the work.
+    await import('./board-heartbeat.mjs')
+      .then((m) => m.heartbeat({ trigger: m.TRIGGERS.IN_FLIGHT, detail: `Wartestellung: ${waitingOn}` }))
+      .catch(() => {})
   } else {
     fail(`unknown option "${argv[0]}".\n${usage}`)
   }

@@ -19,6 +19,11 @@
 //       append-and-defer puts every new point there by DEFAULT — 589 landed at
 //       the very back although the user wanted it worked at once. This rule is
 //       about the work order ALONE and is judged without a board.
+//   (1d) THE RELEASE BOUNDARY (point 789) — a point the MACHINE filed for itself
+//       may stand BEFORE the release point only when the point STATES high
+//       urgency and the rank record carries the one-line reason; anything else
+//       belongs behind it. The user's own points are exempt, because he ranks
+//       them himself. Judged without a board, like (1c).
 //   (2) DASHBOARD TRUTH — a queue/now card must not CLAIM its point is done
 //       ("behoben", "erledigt", …) while that point is still open ([ ]) in
 //       TASKS.md. A conservative negation/qualifier window keeps honest
@@ -29,6 +34,7 @@
 // The remedies' publish steps come from scripts/board-remedy.mjs — one copy.
 import { REPUBLISH } from './board-remedy.mjs'
 import { gatedPoints } from './user-gate-core.mjs'
+import { pointNumbersFromChip, pointOwnershipFromTitle, taskPointNumbers } from './dashboard-point-reader-core.mjs'
 import {
   FINDER_POINTS,
   QUEUE_REBUILD_CMD,
@@ -36,7 +42,16 @@ import {
   openPointsOf,
   queueOrder,
 } from './board-queue-core.mjs'
-import { RANK_CMD, SEED_CMD, appendGateState, parseRankRecord } from './queue-rank-core.mjs'
+import {
+  RANK_CMD,
+  SEED_CMD,
+  appendGateState,
+  boundaryUnarmedMessage,
+  parseRankRecord,
+  releaseBoundaryMessage,
+  releaseBoundaryState,
+} from './queue-rank-core.mjs'
+import { parsePointBlocks } from './criticality-review-guard-core.mjs'
 
 // The rank constants moved to board-queue-core with the ranking itself (point
 // 608) — this guard is now a CONSUMER of that order, and owning them here would
@@ -97,7 +112,8 @@ const stripTags = (html) => html.replace(/<[^>]*>/g, ' ')
 /**
  * Warteschlange cards in DOCUMENT ORDER: [{point, text}]. Anchored on the
  * section header (not any mention — the dashboard-guard lesson of 22.07.2026);
- * cards are `<details>` blocks with `<span class="num">N</span>`.
+ * cards are `<details>` blocks with structured `.num` chips. A compound chip
+ * contributes each owner in chip order, matching the shared dashboard reader.
  */
 export function parseQueueCards(html) {
   if (typeof html !== 'string') return []
@@ -107,8 +123,8 @@ export function parseQueueCards(html) {
   const queueHtml = html.slice(qStart, qEnd < 0 ? undefined : qEnd)
   const cards = []
   for (const chunk of queueHtml.split(/<details\b/).slice(1)) {
-    const m = chunk.match(/class="num">\s*(\d+)/)
-    if (m) cards.push({ point: Number(m[1]), text: stripTags(chunk) })
+    const chip = (chunk.match(/class="num">\s*([^<]*?)\s*</) ?? [])[1]
+    for (const point of pointNumbersFromChip(chip)) cards.push({ point, text: stripTags(chunk) })
   }
   return cards
 }
@@ -133,12 +149,12 @@ function nowSection(html) {
  * was reported against 610 — the section's FIRST point — sending the reader to an
  * innocent card with full confidence. Each card is judged on its own text.
  */
-export function parseNowCards(html) {
+export function parseNowCards(html, options = {}) {
   const section = nowSection(html)
   if (section === null) return []
   const cards = []
   for (const chunk of section.split(/<details\b/).slice(1)) {
-    cards.push({ point: nowCardPoint(chunk), text: stripTags(chunk) })
+    cards.push({ point: nowCardPoint(chunk, options), text: stripTags(chunk) })
   }
   return cards
 }
@@ -148,24 +164,28 @@ export function parseNowCards(html) {
  * a card written before that — the leading number of its title. Null for the
  * unnumbered handover card and any other non-point work.
  */
-function nowCardPoint(chunk) {
-  const m = chunk.match(/class="num">\s*(\d+)/) ?? chunk.match(/class="t">\s*(\d+)/)
-  return m ? Number(m[1]) : null
+function nowCardPoint(chunk, options) {
+  const chip = chunk.match(/class="num">\s*([^<]*?)\s*</)
+  const chipPoint = chip ? pointNumbersFromChip(chip[1])[0] : null
+  if (chipPoint != null) return chipPoint
+  const title = (chunk.match(/class="t">\s*([^<]*)/) ?? [])[1]
+  return pointOwnershipFromTitle(title, options).points[0] ?? null
 }
 
 /**
  * The now-SECTION as {point, text} — a probe for "does this board have a now
  * section at all", which is all `dashboard-integrity-guard-core` asks of it.
  *
- * Its text is the WHOLE section and its point the first number in it, so it must
- * never be used to attribute a card's words to a point: use `parseNowCards`
- * above. Both exist on purpose; collapsing them re-creates the mix-up.
+ * Its text is the WHOLE section and its point belongs to the FIRST card (or is
+ * null when that card is unnumbered), so it must never be used to attribute a
+ * card's words to a point: use `parseNowCards` above. Both exist on purpose;
+ * collapsing them re-creates the mix-up.
  */
-export function parseNowCard(html) {
+export function parseNowCard(html, options = {}) {
   const section = nowSection(html)
   if (section === null) return null
-  const m = section.match(/class="(?:num|t)">\s*(\d+)/)
-  return { point: m ? Number(m[1]) : null, text: stripTags(section) }
+  const [first] = parseNowCards(html, options)
+  return { point: first?.point ?? null, text: stripTags(section) }
 }
 
 /**
@@ -308,6 +328,52 @@ export function unrankedAppendProblem(tasksMd, rankRecordJson) {
   )
 }
 
+/**
+ * The OPEN point blocks of a work order as `{ <n>: '<body>' }` — the text each
+ * rule below judges a point by. Ticked blocks are left out: a point the order
+ * calls finished states nothing about where it should stand.
+ */
+export function openPointBodies(tasksMd) {
+  const bodies = {}
+  for (const block of parsePointBlocks(tasksMd)) if (!block.done) bodies[block.n] = block.body
+  return bodies
+}
+
+/**
+ * Rule 1d (point 789): machine-filed points standing in front of the release.
+ *
+ * The append gate above asks whether the END of the order is right; this asks
+ * whether the FRONT was earned. Both read the same record, and both judge only
+ * points the provenance baseline does not remember, so the order as it stood
+ * before the rule existed is not re-litigated at the first turn end.
+ */
+export function releaseBoundaryProblem(tasksMd, rankRecordJson) {
+  return releaseBoundaryProblemFrom(tasksMd, parseRankRecord(rankRecordJson))
+}
+
+/**
+ * The same judgment on a record somebody has ALREADY parsed.
+ *
+ * A caller holding a parsed record must not hand it back as JSON to be read
+ * again: the normalised shape spells its absent parts as `null`, and the parser
+ * reads a present-but-unreadable part as TORN — so a round trip through
+ * `JSON.stringify` turns a perfectly good record into an unreadable one and the
+ * rule falls silent. The CLI holds a parsed record and used to do exactly that.
+ */
+export function releaseBoundaryProblemFrom(tasksMd, record) {
+  const state = releaseBoundaryState(openPointsOf(tasksMd), record, {
+    releasePoint: RELEASE_TAG_POINT,
+    bodies: openPointBodies(tasksMd),
+  })
+  // An UNARMED front asks for its arming rather than falling silent — the same
+  // answer the append gate gives to a missing baseline, and for the same reason:
+  // a clean-slate exemption is how the whole question gets swallowed.
+  if (state.state === 'unarmed') {
+    return { breaches: [], reason: boundaryUnarmedMessage(state.ahead, RELEASE_TAG_POINT) }
+  }
+  return { breaches: state.breaches, reason: releaseBoundaryMessage(state.breaches, RELEASE_TAG_POINT) }
+}
+
 /** Top-level decision on the raw file contents. Total: any bad input → allow. */
 export function evaluate({ dashboardHtml, tasksMd, rankRecordJson } = {}) {
   try {
@@ -322,6 +388,11 @@ export function evaluate({ dashboardHtml, tasksMd, rankRecordJson } = {}) {
     // board rules below keep their own "nothing to judge" test instead.
     const unranked = unrankedAppendProblem(tasksMd, rankRecordJson)
     if (unranked) problems.push(unranked)
+
+    // The RELEASE BOUNDARY, judged beside it and for the same reason: it is a
+    // statement about the work order alone, and it must not depend on a board.
+    const boundary = releaseBoundaryProblem(tasksMd, rankRecordJson)
+    if (boundary.reason) problems.push(boundary.reason)
 
     const cards = parseQueueCards(dashboardHtml)
 
@@ -364,7 +435,9 @@ export function evaluate({ dashboardHtml, tasksMd, rankRecordJson } = {}) {
     // EACH now-card with its OWN text: the section carries one card per point in
     // parallel work, and judging it as one card attributed every claim in it to
     // the first point — which sent the reader to an innocent card.
-    const nowCards = parseNowCards(dashboardHtml).filter((c) => c.point != null)
+    const nowCards = parseNowCards(dashboardHtml, { knownPoints: taskPointNumbers(tasksMd) }).filter(
+      (c) => c.point != null,
+    )
     const claims = falseDoneClaims([...cards, ...nowCards], open)
     if (claims.length) {
       problems.push(

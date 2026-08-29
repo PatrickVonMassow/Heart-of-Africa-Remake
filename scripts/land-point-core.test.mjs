@@ -7,7 +7,7 @@
 // happen — rather than towards the happy chain, which is the cheap half.
 import { describe, it, expect } from 'vitest'
 import { evaluateTasksArchive } from './tasks-archive-guard-core.mjs'
-import { evaluateCommitTrailers } from './model-guard-core.mjs'
+import { evaluateCommitTrailers, POLICY_NEUTRAL } from './model-guard-core.mjs'
 import { openFingerprintOfTasks } from './board-currency-core.mjs'
 import {
   AUDIT_TRIGGER_FILES,
@@ -64,6 +64,13 @@ describe('the chain itself', () => {
     expect(MERGE_ARGS).not.toContain('--ff-only')
   })
 
+  it('installs the append-only ledger driver for the merge invocation', () => {
+    expect(MERGE_ARGS.indexOf('-c')).toBeLessThan(MERGE_ARGS.indexOf('merge'))
+    expect(MERGE_ARGS).toContain(
+      'merge.hoaMechanismLedger.driver=node scripts/mechanism-review-merge.mjs %O %A %B %P',
+    )
+  })
+
   it('gives every step a label, and every label a step', () => {
     for (const s of LANDING_STEPS) expect(stepLabel(s.id)).toBe(s.label)
     expect(stepLabel('nonesuch')).toBe('nonesuch')
@@ -96,7 +103,7 @@ describe('the tick commit message', () => {
 
   it('accepts every model the policy allows', () => {
     for (const m of ['Claude Opus 5', 'Claude Fable 5', 'Claude Opus 4.8']) {
-      expect(evaluateCommitTrailers(tickCommitMessage({ number: 1, model: m })).block).toBe(false)
+      expect(evaluateCommitTrailers(tickCommitMessage({ number: 1, model: m }), POLICY_NEUTRAL).block).toBe(false)
     }
   })
 

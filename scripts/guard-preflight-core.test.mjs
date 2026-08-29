@@ -5,8 +5,9 @@
 // drift and hand back a false "clean". These tests fail if anyone replaces a
 // wrapper's gather step with a local copy.
 import { describe, it, expect } from 'vitest'
-import { readFileSync } from 'node:fs'
-import { resolve } from 'node:path'
+import { mkdtempSync, readFileSync, rmSync, statSync, writeFileSync } from 'node:fs'
+import { tmpdir } from 'node:os'
+import { join, resolve } from 'node:path'
 import {
   ACTIONS,
   CAUSE,
@@ -16,12 +17,14 @@ import {
   isKnownAction,
   normaliseVerdict,
   runPreflight,
+  runPreflightAsync,
   selectGuards,
   summarise,
   unregisteredStopHooks,
   wiredStopHookIds,
 } from './guard-preflight-core.mjs'
 import { GUARDS, resolveSessionId, unregisteredHooks } from './guard-preflight.mjs'
+import { EXPECTED_GUARD_IDS } from './guard-preflight-expected.mjs'
 import { gatherRuleEchoInputs, gatherStampedFiles } from './rule-echo-guard.mjs'
 import { RULE_REGISTRY, checkAll, formatVerdict, unregisteredStamps } from './rule-echo-core.mjs'
 import { readOwnerLock } from './batch-singleton.mjs'
@@ -39,7 +42,9 @@ import { evaluate as queueOrderEvaluate } from './queue-order-guard-core.mjs'
 import { evaluate as dashboardEvaluate } from './dashboard-guard-core.mjs'
 import { evaluate as renderVerifyEvaluate } from './render-verify-core.mjs'
 import { findForbiddenCommits } from './model-guard-core.mjs'
-import { green } from './dashboard-guard-fixtures.mjs'
+import { boardHtml, green } from './dashboard-guard-fixtures.mjs'
+import { gatherDecisionCardCondition } from './decision-card-guard.mjs'
+import { decideBatchProgress, gatherBatchProgressInputs } from './batch-progress-guard.mjs'
 
 /** A guard whose gathering and decision are visible to the test. */
 const fakeGuard = (id, gathered, verdict, calls = []) => ({
@@ -145,6 +150,13 @@ describe('normaliseVerdict', () => {
     expect(normaliseVerdict({ whatever: 1 }).block).toBe(false)
   })
 
+  it('keeps an explanatory clean reason for read-only verdicts and overrides', () => {
+    expect(normaliseVerdict({ block: false, reason: 'allowed by recorded override' })).toEqual({
+      block: false,
+      reason: 'allowed by recorded override',
+    })
+  })
+
   it('names a missing reason instead of printing an empty block', () => {
     expect(normaliseVerdict({ block: true }).reason).toMatch(/no reason given/)
   })
@@ -177,6 +189,43 @@ describe('selectGuards', () => {
     // told afterwards costs the user a duplicate.
     expect(isKnownAction('answer')).toBe(true)
     expect(selectGuards(guards, 'answer')).toHaveLength(3)
+  })
+
+  it('gives commissioning its action-only guard and keeps it out of turn end', () => {
+    const commission = GUARDS.find((guard) => guard.id === 'commission-guard')
+    expect(selectGuards(GUARDS, 'commission')).toEqual([commission])
+    expect(selectGuards(GUARDS, 'answer')).not.toContain(commission)
+  })
+})
+
+describe('commission preflight', () => {
+  const commission = GUARDS.find((guard) => guard.id === 'commission-guard')
+
+  it('reports the queue and full-slot refusal together, including a recorded queue override', async () => {
+    const inputs = {
+      point: 707,
+      points: [707],
+      refs: [],
+      refsLoose: false,
+      open: [700, 701, 702, 707],
+      gates: null,
+      inFlight: [],
+      branches: [
+        { ref: 'feat/700-a', tipAt: 1, behind: 1 },
+        { ref: 'feat/701-b', tipAt: 1, behind: 1 },
+        { ref: 'feat/702-c', tipAt: 1, behind: 1 },
+      ],
+      readable: true,
+      record: { overrides: { 707: { reason: 'critical production repair', at: '2026-08-17T20:03:00Z' } }, parked: {} },
+      override: 'critical production repair',
+    }
+    const [result] = await runPreflightAsync([
+      { ...commission, gather: () => ({ applicable: true, inputs }) },
+    ], { sessionId: 'owner', point: 707 })
+    expect(result.status).toBe(STATUS.block)
+    expect(result.reason).toContain('A SLOT IS NOT FREE')
+    expect(result.reason).toContain('critical production repair')
+    expect(formatPreflightReport([result], { action: 'commission' })).toContain('commission-guard')
   })
 })
 
@@ -246,6 +295,93 @@ describe('formatPreflightReport', () => {
       unregistered: [],
     })
     expect(text).toContain('No registered guard would block right now.')
+  })
+
+  it('renders a future-input condition without calling it clean or merely not judged', () => {
+    const text = formatPreflightReport([
+      { id: 'timestamp-guard', status: STATUS.condition, reason: 'begin with **Dienstag, 18.08.2026, 12:00**' },
+    ])
+    expect(text).toContain('condition')
+    expect(text).toContain('Dienstag')
+    expect(text).toContain('CONDITIONS: timestamp-guard')
+    expect(text).not.toContain('NOT JUDGED here')
+    expect(text).not.toContain('No registered guard would block right now.')
+  })
+})
+
+describe('the four formerly blind guards', () => {
+  const byId = Object.fromEntries(GUARDS.map((guard) => [guard.id, guard]))
+
+  it('reports CI red as a block, reply guards as conditions, and progress from its pure decision', async () => {
+    const decisionCondition = gatherDecisionCardCondition({
+      sessionId: 'owner',
+      paused: false,
+      otherOwner: false,
+      dashboardExists: true,
+      dashboardHtml: boardHtml({ klaerungExtra: ['Kartenschrift wählen'] }),
+    })
+    const results = await runPreflightAsync([
+      {
+        ...byId['ci-status-guard'],
+        gather: async () => ({ applicable: true, inputs: { decision: 'CI fixture is RED' } }),
+      },
+      byId['timestamp-guard'],
+      {
+        ...byId['decision-card-guard'],
+        gather: () => decisionCondition,
+      },
+      {
+        ...byId['batch-progress-guard'],
+        gather: () => ({
+          applicable: true,
+          inputs: { sid: 'owner', paused: false, openCount: 1, ownership: 'mine' },
+        }),
+      },
+    ], { sessionId: 'owner' })
+
+    expect(Object.fromEntries(results.map((result) => [result.id, result.status]))).toEqual({
+      'ci-status-guard': STATUS.block,
+      'timestamp-guard': STATUS.condition,
+      'decision-card-guard': STATUS.condition,
+      'batch-progress-guard': STATUS.block,
+    })
+    expect(results.find((result) => result.id === 'ci-status-guard')?.reason).toBe('CI fixture is RED')
+    expect(results.find((result) => result.id === 'timestamp-guard')?.reason).toContain('Europe/Berlin')
+    expect(results.find((result) => result.id === 'decision-card-guard')?.reason).toContain('Kartenschrift wählen')
+    expect(results.find((result) => result.id === 'batch-progress-guard')?.reason).toContain('block-continue')
+  })
+
+  it('leaves the batch lock byte- and mtime-identical while predicting an allowed boundary stop', () => {
+    const dir = mkdtempSync(join(tmpdir(), 'batch-progress-preflight-'))
+    const lockPath = join(dir, 'batch-lock.json')
+    const lock = { sessionId: 'owner', pid: process.pid, acquiredAt: 1, leaseUntil: Date.now() + 60_000 }
+    writeFileSync(lockPath, JSON.stringify(lock))
+    const before = statSync(lockPath, { bigint: true })
+    const textBefore = readFileSync(lockPath, 'utf8')
+    try {
+      const gathered = gatherBatchProgressInputs({
+        sessionId: 'owner',
+        tasksText: '- [ ] 707. Still open.\n',
+        paused: false,
+        lockPath,
+        lock,
+        probes: {
+          gatherClaim: () => ({ honour: false, mine: false, reason: 'none' }),
+          detectParallel: () => [],
+          readUnhandledAlert: () => null,
+          gatherBoundary: () => ({ boundary: { valid: true, point: 706 }, launcher: 'armed', due: null }),
+          gatherInFlight: () => ({ live: false }),
+          gatherWatermark: () => ({ state: 'below' }),
+        },
+      })
+      expect(gathered.applicable).toBe(true)
+      expect(decideBatchProgress(gathered.inputs)).toMatchObject({ block: false, decision: 'allow-boundary' })
+      const after = statSync(lockPath, { bigint: true })
+      expect(after.mtimeNs).toBe(before.mtimeNs)
+      expect(readFileSync(lockPath, 'utf8')).toBe(textBefore)
+    } finally {
+      rmSync(dir, { recursive: true, force: true })
+    }
   })
 })
 
@@ -432,40 +568,11 @@ describe('GATHER-STEP REUSE (the drift guard)', () => {
   })
 
   it('registers every guard whose wrapper exports a gather step', () => {
-    expect(Object.keys(byId).sort()).toEqual(
-      [
-        'batch-progress-guard',
-        'branch-hygiene-guard',
-        'ci-status-guard',
-        'container-ask-guard',
-        'criticality-review-guard',
-        'dashboard-card-topic-guard',
-        'dashboard-conciseness-guard',
-        'dashboard-guard',
-        'dashboard-integrity-guard',
-        'dashboard-sync',
-        'decision-card-guard',
-        'doc-budget-guard',
-        'findings-guard',
-        'guard-health-guard',
-        'guide-brevity-guard',
-        'mechanism-review-guard',
-        'model-guard',
-        'prep-guard',
-        'push-arrival-guard',
-        'queue-order-guard',
-        'render-verify-guard',
-        'retro-currency-guard',
-        'rule-echo-guard',
-        'rule-review-guard',
-        'tasks-archive-guard',
-        'tasks-spec-guard',
-        'timestamp-guard',
-      ].sort(),
-    )
+    expect(Object.keys(byId).sort()).toEqual([...EXPECTED_GUARD_IDS].sort())
   })
 
-  // THE DRIFT ITSELF (point 437 E). The list above is a second copy of the truth;
+  // THE DRIFT ITSELF (point 437 E). The expected list is shared with the
+  // commit-time guard rather than living as an unwatched third copy here;
   // this reads the AUTHORITATIVE chain. Until 07.08.2026 fourteen wired Stop
   // hooks sat outside the registry, so the preflight said nothing about them
   // while they would block — and §7.2 tells the session to preflight and answer
@@ -494,6 +601,7 @@ describe('GATHER-STEP REUSE (the drift guard)', () => {
     expect(byId['queue-order-guard'].gather).toBe(gatherQueueOrderInputs)
     expect(byId['doc-budget-guard'].gather).toBe(gatherDocBudgetInputs)
     expect(byId['render-verify-guard'].gather).toBe(gatherRenderVerifyInputs)
+    expect(byId['batch-progress-guard'].gather).toBe(gatherBatchProgressInputs)
     // model-guard is wrapped only to pass arm:false (no baseline write from a
     // read-only run); the wrapper's function must still be the one called.
     expect(byId['model-guard'].gather.toString()).toContain('gatherModelGuardInputs')
@@ -543,7 +651,15 @@ describe('GATHER-STEP REUSE (the drift guard)', () => {
   // three-commit guard branch), so the default 5 s budget makes these tests fail
   // for the state of the checkout rather than for a defect. The generous timeout
   // is the fail-soft; what they assert is unchanged.
-  const REAL_REPO_TIMEOUT_MS = 30_000
+  //
+  // RAISED AGAIN 26.08.2026, and the reason is worth keeping: the cost grows with
+  // the UNREVIEWED BACKLOG, not with this file. With ~40 contributions awaiting a
+  // cross-vendor review the sibling test measured 28.1 s against the 30 s budget,
+  // so every machine carrying any other load turned this into a red unit gate —
+  // which blocks the push, which stops the batch, for no defect at all. The
+  // budget must therefore stand clear of the backlog's growth, not just above
+  // today's reading.
+  const REAL_REPO_TIMEOUT_MS = 180_000
 
   /**
    * THE ID THESE TWO RUN UNDER (point 434 (8), four-eyes re-check, SHOULD-FIX 2).
@@ -561,11 +677,12 @@ describe('GATHER-STEP REUSE (the drift guard)', () => {
 
   it(
     'holds each gather step to the applicable/inputs contract on the REAL repo',
-    () => {
+    async () => {
       for (const guard of GUARDS) {
-        const gathered = guard.gather({ sessionId: realRepoSid() })
+        const gathered = await guard.gather({ sessionId: realRepoSid() })
         expect(gathered, guard.id).toBeTruthy()
         if (gathered.applicable === false) expect(typeof gathered.why, guard.id).toBe('string')
+        else if (gathered.condition === true) expect(typeof gathered.why, guard.id).toBe('string')
         else expect(typeof gathered.inputs, guard.id).toBe('object')
       }
     },
@@ -574,10 +691,10 @@ describe('GATHER-STEP REUSE (the drift guard)', () => {
 
   it(
     'runs against the real repo without an error status',
-    () => {
+    async () => {
       // A wrapper that throws on import or on gathering would show up here — and
       // an `error` row is exactly the false-confidence case this must not have.
-      const results = runPreflight(GUARDS, { sessionId: realRepoSid() })
+      const results = await runPreflightAsync(GUARDS, { sessionId: realRepoSid() })
       expect(results.filter((r) => r.status === STATUS.error)).toEqual([])
       expect(results.map((r) => r.id)).toEqual(GUARDS.map((g) => g.id))
     },

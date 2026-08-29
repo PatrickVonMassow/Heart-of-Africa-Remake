@@ -75,7 +75,7 @@ export const RULE_REGISTRY = Object.freeze([
       Object.freeze({ file: 'scripts/model-guard-core.mjs' }),
       Object.freeze({ file: 'scripts/review-sol-core.mjs' }),
       Object.freeze({ file: 'scripts/sol-share-core.mjs' }),
-      Object.freeze({ file: 'memory/fable-authors-hard-cases.md', optional: true }),
+      Object.freeze({ file: 'memory/hard-cases-go-to-sol.md', optional: true }),
       Object.freeze({ file: 'memory/fable-sparingly.md', optional: true }),
       Object.freeze({ file: 'memory/serving-model-watch.md', optional: true }),
     ]),

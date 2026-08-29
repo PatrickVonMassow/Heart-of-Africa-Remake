@@ -1,0 +1,442 @@
+{
+ "mergedBy": "Claude Fable 5",
+ "mergedByNote": "Folded 22.08.2026 by Claude Fable 5, which wrote neither half: half A is Claude Opus 5 (settled by 676-provenance.md), half B is GPT-5.6 Sol. Authorised by the fable-switch record — ON since 2026-08-22T16:26:48.740Z, set by the owner: \"Anthropic released new weekly volume — Fable may be used again\". This fold was produced blind from the two halves before reading any earlier union, and it REPLACES the two recorded fallback folds (first by Sol, then by Claude Opus 5, each an author of one half); those remain in history as the weaker two-model fallback they were recorded as.",
+ "entries": [
+  {
+   "id": "M1",
+   "from": [
+    "A1",
+    "B1"
+   ],
+   "defect": "Decision: the two goals are not inherently conflicting; the conflict is an artefact of coupling worker lifetime and recoverability to the main session's process parentage. The in-flight declaration names branch, worktree, pid and log — enough to LOCATE the run, but not to adopt it: PID is reusable, so adoption additionally requires the stable batch, job, attempt and process-start identities and the adoption record that M17 defines. Handover must therefore cease to mean terminating active work."
+  },
+  {
+   "id": "M2",
+   "from": [
+    "A2",
+    "B3"
+   ],
+   "defect": "The coupling is provably breakable, and the detached Sol authoring lane (scripts/author-sol.mjs) is the proof and the reference: measured 13.08.2026, it ran through the supervising session's landing of another point, a board rebuild and a failed boundary attempt, and would have survived that session's death. Treat that proven path as the reference worker contract: stable worktree and branch, detached launcher ownership, step commits, periodic pushes, heartbeat, log, and explicit terminal status."
+  },
+  {
+   "id": "M3",
+   "from": [
+    "A3a"
+   ],
+   "defect": "Delegated AUTHORING runs as a detached process (the author-sol.mjs shape), never as an in-process Agent-tool subagent, whenever the point is authored rather than judged."
+  },
+  {
+   "id": "M4",
+   "from": [
+    "B2"
+   ],
+   "defect": "Split the system into a short-lived coordinator plane and a session-independent worker plane: sessions select work, review, verify, land, and record progress, while durable workers author isolated points."
+  },
+  {
+   "id": "M5",
+   "from": [
+    "B4"
+   ],
+   "defect": "Add a model-neutral detached-worker adapter around available CLI runners; an adapter is handover-capable only if it satisfies the same checkpoint, push, heartbeat, status, and cancellation contract as author-sol.mjs."
+  },
+  {
+   "id": "M6",
+   "from": [
+    "B5"
+   ],
+   "defect": "Do not relabel an Agent-tool child as durable: unsupported agents remain session-bound, and a boundary is blocked until those particular children finish or are safely stopped."
+  },
+  {
+   "id": "M7",
+   "from": [
+    "B6"
+   ],
+   "defect": "Make the OS launcher daemon, rather than a main session, the parent and lifecycle owner of every handover-capable worker so session exit cannot kill it."
+  },
+  {
+   "id": "M8",
+   "from": [
+    "B7"
+   ],
+   "defect": "Give every run a stable batch id, point id, attempt id, process-start identity, branch, worktree, base SHA, PID, log path, heartbeat path, and launcher lease."
+  },
+  {
+   "id": "M9",
+   "from": [
+    "B8"
+   ],
+   "defect": "Enforce the cap of three active authoring processes globally in the daemon, not separately in each session, so overlapping coordinator epochs cannot temporarily create six workers."
+  },
+  {
+   "id": "M10",
+   "from": [
+    "B9"
+   ],
+   "defect": "Let the main session pre-authorize a bounded ready queue of concrete work-order points with dependencies, base SHA, branch, and worktree; the daemon may refill a freed slot only from that queue."
+  },
+  {
+   "id": "M11",
+   "from": [
+    "B10"
+   ],
+   "defect": "Keep point selection with the main session: the daemon starts already-delegated queue entries but must never invent work, reorder dependency-blocked points, or broaden a point's scope."
+  },
+  {
+   "id": "M12",
+   "from": [
+    "B11"
+   ],
+   "defect": "Record a reason code and duration whenever fewer than three lanes run despite three eligible points; valid reasons include dependency blocking, review-backlog pressure, adapter unavailable, and durability failure."
+  },
+  {
+   "id": "M13",
+   "from": [
+    "B12"
+   ],
+   "defect": "Apply an explicit completed-review backlog limit so automatic refilling cannot produce an unbounded pile of stale branches while serial landing remains slower than authoring."
+  },
+  {
+   "id": "M14",
+   "from": [
+    "B13"
+   ],
+   "defect": "Store an append-only, checksummed event journal at <git-common-dir>/codex-batches/<batch-id>/events.jsonl, in the shared Git common directory outside every worktree and transcript, as the coordination record that survives session replacement."
+  },
+  {
+   "id": "M15",
+   "from": [
+    "B14"
+   ],
+   "defect": "Maintain an atomically replaced derived snapshot (<git-common-dir>/codex-batches/<batch-id>/snapshot.json) for fast resume while retaining the event journal as the auditable source used to detect partial or contradictory writes."
+  },
+  {
+   "id": "M16",
+   "from": [
+    "B15"
+   ],
+   "defect": "Represent each point in the snapshot as queued, running, checkpointing, ready-for-review, landing, landed, failed, stalled, or cancelled, and record with each state the actor, the coordinator epoch, timestamps, the last commit, and the last pushed SHA."
+  },
+  {
+   "id": "M17",
+   "from": [
+    "A3b",
+    "B16"
+   ],
+   "defect": "The in-flight declaration becomes the ADOPTION RECORD: extend it with stable batch, job, attempt, and process-start identities plus a transferable flag — PID alone is insufficient because it can be reused. What is missing today is exactly that nothing tells the successor the run is now its own."
+  },
+  {
+   "id": "M18",
+   "from": [
+    "A5a",
+    "B17"
+   ],
+   "defect": "A transferable declaration remains probeable across coordinator sessions and expires LOUDLY when heartbeat, log advancement, checkpoint SHA, or launcher ownership stops agreeing: expiry must alert, not merely unblock, or an adopted run dies unnoticed."
+  },
+  {
+   "id": "M19",
+   "from": [
+    "B18"
+   ],
+   "defect": "Before handover, request a checkpoint from every running durable worker and require acknowledgment that all current work is committed and pushed; completion of the point is not required."
+  },
+  {
+   "id": "M20",
+   "from": [
+    "B19"
+   ],
+   "defect": "If a worker cannot checkpoint within the bounded interval, mark it non-transferable and block the boundary with its job id and recovery choices instead of silently risking uncommitted work."
+  },
+  {
+   "id": "M21",
+   "from": [
+    "B20"
+   ],
+   "defect": "Make handover two-phase: --prepare performs bookkeeping, board updates, daemon health checks, checkpoint barriers, landing-lock checks, and successor-input validation without creating the boundary marker."
+  },
+  {
+   "id": "M22",
+   "from": [
+    "B21"
+   ],
+   "defect": "Make --commit the main session's final repository action: atomically seal the snapshot, record the next coordinator epoch and nonce, create the marker, receive the launcher's durable receipt, and then end the session."
+  },
+  {
+   "id": "M23",
+   "from": [
+    "B22"
+   ],
+   "defect": "Forbid bookkeeping, guard remediation, status edits, refills, or other tool work after batch-boundary.mjs --commit; all such work belongs before --commit or in the successor."
+  },
+  {
+   "id": "M24",
+   "from": [
+    "B23"
+   ],
+   "defect": "Fence the old coordinator epoch when the marker is accepted and reject further mutations under that epoch, making accidental post-boundary work an immediate error rather than merely deleting the marker silently."
+  },
+  {
+   "id": "M25",
+   "from": [
+    "B24"
+   ],
+   "defect": "Record marker creation, deletion, old-session exit, successor start, and successor-ready acknowledgment independently; alert if the marker disappears, the old session remains alive, or no successor becomes ready within the configured deadline."
+  },
+  {
+   "id": "M26",
+   "from": [
+    "B25"
+   ],
+   "defect": "On startup, the successor reads the work order, sealed batch snapshot, event journal tail, launcher process table, in-flight declarations, and current local and remote branch SHAs; it does not depend on the predecessor's transcript."
+  },
+  {
+   "id": "M27",
+   "from": [
+    "A4",
+    "B26"
+   ],
+   "defect": "Give the successor the capability it lacks today: resume supervision of processes it did not spawn — adopt by stable job id, query status, renew declarations, request checkpoints, cancel workers, classify outputs, and land completed branches without reparenting their processes; notice completion without a harness notification (poll the log and branch tip through the existing probe) and hand findings back to a worker for a second leg."
+  },
+  {
+   "id": "M28",
+   "from": [
+    "B27"
+   ],
+   "defect": "Reconcile every recorded lane as running, completed, stalled, missing, divergent, or orphaned before spawning anything; print every mismatch and place unresolved lanes in a red progress-board state."
+  },
+  {
+   "id": "M29",
+   "from": [
+    "B28"
+   ],
+   "defect": "Refill only after reconciliation and global-cap acquisition, preventing duplicate work when a worker finished or a launcher restarted during the handover gap."
+  },
+  {
+   "id": "M30",
+   "from": [
+    "A5b",
+    "B29"
+   ],
+   "defect": "Failure mode: two sessions adopt the same run or coordinate at once. Half A holds that the batch lock and its fence already serialise ownership; half B requires the daemon to grant exactly one renewable coordinator lease per batch, with all queue, cancellation, landing, and bookkeeping mutations carrying its epoch so old and new sessions cannot both coordinate. Build the lease; the lock and fence remain the session-side serialisation."
+  },
+  {
+   "id": "M31",
+   "from": [
+    "A3c",
+    "B30"
+   ],
+   "defect": "The handover condition changes from 'no agent in flight' to 'the point I was LANDING is landed': running authors are handed on, not waited out. Use a fresh main session after each completed landing, or earlier at a conservative context watermark, because one 30-90 minute review-and-landing unit is already a natural atomic coordinator epoch."
+  },
+  {
+   "id": "M32",
+   "from": [
+    "B31"
+   ],
+   "defect": "Preserve serial landing and require a batch-wide landing lock; durable authoring parallelism does not authorize parallel merges, work-order edits, or progress-board updates."
+  },
+  {
+   "id": "M33",
+   "from": [
+    "B32"
+   ],
+   "defect": "Journal the candidate SHA, target SHA, diff-review completion, gate results, graphic artifact hashes, merge SHA, bookkeeping update, and board update so a crash mid-landing is detected and recoverable."
+  },
+  {
+   "id": "M34",
+   "from": [
+    "B33"
+   ],
+   "defect": "Planned boundaries occur only before a landing starts or after its journal reaches 'landed'; after an unplanned crash, the successor repeats any human judgment whose completion cannot be proven."
+  },
+  {
+   "id": "M35",
+   "from": [
+    "B34"
+   ],
+   "defect": "Keep both graphics-backend judgments in the main session and persist their artifact paths, hashes, backend names, and result in the landing journal; worker claims never substitute for these checks."
+  },
+  {
+   "id": "M36",
+   "from": [
+    "B35"
+   ],
+   "defect": "Revalidate a completed branch against the current landing base because earlier serial landings may make its recorded base stale; conflicts or changed gates return it to an explicit rework state."
+  },
+  {
+   "id": "M37",
+   "from": [
+    "B36"
+   ],
+   "defect": "A worker may report ready-for-review only when its worktree is clean, required checks have a recorded result, and its terminal commit is visible on the expected remote branch."
+  },
+  {
+   "id": "M38",
+   "from": [
+    "B37"
+   ],
+   "defect": "A heartbeat timeout, unexpected exit, push failure, dirty terminal worktree, or missing log changes the lane to a named failure state, frees no ambiguous lease, and raises a board/probe alert."
+  },
+  {
+   "id": "M39",
+   "from": [
+    "B38"
+   ],
+   "defect": "Prevent duplicate writers with a daemon-held attempt lease and process-start identity; restart only after death is proven, and fail closed if ownership or the worktree lock is uncertain."
+  },
+  {
+   "id": "M40",
+   "from": [
+    "B39"
+   ],
+   "defect": "Require stale attempts to verify their current lease before every checkpoint and push; a fenced attempt that resumes must stop and leave its branch intact for inspection."
+  },
+  {
+   "id": "M41",
+   "from": [
+    "B40"
+   ],
+   "defect": "If the local registry is corrupt or missing, reconstruct only provable facts from the work order, launcher records, worktrees, logs, and pushed branches, and quarantine uncertain points instead of declaring them complete."
+  },
+  {
+   "id": "M42",
+   "from": [
+    "B41"
+   ],
+   "defect": "Refuse a boundary when the daemon, state directory, remote push destination, or successor-launch path is unhealthy; a fast handover is not successful unless the work and the next coordinator are recoverable."
+  },
+  {
+   "id": "M43",
+   "from": [
+    "B42"
+   ],
+   "defect": "Cancellation caused by obsolete requirements or dependency changes goes through the daemon, records the reason and last pushed SHA, waits for lease release, and preserves the branch rather than deleting evidence."
+  },
+  {
+   "id": "M44",
+   "from": [
+    "A5c"
+   ],
+   "defect": "Failure mode: a detached run outlives its point with nobody landing it. The board now-card and the ETA rule make an unattended run visible to the reader."
+  },
+  {
+   "id": "M45",
+   "from": [
+    "A6a"
+   ],
+   "defect": "Rejected: raising the pool cap. The binding constraint is LANDING throughput (30-90 minutes per point in the main session today), not authoring slots; more parallel authors only queue at the same door."
+  },
+  {
+   "id": "M46",
+   "from": [
+    "A6b",
+    "B43"
+   ],
+   "defect": "Rejected: the coordinator session refilling authoring slots to stay busy, and continuous refilling with in-process Agent-tool children in particular — the former grows main-session context for no added throughput, the latter perpetuates the original lifetime dependency and makes every fast boundary destructive."
+  },
+  {
+   "id": "M47",
+   "from": [
+    "B44"
+   ],
+   "defect": "Rejected: routinely draining all three lanes before every boundary, because it solves safety by deliberately sacrificing parallelism and recreates the observed long idle tail."
+  },
+  {
+   "id": "M48",
+   "from": [
+    "B45"
+   ],
+   "defect": "Rejected: relying on the one detached Sol lane alone while two session-bound lanes remain; the remaining child is still enough to block handover, so durability is a per-active-lane invariant."
+  },
+  {
+   "id": "M49",
+   "from": [
+    "B46"
+   ],
+   "defect": "Rejected: transferring opaque child handles or copying the old transcript into the successor — neither preserves process ownership, and transcript growth would defeat the measured reason for handover."
+  },
+  {
+   "id": "M50",
+   "from": [
+    "A6c",
+    "B47"
+   ],
+   "defect": "Rejected: moving diff judgment, dual-backend picture verification, serial landing, work-order bookkeeping, or board ownership into authoring workers; those are the serial duties that define the main session — coordinator responsibilities and quality gates."
+  },
+  {
+   "id": "M51",
+   "from": [
+    "B48"
+   ],
+   "defect": "Rejected: treating a PID, log activity, boundary marker, or unpushed local commit as sufficient proof by itself; acceptance requires mutually consistent launcher identity, lease, heartbeat, branch SHA, and durable record."
+  },
+  {
+   "id": "M52",
+   "from": [
+    "B49"
+   ],
+   "defect": "Rejected: making the boundary marker survive arbitrary same-session work, because the launcher could then resume from a stale snapshot; post-marker work must invalidate and alarm, not be hidden."
+  },
+  {
+   "id": "M53",
+   "from": [
+    "A7"
+   ],
+   "defect": "The larger driver the problem statement understates: main-session context grows mostly from HARVESTING and BOOKKEEPING (diffs, gates, guard remedies, board work), not from spawning — measured 13.08.2026, one point's review plus guard loops dominated the session. Therefore also split the coordinator ROLES: a short-lived dispatcher that only spawns, and a lander that only reviews and lands one point, so neither carries the other's history."
+  },
+  {
+   "id": "M54",
+   "from": [
+    "A8"
+   ],
+   "defect": "Measure with scripts/measure-context-cost.mjs over a full day, in both scopes: median main-session context at handover, and the share of spend above 150k context (the 87-94 % figure that motivated the boundary). Success is that figure falling while the number of points landed per day does not."
+  },
+  {
+   "id": "M55",
+   "from": [
+    "B50"
+   ],
+   "defect": "Generate the canonical result from the event journal, launcher timestamps, lane reason codes, boundary receipts, and per-session context-token samples, and publish it in the progress board for each batch."
+  },
+  {
+   "id": "M56",
+   "from": [
+    "B51"
+   ],
+   "defect": "Report eligible three-lane utilization as time with three active workers divided by time with at least three eligible authorized points, excluding only individually recorded reason intervals."
+  },
+  {
+   "id": "M57",
+   "from": [
+    "B52"
+   ],
+   "defect": "Report handover checkpoint wait, marker-to-successor-ready latency, running workers carried across each boundary, landing duration, and the share of token spend occurring above 150k context."
+  },
+  {
+   "id": "M58",
+   "from": [
+    "B53"
+   ],
+   "defect": "Accept the design after a representative multi-point batch reaches at least 90% eligible three-lane utilization, p95 checkpoint wait at most three minutes, p95 successor-ready latency at most five minutes, and less than 10% of tokens above 150k."
+  },
+  {
+   "id": "M59",
+   "from": [
+    "B54"
+   ],
+   "defect": "Require zero lost worker attempts, duplicate active writers, overlapping coordinator leases, unaccounted idle intervals, or silently missed boundaries; any nonzero count fails the trial regardless of average speed."
+  },
+  {
+   "id": "M60",
+   "from": [
+    "B55"
+   ],
+   "defect": "Roll out first with the already-proven author-sol.mjs adapter behind a handover-capable flag, then enable other adapters only after crash, stall, push-failure, marker-deletion, daemon-restart, and split-brain drills pass."
+  },
+  {
+   "id": "M61",
+   "from": [
+    "B56"
+   ],
+   "defect": "Retain the existing drain-before-boundary rule as the explicit safe fallback whenever any active lane lacks the durable contract; degradation is visible and slower, but never loses work."
+  }
+ ]
+}

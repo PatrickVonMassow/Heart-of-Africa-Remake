@@ -5,7 +5,7 @@ import {
   ALERT_GAPS_MS,
   ALERT_PAUSE_RUNG,
   ALERT_PRIORITIES,
-  PAUSE_MIN_PRIORITY,
+  CORRUPTION_ALERT_CLASSES,
   PRIORITY_ORDER,
   higherPriority,
   priorityRank,
@@ -13,9 +13,11 @@ import {
   advanceLadder,
   alertKey,
   clearLadder,
+  continuationDecisionCard,
+  corruptionDecisionCard,
+  corruptionRecovery,
   describeEscalation,
   escalationDecision,
-  escalationPauseReason,
   ladderEntry,
 } from './alert-escalation-core.mjs'
 
@@ -76,111 +78,181 @@ describe('escalationDecision — a repeated identical alert backs off', () => {
   })
 
   it('raises a CONDITION’s priority with the rung, so the fourth buzz does not look like the first', () => {
-    const first = escalationDecision({ ...at(null), priority: 'high' }).priority
-    const top = escalationDecision({ ...at({ rung: ALERT_PAUSE_RUNG, lastSentAt: NOW - ALERT_GAPS_MS[ALERT_PAUSE_RUNG], firstSentAt: NOW - 300 * MIN, sends: 4 }), priority: 'high' }).priority
+    const first = escalationDecision({ ...at(null), priority: 'default' }).priority
+    const top = escalationDecision({ ...at({ rung: ALERT_PAUSE_RUNG, lastSentAt: NOW - ALERT_GAPS_MS[ALERT_PAUSE_RUNG], firstSentAt: NOW - 300 * MIN, sends: 4 }), priority: 'default' }).priority
     expect(first).toBe('default')
     expect(top).toBe('urgent')
   })
 
-  it('does NOT raise an EVENT’s priority at any rung — it is delivered as the caller declared it', () => {
-    // Priority escalation and the pause are ONE ladder (four-eyes re-review): an
-    // alert that may not pause has no business buzzing at urgent either. Before
-    // this, the launcher's routine "Resurrected" reached the phone at URGENT
-    // every two hours on a busy night.
+  it('never lowers an urgent caller while climbing', () => {
     for (let rung = 0; rung <= ALERT_PAUSE_RUNG; rung++) {
       const entry = rung === 0 ? null : { rung, lastSentAt: NOW - ALERT_GAPS_MS[rung], firstSentAt: NOW - 300 * MIN, sends: rung }
-      expect(escalationDecision({ ...at(entry), priority: 'low' }).priority).toBe('low')
+      expect(escalationDecision({ ...at(entry), priority: 'urgent' }).priority).toBe('urgent')
+    }
+  })
+
+  it('does NOT raise an EVENT’s priority at any rung — it is delivered as the caller declared it', () => {
+    for (let rung = 0; rung <= ALERT_PAUSE_RUNG; rung++) {
+      const entry = rung === 0
+        ? null
+        : { rung, lastSentAt: NOW - ALERT_GAPS_MS[rung], firstSentAt: NOW - 300 * MIN, sends: rung }
+      expect(escalationDecision({ ...at(entry), priority: 'low', recurring: true }).priority).toBe('low')
     }
   })
 })
 
-describe('escalationDecision — the last rung PAUSES the batch', () => {
+describe('escalationDecision — only the closed corruption list may run a repair', () => {
   const topEntry = { rung: ALERT_PAUSE_RUNG, lastSentAt: NOW - ALERT_GAPS_MS[ALERT_PAUSE_RUNG], firstSentAt: NOW - 300 * MIN, sends: ALERT_PAUSE_RUNG }
-  // A CONDITION-shaped alert: the watchdog, CI-red and the wedge alerts all
-  // post at high/urgent. Only these may reach the pause rung.
-  const condition = { ...at(topEntry), priority: 'high' }
+  const corruption = { ...at(topEntry), title: 'REPOSITORY INTEGRITY', priority: 'high', alertClass: 'repository-integrity' }
 
-  it('pauses instead of buzzing a fifth time', () => {
-    // Would have prevented the night of 29./30.07.2026 ending with a stopped
-    // batch and a phone that had merely been notified.
-    const d = escalationDecision(condition)
-    expect(d.action).toBe('pause-and-send')
-    expect(d.reason).toMatch(/pauses/)
+  it.each(CORRUPTION_ALERT_CLASSES)('gives the explicit %s corruption class its named repair', (alertClass) => {
+    const d = escalationDecision({ ...corruption, alertClass })
+    expect(d.action).toBe('repair-and-probe')
+    expect(d.repair).toEqual(corruptionRecovery(alertClass))
+    expect(d.repair.command).toEqual(['scripts/batch-doctor.mjs', '--repair'])
   })
 
-  it('does NOT re-pause a batch that is already paused', () => {
-    // Stand-down: the pause is a state, not an action to repeat.
-    const d = escalationDecision({ ...condition, paused: true })
+  it('does not let an urgent but unknown class acquire pause authority', () => {
+    const d = escalationDecision({ ...corruption, alertClass: 'new-unsafe-sounding-class', priority: 'urgent' })
+    expect(d.action).toBe('continue-and-record')
+  })
+
+  it('leaves forbidden-serving-model recovery to its trusted lane handoff', () => {
+    const d = escalationDecision({ ...corruption, alertClass: 'forbidden-serving-model' })
+    expect(d.action).toBe('continue-and-record')
+  })
+
+  it.each(CORRUPTION_ALERT_CLASSES)('does not let a `recurring` declaration disarm the %s repair', (alertClass) => {
+    // THE ESCAPE HATCH this point exists to close: if `recurring` were read
+    // before the corruption class, any caller could keep the batch running
+    // through a closed-list safety condition by calling itself an event —
+    // silently, with every other case here still green. Over the WHOLE closed
+    // list, so a per-class special case cannot leave one class disarmable.
+    const d = escalationDecision({ ...corruption, alertClass, priority: 'low', recurring: true })
+    expect(d.action).toBe('repair-and-probe')
+    expect(d.priority).toBe('urgent')
+    expect(d.decisionCard).toMatch(/^Entscheidungsprotokoll:/)
+    expect(d.reason).toMatch(/quarantine or repair/)
+    expect(d.reason).not.toMatch(/recurring EVENT/)
+  })
+
+  it('stands down its repair while the batch is already paused', () => {
+    const d = escalationDecision({ ...corruption, paused: true })
     expect(d.action).toBe('send')
     expect(d.reason).toMatch(/ALREADY paused/)
   })
 
-  it('falls silent above the last rung — the state now carries the message', () => {
-    const d = escalationDecision({ ...at({ rung: ALERT_PAUSE_RUNG + 1, lastSentAt: NOW - 10 * MIN, firstSentAt: NOW - 300 * MIN, sends: 5 }), priority: 'high' })
-    expect(d.action).toBe('suppress')
-    expect(d.reason).toMatch(/board card/)
+  it('repairs old above-ceiling corruption state onto the capped probe rung', () => {
+    const d = escalationDecision({ ...corruption, entry: { rung: ALERT_PAUSE_RUNG + 1, lastSentAt: NOW - ALERT_GAPS_MS[ALERT_PAUSE_RUNG], firstSentAt: NOW - 300 * MIN, sends: 5 } })
+    expect(d.action).toBe('repair-and-probe')
+    expect(d.rung).toBe(ALERT_PAUSE_RUNG)
+    expect(d.nextRung).toBe(ALERT_PAUSE_RUNG)
   })
 
-  it('reaches the pause in under four hours of an unanswered condition', () => {
-    // A ladder that only pauses after a working day would not have caught the
+  it('keeps a clock between capped corruption repairs', () => {
+    const d = escalationDecision({ ...corruption, entry: { rung: ALERT_PAUSE_RUNG + 1, lastSentAt: NOW - 10 * MIN, firstSentAt: NOW - 300 * MIN, sends: 5 } })
+    expect(d.action).toBe('suppress')
+    expect(d.dueInMs).toBe(ALERT_GAPS_MS[ALERT_PAUSE_RUNG] - 10 * MIN)
+  })
+
+  it('reaches the repair in under four hours of an unanswered condition', () => {
+    // A ladder that only repairs after a working day would not have caught the
     // night either.
     const total = ALERT_GAPS_MS.reduce((a, b) => a + b, 0)
     expect(total).toBeLessThanOrEqual(4 * 60 * MIN)
     expect(total).toBeGreaterThanOrEqual(2 * 60 * MIN)
   })
 
-  it('writes the pause reason in the morning reader’s language, naming the alert and the way out', () => {
-    const reason = escalationPauseReason('Batch steht seit 2 Stunden', escalationDecision(condition), '30.07.2026, 04:00')
-    expect(reason).toMatch(/Eskalation/)
-    expect(reason).toMatch(/Batch steht/)
-    expect(reason).toMatch(/batch-paused/)
+  it('names the corruption class, its repair, decision record, and next attempt', () => {
+    const d = escalationDecision(corruption)
+    expect(d.alertClass).toBe('repository-integrity')
+    expect(d.repair.remedy).toMatch(/doctor quarantine or repair/)
+    expect(d.decisionCard).toBe(corruptionDecisionCard('REPOSITORY INTEGRITY', 'repository-integrity'))
+    expect(d.decisionRecord).toMatchObject({ title: d.decisionCard })
+    expect(d.decisionRecord.body).toMatch(/Retroaktives Veto/)
+    expect(d.nextAttemptAt).toBe(NOW + ALERT_GAPS_MS[ALERT_PAUSE_RUNG])
+    expect(d.probeAfterMs).toBe(ALERT_GAPS_MS[ALERT_PAUSE_RUNG])
+    expect(d).not.toHaveProperty('clockless')
   })
 })
 
-describe('escalationDecision — an EVENT never pauses a healthy batch', () => {
+describe('escalationDecision — generic stalled and stale alerts continue and record', () => {
   const topEntry = { rung: ALERT_PAUSE_RUNG, lastSentAt: NOW - ALERT_GAPS_MS[ALERT_PAUSE_RUNG], firstSentAt: NOW - 300 * MIN, sends: ALERT_PAUSE_RUNG }
+  const generic = { ...at(topEntry), title: 'Batch drive is STALLED', priority: 'urgent', alertClass: 'stalled' }
 
-  it.each(['low', 'default'])('caps a %s-priority recurring event at the top gap instead of pausing', (priority) => {
-    // WOULD HAVE PAUSED A HEALTHY BATCH: batch-autostart posts "Resurrected"
-    // (priority low) on EVERY successor spawn — the designed healthy flow under
-    // the context-boundary policy, several times a night, and identical once
-    // digit runs collapse. Simulated at a 45-min point cadence it reached this
-    // rung after ~5 hours; the 6-hour reset never fires on a busy night.
-    const d = escalationDecision({ ...at(topEntry), priority })
-    expect(d.action).toBe('send')
-    expect(d.reason).toMatch(/EVENT, not an unanswered condition/)
+  it.each(['stalled', 'staleness', 'outage', 'generic'])('never pauses a repeated %s alert', (alertClass) => {
+    const d = escalationDecision({ ...generic, alertClass })
+    expect(d.action).toBe('continue-and-record')
+    expect(d.action).not.toBe('pause-and-send')
   })
 
+  it('cannot return a pause verdict however far a generic alert repeats', () => {
+    for (let rung = 0; rung <= ALERT_PAUSE_RUNG + 20; rung++) {
+      const entry = rung === 0 ? null : { ...topEntry, rung }
+      expect(escalationDecision({ ...generic, entry }).action).not.toBe('pause-and-send')
+    }
+  })
+
+  it('names the decision card demanded by the continue verdict', () => {
+    const d = escalationDecision(generic)
+    expect(d.decisionCard).toBe('Entscheidungsprotokoll: Batch läuft weiter — Batch drive is STALLED')
+    expect(d.reason).toContain(d.decisionCard)
+    expect(continuationDecisionCard('  Board   out of date ')).toBe('Entscheidungsprotokoll: Batch läuft weiter — Board out of date')
+  })
+
+  it('advances above the top only after the continue decision is recorded', () => {
+    const d = escalationDecision(generic)
+    expect(d.nextRung).toBe(ALERT_PAUSE_RUNG + 1)
+    const next = escalationDecision({ ...generic, entry: { ...topEntry, rung: d.nextRung } })
+    expect(next.action).toBe('suppress')
+    expect(next.reason).toMatch(/decision card records/)
+  })
+
+  it('priority never grants pause authority', () => {
+    for (const p of PRIORITY_ORDER) {
+      expect(escalationDecision({ ...generic, priority: p }).action).toBe('continue-and-record')
+    }
+  })
+})
+
+describe('escalationDecision — a recurring EVENT keeps its ceiling', () => {
+  const topEntry = {
+    rung: ALERT_PAUSE_RUNG,
+    lastSentAt: NOW - ALERT_GAPS_MS[ALERT_PAUSE_RUNG],
+    firstSentAt: NOW - 300 * MIN,
+    sends: ALERT_PAUSE_RUNG,
+  }
+  const event = { ...at(topEntry), title: 'Resurrected', priority: 'low', recurring: true }
+
   it('keeps an event alert ON the ceiling rung, so it never falls permanently silent', () => {
-    // The other half of the same bug: throttling a recurring healthy-flow
-    // notification into permanent silence would hide the flow entirely.
-    const d = escalationDecision({ ...at(topEntry), priority: 'low' })
+    const d = escalationDecision(event)
+    expect(d.action).toBe('send')
     expect(d.nextRung).toBe(ALERT_PAUSE_RUNG)
-    const next = escalationDecision({ ...at({ ...topEntry, rung: d.nextRung }), priority: 'low' })
+    const next = escalationDecision({ ...event, entry: { ...topEntry, rung: d.nextRung } })
     expect(next.action).toBe('send')
   })
 
-  it('still throttles the event between rungs — the ceiling is a gap, not a licence', () => {
-    const d = escalationDecision({ ...at({ ...topEntry, lastSentAt: NOW - MIN }), priority: 'low' })
-    expect(d.action).toBe('suppress')
-  })
-
-  it('reads the CALLER’s priority, not the rung’s own', () => {
-    // The rung's own priority at the top of the ladder is "urgent". If the gate
-    // read THAT rather than the caller's argument, every event alert would pause
-    // the batch and the gate would be decorative.
-    expect(ALERT_PRIORITIES[ALERT_PAUSE_RUNG]).toBe('urgent')
-    const d = escalationDecision({ ...at(topEntry), priority: 'low' })
+  it('files no continuation decision card for an event-shaped alert', () => {
+    const d = escalationDecision(event)
     expect(d.action).toBe('send')
-    expect(d.priority).toBe('low')
+    expect(d.decisionCard).toBeUndefined()
+    expect(d.reason).toMatch(/creates no decision card/)
   })
 
-  it('pauses for exactly the priorities at or above the threshold', () => {
-    for (const p of PRIORITY_ORDER) {
-      const d = escalationDecision({ ...at(topEntry), priority: p })
-      const shouldPause = priorityRank(p) >= priorityRank(PAUSE_MIN_PRIORITY)
-      expect(d.action).toBe(shouldPause ? 'pause-and-send' : 'send')
-    }
+  it('still throttles the event between ceiling sends', () => {
+    const d = escalationDecision({ ...event, entry: { ...topEntry, lastSentAt: NOW - MIN } })
+    expect(d.action).toBe('suppress')
+    expect(d.dueInMs).toBe(ALERT_GAPS_MS[ALERT_PAUSE_RUNG] - MIN)
+  })
+
+  it('repairs event state that was already advanced above the ceiling', () => {
+    const d = escalationDecision({
+      ...event,
+      entry: { ...topEntry, rung: ALERT_PAUSE_RUNG + 1 },
+    })
+    expect(d.action).toBe('send')
+    expect(d.rung).toBe(ALERT_PAUSE_RUNG)
+    expect(d.nextRung).toBe(ALERT_PAUSE_RUNG)
   })
 })
 

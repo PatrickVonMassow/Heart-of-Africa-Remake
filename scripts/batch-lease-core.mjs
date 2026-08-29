@@ -52,9 +52,12 @@
 // safe direction is the conservative one: the old string regexes saw through a
 // wrapper by accident, and losing that would let a dispossessed session push
 // shared history through any shell (four-eyes review, 30.07.2026).
+import { isAbsolute, relative, resolve, sep } from 'node:path'
 import {
   expandSegments,
   isMutatingSegment,
+  directSegmentIntent,
+  headAndArgs,
   gitSubcommand,
   segmentInvokesScript,
   segmentMentionsFile,
@@ -421,6 +424,32 @@ export function nextFence({ fenceState, priorFence } = {}) {
   return Math.max(cur, prior !== null && prior > 0 ? Math.floor(prior) : 0) + 1
 }
 
+/**
+ * MAY THIS FENCE CLAIM BE RECORDED? PURE.
+ *
+ * A fence is an ordering condition, not a label. An explicitly proposed number
+ * at or below either durable source of the high-water mark is stale and must be
+ * refused, not silently promoted and attributed to the claimant. With no
+ * explicit proposal the owner of the serialized grant door receives the next
+ * number. The I/O half re-reads the file while holding that door before calling
+ * this decision, so the returned number cannot race an intervening grant.
+ */
+export function fenceClaimDecision({ fenceState, priorFence, requestedFence } = {}) {
+  const current = normaliseFence(fenceState).fence
+  const prior = num(priorFence)
+  const highWater = Math.max(current, prior !== null && prior > 0 ? Math.floor(prior) : 0)
+  const explicit = requestedFence !== undefined
+  const requested = num(requestedFence)
+  if (explicit && (!Number.isSafeInteger(requested) || requested <= highWater)) {
+    return { accept: false, reason: 'stale-fence', fence: null, highWater }
+  }
+  const fence = explicit ? requested : highWater + 1
+  if (!Number.isSafeInteger(fence) || fence <= highWater) {
+    return { accept: false, reason: 'fence-exhausted', fence: null, highWater }
+  }
+  return { accept: true, reason: 'accepted', fence, highWater }
+}
+
 /** The fence file as it reads after granting `fence` to `sessionId`. PURE.
  *  Max-wins: a grant can never lower the mark, even if a caller passes an old
  *  number. */
@@ -616,7 +645,7 @@ export function fenceGuardedAction({ toolName, command, filePath } = {}) {
   // A PATH ALONE IS NOT AN ACTION: `Read`, `Grep` and `Glob` carry file paths
   // too, and a gate that refuses to let a fenced-out session READ the work order
   // would tell it it is dispossessed by denying it the only way to find out.
-  if (path && (tool === 'Edit' || tool === 'Write' || tool === 'NotebookEdit')) {
+  if (path && (tool === 'Edit' || tool === 'Write' || tool === 'MultiEdit' || tool === 'NotebookEdit')) {
     if (TASKS_FILES.some((f) => path === f || path.endsWith(`/${f}`))) {
       return { kind: 'tasks', what: 'an edit of the work order (the tick / the archive move)' }
     }
@@ -698,5 +727,185 @@ export function fenceDecision({ fenceState, sessionId, toolName, command, filePa
     }
   } catch {
     return { block: false, reason: '', kind: null }
+  }
+}
+
+/**
+ * Is this call about to write the checkout whose current branch is `main`?
+ * PURE. The PreToolUse matcher already narrows the possible tools; this second
+ * classification keeps reads and repository gates open and treats an unreadably
+ * deep shell wrapper conservatively as a write.
+ */
+const NON_TRACKED_GATE_SCRIPTS = /^(?:build|lint|test(?::.*)?|typecheck(?::.*)?)$/
+const NON_TRACKED_GATE_BINS = new Set(['vitest', 'tsc', 'vite', 'oxlint'])
+
+/**
+ * Known verification/build entry points write ignored outputs (dist, coverage,
+ * Vitest state), not tracked repository state. The shared command classifier
+ * correctly calls them state-changing for broader guards; this main-only fence
+ * has the narrower job of preventing a second tracked-state writer.
+ */
+function nonTrackedGateSegment(segment) {
+  const { head, args } = headAndArgs(segment)
+  const pos = args.map((arg) => arg.text).filter((arg) => arg && !arg.startsWith('-') && arg !== '--')
+  if (head === 'npm' || head === 'pnpm' || head === 'yarn') {
+    const sub = (pos[0] ?? '').toLowerCase()
+    const script = sub === 'run' ? pos[1] : sub === 'test' ? 'test' : head === 'yarn' ? sub : ''
+    return NON_TRACKED_GATE_SCRIPTS.test(script ?? '')
+  }
+  if (head === 'npx') return NON_TRACKED_GATE_BINS.has((pos[0] ?? '').toLowerCase())
+  return false
+}
+
+/** A gate redirected into a real file is once again an arbitrary checkout write. */
+function writesOutputFile(segment) {
+  const nullSinks = new Set(['/dev/null', '$null', 'nul', 'nul:', '/dev/zero'])
+  return (segment?.redirects ?? []).some(
+    (redirect) =>
+      redirect.op.includes('>') &&
+      !redirect.op.endsWith('&') &&
+      redirect.target &&
+      !nullSinks.has(redirect.target.toLowerCase()) &&
+      (redirect.fd === '' || redirect.fd === '1'),
+  )
+}
+
+/**
+ * Does a canonical target land in the checkout? PURE.
+ *
+ * The wrapper resolves both paths through the filesystem before calling this
+ * predicate. Keeping containment here means `..`, symlinks and platform path
+ * separators all receive one decision, while the unit layer can exercise the
+ * security boundary without touching the live checkout.
+ *
+ * Missing path evidence answers true (the conservative direction): a malformed
+ * write payload must not turn into an exemption from the main-write fence.
+ */
+export function resolvedTargetInCheckout({ resolvedFilePath, checkoutRoot } = {}) {
+  if (typeof resolvedFilePath !== 'string' || !resolvedFilePath.trim()) return true
+  if (typeof checkoutRoot !== 'string' || !checkoutRoot.trim()) return true
+  const root = resolve(checkoutRoot)
+  const target = resolve(resolvedFilePath)
+  const rel = relative(root, target)
+  return rel === '' || (!isAbsolute(rel) && rel !== '..' && !rel.startsWith(`..${sep}`))
+}
+
+/**
+ * The plain file utilities whose whole effect IS the paths they are given. Only
+ * these can be judged by their arguments: `git commit -F /tmp/msg` writes the
+ * repository whatever its argument points at, and `npm` writes wherever its
+ * scripts do, so neither may ever reach the containment test below.
+ */
+const FILE_TOOLS = new Set([
+  'cat', 'tee', 'cp', 'mv', 'rm', 'rmdir', 'mkdir', 'touch', 'ln', 'chmod', 'sed', 'awk',
+  'printf', 'echo', 'head', 'tail', 'sort', 'dd',
+])
+
+/**
+ * Does this segment write ONLY outside the checkout? PURE (path resolution needs
+ * no filesystem).
+ *
+ * MEASURED 25.08.2026 (point 749). A session correcting one of its own MEMORY
+ * files — `/home/node/.claude/projects/…/memory/…md`, which is neither TASKS.md
+ * nor the dashboard nor the repository — was refused by the main-write fence,
+ * because a Bash segment is judged by its INTENT and nothing looked at where the
+ * bytes were going. The Edit tool already had this exemption; a heredoc to the
+ * same path did not, so the fix had to be handed to the owner session instead of
+ * being made by the one that found the defect.
+ *
+ * Conservative in both directions: a segment with no path argument at all is NOT
+ * exempted (that is the `git push` shape), and one path inside the checkout
+ * removes the exemption for the whole segment.
+ */
+export function segmentWritesOnlyOutsideCheckout(segment, { cwd = '', checkoutRoot = '' } = {}) {
+  if (!checkoutRoot) return false
+  const { head, args } = headAndArgs(segment)
+  if (!FILE_TOOLS.has(String(head))) return false
+  const candidates = [
+    ...(segment?.redirects ?? []).filter((r) => r.op?.includes('>')).map((r) => r.target),
+    ...args.map((arg) => arg.text).filter((text) => text && !text.startsWith('-') && text !== '--'),
+    // EVERY positional counts, bare filenames included (measured while building
+    // this: requiring a slash let `cp <outside> TASKS.md` pass as an outside-only
+    // write, because the target with no slash was not even a candidate). Counting
+    // sources as well only ever makes the test STRICTER, which is the safe side.
+  ].filter((text) => typeof text === 'string' && text.trim())
+  if (candidates.length === 0) return false
+  return candidates.every(
+    (target) =>
+      !resolvedTargetInCheckout({
+        resolvedFilePath: resolve(cwd || checkoutRoot, target),
+        checkoutRoot,
+      }),
+  )
+}
+
+export function mainWritingAction({ toolName, command, filePath, resolvedFilePath, checkoutRoot, cwd = '' } = {}) {
+  const tool = String(toolName ?? '')
+  if (['Edit', 'Write', 'MultiEdit', 'NotebookEdit'].includes(tool)) {
+    if (filePath && !resolvedTargetInCheckout({ resolvedFilePath, checkoutRoot })) {
+      return { writes: false, what: '' }
+    }
+    return { writes: true, what: `${tool} in the main checkout` }
+  }
+  if (tool === 'Agent') return { writes: true, what: `${tool} in the main checkout` }
+  if (tool !== 'Bash' && tool !== 'PowerShell') return { writes: false, what: '' }
+  let tooDeep = false
+  const segments = expandSegments(command, { onTruncate: () => (tooDeep = true) })
+  // `expandSegments` already yields every carried command separately. Judge the
+  // direct program so `bash -c "npm run build"` does not get denied at the shell
+  // carrier before its build leaf can receive the narrow exception below.
+  const segment = segments.find((candidate) => {
+    if (directSegmentIntent(candidate) !== 'write') return false
+    // A write that lands entirely OUTSIDE this checkout is not a main write
+    // (point 749) — the session memory directory is the case that measured it.
+    if (segmentWritesOnlyOutsideCheckout(candidate, { cwd, checkoutRoot })) return false
+    return !nonTrackedGateSegment(candidate) || writesOutputFile(candidate)
+  })
+  if (segment) return { writes: true, what: `the state-changing segment \`${segment.raw}\` on main` }
+  if (tooDeep) return { writes: true, what: 'a command wrapped deeper than the main-write fence can read' }
+  return { writes: false, what: '' }
+}
+
+/**
+ * A main-writing session must already own the batch lock. PURE and total.
+ *
+ * This is deliberately separate from stale-fence detection: the incident came
+ * from a session that had never acquired a lock or fence, so it could not be
+ * stale by definition. A delegated worktree remains exempt, and a paused batch
+ * remains entirely ungated. The wrapper records the owning process as a batch
+ * writer when `registerWriter` is true; that independent process record is what
+ * the launcher probes if the lock later disappears.
+ */
+export function mainWriteFenceDecision({
+  paused = false,
+  worktree = false,
+  branch = '',
+  ownsBatchLock = false,
+  toolName,
+  command,
+  filePath,
+  resolvedFilePath,
+  checkoutRoot,
+  cwd = '',
+} = {}) {
+  try {
+    if (paused === true || worktree === true || branch !== 'main') {
+      return { block: false, registerWriter: false, reason: '' }
+    }
+    const action = mainWritingAction({ toolName, command, filePath, resolvedFilePath, checkoutRoot, cwd })
+    if (!action.writes) return { block: false, registerWriter: false, reason: '' }
+    if (ownsBatchLock === true) return { block: false, registerWriter: true, reason: '' }
+    return {
+      block: true,
+      registerWriter: false,
+      reason:
+        `MAIN WRITE REFUSED — this session holds no batch lock. The call is ${action.what}. ` +
+        'The lock is registration as well as ownership: without it the launcher cannot connect this writer to ' +
+        'its live process, and could start a second session beside it. Nothing was acquired silently. ' +
+        'Take the batch through the explicit claimant path (`node scripts/batch-claim.mjs --session <this session id>`) ' +
+        'or continue on an isolated feature worktree; a current owner may keep writing main.',
+    }
+  } catch {
+    return { block: false, registerWriter: false, reason: '' }
   }
 }

@@ -6,7 +6,7 @@ import { readFile } from 'node:fs/promises'
 import { describe, it, expect } from 'vitest'
 import {
   DEFAULT_BACKEND, DEV_SUITES, SMALL_SUITES, WEBGL_ONLY_SUITES,
-  laneFor, parseArgs, planBackends, selectBackend, skippedSuites, suitesFor,
+  laneFor, needsDevServer, needsGpuBackendProbe, parseArgs, planBackends, selectBackend, skippedSuites, suitesFor,
 } from './tiers.mjs'
 
 describe('tier sets (point 173)', () => {
@@ -28,6 +28,36 @@ describe('tier sets (point 173)', () => {
   it('keeps the WebGL2-only exception to the two documented suites', () => {
     expect(WEBGL_ONLY_SUITES).toEqual(['touch', 'voice'])
     for (const s of WEBGL_ONLY_SUITES) expect(DEV_SUITES).toContain(s)
+  })
+})
+
+describe('GPU backend preflight selection', () => {
+  it('runs before every browser-backed suite and production preview', () => {
+    expect(needsGpuBackendProbe(['startup'])).toBe(true)
+    expect(needsGpuBackendProbe(['docs', 'flow'])).toBe(true)
+    expect(needsGpuBackendProbe([], { preview: true })).toBe(true)
+  })
+
+  it('keeps GPU-independent selections out of the renderer preflight', () => {
+    expect(needsGpuBackendProbe(['docs'])).toBe(false)
+    expect(needsGpuBackendProbe(['board-layout'])).toBe(false)
+    expect(needsGpuBackendProbe([])).toBe(false)
+  })
+
+  it('runs the self-contained board layout without starting the game server', () => {
+    expect(needsDevServer(['board-layout'])).toBe(false)
+    expect(SMALL_SUITES).toContain('board-layout')
+  })
+
+  it('is wired before the dev server and browser-suite loop', async () => {
+    const source = await readFile('scripts/verify/run-all.mjs', 'utf8')
+    const probe = source.indexOf('gpuBackendVerdict(await probeGpuBackends())')
+    const server = source.indexOf('const server = needsDevServer(devPick)')
+    const suiteLoop = source.indexOf('results.push(runSuiteWithRetry(s, server.base))')
+
+    expect(probe).toBeGreaterThan(0)
+    expect(probe).toBeLessThan(server)
+    expect(probe).toBeLessThan(suiteLoop)
   })
 })
 

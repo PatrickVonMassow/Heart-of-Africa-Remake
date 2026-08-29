@@ -1,0 +1,66 @@
+A: 15 entries  B: 18 entries
+
+identical, collapsed for free — no decision needed (0):
+
+CANDIDATE PAIRS — the only thing the merging model decides (18):
+  A15 ↔ B15  (same file)
+      A15: order — KEEP: Resulting head is 623,712,713,701,707,706,708,710,715,553,596,597, then the binding 697,703,595/598,581,336 block; 705 retires into 708 and 662 retires into 553.
+      B15: order — MOVE: Refinement of the head against the user's 17.08 word (only token-reduction outranks landing branches): pull the token-reduction levers 662/553/596/597 ahead of the low bookkeeping 706/710, giving 712, 623, 713, 701, 707, 705, 708, 662, 553, 596, 597, 706, 710 — the user's 18.08 block (697, 703, 595/598, 581, 336) stays directly after the head's last point, nothing pulled past it.
+  A4 ↔ B4  (same file)
+      A4: 701 — KEEP: Measure per-finished-point cost and lever effectiveness before choosing further consumption remedies; none of the listed commits supplies this repeatable ledger.
+      B4: 701 — KEEP: Right before the unbuilt levers it must judge — 553's and 662's ceilings are explicitly "calibrated from the cost data", so its place at 4 is load-bearing; note partial substrate exists (`measure-task-cost.mjs` already prints the phase split and `--tasks`), but the per-point ledger command and the per-lever firing/effectiveness reading do not.
+  A1 ↔ B1  (same file)
+      A1: 623 — KEEP: First place is sensible for a repeated user-visible stale-decision bug in a high-criticality guard; no listed landing delivers its answer carrier, deadline, and retrospective recognition together.
+      B1: 623 — KEEP: Head place right — user-requested mechanism asked TWICE (10.08 and item 6's 18.08 re-ask), HIGH criticality, and verified undelivered (no `scripts/vdzk-answer.mjs`, no message-keyed review or retrospect rule in `decision-card-guard-core.mjs`); requested fixes rank before QA tickets.
+  A11 ↔ B11  (same file)
+      A11: 662 — MERGE: Merge into point 553, retaining the merge-without-tick trigger; both define context-triggered handover through batch-progress-guard, and one spec must reconcile their competing token-versus-time ceiling definitions.
+      B11: 662 — KEEP: Place beside 553 right; partial delivery noted, not DONE — landed point 700's context fence now BINDS at the 150k watermark, covering the ">150k carried for 14 h" path, but the un-ticked-merge boundary demand is untouched (verified: `batch-progress-guard.mjs` still says "Merge and tick it first") and the spec's "tokens the scripts cannot read" premise is stale — recalibrate its ceiling on the now-readable context measure when built.
+  A7 ↔ B7  (same file)
+      A7: 705 — MERGE: Merge into point 708, because staged edits, one combined guard pass, and one checked publish are the required transaction semantics of 708’s end-turn command, not independent work.
+      B7: 705 — MOVE: Before 708 — 708's end-turn command must end in exactly ONE publish, which IS 705's staged mode, so building 708 first hard-codes the coupled edit-publish it would immediately rework; also note the "lift `.claude/batch-paused`" sub-item is moot (marker verified gone, pause already lifted) and should be struck at build time.
+  A5 ↔ B5  (same file)
+      A5: 707 — KEEP: The four-guard preflight gap and missing stand-down are active known bugs; landed point 711 may reduce one deploy-transient case but does not deliver the point in substance.
+      B5: 707 — KEEP: Correctly after 712 (it only CARRIES 712's refusals into the report); verified undelivered — `guide-brevity-guard.mjs` still checks only `.claude/batch-paused` with no `heldByOtherLiveOwner`, and `guard-preflight-core.mjs` still emits `not-judged` for the four guards.
+  A10 ↔ B10  (same file)
+      A10: 715 — KEEP: The defaulted-anchor recognition is delivered only partially; finishing the recorded 39-entry attended rollout remains substantive work and its present pre-cost-block place is reasonable.
+      B10: 715 — MOVE: Out of the headless head — declared refinement of the user's ranking: the remaining work is ATTENDED-ONLY by its own spec (`.claude/settings.json` protected; verified 36 scripts still listed in `RELATIVE_WIRING_ROLLOUT`, settings still 39 relative vs 2 anchored lines), so at position 10 it would jam 712's front-three picker for every headless session; either move it behind the user's 18.08 block or mark it attended-gated so the picker skips it.
+  A9 ↔ B9  (same file)
+      A9: 710 — KEEP: Its bounded accounting preserves 57 paid-for findings before ignored local artefacts disappear, and it remains ahead of the attended-only rollout without crossing the user-ranked branch block.
+      B9: 710 — KEEP: Low bookkeeping, place fine — but the perishable half is urgent independent of rank: `local/multistep-analysis-17-08/` (multistep-A/B, union.json, verified present) is git-ignored and one checkout event from gone; commit the raw artifacts NOW as evidence, ahead of the mapping work (see B16).
+  A12 ↔ B12  (same file)
+      A12: 553 — KEEP: With 662 absorbed, this remains the single owner of measured context budgets, written mid-point handoffs, delegated-agent enforcement, and the post-landing effectiveness measurement before 596/597.
+      B12: 553 — KEEP: High and correctly adjacent to 662 — both extend `batch-progress-guard`'s legal-stop/boundary rules and should be built together (see B18); verified unbuilt (no `scripts/point-handoff.mjs`).
+  A15 ↔ B18  (same file)
+      A15: order — KEEP: Resulting head is 623,712,713,701,707,706,708,710,715,553,596,597, then the binding 697,703,595/598,581,336 block; 705 retires into 708 and 662 retires into 553.
+      B18: order — KEEP: Build 662 and 553 as one coordinated change to `batch-progress-guard` with a single cross-model mechanism review — two sequential reviews of the same guard's boundary rules is the review-round cost 701 will measure as a top item; the points stay separate numbers, only their landing is paired.
+  A13 ↔ B13  (same file)
+      A13: 596 — KEEP: Tail and silent-run visibility remains wholly unbuilt—the spec explicitly says the 595/598 branch contains none of it—and it sensibly precedes the bounded-output point.
+      B13: 596 — KEEP: Correctly after 553 (rides the same measurement machinery and medians); verified unbuilt per its own 17.08 branch reading, and the silence-window third trigger (the six-and-a-half-hour bleed) is the part with proven cost — do not let it slip out in a re-cut.
+  A15 ↔ B17  (same file)
+      A15: order — KEEP: Resulting head is 623,712,713,701,707,706,708,710,715,553,596,597, then the binding 697,703,595/598,581,336 block; 705 retires into 708 and 662 retires into 553.
+      B17: order — KEEP: Partial subsumption, not a merge — 713's derived now-section substantially covers 706's third bullet (`queue <N>` unseating the now-card: a derived render re-creates the card), so land 713 first and shrink 706's third bullet to a regression test; 706's parser and rebuild-card halves stay its own work.
+  A2 ↔ B2  (same file)
+      A2: 712 — KEEP: Second place is sensible because it makes the existing work order govern commissioning and prevents further branch accumulation; points 590/608 delivered ordering, not picker or slot enforcement.
+      B2: 712 — MOVE: To the very front, before 623 — its pick-refusal and branch-counted slots govern every subsequent pick in this head (the priority "stated three times over three weeks"), so landing it first makes the rest of the queue self-enforcing; verified unbuilt (`batch-in-flight-core.mjs` still computes `slotsFree = limit - running`, agents not branches).
+  A15 ↔ B16  (same file)
+      A15: order — KEEP: Resulting head is 623,712,713,701,707,706,708,710,715,553,596,597, then the binding 697,703,595/598,581,336 block; 705 retires into 708 and 662 retires into 553.
+      B16: order — KEEP: Cross-point evidence rescue — commit the git-ignored blind/analysis artifacts (`local/blind-713/` for 713, `local/multistep-analysis-17-08/` for 710) in one small evidence commit immediately, decoupled from when either point is worked; both points cite them and a checkout loss would discard two paid-for four-eyes stages.
+  A6 ↔ B6  (same file)
+      A6: 708 — MOVE: Move after point 706, because the one-command workflows must orchestrate queue and board primitives only after their silent-loss and now-card semantics are corrected.
+      B6: 708 — KEEP: Medium, but it is per-point overhead on every session — genuine token reduction, rightly ahead of the low board-bookkeeping points; its build order (file-a-point first) is already frequency-justified in the spec.
+  A14 ↔ B14  (same file)
+      A14: 597 — KEEP: It is explicitly absent from the shared 595/598 branch and must remain the final queue-head item so the user-ranked 697,703,595/598,581,336 block stays directly after it.
+      B14: 597 — KEEP: Last of the head fits its LOW criticality; note only the unconditional bounded-output half is workable now — the standing-load/cache-prefix half is CONDITIONAL on point 599, which is not in this head, so the point should land its unconditional half without waiting.
+  A3 ↔ B3  (same file)
+      A3: 713 — KEEP: This concrete user-visible dashboard falsehood belongs ahead of broad measurement work; the derived queue from 590/608 does not derive or validate the now-section.
+      B3: 713 — KEEP: Position 3 right, but the owed COUNTED blind merge of `local/blind-713/` (0 identical vs 56 candidate pairs, third-model merger) is a hard prerequisite before building; the defect is verified live — `board-core.mjs:369` still reads the FIRST now-card for focus, exactly the measured 17.08 failure.
+  A8 ↔ B8  (same file)
+      A8: 706 — KEEP: Keep ahead of 708 as a concrete data-loss and section-corruption fix whose corrected primitives the workflow command will depend upon.
+      B8: 706 — KEEP: Low and correctly behind the mediums; verified still present (`parseSetArgs` in `board-queue-core.mjs` still buckets prose after `--estimate` with no duration check — the flag-refusal at line ~227 covers only `--`-prefixed values), but see B17 on its overlap with 713.
+
+These pairs are a RANKING, not the merge: read BOTH lists in full and pair anything
+that means the same, whether it is listed above or not — the ranking only saves you
+the obvious ones. Write the union as { "mergedBy": "<model>", "entries": [ { "id":
+"U1", "from": ["A1","B2"], "defect": "what the merged finding is" } ] } — one entry
+per finding KEPT, `from` naming the input entries it stands for, and a `defect` line
+on every fold — then check it with --union.

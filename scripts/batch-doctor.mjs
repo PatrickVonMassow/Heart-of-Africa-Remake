@@ -41,10 +41,33 @@ import {
   tasksRecoverableFromHead,
   tasksTextParses,
 } from './batch-doctor-states.mjs'
-import { readOwnerLock, detectParallel, readUnhandledAlert, markAlertHandled, assessOwner, bootTimeMs, probePid, LOCK_PATH, DOCTOR_STATE_PATH } from './batch-singleton.mjs'
+import {
+  readOwnerLock,
+  detectParallel,
+  readUnhandledAlert,
+  markAlertHandled,
+  assessOwner,
+  bootTimeMs,
+  findClaudeAncestor,
+  ownerSessionTear,
+  probePid,
+  transitionOwnerSession,
+  LOCK_PATH,
+  DOCTOR_STATE_PATH,
+} from './batch-singleton.mjs'
 import { readMachine, listProcesses, repoMarker } from './verify/machine-load.mjs'
+import { COMMON_REPO_ROOT, REPO_ROOT, withoutGitLocalEnvironment } from './repo-paths.mjs'
+import { recordDoctorGateMeasurement } from './decision-log-core.mjs'
+import { writeJsonAtomic } from './atomic-write.mjs'
 
-const REPO = fileURLToPath(new URL('..', import.meta.url))
+// Batch authority state lives in the one checkout every linked worktree shares.
+const REPO = COMMON_REPO_ROOT() || fileURLToPath(new URL('..', import.meta.url))
+// The checkout this process was invoked from; evidence only, never authority.
+const CHECKOUT_ROOT = REPO_ROOT
+// The doctor can itself be started from a hook or another Git child. Its
+// authority intentionally lives in the common checkout, but inherited GIT_DIR
+// must not override that cwd or leak onwards into the nested fast-gate suite.
+const REPOSITORY_ENV = withoutGitLocalEnvironment()
 const LOG = join(REPO, '.claude', 'doctor.log')
 const repair = process.argv.includes('--repair')
 const gate = process.argv.includes('--gate')
@@ -64,6 +87,7 @@ const git = (args, opts = {}) =>
     windowsHide: true,
     cwd: REPO,
     encoding: 'utf8',
+    env: REPOSITORY_ENV,
     timeout: opts.timeout ?? 30000,
     stdio: ['ignore', 'pipe', 'pipe'],
   }).trim()
@@ -131,7 +155,16 @@ try {
 }
 
 const owner = readOwnerLock()
-const readerSid = process.env.CLAUDE_SESSION_ID ?? owner?.sessionId ?? ''
+const sessionFlagAt = process.argv.indexOf('--session')
+const argvSessionId = sessionFlagAt >= 0 && process.argv[sessionFlagAt + 1] && !process.argv[sessionFlagAt + 1].startsWith('--')
+  ? process.argv[sessionFlagAt + 1]
+  : ''
+const environmentSessionId = process.env.CLAUDE_SESSION_ID ?? ''
+const sessionAssertionAgrees = !(argvSessionId && environmentSessionId && argvSessionId !== environmentSessionId)
+const activeSessionId = sessionAssertionAgrees ? (argvSessionId || environmentSessionId) : ''
+const readerSid = activeSessionId || owner?.sessionId || ''
+const ownerAncestor = activeSessionId ? findClaudeAncestor() : null
+const tornOwnerSession = ownerSessionTear({ sessionId: activeSessionId, lock: owner, ancestor: ownerAncestor })
 const parallelNow = detectParallel(owner?.sessionId ?? '')
 const rawAlert = readUnhandledAlert()
 // AN ALERT MUST NAME SOMEONE ELSE (point 431, third half). The alert is a file:
@@ -179,6 +212,11 @@ const strays = gather(
 const tasksRecoverable = tasksParses ? false : gather('HEAD:TASKS.md', () => tasksRecoverableFromHead({ git }), false)
 const stalePendingSpawn = gather('the batch lock', () => findStalePendingSpawn({ lockPath: LOCK_PATH, now: nowMs, probe: probePid }), null)
 const boardBehind = gather('the board publish record', () => findBoardBehind({ repo: REPO }), null)
+const privateBatchLockPath =
+  CHECKOUT_ROOT && CHECKOUT_ROOT !== REPO ? join(CHECKOUT_ROOT, '.claude', 'batch-lock.json') : ''
+const privateBatchLock = privateBatchLockPath && existsSync(privateBatchLockPath)
+  ? { path: privateBatchLockPath }
+  : null
 
 log(
   `state: branch=${branch} mergeInProgress=${mergeInProgress} dirty=${dirtyFiles.length} ` +
@@ -191,6 +229,11 @@ log(
     `tasksRecoverable=${tasksRecoverable} stalePendingSpawn=${stalePendingSpawn ? 'yes' : 'no'} ` +
     `boardBehind=${boardBehind ? 'yes' : 'no'} ownerAlive=${ownerAlive}`,
 )
+if (privateBatchLock) log(`TORN: worktree-private batch lock found at ${privateBatchLock.path}; it is not authority`)
+if (!sessionAssertionAgrees) log('TORN-ID REPAIR REFUSED: --session and CLAUDE_SESSION_ID name different sessions')
+if (tornOwnerSession.torn) {
+  log(`TORN: this process owns the lock, but it records session ${tornOwnerSession.recordedSessionId} instead of ${activeSessionId}`)
+}
 
 // --- Plan + execute ------------------------------------------------------------
 
@@ -209,6 +252,8 @@ const plan = planRemediation({
   stalePendingSpawn,
   boardBehind,
   ownerAlive,
+  privateBatchLock,
+  tornOwnerSession: tornOwnerSession.torn ? tornOwnerSession : null,
 })
 
 if (plan.length === 0) log('repo state CONSISTENT — no remediation needed')
@@ -285,6 +330,17 @@ for (const a of plan) {
     } else if (a.action === 'republish-board') {
       republishBoard({ repo: REPO })
       log('EXECUTED republish-board: scripts/board-publish.mjs re-ran — the reader sees the current board again')
+    } else if (a.action === 'repair-owner-session-id') {
+      const transitioned = transitionOwnerSession(activeSessionId, {
+        lock: owner,
+        ancestor: ownerAncestor,
+        lockPath: LOCK_PATH,
+      })
+      if (!transitioned.transitioned) throw new Error(`owner session transition refused (${transitioned.reason})`)
+      log(
+        `EXECUTED repair-owner-session-id: ${transitioned.sessionIdBefore} -> ${activeSessionId} through ` +
+          'transitionOwnerSession (generation and process incarnation rechecked; lifecycle recorded)',
+      )
     }
   } catch (e) {
     log(`FAILED ${a.action}: ${e && e.message} — fix by hand`)
@@ -307,7 +363,7 @@ if (gate) {
     let failed = false
     try {
       log(`gate: running ${cmd} …`)
-      execSync(cmd, { windowsHide: true, cwd: REPO, stdio: 'pipe', timeout: 15 * 60 * 1000 })
+      execSync(cmd, { windowsHide: true, cwd: REPO, env: REPOSITORY_ENV, stdio: 'pipe', timeout: 15 * 60 * 1000 })
       log(`gate: ${cmd} PASSED`)
     } catch {
       failed = true
@@ -340,6 +396,8 @@ function liveAgentWorktrees() {
 // --- Verdict -------------------------------------------------------------------
 
 const pendingRepair = needsRepair(plan) && !repair
+const measurementClean = gate && !pendingRepair && !gateFailed && !gateInconclusive && !alertsRemain
+if (gate) recordGateMeasurement(measurementClean)
 if (!pendingRepair && !gateFailed) {
   markAlertHandled()
   log('parallel alert marked handled')
@@ -385,5 +443,22 @@ function recordGateSatisfied() {
     log(`gate demand satisfied for HEAD ${head.slice(0, 8)} beside [${parallelSids.join(', ') || 'no other session'}]`)
   } catch (e) {
     log(`warn: could not record the gate satisfaction (${e && e.message}) — the demand simply stays live`)
+  }
+}
+
+function recordGateMeasurement(clean) {
+  try {
+    const statePath = DOCTOR_STATE_PATH
+    const state = existsSync(statePath) ? JSON.parse(readFileSync(statePath, 'utf8')) : {}
+    const detail = clean
+      ? 'repo state CONSISTENT; npm run test:unit, npm run build and npm run lint passed'
+      : gateInconclusive
+        ? 'the gate was inconclusive under machine load'
+        : 'the doctor or at least one fast gate reported findings'
+    const measured = recordDoctorGateMeasurement(state, { at: Date.now(), clean, detail })
+    writeJsonAtomic(statePath, measured)
+    log(`decision measurement batch-doctor-gate ${clean ? 'CLEAN' : 'DIRTY'} — ${detail}`)
+  } catch (e) {
+    log(`warn: could not record the doctor measurement (${e && e.message}) — every decision simply stays live`)
   }
 }

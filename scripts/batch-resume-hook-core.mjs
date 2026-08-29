@@ -25,6 +25,21 @@
 import { CLAIM_BY } from './chat-watcher-core.mjs'
 import { CLAIM_MAX_AGE_MS } from './batch-claim-core.mjs'
 
+const OWNER_OWNERSHIP = new Set(['acquired-spawn', 'acquired', 'mine'])
+
+/**
+ * Content that belongs to the batch dispatcher is injected only after this
+ * SessionStart has proved ownership. Keeping this decision pure prevents a
+ * stand-down session from inheriting the runbook merely because the file is
+ * readable on disk.
+ */
+export function ownerRunbookContext(ownership, runbookText) {
+  if (!OWNER_OWNERSHIP.has(ownership)) return ''
+  const body = String(runbookText ?? '').trim()
+  if (!body) return ''
+  return `\n\n--- OWNER-ONLY BATCH RUNBOOK ---\n${body}\n--- END OWNER-ONLY BATCH RUNBOOK ---`
+}
+
 /**
  * How the SessionStart text opens: how much is open, and the one point the
  * session will actually carry (point 440).
@@ -43,13 +58,13 @@ const namedFew = (nums, max = 6) =>
 
 /**
  * What a session is told when NOTHING is workable because every remaining point
- * waits on the user (point 450). The batch is not finished and it is not idle —
- * it is blocked on one person, and a silent start would read as "done".
+ * awaits a true confirmation. The batch is not finished and it is not idle —
+ * it is blocked at explicitly named outward acts, and silence would read as done.
  */
 export function allGatedMessage(gated = []) {
   const waiting = (gated ?? []).map(Number).filter(Number.isFinite)
   return (
-    `[batch-resume] Every remaining work-order point WAITS ON THE USER (${waiting.length}: ${namedFew(waiting)}). ` +
+    `[batch-resume] Every remaining work-order point AWAITS CONFIRMATION (${waiting.length}: ${namedFew(waiting)}). ` +
     'There is no next point to start — do NOT begin one. Check that each has its "Von dir zu klären" card on the ' +
     'board (node scripts/defer-for-user.mjs --list for the recorded reasons); when an answer arrives, ' +
     'node scripts/defer-for-user.mjs --clear <N> puts that point back at the head of the queue.'
@@ -68,7 +83,7 @@ export function openPointsHeadline(openNumbers = [], { gated = [] } = {}) {
     // not pick up a point that cannot proceed without an answer — but it must
     // know one is waiting, or it would read the shorter queue as progress.
     (waiting.length
-      ? `${waiting.length} further point(s) WAIT ON THE USER and are skipped: ${namedFew(waiting)} — ` +
+      ? `${waiting.length} further point(s) AWAIT CONFIRMATION and are skipped: ${namedFew(waiting)} — ` +
         'do not start them (node scripts/defer-for-user.mjs --list for the recorded reasons; ' +
         '--clear <N> when the answer arrives, which puts the point back at the head of the queue). '
       : '')

@@ -23,6 +23,58 @@ function runName(r) {
 function runUrl(r) {
   return String((r && (r.url ?? r.html_url)) ?? '')
 }
+function runAttempt(r) {
+  const value = Number(r && (r.runAttempt ?? r.run_attempt))
+  return Number.isSafeInteger(value) && value > 0 ? value : 1
+}
+
+/**
+ * The runs for ONE workflow at ONE sha, reduced to the single run that carries
+ * the verdict — with SUPERSEDED CANCELLATIONS DROPPED FIRST.
+ *
+ * WHY (21.08.2026, measured on this batch): the same commit is run under more
+ * than one ref. Creating `feat/<point>` at main's tip pushes main's sha a second
+ * time, GitHub starts a second "CI" run for it, and the author's first commit
+ * then cancels that run through `concurrency: cancel-in-progress`. That
+ * cancellation is NEWER than main's own concluded run, so "newest id wins" let
+ * it bury a green main — the guard reported origin/main RED against a sha whose
+ * own CI run had succeeded, and demanded a fixing push that no code could
+ * supply. It reproduces at EVERY point, because branching off main is the
+ * routine first act of one.
+ *
+ * A cancellation carries NO information about the code: the run was stopped, it
+ * did not judge. So it counts only when it is the ONLY verdict that workflow
+ * reached on that commit — a genuinely cancelled lone run still demands
+ * attention. The moment another run of the same workflow on the same sha
+ * CONCLUDED, that conclusion is the evidence and the cancellation is noise.
+ *
+ * Note this never turns a red green: `failure`, `timed_out` and
+ * `startup_failure` are untouched, and dropping a cancellation only ever
+ * uncovers the verdict standing behind it — which may itself be red.
+ */
+function verdictRuns(runs, headSha) {
+  const mine = runs.filter((r) => runSha(r) === headSha)
+  const concluded = new Set()
+  for (const r of mine) {
+    if (String(r?.status ?? '') !== 'completed') continue
+    if (String(r?.conclusion ?? '') === 'cancelled') continue
+    concluded.add(runName(r))
+  }
+  return mine.filter(
+    (r) => !(String(r?.conclusion ?? '') === 'cancelled' && concluded.has(runName(r))),
+  )
+}
+
+/** Newest run per workflow name, from an already sha-filtered list. */
+function newestPerWorkflowFrom(runs) {
+  const newest = new Map()
+  for (const r of runs) {
+    const key = runName(r)
+    const prev = newest.get(key)
+    if (!prev || Number(runId(r) ?? 0) > Number(runId(prev) ?? 0)) newest.set(key, r)
+  }
+  return newest
+}
 
 /**
  * Classify the CI state for `headSha` from a list of workflow runs.
@@ -34,15 +86,10 @@ function runUrl(r) {
 export function classifyRuns(runs, headSha) {
   try {
     if (!Array.isArray(runs) || !headSha) return { state: 'none' }
-    const mine = runs.filter((r) => runSha(r) === headSha)
+    const mine = verdictRuns(runs, headSha)
     if (mine.length === 0) return { state: 'none' }
 
-    const newestPerWorkflow = new Map()
-    for (const r of mine) {
-      const key = runName(r)
-      const prev = newestPerWorkflow.get(key)
-      if (!prev || Number(runId(r) ?? 0) > Number(runId(prev) ?? 0)) newestPerWorkflow.set(key, r)
-    }
+    const newestPerWorkflow = newestPerWorkflowFrom(mine)
 
     let pending = null
     let success = null
@@ -59,6 +106,7 @@ export function classifyRuns(runs, headSha) {
           runId: runId(r),
           workflowName: runName(r),
           conclusion,
+          runAttempt: runAttempt(r),
           url: runUrl(r),
         }
       }
@@ -86,12 +134,7 @@ export function classifyRuns(runs, headSha) {
 export function failedRuns(runs, headSha) {
   try {
     if (!Array.isArray(runs) || !headSha) return []
-    const newestPerWorkflow = new Map()
-    for (const r of runs.filter((x) => runSha(x) === headSha)) {
-      const key = runName(r)
-      const prev = newestPerWorkflow.get(key)
-      if (!prev || Number(runId(r) ?? 0) > Number(runId(prev) ?? 0)) newestPerWorkflow.set(key, r)
-    }
+    const newestPerWorkflow = newestPerWorkflowFrom(verdictRuns(runs, headSha))
     return [...newestPerWorkflow.values()]
       .filter((r) => String(r?.status ?? '') === 'completed' && FAILED_CONCLUSIONS.has(String(r?.conclusion ?? '')))
       .map((r) => ({
@@ -99,6 +142,7 @@ export function failedRuns(runs, headSha) {
         runId: runId(r),
         workflowName: runName(r),
         conclusion: String(r?.conclusion ?? ''),
+        runAttempt: runAttempt(r),
         url: runUrl(r),
       }))
   } catch {
@@ -119,12 +163,7 @@ export function failedRuns(runs, headSha) {
 export function recoveredWorkflows(runs, headSha) {
   try {
     if (!Array.isArray(runs) || !headSha) return []
-    const newestPerWorkflow = new Map()
-    for (const r of runs.filter((x) => runSha(x) === headSha)) {
-      const key = runName(r)
-      const prev = newestPerWorkflow.get(key)
-      if (!prev || Number(runId(r) ?? 0) > Number(runId(prev) ?? 0)) newestPerWorkflow.set(key, r)
-    }
+    const newestPerWorkflow = newestPerWorkflowFrom(verdictRuns(runs, headSha))
     return [...newestPerWorkflow.entries()]
       .filter(([, r]) => String(r?.status ?? '') === 'completed' && !FAILED_CONCLUSIONS.has(String(r?.conclusion ?? '')))
       .map(([name]) => name)
@@ -144,8 +183,9 @@ export function shouldBlock(state) {
 // The guard used to ask about `git rev-parse HEAD` alone. Through the night of
 // 30.07. the owning session's HEAD was `main` and green while every push of a
 // delegated agent's branch failed CI: thirteen "Run failed" mails, and the one
-// session that could have fixed it never learned. A delegated agent pushes under
-// the parent's session id, so those refs ARE the parent's responsibility.
+// session that could have fixed it never learned. Those refs must stay visible,
+// but an actively authored branch is not the supervisor's turn-end gate. Main
+// and branches handed back as landing candidates are.
 //
 // So the unit of judgement is the PUSHED REF, and the demand is not "notice a
 // red" but "confirm the run for that exact sha CONCLUDED green" — which closes
@@ -170,8 +210,184 @@ export const WAIT_BUDGET_MS = 30 * 60 * 1000
 /** Minimum spacing between two API calls for the same non-terminal sha, so a
  *  blocked or waiting session re-asks about once a minute, not once a turn. */
 export const RECHECK_MS = 60 * 1000
+/** The durable observer starts quickly, then backs off to a bounded interval.
+ *  The 900-second launcher tick is recovery only; it is never this clock. */
+export const CI_WAIT_BACKOFF_MIN_MS = 15 * 1000
+export const CI_WAIT_BACKOFF_MAX_MS = 90 * 1000
+/** Schema version for the renewable wait stored beside the sha cache. */
+export const CI_WAIT_VERSION = 1
 /** How long an outage-waiver clock may sit unrefreshed before it is forgotten. */
 export const FAMINE_TTL_MS = 7 * 24 * 60 * 60 * 1000
+
+/** Stable identity of one workflow run. GitHub keeps the run id across a
+ * failed-jobs re-run; that is deliberately one wait while `run_attempt` moves. */
+export function ciWaitIdentity({ target, classification } = {}) {
+  const ref = typeof target?.ref === 'string' ? target.ref : ''
+  const sha = typeof target?.sha === 'string' ? target.sha : ''
+  const workflow = typeof classification?.workflowName === 'string' ? classification.workflowName : ''
+  const run = classification?.runId
+  if (!ref || !sha || !workflow || (typeof run !== 'number' && typeof run !== 'string')) return null
+  return `${ref}:${sha}:${workflow}:${String(run)}`
+}
+
+/**
+ * Create or renew the durable observation of an unfinished workflow run.
+ *
+ * The wake token and current-attempt deadline never move on a repeat Stop:
+ * replacing the token would orphan the already-running observer, and replacing
+ * the deadline would silently extend one attempt forever. A failed-jobs re-run
+ * is a new attempt, however, so it gets a fresh budget without replacing the
+ * observer. Last observation and observation count always move. Token creation
+ * stays injected so this module remains deterministic under a fake clock.
+ */
+export function renewCiWait(previous, observation, {
+  now = Date.now(),
+  makeWakeToken = () => '',
+  waitBudgetMs = WAIT_BUDGET_MS,
+} = {}) {
+  try {
+    const identity = ciWaitIdentity(observation)
+    if (!identity || observation?.classification?.state !== 'pending' || !Number.isFinite(Number(now))) return null
+    const same = previous?.v === CI_WAIT_VERSION && previous?.identity === identity && previous?.state === 'pending' && previous?.terminal == null
+    const runAttempt = observation.classification.runAttempt ?? previous?.runAttempt ?? 1
+    const rerunKey = observation.classification.rerunKey ?? previous?.rerunKey ?? null
+    const newAttempt = same && (
+      (observation.classification.rerunKey != null && observation.classification.rerunKey !== previous?.rerunKey) ||
+      (Number.isFinite(Number(observation.classification.runAttempt)) &&
+        Number.isFinite(Number(previous?.runAttempt)) &&
+        Number(observation.classification.runAttempt) > Number(previous.runAttempt))
+    )
+    const firstObservationAt = same && Number.isFinite(previous.firstObservationAt)
+      ? previous.firstObservationAt
+      : Number.isFinite(observation?.observedAt)
+        ? observation.observedAt
+        : Number(now)
+    const observedBudgetStart = Number.isFinite(observation?.firstSeenAt) ? observation.firstSeenAt : firstObservationAt
+    const budgetStartedAt = newAttempt
+      ? (Number.isFinite(observation?.observedAt) ? observation.observedAt : Number(now))
+      : same && Number.isFinite(previous?.budgetStartedAt)
+        ? previous.budgetStartedAt
+        : observedBudgetStart
+    const wakeToken = same && typeof previous.wakeToken === 'string' && previous.wakeToken
+      ? previous.wakeToken
+      : String(makeWakeToken() ?? '')
+    if (!wakeToken) return null
+    return {
+      v: CI_WAIT_VERSION,
+      identity,
+      state: 'pending',
+      ref: observation.target.ref,
+      sha: observation.target.sha,
+      workflow: observation.classification.workflowName,
+      runId: observation.classification.runId,
+      runAttempt,
+      rerunKey,
+      firstObservationAt,
+      budgetStartedAt,
+      lastObservationAt: Number(now),
+      deadline: same && !newAttempt && Number.isFinite(previous.deadline)
+        ? previous.deadline
+        : budgetStartedAt + waitBudgetMs,
+      wakeToken,
+      observations: same && Number.isSafeInteger(previous.observations) ? previous.observations + 1 : 1,
+      observer: same && previous.observer && typeof previous.observer === 'object'
+        ? { ...previous.observer }
+        : null,
+      terminal: null,
+    }
+  } catch {
+    return null
+  }
+}
+
+/** Persist one observer result. Pending renews the observation without changing
+ * identity/deadline/token; terminal keeps the full wait visible for the guarded
+ * successor request. Unknown/API-failure results leave the durable truth alone. */
+export function observeCiWait(wait, classification, { now = Date.now() } = {}) {
+  try {
+    if (wait?.v !== CI_WAIT_VERSION || wait?.state !== 'pending' || !wait?.wakeToken) return wait ?? null
+    const state = String(classification?.state ?? '')
+    if (state === 'pending') {
+      return {
+        ...wait,
+        lastObservationAt: Number(now),
+        observations: Number.isSafeInteger(wait.observations) ? wait.observations + 1 : 1,
+      }
+    }
+    if (state !== 'success' && state !== 'failed') return wait
+    const verdict = state === 'success' ? 'green' : 'red'
+    return {
+      ...wait,
+      state,
+      lastObservationAt: Number(now),
+      observations: Number.isSafeInteger(wait.observations) ? wait.observations + 1 : 1,
+      observer: null,
+      terminal: {
+        state,
+        verdict,
+        observedAt: Number(now),
+        conclusion: classification?.conclusion ?? null,
+        url: classification?.url ?? null,
+      },
+    }
+  } catch {
+    return wait ?? null
+  }
+}
+
+/** Reconcile one completed sweep with the durable wait under the state lock.
+ * Terminal written by a concurrent observer outranks a stale pending response;
+ * a genuinely new run identity can still begin the next wait. */
+export function reconcileCiWait(previous, observations = [], options = {}) {
+  try {
+    const list = Array.isArray(observations) ? observations : []
+    const matching = previous?.identity
+      ? list.find((item) => ciWaitIdentity(item) === previous.identity)
+      : null
+    if (matching?.classification?.state === 'pending') {
+      return previous?.state === 'pending'
+        ? renewCiWait(previous, matching, options) ?? previous
+        : previous ?? null
+    }
+    if (matching) return observeCiWait(previous, matching.classification, options)
+    if (previous?.state === 'pending') return previous
+    const pending = list.find((item) => item?.classification?.state === 'pending')
+    return pending ? renewCiWait(null, pending, options) : previous ?? null
+  } catch {
+    return previous ?? null
+  }
+}
+
+/** Archive the terminal wait only for the successor carrying its wake token. */
+export function acknowledgeCiWaitState(state, wakeToken, { now = Date.now() } = {}) {
+  try {
+    const current = state && typeof state === 'object' ? state : {}
+    const wait = current.ciWait
+    if (!wait?.terminal || typeof wakeToken !== 'string' || wait.wakeToken !== wakeToken) {
+      return { state: current, acknowledged: false }
+    }
+    return {
+      acknowledged: true,
+      state: {
+        ...current,
+        lastCiWait: { ...wait, recoveredAt: now },
+        ciWait: null,
+      },
+    }
+  } catch {
+    return { state: state && typeof state === 'object' ? state : {}, acknowledged: false }
+  }
+}
+
+/** Exponential bounded backoff for the detached observer. The deadline is not
+ * consulted: it releases the interaction, never the observation. */
+export function ciWaitBackoffMs(wait, {
+  minMs = CI_WAIT_BACKOFF_MIN_MS,
+  maxMs = CI_WAIT_BACKOFF_MAX_MS,
+} = {}) {
+  const count = Number.isSafeInteger(wait?.observations) && wait.observations > 0 ? wait.observations : 1
+  return Math.min(Math.max(1, Number(maxMs) || CI_WAIT_BACKOFF_MAX_MS), Math.max(1, Number(minMs) || CI_WAIT_BACKOFF_MIN_MS) * (2 ** Math.min(count - 1, 6)))
+}
 
 /** `%gD` under `--date=unix`: `refs/remotes/origin/x@{1786125241}`. */
 const REFLOG_LINE = /^(.+)@\{(\d+)\}\t([0-9a-f]{7,40})\t(.*)$/
@@ -218,11 +434,21 @@ export function pushedRefsFromReflog(text, { now = Date.now(), windowMs = PUSH_W
 export function refTargets({ pushed = [], existingRefs = [], headSha = '', headPushed = false } = {}) {
   try {
     const exists = new Set(existingRefs)
-    const seenShas = new Set()
+    const seenShas = new Map()
     const live = []
     for (const p of [...pushed].sort((a, b) => Number(b?.at ?? 0) - Number(a?.at ?? 0))) {
-      if (!p?.ref || !p?.sha || !exists.has(p.ref) || seenShas.has(p.sha)) continue
-      seenShas.add(p.sha)
+      if (!p?.ref || !p?.sha || !exists.has(p.ref)) continue
+      const previous = seenShas.get(p.sha)
+      if (previous !== undefined) {
+        // Main always gates. When creating a feature branch pushes main's tip
+        // under a second ref, SHA de-duplication must not discard that fact in
+        // favour of the newer feature-ref reflog entry.
+        if (p.ref === 'origin/main' && live[previous]?.ref !== 'origin/main') {
+          live[previous] = { ref: p.ref, sha: p.sha, at: Number(p.at) || 0 }
+        }
+        continue
+      }
+      seenShas.set(p.sha, live.length)
       live.push({ ref: p.ref, sha: p.sha, at: Number(p.at) || 0 })
     }
     // HEAD's own sha leads: it is what the session is standing on.
@@ -231,6 +457,30 @@ export function refTargets({ pushed = [], existingRefs = [], headSha = '', headP
     return live
   } catch {
     return []
+  }
+}
+
+const branchName = (ref) => String(ref ?? '').trim().replace(/^refs\/remotes\//, '').replace(/^refs\/heads\//, '').replace(/^origin\//, '')
+
+/**
+ * Decide which pushed refs own the supervisor's turn end.
+ *
+ * Main and every branch no longer covered by a live author declaration gate.
+ * A declared author branch remains visible but report-only until that exact
+ * declaration ends. HEAD is conservative because its branch identity was lost
+ * before this pure layer received it.
+ */
+export function selectCiTargets({ targets = [], liveAuthorBranches = [] } = {}) {
+  try {
+    const authored = new Set((Array.isArray(liveAuthorBranches) ? liveAuthorBranches : []).map(branchName).filter(Boolean))
+    return (Array.isArray(targets) ? targets : []).map((target) => {
+      const branch = branchName(target?.ref)
+      const reportOnly = branch !== 'main' && branch !== 'HEAD' && authored.has(branch)
+      return { ...target, disposition: reportOnly ? 'report' : 'gate' }
+    })
+  } catch {
+    // A selection bug may never exempt a ref from the gate.
+    return (Array.isArray(targets) ? targets : []).map((target) => ({ ...target, disposition: 'gate' }))
   }
 }
 
@@ -367,6 +617,7 @@ export async function sweepTargets({
   const nextNotified = { ...notified }
   const nextFamine = { ...famine }
   const failedOpen = []
+  const observations = []
   // The waiver clocks this sweep touched, applied once at the end so the order
   // of the targets cannot decide them.
   const judgedNames = new Set()
@@ -376,13 +627,14 @@ export async function sweepTargets({
   let dirty = false
 
   for (const target of targets) {
+    const gates = target?.disposition !== 'report'
     const entry = nextCache[target.sha]
     const cached = cachedAnswer(entry, now)
     // A sha whose run CONCLUDED green (or that no workflow covers) is never
     // asked about again — this is what keeps the repeat turn free.
     if (cached === 'success' || cached === 'nocheck') continue
     if (cached === 'failed') {
-      if (entry.reason) block ??= entry.reason
+      if (gates && entry.reason) block ??= entry.reason
       continue
     }
     if (cached === 'pending') {
@@ -390,13 +642,26 @@ export async function sweepTargets({
       // keep blocking once the ceiling has passed in the meantime (four-eyes
       // residual (b)). Past it the entry still mutes the API, it just no longer
       // holds the turn.
-      if (refVerdict({ state: 'pending', at: Number(entry.firstSeenAt) || now, now }) === 'wait') {
-        waiting ??= entry.reason
+      const waitStartedAt = Number(entry.budgetStartedAt) || Number(entry.firstSeenAt) || now
+      if (refVerdict({ state: 'pending', at: waitStartedAt, now }) === 'wait') {
+        if (gates) waiting ??= entry.reason
+        observations.push({
+          target,
+          classification: { state: 'pending', runId: entry.runId ?? null, workflowName: entry.workflowName ?? null },
+          firstSeenAt: waitStartedAt,
+          observedAt: now,
+          previousState: entry.state,
+          verdict: 'wait',
+        })
       }
       continue
     }
 
-    const at = Number(target.at) || Number(entry?.firstSeenAt) || now
+    // A re-run is a new attempt on the SAME sha. Its explicit budget origin
+    // therefore outranks the reflog time of the original push on every recheck.
+    const rerunBudgetStartedAt = Number(entry?.budgetStartedAt) || 0
+    const at = rerunBudgetStartedAt || Number(target.at) || Number(entry?.firstSeenAt) || now
+    const keepRerunBudget = rerunBudgetStartedAt > 0 ? { budgetStartedAt: rerunBudgetStartedAt } : {}
     const runs = await fetchRuns(target.sha)
     if (!runs) {
       // Offline / rate-limited / API error → fail OPEN, with the reason STATED
@@ -407,6 +672,7 @@ export async function sweepTargets({
     }
     const classification = classifyRuns(runs, target.sha)
     const verdict = refVerdict({ state: classification.state, at, now })
+    observations.push({ target, classification, firstSeenAt: at, observedAt: now, previousState: entry?.state ?? null, verdict })
     dirty = true
 
     if (verdict === 'green') {
@@ -423,7 +689,7 @@ export async function sweepTargets({
       // an hour later is still judged (four-eyes finding 3): the runner famine
       // that motivated this guard is exactly the case that takes that long.
       failedOpen.push(`${target.ref} ${String(target.sha).slice(0, 7)}: its run never concluded — waited past the budget`)
-      nextCache[target.sha] = { state: 'pending', firstSeenAt: at, checkedAt: now }
+      nextCache[target.sha] = { state: 'pending', firstSeenAt: at, checkedAt: now, ...keepRerunBudget }
       continue
     }
     if (verdict === 'nocheck') {
@@ -437,8 +703,12 @@ export async function sweepTargets({
     }
     if (verdict === 'wait') {
       const reason = waitReason(target, classification)
-      waiting ??= reason
-      nextCache[target.sha] = { state: 'pending', firstSeenAt: at, checkedAt: now, reason }
+      if (gates) waiting ??= reason
+      nextCache[target.sha] = {
+        state: 'pending', firstSeenAt: at, checkedAt: now, reason,
+        runId: classification.runId ?? null, workflowName: classification.workflowName ?? null,
+        ...keepRerunBudget,
+      }
       continue
     }
     if (verdict === 'pass') {
@@ -451,7 +721,7 @@ export async function sweepTargets({
     // RED. WHERE the fault lies decides the remedy: a red the repository cannot
     // fix must not demand a fixing push (point 526), and EVERY failed run on the
     // sha is judged, not just the one classifyRuns names (four-eyes 06.08.2026).
-    const { classification: chosen, standDown, stillFamished, judgedWorkflows } = await judgeRed({
+    const { classification: chosen, standDown, stillFamished, judgedWorkflows, rerunWait } = await judgeRed({
       sha: target.sha,
       runs,
       // What this sweep has learned so far included, so a second red target on
@@ -477,7 +747,7 @@ export async function sweepTargets({
     const alertKey = standDown
       ? `${target.sha}:${chosen.runId}:${new Date(now).toISOString().slice(0, 13)}`
       : target.sha
-    if (shouldNotify(chosen.state, nextNotified[target.ref], alertKey)) {
+    if (gates && shouldNotify(chosen.state, nextNotified[target.ref], alertKey)) {
       await notify({ target, classification: chosen, standDown })
       nextNotified[target.ref] = alertKey
     }
@@ -485,8 +755,20 @@ export async function sweepTargets({
     // A red with NOTHING to do is reported, not sat on (point 528): holding the
     // turn end over GitHub's own outage clears nothing and stops the batch.
     const reason = standDown ? null : blockReason(chosen, target.sha, target.ref)
+    if (standDown && rerunWait?.state === 'pending') {
+      const wait = waitReason(target, rerunWait)
+      if (gates) waiting ??= wait
+      // Dispatch happened NOW; neither the original push nor the original
+      // attempt's queue time may consume the new attempt's wait budget.
+      Object.assign(observations.at(-1), { classification: rerunWait, firstSeenAt: now, verdict: 'wait' })
+      nextCache[target.sha] = {
+        state: 'pending', firstSeenAt: now, budgetStartedAt: now, checkedAt: now, reason: wait,
+        runId: rerunWait.runId ?? null, workflowName: rerunWait.workflowName ?? null,
+      }
+      continue
+    }
     nextCache[target.sha] = { state: 'failed', firstSeenAt: at, checkedAt: now, reason }
-    if (reason) block ??= reason
+    if (gates && reason) block ??= reason
   }
 
   // A workflow still dying the famine way KEEPS its clock; one this sweep judged
@@ -500,6 +782,7 @@ export async function sweepTargets({
     notified: nextNotified,
     famine: nextFamine,
     failedOpen,
+    observations,
     dirty,
   }
 }
@@ -514,7 +797,21 @@ export function waitReason(target, classification) {
     `is still running. A push is not landed until its run is GREEN, and an unfinished ` +
     `run is a wait, not a pass. Sleep about 90 s, then end the turn again — this clears ` +
     `by itself once the run concludes green, fails open after ${Math.round(WAIT_BUDGET_MS / 60000)} ` +
-    `minutes, and the user pausing the batch via .claude/batch-paused clears it too.`
+    `minutes, and an explicit user stop recorded with \`node scripts/batch-pause.mjs --user-stop "<reason>"\` ` +
+    `clears it too.`
+  )
+}
+
+/** The ntfy text for a red pushed ref. Unactionable reds normally stay terse;
+ * one carrying `alertDetail` has a time-bound condition the alert itself must
+ * name, because the turn is deliberately allowed to continue. */
+export function ciRedAlertMessage({ target = {}, classification = {}, standDown = false } = {}) {
+  const c = classification
+  return (
+    `CI failed for pushed ${target.ref ?? '?'} ${String(target.sha ?? '').slice(0, 7)}: ` +
+    `"${c.workflowName ?? '?'}" run ${c.runId ?? '?'} (${c.conclusion ?? '?'}, cause: ${c.cause ?? 'unknown'}` +
+    `${standDown ? ', nothing in the repository can clear it' : ''}). ${c.url ?? ''}` +
+    (c.escalate || c.alertDetail ? ` ${c.detail ?? ''}. ${c.remedy ?? ''}` : '')
   )
 }
 
@@ -548,8 +845,8 @@ export function blockReason(classification, headSha, refName = 'HEAD') {
       head +
       outside +
       `${c.detail ?? ''}. ${c.remedy ?? ''} ${trail}` +
-      `Once that run is green this clears by itself; the user pausing the batch ` +
-      `via .claude/batch-paused also clears it.`
+      `Once that run is green this clears by itself; an explicit user stop recorded with ` +
+      `\`node scripts/batch-pause.mjs --user-stop "<reason>"\` also clears it.`
     )
   }
 
@@ -559,6 +856,7 @@ export function blockReason(classification, headSha, refName = 'HEAD') {
     `Reproduce the fast gate locally (npm run build && npm run lint && ` +
     `node scripts/audit-check.mjs && npm run test:unit), fix the cause, commit and push — ` +
     `CI green is part of done. ${trail}` +
-    `Only a fixing push (or the user pausing the batch via .claude/batch-paused) clears this.`
+    `Only a fixing push (or an explicit user stop recorded with ` +
+    `\`node scripts/batch-pause.mjs --user-stop "<reason>"\`) clears this.`
   )
 }

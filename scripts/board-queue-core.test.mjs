@@ -34,6 +34,7 @@ import {
   parseTaskTitles,
   queueEntries,
   queueOrder,
+  blockedCardBody,
   blockedCardTitle,
   boardSafeTitle,
   renderQueueCard,
@@ -45,13 +46,23 @@ import {
   gatedEntryPoints,
   gatedMeta,
   normaliseGates,
+  frontCandidates,
+  commissionDecision,
+  commissionRefusal,
+  COMMISSION_OVERRIDE_CMD,
+  estimateCompareDecision,
 } from './board-queue-core.mjs'
 import { gateSets } from './user-gate-core.mjs'
+import { POOL_CAP } from './batch-in-flight-core.mjs'
+
+const CONFIRMATION_REASON = 'release-tag: push the version tag, safe prepared state: verified locally and no tag pushed'
+const confirmationLine = (point, title = 'GATED', stamp = '2026-07-29') =>
+  `- [ ] ${point}. ${title} AWAITING-CONFIRMATION(${stamp}; ${CONFIRMATION_REASON})`
 
 const board = (queue) => `<title>B</title>
 <main><h1>Dashboard</h1>
 <details class="sect"><summary><h2>Woran ich gerade arbeite</h2></summary>
-<details class="now"><summary><span class="t">210 — Arbeit</span>
+<details class="now"><summary><span class="num">210</span><span class="t">Arbeit</span>
 <span class="right"><span class="meta">09:00 · bis ~23:00</span></span></summary>
 <div class="body"><p>Status (Stand 09:00): läuft.</p></div></details>
 </details>
@@ -65,6 +76,17 @@ ${queue}
 <p class="archive-link">Ältere im <a href="https://example.invalid/archiv">Archiv</a>.</p>
 </details>
 </main>`
+
+// Occurrence-level reader for generator assertions. The production parser
+// intentionally returns a Set, which is right for coverage checks but cannot
+// prove that a queue card was rendered exactly once.
+const queuePointOccurrences = (html) => {
+  const start = html.indexOf('<h2>Warteschlange')
+  if (start < 0) return []
+  const end = html.indexOf('<h2>', start + 1)
+  const section = html.slice(start, end < 0 ? undefined : end)
+  return [...section.matchAll(/class="num">\s*(\d+)/g)].map((m) => Number(m[1]))
+}
 
 describe('normaliseQueueData — a hand-editable file must degrade, never throw', () => {
   it('keeps the prose and drops everything hostile', () => {
@@ -134,6 +156,23 @@ describe('queueEntries — every open point gets a card, and never two', () => {
       stub: false,
     })
   })
+  // POINT 730 — a card nobody has estimated inherits the MEASURED median of its
+  // criticality class, and the "no estimate yet" marker stays for the rest.
+  it('inherits the measured median of its class when nobody estimated the point', () => {
+    const calibration = { defaults: { medium: 1 }, criticality: new Map([[412, 'medium']]) }
+    expect(queueEntries({ open: [412], calibration })[0].meta).toBe('~1 h · Klassenmedian')
+  })
+  it('keeps the "no estimate yet" marker when the point\'s class was never measured', () => {
+    const calibration = { defaults: { medium: 1 }, criticality: new Map([[412, 'maximum']]) }
+    expect(queueEntries({ open: [412], calibration })[0].meta).toBe(QUEUE_STUB_META)
+    // …and with no measurement at all, nothing about the card changes.
+    expect(queueEntries({ open: [412] })[0].meta).toBe(QUEUE_STUB_META)
+  })
+  it('never overrides a stored estimate with an inherited one', () => {
+    const calibration = { defaults: { medium: 1 }, criticality: new Map([[412, 'medium']]) }
+    const data = { points: { 412: { title: null, body: 'Text.', estimate: '~3 h' } } }
+    expect(queueEntries({ open: [412], data, calibration })[0].meta).toBe('~3 h')
+  })
   it('REFUSES to re-add a point another section already claims', () => {
     // The double-listing trap: the point moved to the now-card must not come
     // back as a queue card, or invariant 4b blocks the very turn that published.
@@ -146,14 +185,14 @@ describe('the user gate (point 450) — a point waiting on the user never jams t
   const gates = (...lines) => gateSets(lines.join('\n'))
 
   it('moves a gated point behind every workable one, whatever the work order says', () => {
-    const g = gates('- [ ] 7. GATED AWAITING-USER(2026-07-29; needs a ruling)')
+    const g = gates(confirmationLine(7))
     expect(queueOrder([7, 8, 9], g)).toEqual([8, 9, 7])
   })
 
   it('keeps several gated points out of the way at once, in their work-order sequence', () => {
     const g = gates(
-      '- [ ] 7. A AWAITING-USER(2026-07-29; a)',
-      '- [ ] 8. B AWAITING-USER(2026-07-30; b)',
+      confirmationLine(7, 'A'),
+      confirmationLine(8, 'B', '2026-07-30'),
     )
     expect(queueOrder([7, 8, 9], g)).toEqual([9, 7, 8])
   })
@@ -164,7 +203,7 @@ describe('the user gate (point 450) — a point waiting on the user never jams t
   })
 
   it('lets an answered point outrank even the head of the work order', () => {
-    const g = gates('- [ ] 9. ANSWERED USER-ANSWERED(2026-08-07)', '- [ ] 7. GATED AWAITING-USER(2026-01-01; why)')
+    const g = gates('- [ ] 9. ANSWERED USER-ANSWERED(2026-08-07)', confirmationLine(7, 'GATED', '2026-01-01'))
     expect(queueOrder([7, 8, 9], g)).toEqual([9, 8, 7])
   })
 
@@ -174,12 +213,12 @@ describe('the user gate (point 450) — a point waiting on the user never jams t
   })
 
   it('takes the raw work order as its gate argument, not only a parsed one', () => {
-    const tasks = '- [ ] 7. GATED AWAITING-USER(2026-07-29; needs a ruling)\n- [ ] 8. B.\n- [ ] 9. C.'
+    const tasks = `${confirmationLine(7)}\n- [ ] 8. B.\n- [ ] 9. C.`
     expect(queueOrder([7, 8, 9], tasks)).toEqual([8, 9, 7])
   })
 
   it('marks the card as waiting on the USER instead of promising a duration', () => {
-    const g = gates('- [ ] 7. GATED AWAITING-USER(2026-07-29; needs a ruling)')
+    const g = gates(confirmationLine(7))
     const data = { points: { 7: { title: 'Gattertitel', body: 'Der Text.', estimate: '~3 h' } } }
     const [e] = queueEntries({ open: [7], data, gates: g })
     expect(e.gated).toBe(true)
@@ -198,25 +237,25 @@ describe('the user gate (point 450) — a point waiting on the user never jams t
   })
 
   it('KEEPS the gated point on the board — a skipped point is never a dropped one', () => {
-    const g = gates('- [ ] 7. GATED AWAITING-USER(2026-07-29; why)')
+    const g = gates(confirmationLine(7))
     expect(queueEntries({ open: [7, 8], gates: g }).map((e) => e.point)).toEqual([8, 7])
   })
 
   it('does not nag for an estimate the gate itself forbids', () => {
-    const g = gates('- [ ] 7. GATED AWAITING-USER(2026-07-29; why)')
+    const g = gates(confirmationLine(7))
     const entries = queueEntries({ open: [7], gates: g })
     expect(unestimatedPoints(entries)).toEqual([])
   })
 
   it('passes the board audit with the gated meta — no block loop while the user is away', () => {
-    const g = gates('- [ ] 412. GATED AWAITING-USER(2026-07-29; why)')
+    const g = gates(confirmationLine(412))
     const { html } = buildQueueSection(board(''), { open: [210, 412], exclude: [210], titles: { 412: 'Neu' }, gates: g })
     expect(html).toContain(QUEUE_GATED_META)
     expect(auditDashboard(html, { open: [210, 412], done: [], nowMinutes: 9 * 60 }).map((x) => x.code)).not.toContain('queue-meta')
   })
 
   it('never imports the gated meta back as the point’s estimate', () => {
-    const g = gates('- [ ] 412. GATED AWAITING-USER(2026-07-29; why)')
+    const g = gates(confirmationLine(412))
     const { html } = buildQueueSection(board(''), { open: [412], titles: { 412: 'Neu' }, gates: g })
     const imported = importQueueFromHtml(html)
     expect(imported.points[412].estimate).toBeNull()
@@ -229,8 +268,17 @@ describe('the user gate (point 450) — a point waiting on the user never jams t
   it('normaliseGates takes text, a parsed result or nothing at all', () => {
     expect(normaliseGates(null).gated.size).toBe(0)
     expect(normaliseGates(undefined).answered.size).toBe(0)
-    expect([...normaliseGates('- [ ] 3. X AWAITING-USER(2026-01-01; y)').gated]).toEqual([3])
-    expect([...normaliseGates(gates('- [ ] 3. X AWAITING-USER(2026-01-01; y)')).gated]).toEqual([3])
+    expect([...normaliseGates(confirmationLine(3, 'X', '2026-01-01')).gated]).toEqual([3])
+    expect([...normaliseGates(gates(confirmationLine(3, 'X', '2026-01-01'))).gated]).toEqual([3])
+  })
+
+  it('keeps an all-advisory queue workable in work-order order', () => {
+    const advisory = [
+      '- [ ] 7. A AWAITING-USER(2026-07-29; choose blue or green)',
+      '- [ ] 8. B SELF-DECIDED(2026-08-23; use the existing layout)',
+    ].join('\n')
+    expect(queueOrder([7, 8], advisory)).toEqual([7, 8])
+    expect(frontCandidates({ open: [7, 8], gates: advisory, count: 2 })).toEqual([7, 8])
   })
 })
 
@@ -242,7 +290,7 @@ describe('buildQueueSection — the projection replaces the section, nothing els
     expect(html).toContain('>Neu<')
     expect(html).not.toContain('>alt<')
     expect(html).toContain('<h2>Erledigt</h2>')
-    expect(html).toContain('210 — Arbeit')
+    expect(html).toContain('<span class="num">210</span><span class="t">Arbeit</span>')
     expect(html).toContain('archive-link')
   })
   it('says so loudly when there is no Warteschlange to project into', () => {
@@ -348,6 +396,17 @@ describe('the one-time import from a hand-written board', () => {
     expect(importQueueFromHtml('<main></main>')).toEqual({ points: {} })
   })
 
+  it('imports every owner from a compound chip through the shared chip reader', () => {
+    const html = board(
+      '<details><summary><span class="num">1000·1003</span><span class="t">Verbund</span>' +
+        '<span class="meta">~2 h</span></summary><div class="body"><p>Gemeinsamer Text.</p></div></details>',
+    )
+    const { points } = importQueueFromHtml(html)
+    expect(Object.keys(points)).toEqual(['1000', '1003'])
+    expect(points[1000]).toEqual({ title: 'Verbund', body: ['Gemeinsamer Text.'], estimate: '~2 h' })
+    expect(points[1003]).toEqual(points[1000])
+  })
+
   // POINT 530: the round trip data → board → data is what destroyed 46 cards.
   it('keeps every rendered <p> as its own paragraph', () => {
     const body = ['Erster Absatz.', 'Zweiter Absatz.', 'Dritter Absatz.']
@@ -378,6 +437,11 @@ describe('the one-time import from a hand-written board', () => {
   it('does not import the generator’s own stub as prose', () => {
     const html = board(renderQueueCard({ point: 4, title: 'Vier', body: null, meta: QUEUE_STUB_META }))
     expect(importQueueFromHtml(html).points[4].body).toBeNull()
+  })
+
+  it('does not import an inherited class median as an authored estimate', () => {
+    const html = board(renderQueueCard({ point: 4, title: 'Vier', body: 'Text.', meta: '~2 h · Klassenmedian' }))
+    expect(importQueueFromHtml(html).points[4].estimate).toBeNull()
   })
 })
 
@@ -652,6 +716,25 @@ describe('parseSetArgs — the flags behind one `set` call', () => {
       estimate: '~2 h Der Text.',
     })
   })
+  it('parses an optional exact estimate guard without storing it as card text', () => {
+    expect(parseSetArgs(['452', '--estimate', '~1 h', '--if-estimate', '~2 h'])).toMatchObject({
+      point: '452',
+      estimate: '~1 h',
+      ifEstimate: '~2 h',
+    })
+    expect(() => parseSetArgs(['452', '--estimate', '~1 h', '--if-estimate', '--title'])).toThrow(
+      /--if-estimate needs an estimate value/,
+    )
+  })
+  it('makes the compare-and-set decision by exact stored value', () => {
+    expect(estimateCompareDecision('~2 h', '~2 h')).toEqual({ matched: true, current: '~2 h', expected: '~2 h' })
+    expect(estimateCompareDecision('~2,5 h', '~2 h')).toEqual({
+      matched: false,
+      current: '~2,5 h',
+      expected: '~2 h',
+    })
+    expect(estimateCompareDecision(null, '~2 h').matched).toBe(false)
+  })
   it('names which field --text-stdin fills — the umlaut-safe path for a TITLE', () => {
     expect(parseSetArgs(['452', '--text-stdin']).stdinField).toBe('body')
     expect(parseSetArgs(['452', '--title', '--text-stdin']).stdinField).toBe('title')
@@ -709,7 +792,7 @@ describe('the rendered queue — one flat list, no bundle left in the markup', (
   it('lists every open point exactly ONCE, in the queue order the cards are read in', () => {
     const open = [465, 439, 184, 295, RELEASE_TAG_POINT]
     const { html, entries } = built(open)
-    const rendered = [...html.matchAll(/class="num">(\d+)</g)].map((m) => Number(m[1]))
+    const rendered = queuePointOccurrences(html)
     expect(rendered).toEqual(entries.map((e) => e.point))
     expect(new Set(rendered).size).toBe(rendered.length)
     expect(rendered.slice().sort((a, b) => a - b)).toEqual(open.slice().sort((a, b) => a - b))
@@ -722,8 +805,7 @@ describe('the rendered queue — one flat list, no bundle left in the markup', (
   // 10.08.2026 and the published board kept showing the old plan.
   it('re-sequencing the work order re-sequences the rendered cards, nothing else edited', () => {
     const data = { points: { 439: { title: 'A', body: 'Eins.' }, 465: { title: 'B', body: 'Zwei.' } } }
-    const cards = (open) =>
-      [...built(open, data).html.matchAll(/class="num">(\d+)</g)].map((m) => Number(m[1]))
+    const cards = (open) => queuePointOccurrences(built(open, data).html)
     expect(cards([439, 465, 295])).toEqual([439, 465, 295])
     expect(cards([295, 465, 439])).toEqual([295, 465, 439])
   })
@@ -736,8 +818,9 @@ describe('the rendered queue — one flat list, no bundle left in the markup', (
     const tasks = readFileSync(resolve(REPO_ROOT, 'TASKS.md'), 'utf8')
     const open = openPointsOf(tasks)
     const { html } = buildQueueSection(board(''), { open, titles: parseTaskTitles(tasks) })
-    const rendered = [...html.matchAll(/class="num">(\d+)</g)].map((m) => Number(m[1]))
+    const rendered = queuePointOccurrences(html)
     expect(rendered.slice().sort((a, b) => a - b)).toEqual(open.slice().sort((a, b) => a - b))
+    expect(new Set(rendered).size).toBe(rendered.length)
     expect(html).not.toContain('class="group"')
   })
 
@@ -840,6 +923,23 @@ describe('the pending-request card', () => {
     expect(t).not.toMatch(/\(462\)/)
   })
 
+  it('neutralises uncapped point references without rewriting only a numeric prefix', () => {
+    expect(boardSafeTitle('Punkt 1000 folgt (1003)')).toBe('Punkt Nr. 1000 folgt [1003]')
+    expect(boardSafeTitle('point 10000')).toBe('point Nr. 10000')
+    const card = renderRequestsCard([
+      { at: '2026-07-30T20:11:00.000Z', title: 'Punkt 1000 folgt (1003)', route: 'tasks' },
+    ])
+    const html = `<h2>Warteschlange</h2>${card}<h2>Erledigt</h2>`
+    expect(card).toContain('<div class="body">')
+    const unsafe = html.replace('Punkt Nr. 1000', 'Punkt 1000').replace('[1003]', '(1003)')
+    expect(evaluateTopic({ dashboardHtml: unsafe, tasksText: '- [ ] 1000. A\n- [ ] 1003. B\n' }).block).toBe(true)
+    expect(evaluateTopic({ dashboardHtml: html, tasksText: '- [ ] 1000. A\n- [ ] 1003. B\n' }).block).toBe(false)
+  })
+
+  it('neutralises a parenthesized year without falsely labelling it as a point', () => {
+    expect(boardSafeTitle('Bilanz (2026) prüfen')).toBe('Bilanz [2026] prüfen')
+  })
+
   it('truncates a long title rather than filling the card with one', () => {
     const t = boardSafeTitle('Ein sehr langer Titel, der auf einem Telefon niemals in eine Zeile passen würde')
     expect(t.length).toBeLessThanOrEqual(60)
@@ -881,6 +981,34 @@ describe('the pending-request card', () => {
     expect(safe).not.toMatch(/\(465\)/)
   })
 
+  it('neutralises the foreign reason before the owner publishes its card', () => {
+    const body = blockedCardBody(
+      'Bitte fuer Punkt 1004 pruefen (1004) in scripts/finding.mjs, §6 und ab12345.\n\n' +
+        'Der zweite Absatz erklärt, warum die Entscheidung getrennt bleiben muss.',
+    )
+    expect(body).toContain('Bitte für Punkt Nr. 1004 prüfen [1004] in scripts/finding.mjs, §6 und ab12345.')
+    expect(body).toContain('\n\nDer zweite Absatz erklärt')
+    expect(body).not.toMatch(/\bPunkt 1004\b|\(1004\)/)
+    expect(body).toContain('scripts/finding.mjs')
+    expect(body).toContain('§6')
+    expect(body).toContain('ab12345')
+    expect(paragraphs(body)).toHaveLength(3)
+    expect(findTransliterations(body)).toEqual([])
+    const html =
+      '<h2>Von dir zu klären</h2><details><summary><span class="t">Anfrage nicht übernehmbar</span></summary>' +
+      `<div class="body"><p>${body}</p></div></details><h2>Warteschlange</h2>`
+    expect(evaluateTopic({ dashboardHtml: html, tasksText: '- [ ] 1004. Vierstelliger Punkt.\n' }).block).toBe(false)
+  })
+
+  it('repairs prose without rewriting transliterated file paths or URLs', () => {
+    const reason =
+      'Bitte fuer scripts/fuehrung-pruefen.mjs und C:\\tmp\\zurueck.md pruefen; ' +
+      'Details: https://example.invalid/fuer/pruefung.'
+    const body = blockedCardBody(reason)
+    expect(body).toContain('Bitte für scripts/fuehrung-pruefen.mjs und C:\\tmp\\zurueck.md prüfen;')
+    expect(body).toContain('https://example.invalid/fuer/pruefung.')
+  })
+
   it('keeps a hostile title out of the audit on the real card', () => {
     const html = renderRequestsCard([
       { at: '2026-07-30T20:11:00.000Z', title: 'Bitte fuer Punkt 465 pruefen (465) scripts/finding.mjs', route: 'tasks' },
@@ -912,5 +1040,194 @@ describe('the request card inside a rebuilt queue', () => {
     expect(codes.filter((c) => c !== 'queue-stubbed')).toEqual([])
     expect(concisenessOffenders(html)).toEqual([])
     expect(evaluateTopic({ dashboardHtml: html, tasksText: '- [ ] 439. X\n- [ ] 465. Y\n' }).block).toBe(false)
+  })
+})
+
+// ---- THE QUEUE BINDS THE PICKER (point 712) --------------------------------
+//
+// The measured 17.08.2026 state is the fixture the blocks below run on: point
+// 697 was commissioned while the derived sequence read `700 701 707 708 711 705
+// 706 710 662 …`, and nothing refused it.
+
+/** The open sequence as the work order carried it on 17.08.2026, abridged after
+ *  the head that matters — the order is what is under test, not the length. */
+const QUEUE_17_08 = [700, 701, 707, 708, 711, 705, 706, 710, 662, 553, 596, 597, 686, 687, 697]
+
+describe('frontCandidates — the workable head of the derived order', () => {
+  it('is the first `count` open points of queueOrder', () => {
+    expect(frontCandidates({ open: QUEUE_17_08 })).toEqual([700, 701, 707])
+    expect(frontCandidates({ open: QUEUE_17_08, count: 1 })).toEqual([700])
+    expect(frontCandidates({ open: QUEUE_17_08, count: 5 })).toEqual([700, 701, 707, 708, 711])
+  })
+
+  it('SKIPS a user-gated point — it cannot be worked, so it may not hold a slot open', () => {
+    const gates = { gated: new Set([700, 701]), answered: new Set(), since: new Map() }
+    expect(frontCandidates({ open: QUEUE_17_08, gates })).toEqual([707, 708, 711])
+  })
+
+  it('SKIPS a point already in flight, so the window stays three real candidates deep', () => {
+    expect(frontCandidates({ open: QUEUE_17_08, inFlight: [700, 707] })).toEqual([701, 708, 711])
+  })
+
+  it('lifts an ANSWERED point to the head, exactly as the board ranks it', () => {
+    const gates = { gated: new Set(), answered: new Set([662]), since: new Map() }
+    expect(frontCandidates({ open: QUEUE_17_08, gates })).toEqual([662, 700, 701])
+  })
+
+  it('accepts the raw work-order text as its gates, like every other queue rule', () => {
+    const tasks = `- [ ] 700. A\n${confirmationLine(701, 'B', '2026-08-17')}\n- [ ] 707. C\n- [ ] 708. D\n`
+    expect(frontCandidates({ open: [700, 701, 707, 708], gates: tasks })).toEqual([700, 707, 708])
+  })
+
+  it('never throws and never invents a candidate on hostile input', () => {
+    expect(frontCandidates()).toEqual([])
+    expect(frontCandidates({ open: [], inFlight: 'nonsense' })).toEqual([])
+    expect(frontCandidates({ open: QUEUE_17_08, count: 0 })).toHaveLength(POOL_CAP)
+    expect(frontCandidates({ open: QUEUE_17_08, count: -4 })).toHaveLength(POOL_CAP)
+    expect(frontCandidates({ open: QUEUE_17_08, count: 2.7 })).toEqual([700, 701])
+    expect(frontCandidates({ open: QUEUE_17_08, inFlight: [null, 'x', 0, -1] })).toEqual([700, 701, 707])
+  })
+})
+
+describe('commissionDecision — the real 17.08.2026 pick is refused', () => {
+  it('REFUSES point 697 against that queue and names 700, 701 and 707', () => {
+    const d = commissionDecision({ point: 697, open: QUEUE_17_08 })
+    expect(d.allowed).toBe(false)
+    expect(d.why).toBe('behind-front')
+    expect(d.candidates).toEqual([700, 701, 707])
+    expect(d.position).toBe(15)
+    expect(d.total).toBe(15)
+    const text = commissionRefusal(d)
+    expect(text).toContain('697')
+    expect(text).toContain('700, 701, 707')
+    expect(text).toContain('15 of 15')
+    expect(text).toContain('--override')
+  })
+
+  it('ACCEPTS a front candidate — each of the three, not merely the first', () => {
+    for (const n of [700, 701, 707]) {
+      expect(commissionDecision({ point: n, open: QUEUE_17_08 })).toMatchObject({ allowed: true, why: 'at-front' })
+    }
+  })
+
+  it('lets the fourth point through the moment the three ahead of it are in flight', () => {
+    expect(commissionDecision({ point: 708, open: QUEUE_17_08 })).toMatchObject({ allowed: false })
+    expect(commissionDecision({ point: 708, open: QUEUE_17_08, inFlight: [700, 701, 707] })).toMatchObject({
+      allowed: true,
+      why: 'at-front',
+    })
+  })
+
+  it('skips a GATED point when the front three are chosen, and refuses commissioning it', () => {
+    const gates = { gated: new Set([701]), answered: new Set(), since: new Map() }
+    const d = commissionDecision({ point: 708, open: QUEUE_17_08, gates })
+    expect(d.candidates).toEqual([700, 707, 708])
+    expect(d).toMatchObject({ allowed: true, why: 'at-front' })
+    const gated = commissionDecision({ point: 701, open: QUEUE_17_08, gates })
+    expect(gated).toMatchObject({ allowed: false, why: 'user-gated' })
+    expect(commissionRefusal(gated)).toContain('WAITING FOR CONFIRMATION')
+  })
+
+  // THE GATED REFUSAL NAMES THE REMEDY THAT ACTUALLY LIFTS IT, AND NO OTHER
+  // (fourth review, finding 13). Printing the override command here sent the
+  // reader into a recorded-then-ignored loop: the decision asks the gate BEFORE
+  // the override, so following that remedy records a reason that changes
+  // nothing and the guard denies again.
+  it('the GATED refusal never prints the override command, and names the user\'s word instead', () => {
+    const gates = { gated: new Set([701]), answered: new Set(), since: new Map() }
+    const text = commissionRefusal(commissionDecision({ point: 701, open: QUEUE_17_08, gates }))
+    expect(text).not.toContain('--override')
+    expect(text).not.toContain(COMMISSION_OVERRIDE_CMD)
+    expect(text).toContain('AWAITING-CONFIRMATION')
+    expect(text).toContain("user's answer")
+    expect(text).toContain('NOT honoured')
+    // …while the ORDINARY queue refusal keeps the override as its recorded escape.
+    const behind = commissionRefusal(commissionDecision({ point: 697, open: QUEUE_17_08 }))
+    expect(behind).toContain(COMMISSION_OVERRIDE_CMD)
+  })
+
+  it('skips an IN-FLIGHT point when the front three are chosen', () => {
+    const d = commissionDecision({ point: 708, open: QUEUE_17_08, inFlight: [701] })
+    expect(d.candidates).toEqual([700, 707, 708])
+    expect(d.allowed).toBe(true)
+  })
+
+  it('ACCEPTS an override with a recorded reason and reports the reason back', () => {
+    const d = commissionDecision({ point: 697, open: QUEUE_17_08, override: '  red on main masks other suites  ' })
+    expect(d).toMatchObject({ allowed: true, why: 'override' })
+    expect(d.override).toBe('red on main masks other suites')
+  })
+
+  it('takes an EMPTY or whitespace override as no override at all — silence is the forbidden way', () => {
+    for (const override of ['', '   ', '\n\t', null, undefined]) {
+      expect(commissionDecision({ point: 697, open: QUEUE_17_08, override }).allowed).toBe(false)
+    }
+  })
+
+  it('does not override a USER GATE — a gated point waits, whatever reason is typed', () => {
+    const gates = { gated: new Set([697]), answered: new Set(), since: new Map() }
+    expect(commissionDecision({ point: 697, open: QUEUE_17_08, gates, override: 'urgent' })).toMatchObject({
+      allowed: false,
+      why: 'user-gated',
+    })
+  })
+
+  it('lets work on a point already in flight through — that is finishing, not opening', () => {
+    expect(commissionDecision({ point: 697, open: QUEUE_17_08, inFlight: [697] })).toMatchObject({
+      allowed: true,
+      why: 'already-in-flight',
+    })
+  })
+
+  // THE INTERSECTION, which the two cases above miss between them (Sol, review of
+  // 91d88f9a): a gated point WITH a branch standing. Asked in the other order, an
+  // open branch bought every further commissioning on a point the user has
+  // stopped — the opposite of "cannot be worked at all".
+  it('a GATED point stays refused even while its branch stands open', () => {
+    const gates = { gated: new Set([697]), answered: new Set(), since: new Map() }
+    const d = commissionDecision({ point: 697, open: QUEUE_17_08, gates, inFlight: [697] })
+    expect(d).toMatchObject({ allowed: false, why: 'user-gated' })
+    expect(commissionRefusal(d)).toContain('WAITING FOR CONFIRMATION')
+    // …and with a typed reason on top of the branch, still refused.
+    expect(
+      commissionDecision({ point: 697, open: QUEUE_17_08, gates, inFlight: [697], override: 'urgent' }).allowed,
+    ).toBe(false)
+  })
+
+  it('cannot judge, so it ALLOWS: no point, no work order, a point the order does not carry', () => {
+    expect(commissionDecision({ open: QUEUE_17_08 })).toMatchObject({ allowed: true, why: 'no-point' })
+    expect(commissionDecision({ point: 0, open: QUEUE_17_08 }).why).toBe('no-point')
+    expect(commissionDecision({ point: 'x', open: QUEUE_17_08 }).why).toBe('no-point')
+    expect(commissionDecision({ point: 697, open: [] })).toMatchObject({ allowed: true, why: 'no-work-order' })
+    expect(commissionDecision({ point: 999, open: QUEUE_17_08 })).toMatchObject({
+      allowed: true,
+      why: 'not-in-work-order',
+    })
+  })
+
+  it('ALLOWS when the front offers nothing — a refusal naming no alternative is a trap', () => {
+    const gates = { gated: new Set(QUEUE_17_08), answered: new Set(), since: new Map() }
+    const d = commissionDecision({ point: 999, open: QUEUE_17_08, gates })
+    expect(d.candidates).toEqual([])
+    expect(d).toMatchObject({ allowed: true, why: 'not-in-work-order' })
+    // …and with every OTHER point in flight, the one left is still commissionable.
+    const busy = QUEUE_17_08.filter((n) => n !== 697)
+    expect(commissionDecision({ point: 697, open: QUEUE_17_08, inFlight: busy })).toMatchObject({
+      allowed: true,
+      why: 'at-front',
+    })
+  })
+
+  it('never throws on hostile input', () => {
+    expect(() => commissionDecision()).not.toThrow()
+    expect(commissionDecision().allowed).toBe(true)
+    expect(() => commissionRefusal()).not.toThrow()
+    expect(commissionRefusal()).toContain('?')
+    expect(commissionRefusal({ point: 5, candidates: [], position: null, total: 0 })).toContain('no workable candidate')
+  })
+
+  it('follows the pool cap rather than a second number', () => {
+    expect(commissionDecision({ point: 708, open: QUEUE_17_08, cap: 4 })).toMatchObject({ allowed: true })
+    expect(commissionDecision({ point: 708, open: QUEUE_17_08, cap: POOL_CAP })).toMatchObject({ allowed: false })
   })
 })

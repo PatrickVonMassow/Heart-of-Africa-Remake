@@ -55,6 +55,7 @@ import { assessClaim, reservationDecision } from './batch-claim-core.mjs'
 import { isPaused } from './batch-lock.mjs'
 import { openPointStatus, ARCHIVE_PATH, TASKS_PATH } from './tasks-source.mjs'
 import { buildSpawnArgs, buildSpawnOptions, resolveClaudeCli, cliSearchSummary } from './batch-autostart-core.mjs'
+import { currentFableState } from './fable-switch.mjs'
 import {
   CLAIM_SESSION_PREFIX,
   DEFERRAL_MS,
@@ -292,7 +293,9 @@ function spawnResponder(messages) {
     // windowsHide + detached + the background-task ceiling all come from the
     // launcher's own builder (point 401: a popping console window steals the
     // user's focus, and this process wakes while the user is elsewhere).
-    child = spawn(exe, buildSpawnArgs({ prompt }), buildSpawnOptions({ cwd: REPO_ROOT, stdio: ['ignore', out, out] }))
+    const fableState = currentFableState()
+    if (!fableState.ok) throw new Error(fableState.problem)
+    child = spawn(exe, buildSpawnArgs({ prompt, fableState }), buildSpawnOptions({ cwd: REPO_ROOT, stdio: ['ignore', out, out] }))
   } catch (e) {
     log({ event: 'spawn-failed', reason: (e && e.message) || String(e) })
     return false
@@ -368,10 +371,10 @@ function shutdown(why, code = 0) {
   try {
     if (state.childTimer) clearTimeout(state.childTimer)
     if (state.sweepTimer) clearInterval(state.sweepTimer)
-    // A responder is OURS, so an orderly stop takes it with us: the launcher
-    // stops this process precisely when the batch is paused, and leaving a
-    // headless session behind under a claim nobody holds any more is the exact
-    // orphan the pause is meant to prevent.
+    // A responder is OURS, so an orderly stop takes it with us. The launcher
+    // keeps this process through a batch pause so user mail can end that pause;
+    // any other shutdown still must not leave a headless session under a claim
+    // nobody holds any more.
     if (state.child) {
       try {
         process.kill(state.child.pid)

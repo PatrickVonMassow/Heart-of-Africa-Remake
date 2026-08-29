@@ -26,6 +26,7 @@ import {
   MANDATE_MAX_AGE_MS,
   PID_START_TOLERANCE_MS,
 } from './batch-doctor-core.mjs'
+import { recordDoctorGateMeasurement } from './decision-log-core.mjs'
 
 const quiet = { level: 'quiet', reasons: [], agentWorktrees: [] }
 const busy = { level: 'busy', reasons: ['CPU 91 % busy over 1 s'], agentWorktrees: [] }
@@ -45,6 +46,24 @@ describe('planRemediation', () => {
     const plan = planRemediation(clean)
     expect(isConsistent(plan)).toBe(true)
     expect(needsRepair(plan)).toBe(false)
+  })
+
+  it('reports a worktree-private batch lock as torn and never as authority', () => {
+    const path = '/repo/.claude/worktrees/point-1/.claude/batch-lock.json'
+    const plan = planRemediation({ ...clean, privateBatchLock: { path } })
+    expect(plan).toMatchObject([{ action: 'alert-private-batch-lock', level: 'alert' }])
+    expect(plan[0].reason).toContain(path)
+    expect(needsRepair(plan)).toBe(false)
+  })
+
+  it('plans the supported owner-id repair as a generation-checked transition', () => {
+    const plan = planRemediation({
+      ...clean,
+      tornOwnerSession: { recordedSessionId: 'x', sessionId: 'real-session' },
+    })
+    expect(plan).toMatchObject([{ action: 'repair-owner-session-id', level: 'repair' }])
+    expect(plan[0].reason).toContain('transitionOwnerSession')
+    expect(needsRepair(plan)).toBe(true)
   })
 
   it('ahead-only (unpushed owner commits) is the NORMAL state — no action', () => {
@@ -293,6 +312,30 @@ describe('shouldRecordSatisfaction — only a judgeable green may clear the dema
   it('a real red, or a repair still pending, keeps the demand live', () => {
     expect(shouldRecordSatisfaction({ gateRan: true, broken: true })).toBe(false)
     expect(shouldRecordSatisfaction({ gateRan: true, pendingRepair: true })).toBe(false)
+  })
+})
+
+describe('recordDoctorGateMeasurement — durable decision expiry evidence', () => {
+  it('records a dirty measurement without inventing a clean result', () => {
+    const state = recordDoctorGateMeasurement({ handledAt: 10 }, { at: 20, clean: false, detail: 'lint failed' })
+    expect(state.handledAt).toBe(10)
+    expect(state.measurements['batch-doctor-gate']).toEqual({
+      lastRunAt: 20,
+      lastVerdict: 'dirty',
+      lastDetail: 'lint failed',
+    })
+  })
+
+  it('retains the clean proof when a later run is dirty, so an expired decision cannot return', () => {
+    const clean = recordDoctorGateMeasurement({}, { at: 20, clean: true, detail: 'repo state CONSISTENT' })
+    const later = recordDoctorGateMeasurement(clean, { at: 30, clean: false, detail: 'unit failed' })
+    expect(later.measurements['batch-doctor-gate']).toMatchObject({
+      lastRunAt: 30,
+      lastVerdict: 'dirty',
+      lastDetail: 'unit failed',
+      cleanAt: 20,
+      cleanDetail: 'repo state CONSISTENT',
+    })
   })
 })
 

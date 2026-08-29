@@ -94,15 +94,15 @@ export function retryAttempts({ statePath = STATE_PATH, path = PAUSE_PATH } = {}
 }
 
 /**
- * Park the batch. A park carries a RESTART CLOCK unless its cause is on the short
- * unsafe list of batch-pause-core.mjs (`CLOCKLESS_CAUSES`) or the ladder is spent.
+ * Park the batch. Every automatic park carries a RESTART CLOCK; only an explicit
+ * `{ cause: 'user-stop' }` is written as a typed clockless user stop.
  *
  * `setPaused(reason)` therefore now writes a clocked park by default, which is the
  * whole point of 445: an unattended cause that clears itself must not cost the rest
  * of the absence. A caller that means "hold until a human comes" passes a clockless
- * cause (e.g. `{ cause: 'user-stop' }`) or `{ retryAfter: null }` outright. The rung
- * comes from `retryAttempts()` unless the caller names one, so a repeating cause
- * climbs to a clockless park instead of oscillating for ever.
+ * cause (`{ cause: 'user-stop' }`). A bare `{ retryAfter: null }` is deliberately
+ * not proof and the launcher recovers it. The rung comes from `retryAttempts()`
+ * unless the caller names one; a spent ladder keeps probing at its capped interval.
  */
 export function setPaused(reason, { cause = null, attempt, retryAfter, now = Date.now(), path = PAUSE_PATH, statePath = STATE_PATH } = {}) {
   const rung = Number.isFinite(attempt) ? attempt : retryAttempts({ statePath, path })

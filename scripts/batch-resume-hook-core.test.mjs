@@ -6,6 +6,7 @@ import {
   STAND_DOWN_KINDS,
   allGatedMessage,
   openPointsHeadline,
+  ownerRunbookContext,
   standDownKind,
   standDownMessage,
 } from './batch-resume-hook-core.mjs'
@@ -23,6 +24,23 @@ const watcherClaim = (responderPid) =>
   })
 const userClaim = { v: 1, sessionId: 'user-window-1', pid: 55, pidStartedAt: now - 9000, at: now - 9000 }
 const liveLock = { sessionId: 'owner-1', pid: 42, claimedAt: now - 120_000 }
+
+describe('ownerRunbookContext — role-specific policy stays with the owner', () => {
+  it.each(['acquired-spawn', 'acquired', 'mine'])('serves the runbook to %s', (ownership) => {
+    const text = ownerRunbookContext(ownership, '# Dispatch\nOwner duty.')
+    expect(text).toContain('OWNER-ONLY BATCH RUNBOOK')
+    expect(text).toContain('Owner duty.')
+  })
+
+  it.each(['none', 'reserved', 'stand-down', undefined])('serves nothing to %s', (ownership) => {
+    expect(ownerRunbookContext(ownership, 'secret owner mechanics')).toBe('')
+  })
+
+  it('does not inject an empty or unreadable runbook', () => {
+    expect(ownerRunbookContext('mine', '')).toBe('')
+    expect(ownerRunbookContext('mine', null)).toBe('')
+  })
+})
 
 describe('standDownKind — which of the four situations reached this branch', () => {
   it('THIS session is the responder when the watcher claim names its own claude process', () => {
@@ -251,14 +269,14 @@ describe('the open-point headline (point 440)', () => {
   it('NAMES the points waiting on the user, and never offers one as the next (point 450)', () => {
     const text = openPointsHeadline([174, 184], { gated: [462, 463] })
     expect(text).toContain('2 open point(s)')
-    expect(text).toContain('WAIT ON THE USER')
+    expect(text).toContain('AWAIT CONFIRMATION')
     expect(text).toContain('462, 463')
     expect(text).toContain('point-brief.mjs 174') // the next point is still a workable one
     expect(text).toContain('--clear')
   })
 
   it('says nothing about gates when none exist — the headline is unchanged', () => {
-    expect(openPointsHeadline([174, 184])).not.toContain('WAIT ON THE USER')
+    expect(openPointsHeadline([174, 184])).not.toContain('AWAIT CONFIRMATION')
     expect(openPointsHeadline([174, 184], { gated: [] })).toBe(openPointsHeadline([174, 184]))
   })
 
@@ -272,7 +290,7 @@ describe('the open-point headline (point 440)', () => {
 
   it('speaks when EVERYTHING waits on the user — silence would read as finished', () => {
     const text = allGatedMessage([462, 463])
-    expect(text).toContain('WAITS ON THE USER')
+    expect(text).toContain('AWAITS CONFIRMATION')
     expect(text).toContain('462, 463')
     expect(text).toContain('do NOT begin one')
     expect(text).toContain('--clear')
@@ -295,5 +313,25 @@ describe('the open-point headline (point 440)', () => {
     const hook = readFileSync(join(dirname(fileURLToPath(import.meta.url)), 'batch-resume-hook.mjs'), 'utf8')
     expect(hook).toContain('openPointsHeadline(nums, { gated: gatedNums })')
     expect(hook).not.toContain("open point(s): ${nums}")
+  })
+
+  it('derives the serving chain from the Fable switch instead of spelling one inline', () => {
+    const hook = readFileSync(join(dirname(fileURLToPath(import.meta.url)), 'batch-resume-hook.mjs'), 'utf8')
+    expect(hook).toContain('servingPolicyLine(fableState)')
+    expect(hook).not.toContain("'Fable 5, then Opus 4.8")
+  })
+
+  it('orients every owning successor through the child-output measurement', () => {
+    const hook = readFileSync(join(dirname(fileURLToPath(import.meta.url)), 'batch-resume-hook.mjs'), 'utf8')
+    expect(hook).toContain('gatherSuccessorAgentOrientation(sessionId, { now })')
+    expect(hook).toContain('${agentLine}${ownerContext}')
+    expect(hook).toContain('PREDECESSOR CHILD STATE UNKNOWN')
+  })
+
+  it('serves the same transfer-and-measure rule from the owner runbook', () => {
+    const runbook = readFileSync(join(dirname(fileURLToPath(import.meta.url)), '..', 'docs', 'batch-owner-runbook.md'), 'utf8')
+    expect(runbook).toMatch(/transfers pushed author\s+checkpoints/)
+    expect(runbook).toContain('batch-in-flight.mjs --agent-check')
+    expect(runbook).toContain('unreadable output is unknown, not death')
   })
 })

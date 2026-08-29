@@ -1,0 +1,204 @@
+{
+ "mergedBy": "Claude Fable 5",
+ "mergedByNote": "Folded 26.08.2026 by Claude Fable 5, which wrote neither half: half A is Claude Opus 5, half B is GPT-5.6 Sol (both labels settled by 713-provenance.md). Authorised by the fable-switch record — ON since 2026-08-22T16:26:48.740Z. The 19.08.2026 union recorded in docs/blind-713/union.json was folded under a Sol trailer, which is an author of half B, so it does not satisfy CLAUDE.md §6 and is superseded here.",
+ "modelA": "Claude Opus 5",
+ "modelB": "GPT-5.6 Sol",
+ "entries": [
+  {
+   "id": "M1",
+   "file": "TASKS.md",
+   "defect": "DEFECT: on 17.08.2026 the now-section was empty at 19:59 and held only point 700 at 20:07, while `batch-in-flight --status` declared 697, 700 and 711 in flight, all pushed and none merged; nine open `feat/*` branches were not themselves proof of active work. No existing guard covers this: the actual-work check accepts evidence for any displayed point and never compares the COMPLETE active-point set, and the queue, topic, conciseness and done-claim guards address different invariants — the section is the last part of the board with no source but a hand.",
+   "from": [
+    "A1",
+    "B1"
+   ]
+  },
+  {
+   "id": "M2",
+   "file": "scripts/board-core.mjs",
+   "defect": "FINAL STATE: the SET of now-cards is a projection of the authoritative in-flight declaration while each card's German reader-facing prose stays explicitly human-authored — the same split the Warteschlange already uses. DECIDED: the source is the structured record ALONE; A2's additional clause that open `feat/<N>` branches also feed the set loses, because nine branches stood open while only three points were in flight and branch-name guessing is exactly the heuristic that could not be closed (see M4). Wholly hand-maintained membership is rejected because it caused the measured omission; wholesale prose generation is rejected because point 491 proves regeneration can destroy authored meaning.",
+   "from": [
+    "A2",
+    "B2"
+   ]
+  },
+  {
+   "id": "M3",
+   "file": "scripts/board-core.mjs",
+   "defect": "FINAL STATE: the render makes the section carry exactly one numbered card per active point — it CREATES a card for an in-flight point that has none and REMOVES one whose point is no longer in the record. DECIDED: removal is projection-driven as the work order words it, not gated on B5's explicit exit-transition ceremony — a point absent from the normalized record loses its now-card; B5's destinations survive as the description of where the point then stands (landed to Erledigt, returned to the work-order queue position, blocked solely on the user to \"Von dir zu klären\", reopened back to the queue until recommissioned).",
+   "from": [
+    "A3",
+    "B5"
+   ]
+  },
+  {
+   "id": "M4",
+   "file": "scripts/batch-in-flight-core.mjs",
+   "defect": "FINAL STATE: open or recently moving branches that are ABSENT from the structured record create no now-cards, and an untagged legacy strand, malformed point, closed/unknown TASKS point, contradictory checkpoint or unreadable record is an unresolved state that is reported loudly and never interpreted as zero active points. DECIDED for Sol against the point's original branch-scan clause: only the structured record may create a card, because every branch-name heuristic grew a new edge across five review rounds and the record is the one place the mapping is actually known.",
+   "from": [
+    "B4"
+   ]
+  },
+  {
+   "id": "M5",
+   "file": "scripts/board-core.mjs",
+   "defect": "FINAL STATE: an existing card's authored prose survives every render byte-for-byte — a render that would blank or replace written title, body, Unicode, links or metadata refuses or restores it (point 491's lesson applied in advance), prose and section-specific metadata change only from explicit operator input, and a deliberate replacement preserves the previous copy until the whole operation succeeds; conflicting duplicate copies for one point refuse reconciliation without modifying any card. B7's further claim that the render never creates stub copy is decided against in M6 — it applies to EXISTING text only.",
+   "from": [
+    "A4",
+    "B7"
+   ]
+  },
+  {
+   "id": "M6",
+   "file": "scripts/board-core.mjs",
+   "defect": "FINAL STATE: a card the render creates for a newly active point with no copy is a visible STUB that says it needs its text, so an unwritten card is never silently empty. DECIDED against B7's \"missing copy refuses reconciliation\": refusing would leave the section incomplete, which is the measured defect itself; a marked stub where nothing existed destroys no authored meaning, so 491's lesson (protected in M5) is not violated — this follows the point's recorded final-state wording.",
+   "from": [
+    "A5"
+   ]
+  },
+  {
+   "id": "M7",
+   "file": "scripts/dashboard-integrity-guard-core.mjs",
+   "defect": "FINAL STATE: while anything is in flight, an empty (or incomplete) now-section BLOCKS the turn end, naming the missing point numbers.",
+   "from": [
+    "A6"
+   ]
+  },
+  {
+   "id": "M8",
+   "file": "scripts/board-core.mjs",
+   "defect": "FINAL STATE: a VERIFIED zero-point active record renders a dedicated, parser-distinct NON-card German empty-state element meaning \"there is currently no demonstrably active point\", so a reader can tell \"nothing is running\" from \"nobody wrote it\". DECIDED for Sol against A7's \"says so in one card\": an unnumbered idle CARD is what turns the dup-in-section audit red and what froze a delegated author mid-rework via the idle-claim guard — a non-card element keeps every card-counting audit honest. Missing, malformed or unverifiable source data never renders that element, never clears the section, and prevents publication while preserving the last authored board.",
+   "from": [
+    "A7",
+    "B9"
+   ]
+  },
+  {
+   "id": "M9",
+   "file": "scripts/board-core.mjs",
+   "defect": "FINAL STATE: point 700's undecided handover clause is answered — a numbered card always stands while work is in flight, the unnumbered handover card is legitimate only BESIDE the numbered cards and never substitutes for them, and the verified-zero state uses the parser-distinct non-card element rather than any card; that settles the `dup-in-section` red, and the clause is struck from point 700's spec in the landing commit.",
+   "from": [
+    "A8",
+    "B12"
+   ]
+  },
+  {
+   "id": "M10",
+   "file": "scripts/dashboard-integrity-guard.mjs",
+   "defect": "FINAL STATE: the Stop-hook wrapper uses the same pure comparison, blocks a readable mismatch naming missing and extra points plus the serial reconcile-and-publish remedy, stands down for `heldByOtherLiveOwner` and `.claude/batch-paused`, and fails OPEN on its own error with pure decision logic and a thin I/O wrapper. DECIDED for Sol's split failure mode against A9's blanket fail-open: the explicit publish preflight fails CLOSED, because no publication beats publishing a knowingly false board — fail-open remains the rule only for the Stop path, consistent with every existing Stop guard.",
+   "from": [
+    "A9",
+    "B11"
+   ]
+  },
+  {
+   "id": "M11",
+   "file": "scripts/batch-in-flight-core.mjs",
+   "defect": "FINAL STATE: the active-work record normalizes to the live owner's numbered focus plus explicitly point-tagged in-flight strands — branch, worktree, PID and log evidence grouped by an integer `point` recorded at write time rather than inferred from names, multiple agents or evidence items for one point deduplicated to one, and authoring, counter-read, verification, ready-to-land, landing and valid transferred-awaiting-adoption phases all counted as active.",
+   "from": [
+    "B3"
+   ]
+  },
+  {
+   "id": "M12",
+   "file": "scripts/board-core.mjs",
+   "defect": "FINAL STATE: transfer, adoption, session compaction, counter-review and handover are continuity states, not exits — their numbered cards remain in the now-section; pausing the batch does not silently erase genuinely running work, and stale evidence or ambiguous ownership demands reconciliation rather than automatic card removal.",
+   "from": [
+    "B6"
+   ]
+  },
+  {
+   "id": "M13",
+   "file": "scripts/board-core.mjs",
+   "defect": "FINAL STATE: surviving cards keep their prior relative order, new cards follow the structured strand/start order with the point number as deterministic tie-break, repeated evidence for one point yields one card, and reconciliation is idempotent and preserves Unicode, links and arbitrary authored inline markup.",
+   "from": [
+    "B8"
+   ]
+  },
+  {
+   "id": "M14",
+   "file": "scripts/board-publish.mjs",
+   "defect": "FINAL STATE: publication performs the exact-set check against the normalized record and refuses a missing, extra, duplicate, unknown or cross-section point; lifecycle commands reconcile and publish through ONE serialized board operation (never concurrent `board.mjs` calls, honoring board-cli-is-not-parallel-safe), and a failed reconciliation or publication remains a named non-zero pending obligation instead of silently advertising success. DECIDED with Sol: this publish-time gate is added beside — not instead of — the turn-end block of M7, per the point's recorded resolution.",
+   "from": [
+    "B10"
+   ]
+  },
+  {
+   "id": "M15",
+   "file": "scripts/dashboard-integrity-guard-core.test.mjs",
+   "defect": "VERIFIABLE: with expected active points [697,700,711], an empty now-section returns missing:[697,700,711] and blocks; a sole point-700 card returns missing:[697,711] and blocks; exactly the three distinct cards allows; and any fourth, stale card is returned in `extra` and blocks.",
+   "from": [
+    "A10",
+    "B13"
+   ]
+  },
+  {
+   "id": "M16",
+   "file": "scripts/dashboard-integrity-guard-core.test.mjs",
+   "defect": "VERIFIABLE: two now-cards for one point report a duplicate even when set equality holds; one point appearing in now and queue/clarification/archive reports the existing cross-section violation; a nonempty active record is still checked when every board section is otherwise empty; and the former \"no board — registration owns it\" escape cannot suppress a known nonempty active-set mismatch.",
+   "from": [
+    "B14"
+   ]
+  },
+  {
+   "id": "M17",
+   "file": "scripts/batch-in-flight-core.test.mjs",
+   "defect": "VERIFIABLE: multiple branch/worktree/PID items tagged to one point normalize to one point; focus 700 plus strands 697 and 711 normalize to all three; nine undeclared `feat/*` branches add none; pushed-unmerged review and landing phases remain active while terminal exit phases do not; and untagged, malformed, unknown, closed or checkpoint-contradictory records return unknown/error, never an empty active set.",
+   "from": [
+    "B15"
+   ]
+  },
+  {
+   "id": "M18",
+   "file": "scripts/board-core.test.mjs",
+   "defect": "VERIFIABLE: a render creates the two missing stub cards without touching point 700's prose; reconcile preserves authored German title, body, Unicode, links and metadata byte-for-byte for unchanged fields; a render that would blank existing prose refuses; explicit replacement changes only the supplied field; conflicting duplicate copy fails without partial mutation; a card for a point no longer in flight is removed; ordering is stable and a second identical reconciliation produces byte-identical HTML. DECIDED consistently with M6: B17's \"missing copy fails\" case is replaced by the stub-creation assertion, and \"no prose becomes a stub\" holds for existing text only.",
+   "from": [
+    "A11",
+    "B17"
+   ]
+  },
+  {
+   "id": "M19",
+   "file": "scripts/board-core.test.mjs",
+   "defect": "VERIFIABLE: promotion, return to queue order, move to user clarification, answered-decision return, archive, abandonment, reopen and recommission each leave the point in exactly one correct section; transfer and adoption retain the numbered now-card; the unnumbered handover card beside a numbered one passes and alone does not; a non-owner session and a paused batch are waved through; and — DECIDED per M8 — a verified no-active-points scenario is accepted only with the dedicated non-card empty-state element, not with A12's explicit \"nothing running\" card.",
+   "from": [
+    "A12",
+    "B16"
+   ]
+  },
+  {
+   "id": "M20",
+   "file": "scripts/board-core.test.mjs",
+   "defect": "VERIFIABLE: the point-700 \"promotes, returns, archives and answers without a new violation\" test starts continuity and handover cases with a numbered active card, never an unnumbered handover card, and separately proves the parser-distinct verified-zero empty state needs no fictitious card to move.",
+   "from": [
+    "B19"
+   ]
+  },
+  {
+   "id": "M21",
+   "file": "scripts/dashboard-integrity-guard-core.test.mjs",
+   "defect": "VERIFIABLE: malformed or unreadable source data is handled totally — fail-open in the Stop decision but fail-closed in the publish preflight; paused and other-live-owner Stop cases allow without changing board state; exact equality allows; mismatch diagnostics name missing, extra and duplicate points; and the composed test retains existing single-topic, no-false-done, queue-order and now-ETA enforcement for every projected card.",
+   "from": [
+    "B18"
+   ]
+  },
+  {
+   "id": "M22",
+   "file": "TASKS.md",
+   "defect": "Criticality: MEDIUM-HIGH — DECIDED for Opus against Sol's CRITICAL: the section is what the user reads to know whether anything is happening at all and it told him the opposite of the truth, but the defect misinformed a reader without losing work, corrupting state or bypassing a safety gate, and the work order records MEDIUM-HIGH with Sol's CRITICAL noted as the dissent; the rating stays MEDIUM-HIGH and the dissent stays on record.",
+   "from": [
+    "A13",
+    "B20"
+   ]
+  },
+  {
+   "id": "M23",
+   "file": "TASKS.md",
+   "defect": "Bundle: Chat & Tafel; the other model's recorded cross-vendor review is required before the merge because a guard core and the board render change, and the point lands TOGETHER with the resolution of point 700's handover clause (struck from 700's spec in the landing commit) plus the dashboard-integrity and batch-in-flight record changes, because separating them would preserve either the duplicate-card gate failure or the incomplete active-set source.",
+   "from": [
+    "A14",
+    "B21"
+   ]
+  }
+ ]
+}

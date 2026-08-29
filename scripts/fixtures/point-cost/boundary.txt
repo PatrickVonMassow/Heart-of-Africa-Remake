@@ -1,0 +1,2 @@
+[2026-08-18T10:20:00.000Z] HANDOVER point 900 by main-1 — lock marked handed-over.
+[2026-08-18T10:00:06.000Z] HANDOVER context watermark by main-1 — lock marked handed-over.

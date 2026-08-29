@@ -21,13 +21,10 @@
 // whole apparatus exists to prevent (the e9407cae incident).
 //
 // FOUR BOUNDS, each measurable rather than a matter of taste:
-//   1. IT IS BOUNDED BY THE THING IT WAITS FOR, not by a clock somebody has to
-//      feed (point 434 (6), 30.07.2026 — see `assessClaim`). A claim file left by
-//      a window that was closed must never hand the batch to nobody, and the
-//      reader that answers that is the pid probe of bound 2, not the calendar.
-//      The wall clock survives only where there is nobody left to wait for: with
-//      the lock free and the claim untaken, `CLAIM_MAX_AGE_MS` is the TAKE-UP
-//      window after which the ordinary handover takes over again.
+//   1. IT IS BOUNDED BY REAL CLAIMANT IDENTITY while a live owner still holds:
+//      the claim has somebody to wait for, and closes with its window. Once the
+//      lock is free, `CLAIM_MAX_AGE_MS` runs from the claim, release, or a newer
+//      attributable `activityAt`, so an untaken reservation cannot last forever.
 //   2. THE CLAIMANT MUST BE ALIVE, and alive by IDENTITY: the recorded pid must
 //      exist AND have started when the claim says it did. A reused pid is a
 //      stranger. This is the same rule `checkEvidence` applies to a declared
@@ -111,8 +108,8 @@ export function claimIsBounded(claim) {
 }
 
 /**
- * IS THERE ANYBODY TO WAIT FOR — the input `assessClaim` suspends its clock on.
- * PURE, so both readers derive it the same way and cannot drift apart.
+ * IS THERE A LIVE SESSION OWNER? PURE. A human claim's pending clock pauses while
+ * this is true; once the owner is gone, the take-up window is the bound.
  *
  * IT IS NOT LOCK EXISTENCE (four-eyes review, Fable 5, 30.07.2026, finding 1).
  * Derived as `!!lock?.sessionId` it also matched the LAUNCHER's `pending-spawn`
@@ -120,11 +117,9 @@ export function claimIsBounded(claim) {
  * `claude -p` still booting. That produced a loop out of the crash path: the
  * launcher reads the claim with no owner (`ownerHolding` false), finds it
  * expired, reaps the dead owner and spawns — and the successor's resume hook
- * then read `ownerHolding` off the launcher's OWN pending lock, honoured the
- * claim with no aging, stood down without converting the pending spawn, and the
- * next tick spawned again. Two readers disagreeing about one state is the
- * disease this point was written for, so the predicate demands what the words
- * mean: a LIVE SESSION owner, and never the claimant itself.
+ * then read `ownerHolding` off the launcher's OWN pending lock and stood down
+ * without converting it. The predicate still demands what the words mean: a
+ * LIVE SESSION owner, and never the claimant itself.
  *
  * `alive` is the caller's `assessOwner(...).alive` — the lock's own liveness
  * rule, not a second one invented here.
@@ -134,6 +129,57 @@ export function ownerIsHolding({ lock = null, claimantSid = '', alive = false } 
   if (lock.kind === 'pending-spawn') return false
   if (claimantSid && lock.sessionId === claimantSid) return false
   return alive === true
+}
+
+/**
+ * Has the hand-over reached the point a waiting caller cares about? The state is
+ * the gathered status object printed by `batch-claim.mjs --status`; no caller
+ * needs to rediscover ownership from its JSON shape.
+ */
+export function claimWaitDecision(state = {}, claimantSid = '') {
+  if (state?.lockHeld === true) return { done: false, reason: 'held' }
+  const assessment = state?.assessment ?? null
+  const spent = claimantSid !== '' &&
+    assessment?.claimantSid === claimantSid &&
+    (assessment?.reserve === true ||
+      typeof assessment?.releasedAt === 'number' ||
+      assessment?.reason === 'released' ||
+      assessment?.reason === 'released-reserved')
+  if (spent) return { done: true, reason: 'spent' }
+  return { done: true, reason: 'free' }
+}
+
+/**
+ * Wait for the first probe that sees a free lock. A released claim belonging to
+ * this waiter only changes the success message; it can never outweigh a live
+ * lock. PURE ASYNC
+ * orchestration: state reader, monotonic clock and sleep are all injected, so a
+ * fixture advances without a real timer and a successful probe returns without
+ * one trailing poll delay.
+ */
+export async function waitForClaimEnd({
+  readState,
+  claimantSid = '',
+  clock = Date.now,
+  sleep,
+  timeoutMs = CLAIM_MAX_AGE_MS,
+  pollMs = 250,
+} = {}) {
+  if (typeof readState !== 'function' || typeof sleep !== 'function') {
+    throw new TypeError('waitForClaimEnd needs readState and sleep functions')
+  }
+  const startedAt = clock()
+  let probes = 0
+  for (;;) {
+    const state = await readState()
+    probes += 1
+    const decision = claimWaitDecision(state, claimantSid)
+    if (decision.done) return { ok: true, reason: decision.reason, probes, state }
+
+    const remaining = timeoutMs - (clock() - startedAt)
+    if (!(remaining > 0)) return { ok: false, reason: 'timeout', probes, state }
+    await sleep(Math.min(pollMs, remaining))
+  }
 }
 
 /** What the git probe answers when it could not find OUT (a timeout under load, a
@@ -187,11 +233,7 @@ export function claimantLiveness({ claim, probePid = null, tolerance = PID_START
  *               session, so the owner's own claim would otherwise read as a
  *               stranger's and it would release the batch to itself.
  *   ownerSid  — who holds the lock right now, when known
- *   ownerHolding — is a live owner still holding the lock, i.e. is there anybody
- *               to WAIT for? While there is, the claim does not age (point 434
- *               (6a)); once there is not, `maxAgeMs` is the take-up window. It
- *               defaults to FALSE, so a caller that cannot answer gets the
- *               bounded reading — the direction that can never strand the batch.
+ *   ownerHolding — retained caller context; it does not suspend reservation age.
  *   now, maxAgeMs, probePid, tolerance
  *
  * Returns { honour, reserve, mine, reason, ageMs, claimantSid, releasedAt }.
@@ -257,6 +299,13 @@ export function assessClaim({
   // A claim from the future is a clock nobody here can reason about → ignore it.
   // Costs one re-claim; the other direction hands the batch over on a bad stamp.
   if (!(ageMs >= 0)) return out(false, 'clock-skew', { ...base, ageMs })
+  // A holder may renew its reservation only with an attributable activity stamp.
+  // A future stamp proves nothing; the original claim remains the baseline.
+  const activityAt = typeof claim.activityAt === 'number' && claim.activityAt >= claim.at && claim.activityAt <= now
+    ? claim.activityAt
+    : null
+  const renewedAt = Math.max(claim.at, activityAt ?? 0)
+  const renewalAgeMs = now - renewedAt
 
   // Ours? By the lock's own identity rules — session id first, the claude process
   // second — so a compaction that mints a new id never orphans a claim this very
@@ -269,8 +318,8 @@ export function assessClaim({
 
   // ALREADY HANDED OVER → never honourable again, for everybody but its own
   // writer (see above). It still RESERVES the free lock while its claimant is
-  // provably alive (point 461): the same identity probe, no second notion of
-  // liveness, and no deadline anybody has to feed.
+  // provably alive and its activity window holds (point 461): the same identity
+  // probe and the same renewable bound as a pending claim.
   if (base.releasedAt !== null || (typeof claim.releasedBy === 'string' && claim.releasedBy.trim() !== '')) {
     // An ERRAND claim's pid names its ISSUER rather than its taker, so it proves
     // nobody is waiting. Asked first: it needs no probe at all.
@@ -283,7 +332,10 @@ export function assessClaim({
     // reading that cannot strand the batch is the one that reserves nothing.
     // Checked BEFORE the probe: a long-expired record then costs no OS call
     // (four-eyes review, Fable 5, 30.07.2026, finding 4).
-    const sinceRelease = base.releasedAt === null ? null : now - base.releasedAt
+    const releasedRenewedAt = activityAt !== null && base.releasedAt !== null && activityAt >= base.releasedAt
+      ? activityAt
+      : base.releasedAt
+    const sinceRelease = releasedRenewedAt === null ? null : now - releasedRenewedAt
     if (sinceRelease === null || !(sinceRelease >= 0) || sinceRelease > maxAgeMs) {
       return out(false, 'released', { ...base, ageMs })
     }
@@ -297,9 +349,12 @@ export function assessClaim({
   const live = claimantLiveness({ claim, probePid, tolerance })
   if (!live.alive) return out(false, live.reason, { ...base, ageMs })
 
-  // THE CLOCK, where and only where nothing else bounds the wait: an errand claim
-  // that carries its own issuer, or a claim with no live owner left to wait for.
-  if ((claimIsBounded(claim) || ownerHolding !== true) && ageMs > maxAgeMs) {
+  // While a LIVE SESSION owner still holds the lock, a human takeover claim has
+  // somebody to wait for and its claimant's identity is the honest bound. The
+  // take-up clock starts mattering when there is nobody left to wait for. Machine
+  // errands keep their own clock because their pid names the issuer, not a window
+  // waiting to take the batch.
+  if (renewalAgeMs > maxAgeMs && (ownerHolding !== true || claimIsBounded(claim))) {
     return out(false, 'expired', { ...base, ageMs })
   }
   return out(true, 'honour', { ...base, ageMs })
@@ -308,11 +363,12 @@ export function assessClaim({
 /**
  * MAY THE OWNER RELEASE NOW? PURE.
  *
- * A merge, a delegated agent still building and a running verification are all
- * things that must never be cut in half, so an honoured claim WAITS for them
- * rather than overriding them. The in-flight evidence is the existing one
- * (`assessInFlight().live`) — this file does not invent a second way to ask
- * whether work is still running.
+ * A merge and uncheckpointed delegated work must never be cut in half, so an
+ * honoured claim WAITS for them. A declared agent with committed-and-pushed
+ * checkpoints is different: point 716 makes release an ownership boundary, and
+ * that work transfers to the claiming successor through the same adoption record
+ * as a landed boundary. The in-flight and transfer verdicts are the existing
+ * ones — this file does not invent a second way to measure either.
  *
  * An UNVERIFIABLE git state waits too. A probe that timed out under load says
  * nothing about the checkout, and reading it as "nothing half-done" is precisely
@@ -322,15 +378,15 @@ export function assessClaim({
  *
  * Returns { verdict: 'none' | 'wait' | 'release', reason }.
  */
-export function releaseDecision({ assessment, inFlightLive = false, gitOperation = null } = {}) {
+export function releaseDecision({ assessment, inFlightLive = false, inFlightTransferable = false, gitOperation = null } = {}) {
   if (!assessment || assessment.honour !== true) {
     return { verdict: 'none', reason: assessment?.reason ?? 'no-claim' }
   }
-  if (inFlightLive === true) return { verdict: 'wait', reason: 'work-in-flight' }
+  if (inFlightLive === true && inFlightTransferable !== true) return { verdict: 'wait', reason: 'work-in-flight' }
   const op = typeof gitOperation === 'string' && gitOperation.trim() ? gitOperation.trim() : null
   if (op === GIT_STATE_UNVERIFIABLE) return { verdict: 'wait', reason: 'git-state-unverifiable' }
   if (op) return { verdict: 'wait', reason: `git-${op}` }
-  return { verdict: 'release', reason: 'clean' }
+  return { verdict: 'release', reason: inFlightLive === true ? 'work-transferable' : 'clean' }
 }
 
 /**
@@ -363,6 +419,50 @@ export function reservationDecision({ assessment } = {}) {
     return { acquire: false, reason: 'reserved-released', claimantSid: a.claimantSid ?? null }
   }
   return { acquire: true, reason: a?.mine === true ? 'own-claim' : (a?.reason ?? 'no-claim'), claimantSid: a?.claimantSid ?? null }
+}
+
+/**
+ * WHERE DOES OWNERSHIP GO WHEN THE CURRENT OWNER MAY NO LONGER CONTINUE? PURE.
+ *
+ * This is the single destination decision used by a regular boundary, a handed-
+ * over lock, a free lock and an expired lease. `renewalUntil` is present only
+ * when the launcher's independently observed evidence extended an expired lease.
+ * An honoured claim wins that tie: the user explicitly asked to take over, so the
+ * old owner is released to that window instead of being renewed past it.
+ *
+ * Returns { action, spawn, reason, claimantSid, renewalUntil } where action is:
+ *   wait    — the current owner still owns the batch;
+ *   reserve — release/leave the lock free for the claiming window;
+ *   renew   — persist the evidence-backed lease extension;
+ *   spawn   — start a fresh successor.
+ */
+export function resolveBoundaryDestination({
+  assessment = null,
+  ownerAlive = false,
+  leaseExpired = false,
+  renewalUntil = null,
+} = {}) {
+  const reservation = reservationDecision({ assessment })
+  const reserved = reservation.acquire === false
+  const renewal = typeof renewalUntil === 'number' && Number.isFinite(renewalUntil)
+
+  if (leaseExpired === true) {
+    if (reserved) {
+      return { action: 'reserve', spawn: false, reason: reservation.reason, claimantSid: reservation.claimantSid, renewalUntil: null }
+    }
+    if (renewal) {
+      return { action: 'renew', spawn: false, reason: 'evidence-advancing', claimantSid: null, renewalUntil }
+    }
+    return { action: 'spawn', spawn: true, reason: reservation.reason, claimantSid: reservation.claimantSid, renewalUntil: null }
+  }
+
+  if (ownerAlive === true) {
+    return { action: 'wait', spawn: false, reason: reserved ? reservation.reason : 'owner-alive', claimantSid: reservation.claimantSid, renewalUntil: null }
+  }
+  if (reserved) {
+    return { action: 'reserve', spawn: false, reason: reservation.reason, claimantSid: reservation.claimantSid, renewalUntil: null }
+  }
+  return { action: 'spawn', spawn: true, reason: reservation.reason, claimantSid: reservation.claimantSid, renewalUntil: null }
 }
 
 /**
@@ -404,15 +504,17 @@ export function reservationDecision({ assessment } = {}) {
  */
 export function takeoverDecision({
   claim = null,
+  assessment: suppliedAssessment = null,
   now,
   maxAgeMs = CLAIM_MAX_AGE_MS,
   probePid = null,
   tolerance = PID_START_TOLERANCE_MS,
 } = {}) {
-  const assessment = claim ? assessClaim({ claim, now, maxAgeMs, probePid, tolerance }) : null
-  const { acquire, reason, claimantSid } = reservationDecision({ assessment })
+  const assessment = suppliedAssessment ?? (claim ? assessClaim({ claim, now, maxAgeMs, probePid, tolerance }) : null)
+  const destination = resolveBoundaryDestination({ assessment })
+  const { reason, claimantSid } = destination
   const ageMs = Number.isFinite(assessment?.ageMs) ? assessment.ageMs : null
-  if (acquire) return { spawn: true, reason, claimantSid, ageMs, message: null }
+  if (destination.spawn) return { spawn: true, reason, claimantSid, ageMs, message: null }
 
   // FLOOR, never round: an age rounded UP reads at the log as though the window
   // had already run out while the lock was in fact still being held, and the line
@@ -444,7 +546,7 @@ export function takeoverDecision({
  * MAY THIS SESSION RECORD A CLAIM? PURE.
  *
  * 'refresh' — the pending claim is already ours (re-stating the wait is free)
- * 'refuse'  — another live session claimed first; first claim wins while it lives
+ * 'refuse'  — another renewed live session claimed first
  * 'write'   — nothing honourable is pending
  *
  * The refusal is what keeps two returning windows from both being told the batch

@@ -41,27 +41,150 @@ export const ENFORCER_RE = /^(?!.*-core\.)([a-z0-9-]+-(?:guard|gate|hook))\.mjs$
 // without a written reason is refused, so "park it" is not available as an escape,
 // and the entry must be removed in the same commit that adds the hook line.
 export const INTENTIONALLY_DORMANT = {
-  'path-scope-guard.mjs':
-    'Built 07.08.2026 by a worktree agent, which may not touch .claude/settings.json — the PreToolUse line ' +
-    'is a protected-path edit and needs an attended session. Its core is measured against the real command ' +
-    'corpus (1 deny in 5751 transcript commands, and that one deliberate). REMOVE THIS ENTRY IN THE SAME ' +
-    'COMMIT THAT ADDS THE HOOK LINE.',
-  'point-proof-guard.mjs':
-    'Built 07.08.2026 by a worktree agent, which may not touch .claude/settings.json — the PreToolUse line ' +
-    'is a protected-path edit and needs an attended session. It is inert until then in a second sense too: ' +
-    'no point in the corpus carries a PROOF line yet, so the gate has nothing to judge. REMOVE THIS ENTRY ' +
-    'IN THE SAME COMMIT THAT ADDS THE HOOK LINE.',
-  'bundle-first-guard.mjs':
-    'Built 07.08.2026 by a worktree agent — same protected-path reason as above. It ALSO needs its finding ' +
-    'cleared before it is armed: it reports 29 open points in no bundle of docs/work-packages.md, which is ' +
-    'the drift it exists to catch, and a worktree agent may not edit that file either. Reconcile the scheme ' +
-    '(`node scripts/bundle-first-guard.mjs --status`), THEN wire it and REMOVE THIS ENTRY IN THE SAME COMMIT.',
-  'context-fence-guard.mjs':
-    'Built 17.08.2026 by a worktree agent (point 700), which may not touch .claude/settings.json — the ' +
-    'PreToolUse line ("Edit|Write|NotebookEdit|Agent|Task|Bash|PowerShell" → node scripts/context-fence-guard.mjs) ' +
-    'is a protected-path edit and needs an attended session. Its core and its spawned wrapper are fully ' +
-    'tested, so it is correct the moment it is armed. REMOVE THIS ENTRY IN THE SAME COMMIT THAT ADDS THE ' +
-    'HOOK LINE.',
+  // commission-guard.mjs left this map on 18.08.2026, in the commit that added
+  // its PreToolUse line ("Agent|Task|Bash|PowerShell") — the rule above, kept.
+  // bundle-first-guard.mjs left it on 19.08.2026, the last of point 542's four:
+  // its precondition was the real work — every open point in a bundle of
+  // docs/work-packages.md — and the Stop line was added in the same commit that
+  // deleted this entry. The map is EMPTY again, which is the state it wants.
+}
+
+/**
+ * IS THIS ENFORCER WIRED, AND ON THE EVENT AND TOOLS IT NEEDS? PURE, over the
+ * settings TEXT.
+ *
+ * The blunt question the map above answers from MEMORY, asked of the FACT
+ * instead, and asked of the STRUCTURE rather than of the characters: the first
+ * cut scanned the whole file for the basename, so a malformed settings file, a
+ * name inside another guard's arguments, or the guard wired on the WRONG event
+ * all read as armed (Sol, review of dd7fd78c). A guard that reports itself armed
+ * while it refuses nothing is the failure this module exists for, and it is
+ * worse coming from the guard's own mouth — so anything that does not parse, or
+ * parses without the entry, is NOT wired.
+ *
+ * `event` narrows to one hook event (`PreToolUse`, `Stop`, …); `tools` demands
+ * that the entry's matcher name every one of them, because a hook that never
+ * sees the call that opens work refuses nothing either.
+ */
+export function isEnforcerWired(settingsText, name, { event = null, tools = [] } = {}) {
+  const wanted = String(name ?? '').trim()
+  if (!wanted) return false
+  let parsed
+  try {
+    parsed = JSON.parse(String(settingsText ?? ''))
+  } catch {
+    return false
+  }
+  const hooks = parsed && typeof parsed === 'object' && !Array.isArray(parsed) ? parsed.hooks : null
+  if (!hooks || typeof hooks !== 'object' || Array.isArray(hooks)) return false
+  const events = event ? [event] : Object.keys(hooks)
+  const needed = (Array.isArray(tools) ? tools : [tools]).map((t) => String(t)).filter(Boolean)
+  const covered = new Set()
+  for (const ev of events) {
+    for (const entry of Array.isArray(hooks[ev]) ? hooks[ev] : []) {
+      const names = (Array.isArray(entry?.hooks) ? entry.hooks : []).some((h) =>
+        h?.type === 'command' && executedScriptRefs(h?.command).some((ref) => ref.split(/[/\\]/).pop() === wanted),
+      )
+      if (!names) continue
+      if (needed.length === 0) return true
+      for (const tool of needed) if (matcherCoversTool(entry?.matcher, tool)) covered.add(tool)
+    }
+  }
+  return needed.length > 0 && needed.every((tool) => covered.has(tool))
+}
+
+/**
+ * The script each shell segment EXECUTES — never one that is merely an ARGUMENT
+ * (fourth review, finding 14: `node scripts/other-guard.mjs --config
+ * scripts/commission-guard.mjs` reported the commission guard ARMED, the exact
+ * failure the structural parse was installed to end). The rule: a command is
+ * read segment by segment (`&&`, `||`, `;`, `|`, `&`, newline), and the FIRST
+ * script's arguments. A segment only counts when its command is Node and the
+ * path is Node's entry script. Thus `echo scripts/x.mjs`, `git diff --
+ * scripts/x.mjs`, and `node --check scripts/x.mjs` execute no guard.
+ */
+export function executedScriptRefs(command) {
+  const out = []
+  for (const seg of String(command ?? '').split(/\n|&&|\|\||[;|&]/)) {
+    const tokens = seg.match(/"(?:\\.|[^"])*"|'[^']*'|\S+/g) ?? []
+    const unquote = (token) => String(token ?? '').replace(/^(['"])(.*)\1$/, '$2')
+    let program = unquote(tokens.shift())
+    // `exec node …` is the normal final line of a Git hook. `exec` replaces
+    // the shell process; it does not make Node an argument. Reading only the
+    // first token therefore called every such hook inert. Environment
+    // assignments can precede the command for the same reason, and are skipped
+    // only before the program — an assignment after `node` is an argument.
+    while (program === 'exec' || /^[A-Za-z_][A-Za-z0-9_]*=/.test(program)) {
+      program = unquote(tokens.shift())
+    }
+    if (!/(?:^|[/\\])node(?:\.exe)?$/i.test(program)) continue
+    let entry = ''
+    for (let i = 0; i < tokens.length; i += 1) {
+      const token = unquote(tokens[i])
+      if (token === '--check' || token === '-c' || token === '--eval' || token === '-e' || token === '--print' || token === '-p') {
+        entry = ''
+        break
+      }
+      if (token === '--require' || token === '-r' || token === '--import') {
+        i += 1
+        continue
+      }
+      if (token === '--') {
+        entry = unquote(tokens[i + 1])
+        break
+      }
+      if (token.startsWith('-')) continue
+      entry = token
+      break
+    }
+    const ref = entry.match(SCRIPT_REF_RE)?.[0]
+    if (ref) out.push(ref)
+  }
+  return out
+}
+
+/** Whether one of the measured commands ACTUALLY executes this enforcer.
+ *
+ * The old audit searched one concatenated blob. A comment, a sample hook, or a
+ * path used as another command's argument therefore armed a guard that could
+ * never fire. The wrapper now supplies only commands from parsed settings and
+ * recognized executable Git hooks; this final pure step still insists that the
+ * file is Node's entry script in a shell segment. That deliberately excludes an
+ * npm script which invokes it indirectly, a dispatcher which imports it, and a
+ * `node -e`/`--eval` program which dynamically imports it: this reader cannot
+ * prove that any of those paths reaches the enforcer. A future indirect wiring
+ * must either become a direct invocation or extend this reader to measure that
+ * shape. `wiredText` callers are kept compatible by passing its lines here, but
+ * prose and comments prove nothing.
+ */
+export function enforcerWiredByCommands(commands, name) {
+  const wanted = String(name ?? '').trim()
+  if (!wanted) return false
+  const rows = Array.isArray(commands) ? commands : []
+  return rows.some((command) =>
+    executedScriptRefs(command).some((ref) => ref.split(/[/\\]/).pop() === wanted),
+  )
+}
+
+/**
+ * DOES THIS MATCHER COVER THIS TOOL? The harness treats a PreToolUse matcher as
+ * a full-string pattern per tool name, so it is judged HERE the same way — a
+ * bare substring test read `SubAgent|TaskOutput|BashTool|PowerShellX` as
+ * covering Agent/Task/Bash/PowerShell while it matches none of them (fourth
+ * review, finding 15). `''` and `'*'` match every tool, as the harness does; a
+ * matcher that is not a valid pattern covers NOTHING: the harness cannot
+ * reliably fire it, and salvaging valid-looking alternatives would recreate a
+ * false ARMED report.
+ */
+export function matcherCoversTool(matcher, tool) {
+  const m = String(matcher ?? '').trim()
+  if (m === '' || m === '*') return true
+  const t = String(tool ?? '')
+  try {
+    return new RegExp(`^(?:${m})$`).test(t)
+  } catch {
+    return false
+  }
 }
 
 /**
@@ -344,7 +467,9 @@ export function auditHookAnchoring({ hookCommands = null, rollout = RELATIVE_WIR
  *   sources      { filename: text } for the enforcers, so the core a wrapper
  *                actually IMPORTS can be read rather than guessed from its name
  *   wiredText    concatenated text of everything that can INVOKE an enforcer —
- *                the hook settings plus any git hooks that are actually active
+ *                compatibility input, parsed line-by-line as commands
+ *   wiringCommands commands measured structurally from parsed settings and
+ *                recognized executable Git hooks (preferred)
  *   hookCommands the settings' hook rows, structured — the ANCHORING check needs
  *                to know which line came from where, which the blob cannot say
  *   dormant      override for INTENTIONALLY_DORMANT (tests inject their own)
@@ -355,6 +480,7 @@ export function auditGuardHealth({
   files = [],
   sources = {},
   wiredText = '',
+  wiringCommands = null,
   hookCommands = null,
   dormant = INTENTIONALLY_DORMANT,
   knownUntested = KNOWN_UNTESTED,
@@ -363,6 +489,7 @@ export function auditGuardHealth({
   const all = Array.isArray(files) ? files : []
   const names = all.filter((f) => ENFORCER_RE.test(f))
   const text = String(wiredText ?? '')
+  const commands = Array.isArray(wiringCommands) ? wiringCommands : text.split(/\r?\n/)
   const violations = []
   const report = []
 
@@ -370,7 +497,7 @@ export function auditGuardHealth({
     // Wired = something that can actually run it names it. Matching the file
     // name (not the base) keeps `foo-guard.mjs` from being satisfied by a
     // mention of `foo-guard-core.mjs`.
-    const wired = text.includes(file)
+    const wired = enforcerWiredByCommands(commands, file)
     // Which pure modules does this wrapper actually import? Guessing the core
     // from the wrapper's NAME produced false accusations — retro-currency-guard
     // imports retro-core, which is thoroughly tested, and a name-based rule

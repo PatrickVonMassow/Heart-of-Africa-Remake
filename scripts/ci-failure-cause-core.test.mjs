@@ -8,6 +8,7 @@ import {
   OUTAGE_WAIVER_MAX_MS,
   PAGES_WORKFLOW,
   classifyFailureCause,
+  failedJobsRerunDecision,
   failedJobNames,
   jobsComplete,
   moreJobPages,
@@ -16,6 +17,59 @@ import {
 } from './ci-failure-cause-core.mjs'
 
 const job = (over = {}) => ({ name: 'build', status: 'completed', conclusion: 'success', ...over })
+
+describe('failedJobsRerunDecision', () => {
+  const failedRun = (over = {}) => ({ status: 'completed', conclusion: 'failure', run_attempt: 1, ...over })
+
+  it('classifies the measured never-started shape as environment and grants one re-run', () => {
+    const jobs = [
+      job({ name: 'build', status: 'queued', conclusion: null, steps: [] }),
+      job({ name: 'deploy', conclusion: 'skipped', steps: [] }),
+    ]
+    expect(failedJobsRerunDecision({ run: failedRun(), jobs })).toEqual({ kind: 'environment', dispatch: true })
+    expect(classifyFailureCause({
+      workflowName: PAGES_WORKFLOW,
+      runStatus: 'completed',
+      runAttempt: 1,
+      conclusion: 'failure',
+      jobs,
+    })).toMatchObject({ cause: 'external', actionable: false, neverStarted: true, rerunFailedJobs: true })
+  })
+
+  it('recognises GitHub\'s startup_failure spelling with no steps', () => {
+    expect(failedJobsRerunDecision({
+      run: failedRun(),
+      jobs: [job({ status: 'completed', conclusion: 'startup_failure', steps: [] })],
+    })).toEqual({ kind: 'environment', dispatch: true })
+  })
+
+  it('keeps a genuine step failure product-red', () => {
+    expect(failedJobsRerunDecision({
+      run: failedRun(),
+      jobs: [job({ conclusion: 'failure', steps: [{ name: 'Build', conclusion: 'failure' }] })],
+    })).toEqual({ kind: 'product', dispatch: false })
+    expect(failedJobsRerunDecision({
+      run: failedRun(),
+      jobs: [
+        job({ name: 'queued', status: 'queued', conclusion: null, steps: [] }),
+        job({ name: 'ran', conclusion: null, steps: [{ name: 'Build', conclusion: 'failure' }] }),
+      ],
+    })).toEqual({ kind: 'product', dispatch: false })
+  })
+
+  it('does not classify a job that is merely queued while its run is unfinished', () => {
+    expect(failedJobsRerunDecision({
+      run: { status: 'queued', conclusion: null, run_attempt: 1 },
+      jobs: [job({ status: 'queued', conclusion: null, steps: [] })],
+    })).toEqual({ kind: 'pending', dispatch: false })
+  })
+
+  it('never grants a recursive re-run after the first dispatch or attempt', () => {
+    const jobs = [job({ status: 'queued', conclusion: null, steps: [] })]
+    expect(failedJobsRerunDecision({ run: failedRun(), jobs, alreadyDispatched: true })).toEqual({ kind: 'environment', dispatch: false })
+    expect(failedJobsRerunDecision({ run: failedRun({ run_attempt: 2 }), jobs })).toEqual({ kind: 'environment', dispatch: false })
+  })
+})
 
 describe('failedJobNames', () => {
   it('names exactly the completed jobs that failed', () => {
@@ -46,6 +100,42 @@ describe('classifyFailureCause', () => {
     expect(c.failedJobs).toEqual(['deploy'])
     expect(c.remedy).toContain('pages-deploy-unblock.mjs --cancel')
     expect(c.remedy).toContain('No push in this repository')
+  })
+
+  it('passes a Pages API outage when the queue is provably empty, with a deadline and no fake remedy', () => {
+    const now = Date.parse('2026-08-17T20:03:00Z')
+    const c = classifyFailureCause({
+      workflowName: PAGES_WORKFLOW,
+      conclusion: 'failure',
+      now,
+      pagesBlockers: [],
+      jobs: [
+        job({ name: 'build' }),
+        job({
+          name: 'deploy',
+          conclusion: 'failure',
+          steps: [
+            { name: 'Deploy to GitHub Pages', conclusion: 'failure' },
+            { name: 'Deploy to GitHub Pages (retry once)', conclusion: 'failure' },
+          ],
+        }),
+      ],
+    })
+    expect(c).toMatchObject({ cause: 'external', actionable: false, alertDetail: true })
+    expect(c.detail).toContain('no in-progress deployment to cancel')
+    expect(c.remedy).toContain('2026-08-18T02:03:00.000Z')
+    expect(c.remedy).not.toContain('pages-deploy-unblock.mjs --cancel')
+  })
+
+  it('keeps the cancel refusal when the read-only Pages check finds a real blocker', () => {
+    const c = classifyFailureCause({
+      workflowName: PAGES_WORKFLOW,
+      conclusion: 'failure',
+      pagesBlockers: [{ sha: 'a'.repeat(40), status: 'deployment_in_progress' }],
+      jobs: [job({ name: 'build' }), job({ name: 'deploy', conclusion: 'failure' })],
+    })
+    expect(c.actionable).not.toBe(false)
+    expect(c.remedy).toContain('pages-deploy-unblock.mjs --cancel')
   })
 
   it('calls a failed Pages BUILD job ours — it stays a fixing push', () => {

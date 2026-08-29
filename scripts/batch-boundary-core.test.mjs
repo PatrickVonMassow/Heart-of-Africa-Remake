@@ -7,6 +7,7 @@
 //   - stopping with a launcher that will never fire, which would not shorten a
 //     session but END the batch.
 import { describe, it, expect } from 'vitest'
+import ts from 'typescript'
 import {
   BOUNDARY_DESTINATIONS,
   BOUNDARY_FRESH_MS,
@@ -24,11 +25,13 @@ import {
   isClosingSetPath,
   isClosingSetCommand,
   isOutputPagerSegment,
+  withoutOutputDescriptorMerges,
   describeWithdrawalTrigger,
   hookCallTimestamp,
   berlinMinuteOfDay,
   boardCarriesCard,
   cardProofFragments,
+  claimantCardIdentity,
   cardRegions,
   cardStampIsCurrent,
   CARD_PROOF_WINDOW,
@@ -41,20 +44,50 @@ import {
   BOUNDARY_CAUSES,
   WITHDRAWAL_TRIGGER_MAX,
 } from './batch-boundary-core.mjs'
-import { NO_CURRENT_WORK_TITLE } from './board-core.mjs'
+import { namesFollowOnWork, toNoCurrentWork } from './board-core.mjs'
+import { concisenessOffenders } from './dashboard-conciseness-guard-core.mjs'
 import {
   evaluate as evaluateTopic,
   knownPoints,
   topicViolations,
 } from './dashboard-card-topic-guard-core.mjs'
-import { progressGuardDecision } from './batch-singleton.mjs'
-import { mkdtempSync, rmSync, writeFileSync } from 'node:fs'
+import { markHandover, progressGuardDecision, readOwnerLock } from './batch-singleton.mjs'
+import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
-import { join } from 'node:path'
-import { clearBoundary, commitSealedBoundary, standingCards } from './batch-boundary.mjs'
+import { join, resolve } from 'node:path'
+import {
+  boundaryHandover,
+  clearBoundary,
+  commitSealedBoundary,
+  handoverAndRequest,
+  requestImmediateSuccessor,
+  successorRequestFailureLine,
+  standingCards,
+} from './batch-boundary.mjs'
+import { evaluateRuleReview } from './rule-review-core.mjs'
+import { evaluate as evaluateRenderVerify } from './render-verify-core.mjs'
+import { evaluateMechanismReview } from './mechanism-review-core.mjs'
+import { recordHandoverBudgetCompletion } from './handover-budget.mjs'
+import {
+  durableBoundaryMarker,
+  durableCommitVerdict,
+  durablePostCommitMutation,
+  durablePrepareReceipt,
+  durablePrepareVerdict,
+} from './batch-boundary-plane-core.mjs'
 
 const NOW = 1_785_000_000_000
 const SID = 'session-abc'
+const NEXT_POINT = 744
+const CURRENT_CLAIM = { sessionId: 'ecc312cf-current', pid: 2_156_063 }
+const cardText = (opts = {}) =>
+  boundaryCardText({
+    nextPoint: NEXT_POINT,
+    ...(opts.destination === BOUNDARY_DESTINATIONS.CLAIMING_WINDOW
+      ? claimantCardIdentity(CURRENT_CLAIM)
+      : {}),
+    ...opts,
+  })
 // A marker as `--commit` writes it — SEALED. The unphased shape the retired
 // one-shot form wrote is no longer a boundary claim (Sol's review of abdde93),
 // and the case below pins that.
@@ -313,6 +346,8 @@ describe('handoverSurvivesCall — closing work keeps the boundary, anything els
       'node scripts/batch-boundary.mjs 388',
       'cd /repo && node scripts/board.mjs move 388 done',
       'node "C:/repo/scripts/retro-refresh.mjs"',
+      'node scripts/board-queue.mjs',
+      'node scripts/finding.mjs --drain',
     ]) {
       expect(call({ command: c })).toMatchObject({ survives: true })
     }
@@ -336,8 +371,9 @@ describe('handoverSurvivesCall — closing work keeps the boundary, anything els
     // through `npm test` — a successor could then spawn beside a working session.
     expect(call({ command: 'node scripts/board.mjs & npm test' }).survives).toBe(false)
     expect(call({ command: 'npm test & node scripts/board.mjs' }).survives).toBe(false)
-    // …and a genuine chain of closing commands still survives it.
-    expect(call({ command: 'node scripts/focus.mjs confirm & node scripts/dashboard-publish.mjs' }).survives).toBe(true)
+    // Even two closing invocations are unsafe when the first is detached: the
+    // shell starts the second before the first has withdrawn the boundary.
+    expect(call({ command: 'node scripts/focus.mjs confirm & node scripts/dashboard-publish.mjs' }).survives).toBe(false)
   })
 
   it('a segment that can run or write something unseen is not closing', () => {
@@ -349,6 +385,65 @@ describe('handoverSurvivesCall — closing work keeps the boundary, anything els
     ]) {
       expect(call({ command: c }).survives).toBe(false)
     }
+  })
+
+  it('THE WAY OUT SURVIVES harmless output decoration', () => {
+    for (const command of [
+      'node scripts/batch-boundary.mjs --clear',
+      'node scripts/batch-boundary.mjs --clear 2>&1',
+      'node scripts/batch-boundary.mjs --clear | tail -3',
+      'node scripts/batch-boundary.mjs --clear 2>&1 | tail -3',
+      'node scripts/board.mjs attest 2>&1 | tail -3',
+      'node scripts/board-queue.mjs 2>&1 | head -3',
+      'node scripts/finding.mjs --drain 2>&1 | more',
+      // A separator closes the merge as surely as a space does.
+      'node scripts/batch-boundary.mjs --clear 2>&1|tail -3',
+      'node scripts/board.mjs attest 2>&1;node scripts/board-publish.mjs',
+    ]) {
+      expect(call({ command }).survives, command).toBe(true)
+    }
+  })
+
+  it('keeps file writes, substitutions and second work outside the closing set', () => {
+    for (const command of [
+      'node scripts/batch-boundary.mjs --clear > boundary.txt',
+      'node scripts/batch-boundary.mjs --clear 2> errors.txt',
+      'node scripts/batch-boundary.mjs --clear $(git status)',
+      'node scripts/batch-boundary.mjs --clear && git commit -m carry-on',
+      'node scripts/batch-boundary.mjs --clear & tail -3',
+      'node scripts/batch-boundary.mjs --clear ; tail /tmp/file',
+    ]) {
+      expect(call({ command }).survives, command).toBe(false)
+    }
+  })
+
+  it('recognises only descriptor merges as harmless redirection', () => {
+    expect(withoutOutputDescriptorMerges('x 2>&1 1>&2')).toBe('x  ')
+    expect(withoutOutputDescriptorMerges('x > out 2> err')).toBe('x > out 2> err')
+    expect(withoutOutputDescriptorMerges('x >& out')).toBe('x >& out')
+    // The merge ends at a separator too, not only at whitespace.
+    expect(withoutOutputDescriptorMerges('x 2>&1|y')).toBe('x |y')
+    expect(withoutOutputDescriptorMerges('x 2>&1;y')).toBe('x ;y')
+    expect(withoutOutputDescriptorMerges('x 2>&1&& y')).toBe('x && y')
+    // A LONE trailing & backgrounds the call — it is not output handling and the
+    // merge stays in place, so the segment reads as the redirection it is.
+    expect(withoutOutputDescriptorMerges('x 2>&1&')).toBe('x 2>&1&')
+    // A digit that keeps running is not a file descriptor merge we understand.
+    expect(withoutOutputDescriptorMerges('x 2>&1a')).toBe('x 2>&1a')
+  })
+
+  it('a DETACHED closing command is not closing work, however it is spelled', () => {
+    for (const command of [
+      'node scripts/batch-boundary.mjs --clear &',
+      'node scripts/batch-boundary.mjs --clear 2>&1&',
+      'node scripts/batch-boundary.mjs --clear 2>&1 &',
+    ]) {
+      expect(call({ command }).survives, command).toBe(false)
+    }
+    // An & BETWEEN commands still detaches the one on its left, even if both
+    // invocations otherwise belong to the closing set.
+    expect(call({ command: 'node scripts/board.mjs attest & node scripts/board-publish.mjs' }).survives).toBe(false)
+    expect(call({ command: 'node scripts/board.mjs attest && node scripts/board-publish.mjs' }).survives).toBe(true)
   })
 
   it('is CONSERVATIVE where it cannot tell: unknown tool, no target, empty command', () => {
@@ -388,6 +483,11 @@ describe('handoverSurvivesCall — closing work keeps the boundary, anything els
     // A pager in the MIDDLE would hide whatever follows it.
     expect(call({ command: 'node scripts/focus.mjs show | tail -2 | npm test' }).survives).toBe(false)
     expect(call({ command: 'node scripts/focus.mjs show | tail -2 && git push' }).survives).toBe(false)
+    // Pager names only mean output handling after a pipe. Sequencing starts an
+    // independent command, which therefore has to belong to the closing set.
+    expect(call({ command: 'node scripts/focus.mjs show ; tail /tmp/file' }).survives).toBe(false)
+    expect(call({ command: 'node scripts/focus.mjs show && tail -2' }).survives).toBe(false)
+    expect(call({ command: 'node scripts/focus.mjs show || tail -2' }).survives).toBe(false)
   })
 
   it('a pager ALONE is not a closing line', () => {
@@ -515,12 +615,14 @@ describe('the boundary card names where the batch actually goes', () => {
   it('WITH an honoured claim: the claiming window, and the launcher skips the spawn', () => {
     const where = boundaryDestination({ claimHonoured: true, claimantSid: 'session-window-1' })
     expect(where).toEqual({ destination: BOUNDARY_DESTINATIONS.CLAIMING_WINDOW, claimantSid: 'session-window-1' })
-    const text = boundaryCardText({ point: 434, ...where })
+    const text = cardText({ ...where, claimantPid: CURRENT_CLAIM.pid })
     expect(text).toContain('Der Punkt ist abgeschlossen.')
     expect(text).toContain('NICHT an eine frische Sitzung')
-    expect(text).toContain('Fenster session-window-1 hat ihn beansprucht')
+    expect(text).toContain(`PID ${CURRENT_CLAIM.pid}`)
+    expect(text).toContain('aktuelle Sitzung session-window-1')
+    expect(text).toContain(`Punkt ${NEXT_POINT}`)
+    expect(text).toContain('node scripts/batch-claim.mjs --session session-window-1')
     expect(text).toContain('Launcher hält den Start deshalb zurück')
-    expect(text).toContain('--session session-window-1')
     // The sentence the incident was made of must not appear in this state.
     expect(text).not.toContain('nächsten Punkt der Warteschlange')
   })
@@ -528,9 +630,9 @@ describe('the boundary card names where the batch actually goes', () => {
   it('WITHOUT a claim: a fresh session, which takes the next queued point', () => {
     const where = boundaryDestination({})
     expect(where).toEqual({ destination: BOUNDARY_DESTINATIONS.FRESH_SESSION, claimantSid: null })
-    const text = boundaryCardText({ point: 434, ...where })
+    const text = cardText(where)
     expect(text).toContain('Ich übergebe an eine frische Sitzung')
-    expect(text).toContain('nächsten Punkt der Warteschlange')
+    expect(text).toContain(`Punkt ${NEXT_POINT} als nächsten offenen Punkt der Warteschlange`)
     expect(text).toContain('Kein Fenster hat den Stapel beansprucht')
   })
 
@@ -545,33 +647,102 @@ describe('the boundary card names where the batch actually goes', () => {
     )
   })
 
-  it('is total, and never prints a point number at all', () => {
-    for (const point of [undefined, 'vier', 0, 434]) {
-      expect(boundaryCardText({ point }).startsWith('Der Punkt ist abgeschlossen.')).toBe(true)
+  it('refuses to dictate a card without a valid first open point', () => {
+    for (const nextPoint of [undefined, 'vier', 0, -1, 1_000_000]) {
+      expect(() => boundaryCardText({ nextPoint })).toThrow(/nextPoint must name the first open/)
     }
   })
 
-  // POINT 439: two sanctioned mechanisms used to contradict each other. This text
-  // is prescribed for VERBATIM use in the gap card `done <n> --none` writes — a
-  // card that owns no point number, so the topic guard read every "Punkt N" in it
-  // as a reference to a foreign point and blocked the turn end. The loser was
-  // always the boundary: the block costs a turn, and every remedy command counts
-  // as work and deletes the marker, so the handover had to be re-taken.
-  it('AGREES WITH THE TOPIC GUARD: the prescribed text passes in the card it is written into', () => {
-    const tasks = '- [ ] 434. Etwas Offenes.\n- [ ] 439. Noch etwas.\n- [x] 400. Erledigt.\n'
-    const gapCard = (text) =>
-      '<h2>Woran ich gerade arbeite</h2>\n' +
-      `<details class="now"><summary><span class="t">${NO_CURRENT_WORK_TITLE}</span></summary>` +
-      `<div class="body"><p><span class="stamp">Stand 21:10</span> ${text}</p></div></details>\n` +
-      '<h2>Erledigt</h2>\n'
-    for (const where of [
-      boundaryDestination({}),
-      boundaryDestination({ claimHonoured: true, claimantSid: 'session-window-1' }),
+  it('dictates the canonical finished-batch card when the work order has no open point', () => {
+    const handover = boundaryHandover({ sid: 'x', tasksText: '# no open points\n' })
+    expect(handover.nextPoint).toBe(null)
+    expect(handover.card).toContain(
+      'Der Arbeitsauftrag enthält keinen offenen Punkt; der Stapel ist abgeschlossen.',
+    )
+    expect(namesFollowOnWork(handover.card)).toBe(true)
+  })
+
+  // POINT 800: the dictated text and every gate that consumes it are one
+  // contract. This is a property over several possible queue heads, for both
+  // destinations, so the composer cannot drift back to a nameless card.
+  it('dictates text accepted by the none writer, topic guard, conciseness guard and commit proof', () => {
+    const section = (name) => `<details class="sect"><summary><h2>${name}</h2></summary>\n</details>\n`
+    const emptyBoard =
+      `<main>\n${section('Woran ich gerade arbeite')}${section('Von dir zu klären')}` +
+      `${section('Warteschlange')}${section('Erledigt')}</main>\n`
+    for (const nextPoint of [1, 54, 800, 10_000]) {
+      const tasks = `- [ ] ${nextPoint}. Nächster Punkt.\n- [x] 400. Erledigt.\n`
+      for (const destination of [
+        BOUNDARY_DESTINATIONS.FRESH_SESSION,
+        BOUNDARY_DESTINATIONS.CLAIMING_WINDOW,
+      ]) {
+        const text = boundaryCardText({
+          destination,
+          nextPoint,
+          ...(destination === BOUNDARY_DESTINATIONS.CLAIMING_WINDOW
+            ? claimantCardIdentity(CURRENT_CLAIM)
+            : {}),
+        })
+        expect(namesFollowOnWork(text)).toBe(true)
+        const card = toNoCurrentWork(emptyBoard, text, { stamp: '21:10' })
+        expect(topicViolations(card, knownPoints(tasks))).toEqual([])
+        expect(evaluateTopic({ dashboardHtml: card, tasksText: tasks }).block).toBe(false)
+        expect(concisenessOffenders(card)).toEqual([])
+        expect(boardCarriesCard(card, cardProofFragments({ destination }))).toMatchObject({ carries: true })
+        for (const fragment of cardProofFragments({ destination })) expect(text).toContain(fragment)
+      }
+    }
+  })
+
+  it('dictates an empty-queue form accepted by every card gate for either destination', () => {
+    const section = (name) => `<details class="sect"><summary><h2>${name}</h2></summary>\n</details>\n`
+    const emptyBoard =
+      `<main>\n${section('Woran ich gerade arbeite')}${section('Von dir zu klären')}` +
+      `${section('Warteschlange')}${section('Erledigt')}</main>\n`
+    const tasks = '# no open points\n'
+    for (const destination of [
+      BOUNDARY_DESTINATIONS.FRESH_SESSION,
+      BOUNDARY_DESTINATIONS.CLAIMING_WINDOW,
     ]) {
-      const card = gapCard(boundaryCardText({ point: 434, ...where }))
+      const text = boundaryCardText({
+        destination,
+        nextPoint: null,
+        ...(destination === BOUNDARY_DESTINATIONS.CLAIMING_WINDOW
+          ? claimantCardIdentity(CURRENT_CLAIM)
+          : {}),
+      })
+      expect(namesFollowOnWork(text)).toBe(true)
+      const card = toNoCurrentWork(emptyBoard, text, { stamp: '21:10' })
       expect(topicViolations(card, knownPoints(tasks))).toEqual([])
       expect(evaluateTopic({ dashboardHtml: card, tasksText: tasks }).block).toBe(false)
+      expect(concisenessOffenders(card)).toEqual([])
+      expect(boardCarriesCard(card, cardProofFragments({ destination }))).toMatchObject({ carries: true })
     }
+  })
+
+  // POINT 790: a `/clear` changes the session id, not the window pid. Only the
+  // CURRENT claim record feeds the card, and both identifiers appear together.
+  it('identifies the current claimant record and never a stale session from the same window', () => {
+    const previousSid = 'c0ad5041-before-clear'
+    const current = { sessionId: 'ecc312cf-after-clear', pid: CURRENT_CLAIM.pid }
+    const text = boundaryCardText({
+      destination: BOUNDARY_DESTINATIONS.CLAIMING_WINDOW,
+      nextPoint: NEXT_POINT,
+      ...claimantCardIdentity(current),
+    })
+    expect(text).toContain(`PID ${current.pid} (aktuelle Sitzung ${current.sessionId})`)
+    expect(text).not.toContain(previousSid)
+  })
+
+  it('keeps the current claimant session when its pid is unavailable', () => {
+    const text = boundaryCardText({
+      destination: BOUNDARY_DESTINATIONS.CLAIMING_WINDOW,
+      claimantSid: 'abc-123',
+      claimantPid: null,
+      nextPoint: NEXT_POINT,
+    })
+    expect(text).toContain('Fenster der aktuellen Sitzung abc-123 (PID unbekannt)')
+    expect(text).toContain(`Punkt ${NEXT_POINT}`)
   })
 
   // POINT 470: the printed instruction must be a command that WORKS. Printing
@@ -594,10 +765,10 @@ describe('the boundary card names where the batch actually goes', () => {
   })
 
   it('INDEPENDENCE: the card is decided with no lock, no launcher probe and no work order', () => {
-    // Nothing but the claim verdict reaches this decision, so a stale or missing
-    // input from any other layer cannot silence it or make it lie.
-    expect(boundaryCardText({ point: 1, ...boundaryDestination({ claimHonoured: true, claimantSid: 's' }) })).toContain(
-      'Fenster s hat ihn beansprucht',
+    // The already-gathered queue head and claim record are plain inputs; the
+    // composer performs no I/O and cannot substitute a remembered identity.
+    expect(cardText({ ...boundaryDestination({ claimHonoured: true, claimantSid: 's' }), claimantPid: 42 })).toContain(
+      'PID 42 (aktuelle Sitzung s)',
     )
   })
 })
@@ -700,6 +871,239 @@ describe('the marker survives everything --prepare prescribes (point 675)', () =
   })
 })
 
+const REMEDY_RUNTIME_VALUE = 'remedy_runtime_value'
+
+function staticRemedyText(node) {
+  if (ts.isStringLiteral(node) || ts.isNoSubstitutionTemplateLiteral(node)) return node.text
+  if (ts.isTemplateExpression(node)) {
+    return node.head.text + node.templateSpans.map((span) => REMEDY_RUNTIME_VALUE + span.literal.text).join('')
+  }
+  if (ts.isBinaryExpression(node) && node.operatorToken.kind === ts.SyntaxKind.PlusToken) {
+    const left = staticRemedyText(node.left)
+    const right = staticRemedyText(node.right)
+    if (left === null && right === null) return null
+    return (left ?? REMEDY_RUNTIME_VALUE) + (right ?? REMEDY_RUNTIME_VALUE)
+  }
+  return null
+}
+
+function staticRemedyTexts(root) {
+  const texts = []
+  const visit = (node) => {
+    const text = staticRemedyText(node)
+    const parentText = node.parent && node.parent !== root.parent ? staticRemedyText(node.parent) : null
+    if (text !== null && parentText === null) texts.push(text)
+    ts.forEachChild(node, visit)
+  }
+  visit(root)
+  return texts
+}
+
+function topLevelDeclarations(sourceFile) {
+  const declarations = new Map()
+  for (const statement of sourceFile.statements) {
+    if ((ts.isFunctionDeclaration(statement) || ts.isClassDeclaration(statement)) && statement.name) {
+      declarations.set(statement.name.text, statement)
+    }
+    if (ts.isVariableStatement(statement)) {
+      for (const declaration of statement.declarationList.declarations) {
+        if (ts.isIdentifier(declaration.name)) declarations.set(declaration.name.text, declaration)
+      }
+    }
+  }
+  return declarations
+}
+
+function declarationsReachableFrom(sourceFile, importedNames) {
+  const declarations = topLevelDeclarations(sourceFile)
+  const pending = [...importedNames]
+  const reached = []
+  const seen = new Set()
+  while (pending.length) {
+    const name = pending.pop()
+    if (seen.has(name) || !declarations.has(name)) continue
+    seen.add(name)
+    const declaration = declarations.get(name)
+    reached.push(declaration)
+    const visit = (node) => {
+      if (ts.isIdentifier(node) && declarations.has(node.text) && !seen.has(node.text)) pending.push(node.text)
+      ts.forEachChild(node, visit)
+    }
+    visit(declaration)
+  }
+  return reached
+}
+
+function commandEndInPrintedLine(line, start) {
+  let doubleQuoted = false
+  let singleQuoted = false
+  for (let i = start; i < line.length; i += 1) {
+    const char = line[i]
+    if (char === '"' && !singleQuoted) doubleQuoted = !doubleQuoted
+    else if (char === "'" && !doubleQuoted) singleQuoted = !singleQuoted
+    if (doubleQuoted || singleQuoted) continue
+    if (char === '`' || char === ',' || char === '—') return i
+    if (char === '.' && /\s/.test(line[i + 1] ?? '')) return i
+  }
+  return line.length
+}
+
+function remedyCommandsInText(text) {
+  const remedies = []
+  const unclassifiable = []
+  for (const line of String(text).split(/\r?\n/)) {
+    for (const match of line.matchAll(/node\s+scripts[\\/][\w/-]+\.mjs/g)) {
+      const before = line.slice(0, match.index)
+      const clauseStart = Math.max(before.lastIndexOf('`'), before.lastIndexOf('. '), before.lastIndexOf(', ')) + 1
+      const leadingClause = before.slice(clauseStart)
+      const end = commandEndInPrintedLine(line, match.index + match[0].length)
+      const printed = line.slice(match.index, end).trim().replace(/[):]+$/, '')
+      if (/&&|\|\||(^|[^&])&(?!&)/.test(leadingClause)) {
+        unclassifiable.push({
+          printed,
+          context: `${leadingClause}${printed}`.trim().replaceAll(REMEDY_RUNTIME_VALUE, '<runtime>'),
+        })
+        continue
+      }
+      const command = printed.replace(/<[^>\n]+>/g, 'value').replaceAll(REMEDY_RUNTIME_VALUE, 'value')
+      remedies.push({ command, printed })
+    }
+  }
+  return { remedies, unclassifiable }
+}
+
+function stopGuardRemedies(root, guard) {
+  const parse = (file) => {
+    const source = readFileSync(resolve(root, 'scripts', file), 'utf8')
+    return ts.createSourceFile(file, source, ts.ScriptTarget.Latest, true, ts.ScriptKind.JS)
+  }
+  const wrapper = parse(guard)
+  const sources = [{ file: guard, nodes: [wrapper] }]
+
+  for (const statement of wrapper.statements) {
+    if (!ts.isImportDeclaration(statement)) continue
+    const importedFile = statement.moduleSpecifier.text
+    if (!importedFile.startsWith('./') || !importedFile.endsWith('-core.mjs')) continue
+    const bindings = statement.importClause?.namedBindings
+    if (!bindings || !ts.isNamedImports(bindings)) continue
+    const importedNames = bindings.elements.map((element) => (element.propertyName ?? element.name).text)
+    const file = importedFile.slice(2)
+    const core = parse(file)
+    sources.push({ file, nodes: declarationsReachableFrom(core, importedNames) })
+  }
+
+  const remedies = []
+  const unclassifiable = []
+  for (const { file, nodes } of sources) {
+    for (const node of nodes) {
+      for (const text of staticRemedyTexts(node)) {
+        const found = remedyCommandsInText(text)
+        remedies.push(...found.remedies.map((remedy) => ({ guard, source: file, ...remedy })))
+        unclassifiable.push(...found.unclassifiable.map((remedy) => ({ guard, source: file, ...remedy })))
+      }
+    }
+  }
+  return { remedies, unclassifiable }
+}
+
+describe('every Stop-guard remedy is closing work or explicitly deferred at the fence', () => {
+  it('keeps the reviewed additions to reads and boundary bookkeeping, one by one', () => {
+    const closingAdditions = new Map([
+      ['batch-launcher', 'arms the successor launcher'],
+      ['batch-pause', 'records the reason this session is ending'],
+      ['chat-reply', 'delivers the closing reply'],
+      ['pages-deploy-unblock', 'settles the CI handover state'],
+      ['rule-echo', 'reads and reports the standing rule'],
+      ['vdzk-answer', 'records the closing answer receipt'],
+      ['guard-health-guard', 'reads the guard-health status'],
+      ['guide-brevity-guard', 'reads the guide-budget status'],
+      ['verify/run-wait', 'reads the existing verify receipt or waits for it'],
+      ['worktree-cleanup', 'performs the boundary worktree bookkeeping'],
+    ])
+    for (const [script, reason] of closingAdditions) {
+      expect(isClosingSetCommand(`node scripts/${script}.mjs`), reason).toBe(true)
+    }
+    for (const script of ['review-sol', 'throttle-probe', 'verify/run-all']) {
+      expect(isClosingSetCommand(`node scripts/${script}.mjs`), `${script} starts real work`).toBe(false)
+    }
+  })
+
+  it('derives remedy scripts from the authoritative hook chain, not a copied guard list', () => {
+    const root = process.cwd()
+    const settings = JSON.parse(readFileSync(resolve(root, '.claude/settings.json'), 'utf8'))
+    const guards = (settings.hooks?.Stop ?? [])
+      .flatMap((entry) => entry.hooks ?? [])
+      .map((hook) => /scripts[\\/]([\w.-]+\.mjs)/.exec(hook.command ?? '')?.[1])
+      .filter(Boolean)
+    expect(guards.length).toBeGreaterThan(5)
+
+    const remedies = []
+    const unclassifiable = []
+    for (const guard of guards) {
+      const found = stopGuardRemedies(root, guard)
+      remedies.push(...found.remedies)
+      unclassifiable.push(...found.unclassifiable)
+    }
+
+    expect(remedies.length).toBeGreaterThan(20)
+    expect(remedies.map(({ command }) => command)).toEqual(
+      expect.arrayContaining([
+        expect.stringMatching(/^node scripts\/finding\.mjs --drain/),
+        expect.stringMatching(/^node scripts\/board-queue\.mjs/),
+        expect.stringMatching(/^node scripts\/rule-review\.mjs --reviewed/),
+      ]),
+    )
+    expect(
+      [...new Set(unclassifiable.map(({ guard, source, context }) => `${guard} via ${source}: ${context}`))],
+    ).toEqual([
+      'ci-status-guard.mjs via ci-status-guard-core.mjs: <runtime>Reproduce the fast gate locally (npm run build && npm run lint && node scripts/audit-check.mjs && npm run test:unit',
+      'ci-status-guard.mjs via ci-failure-cause-core.mjs: Reproduce the fast gate locally (npm run build && npm run lint && node scripts/audit-check.mjs && npm run test:unit',
+    ])
+    const closedFence = { closed: true, successor: 'the successor session' }
+    const deferredGuards = new Map([
+      ['render-verify-guard.mjs', evaluateRenderVerify({
+        head: 'head',
+        clearedHead: 'base',
+        changedRenderPaths: ['src/render/pending.ts'],
+        fence: closedFence,
+        sessionId: 'sealed-session',
+      })],
+      ['mechanism-review-guard.mjs', evaluateMechanismReview({
+        baseline: 'base',
+        head: 'head',
+        pendingCommits: [{
+          sha: 'a'.repeat(40),
+          subject: 'Change a guard',
+          authorModel: 'Claude Opus 5',
+          files: ['scripts/pending-guard.mjs'],
+          coveringRecordShas: [],
+        }],
+        records: [],
+        fence: closedFence,
+        sessionId: 'sealed-session',
+      })],
+    ])
+    const deferredRemedies = []
+    for (const { guard, source, command } of remedies) {
+      if (isClosingSetCommand(command)) continue
+      const verdict = deferredGuards.get(guard)
+      expect(verdict?.deferred, `${guard} via ${source} demands real work without fenced deferral: ${command}`).toBe(true)
+      deferredRemedies.push(command)
+    }
+    expect(new Set(deferredRemedies.map((command) => /scripts[\\/]([\w/-]+)\.mjs/.exec(command)?.[1]))).toEqual(
+      new Set(['review-sol', 'throttle-probe', 'verify/run-all']),
+    )
+  })
+
+  it('keeps a shell continuation after the remedy script in the classified command', () => {
+    const found = remedyCommandsInText('Run `node scripts/board.mjs && npm test`.')
+    expect(found.remedies).toEqual([
+      { command: 'node scripts/board.mjs && npm test', printed: 'node scripts/board.mjs && npm test' },
+    ])
+    expect(isClosingSetCommand(found.remedies[0].command)).toBe(false)
+  })
+})
+
 // ---------------------------------------------------------------------------
 // THE CONTEXT BOUNDARY (point 675, defeat 3): valid without a closed point,
 // but ONLY on a recorded real measurement.
@@ -784,16 +1188,53 @@ describe('assessBoundary — the context-watermark cause', () => {
   })
 })
 
-describe('commitSealedBoundary — the marker is the LAST write (Sol findings 1/4)', () => {
-  it('records the transfer first, then writes the marker', () => {
+describe('commitSealedBoundary — the marker and ownership handover are one commit', () => {
+  it('records the transfer, writes the marker, then hands the lock over', () => {
     const order = []
     const out = commitSealedBoundary({
       transfer: { commit: () => (order.push('transfer'), 'feat/x@abcd') },
       marker: { v: 2 },
       write: () => order.push('marker'),
+      handover: () => (order.push('handover'), { handed: true }),
     })
-    expect(order).toEqual(['transfer', 'marker'])
+    expect(order).toEqual(['transfer', 'marker', 'handover'])
     expect(out).toBe('feat/x@abcd')
+  })
+
+  it('completes the boundary before recording an over-cap exit, and recorder failure cannot undo it', () => {
+    const order = []
+    const said = []
+    const records = []
+    expect(() => commitSealedBoundary({
+      marker: { v: 2, cause: 'context' },
+      write: () => order.push('marker'),
+      handover: () => (order.push('handover'), { handed: true }),
+      complete: () => {
+        order.push('overrun-record')
+        return recordHandoverBudgetCompletion(
+          { sessionId: SID, tokens: 150_001, cause: 'context', at: NOW },
+          {
+            read: () => ({ v: 1, sessionId: SID, startTokens: 122_000, startedAt: NOW - 1 }),
+            makeDir: () => {},
+            append: (_path, line) => records.push(JSON.parse(line)),
+            say: (line) => said.push(line),
+          },
+        )
+      },
+      warn: (line) => said.push(line),
+    })).not.toThrow()
+    expect(order).toEqual(['marker', 'handover', 'overrun-record'])
+    expect(records).toMatchObject([{ exceeded: true, overrunTokens: 1 }])
+    expect(said.join('\n')).toMatch(/HANDOVER CAP EXCEEDED.*boundary stands/s)
+
+    expect(() => commitSealedBoundary({
+      marker: { v: 2 },
+      write: () => {},
+      handover: () => ({ handed: true }),
+      complete: () => { throw new Error('series unavailable') },
+      warn: (line) => said.push(line),
+    })).not.toThrow()
+    expect(said.join('\n')).toMatch(/WARNING.*boundary stands/s)
   })
 
   it('a THROWING transfer leaves NO marker behind, and names its stage', () => {
@@ -844,19 +1285,122 @@ describe('commitSealedBoundary — the marker is the LAST write (Sol findings 1/
     expect(commitSealedBoundary({ transfer: null, marker: { v: 2, point: 675 }, write: (m) => (marker = m) })).toBeNull()
     expect(marker).toEqual({ v: 2, point: 675 })
   })
+
+  it('a failed ownership handover names the stage and leaves the committed marker explicit', () => {
+    let marker = null
+    let caught = null
+    try {
+      commitSealedBoundary({
+        marker: { v: 2, cause: 'context' },
+        write: (m) => (marker = m),
+        handover: () => ({ handed: false, reason: 'write-failed', error: new Error('lock busy') }),
+      })
+    } catch (e) {
+      caught = e
+    }
+    expect(marker).toEqual({ v: 2, cause: 'context' })
+    expect(caught?.stage).toBe('handover')
+    expect(caught?.message).toBe('lock busy')
+  })
+
+  it('leaves the lock handed over even when an unrelated Stop duty blocks afterwards', () => {
+    const dir = mkdtempSync(join(tmpdir(), 'boundary-handover-'))
+    const lockPath = join(dir, 'batch-lock.json')
+    writeFileSync(lockPath, JSON.stringify({ sessionId: SID, claimedAt: NOW - 10_000, pid: process.pid }))
+    try {
+      commitSealedBoundary({
+        marker: marker({ cause: 'context', point: null }),
+        write: () => {},
+        handover: () => markHandover(SID, { lockPath, point: null, now: NOW }),
+      })
+      const unrelated = evaluateRuleReview({ now: NOW, lastReviewedAt: null, sessionId: SID })
+      expect(unrelated?.decision).toBe('block')
+      expect(readOwnerLock(lockPath)).toMatchObject({ handedOver: true, handedOverAt: NOW, handoverPoint: null })
+    } finally {
+      rmSync(dir, { recursive: true, force: true })
+    }
+  })
+})
+
+describe('boundary immediate successor request', () => {
+  it('invokes the shared launcher synchronously with the handed-over generation', () => {
+    let call = null
+    const result = requestImmediateSuccessor({
+      generation: 17,
+      run: (file, args, options) => { call = { file, args, options } },
+    })
+    expect(result).toEqual({ requested: true, reason: 'requested', generation: 17 })
+    expect(call.file).toBe(process.execPath)
+    expect(call.args).toEqual(expect.arrayContaining([
+      expect.stringMatching(/batch-autostart\.mjs$/), '--immediate', '--cause', 'boundary', '--generation', '17',
+    ]))
+    expect(call.options).toMatchObject({ windowsHide: true, timeout: 180_000 })
+  })
+
+  it('marks first, reads that generation, and requests before returning', () => {
+    const order = []
+    const result = handoverAndRequest({
+      sid: SID,
+      point: 811,
+      mark: (sid, { point }) => (order.push(`mark:${sid}:${point}`), { handed: true, reason: 'ok' }),
+      readLock: () => (order.push('read'), { sessionId: SID, fence: 23, handedOver: true }),
+      request: ({ generation, cause }) => (order.push(`request:${cause}:${generation}`), { requested: true }),
+    })
+    expect(order).toEqual([`mark:${SID}:811`, 'read', 'request:boundary:23'])
+    expect(result).toMatchObject({ handed: true, successor: { requested: true } })
+  })
+
+  it('keeps the handover successful when the eager request fails and names the watchdog fallback', () => {
+    const noGeneration = handoverAndRequest({
+      sid: SID,
+      mark: () => ({ handed: true, reason: 'ok' }),
+      readLock: () => ({ sessionId: SID }),
+      request: ({ generation }) => requestImmediateSuccessor({ generation, run: () => {} }),
+    })
+    expect(noGeneration).toMatchObject({
+      handed: true,
+      reason: 'ok',
+      successorFailure: 'handover-generation-unreadable',
+      successor: { requested: false, reason: 'handover-generation-unreadable' },
+    })
+    expect(successorRequestFailureLine(noGeneration)).toBe(
+      'the immediate successor request failed (handover-generation-unreadable); the 900-second watchdog remains armed',
+    )
+
+    const failed = handoverAndRequest({
+      sid: SID,
+      mark: () => ({ handed: true, reason: 'ok' }),
+      readLock: () => ({ sessionId: SID, fence: 24 }),
+      request: () => ({ requested: false, reason: 'request-failed', error: new Error('launcher unavailable') }),
+    })
+    expect(failed).toMatchObject({ handed: true, reason: 'ok', successorFailure: 'request-failed' })
+    expect(failed.successor.error.message).toBe('launcher unavailable')
+
+    // `commitSealedBoundary` is the CLI's exit-1 boundary: only a failed mark
+    // may cross it. A failed optimization leaves the already-written boundary
+    // successful so the watchdog can recover it.
+    expect(() => commitSealedBoundary({
+      marker: { v: 2, cause: 'point' },
+      write: () => {},
+      handover: () => failed,
+    })).not.toThrow()
+    expect(successorRequestFailureLine(failed)).toBe(
+      'the immediate successor request failed (request-failed); the 900-second watchdog remains armed',
+    )
+  })
 })
 
 describe('boundaryCardText — the watermark variant says WHY (point 675)', () => {
   it('a context boundary names the watermark, not a closed point', () => {
-    const text = boundaryCardText({ ...boundaryDestination({}), cause: 'context' })
+    const text = cardText({ ...boundaryDestination({}), cause: 'context' })
     expect(text).toContain('Wasserstandsmarke')
     expect(text).not.toContain('Der Punkt ist abgeschlossen')
   })
 
   it('the point variant is untouched, and the claiming-window variant carries the head too', () => {
-    expect(boundaryCardText({ ...boundaryDestination({}) })).toContain('Der Punkt ist abgeschlossen')
+    expect(cardText({ ...boundaryDestination({}) })).toContain('Der Punkt ist abgeschlossen')
     expect(
-      boundaryCardText({ ...boundaryDestination({ claimHonoured: true, claimantSid: 's' }), cause: 'context' }),
+      cardText({ ...boundaryDestination({ claimHonoured: true, claimantSid: 's' }), cause: 'context' }),
     ).toContain('Wasserstandsmarke')
   })
 })
@@ -948,7 +1492,7 @@ describe('unpreparedRefusal — --commit refuses what --prepare never prepared (
       expect(standingCards({ cause, destination, path })).toEqual({ readable: true, cards: [] })
       writeFileSync(
         path,
-        `<details class="card"><p>${boundaryCardText({ destination, cause })}</p></details>`,
+        `<details class="card"><p>${cardText({ destination, cause })}</p></details>`,
       )
       const seen = standingCards({ cause, destination, path })
       expect(seen.readable).toBe(true)
@@ -1109,7 +1653,7 @@ describe('markerFresh / boardCarriesCard — a forged stamp, an unannounced hand
   it('proves each real card by fragments that are actually in it — for both causes and both destinations', () => {
     for (const cause of [BOUNDARY_CAUSES.CONTEXT, BOUNDARY_CAUSES.POINT]) {
       for (const destination of [BOUNDARY_DESTINATIONS.FRESH_SESSION, BOUNDARY_DESTINATIONS.CLAIMING_WINDOW]) {
-        const card = boundaryCardText({ destination, claimantSid: 'window-7', cause })
+        const card = cardText({ destination, claimantSid: 'window-7', cause })
         const proof = boardCarriesCard(`<div><p>${card}</p></div>`, cardProofFragments({ cause, destination }))
         expect(proof).toEqual({ carries: true, verifiable: true, missing: [] })
       }
@@ -1124,7 +1668,7 @@ describe('markerFresh / boardCarriesCard — a forged stamp, an unannounced hand
   })
 
   it('refuses the WRONG card, and the wrong destination', () => {
-    const pointCard = boundaryCardText({ destination: BOUNDARY_DESTINATIONS.FRESH_SESSION, cause: BOUNDARY_CAUSES.POINT })
+    const pointCard = cardText({ destination: BOUNDARY_DESTINATIONS.FRESH_SESSION, cause: BOUNDARY_CAUSES.POINT })
     // A point card is no watermark card: it claims a closure that never happened.
     const asContext = boardCarriesCard(
       pointCard,
@@ -1148,7 +1692,7 @@ describe('markerFresh / boardCarriesCard — a forged stamp, an unannounced hand
     // manufactured between them. No card on this board is a watermark handover
     // to a claiming window, and the proof must not add the two together.
     const card = (cause, destination) =>
-      `<details class="card"><summary>Übergabe</summary><p>${boundaryCardText({ destination, claimantSid: 'window-7', cause })}</p></details>`
+      `<details class="card"><summary>Übergabe</summary><p>${cardText({ destination, claimantSid: 'window-7', cause })}</p></details>`
     const board =
       `<details class="sect"><summary><h2>Aktuell</h2></summary>` +
       card(BOUNDARY_CAUSES.CONTEXT, BOUNDARY_DESTINATIONS.FRESH_SESSION) +
@@ -1183,9 +1727,9 @@ describe('markerFresh / boardCarriesCard — a forged stamp, an unannounced hand
 
   it('falls back to one card\'s length on a board with no card markup', () => {
     const plain =
-      boundaryCardText({ destination: BOUNDARY_DESTINATIONS.FRESH_SESSION, cause: BOUNDARY_CAUSES.CONTEXT }) +
+      cardText({ destination: BOUNDARY_DESTINATIONS.FRESH_SESSION, cause: BOUNDARY_CAUSES.CONTEXT }) +
       '\n'.padEnd(CARD_PROOF_WINDOW, '.') +
-      boundaryCardText({ destination: BOUNDARY_DESTINATIONS.CLAIMING_WINDOW, claimantSid: 'w', cause: BOUNDARY_CAUSES.POINT })
+      cardText({ destination: BOUNDARY_DESTINATIONS.CLAIMING_WINDOW, claimantSid: 'w', cause: BOUNDARY_CAUSES.POINT })
     expect(
       boardCarriesCard(
         plain,
@@ -1202,7 +1746,7 @@ describe('markerFresh / boardCarriesCard — a forged stamp, an unannounced hand
 
   const stamped = (hhmm) =>
     `<details class="card"><summary>Übergabe</summary><p><span class="stamp">Stand ${hhmm}</span> ` +
-    `${boundaryCardText({ destination: BOUNDARY_DESTINATIONS.FRESH_SESSION, cause: BOUNDARY_CAUSES.CONTEXT })}</p></details>`
+    `${cardText({ destination: BOUNDARY_DESTINATIONS.FRESH_SESSION, cause: BOUNDARY_CAUSES.CONTEXT })}</p></details>`
   const frags = cardProofFragments({
     cause: BOUNDARY_CAUSES.CONTEXT,
     destination: BOUNDARY_DESTINATIONS.FRESH_SESSION,
@@ -1306,7 +1850,7 @@ describe('markerFresh / boardCarriesCard — a forged stamp, an unannounced hand
     // there, because a boundary check may not trap a session on a format change.
     expect(cardStampIsCurrent('<p>no stamp here</p>', { sinceMs: prepared, boardStamps: false })).toBe(true)
     const card =
-      `<details class="card"><p>${boundaryCardText({ destination: BOUNDARY_DESTINATIONS.FRESH_SESSION, cause: BOUNDARY_CAUSES.CONTEXT })}</p></details>`
+      `<details class="card"><p>${cardText({ destination: BOUNDARY_DESTINATIONS.FRESH_SESSION, cause: BOUNDARY_CAUSES.CONTEXT })}</p></details>`
     const frags = cardProofFragments({
       cause: BOUNDARY_CAUSES.CONTEXT,
       destination: BOUNDARY_DESTINATIONS.FRESH_SESSION,
@@ -1328,5 +1872,57 @@ describe('markerFresh / boardCarriesCard — a forged stamp, an unannounced hand
         missing: [],
       })
     }
+  })
+})
+
+describe('the durable two-phase batch boundary', () => {
+  const evidence = (overrides = {}) => ({
+    daemon: { ok: true, journalVerdict: 'ok' },
+    state: { journalVerdict: 'ok', snapshotSealed: true },
+    landingStage: null,
+    bookkeeping: { clean: true },
+    board: { updated: true, readable: true },
+    queue: { ok: true },
+    checkpoint: { ok: true, verdict: 'ready', requestId: 'cp-7' },
+    ...overrides,
+  })
+
+  it('prepares only after every health and checkpoint dependency is affirmative', () => {
+    expect(durablePrepareVerdict(evidence())).toEqual({ ok: true, verdict: 'prepared' })
+    for (const broken of [
+      { daemon: { ok: false } },
+      { state: { journalVerdict: 'corrupt', snapshotSealed: false } },
+      { landingStage: 'gates' },
+      { bookkeeping: { clean: false } },
+      { board: { updated: false, readable: true } },
+      { queue: { ok: false, reason: 'bad queue' } },
+      { checkpoint: { ok: false, verdict: 'blocked' } },
+    ]) expect(durablePrepareVerdict(evidence(broken)).ok).toBe(false)
+  })
+
+  it('failed prepare cannot produce a receipt or marker', () => {
+    const refused = durablePrepareReceipt({ batchId: 'b', sessionId: SID, fence: 7, requestId: 'r', at: NOW, evidence: evidence({ checkpoint: { ok: false } }) })
+    expect(refused.ok).toBe(false)
+    expect(durableBoundaryMarker({ prepared: refused.receipt, daemonReceipt: { ok: true } }).ok).toBe(false)
+  })
+
+  it('binds commit to batch, session, unchanged fence, and sealed snapshot', () => {
+    const prepared = durablePrepareReceipt({ batchId: 'b', sessionId: SID, fence: 7, requestId: 'r', at: NOW, evidence: evidence() }).receipt
+    const snapshot = { ok: true, snapshot: { batchId: 'b' } }
+    expect(durableCommitVerdict({ prepared, batchId: 'b', sessionId: SID, fence: 7, snapshot })).toEqual({ ok: true, alreadyCommitted: false })
+    expect(durableCommitVerdict({ prepared, batchId: 'b', sessionId: SID, fence: 8, snapshot }).ok).toBe(false)
+  })
+
+  it('makes commit idempotent without advancing the fence', () => {
+    const prepared = durablePrepareReceipt({ batchId: 'b', sessionId: SID, fence: 7, requestId: 'r', at: NOW, evidence: evidence() }).receipt
+    const built = durableBoundaryMarker({ prepared, daemonReceipt: { ok: true, daemonGeneration: 'daemon-g' } })
+    expect(built.marker.fence).toBe(7)
+    expect(durableCommitVerdict({ prepared, batchId: 'b', sessionId: SID, fence: 7, snapshot: { ok: true, snapshot: { batchId: 'b' } }, marker: built.marker })).toEqual({ ok: true, alreadyCommitted: true })
+  })
+
+  it('fences every post-commit mutation by the old coordinator', () => {
+    const marker = { kind: 'durable-batch-boundary', phase: 'committed', sessionId: SID, fence: 7 }
+    expect(durablePostCommitMutation({ marker, sessionId: SID, fence: 7 }).ok).toBe(false)
+    expect(durablePostCommitMutation({ marker, sessionId: 'successor', fence: 8 }).ok).toBe(true)
   })
 })

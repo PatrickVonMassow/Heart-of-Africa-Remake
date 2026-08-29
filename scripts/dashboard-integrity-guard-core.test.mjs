@@ -17,7 +17,10 @@ import {
   specSnapshots,
   driftedCards,
   evaluate,
+  duplicateDonePoints,
+  nowProjectionStopDecision,
 } from './dashboard-integrity-guard-core.mjs'
+import { NOW_EMPTY_STATE_MARKUP } from './board-core.mjs'
 
 /** Minimal dashboard in the real board's markup (mirrors the queue-order tests).
  *  `nowTitles` renders SEVERAL now-cards (parallel feature-branch work) and
@@ -67,6 +70,95 @@ const SPECS = tasksMd([
   { n: 223, spec: 'Weather x terrain audit across src/systems/season.ts.' },
   { n: 209, open: false, spec: 'Closed point.' },
 ])
+
+describe('nowProjectionStopDecision — exact declared active set', () => {
+  const active = { ok: true, points: [700, 697, 711], focusPoint: 700 }
+  const knownPoints = new Set([697, 700, 711, 712])
+
+  // The projection reads the REAL board's section markup: since the fifth
+  // cross-vendor round a document without the `sect`-wrapped now-heading is
+  // REFUSED rather than read as one big now-section, so this fixture carries
+  // the published board's four sections, not the bare-h2 shorthand above.
+  const projBoard = (nowTitles = [], nowExtra = '') => {
+    const now = nowTitles
+      .map(
+        (t) => `<details class="now" open><summary><span class="t">${t}</span></summary>
+<div class="body"><p>Status: in Arbeit.</p></div></details>`,
+      )
+      .join('\n')
+    return `<main>\n<details class="sect"><summary><h2>Woran ich gerade arbeite</h2></summary>\n${now}\n${nowExtra}\n</details>\n` +
+      '<details class="sect"><summary><h2>Von dir zu klären</h2></summary>\n</details>\n' +
+      '<details class="sect"><summary><h2>Warteschlange</h2></summary>\n</details>\n' +
+      '<details class="sect"><summary><h2>Erledigt</h2></summary>\n</details>\n</main>\n'
+  }
+
+  it('names 697 and 711 on the measured board that showed only 700', () => {
+    const result = nowProjectionStopDecision({
+      dashboardHtml: projBoard(['700 — Kontext']),
+      activeWork: active,
+      knownPoints,
+    })
+    expect(result).toMatchObject({ block: true, comparison: { missing: [697, 711] } })
+    expect(result.reason).toMatch(/missing 697, 711/)
+  })
+
+  it('blocks an empty section with all three named and allows exact equality', () => {
+    expect(nowProjectionStopDecision({
+      dashboardHtml: projBoard([]),
+      activeWork: active,
+      knownPoints,
+    })).toMatchObject({ block: true, comparison: { missing: [700, 697, 711] } })
+    expect(nowProjectionStopDecision({
+      dashboardHtml: projBoard(['700 — A', '697 — B', '711 — C']),
+      activeWork: active,
+      knownPoints,
+    }).block).toBe(false)
+  })
+
+  it('reports extra and duplicate cards instead of hiding them behind set equality', () => {
+    expect(nowProjectionStopDecision({
+      dashboardHtml: projBoard(['700 — A', '697 — B', '711 — C', '712 — Alt']),
+      activeWork: active,
+      knownPoints,
+    })).toMatchObject({ block: true, comparison: { extra: [712] } })
+    expect(nowProjectionStopDecision({
+      dashboardHtml: projBoard(['700 — A', '700 — A2', '697 — B', '711 — C']),
+      activeWork: active,
+      knownPoints,
+    })).toMatchObject({ block: true, comparison: { duplicates: [700] } })
+  })
+
+  it('accepts verified zero only with the dedicated non-card state', () => {
+    const zero = { ok: true, points: [], focusPoint: null }
+    expect(nowProjectionStopDecision({
+      dashboardHtml: projBoard([], NOW_EMPTY_STATE_MARKUP),
+      activeWork: zero,
+      knownPoints,
+    }).block).toBe(false)
+    expect(nowProjectionStopDecision({ dashboardHtml: projBoard([]), activeWork: zero }).block).toBe(true)
+  })
+
+  it('fails open for source errors, another owner and a paused batch', () => {
+    const mismatch = { dashboardHtml: projBoard([]), activeWork: active, knownPoints }
+    expect(nowProjectionStopDecision({ ...mismatch, activeWork: { ok: false, points: [] } }).block).toBe(false)
+    expect(nowProjectionStopDecision({ ...mismatch, heldByOther: true }).block).toBe(false)
+    expect(nowProjectionStopDecision({ ...mismatch, paused: true }).block).toBe(false)
+  })
+
+  it('does not let the old no-board escape suppress a known nonempty declaration', () => {
+    // A document without the section heading now REFUSES in the comparison
+    // (fifth cross-vendor round): the decision still blocks — the escape stays
+    // closed — but by naming the missing section, not by counting cards it
+    // would have had to invent a section for.
+    const result = evaluate({
+      dashboardHtml: '<p>no sections</p>',
+      tasksMd: tasksMd([{ n: 697 }, { n: 700 }, { n: 711 }]),
+      activeWork: active,
+    })
+    expect(result.block).toBe(true)
+    expect(result.reason).toMatch(/NOW-SECTION DOES NOT MATCH.*section heading is missing/)
+  })
+})
 
 describe('constants', () => {
   it('pin the calibratable thresholds', () => {
@@ -311,5 +403,54 @@ describe('evaluate — end to end', () => {
     expect(evaluate({ dashboardHtml: 42, tasksMd: {} }).block).toBe(false)
     expect(evaluate({ dashboardHtml: '<p>no sections</p>', tasksMd: SPECS }).block).toBe(false)
     expect(evaluate({ dashboardHtml: boardHtml({}), tasksMd: '- [x] 209. Done.' }).block).toBe(false)
+  })
+})
+
+describe('duplicateDonePoints — one point, one Erledigt card (user 18.08.2026)', () => {
+  const done = (point, meta) =>
+    `<details>\n  <summary><span class="num">${point}</span><span class="t">T</span>` +
+    `<span class="right"><span class="meta">${meta}</span></span></summary>\n  <div class="body">\n    <p>x</p>\n  </div>\n</details>\n`
+  const board = (inner) => `<main>\n<details class="sect">\n<summary><h2>Erledigt</h2></summary>\n${inner}</details>\n</main>`
+
+  it('names a point standing there more than once', () => {
+    expect(duplicateDonePoints(board(done(700, '01:04 · 01:10') + done(700, '21:17 · 00:44') + done(701, '09:00 · 09:30')))).toEqual(['700'])
+  })
+
+  it('says nothing when every point has one card', () => {
+    expect(duplicateDonePoints(board(done(700, '01:04 · 01:10') + done(701, '09:00 · 09:30')))).toEqual([])
+  })
+
+  it('reads the ERLEDIGT section only, so a queue or now card for the same point is fine', () => {
+    const html =
+      `<main>\n<details class="sect">\n<summary><h2>Warteschlange</h2></summary>\n${done(700, '~2 h')}</details>\n` +
+      `<details class="sect">\n<summary><h2>Erledigt</h2></summary>\n${done(700, '01:04 · 01:10')}</details>\n</main>`
+    expect(duplicateDonePoints(html)).toEqual([])
+  })
+
+  it('stops at the NEXT section, so a queue placed after Erledigt is not counted', () => {
+    const html =
+      `<main>\n<details class="sect">\n<summary><h2>Erledigt</h2></summary>\n${done(700, '01:04 · 01:10')}</details>\n` +
+      `<details class="sect">\n<summary><h2>Warteschlange</h2></summary>\n${done(700, '~2 h')}</details>\n</main>`
+    expect(duplicateDonePoints(html)).toEqual([])
+  })
+
+  it('never throws on a board without the section, or on nothing', () => {
+    expect(duplicateDonePoints('<main></main>')).toEqual([])
+    expect(duplicateDonePoints()).toEqual([])
+  })
+
+  it('BLOCKS through evaluate() even when the batch is complete or the board is bare', () => {
+    // Both early returns used to run first, so exactly the boards that consist of
+    // duplicated archive cards were waved through (cross-vendor review 18.08.).
+    const html = board(done(700, '01:04 · 01:10') + done(700, '21:17 · 00:44'))
+    const allTicked = '- [x] 700. Done.\n'
+    expect(evaluate({ dashboardHtml: html, tasksMd: allTicked }).block).toBe(true)
+    expect(evaluate({ dashboardHtml: html, tasksMd: allTicked }).reason).toMatch(/ERLEDIGT MORE THAN ONCE/)
+    // …and with an open point but no queue/now card at all.
+    const open = '- [ ] 701. Offen.\n'
+    expect(evaluate({ dashboardHtml: html, tasksMd: open }).block).toBe(true)
+    // A clean archive still passes both paths.
+    const clean = board(done(700, '01:04 · 01:10'))
+    expect(evaluate({ dashboardHtml: clean, tasksMd: allTicked }).block).toBe(false)
   })
 })

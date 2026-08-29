@@ -18,9 +18,19 @@ import {
   formatUnavailable,
   normaliseKind,
   parseAnswer,
+  parseClaudeAskOutput,
+  resolveAskModel,
 } from './ask-sol-core.mjs'
 
 describe('the kinds', () => {
+  it('addresses every model the blind-merger switch can select', () => {
+    expect(resolveAskModel()).toMatchObject({ key: 'sol', runtime: 'codex', name: 'GPT-5.6 Sol' })
+    expect(resolveAskModel('fable')).toMatchObject({ runtime: 'claude', name: 'Fable 5', id: 'claude-fable-5' })
+    expect(resolveAskModel('opus')).toMatchObject({ runtime: 'claude', name: 'Opus 5' })
+    expect(resolveAskModel('sonnet')).toBeNull()
+    expect(resolveAskModel('opus48')).toMatchObject({ name: 'Opus 4.8', id: 'claude-opus-4-8[1m]' })
+  })
+
   it('are the four read-only ones, each with a task and an answer shape', () => {
     expect(KINDS).toEqual(['diagnose', 'audit', 'enumerate', 'explain'])
     for (const kind of KINDS) {
@@ -38,6 +48,39 @@ describe('the kinds', () => {
   })
 })
 
+describe('Claude answer attribution', () => {
+  const response = (answerModel = 'claude-fable-5') => JSON.stringify({
+    result: 'the folded answer',
+    usage: { input_tokens: 7, output_tokens: 4, cache_read_input_tokens: 0, cache_creation_input_tokens: 90 },
+    modelUsage: {
+      'claude-haiku-4-5-20251001': { inputTokens: 800, outputTokens: 12, cacheReadInputTokens: 0, cacheCreationInputTokens: 0 },
+      [answerModel]: { inputTokens: 7, outputTokens: 4, cacheReadInputTokens: 0, cacheCreationInputTokens: 90, canonicalModel: answerModel },
+    },
+  })
+
+  it('accepts the selected answer model while recording an auxiliary classifier', () => {
+    expect(parseClaudeAskOutput(response(), resolveAskModel('fable'))).toMatchObject({
+      ok: true,
+      result: 'the folded answer',
+      answerModel: 'claude-fable-5',
+      models: ['claude-haiku-4-5-20251001', 'claude-fable-5'],
+    })
+  })
+
+  it('refuses substitution even when the requested model appears as auxiliary usage', () => {
+    const value = JSON.parse(response('claude-opus-5'))
+    value.modelUsage['claude-fable-5'] = { inputTokens: 100, outputTokens: 1, cacheReadInputTokens: 0, cacheCreationInputTokens: 0 }
+    expect(parseClaudeAskOutput(JSON.stringify(value), resolveAskModel('fable'))).toMatchObject({ ok: false })
+  })
+
+  it('refuses unreadable output and a non-text result', () => {
+    expect(parseClaudeAskOutput('no json', resolveAskModel('fable')).ok).toBe(false)
+    const value = JSON.parse(response())
+    value.result = { plan: 'not the answer' }
+    expect(parseClaudeAskOutput(JSON.stringify(value), resolveAskModel('fable')).error).toMatch(/no text result/)
+  })
+})
+
 describe('the prompt', () => {
   it('states the task, the question and that the material is ATTACHED, never fetched', () => {
     const p = buildAskPrompt({ kind: 'diagnose', brief: 'why did the place suite go red?' })
@@ -48,6 +91,12 @@ describe('the prompt', () => {
     expect(p).toMatch(/TRUNCATED/)
     expect(p).toMatch(/CAUSE:/)
     expect(p).toMatch(/EVIDENCE:/)
+  })
+
+  it('names the selected read-only model in the prompt', () => {
+    expect(buildAskPrompt({ kind: 'explain', brief: 'fold these', modelName: 'Fable 5' })).toContain(
+      'READ-ONLY work for this repository as Fable 5',
+    )
   })
 
   it('tells an ENUMERATE it is a divergent half that a third model will merge by id', () => {
@@ -65,6 +114,17 @@ describe('the prompt', () => {
 
   it('names a missing question rather than inventing one', () => {
     expect(buildAskPrompt({ kind: 'audit', brief: '' })).toMatch(/none given/)
+  })
+})
+
+describe('model-specific reports', () => {
+  it('never labels a Fable refusal or answer as Sol', () => {
+    expect(formatUnavailable({ kind: 'explain', cause: 'substituted', modelName: 'Fable 5' })).toMatch(
+      /Fable 5 did NOT answer/,
+    )
+    expect(formatAnswerReport({ kind: 'explain', parsed: { summary: 'folded' }, modelName: 'Fable 5', effort: 'high' })).toMatch(
+      /Fable 5 \(effort high\) answered/,
+    )
   })
 })
 
@@ -147,6 +207,190 @@ describe('the material', () => {
 
   it('is empty for nothing at all, which is what the command refuses to send', () => {
     expect(formatAskMaterial({ sections: [] }).text.trim()).toBe('')
+  })
+})
+
+describe('the markdown strip reads shapes, not characters (round-7 pass 1)', () => {
+  it('keeps an underscore inside a path — content is not decoration', () => {
+    const parsed = parseAnswer({
+      kind: 'diagnose',
+      text: 'reasoning\n\nCAUSE: the fixture writes early\nEVIDENCE: src/foo_bar.mjs:12 writes outside the shutter',
+    })
+    expect(parsed.ok).toBe(true)
+    expect(parsed.answer.evidence).toContain('src/foo_bar.mjs')
+  })
+
+  it('a mid-word marker CAN admit through the net-only spelling — the deliberate fail-closed cost', () => {
+    // Final round, pass 1: mixed nesting defeated both the raw scan and the
+    // pair strip, so the admission net gained a third spelling with every
+    // marker deleted outright. That spelling fabricates 'no material' out of
+    // 'no ma*terial' — a REFUSED round (work handed on), never a cleared one,
+    // which is the direction the net may err in.
+    const parsed = parseAnswer({
+      kind: 'explain',
+      text: 'The token no ma*terial appears verbatim in the fixture and is asserted by the failing case there.',
+    })
+    expect(parsed.ok).toBe(false)
+    expect(parsed.error).toContain('could not see the material')
+  })
+
+  it('keeps an UNMATCHED word-edge marker in QUOTED output — a lone marker is content (round 8)', () => {
+    // `src/foo_.mjs` names a file: quoting and matching never mangle it. (The
+    // ADMISSION net's net-only spelling is the one deliberate exception — see
+    // the fail-closed case above.)
+    const parsed = parseAnswer({
+      kind: 'diagnose',
+      text: 'reasoning\n\nCAUSE: the underscore is load-bearing\nEVIDENCE: src/foo_.mjs:3 exports the checked symbol',
+    })
+    expect(parsed.ok).toBe(true)
+    expect(parsed.answer.evidence).toContain('src/foo_.mjs')
+  })
+
+  it('still UNSHIELDS an emphasised admission at word edges', () => {
+    const parsed = parseAnswer({
+      kind: 'explain',
+      text: 'I checked nothing because **no** material was supplied to this run at all, sadly.',
+    })
+    expect(parsed.ok).toBe(false)
+    expect(parsed.error).toContain('could not see the material')
+  })
+
+  it('unshields NESTED emphasis too — the pair rule iterates to its fixpoint (closing round)', () => {
+    const parsed = parseAnswer({
+      kind: 'explain',
+      text: 'I read *no **material*** from this range because none arrived with the request at all.',
+    })
+    expect(parsed.ok).toBe(false)
+    expect(parsed.error).toContain('could not see the material')
+  })
+
+  it('admits on EITHER the raw or the stripped scan — no shape can shield both (final convergence)', () => {
+    // Every shape that defeated the stripped scan alone in an earlier round,
+    // plus the plain phrase: the double scan must catch each one.
+    for (const text of [
+      // plain, no decoration at all — the raw scan's own bread and butter
+      'I could not read the material for this range, so nothing here was judged by me.',
+      // flat emphasis (round 7)
+      'I checked nothing because **no** material was supplied to this run at all, sadly.',
+      // nested emphasis (round 8)
+      'I read *no **material*** from this range because none arrived with the request at all.',
+      // quote-adjacent emphasis (round 9 — the shape the enumerated boundary missed)
+      'It ended early: "**no** material was supplied" is the whole story of this run, regrettably.',
+      // MIXED nesting (final round, pass 1): opening **_ never equals closing _**,
+      // so the pair strip keeps it and the raw word boundary is broken — only
+      // the net-only spelling sees it.
+      'I checked **_no_** material from this range because none arrived with the request, sadly.',
+    ]) {
+      const parsed = parseAnswer({ kind: 'explain', text })
+      expect(parsed.ok, text).toBe(false)
+      expect(parsed.error).toContain('could not see the material')
+    }
+  })
+
+  it('quotes fields from the RAW text — src/__init__.py reaches the caller byte-exact', () => {
+    // The finding that closed the loop: the stripped copy rewrote matched
+    // word-edge pairs, so diagnose evidence cited src/init.py for a file
+    // named src/__init__.py. Matching runs on the stripped line; the VALUE
+    // is cut from the raw one.
+    const parsed = parseAnswer({
+      kind: 'diagnose',
+      text: 'reasoning\n\nCAUSE: the __init__ module writes early\nEVIDENCE: src/__init__.py:3 writes the frame outside the shutter',
+    })
+    expect(parsed.ok).toBe(true)
+    // BYTE-IDENTICAL to the raw input, not merely containing the token.
+    expect(parsed.answer.cause).toBe('the __init__ module writes early')
+    expect(parsed.answer.evidence).toBe('src/__init__.py:3 writes the frame outside the shutter')
+  })
+
+  it('rules the diagnose placeholder on the STRIPPED capture — decoration cannot smuggle it', () => {
+    const parsed = parseAnswer({
+      kind: 'diagnose',
+      text: 'reasoning\n\nCAUSE: **<the one cause, named>**\nEVIDENCE: **<the lines in the material>**',
+    })
+    expect(parsed.ok).toBe(false)
+    expect(parsed.error).toContain('placeholders')
+  })
+
+  it('still recognises a DECORATED label — the stripped line matches, the raw line is quoted', () => {
+    const parsed = parseAnswer({
+      kind: 'diagnose',
+      text: 'reasoning\n\n**CAUSE:** the fixture writes early\n**EVIDENCE:** src/__init__.py:9 exports the checked symbol',
+    })
+    expect(parsed.ok).toBe(true)
+    expect(parsed.answer.cause).toBe('the fixture writes early')
+    expect(parsed.answer.evidence).toContain('src/__init__.py:9')
+  })
+
+  it('carries a list entry’s file and finding byte-for-byte from the raw line', () => {
+    const parsed = parseAnswer({
+      kind: 'audit',
+      text: 'sweep done\n\nA1 | src/__init__.py | the __slots__ list drops the flag field entirely',
+    })
+    expect(parsed.ok).toBe(true)
+    expect(parsed.answer.entries).toEqual([
+      { id: 'A1', file: 'src/__init__.py', text: 'the __slots__ list drops the flag field entirely' },
+    ])
+  })
+
+  it('an ENUMERATE entry quotes raw too — every list kind obeys the one rule', () => {
+    const parsed = parseAnswer({
+      kind: 'enumerate',
+      text: 'my own list\n\nB1 | src/__init__.py | the __all__ export omits the loader symbol',
+    })
+    expect(parsed.ok).toBe(true)
+    expect(parsed.answer.entries).toEqual([
+      { id: 'B1', file: 'src/__init__.py', text: 'the __all__ export omits the loader symbol' },
+    ])
+  })
+
+  it('an EXPLAIN answer is the raw text byte-for-byte, never the stripped copy', () => {
+    // WITH boundary whitespace: a fidelity test whose input cannot expose the
+    // loss is not a test — the old .trim() ate exactly these bytes.
+    const text =
+      '\n  The module src/__init__.py wires the loader: it re-exports __all__ from the package and keeps the flag literal.\n\n'
+    const parsed = parseAnswer({ kind: 'explain', text })
+    expect(parsed.ok).toBe(true)
+    expect(parsed.answer.text).toBe(text)
+    expect(parsed.summary).toContain('src/__init__.py')
+  })
+
+  it('rules entry PRESENCE on the stripped captures — decoration-only fields are empty fields', () => {
+    // 'A1 | a.mjs | ```' strips to an empty finding: refused, not accepted.
+    const noFinding = parseAnswer({ kind: 'audit', text: 'sweep\n\nA1 | a.mjs | ```' })
+    expect(noFinding.ok).toBe(false)
+    expect(noFinding.error).toContain('carries no finding')
+    // A decoration-only FILE field is an unnamed file, never a quoted marker.
+    const noFile = parseAnswer({ kind: 'audit', text: 'sweep\n\nA1 | ``` | the loader drops the flag field' })
+    expect(noFile.ok).toBe(true)
+    expect(noFile.answer.entries[0].file).toBe('(unspecified)')
+    // …and the NO-FINDINGS explanation obeys the same rule (landing round):
+    // an unpaired marker survives the pair strip, so `NO FINDINGS: _` read as
+    // an explained clean audit while naming nothing checked.
+    const bare = parseAnswer({ kind: 'audit', text: 'sweep\n\nNO FINDINGS: _' })
+    expect(bare.ok).toBe(false)
+    const explained = parseAnswer({ kind: 'audit', text: 'sweep\n\nNO FINDINGS: checked the loader end to end' })
+    expect(explained.ok).toBe(true)
+    // …and the PROMPT'S OWN TEMPLATE names nothing checked (fourth landing
+    // round): the echoed placeholder is not an explanation.
+    expect(parseAnswer({ kind: 'audit', text: 'sweep\n\nNO FINDINGS: <what you checked>' }).ok).toBe(false)
+  })
+
+  it('refuses marker-only and marker-shielded DIAGNOSE fields (fourth landing round)', () => {
+    expect(parseAnswer({ kind: 'diagnose', text: 'looked.\n\nCAUSE: _\nEVIDENCE: __________' }).ok).toBe(false)
+    expect(
+      parseAnswer({ kind: 'diagnose', text: 'looked.\n\nCAUSE: _<the one cause>\nEVIDENCE: _<the two lines that prove it>' }).ok,
+    ).toBe(false)
+    expect(
+      parseAnswer({ kind: 'diagnose', text: 'looked.\n\nCAUSE: the poller drops the lock\nEVIDENCE: the stamp is written before the rename lands' }).ok,
+    ).toBe(true)
+  })
+
+  it('does not admit a genuine review that merely SPEAKS the net’s vocabulary, raw or stripped', () => {
+    const parsed = parseAnswer({
+      kind: 'explain',
+      text: 'Checked the **splitter** against quoted paths; the patch was not supplied in the failing fixture, which is the defect.',
+    })
+    expect(parsed.ok).toBe(true)
   })
 })
 

@@ -7,14 +7,35 @@ import {
   FENCE_END_COMMAND,
   authoringTarget,
   classifyFenceCall,
-  contextFenceDecision,
   fenceRefusal,
   resolveThroughAncestors,
 } from './context-fence-core.mjs'
 
 const PAST = { state: 'past', tokens: 434_440, watermark: 150_000 }
 
-const decide = (call, reading = PAST) => contextFenceDecision({ ...reading, ...call })
+// Classification has no threshold of its own. These tests exercise its historic
+// deny/allow vocabulary by wrapping it in a measured-past fixture; prospective
+// arithmetic and mode routing live in context-budget*.test.mjs now.
+const decide = (call, reading = PAST) => {
+  const idle = { block: false, reason: null, observed: false, what: null, authoring: false }
+  if (reading.state !== 'past') return idle
+  const classified = classifyFenceCall(call)
+  if (!classified.starts) return idle
+  return {
+    ...idle,
+    block: true,
+    observed: true,
+    what: classified.what,
+    authoring: classified.authoring,
+    reason: fenceRefusal({
+      tokens: reading.tokens,
+      watermark: reading.watermark,
+      what: classified.what,
+      authoring: classified.authoring,
+      clearFirst: classified.clearFirst,
+    }),
+  }
+}
 
 describe('over the mark, a STARTING call is denied — naming the mark', () => {
   const starts = [
@@ -93,6 +114,7 @@ describe('over the mark, a STARTING call is denied — naming the mark', () => {
         }),
     }],
     ['delegating to Sol', { toolName: 'Bash', command: 'node scripts/author-sol.mjs 701' }],
+    ['delegating to Fable', { toolName: 'Bash', command: 'node scripts/author-fable.mjs --point 834' }],
     ['a cross-vendor review run', { toolName: 'Bash', command: 'node scripts/review-sol.mjs --commit abc' }],
     ['a delegated ask run', { toolName: 'Bash', command: 'node scripts/ask-sol.mjs --kind audit --brief "x"' }],
   ]
@@ -116,6 +138,10 @@ describe('over the mark, AUTHORING is denied — and the refusal names the carri
     ['a memory', { toolName: 'Write', filePath: '/home/node/.claude/projects/-workspace-hoa/memory/new-rule.md' }],
     ['the memory index', { toolName: 'Edit', filePath: 'MEMORY.md' }],
     ['CLAUDE.md itself', { toolName: 'Edit', filePath: 'CLAUDE.md' }],
+    // MultiEdit is not offered by this harness today. It is pinned anyway: the
+    // settings file guards it wherever a write is guarded, and a write tool the
+    // set forgets opens silently the day the harness gains it (Sol, c38d8e9).
+    ['a work-order point via MultiEdit', { toolName: 'MultiEdit', filePath: 'TASKS.md' }],
     ['a redirect into the work order', { toolName: 'Bash', command: 'echo "- [ ] 999. x" >> TASKS.md' }],
     ['a redirect into a doc', { toolName: 'Bash', command: 'cat notes >> docs/new-section.md' }],
   ]
@@ -571,6 +597,45 @@ describe('the refusal text', () => {
     expect(plain).not.toContain('finding.mjs')
     const authored = fenceRefusal({ tokens: 200_000, watermark: 150_000, what: 'authoring a memory', authoring: true })
     expect(authored).toContain('finding.mjs --record')
+  })
+
+  it('names /clear only where the call has that cheaper way out', () => {
+    const plain = fenceRefusal({ tokens: 200_000, watermark: 150_000, what: 'starting a browser verify run' })
+    expect(plain).not.toContain('/clear')
+    const claim = fenceRefusal({ tokens: 200_000, watermark: 150_000, what: 'taking the batch', clearFirst: true })
+    expect(claim).toContain('/clear')
+    // The boundary stays named beside it: unattended there is no one to clear.
+    expect(claim).toContain(FENCE_END_COMMAND)
+  })
+})
+
+describe('TAKING THE BATCH IS STARTING WORK (point 542)', () => {
+  const claim = 'node scripts/batch-claim.mjs --session 4e67c9a0-d702-4cf2-a0d6-db243bc1971a'
+
+  it('is denied past the mark, and the refusal names /clear', () => {
+    const v = decide({ toolName: 'Bash', command: claim })
+    expect(v.block).toBe(true)
+    expect(v.reason).toContain('/clear')
+    expect(v.reason).toContain(FENCE_END_COMMAND)
+  })
+
+  it('is allowed below the mark, like every other start', () => {
+    const v = decide({ toolName: 'Bash', command: claim }, { state: 'below', tokens: 40_000, watermark: 150_000 })
+    expect(v.block).toBe(false)
+  })
+
+  it('READING the claim state is not taking it', () => {
+    expect(decide({ toolName: 'Bash', command: 'node scripts/batch-claim.mjs --status' }).block).toBe(false)
+  })
+
+  it('WITHDRAWING the claim stays allowed — it lets go, and the fence may not trap that', () => {
+    const v = decide({ toolName: 'Bash', command: 'node scripts/batch-claim.mjs --withdraw --session abc' })
+    expect(v.block).toBe(false)
+  })
+
+  it('a claim riding beside a read is still a claim', () => {
+    const v = decide({ toolName: 'Bash', command: `node scripts/batch-claim.mjs --status && ${claim}` })
+    expect(v.block).toBe(true)
   })
 })
 

@@ -31,6 +31,7 @@
 import { createHash } from 'node:crypto'
 import { parseQueueCards, parseNowCard } from './queue-order-guard-core.mjs'
 import { parseNowCardPoints } from './dashboard-guard-core.mjs'
+import { compareNowProjection } from './board-core.mjs'
 // The remedies' publish steps come from scripts/board-remedy.mjs — one copy.
 import { REPUBLISH } from './board-remedy.mjs'
 
@@ -266,6 +267,56 @@ export function driftedCards(input) {
 // ---- top-level decision ------------------------------------------------------
 
 const ALLOW = { block: false, reason: '' }
+const block = (reason) => ({ block: true, reason })
+
+/** Pure Stop-hook half of the derived now-section invariant. */
+export function nowProjectionStopDecision({
+  dashboardHtml,
+  activeWork = null,
+  knownPoints = null,
+  paused = false,
+  heldByOther = false,
+} = {}) {
+  if (paused || heldByOther || !activeWork || activeWork.ok !== true) return ALLOW
+  // AN `ok:true` SOURCE STILL HAS TO CARRY A POINT LIST (ninth cross-vendor
+  // round): a malformed one made this function throw, and the only catch was
+  // the outermost one in `evaluate()` — so the projection's own error silently
+  // swallowed the duplicate- and stale-card findings beside it. This check
+  // fails open HERE, on its own error alone.
+  if (!Array.isArray(activeWork.points)) return ALLOW
+  let comparison
+  try {
+    // The focus invariant is the render's rule, so the Stop side reads it too —
+    // otherwise the two halves block on different things (ninth cross-vendor round).
+    comparison = compareNowProjection(dashboardHtml, activeWork.points, {
+      knownPoints,
+      focusPoint: activeWork.focusPoint ?? null,
+    })
+  } catch {
+    return ALLOW
+  }
+  if (comparison.ok) return { ...ALLOW, comparison }
+  const parts = []
+  if (comparison.missing?.length) parts.push(`missing ${comparison.missing.join(', ')}`)
+  if (comparison.extra?.length) parts.push(`extra ${comparison.extra.join(', ')}`)
+  if (comparison.duplicates?.length) parts.push(`duplicate ${comparison.duplicates.join(', ')}`)
+  if (comparison.unknown?.length) parts.push(`unknown ${comparison.unknown.join(', ')}`)
+  if (comparison.crossSection?.length) {
+    parts.push(`cross-section ${comparison.crossSection.map((item) => `${item.point} (${item.sections.join('/')})`).join(', ')}`)
+  }
+  if (comparison.focusUnrepresented) parts.push(`the focus names point ${comparison.focusPoint}, which has no card`)
+  if (comparison.focusMisplaced) parts.push(`the focused point ${comparison.focusPoint} does not stand first`)
+  if (comparison.emptyStateCount !== undefined && activeWork.points.length === 0) {
+    parts.push('verified zero requires exactly the dedicated non-card empty state')
+  } else if (comparison.emptyStateCount > 0) parts.push('the zero-work state stands while points are active')
+  return {
+    block: true,
+    comparison,
+    reason:
+      `NOW-SECTION DOES NOT MATCH DECLARED ACTIVE WORK: ${parts.join('; ') || comparison.error || 'unreadable board'}. ` +
+      `Reconcile and publish as one serialized operation: ${REPUBLISH}.`,
+  }
+}
 
 /**
  * Decide on the raw inputs. All optional; any bad shape → allow:
@@ -275,14 +326,69 @@ const ALLOW = { block: false, reason: '' }
  *   touchedFiles             working-tree changed/untracked paths
  *   snapshots                integritySnapshots from dashboard-state.json
  */
+/**
+ * Point numbers standing in the Erledigt section more than once.
+ *
+ * WHY IT IS A CHECK AND NOT ONLY A FIX: `board.mjs done` folds duplicates now,
+ * but the board is a FILE, and a hand-edit or a merge of two published versions
+ * can reintroduce them — point 700 stood there four times before anyone looked
+ * (user 18.08.2026). Reading only the Erledigt section matters: the same point
+ * legitimately has a queue card and a now-card beside its archive entry.
+ */
+export function duplicateDonePoints(dashboardHtml) {
+  const html = String(dashboardHtml ?? '')
+  const at = html.indexOf('<summary><h2>Erledigt</h2></summary>')
+  if (at < 0) return []
+  // STOP AT THE NEXT SECTION (cross-vendor review 18.08.2026): slicing to the end
+  // of the file counted a queue or now section placed AFTER Erledigt, which is
+  // the cross-section false positive this function claims to avoid.
+  const next = html.indexOf('<details class="sect">', at)
+  const section = html.slice(at, next < 0 ? html.length : next)
+  const points = [...section.matchAll(
+    /<details>\s*<summary>(?:<span class="card-header-left">\s*)?<span class="num">\s*(\d+)\s*<\/span>/g,
+  )].map(
+    (m) => m[1],
+  )
+  const seen = new Set()
+  const twice = new Set()
+  for (const p of points) {
+    if (seen.has(p)) twice.add(p)
+    seen.add(p)
+  }
+  return [...twice]
+}
+
 export function evaluate(input) {
   try {
-    const { dashboardHtml, tasksMd, focusPoint = null, commitSubjects = [], touchedFiles = [], snapshots = null } =
+    const { dashboardHtml, tasksMd, focusPoint = null, commitSubjects = [], touchedFiles = [], snapshots = null,
+      activeWork = null, paused = false, heldByOther = false } =
       input ?? {}
+    // (D) ONE POINT, ONE ERLEDIGT CARD — checked BEFORE every early return
+    // (cross-vendor review 18.08.2026): a finished batch and a board holding
+    // nothing but duplicated archive cards both left this check unreached, which
+    // is exactly the state it exists for.
+    const duplicateDone = duplicateDonePoints(dashboardHtml)
+    const duplicateProblem = duplicateDone.length
+      ? `POINT(S) ${duplicateDone.join(', ')} STAND IN ERLEDIGT MORE THAN ONCE: a point that comes ` +
+        'back into current work is archived again, and each archiving used to append another card, ' +
+        'so the section counts one finished point several times. Fold them: ' +
+        `node scripts/board.mjs merge-done, then ${REPUBLISH}.`
+      : ''
+
     const specs = parsePointSpecs(tasksMd)
+    const projection = nowProjectionStopDecision({
+      dashboardHtml,
+      activeWork,
+      knownPoints: new Set(specs.keys()),
+      paused,
+      heldByOther,
+    })
     let anyOpen = false
     for (const s of specs.values()) if (s.open) anyOpen = true
-    if (!anyOpen) return ALLOW // batch complete — no dashboard duty
+    if (!anyOpen) {
+      const ending = [duplicateProblem, projection.block ? projection.reason : ''].filter(Boolean)
+      return ending.length ? block(ending.join(' | ')) : ALLOW
+    }
 
     const cards = parseQueueCards(dashboardHtml)
     const nowCard = parseNowCard(dashboardHtml)
@@ -290,9 +396,15 @@ export function evaluate(input) {
     // active parallel work (user decision 22.07.2026), so check A must accept
     // evidence for any of them, not only the first card.
     const nowPoints = parseNowCardPoints(dashboardHtml)
-    if (!nowCard && cards.length === 0) return ALLOW // no board — dashboard-guard owns registration
+    if (!nowCard && cards.length === 0 && !projection.block) {
+      // no board — dashboard-guard owns registration, but a duplicated archive is
+      // still a duplicated archive
+      return duplicateProblem ? block(duplicateProblem) : ALLOW
+    }
 
     const problems = []
+    if (duplicateProblem) problems.push(duplicateProblem)
+    if (projection.block) problems.push(projection.reason)
 
     // (B) stale queue cards
     const { closed, unknown } = staleQueueCards(cards.map((c) => c.point), specs)

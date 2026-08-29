@@ -74,20 +74,55 @@ async function settle(dom, cond, tries = 200) {
 const okResponse = (body) => ({ ok: true, status: 200, statusText: 'OK', text: async () => body })
 
 describe('the board favicon artwork', () => {
+  const faviconDoc = () => new JSDOM(faviconSvg, { contentType: 'image/svg+xml' }).window.document
+
   it('is a square, self-contained, single-path silhouette', () => {
-    const doc = new JSDOM(faviconSvg, { contentType: 'image/svg+xml' }).window.document
-    const svg = doc.documentElement
-    const paper = svg.firstElementChild
+    const svg = faviconDoc().documentElement
 
     expect(svg.getAttribute('viewBox')).toBe('0 0 64 64')
     expect(svg.hasAttribute('style')).toBe(false)
-    expect(paper.tagName).toBe('rect')
-    expect(paper.getAttribute('width')).toBe('64')
-    expect(paper.getAttribute('height')).toBe('64')
-    expect(paper.getAttribute('fill')).toBe('#f0e8d2')
     expect(svg.querySelectorAll('path')).toHaveLength(1)
     expect(svg.querySelector('path').getAttribute('fill')).toBe('#3a2e1c')
     expect(svg.querySelectorAll('text, linearGradient, radialGradient, image, use')).toHaveLength(0)
+  })
+
+  // The icon stands between other tabs, whose favicons all stand free: no plate
+  // may be painted behind the silhouette (point 685).
+  it('paints no opaque full-size background behind the silhouette', () => {
+    const svg = faviconDoc().documentElement
+    for (const shape of svg.querySelectorAll('rect, circle, ellipse, polygon')) {
+      const coversAll =
+        shape.tagName === 'rect' &&
+        Number(shape.getAttribute('width')) >= 64 &&
+        Number(shape.getAttribute('height')) >= 64
+      const opaque = shape.getAttribute('fill') !== 'none' && shape.getAttribute('fill-opacity') !== '0'
+      expect(coversAll && opaque, `${shape.tagName} covers the whole icon opaquely`).toBe(false)
+    }
+    // The retired plate colour must not come back in any form.
+    expect(faviconSvg).not.toContain('#f0e8d2')
+  })
+
+  // Standing on the browser's own tab colour, the silhouette carries its own
+  // theme rule; a browser ignoring the <style> keeps the dark presentation fill.
+  it('carries a light and a dark fill as an internal style rule', () => {
+    const svg = faviconDoc().documentElement
+    const style = svg.querySelector('style')
+    expect(style, 'the icon must carry an internal <style>').not.toBeNull()
+
+    const css = style.textContent.replace(/\s+/g, ' ')
+    const dark = css.slice(css.indexOf('@media'))
+    expect(css).toContain('#3a2e1c')
+    expect(dark).toContain('prefers-color-scheme: dark')
+    expect(dark).toContain('#e9dfc2')
+    expect(dark).not.toContain('#3a2e1c')
+
+    // The rule reaches the path, and the presentation attribute survives as the
+    // fallback for a renderer that drops the stylesheet.
+    const path = svg.querySelector('path')
+    const selector = css.slice(0, css.indexOf('{')).trim()
+    expect(selector.startsWith('.')).toBe(true)
+    expect(path.getAttribute('class')).toBe(selector.slice(1))
+    expect(path.getAttribute('fill')).toBe('#3a2e1c')
   })
 })
 

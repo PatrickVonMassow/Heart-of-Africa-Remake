@@ -1,38 +1,57 @@
 {
-  "commit": "41d8cafd39bab4766f0989b679915ada459ccaaf",
+  "commit": "1cbd8a1a831063c5ef9c4db5acc3718049e2e5e6",
   "steps": {
     "large-regression": {
-      "evidence": "NICHT DURCHGEFUEHRT — vom Nutzer am 29.07.2026 fuer diesen poc-Tag ausdruecklich erlassen ('ausnahmsweise mal ohne die Closing-Schritte'). Belegt ist nur das schnelle Tor auf 41d8caf: 154 Testdateien / 4360 Tests, Build und Linter sauber; die drei heute Nacht gemergten Punkte (300/402/404) wurden je einzeln geprueft."
+      "evidence": "NOT RUN — WAIVED BY THE USER on 20.8.2026, 19:37:32. He instructed that the poc tag point at the current main and be served at /poc/, was shown that 0 of 13 closing steps stand for 1cbd8a1a8310 and that the state would go out unclosed, and chose the override deliberately. This records the waiver, never a run: no LARGE regression, no cleanup and no acceptance evidence exists for this commit.",
+      "at": "2026-08-20T17:37:32.497Z"
     },
     "lint-audit": {
-      "evidence": "NICHT DURCHGEFUEHRT — vom Nutzer am 29.07.2026 fuer diesen poc-Tag ausdruecklich erlassen ('ausnahmsweise mal ohne die Closing-Schritte'). Belegt ist nur das schnelle Tor auf 41d8caf: 154 Testdateien / 4360 Tests, Build und Linter sauber; die drei heute Nacht gemergten Punkte (300/402/404) wurden je einzeln geprueft."
+      "evidence": "NOT RUN — WAIVED BY THE USER on 20.8.2026, 19:37:32. He instructed that the poc tag point at the current main and be served at /poc/, was shown that 0 of 13 closing steps stand for 1cbd8a1a8310 and that the state would go out unclosed, and chose the override deliberately. This records the waiver, never a run: no LARGE regression, no cleanup and no acceptance evidence exists for this commit.",
+      "at": "2026-08-20T17:37:32.531Z"
     },
     "dead-code": {
-      "evidence": "NICHT DURCHGEFUEHRT — vom Nutzer am 29.07.2026 fuer diesen poc-Tag ausdruecklich erlassen ('ausnahmsweise mal ohne die Closing-Schritte'). Belegt ist nur das schnelle Tor auf 41d8caf: 154 Testdateien / 4360 Tests, Build und Linter sauber; die drei heute Nacht gemergten Punkte (300/402/404) wurden je einzeln geprueft."
+      "evidence": "NOT RUN — WAIVED BY THE USER on 20.8.2026, 19:37:32. He instructed that the poc tag point at the current main and be served at /poc/, was shown that 0 of 13 closing steps stand for 1cbd8a1a8310 and that the state would go out unclosed, and chose the override deliberately. This records the waiver, never a run: no LARGE regression, no cleanup and no acceptance evidence exists for this commit.",
+      "at": "2026-08-20T17:37:32.562Z"
     },
     "stale-doc": {
-      "evidence": "NICHT DURCHGEFUEHRT — vom Nutzer am 29.07.2026 fuer diesen poc-Tag ausdruecklich erlassen ('ausnahmsweise mal ohne die Closing-Schritte'). Belegt ist nur das schnelle Tor auf 41d8caf: 154 Testdateien / 4360 Tests, Build und Linter sauber; die drei heute Nacht gemergten Punkte (300/402/404) wurden je einzeln geprueft."
+      "evidence": "NOT RUN — WAIVED BY THE USER on 20.8.2026, 19:37:32. He instructed that the poc tag point at the current main and be served at /poc/, was shown that 0 of 13 closing steps stand for 1cbd8a1a8310 and that the state would go out unclosed, and chose the override deliberately. This records the waiver, never a run: no LARGE regression, no cleanup and no acceptance evidence exists for this commit.",
+      "at": "2026-08-20T17:37:32.600Z"
     },
     "stale-comment": {
-      "evidence": "NICHT DURCHGEFUEHRT — vom Nutzer am 29.07.2026 fuer diesen poc-Tag ausdruecklich erlassen ('ausnahmsweise mal ohne die Closing-Schritte'). Belegt ist nur das schnelle Tor auf 41d8caf: 154 Testdateien / 4360 Tests, Build und Linter sauber; die drei heute Nacht gemergten Punkte (300/402/404) wurden je einzeln geprueft."
+      "evidence": "NOT RUN — WAIVED BY THE USER on 20.8.2026, 19:37:32. He instructed that the poc tag point at the current main and be served at /poc/, was shown that 0 of 13 closing steps stand for 1cbd8a1a8310 and that the state would go out unclosed, and chose the override deliberately. This records the waiver, never a run: no LARGE regression, no cleanup and no acceptance evidence exists for this commit.",
+      "at": "2026-08-20T17:37:32.640Z"
     },
     "md-audit": {
-      "evidence": "NICHT DURCHGEFUEHRT — vom Nutzer am 29.07.2026 fuer diesen poc-Tag ausdruecklich erlassen ('ausnahmsweise mal ohne die Closing-Schritte'). Belegt ist nur das schnelle Tor auf 41d8caf: 154 Testdateien / 4360 Tests, Build und Linter sauber; die drei heute Nacht gemergten Punkte (300/402/404) wurden je einzeln geprueft."
+      "evidence": "NOT RUN — WAIVED BY THE USER on 20.8.2026, 19:37:32. He instructed that the poc tag point at the current main and be served at /poc/, was shown that 0 of 13 closing steps stand for 1cbd8a1a8310 and that the state would go out unclosed, and chose the override deliberately. This records the waiver, never a run: no LARGE regression, no cleanup and no acceptance evidence exists for this commit.",
+      "at": "2026-08-20T17:37:32.674Z"
+    },
+    "cleanup-blind-parallel": {
+      "evidence": "NOT RUN — WAIVED BY THE USER on 20.8.2026, 19:37:32. He instructed that the poc tag point at the current main and be served at /poc/, was shown that 0 of 13 closing steps stand for 1cbd8a1a8310 and that the state would go out unclosed, and chose the override deliberately. This records the waiver, never a run: no LARGE regression, no cleanup and no acceptance evidence exists for this commit.",
+      "at": "2026-08-20T17:37:32.708Z"
+    },
+    "regression-after-cleanup": {
+      "evidence": "NOT RUN on 1cbd8a1a831063c5ef9c4db5acc3718049e2e5e6 — WAIVED BY THE USER, 20.08.2026, after he was shown that no closing step stands for this commit and chose to move the poc tag anyway. No second LARGE regression exists for it; this line records the waiver, not a run.",
+      "at": "2026-08-20T17:37:43.573Z"
     },
     "impl-sections": {
-      "evidence": "NICHT DURCHGEFUEHRT — vom Nutzer am 29.07.2026 fuer diesen poc-Tag ausdruecklich erlassen ('ausnahmsweise mal ohne die Closing-Schritte'). Belegt ist nur das schnelle Tor auf 41d8caf: 154 Testdateien / 4360 Tests, Build und Linter sauber; die drei heute Nacht gemergten Punkte (300/402/404) wurden je einzeln geprueft."
+      "evidence": "NOT RUN — WAIVED BY THE USER on 20.8.2026, 19:37:32. He instructed that the poc tag point at the current main and be served at /poc/, was shown that 0 of 13 closing steps stand for 1cbd8a1a8310 and that the state would go out unclosed, and chose the override deliberately. This records the waiver, never a run: no LARGE regression, no cleanup and no acceptance evidence exists for this commit.",
+      "at": "2026-08-20T17:37:32.781Z"
     },
     "graphics-detail-doc": {
-      "evidence": "NICHT DURCHGEFUEHRT — vom Nutzer am 29.07.2026 fuer diesen poc-Tag ausdruecklich erlassen ('ausnahmsweise mal ohne die Closing-Schritte'). Belegt ist nur das schnelle Tor auf 41d8caf: 154 Testdateien / 4360 Tests, Build und Linter sauber; die drei heute Nacht gemergten Punkte (300/402/404) wurden je einzeln geprueft."
+      "evidence": "NOT RUN — WAIVED BY THE USER on 20.8.2026, 19:37:32. He instructed that the poc tag point at the current main and be served at /poc/, was shown that 0 of 13 closing steps stand for 1cbd8a1a8310 and that the state would go out unclosed, and chose the override deliberately. This records the waiver, never a run: no LARGE regression, no cleanup and no acceptance evidence exists for this commit.",
+      "at": "2026-08-20T17:37:32.815Z"
     },
     "acceptance-criteria": {
-      "evidence": "NICHT DURCHGEFUEHRT — vom Nutzer am 29.07.2026 fuer diesen poc-Tag ausdruecklich erlassen ('ausnahmsweise mal ohne die Closing-Schritte'). Belegt ist nur das schnelle Tor auf 41d8caf: 154 Testdateien / 4360 Tests, Build und Linter sauber; die drei heute Nacht gemergten Punkte (300/402/404) wurden je einzeln geprueft."
+      "evidence": "NOT RUN — WAIVED BY THE USER on 20.8.2026, 19:37:32. He instructed that the poc tag point at the current main and be served at /poc/, was shown that 0 of 13 closing steps stand for 1cbd8a1a8310 and that the state would go out unclosed, and chose the override deliberately. This records the waiver, never a run: no LARGE regression, no cleanup and no acceptance evidence exists for this commit.",
+      "at": "2026-08-20T17:37:32.851Z"
     },
     "open-items": {
-      "evidence": "NICHT DURCHGEFUEHRT — vom Nutzer am 29.07.2026 fuer diesen poc-Tag ausdruecklich erlassen ('ausnahmsweise mal ohne die Closing-Schritte'). Belegt ist nur das schnelle Tor auf 41d8caf: 154 Testdateien / 4360 Tests, Build und Linter sauber; die drei heute Nacht gemergten Punkte (300/402/404) wurden je einzeln geprueft."
+      "evidence": "NOT RUN — WAIVED BY THE USER on 20.8.2026, 19:37:32. He instructed that the poc tag point at the current main and be served at /poc/, was shown that 0 of 13 closing steps stand for 1cbd8a1a8310 and that the state would go out unclosed, and chose the override deliberately. This records the waiver, never a run: no LARGE regression, no cleanup and no acceptance evidence exists for this commit.",
+      "at": "2026-08-20T17:37:32.886Z"
     },
     "simplifications": {
-      "evidence": "NICHT DURCHGEFUEHRT — vom Nutzer am 29.07.2026 fuer diesen poc-Tag ausdruecklich erlassen ('ausnahmsweise mal ohne die Closing-Schritte'). Belegt ist nur das schnelle Tor auf 41d8caf: 154 Testdateien / 4360 Tests, Build und Linter sauber; die drei heute Nacht gemergten Punkte (300/402/404) wurden je einzeln geprueft."
+      "evidence": "NOT RUN — WAIVED BY THE USER on 20.8.2026, 19:37:32. He instructed that the poc tag point at the current main and be served at /poc/, was shown that 0 of 13 closing steps stand for 1cbd8a1a8310 and that the state would go out unclosed, and chose the override deliberately. This records the waiver, never a run: no LARGE regression, no cleanup and no acceptance evidence exists for this commit.",
+      "at": "2026-08-20T17:37:32.923Z"
     }
   }
 }

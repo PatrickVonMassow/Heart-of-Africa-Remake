@@ -12,7 +12,7 @@
  * Node check that rides along for a single report.
  */
 export const DEV_SUITES = [
-  'docs', 'startup', 'world', 'i18n', 'flow', 'health', 'events', 'collision', 'handwriting',
+  'docs', 'board-layout', 'startup', 'world', 'i18n', 'flow', 'health', 'events', 'collision', 'handwriting',
   'polish', 'gamepad', 'touch', 'voice', 'settings', 'enrichments', 'invariants',
   'benchmark', 'report',
 ]
@@ -22,7 +22,7 @@ export const DEV_SUITES = [
  * consistency, the one E2E core loop, health/events/collision and TTS. A strict
  * subset of DEV_SUITES.
  */
-export const SMALL_SUITES = ['docs', 'i18n', 'flow', 'health', 'events', 'collision', 'voice']
+export const SMALL_SUITES = ['docs', 'board-layout', 'i18n', 'flow', 'health', 'events', 'collision', 'voice']
 
 /**
  * WebGL2-ONLY suites (user decision 20.07.2026): headless WebGPU under system
@@ -50,16 +50,24 @@ export const WEBGL_ONLY_SUITES = ['touch', 'voice']
 export const DEFAULT_BACKEND = 'webgpu'
 
 /**
- * Suites that need NO dev server: pure Node checks that read the checkout
- * itself. Naming them keeps a `docs`-only run free of a vite start-up (and lets
- * the baseline classifier run the BASELINE tree's own copy of such a script,
- * since there is no server whose code could differ instead).
+ * Suites that need NO dev server: pure Node checks that read the checkout and
+ * the board-layout check that renders self-contained HTML in bundled Chromium.
+ * Naming them keeps these runs free of a Vite start-up (and lets the baseline
+ * classifier run the BASELINE tree's own copy of such a script, since there is
+ * no server whose code could differ instead).
  */
-export const SERVERLESS_SUITES = ['docs']
+export const SERVERLESS_SUITES = ['docs', 'board-layout']
 
 /** Does this suite selection need a dev server at all? */
 export function needsDevServer(suites) {
   return (suites ?? []).some((s) => !SERVERLESS_SUITES.includes(s))
+}
+
+/** Does this selection need the fast GPU-backend preflight? Pure Node suites and
+ *  build/lint/unit selections do not; every Chromium suite and the production preview
+ *  do. Kept pure so the runner cannot silently move the probe onto every command. */
+export function needsGpuBackendProbe(suites, { preview = false } = {}) {
+  return preview || needsDevServer(suites)
 }
 
 /** The renderer backend a VERIFY_GL value selects (mirrored from _browser.mjs).

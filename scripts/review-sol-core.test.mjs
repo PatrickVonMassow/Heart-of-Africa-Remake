@@ -5,7 +5,7 @@
 // case, and the recorded model is asserted to follow the RUN rather than the
 // preference in both directions.
 import { describe, expect, it } from 'vitest'
-import { validateRecord, VERDICTS } from './mechanism-review-core.mjs'
+import { reviewIdentityProblem, validateRecord, VERDICTS } from './mechanism-review-core.mjs'
 import {
   addedFilesAreCoveredByPatch,
   buildReviewPrompt,
@@ -14,12 +14,15 @@ import {
   coverageDecision,
   decideReview,
   fallbackReviewerFor,
+  FALLBACK_CHAIN,
   FALLBACK_MODEL_NAME,
   formatRecordCommand,
+  formatReviewerCommand,
   formatReviewMaterial,
   formatReviewReport,
   isUnknownModelRefusal,
   modelsInTrailerField,
+  modelsInCommitMessage,
   newFilePathsIn,
   OUTCOME,
   parseVerdict,
@@ -30,17 +33,25 @@ import {
   CLAUDE_REVIEW_CHAIN,
   solAuthored,
   SECOND_FALLBACK_MODEL_NAME,
+  reviewerDescriptor,
+  REVIEWER_ROSTER,
   SOL_MODEL_ID,
   SOL_MODEL_NAME,
   SOL_REASONING_EFFORT,
 } from './review-sol-core.mjs'
+import { readState, writeState } from './fable-switch-core.mjs'
+
+const FABLE_OFF = readState(JSON.stringify(writeState('off', { why: 'test', by: 'test', now: 1 })))
 
 const solSays = (verdict = 'merge', evidence = 'read the diff and the guard test; the fail-open path is covered') =>
   `I checked the change.\n\nVERDICT: ${verdict}\nEVIDENCE: ${evidence}\n`
 
+// `shortfall: null` is the material accounting's explicit "the round provably
+// carried everything" — the only value that lets a decision become ready.
 const okRun = (text = solSays()) => ({
   outcome: classifyOutcome({ exitCode: 0, stdout: text }),
   parsed: parseVerdict(text),
+  shortfall: null,
 })
 
 describe('classifyOutcome — how a codex run ended', () => {
@@ -157,10 +168,46 @@ describe('parseVerdict — only a real verdict is a verdict', () => {
     })
   })
 
+  it('quotes the EVIDENCE from the raw line byte-for-byte — the strip must not rewrite it', () => {
+    // This string reaches the ledger via --record; a stripped copy rewrote
+    // src/__init__.py into src/init.py.
+    const evidence = 'checked src/__init__.py and the __slots__ handling end to end'
+    expect(parseVerdict(`prose\n\nVERDICT: merge\nEVIDENCE: ${evidence}`)).toMatchObject({
+      ok: true,
+      evidence,
+    })
+  })
+
+  it('rules the placeholder on the STRIPPED capture — decoration cannot smuggle it', () => {
+    const parsed = parseVerdict('prose\n\nVERDICT: merge\nEVIDENCE: **<one line naming what you actually checked>**')
+    expect(parsed.ok).toBe(false)
+    expect(parsed.error).toContain('no usable EVIDENCE line')
+  })
+
   it('survives markdown emphasis and a leading bullet', () => {
     expect(parseVerdict('- **VERDICT:** `do-not-merge`\n- **EVIDENCE:** the fallback records a verdict nobody gave')).toMatchObject(
       { ok: true, verdict: 'do-not-merge' },
     )
+  })
+
+  it('never fabricates a label from a mid-word backtick (landing-round pass 7)', () => {
+    // Deleting backtick runs outright merged word fragments: VERD`ICT: read
+    // as VERDICT: and a fabricated pair was accepted as the terminal fields.
+    expect(parseVerdict('VERD`ICT: merge\nEVID`ENCE: read the whole diff and the tests').ok).toBe(false)
+    const receipted = 'looked.\n\nREC`EIPT: abcd1234abcd1234\nVERDICT: merge\nEVIDENCE: read the whole diff and the tests'
+    expect(parseVerdict(receipted, { receipt: 'abcd1234abcd1234' }).ok).toBe(false)
+    // …while PAIRED backtick decoration around a label still unwraps.
+    expect(parseVerdict('`VERDICT:` merge\n`EVIDENCE:` read the whole diff and the tests')).toMatchObject({
+      ok: true,
+      verdict: 'merge',
+    })
+  })
+
+  it('drops a bare code-fence line rather than letting it displace the terminal pair', () => {
+    expect(parseVerdict('VERDICT: merge\nEVIDENCE: read the whole diff and the tests\n```')).toMatchObject({
+      ok: true,
+      verdict: 'merge',
+    })
   })
 
   it('takes the LAST pair, so a quoted instruction cannot shadow the answer', () => {
@@ -177,6 +224,11 @@ describe('parseVerdict — only a real verdict is a verdict', () => {
   it('refuses an evidence line that says nothing, including the placeholder itself', () => {
     expect(parseVerdict('VERDICT: merge\nEVIDENCE: fine')).toMatchObject({ ok: false })
     expect(parseVerdict('VERDICT: merge\nEVIDENCE: <one line naming what you checked>')).toMatchObject({ ok: false })
+    // An UNPAIRED marker survives the pair strip and shielded the anchored
+    // placeholder test (landing round): ruled on the net-only spelling too.
+    expect(parseVerdict('VERDICT: merge\nEVIDENCE: _<one line naming what you checked>')).toMatchObject({ ok: false })
+    // A leading bullet shields nothing either (fourth landing round).
+    expect(parseVerdict('VERDICT: merge\nEVIDENCE: - <one line naming what you checked>')).toMatchObject({ ok: false })
   })
 
   it('refuses a reviewer that says it could not see the change, whatever verdict it gave', () => {
@@ -187,6 +239,10 @@ describe('parseVerdict — only a real verdict is a verdict', () => {
       'I could not read the diff, so no line-level review actually ran',
       'None of my commands reached the repository, so nothing was verified',
       'We were unable to access the files under review',
+      // No second inspection verb after the receive verb (landing-round pass
+      // 2): what was never received was never reviewed.
+      'I did not receive the patch',
+      'We never got the material for this range',
     ]) {
       expect(parseVerdict(`VERDICT: do-not-merge\nEVIDENCE: ${evidence}`)).toMatchObject({ ok: false })
       expect(parseVerdict(`VERDICT: merge\nEVIDENCE: ${evidence}`)).toMatchObject({ ok: false })
@@ -197,6 +253,53 @@ describe('parseVerdict — only a real verdict is a verdict', () => {
     ).toMatchObject({ ok: true })
   })
 
+  it('does NOT route a real verdict to the fallback because its FINDINGS use the net’s words', () => {
+    // Measured 18.08.2026 (point 714, pass 2): Sol reviewed the review tooling
+    // itself, its findings named a file that ends up "with no patch"
+    // association, and the clean do-not-merge below it was reported as "the
+    // reviewer says it could not see the change" — a FALSE fallback, which is
+    // the mirror image of the bug the net exists for. This message is that
+    // answer's shape: a findings body, then the two closing lines.
+    const answer = [
+      'Findings:',
+      '1. review-material-core.mjs — parseDiffHeader misparses valid unquoted renames whose',
+      '   destination contains " b/": the real destination then loses its patch association',
+      '   while a fictitious dest.txt with no patch enters the plan.',
+      '2. review-material-core.mjs — parsePassFiles collapses paths, so a file the range',
+      '   touched can look covered although its content was not supplied to any pass.',
+      'VERDICT: do-not-merge',
+      'EVIDENCE: Checked the full supplied core and CLI-test material; found an unquoted-rename misassociation that leaves a file with no patch, and non-round-trippable pass-file paths',
+    ].join('\n')
+    expect(parseVerdict(answer)).toMatchObject({ ok: true, verdict: 'do-not-merge' })
+  })
+
+  it('still refuses the genuine admission, first person or bare', () => {
+    expect(
+      parseVerdict('VERDICT: do-not-merge\nEVIDENCE: Checked what I was given, but I could not read the diff itself'),
+    ).toMatchObject({ ok: false })
+    expect(
+      parseVerdict('VERDICT: do-not-merge\nEVIDENCE: no patch arrived on stdin, so nothing here judges the change'),
+    ).toMatchObject({ ok: false })
+  })
+
+  // FINDING 8 (fourth cross-vendor round, pass 4): `sentInput` proves only the
+  // hand-off to the spawn — a child can exit 0 with a parseable verdict without
+  // ever reading its stdin. The token stands only on the material's LAST line,
+  // never in the prompt, so echoing it back is evidence of the read.
+  it('demands the material RECEIPT back where one was issued', () => {
+    const good = `looked closely.\n\nRECEIPT: abcd1234abcd1234\nVERDICT: merge\nEVIDENCE: read the whole diff and its tests`
+    expect(parseVerdict(good, { receipt: 'abcd1234abcd1234' })).toMatchObject({ ok: true, verdict: 'merge' })
+    const missing = parseVerdict(solSays(), { receipt: 'abcd1234abcd1234' })
+    expect(missing.ok).toBe(false)
+    expect(missing.error).toContain('no RECEIPT')
+    const wrong = parseVerdict(good, { receipt: 'ffff0000ffff0000' })
+    expect(wrong.ok).toBe(false)
+    expect(wrong.error).toContain('does not match')
+    // …and a message shaped for a receipt but asked without one still parses
+    // as before: the last two lines are the pair.
+    expect(parseVerdict(solSays())).toMatchObject({ ok: true, verdict: 'merge' })
+  })
+
   it('requires the pair to be the LAST two lines, not two matches from anywhere', () => {
     const spliced = 'VERDICT: merge\n\nSome later paragraph.\n\nEVIDENCE: read the whole diff and the tests'
     expect(parseVerdict(spliced)).toMatchObject({ ok: false })
@@ -205,9 +308,50 @@ describe('parseVerdict — only a real verdict is a verdict', () => {
 })
 
 describe('decideReview — the recorded model follows the RUN, never the preference', () => {
+  it('maps every model either review chain can name to this runnable command', () => {
+    expect(REVIEWER_ROSTER.map(({ name }) => name)).toEqual([
+      'GPT-5.6 Sol',
+      'Fable 5',
+      'Opus 5',
+      'Opus 4.8',
+    ])
+    for (const model of [...FALLBACK_CHAIN, ...CLAUDE_REVIEW_CHAIN]) {
+      const reviewer = reviewerDescriptor(model)
+      expect(reviewer, model).toMatchObject({ name: model, runtime: 'claude' })
+      expect(formatReviewerCommand({ model, sha: 'a'.repeat(40), brief: 'read both end-state files' })).toContain(
+        `--reviewer ${reviewer.key}`,
+      )
+    }
+  })
+
+  it('turns the real mixed-author ineligibility into a runnable Fable command', () => {
+    const decision = decideReview({
+      ...okRun(),
+      authorModel: ['GPT-5.6 Sol', 'Claude Opus 5'],
+    })
+    expect(decision).toMatchObject({ model: 'Fable 5', kind: OUTCOME.SELF_REVIEW, ready: false })
+    expect(formatReviewerCommand({
+      model: decision.model,
+      sha: '16793dd'.padEnd(40, '0'),
+      brief: 'read the guide and brevity core at their end state',
+      point: 977,
+    })).toMatch(/^node scripts\/review-sol\.mjs --reviewer fable /)
+  })
+
   it('a reachable Sol reviews, and is recorded as the reviewer', () => {
     const d = decideReview(okRun())
     expect(d).toMatchObject({ model: SOL_MODEL_NAME, fellBack: false, ready: true, verdict: 'merge' })
+  })
+
+  it('is NOT ready without delivery evidence — a clean exit is not a carried round', () => {
+    // `ready` rested on outcome.ok && parsed.ok alone (escalation round): the
+    // exit code says nothing about whether the material reached the reviewer.
+    // A present shortfall refuses, and a caller that never asked refuses too.
+    const run = okRun()
+    expect(decideReview({ ...run, shortfall: undefined }).ready).toBe(false)
+    expect(decideReview({ ...run, shortfall: { reason: 'unverified' } }).ready).toBe(false)
+    // The verdict itself is still reported — the findings are worth having.
+    expect(decideReview({ ...run, shortfall: { reason: 'unverified' } }).verdict).toBe('merge')
   })
 
   it.each([
@@ -237,6 +381,17 @@ describe('decideReview — the recorded model follows the RUN, never the prefere
     expect(fallbackReviewerFor('')).toBe(FALLBACK_MODEL_NAME)
   })
 
+  it('removes Fable from both review directions while the shared switch refuses it', () => {
+    const failed = { outcome: classifyOutcome({ exitCode: 1, stderr: 'not logged in' }), parsed: { ok: false } }
+    expect(decideReview({ ...failed, fableState: FABLE_OFF }).model).toBe('Opus 5')
+    expect(fallbackReviewerFor('', FABLE_OFF)).toBe('Opus 5')
+    expect(claudeReviewerFor(['GPT-5.6 Sol', 'Opus 5'], FABLE_OFF)).toBe('Opus 4.8')
+    expect(decideReview({ ...failed, authorModel: ['Opus 5', 'Opus 4.8'], fableState: FABLE_OFF })).toMatchObject({
+      model: '',
+      chain: ['Opus 5', 'Opus 4.8'],
+    })
+  })
+
   it('looks at EVERY author in the reviewed range, and picks one that wrote none of it', () => {
     // One record clears every commit it contains, so the reviewer must have
     // authored NO part of the range — picking Opus 5 for an Opus+Fable range
@@ -253,6 +408,45 @@ describe('decideReview — the recorded model follows the RUN, never the prefere
     expect(modelsInTrailerField(field)).toHaveLength(2)
     expect(fallbackReviewerFor(modelsInTrailerField(field))).toBe('Opus 4.8')
     expect(modelsInTrailerField('Patrick <p@example.com>')).toEqual([])
+  })
+
+  it('reads the reviewer separately, so reviewer credit is not authorship', () => {
+    const identities = modelsInCommitMessage(
+      'Separate review identity\n\n' +
+        'Co-Authored-By: Claude Opus 5 <noreply@anthropic.com>\n' +
+        'Reviewed-By: GPT-5.6 Sol <noreply@openai.com>\n',
+    )
+    expect(identities).toEqual({ authors: ['Opus 5'], reviewers: ['GPT 5.6 Sol'] })
+    expect(reviewIdentityProblem(identities.reviewers[0], { authorModels: identities.authors })).toBe('')
+  })
+
+  it('treats the three pre-fix reviewer credits as ambiguous co-authorship, never inferred review', () => {
+    // These immutable ledger-only commits intended Sol as reviewer and Opus 5
+    // as author. Their shared Co-Authored-By key cannot prove that intent, so
+    // the ledger remains their reviewer record and trailer readers correctly
+    // treat both lines as authorship. New commits use Reviewed-By instead.
+    for (const [sha, lines] of [
+      [
+        '836b187bf5c92d086c603e0fe4ba9a09a7408547',
+        ['GPT-5.6 Sol <noreply@openai.com>', 'Claude Opus 5 <noreply@anthropic.com>'],
+      ],
+      [
+        'fd02a519a03e1680f1c6c5b182987c42b4b3424d',
+        ['GPT-5.6 Sol <noreply@openai.com>', 'Claude Opus 5 <noreply@anthropic.com>'],
+      ],
+      [
+        '1f24975053368939872dd1182bf71860e783a7ce',
+        ['Claude Opus 5 <noreply@anthropic.com>', 'GPT-5.6 Sol <noreply@openai.com>'],
+      ],
+    ]) {
+      const identities = modelsInCommitMessage(
+        `${sha}\n\n` +
+          lines.map((line) => `Co-Authored-By: ${line}`).join('\n') +
+          '\n',
+      )
+      expect(new Set(identities.authors), sha).toEqual(new Set(['Opus 5', 'GPT 5.6 Sol']))
+      expect(identities.reviewers, sha).toEqual([])
+    }
   })
 
   it('names NOBODY when every model in the chain authored part of the range', () => {
@@ -280,6 +474,25 @@ describe('decideReview — the recorded model follows the RUN, never the prefere
     // An instruction naming Fable beside a command naming Opus is how a
     // self-review gets recorded.
     expect(report).not.toMatch(/Hand it to Fable/)
+  })
+
+  it.each([
+    ['a timeout', { timedOut: true }],
+    ['an error exit', { exitCode: 9, stderr: 'panicked at src/main.rs' }],
+    ['a dead host', { exitCode: 1, stderr: 'error sending request for url' }],
+  ])('prints NO record command after %s — a failed delivery offers no record in any shape', (_n, run) => {
+    const d = decideReview({ outcome: classifyOutcome(run), parsed: { ok: false } })
+    const report = formatReviewReport({ decision: d, sha: 'a'.repeat(40), mode: 'review' })
+    expect(report).toContain('NO RECORD COMMAND IS PRINTED')
+    expect(report).not.toContain('mechanism-review.mjs --record')
+    expect(report).toContain(FALLBACK_MODEL_NAME)
+  })
+
+  it('still hands a NO-VERDICT run on with the placeholder template — its transfer completed', () => {
+    const d = decideReview(okRun('I had a look and it seems fine.'))
+    const report = formatReviewReport({ decision: d, sha: 'a'.repeat(40), mode: 'review' })
+    expect(report).toContain('mechanism-review.mjs --record')
+    expect(report).toMatch(/--verdict <merge\|merge-with-fixes\|do-not-merge>/)
   })
 
   it('never names Sol on a failed run, and never names Fable on a successful one', () => {
@@ -340,6 +553,155 @@ describe('the record the command prints', () => {
     // The verdict itself is still reported — the review happened, it just does
     // not cover what a record at this sha would clear.
     expect(report).toContain('merge')
+  })
+
+  it('never prints a record command while the decision is not READY, whatever the defaults', () => {
+    // Round 4, pass 3: decideReview correctly answers ready:false for a round
+    // whose delivery accounting it was never shown — and the report printed the
+    // record command anyway, because its own shortfall parameter defaulted to
+    // null, the accounting's word for "provably complete". The report now rests
+    // on the decision, so a caller that never asked the accounting gets the
+    // unverified refusal, not a command.
+    const decision = decideReview({
+      outcome: classifyOutcome({ exitCode: 0, stdout: solSays() }),
+      parsed: parseVerdict(solSays()),
+      // no shortfall handed over at all — the accounting was never consulted
+    })
+    expect(decision.fellBack).toBe(false)
+    expect(decision.ready).toBe(false)
+    const report = formatReviewReport({ decision, sha: 'a'.repeat(40) })
+    expect(report).not.toContain('mechanism-review.mjs --record')
+    expect(report).toContain('NO RECORD COMMAND IS PRINTED')
+    expect(report).toContain('never asked the material accounting')
+  })
+
+  it('refuses the same way when ready is false although a null shortfall reached the report', () => {
+    // The two inputs contradicting each other must resolve toward the refusal:
+    // ready is the decision's word, and null alone must not outvote it.
+    const decision = {
+      model: SOL_MODEL_NAME,
+      fellBack: false,
+      ready: false,
+      verdict: 'merge',
+      evidence: 'read the diff end to end',
+    }
+    const report = formatReviewReport({ decision, sha: 'b'.repeat(40), shortfall: null })
+    expect(report).not.toContain('--record')
+    expect(report).toContain('NO RECORD COMMAND IS PRINTED')
+  })
+
+  it('is NOT printed at all when the round did not carry the material (point 714)', () => {
+    const report = formatReviewReport({
+      decision: decideReview(okRun()),
+      sha: 'a'.repeat(40),
+      mode: 'review',
+      shortfall: {
+        reason: 'over-budget',
+        truncated: ['scripts/context-fence-guard.mjs'],
+        omitted: ['scripts/context-fence-core.test.mjs'],
+        budget: 200_000,
+        size: 200_000,
+        rawSize: 900_000,
+      },
+    })
+    expect(report).toMatch(/NO RECORD COMMAND IS PRINTED/)
+    expect(report).not.toContain('mechanism-review.mjs --record')
+    // Every file the reviewer never saw is NAMED — the whole failure was that
+    // this list existed only inside the material.
+    expect(report).toContain('scripts/context-fence-guard.mjs')
+    expect(report).toContain('scripts/context-fence-core.test.mjs')
+    // …and the reviewer's answer is still reported: the findings are worth having.
+    expect(report).toContain('merge')
+  })
+
+  // TWO REASONS ARE NOT ONE (cross-vendor review, second round): the narrowed
+  // range returned before the short-fall, so a round that ALSO overflowed named
+  // none of the files nobody read.
+  it('names the lost files even when the range was narrowed as well', () => {
+    const report = formatReviewReport({
+      decision: decideReview(okRun()),
+      sha: 'a'.repeat(40),
+      mode: 'review',
+      partial: { reviewedBase: 'b'.repeat(40), coverageBase: 'c'.repeat(40) },
+      shortfall: {
+        reason: 'over-budget',
+        truncated: ['scripts/lost.mjs'],
+        omitted: [],
+        budget: 200_000,
+        size: 200_000,
+        rawSize: 900_000,
+      },
+    })
+    expect(report).toContain('scripts/lost.mjs')
+    expect(report).not.toContain('mechanism-review.mjs --record')
+  })
+
+  // The hand-over paths print the record command without spending a round, so a
+  // short-fall there must still say WHOSE review it is waiting for.
+  it('keeps naming the reviewer when a hand-over is refused a record', () => {
+    const swap = formatReviewReport({
+      decision: decideReview({ outcome: { ok: false, kind: 'self-review', cause: 'Sol authored it' }, parsed: {}, authorModel: ['GPT-5.6 Sol'] }),
+      sha: 'a'.repeat(40),
+      mode: 'review',
+      shortfall: { reason: 'needs-passes', passes: [{ index: 1, files: ['x.mjs'] }], budget: 10, rawSize: 99, truncated: [], omitted: [] },
+    })
+    expect(swap).toContain('ROLE SWAP')
+    expect(swap).toContain('Opus 5')
+    expect(swap).toContain('does not fit ONE review round')
+    expect(swap).not.toContain('mechanism-review.mjs --record')
+
+    const down = formatReviewReport({
+      decision: decideReview({ outcome: { ok: false, kind: 'unreachable', cause: 'the host could not be reached' }, parsed: {} }),
+      sha: 'a'.repeat(40),
+      mode: 'review',
+      shortfall: { reason: 'unplanned', detail: 'never measured', truncated: [], omitted: [], budget: 1, size: 0, rawSize: 0 },
+    })
+    expect(down).toContain(FALLBACK_MODEL_NAME)
+    expect(down).toContain('unknown fit refuses')
+  })
+
+  it('carries the pass a verdict covers, so a composition can be recorded', () => {
+    const report = formatReviewReport({
+      decision: decideReview(okRun()),
+      sha: 'a'.repeat(40),
+      mode: 'review',
+      pass: { index: 1, total: 3, files: ['scripts/a.mjs', 'scripts/b.mjs'] },
+    })
+    expect(report).toContain('--pass 1/3')
+    expect(report).toContain('--pass-files "scripts/a.mjs,scripts/b.mjs"')
+    expect(report).toContain('PASS 1/3')
+    expect(report).toContain('clears the listed files at aaaaaaa')
+  })
+
+  it('prints a bounded one-round record as scoped end-state coverage', () => {
+    const report = formatReviewReport({
+      decision: decideReview(okRun()),
+      sha: 'a'.repeat(40),
+      mode: 'review',
+      pass: { index: 1, total: 1, files: ['scripts/a.mjs'], endState: 'a'.repeat(40) },
+    })
+    expect(report).toContain('--pass 1/1')
+    expect(report).toContain('SCOPED PASS')
+    expect(report).toContain('clears the listed files at aaaaaaa')
+    expect(report).not.toContain('range too large')
+  })
+
+  it('sends the caller to the LEDGER for the remainder, never to a guessed next number', () => {
+    // Round-3 pass 6 kept the warning on every pass; round-4 pass 6 removed
+    // the numeric hint entirely — passes run in any order, so "next: k+1"
+    // recommended already-recorded passes and fell silent on unrecorded ones
+    // whenever the highest number ran first.
+    for (const index of [1, 3]) {
+      const report = formatReviewReport({
+        decision: decideReview(okRun()),
+        sha: 'a'.repeat(40),
+        mode: 'review',
+        pass: { index, total: 3, files: ['scripts/c.mjs'] },
+      })
+      expect(report).toContain('clears the listed files at aaaaaaa')
+      expect(report).toContain('mechanism-review.mjs --list')
+      expect(report).not.toMatch(/next: --pass/)
+    }
   })
 
   it('decides coverage strictly: only an EQUAL base is full coverage', () => {
@@ -418,13 +780,21 @@ describe('the recorder accepts the reviewer the rule now prefers (point 624)', (
 })
 
 describe('the material the reviewer is handed', () => {
+  // The patch must CARRY each file's section: a carried file whose diff is not
+  // in the patch is refused as an omission (round-1 pass-3 finding, 18.08.2026).
+  const sectionFor = (p) => [`diff --git a/${p} b/${p}`, `--- a/${p}`, `+++ b/${p}`, '+x'].join('\n')
   const material = (files, budget) =>
-    formatReviewMaterial({ stat: ' a | 2 +-', patch: 'diff --git a/a b/a', files, budget })
+    formatReviewMaterial({
+      stat: ' a | 2 +-',
+      patch: files.length ? files.map((f) => sectionFor(f.path)).join('\n') : 'diff --git a/a b/a',
+      files,
+      budget,
+    })
 
   it('carries the diffstat, the patch and each file with its path', () => {
     const out = material([{ path: 'scripts/a.mjs', text: 'export const a = 1' }])
     expect(out).toContain('=== DIFFSTAT ===')
-    expect(out).toContain('diff --git a/a b/a')
+    expect(out).toContain('diff --git a/scripts/a.mjs b/scripts/a.mjs')
     expect(out).toContain('=== FILE (current content): scripts/a.mjs ===')
     expect(out).toContain('export const a = 1')
   })
@@ -520,11 +890,13 @@ describe('the saved login survives what it has to survive', () => {
     expect(savedAuthPathFrom('/workspace/hoa/.git', '/workspace/hoa/.claude/worktrees/agent-1')).toBe(
       '/workspace/hoa/local/codex-auth.json',
     )
+    expect(savedAuthPathFrom('/workspace/hoa/.git', '/workspace/hoa')).toBe('/workspace/hoa/local/codex-auth.json')
   })
 
   it('falls back to the current checkout when git answers nothing', () => {
     expect(savedAuthPathFrom('', '/repo')).toBe('/repo/local/codex-auth.json')
     expect(savedAuthPathFrom('   \n', '/repo')).toBe('/repo/local/codex-auth.json')
+    expect(savedAuthPathFrom('/srv/hoa.git', '/repo')).toBe('/repo/local/codex-auth.json')
   })
 
   it('handles a windows path and a trailing separator', () => {
@@ -567,6 +939,30 @@ describe('the codex command line is the rule, not a preference of the caller', (
     expect(divergent).toMatch(/B<n> \| <file> \| <the defect in/)
     expect(divergent).toMatch(/cannot be counted/)
     expect(buildReviewPrompt({ sha: 'abc', brief: 'x' })).not.toMatch(/ONE ENTRY PER LINE/)
+  })
+
+  it('demands the RECEIPT in the answer shape without ever containing the token', () => {
+    const token = 'abcd1234abcd1234'
+    const prompt = buildReviewPrompt({ sha: 'abc', brief: 'x', receipt: token })
+    expect(prompt).toContain('EXACTLY these three lines')
+    expect(prompt).toContain('RECEIPT: <the hex token')
+    // The whole worth of the receipt: the prompt NEVER carries it, so only a
+    // child that read the material to its end can echo it.
+    expect(prompt).not.toContain(token)
+    expect(buildReviewPrompt({ sha: 'abc', brief: 'x' })).toContain('EXACTLY these two lines')
+  })
+
+  it('tells a PASS reviewer the manifest governs absence, and a whole-range one nothing of it', () => {
+    // The structural finding of the fourth cross-vendor round: every pass
+    // verdict degraded into a coverage refusal because nothing told the
+    // reviewer which absences were design. The prompt now says it, and the
+    // material's own manifest says it again where the files are listed.
+    const prompt = buildReviewPrompt({ sha: 'abc', brief: 'x', pass: { index: 2, total: 3 } })
+    expect(prompt).toContain('THIS IS PASS 2 OF 3')
+    expect(prompt).toMatch(/OPENS WITH A\nMANIFEST/)
+    expect(prompt).toMatch(/absent is NOT truncated/)
+    expect(prompt).toMatch(/covers exactly the files this pass carries/)
+    expect(buildReviewPrompt({ sha: 'abc', brief: 'x' })).not.toContain('THIS IS PASS')
   })
 })
 

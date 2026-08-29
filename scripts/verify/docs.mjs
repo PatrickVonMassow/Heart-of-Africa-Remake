@@ -1,16 +1,17 @@
 // Doc-consistency checks (no browser). Keeps the README in step with the
 // authoritative acceptance list in CLAUDE.md §7.1 — the count in the README's
 // Status section must equal the number of numbered criteria there — and keeps
-// §7.1's two POINTER FAMILIES honest: the `Evidence:` lines into
-// docs/acceptance-evidence.md and the `Detail:` lines into
-// docs/acceptance-criteria-detail.md. Both families work the same way (a
-// criterion states what must hold and points at the rest under the SAME
-// number), so both are checked by the same three rules — a pointer names its
-// own criterion, it resolves to a real section, and no section is orphaned.
+// §7.1's two COMPANION DOCUMENTS honest: docs/acceptance-evidence.md carries
+// each criterion's evidence and docs/acceptance-criteria-detail.md its
+// condition, both under the SAME number. §7.1 kept a `Detail:`/`Evidence:`
+// pointer line under every criterion until the build order was cut to its
+// binding sentences (a3a04322, 21.08.2026); the numbering IS the reference now,
+// so both documents are checked the same way — every criterion has its section,
+// and no section stands without its criterion.
 //
 // The decision layer below is PURE and exported; the file only runs the checks
 // when it is executed as a script, so scripts/verify/docs.test.mjs can exercise
-// it against a present, a missing and a misspelled section.
+// it against a present section, a missing one and an orphaned one.
 import { readFileSync } from 'node:fs'
 import { fileURLToPath, pathToFileURL } from 'node:url'
 
@@ -35,47 +36,50 @@ export function sectionNumbers(doc) {
   return [...String(doc ?? '').matchAll(/^## (\d+)\./gm)].map((m) => Number(m[1]))
 }
 
-const escapeRe = (s) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
-
-/** `Evidence: docs/acceptance-evidence.md §12.` and its `Detail:` twin. */
-export function pointerRe(keyword, doc) {
-  return new RegExp(`${escapeRe(keyword)}: ${escapeRe(doc)} §(\\d+)\\.`)
+/**
+ * Judge one companion document against §7.1. Returns the number of criteria
+ * judged plus two arrays, both empty when a non-empty §7.1 is sound:
+ *   missing — a criterion with no section of its number in the document,
+ *   orphans — a section in the document that NO criterion carries.
+ *
+ * `orphans` is judged in its own direction on purpose (four-eyes review, point
+ * 555): a criterion that is deleted or renumbered leaves its section standing,
+ * and a check that only asked "does every criterion have a section" would call
+ * that sound — the one direction in which a moved criterion rots silently.
+ */
+export function checkCompanion(section, target) {
+  const criteria = criterionNumbers(section)
+  const sections = sectionNumbers(target)
+  return {
+    criterionCount: criteria.length,
+    missing: criteria.filter((n) => !sections.includes(n)),
+    orphans: sections.filter((n) => !criteria.includes(n)),
+  }
 }
 
 /**
- * Judge one pointer family of §7.1 against the document it points into.
- * Returns { misdirected, unresolved, orphans } — each an array of readable
- * strings/numbers, all empty when the family is sound:
- *   misdirected — a pointer standing under a criterion it does not name,
- *   unresolved  — a pointer naming a section the target document lacks,
- *   orphans     — a section in the target document that NO POINTER names.
- *
- * `orphans` is deliberately judged against the pointers, not merely against the
- * criterion numbers (four-eyes review, point 555): a pointer that is DELETED or
- * whose document path is misspelled leaves its section standing, and a check
- * that only asked "is there a criterion with that number" would call that
- * sound — the one direction in which a moved criterion rots silently.
+ * Turn one document's judgment into the two CLI rules. Keeping this layer pure
+ * makes the fail-closed zero-criterion verdict directly testable: no rule may
+ * turn green merely because its subject disappeared.
  */
-export function checkPointers(section, target, keyword, doc) {
-  const re = pointerRe(keyword, doc)
-  const sections = sectionNumbers(target)
-  const misdirected = []
-  const pointers = []
-  let current = null
-  for (const line of String(section ?? '').split('\n')) {
-    const crit = line.match(/^(\d+)\.\s+\*\*/)
-    if (crit) current = Number(crit[1])
-    const ptr = line.match(re)
-    if (!ptr) continue
-    const at = Number(ptr[1])
-    pointers.push(at)
-    if (at !== current) misdirected.push(`§${at} under criterion ${current}`)
-  }
-  return {
-    misdirected,
-    unresolved: pointers.filter((n) => !sections.includes(n)),
-    orphans: sections.filter((n) => !pointers.includes(n)),
-  }
+export function companionRules(kind, doc, verdict) {
+  const count = verdict.criterionCount
+  const judged = `${count} criteri${count === 1 ? 'on' : 'a'} judged`
+  const hasCriteria = count > 0
+  const noneJudged = hasCriteria ? '' : 'no criteria matched'
+  const numbers = (list) => list.map((n) => `§${n}`).join(', ')
+  return [
+    {
+      name: `every criterion has its ${kind} section in ${doc} (${judged})`,
+      ok: hasCriteria && verdict.missing.length === 0,
+      detail: numbers(verdict.missing) || (hasCriteria ? 'all present' : noneJudged),
+    },
+    {
+      name: `no orphaned ${kind} section that no criterion carries (${judged})`,
+      ok: hasCriteria && verdict.orphans.length === 0,
+      detail: numbers(verdict.orphans) || (hasCriteria ? 'none' : noneJudged),
+    },
+  ]
 }
 
 function main() {
@@ -105,28 +109,18 @@ function main() {
 
   // The evidence chains live in docs/acceptance-evidence.md under the SAME
   // numbers (user 26.07.2026), and since point 555 the criteria's full wording
-  // lives in docs/acceptance-criteria-detail.md the same way. The intro asks for
+  // lives in docs/acceptance-criteria-detail.md the same way. §7.1 asks for
   // criterion and section to change in one commit — a request nothing enforced,
   // in a project whose model is "enforce, don't remind" (four-eyes review,
   // second round). These checks do.
-  const families = [
-    { kind: 'evidence', keyword: 'Evidence', doc: EVIDENCE_DOC },
-    { kind: 'detail', keyword: 'Detail', doc: DETAIL_DOC },
+  const companions = [
+    { kind: 'evidence', doc: EVIDENCE_DOC },
+    { kind: 'detail', doc: DETAIL_DOC },
   ]
-  for (const f of families) {
-    const target = readFileSync(root + f.doc, 'utf8')
-    const v = checkPointers(section, target, f.keyword, f.doc)
-    check(`every ${f.kind} pointer names its own criterion`, v.misdirected.length === 0, v.misdirected.join(', '))
-    check(
-      `every pointer has a section in ${f.doc}`,
-      v.unresolved.length === 0,
-      v.unresolved.join(', ') || 'all present',
-    )
-    check(
-      `no orphaned ${f.kind} section that no criterion points at`,
-      v.orphans.length === 0,
-      v.orphans.join(', ') || 'none',
-    )
+  for (const c of companions) {
+    const target = readFileSync(root + c.doc, 'utf8')
+    const v = checkCompanion(section, target)
+    for (const rule of companionRules(c.kind, c.doc, v)) check(rule.name, rule.ok, rule.detail)
   }
 
   console.log('console errors: 0')

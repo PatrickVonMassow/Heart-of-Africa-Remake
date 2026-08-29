@@ -1,8 +1,9 @@
 // The run record (point 592): the file that makes a verify run one checkable
 // object, so awaiting it replaces re-reading its log.
+import { execFileSync } from 'node:child_process'
 import { mkdtempSync, mkdirSync, utimesSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
-import { join } from 'node:path'
+import { join, resolve } from 'node:path'
 import { describe, it, expect } from 'vitest'
 import {
   SCAN_LIMIT,
@@ -13,6 +14,7 @@ import {
   latestRecordPath,
   pidAlive,
   readRecord,
+  logDir,
   recordPathFor,
   runIsLive,
   writeRecord,
@@ -142,5 +144,27 @@ describe('countPoll — the only thing that moves the counter', () => {
 
   it('answers null where there is nothing to count against', () => {
     expect(countPoll(join(tmp(), 'absent.run.json'))).toBeNull()
+  })
+})
+
+describe('the log directory belongs to the checkout the process was GIVEN', () => {
+  it('defaults to this checkout', () => {
+    expect(logDir({})).toBe(join(resolve(process.cwd()), 'local', 'verify-logs'))
+  })
+
+  // The module is loaded in a CHILD, because the root is resolved once per
+  // process: a fixture that runs a script from this checkout against a
+  // temporary repository must not find the live checkout's run records. The
+  // attended context-ceiling hook did, and read its own verify run as a reason
+  // to stay silent (measured 26.08.2026).
+  it('follows HOA_REPO_ROOT into a fixture repository', () => {
+    const root = mkdtempSync(join(tmpdir(), 'hoa-runrecord-root-'))
+    const module = resolve(process.cwd(), 'scripts/verify/run-record.mjs')
+    const out = execFileSync(
+      process.execPath,
+      ['-e', `import(${JSON.stringify(module)}).then((m) => console.log(m.logDir({})))`],
+      { encoding: 'utf8', env: { ...process.env, HOA_REPO_ROOT: root }, windowsHide: true },
+    )
+    expect(out.trim()).toBe(join(root, 'local', 'verify-logs'))
   })
 })

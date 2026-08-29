@@ -36,6 +36,7 @@ import {
 
 import { boardHtml, green } from './dashboard-guard-fixtures.mjs'
 import { renderQueueCard } from './board-queue-core.mjs'
+import { taskPointNumbers } from './dashboard-point-reader-core.mjs'
 
 
 describe('parseTasks', () => {
@@ -77,6 +78,14 @@ describe('parseNowCardPoint', () => {
   it('reads the FIRST of several parallel now-cards (back-compat view)', () => {
     expect(parseNowCardPoint(boardHtml({ nowCards: [226, 211] }))).toBe(226)
   })
+  it('rejects a bare year unless TASKS provenance confirms the four-digit point', () => {
+    const html = boardHtml({ nowPoint: null, nowTitle: 'Platzhalter' }).replace(
+      '<span class="t">Platzhalter</span>',
+      '<span class="t">2026 — Jahresrückblick</span>',
+    )
+    expect(parseNowCardPoint(html)).toBeNull()
+    expect(parseNowCardPoint(html, { knownPoints: [2026] })).toBe(2026)
+  })
 })
 
 describe('parseNowCardPoints', () => {
@@ -87,6 +96,24 @@ describe('parseNowCardPoints', () => {
   it('lets non-numeric now-cards contribute nothing beside numeric siblings', () => {
     const set = parseNowCardPoints(boardHtml({ nowCards: [226, 'Closing-Zyklus'] }))
     expect([...set]).toEqual([226])
+  })
+  it('reads uncapped and compound legacy title ownership without accepting a date', () => {
+    const html = boardHtml({ nowCards: ['Verbundarbeit', 'Rückblick'] })
+      .replace('<span class="t">Verbundarbeit</span>', '<span class="t">1003+1004 — Verbundarbeit</span>')
+      .replace('<span class="t">Rückblick</span>', '<span class="t">2026-07-25 — Rückblick</span>')
+    expect(html).not.toContain('<span class="num">1003</span>')
+    expect(parseNowCardPoints(html, { knownPoints: [1003, 1004] })).toEqual(new Set([1003, 1004]))
+  })
+  it('rejects a bare year and clock time unless provenance proves the year is a point', () => {
+    const html = boardHtml({ nowCards: ['Jahr', 'Uhrzeit'] })
+      .replace('<span class="t">Jahr</span>', '<span class="t">2026 — Jahresrückblick</span>')
+      .replace('<span class="t">Uhrzeit</span>', '<span class="t">14:54 — Nachtrag</span>')
+    expect(parseNowCardPoints(html)).toEqual(new Set())
+    expect(parseNowCardPoints(html, { knownPoints: [2026, 14] })).toEqual(new Set([2026]))
+  })
+  it('preserves document order across mixed chip and legacy-title cards', () => {
+    const html = boardHtml({ nowCards: ['1003 — Altform', 226, '1004 — Altform'] })
+    expect([...parseNowCardPoints(html)]).toEqual([1003, 226, 1004])
   })
   it('stays section-bounded: numbered VDZK/queue cards never leak in', () => {
     const html = boardHtml({ nowCards: ['Automatik absichern'], klaerung: [206], queue: [211, 204] })
@@ -104,10 +131,26 @@ describe('parseNowCardPoints', () => {
     const html = boardHtml({ nowCards: [226] }).replace('<h2>Woran ich gerade arbeite</h2></summary>', `<h2>Woran ich gerade arbeite</h2></summary>\n${chip}`)
     expect([...parseNowCardPoints(html)].sort((a, b) => a - b)).toEqual([226, 655])
   })
+  it('reads every point from a compound numbered chip', () => {
+    const chip =
+      '<details class="now"><summary><span class="num">1003·1004</span>' +
+      '<span class="t">Verbundarbeit</span></summary><div class="body"><p>Kurz.</p></div></details>'
+    const html = boardHtml({ nowPoint: null }).replace('<h2>Woran ich gerade arbeite</h2></summary>', `<h2>Woran ich gerade arbeite</h2></summary>\n${chip}`)
+    expect(parseNowCardPoints(html)).toEqual(new Set([1003, 1004]))
+  })
   it('is empty on a missing section and non-string input', () => {
     expect(parseNowCardPoints('<h2>Warteschlange</h2>').size).toBe(0)
     expect(parseNowCardPoints(null).size).toBe(0)
     expect(parseNowCardPoints(undefined).size).toBe(0)
+  })
+  it('lets the focus name ANY standing card, not only the first (point 713)', () => {
+    // Measured 17.08.2026: `board.mjs now` prepends and the focus tooling read
+    // the FIRST card, so opening strand 697 silently moved the focus off 700.
+    // focus.mjs set/confirm match membership in this SET, so the section's
+    // order carries no focus meaning — the render decides it (focused first).
+    const set = parseNowCardPoints(boardHtml({ nowCards: [697, 700] }))
+    expect(set.has(700)).toBe(true)
+    expect(set.has(697)).toBe(true)
   })
 })
 
@@ -116,6 +159,13 @@ describe('parseQueuePoints', () => {
     const set = parseQueuePoints(boardHtml({ queue: [211, 204], done: [209] }))
     expect([...set].sort()).toEqual([204, 211])
     expect(set.has(209)).toBe(false)
+  })
+  it('reads a four-digit queue point directly', () => {
+    expect(parseQueuePoints(boardHtml({ queue: [1003] }))).toEqual(new Set([1003]))
+  })
+  it('reads every point from a compound queue chip', () => {
+    const html = boardHtml({ queue: [211] }).replace('<span class="num">211</span>', '<span class="num">1003·1004</span>')
+    expect(parseQueuePoints(html)).toEqual(new Set([1003, 1004]))
   })
   it('is empty on missing section / non-string input', () => {
     expect(parseQueuePoints('<p>no board</p>').size).toBe(0)
@@ -130,6 +180,24 @@ describe('parseKlaerungPoints', () => {
       klaerungExtra: ['📱 ntfy-Topic abonnieren — dann bekommst du Ausfall-Pushes'],
     })
     expect([...parseKlaerungPoints(html)].sort()).toEqual([206, 210])
+  })
+  it('does not invent a VDZK point from a date or hyphenated count', () => {
+    const html = boardHtml({
+      klaerungExtra: [
+        '2026-07-25 — Rückblick',
+        '5-Minuten-Check — Aufwand',
+      ],
+    })
+    expect(parseKlaerungPoints(html)).toEqual(new Set())
+  })
+  it('rejects a bare year and clock time unless TASKS provenance confirms the year', () => {
+    const html = boardHtml({ klaerungExtra: ['2026 — Jahresrückblick', '14:54 — Nachtrag'] })
+    expect(parseKlaerungPoints(html)).toEqual(new Set())
+    expect(parseKlaerungPoints(html, { knownPoints: [2026, 14] })).toEqual(new Set([2026]))
+  })
+  it('reads uncapped and compound points from the chip-less VDZK title shape', () => {
+    const html = boardHtml({ klaerungExtra: ['1003+1004 — Vierstellige Punkte ohne Nummern-Chip'] })
+    expect(parseKlaerungPoints(html, { knownPoints: [1003, 1004] })).toEqual(new Set([1003, 1004]))
   })
   it('does not pick up now-card, queue, or Erledigt titles', () => {
     // No VDZK cards at all — nothing from the surrounding sections leaks in.
@@ -172,6 +240,12 @@ describe('evaluate — registration and freshness (pre-existing invariants)', ()
     expect(r.decision).toBe('block')
     expect(r.reason).toMatch(/STALE.*209/)
   })
+  it('blocks a four-digit ticked point still sitting in the Warteschlange', () => {
+    const html = boardHtml({ queue: [211, 204, 1003] })
+    const r = evaluate(green({ html, done: [209, 1003] }))
+    expect(r.decision).toBe('block')
+    expect(r.reason).toMatch(/STALE.*1003/)
+  })
   it('blocks an open point missing from queue and now-card', () => {
     const r = evaluate(green({ open: [210, 211, 204, 184] }))
     expect(r.decision).toBe('block')
@@ -184,6 +258,18 @@ describe('evaluate — registration and freshness (pre-existing invariants)', ()
     const r = evaluate(green({ html }))
     expect(r.decision).toBe('block')
     expect(r.reason).toMatch(/DOUBLE-LISTS.*210/)
+  })
+  it('blocks a four-digit point double-listed in the now-card AND the Warteschlange', () => {
+    const html = boardHtml({ nowPoint: 1003, queue: [1003, 211, 204] })
+    const r = evaluate(
+      green({
+        html,
+        open: [1003, 211, 204],
+        focus: { point: 1003, note: 'four-digit work', setAt: 1000, confirmedAt: 1000 },
+      }),
+    )
+    expect(r.decision).toBe('block')
+    expect(r.reason).toMatch(/DOUBLE-LISTS.*1003/)
   })
   it('allows the now-card point when it is NOT also in the queue', () => {
     const r = evaluate(green({ html: boardHtml({ nowPoint: 210, queue: [211, 204] }) }))
@@ -262,6 +348,22 @@ describe('evaluate — one section per point ("Von dir zu klären" overlaps)', (
       green({ open: [210, 211, 204, 206], html: boardHtml({ queue: [211, 204], klaerung: [206] }) }),
     )
     expect(r.decision).toBe('allow')
+  })
+  it('counts a four-digit point that lives ONLY under "Von dir zu klären"', () => {
+    const r = evaluate(
+      green({ open: [210, 211, 204, 1003], html: boardHtml({ klaerung: [1003] }) }),
+    )
+    expect(r.decision).toBe('allow')
+  })
+  it('still detects a four-digit VDZK overlap with another open section', () => {
+    const r = evaluate(
+      green({
+        open: [210, 211, 204, 1003],
+        html: boardHtml({ queue: [211, 204, 1003], klaerung: [1003] }),
+      }),
+    )
+    expect(r.decision).toBe('block')
+    expect(r.reason).toMatch(/VON DIR ZU KLÄREN.*1003.*Warteschlange/)
   })
   it('ignores no-number VDZK cards (never point-tied)', () => {
     const r = evaluate(green({ html: boardHtml({ klaerungExtra: ['ntfy-Topic abonnieren'] }) }))
@@ -466,9 +568,9 @@ describe('sliceSections / parseCards', () => {
       '<details><summary><span class="t">313: D</span></summary><div class="body">x</div></details>'
     expect(parseCards(html).flatMap((c) => c.points)).toEqual([262, 287, 288, 232, 233, 234, 313])
   })
-  it('does NOT read a sub-delivery .num like "203A" as a point number', () => {
+  it('reads a sub-delivery .num like "203A" as its base point', () => {
     const html = '<details><summary><span class="num">203A</span><span class="t">Teil</span></summary><div class="body">x</div></details>'
-    expect(parseCards(html)[0].points).toEqual([])
+    expect(parseCards(html)[0].points).toEqual([203])
   })
   it('splits a COMPOUND .num the real board writes ("232·233·234", "92+94", "71/72")', () => {
     const card = (num) => `<details><summary><span class="num">${num}</span><span class="t">X</span></summary><div class="body">x</div></details>`
@@ -476,12 +578,31 @@ describe('sliceSections / parseCards', () => {
     expect(parseCards(card('92+94'))[0].points).toEqual([92, 94])
     expect(parseCards(card('71/72'))[0].points).toEqual([71, 72])
   })
-  it('reads no phantom point from a date, a count or a year in a title', () => {
+  it('reads four-digit ownership from a structured chip or a TASKS-confirmed legacy title', () => {
+    const structured = '<details><summary><span class="num">1003</span><span class="t">Done</span></summary><div class="body">x</div></details>'
+    const freeTitle = '<details><summary><span class="t">1003 — Jahresrückblick</span></summary><div class="body">x</div></details>'
+    expect(parseCards(structured)[0].points).toEqual([1003])
+    expect(parseCards(freeTitle, { knownPoints: new Set([1003]) })[0].points).toEqual([1003])
+  })
+  it('keeps every shared-reader call total when options are explicitly null', () => {
+    const now = boardHtml({ nowCards: ['210 — Titel'] })
+    const clarification = boardHtml({ klaerungExtra: ['210 — Frage'] })
+    expect(parseNowCardPoints(now, null)).toEqual(new Set([210]))
+    expect(parseKlaerungPoints(clarification, null)).toContain(210)
+    expect(parseCards('<details><summary><span class="t">210 — Titel</span></summary></details>', null)[0].points)
+      .toEqual([210])
+  })
+  it('reads no phantom point from a date, a hyphenated count or a free-title year', () => {
     const card = (t) => `<details><summary><span class="t">${t}</span></summary><div class="body">x</div></details>`
     expect(parseCards(card('2026-07-25 — Rückblick'))[0].points).toEqual([])
     expect(parseCards(card('5-Minuten-Check — X'))[0].points).toEqual([])
-    expect(parseCards(card('1890 — Kartenstand'))[0].points).toEqual([])
     expect(parseCards(card('1890er Namen für Landmarken'))[0].points).toEqual([])
+    expect(parseCards(card('2026 — Jahresrückblick'))[0].points).toEqual([])
+    expect(parseCards(card('1890: Kalenderstopp'))[0].points).toEqual([])
+  })
+  it('uses TASKS provenance rather than a ceiling for an ambiguous four-digit title', () => {
+    const html = '<details><summary><span class="t">2026 — Echter Punkt</span></summary><div class="body">x</div></details>'
+    expect(parseCards(html, { knownPoints: [2026] })[0].points).toEqual([2026])
   })
   it('reads a body that starts with a container child (no false empty-body)', () => {
     const html =
@@ -489,8 +610,11 @@ describe('sliceSections / parseCards', () => {
       '<div class="body"><div class="pills"><span>x</span></div><p>Echter Text.</p></div></details>'
     expect(parseCards(html)[0].body).toMatch(/Echter Text/)
   })
-  it('is total on non-string input', () => {
+  it('is total on malformed input and options', () => {
     expect(parseCards(null)).toEqual([])
+    expect(parseCards('<details><summary><span class="t">210 — Titel</span></summary></details>', null)).toEqual([
+      { meta: null, body: '', title: '210 — Titel', points: [210] },
+    ])
     expect(sliceSections(null).order).toEqual([])
   })
 })
@@ -508,6 +632,14 @@ describe('auditDashboard — the 25.07 witnesses', () => {
     expect(codes(boardHtml(), { done: [209, 262] })).toContain('erledigt-missing')
     // …and passes once its card exists.
     expect(codes(boardHtml({ done: [209, 262] }), { done: [209, 262] })).not.toContain('erledigt-missing')
+  })
+  it('accepts a four-digit newly ticked point whose Erledigt card is present, without a waiver', () => {
+    const input = { ...base, done: [209, 1003], doneSeen: [209] }
+    expect(auditDashboard(boardHtml({ done: input.done }), input)).toEqual([])
+  })
+  it('reports a four-digit newly ticked point whose Erledigt card is missing', () => {
+    const input = { ...base, done: [209, 1003], doneSeen: [209] }
+    expect(codes(boardHtml(), input)).toContain('erledigt-missing')
   })
   it('grandfathers pre-guard history: no baseline yet → no new-tick complaints', () => {
     expect(codes(boardHtml(), { done: [209, 262, 273, 293, 305], doneSeen: null })).not.toContain('erledigt-missing')
@@ -561,6 +693,30 @@ describe('auditDashboard — the 25.07 witnesses', () => {
 
   it('WITNESS duplicate: the same point on two cards of ONE open section blocks', () => {
     expect(codes(boardHtml({ queue: [211, 211, 204] }))).toContain('dup-in-section')
+  })
+  it('does not invent a duplicate point from repeated free-title years', () => {
+    const html = boardHtml({ nowCards: ['Jahresrückblick', 'Kalenderstand'] })
+      .replace('class="t">Jahresrückblick', 'class="t">2026 — Jahresrückblick')
+      .replace('class="t">Kalenderstand', 'class="t">2026 — Kalenderstand')
+    expect(html).toContain('class="t">2026 — Jahresrückblick')
+    expect(html).toContain('class="t">2026 — Kalenderstand')
+    expect(html.match(/class="t">2026 —/g)).toHaveLength(2)
+    expect(codes(html)).not.toContain('dup-in-section')
+  })
+  it('still audits a TASKS-confirmed four-digit legacy point without a ceiling', () => {
+    const html = boardHtml({ nowCards: ['Erste Karte', 'Zweite Karte'] })
+      .replace('class="t">Erste Karte', 'class="t">2026 — Erste Karte')
+      .replace('class="t">Zweite Karte', 'class="t">2026 — Zweite Karte')
+    expect(codes(html, { open: [2026, 211, 204] })).toContain('dup-in-section')
+    expect(codes(html, { open: [2026, 211, 204], knownPoints: new Set() })).toContain('dup-in-section')
+  })
+  it('keeps a four-digit DEFERRED point in the free-title provenance set', () => {
+    const html = boardHtml({ nowCards: ['Erste Karte', 'Zweite Karte'] })
+      .replace('class="t">Erste Karte', 'class="t">2026 — Erste Karte')
+      .replace('class="t">Zweite Karte', 'class="t">2026 — Zweite Karte')
+    const knownPoints = taskPointNumbers('- [ ] 2026. Später DEFERRED bis zum Release')
+    expect(knownPoints).toEqual(new Set([2026]))
+    expect(codes(html, { knownPoints })).toContain('dup-in-section')
   })
   it('but Erledigt may hold several delivery cards for one point (the real point-206 case)', () => {
     expect(codes(boardHtml({ done: [206, 206, 209] }))).not.toContain('dup-in-section')
@@ -1094,6 +1250,18 @@ describe('the expected-end rule reaches the turn end', () => {
     expect(JSON.stringify(withClock)).toContain('now-eta-past')
     // Without a clock the rule stays silent — it is never guessed.
     expect(JSON.stringify(evaluate(green({ html: stale })))).not.toContain('now-eta-past')
+  })
+})
+
+describe('duplicate card titles', () => {
+  const codes = (html) => auditDashboard(html, { open: [210, 211, 204], done: [209] }).map((v) => v.code)
+
+  it('fails on a hand-built duplicate in any section and clears after repair', () => {
+    const duplicated = boardHtml({ klaerungExtra: ['Kartenschrift wählen', 'Kartenschrift wählen'] })
+    expect(codes(duplicated)).toContain('duplicate-card-title')
+
+    const repaired = duplicated.replace('Kartenschrift wählen', 'Kartenschrift für Überschriften wählen')
+    expect(codes(repaired)).not.toContain('duplicate-card-title')
   })
 })
 

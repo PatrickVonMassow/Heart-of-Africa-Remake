@@ -12,11 +12,12 @@
 // promise that an unreadable state never costs the caller a tool call.
 import { describe, it, expect, beforeAll, afterAll, afterEach, beforeEach } from 'vitest'
 import { spawnSync } from 'node:child_process'
-import { cpSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
+import { cpSync, existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, symlinkSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { resolve } from 'node:path'
 
 const SOURCE_SCRIPTS = resolve(process.cwd(), 'scripts')
+const SID = 'board-first-test' // the session id callGuard sends
 let repo
 
 const statePath = () => resolve(repo, '.claude', 'dashboard-state.json')
@@ -53,6 +54,8 @@ beforeAll(() => {
     filter: (src) => !/[\\/](verify|git-hooks)([\\/]|$)/.test(src),
   })
   mkdirSync(resolve(repo, '.claude'), { recursive: true })
+  const initialized = spawnSync('git', ['init', '-b', 'main'], { cwd: repo, encoding: 'utf8', windowsHide: true })
+  if (initialized.status !== 0) throw new Error(initialized.stderr)
 })
 
 afterAll(() => {
@@ -64,6 +67,13 @@ beforeEach(() => {
   const now = Date.now()
   writeJson(statePath(), { turnStartedAt: now })
   writeJson(focusPath(), { point: 366, note: 'stale', setAt: now - 60_000, confirmedAt: now - 60_000 })
+  writeJson(resolve(repo, '.claude', 'batch-lock.json'), {
+    v: 2,
+    sessionId: SID,
+    claimedAt: now,
+    leaseUntil: now + 60 * 60_000,
+    pid: process.pid,
+  })
 })
 
 describe('board-first-guard (spawned)', () => {
@@ -132,6 +142,36 @@ describe('board-first-guard (spawned)', () => {
     } finally {
       rmSync(pause, { force: true })
     }
+  })
+
+  it('refuses a mutation after lock ownership moves and names the stand-down path', () => {
+    const now = Date.now()
+    writeJson(resolve(repo, '.claude', 'batch-lock.json'), {
+      v: 2,
+      sessionId: 'successor-session',
+      claimedAt: now,
+      leaseUntil: now + 60 * 60_000,
+      pid: process.pid,
+    })
+
+    const r = callGuard('Bash', { command: 'npm run build' })
+    expect(r.status, r.stderr).toBe(0)
+    const reason = r.decision?.hookSpecificOutput?.permissionDecisionReason ?? ''
+    expect(reason).toContain('BATCH OWNERSHIP STAND-DOWN')
+    expect(reason).toContain('STAND-DOWN PATH')
+    expect(reason).toContain('npm run build')
+  })
+
+  it('still permits reads after ownership moves', () => {
+    const now = Date.now()
+    writeJson(resolve(repo, '.claude', 'batch-lock.json'), {
+      v: 2,
+      sessionId: 'successor-session',
+      claimedAt: now,
+      leaseUntil: now + 60 * 60_000,
+      pid: process.pid,
+    })
+    expect(callGuard('Bash', { command: 'git status --short' }).stdout.trim()).toBe('')
   })
 
   // --- THE NO-WORK CLAIM (point 470) -----------------------------------------
@@ -227,7 +267,6 @@ describe('board-first-guard (spawned)', () => {
   // Spawned, not mocked: this gate's whole promise is that a session which lost
   // the batch cannot go on writing shared state, and a promise about the executed
   // path has to be shown on the executed path.
-  const SID = 'board-first-test' // the session id callGuard sends
   const fencePath = () => resolve(repo, '.claude', 'batch-fence.json')
   /** `held` for our session, and the mark since moved to `current`. */
   const seedFence = (held, current, holder = 'the-successor') =>
@@ -325,14 +364,75 @@ describe('board-first-guard (spawned)', () => {
     }
   })
 
-  it('a session that NEVER held a fence is never blocked, whatever the mark says', () => {
-    // The over-blocking direction is the expensive one: a block-loop cost this
-    // project ~30 turns once. An attended window has no grant on record.
+  it('a session that NEVER held a fence is still refused when it tries to write main without the lock', () => {
+    // Stale-fence status alone cannot see this session; the independent
+    // main-write ownership rule closes that measured hole.
     writeJson(fencePath(), { v: 1, fence: 99, holder: 'someone-else', at: Date.now(), holders: [{ sessionId: 'someone-else', fence: 99, at: Date.now() }] })
+    rmSync(resolve(repo, '.claude', 'batch-lock.json'), { force: true })
     try {
-      expect(denial(callGuard('Bash', { command: 'git push origin main' }))).not.toContain('FENCED OUT')
+      const reason = denial(callGuard('Bash', { command: 'git commit -m x' }))
+      expect(reason).toContain('MAIN WRITE REFUSED')
+      expect(reason).toContain('holds no batch lock')
+      expect(reason).not.toContain('FENCED OUT')
     } finally {
       rmSync(fencePath(), { force: true })
+    }
+  })
+
+  it('a lockless main session may write outside the checkout but not enter it through a symlink', () => {
+    const now = Date.now()
+    writeJson(statePath(), { turnStartedAt: now - 1000 })
+    writeJson(focusPath(), { point: 821, note: 'fresh', setAt: now, confirmedAt: now })
+    rmSync(resolve(repo, '.claude', 'batch-lock.json'), { force: true })
+    const scratch = mkdtempSync(resolve(tmpdir(), 'hoa-main-write-scratch-'))
+    const link = resolve(scratch, 'repo-link')
+    symlinkSync(repo, link, 'dir')
+    try {
+      expect(callGuard('Write', { file_path: resolve(scratch, 'note.mjs') }).stdout.trim()).toBe('')
+      expect(callGuard('Write', { file_path: resolve(scratch, 'memory', 'MEMORY.md') }).stdout.trim()).toBe('')
+      expect(denial(callGuard('Write', { file_path: resolve(repo, '..', repo.split(/[\\/]/).at(-1), 'inside.md') }))).toContain(
+        'MAIN WRITE REFUSED',
+      )
+      expect(denial(callGuard('Write', { file_path: resolve(link, 'through-link.md') }))).toContain('MAIN WRITE REFUSED')
+    } finally {
+      rmSync(scratch, { recursive: true, force: true })
+    }
+  })
+
+  it('refuses a dangling outside symlink whose future target is inside the checkout', () => {
+    const now = Date.now()
+    writeJson(statePath(), { turnStartedAt: now - 1000 })
+    writeJson(focusPath(), { point: 821, note: 'fresh', setAt: now, confirmedAt: now })
+    rmSync(resolve(repo, '.claude', 'batch-lock.json'), { force: true })
+    const scratch = mkdtempSync(resolve(tmpdir(), 'hoa-main-write-dangling-'))
+    const danglingLink = resolve(scratch, 'future-file-link')
+    const chainedLink = resolve(scratch, 'future-file-chain')
+    const futureCheckoutFile = resolve(repo, 'not-created-yet.md')
+    symlinkSync(futureCheckoutFile, danglingLink, 'file')
+    symlinkSync(danglingLink, chainedLink, 'file')
+    try {
+      expect(existsSync(futureCheckoutFile)).toBe(false)
+      expect(denial(callGuard('Write', { file_path: danglingLink }))).toContain('MAIN WRITE REFUSED')
+      expect(denial(callGuard('Write', { file_path: chainedLink }))).toContain('MAIN WRITE REFUSED')
+    } finally {
+      rmSync(scratch, { recursive: true, force: true })
+    }
+  })
+
+  it('conservatively refuses a write when the target is a symlink loop', () => {
+    const now = Date.now()
+    writeJson(statePath(), { turnStartedAt: now - 1000 })
+    writeJson(focusPath(), { point: 821, note: 'fresh', setAt: now, confirmedAt: now })
+    rmSync(resolve(repo, '.claude', 'batch-lock.json'), { force: true })
+    const scratch = mkdtempSync(resolve(tmpdir(), 'hoa-main-write-loop-'))
+    const loopA = resolve(scratch, 'loop-a')
+    const loopB = resolve(scratch, 'loop-b')
+    symlinkSync(loopB, loopA, 'file')
+    symlinkSync(loopA, loopB, 'file')
+    try {
+      expect(denial(callGuard('Write', { file_path: loopA }))).toContain('MAIN WRITE REFUSED')
+    } finally {
+      rmSync(scratch, { recursive: true, force: true })
     }
   })
 
@@ -352,7 +452,7 @@ describe('board-first-guard (spawned)', () => {
     }
   })
 
-  it('INDEPENDENCE + fail-open: a stale fence still refuses with NO lock and NO state; a torn one refuses nothing', () => {
+  it('INDEPENDENCE + fail-open: stale-fence evidence needs no lock/state; a torn fence invents no stale grant', () => {
     // The fence file is the only input this gate needs — deliberately, because on
     // the lost night every other local signal was missing or stale.
     seedFence(7, 8)
@@ -363,7 +463,10 @@ describe('board-first-guard (spawned)', () => {
       writeFileSync(fencePath(), '{ torn')
       const r = callGuard('Bash', { command: 'git push' })
       expect(r.status, r.stderr).toBe(0)
-      expect(r.stdout.trim()).toBe('')
+      // The torn fence itself invents no stale grant. The independent rule still
+      // refuses this real main write because the fixture deliberately has no lock.
+      expect(denial(r)).not.toContain('FENCED OUT')
+      expect(denial(r)).toContain('MAIN WRITE REFUSED')
     } finally {
       rmSync(fencePath(), { force: true })
     }

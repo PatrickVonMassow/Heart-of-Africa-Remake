@@ -14,28 +14,35 @@
 //
 //   node scripts/bundle-first-guard.mjs --status
 import { readFileSync, existsSync } from 'node:fs'
-import { evaluate } from './bundle-first-core.mjs'
+import { evaluate, statusLine } from './bundle-first-core.mjs'
 import { heldByOtherLiveOwner } from './batch-singleton.mjs'
 import { isMainModule } from './is-main.mjs'
 import { repoPath } from './repo-paths.mjs'
 
-const TASKS = repoPath('TASKS.md')
-const WORK_PACKAGES = repoPath('docs/work-packages.md')
-const PAUSE = repoPath('.claude/batch-paused')
-
+// RESOLVED ON USE, NEVER AT IMPORT (cross-vendor review finding): a path
+// resolved at module scope is computed BEFORE the try below, so its throw would
+// leave the process nonzero instead of allowing the stop. Every call site of
+// this reader stands inside a fail-open, which is where the resolution belongs.
+// `resolvePath` is the seam that makes the placement PROVABLE rather than
+// merely stated: an injected resolver can only be reached if the resolution
+// really happens on the call. What no try in this file can enclose is another
+// module's own top-level initialisation.
 /** The guard's I/O half, shared with the preflight (point 365 D). */
-export function gatherBundleFirstInputs({ sessionId = '' } = {}) {
-  if (existsSync(PAUSE)) return { applicable: false, why: 'the batch is paused' }
+export function gatherBundleFirstInputs({ sessionId = '', resolvePath = repoPath } = {}) {
+  const tasks = resolvePath('TASKS.md')
+  const workPackages = resolvePath('docs/work-packages.md')
+  const pause = resolvePath('.claude/batch-paused')
+  if (existsSync(pause)) return { applicable: false, why: 'the batch is paused' }
   if (heldByOtherLiveOwner(sessionId)) {
     return { applicable: false, why: 'another live session owns the batch lock', cause: 'not-lock-owner' }
   }
-  if (!existsSync(WORK_PACKAGES)) return { applicable: false, why: 'no docs/work-packages.md in this checkout' }
-  if (!existsSync(TASKS)) return { applicable: false, why: 'no TASKS.md in this checkout' }
+  if (!existsSync(workPackages)) return { applicable: false, why: 'no docs/work-packages.md in this checkout' }
+  if (!existsSync(tasks)) return { applicable: false, why: 'no TASKS.md in this checkout' }
   return {
     applicable: true,
     inputs: {
-      tasksMd: readFileSync(TASKS, 'utf8'),
-      workPackagesMd: readFileSync(WORK_PACKAGES, 'utf8'),
+      tasksMd: readFileSync(tasks, 'utf8'),
+      workPackagesMd: readFileSync(workPackages, 'utf8'),
     },
   }
 }
@@ -49,7 +56,10 @@ if (isMainModule(import.meta.url)) {
         process.exit(0)
       }
       const result = evaluate(gathered.inputs)
-      console.log(result.block ? result.reason : 'bundle-first-guard: every open point is placed.')
+      // The sentence is the core's (round-fifteen review finding): a fail-open
+      // and a measured invariant are the same DECISION and a very different
+      // statement, and that difference belongs where a unit case can reach it.
+      console.log(statusLine(result))
       process.exit(0)
     }
 

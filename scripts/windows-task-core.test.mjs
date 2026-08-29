@@ -16,6 +16,10 @@ import { dirname, join } from 'node:path'
 import { LAUNCHER_TASK_NAME } from './batch-launcher-core.mjs'
 import {
   OK_TASK_RESULTS,
+  EMERGENCY_INTERVAL_MINUTES,
+  EMERGENCY_OFFSET_MINUTES,
+  EMERGENCY_SCRIPT_PATH,
+  EMERGENCY_TASK_NAME,
   PEER_MAX_SILENCE_MS,
   PRIMARY_TASK_NAME,
   SETUP_SCRIPT_PATH,
@@ -66,6 +70,7 @@ describe('the two task names', () => {
     expect(WATCHDOG_TASK_NAME).not.toBe(PRIMARY_TASK_NAME)
     expect(taskNameFor('primary')).toBe(PRIMARY_TASK_NAME)
     expect(taskNameFor('watchdog')).toBe(WATCHDOG_TASK_NAME)
+    expect(taskNameFor('emergency')).toBe(EMERGENCY_TASK_NAME)
     expect(taskNameFor('nonsense')).toBeNull()
     expect(taskNameFor(undefined)).toBeNull()
   })
@@ -75,6 +80,12 @@ describe('the two task names', () => {
     // read a peer that has not yet recorded the run it is starting.
     expect(WATCHDOG_OFFSET_MINUTES).toBeGreaterThan(0)
     expect(WATCHDOG_OFFSET_MINUTES).toBeLessThan(TASK_INTERVAL_MINUTES)
+  })
+
+  it('gives the emergency lane its own offset hourly timer', () => {
+    expect(EMERGENCY_TASK_NAME).toBe('HoA-Batch-Emergency')
+    expect(EMERGENCY_INTERVAL_MINUTES).toBe(60)
+    expect(EMERGENCY_OFFSET_MINUTES).toBeGreaterThan(WATCHDOG_OFFSET_MINUTES)
   })
 
   it('tolerates two missed ticks before calling a peer silent', () => {
@@ -279,6 +290,7 @@ describe('parseWatchArgs', () => {
 
   it('withholds every repair under --dry-run', () => {
     expect(parseWatchArgs(['--check', 'primary', '--dry-run']).apply).toBe(false)
+    expect(parseWatchArgs(['--check', 'emergency']).role).toBe('emergency')
   })
 
   it('refuses an unknown role, an unknown flag and a missing role', () => {
@@ -320,7 +332,7 @@ describe('the watch CLI, run for real', () => {
     const r = run(['--check', 'nonsense'])
     expect(r.status).toBe(2)
     expect(`${r.stderr}`).toMatch(/unknown role/)
-    expect(`${r.stderr}`).toMatch(/--check primary\|watchdog/)
+    expect(`${r.stderr}`).toMatch(/--check primary\|watchdog\|emergency/)
   })
 
   it('prints usage on --help', () => {
@@ -337,10 +349,14 @@ describe('the elevated setup script — held to the same constants by reading it
   it('names exactly the task names, cadence and paths the core module exports', () => {
     expect(text).toContain(`$PrimaryTaskName        = '${PRIMARY_TASK_NAME}'`)
     expect(text).toContain(`$WatchdogTaskName       = '${WATCHDOG_TASK_NAME}'`)
+    expect(text).toContain(`$EmergencyTaskName      = '${EMERGENCY_TASK_NAME}'`)
     expect(text).toContain(`$TaskIntervalMinutes    = ${TASK_INTERVAL_MINUTES}`)
     expect(text).toContain(`$WatchdogOffsetMinutes  = ${WATCHDOG_OFFSET_MINUTES}`)
     expect(text).toContain(TASK_DEFINITION_DIR.replace(/\//g, '\\'))
     expect(text).toContain(WATCH_SCRIPT_PATH.replace(/\//g, '\\'))
+    expect(text).toContain(EMERGENCY_SCRIPT_PATH.replace(/\//g, '\\'))
+    expect(text).toContain(`$EmergencyIntervalMinutes = ${EMERGENCY_INTERVAL_MINUTES}`)
+    expect(text).toContain(`$EmergencyOffsetMinutes = ${EMERGENCY_OFFSET_MINUTES}`)
   })
 
   it('refuses to run unelevated', () => {
@@ -353,6 +369,8 @@ describe('the elevated setup script — held to the same constants by reading it
     expect(text).toContain('--check watchdog') // (b) the primary watches the second task
     expect(text).toContain('-AtStartup') // (c) the second task survives a reboot with nobody logged on
     expect(text).toContain('--check primary')
+    expect(text).toContain('--check emergency')
+    expect(text).toContain('batch-emergency.mjs')
     expect(text).toContain("New-ScheduledTaskPrincipal -UserId 'SYSTEM'")
     expect(text).toContain('NoAutoRebootWithLoggedOnUsers') // (e) no restart into a locked screen
     expect(text).toContain('DisableAutomaticRestartSignOn')

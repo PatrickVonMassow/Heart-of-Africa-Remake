@@ -27,6 +27,19 @@ lives in `scripts/verify/README.md`.
 
 ---
 
+## 1. Build/start.
+
+Verifiable: `npm install`, `npm run dev` and `npm run build` each complete
+without errors; the build chains `scripts/deps-preflight.mjs`, `tsc -b` and the
+Vite production build, so a missing dependency or a type error fails THIS
+criterion rather than surfacing later as someone else's. That the application
+loads without console errors is asserted by every browser suite: each one opens
+the application and closes its report with `console errors: 0`, and one console
+error fails the run. `scripts/verify/startup.mjs` additionally holds the loading
+picture to `balance.startup.pictureFreezeBudgetMs` on both backends, so a load
+counts only where a picture is actually PAINTED — a served document that never
+reaches the player is not a start.
+
 ## 2. Two perspectives.
 
 Verifiable: an automated
@@ -423,6 +436,24 @@ and longitude equal the actual grave position and that non-knowing
 chiefs point to the knowing people; `scripts/verify/flow.mjs` plays
 the full loop (gift → lesson → deciphered latitude, the East leg for
 the longitude, then the dig).
+
+## 11. Game graphics.
+
+Verifiable: screenshots on BOTH backends — `scripts/verify/world.mjs` shoots the
+bird's-eye view at characteristic locations, the settlement suites the walkable
+ones — plus `scripts/verify/visualsweep.mjs`, which passes and fails nothing but
+DRIVES a walk at each spot and captures a filmstrip along the path, so the
+frames can be inspected the way a player meets them rather than as a jump cut.
+
+The AAA impression itself is a human verdict and deliberately has no pass/fail
+suite: it is judged on the rendered picture of deployed `main`, under the rule
+that binds every chain here — the RESULT the player sees, not the mechanism that
+was supposed to produce it. What the suites do pin is the geography beneath the
+picture: `src/world/world.test.ts` holds the counts, the terrain sampling and
+the coast/river distances, so the shape being smoothed stays the right shape,
+while the smoothness of that geometry is read off the screenshots. Screenshot
+METRICS count as evidence only once `node scripts/picture-stability.mjs <suite>`
+reports STABLE; the verdicts are `docs/picture-check-levers.md`.
 
 ## 12. Atmosphere.
 
@@ -1186,21 +1217,33 @@ duration, the conversing pair takes turns and a figure between gestures stands
 exactly at rest (`scripts/verify/polish.mjs`, screenshots
 479-gesture-beckon / -point / -refuse / -indicate).
 
-THE SETTLEMENT EDGE ON THE GROUND (§2.6, points 352/488): where the inhabited
+THE SETTLEMENT EDGE ON THE GROUND (§2.6, points 352/488/581): where the inhabited
 ground ends, the swept, trodden earth gives way to open land across a soft band —
-three terms of the ground material that is already drawn (a multiplicative
-darkening of the compacted inside, its blotchy patch mottling faded out, its
+four terms of the ground material that is already drawn (a multiplicative
+darkening of the compacted inside, its blotchy patch mottling levelled out to the
+open ground's own MEAN, the warm dust beaten out of it toward its own grey, its
 micro-relief worn flatter), never a ring or a glow, and NO quality key, because a
-term in a shaded material has no cost to switch off.
+term in a shaded material has no cost to switch off. Point 581 is the legibility
+of that band: the user could not make the boundary out with the master strength
+already at its ceiling, so the per-kind look itself was rebuilt — the fall
+concentrated into the band's middle metre instead of smeared over all three, the
+levelling that had been giving the darkening back, and the dust cue for a
+sand-on-sand village. `strength: 1` still means the full per-kind look.
 Verifiable: the band holds no radius of its own — `src/scenes/place/boundary.ts`
 is the one boundary, the leave check asks it, and its per-angle sampling fills the
 band's lookup, so a boundary that stops being a circle needs no second edit. The
 pure tests BISECT the leave check and compare it with the radius the band draws
 at, for every place in the roster at 32 bearings, follow a moved boundary,
 reproduce a deliberately non-circular one, cover `PLACE_KINDS` totality, cap the
-wander below both the honesty limit and the band's own half-width (so the true
-line always lies inside the visible give-way), and prove the tone step is a RATIO
-that survives both ends of the year against the real season curve
+wander below both the honesty limit and the band's own VISIBLE FALL (so the true
+line always lies inside the part of the give-way the player sees change), pin the
+fall as concentrated at the boundary, and prove the tone step is a RATIO that
+survives both ends of the year against the real season curve — plus, since 581,
+the value the band actually reads at against the ground it sits on, over every
+place kind and every settlement palette in the game, above a stated minimum, and
+the one number there that is a MEASUREMENT rather than a calibration — the level
+the swept side is flattened to — re-measured from a mirror of the shader's own
+mottling noise, so it cannot drift away from the mean it stands for
 (`src/render/edgeBand.test.ts`); a source-level test refuses a second hand-rolled
 distance-against-radius test in the scene (`src/scenes/place/boundary.test.ts`).
 Live, the picture is measured by ATTRIBUTION rather than correlation — the
@@ -1443,6 +1486,18 @@ Verifiable: screenshots of the status bar, journal, a trade
 dialog and the map in both languages; no hardcoded player-visible
 strings outside the language files (spot check); the application runs
 without console errors in both languages.
+
+## 18. Lint and dependency hygiene.
+
+Verifiable: `npm run lint` (oxlint) reports zero errors and zero warnings, run
+on every change rather than saved up for a closing. `node scripts/audit-check.mjs`
+wraps `npm audit --json` and exits non-zero for ANY advisory not recorded in its
+`ALLOW` map together with the reason it is tolerable, so a new vulnerability
+fails loudly while a recorded one cannot quietly rot; CLAUDE.md §7.2 runs it
+whenever the lockfile changes. The single current entry is GHSA-f88m-g3jw-g9cj
+(sharp/libvips, high, no upstream fix): a transitive Node dependency of
+kokoro-js that is absent from the browser bundle and never runs at build time,
+so it is not reachable in the shipped game.
 
 ## 19. Journal voice markup and read-aloud.
 

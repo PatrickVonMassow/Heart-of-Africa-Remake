@@ -30,9 +30,9 @@ import { execFileSync } from 'node:child_process'
 import { repoPath } from './repo-paths.mjs'
 import { writeJsonAtomic } from './atomic-write.mjs'
 import { readTasksOpen, TASKS_PATH, ARCHIVE_PATH } from './tasks-source.mjs'
-import { readOwnerLock } from './batch-singleton.mjs'
+import { markHandover, readOwnerLock } from './batch-singleton.mjs'
 import { gatherClaim } from './batch-claim.mjs'
-import { reservationDecision } from './batch-claim-core.mjs'
+import { resolveBoundaryDestination } from './batch-claim-core.mjs'
 import {
   BOUNDARY_CAUSES,
   BOUNDARY_DESTINATIONS,
@@ -44,6 +44,7 @@ import {
   boundaryCardCommand,
   cardProofFragments,
   cardRegions,
+  claimantCardIdentity,
   boundaryCardText,
   boundaryDestination,
   boundaryDueFrom,
@@ -57,13 +58,56 @@ import {
 import { launcherRemedy } from './batch-launcher-core.mjs'
 import { PUBLISH_CMD } from './board-remedy.mjs'
 import { gatherHandoverTransfer as gatherTransfer } from './batch-in-flight.mjs'
-import { gatherWatermark, watermarkTokens } from './context-watermark.mjs'
-import { contextDistanceNote } from './context-watermark-core.mjs'
+import { gatherWatermark, triggerTokens } from './context-watermark.mjs'
+import { CONTEXT_CEILING_TOKENS, CONTEXT_MARGIN_TOKENS, contextDistanceNote } from './context-watermark-core.mjs'
+import { noteBoundaryIncident } from './context-incidents.mjs'
 import { launcherState } from './batch-launcher.mjs'
 import { BOARD_FILE_DEFAULT } from './dashboard-state.mjs'
 import { nowCard } from './board-core.mjs'
+import { parseTasks } from './dashboard-guard-core.mjs'
+import { recordHandoverBudgetCompletion } from './handover-budget.mjs'
+import {
+  noteHandoverAttributionCommit,
+  noteHandoverAttributionPrepare,
+} from './handover-attribution.mjs'
+import { commitDurableBoundary, prepareDurableBoundary } from './batch-boundary-plane.mjs'
 
 export const BOUNDARY_PATH = repoPath('.claude/batch-boundary.json')
+
+/** The boundary's overshoot consumer is deliberately fixed to the cost
+ * ceiling. Admission uses the lower trigger through gatherWatermark. */
+export function boundaryContextDistanceNote(tokens) {
+  return contextDistanceNote({ tokens, ceiling: CONTEXT_CEILING_TOKENS })
+}
+
+/**
+ * APPEND THE OVERSHOOT TO THE SERIES (point 742) — the printed distance was a
+ * number nobody could count twice; this keeps it, with the session's per-turn
+ * growth and the growth per KIND of call.
+ *
+ * IT CANNOT FAIL THE BOUNDARY. The handover is what keeps the batch alive and the
+ * bookkeeping is evidence, so every failure degrades to a printed warning — the
+ * recorder swallows its own errors and this call site swallows anything left
+ * (a broken series file must never cost a session its handover).
+ * Same condition as the distance note: only a measured reading further past the
+ * ceiling than the stated margin is an incident.
+ */
+export function recordBoundaryOvershoot({ tokens, cause, sid, point = null, transcript = '', note = noteBoundaryIncident } = {}) {
+  try {
+    return note({
+      tokens,
+      sessionId: sid,
+      point,
+      cause,
+      transcriptPath: transcript,
+      ceiling: CONTEXT_CEILING_TOKENS,
+      margin: CONTEXT_MARGIN_TOKENS,
+    })
+  } catch (error) {
+    console.log(`\nWARNING: the context-overshoot record could not be taken (${error?.message ?? error}); the boundary stands.`)
+    return { written: false, reason: 'write-failed', record: null, error }
+  }
+}
 
 const readText = (p) => {
   try {
@@ -305,9 +349,9 @@ export function closureOf(point, { cwd = repoPath('.') } = {}) {
 export function gatherBoundary(sid, { now = Date.now(), path = BOUNDARY_PATH } = {}) {
   const marker = readBoundary(path)
   const closure = marker ? closureOf(marker.point) : 'unknown'
-  // The CURRENT configured watermark rides along (Sol final round, finding 1):
+  // The CURRENT configured trigger rides along (Sol final round, finding 1):
   // a context claim must clear it as well as its own recorded mark.
-  const boundary = assessBoundary({ marker, sid, now, closure, watermarkNow: watermarkTokens() })
+  const boundary = assessBoundary({ marker, sid, now, closure, watermarkNow: triggerTokens() })
   // Probe the OS only when a boundary is actually claimed — this runs at every
   // turn end of the owning session, and a PowerShell round-trip per turn for a
   // question nobody asked would be pure waste.
@@ -443,7 +487,10 @@ export function pointCardStanding(point, { path = repoPath(BOARD_FILE_DEFAULT) }
   }
 }
 
-export function boundaryHandover({ sid = readOwnerLock()?.sessionId ?? '' } = {}) {
+export function boundaryHandover({
+  sid = readOwnerLock()?.sessionId ?? '',
+  tasksText = readTasksOpen(TASKS_PATH),
+} = {}) {
   let claim = { honour: false, claimantSid: null }
   try {
     claim = gatherClaim(sid, { ownerLock: readOwnerLock() })
@@ -454,22 +501,94 @@ export function boundaryHandover({ sid = readOwnerLock()?.sessionId ?? '' } = {}
   // that is honoured AND for a released one still reserving the freed lock
   // (point 461), so the card must name the claiming window in both states or it
   // announces a fresh session the launcher will not start.
+  const destination = resolveBoundaryDestination({ assessment: claim })
   const where = boundaryDestination({
-    claimHonoured: reservationDecision({ assessment: claim }).acquire === false,
+    claimHonoured: destination.action === 'reserve',
     claimantSid: claim.claimantSid,
   })
-  // The card takes NO point number (point 439): it goes into the unnumbered gap
-  // card, where the topic guard reads every point reference as a foreign one.
-  return { ...where, card: boundaryCardText(where) }
+  // The CARD owns no point chip, but its prose names the first open point or the
+  // canonical fact that none remains: that is the publish gate's required
+  // handover destination. State-card titles are the topic guard's narrow
+  // exemption, so the forward reference is legal when one exists.
+  const nextPoint = parseTasks(tasksText).open[0] ?? null
+  const claimant = claimantCardIdentity(claim.claim)
+  const cardInput = { ...where, ...claimant, nextPoint }
+  return { ...cardInput, card: boundaryCardText(cardInput) }
+}
+
+/** Ask the shared launcher decision to start the successor now. The launcher is
+ * still the only spawner; this is merely an event transport into that door. */
+export function requestImmediateSuccessor({ generation, cause = 'boundary', run = execFileSync } = {}) {
+  if (!Number.isSafeInteger(generation) || generation < 0) {
+    return { requested: false, reason: 'handover-generation-unreadable' }
+  }
+  try {
+    run(
+      process.execPath,
+      [repoPath('scripts/batch-autostart.mjs'), '--immediate', '--cause', cause, '--generation', String(generation)],
+      {
+        cwd: repoPath('.'),
+        encoding: 'utf8',
+        windowsHide: true,
+        timeout: 180_000,
+        stdio: ['ignore', 'pipe', 'pipe'],
+      },
+    )
+    return { requested: true, reason: 'requested', generation }
+  } catch (error) {
+    return { requested: false, reason: 'request-failed', generation, error }
+  }
+}
+
+/** Mark this generation handed over, then synchronously place its immediate
+ * request before the boundary command returns. */
+export function handoverAndRequest({
+  sid,
+  point = null,
+  mark = markHandover,
+  readLock = readOwnerLock,
+  request = requestImmediateSuccessor,
+} = {}) {
+  const handed = mark(sid, { point })
+  if (!handed?.handed) return handed
+  const lock = readLock()
+  const generation = lock?.sessionId === sid && Number.isSafeInteger(lock?.fence) ? lock.fence : null
+  const successor = request({ generation, cause: 'boundary' })
+  if (!successor?.requested) {
+    return {
+      ...handed,
+      successor,
+      successorFailure: successor?.reason ?? 'unknown request failure',
+    }
+  }
+  return { ...handed, successor }
+}
+
+/** A failed eager request does not undo the durable handover. Tell the closing
+ * session which recovery path remains without turning the boundary into an
+ * error or inviting an impossible retry. */
+export function successorRequestFailureLine(result) {
+  if (result?.handed !== true || result?.successor?.requested !== false) return ''
+  const reason = result.successorFailure ?? result.successor.reason ?? 'unknown request failure'
+  return `the immediate successor request failed (${reason}); the 900-second watchdog remains armed`
 }
 
 /**
  * THE COMMIT'S WRITE ORDER, extracted so a test can prove it (Sol re-review of
  * cd6faaa, finding 4): the transfer is recorded FIRST and the marker LAST — a
  * throwing transfer leaves NO marker, because the marker is what authorises the
- * stop and nothing may follow it. `write` is injectable for exactly that proof.
+ * stop. The ownership handover follows the marker inside this same commit — it
+ * may no longer depend on `batch-progress-guard` being the first Stop guard to
+ * allow. Both writes are injectable for an ordered proof.
  */
-export function commitSealedBoundary({ transfer, marker, write = writeBoundary } = {}) {
+export function commitSealedBoundary({
+  transfer,
+  marker,
+  write = writeBoundary,
+  handover = null,
+  complete = null,
+  warn = console.log,
+} = {}) {
   let transferred = null
   if (transfer && typeof transfer.commit === 'function') {
     try {
@@ -488,6 +607,27 @@ export function commitSealedBoundary({ transfer, marker, write = writeBoundary }
     // half-taken. The caller says which half, honestly.
     throw Object.assign(new Error(String(cause?.message ?? cause)), { stage: 'marker', cause, transferred })
   }
+  if (typeof handover === 'function') {
+    const result = handover()
+    if (!result || result.handed !== true) {
+      const why = result?.reason === 'write-failed' ? String(result?.error?.message ?? result.error) : result?.reason
+      throw Object.assign(new Error(why || 'handover failed'), {
+        stage: 'handover',
+        transferred,
+        handover: result ?? null,
+      })
+    }
+  }
+  // THE EVIDENCE FOLLOWS THE HANDOVER. The marker and ownership transfer now
+  // stand, so a broken recorder may warn but may never turn a successful exit
+  // into a failed one.
+  if (typeof complete === 'function') {
+    try {
+      complete(marker)
+    } catch (error) {
+      warn(`\nWARNING: handover completion evidence failed (${error?.message ?? error}); the boundary stands.`)
+    }
+  }
   return transferred
 }
 
@@ -500,12 +640,24 @@ if (isMain) {
   const argv = process.argv.slice(2)
   const arg = argv[0]
   const sid = readOwnerLock()?.sessionId ?? ''
+  const ownerLock = readOwnerLock()
+  const durableBatchIndex = argv.indexOf('--batch')
+  const durableBatchId = durableBatchIndex >= 0 ? argv[durableBatchIndex + 1] : null
   const fail = (msg) => {
     console.error(msg)
     process.exit(1)
   }
 
-  if (arg === '--clear') {
+  if (durableBatchId && (arg === '--prepare' || arg === '--commit')) {
+    if (!sid || !Number.isInteger(ownerLock?.fence)) {
+      fail('a durable batch boundary requires the live batch-lock owner and its fence; nothing recorded')
+    }
+    const result = arg === '--prepare'
+      ? await prepareDurableBoundary({ repoDir: repoPath('.'), batchId: durableBatchId, sessionId: sid, fence: ownerLock.fence })
+      : await commitDurableBoundary({ repoDir: repoPath('.'), batchId: durableBatchId, sessionId: sid, fence: ownerLock.fence })
+    if (!result.ok) fail(`durable boundary ${arg.slice(2)} refused: ${result.reason ?? (result.refusals ?? []).join('; ')}`)
+    console.log(JSON.stringify(result, null, 2))
+  } else if (arg === '--clear') {
     // The prepare receipt goes with the marker: a withdrawn boundary is re-TAKEN
     // from the first phase, bookkeeping included, not committed on the strength
     // of an attempt the session deliberately abandoned.
@@ -604,6 +756,8 @@ if (isMain) {
       const card = boundaryCardText({
         destination: handover.destination,
         claimantSid: handover.claimantSid,
+        claimantPid: handover.claimantPid,
+        nextPoint: handover.nextPoint,
         cause: BOUNDARY_CAUSES.CONTEXT,
       })
       const cardBlock =
@@ -624,6 +778,15 @@ if (isMain) {
             board: standingCards({ cause: BOUNDARY_CAUSES.CONTEXT, destination: handover.destination }),
           }),
         )
+        noteHandoverAttributionPrepare({
+          sessionId: sid,
+          tokens: wm.tokens,
+          at: Date.now(),
+          cause: BOUNDARY_CAUSES.CONTEXT,
+          point: null,
+          transcript: wm.transcript ?? '',
+          destination: handover.destination,
+        })
         console.log(
           `PREPARED (nothing recorded yet): the context measures ${wm.tokens} tokens against the ` +
             `${wm.watermark} watermark, the launcher is armed` +
@@ -665,9 +828,27 @@ if (isMain) {
       // `commitSealedBoundary` pins the order, and a failed transfer refuses
       // before anything is recorded.
       let transferred = null
+      let handoverResult = null
       try {
         transferred = commitSealedBoundary({
           transfer,
+          handover: () => (handoverResult = handoverAndRequest({ sid, point: null })),
+          complete: (committedMarker) => {
+            recordHandoverBudgetCompletion({
+              sessionId: sid,
+              tokens: wm.tokens,
+              cause: BOUNDARY_CAUSES.CONTEXT,
+              point: null,
+              transcript: wm.transcript ?? '',
+            })
+            noteHandoverAttributionCommit({
+              sessionId: sid,
+              tokens: wm.tokens,
+              at: committedMarker.at,
+              transcript: wm.transcript ?? '',
+              destination: handover.destination,
+            })
+          },
           marker: {
             v: 2,
             phase: BOUNDARY_PHASES.COMMITTED,
@@ -688,14 +869,19 @@ if (isMain) {
             ? `the transfer stage succeeded${e.transferred ? ` (${e.transferred})` : ''} but the boundary MARKER ` +
                 `could not be written (${e?.message ?? e}) — the boundary is NOT taken. Retry this exact commit: ` +
                 'it is idempotent (an already-transferred declaration is not re-judged), and only the marker is missing.'
-            : `the in-flight declaration could not be marked transferred (${e?.message ?? e}) — nothing recorded. ` +
+            : e?.stage === 'handover'
+              ? `the boundary marker is COMMITTED, but the batch lock could not be marked handed-over ` +
+                `(${e?.message ?? e}) — the launcher still sees this session as the live owner. Retry this exact ` +
+                'commit; the transfer and marker writes are idempotent, and the retry finishes the handover.'
+              : `the in-flight declaration could not be marked transferred (${e?.message ?? e}) — nothing recorded. ` +
                 'Retry, or check `node scripts/batch-in-flight.mjs --status`.',
         )
       }
       console.log(
         `boundary COMMITTED at the context watermark (${wm.tokens} >= ${wm.watermark} tokens). This was the ` +
           'last repository action of this session — END IT NOW and SAY in your closing message that the ' +
-          'context watermark is why. ' +
+          'context watermark is why. The batch lock is HANDED OVER already; no later Stop guard can prevent ' +
+          'the launcher from seeing this boundary. ' +
           (handover.destination === BOUNDARY_DESTINATIONS.CLAIMING_WINDOW
             ? `The batch goes to claiming window ${handover.claimantSid}. `
             : `The launcher (${launcherRemedy().name}) starts the fresh session. `) +
@@ -705,11 +891,23 @@ if (isMain) {
               'with `node scripts/batch-in-flight.mjs --adopt`.'
             : ''),
       )
+      const successorFailureLine = successorRequestFailureLine(handoverResult)
+      if (successorFailureLine) console.log(successorFailureLine)
       // The distance is a NUMBER somebody reads, not a claim (point 700): a
-      // commit further past the mark than the stated margin owes the closing
-      // report a sentence.
-      const distance = contextDistanceNote({ tokens: wm.tokens, watermark: wm.watermark })
+      // commit further past the ceiling than the stated margin owes the
+      // closing report a sentence. Admission above used the trigger; overshoot
+      // deliberately measures the separate cost ceiling.
+      const distance = boundaryContextDistanceNote(wm.tokens)
       if (distance) console.log(`\n${distance}`)
+      // …and the number is KEPT (point 742), so the next reading does not start
+      // from zero. Evidence only: nothing is filed or ranked from it.
+      recordBoundaryOvershoot({
+        tokens: wm.tokens,
+        cause: BOUNDARY_CAUSES.CONTEXT,
+        sid,
+        point: null,
+        transcript: wm.transcript ?? '',
+      })
       process.exit(0)
     }
 
@@ -761,8 +959,9 @@ if (isMain) {
     const toWindow = handover.destination === BOUNDARY_DESTINATIONS.CLAIMING_WINDOW
     const cardBlock =
       'THE BOARD CARD (point 434 (7)) — it must name where the batch actually goes, so take this text ' +
-      'verbatim rather than writing it again. It names NO point number on purpose: it goes into the ' +
-      'unnumbered gap card, where the topic guard reads every point reference as a foreign one.\n\n' +
+      'verbatim rather than writing it again. It names the next open point, or says that none remains, on ' +
+      'purpose: the unnumbered gap card owes that destination to its reader, and the topic guard exempts ' +
+      'that state card by title.\n\n' +
       `${handover.card}\n\n` +
       // The command is CHOSEN from the board's real state (point 470), never
       // assumed: an instruction that does not work is what sent sessions to
@@ -793,6 +992,15 @@ if (isMain) {
           board: standingCards({ cause: BOUNDARY_CAUSES.POINT, destination: handover.destination }),
         }),
       )
+      noteHandoverAttributionPrepare({
+        sessionId: sid,
+        tokens: contextTokens,
+        at: Date.now(),
+        cause: BOUNDARY_CAUSES.POINT,
+        point,
+        transcript: wmPoint.transcript ?? '',
+        destination: handover.destination,
+      })
       console.log(
         (phaseFlag === null
           ? `NOTE: the one-shot form is retired (point 675) — this call ran --prepare ${point} instead, and ` +
@@ -844,9 +1052,27 @@ if (isMain) {
     // Transfer FIRST, marker LAST (Sol review of 807c2bf, finding 1) —
     // `commitSealedBoundary` pins the order.
     let transferred = null
+    let handoverResult = null
     try {
       transferred = commitSealedBoundary({
         transfer,
+        handover: () => (handoverResult = handoverAndRequest({ sid, point })),
+        complete: (committedMarker) => {
+          recordHandoverBudgetCompletion({
+            sessionId: sid,
+            tokens: contextTokens,
+            cause: BOUNDARY_CAUSES.POINT,
+            point,
+            transcript: wmPoint.transcript ?? '',
+          })
+          noteHandoverAttributionCommit({
+            sessionId: sid,
+            tokens: contextTokens,
+            at: committedMarker.at,
+            transcript: wmPoint.transcript ?? '',
+            destination: handover.destination,
+          })
+        },
         marker: {
           v: 2,
           phase: BOUNDARY_PHASES.COMMITTED,
@@ -867,7 +1093,11 @@ if (isMain) {
           ? `the transfer stage succeeded${e.transferred ? ` (${e.transferred})` : ''} but the boundary MARKER ` +
               `could not be written (${e?.message ?? e}) — the boundary is NOT taken. Retry this exact commit: ` +
               'it is idempotent (an already-transferred declaration is not re-judged), and only the marker is missing.'
-          : `the in-flight declaration could not be marked transferred (${e?.message ?? e}) — nothing recorded. ` +
+          : e?.stage === 'handover'
+            ? `the boundary marker is COMMITTED, but the batch lock could not be marked handed-over ` +
+              `(${e?.message ?? e}) — the launcher still sees this session as the live owner. Retry this exact ` +
+              'commit; the transfer and marker writes are idempotent, and the retry finishes the handover.'
+            : `the in-flight declaration could not be marked transferred (${e?.message ?? e}) — nothing recorded. ` +
               'Retry, or check `node scripts/batch-in-flight.mjs --status`.',
       )
     }
@@ -878,13 +1108,26 @@ if (isMain) {
 
     console.log(
       `boundary COMMITTED: point ${point} is landed and the launcher is armed. This was the last repository ` +
-        `action of this session — END IT NOW. ${destinationLine}Any further mutation is DENIED loudly ` +
+        `action of this session — END IT NOW. The batch lock is HANDED OVER already. ${destinationLine}` +
+        `Any further mutation is DENIED loudly ` +
         '(withdraw deliberately with `node scripts/batch-boundary.mjs --clear` if you truly must work again).' +
         transferLine,
     )
-    // Point 700: a boundary further past the mark than the stated margin — or
-    // one whose context could not be measured — owes the closing report a line.
-    const distance = contextDistanceNote({ tokens: contextTokens, watermark: wmPoint.watermark })
+    const successorFailureLine = successorRequestFailureLine(handoverResult)
+    if (successorFailureLine) console.log(successorFailureLine)
+    // Point 700: a boundary further past the ceiling than the stated margin —
+    // or one whose context could not be measured — owes the closing report a
+    // line. The trigger in wmPoint is for admission, not this overshoot record.
+    const distance = boundaryContextDistanceNote(contextTokens)
     if (distance) console.log(`\n${distance}`)
+    // A POINT boundary overshoots too (the 311,039-token handover of 19.08.2026
+    // was one), so it records on the same condition — point 742.
+    recordBoundaryOvershoot({
+      tokens: contextTokens,
+      cause: BOUNDARY_CAUSES.POINT,
+      sid,
+      point,
+      transcript: wmPoint.transcript ?? '',
+    })
   }
 }

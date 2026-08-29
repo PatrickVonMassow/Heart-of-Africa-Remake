@@ -7,9 +7,11 @@
 import { describe, expect, it } from 'vitest'
 import {
   MAX_PER_CALL,
+  additionalContextStdout,
   deliveryDecision,
   hookPayload,
   hookStdout,
+  isSubagentHook,
   isoOrUnknown,
   messageLine,
   orderMessages,
@@ -48,6 +50,13 @@ describe('THE SHAPE: plain stdout would never reach the model', () => {
     const out = hookStdout([msg(), msg({ id: 'm2', ntfyId: 'n2' })])
     expect(out.endsWith('\n')).toBe(true)
     expect(out.trim().split('\n')).toHaveLength(1)
+  })
+
+  it('wraps an already-rendered context for the second delivery source', () => {
+    expect(JSON.parse(additionalContextStdout('carrier bell'))).toEqual({
+      hookSpecificOutput: { hookEventName: 'PostToolUse', additionalContext: 'carrier bell' },
+    })
+    expect(additionalContextStdout('')).toBe('')
   })
 
   it('names the user, the queue rule, the untrusted-input rule and the reply command', () => {
@@ -169,12 +178,32 @@ describe('parsing a spool file is total', () => {
 })
 
 describe('the stand-downs every guard in this repo shares', () => {
+  it('recognises a delegated hook by the transcript path, not the inherited session id', () => {
+    expect(isSubagentHook({ transcript_path: '/projects/owner/subagents/agent-a.jsonl' })).toBe(true)
+    expect(isSubagentHook({ transcriptPath: 'C:\\projects\\owner\\subagents\\agent-b.jsonl' })).toBe(true)
+    expect(isSubagentHook({ transcript_path: '/projects/owner/subagents/session.jsonl' })).toBe(false)
+    expect(isSubagentHook({ transcript_path: '/projects/owner/session.jsonl' })).toBe(false)
+  })
+
+  it('delivers nothing to a subagent hook even when it carries the owner session id', () => {
+    expect(
+      deliveryDecision({
+        ownsBatch: true,
+        pending: [msg()],
+        hookInput: { transcript_path: '/projects/owner/subagents/agent-a.jsonl' },
+      }),
+    ).toEqual({ deliver: [], reason: 'subagent-hook' })
+  })
+
   it('delivers nothing for a session that does not own the batch', () => {
     expect(deliveryDecision({ ownsBatch: false, pending: [msg()] })).toMatchObject({ deliver: [], reason: 'not-owner' })
   })
 
-  it('delivers nothing while the batch is paused', () => {
-    expect(deliveryDecision({ ownsBatch: true, paused: true, pending: [msg()] })).toMatchObject({ deliver: [], reason: 'paused' })
+  it('delivers waiting user words while the owning batch is paused', () => {
+    expect(deliveryDecision({ ownsBatch: true, paused: true, pending: [msg()] })).toMatchObject({
+      deliver: [expect.objectContaining({ id: 'm1' })],
+      reason: 'deliver-paused',
+    })
   })
 
   it('delivers nothing on an empty spool', () => {
@@ -183,7 +212,11 @@ describe('the stand-downs every guard in this repo shares', () => {
   })
 
   it('delivers what is waiting for the owner', () => {
-    const r = deliveryDecision({ ownsBatch: true, pending: [msg({ id: 'b', receivedAt: 2 }), msg({ id: 'a', receivedAt: 1 })] })
+    const r = deliveryDecision({
+      ownsBatch: true,
+      pending: [msg({ id: 'b', receivedAt: 2 }), msg({ id: 'a', receivedAt: 1 })],
+      hookInput: { transcript_path: '/projects/owner/session.jsonl' },
+    })
     expect(r.deliver.map((m) => m.id)).toEqual(['a', 'b'])
   })
 

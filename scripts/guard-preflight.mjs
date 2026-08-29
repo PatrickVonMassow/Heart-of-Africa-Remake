@@ -4,6 +4,7 @@
 //   node scripts/guard-preflight.mjs                 # the whole Stop chain
 //   node scripts/guard-preflight.mjs --for answer    # …before composing the closing reply
 //   node scripts/guard-preflight.mjs --for merge     # merge / tick / commit / tag
+//   node scripts/guard-preflight.mjs --for commission --point 707 # before opening point work
 //   node scripts/guard-preflight.mjs --session <id>  # whose session is asking
 //   node scripts/guard-preflight.mjs --json          # machine-readable
 //
@@ -49,6 +50,8 @@ import { gatherTasksSpecInputs } from './tasks-spec-guard.mjs'
 import { gatherTasksArchiveInputs } from './tasks-archive-guard.mjs'
 import { gatherQueueOrderInputs } from './queue-order-guard.mjs'
 import { gatherDocBudgetInputs } from './doc-budget-guard.mjs'
+import { gatherBundleFirstInputs } from './bundle-first-guard.mjs'
+import { evaluate as evaluateBundleFirst } from './bundle-first-core.mjs'
 import { gatherModelGuardInputs } from './model-guard.mjs'
 import { gatherRenderVerifyInputs } from './render-verify-guard.mjs'
 import { gatherMechanismReviewInputs } from './mechanism-review-guard.mjs'
@@ -81,14 +84,19 @@ import { RULE_REGISTRY, checkAll, formatVerdict, unregisteredStamps } from './ru
 import { auditGuardHealth, formatGuardHealth } from './guard-health-core.mjs'
 import { gatherDashboardSyncInputs } from './dashboard-sync.mjs'
 import { evaluate as dashboardSyncEvaluate } from './dashboard-sync-core.mjs'
+import { gatherCiStatusInputs } from './ci-status-guard.mjs'
+import { timestampReplyCondition } from './timestamp-guard-core.mjs'
+import { gatherDecisionCardCondition } from './decision-card-guard.mjs'
+import { gatherClearClaimCondition } from './clear-claim-guard.mjs'
+import { decideBatchProgress, gatherBatchProgressInputs } from './batch-progress-guard.mjs'
+import { commissionVerdict, gatherCommissionInputs } from './commission-guard.mjs'
 
 import { readFileSync } from 'node:fs'
 import {
   ACTIONS,
-  CAUSE,
   formatPreflightReport,
   isKnownAction,
-  runPreflight,
+  runPreflightAsync,
   selectGuards,
   unregisteredStopHooks,
   wiredStopHookIds,
@@ -96,21 +104,6 @@ import {
 import { isMainModule } from './is-main.mjs'
 import { readOwnerLock } from './batch-singleton.mjs'
 import { repoPath } from './repo-paths.mjs'
-
-/**
- * A guard that IS wired and that this read-only report cannot judge, registered
- * so it is named rather than silently absent (point 437 E).
- *
- * The gather is a constant on purpose: there is nothing to gather, and importing
- * the wrapper to say so would run its hook body. The report renders these as
- * `not-judged`, never as clean, and the summary refuses to call the chain clear
- * while one of them is in it.
- */
-const notJudged = (id, why) => ({
-  id,
-  gather: () => ({ applicable: false, cause: CAUSE.notJudged, why }),
-  decide: () => ({ block: false }),
-})
 
 /**
  * Whose session is asking. Four of the guards stand down for a session that does
@@ -150,23 +143,44 @@ export function resolveSessionId(args = [], env = process.env, readLock = readOw
  */
 export const GUARDS = [
   {
+    id: 'commission-guard',
+    turnEnd: false,
+    gather: ({ sessionId, point } = {}) => gatherCommissionInputs({ sessionId, point }),
+    decide: (inputs) => {
+      const verdict = commissionVerdict(inputs)
+      const override = verdict.queue?.override
+      return {
+        block: verdict.block,
+        reason: verdict.block
+          ? verdict.reason +
+            (override
+              ? `\n\nQueue override recorded for point ${verdict.queue.point}: ${override}`
+              : '')
+          : override
+            ? `commission allowed with recorded override for point ${verdict.queue.point}: ${override}`
+            : `commission allowed (queue: ${verdict.queue?.why ?? 'unknown'}, slots: ${verdict.slots?.why ?? 'unknown'})`,
+      }
+    },
+  },
+  {
     id: 'model-guard',
     // arm:false — a read-only preflight must not arm a baseline the guard has
     // not armed itself, which would hide exactly the commits it looks for.
     gather: ({ sessionId } = {}) => gatherModelGuardInputs({ sessionId, arm: false }),
     // Both halves of the split (point 397), so the preflight predicts which of
     // the two blocks the session would meet — they have different remedies.
-    decide: ({ log, baselineMs, backupRefs }) => {
-      const forbidden = findForbiddenCommits(log, baselineMs)
-      const unidentified = findUnidentifiedCommits(log, baselineMs)
+    decide: ({ log, baselineMs, backupRefs, fableState }) => {
+      if (!fableState?.ok) return { block: true, reason: `SERVING-MODEL TRIPWIRE: ${fableState?.problem}` }
+      const forbidden = findForbiddenCommits(log, baselineMs, fableState)
+      const unidentified = findUnidentifiedCommits(log, baselineMs, fableState)
       if (forbidden.length) {
         return {
           block: true,
-          reason: formatForbiddenReason(forbidden, { backupRefs, alsoUnidentified: unidentified }),
+          reason: formatForbiddenReason(forbidden, { backupRefs, alsoUnidentified: unidentified, fableState }),
         }
       }
       if (unidentified.length) {
-        return { block: true, reason: formatUnidentifiedReason(unidentified, { backupRefs }) }
+        return { block: true, reason: formatUnidentifiedReason(unidentified, { backupRefs, fableState }) }
       }
       return { block: false }
     },
@@ -186,7 +200,12 @@ export const GUARDS = [
     gather: gatherMechanismReviewInputs,
     decide: (inputs) => {
       const verdict = evaluateMechanismReview(inputs)
-      return { block: verdict.block, reason: formatMechanismReviewVerdict(verdict) }
+      return {
+        block: verdict.block,
+        reason: verdict.deferred
+          ? verdict.reason
+          : formatMechanismReviewVerdict(verdict, { authorshipPlan: inputs.authorshipPlan }),
+      }
     },
   },
   {
@@ -221,6 +240,14 @@ export const GUARDS = [
     decide: ({ docs }) => {
       const verdict = evaluateDocBudgets(docs)
       return { block: verdict.block, reason: formatDocBudgetVerdict(verdict) }
+    },
+  },
+  {
+    id: 'bundle-first-guard',
+    gather: gatherBundleFirstInputs,
+    decide: (inputs) => {
+      const verdict = evaluateBundleFirst(inputs)
+      return { block: verdict.block, reason: verdict.reason }
     },
   },
   {
@@ -297,7 +324,7 @@ export const GUARDS = [
     gather: gatherRuleReviewInputs,
     decide: (inputs) => {
       const verdict = evaluateRuleReview(inputs)
-      return { block: Boolean(verdict), reason: verdict ? verdict.reason : '' }
+      return { block: verdict?.decision === 'block', reason: verdict ? verdict.reason : '' }
     },
   },
   {
@@ -335,27 +362,31 @@ export const GUARDS = [
     decide: dashboardSyncEvaluate,
   },
 
-  // ── Wired, and honestly NOT judged here ───────────────────────────────────
-  notJudged(
-    'ci-status-guard',
-    'its verdict comes from the GitHub API — a network round trip this read-only report does not make. ' +
-      'Ask it directly if a push just landed.',
-  ),
-  notJudged(
-    'timestamp-guard',
-    'it judges the reply being composed, which does not exist while a preflight runs. Begin the reply ' +
-      'with the current bold Berlin timestamp and it passes.',
-  ),
-  notJudged(
-    'decision-card-guard',
-    'it judges the reply being composed against the board — and at preflight time the transcript still ' +
-      'holds the PREVIOUS turn, so any verdict here would be about the wrong text.',
-  ),
-  notJudged(
-    'batch-progress-guard',
-    'evaluating it ACQUIRES and can hand over the batch lock, which a read-only report must not do. ' +
-      'Drive it with node scripts/batch-boundary.mjs --status.',
-  ),
+  {
+    id: 'ci-status-guard',
+    gather: ({ sessionId } = {}) => gatherCiStatusInputs({ sessionId, readOnly: true }),
+    decide: ({ decision }) => ({ block: Boolean(decision), reason: decision ?? '' }),
+  },
+  {
+    id: 'timestamp-guard',
+    gather: () => ({ applicable: true, condition: true, why: timestampReplyCondition() }),
+    decide: () => ({ block: false }),
+  },
+  {
+    id: 'decision-card-guard',
+    gather: gatherDecisionCardCondition,
+    decide: () => ({ block: false }),
+  },
+  {
+    id: 'clear-claim-guard',
+    gather: gatherClearClaimCondition,
+    decide: () => ({ block: false }),
+  },
+  {
+    id: 'batch-progress-guard',
+    gather: gatherBatchProgressInputs,
+    decide: decideBatchProgress,
+  },
 ]
 
 /**
@@ -379,7 +410,9 @@ if (isMainModule(import.meta.url)) {
 
   const guards = selectGuards(GUARDS, action)
   const { sessionId, source, sessionKnown } = resolveSessionId(args)
-  const results = runPreflight(guards, { sessionId, sessionKnown })
+  const pointIdx = args.findIndex((a) => a === '--point')
+  const point = pointIdx >= 0 ? Number(args[pointIdx + 1]) || null : null
+  const results = await runPreflightAsync(guards, { sessionId, sessionKnown, point })
   // Only the WHOLE-CHAIN actions can report drift: a narrowed `--for merge` was
   // never claiming to cover the chain, so listing the rest there would be noise.
   const unregistered = ACTIONS[action] ? [] : unregisteredHooks(GUARDS)

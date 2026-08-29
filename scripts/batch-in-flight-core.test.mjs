@@ -12,12 +12,13 @@
 //   · with none declared, the guard behaves exactly as it did before;
 //   · and nothing here may touch the repository's .claude/ (finding 3).
 import { describe, it, expect } from 'vitest'
-import { existsSync, mkdtempSync, mkdirSync, readFileSync, rmSync, statSync, utimesSync, writeFileSync } from 'node:fs'
-import { execFileSync } from 'node:child_process'
+import { cpSync, existsSync, mkdtempSync, mkdirSync, readFileSync, rmSync, statSync, utimesSync, writeFileSync } from 'node:fs'
+import { execFileSync, spawnSync } from 'node:child_process'
 import { tmpdir } from 'node:os'
 import { basename, join, resolve } from 'node:path'
 import { REPO_ROOT } from './repo-paths.mjs'
 import {
+  assessCiWait,
   IN_FLIGHT_MAX_AGE_MS,
   LAUNCHER_WORK_MAX_AGE_MS,
   LOG_FRESH_MS,
@@ -25,15 +26,20 @@ import {
   RESPAWN_GRACE_MS,
   WORK_FRESH_MS,
   agentOutputVerdict,
+  declaredAgentProbe,
   assessInFlight,
   assessOwnerWork,
   checkEvidence,
   combineWorktreeStamps,
   porcelainPaths,
+  registeredFeatureWorktrees,
+  writerGitMetadataAt,
   worktreeStamp,
   describeInFlight,
   evidenceVerdict,
   respawnDecision,
+  standDownBoundaryDecision,
+  successorAgentOrientation,
   selfReferentialEvidence,
   slotReasonDecision,
   declaredAgentCount,
@@ -51,6 +57,22 @@ import {
   markTransferred,
   transferBlockMessage,
   POOL_CAP,
+  COMMISSION_RECORD_PATH,
+  pointOfBranch,
+  normalizeActiveWork,
+  unattributableEvidenceAlerts,
+  describeBranchAge,
+  parseCommissionRecord,
+  commissionOverrideFor,
+  recordCommissionOverride,
+  recordParkedBranch,
+  clearParkedBranch,
+  commissionRecordReport,
+  openBranchSlots,
+  branchSlotDecision,
+  branchSlotRefusal,
+  commissionTarget,
+  normaliseTip,
 } from './batch-in-flight-core.mjs'
 import {
   assessOwner,
@@ -64,12 +86,21 @@ import {
 import { LEASE_MS } from './batch-lease-core.mjs'
 import {
   absPath,
+  agentCheckDeclaration,
   adoptTransferred,
+  checkAgentOutput,
+  checkDeclaredAgentOutput,
   commandNamesRun,
+  declaredAgentCheckCommand,
   gatherHandoverTransfer,
+  gatherStandDownBoundary,
+  gatherSuccessorAgentOrientation,
   processCommandOf,
   runRecordFor,
   gatherInFlight,
+  gatherSlots,
+  openFeatBranches,
+  registeredFeatureWriters,
   maxAgeMs,
   readDeclaration,
   resolveRefName,
@@ -82,6 +113,7 @@ import {
   worktreeActiveAt,
   worktreeFilesActiveAt,
   runningBranchFiles,
+  tagEvidencePoint,
 } from './batch-in-flight.mjs'
 import { selfCommandLine } from './verify/run-record.mjs'
 
@@ -120,15 +152,188 @@ const declaration = (over = {}) => ({
 const assess = (over = {}, probeOver = {}) =>
   assessInFlight({ declaration: declaration(over), sid: SID, now: NOW, ...probes(probeOver) })
 
+describe('normalizeActiveWork — the board\'s structured point source', () => {
+  const openPoints = new Set([697, 700, 711])
+
+  it('combines the focused point with tagged strands and deduplicates repeated evidence', () => {
+    const result = normalizeActiveWork({
+      focusPoint: 700,
+      openPoints,
+      declaration: {
+        evidence: [
+          { kind: 'branch', point: 697, phase: 'authoring' },
+          { kind: 'worktree', point: 697, phase: 'counter-read' },
+          { kind: 'pid', point: 711, phase: 'verification' },
+        ],
+      },
+    })
+    expect(result).toMatchObject({ ok: true, points: [700, 697, 711], focusPoint: 700 })
+  })
+
+  it('keeps transfer and landing continuity active but excludes explicit exit phases', () => {
+    const result = normalizeActiveWork({
+      openPoints,
+      declaration: {
+        evidence: [
+          { point: 697, phase: 'transferred' },
+          { point: 700, phase: 'ready-to-land' },
+          { point: 711, phase: 'returned' },
+        ],
+      },
+    })
+    expect(result).toMatchObject({ ok: true, points: [697, 700] })
+  })
+
+  it('does not promote undeclared feat branches into active work', () => {
+    expect(normalizeActiveWork({ openPoints, declaration: null, focusPoint: null, openBranches: [
+      'feat/697-a', 'feat/700-b', 'feat/711-c', 'feat/1', 'feat/2', 'feat/3', 'feat/4', 'feat/5', 'feat/6',
+    ] })).toMatchObject({ ok: true, points: [] })
+  })
+
+  it('derives legacy branch and worktree strands without consulting undeclared branches', () => {
+    const result = normalizeActiveWork({
+      focusPoint: 713,
+      openPoints: new Set([713]),
+      declaration: {
+        evidence: [
+          { kind: 'branch', ref: 'refs/heads/feat/713-now-section-derived' },
+          { kind: 'worktree', path: '/workspace/hoa/.claude/worktrees/point-713' },
+        ],
+      },
+      worktreeRef: (path) => path.endsWith('/point-713') ? 'refs/heads/feat/713-now-section-derived' : null,
+    })
+    expect(result).toMatchObject({ ok: true, points: [713], focusPoint: 713, errors: [] })
+  })
+
+  it('stamps branch/worktree evidence from its own strand and pid/log evidence from the declared focus', () => {
+    expect(tagEvidencePoint({ kind: 'branch', ref: 'feat/697-a' }, { currentPoint: 700 })).toMatchObject({
+      point: 697,
+      phase: 'authoring',
+    })
+    expect(tagEvidencePoint({ kind: 'worktree', path: '/w/711' }, {
+      currentPoint: 700,
+      worktreeRef: 'refs/heads/feat/711-c',
+    })).toMatchObject({ point: 711 })
+    expect(tagEvidencePoint({ kind: 'log', path: '/w/run.log' }, { currentPoint: 700, phase: 'verification' }))
+      .toMatchObject({ point: 700, phase: 'verification' })
+  })
+
+  // Sixth cross-vendor round: the branch name used to outvote an EXPLICIT
+  // --point, so `--point 713 --branch feat/999-work` recorded 999 while the
+  // CLI's own message told the caller to declare the point first.
+  it('lets a DECLARED point win over the branch name and refuses the contradiction', () => {
+    // A name that derives nothing takes the declared point rather than none.
+    expect(
+      tagEvidencePoint({ kind: 'branch', ref: 'refs/heads/topic/live' }, { currentPoint: 713, declared: true }),
+    ).toMatchObject({ point: 713 })
+    // A name that derives a DIFFERENT point is the contradiction, and it is
+    // refused rather than silently recorded either way round.
+    expect(() =>
+      tagEvidencePoint({ kind: 'branch', ref: 'refs/heads/feat/999-work' }, { currentPoint: 713, declared: true }),
+    ).toThrow(/declared point 713 .* names point 999 .* disagree/)
+    // The same pair WITHOUT a declaration is the multi-strand case, not a
+    // contradiction: the focus names this session, the branch names its strand.
+    expect(
+      tagEvidencePoint({ kind: 'branch', ref: 'refs/heads/feat/697-a' }, { currentPoint: 713 }),
+    ).toMatchObject({ point: 697 })
+    // A declared point also stamps evidence whose name says nothing.
+    expect(
+      tagEvidencePoint({ kind: 'log', path: '/w/run.log' }, { currentPoint: 713, declared: true, phase: 'verification' }),
+    ).toMatchObject({ point: 713, phase: 'verification' })
+  })
+
+  it.each([
+    ['unreadable source', { readable: false }],
+    ['untagged evidence with no derivable point', { declaration: { evidence: [{ kind: 'branch', ref: 'main', point: null }] } }],
+    ['malformed point', { declaration: { evidence: [{ point: 'x' }] } }],
+    ['closed point', { declaration: { evidence: [{ point: 699 }] } }],
+    ['unknown phase', { declaration: { evidence: [{ point: 697, phase: 'maybe' }] } }],
+    ['contradicted checkpoint', { checkpointContradicted: true }],
+  ])('returns unknown rather than an empty active set for %s', (_label, over) => {
+    const result = normalizeActiveWork({ openPoints, ...over })
+    expect(result.ok).toBe(false)
+    expect(result.points).toEqual([])
+    expect(result.errors.length).toBeGreaterThan(0)
+  })
+
+  it('an EMPTY open-point set is a verified "nothing is open", never a free pass', () => {
+    // Sixth cross-review: the old `open.size > 0` guard skipped the membership
+    // check entirely when nothing was open, so any declared strand sailed
+    // through on the fail-closed publish side.
+    const declared = { declaration: { evidence: [{ point: 697 }] } }
+    const result = normalizeActiveWork({ openPoints: new Set(), ...declared })
+    expect(result).toMatchObject({ ok: false, points: [] })
+    expect(result.errors.join(' ')).toContain('not open')
+    // …and a numbered focus against the empty set refuses the same way.
+    expect(normalizeActiveWork({ openPoints: [], focusPoint: 700 }).ok).toBe(false)
+    // The genuinely idle record stays a valid zero.
+    expect(normalizeActiveWork({ openPoints: new Set(), declaration: null, focusPoint: null }))
+      .toMatchObject({ ok: true, points: [] })
+  })
+})
+
+describe('unattributableEvidenceAlerts — an adoption never succeeds silently into an empty board', () => {
+  it('names every kept item that stays point-less after the migration, with the human way out', () => {
+    const alerts = unattributableEvidenceAlerts(
+      [
+        { kind: 'branch', ref: 'feat/700-x', point: 700 },
+        { kind: 'pid', pid: 77 },
+        { kind: 'log', path: '/l' },
+        { kind: 'worktree', path: '/w/point-713' },
+      ],
+      { worktreeRef: (p) => (p === '/w/point-713' ? 'refs/heads/feat/713-x' : null) },
+    )
+    expect(alerts).toHaveLength(2)
+    expect(alerts[0]).toContain('pid 77')
+    expect(alerts[1]).toContain('log /l')
+    for (const alert of alerts) expect(alert).toContain('batch-in-flight.mjs --clear')
+  })
+
+  it('stays silent when every item is attributed, and never throws on junk', () => {
+    expect(unattributableEvidenceAlerts([{ kind: 'branch', ref: 'feat/700-x', point: 700 }])).toEqual([])
+    // Point-carrying pid/log evidence is attributed by the SAME field (seventh
+    // cross-review): an implementation that complained about pid/log by KIND,
+    // regardless of the recorded point, would block every valid adoption.
+    expect(unattributableEvidenceAlerts([
+      { kind: 'pid', pid: 77, point: 700 },
+      { kind: 'log', path: '/l', point: 697 },
+    ])).toEqual([])
+    expect(unattributableEvidenceAlerts()).toEqual([])
+    expect(unattributableEvidenceAlerts([null, 'x'])).toEqual([])
+  })
+
+  it('skips a point-less TERMINAL item, exactly as the read side does', () => {
+    // Seventh cross-review: `normalizeActiveWork` returns on a terminal phase
+    // BEFORE resolving the point, so this item never refuses the record — an
+    // alert here falsely claimed a refusal and recommended the whole clear.
+    expect(unattributableEvidenceAlerts([{ kind: 'log', path: '/l', phase: 'landed' }])).toEqual([])
+    // The declaration-level phase is the same fallback the read side applies…
+    expect(unattributableEvidenceAlerts([{ kind: 'pid', pid: 77 }], { declarationPhase: 'completed' })).toEqual([])
+    // …and an item's own phase wins over it, in both directions.
+    expect(
+      unattributableEvidenceAlerts([{ kind: 'pid', pid: 77, phase: 'verification' }], { declarationPhase: 'landed' }),
+    ).toHaveLength(1)
+    expect(
+      unattributableEvidenceAlerts([{ kind: 'pid', pid: 77, phase: 'returned' }], { declarationPhase: 'authoring' }),
+    ).toEqual([])
+    // A point-less ACTIVE item still alerts — that one the read side refuses.
+    expect(unattributableEvidenceAlerts([{ kind: 'log', path: '/l', phase: 'authoring' }])).toHaveLength(1)
+  })
+})
+
 // ---------------------------------------------------------------------------
 describe('checkEvidence — every kind is answered by a probe, never by the claim', () => {
   const pidItem = (over = {}) => ({ kind: 'pid', pid: 77, startedAt: RUN_STARTED, ...over })
 
   it('a pid counts only while the process is really alive', () => {
-    expect(checkEvidence(pidItem(), { now: NOW, probePid: () => alive() }).ok).toBe(true)
+    expect(checkEvidence(pidItem(), { now: NOW, probePid: () => alive() })).toMatchObject({
+      ok: true,
+      progressAt: NOW,
+    })
     expect(checkEvidence(pidItem(), { now: NOW, probePid: () => dead() })).toMatchObject({
       ok: false,
       detail: 'process-gone',
+      progressAt: null,
     })
   })
 
@@ -278,6 +483,22 @@ describe('the worktree stamp reads BOTH sources and says which one answered', ()
     expect(combineWorktreeStamps()).toBe(null)
   })
 
+  it('only writer-moved stamps can carry the pure alive verdict', () => {
+    // A reader can refresh both of these with `git status`; neither is output.
+    const readerOnly = writerGitMetadataAt({ gitdirAt: NOW, indexAt: NOW })
+    expect(readerOnly).toBe(null)
+    expect(agentOutputVerdict({ worktreeAt: combineWorktreeStamps({ gitAt: readerOnly }), now: NOW }))
+      .toMatchObject({ verdict: 'unmeasurable', judgedOn: 'none' })
+
+    const commitEditAt = writerGitMetadataAt({ commitEditAt: NOW - 1000 })
+    expect(agentOutputVerdict({ worktreeAt: combineWorktreeStamps({ gitAt: commitEditAt }), now: NOW }))
+      .toMatchObject({ verdict: 'alive', judgedOn: 'git' })
+    expect(agentOutputVerdict({ branchTipAt: NOW - 1000, now: NOW }))
+      .toMatchObject({ verdict: 'alive', judgedOn: 'git' })
+    expect(agentOutputVerdict({ worktreeAt: combineWorktreeStamps({ filesAt: NOW - 1000 }), now: NOW }))
+      .toMatchObject({ verdict: 'alive', judgedOn: 'git' })
+  })
+
   it('worktreeStamp accepts both shapes and refuses everything else', () => {
     expect(worktreeStamp(12)).toEqual({ at: 12, source: null })
     expect(worktreeStamp({ at: 12, source: 'working files' })).toEqual({ at: 12, source: 'working files' })
@@ -331,6 +552,58 @@ describe('the worktree stamp reads BOTH sources and says which one answered', ()
     // verbatim — trimming it would make its stat miss (four-eyes review, finding 6).
     expect(porcelainPaths(rec('?? odd name .ts', '?? tab\tname.ts'))).toEqual(['odd name .ts', 'tab\tname.ts'])
     for (const junk of ['', null, undefined, '\0\0', 'XY']) expect(porcelainPaths(junk), String(junk)).toEqual([])
+  })
+})
+
+describe('the launcher-facing feature worktree register', () => {
+  const porcelain = [
+    'worktree /repo',
+    'HEAD aaaaa',
+    'branch refs/heads/main',
+    '',
+    'worktree /repo/.claude/worktrees/point-515',
+    'HEAD bbbbb',
+    'branch refs/heads/feat/515-detector',
+    '',
+    'worktree /repo/.claude/worktrees/detached',
+    'HEAD ccccc',
+    'detached',
+    '',
+  ].join('\n')
+
+  it('reads only registered feature checkouts from porcelain', () => {
+    expect(registeredFeatureWorktrees(porcelain)).toEqual([
+      { path: '/repo/.claude/worktrees/point-515', branch: 'feat/515-detector' },
+    ])
+  })
+
+  it('asks the same agent-check evidence and recognises a declared transfer', () => {
+    const declaration = {
+      evidence: [{ kind: 'branch', ref: 'feat/515-detector' }],
+    }
+    const result = registeredFeatureWriters({
+      now: NOW,
+      declaration,
+      exec: () => porcelain,
+      openProbe: () => ({ readable: true, branches: [{ ref: 'feat/515-detector' }] }),
+      check: ({ branch, worktree, now }) => ({
+        output: agentOutputVerdict({ branchTipAt: now - 1_000, now }),
+        reason: 'agent-alive',
+        detail: `${branch} moving in ${worktree}`,
+      }),
+    })
+    expect(result).toMatchObject({
+      readable: true,
+      writers: [{ branch: 'feat/515-detector', recognized: true, output: { verdict: 'alive' } }],
+    })
+  })
+
+  it('refuses to invent an empty register when Git cannot enumerate worktrees', () => {
+    expect(registeredFeatureWriters({ exec: () => { throw new Error('broken') } })).toEqual({
+      readable: false,
+      writers: [],
+      reason: 'git-worktree-register-unreadable',
+    })
   })
 })
 
@@ -444,6 +717,22 @@ describe('worktreeActiveAt against a REAL checkout (its own temp repo, never thi
       const item = checkEvidence({ kind: 'worktree', path: dir }, { now: Date.now(), worktreeActiveAt })
       expect(item.ok).toBe(false)
       expect(item.detail).toContain('newest: git metadata')
+    } finally {
+      rmSync(dir, { recursive: true, force: true })
+    }
+  })
+
+  it('a fresh COMMIT_EDITMSG remains writer evidence', () => {
+    const dir = mkdtempSync(join(tmpdir(), 'hoa-wt-commit-edit-'))
+    try {
+      seedRepo(dir)
+      backdate(dir, 40 * 60 * 1000)
+      const now = new Date()
+      utimesSync(join(dir, '.git', 'COMMIT_EDITMSG'), now, now)
+
+      const stamp = worktreeActiveAt(dir)
+      expect(stamp.source).toBe('git metadata')
+      expect(checkEvidence({ kind: 'worktree', path: dir }, { now: Date.now(), worktreeActiveAt }).ok).toBe(true)
     } finally {
       rmSync(dir, { recursive: true, force: true })
     }
@@ -839,6 +1128,395 @@ describe('agentOutputVerdict / respawnDecision — an agent is judged by what it
 })
 
 // ---------------------------------------------------------------------------
+// POINT 716: losing the lock is a boundary for the owner's children, and the
+// successor may not turn an owner-process verdict into an agent verdict.
+describe('the stand-down boundary — declared children cross ownership', () => {
+  const agent = declaration({
+    evidence: [
+      { kind: 'worktree', path: '/repo/.claude/worktrees/point-716' },
+      { kind: 'branch', ref: 'feat/716-standdown-boundary' },
+      { kind: 'log', path: '/tmp/agent.log' },
+    ],
+  })
+  const working = respawnDecision({ output: agentOutputVerdict({ worktreeAt: NOW - 60_000, now: NOW }) })
+  const unknown = respawnDecision({ output: agentOutputVerdict({ now: NOW }) })
+
+  it('extracts every output address for one combined --agent-check', () => {
+    expect(declaredAgentProbe(agent)).toEqual({
+      agent: true,
+      worktrees: ['/repo/.claude/worktrees/point-716'],
+      branches: ['feat/716-standdown-boundary'],
+      logs: ['/tmp/agent.log'],
+      pids: [],
+    })
+    expect(declaredAgentProbe(declaration({ evidence: [{ kind: 'pid', pid: 7 }] }))).toMatchObject({
+      agent: false,
+      pids: [{ kind: 'pid', pid: 7 }],
+    })
+  })
+
+  it('asks every declared path in one --agent-check verdict', () => {
+    const command = declaredAgentCheckCommand(agent)
+    expect(command).toContain('--worktree "/repo/.claude/worktrees/point-716"')
+    expect(command).toContain('--branch "feat/716-standdown-boundary"')
+    expect(command).toContain('--log "/tmp/agent.log"')
+    const checked = checkDeclaredAgentOutput(agent, {
+      now: NOW,
+      worktreeProbe: () => null,
+      branchProbe: () => NOW - 60_000,
+      logProbe: () => null,
+    })
+    expect(checked).toMatchObject({ checked: true, respawn: false, reason: 'agent-alive' })
+    // The newest of several children decides; one quiet branch can never permit
+    // replacement while another declared worktree is moving.
+    expect(
+      checkAgentOutput({
+        worktree: ['/quiet', '/moving'],
+        branch: ['quiet-branch'],
+        now: NOW,
+        worktreeProbe: (path) => (path === '/moving' ? NOW - 1000 : NOW - 90 * 60_000),
+        branchProbe: () => NOW - 90 * 60_000,
+      }),
+    ).toMatchObject({ respawn: false, reason: 'agent-alive' })
+  })
+
+  it('a gone declared pid refutes a branch tip left one minute ago', () => {
+    const recorded = declaration({
+      evidence: [
+        { kind: 'branch', ref: 'feat/874-author', label: 'author output' },
+        { kind: 'pid', pid: RUN_PID, startedAt: RUN_STARTED, label: 'author process' },
+      ],
+    })
+    const checked = checkDeclaredAgentOutput(recorded, {
+      now: NOW,
+      branchProbe: () => NOW - 60_000,
+      pidProbe: () => dead(),
+    })
+    expect(checked).toMatchObject({
+      checked: true,
+      respawn: true,
+      reason: 'process-refuted',
+      judgedOn: 'process',
+      output: {
+        verdict: 'dead',
+        refutations: [
+          {
+            evidence: `pid ${RUN_PID} (author process)`,
+            measurement: 'process-gone',
+            refuted: expect.stringContaining('work output 1 min old'),
+          },
+        ],
+      },
+    })
+  })
+
+  it('a reused declared pid refutes the same fresh branch tip', () => {
+    const recorded = declaration({
+      evidence: [
+        { kind: 'branch', ref: 'feat/874-author' },
+        { kind: 'pid', pid: RUN_PID, startedAt: RUN_STARTED },
+      ],
+    })
+    const checked = checkDeclaredAgentOutput(recorded, {
+      now: NOW,
+      branchProbe: () => NOW - 60_000,
+      pidProbe: () => ({ exists: true, startedAt: RUN_STARTED + PID_START_TOLERANCE_MS + 1 }),
+    })
+    expect(checked).toMatchObject({
+      respawn: true,
+      reason: 'process-refuted',
+      judgedOn: 'process',
+      output: { verdict: 'dead', refutations: [{ measurement: 'pid-reused' }] },
+    })
+    expect(checked.detail).toContain(`pid ${RUN_PID}`)
+    expect(checked.detail).toContain('pid-reused')
+  })
+
+  it('without pid evidence a fresh tip still decides alone, unchanged', () => {
+    const recorded = declaration({ evidence: [{ kind: 'branch', ref: 'feat/874-author' }] })
+    expect(
+      checkDeclaredAgentOutput(recorded, { now: NOW, branchProbe: () => NOW - 60_000 }),
+    ).toMatchObject({
+      checked: true,
+      respawn: false,
+      reason: 'agent-alive',
+      judgedOn: 'git',
+      output: { verdict: 'alive' },
+    })
+  })
+
+  it('a live pid and silent log beside a fresh commit retain the 30.07 verdict', () => {
+    const recorded = declaration({
+      evidence: [
+        { kind: 'branch', ref: 'feat/874-author' },
+        { kind: 'pid', pid: RUN_PID, startedAt: RUN_STARTED },
+        { kind: 'log', path: '/tmp/author-874.log' },
+      ],
+    })
+    expect(
+      checkDeclaredAgentOutput(recorded, {
+        now: NOW,
+        branchProbe: () => NOW - 60_000,
+        pidProbe: () => alive(),
+        logProbe: () => NOW - 59 * 60_000,
+      }),
+    ).toMatchObject({
+      respawn: false,
+      reason: 'agent-alive',
+      judgedOn: 'git',
+      output: { verdict: 'alive' },
+    })
+  })
+
+  it('--agent-check with no output arguments probes the recorded declaration', () => {
+    const recorded = declaration({
+      evidence: [
+        { kind: 'branch', ref: 'feat/874-author' },
+        { kind: 'pid', pid: RUN_PID, startedAt: RUN_STARTED, label: 'recorded author' },
+      ],
+    })
+    const fromNoArguments = agentCheckDeclaration(recorded)
+    expect(fromNoArguments.evidence).toEqual(recorded.evidence)
+    expect(
+      checkDeclaredAgentOutput(fromNoArguments, {
+        now: NOW,
+        branchProbe: () => NOW - 60_000,
+        pidProbe: () => dead(),
+      }),
+    ).toMatchObject({
+      checked: true,
+      respawn: true,
+      reason: 'process-refuted',
+      output: { verdict: 'dead', refutations: [{ evidence: `pid ${RUN_PID} (recorded author)` }] },
+    })
+  })
+
+  it('explicit output arguments augment and de-duplicate recorded evidence', () => {
+    const recorded = declaration({ evidence: [{ kind: 'branch', ref: 'feat/874-author' }] })
+    expect(
+      agentCheckDeclaration(recorded, {
+        branches: ['feat/874-author', 'feat/875-other'],
+        worktrees: ['/repo/point-875'],
+        logs: ['/tmp/author.log'],
+      }).evidence,
+    ).toEqual([
+      { kind: 'branch', ref: 'feat/874-author' },
+      { kind: 'worktree', path: '/repo/point-875' },
+      { kind: 'branch', ref: 'feat/875-other' },
+      { kind: 'log', path: '/tmp/author.log' },
+    ])
+  })
+
+  it('does not let a gone recorded pid refute a foreign explicit branch', () => {
+    const recorded = declaration({
+      evidence: [
+        { kind: 'branch', ref: 'feat/A' },
+        { kind: 'pid', pid: RUN_PID, startedAt: RUN_STARTED },
+      ],
+    })
+    const probe = agentCheckDeclaration(recorded, { branches: ['feat/B'] })
+    expect(probe.evidence).toEqual([
+      { kind: 'branch', ref: 'feat/A' },
+      { kind: 'branch', ref: 'feat/B' },
+    ])
+    expect(
+      checkDeclaredAgentOutput(probe, {
+        now: NOW,
+        branchProbe: (ref) => (ref === 'feat/B' ? NOW - 60_000 : NOW - 60 * 60_000),
+        pidProbe: () => dead(),
+      }),
+    ).toMatchObject({
+      checked: true,
+      respawn: false,
+      reason: 'agent-alive',
+      judgedOn: 'git',
+      output: { verdict: 'alive' },
+    })
+  })
+
+  it('keeps a gone recorded pid when explicit arguments re-state its own address', () => {
+    const recorded = declaration({
+      evidence: [
+        { kind: 'branch', ref: 'feat/A' },
+        { kind: 'pid', pid: RUN_PID, startedAt: RUN_STARTED },
+      ],
+    })
+    const probe = agentCheckDeclaration(recorded, { branches: ['feat/A'] })
+    expect(probe.evidence).toEqual(recorded.evidence)
+    expect(
+      checkDeclaredAgentOutput(probe, {
+        now: NOW,
+        branchProbe: () => NOW - 60_000,
+        pidProbe: () => dead(),
+      }),
+    ).toMatchObject({
+      checked: true,
+      respawn: true,
+      reason: 'process-refuted',
+      judgedOn: 'process',
+      output: { verdict: 'dead' },
+    })
+  })
+
+  it('turns a live declared agent into a transfer, never a silent stand-down', () => {
+    expect(
+      standDownBoundaryDecision({
+        sid: SID,
+        declaration: agent,
+        agentCheck: working,
+        transfer: { available: true, blocked: false },
+      }),
+    ).toEqual({ action: 'transfer', reason: 'agent-working' })
+  })
+
+  it('keeps the parent alive for a working child without a pushed checkpoint', () => {
+    expect(
+      standDownBoundaryDecision({
+        sid: SID,
+        declaration: agent,
+        agentCheck: working,
+        transfer: { available: false, blocked: true },
+      }),
+    ).toEqual({ action: 'block', reason: 'checkpoint-required' })
+    expect(
+      standDownBoundaryDecision({ sid: SID, declaration: agent, agentCheck: unknown, transfer: { available: false } }),
+    ).toEqual({ action: 'block', reason: 'agent-unmeasurable' })
+  })
+
+  it('keeps today’s plain stand-down when this session has no declared agent', () => {
+    expect(standDownBoundaryDecision({ sid: SID })).toEqual({ action: 'stand-down', reason: 'no-own-agent' })
+    expect(
+      standDownBoundaryDecision({ sid: SID, declaration: declaration({ evidence: [{ kind: 'pid', pid: 7 }] }) }),
+    ).toEqual({ action: 'stand-down', reason: 'no-declared-agent' })
+    expect(standDownBoundaryDecision({ sid: 'successor', declaration: agent })).toEqual({
+      action: 'stand-down',
+      reason: 'no-own-agent',
+    })
+  })
+
+  it('orients the successor from the measurement and names the exact probe', () => {
+    const transferred = { ...agent, transfer: { v: 1, by: SID, at: NOW, checkpoints: [] } }
+    const text = successorAgentOrientation({
+      declaration: transferred,
+      sid: 'successor',
+      agentCheck: working,
+      command: 'node scripts/batch-in-flight.mjs --agent-check --worktree "/repo/w"',
+    })
+    expect(text).toContain('MEASURED WORKING')
+    expect(text).toContain('--adopt')
+    expect(text).toContain('--agent-check')
+    expect(text).not.toContain('provably dead')
+    expect(successorAgentOrientation({ declaration: agent, sid: SID, agentCheck: working })).toBe('')
+  })
+
+  it('carries a process refutation into the stand-down and successor verdicts', () => {
+    const refuted = {
+      respawn: true,
+      reason: 'process-refuted',
+      judgedOn: 'process',
+      detail: 'pid 9001 (author) — process-gone refutes work output 1 min old',
+    }
+    expect(
+      standDownBoundaryDecision({ sid: SID, declaration: agent, agentCheck: refuted, transfer: { available: false } }),
+    ).toEqual({ action: 'stand-down', reason: 'agent-process-refuted' })
+    const text = successorAgentOrientation({ declaration: agent, sid: 'successor', agentCheck: refuted })
+    expect(text).toContain('PROCESS MEASURED DEAD')
+    expect(text).toContain('pid 9001 (author)')
+    expect(text).not.toContain('STATE UNKNOWN')
+  })
+
+  it('writes the transfer at stand-down, and the successor sees and adopts it', () => {
+    const dir = mkdtempSync(join(tmpdir(), 'hoa-standdown-'))
+    const repo = join(dir, 'repo')
+    const remote = join(dir, 'remote.git')
+    const lockPath = join(dir, 'batch-lock.json')
+    const path = statePathsFor(lockPath).inFlightPath
+    const gitEnv = { ...process.env, GIT_CONFIG_GLOBAL: '/dev/null', GIT_CONFIG_SYSTEM: '/dev/null' }
+    const git = (cwd, ...args) =>
+      execFileSync('git', ['-c', 'commit.gpgsign=false', '-c', 'core.hooksPath=', ...args], {
+        cwd,
+        env: gitEnv,
+        encoding: 'utf8',
+        windowsHide: true,
+        stdio: ['ignore', 'pipe', 'ignore'],
+      }).trim()
+    try {
+      // The checkpoint belongs to this case, never to the checkout running it:
+      // immediately after a landing, that checkout's main is necessarily ahead
+      // of origin/main. A bare remote gives the fixture the pushed equality the
+      // transfer contract requires in every repository state.
+      git(dir, 'init', '-q', '--bare', remote)
+      git(dir, 'init', '-q', '--initial-branch=main', repo)
+      writeFileSync(join(repo, 'agent.txt'), 'moving work\n')
+      git(repo, 'add', 'agent.txt')
+      git(repo, '-c', 'user.name=Fixture', '-c', 'user.email=fixture@example.invalid', 'commit', '-q', '-m', 'checkpoint')
+      git(repo, 'remote', 'add', 'origin', remote)
+      git(repo, 'push', '-q', '-u', 'origin', 'main')
+      expect(git(repo, 'rev-parse', 'main')).toBe(git(repo, 'rev-parse', 'origin/main'))
+
+      // The declaration is written directly because the test exercises the
+      // handover seam, not the CLI's separate self-reference refusal.
+      // The evidence names its point, as every write path stamps it since the
+      // fifth cross-vendor round: `main` resolves to no `feat/<N>-…` point, so
+      // an unstamped item would be refused as unattributable — which is the
+      // rule, not this case's subject.
+      writeDeclaration(declaration({ evidence: [{ kind: 'branch', ref: 'main', point: 713 }] }), path)
+      const boundary = gatherStandDownBoundary(SID, {
+        cwd: repo,
+        lockPath,
+        now: NOW,
+        agentProbes: { branchProbe: () => NOW - 60_000 },
+      })
+      expect(boundary).toMatchObject({ action: 'transferred', reason: 'agent-working' })
+      expect(readDeclaration(path).transfer).toMatchObject({ by: SID })
+
+      const orientation = gatherSuccessorAgentOrientation('session-successor', {
+        lockPath,
+        now: NOW,
+        agentProbes: { branchProbe: () => NOW - 60_000 },
+      })
+      expect(orientation).toContain('MEASURED WORKING')
+      expect(orientation).toContain('--adopt')
+      expect(orientation).not.toContain('provably dead')
+
+      const adopted = adoptTransferred('session-successor', {
+        cwd: repo,
+        lockPath,
+        now: NOW + 1,
+        probeSet: { refTipAt: () => NOW, probePid: () => null, worktreeActiveAt: () => null, mtimeOf: () => null },
+      })
+      expect(adopted).toMatchObject({ adopted: true, reason: 'adopted' })
+      expect(readDeclaration(path)).toMatchObject({
+        sessionId: 'session-successor',
+        adopted: { from: SID, at: NOW + 1 },
+      })
+    } finally {
+      rmSync(dir, { recursive: true, force: true })
+    }
+  })
+
+  it('calls an unreadable declaration UNKNOWN and names the probes on both sides', () => {
+    const dir = mkdtempSync(join(tmpdir(), 'hoa-standdown-unknown-'))
+    const lockPath = join(dir, 'batch-lock.json')
+    const path = statePathsFor(lockPath).inFlightPath
+    try {
+      writeFileSync(path, '{not json')
+      expect(gatherStandDownBoundary(SID, { lockPath })).toMatchObject({
+        action: 'block',
+        reason: 'declaration-unreadable',
+        command: 'node scripts/batch-in-flight.mjs --status',
+      })
+      const text = gatherSuccessorAgentOrientation('session-successor', { lockPath })
+      expect(text).toContain('STATE UNKNOWN')
+      expect(text).toContain('--agent-check')
+      expect(text).not.toContain('provably dead')
+    } finally {
+      rmSync(dir, { recursive: true, force: true })
+    }
+  })
+})
+
+// ---------------------------------------------------------------------------
 describe('evidenceVerdict — the verdict names the source it rests on', () => {
   const item = (kind, ok) => ({ ok, kind, describe: `${kind} x`, detail: ok ? 'fresh' : 'quiet' })
 
@@ -855,6 +1533,20 @@ describe('evidenceVerdict — the verdict names the source it rests on', () => {
     expect(v.outputFresh).toBe(true)
     expect(v.fresh).toHaveLength(1)
     expect(v.silent).toEqual(['log x — quiet'])
+  })
+
+  it('lets a positive process refutation outrank the process\'s fresh last output', () => {
+    const v = evidenceVerdict([
+      item('branch', true),
+      { ...item('pid', false), describe: 'pid 42 (author)', detail: 'process-gone' },
+    ])
+    expect(v).toMatchObject({
+      judgedOn: 'process',
+      outputFresh: true,
+      refutations: [{ evidence: 'pid 42 (author)', measurement: 'process-gone' }],
+    })
+    // An unverifiable identity remains uncertainty, not a fabricated death.
+    expect(evidenceVerdict([{ ...item('pid', false), detail: 'start-time-unverifiable' }]).refutations).toEqual([])
   })
 })
 
@@ -889,6 +1581,13 @@ describe('the declaration file is derived from the caller’s lock path', () => 
       expect(readDeclaration(path)).toMatchObject({ sessionId: SID })
       // The real gather, real probe: this process is alive, so the wait holds.
       expect(gatherInFlight(SID, { lockPath })).toMatchObject({ live: true, reason: 'live' })
+      // A consumer of declaration liveness does not pay for or receive the
+      // separate batch-capacity census.
+      expect(gatherInFlight(SID, { lockPath, includeSlots: false })).toMatchObject({
+        live: true,
+        reason: 'live',
+        slots: null,
+      })
       clearDeclaration(path)
       expect(readDeclaration(path)).toBe(null)
       expect(gatherInFlight(SID, { lockPath })).toMatchObject({ live: false, reason: 'no-declaration' })
@@ -1274,9 +1973,15 @@ describe('the CLI records RESOLVED evidence, not what was typed', () => {
   it('resolveRefName asks GIT what a ref names, so an alias cannot hide behind a spelling', () => {
     const dir = mkdtempSync(join(tmpdir(), 'hoa-ref-'))
     const git = (...args) =>
-      execFileSync('git', args, { windowsHide: true, cwd: dir, encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] }).trim()
+      execFileSync('git', ['-c', 'commit.gpgsign=false', '-c', 'core.hooksPath=', ...args], {
+        windowsHide: true,
+        cwd: dir,
+        encoding: 'utf8',
+        stdio: ['ignore', 'pipe', 'ignore'],
+      }).trim()
     try {
       git('init', '-b', 'main')
+      expect(git('rev-parse', '--show-toplevel')).toBe(resolve(dir))
       git('-c', 'user.name=t', '-c', 'user.email=t@t', 'commit', '--allow-empty', '-m', 'x')
       const at = (ref) => resolveRefName(ref, { cwd: dir })
       // The two live bypasses, resolved to names the refusal already knows.
@@ -1391,7 +2096,7 @@ describe('filesNamedIn / openPointSpecs — what a queued point says it touches'
 
   it('carries a point waiting on the user, but FLAGGED (point 450)', () => {
     const tasks = [
-      '- [ ] 500. FIRST POINT touching scripts/a.mjs AWAITING-USER(2026-07-29; needs a ruling)',
+      '- [ ] 500. FIRST POINT touching scripts/a.mjs AWAITING-CONFIRMATION(2026-07-29; release-tag: push the version tag, safe prepared state: verified locally and no tag pushed)',
       '  and also src/ui/B.tsx',
       '- [ ] 503. THIRD POINT touching docs/d.md',
       '- [ ] 504. ANSWERED POINT touching docs/e.md USER-ANSWERED(2026-08-07)',
@@ -1439,8 +2144,8 @@ describe('slotReasonDecision — the cap is a target, and the demand is narrow',
   const running = ['scripts/batch-singleton.mjs']
 
   it('THE MEASURED STATE: one agent, free slots, an independent point → a reason is DEMANDED', () => {
-    const d = slotReasonDecision({ agents: 1, openPoints: independent, runningFiles: running })
-    expect(d).toMatchObject({ needsReason: true, agents: 1, slotsFree: POOL_CAP - 1, why: 'idle-slots' })
+    const d = slotReasonDecision({ agents: 1, openBranches: 1, openPoints: independent, runningFiles: running })
+    expect(d).toMatchObject({ needsReason: true, agents: 1, openBranches: 1, slotsFree: POOL_CAP - 1, why: 'idle-slots' })
     expect(d.candidates.map((c) => c.point)).toEqual([500])
   })
 
@@ -1460,11 +2165,20 @@ describe('slotReasonDecision — the cap is a target, and the demand is narrow',
   })
 
   it('a FULL pool passes with no reason at all', () => {
+    // Full of AGENTS here, which since point 712 is the separately named state:
+    // the occupancy rule counts branches, the agent cap still binds a spawn — and
+    // the SLOT count stays the branch count, so a full set of agents that cut no
+    // branch reports the branch slots it really left free (Sol, review of 3078d166).
     expect(
       slotReasonDecision({ agents: POOL_CAP, openPoints: independent, runningFiles: running }),
+    ).toMatchObject({ needsReason: false, slotsFree: POOL_CAP, openBranches: 0, why: 'agents-at-cap' })
+    expect(
+      slotReasonDecision({ openBranches: POOL_CAP, openPoints: independent, runningFiles: running }),
     ).toMatchObject({ needsReason: false, slotsFree: 0, why: 'at-cap' })
     // …and over the cap is not negative slots.
-    expect(slotReasonDecision({ agents: POOL_CAP + 2, openPoints: independent, runningFiles: running }).slotsFree).toBe(0)
+    expect(
+      slotReasonDecision({ openBranches: POOL_CAP + 2, openPoints: independent, runningFiles: running }).slotsFree,
+    ).toBe(0)
   })
 
   it('a queue whose open points ALL touch the running branch passes', () => {
@@ -1534,9 +2248,9 @@ describe('slotReasonDecision — the cap is a target, and the demand is narrow',
 
   it('a junk cap or agent count falls back rather than demanding on nonsense', () => {
     expect(slotReasonDecision({ agents: NaN, openPoints: independent, runningFiles: running }).slotsFree).toBe(POOL_CAP)
-    expect(slotReasonDecision({ agents: 1, openPoints: independent, runningFiles: running, cap: 0 }).slotsFree).toBe(
-      POOL_CAP - 1,
-    )
+    expect(
+      slotReasonDecision({ agents: 1, openBranches: 1, openPoints: independent, runningFiles: running, cap: 0 }).slotsFree,
+    ).toBe(POOL_CAP - 1)
     expect(() => slotReasonDecision()).not.toThrow()
     expect(slotReasonDecision().needsReason).toBe(false)
   })
@@ -1551,13 +2265,14 @@ describe('the running-file set comes from the worktree too, not only from a --br
     const dir = mkdtempSync(join(tmpdir(), 'hoa-slots-'))
     try {
       const git = (...args) =>
-        execFileSync('git', ['-c', 'user.email=t@t', '-c', 'user.name=t', '-c', 'commit.gpgsign=false', ...args], {
+        execFileSync('git', ['-c', 'user.email=t@t', '-c', 'user.name=t', '-c', 'commit.gpgsign=false', '-c', 'core.hooksPath=', ...args], {
           windowsHide: true,
           cwd: dir,
           encoding: 'utf8',
           stdio: ['ignore', 'pipe', 'ignore'],
         })
       git('init', '-q', '-b', 'main', '.')
+      expect(git('rev-parse', '--show-toplevel').trim()).toBe(resolve(dir))
       writeFileSync(join(dir, 'seed.txt'), 'seed\n')
       git('add', '-A')
       git('commit', '-q', '-m', 'seed')
@@ -1593,7 +2308,7 @@ describe('the running-file set comes from the worktree too, not only from a --br
 })
 
 describe('slotsRemedy — the block must name BOTH honest answers', () => {
-  const slots = { agents: 1, slotsFree: 2, candidates: [{ point: 500 }, { point: 501 }] }
+  const slots = { agents: 1, openBranches: 1, slotsFree: 2, candidates: [{ point: 500 }, { point: 501 }] }
 
   it('names commissioning another point AND stating why the queue is unsuitable', () => {
     const text = slotsRemedy({ slots })
@@ -1605,6 +2320,7 @@ describe('slotsRemedy — the block must name BOTH honest answers', () => {
 
   it('names the numbers and the candidate points, so the reader need not go looking', () => {
     const text = slotsRemedy({ slots })
+    expect(text).toContain('1 open feat/* branch(es)')
     expect(text).toContain('1 agent(s) running')
     expect(text).toContain(`2 of ${POOL_CAP} slots FREE`)
     expect(text).toContain('500, 501')
@@ -1792,6 +2508,76 @@ describe('declarationShields — the expiry the branch sweep now applies too', (
     expect(declarationShields({ declaration: {}, now: NOW })).toMatchObject({ shields: true, reason: 'no-timestamp' })
     expect(declarationShields({ declaration: { at: 'soon' }, now: NOW }).shields).toBe(true)
     expect(declarationShields().shields).toBe(true)
+  })
+})
+
+describe('durable CI wait assessment', () => {
+  const wait = (over = {}) => ({
+    v: 1,
+    identity: 'origin/feat/x:abc:CI:42',
+    state: 'pending',
+    ref: 'origin/feat/x',
+    sha: 'abc',
+    workflow: 'CI',
+    runId: 42,
+    firstObservationAt: NOW - 60_000,
+    lastObservationAt: NOW - 1_000,
+    deadline: NOW + 60_000,
+    wakeToken: 'wake-1',
+    observer: { pid: 44, startedAt: NOW - 20_000 },
+    terminal: null,
+    ...over,
+  })
+
+  it('remains visible after its worker exits and after its interaction deadline', () => {
+    expect(assessCiWait({ wait: wait(), now: NOW, probePid: () => null })).toMatchObject({
+      visible: true,
+      pending: true,
+      observerAlive: false,
+      repair: true,
+      deadline: NOW + 60_000,
+      deadlineReached: false,
+      reason: 'observer-missing',
+    })
+    expect(assessCiWait({ wait: wait({ deadline: NOW - 1 }), now: NOW, probePid: () => null })).toMatchObject({
+      visible: true,
+      pending: true,
+      repair: true,
+      deadline: NOW - 1,
+      deadlineReached: true,
+    })
+  })
+
+  it('proves the observer by pid and start time, never by a recycled pid alone', () => {
+    expect(assessCiWait({
+      wait: wait(),
+      now: NOW,
+      probePid: () => ({ exists: true, startedAt: NOW - 20_000 }),
+    })).toMatchObject({ observerAlive: true, repair: false, reason: 'observing' })
+    expect(assessCiWait({
+      wait: wait(),
+      now: NOW,
+      probePid: () => ({ exists: true, startedAt: NOW - 200_000 }),
+    })).toMatchObject({ observerAlive: false, repair: true })
+  })
+
+  it('keeps a terminal result visible for the matching wake request', () => {
+    expect(assessCiWait({
+      wait: wait({ state: 'failed', observer: null, terminal: { state: 'failed', verdict: 'red', observedAt: NOW } }),
+      now: NOW,
+    })).toMatchObject({
+      visible: true,
+      pending: false,
+      terminal: true,
+      repair: false,
+      wakeToken: 'wake-1',
+      result: { verdict: 'red' },
+    })
+  })
+
+  it('does not invent visibility from malformed state', () => {
+    expect(assessCiWait({ wait: null })).toMatchObject({ visible: false, reason: 'no-wait' })
+    expect(assessCiWait({ wait: { state: 'pending' } })).toMatchObject({ visible: false, reason: 'unreadable' })
   })
 })
 
@@ -2236,10 +3022,41 @@ describe('runRecordFor — the run record beside a declared log, reduced for the
 
 describe('markTransferred — the adoption record stays probeable (M4/M7)', () => {
   it('keeps the declaration intact and records who, when and which checkpoints', () => {
-    const declaration = { v: 1, sessionId: 's1', at: 1, waitingOn: 'agent', evidence: [{ kind: 'branch', ref: 'b' }] }
+    const declaration = { v: 1, sessionId: 's1', at: 1, waitingOn: 'agent', evidence: [{ kind: 'branch', ref: 'b', point: null }] }
     const t = markTransferred({ declaration, bySid: 's1', now: 99, checkpoints: [{ ref: 'b', sha: 'x' }] })
     expect(t.evidence).toEqual(declaration.evidence)
     expect(t.transfer).toEqual({ v: 1, by: 's1', at: 99, checkpoints: [{ ref: 'b', sha: 'x' }] })
+  })
+
+  it('the transfer is a write, so it migrates: legacy evidence leaves with its point recorded', () => {
+    // Sixth cross-review: writing the legacy evidence back unchanged handed
+    // the successor a declaration without its once-only migration.
+    const declaration = {
+      v: 1,
+      sessionId: 's1',
+      at: 1,
+      waitingOn: 'agent',
+      evidence: [
+        { kind: 'branch', ref: 'feat/700-context-fence' },
+        { kind: 'worktree', path: '/w/point-713' },
+        { kind: 'log', path: '/l' },
+      ],
+    }
+    const t = markTransferred({
+      declaration,
+      bySid: 's1',
+      now: 9,
+      checkpoints: [],
+      worktreeRef: (p) => (p === '/w/point-713' ? 'refs/heads/feat/713-now-section-derived' : null),
+    })
+    expect(t.evidence).toEqual([
+      { kind: 'branch', ref: 'feat/700-context-fence', point: 700 },
+      { kind: 'worktree', path: '/w/point-713', point: 713 },
+      // What resolves to nothing records the NULL, so the next read cannot
+      // re-derive a different answer than this write had (ninth round).
+      { kind: 'log', path: '/l', point: null },
+    ])
+    expect(declaration.evidence[0]).toEqual({ kind: 'branch', ref: 'feat/700-context-fence' })
   })
 
   it('a RE-TRANSFER supersedes the old adoption, so the record stays protected (Sol re-review, finding 1)', () => {
@@ -2248,7 +3065,7 @@ describe('markTransferred — the adoption record stays probeable (M4/M7)', () =
       sessionId: 's2',
       at: 5,
       waitingOn: 'agent',
-      evidence: [{ kind: 'branch', ref: 'b' }],
+      evidence: [{ kind: 'branch', ref: 'b', point: null }],
       transfer: { v: 1, by: 's1', at: 2, checkpoints: [] },
       adopted: { from: 's1', at: 3 },
     }
@@ -2435,6 +3252,233 @@ describe('gatherHandoverTransfer — session-bound and idempotent', () => {
   })
 })
 
+// ---------------------------------------------------------------------------
+// THE ADOPTION ITSELF, run for real against the declaration file (seventh
+// cross-review): the sixth round's alert stood BESIDE `adopted: true`, so the
+// CLI printed ADOPTED and exited 0 while the read side discarded the whole
+// record one look later. These cases pin the WRITE path, not the alert helper.
+// ---------------------------------------------------------------------------
+describe('adoptTransferred — unattributable kept evidence refuses BEFORE the write', () => {
+  const withTempLock = (fn) => {
+    const dir = mkdtempSync(join(tmpdir(), 'hoa-adopt-'))
+    const lockPath = join(dir, 'batch-lock.json')
+    try {
+      fn({ dir, lockPath, path: statePathsFor(lockPath).inFlightPath })
+    } finally {
+      rmSync(dir, { recursive: true, force: true })
+    }
+  }
+
+  /** A transferred declaration whose evidence is FRESH log files — the probe
+   *  keeps them, so the attribution question is what decides the adoption. */
+  const transferred = (evidence) => ({
+    v: 1,
+    sessionId: 'session-predecessor',
+    at: Date.now(),
+    waitingOn: 'a delegated agent',
+    transfer: { v: 1, by: 'session-predecessor', at: Date.now(), checkpoints: [] },
+    evidence,
+  })
+
+  it('refuses with the human way out and writes NOTHING while a kept live item resolves to no point', () => {
+    withTempLock(({ dir, lockPath, path }) => {
+      const log = join(dir, 'agent.log')
+      writeFileSync(log, 'still writing')
+      const before = transferred([
+        { kind: 'log', path: log, point: 700, phase: 'authoring' },
+        { kind: 'log', path: log },
+      ])
+      writeDeclaration(before, path)
+      const a = adoptTransferred('session-successor', { lockPath })
+      expect(a.adopted).toBe(false)
+      expect(a.reason).toBe('unattributable-evidence')
+      expect(a.alerts.join(' ')).toContain('batch-in-flight.mjs --clear')
+      // The record was NOT rewritten: no adopted stamp, still the
+      // predecessor's, its evidence byte-identical.
+      const after = readDeclaration(path)
+      expect(after.adopted).toBeUndefined()
+      expect(after.sessionId).toBe('session-predecessor')
+      expect(after.evidence).toEqual(before.evidence)
+    })
+  })
+
+  it('adopts point-carrying pid/log evidence cleanly — attribution is the recorded field, never the kind', () => {
+    // The valid adoption a kind-based complaint would block (finding 3's
+    // hostile implementation): the log item carries its point, so it adopts.
+    withTempLock(({ dir, lockPath, path }) => {
+      const log = join(dir, 'agent.log')
+      writeFileSync(log, 'still writing')
+      writeDeclaration(transferred([{ kind: 'log', path: log, point: 700, phase: 'authoring' }]), path)
+      const a = adoptTransferred('session-successor', { lockPath })
+      expect(a).toMatchObject({ adopted: true, reason: 'adopted', kept: 1, dropped: 0 })
+      expect(a.alerts).toEqual([])
+      const after = readDeclaration(path)
+      expect(after.sessionId).toBe('session-successor')
+      expect(after.adopted.from).toBe('session-predecessor')
+      // The ROUNDTRIP holds (eighth cross-review): the adopted record still
+      // carries the evidence with its point — an adoption that stamped
+      // `adopted: true` but blanked the evidence or damaged the point would
+      // leave the read side silently empty one look later.
+      expect(after.evidence).toEqual([{ kind: 'log', path: log, point: 700, phase: 'authoring' }])
+      expect(normalizeActiveWork({ declaration: after, openPoints: [700] })).toMatchObject({
+        ok: true,
+        points: [700],
+      })
+    })
+  })
+
+  it('adopts LIVE PID evidence with its recorded point kept verbatim — attribution is never decided by kind', () => {
+    // Eighth cross-review: the pid path had only reached the alert helper. This
+    // runs the real adoption over a pid the real probe confirms alive, so an
+    // adoption that ignored or stripped `point` on pid items, or reported every
+    // pid as unattributable by kind, fails here.
+    withTempLock(({ lockPath, path }) => {
+      const probe = probePid(process.pid)
+      expect(probe.exists).toBe(true)
+      const item = { kind: 'pid', pid: process.pid, startedAt: probe.startedAt, point: 700, phase: 'authoring' }
+      writeDeclaration(transferred([item]), path)
+      const a = adoptTransferred('session-successor', { lockPath })
+      expect(a).toMatchObject({ adopted: true, reason: 'adopted', kept: 1, dropped: 0 })
+      expect(a.alerts).toEqual([])
+      const after = readDeclaration(path)
+      expect(after.evidence).toEqual([item])
+      expect(normalizeActiveWork({ declaration: after, openPoints: [700] })).toMatchObject({ ok: true, points: [700] })
+    })
+  })
+
+  it('judges attribution on the KEPT evidence only — a stale point-less item is dropped and named, never a refusal', () => {
+    // Eighth cross-review: the refusal case fed both items from one fresh log,
+    // so an implementation that questioned already-EXPIRED point-less items
+    // before the probe — refusing an otherwise valid adoption — stayed green.
+    withTempLock(({ dir, lockPath, path }) => {
+      const live = join(dir, 'live.log')
+      writeFileSync(live, 'still writing')
+      const stale = join(dir, 'stale.log')
+      writeFileSync(stale, 'long finished')
+      const old = new Date(Date.now() - LOG_FRESH_MS - 3_600_000)
+      utimesSync(stale, old, old)
+      writeDeclaration(
+        transferred([
+          { kind: 'log', path: live, point: 700, phase: 'authoring' },
+          { kind: 'log', path: stale, phase: 'authoring' },
+        ]),
+        path,
+      )
+      const a = adoptTransferred('session-successor', { lockPath })
+      expect(a).toMatchObject({ adopted: true, reason: 'adopted', kept: 1, dropped: 1 })
+      expect(a.alerts.join(' ')).toContain('expired')
+      // The dropped item does not survive into the adopted record.
+      expect(readDeclaration(path).evidence).toEqual([{ kind: 'log', path: live, point: 700, phase: 'authoring' }])
+    })
+  })
+
+  it('hands the DECLARATION-level phase to the attribution check — terminal at the record, point-less item adopts', () => {
+    // Eighth cross-review: the declaration-phase fallback was only proven at
+    // the helper; a wiring that never passed `declaration.phase` through would
+    // default the item to "authoring" and falsely refuse this adoption.
+    withTempLock(({ dir, lockPath, path }) => {
+      const log = join(dir, 'agent.log')
+      writeFileSync(log, 'still writing')
+      writeDeclaration({ ...transferred([{ kind: 'log', path: log }]), phase: 'landed' }, path)
+      const a = adoptTransferred('session-successor', { lockPath })
+      expect(a).toMatchObject({ adopted: true, reason: 'adopted', kept: 1, dropped: 0 })
+      expect(a.alerts).toEqual([])
+      expect(readDeclaration(path).sessionId).toBe('session-successor')
+    })
+  })
+
+  it('a point-less TERMINAL item never blocks the adoption — the read side skips it the same way', () => {
+    withTempLock(({ dir, lockPath, path }) => {
+      const log = join(dir, 'agent.log')
+      writeFileSync(log, 'still writing')
+      writeDeclaration(
+        transferred([
+          { kind: 'log', path: log, point: 700, phase: 'authoring' },
+          { kind: 'log', path: log, phase: 'landed' },
+        ]),
+        path,
+      )
+      const a = adoptTransferred('session-successor', { lockPath })
+      expect(a).toMatchObject({ adopted: true, reason: 'adopted' })
+      // No alert rides beside the success (eighth cross-review): the sixth
+      // round's defect was exactly an adoption that succeeded AND printed a
+      // false clear-alarm — a terminal item must produce neither.
+      expect(a.alerts).toEqual([])
+      expect(readDeclaration(path).sessionId).toBe('session-successor')
+    })
+  })
+})
+
+// ---------------------------------------------------------------------------
+// THE CLI ITSELF (eighth cross-review): every case above calls
+// `adoptTransferred` in-process, so a CLI that ignored `--adopt`, routed it
+// elsewhere, or printed ADOPTED and exited 0 regardless of the result stayed
+// green. Spawned inside an isolated temp repo, like board-focus-behaviour —
+// nothing here touches the repository's own .claude/.
+// ---------------------------------------------------------------------------
+describe('batch-in-flight.mjs --adopt (spawned) — the CLI answers with the real verdict, exit code and write', () => {
+  const withCliRepo = (fn) => {
+    const repo = mkdtempSync(join(tmpdir(), 'hoa-adopt-cli-'))
+    try {
+      cpSync(join(REPO_ROOT, 'scripts'), join(repo, 'scripts'), {
+        recursive: true,
+        filter: (src) => !/[\\/](git-hooks)([\\/]|$)/.test(src),
+      })
+      mkdirSync(join(repo, '.claude'), { recursive: true })
+      const lockPath = join(repo, '.claude', 'batch-lock.json')
+      writeFileSync(lockPath, JSON.stringify({ sessionId: 'session-successor', claimedAt: Date.now() }))
+      fn({ repo, declarationPath: statePathsFor(lockPath).inFlightPath })
+    } finally {
+      rmSync(repo, { recursive: true, force: true })
+    }
+  }
+  const runAdopt = (repo) =>
+    spawnSync(process.execPath, [join(repo, 'scripts', 'batch-in-flight.mjs'), '--adopt'], {
+      windowsHide: true,
+      cwd: repo,
+      encoding: 'utf8',
+      timeout: 60_000,
+    })
+  const transferred = (evidence) => ({
+    v: 1,
+    sessionId: 'session-predecessor',
+    at: Date.now(),
+    waitingOn: 'a delegated agent',
+    transfer: { v: 1, by: 'session-predecessor', at: Date.now(), checkpoints: [] },
+    evidence,
+  })
+
+  it('adopts through the real entry point: exit 0, ADOPTED said, the record rewritten with its evidence intact', () => {
+    withCliRepo(({ repo, declarationPath }) => {
+      const log = join(repo, 'agent.log')
+      writeFileSync(log, 'still writing')
+      const item = { kind: 'log', path: log, point: 700, phase: 'authoring' }
+      writeFileSync(declarationPath, JSON.stringify(transferred([item])))
+      const r = runAdopt(repo)
+      expect(r.status, r.stderr).toBe(0)
+      expect(r.stdout).toContain('ADOPTED the transferred declaration')
+      const after = JSON.parse(readFileSync(declarationPath, 'utf8'))
+      expect(after.sessionId).toBe('session-successor')
+      expect(after.adopted.from).toBe('session-predecessor')
+      expect(after.evidence).toEqual([item])
+    })
+  })
+
+  it('refuses through the real entry point: exit 1, the alert and the way out on stderr, the record untouched', () => {
+    withCliRepo(({ repo, declarationPath }) => {
+      const log = join(repo, 'agent.log')
+      writeFileSync(log, 'still writing')
+      const before = JSON.stringify(transferred([{ kind: 'log', path: log, phase: 'authoring' }]))
+      writeFileSync(declarationPath, before)
+      const r = runAdopt(repo)
+      expect(r.status).toBe(1)
+      expect(r.stderr).toContain('ALERT:')
+      expect(r.stderr).toContain('ADOPTION REFUSED')
+      expect(readFileSync(declarationPath, 'utf8')).toBe(before)
+    })
+  })
+})
+
 describe('selfAdoptionRefusal — the transferrer is never the adopter (point 675)', () => {
   const transferred = declaration({ transfer: { v: 1, by: SID, at: 1, checkpoints: [] } })
   const sealed = { v: 2, phase: 'committed', cause: 'point', sessionId: SID, point: 675, at: NOW - 1000 }
@@ -2529,5 +3573,880 @@ describe('transferredMutationRefusal — the adoption record is not this side’
       }),
     ).toBeNull()
     expect(transferredMutationRefusal({ declaration: null, marker: sealed, now: NOW })).toBeNull()
+  })
+})
+
+// ---- A SLOT IS NOT FREE UNTIL ITS BRANCH IS GONE (point 712) ---------------
+
+/** The evening the nine branches were counted. */
+const AUG17 = Date.parse('2026-08-17T19:41:00.000Z')
+const days = (n) => n * 86400000
+const hours = (n) => n * 3600000
+
+/** The nine open branches of 17.08.2026, exactly as they were measured. */
+const NINE_BRANCHES = [
+  { ref: 'feat/336-croc-staging', tipAt: AUG17 - days(13), behind: 1679 },
+  { ref: 'feat/686-five-word-lexicon', tipAt: AUG17 - days(4), behind: 81 },
+  { ref: 'feat/687-bank-game', tipAt: AUG17 - days(3), behind: 81 },
+  { ref: 'feat/687-roam-bound-fixes', tipAt: AUG17 - hours(9), behind: 12 },
+  { ref: 'feat/581-settlement-boundary-contrast', tipAt: AUG17 - hours(10), behind: 14 },
+  { ref: 'feat/595-598-verification-ladder-brief', tipAt: AUG17 - hours(8), behind: 9 },
+  { ref: 'feat/703-board-write-report', tipAt: AUG17 - hours(4), behind: 5 },
+  { ref: 'feat/700-context-fence', tipAt: AUG17 - hours(2), behind: 2 },
+  { ref: 'feat/711-queue-rank', tipAt: AUG17 - hours(1), behind: 1 },
+]
+
+describe('pointOfBranch / describeBranchAge — reading a branch name and an age', () => {
+  it('reads the point out of a feat branch in every spelling git prints', () => {
+    expect(pointOfBranch('feat/336-croc-staging')).toBe(336)
+    expect(pointOfBranch('origin/feat/336-croc-staging')).toBe(336)
+    expect(pointOfBranch('refs/heads/feat/712-queue-binds-picker')).toBe(712)
+    expect(pointOfBranch('refs/remotes/origin/feat/595-598-verification-ladder-brief')).toBe(595)
+  })
+
+  it('answers null for anything that is not a numbered feat branch', () => {
+    expect(pointOfBranch('main')).toBeNull()
+    expect(pointOfBranch('worktree-agent-a1')).toBeNull()
+    expect(pointOfBranch('feat/no-number')).toBeNull()
+    expect(pointOfBranch('feat/0-zero')).toBeNull()
+    expect(pointOfBranch('')).toBeNull()
+    expect(pointOfBranch()).toBeNull()
+  })
+
+  it('says days past a day, hours past an hour, and admits when it cannot say', () => {
+    expect(describeBranchAge(days(13))).toBe('13 d')
+    expect(describeBranchAge(hours(9))).toBe('9 h')
+    expect(describeBranchAge(45 * 60000)).toBe('45 min')
+    expect(describeBranchAge(NaN)).toBe('age unknown')
+    expect(describeBranchAge(null)).toBe('age unknown')
+    expect(describeBranchAge(-5)).toBe('age unknown')
+  })
+})
+
+describe('branchSlotDecision — the pool counts OPEN BRANCHES, not running agents', () => {
+  it('marks the entire census unreadable when one requested behind-count fails', () => {
+    const dir = mkdtempSync(join(tmpdir(), 'hoa-open-branches-'))
+    const git = (...args) =>
+      execFileSync('git', ['-c', 'commit.gpgsign=false', '-c', 'core.hooksPath=', ...args], {
+        cwd: dir,
+        stdio: 'ignore',
+        windowsHide: true,
+        env: { ...process.env, LC_ALL: 'C' },
+      })
+    try {
+      git('init', '-b', 'main')
+      expect(
+        execFileSync('git', ['-C', dir, 'rev-parse', '--show-toplevel'], { encoding: 'utf8', windowsHide: true }).trim(),
+      ).toBe(resolve(dir))
+      git('config', 'user.email', 'test@example.invalid')
+      git('config', 'user.name', 'Test')
+      writeFileSync(join(dir, 'base.txt'), 'base')
+      git('add', 'base.txt')
+      git('commit', '-m', 'base')
+      git('switch', '-c', 'feat/712-test')
+      writeFileSync(join(dir, 'work.txt'), 'work')
+      git('add', 'work.txt')
+      git('commit', '-m', 'work')
+      git('switch', 'main')
+      const result = openFeatBranches({ cwd: dir, behind: true, behindProbe: () => null })
+      expect(result).toEqual({ readable: false, branches: [] })
+    } finally {
+      rmSync(dir, { recursive: true, force: true })
+    }
+  })
+
+  it('REFUSES a further point while the nine of 17.08.2026 stand open', () => {
+    const d = branchSlotDecision({ branches: NINE_BRANCHES, point: 697, now: AUG17 })
+    expect(d.allowed).toBe(false)
+    expect(d.why).toBe('branches-open')
+    expect(d.count).toBe(9)
+    expect(d.slotsFree).toBe(0)
+  })
+
+  it('lists them OLDEST FIRST with age and behind-count, and names LAND and PARK', () => {
+    const text = branchSlotRefusal(branchSlotDecision({ branches: NINE_BRANCHES, point: 697, now: AUG17 }))
+    expect(text.split('\n').filter((line) => line.startsWith('  · '))).toEqual([
+      '  · feat/336-croc-staging — 13 d, 1679 commits behind main',
+      '  · feat/686-five-word-lexicon — 4 d, 81 commits behind main',
+      '  · feat/687-bank-game — 3 d, 81 commits behind main',
+      // Deliberately reversed in the fixture: input puts the 9-hour branch
+      // first, so preserving input order fails this assertion.
+      '  · feat/581-settlement-boundary-contrast — 10 h, 14 commits behind main',
+      '  · feat/687-roam-bound-fixes — 9 h, 12 commits behind main',
+      '  · feat/595-598-verification-ladder-brief — 8 h, 9 commits behind main',
+      '  · feat/703-board-write-report — 4 h, 5 commits behind main',
+      '  · feat/700-context-fence — 2 h, 2 commits behind main',
+      '  · feat/711-queue-rank — 1 h, 1 commit behind main',
+    ])
+    expect(text).toContain('land-point.mjs')
+    expect(text).toContain('--park')
+    expect(text).toContain('697')
+  })
+
+  it('ALLOWS while only two branches stand open', () => {
+    const two = NINE_BRANCHES.slice(0, 2)
+    expect(branchSlotDecision({ branches: two, point: 697, now: AUG17 })).toMatchObject({
+      allowed: true,
+      why: 'slots-free',
+      count: 2,
+      slotsFree: 1,
+    })
+  })
+
+  it('refuses at exactly the cap — three open branches are three occupied slots', () => {
+    expect(branchSlotDecision({ branches: NINE_BRANCHES.slice(0, 3), point: 697, now: AUG17 }).allowed).toBe(false)
+  })
+
+  it('does not count a PARKED branch', () => {
+    const parked = { 'feat/336-croc-staging': { reason: '1679 behind, superseded', at: '2026-08-17T18:00:00.000Z' } }
+    const d = branchSlotDecision({ branches: NINE_BRANCHES.slice(0, 3), parked, point: 697, now: AUG17 })
+    expect(d).toMatchObject({ allowed: true, why: 'slots-free', count: 2 })
+    expect(d.parkedOut.map((b) => b.ref)).toEqual(['feat/336-croc-staging'])
+    expect(d.parkedOut[0].reason).toBe('1679 behind, superseded')
+  })
+
+  it('takes a parked branch BACK into the count once it receives a commit', () => {
+    const parked = { 'feat/336-croc-staging': { reason: 'superseded', at: '2026-08-17T18:00:00.000Z' } }
+    // Its tip (13 days before 17.08.) is OLDER than the park → still parked.
+    expect(branchSlotDecision({ branches: NINE_BRANCHES.slice(0, 3), parked, point: 697, now: AUG17 }).count).toBe(2)
+    // A commit after the park makes it live work again.
+    const moved = [{ ...NINE_BRANCHES[0], tipAt: Date.parse('2026-08-17T18:30:00.000Z') }, ...NINE_BRANCHES.slice(1, 3)]
+    expect(branchSlotDecision({ branches: moved, parked, point: 697, now: AUG17 }).count).toBe(3)
+  })
+
+  // THE PARK EXPIRES AGAINST THE TIP, not against a clock (Sol, review of
+  // 91d88f9a). Git's committer date is whole seconds and a rebase can preserve
+  // it, so a timestamp comparison called real movement "still parked".
+  describe('a park is measured against the branch TIP', () => {
+    const at = '2026-08-17T18:00:00.000Z'
+    const parkedAt = (tip) => ({ 'feat/336-croc-staging': { reason: 'superseded', at, tip } })
+    const withTip = (tip, extra = {}) => [
+      { ...NINE_BRANCHES[0], tip, ...extra },
+      ...NINE_BRANCHES.slice(1, 3),
+    ]
+
+    it('stays parked while the tip is the one it was parked at', () => {
+      expect(branchSlotDecision({ branches: withTip('a1b2c3d4'), parked: parkedAt('a1b2c3d4'), now: AUG17 }).count).toBe(
+        2,
+      )
+    })
+
+    it('returns to the count on a NEW tip, whatever the committer date says', () => {
+      // The killing case: a commit in the same second as the park, and one whose
+      // committer date was preserved from BEFORE it. Both moved; both count.
+      const sameSecond = withTip('99ffee00', { tipAt: Date.parse(at) })
+      expect(branchSlotDecision({ branches: sameSecond, parked: parkedAt('a1b2c3d4'), now: AUG17 }).count).toBe(3)
+      const backdated = withTip('99ffee00', { tipAt: Date.parse('2026-08-01T10:00:00.000Z') })
+      expect(branchSlotDecision({ branches: backdated, parked: parkedAt('a1b2c3d4'), now: AUG17 }).count).toBe(3)
+    })
+
+    it('stays parked while the tip cannot be read — an unreadable tip proves no movement', () => {
+      const d = branchSlotDecision({ branches: withTip(''), parked: parkedAt('a1b2c3d4'), now: AUG17 })
+      expect(d.count).toBe(2)
+      // …but NOT silently (fourth review, finding 5): the entry is marked, so
+      // the status can say the baseline could not be re-checked.
+      expect(d.parkedOut).toHaveLength(1)
+      expect(d.parkedOut[0]).toMatchObject({ ref: 'feat/336-croc-staging', tipUnverified: true })
+      // A park whose tip WAS read carries no such mark.
+      const clean = branchSlotDecision({ branches: withTip('a1b2c3d4'), parked: parkedAt('a1b2c3d4'), now: AUG17 })
+      expect(clean.parkedOut[0].tipUnverified).toBeUndefined()
+    })
+
+    it('does NOT honour a park with no baseline at all, and says which one', () => {
+      const noBaseline = { 'feat/336-croc-staging': { reason: 'superseded', at: 'not a date' } }
+      const d = branchSlotDecision({ branches: NINE_BRANCHES.slice(0, 3), parked: noBaseline, point: 697, now: AUG17 })
+      expect(d.count).toBe(3)
+      expect(d.invalidParks.map((b) => b.ref)).toEqual(['feat/336-croc-staging'])
+      expect(commissionRecordReport(parseCommissionRecord(JSON.stringify({ parked: noBaseline })))).toContain(
+        'NO BASELINE',
+      )
+    })
+
+    it('reads a tip only where it is one, and keeps it through the record', () => {
+      expect(normaliseTip('A1B2C3D4')).toBe('a1b2c3d4')
+      for (const bad of ['', 'zzzz', 'abc', null, 42, 'a'.repeat(65)]) expect(normaliseTip(bad)).toBe('')
+      const rec = recordParkedBranch(parseCommissionRecord(''), 'feat/1-a', 'why', { at, tip: 'A1B2C3D4E5' })
+      expect(parseCommissionRecord(JSON.stringify(rec)).parked['feat/1-a'].tip).toBe('a1b2c3d4e5')
+      expect(commissionRecordReport(rec)).toContain('parked at a1b2c3d4')
+      // A hand-edited nonsense tip is dropped, and the clock carries the park.
+      const hand = parseCommissionRecord(JSON.stringify({ parked: { 'feat/1-a': { reason: 'why', at, tip: 'nope' } } }))
+      expect(hand.parked['feat/1-a'].tip).toBe('')
+    })
+  })
+
+  // WORK ASSIGNED BACK ONTO A PARKED BRANCH REOCCUPIES ITS SLOT AT THE
+  // ASSIGNMENT (fourth review, findings 6 and 11). Counting parked branches
+  // into the in-flight set read that assignment as `nothing-opened`, so at a
+  // full pool the call passed and occupancy exceeded the cap the moment the
+  // branch moved.
+  describe('recommissioning a PARKED branch opens a slot again', () => {
+    const at = '2026-08-17T18:00:00.000Z'
+    const parked = { 'feat/336-croc-staging': { reason: 'superseded', at, tip: 'a1b2c3d4' } }
+    const parked336 = { ...NINE_BRANCHES[0], tip: 'a1b2c3d4' }
+
+    it('REFUSES at a full pool — the reassignment is an opening, not nothing', () => {
+      // 336 parked, three LIVE branches: the pool is full.
+      const branches = [parked336, ...NINE_BRANCHES.slice(1, 4)]
+      const d = branchSlotDecision({
+        branches,
+        parked,
+        points: [336],
+        refs: ['feat/336-croc-staging'],
+        now: AUG17,
+      })
+      expect(d.count).toBe(3)
+      expect(d.adding).toBe(1)
+      expect(d.allowed).toBe(false)
+    })
+
+    it('ALLOWS with room, counts the branch again, and NAMES the park to clear', () => {
+      const branches = [parked336, ...NINE_BRANCHES.slice(1, 3)]
+      const d = branchSlotDecision({
+        branches,
+        parked,
+        points: [336],
+        refs: ['feat/336-croc-staging'],
+        now: AUG17,
+      })
+      expect(d).toMatchObject({ allowed: true, count: 2, adding: 1 })
+      expect(d.reopens).toEqual(['feat/336-croc-staging'])
+    })
+
+    it('reads a POINT-only assignment (a spawn) onto a parked branch the same way', () => {
+      const branches = [parked336, ...NINE_BRANCHES.slice(1, 4)]
+      const d = branchSlotDecision({ branches, parked, points: [336], now: AUG17 })
+      expect(d.adding).toBe(1)
+      expect(d.allowed).toBe(false)
+      expect(d.reopens).toEqual(['feat/336-croc-staging'])
+    })
+
+    it('projects every parked branch a point-wide assignment reoccupies', () => {
+      const twoParks = {
+        ...parked,
+        'feat/336-second': { reason: 'alternate', at, tip: 'bb22cc33' },
+      }
+      const branches = [
+        parked336,
+        { ...parked336, ref: 'feat/336-second', tip: 'bb22cc33' },
+        ...NINE_BRANCHES.slice(1, 3),
+      ]
+      const d = branchSlotDecision({ branches, parked: twoParks, points: [336], now: AUG17 })
+      expect(d).toMatchObject({ count: 2, adding: 2, allowed: false })
+      expect(d.reopens).toEqual(['feat/336-croc-staging', 'feat/336-second'])
+    })
+
+    it('a point with a LIVE branch beside its parked one is still being finished', () => {
+      const parked687 = { 'feat/687-roam-bound-fixes': { reason: 'superseded', at, tip: 'ffee0011' } }
+      const branches = [
+        NINE_BRANCHES[2], // feat/687-bank-game, live
+        { ...NINE_BRANCHES[3], tip: 'ffee0011' }, // feat/687-roam-bound-fixes, parked
+        NINE_BRANCHES[1],
+      ]
+      const d = branchSlotDecision({ branches, parked: parked687, points: [687], now: AUG17 })
+      expect(d).toMatchObject({ allowed: true, adding: 0, reopens: [] })
+    })
+  })
+
+  it('keeps a parked branch parked when its tip date cannot be read', () => {
+    const parked = { 'feat/336-croc-staging': { reason: 'superseded', at: '2026-08-17T18:00:00.000Z' } }
+    const blind = [{ ref: 'feat/336-croc-staging', tipAt: null, behind: null }, ...NINE_BRANCHES.slice(1, 3)]
+    expect(branchSlotDecision({ branches: blind, parked, point: 697, now: AUG17 }).count).toBe(2)
+  })
+
+  it('matches a park written in any git spelling of the same branch', () => {
+    const parked = { 'origin/feat/336-croc-staging': { reason: 'superseded', at: '2026-08-17T18:00:00.000Z' } }
+    expect(branchSlotDecision({ branches: NINE_BRANCHES.slice(0, 3), parked, point: 697, now: AUG17 }).count).toBe(2)
+  })
+
+  it('counts one branch once across its local and remote spellings', () => {
+    const doubled = NINE_BRANCHES.slice(0, 3).flatMap((b) => [b, { ...b, ref: `origin/${b.ref}` }])
+    expect(branchSlotDecision({ branches: doubled, point: 697, now: AUG17 }).count).toBe(3)
+  })
+
+  it('counts TWO branches for one point as two — both were real work standing open', () => {
+    const both = [NINE_BRANCHES[2], NINE_BRANCHES[3]]
+    expect(branchSlotDecision({ branches: both, point: 697, now: AUG17 }).count).toBe(2)
+  })
+
+  it('does not count the branch of the point being commissioned — that is finishing, not opening', () => {
+    const three = NINE_BRANCHES.slice(0, 3)
+    expect(branchSlotDecision({ branches: three, point: 336, now: AUG17 })).toMatchObject({
+      allowed: true,
+      count: 3,
+      adding: 0,
+    })
+  })
+
+  it('FAILS OPEN when git could not be questioned', () => {
+    expect(branchSlotDecision({ branches: NINE_BRANCHES, point: 697, readable: false, now: AUG17 })).toMatchObject({
+      allowed: true,
+      why: 'branches-unreadable',
+    })
+  })
+
+  it('keeps existing target branches in occupancy while naming every target', () => {
+    const three = NINE_BRANCHES.slice(0, 3) // 336, 686, 687
+    // Continuing two existing points adds nothing, but all three live branches
+    // still occupy their slots.
+    expect(branchSlotDecision({ branches: three, points: [336, 686], now: AUG17 })).toMatchObject({
+      allowed: true,
+      count: 3,
+      adding: 0,
+    })
+    const d = branchSlotDecision({ branches: three, points: [705, 697], now: AUG17 })
+    expect(d.allowed).toBe(false)
+    expect(branchSlotRefusal(d)).toContain('opening points 705 and 697 would add 2 more')
+  })
+
+  // THE DECISIVE CAPACITY CASE (fourth review, finding 8): TWO occupied slots
+  // plus TWO newly opened points. An implementation that ignores the second
+  // commissioning computes 2+1 and allows; the real state the call would leave
+  // is 4 branches under a cap of 3.
+  it('refuses TWO points opened into ONE free slot — judged on the state the call would LEAVE', () => {
+    const two = NINE_BRANCHES.slice(0, 2)
+    const d = branchSlotDecision({ branches: two, points: [705, 697], now: AUG17 })
+    expect(d.count).toBe(2)
+    expect(d.adding).toBe(2)
+    expect(d.allowed).toBe(false)
+    // ONE of the two points alone fits the free slot.
+    expect(branchSlotDecision({ branches: two, points: [705], now: AUG17 }).allowed).toBe(true)
+    // Here landing ONE suffices (2+2−3), and the refusal says exactly that…
+    expect(branchSlotRefusal(d)).toContain('one of them must go')
+    // …while at THREE occupied plus two opened, landing one leaves the call
+    // refused, and the refusal must demand TWO (finding 7).
+    const worse = branchSlotDecision({ branches: NINE_BRANCHES.slice(0, 3), points: [705, 697], now: AUG17 })
+    expect(worse.allowed).toBe(false)
+    expect(branchSlotRefusal(worse)).toContain('2 of them must go')
+  })
+
+  it('tells an oversized empty-pool call to commission fewer targets', () => {
+    const d = branchSlotDecision({ branches: [], points: [712, 713, 714, 715], cap: 3, now: AUG17 })
+    expect(d).toMatchObject({ count: 0, adding: 4, allowed: false })
+    const text = branchSlotRefusal(d)
+    expect(text).toContain('THE CALL ITSELF EXCEEDS THE POOL CAP')
+    expect(text).toContain('COMMISSION FEWER TARGETS')
+    expect(text).toContain('at most 3 branches')
+    expect(text).toContain('no existing branch to LAND or PARK')
+    expect(text).not.toContain('one of them must go')
+  })
+
+  it('names both required remedies when landing every standing branch is not enough', () => {
+    const one = [{ ...NINE_BRANCHES[0], tip: 'a1b2c3d4' }]
+    const points = [701, 702, 703, 704]
+    const refused = branchSlotDecision({ branches: one, points, cap: 3, now: AUG17 })
+    expect(refused).toMatchObject({ count: 1, adding: 4, allowed: false })
+
+    const text = branchSlotRefusal(refused)
+    expect(text).toContain('feat/336-croc-staging')
+    expect(text).toContain('LAND or PARK all 1 standing branch')
+    expect(text).toContain('COMMISSION 1 FEWER branch-opening target')
+    expect(text).toContain('Neither action alone frees enough slots')
+
+    // Follow the complete remedy: remove the one named branch and one target.
+    // Either printed way of removing the standing branch must then allow the
+    // remaining three-target call under a cap of three.
+    const smallerCall = points.slice(0, 3)
+    expect(branchSlotDecision({ branches: [], points: smallerCall, cap: 3, now: AUG17 }).allowed).toBe(true)
+    const rec = recordParkedBranch(parseCommissionRecord(''), 'feat/336-croc-staging', 'superseded by 701', {
+      at: '2026-08-17T19:00:00.000Z',
+      tip: 'a1b2c3d4',
+    })
+    expect(
+      branchSlotDecision({ branches: one, parked: rec.parked, points: smallerCall, cap: 3, now: AUG17 }).allowed,
+    ).toBe(true)
+
+    // Prove why BOTH clauses are present: either half by itself remains refused.
+    expect(branchSlotDecision({ branches: [], points, cap: 3, now: AUG17 }).allowed).toBe(false)
+    expect(branchSlotDecision({ branches: one, points: smallerCall, cap: 3, now: AUG17 }).allowed).toBe(false)
+  })
+
+  it('refuses a mixed call that continues one occupied point and opens another at the cap', () => {
+    const three = NINE_BRANCHES.slice(0, 3)
+    const d = branchSlotDecision({ branches: three, points: [336, 705], now: AUG17 })
+    expect(d).toMatchObject({ count: 3, adding: 1, allowed: false, why: 'branches-open' })
+  })
+
+  // THE REMEDY, FOLLOWED, LIFTS THE REFUSAL (fourth review, findings 7 and 12):
+  // asserting two substrings proved nothing about the remedy being complete or
+  // effective, so each named way out is taken here and the decision re-asked.
+  it('following the refusal\'s remedy — LAND or PARK — flips the decision to allowed', () => {
+    const three = [{ ...NINE_BRANCHES[0], tip: 'a1b2c3d4' }, ...NINE_BRANCHES.slice(1, 3)]
+    const refused = branchSlotDecision({ branches: three, point: 705, now: AUG17 })
+    expect(refused.allowed).toBe(false)
+    const text = branchSlotRefusal(refused)
+    // The refusal names the concrete branch to act on (oldest first) and the
+    // complete park command shape, reason slot included.
+    expect(text).toContain('one of them must go')
+    expect(text.indexOf('feat/336-croc-staging')).toBeGreaterThan(-1)
+    expect(text).toContain('--reason "<why>"')
+    // (a) LAND the oldest: its branch gone, the same call fits.
+    expect(branchSlotDecision({ branches: three.slice(1), point: 705, now: AUG17 }).allowed).toBe(true)
+    // (b) PARK it exactly as the printed command records it — non-empty reason,
+    // tip baseline — and the same call fits too.
+    const rec = recordParkedBranch(parseCommissionRecord(''), 'feat/336-croc-staging', 'superseded by 703', {
+      at: '2026-08-17T19:00:00.000Z',
+      tip: 'a1b2c3d4',
+    })
+    expect(branchSlotDecision({ branches: three, parked: rec.parked, point: 705, now: AUG17 })).toMatchObject({
+      allowed: true,
+      count: 2,
+    })
+    // An EMPTY reason records no park at all, so the refusal stands.
+    const silent = recordParkedBranch(parseCommissionRecord(''), 'feat/336-croc-staging', '   ', {
+      at: '2026-08-17T19:00:00.000Z',
+      tip: 'a1b2c3d4',
+    })
+    expect(branchSlotDecision({ branches: three, parked: silent.parked, point: 705, now: AUG17 }).allowed).toBe(false)
+  })
+
+  // A NAMED REF NARROWS THE EXEMPTION TO ITSELF (Sol, review of 3078d166). 687
+  // stood on TWO branches on 17.08.2026; the point-wide exemption excused both
+  // of them for a call that was cutting a THIRD.
+  it('exempts only the branch a call NAMES, not every branch its point owns', () => {
+    const three = NINE_BRANCHES.slice(0, 3) // 336, 686, 687-bank-game
+    // Naming the branch that already stands: it is the one being finished.
+    expect(
+      branchSlotDecision({ branches: three, points: [687], refs: ['feat/687-bank-game'], cap: 3, now: AUG17 }),
+    ).toMatchObject({ allowed: true, count: 3, adding: 0 })
+    // Naming a branch that does NOT stand: all three keep their slots.
+    expect(
+      branchSlotDecision({ branches: three, points: [687], refs: ['feat/687-second'], cap: 3, now: AUG17 }),
+    ).toMatchObject({ allowed: false, count: 3 })
+    // Naming NOTHING keeps the point-wide exemption — the branch is unidentifiable.
+    expect(branchSlotDecision({ branches: three, points: [687], cap: 3, now: AUG17 })).toMatchObject({
+      allowed: true,
+      count: 3,
+      adding: 0,
+    })
+    // A ref for one point does not narrow ANOTHER point's exemption.
+    expect(
+      branchSlotDecision({ branches: three, points: [687, 686], refs: ['feat/687-second'], cap: 3, now: AUG17 }),
+    ).toMatchObject({ count: 3 })
+  })
+
+  it('never throws on hostile input, and refuses nothing it cannot see', () => {
+    expect(() => branchSlotDecision()).not.toThrow()
+    expect(branchSlotDecision().allowed).toBe(true)
+    expect(branchSlotDecision({ branches: 'nonsense' }).allowed).toBe(true)
+    expect(branchSlotDecision({ branches: [null, {}, { ref: '   ' }] }).count).toBe(0)
+    expect(() => branchSlotRefusal()).not.toThrow()
+    expect(() => openBranchSlots()).not.toThrow()
+  })
+
+  it('caps the listing and says how many it left out', () => {
+    const text = branchSlotRefusal(branchSlotDecision({ branches: NINE_BRANCHES, now: AUG17 }), { limit: 3 })
+    expect(text).toContain('…and 6 more')
+  })
+})
+
+describe('the commission record — an override is visible AFTERWARDS, not only when taken', () => {
+  it('stores an override with the point and reports the reason back', () => {
+    const rec = recordCommissionOverride(parseCommissionRecord(''), 697, 'red on main masks other suites', {
+      at: '2026-08-17T19:41:00.000Z',
+    })
+    expect(commissionOverrideFor(rec, 697)).toBe('red on main masks other suites')
+    expect(commissionOverrideFor(rec, 700)).toBe('')
+    const text = commissionRecordReport(rec)
+    expect(text).toContain('point 697')
+    expect(text).toContain('red on main masks other suites')
+    expect(text).toContain('2026-08-17T19:41:00.000Z')
+  })
+
+  it('refuses to store an EMPTY reason — that is the silence the mechanism forbids', () => {
+    const empty = parseCommissionRecord('')
+    expect(commissionOverrideFor(recordCommissionOverride(empty, 697, '   '), 697)).toBe('')
+    expect(commissionOverrideFor(recordCommissionOverride(empty, 697, null), 697)).toBe('')
+    expect(recordParkedBranch(empty, 'feat/336-croc-staging', '').parked).toEqual({})
+    expect(recordCommissionOverride(empty, 0, 'why').overrides).toEqual({})
+  })
+
+  it('parks and unparks a branch under one spelling', () => {
+    let rec = recordParkedBranch(parseCommissionRecord(''), 'origin/feat/336-croc-staging', 'superseded by 703', {
+      at: '2026-08-17T19:00:00.000Z',
+    })
+    expect(Object.keys(rec.parked)).toEqual(['feat/336-croc-staging'])
+    expect(commissionRecordReport(rec)).toContain('feat/336-croc-staging — superseded by 703')
+    rec = clearParkedBranch(rec, 'refs/heads/feat/336-croc-staging')
+    expect(rec.parked).toEqual({})
+    expect(commissionRecordReport(rec)).toContain('Parked branches: none.')
+  })
+
+  it('round-trips through JSON, and survives a torn file by saying so', () => {
+    const rec = recordParkedBranch(recordCommissionOverride(parseCommissionRecord(''), 697, 'why', { at: 'x' }), 'feat/1-a', 'parked')
+    expect(parseCommissionRecord(JSON.stringify(rec))).toMatchObject({
+      overrides: { 697: { reason: 'why', at: 'x' } },
+      parked: { 'feat/1-a': { reason: 'parked', at: '' } },
+      torn: false,
+    })
+    for (const bad of ['{', '[]', 'null', '"text"', '{"overrides":5}']) {
+      const parsed = parseCommissionRecord(bad)
+      expect(parsed.overrides).toEqual({})
+      expect(parsed.parked).toEqual({})
+    }
+    expect(parseCommissionRecord('{').torn).toBe(true)
+    expect(commissionRecordReport(parseCommissionRecord('{'))).toContain(COMMISSION_RECORD_PATH)
+    expect(parseCommissionRecord('').torn).toBe(false)
+    expect(parseCommissionRecord(null).torn).toBe(false)
+    // A well-formed file with a hostile entry keeps only what it can trust.
+    expect(parseCommissionRecord('{"overrides":{"x":{"reason":"a"},"7":{"reason":""}},"parked":{"":{"reason":"a"}}}'))
+      .toMatchObject({ overrides: {}, parked: {}, torn: false })
+  })
+
+  it('never throws on hostile input', () => {
+    expect(() => commissionRecordReport()).not.toThrow()
+    expect(() => recordCommissionOverride(null, 1, 'a')).not.toThrow()
+    expect(() => clearParkedBranch(null, 'feat/1-a')).not.toThrow()
+    expect(commissionOverrideFor(null, 1)).toBe('')
+  })
+})
+
+describe('slotReasonDecision — the target half counts the same occupancy as the refusal', () => {
+  const independent = [{ point: 9, files: ['src/a.ts'] }]
+  const running = ['src/b.ts']
+
+  it('reads a full pool of OPEN BRANCHES as at-cap, however few agents run', () => {
+    expect(
+      slotReasonDecision({ agents: 1, openBranches: 9, openPoints: independent, runningFiles: running }),
+    ).toMatchObject({ needsReason: false, why: 'at-cap', slotsFree: 0 })
+  })
+
+  it('still demands a reason where branches and agents both leave room', () => {
+    expect(
+      slotReasonDecision({ agents: 1, openBranches: 1, openPoints: independent, runningFiles: running }),
+    ).toMatchObject({ needsReason: true, why: 'idle-slots' })
+  })
+
+  // REWRITTEN after Sol's review of 91d88f9a: the old case pinned the bare
+  // `Math.max` and so pinned a divergence from the branch rule instead of the
+  // rule. The two states are DIFFERENT and are now named as such — the branch
+  // count is the occupancy point 712 specifies, and a full set of running agents
+  // is the concurrent-agent cap of CLAUDE.md §6, which still binds a spawn.
+  it('names WHICH cap is full — the branches, or the agents that have not cut one', () => {
+    expect(slotReasonDecision({ agents: 0, openBranches: 3, openPoints: independent, runningFiles: running })).toMatchObject(
+      { needsReason: false, why: 'at-cap', slotsFree: 0, openBranches: 3 },
+    )
+    // THE AGENT COUNT NEVER OCCUPIES A BRANCH SLOT (Sol, review of 3078d166):
+    // three agents that cut no branch suppress the DEMAND under their own name,
+    // and still report the three branch slots that really stand empty. Folding
+    // the two into `max()` reported one free slot for a pool with none taken.
+    expect(slotReasonDecision({ agents: 3, openBranches: 0, openPoints: independent, runningFiles: running })).toMatchObject(
+      { needsReason: false, why: 'agents-at-cap', slotsFree: POOL_CAP, agents: 3, openBranches: 0 },
+    )
+    // Neither full: the demand stands, and both counts are reported SEPARATELY.
+    expect(slotReasonDecision({ agents: 2, openBranches: 1, openPoints: independent, runningFiles: running })).toMatchObject(
+      { needsReason: true, why: 'idle-slots', slotsFree: POOL_CAP - 1, agents: 2, openBranches: 1 },
+    )
+  })
+
+  it('demands NOTHING while the branch count could not be read at all', () => {
+    // A git that cannot be questioned reads as zero branches, which is exactly
+    // what a repository with no open branch reads as — so the demand would fire
+    // on unmeasured occupancy. It stands down instead.
+    expect(
+      slotReasonDecision({
+        agents: 1,
+        openBranches: 0,
+        branchesReadable: false,
+        openPoints: independent,
+        runningFiles: running,
+      }),
+    ).toMatchObject({ needsReason: false, why: 'branches-unreadable' })
+    // …but a PAUSE and a freeze still answer first: they are the stronger reason.
+    expect(
+      slotReasonDecision({ branchesReadable: false, paused: true, openPoints: independent, runningFiles: running }).why,
+    ).toBe('paused')
+  })
+
+  it('carries a torn commission record into the pure slot decision and report', () => {
+    expect(
+      slotReasonDecision({
+        agents: 1,
+        openBranches: 3,
+        recordReadable: false,
+        openPoints: independent,
+        runningFiles: running,
+      }),
+    ).toMatchObject({ needsReason: false, why: 'record-unreadable' })
+    expect(gatherSlots({}, { recordProbe: () => ({ overrides: {}, parked: {}, torn: true }) })).toMatchObject({
+      needsReason: false,
+      why: 'record-unreadable',
+    })
+  })
+
+  it('ignores a nonsensical branch count rather than inventing occupancy', () => {
+    expect(
+      slotReasonDecision({ agents: 1, openBranches: NaN, openPoints: independent, runningFiles: running }).slotsFree,
+    ).toBe(POOL_CAP)
+    expect(
+      slotReasonDecision({ agents: 1, openBranches: -4, openPoints: independent, runningFiles: running }).slotsFree,
+    ).toBe(POOL_CAP)
+  })
+})
+
+// ---- WHICH POINT IS A TOOL CALL OPENING? (point 712) ----------------------
+//
+// The refusal is worth exactly what this recognition is worth: a call it misreads
+// refuses the wrong work, and a call it misses is the silent failure of
+// 17.08.2026 all over again. Both directions are written from the failure side.
+describe('commissionTarget — the act of opening a point, recognised', () => {
+  it('reads the point out of the branch an agent prompt names', () => {
+    expect(
+      commissionTarget({
+        toolName: 'Agent',
+        prompt: 'Work in /workspace/hoa/.claude/worktrees/agent-x, branch feat/697-goat-foot is checked out.',
+      }),
+      // THE PROSE'S OWN BRANCH NAME IS CARRIED (Sol, review of dd7fd78c): without
+      // it a spawn naming a SECOND branch for a point in flight kept the
+      // point-wide exemption, which is the escape the shell path had just lost.
+    ).toEqual({ point: 697, points: [697], refs: ['feat/697-goat-foot'], refsLoose: true, how: 'agent' })
+  })
+
+  it('reads a point NAMED in prose when no branch is spelled out, in either language', () => {
+    expect(commissionTarget({ toolName: 'Task', prompt: 'Deliver work-order point 697.' })).toEqual({
+      point: 697,
+      points: [697],
+      refs: [],
+      refsLoose: true,
+      how: 'agent',
+    })
+    expect(commissionTarget({ toolName: 'Agent', description: 'Punkt 705 umsetzen' })).toEqual({
+      point: 705,
+      points: [705],
+      refs: [],
+      refsLoose: true,
+      how: 'agent',
+    })
+  })
+
+  // REWRITTEN after Sol's review of 91d88f9a. The old case blessed
+  // `git checkout -b feat/697-a && git branch feat/705-b` as "no target", which
+  // made ONE shell call a complete bypass of both refusals — the test pinned the
+  // hole rather than the rule. A command is not ambiguous about what it creates.
+  it('judges every point a command opens, while declaring multi-point prose ambiguous', () => {
+    expect(
+      commissionTarget({ toolName: 'Bash', command: 'git checkout -b feat/697-a && git branch feat/705-b' }),
+    ).toEqual({ point: 697, points: [697, 705], refs: ['feat/697-a', 'feat/705-b'], refsLoose: false, how: 'branch' })
+    // …in every separator a shell offers, and with a worktree beside a cut.
+    expect(
+      commissionTarget({ toolName: 'Bash', command: 'git branch feat/705-b; git switch -c feat/697-a' }).points,
+    ).toEqual([705, 697])
+    expect(
+      commissionTarget({ toolName: 'Bash', command: 'git worktree add -b feat/711-x t\ngit checkout -b feat/697-a' })
+        .points,
+    ).toEqual([711, 697])
+    // A spawn prompt is free prose, so two branch names are reported rather
+    // than guessed into two assignments.
+    const prose = commissionTarget({
+      toolName: 'Agent',
+      prompt: 'work branch feat/697-a and also branch feat/705-b',
+    })
+    expect(prose).toMatchObject({ point: null, points: [], how: 'ambiguous-prose' })
+    expect(prose.ambiguous).toMatchObject({ points: [697, 705], refs: ['feat/697-a', 'feat/705-b'] })
+  })
+
+  it('declares mixed negation ambiguous instead of guessing points in or out', () => {
+    const t = commissionTarget({ toolName: 'Agent', prompt: 'branch feat/697-a; do not touch feat/705-b' })
+    expect(t).toMatchObject({ point: null, points: [], how: 'ambiguous-prose' })
+    expect(t.ambiguous).toMatchObject({ points: [697, 705], refs: ['feat/697-a', 'feat/705-b'] })
+    expect(t.ambiguous.reasons).toContain('multiple point mentions')
+    const post = commissionTarget({ toolName: 'Agent', prompt: 'Punkt 705 nicht beginnen' })
+    expect(post).toMatchObject({ point: null, points: [], how: 'ambiguous-prose' })
+    expect(post.ambiguous.points).toEqual([705])
+    // A negation in another sentence is not attached to the assignment.
+    expect(commissionTarget({ toolName: 'Agent', prompt: 'Do not guess. Work point 705' }).points).toEqual([705])
+    expect(commissionTarget({ toolName: 'Agent', prompt: 'work point 705 and do not skip the tests' }).how).toBe(
+      'ambiguous-prose',
+    )
+  })
+
+  it('reads the branch off the flag, so a START point and a push are not commissionings', () => {
+    expect(
+      commissionTarget({ toolName: 'Bash', command: 'git checkout -b feat/697-a origin/feat/705-b' }).points,
+    ).toEqual([697])
+    expect(
+      commissionTarget({ toolName: 'Bash', command: 'git checkout -b feat/697-a && git push -u origin feat/705-b' })
+        .points,
+    ).toEqual([697])
+  })
+
+  it('declares multi-point and dependency prose ambiguous, naming what it saw', () => {
+    const two = commissionTarget({ toolName: 'Agent', prompt: 'implement point 712 and point 713' })
+    expect(two).toMatchObject({ point: null, points: [], how: 'ambiguous-prose' })
+    expect(two.ambiguous.points).toEqual([712, 713])
+    const dependency = commissionTarget({ toolName: 'Agent', prompt: 'point 697 depends on point 705' })
+    expect(dependency).toMatchObject({ point: null, points: [], how: 'ambiguous-prose' })
+    expect(dependency.ambiguous.points).toEqual([697, 705])
+  })
+
+  it('does not let a branch mention hide a second prose point', () => {
+    const t = commissionTarget({ toolName: 'Agent', prompt: 'branch feat/711-x, which point 400 first asked for' })
+    expect(t).toMatchObject({ point: null, points: [], how: 'ambiguous-prose' })
+    expect(t.ambiguous).toMatchObject({ points: [711, 400], refs: ['feat/711-x'] })
+  })
+
+  it('recognises a branch being CUT, in every spelling, slug or none', () => {
+    expect(commissionTarget({ toolName: 'Bash', command: 'git checkout -b feat/697-goat main' })).toEqual({
+      point: 697,
+      points: [697],
+      refs: ['feat/697-goat'],
+      refsLoose: false,
+      how: 'branch',
+    })
+    expect(commissionTarget({ toolName: 'Bash', command: 'git switch -c feat/697' })).toEqual({
+      point: 697,
+      points: [697],
+      refs: ['feat/697'],
+      refsLoose: false,
+      how: 'branch',
+    })
+    expect(commissionTarget({ toolName: 'Bash', command: 'git branch feat/697-goat main' })).toEqual({
+      point: 697,
+      points: [697],
+      refs: ['feat/697-goat'],
+      refsLoose: false,
+      how: 'branch',
+    })
+  })
+
+  // ADDED after Sol's review of 3078d166: the short flags alone were a bypass.
+  // `git switch --create feat/697-x` cuts a branch git is perfectly happy with,
+  // and the guard answered `none` and exited before either refusal fired. Every
+  // spelling git accepts must be a spelling this rule reads.
+  it('recognises the LONG and FORCE spellings too — a bypass is a bypass', () => {
+    const points = (command) => commissionTarget({ toolName: 'Bash', command }).points
+    expect(points('git switch --create feat/697-x')).toEqual([697])
+    expect(points('git switch --force-create feat/697-x')).toEqual([697])
+    expect(points('git switch -C feat/697-x')).toEqual([697])
+    expect(points('git checkout -B feat/697-x main')).toEqual([697])
+    // The ORPHAN forms cut a branch with an empty history — still a branch
+    // (fourth review, finding 10: the sweep had omitted them).
+    expect(points('git checkout --orphan feat/697-x')).toEqual([697])
+    expect(points('git switch --orphan feat/697-x')).toEqual([697])
+    expect(points('git worktree add -B feat/697-x .claude/worktrees/agent-y')).toEqual([697])
+    // `git branch -c/-m <old> <new>` CREATES <new>, and the new name is the last.
+    expect(points('git branch -c feat/705-a feat/697-x')).toEqual([697])
+    expect(points('git branch --copy feat/705-a feat/697-x')).toEqual([697])
+    expect(points('git branch -M feat/697-x')).toEqual([697])
+    // `-t`/`--track` CREATE with tracking set up; `--recurse-submodules` is a
+    // boolean that must not eat the branch name (fourth review, finding 3).
+    expect(points('git branch -t feat/697-x main')).toEqual([697])
+    expect(points('git branch --track feat/697-x main')).toEqual([697])
+    expect(points('git branch --recurse-submodules feat/697-x main')).toEqual([697])
+    // …while the DESTRUCTIVE and read-only forms still open nothing.
+    expect(points('git branch -D feat/697-x')).toEqual([])
+    expect(points('git branch -d feat/697-x')).toEqual([])
+    expect(points('git branch --list feat/697-x')).toEqual([])
+    expect(points('git push -u origin feat/697-x')).toEqual([])
+    expect(points('git checkout feat/697-x')).toEqual([])
+    expect(points('git switch feat/697-x')).toEqual([])
+  })
+
+  // A NAME IN QUOTES IS THE SAME NAME (fourth review, finding 2): the `(\S+)`
+  // capture kept the shell quoting, `normRef` did not strip it, and the call
+  // walked past both refusals as "no target".
+  it('reads a QUOTED branch name in every creating spelling', () => {
+    const target = (command) => commissionTarget({ toolName: 'Bash', command })
+    expect(target("git switch -c 'feat/712-work'")).toMatchObject({ points: [712], refs: ['feat/712-work'] })
+    expect(target('git checkout -b "feat/712-work" main')).toMatchObject({ points: [712], refs: ['feat/712-work'] })
+    expect(target("git branch 'feat/712-work'")).toMatchObject({ points: [712], refs: ['feat/712-work'] })
+    expect(target('git worktree add -b "feat/712-work" .claude/worktrees/agent-z')).toMatchObject({
+      points: [712],
+      refs: ['feat/712-work'],
+    })
+  })
+
+  it('recognises a worktree being created on one', () => {
+    expect(
+      commissionTarget({ toolName: 'Bash', command: 'git worktree add -b feat/697-goat .claude/worktrees/agent-y' }),
+    ).toEqual({ point: 697, points: [697], refs: ['feat/697-goat'], refsLoose: false, how: 'worktree' })
+    // A tree created ON an existing branch is the same act, named plainly.
+    expect(
+      commissionTarget({ toolName: 'Bash', command: 'git worktree add .claude/worktrees/agent-y feat/697-goat' }).points,
+    ).toEqual([697])
+  })
+
+  it('recognises an authoring run as the commissioning it is', () => {
+    expect(commissionTarget({ toolName: 'Bash', command: 'node scripts/author-sol.mjs --point 697' })).toEqual({
+      point: 697,
+      points: [697],
+      refs: [],
+      refsLoose: false,
+      how: 'author',
+    })
+    expect(commissionTarget({ toolName: 'Bash', command: 'node scripts/author-fable.mjs --point 834' })).toEqual({
+      point: 834,
+      points: [834],
+      refs: [],
+      refsLoose: false,
+      how: 'author',
+    })
+  })
+
+  it('opens NOTHING on the read-only authoring legs — routing and dry-run', () => {
+    expect(commissionTarget({ toolName: 'Bash', command: 'node scripts/author-sol.mjs --routing --point 697' })).toEqual(
+      { point: null, points: [], refs: [], refsLoose: false, how: 'none' },
+    )
+    expect(
+      commissionTarget({ toolName: 'Bash', command: 'node scripts/author-sol.mjs --point 697 --dry-run' }).point,
+    ).toBeNull()
+    expect(
+      commissionTarget({ toolName: 'Bash', command: 'node scripts/author-fable.mjs --point 834 --dry-run' }).point,
+    ).toBeNull()
+    // …and a read-only leg beside a real cut does not shield the cut.
+    expect(
+      commissionTarget({
+        toolName: 'Bash',
+        command: 'node scripts/author-sol.mjs --routing --point 705 && git checkout -b feat/697-a',
+      }).points,
+    ).toEqual([697])
+  })
+
+  it('opens NOTHING when the call only touches a branch that already exists', () => {
+    for (const command of [
+      'git checkout feat/697-goat',
+      'git push -u origin feat/697-goat',
+      'git switch feat/697-goat',
+      'git branch -D feat/697-goat',
+      'git merge --no-ff feat/697-goat',
+      'git log feat/697-goat',
+      'node scripts/land-point.mjs 697 --model opus-5',
+      'node scripts/point-brief.mjs 697',
+    ]) {
+      expect(commissionTarget({ toolName: 'Bash', command }).point, command).toBeNull()
+    }
+  })
+
+  it('judges a COMMAND wherever it arrives — which tools it SEES is the matcher\'s job, not this rule\'s', () => {
+    expect(commissionTarget({ toolName: 'PowerShell', command: 'git checkout -b feat/697-x' })).toEqual({
+      point: 697,
+      points: [697],
+      refs: ['feat/697-x'],
+      refsLoose: false,
+      how: 'branch',
+    })
+  })
+
+  it('opens nothing on a call that carries no command and no prompt', () => {
+    expect(commissionTarget({ toolName: 'Bash', command: '   ' })).toEqual({
+      point: null,
+      points: [],
+      refs: [],
+      refsLoose: false,
+      how: 'none',
+    })
+    expect(commissionTarget({ toolName: 'Read', filePath: 'TASKS.md' })).toEqual({
+      point: null,
+      points: [],
+      refs: [],
+      refsLoose: false,
+      how: 'none',
+    })
+    expect(commissionTarget()).toEqual({ point: null, points: [], refs: [], refsLoose: false, how: 'none' })
+  })
+
+  it('never throws on hostile input', () => {
+    expect(() => commissionTarget({ toolName: null, command: null, prompt: null, description: null })).not.toThrow()
+    expect(commissionTarget({ toolName: 'Bash', command: 'git checkout -b feat/0-nope' }).point).toBeNull()
+    expect(commissionTarget({ toolName: 'Agent', prompt: 'feat/'.repeat(500) }).point).toBeNull()
   })
 })

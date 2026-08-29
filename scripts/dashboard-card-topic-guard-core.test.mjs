@@ -15,7 +15,7 @@ import {
 import { CLOSING_WORK_TITLE, NO_CURRENT_WORK_TITLE } from './board-core.mjs'
 
 /** Known-point set covering the numbers the cases below reference. */
-const KNOWN = new Set([1, 13, 92, 188, 244, 246, 266, 272])
+const KNOWN = new Set([1, 13, 92, 188, 244, 246, 266, 272, 1000, 1003])
 
 const TASKS_SAMPLE = `# TASKS
 - [x] 1. First point ever.
@@ -25,6 +25,8 @@ const TASKS_SAMPLE = `# TASKS
 some prose mentioning 123. without the checkbox form
 - [x] 246. Crocodile fix.
 - [x] 266. Trample crush sound.
+- [ ] 1000. First four-digit point.
+- [ ] 1003. Second four-digit point.
 `
 
 /** Minimal dashboard in the real board's markup (now + questions + queue + done). */
@@ -47,7 +49,7 @@ ${done.map(card).join('\n')}
 
 describe('knownPoints', () => {
   it('collects every `- [ ] N.` / `- [x] N.` line and nothing else', () => {
-    expect([...knownPoints(TASKS_SAMPLE)].sort((a, b) => a - b)).toEqual([1, 92, 246, 266, 272])
+    expect([...knownPoints(TASKS_SAMPLE)].sort((a, b) => a - b)).toEqual([1, 92, 246, 266, 272, 1000, 1003])
   })
 
   it('is total on non-string input', () => {
@@ -68,6 +70,61 @@ describe('parseCards', () => {
     expect(queue.map((c) => c.point)).toEqual([244])
   })
 
+  it('reads an uncapped own point from a now-card title', () => {
+    const html = boardHtml({ now: [{ n: 1000, body: '<p>Kurz.</p>' }] })
+    const now = parseCards(html.slice(html.indexOf('Woran ich'), html.indexOf('<h2>Von dir')), 'now', {
+      knownPoints: KNOWN,
+    })
+    expect(now.map((c) => c.point)).toEqual([1000])
+  })
+
+  it('aligns colon and compound ownership with the dashboard audit', () => {
+    const section = `
+<details><summary><span class="t">1000: Einzelarbeit</span></summary><div class="body">Punkt 1000.</div></details>
+<details><summary><span class="t">1000+1003 — Verbundarbeit</span></summary><div class="body">Punkt 1000 und Punkt 1003.</div></details>
+<details><summary><span class="num">1000·1003</span><span class="t">Chip-Verbund</span></summary><div class="body">Punkt 1000 und Punkt 1003.</div></details>`
+    const cards = parseCards(section, 'now', { knownPoints: KNOWN })
+    expect(cards.map((c) => c.point)).toEqual([1000, null, null])
+    expect(cards.map((c) => c.ownedPoints)).toEqual([[1000], [1000, 1003], [1000, 1003]])
+    expect(topicViolations(`<h2>Woran ich gerade arbeite</h2>${section}`, KNOWN)).toEqual([])
+  })
+
+  it('uses provenance to distinguish a bare year from a four-digit point', () => {
+    const section =
+      '<details><summary><span class="t">2026 — Jahresrückblick</span></summary>' +
+      '<div class="body">Punkt 1003.</div></details>'
+    expect(parseCards(section, 'now')[0].ownedPoints).toEqual([])
+    expect(parseCards(section, 'now', { knownPoints: [2026] })[0].ownedPoints).toEqual([2026])
+  })
+
+  it('attributes a sub-delivery chip to its base point', () => {
+    const section =
+      '<details><summary><span class="num">203A</span><span class="t">Teil</span></summary>' +
+      '<div class="body">Punkt 203.</div></details>'
+    expect(parseCards(section, 'now')[0].ownedPoints).toEqual([203])
+    expect(topicViolations(`<h2>Woran ich gerade arbeite</h2>${section}`, KNOWN)).toEqual([])
+  })
+
+  it('does not invent ownership from an ISO date or a hyphenated count', () => {
+    const section = `
+<details><summary><span class="t">2026-07-25 — Rückblick</span></summary><div class="body">Kurz.</div></details>
+<details><summary><span class="t">1 - 2 Tage Aufwand</span></summary><div class="body">Punkt 1.</div></details>`
+    expect(parseCards(section, 'now').map((c) => c.point)).toEqual([null, null])
+    expect(topicViolations(`<h2>Woran ich gerade arbeite</h2>${section}`, KNOWN)).toMatchObject([
+      { where: 'now', point: null, title: '1 - 2 Tage Aufwand', ref: 1 },
+    ])
+  })
+
+  it('does not treat a spaced plain hyphen as a legacy point separator', () => {
+    const section =
+      '<details><summary><span class="t">1000 - Arbeit</span></summary>' +
+      '<div class="body">Punkt 1000.</div></details>'
+    expect(parseCards(section, 'now').map((c) => c.point)).toEqual([null])
+    expect(topicViolations(`<h2>Woran ich gerade arbeite</h2>${section}`, KNOWN)).toMatchObject([
+      { where: 'now', point: null, title: '1000 - Arbeit', ref: 1000 },
+    ])
+  })
+
   it('is total on malformed input', () => {
     expect(parseCards(null, 'queue')).toEqual([])
     expect(parseCards('<details><summary>kein body</summary></details>', 'now')).toEqual([])
@@ -78,6 +135,11 @@ describe('foreignRefs', () => {
   it('finds parenthesized and spelled-out foreign points, deduplicated and sorted', () => {
     const body = '<p>Der Krokodil-Fix (246) und der Geräusch-Fix (266) sind gelandet, siehe Punkt 244 und nochmal (246).</p>'
     expect(foreignRefs(body, 272, KNOWN)).toEqual([244, 246, 266])
+  })
+
+  it('finds four-digit references without matching a known point inside a longer number', () => {
+    expect(foreignRefs('<p>Punkt 1000 und (1003).</p>', 272, KNOWN)).toEqual([1000, 1003])
+    expect(foreignRefs('<p>Punkt 10000 und (10030).</p>', 272, KNOWN)).toEqual([])
   })
 
   it('never flags the card own number', () => {
@@ -117,6 +179,14 @@ describe('topicViolations', () => {
       queue: [{ n: 246, body: '<p>Der Fix (246) ist gebaut — Punkt 246 wartet auf die Prüfung.</p>' }],
     })
     expect(topicViolations(html, KNOWN)).toEqual([])
+  })
+
+  it('keeps a four-digit now-card on topic and flags its four-digit foreign reference', () => {
+    const own = boardHtml({ now: [{ n: 1000, body: '<p>Punkt 1000 bleibt auf der eigenen Karte.</p>' }] })
+    expect(topicViolations(own, KNOWN)).toEqual([])
+
+    const foreign = boardHtml({ now: [{ n: 1000, body: '<p>Folgt Punkt 1003.</p>' }] })
+    expect(topicViolations(foreign, KNOWN)).toMatchObject([{ where: 'now', point: 1000, ref: 1003 }])
   })
 
   it('flags "Punkt N"/"point N" to a foreign point in now and queue cards', () => {
@@ -197,6 +267,13 @@ describe('evaluate', () => {
     expect(r.reason).toContain('--synced')
   })
 
+  it('blocks a four-digit foreign reference through the TASKS-to-evaluate entry point', () => {
+    const html = boardHtml({ now: [{ n: 1000, body: '<p>Folgt Punkt 1003.</p>' }] })
+    const r = evaluate({ dashboardHtml: html, tasksText: TASKS_SAMPLE })
+    expect(r.block).toBe(true)
+    expect(r.reason).toContain('now-card "1000" references point 1003')
+  })
+
   it('allows a clean board and is total on missing input', () => {
     const clean = boardHtml({ now: [{ n: 272, body: '<p>Läuft.</p>' }] })
     expect(evaluate({ dashboardHtml: clean, tasksText: TASKS_SAMPLE }).block).toBe(false)
@@ -228,11 +305,12 @@ describe('the idle and closing cards are exempt', () => {
     expect(evaluate({ dashboardHtml: html, tasksText: TASKS_SAMPLE }).block).toBe(false)
   })
 
-  it('passes over the idle card just the same', () => {
+  it('accepts the idle card\'s required forward reference', () => {
     const html = boardHtml({
-      now: [stateCard(NO_CURRENT_WORK_TITLE, '<p>Punkt 266 ist abgeschlossen, der Stapel wartet.</p>')],
+      now: [stateCard(NO_CURRENT_WORK_TITLE, '<p>Der Nachfolger nimmt Punkt 266 als Nächstes auf.</p>')],
     })
     expect(topicViolations(html, KNOWN)).toEqual([])
+    expect(evaluate({ dashboardHtml: html, tasksText: TASKS_SAMPLE }).block).toBe(false)
   })
 
   it('exempts the two by NAME, not every card without a number', () => {

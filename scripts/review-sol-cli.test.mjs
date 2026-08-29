@@ -42,28 +42,44 @@ import {
 import { tmpdir } from 'node:os'
 import { delimiter, join, resolve } from 'node:path'
 import { FALLBACK_MODEL_NAME, SECOND_FALLBACK_MODEL_NAME, SOL_MODEL_NAME } from './review-sol-core.mjs'
+import { writeState as writeFableState } from './fable-switch-core.mjs'
 
 /** The command and everything it imports — copied so REPO_ROOT is the fixture. */
 const SCRIPT_FILES = [
   'review-sol.mjs',
   'review-sol-core.mjs',
+  // The material budget, its accounting and the pass plan (point 714): the
+  // command refuses a record whose round did not carry the range, and the suite
+  // exercises that refusal against the real command.
+  'review-material-core.mjs',
   // The recorder too: the suite RUNS the record command the report prints, which
   // is the only honest way to claim that command is complete.
   'mechanism-review.mjs',
   'mechanism-review-core.mjs',
+  'authorship-check-core.mjs',
+  'authorship-check-io.mjs',
+  'mandatory-duty-core.mjs',
+  'mechanism-review-range-core.mjs',
   // …which counts a blind-parallel union itself (point 634), so its accounting
   // core travels with it, and asks the AUTHOR allowlist what a model trailer
   // looks like (point 667), so that one does too.
   'blind-merge-core.mjs',
   'model-guard-core.mjs',
+  'main-checkout-core.mjs',
   'repo-paths.mjs',
   'is-main.mjs',
+  // …and the tracked-file probe the recorder asks before it lets a blind half
+  // name its own author (point 834).
+  'git-tracked.mjs',
   // The share switch the command asks BEFORE it spends an allowance (point 654), and
   // the atomic write it persists a setting with. The fixture leaves the setting unset,
   // so every case below runs at `default` — reviews to Sol, as before.
   'sol-share.mjs',
   'sol-share-core.mjs',
+  'fable-switch.mjs',
+  'fable-switch-core.mjs',
   'ask-sol-core.mjs',
+  'author-fable-core.mjs',
   'atomic-write.mjs',
 ]
 
@@ -71,12 +87,31 @@ let dir = ''
 let repo = ''
 let stubDir = ''
 let stateDir = ''
+let fableOnFile = ''
+let fableOffFile = ''
 let script = ''
 let mainSha = ''
 let headSha = ''
 let fableSha = ''
 let solSha = ''
+let solHeadSha = ''
+let unreviewableSha = ''
+let partlyReviewableSha = ''
+let mergeResolutionSha = ''
 let orphanSha = ''
+let bulkSha = ''
+let oddSha = ''
+let gitlinkSha = ''
+let bulkSolSha = ''
+let edgeSha = ''
+let manyTouchesSha = ''
+let historicalReviewSha = ''
+let revertedSha = ''
+/** A name git prints QUOTED, because it is not plain ASCII. */
+const ODD_NAME = 'ümlaut.txt'
+/** A name git does NOT quote and a trim would corrupt (POSIX only — Windows
+ *  cannot create it, so its case skips there). */
+const EDGE_NAME = 'edge-space.txt '
 /** An EMPTY git template: a host `init.templateDir` must not seed the fixture. */
 let emptyTemplate = ''
 
@@ -91,6 +126,17 @@ if (argv[0] === '--version') {
 }
 const out = argv[argv.indexOf('-o') + 1]
 const model = argv[argv.indexOf('-m') + 1]
+if (process.env.STUB_MODE === 'no-receipt') {
+  // The child this mode plays EXITS WITHOUT EVER READING ITS STDIN (finding 8;
+  // round-1 pass 4): the earlier stub read everything first and only withheld
+  // the token, which tested a different child — one that DID read. Answering
+  // before the first read is what makes the receipt impossible to echo for the
+  // honest reason.
+  const answer = process.env.STUB_ANSWER || 'VERDICT: merge\\nEVIDENCE: read the whole range and both test files'
+  if (out) writeFileSync(out, answer)
+  process.stdout.write(answer)
+  process.exit(0)
+}
 // What arrived on stdin is recorded: the material travels that way, and an
 // assertion on the caller's own log message would stay green without it.
 let stdin = ''
@@ -107,10 +153,38 @@ if (process.env.STUB_MODE === 'fail') {
   process.stderr.write('stream error: You are not logged in. Run \`codex login\`.\\n')
   process.exit(1)
 }
-const answer = process.env.STUB_ANSWER || 'VERDICT: merge\\nEVIDENCE: read the whole range and both test files'
+// A compliant reviewer reads the material to its end and echoes the RECEIPT
+// token from its last line (finding 8). STUB_MODE=no-receipt plays the child
+// that answered without ever reading its stdin.
+const token = /=== END OF MATERIAL — RECEIPT ([0-9a-f]+) ===/.exec(stdin)
+const receipt = process.env.STUB_MODE === 'no-receipt' || !token ? '' : 'RECEIPT: ' + token[1] + '\\n'
+const answer = receipt + (process.env.STUB_ANSWER || 'VERDICT: merge\\nEVIDENCE: read the whole range and both test files')
 if (out) writeFileSync(out, answer)
 process.stdout.write(answer)
 process.exit(0)
+`
+
+/** A read-only Claude reviewer whose result proves the requested top-level model. */
+const CLAUDE_STUB = `#!/usr/bin/env node
+const { readFileSync, writeFileSync, appendFileSync } = require('node:fs')
+const argv = process.argv.slice(2)
+const model = argv[argv.indexOf('--model') + 1]
+let stdin = ''
+try { stdin = readFileSync(0, 'utf8') } catch {}
+writeFileSync(process.env.STUB_STDIN, stdin)
+appendFileSync(process.env.STUB_LOG, model + '\\n')
+const token = /=== END OF MATERIAL — RECEIPT ([0-9a-f]+) ===/.exec(stdin)
+const answer = (token ? 'RECEIPT: ' + token[1] + '\\n' : '') +
+  'VERDICT: merge\\nEVIDENCE: read the complete bounded end-state files and their patch'
+process.stdout.write(JSON.stringify({
+  session_id: 'fixture-review-session',
+  result: answer,
+  usage: { input_tokens: 7, output_tokens: 4, cache_read_input_tokens: 0, cache_creation_input_tokens: 90 },
+  modelUsage: {
+    'claude-haiku-4-5': { inputTokens: 20, outputTokens: 1, cacheReadInputTokens: 0, cacheCreationInputTokens: 0 },
+    [model]: { inputTokens: 7, outputTokens: 4, cacheReadInputTokens: 0, cacheCreationInputTokens: 90, canonicalModel: model },
+  },
+}))
 `
 
 /**
@@ -182,6 +256,7 @@ const run = (args, env = {}) =>
       CODEX_HOME: join(dir, 'codex-home'),
       STUB_LOG: join(dir, 'calls.log'),
       STUB_STDIN: join(dir, 'stdin.txt'),
+      FABLE_SWITCH_FILE: fableOnFile,
       ...env,
     }),
   })
@@ -227,17 +302,29 @@ beforeAll(() => {
   repo = join(dir, 'repo')
   stubDir = join(dir, 'bin')
   stateDir = join(repo, 'local')
+  fableOnFile = join(dir, 'fable-on.json')
+  fableOffFile = join(dir, 'fable-off.json')
   mkdirSync(stubDir, { recursive: true })
   mkdirSync(join(repo, 'scripts'), { recursive: true })
 
   writeFileSync(join(stubDir, 'codex'), STUB)
   chmodSync(join(stubDir, 'codex'), 0o755)
+  writeFileSync(join(stubDir, 'claude'), CLAUDE_STUB)
+  chmodSync(join(stubDir, 'claude'), 0o755)
   // Windows cannot execute an extensionless shebang script, and this suite makes
   // Windows-specific assertions elsewhere (four-eyes finding, 11.08.2026).
   if (process.platform === 'win32') {
     writeFileSync(join(stubDir, 'codex.cmd'), `@echo off\r\nnode "%~dp0codex" %*\r\n`)
   }
   writeFileSync(join(dir, 'calls.log'), '')
+  writeFileSync(
+    fableOnFile,
+    JSON.stringify(writeFableState('on', { why: 'fixture default', by: 'test', now: 1 })),
+  )
+  writeFileSync(
+    fableOffFile,
+    JSON.stringify(writeFableState('off', { why: 'fixture refusal', by: 'test', now: 1 })),
+  )
 
   // The fixture history: main, a feature branch above it, and a branch whose
   // commit was authored by the fallback reviewer itself.
@@ -254,6 +341,15 @@ beforeAll(() => {
   // path is refused unless git PROVES it ignored, and that proof is a property
   // of the checkout the file lives in.
   writeFileSync(join(repo, '.gitignore'), '/local/\nnode_modules\n')
+  // A path GIT QUOTES lives in the fixture world from the start (cross-vendor
+  // review, second round): its non-ASCII name is written `"\303\274mlaut.txt"`
+  // in `--name-only` and in the diff header alike, and read literally it
+  // resolved in no `git show` and matched no patch section — the file travelled
+  // in no pass and nothing said so.
+  writeFileSync(join(repo, ODD_NAME), 'the original odd-named file\n')
+  // The trailing-space file exists from the start, so the edge branch MODIFIES
+  // it and its current content must travel beside the patch.
+  if (process.platform !== 'win32') writeFileSync(join(repo, EDGE_NAME), 'the original edge-space file\n')
   mainSha = commit('world.txt', 'the fixture world\n', 'Lay down the fixture world', 'Opus 5')
 
   git('checkout', '-q', '-b', 'feat')
@@ -269,6 +365,123 @@ beforeAll(() => {
   git('add', '-A')
   git('commit', '--no-verify', '-q', '-m', 'Write something as Sol\n\nCo-Authored-By: GPT-5.6 Sol <noreply@openai.com>')
   solSha = git('rev-parse', 'HEAD')
+  // …with a SECOND commit above it, so a `--since` can narrow the Sol range.
+  writeFileSync(join(repo, 'sol2.txt'), 'a second commit in the OpenAI authoring lane\n')
+  git('add', '-A')
+  git('commit', '--no-verify', '-q', '-m', 'Extend the Sol work\n\nCo-Authored-By: GPT-5.6 Sol <noreply@openai.com>')
+  solHeadSha = git('rev-parse', 'HEAD')
+
+  // A single contribution authored by both vendors has no independent vendor
+  // left in the configured reviewer pool. Its refusal must still name the
+  // bounded narrowing the operator can use to make progress around it.
+  git('checkout', '-q', '-b', 'unreviewable', 'main')
+  writeFileSync(join(repo, 'unreviewable.txt'), 'written by both authoring lanes\n')
+  git('add', '-A')
+  git(
+    'commit',
+    '--no-verify',
+    '-q',
+    '-m',
+    'Write across both authoring lanes\n\nCo-Authored-By: GPT-5.6 Sol <noreply@openai.com>\nCo-Authored-By: Claude Opus 5 <noreply@anthropic.com>',
+  )
+  unreviewableSha = git('rev-parse', 'HEAD')
+
+  // One independently reviewable file beside one both-vendor file. The latter
+  // remains owed, but it must not suppress the pass the former can earn.
+  git('checkout', '-q', '-b', 'partly-reviewable', 'main')
+  commit('reviewable.txt', 'written by one authoring lane\n', 'Add the reviewable part', 'Opus 5')
+  writeFileSync(join(repo, 'unavailable.txt'), 'written by both authoring lanes\n')
+  git('add', '-A')
+  git(
+    'commit',
+    '--no-verify',
+    '-q',
+    '-m',
+    'Add the unavailable part\n\nCo-Authored-By: GPT-5.6 Sol <noreply@openai.com>\nCo-Authored-By: Claude Opus 5 <noreply@anthropic.com>',
+  )
+  partlyReviewableSha = git('rev-parse', 'HEAD')
+
+  // A feature branch resolves a conflict while merging a newer main. The
+  // merge itself has no trailer and its second parent is outside `main..head`,
+  // exactly the historical shape that used to turn the cc-only resolution into
+  // unknown authorship and refuse the whole review plan.
+  git('checkout', '-q', '-b', 'merge-resolution', mainSha)
+  commit('world.txt', 'the feature-side world\n', 'Revise the world on the feature', 'Opus 5')
+  git('checkout', '-q', 'main')
+  commit('world.txt', 'the main-side world\n', 'Revise the world on main', 'Opus 5')
+  git('checkout', '-q', 'merge-resolution')
+  const merged = spawnSync('git', ['-c', 'core.hooksPath=', 'merge', '--no-ff', '--no-commit', 'main'], {
+    windowsHide: true,
+    cwd: repo,
+    encoding: 'utf8',
+    env: hermeticEnv(),
+  })
+  expect(merged.status).toBe(1)
+  expect(`${merged.stdout}${merged.stderr}`).toContain('CONFLICT')
+  writeFileSync(join(repo, 'world.txt'), 'the resolved world\n')
+  git('add', '-A')
+  git('commit', '--no-verify', '-q', '-m', 'Resolve the main merge')
+  mergeResolutionSha = git('rev-parse', 'HEAD')
+
+  // A branch whose material CANNOT fit one round (point 714): two files of 120k
+  // characters, so the range needs more than the 200k budget however it is cut.
+  git('checkout', '-q', '-b', 'bulk', 'main')
+  writeFileSync(join(repo, 'bulk-a.txt'), `${'a'.repeat(120_000)}\n`)
+  writeFileSync(join(repo, 'bulk-b.txt'), `${'b'.repeat(120_000)}\n`)
+  git('add', '-A')
+  git('commit', '--no-verify', '-q', '-m', 'Add two files no single round can hold\n\nCo-Authored-By: Claude Opus 5 <noreply@anthropic.com>')
+  bulkSha = git('rev-parse', 'HEAD')
+
+  // …and a branch that CHANGES that quoted-name file, so the range carries it as
+  // a modification and its current content must travel with the patch.
+  git('checkout', '-q', '-b', 'odd-name', 'main')
+  oddSha = commit(ODD_NAME, 'the odd-named file, revised in this range\n', 'Revise the odd-named file', 'Opus 5')
+
+  // …and a branch adding a GITLINK (a submodule pointer, mode 160000): its
+  // entry names a COMMIT object, so its body is absent by design. cacheinfo
+  // writes the entry without any submodule machinery.
+  git('checkout', '-q', '-b', 'gitlink', 'main')
+  git('update-index', '--add', '--cacheinfo', `160000,${'f'.repeat(40)},vendor-sub`)
+  git('commit', '--no-verify', '-q', '-m', 'Pin the vendored subproject\n\nCo-Authored-By: Claude Opus 5 <noreply@anthropic.com>')
+  gitlinkSha = git('rev-parse', 'HEAD')
+
+  // …and a branch touching a path with a TRAILING SPACE, which git prints
+  // UNQUOTED — the spelling a trim corrupts into a different path (point 714,
+  // third round). Windows cannot create such a file, so the branch is POSIX-only.
+  if (process.platform !== 'win32') {
+    git('checkout', '-q', '-b', 'edge-name', 'main')
+    edgeSha = commit(EDGE_NAME, 'content behind the trailing space\n', 'Touch the edge-space file', 'Opus 5')
+  }
+
+  // …and the same bulk, authored by SOL: the role swap hands the whole range to
+  // a Claude reviewer, and a range no round can hold must be handed on as passes
+  // rather than as a whole-range record template (cross-vendor review, second
+  // round).
+  git('checkout', '-q', '-b', 'bulk-sol', 'main')
+  writeFileSync(join(repo, 'bulk-c.txt'), `${'c'.repeat(120_000)}\n`)
+  writeFileSync(join(repo, 'bulk-d.txt'), `${'d'.repeat(120_000)}\n`)
+  git('add', '-A')
+  git('commit', '--no-verify', '-q', '-m', 'Add two more files no round can hold\n\nCo-Authored-By: GPT-5.6 Sol <noreply@openai.com>')
+  bulkSolSha = git('rev-parse', 'HEAD')
+
+  // The measured shape behind point 737: history is long, but the end-state
+  // artefact is one small file and therefore one review round.
+  git('checkout', '-q', '-b', 'many-touches', 'main')
+  for (let index = 1; index <= 8; index++) {
+    const touchSha = commit(
+      'shared.txt',
+      `current end state after touch ${index}\n`,
+      `Touch the shared file ${index}`,
+      'Opus 5',
+    )
+    if (index === 1) historicalReviewSha = touchSha
+    manyTouchesSha = touchSha
+  }
+
+  // A path changed and then restored has no net artefact to review.
+  git('checkout', '-q', '-b', 'reverted', mainSha)
+  commit('world.txt', 'temporary world\n', 'Temporarily revise the world', 'Opus 5')
+  revertedSha = commit('world.txt', 'the fixture world\n', 'Restore the fixture world', 'Opus 5')
 
   // A history sharing no ancestor with the rest: the third form of "not a proper
   // ancestor", which merge-base answers with nothing at all.
@@ -276,6 +489,31 @@ beforeAll(() => {
   git('rm', '-rqf', '--ignore-unmatch', '.')
   orphanSha = commit('orphan.txt', 'no common ancestor with anything\n', 'Start an unrelated history', 'Opus 5')
   git('checkout', '-q', '-f', 'feat')
+
+  // A genuine contribution-era scoped pass: it read shared.txt after touch 1,
+  // then seven later commits changed that file. The new plan must say why this
+  // once-usable reading no longer reduces the current file debt.
+  mkdirSync(join(repo, '.claude'), { recursive: true })
+  writeFileSync(
+    join(repo, '.claude', 'mechanism-reviews.jsonl'),
+    `${JSON.stringify({
+      sha: historicalReviewSha,
+      model: 'GPT-5.6 Sol',
+      verdict: 'merge',
+      evidence: 'read the complete shared file after its first change',
+      mode: 'review',
+      pass: { index: 1, total: 1, files: ['shared.txt'], commits: [historicalReviewSha] },
+      at: Date.now(),
+      // The fixture commits are created at test time, which is inside the
+      // commit-era reviewer rule, so the row carries what that rule demands of
+      // an OpenAI reviewer: an explicit unverified claim with its reason.
+      reviewerAuthorship: {
+        status: 'unverified',
+        claimedModel: 'GPT-5.6 Sol',
+        reason: 'external CLI reviewer, no harness transcript',
+      },
+    })}\n`,
+  )
 })
 
 afterAll(() => rmSync(dir, { recursive: true, force: true }))
@@ -303,6 +541,30 @@ describe('the fixture is hermetic', () => {
 })
 
 describe('a review that runs', () => {
+  it('reviews one current file once after eight commits touched it', () => {
+    provenId()
+    const r = run(['--sha', manyTouchesSha, '--brief', 'judge the current shared file'])
+    expect(r.status, r.stderr).toBe(0)
+    expect(r.stderr).toContain('It fits in one round.')
+    expect(r.stderr).toContain('DROPPED INTERMEDIATE STATES: shared.txt — 7 states were superseded')
+    expect(r.stderr).toContain(
+      'INVALIDATED HISTORICAL COVERAGE: 1 scoped pass record contains a reading that no longer clears 1 end-state file',
+    )
+    expect(r.stderr).toContain(`${historicalReviewSha.slice(0, 7)} pass 1/1: shared.txt`)
+    expect(r.stderr.match(/^  pass 1\/1 →/gm)).toHaveLength(1)
+    expect(readFileSync(join(dir, 'stdin.txt'), 'utf8')).toContain('current end state after touch 8')
+  })
+
+  it('drops a file restored to its base state and names the reason', () => {
+    writeFileSync(join(dir, 'calls.log'), '')
+    const r = run(['--sha', revertedSha, '--brief', 'judge the net range'])
+    expect(r.status, r.stderr).toBe(0)
+    expect(r.stderr).toContain('DROPPED AS NON-MATERIAL: world.txt — end state identical to the base')
+    expect(r.stderr).toContain('no review record is needed')
+    expect(r.stdout).not.toContain('mechanism-review.mjs --record')
+    expect(calls()).toEqual([])
+  })
+
   it('prints the reviewer, its answer and a complete record command, and exits 0', () => {
     provenId()
     const r = run(['--sha', headSha, '--point', '624', '--brief', 'judge the fallback path'])
@@ -340,10 +602,103 @@ describe('a review that runs', () => {
     expect(received).toContain('=== DIFFSTAT ===')
     expect(received).toContain('=== PATCH ===')
     expect(received).toContain('diff --git')
+    // …WHOLE: the size the command claims for the round is the size the child
+    // process actually read off its stdin — a real transport check, not the
+    // call site's own echo (escalation round).
+    const claimed = Number(/material: (\d+) characters/.exec(r.stderr)?.[1])
+    expect(received.length).toBe(claimed)
     // …and it is the whole BRANCH, both commits above main, not just the head.
     expect(received).toContain('the fixture world, revised')
     expect(received).toContain('a file the patch carries whole')
     expect(r.stderr).toMatch(/material: \d+ characters/)
+  })
+})
+
+describe('the file bodies travel byte-exact', () => {
+  it('keeps a body’s leading and trailing blank lines, which a trim would eat', () => {
+    // Fourth cross-vendor round, pass 4: gatherRange read bodies through the
+    // trimming git() default, so every file lost its edge whitespace and final
+    // newline — and the assembly recorded the ALTERED string as complete, so
+    // byte-inexact delivery passed the accounting. Asserted on what the child
+    // process actually received, not on any log line.
+    provenId()
+    git('checkout', '-q', '-b', 'padded-work', 'main')
+    // A MODIFIED file, so its body travels as current content — an added one
+    // rides inside the patch and would not exercise the body read.
+    const sha = commit('world.txt', '\n\n  body with edges  \n\n', 'Pad a file with blank edges', 'Opus 5')
+    const r = run(['--sha', sha, '--brief', 'judge the padding'])
+    expect(r.status, r.stderr).toBe(0)
+    const sent = readFileSync(join(dir, 'stdin.txt'), 'utf8')
+    expect(sent).toContain('=== FILE (current content): world.txt ===\n\n\n  body with edges  \n\n')
+  })
+})
+
+describe('a binary file in the range', () => {
+  it('travels absent-by-design in the material rather than vanishing or arriving as mojibake', () => {
+    // Fourth cross-vendor round, pass 4, finding 7: an added binary was
+    // skipped as "covered by the patch" while the ordinary diff carries only
+    // "Binary files differ" — the blob never travelled, nothing was recorded.
+    provenId()
+    git('checkout', '-q', '-b', 'binary-work', 'main')
+    writeFileSync(join(repo, 'blob.bin'), Buffer.from([0, 1, 2, 3, 250, 251, 0, 90]))
+    git('add', '-A')
+    git('commit', '--no-verify', '-q', '-m', 'Add a binary blob\n\nCo-Authored-By: Claude Opus 5 <noreply@anthropic.com>')
+    const sha = git('rev-parse', 'HEAD')
+    const r = run(['--sha', sha, '--brief', 'judge the blob'])
+    expect(r.status, r.stderr).toBe(0)
+    const sent = readFileSync(join(dir, 'stdin.txt'), 'utf8')
+    expect(sent).toContain('FILE BODY ABSENT BY DESIGN — binary')
+    expect(sent).toContain('blob.bin')
+    expect(sent).not.toContain('GIT binary patch')
+    expect(sent).not.toContain('literal ')
+    // The declaration is not a loss: the record command is still offered.
+    expect(r.stdout).toContain('mechanism-review.mjs --record')
+  })
+
+  // ROUND-1 PASS 5: invalid UTF-8 without a NUL slipped past the binary check
+  // as replacement characters, and the ALTERED text was recorded as complete
+  // delivery. The strict decode refuses such bytes by name instead.
+  it('refuses a range whose diff bytes are not valid UTF-8, rather than recording mojibake', () => {
+    provenId()
+    git('checkout', '-q', '-b', 'latin1-work', 'main')
+    // 0xFF is not valid UTF-8 anywhere, and there is no NUL — git diffs this
+    // as TEXT, which is exactly the hole: the lenient decode wrote U+FFFD and
+    // called the material complete.
+    writeFileSync(join(repo, 'legacy.txt'), Buffer.from([0x61, 0xff, 0x62, 0x0a]))
+    git('add', '-A')
+    git('commit', '--no-verify', '-q', '-m', 'Add a latin1 body\n\nCo-Authored-By: Claude Opus 5 <noreply@anthropic.com>')
+    const sha = git('rev-parse', 'HEAD')
+    const r = run(['--sha', sha, '--brief', 'judge the legacy bytes'])
+    expect(r.status).not.toBe(0)
+    expect(`${r.stdout}${r.stderr}`).toContain('not valid UTF-8')
+    expect(r.stdout).not.toContain('mechanism-review.mjs --record')
+  })
+})
+
+describe('a child that never read its material', () => {
+  it('yields no verdict and no completed record — the receipt closes the unread-stdin hole', () => {
+    // Finding 8: a child can exit 0 with a parseable verdict without ever
+    // reading an input smaller than the pipe buffer, and the process layer
+    // cannot witness the read. The RECEIPT token stands only on the material's
+    // last line, so this stub — which answers without it — is exactly that
+    // child, and its answer must not become a record.
+    provenId()
+    const r = run(['--sha', headSha, '--brief', 'judge the change'], { STUB_MODE: 'no-receipt' })
+    expect(r.status).toBe(3)
+    expect(r.stdout).toContain('no parseable verdict')
+    expect(r.stdout).toContain('RECEIPT')
+    expect(r.stdout).toContain('The review is NOT done')
+    // ROUND-2 PASS 4: the stub deliberately answers `VERDICT: merge`, so a
+    // regression that printed a RUNNABLE record command beside the refusal
+    // would have passed every line above. What may travel is the hand-over
+    // TEMPLATE, whose angle-bracket placeholders the recorder refuses — never
+    // the unread child's own verdict as a completed command.
+    const out = `${r.stdout}${r.stderr}`
+    expect(out).not.toContain('--verdict merge ')
+    expect(out).not.toMatch(/--verdict merge$/m)
+    if (out.includes('mechanism-review.mjs --record')) {
+      expect(out).toContain('--verdict <')
+    }
   })
 })
 
@@ -356,9 +711,23 @@ describe('a review that does not run', () => {
     expect(r.stdout).toMatch(/login/i)
     expect(r.stdout).toContain(FALLBACK_MODEL_NAME)
     expect(r.stdout).toContain('The review is NOT done')
-    // The printed record cannot be run as it stands: the verdict is a placeholder.
-    expect(r.stdout).toMatch(/--verdict <merge\|merge-with-fixes\|do-not-merge>/)
-    expect(r.stdout).not.toContain('--model "GPT-5.6 Sol"')
+    // A FAILED DELIVERY OFFERS NO RECORD IN ANY SHAPE (escalation round): the
+    // run errored, so nothing of the range was read, and even a placeholder
+    // template at the whole sha is an offer no completed hand-off backs.
+    expect(r.stdout).toContain('NO RECORD COMMAND IS PRINTED')
+    expect(r.stdout).not.toContain('mechanism-review.mjs --record')
+  })
+
+  it('never hands a review to Fable while the shared switch is off', () => {
+    provenId()
+    const r = run(['--sha', headSha, '--brief', 'judge the fallback path'], {
+      STUB_MODE: 'fail',
+      FABLE_SWITCH_FILE: fableOffFile,
+    })
+    expect(r.status).toBe(3)
+    // Opus 5 authored the fixture range, so the first eligible non-Fable reviewer is Opus 4.8.
+    expect(r.stdout).toContain('Opus 4.8')
+    expect(r.stdout).not.toContain(FALLBACK_MODEL_NAME)
   })
 
   it('treats an answer that admits it saw nothing as no review at all', () => {
@@ -393,13 +762,23 @@ describe('a review that does not run', () => {
     provenId()
     const r = run(['--sha', fableSha, '--brief', 'judge it'], { STUB_MODE: 'fail' })
     expect(r.status).toBe(3)
+    // The hand-over names its reviewer in PROSE — after a failed delivery no
+    // record command is printed at all, not even a placeholder template.
     expect(r.stdout).toContain(SECOND_FALLBACK_MODEL_NAME)
-    expect(r.stdout).toContain(`--model "${SECOND_FALLBACK_MODEL_NAME}"`)
+    expect(r.stdout).not.toContain('mechanism-review.mjs --record')
     expect(r.stdout).not.toMatch(/Hand it to Fable/)
   })
 })
 
 describe('the guards around the run', () => {
+  it('reviews a cc-only resolution whose trailer-bearing merged parent is outside the range', () => {
+    provenId()
+    const r = run(['--sha', mergeResolutionSha, '--brief', 'judge the resolved file'])
+    expect(r.status, r.stderr).toBe(0)
+    expect(r.stderr).not.toContain('UNREVIEWABLE')
+    expect(readFileSync(join(dir, 'stdin.txt'), 'utf8')).toContain('the resolved world')
+  })
+
   it('refuses a --since ref that does not exist instead of silently reviewing one commit', () => {
     provenId()
     const r = run(['--sha', headSha, '--since', 'no-such-branch-here', '--brief', 'judge it'])
@@ -424,14 +803,51 @@ describe('the guards around the run', () => {
     expect(r.stderr).toMatch(/--since/)
   })
 
-  it('reviews a narrowed range but prints NO record for it', () => {
-    // The verdict is still reported; the ready-to-run command is not, because a
-    // record at that sha would clear commits this review never saw.
+  it('prints a runnable Fable handover when both vendors but not every model authored', () => {
+    const r = run(['--sha', unreviewableSha, '--brief', 'judge it', '--point', '870'])
+    expect(r.status).toBe(3)
+    expect(r.stdout).toContain('node scripts/review-sol.mjs --reviewer fable')
+    expect(r.stdout).toContain('--point 870')
+    expect(r.stderr).not.toMatch(/UNREVIEWABLE/)
+  })
+
+  it('plans and runs the reviewable pass while naming the unavailable remainder', () => {
+    const planned = run(['--sha', partlyReviewableSha, '--brief', 'judge what can be reviewed'])
+    expect(planned.status).toBe(4)
+    expect(planned.stderr).toContain('2 RUNNABLE PASSES')
+    expect(planned.stderr).toContain('reviewable.txt')
+    expect(planned.stderr).toContain('unavailable.txt')
+    expect(planned.stderr).toContain('100% planned coverage (2/2 changed files)')
+
+    provenId()
+    const reviewed = run([
+      '--sha', partlyReviewableSha,
+      '--brief', 'judge what can be reviewed',
+      '--pass', '1',
+    ])
+    expect(reviewed.status, reviewed.stderr).toBe(0)
+    const printed = recordCommandIn(reviewed.stdout)
+    expect(printed).toContain('--pass 1/2')
+    expect(printed).toContain('--pass-files "reviewable.txt"')
+    expect(printed).not.toContain('unavailable.txt')
+    expect(reviewed.stdout).toContain('Coverage: PARTIAL REVIEW — 50% of changed files (1/2)')
+    const sent = readFileSync(join(dir, 'stdin.txt'), 'utf8')
+    expect(sent).toContain('reviewable.txt')
+    expect(sent).toContain('ABSENT BY DESIGN')
+    expect(sent).toContain('pass 2/2')
+    expect(sent).toContain('unavailable.txt')
+    expect(sent).not.toContain('written by both authoring lanes')
+  })
+
+  it('records a narrowed one-round range as exactly one scoped pass', () => {
     provenId()
     const r = run(['--sha', headSha, '--since', `${headSha}~1`, '--brief', 'judge it'])
     expect(r.status).toBe(0)
-    expect(r.stdout).toMatch(/NO RECORD COMMAND IS PRINTED/)
-    expect(r.stdout).not.toContain('mechanism-review.mjs --record')
+    const printed = recordCommandIn(r.stdout)
+    expect(printed).toContain('--pass 1/1')
+    expect(printed).toContain('--pass-files "added.txt"')
+    expect(printed).not.toContain('--pass-commits')
+    expect(r.stdout).toContain(`clears the listed files at ${headSha.slice(0, 7)}`)
   })
 
   it('refuses an explicit --since that is not a proper ancestor, in each of its three forms', () => {
@@ -560,18 +976,367 @@ describe('the saved login', () => {
 // POINT 667: Sol authors too, so the command must recognise the range it may not
 // judge — and must recognise it BEFORE it spends an allowance on it.
 describe('a range SOL authored', () => {
-  it('refuses to review its own work, spends no codex call, and names the Claude reviewer', () => {
+  it('refuses to review its own work, spends no codex call, and prints the runnable Claude reviewer', () => {
     writeFileSync(join(dir, 'calls.log'), '')
     const r = run(['--sha', solSha, '--point', '667', '--brief', 'judge the authoring lane'])
     expect(r.status, r.stderr).toBe(3)
     expect(r.stdout).toMatch(/ROLE SWAP/)
     expect(r.stdout).toMatch(/AUTHORED part of/)
-    expect(r.stdout).toContain('--model "Opus 5"')
+    expect(r.stdout).toContain('node scripts/review-sol.mjs --reviewer opus')
     // Not one call — not even the model-id probe: the question is answered from
     // the trailers, and paying for a review Sol may not give is the waste this
     // ordering exists to prevent.
     expect(calls()).toEqual([])
-    // And no verdict is invented: the record command still carries the placeholder.
-    expect(r.stdout).toMatch(/--verdict <merge\|/)
+    expect(r.stdout).not.toContain('mechanism-review.mjs --record')
+  })
+
+  it('starts the selected Opus reader and prints a record command with its model receipt', () => {
+    writeFileSync(join(dir, 'calls.log'), '')
+    const r = run(['--reviewer', 'opus', '--sha', solSha, '--point', '667', '--brief', 'judge the authoring lane'])
+    expect(r.status, `${r.stdout}${r.stderr}`).toBe(0)
+    expect(calls()).toEqual(['claude-opus-5[1m]'])
+    expect(r.stdout).toContain('Opus 5 reviewed')
+    expect(r.stdout).toContain('--model "Opus 5"')
+    expect(r.stdout).toContain('--model-result')
+    expect(r.stdout).toContain('--handover sol-authored')
+  })
+
+  it('runs Fable for the mixed Sol/Opus end state and the recorder accepts exactly that routed verdict', () => {
+    writeFileSync(join(dir, 'calls.log'), '')
+    const r = run([
+      '--reviewer', 'fable', '--sha', unreviewableSha, '--point', '977', '--brief', 'judge the mixed end state',
+      '--file', 'unreviewable.txt',
+    ])
+    expect(r.status, `${r.stdout}${r.stderr}`).toBe(0)
+    expect(calls()).toEqual(['claude-fable-5'])
+    const command = splitCommand(recordCommandIn(r.stdout))
+    expect(command.slice(0, 2)).toEqual(['node', 'scripts/mechanism-review.mjs'])
+    const recorded = spawnSync(process.execPath, command.slice(1), {
+      cwd: repo,
+      encoding: 'utf8',
+      windowsHide: true,
+      env: hermeticEnv({ FABLE_SWITCH_FILE: fableOnFile }),
+    })
+    expect(recorded.status, `${recorded.stdout}${recorded.stderr}`).toBe(0)
+    const row = JSON.parse(readFileSync(join(repo, '.claude', 'mechanism-reviews.jsonl'), 'utf8').trim().split('\n').at(-1))
+    expect(row).toMatchObject({
+      sha: unreviewableSha,
+      model: 'Fable 5',
+      verdict: 'merge',
+      handover: 'sol-authored',
+      pass: { index: 1, total: 1, files: ['unreviewable.txt'], endState: unreviewableSha },
+      reviewerAuthorship: {
+        status: 'agreement', actualModel: 'Fable 5', servedModel: 'claude-fable-5', proof: 'claude-result',
+      },
+    })
+  })
+})
+
+// POINT 714, second cross-vendor round: a file whose name git QUOTES must reach
+// the reviewer like any other, or it is a file the record clears unread.
+describe('a path git writes in quotes', () => {
+  it('sends its content, not an unresolvable quoted name', () => {
+    provenId()
+    const r = run(['--sha', oddSha, '--brief', 'judge the odd name'])
+    expect(r.status, r.stderr).toBe(0)
+    const sent = readFileSync(join(dir, 'stdin.txt'), 'utf8')
+    // The CONTENT is the proof the path resolved — asserted CONTIGUOUSLY under
+    // ITS OWN header (final-round pass 7): the bare toContain was satisfied by
+    // the PATCH carrying the line, so the odd name's body could resolve empty
+    // while this stayed green. The header must NAME the odd file and the body
+    // must follow it before the next structural marker.
+    // The material spells the DECODED name (git's quoted octal form resolves
+    // to the real path, and needsQuoting has nothing to escape in it).
+    const header = `=== FILE (current content): ${ODD_NAME} ===`
+    expect(sent).toContain(header)
+    const body = sent.slice(sent.indexOf(header) + header.length)
+    const nextMarker = body.indexOf('=== ')
+    expect(body.slice(0, nextMarker < 0 ? undefined : nextMarker)).toContain(
+      'the odd-named file, revised in this range',
+    )
+    expect(sent).not.toContain('OMITTED ENTIRELY')
+  })
+})
+
+// A submodule entry points at a COMMIT object, not a file blob. Its body is a
+// named deliberate absence, and the round never tries to read it as content.
+describe('a modified gitlink', () => {
+  it('is named absent-by-design, and the round completes', () => {
+    provenId()
+    const r = run(['--sha', gitlinkSha, '--brief', 'judge the submodule pin'])
+    expect(r.status, r.stderr).toBe(0)
+    const sent = readFileSync(join(dir, 'stdin.txt'), 'utf8')
+    expect(sent).toContain(`+Subproject commit ${'f'.repeat(40)}`)
+    expect(sent).toContain('FILE BODY ABSENT BY DESIGN — submodule pointer: vendor-sub ===')
+    expect(sent).not.toContain('OMITTED ENTIRELY')
+  })
+
+  it('keeps a TEXT file text although its hunk holds the pointer line (landing-round pass 8)', () => {
+    // The classifier read the `+Subproject commit <hex>` HUNK line as gitlink
+    // evidence, so a normal text file merely containing that literal line was
+    // assigned no content of its own — silently omitted while the accounting
+    // read complete. Only git's own mode headers prove a 160000 entry.
+    provenId()
+    git('checkout', '-q', '-b', 'fake-gitlink', 'main')
+    const body = `prose about submodules\nSubproject commit ${'a'.repeat(40)}\nmore prose\n`
+    const sha = commit('world.txt', body, 'Mention a subproject pointer in prose', 'Opus 5')
+    const r = run(['--sha', sha, '--brief', 'judge the prose'])
+    expect(r.status, r.stderr).toBe(0)
+    const sent = readFileSync(join(dir, 'stdin.txt'), 'utf8')
+    expect(sent).toContain(`=== FILE (current content): world.txt ===\n${body}`)
+  })
+})
+
+// A fitting narrowed range is handed over with the same exact contribution
+// scope as a completed Sol round; the placeholder still prevents recording a
+// verdict nobody gave.
+describe('a narrowed --since on the early routes', () => {
+  it('prints a scoped runnable reader at claude-only while --since narrows the range', () => {
+    const shareFile = join(dir, 'sol-share.json')
+    writeFileSync(shareFile, JSON.stringify({ setting: 'claude-only' }))
+    writeFileSync(join(dir, 'calls.log'), '')
+    const r = run(['--sha', headSha, '--since', `${headSha}~1`, '--brief', 'judge it'], { SOL_SHARE_FILE: shareFile })
+    expect(r.status).toBe(3)
+    expect(r.stdout).toContain('node scripts/review-sol.mjs --reviewer fable')
+    expect(r.stdout).toContain(`--since ${headSha}~1`)
+    expect(readFileSync(join(dir, 'calls.log'), 'utf8').trim()).toBe('')
+    rmSync(shareFile, { force: true })
+  })
+
+  it('prints a scoped runnable reader for a narrowed Sol-authored range too', () => {
+    writeFileSync(join(dir, 'calls.log'), '')
+    const r = run(['--sha', solHeadSha, '--since', `${solHeadSha}~1`, '--brief', 'judge it'])
+    expect(r.status).toBe(3)
+    expect(r.stdout).toContain('node scripts/review-sol.mjs --reviewer opus')
+    expect(r.stdout).toContain(`--since ${solHeadSha}~1`)
+    expect(calls()).toEqual([])
+  })
+
+  it('still hands over the full runnable command when no --since narrows the early route', () => {
+    // The refusal is about the narrowing, not about the hand-over itself.
+    writeFileSync(join(dir, 'calls.log'), '')
+    const r = run(['--sha', solHeadSha, '--brief', 'judge it'])
+    expect(r.status).toBe(3)
+    expect(r.stdout).toContain('node scripts/review-sol.mjs --reviewer opus')
+    expect(r.stdout).not.toContain('--since')
+  })
+})
+
+// POINT 714, third round: a path with a trailing space is printed UNQUOTED by
+// git, and a trim anywhere on the way turns it into a different path — the real
+// file then reaches no pass and no content list, with nothing said.
+describe('a path with a trailing space', () => {
+  it.skipIf(process.platform === 'win32')('travels byte-exact, content and all', () => {
+    provenId()
+    const r = run(['--sha', edgeSha, '--brief', 'judge the edge name'])
+    expect(r.status, r.stderr).toBe(0)
+    const sent = readFileSync(join(dir, 'stdin.txt'), 'utf8')
+    // CONTIGUOUS, header and body as one string (fourth landing round,
+    // carried pass 8): asserted separately, the body's presence in the PATCH
+    // kept this green even if the current-content lookup failed.
+    expect(sent).toContain(`=== FILE (current content): "${EDGE_NAME}" ===\ncontent behind the trailing space\n`)
+    expect(sent).not.toContain('OMITTED ENTIRELY')
+  })
+})
+
+// POINT 714: a range whose material cannot fit one round must be recognised
+// BEFORE the round is spent, and no record may be offered for what was not read.
+describe('a range too large for one round', () => {
+  it('names the threshold, refuses to spend the round, and prints the pass plan', () => {
+    provenId()
+    const r = run(['--sha', bulkSha, '--brief', 'judge the bulk range'])
+    expect(r.status, r.stderr).toBe(4)
+    expect(r.stderr).toContain('material budget is 200000 characters')
+    expect(r.stderr).toContain("PASSES over the END-STATE FILE SET's reviewable material")
+    expect(r.stderr).toContain('bulk-a.txt')
+    expect(r.stderr).toContain('bulk-b.txt')
+    expect(r.stderr).toContain('--pass 1')
+    // THE ROUND IS NOT SPENT: the whole cost of the old behaviour was a paid
+    // review whose record covered files nobody read.
+    expect(calls()).toEqual([])
+    // And nothing that looks like a record reaches the caller.
+    expect(r.stdout).not.toContain('mechanism-review.mjs --record')
+  })
+
+  it('reviews ONE pass on demand and offers a record for that pass alone', () => {
+    provenId()
+    const r = run(['--sha', bulkSha, '--brief', 'judge the bulk range', '--pass', '1'])
+    expect(r.status, r.stderr).toBe(0)
+    const printed = recordCommandIn(r.stdout)
+    expect(printed).toMatch(/--pass 1\/2/)
+    expect(printed).toMatch(/--pass-files "bulk-[ab]\.txt"/)
+    expect(r.stdout).toContain('clears the listed files at')
+    expect(r.stdout).toContain('Coverage: PARTIAL REVIEW — 50% of changed files (1/2); block 1/2.')
+    expect(r.stdout).toContain('assigned to other blocks, not dropped:')
+    expect(r.stdout).toContain('dropped: none')
+    // What actually went to the reviewer stayed inside the budget.
+    const sent = readFileSync(join(dir, 'stdin.txt'), 'utf8')
+    expect(sent.length).toBeLessThanOrEqual(200_000)
+    expect(sent).toContain('=== PATCH ===')
+    // THE ARITHMETIC, measured against a doubting review (landing-round pass
+    // 7): a 120k added file exceeds the standing patch HALF-share, so the plan
+    // widens this pass's patchRoom to the exact joined section — the pass's
+    // patch is mandatory material — and delivers the file PATCH-ONLY. Its
+    // whole body still travels, as the added lines of its own diff; nothing is
+    // truncated, and the completed two-pass record is earned, not fabricated.
+    // THE RECORDED SCOPE IS BOUND TO THE TRANSPORTED BYTES (second landing
+    // round, pass 7): the file the record command names is the file whose
+    // body and diff section actually travelled — not merely "one of the two".
+    const scoped = /--pass-files "bulk-([ab])\.txt"/.exec(printed)?.[1]
+    expect(['a', 'b']).toContain(scoped)
+    const other = scoped === 'a' ? 'b' : 'a'
+    expect(sent).toContain(scoped.repeat(120_000))
+    expect(sent).not.toContain(other.repeat(120_000))
+    expect(sent).toContain(`diff --git a/bulk-${scoped}.txt b/bulk-${scoped}.txt`)
+    // …at the PATCH-ONLY delivery level the manifest declares: the body rides
+    // inside the PATCH section, and the content slot says so.
+    expect(sent).toContain(`its COMPLETE diff is in the PATCH above: bulk-${scoped}.txt ===`)
+    const patchAt = sent.indexOf('=== PATCH ===')
+    expect(patchAt).toBeGreaterThan(-1)
+    expect(sent.indexOf(scoped.repeat(120_000))).toBeGreaterThan(patchAt)
+    expect(sent).not.toContain('[TRUNCATED:')
+    // THE RECORDER ACCEPTS IT, run rather than pattern-matched: a pass command
+    // the recorder refuses is a command that clears nothing.
+    const recorded = spawnSync(process.execPath, splitCommand(printed).slice(1), {
+      cwd: repo,
+      encoding: 'utf8',
+      windowsHide: true,
+      env: hermeticEnv(),
+    })
+    expect(recorded.status, recorded.stderr).toBe(0)
+    const ledger = readFileSync(join(repo, '.claude', 'mechanism-reviews.jsonl'), 'utf8').trim().split('\n')
+    expect(JSON.parse(ledger.at(-1))).toMatchObject({
+      sha: bulkSha,
+      partialReview: true,
+      pass: { index: 1, total: 2, files: [expect.stringMatching(/^bulk-[ab]\.txt$/)] },
+    })
+  })
+
+  it('reviews the OTHER pass, and the two together name both files', () => {
+    provenId()
+    const one = run(['--sha', bulkSha, '--brief', 'judge the bulk range', '--pass', '1'])
+    const two = run(['--sha', bulkSha, '--brief', 'judge the bulk range', '--pass', '2'])
+    expect(two.status, two.stderr).toBe(0)
+    const files = [one.stdout, two.stdout]
+      .map((out) => /--pass-files "([^"]*)"/.exec(recordCommandIn(out))?.[1] ?? '')
+      .join(',')
+      .split(',')
+    expect([...files].sort()).toEqual(['bulk-a.txt', 'bulk-b.txt'])
+  })
+
+  // A split range must select a pass before any reviewer is started or handed
+  // over; there is no honest whole-range command for material that does not fit.
+  it('offers no whole-range record when SOL authored a range too large, and names the passes', () => {
+    writeFileSync(join(dir, 'calls.log'), '')
+    const r = run(['--sha', bulkSolSha, '--brief', 'judge the bulk Sol range'])
+    expect(r.status, r.stderr).toBe(4)
+    expect(r.stderr).toContain('2 RUNNABLE PASSES')
+    expect(r.stderr).toContain('reviewer Opus 5')
+    expect(r.stderr).toContain('--pass 1')
+    expect(r.stdout).not.toContain('mechanism-review.mjs --record')
+    expect(calls()).toEqual([])
+  })
+
+  it('offers no whole-range record at claude-only either, while the range does not fit', () => {
+    const shareFile = join(dir, 'sol-share.json')
+    writeFileSync(shareFile, JSON.stringify({ setting: 'claude-only' }))
+    writeFileSync(join(dir, 'calls.log'), '')
+    const r = run(['--sha', bulkSha, '--brief', 'judge the bulk range'], { SOL_SHARE_FILE: shareFile })
+    expect(r.status).toBe(4)
+    expect(r.stderr).toContain('2 RUNNABLE PASSES')
+    expect(r.stderr).toContain('bulk-a.txt')
+    expect(r.stdout).not.toContain('mechanism-review.mjs --record')
+    expect(calls()).toEqual([])
+    rmSync(shareFile, { force: true })
+  })
+
+  it('hands over ONE PASS of a range too large when --pass names it (round-2 pass 5)', () => {
+    // The flag was parsed only after the hand-off exits, so a pass-scoped
+    // hand-off was unreachable: --pass was silently ignored and the report
+    // covered the whole range.
+    const shareFile = join(dir, 'sol-share.json')
+    writeFileSync(shareFile, JSON.stringify({ setting: 'claude-only' }))
+    writeFileSync(join(dir, 'calls.log'), '')
+    const r = run(['--sha', bulkSha, '--brief', 'judge the bulk range', '--pass', '1'], {
+      SOL_SHARE_FILE: shareFile,
+    })
+    expect(r.status).toBe(3)
+    expect(r.stdout).toMatch(/claude-only/)
+    expect(r.stdout).toContain('--pass 1')
+    expect(r.stdout).toContain('--reviewer fable')
+    // The hand-off template carries the not-cleared warning and the ledger
+    // pointer too (round-5 pass 6) — a fallback pass template without it read
+    // like a cleared range.
+    expect(r.stdout).toContain('clears the listed files at')
+    expect(r.stdout).toContain('mechanism-review.mjs --list')
+    expect(calls()).toEqual([])
+    rmSync(shareFile, { force: true })
+  })
+
+  it('refuses a pass number the hand-off range does not have, exactly like the paid path', () => {
+    const shareFile = join(dir, 'sol-share.json')
+    writeFileSync(shareFile, JSON.stringify({ setting: 'claude-only' }))
+    const r = run(['--sha', bulkSha, '--brief', 'judge the bulk range', '--pass', '9'], {
+      SOL_SHARE_FILE: shareFile,
+    })
+    expect(r.status).toBe(2)
+    expect(r.stderr).toContain('splits into 2 pass(es)')
+    rmSync(shareFile, { force: true })
+  })
+
+  it('still hands over a runnable reader command where the range DOES fit', () => {
+    // The refusal is about the material, not about the hand-over: a small range
+    // must keep its ready-to-run template.
+    const shareFile = join(dir, 'sol-share.json')
+    writeFileSync(shareFile, JSON.stringify({ setting: 'claude-only' }))
+    const r = run(['--sha', headSha, '--brief', 'judge the ordinary range'], { SOL_SHARE_FILE: shareFile })
+    expect(r.status).toBe(3)
+    expect(r.stdout).toContain('node scripts/review-sol.mjs --reviewer fable')
+    rmSync(shareFile, { force: true })
+  })
+
+  it('refuses a pass number this range does not have', () => {
+    provenId()
+    const r = run(['--sha', bulkSha, '--brief', 'judge the bulk range', '--pass', '9'])
+    expect(r.status).toBe(2)
+    expect(r.stderr).toContain('splits into 2 pass(es)')
+    expect(calls()).toEqual([])
+  })
+
+  it('refuses --pass on a range that fits, rather than recording a split nobody needs', () => {
+    provenId()
+    const r = run(['--sha', headSha, '--brief', 'judge the ordinary range', '--pass', '1'])
+    expect(r.status).toBe(2)
+    expect(r.stderr).toContain('fits in one round')
+    expect(calls()).toEqual([])
+  })
+
+  it('says a range that fits does so, before the round', () => {
+    provenId()
+    const r = run(['--sha', headSha, '--brief', 'judge the ordinary range'])
+    expect(r.status, r.stderr).toBe(0)
+    expect(r.stderr).toContain('It fits in one round.')
+    expect(r.stderr).toContain('Coverage plan: 100% planned coverage')
+    expect(r.stdout).toContain('Coverage: FULL REVIEW — 100% of changed files')
+  })
+
+  it('retires carry planning because recorded contribution coverage now persists directly', () => {
+    provenId()
+    const r = run([
+      '--sha', bulkSha,
+      '--brief', 'judge the remaining contributions',
+      '--carry-from', headSha,
+    ])
+    expect(r.status).toBe(2)
+    expect(r.stderr).toContain('--carry-from is obsolete')
+    expect(r.stderr).toContain('end-state files')
+    expect(calls()).toEqual([])
+  })
+
+  it('states the file-scoped convergence cost for answer commits', () => {
+    const r = run([])
+    expect(r.status).toBe(2)
+    expect(r.stderr).toContain('commits touching')
+    expect(r.stderr).toContain('confirming clean pass only for')
   })
 })

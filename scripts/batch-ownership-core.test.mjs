@@ -11,12 +11,14 @@
 //      question nobody asked.
 import { describe, it, expect } from 'vitest'
 import { LEASE_MS, DECLARED_WAIT_LEASE_MS } from './batch-lease-core.mjs'
+import { checkEvidence } from './batch-in-flight-core.mjs'
 import {
   IDLE_WINDOW_MS,
   effectiveLeaseUntil,
   idleVerdict,
   lockDeclaresWait,
   ownershipVerdict,
+  ownerActivityDecision,
   workedSinceClaim,
 } from './batch-ownership-core.mjs'
 
@@ -53,14 +55,11 @@ describe('effectiveLeaseUntil — the ONE place ownership\'s end is computed', (
     expect(effectiveLeaseUntil({}, { now: NOW })).toBeNull()
   })
 
-  it('is the seam point 517 extends — it takes the evidence today and ignores it', () => {
-    // The signature is the contract: an extension lands INSIDE this function, so
-    // the idle rule below and a lease extension can never become two arithmetics
-    // on one number (point 614's cross-point ruling).
-    const l = lock({ leaseUntil: NOW + 1000 })
-    expect(effectiveLeaseUntil(l, { now: NOW, evidence: { advancing: true, at: NOW } })).toBe(
-      effectiveLeaseUntil(l, { now: NOW }),
-    )
+  it('extends from the last advancing evidence, never from quiet or future evidence', () => {
+    const l = lock({ leaseUntil: NOW - 1000 })
+    expect(effectiveLeaseUntil(l, { now: NOW, evidence: { advancing: true, at: NOW } })).toBe(NOW + LEASE_MS)
+    expect(effectiveLeaseUntil(l, { now: NOW, evidence: { advancing: false, at: NOW } })).toBe(NOW - 1000)
+    expect(effectiveLeaseUntil(l, { now: NOW, evidence: { advancing: true, at: NOW + 1 } })).toBe(NOW - 1000)
   })
 })
 
@@ -74,6 +73,116 @@ describe('workedSinceClaim — has the owner done anything at all?', () => {
     // Unknown may not dispossess anybody: that is what makes this need no migration.
     expect(workedSinceClaim({ claimedAt: NOW })).toBeNull()
     expect(workedSinceClaim(null)).toBeNull()
+  })
+})
+
+describe('ownerActivityDecision — a heartbeat is not progress', () => {
+  const owner = lock({ fence: 17, claimedAt: NOW })
+  const foreground = {
+    event: 'foreground-activity',
+    session: 's1',
+    generation: 17,
+    atMs: NOW - 1_000,
+  }
+
+  it('assesses stalled only after two unchanged decision intervals', () => {
+    const first = ownerActivityDecision({ lock: owner, records: [foreground] })
+    const second = ownerActivityDecision({ lock: { ...owner, claimedAt: NOW + 1 }, records: [foreground], previous: first.state })
+    const third = ownerActivityDecision({ lock: { ...owner, claimedAt: NOW + 2 }, records: [foreground], previous: second.state })
+    expect(first).toMatchObject({ stalled: false, unchangedIntervals: 0, progressAt: NOW - 1_000 })
+    expect(second).toMatchObject({ stalled: false, unchangedIntervals: 1 })
+    expect(third).toMatchObject({ stalled: true, unchangedIntervals: 2, reason: 'no-real-progress' })
+  })
+
+  it('resets on foreground, delegated, verification, durable-wait, or declared-output progress', () => {
+    const baseline = ownerActivityDecision({ lock: owner, records: [foreground] })
+    for (const event of ['foreground-activity', 'delegated-start', 'verification-progress', 'ci-wait-observation']) {
+      const next = ownerActivityDecision({
+        lock: owner,
+        records: [{ ...foreground, event, atMs: NOW + 1_000 }],
+        previous: { ...baseline.state, unchangedIntervals: 1 },
+      })
+      expect(next).toMatchObject({ stalled: false, unchangedIntervals: 0, progressAt: NOW + 1_000 })
+    }
+    const output = ownerActivityDecision({
+      lock: owner,
+      records: [foreground],
+      work: { items: [{ ok: true, kind: 'worktree', progressAt: NOW + 2_000 }] },
+      previous: { ...baseline.state, unchangedIntervals: 1 },
+    })
+    expect(output).toMatchObject({ stalled: false, unchangedIntervals: 0, progressAt: NOW + 2_000 })
+  })
+
+  it('does not assess a live pid-backed declaration as stalled during one blocking call', () => {
+    const pidWork = (at) => ({
+      advancing: true,
+      items: [checkEvidence(
+        { kind: 'pid', pid: 812, startedAt: NOW - 10_000 },
+        { now: at, probePid: () => ({ exists: true, startedAt: NOW - 10_000 }) },
+      )],
+    })
+    const first = ownerActivityDecision({ lock: owner, records: [], work: pidWork(NOW) })
+    const second = ownerActivityDecision({ lock: owner, records: [], work: pidWork(NOW + 15 * 60_000), previous: first.state })
+    const third = ownerActivityDecision({ lock: owner, records: [], work: pidWork(NOW + 30 * 60_000), previous: second.state })
+
+    expect(first).toMatchObject({ stalled: false, unchangedIntervals: 0, progressAt: NOW })
+    expect(second).toMatchObject({ stalled: false, unchangedIntervals: 0, progressAt: NOW + 15 * 60_000 })
+    expect(third).toMatchObject({ stalled: false, unchangedIntervals: 0, progressAt: NOW + 30 * 60_000 })
+    expect(ownershipVerdict({
+      lock: { ...owner, claimedAt: NOW + 30 * 60_000 },
+      now: NOW + 30 * 60_000 + 1,
+      activity: third,
+      work: pidWork(NOW + 30 * 60_000),
+      corroboration: live,
+    })).toMatchObject({
+      settled: true,
+      owns: true,
+      reason: 'fresh-heartbeat',
+    })
+  })
+
+  it('does not borrow another session or generation activity', () => {
+    const result = ownerActivityDecision({
+      lock: owner,
+      records: [
+        { ...foreground, session: 'other', atMs: NOW + 1_000 },
+        { ...foreground, generation: 18, atMs: NOW + 2_000 },
+      ],
+    })
+    expect(result).toMatchObject({ progressAt: null, stalled: false, reason: 'no-progress-observed' })
+  })
+
+  it('cannot assess a stall when the activity journal could not be read', () => {
+    const baseline = ownerActivityDecision({ lock: owner, records: [foreground] })
+    const first = ownerActivityDecision({
+      lock: owner,
+      records: null,
+      previous: { ...baseline.state, unchangedIntervals: 1 },
+    })
+    const second = ownerActivityDecision({ lock: owner, records: null, previous: first.state })
+
+    expect(first).toEqual({
+      stalled: false,
+      progressAt: null,
+      unchangedIntervals: 0,
+      state: null,
+      reason: 'activity-unassessable',
+    })
+    expect(second).toEqual(first)
+  })
+
+  it('lets a stalled verdict outrank a fresh heartbeat, except while paused', () => {
+    const activity = { stalled: true, unchangedIntervals: 2 }
+    expect(ownershipVerdict({ lock: owner, now: NOW + 1, activity, corroboration: live })).toMatchObject({
+      settled: true,
+      owns: false,
+      reason: 'stalled-no-progress',
+    })
+    expect(ownershipVerdict({ lock: owner, now: NOW + 1, activity, paused: true, corroboration: live })).toMatchObject({
+      settled: true,
+      owns: true,
+      reason: 'fresh-heartbeat',
+    })
   })
 })
 
@@ -266,13 +375,45 @@ describe('the ownership verdict — the order of authority is preserved', () => 
       owns: false,
       reason: 'lease-expired',
     })
-    // …and a live owner whose declared work has PRODUCED something keeps it.
+    // …and a live owner whose declared evidence still advances earns a renewal.
     const kept = ownershipVerdict({
       lock: stale,
       now: NOW,
       corroboration: live,
-      work: { declared: true, advancing: true, corroboratedBy: 'git', summary: 'a commit 2 min ago' },
+      work: {
+        declared: true,
+        advancing: true,
+        corroboratedBy: 'git',
+        summary: 'a commit now',
+        items: [{ ok: true, kind: 'branch', progressAt: NOW }],
+      },
     })
-    expect(kept).toMatchObject({ owns: true, reason: 'lease-expired-owner-working' })
+    expect(kept).toMatchObject({
+      owns: true,
+      reason: 'lease-renewal-due',
+      leaseExpired: true,
+      renewalUntil: NOW + LEASE_MS,
+    })
+
+    // Quiet evidence renews nothing: the same arithmetic yields takeover.
+    expect(ownershipVerdict({
+      lock: stale,
+      now: NOW,
+      corroboration: live,
+      work: { declared: true, advancing: false, items: [], summary: 'quiet' },
+    })).toMatchObject({ owns: false, reason: 'lease-expired' })
+
+    // A live pid is re-observed, not advancing output; it cannot renew forever.
+    expect(ownershipVerdict({
+      lock: stale,
+      now: NOW,
+      corroboration: live,
+      work: {
+        declared: true,
+        advancing: true,
+        corroboratedBy: 'process',
+        items: [{ ok: true, kind: 'pid', progressAt: NOW }],
+      },
+    })).toMatchObject({ owns: false, reason: 'lease-expired' })
   })
 })

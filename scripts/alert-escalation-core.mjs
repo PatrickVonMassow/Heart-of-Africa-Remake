@@ -13,13 +13,19 @@
 //   rung 0  send immediately          — the first time the condition is seen
 //   rung 1  not before 15 min later
 //   rung 2  not before 30 min later
-//   rung 3  not before 60 min later   — priority rises with the rung
-//   rung 4  not before 120 min later  — AND THE BATCH PAUSES, with a board card
-//   above   silence: the batch is paused and the reason is written down
+//   rung 3  not before 60 min later   — condition priority rises with the rung
+//   rung 4  not before 120 min later  — decide once, or hold a probe/event at its ceiling
+//   above   silence: a non-corruption condition's decision card carries the answer
 //
 // Four buzzes over ~3.5 hours instead of eight identical ones, then a state the
-// morning reader cannot miss. The LAST RUNG IS THE POINT: an alert can be slept
-// through, a paused batch with a card explaining itself cannot.
+// morning reader cannot miss. The LAST RUNG no longer manufactures a standstill:
+// for a CONDITION it records the decision to continue and the user's retroactive
+// veto route. A recurring EVENT stays on that rung, at the caller's own priority,
+// because each occurrence is news rather than an unanswered request. A condition
+// on the closed corruption list runs its named repair and stays on the capped
+// rung. It may not continue ordinary work through corruption, but it also may
+// not turn that safety boundary into a clockless human hold. Event/condition
+// shape and corruption authority are separate caller declarations.
 //
 // WHAT COUNTS AS "IDENTICAL". The watchdog's message carries a rising minute
 // count, so a byte comparison would call every buzz a new alert and the ladder
@@ -33,10 +39,10 @@
 // this half only decides.
 
 /** The minimum gap before the next send at each rung. Index = rung = how many
- *  identical alerts have already gone out. The last entry is the PAUSE rung. */
+ *  identical alerts have already gone out. The last entry is the decision rung. */
 export const ALERT_GAPS_MS = [0, 15 * 60 * 1000, 30 * 60 * 1000, 60 * 60 * 1000, 120 * 60 * 1000]
 
-/** The last rung — reaching it pauses the batch instead of buzzing again. */
+/** The last rung — reaching it resolves the unanswered alert instead of buzzing again. */
 export const ALERT_PAUSE_RUNG = ALERT_GAPS_MS.length - 1
 
 /** ntfy priority per rung. Rising, so the fourth buzz does not look like the
@@ -66,26 +72,47 @@ export function higherPriority(a, b) {
 }
 
 /**
- * THE PAUSE RUNG IS FOR CONDITIONS, NOT FOR EVENTS (four-eyes review, blocker).
+ * THE CLOSED LIST OF ALERT CLASSES ALLOWED TO STOP ORDINARY WORK FOR REPAIR.
  *
- * The ladder's premise — "the same alert again means the same condition is still
- * unanswered" — holds for the watchdog's "nothing has moved", for CI-red and for
- * a wedged owner. It is FALSE for an EVENT notification: `batch-autostart` posts
- * "Resurrected" on every successor spawn, which under the context-boundary
- * policy is the designed HEALTHY flow several times a night, and its text is
- * identical once digit runs collapse. Simulated at a 45-minute point cadence it
- * reaches the last rung after ~5 hours and would pause a perfectly healthy batch
- * — the exact opposite of this layer's purpose, and the 6-hour reset never fires
- * on a busy night.
- *
- * So pausing requires the CALLER's own declared priority to be at least this.
- * An event notification is posted at `low`/`default` and therefore CANNOT pause:
- * it throttles at the top gap and keeps going out for as long as it recurs,
- * rather than either pausing or falling permanently silent. Condition-shaped
- * callers already post at `high`/`urgent`. The gate reads the CALLER's priority,
- * never the rung's own raised one, which would defeat it.
+ * Priority is presentation, not authority. A generic stall may be urgent and a
+ * repository finding may initially be quiet; neither fact decides whether
+ * continuing can damage the work. Callers therefore name the condition class,
+ * and this list — beside the decision core — is the complete pause capability.
+ * Unknown, absent and newly invented classes all fall toward continuation.
  */
-export const PAUSE_MIN_PRIORITY = 'high'
+export const CORRUPTION_ALERT_CLASSES = Object.freeze([
+  'repository-integrity',
+])
+
+/** Every closed-list class owns an explicit machine-runnable recovery. */
+export const CORRUPTION_RECOVERIES = Object.freeze({
+  'repository-integrity': Object.freeze({
+    command: Object.freeze(['scripts/batch-doctor.mjs', '--repair']),
+    remedy: 'batch-doctor quarantine or repair',
+  }),
+})
+
+const CORRUPTION_ALERT_CLASS_SET = new Set(CORRUPTION_ALERT_CLASSES)
+
+export function isCorruptionAlertClass(alertClass) {
+  return CORRUPTION_ALERT_CLASS_SET.has(String(alertClass ?? ''))
+}
+
+export function corruptionRecovery(alertClass) {
+  return CORRUPTION_RECOVERIES[String(alertClass ?? '')] ?? null
+}
+
+/** Stable card title named by the pure verdict and consumed by the I/O half. */
+export function continuationDecisionCard(title = '') {
+  const subject = String(title).trim().replace(/\s+/g, ' ') || 'unnamed alert'
+  return `Entscheidungsprotokoll: Batch läuft weiter — ${subject}`.slice(0, 160)
+}
+
+export function corruptionDecisionCard(title = '', alertClass = '') {
+  const subject = String(title).trim().replace(/\s+/g, ' ') || 'unnamed alert'
+  const kind = String(alertClass).trim() || 'unknown-corruption'
+  return `Entscheidungsprotokoll: ${kind} wird repariert und erneut geprüft — ${subject}`.slice(0, 160)
+}
 
 /** Keeps a title's last word and a message's first word from merging into one
  *  token — two alerts that differ only at that seam stay two alerts. */
@@ -119,38 +146,43 @@ export function ladderEntry(state, key) {
     lastSentAt,
     firstSentAt: Number.isFinite(Number(e.firstSentAt)) ? Number(e.firstSentAt) : lastSentAt,
     sends: Number.isFinite(Number(e.sends)) ? Number(e.sends) : 0,
+    // Carried through so a later rung does not silently drop the decision record
+    // the board derives its state card from (point 749). Defended like the rest:
+    // only a record with a readable body counts as one.
+    ...(e.record && typeof e.record === 'object' && String(e.record.body ?? '').trim()
+      ? { record: e.record }
+      : {}),
   }
 }
 
 /**
  * THE DECISION. Pure.
  *
- * @returns {{action:'send'|'suppress'|'pause-and-send', rung:number, nextRung:number,
- *            priority:string, dueInMs:number, reason:string, reset:boolean}}
+ * @returns {{action:'send'|'suppress'|'repair-and-probe'|'continue-and-record', rung:number,
+ *            nextRung:number, priority:string, dueInMs:number, reason:string,
+ *            reset:boolean, decisionCard?:string}}
  */
 export function escalationDecision({
   key,
+  title = '',
   now = Date.now(),
   entry = null,
   paused = false,
-  // The CALLER's own declared priority — the gate on the pause rung reads this,
-  // never the rung's raised one. See PAUSE_MIN_PRIORITY.
   priority = 'default',
-  pauseMinPriority = PAUSE_MIN_PRIORITY,
+  alertClass = 'generic',
+  recurring = false,
   gaps = ALERT_GAPS_MS,
   resetMs = ALERT_RESET_MS,
   priorities = ALERT_PRIORITIES,
 } = {}) {
   const pauseRung = gaps.length - 1
-  const mayPause = priorityRank(priority) >= priorityRank(pauseMinPriority)
-
-  // PRIORITY ESCALATION AND THE PAUSE ARE ONE LADDER, so an alert that may not
-  // pause has no business buzzing at urgent either (four-eyes re-review). Below
-  // the threshold the alert is an EVENT: it is throttled, but delivered at the
-  // caller's OWN priority — otherwise the launcher's "Resurrected" would reach
-  // the phone at urgent every two hours while the module's own contract calls it
-  // routine. Above the threshold the rung raises as before.
-  const prio = (rung) => (mayPause ? (priorities[Math.min(rung, priorities.length - 1)] ?? 'default') : priority)
+  const mayPause = isCorruptionAlertClass(alertClass)
+  // Corruption authority wins if a caller makes contradictory declarations:
+  // `recurring` cannot be used to downgrade a closed-list safety condition.
+  const isRecurringEvent = recurring === true && !mayPause
+  const prio = (rung) => isRecurringEvent
+    ? priority
+    : higherPriority(priority, priorities[Math.min(rung, priorities.length - 1)] ?? 'default')
 
   if (!entry) {
     return { key, action: 'send', rung: 0, nextRung: 1, priority: prio(0), dueInMs: 0, reset: false, reason: 'first time this alert is raised' }
@@ -165,9 +197,22 @@ export function escalationDecision({
     return { key, action: 'send', rung: 0, nextRung: 1, priority: prio(0), dueInMs: 0, reset: true, reason: `the same alert last went out ${Math.round(since / 60000)} min ago — the condition is treated as cleared and the ladder restarts` }
   }
 
-  const rung = entry.rung
+  // A short-lived regressed build advanced recurring events above the ceiling.
+  // Corruption pauses from the previous policy did the same. Clamp both back
+  // onto the capped rung so existing state starts probing rather than staying
+  // permanently silent.
+  const rung = isRecurringEvent || mayPause ? Math.min(entry.rung, pauseRung) : entry.rung
   if (rung > pauseRung) {
-    return { key, action: 'suppress', rung, nextRung: rung, priority: prio(rung), dueInMs: Infinity, reset: false, reason: 'the ladder is at its top: the batch is paused for this alert and the board card names why — repeating the buzz adds nothing' }
+    return {
+      key,
+      action: 'suppress',
+      rung,
+      nextRung: rung,
+      priority: prio(rung),
+      dueInMs: Infinity,
+      reset: false,
+      reason: 'the ladder is at its top: the decision card records why the batch continued and how to veto that decision retroactively',
+    }
   }
 
   const gap = gaps[Math.min(rung, gaps.length - 1)]
@@ -176,15 +221,69 @@ export function escalationDecision({
   }
 
   if (rung === pauseRung) {
-    // AN EVENT-SHAPED ALERT NEVER PAUSES and never goes permanently silent: it
-    // settles at the top gap and keeps recurring. Staying ON the last rung
-    // (nextRung === pauseRung) is what makes that a ceiling rather than a cliff.
-    if (!mayPause) {
-      return { key, action: 'send', rung, nextRung: pauseRung, priority: prio(rung), dueInMs: 0, reset: false, reason: `ceiling: an alert raised at "${priority}" is an EVENT, not an unanswered condition — it throttles to one every ${Math.round(gaps[pauseRung] / 60000)} min and never pauses the batch` }
+    if (isRecurringEvent) {
+      return {
+        key,
+        action: 'send',
+        rung,
+        nextRung: pauseRung,
+        priority: prio(rung),
+        dueInMs: 0,
+        reset: false,
+        reason:
+          `ceiling: this is a recurring EVENT, not an unanswered condition — it stays at the caller's ` +
+          `"${priority}" priority, sends at most once every ${Math.round(gaps[pauseRung] / 60000)} min, ` +
+          'and creates no decision card',
+      }
     }
-    return paused
-      ? { key, action: 'send', rung, nextRung: rung + 1, priority: prio(rung), dueInMs: 0, reset: false, reason: 'last rung reached, and the batch is ALREADY paused — the alert goes out, the pause is not re-applied' }
-      : { key, action: 'pause-and-send', rung, nextRung: rung + 1, priority: prio(rung), dueInMs: 0, reset: false, reason: `last rung: this alert has gone unanswered through ${rung} risings — the batch pauses so it cannot be slept through` }
+    if (!mayPause) {
+      const decisionCard = continuationDecisionCard(title)
+      return {
+        key,
+        action: 'continue-and-record',
+        rung,
+        nextRung: rung + 1,
+        priority: prio(rung),
+        dueInMs: 0,
+        reset: false,
+        decisionCard,
+        reason:
+          `last rung: "${alertClass}" is not on the closed corruption list — the batch keeps running and ` +
+          `decision card "${decisionCard}" records the decision and its retroactive veto`,
+      }
+    }
+    if (paused) {
+      return { key, action: 'send', rung, nextRung: rung, priority: prio(rung), dueInMs: 0, reset: false, reason: 'last rung reached, and the batch is ALREADY paused — the alert goes out, repair stands down with the paused batch' }
+    }
+    const repair = corruptionRecovery(alertClass)
+    const probeAfterMs = gaps[pauseRung]
+    const decisionCard = corruptionDecisionCard(title, alertClass)
+    const nextAttemptAt = now + probeAfterMs
+    const decisionRecord = {
+      title: decisionCard,
+      body:
+        `Automatische Entscheidung: ${repair.remedy} für „${title || 'unnamed alert'}“ ausführen; ` +
+        `nächster Versuch ${new Date(nextAttemptAt).toISOString()}. Retroaktives Veto: „Veto“ mit dem ` +
+        `letzten zulässigen Commit; Doctor-Quarantäne und Rescue-Nachweise bleiben erhalten.`,
+    }
+    return {
+      key,
+      action: 'repair-and-probe',
+      rung,
+      nextRung: pauseRung,
+      priority: prio(rung),
+      dueInMs: 0,
+      probeAfterMs,
+      nextAttemptAt,
+      reset: false,
+      alertClass,
+      repair,
+      decisionCard,
+      decisionRecord,
+      reason:
+        `last rung: corruption class "${alertClass}" runs ${repair.remedy}, records decision card ` +
+        `"${decisionCard}", and probes again in ${Math.round(probeAfterMs / 60000)} min`,
+    }
   }
 
   return { key, action: 'send', rung, nextRung: rung + 1, priority: prio(rung), dueInMs: 0, reset: false, reason: `rung ${rung}: the condition is still there ${Math.round(since / 60000)} min later` }
@@ -193,7 +292,7 @@ export function escalationDecision({
 /** Book a delivered alert on the ladder — pure state transition. Entries that
  *  have not been touched for two reset windows are dropped, so the file cannot
  *  grow without bound. */
-export function advanceLadder(state, { key, decision, now = Date.now(), resetMs = ALERT_RESET_MS }) {
+export function advanceLadder(state, { key, decision, now = Date.now(), resetMs = ALERT_RESET_MS, record = null }) {
   const alerts = state?.alerts && typeof state.alerts === 'object' ? { ...state.alerts } : {}
   for (const [k, e] of Object.entries(alerts)) {
     const at = Number(e?.lastSentAt)
@@ -205,6 +304,13 @@ export function advanceLadder(state, { key, decision, now = Date.now(), resetMs 
     lastSentAt: now,
     firstSentAt: decision.reset || !prev ? now : prev.firstSentAt,
     sends: (decision.reset || !prev ? 0 : prev.sends) + 1,
+    // THE DECISION RECORD LIVES ON THE RUNG (point 749). The last rung used to
+    // post it as a "Von dir zu klären" card, which asked the user to act on a
+    // machine-side incident and then outlived the condition; the board derives
+    // its state card from here instead, so the record disappears with the alert.
+    // An entry the ladder RESETS drops its old record with it: the condition it
+    // described is the one that was treated as cleared.
+    ...(record ? { record } : decision.reset ? {} : prev?.record ? { record: prev.record } : {}),
   }
   return { alerts }
 }
@@ -214,17 +320,6 @@ export function clearLadder(state, key) {
   const alerts = state?.alerts && typeof state.alerts === 'object' ? { ...state.alerts } : {}
   delete alerts[key]
   return { alerts }
-}
-
-/** The German pause text for the last rung — the morning reader's sentence. */
-export function escalationPauseReason(title, decision, stamp) {
-  return (
-    `Eskalation: Die Meldung „${title}“ wurde ${decision.rung + 1} Mal mit steigendem Abstand gesendet und blieb unbeantwortet. ` +
-    `Der Batch pausiert deshalb absichtlich — eine Benachrichtigung kann man verschlafen, einen pausierten Batch nicht. ` +
-    `Er läuft weiter, sobald die Pause-Datei .claude/batch-paused gelöscht wird — oder von selbst, ` +
-    `sobald die Restart-Uhr in dieser Datei abgelaufen ist (Punkt 445). ` +
-    `[${stamp}]`
-  )
 }
 
 /** One English line for the log. */

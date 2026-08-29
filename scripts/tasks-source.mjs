@@ -16,23 +16,11 @@
 // A consumer of the second kind that forgets the archive silently stops seeing
 // finished points — it would not fail, it would just never complain again.
 import { existsSync, readFileSync } from 'node:fs'
-import { fileURLToPath } from 'node:url'
 import { resolve } from 'node:path'
+import { REPO_ROOT } from './repo-paths.mjs'
 
-// Resolve from this module's own location when that is available, and fall back
-// to the working directory otherwise: under the test runner `import.meta.url` is
-// not always a file: URL, and a module that throws at import time takes its
-// whole consumer down — retro-core.test.mjs failed to load for exactly that.
-const repoRoot = (() => {
-  try {
-    return fileURLToPath(new URL('..', import.meta.url))
-  } catch {
-    return process.cwd()
-  }
-})()
-
-export const TASKS_PATH = resolve(repoRoot, 'TASKS.md')
-export const ARCHIVE_PATH = resolve(repoRoot, 'docs/tasks-archive.md')
+export const TASKS_PATH = resolve(REPO_ROOT, 'TASKS.md')
+export const ARCHIVE_PATH = resolve(REPO_ROOT, 'docs/tasks-archive.md')
 
 const read = (p) => {
   try {

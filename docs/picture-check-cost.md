@@ -94,8 +94,8 @@ Suite membership from `scripts/verify/tiers.mjs`.
 
 | | Suites | Shots | Reviewing tokens | Summed median runtime |
 | --- | ---: | ---: | ---: | ---: |
-| SMALL (`npm run test:small`) | 7 | 19 | 29,548 | 469.3 s = 7.8 min |
-| LARGE, one backend (`test:large`) | 16 + preview | 93 | 150,289 | 2,536.0 s = 42.3 min |
+| SMALL (`npm run test:small`) | 8 (one unmeasured) | 19 | 29,548 | 469.3 s measured = 7.8 min |
+| LARGE, one backend (`test:large`) | 17 + preview (one unmeasured) | 93 | 150,289 | 2,536.0 s measured = 42.3 min |
 | LARGE, both backends (`npm test`) | — | 182 | 294,096 | — |
 
 The both-backend row follows the wiring in `tiers.mjs`: the WebGPU pass skips

@@ -27,6 +27,7 @@
 // Fail-open is the WRAPPER's job; this core must never throw on partial input.
 // The remedy's publish steps come from scripts/board-remedy.mjs — one copy.
 import { REPUBLISH } from './board-remedy.mjs'
+import { pointNumbersFromChip, pointOwnershipFromTitle } from './dashboard-point-reader-core.mjs'
 
 /** Max body words for a now/queue card (good cards measured <= 82). */
 export const WORD_BUDGET = 90
@@ -58,21 +59,25 @@ function sectionSlice(html, marker) {
  * number in `<span class="t">` (now-cards); null for non-point work. Cards
  * without a body block are skipped (nothing to measure).
  */
-export function parseCards(sectionHtml, where) {
+export function parseCards(sectionHtml, where, options = {}) {
   if (typeof sectionHtml !== 'string' || typeof where !== 'string') return []
   const cards = []
   for (const chunk of sectionHtml.split(/<details\b/).slice(1)) {
-    const num = chunk.match(/class="num">\s*(\d+)/)
+    const num = chunk.match(/class="num">\s*([^<]*?)\s*</)
     const title = chunk.match(/class="t">\s*([^<]*)/)
-    const titleNum = title && title[1].match(/^\s*(\d+)/)
+    const ownedPoints = num
+      ? pointNumbersFromChip(num[1])
+      : pointOwnershipFromTitle(title?.[1], options).points
     const body =
       chunk.match(/<div class="body">([\s\S]*?)<\/div>\s*<\/details>/) ||
       chunk.match(/<div class="body">([\s\S]*)$/)
     if (!body) continue
     cards.push({
       where,
-      point: num ? Number(num[1]) : titleNum ? Number(titleNum[1]) : null,
+      point: ownedPoints.length === 1 ? ownedPoints[0] : null,
       title: title ? title[1].trim() : '',
+      // The card's own opening tag, so a rule can ask what KIND of card it is.
+      kind: (chunk.match(/^[^>]*data-state="([^"]*)"/) ?? [])[1] ?? null,
       bodyHtml: body[1],
     })
   }
@@ -90,18 +95,31 @@ export function cardStats(bodyHtml) {
   }
 }
 
+/** The one card this guard does not judge: the machine's own derived state card. */
+function isDerivedStateCard(card) {
+  return card?.kind === 'derived'
+}
+
 /**
  * The offending now/queue cards as [{where: 'now'|'queue', point, reason}].
  * Total: malformed input yields no offenders.
  */
-export function concisenessOffenders(html) {
+export function concisenessOffenders(html, options = {}) {
   if (typeof html !== 'string') return []
   const cards = [
-    ...parseCards(sectionSlice(html, 'Woran ich gerade arbeite'), 'now'),
-    ...parseCards(sectionSlice(html, '<h2>Warteschlange'), 'queue'),
+    ...parseCards(sectionSlice(html, 'Woran ich gerade arbeite'), 'now', options),
+    ...parseCards(sectionSlice(html, '<h2>Warteschlange'), 'queue', options),
   ]
   const offenders = []
   for (const card of cards) {
+    // THE DERIVED STATE CARD IS THE MACHINE'S OWN RECORD, not authored prose
+    // (measured 26.08.2026): it carries decisions the batch made on its own —
+    // the alert it continued past, the veto route back — and the wording is a
+    // RECORD, so shortening it would shorten the evidence. `board-state-core`
+    // already caps it at MAX_STATE_PARAGRAPHS, which is the bound that keeps it
+    // from becoming the "Text-Tapete" this guard exists to prevent; the budgets
+    // below stay in force for every card a session writes by hand.
+    if (isDerivedStateCard(card)) continue
     const { words, paragraphs, techTokens } = cardStats(card.bodyHtml)
     const reasons = []
     if (words > WORD_BUDGET) reasons.push(`${words} words (budget ${WORD_BUDGET}) — too verbose`)
@@ -117,9 +135,9 @@ export function concisenessOffenders(html) {
 }
 
 /** Top-level decision on the raw dashboard HTML. Total: any bad input → allow. */
-export function evaluate({ dashboardHtml } = {}) {
+export function evaluate({ dashboardHtml, knownPoints } = {}) {
   try {
-    const offenders = concisenessOffenders(dashboardHtml)
+    const offenders = concisenessOffenders(dashboardHtml, { knownPoints })
     if (offenders.length === 0) return { block: false, reason: '' }
     const list = offenders
       .map((o) => `${o.where} card ${o.point ?? '(no point)'}: ${o.reason}`)

@@ -22,7 +22,8 @@ import { spawnSync } from 'node:child_process'
 import { resolve, join } from 'node:path'
 import { REPO_ROOT } from './repo-paths.mjs'
 import { isMainModule } from './is-main.mjs'
-import { ACTIONS, mainCheckoutFrom, planBootstrap, formatPlan } from './worktree-bootstrap-core.mjs'
+import { mainCheckoutFrom } from './main-checkout-core.mjs'
+import { ACTIONS, planBootstrap, formatPlan } from './worktree-bootstrap-core.mjs'
 
 const read = (path) => {
   try {

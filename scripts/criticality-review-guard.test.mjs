@@ -15,7 +15,22 @@ import { spawnSync } from 'node:child_process'
 import { cpSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { resolve } from 'node:path'
-import { baselineFor, bootstrapBase, readWorkOrder, showAt } from './criticality-review-guard.mjs'
+import {
+  attachPointFileSets,
+  attachUnavailableClearances,
+  baselineFor,
+  bootstrapBase,
+  buildUnavailableReceipt,
+  measurePointFilesWithoutCommission,
+  parseUnavailableReceiptArgs,
+  pointAuthorshipLogCommand,
+  pointFilesCommand,
+  pointLandingLogCommand,
+  pointLaneCommitsCommand,
+  pointLaneRefsCommand,
+  readWorkOrder,
+  showAt,
+} from './criticality-review-guard.mjs'
 
 describe('baselineFor', () => {
   it('prefers the branch’s own confirmed baseline, then main’s, then nothing', () => {
@@ -87,6 +102,335 @@ describe('showAt', () => {
         throw e
       }),
     ).toThrow(/not a git repository/)
+  })
+})
+
+describe('point file-set measurement', () => {
+  it('uses the point lane only, excluding merges that import unrelated main work', () => {
+    expect(pointFilesCommand('base', 'review')).toEqual([
+      'log',
+      '--first-parent',
+      '--no-merges',
+      '--format=format:',
+      '--name-only',
+      '-z',
+      'base..review',
+    ])
+  })
+
+  it('measures a self-authored point from the merge that landed its named lane', () => {
+    const reviewed = 'c'.repeat(40)
+    const landing = 'c'.repeat(40)
+    const side = 'd'.repeat(40)
+    const calls = []
+    const files = measurePointFilesWithoutCommission(893, reviewed, {
+      isAncestor: () => false,
+      run: (args) => {
+        calls.push(args)
+        if (args[0] === 'log') {
+          return `\x1e${landing}\x1f${'a'.repeat(40)} ${side}\x1fMerge branch 'feat/893-attempt-lease-fencing'\n`
+        }
+        if (args[0] === 'diff') return 'scripts/lease.mjs\0scripts/lease.test.mjs\0scripts/lease.mjs\0'
+        throw new Error(`unexpected command: ${args.join(' ')}`)
+      },
+    })
+
+    expect(calls).toEqual([pointLandingLogCommand(), ['diff', '--name-only', '-z', `${landing}^1`, landing]])
+    expect(files).toEqual(['scripts/lease.mjs', 'scripts/lease.test.mjs'])
+  })
+
+  // ONE BOUNDARY (28.08.2026): `review-sol` structurally refuses to put the work
+  // order, its archive or the retrospective in a pass, so a point whose measured
+  // file set picked one of them up could never reach a complete composition,
+  // whatever was reviewed. The gate reads the planner's exclusion list.
+  // The receipt path measured its own set and skipped the boundary (cross-vendor
+  // review, GPT-5.6 Sol): a clearance could then be written for the work order or
+  // the retrospective — paths no review round was ever owed for.
+  it('never lets an unavailable receipt claim a path outside the review boundary', () => {
+    const sha = 'a'.repeat(40)
+    const built = buildUnavailableReceipt({
+      sha,
+      point: 893,
+      files: ['scripts/lease.mjs', 'TASKS.md'],
+      reason: 'every configured reviewer vendor authored part of this contribution',
+      records: [{ kind: 'authoring-commission', point: 893, sha: 'b'.repeat(40), at: 1 }],
+      resolveSha: () => sha,
+      isAncestor: () => true,
+      measure: () => ({ unavailableFiles: ['scripts/lease.mjs', 'TASKS.md'] }),
+    })
+
+    expect(built.ok).toBe(false)
+    expect(built.errors.join(' ')).toContain('scripts/lease.mjs')
+    expect(built.errors.join(' ')).not.toContain('TASKS.md')
+  })
+
+  it('writes the receipt for the measured set once the excluded paths are gone', () => {
+    const sha = 'a'.repeat(40)
+    const built = buildUnavailableReceipt({
+      sha,
+      point: 893,
+      files: ['scripts/lease.mjs'],
+      reason: 'every configured reviewer vendor authored part of this contribution',
+      records: [{ kind: 'authoring-commission', point: 893, sha: 'b'.repeat(40), at: 1 }],
+      resolveSha: () => sha,
+      isAncestor: () => true,
+      measure: () => ({ unavailableFiles: ['scripts/lease.mjs', 'docs/tasks-archive.md'] }),
+      now: 1_700_000_000_000,
+    })
+
+    expect(built.ok).toBe(true)
+    expect(built.record.files).toEqual(['scripts/lease.mjs'])
+  })
+
+  it('leaves out the paths no review round may carry', () => {
+    const reviewed = 'c'.repeat(40)
+    const landing = 'c'.repeat(40)
+    const side = 'd'.repeat(40)
+    const files = measurePointFilesWithoutCommission(893, reviewed, {
+      isAncestor: () => false,
+      run: (args) => {
+        if (args[0] === 'log') {
+          return `\x1e${landing}\x1f${'a'.repeat(40)} ${side}\x1fMerge branch 'feat/893-attempt-lease-fencing'\n`
+        }
+        if (args[0] === 'diff') {
+          return [
+            'scripts/lease.mjs',
+            'TASKS.md',
+            'docs/tasks-archive.md',
+            'docs/analysis_de/retrospektive-zusammenarbeit.md',
+          ].join('\0')
+        }
+        throw new Error(`unexpected command: ${args.join(' ')}`)
+      },
+    })
+
+    expect(files).toEqual(['scripts/lease.mjs'])
+  })
+
+  it('uses a landing merge to recover the lane base for an earlier branch review', () => {
+    const first = 'a'.repeat(40)
+    const reviewed = 'b'.repeat(40)
+    const landing = 'c'.repeat(40)
+    const side = 'd'.repeat(40)
+    const mainParent = 'e'.repeat(40)
+    const base = 'f'.repeat(40)
+    const calls = []
+    const files = measurePointFilesWithoutCommission(893, reviewed, {
+      isAncestor: (a, b) => (a === reviewed && b === side) || (a === first && b === reviewed),
+      run: (args) => {
+        calls.push(args)
+        if (args.includes('--merges')) {
+          return `\x1e${landing}\x1f${mainParent} ${side}\x1fMerge branch 'feat/893-attempt-lease-fencing'\n`
+        }
+        if (args[0] === 'rev-list') return `${first}\n${reviewed}\n${side}\n`
+        if (args[0] === 'rev-parse') return `${base}\n`
+        if (args[0] === 'log') return 'scripts/lease.mjs\0scripts/lease.test.mjs\0'
+        throw new Error(`unexpected command: ${args.join(' ')}`)
+      },
+    })
+
+    expect(calls).toContainEqual(pointLaneCommitsCommand(side, `${landing}^1`))
+    expect(calls.at(-1)).toEqual(pointFilesCommand(base, reviewed))
+    expect(files).toEqual(['scripts/lease.mjs', 'scripts/lease.test.mjs'])
+  })
+
+  it('falls back to the parent of the first retained lane commit before landing', () => {
+    const first = 'a'.repeat(40)
+    const reviewed = 'b'.repeat(40)
+    const tip = 'c'.repeat(40)
+    const base = 'd'.repeat(40)
+    const ref = 'refs/heads/feat/903-measurable-point-file-set'
+    const calls = []
+    const files = measurePointFilesWithoutCommission(903, reviewed, {
+      isAncestor: (a, b) => (a === reviewed && b === tip) || (a === first && b === reviewed),
+      run: (args) => {
+        calls.push(args)
+        if (args.includes('--merges')) return ''
+        if (args[0] === 'for-each-ref') return `${ref}\t${tip}\n`
+        if (args[0] === 'rev-list') return `${first}\n${reviewed}\n${tip}\n`
+        if (args[0] === 'rev-parse') return `${base}\n`
+        if (args[0] === 'log') return 'scripts/guard.mjs\0scripts/guard.test.mjs\0'
+        throw new Error(`unexpected command: ${args.join(' ')}`)
+      },
+    })
+
+    expect(pointLaneRefsCommand(903)).toContain('refs/heads/feat/903-*')
+    expect(pointLaneCommitsCommand(ref)).toEqual(['rev-list', '--first-parent', '--reverse', ref, '--not', 'main'])
+    expect(calls.at(-1)).toEqual(pointFilesCommand(base, reviewed))
+    expect(files).toEqual(['scripts/guard.mjs', 'scripts/guard.test.mjs'])
+  })
+
+  it('attaches a Git fallback file set when no commission row exists', () => {
+    const review = {
+      point: 893,
+      sha: 'b'.repeat(40),
+      verdict: 'merge',
+      pointFiles: ['forged.mjs'],
+      reachable: true,
+    }
+    const calls = []
+    const rows = attachPointFileSets(
+      [review],
+      () => {
+        throw new Error('commission measurement must not run')
+      },
+      (point, sha) => {
+        calls.push([point, sha])
+        return ['scripts/lease.mjs', 'scripts/lease.test.mjs']
+      },
+    )
+
+    expect(calls).toEqual([[893, review.sha]])
+    expect(rows[0].pointFiles).toEqual(['scripts/lease.mjs', 'scripts/lease.test.mjs'])
+  })
+
+  it('includes only first-parent work plus cc-only merge resolutions in unavailable measurement', () => {
+    expect(pointAuthorshipLogCommand('base', 'review')).toEqual([
+      '-c',
+      'core.quotepath=on',
+      'log',
+      '--first-parent',
+      '--format=%x1e%H%x1f%ct%x1f%P',
+      '--name-only',
+      '--no-renames',
+      '--diff-merges=cc',
+      '--reverse',
+      'base..review',
+    ])
+  })
+
+  it('replaces forged ledger coverage and leaves a failed measurement unknown', () => {
+    const commission = {
+      kind: 'authoring-commission',
+      point: 769,
+      sha: 'a'.repeat(40),
+      at: 1_787_000_000_000,
+      reachable: true,
+    }
+    const measured = {
+      point: 769,
+      sha: 'b'.repeat(40),
+      verdict: 'merge',
+      descendsFrom: [commission.sha],
+      pointFiles: ['forged.mjs'],
+      reachable: true,
+    }
+    const failed = {
+      ...measured,
+      sha: 'c'.repeat(40),
+      descendsFrom: [commission.sha, measured.sha],
+    }
+    const rows = attachPointFileSets([commission, measured, failed], (_base, sha) => {
+      if (sha === failed.sha) throw new Error('undiffable')
+      return ['scripts/real.mjs', ' edge-space.mjs', 'scripts/real.mjs']
+    })
+    expect(rows[1].pointFiles).toEqual(['scripts/real.mjs', ' edge-space.mjs'])
+    expect(rows[2].pointFiles).toBeUndefined()
+  })
+
+  it('computes the reviewed file set from a Fable commission base', () => {
+    const commission = {
+      kind: 'authoring-commission',
+      point: 846,
+      sha: 'a'.repeat(40),
+      model: 'Fable 5',
+      at: 1_787_130_000_000,
+      reachable: true,
+    }
+    const review = {
+      point: 846,
+      sha: 'b'.repeat(40),
+      verdict: 'merge',
+      descendsFrom: [commission.sha],
+      reachable: true,
+    }
+    const calls = []
+    const rows = attachPointFileSets([commission, review], (base, sha) => {
+      calls.push([base, sha])
+      return ['scripts/author-fable.mjs', 'scripts/author-sol.mjs']
+    })
+
+    expect(calls).toEqual([[commission.sha, review.sha]])
+    expect(rows[1].pointFiles).toEqual(['scripts/author-fable.mjs', 'scripts/author-sol.mjs'])
+  })
+
+  it('verifies unavailable receipts only for Git’s exact unreviewable file set', () => {
+    const commission = {
+      kind: 'authoring-commission',
+      point: 769,
+      sha: 'a'.repeat(40),
+      at: 1_787_000_000_000,
+      reachable: true,
+    }
+    const receipt = {
+      kind: 'criticality-review-unavailable',
+      point: 769,
+      sha: 'b'.repeat(40),
+      files: ['scripts/both.mjs'],
+      descendsFrom: [commission.sha],
+      unavailableVerified: true,
+      unavailableFiles: ['forged.mjs'],
+      reachable: true,
+    }
+    const wrong = { ...receipt, sha: 'c'.repeat(40), files: ['scripts/reviewable.mjs'] }
+    const rows = attachUnavailableClearances([commission, receipt, wrong], () => ({
+      pointFiles: ['scripts/reviewable.mjs', 'scripts/both.mjs'],
+      unavailableFiles: ['scripts/both.mjs'],
+    }))
+    expect(rows[1]).toMatchObject({
+      unavailableVerified: true,
+      unavailableFiles: ['scripts/both.mjs'],
+      pointFiles: ['scripts/reviewable.mjs', 'scripts/both.mjs'],
+    })
+    expect(rows[2].unavailableVerified).toBeUndefined()
+    expect(rows[2].unavailableFiles).toBeUndefined()
+  })
+
+  it('builds a receipt only when its file set equals the Git measurement', () => {
+    const commission = {
+      kind: 'authoring-commission',
+      point: 870,
+      sha: 'a'.repeat(40),
+      at: 100,
+    }
+    const common = {
+      sha: 'b'.repeat(40),
+      point: '870',
+      reason: 'both configured vendors authored these contributions',
+      records: [commission],
+      now: 1_787_000_000_000,
+      resolveSha: () => 'b'.repeat(40),
+      isAncestor: () => true,
+      measure: () => ({ unavailableFiles: ['scripts/both.mjs', ' edge.mjs'] }),
+    }
+    const wrong = buildUnavailableReceipt({ ...common, files: ['scripts/both.mjs'] })
+    expect(wrong.ok).toBe(false)
+    expect(wrong.errors[0]).toContain("does not equal Git's unavailable set")
+    expect(wrong.errors[0]).toContain('" edge.mjs"')
+
+    const exact = buildUnavailableReceipt({ ...common, files: [' edge.mjs', 'scripts/both.mjs'] })
+    expect(exact).toMatchObject({
+      ok: true,
+      record: {
+        kind: 'criticality-review-unavailable',
+        point: 870,
+        sha: 'b'.repeat(40),
+        files: ['scripts/both.mjs', ' edge.mjs'],
+      },
+    })
+  })
+
+  it('parses the receipt file list byte-exact and refuses unknown CLI input', () => {
+    const parsed = parseUnavailableReceiptArgs([
+      '--record-unavailable', 'b'.repeat(40),
+      '--point', '870',
+      '--files', 'plain.mjs," edge.mjs"',
+      '--reason', 'no independent reviewer exists',
+    ])
+    expect(parsed).toMatchObject({ ok: true, values: { files: ['plain.mjs', ' edge.mjs'] } })
+    expect(parseUnavailableReceiptArgs(['--record-unavailable', 'abc1234', '--file', 'x']).errors).toContain(
+      'unknown unavailable-receipt argument --file',
+    )
   })
 })
 
@@ -186,6 +530,11 @@ describe('the gate against a real tick', { timeout: 60_000 }, () => {
     }
   })
 
+  it('binds every fixture git call to the temporary repository', () => {
+    expect(git('rev-parse', '--show-toplevel').stdout.trim()).toBe(resolve(repo))
+    expect(repo.startsWith(tmpdir())).toBe(true)
+  })
+
   it('is clear before anything is ticked, and arms its baseline there', () => {
     expectAllow()
   })
@@ -223,11 +572,11 @@ describe('the gate against a real tick', { timeout: 60_000 }, () => {
       { windowsHide: true, cwd: repo, encoding: 'utf8' },
     )
     expect(r.status, 'a self-review must be refused at the record command').toBe(1)
-    expect(r.stderr).toMatch(/SELF-REVIEW/i)
+    expect(r.stderr).toMatch(/SAME-VENDOR REVIEW/i)
     expect(runHook().decision?.decision).toBe('block')
   })
 
-  it('CLEARS once a different model records a merge naming the point', () => {
+  it('CLEARS once a different vendor records a merge naming the point', () => {
     const reviewed = git('rev-parse', 'HEAD').stdout.trim()
     const r = spawnSync(
       process.execPath,
@@ -235,7 +584,7 @@ describe('the gate against a real tick', { timeout: 60_000 }, () => {
         resolve(repo, 'scripts', 'mechanism-review.mjs'),
         '--record', reviewed,
         '--point', '900',
-        '--model', 'Fable 5',
+        '--model', 'GPT-5.6 Sol',
         '--verdict', 'merge',
         '--evidence', 'read the core, ran the gate against a synthetic tick, no side effects found',
         '--mode', 'review',
@@ -286,6 +635,84 @@ describe('the gate against a real tick', { timeout: 60_000 }, () => {
     rmSync(resolve(repo, 'docs/tasks-archive.md'), { recursive: true })
     write('docs/tasks-archive.md', `# Archive\n\n${PLAIN(901, true)}\n\n${HIGH(900, true)}\n\n${HIGH(903, true)}\n`)
     expect(runHook().decision?.decision, 'the gate must still be there afterwards').toBe('block')
+  })
+})
+
+describe('the unavailable-receipt CLI', { timeout: 30_000 }, () => {
+  it('refuses a mismatched file claim and appends the exact Git-measured set', () => {
+    const receiptRepo = mkdtempSync(resolve(tmpdir(), 'hoa-unavailable-receipt-'))
+    try {
+      cpSync(resolve(process.cwd(), 'scripts'), resolve(receiptRepo, 'scripts'), {
+        recursive: true,
+        filter: (src) => !/[\\/](verify|git-hooks)([\\/]|$)/.test(src),
+      })
+      mkdirSync(resolve(receiptRepo, '.claude'), { recursive: true })
+      const runGit = (...args) =>
+        spawnSync('git', ['-c', 'core.hooksPath=', '-c', 'commit.gpgsign=false', ...args], {
+          windowsHide: true,
+          cwd: receiptRepo,
+          encoding: 'utf8',
+        })
+      expect(runGit('init', '-q', '-b', 'main').status).toBe(0)
+      expect(runGit('config', 'user.email', 'receipt@test.local').status).toBe(0)
+      expect(runGit('config', 'user.name', 'receipt test').status).toBe(0)
+      writeFileSync(resolve(receiptRepo, 'seed.txt'), 'base\n')
+      expect(runGit('add', 'seed.txt').status).toBe(0)
+      expect(
+        runGit(
+          'commit', '-q', '-m',
+          'Seed the receipt range\n\nCo-Authored-By: Claude Opus 5 <noreply@anthropic.com>',
+        ).status,
+      ).toBe(0)
+      const base = runGit('rev-parse', 'HEAD').stdout.trim()
+      writeFileSync(
+        resolve(receiptRepo, '.claude/mechanism-reviews.jsonl'),
+        `${JSON.stringify({ kind: 'authoring-commission', point: 870, sha: base, model: 'GPT-5.6 Sol', at: 1 })}\n`,
+      )
+      mkdirSync(resolve(receiptRepo, 'src'), { recursive: true })
+      writeFileSync(resolve(receiptRepo, 'src/both.mjs'), 'export const both = true\n')
+      expect(runGit('add', 'src/both.mjs').status).toBe(0)
+      expect(
+        runGit(
+          'commit', '-q', '-m',
+          'Add a contribution by every configured reader\n\nCo-Authored-By: GPT-5.6 Sol <noreply@openai.com>\nCo-Authored-By: Claude Opus 5 <noreply@anthropic.com>\nCo-Authored-By: Claude Fable 5 <noreply@anthropic.com>\nCo-Authored-By: Claude Opus 4.8 <noreply@anthropic.com>',
+        ).status,
+      ).toBe(0)
+      const head = runGit('rev-parse', 'HEAD').stdout.trim()
+      const command = resolve(receiptRepo, 'scripts/criticality-review-guard.mjs')
+      const args = [
+        '--record-unavailable', head,
+        '--point', '870',
+        '--reason', 'every configured reviewer authored this contribution',
+      ]
+      const wrong = spawnSync(process.execPath, [command, ...args, '--files', 'src/wrong.mjs'], {
+        windowsHide: true,
+        cwd: receiptRepo,
+        encoding: 'utf8',
+      })
+      expect(wrong.status).toBe(1)
+      expect(wrong.stderr).toContain("does not equal Git's unavailable set")
+      expect(readFileSync(resolve(receiptRepo, '.claude/mechanism-reviews.jsonl'), 'utf8').trim().split('\n')).toHaveLength(1)
+
+      const exact = spawnSync(process.execPath, [command, ...args, '--files', 'src/both.mjs'], {
+        windowsHide: true,
+        cwd: receiptRepo,
+        encoding: 'utf8',
+      })
+      expect(exact.status, exact.stderr).toBe(0)
+      const rows = readFileSync(resolve(receiptRepo, '.claude/mechanism-reviews.jsonl'), 'utf8')
+        .trim()
+        .split('\n')
+        .map(JSON.parse)
+      expect(rows[1]).toMatchObject({
+        kind: 'criticality-review-unavailable',
+        point: 870,
+        sha: head,
+        files: ['src/both.mjs'],
+      })
+    } finally {
+      rmSync(receiptRepo, { recursive: true, force: true })
+    }
   })
 })
 

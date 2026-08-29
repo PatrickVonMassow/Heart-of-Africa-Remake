@@ -53,6 +53,12 @@ import {
 import { normaliseLineEndings } from './board-core.mjs'
 import { SINGLE_PARAGRAPH_WORD_BUDGET, WORD_BUDGET } from './dashboard-conciseness-guard-core.mjs'
 import { gateSets } from './user-gate-core.mjs'
+import { INHERITED_ESTIMATE_NOTE, inheritedEstimate } from './queue-calibration-core.mjs'
+import { pointNumbersFromChip } from './dashboard-point-reader-core.mjs'
+// The pool cap is the width of the queue's front (point 712) — three slots,
+// three candidates. It is IMPORTED rather than restated: a second 3 in this file
+// would be a second home for the number CLAUDE.md §6 states.
+import { POOL_CAP } from './batch-in-flight-core.mjs'
 
 // The stub meta is DEFINED beside the audit rule that exempts it and re-exported
 // here: two copies of that string would be a block loop waiting to happen. The
@@ -352,8 +358,13 @@ export function gatedMeta(since) {
  * gated point that already has its "Von dir zu klären" card is excluded by the
  * caller anyway; this is the honest state of the window before that card exists,
  * or after somebody forgot it.)
+ *
+ * `calibration` is what `queue-calibration.mjs` measured (point 730). A point
+ * nobody has estimated inherits the MEASURED MEDIAN of its criticality class
+ * instead of showing the "no estimate yet" marker — the marker is not retired,
+ * it is what still stands when the point carries no class the measurement covers.
  */
-export function queueEntries({ open = [], data = null, exclude = [], titles = {}, gates = null } = {}) {
+export function queueEntries({ open = [], data = null, exclude = [], titles = {}, gates = null, calibration = null } = {}) {
   const { points } = normaliseQueueData(data)
   const g = normaliseGates(gates)
   const skip = new Set((Array.isArray(exclude) ? exclude : [...exclude]).map(Number))
@@ -368,7 +379,7 @@ export function queueEntries({ open = [], data = null, exclude = [], titles = {}
       point,
       title,
       body: entry.body ?? [QUEUE_STUB_BODY],
-      meta: gated ? gatedMeta(g.since.get(point)) : entry.estimate || QUEUE_STUB_META,
+      meta: gated ? gatedMeta(g.since.get(point)) : entry.estimate || inheritedEstimate(point, calibration ?? {}) || QUEUE_STUB_META,
       stub,
       gated,
       // The fallback is still TAKEN — it is no longer taken SILENTLY.
@@ -411,6 +422,9 @@ export function repairTransliteration(word) {
  * point reference would block the owner's turn end on the conciseness and
  * card-topic guards, for text it never wrote. Neutralising it here keeps the
  * meaning readable and the guards satisfied by construction.
+ * Any parenthesized 2+ digit token is neutralised with plain brackets. That
+ * preserves a year such as `(2026)` without relabelling it as a point, while
+ * still removing the parenthesized shape the topic guard recognises.
  */
 export function boardSafeTitle(title, { maxLength = 60 } = {}) {
   let t = String(title ?? '').replace(/\s+/g, ' ').trim()
@@ -427,8 +441,8 @@ export function boardSafeTitle(title, { maxLength = 60 } = {}) {
     .replace(/\b[\w-]+\.(?:mjs|cjs|ts|tsx|js|md)\b/g, (m) => stem(m))
     .replace(/§\s*/g, 'Abschnitt ')
     .replace(/\b[0-9a-f]{7,40}\b/g, (m) => (/\d/.test(m) ? 'Rev.' : m))
-    .replace(/\b(punkt|point)\s+(\d{1,3})\b/gi, '$1 Nr. $2')
-    .replace(/\((\d{2,3})\)/g, '[Nr. $1]')
+    .replace(/\b(punkt|point)\s+(\d+)\b/gi, '$1 Nr. $2')
+    .replace(/\((\d{2,})\)/g, '[$1]')
     .replace(/\s+/g, ' ')
     .trim()
   return t.length > maxLength ? `${t.slice(0, maxLength - 1).trimEnd()}…` : t
@@ -450,6 +464,47 @@ export const BLOCKED_CARD_PREFIX = 'Anfrage nicht übernehmbar: '
  */
 export function blockedCardTitle(title) {
   return `${BLOCKED_CARD_PREFIX}${boardSafeTitle(title)}`
+}
+
+/**
+ * The body of that same card. It carries the typed authority the board's
+ * admissibility rule demands: whether a deposited finding becomes a work-order
+ * point is an EXTENSION OF THE COMMISSIONED SCOPE, which is one of the closed
+ * user-owned categories — so this question may stay open where a prioritisation
+ * question may not. The body is kept HERE rather than inline at the caller
+ * because the gate that judges it is unit-tested against this exact text; a card
+ * shape that lives in a CLI script is a shape no test can reach.
+ */
+export function blockedCardBody(why) {
+  // `why` is BODY prose, not a title: preserve its paragraphs, paths, section
+  // references and revisions. Only the two point-reference shapes read by the
+  // topic guard are neutralised (plus the shell transliterations the board
+  // audit rejects). A title-shaped whitespace collapse here once fused a
+  // deposited multi-paragraph reason back into the wall the prose guards ban.
+  const neutralizeParagraph = (paragraph) => {
+    const protectedTokens = []
+    const prose = String(paragraph).replace(
+      /\b[a-z][a-z0-9+.-]*:\/\/[^\s]+|(?:\b[A-Za-z]:)?(?:[\wÄÖÜäöüß.-]+[\\/])+[\wÄÖÜäöüß.-]+|\b[\wÄÖÜäöüß-]+\.(?:mjs|cjs|ts|tsx|js|md)\b/gi,
+      (token) => `\uE000${protectedTokens.push(token) - 1}\uE001`,
+    )
+    return prose
+      .replace(/[A-Za-zÄÖÜäöüß]+/g, repairTransliteration)
+      .replace(/\b(punkt|point)\s+(\d+)\b/gi, '$1 Nr. $2')
+      .replace(/\((\d{2,})\)/g, '[$1]')
+      .replace(/\uE000(\d+)\uE001/g, (_marker, index) => protectedTokens[Number(index)])
+      .trim()
+  }
+  const safeWhy = String(why ?? '')
+    .trim()
+    .split(/\r?\n[ \t\r]*\n+/)
+    .map(neutralizeParagraph)
+    .filter(Boolean)
+    .join('\n\n')
+  return (
+    `User-owned category: scope-extension.\n${safeWhy}\n\n` +
+    'Die Anfrage liegt im Träger und wird nicht in den Arbeitsauftrag übernommen, solange das so bleibt. ' +
+    'Deine Möglichkeiten: den Befund als Punkt aufnehmen, oder ihn verwerfen.\n'
+  )
 }
 
 /**
@@ -532,10 +587,10 @@ export function queueSectionBounds(html) {
  * a request that has since been queued disappears from the board on the next
  * rebuild without anything having to remember it.
  */
-export function buildQueueSection(html, { open = [], data = null, exclude = [], titles = {}, requests = [], gates = null } = {}) {
+export function buildQueueSection(html, { open = [], data = null, exclude = [], titles = {}, requests = [], gates = null, calibration = null } = {}) {
   const doc = String(html ?? '')
   const { from, end } = queueSectionBounds(doc)
-  const entries = queueEntries({ open, data, exclude, titles, gates })
+  const entries = queueEntries({ open, data, exclude, titles, gates, calibration })
   const cards = `${renderQueueCards(entries)}${renderRequestsCard(requests)}`
   return { html: `${doc.slice(0, from)}\n${cards}${doc.slice(end)}`, entries }
 }
@@ -574,9 +629,9 @@ export function importQueueFromHtml(html) {
   const points = {}
   for (const chunk of section.split(/<details\b/).slice(1)) {
     const summary = (chunk.match(/<summary>([\s\S]*?)<\/summary>/) ?? [])[1] ?? ''
-    const num = summary.match(/class="num">\s*(\d+)\s*</)
-    if (!num) continue
-    const point = Number(num[1])
+    const chip = (summary.match(/class="num">\s*([^<]*?)\s*</) ?? [])[1]
+    const cardPoints = pointNumbersFromChip(chip)
+    if (!cardPoints.length) continue
     const title = (summary.match(/class="t">([\s\S]*?)<\/span>/) ?? [])[1] ?? ''
     const metaRaw = (summary.match(/class="meta">([^<]*)</) ?? [])[1] ?? ''
     const bodyHtml = (chunk.match(/<div class="body[^"]*">([\s\S]*)$/) ?? [])[1] ?? ''
@@ -589,8 +644,13 @@ export function importQueueFromHtml(html) {
     // THE GATED META IS NOT AN ESTIMATE (point 450). Importing it would store
     // "wartet auf deine Entscheidung" as the point's duration, and one rebuild
     // later the card would carry that string for ever — even after the answer.
-    const isGated = metaRaw.trim().startsWith(QUEUE_GATED_META)
-    points[point] = {
+    const meta = metaRaw.trim()
+    const isGated = meta.startsWith(QUEUE_GATED_META)
+    // A rendered class median is a derived fallback, not an authored estimate.
+    // Importing it would freeze the inheritance and let calibration multiply a
+    // value derived from that same calibration a second time.
+    const isInherited = meta.includes(INHERITED_ESTIMATE_NOTE)
+    const entry = {
       gated: isGated || undefined,
       // UNESCAPED, like the body (four-eyes finding 2): the card renders its
       // title through `esc`, so storing it as read would put `&amp;amp;` on the
@@ -601,8 +661,9 @@ export function importQueueFromHtml(html) {
       // would make the card count as described and silence the "no prose yet"
       // report for ever.
       body: body.length && body.join(' ') !== QUEUE_STUB_BODY ? body : null,
-      estimate: metaRaw.trim() && metaRaw.trim() !== QUEUE_STUB_META && !isGated ? metaRaw.trim() : null,
+      estimate: meta && meta !== QUEUE_STUB_META && !isGated && !isInherited ? meta : null,
     }
+    for (const point of cardPoints) points[point] = { ...entry, body: entry.body ? [...entry.body] : null }
   }
   return { points }
 }
@@ -727,7 +788,16 @@ export function setQueueEntry(data, point, { title, body, estimate } = {}) {
 export const SET_STDIN_FLAG = '--text-stdin'
 
 /** Every flag `set` knows — named back at a caller that mistyped one. */
-export const SET_FLAGS = Object.freeze(['--title', '--estimate', SET_STDIN_FLAG, '--'])
+export const SET_FLAGS = Object.freeze(['--title', '--estimate', '--if-estimate', SET_STDIN_FLAG, '--'])
+
+/** Exact compare decision used by `set --if-estimate`, kept pure for tests. */
+export function estimateCompareDecision(current, expected) {
+  return {
+    matched: current === expected,
+    current: current ?? null,
+    expected: expected ?? null,
+  }
+}
 
 /**
  * Split `set`'s argv into its buckets (point 439). PURE, so the flag handling is
@@ -745,10 +815,11 @@ export const SET_FLAGS = Object.freeze(['--title', '--estimate', SET_STDIN_FLAG,
 export function parseSetArgs(rest) {
   const args = (Array.isArray(rest) ? rest : []).map((a) => String(a))
   const buckets = { body: [], title: [], estimate: [] }
-  const out = { point: args[0], title: null, body: null, estimate: null, stdinField: null }
+  const out = { point: args[0], title: null, body: null, estimate: null, ifEstimate: null, stdinField: null }
   let field = 'body'
   let literal = false
-  for (const a of args.slice(1)) {
+  for (let i = 1; i < args.length; i += 1) {
+    const a = args[i]
     if (!literal) {
       // A bare `--` ends the flags for the CURRENT field, so a text that begins
       // with a dash stays writable without a second command.
@@ -758,6 +829,14 @@ export function parseSetArgs(rest) {
       }
       if (a === '--title' || a === '--estimate') {
         field = a.slice(2)
+        continue
+      }
+      if (a === '--if-estimate') {
+        const expected = args[i + 1]
+        if (!expected || expected.startsWith('--')) throw new Error('board-queue: --if-estimate needs an estimate value')
+        if (out.ifEstimate !== null) throw new Error('board-queue: --if-estimate was given more than once')
+        out.ifEstimate = expected
+        i += 1
         continue
       }
       if (a === SET_STDIN_FLAG) {
@@ -792,4 +871,152 @@ export function openPointsOf(tasksText) {
  *  is positive evidence that a half-written file cannot fabricate. */
 export function closedPointsOf(tasksText) {
   return parseTasks(String(tasksText ?? '')).done
+}
+
+// ---- THE QUEUE BINDS THE PICKER (point 712) --------------------------------
+//
+// `queueOrder` above has ranked the board since point 608, and the board has
+// agreed with it since — but NOTHING asked it which point may be STARTED. On
+// 17.08.2026 point 697, a tier-3 polish defect, was commissioned while the
+// derived sequence read `700 701 707 708 711 705 706 710 662 …`; no guard fired,
+// because every existing rule judges the ranking's completeness, the board's
+// agreement with it and the honesty of its cards — never the pick.
+//
+// So the decision lives HERE, beside the ranking it reads, and no second list is
+// introduced: the front of the queue is `queueOrder`'s own head. What the picker
+// may open is decided from that alone.
+
+/** How an override is recorded, and where it becomes visible afterwards. Both
+ *  are named by the refusal — a rule whose remedy is not in its own message is a
+ *  rule the reader has to go and look up. */
+export const COMMISSION_OVERRIDE_CMD = 'node scripts/commission-guard.mjs --override <N> --reason "<why>"'
+
+/** The reporting command that prints every recorded override and park. */
+export const COMMISSION_STATUS_CMD = 'node scripts/commission-guard.mjs --status'
+
+/**
+ * The front-most WORKABLE candidates of the queue. PURE.
+ *
+ * "Workable" is the whole subtlety: the head of `queueOrder` may hold points
+ * that cannot be started at all — one waiting on the user (point 450), one whose
+ * branch is already open — and a front that named those would refuse everything
+ * while offering nothing. Both are SKIPPED, so the window is always `count` real
+ * candidates deep whenever the queue holds that many.
+ *
+ * `count` is the pool cap, deliberately: three slots, three candidates, so the
+ * three agents the pool may run are exactly the three points at the front.
+ */
+export function frontCandidates({ open = [], gates = null, inFlight = [], count = POOL_CAP } = {}) {
+  const g = normaliseGates(gates)
+  const busy = new Set((Array.isArray(inFlight) ? inFlight : []).map(Number).filter((n) => Number.isInteger(n) && n > 0))
+  const want = Number.isFinite(count) && count > 0 ? Math.floor(count) : POOL_CAP
+  const out = []
+  for (const n of queueOrder(open, g)) {
+    if (g.gated.has(n) || busy.has(n)) continue
+    out.push(n)
+    if (out.length >= want) break
+  }
+  return out
+}
+
+/**
+ * MAY WORK BE OPENED ON THIS POINT? PURE.
+ *
+ * Returns { allowed, point, candidates, position, total, override, why }. Every
+ * verdict carries the state that produced it, so the wrapper's message can say
+ * which rule applied and the preflight (point 707) can report it without
+ * re-deciding anything.
+ *
+ * EVERY "cannot judge" ANSWERS ALLOWED, by decision rather than by luck: a call
+ * that names no point, a work order that reads as empty, a point the work order
+ * does not carry (a cross-cutting branch, a hotfix) and a front that offers no
+ * candidate at all are all states in which a refusal would name no alternative.
+ * A guard that blocks while it cannot say what to do instead is a trap.
+ */
+export function commissionDecision({
+  point = null,
+  open = [],
+  gates = null,
+  inFlight = [],
+  cap = POOL_CAP,
+  override = '',
+} = {}) {
+  const g = normaliseGates(gates)
+  const n = Number(point)
+  const reason = String(override ?? '').trim()
+  const known = Number.isInteger(n) && n > 0
+  const order = queueOrder(open, g)
+  const idx = known ? order.indexOf(n) : -1
+  const candidates = frontCandidates({ open, gates: g, inFlight, count: cap })
+  const busy = new Set((Array.isArray(inFlight) ? inFlight : []).map(Number))
+  const out = {
+    point: known ? n : null,
+    candidates,
+    position: idx >= 0 ? idx + 1 : null,
+    total: order.length,
+    override: reason || null,
+  }
+  const ok = (why) => ({ ...out, allowed: true, why })
+  if (!known) return ok('no-point')
+  if (order.length === 0) return ok('no-work-order')
+  if (idx < 0) return ok('not-in-work-order')
+  // A point waiting on the user cannot be worked AT ALL, and that is a different
+  // sentence from "it is behind others" — reporting the second for the first is
+  // how a gate reads as a queue-order quibble.
+  //
+  // IT IS ASKED BEFORE THE IN-FLIGHT QUESTION, and the order is the rule (Sol,
+  // review of 91d88f9a): asked after it, an existing branch for a gated point
+  // bought every further commissioning on it — spawn an agent, start an
+  // authoring run — which is the opposite of "cannot be worked at all". A branch
+  // that already stands does not turn the user's gate into permission; the
+  // recorded override is not an escape here either: the queue's ORDER is mine to
+  // depart from with a reason, the user's gate is not.
+  if (g.gated.has(n)) return { ...out, allowed: false, why: 'user-gated' }
+  // Work already under way is not being OPENED. The refusal fires at the moment
+  // a point is picked up; a session pushing to the branch it already holds, or
+  // re-cutting one that exists, is finishing, not starting.
+  if (busy.has(n)) return ok('already-in-flight')
+  if (candidates.includes(n)) return ok('at-front')
+  if (candidates.length === 0) return ok('no-candidates')
+  if (reason) return ok('override')
+  return { ...out, allowed: false, why: 'behind-front' }
+}
+
+/**
+ * The refusal's wording. PURE, so it is pinned by a test rather than left to a
+ * script: the point requires it to NAME the candidates it expected and the
+ * refused point's own position, and to say how an override is taken.
+ *
+ * EVERY REFUSAL NAMES THE REMEDY THAT ACTUALLY LIFTS IT, AND NO OTHER (spec,
+ * fourth review finding 13). The GATED refusal therefore never prints the
+ * override command: an override recorded for a gated point is deliberately not
+ * honoured (`commissionDecision` asks the gate first), so a reader who followed
+ * that printed remedy would record a reason the decision then ignores and be
+ * denied again — the block-loop class that cost ~30 turns on 24.07.2026. What
+ * lifts a gate is the USER'S WORD, closing the point's AWAITING-CONFIRMATION line in
+ * the work order, and that is what the refusal says.
+ */
+export function commissionRefusal(decision = {}) {
+  const n = decision?.point ?? '?'
+  const names = (Array.isArray(decision?.candidates) ? decision.candidates : []).join(', ')
+  const front = names ? `the front of the queue holds ${names}` : 'the queue offers no workable candidate'
+  const total = decision?.total ?? 0
+  const where =
+    decision?.position != null
+      ? `the work order ranks it ${decision.position} of ${total} open points`
+      : 'the work order does not rank it'
+  if (decision?.why === 'user-gated') {
+    return (
+      `POINT ${n} IS WAITING FOR CONFIRMATION (its AWAITING-CONFIRMATION line in the work order), so no work may be opened ` +
+      `on it: ${front}. The ONLY thing that lifts this is the user's answer — his word closes the point's ` +
+      'AWAITING-CONFIRMATION line, and the point becomes workable in the same moment. A recorded override is ' +
+      'deliberately NOT honoured for a gated point, so do not record one: work a front candidate, or ask the ' +
+      'user (the board carries the decision card).'
+    )
+  }
+  const remedy =
+    `Work one of those instead, or RECORD why ${n} goes first: ${COMMISSION_OVERRIDE_CMD}. ` +
+    `The reason is stored with the point and printed by \`${COMMISSION_STATUS_CMD}\`, so an override stays ` +
+    'visible afterwards — overriding is allowed, taking it silently is not.'
+  return `COMMISSIONING POINT ${n} ANSWERS TO NOTHING: ${where}, while ${front}. ${remedy}`
 }

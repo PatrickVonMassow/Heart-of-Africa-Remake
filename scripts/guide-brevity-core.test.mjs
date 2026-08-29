@@ -4,14 +4,17 @@ import { resolve } from 'node:path'
 import {
   LIMITS,
   auditGuide,
+  measureGuide,
   parseEntries,
   sliceSection,
   strayLines,
   formatViolations,
 } from './guide-brevity-core.mjs'
+import { gatherGuideBrevityInputs } from './guide-brevity-guard.mjs'
 
 // Vitest rewrites import.meta.url, so resolve from the repo root it runs in.
 const GUIDE = resolve(process.cwd(), 'docs/analysis_de/vibe-coding-anleitung.md')
+const CORE = resolve(process.cwd(), 'scripts/guide-brevity-core.mjs')
 
 const entry = (title, riskLines, withPrompt = true) =>
   [
@@ -27,7 +30,18 @@ const entry = (title, riskLines, withPrompt = true) =>
 const filler = Array.from({ length: LIMITS.minEntries }, (_, i) =>
   `- **Füller ${i}** Ein Risiko.\n  → *Prompt:* „Etabliere einen Mechanismus."`,
 )
-const rawDoc = (...entries) => `# Titel\n\n## Die häufigsten Fallstricke\n\n${entries.join('\n\n')}\n`
+const metaRules = `## Drei Meta-Regeln, die alles zusammenhalten
+
+1. **Root-Cause vor Fix.** Eine vermutete Ursache ist ein Kandidat.
+   > *Prompt:* „Versuche zuerst, sie unabhängig zu widerlegen.
+   > Schreib vorher, welcher Befund sie zur Tatsache macht.
+   > Hält sie stand, darf sie wahr sein. Wer den Auftrag vergibt, misst **blind mit**."
+
+2. **Nutzer-Artefakte sind Verträge.** Ändere ihre Struktur nicht ungefragt.
+
+3. **Parallel arbeiten geht nur mit Isolierung.** Trenne die Arbeitskopien.`
+const rawDoc = (...entries) =>
+  `# Titel\n\n## Die häufigsten Fallstricke\n\n${entries.join('\n\n')}\n\n${metaRules}\n`
 const doc = (...entries) => rawDoc(...entries, ...filler)
 
 describe('auditGuide — budgets', () => {
@@ -150,6 +164,72 @@ describe('auditGuide — structural sanity', () => {
   })
 })
 
+describe('auditGuide — falsification meta-rule', () => {
+  it('fails when the root-cause rule loses its independent falsification attempt', () => {
+    const weakened = doc(entry('A', 2)).replace(
+      'Versuche zuerst, sie unabhängig zu widerlegen.',
+      'Bestätige die Vermutung zuerst.',
+    )
+    const { ok, violations } = auditGuide(weakened)
+
+    expect(ok).toBe(false)
+    expect(violations).toContainEqual(expect.objectContaining({
+      kind: 'meta-rule',
+      detail: expect.stringContaining('unabhängigen Widerlegungsversuch'),
+    }))
+  })
+
+  it('fails when a true hypothesis is no longer allowed to survive the attempt', () => {
+    const weakened = doc(entry('A', 2)).replace(
+      'Hält sie stand, darf sie wahr sein.',
+      'Danach muss die Hypothese verworfen werden.',
+    )
+
+    expect(auditGuide(weakened).violations).toContainEqual(expect.objectContaining({
+      kind: 'meta-rule',
+      detail: expect.stringContaining('wahre Hypothese'),
+    }))
+  })
+
+  it('fails when the assigning party no longer measures blindly alongside', () => {
+    const weakened = doc(entry('A', 2)).replace(
+      'Wer den Auftrag vergibt, misst **blind mit**.',
+      'Wer den Auftrag vergibt, wartet auf das Ergebnis.',
+    )
+
+    expect(auditGuide(weakened).violations).toContainEqual(expect.objectContaining({
+      kind: 'meta-rule',
+      detail: expect.stringContaining('blinde Gegenmessung'),
+    }))
+  })
+
+  it('fails when a suspicion loses its promotion criterion', () => {
+    const weakened = doc(entry('A', 2)).replace(
+      'Schreib vorher, welcher Befund sie zur Tatsache macht.',
+      'Prüfe die Vermutung später noch einmal.',
+    )
+
+    expect(auditGuide(weakened).violations).toContainEqual(expect.objectContaining({
+      kind: 'meta-rule',
+      detail: expect.stringContaining('Beförderungskriterium'),
+    }))
+  })
+
+  it('does not accept the required words when they are moved to a neighbouring rule', () => {
+    const misplaced = doc(entry('A', 2))
+      .replace('Versuche zuerst, sie unabhängig zu widerlegen.', 'Prüfe die Vermutung.')
+      .replace(
+        '2. **Nutzer-Artefakte sind Verträge.**',
+        '2. **Nutzer-Artefakte sind Verträge.** Versuche zuerst, sie unabhängig zu widerlegen.',
+      )
+
+    expect(auditGuide(misplaced).violations).toContainEqual(expect.objectContaining({
+      kind: 'meta-rule',
+      detail: expect.stringContaining('unabhängigen Widerlegungsversuch'),
+    }))
+  })
+})
+
 describe('auditGuide — budget boundaries', () => {
   it('allows a risk exactly at the limit and rejects one line more', () => {
     expect(auditGuide(doc(entry('Grenze', LIMITS.maxRiskLines))).violations
@@ -161,9 +241,44 @@ describe('auditGuide — budget boundaries', () => {
   it('leaves the fingerprint comment out of BOTH budgets', () => {
     const d = doc(entry('A', 2))
     const withFp = `${d}<!-- GUIDE-FINGERPRINT: ${'a'.repeat(64)} -->\n`
-    const tight = { ...LIMITS, maxLines: d.split('\n').length, minEntries: 1 }
+    const measured = measureGuide(d)
+    const tight = { ...LIMITS, maxLines: measured.lines, maxWords: measured.words, minEntries: 1 }
     expect(auditGuide(d, tight).violations.filter((v) => v.kind === 'length')).toHaveLength(0)
     expect(auditGuide(withFp, tight).violations.filter((v) => v.kind === 'length')).toHaveLength(0)
+  })
+
+  it('leaves every line and word of a multi-line bookkeeping comment out of both budgets', () => {
+    const d = doc(entry('A', 2))
+    const withFp = `${d}<!-- GUIDE-FINGERPRINT:\n${'bookkeeping '.repeat(100)}\n\n-->\n`
+    expect(measureGuide(withFp)).toEqual(measureGuide(d))
+  })
+
+  it('counts every line and word after an unterminated comment opener', () => {
+    const malformed = 'line one\nline two <!--\nline three\nline four\n'
+    expect(measureGuide(malformed)).toEqual(measureGuide('line one\nline two \nline three\nline four\n'))
+    expect(measureGuide(malformed)).toEqual({ lines: 5, words: 8 })
+  })
+
+  it('cannot re-form an unterminated opener across its own excision seam', () => {
+    const malformed = 'A <!-<!---rest of the guide'
+    expect(measureGuide(malformed)).toEqual(measureGuide('A <!- -rest of the guide'))
+    expect(measureGuide(malformed)).toEqual({ lines: 1, words: 6 })
+  })
+
+  it('keeps word boundaries while neutralising every opener in a malformed tail', () => {
+    const malformed = 'word<!--more <!-<!---rest'
+    expect(measureGuide(malformed)).toEqual(measureGuide('word more <!- -rest'))
+    expect(measureGuide(malformed)).toEqual({ lines: 1, words: 4 })
+  })
+
+  it('retains visible words before a comment that opens mid-line', () => {
+    const measured = measureGuide('keep these words <!-- hidden\nstill hidden\n-->')
+    expect(measured).toEqual({ lines: 1, words: 3 })
+  })
+
+  it('retains visible words after a comment that closes mid-line', () => {
+    const measured = measureGuide('<!-- hidden\nstill hidden --> keep these words')
+    expect(measured).toEqual({ lines: 1, words: 3 })
   })
 })
 
@@ -198,11 +313,124 @@ describe('formatViolations', () => {
   })
 })
 
+describe('guide-brevity ownership', () => {
+  // DERIVED from the ceiling, never a literal: this fixture exists to be over budget, and a
+  // literal that merely happened to clear the ceiling of the day turns into an under-budget
+  // document the moment the budget ratchets, which is what happened on 25.08.2026.
+  const overBudget = doc(entry('Zu lang', 2)) + `${'zusatz '.repeat(LIMITS.maxWords + 100)}\n`
+
+  it('stands down when another live session owns the batch', () => {
+    const gathered = gatherGuideBrevityInputs({
+      sessionId: 'non-owner',
+      paused: false,
+      otherOwner: true,
+      guideExists: true,
+      guideText: overBudget,
+    })
+    expect(gathered).toMatchObject({
+      applicable: false,
+      why: 'another live session owns the batch lock',
+      cause: 'not-lock-owner',
+    })
+  })
+
+  it('still gives the owner the unchanged budget verdict', () => {
+    const gathered = gatherGuideBrevityInputs({
+      sessionId: 'owner',
+      paused: false,
+      otherOwner: false,
+      guideExists: true,
+      guideText: overBudget,
+    })
+    expect(gathered.applicable).toBe(true)
+    const verdict = auditGuide(gathered.inputs.guideText)
+    expect(verdict.ok).toBe(false)
+    expect(verdict.violations.map((v) => v.kind)).toContain('length')
+  })
+})
+
 // THE ACTUAL GATE: the real document must satisfy its own budget on every unit
 // run, so the guide cannot drift back into a chronicle between closings.
 describe('the real vibe-coding guide', () => {
+  const guide = readFileSync(GUIDE, 'utf8')
+
   it('stays a short, project-neutral beginner guide', () => {
-    const { ok, violations } = auditGuide(readFileSync(GUIDE, 'utf8'))
+    const { ok, violations } = auditGuide(guide)
     expect(ok, `\n${formatViolations(violations)}\n`).toBe(true)
+  })
+
+  it('carries both new lessons in actionable house form', () => {
+    const entries = parseEntries(sliceSection(guide, /Fallstrick/i))
+    const byTitle = Object.fromEntries(
+      entries.map((entry) => [entry.title, entry.lines.join(' ').replace(/\s+/g, ' ')]),
+    )
+
+    expect(byTitle['Der Prüflauf verändert sein eigenes Projekt.']).toContain(
+      '„Etabliere einen Mechanismus, der einen Prüflauf rot färbt, sobald er das Projekt verändert hat, in dem er läuft"',
+    )
+    expect(byTitle['Die Ausnahme existiert nur in der Verweigerung.']).toContain(
+      'Kann der ehrlichste Wortlaut der Ausnahme meine eigene Prüfung bestehen?',
+    )
+  })
+
+  it('lets a true suspected cause survive the required falsification attempt', () => {
+    const metaRule = sliceSection(guide, /Drei Meta-Regeln/i)
+      .map(({ text }) => text)
+      .join(' ')
+      .replace(/\s+/g, ' ')
+
+    expect(metaRule).toContain('Versuche zuerst, sie unabhängig zu widerlegen.')
+    expect(metaRule).toContain('welcher Befund sie zur Tatsache macht.')
+    expect(metaRule).toContain('Hält sie stand, darf sie wahr sein.')
+    expect(metaRule).toContain('Wer den Auftrag vergibt, misst **blind mit**.')
+  })
+
+  it('keeps the complete window rule while naming omitted review material to its judge', () => {
+    const entries = parseEntries(sliceSection(guide, /Fallstrick/i))
+    const measuredLess = entries.find((entry) =>
+      entry.title.startsWith('Die Messung — und die Gegenprüfung — sah weniger'))
+    const text = measuredLess?.lines.join(' ').replace(/\s+/g, ' ')
+
+    expect(text).toContain('Nur die letzten *n* Einträge')
+    expect(text).toContain('aus dem **Gegenstand** ab: nach Zeit, nie nach Anzahl.')
+    expect(text).toContain('still gekürzter Prüfstoff für das Modell wie ein Mangel')
+    expect(text).toContain(
+      'Nenne dem **prüfenden Modell selbst** jedes weggelassene Material, nicht nur dem Aufrufer',
+    )
+  })
+
+  it('puts a permission beside its limit and reviews cases no rule covers', () => {
+    const entries = parseEntries(sliceSection(guide, /Fallstrick/i))
+    const ruleDrift = entries.find((entry) =>
+      entry.title.startsWith('Regeln und Wächter verrotten'))
+    const text = ruleDrift?.lines.join(' ').replace(/\s+/g, ' ')
+
+    expect(text).toContain('mehrere richtige Regeln können durch ihre Lücke etwas verbieten')
+    expect(text).toContain('Warten sieht dabei wie Sorgfalt aus')
+    expect(text).toContain('**Erlaubnis im selben Satz wie ihre Grenze**')
+    expect(text).toContain('**Welcher naheliegende Fall wird von keiner Regel erfasst?**')
+  })
+
+  it('sets both ceilings to the guard\'s exact measured size', () => {
+    const measured = measureGuide(guide)
+    expect({ maxLines: LIMITS.maxLines, maxWords: LIMITS.maxWords }).toEqual({
+      maxLines: measured.lines,
+      maxWords: measured.words,
+    })
+  })
+})
+
+describe('the guide-budget escalation instruction', () => {
+  it('finishes a justified raise in the code record and produces no decision card', () => {
+    const source = readFileSync(CORE, 'utf8')
+    const instruction = source.slice(
+      source.indexOf('// The budget caps NARRATIVE growth'),
+      source.indexOf('export const PROJECT_MARKERS'),
+    )
+
+    expect(instruction).toContain('its final step is the written')
+    expect(instruction).toContain('It produces no decision card')
+    expect(instruction).not.toContain('Recorded as a decision card')
+    expect(instruction).not.toContain('last step of a raise belongs')
   })
 })

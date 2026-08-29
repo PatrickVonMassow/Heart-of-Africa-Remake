@@ -216,7 +216,8 @@ export function retryDecision(input) {
  * exhausted, where the key carries the hour so the escalation ladder can climb
  * (the same reasoning ci-status-guard uses for a red nothing can clear).
  *
- * @returns {{notify:boolean, key:string|null, title:string, message:string, priority:string}}
+ * @returns {{notify:boolean, key:string|null, title:string, message:string, priority:string,
+ *   recurring?:boolean}}
  */
 export function stalenessAlert(input) {
   try {
@@ -259,6 +260,7 @@ export function stalenessAlert(input) {
       title: exhausted ? 'Deployed site STILL stale' : 'Deployed site is stale',
       message: parts.join(' '),
       priority: exhausted ? 'high' : 'default',
+      recurring: !exhausted,
     }
   } catch {
     return { notify: false, key: null, title: '', message: '', priority: 'default' }

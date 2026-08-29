@@ -329,3 +329,14 @@ describe('pathsInCommand', () => {
     expect(found[0].raw).toBe('/mnt/c/Users/Patri/Documents/x')
   })
 })
+
+describe('the guard reads a path from every write tool it is wired for', () => {
+  it('judges a MultiEdit like an Edit, so the write tool cannot slip past', async () => {
+    const { subjectFrom, PATH_TOOLS } = await import('./path-scope-guard.mjs')
+    expect(PATH_TOOLS.has('MultiEdit')).toBe(true)
+    expect(subjectFrom({ tool_name: 'MultiEdit', tool_input: { file_path: '~/Documents/x' }, cwd: '' })).toEqual({
+      filePath: '~/Documents/x',
+      cwd: '',
+    })
+  })
+})

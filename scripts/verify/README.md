@@ -168,7 +168,7 @@ when the result becomes the session's next action. The decision is pure in
 never fires for a non-owner or a paused batch, and refuses a run whose log has
 gone quiet (that is a wedge, not a wait).
 
-### Host bring-up — once per machine (point 475)
+### Host bring-up and fast GPU preflight (points 475/732)
 
 The browser suites need a browser, and `npm install` does not put one there. One
 documented command does, on every platform:
@@ -180,7 +180,8 @@ npm run verify:bringup -- --check   # report only, install nothing
 
 **No suite ever installs implicitly** — a regression that quietly downloads
 ~180 MB mid-run is a surprise, not a convenience — so a fresh machine runs this
-once and never again.
+once to install. The command's probe is also safe to repeat: it opens a bare
+localhost canvas in each exact verification browser, without starting the app.
 
 | Lane | Needs | Where it comes from |
 |---|---|---|
@@ -194,14 +195,24 @@ the path over is what makes the report honest: the `chrome` CHANNEL resolves, in
 playwright-core's registry, to `/opt/google/chrome/chrome` and its beta/dev/canary
 siblings and **nothing else**, so a chromium-only host used to be reported "present"
 and then die on Playwright's generic channel error. Windows and macOS are not probed
-at all and keep the historical `channel:'chrome'` launch byte for byte. Whether a
-particular build really brings up a headless WebGPU adapter is not a probe's question:
-`assertBackend` answers it on the running renderer, and a lane that came up on WebGL 2
-fails loud.
+for a path and keep the historical `channel:'chrome'` launch byte for byte.
+
+**A binary is not a backend.** The 19.08.2026 outage had both browsers installed,
+so the old bring-up exited 0, but Chrome's own Graphics Feature Status said
+`(gl=none,angle=none)`, `webgl=disabled_off`, `webgpu=disabled_off`; bare canvases
+returned neither a WebGL 2 context nor a WebGPU adapter. `verify:bringup` now queries
+that status through CDP `SystemInfo.getInfo` and makes one of three pure-tested
+verdicts: PRESENT (both APIs on a named hardware renderer), DEGRADED (one missing,
+software, or unnamed), or ABSENT (neither exists). ABSENT explicitly names the
+host/browser GPU layer, before app startup; PRESENT says a later `window.__renderer`
+timeout belongs to app startup instead. It fails in seconds, before the 180-second
+suite wait. `run-all.mjs` executes the same probe automatically before any Chromium
+suite or production preview and exits before starting Vite on a red verdict; pure
+Node selections such as `docs`, `build`, `lint`, and `unit` stay GPU-independent.
 
 The **graphics stack is chosen by platform** (`launch-args-core.mjs`, swept by
 `launch-args-core.test.mjs`): Windows keeps `--use-angle=d3d11` exactly as it always
-had it, macOS `metal`, and Linux gets `--use-angle=gl` with `GALLIUM_DRIVER=d3d12`
+had it, macOS `metal`, and Linux gets `--use-angle=gl-egl` with `GALLIUM_DRIVER=d3d12`
 in the browser's environment. That pair is what reaches the GPU behind `/dev/dxg`
 in the WSL container — `ANGLE (Microsoft Corporation, D3D12 (NVIDIA GeForce RTX
 4070 Ti), OpenGL 4.6)` — measured at 170 renderer calls per second against the 22.7
@@ -215,7 +226,7 @@ sets nothing at all). Linux additionally launches with `--no-sandbox`,
 Windows and macOS keep their argument list unchanged.
 
 The **WebGPU lane rides the same GL chain** on Linux, through Dawn's OpenGLES
-backend: `--use-gl=angle --use-angle=gl --use-webgpu-adapter=opengles
+backend: `--use-gl=angle --use-angle=gl-egl --use-webgpu-adapter=opengles
 --force-webgpu-compat` (point 505). Vulkan is a dead end here — the only Vulkan
 device is Dozen, whose `fullDrawIndexUint32 = false` Dawn's Vulkan backend
 refuses, so it falls back to its bundled SwiftShader and no flag reaches into
@@ -286,8 +297,8 @@ Vitest+SMALL / Vitest+LARGE; the **closing cycle ALWAYS runs LARGE**):
 
 | Tier | Command | Backend | Browser suites | Preview |
 |------|---------|---------|----------------|---------|
-| **SMALL** (everyday gate) | `npm run test:small` | WebGPU | `docs, i18n, flow, health, events, collision, voice` — fast, low-flake, core coverage (doc/i18n consistency, the one E2E core loop, health/events/collision, TTS) | no |
-| **LARGE** (default) | `npm test` / `npm run test:large` | WebGL 2, then WebGPU | **all 18** — SMALL plus the heavier scene/geometry/screenshot suites (`world, handwriting, polish, gamepad, touch, settings, invariants`), `startup` (the point-337 loading-picture freeze budget), `benchmark` (the in-game F8 measurement run), `report` (the F6 bug-report archive, whose PNG member is decoded and checked for real scene content) and `enrichments` (the wildlife/atmosphere staging, which carries the rotating family flakes) | yes |
+| **SMALL** (everyday gate) | `npm run test:small` | WebGPU | `docs, board-layout, i18n, flow, health, events, collision, voice` — fast, low-flake, core coverage (doc/board/i18n consistency, the one E2E core loop, health/events/collision, TTS) | no |
+| **LARGE** (default) | `npm test` / `npm run test:large` | WebGL 2, then WebGPU | **all 19** — SMALL plus the heavier scene/geometry/screenshot suites (`world, handwriting, polish, gamepad, touch, settings, invariants`), `startup` (the point-337 loading-picture freeze budget), `benchmark` (the in-game F8 measurement run), `report` (the F6 bug-report archive, whose PNG member is decoded and checked for real scene content) and `enrichments` (the wildlife/atmosphere staging, which carries the rotating family flakes) | yes |
 
 Both tiers run the same Vitest + build + lint preflight. SMALL is a strict subset
 of `DEV_SUITES`; keep it that way. New heavy or flaky browser scenarios join
@@ -456,6 +467,20 @@ front of each turns one into a declaration.
   `if (section('<slug>')) { … }` and give each block the jump/wait it inherited
   from the one before. A suite that declares none keeps working unchanged and
   refuses `--section` with that reason.
+- **Which suites are sectioned (point 595 finished what 566 began).** Every
+  browser suite is, except two that are ONE measurement each and would gain a
+  single section naming the whole file: `startup` (one liveness window across the
+  whole load) and `benchmark` (one F8 sweep, which every check afterwards reads
+  out of the same report). `docs` drives no browser at all. `invariants` is
+  sectioned by ROUTE STOP, and its declarations therefore SELECT a stop rather
+  than wrap a block — the two invariants are judged over the driven route at the
+  end, so a partial run judges them over the stops that ran.
+- **A partial run must not damage the runs after it.** `voice` records the TTS
+  asset cache (point 88) and seals it as COMPLETE at the end; one section asks
+  for a fraction of the assets, so the seal is skipped on a partial run
+  (`sections.partial`) — otherwise the cheap rung would make every later STRICT
+  run abort on a gap it created itself. A suite that WRITES a shared artefact
+  owes the same check.
 - **A section is a BLOCK SCOPE, so anything two of them share lives ABOVE
   them.** A helper declared inside one block is invisible to the next, and
   nothing says so until the browser run reaches the call: `pinFamily`, declared
@@ -466,6 +491,29 @@ front of each turns one into a declaration.
   carry `page.evaluate` callbacks), so `npm run lint` refuses it in a tenth of a
   second, and `scope.test.mjs` keeps the rule armed by running the real config
   over a fixture of exactly that shape.
+- **The delegation brief ROUTES a render point here (point 595).** The rung
+  existed and was unused: checked 09.08.2026, `--section` appeared in this file
+  and in `tiers.mjs` and nowhere else — in no brief, no agent prompt, no rule
+  text — and not one recorded render-verify run was partial. So
+  `scripts/point-brief-core.mjs` carries the VERIFICATION LADDER in the brief of
+  every point whose spec can move a picture: section → suite → whole set while
+  repairing, the full fast gate and the whole suite as the proof, the both-backend
+  picture proof once, on `main`-merged-into-the-branch, with the verified
+  `git HEAD` reported. It is a building block of the brief, not a paragraph
+  somebody has to remember.
+- **And the brief NAMES the check set, with its sections (point 598).** The same
+  brief carries a generated ORIENTATION: the paths the spec itself names with
+  each file's own header line, what lives in their directories, and — read from
+  the work order's own `Diff → browser-suite mapping` paragraph — an ITERATION
+  CHECK SET of suite/`--section` pairs, one per covering suite, with the
+  whole-suite final proof stated separately beneath it so the cheap rung can
+  never be read as the acceptance. The set follows the CURRENT DIFF where the
+  branch already has one and the spec's prospective paths before that, and says
+  which of the two it used. All of it is read from the tree at generation time
+  (`readTree` and `currentDiffPaths` in `scripts/point-brief.mjs`), so it cannot
+  go stale, and all of it is framed as a HINT: the spec decides what changes,
+  the block only says where to look. An unknown name lists the real ones, so
+  `--section=list` is the way to see a suite's blocks without booting anything.
 - **The one recurring defect is a section that does NOT own its setup**: it
   reads a scene the block before it staged, so it passes in the whole run and
   fails standalone. Where blocks genuinely share one staging they belong in ONE
@@ -722,6 +770,14 @@ the session. Only the run is skipped — and the NEXT commit on that branch, the
 one that finishes the work, carries neither marker nor trailer and runs CI
 normally.
 
+The timed Sol authoring lane applies that distinction mechanically. Every
+author-written checkpoint and the pre-run commission receipt use the rescue
+pair, so its two-minute pushes start no disposable CI chain. Only after the
+author process exits cleanly, leaves a clean tree and reports `test:unit`, build
+and lint green does the wrapper add one unskipped completion commit. A killed or
+malformed run gets no completion commit; its pushed history therefore claims
+only recoverable work, never readiness to land.
+
 The convention is unchanged by point 513, only its reason has narrowed: a branch
 run mails nobody now, so what the marker still buys is that a half-finished state
 raises no alert, no red commit status and no entry to triage at all. Both halves
@@ -764,9 +820,11 @@ differences included, where merely noticing red closes only the cases someone
 happens to look at. Concretely (`ci-status-guard-core.mjs`, pure and pinned in
 `ci-status-guard-core.test.mjs`):
 
-- **Every ref this repository pushed** is judged, not just HEAD. A delegated
-  agent pushes under the parent's session id and into the shared reflog, so those
-  refs are the parent's responsibility. The ref is named in the block message.
+- **Every ref this repository pushed** is observed, not just HEAD. `main` always
+  gates, and a feature branch gates once its author hands it back as a landing
+  candidate. While that exact branch has a live in-flight declaration it is
+  reported without blocking the supervisor; removal of the declaration restores
+  the gate immediately, including from a fresh cached verdict.
 - **The list comes from the local push reflog** (`update by push` entries only —
   a fetch is somebody else's branch), never from an API sweep over branches.
   Four local git calls per turn end, ~30 ms measured, none of them growing with
@@ -913,9 +971,10 @@ fails soft: a triage aid must never turn a readable red into a crashed run. The
 suite result stays the gate — `--strict` is there for a caller that wants a
 non-zero exit on a real regression.
 
-`docs` is a pure-Node suite, so it needs no server on either side
-(`SERVERLESS_SUITES` in `tiers.mjs`; a `docs`-only run starts no vite at all) and
-the baseline runs the baseline tree's OWN copy of it.
+`docs` is a pure-Node suite and `board-layout` renders self-contained board HTML
+in bundled Chromium, so neither needs the game server on either side
+(`SERVERLESS_SUITES` in `tiers.mjs`). The baseline runs the baseline tree's OWN
+copy of either one.
 
 ## What a fix must PROVE (point 589)
 
@@ -1186,12 +1245,317 @@ point. The mechanics:
 What still does **not** clear: a red charged to nothing (that is a FINDING, file
 it — a ledger entry is not where an unfiled red goes), a red charged to a point
 that is ticked or deferred (the exception expires with the point that owned it),
-a run that failed without reporting a single red, a run whose output flooded past
-the capture cap (the dropped line may have been the unfiled red, so the cap
-itself becomes an unaccounted red), and a run that CRASHED rather than reported —
-`uncaughtExceptionMonitor` catches that, because node prints an uncaught
-exception straight to fd 2 where no tapped stream write can see it. `--defer`
-stays for what genuinely cannot be judged headless.
+a run that failed without reporting a single red, and a run that CRASHED rather
+than reported — `uncaughtExceptionMonitor` catches that, because node prints an
+uncaught exception straight to fd 2 where no tapped stream write can see it.
+`--defer` stays for what genuinely cannot be judged headless.
+
+### A red line is never dropped quietly — the cap is a stated budget (point 734)
+
+The recorder used to cap its capture at 400 result lines and its record at 60
+reds. A run past either cap was HALF-RECORDED — a fragment of its red set plus
+a truncation marker — and unclosable by construction: all three closings of
+point 640 need the red's identity, and the lost part had none. It blocked every
+later render change until somebody hand-wrote a `--defer`, i.e. exactly the
+waiver the charge ledger exists to abolish; the sign-off machinery built to
+patch that kept minting new laundering paths through five review rounds.
+
+**The measurement that decided it** (re-taken 19.08.2026 from every stored
+artefact — 94 of 178 suite logs in `local/` carrying result lines, plus the
+full 40-run state window): a real red SET is small. The worst run on record, a
+WebGPU validation cascade in `webgpu/settings`, printed **521 result lines but
+only 33 distinct ones** and parsed to **18/19 recorded reds**; no record has
+ever held more than 19 reds, and every non-cascade log carries **≤ 12 result
+lines**. What is unbounded is REPETITION — one page error printed once per
+frame — never the set: reds are bounded by the suite's checks and its distinct
+console errors. (The earlier reading, "red lines are exactly the unbounded
+ones, so they cannot go uncapped", conflated occurrences with identities.)
+
+So the spec's option "the cap stops applying to RED lines" was chosen — for the
+range every measured run lives in. The tap keeps a line only when it brings a
+result IDENTITY nothing has kept yet — so the first occurrence of each red is
+retained, with the detail a `detailMatch` charge reads, and a line whose reds
+are all already represented is dropped. (Not "one line per identity": a line
+introducing `B` is kept even though it also carries the already-kept `A`, so `A`
+may appear on several kept lines. What is bounded is the identity SET, not the
+line count.) The parser de-duplicates by that same key anyway, so collapsing
+here changes no verdict. The record then stores the whole red set of a run that
+refused no result line: every red it observed keeps its identity and stays
+closable the three ordinary ways of point 640, whatever the flood around it. A
+run that DID refuse one is a different thing, and the next paragraph says what.
+
+**As far as its budgets reach, and no further** (round 18). That guarantee holds
+for a run in which no result line was refused, which is every run this project
+has produced — and the three budgets below exist precisely because a run can
+exceed them. When one is reached the line is refused WHOLE, so a red carried only
+by that line has no recorded identity and none of the three ordinary closings can
+reach it. That run is not a red set with a hole in it: it is an INCOMPLETE
+RECORDING, a class of its own with its own signed way out, and the count of
+refused lines is what says so.
+
+**The bound is the identity, not the line** (review finding, 28.08.2026). The
+first version of this kept each distinct LINE, which is no bound at all: a
+per-frame error whose text carries a counter — `renderTargets grew back … 19 ->
+22`, then `20 -> 23` — prints a NEW distinct line every frame, so the buffer
+grew without limit, and an exhausted process dies. That failure mode is the
+worst one available here: a run full of observed reds becomes a crash record,
+and a crash has a signature that closes it. Keying by the parsed identity (the
+console normalisation folds counters, hex runs and URLs away) collapses that
+flood onto one red.
+
+**And a line's parts are never a key of their own** (round 13). The identity was
+briefly the parts JOINED, which is a key over COMBINATIONS: `[A,B]`, `[A,C]`,
+`[B,C]` are three keys over two reds, so a suite that varies how it groups its
+`console errors:` summary lines mints combinatorially many keys without printing
+a new red. A line now earns its slot by carrying an identity nothing kept yet;
+one whose reds are all already represented is dropped as the repetition it is,
+and the parse still finds those reds inside the lines that were kept.
+
+**The identity is not a bound by itself, so there is an explicit ceiling**
+(review finding, 28.08.2026, round 13). "Bounded by the suite's checks and its
+distinct console errors" is true of the checks — their labels are written in the
+suite's source and are finite — and NOT true of the console errors, which carry
+whatever text the page produced. The normalisation folds counters, hex runs and
+URLs away, which is exactly the per-frame case the old line cap existed for; it
+cannot fold away a generated word, a symbol name or a message assembled from
+changing data, and each of those mints a fresh identity every print. The
+measurements above are evidence about the logs that exist. They are not a bound
+on the ones that do not, and this document previously read them as one.
+
+So the bound is stated rather than hoped for: `MAX_RED_IDENTITIES` (500 in
+`scripts/render-verify-recorder.mjs`) distinct reds per run — more than
+twenty-six times the largest red set ever recorded (19), and fifteen times the
+33 distinct result LINES of the worst log, which is the other number above and
+not the same one. No run this project has produced comes near it. Past it the buffer stops growing and **the run is recorded as an INCOMPLETE
+RECORDING**, carrying the count of the lines it refused. A line is weighed
+WHOLE against the ceiling — a `console errors:` summary carries as many reds as
+the page printed, and asking whether the buffer was full BEFORE adding all of
+them let one such line take the record arbitrarily far past the limit without
+marking anything (round 14). A line whose fresh identities do not all fit is
+refused as one, which is loud; keeping it part-way would store reds the record
+cannot account for. What is weighed are its IDENTITIES, not its parts: a summary
+that prints the same red five hundred times brings exactly one, and counting the
+parts turned an ordinary repeated-error run into a FALSE incomplete recording —
+which blocks the render set in precisely the way this point exists to end. And
+the ceiling is decided before anything is remembered, so a refused line cannot
+fill the varied-measurement map and leave a later, kept red unwatched.
+
+**And an identity ceiling is not a memory bound** (round 14). A summary
+repeating ONE error a million times brings a single identity, so it fit — and
+the retained string then grew with the page's output rather than with its red
+set, which is the exhausted process the ceiling exists to prevent. Two more
+budgets sit beside it and are refused the same loud way: `MAX_CAPTURE_CHARS`
+(4 Mi UTF-16 code units of kept text in total — what `String.length` counts, so
+it bounds what the tap RETAINS and promises no byte figure at all: an engine may
+store the same string one byte per character or two, and its UTF-8 form is
+different again depending on the script it is written in — it counts the JOINED
+text, newlines included, because the joined text is what the parser is handed)
+and `MAX_LINE_CHARS` (64 Ki code units for one line, which
+also caps the tap's partial-line buffer — a line whose middle had to be dropped
+is refused when its newline arrives, never parsed as a stump). The identity
+ceiling and the total budget are asked only of a line that would be KEPT: one
+bringing nothing new is dropped as repetition, because counting that would be a
+false truncation. The PER-LINE limit is the exception, asked of every result
+line and asked BEFORE it is parsed (round 15) — telling repetition apart means
+parsing exactly the line whose size is the problem, and asking afterwards
+allocated the memory the limit exists to prevent. The chunk is scanned newline
+by newline rather than split (round 16), and an overlong line is judged from a
+bounded prefix — both probes are anchored at the line's start — so it is refused
+without ever being copied whole. It also makes the refusal
+independent of how the process chunked its writes, which otherwise decided
+whether the same output was a truncation. That is the spec's
+OTHER option, applied where the first one runs out: a run either records its
+reds completely, or fails loudly as an incomplete recording — it never
+half-records itself and calls the result a red set. The incomplete class
+therefore stays reachable for new records too, which is what gives such a run a
+signed way out (`--incomplete`) instead of the hand-written `--defer` this
+point exists to abolish.
+
+A dropped result line marks the recording whatever the exit code said (round
+17, overturning round 16's carve-out for an exit-0 run). That carve-out rested
+on reading a refused line as chatter the accounting never wanted, and the tap
+says otherwise: a line is refused only when it matches `KEPT_LINE` — a suite's
+own `FAIL`, an `ERR:`, a `console errors:` summary. Ordinary output never
+reaches a budget, so a genuinely green run cannot be marked by this rule; it
+prints no result line to drop. What the carve-out really exempted was the
+opposite case — a process that ended 0 while its own output carried result lines
+nobody read — and that run then counted as picture COVERAGE, which is the worst
+thing an unread recording can be taken for.
+
+### The record keeps the MEASUREMENT, so a charge can be applied afterwards
+
+A stored red used to be `name`/`key`/`kind`/`point` and nothing else. That was
+enough for a `match` charge, which reads the name — and never enough for a
+`detailMatch` charge, which reads the printed measurement: re-read from disk the
+detail was always empty, so the ledger's narrowest instrument could only ever
+fire while a run was being written. Measured 28.08.2026: all 17 reds in the
+state window carried key/kind/name/point and no detail, so the entry scoped to
+the point-694 children signature reached none of them.
+
+The record now keeps the detail too, bounded at 200 characters, and `chargeReds`
+evaluates the charge against the STORED red rather than against the unbounded
+parse — so what was matched is exactly what was kept, and a signature past the
+bound matches at record time no more than it does afterwards. Reds recorded
+before this repair carry no detail and stay out of a `detailMatch` entry's
+reach; that information was never written down and nothing can recover it.
+
+**A measurement that varied inside one run cannot be signed for.** The record
+holds one entry per check key, so a check that failed twice printing two
+different measurements keeps the first — and a signature matching that one
+would have owned the key while the second, unowned observation disappeared. The
+collapse stays (keeping every distinct detail re-opens exactly the unbounded
+growth the cap removal ended: a per-frame error whose text carries a counter
+mints a new detail every frame), so the recorder marks such a red instead and
+the narrow charge refuses it. Loudly uncharged beats quietly excused; a broad
+`match` entry is unaffected, because it never claimed to read a measurement.
+
+### Owning and covering are two questions, and each has ONE answer
+
+- **Does an open point own this red?** Read the ledger AS IT STANDS NOW.
+  Charging a red, or filing the point that owns it and charging it there, is how
+  point 640's ways (2) and (3) are taken, and a rule that could only be
+  satisfied by editing a render file would leave both nominal.
+- **Did this run verify the picture?** Read the charge the RECORD carries, and
+  nothing else. No ledger edit makes a finished run cover a backend, and none
+  retakes a lost reading: coverage is a claim about pixels somebody looked at.
+
+The second rule now holds for every caller. `unexplainedRuns` used to hand
+`runVerdict` a ledger through two of its helpers, which the function never read
+— a dead argument that described a mechanism nobody had built (review finding,
+28.08.2026). The consequence is stated rather than hidden: a run whose reds only
+became owned after it was recorded neither covers a backend nor re-records a
+truncation, while its reds stop blocking through the first rule.
+
+### The records written before that fix (the legacy `incomplete` class)
+
+Records already on file (the two truncated `webgpu/settings` runs of
+13.08.2026) still carry the truncation marker, and for THEM the incomplete-
+recording class remains: `runVerdict` answers `incomplete` — a class of its
+own, covering nothing — and the guard names it apart from an unexplained red
+in EVERY branch of its block message, so nobody hunts a defect that was never
+captured. Two things CLOSE it, and neither is the ledger (a charge needs the
+red's identity, and the lost part has none). The loud `--defer` remains what
+it is everywhere else — the hand waiver that carries a whole record past the
+gate, this class included, and names in the state file every red it waved; it
+closes nothing and is not one of the two (round 23, which read the list as
+claiming otherwise):
+
+1. **A real re-recording** — a COVERING run of the same suite on the same
+   backend, later than the broken one and on code since the last render edit.
+   A red is an observation no later green un-observes; a truncation is a
+   MEASUREMENT THAT WAS LOST, and a lost measurement is answered by taking it
+   again. This is the first answer, always.
+2. **A signed closure**, for a recording that genuinely cannot be redone:
+
+   ```
+   node scripts/render-verify-guard.mjs --incomplete "<backend>/<suite>" [--at <iso|ms>] [--run <id>] --evidence "<why>"
+   ```
+
+   It binds ONE record by its CONTENT identity (`runIdentity`, a hash of the
+   record's whole canonical content — a stamp was not an identity: it fell
+   back `at` → `startedAt`, so one signature could close a second run sharing
+   a millisecond, and a record with no readable stamp was closable by nothing
+   at all). `--at` and `--run` only narrow the selection; ambiguity is refused
+   with each candidate's `--run` id rather than resolved. It demands written
+   evidence, and a closure carrying none closes nothing; it is only OFFERED
+   where it would lift something — a truncated run that CRASHED stays red and
+   a truncated `--section` probe stays partial; it clears no backend — the run
+   stays `incomplete`, never a green; and it closes **only the part nobody can
+   know**: every red the run DID record keeps blocking and closes the three
+   ordinary ways, and for a run that also passed on the RETRY those reds are
+   the FIRST attempt's, held in `suspectOf`. Stated residual, unchanged: the
+   closure cannot tell an unavoidable overflow from output flooded on purpose
+   — but it can never bury a red that reached the record, and for every run
+   recorded since the fix, ALL of them did.
+
+### A crashed run has the same named way out (point 734, sixth round)
+
+A CRASH is the one verdict no ledger can ever reach: `runVerdict` returns no
+charges for it, deliberately — a run that died rather than reported judged no
+picture, so THE CRASH ITSELF is nothing anyone can fix, charge or file, and
+extending `RED_CHARGES` reclassifies it not at all. That is the DISPOSITION of
+the crash, and it says nothing about the reds the run printed BEFORE it died:
+those were really observed, they keep blocking, and they close the three
+ordinary ways — exactly as the paragraph below spells out. Eight of the
+recorded 13.–19.08.2026 runs
+are exactly this shape, and inside the window their only exit was the hand
+`--defer`. The guard now names a crash as its own class — **not** an
+"unexplained red" to hunt — in the status view and in every branch of its
+block message, and gives it the same signed route:
+
+```
+node scripts/render-verify-guard.mjs --crashed "<backend>/<suite>" [--at <iso|ms>] [--run <id>] --evidence "<what the kept log shows>"
+```
+
+Same binding rules as `--incomplete` (one record by content identity, written
+evidence, ambiguity refused), and the closure stops at exactly the same line:
+it closes the CRASH, never a red the run got out before it died. That is not
+where it started — the branch used to drop the whole record on the argument
+that a crashed run's fragmentary reds "never blocked on their own". True of the
+mechanism and the wrong conclusion (review finding, 28.08.2026): a check the
+suite printed FAIL for was really observed, and point 640 gives that
+observation three closings, of which "the process died afterwards" is not one.
+So a signed crash now stops the crash sentence and leaves any recorded red
+standing, to be fixed, charged or filed like any other. It only ever ADDS
+blockers, and a crashed run that printed nothing behaves as it always did.
+
+The signature states exactly "we read the kept log (`local/verify-logs/`, point
+460); the run died; there is no report here to judge", which is a disposition
+and never coverage: `runVerdict` still answers red, the backend still needs a
+real covering run, and a signed-off crash is never a pass. The two closure
+families live in separate lists (`crashClosures` beside `incompleteClosures`),
+so neither signature can ever serve the other — a run that crashed AND
+truncated is refused by the `--incomplete` draft (a crash outranks the
+truncation) and is signed as what it is: a crash.
+
+**A re-run does not remove a crashed record**, and the guard no longer says it
+does (same review finding — the message advertised a remedy the code does not
+implement). A crash is an observed failure and no later green un-observes it,
+exactly as with a red: the record leaves the list when its CAUSE is named and
+fixed — the render edit moves the window past it and its own suite then comes
+up covering — or through the signature, or through the loud deferral. Never
+through silence, and never through repetition.
+
+**A run that crashed AND truncated needs BOTH signatures.** The crash outranks
+the truncation, so while the crash is open the record is not offered the
+`--incomplete` route at all — and it used to be excluded from that route
+forever, because the raw record still says `crashed` after the crash is signed
+(review finding, 28.08.2026). Its lost lines could then be reached by no
+signature at all. A signed crash is now judged as what the record still holds:
+the lost recording becomes an incomplete recording with its own route, and any
+red the run printed before it died stands. A signed crash that recorded nothing
+AND lost nothing is closed by that one signature alone, because "it failed
+without reporting a red" is only the crash restated — but a run that also
+truncated has lost output whether or not it printed a red, so it owes the
+second signature exactly like any other, and one is not enough for it.
+
+**What a DEFERRAL pays for is the whole record, so it names the whole record**
+(round 17). The waved-through list used to read only the one sentence each class
+blocks with — the crash sentence, the lost-recording sentence — so a deferral
+over a crashed or truncated run carried away every red the run really printed
+with nothing naming them, and a bypass whose cost is invisible is one nobody
+weighs. The blocking sentence is unchanged, because it is the one thing a reader
+must dispose of; the COST beside it now names that sentence, the lost recording
+where the run also truncated, and every printed red no open point owns. One red
+is its kind and its name there: a failing check and a console error printing the
+same text are two observations, and counting them as one understated the bypass.
+
+**And `--status` reads the classification the gate reads** (round 17). Its
+per-backend line called every unaccounted entry of the last run an "unaccounted
+red" — the crash and lost-recording sentences included, the two classes this
+point exists to tell apart — and it consulted no signature, so a record already
+signed off was still reported as an open red for as long as it stayed the last
+run. Both readings come from `unexplainedRuns`, which is what actually blocks.
+The open-crash paragraph no longer says nothing in the run can be explained or
+charged either: the CRASH carries no red anybody can own, and a red the run
+printed before it died still closes the three ordinary ways — which is what the
+sign-off message had been saying all along.
+
+**And a flag is not a value.** `--evidence --run <id>` used to yield the literal
+`--run` as the written evidence, which the draft — handed a non-empty string —
+signed the record on. The argument reading is now its own exported function
+(`closureArgs`) with its own cases, because it was the one door in this CLI that
+no test went through.
 
 ## The world seed is pinned AT THE LAUNCHER (points 549/557)
 
@@ -1381,6 +1745,34 @@ Read it as the model case: when the shutter refuses, ask FIRST whether the frame
 was ever pointed at its subject. Do NOT resolve a refusal by redeclaring the
 frame `general` — a check that reports its own subject as optional is the
 failure this mechanism exists to prevent.
+
+## Verification rules extracted from the per-turn policy
+
+Exercise features at states a player can reach. In bird's-eye view the ordinary
+zoom range is 0.125–0.5 (default 0.5); use a debug-wide zoom only when testing
+that control. Decide visibility by projecting the subject into the rendered
+frame (`__camera.onScreen`/`ndc`), never from a guessed radius, fog distance, or
+other proxy. A proxy can pass while the pixels remain wrong.
+
+Every frame declares its subject at the shutter: `world` for a place or
+landmark, `local`/`place` for settlement content, `hud` for an interface target,
+or `general` with a reason. `frameSubject.mjs` refuses a frame that does not show
+the named subject, and the unit layer refuses screenshot writes outside the
+shutter.
+
+Every browser suite launches through `launchVerifyBrowser()` and calls
+`assertBackend` after `window.__renderer` appears. WebGPU is the ordinary and
+SMALL lane; LARGE runs the full WebGL 2 regression and then the WebGPU render
+suites. `touch` and `voice` route to WebGL 2 because headless WebGPU cannot drive
+them. `docs` and `preview` are exempt because the first is pure Node and the
+second intentionally lacks the dev-only renderer probe. The accepted residual
+is explicit: a WebGL-2-only regression can surface at the next LARGE.
+
+A red closes only through a named fix, a charge to the owning open point via
+`scripts/render-verify-charges.mjs`, or a newly filed point. Passing on retry is
+SUSPECT and covers nothing; `--defer` waives one record but does not close it.
+To test a load hypothesis, use `scripts/throttle-probe.mjs` rather than inferring
+it from a later green.
 
 ## Headless limitations
 

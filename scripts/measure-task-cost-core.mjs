@@ -132,7 +132,7 @@ export function classifyToolCall({ name = '', input = {} } = {}) {
   if (SILENT_TOOLS.has(name)) return null
   if (name === 'Bash') return classifyBash(input?.command ?? '')
   if (name === 'Read') return classifyFile(input?.file_path ?? '', { read: true })
-  if (name === 'Edit' || name === 'Write' || name === 'NotebookEdit') return classifyFile(input?.file_path ?? '')
+  if (name === 'Edit' || name === 'Write' || name === 'MultiEdit' || name === 'NotebookEdit') return classifyFile(input?.file_path ?? '')
   return null
 }
 
@@ -269,7 +269,7 @@ export function classifyVerificationToolCall({ name = '', input = {} } = {}) {
   // JPEG or a WebP is still a picture being judged, and counting it as text inflated
   // exactly the share this split reports.
   if (name === 'Read') return VERIFICATION_IMAGE.test(rel) ? 'eyes' : 'text'
-  if (name === 'Edit' || name === 'Write' || name === 'NotebookEdit') return 'authoring'
+  if (name === 'Edit' || name === 'Write' || name === 'MultiEdit' || name === 'NotebookEdit') return 'authoring'
   return 'unclear'
 }
 
