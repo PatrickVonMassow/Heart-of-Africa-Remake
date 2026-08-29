@@ -258,6 +258,16 @@ describe('auditGuide — budget boundaries', () => {
     expect(measureGuide(malformed)).toEqual(measureGuide('line one\nline two \nline three\nline four\n'))
     expect(measureGuide(malformed)).toEqual({ lines: 5, words: 8 })
   })
+
+  it('retains visible words before a comment that opens mid-line', () => {
+    const measured = measureGuide('keep these words <!-- hidden\nstill hidden\n-->')
+    expect(measured).toEqual({ lines: 1, words: 3 })
+  })
+
+  it('retains visible words after a comment that closes mid-line', () => {
+    const measured = measureGuide('<!-- hidden\nstill hidden --> keep these words')
+    expect(measured).toEqual({ lines: 1, words: 3 })
+  })
 })
 
 describe('parsing helpers', () => {
