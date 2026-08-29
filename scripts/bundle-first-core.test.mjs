@@ -907,6 +907,14 @@ describe('the real docs/work-packages.md', () => {
     // there is no bucket a wrong home could fall into unjudged.
     expect(withoutAuthority).toEqual([])
     expect(bySpec.length + byPriorList.length).toBe(open.size)
-    expect(bySpec.length).toBeGreaterThanOrEqual(176)
+    // A RATCHET LANDING CANNOT BREAK (landing of point 1002): the old floor
+    // counted `bySpec` out of the CURRENT open set, so every landed point whose
+    // own spec named its bundle lowered it and this case went red for the work
+    // going right. The half that must only ever SHRINK is the legacy authority:
+    // a point leaves the pre-1003 snapshot's list by landing or by gaining a
+    // `Bundle:` line of its own, and nothing can add to a snapshot of the past.
+    // A point that LOSES its `Bundle:` line while standing in that snapshot is
+    // the regression this bound is here to catch.
+    expect(byPriorList.length).toBeLessThanOrEqual(158)
   })
 })
