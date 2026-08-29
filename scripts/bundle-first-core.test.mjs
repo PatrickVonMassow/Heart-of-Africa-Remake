@@ -472,9 +472,16 @@ describe('evaluate — the fail-open exits', () => {
   })
 
   it('allows an unreadable or absent work-packages file', () => {
-    expect(evaluate({ tasksMd: tasks([540]), workPackagesMd: '' }).block).toBe(false)
-    expect(evaluate({ tasksMd: tasks([540]) }).block).toBe(false)
-    expect(evaluate({ tasksMd: tasks([540]), workPackagesMd: null }).block).toBe(false)
+    for (const inputs of [
+      { tasksMd: tasks([540]), workPackagesMd: '' },
+      { tasksMd: tasks([540]) },
+      { tasksMd: tasks([540]), workPackagesMd: null },
+    ]) {
+      // `checked` beside the decision (round-seventeen review finding): these
+      // exits allow WITHOUT judging, and a regression that reported them as
+      // judged would make statusLine claim the invariant here.
+      expect(evaluate(inputs), JSON.stringify(inputs)).toMatchObject({ block: false, checked: false })
+    }
   })
 
   it('allows the OTHER half-restructure — the exemptions parse, the table heading does not', () => {
@@ -562,35 +569,56 @@ describe('the real docs/work-packages.md', () => {
   // from the reader's view without a single case turning red. These two counts
   // come from the document's own shape, so a row or a bullet that stops parsing
   // is a failure rather than a silence.
-  it('parses EVERY bundle row and EVERY exemption bullet the document writes', () => {
-    const section = md.slice(md.indexOf(BUNDLES_HEADING), md.indexOf(UNBUNDLED_MARKER))
+  // THE ORACLE IS ONE FUNCTION, USED ON THE REAL DOCUMENT AND ON A SYNTHETIC
+  // ONE (round-seventeen review finding): a tripwire that only ever runs on a
+  // clean document can be loosened without a case noticing, so the same counts
+  // are taken of a document deliberately written in the shapes the parser
+  // cannot read.
+  const structuralCounts = (doc) => {
+    const section = doc.slice(doc.indexOf(BUNDLES_HEADING), doc.indexOf(UNBUNDLED_MARKER))
     // COUNTED BY THE SHAPE OF THE DOCUMENT, NOT BY THE PARSER'S OWN RULE
-    // (round-eleven review finding): a count that recognises exactly what the
-    // parser recognises goes blind wherever the parser does. Every table line
-    // is a row here, and only the header and its separator may fail to parse.
-    // WIDER THAN THE PARSER HERE TOO (round-sixteen review finding): a Markdown
-    // body row may leave its leading pipe off, and the parser reads only rows
-    // that carry one. Counting by the CELL SEPARATORS instead sees such a row,
-    // so it makes this red rather than disappearing from both sides.
-    const tableLines = section.split('\n').filter((line) => (line.match(/\|/g) ?? []).length >= 3)
-    const separators = tableLines.filter((line) => /^\|[\s|:-]+$/.test(line.trim()))
-    expect(separators).toHaveLength(1)
-    expect(tableLines.length).toBeGreaterThan(7)
-    expect(parseBundles(md)).toHaveLength(tableLines.length - 2)
-
-    const tail = md.slice(md.indexOf(UNBUNDLED_MARKER))
+    // (round-eleven, sixteen and seventeen review findings): a count that
+    // recognises exactly what the parser recognises goes blind wherever the
+    // parser does. TWO cell separators are enough, so a row that leaves its
+    // leading pipe off and a row truncated after its id are both seen.
+    const rows = section.split('\n').filter((line) => (line.match(/\|/g) ?? []).length >= 2)
+    const tail = doc.slice(doc.indexOf(UNBUNDLED_MARKER))
     const end = tail.indexOf('\n## ')
     // WIDER THAN THE PARSER ON PURPOSE (round-twelve and round-fourteen review
     // findings): the parser reads every bullet marker up to three spaces in,
     // and this count takes ANY indentation and a marker standing alone at the
-    // end of its line as well. A list item in a shape the parser cannot read
-    // therefore makes this red instead of disappearing from the parser and its
-    // own count together.
-    const listed = (end < 0 ? tail : tail.slice(0, end))
+    // end of its line as well.
+    const bullets = (end < 0 ? tail : tail.slice(0, end))
       .split('\n')
       .filter((line) => /^\s*[-*+](\s|$)/.test(line))
-    expect(listed.length).toBeGreaterThan(5)
-    expect(parseUnbundled(md).bullets).toHaveLength(listed.length)
+    return { rows, bullets, separators: rows.filter((line) => /^\|[\s|:-]+$/.test(line.trim())) }
+  }
+
+  it('parses EVERY bundle row and EVERY exemption bullet the document writes', () => {
+    const { rows, bullets, separators } = structuralCounts(md)
+    expect(separators).toHaveLength(1)
+    expect(rows.length).toBeGreaterThan(7)
+    // Only the header and its separator may fail to parse.
+    expect(parseBundles(md)).toHaveLength(rows.length - 2)
+    expect(bullets.length).toBeGreaterThan(5)
+    expect(parseUnbundled(md).bullets).toHaveLength(bullets.length)
+  })
+
+  it('the oracle SEES the shapes the parser cannot, so loosening it turns red', () => {
+    const base = md.slice(0, md.indexOf(UNBUNDLED_MARKER))
+    const tail = md.slice(md.indexOf(UNBUNDLED_MARKER))
+    for (const row of ['**Neu** | Z | What it is | #999 |', '| **Neu** | Z']) {
+      const doc = `${base}${row}\n\n${tail}`
+      expect(structuralCounts(doc).rows.length, row).toBe(structuralCounts(md).rows.length + 1)
+      expect(parseBundles(doc), row).toHaveLength(parseBundles(md).length)
+    }
+    // Inserted on its own line after the marker's line, so the bullet is a
+    // bullet rather than a continuation of the sentence that introduces them.
+    const afterMarkerLine = tail.indexOf('\n') + 1
+    for (const bullet of ['+ **#999** — another shape.', '  - **#999**.', '-']) {
+      const doc = `${base}${tail.slice(0, afterMarkerLine)}\n${bullet}\n${tail.slice(afterMarkerLine)}`
+      expect(structuralCounts(doc).bullets.length, bullet).toBe(structuralCounts(md).bullets.length + 1)
+    }
   })
 
   // THE FIXTURE IS A MEASUREMENT, AND IT SAYS SO ITSELF (round-ten review
