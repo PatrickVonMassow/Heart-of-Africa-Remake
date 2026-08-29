@@ -562,17 +562,30 @@ describe('statusLine', () => {
 // here — that the resolution happens on the CALL, and that a throw inside it
 // still allows the stop and exits 0.
 describe('bundle-first-guard — the fail-open boundary', () => {
-  it('resolves its checkout paths on the call, not at import', async () => {
+  // ALL THREE PATHS, NOT THE FIRST ONE (round-twenty review finding): a case
+  // that throws on the first resolution leaves the other two unmeasured, and
+  // moving only those back to module scope would keep the suite green.
+  const CHECKOUT_PATHS = ['TASKS.md', 'docs/work-packages.md', '.claude/batch-paused']
+
+  it('resolves every one of its checkout paths on the call, not at import', async () => {
     const { gatherBundleFirstInputs } = await import('./bundle-first-guard.mjs')
+    const asked = []
+    gatherBundleFirstInputs({ resolvePath: (path) => (asked.push(path), path) })
     // Reachable ONLY if the resolution happens here: a module-scope resolution
     // ran at import and no resolver this case supplies could ever be called.
+    expect(asked).toEqual(CHECKOUT_PATHS)
+  })
+
+  it.each(CHECKOUT_PATHS)('lets a failure resolving %s out to the caller, which owes the allow', async (failing) => {
+    const { gatherBundleFirstInputs } = await import('./bundle-first-guard.mjs')
     expect(() =>
       gatherBundleFirstInputs({
-        resolvePath: () => {
-          throw new Error('no checkout')
+        resolvePath: (path) => {
+          if (path === failing) throw new Error(`cannot resolve ${failing}`)
+          return path
         },
       }),
-    ).toThrow('no checkout')
+    ).toThrow(`cannot resolve ${failing}`)
   })
 
   it('allows the stop and exits 0 when reading the checkout throws', async () => {
