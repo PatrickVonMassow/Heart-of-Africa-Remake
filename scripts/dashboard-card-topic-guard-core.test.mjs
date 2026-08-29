@@ -75,6 +75,16 @@ describe('parseCards', () => {
     expect(now.map((c) => c.point)).toEqual([1000])
   })
 
+  it('does not invent ownership from an ISO date or a single-digit effort title', () => {
+    const section = `
+<details><summary><span class="t">2026-07-25 — Rückblick</span></summary><div class="body">Kurz.</div></details>
+<details><summary><span class="t">1 - 2 Tage Aufwand</span></summary><div class="body">Punkt 1.</div></details>`
+    expect(parseCards(section, 'now').map((c) => c.point)).toEqual([null, null])
+    expect(topicViolations(`<h2>Woran ich gerade arbeite</h2>${section}`, KNOWN)).toMatchObject([
+      { where: 'now', point: null, ref: 1 },
+    ])
+  })
+
   it('is total on malformed input', () => {
     expect(parseCards(null, 'queue')).toEqual([])
     expect(parseCards('<details><summary>kein body</summary></details>', 'now')).toEqual([])

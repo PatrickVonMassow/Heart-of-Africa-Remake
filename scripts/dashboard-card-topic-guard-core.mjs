@@ -70,8 +70,10 @@ function sectionSlice(html, marker) {
 /**
  * The `<details>` cards of one section as [{where, point, title, bodyHtml}].
  * The own point comes from `<span class="num">N</span>` (queue) or a now-card
- * title starting `N — …` / `N - …`; null for cards without one (VDZK,
- * process cards). Cards without a body block are skipped (nothing to scan).
+ * title starting `NN — …` / `NN – …`; null for cards without one (VDZK,
+ * process cards). The 2+ digit floor preserves the board's single-digit list
+ * convention, and a plain hyphen is excluded so an ISO date cannot own its
+ * leading year. Cards without a body block are skipped (nothing to scan).
  */
 export function parseCards(sectionHtml, where) {
   if (typeof sectionHtml !== 'string' || typeof where !== 'string') return []
@@ -79,7 +81,7 @@ export function parseCards(sectionHtml, where) {
   for (const chunk of sectionHtml.split(/<details\b/).slice(1)) {
     const num = chunk.match(/class="num">\s*(\d+)/)
     const title = chunk.match(/class="t">\s*([^<]*)/)
-    const titleNum = title && title[1].match(/^\s*(\d+)\s*[—-]/)
+    const titleNum = title && title[1].match(/^\s*(\d{2,})\s*[—–]/)
     const body =
       chunk.match(/<div class="body">([\s\S]*?)<\/div>\s*<\/details>/) ||
       chunk.match(/<div class="body">([\s\S]*)$/)
