@@ -3,6 +3,9 @@ import { ACTIVITY_CLASSES } from './batch-standstill-core.mjs'
 import {
   EMERGENCY_COOLDOWN_MS,
   EMERGENCY_THRESHOLD_MS,
+  VERIFICATION_LEASE_MS,
+  VERIFICATION_SUSPENSION_MAX_MS,
+  activeVerificationLease,
   activeVeto,
   emergencyDecision,
   emergencyHandoffPrompt,
@@ -14,6 +17,7 @@ const NOW = Date.parse('2026-08-26T20:00:00Z')
 const progressAt = NOW - 2 * EMERGENCY_THRESHOLD_MS
 const report = (className = ACTIVITY_CLASSES.NO_WORKER) => ({
   window: { start: progressAt - EMERGENCY_THRESHOLD_MS, end: NOW },
+  batchProgress: [{ at: progressAt, kind: 'first-parent-commit' }],
   timeline: [
     { start: progressAt - 1000, end: progressAt, className: ACTIVITY_CLASSES.FOREGROUND },
     { start: progressAt, end: NOW, className },
@@ -28,9 +32,9 @@ describe('the independent emergency decision', () => {
     expect(activeVeto({ reason: 'expired', until: NOW - 1 }, NOW)).toBe(false)
   })
 
-  it('does nothing while measured progress is inside the hour', () => {
+  it('stands down when a real batch advance is inside the hour', () => {
     const recent = report()
-    recent.timeline[0].end = NOW - EMERGENCY_THRESHOLD_MS + 1
+    recent.batchProgress[0].at = NOW - EMERGENCY_THRESHOLD_MS + 1
     expect(emergencyDecision({ now: NOW, report: recent, workablePoints: [947] })).toMatchObject({
       action: 'observe', strike: false, reason: 'progress-within-threshold',
     })
@@ -48,7 +52,7 @@ describe('the independent emergency decision', () => {
       action: 'hard-recover', strike: true, reason: 'batch-still-stalled-after-recorded-recovery',
     })
     const moved = report()
-    moved.timeline[0].end = progressAt + 1
+    moved.batchProgress[0].at = progressAt + 1
     expect(emergencyDecision({ now: NOW, report: moved, workablePoints: [947], state }).action).toBe('soft-recover')
   })
 
@@ -58,16 +62,181 @@ describe('the independent emergency decision', () => {
     expect(emergencyDecision({ now: NOW, report: {}, workablePoints: [947] }).reason).toBe('no-bounded-evidence-window')
   })
 
-  it('takes the latest end of real advancing work, never owner presence', () => {
+  it('takes only explicit batch progress, never session activity or owner presence', () => {
     expect(latestProgressAt(report(ACTIVITY_CLASSES.IDLE_OWNER))).toBe(progressAt)
     expect(latestProgressAt({
       window: { start: 1 },
+      batchProgress: [
+        { at: 5, kind: 'first-parent-commit' },
+        { at: 8, kind: 'delegated-branch-moved' },
+        { at: 99, kind: ACTIVITY_CLASSES.FOREGROUND },
+      ],
       timeline: [
         { end: 4, className: ACTIVITY_CLASSES.FOREGROUND },
-        { end: 8, className: ACTIVITY_CLASSES.VERIFICATION },
+        { end: 10, className: ACTIVITY_CLASSES.VERIFICATION },
         { end: 12, className: ACTIVITY_CLASSES.IDLE_OWNER },
       ],
     })).toBe(8)
+    expect(latestProgressAt({
+      window: { start: 1 },
+      timeline: Object.values(ACTIVITY_CLASSES).map((className, index) => ({ end: index + 2, className })),
+    })).toBe(1)
+  })
+
+  it('strikes an owner that stays busy without moving the batch', () => {
+    const busy = report(ACTIVITY_CLASSES.FOREGROUND)
+    busy.timeline = Array.from({ length: 12 }, (_, index) => ({
+      start: progressAt + index * 10 * 60_000,
+      end: progressAt + (index + 1) * 10 * 60_000,
+      className: ACTIVITY_CLASSES.FOREGROUND,
+    }))
+    expect(emergencyDecision({ now: NOW, report: busy, workablePoints: [947] })).toMatchObject({
+      action: 'soft-recover', strike: true, progressAt,
+    })
+  })
+
+  it('suspends the old durable-progress clock for one named, advancing, live verification run', () => {
+    const overdue = report(ACTIVITY_CLASSES.VERIFICATION)
+    overdue.batchProgress[0].at = NOW - 90 * 60_000
+    overdue.verificationLeases = [{
+      record: '/repo/local/verify-logs/large.log.run.json',
+      command: 'verify --plan large',
+      status: 'running',
+      startedAt: NOW - 80 * 60_000,
+      progressAt: NOW - 60_000,
+      leaseUntil: NOW - 60_000 + VERIFICATION_LEASE_MS,
+      processAlive: true,
+    }]
+    expect(emergencyDecision({ now: NOW, report: overdue, workablePoints: [1002] })).toMatchObject({
+      action: 'stand-down', strike: false, reason: 'live-verification-lease',
+      progressAt: NOW - 90 * 60_000,
+      verificationLease: { command: 'verify --plan large', progressAt: NOW - 60_000 },
+    })
+  })
+
+  it('keeps ordinary in-threshold progress observable even with a live verification lease', () => {
+    const healthy = report(ACTIVITY_CLASSES.VERIFICATION)
+    healthy.batchProgress[0].at = NOW - EMERGENCY_THRESHOLD_MS + 1
+    healthy.verificationLeases = [{
+      record: '/repo/local/verify-logs/large.log.run.json',
+      command: 'verify --plan large',
+      status: 'running',
+      startedAt: NOW - 10 * 60_000,
+      progressAt: NOW - 1000,
+      leaseUntil: NOW - 1000 + VERIFICATION_LEASE_MS,
+      processAlive: true,
+    }]
+    expect(emergencyDecision({ now: NOW, report: healthy, workablePoints: [1002] })).toMatchObject({
+      action: 'observe', strike: false, reason: 'progress-within-threshold',
+    })
+  })
+
+  it.each([
+    ['expired', { progressAt: NOW - 60_000, leaseUntil: NOW - 1, processAlive: true }],
+    ['stale', { progressAt: NOW - VERIFICATION_LEASE_MS - 1, leaseUntil: NOW + 60_000, processAlive: true }],
+    ['process-dead', { progressAt: NOW - 60_000, leaseUntil: NOW + 60_000, processAlive: false }],
+  ])('strikes exactly as before when a verification lease is %s', (_case, fields) => {
+    const overdue = report(ACTIVITY_CLASSES.VERIFICATION)
+    overdue.batchProgress[0].at = NOW - 90 * 60_000
+    overdue.verificationLeases = [{
+      record: '/repo/local/verify-logs/large.log.run.json',
+      command: 'verify --plan large',
+      status: 'running',
+      startedAt: NOW - 100 * 60_000,
+      ...fields,
+    }]
+    expect(activeVerificationLease(overdue, NOW)).toBeNull()
+    expect(emergencyDecision({ now: NOW, report: overdue, workablePoints: [1002] })).toMatchObject({
+      action: 'soft-recover', strike: true, reason: 'batch-stalled-past-threshold',
+      progressAt: NOW - 90 * 60_000,
+    })
+  })
+
+  it('caps repeated verification renewals at two hours from the run start', () => {
+    const overdue = report(ACTIVITY_CLASSES.VERIFICATION)
+    const startedAt = NOW - VERIFICATION_SUSPENSION_MAX_MS
+    overdue.verificationLeases = [{
+      record: '/repo/local/verify-logs/large.log.run.json',
+      command: 'verify --plan large',
+      status: 'running',
+      startedAt,
+      progressAt: NOW - 1000,
+      leaseUntil: NOW - 1000 + VERIFICATION_LEASE_MS,
+      processAlive: true,
+    }]
+    expect(activeVerificationLease(overdue, NOW)).toBeNull()
+    expect(emergencyDecision({ now: NOW, report: overdue, workablePoints: [1002] })).toMatchObject({
+      action: 'soft-recover', strike: true, reason: 'batch-stalled-past-threshold',
+    })
+
+    const beforeCeiling = NOW - 1
+    overdue.verificationLeases[0].startedAt = beforeCeiling - VERIFICATION_SUSPENSION_MAX_MS + 1
+    overdue.verificationLeases[0].progressAt = beforeCeiling - 1000
+    overdue.verificationLeases[0].leaseUntil = overdue.verificationLeases[0].progressAt + VERIFICATION_LEASE_MS
+    expect(activeVerificationLease(overdue, beforeCeiling)).toMatchObject({
+      leaseUntil: NOW,
+      suspensionUntil: NOW,
+    })
+  })
+
+  it('scales the per-record suspension ceiling with a custom emergency threshold', () => {
+    const thresholdMs = 30 * 60_000
+    const overdue = report(ACTIVITY_CLASSES.VERIFICATION)
+    overdue.batchProgress[0].at = NOW - thresholdMs - 1
+    overdue.verificationLeases = [{
+      record: '/repo/local/verify-logs/large.log.run.json',
+      command: 'verify --plan large',
+      status: 'running',
+      startedAt: NOW - 2 * thresholdMs,
+      progressAt: NOW - 1000,
+      leaseUntil: NOW - 1000 + VERIFICATION_LEASE_MS,
+      processAlive: true,
+    }]
+    expect(activeVerificationLease(overdue, NOW)).not.toBeNull()
+    expect(emergencyDecision({ now: NOW, report: overdue, workablePoints: [1002], thresholdMs })).toMatchObject({
+      action: 'soft-recover', strike: true, reason: 'batch-stalled-past-threshold',
+    })
+  })
+
+  it.each([
+    ['self-serving future bound', {
+      record: '/repo/local/verify-logs/large.log.run.json', command: 'verify --plan large',
+      progressAt: NOW - 1000, leaseUntil: NOW + 10 * VERIFICATION_LEASE_MS,
+    }],
+    ['unnamed record', { record: '', command: 'verify --plan large', progressAt: NOW - 1000, leaseUntil: NOW + 1000 }],
+    ['unnamed command', { record: '/repo/large.log.run.json', command: ' ', progressAt: NOW - 1000, leaseUntil: NOW + 1000 }],
+    ['sample beyond the window', {
+      record: '/repo/large.log.run.json', command: 'verify --plan large',
+      progressAt: NOW - 1000, leaseUntil: NOW + 1000, windowEnd: NOW - 2000,
+    }],
+    ['future-dated sample', {
+      record: '/repo/large.log.run.json', command: 'verify --plan large',
+      progressAt: NOW + 1, leaseUntil: NOW + 1000, windowEnd: NOW + 60_000,
+    }],
+  ])('rejects a verification lease with %s', (_case, fields) => {
+    const overdue = report(ACTIVITY_CLASSES.VERIFICATION)
+    const { windowEnd, ...leaseFields } = fields
+    if (Number.isFinite(windowEnd)) overdue.window.end = windowEnd
+    overdue.verificationLeases = [{
+      status: 'running', startedAt: NOW - 60_000, processAlive: true,
+      ...leaseFields,
+    }]
+    expect(activeVerificationLease(overdue, NOW)).toBeNull()
+  })
+
+  it('selects the freshest valid lease when several runs are present', () => {
+    const overdue = report(ACTIVITY_CLASSES.VERIFICATION)
+    const lease = (name, sampledAgo) => ({
+      record: `/repo/local/verify-logs/${name}.log.run.json`,
+      command: `verify ${name}`,
+      status: 'running',
+      startedAt: NOW - 60 * 60_000,
+      progressAt: NOW - sampledAgo,
+      leaseUntil: NOW - sampledAgo + VERIFICATION_LEASE_MS,
+      processAlive: true,
+    })
+    overdue.verificationLeases = [lease('older', 2 * 60_000), lease('newer', 1000)]
+    expect(activeVerificationLease(overdue, NOW)).toMatchObject({ command: 'verify newer', progressAt: NOW - 1000 })
   })
 
   it('records the strike, evidence, outcome phase and exact veto command', () => {

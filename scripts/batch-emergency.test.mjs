@@ -1,10 +1,11 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { mkdtempSync, readFileSync, rmSync } from 'node:fs'
+import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { ACTIVITY_CLASSES } from './batch-standstill-core.mjs'
 import { EMERGENCY_COOLDOWN_MS, EMERGENCY_THRESHOLD_MS } from './batch-emergency-core.mjs'
-import { restartOutcome, runEmergency, terminateLockedOwner } from './batch-emergency.mjs'
+import { runRecordFor } from './batch-in-flight.mjs'
+import { defaultInputs, restartOutcome, runEmergency, terminateLockedOwner, verificationProcessAlive } from './batch-emergency.mjs'
 
 const dirs = []
 afterEach(() => {
@@ -25,6 +26,7 @@ const fixture = () => {
       workablePoints: [947], paused: false, veto: null, state: {},
       report: {
         window: { start: progressAt - 1, end: now },
+        batchProgress: [{ at: progressAt, kind: 'first-parent-commit' }],
         timeline: [
           { start: progressAt - 1, end: progressAt, className: ACTIVITY_CLASSES.FOREGROUND },
           { start: progressAt, end: now, className: ACTIVITY_CLASSES.IDLE_OWNER },
@@ -118,5 +120,63 @@ describe('restart identity', () => {
     expect(restartOutcome({ execute, platform: 'win32' })).toMatchObject({ step: 'start-primary-scheduled-task', ok: true })
     expect(execute.mock.calls[0][0]).toBe('powershell')
     expect(execute.mock.calls[0][1].join(' ')).toMatch(/Start-ScheduledTask.*HoA-Batch-Autostart/)
+  })
+})
+
+describe('verification process identity', () => {
+  it('makes the real run-record reducer follow the captured snapshot instead of re-reading disk', () => {
+    const repo = mkdtempSync(join(tmpdir(), 'hoa-emergency-snapshot-'))
+    dirs.push(repo)
+    const log = join(repo, 'large.log')
+    const diskPid = 111
+    const snapshotPid = 222
+    writeFileSync(`${log}.run.json`, JSON.stringify({
+      pid: diskPid, log, status: 'running', startedAt: 1000,
+    }))
+    const snapshot = { pid: snapshotPid, log, status: 'running', startedAt: 2000 }
+    const probed = []
+    const realRunRecord = (path, options) => runRecordFor(path, {
+      ...options,
+      probe: (pid) => { probed.push(pid); return { exists: pid === snapshotPid } },
+      commandOf: () => `node /repo/scripts/verify/run-logged.mjs --log-file ${log}`,
+    })
+
+    expect(verificationProcessAlive(snapshot, `${log}.run.json`, log, { runRecord: realRunRecord })).toBe(true)
+    expect(probed).toEqual([snapshotPid])
+  })
+
+  it('probes the already-resolved log and accepts only an explicit live verdict', () => {
+    const log = '/repo/local/verify-logs/large.log'
+    const record = { pid: 4242, log: 'local/verify-logs/large.log', startedAt: 1000 }
+    const runRecord = vi.fn(() => ({ alive: true }))
+    expect(verificationProcessAlive(record, '/ignored.run.json', log, { runRecord })).toBe(true)
+    expect(runRecord).toHaveBeenCalledWith(log, { read: expect.any(Function) })
+    expect(runRecord.mock.calls[0][1].read()).toBe(record)
+    expect(verificationProcessAlive(record, '', log, { runRecord: () => ({ alive: false }) })).toBe(false)
+    expect(verificationProcessAlive(record, '', log, { runRecord: () => { throw new Error('unreadable') } })).toBe(false)
+    expect(verificationProcessAlive(null, '', log, { runRecord })).toBe(false)
+  })
+
+  it('wires the resolved report path into the real default input probe', () => {
+    const repo = mkdtempSync(join(tmpdir(), 'hoa-emergency-inputs-'))
+    dirs.push(repo)
+    writeFileSync(join(repo, 'TASKS.md'), '')
+    const log = join(repo, 'local', 'verify-logs', 'large.log')
+    const record = { pid: 4242, log: 'local/verify-logs/large.log', startedAt: 1000 }
+    const runRecord = vi.fn(() => ({ alive: true }))
+    let alive = false
+    defaultInputs({
+      repo,
+      now: Date.now(),
+      thresholdMs: EMERGENCY_THRESHOLD_MS,
+      runRecord,
+      gather: ({ verificationProcessAlive: probe }) => {
+        alive = probe(record, `${log}.run.json`, log)
+        return {}
+      },
+    })
+    expect(alive).toBe(true)
+    expect(runRecord).toHaveBeenCalledWith(log, { read: expect.any(Function) })
+    expect(runRecord.mock.calls[0][1].read()).toBe(record)
   })
 })

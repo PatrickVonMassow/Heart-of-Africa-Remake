@@ -75,6 +75,7 @@ Das Musterbeispiel sind die Chat-Zeitstempel: neun Eskalationsstufen, acht weich
 | 27.08. | Vierte Runde derselben abgelehnten Kartenkopf-Darstellung: Der dritte Anlauf machte den Nutzer in seiner eigenen Abnahmebedingung zur entscheidenden Instanz und wurde trotzdem auf das eigene grüne Urteil gemergt und abgehakt — und die Schranke, die eine vierte Runde hätte verhindern sollen, war aus dem VORGESCHLAGENEN Zielbild abgeleitet und deshalb von genau der abgelehnten Darstellung erfüllt (§3.202, Punkte 967/969) |
 | 27.08. abends | Ein Veto der Gegenlesung stand auf `main`, dessen dritter Befund eine Erfindung des Prüfwerkzeugs war: Es schneidet die Retrospektive planmäßig aus dem Prüfstoff, druckt die Kürzung nur in die Konsole des Aufrufers und meldet in derselben Ausgabe »nichts weggelassen« — der Prüfer konnte »fehlt im Commit« von »fehlt in meiner Vorlage« nicht unterscheiden und klagte den Commit an. Der Schutzsatz dagegen gilt nur für eine aufgeteilte Prüfung, die ein Manifest schreibt (§3.203, Punkt 972) |
 | 27.08. abends | Dasselbe Kritikalitäts-Tor forderte binnen zwanzig Minuten erst eine, dann zwei, dann sechs gegenzulesende Dateien für einen Punkt, der in dieser Zeit keinen Commit hatte und keine der genannten Dateien je angefasst hat — die Vereinigung folgt dem Zeitfenster, nicht dem Punkt, und der Commit, der den Befund eintrug, hob die Forderung selbst mit an (§3.204, Punkt 974) |
+| 28.08. abends | Die Notfall-Uhr des unbeaufsichtigten Stapels wurde genau wie bestellt auf nachweisbaren Fortschritt verengt — und verlor dabei einen Schutz, den nie jemand aufgeschrieben hatte: Der ehrliche Abschluss-Prüflauf über beide Backends dauert gemessen 80 min 48 s gegen eine Schwelle von 60 Minuten und sieht seither aus wie ein Hänger, den die Rettungsroutine unterbricht. Kein Test wurde rot; der Schutz war vorhanden, nicht zugesichert (§3.210, Punkt 1002) |
 
 Muster: Ab dem 22.07. explodiert die Commit-Rate (Delegation) — und genau dann häufen sich die Infrastruktur-Vorfälle. **Skalierung der Autonomie erzeugt eine eigene Problemklasse, die die Feature-Arbeit zeitweise überholt.**
 
@@ -1412,7 +1413,7 @@ keinen Träger hat. Gebucht als Punkt 956.
 
 ## Anhang A — Maschinell gepflegte Quellen-Übersicht
 
-Zuletzt aktualisiert: Freitag, 28.08.2026, 20:27 · Quellen-Fingerprint: `90cddae67d92…`
+Zuletzt aktualisiert: Samstag, 29.08.2026, 10:16 · Quellen-Fingerprint: `a9d5f56caf6d…`
 
 Spalten heuristisch aus den Quellen abgeleitet (Anläufe = distinkte Datumsnennungen im Memory;
 Maßnahme = Guard-Skripte mit Namens-Treffer). Die inhaltliche Bewertung gehört der Prosa oben.
@@ -1450,7 +1451,7 @@ Maßnahme = Guard-Skripte mit Namens-Treffer). Die inhaltliche Bewertung gehört
 | Work at High effort by default; the user reserves Extra high for research and design decisions, not implementation | 4 | hoch | — (Regel/Memory) | ◐ Regel |
 | Write idiomatic English in all English text (README, code comments, commit messages) — no German calques like 'stand' for a version | 1 | niedrig | — (Regel/Memory) | ◐ Regel |
 | Fable is NOT the default lane because its volume is the scarcest; difficulty is no reason for it either (since 18.08.2026 hard cases go straight to Sol), and review is cross-vendor, not Fable-by-default | 4 | hoch | — (Regel/Memory) | ◐ Regel |
-| Findings recorded by a session that could not write the work order — carry each into TASKS.md, then mark it drained | 33 | hoch | findings-guard.mjs | ✔ Mechanismus |
+| Findings recorded by a session that could not write the work order — carry each into TASKS.md, then mark it drained | 34 | hoch | findings-guard.mjs | ✔ Mechanismus |
 | A recurring lookup gets a script; never pull raw transcripts, listings, or logs into context to answer it | 1 | niedrig | — (Regel/Memory) | ◐ Regel |
 | Past the 150k context watermark, FINISH the step and hand over — never start a suite, an agent or a point after it; the user raised the cost twice (13.08. and 17.08.2026) | 2 | mittel | — (Regel/Memory) | ◐ Regel |
 | User 18.08.2026: hard, complex, error-prone and HIGH-criticality points are AUTHORED by GPT-5.6 Sol directly — Opus 5 authors only what is left, and Fable authors only a point that tags its lane or one the router escalates | 4 | hoch | — (Regel/Memory) | ◐ Regel |
@@ -1513,10 +1514,10 @@ Maßnahme = Guard-Skripte mit Namens-Treffer). Die inhaltliche Bewertung gehört
 | A pending batch claim HOLDS THE LAUNCHER BACK — withdraw it whenever the claiming window is left unattended | 2 | mittel | clear-claim-guard.mjs | ✔ Mechanismus |
 | Multi-agent workflows eat the session/weekly limit fast — verify findings INLINE, keep fan-outs small, warn the user with a cost estimate before any big workflow | 3 | mittel | doc-budget-guard.mjs | ✔ Mechanismus |
 
-Erfasste Quellen: 93 Feedback-/Projekt-Memories · 57 Guard-/Hook-Skripte · 6 Revert-/Reapply-Commits · 113 Prozess-/Meta-TASKS-Punkte (davon 48 offen).
+Erfasste Quellen: 93 Feedback-/Projekt-Memories · 57 Guard-/Hook-Skripte · 6 Revert-/Reapply-Commits · 113 Prozess-/Meta-TASKS-Punkte (davon 47 offen).
 
-<!-- RETRO-FINGERPRINT: 90cddae67d920ffbee228b0d677b78cfe9e4eab900ebf58cbd7376e510979f70 -->
-<!-- RETRO-LAST-REFRESHED: 2026-08-28T18:27:30.380Z -->
+<!-- RETRO-FINGERPRINT: a9d5f56caf6d218d3786b52f8f5d125f32d9ecd21b5522c73fc4c99553beba10 -->
+<!-- RETRO-LAST-REFRESHED: 2026-08-29T08:16:39.764Z -->
 <!-- AUTO-GENERATED:END -->
 
 ### 3.111 Ein Erfolg ist kein Beweis für den Weg, auf dem er zustande kam
@@ -4619,3 +4620,57 @@ Begründung schreibt, prüft sie gegen die Behauptungen, die im selben Dokument 
 wer den Prüfstoff nach Größe schneidet, muss wissen, dass ein Widerspruch über die Schnittkante
 hinweg für jeden einzelnen Pass unsichtbar ist. Prüffrage beim Schreiben einer Rechtfertigung:
 *Widerlegt dieser Satz etwas, das ich weiter oben behauptet habe?*
+### 3.210 Die richtige Verengung nahm einen Schutz mit, den nie jemand benannt hatte
+
+Am 28.08.2026 wurde die Notfall-Uhr des unbeaufsichtigten Stapels genau so verengt, wie es
+bestellt war: Sie zählt nur noch nachweisbaren Fortschritt am Stapel — einen Commit auf `main`,
+eine gesetzte Sitzungsgrenze, einen bewegten delegierten Zweig — und nicht länger die
+Werkzeugaufrufe der Sitzung selbst. Der Grund war zwingend: Ein Besitzer, der in einer Schleife
+festhängt, erzeugt lückenlos Aktivität, und die Uhr lief deshalb nie ab. Die Änderung schließt
+diesen Fall, ist getestet und wird im Chaos-Drill an einem echten Prozess vorgeführt.
+
+Was die alte, zu weite Definition nebenbei geschützt hatte, stand nirgends: Ein ehrlicher langer
+Prüflauf zählte als Fortschritt, weil er zufällig unter dieselbe Klasse fiel. Nach der Verengung
+sieht er aus wie ein Hänger. Gemessen dauert die vollständige Suite über beide Backends 80 Minuten
+und 48 Sekunden, die Schwelle liegt bei 60 — der Abschlusslauf, mit dem jede Auslieferung endet,
+würde also von genau der Reparatur unterbrochen, die den Stapel am Leben halten soll. Kein Test
+wäre rot geworden, und die Spezifikation des Punktes war vollständig erfüllt: Der Schutz war nie
+zugesichert, nur vorhanden.
+
+Gefunden hat ihn die herstellerübergreifende Gegenlese, nicht der Autor und nicht das Tor — dieselbe
+Stellung wie in §3.121, nur andersherum: Dort überlebte ein Defekt in einer erklärten Restlücke,
+hier in einer nie erklärten Selbstverständlichkeit.
+
+**Lehre:** Wer ein Signal verengt, entfernt jeden Schutz, den die alte Weite unbenannt mitgetragen
+hat. Eine Spezifikation nennt, was hineingehört; sie nennt nie, was still herausfällt. Prüffrage
+bei jeder Verengung: *Wer hat sich bisher auf die Breite verlassen, ohne dass es irgendwo steht?*
+Die Antwort gehört als eigener Punkt in den Arbeitsauftrag, bevor die Verengung landet — nicht
+erst, nachdem sie einmal zugeschlagen hat.
+
+### 3.211 Neun Runden, jede Ablehnung kleiner als die davor — und keine war die letzte
+
+In der Nacht auf den 29.08.2026 hat das Vier-Augen-Tor am Bündelleser neun
+herstellerübergreifende Runden verbraucht. Die erste Ablehnung traf einen echten Defekt: Der
+Leser nahm jede ein- bis vierstellige Zahl aus 39 KB Prosa für eine Punktnummer und zog vorher
+bekannte Datumsformen ab. Die neunte lautete, eine Unicode-Ziffer in einer Code-Spanne könne
+theoretisch platzieren. Dazwischen wurde jede einzelne Ablehnung beantwortet, und jede Antwort
+verdiente eine neue: die führende Liste öffnete mit einem Datum, die Marke stieß an eine
+HTML-Entität, der Beweis maß das Dokument gegen sich selbst, die Zählung verglich eine Menge mit
+sich selbst. Keine dieser Ablehnungen war falsch. Der Punkt, um den es ging, war selbst aus
+genau diesem Muster entstanden: Vier frühere Runden hatten ihn als eigenen Auftragspunkt
+hinterlassen, weil sie nicht konvergierten.
+
+Angehalten hat nicht das Urteil, sondern ein Zähler: Der Wiederholungs-Wächter meldete den
+neunten Commit in Folge am selben Mechanismus gegen ein gemessenes Maximum von acht. Ohne ihn
+wäre die Sitzung in eine zehnte Runde gegangen, denn jede einzelne Runde ist für sich begründet
+— genau das macht die Schleife so schwer zu verlassen. Erschwerend kommt hinzu, dass das Tor
+jedes Zug-Ende verweigert, solange die Ablehnung steht: Der Stapel kommt an keinem Punkt vorbei,
+nicht nur an diesem, und der Ausweg, den das Tor nennt — beheben und nachprüfen lassen — ist
+derselbe Weg, der neun Mal nicht ans Ziel führte.
+
+**Lehre:** Ein Tor, das Runden fordert, braucht eine Zahl, ab der die verbleibende Lücke ein
+eigener Punkt ist statt einer weiteren Runde. Ohne diese Grenze misst das Tor nicht mehr die
+Qualität der Arbeit, sondern die Ausdauer der Sitzung, und ein Rest, der mit jeder Runde kleiner
+wird, ist kein Fortschritt, sondern eine Asymptote. Prüffrage bei jeder Gegenlese: *Ist der
+Befund dieser Runde kleiner als der der vorigen — und wenn ja, warum ist er dann noch eine Runde
+und nicht ein Punkt?*

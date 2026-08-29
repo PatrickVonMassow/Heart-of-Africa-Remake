@@ -18,6 +18,10 @@ afterEach(() => {
 })
 
 describe('batch activity journal records', () => {
+  it('pins the verification progress event name consumed by standstill reports', () => {
+    expect(ACTIVITY_EVENTS.VERIFICATION_PROGRESS).toBe('verification-progress')
+  })
+
   it('carries every required identity and evidence field explicitly', () => {
     expect(activityRecord({
       seq: 7,

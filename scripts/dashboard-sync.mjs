@@ -33,6 +33,7 @@ import { readTasksAll } from './tasks-source.mjs'
 import { isMainModule } from './is-main.mjs'
 import { CAUSE } from './guard-preflight-core.mjs'
 import { REPO_ROOT, repoPath } from './repo-paths.mjs'
+import { taskPointNumbers } from './dashboard-point-reader-core.mjs'
 
 const TASKS = repoPath('TASKS.md')
 const DASHBOARD = repoPath('.batch-dashboard.html')
@@ -66,13 +67,14 @@ function currentState() {
     agentBranches,
     open,
     done,
+    knownPoints: taskPointNumbers(tasksText),
     tasksReadable: typeof tasksText === 'string',
   }
 }
 
-function readCards() {
+function readCards(knownPoints) {
   try {
-    return nowCardTitles(readFileSync(DASHBOARD, 'utf8'))
+    return nowCardTitles(readFileSync(DASHBOARD, 'utf8'), { knownPoints })
   } catch {
     return null // dashboard unreadable → core fails open
   }
@@ -87,7 +89,8 @@ export function gatherDashboardSyncInputs({ sessionId = '' } = {}) {
   }
   // No board yet — dashboard-guard owns that case.
   if (!existsSync(DASHBOARD)) return { applicable: false, why: 'no dashboard file in this checkout' }
-  return { applicable: true, inputs: { cards: readCards(), state: currentState(), paused: false } }
+  const state = currentState()
+  return { applicable: true, inputs: { cards: readCards(state.knownPoints), state, paused: false } }
 }
 
 if (isMainModule(import.meta.url)) {
@@ -102,7 +105,7 @@ if (isMainModule(import.meta.url)) {
   // --status: print the gathered state and the verdict (manual inspection).
   if (process.argv[2] === '--status') {
     const state = currentState()
-    const cards = readCards()
+    const cards = readCards(state.knownPoints)
     const result = evaluate({ cards, state, paused: existsSync(PAUSE) })
     console.log(JSON.stringify({ cards, state, result }, null, 2))
     process.exit(0)

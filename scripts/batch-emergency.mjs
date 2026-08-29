@@ -9,6 +9,7 @@ import { isMainModule } from './is-main.mjs'
 import { REPO_ROOT } from './repo-paths.mjs'
 import { writeJsonAtomic } from './atomic-write.mjs'
 import { gatherStandstillReport } from './batch-standstill-report.mjs'
+import { runRecordFor } from './batch-in-flight.mjs'
 import { openPointsOf, frontCandidates } from './board-queue-core.mjs'
 import { gateSets } from './user-gate-core.mjs'
 import {
@@ -26,6 +27,15 @@ export { EMERGENCY_INTERVAL_MINUTES, EMERGENCY_SCRIPT_PATH, EMERGENCY_TASK_NAME 
 export const EMERGENCY_STATE_PATH = join(REPO_ROOT, 'local', 'batch-emergency-state.json')
 export const EMERGENCY_LOG_PATH = join(REPO_ROOT, 'local', 'batch-emergency-strikes.jsonl')
 export const EMERGENCY_VETO_PATH = join(REPO_ROOT, 'local', 'batch-emergency-veto.json')
+
+/** The report reads a run record and resolves its log once. Feed that same
+ * snapshot into runRecordFor's process-identity reduction so the reported pid
+ * and liveness verdict cannot come from different record contents. Only an
+ * explicit live verdict is accepted; false, null and exceptions fail closed. */
+export function verificationProcessAlive(record, _recordPath, logPath, { runRecord = runRecordFor } = {}) {
+  if (!record || typeof record !== 'object' || typeof logPath !== 'string' || !logPath.trim()) return false
+  try { return runRecord(logPath, { read: () => record })?.alive === true } catch { return false }
+}
 
 const readJson = (path) => {
   try { return JSON.parse(readFileSync(path, 'utf8')) } catch { return null }
@@ -79,6 +89,10 @@ export function terminateLockedOwner(lock, { execute = execFileSync, kill = proc
     if (process.platform === 'win32') {
       execute('taskkill.exe', ['/PID', String(lock.pid), '/T', '/F'], { windowsHide: true, timeout: 30_000, stdio: 'ignore' })
     } else {
+      // Deliberately exact-pid only. POSIX descendant termination needs a
+      // separately proved process tree; see docs/batch-autonomy.md. The
+      // verification lease still has a two-hour per-record ceiling, but a
+      // living orphan wrapper can satisfy identity until then.
       kill(lock.pid, 'SIGTERM')
     }
     return { step: 'terminate-owner', ok: true, pid: lock.pid }
@@ -88,7 +102,9 @@ export function terminateLockedOwner(lock, { execute = execFileSync, kill = proc
   }
 }
 
-function defaultInputs({ repo, now, thresholdMs }) {
+export function defaultInputs({
+  repo, now, thresholdMs, gather = gatherStandstillReport, runRecord = runRecordFor,
+}) {
   const tasksText = readFileSync(join(repo, 'TASKS.md'), 'utf8')
   const open = openPointsOf(tasksText)
   const workablePoints = frontCandidates({ open, gates: gateSets(tasksText), inFlight: [], count: open.length })
@@ -97,7 +113,11 @@ function defaultInputs({ repo, now, thresholdMs }) {
     paused: existsSync(join(repo, '.claude', 'batch-paused')),
     veto: readJson(join(repo, 'local', 'batch-emergency-veto.json')),
     state: readJson(join(repo, 'local', 'batch-emergency-state.json')) ?? {},
-    report: gatherStandstillReport({ repo, ref: 'main', start: now - 4 * thresholdMs, end: now, thresholdMs }),
+    report: gather({
+      repo, ref: 'main', start: now - 4 * thresholdMs, end: now, thresholdMs,
+      verificationProcessAlive: (record, recordPath, logPath) =>
+        verificationProcessAlive(record, recordPath, logPath, { runRecord }),
+    }),
   }
 }
 

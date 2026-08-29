@@ -4,6 +4,8 @@
 // exemptions (Erledigt / Von dir zu klären), and totality on malformed input
 // (the wrapper's fail-open depends on the core never throwing).
 import { describe, it, expect } from 'vitest'
+import { readFileSync } from 'node:fs'
+import { resolve } from 'node:path'
 import {
   WORD_BUDGET,
   TECH_TOKEN_BUDGET,
@@ -22,7 +24,7 @@ function boardHtml({ now = [], questions = [], queue = [], done = [] } = {}) {
   const card = ({ n, t = 'Titel', body }) =>
     `<details>\n  <summary>${n != null ? `<span class="num">${n}</span>` : ''}<span class="t">${t}</span></summary>\n  <div class="body">${body}</div>\n</details>`
   const nowCard = ({ n, t = 'Titel', body }) =>
-    `<details class="now" open>\n  <summary><span class="t">${n != null ? `${n} ` : ''}${t}</span></summary>\n  <div class="body">${body}</div>\n</details>`
+    `<details class="now" open>\n  <summary><span class="t">${n != null ? `${n} — ` : ''}${t}</span></summary>\n  <div class="body">${body}</div>\n</details>`
   return `<main><h1>Dashboard</h1>
 <h2>Woran ich gerade arbeite</h2>
 ${now.map(nowCard).join('\n')}
@@ -63,6 +65,12 @@ describe('cardStats', () => {
 })
 
 describe('parseCards', () => {
+  it('wires TASKS provenance into the production wrapper', () => {
+    const source = readFileSync(resolve(process.cwd(), 'scripts', 'dashboard-conciseness-guard.mjs'), 'utf8')
+    expect(source).toContain('knownPoints = taskPointNumbers(readTasksAll(TASKS))')
+    expect(source).toContain('inputs: { dashboardHtml: readFileSync(DASHBOARD, \'utf8\'), knownPoints }')
+  })
+
   it('reads the point from class="num" (queue) or the leading title number (now)', () => {
     const html = boardHtml({
       now: [{ n: 244, body: '<p>Kurz.</p>' }],
@@ -77,6 +85,17 @@ describe('parseCards', () => {
   it('is total on malformed input', () => {
     expect(parseCards(null, 'queue')).toEqual([])
     expect(parseCards('<details><summary>kein body</summary></details>', 'queue')).toEqual([])
+  })
+  it('uses the shared provenance rule for ambiguous four-digit titles', () => {
+    const html = boardHtml({ now: [{ t: '2026 — Jahresrückblick', body: '<p>Kurz.</p>' }] })
+    const section = html.slice(html.indexOf('Woran ich'), html.indexOf('<h2>Von dir'))
+    expect(parseCards(section, 'now')[0].point).toBeNull()
+    expect(parseCards(section, 'now', { knownPoints: [2026] })[0].point).toBe(2026)
+  })
+  it('does not mislabel a compound card as belonging to only its first point', () => {
+    const html = boardHtml({ now: [{ t: '1000+1003 — Verbund', body: '<p>Kurz.</p>' }] })
+    const section = html.slice(html.indexOf('Woran ich'), html.indexOf('<h2>Von dir'))
+    expect(parseCards(section, 'now', { knownPoints: [1000, 1003] })[0].point).toBeNull()
   })
 })
 

@@ -24997,3 +24997,161 @@ Nummerierung bleiben deshalb identisch — hier wird nur verschoben, nie umgesch
   breaks no player-visible behaviour itself, but a gate whose only exit is a hand waiver decays
   into a formality.
   Bundle: Session- & Repo-Hygiene.
+
+- [x] 993. A run that crashed but exited 0 is recorded as fully clean and COVERS a backend.
+  MEASURED 28.08.2026 while answering the eleventh review round of point 734, in
+  `scripts/render-verify-recorder.mjs`: the tap sets `state.crashed = true` the moment a stderr
+  line matches `CRASH_LINE`, but the record is written with `...(exit !== 0 ? { reds, crashed:
+  armed.crashed } : {})`. A run whose stack reached the tap while the process still ended with
+  code 0 therefore stores neither its reds nor its crash flag — the record is indistinguishable
+  from a clean one, and an asserted clean run COVERS its backend.
+  WHAT IT COSTS: point 734 gave the crashed run its own signed disposition precisely because a
+  crash may not be mistaken for a green. This path skips the disposition entirely: the crash is
+  not merely unexplained, it is invisible, and the run is then counted as the picture proof for a
+  render change. The comment at the tap says a false positive "only makes the gate stricter",
+  which is true on the `exit !== 0` path and false on this one — the same flag makes the gate
+  LOOSER here, because the record it produces is a green.
+  FINAL STATE: the crash observation is recorded independently of the exit code, and a record
+  carrying it is never coverage: it takes the crashed run's signed way out like any other. The
+  tap's comment states which way each direction of the flag actually moves the gate.
+  VERIFIABLE: Vitest at the recorder — a run whose stderr matched `CRASH_LINE` and whose process
+  exited 0 stores `crashed: true` and its reds, and `runVerdict`/coverage refuse it as a clean
+  covering run; a run with neither is unaffected; the ordinary crashed-and-nonzero run keeps
+  today's record shape exactly.
+  Criticality: high — it is the one path on which the render gate accepts a crash as its picture
+  proof.
+  Bundle: Session- & Repo-Hygiene.
+
+- [x] 958. The independent emergency lane reads a session's own tool calls as batch progress, so a
+  BUSY wedge never reaches it. MEASURED 27.08.2026 while cross-reading the lane point 947 built:
+  `scripts/batch-emergency-core.mjs` puts `ACTIVITY_CLASSES.FOREGROUND` into `ADVANCING_CLASSES`,
+  and `latestProgressAt` takes the latest END of any advancing interval. By the standstill
+  classifier's own definition an interval is FOREGROUND on nothing more than a timestamped
+  session-linked tool call. So an owner wedged in a BUSY loop — a poll loop, a guard refusal it
+  keeps retrying, an agent re-reading the same files — keeps emitting foreground intervals, the
+  progress boundary keeps moving, and `emergencyDecision` never reaches its one-hour threshold. The
+  lane therefore covers the QUIET wedge only, while `docs/batch-autonomy.md` S-19 claims it covers
+  the live-but-wedged owner because it "uses bounded advancing intervals, never process presence".
+  That claim is true about process presence and false about tool activity, and the busy shape is
+  measured in this repository: the poll-loop rule of 28.07.2026 records a chain of 437 answers for
+  one word.
+  FINAL STATE:
+  - PROGRESS FOR THIS DECISION IS BATCH PROGRESS, not session activity: a first-parent commit on
+    `main`, a landed point, a committed boundary, a delegated branch that moved. Foreground tool
+    activity may at most soften a strike; it may never reset the clock on its own.
+  - THE DOCUMENT SAYS WHICH OF THE TWO IT MEASURES. `docs/batch-autonomy.md` S-19 is corrected in
+    the same commit, because its present wording is what makes the gap invisible.
+  - THE QUIET CASE IS NOT LOST. A wedge with no activity at all must still strike exactly as it
+    does today; the change may only ADD the busy case.
+  VERIFIABLE: Vitest over `emergencyDecision` — a timeline of unbroken FOREGROUND intervals with no
+  batch-level advance for longer than the threshold still strikes; a real batch advance inside the
+  threshold still stands the lane down; and the existing quiet-wedge cases stay green. Plus the
+  chaos drill extended to the busy shape: a wedged owner that keeps making tool calls is recovered
+  without human action.
+  Criticality: high — it is the hole in the double safety the user ordered on 26.08.2026, and the
+  busy wedge is the shape this batch has actually produced.
+  Bundle: Urlaubsfestigkeit. It changes the same decision core as 947's lane, so it does not run
+  beside another point touching `scripts/batch-emergency-core.mjs`.
+
+- [x] 1003. The bundle membership check reads point numbers out of free prose, and no date filter
+  settles it. MEASURED 28.08.2026 across four cross-vendor review rounds on
+  `scripts/bundle-first-core.mjs` — `4c4b61f`, `0e52672`, `9ff620f`, `11f3163`, every one reviewed
+  by GPT-5.6 Sol and every one refused. `numbersIn` takes each 1-to-4-digit token in a bundle's
+  points cell for a point number and subtracts date shapes first. Each round closed the form the
+  round before had named and earned a new one: the bare year deleted real point numbers 1900-2099,
+  the optional leading day swallowed any number standing in front of a month name, and what is left
+  after bounding both is inherent — a four-digit QUANTITY in prose (`1440 px`) counts as a point,
+  and any date form the strip list does not know leaves its numbers behind. The cause is that the
+  cell stopped being a list: it carries paragraphs of prose per bundle, and a regular expression
+  over prose cannot tell a reference from a measurement.
+  FINAL STATE:
+  - THE CELL SAYS WHICH NUMBERS ARE REFERENCES. A bundle's points are read from an explicit,
+    machine-readable form — a leading number list ahead of the prose, or a marker around each
+    reference — and never from arbitrary prose. The prose stays readable for a human.
+  - NO DIGIT CEILING AND NO DATE GUESSING. Once the reader stops reading prose it needs neither a
+    strip list nor a digit bound, and the class of defect that produced the four refusals is gone
+    rather than narrowed.
+  - THE MIGRATION IS MECHANICAL AND PROVEN: the existing table converts with no membership change,
+    shown by comparing the placed set before and after over the real `docs/work-packages.md`.
+  VERIFIABLE: Vitest over the reader — a cell whose prose contains a date, a four-digit quantity and
+  a number standing in front of a month name yields exactly the referenced points and nothing else;
+  plus a conversion case proving the placed set of the real `docs/work-packages.md` is identical
+  before and after.
+  Criticality: medium — the guard's fail direction is allow, so it under-reports drift rather than
+  blocking work; but it is the only check that keeps the bundle scheme matching the open set.
+  Bundle: Session- & Repo-Hygiene.
+
+- [x] 1002. A legitimate verification run longer than an hour now earns an emergency strike.
+  MEASURED 28.08.2026 while cross-reading point 958: the emergency clock was narrowed to durable
+  batch progress alone — `BATCH_PROGRESS_KINDS` in `scripts/batch-emergency-core.mjs` admits a
+  first-parent `main` commit, a committed boundary and a moved delegated branch tip, and nothing
+  else. That is what point 958 ordered and it closes the busy-wedge hole. It also removes the
+  protection the old `ADVANCING_CLASSES` gave the VERIFICATION and CI_WAIT classes: an owner that
+  is doing exactly the right thing — one whole-suite run, no commit while it runs — presents the
+  same evidence as a wedge. `node scripts/verify/run-wait.mjs --plan large` reports 80m 48s for the
+  20 suites over both backends against `EMERGENCY_THRESHOLD_MS` of 60 minutes, so the honest LARGE
+  run at the end of every closing outlives the threshold and takes a soft strike: doctor repair
+  plus a restart, which kills the run it interrupted. The clocked veto in
+  `local/batch-emergency-veto.json` exists but nothing sets it, so the protection is a manual step
+  no runbook names.
+  FINAL STATE:
+  - A NAMED, BOUNDED, LIVE VERIFICATION RUN SUSPENDS THE CLOCK — not the VERIFICATION activity
+    class again, but the run's own progress lease: the wrapper already writes `*.run.json` beside
+    its log and `run-wait.mjs` already reads its terminal receipt. A lease that has stopped
+    advancing, expired, or belongs to a dead process protects nothing.
+  - THE BUSY WEDGE STAYS CLOSED. Tool activity, process presence and a stale lease must still fail
+    to renew the clock; only a lease that is measurably alive may.
+  - THE DOCUMENT SAYS SO. `docs/batch-autonomy.md` names the suspension beside S-19, because the
+    S-19 wording is the only place a reader learns what the clock measures.
+  VERIFIABLE: Vitest over `emergencyDecision` — a report whose window holds no batch progress for
+  ninety minutes but a live, advancing verification lease stands the lane down; the same report
+  with the lease expired, stale or process-dead strikes exactly as today; and every existing busy
+  and quiet wedge case stays green. Plus the chaos drill extended: a wedged owner holding a stale
+  lease is still recovered without human action.
+  Criticality: high — it is a self-inflicted kill on the batch's own closing run, in the lane whose
+  whole purpose is to keep the batch alive unattended.
+  Bundle: Urlaubsfestigkeit. It changes the same decision core as 947 and 958, so it does not run
+  beside another point touching `scripts/batch-emergency-core.mjs`.
+
+- [x] 884. Two dated fuses in the board and guide guards. MEASURED 24.08.2026 by the cross-vendor
+  reviews of `52c8ad1` and `267ff5e`:
+  (1) `scripts/dashboard-card-topic-guard-core.mjs:82,100` — both reference forms cap the point
+  number at three digits, and the spelled form's trailing `\b` keeps `\d{1,3}` from matching inside
+  a four-digit number. Probed: a card body saying "Punkt 1000" yields no foreign reference, and a
+  card titled `1000 — Titel` parses as owning no point at all, so the guard goes blind the moment
+  the work order passes 999. The highest point today is 884. Its JSDoc at `:104` also promises the
+  references in order of first appearance while the code sorts them numerically.
+  (2) `scripts/guide-brevity-core.test.mjs:164-170` — the case titled "leaves the fingerprint
+  comment out of BOTH budgets" tightens only `maxLines` and leaves `maxWords` at the full ceiling
+  against a hundred-word fixture, so the word half of that invariant passes whether or not the
+  comment is excluded. Related, not a defect today: `measureGuide` drops a line only when it STARTS
+  with `<!--`, so a multi-line comment's continuation and closing lines would count.
+  (3) `scripts/board-queue-core.mjs:440,441` carries the same two capped readers for the board's
+  own prose rewrite. AMENDED 28.08.2026: the fuse is no longer dated — the work order passed 999,
+  and a third site of this class, `numbersIn` in `scripts/bundle-first-core.mjs`, reported points
+  1000-1002 as unbundled until it was widened to four digits in the same hour. SUPERSEDED
+  29.08.2026 by the spec examination of this point: point 1003 replaced that prose reader with an
+  explicit machine-readable marker and landed, so `bundle-first-core.mjs` is no longer a
+  digit-ceiling reader and is NOT work for this point. Neither are the four refusals it earned
+  (`4c4b61f`, `0e52672`, `9ff620f`, `11f3163`): they attacked the superseded regex approach and
+  what still stands of them is point 1004. What remains under (3) is `board-queue-core.mjs` alone.
+  (4) THE FOURTH SITE IS NOW BLOCKING THE BATCH. MEASURED 29.08.2026 landing point 1003:
+  `parseCards` in `scripts/dashboard-guard-core.mjs:308,312` applies `MAX_POINT = 999` to BOTH its
+  readings, so the `class="num"` field — which the board itself writes and which holds nothing but
+  the card's own point numbers — goes blind at 1000. The consistency audit therefore reports
+  `erledigt-missing` for a done card it is looking straight at, and `dashboard-guard --synced`
+  refuses to attest. It does not wait itself out: `doneSeen` advances only over points that HAVE a
+  card, so the finding returns at every turn end and EVERY four-digit landing hangs behind a
+  hand-written waiver. The bound protects nothing on the structured field; on the free TITLE text,
+  where a year could pose as a point, it does — so the two readings must part company.
+  FINAL STATE: point numbers are parsed without a digit ceiling at the three readers that remain —
+  `dashboard-card-topic-guard-core.mjs`, `board-queue-core.mjs` and `dashboard-guard-core.mjs` —
+  with the bound kept only where the text it reads is free prose; the JSDoc matches the code; the
+  fingerprint case tightens both budgets; and a multi-line comment is excluded whole. The prose
+  reader in `bundle-first-core.mjs` is neither restored nor re-reviewed here.
+  VERIFIABLE: unit cases with a four-digit point in a title and in a body, a done card whose number
+  is four digits passing the consistency audit with no waiver, and a fingerprint case that fails
+  when only one budget excludes the comment.
+  Criticality: high — site (4) blocks the attestation of every turn end that follows a four-digit
+  landing, and the only way past it today is a waiver that never clears.
+  Bundle: Chat & Tafel.

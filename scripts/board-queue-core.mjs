@@ -54,6 +54,7 @@ import { normaliseLineEndings } from './board-core.mjs'
 import { SINGLE_PARAGRAPH_WORD_BUDGET, WORD_BUDGET } from './dashboard-conciseness-guard-core.mjs'
 import { gateSets } from './user-gate-core.mjs'
 import { INHERITED_ESTIMATE_NOTE, inheritedEstimate } from './queue-calibration-core.mjs'
+import { pointNumbersFromChip } from './dashboard-point-reader-core.mjs'
 // The pool cap is the width of the queue's front (point 712) — three slots,
 // three candidates. It is IMPORTED rather than restated: a second 3 in this file
 // would be a second home for the number CLAUDE.md §6 states.
@@ -421,6 +422,9 @@ export function repairTransliteration(word) {
  * point reference would block the owner's turn end on the conciseness and
  * card-topic guards, for text it never wrote. Neutralising it here keeps the
  * meaning readable and the guards satisfied by construction.
+ * Any parenthesized 2+ digit token is neutralised with plain brackets. That
+ * preserves a year such as `(2026)` without relabelling it as a point, while
+ * still removing the parenthesized shape the topic guard recognises.
  */
 export function boardSafeTitle(title, { maxLength = 60 } = {}) {
   let t = String(title ?? '').replace(/\s+/g, ' ').trim()
@@ -437,8 +441,8 @@ export function boardSafeTitle(title, { maxLength = 60 } = {}) {
     .replace(/\b[\w-]+\.(?:mjs|cjs|ts|tsx|js|md)\b/g, (m) => stem(m))
     .replace(/§\s*/g, 'Abschnitt ')
     .replace(/\b[0-9a-f]{7,40}\b/g, (m) => (/\d/.test(m) ? 'Rev.' : m))
-    .replace(/\b(punkt|point)\s+(\d{1,3})\b/gi, '$1 Nr. $2')
-    .replace(/\((\d{2,3})\)/g, '[Nr. $1]')
+    .replace(/\b(punkt|point)\s+(\d+)\b/gi, '$1 Nr. $2')
+    .replace(/\((\d{2,})\)/g, '[$1]')
     .replace(/\s+/g, ' ')
     .trim()
   return t.length > maxLength ? `${t.slice(0, maxLength - 1).trimEnd()}…` : t
@@ -472,8 +476,32 @@ export function blockedCardTitle(title) {
  * shape that lives in a CLI script is a shape no test can reach.
  */
 export function blockedCardBody(why) {
+  // `why` is BODY prose, not a title: preserve its paragraphs, paths, section
+  // references and revisions. Only the two point-reference shapes read by the
+  // topic guard are neutralised (plus the shell transliterations the board
+  // audit rejects). A title-shaped whitespace collapse here once fused a
+  // deposited multi-paragraph reason back into the wall the prose guards ban.
+  const neutralizeParagraph = (paragraph) => {
+    const protectedTokens = []
+    const prose = String(paragraph).replace(
+      /\b[a-z][a-z0-9+.-]*:\/\/[^\s]+|(?:\b[A-Za-z]:)?(?:[\wÄÖÜäöüß.-]+[\\/])+[\wÄÖÜäöüß.-]+|\b[\wÄÖÜäöüß-]+\.(?:mjs|cjs|ts|tsx|js|md)\b/gi,
+      (token) => `\uE000${protectedTokens.push(token) - 1}\uE001`,
+    )
+    return prose
+      .replace(/[A-Za-zÄÖÜäöüß]+/g, repairTransliteration)
+      .replace(/\b(punkt|point)\s+(\d+)\b/gi, '$1 Nr. $2')
+      .replace(/\((\d{2,})\)/g, '[$1]')
+      .replace(/\uE000(\d+)\uE001/g, (_marker, index) => protectedTokens[Number(index)])
+      .trim()
+  }
+  const safeWhy = String(why ?? '')
+    .trim()
+    .split(/\r?\n[ \t\r]*\n+/)
+    .map(neutralizeParagraph)
+    .filter(Boolean)
+    .join('\n\n')
   return (
-    `User-owned category: scope-extension.\n${String(why ?? '').trim()}\n\n` +
+    `User-owned category: scope-extension.\n${safeWhy}\n\n` +
     'Die Anfrage liegt im Träger und wird nicht in den Arbeitsauftrag übernommen, solange das so bleibt. ' +
     'Deine Möglichkeiten: den Befund als Punkt aufnehmen, oder ihn verwerfen.\n'
   )
@@ -601,9 +629,9 @@ export function importQueueFromHtml(html) {
   const points = {}
   for (const chunk of section.split(/<details\b/).slice(1)) {
     const summary = (chunk.match(/<summary>([\s\S]*?)<\/summary>/) ?? [])[1] ?? ''
-    const num = summary.match(/class="num">\s*(\d+)\s*</)
-    if (!num) continue
-    const point = Number(num[1])
+    const chip = (summary.match(/class="num">\s*([^<]*?)\s*</) ?? [])[1]
+    const cardPoints = pointNumbersFromChip(chip)
+    if (!cardPoints.length) continue
     const title = (summary.match(/class="t">([\s\S]*?)<\/span>/) ?? [])[1] ?? ''
     const metaRaw = (summary.match(/class="meta">([^<]*)</) ?? [])[1] ?? ''
     const bodyHtml = (chunk.match(/<div class="body[^"]*">([\s\S]*)$/) ?? [])[1] ?? ''
@@ -622,7 +650,7 @@ export function importQueueFromHtml(html) {
     // Importing it would freeze the inheritance and let calibration multiply a
     // value derived from that same calibration a second time.
     const isInherited = meta.includes(INHERITED_ESTIMATE_NOTE)
-    points[point] = {
+    const entry = {
       gated: isGated || undefined,
       // UNESCAPED, like the body (four-eyes finding 2): the card renders its
       // title through `esc`, so storing it as read would put `&amp;amp;` on the
@@ -635,6 +663,7 @@ export function importQueueFromHtml(html) {
       body: body.length && body.join(' ') !== QUEUE_STUB_BODY ? body : null,
       estimate: meta && meta !== QUEUE_STUB_META && !isGated && !isInherited ? meta : null,
     }
+    for (const point of cardPoints) points[point] = { ...entry, body: entry.body ? [...entry.body] : null }
   }
   return { points }
 }

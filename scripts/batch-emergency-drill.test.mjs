@@ -6,7 +6,7 @@ import { fileURLToPath } from 'node:url'
 const HERE = dirname(fileURLToPath(import.meta.url))
 
 describe('the total-wedge chaos drill', () => {
-  it('calls the real emergency lane and measures a hard recovery without a human', () => {
+  it('recovers a busy owner wedge through the real emergency lane without a human', () => {
     const run = spawnSync(process.execPath, [join(HERE, 'batch-emergency-drill.mjs')], {
       encoding: 'utf8', windowsHide: true, timeout: 30_000,
     })
@@ -18,6 +18,8 @@ describe('the total-wedge chaos drill', () => {
       ownerTerminated: true,
       restartAttempts: 2,
       strikeRecords: 4,
+      busyActivityIgnored: true,
+      liveVerificationProbe: true,
       restoredWithoutHuman: true,
     })
     expect(result.measuredMs).toBeGreaterThanOrEqual(0)

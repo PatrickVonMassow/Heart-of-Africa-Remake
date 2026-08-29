@@ -232,6 +232,106 @@ const vdzkEntry = (title) =>
   `<details>\n  <summary><span class="t">${title}</span></summary>\n` +
   `  <div class="body">\n    <p>Die Frage.</p>\n  </div>\n</details>\n`
 
+describe('four-digit point lifecycle', () => {
+  it('preserves a legacy title-only card through the destructive projection path', () => {
+    const source = fullBoard({ now: nowEntry(1000, 'Große Übergabe', '10:00 · ~12:00') })
+    expect(compareNowProjection(source, [1000])).toMatchObject({ ok: true, missing: [], extra: [], strayCards: 0 })
+    expect(reconcileNowProjection(source, [1000], { focusPoint: 1000, stamp: '12:00' })).toBe(source)
+    expect(
+      projectNowForPublish(source, { ok: true, points: [1000], focusPoint: 1000 }, { stamp: '12:00' }),
+    ).toMatchObject({ html: source, comparison: { ok: true } })
+  })
+
+  it('returns a legacy title-only now-card to the queue', () => {
+    const source = fullBoard({ now: nowEntry(1000, 'Große Übergabe', '10:00 · ~12:00') })
+    expect(parseNowCardPoints(source, { knownPoints: [1000] })).toEqual(new Set([1000]))
+    const out = toQueue(source, 1000)
+    expect(out).toContain('<span class="num">1000</span><span class="t">Große Übergabe</span>')
+    expect(parseQueuePoints(out)).toEqual(new Set([1000]))
+    expect(parseNowCardPoints(out)).toEqual(new Set())
+  })
+
+  it('archives a legacy title-only now-card', () => {
+    const out = toDone(fullBoard({ now: nowEntry(1000, 'Großer Abschluss', '10:00 · ~12:00') }), 1000, {
+      text: 'Fertig.',
+      end: '12:15',
+    })
+    expect(doneCards(out, 1000)).toHaveLength(1)
+    expect(out).toContain('<span class="num">1000</span><span class="t">Großer Abschluss</span>')
+  })
+
+  it('archives one four-digit point and promotes the next atomically', () => {
+    const source = fullBoard({
+      now: nowEntry(1000, 'Großer Abschluss', '10:00 · ~12:00'),
+      queue: queueEntry(1001, 'Großer Nachfolger', '~2 h'),
+      done: '<p class="archive-link">\u00c4ltere im <a href="https://example.invalid/archiv">Archiv</a>.</p>\n',
+    })
+    const out = closeCard(source, 1000, {
+      text: 'Fertig.',
+      end: '12:15',
+      next: 1001,
+      nextStatus: 'Angefangen.',
+    })
+    expect(doneCards(out, 1000)).toHaveLength(1)
+    expect(parseNowCardPoints(out)).toEqual(new Set([1001]))
+    expect(queueCard(out, 1001)).toBeNull()
+    const structureBefore = new Set(structureViolations(source).map((v) => v.code))
+    expect(structureViolations(out).map((v) => v.code).filter((code) => !structureBefore.has(code))).toEqual([])
+    const auditBefore = new Set(
+      auditDashboard(source, { open: [1000, 1001], done: [], doneSeen: [] }).map((v) => v.code),
+    )
+    expect(
+      auditDashboard(out, { open: [1001], done: [1000], doneSeen: [] })
+        .map((v) => v.code)
+        .filter((code) => !auditBefore.has(code)),
+    ).toEqual([])
+  })
+
+  it('writes four-digit closing work from the queued subject', () => {
+    const queued = fullBoard({
+      queue: queueEntry(1000, 'Großer Abschluss', '~2 h'),
+      done: '<p class="archive-link">Ältere im <a href="https://example.invalid/archiv">Archiv</a>.</p>\n',
+    })
+    const running = toNow(queued, 1000, 'Läuft.', { stamp: '10:00' })
+    const board = toDone(running, 1000, { text: 'Zusammengeführt.', end: '12:15' })
+    const out = toClosingWork(board, 1000, {
+      reason: 'Das Vier-Augen-Protokoll fehlt noch.',
+      stamp: '12:20',
+    })
+    expect(out).toContain('<span class="num">1000</span><span class="t">Großer Abschluss: Abschlussarbeiten</span>')
+    expect(parseNowCardPoints(out)).toEqual(new Set([1000]))
+    const structureBefore = new Set(structureViolations(board).map((v) => v.code))
+    expect(structureViolations(out).map((v) => v.code).filter((code) => !structureBefore.has(code))).toEqual([])
+    const auditBefore = new Set(auditDashboard(board, { open: [], done: [1000], doneSeen: [] }).map((v) => v.code))
+    expect(
+      auditDashboard(out, { open: [], done: [1000], doneSeen: [] })
+        .map((v) => v.code)
+        .filter((code) => !auditBefore.has(code)),
+    ).toEqual([])
+  })
+
+  it('retitles and upgrades four-digit legacy now-cards without losing ownership', () => {
+    const legacy = fullBoard({ now: nowEntry(1000, 'Alter Titel', '10:00 · ~12:00') })
+    const retitled = setCardTitle(legacy, 1000, 'Neuer Titel')
+    expect(retitled).toContain('<span class="num">1000</span><span class="t">Neuer Titel</span>')
+    expect(parseNowCardPoints(retitled)).toEqual(new Set([1000]))
+
+    const upgraded = upgradeNowCards(legacy)
+    expect(upgraded).toContain('<span class="num">1000</span><span class="t">Alter Titel</span>')
+    expect(parseNowCardPoints(upgraded)).toEqual(new Set([1000]))
+  })
+
+  it('merges duplicate four-digit archive cards', () => {
+    const html = fullBoard({
+      done: queueEntry(1000, 'Neu', '11:00 · 12:00') + queueEntry(1000, 'Alt', '09:00 · 10:00'),
+    })
+    const out = mergeDoneDuplicates(html)
+    expect(out.merged).toEqual(['1000'])
+    expect(doneCards(out.html, 1000)).toHaveLength(1)
+    expect(out.html).toContain('<span class="meta">09:00 · 12:00</span>')
+  })
+})
+
 describe('derived now-section membership', () => {
   const handover =
     '<details class="now" data-state="handover">\n  <summary><span class="t">Sitzungsübergabe</span></summary>\n' +
@@ -930,6 +1030,14 @@ describe('toNow — queue card in, current-work card out', () => {
     expect(out).toContain('<span class="num">369</span><span class="t">Ein verwaistes Jungtier</span>')
     expect(out).toContain('<span class="meta">16:20 · ~18:20</span>')
     expect(out).toContain('<span class="stamp">Stand 16:20</span> Neu angesetzt.')
+  })
+
+  it('writes a numeric chip for a four-digit point that the bounded free-title reader would reject', () => {
+    const source = fullBoard({ queue: queueEntry(1002, 'Verbundarbeit', '~2 h') })
+    const out = toNow(source, 1002, 'Angefangen.', { stamp: '16:20' })
+    expect(out).toContain('<span class="num">1002</span><span class="t">Verbundarbeit</span>')
+    const now = parseCards(sliceSections(out).sections['Woran ich gerade arbeite'])
+    expect(now[0].points).toEqual([1002])
   })
 
   it('leaves no queue card behind — the double-listing the guard blocks on', () => {
