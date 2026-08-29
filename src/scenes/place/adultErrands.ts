@@ -4,7 +4,6 @@
 // teaching is built.
 
 import type { ConceptId, Phrase } from '../../communication/lexicon'
-import { createProducerWatch, type ProducerWatch } from '../../systems/devAssert'
 import type { GestureKind } from '../../render/gesture'
 
 export type ErrandSituationId = never
@@ -53,7 +52,6 @@ export interface AdultErrandConfig {
   digSeconds: number
   errandSeconds: number
   stallSeconds: number
-  silenceSeconds: number
   pace: number
 }
 
@@ -74,7 +72,6 @@ export interface AdultErrandState {
   } | null
   assignments: (ErrandAssignment | null)[]
   staged: Record<ErrandSituationId, number>
-  speech: ProducerWatch
 }
 
 /** No old mixed-concept errand remains in the five-word language. */
@@ -89,7 +86,6 @@ export function createAdultErrands(
     last: null,
     assignments: Array.from({ length: Math.max(0, count) }, () => null),
     staged: {},
-    speech: createProducerWatch(),
   }
 }
 

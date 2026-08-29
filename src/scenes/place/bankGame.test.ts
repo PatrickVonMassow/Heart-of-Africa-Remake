@@ -12,8 +12,9 @@
 // is the ROUND. The settlement's own layout, colliders and crowd are what
 // `tagShuffle.test.ts` replays.
 
-import { describe, expect, it } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 import { balance } from '../../config/balance'
+import { resetDevAsserts } from '../../systems/devAssert'
 import { floorPace } from '../../systems/pursuit'
 import { mulberry32 } from '../../world/noise'
 import {
@@ -652,4 +653,55 @@ describe('the children`s game at the bank (point 687)', () => {
     expect(Math.hypot(a.x - b.x, a.z - b.z)).toBeGreaterThan(CFG.stationSpacing)
   })
 
+})
+
+/**
+ * THE LONG-RUN SPEECH ALARM (point 589), which moved here with the words. It
+ * used to watch the situation catalogue, and the five-word rebuild deleted that
+ * catalogue and left the alarm — and its debug slider — watching a producer that
+ * could no longer produce anything at all. The bank round is what speaks now, so
+ * the window is judged against the round's own longest legitimate quiet spell.
+ */
+describe('the round is watched for going silent (point 589)', () => {
+  beforeEach(() => {
+    resetDevAsserts()
+  })
+  afterEach(() => {
+    resetDevAsserts()
+  })
+
+  const codes = () =>
+    ((window as unknown as { __assertLog?: Array<{ code: string }> }).__assertLog ?? []).map(
+      (e) => e.code,
+    )
+
+  it('stays quiet over a healthy group, well past its own window', () => {
+    replayAll(CFG.roundSilenceSeconds + 60)
+    expect(codes()).toEqual([])
+  })
+
+  it('never fires on a group of one, who has nobody to play the round with', () => {
+    replay(CFG.roundSilenceSeconds * 2, { count: 1 })
+    expect(codes()).toEqual([])
+  })
+
+  it('FIRES when a group that could play says nothing for its window', () => {
+    // A round the phases can never carry forward: every child is held where it
+    // stands, so no rock is ever reached, no call is ever made, and only the
+    // RESULT — nothing said — catches it. The timers all keep running.
+    const frozen: BankWorld = {
+      ...openWorld(),
+      blocked: () => true,
+      nudge: (x, z) => ({ x, z, found: false }),
+    }
+    const cfg: BankConfig = { ...CFG, roundSilenceSeconds: 30 }
+    replay(cfg.roundSilenceSeconds + 20, { cfg, world: frozen })
+    expect(codes().join(' ')).toContain('bank-speech-silent')
+  })
+
+  it('counts the round it watched — the window is not simply never armed', () => {
+    const { s } = replay(180)
+    expect(s.speech.produced).toBeGreaterThan(1)
+    expect(s.speech.silence).toBeLessThanOrEqual(CFG.roundSilenceSeconds)
+  })
 })

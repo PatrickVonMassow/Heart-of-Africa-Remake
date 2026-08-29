@@ -1342,18 +1342,21 @@ in more than one situation, and heard in at least two DIFFERENT ones over a
 driven visit; every situation staged within a visit; both staged contrasts; the
 refusals only ever as answers, cancelling what the child was told; the errands
 really carried out and every one of them expiring.
-THE VILLAGE'S PRODUCERS ARE ALARMED FOR THE LONG RUN (point 589): the adults'
-utterances, the children's play and the children's speech each carry a watch of
+THE VILLAGE'S PRODUCERS ARE ALARMED FOR THE LONG RUN (point 589): the children's
+play at the chase and their speech at the bank round each carry a watch of
 the dev-assert channel's long-run family (`watchProducer`,
-`src/systems/devAssert.ts`), and each raises `errands-silent` / `tag-silent` /
-`child-speech-silent` once it has produced nothing for its own window
-(`balance.villageLife.*.silenceSeconds`, debug-editable in both languages) —
+`src/systems/devAssert.ts`), and each raises `tag-silent` /
+`bank-speech-silent` once it has produced nothing for its own window
+(`balance.villageLife.tag.silenceSeconds` and
+`balance.villageLife.bankGame.roundSilenceSeconds`, debug-editable in both
+languages) — the two alarms of the deleted situation catalogues went with them,
+because a watch on a producer that can no longer produce reads as covered —
 so a village that goes quiet after minutes reports itself in every session,
 headless or manual, which no seconds-long suite can reach. Verifiable both ways
-in the fast layer (`src/systems/devAssert.test.ts`, plus the three producers'
+in the fast layer (`src/systems/devAssert.test.ts`, plus both producers'
 own test files): a stalled producer trips its alarm, a healthy one is silent
 through half an hour of simulated play, a legitimately quiet one (a lone child,
-a village with nowhere to send anyone) is never judged, and a frame-loop gap
+a group with nobody to play the round with) is never judged, and a frame-loop gap
 cannot raise the alarm while a loop crawling at six-second frames still does.
 The watches reach the SCHEDULERS, so the ear's own end of the chain is armed
 where it lives: `playSpeech` raises `speech-inaudible` when the level that

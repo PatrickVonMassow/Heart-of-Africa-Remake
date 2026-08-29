@@ -2391,10 +2391,6 @@ function ErrandVillagers({
     w.__placeErrands = () => ({
       staged: { ...errands.staged },
       last: errands.last ? { ...errands.last } : null,
-      // How long the village has been quiet — what point 586 is measured by,
-      // and what the `errands-silent` assert fires on.
-      silence: errands.speech.silence,
-      spoken: errands.speech.produced,
       geography: {
         bank: geography.bank,
         upstream: geography.upstream,

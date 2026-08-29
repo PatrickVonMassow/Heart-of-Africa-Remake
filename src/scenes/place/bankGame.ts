@@ -39,7 +39,7 @@
 // on the same terms. What is new here is the ROUND, not the step.
 
 import type { GestureKind } from '../../render/gesture'
-import { devAssert } from '../../systems/devAssert'
+import { createProducerWatch, devAssert, watchProducer, type ProducerWatch } from '../../systems/devAssert'
 import {
   advanceReserve,
   chooseEffort,
@@ -239,6 +239,11 @@ export interface BankRoundConfig {
   /** Constant gap between two utterances, so two moments falling in the same
    *  breath are still heard as two. */
   utteranceGapSeconds: number
+  /** The longest silence tolerated of a round that could speak, before the
+   *  dev-mode alarm of point 589 fires. Deliberately NOT `silenceSeconds`: the
+   *  round's config is the tag config with this one merged over it, and a shared
+   *  name would silently decide which round's window a reader is looking at. */
+  roundSilenceSeconds: number
 }
 
 export type BankConfig = TagConfig & BankRoundConfig
@@ -312,6 +317,11 @@ export interface BankState {
    *  hearing gap is omitted, never carried into a later moment. */
   pending: BankUtterance[]
   sinceSaid: number
+  /** The point-589 long-run watch on the round's own SPEECH. It moved here with
+   *  the words: the alarm used to sit on the situation catalogue the five-word
+   *  rebuild deleted, and was left watching a producer that could no longer
+   *  produce anything at all. */
+  speech: ProducerWatch
 }
 
 const dist = (a: { x: number; z: number }, b: { x: number; z: number }) =>
@@ -421,6 +431,7 @@ export function createBankGame(
     playing: true,
     pending: [],
     sinceSaid: Infinity,
+    speech: createProducerWatch(),
   }
 }
 
@@ -689,7 +700,39 @@ function openRoam(s: BankState, cfg: BankConfig, rand: () => number): void {
  * the stage and the world predicates. Returns the utterance that fell this
  * frame, or null; the caller speaks it exactly as it speaks any village speech.
  */
+/**
+ * One step of the round, plus the long-run watch on what it SAID (point 589).
+ * The alarm is about the output that reaches the player — an utterance spoken —
+ * never about the timer meant to schedule it, and it is DEV-gated at the call
+ * site so a production build allocates nothing per frame.
+ */
 export function stepBankGame(
+  s: BankState,
+  dt: number,
+  cfg: BankConfig,
+  stage: BankStage,
+  world: BankWorld,
+  rand: () => number,
+): BankUtterance | null {
+  const spoken = advanceBankGame(s, dt, cfg, stage, world, rand)
+  if (import.meta.env.DEV) {
+    watchProducer(s.speech, {
+      code: 'bank-speech-silent',
+      dt,
+      produced: spoken !== null,
+      // A round with nobody to play it is quiet by right, exactly as a group of
+      // one is at the chase.
+      expected: s.children.length >= 2,
+      maxSilenceSeconds: cfg.roundSilenceSeconds,
+      detail: () =>
+        `${s.children.length} children, phase ${s.phase} for ${s.phaseFor.toFixed(0)}s more, ` +
+        `${s.cycles} cycles and ${s.runs} runs played`,
+    })
+  }
+  return spoken
+}
+
+function advanceBankGame(
   s: BankState,
   dt: number,
   cfg: BankConfig,

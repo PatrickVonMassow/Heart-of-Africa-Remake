@@ -593,20 +593,19 @@ export interface Strings {
     bankWalkPace: string
     bankStrangerBerth: string
     bankUtteranceGap: string
+    bankSilence: string
     childSpeechInterval: string
     childSpeechSpread: string
     childSpeechAction: string
     childSpeechPace: string
     childSpeechRefusal: string
     childSpeechReply: string
-    childSpeechSilence: string
     adultErrandInterval: string
     adultErrandSpread: string
     adultErrandDwell: string
     adultErrandDig: string
     adultErrandLife: string
     adultErrandStall: string
-    adultErrandSilence: string
     adultErrandPace: string
     adultErrandCount: string
     separationRadius: string

@@ -40,7 +40,6 @@ export interface ChildSpeechConfig {
   actionPace: number
   refusalChance: number
   replySeconds: number
-  silenceSeconds: number
 }
 
 export interface ChildSpeechState {

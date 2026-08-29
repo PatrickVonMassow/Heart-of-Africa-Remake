@@ -36,7 +36,6 @@ const CHILD_CFG: ChildSpeechConfig = {
   actionPace: 1,
   refusalChance: 0.2,
   replySeconds: 1.5,
-  silenceSeconds: 2,
 }
 
 const CHILD_VIEW: SituationView = {
@@ -60,7 +59,6 @@ const ADULT_CFG: AdultErrandConfig = {
   digSeconds: 4,
   errandSeconds: 20,
   stallSeconds: 6,
-  silenceSeconds: 2,
   pace: 1,
 }
 

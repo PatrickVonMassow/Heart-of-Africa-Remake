@@ -751,6 +751,9 @@ export interface BalanceConfig {
       strangerBerth: number
       /** Constant gap between two utterances of the round. */
       utteranceGapSeconds: number
+      /** Dev-mode alarm (point 589): a round that could speak and has said
+       *  nothing for this long raises `bank-speech-silent`. */
+      roundSilenceSeconds: number
     }
     /** What the children SAY at their game (work-order point 481). */
     childSpeech: {
@@ -766,9 +769,6 @@ export interface BalanceConfig {
       refusalChance: number
       /** How long after a call a refusal still reads as its answer. */
       replySeconds: number
-      /** Dev-mode alarm: a group of children that could speak and has said
-       *  nothing for this long raises `child-speech-silent`. */
-      silenceSeconds: number
     }
     /** The adults' errands, which teach the five landscape and action concepts
      *  (work-order point 483). */
@@ -786,9 +786,6 @@ export interface BalanceConfig {
       /** Seconds of NO headway toward the target after which the errand is let
        *  go, so a walk that cannot finish stops holding its villager. */
       stallSeconds: number
-      /** Dev-mode alarm: no errand staged for this long in a village that could
-       *  stage one raises the `errands-silent` assert. */
-      silenceSeconds: number
       /** The pace a villager walks at while on an errand (m/s). */
       pace: number
       /** How many errand villagers a village keeps out and about. Read when a
@@ -1339,6 +1336,15 @@ export const balance: BalanceConfig = {
       // One atom is four syllables at 0.35 s each; this leaves a clear breath
       // between two moments that fall together.
       utteranceGapSeconds: 2,
+      // The long-run alarm's window (point 589), which the bank round inherits
+      // from the situation catalogue the five-word rebuild deleted. Read off the
+      // round's OWN phases: the longest LEGITIMATE quiet spell runs from the
+      // parting call to the next cycle's RIVER call — partSeconds (8) plus a
+      // roaming phase at its widest spread (55 x 1.25 = 68.75) plus the off-game
+      // ROCK guard's whole overtime (45), which is ~122 s, and in that stretch a
+      // cycle whose boulder proves unreachable says nothing at all. Half again
+      // over that, so only a round that has genuinely stopped speaking trips it.
+      roundSilenceSeconds: 180,
     },
     // What the children SAY (work-order point 481). Calibratable starting
     // values: an utterance every few seconds is often enough to be heard several
@@ -1352,9 +1358,6 @@ export const balance: BalanceConfig = {
       actionPace: 1.6, // a brisk errand walk, well under the chase's trot
       refusalChance: 0.35,
       replySeconds: 5,
-      // The long-run alarm's window (point 589): well clear of the interval and
-      // its spread, so only a group that has genuinely stopped speaking trips it.
-      silenceSeconds: 60,
     },
     // The adults' errands (work-order point 483). Calibratable starting values
     // (educated guess, CLAUDE.md §2): slower than the children's chatter,
@@ -1379,10 +1382,6 @@ export const balance: BalanceConfig = {
       // above, which on its own held a blocked villager for twenty staged
       // errands and left the village silent for minutes (point 586).
       stallSeconds: 20,
-      // The alarm window. Measured on a healthy village, the longest quiet
-      // spell between two errands is ~25 s; the user watched them stay silent
-      // for minutes, so anything past a minute is a defect, not a lull.
-      silenceSeconds: 60,
       pace: 1.25, // an unhurried working walk
       villagerCount: 4,
     },

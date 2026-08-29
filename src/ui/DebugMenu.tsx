@@ -201,6 +201,7 @@ const BANK_GAME_FIELDS: ReadonlyArray<{
   { key: 'walkPace', label: 'bankWalkPace', step: 0.1, min: 0.1 },
   { key: 'strangerBerth', label: 'bankStrangerBerth', step: 0.1, min: 0 },
   { key: 'utteranceGapSeconds', label: 'bankUtteranceGap', step: 0.5, min: 0 },
+  { key: 'roundSilenceSeconds', label: 'bankSilence', step: 10, min: 10 },
 ]
 
 /**
@@ -222,7 +223,6 @@ const CHILD_SPEECH_FIELDS: ReadonlyArray<{
   { key: 'actionPace', label: 'childSpeechPace', step: 0.1, min: 0.1 },
   { key: 'refusalChance', label: 'childSpeechRefusal', step: 0.05, min: 0, max: 1 },
   { key: 'replySeconds', label: 'childSpeechReply', step: 0.5, min: 0 },
-  { key: 'silenceSeconds', label: 'childSpeechSilence', step: 5, min: 1 },
 ]
 
 /**
@@ -244,7 +244,6 @@ const ADULT_ERRAND_FIELDS: ReadonlyArray<{
   { key: 'digSeconds', label: 'adultErrandDig', step: 0.5, min: 0 },
   { key: 'errandSeconds', label: 'adultErrandLife', step: 5, min: 1 },
   { key: 'stallSeconds', label: 'adultErrandStall', step: 1, min: 1 },
-  { key: 'silenceSeconds', label: 'adultErrandSilence', step: 5, min: 1 },
   { key: 'pace', label: 'adultErrandPace', step: 0.1, min: 0.1 },
   { key: 'villagerCount', label: 'adultErrandCount', step: 1, min: 0, max: 12 },
 ]
