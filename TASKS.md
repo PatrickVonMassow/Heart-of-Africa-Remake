@@ -13710,18 +13710,27 @@ to land than a mechanism that needs a review.
   remains on Anthropic is what CLAUDE.md §6 never routes away — the browser suites, the picture
   judgment, the landing, the main-session bookkeeping — plus the SERVING model itself, which is the
   largest consumer of the four and has no switch at all.
-  THE ONE STRUCTURAL LEVER IS NOT AVAILABLE. A durable, daemon-owned Sol author survives a session
-  handover; an Agent-tool child does not, and blocks the point boundary it is caught by. That lane
-  is point 834, which stands unlanded on `feat/834-durable-authoring-lane`, and this repository
-  carries no daemon state at all (`batch-daemon status` answers "not a usable batch id"). So today
-  every delegated authoring run is bound to a live Anthropic session, and the only way to spend
-  less Anthropic volume is to end that session sooner — which trades one cost for another, because
-  a fresh session re-reads the board, the work order and the branch state before it can act.
+  THE ONE STRUCTURAL LEVER IS BUILT BUT NOT RUNNING. A durable, daemon-owned Sol author survives a
+  session handover; an Agent-tool child does not, and blocks the point boundary it is caught by.
+  That lane is point 834, and 834 IS LANDED AND TICKED — it merged as `feat/834-takeover-drills`
+  (b8f169f7) and its machinery stands on `main`: `scripts/batch-daemon.mjs`,
+  `scripts/detached-agent.mjs`, `scripts/batch-dispatch.mjs`. (Corrected 30.08.2026: this point
+  first claimed 834 was unlanded, on the strength of a branch NAME rather than a measurement, and
+  the user caught it. The branch `feat/834-durable-authoring-lane` does still exist with 122
+  commits off `main`, but it is BEHIND main rather than ahead of it — a stale leftover from before
+  the point was recut. That is its own hygiene item, not evidence about the lane.)
+  WHAT IS MISSING IS A RUNNING DAEMON, measured 30.08.2026: there is no control socket
+  (`.git/codex-batches/<batch>/control.sock` does not exist) and no state store for any batch id in
+  this repository, so `batch-dispatch.mjs` has nothing to submit a start-attempt to. So today every
+  delegated authoring run is bound to a live Anthropic session, and the only way to spend less
+  Anthropic volume is to end that session sooner — which trades one cost for another, because a
+  fresh session re-reads the board, the work order and the branch state before it can act.
   FINAL STATE: the share is steerable by measurement rather than by ending sessions. The batch can
   say what it spent per vendor over a window, the serving model's own share is part of that
-  number, and the durable lane is available so authoring survives a handover instead of pinning a
-  session open. Whether that means landing 834 first, or a smaller carve-out that gives only the
-  authoring runs their own process, is decided from the measurement rather than assumed here.
+  number, and the durable lane is actually SERVING, so authoring survives a handover instead of
+  pinning a session open. What that needs is the daemon's operating story — who starts it, under
+  whose supervision it survives a session end, and how a batch id and its authorized queue come to
+  exist — decided from the measurement rather than assumed here.
   VERIFIABLE: a per-vendor spend figure for a named window that includes the serving model; and a
   delegated authoring run that outlives the session which commissioned it, adopted by the next one
   through the boundary that already exists.
