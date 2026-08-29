@@ -31,6 +31,17 @@ const reportAt = (end) => {
   return {
     window: { start: progressAt - 1, end },
     batchProgress: [{ at: progressAt, kind: 'first-parent-commit' }],
+    verificationLeases: [{
+      record: join(dir, 'wedged-large.log.run.json'),
+      command: 'verify --plan large',
+      status: 'running',
+      startedAt: progressAt - 60_000,
+      progressAt,
+      // Deliberately future-dated: old output cannot keep a wedge alive merely
+      // because a stale record claims a generous bound.
+      leaseUntil: end + EMERGENCY_THRESHOLD_MS,
+      processAlive: true,
+    }],
     timeline,
   }
 }
@@ -68,11 +79,12 @@ try {
     restartAttempts: commands.filter((line) => /batch-autostart\.mjs/.test(line)).length,
     strikeRecords: rows.length,
     busyActivityIgnored: soft.decision.progressAt === progressAt && hard.decision.progressAt === progressAt,
+    staleLeaseIgnored: soft.decision.reason === 'batch-stalled-past-threshold' && hard.decision.reason === 'batch-still-stalled-after-recorded-recovery',
     restoredWithoutHuman: hard.restored && dead,
     measuredMs: Date.now() - now,
   }
   process.stdout.write(`${JSON.stringify(result)}\n`)
-  if (!result.restoredWithoutHuman || !result.busyActivityIgnored || result.softAction !== 'soft-recover' || result.hardAction !== 'hard-recover' || result.strikeRecords !== 4) {
+  if (!result.restoredWithoutHuman || !result.busyActivityIgnored || !result.staleLeaseIgnored || result.softAction !== 'soft-recover' || result.hardAction !== 'hard-recover' || result.strikeRecords !== 4) {
     process.exitCode = 1
   }
 } catch (error) {
