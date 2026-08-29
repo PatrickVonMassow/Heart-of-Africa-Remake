@@ -907,14 +907,32 @@ describe('the real docs/work-packages.md', () => {
     // there is no bucket a wrong home could fall into unjudged.
     expect(withoutAuthority).toEqual([])
     expect(bySpec.length + byPriorList.length).toBe(open.size)
-    // A RATCHET LANDING CANNOT BREAK (landing of point 1002): the old floor
-    // counted `bySpec` out of the CURRENT open set, so every landed point whose
-    // own spec named its bundle lowered it and this case went red for the work
-    // going right. The half that must only ever SHRINK is the legacy authority:
-    // a point leaves the pre-1003 snapshot's list by landing or by gaining a
-    // `Bundle:` line of its own, and nothing can add to a snapshot of the past.
-    // A point that LOSES its `Bundle:` line while standing in that snapshot is
-    // the regression this bound is here to catch.
-    expect(byPriorList.length).toBeLessThanOrEqual(158)
+    // A RATCHET LANDING CANNOT BREAK, AND NO COUNT (landing of point 1002, then
+    // its review). The original floor counted `bySpec` out of the CURRENT open
+    // set, so every landed point whose own spec named its bundle lowered it and
+    // this case went red for the work going right. A COUNT on the other half
+    // does not fix that: one point falling back to the legacy authority and one
+    // legacy point landing in the same run offset each other exactly, and the
+    // regression passes unseen.
+    //
+    // So the SET is frozen, not its size. A point leaves this list by landing
+    // or by gaining a `Bundle:` line of its own — both shrink it, and neither
+    // can fail here. What fails is a point ARRIVING: an open point that loses
+    // its `Bundle:` line while standing in the pre-1003 snapshot, whatever else
+    // landed alongside it. Nothing can add to a snapshot of the past, so a point
+    // appended after it can never reach this list at all — a new point must
+    // carry its own `Bundle:` line or fall into `withoutAuthority` above.
+    const LEGACY_AUTHORITY = new Set([
+    174, 184, 200, 203, 205, 207, 265, 269, 285, 303, 309, 310, 312, 314, 315, 319, 320, 321, 322,
+    326, 327, 328, 330, 333, 336, 343, 344, 345, 346, 347, 348, 350, 353, 354, 356, 357, 358, 359,
+    360, 362, 363, 364, 379, 380, 384, 385, 391, 414, 415, 422, 428, 448, 449, 451, 453, 455, 456,
+    457, 460, 463, 464, 465, 467, 468, 471, 491, 495, 497, 498, 504, 507, 508, 510, 511, 514, 518,
+    519, 520, 521, 523, 528, 529, 531, 532, 533, 534, 535, 536, 537, 538, 548, 551, 552, 553, 554,
+    558, 559, 560, 561, 563, 564, 565, 567, 568, 570, 574, 575, 591, 596, 599, 602, 603, 607, 609,
+    611, 615, 616, 617, 618, 619, 620, 621, 622, 625, 626, 627, 630, 632, 633, 635, 636, 637, 638,
+    639, 642, 643, 646, 647, 652, 653, 658, 659, 660, 663, 664, 665, 668, 670, 677, 678, 683, 715,
+    719, 722, 841, 887, 888, 904
+    ])
+    expect(byPriorList.filter((n) => !LEGACY_AUTHORITY.has(n))).toEqual([])
   })
 })
