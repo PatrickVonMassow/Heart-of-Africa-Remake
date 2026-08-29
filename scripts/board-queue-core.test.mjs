@@ -34,6 +34,7 @@ import {
   parseTaskTitles,
   queueEntries,
   queueOrder,
+  blockedCardBody,
   blockedCardTitle,
   boardSafeTitle,
   renderQueueCard,
@@ -959,6 +960,17 @@ describe('the pending-request card', () => {
     expect(safe).not.toMatch(/scripts\/|\.mjs/)
     expect(safe).not.toMatch(/\bPunkt 465\b/)
     expect(safe).not.toMatch(/\(465\)/)
+  })
+
+  it('neutralises the foreign reason before the owner publishes its card', () => {
+    const body = blockedCardBody('Bitte fuer Punkt 1004 pruefen (1004) scripts/finding.mjs')
+    expect(body).toContain('Bitte für Punkt Nr. 1004 prüfen [1004] finding')
+    expect(body).not.toMatch(/\bPunkt 1004\b|\(1004\)|scripts\/|\.mjs/)
+    expect(findTransliterations(body)).toEqual([])
+    const html =
+      '<h2>Von dir zu klären</h2><details><summary><span class="t">Anfrage nicht übernehmbar</span></summary>' +
+      `<div class="body"><p>${body}</p></div></details><h2>Warteschlange</h2>`
+    expect(evaluateTopic({ dashboardHtml: html, tasksText: '- [ ] 1004. Vierstelliger Punkt.\n' }).block).toBe(false)
   })
 
   it('keeps a hostile title out of the audit on the real card', () => {

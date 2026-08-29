@@ -475,8 +475,13 @@ export function blockedCardTitle(title) {
  * shape that lives in a CLI script is a shape no test can reach.
  */
 export function blockedCardBody(why) {
+  // `why` is deposited by the foreign session just like its title. Run it
+  // through the same guard-neutralisation without a title-length cap; otherwise
+  // an uncapped `Punkt N` / `(N)` reference can make the owner's VDZK card fail
+  // the topic guard on prose the owner never authored.
+  const safeWhy = boardSafeTitle(why, { maxLength: Number.POSITIVE_INFINITY })
   return (
-    `User-owned category: scope-extension.\n${String(why ?? '').trim()}\n\n` +
+    `User-owned category: scope-extension.\n${safeWhy}\n\n` +
     'Die Anfrage liegt im Träger und wird nicht in den Arbeitsauftrag übernommen, solange das so bleibt. ' +
     'Deine Möglichkeiten: den Befund als Punkt aufnehmen, oder ihn verwerfen.\n'
   )
