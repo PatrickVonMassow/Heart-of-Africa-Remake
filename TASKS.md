@@ -113,12 +113,23 @@ put it is the mistake this line exists to stop.
   judgement — flips `enabled` and writes the evidence into `DURABLE_LANE_STEPS`.
   ALSO FIX, one line: `scripts/batch-board-core.mjs` hardcodes `cap: 3` instead of
   `DAEMON_POOL_CAP`, so a changed cap would leave the board projecting the old one.
+  ALSO MEASURED 29.08.2026 09:20 on the batch host, while point 884 landed: THE REAL-PATH
+  DRILLS LEAK WHAT THEY START. A drill daemon was still serving after 11 h 35 min — pid
+  1858195, `node scripts/batch-daemon.mjs serve --repo /tmp/daemon-sandbox-KKVhV3/repo --batch
+  drill-batch --nonce c61c169c… --drill` — with ten `/tmp/daemon-sandbox-*` directories beside
+  it, one per run. Driving the REAL daemon is exactly what makes this possible, and a foreign
+  live daemon on the host is what every standstill and process measurement afterwards has to
+  tell apart from the batch's own. Each drill therefore tears down what it started: the
+  daemon it spawned is killed and its sandbox removed, on the failing path as well as the
+  passing one.
   VERIFIABLE: unit cases that a dispatch leaving eligible lanes unstarted writes exactly one
   open reason interval and closes it when the pool recovers, and that a metric series read back
   from the journal reproduces the recorded events; each real-path drill asserted through
   `node scripts/batch-daemon-drill.mjs --scenario <name>` against processes it actually killed,
-  stalled or dirtied; a trial report against the recorded baseline day whose `trialVerdict`
-  carries zero failures; plus `npm run test:unit`, lint, build.
+  stalled or dirtied; a case that asserts no drill daemon process and no `/tmp/daemon-sandbox-*`
+  directory survives a completed run, the failing one included; a trial report against the
+  recorded baseline day whose `trialVerdict` carries zero failures; plus `npm run test:unit`,
+  lint, build.
   Criticality: high — it decides whether the durable lane may be switched on at all, and every
   claim that unlocks it is currently carried by a green flag rather than by a measurement.
   Bundle: Session- & Repo-Hygiene.
