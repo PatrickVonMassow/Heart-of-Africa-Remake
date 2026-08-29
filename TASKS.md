@@ -13263,6 +13263,21 @@ to land than a mechanism that needs a review.
   order, and the first consumer that trusts that (a scan that stops early, a "latest wins" walk, a
   bisect) reads a review or a receipt that is not there. It is also the reason a hand-resolved
   conflict cannot be checked against a simple rule.
+  AND THE DRIVER IS NOT THERE WHEN AN ORDINARY MERGE NEEDS IT (measured 29.08.2026 while merging
+  `main` into `feat/925-durable-lane-measured`). `.gitattributes:9` names `merge=hoaMechanismLedger`,
+  but `scripts/mechanism-review-merge.mjs` says in its own first lines that the driver is
+  "configured transiently by `scripts/land-point.mjs`" — and `git config --get-regexp '^merge\.'`
+  in the checkout is empty. Every merge that is not a landing therefore falls back to the text
+  merge, conflicts on the append-only file, and is resolved by hand. The measured hand resolution
+  unioned the lines and deduplicated them, which silently collapsed three rows `main` carries
+  twice; no unique record was lost, but multiplicity is exactly what the driver's own suite
+  asserts, so the rule the project checks was broken by the route the project leaves open. The
+  driver refused this merge for a second reason worth recording: the branch tip was already not
+  append-only against its own ancestor (a predecessor's hand resolution had inserted a row at
+  line 1463 and removed line 1470), so `mergeMechanismReviewLedger` throws
+  "current tip modified or reordered ancestor line 1463" — a hand resolution makes the next one
+  impossible to check.
+
   FINAL STATE: either the file is ordered by `at` and the union driver keeps it ordered across the
   ancestor prefix as well, or the contract is corrected where it is written — the driver's own
   comment, `.gitattributes` and point 988's archived VERIFIABLE clause stop promising an order the
@@ -13270,7 +13285,10 @@ to land than a mechanism that needs a review.
   VERIFIABLE: Vitest over the ledger — a check that reads `.claude/mechanism-reviews.jsonl` and
   fails on a row whose `at` precedes its predecessor (after the chosen final state is in place),
   plus a merge case where the ancestor prefix already holds a late row and the driver's result is
-  judged against the decided contract.
+  judged against the decided contract; and a case that the driver is configured for an ORDINARY
+  merge in a fresh checkout and a linked worktree — not only inside a landing — asserted by
+  reading the merge configuration the repository actually installs rather than by re-stating
+  `.gitattributes`.
   Criticality: medium — it corrupts nothing today, but it is the evidence file the four-eyes gate
   rests on, and its stated order is not the order it has.
   Bundle: Modell & Wächter.
