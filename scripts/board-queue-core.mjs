@@ -421,8 +421,9 @@ export function repairTransliteration(word) {
  * point reference would block the owner's turn end on the conciseness and
  * card-topic guards, for text it never wrote. Neutralising it here keeps the
  * meaning readable and the guards satisfied by construction.
- * Deliberate cost: any parenthesized 2+ digit token is neutralised, so a year
- * such as `(2026)` becomes `[Nr. 2026]`; this publisher cannot know TASKS here.
+ * Any parenthesized 2+ digit token is neutralised with plain brackets. That
+ * preserves a year such as `(2026)` without relabelling it as a point, while
+ * still removing the parenthesized shape the topic guard recognises.
  */
 export function boardSafeTitle(title, { maxLength = 60 } = {}) {
   let t = String(title ?? '').replace(/\s+/g, ' ').trim()
@@ -440,7 +441,7 @@ export function boardSafeTitle(title, { maxLength = 60 } = {}) {
     .replace(/§\s*/g, 'Abschnitt ')
     .replace(/\b[0-9a-f]{7,40}\b/g, (m) => (/\d/.test(m) ? 'Rev.' : m))
     .replace(/\b(punkt|point)\s+(\d+)\b/gi, '$1 Nr. $2')
-    .replace(/\((\d{2,})\)/g, '[Nr. $1]')
+    .replace(/\((\d{2,})\)/g, '[$1]')
     .replace(/\s+/g, ' ')
     .trim()
   return t.length > maxLength ? `${t.slice(0, maxLength - 1).trimEnd()}…` : t

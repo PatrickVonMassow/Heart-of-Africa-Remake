@@ -912,12 +912,12 @@ describe('the pending-request card', () => {
   })
 
   it('neutralises uncapped point references without rewriting only a numeric prefix', () => {
-    expect(boardSafeTitle('Punkt 1000 folgt (1003)')).toBe('Punkt Nr. 1000 folgt [Nr. 1003]')
+    expect(boardSafeTitle('Punkt 1000 folgt (1003)')).toBe('Punkt Nr. 1000 folgt [1003]')
     expect(boardSafeTitle('point 10000')).toBe('point Nr. 10000')
   })
 
-  it('deliberately neutralises a parenthesized year like any point-shaped token', () => {
-    expect(boardSafeTitle('Bilanz (2026) prüfen')).toBe('Bilanz [Nr. 2026] prüfen')
+  it('neutralises a parenthesized year without falsely labelling it as a point', () => {
+    expect(boardSafeTitle('Bilanz (2026) prüfen')).toBe('Bilanz [2026] prüfen')
   })
 
   it('truncates a long title rather than filling the card with one', () => {
