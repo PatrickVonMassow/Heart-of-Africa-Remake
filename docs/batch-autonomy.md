@@ -141,7 +141,9 @@ cannot renew the emergency clock. A named verification run is the sole clock
 suspension: `scripts/verify/run-logged.mjs` writes its `*.run.json` and emits an
 append-only progress event only when it consumes output; the latest such event
 renews a 15-minute lease, and the emergency lane proves that the record still
-names the live wrapper process. Each renewal is capped at 15 minutes and the
+names the live wrapper process. The stored log path must resolve to the log
+adjacent to that same `*.run.json`; it cannot redirect identity to another run.
+Each renewal is capped at 15 minutes and the
 record's suspension ends two hours after its `startedAt`: this admits the
 measured 80m48s two-backend LARGE run with margin and bounds renewals within
 that invocation. A newly invoked wrapper writes a new record with its own

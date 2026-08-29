@@ -192,6 +192,13 @@ export function resolveVerificationLog(recordLog, { repo } = {}) {
   return typeof repo === 'string' && repo.trim() ? resolve(repo, recordLog) : null
 }
 
+function sameVerificationPath(left, right) {
+  if (win32.isAbsolute(left) || win32.isAbsolute(right)) {
+    return win32.normalize(left).toLowerCase() === win32.normalize(right).toLowerCase()
+  }
+  return resolve(left) === resolve(right)
+}
+
 function emittedVerificationProgress(records, record, path, end) {
   let latest = null
   for (const event of records ?? []) {
@@ -223,7 +230,11 @@ export function verificationRecordEvidence(dir, {
     if (!finite(began)) continue
     let finished = Number(record?.finishedAt)
     let progressAt = null
-    const logPath = resolveVerificationLog(record.log, { repo })
+    const resolvedLogPath = resolveVerificationLog(record.log, { repo })
+    const adjacentLogPath = path.slice(0, -'.run.json'.length)
+    const logPath = resolvedLogPath && sameVerificationPath(resolvedLogPath, adjacentLogPath)
+      ? resolvedLogPath
+      : null
     if (record.status === 'running' && logPath) {
       progressAt = emittedVerificationProgress(records, record, path, end)
       finished = finite(progressAt) ? Math.min(end, progressAt + leaseMs) : NaN

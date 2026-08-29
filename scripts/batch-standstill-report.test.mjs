@@ -1,7 +1,7 @@
 import { mkdirSync, mkdtempSync, readFileSync, rmSync, utimesSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 import { ACTIVITY_CLASSES, classifyTimeline, commitGapSummary, evidenceInterval, timelineTotals } from './batch-standstill-core.mjs'
 import {
   autostartEvidence,
@@ -222,6 +222,38 @@ describe('standstill report inputs', () => {
       expect(resolveVerificationLog('C:\\repo\\local\\verify-logs\\large.log', { repo })).toBe(
         'C:\\repo\\local\\verify-logs\\large.log',
       )
+    } finally {
+      rmSync(repo, { recursive: true, force: true })
+    }
+  })
+
+  it('rejects a run record that redirects identity to another log', () => {
+    const repo = mkdtempSync(join(tmpdir(), 'hoa-verification-redirect-'))
+    const dir = join(repo, 'local', 'verify-logs')
+    const end = Date.parse('2026-08-21T10:00:00Z')
+    const startedAt = end - 60_000
+    const ownLog = join(dir, 'own.log')
+    const otherLog = join(dir, 'other.log')
+    const recordPath = `${ownLog}.run.json`
+    try {
+      mkdirSync(dir, { recursive: true })
+      writeFileSync(ownLog, 'own output\n')
+      writeFileSync(otherLog, 'other output\n')
+      writeFileSync(recordPath, JSON.stringify({
+        command: 'verify --plan large', log: 'local/verify-logs/other.log',
+        status: 'running', startedAt, pid: 4242,
+      }))
+      const processAlive = vi.fn(() => true)
+      const result = verificationRecordEvidence(dir, {
+        repo,
+        start: startedAt - 1,
+        end,
+        records: [verificationProgress({ at: end - 1000, path: recordPath, startedAt })],
+        processAlive,
+      })
+      expect(processAlive).not.toHaveBeenCalled()
+      expect(result.leases).toEqual([])
+      expect(result.intervals).toEqual([])
     } finally {
       rmSync(repo, { recursive: true, force: true })
     }
