@@ -142,10 +142,12 @@ suspension: `scripts/verify/run-logged.mjs` writes its `*.run.json` and emits an
 append-only progress event only when it consumes output; the latest such event
 renews a 15-minute lease, and the emergency lane proves that the record still
 names the live wrapper process. Each renewal is capped at 15 minutes and the
-whole suspension ends two hours after `startedAt`: this admits the measured
-80m48s two-backend LARGE run with margin but gives a chatty retry loop an
-arithmetic end. Rewriting `startedAt` or touching the output log emits no event
-and buys no time. This lease never changes the last durable-progress boundary.
+record's suspension ends two hours after its `startedAt`: this admits the
+measured 80m48s two-backend LARGE run with margin and bounds renewals within
+that invocation. A newly invoked wrapper writes a new record with its own
+two-hour bound; retries across records are not aggregated. Rewriting `startedAt`
+or touching the output log emits no event and buys no time. This lease never
+changes the last durable-progress boundary.
 No fresh output, an expired bound, a terminal receipt, or a dead/reused process
 withdraws the suspension, so a busy wedge still strikes.
 
@@ -164,9 +166,10 @@ One platform asymmetry remains explicit. Windows hard recovery uses
 each recorded batch pid; it does not yet prove and terminate that pid's whole
 descendant tree. A verification wrapper and its child can therefore outlive the
 recorded batch owner, leaving a `running` record whose wrapper still satisfies
-the identity probe. The two-hour suspension ceiling prevents an indefinite
-hold, but it does not remove that temporary orphan suspension; a general POSIX
-tree-kill needs its own process-tree identity proof before it is safe to add.
+the identity probe. The per-record two-hour suspension ceiling prevents that
+record from holding indefinitely, but it does not remove the temporary orphan
+suspension; a general POSIX tree-kill needs its own process-tree identity proof
+before it is safe to add.
 
 `scripts/batch-emergency-drill.mjs` is the Urlaubsfestigkeit proof. It calls the
 real `runEmergency`, creates a real wedged owner process, measures the soft strike

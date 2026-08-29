@@ -90,7 +90,7 @@ export function terminateLockedOwner(lock, { execute = execFileSync, kill = proc
     } else {
       // Deliberately exact-pid only. POSIX descendant termination needs a
       // separately proved process tree; see docs/batch-autonomy.md. The
-      // verification lease still has a two-hour aggregate ceiling, but a
+      // verification lease still has a two-hour per-record ceiling, but a
       // living orphan wrapper can satisfy identity until then.
       kill(lock.pid, 'SIGTERM')
     }
