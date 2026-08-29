@@ -364,6 +364,74 @@ put it is the mistake this line exists to stop.
   Nutzer, 13.08.2026 22:36: »Die Kinder spielen nicht permanent … Irgendwann ruft eines RIVER und zeigt auf den Fluss. Dann laufen alle dort hin und spielen das Spiel. Das Kind, das RIVER gerufen hat, ist dann zu Beginn der Fänger.«
   Nutzer, 13.08.2026 23:11: »Man sollte meinen, dass die Kinder etwas Angst/Respekt vor mir als fremder Erwachsener haben, anstatt mich fast umzurennen.«
   Nutzer, 13.08.2026 20:51: »Beim Kinderspiel kann ich auch nichts lernen. Ich erkenne da kein Fangspiel. Für mich laufen die Kinder mehr oder weniger zufällig hin und her (wenn sie mal nicht festhängen) und werfen mit Anweisungen um sich, die dem Spiel nicht dienlich sind. Ursprünglich war es mal ein Fangspiel, bei dem einer die anderen fangen muss und der Gefangene dadurch zum Fänger wird. Durch die ganzen neuen Situationen, die zur Erklärung der Kommunikationskonzepte COME, THERE, FOLLOW, usw. hinzugekommen sind, ist das Kinderspiel völlig verwässert. Das Herumschicken wirkt wie zum Selbstzweck eingeführt und macht das Fangspiel nicht mehr erkennbar.«
+  CROSS-VENDOR REVIEW OF THE LANDING (29.08.2026, 16 passes over the whole diff
+  `main..de7e175` on `feat/687-roam-bound-fixes`, cut by per-file authorship: GPT-5.6 Sol read the
+  Claude-authored files, Opus 4.8 the Sol-authored ones). THE ROUND ITSELF CAME BACK CLEAN: pass 16
+  traced bankGame.ts's state machine and its multi-seed hand-stepped tests against §1-§4 — caller
+  becomes catcher, ROCK as a class via tap plus boulder plus arrival, UPSTREAM/DOWNSTREAM detached
+  by the parting, roam bounded, shut-leg refusal, null-route walk-at-goal, crouched child held —
+  and recorded merge, its one gap the untested `roamGuardSeconds` overtime abandon branch; pass 15
+  recorded merge on PlaceLife.tsx's bank-vs-tag wiring; passes 2 and 11 merge on lexicon.ts and
+  PlaceScene.tsx. THE THREE do-not-merge VERDICTS ALL FELL ON THE SUPPORTING WORK, and they are
+  what this point still owes:
+  - `src/scenes/place/routing.ts:164-251` — `findPlaceRoute` substitutes a nearby free cell for a
+    blocked goal, then ALWAYS appends the original blocked `to`, so it can return a NON-NULL route
+    whose last leg is impossible. A goal inside a collider but within four rings of free ground
+    produces exactly that, and a caller whose arrival radius is smaller than the obstruction drives
+    at it for the whole phase instead of being told there is no route — which is precisely what
+    bankGame.ts's null-route handling exists to catch. `routing.test.ts:108-137` cannot see it: the
+    grid already requires `standingClear` and `navRestrict` already requires `onGround`, so the
+    test recomputes those predicates on cells it has itself marked free, exercising no real-layout
+    route and no continuous leg.
+  - `src/scenes/place/layout.ts:378,1067,1075,1188,1234` — `inBankPlayLane` is called ONCE, and only
+    for loose flora and rocks; dwellings, fences and fixed props are placed without it, so a
+    compound fence or a hut may stand in the 3 m running corridor the round relies on. And
+    `playRocks` is derived at :385 from the UNSETTLED bank, while `settleBankPoints` runs at :1235
+    over a collider set that already contains the play rocks (:1192): after a settling move the
+    bank and the play-rock stage no longer share one geometry, and an endpoint obstructed for its
+    first metre cannot move through the nearby play rock, so the silent three-metre search can end
+    without free ground.
+  - `docs/acceptance-evidence.md` §15 still carries "THE CHILDREN PLAY A GAME OF TAG" and "AT THAT
+    GAME THE CHILDREN TEACH THE SIX GENERAL CONCEPTS", and a "Verifiable" line claiming live
+    coverage from the deleted `childSituations.test.ts` over twelve situations and six concepts. It
+    contradicts §7 of the same document, and it is a false evidence chain the closing would read.
+  - `scripts/verify/polish.mjs` — the browser layer's own bank-round checks are weaker than their
+    wording: the `crossers` loop walks EVERY sample regardless of `s.phase`, so a crossing during
+    walk-back or roam satisfies "the children walk PAST the traveller"; `perChildMinute` is a GROUP
+    average, so one child stuck at `walked === 0` passes while the others carry it (the stated
+    reason — a tagged child holds its crouch — justifies exempting a TAGGED child, not every
+    child); `played >= 0.9 * LANE_WINDOW_S && phases.size >= 2` in bambara-village alone does not
+    close call -> runs -> walk -> roam; two labels say the rocks are seen "from the start line"
+    while the stance is 25 % of the stretch back and 13 % aside; and the errand tripwire's comment
+    claims a max-over-samples read proves absence "either way" when that holds only for a
+    cumulative counter, which the same comment says is not guaranteed. NOTE: the run-phase-only
+    crossing and the per-child whole-cycle reading over all four river layouts DO exist and were
+    confirmed sound in pass 3 — they live in `src/scenes/place/tagShuffle.test.ts` over a 120 s
+    window, not in polish.mjs. Its one defect is `penHasClearWall`, whose inner edge lacks the
+    body-radius margin its outer edge and its own comment carry.
+  SMALLER, EACH POINTED AT A LINE: `speaking.test.ts:19` binds `RIVER_UTTERANCE` to
+  `utteranceOf('ROCK')` (as does `ROCK_UTTERANCE` two lines down), so the file's one tone assertion
+  pins ROCK under RIVER's name and RIVER is exercised nowhere; `scripts/verify/settings.mjs:705`
+  names a check "one shape for every word" over only FOUR atoms, omitting DOWNSTREAM;
+  `verifySuiteUtterances.test.ts:20` matches single-quoted literals only and scans comments, so a
+  double-quoted or template utterance is invisible while a commented-out one satisfies the
+  must-speak test; nothing anywhere pins the three river places more than one arrival radius apart
+  since the deletion of `adultErrands.test.ts` took the only `AT_PLACE_RADIUS * 2` assertion with it
+  (`longestStall` IS re-pinned in tagShuffle.test.ts:856 and polish.mjs, and the `errands-silent`
+  and `child-speech-silent` alarms were retired deliberately with the reason written into
+  scripts/verify/README.md:1045 — only `longestHold` has no replacement); `DebugMenu.test.tsx:874`
+  proves the 19 bank-game controls EXIST but never that one acts, and neither DEFAULTS nor
+  afterEach restores `balance.villageLife.bankGame`; `Dialogs.test.tsx:318` does not tie NO_READING
+  to ROCK in particular; `balance.ts` carries three rationale comments contradicted by the values
+  beside them (dodge "six metres"/"six metres" against `dodgeDistance` 7 and `dodgeReach` 3,
+  `utteranceGapSeconds` "0.35 s" against `syllableSeconds` 0.3, and a surviving "five-syllable
+  atom" against point 686's four); `chiefReply.ts:7` still says "three runs of syllables" for a
+  two-concept phrase; `de.ts:1072` has the drums name the boulder "higher than a man, alone, and
+  unique", which the four-word message cannot say and which makes ROCK read as one boulder's name
+  against point 686 item 1; `en.ts:582` calls the gather phase a "walk to the bank" where §1 has
+  the group RUN; `design.md` §8 still calls the §13.2 glossary "the placeholder under review in
+  §13.4" after the rewrite stopped reviewing it; and `lexicon.ts`'s `isWellFormed` docstring still
+  says "a sequence usable as a concept" after the clause that made that true was dropped.
   Refs: src/scenes/place/tagGame.ts, src/scenes/place/childSituations.ts, src/scenes/place/PlaceLife.tsx, src/scenes/place/lifeSpots.ts, src/scenes/place/layout.ts, src/config/balance.ts
   Bundle: Dorfleben.
 
@@ -13413,4 +13481,43 @@ to land than a mechanism that needs a review.
   Criticality: high — it is the one condition standing between the built durable lane and its
   activation, and a trial run loosely is worse than none: it would switch on a lane whose
   survivability was never measured.
+  Bundle: Session- & Repo-Hygiene.
+
+- [ ] 1008. The review router and the review ledger each forbid what the other requires, so two
+  passes of a sixteen-pass plan can be cleared by nobody (measured 29.08.2026 while reviewing the
+  686+687 landing range `main..de7e175` on `feat/687-roam-bound-fixes`).
+  `scripts/review-sol.mjs` cuts a range too large for one round into passes by PER-FILE authorship
+  and names each pass's reviewer accordingly. For this range it routed passes 4 and 5 — twelve and
+  four Sol-authored files — to "anthropic reviewer Opus 5", correctly, because Sol may not review
+  its own work. `scripts/mechanism-review.mjs` then refused both records by PER-COMMIT vendor:
+  "a SAME-VENDOR REVIEW is refused: `de7e175` was authored by Claude Opus 5 and Opus 5 is from that
+  vendor; the review has no valid first-eligible handover (missing-or-unknown-handover)". Handing
+  the same pass to Opus 4.8 is refused from the other side: "--reviewer opus48 is not this range's
+  first eligible handover; the route names Opus 5." Fourteen of sixteen passes recorded without
+  trouble; these two cannot be cleared by any reviewer either half will accept, on a range whose
+  landing needs all sixteen.
+  THE REVIEWS THEMSELVES RAN and were worth having — the finding that `speaking.test.ts:19` binds
+  `RIVER_UTTERANCE` to `utteranceOf('ROCK')`, so the file's one tone assertion pins ROCK under
+  RIVER's name, came out of pass 4. Only the RECORD is unreachable, which is the worst shape: the
+  work is done, the evidence exists, and the gate reports it as missing.
+  WHY IT MATTERS: this is not a stuck range, it is a stuck CLASS. Any range whose tip commit is
+  Claude-authored and which contains Sol-authored files large enough to need their own pass hits
+  it, and the batch's ordinary shape — Sol authors, Claude lands — produces exactly that. The
+  escape `review-sol.mjs` documents for the case ("with `--point <N>`, the plan prints the
+  Git-verified unavailable-receipt command for that exact remainder") did not appear in the plan
+  output, and `mechanism-review.mjs`'s `--handover sol-authored` is never offered by the router.
+  FINAL STATE: the two halves judge eligibility on the SAME quantity. Either the ledger judges per
+  file as the router does — a reviewer that authored none of the pass's files is independent of it,
+  whatever the tip commit's trailer says — or the router refuses to name a reviewer the ledger will
+  reject and falls through to the next eligible model. Whichever is chosen, a pass the plan offers
+  is a pass that can be recorded, and a remainder with no eligible reviewer is NAMED as such with
+  the unavailable-receipt command the documentation already promises, rather than looking runnable
+  and failing at the record.
+  VERIFIABLE: unit cases over the pure cores — a pass whose files were authored by one vendor and
+  whose tip commit was authored by the other yields a reviewer that the ledger accepts; a range
+  with no eligible reviewer for some file set yields a plan that says so and prints the receipt
+  command instead of a runnable pass index; and a regression case reproducing the measured
+  `de7e175` pass-4/pass-5 sequence. Plus `npm run test:unit`, lint, build.
+  Criticality: high — it blocks the four-eyes record of a landing that is otherwise ready, and it
+  blocks it in the batch's most ordinary authorship shape, so it will recur until it is fixed.
   Bundle: Session- & Repo-Hygiene.
