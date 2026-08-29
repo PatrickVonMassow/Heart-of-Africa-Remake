@@ -572,10 +572,10 @@
       "place": "last"
     },
     "884": {
-      "at": "2026-08-24T06:26:45.501Z",
-      "why": "One fuse dated at point 1000 and one half-covered assertion — nothing bites at 884.",
+      "at": "2026-08-29T00:47:37.132Z",
+      "why": "Its first half now BLOCKS every landing: the board's card parser bounds a point at 999, so a four-digit point's Erledigt card reads as missing and the board sync refuses — measured 29.08.2026 when point 1003 landed and had to be waived through.",
       "origin": "machine",
-      "place": "last"
+      "place": "ahead"
     },
     "898": {
       "at": "2026-08-24T14:37:17.169Z",
@@ -979,12 +979,6 @@
       "origin": "machine",
       "place": "ahead"
     },
-    "1003": {
-      "at": "2026-08-28T20:22:45.209Z",
-      "why": "The guard errs toward allow, so it under-reports drift instead of blocking work — last is right until the release is cut.",
-      "origin": "machine",
-      "place": "last"
-    },
     "1004": {
       "at": "2026-08-28T22:16:28.449Z",
       "why": "Der Rest von 1003 betrifft den Markdown-Kontext des Lesers, nicht die Zugehörigkeit; er wartet hinter 1003 selbst und hinter der Freigabe.",
@@ -1028,7 +1022,7 @@
     "why": "The order standing in front of the release today is the arrangement that predates this rule; the four machine-filed points that had ranked themselves there were moved behind 174 first"
   },
   "settled": {
-    "at": "2026-08-28T22:16:28.457Z",
+    "at": "2026-08-29T00:47:37.140Z",
     "points": [
       174,
       184,
@@ -1363,7 +1357,6 @@
       1000,
       1001,
       1002,
-      1003,
       1004
     ]
   }
