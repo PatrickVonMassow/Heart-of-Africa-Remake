@@ -100,17 +100,27 @@ put it is the mistake this line exists to stop.
   already paid for. `DURABLE_LANE_STEPS` step 12 nevertheless reads green with the evidence
   "complete daemon failure matrix", and step 12 is one of `STEPS_REQUIRED_FOR_ACTIVATION`, so
   that wording is what an operator would enable the lane on.
-  THIRD, THE MEASURED TRIAL IS NOT RUN. 676 requires a trial against a recorded baseline day
-  with zero safety incidents, a median handover context materially below baseline, and points
-  per day no worse than baseline. The recorded baseline day and the trial both remain owed.
+  THIRD, THE MEASURED TRIAL HAS NO APPARATUS. 676 requires a trial against a recorded baseline
+  day with zero safety incidents, a median handover context materially below baseline, and points
+  per day no worse than baseline. Nothing can run it: `sealSamplingPlan` has no caller, so
+  `batchMetricsReport` refuses with "no sampling plan was sealed into the journal"; the
+  `context-samples.json` it reads beside the store is written by nobody, so `medianHandoverContext`
+  and `highContextShare` are unmeasured on both sides; there is no recorder for the baseline day
+  and no command that reaches `trialVerdict` at all. SPLIT 29.08.2026: this point builds the
+  apparatus and point 1007 runs the campaign with it, because the run itself is a day of real
+  durable-lane operation and not code.
   FINAL STATE: the dispatcher journals its reason interval and its lane-utilization,
   checkpoint, boundary and landing events through `record-metric` under the coordinator fence,
   so `calculateBatchMetrics` reads a real series; the failure matrix drives the real daemon,
   the real worker and the real files for at least worker-crash, stall, push-failure,
   dirty-worktree, marker-deletion, daemon-restart and checkpoint-timeout, with the pure-input
-  checks kept as the cheap layer beneath them rather than as the proof; and the durable lane
-  runs its measured trial with the Sol adapter alone, whose verdict — not an operator's
-  judgement — flips `enabled` and writes the evidence into `DURABLE_LANE_STEPS`.
+  checks kept as the cheap layer beneath them rather than as the proof; and the measured trial
+  is RUNNABLE end to end — a sealed sampling plan written into the journal before the interval
+  begins, context samples recorded independently of the events they are compared against, a
+  baseline day recorded from measured history rather than asserted, and one command that reads
+  both reports, calls `trialVerdict`, and lets that verdict — not an operator's judgement —
+  flip `enabled` through `flagChange` and name its own report as the evidence. A failing verdict
+  names every failed condition and changes nothing.
   ALSO FIX, one line: `scripts/batch-board-core.mjs` hardcodes `cap: 3` instead of
   `DAEMON_POOL_CAP`, so a changed cap would leave the board projecting the old one.
   ALSO MEASURED 29.08.2026 09:20 on the batch host, while point 884 landed: THE REAL-PATH
@@ -127,9 +137,11 @@ put it is the mistake this line exists to stop.
   from the journal reproduces the recorded events; each real-path drill asserted through
   `node scripts/batch-daemon-drill.mjs --scenario <name>` against processes it actually killed,
   stalled or dirtied; a case that asserts no drill daemon process and no `/tmp/daemon-sandbox-*`
-  directory survives a completed run, the failing one included; a trial report against the
-  recorded baseline day whose `trialVerdict` carries zero failures; plus `npm run test:unit`,
-  lint, build.
+  directory survives a completed run, the failing one included; unit cases over the trial command
+  that a plan sealed after the first event is refused, that a passing verdict is what writes the
+  flag and a failing one leaves it untouched while naming every failed condition, and that the
+  baseline recorder reproduces its two compared figures from a fixture of measured history; plus
+  `npm run test:unit`, lint, build.
   Criticality: high — it decides whether the durable lane may be switched on at all, and every
   claim that unlocks it is currently carried by a green flag rather than by a measurement.
   Bundle: Session- & Repo-Hygiene.
@@ -13423,4 +13435,33 @@ to land than a mechanism that needs a review.
   lint, build.
   Criticality: high — while it stands, genuine independent review evidence can be lost without a
   message, and the gate's refusal reads as a missing review rather than a displaced one.
+  Bundle: Session- & Repo-Hygiene.
+
+- [ ] 1007. The durable lane's measured trial is run, and its verdict decides the switch (split
+  out of point 925 on 29.08.2026). Point 925 builds the apparatus: a sampling plan sealed into
+  the journal before the interval begins, independently recorded context samples, a baseline-day
+  recorder that reads measured history, and one command that reaches `trialVerdict` and lets a
+  passing verdict flip `.claude/durable-lane-flag.json` through `flagChange`. It does not run the
+  campaign, because the campaign is not code: it is a recorded baseline day of today's path and a
+  trial interval of real durable-lane operation with the Sol adapter alone, long enough that
+  `p95CheckpointWaitMs`, `p95SuccessorReadyMs`, `highContextShare`, `medianHandoverContext` and
+  `pointsPerDay` are measured rather than null — `trialVerdict` scores every unmeasured figure as
+  a failure, so a short interval fails safe rather than passing quietly.
+  WHAT THE RUN OWES. The sampling plan is sealed BEFORE the first measured event and names its
+  method, batch mix, eligible intervals and exclusions; `validateSamplingPlan` refuses a plan
+  sealed afterwards, and that refusal is the whole reason the plan cannot be written to fit the
+  result. The baseline day is a real day of the batch on today's path, recorded once and not
+  re-picked after seeing the trial. The trial runs the ordinary work order — no point is chosen
+  for it — and every safety incident it produces is recorded rather than excluded.
+  FINAL STATE: a trial report and a baseline report both stand in the repository with the sealed
+  plan hash that produced them, `trialVerdict` over the pair carries zero failures, and the flag
+  file records the trial report as the reason `enabled` became true. A failing verdict is an
+  equally complete result: it is recorded, the flag stays off, and what failed becomes the next
+  point rather than a re-run with a different plan.
+  VERIFIABLE: the sealed plan, the baseline report, the trial report and the recorded verdict,
+  each reproducible from the journal and the samples they name by `node scripts/batch-metrics.mjs`
+  and the trial command; plus the flag file's `changedBy` naming that report.
+  Criticality: high — it is the one condition standing between the built durable lane and its
+  activation, and a trial run loosely is worse than none: it would switch on a lane whose
+  survivability was never measured.
   Bundle: Session- & Repo-Hygiene.
