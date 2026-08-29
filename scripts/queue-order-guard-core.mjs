@@ -112,7 +112,8 @@ const stripTags = (html) => html.replace(/<[^>]*>/g, ' ')
 /**
  * Warteschlange cards in DOCUMENT ORDER: [{point, text}]. Anchored on the
  * section header (not any mention — the dashboard-guard lesson of 22.07.2026);
- * cards are `<details>` blocks with `<span class="num">N</span>`.
+ * cards are `<details>` blocks with structured `.num` chips. A compound chip
+ * contributes each owner in chip order, matching the shared dashboard reader.
  */
 export function parseQueueCards(html) {
   if (typeof html !== 'string') return []
@@ -122,8 +123,8 @@ export function parseQueueCards(html) {
   const queueHtml = html.slice(qStart, qEnd < 0 ? undefined : qEnd)
   const cards = []
   for (const chunk of queueHtml.split(/<details\b/).slice(1)) {
-    const m = chunk.match(/class="num">\s*(\d+)/)
-    if (m) cards.push({ point: Number(m[1]), text: stripTags(chunk) })
+    const chip = (chunk.match(/class="num">\s*([^<]*?)\s*</) ?? [])[1]
+    for (const point of pointNumbersFromChip(chip)) cards.push({ point, text: stripTags(chunk) })
   }
   return cards
 }
