@@ -932,6 +932,14 @@ describe('toNow — queue card in, current-work card out', () => {
     expect(out).toContain('<span class="stamp">Stand 16:20</span> Neu angesetzt.')
   })
 
+  it('writes a numeric chip for a four-digit point that the bounded free-title reader would reject', () => {
+    const source = fullBoard({ queue: queueEntry(1002, 'Verbundarbeit', '~2 h') })
+    const out = toNow(source, 1002, 'Angefangen.', { stamp: '16:20' })
+    expect(out).toContain('<span class="num">1002</span><span class="t">Verbundarbeit</span>')
+    const now = parseCards(sliceSections(out).sections['Woran ich gerade arbeite'])
+    expect(now[0].points).toEqual([1002])
+  })
+
   it('leaves no queue card behind — the double-listing the guard blocks on', () => {
     const out = toNow(board(), 369, 'x', { stamp: '16:20' })
     expect(queueCard(out, 369)).toBeNull()

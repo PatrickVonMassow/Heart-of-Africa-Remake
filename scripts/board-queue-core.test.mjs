@@ -61,7 +61,7 @@ const confirmationLine = (point, title = 'GATED', stamp = '2026-07-29') =>
 const board = (queue) => `<title>B</title>
 <main><h1>Dashboard</h1>
 <details class="sect"><summary><h2>Woran ich gerade arbeite</h2></summary>
-<details class="now"><summary><span class="t">210 — Arbeit</span>
+<details class="now"><summary><span class="num">210</span><span class="t">Arbeit</span>
 <span class="right"><span class="meta">09:00 · bis ~23:00</span></span></summary>
 <div class="body"><p>Status (Stand 09:00): läuft.</p></div></details>
 </details>
@@ -278,7 +278,7 @@ describe('buildQueueSection — the projection replaces the section, nothing els
     expect(html).toContain('>Neu<')
     expect(html).not.toContain('>alt<')
     expect(html).toContain('<h2>Erledigt</h2>')
-    expect(html).toContain('210 — Arbeit')
+    expect(html).toContain('<span class="num">210</span><span class="t">Arbeit</span>')
     expect(html).toContain('archive-link')
   })
   it('says so loudly when there is no Warteschlange to project into', () => {
@@ -769,7 +769,7 @@ describe('the rendered queue — one flat list, no bundle left in the markup', (
   it('lists every open point exactly ONCE, in the queue order the cards are read in', () => {
     const open = [465, 439, 184, 295, RELEASE_TAG_POINT]
     const { html, entries } = built(open)
-    const rendered = [...html.matchAll(/class="num">(\d+)</g)].map((m) => Number(m[1]))
+    const rendered = [...parseQueuePoints(html)]
     expect(rendered).toEqual(entries.map((e) => e.point))
     expect(new Set(rendered).size).toBe(rendered.length)
     expect(rendered.slice().sort((a, b) => a - b)).toEqual(open.slice().sort((a, b) => a - b))
@@ -782,8 +782,7 @@ describe('the rendered queue — one flat list, no bundle left in the markup', (
   // 10.08.2026 and the published board kept showing the old plan.
   it('re-sequencing the work order re-sequences the rendered cards, nothing else edited', () => {
     const data = { points: { 439: { title: 'A', body: 'Eins.' }, 465: { title: 'B', body: 'Zwei.' } } }
-    const cards = (open) =>
-      [...built(open, data).html.matchAll(/class="num">(\d+)</g)].map((m) => Number(m[1]))
+    const cards = (open) => [...parseQueuePoints(built(open, data).html)]
     expect(cards([439, 465, 295])).toEqual([439, 465, 295])
     expect(cards([295, 465, 439])).toEqual([295, 465, 439])
   })
@@ -796,7 +795,7 @@ describe('the rendered queue — one flat list, no bundle left in the markup', (
     const tasks = readFileSync(resolve(REPO_ROOT, 'TASKS.md'), 'utf8')
     const open = openPointsOf(tasks)
     const { html } = buildQueueSection(board(''), { open, titles: parseTaskTitles(tasks) })
-    const rendered = [...html.matchAll(/class="num">(\d+)</g)].map((m) => Number(m[1]))
+    const rendered = [...parseQueuePoints(html)]
     expect(rendered.slice().sort((a, b) => a - b)).toEqual(open.slice().sort((a, b) => a - b))
     expect(html).not.toContain('class="group"')
   })
