@@ -539,6 +539,10 @@ describe('auditDashboard — the 25.07 witnesses', () => {
     const input = { ...base, done: [209, 1003], doneSeen: [209] }
     expect(auditDashboard(boardHtml({ done: input.done }), input)).toEqual([])
   })
+  it('reports a four-digit newly ticked point whose Erledigt card is missing', () => {
+    const input = { ...base, done: [209, 1003], doneSeen: [209] }
+    expect(codes(boardHtml(), input)).toContain('erledigt-missing')
+  })
   it('grandfathers pre-guard history: no baseline yet → no new-tick complaints', () => {
     expect(codes(boardHtml(), { done: [209, 262, 273, 293, 305], doneSeen: null })).not.toContain('erledigt-missing')
   })
