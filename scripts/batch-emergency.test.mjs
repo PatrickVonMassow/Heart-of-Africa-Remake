@@ -4,6 +4,7 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { ACTIVITY_CLASSES } from './batch-standstill-core.mjs'
 import { EMERGENCY_COOLDOWN_MS, EMERGENCY_THRESHOLD_MS } from './batch-emergency-core.mjs'
+import { runRecordFor } from './batch-in-flight.mjs'
 import { defaultInputs, restartOutcome, runEmergency, terminateLockedOwner, verificationProcessAlive } from './batch-emergency.mjs'
 
 const dirs = []
@@ -123,6 +124,27 @@ describe('restart identity', () => {
 })
 
 describe('verification process identity', () => {
+  it('makes the real run-record reducer follow the captured snapshot instead of re-reading disk', () => {
+    const repo = mkdtempSync(join(tmpdir(), 'hoa-emergency-snapshot-'))
+    dirs.push(repo)
+    const log = join(repo, 'large.log')
+    const diskPid = 111
+    const snapshotPid = 222
+    writeFileSync(`${log}.run.json`, JSON.stringify({
+      pid: diskPid, log, status: 'running', startedAt: 1000,
+    }))
+    const snapshot = { pid: snapshotPid, log, status: 'running', startedAt: 2000 }
+    const probed = []
+    const realRunRecord = (path, options) => runRecordFor(path, {
+      ...options,
+      probe: (pid) => { probed.push(pid); return { exists: pid === snapshotPid } },
+      commandOf: () => `node /repo/scripts/verify/run-logged.mjs --log-file ${log}`,
+    })
+
+    expect(verificationProcessAlive(snapshot, `${log}.run.json`, log, { runRecord: realRunRecord })).toBe(true)
+    expect(probed).toEqual([snapshotPid])
+  })
+
   it('probes the already-resolved log and accepts only an explicit live verdict', () => {
     const log = '/repo/local/verify-logs/large.log'
     const record = { pid: 4242, log: 'local/verify-logs/large.log', startedAt: 1000 }
