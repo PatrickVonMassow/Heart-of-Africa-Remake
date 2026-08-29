@@ -481,12 +481,19 @@ export function blockedCardBody(why) {
   // topic guard are neutralised (plus the shell transliterations the board
   // audit rejects). A title-shaped whitespace collapse here once fused a
   // deposited multi-paragraph reason back into the wall the prose guards ban.
-  const neutralizeParagraph = (paragraph) =>
-    String(paragraph)
+  const neutralizeParagraph = (paragraph) => {
+    const protectedTokens = []
+    const prose = String(paragraph).replace(
+      /\b[a-z][a-z0-9+.-]*:\/\/[^\s]+|(?:\b[A-Za-z]:)?(?:[\wÄÖÜäöüß.-]+[\\/])+[\wÄÖÜäöüß.-]+|\b[\wÄÖÜäöüß-]+\.(?:mjs|cjs|ts|tsx|js|md)\b/gi,
+      (token) => `\0${protectedTokens.push(token) - 1}\0`,
+    )
+    return prose
       .replace(/[A-Za-zÄÖÜäöüß]+/g, repairTransliteration)
       .replace(/\b(punkt|point)\s+(\d+)\b/gi, '$1 Nr. $2')
       .replace(/\((\d{2,})\)/g, '[$1]')
+      .replace(/\0(\d+)\0/g, (_marker, index) => protectedTokens[Number(index)])
       .trim()
+  }
   const safeWhy = String(why ?? '')
     .trim()
     .split(/\r?\n[ \t\r]*\n+/)

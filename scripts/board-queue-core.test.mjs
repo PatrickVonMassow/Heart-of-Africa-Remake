@@ -1000,6 +1000,15 @@ describe('the pending-request card', () => {
     expect(evaluateTopic({ dashboardHtml: html, tasksText: '- [ ] 1004. Vierstelliger Punkt.\n' }).block).toBe(false)
   })
 
+  it('repairs prose without rewriting transliterated file paths or URLs', () => {
+    const reason =
+      'Bitte fuer scripts/fuehrung-pruefen.mjs und C:\\tmp\\zurueck.md pruefen; ' +
+      'Details: https://example.invalid/fuer/pruefung.'
+    const body = blockedCardBody(reason)
+    expect(body).toContain('Bitte für scripts/fuehrung-pruefen.mjs und C:\\tmp\\zurueck.md prüfen;')
+    expect(body).toContain('https://example.invalid/fuer/pruefung.')
+  })
+
   it('keeps a hostile title out of the audit on the real card', () => {
     const html = renderRequestsCard([
       { at: '2026-07-30T20:11:00.000Z', title: 'Bitte fuer Punkt 465 pruefen (465) scripts/finding.mjs', route: 'tasks' },
