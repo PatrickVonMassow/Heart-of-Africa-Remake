@@ -364,6 +364,96 @@ put it is the mistake this line exists to stop.
   Nutzer, 13.08.2026 22:36: »Die Kinder spielen nicht permanent … Irgendwann ruft eines RIVER und zeigt auf den Fluss. Dann laufen alle dort hin und spielen das Spiel. Das Kind, das RIVER gerufen hat, ist dann zu Beginn der Fänger.«
   Nutzer, 13.08.2026 23:11: »Man sollte meinen, dass die Kinder etwas Angst/Respekt vor mir als fremder Erwachsener haben, anstatt mich fast umzurennen.«
   Nutzer, 13.08.2026 20:51: »Beim Kinderspiel kann ich auch nichts lernen. Ich erkenne da kein Fangspiel. Für mich laufen die Kinder mehr oder weniger zufällig hin und her (wenn sie mal nicht festhängen) und werfen mit Anweisungen um sich, die dem Spiel nicht dienlich sind. Ursprünglich war es mal ein Fangspiel, bei dem einer die anderen fangen muss und der Gefangene dadurch zum Fänger wird. Durch die ganzen neuen Situationen, die zur Erklärung der Kommunikationskonzepte COME, THERE, FOLLOW, usw. hinzugekommen sind, ist das Kinderspiel völlig verwässert. Das Herumschicken wirkt wie zum Selbstzweck eingeführt und macht das Fangspiel nicht mehr erkennbar.«
+  CROSS-VENDOR REVIEW OF THE LANDING (29.08.2026, 16 passes over `main..de7e175` on
+  `feat/687-roam-bound-fixes`, cut by per-file authorship: GPT-5.6 Sol read the Claude-authored
+  files, Opus 4.8 the Sol-authored ones). THE ROUND ITSELF CAME BACK CLEAN: pass 16 traced
+  bankGame.ts's state machine and its multi-seed hand-stepped tests against §1-§4 — caller becomes
+  catcher, ROCK as a class via tap plus boulder plus arrival, UPSTREAM/DOWNSTREAM detached by the
+  parting, roam bounded, shut-leg refusal, null-route walk-at-goal, crouched child held — and
+  recorded merge, its one gap the untested `roamGuardSeconds` abandon branch; pass 15 merge on
+  PlaceLife.tsx's wiring, passes 2 and 11 merge on lexicon.ts and PlaceScene.tsx. THE THREE
+  do-not-merge VERDICTS ALL FELL ON THE SUPPORTING WORK, and they are what this point owes:
+  - `src/scenes/place/routing.ts:164-251` — `findPlaceRoute` substitutes a nearby free cell for a
+    blocked goal, then ALWAYS appends the original blocked `to`, so it can return a NON-NULL route
+    whose last leg is impossible. A goal inside a collider but within four rings of free ground
+    produces exactly that, and a caller whose arrival radius is smaller than the obstruction drives
+    at it for the whole phase instead of being told there is no route — which is precisely what
+    bankGame.ts's null-route handling exists to catch. `routing.test.ts:108-137` cannot see it: the
+    grid already requires `standingClear` and `navRestrict` already requires `onGround`, so it
+    recomputes those predicates on cells it marked free, exercising no real route and no leg.
+  - `src/scenes/place/layout.ts:378,1067,1075,1188,1234` — `inBankPlayLane` is called ONCE, and only
+    for loose flora and rocks; dwellings, fences and fixed props are placed without it, so a
+    compound fence or a hut may stand in the 3 m running corridor the round relies on. And
+    `playRocks` is derived at :385 from the UNSETTLED bank, while `settleBankPoints` runs at :1235
+    over a collider set that already contains the play rocks (:1192): after a settling move the
+    bank and the play-rock stage no longer share one geometry, and an endpoint obstructed for its
+    first metre cannot move through the nearby play rock, so the silent three-metre search can end
+    without free ground.
+  - `docs/acceptance-evidence.md` §15 still carries "THE CHILDREN PLAY A GAME OF TAG" and "AT THAT
+    GAME THE CHILDREN TEACH THE SIX GENERAL CONCEPTS", plus a "Verifiable" line claiming live
+    coverage from the deleted `childSituations.test.ts`. It contradicts §7 of the same document —
+    a false evidence chain the closing would read.
+  - `scripts/verify/polish.mjs` — the browser layer's own bank-round checks are weaker than their
+    wording: the `crossers` loop walks EVERY sample regardless of `s.phase`, so a crossing during
+    walk-back or roam satisfies "the children walk PAST the traveller"; `perChildMinute` is a GROUP
+    average, so one child stuck at `walked === 0` passes while the others carry it (its stated
+    reason — a tagged child holds its crouch — exempts a TAGGED child, not every child);
+    `played >= 0.9 * LANE_WINDOW_S && phases.size >= 2` in bambara-village alone does not
+    close call -> runs -> walk -> roam; two labels say the rocks are seen "from the start line"
+    while the stance is 25 % of the stretch back and 13 % aside; and the errand tripwire's comment
+    claims a max-over-samples read proves absence "either way" when that holds only for a
+    cumulative counter, which the same comment says is not guaranteed. NOTE: the run-phase-only
+    crossing and the per-child whole-cycle reading over all four river layouts DO exist and were
+    confirmed sound in pass 3 — they live in `src/scenes/place/tagShuffle.test.ts` over a 120 s
+    window, not in polish.mjs. Its one defect is `penHasClearWall`, whose inner edge lacks the
+    body-radius margin its outer edge and its own comment carry.
+  SMALLER, EACH POINTED AT A LINE: `speaking.test.ts:19` binds `RIVER_UTTERANCE` to
+  `utteranceOf('ROCK')` (as does `ROCK_UTTERANCE` two lines down), so the file's one tone assertion
+  pins ROCK under RIVER's name and RIVER is exercised nowhere; `scripts/verify/settings.mjs:705`
+  names a check "one shape for every word" over only FOUR atoms, omitting DOWNSTREAM;
+  `verifySuiteUtterances.test.ts:20` matches single-quoted literals only and scans comments, so a
+  double-quoted or template utterance is invisible while a commented-out one satisfies the
+  must-speak test; nothing anywhere pins the three river places more than one arrival radius apart
+  since the deletion of `adultErrands.test.ts` took the only `AT_PLACE_RADIUS * 2` assertion with it
+  (`longestStall` IS re-pinned in tagShuffle.test.ts:856 and polish.mjs, and the `errands-silent`
+  and `child-speech-silent` alarms were retired deliberately with the reason written into
+  scripts/verify/README.md:1045 — only `longestHold` has no replacement); `DebugMenu.test.tsx:874`
+  proves the 19 bank-game controls EXIST but never that one acts, and neither DEFAULTS nor
+  afterEach restores `balance.villageLife.bankGame`; `Dialogs.test.tsx:318` does not tie NO_READING
+  to ROCK in particular; `balance.ts` carries three rationale comments contradicted by the values
+  beside them (dodge "six metres"/"six metres" against `dodgeDistance` 7 and `dodgeReach` 3,
+  `utteranceGapSeconds` "0.35 s" against `syllableSeconds` 0.3, and a surviving "five-syllable
+  atom" against point 686's four); `chiefReply.ts:7` still says "three runs of syllables" for a
+  two-concept phrase; `de.ts:1072` has the drums name the boulder "higher than a man, alone, and
+  unique", which the four-word message cannot say and which makes ROCK read as one boulder's name
+  against point 686 item 1; `en.ts:582` calls the gather phase a "walk to the bank" where §1 has
+  the group RUN; `design.md` §8 still calls the §13.2 glossary "the placeholder under review in
+  §13.4" after the rewrite stopped reviewing it; and `isWellFormed`'s docstring still says "usable as a
+  concept" after the clause that made that true was dropped.
+  THE FULL REGRESSION OF 29.08.2026 (`npm test` on `de7e175`, WebGL 2, 91m 09s, 131 frames): RED,
+  so the WebGPU pass never started. Four of twenty suites failed, none of them this rebuild's:
+  - `settings` — "first-person ground shows micro-detail (edge energy)", laplacian mean 1.07, the
+    SAME check twice. Classified against the merge-base `4acf6039abe0`: PRE-EXISTING, already red
+    on the baseline.
+  - `benchmark` — six checks twice: `ssaoEnabled`, `travelZoom`, `travelSpeed`, `seed`, `day` not
+    restored and `Math.random` still replaced. All PRE-EXISTING, owned by nobody — now point 1009.
+  - `enrichments` — "the streamed dressing does not grow over a session at a fixed anchor", the
+    same `{samples:[0,0,0,0,0]}` on the branch and on the baseline: PRE-EXISTING. It is charged, to
+    point 938, but that entry is scoped to `webgpu`/`compatibility` and this reading is WebGL 2, so
+    the charge does not cover the lane it was measured on and needs widening with today's evidence.
+  - `flow` — `page.reload` timed out on `networkidle`, green on retry, SUSPECT.
+  ONE APPARENT REGRESSION DID NOT SURVIVE MEASUREMENT. That classification's single current-tree
+  run also called two checks REAL REGRESSION — "a feed that ends without a kill leaves no remnant"
+  and the dev assertion `animal-buried` (zebra bodyY=0.42 against ground=1.03) — green on both
+  baseline runs. Re-measured at once: five more branch passes, ZERO occurrences of either — one run
+  rotated onto two OTHER checks instead. That is the rotating family flake
+  `scripts/verify/README.md` says this suite carries. Only baseline runs in the same NUMBER would
+  settle it; two cannot separate a 1-in-6 rate from zero.
+  WHAT IT PROVES: build, lint, type-check and 14,467 unit tests green; `polish` green at 200
+  checks, and `world`, `collision`, `handwriting`, `gamepad`, `touch`, `voice`, `health`, `events`,
+  `startup`, `report`, `preview` green. The loading-picture freeze that reddened the aborted 10:40
+  run passed here — that run had declared its own machine loaded and its timing verdicts void, so
+  it was the load. The WebGPU half of the two-backend obligation is still owed.
   Refs: src/scenes/place/tagGame.ts, src/scenes/place/childSituations.ts, src/scenes/place/PlaceLife.tsx, src/scenes/place/lifeSpots.ts, src/scenes/place/layout.ts, src/config/balance.ts
   Bundle: Dorfleben.
 
@@ -13413,4 +13503,75 @@ to land than a mechanism that needs a review.
   Criticality: high — it is the one condition standing between the built durable lane and its
   activation, and a trial run loosely is worse than none: it would switch on a lane whose
   survivability was never measured.
+  Bundle: Session- & Repo-Hygiene.
+
+- [ ] 1008. The review router and the review ledger each forbid what the other requires, so two
+  passes of a sixteen-pass plan can be cleared by nobody (measured 29.08.2026 while reviewing the
+  686+687 landing range `main..de7e175` on `feat/687-roam-bound-fixes`).
+  `scripts/review-sol.mjs` cuts a range too large for one round into passes by PER-FILE authorship
+  and names each pass's reviewer accordingly. For this range it routed passes 4 and 5 — twelve and
+  four Sol-authored files — to "anthropic reviewer Opus 5", correctly, because Sol may not review
+  its own work. `scripts/mechanism-review.mjs` then refused both records by PER-COMMIT vendor:
+  "a SAME-VENDOR REVIEW is refused: `de7e175` was authored by Claude Opus 5 and Opus 5 is from that
+  vendor; the review has no valid first-eligible handover (missing-or-unknown-handover)". Handing
+  the same pass to Opus 4.8 is refused from the other side: "--reviewer opus48 is not this range's
+  first eligible handover; the route names Opus 5." Fourteen of sixteen passes recorded without
+  trouble; these two cannot be cleared by any reviewer either half will accept, on a range whose
+  landing needs all sixteen.
+  THE REVIEWS THEMSELVES RAN and were worth having — the finding that `speaking.test.ts:19` binds
+  `RIVER_UTTERANCE` to `utteranceOf('ROCK')`, so the file's one tone assertion pins ROCK under
+  RIVER's name, came out of pass 4. Only the RECORD is unreachable, which is the worst shape: the
+  work is done, the evidence exists, and the gate reports it as missing.
+  WHY IT MATTERS: this is not a stuck range, it is a stuck CLASS. Any range whose tip commit is
+  Claude-authored and which contains Sol-authored files large enough to need their own pass hits
+  it, and the batch's ordinary shape — Sol authors, Claude lands — produces exactly that. The
+  escape `review-sol.mjs` documents for the case ("with `--point <N>`, the plan prints the
+  Git-verified unavailable-receipt command for that exact remainder") did not appear in the plan
+  output, and `mechanism-review.mjs`'s `--handover sol-authored` is never offered by the router.
+  FINAL STATE: the two halves judge eligibility on the SAME quantity. Either the ledger judges per
+  file as the router does — a reviewer that authored none of the pass's files is independent of it,
+  whatever the tip commit's trailer says — or the router refuses to name a reviewer the ledger will
+  reject and falls through to the next eligible model. Whichever is chosen, a pass the plan offers
+  is a pass that can be recorded, and a remainder with no eligible reviewer is NAMED as such with
+  the unavailable-receipt command the documentation already promises, rather than looking runnable
+  and failing at the record.
+  VERIFIABLE: unit cases over the pure cores — a pass whose files were authored by one vendor and
+  whose tip commit was authored by the other yields a reviewer that the ledger accepts; a range
+  with no eligible reviewer for some file set yields a plan that says so and prints the receipt
+  command instead of a runnable pass index; and a regression case reproducing the measured
+  `de7e175` pass-4/pass-5 sequence. Plus `npm run test:unit`, lint, build.
+  Criticality: high — it blocks the four-eyes record of a landing that is otherwise ready, and it
+  blocks it in the batch's most ordinary authorship shape, so it will recur until it is fixed.
+  Bundle: Session- & Repo-Hygiene.
+
+- [ ] 1009. The benchmark run borrows the world and never gives it back, and it leaves `Math.random`
+  replaced (measured 29.08.2026 in the LARGE run on `feat/687-roam-bound-fixes`, WebGL 2, then
+  classified against the merge-base `4acf6039abe0`: all six checks are already red on `main`, so
+  this is not the branch's).
+  Six checks of `scripts/verify/benchmark.mjs` fail on every run and NOTHING owns them: no open
+  point names them and `scripts/render-verify-charges.mjs` carries no `benchmark` entry at all. A
+  red with no owner is exactly what CLAUDE.md §7.2 forbids — it rides along in every LARGE run and
+  trains the reader to skip it.
+  WHAT IS MEASURED: `restored: ssaoEnabled — false -> true`, `restored: travelZoom — 1.5 -> 0.5`,
+  `restored: travelSpeed — 7.25 -> 5.6`, `restored: seed — 18900701 -> 42`, `restored: day — 181 ->
+  0`, and `Math.random is the original function again`. The F8 measurement run BORROWS the world to
+  make its rows comparable — it pins a seed and a day, fixes the travel zoom and speed, forces the
+  SSAO switch, and replaces `Math.random` so the same frame is drawn twice the same way — and it
+  returns none of it. The last one is the one that spreads: a session that has pressed F8 keeps a
+  patched `Math.random` for the rest of its life, so every later check and every later minute of
+  play draws from the benchmark's generator rather than the game's, and a world at seed 42 on day 0
+  is not the world the player stood in before pressing the key. The two WebGPU timestamp rows fail
+  on the baseline in the same run and belong to the same lane.
+  FINAL STATE: the benchmark restores every value it changed — the five settings by name and
+  `Math.random` by identity — whatever exit path it takes, including a throw and an early abort,
+  because a measurement that can poison the session it ran in is worse than no measurement. What it
+  borrowed is recorded in one place rather than assumed at each call site, so a value added to the
+  run cannot be forgotten on the way back. If a value genuinely CANNOT be restored, the run says so
+  by name and the check asserts that named exception rather than passing silently.
+  VERIFIABLE: the six named checks go green in the `benchmark` suite on both backends; a Vitest
+  case that a benchmark run which throws mid-way still restores every borrowed value and the
+  original `Math.random`; and a case that adding a borrowed value without registering it fails,
+  so the next one cannot be forgotten the same way.
+  Criticality: medium — it loses no code and no save, but it silently changes the world and the
+  random source of any session that measured itself, and it has stood unowned in every LARGE run.
   Bundle: Session- & Repo-Hygiene.

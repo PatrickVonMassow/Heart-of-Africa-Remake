@@ -130,6 +130,19 @@ const KIND_LABEL = {
 export const strayLabel = (kind) => KIND_LABEL[kind] ?? String(kind)
 
 /**
+ * An agent CLI session rather than anything it runs: the `claude` binary invoked
+ * with a prompt (`-p` / `--print`). Its command line carries the whole prompt,
+ * so any command the prompt mentions appears in it verbatim — which is why it
+ * must be recognised before every pattern that reads a command line for a tool
+ * name. Matched on the executable, not on the prompt, so a suite that merely
+ * happens to mention `claude` is unaffected.
+ */
+export function isAgentSession(cmd) {
+  const text = String(cmd ?? '').toLowerCase()
+  return /(^|\/|\s)claude(\s|$)/.test(text) && /\s(-p|--print)(\s|$)/.test(text)
+}
+
+/**
  * What ONE process is, or null for "not interesting". Order matters: `vitest`
  * contains `vite`, and `vite build` is a build rather than a server, so the
  * narrow patterns are tested first.
@@ -138,10 +151,21 @@ export const strayLabel = (kind) => KIND_LABEL[kind] ?? String(kind)
  * to kill nor usually the cause. Only an AUTOMATION browser (headless, remote
  * debugging, a Playwright profile) counts, because that one is a leftover of a
  * verify run that died without cleaning up.
+ *
+ * AN AGENT SESSION IS NOT A SUITE, however much its command line looks like one
+ * (measured 29.08.2026). The batch session is `claude -p <prompt>`, and the
+ * prompt QUOTES the project's own commands — `node scripts/verify/run-wait.mjs
+ * --await` among them — so the verify pattern below matched the session itself.
+ * Every run that session started was then reported as racing another suite, the
+ * machine was declared under load, and the run's timing verdicts were voided:
+ * the check meant to protect the evidence was destroying it, silently and every
+ * time. A prompt is text, not an invocation, so the session is recognised first
+ * and classified as nothing.
  */
 export function classifyProcess(proc) {
   const cmd = `${proc?.name ?? ''} ${proc?.cmd ?? ''}`.toLowerCase().replace(/\\/g, '/')
   if (!cmd.trim()) return null
+  if (isAgentSession(cmd)) return null
   if (/scripts\/verify\/[a-z-]+\.mjs|playwright[^ ]*\/cli|run-all\.mjs/.test(cmd)) return STRAY_KIND.verifyRun
   if (/\bvitest\b/.test(cmd)) return STRAY_KIND.unitRun
   if (/\bvite\b[^\n]*\bbuild\b|\btsc\b|\boxlint\b|\btsgo\b/.test(cmd)) return STRAY_KIND.build
