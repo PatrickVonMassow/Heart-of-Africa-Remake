@@ -547,22 +547,35 @@ describe('render-verify-guard --status — what it prints about a run it cannot 
   /** `pending: true` leaves a real render change behind the baseline, so the
    *  gate is ARMED — without it `since` is 0, every historical record enters the
    *  open list and none of them is blocking anything (review finding,
-   *  28.08.2026, round 20). */
+   *  28.08.2026, round 20).
+   *
+   *  A STATE MAY BE A FUNCTION OF THE CLOCK READ AFTER THE SETUP, and a case
+   *  that dates a record "now" must use that form. `since` is the render
+   *  commit's `%ct` — WHOLE SECONDS — so a clock read before `git init` and two
+   *  commits lands in the second BEFORE the edit whenever that setup crosses a
+   *  second boundary, and the record then predates the change it was written to
+   *  cover. That is not slowness: it fails for the sub-second fraction the clock
+   *  happened to carry, which is why it passed here and failed on CI
+   *  (29.08.2026, run 33244227074). The builder is called after the last git
+   *  call, so `at >= since` holds by construction. */
   const inTempRepo = (state, { pending = false } = {}) => {
     const root = mkdtempSync(join(tmpdir(), 'hoa-render-status-'))
+    let cleared = null
     try {
       execFileSync('git', ['init', '-q', '-b', 'main'], { cwd: root, windowsHide: true })
       execFileSync('git', ['-c', 'user.email=t@t', '-c', 'user.name=t', 'commit', '-q', '--allow-empty', '-m', 'root'], { cwd: root, windowsHide: true })
       if (pending) {
-        const cleared = execFileSync('git', ['rev-parse', 'HEAD'], { cwd: root, encoding: 'utf8', windowsHide: true }).trim()
+        const clearedHead = execFileSync('git', ['rev-parse', 'HEAD'], { cwd: root, encoding: 'utf8', windowsHide: true }).trim()
         mkdirSync(join(root, 'src', 'scenes'), { recursive: true })
         writeFileSync(join(root, 'src', 'scenes', 'water.ts'), 'export const rim = 1\n')
         execFileSync('git', ['add', '-A'], { cwd: root, windowsHide: true })
         execFileSync('git', ['-c', 'user.email=t@t', '-c', 'user.name=t', 'commit', '-q', '-m', 'a render change'], { cwd: root, windowsHide: true })
-        state = { ...state, clearedHeads: { main: cleared } }
+        cleared = clearedHead
       }
+      let resolved = typeof state === 'function' ? state(Date.now()) : state
+      if (cleared !== null) resolved = { ...resolved, clearedHeads: { main: cleared } }
       mkdirSync(join(root, '.claude'), { recursive: true })
-      writeFileSync(join(root, '.claude', 'render-verify-state.json'), JSON.stringify(state))
+      writeFileSync(join(root, '.claude', 'render-verify-state.json'), JSON.stringify(resolved))
       return execFileSync(process.execPath, [GUARD, '--status'], {
         cwd: root,
         env: { ...process.env, HOA_REPO_ROOT: root },
@@ -581,19 +594,24 @@ describe('render-verify-guard --status — what it prints about a run it cannot 
    *  28.08.2026, round 18). */
   const runCli = (state, argvs, { pending = false } = {}) => {
     const root = mkdtempSync(join(tmpdir(), 'hoa-render-cli-'))
+    let cleared = null
     try {
       execFileSync('git', ['init', '-q', '-b', 'main'], { cwd: root, windowsHide: true })
       execFileSync('git', ['-c', 'user.email=t@t', '-c', 'user.name=t', 'commit', '-q', '--allow-empty', '-m', 'root'], { cwd: root, windowsHide: true })
       if (pending) {
-        const cleared = execFileSync('git', ['rev-parse', 'HEAD'], { cwd: root, encoding: 'utf8', windowsHide: true }).trim()
+        const clearedHead = execFileSync('git', ['rev-parse', 'HEAD'], { cwd: root, encoding: 'utf8', windowsHide: true }).trim()
         mkdirSync(join(root, 'src', 'scenes'), { recursive: true })
         writeFileSync(join(root, 'src', 'scenes', 'water.ts'), 'export const rim = 1\n')
         execFileSync('git', ['add', '-A'], { cwd: root, windowsHide: true })
         execFileSync('git', ['-c', 'user.email=t@t', '-c', 'user.name=t', 'commit', '-q', '-m', 'a render change'], { cwd: root, windowsHide: true })
-        state = { ...state, clearedHeads: { main: cleared } }
+        cleared = clearedHead
       }
+      // Same clock rule as inTempRepo: a state written as a function is called
+      // after the last git call, so a record dated "now" cannot predate `since`.
+      let resolved = typeof state === 'function' ? state(Date.now()) : state
+      if (cleared !== null) resolved = { ...resolved, clearedHeads: { main: cleared } }
       mkdirSync(join(root, '.claude'), { recursive: true })
-      writeFileSync(join(root, '.claude', 'render-verify-state.json'), JSON.stringify(state))
+      writeFileSync(join(root, '.claude', 'render-verify-state.json'), JSON.stringify(resolved))
       return argvs.map((argv) =>
         execFileSync(process.execPath, [GUARD, ...argv], {
           cwd: root,
@@ -691,9 +709,8 @@ describe('render-verify-guard --status — what it prints about a run it cannot 
     // the status table: the record must not become COVERAGE, and only the
     // command that BLOCKS can say so — after the signature, not before it.
     expect(after).toMatch(/webgpu settings\s+exit 0 .*incomplete/)
-    const inWindow = { backend: 'webgpu', suite: 'settings', at: Date.now(), exit: 0, asserted: true, screenshotCount: 9, truncated: true, droppedLines: 115 }
     const [signedAgain, blocked] = runCli(
-      { runs: [inWindow] },
+      (at) => ({ runs: [{ backend: 'webgpu', suite: 'settings', at, exit: 0, asserted: true, screenshotCount: 9, truncated: true, droppedLines: 115 }] }),
       [
         ['--incomplete', 'webgpu/settings', '--evidence', 'local/verify-logs/ holds the whole run; the flood was the dev server'],
         [],
@@ -953,9 +970,8 @@ describe('render-verify-guard --status — what it prints about a run it cannot 
   // by a red it DID record — and the incomplete line then said "BLOCKING NOW"
   // about the truncation, which is not what is stopping anything.
   it('says of a re-recorded truncation that its RED is what still blocks', () => {
-    const at = Date.now()
     const out = inTempRepo(
-      {
+      (at) => ({
         runs: [
           {
             backend: 'webgpu',
@@ -968,7 +984,7 @@ describe('render-verify-guard --status — what it prints about a run it cannot 
           },
           { backend: 'webgpu', suite: 'settings', at: at + 1000, exit: 0, asserted: true },
         ],
-      },
+      }),
       { pending: true },
     )
     expect(out).toMatch(/INCOMPLETE RECORDING \(not an unexplained red\).*what still blocks this record is its red/)
