@@ -276,7 +276,7 @@ export const en: Strings = {
 
   drumMessage: {
     title: "The Chief's Message on the Drums",
-    hint: 'Seven words, one after another. Above each stands my own reading — click one to change it; it is the same note my book holds.',
+    hint: 'Four words, one after another. Above each stands my own reading — click one to change it; it is the same note my book holds.',
     readingFor: (utterance: string) => `My reading of ${utterance}`,
     notePlaceholder: 'My reading',
     close: 'Put the message away (Esc)',
@@ -1055,11 +1055,11 @@ export const en: Strings = {
     giftLore: (p: TextParams) =>
       `The old man spoke of the treasures of his land: what his people revere above all is [emph]${en.gifts[p.gift as keyof typeof en.gifts]}[/emph]. [pause]A chief honored with it will open his heart.`,
     drumMessage:
-      '[awe]The chief called his drummer, and two drums spoke for him — a great one and a small one.[/awe] [pause]Seven words, each of five beats, each parted from the next by the same short silence — deep for the low syllable, bright for the high one. [excited]I know these words. I have heard every one of them in the lanes and at the water.[/excited] [pause]I have written them down in the order they were beaten; what they ask of me I must read for myself.',
+      '[awe]The chief called his drummer, and two drums spoke for him — a great one and a small one.[/awe] [pause]Four words, each of four beats, each parted from the next by the same short silence — deep for the low syllable, bright for the high one. [excited]I know these words. I have heard every one of them in the lanes and at the water.[/excited] [pause]I have written them down in the order they were beaten; what they ask of me I must read for myself.',
     rockArtefact:
-      "[excited]Seven words, and they were an errand after all.[/excited] I followed the water against its own pull until the block of stone stood on the bank exactly as the drums had it — taller than a man, alone, nothing of its kind anywhere near it. [pause]Three spans down my shovel met something that was not stone: hammered metal on worn wood, sealed in the river's own clay. [awe]It has lain here longer than the village has stood.[/awe] [pause]I did not open it further. [somber]It is not mine to open.[/somber]",
+      "[excited]Four words, and they were an errand after all.[/excited] I followed the water against its own pull until the block of stone stood on the bank exactly as the drums had it — taller than a man, alone, nothing of its kind anywhere near it. [pause]Three spans down my shovel met something that was not stone: hammered metal on worn wood, sealed in the river's own clay. [awe]It has lain here longer than the village has stood.[/awe] [pause]I did not open it further. [somber]It is not mine to open.[/somber]",
     artefactGiven:
-      "[breath]I carried it back down the river and laid it in the chief's hands.[/breath] [pause]He turned it over once and spoke three words over it. [excited]I had heard every one of them before — one at the stone by the lane, one where they were digging, one from the children at their game.[/excited] [pause][awe]He had sent me to a place he cannot name in any tongue of mine, and I went there and came back with what lay buried at it.[/awe] [pause][somber]We share no language.[pause] And yet we have just understood one another.[/somber]",
+      "[breath]I carried it back down the river and laid it in the chief's hands.[/breath] [pause]He turned it over once and spoke three words over it. [excited]I had heard every one of them before — one at the water, one at the rocks the children run to, and one in the beat of his own drums.[/excited] [pause][awe]He had sent me to a place he cannot name in any tongue of mine, and I went there and came back with what lay buried at it.[/awe] [pause][somber]We share no language.[pause] And yet we have just understood one another.[/somber]",
     digNothing: '[weary]I dug at this spot, but the sand yielded nothing except stones and old roots.[/weary]',
     victory: (p: TextParams) =>
       `${en.formatDate(p.day as number, 1890)}. [excited]My shovel struck stone —[pause] hewn stone![/excited] [breath]With trembling hands I laid the burial chamber bare. [awe]Gold gleams in the torchlight, and upon the sarcophagus rests the mask of the great king.[/awe] [breath][awe]I have found it.[pause] The Heart of Africa.[/awe] [pause][somber]The journey was worth every step.[/somber]`,

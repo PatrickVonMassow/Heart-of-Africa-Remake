@@ -690,36 +690,48 @@ if (section('ambience-sources')) {
   // The plan (pace, pause, attenuation) is pinned in the Vitest layer; the browser
   // owes only the fact that a spoken utterance SCHEDULES audio — and that one
   // spoken from beyond the hearing radius schedules nothing at all.
-  const speech = await page.evaluate(() => {
+  // THE SHIPPED WORDS, not a typed shape. A five-syllable literal outlived the
+  // four-syllable rebuild here: the heard store is string-keyed, so every check
+  // below stayed green while proving the audio path for an utterance the game can
+  // no longer produce, and the shipped one was covered nowhere (point 686). The
+  // atoms are RIVER, UPSTREAM, ROCK and DIG as src/communication/lexicon.ts beats
+  // them, and src/communication/verifySuiteUtterances.test.ts pins these literals
+  // against that lexicon so they cannot drift out of it again.
+  const ATOMS = ['ba-BA-ba-BA', 'ba-ba-BA-BA', 'BA-ba-ba-BA', 'ba-BA-BA-ba']
+  const BEATS = ATOMS[0].split('-').length
+  check('the suite speaks the shipped lexicon, one shape for every word (point 686)',
+    ATOMS.every((u) => u.split('-').length === BEATS) && new Set(ATOMS).size === ATOMS.length,
+    JSON.stringify(ATOMS))
+  const speech = await page.evaluate((atoms) => {
     window.__balance.ambienceVolume = 0.5
     const a = window.__ambience
     a.start()
     const near = { ...a.speechProbe() }
-    a.speak('BA-BA-ba-ba-ba', 0) // right beside the speaker
+    a.speak(atoms[0], 0) // right beside the speaker
     const spokenNear = { ...a.speechProbe() }
-    a.speak('BA-BA-ba-ba-ba', window.__balance.communication.hearingRadius * 3) // out of earshot
+    a.speak(atoms[0], window.__balance.communication.hearingRadius * 3) // out of earshot
     const spokenFar = { ...a.speechProbe() }
-    a.speakPhrase(['BA-ba-ba-BA-ba', 'BA-ba-BA-ba-ba'], 0) // dig + here
+    a.speakPhrase([atoms[2], atoms[3]], 0) // rock + dig, as the drums beat them
     const phrase = { ...a.speechProbe() }
     return { near, spokenNear, spokenFar, phrase }
-  })
+  }, ATOMS)
   check('a nearby utterance schedules its syllables with a positive level (design.md §13.4)',
     speech.spokenNear.spoken === speech.near.spoken + 1 &&
-      speech.spokenNear.syllables === speech.near.syllables + 5 &&
+      speech.spokenNear.syllables === speech.near.syllables + BEATS &&
       speech.spokenNear.lastPeak > 0,
     JSON.stringify(speech))
   check('an utterance from beyond the hearing radius schedules nothing',
     speech.spokenFar.spoken === speech.spokenNear.spoken &&
       speech.spokenFar.syllables === speech.spokenNear.syllables,
     JSON.stringify(speech))
-  check('a phrase plays every atom (two five-syllable atoms)',
-    speech.phrase.syllables === speech.spokenFar.syllables + 10, JSON.stringify(speech))
+  check('a phrase plays every atom (two shipped atoms)',
+    speech.phrase.syllables === speech.spokenFar.syllables + 2 * BEATS, JSON.stringify(speech))
 
   // --- Point 577: the speech is NOT on the "everything else" bus -------------
 // The reported bug (F6 `keineBaBAs.zip`, ambientVolume 0) was invisible to the
 // check above: the plan still reported a positive peak, and only the bus behind
 // it was zero. So this reads the live GAIN of the buses in the running engine.
-const speechBus = await page.evaluate(() => {
+const speechBus = await page.evaluate((atom) => {
   const a = window.__ambience
   const b = window.__balance
   const ambientWas = b.ambientVolume
@@ -729,7 +741,7 @@ const speechBus = await page.evaluate(() => {
   b.ambientVolume = 0
   a.refresh()
   const before = { ...a.speechProbe() }
-  a.speak('BA-BA-ba-ba-ba', 0)
+  a.speak(atom, 0)
   const muted = {
     probe: { ...a.speechProbe() },
     speech: a.busGain('speech'),
@@ -744,9 +756,9 @@ const speechBus = await page.evaluate(() => {
   a.refresh()
   const restored = a.busGain('speech')
   return { before, muted, off, restored }
-})
+}, ATOMS[0])
 check('the syllables still play with "everything else" at zero (point 577)',
-  speechBus.muted.probe.syllables === speechBus.before.syllables + 5 &&
+  speechBus.muted.probe.syllables === speechBus.before.syllables + BEATS &&
     speechBus.muted.probe.lastPeak > 0 && speechBus.muted.speech > 0 && speechBus.muted.ambient === 0,
   JSON.stringify(speechBus))
 check('the speech slider is the only one that silences it, and the bed stays up',

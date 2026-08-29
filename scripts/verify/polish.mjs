@@ -615,7 +615,11 @@ if (section('panorama-wildlife')) {
 // DOM box, so no frame passes between deciding and measuring.
 if (section('speech-hypothesis')) {
   await goToPlace('maasai-village')
-  const COME = 'BA-BA-ba-ba-ba'
+  // A SHIPPED word, not a hand-typed shape: RIVER as src/communication/lexicon.ts
+  // beats it. A five-syllable literal survived the four-syllable rebuild here and
+  // proved the label path for an utterance the game can no longer produce
+  // (point 686); src/communication/verifySuiteUtterances.test.ts pins it now.
+  const RIVER = 'ba-BA-ba-BA'
   const pose = await page.evaluate(() => {
     const p = window.__placePlayer
     return p ? { x: p.x, z: p.z, yaw: p.yaw, pitch: p.pitch } : null
@@ -742,7 +746,7 @@ if (section('speech-hypothesis')) {
         figure.name = 'inhabitant'
         return ok
       },
-      { u: COME, idx: speakerIndex },
+      { u: RIVER, idx: speakerIndex },
     )
     check('a figure can speak over its head at all (point 485)', spoke, `spoke ${spoke}`)
     await nextFrames(3)
@@ -825,17 +829,17 @@ if (section('speech-hypothesis')) {
     const last = samples[samples.length - 1] ?? { syllables: '', reading: '' }
     check(
       'the label shows the syllables beside the reading, `???` where none is written (point 485)',
-      last.syllables === COME && last.reading === '???',
+      last.syllables === RIVER && last.reading === '???',
       JSON.stringify(last),
     )
     // Point 485 (3): editing the note in the journal changes the label at once —
     // one source seen twice, nothing copied onto the label.
-    await page.evaluate((u) => window.__game.getState().setUtteranceHypothesis(u, 'come here'), COME)
+    await page.evaluate((u) => window.__game.getState().setUtteranceHypothesis(u, 'the water'), RIVER)
     await nextFrames(2)
     const afterEdit = await read()
     check(
       'a reading written in the journal stands over the head immediately (point 485)',
-      !!afterEdit && afterEdit.reading === 'come here',
+      !!afterEdit && afterEdit.reading === 'the water',
       JSON.stringify(afterEdit),
     )
     // Re-aim before the shutter: the speaker has kept walking through the
@@ -883,7 +887,7 @@ if (section('speech-hypothesis')) {
       window.__game.getState().setUtteranceHypothesis(u, '')
       window.__speech?.clear()
       delete window.__speechProbeFigures
-    }, COME)
+    }, RIVER)
   }
   await page.evaluate((saved) => {
     const p = window.__placePlayer
@@ -905,7 +909,7 @@ if (section('speech-hypothesis')) {
 // the typing are the genuine article.
 if (section('speech-guess')) {
   await goToPlace('maasai-village')
-  const GUESS_UTTERANCE = 'BA-BA-ba-ba-ba'
+  const GUESS_UTTERANCE = 'ba-BA-ba-BA' // RIVER, as the shipped lexicon beats it
   const guessPose = await page.evaluate(() => {
     const p = window.__placePlayer
     return p ? { x: p.x, z: p.z, yaw: p.yaw, pitch: p.pitch } : null

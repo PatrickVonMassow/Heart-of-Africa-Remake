@@ -42,6 +42,10 @@ another valid word. At length four this rule produces eight sequences. Five are
 used and three remain reserved. Length three produces only four parity
 sequences and cannot hold the five-word language.
 
+A word carries at least one syllable of each tone. Four identical strikes are
+the least hearable thing the drums can beat, and the message opens on RIVER, so
+the two single-tone sequences are never words.
+
 The direction words are exact tonal reversals. They are the mirror pair the
 player is meant to notice. The four-word chief's message is sixteen syllables,
 short enough to compare with a written note.
@@ -53,13 +57,15 @@ second region can add its own entry without changing consumers.
 
 | Concept | Sequence | Meaning in the teaching |
 |---|---|---|
-| RIVER | `ba-ba-ba-ba` | the watercourse |
+| RIVER | `ba-BA-ba-BA` | the watercourse |
 | UPSTREAM | `ba-ba-BA-BA` | against the current |
 | DOWNSTREAM | `BA-BA-ba-ba` | with the current; the mirror of UPSTREAM |
 | ROCK | `BA-ba-ba-BA` | a class of thing, not one named boulder |
 | DIG | `ba-BA-BA-ba` | digging |
 
-Reserved and unused: `ba-BA-ba-BA`, `BA-ba-BA-ba`, `BA-BA-BA-BA`.
+Reserved and unused: `BA-ba-BA-ba` (the tonal mirror of RIVER, deliberately
+left unspoken so the direction pair stays the only mirror the player hears), and
+the two single-tone sequences `ba-ba-ba-ba` and `BA-BA-BA-BA`.
 
 ROCK must transfer between instances: the player learns it from the play rocks
 in the village and applies it to the boulder upstream. It never means "the big

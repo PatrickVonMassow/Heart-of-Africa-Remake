@@ -87,24 +87,28 @@ export function toneOfSyllable(syllable: string): Tone {
  * The tonal West/Centre belt of the slice — the only lect the PoC ships.
  * Four syllables with an EVEN number of highs: any two such sequences differ in
  * at least two syllables, so one misheard beat can never turn one concept into
- * another, only into a non-word the player notices. Eight sequences qualify;
- * five are used.
+ * another, only into a non-word the player notices. Eight sequences qualify.
+ *
+ * A WORD additionally carries AT LEAST ONE SYLLABLE OF EACH TONE. The two
+ * single-tone sequences are four identical strikes, the least hearable thing
+ * the drums can beat, and the message opens on RIVER — so they stay out of the
+ * lexicon and sit in `reserved` with the one spare mixed sequence.
  */
 const TONAL_WEST_CENTRE: Lect = {
   id: 'tonalWestCentre',
   low: 'ba',
   high: 'BA',
   sequences: {
-    RIVER: seq('ba-ba-ba-ba'),
+    RIVER: seq('ba-BA-ba-BA'), // alternating: the word the whole message opens on
     UPSTREAM: seq('ba-ba-BA-BA'), // rising against the current
     DOWNSTREAM: seq('BA-BA-ba-ba'), // its mirror, falling with it
     ROCK: seq('BA-ba-ba-BA'), // framed by two highs: a class of solid things
     DIG: seq('ba-BA-BA-ba'),
   },
   reserved: [
-    seq('ba-BA-ba-BA'),
-    seq('BA-ba-BA-ba'),
-    seq('BA-BA-BA-BA'),
+    seq('BA-ba-BA-ba'), // spare: the tonal mirror of RIVER, deliberately unspoken
+    seq('ba-ba-ba-ba'), // single-tone, therefore never a word
+    seq('BA-BA-BA-BA'), // single-tone, therefore never a word
   ],
 }
 

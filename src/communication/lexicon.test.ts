@@ -30,7 +30,7 @@ const LECT_IDS = Object.keys(LECTS) as LectId[]
 
 /** The table of docs/communication-poc-spec.md, transcribed independently. */
 const SPEC_TABLE: Record<ConceptId, string> = {
-  RIVER: 'ba-ba-ba-ba',
+  RIVER: 'ba-BA-ba-BA',
   UPSTREAM: 'ba-ba-BA-BA',
   DOWNSTREAM: 'BA-BA-ba-ba',
   ROCK: 'BA-ba-ba-BA',
@@ -64,7 +64,7 @@ describe('the registry is complete', () => {
 
   it('resolves a spoken utterance back to its concept, and a non-word to null', () => {
     for (const concept of CONCEPT_IDS) expect(conceptOf(utteranceOf(concept))).toBe(concept)
-    expect(conceptOf('ba-BA-ba-BA')).toBeNull() // well-formed but reserved
+    expect(conceptOf('BA-ba-BA-ba')).toBeNull() // well-formed but reserved
     expect(conceptOf('BA-ba-BA')).toBeNull() // too short
     expect(conceptOf('')).toBeNull()
   })
@@ -99,6 +99,18 @@ describe('the sequences are hearable', () => {
     expect(isWellFormed(['low', 'low', 'low', 'low'])).toBe(true) // even weight zero
     expect(isWellFormed(['high', 'high', 'high', 'high'])).toBe(true) // even weight four
     expect(isWellFormed(['high', 'low', 'low', 'low'])).toBe(false) // odd weight
+  })
+
+  it('carry at least one syllable of each tone — no word is four identical beats', () => {
+    for (const concept of CONCEPT_IDS) {
+      const s = sequenceOf(concept)
+      expect(highCount(s), concept).toBeGreaterThan(0)
+      expect(highCount(s), concept).toBeLessThan(SEQUENCE_LENGTH)
+    }
+    // …and the two single-tone sequences are held in reserve rather than spoken.
+    const reserved = lectOf().reserved.map(key)
+    expect(reserved).toContain(key(['low', 'low', 'low', 'low']))
+    expect(reserved).toContain(key(['high', 'high', 'high', 'high']))
   })
 
   it('are unique', () => {
@@ -223,7 +235,7 @@ describe('the journal sort order', () => {
   it('sorts the whole lexicon deterministically', () => {
     const sorted = CONCEPT_IDS.map((c) => utteranceOf(c)).sort(compareUtterances)
     expect(sorted.map((u) => conceptOf(u))).toEqual(
-      ['RIVER', 'UPSTREAM', 'DIG', 'ROCK', 'DOWNSTREAM'],
+      ['UPSTREAM', 'RIVER', 'DIG', 'ROCK', 'DOWNSTREAM'],
     )
   })
 })

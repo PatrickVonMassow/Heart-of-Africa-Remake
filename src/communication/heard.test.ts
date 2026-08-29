@@ -150,7 +150,7 @@ describe('the journal listing', () => {
       memory = observeUtterance(memory, utteranceOf(concept), 1)
     }
     const listed = heardUtterances(memory).map((e) => conceptOf(e.utterance))
-    expect(listed).toEqual(['RIVER', 'UPSTREAM', 'DIG', 'ROCK', 'DOWNSTREAM'])
+    expect(listed).toEqual(['UPSTREAM', 'RIVER', 'DIG', 'ROCK', 'DOWNSTREAM'])
   })
 })
 
