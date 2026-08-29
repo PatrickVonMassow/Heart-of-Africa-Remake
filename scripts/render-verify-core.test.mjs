@@ -2838,14 +2838,22 @@ describe('the shipped charge ledger', () => {
       'THREE.WebGPURenderer: Uncaptured WebGPU GPUValidationError: [Invalid Texture "normal-msaa"] is invalid due to a previous error.',
     ]
     for (const t of measured) expect(asStored(t).point, t).toBe(514)
-    // A downstream sentence from ANOTHER object, and the async-pipeline form
-    // point 734 says must be FILED rather than owned: both stay real reds.
-    const foreign = [
-      'THREE.WebGPURenderer: Uncaptured WebGPU GPUValidationError: [Invalid BindGroup] is invalid due to a previous error.',
+    // A downstream sentence from ANOTHER object stays a real red: 514's scope is
+    // the objects it measured, and nothing here can see the root in the record.
+    expect(
+      asStored('THREE.WebGPURenderer: Uncaptured WebGPU GPUValidationError: [Invalid BindGroup] is invalid due to a previous error.').point,
+    ).toBeNull()
+    // THE TWO FORMS POINT 734 SAID MUST BE FILED NOW HAVE THEIR POINT (29.08.2026).
+    // 734 required the async-pipeline error be "given [an owning point] the moment
+    // a run reproduces it"; the LARGE run of 29.08.2026 reproduced it twice, and
+    // point 1011 was filed for it and for the command-buffer form beside it. They
+    // are charged THERE, never to 514 — the root's owner keeps only what it
+    // measured, and the encoder's number is a run-local counter no charge may read.
+    const filed = [
       'THREE.WebGPURenderer: Uncaptured WebGPU GPUValidationError: [Invalid CommandBuffer from CommandEncoder "renderContext_1"] is invalid due to a previous error.',
       'THREE.WebGPURenderer: Async render pipeline creation failed (renderPipeline_x): [Invalid TextureView] is invalid due to a previous error.',
     ]
-    for (const t of foreign) expect(asStored(t).point, t).toBeNull()
+    for (const t of filed) expect(asStored(t).point, t).toBe(1011)
   })
 
   // THE MSAA TEXTURE ALTERNATIVE CARRIES ITS SENTENCE, NOT THE OBJECT NAME
@@ -2975,17 +2983,24 @@ describe('the shipped charge ledger', () => {
     expect(chargeFor(crossed, scoped)).toBeNull()
   })
 
-  it('leaves the async-pipeline message uncharged though it quotes the cascade sentence', () => {
+  it('charges the async-pipeline message to its OWN point, never to the root it quotes', () => {
     const scoped = { suite: 'settings', backend: 'webgpu', kind: 'console', featureLevel: 'compatibility' }
     const asyncForm = failedChecks(
       'ERR: THREE.WebGPURenderer: Async render pipeline creation failed (renderPipeline_x): [Invalid TextureView] is invalid due to a previous error.',
     )[0]
-    expect(chargeFor(asyncForm, scoped)).toBeNull()
+    expect(chargeFor(asyncForm, scoped).point).toBe(1011)
     // While the measured form, at the start of the stored name, still charges.
     const measured = failedChecks(
       'ERR: THREE.WebGPURenderer: Uncaptured WebGPU GPUValidationError: [Invalid TextureView] is invalid due to a previous error.',
     )[0]
     expect(chargeFor(measured, scoped).point).toBe(514)
+    // AND THE ANCHOR STILL HOLDS: the point-1011 pattern begins at the renderer's
+    // own prefix, so the bare wording — the shape an unrelated defect prints —
+    // is charged by neither entry. This is the over-reach the pins above exist
+    // for, and filing the point did not widen it.
+    for (const bare of ['console error: Async render pipeline creation failed', 'console error: Invalid CommandBuffer from CommandEncoder']) {
+      expect(chargeFor(red(bare, null, 'console'), scoped), bare).toBeNull()
+    }
   })
 
   // A NARROW HALF IS ANCHORED WHERE THE STORED DETAIL BEGINS (review finding,
