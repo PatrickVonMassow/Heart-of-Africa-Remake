@@ -232,6 +232,70 @@ const vdzkEntry = (title) =>
   `<details>\n  <summary><span class="t">${title}</span></summary>\n` +
   `  <div class="body">\n    <p>Die Frage.</p>\n  </div>\n</details>\n`
 
+describe('four-digit point lifecycle', () => {
+  it('returns a legacy title-only now-card to the queue', () => {
+    const out = toQueue(fullBoard({ now: nowEntry(1000, 'Große Übergabe', '10:00 · ~12:00') }), 1000)
+    expect(out).toContain('<span class="num">1000</span><span class="t">Große Übergabe</span>')
+    expect(parseQueuePoints(out)).toEqual(new Set([1000]))
+    expect(parseNowCardPoints(out)).toEqual(new Set())
+  })
+
+  it('archives a legacy title-only now-card', () => {
+    const out = toDone(fullBoard({ now: nowEntry(1000, 'Großer Abschluss', '10:00 · ~12:00') }), 1000, {
+      text: 'Fertig.',
+      end: '12:15',
+    })
+    expect(doneCards(out, 1000)).toHaveLength(1)
+    expect(out).toContain('<span class="num">1000</span><span class="t">Großer Abschluss</span>')
+  })
+
+  it('archives one four-digit point and promotes the next atomically', () => {
+    const source = fullBoard({
+      now: nowEntry(1000, 'Großer Abschluss', '10:00 · ~12:00'),
+      queue: queueEntry(1001, 'Großer Nachfolger', '~2 h'),
+    })
+    const out = closeCard(source, 1000, {
+      text: 'Fertig.',
+      end: '12:15',
+      next: 1001,
+      nextStatus: 'Angefangen.',
+    })
+    expect(doneCards(out, 1000)).toHaveLength(1)
+    expect(parseNowCardPoints(out)).toEqual(new Set([1001]))
+    expect(queueCard(out, 1001)).toBeNull()
+  })
+
+  it('writes four-digit closing work from the queued subject', () => {
+    const out = toClosingWork(fullBoard({ queue: queueEntry(1000, 'Großer Abschluss', '~2 h') }), 1000, {
+      reason: 'Das Vier-Augen-Protokoll fehlt noch.',
+      stamp: '12:20',
+    })
+    expect(out).toContain('<span class="num">1000</span><span class="t">Großer Abschluss: Abschlussarbeiten</span>')
+    expect(parseNowCardPoints(out)).toEqual(new Set([1000]))
+  })
+
+  it('retitles and upgrades four-digit legacy now-cards without losing ownership', () => {
+    const legacy = fullBoard({ now: nowEntry(1000, 'Alter Titel', '10:00 · ~12:00') })
+    const retitled = setCardTitle(legacy, 1000, 'Neuer Titel')
+    expect(retitled).toContain('<span class="num">1000</span><span class="t">Neuer Titel</span>')
+    expect(parseNowCardPoints(retitled)).toEqual(new Set([1000]))
+
+    const upgraded = upgradeNowCards(legacy)
+    expect(upgraded).toContain('<span class="num">1000</span><span class="t">Alter Titel</span>')
+    expect(parseNowCardPoints(upgraded)).toEqual(new Set([1000]))
+  })
+
+  it('merges duplicate four-digit archive cards', () => {
+    const html = fullBoard({
+      done: queueEntry(1000, 'Neu', '11:00 · 12:00') + queueEntry(1000, 'Alt', '09:00 · 10:00'),
+    })
+    const out = mergeDoneDuplicates(html)
+    expect(out.merged).toEqual(['1000'])
+    expect(doneCards(out.html, 1000)).toHaveLength(1)
+    expect(out.html).toContain('<span class="meta">09:00 · 12:00</span>')
+  })
+})
+
 describe('derived now-section membership', () => {
   const handover =
     '<details class="now" data-state="handover">\n  <summary><span class="t">Sitzungsübergabe</span></summary>\n' +
