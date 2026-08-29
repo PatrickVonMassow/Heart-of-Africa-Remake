@@ -19,8 +19,11 @@ export function pointNumbersFromChip(raw) {
  * Point ownership at the start of FREE title text.
  *
  * A single point needs the board's legacy dash/colon separator. A compound run
- * (`287+288`, `121, 130 und 146`) is already explicit ownership and may flow
- * straight into its label, matching the sync guard's established title form.
+ * joined by the board's OWN connectors (`287+288`, `232·233·234`, `71/72`) is
+ * already explicit ownership and may flow straight into its label, matching the
+ * sync guard's established title form. A run joined by prose instead (`121, 130
+ * und 146`) reads the same as a counted enumeration, so it needs the dash/colon
+ * separator as well before it counts as ownership.
  * The sync guard additionally opts into `allowUnseparatedSingle` for its older
  * `306 Closing…` titles; keeping that exception here lets the consumer retain
  * its compatibility contract without growing another numeric parser.

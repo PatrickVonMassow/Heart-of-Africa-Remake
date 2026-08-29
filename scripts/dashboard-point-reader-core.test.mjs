@@ -19,6 +19,8 @@ describe('pointOwnershipFromTitle — the one free-title ownership grammar', () 
     ['plain-hyphen title', '465 - Arbeit', [465], []],
     ['colon point', '313: Arbeit', [], [313]],
     ['compound title', '287+288 — Verbundarbeit', [], [287, 288]],
+    ['connector run without a separator', '287+288 Verbundarbeit', [], [287, 288]],
+    ['prose run without a separator', '121, 130 und 146 Familien-Dramen', [], []],
   ])('%s: %s -> %j', (_shape, title, knownPoints, expected) => {
     expect(pointOwnershipFromTitle(title, { knownPoints }).points).toEqual(expected)
   })
