@@ -793,7 +793,7 @@ describe('the rendered queue — one flat list, no bundle left in the markup', (
   // 10.08.2026 and the published board kept showing the old plan.
   it('re-sequencing the work order re-sequences the rendered cards, nothing else edited', () => {
     const data = { points: { 439: { title: 'A', body: 'Eins.' }, 465: { title: 'B', body: 'Zwei.' } } }
-    const cards = (open) => [...parseQueuePoints(built(open, data).html)]
+    const cards = (open) => queuePointOccurrences(built(open, data).html)
     expect(cards([439, 465, 295])).toEqual([439, 465, 295])
     expect(cards([295, 465, 439])).toEqual([295, 465, 439])
   })
