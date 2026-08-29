@@ -104,7 +104,7 @@ named owner. Only S-12 is allowed to stop the whole batch.
 | S-16 | Missing queue cards and board-first refusal form a mutual board-write block. | **In place:** `board-queue.mjs import/set` is the sanctioned missing-card writer and board mutation ordering keeps that exit reachable. |
 | S-17 | Lane/coupling exclusions leave open points but no named candidate. | **Direct fix:** compute the exclusion set, name the first non-excluded point, or emit a standstill event. The emergency workable set ignores dead in-flight claims. |
 | S-18 | A required finding cannot reach its normal tracked carrier. | **Direct fix:** provide a durable fallback sink outside guarded writers and replay it later. Emergency intents/outcomes demonstrate the required atomic-local-sink shape. |
-| S-19 | A live-but-wedged owner suppresses the responder because liveness is mistaken for progress. | **In place:** the emergency clock advances only on explicit batch progress (a first-parent main commit, committed boundary, or moved delegated branch tip), never process presence or foreground tool activity, and acts after the measured hour. |
+| S-19 | A live-but-wedged owner suppresses the responder because liveness is mistaken for progress. | **In place:** the emergency clock advances only on explicit batch progress (a first-parent main commit, committed boundary, or moved delegated branch tip), never process presence or foreground tool activity, and acts after the measured hour. One named verification run suspends rather than advances that clock only while its adjacent run record remains running, its output renews the bounded 15-minute progress lease, and the record's exact wrapper process is alive; an expired or stale lease, a terminal receipt, or a dead/reused process protects nothing. |
 | S-20 | An abandoned claim suppresses launch for its whole lease. | **In place:** claim assessment expires inactive claims; emergency containment remains independent of the claimant session. |
 | S-21 | Unrelated artefact writes renew a dead in-flight declaration. | **Direct fix:** bind renewal to the declared process/work identity rather than branch/log movement; the emergency progress classifier admits only bounded work intervals. |
 | S-22 | Cleanup removes a worktree beneath a live delegate. | **In place:** cleanup refuses a live process and names its pid; hard recovery first proves and terminates exact process incarnations, then lets doctor perform recoverable cleanup. |
@@ -137,7 +137,32 @@ exact `--veto … --until …` route. For this decision, measured progress means
 durable batch event: a first-parent commit on `main` (including a landed point),
 a committed boundary, or a delegated branch-tip commit. The activity timeline
 remains diagnostic; tool calls, verification output, waits, and process presence
-cannot renew the emergency clock.
+cannot renew the emergency clock. A named verification run is the sole clock
+suspension: `scripts/verify/run-logged.mjs` writes its `*.run.json` and emits an
+append-only progress event only when it consumes output; the latest such event
+renews a 15-minute lease, and the emergency lane proves that the record still
+names the live wrapper process. The stored log path must resolve to the log
+adjacent to that same `*.run.json`; it cannot redirect identity to another run.
+Each renewal is capped at 15 minutes and the
+record's suspension ends two hours after its `startedAt`: this admits the
+measured 80m48s two-backend LARGE run with margin and bounds renewals within
+that invocation. A newly invoked wrapper writes a new record with its own
+two-hour bound; retries across records are not aggregated. That leaves an
+unbounded cross-record residual: a genuine retry loop can keep emergency
+recovery suspended indefinitely without durable batch progress, provided each
+new record names a live wrapper that emits real output events. Rewriting
+`startedAt` or touching the output log emits no event and buys no time. This
+lease never changes the last durable-progress boundary.
+`startedAt` is the wrapper's wall-clock start, so queueing or lock waits inside
+that invocation consume the same per-record allowance as test execution. The
+lease also depends on a valid `.claude/batch-activity.jsonl`: if the journal is
+missing, rotated, truncated, or its progress line is rejected, the report has
+no fresh progress evidence and withdraws the suspension. Both choices fail in
+the conservative direction rather than letting unverifiable activity hide a
+wedge.
+No fresh output, an expired bound, a terminal receipt, a dead process, or a PID
+whose command line no longer names the recorded wrapper and log withdraws the
+suspension, so a busy wedge still strikes.
 
 The first hour-without-progress strike is soft: doctor repair followed by a
 normal restart. A hard strike is legal only when that recorded strike exists and
@@ -148,6 +173,16 @@ interactive primary Scheduled Task (not an unauthenticated Claude under SYSTEM).
 Wholesale worktree deletion was rejected: the repository doctor already knows
 which cleanup is recoverable, while blind deletion is how uncommitted work was
 lost on 11.08.2026.
+
+One platform asymmetry remains explicit. Windows hard recovery uses
+`taskkill.exe /T`, while POSIX `terminateLockedOwner` sends `SIGTERM` only to
+each recorded batch pid; it does not yet prove and terminate that pid's whole
+descendant tree. A verification wrapper and its child can therefore outlive the
+recorded batch owner, leaving a `running` record whose wrapper still satisfies
+the identity probe. The per-record two-hour suspension ceiling prevents that
+record from holding indefinitely, but it does not remove the temporary orphan
+suspension; a general POSIX tree-kill needs its own process-tree identity proof
+before it is safe to add.
 
 `scripts/batch-emergency-drill.mjs` is the Urlaubsfestigkeit proof. It calls the
 real `runEmergency`, creates a real wedged owner process, measures the soft strike

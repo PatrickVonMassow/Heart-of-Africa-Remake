@@ -1,8 +1,8 @@
 import { execFileSync } from 'node:child_process'
 import { existsSync, readFileSync, readdirSync, statSync } from 'node:fs'
 import { homedir } from 'node:os'
-import { basename, join } from 'node:path'
-import { parseActivityJournal } from './batch-activity-journal-core.mjs'
+import { isAbsolute, join, resolve, win32 } from 'node:path'
+import { ACTIVITY_EVENTS, parseActivityJournal } from './batch-activity-journal-core.mjs'
 import { ACTIVITY_CLASSES, evidenceInterval } from './batch-standstill-core.mjs'
 import { parsePauseRecord } from './batch-pause-core.mjs'
 
@@ -182,12 +182,46 @@ function recordFiles(dir) {
   }
 }
 
+/** Resolve the log ONCE for both progress attribution and process identity.
+ * Run records store repository-relative display paths; native and Windows
+ * absolute spellings are already complete and must not be rebased. */
+export function resolveVerificationLog(recordLog, { repo } = {}) {
+  if (typeof recordLog !== 'string' || !recordLog.trim()) return null
+  if (isAbsolute(recordLog) || win32.isAbsolute(recordLog)) return recordLog
+  return typeof repo === 'string' && repo.trim() ? resolve(repo, recordLog) : null
+}
+
+function sameVerificationPath(left, right) {
+  if (win32.isAbsolute(left) || win32.isAbsolute(right)) {
+    return win32.normalize(left).toLowerCase() === win32.normalize(right).toLowerCase()
+  }
+  return resolve(left) === resolve(right)
+}
+
+function emittedVerificationProgress(records, record, path, end) {
+  let latest = null
+  for (const event of records ?? []) {
+    const evidence = event?.evidence
+    const sameRecord = evidence?.recordPath === path || evidence?.id === path
+    if (event?.event !== ACTIVITY_EVENTS.VERIFICATION_PROGRESS || !sameRecord) continue
+    if (Number(evidence?.startedAt) !== Number(record?.startedAt) || event?.pid !== record?.pid) continue
+    const at = Number(event?.atMs)
+    if (!finite(at) || at <= Number(record.startedAt) || at > end) continue
+    latest = latest === null ? at : Math.max(latest, at)
+  }
+  return latest
+}
+
 /** Finished named runs are explicit verification intervals. A running record is
- * accepted only to the last output-log progress plus a renewable lease, and the
- * interval never exceeds that lease. */
-export function verificationRecordEvidence(dir, { start, end, leaseMs = 15 * 60_000 } = {}) {
+ * accepted only to the last output-triggered journal event plus a renewable
+ * lease, and the interval never exceeds that lease. A timestamp-only touch of
+ * either adjacent file emits no event and therefore proves no progress. */
+export function verificationRecordEvidence(dir, {
+  repo, start, end, leaseMs = 15 * 60_000, records = [], processAlive: processAliveProbe,
+} = {}) {
   const intervals = []
   const boundaries = []
+  const leases = []
   for (const path of recordFiles(dir)) {
     let record
     try { record = JSON.parse(readFileSync(path, 'utf8')) } catch { continue }
@@ -195,9 +229,13 @@ export function verificationRecordEvidence(dir, { start, end, leaseMs = 15 * 60_
     if (!finite(began)) continue
     let finished = Number(record?.finishedAt)
     let progressAt = null
-    const logPath = typeof record.log === 'string' ? (record.log.startsWith('/') ? record.log : join(dir, basename(record.log))) : null
+    const resolvedLogPath = resolveVerificationLog(record.log, { repo })
+    const adjacentLogPath = path.slice(0, -'.run.json'.length)
+    const logPath = resolvedLogPath && sameVerificationPath(resolvedLogPath, adjacentLogPath)
+      ? resolvedLogPath
+      : null
     if (record.status === 'running' && logPath) {
-      try { progressAt = statSync(logPath).mtimeMs } catch { /* no progress proof */ }
+      progressAt = emittedVerificationProgress(records, record, path, end)
       finished = finite(progressAt) ? Math.min(end, progressAt + leaseMs) : NaN
     }
     if (!finite(finished) || finished <= began) continue
@@ -209,9 +247,24 @@ export function verificationRecordEvidence(dir, { start, end, leaseMs = 15 * 60_
         progressAt, result: record.status === 'finished' ? { exitCode: record.exitCode, finishedAt: record.finishedAt } : null,
       },
     }))
+    if (record.status === 'running' && finite(progressAt)) {
+      let processAlive = false
+      try { processAlive = processAliveProbe?.(record, path, logPath) === true } catch { /* no identity proof */ }
+      leases.push({
+        record: path,
+        log: record.log ?? null,
+        command: record.command ?? null,
+        status: record.status,
+        startedAt: began,
+        progressAt,
+        leaseUntil: progressAt + leaseMs,
+        pid: record.pid ?? null,
+        processAlive,
+      })
+    }
     boundaries.push(began, finished)
   }
-  return { intervals: intervals.filter(Boolean), boundaries }
+  return { intervals: intervals.filter(Boolean), boundaries, leases }
 }
 
 function transcriptTimestamp(row) {

@@ -19,6 +19,7 @@ describe('the total-wedge chaos drill', () => {
       restartAttempts: 2,
       strikeRecords: 4,
       busyActivityIgnored: true,
+      liveVerificationProbe: true,
       restoredWithoutHuman: true,
     })
     expect(result.measuredMs).toBeGreaterThanOrEqual(0)

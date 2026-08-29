@@ -5,6 +5,10 @@
 // session must be told. scripts/batch-emergency.mjs does the acting.
 export const EMERGENCY_THRESHOLD_MS = 60 * 60 * 1000
 export const EMERGENCY_COOLDOWN_MS = 45 * 60 * 1000
+export const VERIFICATION_LEASE_MS = 15 * 60 * 1000
+// The measured two-backend LARGE run is 80m48s. Two hours admits that run and
+// ordinary variance while bounding renewals from any one run record.
+export const VERIFICATION_SUSPENSION_MAX_MS = 2 * EMERGENCY_THRESHOLD_MS
 export const BATCH_PROGRESS_KINDS = new Set([
   'first-parent-commit',
   'committed-boundary',
@@ -26,6 +30,42 @@ export function activeVeto(veto, now = Date.now()) {
   if (!veto || typeof veto !== 'object') return false
   return typeof veto.reason === 'string' && veto.reason.trim().length > 0 &&
     Number.isFinite(veto.until) && veto.until > now
+}
+
+/**
+ * A named verification run suspends this tick; it does not become batch
+ * progress. The IO half measures the adjacent run record, output-log mtime and
+ * process identity, while this pure half makes the evidence self-bounding. In
+ * particular, a stale progress sample cannot be rescued by an arbitrary future
+ * `leaseUntil` value.
+ */
+export function activeVerificationLease(
+  report = {},
+  now = Date.now(),
+  leaseMs = VERIFICATION_LEASE_MS,
+  suspensionMaxMs = VERIFICATION_SUSPENSION_MAX_MS,
+) {
+  let active = null
+  const windowEnd = Number(report?.window?.end)
+  for (const lease of report?.verificationLeases ?? []) {
+    const startedAt = Number(lease?.startedAt)
+    const progressAt = Number(lease?.progressAt)
+    const leaseUntil = Number(lease?.leaseUntil)
+    const named = typeof lease?.record === 'string' && lease.record.trim().length > 0 &&
+      typeof lease?.command === 'string' && lease.command.trim().length > 0
+    if (!named || lease?.status !== 'running' || lease?.processAlive !== true) continue
+    if (![startedAt, progressAt, leaseUntil].every(Number.isFinite)) continue
+    if (progressAt < startedAt || progressAt > now || (Number.isFinite(windowEnd) && progressAt > windowEnd)) continue
+    if (leaseUntil <= now || leaseUntil <= progressAt || leaseUntil - progressAt > leaseMs) continue
+    if (now - progressAt >= leaseMs) continue
+    const suspensionUntil = startedAt + suspensionMaxMs
+    if (!Number.isFinite(suspensionUntil) || now >= suspensionUntil) continue
+    const effectiveUntil = Math.min(leaseUntil, suspensionUntil)
+    if (!active || progressAt > active.progressAt) {
+      active = { ...lease, startedAt, progressAt, leaseUntil: effectiveUntil, suspensionUntil }
+    }
+  }
+  return active
 }
 
 /**
@@ -52,6 +92,14 @@ export function emergencyDecision({
   const stalledMs = Math.max(0, now - progressAt)
   if (stalledMs < thresholdMs) {
     return { action: 'observe', reason: 'progress-within-threshold', strike: false, progressAt, stalledMs }
+  }
+  const suspensionMaxMs = thresholdMs * (VERIFICATION_SUSPENSION_MAX_MS / EMERGENCY_THRESHOLD_MS)
+  const verificationLease = activeVerificationLease(report, now, VERIFICATION_LEASE_MS, suspensionMaxMs)
+  if (verificationLease) {
+    return {
+      action: 'stand-down', reason: 'live-verification-lease', strike: false,
+      progressAt, stalledMs, verificationLease,
+    }
   }
   if (Number.isFinite(state?.lastStrikeAt) && now - state.lastStrikeAt < cooldownMs) {
     return { action: 'observe', reason: 'strike-cooldown', strike: false, progressAt, stalledMs }
