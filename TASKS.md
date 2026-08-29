@@ -13521,3 +13521,35 @@ to land than a mechanism that needs a review.
   Criticality: high — it blocks the four-eyes record of a landing that is otherwise ready, and it
   blocks it in the batch's most ordinary authorship shape, so it will recur until it is fixed.
   Bundle: Session- & Repo-Hygiene.
+
+- [ ] 1009. The benchmark run borrows the world and never gives it back, and it leaves `Math.random`
+  replaced (measured 29.08.2026 in the LARGE run on `feat/687-roam-bound-fixes`, WebGL 2, then
+  classified against the merge-base `4acf6039abe0`: all six checks are already red on `main`, so
+  this is not the branch's).
+  Six checks of `scripts/verify/benchmark.mjs` fail on every run and NOTHING owns them: no open
+  point names them and `scripts/render-verify-charges.mjs` carries no `benchmark` entry at all. A
+  red with no owner is exactly what CLAUDE.md §7.2 forbids — it rides along in every LARGE run and
+  trains the reader to skip it.
+  WHAT IS MEASURED: `restored: ssaoEnabled — false -> true`, `restored: travelZoom — 1.5 -> 0.5`,
+  `restored: travelSpeed — 7.25 -> 5.6`, `restored: seed — 18900701 -> 42`, `restored: day — 181 ->
+  0`, and `Math.random is the original function again`. The F8 measurement run BORROWS the world to
+  make its rows comparable — it pins a seed and a day, fixes the travel zoom and speed, forces the
+  SSAO switch, and replaces `Math.random` so the same frame is drawn twice the same way — and it
+  returns none of it. The last one is the one that spreads: a session that has pressed F8 keeps a
+  patched `Math.random` for the rest of its life, so every later check and every later minute of
+  play draws from the benchmark's generator rather than the game's, and a world at seed 42 on day 0
+  is not the world the player stood in before pressing the key. The two WebGPU timestamp rows fail
+  on the baseline in the same run and belong to the same lane.
+  FINAL STATE: the benchmark restores every value it changed — the five settings by name and
+  `Math.random` by identity — whatever exit path it takes, including a throw and an early abort,
+  because a measurement that can poison the session it ran in is worse than no measurement. What it
+  borrowed is recorded in one place rather than assumed at each call site, so a value added to the
+  run cannot be forgotten on the way back. If a value genuinely CANNOT be restored, the run says so
+  by name and the check asserts that named exception rather than passing silently.
+  VERIFIABLE: the six named checks go green in the `benchmark` suite on both backends; a Vitest
+  case that a benchmark run which throws mid-way still restores every borrowed value and the
+  original `Math.random`; and a case that adding a borrowed value without registering it fails,
+  so the next one cannot be forgotten the same way.
+  Criticality: medium — it loses no code and no save, but it silently changes the world and the
+  random source of any session that measured itself, and it has stood unowned in every LARGE run.
+  Bundle: Session- & Repo-Hygiene.
