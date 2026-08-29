@@ -276,8 +276,7 @@ governs the climate, peoples, dress, ecology and panzootic — the game keeps th
 as a homage to its ancestor. This is the third deliberate carve-out from the
 accuracy principle, alongside the §19.8 grief and the §19.13 exaggeration;
 recorded here so nobody later "corrects" it toward historical accuracy. (§13.2's
-glossary is doubly provisional — it is also the placeholder under review in
-§13.4.)
+glossary belongs to the inherited mechanic; §13.4's slice does not use it.)
 
 ---
 

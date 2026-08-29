@@ -16,7 +16,7 @@ import {
   utteranceSeconds,
 } from './speaking'
 
-const RIVER_UTTERANCE = utteranceOf('ROCK')
+const RIVER_UTTERANCE = utteranceOf('RIVER')
 const DIG = utteranceOf('DIG')
 const ROCK_UTTERANCE = utteranceOf('ROCK')
 
@@ -77,7 +77,12 @@ describe('utterancePlan (the syllables at a constant pace)', () => {
     const plan = utterancePlan(RIVER_UTTERANCE, 0, { syllableSeconds: 0.3, volume: 1 })
     expect(plan.syllables).toHaveLength(SEQUENCE_LENGTH)
     plan.syllables.forEach((s, i) => expect(s.startOffset).toBeCloseTo(i * 0.3, 10))
-    expect(plan.syllables.map((s) => s.tone)).toEqual(['high', 'low', 'low', 'high'])
+    // RIVER is `ba-BA-ba-BA`, transcribed here rather than read back from the
+    // lexicon, so a silent change to the table fails this case instead of
+    // travelling through it. The constant above used to hold ROCK, so this one
+    // assertion pinned ROCK's sequence under RIVER's name and RIVER's own was
+    // never exercised anywhere in the file (cross-vendor review, 29.08.2026).
+    expect(plan.syllables.map((s) => s.tone)).toEqual(['low', 'high', 'low', 'high'])
   })
 
   it('keeps a gap between syllables at any pace, so four beats read as four', () => {

@@ -182,8 +182,14 @@ export function toneDistance(a: ToneSequence, b: ToneSequence): number {
 }
 
 /**
- * A sequence usable as a concept: the fixed length and an even number of highs,
- * which buys the distance of two between any two inventory entries.
+ * A sequence the village's tongue CAN form: the fixed length and an even number
+ * of highs, which buys the distance of two between any two inventory entries.
+ *
+ * Not the same as "usable as a concept", which it used to say. The single-tone
+ * sequences `ba-ba-ba-ba` and `BA-BA-BA-BA` are well formed by this rule and are
+ * deliberately never words — they are two of the three the inventory holds in
+ * reserve. Whether a sequence IS a word is `conceptOf`'s question, and it answers
+ * it against the lexicon rather than by calling this.
  */
 export function isWellFormed(sequence: ToneSequence): boolean {
   if (sequence.length !== SEQUENCE_LENGTH) return false

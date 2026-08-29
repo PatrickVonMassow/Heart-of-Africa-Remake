@@ -4,7 +4,7 @@
 // The hand-over is what solves the puzzle, and the chief acknowledges it IN HIS
 // OWN TONGUE: two concepts, spoken like any other phrase in the village, with
 // no translation anywhere. A player who learned the words reads them; a player
-// who did not sees three runs of syllables and his own `???`. That asymmetry is
+// who did not sees two runs of syllables and his own `???`. That asymmetry is
 // the payoff of the whole slice, so nothing here may localize.
 //
 // Both concepts stand in the chief's own drum message. Nothing new is

@@ -1296,10 +1296,12 @@ export const balance: BalanceConfig = {
       standOff: 2.6,
       stationSpacing: 1,
       // The swerve that makes a run a game rather than a sweep: a runner starts
-      // bending its line six metres out from a catcher and, at the closest,
-      // aims six metres to the side of the rock. Both are wide enough that the
-      // dodge is visible from the far end of the stretch and narrow enough that
-      // the runner is still plainly making for the rock.
+      // bending its line SEVEN metres out from a catcher and, at the closest,
+      // aims THREE metres to the side of the rock. Wide enough that the dodge is
+      // visible from the far end of the stretch, narrow enough that the runner is
+      // still plainly making for the rock. (The prose said six and six until
+      // 29.08.2026 — the values had been retuned and it had not, so a tuner read
+      // both the trigger distance and the swerve width wrong.)
       laneSpacing: 1.2,
       dodgeDistance: 7,
       dodgeReach: 3,
@@ -1333,8 +1335,9 @@ export const balance: BalanceConfig = {
       // 7): the children are shy of the stranger, so they visibly swerve round
       // the traveller rather than brushing past him.
       strangerBerth: 0.3,
-      // One atom is four syllables at 0.35 s each; this leaves a clear breath
-      // between two moments that fall together.
+      // One atom is four syllables at `communication.syllableSeconds` — 0.3 s —
+      // so an atom runs 1.2 s; this leaves a clear breath between two moments
+      // that fall together.
       utteranceGapSeconds: 2,
       // The long-run alarm's window (point 589), which the bank round inherits
       // from the situation catalogue the five-word rebuild deleted. Read off the
@@ -1439,8 +1442,9 @@ export const balance: BalanceConfig = {
     // The rule lives in src/communication/spokenGesture.ts and follows this
     // value wherever the debug menu sets it.
     hearingRadius: 10,
-    // One five-syllable atom takes 1.5 s at this pace — slow enough to count
-    // the beats by ear, quick enough that a seven-atom message stays short.
+    // One four-syllable atom takes 1.2 s at this pace (point 686 shortened the
+    // word from five syllables to four) — slow enough to count the beats by ear,
+    // quick enough that the chief's four-atom message stays short.
     syllableSeconds: 0.3,
     // A sharp fall: half way to the radius a voice is already at ~14 % and at
     // the rim at 4 %, so the children's group and the adults' group are never

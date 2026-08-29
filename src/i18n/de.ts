@@ -581,7 +581,7 @@ export const de: Strings = {
     tagPlayRadius: 'Fangen: Radius des Spielplatzes',
     bankRoam: 'Uferspiel: Streifzug dauert (s)',
     bankRoamSpread: 'Uferspiel: Streuung des Streifzugs',
-    bankGather: 'Uferspiel: Weg zum Ufer, Notbremse (s)',
+    bankGather: 'Uferspiel: Lauf zum Ufer, Notbremse (s)',
     bankRun: 'Uferspiel: ein Lauf, Notbremse (s)',
     bankRegroup: 'Uferspiel: Seitenwechsel, Notbremse (s)',
     bankPart: 'Uferspiel: Abzug am Ufer dauert (s)',
@@ -1068,7 +1068,7 @@ export const de: Strings = {
     drumMessage:
       '[awe]Das Oberhaupt rief seinen Trommler, und zwei Trommeln sprachen an seiner Statt – eine große und eine kleine.[/awe] [pause]Vier Wörter zu je vier Schlägen, jedes vom nächsten durch dieselbe kurze Stille getrennt – dumpf für die tiefe Silbe, hell für die hohe. [excited]Ich kenne diese Wörter. Jedes einzelne habe ich in den Gassen und am Wasser gehört.[/excited] [pause]Ich habe sie in der Reihenfolge notiert, in der sie geschlagen wurden; was sie von mir verlangen, muss ich selbst lesen.',
     rockArtefact:
-      '[excited]Vier Wörter – und es war doch ein Auftrag.[/excited] Ich bin dem Wasser gegen seinen eigenen Zug gefolgt, bis der Steinblock am Ufer stand, genau so, wie die Trommeln ihn genannt hatten: höher als ein Mann, allein, und weit und breit nichts seinesgleichen. [pause]Drei Spann tief stieß mein Spaten auf etwas, das kein Stein war: gehämmertes Metall auf verwittertem Holz, eingeschlossen im Lehm des Flusses. [awe]Es liegt hier länger, als das Dorf steht.[/awe] [pause]Ich habe es nicht weiter geöffnet. [somber]Es steht mir nicht zu, es zu öffnen.[/somber]',
+      '[excited]Vier Wörter – und es war doch ein Auftrag.[/excited] Ich bin dem Wasser gegen seinen eigenen Zug gefolgt, bis ein Steinblock am Ufer stand – von der Art, die die Kinder an ihren beiden Felsen benennen, und der einzige hier oben. [pause]Mehr hatten die Trommeln nicht gesagt: Wasser, gegen den Zug, Stein, graben. Alles Übrige daran musste ich selbst finden. [pause]Drei Spann tief stieß mein Spaten auf etwas, das kein Stein war: gehämmertes Metall auf verwittertem Holz, eingeschlossen im Lehm des Flusses. [awe]Es liegt hier länger, als das Dorf steht.[/awe] [pause]Ich habe es nicht weiter geöffnet. [somber]Es steht mir nicht zu, es zu öffnen.[/somber]',
     artefactGiven:
       '[breath]Ich habe es den Fluss hinab zurückgetragen und dem Oberhaupt in die Hände gelegt.[/breath] [pause]Er drehte es einmal um und sprach drei Wörter darüber. [excited]Jedes einzelne hatte ich schon gehört – eines am Wasser, eines an den Felsen, zu denen die Kinder laufen, und eines im Schlag seiner eigenen Trommeln.[/excited] [pause][awe]Er hatte mich an einen Ort geschickt, den er in keiner meiner Sprachen benennen kann, und ich war dort gewesen und mit dem zurückgekommen, was daran begraben lag.[/awe] [pause][somber]Wir haben keine gemeinsame Sprache.[pause] Und doch haben wir einander eben verstanden.[/somber]',
     digNothing: '[weary]Ich grub an dieser Stelle, doch der Sand gab nichts preis als Steine und alte Wurzeln.[/weary]',

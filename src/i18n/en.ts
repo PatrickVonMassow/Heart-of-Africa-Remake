@@ -579,7 +579,7 @@ export const en: Strings = {
     tagPlayRadius: 'Tag: play ground radius',
     bankRoam: 'Bank game: roaming lasts (s)',
     bankRoamSpread: 'Bank game: spread of the roaming',
-    bankGather: 'Bank game: walk to the bank, backstop (s)',
+    bankGather: 'Bank game: run to the bank, backstop (s)',
     bankRun: 'Bank game: one run, backstop (s)',
     bankRegroup: 'Bank game: side swap, backstop (s)',
     bankPart: 'Bank game: parting walk lasts (s)',
@@ -1056,7 +1056,7 @@ export const en: Strings = {
     drumMessage:
       '[awe]The chief called his drummer, and two drums spoke for him — a great one and a small one.[/awe] [pause]Four words, each of four beats, each parted from the next by the same short silence — deep for the low syllable, bright for the high one. [excited]I know these words. I have heard every one of them in the lanes and at the water.[/excited] [pause]I have written them down in the order they were beaten; what they ask of me I must read for myself.',
     rockArtefact:
-      "[excited]Four words, and they were an errand after all.[/excited] I followed the water against its own pull until the block of stone stood on the bank exactly as the drums had it — taller than a man, alone, nothing of its kind anywhere near it. [pause]Three spans down my shovel met something that was not stone: hammered metal on worn wood, sealed in the river's own clay. [awe]It has lain here longer than the village has stood.[/awe] [pause]I did not open it further. [somber]It is not mine to open.[/somber]",
+      "[excited]Four words, and they were an errand after all.[/excited] I followed the water against its own pull until a block of stone stood on the bank — the kind of thing the children name at their own two rocks, and the only one up here. [pause]The drums had said no more than that: water, against the pull, stone, dig. Everything else about it I had to find for myself. [pause]Three spans down my shovel met something that was not stone: hammered metal on worn wood, sealed in the river's own clay. [awe]It has lain here longer than the village has stood.[/awe] [pause]I did not open it further. [somber]It is not mine to open.[/somber]",
     artefactGiven:
       "[breath]I carried it back down the river and laid it in the chief's hands.[/breath] [pause]He turned it over once and spoke three words over it. [excited]I had heard every one of them before — one at the water, one at the rocks the children run to, and one in the beat of his own drums.[/excited] [pause][awe]He had sent me to a place he cannot name in any tongue of mine, and I went there and came back with what lay buried at it.[/awe] [pause][somber]We share no language.[pause] And yet we have just understood one another.[/somber]",
     digNothing: '[weary]I dug at this spot, but the sand yielded nothing except stones and old roots.[/weary]',

@@ -694,10 +694,15 @@ if (section('ambience-sources')) {
   // four-syllable rebuild here: the heard store is string-keyed, so every check
   // below stayed green while proving the audio path for an utterance the game can
   // no longer produce, and the shipped one was covered nowhere (point 686). The
-  // atoms are RIVER, UPSTREAM, ROCK and DIG as src/communication/lexicon.ts beats
-  // them, and src/communication/verifySuiteUtterances.test.ts pins these literals
-  // against that lexicon so they cannot drift out of it again.
-  const ATOMS = ['ba-BA-ba-BA', 'ba-ba-BA-BA', 'BA-ba-ba-BA', 'ba-BA-BA-ba']
+  // atoms are RIVER, UPSTREAM, ROCK, DIG and DOWNSTREAM as
+  // src/communication/lexicon.ts beats them, and
+  // src/communication/verifySuiteUtterances.test.ts pins these literals against
+  // that lexicon so they cannot drift out of it again. DOWNSTREAM stands here
+  // because the check below says "every word" and used to carry only the four
+  // the drums beat, so its own name outran it (cross-vendor review, 29.08.2026);
+  // it is appended rather than inserted, because the indices below name the atoms
+  // the audio path is driven with.
+  const ATOMS = ['ba-BA-ba-BA', 'ba-ba-BA-BA', 'BA-ba-ba-BA', 'ba-BA-BA-ba', 'BA-BA-ba-ba']
   const BEATS = ATOMS[0].split('-').length
   check('the suite speaks the shipped lexicon, one shape for every word (point 686)',
     ATOMS.every((u) => u.split('-').length === BEATS) && new Set(ATOMS).size === ATOMS.length,
