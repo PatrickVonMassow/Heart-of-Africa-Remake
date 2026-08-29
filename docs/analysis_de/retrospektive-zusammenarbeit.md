@@ -67,6 +67,7 @@ Das Musterbeispiel sind die Chat-Zeitstempel: neun Eskalationsstufen, acht weich
 | 26.08. nachts | Zweimal grün über einer Attrappe, die das echte Board nur nachgebaut statt gelesen hat: Das Kritikalitäts-Stylesheet landete im Kommentar der Refresh-Routine, und die auf Zuruf nachgereichte Regressionsprüfung ließ genau die eine `<meta>`-Zeile weg, die den gemeinten Anker im echten Board verfehlen lässt — Runde zwei verschob und löschte dabei die BOM der Datei (§3.184, Punkt 844) |
 | 26.08. früh | Dritter Rückfall derselben Dublette, diesmal von mir: Ich legte einen frisch gemessenen Befund als Punkt 928 ab, obwohl Punkt 856 seit dem 23.08. genau ihn beschreibt — gefunden wieder erst von der Bündelpflicht, nicht beim Anlegen. Neu war nur die zweite Messung; sie ist jetzt in 856 nachgetragen (§3.168-Nachtrag, 928 in 856 gefaltet) |
 | 24.08. mittags | Der delegierte Autor schrieb drei Commits um, die er bereits veroeffentlicht hatte: Sein Abschluss-Push scheiterte als non-fast-forward, und sein eigener Bericht meldete die fertige Arbeit als „nur lokal“ — obwohl die Baeume beider Seiten byte-identisch waren und sich nur eine Leerzeile im Commit-Text unterschied. Wer dem Bericht glaubt, sucht verlorene Arbeit, die nie verloren war; wer ihn ignoriert, uebersieht den echten Fall. Dieselbe Stunde zeigte die Kehrseite von der Gegenseite: Ein Tor-Lauf im Arbeitsbaum wurde rot, weil die pruefende Sitzung selbst waehrenddessen auf main committete — kein Test schlug fehl, nur der Teardown benannte die Ref-Bewegung |
+| 29.08. | Kein Regressionslauf des Tages hatte ein gültiges Zeit-Urteil: Der Ruhe-Wächter las den Auftragstext der eigenen Batch-Sitzung als zweiten Prüflauf, weil dieser die Prüfbefehle zitiert, erklärte die Maschine für belastet und strich die Zeit-Urteile — protokolliert in einer Zeile, die wie Hausmeisterei klingt; am selben Abend tötete der Integritäts-Wächter eine 85-minütige Zwei-Backend-Regression, weil dieselbe Sitzung nebenher auf main committete (§3.214, Punkt 955) |
 | 26.08. vormittags | Neun Gegenlesungsdurchgänge über die abgeleitete Board-Sektion fanden am Ende EINE Fehlerklasse — zweimal: Ein Beleg ohne zuordenbaren Punkt und ein Fokus-Eintrag, der etwas nennt, das keine Punktnummer ist, kamen beide als »kein Fokus« heraus, also Byte für Byte als die Antwort einer FEHLENDEN Quelle. Aus beschädigten Daten wurde so eine geprüfte Null (§3.185, Punkt 713) |
 | 26.08. mittags | Zwanzig Minuten nach der Landung verweigerte derselbe Mechanismus die Veröffentlichung des Boards an der Sitzungsgrenze: Die Ausnahme für das Kärtchen, das die Maschine selbst schreibt, galt nur im Zweig »es läuft etwas« und nie in seinem Spiegel (§3.186, Punkt 935) |
 | 27.08. nachts | Zwei Wächter gaben einander ein Alibi: Der Teardown der Unit-Suite ließ einen Lauf scheitern, weil die eigene Sitzung vier Sekunden vor Schluss den Zweig des nächsten Punktes anlegte — 430 Dateien und 14 015 Fälle waren grün —, und die Lastprobe entlastete dieses Rot sofort mit sieben »lebenden« Arbeitsbäumen, in denen kein Prozess lief und seit drei bis vierzehn Tagen nichts geschrieben wurde. Beide Alibis sind auf dieser Maschine dauerhaft, also kann dieses Tor kein Rot mehr beweisen (§3.198, Punkte 455 und 955) |
@@ -1413,7 +1414,7 @@ keinen Träger hat. Gebucht als Punkt 956.
 
 ## Anhang A — Maschinell gepflegte Quellen-Übersicht
 
-Zuletzt aktualisiert: Samstag, 29.08.2026, 11:45 · Quellen-Fingerprint: `e7b9e518a2d7…`
+Zuletzt aktualisiert: Samstag, 29.08.2026, 19:57 · Quellen-Fingerprint: `acc97b2da3d9…`
 
 Spalten heuristisch aus den Quellen abgeleitet (Anläufe = distinkte Datumsnennungen im Memory;
 Maßnahme = Guard-Skripte mit Namens-Treffer). Die inhaltliche Bewertung gehört der Prosa oben.
@@ -1516,8 +1517,8 @@ Maßnahme = Guard-Skripte mit Namens-Treffer). Die inhaltliche Bewertung gehört
 
 Erfasste Quellen: 93 Feedback-/Projekt-Memories · 57 Guard-/Hook-Skripte · 6 Revert-/Reapply-Commits · 114 Prozess-/Meta-TASKS-Punkte (davon 48 offen).
 
-<!-- RETRO-FINGERPRINT: e7b9e518a2d70eff1593e3bcac172db4a597465a445efb4596887ca5d4689a06 -->
-<!-- RETRO-LAST-REFRESHED: 2026-08-29T09:45:36.536Z -->
+<!-- RETRO-FINGERPRINT: acc97b2da3d9b6c03049ea09cb43fce0f32dc29a78fbcb4ad7f0107f4801ed07 -->
+<!-- RETRO-LAST-REFRESHED: 2026-08-29T17:57:55.661Z -->
 <!-- AUTO-GENERATED:END -->
 
 ### 3.111 Ein Erfolg ist kein Beweis für den Weg, auf dem er zustande kam
@@ -4724,3 +4725,42 @@ setzt. Ein Mechanismus, der nur innerhalb eines Kommandos existiert, ist für je
 daneben nicht vorhanden, und die Handarbeit, die dann einspringt, verletzt die Zusicherung
 still. Prüffrage bei jedem transient gesetzten Mechanismus: *Was passiert auf dem Weg, der
 ihn nicht setzt — und merkt es jemand?*
+
+### 3.214 Der Ruhe-Wächter las den eigenen Auftragstext als zweiten Prüflauf
+
+Am 29.08. hatte kein einziger Regressionslauf des Tages ein gültiges Zeit-Urteil, und niemand
+merkte es, weil der Grund wie gewöhnliche Hausmeisterei aussah. Der Ruhe-Check des Prüfstands
+(Punkt 296) zählt vor jedem Lauf die fremden Prozesse, die ihm die Maschine wegnehmen könnten;
+findet er einen, erklärt er die Maschine für belastet und streicht die Zeit-Urteile des Laufs
+als Beleg. Er entscheidet das an der Kommandozeile, und eine Kommandozeile ist Text. Die
+autonome Batch-Sitzung läuft als `claude -p <Auftrag>` — und dieser Auftrag ZITIERT die Befehle
+des Projekts, `node scripts/verify/run-wait.mjs --await` unter ihnen. Damit erfüllte die
+Sitzung selbst das Muster für „ein anderer Prüflauf", und zwar jede Sitzung, die je mit diesem
+Auftrag gestartet wurde.
+
+Die Folge stand jedes Mal im Protokoll, in einer Zeile, die niemand als Alarm liest: *„the
+machine is loaded … its timing verdicts do NOT count as evidence"*. Ein Lauf um 10:40 meldete
+darunter das Ladebild als zu lange stillstehend — ein Roter, der nach der eigenen Ansage des
+Laufs nichts belegte. Auf einer wirklich ruhigen Maschine bestand dieselbe Prüfung eine Stunde
+später im ersten Anlauf, und mit dem behobenen Erkenner bestanden auch `startup` und `flow`
+sofort, statt wie den ganzen Tag über erst in der Wiederholung, die per Regel nichts abdeckt.
+
+Am selben Abend zeigte sich die zweite Hälfte derselben Familie, und diesmal war der Preis
+nicht ein Urteil, sondern ein ganzer Lauf: Der Integritäts-Wächter der Unit-Suite tötete eine
+85-minütige Regression über beide Backends, weil dieselbe Sitzung nebenher auf `main`
+committete, was der Lauf gerade zu belegen hatte. Kein Test schlug fehl, nichts leckte — der
+Teardown sah eine Ref-Bewegung und konnte sie nicht von Testleckage unterscheiden. Die Form ist
+vom 24.08. bekannt; neu ist die Größenordnung der Rechnung und der Umstand, dass die einzige
+heute verfügbare Abwehr eine Regel ist, die kein Wächter durchsetzt — *fasse keine Referenz an,
+solange ein großer Lauf läuft* — und die genau dort unbrauchbar ist, wo man sie braucht: Eine
+lange Messung ist die einzige Zeit, in der für die Buchführung überhaupt Platz ist.
+
+**Lehre:** Ein Wächter, der die Umgebung beurteilt, muss seinen eigenen Betreiber kennen. Beide
+Fälle sind derselbe Kurzschluss — der Apparat zählt die Hand, die ihn führt, als Störung — und
+beide sind teurer als das, wovor sie schützen, weil ihr Schaden als Normalbetrieb protokolliert
+wird. Ein Prüfmuster, das eine Kommandozeile nach Werkzeugnamen durchsucht, muss zuerst fragen,
+WAS der Prozess ist, und erst danach, was in seinen Argumenten vorkommt: Ein Auftragstext ist
+kein Aufruf. Und ein Tor, das aus einer wahren Beobachtung („eine Referenz hat sich bewegt")
+eine falsche Schlussfolgerung zieht („also ist der Lauf ungültig"), darf diese Kosten nicht
+still verbuchen, sondern muss nennen, was es nicht unterscheiden kann — sonst zahlt der Batch
+die Rechnung dauerhaft, ohne dass sie je jemandem auffällt.

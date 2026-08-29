@@ -577,6 +577,45 @@ export const RED_CHARGES = [
       'owns it.',
   },
   {
+    point: 938,
+    suite: 'enrichments',
+    backend: 'webgl',
+    kind: 'check',
+    match: /^the streamed dressing does not grow over a session at a fixed anchor/i,
+    why:
+      'THE WebGL 2 HALF OF POINT 938, measured 29.08.2026 and entered because the WebGPU entry ' +
+      'above is scoped to that lane and its compatibility level, so it deliberately excuses ' +
+      'nothing here. Classified with scripts/verify/baseline-classify.mjs enrichments at ' +
+      'VERIFY_GL=webgl against the merge-base 4acf6039abe0: the check is red on the BASELINE and ' +
+      'on the branch with the IDENTICAL detail — {"samples":[0,0,0,0,0],"min":0,"max":0,' +
+      '"spread":0} — over two baseline runs and seven branch observations, so it is pre-existing ' +
+      'and nothing about the bank-round rebuild touches it. Zero samples on both sides says the ' +
+      'dressing does not stream at all here rather than that it grows too little, which is the ' +
+      'same question 938 already owns: whether the CHECK or the dressing is the stale one. The ' +
+      'charge dies with that point.',
+  },
+  {
+    point: 1009,
+    suite: 'benchmark',
+    kind: 'check',
+    match:
+      /^(restored: (ssaoEnabled|travelZoom|travelSpeed|seed|day)|Math\.random is the original function again)$/i,
+    why:
+      'FILED AS 1009 ON 29.08.2026, the day the six were classified. Measured in the LARGE run on ' +
+      'feat/687-roam-bound-fixes (WebGL 2) and classified with baseline-classify against the ' +
+      'merge-base 4acf6039abe0: ALL SIX are already red on the baseline, so none of them is the ' +
+      'communication rebuild\'s. Before that classification NOTHING owned them — no open point ' +
+      'named them and this table held no benchmark entry at all — so they reddened every full ' +
+      'regression with no owner, which is the one thing CLAUDE.md 7.2 forbids and the reason a ' +
+      'LARGE could not go green for any point. The defect they report is real and 1009 holds it: ' +
+      'the F8 measurement run borrows the world — a pinned seed and day, a fixed travel zoom and ' +
+      'speed, the SSAO switch, and Math.random replaced so a frame draws the same way twice — and ' +
+      'returns none of it. NOT SCOPED TO A BACKEND, deliberately: the restore path is plain ' +
+      'JavaScript state and has nothing to do with which renderer drew the rows, and the reds were ' +
+      'recorded on WebGL 2 while the two WebGPU timestamp rows of the same run fail for their own ' +
+      'reasons and are NOT covered here. The charge dies with the point.',
+  },
+  {
     point: 603,
     suite: 'settings',
     backend: 'webgl',
