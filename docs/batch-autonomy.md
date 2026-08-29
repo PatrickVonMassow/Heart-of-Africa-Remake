@@ -147,9 +147,12 @@ Each renewal is capped at 15 minutes and the
 record's suspension ends two hours after its `startedAt`: this admits the
 measured 80m48s two-backend LARGE run with margin and bounds renewals within
 that invocation. A newly invoked wrapper writes a new record with its own
-two-hour bound; retries across records are not aggregated. Rewriting `startedAt`
-or touching the output log emits no event and buys no time. This lease never
-changes the last durable-progress boundary.
+two-hour bound; retries across records are not aggregated. That leaves an
+unbounded cross-record residual: a genuine retry loop can keep emergency
+recovery suspended indefinitely without durable batch progress, provided each
+new record names a live wrapper that emits real output events. Rewriting
+`startedAt` or touching the output log emits no event and buys no time. This
+lease never changes the last durable-progress boundary.
 `startedAt` is the wrapper's wall-clock start, so queueing or lock waits inside
 that invocation consume the same per-record allowance as test execution. The
 lease also depends on a valid `.claude/batch-activity.jsonl`: if the journal is
