@@ -10,6 +10,7 @@ import { tmpdir } from 'node:os'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { describe, it, expect } from 'vitest'
+import { parseActivityJournal } from '../batch-activity-journal-core.mjs'
 import { commandNamesRun } from '../batch-in-flight.mjs'
 import { ORDINARY_OUTPUT_BUDGET } from '../tool-output-budget-core.mjs'
 import { MAX_SELECTED_LINES, parseRunLoggedArgs } from './run-logged-args.mjs'
@@ -128,6 +129,21 @@ describe('run-logged default launch — the run-identity re-exec (point 700, Sol
       const record = JSON.parse(readFileSync(join(dir, recordName), 'utf8'))
       expect(record.status).toBe('finished')
       expect(record.exitCode).toBe(1)
+      const journal = parseActivityJournal(readFileSync(join(dir, 'activity.jsonl'), 'utf8'))
+      expect(journal.rejected).toEqual([])
+      expect(journal.records.map((event) => event.event)).toEqual([
+        'verification-start',
+        'verification-finish',
+      ])
+      expect(journal.records).toEqual(journal.records.map((event) => expect.objectContaining({
+        pid: record.pid,
+        cause: 'named-verification-run',
+        evidence: expect.objectContaining({
+          id: join(dir, recordName),
+          recordPath: join(dir, recordName),
+          startedAt: record.startedAt,
+        }),
+      })))
       // The writer's own probed argv (/proc, recorded as evidence) carries the
       // log path it recorded…
       expect(String(record.cmdline)).toContain('--log-file')

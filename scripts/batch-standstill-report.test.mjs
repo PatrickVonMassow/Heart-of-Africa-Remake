@@ -2,7 +2,6 @@ import { mkdirSync, mkdtempSync, readFileSync, rmSync, utimesSync, writeFileSync
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { describe, expect, it } from 'vitest'
-import { ACTIVITY_EVENTS } from './batch-activity-journal-core.mjs'
 import { ACTIVITY_CLASSES, classifyTimeline, commitGapSummary, evidenceInterval, timelineTotals } from './batch-standstill-core.mjs'
 import {
   autostartEvidence,
@@ -19,7 +18,7 @@ import { parseWindow, renderStandstillReport } from './batch-standstill-report.m
 
 describe('standstill report inputs', () => {
   const verificationProgress = ({ at, path, startedAt, pid = 4242 }) => ({
-    event: ACTIVITY_EVENTS.VERIFICATION_PROGRESS,
+    event: 'verification-progress',
     atMs: at,
     pid,
     evidence: { id: path, recordPath: path, startedAt },
