@@ -61,7 +61,6 @@ export function activeVerificationLease(
     const suspensionUntil = startedAt + suspensionMaxMs
     if (!Number.isFinite(suspensionUntil) || now >= suspensionUntil) continue
     const effectiveUntil = Math.min(leaseUntil, suspensionUntil)
-    if (effectiveUntil <= now) continue
     if (!active || progressAt > active.progressAt) {
       active = { ...lease, startedAt, progressAt, leaseUntil: effectiveUntil, suspensionUntil }
     }
@@ -94,7 +93,8 @@ export function emergencyDecision({
   if (stalledMs < thresholdMs) {
     return { action: 'observe', reason: 'progress-within-threshold', strike: false, progressAt, stalledMs }
   }
-  const verificationLease = activeVerificationLease(report, now)
+  const suspensionMaxMs = thresholdMs * (VERIFICATION_SUSPENSION_MAX_MS / EMERGENCY_THRESHOLD_MS)
+  const verificationLease = activeVerificationLease(report, now, VERIFICATION_LEASE_MS, suspensionMaxMs)
   if (verificationLease) {
     return {
       action: 'stand-down', reason: 'live-verification-lease', strike: false,

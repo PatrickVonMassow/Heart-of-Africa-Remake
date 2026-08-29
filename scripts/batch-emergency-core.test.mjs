@@ -179,6 +179,25 @@ describe('the independent emergency decision', () => {
     })
   })
 
+  it('scales the per-record suspension ceiling with a custom emergency threshold', () => {
+    const thresholdMs = 30 * 60_000
+    const overdue = report(ACTIVITY_CLASSES.VERIFICATION)
+    overdue.batchProgress[0].at = NOW - thresholdMs - 1
+    overdue.verificationLeases = [{
+      record: '/repo/local/verify-logs/large.log.run.json',
+      command: 'verify --plan large',
+      status: 'running',
+      startedAt: NOW - 2 * thresholdMs,
+      progressAt: NOW - 1000,
+      leaseUntil: NOW - 1000 + VERIFICATION_LEASE_MS,
+      processAlive: true,
+    }]
+    expect(activeVerificationLease(overdue, NOW)).not.toBeNull()
+    expect(emergencyDecision({ now: NOW, report: overdue, workablePoints: [1002], thresholdMs })).toMatchObject({
+      action: 'soft-recover', strike: true, reason: 'batch-stalled-past-threshold',
+    })
+  })
+
   it.each([
     ['self-serving future bound', {
       record: '/repo/local/verify-logs/large.log.run.json', command: 'verify --plan large',
