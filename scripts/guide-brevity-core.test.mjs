@@ -259,6 +259,18 @@ describe('auditGuide — budget boundaries', () => {
     expect(measureGuide(malformed)).toEqual({ lines: 5, words: 8 })
   })
 
+  it('cannot re-form an unterminated opener across its own excision seam', () => {
+    const malformed = 'A <!-<!---rest of the guide'
+    expect(measureGuide(malformed)).toEqual(measureGuide('A <!- -rest of the guide'))
+    expect(measureGuide(malformed)).toEqual({ lines: 1, words: 6 })
+  })
+
+  it('keeps word boundaries while neutralising every opener in a malformed tail', () => {
+    const malformed = 'word<!--more <!-<!---rest'
+    expect(measureGuide(malformed)).toEqual(measureGuide('word more <!- -rest'))
+    expect(measureGuide(malformed)).toEqual({ lines: 1, words: 4 })
+  })
+
   it('retains visible words before a comment that opens mid-line', () => {
     const measured = measureGuide('keep these words <!-- hidden\nstill hidden\n-->')
     expect(measured).toEqual({ lines: 1, words: 3 })

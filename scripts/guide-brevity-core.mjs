@@ -467,7 +467,13 @@ export function measureGuide(text) {
     cursor = end + 3
   }
   if (unmatchedStart >= 0) {
-    source = source.slice(0, unmatchedStart) + source.slice(unmatchedStart + 4).replaceAll('<!--', '')
+    // Replace, do not delete: deletion can join `<!-` on the left to `-` on
+    // the right and manufacture a fresh `<!--` at either replacement seam.
+    // A space also keeps `word<!--more` as two measured words.
+    source =
+      source.slice(0, unmatchedStart) +
+      ' ' +
+      source.slice(unmatchedStart + 4).replaceAll('<!--', ' ')
   }
   const lines = source.split('\n')
   const body = []
