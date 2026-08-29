@@ -445,8 +445,8 @@ put it is the mistake this line exists to stop.
   ONE APPARENT REGRESSION DID NOT SURVIVE MEASUREMENT. That classification's single current-tree
   run also called two checks REAL REGRESSION — "a feed that ends without a kill leaves no remnant"
   and the dev assertion `animal-buried` (zebra bodyY=0.42 against ground=1.03) — green on both
-  baseline runs. Re-measured at once: four more branch passes, ZERO occurrences of either, so they
-  stand at one of six branch observations. That is the rotating family flake
+  baseline runs. Re-measured at once: five more branch passes, ZERO occurrences of either — one run
+  rotated onto two OTHER checks instead. That is the rotating family flake
   `scripts/verify/README.md` says this suite carries. Only baseline runs in the same NUMBER would
   settle it; two cannot separate a 1-in-6 rate from zero.
   WHAT IT PROVES: build, lint, type-check and 14,467 unit tests green; `polish` green at 200
