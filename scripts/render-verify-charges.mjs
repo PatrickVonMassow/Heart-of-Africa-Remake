@@ -627,4 +627,122 @@ export const RED_CHARGES = [
       'the red point 603 declares itself the owner of ("UNTIL THEN this point is where that red is ' +
       'charged") and which only the WebGPU half of the ledger had entered, under point 514.',
   },
+  {
+    point: 698,
+    suite: 'polish',
+    backend: 'webgpu',
+    featureLevel: 'compatibility',
+    kind: 'check',
+    match: /^the children walk PAST the traveller/i,
+    why:
+      'THE USER DECIDED THIS ONE BY NAME. Measured 17.08.2026 on this same branch and filed as '
+      + 'point 698, whose first line records the ruling: land the bank round as it stands and '
+      + 'calibrate the crossing density there. Counted only while the round is RUNNING — which is '
+      + 'what the check now does — three of four measured cases show no crossing at all inside a '
+      + '200 s window, and the first crossing needs 251 s / 81 s / 447 s / 228 s of game time over '
+      + '600 s. The polish window is 45 s, so a red here is the DENSITY 698 owns, not a broken '
+      + 'round: the same suite passed the same check whole on the retry of the 29.08.2026 LARGE '
+      + 'run (200 checks, 0 fail), and the mechanic itself — the runs, the tags, the body '
+      + 'separation, the stranger berth — passes in the same section. '
+      + 'Scoped to suite, backend, level and kind like its neighbours: the charge dies with point '
+      + '698, and on a CORE adapter this check was never measured and stays a real red.',
+  },
+  {
+    point: 1011,
+    suite: 'settings',
+    backend: 'webgpu',
+    featureLevel: 'compatibility',
+    kind: 'console',
+    match:
+      /^console error: THREE\.WebGPURenderer: (Async render pipeline creation failed|Uncaptured WebGPU GPUValidationError: \[Invalid CommandBuffer from CommandEncoder)/i,
+    why:
+      'THE THIRD DOOR OF THE SAME CASCADE, filed as point 1011 on 29.08.2026. The 514 console '
+      + 'entry above already names "the invalid msaa-texture/view/command-buffer and '
+      + 'async-pipeline errors" as the downstream of the RGBA16Float MSAA fault, but its four '
+      + 'anchored patterns start at texts these two never carry, so both rode along unaccounted '
+      + 'through the whole LARGE run of 29.08.2026 on feat/687-roam-bound-fixes — twice, on both '
+      + 'recorded webgpu/settings runs, each carrying featureLevel=compatibility. '
+      + 'The two alternatives name the START of the measured texts and nothing wider: an async '
+      + 'pipeline failure or an invalid command buffer that is NOT this cascade still reds. '
+      + 'Scoped to suite, backend, level and kind for the reason its siblings are: on the CORE '
+      + 'adapter the player runs, each of these stays a real red, and the charge dies with 1011.',
+  },
+  {
+    point: 1012,
+    suite: 'benchmark',
+    backend: 'webgpu',
+    featureLevel: 'compatibility',
+    kind: 'check',
+    match: /^WebGPU: real GPU timestamps were measured for/i,
+    why:
+      'A CHECK THAT CANNOT PASS ON THE LANE IT RUNS ON, filed as point 1012 on 29.08.2026. Both '
+      + 'attempts of the 29.08.2026 LARGE run on feat/687-roam-bound-fixes read 0/33 rows and 0/3 '
+      + 'low rows, and the red prints its own cause: "adapter without the timestamp-query '
+      + 'feature". Point 1009 mentions the pair in prose but owns the borrowed world, not this — '
+      + 'its final state and verifiable list name only the five restored settings and Math.random. '
+      + 'Scoped to the compatibility level on purpose: on an adapter that DOES expose '
+      + 'timestamp-query a missing timestamp is a real defect and stays red. The charge dies with '
+      + 'point 1012, which owes the UNAVAILABLE verdict that replaces it.',
+  },
+  {
+    point: 514,
+    suite: 'benchmark',
+    backend: 'webgpu',
+    featureLevel: 'compatibility',
+    kind: 'check',
+    match: /^no console errors$/i,
+    detailMatch: /RGBA16Float\) does not support multisampling/i,
+    why:
+      'THE MSAA CASCADE REACHING A FOURTH SUITE, charged 29.08.2026. This is the same lane fault '
+      + 'point 514 §5 owns, arriving in the benchmark suite instead of settings: both attempts of '
+      + 'the LARGE run on feat/687-roam-bound-fixes failed "no console errors" carrying exactly '
+      + '"THREE.WebGPURenderer: Uncaptured WebGPU GPUValidationError: The texture format '
+      + '(TextureFormat::RGBA16Float) does not support multisampling." — the fallback edge that '
+      + 'cannot exist on this lane. '
+      + 'DETAIL-SCOPED, not merely name-scoped: "no console errors" is a generic assertion, so '
+      + 'without detailMatch this entry would have excused ANY console error the benchmark ever '
+      + 'reports. Only the measured RGBA16Float sentence is excused; every other console error in '
+      + 'this suite stays a real red, on this lane as on any other. The charge dies with 514.',
+  },
+  {
+    point: 927,
+    suite: 'report',
+    backend: 'webgpu',
+    featureLevel: 'compatibility',
+    kind: 'check',
+    match:
+      /^(the archive holds picture, state, overlay and description|member .*\.png is present|the archive carries a screenshot)$/i,
+    why:
+      'POINT 927 OWNS THIS RED IN FULL AND IN ITS OWN WORDS: "The F6 bug report hands the user an '
+      + 'archive WITHOUT the picture", measured 26.08.2026 on main (f14cf8e9) via '
+      + 'baseline-classify, red in BOTH baseline runs, and named there as a WebGPU-ONLY defect — '
+      + 'the identical tree passes the report suite whole on WebGL 2 with all four members '
+      + 'present. The 29.08.2026 LARGE run on feat/687-roam-bound-fixes reproduces exactly the '
+      + 'three checks 927 lists, twice, on the WebGPU lane. '
+      + 'BACKEND-SCOPED for the reason the point itself measured: on WebGL 2 these three stay real '
+      + 'reds, because there the picture is there and its absence would be a NEW defect. '
+      + 'LEVEL-SCOPED like every other WebGPU entry in this ledger: 927 recorded no feature '
+      + 'level, while BOTH runs that reproduce it here carry featureLevel=compatibility, so the '
+      + 'core adapter the player runs was never measured and the same three checks stay red '
+      + 'there. This entry accounts for the red; it does '
+      + 'not soften it — 927 is criticality HIGH and the archive is a broken channel to the user '
+      + 'until it lands.',
+  },
+  {
+    point: 1010,
+    suite: 'polish',
+    backend: 'webgl',
+    kind: 'check',
+    match: /^no two Ctrl labels fuse in the village crowd/i,
+    why:
+      'THE RED WHOSE CHECK NAMES A TICKED POINT, filed as point 1010 on 29.08.2026. The check '
+      + 'prints "(point 628)", 628 is ticked and lives in docs/tasks-archive.md, and a charge dies '
+      + 'with its point by construction — so the red had no owner at all. Measured in the '
+      + '29.08.2026 LARGE run on feat/687-roam-bound-fixes, WebGL 2: 1/90 frames held a pair fused '
+      + 'beyond 6 px, deepest 19 px, and the retry passed with 200 checks, so the record is '
+      + 'SUSPECT and covers nothing. '
+      + 'This entry gives the red an owner that can CLOSE it; it does not decide the cause. Point '
+      + '1010 owes the throttle probe that separates real fusion at this crowd density from a '
+      + 'loaded host, and the charge dies with it.',
+  },
 ]
