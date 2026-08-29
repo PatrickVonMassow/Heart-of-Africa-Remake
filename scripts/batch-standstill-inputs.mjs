@@ -1,8 +1,9 @@
 import { execFileSync } from 'node:child_process'
-import { existsSync, readFileSync, readdirSync, statSync } from 'node:fs'
+import { existsSync, readFileSync, readdirSync } from 'node:fs'
 import { homedir } from 'node:os'
 import { basename, join } from 'node:path'
 import { parseActivityJournal } from './batch-activity-journal-core.mjs'
+import { ACTIVITY_EVENTS } from './batch-activity-journal-core.mjs'
 import { ACTIVITY_CLASSES, evidenceInterval } from './batch-standstill-core.mjs'
 import { parsePauseRecord } from './batch-pause-core.mjs'
 
@@ -182,10 +183,27 @@ function recordFiles(dir) {
   }
 }
 
+function emittedVerificationProgress(records, record, path, end) {
+  let latest = null
+  for (const event of records ?? []) {
+    const evidence = event?.evidence
+    const sameRecord = evidence?.recordPath === path || evidence?.id === path
+    if (event?.event !== ACTIVITY_EVENTS.VERIFICATION_PROGRESS || !sameRecord) continue
+    if (Number(evidence?.startedAt) !== Number(record?.startedAt) || event?.pid !== record?.pid) continue
+    const at = Math.min(end, Number(event?.atMs))
+    if (!finite(at) || at <= Number(record.startedAt)) continue
+    latest = latest === null ? at : Math.max(latest, at)
+  }
+  return latest
+}
+
 /** Finished named runs are explicit verification intervals. A running record is
- * accepted only to the last output-log progress plus a renewable lease, and the
- * interval never exceeds that lease. */
-export function verificationRecordEvidence(dir, { start, end, leaseMs = 15 * 60_000, processAlive: processAliveProbe } = {}) {
+ * accepted only to the last output-triggered journal event plus a renewable
+ * lease, and the interval never exceeds that lease. A timestamp-only touch of
+ * either adjacent file emits no event and therefore proves no progress. */
+export function verificationRecordEvidence(dir, {
+  start, end, leaseMs = 15 * 60_000, records = [], processAlive: processAliveProbe,
+} = {}) {
   const intervals = []
   const boundaries = []
   const leases = []
@@ -198,7 +216,7 @@ export function verificationRecordEvidence(dir, { start, end, leaseMs = 15 * 60_
     let progressAt = null
     const logPath = typeof record.log === 'string' ? (record.log.startsWith('/') ? record.log : join(dir, basename(record.log))) : null
     if (record.status === 'running' && logPath) {
-      try { progressAt = Math.min(end, Math.max(began, statSync(logPath).mtimeMs)) } catch { /* no progress proof */ }
+      progressAt = emittedVerificationProgress(records, record, path, end)
       finished = finite(progressAt) ? Math.min(end, progressAt + leaseMs) : NaN
     }
     if (!finite(finished) || finished <= began) continue

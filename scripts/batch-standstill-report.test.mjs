@@ -2,6 +2,7 @@ import { mkdtempSync, readFileSync, rmSync, utimesSync, writeFileSync } from 'no
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { describe, expect, it } from 'vitest'
+import { ACTIVITY_EVENTS } from './batch-activity-journal-core.mjs'
 import { ACTIVITY_CLASSES, classifyTimeline, commitGapSummary, evidenceInterval, timelineTotals } from './batch-standstill-core.mjs'
 import {
   autostartEvidence,
@@ -16,6 +17,13 @@ import {
 import { parseWindow, renderStandstillReport } from './batch-standstill-report.mjs'
 
 describe('standstill report inputs', () => {
+  const verificationProgress = ({ at, path, startedAt, pid = 4242 }) => ({
+    event: ACTIVITY_EVENTS.VERIFICATION_PROGRESS,
+    atMs: at,
+    pid,
+    evidence: { id: path, recordPath: path, startedAt },
+  })
+
   it('pairs only timestamped tool calls, not heartbeat-like transcript lines', () => {
     const rows = [
       { timestamp: '2026-08-21T08:00:00.000Z', type: 'assistant', message: { content: [{ type: 'tool_use', id: 't1', name: 'Bash' }] } },
@@ -121,6 +129,7 @@ describe('standstill report inputs', () => {
       const result = verificationRecordEvidence(dir, {
         start: startedAt - 1,
         end: now,
+        records: [verificationProgress({ at: progressAt, path: recordPath, startedAt })],
         processAlive: (record, path) => record.pid === 4242 && path === recordPath,
       })
       expect(result.leases).toEqual([{
@@ -139,14 +148,38 @@ describe('standstill report inputs', () => {
     }
   })
 
-  it('clamps output sampled after the fixed report window to that window', () => {
+  it('clamps emitted output sampled after the fixed report window to that window', () => {
     const dir = mkdtempSync(join(tmpdir(), 'hoa-verification-window-'))
     const end = Date.parse('2026-08-21T10:00:00Z')
     const startedAt = end - 80 * 60_000
     const log = join(dir, 'large.log')
     try {
       writeFileSync(log, 'still running\n')
+      const recordPath = `${log}.run.json`
       utimesSync(log, (end + 1000) / 1000, (end + 1000) / 1000)
+      writeFileSync(recordPath, JSON.stringify({
+        command: 'verify --plan large', log, status: 'running', startedAt, pid: 4242,
+      }))
+      const result = verificationRecordEvidence(dir, {
+        start: startedAt - 1,
+        end,
+        records: [verificationProgress({ at: end + 1000, path: recordPath, startedAt })],
+        processAlive: () => true,
+      })
+      expect(result.leases[0]).toMatchObject({ progressAt: end, leaseUntil: end + 15 * 60_000 })
+    } finally {
+      rmSync(dir, { recursive: true, force: true })
+    }
+  })
+
+  it('does not manufacture progress from startedAt or a touched output log', () => {
+    const dir = mkdtempSync(join(tmpdir(), 'hoa-verification-no-output-'))
+    const end = Date.parse('2026-08-21T10:00:00Z')
+    const startedAt = end - 60_000
+    const log = join(dir, 'large.log')
+    try {
+      writeFileSync(log, '')
+      utimesSync(log, end / 1000, end / 1000)
       writeFileSync(`${log}.run.json`, JSON.stringify({
         command: 'verify --plan large', log, status: 'running', startedAt, pid: 4242,
       }))
@@ -155,7 +188,8 @@ describe('standstill report inputs', () => {
         end,
         processAlive: () => true,
       })
-      expect(result.leases[0]).toMatchObject({ progressAt: end, leaseUntil: end + 15 * 60_000 })
+      expect(result.leases).toEqual([])
+      expect(result.intervals).toEqual([])
     } finally {
       rmSync(dir, { recursive: true, force: true })
     }

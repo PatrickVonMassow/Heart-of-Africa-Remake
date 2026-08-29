@@ -79,7 +79,7 @@ export function gatherStandstillReport({
   const delegatedProgress = delegatedBranchProgress(readText(paths.inFlight), { repo, records: journal.records, start, end })
   const pauseMarker = pauseMarkerEvidence(readText(paths.pauseMarker), { start, end })
   const verification = verificationRecordEvidence(resolve(repo, 'local', 'verify-logs'), {
-    start, end, processAlive: verificationProcessAlive,
+    start, end, records: journal.records, processAlive: verificationProcessAlive,
   })
   const transcripts = paths.sessionTranscripts.map((path) => transcriptEvidence(readText(path), { session: path.split(/[\\/]/).at(-1)?.replace(/\.jsonl$/, '') }))
   const intervals = [journalDerived, auto, autoLast, boundaryMarker, pauseMarker, verification, ...transcripts].flatMap((input) => input.intervals)
