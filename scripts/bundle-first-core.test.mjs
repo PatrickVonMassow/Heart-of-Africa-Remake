@@ -269,6 +269,16 @@ describe('duplicateHomes', () => {
     expect(duplicateHomes(new Set([350]), bundles, new Set([200]))).toEqual([])
   })
 
+  it('reads two rows carrying the SAME id as two homes, and says which row', () => {
+    const bundles = [
+      { id: 'A', points: new Set([350]), list: [350] },
+      { id: 'A', points: new Set([350]), list: [350] },
+    ]
+    expect(duplicateHomes(new Set([350]), bundles, new Set())).toEqual([
+      { point: 350, homes: ['A (row 1)', 'A (row 2)'] },
+    ])
+  })
+
   it('counts the ENTRY, not the sighting — a repeat inside one home is one home', () => {
     const bundles = [{ id: 'A', points: new Set([350]), list: [350, 350] }]
     expect(duplicateHomes(new Set([350]), bundles, new Set())).toEqual([])
@@ -558,7 +568,11 @@ describe('the real docs/work-packages.md', () => {
     // (round-eleven review finding): a count that recognises exactly what the
     // parser recognises goes blind wherever the parser does. Every table line
     // is a row here, and only the header and its separator may fail to parse.
-    const tableLines = section.split('\n').filter((line) => line.trimStart().startsWith('|'))
+    // WIDER THAN THE PARSER HERE TOO (round-sixteen review finding): a Markdown
+    // body row may leave its leading pipe off, and the parser reads only rows
+    // that carry one. Counting by the CELL SEPARATORS instead sees such a row,
+    // so it makes this red rather than disappearing from both sides.
+    const tableLines = section.split('\n').filter((line) => (line.match(/\|/g) ?? []).length >= 3)
     const separators = tableLines.filter((line) => /^\|[\s|:-]+$/.test(line.trim()))
     expect(separators).toHaveLength(1)
     expect(tableLines.length).toBeGreaterThan(7)
@@ -632,20 +646,22 @@ describe('the real docs/work-packages.md', () => {
   // membership canonical, which makes the invariant checkable — here.
   it('prints through the core, so the CLI cannot answer with a sentence of its own', async () => {
     const { spawnSync } = await import('node:child_process')
+    const { gatherBundleFirstInputs } = await import('./bundle-first-guard.mjs')
+    // The environment is judged by the SAME function the wrapper judges it by,
+    // never by reading the output the assertion is about (round-sixteen review
+    // finding — a test that decides from its own subject's answer can be talked
+    // out of running). Both branches are asserted; neither is skipped.
+    const gathered = gatherBundleFirstInputs({ sessionId: 'status-run' })
     const res = spawnSync(process.execPath, [repoPath('scripts/bundle-first-guard.mjs'), '--status'], {
       encoding: 'utf8',
       windowsHide: true,
     })
     expect(res.status).toBe(0)
-    const expected = statusLine(
-      evaluate({
-        tasksMd: readFileSync(repoPath('TASKS.md'), 'utf8'),
-        workPackagesMd: md,
-      }),
+    expect(res.stdout.trim()).toBe(
+      gathered.applicable
+        ? statusLine(evaluate({ tasksMd: readFileSync(repoPath('TASKS.md'), 'utf8'), workPackagesMd: md }))
+        : `bundle-first-guard: not applicable — ${gathered.why}`,
     )
-    // The guard stands down for a paused batch or a foreign lock owner; that
-    // line is the only other thing it may print.
-    if (!/not applicable/.test(res.stdout)) expect(res.stdout.trim()).toBe(expected)
   })
 
   it('gives every open point exactly one home', () => {

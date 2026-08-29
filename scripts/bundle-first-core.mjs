@@ -214,7 +214,19 @@ export function duplicateHomes(openSet, bundles, unbundled) {
   // one home, which is the guard blocking on a formatting nicety instead of on
   // the drift it exists to catch. Hence a set of entries, not a list of
   // sightings.
-  for (const b of bundles || []) for (const n of b.list ?? [...b.points]) add(n, b.id)
+  // THE ROW IS THE HOME, AND ITS ID IS ONLY ITS NAME (round-sixteen review
+  // finding). Two rows carrying the same id are two homes; identifying a home
+  // by the id alone collapsed them into one and let that shape through. So the
+  // row's position is the identity, and the id is disambiguated in the label
+  // only where the document actually repeats it — the ordinary message stays
+  // "A and J" rather than paying for a case the document does not have.
+  const rows = [...(bundles || [])]
+  const idCounts = new Map()
+  for (const b of rows) idCounts.set(b.id, (idCounts.get(b.id) ?? 0) + 1)
+  rows.forEach((b, i) => {
+    const label = (idCounts.get(b.id) ?? 0) > 1 ? `${b.id} (row ${i + 1})` : String(b.id)
+    for (const n of b.list ?? [...b.points]) add(n, label)
+  })
   const bullets = Array.isArray(unbundled?.bullets) ? unbundled.bullets : null
   if (bullets) {
     bullets.forEach((bullet, i) => {
