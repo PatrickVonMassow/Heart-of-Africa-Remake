@@ -125,11 +125,14 @@ describe('restart identity', () => {
 describe('verification process identity', () => {
   it('probes the already-resolved log and accepts only an explicit live verdict', () => {
     const log = '/repo/local/verify-logs/large.log'
+    const record = { pid: 4242, log: 'local/verify-logs/large.log', startedAt: 1000 }
     const runRecord = vi.fn(() => ({ alive: true }))
-    expect(verificationProcessAlive({}, '/ignored.run.json', log, { runRecord })).toBe(true)
-    expect(runRecord).toHaveBeenCalledWith(log)
-    expect(verificationProcessAlive({}, '', log, { runRecord: () => ({ alive: false }) })).toBe(false)
-    expect(verificationProcessAlive({}, '', log, { runRecord: () => { throw new Error('unreadable') } })).toBe(false)
+    expect(verificationProcessAlive(record, '/ignored.run.json', log, { runRecord })).toBe(true)
+    expect(runRecord).toHaveBeenCalledWith(log, { read: expect.any(Function) })
+    expect(runRecord.mock.calls[0][1].read()).toBe(record)
+    expect(verificationProcessAlive(record, '', log, { runRecord: () => ({ alive: false }) })).toBe(false)
+    expect(verificationProcessAlive(record, '', log, { runRecord: () => { throw new Error('unreadable') } })).toBe(false)
+    expect(verificationProcessAlive(null, '', log, { runRecord })).toBe(false)
   })
 
   it('wires the resolved report path into the real default input probe', () => {
@@ -137,6 +140,7 @@ describe('verification process identity', () => {
     dirs.push(repo)
     writeFileSync(join(repo, 'TASKS.md'), '')
     const log = join(repo, 'local', 'verify-logs', 'large.log')
+    const record = { pid: 4242, log: 'local/verify-logs/large.log', startedAt: 1000 }
     const runRecord = vi.fn(() => ({ alive: true }))
     let alive = false
     defaultInputs({
@@ -145,11 +149,12 @@ describe('verification process identity', () => {
       thresholdMs: EMERGENCY_THRESHOLD_MS,
       runRecord,
       gather: ({ verificationProcessAlive: probe }) => {
-        alive = probe({}, `${log}.run.json`, log)
+        alive = probe(record, `${log}.run.json`, log)
         return {}
       },
     })
     expect(alive).toBe(true)
-    expect(runRecord).toHaveBeenCalledWith(log)
+    expect(runRecord).toHaveBeenCalledWith(log, { read: expect.any(Function) })
+    expect(runRecord.mock.calls[0][1].read()).toBe(record)
   })
 })

@@ -24,9 +24,10 @@ writeFileSync(verificationLog, 'measured output\n')
 const verificationSleeper = spawn(process.execPath, [verificationScript, '--log-file', verificationLog], {
   stdio: 'ignore', windowsHide: true,
 })
-writeFileSync(`${verificationLog}.run.json`, JSON.stringify({
-  pid: verificationSleeper.pid, log: verificationLog, status: 'running',
-}))
+const verificationRecord = {
+  pid: verificationSleeper.pid, log: verificationLog, status: 'running', startedAt: now,
+}
+writeFileSync(`${verificationLog}.run.json`, JSON.stringify(verificationRecord))
 
 const reportAt = (end) => {
   const timeline = []
@@ -65,7 +66,11 @@ try {
   let liveVerificationProbe = false
   const probeDeadline = Date.now() + 2000
   while (!liveVerificationProbe && Date.now() < probeDeadline) {
-    liveVerificationProbe = verificationProcessAlive({}, `${verificationLog}.run.json`, verificationLog)
+    liveVerificationProbe = verificationProcessAlive(
+      verificationRecord,
+      `${verificationLog}.run.json`,
+      verificationLog,
+    )
     if (!liveVerificationProbe) await new Promise((resolve) => setTimeout(resolve, 10))
   }
   const common = { statePath, logPath, execute, getLock: () => lock, getProcesses: () => ({}), revoke: () => ({ revoked: true, reason: 'drill-revoked' }), releaseLock: () => true }

@@ -28,12 +28,13 @@ export const EMERGENCY_STATE_PATH = join(REPO_ROOT, 'local', 'batch-emergency-st
 export const EMERGENCY_LOG_PATH = join(REPO_ROOT, 'local', 'batch-emergency-strikes.jsonl')
 export const EMERGENCY_VETO_PATH = join(REPO_ROOT, 'local', 'batch-emergency-veto.json')
 
-/** The report resolves a run's log once and hands this exact path to both the
- * progress evidence and identity probe. Only runRecordFor's positive identity
- * verdict is live; false, null and exceptions all fail closed. */
-export function verificationProcessAlive(_record, _recordPath, logPath, { runRecord = runRecordFor } = {}) {
-  if (typeof logPath !== 'string' || !logPath.trim()) return false
-  try { return runRecord(logPath)?.alive === true } catch { return false }
+/** The report reads a run record and resolves its log once. Feed that same
+ * snapshot into runRecordFor's process-identity reduction so the reported pid
+ * and liveness verdict cannot come from different record contents. Only an
+ * explicit live verdict is accepted; false, null and exceptions fail closed. */
+export function verificationProcessAlive(record, _recordPath, logPath, { runRecord = runRecordFor } = {}) {
+  if (!record || typeof record !== 'object' || typeof logPath !== 'string' || !logPath.trim()) return false
+  try { return runRecord(logPath, { read: () => record })?.alive === true } catch { return false }
 }
 
 const readJson = (path) => {

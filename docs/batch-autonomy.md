@@ -148,8 +148,9 @@ that invocation. A newly invoked wrapper writes a new record with its own
 two-hour bound; retries across records are not aggregated. Rewriting `startedAt`
 or touching the output log emits no event and buys no time. This lease never
 changes the last durable-progress boundary.
-No fresh output, an expired bound, a terminal receipt, or a dead/reused process
-withdraws the suspension, so a busy wedge still strikes.
+No fresh output, an expired bound, a terminal receipt, a dead process, or a PID
+whose command line no longer names the recorded wrapper and log withdraws the
+suspension, so a busy wedge still strikes.
 
 The first hour-without-progress strike is soft: doctor repair followed by a
 normal restart. A hard strike is legal only when that recorded strike exists and
