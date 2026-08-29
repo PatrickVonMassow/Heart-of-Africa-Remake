@@ -2843,17 +2843,21 @@ describe('the shipped charge ledger', () => {
     expect(
       asStored('THREE.WebGPURenderer: Uncaptured WebGPU GPUValidationError: [Invalid BindGroup] is invalid due to a previous error.').point,
     ).toBeNull()
-    // THE TWO FORMS POINT 734 SAID MUST BE FILED NOW HAVE THEIR POINT (29.08.2026).
-    // 734 required the async-pipeline error be "given [an owning point] the moment
-    // a run reproduces it"; the LARGE run of 29.08.2026 reproduced it twice, and
-    // point 1011 was filed for it and for the command-buffer form beside it. They
-    // are charged THERE, never to 514 — the root's owner keeps only what it
-    // measured, and the encoder's number is a run-local counter no charge may read.
-    const filed = [
+    // THE TWO FORMS POINT 734 SAID MUST BE FILED HAVE THEIR POINT (1011, filed
+    // 29.08.2026) AND STILL NO CHARGE — deliberately. A charge for them was
+    // WRITTEN and then WITHDRAWN on 30.08.2026 after two cross-vendor rounds: the
+    // stored console name is cut at 120 characters before the cascade's own
+    // marker, and these texts share one derived key across seven pipeline
+    // objects, so the recorder marks their detail VARIED and no detailMatch may
+    // read it. Every pattern that matched the measured reds therefore also
+    // matched an unrelated pipeline or command-buffer failure on the same lane.
+    // Filing the point is a disposition; an over-broad charge is not. They stay
+    // REAL REDS until point 990 lets a charge name the root it depends on.
+    const stillRed = [
       'THREE.WebGPURenderer: Uncaptured WebGPU GPUValidationError: [Invalid CommandBuffer from CommandEncoder "renderContext_1"] is invalid due to a previous error.',
       'THREE.WebGPURenderer: Async render pipeline creation failed (renderPipeline_x): [Invalid TextureView] is invalid due to a previous error.',
     ]
-    for (const t of filed) expect(asStored(t).point, t).toBe(1011)
+    for (const t of stillRed) expect(asStored(t)?.point ?? null, t).toBeNull()
   })
 
   // THE MSAA TEXTURE ALTERNATIVE CARRIES ITS SENTENCE, NOT THE OBJECT NAME
@@ -2989,29 +2993,6 @@ describe('the shipped charge ledger', () => {
   // is the one failure mode a charge must never have. These pin the narrow half
   // AND the measured half together: an entry that stops matching its own
   // evidence is as broken as one that matches everything.
-  it('keeps the point-1011 charge to the cascade objects it measured', () => {
-    const scoped = { suite: 'settings', backend: 'webgpu', kind: 'console', featureLevel: 'compatibility' }
-    const stored = (text_) => chargeReds(failedChecks(`ERR: ${text_}`), { ...scoped, ledger: RED_CHARGES })[0]
-    // THE MEASURED FAMILY, including the LONGEST object, whose stored name is cut
-    // one character before `[Invalid Text` — the bound the pattern sits at.
-    for (const t of [
-      'THREE.WebGPURenderer: Async render pipeline creation failed (renderPipeline_ShadowMaterial_1867): [Invalid TextureView] is invalid due to a previous error.',
-      'THREE.WebGPURenderer: Async render pipeline creation failed (renderPipeline_MeshStandardNodeMaterial_1006): [Invalid TextureView] is invalid due to a previous error.',
-      'THREE.WebGPURenderer: Uncaptured WebGPU GPUValidationError: [Invalid CommandBuffer from CommandEncoder "renderContext_11"] is invalid due to a previous error.',
-    ]) {
-      expect(stored(t)?.point, t).toBe(1011)
-    }
-    // A PIPELINE FAILURE ON ANOTHER OBJECT IS NOT THIS CASCADE, and a command
-    // buffer from another encoder is not either. Both stay real reds.
-    for (const t of [
-      'THREE.WebGPURenderer: Async render pipeline creation failed (renderPipeline_ShadowMaterial_1867): [Invalid BindGroup] is invalid due to a previous error.',
-      'THREE.WebGPURenderer: Async render pipeline creation failed (renderPipeline_x): [Invalid ShaderModule] is invalid due to a previous error.',
-      'THREE.WebGPURenderer: Uncaptured WebGPU GPUValidationError: [Invalid CommandBuffer from CommandEncoder "computePass_3"] is invalid due to a previous error.',
-    ]) {
-      expect(stored(t)?.point ?? null, t).toBeNull()
-    }
-  })
-
   it('excuses the timestamp row only where the red names the missing capability', () => {
     const scoped = { suite: 'benchmark', backend: 'webgpu', kind: 'check', featureLevel: 'compatibility' }
     const withDetail = (name, detail) => ({ ...red(name), detail })
@@ -3052,21 +3033,20 @@ describe('the shipped charge ledger', () => {
     expect(chargeFor(withDetail('the children walk PAST the traveller', noRun), scoped)).toBeNull()
   })
 
-  it('charges the async-pipeline message to its OWN point, never to the root it quotes', () => {
+  it('leaves the async-pipeline message uncharged, though its family now has a point', () => {
     const scoped = { suite: 'settings', backend: 'webgpu', kind: 'console', featureLevel: 'compatibility' }
     const asyncForm = failedChecks(
       'ERR: THREE.WebGPURenderer: Async render pipeline creation failed (renderPipeline_x): [Invalid TextureView] is invalid due to a previous error.',
     )[0]
-    expect(chargeFor(asyncForm, scoped).point).toBe(1011)
+    expect(chargeFor(asyncForm, scoped)).toBeNull()
     // While the measured form, at the start of the stored name, still charges.
     const measured = failedChecks(
       'ERR: THREE.WebGPURenderer: Uncaptured WebGPU GPUValidationError: [Invalid TextureView] is invalid due to a previous error.',
     )[0]
     expect(chargeFor(measured, scoped).point).toBe(514)
-    // AND THE ANCHOR STILL HOLDS: the point-1011 pattern begins at the renderer's
-    // own prefix, so the bare wording — the shape an unrelated defect prints —
-    // is charged by neither entry. This is the over-reach the pins above exist
-    // for, and filing the point did not widen it.
+    // AND THE BARE WORDINGS STAY UNCHARGED TOO — the shape an unrelated defect
+    // prints. This is the over-reach the pins above exist for, and filing point
+    // 1011 for the family did not widen it by one character.
     for (const bare of ['console error: Async render pipeline creation failed', 'console error: Invalid CommandBuffer from CommandEncoder']) {
       expect(chargeFor(red(bare, null, 'console'), scoped), bare).toBeNull()
     }

@@ -420,6 +420,29 @@ put it is the mistake this line exists to stop.
   `startup`, `report`, `preview` green. The loading-picture freeze that reddened the aborted 10:40
   run passed here — that run had declared its own machine loaded and its timing verdicts void, so
   it was the load. The WebGPU half of the two-backend obligation is still owed.
+  WHAT THE 29.08.2026 WEBGPU RUN LEFT OWED (measured on `feat/687-roam-bound-fixes`, LARGE,
+  90 m 52 s, exit 1). Every red of that run now names an open point and `render-verify-guard
+  --status` reports no unaccounted red on the branch — the freeze to 733, world's frame 11 to 627,
+  the crossing to 698, enrichments' frame 72 and the MSAA cascade to 514, the picture-less bug
+  report to 927, the Ctrl labels to 1010, the benchmark's borrowed world to 1009, and the three
+  that had no point at all to 1011, 1012 and 1013. THREE THINGS STILL BLOCK THE LANDING:
+  - THE WEBGL 2 HALF WAS NEVER RUN. The run requested `backends: ["webgpu","webgl"]`
+    (`local/verify-logs/2026-08-29T19-31-59-213-large.log.run.json`) and its receipt records
+    `backends: ["WebGPU"]` — run-all stops at the first red backend. LARGE owes the complete
+    WebGL 2 regression lane (CLAUDE.md §7.2), so this run does not satisfy it.
+  - FOUR RUN RECORDS CARRY `crashed: true` AND CANNOT BE SIGNED OFF FROM THE KEPT LOG.
+    `webgpu/world` (19:37, 19:38) and `webgpu/enrichments` (20:51, 20:53) are marked crashed in
+    `.claude/render-verify-state.json` while each stored its reds and each is charged (627, 514).
+    `render-verify-recorder` sets the flag from a `CRASH_LINE` on STDERR; `scripts/verify/run-logged.mjs`
+    merges stderr into the log but writes only lines its `select()` keeps, so the kept log is a
+    FILTERED view and cannot evidence the absence of that line. The sign-off the guard asks for
+    ("what the log shows") therefore cannot be given honestly from the material that exists, and
+    it was deliberately NOT given on 29.08.2026. Either the recorder keeps the line that set the
+    flag, or the run is re-taken with the raw stream retained.
+  - SIX FRAMES ARE MISSING, 88 of 94, and which suite stopped short is not established. The
+    shutter's refusals (world's frame 11 twice, enrichments' frame 72 twice) and the
+    `687-bank-game-traveller` frame that never fired — the run phase held only 16 of 395 samples
+    in the 45 s window — are a plausible but UNMEASURED account of the shortfall.
   Refs: src/scenes/place/tagGame.ts, src/scenes/place/childSituations.ts, src/scenes/place/PlaceLife.tsx, src/scenes/place/lifeSpots.ts, src/scenes/place/layout.ts, src/config/balance.ts
   Bundle: Dorfleben.
 
@@ -13606,10 +13629,26 @@ to land than a mechanism that needs a review.
   `featureLevel: 'compatibility'`, `kind: 'console'` — or the lane records the MSAA family as
   UNAVAILABLE rather than red, which is the decision point 514 owes anyway. Scope stays narrow on
   purpose: on a CORE adapter, the one the player runs, each of these stays a real red.
+  A CHARGE WAS WRITTEN FOR THIS AND WITHDRAWN, 30.08.2026 — read this before writing another.
+  Two cross-vendor rounds (GPT-5.6 Sol, effort high) returned do-not-merge on every pattern tried,
+  and the second one named why the family cannot be charged from the record as it stands:
+  - The stored console NAME is normalised to 120 characters. For the longest object measured,
+    `renderPipeline_MeshStandardNodeMaterial_1006`, the cut lands at `[Invalid Tex` — BEFORE the
+    cascade's own marker, `is invalid due to a previous error`. So the name can carry the prefix
+    and the downstream object's first letters, and nothing that establishes the root.
+  - The untruncated DETAIL does carry the whole sentence, but these seven texts share ONE derived
+    key while naming SEVEN different pipeline objects, so the recorder marks the detail VARIED and
+    refuses any `detailMatch` against it. That safeguard is working, not failing.
+  Every pattern that still matched the measured reds therefore also matched an unrelated pipeline
+  or command-buffer failure on the same lane — which is the one property a charge must never have.
+  FILING THIS POINT IS THE DISPOSITION; an over-broad charge would not be one. The reds stay REAL
+  REDS and the render gate stays blocked on them until this point or point 990 lands, and 990 is
+  the one that would make a charge writable at all: it owns letting an entry declare the ROOT its
+  downstream sentence depends on. This point should be worked AFTER 990 for that reason.
   VERIFIABLE: the `settings` suite's recorded console reds on a compatibility-level WebGPU run are
   all accounted for by `node scripts/render-verify-guard.mjs --status`; and a Vitest case in
-  `render-verify-core.test.mjs` that each new pattern matches the measured text and does NOT match
-  the same wording without the cascade's signature.
+  `render-verify-core.test.mjs` that whatever mechanism closes them matches the measured text and
+  does NOT match the same wording without the cascade's signature.
   Criticality: medium — it loses nothing and the cause is known, but a red nobody owns teaches the
   reader to skip the whole report, which is the habit every charge in that table exists to prevent.
   Bundle: Session- & Repo-Hygiene.
@@ -13662,3 +13701,30 @@ to land than a mechanism that needs a review.
   Criticality: low - a single mis-scored hunt in sixteen, invisible to the player, but it makes an
   ecology check report a fault it may not have found.
   Bundle: Tierverhalten.
+
+- [ ] 1014. The Anthropic share of the batch has no lever left except ending the session (user
+  29.08.2026, 22:07 board chat: "Das Anthropic-Volumen ist fast erschöpft, das von OpenAI wurde
+  gerade zurückgesetzt. Verschiebe so viel Last wie möglich auf OpenAI").
+  MEASURED THE SAME NIGHT: `sol-share --status` already stands at `prefer-sol`, which routes every
+  read-only kind AND the authoring of every point the cut does not keep here to GPT-5.6 Sol. What
+  remains on Anthropic is what CLAUDE.md §6 never routes away — the browser suites, the picture
+  judgment, the landing, the main-session bookkeeping — plus the SERVING model itself, which is the
+  largest consumer of the four and has no switch at all.
+  THE ONE STRUCTURAL LEVER IS NOT AVAILABLE. A durable, daemon-owned Sol author survives a session
+  handover; an Agent-tool child does not, and blocks the point boundary it is caught by. That lane
+  is point 834, which stands unlanded on `feat/834-durable-authoring-lane`, and this repository
+  carries no daemon state at all (`batch-daemon status` answers "not a usable batch id"). So today
+  every delegated authoring run is bound to a live Anthropic session, and the only way to spend
+  less Anthropic volume is to end that session sooner — which trades one cost for another, because
+  a fresh session re-reads the board, the work order and the branch state before it can act.
+  FINAL STATE: the share is steerable by measurement rather than by ending sessions. The batch can
+  say what it spent per vendor over a window, the serving model's own share is part of that
+  number, and the durable lane is available so authoring survives a handover instead of pinning a
+  session open. Whether that means landing 834 first, or a smaller carve-out that gives only the
+  authoring runs their own process, is decided from the measurement rather than assumed here.
+  VERIFIABLE: a per-vendor spend figure for a named window that includes the serving model; and a
+  delegated authoring run that outlives the session which commissioned it, adopted by the next one
+  through the boundary that already exists.
+  Criticality: medium — it spends no correctness, but an exhausted vendor stops the batch outright,
+  and the only lever we have today makes the session boundary the tuning knob for cost.
+  Bundle: Session- & Repo-Hygiene.

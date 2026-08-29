@@ -641,7 +641,10 @@ export const RED_CHARGES = [
     // crossing merely does not fall inside the window. So the detail must show the
     // round opening runs at all; a window that never reached the `run` phase is a
     // different defect and stays a real red.
-    detailMatch: /crossed his line;[\s\S]*phases \[[^\]]*run×/i,
+    // A POSITIVE COUNT, not merely the word (cross-vendor review, GPT-5.6 Sol,
+    // round 2): `run×0` satisfied `run×` and would have charged away exactly
+    // the broken round this narrowing exists to keep red.
+    detailMatch: /crossed his line;[\s\S]*phases \[[^\]]*run×[1-9]/i,
     why:
       'THE USER DECIDED THIS ONE BY NAME. Measured 17.08.2026 on this same branch and filed as '
       + 'point 698, whose first line records the ruling: land the bank round as it stands and '
@@ -654,48 +657,6 @@ export const RED_CHARGES = [
       + 'separation, the stranger berth — passes in the same section. '
       + 'Scoped to suite, backend, level and kind like its neighbours: the charge dies with point '
       + '698, and on a CORE adapter this check was never measured and stays a real red.',
-  },
-  {
-    point: 1011,
-    suite: 'settings',
-    backend: 'webgpu',
-    featureLevel: 'compatibility',
-    kind: 'console',
-    // NARROWED 30.08.2026 (cross-vendor review, GPT-5.6 Sol, do-not-merge
-    // finding 1). The alternatives used to end at the bare prefixes, so ANY
-    // pipeline or command-buffer failure on this lane was charged away — the
-    // opposite of what this entry claims about itself. Each now carries the
-    // DOWNSTREAM OBJECT the cascade prints: the async form is excused only when
-    // what it failed on is an invalid TEXTURE, and the command buffer only when
-    // the encoder it came from is a renderContext. An invalid BindGroup or
-    // ShaderModule under the same prefix stays a real red.
-    //
-    // WHY THE BOUND SITS AT `[Invalid Tex` AND NOT ONE CHARACTER FURTHER: a
-    // stored console name is normalised to 120 characters, and for the longest
-    // object measured — `renderPipeline_MeshStandardNodeMaterial_1006` — the cut
-    // lands exactly there. `[Invalid Text` would stop matching the very red this
-    // entry was written for.
-    //
-    // AND WHY NOT THE UNTRUNCATED DETAIL, WHICH CARRIES THE WHOLE SENTENCE: these
-    // seven texts share ONE derived key while carrying SEVEN different pipeline
-    // objects, so the recorder marks the detail VARIED and refuses any
-    // detailMatch against it — that safeguard working, not failing. The name is
-    // therefore the whole of what this record can be asked, and what stays
-    // unasked is exactly POINT 990's subject: a charge cannot verify the root its
-    // downstream sentence points back to.
-    match:
-      /^console error: THREE\.WebGPURenderer: (Async render pipeline creation failed \(renderPipeline_[^)]+\): \[Invalid Tex|Uncaptured WebGPU GPUValidationError: \[Invalid CommandBuffer from CommandEncoder "renderContext_)/i,
-    why:
-      'THE THIRD DOOR OF THE SAME CASCADE, filed as point 1011 on 29.08.2026. The 514 console '
-      + 'entry above already names "the invalid msaa-texture/view/command-buffer and '
-      + 'async-pipeline errors" as the downstream of the RGBA16Float MSAA fault, but its four '
-      + 'anchored patterns start at texts these two never carry, so both rode along unaccounted '
-      + 'through the whole LARGE run of 29.08.2026 on feat/687-roam-bound-fixes — twice, on both '
-      + 'recorded webgpu/settings runs, each carrying featureLevel=compatibility. '
-      + 'The two alternatives name the START of the measured texts and nothing wider: an async '
-      + 'pipeline failure or an invalid command buffer that is NOT this cascade still reds. '
-      + 'Scoped to suite, backend, level and kind for the reason its siblings are: on the CORE '
-      + 'adapter the player runs, each of these stays a real red, and the charge dies with 1011.',
   },
   {
     point: 1012,

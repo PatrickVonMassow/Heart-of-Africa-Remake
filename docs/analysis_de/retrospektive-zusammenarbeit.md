@@ -77,6 +77,7 @@ Das Musterbeispiel sind die Chat-Zeitstempel: neun Eskalationsstufen, acht weich
 | 27.08. abends | Ein Veto der Gegenlesung stand auf `main`, dessen dritter Befund eine Erfindung des Prüfwerkzeugs war: Es schneidet die Retrospektive planmäßig aus dem Prüfstoff, druckt die Kürzung nur in die Konsole des Aufrufers und meldet in derselben Ausgabe »nichts weggelassen« — der Prüfer konnte »fehlt im Commit« von »fehlt in meiner Vorlage« nicht unterscheiden und klagte den Commit an. Der Schutzsatz dagegen gilt nur für eine aufgeteilte Prüfung, die ein Manifest schreibt (§3.203, Punkt 972) |
 | 27.08. abends | Dasselbe Kritikalitäts-Tor forderte binnen zwanzig Minuten erst eine, dann zwei, dann sechs gegenzulesende Dateien für einen Punkt, der in dieser Zeit keinen Commit hatte und keine der genannten Dateien je angefasst hat — die Vereinigung folgt dem Zeitfenster, nicht dem Punkt, und der Commit, der den Befund eintrug, hob die Forderung selbst mit an (§3.204, Punkt 974) |
 | 28.08. abends | Die Notfall-Uhr des unbeaufsichtigten Stapels wurde genau wie bestellt auf nachweisbaren Fortschritt verengt — und verlor dabei einen Schutz, den nie jemand aufgeschrieben hatte: Der ehrliche Abschluss-Prüflauf über beide Backends dauert gemessen 80 min 48 s gegen eine Schwelle von 60 Minuten und sieht seither aus wie ein Hänger, den die Rettungsroutine unterbricht. Kein Test wurde rot; der Schutz war vorhanden, nicht zugesichert (§3.210, Punkt 1002) |
+| 29.08. nachts | Ein Wächter verlangt einen Beleg aus einem Protokoll, das ihn wegwirft: Vier Laufaufzeichnungen tragen die Absturzmarke, gesetzt aus der Fehlerausgabe — das aufbewahrte Protokoll ist eine gefilterte Sicht und kann ihr Fehlen nicht belegen. Nicht freigezeichnet, sondern in den blockierten Punkt geschrieben (§3.215); derselbe Lauf ließ drei Rots ohne jeden Punkt zurück, obwohl die Tafelkarten dafür schon standen (Punkte 1011-1013) |
 
 Muster: Ab dem 22.07. explodiert die Commit-Rate (Delegation) — und genau dann häufen sich die Infrastruktur-Vorfälle. **Skalierung der Autonomie erzeugt eine eigene Problemklasse, die die Feature-Arbeit zeitweise überholt.**
 
@@ -1414,7 +1415,7 @@ keinen Träger hat. Gebucht als Punkt 956.
 
 ## Anhang A — Maschinell gepflegte Quellen-Übersicht
 
-Zuletzt aktualisiert: Samstag, 29.08.2026, 19:57 · Quellen-Fingerprint: `acc97b2da3d9…`
+Zuletzt aktualisiert: Samstag, 29.08.2026, 23:57 · Quellen-Fingerprint: `fdf76b2983ad…`
 
 Spalten heuristisch aus den Quellen abgeleitet (Anläufe = distinkte Datumsnennungen im Memory;
 Maßnahme = Guard-Skripte mit Namens-Treffer). Die inhaltliche Bewertung gehört der Prosa oben.
@@ -1517,8 +1518,8 @@ Maßnahme = Guard-Skripte mit Namens-Treffer). Die inhaltliche Bewertung gehört
 
 Erfasste Quellen: 93 Feedback-/Projekt-Memories · 57 Guard-/Hook-Skripte · 6 Revert-/Reapply-Commits · 114 Prozess-/Meta-TASKS-Punkte (davon 48 offen).
 
-<!-- RETRO-FINGERPRINT: acc97b2da3d9b6c03049ea09cb43fce0f32dc29a78fbcb4ad7f0107f4801ed07 -->
-<!-- RETRO-LAST-REFRESHED: 2026-08-29T17:57:55.661Z -->
+<!-- RETRO-FINGERPRINT: fdf76b2983ad1446216757580ae0a5b742df764f0dc329b826af98cb43769519 -->
+<!-- RETRO-LAST-REFRESHED: 2026-08-29T21:57:55.683Z -->
 <!-- AUTO-GENERATED:END -->
 
 ### 3.111 Ein Erfolg ist kein Beweis für den Weg, auf dem er zustande kam
@@ -4764,3 +4765,35 @@ kein Aufruf. Und ein Tor, das aus einer wahren Beobachtung („eine Referenz hat
 eine falsche Schlussfolgerung zieht („also ist der Lauf ungültig"), darf diese Kosten nicht
 still verbuchen, sondern muss nennen, was es nicht unterscheiden kann — sonst zahlt der Batch
 die Rechnung dauerhaft, ohne dass sie je jemandem auffällt.
+
+### 3.215 Der Wächter verlangt einen Beleg aus einem Protokoll, das ihn wegwirft
+
+Der WebGPU-LARGE-Durchgang der Nacht ließ vier Laufaufzeichnungen mit der Marke
+`crashed: true` zurück — `webgpu/world` zweimal, `webgpu/enrichments` zweimal.
+Die Marke blockiert die Landung, und der Wächter nennt den Ausweg selbst: das
+aufbewahrte Protokoll lesen und den Absturz freizeichnen, mit »was das Protokoll
+zeigt« als Beleg.
+
+Das Protokoll kann es nicht zeigen. Die Marke wird im Recorder von einer
+Stack-Zeile auf der FEHLERAUSGABE gesetzt (`CRASH_LINE`). `run-logged.mjs` führt
+stdout und stderr zusammen, schreibt aber nur, was seine eigene Auswahl behält —
+das aufbewahrte Protokoll ist also eine GEFILTERTE Sicht. Beide Suiten haben
+darin je zweimal vollständig berichtet, mit genau einem Rot, beide gebucht. Kein
+Stack, keine Fehlerzeile. Und genau daraus folgt nichts: Die Abwesenheit in einer
+gefilterten Sicht belegt keine Abwesenheit im Original.
+
+**Die Klasse ist neu und allgemeiner als dieser eine Wächter: Eine Regel verlangt
+einen Beleg aus einem Artefakt, das absichtlich gebaut wurde, um genau diesen
+Beleg wegzuwerfen.** Der Ausweg sieht dabei völlig gangbar aus — es GIBT ein
+Protokoll, es ist lesbar, und wer nicht nachsieht, wie es entsteht, hält das
+Fehlen der Zeile für den Befund. Der bequeme Fehler ist hier nicht das Übersehen,
+sondern das Unterschreiben: Eine Freizeichnung mit »im Protokoll steht nichts
+davon« wäre formal korrekt ausgefüllt und inhaltlich wertlos gewesen, und sie
+hätte die Marke für immer aus dem Weg geräumt.
+
+Die Sitzung hat deshalb NICHT freigezeichnet und den Befund stattdessen in den
+Punkt geschrieben, den er blockiert. Die Heilung gehört auf die Erzeugerseite:
+Wer eine Marke setzt, hebt die Zeile auf, die sie gesetzt hat. Ein Wächter, der
+einen Beleg fordert, den das System nicht aufbewahrt, lässt nur zwei Ausgänge —
+eine Unterschrift ohne Deckung oder einen dauerhaft blockierten Zweig —, und
+beide sind schlechter als die Zeile mitzuschreiben.
