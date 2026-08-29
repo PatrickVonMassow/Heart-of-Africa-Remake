@@ -233,6 +233,15 @@ const vdzkEntry = (title) =>
   `  <div class="body">\n    <p>Die Frage.</p>\n  </div>\n</details>\n`
 
 describe('four-digit point lifecycle', () => {
+  it('preserves a legacy title-only card through the destructive projection path', () => {
+    const source = fullBoard({ now: nowEntry(1000, 'Große Übergabe', '10:00 · ~12:00') })
+    expect(compareNowProjection(source, [1000])).toMatchObject({ ok: true, missing: [], extra: [], strayCards: 0 })
+    expect(reconcileNowProjection(source, [1000], { focusPoint: 1000, stamp: '12:00' })).toBe(source)
+    expect(
+      projectNowForPublish(source, { ok: true, points: [1000], focusPoint: 1000 }, { stamp: '12:00' }),
+    ).toMatchObject({ html: source, comparison: { ok: true } })
+  })
+
   it('returns a legacy title-only now-card to the queue', () => {
     const source = fullBoard({ now: nowEntry(1000, 'Große Übergabe', '10:00 · ~12:00') })
     expect(parseNowCardPoints(source, { knownPoints: [1000] })).toEqual(new Set([1000]))

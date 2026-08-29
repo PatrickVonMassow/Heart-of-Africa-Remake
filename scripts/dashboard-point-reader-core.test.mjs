@@ -52,17 +52,24 @@ describe('structured point provenance', () => {
 })
 
 describe('free-title reader architecture', () => {
-  it('keeps numeric title regexes out of every dashboard guard reader', () => {
-    const files = readdirSync(scriptsDir).filter(
-      (name) => /(?:dashboard|queue-order).*(?:guard|sync)-core\.mjs$/.test(name) && name !== 'dashboard-point-reader-core.mjs',
-    )
-    const offenders = files.filter((name) => {
+  it('routes every title-aware core through the shared reader unless it only classifies state', () => {
+    const coreFiles = readdirSync(scriptsDir).filter((name) => name.endsWith('-core.mjs'))
+    const titleAwareFiles = coreFiles.filter((name) => /class=["']t["']/.test(readFileSync(join(scriptsDir, name), 'utf8')))
+
+    // Non-vacuity is part of the contract: a moved directory or narrowed glob
+    // must fail instead of congratulating an empty scan.
+    expect(coreFiles.length).toBeGreaterThan(40)
+    expect(titleAwareFiles.length).toBeGreaterThan(7)
+    expect(titleAwareFiles).toEqual(expect.arrayContaining(['board-core.mjs', 'board-queue-core.mjs']))
+
+    // board-structure reads title TEXT solely to classify named state cards; it
+    // never derives point ownership. Every ownership-capable title reader must
+    // name the shared module, regardless of regex spelling or local variable.
+    const nonOwnershipReaders = new Set(['board-structure-core.mjs'])
+    const offenders = titleAwareFiles.filter((name) => {
+      if (nonOwnershipReaders.has(name)) return false
       const source = readFileSync(join(scriptsDir, name), 'utf8')
-      return (
-        /class=["']t["'][^\n]{0,100}\\d/.test(source) ||
-        /\b(?:title|titleField|titleNum)\b[^\n]{0,100}\.match\([^\n]{0,100}\\d/.test(source) ||
-        /\b(?:POINT_HEAD|leadingPointRun)\b/.test(source)
-      )
+      return !source.includes("from './dashboard-point-reader-core.mjs'")
     })
     expect(offenders).toEqual([])
   })
