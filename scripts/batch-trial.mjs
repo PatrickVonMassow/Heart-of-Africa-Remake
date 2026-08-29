@@ -1,5 +1,6 @@
 #!/usr/bin/env node
 // The measured verdict is the only path in this command that enables the lane.
+// usage: node scripts/batch-trial.mjs --batch <id> --baseline <baseline.json> --report <trial.json> [--repo <dir>]
 import { existsSync, readFileSync } from 'node:fs'
 import { join, relative, resolve } from 'node:path'
 import { writeJsonAtomic } from './atomic-write.mjs'
@@ -83,7 +84,8 @@ export function runTrial({
 if (isMainModule(import.meta.url)) {
   const parsed = parseTrialArgs(process.argv.slice(2))
   if (!parsed.ok) {
-    console.error(`usage: node scripts/batch-trial.mjs --batch <id> --baseline <baseline.json> --report <trial.json> [--repo <dir>]\n${parsed.reason}`)
+    console.error('usage: node scripts/batch-trial.mjs --batch <id> --baseline <baseline.json> --report <trial.json> [--repo <dir>]')
+    console.error(parsed.reason)
     process.exit(2)
   }
   const result = runTrial(parsed)

@@ -1,5 +1,8 @@
 #!/usr/bin/env node
 // Seal inputs, record independent context samples, and reconstruct trial metrics.
+// usage: node scripts/batch-metrics.mjs report --batch <id> [--repo <dir>]
+// usage: node scripts/batch-metrics.mjs seal-plan --batch <id> --session <id> --fence <n> --plan <plan.json> [--repo <dir>]
+// usage: node scripts/batch-metrics.mjs sample-context --batch <id> --scope handover|ordinary --transcript <session.jsonl> [--repo <dir>]
 import { readFileSync } from 'node:fs'
 import { join, resolve } from 'node:path'
 import { isMainModule } from './is-main.mjs'

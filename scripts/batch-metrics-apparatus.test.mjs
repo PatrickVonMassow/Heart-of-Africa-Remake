@@ -11,7 +11,7 @@ const roots = []
 const repo = () => {
   const root = mkdtempSync(join(tmpdir(), 'metrics-apparatus-'))
   roots.push(root)
-  execFileSync('git', ['init', '-q', root])
+  execFileSync('git', ['init', '-q', root], { windowsHide: true })
   return root
 }
 afterEach(() => roots.splice(0).forEach((root) => rmSync(root, { recursive: true, force: true })))

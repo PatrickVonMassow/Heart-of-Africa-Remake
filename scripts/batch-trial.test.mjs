@@ -11,7 +11,7 @@ const roots = []
 const makeRepo = () => {
   const root = mkdtempSync(join(tmpdir(), 'batch-trial-'))
   roots.push(root)
-  execFileSync('git', ['init', '-q', root])
+  execFileSync('git', ['init', '-q', root], { windowsHide: true })
   mkdirSync(join(root, '.claude'), { recursive: true })
   writeFileSync(join(root, '.claude', 'durable-lane-flag.json'), JSON.stringify({ enabled: false, boundaryMode: 'checkpointed-handover', adapters: ['sol'], changedBy: 'awaiting-trial' }))
   writeFileSync(join(root, 'baseline.json'), JSON.stringify({ ok: true, kind: 'baseline', day: '2026-08-28', medianHandoverContext: 200_000, pointsPerDay: 2 }))
