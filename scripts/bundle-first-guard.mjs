@@ -14,7 +14,7 @@
 //
 //   node scripts/bundle-first-guard.mjs --status
 import { readFileSync, existsSync } from 'node:fs'
-import { evaluate } from './bundle-first-core.mjs'
+import { evaluate, statusLine } from './bundle-first-core.mjs'
 import { heldByOtherLiveOwner } from './batch-singleton.mjs'
 import { isMainModule } from './is-main.mjs'
 import { repoPath } from './repo-paths.mjs'
@@ -49,7 +49,10 @@ if (isMainModule(import.meta.url)) {
         process.exit(0)
       }
       const result = evaluate(gathered.inputs)
-      console.log(result.block ? result.reason : 'bundle-first-guard: every open point is placed.')
+      // The sentence is the core's (round-fifteen review finding): a fail-open
+      // and a measured invariant are the same DECISION and a very different
+      // statement, and that difference belongs where a unit case can reach it.
+      console.log(statusLine(result))
       process.exit(0)
     }
 
