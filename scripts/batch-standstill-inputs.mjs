@@ -198,7 +198,7 @@ export function verificationRecordEvidence(dir, { start, end, leaseMs = 15 * 60_
     let progressAt = null
     const logPath = typeof record.log === 'string' ? (record.log.startsWith('/') ? record.log : join(dir, basename(record.log))) : null
     if (record.status === 'running' && logPath) {
-      try { progressAt = Math.max(began, statSync(logPath).mtimeMs) } catch { /* no progress proof */ }
+      try { progressAt = Math.min(end, Math.max(began, statSync(logPath).mtimeMs)) } catch { /* no progress proof */ }
       finished = finite(progressAt) ? Math.min(end, progressAt + leaseMs) : NaN
     }
     if (!finite(finished) || finished <= began) continue

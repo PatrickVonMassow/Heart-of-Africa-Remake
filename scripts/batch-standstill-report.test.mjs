@@ -139,6 +139,28 @@ describe('standstill report inputs', () => {
     }
   })
 
+  it('clamps output sampled after the fixed report window to that window', () => {
+    const dir = mkdtempSync(join(tmpdir(), 'hoa-verification-window-'))
+    const end = Date.parse('2026-08-21T10:00:00Z')
+    const startedAt = end - 80 * 60_000
+    const log = join(dir, 'large.log')
+    try {
+      writeFileSync(log, 'still running\n')
+      utimesSync(log, (end + 1000) / 1000, (end + 1000) / 1000)
+      writeFileSync(`${log}.run.json`, JSON.stringify({
+        command: 'verify --plan large', log, status: 'running', startedAt, pid: 4242,
+      }))
+      const result = verificationRecordEvidence(dir, {
+        start: startedAt - 1,
+        end,
+        processAlive: () => true,
+      })
+      expect(result.leases[0]).toMatchObject({ progressAt: end, leaseUntil: end + 15 * 60_000 })
+    } finally {
+      rmSync(dir, { recursive: true, force: true })
+    }
+  })
+
   it('renders threshold, evidence, totals, and UTC bounds', () => {
     const start = Date.parse('2026-08-21T08:00:00Z')
     const report = {
