@@ -1890,6 +1890,16 @@ put it is the mistake this line exists to stop.
   Criticality: medium — nothing is red today, but it fires on the next memory written, and it
   fires inside the guard that is supposed to protect the very document being edited.
   Bundle: Session- & Repo-Hygiene.
+  IT HAS NOW HAPPENED, TO THE BEGINNER GUIDE (measured 30.08.2026). The night's work produced a
+  new problem class for `docs/analysis_de/vibe-coding-anleitung.md` — an over-broad exception is a
+  receipt rather than a disposition, and a withdrawal must drag every place that copied its
+  reasoning — and the guide stood at EXACTLY its 495-line budget, so the shortest honest wording of
+  it (two entries, 14 lines) was refused by `guide-brevity-guard`. The analysis went into
+  `retrospektive-zusammenarbeit.md` §3.216, which is where the guard points, and the guide itself
+  was REVERTED rather than the budget raised. So the lesson exists and the beginner-facing document
+  that should carry it does not, which is this point's own prediction happening: the check blocked
+  exactly the turn that wanted to write it. Whatever headroom this point gives, that entry is the
+  first thing owed to the guide.
 
 - [ ] 760. The launcher's own CLI can lose its native binary, and the arming probe cannot see it
   (measured 20.08.2026). The global `@anthropic-ai/claude-code` install stood with NO native
