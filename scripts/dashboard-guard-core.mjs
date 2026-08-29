@@ -308,7 +308,7 @@ export function sliceSections(html) {
  * ("287+288 —", "232·233·234 —", "71/72 —", "313: …") — Opus plan-review
  * hardening 6.
  */
-export function parseCards(sectionHtml, { knownPoints = [] } = {}) {
+export function parseCards(sectionHtml, options = {}) {
   const cards = []
   if (typeof sectionHtml !== 'string') return cards
   // Split a compound point field into its numbers ("232·233·234", "92+94",
@@ -319,6 +319,7 @@ export function parseCards(sectionHtml, { knownPoints = [] } = {}) {
   // that exact point; this is a provenance check, not a numeric ceiling. Other
   // lengths remain separator-qualified, and the structured field stays the
   // authoritative uncapped form.
+  const knownPoints = options?.knownPoints ?? []
   const known = knownPoints instanceof Set ? knownPoints : new Set(Array.isArray(knownPoints) ? knownPoints : [])
   const numbers = (raw) =>
     String(raw)

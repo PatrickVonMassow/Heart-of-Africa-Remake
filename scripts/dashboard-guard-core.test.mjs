@@ -567,8 +567,11 @@ describe('sliceSections / parseCards', () => {
       '<div class="body"><div class="pills"><span>x</span></div><p>Echter Text.</p></div></details>'
     expect(parseCards(html)[0].body).toMatch(/Echter Text/)
   })
-  it('is total on non-string input', () => {
+  it('is total on malformed input and options', () => {
     expect(parseCards(null)).toEqual([])
+    expect(parseCards('<details><summary><span class="t">210 — Titel</span></summary></details>', null)).toEqual([
+      { meta: null, body: '', title: '210 — Titel', points: [210] },
+    ])
     expect(sliceSections(null).order).toEqual([])
   })
 })
