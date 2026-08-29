@@ -68,6 +68,60 @@ describe('the free-ground grid', () => {
     expect(findPlaceRoute(boxed, { x: 0, z: 0 }, { x: 8, z: 0 })).toBeNull()
   })
 
+  // A GOAL INSIDE A COLLIDER IS NO ROUTE, NOT A ROUTE THAT ENDS INSIDE ONE
+  // (cross-vendor review, 29.08.2026). The search substitutes a free cell for a
+  // blocked goal and then appends the TRUE `to`, which is right for the hand's
+  // breadth the substitution exists for — the mover stops at its own arrival
+  // radius and the arrival is judged against the real place. Rings deeper into
+  // SOLID ground it is a lie: the last leg is one no step can finish, so a
+  // caller whose arrival radius is smaller than the obstruction drives at it for
+  // the whole phase instead of being told to give up. The old four-ring goal
+  // reach returned a NON-null route for exactly this, and no case here could see
+  // it, because every case asked only whether the WAYPOINTS stood on free ground
+  // — which they did. Un-free ground that is NOT solid keeps the full reach and
+  // has its own case in riverBank.test.ts: the walk into the river targets the
+  // wade limit, which no collider occupies, and it must still find its way.
+  it('refuses a goal buried deeper than the substitution forgives', () => {
+    const boxed = buildPlaceNavGrid({ radius: 20 }, [{ x: 8, z: 0, r: 3 }], R)
+    // Free ground stops at 3 + R from the collider's middle. This goal lies well
+    // inside that, but close enough that the old four-ring search still found a
+    // free cell to route to and then walked off it into the rock.
+    const buried = { x: 8 - (3 + R) + 1.4, z: 0 }
+    expect(navPointFree(boxed, buried.x, buried.z)).toBe(false)
+    expect(findPlaceRoute(boxed, { x: 0, z: 0 }, buried)).toBeNull()
+    // And the hand's breadth is still forgiven: a goal barely inside the edge
+    // keeps its route, and that route still ends at the true target.
+    const grazed = { x: 8 - (3 + R) - 0.05, z: 0 }
+    expect(navPointFree(boxed, grazed.x, grazed.z)).toBe(false)
+    const route = findPlaceRoute(boxed, { x: 0, z: 0 }, grazed)
+    expect(route).not.toBeNull()
+    expect(route![route!.length - 1]).toEqual(grazed)
+  })
+
+  // THE INVARIANT THE ABOVE IS ONE CASE OF, asserted over a real layout rather
+  // than a hand-built grid: whatever route comes back, its last leg is one the
+  // mover can finish — the target is free ground, or it is near enough to free
+  // ground that an ordinary arrival radius covers the difference.
+  it('never returns a route whose last leg cannot be finished', () => {
+    const boxed = buildPlaceNavGrid({ radius: 20 }, [{ x: 8, z: 0, r: 3 }, { x: -6, z: 4, r: 2 }], R)
+    for (let i = 0; i < 400; i++) {
+      const a = (i / 400) * Math.PI * 2
+      const to = { x: Math.cos(a) * (2 + (i % 13)), z: Math.sin(a) * (2 + (i % 13)) }
+      const route = findPlaceRoute(boxed, { x: 0, z: -12 }, to)
+      if (!route) continue
+      const end = route[route.length - 1]
+      expect(end).toEqual(to)
+      if (navPointFree(boxed, end.x, end.z)) continue
+      // Not free — and in this fixture the only reason is a collider — so free
+      // ground must lie within the one ring a solid goal is forgiven, and the
+      // mover stops a step short rather than pushing at rock.
+      const near = [-NAV_CELL, 0, NAV_CELL].some((dx) =>
+        [-NAV_CELL, 0, NAV_CELL].some((dz) => navPointFree(boxed, end.x + dx, end.z + dz)),
+      )
+      expect(near).toBe(true)
+    }
+  })
+
   // A MOVER WITH RULES OF ITS OWN (work-order 687). The children's round is kept
   // off the sloping shore and out of the carved sub-passage wedges, neither of
   // which the grid knows — and a route over ground the mover's own step then

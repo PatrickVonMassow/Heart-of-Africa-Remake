@@ -48,6 +48,14 @@ export interface PlaceNavGrid {
   min: number
   /** 1 where a mover of the grid's radius may stand, 0 elsewhere. */
   free: Uint8Array
+  /** 1 where a COLLIDER occupies the cell — the half of `free` a mover cannot
+   *  walk into at all. Ground that is merely un-free is a different thing: past
+   *  the wade limit, outside the boundary, or narrowed away by `navRestrict`,
+   *  a mover CAN step there and its caller decides what happens. `findPlaceRoute`
+   *  needs the two apart to tell "walk in and wade on" from "drive at a rock".
+   *  One byte per cell, filled once with `free` and never narrowed after: a
+   *  restriction takes ground away, it does not build a wall. */
+  solid: Uint8Array
   /** Search scratch, reused across calls: a settlement's grid is tens of
    *  thousands of cells, and allocating two arrays of it per route would hand
    *  the render loop a megabyte a second of garbage for nothing. */
@@ -96,6 +104,7 @@ export function buildPlaceNavGrid(
     n,
     min: -reach,
     free: new Uint8Array(n * n),
+    solid: new Uint8Array(n * n),
     parent: new Int32Array(n * n),
     queue: new Int32Array(n * n),
   }
@@ -103,8 +112,10 @@ export function buildPlaceNavGrid(
     const x = worldOf(grid, i)
     for (let j = 0; j < n; j++) {
       const z = worldOf(grid, j)
+      const clear = standingClear(colliders, x, z, moverRadius)
+      if (!clear) grid.solid[i * n + j] = 1
       if (!insidePlace(bounds, x, z, margin + slack)) continue
-      if (!standingClear(colliders, x, z, moverRadius)) continue
+      if (!clear) continue
       grid.free[i * n + j] = 1
     }
   }
@@ -190,7 +201,22 @@ function nearestFreeCell(grid: PlaceNavGrid, x: number, z: number, rings: number
  * corners only — every straight run is collapsed to its end point — and always
  * ends at the true `to`, so the arrival is judged against the real place rather
  * than against a cell centre.
+ *
+ * A GOAL INSIDE SOLID GROUND IS NO ROUTE. The substitution above exists for a
+ * target a hand's breadth inside a collider, where the mover stops at its own
+ * arrival radius and the route may honestly end at the true `to`. Rings deeper
+ * it becomes a lie: the last leg is one no step can finish, and a caller whose
+ * arrival radius is smaller than the obstruction drives at it for as long as it
+ * keeps asking — the "stuck against geometry" this function is meant to REPORT.
+ * So a goal a collider occupies is forgiven exactly one ring and no more.
+ *
+ * Ground that is merely UN-FREE keeps the full reach, and must: the water past
+ * the wade limit, the lobe a caller narrowed away, anything beyond the boundary
+ * — a mover walks into all of those, and what happens there is its caller's
+ * business, not this function's. That is why the grid records the two apart.
  */
+const GOAL_RINGS = 1
+
 export function findPlaceRoute(
   grid: PlaceNavGrid,
   from: NavPoint,
@@ -201,6 +227,12 @@ export function findPlaceRoute(
   const startCell = nearestFreeCell(grid, from.x, from.z, maxRings)
   const goalCell = nearestFreeCell(grid, to.x, to.z, maxRings)
   if (startCell < 0 || goalCell < 0) return null
+  if (
+    grid.solid[cellOf(grid, to.x) * n + cellOf(grid, to.z)] === 1 &&
+    nearestFreeCell(grid, to.x, to.z, Math.min(maxRings, GOAL_RINGS)) < 0
+  ) {
+    return null
+  }
   if (startCell === goalCell) return [{ x: to.x, z: to.z }]
 
   // Breadth-first from the goal over four-neighbourhoods: no diagonal step, so
