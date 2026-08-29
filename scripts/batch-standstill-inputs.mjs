@@ -199,8 +199,8 @@ function emittedVerificationProgress(records, record, path, end) {
     const sameRecord = evidence?.recordPath === path || evidence?.id === path
     if (event?.event !== ACTIVITY_EVENTS.VERIFICATION_PROGRESS || !sameRecord) continue
     if (Number(evidence?.startedAt) !== Number(record?.startedAt) || event?.pid !== record?.pid) continue
-    const at = Math.min(end, Number(event?.atMs))
-    if (!finite(at) || at <= Number(record.startedAt)) continue
+    const at = Number(event?.atMs)
+    if (!finite(at) || at <= Number(record.startedAt) || at > end) continue
     latest = latest === null ? at : Math.max(latest, at)
   }
   return latest

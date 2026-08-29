@@ -149,7 +149,7 @@ describe('standstill report inputs', () => {
     }
   })
 
-  it('clamps emitted output sampled after the fixed report window to that window', () => {
+  it('rejects emitted output sampled after the fixed report window', () => {
     const dir = mkdtempSync(join(tmpdir(), 'hoa-verification-window-'))
     const end = Date.parse('2026-08-21T10:00:00Z')
     const startedAt = end - 80 * 60_000
@@ -167,7 +167,8 @@ describe('standstill report inputs', () => {
         records: [verificationProgress({ at: end + 1000, path: recordPath, startedAt })],
         processAlive: () => true,
       })
-      expect(result.leases[0]).toMatchObject({ progressAt: end, leaseUntil: end + 15 * 60_000 })
+      expect(result.leases).toEqual([])
+      expect(result.intervals).toEqual([])
     } finally {
       rmSync(dir, { recursive: true, force: true })
     }

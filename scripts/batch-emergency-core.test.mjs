@@ -187,12 +187,16 @@ describe('the independent emergency decision', () => {
     ['unnamed record', { record: '', command: 'verify --plan large', progressAt: NOW - 1000, leaseUntil: NOW + 1000 }],
     ['unnamed command', { record: '/repo/large.log.run.json', command: ' ', progressAt: NOW - 1000, leaseUntil: NOW + 1000 }],
     ['sample beyond the window', {
-      record: '/repo/large.log.run.json', command: 'verify --plan large', progressAt: NOW + 1, leaseUntil: NOW + 1000,
+      record: '/repo/large.log.run.json', command: 'verify --plan large',
+      progressAt: NOW - 1000, leaseUntil: NOW + 1000, windowEnd: NOW - 2000,
     }],
   ])('rejects a verification lease with %s', (_case, fields) => {
     const overdue = report(ACTIVITY_CLASSES.VERIFICATION)
+    const { windowEnd, ...leaseFields } = fields
+    if (Number.isFinite(windowEnd)) overdue.window.end = windowEnd
     overdue.verificationLeases = [{
-      status: 'running', startedAt: NOW - 60_000, processAlive: true, ...fields,
+      status: 'running', startedAt: NOW - 60_000, processAlive: true,
+      ...leaseFields,
     }]
     expect(activeVerificationLease(overdue, NOW)).toBeNull()
   })
