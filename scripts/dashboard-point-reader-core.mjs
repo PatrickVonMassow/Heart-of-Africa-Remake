@@ -20,6 +20,9 @@ export function pointNumbersFromChip(raw) {
  * A single point needs the board's legacy dash/colon separator. A compound run
  * (`287+288`, `121, 130 und 146`) is already explicit ownership and may flow
  * straight into its label, matching the sync guard's established title form.
+ * The sync guard additionally opts into `allowUnseparatedSingle` for its older
+ * `306 Closing…` titles; keeping that exception here lets the consumer retain
+ * its compatibility contract without growing another numeric parser.
  * A four-digit token is ambiguous with a year and therefore counts only when
  * `knownPoints` proves that exact TASKS point. Other lengths stay uncapped.
  *
@@ -54,7 +57,9 @@ export function pointOwnershipFromTitle(raw, options = {}) {
   }
 
   const titleSeparator = title.slice(cursor).match(/^\s*(?:[—–]|:(?!\d))\s*/)
-  if (points.length === 1 && !titleSeparator) return { points: [], prefixEnd: 0 }
+  if (points.length === 1 && !titleSeparator && options?.allowUnseparatedSingle !== true) {
+    return { points: [], prefixEnd: 0 }
+  }
   if (titleSeparator) cursor += titleSeparator[0].length
 
   const accepted = [...new Set(points)].filter((point) => String(point).length !== 4 || known.has(point))

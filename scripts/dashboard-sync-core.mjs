@@ -71,7 +71,8 @@ export function parseTasksPoints(text) {
 export function parseCardTitle(raw, options = {}) {
   if (typeof raw !== 'string') return null
   const trimmed = raw.trim()
-  const ownership = pointOwnershipFromTitle(trimmed, options)
+  const readerOptions = options && typeof options === 'object' ? options : {}
+  const ownership = pointOwnershipFromTitle(trimmed, { ...readerOptions, allowUnseparatedSingle: true })
   const points = ownership.points
   return {
     raw: trimmed,

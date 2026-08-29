@@ -66,6 +66,15 @@ describe('parseCardTitle / cardTitle', () => {
     expect(parseCardTitle('224 — workflow').point).toBe(224)
   })
 
+  it('retains the sync guard\'s separator-less legacy title shape', () => {
+    expect(parseCardTitle('306 Closing-Aufräum')).toMatchObject({
+      point: 306,
+      points: [306],
+      label: 'Closing-Aufräum',
+    })
+    expect(nowCardTitles(boardHtml(['306 Closing-Aufräum']))[0]).toMatchObject({ point: 306, points: [306] })
+  })
+
   it('parses a label-only title (»Closing-Aufräum + Fable«) to point null with the full label', () => {
     const c = parseCardTitle('Closing-Aufräum (Dead-Code/Stale-Doc) + Fable-Verifikationen')
     expect(c.point).toBeNull()
@@ -218,6 +227,7 @@ describe('matches', () => {
   it('is total: null card / null state → false, never throws', () => {
     expect(matches(null, state())).toBe(false)
     expect(matches('306 — Guard', null)).toBe(false)
+    expect(parseCardTitle('306 Closing-Aufräum', null).point).toBe(306)
   })
 })
 
@@ -244,6 +254,15 @@ describe('evaluate — blocks on real drift', () => {
     expect(r.block).toBe(true)
     expect(r.reason).toContain('feat/224-workflow')
     expect(r.reason).toContain('306')
+  })
+
+  it('does not report head drift for a separator-less legacy card on its own branch', () => {
+    const r = evaluate({
+      cards: cards(['306 Closing-Aufräum']),
+      state: state({ headBranch: 'feat/306-unrelated-slug', open: [306] }),
+    })
+    expect(r.block).toBe(false)
+    expect(r.drift).toBeNull()
   })
 
   it('allows when a second now-card covers the HEAD point (parallel work)', () => {
