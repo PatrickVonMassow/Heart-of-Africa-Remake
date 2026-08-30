@@ -15,6 +15,11 @@
 // bindings — is pinned in the Vitest layer.
 import { launchVerifyBrowser, assertBackend, waitForSceneBuilt, VERIFY_GL } from './_browser.mjs'
 import { sectionGate } from './sections.mjs'
+import {
+  ARCHIVE_MEMBER_SUFFIXES,
+  archiveMemberDetail,
+  memberPresentCheckName,
+} from './report-archive-names.mjs'
 import { readFile } from 'node:fs/promises'
 import sharp from 'sharp'
 
@@ -132,10 +137,14 @@ if (section('bug-report-archive')) {
 
   const members = readZip(zip)
   const names = members.map((m) => m.name)
-  check('the archive holds picture, state, overlay and description', names.length === 4, names.join(', '))
+  check(
+    'the archive holds picture, state, overlay and description',
+    names.length === ARCHIVE_MEMBER_SUFFIXES.length,
+    archiveMemberDetail(names),
+  )
   const stem = download.suggestedFilename().replace(/\.zip$/, '')
-  for (const suffix of ['.png', '.json', '-overlay.json', '.txt']) {
-    check(`member ${stem}${suffix} is present`, names.includes(`${stem}${suffix}`))
+  for (const suffix of ARCHIVE_MEMBER_SUFFIXES) {
+    check(memberPresentCheckName(stem, suffix), names.includes(`${stem}${suffix}`))
   }
 
   // --- The description and the reproduction fields are in the text file --------
