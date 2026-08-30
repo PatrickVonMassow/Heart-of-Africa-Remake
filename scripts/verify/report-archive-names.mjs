@@ -12,10 +12,33 @@
 // silently stopped matching. Both sides now build the text HERE, so a change to
 // the wording is a change both readers see.
 //
+// The suffixes are named by ROLE rather than left as a bare list (same review,
+// round 2): a test that takes "everything except the picture" out of an unnamed
+// list cannot tell a renamed member from an added one.
+//
 // Pure string work — no imports, so the Vitest layer can read it.
 
-/** The suffixes the archive carries, in the order the suite checks them. */
-export const ARCHIVE_MEMBER_SUFFIXES = ['.png', '.json', '-overlay.json', '.txt']
+/** The rendered picture — absent from the archive when the capture failed. */
+export const ARCHIVE_PICTURE_SUFFIX = '.png'
+/** The game state. */
+export const ARCHIVE_STATE_SUFFIX = '.json'
+/** The overlay snapshot: every visible label and HUD box. */
+export const ARCHIVE_OVERLAY_SUFFIX = '-overlay.json'
+/** The description the user typed, with the reproduction fields. */
+export const ARCHIVE_DESCRIPTION_SUFFIX = '.txt'
+
+/**
+ * The suffixes the archive carries, IN THE ORDER src/report/bugReport.ts writes
+ * them — picture first, because it is what the reader opens. The suite checks
+ * that order, so a reordering in production reds the suite instead of quietly
+ * invalidating the charge that reads the printed list.
+ */
+export const ARCHIVE_MEMBER_SUFFIXES = [
+  ARCHIVE_PICTURE_SUFFIX,
+  ARCHIVE_STATE_SUFFIX,
+  ARCHIVE_OVERLAY_SUFFIX,
+  ARCHIVE_DESCRIPTION_SUFFIX,
+]
 
 /** The separator the member list is joined with. */
 export const ARCHIVE_MEMBER_SEPARATOR = ', '

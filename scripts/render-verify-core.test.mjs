@@ -11,8 +11,12 @@ import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { describe, it, expect } from 'vitest'
 import {
+  ARCHIVE_DESCRIPTION_SUFFIX,
   ARCHIVE_MEMBER_SEPARATOR,
   ARCHIVE_MEMBER_SUFFIXES,
+  ARCHIVE_OVERLAY_SUFFIX,
+  ARCHIVE_PICTURE_SUFFIX,
+  ARCHIVE_STATE_SUFFIX,
   archiveMemberDetail,
   archiveMemberNames,
   memberPresentCheckName,
@@ -3029,15 +3033,25 @@ describe('the shipped charge ledger', () => {
     // three are taken FROM THE SUITE'S OWN SUFFIX LIST rather than spelled out, so
     // renaming a member in production reds this line instead of quietly leaving
     // the charge matching a detail the suite no longer prints.
-    const PICTURE = '.png'
-    expect(ARCHIVE_MEMBER_SUFFIXES).toContain(PICTURE)
-    const nonPicture = ARCHIVE_MEMBER_SUFFIXES.filter((suffix) => suffix !== PICTURE)
+    // The production list is pinned by ROLE and by SHAPE first (cross-vendor
+    // review, GPT-5.6 Sol, round 2): taking "everything but the picture" out of an
+    // unnamed list cannot tell a RENAMED member from an ADDED one, so a suffix
+    // change could mutate the positive fixture below and leave the negative cases
+    // unreachable while every line stayed green.
+    expect(ARCHIVE_MEMBER_SUFFIXES).toEqual([
+      ARCHIVE_PICTURE_SUFFIX,
+      ARCHIVE_STATE_SUFFIX,
+      ARCHIVE_OVERLAY_SUFFIX,
+      ARCHIVE_DESCRIPTION_SUFFIX,
+    ])
+    const nonPicture = ARCHIVE_MEMBER_SUFFIXES.filter((suffix) => suffix !== ARCHIVE_PICTURE_SUFFIX)
+    expect(nonPicture).toEqual([ARCHIVE_STATE_SUFFIX, ARCHIVE_OVERLAY_SUFFIX, ARCHIVE_DESCRIPTION_SUFFIX])
     expect(chargeFor(withDetail(composite, detailOf(...nonPicture)), scoped).point).toBe(927)
     // A LOST STATE OR A LOST OVERLAY IS A DEFECT NOBODY HAS MEASURED, and this
     // check reports all four members through one name — so without the detail the
     // entry would have excused them too.
-    expect(chargeFor(withDetail(composite, detailOf('.png', '.txt')), scoped)).toBeNull()
-    expect(chargeFor(withDetail(composite, detailOf('.json', '.txt')), scoped)).toBeNull()
+    expect(chargeFor(withDetail(composite, detailOf(ARCHIVE_PICTURE_SUFFIX, ARCHIVE_DESCRIPTION_SUFFIX)), scoped)).toBeNull()
+    expect(chargeFor(withDetail(composite, detailOf(ARCHIVE_STATE_SUFFIX, ARCHIVE_DESCRIPTION_SUFFIX)), scoped)).toBeNull()
     // THE LOST-STATE CASE HAD TO BE WRITTEN WITHOUT A SECOND REASON TO FAIL
     // (cross-vendor review, GPT-5.6 Sol, 30.08.2026): the two lines above also
     // lose the overlay or carry a picture, so each stayed null through a
@@ -3046,21 +3060,21 @@ describe('the shipped charge ledger', () => {
     // keeps overlay and description and drops state and picture, so it is null
     // only while the state member is required in its own right.
     expect(
-      chargeFor(withDetail(composite, detailOf('-overlay.json', '.txt')), scoped),
+      chargeFor(withDetail(composite, detailOf(ARCHIVE_OVERLAY_SUFFIX, ARCHIVE_DESCRIPTION_SUFFIX)), scoped),
     ).toBeNull()
     // AND THE STATE MEMBER IS THE ONE THE SUITE NAMES, not merely some other JSON
     // (cross-vendor review, GPT-5.6 Sol, round 2): an archive that shipped a
     // `metadata.json` in place of its state satisfied `a .json that is not the
     // overlay` and was charged as the measured picture loss.
     expect(
-      chargeFor(withDetail(composite, ['metadata.json', memberOf('-overlay.json'), memberOf('.txt')].join(ARCHIVE_MEMBER_SEPARATOR)), scoped),
+      chargeFor(withDetail(composite, ['metadata.json', memberOf(ARCHIVE_OVERLAY_SUFFIX), memberOf(ARCHIVE_DESCRIPTION_SUFFIX)].join(ARCHIVE_MEMBER_SEPARATOR)), scoped),
     ).toBeNull()
     // AND THE NAME MUST BE THE WHOLE MEMBER, not a prefix of another one (round 3):
     // the detail joins its members with a comma, so the state member ends where the
     // separator does — `<stem>.json.bak` is a different file.
     expect(
       chargeFor(
-        withDetail(composite, [`${memberOf('.json')}.bak`, memberOf('-overlay.json'), memberOf('.txt')].join(ARCHIVE_MEMBER_SEPARATOR)),
+        withDetail(composite, [`${memberOf(ARCHIVE_STATE_SUFFIX)}.bak`, memberOf(ARCHIVE_OVERLAY_SUFFIX), memberOf(ARCHIVE_DESCRIPTION_SUFFIX)].join(ARCHIVE_MEMBER_SEPARATOR)),
         scoped,
       ),
     ).toBeNull()
@@ -3068,7 +3082,7 @@ describe('the shipped charge ledger', () => {
     // a member ending `.json,bak` is no more the state file than `.json.bak` is.
     expect(
       chargeFor(
-        withDetail(composite, [`${memberOf('.json')},bak`, memberOf('-overlay.json'), memberOf('.txt')].join(ARCHIVE_MEMBER_SEPARATOR)),
+        withDetail(composite, [`${memberOf(ARCHIVE_STATE_SUFFIX)},bak`, memberOf(ARCHIVE_OVERLAY_SUFFIX), memberOf(ARCHIVE_DESCRIPTION_SUFFIX)].join(ARCHIVE_MEMBER_SEPARATOR)),
         scoped,
       ),
     ).toBeNull()
@@ -3077,7 +3091,7 @@ describe('the shipped charge ledger', () => {
     // whole detail: three members, each built from the stem the suite writes.
     expect(
       chargeFor(
-        withDetail(composite, [memberOf('.json'), 'bak', memberOf('-overlay.json'), memberOf('.txt')].join(ARCHIVE_MEMBER_SEPARATOR)),
+        withDetail(composite, [memberOf(ARCHIVE_STATE_SUFFIX), 'bak', memberOf(ARCHIVE_OVERLAY_SUFFIX), memberOf(ARCHIVE_DESCRIPTION_SUFFIX)].join(ARCHIVE_MEMBER_SEPARATOR)),
         scoped,
       ),
     ).toBeNull()
@@ -3085,13 +3099,13 @@ describe('the shipped charge ledger', () => {
     // satisfied the description, and nothing required the three to share one stem.
     expect(
       chargeFor(
-        withDetail(composite, [memberOf('.json'), memberOf('-overlay.json'), memberOf('-overlay.txt')].join(ARCHIVE_MEMBER_SEPARATOR)),
+        withDetail(composite, [memberOf(ARCHIVE_STATE_SUFFIX), memberOf(ARCHIVE_OVERLAY_SUFFIX), memberOf(`-overlay${ARCHIVE_DESCRIPTION_SUFFIX}`)].join(ARCHIVE_MEMBER_SEPARATOR)),
         scoped,
       ),
     ).toBeNull()
     expect(
       chargeFor(
-        withDetail(composite, [memberOf('.json'), memberOf('-overlay.json', 'hoa-state-2026-08-29-43'), memberOf('.txt')].join(ARCHIVE_MEMBER_SEPARATOR)),
+        withDetail(composite, [memberOf(ARCHIVE_STATE_SUFFIX), memberOf(ARCHIVE_OVERLAY_SUFFIX, 'hoa-state-2026-08-29-43'), memberOf(ARCHIVE_DESCRIPTION_SUFFIX)].join(ARCHIVE_MEMBER_SEPARATOR)),
         scoped,
       ),
     ).toBeNull()
@@ -3104,7 +3118,7 @@ describe('the shipped charge ledger', () => {
     // `m` to the entry would break exactly this case, which is why it is pinned.
     expect(
       chargeFor(
-        withDetail(composite, `${detailOf('.json', '-overlay.json', '.txt')}\n`),
+        withDetail(composite, `${detailOf(...nonPicture)}\n`),
         scoped,
       ),
     ).toBeNull()
@@ -3112,13 +3126,13 @@ describe('the shipped charge ledger', () => {
     // case-variant member is one nobody has measured.
     expect(
       chargeFor(
-        withDetail(composite, detailOf('.json', '-overlay.json', '.txt').toUpperCase()),
+        withDetail(composite, detailOf(...nonPicture).toUpperCase()),
         scoped,
       ),
     ).toBeNull()
     // While the two checks that name the picture themselves need no detail.
     expect(chargeFor(red('the archive carries a screenshot'), scoped).point).toBe(927)
-    expect(chargeFor(red(memberPresentCheckName('hoa-state-2026-08-29-42', ARCHIVE_MEMBER_SUFFIXES[0])), scoped).point).toBe(927)
+    expect(chargeFor(red(memberPresentCheckName('hoa-state-2026-08-29-42', ARCHIVE_PICTURE_SUFFIX)), scoped).point).toBe(927)
     // ANY OTHER PNG MEMBER IS A RED NOBODY HAS MEASURED: the wildcard that used
     // to stand here accepted every `member <anything>.png is present` the report
     // suite might grow (cross-vendor review, GPT-5.6 Sol, 30.08.2026).
@@ -3255,6 +3269,10 @@ describe('the shipped charge ledger', () => {
     // AND ONE FRAME OUT OF NONE IS NOT A SAMPLE: `1/\d+` accepted `1/0 frames`,
     // a count no honest reading can print.
     expect(chargeFor(withDetail(name, measured.replace('1/90', '1/0')), scoped)).toBeNull()
+    // NOR IS AN EMPTY BRACKET A PAIR (cross-vendor review, GPT-5.6 Sol, round 2):
+    // requiring `[...]` left `[]` chargeable, so the identity was still optional.
+    // polish.mjs writes `"<a>"×"<b>" <across>×<down> px` and nothing else.
+    expect(chargeFor(withDetail(name, measured.replace('["Ada"×"Njoro" 14×12 px]', '[]')), scoped)).toBeNull()
   })
 
   it('leaves the async-pipeline message uncharged, though its family now has a point', () => {

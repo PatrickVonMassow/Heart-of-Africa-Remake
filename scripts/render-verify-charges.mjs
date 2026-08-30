@@ -825,8 +825,12 @@ export const RED_CHARGES = [
     // the pair identity. `worstDepth` and `worstPair` come from the same reading in
     // labelFusion.mjs, so a line printing a depth without its pair is a broken
     // measurement — a different red from the one 1010 owns.
+    // AND THE PAIR IS SPELLED OUT, NOT MERELY BRACKETED (same review, round 2):
+    // `\[[^\]]*\]` matches an EMPTY bracket, so the identity was still optional in
+    // substance. polish.mjs writes `"<a>"×"<b>" <across>×<down> px`, and that is
+    // the only shape excused here.
     detailMatch:
-      /^1\/[1-9]\d* frames held a pair fused beyond \d+ px \(allowed \d+\), deepest \d+ px \[[^\]]*\], \d+–\d+ labels across the sample — as deep as the \d+ px unreadable bar$/i,
+      /^1\/[1-9]\d* frames held a pair fused beyond \d+ px \(allowed \d+\), deepest \d+ px \["[^"]+"×"[^"]+" \d+×\d+ px\], \d+–\d+ labels across the sample — as deep as the \d+ px unreadable bar$/i,
     why:
       'THE RED WHOSE CHECK NAMES A TICKED POINT, filed as point 1010 on 29.08.2026. The check '
       + 'prints "(point 628)", 628 is ticked and lives in docs/tasks-archive.md, and a charge dies '
