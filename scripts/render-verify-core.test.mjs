@@ -3052,6 +3052,15 @@ describe('the shipped charge ledger', () => {
         scoped,
       ),
     ).toBeNull()
+    // A member whose OWN name carries the separator is indistinguishable from two
+    // members (round 5), so the entry stops guessing boundaries and describes the
+    // whole detail: three members, each built from the stem the suite writes.
+    expect(
+      chargeFor(
+        withDetail(composite, 'hoa-state-2026-08-29-42.json, bak, hoa-state-2026-08-29-42-overlay.json, hoa-state-2026-08-29-42.txt'),
+        scoped,
+      ),
+    ).toBeNull()
     // While the two checks that name the picture themselves need no detail.
     expect(chargeFor(red('the archive carries a screenshot'), scoped).point).toBe(927)
     expect(chargeFor(red('member hoa-state-2026-08-29-42.png is present'), scoped).point).toBe(927)

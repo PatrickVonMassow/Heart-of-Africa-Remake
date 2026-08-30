@@ -771,9 +771,13 @@ export const RED_CHARGES = [
     // its state would have matched). Each member is bounded by the separator the
     // detail joins on (round 3: an unbounded name accepted `<stem>.json.bak`, which
     // is not the state member at all; round 4: the terminal boundary must be the
-    // SEPARATOR `, `, not a bare comma, or a `<stem>.json,bak` passes as well).
+    // SEPARATOR `, `, not a bare comma; round 5: a separator BOUNDARY cannot be
+    // told from a member whose own name contains `, `, so the expression stops
+    // guessing where members end and describes the WHOLE detail instead — exactly
+    // three members, each one built from the download stem the suite writes, which
+    // by its own `^hoa-state-\d{4}-\d{2}-\d{2}-\d+\.zip$` shape can hold no comma).
     detailMatch:
-      /^(?!.*\.png)(?=(?:.*, )?hoa-state-\d{4}-\d{2}-\d{2}-\d+\.json(?:, |$))(?=(?:.*, )?[^,]*-overlay\.json(?:, |$))(?=(?:.*, )?[^,]*\.txt(?:, |$)).*$/i,
+      /^(?=(?:.*, )?hoa-state-\d{4}-\d{2}-\d{2}-\d+\.json(?:, |$))(?=.*-overlay\.json)(?=.*\.txt)hoa-state-\d{4}-\d{2}-\d{2}-\d+(?:-overlay)?\.(?:json|txt)(?:, hoa-state-\d{4}-\d{2}-\d{2}-\d+(?:-overlay)?\.(?:json|txt)){2}$/i,
     why:
       'THE SAME DEFECT POINT 927 OWNS, READ THROUGH THE ONE CHECK THAT CAN ALSO FAIL FOR ANOTHER ' +
       'REASON. 927 measured a WebGPU archive holding its `.json`, `-overlay.json` and `.txt` and ' +
