@@ -1034,10 +1034,10 @@
       "place": "ahead"
     },
     "1017": {
-      "at": "2026-08-30T05:20:33.657Z",
-      "why": "Dieselbe Familie wie 1015 und 1018: Buchungen, die nur eine Bahn kennen, halten das Bild-Tor an zufaelligen Stellen an. Der Punkt gehoert vor die Freigabe, weil jede Landung darauf wartet.",
+      "at": "2026-08-30T05:45:23.447Z",
+      "why": "Der Punkt beschreibt eine Aufraeumarbeit an der Buchungstabelle, keine Sperre: die drei Haelften, die er meint, sind bereits nachgetragen. Er laeuft deshalb hinter der Freigabe, anders als 1016 und 1018, die das Bild-Tor wirklich zuhalten.",
       "origin": "machine",
-      "place": "ahead"
+      "place": "last"
     },
     "1018": {
       "at": "2026-08-30T05:20:25.430Z",

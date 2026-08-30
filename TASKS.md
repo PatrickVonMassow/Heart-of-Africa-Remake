@@ -112,35 +112,6 @@ put it is the mistake this line exists to stop.
   way no charge and no owner can lift.
   Bundle: Testinfrastruktur.
 
-- [ ] 1017. A charge is scoped to the lane it was first measured on, so the same red needs a
-  second half on the other lane and nobody notices until a run stops (measured across
-  13.08.2026, 29.08.2026 and 30.08.2026).
-  The pattern is established and keeps recurring: point 514's settings reds got a WebGL half as
-  point 603, point 938's dressing growth got one on 29.08., and point 698's crossing got one on
-  30.08. Each was discovered only when a lane happened to run and the gate stopped, and each
-  cost a cross-vendor round to write.
-  WHAT THE SAME DAY ALSO SHOWED, and it is the counter-example this point must respect: the F6
-  report suite's three point-927 picture-loss reds and the Vite 504 look like the same case and
-  are NOT. Read on the everyday lane they are WebGPU reds; run with `VERIFY_GL=webgl` the suite
-  passes WHOLE (34 checks, 0 fail, 30.08.2026 on `main`). Halves were written for them on the
-  strength of a bare `npm test -- report` — which runs WebGPU — and withdrawn the same hour. A
-  red seen on one lane is evidence about that lane only, and "the same red must appear on both"
-  is the assumption this point exists to stop making.
-  FINAL STATE: every entry in `RED_CHARGES` whose red has actually been MEASURED on both lanes
-  carries both, and every entry that has not says in its `why` that the other lane is unmeasured
-  rather than leaving the reader to guess which it is. Where a lane has never been run for that
-  suite, the point says so and the run is what settles it — never an argument from what the code
-  does. Nothing here loosens a scope: on a CORE adapter and on a lane a red was never seen, the
-  strict reading stands.
-  VERIFIABLE: for each entry gaining a half, the run on the other lane that measured it, quoted;
-  a unit case per widened entry proving the other lane still refuses an unmeasured shape,
-  mutation-checked; and a table-wide case that no entry claims a lane its `why` cannot cite.
-  Plus `npm run test:unit`, lint, build.
-  Criticality: medium — it does not hide a defect today, but it stops a gate at a random moment,
-  and the shortcut it invites — assuming the other lane — writes exactly the charge the table
-  forbids.
-  Bundle: Testinfrastruktur.
-
 - [ ] 1018. The recorder knows which section a red came from and throws it away, so the reader
   has to guess (cross-vendor review, GPT-5.6 Sol at effort high, 30.08.2026, do-not-merge on
   both attempts at guessing).
@@ -13895,3 +13866,32 @@ to land than a mechanism that needs a review.
   Criticality: high — a charge that swallows an unmeasured red is the one failure mode the
   whole mechanism exists to prevent, and it currently hides behind a green gate.
   Bundle: Session- & Repo-Hygiene.
+
+- [ ] 1017. A charge is scoped to the lane it was first measured on, so the same red needs a
+  second half on the other lane and nobody notices until a run stops (measured across
+  13.08.2026, 29.08.2026 and 30.08.2026).
+  The pattern is established and keeps recurring: point 514's settings reds got a WebGL half as
+  point 603, point 938's dressing growth got one on 29.08., and point 698's crossing got one on
+  30.08. Each was discovered only when a lane happened to run and the gate stopped, and each
+  cost a cross-vendor round to write.
+  WHAT THE SAME DAY ALSO SHOWED, and it is the counter-example this point must respect: the F6
+  report suite's three point-927 picture-loss reds and the Vite 504 look like the same case and
+  are NOT. Read on the everyday lane they are WebGPU reds; run with `VERIFY_GL=webgl` the suite
+  passes WHOLE (34 checks, 0 fail, 30.08.2026 on `main`). Halves were written for them on the
+  strength of a bare `npm test -- report` — which runs WebGPU — and withdrawn the same hour. A
+  red seen on one lane is evidence about that lane only, and "the same red must appear on both"
+  is the assumption this point exists to stop making.
+  FINAL STATE: every entry in `RED_CHARGES` whose red has actually been MEASURED on both lanes
+  carries both, and every entry that has not says in its `why` that the other lane is unmeasured
+  rather than leaving the reader to guess which it is. Where a lane has never been run for that
+  suite, the point says so and the run is what settles it — never an argument from what the code
+  does. Nothing here loosens a scope: on a CORE adapter and on a lane a red was never seen, the
+  strict reading stands.
+  VERIFIABLE: for each entry gaining a half, the run on the other lane that measured it, quoted;
+  a unit case per widened entry proving the other lane still refuses an unmeasured shape,
+  mutation-checked; and a table-wide case that no entry claims a lane its `why` cannot cite.
+  Plus `npm run test:unit`, lint, build.
+  Criticality: medium — it does not hide a defect today, but it stops a gate at a random moment,
+  and the shortcut it invites — assuming the other lane — writes exactly the charge the table
+  forbids.
+  Bundle: Testinfrastruktur.
