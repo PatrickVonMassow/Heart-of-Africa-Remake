@@ -77,41 +77,6 @@ then point 633 (the closing run), then point 174 (the tag). A newly appended poi
 kind is MOVED to the front in the same turn that files it; leaving it where append-and-defer
 put it is the mistake this line exists to stop.
 
-- [ ] 1016. Four runs that REPORTED their reds are recorded as crashes, and a crash can be
-  closed by nobody (measured 30.08.2026 on `feat/686-five-word-lexicon-game`, the WebGPU lane
-  of the LARGE regression).
-  `webgpu/world` at 03:39:58 and 03:41:04 and `webgpu/enrichments` at 04:26:47 and 04:29:11
-  each carry `crashed: true` in `.claude/render-verify-state.json` — while the same records
-  carry `exit 1`, `asserted: true`, three and eight screenshots, and exactly ONE red apiece
-  whose owner the recorder already resolved: `frame 11-worldmodel-khartoum-confluence` to
-  point 627 and `frame 72-water-victoria-falls` to point 514. A run that reports its red,
-  asserts its backend and takes its frames did not die; it failed and said so.
-  WHY IT MATTERS RATHER THAN BEING COSMETIC: `render-verify-guard` treats a crash as carrying
-  no red anybody can own, so the three ordinary closings of point 640 cannot reach it. These
-  four therefore block the render gate PERMANENTLY although every red in them is charged —
-  and the blocked gate is the one the next point's landing needs. Ten older crash records
-  from 17.08. to 27.08. sit in the same list for the same reason.
-  WHERE TO LOOK: `scripts/render-verify-recorder.mjs` sets `state.crashed = true` from
-  `CRASH_LINE = /^\s+at .+:\d+:\d+|^(?:Uncaught\s+)?\w*Error(?::|\b)/` over STDERR lines
-  alone. Any stderr line that opens with a stack frame or a word ending in `Error` arms it,
-  which a suite can print while running perfectly well — the WebGPU lane prints validation
-  errors by the hundred. The kept logs of the four runs above are in `local/verify-logs/`.
-  FINAL STATE, decided by what the log SHOWS and never by loosening the pattern until the
-  four pass: for each of the four, say whether the run really died or reported. If it
-  reported, the classifier stops calling that shape a crash — a run that produced a terminal
-  verdict, asserted its backend and recorded its reds is a red run, not a dead one — and the
-  four stop blocking. If it really died, the crash is signed off with what the log shows
-  (`node scripts/render-verify-guard.mjs --crashed "<lane/suite>" --evidence "…"`) and the
-  classifier stands. The ten older records are decided the same way in the same pass, so the
-  backlog does not simply grow.
-  VERIFIABLE: a unit case over the recorder's classification for a stderr line that opens
-  with `\w*Error` inside an otherwise reporting run, mutation-checked; `node
-  scripts/render-verify-guard.mjs --status` naming no crashed run that carries a terminal
-  verdict; plus `npm run test:unit`, lint, build.
-  Criticality: high — it blocks the render gate for every point, and it blocks it in the one
-  way no charge and no owner can lift.
-  Bundle: Testinfrastruktur.
-
 - [ ] 1018. The recorder knows which section a red came from and throws it away, so the reader
   has to guess (cross-vendor review, GPT-5.6 Sol at effort high, 30.08.2026, do-not-merge on
   both attempts at guessing).
