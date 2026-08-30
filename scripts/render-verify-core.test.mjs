@@ -1438,6 +1438,18 @@ describe('evaluate — a red is not closed by the runs that FOLLOWED it (point 6
       expect(chargeFor(cutRed, scoped(detailMatch))).toBeNull()
     })
 
+    // A STATEFUL SIGNATURE ANSWERS THE SAME EVERY TIME IT IS ASKED. `usableRegex`
+    // strips `g` and `y`, so no `lastIndex` carries between calls — but the cut
+    // rule asks the pattern TWICE now (once of its match, once of the longer
+    // text), which is exactly where a surviving flag would show (cross-vendor
+    // review, GPT-5.6 Sol, 8f3f23d).
+    it('answers a stateful end-reaching signature the same way however often it is asked', () => {
+      const sticky = { suite: 'report', backend: 'webgpu', ledger: entry(/one\.json, two\.json, z+$/g) }
+      for (let i = 0; i < 4; i += 1) expect(chargeFor(cutRed, sticky), `call ${i}`).toBeNull()
+      const insideG = { suite: 'report', backend: 'webgpu', ledger: entry(/^one\.json, two\.json,/g) }
+      for (let i = 0; i < 4; i += 1) expect(chargeFor(cutRed, insideG)?.point, `call ${i}`).toBe(927)
+    })
+
     // AND THE NARROWING IS LOAD-BEARING, not decoration. Refusing every cut red
     // instead would withdraw the point-698 crossing charge, whose measurement
     // runs past the bound in every real record while its signature stops well
@@ -1451,6 +1463,27 @@ describe('evaluate — a red is not closed by the runs that FOLLOWED it (point 6
       // the kept text reads material the record really holds, and charges.
       expect(chargeFor(cutRed, scoped(/^(?=one\.json)one\.json, two/))?.point).toBe(927)
       expect(chargeFor(cutRed, scoped(/^one\.json(?=, two\.json)/))?.point).toBe(927)
+    })
+
+    // THE REAL ENTRY, NOT AN ANALOGUE (cross-vendor review, GPT-5.6 Sol, 8f3f23d,
+    // which asked for it): the point-698 crossing red is 223 characters long, so
+    // every record of it IS cut — and it charges through the shipped ledger,
+    // because its signature stops far short of the bound. This is the case that
+    // would break first if the refusal were ever widened.
+    it('charges the real point-698 crossing red, whose own record the bound cuts', () => {
+      const measured =
+        'from one side of him to the other — 0 of 4 crossed his line; along the lane (0 = his line) ' +
+        '[-11..25@1, -10..22@1, -24..0@1, -11..14@1] m, walked [67, 67, 67, 68] m, phases ' +
+        '[run×16 part×72 roam×307] over 45s played, 3 tagged'
+      expect(measured.length).toBeGreaterThan(200)
+      const shipped = { suite: 'polish', backend: 'webgpu', featureLevel: 'compatibility' }
+      const [crossing] = chargeReds(
+        [{ name: 'the children walk PAST the traveller — from one side of him to the other', kind: 'check', detail: measured }],
+        shipped,
+      )
+      expect(crossing.detailCut).toBe(true)
+      expect(crossing.detail).toHaveLength(200)
+      expect(crossing.point).toBe(698)
     })
 
     // THE CONTROL that makes the mark itself load-bearing: the same end-reaching
@@ -3234,6 +3267,25 @@ describe('the shipped charge ledger', () => {
     expect(settings({ backend: 'webgpu', featureLevel: 'core' })).toBeNull()
     expect(at(ground, { suite: 'polish', backend: 'webgl' })).toBeNull()
     expect(at(ground, { suite: 'settings', backend: 'webgl' }, 'console')).toBeNull()
+    // AND THE DETAIL IS READ VERBATIM, TAG AND ALL (cross-vendor review, GPT-5.6
+    // Sol, 8f3f23d): these two entries are name-only, so a tagged detail must
+    // change nothing for them — while the composite entry that DOES read a
+    // detail must stay refused with the tag on it, which is the loud state the
+    // withdrawn stripper was refused for. Both halves are asserted here so this
+    // block cannot pass while a reverse reader is put back.
+    const tagged = (detail) => `${detail}  [--section=bug-report-archive]`
+    expect(
+      chargeFor({ name: dressing, kind: 'check', detail: tagged('samples 0') }, { suite: 'enrichments', backend: 'webgl' })
+        .point,
+    ).toBe(938)
+    const members = archiveMemberDetail(
+      archiveMemberNames('hoa-state-2026-08-30-42', ARCHIVE_MEMBER_SUFFIXES.filter((x) => x !== ARCHIVE_PICTURE_SUFFIX)),
+    )
+    const composite = { name: 'the archive holds picture, state, overlay and description', kind: 'check' }
+    const gpuReport = { suite: 'report', backend: 'webgpu', featureLevel: 'compatibility' }
+    expect(chargeFor({ ...composite, detail: members }, gpuReport).point).toBe(927)
+    expect(chargeFor({ ...composite, detail: tagged(members) }, gpuReport)).toBeNull()
+
     // NAMED RATHER THAN LEFT UNSAID: the 603 pattern carries no leading anchor,
     // so text in FRONT of the name still charges — unlike the 938 pair above.
     // Pinned as it stands, not as it ought to be: narrowing a shipped entry is
