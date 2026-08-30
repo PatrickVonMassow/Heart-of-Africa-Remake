@@ -859,10 +859,12 @@ export const RED_CHARGES = [
       + 'on `main` at 55b99d6 and entered because the WebGPU entries above are scoped to that lane '
       + 'and its compatibility level, so they deliberately excuse nothing here. The report suite on '
       + 'WebGL 2 read the same two reds with the same wording: the `.png` member absent and the '
-      + 'archive carrying no screenshot. Which lane drew the frame does not reach this — the '
-      + 'archive is assembled in `src/report/bugReport.ts`, which leaves the member OUT when the '
-      + 'capture failed, and the suite reads a zip rather than a picture. The charge dies with '
-      + 'point 927; the general case is point 1017.',
+      + 'archive carrying no screenshot. NO CAUSAL CLAIM IS MADE ABOUT THE LANE (cross-vendor '
+      + 'review, GPT-5.6 Sol): the missing member comes from a failed CAPTURE of the rendered '
+      + 'frame, and capture is renderer-dependent, so this entry rests on the measurement — the '
+      + 'same red, with the same wording, read on this lane — and not on an argument that the '
+      + 'renderer cannot cause it. Which of the two lanes fails to capture, and why, is 927 own '
+      + 'question. The charge dies with point 927; the general case is point 1017.',
   },
   {
     point: 927,

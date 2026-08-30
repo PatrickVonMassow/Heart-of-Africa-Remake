@@ -3096,6 +3096,11 @@ describe('the shipped charge ledger', () => {
     // nobody measured (same review).
     expect(chargeFor(red('timeout  [--section=x] '), scope(entry(/^timeout$/)))).toBeNull()
     expect(chargeFor(red('timeout '), scope(entry(/^timeout$/)))).toBeNull()
+    // NOR IS WHITESPACE IN FRONT OF THE JOIN (same review, round 2): a stripper
+    // eating `/ {2,}\[--section=…\]$/` passes every case above and still takes a
+    // measurement's own trailing space with it.
+    expect(chargeFor(red('timeout   [--section=x]'), scope(entry(/^timeout$/)))).toBeNull()
+    expect(chargeFor(red('timeout   [--section=x]'), scope(entry(/^timeout $/))).point).toBe(9001)
   })
 
   it('gives the report suite\'s reds an owner on WebGL 2 as well', () => {
@@ -3126,6 +3131,18 @@ describe('the shipped charge ledger', () => {
     // check name is generic, so the detail is the whole of the evidence.
     expect(at('no console errors', `${vite} | TypeError: undefined is not a function`)).toBeNull()
     expect(at('no console errors', 'TypeError: undefined is not a function')).toBeNull()
+    // THE SCOPE ITSELF IS ASSERTED, not assumed (cross-vendor review, GPT-5.6
+    // Sol): every call above fixes suite, backend and kind, so an entry that
+    // dropped those constraints would pass them all. A neighbouring suite, the
+    // console side and a WebGPU CORE adapter must each stay uncharged.
+    const elsewhere = (over) => chargeFor({ ...red2, ...over.red }, { ...scoped, ...over.scope })
+    const red2 = { name: 'the archive carries a screenshot', detail: 'no PNG member', kind: 'check' }
+    expect(elsewhere({ red: {}, scope: { suite: 'enrichments' } })).toBeNull()
+    expect(elsewhere({ red: { kind: 'console' }, scope: {} })).toBeNull()
+    expect(elsewhere({ red: {}, scope: { backend: 'webgpu', featureLevel: 'core' } })).toBeNull()
+    // AND THE NAME STAYS AS NARROW ON THIS LANE AS ON THE OTHER: a PNG member
+    // the suite might one day grow is a red nobody has measured, here too.
+    expect(at('member thumbnail.png is present', '')).toBeNull()
   })
 
   it('charges the archive composite only in the picture-loss shape', () => {
