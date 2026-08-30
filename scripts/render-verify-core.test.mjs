@@ -35,6 +35,7 @@ import {
   chargeablePoints,
   chargeFor,
   chargeReds,
+  wasDetailCut,
   markVariedDetails,
   runVerdict,
   formatSuspectEnv,
@@ -1374,6 +1375,94 @@ describe('evaluate — a red is not closed by the runs that FOLLOWED it (point 6
     // And a BROAD entry is unaffected: it never claimed to read a measurement.
     const broad = [{ ...narrow[0], detailMatch: undefined }]
     expect(evaluate(renderChange({ runs, openPoints, ledger: [...broad, ...siblingLedger] })).decision).toBe('allow')
+  })
+
+  // THE SAME ROUTE FOR A MEASUREMENT THE RECORD CUT OFF (cross-vendor review,
+  // GPT-5.6 Sol, do-not-merge on 3e6ffd2). The record keeps the first 200
+  // characters, and every detailMatch is anchored at BOTH ends — so a red whose
+  // real measurement ran past the bound is stored as its own prefix, and that
+  // prefix can be the WHOLE measurement of a different, shorter red. The
+  // trailing anchor then asserts something false about text nobody kept.
+  it('refuses a NARROW charge on a record whose measurement was CUT, and charges the same signature when it was not', () => {
+    const NAME = 'the archive lists its members'
+    // The shorter red's own, complete measurement — and the signature written
+    // for it, anchored at both ends because that is what a narrow charge is.
+    const whole = 'one.json, two.json'
+    const signature = [{
+      point: 927,
+      suite: 'report',
+      backend: 'webgpu',
+      kind: 'check',
+      match: /^the archive lists its members$/,
+      detailMatch: /^one\.json, two\.json$/,
+      why: 'the measurement point 927 really recorded',
+    }]
+    const scoped = { suite: 'report', backend: 'webgpu', ledger: signature }
+    const line = (detail) => `FAIL  ${NAME} — ${detail}`
+
+    // THE OTHER RED: its measurement CONTINUES past the bound, and the first
+    // 200 characters of it are exactly the shorter red's whole measurement.
+    const filler = 'x'.repeat(300)
+    const longer = `${whole}${', '.repeat(0)}`.padEnd(200, ' ') // 200 chars, then more
+    const cutSource = `${longer}${filler}`
+    const [cutRed] = chargeReds(failedChecks(line(cutSource)), scoped)
+    expect(cutRed.detail).toHaveLength(200)
+    expect(cutRed.detailCut).toBe(true)
+    // Even a signature that DOES match the kept prefix owns nothing here.
+    const prefixSignature = [{ ...signature[0], detailMatch: new RegExp(`^${cutRed.detail.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`) }]
+    expect(chargeFor(cutRed, { ...scoped, ledger: prefixSignature })).toBeNull()
+    expect(cutRed.point).toBeNull()
+
+    // THE CONTROL, and it is what makes the mark load-bearing: the shorter red
+    // measured the same text and was never cut, so the very same kind of
+    // signature owns it.
+    const [wholeRed] = chargeReds(failedChecks(line(whole)), scoped)
+    expect(wholeRed.detailCut).toBeUndefined()
+    expect(wholeRed.point).toBe(927)
+
+    // A BROAD entry is unaffected — it never claimed to read a measurement.
+    const broad = [{ ...signature[0], detailMatch: undefined }]
+    expect(chargeFor(cutRed, { ...scoped, ledger: broad })?.point).toBe(927)
+
+    // AND THE NARROWING IS LOAD-BEARING, not decoration: a signature that stops
+    // INSIDE the kept text read a measurement the record really holds, and the
+    // cut says nothing about it. Refusing every cut red instead — the wider
+    // rule — would withdraw the point-698 crossing charge, whose measurement
+    // runs past the bound in every real record.
+    const inside = [{ ...signature[0], detailMatch: /^one\.json, two\.json/ }]
+    expect(wasDetailCut(cutRed)).toBe(true)
+    expect(chargeFor(cutRed, { ...scoped, ledger: inside })?.point).toBe(927)
+  })
+
+  // A RECORD WRITTEN BEFORE THE MARK EXISTED CARRIES NO FIELD, and the only
+  // signal left in it is the length. Reading a detail that ends ON the bound as
+  // cut can be wrong — and it is wrong in the safe direction only: it withholds
+  // a narrow charge, so the red stays loudly unaccounted instead of being
+  // quietly excused by another red's signature.
+  it('reads a legacy detail that ends on the bound as cut, and an explicit mark either way', () => {
+    const scopedFor = (detailMatch) => ({
+      suite: 'report',
+      backend: 'webgpu',
+      ledger: [{ point: 927, suite: 'report', backend: 'webgpu', kind: 'check', match: /^cut check$/, detailMatch, why: 'the measurement' }],
+    })
+    const atBound = 'y'.repeat(200)
+    const legacy = { name: 'cut check', key: 'cut check', kind: 'check', detail: atBound }
+    const sig = scopedFor(new RegExp(`^${atBound}$`))
+    expect(wasDetailCut(legacy)).toBe(true)
+    expect(chargeFor(legacy, sig)).toBeNull()
+
+    // One character short of the bound is a measurement nothing cut.
+    const shorter = { ...legacy, detail: 'y'.repeat(199) }
+    expect(wasDetailCut(shorter)).toBe(false)
+    expect(chargeFor(shorter, scopedFor(new RegExp(`^${'y'.repeat(199)}$`)))?.point).toBe(927)
+
+    // An EXPLICIT mark outranks the length in both directions: a record that
+    // says it was not cut is believed even at the bound, and one that says it
+    // was is believed even well inside it.
+    expect(wasDetailCut({ ...legacy, detailCut: false })).toBe(false)
+    expect(chargeFor({ ...legacy, detailCut: false }, sig)?.point).toBe(927)
+    expect(wasDetailCut({ ...shorter, detailCut: true })).toBe(true)
+    expect(chargeFor({ ...shorter, detailCut: true }, scopedFor(new RegExp(`^${'y'.repeat(199)}$`)))).toBeNull()
   })
 
   it('does NOT talk a CRASH away with a charge — a run that died judged no picture', () => {

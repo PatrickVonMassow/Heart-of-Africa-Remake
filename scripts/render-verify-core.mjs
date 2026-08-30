@@ -250,6 +250,54 @@ function patternHits(pattern, value) {
   return re === null ? false : re.test(value)
 }
 
+/**
+ * Was this red's measurement CUT by the record's bound? Records written from
+ * this revision carry `detailCut` explicitly, set where the cut is observed.
+ * Older records carry nothing, and only one signal survives in them: a detail
+ * that ends exactly ON the bound was longer than it, or ended there by
+ * coincidence — the record cannot tell which, so it reads as cut.
+ *
+ * EXACTLY on the bound, never past it. A stored detail can be no longer than
+ * the bound, so a longer one is not a record at all but the unbounded parse it
+ * was read from — and that text was never cut. Reading it as cut would refuse
+ * charges over material the reader can see in full.
+ *
+ * Reading an uncut detail as cut costs a NARROW charge and nothing else: the
+ * red stays loudly unaccounted and closes the three ordinary ways (fix it,
+ * charge it, file it). Reading a cut one as whole is what lets one red's
+ * signature quietly excuse another's, which is the one failure mode this table
+ * exists to prevent.
+ */
+export function wasDetailCut(red) {
+  if (red?.detailCut === true) return true
+  if (Object.prototype.hasOwnProperty.call(red ?? {}, 'detailCut')) return false
+  return text(red?.detail).length === MAX_RED_DETAIL_LEN
+}
+
+/**
+ * Does this signature REACH THE END of the text it matched? That is the only
+ * question the cut makes dangerous (cross-vendor review, GPT-5.6 Sol,
+ * do-not-merge on 3e6ffd2).
+ *
+ * A `detailMatch` that ends before the last kept character read a measurement
+ * that really is in the record, and whatever the bound removed lies past it —
+ * the charge stands. A match that runs to the last kept character is claiming
+ * "and this is where the measurement ends", which is exactly what a cut record
+ * cannot say: the same prefix belongs both to the shorter red the signature was
+ * written for and to a longer one nobody kept. So THAT charge is refused.
+ *
+ * Asked in the regex rather than read off its source, because the source can
+ * anchor in ways no `endsWith('$')` sees — an alternation, a lookahead, a
+ * quantifier that happens to consume the rest — and a signature the reader
+ * misjudges as unanchored is the unsafe direction.
+ */
+function matchReachesEnd(pattern, value) {
+  const re = usableRegex(pattern)
+  if (re === null) return false
+  const hit = re.exec(value)
+  return hit !== null && hit.index + hit[0].length >= value.length
+}
+
 export function chargeFor(red, options) {
   const { suite = '', backend = '', featureLevel = null, ledger = RED_CHARGES } = options ?? {}
   const name = text(red?.name)
@@ -314,8 +362,27 @@ export function chargeFor(red, options) {
       // exactly as it was stored, the four reds stay loudly unaccounted, and
       // POINT 1018 records the measurement and its section as separate fields —
       // the only place the provenance actually exists.
+      //
+      // AND A SIGNATURE MAY NOT READ THE END OF A MEASUREMENT THE RECORD CUT
+      // OFF (cross-vendor review, GPT-5.6 Sol, do-not-merge on 3e6ffd2). The
+      // record keeps the first MAX_RED_DETAIL_LEN characters, and a `detailMatch`
+      // anchored at both ends therefore matches `<cut>` out of `<cut><more>` —
+      // satisfying a signature written for a DIFFERENT, genuinely shorter red,
+      // whose whole measurement the longer one merely begins with. The trailing
+      // anchor says "this is where the measurement ends" about text where
+      // nothing ended. Same shape as the section tag and the same answer: the
+      // reader does not guess, it refuses, and the red stays loudly uncharged.
+      //
+      // NARROWED TO THE SIGNATURES THE CUT CAN REACH: a `detailMatch` that ends
+      // before the last kept character read text the record really holds, and it
+      // keeps charging. Refusing every cut red instead withdrew the point-698
+      // crossing charge, whose own measurement runs past the bound in every real
+      // record and whose signature stops well inside it.
       const measured = detail
-      if (charge.detailMatch && (red?.detailVaried === true || !patternHits(charge.detailMatch, measured))) continue
+      if (charge.detailMatch && red?.detailVaried === true) continue
+      if (charge.detailMatch && !patternHits(charge.detailMatch, measured)) continue
+      // The cut only bites a signature that reads the END of the measurement.
+      if (charge.detailMatch && wasDetailCut(red) && matchReachesEnd(charge.detailMatch, measured)) continue
       return charge
     } catch {
       /* a broken ledger entry charges nothing — the red stays unaccounted */
@@ -381,8 +448,13 @@ export function chargeReds(reds, options) {
     }
     // Absent rather than empty: a red that printed no measurement adds no field,
     // so records of reds that never had one keep the shape they always had.
-    const detail = text(red?.detail).slice(0, MAX_RED_DETAIL_LEN)
+    const printed = text(red?.detail)
+    const detail = printed.slice(0, MAX_RED_DETAIL_LEN)
     if (detail) stored.detail = detail
+    // Absent unless it happened, so a record of an uncut red keeps the shape it
+    // always had. Written HERE, where the cut is observed, because afterwards
+    // nothing but the length is left to read — see `wasDetailCut`.
+    if (printed.length > MAX_RED_DETAIL_LEN) stored.detailCut = true
     // Kept on the record, because the reading has to survive to the re-read:
     // otherwise `owned()` would charge afterwards exactly the red the recorder
     // refused to charge.
@@ -417,7 +489,13 @@ const MAX_SUSPECT_NAME_LEN = 200
  *  bounded — and a `detailMatch` signature therefore has to sit inside the
  *  first MAX_RED_DETAIL_LEN characters of the printed detail. That is not a
  *  hidden trap: `chargeReds` charges the TRUNCATED text, so a signature past
- *  the bound matches at record time no more than it does afterwards. */
+ *  the bound matches at record time no more than it does afterwards.
+ *
+ *  What the bound MAY NOT do is make a cut measurement look whole. Every
+ *  `detailMatch` is anchored at both ends, so `<cut>` out of `<cut><more>`
+ *  satisfies a signature written for a genuinely shorter red — a different red,
+ *  quietly excused. A cut red is marked at the cut (`detailCut`) and refuses
+ *  every narrow charge from then on; see `wasDetailCut`. */
 const MAX_RED_NAME_LEN = 200
 const MAX_RED_DETAIL_LEN = 200
 

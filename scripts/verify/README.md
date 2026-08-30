@@ -1399,6 +1399,19 @@ bound matches at record time no more than it does afterwards. Reds recorded
 before this repair carry no detail and stay out of a `detailMatch` entry's
 reach; that information was never written down and nothing can recover it.
 
+**A signature may not read the END of a measurement the bound cut off.** A
+`detailMatch` anchored at both ends says "and this is where the measurement
+ends" — which a cut record cannot say. The same first 200 characters belong
+both to the shorter red the signature was written for and to a longer one whose
+tail nobody kept, so the anchored entry would quietly excuse the wrong red. A
+record written since carries `detailCut` where the cut happened; an older one is
+read as cut when its detail ends exactly ON the bound, and as whole when it is
+longer, because a stored detail can never exceed the bound and a longer one is
+the unbounded parse. The refusal is narrowed to the signatures the cut can
+reach: a `detailMatch` whose match stops INSIDE the kept text read material the
+record really holds and keeps charging — the point-698 crossing entry does
+exactly that, and its measurement runs past the bound in every real record.
+
 **A measurement that varied inside one run cannot be signed for.** The record
 holds one entry per check key, so a check that failed twice printing two
 different measurements keeps the first — and a signature matching that one
