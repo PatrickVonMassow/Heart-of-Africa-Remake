@@ -3183,6 +3183,50 @@ describe('the shipped charge ledger', () => {
     expect(tagged('the archive carries a screenshot', 'no PNG member  [--section=bug-report-archive]', gpuReport).point).toBe(927)
   })
 
+  // THE THREE ENTRIES WHOSE ONLY PIN WAS A TAGGED READ (cross-vendor review,
+  // Opus 4.8, 30.08.2026, soft flag). Points 938 (both lanes) and 603 were
+  // exercised solely inside the deleted section-tag block, and that deletion was
+  // right — a tagged detail charges nothing now — but it left these entries with
+  // the ledger-wide structural cases and no evidence of their own. Here they
+  // charge the measurement they were opened for, on the lane they were measured
+  // on, and nowhere else.
+  it('charges the dressing growth and the ground detail on their own lanes and no others', () => {
+    const at = (name, scope, kind = 'check') => chargeFor({ name, kind, detail: '' }, scope)
+    const dressing = 'the streamed dressing does not grow over a session at a fixed anchor (point 278)'
+    const enrichments = (scope) => at(dressing, { suite: 'enrichments', ...scope })
+    // POINT 938 HAS TWO HALVES, and the point alone cannot tell them apart — the
+    // matched entry's own backend can.
+    expect(enrichments({ backend: 'webgpu', featureLevel: 'compatibility' }).point).toBe(938)
+    expect(enrichments({ backend: 'webgpu', featureLevel: 'compatibility' }).backend).toBe('webgpu')
+    expect(enrichments({ backend: 'webgl' }).point).toBe(938)
+    expect(enrichments({ backend: 'webgl' }).backend).toBe('webgl')
+    // The core adapter the player runs, and a run that recorded no level at all,
+    // are lanes nobody measured this on.
+    expect(enrichments({ backend: 'webgpu', featureLevel: 'core' })).toBeNull()
+    expect(enrichments({ backend: 'webgpu' })).toBeNull()
+    // THE SCOPE IS ASSERTED, NOT ASSUMED: dropping the suite or the kind, or
+    // letting text ride in front of the name, must not leave this case green.
+    expect(at(dressing, { suite: 'polish', backend: 'webgl' })).toBeNull()
+    expect(at(dressing, { suite: 'enrichments', backend: 'webgl' }, 'console')).toBeNull()
+    expect(at(`also ${dressing}`, { suite: 'enrichments', backend: 'webgl' })).toBeNull()
+
+    const ground = 'first-person ground shows micro-detail (edge energy)'
+    const settings = (scope) => at(ground, { suite: 'settings', ...scope })
+    // POINT 603 IS THE WebGL HALF, and its own words say the WebGPU half of the
+    // same red is point 514 — so the two lanes must answer to different points.
+    expect(settings({ backend: 'webgl' }).point).toBe(603)
+    expect(settings({ backend: 'webgpu', featureLevel: 'compatibility' }).point).toBe(514)
+    expect(settings({ backend: 'webgpu', featureLevel: 'core' })).toBeNull()
+    expect(at(ground, { suite: 'polish', backend: 'webgl' })).toBeNull()
+    expect(at(ground, { suite: 'settings', backend: 'webgl' }, 'console')).toBeNull()
+    // NAMED RATHER THAN LEFT UNSAID: the 603 pattern carries no leading anchor,
+    // so text in FRONT of the name still charges — unlike the 938 pair above.
+    // Pinned as it stands, not as it ought to be: narrowing a shipped entry is
+    // its own change with its own evidence, and this case exists to make the
+    // difference visible rather than to hide it.
+    expect(at(`after F8, ${ground}`, { suite: 'settings', backend: 'webgl' }).point).toBe(603)
+  })
+
   // RESTORED AFTER A REVIEW FINDING, TWICE INDEPENDENTLY (GPT-5.6 Sol on
   // f2f40dd, then Opus 4.8 on b258a3e): withdrawing the section-tag stripper
   // took these two blocks with it, and neither depends on the stripper — their
