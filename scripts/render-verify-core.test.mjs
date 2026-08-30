@@ -3028,6 +3028,13 @@ describe('the shipped charge ledger', () => {
     expect(
       chargeFor(withDetail(composite, 'hoa-state-2026-08-29-42-overlay.json, hoa-state-2026-08-29-42.txt'), scoped),
     ).toBeNull()
+    // AND THE STATE MEMBER IS THE ONE THE SUITE NAMES, not merely some other JSON
+    // (cross-vendor review, GPT-5.6 Sol, round 2): an archive that shipped a
+    // `metadata.json` in place of its state satisfied `a .json that is not the
+    // overlay` and was charged as the measured picture loss.
+    expect(
+      chargeFor(withDetail(composite, 'metadata.json, hoa-state-2026-08-29-42-overlay.json, hoa-state-2026-08-29-42.txt'), scoped),
+    ).toBeNull()
     // While the two checks that name the picture themselves need no detail.
     expect(chargeFor(red('the archive carries a screenshot'), scoped).point).toBe(927)
     expect(chargeFor(red('member hoa-state-2026-08-29-42.png is present'), scoped).point).toBe(927)
@@ -3120,6 +3127,21 @@ describe('the shipped charge ledger', () => {
     // And a sample that never held the crowd proves nothing about fusion at all.
     expect(
       chargeFor(withDetail(name, 'the crowd did not hold: as few as 1 label(s) in a sampled frame (peak 6) — under the 2-label floor, nothing proven'), scoped),
+    ).toBeNull()
+    // THE WHOLE PRINTED LINE IS SPELLED OUT, NOT LEFT TO A WILDCARD (cross-vendor
+    // review, GPT-5.6 Sol, round 2). `deepest N px.*unreadable bar` accepted any
+    // text at all between the depth and the bar — including a detail that has lost
+    // the label-floor reading the verdict always prints, which is a changed
+    // measurement rather than the one 1010 owns.
+    expect(
+      chargeFor(
+        withDetail(
+          name,
+          '1/90 frames held a pair fused beyond 6 px (allowed 4), deepest 19 px ' +
+            '["Ada"×"Njoro" 14×12 px] — as deep as the 18 px unreadable bar',
+        ),
+        scoped,
+      ),
     ).toBeNull()
   })
 

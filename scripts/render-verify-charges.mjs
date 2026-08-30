@@ -765,9 +765,11 @@ export const RED_CHARGES = [
     // THE STATE LOOKAHEAD MUST NOT BE SATISFIED BY THE OVERLAY (cross-vendor
     // review, GPT-5.6 Sol, do-not-merge on 5691e9f): `(?=.*\.json)` was already
     // true of `-overlay.json`, so an archive that had ALSO lost its state matched
-    // and was charged as the measured picture loss. The state member is the one
-    // `.json` that is not the overlay.
-    detailMatch: /^(?!.*\.png)(?=.*(?<!-overlay)\.json)(?=.*-overlay\.json)(?=.*\.txt).*$/i,
+    // and was charged as the measured picture loss. The state member is named by
+    // the download stem (cross-vendor review, round 2: `not the overlay` still
+    // accepted any other JSON, so an archive holding a `metadata.json` instead of
+    // its state would have matched).
+    detailMatch: /^(?!.*\.png)(?=.*hoa-state-\d{4}-\d{2}-\d{2}-\d+\.json)(?=.*-overlay\.json)(?=.*\.txt).*$/i,
     why:
       'THE SAME DEFECT POINT 927 OWNS, READ THROUGH THE ONE CHECK THAT CAN ALSO FAIL FOR ANOTHER ' +
       'REASON. 927 measured a WebGPU archive holding its `.json`, `-overlay.json` and `.txt` and ' +
@@ -793,8 +795,13 @@ export const RED_CHARGES = [
     // been swallowed as the single-frame observation 1010 owns. What was measured
     // is one frame out of the sample, deep enough to cross the unreadable bar, with
     // the retry green. A red on more than one frame, a red without the deep bar, or
-    // a crowd that never held stays a real red.
-    detailMatch: /^1\/\d+ frames held a pair fused beyond \d+ px \(allowed \d+\), deepest \d+ px.*unreadable bar$/i,
+    // a crowd that never held stays a real red. The whole printed line is spelled
+    // out rather than left to a wildcard (cross-vendor review, round 2): the words
+    // `unreadable bar` can also appear inside the label pair the detail quotes.
+    // The retry's own verdict is NOT in this detail and cannot be constrained here;
+    // it is part of the record this charge cites, not of the red it reads.
+    detailMatch:
+      /^1\/\d+ frames held a pair fused beyond \d+ px \(allowed \d+\), deepest \d+ px( \[[^\]]*\])?, \d+–\d+ labels across the sample — as deep as the \d+ px unreadable bar$/i,
     why:
       'THE RED WHOSE CHECK NAMES A TICKED POINT, filed as point 1010 on 29.08.2026. The check '
       + 'prints "(point 628)", 628 is ticked and lives in docs/tasks-archive.md, and a charge dies '
