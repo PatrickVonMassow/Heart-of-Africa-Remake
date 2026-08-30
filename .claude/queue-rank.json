@@ -1034,8 +1034,8 @@
       "place": "ahead"
     },
     "1017": {
-      "at": "2026-08-30T05:53:10.703Z",
-      "why": "Der Punkt ist Aufraeumarbeit an der Buchungstabelle, keine Sperre. Drei Haelften — 603, 938 und die WebGL-Haelfte von 698 — stehen bereits, und der heutige Fehlgriff hat gezeigt, worauf der Punkt achten muss: Vier Haelften fuer die Berichts-Suite wurden geschrieben und wieder zurueckgezogen, weil die Meldungen auf jener Bahn gar nicht auftreten. Er laeuft hinter der Freigabe, anders als 1016 und 1018.",
+      "at": "2026-08-30T06:22:12.781Z",
+      "why": "Der Punkt ist Aufraeumarbeit an der Buchungstabelle, keine Sperre. Drei Haelften — 603, 938 und die WebGL-Haelfte von 698 — stehen bereits. Der Fehlgriff vom 30.08. zeigt, worauf er achten muss: Vier Haelften fuer die Berichts-Suite wurden geschrieben und IN DERSELBEN STUNDE wieder zurueckgezogen, weil die Meldungen auf jener Bahn gar nicht auftreten — ein schlichter Testaufruf laeuft auf der Alltagsbahn, und das ist WebGPU. Er laeuft hinter der Freigabe, anders als 1016 und 1018.",
       "origin": "machine",
       "place": "last"
     },
@@ -1045,41 +1045,6 @@
       "origin": "machine",
       "place": "ahead"
     }
-  },
-  "boundary": {
-    "at": "2026-08-21T00:55:14.962Z",
-    "points": [
-      336,
-      553,
-      596,
-      633,
-      659,
-      660,
-      663,
-      686,
-      687,
-      688,
-      689,
-      690,
-      691,
-      692,
-      708,
-      715,
-      719,
-      733,
-      735,
-      736,
-      738,
-      739,
-      746,
-      747,
-      750,
-      759,
-      760,
-      762,
-      764
-    ],
-    "why": "The order standing in front of the release today is the arrangement that predates this rule; the four machine-filed points that had ranked themselves there were moved behind 174 first"
   },
   "settled": {
     "at": "2026-08-30T05:53:10.711Z",
@@ -1430,5 +1395,40 @@
       1017,
       1018
     ]
+  },
+  "boundary": {
+    "at": "2026-08-21T00:55:14.962Z",
+    "points": [
+      336,
+      553,
+      596,
+      633,
+      659,
+      660,
+      663,
+      686,
+      687,
+      688,
+      689,
+      690,
+      691,
+      692,
+      708,
+      715,
+      719,
+      733,
+      735,
+      736,
+      738,
+      739,
+      746,
+      747,
+      750,
+      759,
+      760,
+      762,
+      764
+    ],
+    "why": "The order standing in front of the release today is the arrangement that predates this rule; the four machine-filed points that had ranked themselves there were moved behind 174 first"
   }
 }

@@ -301,12 +301,25 @@ export function chargeFor(red, options) {
       // detail: the point-927 composite charge matched
       // `…-42.txt` while the record held `…-42.txt  [--section=bug-report-archive]`,
       // and the red it exists to account for stayed unaccounted and blocked the
-      // gate. Taking the tag off restores what was measured without loosening a
-      // single anchor: the shape is RECONSTRUCTED from the generator, so a detail
-      // that merely ends in something bracket-shaped keeps every character it
-      // measured (cross-vendor review, GPT-5.6 Sol, do-not-merge on the first
-      // attempt, which used a regex loose enough to eat real measured text).
-      const measured = withoutSectionTag(detail)
+      // gate. Taking the tag off loosens no anchor: the shape is RECONSTRUCTED
+      // from the generator, so a detail ending in something merely bracket-shaped
+      // — no join in front of it, or a join of the wrong whitespace — keeps every
+      // character it measured (cross-vendor review, GPT-5.6 Sol, do-not-merge on
+      // the first attempt, which used a regex loose enough to eat real text).
+      // WHAT RECONSTRUCTION CANNOT DO IS PROVE PROVENANCE, and this comment used
+      // to imply otherwise: a detail that really measured a value ending in the
+      // join and a bracket is indistinguishable here from a tagged one. Only the
+      // recorder can settle that, which is point 1018.
+      // A detail cut at the record's ceiling may have LOST its real tag beyond
+      // the cut, leaving measured text that merely ends in a tag shape — and
+      // stripping there would eat what a check really printed and could satisfy
+      // an anchored signature that belongs to a different red. That is the one
+      // practical way this normalisation could clear a red without provenance
+      // (cross-vendor review, GPT-5.6 Sol), and it is refused outright: a
+      // truncated detail is read exactly as it was stored. The loud outcome —
+      // the charge simply does not match — is the correct one until point 1018
+      // records the section beside the measurement.
+      const measured = detail.length >= MAX_RED_DETAIL_LEN ? detail : withoutSectionTag(detail)
       if (charge.detailMatch && (red?.detailVaried === true || !patternHits(charge.detailMatch, measured))) continue
       return charge
     } catch {

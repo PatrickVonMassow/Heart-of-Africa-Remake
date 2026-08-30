@@ -3096,6 +3096,17 @@ describe('the shipped charge ledger', () => {
     // nobody measured (same review).
     expect(chargeFor(red('timeout  [--section=x] '), scope(entry(/^timeout$/)))).toBeNull()
     expect(chargeFor(red('timeout '), scope(entry(/^timeout$/)))).toBeNull()
+    // A DETAIL CUT AT THE RECORD'S CEILING IS READ AS IT WAS STORED (cross-vendor
+    // review, GPT-5.6 Sol, and it is the one practical way this could have
+    // cleared a red without provenance): the real tag may sit beyond the cut, so
+    // what is left merely ENDS in a tag shape, and stripping it would eat
+    // measured text and could satisfy an anchored signature belonging to another
+    // red. `chargeReds` cuts at 200 characters, so a detail that long is never
+    // normalised.
+    const cut = 'x'.repeat(200 - '  [--section=x]'.length) + '  [--section=x]'
+    expect(cut.length).toBe(200)
+    expect(chargeFor(red(cut), scope(entry(new RegExp(`^${'x'.repeat(200 - '  [--section=x]'.length)}$`))))).toBeNull()
+    expect(chargeFor(red(cut), scope(entry(new RegExp(`^${cut.replace(/[[\]]/g, '\\$&')}$`)))).point).toBe(9001)
     // NOR IS WHITESPACE IN FRONT OF THE JOIN (same review, round 2): a stripper
     // eating `/ {2,}\[--section=…\]$/` passes every case above and still takes a
     // measurement's own trailing space with it.
