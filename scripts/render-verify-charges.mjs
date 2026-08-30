@@ -671,7 +671,12 @@ export const RED_CHARGES = [
     // would have been charged here. The excuse now rests on the red's own stated
     // reason and on nothing else. The low-preset row prints no such reason and is
     // therefore NOT excused: it stays a real red, which is 1012's to close.
-    detailMatch: /adapter without the timestamp-query feature/i,
+    // ANCHORED AT BOTH ENDS 30.08.2026 (cross-vendor review, GPT-5.6 Sol,
+    // do-not-merge on a7e9ce5): unanchored, a detail carrying the known reason
+    // PLUS a second, genuinely different failure still matched. The detail this
+    // check prints is `<n>/<n> rows, reason "<reason>"` and nothing else, so the
+    // excuse is that whole line or nothing.
+    detailMatch: /^0\/\d+ rows, reason "adapter without the timestamp-query feature"$/i,
     why:
       'A CHECK THAT CANNOT PASS ON THE LANE IT RUNS ON, filed as point 1012 on 29.08.2026. Both '
       + 'attempts of the 29.08.2026 LARGE run on feat/687-roam-bound-fixes read 0/33 rows and 0/3 '
@@ -719,7 +724,12 @@ export const RED_CHARGES = [
     // `.png` member, the other says the archive carries no screenshot — so the
     // name alone is the evidence. The composite check below is a different case
     // and gets its own entry.
-    match: /^(member .*\.png is present|the archive carries a screenshot)$/i,
+    // THE PNG MEMBER IS THE MEASURED ONE, NOT ANY PNG (cross-vendor review,
+    // GPT-5.6 Sol, do-not-merge on 5691e9f): `.*\.png` accepted every PNG-member
+    // check the report suite might ever grow. The name the suite prints is built
+    // from the download stem `hoa-state-<date>-<n>`, so that shape is the whole
+    // of what 927 measured; a future `thumbnail.png` member is a different red.
+    match: /^(member hoa-state-\d{4}-\d{2}-\d{2}-\d+\.png is present|the archive carries a screenshot)$/i,
     why:
       'POINT 927 OWNS THIS RED IN FULL AND IN ITS OWN WORDS: "The F6 bug report hands the user an '
       + 'archive WITHOUT the picture", measured 26.08.2026 on main (f14cf8e9) via '
@@ -752,7 +762,28 @@ export const RED_CHARGES = [
     //
     // The detail lists the members the archive DID hold, so the picture-loss
     // shape is: the other three present, and no `.png` anywhere in the list.
-    detailMatch: /^(?!.*\.png)(?=.*\.json)(?=.*-overlay\.json)(?=.*\.txt).*$/i,
+    // THE STATE LOOKAHEAD MUST NOT BE SATISFIED BY THE OVERLAY (cross-vendor
+    // review, GPT-5.6 Sol, do-not-merge on 5691e9f): `(?=.*\.json)` was already
+    // true of `-overlay.json`, so an archive that had ALSO lost its state matched
+    // and was charged as the measured picture loss. The state member is named by
+    // the download stem (cross-vendor review, round 2: `not the overlay` still
+    // accepted any other JSON, so an archive holding a `metadata.json` instead of
+    // its state would have matched). Each member is bounded by the separator the
+    // detail joins on (round 3: an unbounded name accepted `<stem>.json.bak`, which
+    // is not the state member at all; round 4: the terminal boundary must be the
+    // SEPARATOR `, `, not a bare comma; round 5: a separator BOUNDARY cannot be
+    // told from a member whose own name contains `, `, so the expression stops
+    // guessing where members end and describes the WHOLE detail instead — exactly
+    // three members, each one built from the download stem the suite writes, which
+    // by its own `^hoa-state-\d{4}-\d{2}-\d{2}-\d+\.zip$` shape can hold no comma;
+    // round 6: describing the members SEPARATELY still let one stand in for another
+    // — an `-overlay.txt` satisfied the description, and nothing tied the three to
+    // ONE stem. The detail is now the measured line itself, the stem captured once
+    // and required to repeat, in the order point 927 recorded it; round 8: and
+    // CASE-SENSITIVE, because the suite writes these names in lower case and a
+    // `HOA-STATE-….JSON` member is one nobody has measured).
+    detailMatch:
+      /^(hoa-state-\d{4}-\d{2}-\d{2}-\d+)\.json, \1-overlay\.json, \1\.txt$/,
     why:
       'THE SAME DEFECT POINT 927 OWNS, READ THROUGH THE ONE CHECK THAT CAN ALSO FAIL FOR ANOTHER ' +
       'REASON. 927 measured a WebGPU archive holding its `.json`, `-overlay.json` and `.txt` and ' +
@@ -772,6 +803,19 @@ export const RED_CHARGES = [
     backend: 'webgl',
     kind: 'check',
     match: /^no two Ctrl labels fuse in the village crowd/i,
+    // DETAIL-SCOPED 30.08.2026 (cross-vendor review, GPT-5.6 Sol, do-not-merge on
+    // ffc9c23): the name alone charged EVERY future failure of this check — a
+    // SUSTAINED fusion regression, where most frames hold a fused pair, would have
+    // been swallowed as the single-frame observation 1010 owns. What was measured
+    // is one frame out of the sample, deep enough to cross the unreadable bar, with
+    // the retry green. A red on more than one frame, a red without the deep bar, or
+    // a crowd that never held stays a real red. The whole printed line is spelled
+    // out rather than left to a wildcard (cross-vendor review, round 2): the words
+    // `unreadable bar` can also appear inside the label pair the detail quotes.
+    // The retry's own verdict is NOT in this detail and cannot be constrained here;
+    // it is part of the record this charge cites, not of the red it reads.
+    detailMatch:
+      /^1\/\d+ frames held a pair fused beyond \d+ px \(allowed \d+\), deepest \d+ px( \[[^\]]*\])?, \d+–\d+ labels across the sample — as deep as the \d+ px unreadable bar$/i,
     why:
       'THE RED WHOSE CHECK NAMES A TICKED POINT, filed as point 1010 on 29.08.2026. The check '
       + 'prints "(point 628)", 628 is ticked and lives in docs/tasks-archive.md, and a charge dies '

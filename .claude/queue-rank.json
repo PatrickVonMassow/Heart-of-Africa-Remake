@@ -1020,6 +1020,12 @@
       "why": "Haengt an Punkt 834, der unlandiert vorne liegt; vor dessen Landung gibt es nichts zu bauen, und die Sofortmassnahme (prefer-sol) steht bereits.",
       "origin": "machine",
       "place": "last"
+    },
+    "1015": {
+      "at": "2026-08-29T23:57:11.055Z",
+      "why": "Die vier Buchungen, die heute Nacht gelandet sind, sind verengt und gegengeprueft; der Rest der Tabelle buchte schon vorher zu weit und blockiert keine Landung, also laeuft er hinter der Kommunikations-Kette.",
+      "origin": "machine",
+      "place": "last"
     }
   },
   "boundary": {
@@ -1058,7 +1064,7 @@
     "why": "The order standing in front of the release today is the arrangement that predates this rule; the four machine-filed points that had ranked themselves there were moved behind 174 first"
   },
   "settled": {
-    "at": "2026-08-29T22:13:13.878Z",
+    "at": "2026-08-29T23:57:11.066Z",
     "points": [
       174,
       184,
@@ -1400,7 +1406,8 @@
       1011,
       1012,
       1013,
-      1014
+      1014,
+      1015
     ]
   }
 }

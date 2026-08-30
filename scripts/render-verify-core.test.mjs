@@ -2631,7 +2631,11 @@ describe('the shipped charge ledger', () => {
   it('charges the goat-stance red to a DIFFERENT point on each lane', () => {
     const goat = red('settlement walker (goat): the planted foot holds its ground spot')
     expect(chargeFor(goat, { suite: 'polish', backend: 'webgpu', featureLevel: 'compatibility' }).point).toBe(642)
-    expect(chargeFor(goat, { suite: 'polish', backend: 'webgl' })).toBeNull()
+    // THE LANE MUST BE THE ONLY THING THAT DIFFERS (cross-vendor review, GPT-5.6
+    // Sol, 30.08.2026): without the level this observation was null for TWO
+    // reasons at once — the next case already proves a missing level alone does
+    // it — so 642 could have been widened across lanes with this pin still green.
+    expect(chargeFor(goat, { suite: 'polish', backend: 'webgl', featureLevel: 'compatibility' })).toBeNull()
   })
 
   // THE ENTRY RESTS ON THE LANE IT MEASURED (review finding, 28.08.2026). Its
@@ -3014,9 +3018,91 @@ describe('the shipped charge ledger', () => {
     // entry would have excused them too.
     expect(chargeFor(withDetail(composite, 'hoa-state-2026-08-29-42.png, hoa-state-2026-08-29-42.txt'), scoped)).toBeNull()
     expect(chargeFor(withDetail(composite, 'hoa-state-2026-08-29-42.json, hoa-state-2026-08-29-42.txt'), scoped)).toBeNull()
+    // THE LOST-STATE CASE HAD TO BE WRITTEN WITHOUT A SECOND REASON TO FAIL
+    // (cross-vendor review, GPT-5.6 Sol, 30.08.2026): the two lines above also
+    // lose the overlay or carry a picture, so each stayed null through a
+    // CONSTRAINT OTHER than the state lookahead — and the entry's state
+    // lookahead was in fact satisfied by the overlay's own `.json`. This detail
+    // keeps overlay and description and drops state and picture, so it is null
+    // only while the state member is required in its own right.
+    expect(
+      chargeFor(withDetail(composite, 'hoa-state-2026-08-29-42-overlay.json, hoa-state-2026-08-29-42.txt'), scoped),
+    ).toBeNull()
+    // AND THE STATE MEMBER IS THE ONE THE SUITE NAMES, not merely some other JSON
+    // (cross-vendor review, GPT-5.6 Sol, round 2): an archive that shipped a
+    // `metadata.json` in place of its state satisfied `a .json that is not the
+    // overlay` and was charged as the measured picture loss.
+    expect(
+      chargeFor(withDetail(composite, 'metadata.json, hoa-state-2026-08-29-42-overlay.json, hoa-state-2026-08-29-42.txt'), scoped),
+    ).toBeNull()
+    // AND THE NAME MUST BE THE WHOLE MEMBER, not a prefix of another one (round 3):
+    // the detail joins its members with a comma, so the state member ends where the
+    // separator does — `<stem>.json.bak` is a different file.
+    expect(
+      chargeFor(
+        withDetail(composite, 'hoa-state-2026-08-29-42.json.bak, hoa-state-2026-08-29-42-overlay.json, hoa-state-2026-08-29-42.txt'),
+        scoped,
+      ),
+    ).toBeNull()
+    // The boundary is the SEPARATOR the join writes, not a bare comma (round 4):
+    // a member ending `.json,bak` is no more the state file than `.json.bak` is.
+    expect(
+      chargeFor(
+        withDetail(composite, 'hoa-state-2026-08-29-42.json,bak, hoa-state-2026-08-29-42-overlay.json, hoa-state-2026-08-29-42.txt'),
+        scoped,
+      ),
+    ).toBeNull()
+    // A member whose OWN name carries the separator is indistinguishable from two
+    // members (round 5), so the entry stops guessing boundaries and describes the
+    // whole detail: three members, each built from the stem the suite writes.
+    expect(
+      chargeFor(
+        withDetail(composite, 'hoa-state-2026-08-29-42.json, bak, hoa-state-2026-08-29-42-overlay.json, hoa-state-2026-08-29-42.txt'),
+        scoped,
+      ),
+    ).toBeNull()
+    // AND NO MEMBER MAY STAND IN FOR ANOTHER (round 6): an `-overlay.txt` once
+    // satisfied the description, and nothing required the three to share one stem.
+    expect(
+      chargeFor(
+        withDetail(composite, 'hoa-state-2026-08-29-42.json, hoa-state-2026-08-29-42-overlay.json, hoa-state-2026-08-29-42-overlay.txt'),
+        scoped,
+      ),
+    ).toBeNull()
+    expect(
+      chargeFor(
+        withDetail(composite, 'hoa-state-2026-08-29-42.json, hoa-state-2026-08-29-43-overlay.json, hoa-state-2026-08-29-42.txt'),
+        scoped,
+      ),
+    ).toBeNull()
+    // THE END ANCHOR IS ABSOLUTE, AND THIS PROVES IT STAYS SO (round 7). The review
+    // read the final `$` as Perl's — matching before a trailing newline — and asked
+    // for `(?![\s\S])`. In JavaScript that is only true under the `m` flag, which
+    // this expression does not carry, so the finding does not hold as written. It is
+    // answered by measurement rather than by a change: a member that really is
+    // newline-suffixed is not the description member, and it must stay red. Adding
+    // `m` to the entry would break exactly this case, which is why it is pinned.
+    expect(
+      chargeFor(
+        withDetail(composite, 'hoa-state-2026-08-29-42.json, hoa-state-2026-08-29-42-overlay.json, hoa-state-2026-08-29-42.txt\n'),
+        scoped,
+      ),
+    ).toBeNull()
+    // AND THE NAMES ARE LOWER CASE AS THE SUITE WRITES THEM (round 8): a
+    // case-variant member is one nobody has measured.
+    expect(
+      chargeFor(
+        withDetail(composite, 'HOA-STATE-2026-08-29-42.JSON, HOA-STATE-2026-08-29-42-OVERLAY.JSON, HOA-STATE-2026-08-29-42.TXT'),
+        scoped,
+      ),
+    ).toBeNull()
     // While the two checks that name the picture themselves need no detail.
     expect(chargeFor(red('the archive carries a screenshot'), scoped).point).toBe(927)
     expect(chargeFor(red('member hoa-state-2026-08-29-42.png is present'), scoped).point).toBe(927)
+    // ANY OTHER PNG MEMBER IS A RED NOBODY HAS MEASURED: the wildcard that used
+    // to stand here accepted every `member <anything>.png is present` the report
+    // suite might grow (cross-vendor review, GPT-5.6 Sol, 30.08.2026).
+    expect(chargeFor(red('member thumbnail.png is present'), scoped)).toBeNull()
   })
 
   it('excuses the timestamp row only where the red names the missing capability', () => {
@@ -3030,6 +3116,18 @@ describe('the shipped charge ledger', () => {
     // names no capability at all, is deliberately not excused either.
     expect(chargeFor(withDetail('WebGPU: real GPU timestamps were measured for every row', '0/33 rows, reason "the pass recorded no queries"'), scoped)).toBeNull()
     expect(chargeFor(withDetail('WebGPU: real GPU timestamps were measured for the low-preset rows too', '0/3 low rows with gpu'), scoped)).toBeNull()
+    // AND THE REASON MAY NOT RIDE ALONG WITH A SECOND FAILURE: unanchored, the
+    // detail below carried the known capability gap AND a genuinely different
+    // fault and was still excused (cross-vendor review, GPT-5.6 Sol, 30.08.2026).
+    expect(
+      chargeFor(
+        withDetail(
+          'WebGPU: real GPU timestamps were measured for every row',
+          '0/33 rows, reason "adapter without the timestamp-query feature" and 4 rows reported a negative median',
+        ),
+        scoped,
+      ),
+    ).toBeNull()
   })
 
   it('lets the benchmark cascade charge cover that sentence ALONE', () => {
@@ -3042,6 +3140,10 @@ describe('the shipped charge ledger', () => {
     // detail is anchored at both ends, so the assertion cannot become a blanket.
     expect(chargeFor(withDetail('no console errors', `${sentence} TypeError: x is not a function`), scoped)).toBeNull()
     expect(chargeFor(withDetail('no console errors', 'TypeError: x is not a function'), scoped)).toBeNull()
+    // BOTH ends: the two lines above only witness the TRAILING anchor, so the
+    // leading one could have been dropped with every assertion still green
+    // (cross-vendor review, GPT-5.6 Sol, 30.08.2026).
+    expect(chargeFor(withDetail('no console errors', `TypeError: x is not a function ${sentence}`), scoped)).toBeNull()
   })
 
   it('charges the crossing to 698 only while the round actually opens runs', () => {
@@ -3057,6 +3159,51 @@ describe('the shipped charge ledger', () => {
     // crossing merely falls outside the window.
     const noRun = density.replace('[run×16 part×72 roam×307]', '[part×72 roam×323]')
     expect(chargeFor(withDetail('the children walk PAST the traveller', noRun), scoped)).toBeNull()
+  })
+
+  it('charges the label fusion to 1010 only in the single-frame shape it measured', () => {
+    const scoped = { suite: 'polish', backend: 'webgl', kind: 'check' }
+    const withDetail = (name, detail) => ({ ...red(name), detail })
+    const name = 'no two Ctrl labels fuse in the village crowd (point 628)'
+    // WHAT 1010 MEASURED: one frame of ninety, deeper than the unreadable bar,
+    // and the retry green — the loaded-host suspicion the point owes a probe for.
+    const measured =
+      '1/90 frames held a pair fused beyond 6 px (allowed 4), deepest 19 px ' +
+      '["Ada"×"Njoro" 14×12 px], 4–7 labels across the sample — as deep as the 18 px unreadable bar'
+    expect(chargeFor(withDetail(name, measured), scoped).point).toBe(1010)
+    // A SUSTAINED FUSION IS A DIFFERENT DEFECT and must stay red: without a
+    // detail constraint the bare check name charged this away too.
+    expect(chargeFor(withDetail(name, measured.replace('1/90', '37/90')), scoped)).toBeNull()
+    // So must a red that never crossed the unreadable bar — there the crowd is
+    // over its allowed share of fused frames, which is not what 1010 observed.
+    expect(
+      chargeFor(
+        withDetail(
+          name,
+          '7/90 frames held a pair fused beyond 6 px (allowed 4), deepest 9 px, 4–7 labels across the sample',
+        ),
+        scoped,
+      ),
+    ).toBeNull()
+    // And a sample that never held the crowd proves nothing about fusion at all.
+    expect(
+      chargeFor(withDetail(name, 'the crowd did not hold: as few as 1 label(s) in a sampled frame (peak 6) — under the 2-label floor, nothing proven'), scoped),
+    ).toBeNull()
+    // THE WHOLE PRINTED LINE IS SPELLED OUT, NOT LEFT TO A WILDCARD (cross-vendor
+    // review, GPT-5.6 Sol, round 2). `deepest N px.*unreadable bar` accepted any
+    // text at all between the depth and the bar — including a detail that has lost
+    // the label-floor reading the verdict always prints, which is a changed
+    // measurement rather than the one 1010 owns.
+    expect(
+      chargeFor(
+        withDetail(
+          name,
+          '1/90 frames held a pair fused beyond 6 px (allowed 4), deepest 19 px ' +
+            '["Ada"×"Njoro" 14×12 px] — as deep as the 18 px unreadable bar',
+        ),
+        scoped,
+      ),
+    ).toBeNull()
   })
 
   it('leaves the async-pipeline message uncharged, though its family now has a point', () => {
