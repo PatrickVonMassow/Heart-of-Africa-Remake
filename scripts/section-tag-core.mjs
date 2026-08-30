@@ -1,73 +1,26 @@
 // The tag a browser suite appends to a result line so a failing check names the
-// argument that re-runs it alone — and the pattern that reads it back OFF a
-// recorded detail.
+// argument that re-runs it alone.
 //
 // WHY IT LIVES AT THE TOP LEVEL and not beside the suites (scripts/verify/):
-// two readers must agree about it, and one of them is a GUARD. The recorder
-// stores the printed line INCLUDING this tag, while the red-charge table
-// (render-verify-charges.mjs) matches the MEASURED line with regexes anchored
-// at both ends. Written apart, every end-anchored `detailMatch` in a
-// section-using suite silently stopped matching its own recorded red: measured
-// 30.08.2026, the point-927 composite charge read `…-42.txt` while the record
-// held `…-42.txt  [--section=bug-report-archive]`, so the red it exists to
-// account for stayed unaccounted and blocked the gate.
+// guard cores are spawned by guard-hooks.test.mjs from a copy of scripts/ that
+// deliberately EXCLUDES scripts/verify/ — "every guard and every core it imports
+// lives there" — so anything a guard core may ever need belongs here.
 //
-// render-verify-core.mjs is a guard core, and guard-hooks.test.mjs spawns every
-// guard from a copy of scripts/ that deliberately EXCLUDES scripts/verify/ —
-// "every guard and every core it imports lives there". A core that reached into
-// the suite directory would be unspawnable in that harness, so the shared
-// constant comes here and scripts/verify/sections.mjs imports it upwards.
+// WHAT THIS MODULE DELIBERATELY DOES NOT OFFER, and the reason is worth keeping:
+// a way to take the tag back OFF a recorded detail. The recorder stores the
+// printed line INCLUDING the tag, while the red-charge table matches the
+// MEASURED line with regexes anchored at both ends, so no anchored charge in a
+// section-using suite reaches the end of its own recorded red. That is a real,
+// measured defect — four owned reds sit unaccounted because of it. Two readers
+// were written for it on 30.08.2026 and both were refused by the cross-vendor
+// round, for one reason: recovering the tag from the text proves SYNTAX, not
+// PROVENANCE. A check that really measured a value ending in the join and a
+// bracket is indistinguishable from a tagged one, and stripping it could satisfy
+// a signature belonging to a different red. Asked which is worse, the reviewer
+// answered that a silent false clearance is worse than a loud block. So the gate
+// stays shut and POINT 1018 closes it where the provenance actually exists: the
+// recorder, which knows the open section and can store it beside the
+// measurement. Do not add a reader here.
 
 /** What a result line appends while a section is open. */
 export const sectionTag = (name) => ` [--section=${name}]`
-
-/**
- * How a suite's result line joins a measurement to its tag. The suites write
- * `[detail, sections.tag().trim()].filter(Boolean).join('  ')`, so a tagged
- * detail is either the tag ALONE (the check printed no measurement) or the
- * measurement, these two spaces, and the trimmed tag — nothing else.
- */
-export const SECTION_TAG_JOIN = '  '
-
-/**
- * The measurement a suite printed, with the tag it appended taken back off —
- * and NOTHING else touched.
- *
- * A cross-vendor review of 30.08.2026 (GPT-5.6 Sol, do-not-merge) refused the
- * first attempt at this, rightly: it was a regex loose enough to eat text a
- * check had really measured. `\s*\[--section=[^\]]*\]\s*$` matches with NO
- * leading space and eats trailing whitespace, so a detail whose own last word
- * ends `timeout[--section=x]` normalised to `timeout` and a `^timeout$` charge
- * would have excused a red nobody measured — the exact widening the anchors
- * exist to prevent, reached through the stripper instead of through the entry.
- *
- * So the shape is RECONSTRUCTED from the generator rather than described: the
- * candidate name is read out of the trailing bracket, `sectionTag` is asked what
- * it would have written for that name, and the tag comes off only where the
- * detail really ends in it — alone, or behind the suites' own join. A detail
- * that merely looks tagged is returned whole.
-
- * WHAT THIS STILL CANNOT DO, NAMED RATHER THAN HIDDEN (cross-vendor review,
- * GPT-5.6 Sol, do-not-merge on this second attempt as well): reconstruction
- * proves SYNTAX, not PROVENANCE. A check that genuinely measured a value ending
- * in `  [--section=x]` is indistinguishable here from one the suite tagged, and
- * `chargeReds` truncates a long detail before this runs, so a cut could land on
- * that exact shape. Only the recorder can settle it, because only the recorder
- * knows which section was open — that is POINT 1018, which stores the
- * measurement and its section apart instead of asking a reader to guess.
- * The reviewer's second finding belongs to it too: `sectionTag` accepts names
- * with whitespace that the recogniser above will not read back.
- * Until it lands this stands, because the alternative is worse and measured: no
- * anchored charge in a section-using suite matched its own recorded red at all,
- * and four of them blocked the gate.
- */
-export function withoutSectionTag(detail) {
-  const line = typeof detail === 'string' ? detail : ''
-  const match = /\[--section=([^\]\s]+)\]$/.exec(line)
-  if (!match) return line
-  const emitted = sectionTag(match[1]).trim()
-  const head = line.slice(0, line.length - emitted.length)
-  if (head === '') return ''
-  if (head.endsWith(SECTION_TAG_JOIN)) return head.slice(0, -SECTION_TAG_JOIN.length)
-  return line
-}
