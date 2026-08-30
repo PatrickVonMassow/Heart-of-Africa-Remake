@@ -659,6 +659,29 @@ export const RED_CHARGES = [
       + '698, and on a CORE adapter this check was never measured and stays a real red.',
   },
   {
+    point: 698,
+    suite: 'polish',
+    backend: 'webgl',
+    kind: 'check',
+    match: /^the children walk PAST the traveller/i,
+    // The same detail constraint as the WebGPU half, for the same reason: 698
+    // owns the DENSITY, and a window that never reached the `run` phase is a
+    // different defect that stays a real red.
+    detailMatch: /crossed his line;[\s\S]*phases \[[^\]]*run×[1-9]/i,
+    why:
+      'THE WebGL 2 HALF OF POINT 698, measured 30.08.2026 and entered because the WebGPU entry '
+      + 'above is scoped to that lane and its compatibility level, so it deliberately excuses '
+      + 'nothing here. The LARGE run on feat/686-five-word-lexicon-game read "0 of 4 crossed his '
+      + 'line" over 45 s played with phases [run×39 part×161 roam×695] — the round OPENED 39 runs, '
+      + 'so it plays and the crossing merely did not fall inside the window, which is exactly the '
+      + 'density 698 owns and not a broken round. The retry of the same suite passed whole (200 '
+      + 'checks, 0 fail), as it did on 29.08.2026. '
+      + 'Which lane drew the frame does not reach this check: the children are simulated in plain '
+      + 'JavaScript and the check reads their positions, not their pixels — the WebGPU half was '
+      + 'measured first only because that is the lane it first reddened on. The charge dies with '
+      + 'point 698.',
+  },
+  {
     point: 1012,
     suite: 'benchmark',
     backend: 'webgpu',

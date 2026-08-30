@@ -3269,6 +3269,27 @@ describe('the shipped charge ledger', () => {
     // AND ONE FRAME OUT OF NONE IS NOT A SAMPLE: `1/\d+` accepted `1/0 frames`,
     // a count no honest reading can print.
     expect(chargeFor(withDetail(name, measured.replace('1/90', '1/0')), scoped)).toBeNull()
+    // THE CROSSING RED IS OWNED ON BOTH LANES (measured 30.08.2026, WebGL 2). The
+    // children are simulated in plain JavaScript and this check reads their
+    // positions, so the lane that drew the frame does not reach it — but a charge
+    // is scoped to the lane it was measured on, and the WebGPU entry deliberately
+    // excuses nothing here. The WebGL half carries the same detail constraint.
+    const crossing = {
+      name: 'the children walk PAST the traveller — from one side of him to the other',
+      detail:
+        '0 of 4 crossed his line; along the lane (0 = his line) [-11..26@1, -15..16@1, -11..22@1, ' +
+        '-11..16@1] m, walked [67, 67, 68, 66] m, phases [run×39 part×161 roam×695] over 45s played, 3 tagged',
+    }
+    const webglPolish = { suite: 'polish', backend: 'webgl', kind: 'check' }
+    expect(chargeFor({ ...red(crossing.name), detail: crossing.detail }, webglPolish).point).toBe(698)
+    // AND A ROUND THAT NEVER RAN STAYS RED ON THIS LANE TOO — the narrowing the
+    // WebGPU half carries is not weakened by widening the backend.
+    expect(
+      chargeFor(
+        { ...red(crossing.name), detail: crossing.detail.replace('run×39', 'run×0') },
+        webglPolish,
+      ),
+    ).toBeNull()
     // NOR IS AN EMPTY BRACKET A PAIR (cross-vendor review, GPT-5.6 Sol, round 2):
     // requiring `[...]` left `[]` chargeable, so the identity was still optional.
     // polish.mjs writes `"<a>"×"<b>" <across>×<down> px` and nothing else.
