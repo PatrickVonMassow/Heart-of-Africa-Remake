@@ -3044,6 +3044,14 @@ describe('the shipped charge ledger', () => {
         scoped,
       ),
     ).toBeNull()
+    // The boundary is the SEPARATOR the join writes, not a bare comma (round 4):
+    // a member ending `.json,bak` is no more the state file than `.json.bak` is.
+    expect(
+      chargeFor(
+        withDetail(composite, 'hoa-state-2026-08-29-42.json,bak, hoa-state-2026-08-29-42-overlay.json, hoa-state-2026-08-29-42.txt'),
+        scoped,
+      ),
+    ).toBeNull()
     // While the two checks that name the picture themselves need no detail.
     expect(chargeFor(red('the archive carries a screenshot'), scoped).point).toBe(927)
     expect(chargeFor(red('member hoa-state-2026-08-29-42.png is present'), scoped).point).toBe(927)
