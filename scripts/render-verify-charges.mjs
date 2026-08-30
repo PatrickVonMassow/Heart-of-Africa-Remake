@@ -709,6 +709,20 @@ export const RED_CHARGES = [
     // round 2): `run×0` satisfied `run×` and would have charged away exactly
     // the broken round this narrowing exists to keep red.
     detailMatch: /crossed his line;[\s\S]*phases \[[^\]]*run×[1-9]/i,
+    // AND IT READS THE FRONT OF THE MEASUREMENT, WHICH THIS ENTRY DECLARES
+    // (cross-vendor review, GPT-5.6 Sol, three refusals over the truncation
+    // finding). The crossing line is 223 characters, so EVERY record of it is
+    // cut at 200 — and a cut measurement may answer only an entry that says in
+    // its own voice that its signature reads the front and the missing tail
+    // cannot matter. This one does: it needs the crossing count and the phase
+    // list with a positive `run×`, both of which stand at character 178 of the
+    // kept text, 22 characters clear of the bound. What the bound removes is the
+    // ` over 45s played, 3 tagged` epilogue, which the signature never reads and
+    // which cannot turn a running round into a broken one. The declaration is
+    // reviewed with the entry, and it is the only thing that keeps this measured
+    // charge alive without letting the reader guess the author's intent out of
+    // the pattern text.
+    detailReadsPrefix: true,
     why:
       'THE USER DECIDED THIS ONE BY NAME. Measured 17.08.2026 on this same branch and filed as '
       + 'point 698, whose first line records the ruling: land the bank round as it stands and '
@@ -720,7 +734,13 @@ export const RED_CHARGES = [
       + 'run (200 checks, 0 fail), and the mechanic itself — the runs, the tags, the body '
       + 'separation, the stranger berth — passes in the same section. '
       + 'Scoped to suite, backend, level and kind like its neighbours: the charge dies with point '
-      + '698, and on a CORE adapter this check was never measured and stays a real red.',
+      + '698, and on a CORE adapter this check was never measured and stays a real red. '
+      + 'AND IT READS THE FRONT OF A MEASUREMENT THE RECORD CUT (detailReadsPrefix): the crossing '
+      + 'line is 223 characters, so every record of it is cut at the 200-character bound. The '
+      + 'signature needs the crossing count and a positive `run×` in the phase list, and both '
+      + 'stand 22 characters clear of that bound; what the bound removes is the '
+      + '" over 45s played, 3 tagged" epilogue, which the signature never reads and which cannot '
+      + 'turn a running round into a broken one.',
   },
   {
     point: 698,
@@ -732,6 +752,10 @@ export const RED_CHARGES = [
     // owns the DENSITY, and a window that never reached the `run` phase is a
     // different defect that stays a real red.
     detailMatch: /crossed his line;[\s\S]*phases \[[^\]]*run×[1-9]/i,
+    // Reads the front, for the reason the WebGPU entry above sets out at length:
+    // the same 223-character measurement, the same signature, the same 22
+    // characters of clearance before the bound.
+    detailReadsPrefix: true,
     why:
       'THE WebGL 2 HALF OF POINT 698, measured 30.08.2026 and entered because the WebGPU entry '
       + 'above is scoped to that lane and its compatibility level, so it deliberately excuses '
@@ -743,7 +767,11 @@ export const RED_CHARGES = [
       + 'Which lane drew the frame does not reach this check: the children are simulated in plain '
       + 'JavaScript and the check reads their positions, not their pixels — the WebGPU half was '
       + 'measured first only because that is the lane it first reddened on. The charge dies with '
-      + 'point 698.',
+      + 'point 698. '
+      + 'AND IT READS THE FRONT OF A MEASUREMENT THE RECORD CUT (detailReadsPrefix), for the '
+      + 'reason the WebGPU half sets out: the same 223-character crossing line, cut at the '
+      + '200-character bound, with the crossing count and the positive `run×` standing clear of '
+      + 'it and only the trailing epilogue removed.',
   },
   {
     point: 1012,

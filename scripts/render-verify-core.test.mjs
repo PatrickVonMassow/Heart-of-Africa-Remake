@@ -1390,16 +1390,21 @@ describe('evaluate — a red is not closed by the runs that FOLLOWED it (point 6
      *  HEAD plus 180 z's; everything after that is gone. */
     const cutSource = `${HEAD}${'z'.repeat(180)}${'z'.repeat(300)}`
     const KEPT = `${HEAD}${'z'.repeat(180)}`
-    const entry = (detailMatch) => [{
+    const entry = (detailMatch, detailReadsPrefix = false) => [{
       point: 927,
       suite: 'report',
       backend: 'webgpu',
       kind: 'check',
       match: /^the archive lists its members$/,
       detailMatch,
+      ...(detailReadsPrefix ? { detailReadsPrefix: true } : {}),
       why: 'the measurement point 927 recorded',
     }]
-    const scoped = (detailMatch) => ({ suite: 'report', backend: 'webgpu', ledger: entry(detailMatch) })
+    const scoped = (detailMatch, declares = false) => ({
+      suite: 'report',
+      backend: 'webgpu',
+      ledger: entry(detailMatch, declares),
+    })
     const redFrom = (detail) => chargeReds(failedChecks(`FAIL  ${NAME} — ${detail}`), scoped(undefined))[0]
     const cutRed = redFrom(cutSource)
     const wholeRed = redFrom(KEPT.slice(0, 199))
@@ -1413,11 +1418,16 @@ describe('evaluate — a red is not closed by the runs that FOLLOWED it (point 6
       expect(wasDetailCut(wholeRed)).toBe(false)
     })
 
-    // THE REFUSAL IS ASKED IN THE REGEX, NOT READ OFF ITS SOURCE (cross-vendor
-    // review, Opus 4.8, 30.08.2026, which asked for these shapes): a signature
-    // can reach the end without ending in `$`, and one that ends in `$` can
-    // reach it through an alternation, a lookahead or a greedy quantifier. Each
-    // shape below matches the kept text and each is refused.
+    // NO SHAPE OF SIGNATURE READS A CUT MEASUREMENT UNLESS ITS ENTRY SAID SO.
+    // Three readings of the pattern were tried and each was defeated by a shape
+    // built to defeat it — the last by `/^(?=A{200}$)|^A{200}.$/`, which asserts
+    // the end in one alternative and swallows the probe character in the other
+    // (cross-vendor review, GPT-5.6 Sol). So the table below is not a list of
+    // dangerous shapes the reader recognises; it is the evidence that NONE of
+    // them gets through, however it anchors — by a trailing `$`, an alternation,
+    // a greedy quantifier, a lookahead consuming nothing, or a probe-eating
+    // alternative — because none of these entries declared itself a prefix
+    // reader. Each really matches the kept text, so none is refused vacuously.
     it.each([
       ['a literal anchored at both ends', new RegExp(`^${KEPT.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`)],
       ['a greedy quantifier that runs to the anchor', /^one\.json, two\.json, z+$/],
@@ -1431,6 +1441,16 @@ describe('evaluate — a red is not closed by the runs that FOLLOWED it (point 6
       // see, and exactly the claim a cut record cannot support.
       ['a lookahead that asserts the end without consuming anything', /^(?=one\.json, two\.json, z{180}$)/],
       ['a lookahead over the whole kept text at a later index', /(?=json, z{180}$)/],
+      // THE SHAPE THAT DEFEATED THE LAST READING OF THE PATTERN (cross-vendor
+      // review, GPT-5.6 Sol, do-not-merge on 48a100e): one alternative asserts
+      // the end with a zero-width match, the other consumes exactly one more
+      // character — so a probe that appended one character found the pattern
+      // still matching and called it safe, while the real 201-character detail
+      // matches neither branch.
+      ['an alternation that eats the probe character', /^(?=one\.json, two\.json, z{180}$)|^one\.json, two\.json, z{180}.$/],
+      // And an ordinary front-reading signature is refused too, for the only
+      // reason that survives: its entry did not say it reads the front.
+      ['a signature that stops well inside the kept text but declares nothing', /^one\.json, two\.json,/],
     ])('refuses %s on the cut record', (_shape, detailMatch) => {
       // Each shape really matches the kept text — a vacuous non-match would be
       // refused for the wrong reason and pin nothing.
@@ -1438,31 +1458,46 @@ describe('evaluate — a red is not closed by the runs that FOLLOWED it (point 6
       expect(chargeFor(cutRed, scoped(detailMatch))).toBeNull()
     })
 
-    // A STATEFUL SIGNATURE ANSWERS THE SAME EVERY TIME IT IS ASKED. `usableRegex`
-    // strips `g` and `y`, so no `lastIndex` carries between calls — but the cut
-    // rule asks the pattern TWICE now (once of its match, once of the longer
-    // text), which is exactly where a surviving flag would show (cross-vendor
-    // review, GPT-5.6 Sol, 8f3f23d).
-    it('answers a stateful end-reaching signature the same way however often it is asked', () => {
-      const sticky = { suite: 'report', backend: 'webgpu', ledger: entry(/one\.json, two\.json, z+$/g) }
-      for (let i = 0; i < 4; i += 1) expect(chargeFor(cutRed, sticky), `call ${i}`).toBeNull()
-      const insideG = { suite: 'report', backend: 'webgpu', ledger: entry(/^one\.json, two\.json,/g) }
-      for (let i = 0; i < 4; i += 1) expect(chargeFor(cutRed, insideG)?.point, `call ${i}`).toBe(927)
+    // A STATEFUL SIGNATURE ANSWERS THE SAME EVERY TIME IT IS ASKED, and the
+    // REFUSAL is not allowed to be the reason it looks stable (cross-vendor
+    // review, GPT-5.6 Sol, 8f3f23d: repeating `toBeNull()` passes just as well
+    // when a surviving `lastIndex` made the pattern miss). So the entry's own
+    // regex is asserted untouched after every call — `usableRegex` rebuilds a
+    // flagless copy and never advances the one the ledger holds — and the
+    // charging direction is asked the same number of times.
+    it('answers a stateful signature the same way however often it is asked, and never advances it', () => {
+      const declared = /^one\.json, two\.json,/g
+      const withPrefix = { suite: 'report', backend: 'webgpu', ledger: entry(declared, true) }
+      for (let i = 0; i < 4; i += 1) {
+        expect(chargeFor(cutRed, withPrefix)?.point, `call ${i}`).toBe(927)
+        expect(declared.lastIndex, `lastIndex after call ${i}`).toBe(0)
+      }
+      const endReaching = /one\.json, two\.json, z+$/g
+      const undeclared = { suite: 'report', backend: 'webgpu', ledger: entry(endReaching) }
+      for (let i = 0; i < 4; i += 1) {
+        expect(chargeFor(cutRed, undeclared), `call ${i}`).toBeNull()
+        expect(endReaching.lastIndex, `lastIndex after call ${i}`).toBe(0)
+        // The refusal is the DECLARATION's doing, not a missed match: the same
+        // pattern still matches the kept text on every one of these calls.
+        expect(endReaching.test(cutRed.detail), `still matches on call ${i}`).toBe(true)
+        endReaching.lastIndex = 0
+      }
     })
 
-    // AND THE NARROWING IS LOAD-BEARING, not decoration. Refusing every cut red
-    // instead would withdraw the point-698 crossing charge, whose measurement
-    // runs past the bound in every real record while its signature stops well
-    // inside it — the case below is that shape.
-    it('keeps charging a cut record whose signature stops INSIDE the kept text', () => {
-      expect(chargeFor(cutRed, scoped(/^one\.json, two\.json,/))?.point).toBe(927)
-      // A BROAD entry is unaffected — it never claimed to read a measurement.
+    // AND THE DECLARATION IS LOAD-BEARING, not decoration: it is the one thing
+    // that keeps the point-698 crossing charge alive, whose measurement runs
+    // past the bound in every real record.
+    it('charges a cut record for an entry that declared it reads the front', () => {
+      expect(chargeFor(cutRed, scoped(/^one\.json, two\.json,/, true))?.point).toBe(927)
+      // A BROAD entry is unaffected — it never claimed to read a measurement,
+      // so it needs no declaration.
       expect(chargeFor(cutRed, scoped(undefined))?.point).toBe(927)
-      // AND A LOOKAROUND IS NOT REFUSED FOR BEING ONE. The shape above is
-      // refused because it asserts the END; one that asserts something inside
-      // the kept text reads material the record really holds, and charges.
-      expect(chargeFor(cutRed, scoped(/^(?=one\.json)one\.json, two/))?.point).toBe(927)
-      expect(chargeFor(cutRed, scoped(/^one\.json(?=, two\.json)/))?.point).toBe(927)
+      // THE DECLARATION IS NOT A BLANK CHEQUE: a declared signature must still
+      // MATCH the kept text, and one that does not owns nothing.
+      expect(chargeFor(cutRed, scoped(/^nothing of the sort/, true))).toBeNull()
+      // And it is the DECLARATION that decides, not the shape: the same
+      // front-reading pattern owns nothing without it.
+      expect(chargeFor(cutRed, scoped(/^one\.json, two\.json,/))).toBeNull()
     })
 
     // THE REAL ENTRY, NOT AN ANALOGUE (cross-vendor review, GPT-5.6 Sol, 8f3f23d,
@@ -1488,9 +1523,10 @@ describe('evaluate — a red is not closed by the runs that FOLLOWED it (point 6
 
     // THE CONTROL that makes the mark itself load-bearing: the same end-reaching
     // signature owns the same text once the record does not say it was cut.
-    it('charges the same end-reaching signature on a record the bound never touched', () => {
+    it('charges an undeclared end-reaching signature on a record the bound never touched', () => {
       const uncut = new RegExp(`^${KEPT.slice(0, 199).replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`)
       expect(chargeFor(wholeRed, scoped(uncut))?.point).toBe(927)
+      // …and the SAME entry owns nothing the moment the record says it was cut.
       expect(chargeFor({ ...wholeRed, detailCut: true }, scoped(uncut))).toBeNull()
     })
   })
@@ -2763,6 +2799,17 @@ describe('the shipped charge ledger', () => {
       if (c.backend) expect(BACKENDS).toContain(c.backend)
       if (c.kind) expect(['check', 'console']).toContain(c.kind)
       if (c.detailMatch) expect(c.detailMatch).toBeInstanceOf(RegExp)
+      // A DECLARATION THAT READS THE FRONT OF A CUT MEASUREMENT ONLY MEANS
+      // ANYTHING BESIDE A SIGNATURE. On an entry with no `detailMatch` it would
+      // read as a claim about something that does not exist, and the reader
+      // never consults it there — so it must not be written there either.
+      if ('detailReadsPrefix' in c) {
+        expect(c.detailReadsPrefix, `point ${c.point} / ${c.suite}`).toBe(true)
+        expect(c.detailMatch, `point ${c.point} / ${c.suite}`).toBeInstanceOf(RegExp)
+        // And it is a claim, so it says where it holds: the entry's own words
+        // must speak of the cut and of what the bound removes.
+        expect(String(c.why), `point ${c.point} / ${c.suite}`).toMatch(/cut|bound/i)
+      }
       // NO STATEFUL FLAG (review finding, 28.08.2026): `g` and `y` keep
       // `lastIndex` across calls, so one entry would alternate between owning a
       // red and missing it, by call order alone.
@@ -3285,6 +3332,15 @@ describe('the shipped charge ledger', () => {
     const gpuReport = { suite: 'report', backend: 'webgpu', featureLevel: 'compatibility' }
     expect(chargeFor({ ...composite, detail: members }, gpuReport).point).toBe(927)
     expect(chargeFor({ ...composite, detail: tagged(members) }, gpuReport)).toBeNull()
+
+    // POINT 603 IS ASKED WITH A TAGGED DETAIL TOO (cross-vendor review, GPT-5.6
+    // Sol, 8f3f23d): exercising it only with an empty detail would leave this
+    // block green even if the entry grew a `detailMatch` of its own, which would
+    // contradict the name-only behaviour it is here to pin.
+    expect(chargeFor({ name: ground, kind: 'check', detail: tagged('laplacian mean 1.07') }, { suite: 'settings', backend: 'webgl' }).point).toBe(603)
+    expect(
+      chargeFor({ name: ground, kind: 'check', detail: tagged('laplacian mean 1.07') }, { suite: 'settings', backend: 'webgpu', featureLevel: 'compatibility' }).point,
+    ).toBe(514)
 
     // NAMED RATHER THAN LEFT UNSAID: the 603 pattern carries no leading anchor,
     // so text in FRONT of the name still charges — unlike the 938 pair above.

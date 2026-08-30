@@ -1399,18 +1399,28 @@ bound matches at record time no more than it does afterwards. Reds recorded
 before this repair carry no detail and stay out of a `detailMatch` entry's
 reach; that information was never written down and nothing can recover it.
 
-**A signature may not read the END of a measurement the bound cut off.** A
-`detailMatch` anchored at both ends says "and this is where the measurement
-ends" — which a cut record cannot say. The same first 200 characters belong
-both to the shorter red the signature was written for and to a longer one whose
-tail nobody kept, so the anchored entry would quietly excuse the wrong red. A
-record written since carries `detailCut` where the cut happened; an older one is
-read as cut when its detail ends exactly ON the bound, and as whole when it is
-longer, because a stored detail can never exceed the bound and a longer one is
-the unbounded parse. The refusal is narrowed to the signatures the cut can
-reach: a `detailMatch` whose match stops INSIDE the kept text read material the
-record really holds and keeps charging — the point-698 crossing entry does
-exactly that, and its measurement runs past the bound in every real record.
+**A cut measurement answers only an entry that declared it reads the front.**
+The record keeps the first 200 characters, and an anchored `detailMatch` is
+claiming "and this is where the measurement ends" — which a cut record cannot
+say. The same kept prefix belongs both to the red the signature was written for
+and to a longer one whose tail nobody kept, so the anchored entry would quietly
+excuse the wrong red. A record written since carries `detailCut` where the cut
+happened; an older one is read as cut when its detail ends exactly ON the bound,
+and as whole when it is longer, because a stored detail can never exceed the
+bound and a longer one is the unbounded parse.
+
+The reader does not try to tell a safe signature from a dangerous one. Three
+attempts did — reading the pattern source, reading where its match ended, asking
+whether it would still match if the text went on — and a cross-vendor round
+broke each with a shape built for it, the last being
+`/^(?=A{200}$)|^A{200}.$/`, which asserts the end in one branch and swallows the
+probe character in the other. It is the same lesson the section tag taught in
+the same words: recovering intent from TEXT proves syntax, not provenance. So
+the judgement sits where the provenance is — an entry that reads only the front
+of a measurement says `detailReadsPrefix: true` and states in its own `why` how
+far its signature reaches and why the missing tail cannot matter. Both point-698
+crossing entries do; every other narrow entry is refused on a cut record, which
+is the safe direction.
 
 **A measurement that varied inside one run cannot be signed for.** The record
 holds one entry per check key, so a check that failed twice printing two

@@ -262,9 +262,8 @@ function patternHits(pattern, value) {
  * was read from — and that text was never cut. Reading it as cut would refuse
  * charges over material the reader can see in full.
  *
- * Reading an uncut detail as cut costs at most ONE narrow charge — the one
- * whose signature reads the end of the measurement; every other entry keeps
- * charging (see `matchReachesEnd`). The red it does cost stays loudly
+ * Reading an uncut detail as cut costs the narrow charges that did not declare
+ * themselves prefix readers (see `mayReadCutDetail`); the red then stays loudly
  * unaccounted and closes the three ordinary ways (fix it, charge it, file it).
  * Reading a cut one as whole is what lets one red's signature quietly excuse
  * another's, which is the one failure mode this table exists to prevent.
@@ -276,42 +275,29 @@ export function wasDetailCut(red) {
 }
 
 /**
- * Does this signature REACH THE END of the text it matched? That is the only
- * question the cut makes dangerous (cross-vendor review, GPT-5.6 Sol,
- * do-not-merge on 3e6ffd2).
+ * MAY THIS ENTRY'S SIGNATURE BE READ AGAINST A MEASUREMENT THE BOUND CUT?
  *
- * A `detailMatch` that ends before the last kept character read a measurement
- * that really is in the record, and whatever the bound removed lies past it —
- * the charge stands. A match that runs to the last kept character is claiming
- * "and this is where the measurement ends", which is exactly what a cut record
- * cannot say: the same prefix belongs both to the shorter red the signature was
- * written for and to a longer one nobody kept. So THAT charge is refused.
+ * Only if the ENTRY SAYS SO. Three rounds went the other way — reading the
+ * pattern, then reading its match, then asking the pattern whether it would
+ * still match if the text went on — and every one of them was refused with a
+ * counterexample, the last being `/^(?=A{200}$)|^A{200}.$/`, which asserts the
+ * end in one alternative and swallows the probe character in the other
+ * (cross-vendor review, GPT-5.6 Sol). The lesson is the one this file already
+ * learned about the section tag, in the same words: recovering intent from TEXT
+ * proves SYNTAX, not PROVENANCE. A regex cannot be interrogated about what its
+ * author meant, and no finite probe closes a pattern written to defeat it.
  *
- * Asked in the regex rather than read off its source, because the source can
- * anchor in ways no `endsWith('$')` sees — an alternation, a lookahead, a
- * quantifier that happens to consume the rest — and a signature the reader
- * misjudges as unanchored is the unsafe direction.
+ * So the question moves to where the provenance is — the ledger entry, written
+ * and reviewed by people who know which red they measured. An entry that reads
+ * only the FRONT of a measurement says so with `detailReadsPrefix`, in the same
+ * commit that states in its `why` how far the signature reaches and why the
+ * tail cannot matter. Everything else is refused on a cut record, which is the
+ * safe direction: a red loudly unaccounted closes the three ordinary ways,
+ * while a signature that quietly excuses the wrong red is the one failure mode
+ * this table exists to prevent.
  */
-function matchReachesEnd(pattern, value) {
-  const re = usableRegex(pattern)
-  if (re === null) return false
-  const hit = re.exec(value)
-  if (hit === null) return false
-  if (hit.index + hit[0].length >= value.length) return true
-  // A MATCH THAT STOPPED SHORT MAY STILL HAVE ASSERTED THE END (cross-vendor
-  // review, GPT-5.6 Sol, do-not-merge on 8f3f23d). A lookaround CONSUMES
-  // nothing, so `/^(?=A{200}$)/` succeeds with a zero-length hit at index 0 and
-  // the arithmetic above sees a signature stopping at the first character —
-  // while the pattern demanded that the text end exactly there, which is the
-  // very claim the cut cannot support.
-  //
-  // So the question is asked once more, and this time of the pattern rather
-  // than of its match: would it still match if the text went ON? A signature
-  // that reads retained material does; one whose success rested on where this
-  // text happened to end does not. The sentinel is a NUL, which no suite prints
-  // and no ledger entry names, so appending it can only remove the end — never
-  // satisfy something new.
-  return !usableRegex(pattern).test(`${value}\u0000`)
+function mayReadCutDetail(charge) {
+  return charge?.detailReadsPrefix === true
 }
 
 export function chargeFor(red, options) {
@@ -389,16 +375,18 @@ export function chargeFor(red, options) {
       // nothing ended. Same shape as the section tag and the same answer: the
       // reader does not guess, it refuses, and the red stays loudly uncharged.
       //
-      // NARROWED TO THE SIGNATURES THE CUT CAN REACH: a `detailMatch` that ends
-      // before the last kept character read text the record really holds, and it
-      // keeps charging. Refusing every cut red instead withdrew the point-698
-      // crossing charge, whose own measurement runs past the bound in every real
-      // record and whose signature stops well inside it.
+      // AND THE ENTRY DECIDES, NOT THE READER (cross-vendor review, GPT-5.6 Sol,
+      // three refusals). An entry whose signature reads only the FRONT of the
+      // measurement declares `detailReadsPrefix` and keeps charging; every other
+      // one is refused here. Refusing ALL of them instead would withdraw the
+      // point-698 crossing charge, whose own measurement runs past the bound in
+      // every real record — so the declaration is what keeps a real, measured
+      // charge alive without letting the reader guess on anybody's behalf.
       const measured = detail
       if (charge.detailMatch && red?.detailVaried === true) continue
       if (charge.detailMatch && !patternHits(charge.detailMatch, measured)) continue
-      // The cut only bites a signature that reads the END of the measurement.
-      if (charge.detailMatch && wasDetailCut(red) && matchReachesEnd(charge.detailMatch, measured)) continue
+      // A CUT MEASUREMENT ANSWERS ONLY AN ENTRY THAT DECLARED IT READS THE FRONT.
+      if (charge.detailMatch && wasDetailCut(red) && !mayReadCutDetail(charge)) continue
       return charge
     } catch {
       /* a broken ledger entry charges nothing — the red stays unaccounted */
