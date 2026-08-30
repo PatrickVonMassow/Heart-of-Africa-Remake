@@ -3101,6 +3101,11 @@ describe('the shipped charge ledger', () => {
     // measurement's own trailing space with it.
     expect(chargeFor(red('timeout   [--section=x]'), scope(entry(/^timeout$/)))).toBeNull()
     expect(chargeFor(red('timeout   [--section=x]'), scope(entry(/^timeout $/))).point).toBe(9001)
+    // AND THE JOIN IS TWO ASCII SPACES, not any two whitespace characters (same
+    // review, round 3): a separator read as `\s{2}` would strip tabs the suite
+    // never wrote, so the measurement keeps them.
+    expect(chargeFor(red('timeout\t\t[--section=x]'), scope(entry(/^timeout$/)))).toBeNull()
+    expect(chargeFor(red('timeout\t\t[--section=x]'), scope(entry(/^timeout\t\t\[--section=x\]$/))).point).toBe(9001)
   })
 
   it('leaves the report suite\'s picture-loss reds uncharged on WebGL 2', () => {
@@ -3124,9 +3129,12 @@ describe('the shipped charge ledger', () => {
     ).toBeNull()
     expect(at(memberPresentCheckName(stem, ARCHIVE_PICTURE_SUFFIX), '')).toBeNull()
     expect(at('the archive carries a screenshot', 'no PNG member')).toBeNull()
-    expect(
-      at('no console errors', 'Failed to load resource: the server responded with a status of 504 (Outdated Optimize Dep)'),
-    ).toBeNull()
+    // The EXACT red the withdrawn entry charged, duplicate and all — a WebGL
+    // entry could otherwise come back for the duplicated form without failing
+    // here (cross-vendor review, GPT-5.6 Sol).
+    const vite504 = 'Failed to load resource: the server responded with a status of 504 (Outdated Optimize Dep)'
+    expect(at('no console errors', vite504)).toBeNull()
+    expect(at('no console errors', `${vite504} | ${vite504}`)).toBeNull()
     // While the lane they WERE measured on keeps its charge.
     expect(
       chargeFor(
@@ -3146,12 +3154,20 @@ describe('the shipped charge ledger', () => {
     expect(onWebgpu(`${vite} | TypeError: undefined is not a function`)).toBeNull()
     expect(onWebgpu('TypeError: undefined is not a function')).toBeNull()
     // And the CORE adapter the player runs is not the lane this was measured on.
-    expect(
+    const asChecked = (over) =>
       chargeFor(
-        { name: 'no console errors', detail: vite, kind: 'check' },
-        { suite: 'report', backend: 'webgpu', featureLevel: 'core' },
-      ),
-    ).toBeNull()
+        { name: 'no console errors', detail: vite, kind: 'check', ...over.red },
+        { suite: 'report', backend: 'webgpu', featureLevel: 'compatibility', ...over.scope },
+      )
+    expect(asChecked({ red: {}, scope: { featureLevel: 'core' } })).toBeNull()
+    // THE SCOPE IS ASSERTED, NOT ASSUMED (same review): dropping suite or kind,
+    // or broadening the name, must not leave this file green.
+    expect(asChecked({ red: {}, scope: { suite: 'startup' } })).toBeNull()
+    expect(asChecked({ red: { kind: 'console' }, scope: {} })).toBeNull()
+    expect(asChecked({ red: { name: 'no console errors across the F9 cycle' }, scope: {} })).toBeNull()
+    // AND THE DETAIL'S LEADING ANCHOR HOLDS: a different error in FRONT of the
+    // transient is a red nobody measured, so it must not ride in behind it.
+    expect(onWebgpu(`TypeError: undefined is not a function | ${vite}`)).toBeNull()
   })
 
   it('charges the archive composite only in the picture-loss shape', () => {
