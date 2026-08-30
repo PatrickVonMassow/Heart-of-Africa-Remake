@@ -3075,6 +3075,19 @@ describe('the shipped charge ledger', () => {
         scoped,
       ),
     ).toBeNull()
+    // THE END ANCHOR IS ABSOLUTE, AND THIS PROVES IT STAYS SO (round 7). The review
+    // read the final `$` as Perl's — matching before a trailing newline — and asked
+    // for `(?![\s\S])`. In JavaScript that is only true under the `m` flag, which
+    // this expression does not carry, so the finding does not hold as written. It is
+    // answered by measurement rather than by a change: a member that really is
+    // newline-suffixed is not the description member, and it must stay red. Adding
+    // `m` to the entry would break exactly this case, which is why it is pinned.
+    expect(
+      chargeFor(
+        withDetail(composite, 'hoa-state-2026-08-29-42.json, hoa-state-2026-08-29-42-overlay.json, hoa-state-2026-08-29-42.txt\n'),
+        scoped,
+      ),
+    ).toBeNull()
     // While the two checks that name the picture themselves need no detail.
     expect(chargeFor(red('the archive carries a screenshot'), scoped).point).toBe(927)
     expect(chargeFor(red('member hoa-state-2026-08-29-42.png is present'), scoped).point).toBe(927)
