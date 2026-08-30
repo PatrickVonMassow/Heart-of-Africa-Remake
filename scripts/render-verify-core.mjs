@@ -827,7 +827,10 @@ export function crashClosureFor(run, closures) {
  * records predate both fields. For those only, the durable evidence already in
  * the record decides: a non-zero run that asserted its backend and recorded at
  * least one red reached its own failure report, so a stack-shaped validation
- * line on stderr does not turn it into a crash retroactively. */
+ * line on stderr does not turn it into a crash retroactively. Accepted legacy
+ * residual: such a run could have printed that red and then died without an
+ * uncaught-exception marker; old records cannot distinguish that sequence, and
+ * the specified trade is to trust their durable reported-red evidence. */
 export function isCrashedRun(run) {
   if (!run || typeof run !== 'object' || run.crashed !== true) return false
   if (run.crashSource === 'uncaught-exception') return true
