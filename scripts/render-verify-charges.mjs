@@ -553,6 +553,31 @@ export const RED_CHARGES = [
       'whose level went unrecorded — so the narrowing withdraws no charge that stands.',
   },
   {
+    point: 939,
+    suite: 'report',
+    backend: 'webgpu',
+    featureLevel: 'compatibility',
+    kind: 'check',
+    match: /^no console errors$/i,
+    // DETAIL-SCOPED, and it has to be: "no console errors" is a generic
+    // assertion, so the name alone would excuse EVERY console error the report
+    // suite ever reports. Only the 504 sentence is excused, and only when the
+    // whole detail is that sentence — repeated, as the check joins repeats with
+    // ` | ` — and nothing else. A second, different error riding along keeps the
+    // red.
+    detailMatch:
+      /^(Failed to load resource: the server responded with a status of 504 \(Outdated Optimize Dep\))( \| \1)*$/i,
+    why:
+      'THE SAME VITE TRANSIENT POINT 939 OWNS, ARRIVING IN THE REPORT SUITE AS A CHECK. Measured '
+      + '30.08.2026 on `main`, webgpu/report at recorded featureLevel=compatibility: the dev server '
+      + 're-bundled its dependency optimizer during the run and answered two requests with 504, '
+      + 'which CLAUDE.md classifies as an environment transient rather than a product defect. 939 '
+      + 'entered it as a `startup`/`webgpu`/`console` red, so neither the suite nor the kind reaches '
+      + 'this reading and it stood unaccounted. Scoped to the lane and level it was measured on and '
+      + 'to nothing else: the WebGL 2 run of the same suite the same hour passed WHOLE (34 checks, '
+      + '0 fail), so that lane gets no entry here. The charge dies with point 939.',
+  },
+  {
     point: 514,
     suite: 'enrichments',
     backend: 'webgpu',

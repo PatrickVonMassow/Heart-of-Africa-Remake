@@ -3134,6 +3134,24 @@ describe('the shipped charge ledger', () => {
         { suite: 'report', backend: 'webgpu', featureLevel: 'compatibility' },
       ).point,
     ).toBe(927)
+    // AND SO DOES THE VITE TRANSIENT, on the lane and level it was measured on:
+    // point 939 had entered it as a startup CONSOLE red, so the report suite's
+    // generic "no console errors" check stood unaccounted (measured 30.08.2026).
+    const vite = 'Failed to load resource: the server responded with a status of 504 (Outdated Optimize Dep)'
+    const onWebgpu = (detail) =>
+      chargeFor({ name: 'no console errors', detail, kind: 'check' }, { suite: 'report', backend: 'webgpu', featureLevel: 'compatibility' })
+    expect(onWebgpu(`${vite} | ${vite}`).point).toBe(939)
+    // The check name is generic, so the detail is the whole of the evidence: a
+    // second, different console error riding along keeps the red.
+    expect(onWebgpu(`${vite} | TypeError: undefined is not a function`)).toBeNull()
+    expect(onWebgpu('TypeError: undefined is not a function')).toBeNull()
+    // And the CORE adapter the player runs is not the lane this was measured on.
+    expect(
+      chargeFor(
+        { name: 'no console errors', detail: vite, kind: 'check' },
+        { suite: 'report', backend: 'webgpu', featureLevel: 'core' },
+      ),
+    ).toBeNull()
   })
 
   it('charges the archive composite only in the picture-loss shape', () => {
