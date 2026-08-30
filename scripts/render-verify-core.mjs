@@ -21,7 +21,6 @@
 import { createHash } from 'node:crypto'
 
 import { RED_CHARGES } from './render-verify-charges.mjs'
-import { withoutSectionTag } from './section-tag-core.mjs'
 import { scopeMandatoryDuty } from './mandatory-duty-core.mjs'
 
 /** Both renderer backends the game ships; each needs a passing verify run. */
@@ -292,34 +291,30 @@ export function chargeFor(red, options) {
       // stays loudly uncharged and closes the three ordinary ways. A broad
       // `match` entry is unaffected, because it never claimed to read a
       // measurement in the first place.
-      // THE RECORDER'S SECTION TAG IS NOT PART OF THE MEASURED LINE (measured
-      // 30.08.2026). A suite that declares sections appends ` [--section=<name>]`
-      // to every result line so a failing check names the argument that re-runs
-      // it alone, and the record stores the line WITH it. Every `detailMatch`
-      // here is anchored at both ends against the line the SUITE printed, so in
-      // a section-using suite the anchor could never reach the end of a recorded
-      // detail: the point-927 composite charge matched
-      // `…-42.txt` while the record held `…-42.txt  [--section=bug-report-archive]`,
-      // and the red it exists to account for stayed unaccounted and blocked the
-      // gate. Taking the tag off loosens no anchor: the shape is RECONSTRUCTED
-      // from the generator, so a detail ending in something merely bracket-shaped
-      // — no join in front of it, or a join of the wrong whitespace — keeps every
-      // character it measured (cross-vendor review, GPT-5.6 Sol, do-not-merge on
-      // the first attempt, which used a regex loose enough to eat real text).
-      // WHAT RECONSTRUCTION CANNOT DO IS PROVE PROVENANCE, and this comment used
-      // to imply otherwise: a detail that really measured a value ending in the
-      // join and a bracket is indistinguishable here from a tagged one. Only the
-      // recorder can settle that, which is point 1018.
-      // A detail cut at the record's ceiling may have LOST its real tag beyond
-      // the cut, leaving measured text that merely ends in a tag shape — and
-      // stripping there would eat what a check really printed and could satisfy
-      // an anchored signature that belongs to a different red. That is the one
-      // practical way this normalisation could clear a red without provenance
-      // (cross-vendor review, GPT-5.6 Sol), and it is refused outright: a
-      // truncated detail is read exactly as it was stored. The loud outcome —
-      // the charge simply does not match — is the correct one until point 1018
-      // records the section beside the measurement.
-      const measured = detail.length >= MAX_RED_DETAIL_LEN ? detail : withoutSectionTag(detail)
+      // THE RECORDER'S SECTION TAG IS NOT PART OF THE MEASURED LINE, AND THIS
+      // READER MAY NOT TAKE IT OFF ANYWAY (cross-vendor review, GPT-5.6 Sol,
+      // do-not-merge three times, and the third answered the trade directly).
+      //
+      // The defect is real and measured: a suite that declares sections appends
+      // ` [--section=<name>]` to every result line, the record stores the line
+      // WITH it, and every `detailMatch` here is anchored at both ends against
+      // what the suite MEASURED — so in a section-using suite no anchored charge
+      // reaches the end of its own recorded red, and four owned reds block the
+      // gate. Two attempts to recover the measurement from the text were refused,
+      // for one reason: reconstruction proves SYNTAX, not PROVENANCE. A check
+      // that really measured a value ending in the join and a bracket is
+      // indistinguishable here from a tagged one, and stripping it would eat
+      // measured text and could satisfy an anchored signature belonging to a
+      // different red.
+      //
+      // ASKED WHICH IS WORSE, the reviewer answered plainly: a silent false
+      // clearance is worse than a loud block. A blocked gate is visible and
+      // someone fixes it; a charge that quietly excuses the wrong red is the one
+      // failure mode this whole table exists to prevent. So the detail is read
+      // exactly as it was stored, the four reds stay loudly unaccounted, and
+      // POINT 1018 records the measurement and its section as separate fields —
+      // the only place the provenance actually exists.
+      const measured = detail
       if (charge.detailMatch && (red?.detailVaried === true || !patternHits(charge.detailMatch, measured))) continue
       return charge
     } catch {

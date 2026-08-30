@@ -124,8 +124,11 @@ put it is the mistake this line exists to stop.
   reconstruction proves SYNTAX, not PROVENANCE. A check that genuinely measured a value ending
   in two spaces and a bracket is indistinguishable from a tagged one, and `chargeReds`
   truncates a long detail to 200 characters before the reader sees it, so a cut can land on
-  exactly that shape. Named in the module rather than hidden; the guess stands only because the
-  measured alternative is worse.
+  exactly that shape. ASKED DIRECTLY WHICH IS WORSE — the guess, or a gate that stays shut — the
+  reviewer answered that a silent false clearance is worse than a loud block, and the guess was
+  WITHDRAWN on 30.08.2026 rather than kept as an interim. So the four reds are unaccounted again
+  and the gate is shut again, loudly, until this point lands. That is the state to expect, not a
+  regression to re-diagnose.
   FINAL STATE: the run record carries the measurement and the section as SEPARATE fields, the
   charge reads the measurement alone, and no reader parses a tag out of text. Records written
   before the change keep working — an old record has no section field, and the reader must say

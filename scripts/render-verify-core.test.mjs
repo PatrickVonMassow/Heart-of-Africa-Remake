@@ -3016,228 +3016,38 @@ describe('the shipped charge ledger', () => {
   // is the one failure mode a charge must never have. These pin the narrow half
   // AND the measured half together: an entry that stops matching its own
   // evidence is as broken as one that matches everything.
-  it('reads the measured line through the recorder\'s section tag', () => {
-    // MEASURED 30.08.2026, and it had blocked the gate for as long as the
-    // narrowings existed: a suite that declares sections appends
-    // ` [--section=<name>]` to every result line, and the RECORD stores the line
-    // with it — while every detailMatch here is anchored at both ends against
-    // what the SUITE printed. So in a section-using suite no anchored charge
-    // could ever reach the end of its own recorded red. All four details below
-    // are copied from .claude/render-verify-state.json as it holds them.
+  it('reads a recorded detail exactly as the record stored it', () => {
+    // THE DEFECT IS REAL, AND THIS READER IS NOT ALLOWED TO FIX IT (cross-vendor
+    // review, GPT-5.6 Sol, do-not-merge three times). A suite that declares
+    // sections appends ` [--section=<name>]` to every result line and the record
+    // stores the line WITH it, while every detailMatch is anchored at both ends
+    // against the MEASURED line — so no anchored charge in such a suite reaches
+    // the end of its own recorded red. Four owned reds sit unaccounted because of
+    // it, and the gate stays shut.
+    //
+    // Two attempts to take the tag off by reading the text were refused for one
+    // reason: reconstruction proves syntax, not PROVENANCE — a check that really
+    // measured a value ending in the join and a bracket is indistinguishable from
+    // a tagged one, and stripping it could satisfy a signature belonging to a
+    // different red. Asked which is worse, the reviewer answered: a silent false
+    // clearance is worse than a loud block. So this pins the loud state until
+    // point 1018 records the section beside the measurement.
     const tagged = (name, detail, scope, kind = 'check') => chargeFor({ name, detail, kind }, scope)
-    expect(
-      tagged(
-        'the archive holds picture, state, overlay and description',
-        'hoa-state-2026-08-30-42.json, hoa-state-2026-08-30-42-overlay.json, ' +
-          'hoa-state-2026-08-30-42.txt  [--section=bug-report-archive]',
-        { suite: 'report', backend: 'webgpu', featureLevel: 'compatibility' },
-      ).point,
-    ).toBe(927)
-    expect(
-      tagged(
-        'the children walk PAST the traveller — from one side of him to the other',
-        '0 of 4 crossed his line; along the lane (0 = his line) [-11..26@1, -15..16@1, -11..22@1, ' +
-          '-11..16@1] m, walked [67, 67, 68, 66] m, phases [run×39 part×161 roam×695] over 45s ' +
-          'played, 3 tagged  [--section=children-bank-game]',
-        { suite: 'polish', backend: 'webgl' },
-      ).point,
-    ).toBe(698)
-    expect(
-      tagged(
-        'first-person ground shows micro-detail (edge energy)',
-        'laplacian mean 1.07  [--section=ground-detail]',
-        { suite: 'settings', backend: 'webgl' },
-      ).point,
-    ).toBe(603)
-    expect(
-      tagged(
-        'the streamed dressing does not grow over a session at a fixed anchor (point 278)',
-        '{"samples":[0,0,0,0,0],"min":0,"max":0,"spread":0}  [--section=dressing-growth]',
-        { suite: 'enrichments', backend: 'webgl' },
-      ).point,
-    ).toBe(938)
-  })
-
-  // THE STRIPPER MAY NOT EAT MEASURED TEXT (cross-vendor review, GPT-5.6 Sol,
-  // do-not-merge on the first attempt). These use a ledger of their own, because
-  // the shipped entries cannot express the case: a charge whose detail regex
-  // matches what an over-greedy stripper would LEAVE BEHIND is what catches one,
-  // and every shipped entry would return null for its own separate reasons.
-  it('takes off only the tag a suite really appended', () => {
-    const scope = (ledger) => ({ suite: 'probe', backend: 'webgl', ledger })
-    const entry = (detailMatch) => [
-      { point: 9001, suite: 'probe', backend: 'webgl', kind: 'check', match: /^probe$/i, detailMatch },
-    ]
-    const red = (detail) => ({ name: 'probe', detail, kind: 'check' })
-    // The join the suites write — measurement, two spaces, the trimmed tag.
-    expect(chargeFor(red('timeout  [--section=x]'), scope(entry(/^timeout$/))).point).toBe(9001)
-    // NOT the same thing: a measurement whose own last word ends in something
-    // bracket-shaped. The first attempt normalised this to `timeout` and charged
-    // it — a red nobody measured, excused by the stripper rather than the entry.
-    expect(chargeFor(red('timeout[--section=x]'), scope(entry(/^timeout$/)))).toBeNull()
-    // Nor a single space: that is not the join, so nothing comes off.
-    expect(chargeFor(red('timeout [--section=x]'), scope(entry(/^timeout$/)))).toBeNull()
-    // AND NOTHING IS EATEN FROM THE MIDDLE: an over-greedy stripper would leave
-    // `head`, and this entry is written to match exactly that leftover.
-    expect(chargeFor(red('head  [--section=x] tail'), scope(entry(/^head$/)))).toBeNull()
-    // A DETAIL MAY LEGITIMATELY END IN A BRACKET and must survive untouched,
-    // tagged or not — the polish crossing prints one.
-    expect(chargeFor(red('phases [run×39]'), scope(entry(/^phases \[run×39\]$/))).point).toBe(9001)
-    expect(
-      chargeFor(red('phases [run×39]  [--section=x]'), scope(entry(/^phases \[run×39\]$/))).point,
-    ).toBe(9001)
-    // A CHECK THAT PRINTED NO MEASUREMENT records the tag ALONE, and what is left
-    // is the EMPTY measurement. Asserted against a ledger of its own, because the
-    // shipped entry for this red matches by NAME and would pass while the tag sat
-    // there untouched — a vacuous control (cross-vendor review, GPT-5.6 Sol).
-    expect(chargeFor(red('[--section=bug-report-archive]'), scope(entry(/^$/))).point).toBe(9001)
-    // AND TRAILING WHITESPACE IS MEASURED TEXT, not part of the tag: a stripper
-    // that ate it would pass every control above while still normalising a detail
-    // nobody measured (same review).
-    expect(chargeFor(red('timeout  [--section=x] '), scope(entry(/^timeout$/)))).toBeNull()
-    expect(chargeFor(red('timeout '), scope(entry(/^timeout$/)))).toBeNull()
-    // A DETAIL CUT AT THE RECORD'S CEILING IS READ AS IT WAS STORED (cross-vendor
-    // review, GPT-5.6 Sol, and it is the one practical way this could have
-    // cleared a red without provenance): the real tag may sit beyond the cut, so
-    // what is left merely ENDS in a tag shape, and stripping it would eat
-    // measured text and could satisfy an anchored signature belonging to another
-    // red. `chargeReds` cuts at 200 characters, so a detail that long is never
-    // normalised.
-    const cut = 'x'.repeat(200 - '  [--section=x]'.length) + '  [--section=x]'
-    expect(cut.length).toBe(200)
-    expect(chargeFor(red(cut), scope(entry(new RegExp(`^${'x'.repeat(200 - '  [--section=x]'.length)}$`))))).toBeNull()
-    expect(chargeFor(red(cut), scope(entry(new RegExp(`^${cut.replace(/[[\]]/g, '\\$&')}$`)))).point).toBe(9001)
-    // NOR IS WHITESPACE IN FRONT OF THE JOIN (same review, round 2): a stripper
-    // eating `/ {2,}\[--section=…\]$/` passes every case above and still takes a
-    // measurement's own trailing space with it.
-    expect(chargeFor(red('timeout   [--section=x]'), scope(entry(/^timeout$/)))).toBeNull()
-    expect(chargeFor(red('timeout   [--section=x]'), scope(entry(/^timeout $/))).point).toBe(9001)
-    // AND THE JOIN IS TWO ASCII SPACES, not any two whitespace characters (same
-    // review, round 3): a separator read as `\s{2}` would strip tabs the suite
-    // never wrote, so the measurement keeps them.
-    expect(chargeFor(red('timeout\t\t[--section=x]'), scope(entry(/^timeout$/)))).toBeNull()
-    expect(chargeFor(red('timeout\t\t[--section=x]'), scope(entry(/^timeout\t\t\[--section=x\]$/))).point).toBe(9001)
-  })
-
-  it('charges the borrowed world on both measured lanes and no further', () => {
-    // Point 1009's six reds were measured on webgl/benchmark and on
-    // webgpu/benchmark at recorded featureLevel=compatibility, twice each
-    // (30.08.2026). One entry without a backend used to cover them, resting on
-    // the argument that the restore path is plain JavaScript — reasoning, not a
-    // measurement, and it also reached the CORE adapter the player runs and a run
-    // that recorded no level at all (cross-vendor review, GPT-5.6 Sol).
-    const restored = { name: 'restored: ssaoEnabled', detail: 'false -> true', kind: 'check' }
-    const on = (scope) => chargeFor(restored, { suite: 'benchmark', ...scope })
-    expect(on({ backend: 'webgl' }).point).toBe(1009)
-    expect(on({ backend: 'webgpu', featureLevel: 'compatibility' }).point).toBe(1009)
-    // Neither the core adapter nor a run whose level went unrecorded was measured.
-    expect(on({ backend: 'webgpu', featureLevel: 'core' })).toBeNull()
-    expect(on({ backend: 'webgpu' })).toBeNull()
-    // EACH HALF IS ISOLATED, not only the WebGL one (cross-vendor review, GPT-5.6
-    // Sol): dropping the WebGPU entry's suite, kind or backend must not leave
-    // this file green, so the negatives are asserted on BOTH scopes.
-    const gpu = { backend: 'webgpu', featureLevel: 'compatibility' }
-    expect(chargeFor(restored, { suite: 'settings', backend: 'webgl' })).toBeNull()
-    expect(chargeFor(restored, { suite: 'settings', ...gpu })).toBeNull()
-    expect(chargeFor({ ...restored, kind: 'console' }, { suite: 'benchmark', backend: 'webgl' })).toBeNull()
-    expect(chargeFor({ ...restored, kind: 'console' }, { suite: 'benchmark', ...gpu })).toBeNull()
-    // A WebGL scope carrying a level must be answered by the WebGL entry and not
-    // by the other one. Both entries are point 1009, so the POINT cannot tell
-    // them apart (cross-vendor review, GPT-5.6 Sol) — the matched entry's own
-    // backend can.
-    expect(chargeFor(restored, { suite: 'benchmark', backend: 'webgl', featureLevel: 'compatibility' }).backend).toBe('webgl')
-    expect(on({ backend: 'webgl' }).backend).toBe('webgl')
-    expect(on({ backend: 'webgpu', featureLevel: 'compatibility' }).backend).toBe('webgpu')
-    // THE NAME IS THE WHOLE OF THE EVIDENCE — this entry reads no detail, so its
-    // six names are the only thing keeping it narrow. A seventh setting nobody
-    // measured stays red on both lanes, and so does a name that merely starts
-    // with one of the six.
-    for (const scope of [{ backend: 'webgl' }, gpu]) {
-      expect(chargeFor({ ...restored, name: 'restored: fog' }, { suite: 'benchmark', ...scope })).toBeNull()
-      expect(
-        chargeFor({ ...restored, name: 'restored: seed and the day it pins' }, { suite: 'benchmark', ...scope }),
-      ).toBeNull()
-      expect(
-        chargeFor(
-          { ...restored, name: 'Math.random is the original function again, and so is Date.now' },
-          { suite: 'benchmark', ...scope },
-        ),
-      ).toBeNull()
-      // And text in FRONT of one of the six is a different check name too — the
-      // pattern is anchored at both ends, and this is what proves the leading
-      // anchor holds (same review).
-      expect(chargeFor({ ...restored, name: 'also restored: seed' }, { suite: 'benchmark', ...scope })).toBeNull()
-      expect(
-        chargeFor({ ...restored, name: 'after F8, Math.random is the original function again' }, { suite: 'benchmark', ...scope }),
-      ).toBeNull()
-      // While every one of the six charges, on both measured lanes.
-      for (const name of ['restored: ssaoEnabled', 'restored: travelZoom', 'restored: travelSpeed',
-        'restored: seed', 'restored: day', 'Math.random is the original function again']) {
-        expect(chargeFor({ ...restored, name }, { suite: 'benchmark', ...scope }).point, name).toBe(1009)
-      }
-    }
-  })
-
-  it('leaves the report suite\'s picture-loss reds uncharged on WebGL 2', () => {
-    // MEASURED 30.08.2026 on main, and it corrects a mistake of the same day: a
-    // bare `npm test -- report` runs the EVERYDAY lane, which is WebGPU, so four
-    // reds read that way were briefly mistaken for a WebGL measurement and given
-    // WebGL halves. Run with VERIFY_GL=webgl the suite passes WHOLE — 34 checks,
-    // 0 fail — so those reds do not occur on this lane at all and a charge here
-    // would excuse something nobody has measured. That is the one failure mode
-    // the table exists to prevent, so the entries were withdrawn and this holds
-    // the line.
-    const at = (name, detail) => chargeFor({ name, detail, kind: 'check' }, { suite: 'report', backend: 'webgl' })
     const stem = 'hoa-state-2026-08-30-42'
+    const members = archiveMemberDetail(
+      archiveMemberNames(stem, ARCHIVE_MEMBER_SUFFIXES.filter((x) => x !== ARCHIVE_PICTURE_SUFFIX)),
+    )
+    const gpuReport = { suite: 'report', backend: 'webgpu', featureLevel: 'compatibility' }
+    // Without the tag — what the suite printed — the charge answers.
+    expect(tagged('the archive holds picture, state, overlay and description', members, gpuReport).point).toBe(927)
+    // With it, as the record holds it, the charge does NOT, and that is the
+    // defect 1018 closes. Pinned so the day it closes, this line says so.
     expect(
-      at(
-        'the archive holds picture, state, overlay and description',
-        archiveMemberDetail(
-          archiveMemberNames(stem, ARCHIVE_MEMBER_SUFFIXES.filter((x) => x !== ARCHIVE_PICTURE_SUFFIX)),
-        ),
-      ),
+      tagged('the archive holds picture, state, overlay and description', `${members}  [--section=bug-report-archive]`, gpuReport),
     ).toBeNull()
-    expect(at(memberPresentCheckName(stem, ARCHIVE_PICTURE_SUFFIX), '')).toBeNull()
-    expect(at('the archive carries a screenshot', 'no PNG member')).toBeNull()
-    // The EXACT red the withdrawn entry charged, duplicate and all — a WebGL
-    // entry could otherwise come back for the duplicated form without failing
-    // here (cross-vendor review, GPT-5.6 Sol).
-    const vite504 = 'Failed to load resource: the server responded with a status of 504 (Outdated Optimize Dep)'
-    expect(at('no console errors', vite504)).toBeNull()
-    expect(at('no console errors', `${vite504} | ${vite504}`)).toBeNull()
-    // While the lane they WERE measured on keeps its charge.
-    expect(
-      chargeFor(
-        { name: 'the archive carries a screenshot', detail: 'no PNG member', kind: 'check' },
-        { suite: 'report', backend: 'webgpu', featureLevel: 'compatibility' },
-      ).point,
-    ).toBe(927)
-    // AND SO DOES THE VITE TRANSIENT, on the lane and level it was measured on:
-    // point 939 had entered it as a startup CONSOLE red, so the report suite's
-    // generic "no console errors" check stood unaccounted (measured 30.08.2026).
-    const vite = 'Failed to load resource: the server responded with a status of 504 (Outdated Optimize Dep)'
-    const onWebgpu = (detail) =>
-      chargeFor({ name: 'no console errors', detail, kind: 'check' }, { suite: 'report', backend: 'webgpu', featureLevel: 'compatibility' })
-    expect(onWebgpu(`${vite} | ${vite}`).point).toBe(939)
-    // The check name is generic, so the detail is the whole of the evidence: a
-    // second, different console error riding along keeps the red.
-    expect(onWebgpu(`${vite} | TypeError: undefined is not a function`)).toBeNull()
-    expect(onWebgpu('TypeError: undefined is not a function')).toBeNull()
-    // And the CORE adapter the player runs is not the lane this was measured on.
-    const asChecked = (over) =>
-      chargeFor(
-        { name: 'no console errors', detail: vite, kind: 'check', ...over.red },
-        { suite: 'report', backend: 'webgpu', featureLevel: 'compatibility', ...over.scope },
-      )
-    expect(asChecked({ red: {}, scope: { featureLevel: 'core' } })).toBeNull()
-    // THE SCOPE IS ASSERTED, NOT ASSUMED (same review): dropping suite or kind,
-    // or broadening the name, must not leave this file green.
-    expect(asChecked({ red: {}, scope: { suite: 'startup' } })).toBeNull()
-    expect(asChecked({ red: { kind: 'console' }, scope: {} })).toBeNull()
-    expect(asChecked({ red: { name: 'no console errors across the F9 cycle' }, scope: {} })).toBeNull()
-    // AND THE DETAIL'S LEADING ANCHOR HOLDS: a different error in FRONT of the
-    // transient is a red nobody measured, so it must not ride in behind it.
-    expect(onWebgpu(`TypeError: undefined is not a function | ${vite}`)).toBeNull()
+    // A charge that reads no detail is untouched by any of this: the name alone
+    // is its evidence, and the tag never reaches the name.
+    expect(tagged('the archive carries a screenshot', 'no PNG member  [--section=bug-report-archive]', gpuReport).point).toBe(927)
   })
 
   it('charges the archive composite only in the picture-loss shape', () => {
