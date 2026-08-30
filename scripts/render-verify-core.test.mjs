@@ -3122,9 +3122,38 @@ describe('the shipped charge ledger', () => {
     // Neither the core adapter nor a run whose level went unrecorded was measured.
     expect(on({ backend: 'webgpu', featureLevel: 'core' })).toBeNull()
     expect(on({ backend: 'webgpu' })).toBeNull()
-    // And the entry stays in its suite and kind.
+    // EACH HALF IS ISOLATED, not only the WebGL one (cross-vendor review, GPT-5.6
+    // Sol): dropping the WebGPU entry's suite, kind or backend must not leave
+    // this file green, so the negatives are asserted on BOTH scopes.
+    const gpu = { backend: 'webgpu', featureLevel: 'compatibility' }
     expect(chargeFor(restored, { suite: 'settings', backend: 'webgl' })).toBeNull()
+    expect(chargeFor(restored, { suite: 'settings', ...gpu })).toBeNull()
     expect(chargeFor({ ...restored, kind: 'console' }, { suite: 'benchmark', backend: 'webgl' })).toBeNull()
+    expect(chargeFor({ ...restored, kind: 'console' }, { suite: 'benchmark', ...gpu })).toBeNull()
+    // A WebGL scope carrying a level isolates the WebGPU half's backend: nothing
+    // may match it through the lane alone.
+    expect(chargeFor(restored, { suite: 'benchmark', backend: 'webgl', featureLevel: 'compatibility' }).point).toBe(1009)
+    // THE NAME IS THE WHOLE OF THE EVIDENCE — this entry reads no detail, so its
+    // six names are the only thing keeping it narrow. A seventh setting nobody
+    // measured stays red on both lanes, and so does a name that merely starts
+    // with one of the six.
+    for (const scope of [{ backend: 'webgl' }, gpu]) {
+      expect(chargeFor({ ...restored, name: 'restored: fog' }, { suite: 'benchmark', ...scope })).toBeNull()
+      expect(
+        chargeFor({ ...restored, name: 'restored: seed and the day it pins' }, { suite: 'benchmark', ...scope }),
+      ).toBeNull()
+      expect(
+        chargeFor(
+          { ...restored, name: 'Math.random is the original function again, and so is Date.now' },
+          { suite: 'benchmark', ...scope },
+        ),
+      ).toBeNull()
+      // While every one of the six charges, on both measured lanes.
+      for (const name of ['restored: ssaoEnabled', 'restored: travelZoom', 'restored: travelSpeed',
+        'restored: seed', 'restored: day', 'Math.random is the original function again']) {
+        expect(chargeFor({ ...restored, name }, { suite: 'benchmark', ...scope }).point, name).toBe(1009)
+      }
+    }
   })
 
   it('leaves the report suite\'s picture-loss reds uncharged on WebGL 2', () => {
