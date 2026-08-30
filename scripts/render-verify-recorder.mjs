@@ -193,6 +193,12 @@ const LINE_PROBE_CHARS = 4096
  *  crash count as clean picture coverage. */
 const CRASH_LINE = /^\s+at .+:\d+:\d+|^(?:Uncaught\s+)?\w*Error(?::|\b)/
 
+/** A suite's own terminal failure report. Unlike a stack-looking stderr line,
+ * this is emitted on the suite's normal path immediately before its explicit
+ * non-zero exit. `console errors:` is the form used by world and enrichments;
+ * the other forms cover the remaining browser-suite reporters. */
+const TERMINAL_VERDICT_LINE = /^(?:console errors:|CONSOLE ERRORS:|FAILURES:\s*\d+\b|(?:report:\s*)?\d+\s+(?:CROSS-BROWSER\/MOBILE\s+)?CHECK\(S\) FAILED\b)/i
+
 /** Where a stack frame BEGINS. `CRASH_LINE` can only confirm one from its
  *  trailing `:line:column`, which an overlong line puts past the probe — so this
  *  is what says "this might be a crash frame and I cannot tell", the one stderr
@@ -290,6 +296,7 @@ export function tapOutput(state, streams = [[process.stdout, false], [process.st
    */
   const handle = (isErr, line, stream = null) => {
     if (isErr && CRASH_LINE.test(line)) state.crashed = true
+    if (!isErr && TERMINAL_VERDICT_LINE.test(line)) state.terminalVerdict = true
     // A SUBSTITUTED CHARACTER COSTS THE ACCOUNTING ONLY INSIDE A RESULT LINE
     // (review finding, 28.08.2026, round 30). The mark is cleared by the line it
     // belongs to either way: it stands for one line's loss, never for the run's.
@@ -670,6 +677,11 @@ export function armRunRecorder(backend) {
       // in the buffer stands for, so a run with any is recorded INCOMPLETE.
       droppedLines: 0,
       crashed: false,
+      // Set only by the suite's own terminal reporter, never by stderr. This
+      // separates a caught validation stack printed during a completed red run
+      // from Node's uncaught-exception death path below.
+      terminalVerdict: false,
+      uncaught: false,
     }
     const flush = tapOutput(armed)
     // THE REAL CRASH PATH (four-eyes finding F1). Node prints an uncaught
@@ -683,6 +695,7 @@ export function armRunRecorder(backend) {
     // 'unhandledRejection' listener, which would SUPPRESS the crash).
     process.on('uncaughtExceptionMonitor', () => {
       armed.crashed = true
+      armed.uncaught = true
     })
     process.on('exit', (code) => {
       try {
@@ -741,6 +754,15 @@ export function armRunRecorder(backend) {
             /* unparseable output — no red is charged, so the run stays red */
           }
         }
+        // A stack-shaped stderr line is only a crash CANDIDATE. Suites can and
+        // do print WebGPU validation errors while continuing to their own
+        // terminal report. Once that report exists, the backend was asserted
+        // and the red set was recorded, the run reported a failure; it did not
+        // die. An uncaught exception remains definitive even if the suite had
+        // printed earlier verdicts.
+        const reportedFailure =
+          exit !== 0 && armed.terminalVerdict === true && armed.asserted === true && reds.length > 0
+        const crashed = armed.uncaught === true || (armed.crashed === true && !reportedFailure)
         recordRun({
           backend: armed.backend,
           suite: armed.suite,
@@ -775,7 +797,15 @@ export function armRunRecorder(backend) {
           // it through the signed crash disposition instead of letting it
           // count as clean picture coverage. Non-zero runs keep their existing
           // explicit boolean; ordinary exit-0 runs keep omitting the field.
-          ...(exit !== 0 || armed.crashed ? { crashed: armed.crashed } : {}),
+          ...(exit !== 0 || crashed
+            ? {
+                crashed,
+                // Explicit on new non-zero records so readers need the legacy
+                // inference only for records written before this field existed.
+                terminalVerdict: armed.terminalVerdict === true,
+                ...(armed.uncaught === true ? { crashSource: 'uncaught-exception' } : {}),
+              }
+            : {}),
           // A RUN THAT HIT A BUDGET IS AN INCOMPLETE RECORDING, and says how
           // much it refused — `runVerdict` then answers `incomplete` and the
           // signed closure disposes of it, which is the whole way out a

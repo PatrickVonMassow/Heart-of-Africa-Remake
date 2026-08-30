@@ -446,6 +446,19 @@ describe('openCrashedRuns / crashClosureDraft — the crash sign-off', () => {
     expect(openCrashedRuns({ runs: [crashed(1500), probe, ordinary] }).map((r) => r.at)).toEqual([1500])
   })
 
+  it('does not offer a crash sign-off for a legacy run that asserted its backend and reported its red', () => {
+    const reported = crashed(1500, {
+      suite: 'world',
+      asserted: true,
+      screenshotCount: 3,
+      reds: [{ name: 'frame 11-worldmodel-khartoum-confluence', kind: 'check', point: 627 }],
+    })
+    expect(openCrashedRuns({ runs: [reported] })).toEqual([])
+    expect(crashClosureDraft({ runs: [reported] }, { ...signed, selector: 'webgpu/world' }).error).toMatch(
+      /no OPEN crashed run/,
+    )
+  })
+
   it('drops a run that is already signed off, and keeps the next one', () => {
     const one = crashed(1500)
     const state = {
@@ -929,6 +942,25 @@ describe('render-verify-guard --status — what it prints about a run it cannot 
       runs: [{ backend: 'webgpu', suite: 'startup', at: 1500, exit: 1, crashed: true, reds: [] }],
     })
     expect(out).toMatch(/startup\s+exit 1 .*crashed/)
+  })
+
+  it('names no reported legacy red as a crashed run', () => {
+    const out = inTempRepo({
+      runs: [
+        {
+          backend: 'webgpu',
+          suite: 'world',
+          at: 1500,
+          exit: 1,
+          asserted: true,
+          crashed: true,
+          screenshotCount: 3,
+          reds: [{ name: 'frame 11-worldmodel-khartoum-confluence', kind: 'check', point: 627 }],
+        },
+      ],
+    })
+    expect(out).not.toMatch(/⚠ CRASHED RUN/)
+    expect(out).toMatch(/world\s+exit 1 .*red/)
   })
 
   // A RECORD WHOSE MEASUREMENT WAS RETAKEN IS ANSWERED, NOT MERELY OLD (review

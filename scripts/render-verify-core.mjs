@@ -820,6 +820,28 @@ export function crashClosureFor(run, closures) {
   return signedClosureFor(run, closures)
 }
 
+/** Whether a raw `crashed: true` record really says the process died.
+ *
+ * Records written from this revision onward carry `terminalVerdict` explicitly
+ * and mark Node's definitive uncaught-exception path with `crashSource`. Older
+ * records predate both fields. For those only, the durable evidence already in
+ * the record decides: a non-zero run that asserted its backend and recorded at
+ * least one red reached its own failure report, so a stack-shaped validation
+ * line on stderr does not turn it into a crash retroactively. */
+export function isCrashedRun(run) {
+  if (!run || typeof run !== 'object' || run.crashed !== true) return false
+  if (run.crashSource === 'uncaught-exception') return true
+
+  const hasTerminalField = Object.prototype.hasOwnProperty.call(run, 'terminalVerdict')
+  const reported =
+    exitOf(run) !== 0 &&
+    run.asserted === true &&
+    Array.isArray(run.reds) &&
+    run.reds.length > 0 &&
+    (run.terminalVerdict === true || !hasTerminalField)
+  return !reported
+}
+
 /**
  * THE RECORD AS IT IS JUDGED ONCE ITS CRASH IS SIGNED OFF (review finding,
  * 28.08.2026). The signature closes the CRASH READING and nothing else, so what
@@ -834,7 +856,7 @@ export function crashClosureFor(run, closures) {
  * closure lookup, whose identity is the record's real content.
  */
 export function afterCrashClosure(run, crashClosures) {
-  if (run?.crashed !== true) return run
+  if (!isCrashedRun(run)) return run
   return crashClosureFor(run, crashClosures) ? { ...run, crashed: false } : run
 }
 
@@ -926,7 +948,7 @@ export function runVerdict(run, options) {
   // truncation, a crashed run that also flooded its output could be lifted by one
   // signature (review, 19.08.2026). Only `partial` still comes first, because a
   // --section probe is nobody's evidence in either direction.
-  if (run.crashed === true) {
+  if (isCrashedRun(run)) {
     return {
       status: 'red',
       covers: false,
@@ -1244,7 +1266,7 @@ export function unexplainedRuns(runs, since, options) {
     // suite (the recorded rounds pinned that a crash inside the window is not
     // talked away by the runs that followed it — the way out is the explicit,
     // evidenced signature or the deferral, never silence).
-    if (r.crashed === true && !signedCrash) {
+    if (isCrashedRun(r) && !signedCrash) {
       // THE CRASH SENTENCE BLOCKS; THE REDS PRINTED BEFORE THE CRASH ARE CARRIED
       // BESIDE IT (review finding, 28.08.2026). `unaccounted` stays the crash
       // alone — it is the one thing the reader is told to dispose of, and naming
@@ -1866,7 +1888,7 @@ export function evaluate(input) {
     // signed off, it simply leaves the backend uncovered — quoting its synthetic
     // "unaccounted red" here sent the reader hunting a defect the run never
     // reported (sixth round; the same rule the incomplete class already has).
-    if (run.crashed === true && verdict.status === 'red') {
+    if (isCrashedRun(run) && verdict.status === 'red') {
       if (!reported) {
         whyNot.push(
           `${b}: the last run (${suiteName}) CRASHED, but that record is already signed off as ` +
@@ -1915,7 +1937,7 @@ export function evaluate(input) {
     // suspect run's entry carries the first attempt's raw check names, not the
     // sentence about them).
     const open_ =
-      reported && (verdict.status === 'incomplete' || run.crashed === true)
+      reported && (verdict.status === 'incomplete' || isCrashedRun(run))
         ? reported.unaccounted
         : verdict.unaccounted
     const named = open_

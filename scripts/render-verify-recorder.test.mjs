@@ -1004,7 +1004,55 @@ describe('the armed recorder — the REAL wiring, not a stand-in', () => {
       'screenshots',
       'startedAt',
       'suite',
+      'terminalVerdict',
     ])
+  })
+
+  it('records a stderr Error inside an otherwise reporting run as a red, not a crash', async () => {
+    const run = await armed('world', 'compatibility')
+    process.stderr.write('ValidationError: WebGPU texture usage was rejected by the validation layer\n')
+    process.stdout.write('FAIL  frame 11-worldmodel-khartoum-confluence — the confluence moved\n')
+    process.stdout.write('console errors: none\n')
+    const record = run.exit(1)
+
+    expect(record).toMatchObject({
+      exit: 1,
+      asserted: true,
+      terminalVerdict: true,
+      crashed: false,
+    })
+    expect(record.reds.map((r) => r.name)).toContain('frame 11-worldmodel-khartoum-confluence')
+    expect(runVerdict(record, { openPoints: [627] })).toMatchObject({ status: 'accounted', covers: true })
+  })
+
+  it('requires the terminal verdict, backend assertion and recorded red before clearing a stderr crash candidate', async () => {
+    const noTerminal = await armed('world', 'core')
+    process.stderr.write('ValidationError: candidate without a terminal verdict\n')
+    process.stdout.write('FAIL  a red printed before the process died\n')
+    expect(noTerminal.exit(1).crashed).toBe(true)
+
+    const noAssertion = await armed('world')
+    process.stderr.write('ValidationError: candidate without a backend assertion\n')
+    process.stdout.write('FAIL  a red with no asserted backend\nconsole errors: 0\n')
+    expect(noAssertion.exit(1).crashed).toBe(true)
+
+    const noRed = await armed('world', 'core')
+    process.stderr.write('ValidationError: candidate without a recorded red\n')
+    process.stdout.write('console errors: 0\n')
+    expect(noRed.exit(1).crashed).toBe(true)
+  })
+
+  it('keeps an uncaught exception a crash after a terminal verdict', async () => {
+    const run = await armed('world', 'core')
+    process.stderr.write('ValidationError: validation chatter\n')
+    process.stdout.write('FAIL  a red printed before the uncaught exception\nconsole errors: 0\n')
+    process.emit('uncaughtExceptionMonitor', new Error('the process died after reporting began'))
+    const record = run.exit(1)
+    expect(record).toMatchObject({
+      crashed: true,
+      terminalVerdict: true,
+      crashSource: 'uncaught-exception',
+    })
   })
 
   // A stack can reach the stderr tap even when the process ultimately exits 0.

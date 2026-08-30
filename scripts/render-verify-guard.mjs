@@ -59,6 +59,7 @@ import {
   incompleteClosureFor,
   crashClosureFor,
   afterCrashClosure,
+  isCrashedRun,
   unexplainedRuns,
   droppedLinesOf,
   runStamp,
@@ -409,7 +410,7 @@ function classOf(entry) {
 export function openCrashedRuns(state) {
   const runs = Array.isArray(state?.runs) ? state.runs : []
   return runs.filter(
-    (r) => r?.crashed === true && runVerdict(r).status === 'red' && !crashClosureFor(r, state?.crashClosures),
+    (r) => isCrashedRun(r) && runVerdict(r).status === 'red' && !crashClosureFor(r, state?.crashClosures),
   )
 }
 
@@ -769,7 +770,7 @@ if (arg === 'status' || arg === '--status') {
       // guard says so everywhere else — "a re-run judges the picture but does
       // NOT remove this record". Reading the same sentence over a crashed record
       // contradicted the paragraph directly above it.
-      const retaken = r?.crashed === true ? null : reRecordedBy(state, r, { openPoints })
+      const retaken = isCrashedRun(r) ? null : reRecordedBy(state, r, { openPoints })
       if (retaken) {
         return `already answered by the later covering ${retaken.suite} run @${isoText(runStamp(retaken) ?? retaken.at)} — signing it changes nothing`
       }
@@ -894,7 +895,7 @@ if (arg === 'status' || arg === '--status') {
           // 28.08.2026, round 20): `runVerdict` answers `red` for a crashed
           // record, and printing that here contradicted the CRASHED RUN
           // paragraph three lines up in the same report.
-          `${r.crashed === true && v.status === 'red' ? 'crashed' : v.status}` +
+          `${isCrashedRun(r) && v.status === 'red' ? 'crashed' : v.status}` +
           `${v.charges.length ? ` (${v.charges.map((c) => `→${c.point}`).join(' ')})` : ''}`,
       )
     }
