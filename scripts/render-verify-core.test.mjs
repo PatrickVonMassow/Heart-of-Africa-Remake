@@ -3108,6 +3108,25 @@ describe('the shipped charge ledger', () => {
     expect(chargeFor(red('timeout\t\t[--section=x]'), scope(entry(/^timeout\t\t\[--section=x\]$/))).point).toBe(9001)
   })
 
+  it('charges the borrowed world on both measured lanes and no further', () => {
+    // Point 1009's six reds were measured on webgl/benchmark and on
+    // webgpu/benchmark at recorded featureLevel=compatibility, twice each
+    // (30.08.2026). One entry without a backend used to cover them, resting on
+    // the argument that the restore path is plain JavaScript — reasoning, not a
+    // measurement, and it also reached the CORE adapter the player runs and a run
+    // that recorded no level at all (cross-vendor review, GPT-5.6 Sol).
+    const restored = { name: 'restored: ssaoEnabled', detail: 'false -> true', kind: 'check' }
+    const on = (scope) => chargeFor(restored, { suite: 'benchmark', ...scope })
+    expect(on({ backend: 'webgl' }).point).toBe(1009)
+    expect(on({ backend: 'webgpu', featureLevel: 'compatibility' }).point).toBe(1009)
+    // Neither the core adapter nor a run whose level went unrecorded was measured.
+    expect(on({ backend: 'webgpu', featureLevel: 'core' })).toBeNull()
+    expect(on({ backend: 'webgpu' })).toBeNull()
+    // And the entry stays in its suite and kind.
+    expect(chargeFor(restored, { suite: 'settings', backend: 'webgl' })).toBeNull()
+    expect(chargeFor({ ...restored, kind: 'console' }, { suite: 'benchmark', backend: 'webgl' })).toBeNull()
+  })
+
   it('leaves the report suite\'s picture-loss reds uncharged on WebGL 2', () => {
     // MEASURED 30.08.2026 on main, and it corrects a mistake of the same day: a
     // bare `npm test -- report` runs the EVERYDAY lane, which is WebGPU, so four

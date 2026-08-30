@@ -622,10 +622,44 @@ export const RED_CHARGES = [
   {
     point: 1009,
     suite: 'benchmark',
+    backend: 'webgl',
     kind: 'check',
     match:
       /^(restored: (ssaoEnabled|travelZoom|travelSpeed|seed|day)|Math\.random is the original function again)$/i,
     why:
+      'THE WebGL 2 HALF. ' +
+      'FILED AS 1009 ON 29.08.2026, the day the six were classified. Measured in the LARGE run on ' +
+      'feat/687-roam-bound-fixes (WebGL 2) and classified with baseline-classify against the ' +
+      'merge-base 4acf6039abe0: ALL SIX are already red on the baseline, so none of them is the ' +
+      'communication rebuild\'s. Before that classification NOTHING owned them — no open point ' +
+      'named them and this table held no benchmark entry at all — so they reddened every full ' +
+      'regression with no owner, which is the one thing CLAUDE.md 7.2 forbids and the reason a ' +
+      'LARGE could not go green for any point. The defect they report is real and 1009 holds it: ' +
+      'the F8 measurement run borrows the world — a pinned seed and day, a fixed travel zoom and ' +
+      'speed, the SSAO switch, and Math.random replaced so a frame draws the same way twice — and ' +
+      'returns none of it. NOT SCOPED TO A BACKEND, AND NOW MEASURED ON BOTH (cross-vendor ' +
+      'review, GPT-5.6 Sol, 30.08.2026, which rightly refused the earlier argument): the entry ' +
+      'used to rest on the reasoning that the restore path is plain JavaScript state and has ' +
+      'nothing to do with which renderer drew the rows — but reasoning is not a measurement, and ' +
+      'a WebGPU red would have been excused on an argument. The LARGE run of 30.08.2026 supplies ' +
+      'what was missing: all six read red on webgl/benchmark and again on webgpu/benchmark at ' +
+      'recorded featureLevel=compatibility, twice on each lane. The two WebGPU timestamp rows of ' +
+      'the same run fail for their own reasons and are NOT covered here. The charge dies with ' +
+      'the point.',
+  },
+  {
+    point: 1009,
+    suite: 'benchmark',
+    backend: 'webgpu',
+    featureLevel: 'compatibility',
+    kind: 'check',
+    match:
+      /^(restored: (ssaoEnabled|travelZoom|travelSpeed|seed|day)|Math\.random is the original function again)$/i,
+    why:
+      'THE WebGPU HALF, SCOPED TO THE COMPATIBILITY LEVEL (cross-vendor review, GPT-5.6 Sol, ' +
+      '30.08.2026): one entry without a level also excused the CORE adapter the player runs and ' +
+      'a run that recorded no level at all, neither of which this evidence measured. Both ' +
+      'recorded WebGPU readings of 30.08.2026 carry featureLevel=compatibility. ' +
       'FILED AS 1009 ON 29.08.2026, the day the six were classified. Measured in the LARGE run on ' +
       'feat/687-roam-bound-fixes (WebGL 2) and classified with baseline-classify against the ' +
       'merge-base 4acf6039abe0: ALL SIX are already red on the baseline, so none of them is the ' +
