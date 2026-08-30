@@ -3035,6 +3035,15 @@ describe('the shipped charge ledger', () => {
     expect(
       chargeFor(withDetail(composite, 'metadata.json, hoa-state-2026-08-29-42-overlay.json, hoa-state-2026-08-29-42.txt'), scoped),
     ).toBeNull()
+    // AND THE NAME MUST BE THE WHOLE MEMBER, not a prefix of another one (round 3):
+    // the detail joins its members with a comma, so the state member ends where the
+    // separator does — `<stem>.json.bak` is a different file.
+    expect(
+      chargeFor(
+        withDetail(composite, 'hoa-state-2026-08-29-42.json.bak, hoa-state-2026-08-29-42-overlay.json, hoa-state-2026-08-29-42.txt'),
+        scoped,
+      ),
+    ).toBeNull()
     // While the two checks that name the picture themselves need no detail.
     expect(chargeFor(red('the archive carries a screenshot'), scoped).point).toBe(927)
     expect(chargeFor(red('member hoa-state-2026-08-29-42.png is present'), scoped).point).toBe(927)

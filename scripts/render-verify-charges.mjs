@@ -768,8 +768,11 @@ export const RED_CHARGES = [
     // and was charged as the measured picture loss. The state member is named by
     // the download stem (cross-vendor review, round 2: `not the overlay` still
     // accepted any other JSON, so an archive holding a `metadata.json` instead of
-    // its state would have matched).
-    detailMatch: /^(?!.*\.png)(?=.*hoa-state-\d{4}-\d{2}-\d{2}-\d+\.json)(?=.*-overlay\.json)(?=.*\.txt).*$/i,
+    // its state would have matched). Each member is bounded by the separator the
+    // detail joins on (round 3: an unbounded name accepted `<stem>.json.bak`, which
+    // is not the state member at all).
+    detailMatch:
+      /^(?!.*\.png)(?=(?:.*, )?hoa-state-\d{4}-\d{2}-\d{2}-\d+\.json(?:,|$))(?=(?:.*, )?[^,]*-overlay\.json(?:,|$))(?=(?:.*, )?[^,]*\.txt(?:,|$)).*$/i,
     why:
       'THE SAME DEFECT POINT 927 OWNS, READ THROUGH THE ONE CHECK THAT CAN ALSO FAIL FOR ANOTHER ' +
       'REASON. 927 measured a WebGPU archive holding its `.json`, `-overlay.json` and `.txt` and ' +
