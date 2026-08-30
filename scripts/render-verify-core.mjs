@@ -21,7 +21,7 @@
 import { createHash } from 'node:crypto'
 
 import { RED_CHARGES } from './render-verify-charges.mjs'
-import { SECTION_TAG_RE } from './section-tag-core.mjs'
+import { withoutSectionTag } from './section-tag-core.mjs'
 import { scopeMandatoryDuty } from './mandatory-duty-core.mjs'
 
 /** Both renderer backends the game ships; each needs a passing verify run. */
@@ -301,10 +301,12 @@ export function chargeFor(red, options) {
       // detail: the point-927 composite charge matched
       // `…-42.txt` while the record held `…-42.txt  [--section=bug-report-archive]`,
       // and the red it exists to account for stayed unaccounted and blocked the
-      // gate. Stripping the tag restores what was measured without loosening a
-      // single anchor — the pattern comes from the module that writes the tag,
-      // so the two cannot drift apart again.
-      const measured = detail.replace(SECTION_TAG_RE, '')
+      // gate. Taking the tag off restores what was measured without loosening a
+      // single anchor: the shape is RECONSTRUCTED from the generator, so a detail
+      // that merely ends in something bracket-shaped keeps every character it
+      // measured (cross-vendor review, GPT-5.6 Sol, do-not-merge on the first
+      // attempt, which used a regex loose enough to eat real measured text).
+      const measured = withoutSectionTag(detail)
       if (charge.detailMatch && (red?.detailVaried === true || !patternHits(charge.detailMatch, measured))) continue
       return charge
     } catch {
