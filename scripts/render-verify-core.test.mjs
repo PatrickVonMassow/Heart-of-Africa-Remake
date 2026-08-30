@@ -45,6 +45,7 @@ import {
   isIncompleteRecording,
   incompleteClosureFor,
   crashClosureFor,
+  isCrashedRun,
   droppedLinesOf,
   runIdentity,
   derivedRedKey,
@@ -834,7 +835,7 @@ describe('runVerdict — clean, accounted for, or red', () => {
   })
 
   it('does NOT account for a run that crashed, however well charged its reds are', () => {
-    const v = runVerdict(redRun('webgpu', 2000, [red('goat stance', 506)], { crashed: true }), { openPoints })
+    const v = runVerdict(redRun('webgpu', 2000, [red('goat stance', 506)], { crashed: true, terminalVerdict: false }), { openPoints })
     expect(v.status).toBe('red')
     expect(v.unaccounted[0].name).toMatch(/crash/)
   })
@@ -847,6 +848,28 @@ describe('runVerdict — clean, accounted for, or red', () => {
     expect(runVerdict(null).covers).toBe(false)
     expect(runVerdict({ exit: 1, reds: 'nonsense' }, { openPoints }).covers).toBe(false)
     expect(() => runVerdict({ exit: 1, reds: [null, 7] }, { openPoints })).not.toThrow()
+  })
+})
+
+describe('reported legacy reds are not crashes', () => {
+  const legacy = redRun('webgpu', 2000, [red('frame 11-worldmodel-khartoum-confluence', 627)], {
+    suite: 'world',
+    crashed: true,
+    screenshotCount: 3,
+  })
+
+  it('re-reads the recorded terminal verdict as a red run, mutation-checked at every required signal', () => {
+    expect(isCrashedRun(legacy)).toBe(false)
+    expect(runVerdict(legacy, { openPoints: [627] })).toMatchObject({ status: 'accounted', covers: true })
+
+    expect(isCrashedRun({ ...legacy, asserted: false })).toBe(true)
+    expect(isCrashedRun({ ...legacy, reds: [] })).toBe(true)
+    expect(isCrashedRun({ ...legacy, exit: 0 })).toBe(true)
+    expect(isCrashedRun({ ...legacy, terminalVerdict: false })).toBe(true)
+  })
+
+  it('never lets the legacy inference overrule a definitive uncaught exception', () => {
+    expect(isCrashedRun({ ...legacy, crashSource: 'uncaught-exception' })).toBe(true)
   })
 })
 
@@ -1355,7 +1378,7 @@ describe('evaluate — a red is not closed by the runs that FOLLOWED it (point 6
 
   it('does NOT talk a CRASH away with a charge — a run that died judged no picture', () => {
     const ledger = [{ point: 506, match: /goat/, why: 'the software lane cannot draw fast enough' }]
-    const crashed = redRun('webgpu', 1500, [red('goat stance', 506)], { crashed: true })
+    const crashed = redRun('webgpu', 1500, [red('goat stance', 506)], { crashed: true, terminalVerdict: false })
     const result = evaluate(renderChange({ runs: [crashed, run('webgpu', 2000), run('webgl', 2100)], openPoints, ledger }))
     expect(result.decision).toBe('block')
     // Since the sixth round the crash blocks under its OWN name — reporting it
@@ -1977,7 +2000,7 @@ describe('an INCOMPLETE RECORDING is its own class, and has its own way out (poi
   // route since the sixth round — a different list, a different judgment — and
   // this pin is what keeps the two from ever serving each other.
   it('never lifts a run that CRASHED by an incomplete-recording signature, whatever its recording lost', () => {
-    const crashedToo = { ...truncatedLegacy('webgpu', 1500), crashed: true }
+    const crashedToo = { ...truncatedLegacy('webgpu', 1500), crashed: true, terminalVerdict: false }
     expect(runVerdict(crashedToo, { openPoints }).status).toBe('red')
     expect(runVerdict(crashedToo, { openPoints }).unaccounted[0].name).toMatch(/crash/)
     const closures = [closureOf(crashedToo)]
@@ -2068,7 +2091,7 @@ describe('a CRASHED run is its own class, and has its own signed way out (point 
   /** EXACTLY the shape on disk for the 19.08.2026 webgpu/startup crashes:
    *  exit 1, `crashed: true`, an empty red list. */
   const crashedRun = (backend, at, overrides = {}) =>
-    redRun(backend, at, [], { crashed: true, suite: 'startup', ...overrides })
+    redRun(backend, at, [], { crashed: true, terminalVerdict: false, suite: 'startup', ...overrides })
   /** A closure as the --crashed CLI writes it: content identity plus evidence. */
   const crashClosure = (run_, evidence = 'local/verify-logs shows the browser died by SIGKILL; no report exists') => ({
     run: runIdentity(run_),

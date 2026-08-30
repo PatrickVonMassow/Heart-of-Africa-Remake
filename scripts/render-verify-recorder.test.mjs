@@ -9,7 +9,17 @@
 // yet exits non-zero exactly like a reported failure.
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { execFileSync } from 'node:child_process'
-import { DECODE_WINDOW_BYTES, MAX_CAPTURE_CHARS, MAX_LINE_CHARS, MAX_RED_IDENTITIES, tapOutput } from './render-verify-recorder.mjs'
+import { readFileSync, readdirSync } from 'node:fs'
+import { join } from 'node:path'
+import {
+  DECODE_WINDOW_BYTES,
+  MAX_CAPTURE_CHARS,
+  MAX_LINE_CHARS,
+  MAX_RED_IDENTITIES,
+  TERMINAL_VERDICT_LINE,
+  tapOutput,
+} from './render-verify-recorder.mjs'
+import { DEV_SUITES } from './verify/tiers.mjs'
 
 /** Text that is distinct in LETTERS, so the parser's own normalisation (digits,
  *  hex runs and URLs are folded away) cannot collapse it. That is exactly the
@@ -97,6 +107,104 @@ function tapped() {
   ])
   return { state, out, err, flush }
 }
+
+/** Static strings a one-line console.log expression can print. Template
+ * substitutions become a representative `1`: the contract is the literal
+ * report shape in the source, not the runtime count. */
+function printedLiterals(line) {
+  const strings = []
+  const literal = /'((?:\\.|[^'\\])*)'|"((?:\\.|[^"\\])*)"|`((?:\\.|[^`\\])*)`/g
+  for (const match of line.matchAll(literal)) {
+    const raw = match[1] ?? match[2] ?? match[3] ?? ''
+    strings.push(...raw.replace(/\$\{[^}]*\}/g, '1').replace(/\\n/g, '\n').split('\n'))
+  }
+  return strings
+}
+
+/** Browser suite entrypoints are discovered from the directory by their real
+ * browser import. Underscored launch helpers and named host probes are not
+ * suites. `docs.mjs` is the one direct-run Node suite in the same regression
+ * set, discovered by its direct-run guard rather than named here. */
+function verifySuiteSources() {
+  const verifyDir = join(import.meta.dirname, 'verify')
+  return readdirSync(verifyDir, { withFileTypes: true })
+    .filter((entry) => entry.isFile() && entry.name.endsWith('.mjs') && !entry.name.endsWith('.test.mjs'))
+    .flatMap((entry) => {
+      const source = readFileSync(join(verifyDir, entry.name), 'utf8')
+      const browserEntrypoint =
+        !entry.name.startsWith('_') &&
+        !/(?:-check|-probe)\.mjs$/.test(entry.name) &&
+        /from ['"](?:\.\/_browser\.mjs|playwright)['"]/.test(source)
+      const directNodeSuite = /import\.meta\.url === pathToFileURL\(process\.argv\[1\]\)\.href/.test(source)
+      return browserEntrypoint || directNodeSuite ? [{ name: entry.name, source }] : []
+    })
+}
+
+/** Discovery is deliberately structural, but the runner's tier list is the
+ * authority on what it can dispatch. Cross-checking the two means a new or
+ * renamed runner suite cannot silently fall out of this source contract. */
+function expectRunnerSuitesDiscovered(suites) {
+  const discovered = new Set(suites.map(({ name }) => name.replace(/\.mjs$/, '')))
+  const missing = DEV_SUITES.filter((suite) => !discovered.has(suite))
+  expect(
+    missing,
+    `verify suite discovery missed runner suite(s): ${missing.join(', ') || '<none>'}`,
+  ).toEqual([])
+}
+
+describe('terminal verdict source contract', () => {
+  it('recognises a literal terminal report emitted by every real verify suite', () => {
+    const suites = verifySuiteSources()
+    expectRunnerSuitesDiscovered(suites)
+    const emitted = []
+
+    for (const suite of suites) {
+      const reportLines = suite.source
+        .split('\n')
+        .map((line, index) => ({ line: index + 1, text: line.trim() }))
+        .filter(({ text }) => text.includes('console.log('))
+      const literals = reportLines.flatMap(({ text }) => printedLiterals(text))
+      emitted.push(...literals)
+      const matching = reportLines.filter(({ text }) =>
+        printedLiterals(text).some((printed) => TERMINAL_VERDICT_LINE.test(printed)),
+      )
+      const lastReport = reportLines
+        .filter(({ text }) => /console errors:|CONSOLE ERRORS:|FAILURES:|CHECK\(S\) FAILED/.test(text))
+        .at(-1) ?? reportLines.at(-1)
+
+      expect(
+        matching,
+        `${suite.name}: terminal report no longer matches TERMINAL_VERDICT_LINE; current last report line: ` +
+          (lastReport ? `${lastReport.line}: ${lastReport.text}` : '<none>'),
+      ).not.toHaveLength(0)
+    }
+
+    // Each production alternative is exercised by a literal read above. In
+    // particular, flow emits both uppercase console-errors and FAILURES; a
+    // per-suite "some line matched" assertion alone would not pin the latter.
+    const families = [
+      ['console errors:', (line) => line === 'console errors:'],
+      ['CONSOLE ERRORS:', (line) => line === 'CONSOLE ERRORS:'],
+      ['FAILURES: <n>', (line) => /^FAILURES:\s*\d+\b/.test(line)],
+      [
+        '<n> CHECK(S) FAILED',
+        (line) => /^(?:report:\s*)?\d+\s+(?:CROSS-BROWSER\/MOBILE\s+)?CHECK\(S\) FAILED\b/.test(line),
+      ],
+    ]
+    for (const [name, belongs] of families) {
+      const sample = emitted.find(belongs)
+      expect(sample, `no verify suite source emits the ${name} terminal report family`).toBeDefined()
+      expect(TERMINAL_VERDICT_LINE.test(sample), `TERMINAL_VERDICT_LINE lost the ${name} alternative`).toBe(true)
+    }
+  })
+
+  it('names a runner suite that the source discovery stops covering', () => {
+    const withoutWorld = verifySuiteSources().filter(({ name }) => name !== 'world.mjs')
+    expect(() => expectRunnerSuitesDiscovered(withoutWorld)).toThrowError(
+      /verify suite discovery missed runner suite\(s\): world/,
+    )
+  })
+})
 
 describe('tapOutput — observe-only', () => {
   it('passes every write through unchanged, arguments and return value alike', () => {
@@ -1004,7 +1112,55 @@ describe('the armed recorder — the REAL wiring, not a stand-in', () => {
       'screenshots',
       'startedAt',
       'suite',
+      'terminalVerdict',
     ])
+  })
+
+  it('records a stderr Error inside an otherwise reporting run as a red, not a crash', async () => {
+    const run = await armed('world', 'compatibility')
+    process.stderr.write('ValidationError: WebGPU texture usage was rejected by the validation layer\n')
+    process.stdout.write('FAIL  frame 11-worldmodel-khartoum-confluence — the confluence moved\n')
+    process.stdout.write('console errors: none\n')
+    const record = run.exit(1)
+
+    expect(record).toMatchObject({
+      exit: 1,
+      asserted: true,
+      terminalVerdict: true,
+      crashed: false,
+    })
+    expect(record.reds.map((r) => r.name)).toContain('frame 11-worldmodel-khartoum-confluence')
+    expect(runVerdict(record, { openPoints: [627] })).toMatchObject({ status: 'accounted', covers: true })
+  })
+
+  it('requires the terminal verdict, backend assertion and recorded red before clearing a stderr crash candidate', async () => {
+    const noTerminal = await armed('world', 'core')
+    process.stderr.write('ValidationError: candidate without a terminal verdict\n')
+    process.stdout.write('FAIL  a red printed before the process died\n')
+    expect(noTerminal.exit(1).crashed).toBe(true)
+
+    const noAssertion = await armed('world')
+    process.stderr.write('ValidationError: candidate without a backend assertion\n')
+    process.stdout.write('FAIL  a red with no asserted backend\nconsole errors: 0\n')
+    expect(noAssertion.exit(1).crashed).toBe(true)
+
+    const noRed = await armed('world', 'core')
+    process.stderr.write('ValidationError: candidate without a recorded red\n')
+    process.stdout.write('console errors: 0\n')
+    expect(noRed.exit(1).crashed).toBe(true)
+  })
+
+  it('keeps an uncaught exception a crash after a terminal verdict', async () => {
+    const run = await armed('world', 'core')
+    process.stderr.write('ValidationError: validation chatter\n')
+    process.stdout.write('FAIL  a red printed before the uncaught exception\nconsole errors: 0\n')
+    process.emit('uncaughtExceptionMonitor', new Error('the process died after reporting began'))
+    const record = run.exit(1)
+    expect(record).toMatchObject({
+      crashed: true,
+      terminalVerdict: true,
+      crashSource: 'uncaught-exception',
+    })
   })
 
   // A stack can reach the stderr tap even when the process ultimately exits 0.
