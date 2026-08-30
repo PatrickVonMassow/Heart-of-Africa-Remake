@@ -275,7 +275,14 @@ function patternHits(pattern, value) {
  */
 export function wasDetailCut(red) {
   if (red?.detailCut === true) return true
-  if (Object.prototype.hasOwnProperty.call(red ?? {}, 'detailCut')) return false
+  // ONLY A LITERAL `false` PROVES THE OTHER DIRECTION (cross-vendor review,
+  // GPT-5.6 Sol, do-not-merge on ae9a500c). Treating any present value as
+  // "not cut" let a malformed durable record — `detailCut: null` in a
+  // hand-edited or half-written state file — walk past the length inference and
+  // answer a signature belonging to a different red. A field nobody can read is
+  // not evidence, so it falls back to the inference like a record that carries
+  // none at all.
+  if (red?.detailCut === false) return false
   return text(red?.detail).length === MAX_RED_DETAIL_LEN
 }
 

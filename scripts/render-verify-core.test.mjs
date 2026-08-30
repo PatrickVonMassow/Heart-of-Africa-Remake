@@ -1587,6 +1587,17 @@ describe('evaluate — a red is not closed by the runs that FOLLOWED it (point 6
     expect(wasDetailCut(parse)).toBe(false)
     expect(chargeFor(parse, scopedFor(new RegExp(`^${'y'.repeat(400)}$`)))?.point).toBe(927)
 
+    // A FIELD NOBODY CAN READ IS NOT EVIDENCE (cross-vendor review, GPT-5.6 Sol,
+    // do-not-merge on ae9a500c). Treating any present value as "not cut" let a
+    // malformed durable record — a hand-edited or half-written state file —
+    // walk past the inference and answer a signature belonging to a different
+    // red. Only a literal `false` proves the uncut direction; everything else
+    // falls back to the length, which at the bound means refused.
+    for (const broken of [null, undefined, 0, '', 'false', NaN]) {
+      expect(wasDetailCut({ ...legacy, detailCut: broken }), String(broken)).toBe(true)
+      expect(chargeFor({ ...legacy, detailCut: broken }, sig), String(broken)).toBeNull()
+    }
+
     // An EXPLICIT mark outranks the length in both directions: a record that
     // says it was not cut is believed even at the bound, and one that says it
     // was is believed even well inside it.
@@ -2853,6 +2864,7 @@ describe('the shipped charge ledger', () => {
   // today, and a third one has to be argued for HERE, in this test, before it
   // can charge anything.
   it('lets exactly the two crossing entries read a cut measurement, and makes each say why', () => {
+    const MAX_STORED_DETAIL = 200
     const declaring = RED_CHARGES.filter((c) => c.detailReadsPrefix === true)
     expect(declaring.map((c) => `${c.point}/${c.suite}/${c.backend}`)).toEqual([
       '698/polish/webgpu',
@@ -2866,18 +2878,32 @@ describe('the shipped charge ledger', () => {
       '[run×16 part×72 roam×307] over 45s played, 3 tagged'
     expect(measured.length).toBeGreaterThan(200)
     for (const c of declaring) {
-      const hit = new RegExp(c.detailMatch.source, c.detailMatch.flags.replace(/[gy]/g, '')).exec(measured.slice(0, 200))
-      expect(hit, `point ${c.point} / ${c.backend}`).not.toBeNull()
+      const at = (text_) =>
+        new RegExp(c.detailMatch.source, c.detailMatch.flags.replace(/[gy]/g, '')).exec(text_)
+      // ASKED OF THE WHOLE MEASUREMENT, NOT ONLY OF ITS STORED PREFIX
+      // (cross-vendor review, GPT-5.6 Sol, ae9a500c). Running it on the cut text
+      // alone cannot tell a genuine prefix reader from one whose match depends
+      // on the ARTIFICIAL end the cut created — which is the very mistake these
+      // cases are about. A prefix reader answers the same on both, and answers
+      // it in the same place.
+      const whole = at(measured)
+      const kept = at(measured.slice(0, MAX_STORED_DETAIL))
+      expect(whole, `point ${c.point} / ${c.backend} — the full measurement`).not.toBeNull()
+      expect(kept, `point ${c.point} / ${c.backend} — the stored prefix`).not.toBeNull()
+      expect(kept[0], `point ${c.point} / ${c.backend} — same match either way`).toBe(whole[0])
+      expect(kept.index, `point ${c.point} / ${c.backend} — same place either way`).toBe(whole.index)
       // THE CLEARANCE IS THE WHOLE ARGUMENT: the signature must stop short of
       // the bound, or the declaration is claiming something about text the
       // record does not hold.
-      expect(hit.index + hit[0].length, `point ${c.point} / ${c.backend}`).toBeLessThan(200)
-      // And the entry says so in its own words, naming the field, the cut and
-      // what the bound removes — not merely mentioning a bound in passing.
+      expect(whole.index + whole[0].length, `point ${c.point} / ${c.backend}`).toBeLessThan(MAX_STORED_DETAIL)
+      // And the entry says so in its own words: the field it claims, the cut it
+      // claims it about, and WHAT THE BOUND REMOVES — a `why` that merely says
+      // "bound" somewhere is not an argument (same review).
       const why = String(c.why)
       expect(why, `point ${c.point} / ${c.backend}`).toMatch(/detailReadsPrefix/)
-      expect(why, `point ${c.point} / ${c.backend}`).toMatch(/cut/i)
-      expect(why, `point ${c.point} / ${c.backend}`).toMatch(/clear(ance)? of|clear of the bound|epilogue/i)
+      expect(why, `point ${c.point} / ${c.backend}`).toMatch(/cut at the 200-character bound|cut at the \d+-character bound/i)
+      expect(why, `point ${c.point} / ${c.backend}`).toMatch(/what the bound removes|only the trailing epilogue removed/i)
+      expect(why, `point ${c.point} / ${c.backend}`).toMatch(/clear of (?:that|it|the bound)/i)
     }
   })
 
