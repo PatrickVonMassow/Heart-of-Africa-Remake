@@ -113,33 +113,32 @@ put it is the mistake this line exists to stop.
   Bundle: Testinfrastruktur.
 
 - [ ] 1017. A charge is scoped to the lane it was first measured on, so the same red needs a
-  second half on the other lane and nobody notices until a run stops (measured 30.08.2026 on
-  `main` at 55b99d6 and on `feat/686-five-word-lexicon-game`).
-  The pattern is established and keeps recurring: 514 got a WebGL half as point 603, 938 got
-  one on 29.08., and 698 got one today. What today's runs add is that the F6 report suite's
-  three point-927 reds — the composite member list, the missing `.png` member and "the archive
-  carries a screenshot" — appear on WebGL 2 with the identical detail, while all three entries
-  carry `backend: 'webgpu'` and `featureLevel: 'compatibility'`. The same run also reddens
-  "no console errors" with Vite's `504 (Outdated Optimize Dep)`, the environment transient
-  point 939 already owns on `startup`/`webgpu`/`console` and which nothing owns as a `report`
-  check on WebGL 2.
-  WHY IT IS A POINT rather than four more entries: writing the halves one at a time is what
-  produced the backlog. Each is discovered only when a lane happens to run and the gate stops,
-  and every discovery costs a cross-vendor round. The measurable question is whether an entry's
-  evidence is about the LANE at all — 698's children are simulated in plain JavaScript, 927's
-  archive is assembled in `src/`, 939's red is Vite re-bundling — or genuinely about the
-  renderer, as 514's MSAA cascade is.
-  FINAL STATE: every entry in `RED_CHARGES` whose evidence is not about the renderer either
-  carries both lanes or says in its `why` why one lane's absence is deliberate, and the
-  distinction is stated once where the table's contract is written. The four reds measured
-  today are charged or the mechanism explains why they must not be. Nothing here loosens a
-  scope that a lane fault justifies: on a CORE adapter and on the lane a red was never seen,
-  the strict reading stands.
-  VERIFIABLE: `node scripts/verify/run-all.mjs report` on BOTH lanes leaving no unaccounted red;
-  a unit case per newly widened entry proving the other lane still refuses an unmeasured shape,
-  mutation-checked; plus `npm run test:unit`, lint, build.
-  Criticality: medium — it does not hide a defect, but it stops a gate at a random moment and
-  charges a cross-vendor round for a decision the table could state once.
+  second half on the other lane and nobody notices until a run stops (measured across
+  13.08.2026, 29.08.2026 and 30.08.2026).
+  The pattern is established and keeps recurring: point 514's settings reds got a WebGL half as
+  point 603, point 938's dressing growth got one on 29.08., and point 698's crossing got one on
+  30.08. Each was discovered only when a lane happened to run and the gate stopped, and each
+  cost a cross-vendor round to write.
+  WHAT THE SAME DAY ALSO SHOWED, and it is the counter-example this point must respect: the F6
+  report suite's three point-927 picture-loss reds and the Vite 504 look like the same case and
+  are NOT. Read on the everyday lane they are WebGPU reds; run with `VERIFY_GL=webgl` the suite
+  passes WHOLE (34 checks, 0 fail, 30.08.2026 on `main`). Halves were written for them on the
+  strength of a bare `npm test -- report` — which runs WebGPU — and withdrawn the same hour. A
+  red seen on one lane is evidence about that lane only, and "the same red must appear on both"
+  is the assumption this point exists to stop making.
+  FINAL STATE: every entry in `RED_CHARGES` whose red has actually been MEASURED on both lanes
+  carries both, and every entry that has not says in its `why` that the other lane is unmeasured
+  rather than leaving the reader to guess which it is. Where a lane has never been run for that
+  suite, the point says so and the run is what settles it — never an argument from what the code
+  does. Nothing here loosens a scope: on a CORE adapter and on a lane a red was never seen, the
+  strict reading stands.
+  VERIFIABLE: for each entry gaining a half, the run on the other lane that measured it, quoted;
+  a unit case per widened entry proving the other lane still refuses an unmeasured shape,
+  mutation-checked; and a table-wide case that no entry claims a lane its `why` cannot cite.
+  Plus `npm run test:unit`, lint, build.
+  Criticality: medium — it does not hide a defect today, but it stops a gate at a random moment,
+  and the shortcut it invites — assuming the other lane — writes exactly the charge the table
+  forbids.
   Bundle: Testinfrastruktur.
 
 - [ ] 1018. The recorder knows which section a red came from and throws it away, so the reader

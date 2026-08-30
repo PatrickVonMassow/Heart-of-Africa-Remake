@@ -3103,46 +3103,37 @@ describe('the shipped charge ledger', () => {
     expect(chargeFor(red('timeout   [--section=x]'), scope(entry(/^timeout $/))).point).toBe(9001)
   })
 
-  it('gives the report suite\'s reds an owner on WebGL 2 as well', () => {
-    // MEASURED 30.08.2026 on main: the report suite reads the SAME four reds on
-    // WebGL 2 that the WebGPU lane records, while all four entries knew only the
-    // lane they were first measured on. The archive is assembled in `src/` and
-    // the 504 is Vite re-bundling, so neither red is about the renderer at all.
-    const scoped = { suite: 'report', backend: 'webgl' }
-    const at = (name, detail) => chargeFor({ name, detail, kind: 'check' }, scoped)
+  it('leaves the report suite\'s picture-loss reds uncharged on WebGL 2', () => {
+    // MEASURED 30.08.2026 on main, and it corrects a mistake of the same day: a
+    // bare `npm test -- report` runs the EVERYDAY lane, which is WebGPU, so four
+    // reds read that way were briefly mistaken for a WebGL measurement and given
+    // WebGL halves. Run with VERIFY_GL=webgl the suite passes WHOLE — 34 checks,
+    // 0 fail — so those reds do not occur on this lane at all and a charge here
+    // would excuse something nobody has measured. That is the one failure mode
+    // the table exists to prevent, so the entries were withdrawn and this holds
+    // the line.
+    const at = (name, detail) => chargeFor({ name, detail, kind: 'check' }, { suite: 'report', backend: 'webgl' })
     const stem = 'hoa-state-2026-08-30-42'
-    const members = archiveMemberDetail(
-      archiveMemberNames(stem, ARCHIVE_MEMBER_SUFFIXES.filter((x) => x !== ARCHIVE_PICTURE_SUFFIX)),
-    )
-    expect(at('the archive holds picture, state, overlay and description', members).point).toBe(927)
-    expect(at(memberPresentCheckName(stem, ARCHIVE_PICTURE_SUFFIX), '').point).toBe(927)
-    expect(at('the archive carries a screenshot', 'no PNG member').point).toBe(927)
-    const vite = 'Failed to load resource: the server responded with a status of 504 (Outdated Optimize Dep)'
-    expect(at('no console errors', `${vite} | ${vite}`).point).toBe(939)
-    // AND NEITHER HALF IS WIDER THAN THE RED IT MIRRORS. A lost state is still a
-    // defect nobody measured, on this lane as on the other.
     expect(
       at(
         'the archive holds picture, state, overlay and description',
-        archiveMemberDetail(archiveMemberNames(stem, [ARCHIVE_OVERLAY_SUFFIX, ARCHIVE_DESCRIPTION_SUFFIX])),
+        archiveMemberDetail(
+          archiveMemberNames(stem, ARCHIVE_MEMBER_SUFFIXES.filter((x) => x !== ARCHIVE_PICTURE_SUFFIX)),
+        ),
       ),
     ).toBeNull()
-    // And a console error riding along with the transient keeps the red — the
-    // check name is generic, so the detail is the whole of the evidence.
-    expect(at('no console errors', `${vite} | TypeError: undefined is not a function`)).toBeNull()
-    expect(at('no console errors', 'TypeError: undefined is not a function')).toBeNull()
-    // THE SCOPE ITSELF IS ASSERTED, not assumed (cross-vendor review, GPT-5.6
-    // Sol): every call above fixes suite, backend and kind, so an entry that
-    // dropped those constraints would pass them all. A neighbouring suite, the
-    // console side and a WebGPU CORE adapter must each stay uncharged.
-    const elsewhere = (over) => chargeFor({ ...red2, ...over.red }, { ...scoped, ...over.scope })
-    const red2 = { name: 'the archive carries a screenshot', detail: 'no PNG member', kind: 'check' }
-    expect(elsewhere({ red: {}, scope: { suite: 'enrichments' } })).toBeNull()
-    expect(elsewhere({ red: { kind: 'console' }, scope: {} })).toBeNull()
-    expect(elsewhere({ red: {}, scope: { backend: 'webgpu', featureLevel: 'core' } })).toBeNull()
-    // AND THE NAME STAYS AS NARROW ON THIS LANE AS ON THE OTHER: a PNG member
-    // the suite might one day grow is a red nobody has measured, here too.
-    expect(at('member thumbnail.png is present', '')).toBeNull()
+    expect(at(memberPresentCheckName(stem, ARCHIVE_PICTURE_SUFFIX), '')).toBeNull()
+    expect(at('the archive carries a screenshot', 'no PNG member')).toBeNull()
+    expect(
+      at('no console errors', 'Failed to load resource: the server responded with a status of 504 (Outdated Optimize Dep)'),
+    ).toBeNull()
+    // While the lane they WERE measured on keeps its charge.
+    expect(
+      chargeFor(
+        { name: 'the archive carries a screenshot', detail: 'no PNG member', kind: 'check' },
+        { suite: 'report', backend: 'webgpu', featureLevel: 'compatibility' },
+      ).point,
+    ).toBe(927)
   })
 
   it('charges the archive composite only in the picture-loss shape', () => {
