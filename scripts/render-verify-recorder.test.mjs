@@ -10,7 +10,7 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { execFileSync } from 'node:child_process'
 import { readFileSync, readdirSync } from 'node:fs'
-import { join, resolve } from 'node:path'
+import { join } from 'node:path'
 import {
   DECODE_WINDOW_BYTES,
   MAX_CAPTURE_CHARS,
@@ -19,6 +19,7 @@ import {
   TERMINAL_VERDICT_LINE,
   tapOutput,
 } from './render-verify-recorder.mjs'
+import { DEV_SUITES } from './verify/tiers.mjs'
 
 /** Text that is distinct in LETTERS, so the parser's own normalisation (digits,
  *  hex runs and URLs are folded away) cannot collapse it. That is exactly the
@@ -125,7 +126,7 @@ function printedLiterals(line) {
  * suites. `docs.mjs` is the one direct-run Node suite in the same regression
  * set, discovered by its direct-run guard rather than named here. */
 function verifySuiteSources() {
-  const verifyDir = resolve(process.cwd(), 'scripts/verify')
+  const verifyDir = join(import.meta.dirname, 'verify')
   return readdirSync(verifyDir, { withFileTypes: true })
     .filter((entry) => entry.isFile() && entry.name.endsWith('.mjs') && !entry.name.endsWith('.test.mjs'))
     .flatMap((entry) => {
@@ -139,10 +140,22 @@ function verifySuiteSources() {
     })
 }
 
+/** Discovery is deliberately structural, but the runner's tier list is the
+ * authority on what it can dispatch. Cross-checking the two means a new or
+ * renamed runner suite cannot silently fall out of this source contract. */
+function expectRunnerSuitesDiscovered(suites) {
+  const discovered = new Set(suites.map(({ name }) => name.replace(/\.mjs$/, '')))
+  const missing = DEV_SUITES.filter((suite) => !discovered.has(suite))
+  expect(
+    missing,
+    `verify suite discovery missed runner suite(s): ${missing.join(', ') || '<none>'}`,
+  ).toEqual([])
+}
+
 describe('terminal verdict source contract', () => {
   it('recognises a literal terminal report emitted by every real verify suite', () => {
     const suites = verifySuiteSources()
-    expect(suites.length).toBeGreaterThan(0)
+    expectRunnerSuitesDiscovered(suites)
     const emitted = []
 
     for (const suite of suites) {
@@ -183,6 +196,13 @@ describe('terminal verdict source contract', () => {
       expect(sample, `no verify suite source emits the ${name} terminal report family`).toBeDefined()
       expect(TERMINAL_VERDICT_LINE.test(sample), `TERMINAL_VERDICT_LINE lost the ${name} alternative`).toBe(true)
     }
+  })
+
+  it('names a runner suite that the source discovery stops covering', () => {
+    const withoutWorld = verifySuiteSources().filter(({ name }) => name !== 'world.mjs')
+    expect(() => expectRunnerSuitesDiscovered(withoutWorld)).toThrowError(
+      /verify suite discovery missed runner suite\(s\): world/,
+    )
   })
 })
 
