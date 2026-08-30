@@ -3016,6 +3016,87 @@ describe('the shipped charge ledger', () => {
   // is the one failure mode a charge must never have. These pin the narrow half
   // AND the measured half together: an entry that stops matching its own
   // evidence is as broken as one that matches everything.
+  it('reads the measured line through the recorder\'s section tag', () => {
+    // MEASURED 30.08.2026, and it had blocked the gate for as long as the
+    // narrowings existed: a suite that declares sections appends
+    // ` [--section=<name>]` to every result line, and the RECORD stores the line
+    // with it — while every detailMatch here is anchored at both ends against
+    // what the SUITE printed. So in a section-using suite no anchored charge
+    // could ever reach the end of its own recorded red. All four details below
+    // are copied from .claude/render-verify-state.json as it holds them.
+    const tagged = (name, detail, scope, kind = 'check') => chargeFor({ name, detail, kind }, scope)
+    expect(
+      tagged(
+        'the archive holds picture, state, overlay and description',
+        'hoa-state-2026-08-30-42.json, hoa-state-2026-08-30-42-overlay.json, ' +
+          'hoa-state-2026-08-30-42.txt  [--section=bug-report-archive]',
+        { suite: 'report', backend: 'webgpu', featureLevel: 'compatibility' },
+      ).point,
+    ).toBe(927)
+    expect(
+      tagged(
+        'the children walk PAST the traveller — from one side of him to the other',
+        '0 of 4 crossed his line; along the lane (0 = his line) [-11..26@1, -15..16@1, -11..22@1, ' +
+          '-11..16@1] m, walked [67, 67, 68, 66] m, phases [run×39 part×161 roam×695] over 45s ' +
+          'played, 3 tagged  [--section=children-bank-game]',
+        { suite: 'polish', backend: 'webgl' },
+      ).point,
+    ).toBe(698)
+    expect(
+      tagged(
+        'first-person ground shows micro-detail (edge energy)',
+        'laplacian mean 1.07  [--section=ground-detail]',
+        { suite: 'settings', backend: 'webgl' },
+      ).point,
+    ).toBe(603)
+    expect(
+      tagged(
+        'the streamed dressing does not grow over a session at a fixed anchor (point 278)',
+        '{"samples":[0,0,0,0,0],"min":0,"max":0,"spread":0}  [--section=dressing-growth]',
+        { suite: 'enrichments', backend: 'webgl' },
+      ).point,
+    ).toBe(938)
+    // A CHECK THAT PRINTED NO MEASUREMENT records the tag ALONE, and charges by
+    // name as it always did.
+    expect(
+      tagged(
+        'member hoa-state-2026-08-30-42.png is present',
+        '[--section=bug-report-archive]',
+        { suite: 'report', backend: 'webgpu', featureLevel: 'compatibility' },
+      ).point,
+    ).toBe(927)
+  })
+
+  // THE STRIPPER MAY NOT EAT MEASURED TEXT (cross-vendor review, GPT-5.6 Sol,
+  // do-not-merge on the first attempt). These use a ledger of their own, because
+  // the shipped entries cannot express the case: a charge whose detail regex
+  // matches what an over-greedy stripper would LEAVE BEHIND is what catches one,
+  // and every shipped entry would return null for its own separate reasons.
+  it('takes off only the tag a suite really appended', () => {
+    const scope = (ledger) => ({ suite: 'probe', backend: 'webgl', ledger })
+    const entry = (detailMatch) => [
+      { point: 9001, suite: 'probe', backend: 'webgl', kind: 'check', match: /^probe$/i, detailMatch },
+    ]
+    const red = (detail) => ({ name: 'probe', detail, kind: 'check' })
+    // The join the suites write — measurement, two spaces, the trimmed tag.
+    expect(chargeFor(red('timeout  [--section=x]'), scope(entry(/^timeout$/))).point).toBe(9001)
+    // NOT the same thing: a measurement whose own last word ends in something
+    // bracket-shaped. The first attempt normalised this to `timeout` and charged
+    // it — a red nobody measured, excused by the stripper rather than the entry.
+    expect(chargeFor(red('timeout[--section=x]'), scope(entry(/^timeout$/)))).toBeNull()
+    // Nor a single space: that is not the join, so nothing comes off.
+    expect(chargeFor(red('timeout [--section=x]'), scope(entry(/^timeout$/)))).toBeNull()
+    // AND NOTHING IS EATEN FROM THE MIDDLE: an over-greedy stripper would leave
+    // `head`, and this entry is written to match exactly that leftover.
+    expect(chargeFor(red('head  [--section=x] tail'), scope(entry(/^head$/)))).toBeNull()
+    // A DETAIL MAY LEGITIMATELY END IN A BRACKET and must survive untouched,
+    // tagged or not — the polish crossing prints one.
+    expect(chargeFor(red('phases [run×39]'), scope(entry(/^phases \[run×39\]$/))).point).toBe(9001)
+    expect(
+      chargeFor(red('phases [run×39]  [--section=x]'), scope(entry(/^phases \[run×39\]$/))).point,
+    ).toBe(9001)
+  })
+
   it('charges the archive composite only in the picture-loss shape', () => {
     const scoped = { suite: 'report', backend: 'webgpu', kind: 'check', featureLevel: 'compatibility' }
     const withDetail = (name, detail) => ({ ...red(name), detail })
