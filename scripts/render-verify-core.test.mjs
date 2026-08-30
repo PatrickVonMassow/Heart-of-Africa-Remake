@@ -3098,6 +3098,36 @@ describe('the shipped charge ledger', () => {
     expect(chargeFor(red('timeout '), scope(entry(/^timeout$/)))).toBeNull()
   })
 
+  it('gives the report suite\'s reds an owner on WebGL 2 as well', () => {
+    // MEASURED 30.08.2026 on main: the report suite reads the SAME four reds on
+    // WebGL 2 that the WebGPU lane records, while all four entries knew only the
+    // lane they were first measured on. The archive is assembled in `src/` and
+    // the 504 is Vite re-bundling, so neither red is about the renderer at all.
+    const scoped = { suite: 'report', backend: 'webgl' }
+    const at = (name, detail) => chargeFor({ name, detail, kind: 'check' }, scoped)
+    const stem = 'hoa-state-2026-08-30-42'
+    const members = archiveMemberDetail(
+      archiveMemberNames(stem, ARCHIVE_MEMBER_SUFFIXES.filter((x) => x !== ARCHIVE_PICTURE_SUFFIX)),
+    )
+    expect(at('the archive holds picture, state, overlay and description', members).point).toBe(927)
+    expect(at(memberPresentCheckName(stem, ARCHIVE_PICTURE_SUFFIX), '').point).toBe(927)
+    expect(at('the archive carries a screenshot', 'no PNG member').point).toBe(927)
+    const vite = 'Failed to load resource: the server responded with a status of 504 (Outdated Optimize Dep)'
+    expect(at('no console errors', `${vite} | ${vite}`).point).toBe(939)
+    // AND NEITHER HALF IS WIDER THAN THE RED IT MIRRORS. A lost state is still a
+    // defect nobody measured, on this lane as on the other.
+    expect(
+      at(
+        'the archive holds picture, state, overlay and description',
+        archiveMemberDetail(archiveMemberNames(stem, [ARCHIVE_OVERLAY_SUFFIX, ARCHIVE_DESCRIPTION_SUFFIX])),
+      ),
+    ).toBeNull()
+    // And a console error riding along with the transient keeps the red — the
+    // check name is generic, so the detail is the whole of the evidence.
+    expect(at('no console errors', `${vite} | TypeError: undefined is not a function`)).toBeNull()
+    expect(at('no console errors', 'TypeError: undefined is not a function')).toBeNull()
+  })
+
   it('charges the archive composite only in the picture-loss shape', () => {
     const scoped = { suite: 'report', backend: 'webgpu', kind: 'check', featureLevel: 'compatibility' }
     const withDetail = (name, detail) => ({ ...red(name), detail })

@@ -553,6 +553,29 @@ export const RED_CHARGES = [
       'whose level went unrecorded — so the narrowing withdraws no charge that stands.',
   },
   {
+    point: 939,
+    suite: 'report',
+    backend: 'webgl',
+    kind: 'check',
+    match: /^no console errors$/i,
+    // DETAIL-SCOPED, and it has to be: "no console errors" is a generic
+    // assertion, so the name alone would excuse EVERY console error the report
+    // suite ever reports. Only the 504 sentence is excused, and only when the
+    // whole detail is that sentence — repeated, as the check joins repeats with
+    // ` | ` — and nothing else. A second, different error riding along keeps the
+    // red.
+    detailMatch:
+      /^(Failed to load resource: the server responded with a status of 504 \(Outdated Optimize Dep\))( \| \1)*$/i,
+    why:
+      'THE SAME VITE TRANSIENT POINT 939 OWNS, ARRIVING IN THE REPORT SUITE AS A CHECK. Measured '
+      + '30.08.2026 on `main` at 55b99d6, WebGL 2: the dev server re-bundled its dependency '
+      + 'optimizer during the run and answered two requests with 504, which CLAUDE.md classifies '
+      + 'as an environment transient rather than a product defect. 939 entered it as a '
+      + '`startup`/`webgpu`/`console` red, so neither the suite, the lane nor the kind reaches this '
+      + 'reading and it was unaccounted. The charge dies with point 939; the general case — a '
+      + 'charge that knows only the lane it was first measured on — is point 1017.',
+  },
+  {
     point: 514,
     suite: 'enrichments',
     backend: 'webgpu',
@@ -824,6 +847,39 @@ export const RED_CHARGES = [
       'Backend- and level-scoped for the reasons the sibling entry states, and the charge dies ' +
       'with 927, which is criticality HIGH: the archive is a broken channel to the user until it ' +
       'lands.',
+  },
+  {
+    point: 927,
+    suite: 'report',
+    backend: 'webgl',
+    kind: 'check',
+    match: /^(member hoa-state-\d{4}-\d{2}-\d{2}-\d+\.png is present|the archive carries a screenshot)$/i,
+    why:
+      'THE WebGL 2 HALF OF THE TWO CHECKS THAT NAME THE PICTURE THEMSELVES, measured 30.08.2026 '
+      + 'on `main` at 55b99d6 and entered because the WebGPU entries above are scoped to that lane '
+      + 'and its compatibility level, so they deliberately excuse nothing here. The report suite on '
+      + 'WebGL 2 read the same two reds with the same wording: the `.png` member absent and the '
+      + 'archive carrying no screenshot. Which lane drew the frame does not reach this — the '
+      + 'archive is assembled in `src/report/bugReport.ts`, which leaves the member OUT when the '
+      + 'capture failed, and the suite reads a zip rather than a picture. The charge dies with '
+      + 'point 927; the general case is point 1017.',
+  },
+  {
+    point: 927,
+    suite: 'report',
+    backend: 'webgl',
+    kind: 'check',
+    match: /^the archive holds picture, state, overlay and description$/i,
+    // The same detail constraint as the WebGPU half: 927 owns the missing
+    // PICTURE alone, so an archive that lost its state or its overlay is a
+    // defect nobody has measured and stays red on this lane too.
+    detailMatch:
+      /^(hoa-state-\d{4}-\d{2}-\d{2}-\d+)\.json, \1-overlay\.json, \1\.txt$/,
+    why:
+      'THE WebGL 2 HALF OF THE COMPOSITE CHECK, measured 30.08.2026 on `main` at 55b99d6: the same '
+      + 'three-member list without the picture that the WebGPU lane records, narrowed identically '
+      + 'so the picture loss is the only shape excused. The charge dies with point 927; the '
+      + 'general case is point 1017.',
   },
   {
     point: 1010,
