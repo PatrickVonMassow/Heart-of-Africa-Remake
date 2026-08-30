@@ -262,6 +262,11 @@ function patternHits(pattern, value) {
  * was read from — and that text was never cut. Reading it as cut would refuse
  * charges over material the reader can see in full.
  *
+ * And the inference reaches ONLY records that predate the field. A writer since
+ * this revision settles the ambiguous length itself: a detail that ends on the
+ * bound carries `detailCut` either way, so a measurement that merely happened to
+ * be 200 characters long is read as the whole measurement it is.
+ *
  * Reading an uncut detail as cut costs the narrow charges that did not declare
  * themselves prefix readers (see `mayReadCutDetail`); the red then stays loudly
  * unaccounted and closes the three ordinary ways (fix it, charge it, file it).
@@ -455,10 +460,17 @@ export function chargeReds(reds, options) {
     const printed = text(red?.detail)
     const detail = printed.slice(0, MAX_RED_DETAIL_LEN)
     if (detail) stored.detail = detail
-    // Absent unless it happened, so a record of an uncut red keeps the shape it
-    // always had. Written HERE, where the cut is observed, because afterwards
-    // nothing but the length is left to read — see `wasDetailCut`.
+    // WRITTEN HERE, WHERE THE CUT IS OBSERVED, because afterwards nothing but
+    // the length is left to read — and the length is ambiguous at exactly one
+    // place: a measurement that ends ON the bound looks the same whether the
+    // bound took something or the text simply ended there. So the field is
+    // written whenever it settles that question — `true` when the bound cut, and
+    // `false` for the one uncut length that would otherwise be misread (see
+    // `wasDetailCut`; cross-vendor review, GPT-5.6 Sol, do-not-merge on
+    // b3e5200e, which named the false positive). Everywhere else it stays
+    // absent, so an ordinary record keeps the shape it always had.
     if (printed.length > MAX_RED_DETAIL_LEN) stored.detailCut = true
+    else if (printed.length === MAX_RED_DETAIL_LEN) stored.detailCut = false
     // Kept on the record, because the reading has to survive to the re-read:
     // otherwise `owned()` would charge afterwards exactly the red the recorder
     // refused to charge.

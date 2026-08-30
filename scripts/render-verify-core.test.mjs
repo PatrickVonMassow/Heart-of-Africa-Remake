@@ -1553,6 +1553,33 @@ describe('evaluate — a red is not closed by the runs that FOLLOWED it (point 6
     expect(wasDetailCut(shorter)).toBe(false)
     expect(chargeFor(shorter, scopedFor(new RegExp(`^${'y'.repeat(199)}$`)))?.point).toBe(927)
 
+    // AND THE WRITER SETTLES THE ONE AMBIGUOUS LENGTH ITSELF (cross-vendor
+    // review, GPT-5.6 Sol, do-not-merge on b3e5200e): a measurement that merely
+    // happened to be exactly 200 characters long was read as cut, and its narrow
+    // charge withdrawn, although nothing was ever removed from it. Records
+    // written since carry the answer, so the length inference reaches only the
+    // records that predate the field.
+    const [atBoundUncut] = chargeReds(
+      [{ name: 'cut check', kind: 'check', detail: 'y'.repeat(200) }],
+      { suite: 'report', backend: 'webgpu', ledger: [] },
+    )
+    expect(atBoundUncut.detail).toHaveLength(200)
+    expect(atBoundUncut.detailCut).toBe(false)
+    expect(wasDetailCut(atBoundUncut)).toBe(false)
+    expect(chargeFor(atBoundUncut, sig)?.point).toBe(927)
+    // One character more and the record says the bound took something.
+    const [pastBound] = chargeReds(
+      [{ name: 'cut check', kind: 'check', detail: 'y'.repeat(201) }],
+      { suite: 'report', backend: 'webgpu', ledger: [] },
+    )
+    expect(pastBound.detailCut).toBe(true)
+    // …and one character less needs no field at all: nothing is ambiguous there.
+    const [insideBound] = chargeReds(
+      [{ name: 'cut check', kind: 'check', detail: 'y'.repeat(199) }],
+      { suite: 'report', backend: 'webgpu', ledger: [] },
+    )
+    expect(insideBound.detailCut).toBeUndefined()
+
     // EXACTLY on the bound, never past it: text LONGER than the bound is not a
     // record at all but the unbounded parse, which nothing cut. Reading it as
     // cut would refuse charges over material the reader can see in full.
@@ -2806,9 +2833,6 @@ describe('the shipped charge ledger', () => {
       if ('detailReadsPrefix' in c) {
         expect(c.detailReadsPrefix, `point ${c.point} / ${c.suite}`).toBe(true)
         expect(c.detailMatch, `point ${c.point} / ${c.suite}`).toBeInstanceOf(RegExp)
-        // And it is a claim, so it says where it holds: the entry's own words
-        // must speak of the cut and of what the bound removes.
-        expect(String(c.why), `point ${c.point} / ${c.suite}`).toMatch(/cut|bound/i)
       }
       // NO STATEFUL FLAG (review finding, 28.08.2026): `g` and `y` keep
       // `lastIndex` across calls, so one entry would alternate between owning a
@@ -2818,6 +2842,42 @@ describe('the shipped charge ledger', () => {
         expect(re.global).toBe(false)
         expect(re.sticky).toBe(false)
       }
+    }
+  })
+
+  // THE DECLARATION IS AN AUTHORISATION, SO THE LIST OF WHO HOLDS IT IS PINNED
+  // (cross-vendor review, GPT-5.6 Sol, 30.08.2026). A shape check alone would
+  // let any narrow entry take `detailReadsPrefix` and read a cut measurement
+  // with this file still green — which is the one thing the declaration exists
+  // to make deliberate. The two point-698 crossing entries are the whole list
+  // today, and a third one has to be argued for HERE, in this test, before it
+  // can charge anything.
+  it('lets exactly the two crossing entries read a cut measurement, and makes each say why', () => {
+    const declaring = RED_CHARGES.filter((c) => c.detailReadsPrefix === true)
+    expect(declaring.map((c) => `${c.point}/${c.suite}/${c.backend}`)).toEqual([
+      '698/polish/webgpu',
+      '698/polish/webgl',
+    ])
+    // THE MEASUREMENT THE DECLARATION IS ABOUT, and it is the real one: 223
+    // characters, so its record is cut, while the signature stops at 178.
+    const measured =
+      'from one side of him to the other — 0 of 4 crossed his line; along the lane (0 = his line) ' +
+      '[-11..25@1, -10..22@1, -24..0@1, -11..14@1] m, walked [67, 67, 67, 68] m, phases ' +
+      '[run×16 part×72 roam×307] over 45s played, 3 tagged'
+    expect(measured.length).toBeGreaterThan(200)
+    for (const c of declaring) {
+      const hit = new RegExp(c.detailMatch.source, c.detailMatch.flags.replace(/[gy]/g, '')).exec(measured.slice(0, 200))
+      expect(hit, `point ${c.point} / ${c.backend}`).not.toBeNull()
+      // THE CLEARANCE IS THE WHOLE ARGUMENT: the signature must stop short of
+      // the bound, or the declaration is claiming something about text the
+      // record does not hold.
+      expect(hit.index + hit[0].length, `point ${c.point} / ${c.backend}`).toBeLessThan(200)
+      // And the entry says so in its own words, naming the field, the cut and
+      // what the bound removes — not merely mentioning a bound in passing.
+      const why = String(c.why)
+      expect(why, `point ${c.point} / ${c.backend}`).toMatch(/detailReadsPrefix/)
+      expect(why, `point ${c.point} / ${c.backend}`).toMatch(/cut/i)
+      expect(why, `point ${c.point} / ${c.backend}`).toMatch(/clear(ance)? of|clear of the bound|epilogue/i)
     }
   })
 
