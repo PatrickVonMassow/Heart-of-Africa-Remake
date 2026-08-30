@@ -1026,6 +1026,24 @@
       "why": "Die vier Buchungen, die in dieser Nacht gelandet sind, haben Runde um Runde weitere Befunde bekommen — zuletzt eine leere Stichprobe und ein verlorenes Etikettenpaar (a333f20, GPT-5.6 Sol); sie gelten erst als gegengeprueft, wenn eine Runde sauber zurueckkommt. Der Rest der Tabelle buchte schon vorher zu weit und blockiert keine Landung, also laeuft er hinter der Kommunikations-Kette.",
       "origin": "machine",
       "place": "last"
+    },
+    "1016": {
+      "at": "2026-08-30T05:15:26.440Z",
+      "why": "Der Punkt sperrt das Bild-Tor fuer JEDE Landung: vier Laeufe gelten als Abstuerze, obwohl sie ihre Befunde gemeldet haben, und ein Absturz laesst sich von niemandem schliessen. Solange er steht, kann kein Punkt gruen landen, auch nicht die Kommunikations-Kette.",
+      "origin": "machine",
+      "place": "ahead"
+    },
+    "1017": {
+      "at": "2026-08-30T05:20:33.657Z",
+      "why": "Dieselbe Familie wie 1015 und 1018: Buchungen, die nur eine Bahn kennen, halten das Bild-Tor an zufaelligen Stellen an. Der Punkt gehoert vor die Freigabe, weil jede Landung darauf wartet.",
+      "origin": "machine",
+      "place": "ahead"
+    },
+    "1018": {
+      "at": "2026-08-30T05:20:25.430Z",
+      "why": "Eine Buchung liest hier Text, der ihr vielleicht nicht gehoert — und eine Buchung, die einen ungemessenen Befund entschuldigt, ist genau der Fehler, gegen den die ganze Tabelle existiert. Der Gegenleser hat beide Rateversuche abgelehnt.",
+      "origin": "machine",
+      "place": "ahead"
     }
   },
   "settled": {

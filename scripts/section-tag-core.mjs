@@ -46,6 +46,20 @@ export const SECTION_TAG_JOIN = '  '
  * it would have written for that name, and the tag comes off only where the
  * detail really ends in it — alone, or behind the suites' own join. A detail
  * that merely looks tagged is returned whole.
+
+ * WHAT THIS STILL CANNOT DO, NAMED RATHER THAN HIDDEN (cross-vendor review,
+ * GPT-5.6 Sol, do-not-merge on this second attempt as well): reconstruction
+ * proves SYNTAX, not PROVENANCE. A check that genuinely measured a value ending
+ * in `  [--section=x]` is indistinguishable here from one the suite tagged, and
+ * `chargeReds` truncates a long detail before this runs, so a cut could land on
+ * that exact shape. Only the recorder can settle it, because only the recorder
+ * knows which section was open — that is POINT 1018, which stores the
+ * measurement and its section apart instead of asking a reader to guess.
+ * The reviewer's second finding belongs to it too: `sectionTag` accepts names
+ * with whitespace that the recogniser above will not read back.
+ * Until it lands this stands, because the alternative is worse and measured: no
+ * anchored charge in a section-using suite matched its own recorded red at all,
+ * and four of them blocked the gate.
  */
 export function withoutSectionTag(detail) {
   const line = typeof detail === 'string' ? detail : ''
