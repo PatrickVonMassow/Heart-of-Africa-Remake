@@ -3088,6 +3088,14 @@ describe('the shipped charge ledger', () => {
         scoped,
       ),
     ).toBeNull()
+    // AND THE NAMES ARE LOWER CASE AS THE SUITE WRITES THEM (round 8): a
+    // case-variant member is one nobody has measured.
+    expect(
+      chargeFor(
+        withDetail(composite, 'HOA-STATE-2026-08-29-42.JSON, HOA-STATE-2026-08-29-42-OVERLAY.JSON, HOA-STATE-2026-08-29-42.TXT'),
+        scoped,
+      ),
+    ).toBeNull()
     // While the two checks that name the picture themselves need no detail.
     expect(chargeFor(red('the archive carries a screenshot'), scoped).point).toBe(927)
     expect(chargeFor(red('member hoa-state-2026-08-29-42.png is present'), scoped).point).toBe(927)

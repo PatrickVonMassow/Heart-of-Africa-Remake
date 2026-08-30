@@ -779,9 +779,11 @@ export const RED_CHARGES = [
     // round 6: describing the members SEPARATELY still let one stand in for another
     // — an `-overlay.txt` satisfied the description, and nothing tied the three to
     // ONE stem. The detail is now the measured line itself, the stem captured once
-    // and required to repeat, in the order point 927 recorded it).
+    // and required to repeat, in the order point 927 recorded it; round 8: and
+    // CASE-SENSITIVE, because the suite writes these names in lower case and a
+    // `HOA-STATE-….JSON` member is one nobody has measured).
     detailMatch:
-      /^(hoa-state-\d{4}-\d{2}-\d{2}-\d+)\.json, \1-overlay\.json, \1\.txt$/i,
+      /^(hoa-state-\d{4}-\d{2}-\d{2}-\d+)\.json, \1-overlay\.json, \1\.txt$/,
     why:
       'THE SAME DEFECT POINT 927 OWNS, READ THROUGH THE ONE CHECK THAT CAN ALSO FAIL FOR ANOTHER ' +
       'REASON. 927 measured a WebGPU archive holding its `.json`, `-overlay.json` and `.txt` and ' +
