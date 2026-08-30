@@ -21,6 +21,7 @@
 import { createHash } from 'node:crypto'
 
 import { RED_CHARGES } from './render-verify-charges.mjs'
+import { SECTION_TAG_RE } from './section-tag-core.mjs'
 import { scopeMandatoryDuty } from './mandatory-duty-core.mjs'
 
 /** Both renderer backends the game ships; each needs a passing verify run. */
@@ -291,7 +292,20 @@ export function chargeFor(red, options) {
       // stays loudly uncharged and closes the three ordinary ways. A broad
       // `match` entry is unaffected, because it never claimed to read a
       // measurement in the first place.
-      if (charge.detailMatch && (red?.detailVaried === true || !patternHits(charge.detailMatch, detail))) continue
+      // THE RECORDER'S SECTION TAG IS NOT PART OF THE MEASURED LINE (measured
+      // 30.08.2026). A suite that declares sections appends ` [--section=<name>]`
+      // to every result line so a failing check names the argument that re-runs
+      // it alone, and the record stores the line WITH it. Every `detailMatch`
+      // here is anchored at both ends against the line the SUITE printed, so in
+      // a section-using suite the anchor could never reach the end of a recorded
+      // detail: the point-927 composite charge matched
+      // `…-42.txt` while the record held `…-42.txt  [--section=bug-report-archive]`,
+      // and the red it exists to account for stayed unaccounted and blocked the
+      // gate. Stripping the tag restores what was measured without loosening a
+      // single anchor — the pattern comes from the module that writes the tag,
+      // so the two cannot drift apart again.
+      const measured = detail.replace(SECTION_TAG_RE, '')
+      if (charge.detailMatch && (red?.detailVaried === true || !patternHits(charge.detailMatch, measured))) continue
       return charge
     } catch {
       /* a broken ledger entry charges nothing — the red stays unaccounted */

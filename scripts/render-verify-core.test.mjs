@@ -3016,6 +3016,46 @@ describe('the shipped charge ledger', () => {
   // is the one failure mode a charge must never have. These pin the narrow half
   // AND the measured half together: an entry that stops matching its own
   // evidence is as broken as one that matches everything.
+  it('reads the measured line through the recorder\'s section tag', () => {
+    // MEASURED 30.08.2026, and it had blocked the gate for as long as the
+    // narrowings existed: a suite that declares sections appends
+    // ` [--section=<name>]` to every result line, and the RECORD stores the line
+    // with it — while every detailMatch here is anchored at both ends against
+    // what the SUITE printed. So in a section-using suite no anchored charge
+    // could ever reach the end of its own recorded red. These use the details
+    // exactly as .claude/render-verify-state.json holds them.
+    const tagged = (name, detail, scope, kind = 'check') => chargeFor({ name, detail, kind }, scope)
+    expect(
+      tagged(
+        'the archive holds picture, state, overlay and description',
+        'hoa-state-2026-08-30-42.json, hoa-state-2026-08-30-42-overlay.json, ' +
+          'hoa-state-2026-08-30-42.txt  [--section=bug-report-archive]',
+        { suite: 'report', backend: 'webgpu', featureLevel: 'compatibility' },
+      ).point,
+    ).toBe(927)
+    expect(
+      tagged(
+        'the children walk PAST the traveller — from one side of him to the other',
+        '0 of 4 crossed his line; along the lane (0 = his line) [-11..26@1, -15..16@1, -11..22@1, ' +
+          '-11..16@1] m, walked [67, 67, 68, 66] m, phases [run×39 part×161 roam×695] over 45s ' +
+          'played, 3 tagged  [--section=children-bank-game]',
+        { suite: 'polish', backend: 'webgl' },
+      ).point,
+    ).toBe(698)
+    // ONLY THE TRAILING TAG IS RECORDER METADATA. A detail whose own text ends
+    // before something bracket-shaped keeps every character it measured, so a
+    // narrowing cannot be slipped past by writing a section-looking suffix into
+    // the middle of a line.
+    expect(
+      tagged(
+        'the archive holds picture, state, overlay and description',
+        'hoa-state-2026-08-30-42.json  [--section=bug-report-archive], ' +
+          'hoa-state-2026-08-30-42-overlay.json, hoa-state-2026-08-30-42.txt',
+        { suite: 'report', backend: 'webgpu', featureLevel: 'compatibility' },
+      ),
+    ).toBeNull()
+  })
+
   it('charges the archive composite only in the picture-loss shape', () => {
     const scoped = { suite: 'report', backend: 'webgpu', kind: 'check', featureLevel: 'compatibility' }
     const withDetail = (name, detail) => ({ ...red(name), detail })

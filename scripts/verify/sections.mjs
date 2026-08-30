@@ -29,6 +29,8 @@ import { basename } from 'node:path'
 import { maskCode } from '../window-hide-core.mjs'
 
 /** The env var a runner sets to select one section; the suites read it. */
+import { sectionTag } from '../section-tag-core.mjs'
+
 export const SECTION_ENV = 'VERIFY_SECTION'
 
 /** A section declaration in a suite's source: `section('slug')` at a call
@@ -168,7 +170,7 @@ export function makeSectionGate({ sections = [], requested = null, suite = 'the 
     /** What a result line appends so a failing check names the argument that
      *  re-runs it alone. Empty until the first section is entered (the boot
      *  prologue belongs to no section). */
-    tag: () => (current === null ? '' : ` [--section=${current}]`),
+    tag: () => (current === null ? '' : sectionTag(current)),
     /** The banner a partial run prints, so no reader can mistake it for a pass
      *  of the suite. Null for a whole run, which prints nothing new. */
     banner: () =>
