@@ -3183,6 +3183,132 @@ describe('the shipped charge ledger', () => {
     expect(tagged('the archive carries a screenshot', 'no PNG member  [--section=bug-report-archive]', gpuReport).point).toBe(927)
   })
 
+  // RESTORED AFTER A REVIEW FINDING, TWICE INDEPENDENTLY (GPT-5.6 Sol on
+  // f2f40dd, then Opus 4.8 on b258a3e): withdrawing the section-tag stripper
+  // took these two blocks with it, and neither depends on the stripper — their
+  // details carry no tag. Both ledger entries stand, so the deletion was a
+  // silent loss of the backend and feature-level isolation they pin.
+  it('charges the borrowed world on both measured lanes and no further', () => {
+    // Point 1009's six reds were measured on webgl/benchmark and on
+    // webgpu/benchmark at recorded featureLevel=compatibility, twice each
+    // (30.08.2026). One entry without a backend used to cover them, resting on
+    // the argument that the restore path is plain JavaScript — reasoning, not a
+    // measurement, and it also reached the CORE adapter the player runs and a run
+    // that recorded no level at all (cross-vendor review, GPT-5.6 Sol).
+    const restored = { name: 'restored: ssaoEnabled', detail: 'false -> true', kind: 'check' }
+    const on = (scope) => chargeFor(restored, { suite: 'benchmark', ...scope })
+    expect(on({ backend: 'webgl' }).point).toBe(1009)
+    expect(on({ backend: 'webgpu', featureLevel: 'compatibility' }).point).toBe(1009)
+    // Neither the core adapter nor a run whose level went unrecorded was measured.
+    expect(on({ backend: 'webgpu', featureLevel: 'core' })).toBeNull()
+    expect(on({ backend: 'webgpu' })).toBeNull()
+    // EACH HALF IS ISOLATED, not only the WebGL one (cross-vendor review, GPT-5.6
+    // Sol): dropping the WebGPU entry's suite, kind or backend must not leave
+    // this file green, so the negatives are asserted on BOTH scopes.
+    const gpu = { backend: 'webgpu', featureLevel: 'compatibility' }
+    expect(chargeFor(restored, { suite: 'settings', backend: 'webgl' })).toBeNull()
+    expect(chargeFor(restored, { suite: 'settings', ...gpu })).toBeNull()
+    expect(chargeFor({ ...restored, kind: 'console' }, { suite: 'benchmark', backend: 'webgl' })).toBeNull()
+    expect(chargeFor({ ...restored, kind: 'console' }, { suite: 'benchmark', ...gpu })).toBeNull()
+    // A WebGL scope carrying a level must be answered by the WebGL entry and not
+    // by the other one. Both entries are point 1009, so the POINT cannot tell
+    // them apart (cross-vendor review, GPT-5.6 Sol) — the matched entry's own
+    // backend can.
+    expect(chargeFor(restored, { suite: 'benchmark', backend: 'webgl', featureLevel: 'compatibility' }).backend).toBe('webgl')
+    expect(on({ backend: 'webgl' }).backend).toBe('webgl')
+    expect(on({ backend: 'webgpu', featureLevel: 'compatibility' }).backend).toBe('webgpu')
+    // THE NAME IS THE WHOLE OF THE EVIDENCE — this entry reads no detail, so its
+    // six names are the only thing keeping it narrow. A seventh setting nobody
+    // measured stays red on both lanes, and so does a name that merely starts
+    // with one of the six.
+    for (const scope of [{ backend: 'webgl' }, gpu]) {
+      expect(chargeFor({ ...restored, name: 'restored: fog' }, { suite: 'benchmark', ...scope })).toBeNull()
+      expect(
+        chargeFor({ ...restored, name: 'restored: seed and the day it pins' }, { suite: 'benchmark', ...scope }),
+      ).toBeNull()
+      expect(
+        chargeFor(
+          { ...restored, name: 'Math.random is the original function again, and so is Date.now' },
+          { suite: 'benchmark', ...scope },
+        ),
+      ).toBeNull()
+      // And text in FRONT of one of the six is a different check name too — the
+      // pattern is anchored at both ends, and this is what proves the leading
+      // anchor holds (same review).
+      expect(chargeFor({ ...restored, name: 'also restored: seed' }, { suite: 'benchmark', ...scope })).toBeNull()
+      expect(
+        chargeFor({ ...restored, name: 'after F8, Math.random is the original function again' }, { suite: 'benchmark', ...scope }),
+      ).toBeNull()
+      // While every one of the six charges, on both measured lanes.
+      for (const name of ['restored: ssaoEnabled', 'restored: travelZoom', 'restored: travelSpeed',
+        'restored: seed', 'restored: day', 'Math.random is the original function again']) {
+        expect(chargeFor({ ...restored, name }, { suite: 'benchmark', ...scope }).point, name).toBe(1009)
+      }
+    }
+  })
+
+  it('leaves the report suite\'s picture-loss reds uncharged on WebGL 2', () => {
+    // MEASURED 30.08.2026 on main, and it corrects a mistake of the same day: a
+    // bare `npm test -- report` runs the EVERYDAY lane, which is WebGPU, so four
+    // reds read that way were briefly mistaken for a WebGL measurement and given
+    // WebGL halves. Run with VERIFY_GL=webgl the suite passes WHOLE — 34 checks,
+    // 0 fail — so those reds do not occur on this lane at all and a charge here
+    // would excuse something nobody has measured. That is the one failure mode
+    // the table exists to prevent, so the entries were withdrawn and this holds
+    // the line.
+    const at = (name, detail) => chargeFor({ name, detail, kind: 'check' }, { suite: 'report', backend: 'webgl' })
+    const stem = 'hoa-state-2026-08-30-42'
+    expect(
+      at(
+        'the archive holds picture, state, overlay and description',
+        archiveMemberDetail(
+          archiveMemberNames(stem, ARCHIVE_MEMBER_SUFFIXES.filter((x) => x !== ARCHIVE_PICTURE_SUFFIX)),
+        ),
+      ),
+    ).toBeNull()
+    expect(at(memberPresentCheckName(stem, ARCHIVE_PICTURE_SUFFIX), '')).toBeNull()
+    expect(at('the archive carries a screenshot', 'no PNG member')).toBeNull()
+    // The EXACT red the withdrawn entry charged, duplicate and all — a WebGL
+    // entry could otherwise come back for the duplicated form without failing
+    // here (cross-vendor review, GPT-5.6 Sol).
+    const vite504 = 'Failed to load resource: the server responded with a status of 504 (Outdated Optimize Dep)'
+    expect(at('no console errors', vite504)).toBeNull()
+    expect(at('no console errors', `${vite504} | ${vite504}`)).toBeNull()
+    // While the lane they WERE measured on keeps its charge.
+    expect(
+      chargeFor(
+        { name: 'the archive carries a screenshot', detail: 'no PNG member', kind: 'check' },
+        { suite: 'report', backend: 'webgpu', featureLevel: 'compatibility' },
+      ).point,
+    ).toBe(927)
+    // AND SO DOES THE VITE TRANSIENT, on the lane and level it was measured on:
+    // point 939 had entered it as a startup CONSOLE red, so the report suite's
+    // generic "no console errors" check stood unaccounted (measured 30.08.2026).
+    const vite = 'Failed to load resource: the server responded with a status of 504 (Outdated Optimize Dep)'
+    const onWebgpu = (detail) =>
+      chargeFor({ name: 'no console errors', detail, kind: 'check' }, { suite: 'report', backend: 'webgpu', featureLevel: 'compatibility' })
+    expect(onWebgpu(`${vite} | ${vite}`).point).toBe(939)
+    // The check name is generic, so the detail is the whole of the evidence: a
+    // second, different console error riding along keeps the red.
+    expect(onWebgpu(`${vite} | TypeError: undefined is not a function`)).toBeNull()
+    expect(onWebgpu('TypeError: undefined is not a function')).toBeNull()
+    // And the CORE adapter the player runs is not the lane this was measured on.
+    const asChecked = (over) =>
+      chargeFor(
+        { name: 'no console errors', detail: vite, kind: 'check', ...over.red },
+        { suite: 'report', backend: 'webgpu', featureLevel: 'compatibility', ...over.scope },
+      )
+    expect(asChecked({ red: {}, scope: { featureLevel: 'core' } })).toBeNull()
+    // THE SCOPE IS ASSERTED, NOT ASSUMED (same review): dropping suite or kind,
+    // or broadening the name, must not leave this file green.
+    expect(asChecked({ red: {}, scope: { suite: 'startup' } })).toBeNull()
+    expect(asChecked({ red: { kind: 'console' }, scope: {} })).toBeNull()
+    expect(asChecked({ red: { name: 'no console errors across the F9 cycle' }, scope: {} })).toBeNull()
+    // AND THE DETAIL'S LEADING ANCHOR HOLDS: a different error in FRONT of the
+    // transient is a red nobody measured, so it must not ride in behind it.
+    expect(onWebgpu(`TypeError: undefined is not a function | ${vite}`)).toBeNull()
+  })
+
   it('charges the archive composite only in the picture-loss shape', () => {
     const scoped = { suite: 'report', backend: 'webgpu', kind: 'check', featureLevel: 'compatibility' }
     const withDetail = (name, detail) => ({ ...red(name), detail })
