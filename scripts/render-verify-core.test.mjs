@@ -3056,15 +3056,6 @@ describe('the shipped charge ledger', () => {
         { suite: 'enrichments', backend: 'webgl' },
       ).point,
     ).toBe(938)
-    // A CHECK THAT PRINTED NO MEASUREMENT records the tag ALONE, and charges by
-    // name as it always did.
-    expect(
-      tagged(
-        'member hoa-state-2026-08-30-42.png is present',
-        '[--section=bug-report-archive]',
-        { suite: 'report', backend: 'webgpu', featureLevel: 'compatibility' },
-      ).point,
-    ).toBe(927)
   })
 
   // THE STRIPPER MAY NOT EAT MEASURED TEXT (cross-vendor review, GPT-5.6 Sol,
@@ -3095,6 +3086,16 @@ describe('the shipped charge ledger', () => {
     expect(
       chargeFor(red('phases [run×39]  [--section=x]'), scope(entry(/^phases \[run×39\]$/))).point,
     ).toBe(9001)
+    // A CHECK THAT PRINTED NO MEASUREMENT records the tag ALONE, and what is left
+    // is the EMPTY measurement. Asserted against a ledger of its own, because the
+    // shipped entry for this red matches by NAME and would pass while the tag sat
+    // there untouched — a vacuous control (cross-vendor review, GPT-5.6 Sol).
+    expect(chargeFor(red('[--section=bug-report-archive]'), scope(entry(/^$/))).point).toBe(9001)
+    // AND TRAILING WHITESPACE IS MEASURED TEXT, not part of the tag: a stripper
+    // that ate it would pass every control above while still normalising a detail
+    // nobody measured (same review).
+    expect(chargeFor(red('timeout  [--section=x] '), scope(entry(/^timeout$/)))).toBeNull()
+    expect(chargeFor(red('timeout '), scope(entry(/^timeout$/)))).toBeNull()
   })
 
   it('charges the archive composite only in the picture-loss shape', () => {

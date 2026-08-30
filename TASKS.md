@@ -77,6 +77,99 @@ then point 633 (the closing run), then point 174 (the tag). A newly appended poi
 kind is MOVED to the front in the same turn that files it; leaving it where append-and-defer
 put it is the mistake this line exists to stop.
 
+- [ ] 1016. Four runs that REPORTED their reds are recorded as crashes, and a crash can be
+  closed by nobody (measured 30.08.2026 on `feat/686-five-word-lexicon-game`, the WebGPU lane
+  of the LARGE regression).
+  `webgpu/world` at 03:39:58 and 03:41:04 and `webgpu/enrichments` at 04:26:47 and 04:29:11
+  each carry `crashed: true` in `.claude/render-verify-state.json` — while the same records
+  carry `exit 1`, `asserted: true`, three and eight screenshots, and exactly ONE red apiece
+  whose owner the recorder already resolved: `frame 11-worldmodel-khartoum-confluence` to
+  point 627 and `frame 72-water-victoria-falls` to point 514. A run that reports its red,
+  asserts its backend and takes its frames did not die; it failed and said so.
+  WHY IT MATTERS RATHER THAN BEING COSMETIC: `render-verify-guard` treats a crash as carrying
+  no red anybody can own, so the three ordinary closings of point 640 cannot reach it. These
+  four therefore block the render gate PERMANENTLY although every red in them is charged —
+  and the blocked gate is the one the next point's landing needs. Ten older crash records
+  from 17.08. to 27.08. sit in the same list for the same reason.
+  WHERE TO LOOK: `scripts/render-verify-recorder.mjs` sets `state.crashed = true` from
+  `CRASH_LINE = /^\s+at .+:\d+:\d+|^(?:Uncaught\s+)?\w*Error(?::|\b)/` over STDERR lines
+  alone. Any stderr line that opens with a stack frame or a word ending in `Error` arms it,
+  which a suite can print while running perfectly well — the WebGPU lane prints validation
+  errors by the hundred. The kept logs of the four runs above are in `local/verify-logs/`.
+  FINAL STATE, decided by what the log SHOWS and never by loosening the pattern until the
+  four pass: for each of the four, say whether the run really died or reported. If it
+  reported, the classifier stops calling that shape a crash — a run that produced a terminal
+  verdict, asserted its backend and recorded its reds is a red run, not a dead one — and the
+  four stop blocking. If it really died, the crash is signed off with what the log shows
+  (`node scripts/render-verify-guard.mjs --crashed "<lane/suite>" --evidence "…"`) and the
+  classifier stands. The ten older records are decided the same way in the same pass, so the
+  backlog does not simply grow.
+  VERIFIABLE: a unit case over the recorder's classification for a stderr line that opens
+  with `\w*Error` inside an otherwise reporting run, mutation-checked; `node
+  scripts/render-verify-guard.mjs --status` naming no crashed run that carries a terminal
+  verdict; plus `npm run test:unit`, lint, build.
+  Criticality: high — it blocks the render gate for every point, and it blocks it in the one
+  way no charge and no owner can lift.
+  Bundle: Testinfrastruktur.
+
+- [ ] 1017. A charge is scoped to the lane it was first measured on, so the same red needs a
+  second half on the other lane and nobody notices until a run stops (measured 30.08.2026 on
+  `main` at 55b99d6 and on `feat/686-five-word-lexicon-game`).
+  The pattern is established and keeps recurring: 514 got a WebGL half as point 603, 938 got
+  one on 29.08., and 698 got one today. What today's runs add is that the F6 report suite's
+  three point-927 reds — the composite member list, the missing `.png` member and "the archive
+  carries a screenshot" — appear on WebGL 2 with the identical detail, while all three entries
+  carry `backend: 'webgpu'` and `featureLevel: 'compatibility'`. The same run also reddens
+  "no console errors" with Vite's `504 (Outdated Optimize Dep)`, the environment transient
+  point 939 already owns on `startup`/`webgpu`/`console` and which nothing owns as a `report`
+  check on WebGL 2.
+  WHY IT IS A POINT rather than four more entries: writing the halves one at a time is what
+  produced the backlog. Each is discovered only when a lane happens to run and the gate stops,
+  and every discovery costs a cross-vendor round. The measurable question is whether an entry's
+  evidence is about the LANE at all — 698's children are simulated in plain JavaScript, 927's
+  archive is assembled in `src/`, 939's red is Vite re-bundling — or genuinely about the
+  renderer, as 514's MSAA cascade is.
+  FINAL STATE: every entry in `RED_CHARGES` whose evidence is not about the renderer either
+  carries both lanes or says in its `why` why one lane's absence is deliberate, and the
+  distinction is stated once where the table's contract is written. The four reds measured
+  today are charged or the mechanism explains why they must not be. Nothing here loosens a
+  scope that a lane fault justifies: on a CORE adapter and on the lane a red was never seen,
+  the strict reading stands.
+  VERIFIABLE: `node scripts/verify/run-all.mjs report` on BOTH lanes leaving no unaccounted red;
+  a unit case per newly widened entry proving the other lane still refuses an unmeasured shape,
+  mutation-checked; plus `npm run test:unit`, lint, build.
+  Criticality: medium — it does not hide a defect, but it stops a gate at a random moment and
+  charges a cross-vendor round for a decision the table could state once.
+  Bundle: Testinfrastruktur.
+
+- [ ] 1018. The recorder knows which section a red came from and throws it away, so the reader
+  has to guess (cross-vendor review, GPT-5.6 Sol at effort high, 30.08.2026, do-not-merge on
+  both attempts at guessing).
+  A suite that declares sections appends ` [--section=<name>]` to every result line, and the
+  recorder stores the line WITH it. Every `detailMatch` in `RED_CHARGES` is anchored at both
+  ends against what the suite MEASURED, so before 30.08.2026 no anchored charge in a
+  section-using suite could reach the end of its own recorded red — four known reds sat
+  unaccounted and blocked the picture gate. `withoutSectionTag` now takes the tag back off by
+  reconstructing it from its generator, and that is what the reviewer refused TWICE, rightly:
+  reconstruction proves SYNTAX, not PROVENANCE. A check that genuinely measured a value ending
+  in two spaces and a bracket is indistinguishable from a tagged one, and `chargeReds`
+  truncates a long detail to 200 characters before the reader sees it, so a cut can land on
+  exactly that shape. Named in the module rather than hidden; the guess stands only because the
+  measured alternative is worse.
+  FINAL STATE: the run record carries the measurement and the section as SEPARATE fields, the
+  charge reads the measurement alone, and no reader parses a tag out of text. Records written
+  before the change keep working — an old record has no section field, and the reader must say
+  what it does with one rather than silently guessing again. The generator and its recogniser
+  agree about which names are legal: `sectionTag` today accepts a name with whitespace that no
+  recogniser will read back, which is the reviewer's second finding.
+  VERIFIABLE: a unit case where the measurement itself ends in `  [--section=x]` and the charge
+  refuses it while the same text as a real tag charges, mutation-checked; a case over a
+  truncated detail whose cut lands on a tag shape; the four reds of 30.08.2026 still charged;
+  plus `npm run test:unit`, lint, build.
+  Criticality: high — it is a charge reading text it may not own, and a charge that excuses an
+  unmeasured red is the one failure mode the whole table exists to prevent.
+  Bundle: Testinfrastruktur.
+
 - [ ] 686. The taught language is five concepts, and the chief's message is four of them (user
   13.08.2026, playing the deployed communication slice).
   The user played the deployed communication slice on 13.08.2026 with the debug
@@ -13803,96 +13896,3 @@ to land than a mechanism that needs a review.
   Criticality: high — a charge that swallows an unmeasured red is the one failure mode the
   whole mechanism exists to prevent, and it currently hides behind a green gate.
   Bundle: Session- & Repo-Hygiene.
-
-- [ ] 1016. Four runs that REPORTED their reds are recorded as crashes, and a crash can be
-  closed by nobody (measured 30.08.2026 on `feat/686-five-word-lexicon-game`, the WebGPU lane
-  of the LARGE regression).
-  `webgpu/world` at 03:39:58 and 03:41:04 and `webgpu/enrichments` at 04:26:47 and 04:29:11
-  each carry `crashed: true` in `.claude/render-verify-state.json` — while the same records
-  carry `exit 1`, `asserted: true`, three and eight screenshots, and exactly ONE red apiece
-  whose owner the recorder already resolved: `frame 11-worldmodel-khartoum-confluence` to
-  point 627 and `frame 72-water-victoria-falls` to point 514. A run that reports its red,
-  asserts its backend and takes its frames did not die; it failed and said so.
-  WHY IT MATTERS RATHER THAN BEING COSMETIC: `render-verify-guard` treats a crash as carrying
-  no red anybody can own, so the three ordinary closings of point 640 cannot reach it. These
-  four therefore block the render gate PERMANENTLY although every red in them is charged —
-  and the blocked gate is the one the next point's landing needs. Ten older crash records
-  from 17.08. to 27.08. sit in the same list for the same reason.
-  WHERE TO LOOK: `scripts/render-verify-recorder.mjs` sets `state.crashed = true` from
-  `CRASH_LINE = /^\s+at .+:\d+:\d+|^(?:Uncaught\s+)?\w*Error(?::|\b)/` over STDERR lines
-  alone. Any stderr line that opens with a stack frame or a word ending in `Error` arms it,
-  which a suite can print while running perfectly well — the WebGPU lane prints validation
-  errors by the hundred. The kept logs of the four runs above are in `local/verify-logs/`.
-  FINAL STATE, decided by what the log SHOWS and never by loosening the pattern until the
-  four pass: for each of the four, say whether the run really died or reported. If it
-  reported, the classifier stops calling that shape a crash — a run that produced a terminal
-  verdict, asserted its backend and recorded its reds is a red run, not a dead one — and the
-  four stop blocking. If it really died, the crash is signed off with what the log shows
-  (`node scripts/render-verify-guard.mjs --crashed "<lane/suite>" --evidence "…"`) and the
-  classifier stands. The ten older records are decided the same way in the same pass, so the
-  backlog does not simply grow.
-  VERIFIABLE: a unit case over the recorder's classification for a stderr line that opens
-  with `\w*Error` inside an otherwise reporting run, mutation-checked; `node
-  scripts/render-verify-guard.mjs --status` naming no crashed run that carries a terminal
-  verdict; plus `npm run test:unit`, lint, build.
-  Criticality: high — it blocks the render gate for every point, and it blocks it in the one
-  way no charge and no owner can lift.
-  Bundle: Testinfrastruktur.
-
-- [ ] 1017. A charge is scoped to the lane it was first measured on, so the same red needs a
-  second half on the other lane and nobody notices until a run stops (measured 30.08.2026 on
-  `main` at 55b99d6 and on `feat/686-five-word-lexicon-game`).
-  The pattern is established and keeps recurring: 514 got a WebGL half as point 603, 938 got
-  one on 29.08., and 698 got one today. What today's runs add is that the F6 report suite's
-  three point-927 reds — the composite member list, the missing `.png` member and "the archive
-  carries a screenshot" — appear on WebGL 2 with the identical detail, while all three entries
-  carry `backend: 'webgpu'` and `featureLevel: 'compatibility'`. The same run also reddens
-  "no console errors" with Vite's `504 (Outdated Optimize Dep)`, the environment transient
-  point 939 already owns on `startup`/`webgpu`/`console` and which nothing owns as a `report`
-  check on WebGL 2.
-  WHY IT IS A POINT rather than four more entries: writing the halves one at a time is what
-  produced the backlog. Each is discovered only when a lane happens to run and the gate stops,
-  and every discovery costs a cross-vendor round. The measurable question is whether an entry's
-  evidence is about the LANE at all — 698's children are simulated in plain JavaScript, 927's
-  archive is assembled in `src/`, 939's red is Vite re-bundling — or genuinely about the
-  renderer, as 514's MSAA cascade is.
-  FINAL STATE: every entry in `RED_CHARGES` whose evidence is not about the renderer either
-  carries both lanes or says in its `why` why one lane's absence is deliberate, and the
-  distinction is stated once where the table's contract is written. The four reds measured
-  today are charged or the mechanism explains why they must not be. Nothing here loosens a
-  scope that a lane fault justifies: on a CORE adapter and on the lane a red was never seen,
-  the strict reading stands.
-  VERIFIABLE: `node scripts/verify/run-all.mjs report` on BOTH lanes leaving no unaccounted red;
-  a unit case per newly widened entry proving the other lane still refuses an unmeasured shape,
-  mutation-checked; plus `npm run test:unit`, lint, build.
-  Criticality: medium — it does not hide a defect, but it stops a gate at a random moment and
-  charges a cross-vendor round for a decision the table could state once.
-  Bundle: Testinfrastruktur.
-
-- [ ] 1018. The recorder knows which section a red came from and throws it away, so the reader
-  has to guess (cross-vendor review, GPT-5.6 Sol at effort high, 30.08.2026, do-not-merge on
-  both attempts at guessing).
-  A suite that declares sections appends ` [--section=<name>]` to every result line, and the
-  recorder stores the line WITH it. Every `detailMatch` in `RED_CHARGES` is anchored at both
-  ends against what the suite MEASURED, so before 30.08.2026 no anchored charge in a
-  section-using suite could reach the end of its own recorded red — four known reds sat
-  unaccounted and blocked the picture gate. `withoutSectionTag` now takes the tag back off by
-  reconstructing it from its generator, and that is what the reviewer refused TWICE, rightly:
-  reconstruction proves SYNTAX, not PROVENANCE. A check that genuinely measured a value ending
-  in two spaces and a bracket is indistinguishable from a tagged one, and `chargeReds`
-  truncates a long detail to 200 characters before the reader sees it, so a cut can land on
-  exactly that shape. Named in the module rather than hidden; the guess stands only because the
-  measured alternative is worse.
-  FINAL STATE: the run record carries the measurement and the section as SEPARATE fields, the
-  charge reads the measurement alone, and no reader parses a tag out of text. Records written
-  before the change keep working — an old record has no section field, and the reader must say
-  what it does with one rather than silently guessing again. The generator and its recogniser
-  agree about which names are legal: `sectionTag` today accepts a name with whitespace that no
-  recogniser will read back, which is the reviewer's second finding.
-  VERIFIABLE: a unit case where the measurement itself ends in `  [--section=x]` and the charge
-  refuses it while the same text as a real tag charges, mutation-checked; a case over a
-  truncated detail whose cut lands on a tag shape; the four reds of 30.08.2026 still charged;
-  plus `npm run test:unit`, lint, build.
-  Criticality: high — it is a charge reading text it may not own, and a charge that excuses an
-  unmeasured red is the one failure mode the whole table exists to prevent.
-  Bundle: Testinfrastruktur.
