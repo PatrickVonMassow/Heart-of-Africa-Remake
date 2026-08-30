@@ -3130,9 +3130,13 @@ describe('the shipped charge ledger', () => {
     expect(chargeFor(restored, { suite: 'settings', ...gpu })).toBeNull()
     expect(chargeFor({ ...restored, kind: 'console' }, { suite: 'benchmark', backend: 'webgl' })).toBeNull()
     expect(chargeFor({ ...restored, kind: 'console' }, { suite: 'benchmark', ...gpu })).toBeNull()
-    // A WebGL scope carrying a level isolates the WebGPU half's backend: nothing
-    // may match it through the lane alone.
-    expect(chargeFor(restored, { suite: 'benchmark', backend: 'webgl', featureLevel: 'compatibility' }).point).toBe(1009)
+    // A WebGL scope carrying a level must be answered by the WebGL entry and not
+    // by the other one. Both entries are point 1009, so the POINT cannot tell
+    // them apart (cross-vendor review, GPT-5.6 Sol) — the matched entry's own
+    // backend can.
+    expect(chargeFor(restored, { suite: 'benchmark', backend: 'webgl', featureLevel: 'compatibility' }).backend).toBe('webgl')
+    expect(on({ backend: 'webgl' }).backend).toBe('webgl')
+    expect(on({ backend: 'webgpu', featureLevel: 'compatibility' }).backend).toBe('webgpu')
     // THE NAME IS THE WHOLE OF THE EVIDENCE — this entry reads no detail, so its
     // six names are the only thing keeping it narrow. A seventh setting nobody
     // measured stays red on both lanes, and so does a name that merely starts
@@ -3147,6 +3151,13 @@ describe('the shipped charge ledger', () => {
           { ...restored, name: 'Math.random is the original function again, and so is Date.now' },
           { suite: 'benchmark', ...scope },
         ),
+      ).toBeNull()
+      // And text in FRONT of one of the six is a different check name too — the
+      // pattern is anchored at both ends, and this is what proves the leading
+      // anchor holds (same review).
+      expect(chargeFor({ ...restored, name: 'also restored: seed' }, { suite: 'benchmark', ...scope })).toBeNull()
+      expect(
+        chargeFor({ ...restored, name: 'after F8, Math.random is the original function again' }, { suite: 'benchmark', ...scope }),
       ).toBeNull()
       // While every one of the six charges, on both measured lanes.
       for (const name of ['restored: ssaoEnabled', 'restored: travelZoom', 'restored: travelSpeed',
