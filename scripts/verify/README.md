@@ -1470,6 +1470,18 @@ claiming otherwise):
 
 ### A crashed run has the same named way out (point 734, sixth round)
 
+A new record is a CRASH when `crashSource: 'uncaught-exception'` says Node
+really died (even after an earlier report), or when an armed stderr crash
+candidate never completes the suite's reporting path. A non-zero run instead
+counts as a REPORTED RED when its backend was asserted, at least one red was
+recorded, and stdout reached the suite's own terminal report line; stack-shaped
+validation chatter inside that completed run does not make it a crash.
+
+Records from before this distinction have no `terminalVerdict` field. For those
+records the durable evidence already present decides: a non-zero run with an
+asserted backend and recorded reds is read as reported; without that evidence,
+its recorded crash remains a crash.
+
 A CRASH is the one verdict no ledger can ever reach: `runVerdict` returns no
 charges for it, deliberately — a run that died rather than reported judged no
 picture, so THE CRASH ITSELF is nothing anyone can fix, charge or file, and
