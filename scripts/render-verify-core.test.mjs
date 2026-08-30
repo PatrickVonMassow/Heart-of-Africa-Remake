@@ -3128,6 +3128,19 @@ describe('the shipped charge ledger', () => {
         scoped,
       ),
     ).toBeNull()
+    // NOR MAY THE SAMPLE BE EMPTY (cross-vendor review, GPT-5.6 Sol, 30.08.2026).
+    // `0/0 rows` says the benchmark produced no rows at all — the earlier
+    // `rows.every(...)` check passes vacuously on an empty report, so this line is
+    // reachable, and it is a different defect from the measured 0/33 and 0/3.
+    expect(
+      chargeFor(
+        withDetail(
+          'WebGPU: real GPU timestamps were measured for every row',
+          '0/0 rows, reason "adapter without the timestamp-query feature"',
+        ),
+        scoped,
+      ),
+    ).toBeNull()
   })
 
   it('lets the benchmark cascade charge cover that sentence ALONE', () => {
@@ -3204,6 +3217,24 @@ describe('the shipped charge ledger', () => {
         scoped,
       ),
     ).toBeNull()
+    // THE PAIR IS EVIDENCE, NOT DECORATION (cross-vendor review, GPT-5.6 Sol,
+    // 30.08.2026): the bracket used to be optional, so a detail that reports a
+    // depth but has LOST the pair that produced it was charged as the measured
+    // red. `worstDepth` and `worstPair` travel together out of one reading in
+    // labelFusion.mjs — a depth without a pair is a broken measurement.
+    expect(
+      chargeFor(
+        withDetail(
+          name,
+          '1/90 frames held a pair fused beyond 6 px (allowed 4), deepest 19 px' +
+            ', 4–7 labels across the sample — as deep as the 18 px unreadable bar',
+        ),
+        scoped,
+      ),
+    ).toBeNull()
+    // AND ONE FRAME OUT OF NONE IS NOT A SAMPLE: `1/\d+` accepted `1/0 frames`,
+    // a count no honest reading can print.
+    expect(chargeFor(withDetail(name, measured.replace('1/90', '1/0')), scoped)).toBeNull()
   })
 
   it('leaves the async-pipeline message uncharged, though its family now has a point', () => {
