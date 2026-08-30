@@ -262,11 +262,12 @@ function patternHits(pattern, value) {
  * was read from — and that text was never cut. Reading it as cut would refuse
  * charges over material the reader can see in full.
  *
- * Reading an uncut detail as cut costs a NARROW charge and nothing else: the
- * red stays loudly unaccounted and closes the three ordinary ways (fix it,
- * charge it, file it). Reading a cut one as whole is what lets one red's
- * signature quietly excuse another's, which is the one failure mode this table
- * exists to prevent.
+ * Reading an uncut detail as cut costs at most ONE narrow charge — the one
+ * whose signature reads the end of the measurement; every other entry keeps
+ * charging (see `matchReachesEnd`). The red it does cost stays loudly
+ * unaccounted and closes the three ordinary ways (fix it, charge it, file it).
+ * Reading a cut one as whole is what lets one red's signature quietly excuse
+ * another's, which is the one failure mode this table exists to prevent.
  */
 export function wasDetailCut(red) {
   if (red?.detailCut === true) return true
@@ -295,7 +296,22 @@ function matchReachesEnd(pattern, value) {
   const re = usableRegex(pattern)
   if (re === null) return false
   const hit = re.exec(value)
-  return hit !== null && hit.index + hit[0].length >= value.length
+  if (hit === null) return false
+  if (hit.index + hit[0].length >= value.length) return true
+  // A MATCH THAT STOPPED SHORT MAY STILL HAVE ASSERTED THE END (cross-vendor
+  // review, GPT-5.6 Sol, do-not-merge on 8f3f23d). A lookaround CONSUMES
+  // nothing, so `/^(?=A{200}$)/` succeeds with a zero-length hit at index 0 and
+  // the arithmetic above sees a signature stopping at the first character —
+  // while the pattern demanded that the text end exactly there, which is the
+  // very claim the cut cannot support.
+  //
+  // So the question is asked once more, and this time of the pattern rather
+  // than of its match: would it still match if the text went ON? A signature
+  // that reads retained material does; one whose success rested on where this
+  // text happened to end does not. The sentinel is a NUL, which no suite prints
+  // and no ledger entry names, so appending it can only remove the end — never
+  // satisfy something new.
+  return !usableRegex(pattern).test(`${value}\u0000`)
 }
 
 export function chargeFor(red, options) {

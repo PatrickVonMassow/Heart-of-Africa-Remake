@@ -1424,7 +1424,17 @@ describe('evaluate — a red is not closed by the runs that FOLLOWED it (point 6
       ['an alternation whose taken branch reaches the end', /^(?:nothing like it|one\.json, two\.json, z{180})$/],
       ['a lookahead asserting the end after the match', /one\.json, two\.json, z{180}(?=$)/],
       ['a zero-length match at the end', /z*$/],
+      // THE SHAPE THAT SLIPPED THROUGH THE FIRST READING (cross-vendor review,
+      // GPT-5.6 Sol, do-not-merge on 8f3f23d): a lookaround CONSUMES nothing, so
+      // this succeeds with a zero-length hit at index 0 while demanding that the
+      // text end exactly at 200 — an end-claim no arithmetic over the match can
+      // see, and exactly the claim a cut record cannot support.
+      ['a lookahead that asserts the end without consuming anything', /^(?=one\.json, two\.json, z{180}$)/],
+      ['a lookahead over the whole kept text at a later index', /(?=json, z{180}$)/],
     ])('refuses %s on the cut record', (_shape, detailMatch) => {
+      // Each shape really matches the kept text — a vacuous non-match would be
+      // refused for the wrong reason and pin nothing.
+      expect(detailMatch.test(cutRed.detail)).toBe(true)
       expect(chargeFor(cutRed, scoped(detailMatch))).toBeNull()
     })
 
@@ -1436,6 +1446,11 @@ describe('evaluate — a red is not closed by the runs that FOLLOWED it (point 6
       expect(chargeFor(cutRed, scoped(/^one\.json, two\.json,/))?.point).toBe(927)
       // A BROAD entry is unaffected — it never claimed to read a measurement.
       expect(chargeFor(cutRed, scoped(undefined))?.point).toBe(927)
+      // AND A LOOKAROUND IS NOT REFUSED FOR BEING ONE. The shape above is
+      // refused because it asserts the END; one that asserts something inside
+      // the kept text reads material the record really holds, and charges.
+      expect(chargeFor(cutRed, scoped(/^(?=one\.json)one\.json, two/))?.point).toBe(927)
+      expect(chargeFor(cutRed, scoped(/^one\.json(?=, two\.json)/))?.point).toBe(927)
     })
 
     // THE CONTROL that makes the mark itself load-bearing: the same end-reaching
