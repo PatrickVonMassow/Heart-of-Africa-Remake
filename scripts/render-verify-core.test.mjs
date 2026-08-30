@@ -3061,6 +3061,20 @@ describe('the shipped charge ledger', () => {
         scoped,
       ),
     ).toBeNull()
+    // AND NO MEMBER MAY STAND IN FOR ANOTHER (round 6): an `-overlay.txt` once
+    // satisfied the description, and nothing required the three to share one stem.
+    expect(
+      chargeFor(
+        withDetail(composite, 'hoa-state-2026-08-29-42.json, hoa-state-2026-08-29-42-overlay.json, hoa-state-2026-08-29-42-overlay.txt'),
+        scoped,
+      ),
+    ).toBeNull()
+    expect(
+      chargeFor(
+        withDetail(composite, 'hoa-state-2026-08-29-42.json, hoa-state-2026-08-29-43-overlay.json, hoa-state-2026-08-29-42.txt'),
+        scoped,
+      ),
+    ).toBeNull()
     // While the two checks that name the picture themselves need no detail.
     expect(chargeFor(red('the archive carries a screenshot'), scoped).point).toBe(927)
     expect(chargeFor(red('member hoa-state-2026-08-29-42.png is present'), scoped).point).toBe(927)

@@ -775,9 +775,13 @@ export const RED_CHARGES = [
     // told from a member whose own name contains `, `, so the expression stops
     // guessing where members end and describes the WHOLE detail instead — exactly
     // three members, each one built from the download stem the suite writes, which
-    // by its own `^hoa-state-\d{4}-\d{2}-\d{2}-\d+\.zip$` shape can hold no comma).
+    // by its own `^hoa-state-\d{4}-\d{2}-\d{2}-\d+\.zip$` shape can hold no comma;
+    // round 6: describing the members SEPARATELY still let one stand in for another
+    // — an `-overlay.txt` satisfied the description, and nothing tied the three to
+    // ONE stem. The detail is now the measured line itself, the stem captured once
+    // and required to repeat, in the order point 927 recorded it).
     detailMatch:
-      /^(?=(?:.*, )?hoa-state-\d{4}-\d{2}-\d{2}-\d+\.json(?:, |$))(?=.*-overlay\.json)(?=.*\.txt)hoa-state-\d{4}-\d{2}-\d{2}-\d+(?:-overlay)?\.(?:json|txt)(?:, hoa-state-\d{4}-\d{2}-\d{2}-\d+(?:-overlay)?\.(?:json|txt)){2}$/i,
+      /^(hoa-state-\d{4}-\d{2}-\d{2}-\d+)\.json, \1-overlay\.json, \1\.txt$/i,
     why:
       'THE SAME DEFECT POINT 927 OWNS, READ THROUGH THE ONE CHECK THAT CAN ALSO FAIL FOR ANOTHER ' +
       'REASON. 927 measured a WebGPU archive holding its `.json`, `-overlay.json` and `.txt` and ' +
