@@ -196,8 +196,10 @@ const CRASH_LINE = /^\s+at .+:\d+:\d+|^(?:Uncaught\s+)?\w*Error(?::|\b)/
 /** A suite's own terminal failure report. Unlike a stack-looking stderr line,
  * this is emitted on the suite's normal path immediately before its explicit
  * non-zero exit. `console errors:` is the form used by world and enrichments;
- * the other forms cover the remaining browser-suite reporters. */
-const TERMINAL_VERDICT_LINE = /^(?:console errors:|CONSOLE ERRORS:|FAILURES:\s*\d+\b|(?:report:\s*)?\d+\s+(?:CROSS-BROWSER\/MOBILE\s+)?CHECK\(S\) FAILED\b)/i
+ * the other forms cover the remaining browser-suite reporters. The tap arms
+ * this verdict from STDOUT ONLY: stderr is validation/crash evidence, and must
+ * never be allowed to manufacture the normal-path report that clears it. */
+export const TERMINAL_VERDICT_LINE = /^(?:console errors:|CONSOLE ERRORS:|FAILURES:\s*\d+\b|(?:report:\s*)?\d+\s+(?:CROSS-BROWSER\/MOBILE\s+)?CHECK\(S\) FAILED\b)/
 
 /** Where a stack frame BEGINS. `CRASH_LINE` can only confirm one from its
  *  trailing `:line:column`, which an overlong line puts past the probe — so this
