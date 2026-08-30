@@ -659,6 +659,29 @@ export const RED_CHARGES = [
       + '698, and on a CORE adapter this check was never measured and stays a real red.',
   },
   {
+    point: 698,
+    suite: 'polish',
+    backend: 'webgl',
+    kind: 'check',
+    match: /^the children walk PAST the traveller/i,
+    // The same detail constraint as the WebGPU half, for the same reason: 698
+    // owns the DENSITY, and a window that never reached the `run` phase is a
+    // different defect that stays a real red.
+    detailMatch: /crossed his line;[\s\S]*phases \[[^\]]*run×[1-9]/i,
+    why:
+      'THE WebGL 2 HALF OF POINT 698, measured 30.08.2026 and entered because the WebGPU entry '
+      + 'above is scoped to that lane and its compatibility level, so it deliberately excuses '
+      + 'nothing here. The LARGE run on feat/686-five-word-lexicon-game read "0 of 4 crossed his '
+      + 'line" over 45 s played with phases [run×39 part×161 roam×695] — the round OPENED 39 runs, '
+      + 'so it plays and the crossing merely did not fall inside the window, which is exactly the '
+      + 'density 698 owns and not a broken round. The retry of the same suite passed whole (200 '
+      + 'checks, 0 fail), as it did on 29.08.2026. '
+      + 'Which lane drew the frame does not reach this check: the children are simulated in plain '
+      + 'JavaScript and the check reads their positions, not their pixels — the WebGPU half was '
+      + 'measured first only because that is the lane it first reddened on. The charge dies with '
+      + 'point 698.',
+  },
+  {
     point: 1012,
     suite: 'benchmark',
     backend: 'webgpu',
@@ -676,7 +699,12 @@ export const RED_CHARGES = [
     // PLUS a second, genuinely different failure still matched. The detail this
     // check prints is `<n>/<n> rows, reason "<reason>"` and nothing else, so the
     // excuse is that whole line or nothing.
-    detailMatch: /^0\/\d+ rows, reason "adapter without the timestamp-query feature"$/i,
+    // THE ROW COUNT MUST BE A REAL SAMPLE 30.08.2026 (cross-vendor review, GPT-5.6
+    // Sol, do-not-merge on a333f20): `\d+` accepted `0/0 rows` — a benchmark that
+    // produced NO ROWS AT ALL. That report passes the earlier `every` check
+    // vacuously and reaches this line with the same reason string, so the empty
+    // measurement would have been charged as the measured 0/33 and 0/3.
+    detailMatch: /^0\/[1-9]\d* rows, reason "adapter without the timestamp-query feature"$/i,
     why:
       'A CHECK THAT CANNOT PASS ON THE LANE IT RUNS ON, filed as point 1012 on 29.08.2026. Both '
       + 'attempts of the 29.08.2026 LARGE run on feat/687-roam-bound-fixes read 0/33 rows and 0/3 '
@@ -814,8 +842,18 @@ export const RED_CHARGES = [
     // `unreadable bar` can also appear inside the label pair the detail quotes.
     // The retry's own verdict is NOT in this detail and cannot be constrained here;
     // it is part of the record this charge cites, not of the red it reads.
+    // THE SAMPLE AND THE PAIR ARE BOTH MANDATORY 30.08.2026 (cross-vendor review,
+    // GPT-5.6 Sol, do-not-merge on a333f20): `1/\d+` accepted the impossible
+    // `1/0 frames`, and the optional `( \[…\])?` accepted a detail that has LOST
+    // the pair identity. `worstDepth` and `worstPair` come from the same reading in
+    // labelFusion.mjs, so a line printing a depth without its pair is a broken
+    // measurement — a different red from the one 1010 owns.
+    // AND THE PAIR IS SPELLED OUT, NOT MERELY BRACKETED (same review, round 2):
+    // `\[[^\]]*\]` matches an EMPTY bracket, so the identity was still optional in
+    // substance. polish.mjs writes `"<a>"×"<b>" <across>×<down> px`, and that is
+    // the only shape excused here.
     detailMatch:
-      /^1\/\d+ frames held a pair fused beyond \d+ px \(allowed \d+\), deepest \d+ px( \[[^\]]*\])?, \d+–\d+ labels across the sample — as deep as the \d+ px unreadable bar$/i,
+      /^1\/[1-9]\d* frames held a pair fused beyond \d+ px \(allowed \d+\), deepest \d+ px \["[^"]+"×"[^"]+" \d+×\d+ px\], \d+–\d+ labels across the sample — as deep as the \d+ px unreadable bar$/i,
     why:
       'THE RED WHOSE CHECK NAMES A TICKED POINT, filed as point 1010 on 29.08.2026. The check '
       + 'prints "(point 628)", 628 is ticked and lives in docs/tasks-archive.md, and a charge dies '

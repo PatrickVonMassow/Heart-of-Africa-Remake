@@ -86,6 +86,7 @@ export const NON_RENDER_VERIFY = new Set([
   'liveness.mjs', // main-thread liveness ATTRIBUTION; the suites do the driving
   'machine-load-core.mjs',
   'machine-load.mjs',
+  'report-archive-names.mjs', // the names the F6 archive checks print; report.mjs does the downloading
   'run-all.mjs',
   'run-digest-core.mjs', // which of a run's OUTPUT lines the caller reads; it draws nothing
   'run-logged-args.mjs', // pure CLI parsing and output-line caps for the logging wrapper

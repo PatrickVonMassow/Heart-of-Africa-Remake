@@ -15,6 +15,12 @@
 // bindings — is pinned in the Vitest layer.
 import { launchVerifyBrowser, assertBackend, waitForSceneBuilt, VERIFY_GL } from './_browser.mjs'
 import { sectionGate } from './sections.mjs'
+import {
+  ARCHIVE_MEMBER_SUFFIXES,
+  archiveMemberDetail,
+  archiveMemberNames,
+  memberPresentCheckName,
+} from './report-archive-names.mjs'
 import { readFile } from 'node:fs/promises'
 import sharp from 'sharp'
 
@@ -132,11 +138,26 @@ if (section('bug-report-archive')) {
 
   const members = readZip(zip)
   const names = members.map((m) => m.name)
-  check('the archive holds picture, state, overlay and description', names.length === 4, names.join(', '))
+  check(
+    'the archive holds picture, state, overlay and description',
+    names.length === ARCHIVE_MEMBER_SUFFIXES.length,
+    archiveMemberDetail(names),
+  )
   const stem = download.suggestedFilename().replace(/\.zip$/, '')
-  for (const suffix of ['.png', '.json', '-overlay.json', '.txt']) {
-    check(`member ${stem}${suffix} is present`, names.includes(`${stem}${suffix}`))
+  const expected = archiveMemberNames(stem)
+  for (const [i, suffix] of ARCHIVE_MEMBER_SUFFIXES.entries()) {
+    check(memberPresentCheckName(stem, suffix), names.includes(expected[i]))
   }
+  // THE ORDER IS PART OF WHAT THE COMPOSITE CHECK PRINTS (cross-vendor review,
+  // GPT-5.6 Sol, 30.08.2026): the detail above is the archive's own member list
+  // joined, and a charge in the red table reads that line. Without this the
+  // assembler could reorder its entries and the charge would stop matching in
+  // silence. A missing picture keeps the remaining three in their order.
+  check(
+    'the archive lists its members in the order the assembler writes them',
+    archiveMemberDetail(names) === archiveMemberDetail(expected.filter((name) => names.includes(name))),
+    archiveMemberDetail(names),
+  )
 
   // --- The description and the reproduction fields are in the text file --------
   const txt = members.find((m) => m.name.endsWith('.txt'))
