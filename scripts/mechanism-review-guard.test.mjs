@@ -186,6 +186,29 @@ describe('the measured 30.08 refusal multiplication', () => {
     windowsHide: true,
   })
 
+  // CI checks out with fetch-depth 2, so this range is not a range there and
+  // the replay dies on "fatal: Invalid revision range" — MEASURED on run
+  // 33400556465, which reddened for the checkout and not for the code. Like
+  // the dispositions and four-eyes-artefact audits it SKIPS there and says
+  // why; every full clone runs it. Skipping is safe in exactly one direction:
+  // this case only ever recomputes a historical counter, so a shallow checkout
+  // loses coverage and can never manufacture a pass.
+  const historyReachable = checkpoints.every((head) => {
+    try {
+      gitHistory(['merge-base', '--is-ancestor', baseline, head])
+      return true
+    } catch {
+      return false
+    }
+  })
+  if (!historyReachable) {
+    console.warn(
+      'mechanism-review-guard: SKIPPED the 30.08 refusal replay — ' +
+        `${baseline.slice(0, 7)}..${checkpoints[checkpoints.length - 1].slice(0, 7)} is not in this ` +
+        'clone (shallow checkout); a full clone runs it',
+    )
+  }
+
   const replayAt = (head) => {
     const scriptFiles = readdirSync(repoPath('scripts'))
     const commits = parseRangeLog(gitHistory(mechanismLogCommand(baseline, head))).map((commit) => {
@@ -221,7 +244,7 @@ describe('the measured 30.08 refusal multiplication', () => {
     return { pendingCommits, records, head }
   }
 
-  it('replays 4 → 30 → 40 before scoping, then 3 → 3 → 12 with only read contributions charged', () => {
+  it.skipIf(!historyReachable)('replays 4 → 30 → 40 before scoping, then 3 → 3 → 12 with only read contributions charged', () => {
     const replays = checkpoints.map(replayAt)
     const count = (replay, reviewScope) => evaluateMechanismReview({
       baseline,
