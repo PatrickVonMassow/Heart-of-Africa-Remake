@@ -180,15 +180,12 @@ Die Ursache findest du durch **Zerlegen**, nicht durch Wiederholen.
   → *Prompt:* „Frag vor jeder Runde: **Hat sich etwas bewegt außer der Zählung?** Bleibt der
   Umfang, ist der Gegenstand zu groß — **teile das Ticket und arbeite jedes Stück für sich ab**.“
 
-- **Die Sperre wächst beim Abtragen.** Ein Veto wird gegen die **Datei** gebucht statt gegen den
-  Befund und sperrt jeden Beitrag, der sie anfasst — auch die, die es nie gelesen hat. Wer den
-  Befund behebt, muss dieselbe Datei anfassen und schuldet dadurch wieder eine Gegenlesung.
-  → *Prompt:* „Buch ein Veto gegen den **Befund**, nicht gegen die Datei, und unterscheide, was
-  eine Gegenlesung **gelesen** hat, von dem, was nur dieselbe Datei berührte. Quittiere eine
-  Reparaturkette am **Endzustand** als einen Beitrag, nicht Schritt für Schritt. Und gib der
-  Sperre einen **Ausgang**: Erzeugt das Beheben laufend neue Befunde derselben Datei, wird das
-  ein eigenes Ticket, statt die Arbeit anzuhalten.“ *(Ein ehrliches Veto darf das nie billiger
-  machen — es geht um den Weg zu null, nicht um Nachsicht.)*
+- **Die Sperre wächst beim Abtragen.** Das Veto gilt der **Datei** statt dem Befund und sperrt
+  jeden Beitrag, der sie anfasst; wer den Befund behebt, fasst sie an und schuldet neu.
+  → *Prompt:* „Buch ein Veto gegen den **Befund**, nicht die Datei, und trenne, was eine
+  Gegenlesung **gelesen** hat, von dem, was sie nur berührte. Quittiere eine Reparaturkette am
+  **Endzustand** als einen Beitrag. Erzeugt das Beheben laufend neue Befunde derselben Datei,
+  wird das ein eigenes Ticket, statt die Arbeit anzuhalten — Nachsicht ist es nie.“
 
 - **Gebaut — und nie in Betrieb genommen.** Die Ausnahme steht im Fließtext statt in der Datei,
   die das Werkzeug liest; oder das Tor urteilt richtig, nur fährt es kein Weg des Projekts.

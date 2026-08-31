@@ -223,7 +223,17 @@ export const LIMITS = {
   // cut without dropping a claim. Net +6 lines / +57 words against the measured 489 / 4405, and
   // the ceilings move by exactly that to 495 / 4462, with zero slack. Not escalated to the user,
   // under the same general withdrawal of 10.08.2026.
-  maxLines: 495,
+  // 31.08.2026: the debt-that-grows-while-paid lesson — a veto booked against the FILE blocks
+  // every contribution that touched it, and answering one means touching it again — measured
+  // 4 → 30 → 40 blocked contributions in a single session and has no entry here. Written first
+  // at nine lines with a three-clause risk half and a four-sentence prompt, then cut to six with
+  // a two-clause risk half and the caveat folded into the prompt's last clause, as the shortening
+  // step this rule demands. The neighbouring entries were read for redundancy: the closest is
+  // "Runde um Runde, ohne näher zu kommen", which is about a review that never converges on ONE
+  // artefact, not about a verdict spreading to artefacts it never read; neither could be cut
+  // without dropping a claim. Net +7 lines / +85 words against the measured 495 / 4462, and the
+  // ceilings move by exactly that to 502 / 4547, with zero slack.
+  maxLines: 502,
   // EXACT FIT, not headroom — corrected 30.07.2026 after the four-eyes review
   // pointed out that this comment had long stopped describing the numbers. The
   // rule above ("raised only by the measured size of genuinely new tips")
@@ -410,7 +420,10 @@ export const LIMITS = {
   // 28.08.2026: the self-measuring-monitor lesson justified beside maxLines measures 4405 words
   // after its review correction, so this ceiling follows its +64-word net exactly; the guide keeps
   // no unearned headroom.
-  maxWords: 4462,
+  // 31.08.2026: the debt-that-grows-while-paid lesson justified beside maxLines measures 4547
+  // words after its shortening, so this ceiling follows its +85-word net exactly; the guide keeps
+  // no unearned headroom.
+  maxWords: 4547,
   // A pitfall entry = the risk lines plus its prompt. Anything longer is a
   // story, not a tip.
   maxEntryLines: 11,
