@@ -108,6 +108,45 @@ put it is the mistake this line exists to stop.
   unmeasured red is the one failure mode the whole table exists to prevent.
   Bundle: Testinfrastruktur.
 
+- [ ] 1019. A do-not-merge verdict spreads to every contribution that touched the same file, so
+  the four-eyes debt grows faster than a session can pay it off (measured 30.08.2026 on `main`,
+  one session long, evidenced in `.claude/mechanism-reviews.jsonl` between a1d4bf3 and 8249b20).
+  THE MEASUREMENT, in three readings of the same counter. Before point 1016 landed at caafe03,
+  `mechanism-review-guard` named FOUR open contributions. After two honest do-not-merge verdicts
+  entered in that same session — one on 3e6ffd2 for `scripts/render-verify-core.test.mjs`, one on
+  ce1fcfe for `scripts/render-verify-core.mjs` plus `.claude/mechanism-reviews.jsonl` — it named
+  THIRTY, with 38 runnable rounds. After eight repair commits it named FORTY, with 51 rounds.
+  Every one of those eight commits closed a real defect the other vendor had found; the counter
+  rose monotonically anyway, and the repair-loop guard stopped the run at nine consecutive
+  commits, which was correct.
+  THE TWO CAUSES ARE SEPARATE AND BOTH STRUCTURAL. First, a verdict is recorded against a FILE,
+  so it poisons every contribution touching that file until a clean counter-read stands on a
+  successor commit — and `render-verify-core.test.mjs` is the hottest file in the repository. 25
+  of those 30 contributions have nothing to do with the finding; they are charged only for having
+  touched the file. Second, answering a finding on a hot file REQUIRES touching it, so the answer
+  owes a counter-read of its own, and a counter-read of that file has so far always found
+  something. Eight rounds, eight genuine findings, a debt that rose while it was being paid.
+  WHAT IS NOT IN QUESTION: whether the findings were real. All eight were, and nothing here may
+  make an honest do-not-merge cheaper to ignore or easier to wave through — the gate blocked
+  exactly what it exists to block.
+  FINAL STATE: a debt that is being paid can reach zero. The guard distinguishes a contribution
+  the verdict actually READ from one that only co-touched the file, and says which it is rather
+  than charging both alike; a chain of repair commits answering ONE finding is quittanced as ONE
+  contribution against the file's END STATE rather than step by step; and a finding whose answer
+  keeps generating fresh findings on the same file leaves the gate as its own work-order point
+  instead of holding the batch shut. Whichever of the three is built, the commit says WHY the
+  other two were not, because each one loosens a different edge of the gate.
+  VERIFIABLE: a unit case replaying the measured ledger between a1d4bf3 and 8249b20 and asserting
+  the counter it produces before and after the change, so the 4 → 30 → 40 growth is a regression
+  test and not an anecdote; a case proving a co-touching contribution is reported as co-touching
+  and a read one as read, mutation-checked; a case proving an unanswered do-not-merge on a file
+  the session never repaired still blocks, at full strength. Plus `npm run test:unit`, lint,
+  build.
+  Criticality: high — it is the gate that stops the batch from ending a turn, and both directions
+  are expensive: left as it is it can shut the run indefinitely, loosened carelessly it excuses
+  the counter-read that the two verdicts of 30.08. correctly demanded.
+  Bundle: Modell & Wächter.
+
 - [ ] 686. The taught language is five concepts, and the chief's message is four of them (user
   13.08.2026, playing the deployed communication slice).
   The user played the deployed communication slice on 13.08.2026 with the debug
@@ -13863,42 +13902,3 @@ to land than a mechanism that needs a review.
   and the shortcut it invites — assuming the other lane — writes exactly the charge the table
   forbids.
   Bundle: Testinfrastruktur.
-
-- [ ] 1019. A do-not-merge verdict spreads to every contribution that touched the same file, so
-  the four-eyes debt grows faster than a session can pay it off (measured 30.08.2026 on `main`,
-  one session long, evidenced in `.claude/mechanism-reviews.jsonl` between a1d4bf3 and 8249b20).
-  THE MEASUREMENT, in three readings of the same counter. Before point 1016 landed at caafe03,
-  `mechanism-review-guard` named FOUR open contributions. After two honest do-not-merge verdicts
-  entered in that same session — one on 3e6ffd2 for `scripts/render-verify-core.test.mjs`, one on
-  ce1fcfe for `scripts/render-verify-core.mjs` plus `.claude/mechanism-reviews.jsonl` — it named
-  THIRTY, with 38 runnable rounds. After eight repair commits it named FORTY, with 51 rounds.
-  Every one of those eight commits closed a real defect the other vendor had found; the counter
-  rose monotonically anyway, and the repair-loop guard stopped the run at nine consecutive
-  commits, which was correct.
-  THE TWO CAUSES ARE SEPARATE AND BOTH STRUCTURAL. First, a verdict is recorded against a FILE,
-  so it poisons every contribution touching that file until a clean counter-read stands on a
-  successor commit — and `render-verify-core.test.mjs` is the hottest file in the repository. 25
-  of those 30 contributions have nothing to do with the finding; they are charged only for having
-  touched the file. Second, answering a finding on a hot file REQUIRES touching it, so the answer
-  owes a counter-read of its own, and a counter-read of that file has so far always found
-  something. Eight rounds, eight genuine findings, a debt that rose while it was being paid.
-  WHAT IS NOT IN QUESTION: whether the findings were real. All eight were, and nothing here may
-  make an honest do-not-merge cheaper to ignore or easier to wave through — the gate blocked
-  exactly what it exists to block.
-  FINAL STATE: a debt that is being paid can reach zero. The guard distinguishes a contribution
-  the verdict actually READ from one that only co-touched the file, and says which it is rather
-  than charging both alike; a chain of repair commits answering ONE finding is quittanced as ONE
-  contribution against the file's END STATE rather than step by step; and a finding whose answer
-  keeps generating fresh findings on the same file leaves the gate as its own work-order point
-  instead of holding the batch shut. Whichever of the three is built, the commit says WHY the
-  other two were not, because each one loosens a different edge of the gate.
-  VERIFIABLE: a unit case replaying the measured ledger between a1d4bf3 and 8249b20 and asserting
-  the counter it produces before and after the change, so the 4 → 30 → 40 growth is a regression
-  test and not an anecdote; a case proving a co-touching contribution is reported as co-touching
-  and a read one as read, mutation-checked; a case proving an unanswered do-not-merge on a file
-  the session never repaired still blocks, at full strength. Plus `npm run test:unit`, lint,
-  build.
-  Criticality: high — it is the gate that stops the batch from ending a turn, and both directions
-  are expensive: left as it is it can shut the run indefinitely, loosened carelessly it excuses
-  the counter-read that the two verdicts of 30.08. correctly demanded.
-  Bundle: Modell & Wächter.

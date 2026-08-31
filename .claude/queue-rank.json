@@ -1027,12 +1027,6 @@
       "origin": "machine",
       "place": "last"
     },
-    "1016": {
-      "at": "2026-08-30T05:15:26.440Z",
-      "why": "Der Punkt sperrt das Bild-Tor fuer JEDE Landung: vier Laeufe gelten als Abstuerze, obwohl sie ihre Befunde gemeldet haben, und ein Absturz laesst sich von niemandem schliessen. Solange er steht, kann kein Punkt gruen landen, auch nicht die Kommunikations-Kette.",
-      "origin": "machine",
-      "place": "ahead"
-    },
     "1017": {
       "at": "2026-08-30T06:22:12.781Z",
       "why": "Der Punkt ist Aufraeumarbeit an der Buchungstabelle, keine Sperre. Drei Haelften — 603, 938 und die WebGL-Haelfte von 698 — stehen bereits. Der Fehlgriff vom 30.08. zeigt, worauf er achten muss: Vier Haelften fuer die Berichts-Suite wurden geschrieben und IN DERSELBEN STUNDE wieder zurueckgezogen, weil die Meldungen auf jener Bahn gar nicht auftreten — ein schlichter Testaufruf laeuft auf der Alltagsbahn, und das ist WebGPU. Er laeuft hinter der Freigabe, anders als 1016 und 1018.",
@@ -1044,10 +1038,51 @@
       "why": "Eine Buchung liest hier Text, der ihr vielleicht nicht gehoert — und eine Buchung, die einen ungemessenen Befund entschuldigt, ist genau der Fehler, gegen den die ganze Tabelle existiert. Der Gegenleser hat beide Rateversuche abgelehnt.",
       "origin": "machine",
       "place": "ahead"
+    },
+    "1019": {
+      "at": "2026-08-31T08:10:08.500Z",
+      "why": "It shuts every turn end of every session, the release closing run included, so deferring it behind 174 defers 174 itself.",
+      "origin": "machine",
+      "place": "ahead"
     }
   },
+  "boundary": {
+    "at": "2026-08-21T00:55:14.962Z",
+    "points": [
+      336,
+      553,
+      596,
+      633,
+      659,
+      660,
+      663,
+      686,
+      687,
+      688,
+      689,
+      690,
+      691,
+      692,
+      708,
+      715,
+      719,
+      733,
+      735,
+      736,
+      738,
+      739,
+      746,
+      747,
+      750,
+      759,
+      760,
+      762,
+      764
+    ],
+    "why": "The order standing in front of the release today is the arrangement that predates this rule; the four machine-filed points that had ranked themselves there were moved behind 174 first"
+  },
   "settled": {
-    "at": "2026-08-30T05:53:10.711Z",
+    "at": "2026-08-31T08:10:08.511Z",
     "points": [
       174,
       184,
@@ -1391,44 +1426,9 @@
       1013,
       1014,
       1015,
-      1016,
       1017,
-      1018
+      1018,
+      1019
     ]
-  },
-  "boundary": {
-    "at": "2026-08-21T00:55:14.962Z",
-    "points": [
-      336,
-      553,
-      596,
-      633,
-      659,
-      660,
-      663,
-      686,
-      687,
-      688,
-      689,
-      690,
-      691,
-      692,
-      708,
-      715,
-      719,
-      733,
-      735,
-      736,
-      738,
-      739,
-      746,
-      747,
-      750,
-      759,
-      760,
-      762,
-      764
-    ],
-    "why": "The order standing in front of the release today is the arrangement that predates this rule; the four machine-filed points that had ranked themselves there were moved behind 174 first"
   }
 }
