@@ -1418,7 +1418,7 @@ keinen Träger hat. Gebucht als Punkt 956.
 
 ## Anhang A — Maschinell gepflegte Quellen-Übersicht
 
-Zuletzt aktualisiert: Montag, 31.08.2026, 18:37 · Quellen-Fingerprint: `aefad85ae5f1…`
+Zuletzt aktualisiert: Dienstag, 01.09.2026, 00:44 · Quellen-Fingerprint: `d8adcd7da67c…`
 
 Spalten heuristisch aus den Quellen abgeleitet (Anläufe = distinkte Datumsnennungen im Memory;
 Maßnahme = Guard-Skripte mit Namens-Treffer). Die inhaltliche Bewertung gehört der Prosa oben.
@@ -1484,7 +1484,6 @@ Maßnahme = Guard-Skripte mit Namens-Treffer). Die inhaltliche Bewertung gehört
 | Direct pushes to main are approved despite GitHub's branch protection — never ask about switching to pull requests again | 1 | niedrig | push-arrival-guard.mjs | ✔ Mechanismus |
 | Order the TASKS/queue so known-bug fixes + user-requested extensions come BEFORE the big bug-FINDING / QA-framework tickets | 1 | niedrig | queue-order-guard.mjs | ✔ Mechanismus |
 | Console warning \"THREE.Clock deprecated, use THREE.Timer\" comes from R3F v9 internals — fix by updating @react-three/fiber once it migrates to Timer | 1 | niedrig | — (Regel/Memory) | ◐ Regel |
-| User ruling 24.08.2026: a stated recommendation on a VDZK card authorizes deciding by it, executing it, and closing it with what/why/veto recorded; no grant for tags, publishes, force-pushes, user-data deletion, or unrecommended genuine choices | 2 | mittel | decision-card-guard.mjs | ✔ Mechanismus |
 | Choose the browser-regression tier per task at my discretion (Vitest-only / Vitest+small / Vitest+large); the closing cycle ALWAYS runs Vitest+large | 1 | niedrig | — (Regel/Memory) | ◐ Regel |
 | Priority tiers for picking the next point — token-reduction work first, then the communication mechanic, then everything else; open branches before a fresh point | 2 | mittel | lock-release-hook.mjs, queue-order-guard.mjs | ✔ Mechanismus |
 | A declared \"intended residual\" is where real defects hide — legitimate only when the information to close it is genuinely not at hand | 1 | niedrig | — (Regel/Memory) | ◐ Regel |
@@ -1497,6 +1496,7 @@ Maßnahme = Guard-Skripte mit Namens-Treffer). Die inhaltliche Bewertung gehört
 | Write about this project as a participant (\"wir/unser\"), never as an outside observer (\"euer Mechanismus\", \"die ihr abschaffen wollt\") | 1 | niedrig | — (Regel/Memory) | ◐ Regel |
 | a large point that stops converging is cut into smaller standalone points and each is worked on its own — general procedure, no confirmation needed | 1 | niedrig | point-proof-guard.mjs | ✔ Mechanismus |
 | Never access paths outside the project directory unless strictly necessary (e.g. the global ~/.claude rules); keep local non-versioned artefacts in a git-ignored local/ folder inside the repo | 1 | niedrig | — (Regel/Memory) | ◐ Regel |
+| a repeated Stop-guard refusal means my model of the state is wrong — re-measure, never answer it twice with the same words | 1 | niedrig | — (Regel/Memory) | ◐ Regel |
 | Release tags are re-pointed ONLY on the user's explicit request — never automatically after a fix; a cut vX.Y is frozen | 3 | mittel | — (Regel/Memory) | ◐ Regel |
 | TASKS.md and all new entries in it are written in English | 1 | niedrig | tasks-archive-guard.mjs, tasks-spec-guard.mjs | ✔ Mechanismus |
 | TASKS.md entries state the final correct target directly — never keep a 'first defined wrong, then clarified/corrected' trail in the spec | 1 | niedrig | batch-doctor-states.mjs, tasks-archive-guard.mjs, tasks-spec-guard.mjs | ✔ Mechanismus |
@@ -1519,10 +1519,10 @@ Maßnahme = Guard-Skripte mit Namens-Treffer). Die inhaltliche Bewertung gehört
 | A pending batch claim HOLDS THE LAUNCHER BACK — withdraw it whenever the claiming window is left unattended | 2 | mittel | clear-claim-guard.mjs | ✔ Mechanismus |
 | Multi-agent workflows eat the session/weekly limit fast — verify findings INLINE, keep fan-outs small, warn the user with a cost estimate before any big workflow | 3 | mittel | doc-budget-guard.mjs | ✔ Mechanismus |
 
-Erfasste Quellen: 93 Feedback-/Projekt-Memories · 57 Guard-/Hook-Skripte · 6 Revert-/Reapply-Commits · 118 Prozess-/Meta-TASKS-Punkte (davon 52 offen).
+Erfasste Quellen: 93 Feedback-/Projekt-Memories · 57 Guard-/Hook-Skripte · 6 Revert-/Reapply-Commits · 120 Prozess-/Meta-TASKS-Punkte (davon 54 offen).
 
-<!-- RETRO-FINGERPRINT: aefad85ae5f102a132bb5971d027efe70f9cbba1cdf84d799013d5c8ab7daf47 -->
-<!-- RETRO-LAST-REFRESHED: 2026-08-31T16:37:50.754Z -->
+<!-- RETRO-FINGERPRINT: d8adcd7da67c25cf5caebb0bed78789f11390c93781dc45a9423e2a91e1c6c23 -->
+<!-- RETRO-LAST-REFRESHED: 2026-08-31T22:44:47.656Z -->
 <!-- AUTO-GENERATED:END -->
 
 ### 3.111 Ein Erfolg ist kein Beweis für den Weg, auf dem er zustande kam
@@ -5030,3 +5030,33 @@ Uhr —, ist die Toleranz überflüssig; wo sie es nicht können, gehört sie an
 Messung des langsamsten erlaubten Starts geschrieben und nicht an eine runde
 Zahl. Und eine Prüfung, deren Urteil dauerhaft ist, schuldet einen Weg, der es
 zurücknimmt.
+
+### 3.223 Zehnmal dieselbe Ablehnung beantwortet — Stillstand, der wie Betrieb aussieht
+
+Am Abend des 31.08.2026 standen fünf Stop-Wächter gleichzeitig rot. Ein roter
+Stop-Wächter beendet den Zug nicht, er startet ihn neu und hängt die Feststellung
+an. Die Sitzung hat darauf zehnmal hintereinander eine neue Abschlusszeile
+geschrieben — „es läuft alles" — statt eine einzige der Feststellungen zu
+reparieren. Jede dieser Zeilen ging an den Nutzer; er hat die Schleife beendet,
+indem er fragte, warum er zehn fast gleiche Antworten bekommt.
+
+Zwei Ursachen liefen zusammen. Die mechanische: Nichts in der Kette zählt, wie
+oft DIESELBE unbehandelte Feststellung abgelehnt wird, und nichts zwingt den Zug,
+die Ablehnung nach der zweiten Wiederholung dem Nutzer als Befund zu melden statt
+eine weitere Antwort zu schreiben. Die inhaltliche wiegt schwerer: Die Sitzung
+hielt an einer veralteten Tatsache fest — ein Stand-down-Hinweis aus dem
+Sitzungsstart, dessen besitzende Sitzung längst gestorben war —, während der Text
+des Wächters direkt daneben „You hold the batch lock" sagte. Zwei lebende Quellen
+widersprachen sich, und der Widerspruch wurde als Rauschen gelesen statt als
+Messauftrag.
+
+Bemerkenswert ist, wie gut dieser Stillstand getarnt war: Die Sitzung war die
+ganze Zeit aktiv, antwortete, formulierte, hielt ihre Zeitstempel-Regel ein. Von
+außen sah es wie Arbeit aus. Die Notstands-Erkennung, die ruhige Wedges findet,
+hätte hier nichts gefunden — dieselbe Lücke, die Punkt 958 aus der anderen
+Richtung beschreibt.
+
+**Lehre:** Eine wiederholte Ablehnung ist keine Wiederholung, sondern ein Beweis
+— nämlich dafür, dass die Antwort nicht die Reparatur ist. Ein Wächter spricht
+mit DIESER Sitzung; behauptet er etwas über sie, das sie selbst anders glaubt,
+ist das zu messen und nicht zu übergehen. Gebucht als Punkt 1032.

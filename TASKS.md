@@ -14278,3 +14278,89 @@ to land than a mechanism that needs a review.
   failure direction is a real defect standing in the way of unrelated work while a genuinely
   charged red reads as unowned.
   Bundle: Testinfrastruktur.
+
+- [ ] 1032. A blocking Stop guard can refuse the same finding forever, and every refusal spends a
+  user-visible answer (measured 31.08.2026, this session).
+  WHAT HAPPENED: five Stop guards stood red at once. A red Stop guard does not end the turn; it
+  restarts it with the finding attached. The session answered each refusal with a fresh closing
+  line instead of repairing anything, so the same five findings were refused ten times in a row
+  and the user read ten near-identical replies before asking what was going on. Nothing in the
+  chain noticed that the SAME unaddressed finding was being refused again, and nothing forced the
+  session to surface the refusal to the user instead of writing another closing line.
+  SECOND HALF: the session held a stale belief — a SessionStart stand-down notice whose owning
+  session had already died — while `batch-progress-guard`'s own text said "You hold the batch
+  lock". Two live sources contradicted each other and the contradiction was read as noise. A
+  guard that contradicts the session's belief is a measurement order.
+  WHY IT BLOCKS: an unattended session in this state burns turns without progress and, when a
+  user is present, floods the conversation. It is the no-standstill order's failure mode with the
+  standstill hidden behind activity.
+  FINAL STATE: (1) consecutive Stop refusals carrying the same finding signature are counted; from
+  the second identical refusal the turn is required to report the refusal to the user as a finding
+  rather than emit another closing line, and the count is visible in the refusal text itself;
+  (2) the counter survives the refusal loop it is meant to break — it is not stored in the reply;
+  (3) a guard whose text asserts a session-identity fact that the session's own recorded state
+  contradicts says so explicitly, so the contradiction cannot be read as repetition.
+  VERIFIABLE: unit cases over the counter proving a repeated identical finding escalates on the
+  second occurrence and that a DIFFERENT finding resets it; a case proving the escalation text
+  names the finding and the count; a drill that runs a turn end against a deliberately unfixable
+  guard and asserts the second turn breaks to the user instead of looping. Plus `npm run
+  test:unit`, lint, build.
+  Criticality: high — it is the turn-end chain itself, and its failure direction is an unattended
+  session that spends its whole budget refusing.
+  Bundle: Session- & Repo-Hygiene.
+
+- [ ] 1033. The free lock lands silently in the window the user is sitting at (measured
+  31.08.2026, this session).
+  WHAT HAPPENED: `batch-progress-guard` runs at the END OF EVERY TURN and calls the atomic
+  acquire. When the owning session dies, the next Stop run of ANY live session takes the batch.
+  Measured: the previous owner claimed at 22:52:50 and died around 23:00; at 23:03:02 the lock
+  named the INTERACTIVE session the user was chatting in, which had never asked for it and whose
+  own SessionStart notice still said STAND DOWN. The session learned about it only from a
+  subordinate clause inside a guard's refusal text, and kept obeying the stale stand-down.
+  WHY IT BLOCKS: the acquire is correct in its intent — the batch must never be ownerless — but
+  it cannot tell an unattended worker from the window a person is talking to. The user's window
+  is then driven into merges, dashboard writes and TASKS edits it was never asked to do, and the
+  reservation path of point 395 does not help because it only fires for a claim the user made.
+  FINAL STATE: (1) a session that did not request the batch and is demonstrably interactive does
+  not silently acquire a freed lock; it either asks or takes it only after saying so in the
+  answer, and the launcher's fresh worker remains the normal successor; (2) when a session DOES
+  become the owner without asking, that fact is stated as its own visible line, never as a
+  subordinate clause in another guard's refusal; (3) an unattended session is unaffected — the
+  never-ownerless guarantee holds for every path where nobody is sitting.
+  VERIFIABLE: unit cases over the acquire decision proving an interactive non-claimant does not
+  take a freed lock while an unattended session does; a case proving the ownership change is
+  announced on its own; a drill that kills an owner beside a live interactive session and asserts
+  the launcher's worker, not that window, becomes the successor. Plus `npm run test:unit`, lint,
+  build.
+  Criticality: high — it is the batch singleton, and its failure direction hands a user's
+  interactive window a role it never accepted.
+  Bundle: Session- & Repo-Hygiene.
+
+- [ ] 1034. The four-eyes gate prints a repair command its own planner refuses (measured
+  01.09.2026, this session).
+  WHAT HAPPENED: `mechanism-review-guard` blocked every merge on thirteen landed contributions
+  and named, for each, the exact command that would clear it — for example
+  `review-sol.mjs --sha e2550f0 --since e2550f0~1 --pass 5`, "the review was split into 13
+  passes over the FILE SET and only 4 are on record". Running that command is refused:
+  `review-sol` answers "it fits in one round", so pass 5 does not exist. Measured on three of
+  the thirteen: `e2550f0` and `b258a3e` fit in ONE round where the guard demands passes 5-13
+  of thirteen, and `ed2df24` splits into THREE where the guard demands nine more of thirteen.
+  WHY IT BLOCKS: the guard is the gate in front of every merge in the batch, and the only path it
+  offers out is a command that does not run. A session that follows the refusal literally cannot
+  satisfy it, and the refusal repeats unchanged at the next turn end — the standstill class of
+  retrospective §3.223, this time caused by the gate rather than by the session. The clearing
+  path does exist (the scoped 1/1 round the planner really offers), but the guard names a
+  different one, so nobody walks it.
+  FINAL STATE: (1) the guard derives the pass numbers it prints from the SAME planner that would
+  run them, so a printed command is runnable by construction; (2) where the two disagree, the
+  planner wins and the guard says how many passes that range really has; (3) a recorded scoped
+  round clears the contribution it read, and the guard's own refusal text names that round.
+  VERIFIABLE: a unit case that takes a contribution whose range fits in one round and asserts the
+  guard prints `--pass 1` (or no pass flag) rather than an index the planner rejects; a case
+  over a range that really splits, asserting the printed count equals the planner's; a drill that
+  runs the printed command for a fixture contribution and asserts it is accepted rather than
+  refused. Plus `npm run test:unit`, lint, build.
+  Criticality: high — it is the gate in front of every merge, and its failure direction is a
+  batch that cannot land anything while every guard reports itself working.
+  Bundle: Session- & Repo-Hygiene.
+

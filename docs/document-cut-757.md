@@ -89,7 +89,7 @@ tokenizer, not `wc`, because a ceiling is only confirmed against the counter tha
 | document | landed | ceiling | headroom |
 | --- | --- | --- | --- |
 | `CLAUDE.md` | 193 lines / 1,352 words / 9,969 B | 193 / 1,363 | **0 lines**, 11 words |
-| `MEMORY.md` | 50 lines / 789 words / 6,287 B | 50 / 789 | **0 lines**, 0 words |
+| `MEMORY.md` | 50 lines / 784 words / 6,223 B | 50 / 789 | **0 lines**, 5 words |
 | global `CLAUDE.md` | 6 lines / 33 words / 236 B | 6 / 36 | **0 lines**, 3 words |
 
 They hold, but two of them hold with nothing to spare, and that is the finding
@@ -195,7 +195,7 @@ restated. That coupling belongs to the budget decision and is recorded there.
 - `MEMORY.md` :: U52 container-work index duplicate :: COVERED -> container-ask-guard
 - `MEMORY.md` :: U52 chat-timestamp index duplicate :: COVERED -> timestamp-guard
 - `MEMORY.md` :: U52 board-card index duplicates :: COVERED -> dashboard-card-topic-guard
-- `MEMORY.md` :: U52 queue and bundle index duplicates :: COVERED -> queue-order-guard
+- `MEMORY.md` :: U52 queue and bundle index duplicates :: COVERED -> queue-order-guard + bundle-first-guard
 - `MEMORY.md` :: U52 preparation index duplicate :: COVERED -> prep-guard
 - `MEMORY.md` :: U52 retrospective index duplicate :: COVERED -> retro-currency-guard
 - `MEMORY.md` :: U53 effort-high-for-implementation hook :: MOVED -> ~/.claude/projects/-workspace-hoa/memory/effort-high-for-implementation.md
@@ -213,4 +213,4 @@ restated. That coupling belongs to the budget decision and is recorded there.
 - `global-CLAUDE.md` :: U63 phased release QA rule :: MOVED -> docs/maximum-qa.md
 - `global-CLAUDE.md` :: U63 fan-out budget rule :: MOVED -> ~/.claude/projects/-workspace-hoa/memory/workflows-token-budget.md
 - `global-CLAUDE.md` :: U64 judgment, confirmation and faithful-reporting rules :: MOVED -> CLAUDE.md
-- `CLAUDE.md §budgets` :: U66 every cut lands with its twin and lowered ceiling :: COVERED -> rule-echo-guard
+- `CLAUDE.md §budgets` :: U66 every cut lands with its twin and lowered ceiling :: COVERED -> rule-echo-guard + doc-budget-guard
