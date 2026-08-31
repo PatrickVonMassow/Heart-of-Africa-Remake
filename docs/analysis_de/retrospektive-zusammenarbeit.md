@@ -1418,7 +1418,7 @@ keinen Träger hat. Gebucht als Punkt 956.
 
 ## Anhang A — Maschinell gepflegte Quellen-Übersicht
 
-Zuletzt aktualisiert: Montag, 31.08.2026, 18:01 · Quellen-Fingerprint: `0f3a17ead4f4…`
+Zuletzt aktualisiert: Montag, 31.08.2026, 18:37 · Quellen-Fingerprint: `aefad85ae5f1…`
 
 Spalten heuristisch aus den Quellen abgeleitet (Anläufe = distinkte Datumsnennungen im Memory;
 Maßnahme = Guard-Skripte mit Namens-Treffer). Die inhaltliche Bewertung gehört der Prosa oben.
@@ -1521,8 +1521,8 @@ Maßnahme = Guard-Skripte mit Namens-Treffer). Die inhaltliche Bewertung gehört
 
 Erfasste Quellen: 93 Feedback-/Projekt-Memories · 57 Guard-/Hook-Skripte · 6 Revert-/Reapply-Commits · 118 Prozess-/Meta-TASKS-Punkte (davon 52 offen).
 
-<!-- RETRO-FINGERPRINT: 0f3a17ead4f40f26ce552752ac3c2e695fc388547775d5c404d29b7065904d22 -->
-<!-- RETRO-LAST-REFRESHED: 2026-08-31T16:01:31.464Z -->
+<!-- RETRO-FINGERPRINT: aefad85ae5f102a132bb5971d027efe70f9cbba1cdf84d799013d5c8ab7daf47 -->
+<!-- RETRO-LAST-REFRESHED: 2026-08-31T16:37:50.754Z -->
 <!-- AUTO-GENERATED:END -->
 
 ### 3.111 Ein Erfolg ist kein Beweis für den Weg, auf dem er zustande kam
@@ -5001,3 +5001,32 @@ wirkungslos — `not.toContain(expect.stringContaining(…))` vergleicht Element
 kann also nicht fehlschlagen. Gefunden hat es der Prüfer, nicht ich. Auch hier
 gilt derselbe Satz in eigener Sache: Ein Beweis, der den Gegenstand nachbaut
 statt ihn aufzurufen, beweist die eigene Absicht — und nichts sonst.
+
+### 3.222 Zwei Sekunden Toleranz entschieden, ob der Stapel übergeben darf
+
+Am 31.08.2026 gegen 18:1x weigerte sich die Punktgrenze, den Kontext-Handover zu
+committen: »the launcher is unknown«. Der Launcher lief nachweislich — pid 1820,
+gestartet 09:15, letzter Tick 18:09, und `batch-launcher --status` meldete in
+derselben Minute `ready`. Die Ursache war eine Zahl. `classifyDaemonRecord`
+vergleicht die Startzeit, die der Daemon sich selbst in seinen Datensatz
+geschrieben hat, mit der Startzeit, die das Betriebssystem für dieselbe pid
+meldet, und nennt jede Abweichung über zwei Sekunden eine wiederverwendete pid.
+Gemessen wurden 2009 Millisekunden: Auf einer belasteten Maschine braucht der
+Daemon zwischen seinem Start und dem Schreiben seines Datensatzes länger als die
+Toleranz erlaubt.
+
+Das Bösartige daran ist die Dauerhaftigkeit. Der Datensatz wird einmal
+geschrieben, also liest sich ein gesunder Launcher von da an für immer als
+fremder Prozess, und `--start` heilt es nicht: Es findet einen lebenden
+Datensatz und berichtet ihn bloß. Betroffen ist ausgerechnet der eine Weg, der
+nie blockieren darf — eine Sitzung an ihrer Wassermarke kann dann weder
+übergeben noch aufhören noch billig weiterarbeiten. Repariert wurde es von Hand
+mit `--stop` und `--start`; gebucht als Punkt 1027.
+
+**Lehre:** Eine Identitätsprüfung, die zwei Zeitquellen vergleicht, misst die
+Differenz der Quellen mit, nicht nur die Identität. Wo beide Werte aus derselben
+Quelle stammen könnten — hier: die beobachtete Startzeit statt der eigenen
+Uhr —, ist die Toleranz überflüssig; wo sie es nicht können, gehört sie an eine
+Messung des langsamsten erlaubten Starts geschrieben und nicht an eine runde
+Zahl. Und eine Prüfung, deren Urteil dauerhaft ist, schuldet einen Weg, der es
+zurücknimmt.
