@@ -1415,7 +1415,7 @@ keinen Träger hat. Gebucht als Punkt 956.
 
 ## Anhang A — Maschinell gepflegte Quellen-Übersicht
 
-Zuletzt aktualisiert: Montag, 31.08.2026, 10:11 · Quellen-Fingerprint: `56df0cade7f8…`
+Zuletzt aktualisiert: Montag, 31.08.2026, 10:41 · Quellen-Fingerprint: `7db318b27d3c…`
 
 Spalten heuristisch aus den Quellen abgeleitet (Anläufe = distinkte Datumsnennungen im Memory;
 Maßnahme = Guard-Skripte mit Namens-Treffer). Die inhaltliche Bewertung gehört der Prosa oben.
@@ -1453,7 +1453,7 @@ Maßnahme = Guard-Skripte mit Namens-Treffer). Die inhaltliche Bewertung gehört
 | Work at High effort by default; the user reserves Extra high for research and design decisions, not implementation | 4 | hoch | — (Regel/Memory) | ◐ Regel |
 | Write idiomatic English in all English text (README, code comments, commit messages) — no German calques like 'stand' for a version | 1 | niedrig | — (Regel/Memory) | ◐ Regel |
 | Fable is NOT the default lane because its volume is the scarcest; difficulty is no reason for it either (since 18.08.2026 hard cases go straight to Sol), and review is cross-vendor, not Fable-by-default | 4 | hoch | — (Regel/Memory) | ◐ Regel |
-| Findings recorded by a session that could not write the work order — carry each into TASKS.md, then mark it drained | 35 | hoch | findings-guard.mjs | ✔ Mechanismus |
+| Findings recorded by a session that could not write the work order — carry each into TASKS.md, then mark it drained | 36 | hoch | findings-guard.mjs | ✔ Mechanismus |
 | A recurring lookup gets a script; never pull raw transcripts, listings, or logs into context to answer it | 1 | niedrig | — (Regel/Memory) | ◐ Regel |
 | Past the 150k context watermark, FINISH the step and hand over — never start a suite, an agent or a point after it; the user raised the cost twice (13.08. and 17.08.2026) | 2 | mittel | — (Regel/Memory) | ◐ Regel |
 | User 18.08.2026: hard, complex, error-prone and HIGH-criticality points are AUTHORED by GPT-5.6 Sol directly — Opus 5 authors only what is left, and Fable authors only a point that tags its lane or one the router escalates | 4 | hoch | — (Regel/Memory) | ◐ Regel |
@@ -1518,8 +1518,8 @@ Maßnahme = Guard-Skripte mit Namens-Treffer). Die inhaltliche Bewertung gehört
 
 Erfasste Quellen: 93 Feedback-/Projekt-Memories · 57 Guard-/Hook-Skripte · 6 Revert-/Reapply-Commits · 115 Prozess-/Meta-TASKS-Punkte (davon 49 offen).
 
-<!-- RETRO-FINGERPRINT: 56df0cade7f81433c6e6ce00010d751df59c2fac508b9fa566711c25dc113869 -->
-<!-- RETRO-LAST-REFRESHED: 2026-08-31T08:11:29.415Z -->
+<!-- RETRO-FINGERPRINT: 7db318b27d3cb2c9cdf93c0cd902fdbc6ebb58fafd9d8a46e25f219f7270aad8 -->
+<!-- RETRO-LAST-REFRESHED: 2026-08-31T08:41:01.062Z -->
 <!-- AUTO-GENERATED:END -->
 
 ### 3.111 Ein Erfolg ist kein Beweis für den Weg, auf dem er zustande kam
@@ -4863,3 +4863,30 @@ den ein Urteil wirklich GELESEN hat, und einem, der nur dieselbe Datei berührte
 abnimmt statt jeden Zwischenschritt einzeln. Beides steht als Punkt 1019 in der
 Arbeitsordnung; gebaut ist es noch nicht, und bis dahin bleibt dieser Zustand
 die teuerste Sperre des Batches.
+
+### 3.218 Die Prüfung kam, als das Korrigieren schon verboten war
+
+Am 31.08.2026 endete eine Sitzung an der Kontext-Wassermarke, genau nach
+Vorschrift: Der Zaun händigte den Wortlaut der Übergabekarte aus, die Karte
+wurde geschrieben und veröffentlicht, die Vorabprüfung meldete frei, und der
+Zaun wurde als letzte Repository-Aktion festgeschrieben. Erst danach beanstandete
+der Karten-Wächter die soeben geschriebene Karte: 94 Wörter gegen ein Budget von
+90, dazu ein fehlender Absatzumbruch. Die vorgeschriebene Behebung ist ein
+Veröffentlichen — also eine Mutation, und die verweigert der Zaun mit vollem
+Recht, weil ein stilles Löschen seines Markers am 13.08. jede Übergabe zunichte
+gemacht hatte.
+
+Damit standen zwei Mechanismen gegeneinander, und beide hatten recht. Der einzige
+Ausweg war, den Zaun zurückzuziehen, die Karte zu kürzen und ihn neu zu nehmen —
+für vier Wörter. Die Sitzung tat das zunächst NICHT und endete sechs Züge lang
+im Kreis: Jeder Zug meldete dieselben unerfüllbaren Beanstandungen, jeder kostete
+einen Aufruf, keiner bewegte etwas.
+
+**Die Lehre ist eine Reihenfolge, keine Regel: Wer einen Gegenstand prüft, muss
+das tun, solange sein Verfasser ihn noch ändern darf.** Der Zaun kennt diesen
+Moment — er händigt den Kartentext selbst aus —, und der Publish-Gate weist
+Strukturfehler bereits beim Schreiben zurück; nur das Längenbudget wandert an
+einen Wächter, der erst am Zugende spricht. Zwei billige Auswege stehen offen:
+die Kürze beim SCHREIBEN prüfen, oder einen Vorschlagstext aushändigen, der das
+Budget von sich aus einhält. Der heute ausgehändigte lag als einziger Absatz
+schon nahe an der Grenze, sodass jede ehrliche Ergänzung ihn darüberschob.

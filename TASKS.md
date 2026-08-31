@@ -13913,3 +13913,36 @@ to land than a mechanism that needs a review.
   and the shortcut it invites — assuming the other lane — writes exactly the charge the table
   forbids.
   Bundle: Testinfrastruktur.
+
+- [ ] 1020. The handover card is judged for length only after the fence has forbidden changing
+  it, so an honest card can never be corrected (measured 31.08.2026, 10:30–10:41, over six
+  turns that moved nothing).
+  THE SEQUENCE IS THE PRESCRIBED ONE, followed exactly: `batch-boundary.mjs --prepare --context`
+  hands out the WORDING of the handover card, `board.mjs none` writes and publishes it,
+  `guard-preflight --for answer` reports clear, and `batch-boundary.mjs --commit --context` runs
+  as the session's last repository action. ONLY THEN does `dashboard-conciseness-guard` fault the
+  card just written — 94 words against a 90-word budget, plus a missing paragraph break. Its
+  prescribed remedy is a republish, which is a mutation, and the fence refuses every mutation
+  after the commit, rightly: silently deleting that marker defeated every handover on
+  13.08.2026. The only door left is to withdraw the fence, shorten by four words and re-take it.
+  WHAT IT COST, measured: the session did not take that door at first and ended six turns in a
+  loop, each reporting the same unsatisfiable faults, each costing a call and none moving
+  anything. It also could not read its own CI state or measure the time for its reply, because
+  the fence refuses reads too once committed.
+  FINAL STATE: whatever judges the handover card speaks while its author may still change it.
+  The publish gate already refuses a card's STRUCTURE at write time; the length budget is the one
+  check that waits for the turn end, and it moves to the same place — or `--prepare` hands out a
+  wording that fits the budget by construction, which today's did not: it is a single paragraph
+  already near the limit, so any honest addition pushes it over. Whichever half is built, the
+  other is stated in the commit and left deliberately, because both cost little and only one is
+  needed. Nothing here weakens the fence: refusing a mutation after the commit stays exactly as
+  it is.
+  VERIFIABLE: a case that drives the whole prescribed sequence — prepare, write the card,
+  commit — and asserts that a card the length check would fault is refused at WRITE time, before
+  the fence closes; a case proving the wording `--prepare` hands out passes the length check with
+  room for one added sentence; and a case proving a post-commit mutation is still refused, at
+  full strength. Plus `npm run test:unit`, lint, build.
+  Criticality: medium — it costs no correctness and loses no work, but it puts a session into a
+  loop it cannot leave, at the one moment the session is most expensive.
+  Bundle: Chat & Tafel — it edits the board's card gate and the boundary's card wording, so it is
+  not worked beside another point touching the board publish path.
