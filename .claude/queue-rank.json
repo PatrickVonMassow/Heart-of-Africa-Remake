@@ -1033,12 +1033,6 @@
       "origin": "machine",
       "place": "last"
     },
-    "1018": {
-      "at": "2026-08-30T05:20:25.430Z",
-      "why": "Eine Buchung liest hier Text, der ihr vielleicht nicht gehoert — und eine Buchung, die einen ungemessenen Befund entschuldigt, ist genau der Fehler, gegen den die ganze Tabelle existiert. Der Gegenleser hat beide Rateversuche abgelehnt.",
-      "origin": "machine",
-      "place": "ahead"
-    },
     "1019": {
       "at": "2026-08-31T08:10:08.500Z",
       "why": "It shuts every turn end of every session, the release closing run included, so deferring it behind 174 defers 174 itself.",
@@ -1054,6 +1048,18 @@
     "1021": {
       "at": "2026-08-31T09:22:19.588Z",
       "why": "Behind the release, like every point filed from a user report that is not release-blocking; the workaround is a stamp re-measured just before the reply.",
+      "origin": "machine",
+      "place": "last"
+    },
+    "1022": {
+      "at": "2026-08-31T11:13:43.146Z",
+      "why": "Not release-blocking: the release order communication first, then 633, then 174 stands, and the brevity ceiling only mismeasures one document nobody is editing right now.",
+      "origin": "machine",
+      "place": "last"
+    },
+    "1023": {
+      "at": "2026-08-31T11:13:43.234Z",
+      "why": "Its cost is real but derived: the refusal is only reprinted while the four-eyes debt blocks turn ends, and point 1019 — already near the front — removes that blocking, so this shrinks to a readability fix behind the release order.",
       "origin": "machine",
       "place": "last"
     }
@@ -1094,7 +1100,7 @@
     "why": "The order standing in front of the release today is the arrangement that predates this rule; the four machine-filed points that had ranked themselves there were moved behind 174 first"
   },
   "settled": {
-    "at": "2026-08-31T09:22:19.596Z",
+    "at": "2026-08-31T11:13:43.242Z",
     "points": [
       174,
       184,
@@ -1439,10 +1445,11 @@
       1014,
       1015,
       1017,
-      1018,
       1019,
       1020,
-      1021
+      1021,
+      1022,
+      1023
     ]
   }
 }
