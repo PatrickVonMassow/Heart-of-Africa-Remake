@@ -1092,6 +1092,12 @@
       "why": "Es steht bei den anderen Prozessbefunden desselben Abends; die Wirkung ist eine zu weiche Freigabe, kein falsches Rot, und blockiert deshalb keinen Punkt vor ihm.",
       "origin": "machine",
       "place": "last"
+    },
+    "1031": {
+      "at": "2026-08-31T19:56:40.530Z",
+      "why": "Es blockiert die Bildpruefung jedes Punktes und steht deshalb bei den Prozessbefunden desselben Abends, nicht hinter der Veroeffentlichung.",
+      "origin": "machine",
+      "place": "last"
     }
   },
   "boundary": {
@@ -1130,7 +1136,7 @@
     "why": "The order standing in front of the release today is the arrangement that predates this rule; the four machine-filed points that had ranked themselves there were moved behind 174 first"
   },
   "settled": {
-    "at": "2026-08-31T17:39:02.365Z",
+    "at": "2026-08-31T19:56:40.539Z",
     "points": [
       174,
       184,
@@ -1485,7 +1491,8 @@
       1027,
       1028,
       1029,
-      1030
+      1030,
+      1031
     ]
   }
 }
