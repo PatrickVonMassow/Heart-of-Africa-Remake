@@ -1095,7 +1095,7 @@
     },
     "1031": {
       "at": "2026-08-31T19:56:40.530Z",
-      "why": "Es blockiert die Bildpruefung jedes Punktes und steht deshalb bei den Prozessbefunden desselben Abends, nicht hinter der Veroeffentlichung.",
+      "why": "Es blockiert die Bildpruefung jedes Punktes und gehoert der Sache nach zu den Prozessbefunden desselben Abends. Weil die Maschine es selbst eingetragen hat, steht es unter der Nutzerregel vom 20.08.2026 dennoch hinter der Veroeffentlichung — die Anhaengeposition ist die richtige, so dringend der beschriebene Block auch ist.",
       "origin": "machine",
       "place": "last"
     },
