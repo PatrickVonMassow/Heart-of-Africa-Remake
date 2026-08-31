@@ -1417,7 +1417,7 @@ keinen Träger hat. Gebucht als Punkt 956.
 
 ## Anhang A — Maschinell gepflegte Quellen-Übersicht
 
-Zuletzt aktualisiert: Montag, 31.08.2026, 11:22 · Quellen-Fingerprint: `2bc95713bfdd…`
+Zuletzt aktualisiert: Montag, 31.08.2026, 12:13 · Quellen-Fingerprint: `5b41eda229f2…`
 
 Spalten heuristisch aus den Quellen abgeleitet (Anläufe = distinkte Datumsnennungen im Memory;
 Maßnahme = Guard-Skripte mit Namens-Treffer). Die inhaltliche Bewertung gehört der Prosa oben.
@@ -1520,8 +1520,8 @@ Maßnahme = Guard-Skripte mit Namens-Treffer). Die inhaltliche Bewertung gehört
 
 Erfasste Quellen: 93 Feedback-/Projekt-Memories · 57 Guard-/Hook-Skripte · 6 Revert-/Reapply-Commits · 116 Prozess-/Meta-TASKS-Punkte (davon 50 offen).
 
-<!-- RETRO-FINGERPRINT: 2bc95713bfddf1f8b37312ea922bc064504e1425c48a53a0f2cd9c8d4c576c7d -->
-<!-- RETRO-LAST-REFRESHED: 2026-08-31T09:22:28.459Z -->
+<!-- RETRO-FINGERPRINT: 5b41eda229f289ef759fc98353f28e1d6fede0e0c1478b65b4e3b9cc17ce446e -->
+<!-- RETRO-LAST-REFRESHED: 2026-08-31T10:13:41.618Z -->
 <!-- AUTO-GENERATED:END -->
 
 ### 3.111 Ein Erfolg ist kein Beweis für den Weg, auf dem er zustande kam
@@ -4892,3 +4892,26 @@ einen Wächter, der erst am Zugende spricht. Zwei billige Auswege stehen offen:
 die Kürze beim SCHREIBEN prüfen, oder einen Vorschlagstext aushändigen, der das
 Budget von sich aus einhält. Der heute ausgehändigte lag als einziger Absatz
 schon nahe an der Grenze, sodass jede ehrliche Ergänzung ihn darüberschob.
+
+### 3.219 Wer gesperrt wird, bezahlt die Sperre in Kontext — und zwar nach Länge der Schuld
+
+Am 31.08.2026 hielt das Vier-Augen-Tor eine Sitzung an: 43 Beiträge ungelesen,
+fast alle wegen EINES ehrlichen Do-not-merge an einer heißen Datei. Das ist
+Abschnitt 3.217. Neu ist, was das Melden kostet. Der Wächter druckt bei jeder
+Verweigerung sein VOLLSTÄNDIGES Inventar — Commit für Commit, Datei für Datei,
+dazu die Gruppierung nach Verfasserschaft. Bei drei geblockten Zugenden war das
+dreimal dieselbe Liste. Der größte gemessene Einzelsprung des Sitzungskontexts
+betrug +27.140 Tokens in einem Zug; die Sitzung nahm ihre Grenze schließlich bei
+206.132 Tokens, 56.132 über der Decke.
+
+Die Rückkopplung ist das Eigentliche: Der Wächter sperrt, weil die Schuld groß
+ist, und die Meldung ist groß, WEIL die Schuld groß ist. Je näher eine Sitzung
+dem Punkt kommt, an dem sie die Schuld abtragen könnte, desto weniger Kontext
+bleibt ihr dafür übrig. Eine Sitzung, die nichts falsch macht, wird von der
+Diagnose ihres Problems aufgebraucht.
+
+**Die Lehre: Eine Verweigerung muss ihren Grund nennen, nicht ihren Bestand.**
+Ein Satz plus der eine Befund, der die Kette hält, plus der Befehl, der den Rest
+zeigt — das ist alles, was ein Zugende braucht, um richtig zu handeln. Der
+Wächter hat diesen Befehl bereits: er nennt ihn am Ende jeder Meldung. Der
+Bestand gehört dorthin, wo er abgefragt wird, nicht in jede Absage.
