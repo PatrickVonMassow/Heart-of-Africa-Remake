@@ -238,9 +238,19 @@ export const LIMITS = {
   // records for 26.08.2026, made a second time.
   // MINUS ONE, 31.08.2026: the line count above included a phantom line for the file's closing
   // newline. Correcting `measureGuide` takes that line off every measurement at once, so this
-  // ceiling follows it down to 501 and the effective limit is unchanged. `maxWords` never counted
-  // the phantom and does not move.
-  maxLines: 501,
+  // ceiling follows it down and the effective limit is unchanged. `maxWords` never counted the
+  // phantom and does not move for that.
+  // RATCHETED DOWN AGAIN, same day, by the four-eyes re-read of the raise above: the new lesson
+  // was an UNFOLDED DUPLICATE of "Die Pflicht wächst schneller, als du sie erfüllen kannst",
+  // which already carried the obligation that outgrows its discharge. Folded into it, keeping
+  // every distinct claim — the veto scoped to the FILE, read separated from merely touched, the
+  // repair chain acknowledged at its end state, a new finding as its own ticket, and a refusal
+  // that names its reason rather than its backlog — inside that entry's own line budget. The same
+  // read caught the neighbouring priority-in-prose entry having been REPLACED rather than
+  // shortened a commit earlier: the divergence check and "Priorisiere das Ziel" were gone, and
+  // no test missed them. Both are back, paid for inside the same entries, and pinned below.
+  // Measured 500 / 4545, and the ceilings are that, with zero slack.
+  maxLines: 500,
   // EXACT FIT, not headroom — corrected 30.07.2026 after the four-eyes review
   // pointed out that this comment had long stopped describing the numbers. The
   // rule above ("raised only by the measured size of genuinely new tips")
@@ -427,10 +437,10 @@ export const LIMITS = {
   // 28.08.2026: the self-measuring-monitor lesson justified beside maxLines measures 4405 words
   // after its review correction, so this ceiling follows its +64-word net exactly; the guide keeps
   // no unearned headroom.
-  // 31.08.2026: the debt-that-grows-while-paid lesson justified beside maxLines measures 4547
-  // words after its shortening, so this ceiling follows its +85-word net exactly; the guide keeps
-  // no unearned headroom.
-  maxWords: 4547,
+  // 31.08.2026: the debt-that-grows-while-paid lesson justified beside maxLines came back down
+  // to 4545 words once it was folded into the entry it duplicated and the two claims a
+  // neighbouring entry had lost were paid back in place; the guide keeps no unearned headroom.
+  maxWords: 4545,
   // A pitfall entry = the risk lines plus its prompt. Anything longer is a
   // story, not a tip.
   maxEntryLines: 11,

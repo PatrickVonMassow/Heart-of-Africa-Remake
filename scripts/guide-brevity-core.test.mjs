@@ -392,6 +392,38 @@ describe('the real vibe-coding guide', () => {
     )
   })
 
+  it('keeps the priority entry enforceable rather than anecdotal', () => {
+    // The entry was WIDENED and, in the same commit, silently stripped of the
+    // divergence check and of "Priorisiere das Ziel" — the two halves that make
+    // it act. Nothing caught it, because the suite only demanded a prompt
+    // marker (four-eyes finding, GPT-5.6 Sol, 31.08.2026).
+    const entries = parseEntries(sliceSection(guide, /Fallstrick/i))
+    const prose = entries.find((entry) => entry.title.startsWith('Prosa wirkt nicht'))
+    const text = prose?.lines.join(' ').replace(/\s+/g, ' ')
+
+    expect(text).toContain('**Feld**, das der Mechanismus liest')
+    expect(text).toContain('laufen beide auseinander, schlägt eine Prüfung fehl')
+    expect(text).toContain('Priorisiere das **Ziel**')
+    expect(text).toContain('**Altbestand**')
+  })
+
+  it('carries the whole growing-obligation lesson in the one entry that owns it', () => {
+    // Folded from two entries that described the same class. The fold is only
+    // honest if every distinct claim of the absorbed entry survived it.
+    const entries = parseEntries(sliceSection(guide, /Fallstrick/i))
+    const duty = entries.filter((entry) => entry.title.startsWith('Die Pflicht wächst schneller'))
+    expect(duty).toHaveLength(1)
+    const text = duty[0].lines.join(' ').replace(/\s+/g, ' ')
+
+    expect(text).toContain('**einzelnen Beitrag**')
+    expect(text).toContain('Veto der **Datei** statt dem Befund')
+    expect(text).toContain('**gelesen** von bloß berührt')
+    expect(text).toContain('Reparaturkette am **Endzustand** als einen Beitrag')
+    expect(text).toContain('eigenen Ticket')
+    expect(text).toContain('nennt ihren **Grund**, nie ihren Bestand')
+    expect(text).toContain('**Messgerät**')
+  })
+
   it('lets a true suspected cause survive the required falsification attempt', () => {
     const metaRule = sliceSection(guide, /Drei Meta-Regeln/i)
       .map(({ text }) => text)
