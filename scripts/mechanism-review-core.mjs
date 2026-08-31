@@ -1419,11 +1419,19 @@ export function validateRecord({
       // A scoped pass is routed from the accumulated authorship of its FILES,
       // while the recorder can resolve only the pass's end-state commit. It
       // therefore validates the durable fact available here (a known
-      // handover), then the gate recomputes both independence and first
-      // eligibility from the complete file history before this row clears
-      // anything. The reviewer may also have authored an unrelated tip commit;
-      // treating that commit as the pass's author is the router/ledger
-      // deadlock this file-scoped boundary exists to avoid.
+      // handover), then the gate recomputes independence and first eligibility
+      // PER FILE before this row clears anything. The reviewer may also have
+      // authored an unrelated tip commit; treating that commit as the pass's
+      // author is the router/ledger deadlock this file-scoped boundary exists
+      // to avoid.
+      // WHAT "PER FILE" MEANS EXACTLY, because the deadlock lives in the gap:
+      // `pendingEndStateFiles` gives each file the authorship of the LATEST
+      // pending commit that touched it, not the union over its whole pending
+      // history. That is deliberate — the union would make both vendors authors
+      // of every hot file and rebuild the deadlock one level down — but it also
+      // means an EARLIER author of the same file inside the same range is not
+      // seen by the independence check. The file's own `sourceCommits` carries
+      // that history for anything that needs it.
       const deferredPassHandover = String(pass ?? '').trim() && REVIEW_HANDOVERS.includes(String(handover ?? '').trim())
       const handoverProblem = deferredPassHandover
         ? ''
