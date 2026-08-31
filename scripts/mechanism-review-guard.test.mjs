@@ -6,7 +6,8 @@
 // fell back to HEAD on Windows and grandfathered the branch's own work — the
 // gate reported "GATE CLEAR" on four unreviewed mechanism commits.
 import { describe, it, expect } from 'vitest'
-import { readFileSync } from 'node:fs'
+import { execFileSync } from 'node:child_process'
+import { readdirSync, readFileSync } from 'node:fs'
 import {
   attachContributionDispositions,
   attachCoverage,
@@ -16,6 +17,7 @@ import {
   bootstrapBase,
   measureReviewGap,
   mechanismLogCommand,
+  parseRangeLog,
   parseMechanismLog,
   pendingReviewContributions,
   planningContributions,
@@ -31,6 +33,8 @@ import {
   evaluateMechanismReview,
   formatMechanismReviewVerdict,
   LEGACY_RANGE_RETIREMENT_REASON,
+  mechanismPathsIn,
+  modelsFromTrailers,
 } from './mechanism-review-core.mjs'
 import { commonRepoPath, repoPath } from './repo-paths.mjs'
 import { readOwnerLock } from './batch-singleton.mjs'
@@ -165,6 +169,72 @@ describe('historical ledger eras', () => {
       expect(verdict.findings.some((finding) => finding.kind === 'malformed-record'), shortSha).toBe(false)
       expect(formatMechanismReviewVerdict(verdict), shortSha).not.toContain('is malformed')
     }
+  })
+})
+
+describe('the measured 30.08 refusal multiplication', () => {
+  const baseline = '7472bb7e086934ad6da85e57aaa809d7380f3bd7'
+  const checkpoints = [
+    'b79e43305a4bd75e0c0d6e72b18d59de5435a52a',
+    'a1d4bf3f022d7b830d7a89d7e61c7ada780b186b',
+    '8249b20b22aea2ffb5d1e2d64052290401c5a090',
+  ]
+  const gitHistory = (args) => execFileSync('git', args, {
+    cwd: repoPath(),
+    encoding: 'utf8',
+    maxBuffer: 64 * 1024 * 1024,
+  })
+
+  const replayAt = (head) => {
+    const scriptFiles = readdirSync(repoPath('scripts'))
+    const commits = parseRangeLog(gitHistory(mechanismLogCommand(baseline, head))).map((commit) => {
+      const trailers = gitHistory([
+        'show',
+        '-s',
+        '--format=%(trailers:key=Co-Authored-By,valueonly,separator=;)',
+        commit.sha,
+      ])
+      const authorModels = modelsFromTrailers(trailers)
+      return {
+        ...commit,
+        authorModel: authorModels[0] ?? '',
+        authorModels,
+        mechanismFiles: mechanismPathsIn(commit.files, { scriptFiles }),
+      }
+    })
+    const pendingCommits = pendingReviewContributions(
+      commits,
+      scriptFiles,
+      (sha) => gitHistory(['show', '-s', '--format=%s', sha]).trim(),
+    )
+    const ledger = gitHistory(['show', `${head}:.claude/mechanism-reviews.jsonl`])
+      .trim()
+      .split('\n')
+      .map((line) => JSON.parse(line))
+    const records = attachCoverage({
+      pendingCommits,
+      allRecords: ledger,
+      head,
+      revList: (revision) => gitHistory(['rev-list', revision, '--not', baseline]),
+    })
+    return { pendingCommits, records, head }
+  }
+
+  it('replays 4 → 30 → 40 before scoping, then 3 → 3 → 12 with only read contributions charged', () => {
+    const replays = checkpoints.map(replayAt)
+    const count = (replay, reviewScope) => evaluateMechanismReview({
+      baseline,
+      ...replay,
+      reviewScope,
+    }).findings.length
+
+    // The former rule treated every bounded record as range-wide. This is the
+    // measured counter, recomputed from the versioned ledger and commit graph,
+    // not copied from the work-order prose.
+    expect(replays.map((replay) => count(replay, () => 'range'))).toEqual([4, 30, 40])
+    // The remaining growth names real exact-state refusals, incomplete passes,
+    // self-reviews and as-yet-unreviewed repair commits. None is waived.
+    expect(replays.map((replay) => count(replay, undefined))).toEqual([3, 3, 12])
   })
 })
 

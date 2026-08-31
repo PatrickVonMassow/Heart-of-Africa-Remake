@@ -27,7 +27,7 @@
 import { existsSync, mkdirSync, readdirSync, readFileSync, writeFileSync } from 'node:fs'
 import { execFileSync, execSync } from 'node:child_process'
 import { dirname } from 'node:path'
-import { REPO_ROOT, repoPath } from './repo-paths.mjs'
+import { commonRepoPath, REPO_ROOT, repoPath } from './repo-paths.mjs'
 import { isMainModule } from './is-main.mjs'
 import { heldByOtherLiveOwner } from './batch-singleton.mjs'
 import { readRecords, verifyCarried } from './mechanism-review.mjs'
@@ -59,10 +59,11 @@ import { gatherGuardDutyContext } from './guard-duty.mjs'
 
 const PAUSE = repoPath('.claude/batch-paused')
 
-/** Per-branch baseline. Local bookkeeping ("what this tree has confirmed"), so
- *  it is deliberately NOT tracked: a shared file would conflict on every branch,
- *  while the ledger that must travel — the reviews — is the tracked one. */
-export const BASELINE_PATH = repoPath('.claude/mechanism-review-baseline.json')
+/** Per-branch baseline. Host-local rather than tracked, but shared by every
+ * linked worktree: a disposable checkout must see main's branch baselines and
+ * must not recover from the tracked-history anchor merely because it lives at
+ * another path. The branch-keyed map still keeps branch decisions separate. */
+export const BASELINE_PATH = commonRepoPath('.claude/mechanism-review-baseline.json')
 
 /** The reviewed source revision immediately before fail-closed recovery. Unlike
  * a timestamp or ledger field, reachability from this immutable commit is not a

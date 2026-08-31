@@ -1662,7 +1662,7 @@ describe('evaluateMechanismReview', () => {
       expect(v.block).toBe(false)
     })
 
-    it('still poisons a pass-less review when a descendant file-scoped split intersects the remaining debt', () => {
+    it('does not let a descendant file-scoped split poison an ancestor that only co-touched its file', () => {
       const descendant = 'd'.repeat(40)
       const v = evaluateMechanismReview({
         baseline: 'b',
@@ -1673,13 +1673,13 @@ describe('evaluateMechanismReview', () => {
           record({
             sha: descendant,
             model: 'Claude Opus 5',
+            containedShas: new Set(['c'.repeat(40), descendant]),
             pass: { index: 1, total: 2, files: [MECH], endState: descendant },
             at: MERGE_ACCOUNTING_SINCE + 2000,
           }),
         ],
       })
-      expect(v.block).toBe(true)
-      expect(v.findings[0].kind).toBe('self-review')
+      expect(v.block).toBe(false)
     })
 
     it.each([

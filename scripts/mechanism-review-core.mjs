@@ -346,6 +346,43 @@ const containedBy = (record, sha) => {
     : Array.isArray(fact) && fact.map(String).includes(String(sha))
 }
 
+/**
+ * How a bounded end-state reading relates to one pending contribution.
+ *
+ * A file-scoped record says exactly which contribution state it READ:
+ * `pass.endState`, cryptographically bound by the recorder to the record sha.
+ * An older commit contained by that record may have touched the same file, but
+ * it was not the contribution whose verdict the reviewer rendered. Calling it
+ * CO-TOUCHING prevents a refusal on the end state from becoming a refusal of
+ * every historical edit to that hot file.
+ *
+ * Only the complete recorder shape earns that narrowing. Missing or mutated
+ * bounds return `range`, preserving the pre-existing fail-closed reach for
+ * legacy and hand-edited rows. `unrelated` is useful to callers inspecting a
+ * broader record set; the gate ordinarily hands this function covering rows.
+ */
+export function contributionReviewScope(record = {}, commit = {}) {
+  const pass = record?.pass
+  const files = Array.isArray(pass?.files) ? pass.files : null
+  const bounded =
+    pass &&
+    !Array.isArray(pass.commits) &&
+    Number.isInteger(pass.index) &&
+    Number.isInteger(pass.total) &&
+    pass.index >= 1 &&
+    pass.total >= 1 &&
+    pass.index <= pass.total &&
+    files?.length > 0 &&
+    files.every((file) => typeof file === 'string' && file.length > 0) &&
+    typeof pass.endState === 'string' &&
+    pass.endState === String(record?.sha ?? '')
+  if (!bounded) return 'range'
+  if (!containedBy(record, commit?.sha)) return 'unrelated'
+  const touched = new Set((commit?.files ?? []).map(String))
+  if (!files.some((file) => touched.has(String(file)))) return 'unrelated'
+  return String(commit?.sha ?? '') === pass.endState ? 'read' : 'co-touching'
+}
+
 const descendsFrom = (record, earlier) =>
   String(record?.sha ?? '') !== String(earlier?.sha ?? '') && containedBy(record, earlier?.sha)
 
@@ -472,6 +509,12 @@ const openRefusalsIn = (records = [], chain = {}) => {
   const requiredFiles = [...new Set((chain.files ?? []).map(String))]
   return records.filter((refusal) => {
     if (String(refusal.verdict) !== BLOCKING_VERDICT) return false
+    // A bounded file review can refuse only the contribution state it names.
+    // It still counts as a reading of an ancestor whose code survives in that
+    // end state; its negative verdict simply is not re-attributed to work it
+    // did not judge. Legacy/unbounded rows retain their full range reach.
+    const scopeOf = typeof chain.scopeOf === 'function' ? chain.scopeOf : contributionReviewScope
+    if (scopeOf(refusal, chain.commit) === 'co-touching') return false
     const directlyAnswered = clearing.some(
       (answer) => Number(answer.at) > Number(refusal.at) && descendsFrom(answer, refusal),
     )
@@ -1598,6 +1641,7 @@ export function evaluateMechanismReview({
   endStateFiles = null,
   fence = null,
   sessionId = '',
+  reviewScope = contributionReviewScope,
 } = {}) {
   // Missing local evidence is itself a finding. It may never mean "start at
   // HEAD": on main that makes the pending range empty and forgives every debt
@@ -1623,6 +1667,32 @@ export function evaluateMechanismReview({
     bySha.get(key).push(record)
   }
   const findings = []
+  const reviewScopesByRecord = new Map()
+  // Dependency injection exists for the historical replay: the unit case runs
+  // the old range-wide rule and this rule over the SAME immutable Git/ledger
+  // facts. The live wrapper supplies no override and always takes the bounded
+  // production rule. A non-function cannot weaken it.
+  const scopeOf = typeof reviewScope === 'function' ? reviewScope : contributionReviewScope
+
+  const noteReviewScope = (record, commit) => {
+    const relation = scopeOf(record, commit)
+    if (relation !== 'read' && relation !== 'co-touching') return
+    const recordSha = String(record?.sha ?? '')
+    if (!reviewScopesByRecord.has(recordSha)) {
+      reviewScopesByRecord.set(recordSha, {
+        recordSha,
+        readContributionSha: '',
+        coTouchingContributionShas: [],
+        files: [],
+      })
+    }
+    const scope = reviewScopesByRecord.get(recordSha)
+    if (relation === 'read') scope.readContributionSha = String(commit?.sha ?? '')
+    if (relation === 'co-touching' && !scope.coTouchingContributionShas.includes(String(commit?.sha ?? ''))) {
+      scope.coTouchingContributionShas.push(String(commit?.sha ?? ''))
+    }
+    for (const file of record.pass.files.map(String)) if (!scope.files.includes(file)) scope.files.push(file)
+  }
 
   for (const pendingCommit of pendingEndStateFiles(pendingCommits, endStateFiles)) {
     let commit = pendingCommit
@@ -1657,7 +1727,13 @@ export function evaluateMechanismReview({
     // between the two.
     const refusalShaped = (r) =>
       typeof r?.verdict === 'string' && r.verdict.trim().toLowerCase() === BLOCKING_VERDICT
-    const malformedRefusals = covering.filter((r) => refusalShaped(r) && !rowWellFormed(r))
+    for (const refusal of covering.filter(refusalShaped)) noteReviewScope(refusal, commit)
+    const malformedRefusals = covering.filter(
+      (r) =>
+        refusalShaped(r) &&
+        scopeOf(r, commit) !== 'co-touching' &&
+        !rowWellFormed(r),
+    )
     if (malformedRefusals.length) {
       findings.push({ kind: 'malformed-record', commit, records: malformedRefusals })
       continue
@@ -1724,6 +1800,12 @@ export function evaluateMechanismReview({
     const scopedWholeReviews = sound.filter((r) => !fileClaim(r) && !r?.pass)
     const standingScoped = incompleteScoped.filter(
       (split) => {
+        // A descendant's bounded split measured that descendant contribution,
+        // not every ancestor which happens to share one of its files. A broken
+        // bound remains range-scoped and therefore cannot take this exit.
+        if (split.records.every((record) => scopeOf(record, commit) === 'co-touching')) {
+          return false
+        }
         const wholeRangeAnswer = scopedWholeReviews.some(
           (answer) => Number(answer.at) > Math.max(...split.records.map((r) => Number(r.at))) && descendsFrom(answer, split),
         )
@@ -1754,6 +1836,8 @@ export function evaluateMechanismReview({
         commits: pendingCommits,
         records: covering,
         files: [file],
+        commit,
+        scopeOf,
       })
       if (open.length) {
         const latest = open.reduce((a, b) => (Number(b.at) >= Number(a.at) ? b : a))
@@ -1855,6 +1939,7 @@ export function evaluateMechanismReview({
     const split = covering.some((r) =>
       !legacyContributionShape(r) &&
       passRow(r) &&
+      scopeOf(r, commit) !== 'co-touching' &&
       (!fileClaim(r) ||
         !Array.isArray(r?.pass?.files) ||
         r.pass.files.some((file) => remainingFileDebt.has(String(file)))),
@@ -1935,6 +2020,8 @@ export function evaluateMechanismReview({
       commits: pendingCommits,
       records: covering,
       files: commit.files,
+      commit,
+      scopeOf,
     })
     if (open.length) {
       const latest = open.reduce((a, b) => (Number(b.at ?? 0) >= Number(a.at ?? 0) ? b : a))
@@ -1958,10 +2045,18 @@ export function evaluateMechanismReview({
       deferred: true,
       reason: duty.message,
       findings,
+      reviewScopes: [...reviewScopesByRecord.values()],
       head,
     }
   }
-  return { block: findings.length > 0, clear: findings.length === 0, bootstrap: false, findings, head }
+  return {
+    block: findings.length > 0,
+    clear: findings.length === 0,
+    bootstrap: false,
+    findings,
+    reviewScopes: [...reviewScopesByRecord.values()],
+    head,
+  }
 }
 
 /** Render the verdict as the guard's refusal — every offender, and the way out. */
@@ -2013,10 +2108,22 @@ export function formatMechanismReviewVerdict(verdict, { authorshipPlan = null } 
     const author = String(c.authorModel ?? '').trim() || 'unknown model'
     if (f.kind === 'do-not-merge') {
       const r = f.records[0] ?? {}
+      const scope = (verdict.reviewScopes ?? []).find(
+        (candidate) => String(candidate?.recordSha ?? '') === String(r.sha ?? ''),
+      )
+      const coTouching = (scope?.coTouchingContributionShas ?? []).map(short)
       lines.push(
         `  ✗ ${short(c.sha)} ${c.subject ?? ''}`,
         `      ${files}`,
         `      ${String(r.model).trim()} reviewed this and said DO-NOT-MERGE: ${r.evidence ?? ''}`,
+        ...(scope?.readContributionSha
+          ? [
+              `      verdict scope: READ ${short(scope.readContributionSha)}; ` +
+                (coTouching.length
+                  ? `CO-TOUCHED ${coTouching.join(', ')} — ${coTouching.length === 1 ? 'that contribution is' : 'those contributions are'} not charged by this refusal.`
+                  : 'no other contribution is charged by this refusal.'),
+            ]
+          : []),
         '      Fix what the review found, then record the re-review at a commit that DESCENDS',
         `      from ${short(r.sha)} — the verdict is not advisory, and a verdict on work that does`,
         '      not contain the fix answers nothing.',

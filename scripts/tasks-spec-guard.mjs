@@ -13,11 +13,11 @@ import { readFileSync, writeFileSync, existsSync, mkdirSync } from 'node:fs'
 import { evaluate } from './tasks-spec-guard-core.mjs'
 import { heldByOtherLiveOwner } from './batch-singleton.mjs'
 import { isMainModule } from './is-main.mjs'
-import { REPO_ROOT, repoPath } from './repo-paths.mjs'
+import { commonRepoPath, REPO_ROOT, repoPath } from './repo-paths.mjs'
 
 const TASKS = repoPath('TASKS.md')
 const PAUSE = repoPath('.claude/batch-paused')
-export const BASELINE_PATH = repoPath('.claude/tasks-spec-guard-baseline.json')
+export const BASELINE_PATH = commonRepoPath('.claude/tasks-spec-guard-baseline.json')
 
 // MEASURED 27.08.2026: `TASKS.md` crossed 1 MiB and every read of it through
 // execSync began failing with ENOBUFS — Node's default maxBuffer is exactly
