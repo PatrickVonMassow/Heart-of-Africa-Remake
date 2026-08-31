@@ -3738,6 +3738,15 @@ describe('the shipped charge ledger', () => {
     expect(chargeFor(red('member thumbnail.png is present'), scoped)).toBeNull()
   })
 
+  it('keeps an empty-detail archive check under its printed name, so its existing charge applies', () => {
+    const printed = 'member hoa-state-2026-08-31-42.png is present'
+    const [parsed] = failedChecks(`FAIL  ${printed} — `)
+
+    expect(parsed).toMatchObject({ name: printed, detail: '', kind: 'check' })
+    expect(parsed.name).not.toContain('—')
+    expect(chargeFor(parsed, { suite: 'report', backend: 'webgpu', featureLevel: 'compatibility' })?.point).toBe(927)
+  })
+
   it('excuses the timestamp row only where the red names the missing capability', () => {
     const scoped = { suite: 'benchmark', backend: 'webgpu', kind: 'check', featureLevel: 'compatibility' }
     const withDetail = (name, detail) => ({ ...red(name), detail })
