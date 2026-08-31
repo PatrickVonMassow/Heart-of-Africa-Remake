@@ -1150,6 +1150,78 @@ put it is the mistake this line exists to stop.
   that /v0.3/ and /poc/ serve the new state, and FREEZE the tag: it is never
   re-pointed.
 
+- [ ] 1026. LARGE pays for a second backend pass on every change, including the ones that
+  cannot touch the renderer (measured 31.08.2026).
+  `SUITE_RUNTIME_S` (`scripts/verify/run-wait-core.mjs`, table measured 09.08.2026) prices ONE
+  backend pass at 42.3 min; LARGE runs two, expected 80.8 min, and the four most recent recorded
+  LARGE runs took 84.1 / 90.9 / 113.9 / 117.2 min. The second pass is roughly 38 min of every
+  LARGE. Largest suites per pass: enrichments 15.9, polish 5.7, settings 3.2, invariants 2.8 min.
+  `tiers.mjs` itself records the asymmetry that makes the pass droppable: "every one-backend
+  defect on record showed there [WebGPU] while WebGL 2 stayed green (points 210/334/506) — never
+  the other way round." CLAUDE.md §7.2 already accepts the WebGL 2 lane as LAGGING ("A
+  WebGL-2-only defect may remain until the next LARGE"), so this narrows WHEN that lane runs
+  rather than opening a new kind of gap. The predicate that makes the cut already exists, is
+  unit-tested, and already decides the second backend of the PICTURE check
+  (`scripts/render-verify-core.mjs:1133`, used at :1695 and :1838). Only the TEST lane never
+  asks it.
+  WHAT THIS POINT DOES NOT DO — measured, and the reason it is not at the front. The open
+  communication work is backend-SENSITIVE and keeps both passes:
+  `feat/686-five-word-lexicon-game` 91 changed files, 12 render paths, 11 backend-sensitive;
+  `feat/687-roam-bound-fixes` 118 / 13 / 12 (PlaceLife.tsx, PlaceScene.tsx, bankGame.ts,
+  tagGame.ts, childSituations.ts, layout.ts, routing.ts, riverBank.ts, gizaSite.ts,
+  adultErrands.ts, plus `scripts/verify/polish.mjs` and `settings.mjs` — a browser suite's own
+  code is itself a render path). `isBackendSensitivePath` exempts only `src/ui/` inside the
+  render set, and the communication mechanic lives in `src/scenes/place/`. All 16 recorded LARGE
+  runs ran on exactly these two branches, so the saving on the RELEASE path is ZERO. The
+  beneficiaries are the TOOLING bundles, whose points touch `scripts/`, `docs/` and `.claude/`.
+  Final state:
+  The LARGE regression runs its WebGL 2 pass only when the change is backend-sensitive.
+  `planBackends` in `scripts/verify/tiers.mjs` derives the backend passes from the CHANGED PATHS
+  instead of running both unconditionally. A LARGE-equivalent run whose changed render paths are
+  ALL non-backend-sensitive under `isBackendSensitivePath` runs ONE pass on the everyday lane
+  (`DEFAULT_BACKEND`, WebGPU) and records the dropped WebGL 2 pass as an explicit SKIP naming its
+  reason — the discipline `skippedSuites` already follows, never a silent gap.
+  BOTH passes stay, unchanged, whenever: any changed path is backend-sensitive; the change set
+  cannot be classified (no merge-base, no changed paths, a tree the runner cannot attribute) — an
+  unreadable change set counts as sensitive; `VERIFY_GL` is pinned; or the run belongs to the
+  closing sequence (point 633 / `CLOSING_STEPS`), which keeps the complete two-backend regression
+  as the release gate.
+  The decision stays a PURE function beside the existing ones in `tiers.mjs`, pinned by
+  `scripts/verify/tiers.test.mjs`; `run-all.mjs` only feeds it the changed paths it already
+  computes for the repeat-failure classifier (`scripts/verify/run-all.mjs:283-286`) and prints the
+  skip line. `scripts/verify/README.md` states in lockstep which command covers which backend,
+  `docs/picture-check-levers.md` gains the cross-reference that the TEST lane now uses the same
+  predicate as the picture check, and the CLAUDE.md §7.2 sentence "WebGPU is the everyday lane;
+  LARGE adds the complete WebGL 2 regression lane" gains its condition.
+  Residual risk: a WebGL-2-only defect in a non-backend-sensitive path. No such defect is in the
+  record, and the closing run keeps the full two-backend gate.
+  PLACEMENT is the user's delegation of 31.08.2026, 16:39, verbatim: "Okay, dann reihe das doch
+  erst spaeter ein, an einer geeigneten Position nach 174. Wo genau ueberlasse ich dir." Chosen
+  under it: immediately AFTER point 174 (the tag), as the FIRST point of the post-release round
+  and BEFORE the tooling bundles Chat & Tafel, Session- & Repo-Hygiene, Modell & Wächter and
+  Urlaubsfestigkeit. AFTER 174 because this point changes what LARGE COVERS, and LARGE is the
+  gate the release tag is cut against; narrowing it before the tag would alter the very check
+  that signs off the release, and nothing before 174 saves time by it anyway. BEFORE the tooling
+  bundles because they are the ones it actually pays. The user's earlier front-of-queue placement
+  of the same day (16:31) is WITHDRAWN, together with the expectation it rested on (16:36: "Ich
+  erhoffe mir davon, dass die ganzen offenen Tasks zur Kommunikationsmechanik dadurch so start
+  beschleunigt werden, dass der Aufwand fuer den Optimierungs-Task wieder aufgeholt wird"), which
+  the measurement above refuted. The 12.08.2026 release order — communication mechanic first,
+  then 633, then 174 — stands untouched.
+  SIDE FINDINGS recorded with the measurement, not part of this point's final state:
+  `run-all.mjs:461` runs suites strictly sequentially against one dev server, and parallelising
+  them would be the larger lever but collides with the quiet-host rule and `machine-load-core.mjs`;
+  and `enrichments` is at once the most expensive and the least reliable suite (22.3 / 39.4 / 39.1
+  min, three times red), so the difference between the 80.8 min expectation and the 84–117 min
+  reality is its retries, which are SUSPECT under CLAUDE.md §7.2 and cover nothing.
+  Test: pure Vitest over the two cuts plus the unclassifiable and pinned-`VERIFY_GL` fallbacks.
+  Evidence: one LARGE on a non-backend-sensitive change showing a single pass plus the recorded
+  SKIP with its reason and its measured runtime beside the two-pass expectation; one LARGE on a
+  backend-sensitive change showing both passes unchanged.
+  Bundle: Testinfrastruktur. Estimate ~2 h.
+  Criticality: HIGH — it narrows the regression gate the release is cut against, and a wrong cut
+  removes a lane no later run puts back.
+
 - [ ] 1008. The review router and the review ledger each forbid what the other requires, so two
   passes of a sixteen-pass plan can be cleared by nobody (measured 29.08.2026 while reviewing the
   686+687 landing range `main..de7e175` on `feat/687-roam-bound-fixes`).
