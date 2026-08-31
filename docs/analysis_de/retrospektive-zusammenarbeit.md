@@ -1417,7 +1417,7 @@ keinen Träger hat. Gebucht als Punkt 956.
 
 ## Anhang A — Maschinell gepflegte Quellen-Übersicht
 
-Zuletzt aktualisiert: Montag, 31.08.2026, 12:13 · Quellen-Fingerprint: `5b41eda229f2…`
+Zuletzt aktualisiert: Montag, 31.08.2026, 13:09 · Quellen-Fingerprint: `ea378c329158…`
 
 Spalten heuristisch aus den Quellen abgeleitet (Anläufe = distinkte Datumsnennungen im Memory;
 Maßnahme = Guard-Skripte mit Namens-Treffer). Die inhaltliche Bewertung gehört der Prosa oben.
@@ -1518,10 +1518,10 @@ Maßnahme = Guard-Skripte mit Namens-Treffer). Die inhaltliche Bewertung gehört
 | A pending batch claim HOLDS THE LAUNCHER BACK — withdraw it whenever the claiming window is left unattended | 2 | mittel | clear-claim-guard.mjs | ✔ Mechanismus |
 | Multi-agent workflows eat the session/weekly limit fast — verify findings INLINE, keep fan-outs small, warn the user with a cost estimate before any big workflow | 3 | mittel | doc-budget-guard.mjs | ✔ Mechanismus |
 
-Erfasste Quellen: 93 Feedback-/Projekt-Memories · 57 Guard-/Hook-Skripte · 6 Revert-/Reapply-Commits · 116 Prozess-/Meta-TASKS-Punkte (davon 50 offen).
+Erfasste Quellen: 93 Feedback-/Projekt-Memories · 57 Guard-/Hook-Skripte · 6 Revert-/Reapply-Commits · 117 Prozess-/Meta-TASKS-Punkte (davon 51 offen).
 
-<!-- RETRO-FINGERPRINT: 5b41eda229f289ef759fc98353f28e1d6fede0e0c1478b65b4e3b9cc17ce446e -->
-<!-- RETRO-LAST-REFRESHED: 2026-08-31T10:13:41.618Z -->
+<!-- RETRO-FINGERPRINT: ea378c32915891585f43d4d3850d25a3962f4fe5ef6227be86fab12f43e7c2a3 -->
+<!-- RETRO-LAST-REFRESHED: 2026-08-31T11:09:55.652Z -->
 <!-- AUTO-GENERATED:END -->
 
 ### 3.111 Ein Erfolg ist kein Beweis für den Weg, auf dem er zustande kam
