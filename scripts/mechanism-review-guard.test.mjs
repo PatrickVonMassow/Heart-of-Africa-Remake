@@ -183,6 +183,7 @@ describe('the measured 30.08 refusal multiplication', () => {
     cwd: repoPath(),
     encoding: 'utf8',
     maxBuffer: 64 * 1024 * 1024,
+    windowsHide: true,
   })
 
   const replayAt = (head) => {
