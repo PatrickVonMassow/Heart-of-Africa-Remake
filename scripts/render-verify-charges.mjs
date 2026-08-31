@@ -409,20 +409,22 @@ export const RED_CHARGES = [
     backend: 'webgpu',
     featureLevel: 'compatibility',
     kind: 'console',
-    // The recorder cuts the normalised error at 120 characters, just after
-    // `[Invalid TextureView]` in the measured ShadowMaterial name. The numeric
-    // pipeline id varies, and that variation marks the detail as varied, so the
-    // stable stored NAME is the narrowest evidence this red retains. Requiring
-    // ShadowMaterial and TextureView leaves the neighbouring MeshStandard
-    // pipeline failures unowned.
+    // The recorder cuts the normalised error at 120 characters. The measured
+    // ShadowMaterial and RenderPipeline names retain `[Invalid TextureView]`;
+    // the longer MeshStandardMaterial/NodeMaterial names retain only the shown
+    // prefix. Numeric pipeline ids vary, which marks the detail as varied, so
+    // the stable stored NAME is the narrowest evidence these reds retain. The
+    // four alternatives are the complete measured allowlist from the two LARGE
+    // attempts — never a generic async-pipeline match.
     match:
-      /^console error: THREE\.WebGPURenderer: Async render pipeline creation failed \(renderPipeline_ShadowMaterial_\d+\): \[Invalid TextureView\](?:\s|$)/i,
+      /^console error: THREE\.WebGPURenderer: Async render pipeline creation failed \(renderPipeline_(?:ShadowMaterial_\d+\): \[Invalid TextureView\](?:\s|$)|MeshStandardMaterial_\d+\): \[Invalid Texture|MeshStandardNodeMaterial_\d+\): \[Invalid Text|RenderPipeline_\d+\): \[Invalid TextureView\](?:\s|$))/i,
     why:
-      'THE SHADOW PIPELINE SIGNATURE OF POINT 514\'S MSAA CASCADE, charged 31.08.2026 from the ' +
-      'full WebGPU LARGE settings block: renderPipeline_ShadowMaterial_1867/1868 fails on an ' +
-      'Invalid TextureView immediately after the RGBA16Float multisampling root. Scoped to the ' +
-      'measured compatibility settings console lane; other pipeline families remain real reds, ' +
-      'and the charge dies with point 514.',
+      'THE ASYNC PIPELINE SIGNATURE OF POINT 514\'S MSAA CASCADE, charged 31.08.2026 from the ' +
+      'full WebGPU LARGE settings block: the measured ShadowMaterial, MeshStandardMaterial, ' +
+      'MeshStandardNodeMaterial and RenderPipeline variants fail on an Invalid TextureView ' +
+      'immediately after the RGBA16Float multisampling root. Scoped to the measured compatibility ' +
+      'settings console lane and to those four pipeline classes; every other pipeline family ' +
+      'remains a real red, and the charge dies with point 514.',
   },
   {
     point: 514,

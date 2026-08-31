@@ -3189,7 +3189,7 @@ describe('the shipped charge ledger', () => {
     // command-buffer failures still stay red.
     const stillRed = [
       'THREE.WebGPURenderer: Uncaptured WebGPU GPUValidationError: [Invalid CommandBuffer from Queue "renderContext_11"] is invalid due to a previous error.',
-      'THREE.WebGPURenderer: Async render pipeline creation failed (renderPipeline_MeshStandardMaterial_1005): [Invalid TextureView] is invalid due to a previous error.',
+      'THREE.WebGPURenderer: Async render pipeline creation failed (renderPipeline_BasicMaterial_1005): [Invalid TextureView] is invalid due to a previous error.',
     ]
     // THE RED MUST EXIST BEFORE ITS CHARGE MAY BE NULL (cross-vendor review,
     // GPT-5.6 Sol, 30.08.2026): `?.point ?? null` would have passed just as well
@@ -3909,7 +3909,25 @@ describe('the shipped charge ledger', () => {
         measured:
           'THREE.WebGPURenderer: Async render pipeline creation failed (renderPipeline_ShadowMaterial_1867): [Invalid TextureView] is invalid due to a previous error.',
         neighbour:
+          'THREE.WebGPURenderer: Async render pipeline creation failed (renderPipeline_BasicMaterial_1005): [Invalid TextureView] is invalid due to a previous error.',
+      },
+      {
+        measured:
           'THREE.WebGPURenderer: Async render pipeline creation failed (renderPipeline_MeshStandardMaterial_1005): [Invalid TextureView] is invalid due to a previous error.',
+        neighbour:
+          'THREE.WebGPURenderer: Async render pipeline creation failed (renderPipeline_BasicMaterial_1005): [Invalid TextureView] is invalid due to a previous error.',
+      },
+      {
+        measured:
+          'THREE.WebGPURenderer: Async render pipeline creation failed (renderPipeline_MeshStandardNodeMaterial_999): [Invalid TextureView] is invalid due to a previous error.',
+        neighbour:
+          'THREE.WebGPURenderer: Async render pipeline creation failed (renderPipeline_BasicMaterial_999): [Invalid TextureView] is invalid due to a previous error.',
+      },
+      {
+        measured:
+          'THREE.WebGPURenderer: Async render pipeline creation failed (renderPipeline_RenderPipeline_7187): [Invalid TextureView] is invalid due to a previous error.',
+        neighbour:
+          'THREE.WebGPURenderer: Async render pipeline creation failed (renderPipeline_BasicMaterial_7187): [Invalid TextureView] is invalid due to a previous error.',
       },
       {
         measured:

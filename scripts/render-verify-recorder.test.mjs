@@ -956,6 +956,20 @@ describe('the captured lines charge the way the guard reads them', () => {
     })
   })
 
+  it('removes an empty-detail separator after separating section provenance', () => {
+    const capture = tapped(() => 'bug-report-archive')
+    const printed = 'member hoa-state-2026-08-31-42.png is present'
+    capture.out.write(`FAIL  ${printed} —${sectionTag('bug-report-archive')}\n`)
+    capture.flush()
+
+    const [stored] = capturedReds(capture.state)
+    expect(stored).toMatchObject({ name: printed, detail: '', section: 'bug-report-archive' })
+    expect(stored.name).not.toContain('—')
+    expect(
+      chargeFor(stored, { suite: 'report', backend: 'webgpu', featureLevel: 'compatibility' })?.point,
+    ).toBe(927)
+  })
+
   it('does not mistake a tag shape at the detail cut for recorder metadata', () => {
     const shape = sectionTag('x')
     const cut = `${'m'.repeat(200 - shape.length)}${shape}`
