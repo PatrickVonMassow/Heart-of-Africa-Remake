@@ -12,6 +12,8 @@ Jedes verhaltensbezogene Problem durchlief denselben Bogen, und erst die dritte 
 
 Das Musterbeispiel sind die Chat-Zeitstempel: neun Eskalationsstufen, acht weiche Maßnahmen (Merken, Memory, Hook-Banner oben, unten, PostToolUse-Injektion …) — gelöst erst vom blockierenden `timestamp-guard`, der das Turn-Ende verweigert. Der Grund, warum Erinnerung strukturell versagt: Unter Last fällt zuerst die Regel weg, die keinen harten Prüfpunkt hat. Ein Guard verlagert die Einhaltung vom Arbeitsgedächtnis in die Infrastruktur — er ermüdet nicht.
 
+**Nachtrag 31.08.2026 (Punkt 1021): Der Guard erzwingt die Regel, aber seine Voraussetzung blieb weich.** Der Nutzer meldete, dass auf eine Antwort regelmäßig sofort eine zweite folgt, die den Zeitstempel korrigiert — gemessen neun Blockaden in zwei Sitzungen an einem Vormittag. Der Guard ist dabei nicht zu streng (er akzeptiert 15 Minuten rückwärts), und die Reparatur an seiner Wortwahl hält. Weich geblieben ist, was er prüft: Die Uhrzeit wird einmal beim Zugstart eingespritzt, und ob sie vor dem Schreiben der Antwort neu gemessen wird, entscheidet wieder nur eine Regel — die genau bei den langen Zügen ausfällt, bei denen der Startwert eine Stunde alt ist. **Die Lehre ist damit schärfer als oben:** Ein Guard verlagert die *Einhaltung* in die Infrastruktur, nicht automatisch die *Voraussetzung* dafür. Wo die Erfüllung von einer Information abhängt, die das Arbeitsgedächtnis rechtzeitig beschaffen muss, bleibt eine weiche Stelle stehen — sichtbar nicht als Regelbruch, sondern als doppelte Nachricht beim Nutzer.
+
 **Lehre:** Jede wiederholt verletzte Regel so früh wie möglich in einen blockierenden Check gießen. Ein Guard kostet ein bis zwei Stunden; neun Frustrationszyklen kosten mehr.
 
 ---
@@ -1415,7 +1417,7 @@ keinen Träger hat. Gebucht als Punkt 956.
 
 ## Anhang A — Maschinell gepflegte Quellen-Übersicht
 
-Zuletzt aktualisiert: Montag, 31.08.2026, 10:46 · Quellen-Fingerprint: `7e8f40ebae22…`
+Zuletzt aktualisiert: Montag, 31.08.2026, 11:22 · Quellen-Fingerprint: `2bc95713bfdd…`
 
 Spalten heuristisch aus den Quellen abgeleitet (Anläufe = distinkte Datumsnennungen im Memory;
 Maßnahme = Guard-Skripte mit Namens-Treffer). Die inhaltliche Bewertung gehört der Prosa oben.
@@ -1453,7 +1455,7 @@ Maßnahme = Guard-Skripte mit Namens-Treffer). Die inhaltliche Bewertung gehört
 | Work at High effort by default; the user reserves Extra high for research and design decisions, not implementation | 4 | hoch | — (Regel/Memory) | ◐ Regel |
 | Write idiomatic English in all English text (README, code comments, commit messages) — no German calques like 'stand' for a version | 1 | niedrig | — (Regel/Memory) | ◐ Regel |
 | Fable is NOT the default lane because its volume is the scarcest; difficulty is no reason for it either (since 18.08.2026 hard cases go straight to Sol), and review is cross-vendor, not Fable-by-default | 4 | hoch | — (Regel/Memory) | ◐ Regel |
-| Findings recorded by a session that could not write the work order — carry each into TASKS.md, then mark it drained | 36 | hoch | findings-guard.mjs | ✔ Mechanismus |
+| Findings recorded by a session that could not write the work order — carry each into TASKS.md, then mark it drained | 37 | hoch | findings-guard.mjs | ✔ Mechanismus |
 | A recurring lookup gets a script; never pull raw transcripts, listings, or logs into context to answer it | 1 | niedrig | — (Regel/Memory) | ◐ Regel |
 | Past the 150k context watermark, FINISH the step and hand over — never start a suite, an agent or a point after it; the user raised the cost twice (13.08. and 17.08.2026) | 2 | mittel | — (Regel/Memory) | ◐ Regel |
 | User 18.08.2026: hard, complex, error-prone and HIGH-criticality points are AUTHORED by GPT-5.6 Sol directly — Opus 5 authors only what is left, and Fable authors only a point that tags its lane or one the router escalates | 4 | hoch | — (Regel/Memory) | ◐ Regel |
@@ -1516,10 +1518,10 @@ Maßnahme = Guard-Skripte mit Namens-Treffer). Die inhaltliche Bewertung gehört
 | A pending batch claim HOLDS THE LAUNCHER BACK — withdraw it whenever the claiming window is left unattended | 2 | mittel | clear-claim-guard.mjs | ✔ Mechanismus |
 | Multi-agent workflows eat the session/weekly limit fast — verify findings INLINE, keep fan-outs small, warn the user with a cost estimate before any big workflow | 3 | mittel | doc-budget-guard.mjs | ✔ Mechanismus |
 
-Erfasste Quellen: 93 Feedback-/Projekt-Memories · 57 Guard-/Hook-Skripte · 6 Revert-/Reapply-Commits · 115 Prozess-/Meta-TASKS-Punkte (davon 49 offen).
+Erfasste Quellen: 93 Feedback-/Projekt-Memories · 57 Guard-/Hook-Skripte · 6 Revert-/Reapply-Commits · 116 Prozess-/Meta-TASKS-Punkte (davon 50 offen).
 
-<!-- RETRO-FINGERPRINT: 7e8f40ebae2239858ecd06f9299be6aaadec3b703c926e1d494ad60e77f972bb -->
-<!-- RETRO-LAST-REFRESHED: 2026-08-31T08:46:49.961Z -->
+<!-- RETRO-FINGERPRINT: 2bc95713bfddf1f8b37312ea922bc064504e1425c48a53a0f2cd9c8d4c576c7d -->
+<!-- RETRO-LAST-REFRESHED: 2026-08-31T09:22:28.459Z -->
 <!-- AUTO-GENERATED:END -->
 
 ### 3.111 Ein Erfolg ist kein Beweis für den Weg, auf dem er zustande kam

@@ -1050,6 +1050,12 @@
       "why": "It costs no correctness and loses no work, so it waits behind the release like every other machine-filed convenience defect.",
       "origin": "machine",
       "place": "last"
+    },
+    "1021": {
+      "at": "2026-08-31T09:22:19.588Z",
+      "why": "Behind the release, like every point filed from a user report that is not release-blocking; the workaround is a stamp re-measured just before the reply.",
+      "origin": "machine",
+      "place": "last"
     }
   },
   "boundary": {
@@ -1088,7 +1094,7 @@
     "why": "The order standing in front of the release today is the arrangement that predates this rule; the four machine-filed points that had ranked themselves there were moved behind 174 first"
   },
   "settled": {
-    "at": "2026-08-31T08:42:44.559Z",
+    "at": "2026-08-31T09:22:19.596Z",
     "points": [
       174,
       184,
@@ -1435,7 +1441,8 @@
       1017,
       1018,
       1019,
-      1020
+      1020,
+      1021
     ]
   }
 }
