@@ -42,7 +42,8 @@ import { readdirSync, statSync } from 'node:fs'
 import { fileURLToPath } from 'node:url'
 import { recordRun } from './render-verify-state.mjs'
 import { consoleErrorChecks, failedChecks, parseCheckLines } from './verify/baseline-classify-core.mjs'
-import { SECTION_ENV, sectionGateWasBuilt } from './verify/sections.mjs'
+import { SECTION_ENV, resultSection, sectionGateWasBuilt } from './verify/sections.mjs'
+import { isSectionName, sectionTag } from './section-tag-core.mjs'
 import { RETRY_ENV, chargeReds, markVariedDetails, parseSuspectReds } from './render-verify-core.mjs'
 
 // Resolved from this module's own location where that is possible, with a
@@ -234,6 +235,30 @@ function resultParts(line) {
   }
 }
 
+/** Separate recorder metadata while its provenance still exists. `section` is
+ * the live gate value, not a name recovered from `line`; without that value the
+ * text is returned byte-for-byte and an old record remains an old record. */
+export function separateResultSection(line, section) {
+  const printed = typeof line === 'string' ? line : ''
+  if (!isSectionName(section)) return { line: printed, section: null }
+  const emitted = sectionTag(section)
+  if (!printed.endsWith(emitted)) return { line: printed, section: null }
+  return { line: printed.slice(0, -emitted.length), section }
+}
+
+/** Parse the bounded capture and restore the per-red provenance retained beside
+ * it. De-duplication remains `failedChecks`' first-observation rule. */
+export function capturedReds(state) {
+  const lines = Array.isArray(state?.lines) ? state.lines : []
+  const sections = state?.sectionByRed instanceof Map ? state.sectionByRed : new Map()
+  const parsed = failedChecks(lines.join('\n')).map((red) => {
+    const kind = red?.kind === 'console' ? 'console' : 'check'
+    const section = sections.get(`${kind}:${red?.key ?? ''}`)
+    return isSectionName(section) ? { ...red, section } : red
+  })
+  return markVariedDetails(parsed, state?.variedKeys)
+}
+
 let armed = null
 
 /**
@@ -248,7 +273,7 @@ let armed = null
  * printed before that (there is none today) would not be seen — which errs
  * toward blocking, not toward clearing.
  */
-export function tapOutput(state, streams = [[process.stdout, false], [process.stderr, true]]) {
+export function tapOutput(state, streams = [[process.stdout, false], [process.stderr, true]], sectionNow = () => null) {
   const pending = new Map()
   // Each result IDENTITY is kept ONCE, in first-seen order — the first line
   // that CARRIES it, which holds the measurement a charge may match on. The
@@ -305,6 +330,12 @@ export function tapOutput(state, streams = [[process.stdout, false], [process.st
     const renamed = stream !== null && substituted.delete(stream)
     if (!KEPT_LINE.test(line)) return
     if (renamed) refuse()
+    // The recorder asks the live gate before the line becomes durable. It then
+    // removes only the exact suffix that gate's generator emitted. A
+    // section-shaped MEASUREMENT survives: if the suite appended a real tag too,
+    // only the final, provenance-backed suffix is removed.
+    const separated = separateResultSection(line, sectionNow())
+    const recordedLine = separated.line
     // THE PARSE OF ONE LINE IS BOUNDED BY THE LINE (review finding, 28.08.2026,
     // round 20, which read the identity budget as arriving too late). It does
     // arrive after the parse, and the parse cannot run away: `handle` is reached
@@ -313,7 +344,7 @@ export function tapOutput(state, streams = [[process.stdout, false], [process.st
     // identity budget bounds what is REMEMBERED across a whole run, which is the
     // quantity that grows without limit; the per-line budget is what bounds the
     // transient, and it is asked first.
-    const parts = resultParts(line)
+    const parts = resultParts(recordedLine)
     // What this line would ADD, counted as IDENTITIES and not as parts (review
     // finding, 28.08.2026, round 14). A summary that prints the same red five
     // hundred times carries five hundred parts and exactly one new identity;
@@ -323,7 +354,7 @@ export function tapOutput(state, streams = [[process.stdout, false], [process.st
     // exists to end.
     const fresh =
       parts === null
-        ? (keptRaw.has(line) ? [] : [line])
+        ? (keptRaw.has(recordedLine) ? [] : [recordedLine])
         : [...new Set(parts.map((p) => p.id).filter((id) => !keptIds.has(id)))]
     // THE BUDGETS ARE DECIDED BEFORE ANYTHING IS REMEMBERED (review finding,
     // 28.08.2026, round 14). The varied-measurement map used to be filled
@@ -350,7 +381,7 @@ export function tapOutput(state, streams = [[process.stdout, false], [process.st
     if (
       fresh.length > 0 &&
       (keptIds.size + keptRaw.size + fresh.length > MAX_RED_IDENTITIES ||
-        keptChars + line.length + separatorFor(state.lines.length) > MAX_CAPTURE_CHARS)
+        keptChars + recordedLine.length + separatorFor(state.lines.length) > MAX_CAPTURE_CHARS)
     ) {
       refuse()
       return
@@ -372,10 +403,15 @@ export function tapOutput(state, streams = [[process.stdout, false], [process.st
       else if (seen !== part.seen && state.variedKeys instanceof Set) state.variedKeys.add(part.id)
     }
     if (fresh.length === 0) return
-    if (parts === null) keptRaw.add(line)
-    else for (const id of fresh) keptIds.add(id)
-    keptChars += line.length + separatorFor(state.lines.length)
-    state.lines.push(line)
+    if (parts === null) keptRaw.add(recordedLine)
+    else {
+      for (const id of fresh) keptIds.add(id)
+      if (separated.section && state.sectionByRed instanceof Map) {
+        for (const id of fresh) state.sectionByRed.set(id, separated.section)
+      }
+    }
+    keptChars += recordedLine.length + separatorFor(state.lines.length)
+    state.lines.push(recordedLine)
   }
   /**
    * SCANNED, NOT SPLIT (review finding, 28.08.2026, round 16). Building
@@ -675,6 +711,9 @@ export function armRunRecorder(backend) {
       lines: [],
       // The keys whose measurement did NOT hold still within this run.
       variedKeys: new Set(),
+      // The live gate's section for each retained red. Kept beside the text so
+      // no durable reader ever has to infer provenance from a tag-shaped tail.
+      sectionByRed: new Map(),
       // Result lines the ceiling refused — each one carried a red nothing else
       // in the buffer stands for, so a run with any is recorded INCOMPLETE.
       droppedLines: 0,
@@ -685,7 +724,7 @@ export function armRunRecorder(backend) {
       terminalVerdict: false,
       uncaught: false,
     }
-    const flush = tapOutput(armed)
+    const flush = tapOutput(armed, undefined, resultSection)
     // THE REAL CRASH PATH (four-eyes finding F1). Node prints an uncaught
     // exception — an unhandled rejection at a top-level await included, i.e.
     // exactly a Playwright timeout in a suite that does not catch it — from C++
@@ -740,11 +779,10 @@ export function armRunRecorder(backend) {
         let reds = []
         if (exit !== 0 || armed.crashed || armed.droppedLines > 0) {
           try {
-            const output = armed.lines.join('\n')
             // The keys the TAP saw print two different measurements — the buffer
             // keeps only the first, so a narrow charge must not own the red on
             // that one reading (review, 28.08.2026).
-            reds = chargeReds(markVariedDetails(failedChecks(output), armed.variedKeys), {
+            reds = chargeReds(capturedReds(armed), {
               suite: armed.suite,
               backend: armed.backend,
               // The WebGPU feature level this run really came up at, so a charge

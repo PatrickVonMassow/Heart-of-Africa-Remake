@@ -3330,38 +3330,80 @@ describe('the shipped charge ledger', () => {
   // is the one failure mode a charge must never have. These pin the narrow half
   // AND the measured half together: an entry that stops matching its own
   // evidence is as broken as one that matches everything.
-  it('reads a recorded detail exactly as the record stored it', () => {
-    // THE DEFECT IS REAL, AND THIS READER IS NOT ALLOWED TO FIX IT (cross-vendor
-    // review, GPT-5.6 Sol, do-not-merge three times). A suite that declares
-    // sections appends ` [--section=<name>]` to every result line and the record
-    // stores the line WITH it, while every detailMatch is anchored at both ends
-    // against the MEASURED line — so no anchored charge in such a suite reaches
-    // the end of its own recorded red. Four owned reds sit unaccounted because of
-    // it, and the gate stays shut.
-    //
-    // Two attempts to take the tag off by reading the text were refused for one
-    // reason: reconstruction proves syntax, not PROVENANCE — a check that really
-    // measured a value ending in the join and a bracket is indistinguishable from
-    // a tagged one, and stripping it could satisfy a signature belonging to a
-    // different red. Asked which is worse, the reviewer answered: a silent false
-    // clearance is worse than a loud block. So this pins the loud state until
-    // point 1018 records the section beside the measurement.
+  it('keeps an old tagged detail verbatim instead of guessing its provenance', () => {
+    // Records from before the section field keep working in the strict
+    // direction: their text is read exactly as stored. Syntax cannot prove that
+    // this tail was metadata, so the anchored charge refuses it loudly.
     const tagged = (name, detail, scope, kind = 'check') => chargeFor({ name, detail, kind }, scope)
     const stem = 'hoa-state-2026-08-30-42'
     const members = archiveMemberDetail(
       archiveMemberNames(stem, ARCHIVE_MEMBER_SUFFIXES.filter((x) => x !== ARCHIVE_PICTURE_SUFFIX)),
     )
     const gpuReport = { suite: 'report', backend: 'webgpu', featureLevel: 'compatibility' }
-    // Without the tag — what the suite printed — the charge answers.
+    // The measurement alone answers.
     expect(tagged('the archive holds picture, state, overlay and description', members, gpuReport).point).toBe(927)
-    // With it, as the record holds it, the charge does NOT, and that is the
-    // defect 1018 closes. Pinned so the day it closes, this line says so.
+    // An old record has no section field and keeps the tag-shaped tail.
     expect(
       tagged('the archive holds picture, state, overlay and description', `${members}  [--section=bug-report-archive]`, gpuReport),
+    ).toBeNull()
+    // Even a malformed new record cannot ask the READER to strip text. New
+    // records separate before this point; section is data, never an instruction
+    // to reinterpret detail.
+    expect(
+      chargeFor(
+        {
+          name: 'the archive holds picture, state, overlay and description',
+          detail: `${members}  [--section=bug-report-archive]`,
+          section: 'bug-report-archive',
+          kind: 'check',
+        },
+        gpuReport,
+      ),
     ).toBeNull()
     // A charge that reads no detail is untouched by any of this: the name alone
     // is its evidence, and the tag never reaches the name.
     expect(tagged('the archive carries a screenshot', 'no PNG member  [--section=bug-report-archive]', gpuReport).point).toBe(927)
+  })
+
+  it('charges the four measured reds with measurement and section stored separately', () => {
+    const store = (name, detail, section, scope) =>
+      chargeReds([{ name, detail, section, kind: 'check' }], scope)[0]
+    const records = [
+      store(
+        'the archive holds picture, state, overlay and description',
+        'hoa-state-2026-08-30-42.json, hoa-state-2026-08-30-42-overlay.json, hoa-state-2026-08-30-42.txt',
+        'bug-report-archive',
+        { suite: 'report', backend: 'webgpu', featureLevel: 'compatibility' },
+      ),
+      store(
+        'the children walk PAST the traveller — from one side of him to the other',
+        '0 of 4 crossed his line; along the lane (0 = his line) [-11..26@1, -15..16@1, -11..22@1, ' +
+          '-11..16@1] m, walked [67, 67, 68, 66] m, phases [run×39 part×161 roam×695] over 45s ' +
+          'played, 3 tagged',
+        'children-bank-game',
+        { suite: 'polish', backend: 'webgl' },
+      ),
+      store(
+        'first-person ground shows micro-detail (edge energy)',
+        'laplacian mean 1.07',
+        'ground-detail',
+        { suite: 'settings', backend: 'webgl' },
+      ),
+      store(
+        'the streamed dressing does not grow over a session at a fixed anchor (point 278)',
+        '{"samples":[0,0,0,0,0],"min":0,"max":0,"spread":0}',
+        'dressing-growth',
+        { suite: 'enrichments', backend: 'webgl' },
+      ),
+    ]
+    expect(records.map((record) => record.point)).toEqual([927, 698, 603, 938])
+    expect(records.map((record) => record.section)).toEqual([
+      'bug-report-archive',
+      'children-bank-game',
+      'ground-detail',
+      'dressing-growth',
+    ])
+    for (const record of records) expect(record.detail).not.toContain('[--section=')
   })
 
   // THE THREE ENTRIES WHOSE ONLY PIN WAS A TAGGED READ (cross-vendor review,
