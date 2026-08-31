@@ -156,7 +156,7 @@ Die Ursache findest du durch **Zerlegen**, nicht durch Wiederholen.
   Produkt — Urteil, Plan, Anleitung —, lies sie am **echten Bestand**, nie nur an selbstgebauten
   Eingaben.“ *(Sieht das richtig aus?)*
 - **Der Fühler misst sich selbst.** Eine Überwachung liest einen Wert, den ihr Nachsehen selbst
-  erneuert — ein toter Vorgang wirkt lebendig, und je öfter du prüfst, desto lebendiger.
+  erneuert — ein toter Vorgang wirkt dann umso lebendiger, je öfter du prüfst.
   → *Prompt:* „Ein Lebenszeichen darf nur aus einer Quelle kommen, die der **Beobachter nicht
   beschreibt**. Prüf das am **stillgelegten** Gegenstand, mit und ohne Blick dazwischen: Bewegt
   **erst der Blick** den Wert, misst sie sich selbst.“
@@ -283,10 +283,9 @@ Die Ursache findest du durch **Zerlegen**, nicht durch Wiederholen.
   Einträge; nicht geliefert liest sich *grüner* als ein Fehlschlag, still gekürzter Prüfstoff für
   das Modell wie ein Mangel.
   → *Prompt:* „Leite das Fenster jeder Messung aus dem **Gegenstand** ab: nach Zeit, nie nach
-  Anzahl. Nenne dem **prüfenden Modell selbst** jedes weggelassene Material, nicht nur dem
-  Aufrufer, und melde die **Abdeckung**; ein Urteil über halbem Material ist **Teilprüfung**.
-  Ein Urteil gilt dem **Zuschnitt**, den du lieferst: Stimmt er nicht, korrigier ihn und **frag
-  neu** — überstimm nie den Prüfer."
+  Anzahl. Nenne dem **prüfenden Modell selbst** jedes weggelassene Material und melde die
+  **Abdeckung**; ein Urteil über halbem Material ist **Teilprüfung** und gilt dem **Zuschnitt**,
+  den du lieferst — stimmt der nicht, korrigier ihn und **frag neu**, überstimm nie den Prüfer."
 
 - **„Läuft der noch?" mit „ist die Ausgabe frisch?" beantwortet.** Frische belegt nur, dass jemand
   gearbeitet *hat*.
@@ -404,11 +403,13 @@ Die Ursache findest du durch **Zerlegen**, nicht durch Wiederholen.
   → *Prompt:* „Eine Grenze verwehrt die **erste** Handlung nach dem Überschreiten, nicht die
   letzte. Was den Schritt **abschließt**, bleibt erlaubt; was festhält, mach **übergebbar**."
 
-- **Die KI repariert den Wächter, der sie gerade sperrt.** Ein Tor kann zu Recht sperren und
-  trotzdem unlösbar sein: es kennt nur einen erlaubten Weg, oder seine Abhilfe liegt außer
-  Reichweite.
+- **Die KI repariert den Wächter, der sie sperrt — oder beantwortet ihn zehnmal.** Ein Tor kann
+  zu Recht sperren und doch unlösbar sein. Und weil ein rotes Tor den Zug neu startet, schreibt
+  die KI eine Abschlusszeile statt einer Reparatur: sieht aus wie Arbeit, bewegt nichts.
   → *Prompt:* „Sperrt ein Tor dich, ändere es nie allein: **leg dein Eigeninteresse offen**, nimm
-  das zweite Urteil. Bevor ein Tor scharf geht: **zähl alle Wege auf** und prüfe seine Abhilfe."
+  das zweite Urteil, zähl vor dem Scharfstellen **alle Wege** auf und prüf die Abhilfe. Eine
+  **wiederholte** Absage beweist: deine Antwort ist nicht die Reparatur — miss neu und meld sie
+  mir."
 
 - **Der Prüflauf verändert sein eigenes Projekt.** Eine Suite, die ihren Zielpfad aus dem Quellort
   statt der Testumgebung nimmt, schreibt Zweige um und bleibt grün.
@@ -446,15 +447,14 @@ Die Ursache findest du durch **Zerlegen**, nicht durch Wiederholen.
   → *Prompt:* „Zurücktreten heißt **nicht handeln**, nie **nicht wissen**. Lesen kollidiert mit
   nichts.“
 
-- **Die Pflicht wächst schneller, als du sie erfüllen kannst.** Verlangt eine Prüfung „alles seit
-  dem letzten Mal", wird sie unerfüllbar und setzt sich aus. Gilt ein Veto der **Datei** statt dem
-  Befund, wächst der Rückstand beim Abtragen: Wer ihn behebt, fasst die Datei an und schuldet
-  neu — während die Absage den ganzen Bestand druckt und den Platz dafür wegnimmt.
+- **Die Pflicht wächst schneller, als du sie erfüllen kannst.** „Alles seit dem letzten Mal" wird
+  unerfüllbar, und ein Veto der **Datei** statt des Befundes lässt den Rückstand beim Abtragen
+  wachsen: Wer ihn behebt, fasst die Datei an und schuldet neu.
   → *Prompt:* „Binde jede Prüfpflicht an den **einzelnen Beitrag**, nie an einen offenen Zeitraum,
-  und buch ein Veto gegen den **Befund**: trenne **gelesen** von bloß berührt, quittiere eine
-  Reparaturkette am **Endzustand** als einen Beitrag, und mach neue Befunde derselben Datei zum
-  eigenen Ticket. Eine Verweigerung nennt ihren **Grund**, nie ihren Bestand; sieht eine Pflicht
-  unerfüllbar aus, prüf zuerst dein **Messgerät**."
+  und buch ein Veto gegen den **Befund**: trenne **gelesen** von berührt, quittiere eine
+  Reparaturkette am **Endzustand**, und mach neue Befunde derselben Datei zum eigenen Ticket. Eine
+  Verweigerung nennt ihren **Grund**, nie ihren Bestand; sieht eine Pflicht unerfüllbar aus, prüf
+  zuerst dein **Messgerät**."
 
 - **Das Protokoll ohne Verfallsdatum wird zum Dauerplakat.** Was dein Werkzeug über die eigene
   Entscheidung aufschreibt, nimmt niemand je wieder heraus.
@@ -500,4 +500,4 @@ Die Ursache findest du durch **Zerlegen**, nicht durch Wiederholen.
 
 Sie ersetzt die Fallstricke oben nicht.
 
-<!-- GUIDE-FINGERPRINT: aefad85ae5f102a132bb5971d027efe70f9cbba1cdf84d799013d5c8ab7daf47 -->
+<!-- GUIDE-FINGERPRINT: d8adcd7da67c25cf5caebb0bed78789f11390c93781dc45a9423e2a91e1c6c23 -->
