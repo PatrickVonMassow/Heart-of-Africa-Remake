@@ -1086,6 +1086,12 @@
       "why": "Es gehoert unmittelbar hinter die anderen Prozessbefunde desselben Abends; die Tabelle treibt heute keine parallele Vergabe, die vor der Veroeffentlichung noch anlaeuft.",
       "origin": "machine",
       "place": "last"
+    },
+    "1030": {
+      "at": "2026-08-31T17:39:02.357Z",
+      "why": "Es steht bei den anderen Prozessbefunden desselben Abends; die Wirkung ist eine zu weiche Freigabe, kein falsches Rot, und blockiert deshalb keinen Punkt vor ihm.",
+      "origin": "machine",
+      "place": "last"
     }
   },
   "boundary": {
@@ -1124,7 +1130,7 @@
     "why": "The order standing in front of the release today is the arrangement that predates this rule; the four machine-filed points that had ranked themselves there were moved behind 174 first"
   },
   "settled": {
-    "at": "2026-08-31T17:25:12.188Z",
+    "at": "2026-08-31T17:39:02.365Z",
     "points": [
       174,
       184,
@@ -1478,7 +1484,8 @@
       1026,
       1027,
       1028,
-      1029
+      1029,
+      1030
     ]
   }
 }

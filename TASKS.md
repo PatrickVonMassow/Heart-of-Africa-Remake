@@ -14202,3 +14202,37 @@ to land than a mechanism that needs a review.
   Criticality: high — it is the record the dispatcher reads before it spends a lane, and it fails
   silently in the direction of commissioning the collision.
   Bundle: Session- & Repo-Hygiene.
+- [ ] 1030. A refusal is consumed as coverage: a recorded `do-not-merge` CLEARS the very file it
+  refuses (Opus 5, cross-vendor round on the review ledger's core, 31.08.2026 — the finding stands
+  on its own reading; the ledger could not record it, which is point 1008's disagreement measured
+  a second time).
+  `openRefusalsIn` in `scripts/mechanism-review-core.mjs` drops any refusal whose relation to the
+  artefact is `co-touching`. But the per-file loop that consumes it treats the mere PRESENCE of a
+  scoped row as a reading of that file, and only puts the file back into `remainingFiles` when an
+  OPEN refusal survives that drop. A `do-not-merge` row passes the `sound` filter — it tests that
+  the review attests to code reading and is independent, never what it concluded — so for a
+  co-touching relation the same row is at once "not a refusal" and "a reading of this file". The
+  narrowing was applied to the refusal half and not to the clearance half.
+  THE REACHABLE SHAPE, not a hypothetical: end-state mode builds one artefact per file at the
+  LATEST pending commit touching it. With pending commits A (files f, g) and D (file g), artefacts
+  f→A and g→D, and one record R at D reading both f and g: artefact g relates as `read` and the
+  refusal blocks it; artefact f relates as `co-touching`, the refusal is dropped, and f is CLEARED
+  by the record that refused it. Fix g, record a merge at a descendant, and f is never re-reviewed.
+  Every `--carried-from` row has the same shape by construction: a carry is recorded at a head that
+  did not touch the carried files, so its `read` relation is unreachable for them and its refusal
+  charges nobody.
+  WHY IT IS THE WORST PLACE FOR THIS BUG: the whole four-eyes mechanism exists so a second model's
+  refusal cannot be walked past. A refusal that clears its own file is not a weak gate — it is a
+  gate that reports the opposite of what it measured, and it does so silently.
+  FINAL STATE: the clearance half is narrowed with the refusal half. A row may only clear a file
+  for the relation in which it actually read it; a row dropped as co-touching for the refusal is
+  dropped as coverage for that same file too, so the file returns to `remainingFiles` instead of
+  going clear.
+  VERIFIABLE: a unit case building exactly the A/D artefact shape above and asserting the
+  co-touching file is NOT cleared by the refusing row, mutation-checked against today's code; a
+  case over a `--carried-from` row proving its refusal reaches the carried files; a case proving a
+  genuine merge verdict still clears what it read, so the narrowing does not turn every review into
+  a refusal. Plus `npm run test:unit`, lint, build.
+  Criticality: high — it is the gate that decides whether a second model's refusal is answered, and
+  it fails in the direction of reporting cleared where it measured refused.
+  Bundle: Modell & Wächter.
