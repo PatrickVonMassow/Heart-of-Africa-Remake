@@ -141,6 +141,10 @@ change) and 449 last, because the drill is what makes the others more than a cla
 - **#977** — the four-eyes fallback that names a reviewer no command can start. Like 887 and
   888 it is a property of the review machinery rather than of any lane, and every bundle would
   otherwise wait on a gate that is not its own.
+- **#1019** — the do-not-merge verdict that charges every contribution touching the same file,
+  so the debt grows while it is being paid. Like 887, 888 and 977 it is a property of the review
+  ledger rather than of any lane; it blocks every bundle's turn end alike, which is exactly why
+  no single bundle may own its order.
 - **#285**.
 - **#393** — sequenced behind 264, so it moves with that point rather than with a
   bundle.

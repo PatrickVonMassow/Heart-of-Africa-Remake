@@ -1415,7 +1415,7 @@ keinen Träger hat. Gebucht als Punkt 956.
 
 ## Anhang A — Maschinell gepflegte Quellen-Übersicht
 
-Zuletzt aktualisiert: Sonntag, 30.08.2026, 01:02 · Quellen-Fingerprint: `212726edb7a0…`
+Zuletzt aktualisiert: Montag, 31.08.2026, 10:11 · Quellen-Fingerprint: `56df0cade7f8…`
 
 Spalten heuristisch aus den Quellen abgeleitet (Anläufe = distinkte Datumsnennungen im Memory;
 Maßnahme = Guard-Skripte mit Namens-Treffer). Die inhaltliche Bewertung gehört der Prosa oben.
@@ -1453,7 +1453,7 @@ Maßnahme = Guard-Skripte mit Namens-Treffer). Die inhaltliche Bewertung gehört
 | Work at High effort by default; the user reserves Extra high for research and design decisions, not implementation | 4 | hoch | — (Regel/Memory) | ◐ Regel |
 | Write idiomatic English in all English text (README, code comments, commit messages) — no German calques like 'stand' for a version | 1 | niedrig | — (Regel/Memory) | ◐ Regel |
 | Fable is NOT the default lane because its volume is the scarcest; difficulty is no reason for it either (since 18.08.2026 hard cases go straight to Sol), and review is cross-vendor, not Fable-by-default | 4 | hoch | — (Regel/Memory) | ◐ Regel |
-| Findings recorded by a session that could not write the work order — carry each into TASKS.md, then mark it drained | 34 | hoch | findings-guard.mjs | ✔ Mechanismus |
+| Findings recorded by a session that could not write the work order — carry each into TASKS.md, then mark it drained | 35 | hoch | findings-guard.mjs | ✔ Mechanismus |
 | A recurring lookup gets a script; never pull raw transcripts, listings, or logs into context to answer it | 1 | niedrig | — (Regel/Memory) | ◐ Regel |
 | Past the 150k context watermark, FINISH the step and hand over — never start a suite, an agent or a point after it; the user raised the cost twice (13.08. and 17.08.2026) | 2 | mittel | — (Regel/Memory) | ◐ Regel |
 | User 18.08.2026: hard, complex, error-prone and HIGH-criticality points are AUTHORED by GPT-5.6 Sol directly — Opus 5 authors only what is left, and Fable authors only a point that tags its lane or one the router escalates | 4 | hoch | — (Regel/Memory) | ◐ Regel |
@@ -1518,8 +1518,8 @@ Maßnahme = Guard-Skripte mit Namens-Treffer). Die inhaltliche Bewertung gehört
 
 Erfasste Quellen: 93 Feedback-/Projekt-Memories · 57 Guard-/Hook-Skripte · 6 Revert-/Reapply-Commits · 115 Prozess-/Meta-TASKS-Punkte (davon 49 offen).
 
-<!-- RETRO-FINGERPRINT: 212726edb7a02f2dab72337bff5279d9392e71e08692423b135deec5ef6742b4 -->
-<!-- RETRO-LAST-REFRESHED: 2026-08-29T23:02:04.662Z -->
+<!-- RETRO-FINGERPRINT: 56df0cade7f81433c6e6ce00010d751df59c2fac508b9fa566711c25dc113869 -->
+<!-- RETRO-LAST-REFRESHED: 2026-08-31T08:11:29.415Z -->
 <!-- AUTO-GENERATED:END -->
 
 ### 3.111 Ein Erfolg ist kein Beweis für den Weg, auf dem er zustande kam
@@ -4833,3 +4833,33 @@ selbst. Alle drei behaupteten weiter die Ursache, die die Rücknahme gerade nich
 mehr behaupten wollte. Die vierte Runde hat genau das gefunden. **Eine Rücknahme
 ist erst vollständig, wenn auch jede Stelle mitkommt, die von ihr abgeschrieben
 hat.**
+
+### 3.217 Eine Schuld, die beim Abtragen wächst
+
+Am 30.08.2026 stand der Vier-Augen-Zähler vor der Landung von Punkt 1016 bei
+vier offenen Beiträgen. Zwei ehrliche do-not-merge-Urteile später — beide an
+`scripts/render-verify-core.mjs` und dessen Testdatei — stand er bei dreißig.
+Nach acht Reparatur-Commits, von denen jeder einen echten, vom anderen Anbieter
+gefundenen Defekt schloss, stand er bei vierzig. Der Zähler stieg monoton,
+während die Sitzung nichts anderes tat, als die Befunde zu beantworten.
+
+Die Ursache ist zweiteilig und in beiden Hälften strukturell. Erstens wird ein
+Urteil gegen die DATEI gebucht, nicht gegen den Befund: Es sperrt damit jeden
+Beitrag, der dieselbe Datei anfasst, bis eine saubere Gegenlesung an einem
+Nachfolge-Commit steht. Fünfundzwanzig der dreißig gesperrten Beiträge hatten
+mit dem Befund inhaltlich nichts zu tun; sie standen nur da, weil sie dieselbe
+heiße Datei berührt hatten. Zweitens verlangt die Antwort auf einen Befund an
+einer heißen Datei, dass man sie erneut anfasst — und schuldet dadurch selbst
+wieder eine Gegenlesung, die an dieser Datei bisher immer noch etwas fand.
+
+**Die Lehre ist nicht, dass die Befunde falsch waren — alle acht waren echt und
+das Tor hat genau das blockiert, wofür es existiert. Die Lehre ist, dass eine
+Schuld, deren Tilgung neue Schuld erzeugt, ohne einen eigenen Ausgang nie auf
+null kommt.** Der Wiederholungs-Wächter hat den Lauf bei neun Commits in Folge
+angehalten, und das war richtig: Er hat die Schleife erkannt, die die Sitzung
+selbst nicht mehr sah. Was fehlt, ist die Unterscheidung zwischen einem Beitrag,
+den ein Urteil wirklich GELESEN hat, und einem, der nur dieselbe Datei berührte
+— und eine Quittung, die den Endzustand einer Reparaturkette als EINEN Beitrag
+abnimmt statt jeden Zwischenschritt einzeln. Beides steht als Punkt 1019 in der
+Arbeitsordnung; gebaut ist es noch nicht, und bis dahin bleibt dieser Zustand
+die teuerste Sperre des Batches.

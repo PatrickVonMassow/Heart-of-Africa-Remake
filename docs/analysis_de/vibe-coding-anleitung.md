@@ -180,6 +180,13 @@ Die Ursache findest du durch **Zerlegen**, nicht durch Wiederholen.
   → *Prompt:* „Frag vor jeder Runde: **Hat sich etwas bewegt außer der Zählung?** Bleibt der
   Umfang, ist der Gegenstand zu groß — **teile das Ticket und arbeite jedes Stück für sich ab**.“
 
+- **Die Sperre wächst beim Abtragen.** Das Veto gilt der **Datei** statt dem Befund und sperrt
+  jeden Beitrag, der sie anfasst; wer den Befund behebt, fasst sie an und schuldet neu.
+  → *Prompt:* „Buch ein Veto gegen den **Befund**, nicht die Datei, und trenne, was eine
+  Gegenlesung **gelesen** hat, von dem, was sie nur berührte. Quittiere eine Reparaturkette am
+  **Endzustand** als einen Beitrag. Erzeugt das Beheben laufend neue Befunde derselben Datei,
+  wird das ein eigenes Ticket, statt die Arbeit anzuhalten — Nachsicht ist es nie.“
+
 - **Gebaut — und nie in Betrieb genommen.** Die Ausnahme steht im Fließtext statt in der Datei,
   die das Werkzeug liest; oder das Tor urteilt richtig, nur fährt es kein Weg des Projekts.
   → *Prompt:* „Trag eine Ausnahme **im selben Zug** dort ein, wo der Mechanismus sie liest, und
@@ -492,4 +499,4 @@ Die Ursache findest du durch **Zerlegen**, nicht durch Wiederholen.
 
 Sie ersetzt die Fallstricke oben nicht.
 
-<!-- GUIDE-FINGERPRINT: 212726edb7a02f2dab72337bff5279d9392e71e08692423b135deec5ef6742b4 -->
+<!-- GUIDE-FINGERPRINT: 56df0cade7f81433c6e6ce00010d751df59c2fac508b9fa566711c25dc113869 -->
