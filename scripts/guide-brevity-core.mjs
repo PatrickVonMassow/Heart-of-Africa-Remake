@@ -257,11 +257,15 @@ export const LIMITS = {
   // — und die Gegenprüfung — sah weniger, als sie behauptet", which already owns the cut-material
   // class; the neighbours were read for redundancy first, and the closest, "Die Begründung, die
   // sich im eigenen Dokument widerlegt", is about a contradiction the cut HIDES, not about the
-  // verdict the cut PRODUCES. Paying it back inside the entry was tried and refused: every
-  // candidate word carried a claim of its own — "nicht nur dem Aufrufer" is the half that says
-  // WHOM to tell — and dropping a claim to buy a line is the exact defect the entry below records.
-  // Net +2 lines / +22 words, and the ceilings move by exactly that, with zero slack.
-  maxLines: 502,
+  // verdict the cut PRODUCES. THE FIRST DRAFT OVERPAID and said so wrongly: it claimed every
+  // candidate word carried a claim, having only tried to shorten the entry's EXISTING text and
+  // never the new sentence itself. The four-eyes read wrote the same two claims in one line
+  // ("Falscher Zuschnitt? Korrigier ihn, frag neu — überstimm nie den Prüfer"), which is the +1/+11
+  // that stands here. Note what no budget check could have caught: content and ceiling rose
+  // TOGETHER, so `measured > limits` stayed green over eleven words of pure headroom — this class
+  // of overpayment is visible only to a reader who asks whether the words were needed.
+  // Net +1 line / +11 words, and the ceilings move by exactly that, with zero slack.
+  maxLines: 501,
   // EXACT FIT, not headroom — corrected 30.07.2026 after the four-eyes review
   // pointed out that this comment had long stopped describing the numbers. The
   // rule above ("raised only by the measured size of genuinely new tips")
@@ -452,7 +456,7 @@ export const LIMITS = {
   // to 4545 words once it was folded into the entry it duplicated and the two claims a
   // neighbouring entry had lost were paid back in place, and then to 4567 with the verdict-judges-
   // its-material claim justified beside maxLines; the guide keeps no unearned headroom.
-  maxWords: 4567,
+  maxWords: 4556,
   // A pitfall entry = the risk lines plus its prompt. Anything longer is a
   // story, not a tip.
   maxEntryLines: 11,

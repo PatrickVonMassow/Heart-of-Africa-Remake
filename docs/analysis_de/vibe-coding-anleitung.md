@@ -285,8 +285,7 @@ Die Ursache findest du durch **Zerlegen**, nicht durch Wiederholen.
   → *Prompt:* „Leite das Fenster jeder Messung aus dem **Gegenstand** ab: nach Zeit, nie nach
   Anzahl. Nenne dem **prüfenden Modell selbst** jedes weggelassene Material, nicht nur dem
   Aufrufer, und melde die **Abdeckung**; ein Urteil über halbem Material ist **Teilprüfung**.
-  Und es gilt dem gelieferten **Zuschnitt**: Passt es nicht zur Sache, korrigier das Material und
-  **frag neu** — überstimm nie den Prüfer."
+  Falscher **Zuschnitt**? Korrigier ihn, **frag neu** — überstimm nie den Prüfer."
 
 - **„Läuft der noch?" mit „ist die Ausgabe frisch?" beantwortet.** Frische belegt nur, dass jemand
   gearbeitet *hat*.
