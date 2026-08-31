@@ -316,12 +316,6 @@ export const RED_CHARGES = [
     // the compatibility level, the console kind and the measured sentence are
     // the whole of this scope, and the charge dies with point 514 in any case.
     //
-    // `Async render pipeline creation failed` is dropped outright: point 734
-    // records that it has NO owning point in the work order and must be given
-    // one the moment a run reproduces it, so owning it here would bury the very
-    // defect the point says to file. Measured before the change: no recorded
-    // red in the 40-run window matches any of the three, so nothing accounted
-    // for today stops being.
     // ONE ALTERNATIVE, ONE DETAIL — SO THEY CANNOT CROSS (review finding,
     // 28.08.2026, round 22). `match` and `detailMatch` are asked
     // independently, so a red whose NAME was the RGBA16Float root could pass the
@@ -396,8 +390,8 @@ export const RED_CHARGES = [
     why:
       'THE TEXTURE-VIEW HALF of the same cascade, split out 28.08.2026 (round 22) for the same ' +
       'reason. It is the ONE downstream object name the storm was measured with, in the ' +
-      'uncaptured-validation form and never the async-pipeline one — that form has no owning ' +
-      'point and must be FILED the moment a run reproduces it, which is what point 734 says. ' +
+      'uncaptured-validation form; the separately measured ShadowMaterial async-pipeline form ' +
+      'has its own narrow entry below. ' +
       'What this entry still cannot ask is whether the root it points back to is present and ' +
       'uncharged in the same record: a charge reads ONE red and never the run around it, which ' +
       'is POINT 990. On core, on WebGL 2, in another suite or as a CHECK it stays a real red, ' +
@@ -408,6 +402,47 @@ export const RED_CHARGES = [
     // entry's own evidence says has no owner and must stay red.
     match: /^console error: THREE\.WebGPURenderer: Uncaptured WebGPU GPUValidationError: \[Invalid TextureView\] is invalid due to a previous error/i,
     detailMatch: /^THREE\.WebGPURenderer: Uncaptured WebGPU GPUValidationError: \[Invalid TextureView\] is invalid due to a previous error/i,
+  },
+  {
+    point: 514,
+    suite: 'settings',
+    backend: 'webgpu',
+    featureLevel: 'compatibility',
+    kind: 'console',
+    // The recorder cuts the normalised error at 120 characters, just after
+    // `[Invalid TextureView]` in the measured ShadowMaterial name. The numeric
+    // pipeline id varies, and that variation marks the detail as varied, so the
+    // stable stored NAME is the narrowest evidence this red retains. Requiring
+    // ShadowMaterial and TextureView leaves the neighbouring MeshStandard
+    // pipeline failures unowned.
+    match:
+      /^console error: THREE\.WebGPURenderer: Async render pipeline creation failed \(renderPipeline_ShadowMaterial_\d+\): \[Invalid TextureView\](?:\s|$)/i,
+    why:
+      'THE SHADOW PIPELINE SIGNATURE OF POINT 514\'S MSAA CASCADE, charged 31.08.2026 from the ' +
+      'full WebGPU LARGE settings block: renderPipeline_ShadowMaterial_1867/1868 fails on an ' +
+      'Invalid TextureView immediately after the RGBA16Float multisampling root. Scoped to the ' +
+      'measured compatibility settings console lane; other pipeline families remain real reds, ' +
+      'and the charge dies with point 514.',
+  },
+  {
+    point: 514,
+    suite: 'settings',
+    backend: 'webgpu',
+    featureLevel: 'compatibility',
+    kind: 'console',
+    // At the same 120-character bound the measured name ends after the first
+    // two generated renderContext digits. The uncaptured error class, invalid
+    // object type, encoder source and context prefix all survive; its changing
+    // detail does not, so no detailMatch may honestly be applied.
+    match:
+      /^console error: THREE\.WebGPURenderer: Uncaptured WebGPU GPUValidationError: \[Invalid CommandBuffer from CommandEncoder "renderContext_\d{2}$/i,
+    why:
+      'THE COMMAND-BUFFER SIGNATURE OF POINT 514\'S MSAA CASCADE, charged 31.08.2026 from the ' +
+      'full WebGPU LARGE settings block: the uncaptured Invalid CommandBuffer from ' +
+      'CommandEncoder renderContext_11 error follows the same RGBA16Float root and TextureView ' +
+      'failures. Scoped to that compatibility settings console lane and to every stable word the ' +
+      'record retains; neighbouring WebGPU validation errors remain real reds, and the charge ' +
+      'dies with point 514.',
   },
   {
     point: 568,
@@ -791,9 +826,9 @@ export const RED_CHARGES = [
     // NARROWED 30.08.2026 (cross-vendor review, GPT-5.6 Sol, do-not-merge finding
     // 2): the feature level does NOT test the capability, so on a compatibility
     // adapter that DOES expose `timestamp-query` a genuine timestamp regression
-    // would have been charged here. The excuse now rests on the red's own stated
-    // reason and on nothing else. The low-preset row prints no such reason and is
-    // therefore NOT excused: it stays a real red, which is 1012's to close.
+    // would have been charged here. This cause-bearing every-row check therefore
+    // rests on the red's own stated reason; the exact low-preset companion point
+    // 1012 also names is owned separately below.
     // ANCHORED AT BOTH ENDS 30.08.2026 (cross-vendor review, GPT-5.6 Sol,
     // do-not-merge on a7e9ce5): unanchored, a detail carrying the known reason
     // PLUS a second, genuinely different failure still matched. The detail this
@@ -814,6 +849,22 @@ export const RED_CHARGES = [
       + 'Scoped to the compatibility level on purpose: on an adapter that DOES expose '
       + 'timestamp-query a missing timestamp is a real defect and stays red. The charge dies with '
       + 'point 1012, which owes the UNAVAILABLE verdict that replaces it.',
+  },
+  {
+    point: 1012,
+    suite: 'benchmark',
+    backend: 'webgpu',
+    featureLevel: 'compatibility',
+    kind: 'check',
+    match: /^WebGPU: real GPU timestamps were measured for the low-preset rows too$/i,
+    detailMatch: /^0\/[1-9]\d* low rows with gpu$/i,
+    why:
+      'THE SECOND TIMESTAMP CHECK POINT 1012 NAMES, charged 31.08.2026 from the same two ' +
+      'compatibility-lane LARGE attempts as its cause-bearing companion: 0/3 low rows carried GPU ' +
+      'time because the adapter exposes no timestamp-query feature. The exact check name and a ' +
+      'non-empty all-missing low-row sample are required; every other benchmark row stays red. ' +
+      'The charge dies with point 1012, whose final state replaces both impossible failures with ' +
+      'an UNAVAILABLE verdict while preserving the assertion on capable adapters.',
   },
   {
     point: 514,
