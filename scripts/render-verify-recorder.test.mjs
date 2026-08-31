@@ -28,6 +28,7 @@ import { DEV_SUITES } from './verify/tiers.mjs'
  *  a fresh red identity every time it prints, and no parser can fold it. */
 const tag = (i) => String(i).replace(/\d/g, (d) => 'abcdefghij'[Number(d)])
 import { consoleErrorChecks, failedChecks, parseCheckLines } from './verify/baseline-classify-core.mjs'
+import { sectionTag } from './section-tag-core.mjs'
 import { RETRY_ENV, chargeFor, chargeReds, droppedLinesOf, formatSuspectEnv, isIncompleteRecording, markVariedDetails, runIdentity, runVerdict, unexplainedRuns } from './render-verify-core.mjs'
 
 // The record is stubbed, not written: these cases exercise the REAL arming and
@@ -916,8 +917,16 @@ describe('the captured lines charge the way the guard reads them', () => {
     chargeReds(capturedReds(state), { suite: 'probe', backend: 'webgl', ledger })[0]
 
   it('separates a real tag but preserves the same shape inside the measurement', () => {
+    // THE FIXTURES SPEAK THE GENERATOR'S OWN SHAPE (four-eyes finding, Fable 5,
+    // 31.08.2026). They used to hand-roll a TWO-space tag that `sectionTag`
+    // never emits — so a stripper keyed to the real one-space shape would have
+    // walked straight past these negative pins. The tag is taken from the
+    // generator now, which is the only shape a suite can ever print.
+    const TAG = sectionTag('x')
+    const escaped = (text) => text.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+
     const real = tapped(() => 'x')
-    real.out.write('FAIL  probe — timeout  [--section=x]\n')
+    real.out.write(`FAIL  probe — timeout${TAG}\n`)
     real.flush()
     const charged = chargeProbe(real.state, probeLedger(/^timeout$/))
     expect(charged).toMatchObject({ point: 9001, detail: 'timeout', section: 'x' })
@@ -926,32 +935,32 @@ describe('the captured lines charge the way the guard reads them', () => {
     // the second is the tag the live gate says it appended. Only the latter is
     // separated, so a mutation that strips both would falsely charge /^timeout$/.
     const shaped = tapped(() => 'x')
-    shaped.out.write('FAIL  probe — timeout  [--section=x]  [--section=x]\n')
+    shaped.out.write(`FAIL  probe — timeout${TAG}${TAG}\n`)
     shaped.flush()
     expect(chargeProbe(shaped.state, probeLedger(/^timeout$/)).point).toBeNull()
-    expect(chargeProbe(shaped.state, probeLedger(/^timeout  \[--section=x\]$/))).toMatchObject({
+    expect(chargeProbe(shaped.state, probeLedger(new RegExp(`^timeout${escaped(TAG)}$`)))).toMatchObject({
       point: 9001,
-      detail: 'timeout  [--section=x]',
+      detail: `timeout${TAG}`,
       section: 'x',
     })
 
     // Syntax alone proves nothing. With no live section, identical durable text
     // is an old/untagged measurement and the recorder changes none of it.
     const noProvenance = tapped()
-    noProvenance.out.write('FAIL  probe — timeout  [--section=x]\n')
+    noProvenance.out.write(`FAIL  probe — timeout${TAG}\n`)
     noProvenance.flush()
     expect(chargeProbe(noProvenance.state, probeLedger(/^timeout$/)).point).toBeNull()
-    expect(chargeProbe(noProvenance.state, probeLedger(/^timeout  \[--section=x\]$/))).toMatchObject({
+    expect(chargeProbe(noProvenance.state, probeLedger(new RegExp(`^timeout${escaped(TAG)}$`)))).toMatchObject({
       point: 9001,
-      detail: 'timeout  [--section=x]',
+      detail: `timeout${TAG}`,
     })
   })
 
   it('does not mistake a tag shape at the detail cut for recorder metadata', () => {
-    const shape = '  [--section=x]'
+    const shape = sectionTag('x')
     const cut = `${'m'.repeat(200 - shape.length)}${shape}`
     const capture = tapped(() => 'x')
-    capture.out.write(`FAIL  probe — ${cut}TAIL  [--section=x]\n`)
+    capture.out.write(`FAIL  probe — ${cut}TAIL${shape}\n`)
     capture.flush()
     const escaped = cut.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
     const detailMatch = new RegExp(`^${escaped}$`)
