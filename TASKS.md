@@ -155,7 +155,8 @@ put it is the mistake this line exists to stop.
   Criticality: high — it is the gate that stops the batch from ending a turn, and both directions
   are expensive: left as it is it can shut the run indefinitely, loosened carelessly it excuses
   the counter-read that the two verdicts of 30.08. correctly demanded.
-  Bundle: Modell & Wächter.
+  Bundle: Modell & Wächter — it edits the four-eyes gate and its ledger reader, the files 887,
+  888 and 977 also reason about, so it is worked after them and never beside them.
 
 - [ ] 686. The taught language is five concepts, and the chief's message is four of them (user
   13.08.2026, playing the deployed communication slice).
@@ -13912,3 +13913,80 @@ to land than a mechanism that needs a review.
   and the shortcut it invites — assuming the other lane — writes exactly the charge the table
   forbids.
   Bundle: Testinfrastruktur.
+
+- [ ] 1020. The handover card is judged for length only after the fence has forbidden changing
+  it, so an honest card can never be corrected (measured 31.08.2026, 10:30–10:41, over six
+  turns that moved nothing).
+  THE SEQUENCE IS THE PRESCRIBED ONE, followed exactly: `batch-boundary.mjs --prepare --context`
+  hands out the WORDING of the handover card, `board.mjs none` writes and publishes it,
+  `guard-preflight --for answer` reports clear, and `batch-boundary.mjs --commit --context` runs
+  as the session's last repository action. ONLY THEN does `dashboard-conciseness-guard` fault the
+  card just written — 94 words against a 90-word budget, plus a missing paragraph break. Its
+  prescribed remedy is a republish, which is a mutation, and the fence refuses every mutation
+  after the commit, rightly: silently deleting that marker defeated every handover on
+  13.08.2026. The only door left is to withdraw the fence, shorten by four words and re-take it.
+  WHAT IT COST, measured: the session did not take that door at first and ended six turns in a
+  loop, each reporting the same unsatisfiable faults, each costing a call and none moving
+  anything. It also could not read its own CI state or measure the time for its reply, because
+  the fence refuses reads too once committed.
+  FINAL STATE: whatever judges the handover card speaks while its author may still change it.
+  The publish gate already refuses a card's STRUCTURE at write time; the length budget is the one
+  check that waits for the turn end, and it moves to the same place — or `--prepare` hands out a
+  wording that fits the budget by construction, which today's did not: it is a single paragraph
+  already near the limit, so any honest addition pushes it over. Whichever half is built, the
+  other is stated in the commit and left deliberately, because both cost little and only one is
+  needed. Nothing here weakens the fence: refusing a mutation after the commit stays exactly as
+  it is.
+  VERIFIABLE: a case that drives the whole prescribed sequence — prepare, write the card,
+  commit — and asserts that a card the length check would fault is refused at WRITE time, before
+  the fence closes; a case proving the wording `--prepare` hands out passes the length check with
+  room for one added sentence; and a case proving a post-commit mutation is still refused, at
+  full strength. Plus `npm run test:unit`, lint, build.
+  Criticality: medium — it costs no correctness and loses no work, but it puts a session into a
+  loop it cannot leave, at the one moment the session is most expensive.
+  Bundle: Chat & Tafel — it edits the board's card gate and the boundary's card wording, so it is
+  not worked beside another point touching the board publish path.
+
+- [ ] 1021. A stale chat timestamp still costs the user a second message — nine guard blocks in one
+  morning (user 31.08.2026: "Du schreibst immer wieder Nachrichten und direkt eine hinterher, dass
+  der Zeitstempel falsch war und du ihn korrigiert hast", asking whether a task already exists).
+  MEASURED 31.08.2026 over `/home/node/.claude/projects/-workspace-hoa/*.jsonl`: `timestamp-guard`
+  blocked the turn end seven times in session `159f053e` — five on the STALE-STAMP branch (the
+  refused stamps read 10:36, 10:38, 10:41, 10:56, 10:59) and twice on a reply carrying no header at
+  all — plus two more blocks in session `ef036b03`. Every one of those blocks delivers a SECOND
+  message: the answer the user has already read, then a short acknowledgement about the stamp. That
+  is the defect point 403 closed on 28.07.2026 ("THE USER GETS THE SAME MESSAGE TWICE"), reported
+  again today in the one shape that survived it.
+  THE GUARD IS NOT TOO STRICT, AND THE 403 WORDING FIX IS LIVE. `acceptedStamps` already spans
+  `MINUTES_BACK = 15` and `MINUTES_AHEAD = 3`, so an ordinary composition lag cannot false-block,
+  and the block message asks for a SHORT acknowledgement through `shortAckDemand()` and never for
+  the reply "again" (`REPEAT_DEMAND_PATTERNS` pins that). What is missing is the only half that can
+  prevent the second message at all: a reading of the clock taken WHEN THE REPLY IS COMPOSED. The
+  `UserPromptSubmit` hook injects the stamp at the START of the turn and says in its own words that
+  the value ages; on a long turn — session `159f053e` started at 10:01 and was still being blocked
+  at 10:59 — that value is an hour old, and the written instruction to re-measure is the sole
+  defence. A rule, not a mechanism, and it fails exactly on the long turns that are long enough to
+  break the window.
+  FINAL STATE: when the closing reply is written, a Berlin-minute reading younger than the guard's
+  own window is present in the session's context without the model having to remember to take one.
+  A `PostToolUse`-scope injection delivers a fresh header line whenever the last delivered reading
+  is older than a stated threshold well inside `MINUTES_BACK` — never per tool call, so the turn
+  does not fill with clock noise — and it carries the WHOLE header the guard judges (the bold stamp
+  plus the context reading), so a reply that copies it satisfies both halves rather than trading one
+  block for the other. The existing start-of-turn injection stays; this is its refresh, not its
+  replacement.
+  VERIFIABLE: pure Vitest over the refresh decision — a turn whose last delivered reading is older
+  than the threshold yields a fresh line, one inside it yields nothing; a case that the emitted line
+  satisfies `TIMESTAMP_RE` and `HEADER_SUFFIX_RE` together; and a replay case that feeds the five
+  refused stamps of session `159f053e` to `evaluate()` and asserts each passes when taken after the
+  refresh that would have been delivered. Live: a turn with more than fifteen minutes of tool work
+  ends in exactly ONE message.
+  RELATED: point 403 (archived) is the parent — this is the half of its fix that did not hold;
+  points 764 and 785 own the header's context reading while this one owns the minute, and all three
+  touch the same header path, so they are not worked in parallel; point 833 is the guard's own test
+  race and is untouched here.
+  QUEUE RANK: behind point 174. Reason: user-reported but not release-blocking — a stamp re-measured
+  immediately before the closing reply avoids it every turn, and the release order stands.
+  Criticality: medium — no product defect, but it is the most frequent thing the user watches us get
+  wrong, now reported twice, and each occurrence costs him a duplicate message to read.
+  Bundle: Session- & Repo-Hygiene.
