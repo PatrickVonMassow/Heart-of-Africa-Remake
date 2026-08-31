@@ -1080,6 +1080,12 @@
       "why": "Reine Routing-Buchhaltung ohne Spielwirkung: Sie entscheidet erst, wenn ein Punkt die zehnte abgelehnte Runde erreicht, und keiner der Punkte vor ihr steht dort.",
       "origin": "machine",
       "place": "last"
+    },
+    "1029": {
+      "at": "2026-08-31T17:25:12.179Z",
+      "why": "Es gehoert unmittelbar hinter die anderen Prozessbefunde desselben Abends; die Tabelle treibt heute keine parallele Vergabe, die vor der Veroeffentlichung noch anlaeuft.",
+      "origin": "machine",
+      "place": "last"
     }
   },
   "boundary": {
@@ -1118,7 +1124,7 @@
     "why": "The order standing in front of the release today is the arrangement that predates this rule; the four machine-filed points that had ranked themselves there were moved behind 174 first"
   },
   "settled": {
-    "at": "2026-08-31T16:51:57.472Z",
+    "at": "2026-08-31T17:25:12.188Z",
     "points": [
       174,
       184,
@@ -1471,7 +1477,8 @@
       1025,
       1026,
       1027,
-      1028
+      1028,
+      1029
     ]
   }
 }

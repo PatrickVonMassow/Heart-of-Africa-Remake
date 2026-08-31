@@ -14169,3 +14169,36 @@ to land than a mechanism that needs a review.
   Criticality: high — it governs how the scarcest model lane is spent, and it fails in the
   direction of spending it on a spec nobody re-read.
   Bundle: Modell & Wächter.
+- [ ] 1029. The bundle table's shared-file exclusions are one-sided, so the half that reads the
+  other entry schedules the collision it was meant to prevent (GPT-5.6 Sol, receipt
+  296d4d9355fb3e6a, do-not-merge on 2d47029, 31.08.2026).
+  `docs/work-packages.md` splits the work order into bundles BY SHARED FILES, and the entry text
+  is what says which points must not run in parallel. That only works if a collision is written on
+  BOTH sides. It is not. The clearest contradiction Sol measured: #1016 says it may run beside any
+  other point of its bundle, while #1018 says it writes the same record path and must never run
+  beside #1016. The same asymmetry holds for #1017/#1015, #1020/#800, #1024/#800, #1021/#764 and
+  #785, #1026/#948, #1025/#945 and #964, and — written the same evening the defect was found —
+  #1027/#859 and #1028's three named counterparts, of which two turned out to edit a DIFFERENT
+  file altogether.
+  WHY IT MATTERS MORE THAN A DOCUMENT TIDY-UP: the dispatcher reads ONE side. A session opening
+  #1016 reads "may run beside any of them" and commissions it next to #1018, and the two then
+  write the same record path — which is precisely the rework the three-lane cap exists to avoid,
+  and the one cost the batch cannot recover by retrying. Nothing compares the two halves today,
+  and the entries are prose, so the drift is invisible until two lanes collide.
+  MEASURED TWICE ON ONE EVENING, WHICH IS WHAT MAKES IT MECHANICAL AND NOT A SLIP: the #909/#1026
+  pair was found and repaired by hand at 18:45, and one round later the same reviewer named nine
+  more pairs including two written during that very repair. A rule kept by hand in a 180 000-
+  character table is not kept.
+  FINAL STATE: a guard derives every point's named counterparts from the bundle table and refuses
+  a table in which A excludes B while B does not exclude A. The entry keeps its prose — the
+  counterpart list is what is checked, not the wording — and the refusal names the exact pair and
+  the side that is missing, so the fix is one edit rather than a re-read of the table. The
+  existing one-sided pairs are made bilateral in the same change, each against what the point
+  actually edits rather than what its entry claims.
+  VERIFIABLE: a unit case over the parsed table asserting a one-sided pair is refused and a
+  bilateral one passes, mutation-checked; a case over the REAL document proving it holds today; a
+  case proving a point that names no counterpart at all is not turned into a false pair. Plus
+  `npm run test:unit`, lint, build.
+  Criticality: high — it is the record the dispatcher reads before it spends a lane, and it fails
+  silently in the direction of commissioning the collision.
+  Bundle: Session- & Repo-Hygiene.
