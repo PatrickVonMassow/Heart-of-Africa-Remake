@@ -232,8 +232,15 @@ export const LIMITS = {
   // "Runde um Runde, ohne näher zu kommen", which is about a review that never converges on ONE
   // artefact, not about a verdict spreading to artefacts it never read; neither could be cut
   // without dropping a claim. Net +7 lines / +85 words against the measured 495 / 4462, and the
-  // ceilings move by exactly that to 502 / 4547, with zero slack.
-  maxLines: 502,
+  // ceilings move by exactly that to 502 / 4547, with zero slack. THE SPAN OF THAT RAISE IS
+  // 89107a54~1..4d88250, not 4d88250 alone: the tip arrived in 89107a54 and was shortened in
+  // 4d88250, so only their sum is the +7/+85 — the same split-range mistake this block already
+  // records for 26.08.2026, made a second time.
+  // MINUS ONE, 31.08.2026: the line count above included a phantom line for the file's closing
+  // newline. Correcting `measureGuide` takes that line off every measurement at once, so this
+  // ceiling follows it down to 501 and the effective limit is unchanged. `maxWords` never counted
+  // the phantom and does not move.
+  maxLines: 501,
   // EXACT FIT, not headroom — corrected 30.07.2026 after the four-eyes review
   // pointed out that this comment had long stopped describing the numbers. The
   // rule above ("raised only by the measured size of genuinely new tips")
@@ -488,7 +495,14 @@ export function measureGuide(text) {
       ' ' +
       source.slice(unmatchedStart + 4).replaceAll('<!--', ' ')
   }
-  const lines = source.split('\n')
+  // A TERMINATING NEWLINE ENDS THE LAST LINE, it does not open another one.
+  // `split('\n')` leaves a phantom entry for it, so every POSIX-terminated file
+  // measured one line too many and the ceilings below were all ratcheted against
+  // that inflated count (four-eyes finding, GPT-5.6 Sol on 4d88250, 31.08.2026).
+  // Drop exactly that one sentinel — never all trailing blanks, which are real
+  // lines a guide can waste — and read the empty document as no lines at all.
+  const split = source.split('\n')
+  const lines = source === '' ? [] : source.endsWith('\n') ? split.slice(0, -1) : split
   const body = []
   let inComment = false
   for (const line of lines) {

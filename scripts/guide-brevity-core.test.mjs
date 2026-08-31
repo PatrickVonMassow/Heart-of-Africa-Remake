@@ -256,7 +256,26 @@ describe('auditGuide — budget boundaries', () => {
   it('counts every line and word after an unterminated comment opener', () => {
     const malformed = 'line one\nline two <!--\nline three\nline four\n'
     expect(measureGuide(malformed)).toEqual(measureGuide('line one\nline two \nline three\nline four\n'))
-    expect(measureGuide(malformed)).toEqual({ lines: 5, words: 8 })
+    // FOUR lines, not five: the closing newline ends line four rather than
+    // opening a fifth. This case pinned the phantom until 31.08.2026.
+    expect(measureGuide(malformed)).toEqual({ lines: 4, words: 8 })
+  })
+
+  it('reads a closing newline as the end of the last line, not as another one', () => {
+    // The ceilings are ratcheted against this count, so a phantom line here
+    // silently bought the guide a line of headroom in every raise ever made
+    // (four-eyes finding, GPT-5.6 Sol on 4d88250, 31.08.2026).
+    expect(measureGuide('a\nb\n').lines).toBe(2)
+    expect(measureGuide('a\nb').lines).toBe(2)
+    expect(measureGuide('').lines).toBe(0)
+  })
+
+  it('keeps the blank lines a guide really wastes, and drops only the terminator', () => {
+    // The repair must take off exactly ONE sentinel. Stripping trailing blanks
+    // instead would hand back free lines to a file padded with empty ones.
+    expect(measureGuide('a\n\n\n').lines).toBe(3)
+    expect(measureGuide('a\n\n\n\n').lines).toBe(4)
+    expect(measureGuide('\n').lines).toBe(1)
   })
 
   it('cannot re-form an unterminated opener across its own excision seam', () => {
