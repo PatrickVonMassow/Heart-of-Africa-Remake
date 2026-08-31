@@ -14117,3 +14117,55 @@ to land than a mechanism that needs a review.
   Criticality: high — it is the path every unattended handover takes, it fails silently in the
   direction of doing nothing, and the board reports rest while it happens.
   Bundle: Urlaubsfestigkeit.
+- [ ] 1027. A launcher that needed two seconds to write its record is disowned forever, and every
+  handover with it (measured 31.08.2026 18:1x, on this host, against a demonstrably live daemon).
+  `node scripts/batch-boundary.mjs --commit --context` refused the handover with "the launcher is
+  unknown" while the daemon was alive — pid 1820, running since 09:15, ticked 18:09 — and
+  `batch-launcher --status` printed state ready in the same minute.
+  THE CAUSE IS A TOLERANCE, NOT A DEAD PROCESS. `classifyDaemonRecord` compares the record's own
+  `pidStartedAt` (1788160520042) with the OS start time `probePid` reports (1788160518033) and
+  calls any difference above `LAUNCHER_PID_TOLERANCE_MS = 2000` a recycled pid. The measured skew
+  was 2009 ms: on a loaded machine the daemon needs longer than two seconds between its OS start
+  and writing its record, so a healthy launcher reads as somebody else's process — and stays that
+  way, because the record is written once. `batch-launcher --start` does not repair it either: it
+  finds a live record and only reports it. Repaired by hand with `--stop` then `--start` (new pid
+  3372293, probe armed).
+  WHY IT IS THE WORST PLACE FOR A FALSE NEGATIVE: the context handover is the one path that must
+  never be blocked. A session at its watermark cannot hand over, cannot end, and cannot keep
+  working cheaply; the batch stalls on a healthy machine with a healthy launcher.
+  FINAL STATE: the daemon's record stores the OBSERVED start time — the value `probePid` reports
+  at the moment the record is written — instead of its own clock reading, so the later comparison
+  is against the same source; where the two sources must stay separate, the tolerance is set from
+  a measurement of a slow start rather than an assumed two seconds, and the value carries its
+  measurement in a comment. Either way `batch-launcher --start` REPAIRS a record it judges
+  foreign instead of reporting it.
+  VERIFIABLE: a unit case over `classifyDaemonRecord` with the exact measured pair (2009 ms skew,
+  same pid) asserting the record is judged the launcher's own, mutation-checked against the
+  current 2000 ms bound; a case proving a genuinely recycled pid — a start time far outside any
+  slow-start window — is still judged foreign; a case proving `--start` re-arms a record it
+  judges foreign. Plus `npm run test:unit`, lint, build.
+  Criticality: high — it silently disarms the launcher, and its failure direction is the batch
+  standing still unattended.
+  Bundle: Urlaubsfestigkeit.
+- [ ] 1028. An examination recorded at the old round-4 boundary suppresses the round-9 examination
+  the raised threshold exists to add (GPT-5.6 Sol, receipt 8448e11f20d7f429, do-not-merge on
+  942ddf0d, 31.08.2026).
+  Raising `FABLE_ESCALATION_ROUNDS` to 10 moves `SPEC_EXAMINATION_ROUND` from 4 to 9. But an
+  examination record in `scripts/author-routing-core.mjs` carries NO round, and
+  `nextAuthoringStep` gates the examination on the bare `!history.examination`. A point that was
+  already examined at the old round-4 boundary therefore never receives the round-9 examination
+  and walks into the escalation unexamined — which is exactly the case the raise was built for,
+  because a point that has been rejected nine times is the one whose spec is most likely wrong.
+  WHY THE EXISTING TESTS MISS IT: a fresh history is correct, and the boundary test only builds
+  fresh histories. The defect lives solely in the histories that CROSS the change.
+  FINAL STATE: the examination record carries the ROUND it was made at, and `nextAuthoringStep`
+  requires an examination at or after `SPEC_EXAMINATION_ROUND` rather than any examination at
+  all. A record written before this change and carrying no round counts as pre-threshold, so it
+  does not satisfy the new requirement.
+  VERIFIABLE: a unit case over a history carrying a pre-change examination (no round, or round 4)
+  asserting the round-9 examination is still demanded, mutation-checked; a case proving an
+  examination recorded at or after the threshold is NOT demanded twice; a case proving a fresh
+  history is unchanged. Plus `npm run test:unit`, lint, build.
+  Criticality: high — it governs how the scarcest model lane is spent, and it fails in the
+  direction of spending it on a spec nobody re-read.
+  Bundle: Modell & Wächter.
