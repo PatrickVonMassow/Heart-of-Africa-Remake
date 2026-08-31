@@ -9043,6 +9043,16 @@ to land than a mechanism that needs a review.
   Fable when Sol still rejects the re-work; while the Fable quota is out, such work stays with Opus.
   That instruction is what half (1) mechanises, and it expires with the quota reset while the
   mechanism does not.
+  MEASURED 31.08.2026, 17:5x (read-only, prompted by the user asking why a fresh weekly pool shows
+  0 % Fable): the switch is ON since 10:01 that morning, and every AUTHORING route to the lane is
+  cold anyway — `Author lane: fable` appears 0× in the work order, the §6 escalation is armed again
+  but the point in work stands at 0 unsuccessful rounds, and the serving fallback fires on
+  unreachability alone. What the switch changes at once is the MERGER role, which consults
+  `mergerModel` and not the lane cut: ON, the roster is [Fable, Sol, Claude], so a blind-parallel
+  pair written by Sol and Opus is merged by Fable; OFF, the same pair falls back to Sol — an author
+  merging its own half, which is the one rule the merge step exists to enforce. That is a reason to
+  leave the switch ON that has nothing to do with authoring volume, and it is nearly free: Fable was
+  the merger in 3 of 461 review records.
   Criticality: high — it is the only failure mode on record that can destroy finished work outright,
   and it fired today.
 

@@ -1418,7 +1418,7 @@ keinen Träger hat. Gebucht als Punkt 956.
 
 ## Anhang A — Maschinell gepflegte Quellen-Übersicht
 
-Zuletzt aktualisiert: Montag, 31.08.2026, 17:17 · Quellen-Fingerprint: `b9bd6f924e2f…`
+Zuletzt aktualisiert: Montag, 31.08.2026, 18:01 · Quellen-Fingerprint: `0f3a17ead4f4…`
 
 Spalten heuristisch aus den Quellen abgeleitet (Anläufe = distinkte Datumsnennungen im Memory;
 Maßnahme = Guard-Skripte mit Namens-Treffer). Die inhaltliche Bewertung gehört der Prosa oben.
@@ -1518,12 +1518,11 @@ Maßnahme = Guard-Skripte mit Namens-Treffer). Die inhaltliche Bewertung gehört
 | WebGPU is testable headless/autonomously via system Chrome (channel:'chrome') + --headless=new; the limitation applies only to Playwright's bundled Chromium | 2 | mittel | — (Regel/Memory) | ◐ Regel |
 | A pending batch claim HOLDS THE LAUNCHER BACK — withdraw it whenever the claiming window is left unattended | 2 | mittel | clear-claim-guard.mjs | ✔ Mechanismus |
 | Multi-agent workflows eat the session/weekly limit fast — verify findings INLINE, keep fan-outs small, warn the user with a cost estimate before any big workflow | 3 | mittel | doc-budget-guard.mjs | ✔ Mechanismus |
-| A review verdict judges the MATERIAL the reviewer was handed — a split range, an omitted file or a misnamed receipt buys a verdict on your own cut; correct the brief and re-ask, never overrule the reviewer | 3 | mittel | — (Regel/Memory) | ◐ Regel |
 
 Erfasste Quellen: 93 Feedback-/Projekt-Memories · 57 Guard-/Hook-Skripte · 6 Revert-/Reapply-Commits · 118 Prozess-/Meta-TASKS-Punkte (davon 52 offen).
 
-<!-- RETRO-FINGERPRINT: b9bd6f924e2fe7854f85fb8e63a9edece5ebc1e38a327422e127c642095f4dac -->
-<!-- RETRO-LAST-REFRESHED: 2026-08-31T15:17:06.736Z -->
+<!-- RETRO-FINGERPRINT: 0f3a17ead4f40f26ce552752ac3c2e695fc388547775d5c404d29b7065904d22 -->
+<!-- RETRO-LAST-REFRESHED: 2026-08-31T16:01:31.464Z -->
 <!-- AUTO-GENERATED:END -->
 
 ### 3.111 Ein Erfolg ist kein Beweis für den Weg, auf dem er zustande kam
