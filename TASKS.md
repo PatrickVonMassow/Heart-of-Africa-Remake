@@ -155,7 +155,8 @@ put it is the mistake this line exists to stop.
   Criticality: high — it is the gate that stops the batch from ending a turn, and both directions
   are expensive: left as it is it can shut the run indefinitely, loosened carelessly it excuses
   the counter-read that the two verdicts of 30.08. correctly demanded.
-  Bundle: Modell & Wächter.
+  Bundle: Modell & Wächter — it edits the four-eyes gate and its ledger reader, the files 887,
+  888 and 977 also reason about, so it is worked after them and never beside them.
 
 - [ ] 686. The taught language is five concepts, and the chief's message is four of them (user
   13.08.2026, playing the deployed communication slice).
