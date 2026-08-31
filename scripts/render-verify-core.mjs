@@ -21,6 +21,7 @@
 import { createHash } from 'node:crypto'
 
 import { RED_CHARGES } from './render-verify-charges.mjs'
+import { isSectionName } from './section-tag-core.mjs'
 import { scopeMandatoryDuty } from './mandatory-duty-core.mjs'
 
 /** Both renderer backends the game ships; each needs a passing verify run. */
@@ -274,7 +275,8 @@ function patternHits(pattern, value) {
  * another's, which is the one failure mode this table exists to prevent.
  */
 export function wasDetailCut(red) {
-  if (red?.detailCut === true) return true
+  const hasOwnMark = red != null && Object.hasOwn(red, 'detailCut')
+  if (hasOwnMark && red.detailCut === true) return true
   // ONLY A LITERAL `false` PROVES THE OTHER DIRECTION (cross-vendor review,
   // GPT-5.6 Sol, do-not-merge on ae9a500c). Treating any present value as
   // "not cut" let a malformed durable record — `detailCut: null` in a
@@ -282,7 +284,12 @@ export function wasDetailCut(red) {
   // answer a signature belonging to a different red. A field nobody can read is
   // not evidence, so it falls back to the inference like a record that carries
   // none at all.
-  if (red?.detailCut === false) return false
+  // The boolean must also BELONG TO THE RECORD. Looking through its prototype
+  // lets an inherited `false` overrule the conservative legacy inference: a
+  // cut-at-the-bound record can then answer an end-anchored signature as if its
+  // measurement were whole. Durable JSON records have own data properties;
+  // anything inherited is not evidence written by the recorder.
+  if (hasOwnMark && red.detailCut === false) return false
   return text(red?.detail).length === MAX_RED_DETAIL_LEN
 }
 
@@ -353,29 +360,11 @@ export function chargeFor(red, options) {
       // stays loudly uncharged and closes the three ordinary ways. A broad
       // `match` entry is unaffected, because it never claimed to read a
       // measurement in the first place.
-      // THE RECORDER'S SECTION TAG IS NOT PART OF THE MEASURED LINE, AND THIS
-      // READER MAY NOT TAKE IT OFF ANYWAY (cross-vendor review, GPT-5.6 Sol,
-      // do-not-merge three times, and the third answered the trade directly).
-      //
-      // The defect is real and measured: a suite that declares sections appends
-      // ` [--section=<name>]` to every result line, the record stores the line
-      // WITH it, and every `detailMatch` here is anchored at both ends against
-      // what the suite MEASURED — so in a section-using suite no anchored charge
-      // reaches the end of its own recorded red, and four owned reds block the
-      // gate. Two attempts to recover the measurement from the text were refused,
-      // for one reason: reconstruction proves SYNTAX, not PROVENANCE. A check
-      // that really measured a value ending in the join and a bracket is
-      // indistinguishable here from a tagged one, and stripping it would eat
-      // measured text and could satisfy an anchored signature belonging to a
-      // different red.
-      //
-      // ASKED WHICH IS WORSE, the reviewer answered plainly: a silent false
-      // clearance is worse than a loud block. A blocked gate is visible and
-      // someone fixes it; a charge that quietly excuses the wrong red is the one
-      // failure mode this whole table exists to prevent. So the detail is read
-      // exactly as it was stored, the four reds stay loudly unaccounted, and
-      // POINT 1018 records the measurement and its section as separate fields —
-      // the only place the provenance actually exists.
+      // The recorder has already separated its generated section tag while the
+      // live gate supplied provenance. This reader sees only the durable
+      // measurement. An old record has no section field and keeps its old detail
+      // verbatim — including any tag-shaped tail — so it stays loudly uncharged
+      // instead of being guessed into an owner.
       //
       // AND A SIGNATURE MAY NOT READ THE END OF A MEASUREMENT THE RECORD CUT
       // OFF (cross-vendor review, GPT-5.6 Sol, do-not-merge on 3e6ffd2). The
@@ -467,6 +456,9 @@ export function chargeReds(reds, options) {
     const printed = text(red?.detail)
     const detail = printed.slice(0, MAX_RED_DETAIL_LEN)
     if (detail) stored.detail = detail
+    // Provenance is optional for compatibility with every existing record. Only
+    // a name the generator itself accepts is allowed into the durable shape.
+    if (isSectionName(red?.section)) stored.section = red.section
     // WRITTEN HERE, WHERE THE CUT IS OBSERVED, because afterwards nothing but
     // the length is left to read — and the length is ambiguous at exactly one
     // place: a measurement that ends ON the bound looks the same whether the

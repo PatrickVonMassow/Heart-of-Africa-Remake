@@ -29,14 +29,14 @@ import { basename } from 'node:path'
 import { maskCode } from '../window-hide-core.mjs'
 
 /** The env var a runner sets to select one section; the suites read it. */
-import { sectionTag } from '../section-tag-core.mjs'
+import { isSectionName, SECTION_NAME_PATTERN, sectionTag } from '../section-tag-core.mjs'
 
 export const SECTION_ENV = 'VERIFY_SECTION'
 
 /** A section declaration in a suite's source: `section('slug')` at a call
  *  position (never `foo.section(`), with a lowercase slug so the CLI argument is
  *  typeable and stable. */
-const DECL_RE = /(?<![\w.$])section\(\s*(['"])([a-z0-9][a-z0-9-]*)\1/g
+const DECL_RE = new RegExp(`(?<![\\w.$])section\\(\\s*(['"])(${SECTION_NAME_PATTERN})\\1`, 'g')
 /** The same call, up to the opening quote — matched against the MASKED source,
  *  where a string's body is blanked but its quotes and every index survive. */
 const DECL_HEAD = /(?<![\w.$])section\(\s*['"]/g
@@ -152,6 +152,7 @@ export function planSectionRun({ tier = null, filter = [], section = null, known
 export function makeSectionGate({ sections = [], requested = null, suite = 'the suite' } = {}) {
   const verdict = resolveSelection({ sections, requested, suite })
   if (!verdict.ok) throw new Error(verdict.message)
+  currentResultSection = null
   let current = null
   const ran = []
   const gate = {
@@ -159,7 +160,9 @@ export function makeSectionGate({ sections = [], requested = null, suite = 'the 
     partial: verdict.partial,
     requested: verdict.requested,
     section(name) {
+      if (!isSectionName(name)) throw new TypeError(`invalid section name ${JSON.stringify(name)}`)
       current = name
+      currentResultSection = name
       const selected = verdict.requested === null || verdict.requested === name
       if (selected) ran.push(name)
       return selected
@@ -193,6 +196,12 @@ export function makeSectionGate({ sections = [], requested = null, suite = 'the 
   }
   return gate
 }
+
+/** The section whose result lines a suite is emitting now. The recorder reads
+ * this at emission time, while the provenance still exists; it is deliberately
+ * not reconstructed later from durable text. */
+let currentResultSection = null
+export const resultSection = () => currentResultSection
 
 /** Did the process that is running ever build a gate? The run recorder asks, so
  *  a suite that consults NO gate while `VERIFY_SECTION` is exported — a stale

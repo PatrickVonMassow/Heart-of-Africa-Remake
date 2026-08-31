@@ -6,21 +6,19 @@
 // deliberately EXCLUDES scripts/verify/ — "every guard and every core it imports
 // lives there" — so anything a guard core may ever need belongs here.
 //
-// WHAT THIS MODULE DELIBERATELY DOES NOT OFFER, and the reason is worth keeping:
-// a way to take the tag back OFF a recorded detail. The recorder stores the
-// printed line INCLUDING the tag, while the red-charge table matches the
-// MEASURED line with regexes anchored at both ends, so no anchored charge in a
-// section-using suite reaches the end of its own recorded red. That is a real,
-// measured defect — four owned reds sit unaccounted because of it. Two readers
-// were written for it on 30.08.2026 and both were refused by the cross-vendor
-// round, for one reason: recovering the tag from the text proves SYNTAX, not
-// PROVENANCE. A check that really measured a value ending in the join and a
-// bracket is indistinguishable from a tagged one, and stripping it could satisfy
-// a signature belonging to a different red. Asked which is worse, the reviewer
-// answered that a silent false clearance is worse than a loud block. So the gate
-// stays shut and POINT 1018 closes it where the provenance actually exists: the
-// recorder, which knows the open section and can store it beside the
-// measurement. Do not add a reader here.
+// The legal name is shared with the source recogniser. A generator that accepted
+// more names than the recogniser could declare would create tags no section run
+// could select again.
+
+/** The capture-free grammar used inside the declaration recogniser. */
+export const SECTION_NAME_PATTERN = '[a-z0-9][a-z0-9-]*'
+const SECTION_NAME_RE = new RegExp(`^${SECTION_NAME_PATTERN}$`)
+
+/** Is this exactly a section name a suite source may declare? */
+export const isSectionName = (name) => typeof name === 'string' && SECTION_NAME_RE.test(name)
 
 /** What a result line appends while a section is open. */
-export const sectionTag = (name) => ` [--section=${name}]`
+export function sectionTag(name) {
+  if (!isSectionName(name)) throw new TypeError(`invalid section name ${JSON.stringify(name)}`)
+  return ` [--section=${name}]`
+}

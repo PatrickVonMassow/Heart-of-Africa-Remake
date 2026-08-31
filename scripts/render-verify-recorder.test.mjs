@@ -17,6 +17,7 @@ import {
   MAX_LINE_CHARS,
   MAX_RED_IDENTITIES,
   TERMINAL_VERDICT_LINE,
+  capturedReds,
   tapOutput,
 } from './render-verify-recorder.mjs'
 import { DEV_SUITES } from './verify/tiers.mjs'
@@ -62,6 +63,7 @@ afterEach(() => {
 async function armed(suite = 'polish', featureLevel = null) {
   vi.resetModules()
   const mod = await import('./render-verify-recorder.mjs')
+  const sectionMod = await import('./verify/sections.mjs')
   const argv = process.argv[1]
   process.argv[1] = `/x/${suite}.mjs`
   // A sink UNDER the tap: the tap wraps this, so the test's lines are captured
@@ -75,6 +77,11 @@ async function armed(suite = 'polish', featureLevel = null) {
   if (featureLevel) mod.markBackendAsserted(featureLevel)
   process.argv[1] = argv
   return {
+    /** Enter a real suite section through the same module instance the recorder reads. */
+    enterSection(name) {
+      const gate = sectionMod.makeSectionGate({ sections: [name], suite })
+      gate.section(name)
+    },
     /** Fire the real exit handler and read what THIS instance recorded. */
     exit(code) {
       const before = recorded.length
@@ -96,15 +103,15 @@ function fakeStream() {
   }
 }
 
-function tapped() {
+function tapped(sectionNow = () => null) {
   // The real armed shape: the tap records varied identities beside the lines.
-  const state = { lines: [], variedKeys: new Set(), crashed: false }
+  const state = { lines: [], variedKeys: new Set(), sectionByRed: new Map(), crashed: false }
   const out = fakeStream()
   const err = fakeStream()
   const flush = tapOutput(state, [
     [out, false],
     [err, true],
-  ])
+  ], sectionNow)
   return { state, out, err, flush }
 }
 
@@ -896,6 +903,66 @@ describe('tapOutput — a run that DIED rather than reported', () => {
 })
 
 describe('the captured lines charge the way the guard reads them', () => {
+  const probeLedger = (detailMatch, extra = {}) => [{
+    point: 9001,
+    suite: 'probe',
+    backend: 'webgl',
+    kind: 'check',
+    match: /^probe$/,
+    detailMatch,
+    ...extra,
+  }]
+  const chargeProbe = (state, ledger) =>
+    chargeReds(capturedReds(state), { suite: 'probe', backend: 'webgl', ledger })[0]
+
+  it('separates a real tag but preserves the same shape inside the measurement', () => {
+    const real = tapped(() => 'x')
+    real.out.write('FAIL  probe — timeout  [--section=x]\n')
+    real.flush()
+    const charged = chargeProbe(real.state, probeLedger(/^timeout$/))
+    expect(charged).toMatchObject({ point: 9001, detail: 'timeout', section: 'x' })
+
+    // Same characters, different provenance: the first shape is MEASURED and
+    // the second is the tag the live gate says it appended. Only the latter is
+    // separated, so a mutation that strips both would falsely charge /^timeout$/.
+    const shaped = tapped(() => 'x')
+    shaped.out.write('FAIL  probe — timeout  [--section=x]  [--section=x]\n')
+    shaped.flush()
+    expect(chargeProbe(shaped.state, probeLedger(/^timeout$/)).point).toBeNull()
+    expect(chargeProbe(shaped.state, probeLedger(/^timeout  \[--section=x\]$/))).toMatchObject({
+      point: 9001,
+      detail: 'timeout  [--section=x]',
+      section: 'x',
+    })
+
+    // Syntax alone proves nothing. With no live section, identical durable text
+    // is an old/untagged measurement and the recorder changes none of it.
+    const noProvenance = tapped()
+    noProvenance.out.write('FAIL  probe — timeout  [--section=x]\n')
+    noProvenance.flush()
+    expect(chargeProbe(noProvenance.state, probeLedger(/^timeout$/)).point).toBeNull()
+    expect(chargeProbe(noProvenance.state, probeLedger(/^timeout  \[--section=x\]$/))).toMatchObject({
+      point: 9001,
+      detail: 'timeout  [--section=x]',
+    })
+  })
+
+  it('does not mistake a tag shape at the detail cut for recorder metadata', () => {
+    const shape = '  [--section=x]'
+    const cut = `${'m'.repeat(200 - shape.length)}${shape}`
+    const capture = tapped(() => 'x')
+    capture.out.write(`FAIL  probe — ${cut}TAIL  [--section=x]\n`)
+    capture.flush()
+    const escaped = cut.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+    const detailMatch = new RegExp(`^${escaped}$`)
+    expect(detailMatch.test(cut)).toBe(true)
+    const stored = chargeProbe(capture.state, probeLedger(detailMatch))
+    expect(stored.detail).toBe(cut)
+    expect(stored.detailCut).toBe(true)
+    expect(stored.section).toBe('x')
+    expect(stored.point).toBeNull()
+  })
+
   it('turns a red run\'s output into charged reds', () => {
     const { state, out, flush } = tapped()
     out.write('PASS  a check that held\n')
@@ -931,6 +998,22 @@ describe('the captured lines charge the way the guard reads them', () => {
     // And the stored red is chargeable again when it is RE-READ from the record,
     // which is the retroactivity the detail exists for.
     expect(chargeFor(record.reds[0], { suite: 'polish', backend: 'webgpu', featureLevel: 'compatibility' })?.point).toBe(694)
+  })
+
+  it('writes the measurement and section as separate fields through the real exit handler', async () => {
+    const run = await armed('report', 'compatibility')
+    run.enterSection('bug-report-archive')
+    process.stdout.write(
+      'FAIL  the archive holds picture, state, overlay and description — ' +
+      'hoa-state-2026-08-30-42.json, hoa-state-2026-08-30-42-overlay.json, ' +
+      'hoa-state-2026-08-30-42.txt  [--section=bug-report-archive]\n',
+    )
+    const record = run.exit(1)
+    expect(record.reds).toHaveLength(1)
+    expect(record.reds[0]).toMatchObject({ point: 927, section: 'bug-report-archive' })
+    expect(record.reds[0].detail).toBe(
+      'hoa-state-2026-08-30-42.json, hoa-state-2026-08-30-42-overlay.json, hoa-state-2026-08-30-42.txt',
+    )
   })
 
   it('keeps the printed measurement on the stored red, through the real tap', () => {

@@ -5,8 +5,9 @@
 // and refused as recorded coverage (that half lives with the recorder's reader,
 // scripts/render-verify-core.test.mjs).
 import { describe, it, expect } from 'vitest'
-import { listSections, makeSectionGate, planSectionRun, resolveSelection, SECTION_ENV } from './sections.mjs'
+import { listSections, makeSectionGate, planSectionRun, resolveSelection, resultSection, SECTION_ENV } from './sections.mjs'
 import { runVerdict } from '../render-verify-core.mjs'
+import { sectionTag } from '../section-tag-core.mjs'
 
 /** A linear suite in miniature: each section does its own expensive setup and
  *  then its checks, exactly the shape the real suites have. Running it against a
@@ -53,6 +54,14 @@ describe('listSections — the declarations are read from the source', () => {
     expect(listSections("section('a')\nsection('a')")).toEqual(['a'])
     expect(listSections('')).toEqual([])
     expect(listSections(null)).toEqual([])
+  })
+
+  it('uses the same legal-name grammar as the tag generator', () => {
+    expect(listSections("section('legal-name-2')\nsection('two words')")).toEqual(['legal-name-2'])
+    expect(sectionTag('legal-name-2')).toBe(' [--section=legal-name-2]')
+    for (const name of ['two words', ' leading', 'UPPER', '', '-leading']) {
+      expect(() => sectionTag(name), name).toThrow(/invalid section name/)
+    }
   })
 
   // A suite explains its own shape in prose, and that prose names the call. Read
@@ -177,12 +186,14 @@ describe('the gate — a known name runs exactly its setup and its checks', () =
     expect(log[0]).toContain('[--section=herds]')
     expect(log[2]).toContain('[--section=crocodile]')
     expect(log[3]).toContain('[--section=labels]')
+    expect(resultSection()).toBe('labels')
   })
 
   it('tags nothing before the first section — the boot prologue belongs to none', () => {
     const gate = makeSectionGate({ sections: SECTIONS, suite: 'enrichments' })
     expect(gate.tag()).toBe('')
     expect(gate.currentSection()).toBe(null)
+    expect(resultSection()).toBe(null)
   })
 
   it('throws with the candidate list on an unknown name', () => {
