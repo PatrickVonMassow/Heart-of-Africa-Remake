@@ -1418,7 +1418,7 @@ keinen Träger hat. Gebucht als Punkt 956.
 
 ## Anhang A — Maschinell gepflegte Quellen-Übersicht
 
-Zuletzt aktualisiert: Montag, 31.08.2026, 23:45 · Quellen-Fingerprint: `97e7c403fe8b…`
+Zuletzt aktualisiert: Montag, 31.08.2026, 23:53 · Quellen-Fingerprint: `d8adcd7da67c…`
 
 Spalten heuristisch aus den Quellen abgeleitet (Anläufe = distinkte Datumsnennungen im Memory;
 Maßnahme = Guard-Skripte mit Namens-Treffer). Die inhaltliche Bewertung gehört der Prosa oben.
@@ -1518,12 +1518,11 @@ Maßnahme = Guard-Skripte mit Namens-Treffer). Die inhaltliche Bewertung gehört
 | WebGPU is testable headless/autonomously via system Chrome (channel:'chrome') + --headless=new; the limitation applies only to Playwright's bundled Chromium | 2 | mittel | — (Regel/Memory) | ◐ Regel |
 | A pending batch claim HOLDS THE LAUNCHER BACK — withdraw it whenever the claiming window is left unattended | 2 | mittel | clear-claim-guard.mjs | ✔ Mechanismus |
 | Multi-agent workflows eat the session/weekly limit fast — verify findings INLINE, keep fan-outs small, warn the user with a cost estimate before any big workflow | 3 | mittel | doc-budget-guard.mjs | ✔ Mechanismus |
-| A repeated Stop-guard refusal is proof the reply is not the fix — count identical refusals and break to the user on the second | 1 | hoch | — (Punkt 1032 offen) | ○ offen |
 
-Erfasste Quellen: 93 Feedback-/Projekt-Memories · 57 Guard-/Hook-Skripte · 6 Revert-/Reapply-Commits · 119 Prozess-/Meta-TASKS-Punkte (davon 53 offen).
+Erfasste Quellen: 93 Feedback-/Projekt-Memories · 57 Guard-/Hook-Skripte · 6 Revert-/Reapply-Commits · 120 Prozess-/Meta-TASKS-Punkte (davon 54 offen).
 
-<!-- RETRO-FINGERPRINT: 97e7c403fe8ba87f2911d71d904129cd7800acc7ad411a95c367060b4a10f39e -->
-<!-- RETRO-LAST-REFRESHED: 2026-08-31T21:45:00.752Z -->
+<!-- RETRO-FINGERPRINT: d8adcd7da67c25cf5caebb0bed78789f11390c93781dc45a9423e2a91e1c6c23 -->
+<!-- RETRO-LAST-REFRESHED: 2026-08-31T21:53:15.136Z -->
 <!-- AUTO-GENERATED:END -->
 
 ### 3.111 Ein Erfolg ist kein Beweis für den Weg, auf dem er zustande kam
