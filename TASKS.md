@@ -14117,3 +14117,221 @@ to land than a mechanism that needs a review.
   Criticality: high — it is the path every unattended handover takes, it fails silently in the
   direction of doing nothing, and the board reports rest while it happens.
   Bundle: Urlaubsfestigkeit.
+- [ ] 1027. A launcher that needed two seconds to write its record is disowned forever, and every
+  handover with it (measured 31.08.2026 18:1x, on this host, against a demonstrably live daemon).
+  `node scripts/batch-boundary.mjs --commit --context` refused the handover with "the launcher is
+  unknown" while the daemon was alive — pid 1820, running since 09:15, ticked 18:09 — and
+  `batch-launcher --status` printed state ready in the same minute.
+  THE CAUSE IS A TOLERANCE, NOT A DEAD PROCESS. `classifyDaemonRecord` compares the record's own
+  `pidStartedAt` (1788160520042) with the OS start time `probePid` reports (1788160518033) and
+  calls any difference above `LAUNCHER_PID_TOLERANCE_MS = 2000` a recycled pid. The measured skew
+  was 2009 ms: on a loaded machine the daemon needs longer than two seconds between its OS start
+  and writing its record, so a healthy launcher reads as somebody else's process — and stays that
+  way, because the record is written once. `batch-launcher --start` does not repair it either: it
+  finds a live record and only reports it. Repaired by hand with `--stop` then `--start` (new pid
+  3372293, probe armed).
+  WHY IT IS THE WORST PLACE FOR A FALSE NEGATIVE: the context handover is the one path that must
+  never be blocked. A session at its watermark cannot hand over, cannot end, and cannot keep
+  working cheaply; the batch stalls on a healthy machine with a healthy launcher.
+  FINAL STATE: the daemon's record stores the OBSERVED start time — the value `probePid` reports
+  at the moment the record is written — instead of its own clock reading, so the later comparison
+  is against the same source; where the two sources must stay separate, the tolerance is set from
+  a measurement of a slow start rather than an assumed two seconds, and the value carries its
+  measurement in a comment. Either way `batch-launcher --start` REPAIRS a record it judges
+  foreign instead of reporting it.
+  VERIFIABLE: a unit case over `classifyDaemonRecord` with the exact measured pair (2009 ms skew,
+  same pid) asserting the record is judged the launcher's own, mutation-checked against the
+  current 2000 ms bound; a case proving a genuinely recycled pid — a start time far outside any
+  slow-start window — is still judged foreign; a case proving `--start` re-arms a record it
+  judges foreign. Plus `npm run test:unit`, lint, build.
+  Criticality: high — it silently disarms the launcher, and its failure direction is the batch
+  standing still unattended.
+  Bundle: Urlaubsfestigkeit.
+- [ ] 1028. An examination recorded at the old round-4 boundary suppresses the round-9 examination
+  the raised threshold exists to add (GPT-5.6 Sol, receipt 8448e11f20d7f429, do-not-merge on
+  942ddf0d, 31.08.2026).
+  Raising `FABLE_ESCALATION_ROUNDS` to 10 moves `SPEC_EXAMINATION_ROUND` from 4 to 9. But an
+  examination record in `scripts/author-routing-core.mjs` carries NO round, and
+  `nextAuthoringStep` gates the examination on the bare `!history.examination`. A point that was
+  already examined at the old round-4 boundary therefore never receives the round-9 examination
+  and walks into the escalation unexamined — which is exactly the case the raise was built for,
+  because a point that has been rejected nine times is the one whose spec is most likely wrong.
+  WHY THE EXISTING TESTS MISS IT: a fresh history is correct, and the boundary test only builds
+  fresh histories. The defect lives solely in the histories that CROSS the change.
+  FINAL STATE: the examination record carries the ROUND it was made at, and `nextAuthoringStep`
+  requires an examination at or after `SPEC_EXAMINATION_ROUND` rather than any examination at
+  all. A record written before this change and carrying no round counts as pre-threshold, so it
+  does not satisfy the new requirement.
+  VERIFIABLE: a unit case over a history carrying a pre-change examination (no round, or round 4)
+  asserting the round-9 examination is still demanded, mutation-checked; a case proving an
+  examination recorded at or after the threshold is NOT demanded twice; a case proving a fresh
+  history is unchanged. Plus `npm run test:unit`, lint, build.
+  Criticality: high — it governs how the scarcest model lane is spent, and it fails in the
+  direction of spending it on a spec nobody re-read.
+  Bundle: Modell & Wächter.
+- [ ] 1029. The bundle table's shared-file exclusions are one-sided, so the half that reads the
+  other entry schedules the collision it was meant to prevent (GPT-5.6 Sol, receipt
+  296d4d9355fb3e6a, do-not-merge on 2d47029, 31.08.2026).
+  `docs/work-packages.md` splits the work order into bundles BY SHARED FILES, and the entry text
+  is what says which points must not run in parallel. That only works if a collision is written on
+  BOTH sides. It is not. The clearest contradiction Sol measured: #1016 says it may run beside any
+  other point of its bundle, while #1018 says it writes the same record path and must never run
+  beside #1016. The same asymmetry holds for #1017/#1015, #1020/#800, #1024/#800, #1021/#764 and
+  #785, #1026/#948, #1025/#945 and #964, and — written the same evening the defect was found —
+  #1027/#859 and #1028's three named counterparts, of which two turned out to edit a DIFFERENT
+  file altogether.
+  WHY IT MATTERS MORE THAN A DOCUMENT TIDY-UP: the dispatcher reads ONE side. A session opening
+  #1016 reads "may run beside any of them" and commissions it next to #1018, and the two then
+  write the same record path — which is precisely the rework the three-lane cap exists to avoid,
+  and the one cost the batch cannot recover by retrying. Nothing compares the two halves today,
+  and the entries are prose, so the drift is invisible until two lanes collide.
+  MEASURED TWICE ON ONE EVENING, WHICH IS WHAT MAKES IT MECHANICAL AND NOT A SLIP: the #909/#1026
+  pair was found and repaired by hand at 18:45, and one round later the same reviewer named nine
+  more pairs including two written during that very repair. A rule kept by hand in a 180 000-
+  character table is not kept.
+  FINAL STATE: a guard derives every point's named counterparts from the bundle table and refuses
+  a table in which A excludes B while B does not exclude A. The entry keeps its prose — the
+  counterpart list is what is checked, not the wording — and the refusal names the exact pair and
+  the side that is missing, so the fix is one edit rather than a re-read of the table. The
+  existing one-sided pairs are made bilateral in the same change, each against what the point
+  actually edits rather than what its entry claims.
+  VERIFIABLE: a unit case over the parsed table asserting a one-sided pair is refused and a
+  bilateral one passes, mutation-checked; a case over the REAL document proving it holds today; a
+  case proving a point that names no counterpart at all is not turned into a false pair. Plus
+  `npm run test:unit`, lint, build.
+  Criticality: high — it is the record the dispatcher reads before it spends a lane, and it fails
+  silently in the direction of commissioning the collision.
+  Bundle: Session- & Repo-Hygiene.
+- [ ] 1030. A refusal is consumed as coverage: a recorded `do-not-merge` CLEARS the very file it
+  refuses (Opus 5, cross-vendor round on the review ledger's core, 31.08.2026 — the finding stands
+  on its own reading; the ledger could not record it, which is point 1008's disagreement measured
+  a second time).
+  `openRefusalsIn` in `scripts/mechanism-review-core.mjs` drops any refusal whose relation to the
+  artefact is `co-touching`. But the per-file loop that consumes it treats the mere PRESENCE of a
+  scoped row as a reading of that file, and only puts the file back into `remainingFiles` when an
+  OPEN refusal survives that drop. A `do-not-merge` row passes the `sound` filter — it tests that
+  the review attests to code reading and is independent, never what it concluded — so for a
+  co-touching relation the same row is at once "not a refusal" and "a reading of this file". The
+  narrowing was applied to the refusal half and not to the clearance half.
+  THE REACHABLE SHAPE, not a hypothetical: end-state mode builds one artefact per file at the
+  LATEST pending commit touching it. With pending commits A (files f, g) and D (file g), artefacts
+  f→A and g→D, and one record R at D reading both f and g: artefact g relates as `read` and the
+  refusal blocks it; artefact f relates as `co-touching`, the refusal is dropped, and f is CLEARED
+  by the record that refused it. Fix g, record a merge at a descendant, and f is never re-reviewed.
+  Every `--carried-from` row has the same shape by construction: a carry is recorded at a head that
+  did not touch the carried files, so its `read` relation is unreachable for them and its refusal
+  charges nobody.
+  WHY IT IS THE WORST PLACE FOR THIS BUG: the whole four-eyes mechanism exists so a second model's
+  refusal cannot be walked past. A refusal that clears its own file is not a weak gate — it is a
+  gate that reports the opposite of what it measured, and it does so silently.
+  FINAL STATE: the clearance half is narrowed with the refusal half. A row may only clear a file
+  for the relation in which it actually read it; a row dropped as co-touching for the refusal is
+  dropped as coverage for that same file too, so the file returns to `remainingFiles` instead of
+  going clear.
+  VERIFIABLE: a unit case building exactly the A/D artefact shape above and asserting the
+  co-touching file is NOT cleared by the refusing row, mutation-checked against today's code; a
+  case over a `--carried-from` row proving its refusal reaches the carried files; a case proving a
+  genuine merge verdict still clears what it read, so the narrowing does not turn every review into
+  a refusal. Plus `npm run test:unit`, lint, build.
+  Criticality: high — it is the gate that decides whether a second model's refusal is answered, and
+  it fails in the direction of reporting cleared where it measured refused.
+  Bundle: Modell & Wächter.
+- [ ] 1031. Three red families of the WebGPU lane have no owner, and one of them is a charged red
+  the parser renamed (measured 31.08.2026 on the full WebGPU LARGE pass of
+  `feat/686-five-word-lexicon-game`, 63 minutes, quiet machine; every red of that lane put through
+  `chargeFor` rather than read by eye).
+  Of the lane's reds, 15 came back UNCHARGED, in three families:
+  1. THE BUG-REPORT ARCHIVE RED IS CHARGED AND STILL READS UNCHARGED. Point 927's entry matches
+     `^member hoa-state-\d{4}-\d{2}-\d{2}-\d+\.png is present$`, and the suite printed exactly that
+     check — but the recorded red's NAME is `member hoa-state-2026-08-31-42.png is present — ` with
+     the separator still attached and an EMPTY detail. A check that prints no measurement keeps the
+     ` — ` in its name, so an anchored match can never fire. This is the same class as the
+     section-tag work of 30./31.08.: a red is read through text the recorder shaped, not through
+     what the suite meant. It is the cheapest of the three to fix and the most dangerous to leave,
+     because it makes a CORRECT charge silently ineffective.
+  2. TWO CONSOLE SIGNATURES OF THE POINT-514 MSAA CASCADE ARE UNOWNED: `Async render pipeline
+     creation failed (renderPipeline_ShadowMaterial_…)` and `Uncaptured WebGPU GPUValidationError:
+     [Invalid CommandBuffer from CommandEncoder "renderContext_11"]`. The ledger already carries
+     the cascade's other three signatures (`output-msaa`, `normal-msaa`, `[Invalid TextureView]`)
+     and 514's `why` describes exactly this chain. These two arrive in the same block, after the
+     same `RGBA16Float does not support multisampling`, on the same compatibility lane.
+  3. THE BENCHMARK TIMESTAMP ROWS: `WebGPU: real GPU timestamps were measured for the low-preset
+     rows too — 0/3 low rows with gpu`. Point 1009's entry names them and EXCLUDES them in its own
+     words: "The two WebGPU timestamp rows of the same run fail for their own reasons and are NOT
+     covered here." They have therefore been knowingly ownerless since 30.08.2026.
+  WHY IT BLOCKS: CLAUDE.md §7.2 lets a red close only when it is fixed, charged to its owning
+  point, or filed as a new point. These three are none of the three, so no LARGE pass over the
+  WebGPU lane can be read as covering a picture — which is what stopped the communication rebuild
+  from landing on the evening of 31.08.2026, although nothing in that rebuild touches any of them.
+  FINAL STATE: (1) a red whose check printed no measurement is recorded under the name the suite
+  printed, without the dangling separator — fixed in the parser, not in the ledger entry, because
+  every anchored charge has the same hole; (2) the two cascade signatures join point 514's entry,
+  each as narrowly as its measured text allows; (3) the benchmark timestamp rows get an owner —
+  either an existing point that really covers them or a new one — and are never again excluded by a
+  sentence inside another point's charge.
+  VERIFIABLE: a unit case over the red parser proving a check with an EMPTY detail keeps a clean
+  name and that the existing 927 entry then charges it, mutation-checked; a case pinning each new
+  cascade signature against the measured line and proving it does not match the neighbouring one;
+  a re-run of the WebGPU lane's `settings`, `benchmark` and `report` sections in which every red
+  comes back charged. Plus `npm run test:unit`, lint, build.
+  Criticality: high — it is the gate every point's picture verification is judged by, and its
+  failure direction is a real defect standing in the way of unrelated work while a genuinely
+  charged red reads as unowned.
+  Bundle: Testinfrastruktur.
+
+- [ ] 1032. A blocking Stop guard can refuse the same finding forever, and every refusal spends a
+  user-visible answer (measured 31.08.2026, this session).
+  WHAT HAPPENED: five Stop guards stood red at once. A red Stop guard does not end the turn; it
+  restarts it with the finding attached. The session answered each refusal with a fresh closing
+  line instead of repairing anything, so the same five findings were refused ten times in a row
+  and the user read ten near-identical replies before asking what was going on. Nothing in the
+  chain noticed that the SAME unaddressed finding was being refused again, and nothing forced the
+  session to surface the refusal to the user instead of writing another closing line.
+  SECOND HALF: the session held a stale belief — a SessionStart stand-down notice whose owning
+  session had already died — while `batch-progress-guard`'s own text said "You hold the batch
+  lock". Two live sources contradicted each other and the contradiction was read as noise. A
+  guard that contradicts the session's belief is a measurement order.
+  WHY IT BLOCKS: an unattended session in this state burns turns without progress and, when a
+  user is present, floods the conversation. It is the no-standstill order's failure mode with the
+  standstill hidden behind activity.
+  FINAL STATE: (1) consecutive Stop refusals carrying the same finding signature are counted; from
+  the second identical refusal the turn is required to report the refusal to the user as a finding
+  rather than emit another closing line, and the count is visible in the refusal text itself;
+  (2) the counter survives the refusal loop it is meant to break — it is not stored in the reply;
+  (3) a guard whose text asserts a session-identity fact that the session's own recorded state
+  contradicts says so explicitly, so the contradiction cannot be read as repetition.
+  VERIFIABLE: unit cases over the counter proving a repeated identical finding escalates on the
+  second occurrence and that a DIFFERENT finding resets it; a case proving the escalation text
+  names the finding and the count; a drill that runs a turn end against a deliberately unfixable
+  guard and asserts the second turn breaks to the user instead of looping. Plus `npm run
+  test:unit`, lint, build.
+  Criticality: high — it is the turn-end chain itself, and its failure direction is an unattended
+  session that spends its whole budget refusing.
+  Bundle: Session- & Repo-Hygiene.
+
+- [ ] 1033. The free lock lands silently in the window the user is sitting at (measured
+  31.08.2026, this session).
+  WHAT HAPPENED: `batch-progress-guard` runs at the END OF EVERY TURN and calls the atomic
+  acquire. When the owning session dies, the next Stop run of ANY live session takes the batch.
+  Measured: the previous owner claimed at 22:52:50 and died around 23:00; at 23:03:02 the lock
+  named the INTERACTIVE session the user was chatting in, which had never asked for it and whose
+  own SessionStart notice still said STAND DOWN. The session learned about it only from a
+  subordinate clause inside a guard's refusal text, and kept obeying the stale stand-down.
+  WHY IT BLOCKS: the acquire is correct in its intent — the batch must never be ownerless — but
+  it cannot tell an unattended worker from the window a person is talking to. The user's window
+  is then driven into merges, dashboard writes and TASKS edits it was never asked to do, and the
+  reservation path of point 395 does not help because it only fires for a claim the user made.
+  FINAL STATE: (1) a session that did not request the batch and is demonstrably interactive does
+  not silently acquire a freed lock; it either asks or takes it only after saying so in the
+  answer, and the launcher's fresh worker remains the normal successor; (2) when a session DOES
+  become the owner without asking, that fact is stated as its own visible line, never as a
+  subordinate clause in another guard's refusal; (3) an unattended session is unaffected — the
+  never-ownerless guarantee holds for every path where nobody is sitting.
+  VERIFIABLE: unit cases over the acquire decision proving an interactive non-claimant does not
+  take a freed lock while an unattended session does; a case proving the ownership change is
+  announced on its own; a drill that kills an owner beside a live interactive session and asserts
+  the launcher's worker, not that window, becomes the successor. Plus `npm run test:unit`, lint,
+  build.
+  Criticality: high — it is the batch singleton, and its failure direction hands a user's
+  interactive window a role it never accepted.
+  Bundle: Session- & Repo-Hygiene.

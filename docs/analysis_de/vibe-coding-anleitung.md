@@ -500,4 +500,4 @@ Die Ursache findest du durch **Zerlegen**, nicht durch Wiederholen.
 
 Sie ersetzt die Fallstricke oben nicht.
 
-<!-- GUIDE-FINGERPRINT: 0f3a17ead4f40f26ce552752ac3c2e695fc388547775d5c404d29b7065904d22 -->
+<!-- GUIDE-FINGERPRINT: aefad85ae5f102a132bb5971d027efe70f9cbba1cdf84d799013d5c8ab7daf47 -->

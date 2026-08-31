@@ -45,6 +45,12 @@
  *   compatibility adapter loses MSAA, so its errors must stay REAL reds on a core
  *   adapter. A run that recorded no level matches no level-scoped charge.
  * @property {'check'|'console'} [kind]   only a failing check, or only a console error
+ * @property {boolean} [detailReadsPrefix] the signature reads only the FRONT of the
+ *   measurement, so the entry keeps charging on a record the 200-character bound CUT.
+ *   Opt-in per entry and safety-critical: everything else is refused on a cut record,
+ *   because a signature that quietly excuses the wrong red is the failure mode this
+ *   table exists to prevent. The `why` of an entry that sets it states how far the
+ *   signature reaches and why the removed tail cannot matter (render-verify-core.mjs).
  */
 
 /** @type {RedCharge[]} */
@@ -637,8 +643,9 @@ export const RED_CHARGES = [
       'LARGE could not go green for any point. The defect they report is real and 1009 holds it: ' +
       'the F8 measurement run borrows the world — a pinned seed and day, a fixed travel zoom and ' +
       'speed, the SSAO switch, and Math.random replaced so a frame draws the same way twice — and ' +
-      'returns none of it. NOT SCOPED TO A BACKEND, AND NOW MEASURED ON BOTH (cross-vendor ' +
-      'review, GPT-5.6 Sol, 30.08.2026, which rightly refused the earlier argument): the entry ' +
+      'returns none of it. THIS IS THE WebGL 2 HALF OF A CHARGE THAT USED TO CARRY NO BACKEND ' +
+      'AT ALL, split into two measured halves (cross-vendor review, GPT-5.6 Sol, ' +
+      '30.08.2026, which rightly refused the earlier argument): the unscoped entry ' +
       'used to rest on the reasoning that the restore path is plain JavaScript state and has ' +
       'nothing to do with which renderer drew the rows — but reasoning is not a measurement, and ' +
       'a WebGPU red would have been excused on an argument. The LARGE run of 30.08.2026 supplies ' +
@@ -669,8 +676,9 @@ export const RED_CHARGES = [
       'LARGE could not go green for any point. The defect they report is real and 1009 holds it: ' +
       'the F8 measurement run borrows the world — a pinned seed and day, a fixed travel zoom and ' +
       'speed, the SSAO switch, and Math.random replaced so a frame draws the same way twice — and ' +
-      'returns none of it. NOT SCOPED TO A BACKEND, AND NOW MEASURED ON BOTH (cross-vendor ' +
-      'review, GPT-5.6 Sol, 30.08.2026, which rightly refused the earlier argument): the entry ' +
+      'returns none of it. THIS IS THE WebGPU HALF OF A CHARGE THAT USED TO CARRY NO BACKEND ' +
+      'AT ALL, split into two measured halves (cross-vendor review, GPT-5.6 Sol, ' +
+      '30.08.2026, which rightly refused the earlier argument): the unscoped entry ' +
       'used to rest on the reasoning that the restore path is plain JavaScript state and has ' +
       'nothing to do with which renderer drew the rows — but reasoning is not a measurement, and ' +
       'a WebGPU red would have been excused on an argument. The LARGE run of 30.08.2026 supplies ' +

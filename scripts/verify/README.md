@@ -1505,7 +1505,22 @@ validation chatter inside that completed run does not make it a crash.
 Records from before this distinction have no `terminalVerdict` field. For those
 records the durable evidence already present decides: a non-zero run with an
 asserted backend and recorded reds is read as reported; without that evidence,
-its recorded crash remains a crash.
+its recorded crash remains a crash. The `crashSource` marker is NOT relaxed by
+record age — it is read first, for every record, so a legacy run that carries
+Node's definitive uncaught-exception marker stays a crash whatever else it
+recorded.
+
+STATED RESIDUAL, because this document states them rather than assuming them
+away (cross-vendor finding, Fable 5, 31.08.2026): the legacy reading has only
+two of the three legs the new definition uses — it cannot ask whether stdout
+reached the suite's own terminal report line, because old records did not store
+it. A legacy run that printed its first red and THEN died without an
+uncaught-exception marker is therefore read as reported, and its reds become
+chargeable, where the same run recorded today would be a crash and charge
+nothing. The trade is deliberate: old records cannot distinguish that sequence,
+and trusting their durable reported-red evidence keeps a real red blocking
+rather than disappearing into a crash verdict. It applies to no run recorded
+from this revision onward.
 
 A CRASH is the one verdict no ledger can ever reach: `runVerdict` returns no
 charges for it, deliberately — a run that died rather than reported judged no
@@ -1514,8 +1529,10 @@ extending `RED_CHARGES` reclassifies it not at all. That is the DISPOSITION of
 the crash, and it says nothing about the reds the run printed BEFORE it died:
 those were really observed, they keep blocking, and they close the three
 ordinary ways — exactly as the paragraph below spells out. Eight of the
-recorded 13.–19.08.2026 runs
-are exactly this shape, and inside the window their only exit was the hand
+recorded 13.–19.08.2026 runs were exactly this shape WHEN THEY WERE COUNTED,
+before the legacy reading above existed; the count is a dated measurement, not
+a standing property, and the legacy reading may move some of them to reported
+reds. Re-measure it before quoting it. They and inside the window their only exit was the hand
 `--defer`. The guard now names a crash as its own class — **not** an
 "unexplained red" to hunt — in the status view and in every branch of its
 block message, and gives it the same signed route:
