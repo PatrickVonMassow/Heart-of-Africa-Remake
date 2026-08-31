@@ -14278,3 +14278,33 @@ to land than a mechanism that needs a review.
   failure direction is a real defect standing in the way of unrelated work while a genuinely
   charged red reads as unowned.
   Bundle: Testinfrastruktur.
+
+- [ ] 1032. A blocking Stop guard can refuse the same finding forever, and every refusal spends a
+  user-visible answer (measured 31.08.2026, this session).
+  WHAT HAPPENED: five Stop guards stood red at once. A red Stop guard does not end the turn; it
+  restarts it with the finding attached. The session answered each refusal with a fresh closing
+  line instead of repairing anything, so the same five findings were refused ten times in a row
+  and the user read ten near-identical replies before asking what was going on. Nothing in the
+  chain noticed that the SAME unaddressed finding was being refused again, and nothing forced the
+  session to surface the refusal to the user instead of writing another closing line.
+  SECOND HALF: the session held a stale belief — a SessionStart stand-down notice whose owning
+  session had already died — while `batch-progress-guard`'s own text said "You hold the batch
+  lock". Two live sources contradicted each other and the contradiction was read as noise. A
+  guard that contradicts the session's belief is a measurement order.
+  WHY IT BLOCKS: an unattended session in this state burns turns without progress and, when a
+  user is present, floods the conversation. It is the no-standstill order's failure mode with the
+  standstill hidden behind activity.
+  FINAL STATE: (1) consecutive Stop refusals carrying the same finding signature are counted; from
+  the second identical refusal the turn is required to report the refusal to the user as a finding
+  rather than emit another closing line, and the count is visible in the refusal text itself;
+  (2) the counter survives the refusal loop it is meant to break — it is not stored in the reply;
+  (3) a guard whose text asserts a session-identity fact that the session's own recorded state
+  contradicts says so explicitly, so the contradiction cannot be read as repetition.
+  VERIFIABLE: unit cases over the counter proving a repeated identical finding escalates on the
+  second occurrence and that a DIFFERENT finding resets it; a case proving the escalation text
+  names the finding and the count; a drill that runs a turn end against a deliberately unfixable
+  guard and asserts the second turn breaks to the user instead of looping. Plus `npm run
+  test:unit`, lint, build.
+  Criticality: high — it is the turn-end chain itself, and its failure direction is an unattended
+  session that spends its whole budget refusing.
+  Bundle: Session- & Repo-Hygiene.
