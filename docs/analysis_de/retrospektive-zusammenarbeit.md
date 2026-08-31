@@ -1418,7 +1418,7 @@ keinen Träger hat. Gebucht als Punkt 956.
 
 ## Anhang A — Maschinell gepflegte Quellen-Übersicht
 
-Zuletzt aktualisiert: Montag, 31.08.2026, 15:54 · Quellen-Fingerprint: `45efd06816c2…`
+Zuletzt aktualisiert: Montag, 31.08.2026, 17:17 · Quellen-Fingerprint: `b9bd6f924e2f…`
 
 Spalten heuristisch aus den Quellen abgeleitet (Anläufe = distinkte Datumsnennungen im Memory;
 Maßnahme = Guard-Skripte mit Namens-Treffer). Die inhaltliche Bewertung gehört der Prosa oben.
@@ -1456,7 +1456,7 @@ Maßnahme = Guard-Skripte mit Namens-Treffer). Die inhaltliche Bewertung gehört
 | Work at High effort by default; the user reserves Extra high for research and design decisions, not implementation | 4 | hoch | — (Regel/Memory) | ◐ Regel |
 | Write idiomatic English in all English text (README, code comments, commit messages) — no German calques like 'stand' for a version | 1 | niedrig | — (Regel/Memory) | ◐ Regel |
 | Fable is NOT the default lane because its volume is the scarcest; difficulty is no reason for it either (since 18.08.2026 hard cases go straight to Sol), and review is cross-vendor, not Fable-by-default | 4 | hoch | — (Regel/Memory) | ◐ Regel |
-| Findings recorded by a session that could not write the work order — carry each into TASKS.md, then mark it drained | 37 | hoch | findings-guard.mjs | ✔ Mechanismus |
+| Findings recorded by a session that could not write the work order — carry each into TASKS.md, then mark it drained | 39 | hoch | findings-guard.mjs | ✔ Mechanismus |
 | A recurring lookup gets a script; never pull raw transcripts, listings, or logs into context to answer it | 1 | niedrig | — (Regel/Memory) | ◐ Regel |
 | Past the 150k context watermark, FINISH the step and hand over — never start a suite, an agent or a point after it; the user raised the cost twice (13.08. and 17.08.2026) | 2 | mittel | — (Regel/Memory) | ◐ Regel |
 | User 18.08.2026: hard, complex, error-prone and HIGH-criticality points are AUTHORED by GPT-5.6 Sol directly — Opus 5 authors only what is left, and Fable authors only a point that tags its lane or one the router escalates | 4 | hoch | — (Regel/Memory) | ◐ Regel |
@@ -1518,11 +1518,12 @@ Maßnahme = Guard-Skripte mit Namens-Treffer). Die inhaltliche Bewertung gehört
 | WebGPU is testable headless/autonomously via system Chrome (channel:'chrome') + --headless=new; the limitation applies only to Playwright's bundled Chromium | 2 | mittel | — (Regel/Memory) | ◐ Regel |
 | A pending batch claim HOLDS THE LAUNCHER BACK — withdraw it whenever the claiming window is left unattended | 2 | mittel | clear-claim-guard.mjs | ✔ Mechanismus |
 | Multi-agent workflows eat the session/weekly limit fast — verify findings INLINE, keep fan-outs small, warn the user with a cost estimate before any big workflow | 3 | mittel | doc-budget-guard.mjs | ✔ Mechanismus |
+| A review verdict judges the MATERIAL the reviewer was handed — a split range, an omitted file or a misnamed receipt buys a verdict on your own cut; correct the brief and re-ask, never overrule the reviewer | 3 | mittel | — (Regel/Memory) | ◐ Regel |
 
 Erfasste Quellen: 93 Feedback-/Projekt-Memories · 57 Guard-/Hook-Skripte · 6 Revert-/Reapply-Commits · 118 Prozess-/Meta-TASKS-Punkte (davon 52 offen).
 
-<!-- RETRO-FINGERPRINT: 45efd06816c27e988731615db5fadb5b3dd7716661450a5072ac5fbb1c7831ed -->
-<!-- RETRO-LAST-REFRESHED: 2026-08-31T13:54:53.629Z -->
+<!-- RETRO-FINGERPRINT: b9bd6f924e2fe7854f85fb8e63a9edece5ebc1e38a327422e127c642095f4dac -->
+<!-- RETRO-LAST-REFRESHED: 2026-08-31T15:17:06.736Z -->
 <!-- AUTO-GENERATED:END -->
 
 ### 3.111 Ein Erfolg ist kein Beweis für den Weg, auf dem er zustande kam
@@ -4954,3 +4955,50 @@ für den Menschen; sie ersetzt nie den Beleg. Und wo ein Schutz auf Zeit läuft,
 Ablauf an denselben Auslöser wie sein Beginn, sonst addiert sich das Raster auf die Frist.
 Gebucht als Punkt 1025, nach 945 und 964 zu bearbeiten, die dieselbe Nachfolger-Entscheidung
 besitzen.
+
+### 3.221 Der Prüfer antwortete auf mein Briefing, nicht auf den Gegenstand
+
+Am 31.08.2026 hat GPT-5.6 Sol dreimal an einem Nachmittag einen Befund
+geliefert, der am gelieferten Material stimmte und an der Sache falsch war —
+jedes Mal, weil die anfragende Sitzung das Material falsch zugeschnitten hatte.
+
+Beim ersten Mal lautete der Befund „unautorisierte Grenzwerterhöhung". Er war
+für den Bereich, den der Prüfer bekam, zwingend: Der Commit hob zwei Obergrenzen
+und kürzte den Text — die Erhöhung stand also ohne den Zuwachs da, der sie
+verdient. Der Zuwachs lag einen Commit früher. Zusammen gelesen war die
+Rechnung exakt. Bemerkenswert ist nicht der Fehlschluss, sondern dass genau
+diese Lehre seit dem 26.08.2026 im Kommentar derselben Konstante steht, mitsamt
+dem Satz „Split a change like this again and give the reviewer the whole span"
+— und die nächste Sitzung hat den Bereich wieder zerschnitten. Eine
+aufgeschriebene Lehre an der Stelle, an der man sie braucht, hat sie nicht
+verhindert.
+
+Beim zweiten Mal war der Fehler ungeschminkt meiner: Ich ließ eine
+Ledger-Zeile prüfen und nannte im Briefing die Quittung der Prüfung DIESES
+Commits statt der Prüfung, die die Zeile aufzeichnet. Der Prüfer verglich
+gehorsam gegen die falsche Quittung, fand eine Abweichung und sagte
+do-not-merge. Mit korrigiertem Briefing und unverändertem Gegenstand wurde
+daraus merge-with-fixes, und der Rest war ein Wort.
+
+**Die Lehre hat zwei Hälften, und die zweite ist die unbequemere.** Erstens:
+Ein Urteil gilt dem Material, das der Prüfer bekommen hat, nie dem, das man
+gemeint hat — wer einen Bereich zerschneidet, eine Datei weglässt oder eine
+Quittung falsch benennt, bekommt ein Urteil über seinen eigenen Zuschnitt
+zurück. Zweitens, und das ist die Versuchung: Der Ausweg ist NICHT, ein
+unbequemes Urteil als „hat den Kontext nicht" abzutun. Ich habe in beiden
+Fällen das Briefing korrigiert und neu gefragt, statt das Urteil zu überstimmen
+— und beide Male kam etwas Echtes zurück, das der erste Durchgang nicht hatte:
+eine ungefaltete Dublette und zwei stillschweigend verlorene Ansprüche im
+Nachbareintrag. Ein Prüfer, dem man widerspricht, ist ein Prüfer, den man
+abgeschafft hat; ein Prüfer, dem man besseres Material gibt, ist einer, der beim
+zweiten Mal mehr findet.
+
+Und eine dritte Beobachtung desselben Nachmittags gehört daneben, weil sie
+dieselbe Wurzel hat: Mein eigener Nachweis, dass eine neue Zusicherung greift,
+lief in einem Wegwerf-Skript, das die ABSICHT der Zusicherung nachbaute statt
+den Test aufzurufen. Der Nachweis war grün, die Zusicherung im Test aber
+wirkungslos — `not.toContain(expect.stringContaining(…))` vergleicht Elemente
+über Identität, und ein asymmetrischer Matcher trifft dort nie, die Verneinung
+kann also nicht fehlschlagen. Gefunden hat es der Prüfer, nicht ich. Auch hier
+gilt derselbe Satz in eigener Sache: Ein Beweis, der den Gegenstand nachbaut
+statt ihn aufzurufen, beweist die eigene Absicht — und nichts sonst.
