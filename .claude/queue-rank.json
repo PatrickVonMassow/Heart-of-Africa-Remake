@@ -1062,6 +1062,12 @@
       "why": "Its cost is real but derived: the refusal is only reprinted while the four-eyes debt blocks turn ends, and point 1019 — already near the front — removes that blocking, so this shrinks to a readability fix behind the release order.",
       "origin": "machine",
       "place": "last"
+    },
+    "1024": {
+      "at": "2026-08-31T12:27:43.015Z",
+      "why": "Es ist ein Berichtsfehler, kein Laufzeitfehler: Der Stapel arbeitet korrekt weiter, nur die Karte beschreibt ihn falsch. Das wiegt weniger als jeder offene Punkt davor.",
+      "origin": "machine",
+      "place": "last"
     }
   },
   "boundary": {
@@ -1100,7 +1106,7 @@
     "why": "The order standing in front of the release today is the arrangement that predates this rule; the four machine-filed points that had ranked themselves there were moved behind 174 first"
   },
   "settled": {
-    "at": "2026-08-31T11:13:43.242Z",
+    "at": "2026-08-31T12:27:43.025Z",
     "points": [
       174,
       184,
@@ -1449,7 +1455,8 @@
       1020,
       1021,
       1022,
-      1023
+      1023,
+      1024
     ]
   }
 }

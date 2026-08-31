@@ -123,6 +123,18 @@ put it is the mistake this line exists to stop.
   and `criticality-review-guard.mjs` carry the identical pattern and are judged in the same
   breath. This belongs here because it is the same counter, reached by a second road: the range
   the gate measures is wrong for a reason that has nothing to do with the verdicts in it.
+  CARRIED IN 31.08.2026, measured on `main` d4276cd while the gate held this very session shut:
+  the accumulated debt IS payable in one plan, and the plan is the gate's own. `node
+  scripts/review-sol.mjs --sha d4276cd --since 7472bb7 --point 1018` prints TEN runnable passes
+  over the END STATE with 100 % coverage (21/21 changed files), because one pass covers every
+  commit its range contains and the 46 intermediate states collapse into the current file
+  content. Reviewer per pass, assigned by the router: 1-4 GPT-5.6 Sol, 5/6/7/10 Fable 5, 8/9
+  Opus 5. TWO TRAPS, both measured: the commands the plan PRINTS omit `--since` and die with
+  "does not diverge from main", and they omit `--reviewer`, on which the role swap refuses. The
+  sealed migration is NOT the way out — `mechanism-contribution-disposition` is bound to
+  `CONTRIBUTION_SCOPE_BOUNDARY` and later contributions can never match it. This belongs here
+  because the point's final state must let a debt that is being paid reach zero, and this is the
+  measured shape of paying it.
   Bundle: Modell & Wächter — it edits the four-eyes gate and its ledger reader, the files 887,
   888 and 977 also reason about, so it is worked after them and never beside them.
 
@@ -14007,3 +14019,32 @@ to land than a mechanism that needs a review.
   Criticality: high — it is the guard that stops every turn end, and a guard that cannot be read
   cheaply is a guard that gets worked around.
   Bundle: Testinfrastruktur.
+
+- [ ] 1024. The handover card claims a standstill while transferable work is still building
+  (measured 31.08.2026 12:24 at this session's own context watermark).
+  `scripts/batch-boundary.mjs --prepare --context` detects the transferable in-flight work
+  correctly and says so in its own first line — "the declared in-flight work is transferable
+  (feat/1019-veto-scope@4f72388d)" — and then dictates, verbatim, a board card that ends with
+  "Hier läuft nichts weiter." Both cannot be true at once: GPT-5.6 Sol was demonstrably still
+  authoring point 1019 at that moment, with a pushed checkpoint on that branch.
+  THE READER SEES THE CARD, NOT THE PREPARATION OUTPUT. The board is the user's window into the
+  batch; a card that reports rest while a delegated author keeps building tells him the run is
+  idle when it is not, and the next thing he reads is a branch that grew without a session.
+  MEASURED TWICE, WHICH IS WHAT MAKES IT STRUCTURAL AND NOT A WORDING SLIP: `--prepare --context`
+  printed the identical closing sentence with a declared checkpoint-carrying in-flight
+  (`feat/1019-veto-scope@4f72388d`) and without one ("no checkpoints"). The detection therefore
+  does not reach the text at all.
+  FINAL STATE: when the boundary hands over transferable work, the card it dictates ends by
+  naming WHAT keeps running and WHO adopts it, instead of the standstill sentence; the
+  standstill sentence stays for the case it was written for, a boundary with nothing in flight.
+  The board's own contradiction check — which correctly refused this card while point 1019 still
+  stood as current work — is the model: it must refuse the same way when the claim contradicts a
+  declared in-flight run rather than a now-card.
+  VERIFIABLE: a unit case over the boundary's card generator asserting the two in-flight states
+  produce DIFFERENT closing sentences, mutation-checked; a case proving the standstill sentence
+  survives unchanged for a boundary with no declared in-flight work; a case proving the board
+  refuses a standstill card while a transferable in-flight run is declared. Plus
+  `npm run test:unit`, lint, build.
+  Criticality: high — it is the board sentence a returning owner reads first, and a false rest
+  claim is the one report that cannot be checked against anything else on the page.
+  Bundle: Chat & Tafel.
