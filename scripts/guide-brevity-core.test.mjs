@@ -413,13 +413,20 @@ describe('the real vibe-coding guide', () => {
     const entries = parseEntries(sliceSection(guide, /Fallstrick/i))
     const duty = entries.filter((entry) => entry.title.startsWith('Die Pflicht wächst schneller'))
     expect(duty).toHaveLength(1)
+    // The absorbed entry must not come back beside its host: two entries would
+    // satisfy every claim below and re-open the duplication the fold closed.
+    expect(entries.map((entry) => entry.title)).not.toContain(
+      expect.stringContaining('Die Sperre wächst beim Abtragen'),
+    )
     const text = duty[0].lines.join(' ').replace(/\s+/g, ' ')
 
     expect(text).toContain('**einzelnen Beitrag**')
     expect(text).toContain('Veto der **Datei** statt dem Befund')
     expect(text).toContain('**gelesen** von bloß berührt')
     expect(text).toContain('Reparaturkette am **Endzustand** als einen Beitrag')
-    expect(text).toContain('eigenen Ticket')
+    // The WHOLE clause: "eigenen Ticket" alone survives deleting the half that
+    // says which findings it is about.
+    expect(text).toContain('mach neue Befunde derselben Datei zum eigenen Ticket')
     expect(text).toContain('nennt ihren **Grund**, nie ihren Bestand')
     expect(text).toContain('**Messgerät**')
   })
