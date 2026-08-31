@@ -25259,3 +25259,44 @@ Nummerierung bleiben deshalb identisch — hier wird nur verschoben, nie umgesch
   Criticality: high — it blocks the render gate for every point, and it blocks it in the one
   way no charge and no owner can lift.
   Bundle: Testinfrastruktur.
+
+- [x] 1018. The recorder knows which section a red came from and throws it away, so the reader
+  has to guess (cross-vendor review, GPT-5.6 Sol at effort high, 30.08.2026, do-not-merge on
+  both attempts at guessing).
+  A suite that declares sections appends ` [--section=<name>]` to every result line, and the
+  recorder stores the line WITH it. Every `detailMatch` in `RED_CHARGES` is anchored at both
+  ends against what the suite MEASURED, so before 30.08.2026 no anchored charge in a
+  section-using suite could reach the end of its own recorded red — four known reds sat
+  unaccounted and blocked the picture gate. `withoutSectionTag` now takes the tag back off by
+  reconstructing it from its generator, and that is what the reviewer refused TWICE, rightly:
+  reconstruction proves SYNTAX, not PROVENANCE. A check that genuinely measured a value ending
+  in two spaces and a bracket is indistinguishable from a tagged one, and `chargeReds`
+  truncates a long detail to 200 characters before the reader sees it, so a cut can land on
+  exactly that shape. ASKED DIRECTLY WHICH IS WORSE — the guess, or a gate that stays shut — the
+  reviewer answered that a silent false clearance is worse than a loud block, and the guess was
+  WITHDRAWN on 30.08.2026 rather than kept as an interim. So the four reds are unaccounted again
+  and the gate is shut again, loudly, until this point lands. That is the state to expect, not a
+  regression to re-diagnose.
+  FINAL STATE: the run record carries the measurement and the section as SEPARATE fields, the
+  charge reads the measurement alone, and no reader parses a tag out of text. Records written
+  before the change keep working — an old record has no section field, and the reader must say
+  what it does with one rather than silently guessing again. The generator and its recogniser
+  agree about which names are legal: `sectionTag` today accepts a name with whitespace that no
+  recogniser will read back, which is the reviewer's second finding.
+  CARRIED IN 31.08.2026, from a cross-vendor round over `8f3f23d..8249b20` (GPT-5.6 Sol, effort
+  high, pass 2/3, receipt a18f4372aab591fc, recorded do-not-merge): `wasDetailCut` asks
+  `if (red?.detailCut === false) return false` and therefore believes an INHERITED value. A cut
+  record carrying `detailCut: false` on its prototype passes as whole, and an end-anchored charge
+  may reach a red it never measured — the one failure mode this table exists to prevent. The
+  existing malformed-value test only covers own properties made by spread. This point owns it
+  because it rewrites that very reader; an author who touches `wasDetailCut` without knowing it
+  rebuilds it. The same round confirmed the three findings of the previous verdict are closed and
+  named the test for each, so this is the only one outstanding.
+  VERIFIABLE: a unit case where the measurement itself ends in `  [--section=x]` and the charge
+  refuses it while the same text as a real tag charges, mutation-checked; a case over a
+  truncated detail whose cut lands on a tag shape; a record whose `detailCut: false` sits only on
+  the prototype, proving the reader demands an own literal field; the four reds of 30.08.2026
+  still charged; plus `npm run test:unit`, lint, build.
+  Criticality: high — it is a charge reading text it may not own, and a charge that excuses an
+  unmeasured red is the one failure mode the whole table exists to prevent.
+  Bundle: Testinfrastruktur.
