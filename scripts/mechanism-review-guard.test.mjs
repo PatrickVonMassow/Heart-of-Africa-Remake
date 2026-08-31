@@ -10,6 +10,7 @@ import { readFileSync } from 'node:fs'
 import {
   attachContributionDispositions,
   attachCoverage,
+  BASELINE_PATH as MECHANISM_BASELINE_PATH,
   BASELINE_RECOVERY_ANCHOR,
   baselineFor,
   bootstrapBase,
@@ -21,6 +22,8 @@ import {
   gatherMechanismReviewInputs,
   shouldSeedRecoveryAnchor,
 } from './mechanism-review-guard.mjs'
+import { BASELINE_PATH as CRITICALITY_BASELINE_PATH } from './criticality-review-guard.mjs'
+import { BASELINE_PATH as TASKS_SPEC_BASELINE_PATH } from './tasks-spec-guard.mjs'
 import {
   CONTRIBUTION_DISPOSITION_KIND,
   CONTRIBUTION_SCOPE_BOUNDARY,
@@ -29,7 +32,7 @@ import {
   formatMechanismReviewVerdict,
   LEGACY_RANGE_RETIREMENT_REASON,
 } from './mechanism-review-core.mjs'
-import { repoPath } from './repo-paths.mjs'
+import { commonRepoPath, repoPath } from './repo-paths.mjs'
 import { readOwnerLock } from './batch-singleton.mjs'
 
 describe('baselineFor', () => {
@@ -49,6 +52,12 @@ describe('baselineFor', () => {
     expect(baselineFor({ baseline: 'ccc' }, 'feat/new')).toBe('ccc')
     expect(baselineFor({}, 'main')).toBe(null)
     expect(baselineFor(undefined, 'main')).toBe(null)
+  })
+
+  it('stores every checkout-shared guard baseline in the main checkout', () => {
+    expect(MECHANISM_BASELINE_PATH).toBe(commonRepoPath('.claude/mechanism-review-baseline.json'))
+    expect(CRITICALITY_BASELINE_PATH).toBe(commonRepoPath('.claude/criticality-review-baseline.json'))
+    expect(TASKS_SPEC_BASELINE_PATH).toBe(commonRepoPath('.claude/tasks-spec-guard-baseline.json'))
   })
 })
 

@@ -1082,6 +1082,72 @@ describe('evaluateMechanismReview', () => {
     expect(formatMechanismReviewVerdict(v)).toMatch(/the fast path skips the tested files/)
   })
 
+  it('charges a file-scoped refusal to the contribution it read, not an ancestor that only co-touched the file', () => {
+    const readSha = 'd'.repeat(40)
+    const coTouchedSha = 'c'.repeat(40)
+    const file = 'scripts/pre-push-gate-core.mjs'
+    const refusal = record({
+      sha: readSha,
+      verdict: BLOCKING_VERDICT,
+      evidence: 'the end-state fast path skips the required check',
+      containedShas: new Set([coTouchedSha, readSha]),
+      pass: { index: 1, total: 1, files: [file], endState: readSha },
+    })
+    const v = evaluateMechanismReview({
+      baseline: 'b',
+      head: readSha,
+      pendingCommits: [
+        commit({ sha: coTouchedSha, coveringRecordShas: [readSha] }),
+        commit({ sha: readSha, coveringRecordShas: [readSha] }),
+      ],
+      records: [refusal],
+    })
+
+    expect(v.findings.map((finding) => [finding.commit.sha, finding.kind])).toEqual([
+      [readSha, 'do-not-merge'],
+    ])
+    expect(v.reviewScopes).toEqual([{
+      recordSha: readSha,
+      readContributionSha: readSha,
+      coTouchingContributionShas: [coTouchedSha],
+      files: [file],
+    }])
+    expect(formatMechanismReviewVerdict(v)).toContain(`READ ${readSha.slice(0, 7)}`)
+    expect(formatMechanismReviewVerdict(v)).toContain(`CO-TOUCHED ${coTouchedSha.slice(0, 7)}`)
+  })
+
+  it('mutation-checks the refusal boundary and keeps an unscoped refusal at full range strength', () => {
+    const readSha = 'd'.repeat(40)
+    const coTouchedSha = 'c'.repeat(40)
+    const scoped = record({
+      sha: readSha,
+      verdict: BLOCKING_VERDICT,
+      evidence: 'the end-state fast path skips the required check',
+      containedShas: new Set([coTouchedSha, readSha]),
+      pass: {
+        index: 1,
+        total: 1,
+        files: ['scripts/pre-push-gate-core.mjs'],
+        endState: readSha,
+      },
+    })
+    const pendingCommits = [
+      commit({ sha: coTouchedSha, coveringRecordShas: [readSha] }),
+      commit({ sha: readSha, coveringRecordShas: [readSha] }),
+    ]
+    const count = (row) => evaluateMechanismReview({
+      baseline: 'b',
+      head: readSha,
+      pendingCommits,
+      records: [row],
+    }).findings.length
+
+    expect(count(scoped)).toBe(1)
+    expect(count({ ...scoped, pass: { ...scoped.pass, endState: coTouchedSha } })).toBe(2)
+    const { pass: _removedBoundary, ...unscoped } = scoped
+    expect(count(unscoped)).toBe(2)
+  })
+
   it('lets a later review supersede an earlier refusal ONLY by descent (second landing round)', () => {
     // The clearing record descends from the refused one — the guard measured
     // it (containedShas is attachCoverage's rev-list of the record's sha).
