@@ -433,8 +433,11 @@ describe('the real vibe-coding guide', () => {
     expect(duty).toHaveLength(1)
     // The absorbed entry must not come back beside its host: two entries would
     // satisfy every claim below and re-open the duplication the fold closed.
-    expect(entries.map((entry) => entry.title)).not.toContain(
-      expect.stringContaining('Die Sperre wächst beim Abtragen'),
+    // NOT `not.toContain(expect.stringContaining(…))` — `toContain` compares
+    // elements by identity, so an asymmetric matcher never matches and the
+    // negated form can never fail (GPT-5.6 Sol, 31.08.2026).
+    expect(entries.some((entry) => entry.title.includes('Die Sperre wächst beim Abtragen'))).toBe(
+      false,
     )
     const text = duty[0].lines.join(' ').replace(/\s+/g, ' ')
 
