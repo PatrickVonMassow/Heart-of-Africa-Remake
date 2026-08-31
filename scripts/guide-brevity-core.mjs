@@ -232,7 +232,48 @@ export const LIMITS = {
   // "Runde um Runde, ohne näher zu kommen", which is about a review that never converges on ONE
   // artefact, not about a verdict spreading to artefacts it never read; neither could be cut
   // without dropping a claim. Net +7 lines / +85 words against the measured 495 / 4462, and the
-  // ceilings move by exactly that to 502 / 4547, with zero slack.
+  // ceilings move by exactly that to 502 / 4547, with zero slack. THE SPAN OF THAT RAISE IS
+  // 89107a54~1..4d88250, not 4d88250 alone: the tip arrived in 89107a54 and was shortened in
+  // 4d88250, so only their sum is the +7/+85 — the same split-range mistake this block already
+  // records for 26.08.2026, made a second time.
+  // MINUS ONE, 31.08.2026: the line count above included a phantom line for the file's closing
+  // newline. Correcting `measureGuide` takes that line off every measurement at once, so this
+  // ceiling follows it down and the effective limit is unchanged. `maxWords` never counted the
+  // phantom and does not move for that.
+  // RATCHETED DOWN AGAIN, same day, by the four-eyes re-read of the raise above: the new lesson
+  // was an UNFOLDED DUPLICATE of "Die Pflicht wächst schneller, als du sie erfüllen kannst",
+  // which already carried the obligation that outgrows its discharge. Folded into it, keeping
+  // every distinct claim — the veto scoped to the FILE, read separated from merely touched, the
+  // repair chain acknowledged at its end state, a new finding as its own ticket, and a refusal
+  // that names its reason rather than its backlog — inside that entry's own line budget. The same
+  // read caught the neighbouring priority-in-prose entry having been REPLACED rather than
+  // shortened a commit earlier: the divergence check and "Priorisiere das Ziel" were gone, and
+  // no test missed them. Both are back, paid for inside the same entries, and pinned below.
+  // Measured 500 / 4545, and the ceilings are that, with zero slack.
+  // RAISED 31.08.2026 by the measured net of ONE genuinely new claim, FOLDED rather than given an
+  // entry of its own: a review verdict judges the MATERIAL it was handed, so a split range, an
+  // omitted file or a misnamed receipt buys a verdict on your own cut — and the remedy is to
+  // correct the material and ask again, never to overrule the reviewer. It went into "Die Messung
+  // — und die Gegenprüfung — sah weniger, als sie behauptet", which already owns the cut-material
+  // class; the neighbours were read for redundancy first, and the closest, "Die Begründung, die
+  // sich im eigenen Dokument widerlegt", is about a contradiction the cut HIDES, not about the
+  // verdict the cut PRODUCES. THE FIRST DRAFT OVERPAID and said so wrongly: it claimed every
+  // candidate word carried a claim, having only tried to shorten the entry's EXISTING text and
+  // never the new sentence itself. It went through three readings, and each took something the
+  // one before had left: the second cut it to one line, the third found that line had stopped
+  // SAYING the scope claim and only presupposed it ("Falscher Zuschnitt?" assumes what the entry
+  // is there to teach), so the claim is spelled out again at two lines.
+  // WHAT THE BUDGET CHECK IS BLIND TO, stated narrowly: `measured > limits` compares the document
+  // against a ceiling that moved with it, so it stays green over any number of unneeded words. It
+  // is THIS SHAPE that cannot see the overpayment — a ratchet that authorised every increase
+  // separately, against the state before the change began, would. Nothing here is that ratchet
+  // yet, and until it is, the only reader who can catch it is one who asks whether the words were
+  // needed at all.
+  // TWO SPANS, TWO NUMBERS, because one of them was quoted for the other: against the state this
+  // entry's own fold left behind (500 / 4545) the addition is +2 lines / +21 words, which is what
+  // these ceilings move by. Against 495 / 4462 — the state before the whole chain began at
+  // 89107a54 — the inclusive delta is +7 / +104, and that is the number a reader auditing the
+  // chain as ONE change should check.
   maxLines: 502,
   // EXACT FIT, not headroom — corrected 30.07.2026 after the four-eyes review
   // pointed out that this comment had long stopped describing the numbers. The
@@ -420,10 +461,12 @@ export const LIMITS = {
   // 28.08.2026: the self-measuring-monitor lesson justified beside maxLines measures 4405 words
   // after its review correction, so this ceiling follows its +64-word net exactly; the guide keeps
   // no unearned headroom.
-  // 31.08.2026: the debt-that-grows-while-paid lesson justified beside maxLines measures 4547
-  // words after its shortening, so this ceiling follows its +85-word net exactly; the guide keeps
-  // no unearned headroom.
-  maxWords: 4547,
+  // 31.08.2026: the debt-that-grows-while-paid lesson justified beside maxLines came back down
+  // to 4545 words once it was folded into the entry it duplicated and the two claims a
+  // neighbouring entry had lost were paid back in place, and then to 4567 with the verdict-judges-
+  // its-material claim justified beside maxLines, which then went 4567 → 4556 → 4566 across the
+  // three readings of that entry; the guide keeps no unearned headroom at any of them.
+  maxWords: 4566,
   // A pitfall entry = the risk lines plus its prompt. Anything longer is a
   // story, not a tip.
   maxEntryLines: 11,
@@ -488,7 +531,14 @@ export function measureGuide(text) {
       ' ' +
       source.slice(unmatchedStart + 4).replaceAll('<!--', ' ')
   }
-  const lines = source.split('\n')
+  // A TERMINATING NEWLINE ENDS THE LAST LINE, it does not open another one.
+  // `split('\n')` leaves a phantom entry for it, so every POSIX-terminated file
+  // measured one line too many and the ceilings below were all ratcheted against
+  // that inflated count (four-eyes finding, GPT-5.6 Sol on 4d88250, 31.08.2026).
+  // Drop exactly that one sentinel — never all trailing blanks, which are real
+  // lines a guide can waste — and read the empty document as no lines at all.
+  const split = source.split('\n')
+  const lines = source === '' ? [] : source.endsWith('\n') ? split.slice(0, -1) : split
   const body = []
   let inComment = false
   for (const line of lines) {

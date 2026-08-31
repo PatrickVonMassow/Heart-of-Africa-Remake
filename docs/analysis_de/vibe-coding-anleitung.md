@@ -180,13 +180,6 @@ Die Ursache findest du durch **Zerlegen**, nicht durch Wiederholen.
   → *Prompt:* „Frag vor jeder Runde: **Hat sich etwas bewegt außer der Zählung?** Bleibt der
   Umfang, ist der Gegenstand zu groß — **teile das Ticket und arbeite jedes Stück für sich ab**.“
 
-- **Die Sperre wächst beim Abtragen — und ihre Absage wächst mit.** Das Veto gilt der **Datei**
-  statt dem Befund; wer ihn behebt, fasst sie an und schuldet neu. Die Absage druckt dabei den
-  ganzen Bestand, und je größer er ist, desto weniger Platz bleibt zum Abtragen.
-  → *Prompt:* „Buch ein Veto gegen den **Befund**, trenne **gelesen** von bloß berührt, quittiere
-  eine Reparaturkette am **Endzustand** als einen Beitrag, und mach neue Befunde derselben Datei zum
-  eigenen Ticket. Eine Verweigerung nennt ihren **Grund**, nie ihren Bestand.“
-
 - **Gebaut — und nie in Betrieb genommen.** Die Ausnahme steht im Fließtext statt in der Datei,
   die das Werkzeug liest; oder das Tor urteilt richtig, nur fährt es kein Weg des Projekts.
   → *Prompt:* „Trag eine Ausnahme **im selben Zug** dort ein, wo der Mechanismus sie liest, und
@@ -291,7 +284,9 @@ Die Ursache findest du durch **Zerlegen**, nicht durch Wiederholen.
   das Modell wie ein Mangel.
   → *Prompt:* „Leite das Fenster jeder Messung aus dem **Gegenstand** ab: nach Zeit, nie nach
   Anzahl. Nenne dem **prüfenden Modell selbst** jedes weggelassene Material, nicht nur dem
-  Aufrufer, und melde die **Abdeckung**; ein Urteil über halbem Material ist **Teilprüfung**."
+  Aufrufer, und melde die **Abdeckung**; ein Urteil über halbem Material ist **Teilprüfung**.
+  Ein Urteil gilt dem **Zuschnitt**, den du lieferst: Stimmt er nicht, korrigier ihn und **frag
+  neu** — überstimm nie den Prüfer."
 
 - **„Läuft der noch?" mit „ist die Ausgabe frisch?" beantwortet.** Frische belegt nur, dass jemand
   gearbeitet *hat*.
@@ -338,8 +333,9 @@ Die Ursache findest du durch **Zerlegen**, nicht durch Wiederholen.
 
 - **Prosa wirkt nicht — als Priorität so wenig wie als Meldung.** Ein Tor hielt den eigenen
   Delegaten für fremd: Die Übergabe nannte ihn nur im Text.
-  → *Prompt:* „Trag jede wirksame Angabe in das **Feld**, das der Mechanismus liest; sag bei jeder
-  Sortierregel, was mit dem **Altbestand** geschieht."
+  → *Prompt:* „Trag jede wirksame Angabe in das **Feld**, das der Mechanismus liest; laufen beide
+  auseinander, schlägt eine Prüfung fehl. Priorisiere das **Ziel**, und sag bei jeder
+  Sortierregel, was mit dem **Altbestand** geschieht: nachräumen oder liegen lassen."
 
 - **Die Begründung, die sich im eigenen Dokument widerlegt.** Ein Sicherheitsargument und sein
   Gegenbeweis standen drei Abschnitte auseinander; vier Prüfrunden sahen je eine Hälfte, weil der
@@ -451,9 +447,14 @@ Die Ursache findest du durch **Zerlegen**, nicht durch Wiederholen.
   nichts.“
 
 - **Die Pflicht wächst schneller, als du sie erfüllen kannst.** Verlangt eine Prüfung „alles seit
-  dem letzten Mal", wird sie unerfüllbar und setzt sich aus — der Rückstand wächst währenddessen.
-  → *Prompt:* „Binde jede Prüfpflicht an den **einzelnen Beitrag**, nie an einen offenen Zeitraum.
-  Sieht eine Pflicht unerfüllbar aus, prüf zuerst dein **Messgerät**."
+  dem letzten Mal", wird sie unerfüllbar und setzt sich aus. Gilt ein Veto der **Datei** statt dem
+  Befund, wächst der Rückstand beim Abtragen: Wer ihn behebt, fasst die Datei an und schuldet
+  neu — während die Absage den ganzen Bestand druckt und den Platz dafür wegnimmt.
+  → *Prompt:* „Binde jede Prüfpflicht an den **einzelnen Beitrag**, nie an einen offenen Zeitraum,
+  und buch ein Veto gegen den **Befund**: trenne **gelesen** von bloß berührt, quittiere eine
+  Reparaturkette am **Endzustand** als einen Beitrag, und mach neue Befunde derselben Datei zum
+  eigenen Ticket. Eine Verweigerung nennt ihren **Grund**, nie ihren Bestand; sieht eine Pflicht
+  unerfüllbar aus, prüf zuerst dein **Messgerät**."
 
 - **Das Protokoll ohne Verfallsdatum wird zum Dauerplakat.** Was dein Werkzeug über die eigene
   Entscheidung aufschreibt, nimmt niemand je wieder heraus.
@@ -499,4 +500,4 @@ Die Ursache findest du durch **Zerlegen**, nicht durch Wiederholen.
 
 Sie ersetzt die Fallstricke oben nicht.
 
-<!-- GUIDE-FINGERPRINT: 45efd06816c27e988731615db5fadb5b3dd7716661450a5072ac5fbb1c7831ed -->
+<!-- GUIDE-FINGERPRINT: 0f3a17ead4f40f26ce552752ac3c2e695fc388547775d5c404d29b7065904d22 -->

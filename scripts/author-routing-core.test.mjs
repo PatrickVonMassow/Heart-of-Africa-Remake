@@ -357,7 +357,10 @@ describe('re-authoring rounds — decorrelated before Fable', () => {
     expect(next.framing).toBe(AUTHORING_FRAMINGS[1])
     records.push(commissioned(4, next.framing), failed())
     expect(authorRoundHistory(records, 727)).toMatchObject({ unsuccessfulRounds: 5, freshRounds: 4 })
-    expect(nextAuthoringStep({ records, point: 727 })).toMatchObject({ kind: 'spec-examination', round: 5 })
+    // Round 5 is an ordinary commission while the examination sits at
+    // SPEC_EXAMINATION_ROUND; the transition itself is pinned symbolically by
+    // the case below, so this one stays about the framing it reports.
+    expect(nextAuthoringStep({ records, point: 727 })).toMatchObject({ kind: 'commission', round: 5 })
   })
 
   it('moves past an over-framed baseline round on the following ledger row', () => {

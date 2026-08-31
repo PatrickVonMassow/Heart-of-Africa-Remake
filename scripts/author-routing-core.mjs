@@ -45,8 +45,20 @@ export const LANE_MODEL = Object.freeze({
   opus: 'Opus 5',
 })
 
-/** User decision 19.08.2026: Fable escalation begins at this many unsuccessful review rounds. */
-export const FABLE_ESCALATION_ROUNDS = 5
+/**
+ * User decision 31.08.2026: Fable escalation begins at this many unsuccessful
+ * review rounds, and TEN IS THE STANDING DEFAULT — not a shortage measure.
+ *
+ * It was raised once before and fell back to five when the volume shortage that
+ * happened to be running at the time was declared over; the raise was read as
+ * part of that emergency and taken back with it. It is not. The reason to spend
+ * ten rounds before reaching for the scarcest lane holds in a full week exactly
+ * as in an empty one: a point that four reviews have rejected is far more often
+ * badly cut than badly authored, and switching vendor buys less than re-cutting
+ * it. An emergency may raise this FURTHER for a while; when it ends the value
+ * returns here, to ten, and never to five.
+ */
+export const FABLE_ESCALATION_ROUNDS = 10
 
 /** The last Sol/Opus round pauses for a spec reading before Fable may take it. */
 export const SPEC_EXAMINATION_ROUND = FABLE_ESCALATION_ROUNDS - 1

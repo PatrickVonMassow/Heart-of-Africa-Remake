@@ -256,7 +256,26 @@ describe('auditGuide — budget boundaries', () => {
   it('counts every line and word after an unterminated comment opener', () => {
     const malformed = 'line one\nline two <!--\nline three\nline four\n'
     expect(measureGuide(malformed)).toEqual(measureGuide('line one\nline two \nline three\nline four\n'))
-    expect(measureGuide(malformed)).toEqual({ lines: 5, words: 8 })
+    // FOUR lines, not five: the closing newline ends line four rather than
+    // opening a fifth. This case pinned the phantom until 31.08.2026.
+    expect(measureGuide(malformed)).toEqual({ lines: 4, words: 8 })
+  })
+
+  it('reads a closing newline as the end of the last line, not as another one', () => {
+    // The ceilings are ratcheted against this count, so a phantom line here
+    // silently bought the guide a line of headroom in every raise ever made
+    // (four-eyes finding, GPT-5.6 Sol on 4d88250, 31.08.2026).
+    expect(measureGuide('a\nb\n').lines).toBe(2)
+    expect(measureGuide('a\nb').lines).toBe(2)
+    expect(measureGuide('').lines).toBe(0)
+  })
+
+  it('keeps the blank lines a guide really wastes, and drops only the terminator', () => {
+    // The repair must take off exactly ONE sentinel. Stripping trailing blanks
+    // instead would hand back free lines to a file padded with empty ones.
+    expect(measureGuide('a\n\n\n').lines).toBe(3)
+    expect(measureGuide('a\n\n\n\n').lines).toBe(4)
+    expect(measureGuide('\n').lines).toBe(1)
   })
 
   it('cannot re-form an unterminated opener across its own excision seam', () => {
@@ -371,6 +390,66 @@ describe('the real vibe-coding guide', () => {
     expect(byTitle['Die Ausnahme existiert nur in der Verweigerung.']).toContain(
       'Kann der ehrlichste Wortlaut der Ausnahme meine eigene Prüfung bestehen?',
     )
+  })
+
+  it('measures the same document identically with and without its closing newline', () => {
+    // The count the ceilings are ratcheted against must not depend on file
+    // formatting alone — the rendered text is the same either way.
+    const withNewline = guide.endsWith('\n') ? guide : `${guide}\n`
+    const withoutNewline = withNewline.replace(/\n$/, '')
+    expect(measureGuide(withNewline)).toEqual(measureGuide(withoutNewline))
+  })
+
+  it('keeps both ceilings on the measurement, with no unearned headroom', () => {
+    // The rule this file states: a ceiling is raised only by the measured size
+    // of genuinely new tips, exact fit and no slack. A ceiling ABOVE the
+    // measurement is headroom the next paragraph would spend unannounced —
+    // which is how the guard came to raise its own limit (point 1022).
+    const measured = measureGuide(guide)
+    expect(measured.lines).toBe(LIMITS.maxLines)
+    expect(measured.words).toBe(LIMITS.maxWords)
+  })
+
+  it('keeps the priority entry enforceable rather than anecdotal', () => {
+    // The entry was WIDENED and, in the same commit, silently stripped of the
+    // divergence check and of "Priorisiere das Ziel" — the two halves that make
+    // it act. Nothing caught it, because the suite only demanded a prompt
+    // marker (four-eyes finding, GPT-5.6 Sol, 31.08.2026).
+    const entries = parseEntries(sliceSection(guide, /Fallstrick/i))
+    const prose = entries.find((entry) => entry.title.startsWith('Prosa wirkt nicht'))
+    const text = prose?.lines.join(' ').replace(/\s+/g, ' ')
+
+    expect(text).toContain('**Feld**, das der Mechanismus liest')
+    expect(text).toContain('laufen beide auseinander, schlägt eine Prüfung fehl')
+    expect(text).toContain('Priorisiere das **Ziel**')
+    expect(text).toContain('**Altbestand**')
+  })
+
+  it('carries the whole growing-obligation lesson in the one entry that owns it', () => {
+    // Folded from two entries that described the same class. The fold is only
+    // honest if every distinct claim of the absorbed entry survived it.
+    const entries = parseEntries(sliceSection(guide, /Fallstrick/i))
+    const duty = entries.filter((entry) => entry.title.startsWith('Die Pflicht wächst schneller'))
+    expect(duty).toHaveLength(1)
+    // The absorbed entry must not come back beside its host: two entries would
+    // satisfy every claim below and re-open the duplication the fold closed.
+    // NOT `not.toContain(expect.stringContaining(…))` — `toContain` compares
+    // elements by identity, so an asymmetric matcher never matches and the
+    // negated form can never fail (GPT-5.6 Sol, 31.08.2026).
+    expect(entries.some((entry) => entry.title.includes('Die Sperre wächst beim Abtragen'))).toBe(
+      false,
+    )
+    const text = duty[0].lines.join(' ').replace(/\s+/g, ' ')
+
+    expect(text).toContain('**einzelnen Beitrag**')
+    expect(text).toContain('Veto der **Datei** statt dem Befund')
+    expect(text).toContain('**gelesen** von bloß berührt')
+    expect(text).toContain('Reparaturkette am **Endzustand** als einen Beitrag')
+    // The WHOLE clause: "eigenen Ticket" alone survives deleting the half that
+    // says which findings it is about.
+    expect(text).toContain('mach neue Befunde derselben Datei zum eigenen Ticket')
+    expect(text).toContain('nennt ihren **Grund**, nie ihren Bestand')
+    expect(text).toContain('**Messgerät**')
   })
 
   it('lets a true suspected cause survive the required falsification attempt', () => {
