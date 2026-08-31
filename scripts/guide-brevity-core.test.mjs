@@ -392,6 +392,24 @@ describe('the real vibe-coding guide', () => {
     )
   })
 
+  it('measures the same document identically with and without its closing newline', () => {
+    // The count the ceilings are ratcheted against must not depend on file
+    // formatting alone — the rendered text is the same either way.
+    const withNewline = guide.endsWith('\n') ? guide : `${guide}\n`
+    const withoutNewline = withNewline.replace(/\n$/, '')
+    expect(measureGuide(withNewline)).toEqual(measureGuide(withoutNewline))
+  })
+
+  it('keeps both ceilings on the measurement, with no unearned headroom', () => {
+    // The rule this file states: a ceiling is raised only by the measured size
+    // of genuinely new tips, exact fit and no slack. A ceiling ABOVE the
+    // measurement is headroom the next paragraph would spend unannounced —
+    // which is how the guard came to raise its own limit (point 1022).
+    const measured = measureGuide(guide)
+    expect(measured.lines).toBe(LIMITS.maxLines)
+    expect(measured.words).toBe(LIMITS.maxWords)
+  })
+
   it('keeps the priority entry enforceable rather than anecdotal', () => {
     // The entry was WIDENED and, in the same commit, silently stripped of the
     // divergence check and of "Priorisiere das Ziel" — the two halves that make
