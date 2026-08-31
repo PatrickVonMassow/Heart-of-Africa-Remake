@@ -18,6 +18,8 @@ import {
   parseMechanismLog,
   pendingReviewContributions,
   planningContributions,
+  gatherMechanismReviewInputs,
+  shouldSeedRecoveryAnchor,
 } from './mechanism-review-guard.mjs'
 import {
   CONTRIBUTION_DISPOSITION_KIND,
@@ -28,6 +30,7 @@ import {
   LEGACY_RANGE_RETIREMENT_REASON,
 } from './mechanism-review-core.mjs'
 import { repoPath } from './repo-paths.mjs'
+import { readOwnerLock } from './batch-singleton.mjs'
 
 describe('baselineFor', () => {
   const state = { baselines: { main: 'aaa', 'feat/x': 'bbb' } }
@@ -64,6 +67,33 @@ describe('bootstrapBase', () => {
 
   it('never falls back to HEAD when the anchor is absent', () => {
     expect(bootstrapBase('headsha', () => '')).toBe(null)
+  })
+
+  it('seeds the anchor from the one shape that carries the flag AND the baseline', () => {
+    // THE DEFECT THIS PINS: the flag lived only under `inputs` on the normal
+    // path, while the early returns that carry it at the top level carry no
+    // baseline. The Stop path asks for both AT ONCE, so the write could never
+    // happen — a tree whose local baseline file was gone stayed blocked for
+    // good, and its own recovery text described a step the code never took.
+    expect(shouldSeedRecoveryAnchor({ baselineMissing: true, baseline: BASELINE_RECOVERY_ANCHOR })).toBe(true)
+    // The two shapes that must NOT write: no baseline to seed, and a baseline
+    // that is already recorded.
+    expect(shouldSeedRecoveryAnchor({ baselineMissing: true, baseline: null })).toBe(false)
+    expect(shouldSeedRecoveryAnchor({ baselineMissing: false, baseline: BASELINE_RECOVERY_ANCHOR })).toBe(false)
+    // A `--status` read decides nothing and therefore writes nothing.
+    expect(
+      shouldSeedRecoveryAnchor({ baselineMissing: true, baseline: BASELINE_RECOVERY_ANCHOR }, { status: true }),
+    ).toBe(false)
+
+    // And the real gathered shape reports the flag where the predicate reads it,
+    // with the same value it hands to the verdict — the symmetry that broke.
+    // The owner's own id is used so the gather is APPLICABLE here too: with a
+    // live batch lock any other id stands the guard down, and a skipped
+    // assertion would have let the very defect above pass unnoticed.
+    const gathered = gatherMechanismReviewInputs({ sessionId: readOwnerLock()?.sessionId ?? '' })
+    expect(gathered.applicable).toBe(true)
+    expect(Object.hasOwn(gathered, 'baselineMissing')).toBe(true)
+    expect(gathered.baselineMissing).toBe(gathered.inputs.baselineMissing)
   })
 
   it('refuses an unreachable anchor and names the merge that makes recovery possible', () => {
