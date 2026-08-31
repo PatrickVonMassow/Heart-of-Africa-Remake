@@ -259,13 +259,22 @@ export const LIMITS = {
   // sich im eigenen Dokument widerlegt", is about a contradiction the cut HIDES, not about the
   // verdict the cut PRODUCES. THE FIRST DRAFT OVERPAID and said so wrongly: it claimed every
   // candidate word carried a claim, having only tried to shorten the entry's EXISTING text and
-  // never the new sentence itself. The four-eyes read wrote the same two claims in one line
-  // ("Falscher Zuschnitt? Korrigier ihn, frag neu — überstimm nie den Prüfer"), which is the +1/+11
-  // that stands here. Note what no budget check could have caught: content and ceiling rose
-  // TOGETHER, so `measured > limits` stayed green over eleven words of pure headroom — this class
-  // of overpayment is visible only to a reader who asks whether the words were needed.
-  // Net +1 line / +11 words, and the ceilings move by exactly that, with zero slack.
-  maxLines: 501,
+  // never the new sentence itself. It went through three readings, and each took something the
+  // one before had left: the second cut it to one line, the third found that line had stopped
+  // SAYING the scope claim and only presupposed it ("Falscher Zuschnitt?" assumes what the entry
+  // is there to teach), so the claim is spelled out again at two lines.
+  // WHAT THE BUDGET CHECK IS BLIND TO, stated narrowly: `measured > limits` compares the document
+  // against a ceiling that moved with it, so it stays green over any number of unneeded words. It
+  // is THIS SHAPE that cannot see the overpayment — a ratchet that authorised every increase
+  // separately, against the state before the change began, would. Nothing here is that ratchet
+  // yet, and until it is, the only reader who can catch it is one who asks whether the words were
+  // needed at all.
+  // TWO SPANS, TWO NUMBERS, because one of them was quoted for the other: against the state this
+  // entry's own fold left behind (500 / 4545) the addition is +2 lines / +21 words, which is what
+  // these ceilings move by. Against 495 / 4462 — the state before the whole chain began at
+  // 89107a54 — the inclusive delta is +7 / +104, and that is the number a reader auditing the
+  // chain as ONE change should check.
+  maxLines: 502,
   // EXACT FIT, not headroom — corrected 30.07.2026 after the four-eyes review
   // pointed out that this comment had long stopped describing the numbers. The
   // rule above ("raised only by the measured size of genuinely new tips")
@@ -455,8 +464,9 @@ export const LIMITS = {
   // 31.08.2026: the debt-that-grows-while-paid lesson justified beside maxLines came back down
   // to 4545 words once it was folded into the entry it duplicated and the two claims a
   // neighbouring entry had lost were paid back in place, and then to 4567 with the verdict-judges-
-  // its-material claim justified beside maxLines; the guide keeps no unearned headroom.
-  maxWords: 4556,
+  // its-material claim justified beside maxLines, which then went 4567 → 4556 → 4566 across the
+  // three readings of that entry; the guide keeps no unearned headroom at any of them.
+  maxWords: 4566,
   // A pitfall entry = the risk lines plus its prompt. Anything longer is a
   // story, not a tip.
   maxEntryLines: 11,
