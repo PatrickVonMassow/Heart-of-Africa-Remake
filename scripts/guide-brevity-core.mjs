@@ -250,7 +250,18 @@ export const LIMITS = {
   // shortened a commit earlier: the divergence check and "Priorisiere das Ziel" were gone, and
   // no test missed them. Both are back, paid for inside the same entries, and pinned below.
   // Measured 500 / 4545, and the ceilings are that, with zero slack.
-  maxLines: 500,
+  // RAISED 31.08.2026 by the measured net of ONE genuinely new claim, FOLDED rather than given an
+  // entry of its own: a review verdict judges the MATERIAL it was handed, so a split range, an
+  // omitted file or a misnamed receipt buys a verdict on your own cut — and the remedy is to
+  // correct the material and ask again, never to overrule the reviewer. It went into "Die Messung
+  // — und die Gegenprüfung — sah weniger, als sie behauptet", which already owns the cut-material
+  // class; the neighbours were read for redundancy first, and the closest, "Die Begründung, die
+  // sich im eigenen Dokument widerlegt", is about a contradiction the cut HIDES, not about the
+  // verdict the cut PRODUCES. Paying it back inside the entry was tried and refused: every
+  // candidate word carried a claim of its own — "nicht nur dem Aufrufer" is the half that says
+  // WHOM to tell — and dropping a claim to buy a line is the exact defect the entry below records.
+  // Net +2 lines / +22 words, and the ceilings move by exactly that, with zero slack.
+  maxLines: 502,
   // EXACT FIT, not headroom — corrected 30.07.2026 after the four-eyes review
   // pointed out that this comment had long stopped describing the numbers. The
   // rule above ("raised only by the measured size of genuinely new tips")
@@ -439,8 +450,9 @@ export const LIMITS = {
   // no unearned headroom.
   // 31.08.2026: the debt-that-grows-while-paid lesson justified beside maxLines came back down
   // to 4545 words once it was folded into the entry it duplicated and the two claims a
-  // neighbouring entry had lost were paid back in place; the guide keeps no unearned headroom.
-  maxWords: 4545,
+  // neighbouring entry had lost were paid back in place, and then to 4567 with the verdict-judges-
+  // its-material claim justified beside maxLines; the guide keeps no unearned headroom.
+  maxWords: 4567,
   // A pitfall entry = the risk lines plus its prompt. Anything longer is a
   // story, not a tip.
   maxEntryLines: 11,

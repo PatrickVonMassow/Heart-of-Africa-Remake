@@ -284,7 +284,9 @@ Die Ursache findest du durch **Zerlegen**, nicht durch Wiederholen.
   das Modell wie ein Mangel.
   → *Prompt:* „Leite das Fenster jeder Messung aus dem **Gegenstand** ab: nach Zeit, nie nach
   Anzahl. Nenne dem **prüfenden Modell selbst** jedes weggelassene Material, nicht nur dem
-  Aufrufer, und melde die **Abdeckung**; ein Urteil über halbem Material ist **Teilprüfung**."
+  Aufrufer, und melde die **Abdeckung**; ein Urteil über halbem Material ist **Teilprüfung**.
+  Und es gilt dem gelieferten **Zuschnitt**: Passt es nicht zur Sache, korrigier das Material und
+  **frag neu** — überstimm nie den Prüfer."
 
 - **„Läuft der noch?" mit „ist die Ausgabe frisch?" beantwortet.** Frische belegt nur, dass jemand
   gearbeitet *hat*.
@@ -498,4 +500,4 @@ Die Ursache findest du durch **Zerlegen**, nicht durch Wiederholen.
 
 Sie ersetzt die Fallstricke oben nicht.
 
-<!-- GUIDE-FINGERPRINT: 45efd06816c27e988731615db5fadb5b3dd7716661450a5072ac5fbb1c7831ed -->
+<!-- GUIDE-FINGERPRINT: b9bd6f924e2fe7854f85fb8e63a9edece5ebc1e38a327422e127c642095f4dac -->
