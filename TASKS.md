@@ -114,6 +114,15 @@ put it is the mistake this line exists to stop.
   Criticality: high — it is the gate that stops the batch from ending a turn, and both directions
   are expensive: left as it is it can shut the run indefinitely, loosened carelessly it excuses
   the counter-read that the two verdicts of 30.08. correctly demanded.
+  CARRIED IN 31.08.2026, measured while this defect blocked the landing of point 1018: the gate's
+  baseline is CHECKOUT-LOCAL. `BASELINE_PATH` uses `repoPath`, so a linked worktree cannot see the
+  main checkout's baselines and `baselineFor`'s documented fallback to `main` never fires there. A
+  fresh worktree therefore has NO baseline at all, takes the recovery anchor `28293f97` and is
+  billed the whole history from it — a debt no branch can pay, in a checkout that is deleted at
+  the landing. The lock already solved exactly this with `commonRepoPath`; `tasks-spec-guard.mjs`
+  and `criticality-review-guard.mjs` carry the identical pattern and are judged in the same
+  breath. This belongs here because it is the same counter, reached by a second road: the range
+  the gate measures is wrong for a reason that has nothing to do with the verdicts in it.
   Bundle: Modell & Wächter — it edits the four-eyes gate and its ledger reader, the files 887,
   888 and 977 also reason about, so it is worked after them and never beside them.
 
@@ -13949,3 +13958,52 @@ to land than a mechanism that needs a review.
   Criticality: medium — no product defect, but it is the most frequent thing the user watches us get
   wrong, now reported twice, and each occurrence costs him a duplicate message to read.
   Bundle: Session- & Repo-Hygiene.
+
+- [ ] 1022. The brevity guard raises its own ceiling to admit the document it is measuring
+  (cross-vendor round 31.08.2026, GPT-5.6 Sol at effort high, receipt 93df0ef2e985e209, recorded
+  do-not-merge on 4d88250).
+  TWO findings, independent of each other. FIRST: the commit "Pay for the new pitfall by
+  shortening it, not by granting headroom" does the opposite of what its message says.
+  `scripts/guide-brevity-core.mjs` raises `maxLines` 495 → 502 and `maxWords` 4462 → 4547, while
+  the shortening in `docs/analysis_de/vibe-coding-anleitung.md` removes 3 lines and 40 words — so
+  the document still stands 7 lines and 85 words over the OLD caps and passes only because both
+  ceilings moved with it. A budget that rises to meet its document measures nothing, and a commit
+  message stating the unraised budget makes the raise invisible in the history, which is the one
+  place a later reader would look for it. SECOND: the line measurement is EOF-sensitive.
+  `guide-brevity-core.mjs` splits on the newline and keeps the terminal empty element, so a
+  newline-terminated document counts one phantom line that the identical rendered text without
+  its final newline does not. The claimed physical-line measurement carries an off-by-one that
+  changes with file formatting alone.
+  FINAL STATE: the ceilings stand where they stood before 4d88250, or the raise is made in a
+  commit that STATES it with the measured justification the doc-budget rule requires; and the
+  line count is independent of the trailing newline.
+  VERIFIABLE: a unit case over the same document with and without a trailing newline asserting
+  one identical count; a case pinning both ceilings against their values before 4d88250,
+  mutation-checked; plus `npm run test:unit`, lint, build.
+  Criticality: high — it is the guard that decides whether a document may grow, and a guard that
+  raises its own limit to admit the next paragraph enforces nothing.
+  Bundle: Testinfrastruktur.
+
+- [ ] 1023. A refusal that reprints its whole inventory bills the blocked session for the size of
+  the debt (measured 31.08.2026, recorded in `.claude/context-incidents.jsonl`).
+  `mechanism-review-guard` prints its COMPLETE inventory on every refusal: 43 contributions,
+  commit by commit, with the per-file reviewer grouping, and then the same list again as the
+  authorship groups. Three blocked turn ends printed it three times. The largest single context
+  growth step of that session was +27140 tokens in one turn, and the boundary was finally taken
+  at 206132 tokens — 56132 past the 150000 ceiling.
+  THE FEEDBACK IS THE DEFECT: the guard blocks BECAUSE the debt is large, and its message is
+  large BECAUSE the debt is large, so the closer a session comes to being able to pay the debt
+  down, the less context it has left to do it with. A session doing everything right is consumed
+  by the diagnosis of its own problem.
+  FINAL STATE: a refusal names its CAUSE, not its stock — one sentence, the single finding that
+  holds the chain, the count, and the command that shows the rest. The guard already prints that
+  command at the end of every message. The full inventory stays behind `--status`, where it is
+  asked for. Judge the same shape for every other guard whose message grows with the state it
+  names.
+  VERIFIABLE: a unit case over a ledger with N blocked contributions asserting the refusal text
+  stays under a fixed character budget as N grows, mutation-checked; a case proving the naming
+  finding and the status command are still present at N=1 and at N=100; plus `npm run test:unit`,
+  lint, build.
+  Criticality: high — it is the guard that stops every turn end, and a guard that cannot be read
+  cheaply is a guard that gets worked around.
+  Bundle: Testinfrastruktur.
