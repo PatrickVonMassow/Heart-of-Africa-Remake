@@ -275,7 +275,8 @@ function patternHits(pattern, value) {
  * another's, which is the one failure mode this table exists to prevent.
  */
 export function wasDetailCut(red) {
-  if (red?.detailCut === true) return true
+  const hasOwnMark = red != null && Object.hasOwn(red, 'detailCut')
+  if (hasOwnMark && red.detailCut === true) return true
   // ONLY A LITERAL `false` PROVES THE OTHER DIRECTION (cross-vendor review,
   // GPT-5.6 Sol, do-not-merge on ae9a500c). Treating any present value as
   // "not cut" let a malformed durable record — `detailCut: null` in a
@@ -283,7 +284,12 @@ export function wasDetailCut(red) {
   // answer a signature belonging to a different red. A field nobody can read is
   // not evidence, so it falls back to the inference like a record that carries
   // none at all.
-  if (red?.detailCut === false) return false
+  // The boolean must also BELONG TO THE RECORD. Looking through its prototype
+  // lets an inherited `false` overrule the conservative legacy inference: a
+  // cut-at-the-bound record can then answer an end-anchored signature as if its
+  // measurement were whole. Durable JSON records have own data properties;
+  // anything inherited is not evidence written by the recorder.
+  if (hasOwnMark && red.detailCut === false) return false
   return text(red?.detail).length === MAX_RED_DETAIL_LEN
 }
 

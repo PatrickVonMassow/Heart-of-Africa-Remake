@@ -1598,6 +1598,17 @@ describe('evaluate — a red is not closed by the runs that FOLLOWED it (point 6
       expect(chargeFor({ ...legacy, detailCut: broken }, sig), String(broken)).toBeNull()
     }
 
+    // NOR IS AN INHERITED BOOLEAN EVIDENCE WRITTEN ON THE RECORD (cross-vendor
+    // review, GPT-5.6 Sol, do-not-merge on 8249b20). This record's own detail
+    // ends at the ambiguous bound, while only its prototype denies a cut. The
+    // reader must take the safe legacy route and refuse the end-anchored charge;
+    // changing the own-property guard back to optional chaining makes both
+    // assertions fail.
+    const inheritedUncut = Object.assign(Object.create({ detailCut: false }), legacy)
+    expect(Object.hasOwn(inheritedUncut, 'detailCut')).toBe(false)
+    expect(wasDetailCut(inheritedUncut)).toBe(true)
+    expect(chargeFor(inheritedUncut, sig)).toBeNull()
+
     // An EXPLICIT mark outranks the length in both directions: a record that
     // says it was not cut is believed even at the bound, and one that says it
     // was is believed even well inside it.
