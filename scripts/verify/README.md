@@ -1401,6 +1401,29 @@ bound matches at record time no more than it does afterwards. Reds recorded
 before this repair carry no detail and stay out of a `detailMatch` entry's
 reach; that information was never written down and nothing can recover it.
 
+**A cut measurement answers only an entry that declared it reads the front.**
+The record keeps the first 200 characters, and an anchored `detailMatch` is
+claiming "and this is where the measurement ends" — which a cut record cannot
+say. The same kept prefix belongs both to the red the signature was written for
+and to a longer one whose tail nobody kept, so the anchored entry would quietly
+excuse the wrong red. A record written since carries `detailCut` where the cut
+happened; an older one is read as cut when its detail ends exactly ON the bound,
+and as whole when it is longer, because a stored detail can never exceed the
+bound and a longer one is the unbounded parse.
+
+The reader does not try to tell a safe signature from a dangerous one. Three
+attempts did — reading the pattern source, reading where its match ended, asking
+whether it would still match if the text went on — and a cross-vendor round
+broke each with a shape built for it, the last being
+`/^(?=A{200}$)|^A{200}.$/`, which asserts the end in one branch and swallows the
+probe character in the other. It is the same lesson the section tag taught in
+the same words: recovering intent from TEXT proves syntax, not provenance. So
+the judgement sits where the provenance is — an entry that reads only the front
+of a measurement says `detailReadsPrefix: true` and states in its own `why` how
+far its signature reaches and why the missing tail cannot matter. Both point-698
+crossing entries do; every other narrow entry is refused on a cut record, which
+is the safe direction.
+
 **A measurement that varied inside one run cannot be signed for.** The record
 holds one entry per check key, so a check that failed twice printing two
 different measurements keeps the first — and a signature matching that one
@@ -1471,6 +1494,18 @@ claiming otherwise):
    recorded since the fix, ALL of them did.
 
 ### A crashed run has the same named way out (point 734, sixth round)
+
+A new record is a CRASH when `crashSource: 'uncaught-exception'` says Node
+really died (even after an earlier report), or when an armed stderr crash
+candidate never completes the suite's reporting path. A non-zero run instead
+counts as a REPORTED RED when its backend was asserted, at least one red was
+recorded, and stdout reached the suite's own terminal report line; stack-shaped
+validation chatter inside that completed run does not make it a crash.
+
+Records from before this distinction have no `terminalVerdict` field. For those
+records the durable evidence already present decides: a non-zero run with an
+asserted backend and recorded reds is read as reported; without that evidence,
+its recorded crash remains a crash.
 
 A CRASH is the one verdict no ledger can ever reach: `runVerdict` returns no
 charges for it, deliberately — a run that died rather than reported judged no

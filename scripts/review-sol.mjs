@@ -535,9 +535,10 @@ export function formatContributionPassPlan(plan = {}) {
       lines.push(`  ${label} — ${entry.passes.length} runnable ${entry.passes.length === 1 ? 'pass' : 'passes'}:`)
       for (const pass of entry.passes) {
         const passFlag = entry.fits ? '' : ` --pass ${pass.index}`
+        const reviewer = reviewerDescriptor(pass.reviewer)
         lines.push(
           `    node scripts/review-sol.mjs --sha ${entry.sha} --since ${entry.base} ` +
-            `--brief "<what to judge>"${passFlag}`,
+            `${reviewer ? `--reviewer ${reviewer.key} ` : ''}--brief "<what to judge>"${passFlag}`,
         )
       }
     }
@@ -576,11 +577,13 @@ export function formatAuthorshipPlan(plan, { sha = '' } = {}) {
     lines.push(`  mixed-vendor end-state files (kept whole, never split by commit): ${plan.mixedFiles.map(quotePassFile).join(', ')}`)
   }
   for (const pass of plan.passes ?? []) {
+    const reviewer = reviewerDescriptor(pass.reviewer)
     lines.push(
       `  pass ${pass.index}/${pass.total} → ${pass.reviewer ? `${pass.reviewerVendor} reviewer ${pass.reviewer}` : 'UNREVIEWABLE'}; ` +
         `${pass.size} characters; end state ${String(pass.endState).slice(0, 7)}; ` +
         `files ${pass.files.map(quotePassFile).join(', ')}`,
-      `    node scripts/review-sol.mjs --sha ${sha} --brief "<what to judge>" --pass ${pass.index}`,
+      `    node scripts/review-sol.mjs --sha ${sha} --since ${pass.rangeBase} ` +
+        `${reviewer ? `--reviewer ${reviewer.key} ` : ''}--brief "<what to judge>" --pass ${pass.index}`,
     )
   }
   for (const group of plan.unreviewable ?? []) {

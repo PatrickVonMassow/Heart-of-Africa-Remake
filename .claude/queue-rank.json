@@ -1026,10 +1026,87 @@
       "why": "Die vier Buchungen, die in dieser Nacht gelandet sind, haben Runde um Runde weitere Befunde bekommen — zuletzt eine leere Stichprobe und ein verlorenes Etikettenpaar (a333f20, GPT-5.6 Sol); sie gelten erst als gegengeprueft, wenn eine Runde sauber zurueckkommt. Der Rest der Tabelle buchte schon vorher zu weit und blockiert keine Landung, also laeuft er hinter der Kommunikations-Kette.",
       "origin": "machine",
       "place": "last"
+    },
+    "1017": {
+      "at": "2026-08-30T06:22:12.781Z",
+      "why": "Der Punkt ist Aufraeumarbeit an der Buchungstabelle, keine Sperre. Drei Haelften — 603, 938 und die WebGL-Haelfte von 698 — stehen bereits. Der Fehlgriff vom 30.08. zeigt, worauf er achten muss: Vier Haelften fuer die Berichts-Suite wurden geschrieben und IN DERSELBEN STUNDE wieder zurueckgezogen, weil die Meldungen auf jener Bahn gar nicht auftreten — ein schlichter Testaufruf laeuft auf der Alltagsbahn, und das ist WebGPU. Er laeuft hinter der Freigabe, anders als 1016 und 1018.",
+      "origin": "machine",
+      "place": "last"
+    },
+    "1020": {
+      "at": "2026-08-31T08:42:44.550Z",
+      "why": "It costs no correctness and loses no work, so it waits behind the release like every other machine-filed convenience defect.",
+      "origin": "machine",
+      "place": "last"
+    },
+    "1021": {
+      "at": "2026-08-31T09:22:19.588Z",
+      "why": "Behind the release, like every point filed from a user report that is not release-blocking; the workaround is a stamp re-measured just before the reply.",
+      "origin": "machine",
+      "place": "last"
+    },
+    "1022": {
+      "at": "2026-08-31T11:13:43.146Z",
+      "why": "Not release-blocking: the release order communication first, then 633, then 174 stands, and the brevity ceiling only mismeasures one document nobody is editing right now.",
+      "origin": "machine",
+      "place": "last"
+    },
+    "1023": {
+      "at": "2026-08-31T11:13:43.234Z",
+      "why": "Its cost is real but derived: the refusal is only reprinted while the four-eyes debt blocks turn ends, and point 1019 — already near the front — removes that blocking, so this shrinks to a readability fix behind the release order.",
+      "origin": "machine",
+      "place": "last"
+    },
+    "1024": {
+      "at": "2026-08-31T12:27:43.015Z",
+      "why": "Es ist ein Berichtsfehler, kein Laufzeitfehler: Der Stapel arbeitet korrekt weiter, nur die Karte beschreibt ihn falsch. Das wiegt weniger als jeder offene Punkt davor.",
+      "origin": "machine",
+      "place": "last"
+    },
+    "1025": {
+      "at": "2026-08-31T14:00:00.784Z",
+      "why": "It edits the successor decision point 964 also edits and must be worked after it; 964 stands at the far end of the queue, so the appended position already satisfies the only ordering constraint the point has.",
+      "origin": "machine",
+      "place": "last"
     }
   },
+  "boundary": {
+    "at": "2026-08-21T00:55:14.962Z",
+    "points": [
+      336,
+      553,
+      596,
+      633,
+      659,
+      660,
+      663,
+      686,
+      687,
+      688,
+      689,
+      690,
+      691,
+      692,
+      708,
+      715,
+      719,
+      733,
+      735,
+      736,
+      738,
+      739,
+      746,
+      747,
+      750,
+      759,
+      760,
+      762,
+      764
+    ],
+    "why": "The order standing in front of the release today is the arrangement that predates this rule; the four machine-filed points that had ranked themselves there were moved behind 174 first"
+  },
   "settled": {
-    "at": "2026-08-29T23:57:11.066Z",
+    "at": "2026-08-31T14:00:00.792Z",
     "points": [
       174,
       184,
@@ -1372,42 +1449,14 @@
       1012,
       1013,
       1014,
-      1015
+      1015,
+      1017,
+      1020,
+      1021,
+      1022,
+      1023,
+      1024,
+      1025
     ]
-  },
-  "boundary": {
-    "at": "2026-08-21T00:55:14.962Z",
-    "points": [
-      336,
-      553,
-      596,
-      633,
-      659,
-      660,
-      663,
-      686,
-      687,
-      688,
-      689,
-      690,
-      691,
-      692,
-      708,
-      715,
-      719,
-      733,
-      735,
-      736,
-      738,
-      739,
-      746,
-      747,
-      750,
-      759,
-      760,
-      762,
-      764
-    ],
-    "why": "The order standing in front of the release today is the arrangement that predates this rule; the four machine-filed points that had ranked themselves there were moved behind 174 first"
   }
 }

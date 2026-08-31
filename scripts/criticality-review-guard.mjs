@@ -34,7 +34,7 @@
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs'
 import { execFileSync, execSync } from 'node:child_process'
 import { dirname } from 'node:path'
-import { REPO_ROOT, repoPath } from './repo-paths.mjs'
+import { commonRepoPath, REPO_ROOT, repoPath } from './repo-paths.mjs'
 import { isMainModule } from './is-main.mjs'
 import { heldByOtherLiveOwner } from './batch-singleton.mjs'
 import { appendRecord, readRecords, verifyCarried } from './mechanism-review.mjs'
@@ -56,7 +56,7 @@ const PAUSE = repoPath('.claude/batch-paused')
 /** Per-branch baseline. Local bookkeeping ("what this tree has confirmed"), so
  *  it is deliberately NOT tracked — the ledger that must travel between a branch
  *  and the session that merges it is the tracked one. */
-export const BASELINE_PATH = repoPath('.claude/criticality-review-baseline.json')
+export const BASELINE_PATH = commonRepoPath('.claude/criticality-review-baseline.json')
 
 /** The branch ticks happen on (CLAUDE.md §6: TASKS.md is main-only). */
 export const TICK_BRANCH = 'main'

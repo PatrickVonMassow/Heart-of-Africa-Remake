@@ -6,19 +6,26 @@
 // fell back to HEAD on Windows and grandfathered the branch's own work — the
 // gate reported "GATE CLEAR" on four unreviewed mechanism commits.
 import { describe, it, expect } from 'vitest'
-import { readFileSync } from 'node:fs'
+import { execFileSync } from 'node:child_process'
+import { readdirSync, readFileSync } from 'node:fs'
 import {
   attachContributionDispositions,
   attachCoverage,
+  BASELINE_PATH as MECHANISM_BASELINE_PATH,
   BASELINE_RECOVERY_ANCHOR,
   baselineFor,
   bootstrapBase,
   measureReviewGap,
   mechanismLogCommand,
+  parseRangeLog,
   parseMechanismLog,
   pendingReviewContributions,
   planningContributions,
+  gatherMechanismReviewInputs,
+  shouldSeedRecoveryAnchor,
 } from './mechanism-review-guard.mjs'
+import { BASELINE_PATH as CRITICALITY_BASELINE_PATH } from './criticality-review-guard.mjs'
+import { BASELINE_PATH as TASKS_SPEC_BASELINE_PATH } from './tasks-spec-guard.mjs'
 import {
   CONTRIBUTION_DISPOSITION_KIND,
   CONTRIBUTION_SCOPE_BOUNDARY,
@@ -26,8 +33,11 @@ import {
   evaluateMechanismReview,
   formatMechanismReviewVerdict,
   LEGACY_RANGE_RETIREMENT_REASON,
+  mechanismPathsIn,
+  modelsFromTrailers,
 } from './mechanism-review-core.mjs'
-import { repoPath } from './repo-paths.mjs'
+import { commonRepoPath, repoPath } from './repo-paths.mjs'
+import { readOwnerLock } from './batch-singleton.mjs'
 
 describe('baselineFor', () => {
   const state = { baselines: { main: 'aaa', 'feat/x': 'bbb' } }
@@ -47,6 +57,12 @@ describe('baselineFor', () => {
     expect(baselineFor({}, 'main')).toBe(null)
     expect(baselineFor(undefined, 'main')).toBe(null)
   })
+
+  it('stores every checkout-shared guard baseline in the main checkout', () => {
+    expect(MECHANISM_BASELINE_PATH).toBe(commonRepoPath('.claude/mechanism-review-baseline.json'))
+    expect(CRITICALITY_BASELINE_PATH).toBe(commonRepoPath('.claude/criticality-review-baseline.json'))
+    expect(TASKS_SPEC_BASELINE_PATH).toBe(commonRepoPath('.claude/tasks-spec-guard-baseline.json'))
+  })
 })
 
 describe('bootstrapBase', () => {
@@ -64,6 +80,33 @@ describe('bootstrapBase', () => {
 
   it('never falls back to HEAD when the anchor is absent', () => {
     expect(bootstrapBase('headsha', () => '')).toBe(null)
+  })
+
+  it('seeds the anchor from the one shape that carries the flag AND the baseline', () => {
+    // THE DEFECT THIS PINS: the flag lived only under `inputs` on the normal
+    // path, while the early returns that carry it at the top level carry no
+    // baseline. The Stop path asks for both AT ONCE, so the write could never
+    // happen — a tree whose local baseline file was gone stayed blocked for
+    // good, and its own recovery text described a step the code never took.
+    expect(shouldSeedRecoveryAnchor({ baselineMissing: true, baseline: BASELINE_RECOVERY_ANCHOR })).toBe(true)
+    // The two shapes that must NOT write: no baseline to seed, and a baseline
+    // that is already recorded.
+    expect(shouldSeedRecoveryAnchor({ baselineMissing: true, baseline: null })).toBe(false)
+    expect(shouldSeedRecoveryAnchor({ baselineMissing: false, baseline: BASELINE_RECOVERY_ANCHOR })).toBe(false)
+    // A `--status` read decides nothing and therefore writes nothing.
+    expect(
+      shouldSeedRecoveryAnchor({ baselineMissing: true, baseline: BASELINE_RECOVERY_ANCHOR }, { status: true }),
+    ).toBe(false)
+
+    // And the real gathered shape reports the flag where the predicate reads it,
+    // with the same value it hands to the verdict — the symmetry that broke.
+    // The owner's own id is used so the gather is APPLICABLE here too: with a
+    // live batch lock any other id stands the guard down, and a skipped
+    // assertion would have let the very defect above pass unnoticed.
+    const gathered = gatherMechanismReviewInputs({ sessionId: readOwnerLock()?.sessionId ?? '' })
+    expect(gathered.applicable).toBe(true)
+    expect(Object.hasOwn(gathered, 'baselineMissing')).toBe(true)
+    expect(gathered.baselineMissing).toBe(gathered.inputs.baselineMissing)
   })
 
   it('refuses an unreachable anchor and names the merge that makes recovery possible', () => {
@@ -126,6 +169,73 @@ describe('historical ledger eras', () => {
       expect(verdict.findings.some((finding) => finding.kind === 'malformed-record'), shortSha).toBe(false)
       expect(formatMechanismReviewVerdict(verdict), shortSha).not.toContain('is malformed')
     }
+  })
+})
+
+describe('the measured 30.08 refusal multiplication', () => {
+  const baseline = '7472bb7e086934ad6da85e57aaa809d7380f3bd7'
+  const checkpoints = [
+    'b79e43305a4bd75e0c0d6e72b18d59de5435a52a',
+    'a1d4bf3f022d7b830d7a89d7e61c7ada780b186b',
+    '8249b20b22aea2ffb5d1e2d64052290401c5a090',
+  ]
+  const gitHistory = (args) => execFileSync('git', args, {
+    cwd: repoPath(),
+    encoding: 'utf8',
+    maxBuffer: 64 * 1024 * 1024,
+    windowsHide: true,
+  })
+
+  const replayAt = (head) => {
+    const scriptFiles = readdirSync(repoPath('scripts'))
+    const commits = parseRangeLog(gitHistory(mechanismLogCommand(baseline, head))).map((commit) => {
+      const trailers = gitHistory([
+        'show',
+        '-s',
+        '--format=%(trailers:key=Co-Authored-By,valueonly,separator=;)',
+        commit.sha,
+      ])
+      const authorModels = modelsFromTrailers(trailers)
+      return {
+        ...commit,
+        authorModel: authorModels[0] ?? '',
+        authorModels,
+        mechanismFiles: mechanismPathsIn(commit.files, { scriptFiles }),
+      }
+    })
+    const pendingCommits = pendingReviewContributions(
+      commits,
+      scriptFiles,
+      (sha) => gitHistory(['show', '-s', '--format=%s', sha]).trim(),
+    )
+    const ledger = gitHistory(['show', `${head}:.claude/mechanism-reviews.jsonl`])
+      .trim()
+      .split('\n')
+      .map((line) => JSON.parse(line))
+    const records = attachCoverage({
+      pendingCommits,
+      allRecords: ledger,
+      head,
+      revList: (revision) => gitHistory(['rev-list', revision, '--not', baseline]),
+    })
+    return { pendingCommits, records, head }
+  }
+
+  it('replays 4 → 30 → 40 before scoping, then 3 → 3 → 12 with only read contributions charged', () => {
+    const replays = checkpoints.map(replayAt)
+    const count = (replay, reviewScope) => evaluateMechanismReview({
+      baseline,
+      ...replay,
+      reviewScope,
+    }).findings.length
+
+    // The former rule treated every bounded record as range-wide. This is the
+    // measured counter, recomputed from the versioned ledger and commit graph,
+    // not copied from the work-order prose.
+    expect(replays.map((replay) => count(replay, () => 'range'))).toEqual([4, 30, 40])
+    // The remaining growth names real exact-state refusals, incomplete passes,
+    // self-reviews and as-yet-unreviewed repair commits. None is waived.
+    expect(replays.map((replay) => count(replay, undefined))).toEqual([3, 3, 12])
   })
 })
 

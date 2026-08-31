@@ -27,7 +27,7 @@
 import { existsSync, mkdirSync, readdirSync, readFileSync, writeFileSync } from 'node:fs'
 import { execFileSync, execSync } from 'node:child_process'
 import { dirname } from 'node:path'
-import { REPO_ROOT, repoPath } from './repo-paths.mjs'
+import { commonRepoPath, REPO_ROOT, repoPath } from './repo-paths.mjs'
 import { isMainModule } from './is-main.mjs'
 import { heldByOtherLiveOwner } from './batch-singleton.mjs'
 import { readRecords, verifyCarried } from './mechanism-review.mjs'
@@ -59,10 +59,11 @@ import { gatherGuardDutyContext } from './guard-duty.mjs'
 
 const PAUSE = repoPath('.claude/batch-paused')
 
-/** Per-branch baseline. Local bookkeeping ("what this tree has confirmed"), so
- *  it is deliberately NOT tracked: a shared file would conflict on every branch,
- *  while the ledger that must travel — the reviews — is the tracked one. */
-export const BASELINE_PATH = repoPath('.claude/mechanism-review-baseline.json')
+/** Per-branch baseline. Host-local rather than tracked, but shared by every
+ * linked worktree: a disposable checkout must see main's branch baselines and
+ * must not recover from the tracked-history anchor merely because it lives at
+ * another path. The branch-keyed map still keeps branch decisions separate. */
+export const BASELINE_PATH = commonRepoPath('.claude/mechanism-review-baseline.json')
 
 /** The reviewed source revision immediately before fail-closed recovery. Unlike
  * a timestamp or ledger field, reachability from this immutable commit is not a
@@ -106,6 +107,20 @@ export function commitMissing(sha, run = (cmd) => execSync(cmd, { windowsHide: t
     // probe could not answer, and an unanswered question counts as PRESENT.
     return e?.status === 1
   }
+}
+
+/**
+ * Recovery is a two-turn operation: the blocked turn reports and refuses the
+ * missing evidence and may seed only the IMMUTABLE anchor, never HEAD; the next
+ * turn then judges the complete anchor..HEAD range. A `--status` read decides
+ * nothing and therefore writes nothing.
+ *
+ * Both facts must come from the SAME shape — the gathered result reports the
+ * flag and the anchor side by side, and this predicate is what a test can pin.
+ * PURE.
+ */
+export function shouldSeedRecoveryAnchor(gathered, { status = false } = {}) {
+  return status !== true && gathered?.baselineMissing === true && Boolean(gathered?.baseline)
 }
 
 function readBaselineState() {
@@ -506,6 +521,14 @@ export function gatherMechanismReviewInputs({ sessionId = '', guardDuty = gather
     head,
     branch,
     baseline: effective,
+    // TOP-LEVEL, exactly as both early returns report it. The Stop path reads
+    // `gathered.baselineMissing` beside `gathered.baseline` to decide whether to
+    // seed the recovery anchor; while this field lived only under `inputs`, that
+    // condition could never be true and false together in one shape — an early
+    // return has the flag but no baseline, this one had the baseline but no flag
+    // — so the documented two-turn recovery never wrote anything and the gate
+    // stayed shut for good once the local baseline file was gone.
+    baselineMissing,
     // Null if git could not establish a merge-base: pending detection may keep
     // using its conservative raw fallback, but that unproved range can never
     // support a gap waiver.
@@ -614,10 +637,7 @@ if (isMainModule(import.meta.url)) {
 
     const verdict = evaluateMechanismReview(gathered.inputs)
 
-    // Recovery is a two-turn operation: this turn reports and refuses the
-    // missing evidence; a non-status Stop invocation may seed only the immutable
-    // anchor, never HEAD. The next turn then judges the full anchor..HEAD range.
-    if (!status && gathered.baselineMissing && gathered.baseline) {
+    if (shouldSeedRecoveryAnchor(gathered, { status })) {
       writeBaseline(gathered.branch, gathered.baseline)
     }
 

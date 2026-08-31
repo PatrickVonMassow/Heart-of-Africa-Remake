@@ -180,6 +180,13 @@ Die Ursache findest du durch **Zerlegen**, nicht durch Wiederholen.
   → *Prompt:* „Frag vor jeder Runde: **Hat sich etwas bewegt außer der Zählung?** Bleibt der
   Umfang, ist der Gegenstand zu groß — **teile das Ticket und arbeite jedes Stück für sich ab**.“
 
+- **Die Sperre wächst beim Abtragen — und ihre Absage wächst mit.** Das Veto gilt der **Datei**
+  statt dem Befund; wer ihn behebt, fasst sie an und schuldet neu. Die Absage druckt dabei den
+  ganzen Bestand, und je größer er ist, desto weniger Platz bleibt zum Abtragen.
+  → *Prompt:* „Buch ein Veto gegen den **Befund**, trenne **gelesen** von bloß berührt, quittiere
+  eine Reparaturkette am **Endzustand** als einen Beitrag, und mach neue Befunde derselben Datei zum
+  eigenen Ticket. Eine Verweigerung nennt ihren **Grund**, nie ihren Bestand.“
+
 - **Gebaut — und nie in Betrieb genommen.** Die Ausnahme steht im Fließtext statt in der Datei,
   die das Werkzeug liest; oder das Tor urteilt richtig, nur fährt es kein Weg des Projekts.
   → *Prompt:* „Trag eine Ausnahme **im selben Zug** dort ein, wo der Mechanismus sie liest, und
@@ -329,10 +336,10 @@ Die Ursache findest du durch **Zerlegen**, nicht durch Wiederholen.
   → *Prompt:* „Jeder Halt bekommt eine Wiederanlauf-Uhr. Ohne Uhr bleibt nur, was **nachweislich**
   von mir kommt; alles andere wird protokolliert und kurz wiederholt."
 
-- **Priorität in Prosa wirkt nicht — und eine neue Sortierregel greift nur nach vorn.**
-  → *Prompt:* „Trag Priorisiertes dort ein, wo gearbeitet wird; laufen beide auseinander, schlägt
-  eine Prüfung fehl. Priorisiere das **Ziel** — und sag bei jeder Sortierregel, was mit dem
-  **Altbestand** geschieht: nachräumen oder liegen lassen."
+- **Prosa wirkt nicht — als Priorität so wenig wie als Meldung.** Ein Tor hielt den eigenen
+  Delegaten für fremd: Die Übergabe nannte ihn nur im Text.
+  → *Prompt:* „Trag jede wirksame Angabe in das **Feld**, das der Mechanismus liest; sag bei jeder
+  Sortierregel, was mit dem **Altbestand** geschieht."
 
 - **Die Begründung, die sich im eigenen Dokument widerlegt.** Ein Sicherheitsargument und sein
   Gegenbeweis standen drei Abschnitte auseinander; vier Prüfrunden sahen je eine Hälfte, weil der
@@ -492,4 +499,4 @@ Die Ursache findest du durch **Zerlegen**, nicht durch Wiederholen.
 
 Sie ersetzt die Fallstricke oben nicht.
 
-<!-- GUIDE-FINGERPRINT: 212726edb7a02f2dab72337bff5279d9392e71e08692423b135deec5ef6742b4 -->
+<!-- GUIDE-FINGERPRINT: 45efd06816c27e988731615db5fadb5b3dd7716661450a5072ac5fbb1c7831ed -->

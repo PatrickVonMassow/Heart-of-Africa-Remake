@@ -35,6 +35,7 @@ import {
   chargeablePoints,
   chargeFor,
   chargeReds,
+  wasDetailCut,
   markVariedDetails,
   runVerdict,
   formatSuspectEnv,
@@ -45,6 +46,7 @@ import {
   isIncompleteRecording,
   incompleteClosureFor,
   crashClosureFor,
+  isCrashedRun,
   droppedLinesOf,
   runIdentity,
   derivedRedKey,
@@ -834,7 +836,7 @@ describe('runVerdict — clean, accounted for, or red', () => {
   })
 
   it('does NOT account for a run that crashed, however well charged its reds are', () => {
-    const v = runVerdict(redRun('webgpu', 2000, [red('goat stance', 506)], { crashed: true }), { openPoints })
+    const v = runVerdict(redRun('webgpu', 2000, [red('goat stance', 506)], { crashed: true, terminalVerdict: false }), { openPoints })
     expect(v.status).toBe('red')
     expect(v.unaccounted[0].name).toMatch(/crash/)
   })
@@ -847,6 +849,28 @@ describe('runVerdict — clean, accounted for, or red', () => {
     expect(runVerdict(null).covers).toBe(false)
     expect(runVerdict({ exit: 1, reds: 'nonsense' }, { openPoints }).covers).toBe(false)
     expect(() => runVerdict({ exit: 1, reds: [null, 7] }, { openPoints })).not.toThrow()
+  })
+})
+
+describe('reported legacy reds are not crashes', () => {
+  const legacy = redRun('webgpu', 2000, [red('frame 11-worldmodel-khartoum-confluence', 627)], {
+    suite: 'world',
+    crashed: true,
+    screenshotCount: 3,
+  })
+
+  it('re-reads the recorded terminal verdict as a red run, mutation-checked at every required signal', () => {
+    expect(isCrashedRun(legacy)).toBe(false)
+    expect(runVerdict(legacy, { openPoints: [627] })).toMatchObject({ status: 'accounted', covers: true })
+
+    expect(isCrashedRun({ ...legacy, asserted: false })).toBe(true)
+    expect(isCrashedRun({ ...legacy, reds: [] })).toBe(true)
+    expect(isCrashedRun({ ...legacy, exit: 0 })).toBe(true)
+    expect(isCrashedRun({ ...legacy, terminalVerdict: false })).toBe(true)
+  })
+
+  it('never lets the legacy inference overrule a definitive uncaught exception', () => {
+    expect(isCrashedRun({ ...legacy, crashSource: 'uncaught-exception' })).toBe(true)
   })
 })
 
@@ -1353,9 +1377,251 @@ describe('evaluate — a red is not closed by the runs that FOLLOWED it (point 6
     expect(evaluate(renderChange({ runs, openPoints, ledger: [...broad, ...siblingLedger] })).decision).toBe('allow')
   })
 
+  // THE SAME ROUTE FOR A MEASUREMENT THE RECORD CUT OFF (cross-vendor review,
+  // GPT-5.6 Sol, do-not-merge on 3e6ffd2). The record keeps the first 200
+  // characters, and a detailMatch anchored at both ends is claiming "and this is
+  // where the measurement ends" — which a cut record cannot say. The same kept
+  // prefix belongs both to the red the signature was written for and to a longer
+  // one whose tail nobody kept, so the anchored entry excuses the wrong red.
+  describe('a measurement the record CUT cannot answer a signature that reads its end', () => {
+    const NAME = 'the archive lists its members'
+    const HEAD = 'one.json, two.json, '
+    /** 200 characters of measurement, then 300 nobody kept. The record stores
+     *  HEAD plus 180 z's; everything after that is gone. */
+    const cutSource = `${HEAD}${'z'.repeat(180)}${'z'.repeat(300)}`
+    const KEPT = `${HEAD}${'z'.repeat(180)}`
+    const entry = (detailMatch, detailReadsPrefix = false) => [{
+      point: 927,
+      suite: 'report',
+      backend: 'webgpu',
+      kind: 'check',
+      match: /^the archive lists its members$/,
+      detailMatch,
+      ...(detailReadsPrefix ? { detailReadsPrefix: true } : {}),
+      why: 'the measurement point 927 recorded',
+    }]
+    const scoped = (detailMatch, declares = false) => ({
+      suite: 'report',
+      backend: 'webgpu',
+      ledger: entry(detailMatch, declares),
+    })
+    const redFrom = (detail) => chargeReds(failedChecks(`FAIL  ${NAME} — ${detail}`), scoped(undefined))[0]
+    const cutRed = redFrom(cutSource)
+    const wholeRed = redFrom(KEPT.slice(0, 199))
+
+    it('marks the cut where it happens, and only there', () => {
+      expect(cutRed.detail).toBe(KEPT)
+      expect(cutRed.detailCut).toBe(true)
+      expect(wasDetailCut(cutRed)).toBe(true)
+      // A red the bound never touched keeps exactly the shape it always had.
+      expect(wholeRed.detailCut).toBeUndefined()
+      expect(wasDetailCut(wholeRed)).toBe(false)
+    })
+
+    // NO SHAPE OF SIGNATURE READS A CUT MEASUREMENT UNLESS ITS ENTRY SAID SO.
+    // Three readings of the pattern were tried and each was defeated by a shape
+    // built to defeat it — the last by `/^(?=A{200}$)|^A{200}.$/`, which asserts
+    // the end in one alternative and swallows the probe character in the other
+    // (cross-vendor review, GPT-5.6 Sol). So the table below is not a list of
+    // dangerous shapes the reader recognises; it is the evidence that NONE of
+    // them gets through, however it anchors — by a trailing `$`, an alternation,
+    // a greedy quantifier, a lookahead consuming nothing, or a probe-eating
+    // alternative — because none of these entries declared itself a prefix
+    // reader. Each really matches the kept text, so none is refused vacuously.
+    it.each([
+      ['a literal anchored at both ends', new RegExp(`^${KEPT.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`)],
+      ['a greedy quantifier that runs to the anchor', /^one\.json, two\.json, z+$/],
+      ['an alternation whose taken branch reaches the end', /^(?:nothing like it|one\.json, two\.json, z{180})$/],
+      ['a lookahead asserting the end after the match', /one\.json, two\.json, z{180}(?=$)/],
+      ['a zero-length match at the end', /z*$/],
+      // THE SHAPE THAT SLIPPED THROUGH THE FIRST READING (cross-vendor review,
+      // GPT-5.6 Sol, do-not-merge on 8f3f23d): a lookaround CONSUMES nothing, so
+      // this succeeds with a zero-length hit at index 0 while demanding that the
+      // text end exactly at 200 — an end-claim no arithmetic over the match can
+      // see, and exactly the claim a cut record cannot support.
+      ['a lookahead that asserts the end without consuming anything', /^(?=one\.json, two\.json, z{180}$)/],
+      ['a lookahead over the whole kept text at a later index', /(?=json, z{180}$)/],
+      // THE SHAPE THAT DEFEATED THE LAST READING OF THE PATTERN (cross-vendor
+      // review, GPT-5.6 Sol, do-not-merge on 48a100e): one alternative asserts
+      // the end with a zero-width match, the other consumes exactly one more
+      // character — so a probe that appended one character found the pattern
+      // still matching and called it safe, while the real 201-character detail
+      // matches neither branch.
+      ['an alternation that eats the probe character', /^(?=one\.json, two\.json, z{180}$)|^one\.json, two\.json, z{180}.$/],
+      // And an ordinary front-reading signature is refused too, for the only
+      // reason that survives: its entry did not say it reads the front.
+      ['a signature that stops well inside the kept text but declares nothing', /^one\.json, two\.json,/],
+    ])('refuses %s on the cut record', (_shape, detailMatch) => {
+      // Each shape really matches the kept text — a vacuous non-match would be
+      // refused for the wrong reason and pin nothing.
+      expect(detailMatch.test(cutRed.detail)).toBe(true)
+      expect(chargeFor(cutRed, scoped(detailMatch))).toBeNull()
+    })
+
+    // A STATEFUL SIGNATURE ANSWERS THE SAME EVERY TIME IT IS ASKED, and the
+    // REFUSAL is not allowed to be the reason it looks stable (cross-vendor
+    // review, GPT-5.6 Sol, 8f3f23d: repeating `toBeNull()` passes just as well
+    // when a surviving `lastIndex` made the pattern miss). So the entry's own
+    // regex is asserted untouched after every call — `usableRegex` rebuilds a
+    // flagless copy and never advances the one the ledger holds — and the
+    // charging direction is asked the same number of times.
+    it('answers a stateful signature the same way however often it is asked, and never advances it', () => {
+      const declared = /^one\.json, two\.json,/g
+      const withPrefix = { suite: 'report', backend: 'webgpu', ledger: entry(declared, true) }
+      for (let i = 0; i < 4; i += 1) {
+        expect(chargeFor(cutRed, withPrefix)?.point, `call ${i}`).toBe(927)
+        expect(declared.lastIndex, `lastIndex after call ${i}`).toBe(0)
+      }
+      const endReaching = /one\.json, two\.json, z+$/g
+      const undeclared = { suite: 'report', backend: 'webgpu', ledger: entry(endReaching) }
+      for (let i = 0; i < 4; i += 1) {
+        expect(chargeFor(cutRed, undeclared), `call ${i}`).toBeNull()
+        expect(endReaching.lastIndex, `lastIndex after call ${i}`).toBe(0)
+        // The refusal is the DECLARATION's doing, not a missed match: the same
+        // pattern still matches the kept text on every one of these calls.
+        expect(endReaching.test(cutRed.detail), `still matches on call ${i}`).toBe(true)
+        endReaching.lastIndex = 0
+      }
+    })
+
+    // AND THE DECLARATION IS LOAD-BEARING, not decoration: it is the one thing
+    // that keeps the point-698 crossing charge alive, whose measurement runs
+    // past the bound in every real record.
+    it('charges a cut record for an entry that declared it reads the front', () => {
+      expect(chargeFor(cutRed, scoped(/^one\.json, two\.json,/, true))?.point).toBe(927)
+      // A BROAD entry is unaffected — it never claimed to read a measurement,
+      // so it needs no declaration.
+      expect(chargeFor(cutRed, scoped(undefined))?.point).toBe(927)
+      // THE DECLARATION IS NOT A BLANK CHEQUE: a declared signature must still
+      // MATCH the kept text, and one that does not owns nothing.
+      expect(chargeFor(cutRed, scoped(/^nothing of the sort/, true))).toBeNull()
+      // And it is the DECLARATION that decides, not the shape: the same
+      // front-reading pattern owns nothing without it.
+      expect(chargeFor(cutRed, scoped(/^one\.json, two\.json,/))).toBeNull()
+    })
+
+    // THE REAL ENTRY, NOT AN ANALOGUE (cross-vendor review, GPT-5.6 Sol, 8f3f23d,
+    // which asked for it): the point-698 crossing red is 223 characters long, so
+    // every record of it IS cut — and it charges through the shipped ledger,
+    // because its signature stops far short of the bound. This is the case that
+    // would break first if the refusal were ever widened.
+    it('charges the real point-698 crossing red, whose own record the bound cuts', () => {
+      const measured =
+        'from one side of him to the other — 0 of 4 crossed his line; along the lane (0 = his line) ' +
+        '[-11..25@1, -10..22@1, -24..0@1, -11..14@1] m, walked [67, 67, 67, 68] m, phases ' +
+        '[run×16 part×72 roam×307] over 45s played, 3 tagged'
+      expect(measured.length).toBeGreaterThan(200)
+      const shipped = { suite: 'polish', backend: 'webgpu', featureLevel: 'compatibility' }
+      const [crossing] = chargeReds(
+        [{ name: 'the children walk PAST the traveller — from one side of him to the other', kind: 'check', detail: measured }],
+        shipped,
+      )
+      expect(crossing.detailCut).toBe(true)
+      expect(crossing.detail).toHaveLength(200)
+      expect(crossing.point).toBe(698)
+    })
+
+    // THE CONTROL that makes the mark itself load-bearing: the same end-reaching
+    // signature owns the same text once the record does not say it was cut.
+    it('charges an undeclared end-reaching signature on a record the bound never touched', () => {
+      const uncut = new RegExp(`^${KEPT.slice(0, 199).replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`)
+      expect(chargeFor(wholeRed, scoped(uncut))?.point).toBe(927)
+      // …and the SAME entry owns nothing the moment the record says it was cut.
+      expect(chargeFor({ ...wholeRed, detailCut: true }, scoped(uncut))).toBeNull()
+    })
+  })
+
+  // A RECORD WRITTEN BEFORE THE MARK EXISTED CARRIES NO FIELD, and the only
+  // signal left in it is the length. Reading a detail that ends ON the bound as
+  // cut can be wrong — and it is wrong in the safe direction only: it withholds
+  // a narrow charge, so the red stays loudly unaccounted instead of being
+  // quietly excused by another red's signature.
+  it('reads a legacy detail that ends on the bound as cut, and an explicit mark either way', () => {
+    const scopedFor = (detailMatch) => ({
+      suite: 'report',
+      backend: 'webgpu',
+      ledger: [{ point: 927, suite: 'report', backend: 'webgpu', kind: 'check', match: /^cut check$/, detailMatch, why: 'the measurement' }],
+    })
+    const atBound = 'y'.repeat(200)
+    const legacy = { name: 'cut check', key: 'cut check', kind: 'check', detail: atBound }
+    const sig = scopedFor(new RegExp(`^${atBound}$`))
+    expect(wasDetailCut(legacy)).toBe(true)
+    expect(chargeFor(legacy, sig)).toBeNull()
+
+    // One character short of the bound is a measurement nothing cut.
+    const shorter = { ...legacy, detail: 'y'.repeat(199) }
+    expect(wasDetailCut(shorter)).toBe(false)
+    expect(chargeFor(shorter, scopedFor(new RegExp(`^${'y'.repeat(199)}$`)))?.point).toBe(927)
+
+    // AND THE WRITER SETTLES THE ONE AMBIGUOUS LENGTH ITSELF (cross-vendor
+    // review, GPT-5.6 Sol, do-not-merge on b3e5200e): a measurement that merely
+    // happened to be exactly 200 characters long was read as cut, and its narrow
+    // charge withdrawn, although nothing was ever removed from it. Records
+    // written since carry the answer, so the length inference reaches only the
+    // records that predate the field.
+    const [atBoundUncut] = chargeReds(
+      [{ name: 'cut check', kind: 'check', detail: 'y'.repeat(200) }],
+      { suite: 'report', backend: 'webgpu', ledger: [] },
+    )
+    expect(atBoundUncut.detail).toHaveLength(200)
+    expect(atBoundUncut.detailCut).toBe(false)
+    expect(wasDetailCut(atBoundUncut)).toBe(false)
+    expect(chargeFor(atBoundUncut, sig)?.point).toBe(927)
+    // One character more and the record says the bound took something.
+    const [pastBound] = chargeReds(
+      [{ name: 'cut check', kind: 'check', detail: 'y'.repeat(201) }],
+      { suite: 'report', backend: 'webgpu', ledger: [] },
+    )
+    expect(pastBound.detailCut).toBe(true)
+    // …and one character less needs no field at all: nothing is ambiguous there.
+    const [insideBound] = chargeReds(
+      [{ name: 'cut check', kind: 'check', detail: 'y'.repeat(199) }],
+      { suite: 'report', backend: 'webgpu', ledger: [] },
+    )
+    expect(insideBound.detailCut).toBeUndefined()
+
+    // EXACTLY on the bound, never past it: text LONGER than the bound is not a
+    // record at all but the unbounded parse, which nothing cut. Reading it as
+    // cut would refuse charges over material the reader can see in full.
+    const parse = { ...legacy, detail: 'y'.repeat(400) }
+    expect(wasDetailCut(parse)).toBe(false)
+    expect(chargeFor(parse, scopedFor(new RegExp(`^${'y'.repeat(400)}$`)))?.point).toBe(927)
+
+    // A FIELD NOBODY CAN READ IS NOT EVIDENCE (cross-vendor review, GPT-5.6 Sol,
+    // do-not-merge on ae9a500c). Treating any present value as "not cut" let a
+    // malformed durable record — a hand-edited or half-written state file —
+    // walk past the inference and answer a signature belonging to a different
+    // red. Only a literal `false` proves the uncut direction; everything else
+    // falls back to the length, which at the bound means refused.
+    for (const broken of [null, undefined, 0, '', 'false', NaN]) {
+      expect(wasDetailCut({ ...legacy, detailCut: broken }), String(broken)).toBe(true)
+      expect(chargeFor({ ...legacy, detailCut: broken }, sig), String(broken)).toBeNull()
+    }
+
+    // NOR IS AN INHERITED BOOLEAN EVIDENCE WRITTEN ON THE RECORD (cross-vendor
+    // review, GPT-5.6 Sol, do-not-merge on 8249b20). This record's own detail
+    // ends at the ambiguous bound, while only its prototype denies a cut. The
+    // reader must take the safe legacy route and refuse the end-anchored charge;
+    // changing the own-property guard back to optional chaining makes both
+    // assertions fail.
+    const inheritedUncut = Object.assign(Object.create({ detailCut: false }), legacy)
+    expect(Object.hasOwn(inheritedUncut, 'detailCut')).toBe(false)
+    expect(wasDetailCut(inheritedUncut)).toBe(true)
+    expect(chargeFor(inheritedUncut, sig)).toBeNull()
+
+    // An EXPLICIT mark outranks the length in both directions: a record that
+    // says it was not cut is believed even at the bound, and one that says it
+    // was is believed even well inside it.
+    expect(wasDetailCut({ ...legacy, detailCut: false })).toBe(false)
+    expect(chargeFor({ ...legacy, detailCut: false }, sig)?.point).toBe(927)
+    expect(wasDetailCut({ ...shorter, detailCut: true })).toBe(true)
+    expect(chargeFor({ ...shorter, detailCut: true }, scopedFor(new RegExp(`^${'y'.repeat(199)}$`)))).toBeNull()
+  })
+
+
   it('does NOT talk a CRASH away with a charge — a run that died judged no picture', () => {
     const ledger = [{ point: 506, match: /goat/, why: 'the software lane cannot draw fast enough' }]
-    const crashed = redRun('webgpu', 1500, [red('goat stance', 506)], { crashed: true })
+    const crashed = redRun('webgpu', 1500, [red('goat stance', 506)], { crashed: true, terminalVerdict: false })
     const result = evaluate(renderChange({ runs: [crashed, run('webgpu', 2000), run('webgl', 2100)], openPoints, ledger }))
     expect(result.decision).toBe('block')
     // Since the sixth round the crash blocks under its OWN name — reporting it
@@ -1977,7 +2243,7 @@ describe('an INCOMPLETE RECORDING is its own class, and has its own way out (poi
   // route since the sixth round — a different list, a different judgment — and
   // this pin is what keeps the two from ever serving each other.
   it('never lifts a run that CRASHED by an incomplete-recording signature, whatever its recording lost', () => {
-    const crashedToo = { ...truncatedLegacy('webgpu', 1500), crashed: true }
+    const crashedToo = { ...truncatedLegacy('webgpu', 1500), crashed: true, terminalVerdict: false }
     expect(runVerdict(crashedToo, { openPoints }).status).toBe('red')
     expect(runVerdict(crashedToo, { openPoints }).unaccounted[0].name).toMatch(/crash/)
     const closures = [closureOf(crashedToo)]
@@ -2068,7 +2334,7 @@ describe('a CRASHED run is its own class, and has its own signed way out (point 
   /** EXACTLY the shape on disk for the 19.08.2026 webgpu/startup crashes:
    *  exit 1, `crashed: true`, an empty red list. */
   const crashedRun = (backend, at, overrides = {}) =>
-    redRun(backend, at, [], { crashed: true, suite: 'startup', ...overrides })
+    redRun(backend, at, [], { crashed: true, terminalVerdict: false, suite: 'startup', ...overrides })
   /** A closure as the --crashed CLI writes it: content identity plus evidence. */
   const crashClosure = (run_, evidence = 'local/verify-logs shows the browser died by SIGKILL; no report exists') => ({
     run: runIdentity(run_),
@@ -2582,6 +2848,14 @@ describe('the shipped charge ledger', () => {
       if (c.backend) expect(BACKENDS).toContain(c.backend)
       if (c.kind) expect(['check', 'console']).toContain(c.kind)
       if (c.detailMatch) expect(c.detailMatch).toBeInstanceOf(RegExp)
+      // A DECLARATION THAT READS THE FRONT OF A CUT MEASUREMENT ONLY MEANS
+      // ANYTHING BESIDE A SIGNATURE. On an entry with no `detailMatch` it would
+      // read as a claim about something that does not exist, and the reader
+      // never consults it there — so it must not be written there either.
+      if ('detailReadsPrefix' in c) {
+        expect(c.detailReadsPrefix, `point ${c.point} / ${c.suite}`).toBe(true)
+        expect(c.detailMatch, `point ${c.point} / ${c.suite}`).toBeInstanceOf(RegExp)
+      }
       // NO STATEFUL FLAG (review finding, 28.08.2026): `g` and `y` keep
       // `lastIndex` across calls, so one entry would alternate between owning a
       // red and missing it, by call order alone.
@@ -2590,6 +2864,57 @@ describe('the shipped charge ledger', () => {
         expect(re.global).toBe(false)
         expect(re.sticky).toBe(false)
       }
+    }
+  })
+
+  // THE DECLARATION IS AN AUTHORISATION, SO THE LIST OF WHO HOLDS IT IS PINNED
+  // (cross-vendor review, GPT-5.6 Sol, 30.08.2026). A shape check alone would
+  // let any narrow entry take `detailReadsPrefix` and read a cut measurement
+  // with this file still green — which is the one thing the declaration exists
+  // to make deliberate. The two point-698 crossing entries are the whole list
+  // today, and a third one has to be argued for HERE, in this test, before it
+  // can charge anything.
+  it('lets exactly the two crossing entries read a cut measurement, and makes each say why', () => {
+    const MAX_STORED_DETAIL = 200
+    const declaring = RED_CHARGES.filter((c) => c.detailReadsPrefix === true)
+    expect(declaring.map((c) => `${c.point}/${c.suite}/${c.backend}`)).toEqual([
+      '698/polish/webgpu',
+      '698/polish/webgl',
+    ])
+    // THE MEASUREMENT THE DECLARATION IS ABOUT, and it is the real one: 223
+    // characters, so its record is cut, while the signature stops at 178.
+    const measured =
+      'from one side of him to the other — 0 of 4 crossed his line; along the lane (0 = his line) ' +
+      '[-11..25@1, -10..22@1, -24..0@1, -11..14@1] m, walked [67, 67, 67, 68] m, phases ' +
+      '[run×16 part×72 roam×307] over 45s played, 3 tagged'
+    expect(measured.length).toBeGreaterThan(200)
+    for (const c of declaring) {
+      const at = (text_) =>
+        new RegExp(c.detailMatch.source, c.detailMatch.flags.replace(/[gy]/g, '')).exec(text_)
+      // ASKED OF THE WHOLE MEASUREMENT, NOT ONLY OF ITS STORED PREFIX
+      // (cross-vendor review, GPT-5.6 Sol, ae9a500c). Running it on the cut text
+      // alone cannot tell a genuine prefix reader from one whose match depends
+      // on the ARTIFICIAL end the cut created — which is the very mistake these
+      // cases are about. A prefix reader answers the same on both, and answers
+      // it in the same place.
+      const whole = at(measured)
+      const kept = at(measured.slice(0, MAX_STORED_DETAIL))
+      expect(whole, `point ${c.point} / ${c.backend} — the full measurement`).not.toBeNull()
+      expect(kept, `point ${c.point} / ${c.backend} — the stored prefix`).not.toBeNull()
+      expect(kept[0], `point ${c.point} / ${c.backend} — same match either way`).toBe(whole[0])
+      expect(kept.index, `point ${c.point} / ${c.backend} — same place either way`).toBe(whole.index)
+      // THE CLEARANCE IS THE WHOLE ARGUMENT: the signature must stop short of
+      // the bound, or the declaration is claiming something about text the
+      // record does not hold.
+      expect(whole.index + whole[0].length, `point ${c.point} / ${c.backend}`).toBeLessThan(MAX_STORED_DETAIL)
+      // And the entry says so in its own words: the field it claims, the cut it
+      // claims it about, and WHAT THE BOUND REMOVES — a `why` that merely says
+      // "bound" somewhere is not an argument (same review).
+      const why = String(c.why)
+      expect(why, `point ${c.point} / ${c.backend}`).toMatch(/detailReadsPrefix/)
+      expect(why, `point ${c.point} / ${c.backend}`).toMatch(/cut at the 200-character bound|cut at the \d+-character bound/i)
+      expect(why, `point ${c.point} / ${c.backend}`).toMatch(/what the bound removes|only the trailing epilogue removed/i)
+      expect(why, `point ${c.point} / ${c.backend}`).toMatch(/clear of (?:that|it|the bound)/i)
     }
   })
 
@@ -3016,85 +3341,278 @@ describe('the shipped charge ledger', () => {
   // is the one failure mode a charge must never have. These pin the narrow half
   // AND the measured half together: an entry that stops matching its own
   // evidence is as broken as one that matches everything.
-  it('reads the measured line through the recorder\'s section tag', () => {
-    // MEASURED 30.08.2026, and it had blocked the gate for as long as the
-    // narrowings existed: a suite that declares sections appends
-    // ` [--section=<name>]` to every result line, and the RECORD stores the line
-    // with it — while every detailMatch here is anchored at both ends against
-    // what the SUITE printed. So in a section-using suite no anchored charge
-    // could ever reach the end of its own recorded red. All four details below
-    // are copied from .claude/render-verify-state.json as it holds them.
+  it('keeps an old tagged detail verbatim instead of guessing its provenance', () => {
+    // Records from before the section field keep working in the strict
+    // direction: their text is read exactly as stored. Syntax cannot prove that
+    // this tail was metadata, so the anchored charge refuses it loudly.
     const tagged = (name, detail, scope, kind = 'check') => chargeFor({ name, detail, kind }, scope)
+    const stem = 'hoa-state-2026-08-30-42'
+    const members = archiveMemberDetail(
+      archiveMemberNames(stem, ARCHIVE_MEMBER_SUFFIXES.filter((x) => x !== ARCHIVE_PICTURE_SUFFIX)),
+    )
+    const gpuReport = { suite: 'report', backend: 'webgpu', featureLevel: 'compatibility' }
+    // The measurement alone answers.
+    expect(tagged('the archive holds picture, state, overlay and description', members, gpuReport).point).toBe(927)
+    // An old record has no section field and keeps the tag-shaped tail.
     expect(
-      tagged(
+      tagged('the archive holds picture, state, overlay and description', `${members}  [--section=bug-report-archive]`, gpuReport),
+    ).toBeNull()
+    // Even a malformed new record cannot ask the READER to strip text. New
+    // records separate before this point; section is data, never an instruction
+    // to reinterpret detail.
+    expect(
+      chargeFor(
+        {
+          name: 'the archive holds picture, state, overlay and description',
+          detail: `${members}  [--section=bug-report-archive]`,
+          section: 'bug-report-archive',
+          kind: 'check',
+        },
+        gpuReport,
+      ),
+    ).toBeNull()
+    // A charge that reads no detail is untouched by any of this: the name alone
+    // is its evidence, and the tag never reaches the name.
+    expect(tagged('the archive carries a screenshot', 'no PNG member  [--section=bug-report-archive]', gpuReport).point).toBe(927)
+  })
+
+  it('charges the four measured reds with measurement and section stored separately', () => {
+    const store = (name, detail, section, scope) =>
+      chargeReds([{ name, detail, section, kind: 'check' }], scope)[0]
+    const records = [
+      store(
         'the archive holds picture, state, overlay and description',
-        'hoa-state-2026-08-30-42.json, hoa-state-2026-08-30-42-overlay.json, ' +
-          'hoa-state-2026-08-30-42.txt  [--section=bug-report-archive]',
+        'hoa-state-2026-08-30-42.json, hoa-state-2026-08-30-42-overlay.json, hoa-state-2026-08-30-42.txt',
+        'bug-report-archive',
         { suite: 'report', backend: 'webgpu', featureLevel: 'compatibility' },
-      ).point,
-    ).toBe(927)
-    expect(
-      tagged(
+      ),
+      store(
         'the children walk PAST the traveller — from one side of him to the other',
         '0 of 4 crossed his line; along the lane (0 = his line) [-11..26@1, -15..16@1, -11..22@1, ' +
           '-11..16@1] m, walked [67, 67, 68, 66] m, phases [run×39 part×161 roam×695] over 45s ' +
-          'played, 3 tagged  [--section=children-bank-game]',
+          'played, 3 tagged',
+        'children-bank-game',
         { suite: 'polish', backend: 'webgl' },
-      ).point,
-    ).toBe(698)
-    expect(
-      tagged(
+      ),
+      store(
         'first-person ground shows micro-detail (edge energy)',
-        'laplacian mean 1.07  [--section=ground-detail]',
+        'laplacian mean 1.07',
+        'ground-detail',
         { suite: 'settings', backend: 'webgl' },
-      ).point,
-    ).toBe(603)
-    expect(
-      tagged(
+      ),
+      store(
         'the streamed dressing does not grow over a session at a fixed anchor (point 278)',
-        '{"samples":[0,0,0,0,0],"min":0,"max":0,"spread":0}  [--section=dressing-growth]',
+        '{"samples":[0,0,0,0,0],"min":0,"max":0,"spread":0}',
+        'dressing-growth',
         { suite: 'enrichments', backend: 'webgl' },
-      ).point,
-    ).toBe(938)
-    // A CHECK THAT PRINTED NO MEASUREMENT records the tag ALONE, and charges by
-    // name as it always did.
+      ),
+    ]
+    expect(records.map((record) => record.point)).toEqual([927, 698, 603, 938])
+    expect(records.map((record) => record.section)).toEqual([
+      'bug-report-archive',
+      'children-bank-game',
+      'ground-detail',
+      'dressing-growth',
+    ])
+    for (const record of records) expect(record.detail).not.toContain('[--section=')
+  })
+
+  // THE THREE ENTRIES WHOSE ONLY PIN WAS A TAGGED READ (cross-vendor review,
+  // Opus 4.8, 30.08.2026, soft flag). Points 938 (both lanes) and 603 were
+  // exercised solely inside the deleted section-tag block, and that deletion was
+  // right — a tagged detail charges nothing now — but it left these entries with
+  // the ledger-wide structural cases and no evidence of their own. Here they
+  // charge the measurement they were opened for, on the lane they were measured
+  // on, and nowhere else.
+  it('charges the dressing growth and the ground detail on their own lanes and no others', () => {
+    const at = (name, scope, kind = 'check') => chargeFor({ name, kind, detail: '' }, scope)
+    const dressing = 'the streamed dressing does not grow over a session at a fixed anchor (point 278)'
+    const enrichments = (scope) => at(dressing, { suite: 'enrichments', ...scope })
+    // POINT 938 HAS TWO HALVES, and the point alone cannot tell them apart — the
+    // matched entry's own backend can.
+    expect(enrichments({ backend: 'webgpu', featureLevel: 'compatibility' }).point).toBe(938)
+    expect(enrichments({ backend: 'webgpu', featureLevel: 'compatibility' }).backend).toBe('webgpu')
+    expect(enrichments({ backend: 'webgl' }).point).toBe(938)
+    expect(enrichments({ backend: 'webgl' }).backend).toBe('webgl')
+    // The core adapter the player runs, and a run that recorded no level at all,
+    // are lanes nobody measured this on.
+    expect(enrichments({ backend: 'webgpu', featureLevel: 'core' })).toBeNull()
+    expect(enrichments({ backend: 'webgpu' })).toBeNull()
+    // THE SCOPE IS ASSERTED, NOT ASSUMED: dropping the suite or the kind, or
+    // letting text ride in front of the name, must not leave this case green.
+    expect(at(dressing, { suite: 'polish', backend: 'webgl' })).toBeNull()
+    expect(at(dressing, { suite: 'enrichments', backend: 'webgl' }, 'console')).toBeNull()
+    expect(at(`also ${dressing}`, { suite: 'enrichments', backend: 'webgl' })).toBeNull()
+
+    const ground = 'first-person ground shows micro-detail (edge energy)'
+    const settings = (scope) => at(ground, { suite: 'settings', ...scope })
+    // POINT 603 IS THE WebGL HALF, and its own words say the WebGPU half of the
+    // same red is point 514 — so the two lanes must answer to different points.
+    expect(settings({ backend: 'webgl' }).point).toBe(603)
+    expect(settings({ backend: 'webgpu', featureLevel: 'compatibility' }).point).toBe(514)
+    expect(settings({ backend: 'webgpu', featureLevel: 'core' })).toBeNull()
+    expect(at(ground, { suite: 'polish', backend: 'webgl' })).toBeNull()
+    expect(at(ground, { suite: 'settings', backend: 'webgl' }, 'console')).toBeNull()
+    // AND THE DETAIL IS READ VERBATIM, TAG AND ALL (cross-vendor review, GPT-5.6
+    // Sol, 8f3f23d): these two entries are name-only, so a tagged detail must
+    // change nothing for them — while the composite entry that DOES read a
+    // detail must stay refused with the tag on it, which is the loud state the
+    // withdrawn stripper was refused for. Both halves are asserted here so this
+    // block cannot pass while a reverse reader is put back.
+    const tagged = (detail) => `${detail}  [--section=bug-report-archive]`
     expect(
-      tagged(
-        'member hoa-state-2026-08-30-42.png is present',
-        '[--section=bug-report-archive]',
+      chargeFor({ name: dressing, kind: 'check', detail: tagged('samples 0') }, { suite: 'enrichments', backend: 'webgl' })
+        .point,
+    ).toBe(938)
+    const members = archiveMemberDetail(
+      archiveMemberNames('hoa-state-2026-08-30-42', ARCHIVE_MEMBER_SUFFIXES.filter((x) => x !== ARCHIVE_PICTURE_SUFFIX)),
+    )
+    const composite = { name: 'the archive holds picture, state, overlay and description', kind: 'check' }
+    const gpuReport = { suite: 'report', backend: 'webgpu', featureLevel: 'compatibility' }
+    expect(chargeFor({ ...composite, detail: members }, gpuReport).point).toBe(927)
+    expect(chargeFor({ ...composite, detail: tagged(members) }, gpuReport)).toBeNull()
+
+    // POINT 603 IS ASKED WITH A TAGGED DETAIL TOO (cross-vendor review, GPT-5.6
+    // Sol, 8f3f23d): exercising it only with an empty detail would leave this
+    // block green even if the entry grew a `detailMatch` of its own, which would
+    // contradict the name-only behaviour it is here to pin.
+    expect(chargeFor({ name: ground, kind: 'check', detail: tagged('laplacian mean 1.07') }, { suite: 'settings', backend: 'webgl' }).point).toBe(603)
+    expect(
+      chargeFor({ name: ground, kind: 'check', detail: tagged('laplacian mean 1.07') }, { suite: 'settings', backend: 'webgpu', featureLevel: 'compatibility' }).point,
+    ).toBe(514)
+
+    // NAMED RATHER THAN LEFT UNSAID: the 603 pattern carries no leading anchor,
+    // so text in FRONT of the name still charges — unlike the 938 pair above.
+    // Pinned as it stands, not as it ought to be: narrowing a shipped entry is
+    // its own change with its own evidence, and this case exists to make the
+    // difference visible rather than to hide it.
+    expect(at(`after F8, ${ground}`, { suite: 'settings', backend: 'webgl' }).point).toBe(603)
+  })
+
+  // RESTORED AFTER A REVIEW FINDING, TWICE INDEPENDENTLY (GPT-5.6 Sol on
+  // f2f40dd, then Opus 4.8 on b258a3e): withdrawing the section-tag stripper
+  // took these two blocks with it, and neither depends on the stripper — their
+  // details carry no tag. Both ledger entries stand, so the deletion was a
+  // silent loss of the backend and feature-level isolation they pin.
+  it('charges the borrowed world on both measured lanes and no further', () => {
+    // Point 1009's six reds were measured on webgl/benchmark and on
+    // webgpu/benchmark at recorded featureLevel=compatibility, twice each
+    // (30.08.2026). One entry without a backend used to cover them, resting on
+    // the argument that the restore path is plain JavaScript — reasoning, not a
+    // measurement, and it also reached the CORE adapter the player runs and a run
+    // that recorded no level at all (cross-vendor review, GPT-5.6 Sol).
+    const restored = { name: 'restored: ssaoEnabled', detail: 'false -> true', kind: 'check' }
+    const on = (scope) => chargeFor(restored, { suite: 'benchmark', ...scope })
+    expect(on({ backend: 'webgl' }).point).toBe(1009)
+    expect(on({ backend: 'webgpu', featureLevel: 'compatibility' }).point).toBe(1009)
+    // Neither the core adapter nor a run whose level went unrecorded was measured.
+    expect(on({ backend: 'webgpu', featureLevel: 'core' })).toBeNull()
+    expect(on({ backend: 'webgpu' })).toBeNull()
+    // EACH HALF IS ISOLATED, not only the WebGL one (cross-vendor review, GPT-5.6
+    // Sol): dropping the WebGPU entry's suite, kind or backend must not leave
+    // this file green, so the negatives are asserted on BOTH scopes.
+    const gpu = { backend: 'webgpu', featureLevel: 'compatibility' }
+    expect(chargeFor(restored, { suite: 'settings', backend: 'webgl' })).toBeNull()
+    expect(chargeFor(restored, { suite: 'settings', ...gpu })).toBeNull()
+    expect(chargeFor({ ...restored, kind: 'console' }, { suite: 'benchmark', backend: 'webgl' })).toBeNull()
+    expect(chargeFor({ ...restored, kind: 'console' }, { suite: 'benchmark', ...gpu })).toBeNull()
+    // A WebGL scope carrying a level must be answered by the WebGL entry and not
+    // by the other one. Both entries are point 1009, so the POINT cannot tell
+    // them apart (cross-vendor review, GPT-5.6 Sol) — the matched entry's own
+    // backend can.
+    expect(chargeFor(restored, { suite: 'benchmark', backend: 'webgl', featureLevel: 'compatibility' }).backend).toBe('webgl')
+    expect(on({ backend: 'webgl' }).backend).toBe('webgl')
+    expect(on({ backend: 'webgpu', featureLevel: 'compatibility' }).backend).toBe('webgpu')
+    // THE NAME IS THE WHOLE OF THE EVIDENCE — this entry reads no detail, so its
+    // six names are the only thing keeping it narrow. A seventh setting nobody
+    // measured stays red on both lanes, and so does a name that merely starts
+    // with one of the six.
+    for (const scope of [{ backend: 'webgl' }, gpu]) {
+      expect(chargeFor({ ...restored, name: 'restored: fog' }, { suite: 'benchmark', ...scope })).toBeNull()
+      expect(
+        chargeFor({ ...restored, name: 'restored: seed and the day it pins' }, { suite: 'benchmark', ...scope }),
+      ).toBeNull()
+      expect(
+        chargeFor(
+          { ...restored, name: 'Math.random is the original function again, and so is Date.now' },
+          { suite: 'benchmark', ...scope },
+        ),
+      ).toBeNull()
+      // And text in FRONT of one of the six is a different check name too — the
+      // pattern is anchored at both ends, and this is what proves the leading
+      // anchor holds (same review).
+      expect(chargeFor({ ...restored, name: 'also restored: seed' }, { suite: 'benchmark', ...scope })).toBeNull()
+      expect(
+        chargeFor({ ...restored, name: 'after F8, Math.random is the original function again' }, { suite: 'benchmark', ...scope }),
+      ).toBeNull()
+      // While every one of the six charges, on both measured lanes.
+      for (const name of ['restored: ssaoEnabled', 'restored: travelZoom', 'restored: travelSpeed',
+        'restored: seed', 'restored: day', 'Math.random is the original function again']) {
+        expect(chargeFor({ ...restored, name }, { suite: 'benchmark', ...scope }).point, name).toBe(1009)
+      }
+    }
+  })
+
+  it('leaves the report suite\'s picture-loss reds uncharged on WebGL 2', () => {
+    // MEASURED 30.08.2026 on main, and it corrects a mistake of the same day: a
+    // bare `npm test -- report` runs the EVERYDAY lane, which is WebGPU, so four
+    // reds read that way were briefly mistaken for a WebGL measurement and given
+    // WebGL halves. Run with VERIFY_GL=webgl the suite passes WHOLE — 34 checks,
+    // 0 fail — so those reds do not occur on this lane at all and a charge here
+    // would excuse something nobody has measured. That is the one failure mode
+    // the table exists to prevent, so the entries were withdrawn and this holds
+    // the line.
+    const at = (name, detail) => chargeFor({ name, detail, kind: 'check' }, { suite: 'report', backend: 'webgl' })
+    const stem = 'hoa-state-2026-08-30-42'
+    expect(
+      at(
+        'the archive holds picture, state, overlay and description',
+        archiveMemberDetail(
+          archiveMemberNames(stem, ARCHIVE_MEMBER_SUFFIXES.filter((x) => x !== ARCHIVE_PICTURE_SUFFIX)),
+        ),
+      ),
+    ).toBeNull()
+    expect(at(memberPresentCheckName(stem, ARCHIVE_PICTURE_SUFFIX), '')).toBeNull()
+    expect(at('the archive carries a screenshot', 'no PNG member')).toBeNull()
+    // The EXACT red the withdrawn entry charged, duplicate and all — a WebGL
+    // entry could otherwise come back for the duplicated form without failing
+    // here (cross-vendor review, GPT-5.6 Sol).
+    const vite504 = 'Failed to load resource: the server responded with a status of 504 (Outdated Optimize Dep)'
+    expect(at('no console errors', vite504)).toBeNull()
+    expect(at('no console errors', `${vite504} | ${vite504}`)).toBeNull()
+    // While the lane they WERE measured on keeps its charge.
+    expect(
+      chargeFor(
+        { name: 'the archive carries a screenshot', detail: 'no PNG member', kind: 'check' },
         { suite: 'report', backend: 'webgpu', featureLevel: 'compatibility' },
       ).point,
     ).toBe(927)
-  })
-
-  // THE STRIPPER MAY NOT EAT MEASURED TEXT (cross-vendor review, GPT-5.6 Sol,
-  // do-not-merge on the first attempt). These use a ledger of their own, because
-  // the shipped entries cannot express the case: a charge whose detail regex
-  // matches what an over-greedy stripper would LEAVE BEHIND is what catches one,
-  // and every shipped entry would return null for its own separate reasons.
-  it('takes off only the tag a suite really appended', () => {
-    const scope = (ledger) => ({ suite: 'probe', backend: 'webgl', ledger })
-    const entry = (detailMatch) => [
-      { point: 9001, suite: 'probe', backend: 'webgl', kind: 'check', match: /^probe$/i, detailMatch },
-    ]
-    const red = (detail) => ({ name: 'probe', detail, kind: 'check' })
-    // The join the suites write — measurement, two spaces, the trimmed tag.
-    expect(chargeFor(red('timeout  [--section=x]'), scope(entry(/^timeout$/))).point).toBe(9001)
-    // NOT the same thing: a measurement whose own last word ends in something
-    // bracket-shaped. The first attempt normalised this to `timeout` and charged
-    // it — a red nobody measured, excused by the stripper rather than the entry.
-    expect(chargeFor(red('timeout[--section=x]'), scope(entry(/^timeout$/)))).toBeNull()
-    // Nor a single space: that is not the join, so nothing comes off.
-    expect(chargeFor(red('timeout [--section=x]'), scope(entry(/^timeout$/)))).toBeNull()
-    // AND NOTHING IS EATEN FROM THE MIDDLE: an over-greedy stripper would leave
-    // `head`, and this entry is written to match exactly that leftover.
-    expect(chargeFor(red('head  [--section=x] tail'), scope(entry(/^head$/)))).toBeNull()
-    // A DETAIL MAY LEGITIMATELY END IN A BRACKET and must survive untouched,
-    // tagged or not — the polish crossing prints one.
-    expect(chargeFor(red('phases [run×39]'), scope(entry(/^phases \[run×39\]$/))).point).toBe(9001)
-    expect(
-      chargeFor(red('phases [run×39]  [--section=x]'), scope(entry(/^phases \[run×39\]$/))).point,
-    ).toBe(9001)
+    // AND SO DOES THE VITE TRANSIENT, on the lane and level it was measured on:
+    // point 939 had entered it as a startup CONSOLE red, so the report suite's
+    // generic "no console errors" check stood unaccounted (measured 30.08.2026).
+    const vite = 'Failed to load resource: the server responded with a status of 504 (Outdated Optimize Dep)'
+    const onWebgpu = (detail) =>
+      chargeFor({ name: 'no console errors', detail, kind: 'check' }, { suite: 'report', backend: 'webgpu', featureLevel: 'compatibility' })
+    expect(onWebgpu(`${vite} | ${vite}`).point).toBe(939)
+    // The check name is generic, so the detail is the whole of the evidence: a
+    // second, different console error riding along keeps the red.
+    expect(onWebgpu(`${vite} | TypeError: undefined is not a function`)).toBeNull()
+    expect(onWebgpu('TypeError: undefined is not a function')).toBeNull()
+    // And the CORE adapter the player runs is not the lane this was measured on.
+    const asChecked = (over) =>
+      chargeFor(
+        { name: 'no console errors', detail: vite, kind: 'check', ...over.red },
+        { suite: 'report', backend: 'webgpu', featureLevel: 'compatibility', ...over.scope },
+      )
+    expect(asChecked({ red: {}, scope: { featureLevel: 'core' } })).toBeNull()
+    // THE SCOPE IS ASSERTED, NOT ASSUMED (same review): dropping suite or kind,
+    // or broadening the name, must not leave this file green.
+    expect(asChecked({ red: {}, scope: { suite: 'startup' } })).toBeNull()
+    expect(asChecked({ red: { kind: 'console' }, scope: {} })).toBeNull()
+    expect(asChecked({ red: { name: 'no console errors across the F9 cycle' }, scope: {} })).toBeNull()
+    // AND THE DETAIL'S LEADING ANCHOR HOLDS: a different error in FRONT of the
+    // transient is a red nobody measured, so it must not ride in behind it.
+    expect(onWebgpu(`TypeError: undefined is not a function | ${vite}`)).toBeNull()
   })
 
   it('charges the archive composite only in the picture-loss shape', () => {

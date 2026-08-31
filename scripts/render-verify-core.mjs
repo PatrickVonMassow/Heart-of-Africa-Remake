@@ -21,7 +21,7 @@
 import { createHash } from 'node:crypto'
 
 import { RED_CHARGES } from './render-verify-charges.mjs'
-import { withoutSectionTag } from './section-tag-core.mjs'
+import { isSectionName } from './section-tag-core.mjs'
 import { scopeMandatoryDuty } from './mandatory-duty-core.mjs'
 
 /** Both renderer backends the game ships; each needs a passing verify run. */
@@ -251,6 +251,74 @@ function patternHits(pattern, value) {
   return re === null ? false : re.test(value)
 }
 
+/**
+ * Was this red's measurement CUT by the record's bound? Records written from
+ * this revision carry `detailCut` explicitly, set where the cut is observed.
+ * Older records carry nothing, and only one signal survives in them: a detail
+ * that ends exactly ON the bound was longer than it, or ended there by
+ * coincidence — the record cannot tell which, so it reads as cut.
+ *
+ * EXACTLY on the bound, never past it. A stored detail can be no longer than
+ * the bound, so a longer one is not a record at all but the unbounded parse it
+ * was read from — and that text was never cut. Reading it as cut would refuse
+ * charges over material the reader can see in full.
+ *
+ * And the inference reaches ONLY records that predate the field. A writer since
+ * this revision settles the ambiguous length itself: a detail that ends on the
+ * bound carries `detailCut` either way, so a measurement that merely happened to
+ * be 200 characters long is read as the whole measurement it is.
+ *
+ * Reading an uncut detail as cut costs the narrow charges that did not declare
+ * themselves prefix readers (see `mayReadCutDetail`); the red then stays loudly
+ * unaccounted and closes the three ordinary ways (fix it, charge it, file it).
+ * Reading a cut one as whole is what lets one red's signature quietly excuse
+ * another's, which is the one failure mode this table exists to prevent.
+ */
+export function wasDetailCut(red) {
+  const hasOwnMark = red != null && Object.hasOwn(red, 'detailCut')
+  if (hasOwnMark && red.detailCut === true) return true
+  // ONLY A LITERAL `false` PROVES THE OTHER DIRECTION (cross-vendor review,
+  // GPT-5.6 Sol, do-not-merge on ae9a500c). Treating any present value as
+  // "not cut" let a malformed durable record — `detailCut: null` in a
+  // hand-edited or half-written state file — walk past the length inference and
+  // answer a signature belonging to a different red. A field nobody can read is
+  // not evidence, so it falls back to the inference like a record that carries
+  // none at all.
+  // The boolean must also BELONG TO THE RECORD. Looking through its prototype
+  // lets an inherited `false` overrule the conservative legacy inference: a
+  // cut-at-the-bound record can then answer an end-anchored signature as if its
+  // measurement were whole. Durable JSON records have own data properties;
+  // anything inherited is not evidence written by the recorder.
+  if (hasOwnMark && red.detailCut === false) return false
+  return text(red?.detail).length === MAX_RED_DETAIL_LEN
+}
+
+/**
+ * MAY THIS ENTRY'S SIGNATURE BE READ AGAINST A MEASUREMENT THE BOUND CUT?
+ *
+ * Only if the ENTRY SAYS SO. Three rounds went the other way — reading the
+ * pattern, then reading its match, then asking the pattern whether it would
+ * still match if the text went on — and every one of them was refused with a
+ * counterexample, the last being `/^(?=A{200}$)|^A{200}.$/`, which asserts the
+ * end in one alternative and swallows the probe character in the other
+ * (cross-vendor review, GPT-5.6 Sol). The lesson is the one this file already
+ * learned about the section tag, in the same words: recovering intent from TEXT
+ * proves SYNTAX, not PROVENANCE. A regex cannot be interrogated about what its
+ * author meant, and no finite probe closes a pattern written to defeat it.
+ *
+ * So the question moves to where the provenance is — the ledger entry, written
+ * and reviewed by people who know which red they measured. An entry that reads
+ * only the FRONT of a measurement says so with `detailReadsPrefix`, in the same
+ * commit that states in its `why` how far the signature reaches and why the
+ * tail cannot matter. Everything else is refused on a cut record, which is the
+ * safe direction: a red loudly unaccounted closes the three ordinary ways,
+ * while a signature that quietly excuses the wrong red is the one failure mode
+ * this table exists to prevent.
+ */
+function mayReadCutDetail(charge) {
+  return charge?.detailReadsPrefix === true
+}
+
 export function chargeFor(red, options) {
   const { suite = '', backend = '', featureLevel = null, ledger = RED_CHARGES } = options ?? {}
   const name = text(red?.name)
@@ -292,22 +360,34 @@ export function chargeFor(red, options) {
       // stays loudly uncharged and closes the three ordinary ways. A broad
       // `match` entry is unaffected, because it never claimed to read a
       // measurement in the first place.
-      // THE RECORDER'S SECTION TAG IS NOT PART OF THE MEASURED LINE (measured
-      // 30.08.2026). A suite that declares sections appends ` [--section=<name>]`
-      // to every result line so a failing check names the argument that re-runs
-      // it alone, and the record stores the line WITH it. Every `detailMatch`
-      // here is anchored at both ends against the line the SUITE printed, so in
-      // a section-using suite the anchor could never reach the end of a recorded
-      // detail: the point-927 composite charge matched
-      // `…-42.txt` while the record held `…-42.txt  [--section=bug-report-archive]`,
-      // and the red it exists to account for stayed unaccounted and blocked the
-      // gate. Taking the tag off restores what was measured without loosening a
-      // single anchor: the shape is RECONSTRUCTED from the generator, so a detail
-      // that merely ends in something bracket-shaped keeps every character it
-      // measured (cross-vendor review, GPT-5.6 Sol, do-not-merge on the first
-      // attempt, which used a regex loose enough to eat real measured text).
-      const measured = withoutSectionTag(detail)
-      if (charge.detailMatch && (red?.detailVaried === true || !patternHits(charge.detailMatch, measured))) continue
+      // The recorder has already separated its generated section tag while the
+      // live gate supplied provenance. This reader sees only the durable
+      // measurement. An old record has no section field and keeps its old detail
+      // verbatim — including any tag-shaped tail — so it stays loudly uncharged
+      // instead of being guessed into an owner.
+      //
+      // AND A SIGNATURE MAY NOT READ THE END OF A MEASUREMENT THE RECORD CUT
+      // OFF (cross-vendor review, GPT-5.6 Sol, do-not-merge on 3e6ffd2). The
+      // record keeps the first MAX_RED_DETAIL_LEN characters, and a `detailMatch`
+      // anchored at both ends therefore matches `<cut>` out of `<cut><more>` —
+      // satisfying a signature written for a DIFFERENT, genuinely shorter red,
+      // whose whole measurement the longer one merely begins with. The trailing
+      // anchor says "this is where the measurement ends" about text where
+      // nothing ended. Same shape as the section tag and the same answer: the
+      // reader does not guess, it refuses, and the red stays loudly uncharged.
+      //
+      // AND THE ENTRY DECIDES, NOT THE READER (cross-vendor review, GPT-5.6 Sol,
+      // three refusals). An entry whose signature reads only the FRONT of the
+      // measurement declares `detailReadsPrefix` and keeps charging; every other
+      // one is refused here. Refusing ALL of them instead would withdraw the
+      // point-698 crossing charge, whose own measurement runs past the bound in
+      // every real record — so the declaration is what keeps a real, measured
+      // charge alive without letting the reader guess on anybody's behalf.
+      const measured = detail
+      if (charge.detailMatch && red?.detailVaried === true) continue
+      if (charge.detailMatch && !patternHits(charge.detailMatch, measured)) continue
+      // A CUT MEASUREMENT ANSWERS ONLY AN ENTRY THAT DECLARED IT READS THE FRONT.
+      if (charge.detailMatch && wasDetailCut(red) && !mayReadCutDetail(charge)) continue
       return charge
     } catch {
       /* a broken ledger entry charges nothing — the red stays unaccounted */
@@ -373,8 +453,23 @@ export function chargeReds(reds, options) {
     }
     // Absent rather than empty: a red that printed no measurement adds no field,
     // so records of reds that never had one keep the shape they always had.
-    const detail = text(red?.detail).slice(0, MAX_RED_DETAIL_LEN)
+    const printed = text(red?.detail)
+    const detail = printed.slice(0, MAX_RED_DETAIL_LEN)
     if (detail) stored.detail = detail
+    // Provenance is optional for compatibility with every existing record. Only
+    // a name the generator itself accepts is allowed into the durable shape.
+    if (isSectionName(red?.section)) stored.section = red.section
+    // WRITTEN HERE, WHERE THE CUT IS OBSERVED, because afterwards nothing but
+    // the length is left to read — and the length is ambiguous at exactly one
+    // place: a measurement that ends ON the bound looks the same whether the
+    // bound took something or the text simply ended there. So the field is
+    // written whenever it settles that question — `true` when the bound cut, and
+    // `false` for the one uncut length that would otherwise be misread (see
+    // `wasDetailCut`; cross-vendor review, GPT-5.6 Sol, do-not-merge on
+    // b3e5200e, which named the false positive). Everywhere else it stays
+    // absent, so an ordinary record keeps the shape it always had.
+    if (printed.length > MAX_RED_DETAIL_LEN) stored.detailCut = true
+    else if (printed.length === MAX_RED_DETAIL_LEN) stored.detailCut = false
     // Kept on the record, because the reading has to survive to the re-read:
     // otherwise `owned()` would charge afterwards exactly the red the recorder
     // refused to charge.
@@ -409,7 +504,13 @@ const MAX_SUSPECT_NAME_LEN = 200
  *  bounded — and a `detailMatch` signature therefore has to sit inside the
  *  first MAX_RED_DETAIL_LEN characters of the printed detail. That is not a
  *  hidden trap: `chargeReds` charges the TRUNCATED text, so a signature past
- *  the bound matches at record time no more than it does afterwards. */
+ *  the bound matches at record time no more than it does afterwards.
+ *
+ *  What the bound MAY NOT do is make a cut measurement look whole. Every
+ *  `detailMatch` is anchored at both ends, so `<cut>` out of `<cut><more>`
+ *  satisfies a signature written for a genuinely shorter red — a different red,
+ *  quietly excused. A cut red is marked at the cut (`detailCut`) and refuses
+ *  every narrow charge from then on; see `wasDetailCut`. */
 const MAX_RED_NAME_LEN = 200
 const MAX_RED_DETAIL_LEN = 200
 
@@ -812,6 +913,31 @@ export function crashClosureFor(run, closures) {
   return signedClosureFor(run, closures)
 }
 
+/** Whether a raw `crashed: true` record really says the process died.
+ *
+ * Records written from this revision onward carry `terminalVerdict` explicitly
+ * and mark Node's definitive uncaught-exception path with `crashSource`. Older
+ * records predate both fields. For those only, the durable evidence already in
+ * the record decides: a non-zero run that asserted its backend and recorded at
+ * least one red reached its own failure report, so a stack-shaped validation
+ * line on stderr does not turn it into a crash retroactively. Accepted legacy
+ * residual: such a run could have printed that red and then died without an
+ * uncaught-exception marker; old records cannot distinguish that sequence, and
+ * the specified trade is to trust their durable reported-red evidence. */
+export function isCrashedRun(run) {
+  if (!run || typeof run !== 'object' || run.crashed !== true) return false
+  if (run.crashSource === 'uncaught-exception') return true
+
+  const hasTerminalField = Object.prototype.hasOwnProperty.call(run, 'terminalVerdict')
+  const reported =
+    exitOf(run) !== 0 &&
+    run.asserted === true &&
+    Array.isArray(run.reds) &&
+    run.reds.length > 0 &&
+    (run.terminalVerdict === true || !hasTerminalField)
+  return !reported
+}
+
 /**
  * THE RECORD AS IT IS JUDGED ONCE ITS CRASH IS SIGNED OFF (review finding,
  * 28.08.2026). The signature closes the CRASH READING and nothing else, so what
@@ -826,7 +952,7 @@ export function crashClosureFor(run, closures) {
  * closure lookup, whose identity is the record's real content.
  */
 export function afterCrashClosure(run, crashClosures) {
-  if (run?.crashed !== true) return run
+  if (!isCrashedRun(run)) return run
   return crashClosureFor(run, crashClosures) ? { ...run, crashed: false } : run
 }
 
@@ -918,7 +1044,7 @@ export function runVerdict(run, options) {
   // truncation, a crashed run that also flooded its output could be lifted by one
   // signature (review, 19.08.2026). Only `partial` still comes first, because a
   // --section probe is nobody's evidence in either direction.
-  if (run.crashed === true) {
+  if (isCrashedRun(run)) {
     return {
       status: 'red',
       covers: false,
@@ -1236,7 +1362,7 @@ export function unexplainedRuns(runs, since, options) {
     // suite (the recorded rounds pinned that a crash inside the window is not
     // talked away by the runs that followed it — the way out is the explicit,
     // evidenced signature or the deferral, never silence).
-    if (r.crashed === true && !signedCrash) {
+    if (isCrashedRun(r) && !signedCrash) {
       // THE CRASH SENTENCE BLOCKS; THE REDS PRINTED BEFORE THE CRASH ARE CARRIED
       // BESIDE IT (review finding, 28.08.2026). `unaccounted` stays the crash
       // alone — it is the one thing the reader is told to dispose of, and naming
@@ -1858,7 +1984,7 @@ export function evaluate(input) {
     // signed off, it simply leaves the backend uncovered — quoting its synthetic
     // "unaccounted red" here sent the reader hunting a defect the run never
     // reported (sixth round; the same rule the incomplete class already has).
-    if (run.crashed === true && verdict.status === 'red') {
+    if (isCrashedRun(run) && verdict.status === 'red') {
       if (!reported) {
         whyNot.push(
           `${b}: the last run (${suiteName}) CRASHED, but that record is already signed off as ` +
@@ -1907,7 +2033,7 @@ export function evaluate(input) {
     // suspect run's entry carries the first attempt's raw check names, not the
     // sentence about them).
     const open_ =
-      reported && (verdict.status === 'incomplete' || run.crashed === true)
+      reported && (verdict.status === 'incomplete' || isCrashedRun(run))
         ? reported.unaccounted
         : verdict.unaccounted
     const named = open_

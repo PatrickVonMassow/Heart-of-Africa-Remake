@@ -553,6 +553,31 @@ export const RED_CHARGES = [
       'whose level went unrecorded — so the narrowing withdraws no charge that stands.',
   },
   {
+    point: 939,
+    suite: 'report',
+    backend: 'webgpu',
+    featureLevel: 'compatibility',
+    kind: 'check',
+    match: /^no console errors$/i,
+    // DETAIL-SCOPED, and it has to be: "no console errors" is a generic
+    // assertion, so the name alone would excuse EVERY console error the report
+    // suite ever reports. Only the 504 sentence is excused, and only when the
+    // whole detail is that sentence — repeated, as the check joins repeats with
+    // ` | ` — and nothing else. A second, different error riding along keeps the
+    // red.
+    detailMatch:
+      /^(Failed to load resource: the server responded with a status of 504 \(Outdated Optimize Dep\))( \| \1)*$/i,
+    why:
+      'THE SAME VITE TRANSIENT POINT 939 OWNS, ARRIVING IN THE REPORT SUITE AS A CHECK. Measured '
+      + '30.08.2026 on `main`, webgpu/report at recorded featureLevel=compatibility: the dev server '
+      + 're-bundled its dependency optimizer during the run and answered two requests with 504, '
+      + 'which CLAUDE.md classifies as an environment transient rather than a product defect. 939 '
+      + 'entered it as a `startup`/`webgpu`/`console` red, so neither the suite nor the kind reaches '
+      + 'this reading and it stood unaccounted. Scoped to the lane and level it was measured on and '
+      + 'to nothing else: the WebGL 2 run of the same suite the same hour passed WHOLE (34 checks, '
+      + '0 fail), so that lane gets no entry here. The charge dies with point 939.',
+  },
+  {
     point: 514,
     suite: 'enrichments',
     backend: 'webgpu',
@@ -597,10 +622,12 @@ export const RED_CHARGES = [
   {
     point: 1009,
     suite: 'benchmark',
+    backend: 'webgl',
     kind: 'check',
     match:
       /^(restored: (ssaoEnabled|travelZoom|travelSpeed|seed|day)|Math\.random is the original function again)$/i,
     why:
+      'THE WebGL 2 HALF. ' +
       'FILED AS 1009 ON 29.08.2026, the day the six were classified. Measured in the LARGE run on ' +
       'feat/687-roam-bound-fixes (WebGL 2) and classified with baseline-classify against the ' +
       'merge-base 4acf6039abe0: ALL SIX are already red on the baseline, so none of them is the ' +
@@ -610,10 +637,47 @@ export const RED_CHARGES = [
       'LARGE could not go green for any point. The defect they report is real and 1009 holds it: ' +
       'the F8 measurement run borrows the world — a pinned seed and day, a fixed travel zoom and ' +
       'speed, the SSAO switch, and Math.random replaced so a frame draws the same way twice — and ' +
-      'returns none of it. NOT SCOPED TO A BACKEND, deliberately: the restore path is plain ' +
-      'JavaScript state and has nothing to do with which renderer drew the rows, and the reds were ' +
-      'recorded on WebGL 2 while the two WebGPU timestamp rows of the same run fail for their own ' +
-      'reasons and are NOT covered here. The charge dies with the point.',
+      'returns none of it. NOT SCOPED TO A BACKEND, AND NOW MEASURED ON BOTH (cross-vendor ' +
+      'review, GPT-5.6 Sol, 30.08.2026, which rightly refused the earlier argument): the entry ' +
+      'used to rest on the reasoning that the restore path is plain JavaScript state and has ' +
+      'nothing to do with which renderer drew the rows — but reasoning is not a measurement, and ' +
+      'a WebGPU red would have been excused on an argument. The LARGE run of 30.08.2026 supplies ' +
+      'what was missing: all six read red on webgl/benchmark and again on webgpu/benchmark at ' +
+      'recorded featureLevel=compatibility, twice on each lane. The two WebGPU timestamp rows of ' +
+      'the same run fail for their own reasons and are NOT covered here. The charge dies with ' +
+      'the point.',
+  },
+  {
+    point: 1009,
+    suite: 'benchmark',
+    backend: 'webgpu',
+    featureLevel: 'compatibility',
+    kind: 'check',
+    match:
+      /^(restored: (ssaoEnabled|travelZoom|travelSpeed|seed|day)|Math\.random is the original function again)$/i,
+    why:
+      'THE WebGPU HALF, SCOPED TO THE COMPATIBILITY LEVEL (cross-vendor review, GPT-5.6 Sol, ' +
+      '30.08.2026): one entry without a level also excused the CORE adapter the player runs and ' +
+      'a run that recorded no level at all, neither of which this evidence measured. Both ' +
+      'recorded WebGPU readings of 30.08.2026 carry featureLevel=compatibility. ' +
+      'FILED AS 1009 ON 29.08.2026, the day the six were classified. Measured in the LARGE run on ' +
+      'feat/687-roam-bound-fixes (WebGL 2) and classified with baseline-classify against the ' +
+      'merge-base 4acf6039abe0: ALL SIX are already red on the baseline, so none of them is the ' +
+      'communication rebuild\'s. Before that classification NOTHING owned them — no open point ' +
+      'named them and this table held no benchmark entry at all — so they reddened every full ' +
+      'regression with no owner, which is the one thing CLAUDE.md 7.2 forbids and the reason a ' +
+      'LARGE could not go green for any point. The defect they report is real and 1009 holds it: ' +
+      'the F8 measurement run borrows the world — a pinned seed and day, a fixed travel zoom and ' +
+      'speed, the SSAO switch, and Math.random replaced so a frame draws the same way twice — and ' +
+      'returns none of it. NOT SCOPED TO A BACKEND, AND NOW MEASURED ON BOTH (cross-vendor ' +
+      'review, GPT-5.6 Sol, 30.08.2026, which rightly refused the earlier argument): the entry ' +
+      'used to rest on the reasoning that the restore path is plain JavaScript state and has ' +
+      'nothing to do with which renderer drew the rows — but reasoning is not a measurement, and ' +
+      'a WebGPU red would have been excused on an argument. The LARGE run of 30.08.2026 supplies ' +
+      'what was missing: all six read red on webgl/benchmark and again on webgpu/benchmark at ' +
+      'recorded featureLevel=compatibility, twice on each lane. The two WebGPU timestamp rows of ' +
+      'the same run fail for their own reasons and are NOT covered here. The charge dies with ' +
+      'the point.',
   },
   {
     point: 603,
@@ -645,6 +709,20 @@ export const RED_CHARGES = [
     // round 2): `run×0` satisfied `run×` and would have charged away exactly
     // the broken round this narrowing exists to keep red.
     detailMatch: /crossed his line;[\s\S]*phases \[[^\]]*run×[1-9]/i,
+    // AND IT READS THE FRONT OF THE MEASUREMENT, WHICH THIS ENTRY DECLARES
+    // (cross-vendor review, GPT-5.6 Sol, three refusals over the truncation
+    // finding). The crossing line is 223 characters, so EVERY record of it is
+    // cut at 200 — and a cut measurement may answer only an entry that says in
+    // its own voice that its signature reads the front and the missing tail
+    // cannot matter. This one does: it needs the crossing count and the phase
+    // list with a positive `run×`, both of which stand at character 178 of the
+    // kept text, 22 characters clear of the bound. What the bound removes is the
+    // ` over 45s played, 3 tagged` epilogue, which the signature never reads and
+    // which cannot turn a running round into a broken one. The declaration is
+    // reviewed with the entry, and it is the only thing that keeps this measured
+    // charge alive without letting the reader guess the author's intent out of
+    // the pattern text.
+    detailReadsPrefix: true,
     why:
       'THE USER DECIDED THIS ONE BY NAME. Measured 17.08.2026 on this same branch and filed as '
       + 'point 698, whose first line records the ruling: land the bank round as it stands and '
@@ -656,7 +734,13 @@ export const RED_CHARGES = [
       + 'run (200 checks, 0 fail), and the mechanic itself — the runs, the tags, the body '
       + 'separation, the stranger berth — passes in the same section. '
       + 'Scoped to suite, backend, level and kind like its neighbours: the charge dies with point '
-      + '698, and on a CORE adapter this check was never measured and stays a real red.',
+      + '698, and on a CORE adapter this check was never measured and stays a real red. '
+      + 'AND IT READS THE FRONT OF A MEASUREMENT THE RECORD CUT (detailReadsPrefix): the crossing '
+      + 'line is 223 characters, so every record of it is cut at the 200-character bound. The '
+      + 'signature needs the crossing count and a positive `run×` in the phase list, and both '
+      + 'stand 22 characters clear of that bound; what the bound removes is the '
+      + '" over 45s played, 3 tagged" epilogue, which the signature never reads and which cannot '
+      + 'turn a running round into a broken one.',
   },
   {
     point: 698,
@@ -668,6 +752,10 @@ export const RED_CHARGES = [
     // owns the DENSITY, and a window that never reached the `run` phase is a
     // different defect that stays a real red.
     detailMatch: /crossed his line;[\s\S]*phases \[[^\]]*run×[1-9]/i,
+    // Reads the front, for the reason the WebGPU entry above sets out at length:
+    // the same 223-character measurement, the same signature, the same 22
+    // characters of clearance before the bound.
+    detailReadsPrefix: true,
     why:
       'THE WebGL 2 HALF OF POINT 698, measured 30.08.2026 and entered because the WebGPU entry '
       + 'above is scoped to that lane and its compatibility level, so it deliberately excuses '
@@ -679,7 +767,11 @@ export const RED_CHARGES = [
       + 'Which lane drew the frame does not reach this check: the children are simulated in plain '
       + 'JavaScript and the check reads their positions, not their pixels — the WebGPU half was '
       + 'measured first only because that is the lane it first reddened on. The charge dies with '
-      + 'point 698.',
+      + 'point 698. '
+      + 'AND IT READS THE FRONT OF A MEASUREMENT THE RECORD CUT (detailReadsPrefix), for the '
+      + 'reason the WebGPU half sets out: the same 223-character crossing line, cut at the '
+      + '200-character bound, with the crossing count and the positive `run×` standing clear of '
+      + 'it and only the trailing epilogue removed.',
   },
   {
     point: 1012,

@@ -314,7 +314,7 @@
 | `rule-review-guard.mjs` | Stop hook: the rule corpus gets read through periodically, not when someone happens to think of it. | — |
 | `rule-review-state.mjs` | Where the rule-review bookkeeping lives, and how the corpus is counted. | — |
 | `rule-review.mjs` | Attestation CLI for the periodic rule-corpus review. | — |
-| `section-tag-core.mjs` | The tag a browser suite appends to a result line so a failing check names the argument that re-runs it alone — and the pattern that reads it back OFF a recorded detail. | — |
+| `section-tag-core.mjs` | The tag a browser suite appends to a result line so a failing check names the argument that re-runs it alone. | — |
 | `session-context-ceiling-core.mjs` | SESSION CLASS POLICY FOR THE CONTEXT CEILING (point 748) — pure. | — |
 | `settled-owner-rulings.mjs` | The single tracked register of owner decisions that must not be put back to the owner. | — |
 | `settled-ruling-core.mjs` | Tests and support for settled-ruling-core. | — |

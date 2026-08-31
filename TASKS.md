@@ -13803,3 +13803,235 @@ to land than a mechanism that needs a review.
   Criticality: high — a charge that swallows an unmeasured red is the one failure mode the
   whole mechanism exists to prevent, and it currently hides behind a green gate.
   Bundle: Session- & Repo-Hygiene.
+
+- [ ] 1017. A charge is scoped to the lane it was first measured on, so the same red needs a
+  second half on the other lane and nobody notices until a run stops (measured across
+  13.08.2026, 29.08.2026 and 30.08.2026).
+  The pattern is established and keeps recurring: point 514's settings reds got a WebGL half as
+  point 603, point 938's dressing growth got one on 29.08., and point 698's crossing got one on
+  30.08. Each was discovered only when a lane happened to run and the gate stopped, and each
+  cost a cross-vendor round to write.
+  WHAT THE SAME DAY ALSO SHOWED, and it is the counter-example this point must respect: the F6
+  report suite's three point-927 picture-loss reds and the Vite 504 look like the same case and
+  are NOT. Read on the everyday lane they are WebGPU reds; run with `VERIFY_GL=webgl` the suite
+  passes WHOLE (34 checks, 0 fail, 30.08.2026 on `main`). Halves were written for them on the
+  strength of a bare `npm test -- report` — which runs WebGPU — and withdrawn the same hour. A
+  red seen on one lane is evidence about that lane only, and "the same red must appear on both"
+  is the assumption this point exists to stop making.
+  FINAL STATE: every entry in `RED_CHARGES` whose red has actually been MEASURED on both lanes
+  carries both, and every entry that has not says in its `why` that the other lane is unmeasured
+  rather than leaving the reader to guess which it is. Where a lane has never been run for that
+  suite, the point says so and the run is what settles it — never an argument from what the code
+  does. Nothing here loosens a scope: on a CORE adapter and on a lane a red was never seen, the
+  strict reading stands.
+  VERIFIABLE: for each entry gaining a half, the run on the other lane that measured it, quoted;
+  a unit case per widened entry proving the other lane still refuses an unmeasured shape,
+  mutation-checked; and a table-wide case that no entry claims a lane its `why` cannot cite.
+  Plus `npm run test:unit`, lint, build.
+  Criticality: medium — it does not hide a defect today, but it stops a gate at a random moment,
+  and the shortcut it invites — assuming the other lane — writes exactly the charge the table
+  forbids.
+  Bundle: Testinfrastruktur.
+
+- [ ] 1020. The handover card is judged for length only after the fence has forbidden changing
+  it, so an honest card can never be corrected (measured 31.08.2026, 10:30–10:41, over six
+  turns that moved nothing).
+  THE SEQUENCE IS THE PRESCRIBED ONE, followed exactly: `batch-boundary.mjs --prepare --context`
+  hands out the WORDING of the handover card, `board.mjs none` writes and publishes it,
+  `guard-preflight --for answer` reports clear, and `batch-boundary.mjs --commit --context` runs
+  as the session's last repository action. ONLY THEN does `dashboard-conciseness-guard` fault the
+  card just written — 94 words against a 90-word budget, plus a missing paragraph break. Its
+  prescribed remedy is a republish, which is a mutation, and the fence refuses every mutation
+  after the commit, rightly: silently deleting that marker defeated every handover on
+  13.08.2026. The only door left is to withdraw the fence, shorten by four words and re-take it.
+  WHAT IT COST, measured: the session did not take that door at first and ended six turns in a
+  loop, each reporting the same unsatisfiable faults, each costing a call and none moving
+  anything. It also could not read its own CI state or measure the time for its reply, because
+  the fence refuses reads too once committed.
+  FINAL STATE: whatever judges the handover card speaks while its author may still change it.
+  The publish gate already refuses a card's STRUCTURE at write time; the length budget is the one
+  check that waits for the turn end, and it moves to the same place — or `--prepare` hands out a
+  wording that fits the budget by construction, which today's did not: it is a single paragraph
+  already near the limit, so any honest addition pushes it over. Whichever half is built, the
+  other is stated in the commit and left deliberately, because both cost little and only one is
+  needed. Nothing here weakens the fence: refusing a mutation after the commit stays exactly as
+  it is.
+  VERIFIABLE: a case that drives the whole prescribed sequence — prepare, write the card,
+  commit — and asserts that a card the length check would fault is refused at WRITE time, before
+  the fence closes; a case proving the wording `--prepare` hands out passes the length check with
+  room for one added sentence; and a case proving a post-commit mutation is still refused, at
+  full strength. Plus `npm run test:unit`, lint, build.
+  Criticality: medium — it costs no correctness and loses no work, but it puts a session into a
+  loop it cannot leave, at the one moment the session is most expensive.
+  Bundle: Chat & Tafel — it edits the board's card gate and the boundary's card wording, so it is
+  not worked beside another point touching the board publish path.
+
+- [ ] 1021. A stale chat timestamp still costs the user a second message — nine guard blocks in one
+  morning (user 31.08.2026: "Du schreibst immer wieder Nachrichten und direkt eine hinterher, dass
+  der Zeitstempel falsch war und du ihn korrigiert hast", asking whether a task already exists).
+  MEASURED 31.08.2026 over `/home/node/.claude/projects/-workspace-hoa/*.jsonl`: `timestamp-guard`
+  blocked the turn end seven times in session `159f053e` — five on the STALE-STAMP branch (the
+  refused stamps read 10:36, 10:38, 10:41, 10:56, 10:59) and twice on a reply carrying no header at
+  all — plus two more blocks in session `ef036b03`. Every one of those blocks delivers a SECOND
+  message: the answer the user has already read, then a short acknowledgement about the stamp. That
+  is the defect point 403 closed on 28.07.2026 ("THE USER GETS THE SAME MESSAGE TWICE"), reported
+  again today in the one shape that survived it.
+  THE GUARD IS NOT TOO STRICT, AND THE 403 WORDING FIX IS LIVE. `acceptedStamps` already spans
+  `MINUTES_BACK = 15` and `MINUTES_AHEAD = 3`, so an ordinary composition lag cannot false-block,
+  and the block message asks for a SHORT acknowledgement through `shortAckDemand()` and never for
+  the reply "again" (`REPEAT_DEMAND_PATTERNS` pins that). What is missing is the only half that can
+  prevent the second message at all: a reading of the clock taken WHEN THE REPLY IS COMPOSED. The
+  `UserPromptSubmit` hook injects the stamp at the START of the turn and says in its own words that
+  the value ages; on a long turn — session `159f053e` started at 10:01 and was still being blocked
+  at 10:59 — that value is an hour old, and the written instruction to re-measure is the sole
+  defence. A rule, not a mechanism, and it fails exactly on the long turns that are long enough to
+  break the window.
+  FINAL STATE: when the closing reply is written, a Berlin-minute reading younger than the guard's
+  own window is present in the session's context without the model having to remember to take one.
+  A `PostToolUse`-scope injection delivers a fresh header line whenever the last delivered reading
+  is older than a stated threshold well inside `MINUTES_BACK` — never per tool call, so the turn
+  does not fill with clock noise — and it carries the WHOLE header the guard judges (the bold stamp
+  plus the context reading), so a reply that copies it satisfies both halves rather than trading one
+  block for the other. The existing start-of-turn injection stays; this is its refresh, not its
+  replacement.
+  VERIFIABLE: pure Vitest over the refresh decision — a turn whose last delivered reading is older
+  than the threshold yields a fresh line, one inside it yields nothing; a case that the emitted line
+  satisfies `TIMESTAMP_RE` and `HEADER_SUFFIX_RE` together; and a replay case that feeds the five
+  refused stamps of session `159f053e` to `evaluate()` and asserts each passes when taken after the
+  refresh that would have been delivered. Live: a turn with more than fifteen minutes of tool work
+  ends in exactly ONE message.
+  RELATED: point 403 (archived) is the parent — this is the half of its fix that did not hold;
+  points 764 and 785 own the header's context reading while this one owns the minute, and all three
+  touch the same header path, so they are not worked in parallel; point 833 is the guard's own test
+  race and is untouched here.
+  QUEUE RANK: behind point 174. Reason: user-reported but not release-blocking — a stamp re-measured
+  immediately before the closing reply avoids it every turn, and the release order stands.
+  Criticality: medium — no product defect, but it is the most frequent thing the user watches us get
+  wrong, now reported twice, and each occurrence costs him a duplicate message to read.
+  Bundle: Session- & Repo-Hygiene.
+
+- [ ] 1022. The brevity guard raises its own ceiling to admit the document it is measuring
+  (cross-vendor round 31.08.2026, GPT-5.6 Sol at effort high, receipt 93df0ef2e985e209, recorded
+  do-not-merge on 4d88250).
+  TWO findings, independent of each other. FIRST: the commit "Pay for the new pitfall by
+  shortening it, not by granting headroom" does the opposite of what its message says.
+  `scripts/guide-brevity-core.mjs` raises `maxLines` 495 → 502 and `maxWords` 4462 → 4547, while
+  the shortening in `docs/analysis_de/vibe-coding-anleitung.md` removes 3 lines and 40 words — so
+  the document still stands 7 lines and 85 words over the OLD caps and passes only because both
+  ceilings moved with it. A budget that rises to meet its document measures nothing, and a commit
+  message stating the unraised budget makes the raise invisible in the history, which is the one
+  place a later reader would look for it. SECOND: the line measurement is EOF-sensitive.
+  `guide-brevity-core.mjs` splits on the newline and keeps the terminal empty element, so a
+  newline-terminated document counts one phantom line that the identical rendered text without
+  its final newline does not. The claimed physical-line measurement carries an off-by-one that
+  changes with file formatting alone.
+  FINAL STATE: the ceilings stand where they stood before 4d88250, or the raise is made in a
+  commit that STATES it with the measured justification the doc-budget rule requires; and the
+  line count is independent of the trailing newline.
+  VERIFIABLE: a unit case over the same document with and without a trailing newline asserting
+  one identical count; a case pinning both ceilings against their values before 4d88250,
+  mutation-checked; plus `npm run test:unit`, lint, build.
+  Criticality: high — it is the guard that decides whether a document may grow, and a guard that
+  raises its own limit to admit the next paragraph enforces nothing.
+  Bundle: Testinfrastruktur.
+
+- [ ] 1023. A refusal that reprints its whole inventory bills the blocked session for the size of
+  the debt (measured 31.08.2026, recorded in `.claude/context-incidents.jsonl`).
+  `mechanism-review-guard` prints its COMPLETE inventory on every refusal: 43 contributions,
+  commit by commit, with the per-file reviewer grouping, and then the same list again as the
+  authorship groups. Three blocked turn ends printed it three times. The largest single context
+  growth step of that session was +27140 tokens in one turn, and the boundary was finally taken
+  at 206132 tokens — 56132 past the 150000 ceiling.
+  THE FEEDBACK IS THE DEFECT: the guard blocks BECAUSE the debt is large, and its message is
+  large BECAUSE the debt is large, so the closer a session comes to being able to pay the debt
+  down, the less context it has left to do it with. A session doing everything right is consumed
+  by the diagnosis of its own problem.
+  FINAL STATE: a refusal names its CAUSE, not its stock — one sentence, the single finding that
+  holds the chain, the count, and the command that shows the rest. The guard already prints that
+  command at the end of every message. The full inventory stays behind `--status`, where it is
+  asked for. Judge the same shape for every other guard whose message grows with the state it
+  names.
+  VERIFIABLE: a unit case over a ledger with N blocked contributions asserting the refusal text
+  stays under a fixed character budget as N grows, mutation-checked; a case proving the naming
+  finding and the status command are still present at N=1 and at N=100; plus `npm run test:unit`,
+  lint, build.
+  Criticality: high — it is the guard that stops every turn end, and a guard that cannot be read
+  cheaply is a guard that gets worked around.
+  Bundle: Testinfrastruktur.
+
+- [ ] 1024. The handover card claims a standstill while transferable work is still building
+  (measured 31.08.2026 12:24 at this session's own context watermark).
+  `scripts/batch-boundary.mjs --prepare --context` detects the transferable in-flight work
+  correctly and says so in its own first line — "the declared in-flight work is transferable
+  (feat/1019-veto-scope@4f72388d)" — and then dictates, verbatim, a board card that ends with
+  "Hier läuft nichts weiter." Both cannot be true at once: GPT-5.6 Sol was demonstrably still
+  authoring point 1019 at that moment, with a pushed checkpoint on that branch.
+  THE READER SEES THE CARD, NOT THE PREPARATION OUTPUT. The board is the user's window into the
+  batch; a card that reports rest while a delegated author keeps building tells him the run is
+  idle when it is not, and the next thing he reads is a branch that grew without a session.
+  MEASURED TWICE, WHICH IS WHAT MAKES IT STRUCTURAL AND NOT A WORDING SLIP: `--prepare --context`
+  printed the identical closing sentence with a declared checkpoint-carrying in-flight
+  (`feat/1019-veto-scope@4f72388d`) and without one ("no checkpoints"). The detection therefore
+  does not reach the text at all.
+  FINAL STATE: when the boundary hands over transferable work, the card it dictates ends by
+  naming WHAT keeps running and WHO adopts it, instead of the standstill sentence; the
+  standstill sentence stays for the case it was written for, a boundary with nothing in flight.
+  The board's own contradiction check — which correctly refused this card while point 1019 still
+  stood as current work — is the model: it must refuse the same way when the claim contradicts a
+  declared in-flight run rather than a now-card.
+  VERIFIABLE: a unit case over the boundary's card generator asserting the two in-flight states
+  produce DIFFERENT closing sentences, mutation-checked; a case proving the standstill sentence
+  survives unchanged for a boundary with no declared in-flight work; a case proving the board
+  refuses a standstill card while a transferable in-flight run is declared. Plus
+  `npm run test:unit`, lint, build.
+  Criticality: high — it is the board sentence a returning owner reads first, and a false rest
+  claim is the one report that cannot be checked against anything else on the page.
+  Bundle: Chat & Tafel.
+- [ ] 1025. A delegate the boundary named only in prose vetoes its own successor, and the batch
+  stands ownerless (measured 31.08.2026 between 14:37 and 15:10, 33 minutes with no worker while
+  finished, pushed work waited).
+  Session 04a083c1 reached its context watermark at 14:36:50, declared the transfer at 14:37:37
+  and handed the batch over at 14:38:55. The launcher then REFUSED the successor at 14:37:40,
+  14:52:43 and 15:07:45, every time with `registered-writer-live` — "recent registered
+  feature-writer activity measured for feat/1019-veto-scope". The batch only restarted because a
+  human asked why the board had been quiet.
+  THE CAUSE IS A MISSING FIELD, NOT A MISSING RULE. `.claude/batch-in-flight.json` named the
+  delegate in prose alone (`waitingOn: "GPT-5.6 Sol authors point 1019 on
+  feat/1019-veto-scope"`) and its `evidence` array was EMPTY. `declaredAgentProbe`
+  (`scripts/batch-in-flight-core.mjs:1014`) reads `evidence[]` and nothing else, so it returned
+  `agent: false` with no branches and no worktrees; `registeredFeatureWriters`
+  (`scripts/batch-in-flight.mjs:791`) therefore marked the point-1019 worktree
+  `recognized: false`; and the successor gate (`scripts/batch-autostart-core.mjs:505`) filters on
+  exactly `recognized !== true && verdict === 'alive'`. The session's OWN declared, explicitly
+  transferable delegate thus became the veto against its own successor. The comment directly
+  above that filter states the opposite — "The owner's declared agent is marked recognised on
+  every successor path: durable agents survive an owner" — and that promise holds only for a
+  filled `evidence[]`.
+  THE SAME EMPTY FIELD BLINDS THE OTHER SIDE TOO: `standDownBoundaryDecision` returns
+  `no-declared-agent` for such a declaration, so the boundary could not have transferred the
+  delegate even had it tried.
+  THE ARITHMETIC OF THE GAP, because the two mechanisms compound: the writer grace is 30 minutes
+  judged on git metadata (`graceMs: 1800000`), so a delegate that finished at 14:45 still read
+  ALIVE until 15:11:23 — and the launcher ticks every 15 minutes, so the first tick that could
+  have spawned a successor was 15:22:43. An expired veto waits for the raster instead of
+  releasing immediately.
+  WHAT IS NOT IN QUESTION: the grace itself. It exists because on 30.07.2026 an agent was
+  declared dead after 59 silent log minutes while its worktree had committed four minutes
+  earlier, and the successor rebuilt two finished points. Nothing here may make a LIVE delegate
+  easier to kill.
+  FINAL STATE: a boundary that knows a delegate writes it down in the form the successor gate
+  reads — the declaration carries `evidence[]` entries for the delegate's branch, worktree and
+  log, or the boundary refuses to complete and says which item it could not measure. A recognised
+  delegate is handed over WITH the batch instead of vetoing the session that would adopt it. And
+  a veto whose grace has expired triggers a tick at once rather than waiting up to 15 further
+  minutes for the schedule.
+  VERIFIABLE: a unit case over the successor decision proving a declaration whose `waitingOn`
+  names a branch but whose `evidence[]` is empty does NOT produce a `registered-writer-live`
+  refusal for that same branch, mutation-checked against the case where the branch belongs to
+  a writer the owner never declared, which must still veto at full strength; a case proving the
+  boundary refuses to complete with an unmeasurable evidence item rather than writing a prose-only
+  declaration; a case proving a live, recognised delegate is still never replaced. Plus
+  `npm run test:unit`, lint, build.
+  Criticality: high — it is the path every unattended handover takes, it fails silently in the
+  direction of doing nothing, and the board reports rest while it happens.
+  Bundle: Urlaubsfestigkeit.
