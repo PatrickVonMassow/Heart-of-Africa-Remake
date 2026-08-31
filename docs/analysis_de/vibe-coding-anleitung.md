@@ -180,12 +180,12 @@ Die Ursache findest du durch **Zerlegen**, nicht durch Wiederholen.
   → *Prompt:* „Frag vor jeder Runde: **Hat sich etwas bewegt außer der Zählung?** Bleibt der
   Umfang, ist der Gegenstand zu groß — **teile das Ticket und arbeite jedes Stück für sich ab**.“
 
-- **Die Sperre wächst beim Abtragen.** Das Veto gilt der **Datei** statt dem Befund und sperrt
-  jeden Beitrag, der sie anfasst; wer den Befund behebt, fasst sie an und schuldet neu.
-  → *Prompt:* „Buch ein Veto gegen den **Befund**, nicht die Datei, und trenne, was eine
-  Gegenlesung **gelesen** hat, von dem, was sie nur berührte. Quittiere eine Reparaturkette am
-  **Endzustand** als einen Beitrag. Erzeugt das Beheben laufend neue Befunde derselben Datei,
-  wird das ein eigenes Ticket, statt die Arbeit anzuhalten — Nachsicht ist es nie.“
+- **Die Sperre wächst beim Abtragen — und ihre Absage wächst mit.** Das Veto gilt der **Datei**
+  statt dem Befund; wer ihn behebt, fasst sie an und schuldet neu. Die Absage druckt dabei den
+  ganzen Bestand, und je größer er ist, desto weniger Platz bleibt zum Abtragen.
+  → *Prompt:* „Buch ein Veto gegen den **Befund**, trenne **gelesen** von bloß berührt, quittiere
+  eine Reparaturkette am **Endzustand** als einen Beitrag, und mach neue Befunde derselben Datei zum
+  eigenen Ticket. Eine Verweigerung nennt ihren **Grund**, nie ihren Bestand.“
 
 - **Gebaut — und nie in Betrieb genommen.** Die Ausnahme steht im Fließtext statt in der Datei,
   die das Werkzeug liest; oder das Tor urteilt richtig, nur fährt es kein Weg des Projekts.
@@ -499,4 +499,4 @@ Die Ursache findest du durch **Zerlegen**, nicht durch Wiederholen.
 
 Sie ersetzt die Fallstricke oben nicht.
 
-<!-- GUIDE-FINGERPRINT: 5b41eda229f289ef759fc98353f28e1d6fede0e0c1478b65b4e3b9cc17ce446e -->
+<!-- GUIDE-FINGERPRINT: ea378c32915891585f43d4d3850d25a3962f4fe5ef6227be86fab12f43e7c2a3 -->
