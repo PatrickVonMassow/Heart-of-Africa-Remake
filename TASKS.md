@@ -14048,3 +14048,51 @@ to land than a mechanism that needs a review.
   Criticality: high — it is the board sentence a returning owner reads first, and a false rest
   claim is the one report that cannot be checked against anything else on the page.
   Bundle: Chat & Tafel.
+- [ ] 1025. A delegate the boundary named only in prose vetoes its own successor, and the batch
+  stands ownerless (measured 31.08.2026 between 14:37 and 15:10, 33 minutes with no worker while
+  finished, pushed work waited).
+  Session 04a083c1 reached its context watermark at 14:36:50, declared the transfer at 14:37:37
+  and handed the batch over at 14:38:55. The launcher then REFUSED the successor at 14:37:40,
+  14:52:43 and 15:07:45, every time with `registered-writer-live` — "recent registered
+  feature-writer activity measured for feat/1019-veto-scope". The batch only restarted because a
+  human asked why the board had been quiet.
+  THE CAUSE IS A MISSING FIELD, NOT A MISSING RULE. `.claude/batch-in-flight.json` named the
+  delegate in prose alone (`waitingOn: "GPT-5.6 Sol authors point 1019 on
+  feat/1019-veto-scope"`) and its `evidence` array was EMPTY. `declaredAgentProbe`
+  (`scripts/batch-in-flight-core.mjs:1014`) reads `evidence[]` and nothing else, so it returned
+  `agent: false` with no branches and no worktrees; `registeredFeatureWriters`
+  (`scripts/batch-in-flight.mjs:791`) therefore marked the point-1019 worktree
+  `recognized: false`; and the successor gate (`scripts/batch-autostart-core.mjs:505`) filters on
+  exactly `recognized !== true && verdict === 'alive'`. The session's OWN declared, explicitly
+  transferable delegate thus became the veto against its own successor. The comment directly
+  above that filter states the opposite — "The owner's declared agent is marked recognised on
+  every successor path: durable agents survive an owner" — and that promise holds only for a
+  filled `evidence[]`.
+  THE SAME EMPTY FIELD BLINDS THE OTHER SIDE TOO: `standDownBoundaryDecision` returns
+  `no-declared-agent` for such a declaration, so the boundary could not have transferred the
+  delegate even had it tried.
+  THE ARITHMETIC OF THE GAP, because the two mechanisms compound: the writer grace is 30 minutes
+  judged on git metadata (`graceMs: 1800000`), so a delegate that finished at 14:45 still read
+  ALIVE until 15:11:23 — and the launcher ticks every 15 minutes, so the first tick that could
+  have spawned a successor was 15:22:43. An expired veto waits for the raster instead of
+  releasing immediately.
+  WHAT IS NOT IN QUESTION: the grace itself. It exists because on 30.07.2026 an agent was
+  declared dead after 59 silent log minutes while its worktree had committed four minutes
+  earlier, and the successor rebuilt two finished points. Nothing here may make a LIVE delegate
+  easier to kill.
+  FINAL STATE: a boundary that knows a delegate writes it down in the form the successor gate
+  reads — the declaration carries `evidence[]` entries for the delegate's branch, worktree and
+  log, or the boundary refuses to complete and says which item it could not measure. A recognised
+  delegate is handed over WITH the batch instead of vetoing the session that would adopt it. And
+  a veto whose grace has expired triggers a tick at once rather than waiting up to 15 further
+  minutes for the schedule.
+  VERIFIABLE: a unit case over the successor decision proving a declaration whose `waitingOn`
+  names a branch but whose `evidence[]` is empty does NOT produce a `registered-writer-live`
+  refusal for that same branch, mutation-checked against the case where the branch belongs to
+  a writer the owner never declared, which must still veto at full strength; a case proving the
+  boundary refuses to complete with an unmeasurable evidence item rather than writing a prose-only
+  declaration; a case proving a live, recognised delegate is still never replaced. Plus
+  `npm run test:unit`, lint, build.
+  Criticality: high — it is the path every unattended handover takes, it fails silently in the
+  direction of doing nothing, and the board reports rest while it happens.
+  Bundle: Urlaubsfestigkeit.
