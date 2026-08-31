@@ -100,10 +100,20 @@ put it is the mistake this line exists to stop.
   what it does with one rather than silently guessing again. The generator and its recogniser
   agree about which names are legal: `sectionTag` today accepts a name with whitespace that no
   recogniser will read back, which is the reviewer's second finding.
+  CARRIED IN 31.08.2026, from a cross-vendor round over `8f3f23d..8249b20` (GPT-5.6 Sol, effort
+  high, pass 2/3, receipt a18f4372aab591fc, recorded do-not-merge): `wasDetailCut` asks
+  `if (red?.detailCut === false) return false` and therefore believes an INHERITED value. A cut
+  record carrying `detailCut: false` on its prototype passes as whole, and an end-anchored charge
+  may reach a red it never measured — the one failure mode this table exists to prevent. The
+  existing malformed-value test only covers own properties made by spread. This point owns it
+  because it rewrites that very reader; an author who touches `wasDetailCut` without knowing it
+  rebuilds it. The same round confirmed the three findings of the previous verdict are closed and
+  named the test for each, so this is the only one outstanding.
   VERIFIABLE: a unit case where the measurement itself ends in `  [--section=x]` and the charge
   refuses it while the same text as a real tag charges, mutation-checked; a case over a
-  truncated detail whose cut lands on a tag shape; the four reds of 30.08.2026 still charged;
-  plus `npm run test:unit`, lint, build.
+  truncated detail whose cut lands on a tag shape; a record whose `detailCut: false` sits only on
+  the prototype, proving the reader demands an own literal field; the four reds of 30.08.2026
+  still charged; plus `npm run test:unit`, lint, build.
   Criticality: high — it is a charge reading text it may not own, and a charge that excuses an
   unmeasured red is the one failure mode the whole table exists to prevent.
   Bundle: Testinfrastruktur.
