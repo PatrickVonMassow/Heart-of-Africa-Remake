@@ -52,6 +52,7 @@ Das Musterbeispiel sind die Chat-Zeitstempel: neun Eskalationsstufen, acht weich
 | 13.08. | Der Nachprüfer findet eine echte zweite Klippe im geheilten Mechanismus — und jede der fünf gemessenen Kuren verschlechtert gesunde Dörfer stärker, als der Fehler schadet: Befund wird gebucht statt behoben (§3.115) |
 | 20.08. | Der Dokumentschnitt strich Regeln als »von einem Wächter abgedeckt«, ohne einen einzigen Wächter darauf zu prüfen — die Kontextanzeige verschwand, der Nutzer fand es (§3.134); eine vom Nutzer gesetzte Rangfolge wurde in einer Nacht zweimal maschinell überholt, ohne dass irgendwo ein Grund stand (Punkt 614); zwei Werkzeuge derselben Bauart am falschen Ort gemessen — im Hauptbaum gebaut und geprüft, während der Prozess die Arbeit in den isolierten Bereich schickt (§3.137) |
 | 21.08. | Ein Tor verlangte eine Freigabe, die seine eigenen Werkzeuge nicht herstellen können — der HIGH-Punkt war gemergt, geprüft und freigegeben, und der Zugausgang wies ihn trotzdem ab (§3.153) |
+| 31.08. | 33 Minuten ohne Arbeiter, beendet von einer Nutzerfrage: Die Übergabe nannte ihren Delegaten in Prosa, das Nachfolger-Tor liest ein Feld — der eigene Autor wurde zum Veto gegen seinen Nachfolger (§3.220, dritter Wiedergänger von §3.77) |
 | 24.08. | Ein Rot, das die Wiederholung heilt: eine Netzprobe im Testfall überlebt dessen Timeout — deterministisch rot nach jedem Push, grün beim zweiten Lauf (§3.171); zehn Prüfrunden mit zehn echten Befunden neben einem Punkt bei Runde 27 ohne Konvergenz — die Rundenzahl sagt nichts, die Bewegung des Urteils alles (§3.172) |
 | 25.08. nachts | Dieselbe Tür, zweiter Rückfall: Das Kritikalitätstor kann den Dateisatz eines selbst verfassten Punktes nicht messen, weil sein Anker nur beim delegierten Autorenlauf entsteht — ein gemergter, abgehakter und dreizehnmal geprüfter HIGH-Punkt sperrte jedes Zugende, bis eine überflüssige Ganzbereichsrunde ihn räumte (§3.153, Punkt 903) |
 | 25.08. früh | Der delegierte Autor überholte seine eigene Veröffentlichung und kam allein nicht zurück: Nach dem Umschreiben bereits gepushter Commits scheiterte jeder weitere Zwischen-Push, und der Lauf wiederholte zehn Minuten lang denselben nackten Versuch, obwohl der Lease-gesicherte Weg im selben Wrapper längst existiert — der Zweig blieb blind, und die Diagnose druckte einen Bereich aus zwei undefinierten Variablen (§3.174, Punkt 906) |
@@ -1417,7 +1418,7 @@ keinen Träger hat. Gebucht als Punkt 956.
 
 ## Anhang A — Maschinell gepflegte Quellen-Übersicht
 
-Zuletzt aktualisiert: Montag, 31.08.2026, 14:23 · Quellen-Fingerprint: `08524eb14516…`
+Zuletzt aktualisiert: Montag, 31.08.2026, 15:54 · Quellen-Fingerprint: `45efd06816c2…`
 
 Spalten heuristisch aus den Quellen abgeleitet (Anläufe = distinkte Datumsnennungen im Memory;
 Maßnahme = Guard-Skripte mit Namens-Treffer). Die inhaltliche Bewertung gehört der Prosa oben.
@@ -1518,10 +1519,10 @@ Maßnahme = Guard-Skripte mit Namens-Treffer). Die inhaltliche Bewertung gehört
 | A pending batch claim HOLDS THE LAUNCHER BACK — withdraw it whenever the claiming window is left unattended | 2 | mittel | clear-claim-guard.mjs | ✔ Mechanismus |
 | Multi-agent workflows eat the session/weekly limit fast — verify findings INLINE, keep fan-outs small, warn the user with a cost estimate before any big workflow | 3 | mittel | doc-budget-guard.mjs | ✔ Mechanismus |
 
-Erfasste Quellen: 93 Feedback-/Projekt-Memories · 57 Guard-/Hook-Skripte · 6 Revert-/Reapply-Commits · 117 Prozess-/Meta-TASKS-Punkte (davon 51 offen).
+Erfasste Quellen: 93 Feedback-/Projekt-Memories · 57 Guard-/Hook-Skripte · 6 Revert-/Reapply-Commits · 118 Prozess-/Meta-TASKS-Punkte (davon 52 offen).
 
-<!-- RETRO-FINGERPRINT: 08524eb1451635373d6f3475eb5c6297582f04ff7c2dd354ba1a9208b443bf20 -->
-<!-- RETRO-LAST-REFRESHED: 2026-08-31T12:23:30.425Z -->
+<!-- RETRO-FINGERPRINT: 45efd06816c27e988731615db5fadb5b3dd7716661450a5072ac5fbb1c7831ed -->
+<!-- RETRO-LAST-REFRESHED: 2026-08-31T13:54:53.629Z -->
 <!-- AUTO-GENERATED:END -->
 
 ### 3.111 Ein Erfolg ist kein Beweis für den Weg, auf dem er zustande kam
@@ -4915,3 +4916,41 @@ Ein Satz plus der eine Befund, der die Kette hält, plus der Befehl, der den Res
 zeigt — das ist alles, was ein Zugende braucht, um richtig zu handeln. Der
 Wächter hat diesen Befehl bereits: er nennt ihn am Ende jeder Meldung. Der
 Bestand gehört dorthin, wo er abgefragt wird, nicht in jede Absage.
+
+### 3.220 Der Delegat, den die Grenze nur in Prosa nannte, verbot seinen eigenen Nachfolger
+
+Am 31.08.2026 stand der Stapel 33 Minuten ohne Arbeiter da, und beendet wurde es nicht von
+einem Wächter, sondern von der Frage des Nutzers, warum die Tafel seit 14:37 nichts meldet.
+
+Die Übergabe selbst war korrekt: Die Sitzung erreichte um 14:36:50 ihre Wasserstandsmarke,
+erklärte ihre laufende Arbeit für übertragbar und gab das Schloss um 14:38:55 frei. Der Launcher
+tickte danach dreimal und verweigerte jedes Mal den Nachfolger mit derselben Begründung — im
+Arbeitsbaum des Punktes messe er einen lebenden fremden Schreiber. Der »fremde Schreiber« war
+der delegierte Autor der übergebenden Sitzung selbst.
+
+Die Ursache ist ein leeres Feld. Die Deklaration nannte den Delegaten in ihrem Fließtext
+(`waitingOn: "GPT-5.6 Sol authors point 1019 on feat/1019-veto-scope"`), aber ihr `evidence`-Feld
+blieb leer — und `declaredAgentProbe` liest ausschließlich `evidence[]`. Ohne Eintrag ist der
+eigene Delegat »nicht erkannt«, und genau darauf filtert das Nachfolger-Tor. Der Kommentar über
+diesem Filter verspricht das Gegenteil: »durable agents survive an owner«. Das Versprechen gilt,
+aber nur für eine gefüllte Belegliste.
+
+Das ist keine neue Fehlerart, sondern der dritte Wiedergänger von §3.77: Was ein Mensch als
+Prosa hinschreibt, liest die Maschine nicht. Damals stand der Vorrang als Prosa, während die
+Warteschlange ihr eigenes Feld las; hier steht der Delegat als Prosa, während das Tor sein Feld
+liest. Beide Male war der Text vollständig, richtig und für den Leser überzeugend — und beide
+Male hat kein Mechanismus je hineingesehen.
+
+Zwei Rechnungen machen aus dem Fehler die gemessene halbe Stunde. Die Gnadenfrist für einen
+Schreiber ist 30 Minuten und wird an Git-Metadaten gemessen; der Delegat war um 14:45 fertig,
+galt aber bis 15:11 als lebendig. Und der Launcher tickt im 15-Minuten-Raster, also hätte der
+erste mögliche Start um 15:22 gelegen. Ein abgelaufenes Veto wartet auf den nächsten Takt,
+statt ihn auszulösen.
+
+**Die Lehre: Eine Deklaration ist erst dann eine Deklaration, wenn das Tor sie lesen kann, das
+sie überzeugen soll.** Wo ein Mechanismus ein Feld auswertet, muss die schreibende Stelle dieses
+Feld füllen — oder abbrechen und sagen, welchen Beleg sie nicht messen konnte. Prosa daneben ist
+für den Menschen; sie ersetzt nie den Beleg. Und wo ein Schutz auf Zeit läuft, gehört sein
+Ablauf an denselben Auslöser wie sein Beginn, sonst addiert sich das Raster auf die Frist.
+Gebucht als Punkt 1025, nach 945 und 964 zu bearbeiten, die dieselbe Nachfolger-Entscheidung
+besitzen.
