@@ -336,10 +336,10 @@ Die Ursache findest du durch **Zerlegen**, nicht durch Wiederholen.
   → *Prompt:* „Jeder Halt bekommt eine Wiederanlauf-Uhr. Ohne Uhr bleibt nur, was **nachweislich**
   von mir kommt; alles andere wird protokolliert und kurz wiederholt."
 
-- **Priorität in Prosa wirkt nicht — und eine neue Sortierregel greift nur nach vorn.**
-  → *Prompt:* „Trag Priorisiertes dort ein, wo gearbeitet wird; laufen beide auseinander, schlägt
-  eine Prüfung fehl. Priorisiere das **Ziel** — und sag bei jeder Sortierregel, was mit dem
-  **Altbestand** geschieht: nachräumen oder liegen lassen."
+- **Prosa wirkt nicht — als Priorität so wenig wie als Meldung.** Ein Tor hielt den eigenen
+  Delegaten für fremd: Die Übergabe nannte ihn nur im Text.
+  → *Prompt:* „Trag jede wirksame Angabe in das **Feld**, das der Mechanismus liest; sag bei jeder
+  Sortierregel, was mit dem **Altbestand** geschieht."
 
 - **Die Begründung, die sich im eigenen Dokument widerlegt.** Ein Sicherheitsargument und sein
   Gegenbeweis standen drei Abschnitte auseinander; vier Prüfrunden sahen je eine Hälfte, weil der
@@ -499,4 +499,4 @@ Die Ursache findest du durch **Zerlegen**, nicht durch Wiederholen.
 
 Sie ersetzt die Fallstricke oben nicht.
 
-<!-- GUIDE-FINGERPRINT: 08524eb1451635373d6f3475eb5c6297582f04ff7c2dd354ba1a9208b443bf20 -->
+<!-- GUIDE-FINGERPRINT: 45efd06816c27e988731615db5fadb5b3dd7716661450a5072ac5fbb1c7831ed -->
