@@ -42,12 +42,22 @@ const installFableSwitch = (repo, state = 'on') => {
     JSON.stringify(writeFableState(state, { why: 'test switch decision', by: 'test', now: 1 })),
   )
 }
+// THE LEDGER OUTGREW THE DEFAULT PIPE BUFFER, and the failure looked nothing
+// like a size problem: `--list` prints the whole ledger, that print measured
+// 1,045,116 bytes on 01.09.2026 against spawnSync's default 1 MiB, and once a
+// dozen more records crossed the line Node killed the child and returned
+// `status: null` — read here as "the CLI is broken", and on CI as a signal
+// kill. The ledger only ever grows, so a default that fits today is a red run
+// scheduled for later. Nothing here needs a bounded read: give the capture room
+// well past any ledger this repository will hold.
+const RUN_MAX_BUFFER = 64 * 1024 * 1024
 const run = (...args) =>
   spawnSync(process.execPath, [SCRIPT, ...args], {
     windowsHide: true,
     encoding: 'utf8',
     cwd: process.cwd(),
     input: '',
+    maxBuffer: RUN_MAX_BUFFER,
   })
 
 // THE HALVES ARE ADOPTED ONLY FROM COMMITTED BYTES: `committedHalfModel` reads
@@ -334,6 +344,29 @@ describe('the paths that must stay untouched', () => {
     const r = run('--list')
     expect(r.status, r.stderr).toBe(0)
     expect(r.stderr).not.toContain('unknown flag')
+  })
+
+  // THE REGRESSION ITSELF, without waiting for the ledger to grow into it: a
+  // capture at Node's default bound dies on an output this size, and the one
+  // the helper uses does not. The synthetic printer keeps the case
+  // deterministic — the real ledger crosses the line on its own schedule.
+  it('captures a print larger than the default pipe bound, where the default dies', () => {
+    const printer = ['-e', 'process.stdout.write("x".repeat(2 * 1024 * 1024))']
+    const bounded = spawnSync(process.execPath, printer, {
+      windowsHide: true,
+      encoding: 'utf8',
+      input: '',
+    })
+    expect(bounded.status, 'the default bound must be what killed the run').toBe(null)
+
+    const roomy = spawnSync(process.execPath, printer, {
+      windowsHide: true,
+      encoding: 'utf8',
+      input: '',
+      maxBuffer: RUN_MAX_BUFFER,
+    })
+    expect(roomy.status, roomy.stderr).toBe(0)
+    expect(roomy.stdout.length).toBe(2 * 1024 * 1024)
   })
 
   it('a bare invocation still lists the ledger', () => {
