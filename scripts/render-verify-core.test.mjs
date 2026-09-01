@@ -3954,6 +3954,19 @@ describe('the shipped charge ledger', () => {
       },
     ]
 
+    // AND EVERY SCOPE FIELD IS PINNED, not only the material family (cross-vendor
+    // review, 01.09.2026, merge-with-fixes). The five neighbours below vary the
+    // pipeline class and nothing else, so nothing proved that the entry stops at
+    // the lane it was measured on — which is the ONE direction its two truncated
+    // alternatives are open in. The player's core adapter, WebGL 2, another
+    // suite and the CHECK kind each stay a real red.
+    const anchor = { ...failedChecks(`ERR: ${cases[0].measured}`)[0], detailVaried: true }
+    expect(chargeFor(anchor, scoped)?.point).toBe(514)
+    expect(chargeFor(anchor, { ...scoped, featureLevel: 'core' })).toBeNull()
+    expect(chargeFor(anchor, { ...scoped, backend: 'webgl' })).toBeNull()
+    expect(chargeFor(anchor, { ...scoped, suite: 'polish' })).toBeNull()
+    expect(chargeFor({ ...anchor, kind: 'check' }, { ...scoped, kind: 'check' })).toBeNull()
+
     for (const { measured, neighbour } of cases) {
       // The recorder observed changing generated ids in each family. A narrow
       // detailMatch would therefore be refused; the stable stored name must be

@@ -518,3 +518,32 @@ describe('the printed report', () => {
     expect(lines.join('\n')).toContain('dev server never bound')
   })
 })
+
+// THE TWO IDENTITY ROUTES MUST AGREE (cross-vendor review, 01.09.2026). One
+// reads a check out of a RUN's output, the other out of a PASTED `--failed`
+// line, and the triage compares the two by key. When only the parser learned
+// that an empty detail leaves a two-character separator behind, the same check
+// read the two ways produced two keys and the comparison answered
+// `inconclusive` — the 06.08.2026 bug surviving on the half nobody fixed.
+describe('an empty-detail check keys the same from a run and from a pasted line', () => {
+  const PRINTED = 'member hoa-state-2026-08-31-42.png is present'
+
+  it('strips the empty-detail separator on both routes', () => {
+    const [parsed] = parseCheckLines(`FAIL  ${PRINTED} — `)
+    const pasted = checkFromName(`FAIL  ${PRINTED} — `)
+
+    expect(parsed.name).toBe(PRINTED)
+    expect(pasted.name).toBe(PRINTED)
+    expect(pasted.key).toBe(parsed.key)
+  })
+
+  it('still cuts an ordinary detail, and keeps a console line whole', () => {
+    expect(checkFromName(`FAIL  ${PRINTED} — laplacian mean 1.02`).name).toBe(PRINTED)
+    const consoleLine = 'console error: THREE.WebGPURenderer: something — with a dash'
+    expect(checkFromName(consoleLine).name).toBe(consoleLine)
+  })
+
+  it('leaves a name that merely ENDS in a dash-like word alone', () => {
+    expect(checkFromName('FAIL  the frame is off-centre').name).toBe('the frame is off-centre')
+  })
+})

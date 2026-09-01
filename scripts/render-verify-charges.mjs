@@ -299,6 +299,15 @@ export const RED_CHARGES = [
     // time, so an unrelated settings defect printing either would have been
     // charged here retroactively.
     //
+    // AND THAT SENTENCE IS ABOUT *THIS* ENTRY'S SCOPE, NOT A BAN (cross-vendor
+    // review, 01.09.2026): entries further down DO carry those object names as
+    // their whole signature. They may, because each was measured on this one
+    // lane and is scoped to suite, backend, compatibility level and console
+    // kind, and each dies with point 514 — the scope does the work the cause
+    // cannot. What stays forbidden is what this comment was written against: an
+    // entry HERE, whose evidence is the RGBA16Float root, reaching those names
+    // as a bare alternative.
+    //
     // THE DOWNSTREAM SENTENCE IS NOT SELF-LIMITING, AND THIS ENTRY NO LONGER
     // CLAIMS IT IS (review finding, 28.08.2026). The earlier wording argued
     // that `is invalid due to a previous error` may be owned wholesale because
@@ -398,8 +407,12 @@ export const RED_CHARGES = [
       'and the charge dies with point 514.',
     // ANCHORED AT THE STORED IDENTITY (review finding, 28.08.2026, round 23).
     // Unanchored, it matched the sentence wherever it appeared — including
-    // inside an `Async render pipeline creation failed` message, which this
-    // entry's own evidence says has no owner and must stay red.
+    // inside an `Async render pipeline creation failed` message, which THIS
+    // entry was never measured on. That form has since been measured and has an
+    // entry of its own below, narrowly, per pipeline class (01.09.2026); the
+    // anchor stays for the reason it was added, which is that one entry may not
+    // answer for another entry's evidence (cross-vendor review, 01.09.2026:
+    // this comment still said the async form had no owner at all).
     match: /^console error: THREE\.WebGPURenderer: Uncaptured WebGPU GPUValidationError: \[Invalid TextureView\] is invalid due to a previous error/i,
     detailMatch: /^THREE\.WebGPURenderer: Uncaptured WebGPU GPUValidationError: \[Invalid TextureView\] is invalid due to a previous error/i,
   },
@@ -424,7 +437,21 @@ export const RED_CHARGES = [
       'MeshStandardNodeMaterial and RenderPipeline variants fail on an Invalid TextureView ' +
       'immediately after the RGBA16Float multisampling root. Scoped to the measured compatibility ' +
       'settings console lane and to those four pipeline classes; every other pipeline family ' +
-      'remains a real red, and the charge dies with point 514.',
+      'remains a real red, and the charge dies with point 514. ' +
+      'AND WHAT THE 120-CHARACTER CUT COSTS, SAID PLAINLY (cross-vendor review, 01.09.2026, ' +
+      'merge-with-fixes): only the ShadowMaterial and RenderPipeline alternatives can demand the ' +
+      'whole `[Invalid TextureView]`. The two longer class names push the object past the bound, ' +
+      'so their alternatives stop at `[Invalid Texture` and `[Invalid Text` and therefore excuse ' +
+      'ANY invalid-texture object for those two families — `[Invalid Texture "output-msaa"]` ' +
+      'included, which is the cascade root itself and is separately charged in any case. The ' +
+      'stored record cannot distinguish them, so this is the widest the evidence supports rather ' +
+      'than the narrowest anyone would like; narrowing it needs a record that keeps more than the ' +
+      'bound, which is POINT 1018. ' +
+      'THE SIGNATURES ALSO DEPEND ON THE DIGIT COUNT OF A GENERATED ID, and that is a silent ' +
+      'edge in the OTHER direction: `MeshStandardNodeMaterial_999` retains the shown prefix while ' +
+      'a four-digit id cuts one character earlier and matches nothing, so the same measured red ' +
+      'stops being accounted for. That fails toward a real red, which is the safe side, but it ' +
+      'means an unchanged defect can reappear as an unowned one after a renumbering.',
   },
   {
     point: 514,
@@ -444,7 +471,13 @@ export const RED_CHARGES = [
       'CommandEncoder renderContext_11 error follows the same RGBA16Float root and TextureView ' +
       'failures. Scoped to that compatibility settings console lane and to every stable word the ' +
       'record retains; neighbouring WebGPU validation errors remain real reds, and the charge ' +
-      'dies with point 514.',
+      'dies with point 514. ' +
+      'THE TWO DIGITS ARE THE BOUND, NOT THE CONTEXT (cross-vendor review, 01.09.2026): the ' +
+      'pattern ends at `renderContext_` plus exactly two digits because that is where the ' +
+      '120-character cut falls, so it covers `renderContext_11` as measured and `_32`/`_34` as ' +
+      're-measured on 01.09.2026 — and NOT a one- or three-digit id, whose different cut leaves ' +
+      'a different stored name that this entry does not match. Such a red stays a real red, which ' +
+      'is the safe direction, but the same measured failure then reads as unowned.',
   },
   {
     point: 568,
@@ -865,8 +898,18 @@ export const RED_CHARGES = [
       'compatibility-lane LARGE attempts as its cause-bearing companion: 0/3 low rows carried GPU ' +
       'time because the adapter exposes no timestamp-query feature. The exact check name and a ' +
       'non-empty all-missing low-row sample are required; every other benchmark row stays red. ' +
-      'The charge dies with point 1012, whose final state replaces both impossible failures with ' +
-      'an UNAVAILABLE verdict while preserving the assertion on capable adapters.',
+      'AND WHAT THIS SIGNATURE CANNOT ASK, STATED RATHER THAN GLOSSED (cross-vendor review, ' +
+      '01.09.2026, merge-with-fixes): the low check PRINTS NO REASON, so unlike its companion ' +
+      'this entry cannot read the capability gap out of the red, and the feature level does not ' +
+      'test the capability either. What contains it is arithmetic, not the level: `0/N low rows` ' +
+      'with N at least one means the EVERY-ROW check failed in the same run, and on an adapter ' +
+      'that does expose timestamp-query that check prints a DIFFERENT reason — so its own charge ' +
+      'refuses, the run keeps an unaccounted red, and no picture can be read as covered. The ' +
+      'excuse therefore costs a missed low-row regression only in a run that is already blocked ' +
+      'for the same reason. The charge dies with point 1012, whose final state replaces both ' +
+      'impossible failures with an UNAVAILABLE verdict while preserving the assertion on capable ' +
+      'adapters — and which is where the low check learns to print its reason, so this entry can ' +
+      'require it the way its companion does.',
   },
   {
     point: 514,
