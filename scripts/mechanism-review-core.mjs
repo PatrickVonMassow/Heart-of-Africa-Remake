@@ -1562,6 +1562,57 @@ export function reviewRecordWellFormed(record = {}, { commitAt = 0 } = {}) {
 }
 
 /**
+ * Stable identity of one recorded file pass for a trusted planner comparison.
+ * Every field that can change what the pass means participates: mutating the
+ * reviewer, numbering, end state or even one path makes a different key.
+ */
+export function plannerPassKey(record = {}) {
+  const pass = record?.pass ?? {}
+  return JSON.stringify([
+    String(record?.sha ?? ''),
+    String(record?.model ?? ''),
+    Number(pass.index),
+    Number(pass.total),
+    String(pass.endState ?? ''),
+    Array.isArray(pass.files) ? pass.files.map(String) : null,
+  ])
+}
+
+/**
+ * Which ledger rows reproduce the runnable planner exactly.
+ *
+ * The plans are trusted measurements supplied by the wrapper, keyed by their
+ * reviewed sha. The ledger supplies no authority: a claimed pass counts only
+ * when its current planner has the same index, total, byte-exact file order and
+ * assigned reviewer. Returning keys rather than stamping rows keeps a forged
+ * `plannerVerified` field inert and makes every relevant mutation fail closed.
+ */
+export function verifiedPlannerPasses(records = [], plansBySha = new Map()) {
+  const plans = plansBySha instanceof Map ? plansBySha : new Map()
+  const verified = new Set()
+  for (const record of records ?? []) {
+    const pass = record?.pass
+    if (
+      !pass ||
+      Number(pass.total) < 2 ||
+      String(pass.endState ?? '') !== String(record?.sha ?? '') ||
+      !Array.isArray(pass.files)
+    ) continue
+    const plan = plans.get(String(record.sha ?? ''))
+    const planned = (plan?.passes ?? []).find((candidate) => Number(candidate?.index) === Number(pass.index))
+    if (
+      !planned ||
+      Number(planned.total) !== Number(pass.total) ||
+      !sameModel(planned.reviewer, record.model) ||
+      planned.files?.length !== pass.files.length ||
+      !planned.files.every((file, index) => String(file) === String(pass.files[index]))
+    ) continue
+    verified.add(plannerPassKey(record))
+  }
+  return verified
+}
+
+/**
  * ONE FIXED MIGRATION, NOT A GENERAL WAIVER. Historical debt produced only by
  * the retired baseline-wide scope is settled per contribution in the tracked
  * ledger. The row's own claim buys nothing: the impure wrapper sets the
@@ -1652,6 +1703,7 @@ export function evaluateMechanismReview({
   fence = null,
   sessionId = '',
   reviewScope = contributionReviewScope,
+  plannerVerifiedPasses = new Set(),
 } = {}) {
   // Missing local evidence is itself a finding. It may never mean "start at
   // HEAD": on main that makes the pending range empty and forgives every debt
@@ -1755,8 +1807,26 @@ export function evaluateMechanismReview({
     // way — by an edit, or from a branch whose CLI predates the rule. Rows older
     // than MERGE_ACCOUNTING_SINCE are grandfathered by DATE; treating a MISSING
     // field as legacy is what let an edited row simply omit it.
+    const fileClaim = (r) => r?.pass?.endState !== undefined
+    const fileScopedShape = (r) =>
+      fileClaim(r) &&
+      String(r.pass.endState) === String(r.sha) &&
+      Array.isArray(r?.pass?.files) &&
+      !Array.isArray(r?.pass?.commits)
+    // A range planner assigns reviewers by the authorship of EACH FILE GROUP.
+    // Its mixed-vendor split may therefore contain a reviewer from the same
+    // vendor as an unrelated contribution in that range. The wrapper re-runs
+    // that exact planner and supplies mutation-bound keys; only such a match
+    // may override the contribution-wide identity check. Whole-range reviews,
+    // bounded 1/1 scopes and unverified/mutated split rows retain the old rule.
+    const plannerAssigned = (r) =>
+      fileScopedShape(r) &&
+      Number(r?.pass?.total) >= 2 &&
+      plannerVerifiedPasses instanceof Set &&
+      plannerVerifiedPasses.has(plannerPassKey(r))
+    const independenceProblem = (r) => plannerAssigned(r) ? '' : independentReviewProblem(r, commit)
     const selfReviews = wellFormed.filter(
-      (r) => attestsToCodeReading(r) && independentReviewProblem(r, commit),
+      (r) => attestsToCodeReading(r) && independenceProblem(r),
     )
     // COVERAGE MEANS ONE THING ON EVERY PATH: a well-formed, convergent reading
     // of this code by a vendor that authored none of it. A spec examination
@@ -1764,7 +1834,7 @@ export function evaluateMechanismReview({
     // producing and folding lists. Neither attests to reading this commit, so
     // neither joins `sound` or answers a refusal.
     const sound = wellFormed.filter(
-      (r) => attestsToCodeReading(r) && !independentReviewProblem(r, commit),
+      (r) => attestsToCodeReading(r) && !independenceProblem(r),
     )
 
     // END-STATE FILE PASSES CLEAR WHAT THEY READ. The record's own sha is the
@@ -1772,12 +1842,6 @@ export function evaluateMechanismReview({
     // change, so a record covering it remains valid across later commits to
     // other files. Historical pass.commits rows describe superseded
     // contribution slices and deliberately clear nothing here.
-    const fileClaim = (r) => r?.pass?.endState !== undefined
-    const fileScopedShape = (r) =>
-      fileClaim(r) &&
-      String(r.pass.endState) === String(r.sha) &&
-      Array.isArray(r?.pass?.files) &&
-      !Array.isArray(r?.pass?.commits)
     const scoped = sound.filter(fileScopedShape)
 
     // New recorder rows are file-scoped, but they are still parts of ONE split.
@@ -2070,7 +2134,10 @@ export function evaluateMechanismReview({
 }
 
 /** Render the verdict as the guard's refusal — every offender, and the way out. */
-export function formatMechanismReviewVerdict(verdict, { authorshipPlan = null } = {}) {
+export function formatMechanismReviewVerdict(
+  verdict,
+  { authorshipPlan = null, contributionPlan = null, contributionPlanText = '' } = {},
+) {
   if (!verdict?.block) return ''
   if ((verdict.findings ?? []).some((finding) => finding.kind === 'missing-baseline')) {
     return [
@@ -2155,16 +2222,26 @@ export function formatMechanismReviewVerdict(verdict, { authorshipPlan = null } 
     }
     if (f.kind === 'incomplete-passes') {
       const p = f.passes ?? {}
+      const planned = (contributionPlan?.contributions ?? []).find(
+        (entry) => String(entry?.sha ?? '') === String(c.sha ?? ''),
+      )
       lines.push(`  ✗ ${short(c.sha)} ${c.subject ?? ''}`, `      ${files}`)
       if ((p.missing ?? []).length) {
         lines.push(
           `      the review was split into ${p.total} passes over the FILE SET and only ${p.have} are on ` +
             `record — missing pass ${(p.missing ?? []).join(', ')}`,
-          '      A pass covers the files it named; the contribution is cleared when every pass is recorded:',
-          `      node scripts/review-sol.mjs --sha ${short(c.sha)} --since ${short(c.sha)}~1 ` +
-            `--brief "<what to judge>" --pass ${(p.missing ?? [])[0] ?? 1}`,
-          '      The contribution keeps its own immutable commit boundary; later baseline growth',
-          '      cannot widen this review or make a once-runnable pass disappear.',
+          ...(planned
+            ? [
+                `      that historical split does not choose the repair command: the contribution planner ` +
+                  `measures ${planned.passes?.length ?? 0} runnable ` +
+                  `${planned.passes?.length === 1 ? 'pass' : 'passes'} at its immutable parent boundary.`,
+                '      The planner wins; run the contribution-scoped command printed below.',
+              ]
+            : [
+                '      No runnable command is printed from the stale split. Ask the guard status to rerun',
+                '      the contribution planner at the immutable commit boundary; only that measured plan',
+                '      may name a repair pass.',
+              ]),
         )
       }
       // COUNTING THE PASSES IS NOT COUNTING THE FILES. Passes that are all on
@@ -2261,6 +2338,9 @@ export function formatMechanismReviewVerdict(verdict, { authorshipPlan = null } 
       'Each command printed by the guard status is bounded to one contribution and its parent.',
       'Inspect the finite runnable plan with: node scripts/mechanism-review-guard.mjs --status',
     )
+  }
+  if (String(contributionPlanText ?? '').trim()) {
+    lines.push('', 'RUNNABLE CONTRIBUTION PLAN (the same planner review-sol executes):', contributionPlanText.trim())
   }
   return lines.join('\n')
 }
