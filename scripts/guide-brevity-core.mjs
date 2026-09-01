@@ -282,9 +282,11 @@ export const LIMITS = {
   //   +1 line / +22 words — the repeated-refusal lesson (retrospective §3.223): a red gate does
   //     not END the turn, it RESTARTS it, so the session answered the same refusal ten times with
   //     a fresh closing line instead of repairing one of them. SHORTEN-BEFORE-RAISE was applied:
-  //     drafted as its own entry at +7 lines / +76 words, it was FOLDED into "Die KI repariert
-  //     den Wächter, der sie gerade sperrt", which already carries how a blocked session reacts
-  //     to a gate; the fold pays back 4 lines and 24 words.
+  //     rather than an entry of its own it was FOLDED into "Die KI repariert den Wächter, der sie
+  //     gerade sperrt", which already carries how a blocked session reacts to a gate. What the
+  //     fold saved is not stated as a number here: the draft it replaced was never committed, so
+  //     no reader can check such a figure, and the measured +1 / +22 above is what the ceilings
+  //     were actually asked for.
   //   +1 line / +5 words — that a reviewer must be told about SHORTENED material itself, not only
   //     the caller, folded into "Die Messung — und die Gegenprüfung".
   //   +1 line / +24 words — that a veto of the FILE grows the backlog while it is paid off, and

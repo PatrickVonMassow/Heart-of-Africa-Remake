@@ -458,10 +458,14 @@ front of each turns one into a declaration.
   `separateResultSection` splits the printed line at tap time into the
   MEASUREMENT and the section that produced the tag, and the red is stored with
   `section` as its OWN field. A `RED_CHARGES` entry therefore matches the
-  measurement alone, and no reader recovers a name out of durable text — a check
-  that genuinely measured a value ending in a tag shape is not a tagged one. A
-  record written before that change carries no `section` and keeps its old
-  detail.
+  measurement alone, and no reader recovers a name out of durable text: the split
+  is made from the gate's live value, so a value merely SHAPED like a tag — any
+  other section's name, or a bracket a check printed itself — stays in the
+  measurement. THE ONE CASE THAT REMAINS is a check inside section `x` whose own
+  measurement ends in exactly `  [--section=x]`: provenance cannot tell that from
+  the tag the suite appended, and it comes off with it. Nothing distinguishes the
+  two, so the residual is named rather than papered over. A record written before
+  that change carries no `section` and keeps its old detail.
 - **A `--section` run is PARTIAL and is never coverage.** The run recorder stamps
   `partial` on the record from `VERIFY_SECTION`, and `runVerdict` refuses it
   whatever the exit code, so `render-verify-guard` cannot be cleared by one. This
