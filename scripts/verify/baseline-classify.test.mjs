@@ -550,15 +550,20 @@ describe('an empty-detail check keys the same from a run and from a pasted line'
 
   it('pins the ONE ambiguity it cannot resolve: a label genuinely ending in the separator', () => {
     // `FAIL  <name> — <detail>` is the producer convention, so a label whose own
-    // last characters are the separator with no detail is indistinguishable from
-    // an empty detail — the same bytes, the same producer. Both routes resolve
-    // it the same way, on purpose, and that is what makes them agree; the cost
-    // is pinned here rather than left to be discovered (cross-vendor review,
-    // GPT-5.6 Sol at effort high, which asked for exactly this boundary).
-    const [parsed] = parseCheckLines('FAIL  the rock is a class of thing — ')
+    // last characters are the separator followed by the protocol's own empty
+    // detail separator prints TWO separators. Both identity routes lose the
+    // label's terminal one and produce the same key; their detail fields differ
+    // because only the run parser sees the first delimiter. That exact lossy
+    // boundary is pinned rather than being replaced by the ordinary one-dash
+    // empty-detail case (cross-vendor review, GPT-5.6 Sol at effort high).
+    const printed = 'FAIL  the rock is a class of thing —  — '
+    const [parsed] = parseCheckLines(printed)
+    const pasted = checkFromName(printed)
     expect(parsed.name).toBe('the rock is a class of thing')
-    expect(checkFromName('FAIL  the rock is a class of thing —').name).toBe('the rock is a class of thing')
-    expect(checkFromName('FAIL  the rock is a class of thing —').key).toBe(parsed.key)
+    expect(parsed.detail).toBe('—')
+    expect(pasted.name).toBe('the rock is a class of thing')
+    expect(pasted.detail).toBe('')
+    expect(pasted.key).toBe(parsed.key)
   })
 
   it('does not cut a BARE separator down to nothing', () => {

@@ -1097,6 +1097,17 @@ describe('the mode round-trips into the ledger', () => {
       expect(changed.status).toBe(1)
       expect(changed.stderr).toContain(`CHANGED between ${S.slice(0, 7)} and ${H2.slice(0, 7)}`)
       expect(changed.stderr).toContain('review it fresh')
+
+      // A REPLACEMENT TREE CANNOT FORGE THAT IDENTITY. Make H2 appear to carry
+      // H's unchanged tree and the source as its parent. Every replacement-aware
+      // input then says the carry is valid: ancestry holds and fileA's two blobs
+      // match. The recorder must still read H2's real changed tree and refuse.
+      const replacement = git('commit-tree', `${H}^{tree}`, '-p', S, '-m', 'replacement with unchanged blobs').stdout.trim()
+      expect(git('replace', H2, replacement).status).toBe(0)
+      const forged = runRecorder('--record', H2, '--carried-from', S, '--pass', '1/2', '--pass-files', 'fileA.mjs,fileB.mjs')
+      expect(forged.status).toBe(1)
+      expect(forged.stderr).toContain(`CHANGED between ${S.slice(0, 7)} and ${H2.slice(0, 7)}`)
+      expect(readFileSync(join(repo, '.claude', 'mechanism-reviews.jsonl'), 'utf8')).not.toContain('replacement with unchanged blobs')
     } finally {
       rmSync(dir, { recursive: true, force: true })
     }

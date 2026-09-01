@@ -115,7 +115,16 @@ export const RECORDS_PATH = recordsPathFor()
 // command interpolated reached a shell before any validation ran, so a value
 // like `HEAD"; <command>; echo "` executed. execFileSync hands git its
 // arguments directly — there is no shell to inject into.
-const git = (args) => execFileSync('git', args, { windowsHide: true, cwd: REPO_ROOT, encoding: 'utf8' }).trim()
+// Every object fact this recorder derives is from the real object graph. A
+// replacement ref can substitute commits, trees and blobs alike, so applying
+// the flag only to resolveCommit's ancestry reads still let carry verification
+// compare attacker-selected trees while claiming the original shas.
+const git = (args) =>
+  execFileSync('git', ['--no-replace-objects', ...args], {
+    windowsHide: true,
+    cwd: REPO_ROOT,
+    encoding: 'utf8',
+  }).trim()
 
 
 /** The committed model field and blob oid of a repository half — read from a
@@ -1102,7 +1111,7 @@ export function buildCarriedRecord({
   const commit = resolve(sha)
   const source = resolve(from)
   try {
-    execFileSync('git', ['merge-base', '--is-ancestor', source.sha, commit.sha], {
+    execFileSync('git', ['--no-replace-objects', 'merge-base', '--is-ancestor', source.sha, commit.sha], {
       windowsHide: true,
       cwd: REPO_ROOT,
       stdio: 'ignore',
@@ -1239,7 +1248,7 @@ export function verifyCarried(records, allRecords = null) {
         if (!/^[0-9a-f]{7,40}$/i.test(String(r.sha ?? ''))) return false
         if (from === r.sha) return false
         try {
-          execFileSync('git', ['merge-base', '--is-ancestor', from, r.sha], {
+          execFileSync('git', ['--no-replace-objects', 'merge-base', '--is-ancestor', from, r.sha], {
             windowsHide: true,
             cwd: REPO_ROOT,
             stdio: 'ignore',

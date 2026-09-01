@@ -911,6 +911,34 @@ describe('a trailerless merge is attributed to the tip it merged', () => {
     expect(groups[0].unreviewableReason).toBeUndefined()
   })
 
+  it('inherits authorship from every non-first tip of an octopus merge', () => {
+    const THIRD = 'd'.repeat(40)
+    const octopusLog = [
+      `${REC}${MERGE}${FLD}1788000000${FLD}${FIRST} ${MERGED} ${THIRD}`,
+      '',
+      'scripts/x-guard.mjs',
+      '',
+    ].join('\n')
+    const [commit] = rangeCommits('base', 'head', ['scripts/x-guard.mjs'], {
+      readLog: () => octopusLog,
+      readParents: () => [FIRST, MERGED, THIRD],
+      readTrailers: (sha) => ({
+        [MERGE]: '',
+        [MERGED]: 'GPT-5.6 Sol <noreply@openai.com>',
+        [THIRD]: 'Claude Fable 5 <noreply@anthropic.com>',
+      })[sha] ?? '',
+    })
+
+    expect(commit.authorModels).toEqual([
+      'GPT-5.6 Sol <noreply@openai.com>',
+      'Claude Fable 5 <noreply@anthropic.com>',
+    ])
+    expect(commit.parentAuthorModels).toEqual({
+      [MERGED]: ['GPT-5.6 Sol <noreply@openai.com>'],
+      [THIRD]: ['Claude Fable 5 <noreply@anthropic.com>'],
+    })
+  })
+
   it('lets later attributed pass rows settle the pre-repair unknown-row era', () => {
     const [commit] = rangeCommits('base', 'head', ['scripts/x-guard.mjs'], {
       readLog: () => log,
