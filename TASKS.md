@@ -14374,6 +14374,25 @@ to land than a mechanism that needs a review.
   interactive window a role it never accepted.
   Bundle: Session- & Repo-Hygiene.
 
+- [ ] 1039. The run is redirected: freeze, intake rule, and the checklist that stops gating
+  (user decision 01.09.2026, chat: "Erledige direkt die Sofortmaßnahmen (1-3)").
+  The blind-parallel diagnosis (Fable + Sol, merged by Opus) found the governance loop feeding
+  itself; the user ordered its first three measures executed immediately.
+  FINAL STATE:
+  - CLAUDE.md §2 no longer gates work on §7.1 completion; §7.1 is a checklist, progress is
+    judged by playable game output.
+  - CLAUDE.md carries the infrastructure freeze: no new guards, ledger fields, routers, review
+    planners, or workflow abstractions; an infrastructure defect is worked on only when it
+    reproducibly blocks current game work or permits a false approval; rules in the way are
+    switched off, not rebuilt.
+  - CLAUDE.md carries the finding intake rule: a finding becomes a point only for reproducible
+    player impact, security or data risk, a real blockade, or deletion/simplification; the rest
+    goes to `docs/backlog.md`, which exists and is non-blocking.
+  VERIFIABLE: the three clauses stand in CLAUDE.md; `docs/backlog.md` exists; lint, build,
+  `npm run test:unit` stay green.
+  Criticality: high — it changes what every later point is allowed to be.
+  Bundle: Session- & Repo-Hygiene.
+
 - [ ] 1035. The charge ledger landed with six named findings against it, and two of them widen
   what a red is excused for (measured 01.09.2026, cross-vendor reading of point 1031's landing at
   `main..1bdd3a2`, Opus 5 at effort high, two passes, both merge-with-fixes).

@@ -500,7 +500,10 @@ export const LIMITS = {
   // the same measurement.
   // 01.09.2026 (second): the probe-cannot-reach-its-no tip justified beside maxLines measures
   // 119 words, so this ceiling moves 4618 -> 4737 by the same measurement.
-  maxWords: 4737,
+  // 01.09.2026 (third): the outer-budget lesson of the redirection folded into the core lesson
+  // and the meta rules were tightened to pay for it, so the measured guide came DOWN two words
+  // and the ceiling follows it: 4737 -> 4735, no unearned headroom.
+  maxWords: 4735,
   // A pitfall entry = the risk lines plus its prompt. Anything longer is a
   // story, not a tip.
   maxEntryLines: 11,
