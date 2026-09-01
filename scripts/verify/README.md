@@ -1519,17 +1519,19 @@ record age — it is read first, for every record, so a legacy run that carries
 Node's definitive uncaught-exception marker stays a crash whatever else it
 recorded.
 
-STATED RESIDUAL, because this document states them rather than assuming them
-away (cross-vendor finding, Fable 5, 31.08.2026): the legacy reading has only
-two of the three legs the new definition uses — it cannot ask whether stdout
+STATED RESIDUAL, because this document states it rather than assuming it away
+(cross-vendor finding, Fable 5, 31.08.2026): the legacy reading has only two
+of the three legs the new definition uses — it cannot ask whether stdout
 reached the suite's own terminal report line, because old records did not store
 it. A legacy run that printed its first red and THEN died without an
 uncaught-exception marker is therefore read as reported, and its reds become
 chargeable, where the same run recorded today would be a crash and charge
 nothing. The trade is deliberate: old records cannot distinguish that sequence,
-and trusting their durable reported-red evidence keeps a real red blocking
-rather than disappearing into a crash verdict. It applies to no run recorded
-from this revision onward.
+and trusting their durable reported-red evidence keeps a real red CHARGEABLE —
+answerable to a point through the ordinary ledger — instead of uncountable
+under a crash verdict, which can charge nothing. What it does not touch is
+BLOCKING: a red the run printed blocks either way, as the crash paragraph
+below spells out. It applies to no run recorded from this revision onward.
 
 A CRASH is the one verdict no ledger can ever reach: `runVerdict` returns no
 charges for it, deliberately — a run that died rather than reported judged no
