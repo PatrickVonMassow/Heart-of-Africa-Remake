@@ -81,6 +81,7 @@ Das Musterbeispiel sind die Chat-Zeitstempel: neun Eskalationsstufen, acht weich
 | 27.08. abends | Dasselbe Kritikalitäts-Tor forderte binnen zwanzig Minuten erst eine, dann zwei, dann sechs gegenzulesende Dateien für einen Punkt, der in dieser Zeit keinen Commit hatte und keine der genannten Dateien je angefasst hat — die Vereinigung folgt dem Zeitfenster, nicht dem Punkt, und der Commit, der den Befund eintrug, hob die Forderung selbst mit an (§3.204, Punkt 974) |
 | 28.08. abends | Die Notfall-Uhr des unbeaufsichtigten Stapels wurde genau wie bestellt auf nachweisbaren Fortschritt verengt — und verlor dabei einen Schutz, den nie jemand aufgeschrieben hatte: Der ehrliche Abschluss-Prüflauf über beide Backends dauert gemessen 80 min 48 s gegen eine Schwelle von 60 Minuten und sieht seither aus wie ein Hänger, den die Rettungsroutine unterbricht. Kein Test wurde rot; der Schutz war vorhanden, nicht zugesichert (§3.210, Punkt 1002) |
 | 29.08. nachts | Ein Wächter verlangt einen Beleg aus einem Protokoll, das ihn wegwirft: Vier Laufaufzeichnungen tragen die Absturzmarke, gesetzt aus der Fehlerausgabe — das aufbewahrte Protokoll ist eine gefilterte Sicht und kann ihr Fehlen nicht belegen. Nicht freigezeichnet, sondern in den blockierten Punkt geschrieben (§3.215); derselbe Lauf ließ drei Rots ohne jeden Punkt zurück, obwohl die Tafelkarten dafür schon standen (Punkte 1011-1013); drei Gegenlesungsrunden über die Buchungstabelle endeten damit, eine geschriebene Buchung ZURÜCKZUZIEHEN statt sie enger zu fassen — kein Muster konnte das gemessene Rot von seinen Nachbarn trennen (§3.216); und eine Behauptung über einen gelandeten Punkt kam aus einem BRANCHNAMEN statt aus einer Messung, gefunden vom Nutzer in zwei Sätzen |
+| 01.09. | Der Vier-Augen-Wächter sperrte jede Landung, und die Schuld wuchs schneller, als sie zu bezahlen war: Das Tor schnitt die Prüfarbeit nach der einen Regel zu und zählte sie nach der anderen (§3.225), und JEDE eingetragene Bewertung erzeugte selbst wieder einen prüfpflichtigen Beitrag, weil das Hauptbuch versioniert ist — vierzehn ehrliche Runden mit lauter geschlossenen Befunden ließen das Tor rot (§3.226, Punkt 1036) |
 
 Muster: Ab dem 22.07. explodiert die Commit-Rate (Delegation) — und genau dann häufen sich die Infrastruktur-Vorfälle. **Skalierung der Autonomie erzeugt eine eigene Problemklasse, die die Feature-Arbeit zeitweise überholt.**
 
@@ -1418,7 +1419,7 @@ keinen Träger hat. Gebucht als Punkt 956.
 
 ## Anhang A — Maschinell gepflegte Quellen-Übersicht
 
-Zuletzt aktualisiert: Dienstag, 01.09.2026, 07:12 · Quellen-Fingerprint: `fb04ccd12ae6…`
+Zuletzt aktualisiert: Dienstag, 01.09.2026, 15:20 · Quellen-Fingerprint: `c3806b7ceabe…`
 
 Spalten heuristisch aus den Quellen abgeleitet (Anläufe = distinkte Datumsnennungen im Memory;
 Maßnahme = Guard-Skripte mit Namens-Treffer). Die inhaltliche Bewertung gehört der Prosa oben.
@@ -1521,8 +1522,8 @@ Maßnahme = Guard-Skripte mit Namens-Treffer). Die inhaltliche Bewertung gehört
 
 Erfasste Quellen: 93 Feedback-/Projekt-Memories · 57 Guard-/Hook-Skripte · 6 Revert-/Reapply-Commits · 120 Prozess-/Meta-TASKS-Punkte (davon 54 offen).
 
-<!-- RETRO-FINGERPRINT: fb04ccd12ae6596dd0da001271ef7edbea427382506a4268b7e725234f1dc3df -->
-<!-- RETRO-LAST-REFRESHED: 2026-09-01T05:12:37.095Z -->
+<!-- RETRO-FINGERPRINT: c3806b7ceabe620592efc8169b15209ef34d8253b1c0abedbd64689be17e2a02 -->
+<!-- RETRO-LAST-REFRESHED: 2026-09-01T13:20:00.728Z -->
 <!-- AUTO-GENERATED:END -->
 
 ### 3.111 Ein Erfolg ist kein Beweis für den Weg, auf dem er zustande kam
@@ -2609,6 +2610,23 @@ verwandelt eine vergessene Übergabe in eine stille, gegenteilige Entscheidung. 
 geteilten Mechanismus: *Wie viele Stellen rufen ihn auf, und beantworten sie alle dieselbe Frage
 gleich?* Der Vergleich der Antworten ist billig — hier hätte ein Aufruf des Auskunftskommandos
 neben dem Launcher-Protokoll den Widerspruch sofort gezeigt.
+
+**Wiederholung am 01.09.2026, im selben Launcher und mit demselben Vorgabewert.** Punkt 874 hatte
+im August genau die richtige Regel durchgesetzt: Ein positiv widerlegter Prozess darf nicht vom
+letzten Commit der Leiche überstimmt werden. Er hat sie an der Deklarations-Aufrufstelle
+durchgesetzt — und `registeredFeatureWriters`, die der Launcher fragt, baut ihren Aufruf derselben
+reinen Funktion aus einer Git-Worktree-Liste selbst zusammen und übergibt gar keine
+Prozess-Identität. Damit ist der einzige Zweig, der `dead` zurückgibt, dort BAUARTBEDINGT
+unerreichbar: Die Sonde kann ihr eigenes Nein nicht erreichen. Gemessen: Sitzung 37d470a8 starb um
+14:03, die Deklarations-Sonde widerlegte ihren Autor binnen Sekunden, der Launcher meldete ihn um
+14:24 weiter als lebendig und startete keinen Nachfolger — 24 Minuten Stillstand, im Protokoll als
+„da arbeitet noch jemand". Aufgenommen als Punkt 1038.
+
+**Zusatz zur Lehre:** Eine Korrektur ist erst erledigt, wenn sie an ALLEN Aufrufstellen der
+geteilten Funktion steht, nicht nur an der, an der der Fehler gemessen wurde. Und die schärfere
+Prüffrage für eine Sonde lautet nicht „was misst sie?", sondern: *Kann sie mit den Eingängen, die
+diese Aufrufstelle ihr tatsächlich übergibt, ihr eigenes negatives Urteil überhaupt erreichen?*
+Wo die Antwort nein ist, ist ihr grünes Urteil keine Messung, sondern eine Tautologie.
 
 ### 3.150 Sichtbar wird die verwaiste Arbeit nur durch den, der sie nicht mehr sichtbar machen kann
 
@@ -5107,3 +5125,39 @@ Bezahlung den Zähler nicht bewegt, ist die Messung selbst.
 beide Hälften an dieselbe Regel binden. Und wer vor einem solchen Tor steht,
 zahlt die Schuld einmal vollständig, statt zu argumentieren: Erst der bezahlte
 Rest beweist, dass der Zähler falsch zählt.
+
+### 3.226 Das Hauptbuch stand unter der Pflicht, die es selbst führt
+
+Am 01.09.2026 hatte eine Sitzung vierzehn anbieterübergreifende Prüfrunden über
+den Vier-Augen-Wächter gefahren, jeden Befund beantwortet und für jede Runde ein
+`merge` des Gegenmodells auf dem Papier. Das Tor blieb rot. Der Grund liegt
+nicht in der Arbeit, sondern in der Buchführung: Jede Bewertung wird aufgezeichnet,
+indem eine Zeile an `.claude/mechanism-reviews.jsonl` angehängt wird, diese Datei
+ist versioniert, und der Commit, der sie anhängt, ist selbst wieder ein Beitrag,
+der eine Gegenlesung schuldet. Wer eine Schuld tilgt, erzeugt dabei die nächste.
+
+Das ist nicht dieselbe Klasse wie §3.225. Dort widersprechen sich zwei Regeln,
+und die Schuld ist endlich — sie lässt sich nur nicht mit den angebotenen
+Befehlen schließen. Hier ist die Schuld nicht endlich: Der Mechanismus, der die
+Erfüllung der Pflicht dokumentiert, fällt unter dieselbe Pflicht, also läuft der
+Zähler dem Bezahlen davon. Keine noch so korrekte Arbeit innerhalb einer Sitzung
+konvergiert. Sichtbar wurde es erst an den beiden ältesten Einträgen, deren
+fehlende Durchgänge sich überhaupt nicht mehr adressieren ließen, weil ihr
+Dateisatz in der Zwischenzeit ein anderer geworden war — dieselbe Wirkung, nur
+im Nachhinein.
+
+Dazu kam derselbe Fehler in der Diagnose: Das Kritikalitätstor druckte »eine
+spätere Freigabe existiert, aber nicht für einen SPÄTEREN Commit«, obwohl git
+beweist, dass der abgelehnte Commit echter Vorfahr des freigegebenen ist. Der
+wirkliche Grund war ein unvollständiger Durchgangs-Verbund. Wer dem Text glaubt,
+committet eine Reparatur, die es längst gibt; wer ihm nicht glaubt, hält das
+Hauptbuch für kaputt. Eine Ablehnung, die die falsche Ursache nennt, kostet
+genau so viel wie eine, die gar keine nennt — nur merkt es niemand.
+
+**Lehre:** Ein Prüfzwang, dessen eigene Aufzeichnung unter denselben Zwang
+fällt, ist kein strenges Tor, sondern ein Tor ohne Ausgang. Die Aufzeichnung
+einer Bewertung muss entweder von der Pflicht ausgenommen sein — begründet, an
+der einen Stelle, an der solche Ausnahmen ohnehin stehen — oder von der Runde
+mitgedeckt werden, die sie einträgt. Und jede Ablehnung schuldet ihre WIRKLICHE
+Ursache: Was der Leser als Nächstes tun soll, muss aus dem Text folgen, nicht
+aus einer zweiten Messung, die er selbst anstellen muss.

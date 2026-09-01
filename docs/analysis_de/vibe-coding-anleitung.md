@@ -161,6 +161,16 @@ Die Ursache findest du durch **Zerlegen**, nicht durch Wiederholen.
   beschreibt**. Prüf das am **stillgelegten** Gegenstand, mit und ohne Blick dazwischen: Bewegt
   **erst der Blick** den Wert, misst sie sich selbst.“
 
+- **Die Sonde kann ihr Nein nicht erreichen.** Die Prüfung könnte „tot“ sagen — aber nur, wenn
+  man ihr den Beweis übergibt, und genau diese eine Aufrufstelle übergibt ihn nicht. Ihr „lebt
+  noch“ ist dann kein Ergebnis, sondern der einzig mögliche Satz. Beliebter Sonderfall: Der Fix
+  wurde eingebaut — an der Stelle, an der der Fehler auffiel, und nicht an der zweiten.
+  → *Prompt:* „Nimm jede Prüfung und frag: **Mit den Eingaben, die dieser Aufrufer ihr wirklich
+  gibt — kann sie überhaupt das negative Urteil erreichen?** Wo nein, ist ihr Grün eine
+  Tautologie. Und wenn du einen Fix an einer gemeinsamen Funktion machst: **zähl ihre
+  Aufrufstellen** und prüf sie einzeln, statt nur die zu reparieren, die dich gebissen hat.“
+
+
 - **Neue Features zerbrechen alte.** Eine Änderung repariert X und bricht das unbeobachtete Y.
   → *Prompt:* „Etabliere einen Mechanismus, der jede Mechanik auch im **Danach-Zustand** prüft und
   nach jedem Zusammenführen die schnelle Testschicht erzwingt. Bau ‚Invarianten' ein, die im
@@ -503,4 +513,4 @@ Die Ursache findest du durch **Zerlegen**, nicht durch Wiederholen.
 
 Sie ersetzt die Fallstricke oben nicht.
 
-<!-- GUIDE-FINGERPRINT: fb04ccd12ae6596dd0da001271ef7edbea427382506a4268b7e725234f1dc3df -->
+<!-- GUIDE-FINGERPRINT: c3806b7ceabe620592efc8169b15209ef34d8253b1c0abedbd64689be17e2a02 -->

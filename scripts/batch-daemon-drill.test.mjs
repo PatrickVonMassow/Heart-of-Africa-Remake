@@ -8,7 +8,7 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { promisify } from 'node:util'
 import { describe, it, expect } from 'vitest'
-import { runDrill, staleProbeRefused, expectedStaleRefusal, branchPreserved } from './batch-daemon-drill.mjs'
+import { runDrill, staleProbeRefused, expectedStaleRefusal, branchPreserved, waitForTeardownExit } from './batch-daemon-drill.mjs'
 import { startDaemon } from './batch-daemon.mjs'
 import { probePid } from './batch-singleton.mjs'
 import { validateMutation } from './batch-schema-core.mjs'
@@ -440,5 +440,46 @@ describe('branchPreserved', () => {
 
   it('calls a missing branch GONE rather than unjudgeable when a before-tip exists', () => {
     expect(branchPreserved({ tipBefore: A, tipAfter: null }).why).not.toMatch(/cannot be judged/)
+  })
+})
+
+describe('waitForTeardownExit', () => {
+  it('returns a failed named check when a process outlives the teardown bound', async () => {
+    let clock = 0
+    const waited = []
+    const check = await waitForTeardownExit('daemon', 4242, {
+      timeoutMs: 100,
+      pollMs: 30,
+      probe: () => ({ exists: true }),
+      now: () => clock,
+      delay: async (ms) => {
+        waited.push(ms)
+        clock += ms
+      },
+    })
+
+    expect(check).toEqual({
+      name: 'the daemon process exited during teardown',
+      ok: false,
+      detail: 'pid 4242 was still alive after the 100ms teardown bound',
+    })
+    expect(waited).toEqual([30, 30, 30, 10])
+  })
+
+  it('returns as soon as graceful shutdown removes the process', async () => {
+    let clock = 0
+    let probes = 0
+    const check = await waitForTeardownExit('daemon after graceful shutdown', 4242, {
+      timeoutMs: 5_000,
+      pollMs: 50,
+      probe: () => ({ exists: probes++ === 0 }),
+      now: () => clock,
+      delay: async (ms) => { clock += ms },
+    })
+
+    expect(check.ok).toBe(true)
+    expect(check.name).toBe('the daemon after graceful shutdown process exited during teardown')
+    expect(clock).toBe(50)
+    expect(clock).toBeLessThan(5_000)
   })
 })

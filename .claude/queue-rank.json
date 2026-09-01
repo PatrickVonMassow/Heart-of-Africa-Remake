@@ -1116,45 +1116,16 @@
       "why": "The gate refuses every merge while it stands, so no point behind it can land at all — including the release itself.",
       "origin": "machine",
       "place": "ahead"
+    },
+    "1038": {
+      "at": "2026-09-01T13:19:17.341Z",
+      "why": "It costs every ordinary session boundary up to 30 minutes of launcher standstill, so it cannot wait behind the release it would be cut against; it follows 1036, which already carries a pushed branch.",
+      "origin": "machine",
+      "place": "ahead"
     }
   },
-  "boundary": {
-    "at": "2026-08-21T00:55:14.962Z",
-    "points": [
-      336,
-      553,
-      596,
-      633,
-      659,
-      660,
-      663,
-      686,
-      687,
-      688,
-      689,
-      690,
-      691,
-      692,
-      708,
-      715,
-      719,
-      733,
-      735,
-      736,
-      738,
-      739,
-      746,
-      747,
-      750,
-      759,
-      760,
-      762,
-      764
-    ],
-    "why": "The order standing in front of the release today is the arrangement that predates this rule; the four machine-filed points that had ranked themselves there were moved behind 174 first"
-  },
   "settled": {
-    "at": "2026-09-01T08:45:41.236Z",
+    "at": "2026-09-01T11:52:36.887Z",
     "points": [
       174,
       184,
@@ -1514,5 +1485,40 @@
       1035,
       1036
     ]
+  },
+  "boundary": {
+    "at": "2026-08-21T00:55:14.962Z",
+    "points": [
+      336,
+      553,
+      596,
+      633,
+      659,
+      660,
+      663,
+      686,
+      687,
+      688,
+      689,
+      690,
+      691,
+      692,
+      708,
+      715,
+      719,
+      733,
+      735,
+      736,
+      738,
+      739,
+      746,
+      747,
+      750,
+      759,
+      760,
+      762,
+      764
+    ],
+    "why": "The order standing in front of the release today is the arrangement that predates this rule; the four machine-filed points that had ranked themselves there were moved behind 174 first"
   }
 }
