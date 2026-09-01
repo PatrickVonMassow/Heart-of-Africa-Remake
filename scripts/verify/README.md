@@ -1161,11 +1161,12 @@ The same call records the WebGPU **feature level** the run came up at (point 505
 above): on the container's GLES lane that is `compatibility`, on a core adapter
 `core`, and on the WebGL 2 lane it does not apply.
 
-Two suites carry no assertion, each for a structural reason:
+Three suites carry no assertion, each for a structural reason:
 
 | Suite | Why no `assertBackend` |
 |---|---|
 | `docs` | Pure Node doc-structure check — it never opens a browser. |
+| `board-layout` | Opens Chromium, but renders `.batch-dashboard.html` rather than the game, so the dev-only `window.__renderer` the assertion reads never exists. |
 | `preview` | Runs the PRODUCTION build, where `window.__renderer` is dev-only and does not exist. In a LARGE run it rides the WebGL 2 pass only (the WebGPU pass skips the preview). |
 
 A full LARGE run (`npm test` / `npm run test:large`, no `VERIFY_GL` pinned) now
