@@ -658,6 +658,37 @@ describe('the launcher-facing feature worktree register', () => {
     expect(seen).toMatchObject([{ branch: 'feat/515-detector', pids: [] }])
   })
 
+  it('does not apply point process identities when sibling branches make attribution ambiguous', () => {
+    const siblingPorcelain = `${porcelain}\n${[
+      'worktree /repo/.claude/worktrees/point-515-sibling',
+      'HEAD ddddd',
+      'branch refs/heads/feat/515-sibling',
+      '',
+    ].join('\n')}`
+    const seen = []
+    const result = registeredFeatureWriters({
+      now: NOW,
+      declaration: {
+        evidence: [{ kind: 'pid', pid: RUN_PID, startedAt: RUN_STARTED, point: 515 }],
+      },
+      exec: () => siblingPorcelain,
+      openProbe: () => ({
+        readable: true,
+        branches: [{ ref: 'feat/515-detector' }, { ref: 'feat/515-sibling' }],
+      }),
+      check: (options) => {
+        seen.push(options)
+        return { output: { verdict: 'alive' }, reason: 'agent-alive' }
+      },
+    })
+
+    expect(result.readable).toBe(true)
+    expect(seen).toMatchObject([
+      { branch: 'feat/515-detector', pids: [] },
+      { branch: 'feat/515-sibling', pids: [] },
+    ])
+  })
+
   it('refuses to invent an empty register when Git cannot enumerate worktrees', () => {
     expect(registeredFeatureWriters({ exec: () => { throw new Error('broken') } })).toEqual({
       readable: false,
