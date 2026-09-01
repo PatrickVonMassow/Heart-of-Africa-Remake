@@ -1419,7 +1419,7 @@ keinen Träger hat. Gebucht als Punkt 956.
 
 ## Anhang A — Maschinell gepflegte Quellen-Übersicht
 
-Zuletzt aktualisiert: Dienstag, 01.09.2026, 13:41 · Quellen-Fingerprint: `99c82d5463a5…`
+Zuletzt aktualisiert: Dienstag, 01.09.2026, 15:20 · Quellen-Fingerprint: `c3806b7ceabe…`
 
 Spalten heuristisch aus den Quellen abgeleitet (Anläufe = distinkte Datumsnennungen im Memory;
 Maßnahme = Guard-Skripte mit Namens-Treffer). Die inhaltliche Bewertung gehört der Prosa oben.
@@ -1522,8 +1522,8 @@ Maßnahme = Guard-Skripte mit Namens-Treffer). Die inhaltliche Bewertung gehört
 
 Erfasste Quellen: 93 Feedback-/Projekt-Memories · 57 Guard-/Hook-Skripte · 6 Revert-/Reapply-Commits · 120 Prozess-/Meta-TASKS-Punkte (davon 54 offen).
 
-<!-- RETRO-FINGERPRINT: 99c82d5463a58e29ba0b16d28fe19b784c3b3a05d5ed9998fd2075235254c4e3 -->
-<!-- RETRO-LAST-REFRESHED: 2026-09-01T11:41:43.726Z -->
+<!-- RETRO-FINGERPRINT: c3806b7ceabe620592efc8169b15209ef34d8253b1c0abedbd64689be17e2a02 -->
+<!-- RETRO-LAST-REFRESHED: 2026-09-01T13:20:00.728Z -->
 <!-- AUTO-GENERATED:END -->
 
 ### 3.111 Ein Erfolg ist kein Beweis für den Weg, auf dem er zustande kam
@@ -2610,6 +2610,23 @@ verwandelt eine vergessene Übergabe in eine stille, gegenteilige Entscheidung. 
 geteilten Mechanismus: *Wie viele Stellen rufen ihn auf, und beantworten sie alle dieselbe Frage
 gleich?* Der Vergleich der Antworten ist billig — hier hätte ein Aufruf des Auskunftskommandos
 neben dem Launcher-Protokoll den Widerspruch sofort gezeigt.
+
+**Wiederholung am 01.09.2026, im selben Launcher und mit demselben Vorgabewert.** Punkt 874 hatte
+im August genau die richtige Regel durchgesetzt: Ein positiv widerlegter Prozess darf nicht vom
+letzten Commit der Leiche überstimmt werden. Er hat sie an der Deklarations-Aufrufstelle
+durchgesetzt — und `registeredFeatureWriters`, die der Launcher fragt, baut ihren Aufruf derselben
+reinen Funktion aus einer Git-Worktree-Liste selbst zusammen und übergibt gar keine
+Prozess-Identität. Damit ist der einzige Zweig, der `dead` zurückgibt, dort BAUARTBEDINGT
+unerreichbar: Die Sonde kann ihr eigenes Nein nicht erreichen. Gemessen: Sitzung 37d470a8 starb um
+14:03, die Deklarations-Sonde widerlegte ihren Autor binnen Sekunden, der Launcher meldete ihn um
+14:24 weiter als lebendig und startete keinen Nachfolger — 24 Minuten Stillstand, im Protokoll als
+„da arbeitet noch jemand". Aufgenommen als Punkt 1038.
+
+**Zusatz zur Lehre:** Eine Korrektur ist erst erledigt, wenn sie an ALLEN Aufrufstellen der
+geteilten Funktion steht, nicht nur an der, an der der Fehler gemessen wurde. Und die schärfere
+Prüffrage für eine Sonde lautet nicht „was misst sie?", sondern: *Kann sie mit den Eingängen, die
+diese Aufrufstelle ihr tatsächlich übergibt, ihr eigenes negatives Urteil überhaupt erreichen?*
+Wo die Antwort nein ist, ist ihr grünes Urteil keine Messung, sondern eine Tautologie.
 
 ### 3.150 Sichtbar wird die verwaiste Arbeit nur durch den, der sie nicht mehr sichtbar machen kann
 
