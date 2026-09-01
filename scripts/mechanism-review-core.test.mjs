@@ -16,6 +16,7 @@ import {
   evaluateMechanismReview,
   formatArgErrors,
   formatMechanismReviewVerdict,
+  independentReviewProblem,
   isMechanismPath,
   KNOWN_FLAGS,
   ledgerPathFrom,
@@ -360,6 +361,30 @@ describe('validateRecord', () => {
     expect(reviewIdentityProblem('GPT-5.6 Sol', { authorModels: [] })).toBe('unknown-author')
     expect(reviewIdentityProblem('Opus 5', { authorModels: ['Mystery 9'] })).toBe('unknown-author')
     expect(reviewIdentityProblem('Opus 5', { authorModels: ['GPT-5.6 Sol'] })).toBe('')
+  })
+
+  it('lets the gate judge a routed file pass by its authors instead of the range tip', () => {
+    const scoped = {
+      ...good,
+      model: 'Opus 5',
+      authoredBy: 'Claude Opus 5',
+      authors: ['Claude Opus 5'],
+      handover: 'sol-authored',
+      handoverChain: ['Opus 5', 'Fable 5', 'Opus 4.8'],
+      pass: '4/16',
+      passFiles: 'src/communication/speaking.test.ts',
+    }
+
+    // The recorder sees only the reviewed head, while the gate has the file's
+    // complete range history. A valid scoped handover must reach that second
+    // decision even when the reviewer also authored an unrelated tip commit.
+    expect(validateRecord(scoped)).toEqual({ ok: true, errors: [] })
+    expect(independentReviewProblem({ model: 'Opus 5', handover: 'sol-authored' }, {
+      authorModels: ['GPT-5.6 Sol'],
+    })).toBe('')
+    expect(independentReviewProblem({ model: 'Opus 5', handover: 'sol-authored' }, {
+      authorModels: ['GPT-5.6 Sol', 'Claude Opus 5'],
+    })).not.toBe('')
   })
 })
 
