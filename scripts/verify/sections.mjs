@@ -28,9 +28,9 @@ import { readFileSync } from 'node:fs'
 import { basename } from 'node:path'
 import { maskCode } from '../window-hide-core.mjs'
 
-/** The env var a runner sets to select one section; the suites read it. */
 import { isSectionName, SECTION_NAME_PATTERN, sectionTag } from '../section-tag-core.mjs'
 
+/** The env var a runner sets to select one section; the suites read it. */
 export const SECTION_ENV = 'VERIFY_SECTION'
 
 /** A section declaration in a suite's source: `section('slug')` at a call
