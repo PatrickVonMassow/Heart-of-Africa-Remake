@@ -27,6 +27,8 @@ import {
   planningContributions,
   rangeCommits,
   gatherMechanismReviewInputs,
+  GATE_SWITCHED_OFF,
+  resolveMechanismReviewSessionId,
   shouldSeedRecoveryAnchor,
 } from './mechanism-review-guard.mjs'
 import { BASELINE_PATH as CRITICALITY_BASELINE_PATH } from './criticality-review-guard.mjs'
@@ -44,6 +46,27 @@ import {
 import { planAuthorshipGroups } from './mechanism-review-range-core.mjs'
 import { commonRepoPath, repoPath } from './repo-paths.mjs'
 import { readOwnerLock } from './batch-singleton.mjs'
+
+describe('the switched-off gate (point 1036)', () => {
+  it('stands down for every caller but the measuring read, and says why', () => {
+    // The block is off (CLAUDE.md §2 infrastructure freeze). A gather without
+    // `report` is what the Stop hook and guard-preflight both do, and it must
+    // carry no inputs at all — an applicable gather is what produced a verdict.
+    const gate = gatherMechanismReviewInputs({ sessionId: 'anything' })
+    expect(gate.applicable).toBe(false)
+    expect(gate.why).toBe(GATE_SWITCHED_OFF)
+    expect(gate.inputs).toBeUndefined()
+
+    // Nothing is forgiven: the reason names the report that still measures the
+    // debt, so a reader is never left without the way to see it.
+    expect(GATE_SWITCHED_OFF).toContain('mechanism-review-guard.mjs --status')
+
+    // And the read answers regardless of who holds the batch lock — the defect
+    // that made a hand-run `--status` print "stands down" and exit 0.
+    const read = gatherMechanismReviewInputs({ sessionId: '', report: true })
+    expect(read.applicable).toBe(true)
+  })
+})
 
 describe('baselineFor', () => {
   const state = { baselines: { main: 'aaa', 'feat/x': 'bbb' } }
@@ -68,6 +91,36 @@ describe('baselineFor', () => {
     expect(MECHANISM_BASELINE_PATH).toBe(commonRepoPath('.claude/mechanism-review-baseline.json'))
     expect(CRITICALITY_BASELINE_PATH).toBe(commonRepoPath('.claude/criticality-review-baseline.json'))
     expect(TASKS_SPEC_BASELINE_PATH).toBe(commonRepoPath('.claude/tasks-spec-guard-baseline.json'))
+  })
+})
+
+describe('the mechanism status session identity', () => {
+  it('lets the printed bare status command inspect through the live lock owner', () => {
+    const readLock = () => ({ sessionId: 'owning-session' })
+    expect(resolveMechanismReviewSessionId({ status: true, env: {}, readLock })).toBe('owning-session')
+  })
+
+  it('prefers explicit payload and environment identities before the lock', () => {
+    const readLock = () => ({ sessionId: 'lock-session' })
+    expect(resolveMechanismReviewSessionId({
+      payloadSessionId: 'hook-session',
+      status: true,
+      env: { CLAUDE_SESSION_ID: 'env-session' },
+      readLock,
+    })).toBe('hook-session')
+    expect(resolveMechanismReviewSessionId({
+      status: true,
+      env: { CLAUDE_SESSION_ID: 'env-session' },
+      readLock,
+    })).toBe('env-session')
+  })
+
+  it('does not borrow the lock owner for an unidentified Stop hook', () => {
+    expect(resolveMechanismReviewSessionId({
+      status: false,
+      env: { CLAUDE_SESSION_ID: 'env-session' },
+      readLock: () => ({ sessionId: 'lock-session' }),
+    })).toBe('')
   })
 })
 
@@ -109,7 +162,12 @@ describe('bootstrapBase', () => {
     // The owner's own id is used so the gather is APPLICABLE here too: with a
     // live batch lock any other id stands the guard down, and a skipped
     // assertion would have let the very defect above pass unnoticed.
-    const gathered = gatherMechanismReviewInputs({ sessionId: readOwnerLock()?.sessionId ?? '' })
+    // `report: true` is what makes the gather APPLICABLE at all now: the gate's
+    // block is switched off (point 1036) and only the measuring read remains.
+    const gathered = gatherMechanismReviewInputs({
+      sessionId: readOwnerLock()?.sessionId ?? '',
+      report: true,
+    })
     expect(gathered.applicable).toBe(true)
     expect(Object.hasOwn(gathered, 'baselineMissing')).toBe(true)
     expect(gathered.baselineMissing).toBe(gathered.inputs.baselineMissing)
@@ -250,7 +308,7 @@ describe('the measured 30.08 refusal multiplication', () => {
     return { pendingCommits, records, head }
   }
 
-  it.skipIf(!historyReachable)('replays 4 → 30 → 40 before scoping, then 3 → 3 → 12 with only read contributions charged', () => {
+  it.skipIf(!historyReachable)('replays 3 → 30 → 40 before scoping, then 2 → 2 → 11 with corrected refusal scope', () => {
     const replays = checkpoints.map(replayAt)
     const count = (replay, reviewScope) => evaluateMechanismReview({
       baseline,
@@ -258,13 +316,16 @@ describe('the measured 30.08 refusal multiplication', () => {
       reviewScope,
     }).findings.length
 
-    // The former rule treated every bounded record as range-wide. This is the
-    // measured counter, recomputed from the versioned ledger and commit graph,
+    // The former rule treated every bounded record as range-wide. The later
+    // strict-subset reread still corrects one overbroad refusal at the first
+    // immutable state, so even this emulation now starts at three. These are
+    // measured counters recomputed from the versioned ledger and commit graph,
     // not copied from the work-order prose.
-    expect(replays.map((replay) => count(replay, () => 'range'))).toEqual([4, 30, 40])
+    expect(replays.map((replay) => count(replay, () => 'range'))).toEqual([3, 30, 40])
     // The remaining growth names real exact-state refusals, incomplete passes,
-    // self-reviews and as-yet-unreviewed repair commits. None is waived.
-    expect(replays.map((replay) => count(replay, undefined))).toEqual([3, 3, 12])
+    // self-reviews and as-yet-unreviewed repair commits. The one-row reduction
+    // at every cut is the same strict-subset scope correction, not a waiver.
+    expect(replays.map((replay) => count(replay, undefined))).toEqual([2, 2, 11])
   })
 })
 
@@ -462,6 +523,23 @@ describe('pending review contributions', () => {
     expect(pending[0]).toMatchObject({ sha: 'a'.repeat(40), subject: 'subject a' })
     expect(pending[0].mechanismFiles).toEqual(['scripts/example-guard.mjs'])
     expect(pending[0].files).toEqual(['scripts/example-guard.mjs', 'src/ordinary.ts'])
+  })
+
+  it('excludes a ledger-only append but keeps the ledger beside a real mechanism change', () => {
+    const ledger = '.claude/mechanism-reviews.jsonl'
+    const commits = [
+      { sha: 'a'.repeat(40), files: [ledger], authorModels: ['GPT-5.6 Sol'] },
+      {
+        sha: 'b'.repeat(40),
+        files: [ledger, 'scripts/example-guard.mjs'],
+        authorModels: ['GPT-5.6 Sol'],
+      },
+    ]
+    const pending = pendingReviewContributions(commits, ['example-guard.mjs'])
+
+    expect(pending.map((commit) => commit.sha)).toEqual(['b'.repeat(40)])
+    expect(pending[0].mechanismFiles).toEqual(['scripts/example-guard.mjs'])
+    expect(pending[0].files).toEqual([ledger, 'scripts/example-guard.mjs'])
   })
 })
 
@@ -841,7 +919,8 @@ describe('a trailerless merge is attributed to the tip it merged', () => {
     })
 
     expect(commits).toHaveLength(2)
-    expect(commits[0].authorModels).toEqual([])
+    expect(commits[0].authorModels).toEqual(['GPT-5.6 Sol <noreply@openai.com>'])
+    expect(commits[0].authorModel).toBe('GPT-5.6 Sol <noreply@openai.com>')
     // The MERGED tip, not the first parent: a merge inherits from what it took in.
     expect(commits[0].parentAuthorModels).toEqual({ [MERGED]: ['GPT-5.6 Sol <noreply@openai.com>'] })
     expect(asked).toContain(MERGED)
@@ -860,6 +939,83 @@ describe('a trailerless merge is attributed to the tip it merged', () => {
     expect(groups).toHaveLength(1)
     expect(groups[0].reviewer).toBeTruthy()
     expect(groups[0].unreviewableReason).toBeUndefined()
+  })
+
+  it('inherits authorship from every non-first tip of an octopus merge', () => {
+    const THIRD = 'd'.repeat(40)
+    const octopusLog = [
+      `${REC}${MERGE}${FLD}1788000000${FLD}${FIRST} ${MERGED} ${THIRD}`,
+      '',
+      'scripts/x-guard.mjs',
+      '',
+    ].join('\n')
+    const [commit] = rangeCommits('base', 'head', ['scripts/x-guard.mjs'], {
+      readLog: () => octopusLog,
+      readParents: () => [FIRST, MERGED, THIRD],
+      readTrailers: (sha) => ({
+        [MERGE]: '',
+        [MERGED]: 'GPT-5.6 Sol <noreply@openai.com>',
+        [THIRD]: 'Claude Fable 5 <noreply@anthropic.com>',
+      })[sha] ?? '',
+    })
+
+    expect(commit.authorModels).toEqual([
+      'GPT-5.6 Sol <noreply@openai.com>',
+      'Claude Fable 5 <noreply@anthropic.com>',
+    ])
+    expect(commit.parentAuthorModels).toEqual({
+      [MERGED]: ['GPT-5.6 Sol <noreply@openai.com>'],
+      [THIRD]: ['Claude Fable 5 <noreply@anthropic.com>'],
+    })
+  })
+
+  it('lets later attributed pass rows settle the pre-repair unknown-row era', () => {
+    const [commit] = rangeCommits('base', 'head', ['scripts/x-guard.mjs'], {
+      readLog: () => log,
+      readParents: () => [FIRST, MERGED],
+      readTrailers: (sha) => trailers[sha] ?? '',
+    })
+    commit.coveringRecordShas = [MERGE]
+    commit.files = ['scripts/a-guard.mjs', 'scripts/b-guard.mjs']
+    const pass = (index, at, authoredBy) => ({
+      sha: MERGE,
+      authoredBy,
+      model: 'Opus 5',
+      reviewerAuthorship: {
+        status: 'agreement',
+        claimedModel: 'Opus 5',
+        actualModel: 'Opus 5',
+      },
+      verdict: 'merge',
+      evidence: `Checked the complete merge end state in pass ${index}.`,
+      mode: 'review',
+      handover: 'sol-authored',
+      handoverChain: ['Opus 5', 'Fable 5', 'Opus 4.8'],
+      pass: {
+        index,
+        total: 2,
+        files: [commit.files[index - 1]],
+        endState: MERGE,
+      },
+      at,
+    })
+    const beforeRepair = [
+      pass(1, 1_788_000_001_000, ''),
+      pass(2, 1_788_000_002_000, ''),
+    ]
+    const afterRepair = [
+      pass(1, 1_788_000_003_000, 'GPT-5.6 Sol <noreply@openai.com>'),
+      pass(2, 1_788_000_004_000, 'GPT-5.6 Sol <noreply@openai.com>'),
+    ]
+    const verdict = evaluateMechanismReview({
+      baseline: 'base',
+      head: MERGE,
+      pendingCommits: [commit],
+      records: [...beforeRepair, ...afterRepair],
+    })
+
+    expect(verdict.clear).toBe(true)
+    expect(verdict.findings).toEqual([])
   })
 
 

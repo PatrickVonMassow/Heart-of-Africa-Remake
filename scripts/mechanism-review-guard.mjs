@@ -11,8 +11,11 @@
 //
 // Decision logic: mechanism-review-core.mjs (pure, Vitest-covered). This wrapper
 // only gathers git output and the two state files, and is fail-OPEN — an internal
-// error never traps the session. It stands down while .claude/batch-paused exists
-// and for a session that does not own the batch lock.
+// error never traps the session.
+//
+// THAT BLOCK IS SWITCHED OFF (point 1036) — see GATE_SWITCHED_OFF below for why
+// and how to reverse it. What remains is the MEASUREMENT: `--status` reports the
+// outstanding debt in full, to whoever asks, under any lock or pause.
 //
 // RECOVERY: the baseline is per branch local state. Its absence blocks once and
 // seeds a fixed tracked-history anchor; it never self-arms at HEAD, because on
@@ -24,12 +27,12 @@
 //       --mode <review|blind-parallel>
 // CLI:
 //   node scripts/mechanism-review-guard.mjs --status
-import { existsSync, mkdirSync, readdirSync, readFileSync, writeFileSync } from 'node:fs'
+import { mkdirSync, readdirSync, readFileSync, writeFileSync } from 'node:fs'
 import { execFileSync, execSync } from 'node:child_process'
 import { dirname } from 'node:path'
 import { commonRepoPath, REPO_ROOT, repoPath } from './repo-paths.mjs'
 import { isMainModule } from './is-main.mjs'
-import { heldByOtherLiveOwner } from './batch-singleton.mjs'
+import { readOwnerLock } from './batch-singleton.mjs'
 import { readRecords, verifyCarried } from './mechanism-review.mjs'
 import {
   CONTRIBUTION_DISPOSITION_KIND,
@@ -51,6 +54,7 @@ import {
   parseRangeLog as parseWholeRangeLog,
   planAuthorshipGroups,
   reviewEndStateFiles,
+  withResolvedCommitAuthors,
 } from './mechanism-review-range-core.mjs'
 import { quotePassFile, unquoteGitPath } from './review-material-core.mjs'
 import {
@@ -61,7 +65,29 @@ import {
 import { gatherGuardDutyContext } from './guard-duty.mjs'
 import { buildAuthorshipPassPlan, formatContributionPassPlan } from './review-sol.mjs'
 
-const PAUSE = repoPath('.claude/batch-paused')
+
+// SWITCHED OFF, NOT REBUILT (CLAUDE.md §2 infrastructure freeze, user decision
+// 01.09.2026; point 1036). This gate could not converge by construction: a
+// verdict is recorded by APPENDING to `.claude/mechanism-reviews.jsonl`, that
+// file is tracked, and the commit carrying it is itself a mechanism
+// contribution owing a round of its own. Clearing one contribution created the
+// next, so a session that answered every finding honestly — fourteen
+// cross-vendor rounds in one day, Sol's final verdict `merge` on each — still
+// ended red, and no amount of correct work inside one session closed it.
+//
+// What is switched off is the automatic BLOCK, and only that. The four-eyes
+// rule of CLAUDE.md §6 stands as practice; nothing is deleted, forgiven or
+// retired, and the debt stays measurable in full through the guard's own
+// report:
+//
+//   node scripts/mechanism-review-guard.mjs --status
+//
+// Reversing this is one commit: drop the stand-down below.
+export const GATE_SWITCHED_OFF =
+  'the four-eyes mechanism gate no longer blocks — switched off under the infrastructure ' +
+  'freeze (CLAUDE.md §2, user decision 01.09.2026), because recording a verdict created the ' +
+  'next contribution owing one. The debt is not forgiven and stays readable: ' +
+  'node scripts/mechanism-review-guard.mjs --status'
 
 /** Per-branch baseline. Host-local rather than tracked, but shared by every
  * linked worktree: a disposable checkout must see main's branch baselines and
@@ -126,6 +152,35 @@ export function commitMissing(sha, run = (cmd) => execSync(cmd, { windowsHide: t
  */
 export function shouldSeedRecoveryAnchor(gathered, { status = false } = {}) {
   return status !== true && gathered?.baselineMissing === true && Boolean(gathered?.baseline)
+}
+
+/**
+ * Whose session a guard invocation belongs to.
+ *
+ * A Stop payload is authoritative and keeps the ordinary stand-down rule. A
+ * manual `--status` invocation has no payload, however, and is the read-only
+ * command every refusal prints. Resolve that inspection through the same two
+ * honest fallbacks as guard-preflight: the caller's environment, then the live
+ * lock's recorded owner. Without this distinction the owner's own bare status
+ * command supplied `''`, identified itself as a stranger, and printed no debt
+ * or runnable repair command at all.
+ */
+export function resolveMechanismReviewSessionId({
+  payloadSessionId = '',
+  status = false,
+  env = process.env,
+  readLock = readOwnerLock,
+} = {}) {
+  if (payloadSessionId) return String(payloadSessionId)
+  if (!status) return ''
+  if (env?.CLAUDE_SESSION_ID) return String(env.CLAUDE_SESSION_ID)
+  try {
+    const lock = readLock()
+    if (lock?.sessionId) return String(lock.sessionId)
+  } catch {
+    /* unreadable lock — the gatherer fails closed to its normal stand-down */
+  }
+  return ''
 }
 
 function readBaselineState() {
@@ -478,7 +533,7 @@ export function rangeCommits(base, head, files, readers = {}) {
   // only where it can matter: a commit that names its own model needs no
   // ancestry, so the extra object read is confined to the trailerless ones.
   const readParents = readers.readParents ?? ((sha) => defaultParentReader(sha, runGit))
-  return commits.map((commit) => {
+  const measured = commits.map((commit) => {
     // THE COMMIT'S OWN TRAILERS ARE AN AUTHORSHIP READ TOO (cross-vendor review,
     // GPT-5.6 Sol at effort high, second do-not-merge on this end state). It was
     // the one left unwrapped, and it is the most load-bearing of the three: it
@@ -533,6 +588,7 @@ export function rangeCommits(base, head, files, readers = {}) {
       mechanismFiles: mechanismPathsIn(commit.files, { scriptFiles: files }),
     }
   })
+  return withResolvedCommitAuthors(measured)
 }
 
 /**
@@ -568,15 +624,16 @@ export function planningContributions(pendingCommits = [], records = []) {
  * git work, which would drift and hand back a false "clean". Read-only: arming
  * and advancing the baseline stay in the main path below.
  */
-export function gatherMechanismReviewInputs({ sessionId = '', guardDuty = gatherGuardDutyContext } = {}) {
-  if (existsSync(PAUSE)) return { applicable: false, why: 'the batch is paused' }
-  if (heldByOtherLiveOwner(sessionId)) {
-    return {
-      applicable: false,
-      why: 'another live session owns the batch lock',
-      cause: 'not-lock-owner',
-    }
-  }
+export function gatherMechanismReviewInputs({
+  sessionId = '',
+  guardDuty = gatherGuardDutyContext,
+  // `--status` still MEASURES: the report is the debt's only remaining reader,
+  // and it answers whoever asks. A read decides nothing, so neither the pause
+  // nor the batch lock may silence it — that lock check is what made a
+  // hand-run `--status` print "stands down" and exit 0 (point 1036).
+  report = false,
+} = {}) {
+  if (!report) return { applicable: false, why: GATE_SWITCHED_OFF }
   const head = git('rev-parse HEAD')
   let branch = 'HEAD'
   try {
@@ -837,14 +894,15 @@ export function attachCoverage({ pendingCommits = [], allRecords = [], head, rev
 if (isMainModule(import.meta.url)) {
   const status = process.argv[2] === '--status'
   try {
-    let sessionId = ''
+    let payloadSessionId = ''
     try {
-      sessionId = JSON.parse(readFileSync(0, 'utf8')).session_id || ''
+      payloadSessionId = JSON.parse(readFileSync(0, 'utf8')).session_id || ''
     } catch {
       /* manual run — the gate is global truth, not session-local */
     }
+    const sessionId = resolveMechanismReviewSessionId({ payloadSessionId, status })
 
-    const gathered = gatherMechanismReviewInputs({ sessionId })
+    const gathered = gatherMechanismReviewInputs({ sessionId, report: status })
     if (!gathered.applicable) {
       if (status) console.log(`mechanism-review-guard stands down: ${gathered.why}`)
       process.exit(0)

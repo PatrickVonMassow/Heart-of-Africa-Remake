@@ -565,7 +565,13 @@ describe('render-verify-guard', () => {
 // regularly runs a browser suite alongside the unit layer. A timeout under load
 // is a load verdict, not a defect — and one that rotates teaches people to
 // re-run rather than to read.
-describe('mechanism-review-guard: the four-eyes gate on mechanisms', { timeout: 60_000 }, () => {
+describe('mechanism-review-guard: the switched-off four-eyes gate', { timeout: 60_000 }, () => {
+  // THE BLOCK IS GONE (point 1036, CLAUDE.md §2 infrastructure freeze), and with
+  // it the twelve end-to-end blocking cases that used to stand here. What has to
+  // be proven now is the opposite pair: the hook lets an entirely unreviewed
+  // guard through, and the MEASUREMENT that replaced the block still sees the
+  // very commit it no longer stops. The recorder's own same-vendor refusal is
+  // untouched by any of this and stays.
   const BASELINE = '.claude/mechanism-review-baseline.json'
   const LEDGER = '.claude/mechanism-reviews.jsonl'
   const branch = () => git('rev-parse', '--abbrev-ref', 'HEAD').stdout.trim()
@@ -573,34 +579,34 @@ describe('mechanism-review-guard: the four-eyes gate on mechanisms', { timeout: 
   const baselineAt = (sha) => write(BASELINE, JSON.stringify({ baselines: { [branch()]: sha } }))
   const review = (args) => node([resolve(repo, 'scripts', 'mechanism-review.mjs'), ...args])
   const AUTHOR = 'Co-Authored-By: Claude Opus 5 <noreply@anthropic.com>'
-  let base = ''
   let guardSha = ''
 
-  it('BLOCKS a committed guard that no second model has reviewed', () => {
+  it('lets a brand-new unreviewed guard through, at the hook and at the preflight', () => {
     write(LEDGER, '')
-    base = head()
+    const base = head()
     write('scripts/demo-guard.mjs', '// a brand-new enforcer\n')
     commit(`add a demo guard\n\n${AUTHOR}`)
     guardSha = head()
     baselineAt(base)
 
-    const hook = expectHookAgrees('mechanism-review-guard.mjs', 'mechanism-review-guard', { blocks: true })
-    expect(hook.decision.reason).toMatch(/FOUR-EYES GATE ON MECHANISMS/)
-    expect(hook.decision.reason).toContain('scripts/demo-guard.mjs')
-    expect(hook.decision.reason).toContain(guardSha.slice(0, 7))
+    // The preflight registers no verdict for it at all — and it names WHY, so a
+    // reader who wonders where the gate went is told in the same line.
+    const predicted = preflight()['mechanism-review-guard']
+    expect(predicted, 'mechanism-review-guard is not registered with the preflight').toBeTruthy()
+    expect(predicted.status).toBe('not-applicable')
+    expect(predicted.detail ?? predicted.reason ?? '').toContain('switched off')
+
+    // And the Stop hook prints nothing, which is how a hook says "not mine".
+    const hook = runHook('mechanism-review-guard.mjs')
+    expect(hook.status, hook.stderr).toBe(0)
+    expect(hook.stdout.trim(), 'a switched-off gate must print nothing at a turn end').toBe('')
   })
 
-  it('ALLOWS once a DIFFERENT model has recorded a review', () => {
-    const r = review([
-      '--record', guardSha,
-      '--model', 'GPT-5.6 Sol',
-      '--verdict', 'merge',
-      '--evidence', 'read the core and the wrapper against the spec, ran the pure cases',
-      '--mode', 'review',
-    ])
-    expect(r.status, r.stderr).toBe(0)
-    baselineAt(base)
-    expectHookAgrees('mechanism-review-guard.mjs', 'mechanism-review-guard', { blocks: false })
+  it('still MEASURES the contribution it no longer blocks', () => {
+    const status = node([resolve(repo, 'scripts', 'mechanism-review-guard.mjs'), '--status'])
+    expect(status.status, status.stderr).toBe(0)
+    expect(status.stdout).toContain(guardSha.slice(0, 7))
+    expect(status.stdout).toContain('scripts/demo-guard.mjs')
   })
 
   it('REFUSES to record a self-review instead of warning about it', () => {
@@ -613,271 +619,6 @@ describe('mechanism-review-guard: the four-eyes gate on mechanisms', { timeout: 
     ])
     expect(r.status).toBe(1)
     expect(r.stderr).toMatch(/SAME-VENDOR REVIEW is refused/)
-  })
-
-  it('BLOCKS on a do-not-merge verdict as loudly as on a missing record', () => {
-    const r = review([
-      '--record', guardSha,
-      '--model', 'GPT-5.6 Sol',
-      '--verdict', 'do-not-merge',
-      '--evidence', 'the fast path waves through the files the unit layer measures',
-      '--mode', 'review',
-    ])
-    expect(r.status, r.stderr).toBe(0)
-    baselineAt(base)
-    const hook = expectHookAgrees('mechanism-review-guard.mjs', 'mechanism-review-guard', { blocks: true })
-    expect(hook.decision.reason).toMatch(/DO-NOT-MERGE/)
-    expect(hook.decision.reason).toMatch(/the unit layer measures/)
-  })
-
-  it('leaves a turn that changed no mechanism completely alone', () => {
-    const before = head()
-    write('src/ui/Panel.tsx', '// ordinary feature work\n')
-    commit(`a feature change\n\n${AUTHOR}`)
-    baselineAt(before)
-    expectHookAgrees('mechanism-review-guard.mjs', 'mechanism-review-guard', { blocks: false })
-  })
-
-  it('lets ONE record on a DESCENDANT cover the mechanism commits below it', () => {
-    // The promise printed in the block message — "reviewing the branch head is
-    // enough" — resolved through real git ancestry rather than a synthetic list.
-    const from = head()
-    write('scripts/demo2-guard.mjs', '// a second enforcer\n')
-    commit(`add a second demo guard\n\n${AUTHOR}`)
-    write('scripts/demo2-guard.mjs', '// a second enforcer, sharpened\n')
-    commit(`sharpen the second demo guard\n\n${AUTHOR}`)
-    const branchHead = head()
-    baselineAt(from)
-    expectHookAgrees('mechanism-review-guard.mjs', 'mechanism-review-guard', { blocks: true })
-
-    const r = review([
-      '--record', branchHead,
-      '--model', 'GPT-5.6 Sol',
-      '--verdict', 'merge-with-fixes',
-      '--evidence', 'reviewed both commits of the branch at its head',
-      '--mode', 'review',
-    ])
-    expect(r.status, r.stderr).toBe(0)
-    baselineAt(from)
-    expectHookAgrees('mechanism-review-guard.mjs', 'mechanism-review-guard', { blocks: false })
-  })
-
-  it('SEES a guard rewritten INSIDE a merge commit, where no side commit shows it', () => {
-    // `git log --name-only` prints no files for a merge by default, so a guard
-    // rewritten while resolving a conflict — the exact case CLAUDE.md §6 warns
-    // the merging session about — was invisible: the turn cleared and the
-    // baseline advanced past it for good. The arrangement isolates that delta:
-    // the guard exists BEFORE the window (grandfathered), both side commits
-    // touch only ordinary files, and the rewrite happens in the merge alone.
-    write(LEDGER, '')
-    write('scripts/demo3-guard.mjs', '// a third enforcer\n')
-    write('conflict.txt', 'common\n')
-    commit(`add a third demo guard\n\n${AUTHOR}`)
-    const from = head()
-    const trunk = branch()
-
-    git('checkout', '-q', '-b', 'side')
-    write('conflict.txt', 'side\n')
-    commit(`ordinary work on the side branch\n\n${AUTHOR}`)
-    git('checkout', '-q', trunk)
-    write('conflict.txt', 'trunk\n')
-    commit(`ordinary work on the trunk\n\n${AUTHOR}`)
-
-    const merge = git('merge', '--no-ff', '--no-commit', 'side')
-    // The non-zero exit ALONE would be satisfied by a git that never ran at all
-    // (point 573), and this whole case rests on the conflict being real — so the
-    // claim is git's own word for it, not its exit code.
-    expect(`${merge.stdout}${merge.stderr}`, 'the fixture needs a real conflict to resolve').toContain('CONFLICT')
-    expect(merge.status, 'the fixture needs a real conflict to resolve').not.toBe(0)
-    write('conflict.txt', 'resolved\n')
-    write('scripts/demo3-guard.mjs', '// rewritten while resolving the conflict\n')
-    commit(`merge the side branch\n\n${AUTHOR}`)
-    baselineAt(from)
-
-    const hook = expectHookAgrees('mechanism-review-guard.mjs', 'mechanism-review-guard', { blocks: true })
-    expect(hook.decision.reason).toContain('scripts/demo3-guard.mjs')
-    expect(hook.decision.reason).toMatch(/merge the side branch/)
-  })
-
-  it('does NOT block a CLEAN merge of a reviewed mechanism branch', () => {
-    // The companion the case above needs, and the reason `--diff-merges` reads
-    // `cc` rather than `first-parent`: under first-parent a merge lists
-    // everything the branch brought in, so the merge commit itself became a
-    // pending mechanism commit that NO branch-head record can cover — a merge is
-    // not an ancestor of the branch it merges. The gate would have blocked every
-    // landing of every mechanism branch, its own included, and merges carry no
-    // model trailer, so the self-review refusal could not even bite on the record
-    // the trapped session would write.
-    write(LEDGER, '')
-    const from = head()
-    const trunk = branch()
-
-    git('checkout', '-q', '-b', 'clean-side')
-    write('scripts/demo4-guard.mjs', '// a fourth enforcer\n')
-    commit(`add a fourth demo guard\n\n${AUTHOR}`)
-    const sideHead = head()
-    git('checkout', '-q', trunk)
-    write('unrelated.txt', 'the trunk moved on\n')
-    commit(`unrelated trunk work\n\n${AUTHOR}`)
-
-    const r = review([
-      '--record', sideHead,
-      '--model', 'GPT-5.6 Sol',
-      '--verdict', 'merge',
-      '--evidence', 'reviewed the fourth demo guard on its branch before the merge',
-      '--mode', 'review',
-    ])
-    expect(r.status, r.stderr).toBe(0)
-    const merge = git('merge', '--no-ff', '-m', `merge the clean side branch\n\n${AUTHOR}`, 'clean-side')
-    expect(merge.status, merge.stderr).toBe(0)
-    baselineAt(from)
-
-    expectHookAgrees('mechanism-review-guard.mjs', 'mechanism-review-guard', { blocks: false })
-  })
-
-  it('BLOCKS in a FRESH tree on a feature branch, where no baseline exists yet', () => {
-    // The companion to the fork-point bootstrap: a worktree carries no baseline
-    // file, and arming at HEAD would grandfather exactly the mechanism work the
-    // branch was created to add. On Windows this failed silently for a while —
-    // cmd.exe ate the `^` in `main^{commit}`, every ref probe threw, and the
-    // fallback to HEAD reported a clear gate over unreviewed commits.
-    write(LEDGER, '')
-    const trunk = branch()
-    // bootstrapBase forks from `main`; the temp repo's default branch may be
-    // called something else, and force-updating the checked-out branch fails.
-    if (trunk !== 'main') expect(git('branch', '-f', 'main', trunk).status).toBe(0)
-    git('checkout', '-q', '-b', 'feat/fresh-tree')
-    write('scripts/demo5-guard.mjs', '// a fifth enforcer\n')
-    commit(`add a fifth demo guard\n\n${AUTHOR}`)
-    rmSync(resolve(repo, BASELINE), { force: true })
-    try {
-      const hook = expectHookAgrees('mechanism-review-guard.mjs', 'mechanism-review-guard', { blocks: true })
-      expect(hook.decision.reason).toContain('local review baseline is missing')
-      expect(hook.decision.reason).toContain('cannot bootstrap at HEAD')
-    } finally {
-      git('checkout', '-q', trunk)
-    }
-  })
-
-  it('uses the feature merge-base for the gap ruling after main advances', () => {
-    // The stored fallback baseline follows main, but this feature branch forked
-    // earlier. Main-only bulk must not enter the gap measurement: pending
-    // detection and pass coverage both describe fork..feature, so measuring
-    // main-tip..feature would manufacture an uncoverable deletion and waive a
-    // small, reviewable guard change.
-    write(LEDGER, '')
-    const trunk = branch()
-    const fork = head()
-    const baselineBefore = existsSync(resolve(repo, BASELINE))
-      ? readFileSync(resolve(repo, BASELINE), 'utf8')
-      : null
-    if (trunk !== 'main') expect(git('branch', '-f', 'main', trunk).status).toBe(0)
-
-    expect(git('checkout', '-q', '-b', 'feat/main-advanced-gap-range').status).toBe(0)
-    write('scripts/demo-gap-range-guard.mjs', '// small and reviewable\n')
-    commit(`add a reviewable range guard\n\n${AUTHOR}`)
-
-    expect(git('checkout', '-q', 'main').status).toBe(0)
-    write('main-only-bulk.txt', 'main-only material\n'.repeat(20_000))
-    commit(`advance main with unrelated bulk\n\n${AUTHOR}`)
-    const advancedMain = head()
-    expect(git('checkout', '-q', 'feat/main-advanced-gap-range').status).toBe(0)
-    write(BASELINE, JSON.stringify({ baselines: { main: advancedMain } }))
-
-    try {
-      const hook = runHook('mechanism-review-guard.mjs')
-      expect(hook.status, hook.stderr).toBe(0)
-      expect(
-        hook.decision?.decision,
-        `stdout was ${JSON.stringify(hook.stdout)}; stderr was ${hook.stderr}`,
-      ).toBe('block')
-      expect(hook.decision.reason).toContain('scripts/demo-gap-range-guard.mjs')
-      expect(hook.stderr).not.toContain('REVIEW GAP')
-      expect(git('merge-base', advancedMain, head()).stdout.trim()).toBe(fork)
-    } finally {
-      // Keep this isolated fixture's main-only bulk out of the serial cases
-      // below; all of these refs belong to the temporary test repository.
-      if (baselineBefore === null) rmSync(resolve(repo, BASELINE), { force: true })
-      else write(BASELINE, baselineBefore)
-      expect(git('branch', '-f', 'main', fork).status).toBe(0)
-      expect(git('checkout', '-q', trunk).status).toBe(0)
-    }
-  })
-
-  it('does not hide branch bulk from the gap ruling when advanced main has identical content', () => {
-    // The reverse divergence: the feature range really is uncoverable, while
-    // main later acquires the same bulk independently. A raw main-tip..feature
-    // tree diff erases that file and would keep demanding an impossible review;
-    // the common merge-base range must still report the measured gap.
-    write(LEDGER, '')
-    const trunk = branch()
-    const fork = head()
-    const baselineBefore = existsSync(resolve(repo, BASELINE))
-      ? readFileSync(resolve(repo, BASELINE), 'utf8')
-      : null
-    if (trunk !== 'main') expect(git('branch', '-f', 'main', trunk).status).toBe(0)
-    const bulk = 'shared but independently committed material\n'.repeat(12_000)
-
-    expect(git('checkout', '-q', '-b', 'feat/branch-bulk-gap-range').status).toBe(0)
-    write('scripts/demo-branch-bulk-guard.mjs', '// guard beside branch bulk\n')
-    write('shared-bulk.txt', bulk)
-    commit(`add a guard beside branch bulk\n\n${AUTHOR}`)
-
-    expect(git('checkout', '-q', 'main').status).toBe(0)
-    write('shared-bulk.txt', bulk)
-    commit(`advance main with matching bulk\n\n${AUTHOR}`)
-    const advancedMain = head()
-    expect(git('checkout', '-q', 'feat/branch-bulk-gap-range').status).toBe(0)
-    write(BASELINE, JSON.stringify({ baselines: { main: advancedMain } }))
-
-    try {
-      const hook = runHook('mechanism-review-guard.mjs')
-      expect(hook.status, hook.stderr).toBe(0)
-      expect(hook.stdout.trim()).toBe('')
-      expect(hook.stderr).toContain('REVIEW GAP')
-      expect(hook.stderr).toContain('shared-bulk.txt')
-      expect(git('merge-base', advancedMain, head()).stdout.trim()).toBe(fork)
-    } finally {
-      if (baselineBefore === null) rmSync(resolve(repo, BASELINE), { force: true })
-      else write(BASELINE, baselineBefore)
-      expect(git('branch', '-f', 'main', fork).status).toBe(0)
-      expect(git('checkout', '-q', trunk).status).toBe(0)
-    }
-  })
-
-  it('does NOT advance the baseline while it is blocking', () => {
-    // A gate that pins its baseline on a blocked turn clears itself on the next
-    // one — the block would be a single-turn nuisance instead of a gate.
-    write(LEDGER, '')
-    baselineAt(base)
-    const before = readFileSync(resolve(repo, BASELINE), 'utf8')
-    const hook = runHook('mechanism-review-guard.mjs')
-    expect(hook.decision?.decision).toBe('block')
-    expect(readFileSync(resolve(repo, BASELINE), 'utf8')).toBe(before)
-  })
-
-  it('refuses a missing baseline when the recovery anchor is unavailable', () => {
-    write(LEDGER, '')
-    rmSync(resolve(repo, BASELINE), { force: true })
-    const hook = runHook('mechanism-review-guard.mjs')
-    expect(hook.status, hook.stderr).toBe(0)
-    expect(hook.decision?.decision).toBe('block')
-    expect(hook.decision.reason).toContain('local review baseline is missing')
-    expect(existsSync(resolve(repo, BASELINE))).toBe(false)
-  })
-
-  it('stands down silently while the batch is paused', () => {
-    write(LEDGER, '')
-    baselineAt(base) // the unreviewed demo guard is pending again
-    write('.claude/batch-paused', 'test')
-    try {
-      expect(preflight()['mechanism-review-guard'].status).toBe('not-applicable')
-      const hook = runHook('mechanism-review-guard.mjs')
-      expect(hook.status, hook.stderr).toBe(0)
-      expect(hook.stdout.trim()).toBe('')
-    } finally {
-      rmSync(resolve(repo, '.claude/batch-paused'), { force: true })
-    }
   })
 })
 

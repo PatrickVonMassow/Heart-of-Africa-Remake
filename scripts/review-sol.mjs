@@ -535,10 +535,16 @@ export function formatContributionPassPlan(plan = {}) {
       lines.push(`  ${label} — ${entry.passes.length} runnable ${entry.passes.length === 1 ? 'pass' : 'passes'}:`)
       for (const pass of entry.passes) {
         const passFlag = entry.fits ? '' : ` --pass ${pass.index}`
+        // The evaluator may owe only a subset of the original contribution
+        // (for example, the unaffected files beside a historical refusal).
+        // Repeating that measured scope is what makes the printed command
+        // reproduce this plan instead of silently widening back to every file
+        // the immutable commit touched.
+        const fileFlags = (entry.files ?? []).map((file) => ` --file ${shellQuote(file)}`).join('')
         const reviewer = reviewerDescriptor(pass.reviewer)
         lines.push(
           `    node scripts/review-sol.mjs --sha ${entry.sha} --since ${entry.base} ` +
-            `${reviewer ? `--reviewer ${reviewer.key} ` : ''}--brief "<what to judge>"${passFlag}`,
+            `${reviewer ? `--reviewer ${reviewer.key} ` : ''}--brief "<what to judge>"${passFlag}${fileFlags}`,
         )
       }
     }

@@ -57,6 +57,9 @@ export const BLIND_PARALLEL = 'blind-parallel'
 /** Outcomes of the one pre-escalation reading recorded beside a review. */
 export const SPEC_EXAMINATION_VERDICTS = Object.freeze(['sound', 'amended'])
 
+/** Where the tracked ledger sits inside ANY checkout of this repository. */
+export const LEDGER_RELATIVE_PATH = '.claude/mechanism-reviews.jsonl'
+
 /** The verdict that blocks as loudly as a missing record. */
 export const BLOCKING_VERDICT = 'do-not-merge'
 
@@ -122,6 +125,14 @@ export const NAMED_MECHANISM_FILES = Object.freeze([
  */
 export function isMechanismPath(path, { scriptFiles = [] } = {}) {
   const raw = String(path ?? '')
+  // RECORDING A VERDICT IS EVIDENCE ABOUT A MECHANISM, NOT A NEW MECHANISM.
+  // If a ledger-only append triggered this gate, clearing one contribution
+  // would create the next contribution and the debt could never converge. The
+  // exclusion is deliberately only at the contribution trigger: when a commit
+  // changes an actual mechanism too, pendingReviewContributions keeps the
+  // commit's complete file set, including this ledger, so a deletion or rewrite
+  // co-committed with code is still inside the second reader's material.
+  if (raw === LEDGER_RELATIVE_PATH) return false
   // The RAW spelling is judged FIRST, byte-exact (round-1 pass 1): a backslash
   // is a legal byte inside a POSIX file name, and normalizing it away turned
   // `scripts/foo\bar-guard.mjs` into a different path that then evaded the
@@ -167,9 +178,6 @@ export const LEDGER_AT_MIN_MS = 1_700_000_000_000
 export const LEDGER_AT_MAX_MS = 4_102_444_800_000
 export const ledgerAtUsable = (at) =>
   typeof at === 'number' && Number.isFinite(at) && at >= LEDGER_AT_MIN_MS && at <= LEDGER_AT_MAX_MS
-
-/** Where the tracked ledger sits inside ANY checkout of this repository. */
-export const LEDGER_RELATIVE_PATH = '.claude/mechanism-reviews.jsonl'
 
 /** The one-time ledger shape used to close debt created by the retired
  * baseline-wide scope. The wrapper stamps matching rows only after Git proves
@@ -386,6 +394,22 @@ export function contributionReviewScope(record = {}, commit = {}) {
 const descendsFrom = (record, earlier) =>
   String(record?.sha ?? '') !== String(earlier?.sha ?? '') && containedBy(record, earlier?.sha)
 
+/**
+ * A later bounded reading may narrow an earlier refusal at the SAME immutable
+ * state, but it cannot answer the refusal wholesale. This is scope correction,
+ * not a claim that unchanged code was fixed: the clearing row must name a
+ * strict subset of the refusal's files and the file currently being judged.
+ * Re-reading the same set still fixes nothing and remains blocked.
+ */
+const narrowsSameStateRefusal = (answer, refusal, requiredFiles = []) => {
+  if (String(answer?.sha ?? '') !== String(refusal?.sha ?? '')) return false
+  const answerFiles = Array.isArray(answer?.pass?.files) ? [...new Set(answer.pass.files.map(String))] : []
+  const refusalFiles = Array.isArray(refusal?.pass?.files) ? [...new Set(refusal.pass.files.map(String))] : []
+  if (!answerFiles.length || answerFiles.length >= refusalFiles.length) return false
+  if (!answerFiles.every((file) => refusalFiles.includes(file))) return false
+  return (requiredFiles ?? []).every((file) => answerFiles.includes(String(file)))
+}
+
 const commitAuthors = (commit = {}) => {
   const authors = Array.isArray(commit.authorModels)
     ? commit.authorModels
@@ -516,7 +540,9 @@ const openRefusalsIn = (records = [], chain = {}) => {
     const scopeOf = typeof chain.scopeOf === 'function' ? chain.scopeOf : contributionReviewScope
     if (scopeOf(refusal, chain.commit) === 'co-touching') return false
     const directlyAnswered = clearing.some(
-      (answer) => Number(answer.at) > Number(refusal.at) && descendsFrom(answer, refusal),
+      (answer) =>
+        Number(answer.at) > Number(refusal.at) &&
+        (descendsFrom(answer, refusal) || narrowsSameStateRefusal(answer, refusal, requiredFiles)),
     )
     if (directlyAnswered) return false
     const chainClearance = filesClearedByRefusingVendor(refusal, chain)
@@ -1848,28 +1874,48 @@ export function evaluateMechanismReview({
     // No part clears until every numbered part of that split is present. Without
     // this check pass 1/3 cleared its named file and the legacy composition code
     // never saw it because `endState` excluded it from that path.
-    const scopedSplits = [...new Set(covering.filter(fileClaim).map((r) => String(r?.sha ?? '')))].flatMap((sha) => {
-      const rows = scoped.filter((r) => String(r?.sha ?? '') === sha)
+    // PLAN IDENTITY IS (SHA, TOTAL), not SHA alone. A contribution can be
+    // replanned at the same immutable boundary after the historical range cut
+    // becomes stale. Mixing the old 6-part file union into a new 2-part plan
+    // makes both compositions report each other's files as uncovered, so no
+    // complete replan can ever settle the stale split.
+    const scopedSplitKeys = [...new Set(
+      covering
+        .filter(fileClaim)
+        .map((r) => `${String(r?.sha ?? '')}\0${Number(r?.pass?.total)}`),
+    )]
+    const scopedSplits = scopedSplitKeys.flatMap((key) => {
+      const [sha, totalText] = key.split('\0')
+      const total = Number(totalText)
+      const rows = scoped.filter(
+        (r) => String(r?.sha ?? '') === sha && Number(r?.pass?.total) === total,
+      )
       const expected = [...new Set(rows.flatMap((r) => (Array.isArray(r?.pass?.files) ? r.pass.files : [])))]
       return passComposition(rows, { expect: expected })
     })
     const incompleteScoped = scopedSplits.filter((split) => !split.complete)
-    const incompleteScopedShas = new Set(incompleteScoped.map((split) => String(split.sha)))
+    const scopedPlanKey = (sha, total) => `${String(sha ?? '')}\0${Number(total)}`
+    const incompleteScopedPlans = new Set(
+      incompleteScoped.map((split) => scopedPlanKey(split.sha, split.total)),
+    )
     // FILE DEBT IS MEASURED AGAINST THE CURRENT END STATE, not against the
     // numbering of every range plan that once contained that file. A complete
     // scoped reading at another covering sha therefore settles the files it
     // names even when an older range split remains incomplete for other files.
     // This is the same rule outstandingFiles uses for the status/next-pass
-    // plan. A sha carrying any incomplete composition contributes nothing,
-    // while a bounded 1/1 is itself a complete file-scoped reading.
+    // plan. An incomplete PLAN contributes nothing; another measured plan at
+    // the same immutable sha stays independent and may be the complete replan
+    // that settles it. A bounded 1/1 is itself a complete file-scoped reading.
     const completeScoped = [
       ...scoped
         .filter((r) =>
           Number(r?.pass?.index) === 1 &&
           Number(r?.pass?.total) === 1 &&
-          !incompleteScopedShas.has(String(r?.sha ?? '')))
+          !incompleteScopedPlans.has(scopedPlanKey(r?.sha, r?.pass?.total)))
         .map((r) => ({ sha: String(r.sha ?? ''), files: r.pass.files.map(String), records: [r] })),
-      ...scopedSplits.filter((split) => split.complete && !incompleteScopedShas.has(String(split.sha))),
+      ...scopedSplits.filter(
+        (split) => split.complete && !incompleteScopedPlans.has(scopedPlanKey(split.sha, split.total)),
+      ),
     ]
     const scopedWholeReviews = sound.filter((r) => !fileClaim(r) && !r?.pass)
     const standingScoped = incompleteScoped.filter(
@@ -1885,7 +1931,6 @@ export function evaluateMechanismReview({
         )
         const endStateAnswer = completeScoped.some(
           (answer) =>
-            String(answer.sha) !== String(split.sha) &&
             (commit.files ?? []).every((file) => answer.files.map(String).includes(String(file))),
         )
         return !wholeRangeAnswer && !endStateAnswer

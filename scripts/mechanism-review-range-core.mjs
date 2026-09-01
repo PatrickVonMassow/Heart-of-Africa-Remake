@@ -253,6 +253,29 @@ const authorshipResolver = (commits = []) => {
   return resolve
 }
 
+/**
+ * Stamp each measured commit with the authorship the ancestry resolver proves.
+ *
+ * The planner has always called that resolver while grouping files. The gate's
+ * contribution evaluator consumes `authorModels` directly, though, so leaving
+ * the inherited merge author only in `parentAuthorModels` made the two halves
+ * disagree: status offered the right cross-vendor reviewer while the verdict
+ * still called every row a review of unknown authorship. Resolve once over the
+ * complete measured list and hand both consumers the same fact.
+ */
+export function withResolvedCommitAuthors(commits = []) {
+  const measured = Array.isArray(commits) ? commits : []
+  const resolve = authorshipResolver(measured)
+  return measured.map((commit) => {
+    const authorModels = resolve(commit)
+    return {
+      ...commit,
+      authorModels,
+      authorModel: authorModels[0] ?? '',
+    }
+  })
+}
+
 export function eligibleReviewer(authors = [], candidates = REVIEWER_CANDIDATES) {
   const writtenBy = uniq(authors)
   // No authorship fact means no candidate can prove it is the second pair of
