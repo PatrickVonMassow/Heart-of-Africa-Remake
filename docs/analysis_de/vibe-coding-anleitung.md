@@ -55,6 +55,16 @@ Füllstand empfiehlt ein leeres Modell.
 > geht; eine leere Spur empfiehlst du nie. Ist das zweite Modell nicht erreichbar, melde die
 > Folge — kein Vier-Augen, solange das gilt —, statt einspurig weiterzuarbeiten."
 
+**„Die stärkste Version" ist ein Datum, kein Zustand.** Eine Modellbezeichnung steht am Ende
+als fester Text irgendwo im Projekt — und dort bleibt sie. Erscheint eine neuere Version,
+wird nichts rot: Der Eintrag *ist* die Erwartung, gegen die geprüft würde. Halte die
+Bezeichnung deshalb an **einer** Stelle, damit ein Wechsel eine Zeile ist und keine Suche,
+und rechne damit, dass **du** derjenige bist, der die neue Version meldet.
+
+> *Prompt:* „Halte jede Modellbezeichnung an genau EINER Stelle; alles andere liest von dort.
+> Nenne mir diese Stelle. Nenne ich eine neuere Version, prüfe ihre Kennung erst mit einem
+> echten Aufruf, bevor du sie einträgst — und sag mir, was sie sonst noch verlangt."
+
 ---
 
 ## So setzt du ein Projekt auf (Prompts zum Kopieren)
@@ -520,4 +530,4 @@ Die Ursache findest du durch **Zerlegen**, nicht durch Wiederholen.
 
 Sie ersetzt die Fallstricke oben nicht.
 
-<!-- GUIDE-FINGERPRINT: 0d78f63ec14f9a0bce27a593a6dec9f8b51f79a954bcccdc1165f53c1972c061 -->
+<!-- GUIDE-FINGERPRINT: 5ea0bc7893a064bb5a16d99c43cb31912085a0f097c14fb2f4789e9febe7ab4a -->
