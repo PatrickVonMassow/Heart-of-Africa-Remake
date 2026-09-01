@@ -109,6 +109,24 @@ put it is the mistake this line exists to stop.
     behind, it cannot catch up, and no amount of correct work inside one session converges.
     Whatever the fix is, it must make a ledger-only commit NOT owe a round of its own, or make the
     round that records a verdict cover the recording.
+  MEASURED AGAIN THE SAME DAY, at HEAD 28edbb0, before this point was commissioned:
+  - THE GUARD'S OWN INSPECTION COMMAND DOES NOT ANSWER. `node scripts/mechanism-review-guard.mjs
+    --status` — the command every refusal prints as the way to read the remaining debt — takes its
+    session id ONLY from a stdin JSON payload, so a hand-run passes the empty string and
+    `heldByOtherLiveOwner('')` answers true against the batch owner's own lock. The guard prints
+    `stands down: another live session owns the batch lock` and exits 0. Piping
+    `{"session_id":"<the owning id>"}` into it is today the only way to read the status at all.
+    That is the first step of "every step reached through a command the guard itself printed", and
+    it does not work.
+  - THE STALE SPLITS DO PRINT A RUNNABLE COMMAND NOW. The status prints contribution-scoped
+    `review-sol.mjs` commands for both — two passes for `96e082f`, one for `584ceb9` — and says the
+    planner wins over the historical split. What remains against them is narrower than the entry
+    above assumes: `scripts/render-verify-charges.mjs` was in NONE of the four recorded passes, so
+    nobody read it.
+  ORIENTATION, NOT A MANDATE: `REVIEW_END_STATE_EXCLUSIONS` in
+  `scripts/mechanism-review-range-core.mjs` is this repository's existing single boundary for "this
+  path is outside the mechanism gate's reach, and here is the recorded reason". If the ledger fix
+  belongs elsewhere, say why rather than assuming this place.
   FINAL STATE: `node scripts/guard-preflight.mjs --for merge` on `main` reports
   `mechanism-review-guard clean`, every step to that state reached through a command the guard
   itself printed, and no contribution retired without a reason recorded beside it.
