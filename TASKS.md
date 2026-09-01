@@ -1222,45 +1222,6 @@ put it is the mistake this line exists to stop.
   Criticality: HIGH — it narrows the regression gate the release is cut against, and a wrong cut
   removes a lane no later run puts back.
 
-- [ ] 1008. The review router and the review ledger each forbid what the other requires, so two
-  passes of a sixteen-pass plan can be cleared by nobody (measured 29.08.2026 while reviewing the
-  686+687 landing range `main..de7e175` on `feat/687-roam-bound-fixes`).
-  `scripts/review-sol.mjs` cuts a range too large for one round into passes by PER-FILE authorship
-  and names each pass's reviewer accordingly. For this range it routed passes 4 and 5 — twelve and
-  four Sol-authored files — to "anthropic reviewer Opus 5", correctly, because Sol may not review
-  its own work. `scripts/mechanism-review.mjs` then refused both records by PER-COMMIT vendor:
-  "a SAME-VENDOR REVIEW is refused: `de7e175` was authored by Claude Opus 5 and Opus 5 is from that
-  vendor; the review has no valid first-eligible handover (missing-or-unknown-handover)". Handing
-  the same pass to Opus 4.8 is refused from the other side: "--reviewer opus48 is not this range's
-  first eligible handover; the route names Opus 5." Fourteen of sixteen passes recorded without
-  trouble; these two cannot be cleared by any reviewer either half will accept, on a range whose
-  landing needs all sixteen.
-  THE REVIEWS THEMSELVES RAN and were worth having — the finding that `speaking.test.ts:19` binds
-  `RIVER_UTTERANCE` to `utteranceOf('ROCK')`, so the file's one tone assertion pins ROCK under
-  RIVER's name, came out of pass 4. Only the RECORD is unreachable, which is the worst shape: the
-  work is done, the evidence exists, and the gate reports it as missing.
-  WHY IT MATTERS: this is not a stuck range, it is a stuck CLASS. Any range whose tip commit is
-  Claude-authored and which contains Sol-authored files large enough to need their own pass hits
-  it, and the batch's ordinary shape — Sol authors, Claude lands — produces exactly that. The
-  escape `review-sol.mjs` documents for the case ("with `--point <N>`, the plan prints the
-  Git-verified unavailable-receipt command for that exact remainder") did not appear in the plan
-  output, and `mechanism-review.mjs`'s `--handover sol-authored` is never offered by the router.
-  FINAL STATE: the two halves judge eligibility on the SAME quantity. Either the ledger judges per
-  file as the router does — a reviewer that authored none of the pass's files is independent of it,
-  whatever the tip commit's trailer says — or the router refuses to name a reviewer the ledger will
-  reject and falls through to the next eligible model. Whichever is chosen, a pass the plan offers
-  is a pass that can be recorded, and a remainder with no eligible reviewer is NAMED as such with
-  the unavailable-receipt command the documentation already promises, rather than looking runnable
-  and failing at the record.
-  VERIFIABLE: unit cases over the pure cores — a pass whose files were authored by one vendor and
-  whose tip commit was authored by the other yields a reviewer that the ledger accepts; a range
-  with no eligible reviewer for some file set yields a plan that says so and prints the receipt
-  command instead of a runnable pass index; and a regression case reproducing the measured
-  `de7e175` pass-4/pass-5 sequence. Plus `npm run test:unit`, lint, build.
-  Criticality: high — it blocks the four-eyes record of a landing that is otherwise ready, and it
-  blocks it in the batch's most ordinary authorship shape, so it will recur until it is fixed.
-  Bundle: Session- & Repo-Hygiene.
-
 - [ ] 901. A superseded CI run is reported as a failure and buys a whole session as its repair
   path. MEASURED 24./25.08.2026 on this session's own start. `scripts/ci-status-guard-core.mjs:11`
   puts `cancelled` into `FAILED_CONCLUSIONS`, so `classifyRuns` returns `state: 'failed'`,
@@ -14335,3 +14296,32 @@ to land than a mechanism that needs a review.
   Criticality: high — it is the batch singleton, and its failure direction hands a user's
   interactive window a role it never accepted.
   Bundle: Session- & Repo-Hygiene.
+
+- [ ] 1034. The four-eyes gate prints a repair command its own planner refuses (measured
+  01.09.2026, this session).
+  WHAT HAPPENED: `mechanism-review-guard` blocked every merge on thirteen landed contributions
+  and named, for each, the exact command that would clear it — for example
+  `review-sol.mjs --sha e2550f0 --since e2550f0~1 --pass 5`, "the review was split into 13
+  passes over the FILE SET and only 4 are on record". Running that command is refused:
+  `review-sol` answers "it fits in one round", so pass 5 does not exist. Measured on three of
+  the thirteen: `e2550f0` and `b258a3e` fit in ONE round where the guard demands passes 5-13
+  of thirteen, and `ed2df24` splits into THREE where the guard demands nine more of thirteen.
+  WHY IT BLOCKS: the guard is the gate in front of every merge in the batch, and the only path it
+  offers out is a command that does not run. A session that follows the refusal literally cannot
+  satisfy it, and the refusal repeats unchanged at the next turn end — the standstill class of
+  retrospective §3.223, this time caused by the gate rather than by the session. The clearing
+  path does exist (the scoped 1/1 round the planner really offers), but the guard names a
+  different one, so nobody walks it.
+  FINAL STATE: (1) the guard derives the pass numbers it prints from the SAME planner that would
+  run them, so a printed command is runnable by construction; (2) where the two disagree, the
+  planner wins and the guard says how many passes that range really has; (3) a recorded scoped
+  round clears the contribution it read, and the guard's own refusal text names that round.
+  VERIFIABLE: a unit case that takes a contribution whose range fits in one round and asserts the
+  guard prints `--pass 1` (or no pass flag) rather than an index the planner rejects; a case
+  over a range that really splits, asserting the printed count equals the planner's; a drill that
+  runs the printed command for a fixture contribution and asserts it is accepted rather than
+  refused. Plus `npm run test:unit`, lint, build.
+  Criticality: high — it is the gate in front of every merge, and its failure direction is a
+  batch that cannot land anything while every guard reports itself working.
+  Bundle: Session- & Repo-Hygiene.
+

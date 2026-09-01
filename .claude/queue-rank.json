@@ -1095,7 +1095,7 @@
     },
     "1031": {
       "at": "2026-08-31T19:56:40.530Z",
-      "why": "Es blockiert die Bildpruefung jedes Punktes und steht deshalb bei den Prozessbefunden desselben Abends, nicht hinter der Veroeffentlichung.",
+      "why": "Es blockiert die Bildpruefung jedes Punktes und gehoert der Sache nach zu den Prozessbefunden desselben Abends. Weil die Maschine es selbst eingetragen hat, steht es unter der Nutzerregel vom 20.08.2026 dennoch hinter der Veroeffentlichung — die Anhaengeposition ist die richtige, so dringend der beschriebene Block auch ist.",
       "origin": "machine",
       "place": "last"
     },
@@ -1108,6 +1108,12 @@
     "1033": {
       "at": "2026-08-31T21:53:03.594Z",
       "why": "Es gehoert unmittelbar zu 1032 — derselbe Vorfall, dieselbe Nacht, dieselbe Zugende-Kette — und wird mit ihm zusammen gelesen; die Uebernahme selbst ist korrekt und nur ihr Ziel falsch, also blockiert sie keinen anderen Punkt.",
+      "origin": "machine",
+      "place": "last"
+    },
+    "1034": {
+      "at": "2026-08-31T23:05:46.103Z",
+      "why": "Maschinell eingetragen, deshalb hinter der Veroeffentlichung nach der Nutzerregel vom 20.08.2026. Der Merge-Weg bleibt begehbar: Die vom Planer wirklich angebotene Runde raeumt jeden Beitrag ab, nur nennt der Waechter sie nicht — der Defekt kostet Zeit und Irrwege, aber er sperrt nichts endgueltig.",
       "origin": "machine",
       "place": "last"
     }
@@ -1148,7 +1154,7 @@
     "why": "The order standing in front of the release today is the arrangement that predates this rule; the four machine-filed points that had ranked themselves there were moved behind 174 first"
   },
   "settled": {
-    "at": "2026-08-31T21:53:03.614Z",
+    "at": "2026-08-31T23:05:46.112Z",
     "points": [
       174,
       184,
@@ -1506,7 +1512,8 @@
       1030,
       1031,
       1032,
-      1033
+      1033,
+      1034
     ]
   }
 }

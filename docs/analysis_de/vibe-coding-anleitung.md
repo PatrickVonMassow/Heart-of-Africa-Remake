@@ -404,11 +404,14 @@ Die Ursache findest du durch **Zerlegen**, nicht durch Wiederholen.
   → *Prompt:* „Eine Grenze verwehrt die **erste** Handlung nach dem Überschreiten, nicht die
   letzte. Was den Schritt **abschließt**, bleibt erlaubt; was festhält, mach **übergebbar**."
 
-- **Die KI repariert den Wächter, der sie gerade sperrt.** Ein Tor kann zu Recht sperren und
-  trotzdem unlösbar sein: es kennt nur einen erlaubten Weg, oder seine Abhilfe liegt außer
-  Reichweite.
+- **Die KI repariert den Wächter, der sie gerade sperrt — oder beantwortet ihn zehnmal.** Ein Tor
+  kann zu Recht sperren und trotzdem unlösbar sein: es kennt nur einen erlaubten Weg, oder seine
+  Abhilfe liegt außer Reichweite. Und weil ein rotes Tor den Zug neu startet, schreibt die KI eine
+  neue Abschlusszeile statt einer Reparatur: sieht aus wie Arbeit, bewegt nichts.
   → *Prompt:* „Sperrt ein Tor dich, ändere es nie allein: **leg dein Eigeninteresse offen**, nimm
-  das zweite Urteil. Bevor ein Tor scharf geht: **zähl alle Wege auf** und prüfe seine Abhilfe."
+  das zweite Urteil. Bevor ein Tor scharf geht: **zähl alle Wege auf** und prüfe seine Abhilfe.
+  Eine **wiederholte** Absage beweist, dass deine Antwort nicht die Reparatur ist — miss den
+  Zustand neu und meld sie mir beim zweiten Mal."
 
 - **Der Prüflauf verändert sein eigenes Projekt.** Eine Suite, die ihren Zielpfad aus dem Quellort
   statt der Testumgebung nimmt, schreibt Zweige um und bleibt grün.
@@ -500,4 +503,4 @@ Die Ursache findest du durch **Zerlegen**, nicht durch Wiederholen.
 
 Sie ersetzt die Fallstricke oben nicht.
 
-<!-- GUIDE-FINGERPRINT: aefad85ae5f102a132bb5971d027efe70f9cbba1cdf84d799013d5c8ab7daf47 -->
+<!-- GUIDE-FINGERPRINT: d8adcd7da67c25cf5caebb0bed78789f11390c93781dc45a9423e2a91e1c6c23 -->

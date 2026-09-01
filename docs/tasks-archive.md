@@ -25361,3 +25361,42 @@ Nummerierung bleiben deshalb identisch — hier wird nur verschoben, nie umgesch
   measured shape of paying it.
   Bundle: Modell & Wächter — it edits the four-eyes gate and its ledger reader, the files 887,
   888 and 977 also reason about, so it is worked after them and never beside them.
+
+- [x] 1008. The review router and the review ledger each forbid what the other requires, so two
+  passes of a sixteen-pass plan can be cleared by nobody (measured 29.08.2026 while reviewing the
+  686+687 landing range `main..de7e175` on `feat/687-roam-bound-fixes`).
+  `scripts/review-sol.mjs` cuts a range too large for one round into passes by PER-FILE authorship
+  and names each pass's reviewer accordingly. For this range it routed passes 4 and 5 — twelve and
+  four Sol-authored files — to "anthropic reviewer Opus 5", correctly, because Sol may not review
+  its own work. `scripts/mechanism-review.mjs` then refused both records by PER-COMMIT vendor:
+  "a SAME-VENDOR REVIEW is refused: `de7e175` was authored by Claude Opus 5 and Opus 5 is from that
+  vendor; the review has no valid first-eligible handover (missing-or-unknown-handover)". Handing
+  the same pass to Opus 4.8 is refused from the other side: "--reviewer opus48 is not this range's
+  first eligible handover; the route names Opus 5." Fourteen of sixteen passes recorded without
+  trouble; these two cannot be cleared by any reviewer either half will accept, on a range whose
+  landing needs all sixteen.
+  THE REVIEWS THEMSELVES RAN and were worth having — the finding that `speaking.test.ts:19` binds
+  `RIVER_UTTERANCE` to `utteranceOf('ROCK')`, so the file's one tone assertion pins ROCK under
+  RIVER's name, came out of pass 4. Only the RECORD is unreachable, which is the worst shape: the
+  work is done, the evidence exists, and the gate reports it as missing.
+  WHY IT MATTERS: this is not a stuck range, it is a stuck CLASS. Any range whose tip commit is
+  Claude-authored and which contains Sol-authored files large enough to need their own pass hits
+  it, and the batch's ordinary shape — Sol authors, Claude lands — produces exactly that. The
+  escape `review-sol.mjs` documents for the case ("with `--point <N>`, the plan prints the
+  Git-verified unavailable-receipt command for that exact remainder") did not appear in the plan
+  output, and `mechanism-review.mjs`'s `--handover sol-authored` is never offered by the router.
+  FINAL STATE: the two halves judge eligibility on the SAME quantity. Either the ledger judges per
+  file as the router does — a reviewer that authored none of the pass's files is independent of it,
+  whatever the tip commit's trailer says — or the router refuses to name a reviewer the ledger will
+  reject and falls through to the next eligible model. Whichever is chosen, a pass the plan offers
+  is a pass that can be recorded, and a remainder with no eligible reviewer is NAMED as such with
+  the unavailable-receipt command the documentation already promises, rather than looking runnable
+  and failing at the record.
+  VERIFIABLE: unit cases over the pure cores — a pass whose files were authored by one vendor and
+  whose tip commit was authored by the other yields a reviewer that the ledger accepts; a range
+  with no eligible reviewer for some file set yields a plan that says so and prints the receipt
+  command instead of a runnable pass index; and a regression case reproducing the measured
+  `de7e175` pass-4/pass-5 sequence. Plus `npm run test:unit`, lint, build.
+  Criticality: high — it blocks the four-eyes record of a landing that is otherwise ready, and it
+  blocks it in the batch's most ordinary authorship shape, so it will recur until it is fixed.
+  Bundle: Session- & Repo-Hygiene.
