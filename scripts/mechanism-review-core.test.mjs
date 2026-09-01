@@ -167,6 +167,11 @@ describe('isMechanismPath', () => {
       mechanismPathsIn(['src/ui/Hud.tsx', 'scripts/pre-push-gate.mjs', 'README.md'], opts),
     ).toEqual(['scripts/pre-push-gate.mjs'])
   })
+
+  it('does not turn a ledger-only evidence append into recursive review debt', () => {
+    expect(isMechanismPath(LEDGER_RELATIVE_PATH, opts)).toBe(false)
+    expect(mechanismPathsIn([LEDGER_RELATIVE_PATH], opts)).toEqual([])
+  })
 })
 
 describe('model identity', () => {
@@ -766,6 +771,32 @@ describe('evaluateMechanismReview', () => {
       })
       expect(verdict.block).toBe(true)
       expect(verdict.findings[0].kind).toBe('do-not-merge')
+    })
+
+    it('lets a later strict-subset reading correct only an overbroad refusal scope', () => {
+      const first = 'scripts/pre-push-gate-core.mjs'
+      const second = 'scripts/guard-hooks.test.mjs'
+      const refusal = scoped({
+        verdict: 'do-not-merge',
+        at: 1_787_000_001_000,
+        pass: { index: 1, total: 1, files: [first, second], endState: 'c'.repeat(40) },
+      })
+      const narrowed = scoped({
+        verdict: 'merge',
+        at: 1_787_000_002_000,
+        pass: { index: 1, total: 1, files: [first], endState: 'c'.repeat(40) },
+      })
+      const judge = (files) => evaluateMechanismReview({
+        baseline: 'b',
+        head: 'h',
+        pendingCommits: [covered({ files })],
+        records: [refusal, narrowed],
+      })
+
+      expect(judge([first]).block).toBe(false)
+      const stillRefused = judge([second])
+      expect(stillRefused.block).toBe(true)
+      expect(stillRefused.findings[0].kind).toBe('do-not-merge')
     })
 
     it('keeps a file-scoped 1/3 incomplete and lets no pass-less sibling bypass it', () => {
@@ -2036,6 +2067,60 @@ describe('evaluateMechanismReview', () => {
       })
       expect(v.block).toBe(true)
       expect(v.findings[0].kind).toBe('incomplete-passes')
+    })
+
+    it('lets a complete same-boundary replan supersede a stale incomplete split', () => {
+      const old = [
+        pass(1, 3, { pass: { index: 1, total: 3, files: ['old-a.mjs'], endState: 'c'.repeat(40) } }),
+        pass(2, 3, { pass: { index: 2, total: 3, files: ['old-b.mjs'], endState: 'c'.repeat(40) } }),
+      ]
+      const replanned = [
+        pass(1, 2, {
+          pass: {
+            index: 1,
+            total: 2,
+            files: ['scripts/pre-push-gate-core.mjs'],
+            endState: 'c'.repeat(40),
+          },
+        }),
+        pass(2, 2, {
+          pass: { index: 2, total: 2, files: ['reviewed-context.mjs'], endState: 'c'.repeat(40) },
+        }),
+      ]
+      const v = evaluateMechanismReview({
+        baseline: 'b',
+        head: 'h',
+        pendingCommits: [commit(covered)],
+        records: [...old, ...replanned],
+      })
+
+      expect(v.block).toBe(false)
+      expect(v.findings).toEqual([])
+    })
+
+    it('does not let an unrelated descendant file split poison a complete exact-sha replan', () => {
+      const descendant = 'd'.repeat(40)
+      const exact = [pass(1, 2), pass(2, 2)]
+      const unrelated = [1, 2].map((index) => record({
+        sha: descendant,
+        containedShas: new Set(['c'.repeat(40), descendant]),
+        pass: {
+          index,
+          total: 2,
+          files: [`docs/unrelated-${index}.md`],
+          endState: descendant,
+        },
+        at: MERGE_ACCOUNTING_SINCE + 5000 + index,
+      }))
+      const v = evaluateMechanismReview({
+        baseline: 'b',
+        head: descendant,
+        pendingCommits: [commit({ ...covered, coveringRecordShas: ['c'.repeat(40), descendant] })],
+        records: [...exact, ...unrelated],
+      })
+
+      expect(v.block).toBe(false)
+      expect(v.findings).toEqual([])
     })
   })
 })

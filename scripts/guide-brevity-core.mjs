@@ -296,7 +296,22 @@ export const LIMITS = {
   // claim; it is named rather than hidden inside a fold that did not earn it. So the ceilings move
   // by +3 lines / +52 words with zero slack. No existing claim was dropped, and the long form of
   // each fold stays in the retrospective.
-  maxLines: 505,
+  // 01.09.2026: ONE genuinely new tip, "Die Sonde kann ihr Nein nicht erreichen" — a probe whose
+  // call site never hands it the evidence its negative verdict needs, so its green is a tautology,
+  // plus the half of it that says a shared function's fix must reach ALL its call sites. It is not
+  // the neighbouring self-measuring monitor: that one is an observer effect, this one is a branch
+  // that is unreachable by construction. Measured today as a 24-minute launcher standstill over a
+  // writer that had been dead for 21 minutes. The entry measures +10 lines / +119 words in its
+  // final form, so the ceilings move 505 -> 515 and 4618 -> 4737 with zero slack.
+  // 01.09.2026 (fourth): ONE genuinely new tip beside the four-eyes-on-mechanisms
+  // prompt — that gate must ship its own off switch, because every correction to
+  // a mechanism is itself a mechanism change, so the debt outgrows what a session
+  // can pay and the gate stops the work it protects. Measured on this project the
+  // same day: the whole batch stood behind it. It is not the outer-budget lesson
+  // above (a budget bounds how much rule-making happens; this is an escape from a
+  // rule already built). The entry measures +7 lines / +61 words, so the ceilings
+  // move 515 -> 522 and 4735 -> 4796 with zero slack.
+  maxLines: 522,
   // EXACT FIT, not headroom — corrected 30.07.2026 after the four-eyes review
   // pointed out that this comment had long stopped describing the numbers. The
   // rule above ("raised only by the measured size of genuinely new tips")
@@ -491,7 +506,14 @@ export const LIMITS = {
   // 01.09.2026: the three folds justified beside maxLines measure 22 + 5 + 24 words in their
   // folded form, plus the one reworded word named there, so this ceiling moves 4566 → 4618 by
   // the same measurement.
-  maxWords: 4618,
+  // 01.09.2026 (second): the probe-cannot-reach-its-no tip justified beside maxLines measures
+  // 119 words, so this ceiling moves 4618 -> 4737 by the same measurement.
+  // 01.09.2026 (third): the outer-budget lesson of the redirection folded into the core lesson
+  // and the meta rules were tightened to pay for it, so the measured guide came DOWN two words
+  // and the ceiling follows it: 4737 -> 4735, no unearned headroom.
+  // 01.09.2026 (fourth): the off-switch tip justified beside maxLines measures
+  // 61 words, so this ceiling moves 4735 -> 4796 by the same measurement.
+  maxWords: 4796,
   // A pitfall entry = the risk lines plus its prompt. Anything longer is a
   // story, not a tip.
   maxEntryLines: 11,

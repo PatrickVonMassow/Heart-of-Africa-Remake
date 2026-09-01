@@ -3153,7 +3153,7 @@ describe('the shipped charge ledger', () => {
   // (review finding, 28.08.2026). What may be excused is a red that STATES it is
   // downstream — self-limiting, because the root it points back to is a red of
   // its own that nothing here charges.
-  it('does NOT charge the bare cascade object names, nor the async pipeline error nobody owns', () => {
+  it('does NOT charge bare cascade object names without the measured signatures', () => {
     const scoped = { suite: 'settings', backend: 'webgpu', kind: 'console', featureLevel: 'compatibility' }
     for (const t of [
       'console error: THREE.WebGPURenderer: Uncaptured WebGPU GPUValidationError: [Invalid TextureView] is invalid',
@@ -3185,19 +3185,13 @@ describe('the shipped charge ledger', () => {
     expect(
       asStored('THREE.WebGPURenderer: Uncaptured WebGPU GPUValidationError: [Invalid BindGroup] is invalid due to a previous error.').point,
     ).toBeNull()
-    // THE TWO FORMS POINT 734 SAID MUST BE FILED HAVE THEIR POINT (1011, filed
-    // 29.08.2026) AND STILL NO CHARGE — deliberately. A charge for them was
-    // WRITTEN and then WITHDRAWN on 30.08.2026 after two cross-vendor rounds: the
-    // stored console name is cut at 120 characters before the cascade's own
-    // marker, and these texts share one derived key across seven pipeline
-    // objects, so the recorder marks their detail VARIED and no detailMatch may
-    // read it. Every pattern that matched the measured reds therefore also
-    // matched an unrelated pipeline or command-buffer failure on the same lane.
-    // Filing the point is a disposition; an over-broad charge is not. They stay
-    // REAL REDS until point 990 lets a charge name the root it depends on.
+    // The full LARGE pass of 31.08.2026 gave two formerly ownerless forms narrow
+    // stable names: ShadowMaterial + Invalid TextureView, and the uncaptured
+    // CommandBuffer + CommandEncoder + renderContext form. Nearby pipeline and
+    // command-buffer failures still stay red.
     const stillRed = [
-      'THREE.WebGPURenderer: Uncaptured WebGPU GPUValidationError: [Invalid CommandBuffer from CommandEncoder "renderContext_1"] is invalid due to a previous error.',
-      'THREE.WebGPURenderer: Async render pipeline creation failed (renderPipeline_x): [Invalid TextureView] is invalid due to a previous error.',
+      'THREE.WebGPURenderer: Uncaptured WebGPU GPUValidationError: [Invalid CommandBuffer from Queue "renderContext_11"] is invalid due to a previous error.',
+      'THREE.WebGPURenderer: Async render pipeline creation failed (renderPipeline_BasicMaterial_1005): [Invalid TextureView] is invalid due to a previous error.',
     ]
     // THE RED MUST EXIST BEFORE ITS CHARGE MAY BE NULL (cross-vendor review,
     // GPT-5.6 Sol, 30.08.2026): `?.point ?? null` would have passed just as well
@@ -3755,17 +3749,30 @@ describe('the shipped charge ledger', () => {
     expect(chargeFor(red('member thumbnail.png is present'), scoped)).toBeNull()
   })
 
-  it('excuses the timestamp row only where the red names the missing capability', () => {
+  it('keeps an empty-detail archive check under its printed name, so its existing charge applies', () => {
+    const printed = 'member hoa-state-2026-08-31-42.png is present'
+    const [parsed] = failedChecks(`FAIL  ${printed} — `)
+
+    expect(parsed).toMatchObject({ name: printed, detail: '', kind: 'check' })
+    expect(parsed.name).not.toContain('—')
+    expect(chargeFor(parsed, { suite: 'report', backend: 'webgpu', featureLevel: 'compatibility' })?.point).toBe(927)
+  })
+
+  it('owns both timestamp rows under point 1012 without widening either signature', () => {
     const scoped = { suite: 'benchmark', backend: 'webgpu', kind: 'check', featureLevel: 'compatibility' }
     const withDetail = (name, detail) => ({ ...red(name), detail })
     const named = withDetail('WebGPU: real GPU timestamps were measured for every row', '0/33 rows, reason "adapter without the timestamp-query feature"')
     expect(chargeFor(named, scoped).point).toBe(1012)
-    // THE SAME CHECK WITHOUT THAT REASON IS A REAL REGRESSION. The feature level
-    // does not test the capability, so a compatibility adapter that DOES expose
-    // timestamp-query must keep this red — and the low-preset row, whose detail
-    // names no capability at all, is deliberately not excused either.
+    // THE SAME CHECK WITHOUT THAT REASON IS A REAL REGRESSION. Its cause-bearing
+    // entry must still read the capability absence from the red itself.
     expect(chargeFor(withDetail('WebGPU: real GPU timestamps were measured for every row', '0/33 rows, reason "the pass recorded no queries"'), scoped)).toBeNull()
-    expect(chargeFor(withDetail('WebGPU: real GPU timestamps were measured for the low-preset rows too', '0/3 low rows with gpu'), scoped)).toBeNull()
+    const low = withDetail('WebGPU: real GPU timestamps were measured for the low-preset rows too', '0/3 low rows with gpu')
+    expect(chargeFor(low, scoped)?.point).toBe(1012)
+    // Point 1012 names this exact companion row. Its entry does not absorb a
+    // neighbouring preset, an empty sample, or the player's core lane.
+    expect(chargeFor(withDetail('WebGPU: real GPU timestamps were measured for the high-preset rows too', '0/3 high rows with gpu'), scoped)).toBeNull()
+    expect(chargeFor(withDetail(low.name, '0/0 low rows with gpu'), scoped)).toBeNull()
+    expect(chargeFor(low, { ...scoped, featureLevel: 'core' })).toBeNull()
     // AND THE REASON MAY NOT RIDE ALONG WITH A SECOND FAILURE: unanchored, the
     // detail below carried the known capability gap AND a genuinely different
     // fault and was still excused (cross-vendor review, GPT-5.6 Sol, 30.08.2026).
@@ -3912,22 +3919,61 @@ describe('the shipped charge ledger', () => {
     expect(chargeFor(withDetail(name, measured.replace('["Ada"×"Njoro" 14×12 px]', '[]')), scoped)).toBeNull()
   })
 
-  it('leaves the async-pipeline message uncharged, though its family now has a point', () => {
+  it('charges each new cascade signature without taking its neighbouring form', () => {
     const scoped = { suite: 'settings', backend: 'webgpu', kind: 'console', featureLevel: 'compatibility' }
-    const asyncForm = failedChecks(
-      'ERR: THREE.WebGPURenderer: Async render pipeline creation failed (renderPipeline_x): [Invalid TextureView] is invalid due to a previous error.',
-    )[0]
-    expect(chargeFor(asyncForm, scoped)).toBeNull()
-    // While the measured form, at the start of the stored name, still charges.
-    const measured = failedChecks(
-      'ERR: THREE.WebGPURenderer: Uncaptured WebGPU GPUValidationError: [Invalid TextureView] is invalid due to a previous error.',
-    )[0]
-    expect(chargeFor(measured, scoped).point).toBe(514)
-    // AND THE BARE WORDINGS STAY UNCHARGED TOO — the shape an unrelated defect
-    // prints. This is the over-reach the pins above exist for, and filing point
-    // 1011 for the family did not widen it by one character.
-    for (const bare of ['console error: Async render pipeline creation failed', 'console error: Invalid CommandBuffer from CommandEncoder']) {
-      expect(chargeFor(red(bare, null, 'console'), scoped), bare).toBeNull()
+    const cases = [
+      {
+        measured:
+          'THREE.WebGPURenderer: Async render pipeline creation failed (renderPipeline_ShadowMaterial_1867): [Invalid TextureView] is invalid due to a previous error.',
+        neighbour:
+          'THREE.WebGPURenderer: Async render pipeline creation failed (renderPipeline_BasicMaterial_1005): [Invalid TextureView] is invalid due to a previous error.',
+      },
+      {
+        measured:
+          'THREE.WebGPURenderer: Async render pipeline creation failed (renderPipeline_MeshStandardMaterial_1005): [Invalid TextureView] is invalid due to a previous error.',
+        neighbour:
+          'THREE.WebGPURenderer: Async render pipeline creation failed (renderPipeline_BasicMaterial_1005): [Invalid TextureView] is invalid due to a previous error.',
+      },
+      {
+        measured:
+          'THREE.WebGPURenderer: Async render pipeline creation failed (renderPipeline_MeshStandardNodeMaterial_999): [Invalid TextureView] is invalid due to a previous error.',
+        neighbour:
+          'THREE.WebGPURenderer: Async render pipeline creation failed (renderPipeline_BasicMaterial_999): [Invalid TextureView] is invalid due to a previous error.',
+      },
+      {
+        measured:
+          'THREE.WebGPURenderer: Async render pipeline creation failed (renderPipeline_RenderPipeline_7187): [Invalid TextureView] is invalid due to a previous error.',
+        neighbour:
+          'THREE.WebGPURenderer: Async render pipeline creation failed (renderPipeline_BasicMaterial_7187): [Invalid TextureView] is invalid due to a previous error.',
+      },
+      {
+        measured:
+          'THREE.WebGPURenderer: Uncaptured WebGPU GPUValidationError: [Invalid CommandBuffer from CommandEncoder "renderContext_11"] is invalid due to a previous error.',
+        neighbour:
+          'THREE.WebGPURenderer: Uncaptured WebGPU GPUValidationError: [Invalid CommandBuffer from Queue "renderContext_11"] is invalid due to a previous error.',
+      },
+    ]
+
+    // AND EVERY SCOPE FIELD IS PINNED, not only the material family (cross-vendor
+    // review, 01.09.2026, merge-with-fixes). The five neighbours below vary the
+    // pipeline class and nothing else, so nothing proved that the entry stops at
+    // the lane it was measured on — which is the ONE direction its two truncated
+    // alternatives are open in. The player's core adapter, WebGL 2, another
+    // suite and the CHECK kind each stay a real red.
+    const anchor = { ...failedChecks(`ERR: ${cases[0].measured}`)[0], detailVaried: true }
+    expect(chargeFor(anchor, scoped)?.point).toBe(514)
+    expect(chargeFor(anchor, { ...scoped, featureLevel: 'core' })).toBeNull()
+    expect(chargeFor(anchor, { ...scoped, backend: 'webgl' })).toBeNull()
+    expect(chargeFor(anchor, { ...scoped, suite: 'polish' })).toBeNull()
+    expect(chargeFor({ ...anchor, kind: 'check' }, { ...scoped, kind: 'check' })).toBeNull()
+
+    for (const { measured, neighbour } of cases) {
+      // The recorder observed changing generated ids in each family. A narrow
+      // detailMatch would therefore be refused; the stable stored name must be
+      // sufficient on its own.
+      const stored = { ...failedChecks(`ERR: ${measured}`)[0], detailVaried: true }
+      expect(chargeFor(stored, scoped)?.point, measured).toBe(514)
+      expect(chargeFor(failedChecks(`ERR: ${neighbour}`)[0], scoped), neighbour).toBeNull()
     }
   })
 

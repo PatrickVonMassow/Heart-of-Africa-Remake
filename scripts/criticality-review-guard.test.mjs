@@ -15,13 +15,16 @@ import { spawnSync } from 'node:child_process'
 import { cpSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { resolve } from 'node:path'
+import { evaluateCriticalityReview } from './criticality-review-guard-core.mjs'
 import {
   attachPointFileSets,
   attachUnavailableClearances,
   baselineFor,
   bootstrapBase,
+  buildFindingsFiledReceipt,
   buildUnavailableReceipt,
   measurePointFilesWithoutCommission,
+  parseFindingsFiledArgs,
   parseUnavailableReceiptArgs,
   pointAuthorshipLogCommand,
   pointFilesCommand,
@@ -546,17 +549,32 @@ describe('the gate against a real tick', { timeout: 60_000 }, () => {
     expectAllow()
   })
 
-  it('BLOCKS the moment the HIGH point is ticked with no review on record', () => {
+  it('lets the unreviewed HIGH tick through, and still names it in the report', () => {
+    // THE BLOCK IS GONE (CLAUDE.md §2 infrastructure freeze), the same cut as
+    // its twin in mechanism-review-guard.mjs. What must survive is the reading:
+    // a switched-off gate that also stopped measuring would leave the debt with
+    // no reader at all.
+    // The baseline is written by hand now: it used to be armed by the clear
+    // path, and with the block gone that path no longer runs.
+    const base = git('rev-parse', 'HEAD').stdout.trim()
+    write('.claude/criticality-review-baseline.json', JSON.stringify({ baselines: { main: base } }))
     write('TASKS.md', '# TASKS\n\n## Checklist\n')
     write('docs/tasks-archive.md', `# Archive\n\n${PLAIN(901, true)}\n\n${HIGH(900, true)}\n`)
     commit('archive the must-work point')
     const hook = runHook()
-    expect(hook.decision?.decision, `stdout was ${JSON.stringify(hook.stdout)}`).toBe('block')
-    expect(hook.decision.reason).toContain('point 900')
-    expect(hook.decision.reason).toContain('no review recorded')
+    expect(hook.stdout.trim(), 'a switched-off gate must print nothing at a turn end').toBe('')
+
+    const status = spawnSync(
+      process.execPath,
+      [resolve(repo, 'scripts', 'criticality-review-guard.mjs'), '--status'],
+      { windowsHide: true, cwd: repo, encoding: 'utf8', input: '' },
+    )
+    expect(status.status, status.stderr).toBe(0)
+    expect(status.stdout).toContain('point 900')
+    expect(status.stdout).toContain('no review recorded')
   })
 
-  it('BLOCKS on a self-review, refused by the record command itself', () => {
+  it('REFUSES a self-review at the record command, gate or no gate', () => {
     const head = git('rev-parse', 'HEAD').stdout.trim()
     const r = spawnSync(
       process.execPath,
@@ -573,7 +591,6 @@ describe('the gate against a real tick', { timeout: 60_000 }, () => {
     )
     expect(r.status, 'a self-review must be refused at the record command').toBe(1)
     expect(r.stderr).toMatch(/SAME-VENDOR REVIEW/i)
-    expect(runHook().decision?.decision).toBe('block')
   })
 
   it('CLEARS once a different vendor records a merge naming the point', () => {
@@ -618,23 +635,29 @@ describe('the gate against a real tick', { timeout: 60_000 }, () => {
     write('TASKS.md', '# TASKS\n\n## Checklist\n')
     write('docs/tasks-archive.md', `# Archive\n\n${PLAIN(901, true)}\n\n${HIGH(900, true)}\n\n${HIGH(903, true)}\n`)
     commit('tick a second must-work point with no review on record')
-    expect(runHook().decision?.decision, 'the pending tick must block first').toBe('block')
 
     const before = readFileSync(resolve(repo, '.claude/criticality-review-baseline.json'), 'utf8')
     rmSync(resolve(repo, 'docs/tasks-archive.md'))
     mkdirSync(resolve(repo, 'docs/tasks-archive.md'))
     const hook = runHook()
-    // Fail-OPEN: the turn is allowed, loudly, and the state is left alone.
+    // Fail-OPEN was always the answer here; what changed is that the block is
+    // gone, so the state this protects is the REPORT's baseline, not a verdict.
     expect(hook.stdout.trim(), 'an unreadable work order must not produce a verdict').toBe('')
-    expect(hook.stderr).toMatch(/allowing stop/)
     expect(
       readFileSync(resolve(repo, '.claude/criticality-review-baseline.json'), 'utf8'),
-      'the baseline moved — the tick is now forgiven forever',
+      'the baseline moved — the tick would be forgiven forever',
     ).toBe(before)
 
     rmSync(resolve(repo, 'docs/tasks-archive.md'), { recursive: true })
     write('docs/tasks-archive.md', `# Archive\n\n${PLAIN(901, true)}\n\n${HIGH(900, true)}\n\n${HIGH(903, true)}\n`)
-    expect(runHook().decision?.decision, 'the gate must still be there afterwards').toBe('block')
+    // And the DEBT is still there afterwards, which is what the baseline was
+    // guarding: the block no longer answers this, so the report does.
+    const status = spawnSync(
+      process.execPath,
+      [resolve(repo, 'scripts', 'criticality-review-guard.mjs'), '--status'],
+      { windowsHide: true, cwd: repo, encoding: 'utf8', input: '' },
+    )
+    expect(status.stdout, 'the ticked point must still be owed').toContain('point 903')
   })
 })
 
@@ -732,5 +755,129 @@ describe('the archive read at its REAL size', () => {
     const atHead = showAt('HEAD', 'docs/tasks-archive.md')
     expect(atHead.length).toBeGreaterThan(1024 * 1024)
     expect(atHead.trimEnd()).toBe(onDisk.trimEnd())
+  })
+})
+
+// THE ROUTE THE REFUSAL NAMES, WHICH NOTHING COULD TAKE. The gate's own text
+// offers two durable answers to a `do-not-merge` — fix it and record the
+// re-review, or file every finding as an open work-order point and append this
+// receipt naming them — and no command wrote the second. Measured 01.09.2026,
+// when a refusal raised AFTER a point had landed could not be answered the first
+// way either: the point's reviewed range ends at its landing, so a later commit
+// is not "a LATER commit" to the ancestor index. A rule whose only remaining
+// exit is unbuildable is a rule that gets waived.
+describe('the findings-filed receipt', () => {
+  const SHA = 'a'.repeat(40)
+  // A LEDGER TIMESTAMP MUST LOOK LIKE ONE: the row filter asks `ledgerAtUsable`,
+  // so a toy number is not a usable `at` and the review would not be found.
+  const REVIEW = {
+    sha: SHA,
+    point: 700,
+    model: 'GPT-5.6 Sol',
+    verdict: 'do-not-merge',
+    mode: 'review',
+    // The recorder always writes the reviewed commit's authorship key, so a row
+    // without one can only have arrived by hand — and a hand-edited ledger earns
+    // a refusal, never a clearance.
+    authoredBy: 'Claude Opus 5 <noreply@anthropic.com>',
+    evidence: 'read the whole mechanism and found it wrong in two places',
+    at: 1_788_000_000_000,
+  }
+  const build = (over = {}) =>
+    buildFindingsFiledReceipt({
+      sha: SHA,
+      point: 700,
+      model: 'GPT-5.6 Sol',
+      findingPoints: [801, 802],
+      records: [REVIEW],
+      openPoints: [801, 802, 900],
+      now: 1_788_000_100_000,
+      resolveSha: () => SHA,
+      ...over,
+    })
+
+  it('binds the exact review it answers, so two verdicts on one sha stay apart', () => {
+    const built = build()
+    expect(built.ok).toBe(true)
+    expect(built.record).toMatchObject({
+      kind: 'review-findings-filed',
+      sha: SHA,
+      point: 700,
+      model: 'GPT-5.6 Sol',
+      reviewAt: REVIEW.at,
+      findingPoints: [801, 802],
+    })
+    // Strictly after the review, because the acceptance rule compares the two.
+    expect(built.record.at).toBeGreaterThan(REVIEW.at)
+  })
+
+  it('REFUSES when two refusals share the millisecond it would bind by', () => {
+    // The row identifies its review by {sha, point, model, reviewAt}; a tie
+    // there would let ONE findings list clear TWO distinct refusals, and the
+    // ledger carries no finer identifier to tell them apart.
+    const twin = { ...REVIEW, evidence: 'a second, different refusal at the same instant' }
+    const built = build({ records: [REVIEW, twin] })
+    expect(built.ok).toBe(false)
+    expect(built.errors.join(' ')).toMatch(/share the timestamp/)
+  })
+
+  it('is a row the CORE actually accepts, end to end', () => {
+    // The builder's shape is worth nothing unless `evaluateCriticalityReview`
+    // reads it as an answer — so the receipt goes through the evaluator beside
+    // the refusal it answers, and the block it was blocking is gone.
+    const receipt = build().record
+    const tick = { number: 700, criticality: 'high', title: 'a high point' }
+    const inputs = {
+      baseline: 'b'.repeat(40),
+      head: SHA,
+      ticks: [tick],
+      openPoints: [801, 802, 900],
+      records: [REVIEW, receipt],
+    }
+
+    const withoutReceipt = evaluateCriticalityReview({ ...inputs, records: [REVIEW] })
+    expect(withoutReceipt.block).toBe(true)
+
+    const withReceipt = evaluateCriticalityReview(inputs)
+    expect(withReceipt.block).toBe(false)
+  })
+
+  it('REFUSES a point that is not open — a finding moved nowhere is a finding dropped', () => {
+    const built = build({ findingPoints: [801, 999] })
+    expect(built.ok).toBe(false)
+    expect(built.errors.join(' ')).toMatch(/999/)
+  })
+
+  it('REFUSES a receipt against a verdict that needs no answering', () => {
+    const built = build({ records: [{ ...REVIEW, verdict: 'merge' }] })
+    expect(built.ok).toBe(false)
+    expect(built.errors.join(' ')).toMatch(/needs answering/)
+  })
+
+  it('REFUSES when no such review exists at all', () => {
+    expect(build({ records: [] }).ok).toBe(false)
+    expect(build({ model: 'Opus 5' }).ok).toBe(false)
+  })
+
+  it('REFUSES an empty or malformed finding list', () => {
+    expect(build({ findingPoints: [] }).ok).toBe(false)
+    expect(build({ findingPoints: [0] }).ok).toBe(false)
+  })
+
+  it('takes the LATEST refusal when the same model refused twice on one sha', () => {
+    const later = { ...REVIEW, at: 1_788_000_050_000, evidence: 'the second refusal' }
+    expect(build({ records: [REVIEW, later] }).record.reviewAt).toBe(1_788_000_050_000)
+  })
+
+  it('parses its flags strictly, and ignores no unknown token', () => {
+    const ok = parseFindingsFiledArgs([
+      '--record-findings-filed', SHA, '--point', '700', '--model', 'GPT-5.6 Sol', '--finding-points', '801, 802',
+    ])
+    expect(ok.ok).toBe(true)
+    expect(ok.values.findingPoints).toEqual([801, 802])
+
+    expect(parseFindingsFiledArgs(['--record-findings-filed', SHA, '--nope', 'x']).ok).toBe(false)
+    expect(parseFindingsFiledArgs(['--finding-points', '801,eight']).ok).toBe(false)
+    expect(parseFindingsFiledArgs(['--point']).ok).toBe(false)
   })
 })

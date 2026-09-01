@@ -25446,3 +25446,210 @@ Nummerierung bleiben deshalb identisch — hier wird nur verschoben, nie umgesch
   Criticality: high — it is the gate in front of every merge, and its failure direction is a
   batch that cannot land anything while every guard reports itself working.
   Bundle: Session- & Repo-Hygiene.
+
+- [x] 1031. Three red families of the WebGPU lane have no owner, and one of them is a charged red
+  the parser renamed (measured 31.08.2026 on the full WebGPU LARGE pass of
+  `feat/686-five-word-lexicon-game`, 63 minutes, quiet machine; every red of that lane put through
+  `chargeFor` rather than read by eye).
+  Of the lane's reds, 15 came back UNCHARGED, in three families:
+  1. THE BUG-REPORT ARCHIVE RED IS CHARGED AND STILL READS UNCHARGED. Point 927's entry matches
+     `^member hoa-state-\d{4}-\d{2}-\d{2}-\d+\.png is present$`, and the suite printed exactly that
+     check — but the recorded red's NAME is `member hoa-state-2026-08-31-42.png is present — ` with
+     the separator still attached and an EMPTY detail. A check that prints no measurement keeps the
+     ` — ` in its name, so an anchored match can never fire. This is the same class as the
+     section-tag work of 30./31.08.: a red is read through text the recorder shaped, not through
+     what the suite meant. It is the cheapest of the three to fix and the most dangerous to leave,
+     because it makes a CORRECT charge silently ineffective.
+  2. TWO CONSOLE SIGNATURES OF THE POINT-514 MSAA CASCADE ARE UNOWNED: `Async render pipeline
+     creation failed (renderPipeline_ShadowMaterial_…)` and `Uncaptured WebGPU GPUValidationError:
+     [Invalid CommandBuffer from CommandEncoder "renderContext_11"]`. The ledger already carries
+     the cascade's other three signatures (`output-msaa`, `normal-msaa`, `[Invalid TextureView]`)
+     and 514's `why` describes exactly this chain. These two arrive in the same block, after the
+     same `RGBA16Float does not support multisampling`, on the same compatibility lane.
+  3. THE BENCHMARK TIMESTAMP ROWS: `WebGPU: real GPU timestamps were measured for the low-preset
+     rows too — 0/3 low rows with gpu`. Point 1009's entry names them and EXCLUDES them in its own
+     words: "The two WebGPU timestamp rows of the same run fail for their own reasons and are NOT
+     covered here." They have therefore been knowingly ownerless since 30.08.2026.
+  WHY IT BLOCKS: CLAUDE.md §7.2 lets a red close only when it is fixed, charged to its owning
+  point, or filed as a new point. These three are none of the three, so no LARGE pass over the
+  WebGPU lane can be read as covering a picture — which is what stopped the communication rebuild
+  from landing on the evening of 31.08.2026, although nothing in that rebuild touches any of them.
+  FINAL STATE: (1) a red whose check printed no measurement is recorded under the name the suite
+  printed, without the dangling separator — fixed in the parser, not in the ledger entry, because
+  every anchored charge has the same hole; (2) the two cascade signatures join point 514's entry,
+  each as narrowly as its measured text allows; (3) the benchmark timestamp rows get an owner —
+  either an existing point that really covers them or a new one — and are never again excluded by a
+  sentence inside another point's charge.
+  VERIFIABLE: a unit case over the red parser proving a check with an EMPTY detail keeps a clean
+  name and that the existing 927 entry then charges it, mutation-checked; a case pinning each new
+  cascade signature against the measured line and proving it does not match the neighbouring one;
+  a re-run of the WebGPU lane's `settings`, `benchmark` and `report` sections in which every red
+  comes back charged. Plus `npm run test:unit`, lint, build.
+  Criticality: high — it is the gate every point's picture verification is judged by, and its
+  failure direction is a real defect standing in the way of unrelated work while a genuinely
+  charged red reads as unowned.
+  Bundle: Testinfrastruktur.
+
+- [x] 1037. The daemon drill claims it left nothing alive, but it only ASKS and never waits
+  (measured 01.09.2026 on CI run 33502763472 for `main` at `5e33a28`, job `fast`, and reproduced
+  as green three times locally on the same commit — a load-dependent red, not a random one).
+  WHAT FAILED: `scripts/batch-daemon-drill.test.mjs` > `'failing' real-path completion leaves
+  neither its daemon nor its sandbox alive` at line 115, `expect(probePid(result.resources.daemon
+  .pid).exists).toBe(false)` — received `true`. The passing path of the same case stayed green;
+  only the `--inject-failure` path went red.
+  WHY IT IS THE DRILL AND NOT THE TEST: the `finally` block of `realFailureScenario` in
+  `scripts/batch-daemon-drill.mjs` requests `shutdown`, then sleeps a FIXED 300 ms, then SIGKILLs
+  whatever still exists, removes the sandbox, and returns. Nothing waits for the signalled process
+  to actually disappear. So the drill discloses `resources.daemon.pid` as a resource it has torn
+  down while the kill is still in flight, and the assertion reads a process that is dying but not
+  yet gone. On a loaded runner that window is wide enough to lose, and the 300 ms is itself a
+  guess: on a slow runner the daemon has not finished its own shutdown when the sleep ends, so it
+  is SIGKILLed and the gap gets larger, not smaller.
+  WHY IT MATTERS BEYOND THE RED: the drill's whole claim is that a failing teardown leaves no
+  daemon and no sandbox behind. A teardown that signals without confirming cannot prove that — a
+  daemon that genuinely refused to die would look identical to one that simply had not died yet,
+  and the drill would go green over it on any fast machine. The red is the honest half of the
+  bug; the silent green is the dangerous half.
+  FINAL STATE: the drill WAITS for each process it tears down to be gone before it returns, with a
+  bounded wait and a named failure when the wait expires — a process that outlives its teardown is
+  a RED CHECK of the drill, not a race the caller inherits. The fixed 300 ms sleep is replaced by
+  the same bounded wait on the graceful shutdown. The disclosed `resources` describe a state the
+  drill has verified, so the test's assertion becomes a restatement of what the drill already
+  proved rather than a second, racing measurement.
+  VERIFIABLE: a unit case that a teardown whose process does NOT die within the bound comes back
+  as a failed named check rather than a pass; a case that the graceful path does not spend the
+  full bound; the existing drill case, green. Plus `npm run test:unit`, lint, build.
+  Criticality: high — it is the drill that proves the batch daemon leaves nothing running, and its
+  failure direction is a green over a real leak.
+  Bundle: Session- & Repo-Hygiene.
+
+- [x] 1040. The 1036 lane's CI is red: `mechanism-review.mjs --list` is killed by a signal
+  (measured 01.09.2026, findings carrier). A red CI on a pushed ref blocks every landing behind
+  it, so this passes the intake rule as a real blockade.
+  FINAL STATE: the `--list` invocation on the 1036 lane exits normally; the cause of the signal
+  kill (out-of-memory, runaway recursion, or an external kill) is named in the fix's commit; CI
+  on the lane is green.
+  VERIFIABLE: `node scripts/mechanism-review.mjs --list` exits 0 on the lane's head; the lane's
+  CI run concludes green. Plus `npm run test:unit`, lint, build.
+  Criticality: high — a lane whose CI cannot conclude green blocks all landing behind it.
+  Bundle: Testinfrastruktur.
+
+- [x] 1036. The four-eyes ledger on `main` cannot reach green from where the merge-authorship
+  repair left it (measured 01.09.2026, this session, after landing point 1031).
+  A hand-resolved landing merge measured as UNKNOWN authorship — unreviewable by construction —
+  and the repair of that (`--no-replace-objects` ancestry read from the commit object, bounded to
+  the header, in the gate and the recorder alike, six cross-vendor rounds) is landed and green.
+  What it did NOT do is drain the debt that accumulated while the gate stood blocked, and the
+  baseline only advances when the gate passes, so the window keeps every contribution since.
+  WHAT IS OWED, MEASURED:
+  - TWO STALE PASS SPLITS. `96e082f` and `584ceb9` each carry 1 of 2 recorded passes, and the
+    guard prints no runnable command for either: "no runnable command is printed from the stale
+    split — ask the guard status to rerun the contribution planner at the immutable commit
+    boundary". Whether that rerun is a command anybody can invoke today is exactly what this point
+    must establish; if it is not, the missing command is the deliverable.
+  - THE PRE-REPAIR ROWS FOR `1bdd3a2` STILL DOMINATE. Two verdicts were recorded against it before
+    the repair, when the recorder stored no author; two more were recorded after, carrying the
+    resolved `GPT-5.6 Sol` author. The gate still answers "the only review on record is from
+    unknown model's vendor", so a later, better-attributed row does not supersede an earlier
+    unattributed one. Either it does, with a rule that says why, or a row written against
+    authorship the recorder could not then resolve is retired explicitly.
+  - THE REPAIR'S OWN COMMITS OWE THEIR SOL PASSES over their full end-state file sets; the
+    recorded verdicts cover the files each round actually read, which is less than the set.
+  - AND THE DEBT GROWS FASTER THAN IT CAN BE PAID, measured 01.09.2026 over fourteen cross-vendor
+    rounds in one session. Every verdict is recorded by APPENDING to `.claude/mechanism-reviews.jsonl`,
+    that file is tracked, and a commit touching it is itself a mechanism contribution that owes its
+    own review. Clearing one contribution therefore creates another, and a session that answers
+    findings honestly — fourteen rounds, every finding closed, Sol's final verdict `merge` on each
+    — still leaves the gate red. The stale-split entries above are the same effect after the fact:
+    they were split at a file set the range no longer has, so their missing passes cannot be
+    addressed at all. THIS is what makes the point urgent rather than tidy: the gate is not merely
+    behind, it cannot catch up, and no amount of correct work inside one session converges.
+    Whatever the fix is, it must make a ledger-only commit NOT owe a round of its own, or make the
+    round that records a verdict cover the recording.
+  MEASURED AGAIN THE SAME DAY, at HEAD 28edbb0, before this point was commissioned:
+  - THE GUARD'S OWN INSPECTION COMMAND DOES NOT ANSWER. `node scripts/mechanism-review-guard.mjs
+    --status` — the command every refusal prints as the way to read the remaining debt — takes its
+    session id ONLY from a stdin JSON payload, so a hand-run passes the empty string and
+    `heldByOtherLiveOwner('')` answers true against the batch owner's own lock. The guard prints
+    `stands down: another live session owns the batch lock` and exits 0. Piping
+    `{"session_id":"<the owning id>"}` into it is today the only way to read the status at all.
+    That is the first step of "every step reached through a command the guard itself printed", and
+    it does not work.
+  - THE STALE SPLITS DO PRINT A RUNNABLE COMMAND NOW. The status prints contribution-scoped
+    `review-sol.mjs` commands for both — two passes for `96e082f`, one for `584ceb9` — and says the
+    planner wins over the historical split. What remains against them is narrower than the entry
+    above assumes: `scripts/render-verify-charges.mjs` was in NONE of the four recorded passes, so
+    nobody read it.
+  - AND THE CRITICALITY GATE BLAMES THE WRONG THING. Point 1031 carries a `do-not-merge` on
+    `10b83eb` and a `merge` on `9ee3bd18`; git proves `10b83eb` IS a strict ancestor of
+    `9ee3bd18`, so the fix was recorded at a later commit. The gate still prints "A later
+    `merge` exists, but not for a LATER commit — so nothing was fixed between them." The real
+    cause is that the merge row carries `pass` 1/1 over two files, so it enters `compositions`
+    instead of the plain clean bucket, and `compositionComplete` fails because the cumulative
+    ancestry does not cover the point's measured `pointFiles`. The message therefore sends the
+    reader to commit a fix that already exists rather than naming the files nobody read — the way
+    out is invisible, and a reader who trusts the text concludes the ledger is lying about git. An
+    incomplete composition must say so and name its uncovered files, the way the `uncovered-files`
+    finding already does when nothing is clean at all.
+  ORIENTATION, NOT A MANDATE: `REVIEW_END_STATE_EXCLUSIONS` in
+  `scripts/mechanism-review-range-core.mjs` is this repository's existing single boundary for "this
+  path is outside the mechanism gate's reach, and here is the recorded reason". If the ledger fix
+  belongs elsewhere, say why rather than assuming this place.
+  FINAL STATE: `node scripts/guard-preflight.mjs --for merge` on `main` reports
+  `mechanism-review-guard clean`, every step to that state reached through a command the guard
+  itself printed, and no contribution retired without a reason recorded beside it.
+  VERIFIABLE: the real repository — the preflight is clean on `main` — plus a unit case for
+  whichever rule changed: a superseding row, a retirement, or the planner rerun the stale split
+  needs. Plus `npm run test:unit`, lint, build.
+  Criticality: high — while it stands, no point can be landed at all: the gate refuses every merge,
+  and the batch's whole throughput is behind it.
+  Bundle: Session- & Repo-Hygiene.
+
+- [x] 1038. The launcher's writer probe cannot ever call a feature writer dead, so one dead
+  writer wedges the whole batch for half an hour (measured 01.09.2026, this session, filed from
+  the findings carrier).
+  WHAT HAPPENED: batch session 37d470a8 hit its context boundary at 14:01 and died at 14:03,
+  taking its Sol author for point 1036 with it — no `codex` process ran, the worktree
+  `feat/1036-ledger-convergence` had no commit and no non-git file change after 14:03.
+  `scripts/batch-in-flight.mjs` already refused a declaration for that agent as `evidence-gone`,
+  yet `scripts/batch-autostart-core.mjs` still measured the same writer's verdict as `alive` at
+  14:24 and returned `registered-writer-live`, so the launcher started no successor session. The
+  batch stood still for 24 measured minutes with nothing running and nothing to run.
+  WHY THE TWO PROBES DISAGREE — it is structural, not a tuning difference:
+  `agentOutputVerdict` (`scripts/batch-in-flight-core.mjs`) returns `dead` on exactly one
+  ground — a recorded process identity POSITIVELY REFUTED through `processEvidence`. Everything
+  else it can return is `alive`, `quiet` or `unmeasurable`. `registeredFeatureWriters`
+  (`scripts/batch-in-flight.mjs`) calls `checkAgentOutput({ worktree, branch, now })` and passes
+  NO pids at all, so `processEvidence` is empty for every writer it measures and the refutation
+  branch is unreachable BY CONSTRUCTION. The register can therefore never say `dead`: it reads
+  `alive` from a worktree mtime and a branch tip alone, for the full `RESPAWN_GRACE_MS` of 30
+  minutes after the last touch — which a dead process's leftovers keep satisfying. The
+  declaration path passes its recorded pids and refutes the same writer within seconds.
+  `launcherStartDecision` then vetoes on `writer?.output?.verdict === 'alive'`, and the longer,
+  evidence-poorer window wins.
+  WHY 874 DID NOT ALREADY FIX IT: point 874 is the same defect one path over — it taught
+  `--agent-check` to probe the pid its own DECLARATION records, which is exactly why the
+  declaration path refutes this writer within seconds today. It never reached the launcher's
+  REGISTER path, which builds its own probe call from a git worktree listing and has no pid to
+  pass. 874's own rule — a positively refuted process may not be outvoted by the corpse's last
+  commit — is the rule this path still breaks.
+  WHY IT MATTERS BEYOND THE STANDSTILL: the veto reports a LIVE writer, so the launcher's own
+  record says the batch is busy while nothing is running. The failure is invisible in exactly
+  the log a person would read to find it, and it repeats after every session that dies with a
+  delegated author still registered — which is the normal end of a context boundary, not an
+  exotic crash.
+  FINAL STATE: the two probes cannot return opposite verdicts for the same writer. Where a
+  process identity is recorded for a registered feature worktree or branch, `registeredFeatureWriters`
+  carries it into `checkAgentOutput` so a refuted process makes that writer `dead` there too and
+  the launcher starts its successor; where no identity is recorded, the register's veto is bounded
+  so it cannot outlive the declaration probe's own verdict on the same writer. A launcher refusal
+  that rests on a writer nobody could measure names that fact instead of reporting it as live.
+  VERIFIABLE: a unit case that a registered feature writer whose recorded process is positively
+  refuted does NOT veto the launcher, while a writer with fresh git output and no process
+  evidence still does; a case that the declaration probe and the register return the SAME verdict
+  for one writer given one body of evidence; a case that the refusal text distinguishes a
+  measured-live writer from an unmeasured one; the existing `registered-writer-live` launcher
+  cases, green. Plus `npm run test:unit`, lint, build.
+  Criticality: high — its failure direction is a silent batch standstill of up to the full grace
+  window, reported as a live writer, after the most ordinary session ending there is.
+  Bundle: Session- & Repo-Hygiene.

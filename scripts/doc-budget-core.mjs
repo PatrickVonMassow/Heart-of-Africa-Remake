@@ -96,8 +96,13 @@ export const DOC_BUDGETS = [
     // RAISED by the 31 measured words of the 24.08.2026 standing authorization:
     // §6 must name both the VDZK recommendation grant and its boundary in the same
     // sentence, so this binding rule cannot be replaced by a shorter pointer.
-    maxLines: 193,
-    maxWords: 1363,
+    // RAISED by the 12 measured lines / 105 measured words (guard's own count)
+    // of the 01.09.2026 redirection (user decision): the §7.1-gate clause became
+    // three binding clauses — checklist role, infrastructure freeze, finding
+    // intake — that every session must load, because they change what any later
+    // point may be.
+    maxLines: 205,
+    maxWords: 1468,
     // THE RATCHET SLACK, tightest in the project: this file is the per-turn cost of
     // every session and every subagent, so twenty words is the whole licence between
     // one cut and the next. A larger edit than that lowers the ceiling with it.
@@ -135,8 +140,18 @@ export const DOC_BUDGETS = [
     // RAISED on 27.08.2026 by the 21-word hook for the user's 24.08.2026 ruling:
     // a stated VDZK recommendation is a decision the session may execute and
     // record. This is a new authorization, not a longer telling of standstill.
+    // RAISED on 01.09.2026 by the 13-word hook the user ordered persisted: the
+    // redirection plan (keyword "Umsteuerung") with its done/open state, so a
+    // later session can be addressed on it directly. A new topic, not a longer
+    // telling; the ceilings move by exactly that line to the 51 / 802 fit.
+    // LOWERED on 01.09.2026 by the cut that retired the R3F Clock deprecation
+    // watch into docs/backlog.md: a passive upstream watch with no player
+    // impact is what the finding-intake rule (CLAUDE.md §2) collects there
+    // rather than carries at every turn. The ceilings follow the cut down to
+    // the measured 50 / 787 fit — a cut lands with its lowered ceiling, or the
+    // room it frees is spent silently.
     maxLines: 50,
-    maxWords: 789,
+    maxWords: 787,
     maxEntryWords: 22,
     // Fifteen words: an index of one-hook lines, where a whole new entry is ~20 words —
     // so the slack cannot hide one, and re-wording an existing hook is free.

@@ -86,6 +86,15 @@ const RANGE_HEADER = new RegExp(
 // pass 3). AS AN ARGS ARRAY, never a shell line (round-5 pass 3): cmd.exe
 // expands %-spans as environment variables before git runs.
 export const mechanismLogCommand = (base, head) => [
+  // `--no-replace-objects` FIRST, because %P is what the resolver attributes a
+  // trailerless merge by, and `log` HONOURS `refs/replace` (cross-vendor review,
+  // GPT-5.6 Sol at effort high, do-not-merge on the gate half). A replacement
+  // commit naming one parent where the real merge names two would hand the
+  // planner an ancestry that hides the merged tip's author, and an author that
+  // is merely invisible has not stopped being one — the model that wrote that
+  // tip would be free to review its own work. The same flag guards the trailer
+  // reads the gate performs beside this log.
+  '--no-replace-objects',
   '-c',
   'core.quotepath=on',
   'log',
@@ -96,6 +105,81 @@ export const mechanismLogCommand = (base, head) => [
   '--reverse',
   `${base}..${head}`,
 ]
+
+/**
+ * The parent shas of a commit OBJECT, read from `cat-file -p` output.
+ *
+ * BOUNDED TO THE HEADER, and that bound is the whole point (cross-vendor review,
+ * GPT-5.6 Sol at effort high, third do-not-merge on this repair). A commit object
+ * is a header, ONE blank line, then the message — and the message is attacker-
+ * shaped text. Filtering every `parent ` line in the whole object let a commit
+ * whose MESSAGE carried such a line inject a parent that git never recorded, and
+ * that forged parent's trailers would then have been read as the merge's
+ * authorship. Reading past the blank line fails OPEN, which is the one direction
+ * an authorship read may never fail in.
+ */
+export function commitObjectParents(out) {
+  const lines = String(out ?? '').split('\n')
+  // A COMMIT OBJECT OPENS ON ITS TREE. Anything else — empty output, a read that
+  // failed, a blob — is not a commit header, and an empty first line would
+  // otherwise read as a header that terminated immediately and answer "no
+  // parents": the same silent nothing a hidden merged tip produces.
+  if (!/^tree [0-9a-f]{40}$/.test((lines[0] ?? '').replace(/\r$/, ''))) {
+    throw new Error('output does not open on a commit object header terminator — its parent lines cannot be trusted')
+  }
+  const parents = []
+  let terminated = false
+  // GIT PUTS THE PARENTS IN ONE CONTIGUOUS BLOCK DIRECTLY AFTER `tree`, and
+  // accepting one anywhere in the header is forgeable (cross-vendor review,
+  // GPT-5.6 Sol at effort high, CRITICAL): an object carrying a real parent,
+  // then `author`/`committer`, then `parent <forged>` is SINGLE-parented to git
+  // and two-parented to a scan — and the forged object's trailers would then be
+  // inherited as this merge's authorship. The block closes at the first header
+  // line that is not a parent, and nothing may reopen it.
+  let blockClosed = false
+  for (const [index, raw] of lines.entries()) {
+    const line = raw.endsWith('\r') ? raw.slice(0, -1) : raw
+    if (line === '') {
+      // AND THE TERMINATOR MAY NOT BE THE LAST THING IN THE OUTPUT (same review
+      // round, final finding). Output truncated right after a header line's
+      // newline splits to a trailing empty string, which read as the blank line
+      // that ends the header — so a truncated read answered with the parents it
+      // happened to have seen. A real object always has something after that
+      // blank line, even if only the empty string its own trailing newline
+      // leaves. A caller that TRIMS its output loses that evidence for a commit
+      // with an empty message, and such a commit is then refused: no tooling in
+      // this repository writes one, and refusing is the safe side.
+      terminated = index < lines.length - 1
+      break
+    }
+    if (!line.startsWith('parent ')) {
+      // `tree` opens the header and does not close the parent block; every other
+      // header line does.
+      if (index > 0) blockClosed = true
+      continue
+    }
+    if (blockClosed) {
+      throw new Error('commit object header carries a parent line after the parent block closed — git records no such parent')
+    }
+    const sha = line.slice(7)
+    // A PARENT IS AN OBJECT ID OR IT IS NOTHING (same review round). Trimming a
+    // free-form remainder into a "sha" accepted whatever the header carried; the
+    // shape is the only thing that distinguishes a recorded parent from text.
+    if (!/^[0-9a-f]{40}$/.test(sha)) {
+      throw new Error(`commit object header carries a malformed parent line: ${JSON.stringify(line.slice(0, 80))}`)
+    }
+    parents.push(sha)
+  }
+  // AND A HEADER THAT NEVER ENDS IS REFUSED, not accepted as far as it was read.
+  // Without the terminator there is no evidence where the header stopped, so
+  // every line read may already be message — the injection this bound exists to
+  // stop, arriving through a truncated or malformed object instead of a crafted
+  // message. An authorship read may only fail CLOSED.
+  if (!terminated) {
+    throw new Error('commit object has no header terminator — its parent lines cannot be trusted')
+  }
+  return parents
+}
 
 export function parseRangeLog(out, { decodePath = (path) => path } = {}) {
   const commits = []
@@ -167,6 +251,29 @@ const authorshipResolver = (commits = []) => {
     return merged
   }
   return resolve
+}
+
+/**
+ * Stamp each measured commit with the authorship the ancestry resolver proves.
+ *
+ * The planner has always called that resolver while grouping files. The gate's
+ * contribution evaluator consumes `authorModels` directly, though, so leaving
+ * the inherited merge author only in `parentAuthorModels` made the two halves
+ * disagree: status offered the right cross-vendor reviewer while the verdict
+ * still called every row a review of unknown authorship. Resolve once over the
+ * complete measured list and hand both consumers the same fact.
+ */
+export function withResolvedCommitAuthors(commits = []) {
+  const measured = Array.isArray(commits) ? commits : []
+  const resolve = authorshipResolver(measured)
+  return measured.map((commit) => {
+    const authorModels = resolve(commit)
+    return {
+      ...commit,
+      authorModels,
+      authorModel: authorModels[0] ?? '',
+    }
+  })
 }
 
 export function eligibleReviewer(authors = [], candidates = REVIEWER_CANDIDATES) {

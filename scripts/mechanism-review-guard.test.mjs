@@ -20,8 +20,17 @@ import {
   parseRangeLog,
   parseMechanismLog,
   pendingReviewContributions,
+  authorshipBlockResponse,
+  authorshipRead,
+  readSubject,
+  defaultParentReader,
   planningContributions,
+  rangeCommits,
   gatherMechanismReviewInputs,
+  GATE_SWITCHED_OFF,
+  deferralEndsTheRun,
+  statusReportsFindings,
+  resolveMechanismReviewSessionId,
   shouldSeedRecoveryAnchor,
 } from './mechanism-review-guard.mjs'
 import { BASELINE_PATH as CRITICALITY_BASELINE_PATH } from './criticality-review-guard.mjs'
@@ -36,8 +45,54 @@ import {
   mechanismPathsIn,
   modelsFromTrailers,
 } from './mechanism-review-core.mjs'
+import { planAuthorshipGroups } from './mechanism-review-range-core.mjs'
 import { commonRepoPath, repoPath } from './repo-paths.mjs'
 import { readOwnerLock } from './batch-singleton.mjs'
+
+describe('the switched-off gate (point 1036)', () => {
+  it('stands down for every caller but the measuring read, and says why', () => {
+    // The block is off (CLAUDE.md §2 infrastructure freeze). A gather without
+    // `report` is what the Stop hook and guard-preflight both do, and it must
+    // carry no inputs at all — an applicable gather is what produced a verdict.
+    const gate = gatherMechanismReviewInputs({ sessionId: 'anything' })
+    expect(gate.applicable).toBe(false)
+    expect(gate.why).toBe(GATE_SWITCHED_OFF)
+    expect(gate.inputs).toBeUndefined()
+
+    // Nothing is forgiven: the reason names the report that still measures the
+    // debt, so a reader is never left without the way to see it.
+    expect(GATE_SWITCHED_OFF).toContain('mechanism-review-guard.mjs --status')
+
+    // And the read answers regardless of who holds the batch lock — the defect
+    // that made a hand-run `--status` print "stands down" and exit 0.
+    const read = gatherMechanismReviewInputs({ sessionId: '', report: true })
+    expect(read.applicable).toBe(true)
+  })
+
+  it('lets the report outlive a context-fence deferral, and only the report', () => {
+    // The fence suspends ENFORCEMENT. With the block gone there is nothing left
+    // to suspend, so a fenced session that exits before printing takes the last
+    // reader of the debt with it — the same silence the batch-lock stand-down
+    // used to produce.
+    expect(deferralEndsTheRun({ deferred: true }, { status: true })).toBe(false)
+    expect(deferralEndsTheRun({ deferred: true }, { status: false })).toBe(true)
+    expect(deferralEndsTheRun({ deferred: true })).toBe(true)
+    // An undeferred verdict never ends the run here either way.
+    expect(deferralEndsTheRun({ deferred: false }, { status: false })).toBe(false)
+    expect(deferralEndsTheRun(null, { status: false })).toBe(false)
+  })
+
+  it('reports the debt from the findings, never from the dead block flag', () => {
+    // A DEFERRED verdict carries its findings and sets `block` false, so a
+    // report keyed on `block` announced GATE CLEAR over a real debt. With the
+    // block switched off, `block` decides nothing at all any more.
+    expect(statusReportsFindings({ block: false, deferred: true, findings: [{}] })).toBe(true)
+    expect(statusReportsFindings({ block: true, findings: [{}, {}] })).toBe(true)
+    expect(statusReportsFindings({ block: false, findings: [] })).toBe(false)
+    expect(statusReportsFindings({})).toBe(false)
+    expect(statusReportsFindings(null)).toBe(false)
+  })
+})
 
 describe('baselineFor', () => {
   const state = { baselines: { main: 'aaa', 'feat/x': 'bbb' } }
@@ -62,6 +117,36 @@ describe('baselineFor', () => {
     expect(MECHANISM_BASELINE_PATH).toBe(commonRepoPath('.claude/mechanism-review-baseline.json'))
     expect(CRITICALITY_BASELINE_PATH).toBe(commonRepoPath('.claude/criticality-review-baseline.json'))
     expect(TASKS_SPEC_BASELINE_PATH).toBe(commonRepoPath('.claude/tasks-spec-guard-baseline.json'))
+  })
+})
+
+describe('the mechanism status session identity', () => {
+  it('lets the printed bare status command inspect through the live lock owner', () => {
+    const readLock = () => ({ sessionId: 'owning-session' })
+    expect(resolveMechanismReviewSessionId({ status: true, env: {}, readLock })).toBe('owning-session')
+  })
+
+  it('prefers explicit payload and environment identities before the lock', () => {
+    const readLock = () => ({ sessionId: 'lock-session' })
+    expect(resolveMechanismReviewSessionId({
+      payloadSessionId: 'hook-session',
+      status: true,
+      env: { CLAUDE_SESSION_ID: 'env-session' },
+      readLock,
+    })).toBe('hook-session')
+    expect(resolveMechanismReviewSessionId({
+      status: true,
+      env: { CLAUDE_SESSION_ID: 'env-session' },
+      readLock,
+    })).toBe('env-session')
+  })
+
+  it('does not borrow the lock owner for an unidentified Stop hook', () => {
+    expect(resolveMechanismReviewSessionId({
+      status: false,
+      env: { CLAUDE_SESSION_ID: 'env-session' },
+      readLock: () => ({ sessionId: 'lock-session' }),
+    })).toBe('')
   })
 })
 
@@ -103,7 +188,12 @@ describe('bootstrapBase', () => {
     // The owner's own id is used so the gather is APPLICABLE here too: with a
     // live batch lock any other id stands the guard down, and a skipped
     // assertion would have let the very defect above pass unnoticed.
-    const gathered = gatherMechanismReviewInputs({ sessionId: readOwnerLock()?.sessionId ?? '' })
+    // `report: true` is what makes the gather APPLICABLE at all now: the gate's
+    // block is switched off (point 1036) and only the measuring read remains.
+    const gathered = gatherMechanismReviewInputs({
+      sessionId: readOwnerLock()?.sessionId ?? '',
+      report: true,
+    })
     expect(gathered.applicable).toBe(true)
     expect(Object.hasOwn(gathered, 'baselineMissing')).toBe(true)
     expect(gathered.baselineMissing).toBe(gathered.inputs.baselineMissing)
@@ -244,7 +334,7 @@ describe('the measured 30.08 refusal multiplication', () => {
     return { pendingCommits, records, head }
   }
 
-  it.skipIf(!historyReachable)('replays 4 → 30 → 40 before scoping, then 3 → 3 → 12 with only read contributions charged', () => {
+  it.skipIf(!historyReachable)('replays 3 → 30 → 40 before scoping, then 2 → 2 → 11 with corrected refusal scope', () => {
     const replays = checkpoints.map(replayAt)
     const count = (replay, reviewScope) => evaluateMechanismReview({
       baseline,
@@ -252,13 +342,16 @@ describe('the measured 30.08 refusal multiplication', () => {
       reviewScope,
     }).findings.length
 
-    // The former rule treated every bounded record as range-wide. This is the
-    // measured counter, recomputed from the versioned ledger and commit graph,
+    // The former rule treated every bounded record as range-wide. The later
+    // strict-subset reread still corrects one overbroad refusal at the first
+    // immutable state, so even this emulation now starts at three. These are
+    // measured counters recomputed from the versioned ledger and commit graph,
     // not copied from the work-order prose.
-    expect(replays.map((replay) => count(replay, () => 'range'))).toEqual([4, 30, 40])
+    expect(replays.map((replay) => count(replay, () => 'range'))).toEqual([3, 30, 40])
     // The remaining growth names real exact-state refusals, incomplete passes,
-    // self-reviews and as-yet-unreviewed repair commits. None is waived.
-    expect(replays.map((replay) => count(replay, undefined))).toEqual([3, 3, 12])
+    // self-reviews and as-yet-unreviewed repair commits. The one-row reduction
+    // at every cut is the same strict-subset scope correction, not a waiver.
+    expect(replays.map((replay) => count(replay, undefined))).toEqual([2, 2, 11])
   })
 })
 
@@ -457,6 +550,23 @@ describe('pending review contributions', () => {
     expect(pending[0].mechanismFiles).toEqual(['scripts/example-guard.mjs'])
     expect(pending[0].files).toEqual(['scripts/example-guard.mjs', 'src/ordinary.ts'])
   })
+
+  it('excludes a ledger-only append but keeps the ledger beside a real mechanism change', () => {
+    const ledger = '.claude/mechanism-reviews.jsonl'
+    const commits = [
+      { sha: 'a'.repeat(40), files: [ledger], authorModels: ['GPT-5.6 Sol'] },
+      {
+        sha: 'b'.repeat(40),
+        files: [ledger, 'scripts/example-guard.mjs'],
+        authorModels: ['GPT-5.6 Sol'],
+      },
+    ]
+    const pending = pendingReviewContributions(commits, ['example-guard.mjs'])
+
+    expect(pending.map((commit) => commit.sha)).toEqual(['b'.repeat(40)])
+    expect(pending[0].mechanismFiles).toEqual(['scripts/example-guard.mjs'])
+    expect(pending[0].files).toEqual([ledger, 'scripts/example-guard.mjs'])
+  })
 })
 
 describe('the path-carrying git commands', () => {
@@ -469,6 +579,9 @@ describe('the path-carrying git commands', () => {
     // %x1e%-shaped spans as environment variables before git runs, and the
     // gate would then parse an output with no headers at all — and clear.
     expect(mechanismLogCommand('base', 'head')).toEqual([
+      // FIRST, and a GLOBAL flag rather than a log option: %P is what a
+      // trailerless merge is attributed by, and `log` honours `refs/replace`.
+      '--no-replace-objects',
       '-c',
       'core.quotepath=on',
       'log',
@@ -785,5 +898,402 @@ describe('the plan the gate prints names what is OWED, never what the range hold
     })
     expect(text).toContain('scripts/y.mjs')
     expect(text).toContain('scripts/z.mjs')
+  })
+})
+
+// A LANDING'S MERGE CARRIES NO TRAILER OF ITS OWN, and the gate plans one commit
+// at a time, so its authorship resolver's lookup table holds that single commit
+// and never the branch tip it merged. Supplying every non-first parent's trailer
+// is what lets `authorshipResolver` apply point 784's ruling here; without it a
+// merge that contributed a conflict resolution measured as UNKNOWN authorship,
+// which is unreviewable by construction — no verdict may be recorded against it
+// and no documented route clears it, so one hand-resolved landing shut the gate
+// for every later merge (measured 01.09.2026 on main, after landing point 1031).
+describe('a trailerless merge is attributed to the tip it merged', () => {
+  const REC = String.fromCharCode(0x1e)
+  const FLD = String.fromCharCode(0x1f)
+  const MERGE = 'a'.repeat(40)
+  const FIRST = 'b'.repeat(40)
+  const MERGED = 'c'.repeat(40)
+  // THE MERGED TIP IS ITSELF IN THE RANGE — that is the shape measured on main,
+  // and it is the shape a lookup filtered on "outside the range" gets wrong.
+  const log = [
+    `${REC}${MERGE}${FLD}1788000000${FLD}${FIRST} ${MERGED}`,
+    '',
+    'scripts/x-guard.mjs',
+    '',
+    `${REC}${MERGED}${FLD}1787900000${FLD}${FIRST}`,
+    '',
+    'scripts/x-guard.mjs',
+    '',
+  ].join('\n')
+  const trailers = {
+    [MERGE]: '',
+    [MERGED]: 'GPT-5.6 Sol <noreply@openai.com>',
+    [FIRST]: 'Claude Opus 5 <noreply@anthropic.com>',
+  }
+
+  it('hands the merged tip trailer to the planner, even when it is in range', () => {
+    const asked = []
+    const commits = rangeCommits('base', 'head', ['scripts/x-guard.mjs'], {
+      readLog: () => log,
+      readParents: () => [FIRST, MERGED],
+      readTrailers: (sha) => {
+        asked.push(sha)
+        return trailers[sha] ?? ''
+      },
+    })
+
+    expect(commits).toHaveLength(2)
+    expect(commits[0].authorModels).toEqual(['GPT-5.6 Sol <noreply@openai.com>'])
+    expect(commits[0].authorModel).toBe('GPT-5.6 Sol <noreply@openai.com>')
+    // The MERGED tip, not the first parent: a merge inherits from what it took in.
+    expect(commits[0].parentAuthorModels).toEqual({ [MERGED]: ['GPT-5.6 Sol <noreply@openai.com>'] })
+    expect(asked).toContain(MERGED)
+    expect(Object.keys(commits[0].parentAuthorModels)).not.toContain(FIRST)
+  })
+
+  it('resolves that merge to an eligible reviewer instead of unknown authorship', () => {
+    const [commit] = rangeCommits('base', 'head', ['scripts/x-guard.mjs'], {
+      readLog: () => log,
+      readParents: () => [FIRST, MERGED],
+      readTrailers: (sha) => trailers[sha] ?? '',
+    })
+    // The gate plans ONE commit; that is the shape the fix has to survive.
+    const { groups } = planAuthorshipGroups({ commits: [commit], endStateFiles: commit.files })
+
+    expect(groups).toHaveLength(1)
+    expect(groups[0].reviewer).toBeTruthy()
+    expect(groups[0].unreviewableReason).toBeUndefined()
+  })
+
+  it('inherits authorship from every non-first tip of an octopus merge', () => {
+    const THIRD = 'd'.repeat(40)
+    const octopusLog = [
+      `${REC}${MERGE}${FLD}1788000000${FLD}${FIRST} ${MERGED} ${THIRD}`,
+      '',
+      'scripts/x-guard.mjs',
+      '',
+    ].join('\n')
+    const [commit] = rangeCommits('base', 'head', ['scripts/x-guard.mjs'], {
+      readLog: () => octopusLog,
+      readParents: () => [FIRST, MERGED, THIRD],
+      readTrailers: (sha) => ({
+        [MERGE]: '',
+        [MERGED]: 'GPT-5.6 Sol <noreply@openai.com>',
+        [THIRD]: 'Claude Fable 5 <noreply@anthropic.com>',
+      })[sha] ?? '',
+    })
+
+    expect(commit.authorModels).toEqual([
+      'GPT-5.6 Sol <noreply@openai.com>',
+      'Claude Fable 5 <noreply@anthropic.com>',
+    ])
+    expect(commit.parentAuthorModels).toEqual({
+      [MERGED]: ['GPT-5.6 Sol <noreply@openai.com>'],
+      [THIRD]: ['Claude Fable 5 <noreply@anthropic.com>'],
+    })
+  })
+
+  it('lets later attributed pass rows settle the pre-repair unknown-row era', () => {
+    const [commit] = rangeCommits('base', 'head', ['scripts/x-guard.mjs'], {
+      readLog: () => log,
+      readParents: () => [FIRST, MERGED],
+      readTrailers: (sha) => trailers[sha] ?? '',
+    })
+    commit.coveringRecordShas = [MERGE]
+    commit.files = ['scripts/a-guard.mjs', 'scripts/b-guard.mjs']
+    const pass = (index, at, authoredBy) => ({
+      sha: MERGE,
+      authoredBy,
+      model: 'Opus 5',
+      reviewerAuthorship: {
+        status: 'agreement',
+        claimedModel: 'Opus 5',
+        actualModel: 'Opus 5',
+      },
+      verdict: 'merge',
+      evidence: `Checked the complete merge end state in pass ${index}.`,
+      mode: 'review',
+      handover: 'sol-authored',
+      handoverChain: ['Opus 5', 'Fable 5', 'Opus 4.8'],
+      pass: {
+        index,
+        total: 2,
+        files: [commit.files[index - 1]],
+        endState: MERGE,
+      },
+      at,
+    })
+    const beforeRepair = [
+      pass(1, 1_788_000_001_000, ''),
+      pass(2, 1_788_000_002_000, ''),
+    ]
+    const afterRepair = [
+      pass(1, 1_788_000_003_000, 'GPT-5.6 Sol <noreply@openai.com>'),
+      pass(2, 1_788_000_004_000, 'GPT-5.6 Sol <noreply@openai.com>'),
+    ]
+    const verdict = evaluateMechanismReview({
+      baseline: 'base',
+      head: MERGE,
+      pendingCommits: [commit],
+      records: [...beforeRepair, ...afterRepair],
+    })
+
+    expect(verdict.clear).toBe(true)
+    expect(verdict.findings).toEqual([])
+  })
+
+
+  it('takes the parents from the commit object, so a graft in the log cannot hide the tip', () => {
+    // `--no-replace-objects` disables refs/replace and NOTHING else: the log's
+    // %P is still graft-aware, so at a shallow boundary a merge prints as
+    // single-parented. Reading that left the merge with nothing to inherit.
+    const grafted = [`${REC}${MERGE}${FLD}1788000000${FLD}${FIRST}`, '', 'scripts/x-guard.mjs', ''].join('\n')
+    const [commit] = rangeCommits('base', 'head', ['scripts/x-guard.mjs'], {
+      readLog: () => grafted,
+      readParents: () => [FIRST, MERGED],
+      readTrailers: (sha) => trailers[sha] ?? '',
+    })
+
+    expect(commit.parentShas).toEqual([FIRST, MERGED])
+    expect(commit.parentAuthorModels).toEqual({ [MERGED]: ['GPT-5.6 Sol <noreply@openai.com>'] })
+    const { groups } = planAuthorshipGroups({ commits: [commit], endStateFiles: commit.files })
+    expect(groups[0].reviewer).toBeTruthy()
+  })
+
+  it('spends no object read on a commit that names its own model', () => {
+    const authored = [`${REC}${MERGE}${FLD}1788000000${FLD}${FIRST} ${MERGED}`, '', 'scripts/x-guard.mjs', ''].join('\n')
+    let reads = 0
+    rangeCommits('base', 'head', ['scripts/x-guard.mjs'], {
+      readLog: () => authored,
+      readParents: () => {
+        reads += 1
+        return [FIRST, MERGED]
+      },
+      readTrailers: () => 'Claude Opus 5 <noreply@anthropic.com>',
+    })
+
+    expect(reads).toBe(0)
+  })
+
+  it('leaves an ordinary trailerless commit unknown, so absence is never an assignment', () => {
+    const plain = [`${REC}${MERGE}${FLD}1788000000${FLD}${FIRST}`, '', 'scripts/x-guard.mjs', ''].join('\n')
+    const [commit] = rangeCommits('base', 'head', ['scripts/x-guard.mjs'], {
+      readLog: () => plain,
+      readParents: () => [FIRST],
+      readTrailers: () => '',
+    })
+    const { groups } = planAuthorshipGroups({ commits: [commit], endStateFiles: commit.files })
+
+    expect(commit.parentAuthorModels).toEqual({})
+    expect(groups[0].reviewer).toBe('')
+  })
+})
+
+// THE PRODUCTION READ ITSELF, NOT A STAND-IN (cross-vendor review, GPT-5.6 Sol at
+// effort high). Every case above injects `readParents`, which replaces the real
+// command and the real parser — so they stay green if the wiring drops the
+// no-replace flag or starts scanning past the header, and a `parent` line forged
+// in a commit MESSAGE could then become authorship evidence.
+describe('the default parent reader, exercised rather than replaced', () => {
+  const SHA = 'a'.repeat(40)
+  const REAL = 'b'.repeat(40)
+  const FORGED = 'f'.repeat(40)
+
+  it('asks git past refs/replace and ignores a parent line forged in the message', () => {
+    const asked = []
+    const parents = defaultParentReader(SHA, (cmd, options) => {
+      asked.push({ cmd, options })
+      return [
+        `tree ${'0'.repeat(40)}`,
+        `parent ${REAL}`,
+        'author X <x@y> 1 +0000',
+        '',
+        'Merge branch ...',
+        '',
+        `parent ${FORGED}`,
+        '',
+      ].join('\n')
+    })
+
+    expect(parents).toEqual([REAL])
+    expect(parents).not.toContain(FORGED)
+    expect(asked).toHaveLength(1)
+    expect(asked[0].cmd).toContain('--no-replace-objects')
+    expect(asked[0].cmd).toContain('cat-file -p')
+    // The whole object comes back although only the header is wanted, so the
+    // read is bounded and its overflow fails closed.
+    expect(asked[0].options?.maxBuffer).toBeGreaterThan(0)
+  })
+
+  it('is the reader rangeCommits ACTUALLY uses — the production wiring, not a stand-in', () => {
+    // Every parent case above injects `readParents`, so none of them would notice
+    // if rangeCommits stopped calling the default reader at all. This one injects
+    // only the git runner, one layer below, and watches the real command go out.
+    const REC = String.fromCharCode(0x1e)
+    const FLD = String.fromCharCode(0x1f)
+    const MERGED = 'c'.repeat(40)
+    const commands = []
+    const [commit] = rangeCommits('base', 'head', ['scripts/x-guard.mjs'], {
+      // The LOG claims one parent, as a shallow graft would; the object names two.
+      readLog: () => [`${REC}${SHA}${FLD}1788000000${FLD}${REAL}`, '', 'scripts/x-guard.mjs', ''].join('\n'),
+      runGit: (cmd) => {
+        commands.push(cmd)
+        if (cmd.includes('cat-file -p')) {
+          return [
+            `tree ${'0'.repeat(40)}`,
+            `parent ${REAL}`,
+            `parent ${MERGED}`,
+            'author X <x@y> 1 +0000',
+            '',
+            'Merge branch ...',
+            '',
+            `parent ${'f'.repeat(40)}`,
+            '',
+          ].join('\n')
+        }
+        return cmd.includes(MERGED) ? 'GPT-5.6 Sol <noreply@openai.com>' : ''
+      },
+    })
+
+    expect(commit.parentShas).toEqual([REAL, MERGED])
+    expect(commit.parentAuthorModels).toEqual({ [MERGED]: ['GPT-5.6 Sol <noreply@openai.com>'] })
+    expect(commands.some((cmd) => cmd.includes('--no-replace-objects') && cmd.includes('cat-file -p'))).toBe(true)
+    expect(commands.every((cmd) => cmd.startsWith('--no-replace-objects'))).toBe(true)
+  })
+
+  it('lets the read throw, so the bound is a refusal and not a truncation', () => {
+    expect(() =>
+      defaultParentReader(SHA, () => {
+        throw new Error('ENOBUFS: stdout maxBuffer length exceeded')
+      }),
+    ).toThrow(/maxBuffer/)
+  })
+})
+
+// AND A FAILED AUTHORSHIP READ MUST BLOCK. The exception used to travel to this
+// file's top-level catch, which prints "allowing stop" and exits 0 — so one
+// oversized or missing object anywhere in the measured range switched the gate
+// off without touching a mechanism file.
+describe('an authorship read that fails is typed, never shrugged off', () => {
+  const SHA = 'a'.repeat(40)
+  const REAL = 'b'.repeat(40)
+
+  it('marks the failure so the gate can block on it', () => {
+    let caught = null
+    try {
+      authorshipRead(() => {
+        throw new Error('bad object')
+      }, 'the parents of commit abc123')
+    } catch (error) {
+      caught = error
+    }
+
+    expect(caught?.authorshipUnreadable).toBe(true)
+    expect(caught?.message).toContain('the parents of commit abc123')
+    expect(caught?.message).toContain('bad object')
+  })
+
+  it('becomes the refusal the caller finally sees', () => {
+    let caught = null
+    try {
+      authorshipRead(() => {
+        throw new Error('ENOBUFS: stdout maxBuffer length exceeded')
+      }, 'the parents of commit abc123')
+    } catch (error) {
+      caught = error
+    }
+    const answer = authorshipBlockResponse(caught)
+
+    expect(answer.decision).toBe('block')
+    expect(answer.reason).toContain('the parents of commit abc123')
+    expect(answer.reason).toContain('maxBuffer')
+    // The one wrong answer this whole repair exists to refuse.
+    expect(answer.reason).toContain('An empty author list is not the answer')
+  })
+
+  it('lets the DISPLAY-ONLY subject degrade, because it may not be able to stop a gate', () => {
+    // The opposite rule to its siblings, and deliberately so: the subject names
+    // a commit in the refusal text and decides nothing. Making it fail closed
+    // would let a commit with an enormous subject throw into the allow-stop
+    // catch — the same bypass through the one read that has no authority.
+    expect(
+      readSubject('a'.repeat(40), () => {
+        throw new Error('ENOBUFS: stdout maxBuffer length exceeded')
+      }),
+    ).toContain('subject unreadable')
+    expect(readSubject('a'.repeat(40), () => 'a real subject')).toBe('a real subject')
+  })
+
+  it('returns the value untouched when the read succeeds', () => {
+    expect(authorshipRead(() => ['x'], 'anything')).toEqual(['x'])
+  })
+
+  it('carries a failing parent read out of rangeCommits as a blocking failure', () => {
+    const REC = String.fromCharCode(0x1e)
+    const FLD = String.fromCharCode(0x1f)
+    const log = [`${REC}${SHA}${FLD}1788000000${FLD}${REAL}`, '', 'scripts/x-guard.mjs', ''].join('\n')
+    let caught = null
+    try {
+      rangeCommits('base', 'head', ['scripts/x-guard.mjs'], {
+        readLog: () => log,
+        readTrailers: () => '',
+        readParents: () => {
+          throw new Error('fatal: not a valid object name')
+        },
+      })
+    } catch (error) {
+      caught = error
+    }
+
+    expect(caught?.authorshipUnreadable).toBe(true)
+  })
+
+  it('carries a failing OWN trailer read out the same way — the read that decides everything', () => {
+    // It decides `own`, both author fields, and whether the ancestry rule runs at
+    // all, so it is the most load-bearing of the three and was the last to be
+    // wrapped (cross-vendor review, GPT-5.6 Sol, second do-not-merge).
+    const REC = String.fromCharCode(0x1e)
+    const FLD = String.fromCharCode(0x1f)
+    const log = [`${REC}${SHA}${FLD}1788000000${FLD}${REAL}`, '', 'scripts/x-guard.mjs', ''].join('\n')
+    let caught = null
+    try {
+      rangeCommits('base', 'head', ['scripts/x-guard.mjs'], {
+        readLog: () => log,
+        readParents: () => [REAL],
+        readTrailers: () => {
+          throw new Error('ENOBUFS: stdout maxBuffer length exceeded')
+        },
+      })
+    } catch (error) {
+      caught = error
+    }
+
+    expect(caught?.authorshipUnreadable).toBe(true)
+    expect(caught?.message).toContain('the trailers of commit')
+  })
+
+  it('carries a failing merged-parent trailer read out the same way', () => {
+    const REC = String.fromCharCode(0x1e)
+    const FLD = String.fromCharCode(0x1f)
+    const MERGED = 'c'.repeat(40)
+    const log = [`${REC}${SHA}${FLD}1788000000${FLD}${REAL} ${MERGED}`, '', 'scripts/x-guard.mjs', ''].join('\n')
+    let caught = null
+    try {
+      rangeCommits('base', 'head', ['scripts/x-guard.mjs'], {
+        readLog: () => log,
+        readParents: () => [REAL, MERGED],
+        readTrailers: (sha) => {
+          if (sha === MERGED) throw new Error('fatal: bad object')
+          return ''
+        },
+      })
+    } catch (error) {
+      caught = error
+    }
+
+    expect(caught?.authorshipUnreadable).toBe(true)
+    expect(caught?.message).toContain('merged parent')
   })
 })

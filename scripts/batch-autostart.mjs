@@ -864,10 +864,14 @@ const curHead = head()
 // no longer judges wedgedness at all: it reads whether the owner's lease has run
 // out, which is arithmetic on two numbers, and everything else follows from the
 // ordinary "not alive" path this file has always had. The declaration below is
-// still read — but only to SAY what the owner was waiting on, never to decide.
+// still read for the owner report, never as owner-liveness evidence. Its child
+// process identities separately feed the registered-writer verdict below.
 // (`lock` and `probe` were read further up — the leak sweep needs them before any
 // guard may exit.)
-const declaration = lock ? readDeclaration() : null
+// The declaration is also the feature-writer process registry. It survives the
+// owner lock by design, so read it even after that lock is gone; otherwise the
+// launcher's register loses the exact PID evidence the declaration probe uses.
+const declaration = readDeclaration()
 // Read for the REPORT, not for the verdict: when the batch is taken from an owner
 // whose lease ran out, the notification should name what that owner said it was
 // doing. `LAUNCHER_WORK_MAX_AGE_MS` is the launcher's own window on a declaration.

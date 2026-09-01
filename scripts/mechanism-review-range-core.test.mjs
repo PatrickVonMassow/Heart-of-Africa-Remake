@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import {
+  commitObjectParents,
   commitsForFiles,
   endStateArtefacts,
   formatInvalidatedCoverage,
@@ -641,5 +642,98 @@ describe('the reading selector on its own', () => {
 
   it('answers nothing for no readings', () => {
     expect(newestReading([])).toBe(null)
+  })
+})
+
+// A COMMIT OBJECT IS A HEADER, ONE BLANK LINE, THEN THE MESSAGE — and the
+// message is text a commit author chose. Reading `parent ` lines from the whole
+// object let a message inject a parent git never recorded, and that forged
+// parent's Co-Authored-By trailers would have become the merge's authorship:
+// the model that wrote a merged tip could name a different one and review its
+// own work (cross-vendor review, GPT-5.6 Sol at effort high, 01.09.2026).
+describe('commitObjectParents', () => {
+  const A = 'a'.repeat(40)
+  const B = 'b'.repeat(40)
+  const FORGED = 'f'.repeat(40)
+  const object = (parents, message) =>
+    [`tree ${'0'.repeat(40)}`, ...parents.map((p) => `parent ${p}`), 'author X <x@y> 1 +0000', '', message].join('\n')
+
+  it('reads the header parents in order', () => {
+    expect(commitObjectParents(object([A, B], 'Merge branch ...'))).toEqual([A, B])
+  })
+
+  it('stops at the blank line, so a message cannot forge a parent', () => {
+    const message = ['Merge branch ...', '', `parent ${FORGED}`].join('\n')
+    expect(commitObjectParents(object([A, B], message))).toEqual([A, B])
+  })
+
+  it('is not fooled by a message that opens on the forged line', () => {
+    expect(commitObjectParents(object([A], `parent ${FORGED}`))).toEqual([A])
+  })
+
+  it('answers nothing for a root commit', () => {
+    expect(commitObjectParents(object([], 'Lay down the world'))).toEqual([])
+  })
+
+  it('REFUSES output truncated right after a header line, whose newline looks like the terminator', () => {
+    // "tree…\nparent…\n" splits to [tree, parent, ''] — the trailing empty
+    // string is the newline, not the blank line that ends a header, and reading
+    // it as one answered with the parents it happened to have seen.
+    const cut = [`tree ${'0'.repeat(40)}`, `parent ${A}`, ''].join('\n')
+    expect(() => commitObjectParents(cut)).toThrow(/header terminator/)
+    // The same bytes with a message behind them are a real object.
+    expect(commitObjectParents([`tree ${'0'.repeat(40)}`, `parent ${A}`, '', 'msg', ''].join('\n'))).toEqual([A])
+  })
+
+  it('REFUSES a header that never ends, rather than trusting how far it read', () => {
+    // A truncated or malformed object gives no evidence where the header stopped,
+    // so every line read may already be message. Empty output is that same case.
+    expect(() => commitObjectParents([`tree ${'0'.repeat(40)}`, `parent ${A}`].join('\n'))).toThrow(/header terminator/)
+    expect(() => commitObjectParents('')).toThrow(/header terminator/)
+    expect(() => commitObjectParents(null)).toThrow(/header terminator/)
+  })
+
+  it('REFUSES a parent line that arrives after the parent block closed', () => {
+    // Git records parents only as the contiguous block directly after `tree`, so
+    // an object with a real parent, then author/committer, then another parent
+    // line is SINGLE-parented to git — and the extra line is a forgery whose
+    // trailers would otherwise be inherited as this merge's authorship.
+    const forged = [
+      `tree ${'0'.repeat(40)}`,
+      `parent ${A}`,
+      'author X <x@y> 1 +0000',
+      `parent ${FORGED}`,
+      '',
+      'msg',
+      '',
+    ].join('\n')
+    expect(() => commitObjectParents(forged)).toThrow(/after the parent block closed/)
+  })
+
+  it('still takes a genuine multi-parent block, in order', () => {
+    const octopus = [
+      `tree ${'0'.repeat(40)}`,
+      `parent ${A}`,
+      `parent ${B}`,
+      `parent ${FORGED}`,
+      'author X <x@y> 1 +0000',
+      '',
+      'msg',
+      '',
+    ].join('\n')
+    expect(commitObjectParents(octopus)).toEqual([A, B, FORGED])
+  })
+
+  it('REFUSES a parent line that is not an object id', () => {
+    const bent = [`tree ${'0'.repeat(40)}`, `parent ${A} and something else`, '', 'msg'].join('\n')
+    expect(() => commitObjectParents(bent)).toThrow(/malformed parent line/)
+    expect(() =>
+      commitObjectParents([`tree ${'0'.repeat(40)}`, `parent ${A.slice(0, 39)}`, '', 'msg'].join('\n')),
+    ).toThrow(/malformed parent/)
+  })
+
+  it('tolerates CRLF, which a Windows checkout can produce', () => {
+    const crlf = object([A, B], 'Merge branch ...').split('\n').join('\r\n')
+    expect(commitObjectParents(crlf)).toEqual([A, B])
   })
 })

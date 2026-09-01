@@ -71,6 +71,7 @@ import {
   parseClaudeResultOutput,
 } from './fable-switch-core.mjs'
 import { authorshipRefusesPermission } from './authorship-check-core.mjs'
+import { commitObjectParents } from './mechanism-review-range-core.mjs'
 import { checkAuthorshipFile } from './authorship-check-io.mjs'
 
 // Re-exported so the flag surface has ONE definition (the pure parser's) and one
@@ -114,7 +115,16 @@ export const RECORDS_PATH = recordsPathFor()
 // command interpolated reached a shell before any validation ran, so a value
 // like `HEAD"; <command>; echo "` executed. execFileSync hands git its
 // arguments directly — there is no shell to inject into.
-const git = (args) => execFileSync('git', args, { windowsHide: true, cwd: REPO_ROOT, encoding: 'utf8' }).trim()
+// Every object fact this recorder derives is from the real object graph. A
+// replacement ref can substitute commits, trees and blobs alike, so applying
+// the flag only to resolveCommit's ancestry reads still let carry verification
+// compare attacker-selected trees while claiming the original shas.
+const git = (args) =>
+  execFileSync('git', ['--no-replace-objects', ...args], {
+    windowsHide: true,
+    cwd: REPO_ROOT,
+    encoding: 'utf8',
+  }).trim()
 
 
 /** The committed model field and blob oid of a repository half — read from a
@@ -1101,7 +1111,7 @@ export function buildCarriedRecord({
   const commit = resolve(sha)
   const source = resolve(from)
   try {
-    execFileSync('git', ['merge-base', '--is-ancestor', source.sha, commit.sha], {
+    execFileSync('git', ['--no-replace-objects', 'merge-base', '--is-ancestor', source.sha, commit.sha], {
       windowsHide: true,
       cwd: REPO_ROOT,
       stdio: 'ignore',
@@ -1238,7 +1248,7 @@ export function verifyCarried(records, allRecords = null) {
         if (!/^[0-9a-f]{7,40}$/i.test(String(r.sha ?? ''))) return false
         if (from === r.sha) return false
         try {
-          execFileSync('git', ['merge-base', '--is-ancestor', from, r.sha], {
+          execFileSync('git', ['--no-replace-objects', 'merge-base', '--is-ancestor', from, r.sha], {
             windowsHide: true,
             cwd: REPO_ROOT,
             stdio: 'ignore',
@@ -1303,7 +1313,7 @@ export function resolveCommit(sha, { run = git } = {}) {
   // the boundary given, and the coverage reader would then clear contributions
   // nobody read. `--disambiguate` never consults refs: it lists the objects
   // whose id carries the prefix, and anything but exactly one commit is refused.
-  const candidates = run(['rev-parse', `--disambiguate=${ref.toLowerCase()}`])
+  const candidates = run(['--no-replace-objects', 'rev-parse', `--disambiguate=${ref.toLowerCase()}`])
     .split('\n')
     .map((line) => line.trim())
     .filter(Boolean)
@@ -1314,7 +1324,7 @@ export function resolveCommit(sha, { run = git } = {}) {
     // is the one direction this check exists to prevent.
     let type
     try {
-      type = run(['cat-file', '-t', candidate])
+      type = run(['--no-replace-objects', 'cat-file', '-t', candidate])
     } catch (e) {
       throw new Error(`--record <sha>: "${ref}" names an object this repository cannot read (${candidate.slice(0, 12)}): ${(e && e.message) || e}`)
     }
@@ -1329,15 +1339,96 @@ export function resolveCommit(sha, { run = git } = {}) {
     )
   }
   const full = commits[0]
-  const subject = run(['show', '-s', '--format=%s', full])
-  const trailers = run(['show', '-s', '--format=%(trailers:key=Co-Authored-By,valueonly,separator=;)', full])
-  const committedAt = Number(run(['show', '-s', '--format=%ct', full])) * 1000
+  // EVERY read here is replacement-blind, not only the authorship ones
+  // (cross-vendor review, GPT-5.6 Sol at effort high): a replacement can
+  // substitute the recorded subject and, worse, the commit TIME — and a forged
+  // older timestamp defeats the later "a review cannot predate its commit" check.
+  const subject = run(['--no-replace-objects', 'show', '-s', '--format=%s', full])
+  // THE COMMIT'S OWN TRAILERS ARE READ THE SAME WAY (cross-vendor review,
+  // GPT-5.6 Sol, third do-not-merge). This read decides whether the ancestry rule
+  // below runs at all: a replacement object that gives the merge a trailer it
+  // does not have makes `own` non-empty, and the real merged tip is then never
+  // consulted — a forged author rather than a hidden one.
+  const trailers = run([
+    '--no-replace-objects',
+    'show',
+    '-s',
+    '--format=%(trailers:key=Co-Authored-By,valueonly,separator=;)',
+    full,
+  ])
+  const committedAt = Number(run(['--no-replace-objects', 'show', '-s', '--format=%ct', full])) * 1000
+  const own = modelsFromTrailers(trailers)
+  // POINT 784'S RULING, THE RECORDER'S HALF. A landing merge is written by the
+  // machinery and carries no trailer of its own; its contribution belongs to the
+  // trailer-bearing tip(s) it merged. The GATE resolves it that way, so without
+  // the same reading here the two disagreed in the one direction that deadlocks:
+  // the gate owed a review the recorder refused to accept, and a merge that
+  // contributed a conflict resolution could never be cleared by any route.
+  // Structural ancestry only — never the first parent, which the merge did not
+  // take in, and never a guess from the subject line. An ordinary trailerless
+  // commit stays authorless-unknown, because absence must not become an
+  // assignment.
+  //
+  // THE PARENTS ARE READ RAW, NOT THROUGH `%P` (cross-vendor review, GPT-5.6 Sol
+  // at effort high, do-not-merge on the first form). `%P` is GRAFT-AWARE: at a
+  // shallow boundary it prints the rewritten ancestry, so a merge can arrive
+  // looking single-parented. This code would then have inherited nothing and the
+  // merge would read as an ordinary authorless commit — and an author that is
+  // merely INVISIBLE is not an author that is absent, so the model that wrote the
+  // hidden tip would no longer be excluded from reviewing it. `cat-file -p` shows
+  // the commit object's own parent lines, which no graft rewrites.
+  // AND `--no-replace-objects`, because `cat-file` HONOURS `refs/replace`
+  // (cross-vendor review, GPT-5.6 Sol, second do-not-merge). A replacement
+  // object standing in for the merge can name one parent where the real commit
+  // names two, which hides the merged tip's author exactly as a shallow graft
+  // would. The same flag guards the trailer reads below: a replaced PARENT could
+  // otherwise answer with somebody else's trailers.
+  // AND ONLY THE HEADER IS READ: the message below the blank line is attacker-
+  // shaped text, and a `parent <sha>` line inside it would otherwise inject a
+  // parent git never recorded, whose trailers would become this merge's
+  // authorship. `commitObjectParents` owns that bound for both gates.
+  const rawParents = (sha) => commitObjectParents(run(['--no-replace-objects', 'cat-file', '-p', sha]))
+  // AND THE ANCESTRY IS FOLLOWED AS FAR AS IT GOES (cross-vendor review, GPT-5.6
+  // Sol at effort high). Resolving ONE level left a merged tip that is itself a
+  // trailerless machinery merge with no authors at all — the very case this rule
+  // exists for, one step further out — while `authorshipResolver` on the gate
+  // side recurses. The two would then disagree again, which is the deadlock this
+  // whole repair removed. `seen` bounds it: a commit graph is acyclic, but a
+  // repeated parent must not be read twice.
+  //
+  // AN UNREADABLE PARENT FAILS CLOSED. `run` throws where the object is missing —
+  // a shallow clone that HAS the parent line but not the object — and that throw
+  // is deliberately not caught: refusing to record beats recording a review whose
+  // independence rests on authorship nobody could read.
+  const trailersFor = (sha) =>
+    modelsFromTrailers(
+      run([
+        '--no-replace-objects',
+        'show',
+        '-s',
+        '--format=%(trailers:key=Co-Authored-By,valueonly,separator=;)',
+        sha,
+      ]),
+    )
+  const seen = new Set([full])
+  const inherit = (sha) => {
+    const models = trailersFor(sha)
+    if (models.length) return models
+    const parents = rawParents(sha)
+    if (parents.length < 2) return []
+    return parents.slice(1).flatMap((parent) => {
+      if (seen.has(parent)) return []
+      seen.add(parent)
+      return inherit(parent)
+    })
+  }
+  const authors = own.length ? own : [...new Set(inherit(full))]
   return {
     sha: full,
     subject,
     at: Number.isFinite(committedAt) ? committedAt : 0,
-    authoredBy: modelFromTrailers(trailers),
-    authors: modelsFromTrailers(trailers),
+    authoredBy: own.length ? modelFromTrailers(trailers) : (authors[0] ?? ''),
+    authors,
   }
 }
 

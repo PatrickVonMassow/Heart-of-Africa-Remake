@@ -518,3 +518,63 @@ describe('the printed report', () => {
     expect(lines.join('\n')).toContain('dev server never bound')
   })
 })
+
+// THE TWO IDENTITY ROUTES MUST AGREE (cross-vendor review, 01.09.2026). One
+// reads a check out of a RUN's output, the other out of a PASTED `--failed`
+// line, and the triage compares the two by key. When only the parser learned
+// that an empty detail leaves a two-character separator behind, the same check
+// read the two ways produced two keys and the comparison answered
+// `inconclusive` — the 06.08.2026 bug surviving on the half nobody fixed.
+describe('an empty-detail check keys the same from a run and from a pasted line', () => {
+  const PRINTED = 'member hoa-state-2026-08-31-42.png is present'
+
+  it('strips the empty-detail separator on both routes', () => {
+    const [parsed] = parseCheckLines(`FAIL  ${PRINTED} — `)
+    const pasted = checkFromName(`FAIL  ${PRINTED} — `)
+
+    expect(parsed.name).toBe(PRINTED)
+    expect(pasted.name).toBe(PRINTED)
+    expect(pasted.key).toBe(parsed.key)
+  })
+
+  it('still cuts an ordinary detail, and keeps a console line whole', () => {
+    expect(checkFromName(`FAIL  ${PRINTED} — laplacian mean 1.02`).name).toBe(PRINTED)
+    const consoleLine = 'console error: THREE.WebGPURenderer: something — with a dash'
+    expect(checkFromName(consoleLine).name).toBe(consoleLine)
+  })
+
+  it('leaves a HYPHEN alone — only the em-dash separator is a separator', () => {
+    expect(checkFromName('FAIL  the frame is off-centre').name).toBe('the frame is off-centre')
+    expect(checkFromName('FAIL  the em—dash inside a word').name).toBe('the em—dash inside a word')
+  })
+
+  it('pins the ONE ambiguity it cannot resolve: a label genuinely ending in the separator', () => {
+    // `FAIL  <name> — <detail>` is the producer convention, so a label whose own
+    // last characters are the separator followed by the protocol's own empty
+    // detail separator prints TWO separators. Both identity routes lose the
+    // label's terminal one and produce the same key; their detail fields differ
+    // because only the run parser sees the first delimiter. That exact lossy
+    // boundary is pinned rather than being replaced by the ordinary one-dash
+    // empty-detail case (cross-vendor review, GPT-5.6 Sol at effort high).
+    const printed = 'FAIL  the rock is a class of thing —  — '
+    const [parsed] = parseCheckLines(printed)
+    const pasted = checkFromName(printed)
+    expect(parsed.name).toBe('the rock is a class of thing')
+    expect(parsed.detail).toBe('—')
+    expect(pasted.name).toBe('the rock is a class of thing')
+    expect(pasted.detail).toBe('')
+    expect(pasted.key).toBe(parsed.key)
+  })
+
+  it('does not cut a BARE separator down to nothing', () => {
+    // The line parser drops a check with no name (`if (!name) continue`); this
+    // route has no such guard, so the degenerate input is pinned rather than
+    // left to surprise a caller (cross-vendor review, 01.09.2026).
+    expect(checkFromName('FAIL   —').name).toBe('—')
+    expect(checkFromName('FAIL   — ').name).toBe('—')
+  })
+
+  it('cuts at the FIRST separator when a name carries both forms', () => {
+    expect(checkFromName('FAIL  the check — measured 1.02 —').name).toBe('the check')
+  })
+})

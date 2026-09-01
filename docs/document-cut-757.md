@@ -88,11 +88,11 @@ tokenizer, not `wc`, because a ceiling is only confirmed against the counter tha
 
 | document | landed | ceiling | headroom |
 | --- | --- | --- | --- |
-| `CLAUDE.md` | 193 lines / 1,352 words / 9,969 B | 193 / 1,363 | **0 lines**, 11 words |
-| `MEMORY.md` | 50 lines / 788 words / 6,231 B | 50 / 789 | **0 lines**, 1 word |
+| `CLAUDE.md` | 205 lines / 1,468 words / 10,796 B | 205 / 1,468 | **0 lines**, 0 words |
+| `MEMORY.md` | 50 lines / 787 words / 6,262 B | 50 / 787 | **0 lines**, 0 words |
 | global `CLAUDE.md` | 6 lines / 33 words / 236 B | 6 / 36 | **0 lines**, 3 words |
 
-They hold, but two of them hold with nothing to spare, and that is the finding
+They hold, and two of them hold with nothing to spare, which is the finding
 this confirmation produced. The ceilings were set from figures taken BEFORE the
 merge — the code comments in `scripts/doc-budget-core.mjs` still said MEMORY.md
 had landed at 45 lines / 700 words and the global stub at five lines, where the

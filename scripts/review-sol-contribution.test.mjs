@@ -38,6 +38,21 @@ describe('the guard plan is bounded by each contribution', () => {
     expect(plan.passCount).toBe(2)
     expect(plan.contributions.map((entry) => entry.passes[0].index)).toEqual([1, 1])
     expect(formatContributionPassPlan(plan)).not.toContain('--pass')
+    expect(formatContributionPassPlan(plan)).toContain('--file "scripts/example-guard.mjs"')
+  })
+
+  it('prints the exact outstanding file subset into every runnable command', () => {
+    const files = ['scripts/remaining guard.mjs', 'scripts/literal-$value.mjs']
+    const plan = buildContributionPassPlan({
+      commits: [commit('a', files)],
+      buildPlan: () => sized({
+        passes: [{ index: 1, total: 1, files }],
+      }),
+    })
+
+    const text = formatContributionPassPlan(plan)
+    expect(text).toContain('--file "scripts/remaining guard.mjs"')
+    expect(text).toContain('--file "scripts/literal-\\$value.mjs"')
   })
 
   it('lets the runnable planner replace a stale thirteen-pass repair index', () => {

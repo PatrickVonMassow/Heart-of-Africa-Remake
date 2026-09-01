@@ -15,6 +15,8 @@ import { describe, it, expect } from 'vitest'
 import { spawnSync } from 'node:child_process'
 import { readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
+import { launcherStartDecision } from './batch-autostart-core.mjs'
+import { checkAgentOutput, registeredFeatureWriters } from './batch-in-flight.mjs'
 
 describe('batch-autostart is import-proof', () => {
   it('throws instead of spawning when it is imported rather than run', async () => {
@@ -687,9 +689,57 @@ describe('the launcher consults registered feature writers before spawning', () 
 
   it('passes the measured register through both the initial and recovery decisions', () => {
     expect(source).toMatch(/const featureWriterRegister = registeredFeatureWriters\(/)
+    expect(source).toMatch(/const declaration = readDeclaration\(\)/)
+    expect(source).not.toMatch(/const declaration = lock \? readDeclaration\(\) : null/)
     expect(source.match(/featureWriterRegister[:,]/g)?.length).toBeGreaterThanOrEqual(2)
     expect(source.match(/registeredFeatureWriters\(\{[\s\S]{0,80}?declaration[,\s]/g)).toHaveLength(2)
     expect(source).not.toMatch(/declaration:\s*trigger\.kind\s*===\s*SUCCESSOR_TRIGGERS\.BOUNDARY/)
+  })
+
+  it('starts when a no-lock declaration refutes fresh worktree output with a gone pid', () => {
+    const now = 1_800_000_000_000
+    const declaration = {
+      evidence: [
+        { kind: 'branch', ref: 'feat/515-detector', point: 515 },
+        { kind: 'worktree', path: '/repo/.claude/worktrees/point-515', point: 515 },
+        { kind: 'pid', pid: 5150, startedAt: now - 60_000, point: 515 },
+      ],
+    }
+    const register = (declared) => registeredFeatureWriters({
+      now,
+      declaration: declared,
+      exec: () => [
+        'worktree /repo/.claude/worktrees/point-515',
+        'HEAD bbbbb',
+        'branch refs/heads/feat/515-detector',
+        '',
+      ].join('\n'),
+      openProbe: () => ({ readable: true, branches: [{ ref: 'feat/515-detector' }] }),
+      pidProbe: () => ({ exists: false, startedAt: null }),
+      check: (options) => checkAgentOutput({
+        ...options,
+        worktreeProbe: () => ({ at: now - 1_000, source: 'files' }),
+        branchProbe: () => null,
+      }),
+    })
+    const decide = (featureWriterRegister) => launcherStartDecision({
+      lock: null,
+      assessment: { alive: false, reason: 'no-lock' },
+      featureWriterRegister,
+      now,
+    })
+
+    const unrecognized = register(null)
+    expect(unrecognized).toMatchObject({
+      writers: [{ recognized: false, output: { verdict: 'alive', judgedOn: 'git', ageMs: 1_000 } }],
+    })
+    expect(decide(unrecognized)).toMatchObject({ start: false, code: 'registered-writer-live' })
+
+    const declared = register(declaration)
+    expect(declared).toMatchObject({
+      writers: [{ recognized: true, output: { verdict: 'dead', judgedOn: 'process' } }],
+    })
+    expect(decide(declared)).toMatchObject({ start: true })
   })
 })
 

@@ -31,19 +31,20 @@
 // CLI:
 //   node scripts/criticality-review-guard.mjs --status
 // usage: node scripts/criticality-review-guard.mjs --record-unavailable <sha> --point <N> --files "<exact paths>" --reason "<why no vendor is eligible>"
-import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs'
+import { mkdirSync, readFileSync, writeFileSync } from 'node:fs'
 import { execFileSync, execSync } from 'node:child_process'
 import { dirname } from 'node:path'
 import { commonRepoPath, REPO_ROOT, repoPath } from './repo-paths.mjs'
 import { isMainModule } from './is-main.mjs'
-import { heldByOtherLiveOwner } from './batch-singleton.mjs'
 import { appendRecord, readRecords, verifyCarried } from './mechanism-review.mjs'
-import { modelsFromTrailers } from './mechanism-review-core.mjs'
+import { ledgerAtUsable, modelsFromTrailers, sameModel, VERDICTS } from './mechanism-review-core.mjs'
 import { parseRangeLog, planAuthorshipGroups, reviewEndStateFiles } from './mechanism-review-range-core.mjs'
 import { parsePassFiles, quotePassFile, unquoteGitPath } from './review-material-core.mjs'
 import {
   ancestorIndex,
+  CLEARING_VERDICT,
   evaluateCriticalityReview,
+  FINDINGS_FILED_KIND,
   formatCriticalityReviewVerdict,
   highTicks,
   openNumbers,
@@ -51,7 +52,27 @@ import {
   strictAncestorProbe,
 } from './criticality-review-guard-core.mjs'
 
-const PAUSE = repoPath('.claude/batch-paused')
+
+// SWITCHED OFF, NOT REBUILT (CLAUDE.md §2 infrastructure freeze, user decision
+// 01.09.2026), the same cut as its twin in mechanism-review-guard.mjs and under
+// the same recorded board decision, which named BOTH gates. What was measured
+// on 01.09., with the gate blocking the turn end:
+//   · point 1040 could not be cleared at all — "git cannot measure this point's
+//     file set from any available route", because §6 requires the landed lane's
+//     branch to be deleted and the range died with it;
+//   · point 1031 was told a later `merge` existed "but not for a LATER commit"
+//     while git proves the opposite, so the way out it printed was false.
+// A gate whose demand is unmeasurable for correctly finished work is a rule in
+// the way. The BLOCK goes; the measurement stays, and answers whoever asks:
+//
+//   node scripts/criticality-review-guard.mjs --status
+//
+// Reversing this is one commit: drop the stand-down below.
+export const CRITICALITY_GATE_SWITCHED_OFF =
+  'the criticality gate no longer blocks — switched off under the infrastructure freeze ' +
+  '(CLAUDE.md §2, user decision 01.09.2026), together with the four-eyes mechanism gate it ' +
+  'is the twin of. Nothing is forgiven and the debt stays readable: ' +
+  'node scripts/criticality-review-guard.mjs --status'
 
 /** Per-branch baseline. Local bookkeeping ("what this tree has confirmed"), so
  *  it is deliberately NOT tracked — the ledger that must travel between a branch
@@ -385,6 +406,164 @@ export function buildUnavailableReceipt({
   }
 }
 
+/**
+ * The receipt for the OTHER durable answer to a refusal (`FINDINGS_FILED_KIND`).
+ *
+ * The gate's own refusal text names two ways to answer a `do-not-merge`: fix it
+ * and record the re-review, or file every finding as an open work-order point
+ * and append this receipt naming them. Nothing could write it — measured
+ * 01.09.2026, while a refusal raised AFTER a point had landed could not be
+ * answered the first way either, because the point's reviewed range ends at its
+ * landing and a later commit is therefore not "a LATER commit" to the index.
+ * A rule whose only remaining exit is unbuildable is a rule that gets waived.
+ *
+ * It is deliberately narrow. The row must name the EXACT review it answers — sha,
+ * model and that review's own timestamp, which is what tells two verdicts by one
+ * model on one sha apart — and every point it names must be OPEN in the work
+ * order at the moment of writing. Prose saying "filed" is not a receipt.
+ */
+export function buildFindingsFiledReceipt({
+  sha = '',
+  point = '',
+  model = '',
+  findingPoints = [],
+  records = [],
+  openPoints = [],
+  now = Date.now(),
+  resolveSha = (ref) => gitRawFile(['rev-parse', '--verify', `${ref}^{commit}`]).trim(),
+} = {}) {
+  const errors = []
+  const ref = String(sha).trim()
+  const number = Number(point)
+  const who = String(model).trim()
+  const named = [...new Set((Array.isArray(findingPoints) ? findingPoints : []).map(Number))]
+  if (!/^[0-9a-f]{7,40}$/i.test(ref)) errors.push('--record-findings-filed <sha> must be a 7–40 digit hexadecimal commit id')
+  if (!Number.isInteger(number) || number <= 0) errors.push('--point <N> must be the positive integer of the point being cleared')
+  if (!who) errors.push('--model must name the reviewer whose refusal this answers')
+  if (!named.length || named.some((n) => !Number.isInteger(n) || n <= 0)) {
+    errors.push('--finding-points must be a comma-separated list of positive work-order point numbers')
+  }
+  if (errors.length) return { ok: false, errors }
+
+  let full = ''
+  try {
+    full = resolveSha(ref)
+  } catch {
+    return { ok: false, errors: [`--record-findings-filed: ${ref} is not a commit in this repository`] }
+  }
+
+  // THE REVIEW MUST EXIST, AND BE THE KIND OF VERDICT THAT NEEDS ANSWERING.
+  // A receipt against a clean pass answers nothing and would only add noise the
+  // gate has to read past.
+  const refusals = (records ?? []).filter(
+    (row) =>
+      row?.sha === full &&
+      Number(row.point) === number &&
+      sameModel(String(row.model ?? ''), who) &&
+      String(row.verdict ?? '') !== CLEARING_VERDICT &&
+      VERDICTS.includes(String(row.verdict ?? '')) &&
+      ledgerAtUsable(row.at),
+  )
+  if (!refusals.length) {
+    return {
+      ok: false,
+      errors: [`no ${who} verdict on ${full.slice(0, 7)} for point ${number} needs answering — a receipt clears a refusal, nothing else`],
+    }
+  }
+  // THE BINDING MUST BE UNIQUE, OR IT BINDS TWO THINGS (cross-vendor review,
+  // GPT-5.6 Sol at effort high). The emitted row identifies its review by
+  // {sha, point, model, reviewAt} — and two refusals by one model on one sha can
+  // share a millisecond, at which point ONE findings list would clear BOTH. The
+  // ledger has no finer identifier, so the honest answer is to refuse rather
+  // than to pick one and hope.
+  const newest = refusals.reduce((a, b) => (Number(b.at ?? 0) >= Number(a.at ?? 0) ? b : a))
+  const tied = refusals.filter((row) => Number(row.at) === Number(newest.at))
+  if (tied.length > 1) {
+    return {
+      ok: false,
+      errors: [
+        `${tied.length} ${who} verdicts on ${full.slice(0, 7)} for point ${number} share the timestamp ` +
+          `${newest.at}, so a receipt naming it would clear all of them — the ledger carries no finer ` +
+          'identifier, and clearing a refusal nobody answered is the one thing this receipt may not do',
+      ],
+    }
+  }
+  const review = newest
+
+  const open = new Set((Array.isArray(openPoints) ? openPoints : []).map(Number))
+  const closed = named.filter((n) => !open.has(n))
+  if (closed.length) {
+    return {
+      ok: false,
+      errors: [
+        `point(s) ${closed.join(', ')} are not OPEN in the work order — a finding transferred to a point ` +
+          'nobody will work is a finding dropped, so the receipt refuses',
+      ],
+    }
+  }
+
+  // Strictly after the review it answers: the acceptance rule compares the two,
+  // and a clock that has not moved cannot evidence an order.
+  const at = Math.max(Number(now) || 0, Number(review.at ?? 0) + 1)
+  return {
+    ok: true,
+    record: {
+      kind: FINDINGS_FILED_KIND,
+      sha: full,
+      point: number,
+      model: String(review.model ?? who),
+      reviewAt: Number(review.at),
+      findingPoints: named,
+      at,
+      atIso: new Date(at).toISOString(),
+    },
+  }
+}
+
+export const findingsFiledUsage = () =>
+  'node scripts/criticality-review-guard.mjs --record-findings-filed <sha> --point <N> ' +
+  '--model "<reviewer that refused>" --finding-points "<N,N,…>"'
+
+/** Strict parser for the findings-filed write route; no unknown token is ignored. */
+export function parseFindingsFiledArgs(argv = []) {
+  const spec = new Map([
+    ['--record-findings-filed', 'sha'],
+    ['--point', 'point'],
+    ['--model', 'model'],
+    ['--finding-points', 'findingPoints'],
+  ])
+  const values = {}
+  const errors = []
+  for (let i = 0; i < argv.length; i++) {
+    const flag = String(argv[i])
+    const key = spec.get(flag)
+    if (!key) {
+      errors.push(`unknown findings-filed argument ${flag}`)
+      continue
+    }
+    if (values[key] !== undefined) {
+      errors.push(`${flag} was given more than once`)
+      i++
+      continue
+    }
+    const value = argv[i + 1]
+    if (value === undefined || String(value).startsWith('--')) {
+      errors.push(`${flag} expects a value`)
+      continue
+    }
+    values[key] = String(value)
+    i++
+  }
+  const points = String(values.findingPoints ?? '')
+    .split(',')
+    .map((part) => part.trim())
+    .filter(Boolean)
+  if (values.findingPoints !== undefined && points.some((part) => !/^\d+$/.test(part))) {
+    errors.push('--finding-points takes work-order NUMBERS separated by commas')
+  }
+  return { ok: errors.length === 0, values: { ...values, findingPoints: points.map(Number) }, errors }
+}
+
 /** Strict parser for the manual write route; no unknown token is ignored. */
 export function parseUnavailableReceiptArgs(argv = []) {
   const spec = new Map([
@@ -597,11 +776,11 @@ function ancestryProbe(head, shas) {
  * from the SAME gathering the Stop hook uses rather than a second copy of this
  * git work, which would drift and hand back a false "clean".
  */
-export function gatherCriticalityReviewInputs({ sessionId = '' } = {}) {
-  if (existsSync(PAUSE)) return { applicable: false, why: 'the batch is paused' }
-  if (heldByOtherLiveOwner(sessionId)) {
-    return { applicable: false, why: 'another live session owns the batch lock', cause: 'not-lock-owner' }
-  }
+export function gatherCriticalityReviewInputs({ report = false } = {}) {
+  // `--status` still MEASURES, and neither the pause nor the batch lock may
+  // silence it: a read decides nothing, and with the block gone the report is
+  // the debt's only remaining reader.
+  if (!report) return { applicable: false, why: CRITICALITY_GATE_SWITCHED_OFF }
   let branch = 'HEAD'
   try {
     branch = git('rev-parse --abbrev-ref HEAD')
@@ -723,16 +902,45 @@ if (isMainModule(import.meta.url)) {
       process.exit(1)
     }
   }
+  if (argv.includes('--record-findings-filed')) {
+    try {
+      const parsed = parseFindingsFiledArgs(argv)
+      if (!parsed.ok) {
+        console.error(`criticality-review-guard: refusing findings-filed receipt.\n  · ${parsed.errors.join('\n  · ')}`)
+        console.error(`\nrun: ${findingsFiledUsage()}`)
+        process.exit(1)
+      }
+      // A receipt READS the open set — the measuring route, not the gate.
+      const gathered = gatherCriticalityReviewInputs({ report: true })
+      const built = buildFindingsFiledReceipt({
+        ...parsed.values,
+        records: readRecords(),
+        // The OPEN set is read the same way the gate reads it, so a receipt can
+        // never name a point the gate would then find closed.
+        openPoints: gathered.applicable ? gathered.inputs.openPoints : [...openNumbers(readFileSync(repoPath('TASKS.md'), 'utf8'))],
+      })
+      if (!built.ok) {
+        console.error(`criticality-review-guard: refusing findings-filed receipt.\n  · ${built.errors.join('\n  · ')}`)
+        console.error(`\nrun: ${findingsFiledUsage()}`)
+        process.exit(1)
+      }
+      appendRecord(built.record)
+      console.log(
+        `recorded: ${built.record.model}'s refusal on ${built.record.sha.slice(0, 7)} for point ` +
+          `${built.record.point} is answered by open point(s) ${built.record.findingPoints.join(', ')}\n` +
+          '  ledger: .claude/mechanism-reviews.jsonl (tracked — commit it with the points it names)',
+      )
+      process.exit(0)
+    } catch (error) {
+      console.error(`criticality-review-guard: findings-filed receipt failed: ${error?.message ?? error}`)
+      process.exit(1)
+    }
+  }
   const status = argv[0] === '--status'
   try {
-    let sessionId = ''
-    try {
-      sessionId = JSON.parse(readFileSync(0, 'utf8')).session_id || ''
-    } catch {
-      /* manual run — the gate is global truth, not session-local */
-    }
-
-    const gathered = gatherCriticalityReviewInputs({ sessionId })
+    // The stdin payload is no longer read: the gate does not block, and the
+    // report answers whoever asks — session identity decided neither.
+    const gathered = gatherCriticalityReviewInputs({ report: status })
     if (!gathered.applicable) {
       if (status) console.log(`criticality-review-guard stands down: ${gathered.why}`)
       process.exit(0)

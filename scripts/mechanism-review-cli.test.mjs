@@ -42,13 +42,28 @@ const installFableSwitch = (repo, state = 'on') => {
     JSON.stringify(writeFableState(state, { why: 'test switch decision', by: 'test', now: 1 })),
   )
 }
+// THE LEDGER OUTGREW THE DEFAULT PIPE BUFFER, and the failure looked nothing
+// like a size problem: `--list` prints the whole ledger, that print measured
+// 1,045,116 bytes on 01.09.2026 against spawnSync's default 1 MiB, and once a
+// dozen more records crossed the line Node killed the child and returned
+// `status: null` — read here as "the CLI is broken", and on CI as a signal
+// kill. The ledger only ever grows, so a default that fits today is a red run
+// scheduled for later. Nothing here needs a bounded read: give the capture room
+// well past any ledger this repository will hold.
+const RUN_MAX_BUFFER = 64 * 1024 * 1024
+// ONE OPTIONS OBJECT, so the regression below spawns through the same bound it
+// protects: a case that passes its own maxBuffer would stay green after someone
+// deleted this one, which is a drill that never calls the thing it proves.
+const RUN_OPTIONS = {
+  windowsHide: true,
+  encoding: 'utf8',
+  input: '',
+  maxBuffer: RUN_MAX_BUFFER,
+}
+// `windowsHide` is repeated at every call site on purpose: window-hide-core
+// scans the SOURCE of each spawn's options object and cannot follow a spread.
 const run = (...args) =>
-  spawnSync(process.execPath, [SCRIPT, ...args], {
-    windowsHide: true,
-    encoding: 'utf8',
-    cwd: process.cwd(),
-    input: '',
-  })
+  spawnSync(process.execPath, [SCRIPT, ...args], { ...RUN_OPTIONS, windowsHide: true, cwd: process.cwd() })
 
 // THE HALVES ARE ADOPTED ONLY FROM COMMITTED BYTES: `committedHalfModel` reads
 // HEAD and refuses an absolute path outright, so a temp fixture can never satisfy
@@ -334,6 +349,29 @@ describe('the paths that must stay untouched', () => {
     const r = run('--list')
     expect(r.status, r.stderr).toBe(0)
     expect(r.stderr).not.toContain('unknown flag')
+  })
+
+  // THE REGRESSION ITSELF, without waiting for the ledger to grow into it: a
+  // capture at Node's default bound dies on an output this size, and the one
+  // the helper uses does not. The synthetic printer keeps the case
+  // deterministic — the real ledger crosses the line on its own schedule.
+  it('captures a print larger than the default pipe bound, where the default dies', () => {
+    const printer = ['-e', 'process.stdout.write("x".repeat(2 * 1024 * 1024))']
+    const bounded = spawnSync(process.execPath, printer, {
+      windowsHide: true,
+      encoding: 'utf8',
+      input: '',
+    })
+    // `status: null` alone says only that no exit code arrived; ENOBUFS is what
+    // names the bound as the killer, and it is the shape CI reported.
+    expect(bounded.error?.code, 'the default bound must be what killed the run').toBe('ENOBUFS')
+    expect(bounded.status).toBe(null)
+
+    // THROUGH THE SHARED OPTIONS, not a copy: take maxBuffer out of RUN_OPTIONS
+    // and this line dies, which is the whole point of the case.
+    const roomy = spawnSync(process.execPath, printer, { ...RUN_OPTIONS, windowsHide: true })
+    expect(roomy.status, roomy.stderr).toBe(0)
+    expect(roomy.stdout.length).toBe(2 * 1024 * 1024)
   })
 
   it('a bare invocation still lists the ledger', () => {
@@ -797,6 +835,8 @@ describe('the mode round-trips into the ledger', () => {
       for (const f of [
         'mechanism-review.mjs',
         'mechanism-review-core.mjs',
+        // the shared, header-bounded commit-object parent parser (merge authorship)
+        'mechanism-review-range-core.mjs',
         'authorship-check-core.mjs',
         'authorship-check-io.mjs',
         'mandatory-duty-core.mjs',
@@ -995,6 +1035,8 @@ describe('the mode round-trips into the ledger', () => {
       for (const f of [
         'mechanism-review.mjs',
         'mechanism-review-core.mjs',
+        // the shared, header-bounded commit-object parent parser (merge authorship)
+        'mechanism-review-range-core.mjs',
         'authorship-check-core.mjs',
         'authorship-check-io.mjs',
         'mandatory-duty-core.mjs',
@@ -1093,6 +1135,17 @@ describe('the mode round-trips into the ledger', () => {
       expect(changed.status).toBe(1)
       expect(changed.stderr).toContain(`CHANGED between ${S.slice(0, 7)} and ${H2.slice(0, 7)}`)
       expect(changed.stderr).toContain('review it fresh')
+
+      // A REPLACEMENT TREE CANNOT FORGE THAT IDENTITY. Make H2 appear to carry
+      // H's unchanged tree and the source as its parent. Every replacement-aware
+      // input then says the carry is valid: ancestry holds and fileA's two blobs
+      // match. The recorder must still read H2's real changed tree and refuse.
+      const replacement = git('commit-tree', `${H}^{tree}`, '-p', S, '-m', 'replacement with unchanged blobs').stdout.trim()
+      expect(git('replace', H2, replacement).status).toBe(0)
+      const forged = runRecorder('--record', H2, '--carried-from', S, '--pass', '1/2', '--pass-files', 'fileA.mjs,fileB.mjs')
+      expect(forged.status).toBe(1)
+      expect(forged.stderr).toContain(`CHANGED between ${S.slice(0, 7)} and ${H2.slice(0, 7)}`)
+      expect(readFileSync(join(repo, '.claude', 'mechanism-reviews.jsonl'), 'utf8')).not.toContain('replacement with unchanged blobs')
     } finally {
       rmSync(dir, { recursive: true, force: true })
     }
@@ -1222,6 +1275,8 @@ describe('the mode round-trips into the ledger', () => {
       for (const f of [
         'mechanism-review.mjs',
         'mechanism-review-core.mjs',
+        // the shared, header-bounded commit-object parent parser (merge authorship)
+        'mechanism-review-range-core.mjs',
         'authorship-check-core.mjs',
         'authorship-check-io.mjs',
         'mandatory-duty-core.mjs',
@@ -1315,6 +1370,8 @@ describe('the mode round-trips into the ledger', () => {
       for (const f of [
         'mechanism-review.mjs',
         'mechanism-review-core.mjs',
+        // the shared, header-bounded commit-object parent parser (merge authorship)
+        'mechanism-review-range-core.mjs',
         'authorship-check-core.mjs',
         'authorship-check-io.mjs',
         'mandatory-duty-core.mjs',
@@ -1617,15 +1674,21 @@ describe('a boundary resolves against the object database, not against refs', ()
   const SHADOW = 'b'.repeat(40)
 
   const runner = ({ objects = [OBJECT], types = {}, unreadable = [], calls = [] } = {}) => {
-    const fake = (args) => {
-      calls.push(args.join(' '))
+    const fake = (argv) => {
+      calls.push(argv.join(' '))
+      // The authorship reads carry the global `--no-replace-objects` flag ahead
+      // of the subcommand; this fixture judges the subcommand, not the flag.
+      const args = argv[0] === '--no-replace-objects' ? argv.slice(1) : argv
       if (args[0] === 'rev-parse' && String(args[1]).startsWith('--disambiguate=')) {
         const prefix = String(args[1]).slice('--disambiguate='.length)
         return objects.filter((object) => object.startsWith(prefix)).join('\n')
       }
-      if (args[0] === 'cat-file') {
+      if (args[0] === 'cat-file' && args[1] === '-t') {
         if (unreadable.includes(args[2])) throw new Error(`fatal: git cat-file: could not get object info`)
         return types[args[2]] ?? 'commit'
+      }
+      if (args[0] === 'cat-file' && args[1] === '-p') {
+        return [`tree ${'0'.repeat(40)}`, `parent ${SHADOW}`, '', 'subject'].join('\n')
       }
       if (args[0] === 'rev-parse') return SHADOW
       if (args[0] === 'show') return String(args[2]).includes('%s') ? 'subject' : 'GPT-5.6 Sol <noreply@openai.com>'
@@ -1761,5 +1824,176 @@ describe('the ledger path follows the working directory', () => {
     git(odd, 'init', '-q', '-b', 'main')
     expect(gitToplevel(odd)).toBe(realpathSync(odd))
     expect(recordsPathFor(odd)).toBe(resolve(realpathSync(odd), LEDGER_RELATIVE_PATH))
+  })
+})
+
+// A LANDING MERGE CARRIES NO TRAILER OF ITS OWN. Point 784's ruling says its
+// contribution belongs to the trailer-bearing tip(s) it merged, and the GATE
+// resolves it that way. The recorder read only the commit's own trailers, so the
+// two disagreed in the one direction that deadlocks: the gate owed a review the
+// recorder refused to accept ("Unknown authorship is unreviewable"), and a merge
+// that contributed a conflict resolution could be cleared by no route at all.
+// Measured 01.09.2026 on main, after landing point 1031.
+describe('a trailerless merge inherits the authorship of the tip it merged', () => {
+  const MERGE = 'a'.repeat(40)
+  const FIRST = 'b'.repeat(40)
+  const MERGED = 'c'.repeat(40)
+  const SOL = 'GPT-5.6 Sol <noreply@openai.com>'
+  const OPUS = 'Claude Opus 5 <noreply@anthropic.com>'
+  // `graftedParents` is what `%P` would print at a shallow boundary: the rule may
+  // never consult it, so the fixture makes the two disagree and pins which one wins.
+  // `graftedParents` is what `%P` would print at a shallow boundary and
+  // `replacedParents` what a `refs/replace` object would answer: the rule may
+  // consult NEITHER, so the fixture makes all three disagree.
+  const runner =
+    (trailers, parents, { graftedParents = null, replacedParents = null, unreadable = [], replacedTrailers = {} } = {}) =>
+    (args) => {
+      const noReplace = args[0] === '--no-replace-objects'
+      const [cmd, ...rest] = noReplace ? args.slice(1) : args
+      if (cmd === 'rev-parse') return MERGE
+      if (cmd === 'cat-file' && rest[0] === '-t') return 'commit'
+      if (cmd === 'cat-file' && rest[0] === '-p') {
+        const seen = noReplace ? parents : (replacedParents ?? parents)
+        return [`tree ${'0'.repeat(40)}`, ...seen.map((p) => `parent ${p}`), '', 'Merge branch ...'].join('\n')
+      }
+      const format = rest.find((a) => String(a).startsWith('--format='))
+      const target = rest[rest.length - 1]
+      if (format === '--format=%s') return 'Merge branch ...'
+      if (format === '--format=%ct') return '1788000000'
+      if (format === '--format=%P') return (graftedParents ?? parents).join(' ')
+      if (unreadable.includes(target)) throw new Error(`bad object ${target}`)
+      if (!noReplace && replacedTrailers[target] !== undefined) return replacedTrailers[target]
+      return trailers[target] ?? ''
+    }
+
+  it('takes the MERGED tip, never the first parent', () => {
+    const commit = resolveCommit(MERGE, {
+      run: runner({ [MERGE]: '', [FIRST]: OPUS, [MERGED]: SOL }, [FIRST, MERGED]),
+    })
+    expect(commit.authors).toEqual([SOL])
+    expect(commit.authoredBy).toBe(SOL)
+    expect(commit.authors).not.toContain(OPUS)
+  })
+
+  it('leaves its own trailer untouched where the commit has one', () => {
+    const commit = resolveCommit(MERGE, {
+      run: runner({ [MERGE]: OPUS, [FIRST]: '', [MERGED]: SOL }, [FIRST, MERGED]),
+    })
+    expect(commit.authors).toEqual([OPUS])
+  })
+
+
+  it('reads the commit object own parents, so a shallow graft cannot hide the merged tip', () => {
+    const commit = resolveCommit(MERGE, {
+      // `%P` claims a single parent, as it does at a shallow boundary; the object
+      // itself still names both. Trusting `%P` here returned no author at all,
+      // and an author that is merely invisible does not stop being an author —
+      // the model that wrote the hidden tip would have been free to review it.
+      run: runner({ [MERGE]: '', [FIRST]: OPUS, [MERGED]: SOL }, [FIRST, MERGED], { graftedParents: [FIRST] }),
+    })
+    expect(commit.authors).toEqual([SOL])
+  })
+
+  it('refuses rather than guesses when a non-first parent cannot be read', () => {
+    expect(() =>
+      resolveCommit(MERGE, {
+        run: runner({ [MERGE]: '', [FIRST]: OPUS }, [FIRST, MERGED], { unreadable: [MERGED] }),
+      }),
+    ).toThrow()
+  })
+
+
+  it('bypasses refs/replace, so a replacement commit cannot drop the merged tip', () => {
+    const commit = resolveCommit(MERGE, {
+      run: runner({ [MERGE]: '', [FIRST]: OPUS, [MERGED]: SOL }, [FIRST, MERGED], {
+        // A replacement object standing in for the merge names ONE parent, and a
+        // replaced parent would answer with the reviewer's own trailer. Reading
+        // either would let the model that wrote the merged tip review it.
+        replacedParents: [FIRST],
+        replacedTrailers: { [MERGED]: OPUS },
+      }),
+    })
+    expect(commit.authors).toEqual([SOL])
+  })
+
+
+  it('bypasses refs/replace for the merge OWN trailer, so no forged author skips ancestry', () => {
+    const commit = resolveCommit(MERGE, {
+      run: runner({ [MERGE]: '', [FIRST]: OPUS, [MERGED]: SOL }, [FIRST, MERGED], {
+        // A replacement object hands the MERGE a trailer it does not have. Read
+        // that, and `own` is non-empty, the ancestry rule never runs, and the
+        // author is not merely hidden but forged.
+        replacedTrailers: { [MERGE]: OPUS },
+      }),
+    })
+    expect(commit.authors).toEqual([SOL])
+    expect(commit.authors).not.toContain(OPUS)
+  })
+
+  it('follows a trailerless merged tip that is itself a trailerless merge', () => {
+    // Resolving ONE level left the case this rule exists for, one step further
+    // out: a machinery merge whose merged tip is another machinery merge. The
+    // gate's own resolver recurses, so stopping here recreated the disagreement
+    // the whole repair removed (cross-vendor review, GPT-5.6 Sol at effort high).
+    const INNER = 'd'.repeat(40)
+    const parentsOf = { [MERGE]: [FIRST, MERGED], [MERGED]: [FIRST, INNER], [INNER]: [] }
+    const commit = resolveCommit(MERGE, {
+      run: (argv) => {
+        const noReplace = argv[0] === '--no-replace-objects'
+        const args = noReplace ? argv.slice(1) : argv
+        if (args[0] === 'rev-parse') return MERGE
+        if (args[0] === 'cat-file' && args[1] === '-t') return 'commit'
+        if (args[0] === 'cat-file' && args[1] === '-p') {
+          const target = args[2]
+          return [
+            `tree ${'0'.repeat(40)}`,
+            ...(parentsOf[target] ?? []).map((p) => `parent ${p}`),
+            'author X <x@y> 1 +0000',
+            '',
+            'msg',
+            '',
+          ].join('\n')
+        }
+        const format = args.find((a) => String(a).startsWith('--format='))
+        const target = args[args.length - 1]
+        if (format === '--format=%s') return 'Merge branch ...'
+        if (format === '--format=%ct') return '1788000000'
+        // Only the innermost tip names a model; every merge above it is bare.
+        return target === INNER ? SOL : ''
+      },
+    })
+
+    expect(commit.authors).toEqual([SOL])
+  })
+
+  it('reads every field past refs/replace, the timestamp included', () => {
+    // A replacement can substitute the recorded subject and the commit TIME, and
+    // a forged older timestamp defeats the later "a review cannot predate its
+    // commit" validation (cross-vendor review, GPT-5.6 Sol at effort high).
+    const bare = []
+    const commit = resolveCommit(MERGE, {
+      run: (argv) => {
+        if (argv[0] !== '--no-replace-objects') bare.push(argv.join(' '))
+        const args = argv[0] === '--no-replace-objects' ? argv.slice(1) : argv
+        if (args[0] === 'rev-parse') return MERGE
+        if (args[0] === 'cat-file' && args[1] === '-t') return 'commit'
+        if (args[0] === 'cat-file' && args[1] === '-p') {
+          return [`tree ${'0'.repeat(40)}`, `parent ${FIRST}`, '', 'msg', ''].join('\n')
+        }
+        const format = args.find((a) => String(a).startsWith('--format='))
+        if (format === '--format=%s') return 'subject'
+        if (format === '--format=%ct') return '1788000000'
+        return OPUS
+      },
+    })
+
+    expect(commit.at).toBe(1788000000 * 1000)
+    expect(bare).toEqual([])
+  })
+
+  it('leaves an ordinary trailerless commit authorless, so absence is no assignment', () => {
+    const commit = resolveCommit(MERGE, { run: runner({ [MERGE]: '' }, [FIRST]) })
+    expect(commit.authors).toEqual([])
+    expect(commit.authoredBy).toBe('')
   })
 })

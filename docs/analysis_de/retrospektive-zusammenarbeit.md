@@ -81,6 +81,8 @@ Das Musterbeispiel sind die Chat-Zeitstempel: neun Eskalationsstufen, acht weich
 | 27.08. abends | Dasselbe Kritikalitäts-Tor forderte binnen zwanzig Minuten erst eine, dann zwei, dann sechs gegenzulesende Dateien für einen Punkt, der in dieser Zeit keinen Commit hatte und keine der genannten Dateien je angefasst hat — die Vereinigung folgt dem Zeitfenster, nicht dem Punkt, und der Commit, der den Befund eintrug, hob die Forderung selbst mit an (§3.204, Punkt 974) |
 | 28.08. abends | Die Notfall-Uhr des unbeaufsichtigten Stapels wurde genau wie bestellt auf nachweisbaren Fortschritt verengt — und verlor dabei einen Schutz, den nie jemand aufgeschrieben hatte: Der ehrliche Abschluss-Prüflauf über beide Backends dauert gemessen 80 min 48 s gegen eine Schwelle von 60 Minuten und sieht seither aus wie ein Hänger, den die Rettungsroutine unterbricht. Kein Test wurde rot; der Schutz war vorhanden, nicht zugesichert (§3.210, Punkt 1002) |
 | 29.08. nachts | Ein Wächter verlangt einen Beleg aus einem Protokoll, das ihn wegwirft: Vier Laufaufzeichnungen tragen die Absturzmarke, gesetzt aus der Fehlerausgabe — das aufbewahrte Protokoll ist eine gefilterte Sicht und kann ihr Fehlen nicht belegen. Nicht freigezeichnet, sondern in den blockierten Punkt geschrieben (§3.215); derselbe Lauf ließ drei Rots ohne jeden Punkt zurück, obwohl die Tafelkarten dafür schon standen (Punkte 1011-1013); drei Gegenlesungsrunden über die Buchungstabelle endeten damit, eine geschriebene Buchung ZURÜCKZUZIEHEN statt sie enger zu fassen — kein Muster konnte das gemessene Rot von seinen Nachbarn trennen (§3.216); und eine Behauptung über einen gelandeten Punkt kam aus einem BRANCHNAMEN statt aus einer Messung, gefunden vom Nutzer in zwei Sätzen |
+| 01.09. | Der Vier-Augen-Wächter sperrte jede Landung, und die Schuld wuchs schneller, als sie zu bezahlen war: Das Tor schnitt die Prüfarbeit nach der einen Regel zu und zählte sie nach der anderen (§3.225), und JEDE eingetragene Bewertung erzeugte selbst wieder einen prüfpflichtigen Beitrag, weil das Hauptbuch versioniert ist — vierzehn ehrliche Runden mit lauter geschlossenen Befunden ließen das Tor rot (§3.226, Punkt 1036) |
+| 01.09. nachm. | **Die Umsteuerung**: Blind-Doppeldiagnose (Fable + Sol, Opus-Merge) auf die Nutzerfrage nach dem Spielstillstand — die Steuerung war zum Hauptprodukt geworden; der Nutzer gab Freeze, Aufnahmeregel und die Streichung des §7.1-Tors direkt frei, und die Umsetzung bewies Punkt 1005 gleich mit: punktlose Arbeit fand keine Karte (§3.227, Punkt 1039) |
 
 Muster: Ab dem 22.07. explodiert die Commit-Rate (Delegation) — und genau dann häufen sich die Infrastruktur-Vorfälle. **Skalierung der Autonomie erzeugt eine eigene Problemklasse, die die Feature-Arbeit zeitweise überholt.**
 
@@ -1418,7 +1420,7 @@ keinen Träger hat. Gebucht als Punkt 956.
 
 ## Anhang A — Maschinell gepflegte Quellen-Übersicht
 
-Zuletzt aktualisiert: Dienstag, 01.09.2026, 07:12 · Quellen-Fingerprint: `fb04ccd12ae6…`
+Zuletzt aktualisiert: Dienstag, 01.09.2026, 18:49 · Quellen-Fingerprint: `0d78f63ec14f…`
 
 Spalten heuristisch aus den Quellen abgeleitet (Anläufe = distinkte Datumsnennungen im Memory;
 Maßnahme = Guard-Skripte mit Namens-Treffer). Die inhaltliche Bewertung gehört der Prosa oben.
@@ -1483,7 +1485,6 @@ Maßnahme = Guard-Skripte mit Namens-Treffer). Die inhaltliche Bewertung gehört
 | hoa uses a feature-branch workflow — each TASKS point on feat/<point>-<slug>, push the branch after every commit, merge to main only when done+verified; cross-cutting changes go straight to main | 2 | mittel | commit-scope-guard.mjs, push-arrival-guard.mjs | ✔ Mechanismus |
 | Direct pushes to main are approved despite GitHub's branch protection — never ask about switching to pull requests again | 1 | niedrig | push-arrival-guard.mjs | ✔ Mechanismus |
 | Order the TASKS/queue so known-bug fixes + user-requested extensions come BEFORE the big bug-FINDING / QA-framework tickets | 1 | niedrig | queue-order-guard.mjs | ✔ Mechanismus |
-| Console warning \"THREE.Clock deprecated, use THREE.Timer\" comes from R3F v9 internals — fix by updating @react-three/fiber once it migrates to Timer | 1 | niedrig | — (Regel/Memory) | ◐ Regel |
 | Choose the browser-regression tier per task at my discretion (Vitest-only / Vitest+small / Vitest+large); the closing cycle ALWAYS runs Vitest+large | 1 | niedrig | — (Regel/Memory) | ◐ Regel |
 | Priority tiers for picking the next point — token-reduction work first, then the communication mechanic, then everything else; open branches before a fresh point | 2 | mittel | lock-release-hook.mjs, queue-order-guard.mjs | ✔ Mechanismus |
 | A declared \"intended residual\" is where real defects hide — legitimate only when the information to close it is genuinely not at hand | 1 | niedrig | — (Regel/Memory) | ◐ Regel |
@@ -1503,6 +1504,7 @@ Maßnahme = Guard-Skripte mit Namens-Treffer). Die inhaltliche Bewertung gehört
 | Think harder about what to test; when in doubt add MORE tests — never skimp on fast browserless Vitest cases | 1 | niedrig | — (Regel/Memory) | ◐ Regel |
 | Tests and probes must use IN-GAME-achievable zoom (non-debug 0.125–0.5 at least), never a debug-only zoom — testing at an unrealistic zoom has passed while the player still saw the bug, repeatedly | 1 | niedrig | — (Regel/Memory) | ◐ Regel |
 | Permissions are deliberately maximally broad (whole-tool allows incl. Bash); NEVER narrow or \"tidy\" them again — standing user directive | 2 | mittel | — (Regel/Memory) | ◐ Regel |
+| Der 9-Punkte-Plan vom 01.09.2026 gegen die Governance-Selbstproduktion — Stand, offene Maßnahmen, Veto-Wege; Stichwort „Umsteuerung\" | 2 | mittel | — (Regel/Memory) | ◐ Regel |
 | On every user change request, also update CLAUDE.md and design.md where appropriate — standing directive for all future sessions. | 1 | niedrig | — (Regel/Memory) | ◐ Regel |
 | Every place/landmark/settlement name in the game uses the name that was VALID IN 1890, not a later renaming | 1 | niedrig | — (Regel/Memory) | ◐ Regel |
 | vdzk-answer.mjs CLI refuses in SDK-driven sessions; record via its exported functions with the real transcript uuid | 1 | niedrig | — (Regel/Memory) | ◐ Regel |
@@ -1521,8 +1523,8 @@ Maßnahme = Guard-Skripte mit Namens-Treffer). Die inhaltliche Bewertung gehört
 
 Erfasste Quellen: 93 Feedback-/Projekt-Memories · 57 Guard-/Hook-Skripte · 6 Revert-/Reapply-Commits · 120 Prozess-/Meta-TASKS-Punkte (davon 54 offen).
 
-<!-- RETRO-FINGERPRINT: fb04ccd12ae6596dd0da001271ef7edbea427382506a4268b7e725234f1dc3df -->
-<!-- RETRO-LAST-REFRESHED: 2026-09-01T05:12:37.095Z -->
+<!-- RETRO-FINGERPRINT: 0d78f63ec14f9a0bce27a593a6dec9f8b51f79a954bcccdc1165f53c1972c061 -->
+<!-- RETRO-LAST-REFRESHED: 2026-09-01T16:49:05.101Z -->
 <!-- AUTO-GENERATED:END -->
 
 ### 3.111 Ein Erfolg ist kein Beweis für den Weg, auf dem er zustande kam
@@ -2609,6 +2611,23 @@ verwandelt eine vergessene Übergabe in eine stille, gegenteilige Entscheidung. 
 geteilten Mechanismus: *Wie viele Stellen rufen ihn auf, und beantworten sie alle dieselbe Frage
 gleich?* Der Vergleich der Antworten ist billig — hier hätte ein Aufruf des Auskunftskommandos
 neben dem Launcher-Protokoll den Widerspruch sofort gezeigt.
+
+**Wiederholung am 01.09.2026, im selben Launcher und mit demselben Vorgabewert.** Punkt 874 hatte
+im August genau die richtige Regel durchgesetzt: Ein positiv widerlegter Prozess darf nicht vom
+letzten Commit der Leiche überstimmt werden. Er hat sie an der Deklarations-Aufrufstelle
+durchgesetzt — und `registeredFeatureWriters`, die der Launcher fragt, baut ihren Aufruf derselben
+reinen Funktion aus einer Git-Worktree-Liste selbst zusammen und übergibt gar keine
+Prozess-Identität. Damit ist der einzige Zweig, der `dead` zurückgibt, dort BAUARTBEDINGT
+unerreichbar: Die Sonde kann ihr eigenes Nein nicht erreichen. Gemessen: Sitzung 37d470a8 starb um
+14:03, die Deklarations-Sonde widerlegte ihren Autor binnen Sekunden, der Launcher meldete ihn um
+14:24 weiter als lebendig und startete keinen Nachfolger — 24 Minuten Stillstand, im Protokoll als
+„da arbeitet noch jemand". Aufgenommen als Punkt 1038.
+
+**Zusatz zur Lehre:** Eine Korrektur ist erst erledigt, wenn sie an ALLEN Aufrufstellen der
+geteilten Funktion steht, nicht nur an der, an der der Fehler gemessen wurde. Und die schärfere
+Prüffrage für eine Sonde lautet nicht „was misst sie?", sondern: *Kann sie mit den Eingängen, die
+diese Aufrufstelle ihr tatsächlich übergibt, ihr eigenes negatives Urteil überhaupt erreichen?*
+Wo die Antwort nein ist, ist ihr grünes Urteil keine Messung, sondern eine Tautologie.
 
 ### 3.150 Sichtbar wird die verwaiste Arbeit nur durch den, der sie nicht mehr sichtbar machen kann
 
@@ -5107,3 +5126,95 @@ Bezahlung den Zähler nicht bewegt, ist die Messung selbst.
 beide Hälften an dieselbe Regel binden. Und wer vor einem solchen Tor steht,
 zahlt die Schuld einmal vollständig, statt zu argumentieren: Erst der bezahlte
 Rest beweist, dass der Zähler falsch zählt.
+
+### 3.226 Das Hauptbuch stand unter der Pflicht, die es selbst führt
+
+Am 01.09.2026 hatte eine Sitzung vierzehn anbieterübergreifende Prüfrunden über
+den Vier-Augen-Wächter gefahren, jeden Befund beantwortet und für jede Runde ein
+`merge` des Gegenmodells auf dem Papier. Das Tor blieb rot. Der Grund liegt
+nicht in der Arbeit, sondern in der Buchführung: Jede Bewertung wird aufgezeichnet,
+indem eine Zeile an `.claude/mechanism-reviews.jsonl` angehängt wird, diese Datei
+ist versioniert, und der Commit, der sie anhängt, ist selbst wieder ein Beitrag,
+der eine Gegenlesung schuldet. Wer eine Schuld tilgt, erzeugt dabei die nächste.
+
+Das ist nicht dieselbe Klasse wie §3.225. Dort widersprechen sich zwei Regeln,
+und die Schuld ist endlich — sie lässt sich nur nicht mit den angebotenen
+Befehlen schließen. Hier ist die Schuld nicht endlich: Der Mechanismus, der die
+Erfüllung der Pflicht dokumentiert, fällt unter dieselbe Pflicht, also läuft der
+Zähler dem Bezahlen davon. Keine noch so korrekte Arbeit innerhalb einer Sitzung
+konvergiert. Sichtbar wurde es erst an den beiden ältesten Einträgen, deren
+fehlende Durchgänge sich überhaupt nicht mehr adressieren ließen, weil ihr
+Dateisatz in der Zwischenzeit ein anderer geworden war — dieselbe Wirkung, nur
+im Nachhinein.
+
+Dazu kam derselbe Fehler in der Diagnose: Das Kritikalitätstor druckte »eine
+spätere Freigabe existiert, aber nicht für einen SPÄTEREN Commit«, obwohl git
+beweist, dass der abgelehnte Commit echter Vorfahr des freigegebenen ist. Der
+wirkliche Grund war ein unvollständiger Durchgangs-Verbund. Wer dem Text glaubt,
+committet eine Reparatur, die es längst gibt; wer ihm nicht glaubt, hält das
+Hauptbuch für kaputt. Eine Ablehnung, die die falsche Ursache nennt, kostet
+genau so viel wie eine, die gar keine nennt — nur merkt es niemand.
+
+**Lehre:** Ein Prüfzwang, dessen eigene Aufzeichnung unter denselben Zwang
+fällt, ist kein strenges Tor, sondern ein Tor ohne Ausgang. Die Aufzeichnung
+einer Bewertung muss entweder von der Pflicht ausgenommen sein — begründet, an
+der einen Stelle, an der solche Ausnahmen ohnehin stehen — oder von der Runde
+mitgedeckt werden, die sie einträgt. Und jede Ablehnung schuldet ihre WIRKLICHE
+Ursache: Was der Leser als Nächstes tun soll, muss aus dem Text folgen, nicht
+aus einer zweiten Messung, die er selbst anstellen muss.
+
+### 3.227 Die Steuerung war zum Produkt geworden — und die Umsteuerung fand keine Karte
+
+Am 01.09.2026 fragte der Nutzer, warum trotz Wochen hochwertiger Arbeit am
+Spiel kaum Fortschritt sichtbar sei. Die Antwort kam dreifach: Fable und Sol
+diagnostizierten blind aus identischen Eingaben, Opus führte zusammen. Der
+Befund war einstimmig und messbar — rund die Hälfte der 358 offenen Punkte und
+praktisch alle jüngeren Commits galten der Prüf- und Steuerungsinfrastruktur
+selbst. Zwei Rückkopplungen trugen das: ein unbegrenzter Zulauf (jede
+Beobachtung wird regelkonform zum Punkt, und Infra-Arbeit findet Infra-Fehler)
+und ein verschlossener Ablauf (32 Abnahmekriterien als unteilbares Tor, aus dem
+nichts Spielbares vorab herausfallen kann). §§3.217, 3.223 und 3.226 sind
+Einzelfälle genau dieser Klasse; hier wurde die Klasse selbst zur Diagnose.
+
+Der Nutzer gab die ersten drei Maßnahmen frei: Infrastruktur-Freeze (Regeln
+werden abgeschaltet, nicht umgebaut), umgekehrte Aufnahmeregel für Befunde
+(Punkt nur bei Spielerwirkung, Risiko, echter Blockade oder Vereinfachung,
+sonst nicht blockierendes Backlog) und die Streichung des §7.1-Tors. Beim
+Umsetzen bestätigte sich die Diagnose noch einmal im Kleinen: Die punktlose,
+vom Nutzer direkt beauftragte Änderung fand auf der Tafel keine darstellbare
+Karte (Punkt 1005) — vier Anläufe über `now`, `queue`, `none` und `promote`
+wurden abgewiesen, bis die Arbeit sich als eigener Punkt 1039 verkleiden
+musste, um stattfinden zu dürfen.
+
+**Lehre:** Eine Qualitätssicherung ohne wirtschaftliche Grenze optimiert sich
+selbst zum Hauptprodukt; mehr Gründlichkeit erzeugt dann mehr Arbeit, nicht
+weniger. Die Grenze muss außen stehen — als Budget, Aufnahmeschwelle und
+offener Ablauf —, denn von innen konvergiert das System nicht: Selbst seine
+Selbstkritik verbuchte es bis dahin nur als weitere Punkte.
+
+### 3.228 Das erste Tor, das wir abgeschaltet statt repariert haben
+
+Am 01.09. stand das Vier-Augen-Tor für Mechanismen rot und wies jeden Merge
+zurück; die Warteschlange des ganzen Stapels hing dahinter. Vierzehn
+vendor-übergreifende Runden an einem einzigen Tag hatten es nicht ins Grüne
+gebracht — jede Runde beantwortete ihre Befunde ehrlich, und jede Korrektur war
+selbst wieder eine Mechanismus-Änderung mit eigener Prüfpflicht. Das ist die
+Bauform, die §3.226 und §3.227 beschreiben, diesmal am konkreten Tor gemessen.
+
+Neu ist nicht der Befund, sondern die Antwort. Der Freeze aus CLAUDE.md §2 sagt
+für genau diesen Fall: abschalten, nicht umbauen. Also fiel der Block — im
+Wächter-Skript selbst, nicht in einer geschützten Einstellungsdatei, was den
+Weg auch für die übrigen Tore vorzeichnet. Die Messung blieb vollständig
+erhalten; was verschwand, war ausschließlich die Sperre. Drei Dinge sind daran
+festzuhalten. Erstens: Eine abgeschaltete Regel ist keine gelöschte Regel —
+die Schuld ist weiter lesbar, nur nicht mehr blockierend, und die Rücknahme ist
+ein einziger Commit. Zweitens: Die Begründung im Code musste zweimal korrigiert
+werden, weil sie eine Ursache behauptete, die der Branch längst behoben hatte;
+eine Entscheidung, die sich auf eine falsche Ursache stützt, ist auch dann
+angreifbar, wenn sie richtig ist. Am Ende steht dort nur noch das Gemessene und
+die Regel des Nutzers, keine Theorie. Drittens: Ausgerechnet die
+vendor-fremde Prüfung dieser Abschaltung fand in vier Runden zwei echte Fehler
+in dem, was übrig blieb — die Statusabfrage brach unter dem Kontext-Zaun
+wortlos ab und konnte eine offene Schuld als „GATE CLEAR" ausgeben. Das Tor
+abzuschalten und die Prüfung trotzdem zu fahren, war also nicht widersprüchlich,
+sondern genau die Trennung, um die es geht: Die Praxis bleibt, der Zwang geht.

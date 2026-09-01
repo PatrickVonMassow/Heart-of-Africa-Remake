@@ -14197,49 +14197,6 @@ to land than a mechanism that needs a review.
   Criticality: high — it is the gate that decides whether a second model's refusal is answered, and
   it fails in the direction of reporting cleared where it measured refused.
   Bundle: Modell & Wächter.
-- [ ] 1031. Three red families of the WebGPU lane have no owner, and one of them is a charged red
-  the parser renamed (measured 31.08.2026 on the full WebGPU LARGE pass of
-  `feat/686-five-word-lexicon-game`, 63 minutes, quiet machine; every red of that lane put through
-  `chargeFor` rather than read by eye).
-  Of the lane's reds, 15 came back UNCHARGED, in three families:
-  1. THE BUG-REPORT ARCHIVE RED IS CHARGED AND STILL READS UNCHARGED. Point 927's entry matches
-     `^member hoa-state-\d{4}-\d{2}-\d{2}-\d+\.png is present$`, and the suite printed exactly that
-     check — but the recorded red's NAME is `member hoa-state-2026-08-31-42.png is present — ` with
-     the separator still attached and an EMPTY detail. A check that prints no measurement keeps the
-     ` — ` in its name, so an anchored match can never fire. This is the same class as the
-     section-tag work of 30./31.08.: a red is read through text the recorder shaped, not through
-     what the suite meant. It is the cheapest of the three to fix and the most dangerous to leave,
-     because it makes a CORRECT charge silently ineffective.
-  2. TWO CONSOLE SIGNATURES OF THE POINT-514 MSAA CASCADE ARE UNOWNED: `Async render pipeline
-     creation failed (renderPipeline_ShadowMaterial_…)` and `Uncaptured WebGPU GPUValidationError:
-     [Invalid CommandBuffer from CommandEncoder "renderContext_11"]`. The ledger already carries
-     the cascade's other three signatures (`output-msaa`, `normal-msaa`, `[Invalid TextureView]`)
-     and 514's `why` describes exactly this chain. These two arrive in the same block, after the
-     same `RGBA16Float does not support multisampling`, on the same compatibility lane.
-  3. THE BENCHMARK TIMESTAMP ROWS: `WebGPU: real GPU timestamps were measured for the low-preset
-     rows too — 0/3 low rows with gpu`. Point 1009's entry names them and EXCLUDES them in its own
-     words: "The two WebGPU timestamp rows of the same run fail for their own reasons and are NOT
-     covered here." They have therefore been knowingly ownerless since 30.08.2026.
-  WHY IT BLOCKS: CLAUDE.md §7.2 lets a red close only when it is fixed, charged to its owning
-  point, or filed as a new point. These three are none of the three, so no LARGE pass over the
-  WebGPU lane can be read as covering a picture — which is what stopped the communication rebuild
-  from landing on the evening of 31.08.2026, although nothing in that rebuild touches any of them.
-  FINAL STATE: (1) a red whose check printed no measurement is recorded under the name the suite
-  printed, without the dangling separator — fixed in the parser, not in the ledger entry, because
-  every anchored charge has the same hole; (2) the two cascade signatures join point 514's entry,
-  each as narrowly as its measured text allows; (3) the benchmark timestamp rows get an owner —
-  either an existing point that really covers them or a new one — and are never again excluded by a
-  sentence inside another point's charge.
-  VERIFIABLE: a unit case over the red parser proving a check with an EMPTY detail keeps a clean
-  name and that the existing 927 entry then charges it, mutation-checked; a case pinning each new
-  cascade signature against the measured line and proving it does not match the neighbouring one;
-  a re-run of the WebGPU lane's `settings`, `benchmark` and `report` sections in which every red
-  comes back charged. Plus `npm run test:unit`, lint, build.
-  Criticality: high — it is the gate every point's picture verification is judged by, and its
-  failure direction is a real defect standing in the way of unrelated work while a genuinely
-  charged red reads as unowned.
-  Bundle: Testinfrastruktur.
-
 - [ ] 1032. A blocking Stop guard can refuse the same finding forever, and every refusal spends a
   user-visible answer (measured 31.08.2026, this session).
   WHAT HAPPENED: five Stop guards stood red at once. A red Stop guard does not end the turn; it
@@ -14296,3 +14253,72 @@ to land than a mechanism that needs a review.
   Criticality: high — it is the batch singleton, and its failure direction hands a user's
   interactive window a role it never accepted.
   Bundle: Session- & Repo-Hygiene.
+
+- [ ] 1039. The run is redirected: freeze, intake rule, and the checklist that stops gating
+  (user decision 01.09.2026, chat: "Erledige direkt die Sofortmaßnahmen (1-3)").
+  The blind-parallel diagnosis (Fable + Sol, merged by Opus) found the governance loop feeding
+  itself; the user ordered its first three measures executed immediately.
+  FINAL STATE:
+  - CLAUDE.md §2 no longer gates work on §7.1 completion; §7.1 is a checklist, progress is
+    judged by playable game output.
+  - CLAUDE.md carries the infrastructure freeze: no new guards, ledger fields, routers, review
+    planners, or workflow abstractions; an infrastructure defect is worked on only when it
+    reproducibly blocks current game work or permits a false approval; rules in the way are
+    switched off, not rebuilt.
+  - CLAUDE.md carries the finding intake rule: a finding becomes a point only for reproducible
+    player impact, security or data risk, a real blockade, or deletion/simplification; the rest
+    goes to `docs/backlog.md`, which exists and is non-blocking.
+  VERIFIABLE: the three clauses stand in CLAUDE.md; `docs/backlog.md` exists; lint, build,
+  `npm run test:unit` stay green.
+  Criticality: high — it changes what every later point is allowed to be.
+  Bundle: Session- & Repo-Hygiene.
+
+- [ ] 1035. The charge ledger landed with six named findings against it, and two of them widen
+  what a red is excused for (measured 01.09.2026, cross-vendor reading of point 1031's landing at
+  `main..1bdd3a2`, Opus 5 at effort high, two passes, both merge-with-fixes).
+  Point 1031 closed the ownerless WebGPU reds and its own re-run proves every red of `settings`,
+  `benchmark` and `report` now charges. The end-state reading of the same material found six
+  things the per-commit reading had not, and the two first ones are not cosmetic: a charge that
+  excuses more than it measured is the failure direction this ledger exists to prevent.
+  FINAL STATE:
+  - THE LOW-PRESET ENTRY STATES ITS OWN CONTAINMENT. Its companion `detailMatch` demands the red
+    name the missing capability (`reason "adapter without the timestamp-query feature"`), because
+    the feature level does NOT test the capability and a compatibility adapter that DOES expose
+    `timestamp-query` would otherwise have a genuine regression charged. The new entry's
+    `detailMatch` carries no reason at all. There IS real containment — `0/N low rows` with N ≥ 1
+    implies the every-row check fails too, and on a capable adapter that check prints a DIFFERENT
+    reason, so its own charge would not apply and the run stays unaccounted — but the `why` claims
+    a cause the signature cannot read. Either the `why` states the containment it actually rests
+    on, or point 1012 makes the low check print its reason and the entry then requires it.
+  - THE TWO TRUNCATED ASYNC ALTERNATIVES SAY WHAT THEY EXCUSE. `MeshStandardMaterial_\d+\): \[Invalid Texture`
+    and `MeshStandardNodeMaterial_\d+\): \[Invalid Text` stop before the object type, so they charge
+    ANY `[Invalid Text…` object for those two families — `[Invalid Texture "output-msaa"]` included —
+    while the `ShadowMaterial` and `RenderPipeline` alternatives demand the full `[Invalid TextureView]`.
+    The truncation math is real and the record genuinely cannot distinguish, so the fix is in the
+    `why`, which today understates the scope as "those four pipeline classes".
+  - THE DIGIT-COUNT DEPENDENCE IS RECORDED. `renderContext_\d{2}$` matches only because a two-digit
+    id lands the 120-character cut exactly at the digits; `renderContext_7` is not charged, and
+    `MeshStandardNodeMaterial_\d+` works at three digits and fails at four. All fail in the safe
+    direction, but the ledger then silently stops accounting for the same measured red, and neither
+    the comments nor the tests say so.
+  - THE TWO CONTRADICTED COMMENTS GO. One above the TextureView `match` still says the
+    async-pipeline form "has no owner and must stay red"; one in the RGBA16Float block still says
+    `Invalid TextureView` and `Invalid CommandBuffer from CommandEncoder` "say nothing about a
+    cause" while the new CommandBuffer entry adopts exactly that name as its whole signature.
+  - THE CASCADE TEST PINS ITS SCOPE. `charges each new cascade signature without taking its
+    neighbouring form` never varies `featureLevel: 'core'`, `backend: 'webgl'`, another suite or
+    `kind: 'check'`; its five neighbours vary only the material family, never the object or the
+    lane — which is the one direction the two truncated alternatives are open in. The low-preset
+    test already does this and is the model to follow.
+  - `checkFromName` KEEPS THE TRAILING SEPARATOR the parser now strips, so a pasted `--failed`
+    result line for an empty-detail check keys differently from the parsed output and returns
+    `inconclusive`. Point 1031 fixed one half of the 06.08.2026 bug; this is the other.
+  VERIFIABLE: a case per bullet, each mutation-checked — the low entry refuses a red whose detail
+  names no cause OR the `why` names the containment and a case pins the every-row companion staying
+  uncharged; a case that the two truncated alternatives do NOT take another object of the same
+  family, or a `why` that says they do; a case per lane, level, suite and kind for the cascade
+  entries; a case pinning `checkFromName` and the parser on the same empty-detail line. Plus
+  `npm run test:unit`, lint, build.
+  Criticality: high — a charge that excuses a red nobody measured makes the picture gate read green
+  where it should bite, which is the same failure as an ownerless red, from the other side.
+  Bundle: Testinfrastruktur.

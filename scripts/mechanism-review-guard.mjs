@@ -11,8 +11,11 @@
 //
 // Decision logic: mechanism-review-core.mjs (pure, Vitest-covered). This wrapper
 // only gathers git output and the two state files, and is fail-OPEN — an internal
-// error never traps the session. It stands down while .claude/batch-paused exists
-// and for a session that does not own the batch lock.
+// error never traps the session.
+//
+// THAT BLOCK IS SWITCHED OFF (point 1036) — see GATE_SWITCHED_OFF below for why
+// and how to reverse it. What remains is the MEASUREMENT: `--status` reports the
+// outstanding debt in full, to whoever asks, under any lock or pause.
 //
 // RECOVERY: the baseline is per branch local state. Its absence blocks once and
 // seeds a fixed tracked-history anchor; it never self-arms at HEAD, because on
@@ -24,12 +27,12 @@
 //       --mode <review|blind-parallel>
 // CLI:
 //   node scripts/mechanism-review-guard.mjs --status
-import { existsSync, mkdirSync, readdirSync, readFileSync, writeFileSync } from 'node:fs'
+import { mkdirSync, readdirSync, readFileSync, writeFileSync } from 'node:fs'
 import { execFileSync, execSync } from 'node:child_process'
 import { dirname } from 'node:path'
 import { commonRepoPath, REPO_ROOT, repoPath } from './repo-paths.mjs'
 import { isMainModule } from './is-main.mjs'
-import { heldByOtherLiveOwner } from './batch-singleton.mjs'
+import { readOwnerLock } from './batch-singleton.mjs'
 import { readRecords, verifyCarried } from './mechanism-review.mjs'
 import {
   CONTRIBUTION_DISPOSITION_KIND,
@@ -46,10 +49,12 @@ import {
   verifiedPlannerPasses,
 } from './mechanism-review-core.mjs'
 import {
+  commitObjectParents,
   mechanismLogCommand,
   parseRangeLog as parseWholeRangeLog,
   planAuthorshipGroups,
   reviewEndStateFiles,
+  withResolvedCommitAuthors,
 } from './mechanism-review-range-core.mjs'
 import { quotePassFile, unquoteGitPath } from './review-material-core.mjs'
 import {
@@ -60,7 +65,46 @@ import {
 import { gatherGuardDutyContext } from './guard-duty.mjs'
 import { buildAuthorshipPassPlan, formatContributionPassPlan } from './review-sol.mjs'
 
-const PAUSE = repoPath('.claude/batch-paused')
+
+// SWITCHED OFF, NOT REBUILT (CLAUDE.md §2 infrastructure freeze, user decision
+// 01.09.2026; point 1036). What is recorded here is the DECISION and what was
+// measured, not a theory of why the gate behaved as it did:
+//   · it refused every merge, so the batch's whole throughput stood behind it;
+//   · fourteen cross-vendor rounds in one day, every finding answered, did not
+//     clear it, and each round's fixes added a contribution of their own;
+//   · CLAUDE.md §2 says a rule that is in the way is switched off, not rebuilt.
+// Two causes were proposed along the way and are NOT claimed here: a
+// ledger-only commit owes no round (the contribution selection already excludes
+// it), and one follow-up review per fix is ordinary practice, not a regress.
+//
+// What is switched off is the automatic BLOCK, and only that. The four-eyes
+// rule of CLAUDE.md §6 stands as practice; nothing is deleted, forgiven or
+// retired, and the debt stays measurable in full through the guard's own
+// report:
+//
+//   node scripts/mechanism-review-guard.mjs --status
+//
+// Reversing this is one commit: drop the stand-down below.
+export const GATE_SWITCHED_OFF =
+  'the four-eyes mechanism gate no longer blocks — switched off under the infrastructure ' +
+  'freeze (CLAUDE.md §2, user decision 01.09.2026) after it refused every merge and ' +
+  'fourteen cross-vendor rounds in one day did not clear it. The debt is not forgiven ' +
+  'and stays readable: node scripts/mechanism-review-guard.mjs --status'
+
+/** THE REPORT OUTLIVES THE DEFERRAL (cross-vendor review of point 1036). The
+ * context fence suspends the gate's ENFORCEMENT; with the block gone, the
+ * measuring read is all that is left, and a fenced session silently exiting
+ * before it prints is the same defect as the batch-lock stand-down above. A
+ * deferral therefore ends the run only when nobody asked for the report. */
+export const deferralEndsTheRun = (verdict, { status = false } = {}) =>
+  Boolean(verdict?.deferred) && !status
+
+/** WHAT THE REPORT PRINTS IS DECIDED BY THE FINDINGS, NEVER BY `block`
+ * (cross-vendor review of point 1036). A deferred verdict carries its findings
+ * and sets `block` false, so a status keyed on `block` announced GATE CLEAR
+ * over a real debt — and with the block switched off that keying is wrong for
+ * good, because `block` no longer decides anything. */
+export const statusReportsFindings = (verdict) => (verdict?.findings?.length ?? 0) > 0
 
 /** Per-branch baseline. Host-local rather than tracked, but shared by every
  * linked worktree: a disposable checkout must see main's branch baselines and
@@ -78,7 +122,8 @@ export const BASELINE_RECOVERY_ANCHOR = '28293f97ce0149a9936593733763fd20e62b13e
 // mechanism-review-range-core.mjs — including WHY they are raw control bytes
 // and why the header carries no free text. This file only consumes them.
 
-const git = (cmd) => execSync(`git ${cmd}`, { windowsHide: true, cwd: REPO_ROOT, encoding: 'utf8' }).trim()
+const git = (cmd, options = {}) =>
+  execSync(`git ${cmd}`, { windowsHide: true, cwd: REPO_ROOT, encoding: 'utf8', ...options }).trim()
 
 /** The NO-SHELL lane for the two path-carrying commands (round-5 pass 3): on
  *  Windows, execSync routes through cmd.exe, which expands `%x1e%`-shaped
@@ -124,6 +169,35 @@ export function commitMissing(sha, run = (cmd) => execSync(cmd, { windowsHide: t
  */
 export function shouldSeedRecoveryAnchor(gathered, { status = false } = {}) {
   return status !== true && gathered?.baselineMissing === true && Boolean(gathered?.baseline)
+}
+
+/**
+ * Whose session a guard invocation belongs to.
+ *
+ * A Stop payload is authoritative and keeps the ordinary stand-down rule. A
+ * manual `--status` invocation has no payload, however, and is the read-only
+ * command every refusal prints. Resolve that inspection through the same two
+ * honest fallbacks as guard-preflight: the caller's environment, then the live
+ * lock's recorded owner. Without this distinction the owner's own bare status
+ * command supplied `''`, identified itself as a stranger, and printed no debt
+ * or runnable repair command at all.
+ */
+export function resolveMechanismReviewSessionId({
+  payloadSessionId = '',
+  status = false,
+  env = process.env,
+  readLock = readOwnerLock,
+} = {}) {
+  if (payloadSessionId) return String(payloadSessionId)
+  if (!status) return ''
+  if (env?.CLAUDE_SESSION_ID) return String(env.CLAUDE_SESSION_ID)
+  try {
+    const lock = readLock()
+    if (lock?.sessionId) return String(lock.sessionId)
+  } catch {
+    /* unreadable lock — the gatherer fails closed to its normal stand-down */
+  }
+  return ''
 }
 
 function readBaselineState() {
@@ -323,10 +397,35 @@ export function pendingReviewContributions(commits = [], files = [], subjectFor 
  * and the self-review refusal read an empty author). Two calls per PENDING
  * MECHANISM commit only — the common turn has none.
  */
+/**
+ * THE FOURTH AUTHORSHIP READ, found by the same cross-vendor round that typed
+ * the other three (GPT-5.6 Sol at effort high). It carried neither
+ * `--no-replace-objects` nor the wrapper, and it ran EAGERLY although every
+ * caller here takes only `.subject` — so a replaced, missing or oversized object
+ * threw an untyped error that reached the allow-stop catch and switched the gate
+ * off. It is lazy now, so a caller that wants a subject pays for a subject, and
+ * the trailer read is replacement-blind, bounded and typed like its siblings.
+ */
 function commitFacts(sha) {
   return {
-    subject: git(`show -s --format=%s "${sha}"`),
-    trailers: git(`show -s --format="%(trailers:key=Co-Authored-By,valueonly,separator=;)" "${sha}"`),
+    // DISPLAY ONLY, so it DEGRADES rather than throws (cross-vendor review,
+    // GPT-5.6 Sol at effort high). The subject names a commit in the refusal
+    // text and decides nothing; making its read fail closed would have let a
+    // commit with an enormous subject line throw into the allow-stop catch —
+    // the same bypass, arriving through the one read that has no authority.
+    // Nothing else here may take this shape: a read that decides authorship
+    // must refuse, and a read that decides nothing must not be able to.
+    subject: readSubject(sha),
+    get trailers() {
+      return authorshipRead(
+        () =>
+          git(
+            `--no-replace-objects show -s --format="%(trailers:key=Co-Authored-By,valueonly,separator=;)" "${sha}"`,
+            { maxBuffer: PARENT_READ_MAX_BYTES },
+          ),
+        `the trailers of commit ${String(sha).slice(0, 12)}`,
+      )
+    },
   }
 }
 
@@ -349,19 +448,164 @@ function commitFacts(sha) {
  */
 export { mechanismLogCommand }
 
-function rangeCommits(base, head, files) {
-  const out = gitRawFile(mechanismLogCommand(base, head))
-  return parseRangeLog(out).map((commit) => {
-    const trailers = git(`show -s --format="%(trailers:key=Co-Authored-By,valueonly,separator=;)" "${commit.sha}"`)
+/**
+ * The default parent reader, exported so a test can exercise the REAL command
+ * rather than replace it (cross-vendor review, GPT-5.6 Sol: a test that injects
+ * `readParents` stays green if the production wiring drops the no-replace flag
+ * or scans past the header).
+ *
+ * BOUNDED, and the bound fails closed: `cat-file -p` emits the whole object
+ * though only its header is wanted, so a commit with a huge message would
+ * otherwise exceed the command buffer. Overflow throws, `authorshipRead` types
+ * it, and the gate blocks — a denial of progress rather than a bypass.
+ */
+export const PARENT_READ_MAX_BYTES = 1024 * 1024
+
+export function defaultParentReader(sha, runGit) {
+  return commitObjectParents(
+    runGit(`--no-replace-objects cat-file -p "${sha}"`, { maxBuffer: PARENT_READ_MAX_BYTES }),
+  )
+}
+
+/** The commit subject, for the refusal text alone. It answers a placeholder
+ *  where the read fails, because a display string may not be able to stop a
+ *  gate — and because failing closed here would reopen the very bypass the
+ *  authorship reads were hardened against. */
+export function readSubject(sha, runGit) {
+  const run = runGit ?? git
+  try {
+    return run(`--no-replace-objects show -s --format=%s "${sha}"`, { maxBuffer: PARENT_READ_MAX_BYTES })
+  } catch {
+    return `(subject unreadable for ${String(sha).slice(0, 12)})`
+  }
+}
+
+/** The refusal a typed authorship failure earns, built pure so the answer the
+ *  main module emits is pinnable without spawning it (cross-vendor review,
+ *  GPT-5.6 Sol: the failure cases stopped at the typed error and never showed
+ *  what the caller finally sees). */
+export function authorshipBlockResponse(error) {
+  return {
+    decision: 'block',
+    reason:
+      'mechanism-review-guard: a read that decides authorship failed, so no contribution here can be ' +
+      'proven independently reviewed.\n' +
+      `  ${error?.message ?? error}\n` +
+      '  Repair the read (a missing object, an unreachable repository, or an object past the command ' +
+      'buffer) and end the turn again. An empty author list is not the answer: it omits an author.',
+  }
+}
+
+/** Run one authorship read, and type whatever it throws so the gate can block on
+ *  it instead of letting the fail-open catch wave the turn through. */
+export function authorshipRead(read, what) {
+  try {
+    return read()
+  } catch (error) {
+    const wrapped = new Error(
+      `${what} could not be read (${error?.message ?? error}) — authorship that cannot be read is not authorship that is absent`,
+    )
+    wrapped.authorshipUnreadable = true
+    throw wrapped
+  }
+}
+
+export function rangeCommits(base, head, files, readers = {}) {
+  // `runGit` exists so a test can pin the PRODUCTION wiring rather than replace
+  // it (cross-vendor review, GPT-5.6 Sol): injecting `readParents` bypasses both
+  // the real command and the real parser, so those cases stayed green even if the
+  // default reader stopped being used at all.
+  const runGit = readers.runGit ?? git
+  const readLog = readers.readLog ?? ((args) => gitRawFile(args))
+  const readTrailers =
+    readers.readTrailers ??
+    ((sha) =>
+      runGit(
+        `--no-replace-objects show -s --format="%(trailers:key=Co-Authored-By,valueonly,separator=;)" "${sha}"`,
+        // Bounded like the object read, and for the same reason: the format asks
+        // for trailers alone, but a pathological commit should refuse rather
+        // than return something shorter than the truth.
+        { maxBuffer: PARENT_READ_MAX_BYTES },
+      ))
+  const out = readLog(mechanismLogCommand(base, head))
+  const commits = parseRangeLog(out)
+  // THE MERGED TIP'S TRAILER, FETCHED BEFORE IT IS NEEDED (point 784's ruling).
+  // `authorshipResolver` attributes a trailerless merge to the tips it merged,
+  // but it can only read a parent that is IN the measured list or supplied here
+  // — and the list is FIRST-PARENT, so a landing's merged branch tip never is.
+  // Without this the resolver fell through to "unknown" for every merge that
+  // contributed a conflict resolution, and an unknown vendor is unreviewable by
+  // construction: no verdict can be recorded against it and no route clears it.
+  // The criticality guard has fetched the same trailers since 28.08.2026; this
+  // is that gatherer's missing half, not a new rule.
+  // AND `--no-replace-objects` HERE TOO, for the reason the log command states:
+  // a replaced parent could otherwise answer with somebody else's trailers.
+  const trailersOf = (sha) => readTrailers(sha)
+  // THE PARENTS THE ANCESTRY RULE USES COME FROM THE COMMIT OBJECT, NOT FROM THE
+  // LOG (cross-vendor review, GPT-5.6 Sol at effort high, second do-not-merge on
+  // this half). `--no-replace-objects` disables `refs/replace` and NOTHING ELSE:
+  // `log --format=%P` is still GRAFT-aware, so at a shallow boundary a merge
+  // prints as single-parented and the resolver inherits nothing — the merged
+  // tip's author is hidden, and an invisible author is not an absent one. Read
+  // only where it can matter: a commit that names its own model needs no
+  // ancestry, so the extra object read is confined to the trailerless ones.
+  const readParents = readers.readParents ?? ((sha) => defaultParentReader(sha, runGit))
+  const measured = commits.map((commit) => {
+    // THE COMMIT'S OWN TRAILERS ARE AN AUTHORSHIP READ TOO (cross-vendor review,
+    // GPT-5.6 Sol at effort high, second do-not-merge on this end state). It was
+    // the one left unwrapped, and it is the most load-bearing of the three: it
+    // decides `own`, both author fields, AND whether the ancestry rule is
+    // consulted at all. Failing open here switched the gate off exactly as the
+    // other two did.
+    const trailers = authorshipRead(
+      () => trailersOf(commit.sha),
+      `the trailers of commit ${String(commit.sha).slice(0, 12)}`,
+    )
+    // EVERY non-first parent, never only the ones outside this range. The
+    // criticality guard may skip an in-range parent because it hands the
+    // planner the WHOLE list, so the resolver finds that parent itself. This
+    // gate plans ONE COMMIT AT A TIME, so its resolver's lookup table holds
+    // that single commit and nothing else — an in-range parent is exactly as
+    // invisible to it as an out-of-range one, and skipping it left the merge
+    // unattributed.
+    const own = modelsFromTrailers(trailers)
+    // A FAILED AUTHORSHIP READ IS A BLOCK, NEVER A SHRUG (cross-vendor review,
+    // GPT-5.6 Sol at effort high, do-not-merge on the end state). Both reads
+    // below can throw — an object too large for the command buffer, a parent
+    // missing from a shallow or partial clone, a repository that cannot be
+    // reached — and the exception used to travel all the way to this file's
+    // top-level catch, which prints "allowing stop" and exits 0. A single large
+    // trailerless commit anywhere in the measured range would therefore have
+    // switched the whole gate off, without touching a mechanism file at all.
+    // The failure is typed here and answered with `decision: block` there, the
+    // same way an unreadable ledger already is. Substituting an empty author
+    // list would be worse than either: it OMITS a possible author.
+    const parentShas = own.length ? (commit.parentShas ?? []) : authorshipRead(
+      () => readParents(commit.sha),
+      `the parents of commit ${String(commit.sha).slice(0, 12)}`,
+    )
+    const parentAuthorModels = Object.fromEntries(
+      parentShas
+        .slice(1)
+        .map((parent) => [
+          parent,
+          modelsFromTrailers(
+            authorshipRead(() => trailersOf(parent), `the trailers of merged parent ${String(parent).slice(0, 12)}`),
+          ),
+        ]),
+    )
     return {
       ...commit,
+      parentShas,
       authorModel: modelFromTrailers(trailers),
       // EVERY co-author, not only the first: a commit naming two models has
       // two list authors, and neither may merge the union (point 634).
       authorModels: modelsFromTrailers(trailers),
+      parentAuthorModels,
       mechanismFiles: mechanismPathsIn(commit.files, { scriptFiles: files }),
     }
   })
+  return withResolvedCommitAuthors(measured)
 }
 
 /**
@@ -397,15 +641,16 @@ export function planningContributions(pendingCommits = [], records = []) {
  * git work, which would drift and hand back a false "clean". Read-only: arming
  * and advancing the baseline stay in the main path below.
  */
-export function gatherMechanismReviewInputs({ sessionId = '', guardDuty = gatherGuardDutyContext } = {}) {
-  if (existsSync(PAUSE)) return { applicable: false, why: 'the batch is paused' }
-  if (heldByOtherLiveOwner(sessionId)) {
-    return {
-      applicable: false,
-      why: 'another live session owns the batch lock',
-      cause: 'not-lock-owner',
-    }
-  }
+export function gatherMechanismReviewInputs({
+  sessionId = '',
+  guardDuty = gatherGuardDutyContext,
+  // `--status` still MEASURES: the report is the debt's only remaining reader,
+  // and it answers whoever asks. A read decides nothing, so neither the pause
+  // nor the batch lock may silence it — that lock check is what made a
+  // hand-run `--status` print "stands down" and exit 0 (point 1036).
+  report = false,
+} = {}) {
+  if (!report) return { applicable: false, why: GATE_SWITCHED_OFF }
   const head = git('rev-parse HEAD')
   let branch = 'HEAD'
   try {
@@ -666,14 +911,15 @@ export function attachCoverage({ pendingCommits = [], allRecords = [], head, rev
 if (isMainModule(import.meta.url)) {
   const status = process.argv[2] === '--status'
   try {
-    let sessionId = ''
+    let payloadSessionId = ''
     try {
-      sessionId = JSON.parse(readFileSync(0, 'utf8')).session_id || ''
+      payloadSessionId = JSON.parse(readFileSync(0, 'utf8')).session_id || ''
     } catch {
       /* manual run — the gate is global truth, not session-local */
     }
+    const sessionId = resolveMechanismReviewSessionId({ payloadSessionId, status })
 
-    const gathered = gatherMechanismReviewInputs({ sessionId })
+    const gathered = gatherMechanismReviewInputs({ sessionId, report: status })
     if (!gathered.applicable) {
       if (status) console.log(`mechanism-review-guard stands down: ${gathered.why}`)
       process.exit(0)
@@ -685,7 +931,7 @@ if (isMainModule(import.meta.url)) {
       writeBaseline(gathered.branch, gathered.baseline)
     }
 
-    if (verdict.deferred) {
+    if (deferralEndsTheRun(verdict, { status })) {
       // Leave the baseline behind the pending mechanism range: that range is
       // the successor's inbox, not a clearance by the fenced session.
       process.stdout.write(JSON.stringify({ systemMessage: verdict.reason }))
@@ -738,15 +984,24 @@ if (isMainModule(import.meta.url)) {
       if (statusPlan) {
         console.log(formatContributionPassPlan(statusPlan))
       }
+      // NOTHING SUPPRESSES THE DEBT ANY MORE (cross-vendor rounds 2 and 3 of
+      // point 1036). The report used to choose ONE of three things to print —
+      // the gap, the verdict, or GATE CLEAR — and both other branches hid a
+      // real debt: the deferral because it left `block` false, the gap because
+      // it replaced the finding list with the reason it could not be assembled.
+      // The report is the only reader the debt has left, so it prints the
+      // findings whenever there are findings, and the gap and the deferral are
+      // context ABOVE them rather than alternatives to them.
+      if (verdict.deferred) console.log(`\nDEFERRED, NOT CLEAR: ${verdict.reason}`)
       if (outcome.action === 'report-gap') console.log(`\n${gap.report}`)
-      else console.log(
-        verdict.block
-          ? `\n${formatMechanismReviewVerdict(verdict, {
-              authorshipPlan: gathered.authorshipPlan,
-              contributionPlan: statusPlan,
-            })}`
-          : '\nGATE CLEAR',
-      )
+      if (statusReportsFindings(verdict)) {
+        console.log(
+          `\n${formatMechanismReviewVerdict(verdict, {
+            authorshipPlan: gathered.authorshipPlan,
+            contributionPlan: statusPlan,
+          })}`,
+        )
+      } else if (outcome.action !== 'report-gap') console.log('\nGATE CLEAR')
       process.exit(0)
     }
 
@@ -789,6 +1044,13 @@ if (isMainModule(import.meta.url)) {
             '  Repair the ledger (it is tracked in git) and end the turn again.',
         }),
       )
+      process.exit(0)
+    }
+    // THE SAME ANSWER AN UNREADABLE LEDGER GETS, for the same reason (cross-vendor
+    // review, GPT-5.6 Sol at effort high): a read that decides AUTHORSHIP cannot
+    // fail into the catch below, or one unreadable object switches the gate off.
+    if (e && e.authorshipUnreadable) {
+      process.stdout.write(JSON.stringify(authorshipBlockResponse(e)))
       process.exit(0)
     }
     console.error(`mechanism-review-guard error (allowing stop): ${e && e.message}`)
