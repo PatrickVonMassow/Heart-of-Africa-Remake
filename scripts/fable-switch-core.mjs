@@ -6,13 +6,16 @@
 
 export const SWITCH_COMMAND = 'node scripts/fable-switch.mjs'
 export const STATE_FILE_NAME = 'fable-switch.json'
-export const FABLE_MODEL = 'Fable 5'
+export const FABLE_MODEL = 'Fable 5.1'
 export const SOL_MODEL = 'GPT-5.6 Sol'
 export const CLAUDE_MODEL = 'Claude Opus 5'
 export const OPUS_MODEL = 'Opus 5'
 export const OPUS_FALLBACK_MODEL = 'Opus 4.8'
 export const OPUS_MODEL_ID = 'claude-opus-5[1m]'
-export const FABLE_MODEL_ID = 'claude-fable-5'
+// The NEWEST released Fable, never a pinned older one (user, 01.09.2026): a version
+// recorded here cannot go red on its own, so nothing but this line notices a new release.
+// Needs Claude Code >= 2.1.251; older CLIs answer 400 "does not support this model".
+export const FABLE_MODEL_ID = 'claude-fable-5-1'
 export const OPUS_FALLBACK_MODEL_ID = 'claude-opus-4-8[1m]'
 
 /** Read Claude Code's single-result JSON and identify the TOP-LEVEL answer

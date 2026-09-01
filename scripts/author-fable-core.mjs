@@ -5,7 +5,10 @@ import { sameModel } from './mechanism-review-core.mjs'
 
 export { FABLE_MODEL, FABLE_MODEL_ID }
 
-export const FABLE_TRAILER = 'Co-Authored-By: Claude Fable 5 <noreply@anthropic.com>'
+// DERIVED, never spelled out again: a second copy of the model name is a second
+// place a version bump has to be found, which is how the lane stayed on Fable 5
+// after 5.1 shipped (point 1041).
+export const FABLE_TRAILER = `Co-Authored-By: Claude ${FABLE_MODEL} <noreply@anthropic.com>`
 
 /** A headless Claude Code author, with no fallback that could falsify attribution. */
 export function authoringClaudeArgs({ modelId = FABLE_MODEL_ID, prompt = '' } = {}) {

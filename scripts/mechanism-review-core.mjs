@@ -23,7 +23,7 @@ import { resolve } from 'node:path'
 // allowlist's own answer (scripts/model-guard-core.mjs, which imports nothing),
 // so "who authored this" cannot drift from "who may author at all".
 import { modelNamesIn } from './model-guard-core.mjs'
-import { fableIsOn, isSwitchFallbackReason, mergeFallbackReason, mergerModel } from './fable-switch-core.mjs'
+import { FABLE_MODEL, fableIsOn, isSwitchFallbackReason, mergeFallbackReason, mergerModel } from './fable-switch-core.mjs'
 // …and how a review split into PASSES over the file set composes back into a
 // coverage (point 714). Both the recorder and this gate ask the same module, so
 // what may be WRITTEN and what CLEARS cannot drift apart.
@@ -234,6 +234,14 @@ export function parseModel(name) {
     .replace(/<[^>]*>/g, ' ')
     .replace(/\bclaude\b/gi, ' ')
     .toLowerCase()
+    // AN API ID SEPARATES ITS MINOR WITH A DASH, a human name with a dot, and the
+    // version regex below only ever knew the dot — so `claude-opus-4-8` read as
+    // version "4" and did NOT match "Opus 4.8", i.e. that pair was silently NOT
+    // recognised as one model. It stayed invisible while the only dashed id in use
+    // had no minor at all (`claude-fable-5` vs "Fable 5"); moving that lane to
+    // Fable 5.1 is what surfaced it (point 1041). A dated snapshot keeps working:
+    // `claude-haiku-4-5-20251001` becomes 4.5.20251001 and still reads as 4.5.
+    .replace(/(\d)-(?=\d)/g, '$1.')
   return {
     raw,
     // ONE FAMILY PER MODEL, WHICHEVER HALF OF THE NAME IS WRITTEN (point 667).
@@ -293,8 +301,8 @@ export function reviewIdentityProblem(reviewer, commit = {}) {
  *  Claude chain. They are explicit because a same-vendor review without a
  *  handover would otherwise bypass the cross-vendor preference by assertion. */
 export const REVIEW_HANDOVERS = Object.freeze(['sol-authored', 'sol-unavailable'])
-export const SOL_UNAVAILABLE_REVIEW_CHAIN = Object.freeze(['Fable 5', 'Opus 5', 'Opus 4.8'])
-export const SOL_AUTHORED_REVIEW_CHAIN = Object.freeze(['Opus 5', 'Fable 5', 'Opus 4.8'])
+export const SOL_UNAVAILABLE_REVIEW_CHAIN = Object.freeze([FABLE_MODEL, 'Opus 5', 'Opus 4.8'])
+export const SOL_AUTHORED_REVIEW_CHAIN = Object.freeze(['Opus 5', FABLE_MODEL, 'Opus 4.8'])
 
 /** The chain in force for a handover at record time. */
 export function handoverChainFor(reason, fableState) {
@@ -305,7 +313,7 @@ export function handoverChainFor(reason, fableState) {
       : []
   if (!chain.length) return Object.freeze([])
   if (fableState === undefined || fableIsOn(fableState)) return Object.freeze([...chain])
-  return Object.freeze(chain.filter((model) => !sameModel(model, 'Fable 5')))
+  return Object.freeze(chain.filter((model) => !sameModel(model, FABLE_MODEL)))
 }
 
 /** What is wrong with a recorded handover, or ''. The selected fallback must
@@ -1402,7 +1410,7 @@ export function validateRecord({
     // The example NAMES the reviewer the rule prefers (point 624): reviews go to
     // GPT-5.6 Sol first and to Fable 5 when Sol is unavailable, and nothing here
     // restricts the value — a reviewer this recorder refused could not be used.
-    errors.push('--model <name>: which model performed the review (e.g. "GPT-5.6 Sol", "Fable 5")')
+    errors.push(`--model <name>: which model performed the review (e.g. "GPT-5.6 Sol", "${FABLE_MODEL}")`)
   }
   if (!VERDICTS.includes(String(verdict ?? '').trim())) {
     errors.push(`--verdict <v>: one of ${VERDICTS.join(' | ')}`)

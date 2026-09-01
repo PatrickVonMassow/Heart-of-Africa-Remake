@@ -336,7 +336,7 @@ describe('point file-set measurement', () => {
       kind: 'authoring-commission',
       point: 846,
       sha: 'a'.repeat(40),
-      model: 'Fable 5',
+      model: 'Fable 5.1',
       at: 1_787_130_000_000,
       reachable: true,
     }
@@ -698,7 +698,7 @@ describe('the unavailable-receipt CLI', { timeout: 30_000 }, () => {
       expect(
         runGit(
           'commit', '-q', '-m',
-          'Add a contribution by every configured reader\n\nCo-Authored-By: GPT-5.6 Sol <noreply@openai.com>\nCo-Authored-By: Claude Opus 5 <noreply@anthropic.com>\nCo-Authored-By: Claude Fable 5 <noreply@anthropic.com>\nCo-Authored-By: Claude Opus 4.8 <noreply@anthropic.com>',
+          'Add a contribution by every configured reader\n\nCo-Authored-By: GPT-5.6 Sol <noreply@openai.com>\nCo-Authored-By: Claude Opus 5 <noreply@anthropic.com>\nCo-Authored-By: Claude Fable 5.1 <noreply@anthropic.com>\nCo-Authored-By: Claude Opus 4.8 <noreply@anthropic.com>',
         ).status,
       ).toBe(0)
       const head = runGit('rev-parse', 'HEAD').stdout.trim()

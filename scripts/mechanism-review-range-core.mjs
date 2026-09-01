@@ -5,9 +5,10 @@
 // around every model that contributed to that retained end-state path. Intermediate versions are named as
 // superseded, and paths whose final state equals the base are dropped.
 import { independentReviewProblem, sameModel } from './mechanism-review-core.mjs'
+import { FABLE_MODEL } from './fable-switch-core.mjs'
 import { passComposition } from './review-material-core.mjs'
 
-export const REVIEWER_CANDIDATES = Object.freeze(['GPT-5.6 Sol', 'Opus 5', 'Fable 5', 'Opus 4.8'])
+export const REVIEWER_CANDIDATES = Object.freeze(['GPT-5.6 Sol', 'Opus 5', FABLE_MODEL, 'Opus 4.8'])
 export const UNREVIEWABLE_NARROWING_REMEDY =
   'Review every runnable pass and record the exact measured remainder with the criticality-review-unavailable command printed by review-sol.'
 export const NO_ELIGIBLE_REVIEWER_REASON =

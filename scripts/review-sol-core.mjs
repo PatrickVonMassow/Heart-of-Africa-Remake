@@ -24,6 +24,7 @@
 
 import { BLIND_REVIEWER, blindReviewerAdmission, modelFromTrailers, sameModel, VERDICTS } from './mechanism-review-core.mjs'
 import {
+  FABLE_MODEL,
   FABLE_MODEL_ID,
   OPUS_FALLBACK_MODEL_ID,
   OPUS_MODEL_ID,
@@ -60,7 +61,7 @@ export const SOL_REASONING_EFFORT = 'high'
 /** The reviewers that take over whenever Sol did not deliver a verdict, in
  *  order. The ones behind Fable exist because Fable and Opus also AUTHOR here,
  *  and no model may review its own work (CLAUDE.md §6). */
-export const FALLBACK_MODEL_NAME = 'Fable 5'
+export const FALLBACK_MODEL_NAME = FABLE_MODEL
 export const SECOND_FALLBACK_MODEL_NAME = 'Opus 5'
 export const FALLBACK_CHAIN = Object.freeze([FALLBACK_MODEL_NAME, SECOND_FALLBACK_MODEL_NAME, 'Opus 4.8'])
 
@@ -74,7 +75,7 @@ export const FALLBACK_CHAIN = Object.freeze([FALLBACK_MODEL_NAME, SECOND_FALLBAC
  * swap that reviewer ALSO runs the suites, judges the picture and lands the
  * point, which is the main authoring session's job. So it starts at Opus 5.
  */
-export const CLAUDE_REVIEW_CHAIN = Object.freeze(['Opus 5', 'Fable 5', 'Opus 4.8'])
+export const CLAUDE_REVIEW_CHAIN = Object.freeze(['Opus 5', FABLE_MODEL, 'Opus 4.8'])
 
 /** Every reviewer the policy can name, including the exact CLI identity needed
  *  to start it. Keeping the executable roster beside the decision chains makes
@@ -95,7 +96,7 @@ export function reviewerDescriptor(value = '') {
 /** A review candidate chain with the shared switch applied. */
 export function availableReviewChain(chain, fableState) {
   if (fableState === undefined || fableIsOn(fableState)) return Object.freeze([...chain])
-  return Object.freeze(chain.filter((model) => !sameModel(model, 'Fable 5')))
+  return Object.freeze(chain.filter((model) => !sameModel(model, FABLE_MODEL)))
 }
 
 /** The binary, and the ceiling a review may take before it counts as stuck. */

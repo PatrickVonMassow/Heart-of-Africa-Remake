@@ -57,7 +57,7 @@ describe('fable-switch.mjs', () => {
 
   it('makes the opposite flip visible to a fresh reader in the same run', () => {
     expect(run('--on', '--why', 'the user restored capacity').out).toMatch(/^fable-switch: ON/)
-    expect(mergerModel(currentFableState(file))).toBe('Fable 5')
+    expect(mergerModel(currentFableState(file))).toBe('Fable 5.1')
     expect(run('--status').out).toContain('the user restored capacity')
   })
 
