@@ -51,14 +51,17 @@ const installFableSwitch = (repo, state = 'on') => {
 // scheduled for later. Nothing here needs a bounded read: give the capture room
 // well past any ledger this repository will hold.
 const RUN_MAX_BUFFER = 64 * 1024 * 1024
+// ONE OPTIONS OBJECT, so the regression below spawns through the same bound it
+// protects: a case that passes its own maxBuffer would stay green after someone
+// deleted this one, which is a drill that never calls the thing it proves.
+const RUN_OPTIONS = {
+  windowsHide: true,
+  encoding: 'utf8',
+  input: '',
+  maxBuffer: RUN_MAX_BUFFER,
+}
 const run = (...args) =>
-  spawnSync(process.execPath, [SCRIPT, ...args], {
-    windowsHide: true,
-    encoding: 'utf8',
-    cwd: process.cwd(),
-    input: '',
-    maxBuffer: RUN_MAX_BUFFER,
-  })
+  spawnSync(process.execPath, [SCRIPT, ...args], { ...RUN_OPTIONS, cwd: process.cwd() })
 
 // THE HALVES ARE ADOPTED ONLY FROM COMMITTED BYTES: `committedHalfModel` reads
 // HEAD and refuses an absolute path outright, so a temp fixture can never satisfy
@@ -357,14 +360,14 @@ describe('the paths that must stay untouched', () => {
       encoding: 'utf8',
       input: '',
     })
-    expect(bounded.status, 'the default bound must be what killed the run').toBe(null)
+    // `status: null` alone says only that no exit code arrived; ENOBUFS is what
+    // names the bound as the killer, and it is the shape CI reported.
+    expect(bounded.error?.code, 'the default bound must be what killed the run').toBe('ENOBUFS')
+    expect(bounded.status).toBe(null)
 
-    const roomy = spawnSync(process.execPath, printer, {
-      windowsHide: true,
-      encoding: 'utf8',
-      input: '',
-      maxBuffer: RUN_MAX_BUFFER,
-    })
+    // THROUGH THE SHARED OPTIONS, not a copy: take maxBuffer out of RUN_OPTIONS
+    // and this line dies, which is the whole point of the case.
+    const roomy = spawnSync(process.execPath, printer, RUN_OPTIONS)
     expect(roomy.status, roomy.stderr).toBe(0)
     expect(roomy.stdout.length).toBe(2 * 1024 * 1024)
   })
