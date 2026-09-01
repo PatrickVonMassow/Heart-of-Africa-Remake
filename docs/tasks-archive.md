@@ -25533,3 +25533,74 @@ Nummerierung bleiben deshalb identisch — hier wird nur verschoben, nie umgesch
   CI run concludes green. Plus `npm run test:unit`, lint, build.
   Criticality: high — a lane whose CI cannot conclude green blocks all landing behind it.
   Bundle: Testinfrastruktur.
+
+- [x] 1036. The four-eyes ledger on `main` cannot reach green from where the merge-authorship
+  repair left it (measured 01.09.2026, this session, after landing point 1031).
+  A hand-resolved landing merge measured as UNKNOWN authorship — unreviewable by construction —
+  and the repair of that (`--no-replace-objects` ancestry read from the commit object, bounded to
+  the header, in the gate and the recorder alike, six cross-vendor rounds) is landed and green.
+  What it did NOT do is drain the debt that accumulated while the gate stood blocked, and the
+  baseline only advances when the gate passes, so the window keeps every contribution since.
+  WHAT IS OWED, MEASURED:
+  - TWO STALE PASS SPLITS. `96e082f` and `584ceb9` each carry 1 of 2 recorded passes, and the
+    guard prints no runnable command for either: "no runnable command is printed from the stale
+    split — ask the guard status to rerun the contribution planner at the immutable commit
+    boundary". Whether that rerun is a command anybody can invoke today is exactly what this point
+    must establish; if it is not, the missing command is the deliverable.
+  - THE PRE-REPAIR ROWS FOR `1bdd3a2` STILL DOMINATE. Two verdicts were recorded against it before
+    the repair, when the recorder stored no author; two more were recorded after, carrying the
+    resolved `GPT-5.6 Sol` author. The gate still answers "the only review on record is from
+    unknown model's vendor", so a later, better-attributed row does not supersede an earlier
+    unattributed one. Either it does, with a rule that says why, or a row written against
+    authorship the recorder could not then resolve is retired explicitly.
+  - THE REPAIR'S OWN COMMITS OWE THEIR SOL PASSES over their full end-state file sets; the
+    recorded verdicts cover the files each round actually read, which is less than the set.
+  - AND THE DEBT GROWS FASTER THAN IT CAN BE PAID, measured 01.09.2026 over fourteen cross-vendor
+    rounds in one session. Every verdict is recorded by APPENDING to `.claude/mechanism-reviews.jsonl`,
+    that file is tracked, and a commit touching it is itself a mechanism contribution that owes its
+    own review. Clearing one contribution therefore creates another, and a session that answers
+    findings honestly — fourteen rounds, every finding closed, Sol's final verdict `merge` on each
+    — still leaves the gate red. The stale-split entries above are the same effect after the fact:
+    they were split at a file set the range no longer has, so their missing passes cannot be
+    addressed at all. THIS is what makes the point urgent rather than tidy: the gate is not merely
+    behind, it cannot catch up, and no amount of correct work inside one session converges.
+    Whatever the fix is, it must make a ledger-only commit NOT owe a round of its own, or make the
+    round that records a verdict cover the recording.
+  MEASURED AGAIN THE SAME DAY, at HEAD 28edbb0, before this point was commissioned:
+  - THE GUARD'S OWN INSPECTION COMMAND DOES NOT ANSWER. `node scripts/mechanism-review-guard.mjs
+    --status` — the command every refusal prints as the way to read the remaining debt — takes its
+    session id ONLY from a stdin JSON payload, so a hand-run passes the empty string and
+    `heldByOtherLiveOwner('')` answers true against the batch owner's own lock. The guard prints
+    `stands down: another live session owns the batch lock` and exits 0. Piping
+    `{"session_id":"<the owning id>"}` into it is today the only way to read the status at all.
+    That is the first step of "every step reached through a command the guard itself printed", and
+    it does not work.
+  - THE STALE SPLITS DO PRINT A RUNNABLE COMMAND NOW. The status prints contribution-scoped
+    `review-sol.mjs` commands for both — two passes for `96e082f`, one for `584ceb9` — and says the
+    planner wins over the historical split. What remains against them is narrower than the entry
+    above assumes: `scripts/render-verify-charges.mjs` was in NONE of the four recorded passes, so
+    nobody read it.
+  - AND THE CRITICALITY GATE BLAMES THE WRONG THING. Point 1031 carries a `do-not-merge` on
+    `10b83eb` and a `merge` on `9ee3bd18`; git proves `10b83eb` IS a strict ancestor of
+    `9ee3bd18`, so the fix was recorded at a later commit. The gate still prints "A later
+    `merge` exists, but not for a LATER commit — so nothing was fixed between them." The real
+    cause is that the merge row carries `pass` 1/1 over two files, so it enters `compositions`
+    instead of the plain clean bucket, and `compositionComplete` fails because the cumulative
+    ancestry does not cover the point's measured `pointFiles`. The message therefore sends the
+    reader to commit a fix that already exists rather than naming the files nobody read — the way
+    out is invisible, and a reader who trusts the text concludes the ledger is lying about git. An
+    incomplete composition must say so and name its uncovered files, the way the `uncovered-files`
+    finding already does when nothing is clean at all.
+  ORIENTATION, NOT A MANDATE: `REVIEW_END_STATE_EXCLUSIONS` in
+  `scripts/mechanism-review-range-core.mjs` is this repository's existing single boundary for "this
+  path is outside the mechanism gate's reach, and here is the recorded reason". If the ledger fix
+  belongs elsewhere, say why rather than assuming this place.
+  FINAL STATE: `node scripts/guard-preflight.mjs --for merge` on `main` reports
+  `mechanism-review-guard clean`, every step to that state reached through a command the guard
+  itself printed, and no contribution retired without a reason recorded beside it.
+  VERIFIABLE: the real repository — the preflight is clean on `main` — plus a unit case for
+  whichever rule changed: a superseding row, a retirement, or the planner rerun the stale split
+  needs. Plus `npm run test:unit`, lint, build.
+  Criticality: high — while it stands, no point can be landed at all: the gate refuses every merge,
+  and the batch's whole throughput is behind it.
+  Bundle: Session- & Repo-Hygiene.
