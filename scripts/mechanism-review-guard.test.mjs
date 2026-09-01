@@ -20,6 +20,7 @@ import {
   parseRangeLog,
   parseMechanismLog,
   pendingReviewContributions,
+  authorshipBlockResponse,
   authorshipRead,
   defaultParentReader,
   planningContributions,
@@ -943,6 +944,42 @@ describe('the default parent reader, exercised rather than replaced', () => {
     expect(asked[0].options?.maxBuffer).toBeGreaterThan(0)
   })
 
+  it('is the reader rangeCommits ACTUALLY uses — the production wiring, not a stand-in', () => {
+    // Every parent case above injects `readParents`, so none of them would notice
+    // if rangeCommits stopped calling the default reader at all. This one injects
+    // only the git runner, one layer below, and watches the real command go out.
+    const REC = String.fromCharCode(0x1e)
+    const FLD = String.fromCharCode(0x1f)
+    const MERGED = 'c'.repeat(40)
+    const commands = []
+    const [commit] = rangeCommits('base', 'head', ['scripts/x-guard.mjs'], {
+      // The LOG claims one parent, as a shallow graft would; the object names two.
+      readLog: () => [`${REC}${SHA}${FLD}1788000000${FLD}${REAL}`, '', 'scripts/x-guard.mjs', ''].join('\n'),
+      runGit: (cmd) => {
+        commands.push(cmd)
+        if (cmd.includes('cat-file -p')) {
+          return [
+            `tree ${'0'.repeat(40)}`,
+            `parent ${REAL}`,
+            `parent ${MERGED}`,
+            'author X <x@y> 1 +0000',
+            '',
+            'Merge branch ...',
+            '',
+            `parent ${'f'.repeat(40)}`,
+            '',
+          ].join('\n')
+        }
+        return cmd.includes(MERGED) ? 'GPT-5.6 Sol <noreply@openai.com>' : ''
+      },
+    })
+
+    expect(commit.parentShas).toEqual([REAL, MERGED])
+    expect(commit.parentAuthorModels).toEqual({ [MERGED]: ['GPT-5.6 Sol <noreply@openai.com>'] })
+    expect(commands.some((cmd) => cmd.includes('--no-replace-objects') && cmd.includes('cat-file -p'))).toBe(true)
+    expect(commands.every((cmd) => cmd.startsWith('--no-replace-objects'))).toBe(true)
+  })
+
   it('lets the read throw, so the bound is a refusal and not a truncation', () => {
     expect(() =>
       defaultParentReader(SHA, () => {
@@ -973,6 +1010,24 @@ describe('an authorship read that fails is typed, never shrugged off', () => {
     expect(caught?.authorshipUnreadable).toBe(true)
     expect(caught?.message).toContain('the parents of commit abc123')
     expect(caught?.message).toContain('bad object')
+  })
+
+  it('becomes the refusal the caller finally sees', () => {
+    let caught = null
+    try {
+      authorshipRead(() => {
+        throw new Error('ENOBUFS: stdout maxBuffer length exceeded')
+      }, 'the parents of commit abc123')
+    } catch (error) {
+      caught = error
+    }
+    const answer = authorshipBlockResponse(caught)
+
+    expect(answer.decision).toBe('block')
+    expect(answer.reason).toContain('the parents of commit abc123')
+    expect(answer.reason).toContain('maxBuffer')
+    // The one wrong answer this whole repair exists to refuse.
+    expect(answer.reason).toContain('An empty author list is not the answer')
   })
 
   it('returns the value untouched when the read succeeds', () => {

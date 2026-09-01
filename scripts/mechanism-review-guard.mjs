@@ -325,10 +325,28 @@ export function pendingReviewContributions(commits = [], files = [], subjectFor 
  * and the self-review refusal read an empty author). Two calls per PENDING
  * MECHANISM commit only — the common turn has none.
  */
+/**
+ * THE FOURTH AUTHORSHIP READ, found by the same cross-vendor round that typed
+ * the other three (GPT-5.6 Sol at effort high). It carried neither
+ * `--no-replace-objects` nor the wrapper, and it ran EAGERLY although every
+ * caller here takes only `.subject` — so a replaced, missing or oversized object
+ * threw an untyped error that reached the allow-stop catch and switched the gate
+ * off. It is lazy now, so a caller that wants a subject pays for a subject, and
+ * the trailer read is replacement-blind, bounded and typed like its siblings.
+ */
 function commitFacts(sha) {
   return {
-    subject: git(`show -s --format=%s "${sha}"`),
-    trailers: git(`show -s --format="%(trailers:key=Co-Authored-By,valueonly,separator=;)" "${sha}"`),
+    subject: git(`--no-replace-objects show -s --format=%s "${sha}"`, { maxBuffer: PARENT_READ_MAX_BYTES }),
+    get trailers() {
+      return authorshipRead(
+        () =>
+          git(
+            `--no-replace-objects show -s --format="%(trailers:key=Co-Authored-By,valueonly,separator=;)" "${sha}"`,
+            { maxBuffer: PARENT_READ_MAX_BYTES },
+          ),
+        `the trailers of commit ${String(sha).slice(0, 12)}`,
+      )
+    },
   }
 }
 
@@ -370,6 +388,22 @@ export function defaultParentReader(sha, runGit) {
   )
 }
 
+/** The refusal a typed authorship failure earns, built pure so the answer the
+ *  main module emits is pinnable without spawning it (cross-vendor review,
+ *  GPT-5.6 Sol: the failure cases stopped at the typed error and never showed
+ *  what the caller finally sees). */
+export function authorshipBlockResponse(error) {
+  return {
+    decision: 'block',
+    reason:
+      'mechanism-review-guard: a read that decides authorship failed, so no contribution here can be ' +
+      'proven independently reviewed.\n' +
+      `  ${error?.message ?? error}\n` +
+      '  Repair the read (a missing object, an unreachable repository, or an object past the command ' +
+      'buffer) and end the turn again. An empty author list is not the answer: it omits an author.',
+  }
+}
+
 /** Run one authorship read, and type whatever it throws so the gate can block on
  *  it instead of letting the fail-open catch wave the turn through. */
 export function authorshipRead(read, what) {
@@ -385,11 +419,16 @@ export function authorshipRead(read, what) {
 }
 
 export function rangeCommits(base, head, files, readers = {}) {
+  // `runGit` exists so a test can pin the PRODUCTION wiring rather than replace
+  // it (cross-vendor review, GPT-5.6 Sol): injecting `readParents` bypasses both
+  // the real command and the real parser, so those cases stayed green even if the
+  // default reader stopped being used at all.
+  const runGit = readers.runGit ?? git
   const readLog = readers.readLog ?? ((args) => gitRawFile(args))
   const readTrailers =
     readers.readTrailers ??
     ((sha) =>
-      git(
+      runGit(
         `--no-replace-objects show -s --format="%(trailers:key=Co-Authored-By,valueonly,separator=;)" "${sha}"`,
         // Bounded like the object read, and for the same reason: the format asks
         // for trailers alone, but a pathological commit should refuse rather
@@ -418,7 +457,7 @@ export function rangeCommits(base, head, files, readers = {}) {
   // tip's author is hidden, and an invisible author is not an absent one. Read
   // only where it can matter: a commit that names its own model needs no
   // ancestry, so the extra object read is confined to the trailerless ones.
-  const readParents = readers.readParents ?? ((sha) => defaultParentReader(sha, git))
+  const readParents = readers.readParents ?? ((sha) => defaultParentReader(sha, runGit))
   return commits.map((commit) => {
     // THE COMMIT'S OWN TRAILERS ARE AN AUTHORSHIP READ TOO (cross-vendor review,
     // GPT-5.6 Sol at effort high, second do-not-merge on this end state). It was
@@ -907,17 +946,7 @@ if (isMainModule(import.meta.url)) {
     // review, GPT-5.6 Sol at effort high): a read that decides AUTHORSHIP cannot
     // fail into the catch below, or one unreadable object switches the gate off.
     if (e && e.authorshipUnreadable) {
-      process.stdout.write(
-        JSON.stringify({
-          decision: 'block',
-          reason:
-            'mechanism-review-guard: a read that decides authorship failed, so no contribution here can be ' +
-            'proven independently reviewed.\n' +
-            `  ${e.message}\n` +
-            '  Repair the read (a missing object, an unreachable repository, or an object past the command ' +
-            "buffer) and end the turn again. An empty author list is not the answer: it omits an author.",
-        }),
-      )
+      process.stdout.write(JSON.stringify(authorshipBlockResponse(e)))
       process.exit(0)
     }
     console.error(`mechanism-review-guard error (allowing stop): ${e && e.message}`)
