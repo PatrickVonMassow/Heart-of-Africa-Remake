@@ -82,6 +82,7 @@ Das Musterbeispiel sind die Chat-Zeitstempel: neun Eskalationsstufen, acht weich
 | 28.08. abends | Die Notfall-Uhr des unbeaufsichtigten Stapels wurde genau wie bestellt auf nachweisbaren Fortschritt verengt — und verlor dabei einen Schutz, den nie jemand aufgeschrieben hatte: Der ehrliche Abschluss-Prüflauf über beide Backends dauert gemessen 80 min 48 s gegen eine Schwelle von 60 Minuten und sieht seither aus wie ein Hänger, den die Rettungsroutine unterbricht. Kein Test wurde rot; der Schutz war vorhanden, nicht zugesichert (§3.210, Punkt 1002) |
 | 29.08. nachts | Ein Wächter verlangt einen Beleg aus einem Protokoll, das ihn wegwirft: Vier Laufaufzeichnungen tragen die Absturzmarke, gesetzt aus der Fehlerausgabe — das aufbewahrte Protokoll ist eine gefilterte Sicht und kann ihr Fehlen nicht belegen. Nicht freigezeichnet, sondern in den blockierten Punkt geschrieben (§3.215); derselbe Lauf ließ drei Rots ohne jeden Punkt zurück, obwohl die Tafelkarten dafür schon standen (Punkte 1011-1013); drei Gegenlesungsrunden über die Buchungstabelle endeten damit, eine geschriebene Buchung ZURÜCKZUZIEHEN statt sie enger zu fassen — kein Muster konnte das gemessene Rot von seinen Nachbarn trennen (§3.216); und eine Behauptung über einen gelandeten Punkt kam aus einem BRANCHNAMEN statt aus einer Messung, gefunden vom Nutzer in zwei Sätzen |
 | 01.09. | Der Vier-Augen-Wächter sperrte jede Landung, und die Schuld wuchs schneller, als sie zu bezahlen war: Das Tor schnitt die Prüfarbeit nach der einen Regel zu und zählte sie nach der anderen (§3.225), und JEDE eingetragene Bewertung erzeugte selbst wieder einen prüfpflichtigen Beitrag, weil das Hauptbuch versioniert ist — vierzehn ehrliche Runden mit lauter geschlossenen Befunden ließen das Tor rot (§3.226, Punkt 1036) |
+| 01.09. nachts | Die Kontext-Uebergabe liess sich nicht eintragen, weil eine FREMDE, lebende Sitzung eine Karte als laufende Arbeit hielt: Das Tor verlangt die Karte »es laeuft nichts« und liest dafuer die ganze Sektion statt der eigenen Karten — blieben nur Fremdenteignung oder eine Aussage, die die Tafel selbst Widerspruch nennt (§3.230) |
 | 01.09. abends | Eine Nutzerfrage deckte auf, dass unsere Fable-Bahn auf einer festgenagelten Versionsnummer stand: Eine neue Fable-Version hätte uns nie von allein erreicht, weil nichts die eingetragene Konstante gegen die verfügbare hält — stille Stagnation als Umkehrung der stillen Degradation von §3.20 (§3.229) |
 | 01.09. nachm. | **Die Umsteuerung**: Blind-Doppeldiagnose (Fable + Sol, Opus-Merge) auf die Nutzerfrage nach dem Spielstillstand — die Steuerung war zum Hauptprodukt geworden; der Nutzer gab Freeze, Aufnahmeregel und die Streichung des §7.1-Tors direkt frei, und die Umsetzung bewies Punkt 1005 gleich mit: punktlose Arbeit fand keine Karte (§3.227, Punkt 1039) |
 
@@ -1421,7 +1422,7 @@ keinen Träger hat. Gebucht als Punkt 956.
 
 ## Anhang A — Maschinell gepflegte Quellen-Übersicht
 
-Zuletzt aktualisiert: Dienstag, 01.09.2026, 22:01 · Quellen-Fingerprint: `5ea0bc7893a0…`
+Zuletzt aktualisiert: Dienstag, 01.09.2026, 23:04 · Quellen-Fingerprint: `b8f4ccfc41bc…`
 
 Spalten heuristisch aus den Quellen abgeleitet (Anläufe = distinkte Datumsnennungen im Memory;
 Maßnahme = Guard-Skripte mit Namens-Treffer). Die inhaltliche Bewertung gehört der Prosa oben.
@@ -1524,8 +1525,8 @@ Maßnahme = Guard-Skripte mit Namens-Treffer). Die inhaltliche Bewertung gehört
 
 Erfasste Quellen: 93 Feedback-/Projekt-Memories · 57 Guard-/Hook-Skripte · 6 Revert-/Reapply-Commits · 120 Prozess-/Meta-TASKS-Punkte (davon 54 offen).
 
-<!-- RETRO-FINGERPRINT: 5ea0bc7893a064bb5a16d99c43cb31912085a0f097c14fb2f4789e9febe7ab4a -->
-<!-- RETRO-LAST-REFRESHED: 2026-09-01T20:01:29.054Z -->
+<!-- RETRO-FINGERPRINT: b8f4ccfc41bcfa840087ac221d6b5677d8f23edaff7f0511cfc863c79709965b -->
+<!-- RETRO-LAST-REFRESHED: 2026-09-01T21:04:07.365Z -->
 <!-- AUTO-GENERATED:END -->
 
 ### 3.111 Ein Erfolg ist kein Beweis für den Weg, auf dem er zustande kam
@@ -5250,3 +5251,30 @@ Konstante ohne sie umlegt, legt die Fable-Bahn lahm. Zweitens hat auch hier
 wieder der Nutzer den Befund geliefert, nicht wir — dieselbe Rolle wie in §3.99
 und §3.134. Bei einer Angabe, die veralten kann, ohne dass irgendetwas rot
 wird, ist das kein Zufall, sondern die Vorhersage.
+
+### 3.230 Das Sparsamkeitstor konnte sich nicht selbst schliessen
+
+In derselben Nacht sollte die Sitzung an der Kontext-Wasserlinie uebergeben — der
+Mechanismus, der die Kosten des Stapels ueberhaupt begrenzt. Er verlangt dafuer
+eine Tafelkarte, die sagt, dass nichts mehr laeuft. Die Tafel verweigerte diese
+Karte, und zwar zu Recht: Punkt 686 stand als laufende Arbeit einer ANDEREN,
+lebenden Sitzung. Damit gab es nur zwei Wege, und beide sind unzulaessig — die
+Karte einer fremden Sitzung einkassieren, oder eine Aussage veroeffentlichen, die
+die Tafel im selben Atemzug als Widerspruch bezeichnet.
+
+Die Bauform ist die von §3.185 und §3.186, hier aber mit der teuersten Folge: Die
+Pruefung liest die GANZE Sektion, wo sie die Karten DIESER Sitzung lesen muesste.
+Solange nur eine Sitzung schrieb, war das dasselbe; sobald zwei schreiben, ist es
+etwas anderes. Und weil ausgerechnet das Sparsamkeitstor daran haengt, ist das
+Ergebnis das eine, das die Wasserlinie verhindern soll: Die Sitzung arbeitete im
+teuren Kontext weiter, statt zu uebergeben.
+
+Zwei Dinge sind festzuhalten. Erstens: Ein Tor, das eine BEHAUPTUNG ueber den
+Weltzustand verlangt, muss den Ausschnitt benennen, ueber den die Behauptung geht
+— »nichts laeuft« ist in einem Mehr-Sitzungs-Betrieb keine beantwortbare Frage,
+»nichts von MIR laeuft« schon. Zweitens, und das ist der Grund, warum daraus ein
+Punkt wurde statt eines Eintrags im Rueckstand: Der vorgegebene Kartentext haengt
+den Satz »Hier laeuft nichts weiter.« weiterhin bedingungslos an — genau der
+Defekt aus §3.111ff., den Punkt 871 seit dem 24.08. beschreibt. Hier waere er
+gleich zweifach falsch gewesen, denn diese Sitzung hinterliess selbst einen
+gepushten Zweig, der auf sein CI wartet.
