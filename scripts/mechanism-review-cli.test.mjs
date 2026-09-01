@@ -1853,6 +1853,20 @@ describe('a trailerless merge inherits the authorship of the tip it merged', () 
     expect(commit.authors).toEqual([SOL])
   })
 
+
+  it('bypasses refs/replace for the merge OWN trailer, so no forged author skips ancestry', () => {
+    const commit = resolveCommit(MERGE, {
+      run: runner({ [MERGE]: '', [FIRST]: OPUS, [MERGED]: SOL }, [FIRST, MERGED], {
+        // A replacement object hands the MERGE a trailer it does not have. Read
+        // that, and `own` is non-empty, the ancestry rule never runs, and the
+        // author is not merely hidden but forged.
+        replacedTrailers: { [MERGE]: OPUS },
+      }),
+    })
+    expect(commit.authors).toEqual([SOL])
+    expect(commit.authors).not.toContain(OPUS)
+  })
+
   it('leaves an ordinary trailerless commit authorless, so absence is no assignment', () => {
     const commit = resolveCommit(MERGE, { run: runner({ [MERGE]: '' }, [FIRST]) })
     expect(commit.authors).toEqual([])

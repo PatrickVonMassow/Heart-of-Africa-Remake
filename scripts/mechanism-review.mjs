@@ -1330,7 +1330,18 @@ export function resolveCommit(sha, { run = git } = {}) {
   }
   const full = commits[0]
   const subject = run(['show', '-s', '--format=%s', full])
-  const trailers = run(['show', '-s', '--format=%(trailers:key=Co-Authored-By,valueonly,separator=;)', full])
+  // THE COMMIT'S OWN TRAILERS ARE READ THE SAME WAY (cross-vendor review,
+  // GPT-5.6 Sol, third do-not-merge). This read decides whether the ancestry rule
+  // below runs at all: a replacement object that gives the merge a trailer it
+  // does not have makes `own` non-empty, and the real merged tip is then never
+  // consulted — a forged author rather than a hidden one.
+  const trailers = run([
+    '--no-replace-objects',
+    'show',
+    '-s',
+    '--format=%(trailers:key=Co-Authored-By,valueonly,separator=;)',
+    full,
+  ])
   const committedAt = Number(run(['show', '-s', '--format=%ct', full])) * 1000
   const own = modelsFromTrailers(trailers)
   // POINT 784'S RULING, THE RECORDER'S HALF. A landing merge is written by the
