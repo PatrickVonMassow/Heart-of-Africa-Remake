@@ -144,8 +144,14 @@ export const DOC_BUDGETS = [
     // redirection plan (keyword "Umsteuerung") with its done/open state, so a
     // later session can be addressed on it directly. A new topic, not a longer
     // telling; the ceilings move by exactly that line to the 51 / 802 fit.
-    maxLines: 51,
-    maxWords: 802,
+    // LOWERED on 01.09.2026 by the cut that retired the R3F Clock deprecation
+    // watch into docs/backlog.md: a passive upstream watch with no player
+    // impact is what the finding-intake rule (CLAUDE.md §2) collects there
+    // rather than carries at every turn. The ceilings follow the cut down to
+    // the measured 50 / 787 fit — a cut lands with its lowered ceiling, or the
+    // room it frees is spent silently.
+    maxLines: 50,
+    maxWords: 787,
     maxEntryWords: 22,
     // Fifteen words: an index of one-hook lines, where a whole new entry is ~20 words —
     // so the slack cannot hide one, and re-wording an existing hook is free.
