@@ -129,6 +129,48 @@ describe('launcher start liveness — fenced or advancing writer authority', () 
     expect(decision.reason).toContain('recent registered feature-writer activity')
   })
 
+  it('does not let a positively refuted registered writer veto a successor', () => {
+    const decision = launcherStartDecision({
+      lock: null,
+      assessment: { alive: false, reason: 'no-lock' },
+      featureWriterRegister: {
+        readable: true,
+        reason: 'measured',
+        writers: [{
+          branch: 'feat/515-detector',
+          worktree: '/repo/.claude/worktrees/point-515',
+          recognized: false,
+          output: { verdict: 'dead', judgedOn: 'process' },
+        }],
+      },
+      now: NOW,
+    })
+    expect(decision).toMatchObject({ start: true })
+  })
+
+  it('names unmeasured writer output differently from measured-live activity', () => {
+    const writer = {
+      branch: 'feat/515-detector',
+      worktree: '/repo/.claude/worktrees/point-515',
+      recognized: false,
+      output: { verdict: 'unmeasurable', judgedOn: 'none' },
+    }
+    const decision = launcherStartDecision({
+      lock: null,
+      assessment: { alive: false, reason: 'no-lock' },
+      featureWriterRegister: {
+        readable: false,
+        reason: 'registered-feature-output-unmeasurable',
+        writers: [writer],
+      },
+      now: NOW,
+    })
+    expect(decision).toMatchObject({ start: false, code: 'writer-register-unreadable' })
+    expect(decision.reason).toContain('could not be measured')
+    expect(decision.reason).toContain('feat/515-detector')
+    expect(decision.reason).not.toContain('activity measured')
+  })
+
   it('allows quiet feature work and a live agent explicitly recognised for boundary transfer', () => {
     const quiet = { branch: 'feat/old', worktree: '/repo/old', recognized: false, output: { verdict: 'quiet' } }
     const transferred = { branch: 'feat/transferred', worktree: '/repo/live', recognized: true, output: { verdict: 'alive' } }

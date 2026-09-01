@@ -687,6 +687,8 @@ describe('the launcher consults registered feature writers before spawning', () 
 
   it('passes the measured register through both the initial and recovery decisions', () => {
     expect(source).toMatch(/const featureWriterRegister = registeredFeatureWriters\(/)
+    expect(source).toMatch(/const declaration = readDeclaration\(\)/)
+    expect(source).not.toMatch(/const declaration = lock \? readDeclaration\(\) : null/)
     expect(source.match(/featureWriterRegister[:,]/g)?.length).toBeGreaterThanOrEqual(2)
     expect(source.match(/registeredFeatureWriters\(\{[\s\S]{0,80}?declaration[,\s]/g)).toHaveLength(2)
     expect(source).not.toMatch(/declaration:\s*trigger\.kind\s*===\s*SUCCESSOR_TRIGGERS\.BOUNDARY/)

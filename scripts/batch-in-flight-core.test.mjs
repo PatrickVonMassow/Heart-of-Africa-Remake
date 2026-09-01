@@ -598,6 +598,66 @@ describe('the launcher-facing feature worktree register', () => {
     })
   })
 
+  it('carries the registered writer identity into the same verdict as the declaration probe', () => {
+    const declaration = {
+      evidence: [
+        { kind: 'branch', ref: 'feat/515-detector', point: 515 },
+        { kind: 'pid', pid: RUN_PID, startedAt: RUN_STARTED, point: 515 },
+      ],
+    }
+    const probe = (options) => checkAgentOutput({
+      ...options,
+      now: NOW,
+      branchProbe: () => NOW - 1_000,
+      worktreeProbe: () => null,
+      pidProbe: () => dead(),
+    })
+    const declaredVerdict = checkDeclaredAgentOutput(declaration, {
+      now: NOW,
+      branchProbe: () => NOW - 1_000,
+      worktreeProbe: () => null,
+      pidProbe: () => dead(),
+    }).output
+    const registered = registeredFeatureWriters({
+      now: NOW,
+      declaration,
+      exec: () => porcelain,
+      openProbe: () => ({ readable: true, branches: [{ ref: 'feat/515-detector' }] }),
+      check: probe,
+    })
+
+    expect(registered).toMatchObject({
+      readable: true,
+      writers: [{
+        branch: 'feat/515-detector',
+        recognized: true,
+        output: { verdict: 'dead', judgedOn: 'process' },
+      }],
+    })
+    expect(registered.writers[0].output).toEqual(declaredVerdict)
+  })
+
+  it('never applies a different declared strand\'s process identity', () => {
+    const seen = []
+    const result = registeredFeatureWriters({
+      now: NOW,
+      declaration: {
+        evidence: [
+          { kind: 'branch', ref: 'feat/515-detector', point: 515 },
+          { kind: 'pid', pid: RUN_PID, startedAt: RUN_STARTED, point: 999 },
+        ],
+      },
+      exec: () => porcelain,
+      openProbe: () => ({ readable: true, branches: [{ ref: 'feat/515-detector' }] }),
+      check: (options) => {
+        seen.push(options)
+        return { output: { verdict: 'alive' }, reason: 'agent-alive' }
+      },
+    })
+    expect(result.readable).toBe(true)
+    expect(seen).toMatchObject([{ branch: 'feat/515-detector', pids: [] }])
+  })
+
   it('refuses to invent an empty register when Git cannot enumerate worktrees', () => {
     expect(registeredFeatureWriters({ exec: () => { throw new Error('broken') } })).toEqual({
       readable: false,

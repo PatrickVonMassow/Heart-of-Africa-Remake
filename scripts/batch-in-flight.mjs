@@ -66,6 +66,7 @@ import {
   standDownBoundaryDecision,
   successorAgentOrientation,
   declaredAgentCount,
+  evidencePoint,
   openPointSpecs,
   waitEtaRefusal,
   openBranchSlots,
@@ -784,11 +785,21 @@ export function registeredFeatureWriters({
   const writers = trees
     .filter((tree) => openRefs.has(tree.branch))
     .map((tree) => {
-      const measured = check({ worktree: tree.path, branch: tree.branch, now })
+      const recognized = declaredBranches.has(tree.branch) || declaredPaths.has(resolve(tree.path))
+      // A declaration may carry several delegated strands. PID evidence is
+      // attributed to the same point as its branch/worktree when written, so
+      // only identities recorded for THIS writer may refute its leftover Git
+      // output. Passing every declared pid would let one dead child outvote a
+      // different, live child; passing none made process death unreachable.
+      const point = pointOfBranch(tree.branch)
+      const pids = recognized && point !== null
+        ? declared.pids.filter((item) => evidencePoint(item) === point)
+        : []
+      const measured = check({ worktree: tree.path, branch: tree.branch, pids, now })
       return {
         branch: tree.branch,
         worktree: tree.path,
-        recognized: declaredBranches.has(tree.branch) || declaredPaths.has(resolve(tree.path)),
+        recognized,
         output: measured.output ?? null,
         reason: measured.reason ?? null,
         detail: measured.detail ?? null,
