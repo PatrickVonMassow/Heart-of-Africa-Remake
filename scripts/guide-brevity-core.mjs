@@ -274,14 +274,26 @@ export const LIMITS = {
   // these ceilings move by. Against 495 / 4462 — the state before the whole chain began at
   // 89107a54 — the inclusive delta is +7 / +104, and that is the number a reader auditing the
   // chain as ONE change should check.
-  // RAISED 01.09.2026 by exactly the measured size of one genuinely new tip (retrospective
-  // §3.223): a red gate does not END the turn, it RESTARTS it — so the session answered the same
-  // refusal ten times with a fresh closing line instead of repairing one of them, which looks
-  // like work from outside and moves nothing. SHORTEN-BEFORE-RAISE was applied: drafted as its
-  // own entry at +7 lines / +76 words, it was instead FOLDED into "Die KI repariert den Wächter,
-  // der sie gerade sperrt", which already carries how a blocked session reacts to a gate. The
-  // fold pays back 4 lines and 24 words, so the ceilings move by +3 lines / +52 words, with zero
-  // slack. No existing claim was dropped, and the long form stays in the retrospective.
+  // RAISED 01.09.2026 by the measured size of THREE folds, and the split is written down here
+  // because the first version of this note attributed all of it to the first one (cross-vendor
+  // reading, GPT-5.6 Sol, 01.09.2026: the refusal entry is +1 line / +22 words while unrelated
+  // entries supply the other +2 / +30 — a raise whose reason names the wrong text cannot be
+  // audited). The three, measured entry by entry across this commit alone (ea1ab19..dd22289):
+  //   +1 line / +22 words — the repeated-refusal lesson (retrospective §3.223): a red gate does
+  //     not END the turn, it RESTARTS it, so the session answered the same refusal ten times with
+  //     a fresh closing line instead of repairing one of them. SHORTEN-BEFORE-RAISE was applied:
+  //     drafted as its own entry at +7 lines / +76 words, it was FOLDED into "Die KI repariert
+  //     den Wächter, der sie gerade sperrt", which already carries how a blocked session reacts
+  //     to a gate; the fold pays back 4 lines and 24 words.
+  //   +1 line / +5 words — that a reviewer must be told about SHORTENED material itself, not only
+  //     the caller, folded into "Die Messung — und die Gegenprüfung".
+  //   +1 line / +24 words — that a veto of the FILE grows the backlog while it is paid off, and
+  //     that a refusal printing its whole inventory eats the room for its reason, folded into
+  //     "Die Pflicht wächst schneller, als du sie erfüllen kannst".
+  // The remaining +1 word is a rewording of "Der Fühler misst sich selbst" that carries no new
+  // claim; it is named rather than hidden inside a fold that did not earn it. So the ceilings move
+  // by +3 lines / +52 words with zero slack. No existing claim was dropped, and the long form of
+  // each fold stays in the retrospective.
   maxLines: 505,
   // EXACT FIT, not headroom — corrected 30.07.2026 after the four-eyes review
   // pointed out that this comment had long stopped describing the numbers. The
@@ -474,8 +486,9 @@ export const LIMITS = {
   // neighbouring entry had lost were paid back in place, and then to 4567 with the verdict-judges-
   // its-material claim justified beside maxLines, which then went 4567 → 4556 → 4566 across the
   // three readings of that entry; the guide keeps no unearned headroom at any of them.
-  // 01.09.2026: the repeated-refusal lesson justified beside maxLines measures 52 words in its
-  // folded form, so this ceiling moves 4566 → 4618 by the same measurement.
+  // 01.09.2026: the three folds justified beside maxLines measure 22 + 5 + 24 words in their
+  // folded form, plus the one reworded word named there, so this ceiling moves 4566 → 4618 by
+  // the same measurement.
   maxWords: 4618,
   // A pitfall entry = the risk lines plus its prompt. Anything longer is a
   // story, not a tip.
