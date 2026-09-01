@@ -371,6 +371,22 @@ export function rangeCommits(base, head, files, readers = {}) {
   // AND `--no-replace-objects` HERE TOO, for the reason the log command states:
   // a replaced parent could otherwise answer with somebody else's trailers.
   const trailersOf = (sha) => readTrailers(sha)
+  // THE PARENTS THE ANCESTRY RULE USES COME FROM THE COMMIT OBJECT, NOT FROM THE
+  // LOG (cross-vendor review, GPT-5.6 Sol at effort high, second do-not-merge on
+  // this half). `--no-replace-objects` disables `refs/replace` and NOTHING ELSE:
+  // `log --format=%P` is still GRAFT-aware, so at a shallow boundary a merge
+  // prints as single-parented and the resolver inherits nothing — the merged
+  // tip's author is hidden, and an invisible author is not an absent one. Read
+  // only where it can matter: a commit that names its own model needs no
+  // ancestry, so the extra object read is confined to the trailerless ones.
+  const readParents =
+    readers.readParents ??
+    ((sha) =>
+      git(`--no-replace-objects cat-file -p "${sha}"`)
+        .split('\n')
+        .filter((line) => line.startsWith('parent '))
+        .map((line) => line.slice(7).trim())
+        .filter(Boolean))
   return commits.map((commit) => {
     const trailers = trailersOf(commit.sha)
     // EVERY non-first parent, never only the ones outside this range. The
@@ -380,13 +396,14 @@ export function rangeCommits(base, head, files, readers = {}) {
     // that single commit and nothing else — an in-range parent is exactly as
     // invisible to it as an out-of-range one, and skipping it left the merge
     // unattributed.
+    const own = modelsFromTrailers(trailers)
+    const parentShas = own.length ? (commit.parentShas ?? []) : readParents(commit.sha)
     const parentAuthorModels = Object.fromEntries(
-      (commit.parentShas ?? [])
-        .slice(1)
-        .map((parent) => [parent, modelsFromTrailers(trailersOf(parent))]),
+      parentShas.slice(1).map((parent) => [parent, modelsFromTrailers(trailersOf(parent))]),
     )
     return {
       ...commit,
+      parentShas,
       authorModel: modelFromTrailers(trailers),
       // EVERY co-author, not only the first: a commit naming two models has
       // two list authors, and neither may merge the union (point 634).

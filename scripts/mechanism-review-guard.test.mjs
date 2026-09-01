@@ -829,6 +829,7 @@ describe('a trailerless merge is attributed to the tip it merged', () => {
     const asked = []
     const commits = rangeCommits('base', 'head', ['scripts/x-guard.mjs'], {
       readLog: () => log,
+      readParents: () => [FIRST, MERGED],
       readTrailers: (sha) => {
         asked.push(sha)
         return trailers[sha] ?? ''
@@ -846,6 +847,7 @@ describe('a trailerless merge is attributed to the tip it merged', () => {
   it('resolves that merge to an eligible reviewer instead of unknown authorship', () => {
     const [commit] = rangeCommits('base', 'head', ['scripts/x-guard.mjs'], {
       readLog: () => log,
+      readParents: () => [FIRST, MERGED],
       readTrailers: (sha) => trailers[sha] ?? '',
     })
     // The gate plans ONE commit; that is the shape the fix has to survive.
@@ -856,10 +858,44 @@ describe('a trailerless merge is attributed to the tip it merged', () => {
     expect(groups[0].unreviewableReason).toBeUndefined()
   })
 
+
+  it('takes the parents from the commit object, so a graft in the log cannot hide the tip', () => {
+    // `--no-replace-objects` disables refs/replace and NOTHING else: the log's
+    // %P is still graft-aware, so at a shallow boundary a merge prints as
+    // single-parented. Reading that left the merge with nothing to inherit.
+    const grafted = [`${REC}${MERGE}${FLD}1788000000${FLD}${FIRST}`, '', 'scripts/x-guard.mjs', ''].join('\n')
+    const [commit] = rangeCommits('base', 'head', ['scripts/x-guard.mjs'], {
+      readLog: () => grafted,
+      readParents: () => [FIRST, MERGED],
+      readTrailers: (sha) => trailers[sha] ?? '',
+    })
+
+    expect(commit.parentShas).toEqual([FIRST, MERGED])
+    expect(commit.parentAuthorModels).toEqual({ [MERGED]: ['GPT-5.6 Sol <noreply@openai.com>'] })
+    const { groups } = planAuthorshipGroups({ commits: [commit], endStateFiles: commit.files })
+    expect(groups[0].reviewer).toBeTruthy()
+  })
+
+  it('spends no object read on a commit that names its own model', () => {
+    const authored = [`${REC}${MERGE}${FLD}1788000000${FLD}${FIRST} ${MERGED}`, '', 'scripts/x-guard.mjs', ''].join('\n')
+    let reads = 0
+    rangeCommits('base', 'head', ['scripts/x-guard.mjs'], {
+      readLog: () => authored,
+      readParents: () => {
+        reads += 1
+        return [FIRST, MERGED]
+      },
+      readTrailers: () => 'Claude Opus 5 <noreply@anthropic.com>',
+    })
+
+    expect(reads).toBe(0)
+  })
+
   it('leaves an ordinary trailerless commit unknown, so absence is never an assignment', () => {
     const plain = [`${REC}${MERGE}${FLD}1788000000${FLD}${FIRST}`, '', 'scripts/x-guard.mjs', ''].join('\n')
     const [commit] = rangeCommits('base', 'head', ['scripts/x-guard.mjs'], {
       readLog: () => plain,
+      readParents: () => [FIRST],
       readTrailers: () => '',
     })
     const { groups } = planAuthorshipGroups({ commits: [commit], endStateFiles: commit.files })
