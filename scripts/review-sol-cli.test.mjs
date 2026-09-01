@@ -358,7 +358,7 @@ beforeAll(() => {
   headSha = commit('added.txt', 'a file the patch carries whole\n', 'Add a file', 'Opus 5')
 
   git('checkout', '-q', '-b', 'fable-work', 'main')
-  fableSha = commit('fable.txt', 'written by the fallback reviewer\n', 'Write something as Fable', 'Fable 5')
+  fableSha = commit('fable.txt', 'written by the fallback reviewer\n', 'Write something as Fable', 'Fable 5.1')
 
   // …and a branch SOL authored (point 667), which Sol may therefore not review.
   git('checkout', '-q', '-b', 'sol-work', 'main')
@@ -1009,7 +1009,7 @@ describe('a range SOL authored', () => {
       '--file', 'unreviewable.txt',
     ])
     expect(r.status, `${r.stdout}${r.stderr}`).toBe(0)
-    expect(calls()).toEqual(['claude-fable-5'])
+    expect(calls()).toEqual(['claude-fable-5-1'])
     const command = splitCommand(recordCommandIn(r.stdout))
     expect(command.slice(0, 2)).toEqual(['node', 'scripts/mechanism-review.mjs'])
     const recorded = spawnSync(process.execPath, command.slice(1), {
@@ -1022,12 +1022,12 @@ describe('a range SOL authored', () => {
     const row = JSON.parse(readFileSync(join(repo, '.claude', 'mechanism-reviews.jsonl'), 'utf8').trim().split('\n').at(-1))
     expect(row).toMatchObject({
       sha: unreviewableSha,
-      model: 'Fable 5',
+      model: 'Fable 5.1',
       verdict: 'merge',
       handover: 'sol-authored',
       pass: { index: 1, total: 1, files: ['unreviewable.txt'], endState: unreviewableSha },
       reviewerAuthorship: {
-        status: 'agreement', actualModel: 'Fable 5', servedModel: 'claude-fable-5', proof: 'claude-result',
+        status: 'agreement', actualModel: 'Fable 5.1', servedModel: 'claude-fable-5-1', proof: 'claude-result',
       },
     })
   })

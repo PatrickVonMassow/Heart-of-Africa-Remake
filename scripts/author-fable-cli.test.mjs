@@ -52,7 +52,7 @@ describe('Fable authoring CLI', () => {
   it('names the serving command in the shared routing report', () => {
     const result = run(solScript, ['--routing', '--point', '834', '--rounds', String(FABLE_ESCALATION_ROUNDS)])
     expect(result.status, result.stderr).toBe(0)
-    expect(result.stdout).toContain('point 834 → fable (Fable 5)')
+    expect(result.stdout).toContain('point 834 → fable (Fable 5.1)')
     expect(result.stdout).toContain('commission: node scripts/author-fable.mjs --point 834')
   })
 
@@ -74,10 +74,10 @@ describe('Fable authoring CLI', () => {
       '--dry-run',
     ])
     expect(result.status, result.stderr).toBe(0)
-    expect(result.stdout).toContain('claude -p <the prompt> --model claude-fable-5 --output-format json')
+    expect(result.stdout).toContain('claude -p <the prompt> --model claude-fable-5-1 --output-format json')
     expect(result.stdout).not.toContain('--fallback-model')
-    expect(result.stdout).toContain('as Fable 5')
-    expect(result.stdout).toContain('Co-Authored-By: Claude Fable 5 <noreply@anthropic.com>')
+    expect(result.stdout).toContain('as Fable 5.1')
+    expect(result.stdout).toContain('Co-Authored-By: Claude Fable 5.1 <noreply@anthropic.com>')
     expect(result.stdout).toContain('A GPT-5.6 Sol session then REVIEWS')
     expect(result.stdout).toContain('Do NOT push, do NOT merge')
   })
@@ -94,6 +94,6 @@ describe('Fable authoring CLI', () => {
       '--dry-run',
     ], 'off')
     expect(result.status).toBe(3)
-    expect(result.stderr).toContain('Fable 5 is switched off')
+    expect(result.stderr).toContain('Fable 5.1 is switched off')
   })
 })

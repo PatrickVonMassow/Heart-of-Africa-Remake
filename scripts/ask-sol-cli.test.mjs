@@ -219,9 +219,9 @@ describe('an ask that runs', () => {
     clearCalls()
     const r = run(['--model', 'fable', '--kind', 'diagnose', '--brief', 'fold the stage', '--file', materialFile])
     expect(r.status, r.stderr).toBe(0)
-    expect(calls()).toEqual(['claude-fable-5'])
+    expect(calls()).toEqual(['claude-fable-5-1'])
     expect(readFileSync(join(dir, 'stdin.txt'), 'utf8')).toContain('FAIL place')
-    expect(readFileSync(join(dir, 'prompt.txt'), 'utf8')).toContain('READ-ONLY work for this repository as Fable 5')
+    expect(readFileSync(join(dir, 'prompt.txt'), 'utf8')).toContain('READ-ONLY work for this repository as Fable 5.1')
     const args = JSON.parse(readFileSync(join(dir, 'args.json'), 'utf8'))
     expect(args).toContain('dontAsk')
     expect(args).toContain('--tools')
@@ -235,9 +235,9 @@ describe('an ask that runs', () => {
       STUB_SERVED_MODEL: 'claude-opus-5',
     })
     expect(r.status).toBe(3)
-    expect(r.stderr).toMatch(/top-level answer was not attributed to Fable 5/)
+    expect(r.stderr).toMatch(/top-level answer was not attributed to Fable 5.1/)
     expect(r.stderr).toMatch(/usage named claude-haiku-4-5, claude-opus-5/)
-    expect(r.stderr).toMatch(/Fable 5 did NOT answer/)
+    expect(r.stderr).toMatch(/Fable 5.1 did NOT answer/)
   })
 
   it('supports Opus as the third read-only roster model', () => {

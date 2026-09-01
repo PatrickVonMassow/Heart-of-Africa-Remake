@@ -1,4 +1,4 @@
-// WHICH AUTHORING LANE A POINT GOES TO (point 667). rule:model-policy@d0b43947
+// WHICH AUTHORING LANE A POINT GOES TO (point 667). rule:model-policy@d0066fb3
 //
 // The user pays two vendors, and authoring is the largest single item of the
 // spend, so it is split across both rather than sitting on one. It does NOT all
@@ -19,7 +19,7 @@
 //          the main session's job, so authoring it elsewhere buys nothing) —
 //          and only while nothing marks that point hard, because the user's
 //          18.08. ruling outranks this lane, not the other way round.
-//   fable  Fable 5 is the escalation described by CLAUDE.md §6 when the shared
+//   fable  Fable is the escalation described by CLAUDE.md §6 when the shared
 //          switch admits it. A point's tag, a caller override and the automatic
 //          boundary all consult that same decision.
 //
@@ -33,15 +33,16 @@
 // itself. Side-effect free; the work-order reading belongs to
 // scripts/author-sol.mjs. Pinned by author-routing-core.test.mjs.
 
-import { fableIsOn, fableRefusalReason, requireState } from './fable-switch-core.mjs'
+import { FABLE_MODEL, fableIsOn, fableRefusalReason, requireState } from './fable-switch-core.mjs'
 
 /** The authoring lanes, in the order this file describes them. */
 export const LANES = Object.freeze(['sol', 'fable', 'opus'])
 
-/** Who each lane is, for the report a dispatcher reads. */
+/** Who each lane is, for the report a dispatcher reads. The Fable name is DERIVED
+ * from the switch, so a version bump moves one constant and not a scattered set. */
 export const LANE_MODEL = Object.freeze({
   sol: 'GPT-5.6 Sol',
-  fable: 'Fable 5',
+  fable: FABLE_MODEL,
   opus: 'Opus 5',
 })
 

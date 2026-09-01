@@ -152,7 +152,7 @@ describe('the reviewer-vendor matrix binds evidence to the credited model', () =
 
   it('refuses evidence about a DIFFERENT model than the credited one', () => {
     expect(
-      reviewerVendorProblems('Claude Opus 5', { status: 'agreement', claimedModel: 'Claude Fable 5', actualModel: 'Claude Fable 5' }).join(' '),
+      reviewerVendorProblems('Claude Opus 5', { status: 'agreement', claimedModel: 'Claude Fable 5.1', actualModel: 'Claude Fable 5.1' }).join(' '),
     ).toMatch(/evidence for one model proves nothing about another/)
     expect(junkSpelling('docs/half.json')).toBe(false)
   })
@@ -246,7 +246,7 @@ describe('a ledger row\'s half-authorship claim is re-derived, never believed', 
     halfBlobs: ['aaaa1', 'bbbb2'],
     unionSource: 'docs/u.json',
     unionBlob: 'uuuu3',
-    mergedBy: 'Fable 5',
+    mergedBy: 'Fable 5.1',
     accounting: '1 A + 1 B entries → 1 union entries (2 of the 2 input entries merged, 0 only A, 0 only B): every input entry accounted for',
   }
   const blobs = {
@@ -257,7 +257,7 @@ describe('a ledger row\'s half-authorship claim is re-derived, never believed', 
   const texts = {
     aaaa1: JSON.stringify({ model: 'Claude Opus 5', entries: [{ id: 'A1', file: 'x.ts', defect: 'the defect' }] }),
     bbbb2: JSON.stringify({ model: 'GPT-5.6 Sol', entries: [{ id: 'B1', file: 'x.ts', defect: 'the defect restated' }] }),
-    uuuu3: JSON.stringify({ mergedBy: 'Fable 5', entries: [{ id: 'U1', from: ['A1', 'B1'], defect: 'the defect' }] }),
+    uuuu3: JSON.stringify({ mergedBy: 'Fable 5.1', entries: [{ id: 'U1', from: ['A1', 'B1'], defect: 'the defect' }] }),
   }
   const deps = (over = {}) => ({
     isTracked: () => true,
@@ -308,7 +308,7 @@ describe('a ledger row\'s half-authorship claim is re-derived, never believed', 
     // The anchor is the row's own commit: a source its tree does not carry is
     // nothing — a working-tree condition would instead rot true historical rows.
     expect(verifyHalfAuthors(row, deps({ committedHalf: (src) => (src === 'docs/b.json' ? null : blobs[src]) }))).toBe(false)
-    const renamed = { ...blobs, 'docs/a.json': { oid: 'aaaa1', model: 'Fable 5' } }
+    const renamed = { ...blobs, 'docs/a.json': { oid: 'aaaa1', model: 'Fable 5.1' } }
     expect(verifyHalfAuthors(row, deps({ committedHalf: (src) => renamed[src] ?? null }))).toBe(false)
   })
 })
@@ -383,7 +383,7 @@ describe('the paths that must stay untouched', () => {
   it('a well-formed --record is never mistaken for an unknown flag', () => {
     // The sha is deliberately nonsense, so nothing is ever appended: what is
     // asserted is only that the recognised flags reached the record path.
-    const r = run('--record', 'not-a-commit', '--model', 'Fable 5', '--verdict', 'merge', '--evidence', 'x')
+    const r = run('--record', 'not-a-commit', '--model', 'Fable 5.1', '--verdict', 'merge', '--evidence', 'x')
     // THE ORDER MATTERS (point 573). `not.toContain` is satisfied by the EMPTY
     // output of a script that never started, and so is a non-zero exit — this
     // case would have stayed green with the CLI deleted. What it must establish
@@ -424,7 +424,7 @@ describe('a run that omits a REQUIRED flag', () => {
   // The one path that must read exactly as it always did: the usage block, not
   // a git error from deep inside resolveCommit.
   it('prints the existing usage line unchanged, and never a git error', () => {
-    const r = run('--record', 'HEAD', '--model', 'Fable 5')
+    const r = run('--record', 'HEAD', '--model', 'Fable 5.1')
     expect(r.status).not.toBe(0)
     expect(r.stderr).toContain(usage())
     expect(r.stderr).toContain('--verdict')
@@ -433,7 +433,7 @@ describe('a run that omits a REQUIRED flag', () => {
   })
 
   it('answers a missing --record with the usage too, not with a git failure', () => {
-    const r = run('--model', 'Fable 5', '--verdict', 'merge', '--evidence', 'a whole honest line here')
+    const r = run('--model', 'Fable 5.1', '--verdict', 'merge', '--evidence', 'a whole honest line here')
     expect(r.status).not.toBe(0)
     expect(r.stderr).toContain(usage())
     expect(r.stderr).toContain('--record <sha>')
@@ -482,7 +482,7 @@ describe('the mode round-trips into the ledger', () => {
     // The numbers ADD UP — the receipt is checked, not just shaped: 4 + 3 inputs,
     // each one merged or standing alone, 2 folds plus 3 singles = 5 union entries.
     '4 A + 3 B entries → 5 union entries (4 merged, 2 only A, 1 only B): every input entry accounted for'
-  const merged = { mergedBy: 'Fable 5', accounting: ACCOUNTED }
+  const merged = { mergedBy: 'Fable 5.1', accounting: ACCOUNTED }
   const forMode = (mode) => (mode === 'blind-parallel' ? { mode, ...merged } : { mode })
 
   it('writes the mode and reads it back, for both modes', () => {
@@ -558,7 +558,7 @@ describe('the mode round-trips into the ledger', () => {
     withLedger((path) => {
       appendRecord(built.record, path)
       const back = readRecords(path)[0]
-      expect(back.mergedBy).toBe('Fable 5')
+      expect(back.mergedBy).toBe('Fable 5.1')
       expect(back.accounting).toBe(ACCOUNTED)
       expect(back.mergeFallback).toBeUndefined()
     })
@@ -566,7 +566,7 @@ describe('the mode round-trips into the ledger', () => {
       mode: 'blind-parallel',
       ...merged,
       mergedBy: 'GPT-5.6 Sol',
-      mergeFallback: 'Fable 5 was unreachable, so only two models were in this session',
+      mergeFallback: 'Fable 5.1 was unreachable, so only two models were in this session',
     })
     expect(two.ok, (two.errors ?? []).join('\n')).toBe(true)
     expect(two.record.mergeFallback).toMatch(/only two models/)
@@ -574,7 +574,7 @@ describe('the mode round-trips into the ledger', () => {
 
   it('refuses a blind-parallel record with no merger, no count, or a merger that wrote a list', () => {
     expect(build({ mode: 'blind-parallel' }).ok).toBe(false)
-    expect(build({ mode: 'blind-parallel', mergedBy: 'Fable 5' }).ok).toBe(false)
+    expect(build({ mode: 'blind-parallel', mergedBy: 'Fable 5.1' }).ok).toBe(false)
     const own = build({ mode: 'blind-parallel', ...merged, mergedBy: 'GPT-5.6 Sol' })
     expect(own.ok).toBe(false)
     expect(own.errors.join('\n')).toMatch(/may not merge them/i)
@@ -603,15 +603,15 @@ describe('the mode round-trips into the ledger', () => {
         writeFileSync(path, JSON.stringify(value))
         return path
       }
-      const listA = w('A.json', { model: 'Fable 5', entries: [{ id: 'A1', file: 'x.ts', defect: 'the first defect' }] })
+      const listA = w('A.json', { model: 'Fable 5.1', entries: [{ id: 'A1', file: 'x.ts', defect: 'the first defect' }] })
       const listB = w('B.json', { model: 'GPT-5.6 Sol', entries: [{ id: 'B1', file: 'x.ts', defect: 'the first' }] })
       const union = w('U.json', {
-        mergedBy: 'Fable 5',
+        mergedBy: 'Fable 5.1',
         entries: [{ id: 'U1', from: ['A1', 'B1'], defect: 'the first defect, both said it' }],
       })
       const selfMerged = build({
         mode: 'blind-parallel',
-        mergedBy: 'Fable 5',
+        mergedBy: 'Fable 5.1',
         unionPath: union,
         listAPath: listA,
         listBPath: listB,
@@ -623,7 +623,7 @@ describe('the mode round-trips into the ledger', () => {
       })
       expect(selfMerged.ok).toBe(false)
       const text = (selfMerged.errors ?? []).join('\n')
-      expect(text).toMatch(/authored one of the two lists \(Fable 5\)/)
+      expect(text).toMatch(/authored one of the two lists \(Fable 5.1\)/)
       expect(text).not.toMatch(/the two halves were NOT read/)
     } finally {
       rmSync(dir, { recursive: true, force: true })
@@ -646,7 +646,7 @@ describe('the mode round-trips into the ledger', () => {
       // half B — the recorder could not see that, because it read the commit
       // trailers instead of the halves.
       const listA = w('A.json', {
-        model: 'Fable 5',
+        model: 'Fable 5.1',
         entries: [
           { id: 'A1', file: 'x.ts', defect: 'the first defect' },
           { id: 'A2', file: 'y.ts', defect: 'the second defect' },
@@ -680,7 +680,7 @@ describe('the mode round-trips into the ledger', () => {
       expect(built.record.mergedBy).toBe('Claude Opus 5')
       // The record CARRIES the halves, because the gate re-judges it later and
       // would otherwise fall back to the trailer proxy and call this a self-merge.
-      expect(built.record.halfAuthors).toEqual(['Fable 5', 'GPT-5.6 Sol'])
+      expect(built.record.halfAuthors).toEqual(['Fable 5.1', 'GPT-5.6 Sol'])
       // Sources are stored repo-relative where they resolve inside the checkout;
       // these temp fixtures live outside it and stay as given.
       expect(built.record.halfSources).toEqual([listA, listB])
@@ -752,12 +752,12 @@ describe('the mode round-trips into the ledger', () => {
 
       // A union that drops an entry cannot be recorded at all.
       const dropped = w('U-bad.json', { entries: [{ id: 'U1', from: ['A1'] }] })
-      const bad = build({ mode: 'blind-parallel', mergedBy: 'Fable 5', unionPath: dropped, listAPath: listA, listBPath: listB })
+      const bad = build({ mode: 'blind-parallel', mergedBy: 'Fable 5.1', unionPath: dropped, listAPath: listA, listBPath: listB })
       expect(bad.ok).toBe(false)
       expect(bad.errors.join('\n')).toMatch(/is in NO union entry/)
 
       // Half the files is a mistake, not a shortcut.
-      const half = build({ mode: 'blind-parallel', mergedBy: 'Fable 5', unionPath: union })
+      const half = build({ mode: 'blind-parallel', mergedBy: 'Fable 5.1', unionPath: union })
       expect(half.ok).toBe(false)
       expect(half.errors.join('\n')).toMatch(/--list-a and --list-b/)
     } finally {
@@ -780,10 +780,10 @@ describe('the mode round-trips into the ledger', () => {
           JSON.stringify({ timestamp: '2026-08-13T15:34:27.000Z', type: 'user', message: { role: 'user' } }),
         ].join('\n')
 
-      writeFileSync(transcript, line('claude-fable-5'))
+      writeFileSync(transcript, line('claude-fable-5-1'))
       const agreed = build({
         mode: 'review',
-        model: 'Fable 5',
+        model: 'Fable 5.1',
         modelAt: at,
         modelTranscript: transcript,
         resolve: (ref) => stub({ sha: String(ref), authoredBy: 'GPT-5.6 Sol <noreply@openai.com>' }),
@@ -791,15 +791,15 @@ describe('the mode round-trips into the ledger', () => {
       expect(agreed.ok, (agreed.errors ?? []).join('\n')).toBe(true)
       expect(agreed.record.reviewerAuthorship).toMatchObject({
         status: 'agreement',
-        claimedModel: 'Fable 5',
-        actualModel: 'claude-fable-5',
+        claimedModel: 'Fable 5.1',
+        actualModel: 'claude-fable-5-1',
         messageId: 'review-result',
       })
 
       writeFileSync(transcript, line('claude-opus-5'))
       const contradicted = build({
         mode: 'review',
-        model: 'Fable 5',
+        model: 'Fable 5.1',
         modelAt: at,
         modelTranscript: transcript,
         resolve: (ref) => stub({ sha: String(ref), authoredBy: 'GPT-5.6 Sol <noreply@openai.com>' }),
@@ -910,7 +910,7 @@ describe('the mode round-trips into the ledger', () => {
       // The whole switch-generated sentence, not merely the status command: the
       // false "two models existed" wording would still have contained it
       // (re-review round 3).
-      expect(row.mergeFallback).toMatch(/^Fable 5 is switched off by the recorded Fable switch \(node scripts\/fable-switch\.mjs --status\): /)
+      expect(row.mergeFallback).toMatch(/^Fable 5.1 is switched off by the recorded Fable switch \(node scripts\/fable-switch\.mjs --status\): /)
       expect(row.accounting).toMatch(/1 A \+ 1 B entries → 1 union entries .*every input entry accounted for/)
       // The row says which blobs it read, so a later reader re-derives the proof.
       expect(row.halfAuthors).toEqual(['Opus 5', 'GPT-5.6 Sol'])
@@ -1228,7 +1228,7 @@ describe('the mode round-trips into the ledger', () => {
       // A fabricated evidence line, blobs identical: must not stamp.
       carriedRow({ evidence: 'CARRIED from abcdef0 (blobs verified identical): something nobody wrote' }),
       // No source row in the ledger at all: must not stamp.
-      carriedRow({ model: 'Fable 5' }),
+      carriedRow({ model: 'Fable 5.1' }),
       // The superseded contribution model cannot be promoted through carry.
       carriedRow(),
     ]
@@ -1405,7 +1405,7 @@ describe('the mode round-trips into the ledger', () => {
           timestamp: reviewAt,
           type: 'assistant',
           isSidechain: false,
-          message: { role: 'assistant', model: 'claude-fable-5', id: 'm1' },
+          message: { role: 'assistant', model: 'claude-fable-5-1', id: 'm1' },
         })}\n`,
       )
       const record = (model, ...extra) =>
@@ -1432,13 +1432,13 @@ describe('the mode round-trips into the ledger', () => {
       expect(self.stderr).toContain('GPT-5.6 Sol')
 
       // An Anthropic reviewer with no identity evidence is refused outright.
-      const unproven = record('Claude Fable 5')
+      const unproven = record('Claude Fable 5.1')
       expect(unproven.status).not.toBe(0)
       expect(`${unproven.stdout}${unproven.stderr}`).toContain('must be VERIFIED')
 
       // A cross-model record works, and the ledger row carries the subject
       // whole and the authorship exactly as the trailer spells it.
-      const ok = record('Claude Fable 5', '--model-at', reviewAt, '--model-transcript', transcript)
+      const ok = record('Claude Fable 5.1', '--model-at', reviewAt, '--model-transcript', transcript)
       expect(ok.status, `${ok.stdout}${ok.stderr}`).toBe(0)
       const row = JSON.parse(readFileSync(join(repo, '.claude', 'mechanism-reviews.jsonl'), 'utf8').trim())
       expect(row.subject).toBe(subject)
@@ -1504,7 +1504,7 @@ describe('the mode round-trips into the ledger', () => {
 
   it('still reads a legacy row that predates the flag', () => {
     withLedger((path) => {
-      appendRecord({ sha: 'c'.repeat(40), model: 'Fable 5', verdict: 'merge', evidence: 'older row' }, path)
+      appendRecord({ sha: 'c'.repeat(40), model: 'Fable 5.1', verdict: 'merge', evidence: 'older row' }, path)
       const back = readRecords(path)
       expect(back).toHaveLength(1)
       expect(back[0].mode).toBeUndefined()
@@ -1523,7 +1523,7 @@ describe('a routed Claude reviewer round-trips its model proof and exact file sc
         usage: { input_tokens: 7, output_tokens: 4, cache_read_input_tokens: 0, cache_creation_input_tokens: 90 },
         modelUsage: {
           'claude-haiku-4-5': { inputTokens: 20, outputTokens: 1, cacheReadInputTokens: 0, cacheCreationInputTokens: 0 },
-          'claude-fable-5': { inputTokens: 7, outputTokens: 4, cacheReadInputTokens: 0, cacheCreationInputTokens: 90 },
+          'claude-fable-5-1': { inputTokens: 7, outputTokens: 4, cacheReadInputTokens: 0, cacheCreationInputTokens: 90 },
         },
       }))
       const fableState = readFableState(JSON.stringify(writeFableState('on', {
@@ -1531,7 +1531,7 @@ describe('a routed Claude reviewer round-trips its model proof and exact file sc
       })))
       const built = buildRecord({
         sha: '9'.repeat(40),
-        model: 'Fable 5',
+        model: 'Fable 5.1',
         modelAt: '2026-08-28T05:00:00.000Z',
         modelResult: resultPath,
         handover: 'sol-authored',
@@ -1552,13 +1552,13 @@ describe('a routed Claude reviewer round-trips its model proof and exact file sc
       })
       expect(built.ok, built.errors?.join('\n')).toBe(true)
       expect(built.record).toMatchObject({
-        model: 'Fable 5',
+        model: 'Fable 5.1',
         handover: 'sol-authored',
-        handoverChain: ['Opus 5', 'Fable 5', 'Opus 4.8'],
+        handoverChain: ['Opus 5', 'Fable 5.1', 'Opus 4.8'],
         reviewerAuthorship: {
           status: 'agreement',
-          actualModel: 'Fable 5',
-          servedModel: 'claude-fable-5',
+          actualModel: 'Fable 5.1',
+          servedModel: 'claude-fable-5-1',
           proof: 'claude-result',
           resultPath,
         },
@@ -1622,7 +1622,7 @@ describe('the mode at the command line', () => {
   it('refuses a record without --mode, printing the usage', () => {
     const r = run(
       '--record', 'HEAD',
-      '--model', 'Fable 5',
+      '--model', 'Fable 5.1',
       '--verdict', 'merge',
       '--evidence', 'read the core against the spec and ran the pure cases',
     )
@@ -1635,7 +1635,7 @@ describe('the mode at the command line', () => {
   it('refuses a mode that is neither of the two', () => {
     const r = run(
       '--record', 'HEAD',
-      '--model', 'Fable 5',
+      '--model', 'Fable 5.1',
       '--verdict', 'merge',
       '--evidence', 'read the core against the spec and ran the pure cases',
       '--mode', 'skimmed',

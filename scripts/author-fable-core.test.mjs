@@ -21,12 +21,12 @@ describe('Fable authoring process', () => {
       '--dangerously-skip-permissions',
     ])
     expect(args).not.toContain('--fallback-model')
-    expect(FABLE_TRAILER).toContain('Claude Fable 5')
+    expect(FABLE_TRAILER).toContain('Claude Fable 5.1')
   })
 
   it('extracts the final answer only when Claude reports Fable as the serving model', () => {
     const parsed = parseClaudeAuthoringOutput(
-      JSON.stringify({ result: 'DONE: built\nGATES: green\nOPEN: none', modelUsage: { 'claude-fable-5': {} } }),
+      JSON.stringify({ result: 'DONE: built\nGATES: green\nOPEN: none', modelUsage: { 'claude-fable-5-1': {} } }),
     )
     expect(parsed).toMatchObject({ ok: true, result: expect.stringContaining('DONE: built') })
     expect(fableAuthoringOutcome({ exitCode: 0, modelResult: parsed })).toEqual({ ok: true, cause: '' })

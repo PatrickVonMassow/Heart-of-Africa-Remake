@@ -111,7 +111,7 @@ node scripts/author-sol.mjs --point 651 --dry-run  # the prompt and the argv, no
 node scripts/author-sol.mjs --point 651 --findings f.md   # the second leg: answer the review
 ```
 
-<!-- rule:model-policy@d0b43947 -->
+<!-- rule:model-policy@d0066fb3 -->
 **The cut is a function, not a taste.** CLAUDE.md §6 is the single prose source
 for the authoring and escalation policy. `scripts/author-routing-core.mjs`
 applies it from the point text and recorded review history. A point may request
