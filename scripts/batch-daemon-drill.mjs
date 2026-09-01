@@ -40,7 +40,35 @@ import { successorBoundaryVerdict } from './batch-reconcile-core.mjs'
 
 const BATCH = 'parent-death-drill'
 const FENCE_BEFORE = 7
+const TEARDOWN_EXIT_TIMEOUT_MS = 5_000
 const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms))
+
+/** Wait until a process is verifiably absent, and return the named check that
+ *  belongs in a drill result. Polling stops as soon as the process disappears;
+ *  the timeout is a bound, not a fixed teardown delay. Dependencies are
+ *  injectable so the timeout and early-exit directions can be unit-tested
+ *  without leaving a real process behind. */
+export async function waitForTeardownExit(label, pid, {
+  timeoutMs = TEARDOWN_EXIT_TIMEOUT_MS,
+  pollMs = 50,
+  probe = probePid,
+  delay = sleep,
+  now = Date.now,
+} = {}) {
+  const name = `the ${label} process exited during teardown`
+  const startedAt = now()
+  const deadline = startedAt + timeoutMs
+  for (;;) {
+    if (probe(pid)?.exists !== true) {
+      return { name, ok: true, detail: `pid ${pid} was gone after ${now() - startedAt}ms` }
+    }
+    const remaining = deadline - now()
+    if (remaining <= 0) {
+      return { name, ok: false, detail: `pid ${pid} was still alive after the ${timeoutMs}ms teardown bound` }
+    }
+    await delay(Math.min(pollMs, remaining))
+  }
+}
 
 /** THE EXACT reason `validateMutation` emits for the staleness described by
  *  `expectation` — or null when that expectation does not describe a stale
@@ -622,6 +650,7 @@ async function realFailureScenario(scenario, pure, { injectFailure = false } = {
   let daemonRecord = null
   let workerHolder = null
   let workerStopped = false
+  let result
   // Returned as evidence, but never used to judge teardown. The caller can
   // independently probe the exact path and recorded process this run created;
   // a global /tmp scan would couple concurrent batch drills to one another.
@@ -639,7 +668,7 @@ async function realFailureScenario(scenario, pure, { injectFailure = false } = {
     daemonRecord = started.record ?? null
     resources.daemon = daemonRecord
     check('a real daemon process started and claimed durable state', started.ok === true && probePid(daemonRecord?.pid).exists === true, started.reason ?? '')
-    if (!started.ok) return { ok: false, mode: 'real-path', scenario, checks }
+    if (!started.ok) throw new Error(`the real daemon did not start: ${started.reason ?? 'unknown reason'}`)
     const copied = writeLockCopy({ repoDir: repo, record: daemonRecord, sessionId })
     check('the coordinator recorded the real daemon identity', copied.ok === true, copied.reason ?? '')
 
@@ -710,16 +739,21 @@ async function realFailureScenario(scenario, pure, { injectFailure = false } = {
       writeLockCopy({ repoDir: repo, record: daemonRecord, sessionId })
     }
     if (injectFailure) check('the injected teardown-path expectation passes', false, 'deliberate drill failure')
-    return { ok: checks.every((item) => item.ok), mode: 'real-path', scenario, checks, resources }
+    result = { mode: 'real-path', scenario }
   } catch (error) {
     check('the real-path drill completed without an infrastructure exception', false, error?.stack ?? String(error))
-    return { ok: false, mode: 'real-path', scenario, checks, resources }
+    result = { mode: 'real-path', scenario }
   } finally {
     if (workerStopped && workerHolder?.pid && probePid(workerHolder.pid).exists) {
       try { process.kill(workerHolder.pid, 'SIGCONT') } catch { /* already gone */ }
     }
     try { await request('shutdown', { drain: true }, 10_000) } catch { /* daemon may be the injected failure */ }
-    await sleep(300)
+
+    // A shutdown reply only says the request was accepted. Wait for the daemon
+    // itself to disappear, and make exceeding that bound a drill failure even
+    // if the forced cleanup below succeeds.
+    if (daemonRecord?.pid) checks.push(await waitForTeardownExit('daemon after graceful shutdown', daemonRecord.pid))
+
     for (const identity of [workerHolder, daemonRecord]) {
       if (!identity?.pid) continue
       const probe = probePid(identity.pid)
@@ -727,8 +761,16 @@ async function realFailureScenario(scenario, pure, { injectFailure = false } = {
         try { process.kill(identity.pid, 'SIGKILL') } catch { /* already gone */ }
       }
     }
+
+    // SIGKILL is asynchronous too. Do not disclose resources as torn down
+    // until each recorded process is absent or its bounded wait is a named red
+    // check in the result.
+    for (const [label, identity] of [['worker', workerHolder], ['daemon', daemonRecord]]) {
+      if (identity?.pid) checks.push(await waitForTeardownExit(label, identity.pid))
+    }
     rmSync(sandbox, { recursive: true, force: true })
   }
+  return { ...result, ok: checks.every((item) => item.ok), checks, resources }
 }
 
 /** `neuterEpoch` is the NEGATIVE CONTROL: the same scenario against a real
