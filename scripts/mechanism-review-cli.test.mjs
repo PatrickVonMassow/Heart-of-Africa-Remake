@@ -352,10 +352,15 @@ describe('the paths that must stay untouched', () => {
   // deterministic — the real ledger crosses the line on its own schedule.
   it('captures a print larger than the default pipe bound, where the default dies', () => {
     const printer = ['-e', 'process.stdout.write("x".repeat(2 * 1024 * 1024))']
-    const bounded = spawnSync(process.execPath, printer, { encoding: 'utf8', input: '' })
+    const bounded = spawnSync(process.execPath, printer, {
+      windowsHide: true,
+      encoding: 'utf8',
+      input: '',
+    })
     expect(bounded.status, 'the default bound must be what killed the run').toBe(null)
 
     const roomy = spawnSync(process.execPath, printer, {
+      windowsHide: true,
       encoding: 'utf8',
       input: '',
       maxBuffer: RUN_MAX_BUFFER,
