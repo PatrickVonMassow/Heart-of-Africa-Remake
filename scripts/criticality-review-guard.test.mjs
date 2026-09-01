@@ -549,17 +549,32 @@ describe('the gate against a real tick', { timeout: 60_000 }, () => {
     expectAllow()
   })
 
-  it('BLOCKS the moment the HIGH point is ticked with no review on record', () => {
+  it('lets the unreviewed HIGH tick through, and still names it in the report', () => {
+    // THE BLOCK IS GONE (CLAUDE.md §2 infrastructure freeze), the same cut as
+    // its twin in mechanism-review-guard.mjs. What must survive is the reading:
+    // a switched-off gate that also stopped measuring would leave the debt with
+    // no reader at all.
+    // The baseline is written by hand now: it used to be armed by the clear
+    // path, and with the block gone that path no longer runs.
+    const base = git('rev-parse', 'HEAD').stdout.trim()
+    write('.claude/criticality-review-baseline.json', JSON.stringify({ baselines: { main: base } }))
     write('TASKS.md', '# TASKS\n\n## Checklist\n')
     write('docs/tasks-archive.md', `# Archive\n\n${PLAIN(901, true)}\n\n${HIGH(900, true)}\n`)
     commit('archive the must-work point')
     const hook = runHook()
-    expect(hook.decision?.decision, `stdout was ${JSON.stringify(hook.stdout)}`).toBe('block')
-    expect(hook.decision.reason).toContain('point 900')
-    expect(hook.decision.reason).toContain('no review recorded')
+    expect(hook.stdout.trim(), 'a switched-off gate must print nothing at a turn end').toBe('')
+
+    const status = spawnSync(
+      process.execPath,
+      [resolve(repo, 'scripts', 'criticality-review-guard.mjs'), '--status'],
+      { windowsHide: true, cwd: repo, encoding: 'utf8', input: '' },
+    )
+    expect(status.status, status.stderr).toBe(0)
+    expect(status.stdout).toContain('point 900')
+    expect(status.stdout).toContain('no review recorded')
   })
 
-  it('BLOCKS on a self-review, refused by the record command itself', () => {
+  it('REFUSES a self-review at the record command, gate or no gate', () => {
     const head = git('rev-parse', 'HEAD').stdout.trim()
     const r = spawnSync(
       process.execPath,
@@ -576,7 +591,6 @@ describe('the gate against a real tick', { timeout: 60_000 }, () => {
     )
     expect(r.status, 'a self-review must be refused at the record command').toBe(1)
     expect(r.stderr).toMatch(/SAME-VENDOR REVIEW/i)
-    expect(runHook().decision?.decision).toBe('block')
   })
 
   it('CLEARS once a different vendor records a merge naming the point', () => {
@@ -621,23 +635,29 @@ describe('the gate against a real tick', { timeout: 60_000 }, () => {
     write('TASKS.md', '# TASKS\n\n## Checklist\n')
     write('docs/tasks-archive.md', `# Archive\n\n${PLAIN(901, true)}\n\n${HIGH(900, true)}\n\n${HIGH(903, true)}\n`)
     commit('tick a second must-work point with no review on record')
-    expect(runHook().decision?.decision, 'the pending tick must block first').toBe('block')
 
     const before = readFileSync(resolve(repo, '.claude/criticality-review-baseline.json'), 'utf8')
     rmSync(resolve(repo, 'docs/tasks-archive.md'))
     mkdirSync(resolve(repo, 'docs/tasks-archive.md'))
     const hook = runHook()
-    // Fail-OPEN: the turn is allowed, loudly, and the state is left alone.
+    // Fail-OPEN was always the answer here; what changed is that the block is
+    // gone, so the state this protects is the REPORT's baseline, not a verdict.
     expect(hook.stdout.trim(), 'an unreadable work order must not produce a verdict').toBe('')
-    expect(hook.stderr).toMatch(/allowing stop/)
     expect(
       readFileSync(resolve(repo, '.claude/criticality-review-baseline.json'), 'utf8'),
-      'the baseline moved — the tick is now forgiven forever',
+      'the baseline moved — the tick would be forgiven forever',
     ).toBe(before)
 
     rmSync(resolve(repo, 'docs/tasks-archive.md'), { recursive: true })
     write('docs/tasks-archive.md', `# Archive\n\n${PLAIN(901, true)}\n\n${HIGH(900, true)}\n\n${HIGH(903, true)}\n`)
-    expect(runHook().decision?.decision, 'the gate must still be there afterwards').toBe('block')
+    // And the DEBT is still there afterwards, which is what the baseline was
+    // guarding: the block no longer answers this, so the report does.
+    const status = spawnSync(
+      process.execPath,
+      [resolve(repo, 'scripts', 'criticality-review-guard.mjs'), '--status'],
+      { windowsHide: true, cwd: repo, encoding: 'utf8', input: '' },
+    )
+    expect(status.stdout, 'the ticked point must still be owed').toContain('point 903')
   })
 })
 

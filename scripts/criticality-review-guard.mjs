@@ -31,12 +31,11 @@
 // CLI:
 //   node scripts/criticality-review-guard.mjs --status
 // usage: node scripts/criticality-review-guard.mjs --record-unavailable <sha> --point <N> --files "<exact paths>" --reason "<why no vendor is eligible>"
-import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs'
+import { mkdirSync, readFileSync, writeFileSync } from 'node:fs'
 import { execFileSync, execSync } from 'node:child_process'
 import { dirname } from 'node:path'
 import { commonRepoPath, REPO_ROOT, repoPath } from './repo-paths.mjs'
 import { isMainModule } from './is-main.mjs'
-import { heldByOtherLiveOwner } from './batch-singleton.mjs'
 import { appendRecord, readRecords, verifyCarried } from './mechanism-review.mjs'
 import { ledgerAtUsable, modelsFromTrailers, sameModel, VERDICTS } from './mechanism-review-core.mjs'
 import { parseRangeLog, planAuthorshipGroups, reviewEndStateFiles } from './mechanism-review-range-core.mjs'
@@ -53,7 +52,27 @@ import {
   strictAncestorProbe,
 } from './criticality-review-guard-core.mjs'
 
-const PAUSE = repoPath('.claude/batch-paused')
+
+// SWITCHED OFF, NOT REBUILT (CLAUDE.md §2 infrastructure freeze, user decision
+// 01.09.2026), the same cut as its twin in mechanism-review-guard.mjs and under
+// the same recorded board decision, which named BOTH gates. What was measured
+// on 01.09., with the gate blocking the turn end:
+//   · point 1040 could not be cleared at all — "git cannot measure this point's
+//     file set from any available route", because §6 requires the landed lane's
+//     branch to be deleted and the range died with it;
+//   · point 1031 was told a later `merge` existed "but not for a LATER commit"
+//     while git proves the opposite, so the way out it printed was false.
+// A gate whose demand is unmeasurable for correctly finished work is a rule in
+// the way. The BLOCK goes; the measurement stays, and answers whoever asks:
+//
+//   node scripts/criticality-review-guard.mjs --status
+//
+// Reversing this is one commit: drop the stand-down below.
+export const CRITICALITY_GATE_SWITCHED_OFF =
+  'the criticality gate no longer blocks — switched off under the infrastructure freeze ' +
+  '(CLAUDE.md §2, user decision 01.09.2026), together with the four-eyes mechanism gate it ' +
+  'is the twin of. Nothing is forgiven and the debt stays readable: ' +
+  'node scripts/criticality-review-guard.mjs --status'
 
 /** Per-branch baseline. Local bookkeeping ("what this tree has confirmed"), so
  *  it is deliberately NOT tracked — the ledger that must travel between a branch
@@ -757,11 +776,11 @@ function ancestryProbe(head, shas) {
  * from the SAME gathering the Stop hook uses rather than a second copy of this
  * git work, which would drift and hand back a false "clean".
  */
-export function gatherCriticalityReviewInputs({ sessionId = '' } = {}) {
-  if (existsSync(PAUSE)) return { applicable: false, why: 'the batch is paused' }
-  if (heldByOtherLiveOwner(sessionId)) {
-    return { applicable: false, why: 'another live session owns the batch lock', cause: 'not-lock-owner' }
-  }
+export function gatherCriticalityReviewInputs({ report = false } = {}) {
+  // `--status` still MEASURES, and neither the pause nor the batch lock may
+  // silence it: a read decides nothing, and with the block gone the report is
+  // the debt's only remaining reader.
+  if (!report) return { applicable: false, why: CRITICALITY_GATE_SWITCHED_OFF }
   let branch = 'HEAD'
   try {
     branch = git('rev-parse --abbrev-ref HEAD')
@@ -891,7 +910,8 @@ if (isMainModule(import.meta.url)) {
         console.error(`\nrun: ${findingsFiledUsage()}`)
         process.exit(1)
       }
-      const gathered = gatherCriticalityReviewInputs({ sessionId: '' })
+      // A receipt READS the open set — the measuring route, not the gate.
+      const gathered = gatherCriticalityReviewInputs({ report: true })
       const built = buildFindingsFiledReceipt({
         ...parsed.values,
         records: readRecords(),
@@ -918,14 +938,9 @@ if (isMainModule(import.meta.url)) {
   }
   const status = argv[0] === '--status'
   try {
-    let sessionId = ''
-    try {
-      sessionId = JSON.parse(readFileSync(0, 'utf8')).session_id || ''
-    } catch {
-      /* manual run — the gate is global truth, not session-local */
-    }
-
-    const gathered = gatherCriticalityReviewInputs({ sessionId })
+    // The stdin payload is no longer read: the gate does not block, and the
+    // report answers whoever asks — session identity decided neither.
+    const gathered = gatherCriticalityReviewInputs({ report: status })
     if (!gathered.applicable) {
       if (status) console.log(`criticality-review-guard stands down: ${gathered.why}`)
       process.exit(0)
