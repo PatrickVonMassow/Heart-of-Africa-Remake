@@ -82,6 +82,7 @@ Das Musterbeispiel sind die Chat-Zeitstempel: neun Eskalationsstufen, acht weich
 | 28.08. abends | Die Notfall-Uhr des unbeaufsichtigten Stapels wurde genau wie bestellt auf nachweisbaren Fortschritt verengt — und verlor dabei einen Schutz, den nie jemand aufgeschrieben hatte: Der ehrliche Abschluss-Prüflauf über beide Backends dauert gemessen 80 min 48 s gegen eine Schwelle von 60 Minuten und sieht seither aus wie ein Hänger, den die Rettungsroutine unterbricht. Kein Test wurde rot; der Schutz war vorhanden, nicht zugesichert (§3.210, Punkt 1002) |
 | 29.08. nachts | Ein Wächter verlangt einen Beleg aus einem Protokoll, das ihn wegwirft: Vier Laufaufzeichnungen tragen die Absturzmarke, gesetzt aus der Fehlerausgabe — das aufbewahrte Protokoll ist eine gefilterte Sicht und kann ihr Fehlen nicht belegen. Nicht freigezeichnet, sondern in den blockierten Punkt geschrieben (§3.215); derselbe Lauf ließ drei Rots ohne jeden Punkt zurück, obwohl die Tafelkarten dafür schon standen (Punkte 1011-1013); drei Gegenlesungsrunden über die Buchungstabelle endeten damit, eine geschriebene Buchung ZURÜCKZUZIEHEN statt sie enger zu fassen — kein Muster konnte das gemessene Rot von seinen Nachbarn trennen (§3.216); und eine Behauptung über einen gelandeten Punkt kam aus einem BRANCHNAMEN statt aus einer Messung, gefunden vom Nutzer in zwei Sätzen |
 | 01.09. | Der Vier-Augen-Wächter sperrte jede Landung, und die Schuld wuchs schneller, als sie zu bezahlen war: Das Tor schnitt die Prüfarbeit nach der einen Regel zu und zählte sie nach der anderen (§3.225), und JEDE eingetragene Bewertung erzeugte selbst wieder einen prüfpflichtigen Beitrag, weil das Hauptbuch versioniert ist — vierzehn ehrliche Runden mit lauter geschlossenen Befunden ließen das Tor rot (§3.226, Punkt 1036) |
+| 01.09. nachm. | **Die Umsteuerung**: Blind-Doppeldiagnose (Fable + Sol, Opus-Merge) auf die Nutzerfrage nach dem Spielstillstand — die Steuerung war zum Hauptprodukt geworden; der Nutzer gab Freeze, Aufnahmeregel und die Streichung des §7.1-Tors direkt frei, und die Umsetzung bewies Punkt 1005 gleich mit: punktlose Arbeit fand keine Karte (§3.227, Punkt 1039) |
 
 Muster: Ab dem 22.07. explodiert die Commit-Rate (Delegation) — und genau dann häufen sich die Infrastruktur-Vorfälle. **Skalierung der Autonomie erzeugt eine eigene Problemklasse, die die Feature-Arbeit zeitweise überholt.**
 
@@ -1419,7 +1420,7 @@ keinen Träger hat. Gebucht als Punkt 956.
 
 ## Anhang A — Maschinell gepflegte Quellen-Übersicht
 
-Zuletzt aktualisiert: Dienstag, 01.09.2026, 15:20 · Quellen-Fingerprint: `c3806b7ceabe…`
+Zuletzt aktualisiert: Dienstag, 01.09.2026, 16:40 · Quellen-Fingerprint: `f3b298d7fa4c…`
 
 Spalten heuristisch aus den Quellen abgeleitet (Anläufe = distinkte Datumsnennungen im Memory;
 Maßnahme = Guard-Skripte mit Namens-Treffer). Die inhaltliche Bewertung gehört der Prosa oben.
@@ -1522,8 +1523,8 @@ Maßnahme = Guard-Skripte mit Namens-Treffer). Die inhaltliche Bewertung gehört
 
 Erfasste Quellen: 93 Feedback-/Projekt-Memories · 57 Guard-/Hook-Skripte · 6 Revert-/Reapply-Commits · 120 Prozess-/Meta-TASKS-Punkte (davon 54 offen).
 
-<!-- RETRO-FINGERPRINT: c3806b7ceabe620592efc8169b15209ef34d8253b1c0abedbd64689be17e2a02 -->
-<!-- RETRO-LAST-REFRESHED: 2026-09-01T13:20:00.728Z -->
+<!-- RETRO-FINGERPRINT: f3b298d7fa4c4c8e0a3c8fc739f80d678519fcac8c6041367eb78a5f8b1eb1ec -->
+<!-- RETRO-LAST-REFRESHED: 2026-09-01T14:40:05.083Z -->
 <!-- AUTO-GENERATED:END -->
 
 ### 3.111 Ein Erfolg ist kein Beweis für den Weg, auf dem er zustande kam
@@ -5161,3 +5162,32 @@ der einen Stelle, an der solche Ausnahmen ohnehin stehen — oder von der Runde
 mitgedeckt werden, die sie einträgt. Und jede Ablehnung schuldet ihre WIRKLICHE
 Ursache: Was der Leser als Nächstes tun soll, muss aus dem Text folgen, nicht
 aus einer zweiten Messung, die er selbst anstellen muss.
+
+### 3.227 Die Steuerung war zum Produkt geworden — und die Umsteuerung fand keine Karte
+
+Am 01.09.2026 fragte der Nutzer, warum trotz Wochen hochwertiger Arbeit am
+Spiel kaum Fortschritt sichtbar sei. Die Antwort kam dreifach: Fable und Sol
+diagnostizierten blind aus identischen Eingaben, Opus führte zusammen. Der
+Befund war einstimmig und messbar — rund die Hälfte der 358 offenen Punkte und
+praktisch alle jüngeren Commits galten der Prüf- und Steuerungsinfrastruktur
+selbst. Zwei Rückkopplungen trugen das: ein unbegrenzter Zulauf (jede
+Beobachtung wird regelkonform zum Punkt, und Infra-Arbeit findet Infra-Fehler)
+und ein verschlossener Ablauf (32 Abnahmekriterien als unteilbares Tor, aus dem
+nichts Spielbares vorab herausfallen kann). §§3.217, 3.223 und 3.226 sind
+Einzelfälle genau dieser Klasse; hier wurde die Klasse selbst zur Diagnose.
+
+Der Nutzer gab die ersten drei Maßnahmen frei: Infrastruktur-Freeze (Regeln
+werden abgeschaltet, nicht umgebaut), umgekehrte Aufnahmeregel für Befunde
+(Punkt nur bei Spielerwirkung, Risiko, echter Blockade oder Vereinfachung,
+sonst nicht blockierendes Backlog) und die Streichung des §7.1-Tors. Beim
+Umsetzen bestätigte sich die Diagnose noch einmal im Kleinen: Die punktlose,
+vom Nutzer direkt beauftragte Änderung fand auf der Tafel keine darstellbare
+Karte (Punkt 1005) — vier Anläufe über `now`, `queue`, `none` und `promote`
+wurden abgewiesen, bis die Arbeit sich als eigener Punkt 1039 verkleiden
+musste, um stattfinden zu dürfen.
+
+**Lehre:** Eine Qualitätssicherung ohne wirtschaftliche Grenze optimiert sich
+selbst zum Hauptprodukt; mehr Gründlichkeit erzeugt dann mehr Arbeit, nicht
+weniger. Die Grenze muss außen stehen — als Budget, Aufnahmeschwelle und
+offener Ablauf —, denn von innen konvergiert das System nicht: Selbst seine
+Selbstkritik verbuchte es bis dahin nur als weitere Punkte.

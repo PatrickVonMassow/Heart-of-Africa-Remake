@@ -96,8 +96,13 @@ export const DOC_BUDGETS = [
     // RAISED by the 31 measured words of the 24.08.2026 standing authorization:
     // §6 must name both the VDZK recommendation grant and its boundary in the same
     // sentence, so this binding rule cannot be replaced by a shorter pointer.
-    maxLines: 193,
-    maxWords: 1363,
+    // RAISED by the 12 measured lines / 105 measured words (guard's own count)
+    // of the 01.09.2026 redirection (user decision): the §7.1-gate clause became
+    // three binding clauses — checklist role, infrastructure freeze, finding
+    // intake — that every session must load, because they change what any later
+    // point may be.
+    maxLines: 205,
+    maxWords: 1468,
     // THE RATCHET SLACK, tightest in the project: this file is the per-turn cost of
     // every session and every subagent, so twenty words is the whole licence between
     // one cut and the next. A larger edit than that lowers the ceiling with it.

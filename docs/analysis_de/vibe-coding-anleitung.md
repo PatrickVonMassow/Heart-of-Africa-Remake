@@ -17,7 +17,8 @@ war es weg. Verlange deshalb bei allem, was dir wichtig ist, im Prompt einen
 > unmöglich macht, und zeig mir, wo er blockiert."
 
 Der Aufwand richtet sich nach der Wichtigkeit — ein leichter Check für eine leichte
-Regel —, ab der ersten Formulierung, nicht erst beim zweiten Schaden.
+Regel —, ab der ersten Formulierung, nicht erst beim zweiten Schaden. Und gib der
+Prüfmechanik ein Außen-Budget: Sonst wird sie selbst zum Hauptprodukt (§3.227).
 
 ### Wie die Prompts in dieser Anleitung formuliert sind
 
@@ -478,27 +479,26 @@ Die Ursache findest du durch **Zerlegen**, nicht durch Wiederholen.
 
 ## Drei Meta-Regeln, die alles zusammenhalten
 
-1. **Root-Cause vor Fix.** Ursachennotizen ohne Ausrede sind der Rohstoff guter Mechanismen. Und
-   eine im Ticket **vermutete** Ursache ist gefährlicher Rohstoff: Der Ausführende sucht dann ihre
-   Bestätigung.
-   > *Prompt:* „Bevor du etwas Wiederkehrendes reparierst: schreib mir in 3–5 Sätzen die
-   > **mechanische** Ursache — was genau war die Annahme, die brach? Steht die Ursache schon als
-   > Vermutung da, ist sie ein **Kandidat**: Markiere sie als Vermutung und schreib vor dem Versuch,
-   > welcher Befund sie zur Tatsache macht. Versuche zuerst, sie unabhängig zu widerlegen.
-   > Hält sie stand, darf sie wahr sein. Wer den Auftrag vergibt, misst **blind mit**."
+1. **Root-Cause vor Fix.** Ursachennotizen ohne Ausrede sind der Rohstoff guter Mechanismen;
+   eine im Ticket **vermutete** Ursache ist gefährlicher Rohstoff: Der Ausführende sucht dann
+   ihre Bestätigung.
+   > *Prompt:* „Bevor du Wiederkehrendes reparierst: schreib mir in 3–5 Sätzen die
+   > **mechanische** Ursache — welche Annahme brach? Eine schon notierte Ursache ist ein
+   > **Kandidat**: Markiere sie und schreib vorab, welcher Befund sie zur Tatsache macht.
+   > Versuche zuerst, sie unabhängig zu widerlegen. Hält sie stand, darf sie wahr sein.
+   > Wer den Auftrag vergibt, misst **blind mit**."
 
-2. **Nutzer-Artefakte sind Verträge.** Was du festgelegt hast — Dashboard, Ausgabeformat,
-   Board-Struktur — wird nicht eigenmächtig umgebaut.
+2. **Nutzer-Artefakte sind Verträge.** Was du festgelegt hast, wird nicht eigenmächtig umgebaut.
    > *Prompt:* „Struktur von Dingen, die ich festgelegt habe, friert ein. Schlag
    > Änderungen vor, setz sie nicht ungefragt um."
 
 3. **Parallel arbeiten geht nur mit Isolierung.** Die Grenze setzt der **Haupt-Agent**: bei ihm
    endet jeder Strang, und je mehr Fremdstoff sein Kontext aufnimmt, desto schlechter urteilt er.
-   > *Prompt:* „Arbeite jede Aufgabe auf eigenem Feature-Branch mit eigener Arbeitskopie — auch ein
-   > nur lesender Helfer —, führe sie erst verifiziert nach `main`, teile parallele Aufgaben so,
-   > dass sie **nicht dieselben Dateien** anfassen, und arbeite an höchstens **drei** gleichzeitig."
+   > *Prompt:* „Arbeite jede Aufgabe auf eigenem Feature-Branch mit eigener Arbeitskopie — auch
+   > ein nur lesender Helfer —, führe sie erst verifiziert nach `main`, teile parallele Aufgaben
+   > ohne gemeinsame Dateien und arbeite an höchstens **drei** gleichzeitig."
+   > *(Aufschlag ≈ 10–25 % je Strang, geschätzt — Nacharbeit + Aufsicht)*
 
-   *(Aufschlag ≈ 10–25 % je zusätzlichem Strang, geschätzt — Nacharbeit + Aufsicht)*
 
 ---
 
@@ -508,9 +508,9 @@ Die Ursache findest du durch **Zerlegen**, nicht durch Wiederholen.
 > aus —, dann leg ein `TASKS.md` an und richte die zwei Testschichten ein. Nach jeder
 > Änderung: Build/Lint/Audit sauber, ein Test auf der passenden Schicht, ein atomarer Commit.
 > Beurteile Sichtbares am Screenshot. Wenn wir eine Regel festlegen, bau sofort den Check, der
-> sie erzwingt. Bei Kritischem hol ein zweites Modell als Gegenprüfer. Frag nach, wenn das
-> Zielbild unklar ist — rate nicht."
+> sie erzwingt — halte Prozessarbeit aber unter einem festen Budget. Bei Kritischem hol ein
+> zweites Modell als Gegenprüfer. Frag nach, wenn das Zielbild unklar ist — rate nicht."
 
 Sie ersetzt die Fallstricke oben nicht.
 
-<!-- GUIDE-FINGERPRINT: c3806b7ceabe620592efc8169b15209ef34d8253b1c0abedbd64689be17e2a02 -->
+<!-- GUIDE-FINGERPRINT: f3b298d7fa4c4c8e0a3c8fc739f80d678519fcac8c6041367eb78a5f8b1eb1ec -->
