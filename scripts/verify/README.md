@@ -145,7 +145,8 @@ rather than remembered.
 **The receipt.** `run-logged.mjs` writes a RUN RECORD beside the log
 (`<log>.run.json`) before it spawns anything and closes it with a structured
 receipt: exit code, the backend(s) read off the run's own banners, the suites,
-the `git HEAD` it ran on, the log path, the failing names **uncut**, the polls,
+the `git HEAD` it ran on, the log path, the failing names **uncut** (each with
+the `section` it came from where the suite declared one), the polls,
 and **frames expected against frames written**. That last pair is the half point
 375 cannot see — its shutter refuses a frame whose subject is missing, but a
 frame that was never written at all is silent, and a run that photographs 60 of
@@ -453,6 +454,14 @@ front of each turns one into a declaration.
   detail so the check's NAME (and with it the red ledger and the baseline
   classifier) is unchanged — a failing check thus prints the argument that
   re-runs it alone.
+- **The recorder takes that tag back off, and keeps it (point 1018).**
+  `separateResultSection` splits the printed line at tap time into the
+  MEASUREMENT and the section that produced the tag, and the red is stored with
+  `section` as its OWN field. A `RED_CHARGES` entry therefore matches the
+  measurement alone, and no reader recovers a name out of durable text — a check
+  that genuinely measured a value ending in a tag shape is not a tagged one. A
+  record written before that change carries no `section` and keeps its old
+  detail.
 - **A `--section` run is PARTIAL and is never coverage.** The run recorder stamps
   `partial` on the record from `VERIFY_SECTION`, and `runVerdict` refuses it
   whatever the exit code, so `render-verify-guard` cannot be cleared by one. This
@@ -1234,7 +1243,9 @@ point. The mechanics:
 
 - the recorder taps the run's own `FAIL  …` / `ERR: …` lines, parses them with
   `baseline-classify-core.mjs` (the same reading the triage lane uses) and writes
-  them into the run record, each with the point it was charged to;
+  them into the run record, each with the point it was charged to and — for a
+  suite that declares sections — the `section` it came from as a separate field
+  (point 1018), so the charge reads the measurement and never the printed tag;
 - the ledger is `scripts/render-verify-charges.mjs` — data only, one entry per
   known red, scoped by suite/backend/kind and carrying a dated reason;
 - `runVerdict` in `render-verify-core.mjs` decides, and keeps `clean` and
@@ -1530,8 +1541,8 @@ ordinary ways — exactly as the paragraph below spells out. Eight of the
 recorded 13.–19.08.2026 runs were exactly this shape WHEN THEY WERE COUNTED,
 before the legacy reading above existed; the count is a dated measurement, not
 a standing property, and the legacy reading may move some of them to reported
-reds. Re-measure it before quoting it. They and inside the window their only exit was the hand
-`--defer`. The guard now names a crash as its own class — **not** an
+reds. Re-measure it before quoting it. Their only exit inside that window was the
+hand `--defer`. The guard now names a crash as its own class — **not** an
 "unexplained red" to hunt — in the status view and in every branch of its
 block message, and gives it the same signed route:
 
