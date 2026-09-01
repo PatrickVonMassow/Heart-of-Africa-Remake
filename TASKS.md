@@ -14429,6 +14429,12 @@ to land than a mechanism that needs a review.
   declaration path passes its recorded pids and refutes the same writer within seconds.
   `launcherStartDecision` then vetoes on `writer?.output?.verdict === 'alive'`, and the longer,
   evidence-poorer window wins.
+  WHY 874 DID NOT ALREADY FIX IT: point 874 is the same defect one path over — it taught
+  `--agent-check` to probe the pid its own DECLARATION records, which is exactly why the
+  declaration path refutes this writer within seconds today. It never reached the launcher's
+  REGISTER path, which builds its own probe call from a git worktree listing and has no pid to
+  pass. 874's own rule — a positively refuted process may not be outvoted by the corpse's last
+  commit — is the rule this path still breaks.
   WHY IT MATTERS BEYOND THE STANDSTILL: the veto reports a LIVE writer, so the launcher's own
   record says the batch is busy while nothing is running. The failure is invisible in exactly
   the log a person would read to find it, and it repeats after every session that dies with a
