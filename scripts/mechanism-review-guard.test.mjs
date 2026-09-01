@@ -281,7 +281,7 @@ describe('the measured 30.08 refusal multiplication', () => {
     return { pendingCommits, records, head }
   }
 
-  it.skipIf(!historyReachable)('replays 4 → 30 → 40 before scoping, then 3 → 3 → 12 with only read contributions charged', () => {
+  it.skipIf(!historyReachable)('replays 3 → 30 → 40 before scoping, then 2 → 2 → 11 with corrected refusal scope', () => {
     const replays = checkpoints.map(replayAt)
     const count = (replay, reviewScope) => evaluateMechanismReview({
       baseline,
@@ -289,13 +289,16 @@ describe('the measured 30.08 refusal multiplication', () => {
       reviewScope,
     }).findings.length
 
-    // The former rule treated every bounded record as range-wide. This is the
-    // measured counter, recomputed from the versioned ledger and commit graph,
+    // The former rule treated every bounded record as range-wide. The later
+    // strict-subset reread still corrects one overbroad refusal at the first
+    // immutable state, so even this emulation now starts at three. These are
+    // measured counters recomputed from the versioned ledger and commit graph,
     // not copied from the work-order prose.
-    expect(replays.map((replay) => count(replay, () => 'range'))).toEqual([4, 30, 40])
+    expect(replays.map((replay) => count(replay, () => 'range'))).toEqual([3, 30, 40])
     // The remaining growth names real exact-state refusals, incomplete passes,
-    // self-reviews and as-yet-unreviewed repair commits. None is waived.
-    expect(replays.map((replay) => count(replay, undefined))).toEqual([3, 3, 12])
+    // self-reviews and as-yet-unreviewed repair commits. The one-row reduction
+    // at every cut is the same strict-subset scope correction, not a waiver.
+    expect(replays.map((replay) => count(replay, undefined))).toEqual([2, 2, 11])
   })
 })
 
