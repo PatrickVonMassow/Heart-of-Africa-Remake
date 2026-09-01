@@ -27,6 +27,7 @@ import {
   planningContributions,
   rangeCommits,
   gatherMechanismReviewInputs,
+  GATE_SWITCHED_OFF,
   resolveMechanismReviewSessionId,
   shouldSeedRecoveryAnchor,
 } from './mechanism-review-guard.mjs'
@@ -45,6 +46,27 @@ import {
 import { planAuthorshipGroups } from './mechanism-review-range-core.mjs'
 import { commonRepoPath, repoPath } from './repo-paths.mjs'
 import { readOwnerLock } from './batch-singleton.mjs'
+
+describe('the switched-off gate (point 1036)', () => {
+  it('stands down for every caller but the measuring read, and says why', () => {
+    // The block is off (CLAUDE.md §2 infrastructure freeze). A gather without
+    // `report` is what the Stop hook and guard-preflight both do, and it must
+    // carry no inputs at all — an applicable gather is what produced a verdict.
+    const gate = gatherMechanismReviewInputs({ sessionId: 'anything' })
+    expect(gate.applicable).toBe(false)
+    expect(gate.why).toBe(GATE_SWITCHED_OFF)
+    expect(gate.inputs).toBeUndefined()
+
+    // Nothing is forgiven: the reason names the report that still measures the
+    // debt, so a reader is never left without the way to see it.
+    expect(GATE_SWITCHED_OFF).toContain('mechanism-review-guard.mjs --status')
+
+    // And the read answers regardless of who holds the batch lock — the defect
+    // that made a hand-run `--status` print "stands down" and exit 0.
+    const read = gatherMechanismReviewInputs({ sessionId: '', report: true })
+    expect(read.applicable).toBe(true)
+  })
+})
 
 describe('baselineFor', () => {
   const state = { baselines: { main: 'aaa', 'feat/x': 'bbb' } }
@@ -140,7 +162,12 @@ describe('bootstrapBase', () => {
     // The owner's own id is used so the gather is APPLICABLE here too: with a
     // live batch lock any other id stands the guard down, and a skipped
     // assertion would have let the very defect above pass unnoticed.
-    const gathered = gatherMechanismReviewInputs({ sessionId: readOwnerLock()?.sessionId ?? '' })
+    // `report: true` is what makes the gather APPLICABLE at all now: the gate's
+    // block is switched off (point 1036) and only the measuring read remains.
+    const gathered = gatherMechanismReviewInputs({
+      sessionId: readOwnerLock()?.sessionId ?? '',
+      report: true,
+    })
     expect(gathered.applicable).toBe(true)
     expect(Object.hasOwn(gathered, 'baselineMissing')).toBe(true)
     expect(gathered.baselineMissing).toBe(gathered.inputs.baselineMissing)
