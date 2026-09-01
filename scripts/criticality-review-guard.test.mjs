@@ -15,6 +15,7 @@ import { spawnSync } from 'node:child_process'
 import { cpSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { resolve } from 'node:path'
+import { evaluateCriticalityReview } from './criticality-review-guard-core.mjs'
 import {
   attachPointFileSets,
   attachUnavailableClearances,
@@ -749,7 +750,19 @@ describe('the findings-filed receipt', () => {
   const SHA = 'a'.repeat(40)
   // A LEDGER TIMESTAMP MUST LOOK LIKE ONE: the row filter asks `ledgerAtUsable`,
   // so a toy number is not a usable `at` and the review would not be found.
-  const REVIEW = { sha: SHA, point: 700, model: 'GPT-5.6 Sol', verdict: 'do-not-merge', at: 1_788_000_000_000 }
+  const REVIEW = {
+    sha: SHA,
+    point: 700,
+    model: 'GPT-5.6 Sol',
+    verdict: 'do-not-merge',
+    mode: 'review',
+    // The recorder always writes the reviewed commit's authorship key, so a row
+    // without one can only have arrived by hand — and a hand-edited ledger earns
+    // a refusal, never a clearance.
+    authoredBy: 'Claude Opus 5 <noreply@anthropic.com>',
+    evidence: 'read the whole mechanism and found it wrong in two places',
+    at: 1_788_000_000_000,
+  }
   const build = (over = {}) =>
     buildFindingsFiledReceipt({
       sha: SHA,
@@ -776,6 +789,37 @@ describe('the findings-filed receipt', () => {
     })
     // Strictly after the review, because the acceptance rule compares the two.
     expect(built.record.at).toBeGreaterThan(REVIEW.at)
+  })
+
+  it('REFUSES when two refusals share the millisecond it would bind by', () => {
+    // The row identifies its review by {sha, point, model, reviewAt}; a tie
+    // there would let ONE findings list clear TWO distinct refusals, and the
+    // ledger carries no finer identifier to tell them apart.
+    const twin = { ...REVIEW, evidence: 'a second, different refusal at the same instant' }
+    const built = build({ records: [REVIEW, twin] })
+    expect(built.ok).toBe(false)
+    expect(built.errors.join(' ')).toMatch(/share the timestamp/)
+  })
+
+  it('is a row the CORE actually accepts, end to end', () => {
+    // The builder's shape is worth nothing unless `evaluateCriticalityReview`
+    // reads it as an answer — so the receipt goes through the evaluator beside
+    // the refusal it answers, and the block it was blocking is gone.
+    const receipt = build().record
+    const tick = { number: 700, criticality: 'high', title: 'a high point' }
+    const inputs = {
+      baseline: 'b'.repeat(40),
+      head: SHA,
+      ticks: [tick],
+      openPoints: [801, 802, 900],
+      records: [REVIEW, receipt],
+    }
+
+    const withoutReceipt = evaluateCriticalityReview({ ...inputs, records: [REVIEW] })
+    expect(withoutReceipt.block).toBe(true)
+
+    const withReceipt = evaluateCriticalityReview(inputs)
+    expect(withReceipt.block).toBe(false)
   })
 
   it('REFUSES a point that is not open — a finding moved nowhere is a finding dropped', () => {

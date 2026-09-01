@@ -451,7 +451,25 @@ export function buildFindingsFiledReceipt({
       errors: [`no ${who} verdict on ${full.slice(0, 7)} for point ${number} needs answering — a receipt clears a refusal, nothing else`],
     }
   }
-  const review = refusals.reduce((a, b) => (Number(b.at ?? 0) >= Number(a.at ?? 0) ? b : a))
+  // THE BINDING MUST BE UNIQUE, OR IT BINDS TWO THINGS (cross-vendor review,
+  // GPT-5.6 Sol at effort high). The emitted row identifies its review by
+  // {sha, point, model, reviewAt} — and two refusals by one model on one sha can
+  // share a millisecond, at which point ONE findings list would clear BOTH. The
+  // ledger has no finer identifier, so the honest answer is to refuse rather
+  // than to pick one and hope.
+  const newest = refusals.reduce((a, b) => (Number(b.at ?? 0) >= Number(a.at ?? 0) ? b : a))
+  const tied = refusals.filter((row) => Number(row.at) === Number(newest.at))
+  if (tied.length > 1) {
+    return {
+      ok: false,
+      errors: [
+        `${tied.length} ${who} verdicts on ${full.slice(0, 7)} for point ${number} share the timestamp ` +
+          `${newest.at}, so a receipt naming it would clear all of them — the ledger carries no finer ` +
+          'identifier, and clearing a refusal nobody answered is the one thing this receipt may not do',
+      ],
+    }
+  }
+  const review = newest
 
   const open = new Set((Array.isArray(openPoints) ? openPoints : []).map(Number))
   const closed = named.filter((n) => !open.has(n))
