@@ -38,12 +38,14 @@ import { commonRepoPath, REPO_ROOT, repoPath } from './repo-paths.mjs'
 import { isMainModule } from './is-main.mjs'
 import { heldByOtherLiveOwner } from './batch-singleton.mjs'
 import { appendRecord, readRecords, verifyCarried } from './mechanism-review.mjs'
-import { modelsFromTrailers } from './mechanism-review-core.mjs'
+import { ledgerAtUsable, modelsFromTrailers, sameModel, VERDICTS } from './mechanism-review-core.mjs'
 import { parseRangeLog, planAuthorshipGroups, reviewEndStateFiles } from './mechanism-review-range-core.mjs'
 import { parsePassFiles, quotePassFile, unquoteGitPath } from './review-material-core.mjs'
 import {
   ancestorIndex,
+  CLEARING_VERDICT,
   evaluateCriticalityReview,
+  FINDINGS_FILED_KIND,
   formatCriticalityReviewVerdict,
   highTicks,
   openNumbers,
@@ -385,6 +387,146 @@ export function buildUnavailableReceipt({
   }
 }
 
+/**
+ * The receipt for the OTHER durable answer to a refusal (`FINDINGS_FILED_KIND`).
+ *
+ * The gate's own refusal text names two ways to answer a `do-not-merge`: fix it
+ * and record the re-review, or file every finding as an open work-order point
+ * and append this receipt naming them. Nothing could write it — measured
+ * 01.09.2026, while a refusal raised AFTER a point had landed could not be
+ * answered the first way either, because the point's reviewed range ends at its
+ * landing and a later commit is therefore not "a LATER commit" to the index.
+ * A rule whose only remaining exit is unbuildable is a rule that gets waived.
+ *
+ * It is deliberately narrow. The row must name the EXACT review it answers — sha,
+ * model and that review's own timestamp, which is what tells two verdicts by one
+ * model on one sha apart — and every point it names must be OPEN in the work
+ * order at the moment of writing. Prose saying "filed" is not a receipt.
+ */
+export function buildFindingsFiledReceipt({
+  sha = '',
+  point = '',
+  model = '',
+  findingPoints = [],
+  records = [],
+  openPoints = [],
+  now = Date.now(),
+  resolveSha = (ref) => gitRawFile(['rev-parse', '--verify', `${ref}^{commit}`]).trim(),
+} = {}) {
+  const errors = []
+  const ref = String(sha).trim()
+  const number = Number(point)
+  const who = String(model).trim()
+  const named = [...new Set((Array.isArray(findingPoints) ? findingPoints : []).map(Number))]
+  if (!/^[0-9a-f]{7,40}$/i.test(ref)) errors.push('--record-findings-filed <sha> must be a 7–40 digit hexadecimal commit id')
+  if (!Number.isInteger(number) || number <= 0) errors.push('--point <N> must be the positive integer of the point being cleared')
+  if (!who) errors.push('--model must name the reviewer whose refusal this answers')
+  if (!named.length || named.some((n) => !Number.isInteger(n) || n <= 0)) {
+    errors.push('--finding-points must be a comma-separated list of positive work-order point numbers')
+  }
+  if (errors.length) return { ok: false, errors }
+
+  let full = ''
+  try {
+    full = resolveSha(ref)
+  } catch {
+    return { ok: false, errors: [`--record-findings-filed: ${ref} is not a commit in this repository`] }
+  }
+
+  // THE REVIEW MUST EXIST, AND BE THE KIND OF VERDICT THAT NEEDS ANSWERING.
+  // A receipt against a clean pass answers nothing and would only add noise the
+  // gate has to read past.
+  const refusals = (records ?? []).filter(
+    (row) =>
+      row?.sha === full &&
+      Number(row.point) === number &&
+      sameModel(String(row.model ?? ''), who) &&
+      String(row.verdict ?? '') !== CLEARING_VERDICT &&
+      VERDICTS.includes(String(row.verdict ?? '')) &&
+      ledgerAtUsable(row.at),
+  )
+  if (!refusals.length) {
+    return {
+      ok: false,
+      errors: [`no ${who} verdict on ${full.slice(0, 7)} for point ${number} needs answering — a receipt clears a refusal, nothing else`],
+    }
+  }
+  const review = refusals.reduce((a, b) => (Number(b.at ?? 0) >= Number(a.at ?? 0) ? b : a))
+
+  const open = new Set((Array.isArray(openPoints) ? openPoints : []).map(Number))
+  const closed = named.filter((n) => !open.has(n))
+  if (closed.length) {
+    return {
+      ok: false,
+      errors: [
+        `point(s) ${closed.join(', ')} are not OPEN in the work order — a finding transferred to a point ` +
+          'nobody will work is a finding dropped, so the receipt refuses',
+      ],
+    }
+  }
+
+  // Strictly after the review it answers: the acceptance rule compares the two,
+  // and a clock that has not moved cannot evidence an order.
+  const at = Math.max(Number(now) || 0, Number(review.at ?? 0) + 1)
+  return {
+    ok: true,
+    record: {
+      kind: FINDINGS_FILED_KIND,
+      sha: full,
+      point: number,
+      model: String(review.model ?? who),
+      reviewAt: Number(review.at),
+      findingPoints: named,
+      at,
+      atIso: new Date(at).toISOString(),
+    },
+  }
+}
+
+export const findingsFiledUsage = () =>
+  'node scripts/criticality-review-guard.mjs --record-findings-filed <sha> --point <N> ' +
+  '--model "<reviewer that refused>" --finding-points "<N,N,…>"'
+
+/** Strict parser for the findings-filed write route; no unknown token is ignored. */
+export function parseFindingsFiledArgs(argv = []) {
+  const spec = new Map([
+    ['--record-findings-filed', 'sha'],
+    ['--point', 'point'],
+    ['--model', 'model'],
+    ['--finding-points', 'findingPoints'],
+  ])
+  const values = {}
+  const errors = []
+  for (let i = 0; i < argv.length; i++) {
+    const flag = String(argv[i])
+    const key = spec.get(flag)
+    if (!key) {
+      errors.push(`unknown findings-filed argument ${flag}`)
+      continue
+    }
+    if (values[key] !== undefined) {
+      errors.push(`${flag} was given more than once`)
+      i++
+      continue
+    }
+    const value = argv[i + 1]
+    if (value === undefined || String(value).startsWith('--')) {
+      errors.push(`${flag} expects a value`)
+      continue
+    }
+    values[key] = String(value)
+    i++
+  }
+  const points = String(values.findingPoints ?? '')
+    .split(',')
+    .map((part) => part.trim())
+    .filter(Boolean)
+  if (values.findingPoints !== undefined && points.some((part) => !/^\d+$/.test(part))) {
+    errors.push('--finding-points takes work-order NUMBERS separated by commas')
+  }
+  return { ok: errors.length === 0, values: { ...values, findingPoints: points.map(Number) }, errors }
+}
+
 /** Strict parser for the manual write route; no unknown token is ignored. */
 export function parseUnavailableReceiptArgs(argv = []) {
   const spec = new Map([
@@ -720,6 +862,39 @@ if (isMainModule(import.meta.url)) {
       process.exit(0)
     } catch (error) {
       console.error(`criticality-review-guard: unavailable receipt failed: ${error?.message ?? error}`)
+      process.exit(1)
+    }
+  }
+  if (argv.includes('--record-findings-filed')) {
+    try {
+      const parsed = parseFindingsFiledArgs(argv)
+      if (!parsed.ok) {
+        console.error(`criticality-review-guard: refusing findings-filed receipt.\n  · ${parsed.errors.join('\n  · ')}`)
+        console.error(`\nrun: ${findingsFiledUsage()}`)
+        process.exit(1)
+      }
+      const gathered = gatherCriticalityReviewInputs({ sessionId: '' })
+      const built = buildFindingsFiledReceipt({
+        ...parsed.values,
+        records: readRecords(),
+        // The OPEN set is read the same way the gate reads it, so a receipt can
+        // never name a point the gate would then find closed.
+        openPoints: gathered.applicable ? gathered.inputs.openPoints : [...openNumbers(readFileSync(repoPath('TASKS.md'), 'utf8'))],
+      })
+      if (!built.ok) {
+        console.error(`criticality-review-guard: refusing findings-filed receipt.\n  · ${built.errors.join('\n  · ')}`)
+        console.error(`\nrun: ${findingsFiledUsage()}`)
+        process.exit(1)
+      }
+      appendRecord(built.record)
+      console.log(
+        `recorded: ${built.record.model}'s refusal on ${built.record.sha.slice(0, 7)} for point ` +
+          `${built.record.point} is answered by open point(s) ${built.record.findingPoints.join(', ')}\n` +
+          '  ledger: .claude/mechanism-reviews.jsonl (tracked — commit it with the points it names)',
+      )
+      process.exit(0)
+    } catch (error) {
+      console.error(`criticality-review-guard: findings-filed receipt failed: ${error?.message ?? error}`)
       process.exit(1)
     }
   }

@@ -20,8 +20,10 @@ import {
   attachUnavailableClearances,
   baselineFor,
   bootstrapBase,
+  buildFindingsFiledReceipt,
   buildUnavailableReceipt,
   measurePointFilesWithoutCommission,
+  parseFindingsFiledArgs,
   parseUnavailableReceiptArgs,
   pointAuthorshipLogCommand,
   pointFilesCommand,
@@ -732,5 +734,86 @@ describe('the archive read at its REAL size', () => {
     const atHead = showAt('HEAD', 'docs/tasks-archive.md')
     expect(atHead.length).toBeGreaterThan(1024 * 1024)
     expect(atHead.trimEnd()).toBe(onDisk.trimEnd())
+  })
+})
+
+// THE ROUTE THE REFUSAL NAMES, WHICH NOTHING COULD TAKE. The gate's own text
+// offers two durable answers to a `do-not-merge` — fix it and record the
+// re-review, or file every finding as an open work-order point and append this
+// receipt naming them — and no command wrote the second. Measured 01.09.2026,
+// when a refusal raised AFTER a point had landed could not be answered the first
+// way either: the point's reviewed range ends at its landing, so a later commit
+// is not "a LATER commit" to the ancestor index. A rule whose only remaining
+// exit is unbuildable is a rule that gets waived.
+describe('the findings-filed receipt', () => {
+  const SHA = 'a'.repeat(40)
+  // A LEDGER TIMESTAMP MUST LOOK LIKE ONE: the row filter asks `ledgerAtUsable`,
+  // so a toy number is not a usable `at` and the review would not be found.
+  const REVIEW = { sha: SHA, point: 700, model: 'GPT-5.6 Sol', verdict: 'do-not-merge', at: 1_788_000_000_000 }
+  const build = (over = {}) =>
+    buildFindingsFiledReceipt({
+      sha: SHA,
+      point: 700,
+      model: 'GPT-5.6 Sol',
+      findingPoints: [801, 802],
+      records: [REVIEW],
+      openPoints: [801, 802, 900],
+      now: 1_788_000_100_000,
+      resolveSha: () => SHA,
+      ...over,
+    })
+
+  it('binds the exact review it answers, so two verdicts on one sha stay apart', () => {
+    const built = build()
+    expect(built.ok).toBe(true)
+    expect(built.record).toMatchObject({
+      kind: 'review-findings-filed',
+      sha: SHA,
+      point: 700,
+      model: 'GPT-5.6 Sol',
+      reviewAt: REVIEW.at,
+      findingPoints: [801, 802],
+    })
+    // Strictly after the review, because the acceptance rule compares the two.
+    expect(built.record.at).toBeGreaterThan(REVIEW.at)
+  })
+
+  it('REFUSES a point that is not open — a finding moved nowhere is a finding dropped', () => {
+    const built = build({ findingPoints: [801, 999] })
+    expect(built.ok).toBe(false)
+    expect(built.errors.join(' ')).toMatch(/999/)
+  })
+
+  it('REFUSES a receipt against a verdict that needs no answering', () => {
+    const built = build({ records: [{ ...REVIEW, verdict: 'merge' }] })
+    expect(built.ok).toBe(false)
+    expect(built.errors.join(' ')).toMatch(/needs answering/)
+  })
+
+  it('REFUSES when no such review exists at all', () => {
+    expect(build({ records: [] }).ok).toBe(false)
+    expect(build({ model: 'Opus 5' }).ok).toBe(false)
+  })
+
+  it('REFUSES an empty or malformed finding list', () => {
+    expect(build({ findingPoints: [] }).ok).toBe(false)
+    expect(build({ findingPoints: [0] }).ok).toBe(false)
+  })
+
+  it('takes the LATEST refusal when the same model refused twice on one sha', () => {
+    const later = { ...REVIEW, at: 1_788_000_050_000, evidence: 'the second refusal' }
+    expect(build({ records: [REVIEW, later] }).record.reviewAt).toBe(1_788_000_050_000)
+  })
+
+  it('parses its flags strictly, and ignores no unknown token', () => {
+    const ok = parseFindingsFiledArgs([
+      '--record-findings-filed', SHA, '--point', '700', '--model', 'GPT-5.6 Sol', '--finding-points', '801, 802',
+    ])
+    expect(ok.ok).toBe(true)
+    expect(ok.values.findingPoints).toEqual([801, 802])
+
+    expect(parseFindingsFiledArgs(['--record-findings-filed', SHA, '--nope', 'x']).ok).toBe(false)
+    expect(parseFindingsFiledArgs(['--finding-points', '801,eight']).ok).toBe(false)
+    expect(parseFindingsFiledArgs(['--point']).ok).toBe(false)
   })
 })
