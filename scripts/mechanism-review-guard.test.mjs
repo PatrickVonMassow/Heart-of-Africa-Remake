@@ -471,6 +471,9 @@ describe('the path-carrying git commands', () => {
     // %x1e%-shaped spans as environment variables before git runs, and the
     // gate would then parse an output with no headers at all — and clear.
     expect(mechanismLogCommand('base', 'head')).toEqual([
+      // FIRST, and a GLOBAL flag rather than a log option: %P is what a
+      // trailerless merge is attributed by, and `log` honours `refs/replace`.
+      '--no-replace-objects',
       '-c',
       'core.quotepath=on',
       'log',

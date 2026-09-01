@@ -86,6 +86,15 @@ const RANGE_HEADER = new RegExp(
 // pass 3). AS AN ARGS ARRAY, never a shell line (round-5 pass 3): cmd.exe
 // expands %-spans as environment variables before git runs.
 export const mechanismLogCommand = (base, head) => [
+  // `--no-replace-objects` FIRST, because %P is what the resolver attributes a
+  // trailerless merge by, and `log` HONOURS `refs/replace` (cross-vendor review,
+  // GPT-5.6 Sol at effort high, do-not-merge on the gate half). A replacement
+  // commit naming one parent where the real merge names two would hand the
+  // planner an ancestry that hides the merged tip's author, and an author that
+  // is merely invisible has not stopped being one — the model that wrote that
+  // tip would be free to review its own work. The same flag guards the trailer
+  // reads the gate performs beside this log.
+  '--no-replace-objects',
   '-c',
   'core.quotepath=on',
   'log',

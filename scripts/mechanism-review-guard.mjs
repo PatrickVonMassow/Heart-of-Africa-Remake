@@ -353,7 +353,10 @@ export function rangeCommits(base, head, files, readers = {}) {
   const readLog = readers.readLog ?? ((args) => gitRawFile(args))
   const readTrailers =
     readers.readTrailers ??
-    ((sha) => git(`show -s --format="%(trailers:key=Co-Authored-By,valueonly,separator=;)" "${sha}"`))
+    ((sha) =>
+      git(
+        `--no-replace-objects show -s --format="%(trailers:key=Co-Authored-By,valueonly,separator=;)" "${sha}"`,
+      ))
   const out = readLog(mechanismLogCommand(base, head))
   const commits = parseRangeLog(out)
   // THE MERGED TIP'S TRAILER, FETCHED BEFORE IT IS NEEDED (point 784's ruling).
@@ -365,6 +368,8 @@ export function rangeCommits(base, head, files, readers = {}) {
   // construction: no verdict can be recorded against it and no route clears it.
   // The criticality guard has fetched the same trailers since 28.08.2026; this
   // is that gatherer's missing half, not a new rule.
+  // AND `--no-replace-objects` HERE TOO, for the reason the log command states:
+  // a replaced parent could otherwise answer with somebody else's trailers.
   const trailersOf = (sha) => readTrailers(sha)
   return commits.map((commit) => {
     const trailers = trailersOf(commit.sha)
