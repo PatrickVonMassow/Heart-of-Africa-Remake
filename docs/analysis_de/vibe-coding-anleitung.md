@@ -108,6 +108,13 @@ Füllstand empfiehlt ein leeres Modell.
 
    Ein „passt schon" des Autors zählt nicht. *(Kosten ≈ 2x)*
 
+   Genau dieses Tor kann dir den ganzen Stapel blockieren: Jede Korrektur an
+   einem Mechanismus ist selbst eine Mechanismus-Änderung, also wächst die
+   Schuld schneller, als eine Sitzung sie abtragen kann. Bau die Notbremse
+   gleich mit ein:
+   > „Der Zwang muss abschaltbar sein, ohne die Messung zu verlieren: eine Zeile,
+   > die den Block aufhebt, während der Bericht die offene Schuld weiter zeigt."
+
 6. **Fortschritt sichtbar machen (wenn du mitlesen willst).**
    > „Führe ein knappes Fortschritts-Board (eine Datei oder Seite) und **etabliere einen
    > Mechanismus, der seine Aktualität erzwingt**: Es zeigt **immer den echten Stand**.
@@ -513,4 +520,4 @@ Die Ursache findest du durch **Zerlegen**, nicht durch Wiederholen.
 
 Sie ersetzt die Fallstricke oben nicht.
 
-<!-- GUIDE-FINGERPRINT: a8a0de9590316d714d8b2f61140bcec840ce2351a261f7b50a6f8ef5768c83ec -->
+<!-- GUIDE-FINGERPRINT: 0d78f63ec14f9a0bce27a593a6dec9f8b51f79a954bcccdc1165f53c1972c061 -->
