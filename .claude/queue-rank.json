@@ -1111,11 +1111,17 @@
       "origin": "machine",
       "place": "last"
     },
-    "1038": {
-      "at": "2026-09-01T13:19:17.341Z",
-      "why": "It costs every ordinary session boundary up to 30 minutes of launcher standstill, so it cannot wait behind the release it would be cut against; it follows 1036, which already carries a pushed branch.",
+    "1041": {
+      "at": "2026-09-01T21:03:57.666Z",
+      "why": "Direct user instruction of 01.09.2026; the branch is built and waits only on CI.",
       "origin": "machine",
-      "place": "ahead"
+      "place": "last"
+    },
+    "1042": {
+      "at": "2026-09-01T21:03:57.575Z",
+      "why": "The blocked handover is filed where the work order puts it; nothing about it is urgent enough to displace game work.",
+      "origin": "machine",
+      "place": "last"
     }
   },
   "boundary": {
@@ -1154,7 +1160,7 @@
     "why": "The order standing in front of the release today is the arrangement that predates this rule; the four machine-filed points that had ranked themselves there were moved behind 174 first"
   },
   "settled": {
-    "at": "2026-09-01T17:30:58.073Z",
+    "at": "2026-09-01T21:03:57.675Z",
     "points": [
       174,
       184,
@@ -1512,8 +1518,9 @@
       1032,
       1033,
       1035,
-      1038,
-      1039
+      1039,
+      1041,
+      1042
     ]
   }
 }
