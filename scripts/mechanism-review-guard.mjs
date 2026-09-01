@@ -29,7 +29,7 @@ import { execFileSync, execSync } from 'node:child_process'
 import { dirname } from 'node:path'
 import { commonRepoPath, REPO_ROOT, repoPath } from './repo-paths.mjs'
 import { isMainModule } from './is-main.mjs'
-import { heldByOtherLiveOwner } from './batch-singleton.mjs'
+import { heldByOtherLiveOwner, readOwnerLock } from './batch-singleton.mjs'
 import { readRecords, verifyCarried } from './mechanism-review.mjs'
 import {
   CONTRIBUTION_DISPOSITION_KIND,
@@ -126,6 +126,35 @@ export function commitMissing(sha, run = (cmd) => execSync(cmd, { windowsHide: t
  */
 export function shouldSeedRecoveryAnchor(gathered, { status = false } = {}) {
   return status !== true && gathered?.baselineMissing === true && Boolean(gathered?.baseline)
+}
+
+/**
+ * Whose session a guard invocation belongs to.
+ *
+ * A Stop payload is authoritative and keeps the ordinary stand-down rule. A
+ * manual `--status` invocation has no payload, however, and is the read-only
+ * command every refusal prints. Resolve that inspection through the same two
+ * honest fallbacks as guard-preflight: the caller's environment, then the live
+ * lock's recorded owner. Without this distinction the owner's own bare status
+ * command supplied `''`, identified itself as a stranger, and printed no debt
+ * or runnable repair command at all.
+ */
+export function resolveMechanismReviewSessionId({
+  payloadSessionId = '',
+  status = false,
+  env = process.env,
+  readLock = readOwnerLock,
+} = {}) {
+  if (payloadSessionId) return String(payloadSessionId)
+  if (!status) return ''
+  if (env?.CLAUDE_SESSION_ID) return String(env.CLAUDE_SESSION_ID)
+  try {
+    const lock = readLock()
+    if (lock?.sessionId) return String(lock.sessionId)
+  } catch {
+    /* unreadable lock — the gatherer fails closed to its normal stand-down */
+  }
+  return ''
 }
 
 function readBaselineState() {
@@ -837,12 +866,13 @@ export function attachCoverage({ pendingCommits = [], allRecords = [], head, rev
 if (isMainModule(import.meta.url)) {
   const status = process.argv[2] === '--status'
   try {
-    let sessionId = ''
+    let payloadSessionId = ''
     try {
-      sessionId = JSON.parse(readFileSync(0, 'utf8')).session_id || ''
+      payloadSessionId = JSON.parse(readFileSync(0, 'utf8')).session_id || ''
     } catch {
       /* manual run — the gate is global truth, not session-local */
     }
+    const sessionId = resolveMechanismReviewSessionId({ payloadSessionId, status })
 
     const gathered = gatherMechanismReviewInputs({ sessionId })
     if (!gathered.applicable) {

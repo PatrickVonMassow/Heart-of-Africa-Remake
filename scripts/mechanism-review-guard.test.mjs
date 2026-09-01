@@ -27,6 +27,7 @@ import {
   planningContributions,
   rangeCommits,
   gatherMechanismReviewInputs,
+  resolveMechanismReviewSessionId,
   shouldSeedRecoveryAnchor,
 } from './mechanism-review-guard.mjs'
 import { BASELINE_PATH as CRITICALITY_BASELINE_PATH } from './criticality-review-guard.mjs'
@@ -68,6 +69,36 @@ describe('baselineFor', () => {
     expect(MECHANISM_BASELINE_PATH).toBe(commonRepoPath('.claude/mechanism-review-baseline.json'))
     expect(CRITICALITY_BASELINE_PATH).toBe(commonRepoPath('.claude/criticality-review-baseline.json'))
     expect(TASKS_SPEC_BASELINE_PATH).toBe(commonRepoPath('.claude/tasks-spec-guard-baseline.json'))
+  })
+})
+
+describe('the mechanism status session identity', () => {
+  it('lets the printed bare status command inspect through the live lock owner', () => {
+    const readLock = () => ({ sessionId: 'owning-session' })
+    expect(resolveMechanismReviewSessionId({ status: true, env: {}, readLock })).toBe('owning-session')
+  })
+
+  it('prefers explicit payload and environment identities before the lock', () => {
+    const readLock = () => ({ sessionId: 'lock-session' })
+    expect(resolveMechanismReviewSessionId({
+      payloadSessionId: 'hook-session',
+      status: true,
+      env: { CLAUDE_SESSION_ID: 'env-session' },
+      readLock,
+    })).toBe('hook-session')
+    expect(resolveMechanismReviewSessionId({
+      status: true,
+      env: { CLAUDE_SESSION_ID: 'env-session' },
+      readLock,
+    })).toBe('env-session')
+  })
+
+  it('does not borrow the lock owner for an unidentified Stop hook', () => {
+    expect(resolveMechanismReviewSessionId({
+      status: false,
+      env: { CLAUDE_SESSION_ID: 'env-session' },
+      readLock: () => ({ sessionId: 'lock-session' }),
+    })).toBe('')
   })
 })
 
