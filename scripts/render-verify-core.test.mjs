@@ -10,6 +10,8 @@ import { readdirSync, readFileSync } from 'node:fs'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { describe, it, expect } from 'vitest'
+import { separateResultSection } from './render-verify-recorder.mjs'
+import { sectionTag } from './section-tag-core.mjs'
 import {
   ARCHIVE_DESCRIPTION_SUFFIX,
   ARCHIVE_MEMBER_SEPARATOR,
@@ -3377,8 +3379,23 @@ describe('the shipped charge ledger', () => {
   })
 
   it('charges the four measured reds with measurement and section stored separately', () => {
-    const store = (name, detail, section, scope) =>
-      chargeReds([{ name, detail, section, kind: 'check' }], scope)[0]
+    // THE HALVES COME FROM THE RECORDER, not from a hand-built object
+    // (cross-vendor finding, GPT-5.6 Sol, 01.09.2026: the case bypassed recorder
+    // provenance). Writing `detail` and `section` as separate fields proves the
+    // CHARGE and merely assumes the split it rests on. Here the suite's own
+    // printed tail — measurement, the two-space join, the trimmed tag — is cut
+    // by `separateResultSection` under the live gate value, and the parser's
+    // trim is applied as the real tap applies it, so what is charged is what the
+    // recorder really stores.
+    const store = (name, detail, section, scope) => {
+      const printed = [detail, sectionTag(section).trim()].filter(Boolean).join('  ')
+      const separated = separateResultSection(printed, section)
+      expect(separated.section).toBe(section)
+      return chargeReds(
+        [{ name, detail: separated.line.trim(), section: separated.section, kind: 'check' }],
+        scope,
+      )[0]
+    }
     const records = [
       store(
         'the archive holds picture, state, overlay and description',
