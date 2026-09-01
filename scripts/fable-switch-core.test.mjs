@@ -66,18 +66,18 @@ describe('decisions derived from the state', () => {
     expect(servingChain(off())).toEqual(['Opus 5', 'Opus 4.8'])
     expect(servingRoute(on()).map((lane) => lane.id)).toEqual([
       'claude-opus-5[1m]',
-      'claude-fable-5',
+      'claude-fable-5-1',
       'claude-opus-4-8[1m]',
     ])
-    expect(servingFallbackModelId(on())).toBe('claude-fable-5')
+    expect(servingFallbackModelId(on())).toBe('claude-fable-5-1')
     expect(servingFallbackModelId(off())).toBe('claude-opus-4-8[1m]')
   })
 
   it('builds the serving briefing and forbidden names from the same direction', () => {
-    expect(servingPolicyLine(on())).toContain('Opus 5, then Fable 5, then Opus 4.8')
-    expect(servingPolicyLine(on())).not.toContain('Fable 5, Sonnet, Haiku')
+    expect(servingPolicyLine(on())).toContain('Opus 5, then Fable 5.1, then Opus 4.8')
+    expect(servingPolicyLine(on())).not.toContain('Fable 5.1, Sonnet, Haiku')
     expect(servingPolicyLine(off())).toContain('Opus 5, then Opus 4.8')
-    expect(servingPolicyLine(off())).toContain('Fable 5, Sonnet, Haiku')
+    expect(servingPolicyLine(off())).toContain('Fable 5.1, Sonnet, Haiku')
     expect(servingPolicyLine(off())).toContain('node scripts/fable-switch.mjs --status')
     expect(servingPolicyLine(off())).toContain('trusted handoff to the next allowed lane')
     expect(servingPolicyLine(off())).toContain('Only that fresh lane')
@@ -96,7 +96,7 @@ describe('decisions derived from the state', () => {
     expect(mergerModel(off(), [FABLE_MODEL, SOL_MODEL])).toBe(CLAUDE_MODEL)
     expect(mergerModel(on(), [FABLE_MODEL, SOL_MODEL])).toBe(CLAUDE_MODEL)
     // Version and vendor spellings still have to resolve to the same model.
-    expect(mergerModel(off(), ['Fable 5', 'GPT-5.6 Sol'])).toBe(CLAUDE_MODEL)
+    expect(mergerModel(off(), ['Fable 5.1', 'GPT-5.6 Sol'])).toBe(CLAUDE_MODEL)
     expect(mergerModel(off(), [FABLE_MODEL, 'Claude Opus 5 (1M context)'])).toBe(SOL_MODEL)
   })
 
@@ -158,17 +158,17 @@ describe('decisions derived from the state', () => {
     expect(mergePromptFraming(off(), ['Fable / GPT-5.6 Sol', CLAUDE_MODEL])).toMatch(/DECORRELATED MERGE FRAMING/)
     // …but each mentioned model keeps its own version: a name mentioning a
     // DIFFERENT Sol does not disqualify the current one.
-    expect(mergerModel(on(), ['Fable 5 / GPT-6 Sol', 'Claude Opus 5'])).toBe(SOL_MODEL)
+    expect(mergerModel(on(), ['Fable 5.1 / GPT-6 Sol', 'Claude Opus 5'])).toBe(SOL_MODEL)
     // While the mentioned version matching the roster still disqualifies.
-    expect(mergerModel(on(), ['Fable 5 / GPT-5.6 Sol', ''])).toBe(CLAUDE_MODEL)
+    expect(mergerModel(on(), ['Fable 5.1 / GPT-5.6 Sol', ''])).toBe(CLAUDE_MODEL)
     // One family, several versions: each mentioned version is tainted — the
     // collapse to the first version let the other pass as untainted.
     expect(mergerModel(off(), ['GPT-6 Sol / GPT-5.6 Sol', CLAUDE_MODEL])).toBe(SOL_MODEL)
     expect(mergerModel(on(), ['GPT-6 Sol / GPT-5.6 Sol', 'Claude Opus 5'])).toBe(FABLE_MODEL)
-    // SAME-VENDOR compounds too: "Fable 5 / Claude Opus 5" mentions Claude, so
+    // SAME-VENDOR compounds too: "Fable 5.1 / Claude Opus 5" mentions Claude, so
     // Claude may not be offered as untainted (reduction to one key did that).
-    expect(mergerModel(on(), ['Fable 5 / Claude Opus 5', 'GPT-5.6 Sol'])).toBe(FABLE_MODEL)
-    expect(mergePromptFraming(on(), ['Fable 5 / Claude Opus 5', 'GPT-5.6 Sol'])).toMatch(/DECORRELATED MERGE FRAMING/)
+    expect(mergerModel(on(), ['Fable 5.1 / Claude Opus 5', 'GPT-5.6 Sol'])).toBe(FABLE_MODEL)
+    expect(mergePromptFraming(on(), ['Fable 5.1 / Claude Opus 5', 'GPT-5.6 Sol'])).toMatch(/DECORRELATED MERGE FRAMING/)
   })
 
   it('tells two Sol versions apart instead of treating every Sol as one model', () => {
@@ -183,21 +183,21 @@ describe('decisions derived from the state', () => {
 
   it('names the model whose framing must not be reused, which is the selected merger', () => {
     expect(mergePromptFraming(off())).toMatch(/do not reuse.*Sol's own half/)
-    expect(mergePromptFraming(on())).toMatch(/do not reuse.*Fable 5's own half/)
+    expect(mergePromptFraming(on())).toMatch(/do not reuse.*Fable 5.1's own half/)
   })
 
   it('emits one checkable switch fallback without accepting a bare claim', () => {
     const reason = mergeFallbackReason(off())
-    expect(reason).toContain('Fable 5 is switched off')
+    expect(reason).toContain('Fable 5.1 is switched off')
     expect(reason).toContain('not enough volume left')
     expect(isSwitchFallbackReason(reason)).toBe(true)
-    expect(isSwitchFallbackReason('Fable 5 was there')).toBe(false)
+    expect(isSwitchFallbackReason('Fable 5.1 was there')).toBe(false)
     expect(mergeFallbackReason(on())).toBe('')
   })
 
   it('generates the route refusal from the same record', () => {
     expect(fableRefusalReason(off())).toBe(
-      'Fable 5 is refused because the recorded Fable switch is OFF (node scripts/fable-switch.mjs --status): not enough volume left',
+      'Fable 5.1 is refused because the recorded Fable switch is OFF (node scripts/fable-switch.mjs --status): not enough volume left',
     )
     expect(fableRefusalReason(on())).toBe('')
   })

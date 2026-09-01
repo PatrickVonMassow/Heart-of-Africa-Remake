@@ -25653,3 +25653,25 @@ Nummerierung bleiben deshalb identisch — hier wird nur verschoben, nie umgesch
   Criticality: high — its failure direction is a silent batch standstill of up to the full grace
   window, reported as a live writer, after the most ordinary session ending there is.
   Bundle: Session- & Repo-Hygiene.
+
+- [x] 1041. The Fable lane is nailed to one version, so a newer Fable never reaches us.
+  `FABLE_MODEL_ID` in `scripts/fable-switch-core.mjs` reads `claude-fable-5`, and every
+  consumer — authoring, serving fallback, cross-vendor review, blind merge, commit trailers —
+  derives from that one constant. Nothing holds it against the version actually available, so
+  the lane silently stagnates: the entry IS the expectation, so no check can go red. User
+  instruction 01.09.2026: always use the newest Fable, which is now 5.1.
+  - THE CONSTANT MOVES to `claude-fable-5-1`, with the display name `FABLE_MODEL` following to
+    `Fable 5.1`. Measured on 01.09.: the id is real — an invented one fails locally with
+    `[claude-code:unrecognized_model]` while this one reaches the API.
+  - THE CLI MUST COME FIRST. Fable 5.1 answers `API Error: 400 ... version 2.1.251 or newer is
+    required` on the installed 2.1.236; npm has 2.1.257. Flipping the constant before the
+    update takes the Fable lane down, so the update is part of this point, not a prerequisite
+    someone else does.
+  - THE LITERALS FOLLOW: the `claude-fable-5` strings in the script tests, and the `Fable 5`
+    mentions in CLAUDE.md §6 that name the authoring and serving lanes.
+  VERIFIABLE: a real `claude -p` call on the new id whose `modelUsage` names 5.1 — the same
+  proof shape `parseClaudeResultOutput` already demands, so a wrong id cannot pass. Plus the
+  script Vitest files that carry the literal, lint, build.
+  Criticality: medium — no player impact, but it silently decides which model does our work,
+  and a wrong id stops the Fable lane outright.
+  Bundle: Session- & Repo-Hygiene.

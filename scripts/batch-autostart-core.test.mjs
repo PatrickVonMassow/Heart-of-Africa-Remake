@@ -823,7 +823,7 @@ describe('buildSpawnArgs — print mode, the model chain, and no prompt that can
   it('carries the switch-selected serving fallback behind Opus 5', () => {
     const args = buildSpawnArgs({ fableState: FABLE_ON })
     expect(args[args.indexOf('--model') + 1]).toBe(SPAWN_MODEL)
-    expect(args[args.indexOf('--fallback-model') + 1]).toBe('claude-fable-5')
+    expect(args[args.indexOf('--fallback-model') + 1]).toBe('claude-fable-5-1')
     expect(SPAWN_MODEL).toMatch(/opus-5/)
     expect(buildSpawnArgs({ fableState: FABLE_OFF })[args.indexOf('--fallback-model') + 1]).toBe('claude-opus-4-8[1m]')
   })

@@ -311,7 +311,7 @@ describe('decideReview — the recorded model follows the RUN, never the prefere
   it('maps every model either review chain can name to this runnable command', () => {
     expect(REVIEWER_ROSTER.map(({ name }) => name)).toEqual([
       'GPT-5.6 Sol',
-      'Fable 5',
+      'Fable 5.1',
       'Opus 5',
       'Opus 4.8',
     ])
@@ -329,7 +329,7 @@ describe('decideReview — the recorded model follows the RUN, never the prefere
       ...okRun(),
       authorModel: ['GPT-5.6 Sol', 'Claude Opus 5'],
     })
-    expect(decision).toMatchObject({ model: 'Fable 5', kind: OUTCOME.SELF_REVIEW, ready: false })
+    expect(decision).toMatchObject({ model: 'Fable 5.1', kind: OUTCOME.SELF_REVIEW, ready: false })
     expect(formatReviewerCommand({
       model: decision.model,
       sha: '16793dd'.padEnd(40, '0'),
@@ -372,7 +372,7 @@ describe('decideReview — the recorded model follows the RUN, never the prefere
 
   it('does not hand a Fable-authored commit to Fable — that is the self-review both gates refuse', () => {
     const failed = { outcome: classifyOutcome({ exitCode: 1, stderr: 'not logged in' }), parsed: { ok: false } }
-    expect(decideReview({ ...failed, authorModel: 'Claude Fable 5 <noreply@anthropic.com>' }).model).toBe(
+    expect(decideReview({ ...failed, authorModel: 'Claude Fable 5.1 <noreply@anthropic.com>' }).model).toBe(
       SECOND_FALLBACK_MODEL_NAME,
     )
     expect(decideReview({ ...failed, authorModel: 'Claude Opus 5 <noreply@anthropic.com>' }).model).toBe(
@@ -396,15 +396,15 @@ describe('decideReview — the recorded model follows the RUN, never the prefere
     // One record clears every commit it contains, so the reviewer must have
     // authored NO part of the range — picking Opus 5 for an Opus+Fable range
     // (the second round's fix) is a self-review of half of it (third round).
-    expect(fallbackReviewerFor(['Claude Opus 5', 'Claude Fable 5'])).toBe('Opus 4.8')
+    expect(fallbackReviewerFor(['Claude Opus 5', 'Claude Fable 5.1'])).toBe('Opus 4.8')
     expect(fallbackReviewerFor(['Claude Opus 5', 'Claude Opus 4.8'])).toBe(FALLBACK_MODEL_NAME)
-    expect(fallbackReviewerFor(['Claude Fable 5'])).toBe(SECOND_FALLBACK_MODEL_NAME)
+    expect(fallbackReviewerFor(['Claude Fable 5.1'])).toBe(SECOND_FALLBACK_MODEL_NAME)
   })
 
   it('sees BOTH models when one commit names two co-authors', () => {
     // modelFromTrailers answers "who wrote this" with the first name; for "who
     // may not review this" that would hide the second (third round).
-    const field = 'Claude Opus 5 <noreply@anthropic.com>;Claude Fable 5 <noreply@anthropic.com>'
+    const field = 'Claude Opus 5 <noreply@anthropic.com>;Claude Fable 5.1 <noreply@anthropic.com>'
     expect(modelsInTrailerField(field)).toHaveLength(2)
     expect(fallbackReviewerFor(modelsInTrailerField(field))).toBe('Opus 4.8')
     expect(modelsInTrailerField('Patrick <p@example.com>')).toEqual([])
@@ -450,12 +450,12 @@ describe('decideReview — the recorded model follows the RUN, never the prefere
   })
 
   it('names NOBODY when every model in the chain authored part of the range', () => {
-    const none = fallbackReviewerFor(['Claude Opus 5', 'Claude Fable 5', 'Claude Opus 4.8'])
+    const none = fallbackReviewerFor(['Claude Opus 5', 'Claude Fable 5.1', 'Claude Opus 4.8'])
     expect(none).toBe('')
     const d = decideReview({
       outcome: classifyOutcome({ exitCode: 1, stderr: 'not logged in' }),
       parsed: { ok: false },
-      authorModel: ['Claude Opus 5', 'Claude Fable 5', 'Claude Opus 4.8'],
+      authorModel: ['Claude Opus 5', 'Claude Fable 5.1', 'Claude Opus 4.8'],
     })
     const report = formatReviewReport({ decision: d, sha: 'a'.repeat(40), mode: 'review' })
     expect(report).toMatch(/cannot be recorded/)
@@ -467,7 +467,7 @@ describe('decideReview — the recorded model follows the RUN, never the prefere
     const d = decideReview({
       outcome: classifyOutcome({ exitCode: 1, stderr: 'not logged in' }),
       parsed: { ok: false },
-      authorModel: 'Claude Fable 5',
+      authorModel: 'Claude Fable 5.1',
     })
     const report = formatReviewReport({ decision: d, sha: 'a'.repeat(40), mode: 'review' })
     expect(report).toContain(SECOND_FALLBACK_MODEL_NAME)
@@ -765,7 +765,7 @@ describe('the recorder accepts the reviewer the rule now prefers (point 624)', (
   })
 
   it('does not read Sol as a self-review of Claude-authored work', () => {
-    for (const author of ['Claude Opus 5 <noreply@anthropic.com>', 'Claude Fable 5', 'Claude Opus 4.8']) {
+    for (const author of ['Claude Opus 5 <noreply@anthropic.com>', 'Claude Fable 5.1', 'Claude Opus 4.8']) {
       const check = validateRecord({
         sha: 'f'.repeat(40),
         model: SOL_MODEL_NAME,
@@ -977,7 +977,7 @@ describe('the reversed direction — where SOL authored', () => {
     for (const author of [SOL_COMMIT, 'GPT-5.6 Sol', 'Sol', 'gpt-5.6-sol', ['Claude Opus 5', SOL_COMMIT]]) {
       expect(solAuthored(author), String(author)).toBe(true)
     }
-    for (const author of ['', 'Claude Opus 5 <x@y>', ['Claude Opus 5', 'Claude Fable 5'], 'Patrick <p@x>']) {
+    for (const author of ['', 'Claude Opus 5 <x@y>', ['Claude Opus 5', 'Claude Fable 5.1'], 'Patrick <p@x>']) {
       expect(solAuthored(author), String(author)).toBe(false)
     }
   })
@@ -986,10 +986,10 @@ describe('the reversed direction — where SOL authored', () => {
     expect(CLAUDE_REVIEW_CHAIN[0]).toBe('Opus 5')
     expect(claudeReviewerFor(SOL_COMMIT)).toBe('Opus 5')
     // …and skips a Claude model that authored part of the range.
-    expect(claudeReviewerFor([SOL_COMMIT, 'Claude Opus 5 <x@y>'])).toBe('Fable 5')
-    expect(claudeReviewerFor([SOL_COMMIT, 'Claude Opus 5 <x@y>', 'Claude Fable 5 <x@y>'])).toBe('Opus 4.8')
+    expect(claudeReviewerFor([SOL_COMMIT, 'Claude Opus 5 <x@y>'])).toBe('Fable 5.1')
+    expect(claudeReviewerFor([SOL_COMMIT, 'Claude Opus 5 <x@y>', 'Claude Fable 5.1 <x@y>'])).toBe('Opus 4.8')
     // Every candidate authored part of it: no reviewer, said plainly.
-    expect(claudeReviewerFor([SOL_COMMIT, 'Claude Opus 5', 'Claude Fable 5', 'Claude Opus 4.8'])).toBe('')
+    expect(claudeReviewerFor([SOL_COMMIT, 'Claude Opus 5', 'Claude Fable 5.1', 'Claude Opus 4.8'])).toBe('')
   })
 
   it('refuses to record a SUCCESSFUL Sol run over a range Sol authored', () => {
@@ -1009,7 +1009,7 @@ describe('the reversed direction — where SOL authored', () => {
     expect(d).toMatchObject({ model: SOL_MODEL_NAME, ranBy: SOL_MODEL_NAME, verdict: 'merge', ready: true })
     // Sol unavailable over Claude-authored work still falls back to Fable.
     expect(fallbackReviewerFor('Claude Opus 5 <x@y>')).toBe(FALLBACK_MODEL_NAME)
-    expect(fallbackReviewerFor('Claude Fable 5 <x@y>')).toBe(SECOND_FALLBACK_MODEL_NAME)
+    expect(fallbackReviewerFor('Claude Fable 5.1 <x@y>')).toBe(SECOND_FALLBACK_MODEL_NAME)
   })
 
   it('reports a role swap as a role swap, not as a failure, and invents no verdict', () => {
@@ -1036,7 +1036,7 @@ describe('the reversed direction — where SOL authored', () => {
   it('says so when the whole chain authored the range', () => {
     const d = decideReview({
       ...okRun(),
-      authorModel: [SOL_COMMIT, 'Claude Opus 5', 'Claude Fable 5', 'Claude Opus 4.8'],
+      authorModel: [SOL_COMMIT, 'Claude Opus 5', 'Claude Fable 5.1', 'Claude Opus 4.8'],
     })
     const text = formatReviewReport({ decision: d, sha: 'abcdef1234567' })
     expect(d.model).toBe('')

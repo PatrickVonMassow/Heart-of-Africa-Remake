@@ -64,7 +64,7 @@ describe('authorship-cut mechanism review planning', () => {
     const plan = planAuthorshipGroups({
       commits: [
         commit('a', 'Claude Opus 5', ['scripts/a-guard.mjs']),
-        commit('b', 'Claude Fable 5', ['scripts/b-guard.mjs']),
+        commit('b', 'Claude Fable 5.1', ['scripts/b-guard.mjs']),
       ],
     })
     expect(plan.groups).toEqual([
@@ -91,7 +91,7 @@ describe('authorship-cut mechanism review planning', () => {
         authors: ['Claude Opus 5', 'GPT-5.6 Sol'],
         commits: [sha('a'), sha('b')],
         files: [file],
-        reviewer: 'Fable 5',
+        reviewer: 'Fable 5.1',
       }),
     ])
   })
@@ -128,7 +128,7 @@ describe('authorship-cut mechanism review planning', () => {
   it('names a group with no eligible reviewer instead of assigning an author', () => {
     const plan = planAuthorshipGroups({
       commits: [
-        { sha: sha('a'), authorModels: ['GPT-5.6 Sol', 'Opus 5', 'Fable 5', 'Opus 4.8'], files: ['x'] },
+        { sha: sha('a'), authorModels: ['GPT-5.6 Sol', 'Opus 5', 'Fable 5.1', 'Opus 4.8'], files: ['x'] },
       ],
     })
     expect(plan.groups[0].reviewer).toBe('')
@@ -148,7 +148,7 @@ describe('authorship-cut mechanism review planning', () => {
       ],
     })
     expect(plan.groups[0]).toMatchObject({
-      reviewer: 'Fable 5',
+      reviewer: 'Fable 5.1',
       reviewerVendor: 'anthropic',
     })
     expect(plan.unreviewable).toEqual([])
@@ -237,9 +237,9 @@ describe('authorship-cut mechanism review planning', () => {
   })
 
   it('requires the other vendor even when another same-vendor model is not an author', () => {
-    expect(eligibleReviewer(['Claude Fable 5'])).toBe('GPT-5.6 Sol')
+    expect(eligibleReviewer(['Claude Fable 5.1'])).toBe('GPT-5.6 Sol')
     expect(eligibleReviewer(['GPT-5.6 Sol'])).toBe('Opus 5')
-    expect(eligibleReviewer(['GPT-5.6 Sol', 'Claude Opus 5'])).toBe('Fable 5')
+    expect(eligibleReviewer(['GPT-5.6 Sol', 'Claude Opus 5'])).toBe('Fable 5.1')
     expect(vendorOf('Claude Opus 5 <noreply@anthropic.com>')).toBe('anthropic')
   })
 })

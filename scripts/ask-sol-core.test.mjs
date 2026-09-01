@@ -25,7 +25,7 @@ import {
 describe('the kinds', () => {
   it('addresses every model the blind-merger switch can select', () => {
     expect(resolveAskModel()).toMatchObject({ key: 'sol', runtime: 'codex', name: 'GPT-5.6 Sol' })
-    expect(resolveAskModel('fable')).toMatchObject({ runtime: 'claude', name: 'Fable 5', id: 'claude-fable-5' })
+    expect(resolveAskModel('fable')).toMatchObject({ runtime: 'claude', name: 'Fable 5.1', id: 'claude-fable-5-1' })
     expect(resolveAskModel('opus')).toMatchObject({ runtime: 'claude', name: 'Opus 5' })
     expect(resolveAskModel('sonnet')).toBeNull()
     expect(resolveAskModel('opus48')).toMatchObject({ name: 'Opus 4.8', id: 'claude-opus-4-8[1m]' })
@@ -49,7 +49,7 @@ describe('the kinds', () => {
 })
 
 describe('Claude answer attribution', () => {
-  const response = (answerModel = 'claude-fable-5') => JSON.stringify({
+  const response = (answerModel = 'claude-fable-5-1') => JSON.stringify({
     result: 'the folded answer',
     usage: { input_tokens: 7, output_tokens: 4, cache_read_input_tokens: 0, cache_creation_input_tokens: 90 },
     modelUsage: {
@@ -62,14 +62,14 @@ describe('Claude answer attribution', () => {
     expect(parseClaudeAskOutput(response(), resolveAskModel('fable'))).toMatchObject({
       ok: true,
       result: 'the folded answer',
-      answerModel: 'claude-fable-5',
-      models: ['claude-haiku-4-5-20251001', 'claude-fable-5'],
+      answerModel: 'claude-fable-5-1',
+      models: ['claude-haiku-4-5-20251001', 'claude-fable-5-1'],
     })
   })
 
   it('refuses substitution even when the requested model appears as auxiliary usage', () => {
     const value = JSON.parse(response('claude-opus-5'))
-    value.modelUsage['claude-fable-5'] = { inputTokens: 100, outputTokens: 1, cacheReadInputTokens: 0, cacheCreationInputTokens: 0 }
+    value.modelUsage['claude-fable-5-1'] = { inputTokens: 100, outputTokens: 1, cacheReadInputTokens: 0, cacheCreationInputTokens: 0 }
     expect(parseClaudeAskOutput(JSON.stringify(value), resolveAskModel('fable'))).toMatchObject({ ok: false })
   })
 
@@ -94,8 +94,8 @@ describe('the prompt', () => {
   })
 
   it('names the selected read-only model in the prompt', () => {
-    expect(buildAskPrompt({ kind: 'explain', brief: 'fold these', modelName: 'Fable 5' })).toContain(
-      'READ-ONLY work for this repository as Fable 5',
+    expect(buildAskPrompt({ kind: 'explain', brief: 'fold these', modelName: 'Fable 5.1' })).toContain(
+      'READ-ONLY work for this repository as Fable 5.1',
     )
   })
 
@@ -119,11 +119,11 @@ describe('the prompt', () => {
 
 describe('model-specific reports', () => {
   it('never labels a Fable refusal or answer as Sol', () => {
-    expect(formatUnavailable({ kind: 'explain', cause: 'substituted', modelName: 'Fable 5' })).toMatch(
-      /Fable 5 did NOT answer/,
+    expect(formatUnavailable({ kind: 'explain', cause: 'substituted', modelName: 'Fable 5.1' })).toMatch(
+      /Fable 5.1 did NOT answer/,
     )
-    expect(formatAnswerReport({ kind: 'explain', parsed: { summary: 'folded' }, modelName: 'Fable 5', effort: 'high' })).toMatch(
-      /Fable 5 \(effort high\) answered/,
+    expect(formatAnswerReport({ kind: 'explain', parsed: { summary: 'folded' }, modelName: 'Fable 5.1', effort: 'high' })).toMatch(
+      /Fable 5.1 \(effort high\) answered/,
     )
   })
 })

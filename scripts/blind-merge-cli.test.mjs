@@ -81,13 +81,13 @@ beforeAll(() => {
   // A committed line-form half: tracked, but its author still only claimable.
   write('tracked-b.txt', ['- B1 | src/ui/hud.tsx | the affliction badge sits on the date', 'VERDICT: merge'].join('\n'))
   write('U.json', {
-    mergedBy: 'Fable 5',
+    mergedBy: 'Fable 5.1',
     entries: [
       { id: 'U1', from: ['A1'] },
       { id: 'U2', from: ['A2', 'B1'], defect: 'the badge overlaps the date' },
     ],
   })
-  write('U-dropped.json', { mergedBy: 'Fable 5', entries: [{ id: 'U1', from: ['A1'] }] })
+  write('U-dropped.json', { mergedBy: 'Fable 5.1', entries: [{ id: 'U1', from: ['A1'] }] })
   write('U-sol.json', {
     mergedBy: 'GPT-5.6 Sol',
     entries: [
@@ -107,10 +107,10 @@ describe('the command', () => {
   const counted = () => ['--union', p('U.json')]
 
   it('exits 0 on a union that accounts for every entry, and prints the record command', () => {
-    const r = run('--a', p('A.json'), '--b', p('B.json'), ...counted(), '--merged-by', 'Fable 5')
+    const r = run('--a', p('A.json'), '--b', p('B.json'), ...counted(), '--merged-by', 'Fable 5.1')
     expect(r.status).toBe(0)
     expect(r.out).toMatch(/every input entry accounted for/)
-    expect(r.out).toMatch(/--merged-by "Fable 5"/)
+    expect(r.out).toMatch(/--merged-by "Fable 5.1"/)
     expect(r.out).toMatch(/--accounting "2 A \+ 1 B entries/)
   })
 
@@ -118,7 +118,7 @@ describe('the command', () => {
     // It used to validate the union's name and then print --merged-by "".
     const r = run('--a', p('A.json'), '--b', p('B.json'), ...counted())
     expect(r.status).toBe(0)
-    expect(r.out).toMatch(/--merged-by "Fable 5"/)
+    expect(r.out).toMatch(/--merged-by "Fable 5.1"/)
     expect(r.out).not.toMatch(/--merged-by ""/)
   })
 
@@ -128,10 +128,10 @@ describe('the command', () => {
     // reach the count (cross-vendor re-review of point 889: with one half
     // untracked and mislabelled, the actual author was selected as merger with
     // no fallback recorded).
-    const untracked = run('--a', p('A.json'), '--b', p('B.txt'), '--union', p('U.json'), '--merged-by', 'Fable 5')
+    const untracked = run('--a', p('A.json'), '--b', p('B.txt'), '--union', p('U.json'), '--merged-by', 'Fable 5.1')
     expect(untracked.status).toBe(1)
     expect(untracked.out).toMatch(/list B .*not a tracked, clean repository artefact/)
-    const claimed = run('--a', p('A.json'), '--b', p('tracked-b.txt'), '--model-b', 'GPT-5.6 Sol', '--union', p('U.json'), '--merged-by', 'Fable 5')
+    const claimed = run('--a', p('A.json'), '--b', p('tracked-b.txt'), '--model-b', 'GPT-5.6 Sol', '--union', p('U.json'), '--merged-by', 'Fable 5.1')
     expect(claimed.status).toBe(1)
     expect(claimed.out).toMatch(/list B .*tracked but carries no model field/)
     expect(claimed.out).toMatch(/may not be judged against a claim/)
@@ -146,7 +146,7 @@ describe('the command', () => {
           timestamp: at,
           type: 'assistant',
           isSidechain: false,
-          message: { role: 'assistant', model: 'claude-fable-5', id: 'writes-a' },
+          message: { role: 'assistant', model: 'claude-fable-5-1', id: 'writes-a' },
         }),
         JSON.stringify({ timestamp: '2026-08-13T15:34:27.000Z', type: 'user', message: { role: 'user' } }),
       ].join('\n'),
@@ -186,7 +186,7 @@ describe('the command', () => {
       '--union',
       p('U-dropped.json'),
       '--merged-by',
-      'Fable 5',
+      'Fable 5.1',
     )
     expect(r.status).toBe(1)
     expect(r.out).toMatch(/A2 .*is in NO union entry/)
@@ -205,7 +205,7 @@ describe('the command', () => {
     // The flag used to MASK the committed union: a union naming Sol passed with
     // --merged-by Fable, and the printed ledger command named Fable (re-review
     // round 4). The artefact names its own merger.
-    const masked = run('--a', p('A.json'), '--b', p('B.json'), '--union', p('U-sol.json'), '--merged-by', 'Fable 5')
+    const masked = run('--a', p('A.json'), '--b', p('B.json'), '--union', p('U-sol.json'), '--merged-by', 'Fable 5.1')
     expect(masked.status).toBe(1)
     expect(masked.out).toMatch(/contradicts the committed union/)
     const unowned = write('U-unowned.json', {
@@ -313,13 +313,13 @@ describe('the command', () => {
 
   it('refuses an UNTRACKED union in the count form — the folded result must not be able to vanish', () => {
     const loose = write('U-loose.json', {
-      mergedBy: 'Fable 5',
+      mergedBy: 'Fable 5.1',
       entries: [
         { id: 'U1', from: ['A1'] },
         { id: 'U2', from: ['A2', 'B1'], defect: 'the badge overlaps the date' },
       ],
     })
-    const r = run('--a', p('A.json'), '--b', p('B.json'), '--union', loose, '--merged-by', 'Fable 5')
+    const r = run('--a', p('A.json'), '--b', p('B.json'), '--union', loose, '--merged-by', 'Fable 5.1')
     expect(r.status).toBe(1)
     expect(r.out).toMatch(/the union .*not a tracked, clean repository artefact/)
   })
@@ -335,7 +335,7 @@ describe('the command', () => {
   })
 
   it('prints the record command WITH the three files, so the ledger row binds to them', () => {
-    const r = run('--a', p('A.json'), '--b', p('B.json'), '--union', p('U.json'), '--merged-by', 'Fable 5')
+    const r = run('--a', p('A.json'), '--b', p('B.json'), '--union', p('U.json'), '--merged-by', 'Fable 5.1')
     expect(r.status).toBe(0)
     expect(r.out).toMatch(/--union "[^"]*U\.json" --list-a "[^"]*A\.json" --list-b "[^"]*B\.json"/)
   })

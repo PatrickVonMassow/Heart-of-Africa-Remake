@@ -14322,3 +14322,24 @@ to land than a mechanism that needs a review.
   Criticality: high — a charge that excuses a red nobody measured makes the picture gate read green
   where it should bite, which is the same failure as an ownerless red, from the other side.
   Bundle: Testinfrastruktur.
+
+- [ ] 1042. The context handover cannot be recorded while another session holds a now-card.
+  Measured 01.09.2026 22:58. `batch-boundary.mjs --commit --context` demands the "nothing is
+  running" card, and `board.mjs none` refuses that card while ANY now-card stands. Point 686
+  stood as the current work of a LIVE foreign session (its own in-flight declaration; a stop
+  probe answers `not-mine:other-process`), so the only two ways forward were to seize another
+  session's card or to publish a claim the board itself calls a contradiction. Neither is
+  admissible, so the watermark handover was not recorded at all and the session ended without
+  its boundary — the one outcome the watermark rule exists to prevent.
+  - THE CARD MUST BE ABLE TO SAY "nothing of MINE is running". The refusal reads the whole
+    section rather than this session's own cards, which is the same whole-section reading
+    point 1005 already fixed for the criticality reader.
+  - THE DICTATED TEXT STILL APPENDS "Hier läuft nichts weiter." unconditionally — point 871
+    from the multi-session side. Here it would have been false twice: a foreign card stood,
+    and this session left a pushed branch waiting on CI.
+  VERIFIABLE: a case with a foreign now-card present in which the boundary records and the
+  card names only this session's state, and a case in which the sentence is omitted while any
+  work of this session is still in flight. Plus `npm run test:unit`, lint, build.
+  Criticality: medium — no player impact, but it is a real blockade: it stops the one
+  mechanism that keeps session cost bounded.
+  Bundle: Session- & Repo-Hygiene.

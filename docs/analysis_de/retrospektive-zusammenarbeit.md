@@ -82,6 +82,8 @@ Das Musterbeispiel sind die Chat-Zeitstempel: neun Eskalationsstufen, acht weich
 | 28.08. abends | Die Notfall-Uhr des unbeaufsichtigten Stapels wurde genau wie bestellt auf nachweisbaren Fortschritt verengt — und verlor dabei einen Schutz, den nie jemand aufgeschrieben hatte: Der ehrliche Abschluss-Prüflauf über beide Backends dauert gemessen 80 min 48 s gegen eine Schwelle von 60 Minuten und sieht seither aus wie ein Hänger, den die Rettungsroutine unterbricht. Kein Test wurde rot; der Schutz war vorhanden, nicht zugesichert (§3.210, Punkt 1002) |
 | 29.08. nachts | Ein Wächter verlangt einen Beleg aus einem Protokoll, das ihn wegwirft: Vier Laufaufzeichnungen tragen die Absturzmarke, gesetzt aus der Fehlerausgabe — das aufbewahrte Protokoll ist eine gefilterte Sicht und kann ihr Fehlen nicht belegen. Nicht freigezeichnet, sondern in den blockierten Punkt geschrieben (§3.215); derselbe Lauf ließ drei Rots ohne jeden Punkt zurück, obwohl die Tafelkarten dafür schon standen (Punkte 1011-1013); drei Gegenlesungsrunden über die Buchungstabelle endeten damit, eine geschriebene Buchung ZURÜCKZUZIEHEN statt sie enger zu fassen — kein Muster konnte das gemessene Rot von seinen Nachbarn trennen (§3.216); und eine Behauptung über einen gelandeten Punkt kam aus einem BRANCHNAMEN statt aus einer Messung, gefunden vom Nutzer in zwei Sätzen |
 | 01.09. | Der Vier-Augen-Wächter sperrte jede Landung, und die Schuld wuchs schneller, als sie zu bezahlen war: Das Tor schnitt die Prüfarbeit nach der einen Regel zu und zählte sie nach der anderen (§3.225), und JEDE eingetragene Bewertung erzeugte selbst wieder einen prüfpflichtigen Beitrag, weil das Hauptbuch versioniert ist — vierzehn ehrliche Runden mit lauter geschlossenen Befunden ließen das Tor rot (§3.226, Punkt 1036) |
+| 01.09. nachts | Die Kontext-Uebergabe liess sich nicht eintragen, weil eine FREMDE, lebende Sitzung eine Karte als laufende Arbeit hielt: Das Tor verlangt die Karte »es laeuft nichts« und liest dafuer die ganze Sektion statt der eigenen Karten — blieben nur Fremdenteignung oder eine Aussage, die die Tafel selbst Widerspruch nennt (§3.230) |
+| 01.09. abends | Eine Nutzerfrage deckte auf, dass unsere Fable-Bahn auf einer festgenagelten Versionsnummer stand: Eine neue Fable-Version hätte uns nie von allein erreicht, weil nichts die eingetragene Konstante gegen die verfügbare hält — stille Stagnation als Umkehrung der stillen Degradation von §3.20 (§3.229) |
 | 01.09. nachm. | **Die Umsteuerung**: Blind-Doppeldiagnose (Fable + Sol, Opus-Merge) auf die Nutzerfrage nach dem Spielstillstand — die Steuerung war zum Hauptprodukt geworden; der Nutzer gab Freeze, Aufnahmeregel und die Streichung des §7.1-Tors direkt frei, und die Umsetzung bewies Punkt 1005 gleich mit: punktlose Arbeit fand keine Karte (§3.227, Punkt 1039) |
 
 Muster: Ab dem 22.07. explodiert die Commit-Rate (Delegation) — und genau dann häufen sich die Infrastruktur-Vorfälle. **Skalierung der Autonomie erzeugt eine eigene Problemklasse, die die Feature-Arbeit zeitweise überholt.**
@@ -1420,7 +1422,7 @@ keinen Träger hat. Gebucht als Punkt 956.
 
 ## Anhang A — Maschinell gepflegte Quellen-Übersicht
 
-Zuletzt aktualisiert: Dienstag, 01.09.2026, 18:49 · Quellen-Fingerprint: `0d78f63ec14f…`
+Zuletzt aktualisiert: Dienstag, 01.09.2026, 23:26 · Quellen-Fingerprint: `bf937af68efc…`
 
 Spalten heuristisch aus den Quellen abgeleitet (Anläufe = distinkte Datumsnennungen im Memory;
 Maßnahme = Guard-Skripte mit Namens-Treffer). Die inhaltliche Bewertung gehört der Prosa oben.
@@ -1457,7 +1459,7 @@ Maßnahme = Guard-Skripte mit Namens-Treffer). Die inhaltliche Bewertung gehört
 | a drill that recreates the state after an action tests the assumption, not the action — and stays green forever | 1 | niedrig | — (Regel/Memory) | ◐ Regel |
 | Work at High effort by default; the user reserves Extra high for research and design decisions, not implementation | 4 | hoch | — (Regel/Memory) | ◐ Regel |
 | Write idiomatic English in all English text (README, code comments, commit messages) — no German calques like 'stand' for a version | 1 | niedrig | — (Regel/Memory) | ◐ Regel |
-| Fable is NOT the default lane because its volume is the scarcest; difficulty is no reason for it either (since 18.08.2026 hard cases go straight to Sol), and review is cross-vendor, not Fable-by-default | 4 | hoch | — (Regel/Memory) | ◐ Regel |
+| Fable is NOT the default lane because its volume is the scarcest; difficulty is no reason for it either (since 18.08.2026 hard cases go straight to Sol), and review is cross-vendor, not Fable-by-default | 5 | hoch | — (Regel/Memory) | ◐ Regel |
 | Findings recorded by a session that could not write the work order — carry each into TASKS.md, then mark it drained | 40 | hoch | findings-guard.mjs | ✔ Mechanismus |
 | A recurring lookup gets a script; never pull raw transcripts, listings, or logs into context to answer it | 1 | niedrig | — (Regel/Memory) | ◐ Regel |
 | Past the 150k context watermark, FINISH the step and hand over — never start a suite, an agent or a point after it; the user raised the cost twice (13.08. and 17.08.2026) | 2 | mittel | — (Regel/Memory) | ◐ Regel |
@@ -1523,8 +1525,8 @@ Maßnahme = Guard-Skripte mit Namens-Treffer). Die inhaltliche Bewertung gehört
 
 Erfasste Quellen: 93 Feedback-/Projekt-Memories · 57 Guard-/Hook-Skripte · 6 Revert-/Reapply-Commits · 120 Prozess-/Meta-TASKS-Punkte (davon 54 offen).
 
-<!-- RETRO-FINGERPRINT: 0d78f63ec14f9a0bce27a593a6dec9f8b51f79a954bcccdc1165f53c1972c061 -->
-<!-- RETRO-LAST-REFRESHED: 2026-09-01T16:49:05.101Z -->
+<!-- RETRO-FINGERPRINT: bf937af68efc3a379c48d7ef172e97601bc4aa127f7e300af5486a8d3fafd38c -->
+<!-- RETRO-LAST-REFRESHED: 2026-09-01T21:26:43.929Z -->
 <!-- AUTO-GENERATED:END -->
 
 ### 3.111 Ein Erfolg ist kein Beweis für den Weg, auf dem er zustande kam
@@ -5218,3 +5220,61 @@ in dem, was übrig blieb — die Statusabfrage brach unter dem Kontext-Zaun
 wortlos ab und konnte eine offene Schuld als „GATE CLEAR" ausgeben. Das Tor
 abzuschalten und die Prüfung trotzdem zu fahren, war also nicht widersprüchlich,
 sondern genau die Trennung, um die es geht: Die Praxis bleibt, der Zwang geht.
+
+### 3.229 Eine festgenagelte Versionsnummer friert eine Fähigkeit ein
+
+Am Abend des 01.09. fragte der Nutzer, ob wir bei Fable die feste Version 5
+verwenden oder die jeweils neueste — Fable 5.1 war soeben erschienen. Die
+Antwort stand in einer einzigen Zeile: `FABLE_MODEL_ID = 'claude-fable-5'`.
+Diese Konstante speist alles — Authoring, Serving-Fallback, Gegenlesung,
+Blind-Merge, Commit-Trailer —, und genau deshalb hätte keine neue Fable-Version
+uns je von allein erreicht. Kein Mechanismus fragt nach, ob die eingetragene
+Version noch die aktuelle ist.
+
+Das ist eine eigene Fehlerklasse, und sie ist die Umkehrung von §3.20: Dort
+hatten wir stille Modell-*Degradation*, also ein Abrutschen unter das
+Gewollte, das niemand meldete. Hier ist es eine stille **Stagnation** — der
+Zustand bleibt exakt so, wie er einmal richtig war, und wird allein dadurch
+falsch, dass die Welt weiterläuft. Degradation kann man gegen eine Erwartung
+prüfen; Stagnation nicht, denn die Konstante *ist* die Erwartung. Eine
+festgenagelte Version hat damit dieselbe Bauform wie die Prosa-Vorrangregel aus
+§3.77: eine Angabe, die als Wahrheit gelesen wird, ohne dass irgendetwas sie
+gegen ihre Quelle hält.
+
+Zwei Dinge sind an der Messung festzuhalten. Erstens ist die ID-Probe billig
+und eindeutig, und man muss sie führen, statt zu raten: Eine erfundene ID
+scheitert schon lokal mit `unrecognized_model`, eine echte erreicht die API.
+`claude-fable-5-1` erreichte sie — und bekam dort ein
+`400: version 2.1.251 or newer is required`. Die neue Version war also nicht
+nur eine Konstante entfernt, sondern eine CLI-Aktualisierung; wer die
+Konstante ohne sie umlegt, legt die Fable-Bahn lahm. Zweitens hat auch hier
+wieder der Nutzer den Befund geliefert, nicht wir — dieselbe Rolle wie in §3.99
+und §3.134. Bei einer Angabe, die veralten kann, ohne dass irgendetwas rot
+wird, ist das kein Zufall, sondern die Vorhersage.
+
+### 3.230 Das Sparsamkeitstor konnte sich nicht selbst schliessen
+
+In derselben Nacht sollte die Sitzung an der Kontext-Wasserlinie uebergeben — der
+Mechanismus, der die Kosten des Stapels ueberhaupt begrenzt. Er verlangt dafuer
+eine Tafelkarte, die sagt, dass nichts mehr laeuft. Die Tafel verweigerte diese
+Karte, und zwar zu Recht: Punkt 686 stand als laufende Arbeit einer ANDEREN,
+lebenden Sitzung. Damit gab es nur zwei Wege, und beide sind unzulaessig — die
+Karte einer fremden Sitzung einkassieren, oder eine Aussage veroeffentlichen, die
+die Tafel im selben Atemzug als Widerspruch bezeichnet.
+
+Die Bauform ist die von §3.185 und §3.186, hier aber mit der teuersten Folge: Die
+Pruefung liest die GANZE Sektion, wo sie die Karten DIESER Sitzung lesen muesste.
+Solange nur eine Sitzung schrieb, war das dasselbe; sobald zwei schreiben, ist es
+etwas anderes. Und weil ausgerechnet das Sparsamkeitstor daran haengt, ist das
+Ergebnis das eine, das die Wasserlinie verhindern soll: Die Sitzung arbeitete im
+teuren Kontext weiter, statt zu uebergeben.
+
+Zwei Dinge sind festzuhalten. Erstens: Ein Tor, das eine BEHAUPTUNG ueber den
+Weltzustand verlangt, muss den Ausschnitt benennen, ueber den die Behauptung geht
+— »nichts laeuft« ist in einem Mehr-Sitzungs-Betrieb keine beantwortbare Frage,
+»nichts von MIR laeuft« schon. Zweitens, und das ist der Grund, warum daraus ein
+Punkt wurde statt eines Eintrags im Rueckstand: Der vorgegebene Kartentext haengt
+den Satz »Hier laeuft nichts weiter.« weiterhin bedingungslos an — genau der
+Defekt aus §3.111ff., den Punkt 871 seit dem 24.08. beschreibt. Hier waere er
+gleich zweifach falsch gewesen, denn diese Sitzung hinterliess selbst einen
+gepushten Zweig, der auf sein CI wartet.
