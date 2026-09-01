@@ -984,16 +984,24 @@ if (isMainModule(import.meta.url)) {
       if (statusPlan) {
         console.log(formatContributionPassPlan(statusPlan))
       }
+      // NOTHING SUPPRESSES THE DEBT ANY MORE (cross-vendor rounds 2 and 3 of
+      // point 1036). The report used to choose ONE of three things to print —
+      // the gap, the verdict, or GATE CLEAR — and both other branches hid a
+      // real debt: the deferral because it left `block` false, the gap because
+      // it replaced the finding list with the reason it could not be assembled.
+      // The report is the only reader the debt has left, so it prints the
+      // findings whenever there are findings, and the gap and the deferral are
+      // context ABOVE them rather than alternatives to them.
+      if (verdict.deferred) console.log(`\nDEFERRED, NOT CLEAR: ${verdict.reason}`)
       if (outcome.action === 'report-gap') console.log(`\n${gap.report}`)
-      else if (statusReportsFindings(verdict)) {
-        if (verdict.deferred) console.log(`\nDEFERRED, NOT CLEAR: ${verdict.reason}`)
+      if (statusReportsFindings(verdict)) {
         console.log(
           `\n${formatMechanismReviewVerdict(verdict, {
             authorshipPlan: gathered.authorshipPlan,
             contributionPlan: statusPlan,
           })}`,
         )
-      } else console.log('\nGATE CLEAR')
+      } else if (outcome.action !== 'report-gap') console.log('\nGATE CLEAR')
       process.exit(0)
     }
 

@@ -602,11 +602,16 @@ describe('mechanism-review-guard: the switched-off four-eyes gate', { timeout: 6
     expect(hook.stdout.trim(), 'a switched-off gate must print nothing at a turn end').toBe('')
   })
 
-  it('still MEASURES the contribution it no longer blocks', () => {
+  it('still MEASURES the contribution it no longer blocks, and never calls it clear', () => {
+    // THE SPAWNED OUTPUT, not a predicate about it (cross-vendor round 3): the
+    // report's three printing branches were each capable of hiding the debt,
+    // and only running the command shows which one wins here.
     const status = node([resolve(repo, 'scripts', 'mechanism-review-guard.mjs'), '--status'])
     expect(status.status, status.stderr).toBe(0)
     expect(status.stdout).toContain(guardSha.slice(0, 7))
     expect(status.stdout).toContain('scripts/demo-guard.mjs')
+    expect(status.stdout).toContain('outstanding review contributions: 1')
+    expect(status.stdout, 'a debt must never be reported as a clear gate').not.toContain('GATE CLEAR')
   })
 
   it('REFUSES to record a self-review instead of warning about it', () => {
