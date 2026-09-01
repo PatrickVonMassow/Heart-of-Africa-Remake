@@ -123,6 +123,17 @@ put it is the mistake this line exists to stop.
     planner wins over the historical split. What remains against them is narrower than the entry
     above assumes: `scripts/render-verify-charges.mjs` was in NONE of the four recorded passes, so
     nobody read it.
+  - AND THE CRITICALITY GATE BLAMES THE WRONG THING. Point 1031 carries a `do-not-merge` on
+    `10b83eb` and a `merge` on `9ee3bd18`; git proves `10b83eb` IS a strict ancestor of
+    `9ee3bd18`, so the fix was recorded at a later commit. The gate still prints "A later
+    `merge` exists, but not for a LATER commit — so nothing was fixed between them." The real
+    cause is that the merge row carries `pass` 1/1 over two files, so it enters `compositions`
+    instead of the plain clean bucket, and `compositionComplete` fails because the cumulative
+    ancestry does not cover the point's measured `pointFiles`. The message therefore sends the
+    reader to commit a fix that already exists rather than naming the files nobody read — the way
+    out is invisible, and a reader who trusts the text concludes the ledger is lying about git. An
+    incomplete composition must say so and name its uncovered files, the way the `uncovered-files`
+    finding already does when nothing is clean at all.
   ORIENTATION, NOT A MANDATE: `REVIEW_END_STATE_EXCLUSIONS` in
   `scripts/mechanism-review-range-core.mjs` is this repository's existing single boundary for "this
   path is outside the mechanism gate's reach, and here is the recorded reason". If the ledger fix
