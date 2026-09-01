@@ -1155,8 +1155,9 @@ Every browser suite launches through `launchVerifyBrowser()` and calls
 `assertBackend(page)` right after the renderer initialises (`window.__renderer`):
 a run launched with `VERIFY_GL=webgpu` that SILENTLY fell back to WebGL 2 (or a
 `webgl` run that came up on WebGPU) fails LOUD instead of giving false
-confidence. Covered: collision, enrichments, events, flow, gamepad, handwriting,
-health, i18n, invariants, polish, settings, touch, visualsweep, voice, world.
+confidence. Covered: benchmark, collision, enrichments, events, flow, gamepad,
+handwriting, health, i18n, invariants, polish, report, settings, startup, touch,
+visualsweep, voice, world — every browser suite except the three below.
 The same call records the WebGPU **feature level** the run came up at (point 505,
 above): on the container's GLES lane that is `compatibility`, on a core adapter
 `core`, and on the WebGL 2 lane it does not apply.
