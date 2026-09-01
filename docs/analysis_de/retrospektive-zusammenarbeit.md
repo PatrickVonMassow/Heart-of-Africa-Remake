@@ -1420,7 +1420,7 @@ keinen Träger hat. Gebucht als Punkt 956.
 
 ## Anhang A — Maschinell gepflegte Quellen-Übersicht
 
-Zuletzt aktualisiert: Dienstag, 01.09.2026, 17:30 · Quellen-Fingerprint: `a8a0de959031…`
+Zuletzt aktualisiert: Dienstag, 01.09.2026, 18:49 · Quellen-Fingerprint: `0d78f63ec14f…`
 
 Spalten heuristisch aus den Quellen abgeleitet (Anläufe = distinkte Datumsnennungen im Memory;
 Maßnahme = Guard-Skripte mit Namens-Treffer). Die inhaltliche Bewertung gehört der Prosa oben.
@@ -1485,7 +1485,6 @@ Maßnahme = Guard-Skripte mit Namens-Treffer). Die inhaltliche Bewertung gehört
 | hoa uses a feature-branch workflow — each TASKS point on feat/<point>-<slug>, push the branch after every commit, merge to main only when done+verified; cross-cutting changes go straight to main | 2 | mittel | commit-scope-guard.mjs, push-arrival-guard.mjs | ✔ Mechanismus |
 | Direct pushes to main are approved despite GitHub's branch protection — never ask about switching to pull requests again | 1 | niedrig | push-arrival-guard.mjs | ✔ Mechanismus |
 | Order the TASKS/queue so known-bug fixes + user-requested extensions come BEFORE the big bug-FINDING / QA-framework tickets | 1 | niedrig | queue-order-guard.mjs | ✔ Mechanismus |
-| Console warning \"THREE.Clock deprecated, use THREE.Timer\" comes from R3F v9 internals — fix by updating @react-three/fiber once it migrates to Timer | 1 | niedrig | — (Regel/Memory) | ◐ Regel |
 | Choose the browser-regression tier per task at my discretion (Vitest-only / Vitest+small / Vitest+large); the closing cycle ALWAYS runs Vitest+large | 1 | niedrig | — (Regel/Memory) | ◐ Regel |
 | Priority tiers for picking the next point — token-reduction work first, then the communication mechanic, then everything else; open branches before a fresh point | 2 | mittel | lock-release-hook.mjs, queue-order-guard.mjs | ✔ Mechanismus |
 | A declared \"intended residual\" is where real defects hide — legitimate only when the information to close it is genuinely not at hand | 1 | niedrig | — (Regel/Memory) | ◐ Regel |
@@ -1522,10 +1521,10 @@ Maßnahme = Guard-Skripte mit Namens-Treffer). Die inhaltliche Bewertung gehört
 | A pending batch claim HOLDS THE LAUNCHER BACK — withdraw it whenever the claiming window is left unattended | 2 | mittel | clear-claim-guard.mjs | ✔ Mechanismus |
 | Multi-agent workflows eat the session/weekly limit fast — verify findings INLINE, keep fan-outs small, warn the user with a cost estimate before any big workflow | 3 | mittel | doc-budget-guard.mjs | ✔ Mechanismus |
 
-Erfasste Quellen: 94 Feedback-/Projekt-Memories · 57 Guard-/Hook-Skripte · 6 Revert-/Reapply-Commits · 120 Prozess-/Meta-TASKS-Punkte (davon 54 offen).
+Erfasste Quellen: 93 Feedback-/Projekt-Memories · 57 Guard-/Hook-Skripte · 6 Revert-/Reapply-Commits · 120 Prozess-/Meta-TASKS-Punkte (davon 54 offen).
 
-<!-- RETRO-FINGERPRINT: a8a0de9590316d714d8b2f61140bcec840ce2351a261f7b50a6f8ef5768c83ec -->
-<!-- RETRO-LAST-REFRESHED: 2026-09-01T15:30:33.674Z -->
+<!-- RETRO-FINGERPRINT: 0d78f63ec14f9a0bce27a593a6dec9f8b51f79a954bcccdc1165f53c1972c061 -->
+<!-- RETRO-LAST-REFRESHED: 2026-09-01T16:49:05.101Z -->
 <!-- AUTO-GENERATED:END -->
 
 ### 3.111 Ein Erfolg ist kein Beweis für den Weg, auf dem er zustande kam
@@ -5192,3 +5191,30 @@ selbst zum Hauptprodukt; mehr Gründlichkeit erzeugt dann mehr Arbeit, nicht
 weniger. Die Grenze muss außen stehen — als Budget, Aufnahmeschwelle und
 offener Ablauf —, denn von innen konvergiert das System nicht: Selbst seine
 Selbstkritik verbuchte es bis dahin nur als weitere Punkte.
+
+### 3.228 Das erste Tor, das wir abgeschaltet statt repariert haben
+
+Am 01.09. stand das Vier-Augen-Tor für Mechanismen rot und wies jeden Merge
+zurück; die Warteschlange des ganzen Stapels hing dahinter. Vierzehn
+vendor-übergreifende Runden an einem einzigen Tag hatten es nicht ins Grüne
+gebracht — jede Runde beantwortete ihre Befunde ehrlich, und jede Korrektur war
+selbst wieder eine Mechanismus-Änderung mit eigener Prüfpflicht. Das ist die
+Bauform, die §3.226 und §3.227 beschreiben, diesmal am konkreten Tor gemessen.
+
+Neu ist nicht der Befund, sondern die Antwort. Der Freeze aus CLAUDE.md §2 sagt
+für genau diesen Fall: abschalten, nicht umbauen. Also fiel der Block — im
+Wächter-Skript selbst, nicht in einer geschützten Einstellungsdatei, was den
+Weg auch für die übrigen Tore vorzeichnet. Die Messung blieb vollständig
+erhalten; was verschwand, war ausschließlich die Sperre. Drei Dinge sind daran
+festzuhalten. Erstens: Eine abgeschaltete Regel ist keine gelöschte Regel —
+die Schuld ist weiter lesbar, nur nicht mehr blockierend, und die Rücknahme ist
+ein einziger Commit. Zweitens: Die Begründung im Code musste zweimal korrigiert
+werden, weil sie eine Ursache behauptete, die der Branch längst behoben hatte;
+eine Entscheidung, die sich auf eine falsche Ursache stützt, ist auch dann
+angreifbar, wenn sie richtig ist. Am Ende steht dort nur noch das Gemessene und
+die Regel des Nutzers, keine Theorie. Drittens: Ausgerechnet die
+vendor-fremde Prüfung dieser Abschaltung fand in vier Runden zwei echte Fehler
+in dem, was übrig blieb — die Statusabfrage brach unter dem Kontext-Zaun
+wortlos ab und konnte eine offene Schuld als „GATE CLEAR" ausgeben. Das Tor
+abzuschalten und die Prüfung trotzdem zu fahren, war also nicht widersprüchlich,
+sondern genau die Trennung, um die es geht: Die Praxis bleibt, der Zwang geht.

@@ -60,8 +60,10 @@ const RUN_OPTIONS = {
   input: '',
   maxBuffer: RUN_MAX_BUFFER,
 }
+// `windowsHide` is repeated at every call site on purpose: window-hide-core
+// scans the SOURCE of each spawn's options object and cannot follow a spread.
 const run = (...args) =>
-  spawnSync(process.execPath, [SCRIPT, ...args], { ...RUN_OPTIONS, cwd: process.cwd() })
+  spawnSync(process.execPath, [SCRIPT, ...args], { ...RUN_OPTIONS, windowsHide: true, cwd: process.cwd() })
 
 // THE HALVES ARE ADOPTED ONLY FROM COMMITTED BYTES: `committedHalfModel` reads
 // HEAD and refuses an absolute path outright, so a temp fixture can never satisfy
@@ -367,7 +369,7 @@ describe('the paths that must stay untouched', () => {
 
     // THROUGH THE SHARED OPTIONS, not a copy: take maxBuffer out of RUN_OPTIONS
     // and this line dies, which is the whole point of the case.
-    const roomy = spawnSync(process.execPath, printer, RUN_OPTIONS)
+    const roomy = spawnSync(process.execPath, printer, { ...RUN_OPTIONS, windowsHide: true })
     expect(roomy.status, roomy.stderr).toBe(0)
     expect(roomy.stdout.length).toBe(2 * 1024 * 1024)
   })
