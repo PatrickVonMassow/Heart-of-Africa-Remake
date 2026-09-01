@@ -1625,15 +1625,21 @@ describe('a boundary resolves against the object database, not against refs', ()
   const SHADOW = 'b'.repeat(40)
 
   const runner = ({ objects = [OBJECT], types = {}, unreadable = [], calls = [] } = {}) => {
-    const fake = (args) => {
-      calls.push(args.join(' '))
+    const fake = (argv) => {
+      calls.push(argv.join(' '))
+      // The authorship reads carry the global `--no-replace-objects` flag ahead
+      // of the subcommand; this fixture judges the subcommand, not the flag.
+      const args = argv[0] === '--no-replace-objects' ? argv.slice(1) : argv
       if (args[0] === 'rev-parse' && String(args[1]).startsWith('--disambiguate=')) {
         const prefix = String(args[1]).slice('--disambiguate='.length)
         return objects.filter((object) => object.startsWith(prefix)).join('\n')
       }
-      if (args[0] === 'cat-file') {
+      if (args[0] === 'cat-file' && args[1] === '-t') {
         if (unreadable.includes(args[2])) throw new Error(`fatal: git cat-file: could not get object info`)
         return types[args[2]] ?? 'commit'
+      }
+      if (args[0] === 'cat-file' && args[1] === '-p') {
+        return [`tree ${'0'.repeat(40)}`, `parent ${SHADOW}`, '', 'subject'].join('\n')
       }
       if (args[0] === 'rev-parse') return SHADOW
       if (args[0] === 'show') return String(args[2]).includes('%s') ? 'subject' : 'GPT-5.6 Sol <noreply@openai.com>'

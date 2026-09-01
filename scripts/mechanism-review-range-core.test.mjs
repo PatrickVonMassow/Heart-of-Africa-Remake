@@ -671,10 +671,24 @@ describe('commitObjectParents', () => {
     expect(commitObjectParents(object([A], `parent ${FORGED}`))).toEqual([A])
   })
 
-  it('answers nothing for a root commit or unreadable output', () => {
+  it('answers nothing for a root commit', () => {
     expect(commitObjectParents(object([], 'Lay down the world'))).toEqual([])
-    expect(commitObjectParents('')).toEqual([])
-    expect(commitObjectParents(null)).toEqual([])
+  })
+
+  it('REFUSES a header that never ends, rather than trusting how far it read', () => {
+    // A truncated or malformed object gives no evidence where the header stopped,
+    // so every line read may already be message. Empty output is that same case.
+    expect(() => commitObjectParents([`tree ${'0'.repeat(40)}`, `parent ${A}`].join('\n'))).toThrow(/header terminator/)
+    expect(() => commitObjectParents('')).toThrow(/header terminator/)
+    expect(() => commitObjectParents(null)).toThrow(/header terminator/)
+  })
+
+  it('REFUSES a parent line that is not an object id', () => {
+    const bent = [`tree ${'0'.repeat(40)}`, `parent ${A} and something else`, '', 'msg'].join('\n')
+    expect(() => commitObjectParents(bent)).toThrow(/malformed parent line/)
+    expect(() =>
+      commitObjectParents([`tree ${'0'.repeat(40)}`, `parent ${A.slice(0, 39)}`, '', 'msg'].join('\n')),
+    ).toThrow(/malformed parent/)
   })
 
   it('tolerates CRLF, which a Windows checkout can produce', () => {

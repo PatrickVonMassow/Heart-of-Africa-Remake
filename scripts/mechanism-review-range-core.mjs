@@ -119,13 +119,39 @@ export const mechanismLogCommand = (base, head) => [
  * an authorship read may never fail in.
  */
 export function commitObjectParents(out) {
+  const lines = String(out ?? '').split('\n')
+  // A COMMIT OBJECT OPENS ON ITS TREE. Anything else — empty output, a read that
+  // failed, a blob — is not a commit header, and an empty first line would
+  // otherwise read as a header that terminated immediately and answer "no
+  // parents": the same silent nothing a hidden merged tip produces.
+  if (!/^tree [0-9a-f]{40}$/.test((lines[0] ?? '').replace(/\r$/, ''))) {
+    throw new Error('output does not open on a commit object header terminator — its parent lines cannot be trusted')
+  }
   const parents = []
-  for (const raw of String(out ?? '').split('\n')) {
+  let terminated = false
+  for (const raw of lines) {
     const line = raw.endsWith('\r') ? raw.slice(0, -1) : raw
-    if (line === '') break
+    if (line === '') {
+      terminated = true
+      break
+    }
     if (!line.startsWith('parent ')) continue
-    const sha = line.slice(7).trim()
-    if (sha) parents.push(sha)
+    const sha = line.slice(7)
+    // A PARENT IS AN OBJECT ID OR IT IS NOTHING (same review round). Trimming a
+    // free-form remainder into a "sha" accepted whatever the header carried; the
+    // shape is the only thing that distinguishes a recorded parent from text.
+    if (!/^[0-9a-f]{40}$/.test(sha)) {
+      throw new Error(`commit object header carries a malformed parent line: ${JSON.stringify(line.slice(0, 80))}`)
+    }
+    parents.push(sha)
+  }
+  // AND A HEADER THAT NEVER ENDS IS REFUSED, not accepted as far as it was read.
+  // Without the terminator there is no evidence where the header stopped, so
+  // every line read may already be message — the injection this bound exists to
+  // stop, arriving through a truncated or malformed object instead of a crafted
+  // message. An authorship read may only fail CLOSED.
+  if (!terminated) {
+    throw new Error('commit object has no header terminator — its parent lines cannot be trusted')
   }
   return parents
 }
