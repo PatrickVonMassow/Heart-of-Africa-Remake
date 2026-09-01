@@ -98,6 +98,17 @@ put it is the mistake this line exists to stop.
     authorship the recorder could not then resolve is retired explicitly.
   - THE REPAIR'S OWN COMMITS OWE THEIR SOL PASSES over their full end-state file sets; the
     recorded verdicts cover the files each round actually read, which is less than the set.
+  - AND THE DEBT GROWS FASTER THAN IT CAN BE PAID, measured 01.09.2026 over fourteen cross-vendor
+    rounds in one session. Every verdict is recorded by APPENDING to `.claude/mechanism-reviews.jsonl`,
+    that file is tracked, and a commit touching it is itself a mechanism contribution that owes its
+    own review. Clearing one contribution therefore creates another, and a session that answers
+    findings honestly — fourteen rounds, every finding closed, Sol's final verdict `merge` on each
+    — still leaves the gate red. The stale-split entries above are the same effect after the fact:
+    they were split at a file set the range no longer has, so their missing passes cannot be
+    addressed at all. THIS is what makes the point urgent rather than tidy: the gate is not merely
+    behind, it cannot catch up, and no amount of correct work inside one session converges.
+    Whatever the fix is, it must make a ledger-only commit NOT owe a round of its own, or make the
+    round that records a verdict cover the recording.
   FINAL STATE: `node scripts/guard-preflight.mjs --for merge` on `main` reports
   `mechanism-review-guard clean`, every step to that state reached through a command the guard
   itself printed, and no contribution retired without a reason recorded beside it.
