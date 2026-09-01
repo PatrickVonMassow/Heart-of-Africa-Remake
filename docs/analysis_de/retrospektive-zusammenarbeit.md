@@ -1418,7 +1418,7 @@ keinen Träger hat. Gebucht als Punkt 956.
 
 ## Anhang A — Maschinell gepflegte Quellen-Übersicht
 
-Zuletzt aktualisiert: Dienstag, 01.09.2026, 04:48 · Quellen-Fingerprint: `d854a32b6ba0…`
+Zuletzt aktualisiert: Dienstag, 01.09.2026, 07:12 · Quellen-Fingerprint: `fb04ccd12ae6…`
 
 Spalten heuristisch aus den Quellen abgeleitet (Anläufe = distinkte Datumsnennungen im Memory;
 Maßnahme = Guard-Skripte mit Namens-Treffer). Die inhaltliche Bewertung gehört der Prosa oben.
@@ -1456,7 +1456,7 @@ Maßnahme = Guard-Skripte mit Namens-Treffer). Die inhaltliche Bewertung gehört
 | Work at High effort by default; the user reserves Extra high for research and design decisions, not implementation | 4 | hoch | — (Regel/Memory) | ◐ Regel |
 | Write idiomatic English in all English text (README, code comments, commit messages) — no German calques like 'stand' for a version | 1 | niedrig | — (Regel/Memory) | ◐ Regel |
 | Fable is NOT the default lane because its volume is the scarcest; difficulty is no reason for it either (since 18.08.2026 hard cases go straight to Sol), and review is cross-vendor, not Fable-by-default | 4 | hoch | — (Regel/Memory) | ◐ Regel |
-| Findings recorded by a session that could not write the work order — carry each into TASKS.md, then mark it drained | 39 | hoch | findings-guard.mjs | ✔ Mechanismus |
+| Findings recorded by a session that could not write the work order — carry each into TASKS.md, then mark it drained | 40 | hoch | findings-guard.mjs | ✔ Mechanismus |
 | A recurring lookup gets a script; never pull raw transcripts, listings, or logs into context to answer it | 1 | niedrig | — (Regel/Memory) | ◐ Regel |
 | Past the 150k context watermark, FINISH the step and hand over — never start a suite, an agent or a point after it; the user raised the cost twice (13.08. and 17.08.2026) | 2 | mittel | — (Regel/Memory) | ◐ Regel |
 | User 18.08.2026: hard, complex, error-prone and HIGH-criticality points are AUTHORED by GPT-5.6 Sol directly — Opus 5 authors only what is left, and Fable authors only a point that tags its lane or one the router escalates | 4 | hoch | — (Regel/Memory) | ◐ Regel |
@@ -1521,8 +1521,8 @@ Maßnahme = Guard-Skripte mit Namens-Treffer). Die inhaltliche Bewertung gehört
 
 Erfasste Quellen: 93 Feedback-/Projekt-Memories · 57 Guard-/Hook-Skripte · 6 Revert-/Reapply-Commits · 120 Prozess-/Meta-TASKS-Punkte (davon 54 offen).
 
-<!-- RETRO-FINGERPRINT: d854a32b6ba0118a3fa26c00bc468576d92d368db80664bb3e98b265b36460c7 -->
-<!-- RETRO-LAST-REFRESHED: 2026-09-01T02:48:47.820Z -->
+<!-- RETRO-FINGERPRINT: fb04ccd12ae6596dd0da001271ef7edbea427382506a4268b7e725234f1dc3df -->
+<!-- RETRO-LAST-REFRESHED: 2026-09-01T05:12:37.095Z -->
 <!-- AUTO-GENERATED:END -->
 
 ### 3.111 Ein Erfolg ist kein Beweis für den Weg, auf dem er zustande kam
@@ -5081,3 +5081,29 @@ Pushes und die Tafel-Veröffentlichung, gehört VOR den Start der Suite; währen
 läuft, ist nur lesende Vorarbeit erlaubt. Bei einem Lauf von achtzig Minuten ist
 das kein Stilfehler, sondern der Unterschied zwischen einer Landung heute Nacht
 und einer morgen früh.
+
+### 3.225 Das Tor schnitt nach der einen Regel zu und zählte nach der anderen
+
+Am 01.09.2026 sperrte der Vier-Augen-Wächter jede Landung des Stapels. Siebzehn
+Beiträge schuldeten eine Gegenlesung; dreißig Lesungen später waren es drei, und
+diese drei ließen sich mit keinem angebotenen Befehl mehr schließen. Der Grund
+war weder Faulheit noch ein fehlender Prüfer: Der Planer zerlegt eine zu große
+Menge Prüfstoff in Durchgänge und vergibt jeden Durchgang an das Modell, das die
+DATEIEN dieses Durchgangs nicht selbst geschrieben hat — ein Zuschnitt, der
+zwangsläufig die Anbieter mischt. Das Tor dagegen zählt einen Durchgang nur,
+wenn sein Modell dem GANZEN Beitrag fremd ist. Von dreizehn wirklich gelesenen
+Durchgängen zählte es vier. Die restlichen neun konnten nie zählen, weil der
+Planer sie per Bauart an die andere Seite vergeben hatte.
+
+Das ist eine eigene Klasse, kein Sonderfall von §3.223. Dort beantwortet eine
+Sitzung dieselbe Ablehnung zehnmal, weil sie die Reparatur nicht findet. Hier
+gibt es keine: Zwei Regeln, jede für sich vernünftig, ergeben zusammen eine
+Pflicht, die niemand erfüllen kann. Sichtbar wird das erst, wenn man die Pflicht
+wirklich abarbeitet — die neun Durchgänge mussten gelesen werden, damit der
+Zähler bei vier stehen blieb und die Ursache zeigte. Eine Schuld, deren
+Bezahlung den Zähler nicht bewegt, ist die Messung selbst.
+
+**Lehre:** Wer ein Tor baut, das Arbeit ZUSCHNEIDET und Arbeit ZÄHLT, muss
+beide Hälften an dieselbe Regel binden. Und wer vor einem solchen Tor steht,
+zahlt die Schuld einmal vollständig, statt zu argumentieren: Erst der bezahlte
+Rest beweist, dass der Zähler falsch zählt.
