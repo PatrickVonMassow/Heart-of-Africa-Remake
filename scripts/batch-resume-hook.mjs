@@ -280,7 +280,7 @@ try {
     const header =
       openPointsHeadline(nums, { gated: gatedNums }) +
 
-      // rule:model-policy@d0b43947
+      // rule:model-policy@d0066fb3
       'MODEL POLICY (CLAUDE.md §6): AUTHORING HAS THREE LANES. ' +
       'CLAUDE.md §6 owns the authoring and escalation policy; scripts/author-routing-core.mjs ' +
       'makes that cut from point text and recorded review history, while a point\'s own ' +
