@@ -21,6 +21,7 @@ import {
   parseMechanismLog,
   pendingReviewContributions,
   planningContributions,
+  rangeCommits,
   gatherMechanismReviewInputs,
   shouldSeedRecoveryAnchor,
 } from './mechanism-review-guard.mjs'
@@ -36,6 +37,7 @@ import {
   mechanismPathsIn,
   modelsFromTrailers,
 } from './mechanism-review-core.mjs'
+import { planAuthorshipGroups } from './mechanism-review-range-core.mjs'
 import { commonRepoPath, repoPath } from './repo-paths.mjs'
 import { readOwnerLock } from './batch-singleton.mjs'
 
@@ -785,5 +787,81 @@ describe('the plan the gate prints names what is OWED, never what the range hold
     })
     expect(text).toContain('scripts/y.mjs')
     expect(text).toContain('scripts/z.mjs')
+  })
+})
+
+// A LANDING'S MERGE CARRIES NO TRAILER OF ITS OWN, and the gate plans one commit
+// at a time, so its authorship resolver's lookup table holds that single commit
+// and never the branch tip it merged. Supplying every non-first parent's trailer
+// is what lets `authorshipResolver` apply point 784's ruling here; without it a
+// merge that contributed a conflict resolution measured as UNKNOWN authorship,
+// which is unreviewable by construction — no verdict may be recorded against it
+// and no documented route clears it, so one hand-resolved landing shut the gate
+// for every later merge (measured 01.09.2026 on main, after landing point 1031).
+describe('a trailerless merge is attributed to the tip it merged', () => {
+  const REC = String.fromCharCode(0x1e)
+  const FLD = String.fromCharCode(0x1f)
+  const MERGE = 'a'.repeat(40)
+  const FIRST = 'b'.repeat(40)
+  const MERGED = 'c'.repeat(40)
+  // THE MERGED TIP IS ITSELF IN THE RANGE — that is the shape measured on main,
+  // and it is the shape a lookup filtered on "outside the range" gets wrong.
+  const log = [
+    `${REC}${MERGE}${FLD}1788000000${FLD}${FIRST} ${MERGED}`,
+    '',
+    'scripts/x-guard.mjs',
+    '',
+    `${REC}${MERGED}${FLD}1787900000${FLD}${FIRST}`,
+    '',
+    'scripts/x-guard.mjs',
+    '',
+  ].join('\n')
+  const trailers = {
+    [MERGE]: '',
+    [MERGED]: 'GPT-5.6 Sol <noreply@openai.com>',
+    [FIRST]: 'Claude Opus 5 <noreply@anthropic.com>',
+  }
+
+  it('hands the merged tip trailer to the planner, even when it is in range', () => {
+    const asked = []
+    const commits = rangeCommits('base', 'head', ['scripts/x-guard.mjs'], {
+      readLog: () => log,
+      readTrailers: (sha) => {
+        asked.push(sha)
+        return trailers[sha] ?? ''
+      },
+    })
+
+    expect(commits).toHaveLength(2)
+    expect(commits[0].authorModels).toEqual([])
+    // The MERGED tip, not the first parent: a merge inherits from what it took in.
+    expect(commits[0].parentAuthorModels).toEqual({ [MERGED]: ['GPT-5.6 Sol <noreply@openai.com>'] })
+    expect(asked).toContain(MERGED)
+    expect(Object.keys(commits[0].parentAuthorModels)).not.toContain(FIRST)
+  })
+
+  it('resolves that merge to an eligible reviewer instead of unknown authorship', () => {
+    const [commit] = rangeCommits('base', 'head', ['scripts/x-guard.mjs'], {
+      readLog: () => log,
+      readTrailers: (sha) => trailers[sha] ?? '',
+    })
+    // The gate plans ONE commit; that is the shape the fix has to survive.
+    const { groups } = planAuthorshipGroups({ commits: [commit], endStateFiles: commit.files })
+
+    expect(groups).toHaveLength(1)
+    expect(groups[0].reviewer).toBeTruthy()
+    expect(groups[0].unreviewableReason).toBeUndefined()
+  })
+
+  it('leaves an ordinary trailerless commit unknown, so absence is never an assignment', () => {
+    const plain = [`${REC}${MERGE}${FLD}1788000000${FLD}${FIRST}`, '', 'scripts/x-guard.mjs', ''].join('\n')
+    const [commit] = rangeCommits('base', 'head', ['scripts/x-guard.mjs'], {
+      readLog: () => plain,
+      readTrailers: () => '',
+    })
+    const { groups } = planAuthorshipGroups({ commits: [commit], endStateFiles: commit.files })
+
+    expect(commit.parentAuthorModels).toEqual({})
+    expect(groups[0].reviewer).toBe('')
   })
 })

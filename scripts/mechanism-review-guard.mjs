@@ -349,16 +349,44 @@ function commitFacts(sha) {
  */
 export { mechanismLogCommand }
 
-function rangeCommits(base, head, files) {
-  const out = gitRawFile(mechanismLogCommand(base, head))
-  return parseRangeLog(out).map((commit) => {
-    const trailers = git(`show -s --format="%(trailers:key=Co-Authored-By,valueonly,separator=;)" "${commit.sha}"`)
+export function rangeCommits(base, head, files, readers = {}) {
+  const readLog = readers.readLog ?? ((args) => gitRawFile(args))
+  const readTrailers =
+    readers.readTrailers ??
+    ((sha) => git(`show -s --format="%(trailers:key=Co-Authored-By,valueonly,separator=;)" "${sha}"`))
+  const out = readLog(mechanismLogCommand(base, head))
+  const commits = parseRangeLog(out)
+  // THE MERGED TIP'S TRAILER, FETCHED BEFORE IT IS NEEDED (point 784's ruling).
+  // `authorshipResolver` attributes a trailerless merge to the tips it merged,
+  // but it can only read a parent that is IN the measured list or supplied here
+  // — and the list is FIRST-PARENT, so a landing's merged branch tip never is.
+  // Without this the resolver fell through to "unknown" for every merge that
+  // contributed a conflict resolution, and an unknown vendor is unreviewable by
+  // construction: no verdict can be recorded against it and no route clears it.
+  // The criticality guard has fetched the same trailers since 28.08.2026; this
+  // is that gatherer's missing half, not a new rule.
+  const trailersOf = (sha) => readTrailers(sha)
+  return commits.map((commit) => {
+    const trailers = trailersOf(commit.sha)
+    // EVERY non-first parent, never only the ones outside this range. The
+    // criticality guard may skip an in-range parent because it hands the
+    // planner the WHOLE list, so the resolver finds that parent itself. This
+    // gate plans ONE COMMIT AT A TIME, so its resolver's lookup table holds
+    // that single commit and nothing else — an in-range parent is exactly as
+    // invisible to it as an out-of-range one, and skipping it left the merge
+    // unattributed.
+    const parentAuthorModels = Object.fromEntries(
+      (commit.parentShas ?? [])
+        .slice(1)
+        .map((parent) => [parent, modelsFromTrailers(trailersOf(parent))]),
+    )
     return {
       ...commit,
       authorModel: modelFromTrailers(trailers),
       // EVERY co-author, not only the first: a commit naming two models has
       // two list authors, and neither may merge the union (point 634).
       authorModels: modelsFromTrailers(trailers),
+      parentAuthorModels,
       mechanismFiles: mechanismPathsIn(commit.files, { scriptFiles: files }),
     }
   })
