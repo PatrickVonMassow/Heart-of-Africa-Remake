@@ -20,6 +20,8 @@ import {
   parseRangeLog,
   parseMechanismLog,
   pendingReviewContributions,
+  authorshipRead,
+  defaultParentReader,
   planningContributions,
   rangeCommits,
   gatherMechanismReviewInputs,
@@ -902,5 +904,121 @@ describe('a trailerless merge is attributed to the tip it merged', () => {
 
     expect(commit.parentAuthorModels).toEqual({})
     expect(groups[0].reviewer).toBe('')
+  })
+})
+
+// THE PRODUCTION READ ITSELF, NOT A STAND-IN (cross-vendor review, GPT-5.6 Sol at
+// effort high). Every case above injects `readParents`, which replaces the real
+// command and the real parser — so they stay green if the wiring drops the
+// no-replace flag or starts scanning past the header, and a `parent` line forged
+// in a commit MESSAGE could then become authorship evidence.
+describe('the default parent reader, exercised rather than replaced', () => {
+  const SHA = 'a'.repeat(40)
+  const REAL = 'b'.repeat(40)
+  const FORGED = 'f'.repeat(40)
+
+  it('asks git past refs/replace and ignores a parent line forged in the message', () => {
+    const asked = []
+    const parents = defaultParentReader(SHA, (cmd, options) => {
+      asked.push({ cmd, options })
+      return [
+        `tree ${'0'.repeat(40)}`,
+        `parent ${REAL}`,
+        'author X <x@y> 1 +0000',
+        '',
+        'Merge branch ...',
+        '',
+        `parent ${FORGED}`,
+        '',
+      ].join('\n')
+    })
+
+    expect(parents).toEqual([REAL])
+    expect(parents).not.toContain(FORGED)
+    expect(asked).toHaveLength(1)
+    expect(asked[0].cmd).toContain('--no-replace-objects')
+    expect(asked[0].cmd).toContain('cat-file -p')
+    // The whole object comes back although only the header is wanted, so the
+    // read is bounded and its overflow fails closed.
+    expect(asked[0].options?.maxBuffer).toBeGreaterThan(0)
+  })
+
+  it('lets the read throw, so the bound is a refusal and not a truncation', () => {
+    expect(() =>
+      defaultParentReader(SHA, () => {
+        throw new Error('ENOBUFS: stdout maxBuffer length exceeded')
+      }),
+    ).toThrow(/maxBuffer/)
+  })
+})
+
+// AND A FAILED AUTHORSHIP READ MUST BLOCK. The exception used to travel to this
+// file's top-level catch, which prints "allowing stop" and exits 0 — so one
+// oversized or missing object anywhere in the measured range switched the gate
+// off without touching a mechanism file.
+describe('an authorship read that fails is typed, never shrugged off', () => {
+  const SHA = 'a'.repeat(40)
+  const REAL = 'b'.repeat(40)
+
+  it('marks the failure so the gate can block on it', () => {
+    let caught = null
+    try {
+      authorshipRead(() => {
+        throw new Error('bad object')
+      }, 'the parents of commit abc123')
+    } catch (error) {
+      caught = error
+    }
+
+    expect(caught?.authorshipUnreadable).toBe(true)
+    expect(caught?.message).toContain('the parents of commit abc123')
+    expect(caught?.message).toContain('bad object')
+  })
+
+  it('returns the value untouched when the read succeeds', () => {
+    expect(authorshipRead(() => ['x'], 'anything')).toEqual(['x'])
+  })
+
+  it('carries a failing parent read out of rangeCommits as a blocking failure', () => {
+    const REC = String.fromCharCode(0x1e)
+    const FLD = String.fromCharCode(0x1f)
+    const log = [`${REC}${SHA}${FLD}1788000000${FLD}${REAL}`, '', 'scripts/x-guard.mjs', ''].join('\n')
+    let caught = null
+    try {
+      rangeCommits('base', 'head', ['scripts/x-guard.mjs'], {
+        readLog: () => log,
+        readTrailers: () => '',
+        readParents: () => {
+          throw new Error('fatal: not a valid object name')
+        },
+      })
+    } catch (error) {
+      caught = error
+    }
+
+    expect(caught?.authorshipUnreadable).toBe(true)
+  })
+
+  it('carries a failing merged-parent trailer read out the same way', () => {
+    const REC = String.fromCharCode(0x1e)
+    const FLD = String.fromCharCode(0x1f)
+    const MERGED = 'c'.repeat(40)
+    const log = [`${REC}${SHA}${FLD}1788000000${FLD}${REAL} ${MERGED}`, '', 'scripts/x-guard.mjs', ''].join('\n')
+    let caught = null
+    try {
+      rangeCommits('base', 'head', ['scripts/x-guard.mjs'], {
+        readLog: () => log,
+        readParents: () => [REAL, MERGED],
+        readTrailers: (sha) => {
+          if (sha === MERGED) throw new Error('fatal: bad object')
+          return ''
+        },
+      })
+    } catch (error) {
+      caught = error
+    }
+
+    expect(caught?.authorshipUnreadable).toBe(true)
+    expect(caught?.message).toContain('merged parent')
   })
 })

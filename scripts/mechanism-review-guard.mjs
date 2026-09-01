@@ -79,7 +79,8 @@ export const BASELINE_RECOVERY_ANCHOR = '28293f97ce0149a9936593733763fd20e62b13e
 // mechanism-review-range-core.mjs — including WHY they are raw control bytes
 // and why the header carries no free text. This file only consumes them.
 
-const git = (cmd) => execSync(`git ${cmd}`, { windowsHide: true, cwd: REPO_ROOT, encoding: 'utf8' }).trim()
+const git = (cmd, options = {}) =>
+  execSync(`git ${cmd}`, { windowsHide: true, cwd: REPO_ROOT, encoding: 'utf8', ...options }).trim()
 
 /** The NO-SHELL lane for the two path-carrying commands (round-5 pass 3): on
  *  Windows, execSync routes through cmd.exe, which expands `%x1e%`-shaped
@@ -350,6 +351,39 @@ function commitFacts(sha) {
  */
 export { mechanismLogCommand }
 
+/**
+ * The default parent reader, exported so a test can exercise the REAL command
+ * rather than replace it (cross-vendor review, GPT-5.6 Sol: a test that injects
+ * `readParents` stays green if the production wiring drops the no-replace flag
+ * or scans past the header).
+ *
+ * BOUNDED, and the bound fails closed: `cat-file -p` emits the whole object
+ * though only its header is wanted, so a commit with a huge message would
+ * otherwise exceed the command buffer. Overflow throws, `authorshipRead` types
+ * it, and the gate blocks — a denial of progress rather than a bypass.
+ */
+export const PARENT_READ_MAX_BYTES = 1024 * 1024
+
+export function defaultParentReader(sha, runGit) {
+  return commitObjectParents(
+    runGit(`--no-replace-objects cat-file -p "${sha}"`, { maxBuffer: PARENT_READ_MAX_BYTES }),
+  )
+}
+
+/** Run one authorship read, and type whatever it throws so the gate can block on
+ *  it instead of letting the fail-open catch wave the turn through. */
+export function authorshipRead(read, what) {
+  try {
+    return read()
+  } catch (error) {
+    const wrapped = new Error(
+      `${what} could not be read (${error?.message ?? error}) — authorship that cannot be read is not authorship that is absent`,
+    )
+    wrapped.authorshipUnreadable = true
+    throw wrapped
+  }
+}
+
 export function rangeCommits(base, head, files, readers = {}) {
   const readLog = readers.readLog ?? ((args) => gitRawFile(args))
   const readTrailers =
@@ -380,7 +414,7 @@ export function rangeCommits(base, head, files, readers = {}) {
   // tip's author is hidden, and an invisible author is not an absent one. Read
   // only where it can matter: a commit that names its own model needs no
   // ancestry, so the extra object read is confined to the trailerless ones.
-  const readParents = readers.readParents ?? ((sha) => commitObjectParents(git(`--no-replace-objects cat-file -p "${sha}"`)))
+  const readParents = readers.readParents ?? ((sha) => defaultParentReader(sha, git))
   return commits.map((commit) => {
     const trailers = trailersOf(commit.sha)
     // EVERY non-first parent, never only the ones outside this range. The
@@ -391,9 +425,30 @@ export function rangeCommits(base, head, files, readers = {}) {
     // invisible to it as an out-of-range one, and skipping it left the merge
     // unattributed.
     const own = modelsFromTrailers(trailers)
-    const parentShas = own.length ? (commit.parentShas ?? []) : readParents(commit.sha)
+    // A FAILED AUTHORSHIP READ IS A BLOCK, NEVER A SHRUG (cross-vendor review,
+    // GPT-5.6 Sol at effort high, do-not-merge on the end state). Both reads
+    // below can throw — an object too large for the command buffer, a parent
+    // missing from a shallow or partial clone, a repository that cannot be
+    // reached — and the exception used to travel all the way to this file's
+    // top-level catch, which prints "allowing stop" and exits 0. A single large
+    // trailerless commit anywhere in the measured range would therefore have
+    // switched the whole gate off, without touching a mechanism file at all.
+    // The failure is typed here and answered with `decision: block` there, the
+    // same way an unreadable ledger already is. Substituting an empty author
+    // list would be worse than either: it OMITS a possible author.
+    const parentShas = own.length ? (commit.parentShas ?? []) : authorshipRead(
+      () => readParents(commit.sha),
+      `the parents of commit ${String(commit.sha).slice(0, 12)}`,
+    )
     const parentAuthorModels = Object.fromEntries(
-      parentShas.slice(1).map((parent) => [parent, modelsFromTrailers(trailersOf(parent))]),
+      parentShas
+        .slice(1)
+        .map((parent) => [
+          parent,
+          modelsFromTrailers(
+            authorshipRead(() => trailersOf(parent), `the trailers of merged parent ${String(parent).slice(0, 12)}`),
+          ),
+        ]),
     )
     return {
       ...commit,
@@ -831,6 +886,23 @@ if (isMainModule(import.meta.url)) {
             `mechanism-review-guard: the review ledger cannot be read, so nothing here can be proven reviewed.\n` +
             `  ${e.message}\n` +
             '  Repair the ledger (it is tracked in git) and end the turn again.',
+        }),
+      )
+      process.exit(0)
+    }
+    // THE SAME ANSWER AN UNREADABLE LEDGER GETS, for the same reason (cross-vendor
+    // review, GPT-5.6 Sol at effort high): a read that decides AUTHORSHIP cannot
+    // fail into the catch below, or one unreadable object switches the gate off.
+    if (e && e.authorshipUnreadable) {
+      process.stdout.write(
+        JSON.stringify({
+          decision: 'block',
+          reason:
+            'mechanism-review-guard: a read that decides authorship failed, so no contribution here can be ' +
+            'proven independently reviewed.\n' +
+            `  ${e.message}\n` +
+            '  Repair the read (a missing object, an unreachable repository, or an object past the command ' +
+            "buffer) and end the turn again. An empty author list is not the answer: it omits an author.",
         }),
       )
       process.exit(0)
