@@ -1525,10 +1525,11 @@ STATED RESIDUAL, because this document states it rather than assuming it away
 (cross-vendor finding, Fable 5, 31.08.2026): the legacy reading has only two
 of the three legs the new definition uses — it cannot ask whether stdout
 reached the suite's own terminal report line, because old records did not store
-it. A legacy run that printed its first red and THEN died without an
-uncaught-exception marker is therefore read as reported, and its reds become
-chargeable, where the same run recorded today would be a crash and charge
-nothing. The trade is deliberate: old records cannot distinguish that sequence,
+it. A legacy run that asserted its backend, printed its first red and THEN
+died without an uncaught-exception marker is therefore read as reported — the
+asserted backend is required, and without it the recorded crash stands — and
+its reds become chargeable, where the same run recorded today would be a crash
+and charge nothing. The trade is deliberate: old records cannot distinguish that sequence,
 and trusting their durable reported-red evidence keeps a real red CHARGEABLE —
 answerable to a point through the ordinary ledger — instead of uncountable
 under a crash verdict, which can charge nothing. What it does not touch is
@@ -1831,8 +1832,9 @@ Every browser suite launches through `launchVerifyBrowser()` and calls
 `assertBackend` after `window.__renderer` appears. WebGPU is the ordinary and
 SMALL lane; LARGE runs the full WebGL 2 regression and then the WebGPU render
 suites. `touch` and `voice` route to WebGL 2 because headless WebGPU cannot drive
-them. `docs` and `preview` are exempt because the first is pure Node and the
-second intentionally lacks the dev-only renderer probe. The accepted residual
+them. `docs`, `board-layout` and `preview` are exempt: the first is pure Node, the
+second renders the published board rather than the game, and the third
+intentionally lacks the dev-only renderer probe. The accepted residual
 is explicit: a WebGL-2-only regression can surface at the next LARGE.
 
 A red closes only through a named fix, a charge to the owning open point via
