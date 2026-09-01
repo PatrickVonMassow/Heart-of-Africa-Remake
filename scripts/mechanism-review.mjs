@@ -1332,12 +1332,37 @@ export function resolveCommit(sha, { run = git } = {}) {
   const subject = run(['show', '-s', '--format=%s', full])
   const trailers = run(['show', '-s', '--format=%(trailers:key=Co-Authored-By,valueonly,separator=;)', full])
   const committedAt = Number(run(['show', '-s', '--format=%ct', full])) * 1000
+  const own = modelsFromTrailers(trailers)
+  // POINT 784'S RULING, THE RECORDER'S HALF. A landing merge is written by the
+  // machinery and carries no trailer of its own; its contribution belongs to the
+  // trailer-bearing tip(s) it merged. The GATE resolves it that way, so without
+  // the same reading here the two disagreed in the one direction that deadlocks:
+  // the gate owed a review the recorder refused to accept, and a merge that
+  // contributed a conflict resolution could never be cleared by any route.
+  // Structural ancestry only — never the first parent, which the merge did not
+  // take in, and never a guess from the subject line. An ordinary trailerless
+  // commit stays authorless-unknown, because absence must not become an
+  // assignment.
+  const parents = own.length
+    ? []
+    : run(['show', '-s', '--format=%P', full]).split(/\s+/).filter(Boolean)
+  const inherited =
+    parents.length > 1
+      ? parents
+          .slice(1)
+          .flatMap((parent) =>
+            modelsFromTrailers(
+              run(['show', '-s', '--format=%(trailers:key=Co-Authored-By,valueonly,separator=;)', parent]),
+            ),
+          )
+      : []
+  const authors = own.length ? own : [...new Set(inherited)]
   return {
     sha: full,
     subject,
     at: Number.isFinite(committedAt) ? committedAt : 0,
-    authoredBy: modelFromTrailers(trailers),
-    authors: modelsFromTrailers(trailers),
+    authoredBy: own.length ? modelFromTrailers(trailers) : (authors[0] ?? ''),
+    authors,
   }
 }
 

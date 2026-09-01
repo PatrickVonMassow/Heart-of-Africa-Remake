@@ -1763,3 +1763,51 @@ describe('the ledger path follows the working directory', () => {
     expect(recordsPathFor(odd)).toBe(resolve(realpathSync(odd), LEDGER_RELATIVE_PATH))
   })
 })
+
+// A LANDING MERGE CARRIES NO TRAILER OF ITS OWN. Point 784's ruling says its
+// contribution belongs to the trailer-bearing tip(s) it merged, and the GATE
+// resolves it that way. The recorder read only the commit's own trailers, so the
+// two disagreed in the one direction that deadlocks: the gate owed a review the
+// recorder refused to accept ("Unknown authorship is unreviewable"), and a merge
+// that contributed a conflict resolution could be cleared by no route at all.
+// Measured 01.09.2026 on main, after landing point 1031.
+describe('a trailerless merge inherits the authorship of the tip it merged', () => {
+  const MERGE = 'a'.repeat(40)
+  const FIRST = 'b'.repeat(40)
+  const MERGED = 'c'.repeat(40)
+  const SOL = 'GPT-5.6 Sol <noreply@openai.com>'
+  const OPUS = 'Claude Opus 5 <noreply@anthropic.com>'
+  const runner = (trailers, parents) => (args) => {
+    const [cmd, ...rest] = args
+    if (cmd === 'rev-parse') return MERGE
+    if (cmd === 'cat-file') return 'commit'
+    const format = rest.find((a) => String(a).startsWith('--format='))
+    const target = rest[rest.length - 1]
+    if (format === '--format=%s') return 'Merge branch ...'
+    if (format === '--format=%ct') return '1788000000'
+    if (format === '--format=%P') return parents.join(' ')
+    return trailers[target] ?? ''
+  }
+
+  it('takes the MERGED tip, never the first parent', () => {
+    const commit = resolveCommit(MERGE, {
+      run: runner({ [MERGE]: '', [FIRST]: OPUS, [MERGED]: SOL }, [FIRST, MERGED]),
+    })
+    expect(commit.authors).toEqual([SOL])
+    expect(commit.authoredBy).toBe(SOL)
+    expect(commit.authors).not.toContain(OPUS)
+  })
+
+  it('leaves its own trailer untouched where the commit has one', () => {
+    const commit = resolveCommit(MERGE, {
+      run: runner({ [MERGE]: OPUS, [FIRST]: '', [MERGED]: SOL }, [FIRST, MERGED]),
+    })
+    expect(commit.authors).toEqual([OPUS])
+  })
+
+  it('leaves an ordinary trailerless commit authorless, so absence is no assignment', () => {
+    const commit = resolveCommit(MERGE, { run: runner({ [MERGE]: '' }, [FIRST]) })
+    expect(commit.authors).toEqual([])
+    expect(commit.authoredBy).toBe('')
+  })
+})
