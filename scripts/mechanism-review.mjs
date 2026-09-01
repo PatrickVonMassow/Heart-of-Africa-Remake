@@ -71,6 +71,7 @@ import {
   parseClaudeResultOutput,
 } from './fable-switch-core.mjs'
 import { authorshipRefusesPermission } from './authorship-check-core.mjs'
+import { commitObjectParents } from './mechanism-review-range-core.mjs'
 import { checkAuthorshipFile } from './authorship-check-io.mjs'
 
 // Re-exported so the flag surface has ONE definition (the pure parser's) and one
@@ -1369,12 +1370,11 @@ export function resolveCommit(sha, { run = git } = {}) {
   // names two, which hides the merged tip's author exactly as a shallow graft
   // would. The same flag guards the trailer reads below: a replaced PARENT could
   // otherwise answer with somebody else's trailers.
-  const rawParents = (sha) =>
-    run(['--no-replace-objects', 'cat-file', '-p', sha])
-      .split('\n')
-      .filter((line) => line.startsWith('parent '))
-      .map((line) => line.slice(7).trim())
-      .filter(Boolean)
+  // AND ONLY THE HEADER IS READ: the message below the blank line is attacker-
+  // shaped text, and a `parent <sha>` line inside it would otherwise inject a
+  // parent git never recorded, whose trailers would become this merge's
+  // authorship. `commitObjectParents` owns that bound for both gates.
+  const rawParents = (sha) => commitObjectParents(run(['--no-replace-objects', 'cat-file', '-p', sha]))
   const parents = own.length ? [] : rawParents(full)
   // AND AN UNREADABLE PARENT FAILS CLOSED. `run` throws where the object is
   // missing — a shallow clone that HAS the parent line but not the object — and

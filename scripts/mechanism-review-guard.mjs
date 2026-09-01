@@ -46,6 +46,7 @@ import {
   verifiedPlannerPasses,
 } from './mechanism-review-core.mjs'
 import {
+  commitObjectParents,
   mechanismLogCommand,
   parseRangeLog as parseWholeRangeLog,
   planAuthorshipGroups,
@@ -379,14 +380,7 @@ export function rangeCommits(base, head, files, readers = {}) {
   // tip's author is hidden, and an invisible author is not an absent one. Read
   // only where it can matter: a commit that names its own model needs no
   // ancestry, so the extra object read is confined to the trailerless ones.
-  const readParents =
-    readers.readParents ??
-    ((sha) =>
-      git(`--no-replace-objects cat-file -p "${sha}"`)
-        .split('\n')
-        .filter((line) => line.startsWith('parent '))
-        .map((line) => line.slice(7).trim())
-        .filter(Boolean))
+  const readParents = readers.readParents ?? ((sha) => commitObjectParents(git(`--no-replace-objects cat-file -p "${sha}"`)))
   return commits.map((commit) => {
     const trailers = trailersOf(commit.sha)
     // EVERY non-first parent, never only the ones outside this range. The

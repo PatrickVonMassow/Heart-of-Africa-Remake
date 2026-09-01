@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import {
+  commitObjectParents,
   commitsForFiles,
   endStateArtefacts,
   formatInvalidatedCoverage,
@@ -641,5 +642,43 @@ describe('the reading selector on its own', () => {
 
   it('answers nothing for no readings', () => {
     expect(newestReading([])).toBe(null)
+  })
+})
+
+// A COMMIT OBJECT IS A HEADER, ONE BLANK LINE, THEN THE MESSAGE — and the
+// message is text a commit author chose. Reading `parent ` lines from the whole
+// object let a message inject a parent git never recorded, and that forged
+// parent's Co-Authored-By trailers would have become the merge's authorship:
+// the model that wrote a merged tip could name a different one and review its
+// own work (cross-vendor review, GPT-5.6 Sol at effort high, 01.09.2026).
+describe('commitObjectParents', () => {
+  const A = 'a'.repeat(40)
+  const B = 'b'.repeat(40)
+  const FORGED = 'f'.repeat(40)
+  const object = (parents, message) =>
+    [`tree ${'0'.repeat(40)}`, ...parents.map((p) => `parent ${p}`), 'author X <x@y> 1 +0000', '', message].join('\n')
+
+  it('reads the header parents in order', () => {
+    expect(commitObjectParents(object([A, B], 'Merge branch ...'))).toEqual([A, B])
+  })
+
+  it('stops at the blank line, so a message cannot forge a parent', () => {
+    const message = ['Merge branch ...', '', `parent ${FORGED}`].join('\n')
+    expect(commitObjectParents(object([A, B], message))).toEqual([A, B])
+  })
+
+  it('is not fooled by a message that opens on the forged line', () => {
+    expect(commitObjectParents(object([A], `parent ${FORGED}`))).toEqual([A])
+  })
+
+  it('answers nothing for a root commit or unreadable output', () => {
+    expect(commitObjectParents(object([], 'Lay down the world'))).toEqual([])
+    expect(commitObjectParents('')).toEqual([])
+    expect(commitObjectParents(null)).toEqual([])
+  })
+
+  it('tolerates CRLF, which a Windows checkout can produce', () => {
+    const crlf = object([A, B], 'Merge branch ...').split('\n').join('\r\n')
+    expect(commitObjectParents(crlf)).toEqual([A, B])
   })
 })

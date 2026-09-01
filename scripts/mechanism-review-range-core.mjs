@@ -106,6 +106,30 @@ export const mechanismLogCommand = (base, head) => [
   `${base}..${head}`,
 ]
 
+/**
+ * The parent shas of a commit OBJECT, read from `cat-file -p` output.
+ *
+ * BOUNDED TO THE HEADER, and that bound is the whole point (cross-vendor review,
+ * GPT-5.6 Sol at effort high, third do-not-merge on this repair). A commit object
+ * is a header, ONE blank line, then the message — and the message is attacker-
+ * shaped text. Filtering every `parent ` line in the whole object let a commit
+ * whose MESSAGE carried such a line inject a parent that git never recorded, and
+ * that forged parent's trailers would then have been read as the merge's
+ * authorship. Reading past the blank line fails OPEN, which is the one direction
+ * an authorship read may never fail in.
+ */
+export function commitObjectParents(out) {
+  const parents = []
+  for (const raw of String(out ?? '').split('\n')) {
+    const line = raw.endsWith('\r') ? raw.slice(0, -1) : raw
+    if (line === '') break
+    if (!line.startsWith('parent ')) continue
+    const sha = line.slice(7).trim()
+    if (sha) parents.push(sha)
+  }
+  return parents
+}
+
 export function parseRangeLog(out, { decodePath = (path) => path } = {}) {
   const commits = []
   let current = null

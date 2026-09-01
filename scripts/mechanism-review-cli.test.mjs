@@ -797,6 +797,8 @@ describe('the mode round-trips into the ledger', () => {
       for (const f of [
         'mechanism-review.mjs',
         'mechanism-review-core.mjs',
+        // the shared, header-bounded commit-object parent parser (merge authorship)
+        'mechanism-review-range-core.mjs',
         'authorship-check-core.mjs',
         'authorship-check-io.mjs',
         'mandatory-duty-core.mjs',
@@ -995,6 +997,8 @@ describe('the mode round-trips into the ledger', () => {
       for (const f of [
         'mechanism-review.mjs',
         'mechanism-review-core.mjs',
+        // the shared, header-bounded commit-object parent parser (merge authorship)
+        'mechanism-review-range-core.mjs',
         'authorship-check-core.mjs',
         'authorship-check-io.mjs',
         'mandatory-duty-core.mjs',
@@ -1222,6 +1226,8 @@ describe('the mode round-trips into the ledger', () => {
       for (const f of [
         'mechanism-review.mjs',
         'mechanism-review-core.mjs',
+        // the shared, header-bounded commit-object parent parser (merge authorship)
+        'mechanism-review-range-core.mjs',
         'authorship-check-core.mjs',
         'authorship-check-io.mjs',
         'mandatory-duty-core.mjs',
@@ -1315,6 +1321,8 @@ describe('the mode round-trips into the ledger', () => {
       for (const f of [
         'mechanism-review.mjs',
         'mechanism-review-core.mjs',
+        // the shared, header-bounded commit-object parent parser (merge authorship)
+        'mechanism-review-range-core.mjs',
         'authorship-check-core.mjs',
         'authorship-check-io.mjs',
         'mandatory-duty-core.mjs',
