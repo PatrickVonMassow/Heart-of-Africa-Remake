@@ -14374,3 +14374,36 @@ to land than a mechanism that needs a review.
   Criticality: high — a charge that excuses a red nobody measured makes the picture gate read green
   where it should bite, which is the same failure as an ownerless red, from the other side.
   Bundle: Testinfrastruktur.
+
+- [ ] 1037. The daemon drill claims it left nothing alive, but it only ASKS and never waits
+  (measured 01.09.2026 on CI run 33502763472 for `main` at `5e33a28`, job `fast`, and reproduced
+  as green three times locally on the same commit — a load-dependent red, not a random one).
+  WHAT FAILED: `scripts/batch-daemon-drill.test.mjs` > `'failing' real-path completion leaves
+  neither its daemon nor its sandbox alive` at line 115, `expect(probePid(result.resources.daemon
+  .pid).exists).toBe(false)` — received `true`. The passing path of the same case stayed green;
+  only the `--inject-failure` path went red.
+  WHY IT IS THE DRILL AND NOT THE TEST: the `finally` block of `realFailureScenario` in
+  `scripts/batch-daemon-drill.mjs` requests `shutdown`, then sleeps a FIXED 300 ms, then SIGKILLs
+  whatever still exists, removes the sandbox, and returns. Nothing waits for the signalled process
+  to actually disappear. So the drill discloses `resources.daemon.pid` as a resource it has torn
+  down while the kill is still in flight, and the assertion reads a process that is dying but not
+  yet gone. On a loaded runner that window is wide enough to lose, and the 300 ms is itself a
+  guess: on a slow runner the daemon has not finished its own shutdown when the sleep ends, so it
+  is SIGKILLed and the gap gets larger, not smaller.
+  WHY IT MATTERS BEYOND THE RED: the drill's whole claim is that a failing teardown leaves no
+  daemon and no sandbox behind. A teardown that signals without confirming cannot prove that — a
+  daemon that genuinely refused to die would look identical to one that simply had not died yet,
+  and the drill would go green over it on any fast machine. The red is the honest half of the
+  bug; the silent green is the dangerous half.
+  FINAL STATE: the drill WAITS for each process it tears down to be gone before it returns, with a
+  bounded wait and a named failure when the wait expires — a process that outlives its teardown is
+  a RED CHECK of the drill, not a race the caller inherits. The fixed 300 ms sleep is replaced by
+  the same bounded wait on the graceful shutdown. The disclosed `resources` describe a state the
+  drill has verified, so the test's assertion becomes a restatement of what the drill already
+  proved rather than a second, racing measurement.
+  VERIFIABLE: a unit case that a teardown whose process does NOT die within the bound comes back
+  as a failed named check rather than a pass; a case that the graceful path does not spend the
+  full bound; the existing drill case, green. Plus `npm run test:unit`, lint, build.
+  Criticality: high — it is the drill that proves the batch daemon leaves nothing running, and its
+  failure direction is a green over a real leak.
+  Bundle: Testinfrastruktur.
