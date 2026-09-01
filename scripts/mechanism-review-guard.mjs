@@ -336,7 +336,14 @@ export function pendingReviewContributions(commits = [], files = [], subjectFor 
  */
 function commitFacts(sha) {
   return {
-    subject: git(`--no-replace-objects show -s --format=%s "${sha}"`, { maxBuffer: PARENT_READ_MAX_BYTES }),
+    // DISPLAY ONLY, so it DEGRADES rather than throws (cross-vendor review,
+    // GPT-5.6 Sol at effort high). The subject names a commit in the refusal
+    // text and decides nothing; making its read fail closed would have let a
+    // commit with an enormous subject line throw into the allow-stop catch —
+    // the same bypass, arriving through the one read that has no authority.
+    // Nothing else here may take this shape: a read that decides authorship
+    // must refuse, and a read that decides nothing must not be able to.
+    subject: readSubject(sha),
     get trailers() {
       return authorshipRead(
         () =>
@@ -386,6 +393,19 @@ export function defaultParentReader(sha, runGit) {
   return commitObjectParents(
     runGit(`--no-replace-objects cat-file -p "${sha}"`, { maxBuffer: PARENT_READ_MAX_BYTES }),
   )
+}
+
+/** The commit subject, for the refusal text alone. It answers a placeholder
+ *  where the read fails, because a display string may not be able to stop a
+ *  gate — and because failing closed here would reopen the very bypass the
+ *  authorship reads were hardened against. */
+export function readSubject(sha, runGit) {
+  const run = runGit ?? git
+  try {
+    return run(`--no-replace-objects show -s --format=%s "${sha}"`, { maxBuffer: PARENT_READ_MAX_BYTES })
+  } catch {
+    return `(subject unreadable for ${String(sha).slice(0, 12)})`
+  }
 }
 
 /** The refusal a typed authorship failure earns, built pure so the answer the

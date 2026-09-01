@@ -22,6 +22,7 @@ import {
   pendingReviewContributions,
   authorshipBlockResponse,
   authorshipRead,
+  readSubject,
   defaultParentReader,
   planningContributions,
   rangeCommits,
@@ -1028,6 +1029,19 @@ describe('an authorship read that fails is typed, never shrugged off', () => {
     expect(answer.reason).toContain('maxBuffer')
     // The one wrong answer this whole repair exists to refuse.
     expect(answer.reason).toContain('An empty author list is not the answer')
+  })
+
+  it('lets the DISPLAY-ONLY subject degrade, because it may not be able to stop a gate', () => {
+    // The opposite rule to its siblings, and deliberately so: the subject names
+    // a commit in the refusal text and decides nothing. Making it fail closed
+    // would let a commit with an enormous subject throw into the allow-stop
+    // catch — the same bypass through the one read that has no authority.
+    expect(
+      readSubject('a'.repeat(40), () => {
+        throw new Error('ENOBUFS: stdout maxBuffer length exceeded')
+      }),
+    ).toContain('subject unreadable')
+    expect(readSubject('a'.repeat(40), () => 'a real subject')).toBe('a real subject')
   })
 
   it('returns the value untouched when the read succeeds', () => {
