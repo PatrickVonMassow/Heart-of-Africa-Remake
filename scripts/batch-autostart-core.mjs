@@ -497,10 +497,18 @@ export function launcherStartDecision({
   }
   const ownerInactive = !lock || assessment?.alive !== true
   if (ownerInactive && evidence.featureWriterRegister.readable !== true) {
+    const unmeasured = evidence.featureWriterRegister.writers.filter(
+      (writer) => writer?.output?.verdict === 'unmeasurable',
+    )
+    const unmeasuredFor = unmeasured.length > 0
+      ? ` for ${unmeasured.map((writer) => `${writer.branch} (${writer.worktree})`).join(', ')}`
+      : ''
     return {
       start: false,
       code: 'writer-register-unreadable',
-      reason: `the registered feature-writer evidence is unreadable (${evidence.featureWriterRegister.reason ?? 'unknown cause'})`,
+      reason: unmeasured.length > 0
+        ? `registered feature-writer output could not be measured${unmeasuredFor}`
+        : `the registered feature-writer evidence is unreadable (${evidence.featureWriterRegister.reason ?? 'unknown cause'})`,
       evidence,
     }
   }

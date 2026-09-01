@@ -66,6 +66,7 @@ import {
   standDownBoundaryDecision,
   successorAgentOrientation,
   declaredAgentCount,
+  evidencePoint,
   openPointSpecs,
   waitEtaRefusal,
   openBranchSlots,
@@ -761,6 +762,7 @@ export function registeredFeatureWriters({
   exec = execFileSync,
   check = checkAgentOutput,
   openProbe = openFeatBranches,
+  pidProbe = probePid,
 } = {}) {
   let trees
   try {
@@ -781,14 +783,32 @@ export function registeredFeatureWriters({
   const declared = declaredAgentProbe(declaration)
   const declaredBranches = new Set(declared.branches.map((ref) => String(ref).replace(/^refs\/heads\//, '')))
   const declaredPaths = new Set(declared.worktrees.map((path) => resolve(String(path))))
+  const registeredBranchesByPoint = new Map()
+  for (const tree of trees) {
+    const point = pointOfBranch(tree.branch)
+    if (point === null) continue
+    const branches = registeredBranchesByPoint.get(point) ?? new Set()
+    branches.add(tree.branch)
+    registeredBranchesByPoint.set(point, branches)
+  }
   const writers = trees
     .filter((tree) => openRefs.has(tree.branch))
     .map((tree) => {
-      const measured = check({ worktree: tree.path, branch: tree.branch, now })
+      const recognized = declaredBranches.has(tree.branch) || declaredPaths.has(resolve(tree.path))
+      // A declaration may carry several delegated strands. PID evidence is
+      // attributed by its recorded point, independently of whether the partial
+      // declaration also names a branch/worktree. It is safe to attach only
+      // when one registered feature branch names that point: otherwise one dead
+      // child could refute a live sibling branch for the same point.
+      const point = pointOfBranch(tree.branch)
+      const pids = point !== null && registeredBranchesByPoint.get(point)?.size === 1
+        ? declared.pids.filter((item) => evidencePoint(item) === point)
+        : []
+      const measured = check({ worktree: tree.path, branch: tree.branch, pids, now, pidProbe })
       return {
         branch: tree.branch,
         worktree: tree.path,
-        recognized: declaredBranches.has(tree.branch) || declaredPaths.has(resolve(tree.path)),
+        recognized,
         output: measured.output ?? null,
         reason: measured.reason ?? null,
         detail: measured.detail ?? null,
