@@ -51,7 +51,7 @@ describe('the commit-msg model-trailer gate', () => {
       'Co-Authored-By: Claude Opus 5 <noreply@anthropic.com>',
       'Co-Authored-By: Claude Opus 5 (1M context) <noreply@anthropic.com>',
       'Co-Authored-By: Claude Opus 4.8 <noreply@anthropic.com>',
-      'Co-Authored-By: Claude Fable 5 <noreply@anthropic.com>',
+      'Co-Authored-By: Claude Fable 5.1 <noreply@anthropic.com>',
     ]) {
       const r = judge(withTrailer(t))
       expect(r.status, `${t} was refused: ${r.stderr}`).toBe(0)

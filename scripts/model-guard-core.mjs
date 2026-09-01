@@ -1,4 +1,4 @@
-// Pure decision core of the serving-model tripwire (point 309). rule:model-policy@d0b43947
+// Pure decision core of the serving-model tripwire (point 309). rule:model-policy@d0066fb3
 // On 24.07.2026 the session silently degraded to Haiku 4.5 and merged defective work; the
 // The Co-Authored-By field in `git log` is the mechanical record of which MODEL
 // authored a commit. A reviewer uses the distinct Reviewed-By key and therefore
@@ -9,7 +9,8 @@
 // session, and the author of the points whose verification is the work and
 // that nothing marks hard — a hard one is Sol's), Opus 4.8 (fallback when Opus
 // 5 is unavailable), GPT-5.6 Sol (the OpenAI authoring lane, point 667, which
-// since 18.08.2026 takes the hard and critical points too), and Fable 5 when
+// since 18.08.2026 takes the hard and critical points too), and Fable (the newest
+// released version, which is what FABLE_MODEL names -- point 1041) when
 // admitted by the shared Fable switch may run the batch. Every other
 // model — Sonnet and Haiku included — is a policy breach: the batch must stop
 // rather than run on it. Hence an ALLOWLIST, not a Haiku blocklist: an unknown
@@ -49,7 +50,7 @@
 // Reducing them to one string is what once raised a breach on an allowed pair.
 // A cross-vendor reviewer is not an author and uses Reviewed-By (point 982).
 
-import { fableIsOn, fableRefusalReason } from './fable-switch-core.mjs'
+import { FABLE_MODEL, fableIsOn, fableRefusalReason } from './fable-switch-core.mjs'
 
 /** Model names allowed to author batch commits, ONE PATTERN PER AUTHORING LANE,
  *  matched against the name PARSED out of a trailer (`modelNamesIn`) — anchored,
@@ -347,7 +348,7 @@ export function isPolicyBreach(trailerField, fableState) {
 export function allowedTrailers(fableState) {
   return Object.freeze([
     'Co-Authored-By: Claude Opus 5 <noreply@anthropic.com>',
-    ...(admitsFable(fableState) ? ['Co-Authored-By: Claude Fable 5 <noreply@anthropic.com>'] : []),
+    ...(admitsFable(fableState) ? [`Co-Authored-By: Claude ${FABLE_MODEL} <noreply@anthropic.com>`] : []),
     'Co-Authored-By: Claude Opus 4.8 <noreply@anthropic.com>',
     'Co-Authored-By: GPT-5.6 Sol <noreply@openai.com>',
   ])
@@ -366,7 +367,7 @@ export function allowedReviewerTrailers(fableState) {
 /** The authoring lanes in one phrase, generated for the same refusal surface. */
 export function allowedModelsPhrase(fableState) {
   return admitsFable(fableState)
-    ? 'Opus 5, Opus 4.8, Fable 5 and GPT-5.6 Sol'
+    ? `Opus 5, Opus 4.8, ${FABLE_MODEL} and GPT-5.6 Sol`
     : 'Opus 5, Opus 4.8 and GPT-5.6 Sol'
 }
 
@@ -637,7 +638,7 @@ export function formatForbiddenReason(hits, { backupRefs = [], alsoUnidentified 
   return [
     `SERVING-MODEL TRIPWIRE: commit(s) ${shaList(hits)} carry a co-author trailer NAMING a model ` +
       `outside the allowlist in force at each commit's own time (Opus 5, Opus 4.8 and GPT-5.6 Sol ` +
-      `may author throughout; Fable 5 may author only while its recorded policy is ON; Sonnet and Haiku ` +
+      `may author throughout; ${FABLE_MODEL} may author only while its recorded policy is ON; Sonnet and Haiku ` +
       `are never admitted; user policy 25.07./13.08.2026).${switchRefusal} Do NOT continue batch work. ` +
       'The tripwire records a handoff to the next allowed lane of the serving chain. Only that fresh lane, ' +
       'after transcript metadata proves which model answered and it re-reads every trailer, may advance ' +

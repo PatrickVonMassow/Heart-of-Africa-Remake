@@ -188,6 +188,28 @@ describe('model identity', () => {
     expect(sameModel('opus', 'Claude Opus 5')).toBe(true)
   })
 
+  // AN API ID WRITES ITS MINOR WITH A DASH AND ITS SNAPSHOT DATE THE SAME WAY, so
+  // reading either as a version is how a model stops matching its own human name —
+  // and two designations that do not match are two models, i.e. a self-review the
+  // ledger would wave through. The dated major-only form is the case the
+  // cross-vendor round (GPT-5.6 Sol, 01.09.2026) found open on the first fix.
+  it('reads a dashed minor as a minor and a dashed snapshot date as neither', () => {
+    expect(parseModel('claude-opus-4-8')).toMatchObject({ family: 'opus', version: '4.8' })
+    expect(parseModel('claude-fable-5-1')).toMatchObject({ family: 'fable', version: '5.1' })
+    expect(parseModel('claude-opus-5-20260801')).toMatchObject({ family: 'opus', version: '5' })
+    expect(parseModel('claude-haiku-4-5-20251001')).toMatchObject({ family: 'haiku', version: '4.5' })
+    expect(parseModel('claude-opus-5[1m]')).toMatchObject({ family: 'opus', version: '5' })
+  })
+
+  it('recognises the API id and the human name of one model as the same eyes', () => {
+    expect(sameModel('claude-opus-4-8', 'Claude Opus 4.8')).toBe(true)
+    expect(sameModel('claude-fable-5-1', 'Fable 5.1')).toBe(true)
+    expect(sameModel('claude-opus-5-20260801', 'Claude Opus 5')).toBe(true)
+    expect(sameModel('claude-haiku-4-5-20251001', 'Haiku 4.5')).toBe(true)
+    // A released successor is NOT the same eyes as its predecessor.
+    expect(sameModel('claude-fable-5-1', 'Fable 5')).toBe(false)
+  })
+
   it('treats a different family or a different version as a different model', () => {
     expect(sameModel('Fable 5', 'Claude Opus 5')).toBe(false)
     expect(sameModel('Claude Opus 4.8', 'Claude Opus 5')).toBe(false)

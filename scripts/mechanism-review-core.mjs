@@ -239,9 +239,15 @@ export function parseModel(name) {
     // version "4" and did NOT match "Opus 4.8", i.e. that pair was silently NOT
     // recognised as one model. It stayed invisible while the only dashed id in use
     // had no minor at all (`claude-fable-5` vs "Fable 5"); moving that lane to
-    // Fable 5.1 is what surfaced it (point 1041). A dated snapshot keeps working:
-    // `claude-haiku-4-5-20251001` becomes 4.5.20251001 and still reads as 4.5.
-    .replace(/(\d)-(?=\d)/g, '$1.')
+    // Fable 5.1 is what surfaced it (point 1041).
+    //
+    // ONLY A SHORT DIGIT RUN IS A MINOR, never a snapshot date (cross-vendor round,
+    // GPT-5.6 Sol, 01.09.2026). Rewriting EVERY digit-dash-digit made the dated
+    // major-only `claude-opus-5-20260801` read as version 5.20260801, which then
+    // compares UNEQUAL to "Opus 5" — and an unequal pair is exactly what lets a
+    // model be picked to review its own work. A date has eight digits and is left
+    // alone; `claude-haiku-4-5-20251001` still reads 4.5.
+    .replace(/(\d)-(?=\d{1,2}(?!\d))/g, '$1.')
   return {
     raw,
     // ONE FAMILY PER MODEL, WHICHEVER HALF OF THE NAME IS WRITTEN (point 667).
