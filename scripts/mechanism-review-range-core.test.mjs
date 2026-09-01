@@ -675,6 +675,16 @@ describe('commitObjectParents', () => {
     expect(commitObjectParents(object([], 'Lay down the world'))).toEqual([])
   })
 
+  it('REFUSES output truncated right after a header line, whose newline looks like the terminator', () => {
+    // "tree…\nparent…\n" splits to [tree, parent, ''] — the trailing empty
+    // string is the newline, not the blank line that ends a header, and reading
+    // it as one answered with the parents it happened to have seen.
+    const cut = [`tree ${'0'.repeat(40)}`, `parent ${A}`, ''].join('\n')
+    expect(() => commitObjectParents(cut)).toThrow(/header terminator/)
+    // The same bytes with a message behind them are a real object.
+    expect(commitObjectParents([`tree ${'0'.repeat(40)}`, `parent ${A}`, '', 'msg', ''].join('\n'))).toEqual([A])
+  })
+
   it('REFUSES a header that never ends, rather than trusting how far it read', () => {
     // A truncated or malformed object gives no evidence where the header stopped,
     // so every line read may already be message. Empty output is that same case.

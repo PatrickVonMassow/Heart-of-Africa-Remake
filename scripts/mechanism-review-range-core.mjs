@@ -129,10 +129,19 @@ export function commitObjectParents(out) {
   }
   const parents = []
   let terminated = false
-  for (const raw of lines) {
+  for (const [index, raw] of lines.entries()) {
     const line = raw.endsWith('\r') ? raw.slice(0, -1) : raw
     if (line === '') {
-      terminated = true
+      // AND THE TERMINATOR MAY NOT BE THE LAST THING IN THE OUTPUT (same review
+      // round, final finding). Output truncated right after a header line's
+      // newline splits to a trailing empty string, which read as the blank line
+      // that ends the header — so a truncated read answered with the parents it
+      // happened to have seen. A real object always has something after that
+      // blank line, even if only the empty string its own trailing newline
+      // leaves. A caller that TRIMS its output loses that evidence for a commit
+      // with an empty message, and such a commit is then refused: no tooling in
+      // this repository writes one, and refusing is the safe side.
+      terminated = index < lines.length - 1
       break
     }
     if (!line.startsWith('parent ')) continue
