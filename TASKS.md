@@ -77,55 +77,6 @@ then point 633 (the closing run), then point 174 (the tag). A newly appended poi
 kind is MOVED to the front in the same turn that files it; leaving it where append-and-defer
 put it is the mistake this line exists to stop.
 
-- [ ] 1038. The launcher's writer probe cannot ever call a feature writer dead, so one dead
-  writer wedges the whole batch for half an hour (measured 01.09.2026, this session, filed from
-  the findings carrier).
-  WHAT HAPPENED: batch session 37d470a8 hit its context boundary at 14:01 and died at 14:03,
-  taking its Sol author for point 1036 with it — no `codex` process ran, the worktree
-  `feat/1036-ledger-convergence` had no commit and no non-git file change after 14:03.
-  `scripts/batch-in-flight.mjs` already refused a declaration for that agent as `evidence-gone`,
-  yet `scripts/batch-autostart-core.mjs` still measured the same writer's verdict as `alive` at
-  14:24 and returned `registered-writer-live`, so the launcher started no successor session. The
-  batch stood still for 24 measured minutes with nothing running and nothing to run.
-  WHY THE TWO PROBES DISAGREE — it is structural, not a tuning difference:
-  `agentOutputVerdict` (`scripts/batch-in-flight-core.mjs`) returns `dead` on exactly one
-  ground — a recorded process identity POSITIVELY REFUTED through `processEvidence`. Everything
-  else it can return is `alive`, `quiet` or `unmeasurable`. `registeredFeatureWriters`
-  (`scripts/batch-in-flight.mjs`) calls `checkAgentOutput({ worktree, branch, now })` and passes
-  NO pids at all, so `processEvidence` is empty for every writer it measures and the refutation
-  branch is unreachable BY CONSTRUCTION. The register can therefore never say `dead`: it reads
-  `alive` from a worktree mtime and a branch tip alone, for the full `RESPAWN_GRACE_MS` of 30
-  minutes after the last touch — which a dead process's leftovers keep satisfying. The
-  declaration path passes its recorded pids and refutes the same writer within seconds.
-  `launcherStartDecision` then vetoes on `writer?.output?.verdict === 'alive'`, and the longer,
-  evidence-poorer window wins.
-  WHY 874 DID NOT ALREADY FIX IT: point 874 is the same defect one path over — it taught
-  `--agent-check` to probe the pid its own DECLARATION records, which is exactly why the
-  declaration path refutes this writer within seconds today. It never reached the launcher's
-  REGISTER path, which builds its own probe call from a git worktree listing and has no pid to
-  pass. 874's own rule — a positively refuted process may not be outvoted by the corpse's last
-  commit — is the rule this path still breaks.
-  WHY IT MATTERS BEYOND THE STANDSTILL: the veto reports a LIVE writer, so the launcher's own
-  record says the batch is busy while nothing is running. The failure is invisible in exactly
-  the log a person would read to find it, and it repeats after every session that dies with a
-  delegated author still registered — which is the normal end of a context boundary, not an
-  exotic crash.
-  FINAL STATE: the two probes cannot return opposite verdicts for the same writer. Where a
-  process identity is recorded for a registered feature worktree or branch, `registeredFeatureWriters`
-  carries it into `checkAgentOutput` so a refuted process makes that writer `dead` there too and
-  the launcher starts its successor; where no identity is recorded, the register's veto is bounded
-  so it cannot outlive the declaration probe's own verdict on the same writer. A launcher refusal
-  that rests on a writer nobody could measure names that fact instead of reporting it as live.
-  VERIFIABLE: a unit case that a registered feature writer whose recorded process is positively
-  refuted does NOT veto the launcher, while a writer with fresh git output and no process
-  evidence still does; a case that the declaration probe and the register return the SAME verdict
-  for one writer given one body of evidence; a case that the refusal text distinguishes a
-  measured-live writer from an unmeasured one; the existing `registered-writer-live` launcher
-  cases, green. Plus `npm run test:unit`, lint, build.
-  Criticality: high — its failure direction is a silent batch standstill of up to the full grace
-  window, reported as a live writer, after the most ordinary session ending there is.
-  Bundle: Session- & Repo-Hygiene.
-
 - [ ] 686. The taught language is five concepts, and the chief's message is four of them (user
   13.08.2026, playing the deployed communication slice).
   The user played the deployed communication slice on 13.08.2026 with the debug
