@@ -14197,49 +14197,6 @@ to land than a mechanism that needs a review.
   Criticality: high — it is the gate that decides whether a second model's refusal is answered, and
   it fails in the direction of reporting cleared where it measured refused.
   Bundle: Modell & Wächter.
-- [ ] 1031. Three red families of the WebGPU lane have no owner, and one of them is a charged red
-  the parser renamed (measured 31.08.2026 on the full WebGPU LARGE pass of
-  `feat/686-five-word-lexicon-game`, 63 minutes, quiet machine; every red of that lane put through
-  `chargeFor` rather than read by eye).
-  Of the lane's reds, 15 came back UNCHARGED, in three families:
-  1. THE BUG-REPORT ARCHIVE RED IS CHARGED AND STILL READS UNCHARGED. Point 927's entry matches
-     `^member hoa-state-\d{4}-\d{2}-\d{2}-\d+\.png is present$`, and the suite printed exactly that
-     check — but the recorded red's NAME is `member hoa-state-2026-08-31-42.png is present — ` with
-     the separator still attached and an EMPTY detail. A check that prints no measurement keeps the
-     ` — ` in its name, so an anchored match can never fire. This is the same class as the
-     section-tag work of 30./31.08.: a red is read through text the recorder shaped, not through
-     what the suite meant. It is the cheapest of the three to fix and the most dangerous to leave,
-     because it makes a CORRECT charge silently ineffective.
-  2. TWO CONSOLE SIGNATURES OF THE POINT-514 MSAA CASCADE ARE UNOWNED: `Async render pipeline
-     creation failed (renderPipeline_ShadowMaterial_…)` and `Uncaptured WebGPU GPUValidationError:
-     [Invalid CommandBuffer from CommandEncoder "renderContext_11"]`. The ledger already carries
-     the cascade's other three signatures (`output-msaa`, `normal-msaa`, `[Invalid TextureView]`)
-     and 514's `why` describes exactly this chain. These two arrive in the same block, after the
-     same `RGBA16Float does not support multisampling`, on the same compatibility lane.
-  3. THE BENCHMARK TIMESTAMP ROWS: `WebGPU: real GPU timestamps were measured for the low-preset
-     rows too — 0/3 low rows with gpu`. Point 1009's entry names them and EXCLUDES them in its own
-     words: "The two WebGPU timestamp rows of the same run fail for their own reasons and are NOT
-     covered here." They have therefore been knowingly ownerless since 30.08.2026.
-  WHY IT BLOCKS: CLAUDE.md §7.2 lets a red close only when it is fixed, charged to its owning
-  point, or filed as a new point. These three are none of the three, so no LARGE pass over the
-  WebGPU lane can be read as covering a picture — which is what stopped the communication rebuild
-  from landing on the evening of 31.08.2026, although nothing in that rebuild touches any of them.
-  FINAL STATE: (1) a red whose check printed no measurement is recorded under the name the suite
-  printed, without the dangling separator — fixed in the parser, not in the ledger entry, because
-  every anchored charge has the same hole; (2) the two cascade signatures join point 514's entry,
-  each as narrowly as its measured text allows; (3) the benchmark timestamp rows get an owner —
-  either an existing point that really covers them or a new one — and are never again excluded by a
-  sentence inside another point's charge.
-  VERIFIABLE: a unit case over the red parser proving a check with an EMPTY detail keeps a clean
-  name and that the existing 927 entry then charges it, mutation-checked; a case pinning each new
-  cascade signature against the measured line and proving it does not match the neighbouring one;
-  a re-run of the WebGPU lane's `settings`, `benchmark` and `report` sections in which every red
-  comes back charged. Plus `npm run test:unit`, lint, build.
-  Criticality: high — it is the gate every point's picture verification is judged by, and its
-  failure direction is a real defect standing in the way of unrelated work while a genuinely
-  charged red reads as unowned.
-  Bundle: Testinfrastruktur.
-
 - [ ] 1032. A blocking Stop guard can refuse the same finding forever, and every refusal spends a
   user-visible answer (measured 31.08.2026, this session).
   WHAT HAPPENED: five Stop guards stood red at once. A red Stop guard does not end the turn; it
