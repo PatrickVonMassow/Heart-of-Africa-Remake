@@ -67,13 +67,17 @@ import { buildAuthorshipPassPlan, formatContributionPassPlan } from './review-so
 
 
 // SWITCHED OFF, NOT REBUILT (CLAUDE.md §2 infrastructure freeze, user decision
-// 01.09.2026; point 1036). This gate could not converge by construction: a
-// verdict is recorded by APPENDING to `.claude/mechanism-reviews.jsonl`, that
-// file is tracked, and the commit carrying it is itself a mechanism
-// contribution owing a round of its own. Clearing one contribution created the
-// next, so a session that answered every finding honestly — fourteen
-// cross-vendor rounds in one day, Sol's final verdict `merge` on each — still
-// ended red, and no amount of correct work inside one session closed it.
+// 01.09.2026; point 1036). This gate could not be brought green from inside a
+// session: answering a review finding means CHANGING a mechanism, and every
+// such change owes a round of its own, so an honest session generates its next
+// demand as it satisfies the last. Fourteen cross-vendor rounds in one day,
+// every finding answered and Sol's final verdict `merge` on each, still left
+// the preflight red.
+//
+// NOT the reason, though it was believed to be one and stands in this point's
+// spec: a LEDGER-ONLY commit does not owe a round — the contribution selection
+// already excludes it, and `mechanism-review-core.test.mjs` holds that case.
+// The treadmill is the code the findings ask for, not the record of them.
 //
 // What is switched off is the automatic BLOCK, and only that. The four-eyes
 // rule of CLAUDE.md §6 stands as practice; nothing is deleted, forgiven or
@@ -85,9 +89,17 @@ import { buildAuthorshipPassPlan, formatContributionPassPlan } from './review-so
 // Reversing this is one commit: drop the stand-down below.
 export const GATE_SWITCHED_OFF =
   'the four-eyes mechanism gate no longer blocks — switched off under the infrastructure ' +
-  'freeze (CLAUDE.md §2, user decision 01.09.2026), because recording a verdict created the ' +
-  'next contribution owing one. The debt is not forgiven and stays readable: ' +
-  'node scripts/mechanism-review-guard.mjs --status'
+  'freeze (CLAUDE.md §2, user decision 01.09.2026), because answering its findings means ' +
+  'changing a mechanism, and each such change owes the next round. The debt is not forgiven ' +
+  'and stays readable: node scripts/mechanism-review-guard.mjs --status'
+
+/** THE REPORT OUTLIVES THE DEFERRAL (cross-vendor review of point 1036). The
+ * context fence suspends the gate's ENFORCEMENT; with the block gone, the
+ * measuring read is all that is left, and a fenced session silently exiting
+ * before it prints is the same defect as the batch-lock stand-down above. A
+ * deferral therefore ends the run only when nobody asked for the report. */
+export const deferralEndsTheRun = (verdict, { status = false } = {}) =>
+  Boolean(verdict?.deferred) && !status
 
 /** Per-branch baseline. Host-local rather than tracked, but shared by every
  * linked worktree: a disposable checkout must see main's branch baselines and
@@ -914,7 +926,7 @@ if (isMainModule(import.meta.url)) {
       writeBaseline(gathered.branch, gathered.baseline)
     }
 
-    if (verdict.deferred) {
+    if (deferralEndsTheRun(verdict, { status })) {
       // Leave the baseline behind the pending mechanism range: that range is
       // the successor's inbox, not a clearance by the fenced session.
       process.stdout.write(JSON.stringify({ systemMessage: verdict.reason }))
