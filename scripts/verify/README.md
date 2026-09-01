@@ -145,7 +145,8 @@ rather than remembered.
 **The receipt.** `run-logged.mjs` writes a RUN RECORD beside the log
 (`<log>.run.json`) before it spawns anything and closes it with a structured
 receipt: exit code, the backend(s) read off the run's own banners, the suites,
-the `git HEAD` it ran on, the log path, the failing names **uncut**, the polls,
+the `git HEAD` it ran on, the log path, the failing names **uncut** (each with
+the `section` it came from where the suite declared one), the polls,
 and **frames expected against frames written**. That last pair is the half point
 375 cannot see — its shutter refuses a frame whose subject is missing, but a
 frame that was never written at all is silent, and a run that photographs 60 of
@@ -453,6 +454,14 @@ front of each turns one into a declaration.
   detail so the check's NAME (and with it the red ledger and the baseline
   classifier) is unchanged — a failing check thus prints the argument that
   re-runs it alone.
+- **The recorder takes that tag back off, and keeps it (point 1018).**
+  `separateResultSection` splits the printed line at tap time into the
+  MEASUREMENT and the section that produced the tag, and the red is stored with
+  `section` as its OWN field. A `RED_CHARGES` entry therefore matches the
+  measurement alone, and no reader recovers a name out of durable text — a check
+  that genuinely measured a value ending in a tag shape is not a tagged one. A
+  record written before that change carries no `section` and keeps its old
+  detail.
 - **A `--section` run is PARTIAL and is never coverage.** The run recorder stamps
   `partial` on the record from `VERIFY_SECTION`, and `runVerdict` refuses it
   whatever the exit code, so `render-verify-guard` cannot be cleared by one. This
@@ -1148,17 +1157,19 @@ Every browser suite launches through `launchVerifyBrowser()` and calls
 `assertBackend(page)` right after the renderer initialises (`window.__renderer`):
 a run launched with `VERIFY_GL=webgpu` that SILENTLY fell back to WebGL 2 (or a
 `webgl` run that came up on WebGPU) fails LOUD instead of giving false
-confidence. Covered: collision, enrichments, events, flow, gamepad, handwriting,
-health, i18n, invariants, polish, settings, touch, visualsweep, voice, world.
+confidence. Covered: benchmark, collision, enrichments, events, flow, gamepad,
+handwriting, health, i18n, invariants, polish, report, settings, startup, touch,
+visualsweep, voice, world — every browser suite except the three below.
 The same call records the WebGPU **feature level** the run came up at (point 505,
 above): on the container's GLES lane that is `compatibility`, on a core adapter
 `core`, and on the WebGL 2 lane it does not apply.
 
-Two suites carry no assertion, each for a structural reason:
+Three suites carry no assertion, each for a structural reason:
 
 | Suite | Why no `assertBackend` |
 |---|---|
 | `docs` | Pure Node doc-structure check — it never opens a browser. |
+| `board-layout` | Opens Chromium, but renders `.batch-dashboard.html` rather than the game, so the dev-only `window.__renderer` the assertion reads never exists. |
 | `preview` | Runs the PRODUCTION build, where `window.__renderer` is dev-only and does not exist. In a LARGE run it rides the WebGL 2 pass only (the WebGPU pass skips the preview). |
 
 A full LARGE run (`npm test` / `npm run test:large`, no `VERIFY_GL` pinned) now
@@ -1236,7 +1247,9 @@ point. The mechanics:
 
 - the recorder taps the run's own `FAIL  …` / `ERR: …` lines, parses them with
   `baseline-classify-core.mjs` (the same reading the triage lane uses) and writes
-  them into the run record, each with the point it was charged to;
+  them into the run record, each with the point it was charged to and — for a
+  suite that declares sections — the `section` it came from as a separate field
+  (point 1018), so the charge reads the measurement and never the printed tag;
 - the ledger is `scripts/render-verify-charges.mjs` — data only, one entry per
   known red, scoped by suite/backend/kind and carrying a dated reason;
 - `runVerdict` in `render-verify-core.mjs` decides, and keeps `clean` and
@@ -1510,17 +1523,20 @@ record age — it is read first, for every record, so a legacy run that carries
 Node's definitive uncaught-exception marker stays a crash whatever else it
 recorded.
 
-STATED RESIDUAL, because this document states them rather than assuming them
-away (cross-vendor finding, Fable 5, 31.08.2026): the legacy reading has only
-two of the three legs the new definition uses — it cannot ask whether stdout
+STATED RESIDUAL, because this document states it rather than assuming it away
+(cross-vendor finding, Fable 5, 31.08.2026): the legacy reading has only two
+of the three legs the new definition uses — it cannot ask whether stdout
 reached the suite's own terminal report line, because old records did not store
-it. A legacy run that printed its first red and THEN died without an
-uncaught-exception marker is therefore read as reported, and its reds become
-chargeable, where the same run recorded today would be a crash and charge
-nothing. The trade is deliberate: old records cannot distinguish that sequence,
-and trusting their durable reported-red evidence keeps a real red blocking
-rather than disappearing into a crash verdict. It applies to no run recorded
-from this revision onward.
+it. A legacy run that asserted its backend, printed its first red and THEN
+died without an uncaught-exception marker is therefore read as reported — the
+asserted backend is required, and without it the recorded crash stands — and
+its reds become chargeable, where the same run recorded today would be a crash
+and charge nothing. The trade is deliberate: old records cannot distinguish that sequence,
+and trusting their durable reported-red evidence keeps a real red CHARGEABLE —
+answerable to a point through the ordinary ledger — instead of uncountable
+under a crash verdict, which can charge nothing. What it does not touch is
+BLOCKING: a red the run printed blocks either way, as the crash paragraph
+below spells out. It applies to no run recorded from this revision onward.
 
 A CRASH is the one verdict no ledger can ever reach: `runVerdict` returns no
 charges for it, deliberately — a run that died rather than reported judged no
@@ -1532,8 +1548,8 @@ ordinary ways — exactly as the paragraph below spells out. Eight of the
 recorded 13.–19.08.2026 runs were exactly this shape WHEN THEY WERE COUNTED,
 before the legacy reading above existed; the count is a dated measurement, not
 a standing property, and the legacy reading may move some of them to reported
-reds. Re-measure it before quoting it. They and inside the window their only exit was the hand
-`--defer`. The guard now names a crash as its own class — **not** an
+reds. Re-measure it before quoting it. Their only exit inside that window was the
+hand `--defer`. The guard now names a crash as its own class — **not** an
 "unexplained red" to hunt — in the status view and in every branch of its
 block message, and gives it the same signed route:
 
@@ -1818,8 +1834,9 @@ Every browser suite launches through `launchVerifyBrowser()` and calls
 `assertBackend` after `window.__renderer` appears. WebGPU is the ordinary and
 SMALL lane; LARGE runs the full WebGL 2 regression and then the WebGPU render
 suites. `touch` and `voice` route to WebGL 2 because headless WebGPU cannot drive
-them. `docs` and `preview` are exempt because the first is pure Node and the
-second intentionally lacks the dev-only renderer probe. The accepted residual
+them. `docs`, `board-layout` and `preview` are exempt: the first is pure Node, the
+second renders the published board rather than the game, and the third
+intentionally lacks the dev-only renderer probe. The accepted residual
 is explicit: a WebGL-2-only regression can surface at the next LARGE.
 
 A red closes only through a named fix, a charge to the owning open point via

@@ -1029,7 +1029,7 @@
     },
     "1017": {
       "at": "2026-08-30T06:22:12.781Z",
-      "why": "Der Punkt ist Aufraeumarbeit an der Buchungstabelle, keine Sperre. Drei Haelften — 603, 938 und die WebGL-Haelfte von 698 — stehen bereits. Der Fehlgriff vom 30.08. zeigt, worauf er achten muss: Vier Haelften fuer die Berichts-Suite wurden geschrieben und IN DERSELBEN STUNDE wieder zurueckgezogen, weil die Meldungen auf jener Bahn gar nicht auftreten — ein schlichter Testaufruf laeuft auf der Alltagsbahn, und das ist WebGPU. Er laeuft hinter der Freigabe, anders als 1016 und 1018.",
+      "why": "Der Punkt ist Aufraeumarbeit an der Buchungstabelle, keine Sperre. Drei Haelften — 603, 938 und die WebGL-Haelfte von 698 — stehen bereits. Der Fehlgriff vom 30.08. zeigt, worauf er achten muss: Vier Haelften fuer die Berichts-Suite wurden geschrieben und IN DERSELBEN STUNDE wieder zurueckgezogen, weil die Meldungen auf jener Bahn gar nicht auftreten — ein schlichter Testaufruf laeuft auf der Alltagsbahn, und das ist WebGPU. Er laeuft hinter der Freigabe, anders als 1016; 1018 ist gelandet und steht in keiner Rangfolge mehr.",
       "origin": "machine",
       "place": "last"
     },
@@ -1053,7 +1053,7 @@
     },
     "1023": {
       "at": "2026-08-31T11:13:43.234Z",
-      "why": "Its cost is real but derived: the refusal is only reprinted while the four-eyes debt blocks turn ends, and point 1019 — already near the front — removes that blocking, so this shrinks to a readability fix behind the release order.",
+      "why": "Its cost is real but derived: the refusal is only reprinted while the four-eyes debt blocks turn ends, and point 1019, which removed that blocking, has landed, so this shrinks to a readability fix behind the release order.",
       "origin": "machine",
       "place": "last"
     },
