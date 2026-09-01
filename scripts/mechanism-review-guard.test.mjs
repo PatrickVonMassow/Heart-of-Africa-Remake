@@ -872,7 +872,8 @@ describe('a trailerless merge is attributed to the tip it merged', () => {
     })
 
     expect(commits).toHaveLength(2)
-    expect(commits[0].authorModels).toEqual([])
+    expect(commits[0].authorModels).toEqual(['GPT-5.6 Sol <noreply@openai.com>'])
+    expect(commits[0].authorModel).toBe('GPT-5.6 Sol <noreply@openai.com>')
     // The MERGED tip, not the first parent: a merge inherits from what it took in.
     expect(commits[0].parentAuthorModels).toEqual({ [MERGED]: ['GPT-5.6 Sol <noreply@openai.com>'] })
     expect(asked).toContain(MERGED)
@@ -891,6 +892,55 @@ describe('a trailerless merge is attributed to the tip it merged', () => {
     expect(groups).toHaveLength(1)
     expect(groups[0].reviewer).toBeTruthy()
     expect(groups[0].unreviewableReason).toBeUndefined()
+  })
+
+  it('lets later attributed pass rows settle the pre-repair unknown-row era', () => {
+    const [commit] = rangeCommits('base', 'head', ['scripts/x-guard.mjs'], {
+      readLog: () => log,
+      readParents: () => [FIRST, MERGED],
+      readTrailers: (sha) => trailers[sha] ?? '',
+    })
+    commit.coveringRecordShas = [MERGE]
+    commit.files = ['scripts/a-guard.mjs', 'scripts/b-guard.mjs']
+    const pass = (index, at, authoredBy) => ({
+      sha: MERGE,
+      authoredBy,
+      model: 'Opus 5',
+      reviewerAuthorship: {
+        status: 'agreement',
+        claimedModel: 'Opus 5',
+        actualModel: 'Opus 5',
+      },
+      verdict: 'merge',
+      evidence: `Checked the complete merge end state in pass ${index}.`,
+      mode: 'review',
+      handover: 'sol-authored',
+      handoverChain: ['Opus 5', 'Fable 5', 'Opus 4.8'],
+      pass: {
+        index,
+        total: 2,
+        files: [commit.files[index - 1]],
+        endState: MERGE,
+      },
+      at,
+    })
+    const beforeRepair = [
+      pass(1, 1_788_000_001_000, ''),
+      pass(2, 1_788_000_002_000, ''),
+    ]
+    const afterRepair = [
+      pass(1, 1_788_000_003_000, 'GPT-5.6 Sol <noreply@openai.com>'),
+      pass(2, 1_788_000_004_000, 'GPT-5.6 Sol <noreply@openai.com>'),
+    ]
+    const verdict = evaluateMechanismReview({
+      baseline: 'base',
+      head: MERGE,
+      pendingCommits: [commit],
+      records: [...beforeRepair, ...afterRepair],
+    })
+
+    expect(verdict.clear).toBe(true)
+    expect(verdict.findings).toEqual([])
   })
 
 

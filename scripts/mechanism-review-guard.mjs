@@ -51,6 +51,7 @@ import {
   parseRangeLog as parseWholeRangeLog,
   planAuthorshipGroups,
   reviewEndStateFiles,
+  withResolvedCommitAuthors,
 } from './mechanism-review-range-core.mjs'
 import { quotePassFile, unquoteGitPath } from './review-material-core.mjs'
 import {
@@ -507,7 +508,7 @@ export function rangeCommits(base, head, files, readers = {}) {
   // only where it can matter: a commit that names its own model needs no
   // ancestry, so the extra object read is confined to the trailerless ones.
   const readParents = readers.readParents ?? ((sha) => defaultParentReader(sha, runGit))
-  return commits.map((commit) => {
+  const measured = commits.map((commit) => {
     // THE COMMIT'S OWN TRAILERS ARE AN AUTHORSHIP READ TOO (cross-vendor review,
     // GPT-5.6 Sol at effort high, second do-not-merge on this end state). It was
     // the one left unwrapped, and it is the most load-bearing of the three: it
@@ -562,6 +563,7 @@ export function rangeCommits(base, head, files, readers = {}) {
       mechanismFiles: mechanismPathsIn(commit.files, { scriptFiles: files }),
     }
   })
+  return withResolvedCommitAuthors(measured)
 }
 
 /**
