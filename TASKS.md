@@ -14393,17 +14393,6 @@ to land than a mechanism that needs a review.
   Criticality: high — it changes what every later point is allowed to be.
   Bundle: Session- & Repo-Hygiene.
 
-- [ ] 1040. The 1036 lane's CI is red: `mechanism-review.mjs --list` is killed by a signal
-  (measured 01.09.2026, findings carrier). A red CI on a pushed ref blocks every landing behind
-  it, so this passes the intake rule as a real blockade.
-  FINAL STATE: the `--list` invocation on the 1036 lane exits normally; the cause of the signal
-  kill (out-of-memory, runaway recursion, or an external kill) is named in the fix's commit; CI
-  on the lane is green.
-  VERIFIABLE: `node scripts/mechanism-review.mjs --list` exits 0 on the lane's head; the lane's
-  CI run concludes green. Plus `npm run test:unit`, lint, build.
-  Criticality: high — a lane whose CI cannot conclude green blocks all landing behind it.
-  Bundle: Testinfrastruktur.
-
 - [ ] 1035. The charge ledger landed with six named findings against it, and two of them widen
   what a red is excused for (measured 01.09.2026, cross-vendor reading of point 1031's landing at
   `main..1bdd3a2`, Opus 5 at effort high, two passes, both merge-with-fixes).
