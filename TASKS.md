@@ -77,6 +77,37 @@ then point 633 (the closing run), then point 174 (the tag). A newly appended poi
 kind is MOVED to the front in the same turn that files it; leaving it where append-and-defer
 put it is the mistake this line exists to stop.
 
+- [ ] 1036. The four-eyes ledger on `main` cannot reach green from where the merge-authorship
+  repair left it (measured 01.09.2026, this session, after landing point 1031).
+  A hand-resolved landing merge measured as UNKNOWN authorship — unreviewable by construction —
+  and the repair of that (`--no-replace-objects` ancestry read from the commit object, bounded to
+  the header, in the gate and the recorder alike, six cross-vendor rounds) is landed and green.
+  What it did NOT do is drain the debt that accumulated while the gate stood blocked, and the
+  baseline only advances when the gate passes, so the window keeps every contribution since.
+  WHAT IS OWED, MEASURED:
+  - TWO STALE PASS SPLITS. `96e082f` and `584ceb9` each carry 1 of 2 recorded passes, and the
+    guard prints no runnable command for either: "no runnable command is printed from the stale
+    split — ask the guard status to rerun the contribution planner at the immutable commit
+    boundary". Whether that rerun is a command anybody can invoke today is exactly what this point
+    must establish; if it is not, the missing command is the deliverable.
+  - THE PRE-REPAIR ROWS FOR `1bdd3a2` STILL DOMINATE. Two verdicts were recorded against it before
+    the repair, when the recorder stored no author; two more were recorded after, carrying the
+    resolved `GPT-5.6 Sol` author. The gate still answers "the only review on record is from
+    unknown model's vendor", so a later, better-attributed row does not supersede an earlier
+    unattributed one. Either it does, with a rule that says why, or a row written against
+    authorship the recorder could not then resolve is retired explicitly.
+  - THE REPAIR'S OWN COMMITS OWE THEIR SOL PASSES over their full end-state file sets; the
+    recorded verdicts cover the files each round actually read, which is less than the set.
+  FINAL STATE: `node scripts/guard-preflight.mjs --for merge` on `main` reports
+  `mechanism-review-guard clean`, every step to that state reached through a command the guard
+  itself printed, and no contribution retired without a reason recorded beside it.
+  VERIFIABLE: the real repository — the preflight is clean on `main` — plus a unit case for
+  whichever rule changed: a superseding row, a retirement, or the planner rerun the stale split
+  needs. Plus `npm run test:unit`, lint, build.
+  Criticality: high — while it stands, no point can be landed at all: the gate refuses every merge,
+  and the batch's whole throughput is behind it.
+  Bundle: Session- & Repo-Hygiene.
+
 - [ ] 686. The taught language is five concepts, and the chief's message is four of them (user
   13.08.2026, playing the deployed communication slice).
   The user played the deployed communication slice on 13.08.2026 with the debug
@@ -14253,3 +14284,53 @@ to land than a mechanism that needs a review.
   Criticality: high — it is the batch singleton, and its failure direction hands a user's
   interactive window a role it never accepted.
   Bundle: Session- & Repo-Hygiene.
+
+- [ ] 1035. The charge ledger landed with six named findings against it, and two of them widen
+  what a red is excused for (measured 01.09.2026, cross-vendor reading of point 1031's landing at
+  `main..1bdd3a2`, Opus 5 at effort high, two passes, both merge-with-fixes).
+  Point 1031 closed the ownerless WebGPU reds and its own re-run proves every red of `settings`,
+  `benchmark` and `report` now charges. The end-state reading of the same material found six
+  things the per-commit reading had not, and the two first ones are not cosmetic: a charge that
+  excuses more than it measured is the failure direction this ledger exists to prevent.
+  FINAL STATE:
+  - THE LOW-PRESET ENTRY STATES ITS OWN CONTAINMENT. Its companion `detailMatch` demands the red
+    name the missing capability (`reason "adapter without the timestamp-query feature"`), because
+    the feature level does NOT test the capability and a compatibility adapter that DOES expose
+    `timestamp-query` would otherwise have a genuine regression charged. The new entry's
+    `detailMatch` carries no reason at all. There IS real containment — `0/N low rows` with N ≥ 1
+    implies the every-row check fails too, and on a capable adapter that check prints a DIFFERENT
+    reason, so its own charge would not apply and the run stays unaccounted — but the `why` claims
+    a cause the signature cannot read. Either the `why` states the containment it actually rests
+    on, or point 1012 makes the low check print its reason and the entry then requires it.
+  - THE TWO TRUNCATED ASYNC ALTERNATIVES SAY WHAT THEY EXCUSE. `MeshStandardMaterial_\d+\): \[Invalid Texture`
+    and `MeshStandardNodeMaterial_\d+\): \[Invalid Text` stop before the object type, so they charge
+    ANY `[Invalid Text…` object for those two families — `[Invalid Texture "output-msaa"]` included —
+    while the `ShadowMaterial` and `RenderPipeline` alternatives demand the full `[Invalid TextureView]`.
+    The truncation math is real and the record genuinely cannot distinguish, so the fix is in the
+    `why`, which today understates the scope as "those four pipeline classes".
+  - THE DIGIT-COUNT DEPENDENCE IS RECORDED. `renderContext_\d{2}$` matches only because a two-digit
+    id lands the 120-character cut exactly at the digits; `renderContext_7` is not charged, and
+    `MeshStandardNodeMaterial_\d+` works at three digits and fails at four. All fail in the safe
+    direction, but the ledger then silently stops accounting for the same measured red, and neither
+    the comments nor the tests say so.
+  - THE TWO CONTRADICTED COMMENTS GO. One above the TextureView `match` still says the
+    async-pipeline form "has no owner and must stay red"; one in the RGBA16Float block still says
+    `Invalid TextureView` and `Invalid CommandBuffer from CommandEncoder` "say nothing about a
+    cause" while the new CommandBuffer entry adopts exactly that name as its whole signature.
+  - THE CASCADE TEST PINS ITS SCOPE. `charges each new cascade signature without taking its
+    neighbouring form` never varies `featureLevel: 'core'`, `backend: 'webgl'`, another suite or
+    `kind: 'check'`; its five neighbours vary only the material family, never the object or the
+    lane — which is the one direction the two truncated alternatives are open in. The low-preset
+    test already does this and is the model to follow.
+  - `checkFromName` KEEPS THE TRAILING SEPARATOR the parser now strips, so a pasted `--failed`
+    result line for an empty-detail check keys differently from the parsed output and returns
+    `inconclusive`. Point 1031 fixed one half of the 06.08.2026 bug; this is the other.
+  VERIFIABLE: a case per bullet, each mutation-checked — the low entry refuses a red whose detail
+  names no cause OR the `why` names the containment and a case pins the every-row companion staying
+  uncharged; a case that the two truncated alternatives do NOT take another object of the same
+  family, or a `why` that says they do; a case per lane, level, suite and kind for the cascade
+  entries; a case pinning `checkFromName` and the parser on the same empty-detail line. Plus
+  `npm run test:unit`, lint, build.
+  Criticality: high — a charge that excuses a red nobody measured makes the picture gate read green
+  where it should bite, which is the same failure as an ownerless red, from the other side.
+  Bundle: Testinfrastruktur.

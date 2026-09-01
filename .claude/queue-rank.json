@@ -1093,12 +1093,6 @@
       "origin": "machine",
       "place": "last"
     },
-    "1031": {
-      "at": "2026-08-31T19:56:40.530Z",
-      "why": "Es blockiert die Bildpruefung jedes Punktes und gehoert der Sache nach zu den Prozessbefunden desselben Abends. Weil die Maschine es selbst eingetragen hat, steht es unter der Nutzerregel vom 20.08.2026 dennoch hinter der Veroeffentlichung — die Anhaengeposition ist die richtige, so dringend der beschriebene Block auch ist.",
-      "origin": "machine",
-      "place": "last"
-    },
     "1032": {
       "at": "2026-08-31T21:53:03.371Z",
       "why": "Es steht bei den anderen Zugende- und Stillstandsbefunden desselben Abends (1030, 1031, 1033): dieselbe Klasse, dieselbe Reihenfolge. Die Schleife kostet Kontext und Nutzerzeit, blockiert aber keinen anderen Punkt, deshalb bleibt die Anhaengeposition richtig.",
@@ -1111,11 +1105,17 @@
       "origin": "machine",
       "place": "last"
     },
-    "1034": {
-      "at": "2026-08-31T23:05:46.103Z",
-      "why": "Maschinell eingetragen, deshalb hinter der Veroeffentlichung nach der Nutzerregel vom 20.08.2026. Der Merge-Weg bleibt begehbar: Die vom Planer wirklich angebotene Runde raeumt jeden Beitrag ab, nur nennt der Waechter sie nicht — der Defekt kostet Zeit und Irrwege, aber er sperrt nichts endgueltig.",
+    "1035": {
+      "at": "2026-09-01T08:45:36.712Z",
+      "why": "It is a correctness debt on charges that already measure and account correctly today; nothing is blocked behind it, so it waits behind the work that is.",
       "origin": "machine",
       "place": "last"
+    },
+    "1036": {
+      "at": "2026-09-01T08:45:41.227Z",
+      "why": "The gate refuses every merge while it stands, so no point behind it can land at all — including the release itself.",
+      "origin": "machine",
+      "place": "ahead"
     }
   },
   "boundary": {
@@ -1154,7 +1154,7 @@
     "why": "The order standing in front of the release today is the arrangement that predates this rule; the four machine-filed points that had ranked themselves there were moved behind 174 first"
   },
   "settled": {
-    "at": "2026-09-01T02:47:39.195Z",
+    "at": "2026-09-01T08:45:41.236Z",
     "points": [
       174,
       184,
@@ -1509,10 +1509,10 @@
       1028,
       1029,
       1030,
-      1031,
       1032,
       1033,
-      1034
+      1035,
+      1036
     ]
   }
 }
