@@ -140,8 +140,12 @@ export const DOC_BUDGETS = [
     // RAISED on 27.08.2026 by the 21-word hook for the user's 24.08.2026 ruling:
     // a stated VDZK recommendation is a decision the session may execute and
     // record. This is a new authorization, not a longer telling of standstill.
-    maxLines: 50,
-    maxWords: 789,
+    // RAISED on 01.09.2026 by the 13-word hook the user ordered persisted: the
+    // redirection plan (keyword "Umsteuerung") with its done/open state, so a
+    // later session can be addressed on it directly. A new topic, not a longer
+    // telling; the ceilings move by exactly that line to the 51 / 802 fit.
+    maxLines: 51,
+    maxWords: 802,
     maxEntryWords: 22,
     // Fifteen words: an index of one-hook lines, where a whole new entry is ~20 words —
     // so the slack cannot hide one, and re-wording an existing hook is free.
