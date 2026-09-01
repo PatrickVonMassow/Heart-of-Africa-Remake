@@ -29,6 +29,7 @@ import {
   gatherMechanismReviewInputs,
   GATE_SWITCHED_OFF,
   deferralEndsTheRun,
+  statusReportsFindings,
   resolveMechanismReviewSessionId,
   shouldSeedRecoveryAnchor,
 } from './mechanism-review-guard.mjs'
@@ -79,6 +80,17 @@ describe('the switched-off gate (point 1036)', () => {
     // An undeferred verdict never ends the run here either way.
     expect(deferralEndsTheRun({ deferred: false }, { status: false })).toBe(false)
     expect(deferralEndsTheRun(null, { status: false })).toBe(false)
+  })
+
+  it('reports the debt from the findings, never from the dead block flag', () => {
+    // A DEFERRED verdict carries its findings and sets `block` false, so a
+    // report keyed on `block` announced GATE CLEAR over a real debt. With the
+    // block switched off, `block` decides nothing at all any more.
+    expect(statusReportsFindings({ block: false, deferred: true, findings: [{}] })).toBe(true)
+    expect(statusReportsFindings({ block: true, findings: [{}, {}] })).toBe(true)
+    expect(statusReportsFindings({ block: false, findings: [] })).toBe(false)
+    expect(statusReportsFindings({})).toBe(false)
+    expect(statusReportsFindings(null)).toBe(false)
   })
 })
 

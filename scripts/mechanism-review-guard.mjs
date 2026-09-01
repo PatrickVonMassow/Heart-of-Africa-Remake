@@ -67,17 +67,15 @@ import { buildAuthorshipPassPlan, formatContributionPassPlan } from './review-so
 
 
 // SWITCHED OFF, NOT REBUILT (CLAUDE.md §2 infrastructure freeze, user decision
-// 01.09.2026; point 1036). This gate could not be brought green from inside a
-// session: answering a review finding means CHANGING a mechanism, and every
-// such change owes a round of its own, so an honest session generates its next
-// demand as it satisfies the last. Fourteen cross-vendor rounds in one day,
-// every finding answered and Sol's final verdict `merge` on each, still left
-// the preflight red.
-//
-// NOT the reason, though it was believed to be one and stands in this point's
-// spec: a LEDGER-ONLY commit does not owe a round — the contribution selection
-// already excludes it, and `mechanism-review-core.test.mjs` holds that case.
-// The treadmill is the code the findings ask for, not the record of them.
+// 01.09.2026; point 1036). What is recorded here is the DECISION and what was
+// measured, not a theory of why the gate behaved as it did:
+//   · it refused every merge, so the batch's whole throughput stood behind it;
+//   · fourteen cross-vendor rounds in one day, every finding answered, did not
+//     clear it, and each round's fixes added a contribution of their own;
+//   · CLAUDE.md §2 says a rule that is in the way is switched off, not rebuilt.
+// Two causes were proposed along the way and are NOT claimed here: a
+// ledger-only commit owes no round (the contribution selection already excludes
+// it), and one follow-up review per fix is ordinary practice, not a regress.
 //
 // What is switched off is the automatic BLOCK, and only that. The four-eyes
 // rule of CLAUDE.md §6 stands as practice; nothing is deleted, forgiven or
@@ -89,8 +87,8 @@ import { buildAuthorshipPassPlan, formatContributionPassPlan } from './review-so
 // Reversing this is one commit: drop the stand-down below.
 export const GATE_SWITCHED_OFF =
   'the four-eyes mechanism gate no longer blocks — switched off under the infrastructure ' +
-  'freeze (CLAUDE.md §2, user decision 01.09.2026), because answering its findings means ' +
-  'changing a mechanism, and each such change owes the next round. The debt is not forgiven ' +
+  'freeze (CLAUDE.md §2, user decision 01.09.2026) after it refused every merge and ' +
+  'fourteen cross-vendor rounds in one day did not clear it. The debt is not forgiven ' +
   'and stays readable: node scripts/mechanism-review-guard.mjs --status'
 
 /** THE REPORT OUTLIVES THE DEFERRAL (cross-vendor review of point 1036). The
@@ -100,6 +98,13 @@ export const GATE_SWITCHED_OFF =
  * deferral therefore ends the run only when nobody asked for the report. */
 export const deferralEndsTheRun = (verdict, { status = false } = {}) =>
   Boolean(verdict?.deferred) && !status
+
+/** WHAT THE REPORT PRINTS IS DECIDED BY THE FINDINGS, NEVER BY `block`
+ * (cross-vendor review of point 1036). A deferred verdict carries its findings
+ * and sets `block` false, so a status keyed on `block` announced GATE CLEAR
+ * over a real debt — and with the block switched off that keying is wrong for
+ * good, because `block` no longer decides anything. */
+export const statusReportsFindings = (verdict) => (verdict?.findings?.length ?? 0) > 0
 
 /** Per-branch baseline. Host-local rather than tracked, but shared by every
  * linked worktree: a disposable checkout must see main's branch baselines and
@@ -980,14 +985,15 @@ if (isMainModule(import.meta.url)) {
         console.log(formatContributionPassPlan(statusPlan))
       }
       if (outcome.action === 'report-gap') console.log(`\n${gap.report}`)
-      else console.log(
-        verdict.block
-          ? `\n${formatMechanismReviewVerdict(verdict, {
-              authorshipPlan: gathered.authorshipPlan,
-              contributionPlan: statusPlan,
-            })}`
-          : '\nGATE CLEAR',
-      )
+      else if (statusReportsFindings(verdict)) {
+        if (verdict.deferred) console.log(`\nDEFERRED, NOT CLEAR: ${verdict.reason}`)
+        console.log(
+          `\n${formatMechanismReviewVerdict(verdict, {
+            authorshipPlan: gathered.authorshipPlan,
+            contributionPlan: statusPlan,
+          })}`,
+        )
+      } else console.log('\nGATE CLEAR')
       process.exit(0)
     }
 
