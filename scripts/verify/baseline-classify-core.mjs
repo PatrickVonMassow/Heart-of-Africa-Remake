@@ -51,7 +51,14 @@ export function parseCheckLines(output) {
     if (!m) continue
     const rest = m[2]
     const dash = rest.indexOf(' — ')
-    const name = (dash === -1 ? rest : rest.slice(0, dash)).trim()
+    // CHECK_LINE trims trailing whitespace through its final `\s*$`. When a
+    // suite prints an EMPTY detail (`FAIL  <name> — `), that leaves ` —` at
+    // the end of `rest`, so the ordinary three-character separator is no
+    // longer present. Treat that exact suffix as the same separator: the red's
+    // identity is the check label the suite printed, never a label renamed by
+    // the recorder.
+    const emptyDash = dash === -1 && rest.endsWith(' —') ? rest.length - 2 : -1
+    const name = (dash === -1 && emptyDash === -1 ? rest : rest.slice(0, dash === -1 ? emptyDash : dash)).trim()
     const detail = dash === -1 ? '' : rest.slice(dash + 3).trim()
     if (!name) continue
     out.push({ status: m[1], name, key: checkKey(name), detail, kind: 'check' })
