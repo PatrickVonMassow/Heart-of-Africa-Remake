@@ -546,4 +546,16 @@ describe('an empty-detail check keys the same from a run and from a pasted line'
   it('leaves a name that merely ENDS in a dash-like word alone', () => {
     expect(checkFromName('FAIL  the frame is off-centre').name).toBe('the frame is off-centre')
   })
+
+  it('does not cut a BARE separator down to nothing', () => {
+    // The line parser drops a check with no name (`if (!name) continue`); this
+    // route has no such guard, so the degenerate input is pinned rather than
+    // left to surprise a caller (cross-vendor review, 01.09.2026).
+    expect(checkFromName('FAIL   —').name).toBe('—')
+    expect(checkFromName('FAIL   — ').name).toBe('—')
+  })
+
+  it('cuts at the FIRST separator when a name carries both forms', () => {
+    expect(checkFromName('FAIL  the check — measured 1.02 —').name).toBe('the check')
+  })
 })

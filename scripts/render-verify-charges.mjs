@@ -438,20 +438,24 @@ export const RED_CHARGES = [
       'immediately after the RGBA16Float multisampling root. Scoped to the measured compatibility ' +
       'settings console lane and to those four pipeline classes; every other pipeline family ' +
       'remains a real red, and the charge dies with point 514. ' +
-      'AND WHAT THE 120-CHARACTER CUT COSTS, SAID PLAINLY (cross-vendor review, 01.09.2026, ' +
-      'merge-with-fixes): only the ShadowMaterial and RenderPipeline alternatives can demand the ' +
-      'whole `[Invalid TextureView]`. The two longer class names push the object past the bound, ' +
-      'so their alternatives stop at `[Invalid Texture` and `[Invalid Text` and therefore excuse ' +
-      'ANY invalid-texture object for those two families — `[Invalid Texture "output-msaa"]` ' +
-      'included, which is the cascade root itself and is separately charged in any case. The ' +
-      'stored record cannot distinguish them, so this is the widest the evidence supports rather ' +
+      'AND WHAT THE 120-CHARACTER CUT COSTS, SAID EXACTLY (cross-vendor review, 01.09.2026): only ' +
+      'the ShadowMaterial and RenderPipeline alternatives can demand the whole ' +
+      '`[Invalid TextureView]`. The two longer class names push the object past the bound, so ' +
+      'their alternatives END at `[Invalid Texture` and `[Invalid Text` — they are PREFIXES, and ' +
+      'they therefore accept every continuation that starts that way, which is wider than ' +
+      '"an invalid-texture object": `[Invalid TextureView]`, `[Invalid Texture "output-msaa"]` ' +
+      'and any future `[Invalid Text…` wording alike, for those two pipeline classes on this one ' +
+      'lane. Whether such a companion red is charged elsewhere is NOT something this entry may ' +
+      'lean on — a charge reads ONE red and never the run around it (POINT 990). The stored ' +
+      'record simply cannot distinguish them, so this is the widest the evidence supports rather ' +
       'than the narrowest anyone would like; narrowing it needs a record that keeps more than the ' +
       'bound, which is POINT 1018. ' +
       'THE SIGNATURES ALSO DEPEND ON THE DIGIT COUNT OF A GENERATED ID, and that is a silent ' +
-      'edge in the OTHER direction: `MeshStandardNodeMaterial_999` retains the shown prefix while ' +
-      'a four-digit id cuts one character earlier and matches nothing, so the same measured red ' +
-      'stops being accounted for. That fails toward a real red, which is the safe side, but it ' +
-      'means an unchanged defect can reappear as an unowned one after a renumbering.',
+      'edge in the OTHER direction: the cut position is fixed, so a LONGER id leaves a SHORTER ' +
+      'object prefix — `MeshStandardNodeMaterial_999` retains the `[Invalid Text` this ' +
+      'alternative demands, while a four-digit id retains one character less and matches nothing. ' +
+      'That fails toward a real red, which is the safe side, but it means an unchanged defect can ' +
+      'reappear as an unowned one after a renumbering.',
   },
   {
     point: 514,
@@ -472,12 +476,15 @@ export const RED_CHARGES = [
       'failures. Scoped to that compatibility settings console lane and to every stable word the ' +
       'record retains; neighbouring WebGPU validation errors remain real reds, and the charge ' +
       'dies with point 514. ' +
-      'THE TWO DIGITS ARE THE BOUND, NOT THE CONTEXT (cross-vendor review, 01.09.2026): the ' +
-      'pattern ends at `renderContext_` plus exactly two digits because that is where the ' +
-      '120-character cut falls, so it covers `renderContext_11` as measured and `_32`/`_34` as ' +
-      're-measured on 01.09.2026 — and NOT a one- or three-digit id, whose different cut leaves ' +
-      'a different stored name that this entry does not match. Such a red stays a real red, which ' +
-      'is the safe direction, but the same measured failure then reads as unowned.',
+      'WHAT THE PATTERN ASKS, AND WHAT WAS MEASURED (cross-vendor review, 01.09.2026, corrected ' +
+      'twice in the same round for claiming more than the evidence carries): it requires the ' +
+      'stored name to END on `renderContext_` plus exactly two digits. WHICH real ids satisfy ' +
+      'that depends on where the recorder\'s 120-character cut falls in the normalised text, and ' +
+      'that has been measured for THREE of them and no others — `_11` on 31.08.2026 and `_32` ' +
+      'and `_34` on 01.09.2026, all three charged. Whether a one-, three- or four-digit id lands ' +
+      'the cut on two digits is NOT established here, and this entry deliberately claims nothing ' +
+      'about it: an id that does not land there stays a real red, which is the safe direction, ' +
+      'though the same measured failure then reads as unowned.',
   },
   {
     point: 568,
