@@ -391,6 +391,10 @@ export function rangeCommits(base, head, files, readers = {}) {
     ((sha) =>
       git(
         `--no-replace-objects show -s --format="%(trailers:key=Co-Authored-By,valueonly,separator=;)" "${sha}"`,
+        // Bounded like the object read, and for the same reason: the format asks
+        // for trailers alone, but a pathological commit should refuse rather
+        // than return something shorter than the truth.
+        { maxBuffer: PARENT_READ_MAX_BYTES },
       ))
   const out = readLog(mechanismLogCommand(base, head))
   const commits = parseRangeLog(out)
@@ -416,7 +420,16 @@ export function rangeCommits(base, head, files, readers = {}) {
   // ancestry, so the extra object read is confined to the trailerless ones.
   const readParents = readers.readParents ?? ((sha) => defaultParentReader(sha, git))
   return commits.map((commit) => {
-    const trailers = trailersOf(commit.sha)
+    // THE COMMIT'S OWN TRAILERS ARE AN AUTHORSHIP READ TOO (cross-vendor review,
+    // GPT-5.6 Sol at effort high, second do-not-merge on this end state). It was
+    // the one left unwrapped, and it is the most load-bearing of the three: it
+    // decides `own`, both author fields, AND whether the ancestry rule is
+    // consulted at all. Failing open here switched the gate off exactly as the
+    // other two did.
+    const trailers = authorshipRead(
+      () => trailersOf(commit.sha),
+      `the trailers of commit ${String(commit.sha).slice(0, 12)}`,
+    )
     // EVERY non-first parent, never only the ones outside this range. The
     // criticality guard may skip an in-range parent because it hands the
     // planner the WHOLE list, so the resolver finds that parent itself. This

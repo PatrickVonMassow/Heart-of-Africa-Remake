@@ -999,6 +999,30 @@ describe('an authorship read that fails is typed, never shrugged off', () => {
     expect(caught?.authorshipUnreadable).toBe(true)
   })
 
+  it('carries a failing OWN trailer read out the same way — the read that decides everything', () => {
+    // It decides `own`, both author fields, and whether the ancestry rule runs at
+    // all, so it is the most load-bearing of the three and was the last to be
+    // wrapped (cross-vendor review, GPT-5.6 Sol, second do-not-merge).
+    const REC = String.fromCharCode(0x1e)
+    const FLD = String.fromCharCode(0x1f)
+    const log = [`${REC}${SHA}${FLD}1788000000${FLD}${REAL}`, '', 'scripts/x-guard.mjs', ''].join('\n')
+    let caught = null
+    try {
+      rangeCommits('base', 'head', ['scripts/x-guard.mjs'], {
+        readLog: () => log,
+        readParents: () => [REAL],
+        readTrailers: () => {
+          throw new Error('ENOBUFS: stdout maxBuffer length exceeded')
+        },
+      })
+    } catch (error) {
+      caught = error
+    }
+
+    expect(caught?.authorshipUnreadable).toBe(true)
+    expect(caught?.message).toContain('the trailers of commit')
+  })
+
   it('carries a failing merged-parent trailer read out the same way', () => {
     const REC = String.fromCharCode(0x1e)
     const FLD = String.fromCharCode(0x1f)
