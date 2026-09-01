@@ -1352,8 +1352,14 @@ export function resolveCommit(sha, { run = git } = {}) {
   // merely INVISIBLE is not an author that is absent, so the model that wrote the
   // hidden tip would no longer be excluded from reviewing it. `cat-file -p` shows
   // the commit object's own parent lines, which no graft rewrites.
+  // AND `--no-replace-objects`, because `cat-file` HONOURS `refs/replace`
+  // (cross-vendor review, GPT-5.6 Sol, second do-not-merge). A replacement
+  // object standing in for the merge can name one parent where the real commit
+  // names two, which hides the merged tip's author exactly as a shallow graft
+  // would. The same flag guards the trailer reads below: a replaced PARENT could
+  // otherwise answer with somebody else's trailers.
   const rawParents = (sha) =>
-    run(['cat-file', '-p', sha])
+    run(['--no-replace-objects', 'cat-file', '-p', sha])
       .split('\n')
       .filter((line) => line.startsWith('parent '))
       .map((line) => line.slice(7).trim())
@@ -1369,7 +1375,13 @@ export function resolveCommit(sha, { run = git } = {}) {
           .slice(1)
           .flatMap((parent) =>
             modelsFromTrailers(
-              run(['show', '-s', '--format=%(trailers:key=Co-Authored-By,valueonly,separator=;)', parent]),
+              run([
+                '--no-replace-objects',
+                'show',
+                '-s',
+                '--format=%(trailers:key=Co-Authored-By,valueonly,separator=;)',
+                parent,
+              ]),
             ),
           )
       : []

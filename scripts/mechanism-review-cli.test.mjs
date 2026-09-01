@@ -1779,21 +1779,29 @@ describe('a trailerless merge inherits the authorship of the tip it merged', () 
   const OPUS = 'Claude Opus 5 <noreply@anthropic.com>'
   // `graftedParents` is what `%P` would print at a shallow boundary: the rule may
   // never consult it, so the fixture makes the two disagree and pins which one wins.
-  const runner = (trailers, parents, { graftedParents = null, unreadable = [] } = {}) => (args) => {
-    const [cmd, ...rest] = args
-    if (cmd === 'rev-parse') return MERGE
-    if (cmd === 'cat-file' && rest[0] === '-t') return 'commit'
-    if (cmd === 'cat-file' && rest[0] === '-p') {
-      return [`tree ${'0'.repeat(40)}`, ...parents.map((p) => `parent ${p}`), '', 'Merge branch ...'].join('\n')
+  // `graftedParents` is what `%P` would print at a shallow boundary and
+  // `replacedParents` what a `refs/replace` object would answer: the rule may
+  // consult NEITHER, so the fixture makes all three disagree.
+  const runner =
+    (trailers, parents, { graftedParents = null, replacedParents = null, unreadable = [], replacedTrailers = {} } = {}) =>
+    (args) => {
+      const noReplace = args[0] === '--no-replace-objects'
+      const [cmd, ...rest] = noReplace ? args.slice(1) : args
+      if (cmd === 'rev-parse') return MERGE
+      if (cmd === 'cat-file' && rest[0] === '-t') return 'commit'
+      if (cmd === 'cat-file' && rest[0] === '-p') {
+        const seen = noReplace ? parents : (replacedParents ?? parents)
+        return [`tree ${'0'.repeat(40)}`, ...seen.map((p) => `parent ${p}`), '', 'Merge branch ...'].join('\n')
+      }
+      const format = rest.find((a) => String(a).startsWith('--format='))
+      const target = rest[rest.length - 1]
+      if (format === '--format=%s') return 'Merge branch ...'
+      if (format === '--format=%ct') return '1788000000'
+      if (format === '--format=%P') return (graftedParents ?? parents).join(' ')
+      if (unreadable.includes(target)) throw new Error(`bad object ${target}`)
+      if (!noReplace && replacedTrailers[target] !== undefined) return replacedTrailers[target]
+      return trailers[target] ?? ''
     }
-    const format = rest.find((a) => String(a).startsWith('--format='))
-    const target = rest[rest.length - 1]
-    if (format === '--format=%s') return 'Merge branch ...'
-    if (format === '--format=%ct') return '1788000000'
-    if (format === '--format=%P') return (graftedParents ?? parents).join(' ')
-    if (unreadable.includes(target)) throw new Error(`bad object ${target}`)
-    return trailers[target] ?? ''
-  }
 
   it('takes the MERGED tip, never the first parent', () => {
     const commit = resolveCommit(MERGE, {
@@ -1829,6 +1837,20 @@ describe('a trailerless merge inherits the authorship of the tip it merged', () 
         run: runner({ [MERGE]: '', [FIRST]: OPUS }, [FIRST, MERGED], { unreadable: [MERGED] }),
       }),
     ).toThrow()
+  })
+
+
+  it('bypasses refs/replace, so a replacement commit cannot drop the merged tip', () => {
+    const commit = resolveCommit(MERGE, {
+      run: runner({ [MERGE]: '', [FIRST]: OPUS, [MERGED]: SOL }, [FIRST, MERGED], {
+        // A replacement object standing in for the merge names ONE parent, and a
+        // replaced parent would answer with the reviewer's own trailer. Reading
+        // either would let the model that wrote the merged tip review it.
+        replacedParents: [FIRST],
+        replacedTrailers: { [MERGED]: OPUS },
+      }),
+    })
+    expect(commit.authors).toEqual([SOL])
   })
 
   it('leaves an ordinary trailerless commit authorless, so absence is no assignment', () => {
