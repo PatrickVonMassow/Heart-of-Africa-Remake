@@ -1420,7 +1420,7 @@ keinen Träger hat. Gebucht als Punkt 956.
 
 ## Anhang A — Maschinell gepflegte Quellen-Übersicht
 
-Zuletzt aktualisiert: Dienstag, 01.09.2026, 16:40 · Quellen-Fingerprint: `f3b298d7fa4c…`
+Zuletzt aktualisiert: Dienstag, 01.09.2026, 17:30 · Quellen-Fingerprint: `a8a0de959031…`
 
 Spalten heuristisch aus den Quellen abgeleitet (Anläufe = distinkte Datumsnennungen im Memory;
 Maßnahme = Guard-Skripte mit Namens-Treffer). Die inhaltliche Bewertung gehört der Prosa oben.
@@ -1505,6 +1505,7 @@ Maßnahme = Guard-Skripte mit Namens-Treffer). Die inhaltliche Bewertung gehört
 | Think harder about what to test; when in doubt add MORE tests — never skimp on fast browserless Vitest cases | 1 | niedrig | — (Regel/Memory) | ◐ Regel |
 | Tests and probes must use IN-GAME-achievable zoom (non-debug 0.125–0.5 at least), never a debug-only zoom — testing at an unrealistic zoom has passed while the player still saw the bug, repeatedly | 1 | niedrig | — (Regel/Memory) | ◐ Regel |
 | Permissions are deliberately maximally broad (whole-tool allows incl. Bash); NEVER narrow or \"tidy\" them again — standing user directive | 2 | mittel | — (Regel/Memory) | ◐ Regel |
+| Der 9-Punkte-Plan vom 01.09.2026 gegen die Governance-Selbstproduktion — Stand, offene Maßnahmen, Veto-Wege; Stichwort „Umsteuerung\" | 2 | mittel | — (Regel/Memory) | ◐ Regel |
 | On every user change request, also update CLAUDE.md and design.md where appropriate — standing directive for all future sessions. | 1 | niedrig | — (Regel/Memory) | ◐ Regel |
 | Every place/landmark/settlement name in the game uses the name that was VALID IN 1890, not a later renaming | 1 | niedrig | — (Regel/Memory) | ◐ Regel |
 | vdzk-answer.mjs CLI refuses in SDK-driven sessions; record via its exported functions with the real transcript uuid | 1 | niedrig | — (Regel/Memory) | ◐ Regel |
@@ -1521,10 +1522,10 @@ Maßnahme = Guard-Skripte mit Namens-Treffer). Die inhaltliche Bewertung gehört
 | A pending batch claim HOLDS THE LAUNCHER BACK — withdraw it whenever the claiming window is left unattended | 2 | mittel | clear-claim-guard.mjs | ✔ Mechanismus |
 | Multi-agent workflows eat the session/weekly limit fast — verify findings INLINE, keep fan-outs small, warn the user with a cost estimate before any big workflow | 3 | mittel | doc-budget-guard.mjs | ✔ Mechanismus |
 
-Erfasste Quellen: 93 Feedback-/Projekt-Memories · 57 Guard-/Hook-Skripte · 6 Revert-/Reapply-Commits · 120 Prozess-/Meta-TASKS-Punkte (davon 54 offen).
+Erfasste Quellen: 94 Feedback-/Projekt-Memories · 57 Guard-/Hook-Skripte · 6 Revert-/Reapply-Commits · 120 Prozess-/Meta-TASKS-Punkte (davon 54 offen).
 
-<!-- RETRO-FINGERPRINT: f3b298d7fa4c4c8e0a3c8fc739f80d678519fcac8c6041367eb78a5f8b1eb1ec -->
-<!-- RETRO-LAST-REFRESHED: 2026-09-01T14:40:05.083Z -->
+<!-- RETRO-FINGERPRINT: a8a0de9590316d714d8b2f61140bcec840ce2351a261f7b50a6f8ef5768c83ec -->
+<!-- RETRO-LAST-REFRESHED: 2026-09-01T15:30:33.674Z -->
 <!-- AUTO-GENERATED:END -->
 
 ### 3.111 Ein Erfolg ist kein Beweis für den Weg, auf dem er zustande kam
