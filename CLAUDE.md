@@ -15,7 +15,19 @@ the target state; this file governs how it is built and verified.
 - Supply playable numeric values by educated guess under `design.md` §14,
   without overriding stated values. Put estimates, marked calibratable, in
   `src/config/balance.ts`, not throughout the code.
-- Only §7 is in scope; begin nothing beyond it until §7.1 is fully met.
+- §7.1 is the acceptance checklist, no longer a gate (user decision 01.09.2026):
+  no criterion blocks beginning other work, and progress is judged by playable
+  game output, not by checklist completion.
+- **Infrastructure freeze (user decision 01.09.2026).** Add no new guards,
+  ledger fields, routers, review planners, or workflow abstractions. An
+  infrastructure defect is worked on only when it reproducibly blocks current
+  game work or permits a false approval; everything else waits. A rule that is
+  in the way is switched off, not rebuilt.
+- **Finding intake (user decision 01.09.2026).** A finding becomes a work-order
+  point only for reproducible player impact, a security or data risk, a real
+  blockade, or when the point deletes or simplifies something. Everything else
+  goes to `docs/backlog.md` (non-blocking, collected, never a gate); duplicates
+  are closed, not re-mechanized.
 
 ## 3. Tech Stack
 
