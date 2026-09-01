@@ -394,6 +394,22 @@ export function contributionReviewScope(record = {}, commit = {}) {
 const descendsFrom = (record, earlier) =>
   String(record?.sha ?? '') !== String(earlier?.sha ?? '') && containedBy(record, earlier?.sha)
 
+/**
+ * A later bounded reading may narrow an earlier refusal at the SAME immutable
+ * state, but it cannot answer the refusal wholesale. This is scope correction,
+ * not a claim that unchanged code was fixed: the clearing row must name a
+ * strict subset of the refusal's files and the file currently being judged.
+ * Re-reading the same set still fixes nothing and remains blocked.
+ */
+const narrowsSameStateRefusal = (answer, refusal, requiredFiles = []) => {
+  if (String(answer?.sha ?? '') !== String(refusal?.sha ?? '')) return false
+  const answerFiles = Array.isArray(answer?.pass?.files) ? [...new Set(answer.pass.files.map(String))] : []
+  const refusalFiles = Array.isArray(refusal?.pass?.files) ? [...new Set(refusal.pass.files.map(String))] : []
+  if (!answerFiles.length || answerFiles.length >= refusalFiles.length) return false
+  if (!answerFiles.every((file) => refusalFiles.includes(file))) return false
+  return (requiredFiles ?? []).every((file) => answerFiles.includes(String(file)))
+}
+
 const commitAuthors = (commit = {}) => {
   const authors = Array.isArray(commit.authorModels)
     ? commit.authorModels
@@ -524,7 +540,9 @@ const openRefusalsIn = (records = [], chain = {}) => {
     const scopeOf = typeof chain.scopeOf === 'function' ? chain.scopeOf : contributionReviewScope
     if (scopeOf(refusal, chain.commit) === 'co-touching') return false
     const directlyAnswered = clearing.some(
-      (answer) => Number(answer.at) > Number(refusal.at) && descendsFrom(answer, refusal),
+      (answer) =>
+        Number(answer.at) > Number(refusal.at) &&
+        (descendsFrom(answer, refusal) || narrowsSameStateRefusal(answer, refusal, requiredFiles)),
     )
     if (directlyAnswered) return false
     const chainClearance = filesClearedByRefusingVendor(refusal, chain)

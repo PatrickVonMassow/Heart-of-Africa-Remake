@@ -773,6 +773,32 @@ describe('evaluateMechanismReview', () => {
       expect(verdict.findings[0].kind).toBe('do-not-merge')
     })
 
+    it('lets a later strict-subset reading correct only an overbroad refusal scope', () => {
+      const first = 'scripts/pre-push-gate-core.mjs'
+      const second = 'scripts/guard-hooks.test.mjs'
+      const refusal = scoped({
+        verdict: 'do-not-merge',
+        at: 1_787_000_001_000,
+        pass: { index: 1, total: 1, files: [first, second], endState: 'c'.repeat(40) },
+      })
+      const narrowed = scoped({
+        verdict: 'merge',
+        at: 1_787_000_002_000,
+        pass: { index: 1, total: 1, files: [first], endState: 'c'.repeat(40) },
+      })
+      const judge = (files) => evaluateMechanismReview({
+        baseline: 'b',
+        head: 'h',
+        pendingCommits: [covered({ files })],
+        records: [refusal, narrowed],
+      })
+
+      expect(judge([first]).block).toBe(false)
+      const stillRefused = judge([second])
+      expect(stillRefused.block).toBe(true)
+      expect(stillRefused.findings[0].kind).toBe('do-not-merge')
+    })
+
     it('keeps a file-scoped 1/3 incomplete and lets no pass-less sibling bypass it', () => {
       const first = scoped({
         pass: { index: 1, total: 3, files: ['scripts/pre-push-gate-core.mjs'], endState: 'c'.repeat(40) },
