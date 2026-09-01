@@ -41,7 +41,9 @@ import {
   mechanismPathsIn,
   LEGACY_RANGE_RETIREMENT_REASON,
   modelFromTrailers,
+  modelVendor,
   modelsFromTrailers,
+  verifiedPlannerPasses,
 } from './mechanism-review-core.mjs'
 import {
   mechanismLogCommand,
@@ -56,6 +58,7 @@ import {
   guardOutcome,
 } from './mechanism-review-guard-gap-core.mjs'
 import { gatherGuardDutyContext } from './guard-duty.mjs'
+import { buildAuthorshipPassPlan, formatContributionPassPlan } from './review-sol.mjs'
 
 const PAUSE = repoPath('.claude/batch-paused')
 
@@ -508,6 +511,46 @@ export function gatherMechanismReviewInputs({ sessionId = '', guardDuty = gather
     revList: (rev) => git(`rev-list ${rev} --not ${effective}`),
   })))
 
+  // A mixed-vendor FILE split is judged by the reviewer the runnable planner
+  // assigned to each pass, not by every contribution author in the wider
+  // range. Re-run that planner only for recorded multi-pass heads, once per
+  // sha, from this guard's measured baseline. `verifiedPlannerPasses` compares
+  // every semantic field, so a hand-edited row or a plan that has genuinely
+  // changed earns no stamp and the evaluator keeps blocking.
+  const plansBySha = new Map()
+  const claimedSplits = new Map()
+  for (const record of records) {
+    const total = Number(record?.pass?.total)
+    const index = Number(record?.pass?.index)
+    if (!Number.isInteger(total) || total < 2 || !Number.isInteger(index) || index < 1 || index > total) continue
+    const key = `${String(record?.sha ?? '')}\0${total}`
+    if (!claimedSplits.has(key)) {
+      claimedSplits.set(key, { sha: String(record?.sha ?? ''), total, indices: new Set(), reviewerVendors: new Set() })
+    }
+    const split = claimedSplits.get(key)
+    split.indices.add(index)
+    split.reviewerVendors.add(modelVendor(record?.model))
+  }
+  // An incomplete raw set cannot become complete through reviewer validation,
+  // so planning it spends Git work without changing the verdict. This keeps
+  // the common Stop/preflight read bounded to the few historical splits whose
+  // every claimed round is actually present (408757d is one).
+  const splitShas = new Set(
+    [...claimedSplits.values()]
+      .filter((split) => split.indices.size === split.total && split.reviewerVendors.size > 1)
+      .map((split) => split.sha)
+      .filter(Boolean),
+  )
+  for (const sha of splitShas) {
+    try {
+      plansBySha.set(sha, buildAuthorshipPassPlan({ sha, base: effective, records: [] }))
+    } catch {
+      // No trusted plan means no verified pass. The evaluator fails closed and
+      // the contribution planner below remains the only repair-command source.
+    }
+  }
+  const plannerVerifiedPasses = verifiedPlannerPasses(records, plansBySha)
+
   // Authorship is also contribution-local. Grouping the whole baseline range
   // by its last file writers was the same unbounded scope in another form.
   const plannedCommits = planningContributions(pendingCommits, records)
@@ -543,6 +586,7 @@ export function gatherMechanismReviewInputs({ sessionId = '', guardDuty = gather
       fence: guardDuty({ sessionId }),
       authorshipPlan,
       endStateFiles: null,
+      plannerVerifiedPasses,
     },
     commits,
     debt: { outstanding: plannedCommits, invalidatedCoverage: [] },
@@ -692,13 +736,15 @@ if (isMainModule(import.meta.url)) {
       console.log(`outstanding review contributions: ${owedContributions.length}`)
       console.log(`outstanding review passes: ${statusPlan?.passCount ?? '<plan unavailable>'}`)
       if (statusPlan) {
-        const { formatContributionPassPlan } = await import('./review-sol.mjs')
         console.log(formatContributionPassPlan(statusPlan))
       }
       if (outcome.action === 'report-gap') console.log(`\n${gap.report}`)
       else console.log(
         verdict.block
-          ? `\n${formatMechanismReviewVerdict(verdict, { authorshipPlan: gathered.authorshipPlan })}`
+          ? `\n${formatMechanismReviewVerdict(verdict, {
+              authorshipPlan: gathered.authorshipPlan,
+              contributionPlan: statusPlan,
+            })}`
           : '\nGATE CLEAR',
       )
       process.exit(0)
@@ -715,7 +761,11 @@ if (isMainModule(import.meta.url)) {
       process.stdout.write(
         JSON.stringify({
           decision: 'block',
-          reason: formatMechanismReviewVerdict(verdict, { authorshipPlan: gathered.authorshipPlan }),
+          reason: formatMechanismReviewVerdict(verdict, {
+            authorshipPlan: gathered.authorshipPlan,
+            contributionPlan: sizedGapPlan,
+            contributionPlanText: sizedGapPlan ? formatContributionPassPlan(sizedGapPlan) : '',
+          }),
         }),
       )
       process.exit(0)
