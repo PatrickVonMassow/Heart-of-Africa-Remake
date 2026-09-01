@@ -428,7 +428,8 @@ describe('the real vibe-coding guide', () => {
   it('carries the whole growing-obligation lesson in the one entry that owns it', () => {
     // Folded from two entries that described the same class. The fold is only
     // honest if every distinct claim of the absorbed entry survived it.
-    const entries = parseEntries(sliceSection(guide, /Fallstrick/i))
+    const section = sliceSection(guide, /Fallstrick/i)
+    const entries = parseEntries(section)
     const duty = entries.filter((entry) => entry.title.startsWith('Die Pflicht wächst schneller'))
     expect(duty).toHaveLength(1)
     // The absorbed entry must not come back beside its host: two entries would
@@ -436,6 +437,13 @@ describe('the real vibe-coding guide', () => {
     // NOT `not.toContain(expect.stringContaining(…))` — `toContain` compares
     // elements by identity, so an asymmetric matcher never matches and the
     // negated form can never fail (GPT-5.6 Sol, 31.08.2026).
+    // And NOT through `parseEntries` alone: a parser that absorbed the old
+    // heading into its host would leave ONE entry, an empty title search and
+    // every claim below satisfied — the named regression would pass. The RAW
+    // section is what forbids the heading, in its own entry or inside the host
+    // text (GPT-5.6 Sol, 01.09.2026).
+    const rawSection = section.map(({ text }) => text).join('\n')
+    expect(rawSection).not.toContain('Die Sperre wächst beim Abtragen')
     expect(entries.some((entry) => entry.title.includes('Die Sperre wächst beim Abtragen'))).toBe(
       false,
     )
