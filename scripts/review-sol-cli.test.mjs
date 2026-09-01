@@ -43,6 +43,7 @@ import { tmpdir } from 'node:os'
 import { delimiter, join, resolve } from 'node:path'
 import { FALLBACK_MODEL_NAME, SECOND_FALLBACK_MODEL_NAME, SOL_MODEL_NAME } from './review-sol-core.mjs'
 import { writeState as writeFableState } from './fable-switch-core.mjs'
+import { formatContributionPassPlan } from './review-sol.mjs'
 
 /** The command and everything it imports — copied so REPO_ROOT is the fixture. */
 const SCRIPT_FILES = [
@@ -1318,6 +1319,36 @@ describe('a range too large for one round', () => {
     expect(r.stderr).toContain('It fits in one round.')
     expect(r.stderr).toContain('Coverage plan: 100% planned coverage')
     expect(r.stdout).toContain('Coverage: FULL REVIEW — 100% of changed files')
+  })
+
+  it('runs the exact one-round command the guard planner prints', () => {
+    provenId()
+    const base = git('rev-parse', `${headSha}~1`)
+    const planText = formatContributionPassPlan({
+      passCount: 1,
+      contributions: [{
+        sha: headSha,
+        subject: 'Add a file',
+        base,
+        fits: true,
+        passes: [{
+          index: 1,
+          total: 1,
+          files: ['added.txt'],
+          reviewer: 'GPT-5.6 Sol',
+        }],
+        uncoverable: [],
+        unreviewable: [],
+      }],
+    })
+    const command = planText.split('\n').find((line) => line.trim().startsWith('node scripts/review-sol.mjs'))?.trim()
+    expect(command).toBeTruthy()
+    expect(command).not.toContain('--pass')
+
+    const r = run(splitCommand(command).slice(2))
+    expect(r.status, r.stderr).toBe(0)
+    expect(r.stderr).toContain('It fits in one round.')
+    expect(r.stderr).not.toContain('names a pass of a split this range does not need')
   })
 
   it('retires carry planning because recorded contribution coverage now persists directly', () => {

@@ -983,7 +983,13 @@ function stopGuardRemedies(root, guard) {
   for (const statement of wrapper.statements) {
     if (!ts.isImportDeclaration(statement)) continue
     const importedFile = statement.moduleSpecifier.text
-    if (!importedFile.startsWith('./') || !importedFile.endsWith('-core.mjs')) continue
+    // Most refusal text lives in a `-core`, but the mechanism guard now prints
+    // its repair commands through review-sol's contribution formatter so the
+    // guard and executable planner cannot drift. Follow that named formatter
+    // too; otherwise this inventory reports that review-sol vanished precisely
+    // because the command acquired a single authoritative source.
+    const carriesRemedyText = importedFile.endsWith('-core.mjs') || importedFile === './review-sol.mjs'
+    if (!importedFile.startsWith('./') || !carriesRemedyText) continue
     const bindings = statement.importClause?.namedBindings
     if (!bindings || !ts.isNamedImports(bindings)) continue
     const importedNames = bindings.elements.map((element) => (element.propertyName ?? element.name).text)

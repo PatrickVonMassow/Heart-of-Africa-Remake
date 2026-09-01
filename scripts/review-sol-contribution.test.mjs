@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { buildContributionPassPlan, formatContributionPassPlan } from './review-sol.mjs'
+import { formatMechanismReviewVerdict } from './mechanism-review-core.mjs'
 
 const commit = (letter, files = ['scripts/example-guard.mjs']) => ({
   sha: letter.repeat(40),
@@ -36,6 +37,51 @@ describe('the guard plan is bounded by each contribution', () => {
     ])
     expect(plan.passCount).toBe(2)
     expect(plan.contributions.map((entry) => entry.passes[0].index)).toEqual([1, 1])
+    expect(formatContributionPassPlan(plan)).not.toContain('--pass')
+  })
+
+  it('lets the runnable planner replace a stale thirteen-pass repair index', () => {
+    const owed = commit('a')
+    const plan = buildContributionPassPlan({ commits: [owed], buildPlan: () => sized() })
+    const planText = formatContributionPassPlan(plan)
+    const verdict = {
+      block: true,
+      findings: [{
+        kind: 'incomplete-passes',
+        commit: owed,
+        records: [],
+        passes: { total: 13, have: 4, missing: [5, 6, 7, 8, 9, 10, 11, 12, 13], uncovered: [] },
+      }],
+    }
+    const refusal = formatMechanismReviewVerdict(verdict, {
+      contributionPlan: plan,
+      contributionPlanText: planText,
+    })
+
+    expect(refusal).toContain('historical split')
+    expect(refusal).toContain('measures 1 runnable pass')
+    expect(refusal).toContain(`--sha ${owed.sha} --since ${owed.parentShas[0]}`)
+    expect(refusal).not.toContain('--pass 5')
+    expect(refusal).not.toContain('--pass 1')
+  })
+
+  it('prints exactly the count and indices of a contribution that really splits', () => {
+    const plan = buildContributionPassPlan({
+      commits: [commit('a', ['scripts/a-guard.mjs', 'scripts/b.mjs'])],
+      buildPlan: () => sized({
+        fits: false,
+        passes: [
+          { index: 1, total: 2, files: ['scripts/a-guard.mjs'], reviewer: 'Opus 5' },
+          { index: 2, total: 2, files: ['scripts/b.mjs'], reviewer: 'Opus 5' },
+        ],
+      }),
+    })
+    const text = formatContributionPassPlan(plan)
+    expect(plan.passCount).toBe(2)
+    expect(text).toContain('2 runnable passes')
+    expect(text.match(/--pass 1\b/g)).toHaveLength(1)
+    expect(text.match(/--pass 2\b/g)).toHaveLength(1)
+    expect(text).not.toContain('--pass 3')
   })
 
   it('does not let one unassemblable contribution erase a sibling runnable command', () => {

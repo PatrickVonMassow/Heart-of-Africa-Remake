@@ -14296,32 +14296,3 @@ to land than a mechanism that needs a review.
   Criticality: high — it is the batch singleton, and its failure direction hands a user's
   interactive window a role it never accepted.
   Bundle: Session- & Repo-Hygiene.
-
-- [ ] 1034. The four-eyes gate prints a repair command its own planner refuses (measured
-  01.09.2026, this session).
-  WHAT HAPPENED: `mechanism-review-guard` blocked every merge on thirteen landed contributions
-  and named, for each, the exact command that would clear it — for example
-  `review-sol.mjs --sha e2550f0 --since e2550f0~1 --pass 5`, "the review was split into 13
-  passes over the FILE SET and only 4 are on record". Running that command is refused:
-  `review-sol` answers "it fits in one round", so pass 5 does not exist. Measured on three of
-  the thirteen: `e2550f0` and `b258a3e` fit in ONE round where the guard demands passes 5-13
-  of thirteen, and `ed2df24` splits into THREE where the guard demands nine more of thirteen.
-  WHY IT BLOCKS: the guard is the gate in front of every merge in the batch, and the only path it
-  offers out is a command that does not run. A session that follows the refusal literally cannot
-  satisfy it, and the refusal repeats unchanged at the next turn end — the standstill class of
-  retrospective §3.223, this time caused by the gate rather than by the session. The clearing
-  path does exist (the scoped 1/1 round the planner really offers), but the guard names a
-  different one, so nobody walks it.
-  FINAL STATE: (1) the guard derives the pass numbers it prints from the SAME planner that would
-  run them, so a printed command is runnable by construction; (2) where the two disagree, the
-  planner wins and the guard says how many passes that range really has; (3) a recorded scoped
-  round clears the contribution it read, and the guard's own refusal text names that round.
-  VERIFIABLE: a unit case that takes a contribution whose range fits in one round and asserts the
-  guard prints `--pass 1` (or no pass flag) rather than an index the planner rejects; a case
-  over a range that really splits, asserting the printed count equals the planner's; a drill that
-  runs the printed command for a fixture contribution and asserts it is accepted rather than
-  refused. Plus `npm run test:unit`, lint, build.
-  Criticality: high — it is the gate in front of every merge, and its failure direction is a
-  batch that cannot land anything while every guard reports itself working.
-  Bundle: Session- & Repo-Hygiene.
-

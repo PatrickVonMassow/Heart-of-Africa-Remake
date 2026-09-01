@@ -40,6 +40,7 @@ import {
   validateMode,
   validatePass,
   validateRecord,
+  verifiedPlannerPasses,
   VERDICTS,
 } from './mechanism-review-core.mjs'
 import { readState, writeState } from './fable-switch-core.mjs'
@@ -1530,7 +1531,79 @@ describe('evaluateMechanismReview', () => {
       const text = formatMechanismReviewVerdict(v)
       expect(text).toContain('split into 3 passes')
       expect(text).toContain('missing pass 2')
-      expect(text).toContain('--pass 2')
+      expect(text).not.toContain('review-sol.mjs --sha')
+      expect(text).toContain('immutable commit boundary')
+    })
+
+    it('replays the measured 408757d mixed-vendor split through the planner assignment', () => {
+      const sha = '408757db2bc0b6bc8a7f57dc0d2b6ea5981c3ece'
+      const shape = [
+        ['GPT-5.6 Sol', ['.claude/queue-rank.json', 'docs/analysis_de/vibe-coding-anleitung.md', 'docs/command-index.md', 'docs/document-cut-757.md']],
+        ['GPT-5.6 Sol', ['docs/work-packages.md', 'scripts/author-routing-core.mjs']],
+        ['GPT-5.6 Sol', ['scripts/author-routing-core.test.mjs', 'scripts/guide-brevity-core.mjs', 'scripts/guide-brevity-core.test.mjs']],
+        ['GPT-5.6 Sol', ['scripts/render-verify-charges.mjs', 'scripts/verify/report-archive-names.mjs', 'scripts/verify/report.mjs']],
+        ['Fable 5', ['.claude/mechanism-reviews.jsonl', 'scripts/mechanism-review-guard.mjs']],
+        ['Fable 5', ['scripts/mechanism-review-guard.test.mjs', 'scripts/render-verify-core.mjs']],
+        ['Fable 5', ['scripts/render-verify-core.test.mjs', 'scripts/section-tag-core.mjs', 'scripts/verify/sections.mjs']],
+        ['Opus 5', ['scripts/criticality-review-guard.mjs', 'scripts/mechanism-review-core.test.mjs']],
+        ['Opus 5', ['scripts/render-verify-guard.mjs', 'scripts/render-verify-guard.test.mjs', 'scripts/render-verify-recorder.mjs']],
+        ['Opus 5', ['scripts/review-sol.mjs', 'scripts/tasks-spec-guard.mjs', 'scripts/verify/sections.test.mjs', 'scripts/review-sol-plan.test.mjs']],
+        ['Fable 5', ['scripts/mechanism-review-core.mjs']],
+        ['Fable 5', ['scripts/render-verify-recorder.test.mjs']],
+        ['Fable 5', ['scripts/verify/README.md']],
+      ]
+      const rows = shape.map(([model, files], offset) => record({
+        sha,
+        model,
+        verdict: 'merge',
+        at: MERGE_ACCOUNTING_SINCE + 10_000 + offset,
+        pass: { index: offset + 1, total: 13, files, endState: sha },
+      }))
+      const plan = {
+        fits: false,
+        passes: shape.map(([reviewer, files], offset) => ({
+          index: offset + 1,
+          total: 13,
+          reviewer,
+          files,
+        })),
+      }
+      const verified = verifiedPlannerPasses(rows, new Map([[sha, plan]]))
+      expect(verified.size).toBe(13)
+
+      const input = {
+        baseline: 'b',
+        head: 'h',
+        pendingCommits: [commit({
+          authorModel: 'Claude Opus 5',
+          files: ['scripts/mechanism-review-core.mjs'],
+          coveringRecordShas: [sha],
+        })],
+        records: rows,
+        plannerVerifiedPasses: verified,
+      }
+      expect(evaluateMechanismReview(input).block).toBe(false)
+
+      // Mutation checks both halves of the contract: an absent round and a row
+      // whose reviewer no longer matches the planner each restore the exact
+      // incomplete-passes refusal instead of inheriting the prior stamp.
+      const withoutSeven = rows.filter((row) => row.pass.index !== 7)
+      const missing = evaluateMechanismReview({
+        ...input,
+        records: withoutSeven,
+        plannerVerifiedPasses: verifiedPlannerPasses(withoutSeven, new Map([[sha, plan]])),
+      })
+      expect(missing.findings[0].kind).toBe('incomplete-passes')
+      expect(missing.findings[0].passes.missing).toContain(7)
+
+      const changed = rows.map((row) => row.pass.index === 11 ? { ...row, model: 'Opus 5' } : row)
+      const mismatched = evaluateMechanismReview({
+        ...input,
+        records: changed,
+        plannerVerifiedPasses: verifiedPlannerPasses(changed, new Map([[sha, plan]])),
+      })
+      expect(mismatched.findings[0].kind).toBe('incomplete-passes')
+      expect(mismatched.findings[0].passes.missing).toContain(11)
     })
 
     it('CLEARS once every pass of the split is on record', () => {

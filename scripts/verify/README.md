@@ -458,10 +458,17 @@ front of each turns one into a declaration.
   `separateResultSection` splits the printed line at tap time into the
   MEASUREMENT and the section that produced the tag, and the red is stored with
   `section` as its OWN field. A `RED_CHARGES` entry therefore matches the
-  measurement alone, and no reader recovers a name out of durable text — a check
-  that genuinely measured a value ending in a tag shape is not a tagged one. A
-  record written before that change carries no `section` and keeps its old
-  detail.
+  measurement alone, and no reader recovers a name out of durable text: the split
+  is made from the gate's live value, so a value merely SHAPED like a tag — any
+  other section's name, or a bracket a check printed itself — stays in the
+  measurement, and a check that prints a tag shape of its own keeps it because
+  only the FINAL suffix comes off. THE ONE CASE THAT REMAINS is a kept line the
+  suite never tagged — an `ERR:` line, which no printer appends to — whose own
+  text ends in exactly the live section's ` [--section=<slug>]`: the separation
+  reads the live gate, not the printer, so it takes that suffix off a line
+  nothing appended it to. Contrived, but reachable, and named rather than
+  papered over. A record written before that change carries no `section` and
+  keeps its old detail.
 - **A `--section` run is PARTIAL and is never coverage.** The run recorder stamps
   `partial` on the record from `VERIFY_SECTION`, and `runVerdict` refuses it
   whatever the exit code, so `render-verify-guard` cannot be cleared by one. This
@@ -1159,7 +1166,10 @@ a run launched with `VERIFY_GL=webgpu` that SILENTLY fell back to WebGL 2 (or a
 `webgl` run that came up on WebGPU) fails LOUD instead of giving false
 confidence. Covered: benchmark, collision, enrichments, events, flow, gamepad,
 handwriting, health, i18n, invariants, polish, report, settings, startup, touch,
-visualsweep, voice, world — every browser suite except the three below.
+voice, world — every suite in the tier map except the three below. `visualsweep`
+asserts the backend too, but it rides in no tier: it is the on-demand capture
+sweep (point 203 C), it renders no pass/fail verdict, and it runs only when
+somebody asks for it.
 The same call records the WebGPU **feature level** the run came up at (point 505,
 above): on the container's GLES lane that is `compatibility`, on a core adapter
 `core`, and on the WebGL 2 lane it does not apply.
@@ -1532,11 +1542,11 @@ died without an uncaught-exception marker is therefore read as reported — the
 asserted backend is required, and without it the recorded crash stands — and
 its reds become chargeable, where the same run recorded today would be a crash
 and charge nothing. The trade is deliberate: old records cannot distinguish that sequence,
-and trusting their durable reported-red evidence keeps a real red CHARGEABLE —
-answerable to a point through the ordinary ledger — instead of uncountable
-under a crash verdict, which can charge nothing. What it does not touch is
-BLOCKING: a red the run printed blocks either way, as the crash paragraph
-below spells out. It applies to no run recorded from this revision onward.
+and trusting their durable reported-red evidence lets the RUN still clear as
+accounted-for, instead of standing as a crash, which `runVerdict` can never
+clear. It does not touch the reds themselves: one the run printed blocks
+either way and closes the three ordinary ways either way, as the crash
+paragraph below spells out. It applies to no run recorded from this revision onward.
 
 A CRASH is the one verdict no ledger can ever reach: `runVerdict` returns no
 charges for it, deliberately — a run that died rather than reported judged no

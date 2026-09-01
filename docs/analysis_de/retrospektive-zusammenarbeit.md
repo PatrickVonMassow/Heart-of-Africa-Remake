@@ -1418,7 +1418,7 @@ keinen Träger hat. Gebucht als Punkt 956.
 
 ## Anhang A — Maschinell gepflegte Quellen-Übersicht
 
-Zuletzt aktualisiert: Dienstag, 01.09.2026, 00:44 · Quellen-Fingerprint: `d8adcd7da67c…`
+Zuletzt aktualisiert: Dienstag, 01.09.2026, 07:12 · Quellen-Fingerprint: `fb04ccd12ae6…`
 
 Spalten heuristisch aus den Quellen abgeleitet (Anläufe = distinkte Datumsnennungen im Memory;
 Maßnahme = Guard-Skripte mit Namens-Treffer). Die inhaltliche Bewertung gehört der Prosa oben.
@@ -1456,7 +1456,7 @@ Maßnahme = Guard-Skripte mit Namens-Treffer). Die inhaltliche Bewertung gehört
 | Work at High effort by default; the user reserves Extra high for research and design decisions, not implementation | 4 | hoch | — (Regel/Memory) | ◐ Regel |
 | Write idiomatic English in all English text (README, code comments, commit messages) — no German calques like 'stand' for a version | 1 | niedrig | — (Regel/Memory) | ◐ Regel |
 | Fable is NOT the default lane because its volume is the scarcest; difficulty is no reason for it either (since 18.08.2026 hard cases go straight to Sol), and review is cross-vendor, not Fable-by-default | 4 | hoch | — (Regel/Memory) | ◐ Regel |
-| Findings recorded by a session that could not write the work order — carry each into TASKS.md, then mark it drained | 39 | hoch | findings-guard.mjs | ✔ Mechanismus |
+| Findings recorded by a session that could not write the work order — carry each into TASKS.md, then mark it drained | 40 | hoch | findings-guard.mjs | ✔ Mechanismus |
 | A recurring lookup gets a script; never pull raw transcripts, listings, or logs into context to answer it | 1 | niedrig | — (Regel/Memory) | ◐ Regel |
 | Past the 150k context watermark, FINISH the step and hand over — never start a suite, an agent or a point after it; the user raised the cost twice (13.08. and 17.08.2026) | 2 | mittel | — (Regel/Memory) | ◐ Regel |
 | User 18.08.2026: hard, complex, error-prone and HIGH-criticality points are AUTHORED by GPT-5.6 Sol directly — Opus 5 authors only what is left, and Fable authors only a point that tags its lane or one the router escalates | 4 | hoch | — (Regel/Memory) | ◐ Regel |
@@ -1510,7 +1510,7 @@ Maßnahme = Guard-Skripte mit Namens-Treffer). Die inhaltliche Bewertung gehört
 | Headless probes must screenshot the DEFAULT zoom too (zoom-gated dressing like haze only shows there); headless WebGPU is impossible, so WebGPU-only branches stay user-checked | 2 | mittel | render-verify-guard.mjs | ✔ Mechanismus |
 | Every GUI/rendering fix must be verified on BOTH WebGPU and WebGL2 before it counts as done — never mark a render fix done on one path | 2 | mittel | render-verify-guard.mjs | ✔ Mechanismus |
 | A resumed batch session must check the previous owner's PROCESS before working — the launcher's \"provably dead\" verdict was wrong and double-spawned | 2 | mittel | render-verify-guard.mjs | ✔ Mechanismus |
-| Rotating verify AND unit failures under a running agent pool are LOAD, not bugs — 8 of 12 unit runs red from load alone; judge a red only on a quiet machine | 4 | hoch | render-verify-guard.mjs | ✔ Mechanismus |
+| Rotating verify AND unit failures under a running agent pool are LOAD, not bugs — 8 of 12 unit runs red from load alone; judge a red only on a quiet machine | 5 | hoch | render-verify-guard.mjs | ✔ Mechanismus |
 | The named \"version release\" process and its trigger — queue/run a version release for a version the user names (full closing → user approval → tag → mirror poc → publish /TAG/ and /poc/) | 1 | niedrig | lock-release-hook.mjs | ✔ Mechanismus |
 | Standing licence to move, REMOVE or ADD villages when it helps — but every change must be checked against the other requirements first, and the check has already caught a real bug | 1 | niedrig | — (Regel/Memory) | ◐ Regel |
 | A VS Code restart restarts the devcontainer — every process inside dies, PPID 1 proves nothing | 2 | mittel | container-ask-guard.mjs | ✔ Mechanismus |
@@ -1521,8 +1521,8 @@ Maßnahme = Guard-Skripte mit Namens-Treffer). Die inhaltliche Bewertung gehört
 
 Erfasste Quellen: 93 Feedback-/Projekt-Memories · 57 Guard-/Hook-Skripte · 6 Revert-/Reapply-Commits · 120 Prozess-/Meta-TASKS-Punkte (davon 54 offen).
 
-<!-- RETRO-FINGERPRINT: d8adcd7da67c25cf5caebb0bed78789f11390c93781dc45a9423e2a91e1c6c23 -->
-<!-- RETRO-LAST-REFRESHED: 2026-08-31T22:44:47.656Z -->
+<!-- RETRO-FINGERPRINT: fb04ccd12ae6596dd0da001271ef7edbea427382506a4268b7e725234f1dc3df -->
+<!-- RETRO-LAST-REFRESHED: 2026-09-01T05:12:37.095Z -->
 <!-- AUTO-GENERATED:END -->
 
 ### 3.111 Ein Erfolg ist kein Beweis für den Weg, auf dem er zustande kam
@@ -5060,3 +5060,50 @@ Richtung beschreibt.
 — nämlich dafür, dass die Antwort nicht die Reparatur ist. Ein Wächter spricht
 mit DIESER Sitzung; behauptet er etwas über sie, das sie selbst anders glaubt,
 ist das zu messen und nicht zu übergehen. Gebucht als Punkt 1032.
+
+### 3.224 Der Lauf starb nicht an der Last, sondern an meiner eigenen Buchung
+
+Am 01.09.2026 lief die volle Regression auf einem Zweig-Arbeitsbaum, und parallel
+dazu landete ein Buchhaltungs-Commit auf dem Hauptzweig. Nach vier Minuten war der
+Lauf rot — nicht an einer Prüfung, sondern an der Laufzeit-Integritätsprüfung, die
+jede Ref-Änderung, jede neue Arbeitsbaum-Registrierung und jeden angefassten Index
+während eines Laufs meldet, gleich in welchem Auscheck sie geschieht.
+
+Das ist die Umkehrung von §3.8. Dort ist die Regel: Ein Rot unter Last beweist
+nichts, weil die Maschine nicht ruhig war. Hier war die Maschine ruhig; nicht
+ruhig war das REPOSITORY, und zwar durch die Hand dessen, der auf den Lauf
+wartete. Beide Ursachen erzeugen dasselbe wertlose Rot, und beide sind unsichtbar,
+solange man nur auf die Auslastung schaut.
+
+**Lehre:** „Ruhige Maschine" hat eine zweite Hälfte — ein ruhiges Repository.
+Sämtliche Arbeit am Hauptzweig, die Vier-Augen-Einträge, die Buchungs-Commits, die
+Pushes und die Tafel-Veröffentlichung, gehört VOR den Start der Suite; während sie
+läuft, ist nur lesende Vorarbeit erlaubt. Bei einem Lauf von achtzig Minuten ist
+das kein Stilfehler, sondern der Unterschied zwischen einer Landung heute Nacht
+und einer morgen früh.
+
+### 3.225 Das Tor schnitt nach der einen Regel zu und zählte nach der anderen
+
+Am 01.09.2026 sperrte der Vier-Augen-Wächter jede Landung des Stapels. Siebzehn
+Beiträge schuldeten eine Gegenlesung; dreißig Lesungen später waren es drei, und
+diese drei ließen sich mit keinem angebotenen Befehl mehr schließen. Der Grund
+war weder Faulheit noch ein fehlender Prüfer: Der Planer zerlegt eine zu große
+Menge Prüfstoff in Durchgänge und vergibt jeden Durchgang an das Modell, das die
+DATEIEN dieses Durchgangs nicht selbst geschrieben hat — ein Zuschnitt, der
+zwangsläufig die Anbieter mischt. Das Tor dagegen zählt einen Durchgang nur,
+wenn sein Modell dem GANZEN Beitrag fremd ist. Von dreizehn wirklich gelesenen
+Durchgängen zählte es vier. Die restlichen neun konnten nie zählen, weil der
+Planer sie per Bauart an die andere Seite vergeben hatte.
+
+Das ist eine eigene Klasse, kein Sonderfall von §3.223. Dort beantwortet eine
+Sitzung dieselbe Ablehnung zehnmal, weil sie die Reparatur nicht findet. Hier
+gibt es keine: Zwei Regeln, jede für sich vernünftig, ergeben zusammen eine
+Pflicht, die niemand erfüllen kann. Sichtbar wird das erst, wenn man die Pflicht
+wirklich abarbeitet — die neun Durchgänge mussten gelesen werden, damit der
+Zähler bei vier stehen blieb und die Ursache zeigte. Eine Schuld, deren
+Bezahlung den Zähler nicht bewegt, ist die Messung selbst.
+
+**Lehre:** Wer ein Tor baut, das Arbeit ZUSCHNEIDET und Arbeit ZÄHLT, muss
+beide Hälften an dieselbe Regel binden. Und wer vor einem solchen Tor steht,
+zahlt die Schuld einmal vollständig, statt zu argumentieren: Erst der bezahlte
+Rest beweist, dass der Zähler falsch zählt.
