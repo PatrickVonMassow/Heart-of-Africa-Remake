@@ -129,6 +129,14 @@ export function commitObjectParents(out) {
   }
   const parents = []
   let terminated = false
+  // GIT PUTS THE PARENTS IN ONE CONTIGUOUS BLOCK DIRECTLY AFTER `tree`, and
+  // accepting one anywhere in the header is forgeable (cross-vendor review,
+  // GPT-5.6 Sol at effort high, CRITICAL): an object carrying a real parent,
+  // then `author`/`committer`, then `parent <forged>` is SINGLE-parented to git
+  // and two-parented to a scan — and the forged object's trailers would then be
+  // inherited as this merge's authorship. The block closes at the first header
+  // line that is not a parent, and nothing may reopen it.
+  let blockClosed = false
   for (const [index, raw] of lines.entries()) {
     const line = raw.endsWith('\r') ? raw.slice(0, -1) : raw
     if (line === '') {
@@ -144,7 +152,15 @@ export function commitObjectParents(out) {
       terminated = index < lines.length - 1
       break
     }
-    if (!line.startsWith('parent ')) continue
+    if (!line.startsWith('parent ')) {
+      // `tree` opens the header and does not close the parent block; every other
+      // header line does.
+      if (index > 0) blockClosed = true
+      continue
+    }
+    if (blockClosed) {
+      throw new Error('commit object header carries a parent line after the parent block closed — git records no such parent')
+    }
     const sha = line.slice(7)
     // A PARENT IS AN OBJECT ID OR IT IS NOTHING (same review round). Trimming a
     // free-form remainder into a "sha" accepted whatever the header carried; the

@@ -1304,7 +1304,7 @@ export function resolveCommit(sha, { run = git } = {}) {
   // the boundary given, and the coverage reader would then clear contributions
   // nobody read. `--disambiguate` never consults refs: it lists the objects
   // whose id carries the prefix, and anything but exactly one commit is refused.
-  const candidates = run(['rev-parse', `--disambiguate=${ref.toLowerCase()}`])
+  const candidates = run(['--no-replace-objects', 'rev-parse', `--disambiguate=${ref.toLowerCase()}`])
     .split('\n')
     .map((line) => line.trim())
     .filter(Boolean)
@@ -1315,7 +1315,7 @@ export function resolveCommit(sha, { run = git } = {}) {
     // is the one direction this check exists to prevent.
     let type
     try {
-      type = run(['cat-file', '-t', candidate])
+      type = run(['--no-replace-objects', 'cat-file', '-t', candidate])
     } catch (e) {
       throw new Error(`--record <sha>: "${ref}" names an object this repository cannot read (${candidate.slice(0, 12)}): ${(e && e.message) || e}`)
     }
@@ -1330,7 +1330,11 @@ export function resolveCommit(sha, { run = git } = {}) {
     )
   }
   const full = commits[0]
-  const subject = run(['show', '-s', '--format=%s', full])
+  // EVERY read here is replacement-blind, not only the authorship ones
+  // (cross-vendor review, GPT-5.6 Sol at effort high): a replacement can
+  // substitute the recorded subject and, worse, the commit TIME — and a forged
+  // older timestamp defeats the later "a review cannot predate its commit" check.
+  const subject = run(['--no-replace-objects', 'show', '-s', '--format=%s', full])
   // THE COMMIT'S OWN TRAILERS ARE READ THE SAME WAY (cross-vendor review,
   // GPT-5.6 Sol, third do-not-merge). This read decides whether the ancestry rule
   // below runs at all: a replacement object that gives the merge a trailer it
@@ -1343,7 +1347,7 @@ export function resolveCommit(sha, { run = git } = {}) {
     '--format=%(trailers:key=Co-Authored-By,valueonly,separator=;)',
     full,
   ])
-  const committedAt = Number(run(['show', '-s', '--format=%ct', full])) * 1000
+  const committedAt = Number(run(['--no-replace-objects', 'show', '-s', '--format=%ct', full])) * 1000
   const own = modelsFromTrailers(trailers)
   // POINT 784'S RULING, THE RECORDER'S HALF. A landing merge is written by the
   // machinery and carries no trailer of its own; its contribution belongs to the
@@ -1375,28 +1379,41 @@ export function resolveCommit(sha, { run = git } = {}) {
   // parent git never recorded, whose trailers would become this merge's
   // authorship. `commitObjectParents` owns that bound for both gates.
   const rawParents = (sha) => commitObjectParents(run(['--no-replace-objects', 'cat-file', '-p', sha]))
-  const parents = own.length ? [] : rawParents(full)
-  // AND AN UNREADABLE PARENT FAILS CLOSED. `run` throws where the object is
-  // missing — a shallow clone that HAS the parent line but not the object — and
-  // that throw is deliberately not caught: refusing to record beats recording a
-  // review whose independence rests on authorship nobody could read.
-  const inherited =
-    parents.length > 1
-      ? parents
-          .slice(1)
-          .flatMap((parent) =>
-            modelsFromTrailers(
-              run([
-                '--no-replace-objects',
-                'show',
-                '-s',
-                '--format=%(trailers:key=Co-Authored-By,valueonly,separator=;)',
-                parent,
-              ]),
-            ),
-          )
-      : []
-  const authors = own.length ? own : [...new Set(inherited)]
+  // AND THE ANCESTRY IS FOLLOWED AS FAR AS IT GOES (cross-vendor review, GPT-5.6
+  // Sol at effort high). Resolving ONE level left a merged tip that is itself a
+  // trailerless machinery merge with no authors at all — the very case this rule
+  // exists for, one step further out — while `authorshipResolver` on the gate
+  // side recurses. The two would then disagree again, which is the deadlock this
+  // whole repair removed. `seen` bounds it: a commit graph is acyclic, but a
+  // repeated parent must not be read twice.
+  //
+  // AN UNREADABLE PARENT FAILS CLOSED. `run` throws where the object is missing —
+  // a shallow clone that HAS the parent line but not the object — and that throw
+  // is deliberately not caught: refusing to record beats recording a review whose
+  // independence rests on authorship nobody could read.
+  const trailersFor = (sha) =>
+    modelsFromTrailers(
+      run([
+        '--no-replace-objects',
+        'show',
+        '-s',
+        '--format=%(trailers:key=Co-Authored-By,valueonly,separator=;)',
+        sha,
+      ]),
+    )
+  const seen = new Set([full])
+  const inherit = (sha) => {
+    const models = trailersFor(sha)
+    if (models.length) return models
+    const parents = rawParents(sha)
+    if (parents.length < 2) return []
+    return parents.slice(1).flatMap((parent) => {
+      if (seen.has(parent)) return []
+      seen.add(parent)
+      return inherit(parent)
+    })
+  }
+  const authors = own.length ? own : [...new Set(inherit(full))]
   return {
     sha: full,
     subject,

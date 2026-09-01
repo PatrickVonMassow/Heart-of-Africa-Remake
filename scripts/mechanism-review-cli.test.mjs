@@ -1881,6 +1881,67 @@ describe('a trailerless merge inherits the authorship of the tip it merged', () 
     expect(commit.authors).not.toContain(OPUS)
   })
 
+  it('follows a trailerless merged tip that is itself a trailerless merge', () => {
+    // Resolving ONE level left the case this rule exists for, one step further
+    // out: a machinery merge whose merged tip is another machinery merge. The
+    // gate's own resolver recurses, so stopping here recreated the disagreement
+    // the whole repair removed (cross-vendor review, GPT-5.6 Sol at effort high).
+    const INNER = 'd'.repeat(40)
+    const parentsOf = { [MERGE]: [FIRST, MERGED], [MERGED]: [FIRST, INNER], [INNER]: [] }
+    const commit = resolveCommit(MERGE, {
+      run: (argv) => {
+        const noReplace = argv[0] === '--no-replace-objects'
+        const args = noReplace ? argv.slice(1) : argv
+        if (args[0] === 'rev-parse') return MERGE
+        if (args[0] === 'cat-file' && args[1] === '-t') return 'commit'
+        if (args[0] === 'cat-file' && args[1] === '-p') {
+          const target = args[2]
+          return [
+            `tree ${'0'.repeat(40)}`,
+            ...(parentsOf[target] ?? []).map((p) => `parent ${p}`),
+            'author X <x@y> 1 +0000',
+            '',
+            'msg',
+            '',
+          ].join('\n')
+        }
+        const format = args.find((a) => String(a).startsWith('--format='))
+        const target = args[args.length - 1]
+        if (format === '--format=%s') return 'Merge branch ...'
+        if (format === '--format=%ct') return '1788000000'
+        // Only the innermost tip names a model; every merge above it is bare.
+        return target === INNER ? SOL : ''
+      },
+    })
+
+    expect(commit.authors).toEqual([SOL])
+  })
+
+  it('reads every field past refs/replace, the timestamp included', () => {
+    // A replacement can substitute the recorded subject and the commit TIME, and
+    // a forged older timestamp defeats the later "a review cannot predate its
+    // commit" validation (cross-vendor review, GPT-5.6 Sol at effort high).
+    const bare = []
+    const commit = resolveCommit(MERGE, {
+      run: (argv) => {
+        if (argv[0] !== '--no-replace-objects') bare.push(argv.join(' '))
+        const args = argv[0] === '--no-replace-objects' ? argv.slice(1) : argv
+        if (args[0] === 'rev-parse') return MERGE
+        if (args[0] === 'cat-file' && args[1] === '-t') return 'commit'
+        if (args[0] === 'cat-file' && args[1] === '-p') {
+          return [`tree ${'0'.repeat(40)}`, `parent ${FIRST}`, '', 'msg', ''].join('\n')
+        }
+        const format = args.find((a) => String(a).startsWith('--format='))
+        if (format === '--format=%s') return 'subject'
+        if (format === '--format=%ct') return '1788000000'
+        return OPUS
+      },
+    })
+
+    expect(commit.at).toBe(1788000000 * 1000)
+    expect(bare).toEqual([])
+  })
+
   it('leaves an ordinary trailerless commit authorless, so absence is no assignment', () => {
     const commit = resolveCommit(MERGE, { run: runner({ [MERGE]: '' }, [FIRST]) })
     expect(commit.authors).toEqual([])

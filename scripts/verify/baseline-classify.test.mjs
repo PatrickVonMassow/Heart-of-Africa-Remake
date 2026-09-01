@@ -543,8 +543,22 @@ describe('an empty-detail check keys the same from a run and from a pasted line'
     expect(checkFromName(consoleLine).name).toBe(consoleLine)
   })
 
-  it('leaves a name that merely ENDS in a dash-like word alone', () => {
+  it('leaves a HYPHEN alone — only the em-dash separator is a separator', () => {
     expect(checkFromName('FAIL  the frame is off-centre').name).toBe('the frame is off-centre')
+    expect(checkFromName('FAIL  the em—dash inside a word').name).toBe('the em—dash inside a word')
+  })
+
+  it('pins the ONE ambiguity it cannot resolve: a label genuinely ending in the separator', () => {
+    // `FAIL  <name> — <detail>` is the producer convention, so a label whose own
+    // last characters are the separator with no detail is indistinguishable from
+    // an empty detail — the same bytes, the same producer. Both routes resolve
+    // it the same way, on purpose, and that is what makes them agree; the cost
+    // is pinned here rather than left to be discovered (cross-vendor review,
+    // GPT-5.6 Sol at effort high, which asked for exactly this boundary).
+    const [parsed] = parseCheckLines('FAIL  the rock is a class of thing — ')
+    expect(parsed.name).toBe('the rock is a class of thing')
+    expect(checkFromName('FAIL  the rock is a class of thing —').name).toBe('the rock is a class of thing')
+    expect(checkFromName('FAIL  the rock is a class of thing —').key).toBe(parsed.key)
   })
 
   it('does not cut a BARE separator down to nothing', () => {

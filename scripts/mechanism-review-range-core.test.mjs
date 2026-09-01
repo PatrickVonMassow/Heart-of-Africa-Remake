@@ -693,6 +693,37 @@ describe('commitObjectParents', () => {
     expect(() => commitObjectParents(null)).toThrow(/header terminator/)
   })
 
+  it('REFUSES a parent line that arrives after the parent block closed', () => {
+    // Git records parents only as the contiguous block directly after `tree`, so
+    // an object with a real parent, then author/committer, then another parent
+    // line is SINGLE-parented to git — and the extra line is a forgery whose
+    // trailers would otherwise be inherited as this merge's authorship.
+    const forged = [
+      `tree ${'0'.repeat(40)}`,
+      `parent ${A}`,
+      'author X <x@y> 1 +0000',
+      `parent ${FORGED}`,
+      '',
+      'msg',
+      '',
+    ].join('\n')
+    expect(() => commitObjectParents(forged)).toThrow(/after the parent block closed/)
+  })
+
+  it('still takes a genuine multi-parent block, in order', () => {
+    const octopus = [
+      `tree ${'0'.repeat(40)}`,
+      `parent ${A}`,
+      `parent ${B}`,
+      `parent ${FORGED}`,
+      'author X <x@y> 1 +0000',
+      '',
+      'msg',
+      '',
+    ].join('\n')
+    expect(commitObjectParents(octopus)).toEqual([A, B, FORGED])
+  })
+
   it('REFUSES a parent line that is not an object id', () => {
     const bent = [`tree ${'0'.repeat(40)}`, `parent ${A} and something else`, '', 'msg'].join('\n')
     expect(() => commitObjectParents(bent)).toThrow(/malformed parent line/)
