@@ -1343,9 +1343,26 @@ export function resolveCommit(sha, { run = git } = {}) {
   // take in, and never a guess from the subject line. An ordinary trailerless
   // commit stays authorless-unknown, because absence must not become an
   // assignment.
-  const parents = own.length
-    ? []
-    : run(['show', '-s', '--format=%P', full]).split(/\s+/).filter(Boolean)
+  //
+  // THE PARENTS ARE READ RAW, NOT THROUGH `%P` (cross-vendor review, GPT-5.6 Sol
+  // at effort high, do-not-merge on the first form). `%P` is GRAFT-AWARE: at a
+  // shallow boundary it prints the rewritten ancestry, so a merge can arrive
+  // looking single-parented. This code would then have inherited nothing and the
+  // merge would read as an ordinary authorless commit — and an author that is
+  // merely INVISIBLE is not an author that is absent, so the model that wrote the
+  // hidden tip would no longer be excluded from reviewing it. `cat-file -p` shows
+  // the commit object's own parent lines, which no graft rewrites.
+  const rawParents = (sha) =>
+    run(['cat-file', '-p', sha])
+      .split('\n')
+      .filter((line) => line.startsWith('parent '))
+      .map((line) => line.slice(7).trim())
+      .filter(Boolean)
+  const parents = own.length ? [] : rawParents(full)
+  // AND AN UNREADABLE PARENT FAILS CLOSED. `run` throws where the object is
+  // missing — a shallow clone that HAS the parent line but not the object — and
+  // that throw is deliberately not caught: refusing to record beats recording a
+  // review whose independence rests on authorship nobody could read.
   const inherited =
     parents.length > 1
       ? parents

@@ -1777,15 +1777,21 @@ describe('a trailerless merge inherits the authorship of the tip it merged', () 
   const MERGED = 'c'.repeat(40)
   const SOL = 'GPT-5.6 Sol <noreply@openai.com>'
   const OPUS = 'Claude Opus 5 <noreply@anthropic.com>'
-  const runner = (trailers, parents) => (args) => {
+  // `graftedParents` is what `%P` would print at a shallow boundary: the rule may
+  // never consult it, so the fixture makes the two disagree and pins which one wins.
+  const runner = (trailers, parents, { graftedParents = null, unreadable = [] } = {}) => (args) => {
     const [cmd, ...rest] = args
     if (cmd === 'rev-parse') return MERGE
-    if (cmd === 'cat-file') return 'commit'
+    if (cmd === 'cat-file' && rest[0] === '-t') return 'commit'
+    if (cmd === 'cat-file' && rest[0] === '-p') {
+      return [`tree ${'0'.repeat(40)}`, ...parents.map((p) => `parent ${p}`), '', 'Merge branch ...'].join('\n')
+    }
     const format = rest.find((a) => String(a).startsWith('--format='))
     const target = rest[rest.length - 1]
     if (format === '--format=%s') return 'Merge branch ...'
     if (format === '--format=%ct') return '1788000000'
-    if (format === '--format=%P') return parents.join(' ')
+    if (format === '--format=%P') return (graftedParents ?? parents).join(' ')
+    if (unreadable.includes(target)) throw new Error(`bad object ${target}`)
     return trailers[target] ?? ''
   }
 
@@ -1803,6 +1809,26 @@ describe('a trailerless merge inherits the authorship of the tip it merged', () 
       run: runner({ [MERGE]: OPUS, [FIRST]: '', [MERGED]: SOL }, [FIRST, MERGED]),
     })
     expect(commit.authors).toEqual([OPUS])
+  })
+
+
+  it('reads the commit object own parents, so a shallow graft cannot hide the merged tip', () => {
+    const commit = resolveCommit(MERGE, {
+      // `%P` claims a single parent, as it does at a shallow boundary; the object
+      // itself still names both. Trusting `%P` here returned no author at all,
+      // and an author that is merely invisible does not stop being an author —
+      // the model that wrote the hidden tip would have been free to review it.
+      run: runner({ [MERGE]: '', [FIRST]: OPUS, [MERGED]: SOL }, [FIRST, MERGED], { graftedParents: [FIRST] }),
+    })
+    expect(commit.authors).toEqual([SOL])
+  })
+
+  it('refuses rather than guesses when a non-first parent cannot be read', () => {
+    expect(() =>
+      resolveCommit(MERGE, {
+        run: runner({ [MERGE]: '', [FIRST]: OPUS }, [FIRST, MERGED], { unreadable: [MERGED] }),
+      }),
+    ).toThrow()
   })
 
   it('leaves an ordinary trailerless commit authorless, so absence is no assignment', () => {
