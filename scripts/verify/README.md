@@ -1157,7 +1157,10 @@ a run launched with `VERIFY_GL=webgpu` that SILENTLY fell back to WebGL 2 (or a
 `webgl` run that came up on WebGPU) fails LOUD instead of giving false
 confidence. Covered: benchmark, collision, enrichments, events, flow, gamepad,
 handwriting, health, i18n, invariants, polish, report, settings, startup, touch,
-visualsweep, voice, world — every browser suite except the three below.
+voice, world — every suite in the tier map except the three below. `visualsweep`
+asserts the backend too, but it rides in no tier: it is the on-demand capture
+sweep (point 203 C), it renders no pass/fail verdict, and it runs only when
+somebody asks for it.
 The same call records the WebGPU **feature level** the run came up at (point 505,
 above): on the container's GLES lane that is `compatibility`, on a core adapter
 `core`, and on the WebGL 2 lane it does not apply.
@@ -1530,11 +1533,11 @@ died without an uncaught-exception marker is therefore read as reported — the
 asserted backend is required, and without it the recorded crash stands — and
 its reds become chargeable, where the same run recorded today would be a crash
 and charge nothing. The trade is deliberate: old records cannot distinguish that sequence,
-and trusting their durable reported-red evidence keeps a real red CHARGEABLE —
-answerable to a point through the ordinary ledger — instead of uncountable
-under a crash verdict, which can charge nothing. What it does not touch is
-BLOCKING: a red the run printed blocks either way, as the crash paragraph
-below spells out. It applies to no run recorded from this revision onward.
+and trusting their durable reported-red evidence lets the RUN still clear as
+accounted-for, instead of standing as a crash, which `runVerdict` can never
+clear. It does not touch the reds themselves: one the run printed blocks
+either way and closes the three ordinary ways either way, as the crash
+paragraph below spells out. It applies to no run recorded from this revision onward.
 
 A CRASH is the one verdict no ledger can ever reach: `runVerdict` returns no
 charges for it, deliberately — a run that died rather than reported judged no
