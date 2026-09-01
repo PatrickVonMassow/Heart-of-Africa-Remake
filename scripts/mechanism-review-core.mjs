@@ -1856,28 +1856,48 @@ export function evaluateMechanismReview({
     // No part clears until every numbered part of that split is present. Without
     // this check pass 1/3 cleared its named file and the legacy composition code
     // never saw it because `endState` excluded it from that path.
-    const scopedSplits = [...new Set(covering.filter(fileClaim).map((r) => String(r?.sha ?? '')))].flatMap((sha) => {
-      const rows = scoped.filter((r) => String(r?.sha ?? '') === sha)
+    // PLAN IDENTITY IS (SHA, TOTAL), not SHA alone. A contribution can be
+    // replanned at the same immutable boundary after the historical range cut
+    // becomes stale. Mixing the old 6-part file union into a new 2-part plan
+    // makes both compositions report each other's files as uncovered, so no
+    // complete replan can ever settle the stale split.
+    const scopedSplitKeys = [...new Set(
+      covering
+        .filter(fileClaim)
+        .map((r) => `${String(r?.sha ?? '')}\0${Number(r?.pass?.total)}`),
+    )]
+    const scopedSplits = scopedSplitKeys.flatMap((key) => {
+      const [sha, totalText] = key.split('\0')
+      const total = Number(totalText)
+      const rows = scoped.filter(
+        (r) => String(r?.sha ?? '') === sha && Number(r?.pass?.total) === total,
+      )
       const expected = [...new Set(rows.flatMap((r) => (Array.isArray(r?.pass?.files) ? r.pass.files : [])))]
       return passComposition(rows, { expect: expected })
     })
     const incompleteScoped = scopedSplits.filter((split) => !split.complete)
-    const incompleteScopedShas = new Set(incompleteScoped.map((split) => String(split.sha)))
+    const scopedPlanKey = (sha, total) => `${String(sha ?? '')}\0${Number(total)}`
+    const incompleteScopedPlans = new Set(
+      incompleteScoped.map((split) => scopedPlanKey(split.sha, split.total)),
+    )
     // FILE DEBT IS MEASURED AGAINST THE CURRENT END STATE, not against the
     // numbering of every range plan that once contained that file. A complete
     // scoped reading at another covering sha therefore settles the files it
     // names even when an older range split remains incomplete for other files.
     // This is the same rule outstandingFiles uses for the status/next-pass
-    // plan. A sha carrying any incomplete composition contributes nothing,
-    // while a bounded 1/1 is itself a complete file-scoped reading.
+    // plan. An incomplete PLAN contributes nothing; another measured plan at
+    // the same immutable sha stays independent and may be the complete replan
+    // that settles it. A bounded 1/1 is itself a complete file-scoped reading.
     const completeScoped = [
       ...scoped
         .filter((r) =>
           Number(r?.pass?.index) === 1 &&
           Number(r?.pass?.total) === 1 &&
-          !incompleteScopedShas.has(String(r?.sha ?? '')))
+          !incompleteScopedPlans.has(scopedPlanKey(r?.sha, r?.pass?.total)))
         .map((r) => ({ sha: String(r.sha ?? ''), files: r.pass.files.map(String), records: [r] })),
-      ...scopedSplits.filter((split) => split.complete && !incompleteScopedShas.has(String(split.sha))),
+      ...scopedSplits.filter(
+        (split) => split.complete && !incompleteScopedPlans.has(scopedPlanKey(split.sha, split.total)),
+      ),
     ]
     const scopedWholeReviews = sound.filter((r) => !fileClaim(r) && !r?.pass)
     const standingScoped = incompleteScoped.filter(
@@ -1893,7 +1913,6 @@ export function evaluateMechanismReview({
         )
         const endStateAnswer = completeScoped.some(
           (answer) =>
-            String(answer.sha) !== String(split.sha) &&
             (commit.files ?? []).every((file) => answer.files.map(String).includes(String(file))),
         )
         return !wholeRangeAnswer && !endStateAnswer
