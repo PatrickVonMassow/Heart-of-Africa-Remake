@@ -167,6 +167,11 @@ describe('isMechanismPath', () => {
       mechanismPathsIn(['src/ui/Hud.tsx', 'scripts/pre-push-gate.mjs', 'README.md'], opts),
     ).toEqual(['scripts/pre-push-gate.mjs'])
   })
+
+  it('does not turn a ledger-only evidence append into recursive review debt', () => {
+    expect(isMechanismPath(LEDGER_RELATIVE_PATH, opts)).toBe(false)
+    expect(mechanismPathsIn([LEDGER_RELATIVE_PATH], opts)).toEqual([])
+  })
 })
 
 describe('model identity', () => {

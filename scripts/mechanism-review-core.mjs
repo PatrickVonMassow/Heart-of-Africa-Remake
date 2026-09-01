@@ -57,6 +57,9 @@ export const BLIND_PARALLEL = 'blind-parallel'
 /** Outcomes of the one pre-escalation reading recorded beside a review. */
 export const SPEC_EXAMINATION_VERDICTS = Object.freeze(['sound', 'amended'])
 
+/** Where the tracked ledger sits inside ANY checkout of this repository. */
+export const LEDGER_RELATIVE_PATH = '.claude/mechanism-reviews.jsonl'
+
 /** The verdict that blocks as loudly as a missing record. */
 export const BLOCKING_VERDICT = 'do-not-merge'
 
@@ -122,6 +125,14 @@ export const NAMED_MECHANISM_FILES = Object.freeze([
  */
 export function isMechanismPath(path, { scriptFiles = [] } = {}) {
   const raw = String(path ?? '')
+  // RECORDING A VERDICT IS EVIDENCE ABOUT A MECHANISM, NOT A NEW MECHANISM.
+  // If a ledger-only append triggered this gate, clearing one contribution
+  // would create the next contribution and the debt could never converge. The
+  // exclusion is deliberately only at the contribution trigger: when a commit
+  // changes an actual mechanism too, pendingReviewContributions keeps the
+  // commit's complete file set, including this ledger, so a deletion or rewrite
+  // co-committed with code is still inside the second reader's material.
+  if (raw === LEDGER_RELATIVE_PATH) return false
   // The RAW spelling is judged FIRST, byte-exact (round-1 pass 1): a backslash
   // is a legal byte inside a POSIX file name, and normalizing it away turned
   // `scripts/foo\bar-guard.mjs` into a different path that then evaded the
@@ -167,9 +178,6 @@ export const LEDGER_AT_MIN_MS = 1_700_000_000_000
 export const LEDGER_AT_MAX_MS = 4_102_444_800_000
 export const ledgerAtUsable = (at) =>
   typeof at === 'number' && Number.isFinite(at) && at >= LEDGER_AT_MIN_MS && at <= LEDGER_AT_MAX_MS
-
-/** Where the tracked ledger sits inside ANY checkout of this repository. */
-export const LEDGER_RELATIVE_PATH = '.claude/mechanism-reviews.jsonl'
 
 /** The one-time ledger shape used to close debt created by the retired
  * baseline-wide scope. The wrapper stamps matching rows only after Git proves

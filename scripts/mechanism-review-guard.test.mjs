@@ -494,6 +494,23 @@ describe('pending review contributions', () => {
     expect(pending[0].mechanismFiles).toEqual(['scripts/example-guard.mjs'])
     expect(pending[0].files).toEqual(['scripts/example-guard.mjs', 'src/ordinary.ts'])
   })
+
+  it('excludes a ledger-only append but keeps the ledger beside a real mechanism change', () => {
+    const ledger = '.claude/mechanism-reviews.jsonl'
+    const commits = [
+      { sha: 'a'.repeat(40), files: [ledger], authorModels: ['GPT-5.6 Sol'] },
+      {
+        sha: 'b'.repeat(40),
+        files: [ledger, 'scripts/example-guard.mjs'],
+        authorModels: ['GPT-5.6 Sol'],
+      },
+    ]
+    const pending = pendingReviewContributions(commits, ['example-guard.mjs'])
+
+    expect(pending.map((commit) => commit.sha)).toEqual(['b'.repeat(40)])
+    expect(pending[0].mechanismFiles).toEqual(['scripts/example-guard.mjs'])
+    expect(pending[0].files).toEqual([ledger, 'scripts/example-guard.mjs'])
+  })
 })
 
 describe('the path-carrying git commands', () => {
