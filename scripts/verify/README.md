@@ -461,11 +461,14 @@ front of each turns one into a declaration.
   measurement alone, and no reader recovers a name out of durable text: the split
   is made from the gate's live value, so a value merely SHAPED like a tag — any
   other section's name, or a bracket a check printed itself — stays in the
-  measurement. THE ONE CASE THAT REMAINS is a check inside section `x` whose own
-  measurement ends in exactly `  [--section=x]`: provenance cannot tell that from
-  the tag the suite appended, and it comes off with it. Nothing distinguishes the
-  two, so the residual is named rather than papered over. A record written before
-  that change carries no `section` and keeps its old detail.
+  measurement, and a check that prints a tag shape of its own keeps it because
+  only the FINAL suffix comes off. THE ONE CASE THAT REMAINS is a kept line the
+  suite never tagged — an `ERR:` line, which no printer appends to — whose own
+  text ends in exactly the live section's ` [--section=<slug>]`: the separation
+  reads the live gate, not the printer, so it takes that suffix off a line
+  nothing appended it to. Contrived, but reachable, and named rather than
+  papered over. A record written before that change carries no `section` and
+  keeps its old detail.
 - **A `--section` run is PARTIAL and is never coverage.** The run recorder stamps
   `partial` on the record from `VERIFY_SECTION`, and `runVerdict` refuses it
   whatever the exit code, so `render-verify-guard` cannot be cleared by one. This

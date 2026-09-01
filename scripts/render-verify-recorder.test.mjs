@@ -956,6 +956,32 @@ describe('the captured lines charge the way the guard reads them', () => {
     })
   })
 
+  it('takes the live tag off a line no printer tagged — the named residual', () => {
+    // THE ONE CASE PROVENANCE CANNOT DECIDE (documented in the test-architecture
+    // README beside the recorder's contract). The separation asks the live GATE,
+    // not the printer, and an `ERR:` line is kept but never tagged by any suite.
+    // So a page error whose own text happens to end in exactly the open
+    // section's tag loses that suffix, and nothing in the line says otherwise.
+    // Contrived, reachable, and pinned here so it cannot become a surprise: if
+    // someone later narrows the separation to the printers that really append,
+    // this expectation is the one that has to change with it.
+    const TAG = sectionTag('x')
+    const capture = tapped(() => 'x')
+    capture.err.write(`ERR: page said no route${TAG}\n`)
+    capture.flush()
+    const reds = capturedReds(capture.state)
+    expect(reds).toHaveLength(1)
+    expect(reds[0].kind).toBe('console')
+    expect(reds[0].detail ?? reds[0].name).not.toContain('[--section=')
+    // A DIFFERENT section's shape is measured text and survives, which is what
+    // makes this a provenance rule rather than a syntax one.
+    const other = tapped(() => 'x')
+    other.err.write(`ERR: page said no route${sectionTag('y')}\n`)
+    other.flush()
+    const kept = capturedReds(other.state)
+    expect(`${kept[0].detail ?? ''}${kept[0].name ?? ''}`).toContain('[--section=y]')
+  })
+
   it('does not mistake a tag shape at the detail cut for recorder metadata', () => {
     const shape = sectionTag('x')
     const cut = `${'m'.repeat(200 - shape.length)}${shape}`
