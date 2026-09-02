@@ -1116,6 +1116,18 @@
       "why": "The blocked handover is filed where the work order puts it; nothing about it is urgent enough to displace game work.",
       "origin": "machine",
       "place": "last"
+    },
+    "1043": {
+      "at": "2026-09-02T07:23:31.896Z",
+      "why": "Last is right: it is a verify-suite flake behind the infrastructure freeze, and a charge to it already lets landings through — the game work in front of it is what the batch is for.",
+      "origin": "machine",
+      "place": "last"
+    },
+    "1044": {
+      "at": "2026-09-02T07:23:31.982Z",
+      "why": "Last is right: the freeze keeps it waiting, and this session showed the hand route through it — run the two suites outside run-all and read the throw. That costs half an hour per occurrence, which is cheaper than jumping the game work.",
+      "origin": "machine",
+      "place": "last"
     }
   },
   "boundary": {
@@ -1128,8 +1140,6 @@
       659,
       660,
       663,
-      686,
-      687,
       688,
       689,
       690,
@@ -1154,7 +1164,7 @@
     "why": "The order standing in front of the release today is the arrangement that predates this rule; the four machine-filed points that had ranked themselves there were moved behind 174 first"
   },
   "settled": {
-    "at": "2026-09-01T21:46:47.801Z",
+    "at": "2026-09-02T07:23:31.992Z",
     "points": [
       174,
       184,
@@ -1308,8 +1318,6 @@
       678,
       680,
       683,
-      686,
-      687,
       688,
       689,
       690,
@@ -1513,7 +1521,9 @@
       1033,
       1035,
       1039,
-      1042
+      1042,
+      1043,
+      1044
     ]
   }
 }

@@ -85,6 +85,8 @@ Das Musterbeispiel sind die Chat-Zeitstempel: neun Eskalationsstufen, acht weich
 | 01.09. nachts | Die Kontext-Uebergabe liess sich nicht eintragen, weil eine FREMDE, lebende Sitzung eine Karte als laufende Arbeit hielt: Das Tor verlangt die Karte »es laeuft nichts« und liest dafuer die ganze Sektion statt der eigenen Karten — blieben nur Fremdenteignung oder eine Aussage, die die Tafel selbst Widerspruch nennt (§3.230) |
 | 01.09. abends | Eine Nutzerfrage deckte auf, dass unsere Fable-Bahn auf einer festgenagelten Versionsnummer stand: Eine neue Fable-Version hätte uns nie von allein erreicht, weil nichts die eingetragene Konstante gegen die verfügbare hält — stille Stagnation als Umkehrung der stillen Degradation von §3.20 (§3.229) |
 | 01.09. nachm. | **Die Umsteuerung**: Blind-Doppeldiagnose (Fable + Sol, Opus-Merge) auf die Nutzerfrage nach dem Spielstillstand — die Steuerung war zum Hauptprodukt geworden; der Nutzer gab Freeze, Aufnahmeregel und die Streichung des §7.1-Tors direkt frei, und die Umsetzung bewies Punkt 1005 gleich mit: punktlose Arbeit fand keine Karte (§3.227, Punkt 1039) |
+| 02.09. früh | Zwei Tore standen auf einem einzigen Kandidaten und waren damit Münzwürfe: Die Kreuzungsprüfung des Ufer-Fangspiels öffnete ihr Fenster auf irgendeinem Lauf statt auf dem ersten eines Zyklus und bestand fast nur aus der Streifphase — nachgemessen trugen sechs von 84 Fenstern gar keine Überquerung, das Grün war Glück. Die Sprecher-Prüfung derselben Suite bietet zehn Figuren an, fünf davon sind bei jedem Lauf dieselben Fehlschüsse, und eine sechste entscheidet allein (§3.231, Punkte 687/1043) |
+
 
 Muster: Ab dem 22.07. explodiert die Commit-Rate (Delegation) — und genau dann häufen sich die Infrastruktur-Vorfälle. **Skalierung der Autonomie erzeugt eine eigene Problemklasse, die die Feature-Arbeit zeitweise überholt.**
 
@@ -1422,7 +1424,7 @@ keinen Träger hat. Gebucht als Punkt 956.
 
 ## Anhang A — Maschinell gepflegte Quellen-Übersicht
 
-Zuletzt aktualisiert: Dienstag, 01.09.2026, 23:26 · Quellen-Fingerprint: `bf937af68efc…`
+Zuletzt aktualisiert: Mittwoch, 02.09.2026, 09:24 · Quellen-Fingerprint: `9ebbf521855b…`
 
 Spalten heuristisch aus den Quellen abgeleitet (Anläufe = distinkte Datumsnennungen im Memory;
 Maßnahme = Guard-Skripte mit Namens-Treffer). Die inhaltliche Bewertung gehört der Prosa oben.
@@ -1460,7 +1462,7 @@ Maßnahme = Guard-Skripte mit Namens-Treffer). Die inhaltliche Bewertung gehört
 | Work at High effort by default; the user reserves Extra high for research and design decisions, not implementation | 4 | hoch | — (Regel/Memory) | ◐ Regel |
 | Write idiomatic English in all English text (README, code comments, commit messages) — no German calques like 'stand' for a version | 1 | niedrig | — (Regel/Memory) | ◐ Regel |
 | Fable is NOT the default lane because its volume is the scarcest; difficulty is no reason for it either (since 18.08.2026 hard cases go straight to Sol), and review is cross-vendor, not Fable-by-default | 5 | hoch | — (Regel/Memory) | ◐ Regel |
-| Findings recorded by a session that could not write the work order — carry each into TASKS.md, then mark it drained | 40 | hoch | findings-guard.mjs | ✔ Mechanismus |
+| Findings recorded by a session that could not write the work order — carry each into TASKS.md, then mark it drained | 41 | hoch | findings-guard.mjs | ✔ Mechanismus |
 | A recurring lookup gets a script; never pull raw transcripts, listings, or logs into context to answer it | 1 | niedrig | — (Regel/Memory) | ◐ Regel |
 | Past the 150k context watermark, FINISH the step and hand over — never start a suite, an agent or a point after it; the user raised the cost twice (13.08. and 17.08.2026) | 2 | mittel | — (Regel/Memory) | ◐ Regel |
 | User 18.08.2026: hard, complex, error-prone and HIGH-criticality points are AUTHORED by GPT-5.6 Sol directly — Opus 5 authors only what is left, and Fable authors only a point that tags its lane or one the router escalates | 4 | hoch | — (Regel/Memory) | ◐ Regel |
@@ -1525,8 +1527,8 @@ Maßnahme = Guard-Skripte mit Namens-Treffer). Die inhaltliche Bewertung gehört
 
 Erfasste Quellen: 93 Feedback-/Projekt-Memories · 57 Guard-/Hook-Skripte · 6 Revert-/Reapply-Commits · 120 Prozess-/Meta-TASKS-Punkte (davon 54 offen).
 
-<!-- RETRO-FINGERPRINT: bf937af68efc3a379c48d7ef172e97601bc4aa127f7e300af5486a8d3fafd38c -->
-<!-- RETRO-LAST-REFRESHED: 2026-09-01T21:26:43.929Z -->
+<!-- RETRO-FINGERPRINT: 9ebbf521855b456c1d015c56e1f741ca6b89b7de3a6b5a3a87a3d471a008484b -->
+<!-- RETRO-LAST-REFRESHED: 2026-09-02T07:24:59.175Z -->
 <!-- AUTO-GENERATED:END -->
 
 ### 3.111 Ein Erfolg ist kein Beweis für den Weg, auf dem er zustande kam
@@ -5128,6 +5130,39 @@ Bezahlung den Zähler nicht bewegt, ist die Messung selbst.
 beide Hälften an dieselbe Regel binden. Und wer vor einem solchen Tor steht,
 zahlt die Schuld einmal vollständig, statt zu argumentieren: Erst der bezahlte
 Rest beweist, dass der Zähler falsch zählt.
+
+
+### 3.231 Ein Tor, das auf einem einzigen Kandidaten steht, ist ein Münzwurf
+
+Am 02.09. hielten zwei Prüfungen derselben Browser-Suite eine Landung auf, und beide
+hatten dieselbe Form: Ihr Urteil hing an EINEM Kandidaten, und ob der traf, entschied
+der Zufall.
+
+Die erste behauptet, dass die spielenden Kinder an einem im Weg stehenden Reisenden
+vorbeilaufen. Sie öffnete dafür ein 45-Sekunden-Fenster, sobald irgendein Lauf begann.
+Nachgemessen in der schnellen Schicht über sieben Ufer-Layouts: Ein Zyklus hat mehrere
+Läufe, und die späteren tragen nur noch die Läufer, die die früheren überlebt haben —
+sie enden nach zwei Sekunden, und in zwei Sekunden kommt niemand die zehn Meter bis zur
+Mitte. Dazu bestand das Fenster fast nur aus der Streifphase: Die Prüfung verkürzte
+zwar deren Planlänge, nicht aber die Nachspielzeit des Wächters, der jeden Zyklus über
+seine volle Frist hielt. Ergebnis: sechs von 84 Fenstern trugen gar keine Überquerung.
+Das Tor war vorher nicht bestanden worden, sondern gewonnen worden.
+
+Die zweite bietet zehn benannte Figuren an, über denen sie einen Sprechzettel
+fotografieren will, und prüft mit einem Strahl, ob wirklich die Figur getroffen wird.
+Fünf davon sind bei jedem Lauf dieselben Fehlschüsse — die Liste ist Zeichen für
+Zeichen identisch —, also entscheidet die sechste allein, und die trifft mal und mal
+nicht.
+
+Die Lehre ist nicht »mehr wiederholen«. Eine Wiederholung macht einen Münzwurf nicht zu
+einer Messung; sie verdeckt ihn nur, und genau das tat die eingebaute Wiederholung hier
+über Wochen. Die Lehre ist, die MARGE eines Tores zu messen, bevor man ihm glaubt:
+Wie viele unabhängige Gelegenheiten hat es, seine Behauptung zu bestätigen, und wie
+oft findet es keine? Für die erste Prüfung war das in der schnellen Schicht in zwölf
+Sekunden zu haben — 84 Fenster über sieben Layouts, gegen die Stunde, die ein einzelner
+Browser-Lauf kostet und die trotzdem nur eine einzige Stichprobe liefert. Das Gegenstück
+gehört dazu: Der reparierte Fall muss mit den alten Werten nachweislich wieder rot
+werden, sonst ist auch die Reparatur nur ein Glücksfall.
 
 ### 3.226 Das Hauptbuch stand unter der Pflicht, die es selbst führt
 
