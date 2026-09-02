@@ -42,6 +42,7 @@ const DEFAULTS = {
   walkerUnstuckSeconds: balance.walkerUnstuckSeconds,
   unstuck: { ...balance.unstuck },
   tag: { ...balance.villageLife.tag },
+  bankGame: { ...balance.villageLife.bankGame },
   childSpeech: { ...balance.villageLife.childSpeech },
   adultErrands: { ...balance.villageLife.adultErrands },
   separation: { ...balance.villageLife.separation },
@@ -131,6 +132,7 @@ afterEach(() => {
   balance.walkerUnstuckSeconds = DEFAULTS.walkerUnstuckSeconds
   Object.assign(balance.unstuck, DEFAULTS.unstuck)
   Object.assign(balance.villageLife.tag, DEFAULTS.tag)
+  Object.assign(balance.villageLife.bankGame, DEFAULTS.bankGame)
   Object.assign(balance.villageLife.childSpeech, DEFAULTS.childSpeech)
   Object.assign(balance.villageLife.adultErrands, DEFAULTS.adultErrands)
   Object.assign(balance.villageLife.separation, DEFAULTS.separation)
@@ -255,6 +257,17 @@ describe('DebugMenu editable fields write through to balance (settings.mjs fillF
     { label: en.debug.tagBreakOff, read: () => balance.villageLife.tag.breakOff, value: 0.25 },
     { label: en.debug.tagPressure, read: () => balance.villageLife.tag.pressureDistance, value: 7 },
     { label: en.debug.tagPlayRadius, read: () => balance.villageLife.tag.playRadius, value: 12 },
+    // The children's round at the bank (point 687), one from each family its
+    // nineteen controls fall into: a PHASE length, a DISTANCE, a PACE and one of
+    // the roaming bounds. Until 29.08.2026 the nineteen were only ever asserted
+    // to EXIST — a control wired to nothing, or to the wrong field, passed —
+    // and `bankGame` was missing from the restore below, so the first case to
+    // exercise one would have leaked its value into every case after it
+    // (cross-vendor review).
+    { label: en.debug.bankGather, read: () => balance.villageLife.bankGame.gatherSeconds, value: 9 },
+    { label: en.debug.bankDodgeDistance, read: () => balance.villageLife.bankGame.dodgeDistance, value: 5 },
+    { label: en.debug.bankWalkPace, read: () => balance.villageLife.bankGame.walkPace, value: 1.4 },
+    { label: en.debug.bankRoamGuard, read: () => balance.villageLife.bankGame.roamGuardSeconds, value: 30 },
     // What the children SAY at that game (point 481): the rate of the staged
     // situations, the life of the action that follows and the refusal chance.
     { label: en.debug.childSpeechInterval, read: () => balance.villageLife.childSpeech.intervalSeconds, value: 9 },
@@ -874,12 +887,16 @@ const EXPECTED_CONTROLS: Record<DebugGroupId, readonly string[]> = {
     'debug.tagVariation', 'debug.tagUnstuck', 'debug.tagEdge', 'debug.tagSilence',
     'debug.tagLean', 'debug.tagTurnRate',
     'debug.tagPlayRadius',
+    'debug.bankRoam', 'debug.bankRoamSpread', 'debug.bankGather', 'debug.bankRun',
+    'debug.bankRegroup', 'debug.bankPart', 'debug.bankReach', 'debug.bankStandOff',
+    'debug.bankSpacing', 'debug.bankLaneSpacing', 'debug.bankDodgeDistance',
+    'debug.bankDodgeReach', 'debug.bankRoamTurn', 'debug.bankRoamGoal', 'debug.bankRoamGuard', 'debug.bankWalkPace', 'debug.bankStrangerBerth',
+    'debug.bankUtteranceGap', 'debug.bankSilence',
     'debug.childSpeechInterval', 'debug.childSpeechSpread', 'debug.childSpeechAction',
     'debug.childSpeechPace', 'debug.childSpeechRefusal', 'debug.childSpeechReply',
-    'debug.childSpeechSilence',
     'debug.adultErrandInterval', 'debug.adultErrandSpread', 'debug.adultErrandDwell',
     'debug.adultErrandDig', 'debug.adultErrandLife', 'debug.adultErrandStall',
-    'debug.adultErrandSilence', 'debug.adultErrandPace', 'debug.adultErrandCount',
+    'debug.adultErrandPace', 'debug.adultErrandCount',
   ],
   weather: ['debug.season', 'debug.seasonStrength', 'debug.wetGroundStrength', 'debug.foliageCollapse'],
   economy: [
@@ -972,12 +989,12 @@ describe('DebugMenu completeness: every control is present, in its group (point 
     })
   })
 
-  it('carries all 182 controls in total, and none twice', () => {
+  it('carries all 199 controls in total, and none twice', () => {
     render(<DebugMenu />)
     const labels = renderedRowLabels()
     const expected = DEBUG_GROUP_ORDER.flatMap((id) => EXPECTED_CONTROLS[id])
     expect(labels.length).toBe(expected.length)
-    expect(labels.length).toBe(182)
+    expect(labels.length).toBe(199)
     expect(new Set(labels).size).toBe(labels.length)
   })
 
@@ -1024,7 +1041,7 @@ describe('DebugMenu completeness: every control is present, in its group (point 
   it('gives every control a real input, select or button — no label without a control', () => {
     render(<DebugMenu />)
     const rows = [...document.querySelectorAll('.debug-menu .debug-group-body > label')]
-    expect(rows.length).toBe(182)
+    expect(rows.length).toBe(199)
     for (const row of rows) {
       const label = row.querySelector('span')?.textContent ?? '(none)'
       // The renderer row is the one deliberate read-only display (design.md §21.3).
@@ -1078,7 +1095,7 @@ describe('DebugMenu groups collapse and remember their state (point 393)', () =>
     render(<DebugMenu />)
     // Nothing opened: the whole set is still there (hidden), and a value still
     // writes through — the verify suites drive the controls this way.
-    expect(renderedRowLabels().length).toBe(182)
+    expect(renderedRowLabels().length).toBe(199)
     fireEvent.change(numberField(en.debug.travelSpeed), { target: { value: '9' } })
     expect(balance.travelSpeed).toBe(9)
     balance.travelSpeed = DEFAULTS.travelSpeed
@@ -1126,7 +1143,7 @@ describe('DebugMenu filter narrows the whole menu (point 393)', () => {
     typeFilter('croc')
     expect(renderedRowLabels().length).toBeLessThan(149)
     typeFilter('')
-    expect(renderedRowLabels().length).toBe(182)
+    expect(renderedRowLabels().length).toBe(199)
     expect(renderedGroups().filter((g) => g.open).map((g) => g.title)).toEqual([en.debug.groups.tools])
   })
 

@@ -115,7 +115,7 @@ describe('handing the artefact to the chief (point 487)', () => {
     }
     // Nothing is translated for the player: an utterance he wrote no note for
     // stays without one.
-    expect(hypothesisFor(g().communication, utteranceOf('BIG_ROCK'))).toBe('')
+    expect(hypothesisFor(g().communication, utteranceOf('ROCK'))).toBe('')
   })
 
   it('keeps the day and the note of a concept already heard in the village', () => {

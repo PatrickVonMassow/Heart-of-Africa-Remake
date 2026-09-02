@@ -1055,10 +1055,12 @@ the running game measures it. `watchProducer` (`src/systems/devAssert.ts`) is th
 existing assert channel's LONG-RUN family: a producer that has emitted nothing
 for longer than its own specified window raises the ordinary `console.error`,
 which every suite's console gate fails on and every manual session shows. Wired
-so far: `errands-silent` (the adults' utterances and the errands they stage),
-`tag-silent` (the children's play — a catch or a fresh round), and
-`child-speech-silent` (what the children say). `window.__longRun` reports every
-watch live.
+so far: `tag-silent` (the children's play at the chase — a catch or a fresh
+round) and `bank-speech-silent` (what the children say at the bank round, which
+is the round that speaks since the five-word rebuild). `window.__longRun` reports
+every watch live. `errands-silent` and `child-speech-silent` went with the
+situation catalogues they watched: a watch on a producer that can no longer
+produce is worse than none, because it reads as covered.
 
 Two rules keep it worth having: it judges the OUTPUT (an utterance staged, a
 round played), never the timer that was supposed to produce one; and a producer

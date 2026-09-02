@@ -1,5 +1,5 @@
 // The chief's drum message (design.md §13.4, docs/communication-poc-spec.md,
-// work-order point 486): the seven concepts the drums send, the strike plan the
+// work-order point 486): the four concepts the drums send, the strike plan the
 // drummer beats them with, and the elements the message display shows.
 //
 // The sequences are NEVER re-authored here. The message is a list of CONCEPTS;
@@ -18,18 +18,13 @@ import { NO_READING } from './speechLabel'
 import { phrasePlan, type SpeechOptions } from './speaking'
 
 /**
- * The message: "Go to the river. Follow it upstream. Dig at the big rock."
- * Built only from concepts the player can observe in the village beforehand —
- * the children's six teach GO_THERE, FOLLOW and THERE, the adults' errands
- * RIVER, UPSTREAM, BIG_ROCK and DIG.
+ * The message: "River. Upstream. Rock. Dig."
+ * Built only from the five-word lexicon the player can observe beforehand.
  */
 export const CHIEF_MESSAGE_CONCEPTS: readonly ConceptId[] = [
-  'GO_THERE',
   'RIVER',
-  'FOLLOW',
   'UPSTREAM',
-  'BIG_ROCK',
-  'THERE',
+  'ROCK',
   'DIG',
 ]
 

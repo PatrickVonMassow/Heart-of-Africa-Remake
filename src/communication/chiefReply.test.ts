@@ -5,23 +5,15 @@ import { describe, it, expect } from 'vitest'
 import { CHIEF_ACKNOWLEDGE_CONCEPTS, chiefAcknowledgePhrase } from './chiefReply'
 import { CHIEF_MESSAGE_CONCEPTS } from './drumMessage'
 import { CONCEPT_IDS, conceptOf, utteranceOf } from './lexicon'
-import { CHILD_CONCEPTS } from '../scenes/place/childSituations'
-import { ADULT_CONCEPTS } from '../scenes/place/adultErrands'
 
 describe("the chief's acknowledgment (point 487)", () => {
   it('is spoken in concepts of the lect, never in invented words', () => {
     for (const c of CHIEF_ACKNOWLEDGE_CONCEPTS) expect(CONCEPT_IDS).toContain(c)
   })
 
-  it('introduces nothing new: every concept is one the village teaches', () => {
-    const taught = new Set<string>([...CHILD_CONCEPTS, ...ADULT_CONCEPTS])
-    for (const c of CHIEF_ACKNOWLEDGE_CONCEPTS) expect(taught).toContain(c)
-  })
-
-  it('names the errand back: the boulder and the digging are the message’s own', () => {
-    expect(CHIEF_ACKNOWLEDGE_CONCEPTS).toContain('BIG_ROCK')
-    expect(CHIEF_ACKNOWLEDGE_CONCEPTS).toContain('DIG')
-    for (const c of ['BIG_ROCK', 'DIG'] as const) expect(CHIEF_MESSAGE_CONCEPTS).toContain(c)
+  it('names the errand back using the message’s own rock and digging words', () => {
+    expect(CHIEF_ACKNOWLEDGE_CONCEPTS).toEqual(['ROCK', 'DIG'])
+    for (const c of CHIEF_ACKNOWLEDGE_CONCEPTS) expect(CHIEF_MESSAGE_CONCEPTS).toContain(c)
   })
 
   it('speaks the lexicon’s own atoms, in the order of its concepts', () => {

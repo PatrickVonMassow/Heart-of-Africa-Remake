@@ -12,7 +12,7 @@ import { useLocale } from '../i18n'
 import { useUi } from '../state/ui'
 import { freshGame, g, useGame } from '../test/store'
 import { DRUM_MESSAGE_VILLAGE } from '../state/store'
-import { chiefAcknowledgePhrase } from '../communication/chiefReply'
+import { CHIEF_ACKNOWLEDGE_CONCEPTS, chiefAcknowledgePhrase } from '../communication/chiefReply'
 import { NO_READING } from '../communication/speechLabel'
 import { utteranceOf } from '../communication/lexicon'
 import { PLACES } from '../world/geo'
@@ -314,11 +314,21 @@ describe('handing the artefact to the chief (point 487)', () => {
     fireEvent.click(handButton() as Element)
     rerender(<Dialogs />)
 
-    const readings = [...document.querySelectorAll('.chief-acknowledge .reading')].map(
-      (r) => r.textContent,
-    )
-    expect(readings).toContain('to dig')
-    expect(readings).toContain(NO_READING) // BIG_ROCK / HERE carry no note
+    // PAIRED, not merely present (cross-vendor review, 29.08.2026). Asking only
+    // that the two readings appear SOMEWHERE let ROCK show a translation while
+    // DIG supplied the `???` the assertion looked for — which is the one thing
+    // this case exists to forbid. The list renders the acknowledge phrase in its
+    // own order, so each item is tied back to the concept that produced it.
+    const items = [...document.querySelectorAll('.chief-acknowledge .drum-concept')]
+    expect(items).toHaveLength(CHIEF_ACKNOWLEDGE_CONCEPTS.length)
+    const readingOf = (concept: (typeof CHIEF_ACKNOWLEDGE_CONCEPTS)[number]) =>
+      items[CHIEF_ACKNOWLEDGE_CONCEPTS.indexOf(concept)]?.querySelector('.reading')?.textContent
+    expect(readingOf('DIG')).toBe('to dig')
+    expect(readingOf('ROCK')).toBe(NO_READING) // he wrote no note for it
+    // And the unread one is MARKED unread, so the picture says so too.
+    expect(
+      items[CHIEF_ACKNOWLEDGE_CONCEPTS.indexOf('ROCK')]?.querySelector('.reading')?.className,
+    ).toContain('unread')
     // Nothing here is clickable: the answer is heard, not edited.
     expect(document.querySelectorAll('.chief-acknowledge button')).toHaveLength(0)
   })

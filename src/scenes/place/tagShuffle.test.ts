@@ -43,6 +43,7 @@ import {
 import { balance } from '../../config/balance'
 import { mulberry32 } from '../../world/noise'
 import {
+  PLAYER_RADIUS,
   nudgeToFree,
   nudgeWhere,
   resolveMove,
@@ -63,8 +64,30 @@ import {
 } from './inhabitantBodies'
 import { buildLayout, builtFabric, type PlaceLayout } from './layout'
 import { childPlayGround, villageAdultStations } from './lifeSpots'
-import { absorbSeparation, createTagGame, stepTagGame, type TagWorld } from './tagGame'
+import { absorbSeparation, createTagGame, stepTagGame, type TagChild } from './tagGame'
+import {
+  bankChildCanSeparate,
+  createBankGame,
+  insideStrangerBerth,
+  stepBankGame,
+  type BankChild,
+  type BankConfig,
+  type BankStage,
+  type BankState,
+  type BankEnd,
+  type BankWorld,
+  rockAt,
+  stationAt,
+  wayTo,
+} from './bankGame'
+import { insidePlace } from './boundary'
+import { buildPlaceNavGrid, findPlaceRoute, navClearBetween, navRestrict } from './routing'
+import { standsOnGroundPlate } from './riverBank'
 import { buildWedgeCarve } from './wedgeCarve'
+
+/** The children's round as `PlaceLife` composes it (work-order 687): the bank
+ *  game where the settlement stands on a river, the tag round everywhere else. */
+const BANK_CFG: BankConfig = { ...balance.villageLife.tag, ...balance.villageLife.bankGame }
 
 // The two numbers `PlaceLife` holds for the children it draws.
 const KID_SCALE = 0.55
@@ -275,23 +298,44 @@ function village(
     const d = Math.hypot(x - pen.x, z - pen.z)
     return d > options.pen.r && d < options.pen.r + 1.5
   }
+  // THE ROUND'S OWN REGION, exactly as `PlaceLife` wires it: the bank game walks
+  // the whole settlement — its quarter is where the group ROAMS, not a wall it
+  // is kept behind — while the tag round keeps its bounded ground. Replaying the
+  // bank round inside the tag round's circle pressed the group against a
+  // boundary the scene does not have, and clumped four children into half a
+  // metre of ground.
+  const boulder = nearestRock(layout, ground)
+  const hasBank = !!(layout.bank && layout.playRocks && boulder)
+  const region = hasBank
+    ? { x: 0, z: 0, radius: rim }
+    : { x: ground.x, z: ground.z, radius: ground.radius }
   // The sub-passage slots between pinching boundaries are not part of the
   // ground, exactly as `PlaceLife` wires it (point 657).
-  const carve = buildWedgeCarve(colliders, NPC_RADIUS, {
-    x: ground.x,
-    z: ground.z,
-    radius: ground.radius,
-  })
+  // Only the TAG round is kept out of the sub-passage wedges, exactly as
+  // `PlaceLife` wires it — see the reasoning there.
+  const carve = hasBank ? () => false : buildWedgeCarve(colliders, NPC_RADIUS, region)
+  // AND THE SHAPE THE ROUND WALKS, exactly as `PlaceLife` wires it: the bank
+  // round walks the settlement's OWN boundary — the lobe out to the water
+  // included, because the two play rocks stand on it — and is kept off the
+  // sloping shore. The tag round keeps its circle. Replaying the bank round
+  // inside the plain circle put its whole stage out of reach.
+  const bounds = { radius: layout.radius, bank: layout.bank }
+  const onGround = hasBank
+    ? (x: number, z: number) =>
+        insidePlace(bounds, x, z, NPC_RADIUS * 2) && standsOnGroundPlate(layout.bank, x, z, NPC_RADIUS)
+    : (x: number, z: number) =>
+        Math.hypot(x, z) <= rim && Math.hypot(x - region.x, z - region.z) <= region.radius
   const blocked = (x: number, z: number) =>
-    penned(x, z) ||
-    Math.hypot(x, z) > rim ||
-    Math.hypot(x - ground.x, z - ground.z) > ground.radius ||
-    !standingClear(colliders, x, z, NPC_RADIUS) ||
-    carve(x, z)
-  const world: TagWorld = {
-    radius: ground.radius,
-    centerX: ground.x,
-    centerZ: ground.z,
+    penned(x, z) || !onGround(x, z) || !standingClear(colliders, x, z, NPC_RADIUS) || carve(x, z)
+  // And the way ROUND the village for the walk down to the bank, exactly as
+  // `PlaceLife` builds it: only a settlement that plays the bank round has one.
+  const nav = hasBank ? buildPlaceNavGrid(bounds, colliders, NPC_RADIUS) : null
+  // Narrowed by the STEP's own predicate, exactly as `PlaceLife` narrows it.
+  if (nav) navRestrict(nav, onGround)
+  const world: BankWorld = {
+    radius: region.radius,
+    centerX: region.x,
+    centerZ: region.z,
     childRadius: NPC_RADIUS,
     blocked,
     nudge: (x, z) => {
@@ -311,6 +355,8 @@ function village(
       const r = roomy.found ? roomy : nudgeWhere(x, z, (ax, az) => !blocked(ax, az))
       return { x: r.pos[0], z: r.pos[1], found: r.found }
     },
+    lineBlocked: nav ? (ax, az, bx, bz) => !navClearBetween(nav, ax, az, bx, bz) : undefined,
+    route: nav ? (from, to) => findPlaceRoute(nav, from, to) : undefined,
   }
   const rand = mulberry32((localSeed + 5171) >>> 0)
   const spots = Array.from({ length: count }, (_, i) => {
@@ -318,9 +364,26 @@ function village(
     const spot = world.nudge(ground.x + Math.cos(a) * 2.4, ground.z + Math.sin(a) * 2.4)
     return { x: spot.x, z: spot.z }
   })
-  const game = createTagGame(spots, rand, balance.villageLife.tag)
+  // THE ROUND THE SETTLEMENT ACTUALLY PLAYS (work-order 687), built exactly as
+  // `PlaceLife` builds it: the bank game where there is a bank, the tag round
+  // where there is none. Replaying the tag round in a village that plays the
+  // bank one would measure a game nobody watches.
+  const stage: BankStage | null =
+    hasBank && layout.bank && layout.playRocks
+      ? {
+          upstream: layout.playRocks.upstream,
+          downstream: layout.playRocks.downstream,
+          water: { x: layout.bank.nx * layout.bank.distance, z: layout.bank.nz * layout.bank.distance },
+          boulder: boulder!,
+          roam: { x: ground.x, z: ground.z, radius: ground.radius },
+        }
+      : null
+  const bank: BankState | null = stage ? createBankGame(spots, rand, BANK_CFG) : null
+  const game = bank ? null : createTagGame(spots, rand, balance.villageLife.tag)
+  const children: TagChild[] = bank ? bank.children : game!.children
   const speech = createChildSpeech(count, balance.villageLife.childSpeech)
   const speechRand = mulberry32((localSeed + 7717) >>> 0)
+  const bankRand = mulberry32((localSeed + 9931) >>> 0)
   const set = createInhabitantSet()
   const bodies = claimBodies(set, count, { scale: KID_SCALE })
   bodies.forEach((b, i) => {
@@ -352,14 +415,50 @@ function village(
     chaser: -1,
     target: -1,
     immune: -1,
-    children: game.children,
+    children,
     ground: { x: ground.x, z: ground.z, radius: ground.radius },
     // What THERE points at, exactly as `PlaceLife` sets it: the settlement's own
     // middle, well outside the play ground. It was missing here, so the one
     // situation that reads it could never have been replayed.
     farMark: { x: 0, z: 0 },
   }
-  return { game, speech, speechRand, world, set, bodies, view, others, layout, ground, pen }
+  return {
+    game,
+    bank,
+    children,
+    bankRand,
+    stage,
+    speech,
+    speechRand,
+    world: world as BankWorld,
+    set,
+    bodies,
+    view,
+    others,
+    layout,
+    ground,
+    pen,
+    /** The game's own clocks, whichever round is running — the metric reads
+     *  these and must not have to know which. */
+    clock: () => (bank ? bank.clock : game!.clock),
+    playedClock: () => (bank ? bank.playedClock : game!.playedClock),
+    playing: () => (bank ? bank.playing : game!.playing),
+  }
+}
+
+/** The loose boulder nearest the children's quarter — what a child climbs and
+ *  names while the group roams, exactly as `PlaceLife` picks it. */
+function nearestRock(layout: PlaceLayout, ground: { x: number; z: number }): { x: number; z: number } | null {
+  let best: { x: number; z: number } | null = null
+  let bestD = Infinity
+  for (const [rx, rz] of layout.rocks) {
+    const d = Math.hypot(rx - ground.x, rz - ground.z)
+    if (d < bestD) {
+      bestD = d
+      best = { x: rx, z: rz }
+    }
+  }
+  return best
 }
 
 /** One frame of the settlement, in `PlaceLife`'s own order: what was said steers
@@ -368,23 +467,38 @@ function village(
  *  same registry after them, as the vignettes mounted below the children do. */
 function frame(v: ReturnType<typeof village>, dt: number): void {
   const cfg = balance.villageLife.childSpeech
-  v.view.playing = v.game.playing
-  v.view.chaser = v.game.chaser
-  v.view.target = v.game.target
-  v.view.immune = v.game.immuneFor > 0 ? v.game.immune : -1
-  stepTagGame(v.game, dt, balance.villageLife.tag, v.world, (i) => childSteer(v.speech, v.view, i, cfg))
-  for (let i = 0; i < v.game.children.length; i++) {
-    v.bodies[i].x = v.game.children[i].x
-    v.bodies[i].z = v.game.children[i].z
+  if (v.bank) {
+    stepBankGame(v.bank, dt, BANK_CFG, v.stage!, v.world, v.bankRand)
+  } else {
+    v.view.playing = v.game!.playing
+    v.view.chaser = v.game!.chaser
+    v.view.target = v.game!.target
+    v.view.immune = v.game!.immuneFor > 0 ? v.game!.immune : -1
+    stepTagGame(v.game!, dt, balance.villageLife.tag, v.world, (i) => childSteer(v.speech, v.view, i, cfg))
   }
-  separateGroup(v.set, v.bodies, dt, balance.villageLife.separation, v.world)
-  for (let i = 0; i < v.game.children.length; i++) {
+  for (let i = 0; i < v.children.length; i++) {
+    v.bodies[i].x = v.children[i].x
+    v.bodies[i].z = v.children[i].z
+  }
+  const separable = v.bank
+    ? v.bodies.filter((_, i) => bankChildCanSeparate(v.children[i] as BankChild))
+    : v.bodies
+  // The separation resolves in the round's ground PLUS the traveller's berth,
+  // exactly as `PlaceLife` wires it: the traveller is not an inhabitant body, so
+  // without this the separation pushes a child inside the berth the steering
+  // kept.
+  separateGroup(v.set, separable, dt, balance.villageLife.separation, {
+    blocked: (x: number, z: number) =>
+      v.world.blocked(x, z) || insideStrangerBerth(v.world, BANK_CFG, x, z),
+    nudge: v.world.nudge,
+  })
+  for (let i = 0; i < v.children.length; i++) {
     // The resolved position AND the separation's own wedge rescues (point 656
     // follow-up), exactly as `PlaceLife` reads them back.
-    absorbSeparation(v.game.children[i], v.bodies[i])
+    absorbSeparation(v.children[i], v.bodies[i])
   }
-  v.others.step(dt, v.game.clock)
-  stepChildSpeech(v.speech, v.view, dt, cfg, v.speechRand)
+  v.others.step(dt, v.clock())
+  if (!v.bank) stepChildSpeech(v.speech, v.view, dt, cfg, v.speechRand)
 }
 
 interface Track extends ChildMotionSample {
@@ -397,21 +511,24 @@ interface Track extends ChildMotionSample {
 
 /** One sample of every child, in the shape the shared metric judges. */
 function sample(v: ReturnType<typeof village>, paths: Track[][]): void {
-  v.game.children.forEach((c, i) => {
+  const clock = v.clock()
+  const playedClock = v.playedClock()
+  const playing = v.playing()
+  v.children.forEach((c, i) => {
     paths[i].push({
-      clock: v.game.clock,
+      clock,
       x: c.x,
       z: c.z,
       walked: c.walked,
       walkedWhilePlaying: c.walkedWhilePlaying,
-      playedClock: v.game.playedClock,
+      playedClock,
       nudges: c.nudges,
       carried: c.carried,
       pace: c.pace,
       held: c.held,
       // Whether the GROUP was playing (point 656) — the trace has to be able to
       // show that there was a game in it at all.
-      playing: v.game.playing,
+      playing,
     })
   })
 }
@@ -438,15 +555,27 @@ const CADENCES: Array<[string, (rand: () => number) => number]> = [
   ['2-12 frames', (rand) => 2 + Math.floor(rand() * 11)],
 ]
 
-/** Every child's path through `seconds` of the game, sampled every frame. */
-function play(placeId: string, seed: number, seconds: number, dt = 1 / 60): Track[][] {
+/** Every child's path through `seconds` of the game, sampled every frame — and
+ *  the settlement that walked it, for a case that must also read the ROUND's own
+ *  counters off the very replay it judged. */
+function playRound(
+  placeId: string,
+  seed: number,
+  seconds: number,
+  dt = 1 / 60,
+): { v: ReturnType<typeof village>; paths: Track[][] } {
   const v = village(placeId, seed)
-  const paths: Track[][] = v.game.children.map(() => [])
+  const paths: Track[][] = v.children.map(() => [])
   for (let t = 0; t < seconds; t += dt) {
     frame(v, dt)
     sample(v, paths)
   }
-  return paths
+  return { v, paths }
+}
+
+/** Every child's path through `seconds` of the game, sampled every frame. */
+function play(placeId: string, seed: number, seconds: number, dt = 1 / 60): Track[][] {
+  return playRound(placeId, seed, seconds, dt).paths
 }
 
 /**
@@ -457,7 +586,8 @@ function play(placeId: string, seed: number, seconds: number, dt = 1 / 60): Trac
  * group is playing before it judges anything; the pure proof of the user's own
  * bug had no such assertion at all, and would have gone green on a trace with no
  * game in it. The bars are measured on the four settlements replayed below —
- * four children, the whole minute played, 107-115 m walked per child-minute —
+ * four children, the whole minute played, 92-111 m walked per child-minute with
+ * the bank round —
  * and set far below them: they separate a game from NOTHING, not a good game
  * from a poor one — and the walking bar is asked of the QUIETEST child, because
  * a group of four with one statue in it walks three quarters as far as a group
@@ -473,8 +603,8 @@ function expectLively(paths: Track[][]): void {
   // group played a majority of the game CLOCK, and every child walked WHILE it
   // was played — one motionless child among three busy ones is invisible in a
   // sum, and walking counted over the whole trace would take a group's warm-up
-  // for a game. Measured here: the quietest child of each village walks 102-113 m
-  // per minute of play.
+  // for a game. Re-measured with the bank round (work-order 687): the quietest
+  // child of each village walks 92-111 m per minute of play.
   expect(live.quietestWalkedPerPlayedMinute).toBeGreaterThan(CHILD_MOTION.walkFloor)
   expect(holdsAGame(live)).toBe(true)
 }
@@ -490,6 +620,13 @@ const PLACES: Array<[string, number]> = [
 describe('the children never shuffle on the spot (points 648/656)', () => {
   for (const [placeId, seed] of PLACES) {
     it(`${placeId} at seed ${seed} keeps every child covering ground`, () => {
+      // SIXTY SECONDS, RESTORED (work-order 687 item 9). Point 686 had widened
+      // this window to 120 s because emptying the child situations left the
+      // children with nothing but the bare chase: bambara-village at seed
+      // 2972259115 then measured 0.42 % of its judged time shuffled over the
+      // first minute, against a 0.25 % gate. With the bank game back the same
+      // minute re-measures at 0.02 % (worst child 0.05 %), so the window is the
+      // one the user's own complaint is judged over again.
       const paths = play(placeId, seed, 60)
       expectLively(paths)
       const r = shuffleWindows(paths)
@@ -498,21 +635,21 @@ describe('the children never shuffle on the spot (points 648/656)', () => {
       // than the window is judged by nobody and reported as unjudged, so a share
       // is only worth what `judgedShare` says it covers — and both are read off
       // the WORST child, because one snagging child among three healthy ones is
-      // divided by four in every group average. Measured here: the least
-      // judgeable child 0.88-0.90 (the missing part being the tail no window can
-      // reach into and the second before each of that child's few rescues), the
-      // worst child's share 0.00-0.03 %.
+      // divided by four in every group average. Re-measured over the restored
+      // minute with the bank round (work-order 687): the least judgeable child
+      // 0.983 in all three villages — the missing part is the tail no window can
+      // reach into — and the worst child's share 0.000 / 0.000 / 0.028 %.
       expect(r.leastJudged).toBeGreaterThan(CHILD_MOTION.judgedGate)
       expect(r.worstShare).toBeLessThan(CHILD_MOTION.shareGate)
       // AND THE SHORT BURST the one-second window cannot see (point 656): a
       // child that paces on the spot for six tenths of a second between spells
       // of walking never collects the metre a one-second window asks for.
-      // Measured here, worst child: 0.000 / 0.028 / 0.028 %.
+      // Re-measured with the bank round, worst child: 0.000 / 0.000 / 0.000 %.
       const burst = shuffleWindows(paths, CHILD_MOTION.short)
       expect(burst.worstShare).toBeLessThan(CHILD_MOTION.shareGate)
       // AND THE BURST MEASURE MUST HAVE JUDGED SOMETHING: its share is 0 both
-      // when nothing was bad and when nothing was looked at. Measured here:
-      // 230-234 judged child-seconds, least judgeable child 0.941-0.949.
+      // when nothing was bad and when nothing was looked at. Re-measured with
+      // the bank round: 238 judged child-seconds, least judgeable child 0.992.
       expect(judgedEnough(burst)).toBe(true)
       expect(judgedEnough(r)).toBe(true)
       // AND NOBODY IS BEING CARRIED (point 656): the rescue teleport is what
@@ -525,34 +662,43 @@ describe('the children never shuffle on the spot (points 648/656)', () => {
       expect(rescues.nudgesPublished).toBe(true)
       expect(rescues.carriedMetresPerChildMinute).toBeLessThan(CHILD_MOTION.carryGate)
       expect(rescues.perChildMinute).toBeLessThan(CHILD_MOTION.rescueGate)
-      // The worst child on its own clock: 5-6 rescues in its minute here, and
-      // 0.00-2.40 m carried.
+      // The worst child on its own clock: with the bank round not one rescue
+      // falls in this minute in any of the three villages, and nothing is
+      // carried at all.
       expect(rescues.worstPerChildMinute).toBeLessThan(CHILD_MOTION.worstChildRescueGate)
       expect(rescues.worstCarriedMetresPerChildMinute).toBeLessThan(CHILD_MOTION.worstChildCarryGate)
     })
   }
 
-  it('rescues the permanently shivering child at the player-reported seed (point 666)', () => {
+  it('leaves the player-reported settlement with no child to rescue at all (point 666)', () => {
     // The production report names this exact settlement and seed. On the code
     // shipped to the player, child 3 spent effectively every judged window
-    // walking in place for minutes. This is the owed headless reproduction:
-    // the progress watch must fire once, move the child beyond the oscillation,
-    // and the remainder of the same deterministic run must stay clean.
+    // walking in place for minutes, and the progress watch had to carry it out.
+    //
+    // IT NO LONGER HAS ANYTHING TO CARRY. This village stands on a river, so it
+    // plays the bank round (work-order 687), whose children roam on a drifting
+    // heading and otherwise walk a PLANNED way across the settlement — neither
+    // of which presses a fixed target through a pinch, which is what wedged the
+    // reported child. Re-measured over the same deterministic 90 s: not one
+    // rescue in the whole group, nothing carried a centimetre, and the trace
+    // clean end to end.
+    //
+    // The RESCUE MECHANISM keeps its own coverage: the pen cases below build a
+    // wedged child deliberately and prove the watch fires, names it and shows
+    // the carry in the trace. What is asserted here is the settlement's OWN
+    // state, which is the thing the player reported.
     const paths = play('bambara-village', 236333330, 90)
     const rescues = rescueRate(paths)
-    expect(rescues.worstChild).toBe(3)
-    expect(rescues.worstRescues).toBe(1)
-    expect(rescues.carriedMetres).toBeGreaterThan(2)
-    expect(rescues.worstPerChildMinute).toBeLessThan(CHILD_MOTION.worstChildRescueGate)
-    expect(rescues.worstCarriedMetresPerChildMinute).toBeLessThan(CHILD_MOTION.worstChildCarryGate)
-
-    // `nudges` is optional on a track sample — the metric reads a missing one
-    // as zero, and so does this.
-    const rescuedAt = paths[3].findIndex((s) => (s.nudges ?? 0) > 0)
-    expect(rescuedAt).toBeGreaterThan(0)
-    const after = paths.map((path) => path.slice(rescuedAt + 1))
-    const shuffle = shuffleWindows(after)
-    const burst = shuffleWindows(after, CHILD_MOTION.short)
+    expect(rescues.carriedPublished).toBe(true)
+    expect(rescues.nudgesPublished).toBe(true)
+    expect(rescues.worstRescues).toBe(0)
+    expect(rescues.carriedMetres).toBe(0)
+    expect(paths.every((path) => path.every((s) => (s.nudges ?? 0) === 0))).toBe(true)
+    // ...and the run it walks instead is a real game, judged over its whole
+    // length rather than from a rescue onward.
+    expectLively(paths)
+    const shuffle = shuffleWindows(paths)
+    const burst = shuffleWindows(paths, CHILD_MOTION.short)
     expect(judgedEnough(shuffle)).toBe(true)
     expect(judgedEnough(burst)).toBe(true)
     expect(shuffle.worstShare).toBeLessThan(CHILD_MOTION.shareGate)
@@ -570,9 +716,18 @@ describe('the children never shuffle on the spot (points 648/656)', () => {
     // (`buildWedgeCarve`) and the tag-back window's press and U-turn gone, the
     // same recorded cadence must read inside the shipped gates — this case
     // FAILS on the pre-carve code, and that is its whole point.
+    // AND ON BOTH ROUNDS. bambara-village plays the BANK game since work-order
+    // 687, so the mechanism this cadence was recorded against — the tag round's
+    // evade — no longer runs there; maasai-village has no river and still plays
+    // it, so the recorded cadence is replayed on both. The reported settlement
+    // keeps its case, and the fix keeps its gate.
+    for (const [placeId, placeSeed] of [
+      ['bambara-village', 2972259115],
+      ['maasai-village', 42],
+    ] as Array<[string, number]>) {
     const rand = mulberry32(18)
-    const v = village('bambara-village', 2972259115)
-    const paths: Track[][] = v.game.children.map(() => [])
+    const v = village(placeId, placeSeed)
+    const paths: Track[][] = v.children.map(() => [])
     for (let t = 0; t < 150; ) {
       const dt = 0.014 + rand() * 0.012
       t += dt
@@ -591,6 +746,7 @@ describe('the children never shuffle on the spot (points 648/656)', () => {
     expect(rescues.carriedMetresPerChildMinute).toBeLessThan(CHILD_MOTION.carryGate)
     expect(rescues.perChildMinute).toBeLessThan(CHILD_MOTION.rescueGate)
     expect(rescues.worstPerChildMinute).toBeLessThan(CHILD_MOTION.worstChildRescueGate)
+    }
   })
 
   it('holds on the cadence that flipped two evaders about-face at the band edge (point 657, second round)', () => {
@@ -606,9 +762,18 @@ describe('the children never shuffle on the spot (points 648/656)', () => {
     // `evadeHeading` the same recorded cadence must read inside the shipped
     // gates: this case FAILS on the cliff-release code, and that is its
     // whole point.
+    // AND ON BOTH ROUNDS. bambara-village plays the BANK game since work-order
+    // 687, so the mechanism this cadence was recorded against — the tag round's
+    // evade — no longer runs there; maasai-village has no river and still plays
+    // it, so the recorded cadence is replayed on both. The reported settlement
+    // keeps its case, and the fix keeps its gate.
+    for (const [placeId, placeSeed] of [
+      ['bambara-village', 2972259115],
+      ['maasai-village', 42],
+    ] as Array<[string, number]>) {
     const rand = mulberry32(14)
-    const v = village('bambara-village', 2972259115)
-    const paths: Track[][] = v.game.children.map(() => [])
+    const v = village(placeId, placeSeed)
+    const paths: Track[][] = v.children.map(() => [])
     for (let t = 0; t < 150; ) {
       const dt = 0.014 + rand() * 0.012
       t += dt
@@ -627,6 +792,7 @@ describe('the children never shuffle on the spot (points 648/656)', () => {
     expect(rescues.carriedMetresPerChildMinute).toBeLessThan(CHILD_MOTION.carryGate)
     expect(rescues.perChildMinute).toBeLessThan(CHILD_MOTION.rescueGate)
     expect(rescues.worstPerChildMinute).toBeLessThan(CHILD_MOTION.worstChildRescueGate)
+    }
   })
 
   it('holds at a low and uneven frame rate too', () => {
@@ -635,7 +801,7 @@ describe('the children never shuffle on the spot (points 648/656)', () => {
     // measurement is repeated where each frame carries five times the movement.
     const rand = mulberry32(4242)
     const v = village('bambara-village', 2972259115)
-    const paths: Track[][] = v.game.children.map(() => [])
+    const paths: Track[][] = v.children.map(() => [])
     for (let t = 0; t < 150; ) {
       const dt = 0.07 + rand() * 0.03
       t += dt
@@ -655,7 +821,7 @@ describe('the children never shuffle on the spot (points 648/656)', () => {
     // (point 656.4), not the children's alone. An adult is drawn at full scale,
     // so a child owes it a wider berth than it owes another child.
     const v = village('bambara-village', 2972259115)
-    const n = v.game.children.length
+    const n = v.children.length
     const sep = balance.villageLife.separation
     const kidPair = sep.bodyRadius * KID_SCALE * 2 - sep.slop
     const adultPair = sep.bodyRadius * KID_SCALE + sep.bodyRadius - sep.slop
@@ -664,10 +830,10 @@ describe('the children never shuffle on the spot (points 648/656)', () => {
     const stall = new Array<number>(n).fill(0)
     let overlaps = 0
     let nearestAdult = Infinity
-    const last = v.game.children.map((c) => c.walked)
+    const last = v.children.map((c) => c.walked)
     for (let t = 0; t < 60; t += 1 / 60) {
       frame(v, 1 / 60)
-      v.game.children.forEach((c, i) => {
+      v.children.forEach((c, i) => {
         if (c.pace > 1e-6 && !c.held && c.walked - last[i] < 1e-4) {
           stall[i] += 1 / 60
           longestStall = Math.max(longestStall, stall[i])
@@ -675,9 +841,9 @@ describe('the children never shuffle on the spot (points 648/656)', () => {
         last[i] = c.walked
       })
       for (let i = 0; i < n; i++) {
-        const a = v.game.children[i]
+        const a = v.children[i]
         for (let j = i + 1; j < n; j++) {
-          const b = v.game.children[j]
+          const b = v.children[j]
           if (Math.hypot(a.x - b.x, a.z - b.z) < kidPair - 1e-6) overlaps++
         }
         for (const b of adults) {
@@ -706,7 +872,7 @@ describe('the children never shuffle on the spot (points 648/656)', () => {
     // bodies at full scale, crossing and standing among the children, which is
     // the crowding that made the multi-pass sweep necessary.
     const v = village('bambara-village', 2972259115, undefined, { adultsAmongTheChildren: true })
-    const paths: Track[][] = v.game.children.map(() => [])
+    const paths: Track[][] = v.children.map(() => [])
     const sep = balance.villageLife.separation
     const adultPair = sep.bodyRadius * KID_SCALE + sep.bodyRadius - sep.slop
     const adults = [...v.others.standing, ...v.others.porters, ...v.others.walkers]
@@ -716,7 +882,7 @@ describe('the children never shuffle on the spot (points 648/656)', () => {
     for (let t = 0; t < 60; t += 1 / 60) {
       frame(v, 1 / 60)
       sample(v, paths)
-      for (const c of v.game.children) {
+      for (const c of v.children) {
         for (const b of adults) {
           const d = Math.hypot(c.x - b.x, c.z - b.z)
           if (d < adultPair - 1e-6) {
@@ -745,11 +911,11 @@ describe('the children never shuffle on the spot (points 648/656)', () => {
     // here before the fix, 1.14 % of one-second windows (the group), the worst
     // child 3.5 % of its half-second bursts, against 0.00-0.03 % where the
     // adults keep to their own work; a held bar of 2 % stood here in place of a
-    // gate. Now the chase steers round the other inhabitants' bodies
+    // gate. Now the round steers round the other inhabitants' bodies
     // (`TagWorld.occupied`) and the walkers steer round the children
     // (`stepRoundBodies`), and this crowded minute must read INSIDE the same
-    // gates as a quiet one — measured after the fix: not one bad window at
-    // either scale. The bars are the shipped gates, so the old code fails here.
+    // gates as a quiet one — re-measured with the bank round: 322 pair-frames of
+    // contact, not one overlap and not one bad window at either scale. The bars are the shipped gates, so the old code fails here.
     const crowded = shuffleWindows(paths)
     const crowdedBurst = shuffleWindows(paths, CHILD_MOTION.short)
     expect(judgedEnough(crowded)).toBe(true)
@@ -776,47 +942,110 @@ describe('the children never shuffle on the spot (points 648/656)', () => {
 })
 
 /**
- * The pen, measured. A yard of 0.65 m leaves the child room to keep WALKING —
- * the deflection needs a couple of body radii of clear ground ahead before it
- * will take a step at all — and no room to get anywhere, and the settlement
- * carries it 3 m clear whenever its stall watch runs out. The yard was 0.8 m
- * until the point-657 behaviour work: in THAT yard the evader circles the pen
- * wall, and a child circling a 1.6 m circle covers "ground" the 0.35 m window
- * cannot call pacing — the construction, not the gate, had stopped producing
- * the symptom, so the pen tightened to where walking cannot orbit. Measured
- * over 40 s at 0.65 m (re-measured after the point-657 second round's evade
- * ramp): 18.0 rescues per child-minute, carrying it 54.9 m in that minute,
- * 110 m walked per played minute (full legs, the healthy band), and 14.8 %
- * of the judged game time walked without getting anywhere — sixty times the
- * gate. A third of the trace is not judged at all, because a window that
- * spans a carry is refused rather than guessed at; the carries are what the
- * rescue gate answers for. THE MEASURE THIS ONE REPLACED sees 2.5 % of the
- * same trace — less than a quarter of the truth — because every one of its two-second
- * windows holds a 3 m carry: it counted the teleport as the child walking,
- * and as ground the child covered.
+ * THE PEN, RE-MEASURED WITH THE CHILDREN'S GAME BACK (work-order 687 item 9).
+ *
+ * A yard of 0.65 m leaves the child room to keep WALKING — the deflection needs
+ * a couple of body radii of clear ground ahead before it will take a step at all
+ * — and no room to get anywhere, and the settlement carries it 3 m clear
+ * whenever its stall watch runs out. Point 686 had tightened it to 0.6 m because
+ * a child with nothing but the bare chase stopped producing the symptom at
+ * 0.65 m; item 9 puts the 0.65 m yard back, and this is the measurement that
+ * comes with it. Over 40 s at 0.65 m with the bank round: 25.5 rescues per
+ * child-minute carrying it 76.5 m in that minute, 84.0 m walked per played
+ * minute (full legs — the healthy band, once the walking of the roaming phase is
+ * counted), and 25.0 % of the judged game time walked without getting anywhere,
+ * a hundred times the gate. Not half the trace is judged at all, because a
+ * window that spans a carry is refused rather than guessed at; the carries are
+ * what the rescue gate answers for.
+ *
+ * THE MEASURE THIS ONE REPLACED sees 2.4 % of the same trace — a tenth of the
+ * truth — because every one of its two-second windows holds a 3 m carry: it
+ * counted the teleport as the child walking, and as ground the child covered.
+ *
+ * THE BAND IS NARROW IN BOTH DIRECTIONS, and it was measured rather than
+ * guessed: at 0.6 m and at 0.7 m the same 40 s read 1.4 % and 1.5 % shuffled
+ * with a judged share above 0.92 — the wall no longer catches the walk — and at
+ * 0.55 m and tighter the child is carried out before a window can close on it.
+ * 0.65 m is where the construction bites.
  */
 const PEN_RADIUS = 0.65
 const PEN_CARRY = 3
+type PenClearance = 'wall-band' | 'clear-yard'
+
+/** Whether a pen can be placed without putting a sibling on its wall. The old
+ *  construction required every sibling outside a much larger clear yard; the
+ *  corrected construction admits one already inside the pen while still
+ *  keeping every sibling clear of the blocked annulus.
+ *
+ *  THE TWO EDGES ARE NOT SYMMETRIC, and this is the honest reading of it
+ *  (cross-vendor review, 29.08.2026). The OUTER edge carries the body radius;
+ *  the INNER one does not, so a sibling whose centre is inside the wall circle
+ *  counts as inside the yard even where its own body overlaps the wall. That is
+ *  weaker than "clear of the blocked annulus" sounds, and it is deliberate:
+ *  MEASURED with the body margin on both edges, the construction yields 6 valid
+ *  placements where this fixture needs more than 10, and the three assertions
+ *  pinned to the resulting trace — worst share, least judged child, rescues per
+ *  child-minute — all fall with it. The sharper rule is therefore affordable
+ *  only together with a longer trace and a re-measurement of those three
+ *  numbers, which is a re-baseline and not a comment fix. Until then the rule is
+ *  written down as it really is rather than described as something stricter. */
+function penHasClearWall(
+  children: ReadonlyArray<{ x: number; z: number }>,
+  penned: number,
+  r: number,
+  clearance: PenClearance,
+): boolean {
+  const c = children[penned]
+  return children.every((o, i) => {
+    if (i === penned) return true
+    const d = Math.hypot(o.x - c.x, o.z - c.z)
+    return clearance === 'clear-yard'
+      ? d > r + 1.6
+      : d <= r || d >= r + 1.5 + NPC_RADIUS
+  })
+}
+
+interface PenEvidence {
+  placements: number
+  /** Placements the wall-band rule admits because a sibling is already inside
+   *  the yard, but the former r + 1.6 m rule wrongly refuses. */
+  refusedByClearYard: number
+}
 
 describe('and the gate SEES a child that is wedged (point 656)', () => {
   /** The reported settlement with one child penned: a wall thrown up round it
    *  with room to keep walking and none to get anywhere, and a settlement that
    *  carries it clear of the wall when its stall watch runs out. The pen follows
    *  the child, so the trace holds episode after episode rather than one. */
-  function wedged(seconds = 40, r = PEN_RADIUS, carry = PEN_CARRY) {
+  function wedged(
+    seconds = 40,
+    r = PEN_RADIUS,
+    carry = PEN_CARRY,
+    clearance: PenClearance = 'wall-band',
+    evidence?: PenEvidence,
+  ) {
     const v = village('bambara-village', 2972259115, undefined, { pen: { r, carry } })
-    const paths: Track[][] = v.game.children.map(() => [])
+    const paths: Track[][] = v.children.map(() => [])
     for (let t = 0; t < seconds; t += 1 / 60) {
       frame(v, 1 / 60)
-      const c = v.game.children[0]
+      const c = v.children[0]
       // Penned once the game is running, and re-penned wherever it is carried.
       // Never over ANOTHER child, though: the wall is ground nobody may stand
       // on, and building it round a passer-by would leave that child inside a
       // collider — a broken settlement rather than a wedged child.
-      const clear = v.game.children.every(
-        (o, i) => i === 0 || Math.hypot(o.x - c.x, o.z - c.z) > r + 1.6,
-      )
-      if (clear && v.game.clock > 3 && (!v.pen.on || Math.hypot(c.x - v.pen.x, c.z - v.pen.z) > r)) {
+      // Never OVER another child, though: the wall is ground nobody may stand
+      // on, so no sibling may be left inside the band it occupies. Asking for a
+      // clear yard of r + 1.6 m all round was stricter than that and, with the
+      // bank round's children walking their quarter together, it refused nearly
+      // every re-pen — 6 rescues a child-minute where the tag round produced 18,
+      // which is the construction losing its grip on the symptom rather than the
+      // gate losing sight of it.
+      const clear = penHasClearWall(v.children, 0, r, clearance)
+      if (clear && v.clock() > 3 && (!v.pen.on || Math.hypot(c.x - v.pen.x, c.z - v.pen.z) > r)) {
+        if (evidence) {
+          evidence.placements++
+          if (!penHasClearWall(v.children, 0, r, 'clear-yard')) evidence.refusedByClearYard++
+        }
         v.pen.x = c.x
         v.pen.z = c.z
         v.pen.on = true
@@ -825,6 +1054,36 @@ describe('and the gate SEES a child that is wedged (point 656)', () => {
     }
     return paths
   }
+
+  it('re-pens with a sibling safely inside the yard instead of starving the construction', () => {
+    const pair = (d: number) => [{ x: 0, z: 0 }, { x: d, z: 0 }]
+    // A sibling standing on either side of the annulus is valid; one on the wall
+    // or less than its body radius beyond the outer edge is not. This is the
+    // safety the correction retains while dropping unrelated empty ground.
+    expect(penHasClearWall(pair(PEN_RADIUS / 2), 0, PEN_RADIUS, 'wall-band')).toBe(true)
+    expect(penHasClearWall(pair(PEN_RADIUS / 2), 0, PEN_RADIUS, 'clear-yard')).toBe(false)
+    expect(penHasClearWall(pair(PEN_RADIUS + 0.1), 0, PEN_RADIUS, 'wall-band')).toBe(false)
+    expect(
+      penHasClearWall(pair(PEN_RADIUS + 1.5 + NPC_RADIUS - 0.01), 0, PEN_RADIUS, 'wall-band'),
+    ).toBe(false)
+    expect(
+      penHasClearWall(pair(PEN_RADIUS + 1.5 + NPC_RADIUS + 0.01), 0, PEN_RADIUS, 'wall-band'),
+    ).toBe(true)
+
+    const evidence: PenEvidence = { placements: 0, refusedByClearYard: 0 }
+    const corrected = [wedged(40, PEN_RADIUS, PEN_CARRY, 'wall-band', evidence)[0]]
+    const stricter = [wedged(40, PEN_RADIUS, PEN_CARRY, 'clear-yard')[0]]
+    const correctedRescues = rescueRate(corrected).perChildMinute
+    const stricterRescues = rescueRate(stricter).perChildMinute
+
+    // This is the case the former rule got wrong: the wall is clear, but a
+    // sibling already inside its inner yard makes r + 1.6 m of empty ground
+    // impossible. Refusing those valid placements starves the repeated symptom.
+    expect(evidence.placements).toBeGreaterThan(10)
+    expect(evidence.refusedByClearYard).toBeGreaterThan(0)
+    expect(correctedRescues).toBeGreaterThan(stricterRescues * 2)
+    expect(correctedRescues).toBeGreaterThan(CHILD_MOTION.rescueGate * 2)
+  })
 
   it('goes RED on it — and the measure it replaced would have passed', () => {
     const paths = wedged()
@@ -852,8 +1111,8 @@ describe('and the gate SEES a child that is wedged (point 656)', () => {
     // opened for, and it is measured here rather than argued.
     // AND THE WALKING FLOOR CANNOT SEE THIS AT ALL, which is why the share
     // exists. The penned child's legs move exactly as much as a healthy child's
-    // — measured 109.6 m per played minute, inside the shipped villages' own
-    // 102-113 band — so no floor could separate the two without failing
+    // — re-measured 84.0 m per played minute, inside the shipped villages' own
+    // 92-111 band once the walk of the roaming phase is counted — so no floor could separate the two without failing
     // ordinary play. The floor answers "did it move?"; the share answers "did
     // it get anywhere?", and only the second one is the reported bug.
     const legs = traceLiveness(penned)
@@ -861,7 +1120,7 @@ describe('and the gate SEES a child that is wedged (point 656)', () => {
     expect(holdsAGame(traceLiveness(paths))).toBe(true)
     const asItWas = oldMeasure(penned, 2, 2, 0.5)
     expect(asItWas.windows).toBeGreaterThan(1000) // it really did look
-    expect(asItWas.share).toBeLessThan(0.05) // and it saw less than a quarter of the truth
+    expect(asItWas.share).toBeLessThan(0.05) // and it saw a tenth of the truth
     expect(r.share).toBeGreaterThan(asItWas.share * 4)
   })
 
@@ -873,13 +1132,12 @@ describe('and the gate SEES a child that is wedged (point 656)', () => {
     // settlement changes, only how often it was looked at.
     //
     // WHAT IS PINNED HERE IS THE VERDICT, NOT THE NUMBER, and the difference is
-    // deliberate. This child is CARRIED every three and a half seconds, and a
-    // window that spans a carry is refused rather than guessed at — so about
-    // two thirds of the trace can be judged (measured judgedShare 0.663-0.677
-    // across the cadences, re-measured after the point-657 second round's
-    // evade ramp), and what survives is a scatter of short continuous
-    // stretches whose share swings a little with the cadence: 15.15 / 15.17 /
-    // 15.58 / 15.40 / 18.84 %. The one thing that does NOT swing is the
+    // deliberate. This child is CARRIED every other second, and a window that
+    // spans a carry is refused rather than guessed at — so a little over half
+    // the trace can be judged (re-measured with the bank round, judgedShare
+    // 0.525-0.553 across the cadences), and what survives is a scatter of short
+    // continuous stretches whose share swings a little with the cadence: 25.00 /
+    // 24.77 / 25.62 / 25.76 / 27.16 %. The one thing that does NOT swing is the
     // answer the gate reads — every cadence is RED by a factor of at least
     // sixty — and the rescue rate below, which counts the very carries that
     // made the trace unjudgeable, is red by a factor of three at all of them.
@@ -1022,6 +1280,605 @@ describe('and the replay refuses a trace with no game in it (point 656)', () => 
     )
     expect(shuffleWindows(idle).share).toBeLessThan(CHILD_MOTION.shareGate)
     expect(() => expectLively(idle)).toThrow()
+  })
+})
+
+/**
+ * THE ROUND IS PLAYED WHERE THE STAGE IS (work-order 687).
+ *
+ * The bank round's two rocks stand on the settlement's BANK LOBE — measured on
+ * all three river villages, 32.5 m from the middle, while the plain walkable
+ * radius is 28 and the children's own rim 27.4. Wired to the plain circle, the
+ * children could not reach their own stage at ALL: the gather ran out on its
+ * backstop with the group pressed against the rim four metres short of the
+ * stones, the run opened on a bunched group, the catcher swept it in seconds and
+ * the cycle ended without one child on the bank. Every gate above went green on
+ * it — a group shuffling nowhere is exactly what they are built to catch, and
+ * this group was walking hard, just never to the bank — and the browser check
+ * photographed an empty stretch.
+ *
+ * So the stage is asserted as GROUND FIRST (nothing else can be true if the
+ * children may not stand there) and then as a PLAYED ROUND: the group arrives at
+ * both rocks and the runners cross the middle of the stretch, which is where a
+ * traveller standing in the lane would be.
+ */
+describe('the children`s bank round can reach its own stage (work-order 687)', () => {
+  // SEED 42 FIRST, because it is the world the BROWSER section judges this round
+  // in (`scripts/verify/verify-seed.mjs` pins the verify lane to it). The pure
+  // layer had covered the bambara village at the child-motion report's seed
+  // only, and the layout the picture check actually walks — a different one —
+  // was the one whose route across the village could not be planned.
+  const RIVER_VILLAGES: Array<[string, number]> = [
+    ['bambara-village', 42],
+    ['bambara-village', 2972259115],
+    ['nubian-village', 42],
+    ['mandinka-village', 99],
+  ]
+
+  for (const [placeId, seed] of RIVER_VILLAGES) {
+    it(`${placeId} at seed ${seed} lets the children stand on every part of the stage`, () => {
+      const v = village(placeId, seed)
+      expect(v.stage).not.toBeNull()
+      const stage = v.stage!
+      const ends: BankEnd[] = ['upstream', 'downstream']
+      for (const end of ends) {
+        // EVERY WAITING STATION. `stationAt` is what the walk down aims at and
+        // what `inPlace` judges, so a blocked station is a gather that can only
+        // ever end on its backstop.
+        for (let slot = 0; slot < v.children.length; slot++) {
+          const at = stationAt(stage, end, slot, BANK_CFG)
+          expect({ end, slot, blocked: v.world.blocked(at.x, at.z) }).toEqual({ end, slot, blocked: false })
+        }
+        // AND AN ARRIVAL IS PHYSICALLY POSSIBLE: the rock is a collider, so what
+        // has to exist is standing room inside the reach the run judges the
+        // touch by.
+        const rock = rockAt(stage, end)
+        let touchable = 0
+        for (let k = 0; k < 36; k++) {
+          const a = (k / 36) * Math.PI * 2
+          const r = BANK_CFG.reachDistance * 0.9
+          if (!v.world.blocked(rock.x + Math.cos(a) * r, rock.z + Math.sin(a) * r)) touchable++
+        }
+        expect({ end, touchable: touchable > 0 }).toEqual({ end, touchable: true })
+      }
+      // AND THE WHOLE RUNNING LANE BETWEEN THEM, station to station: the ground
+      // the runners cross and the ground a traveller plants himself in.
+      const from = stationAt(stage, 'upstream', 1, BANK_CFG)
+      const to = stationAt(stage, 'downstream', 1, BANK_CFG)
+      const walled: number[] = []
+      for (let k = 0; k <= 40; k++) {
+        const t = k / 40
+        const x = from.x + (to.x - from.x) * t
+        const z = from.z + (to.z - from.z) * t
+        if (v.world.blocked(x, z)) walled.push(Number(t.toFixed(2)))
+      }
+      expect(walled).toEqual([])
+    })
+  }
+
+  it('walks round a traveller planted in the running lane, never through him', () => {
+    const [placeId, seed] = RIVER_VILLAGES[0]
+    const v = village(placeId, seed)
+    const stage = v.stage!
+    const up = rockAt(stage, 'upstream')
+    const down = rockAt(stage, 'downstream')
+    // He plants himself in the MIDDLE of the running ground — the worst place he
+    // could pick, and the one the browser section stands him in.
+    const him = { x: (up.x + down.x) / 2, z: (up.z + down.z) / 2, radius: PLAYER_RADIUS }
+    v.world.stranger = him
+    const bodies = PLAYER_RADIUS + NPC_RADIUS
+    const owed = bodies + BANK_CFG.strangerBerth
+    let minGap = Infinity
+    const dt = 1 / 60
+    for (let t = 0; t < 200; t += dt) {
+      frame(v, dt)
+      for (const c of v.children) minGap = Math.min(minGap, Math.hypot(c.x - him.x, c.z - him.z))
+    }
+    // A run happened with him standing in it, rather than the round halting.
+    expect(v.bank!.runs).toBeGreaterThan(0)
+    // ...and nobody brushed past him: the bodies never met, and the extra radius
+    // the children owe the stranger was kept as well.
+    expect(minGap).toBeGreaterThanOrEqual(bodies)
+    expect(minGap).toBeGreaterThanOrEqual(owed)
+  })
+
+  /**
+   * AND THE BROWSER SECTION'S OWN LANE RULE, REPLAYED (work-order 687). The
+   * picture check stands the traveller in the middle of the stretch, opens a
+   * window on the round's own clock and asks whether a child goes from one side
+   * of him to the other INSIDE A RUN. Which run it opened on, and how long it
+   * watched, decided the answer — and nobody had measured that:
+   *
+   *  - A cycle's LATER runs carry only the runners that survived the ones before
+   *    it, so they end in about two seconds. A runner covers six or seven metres
+   *    in that, and the traveller stands ten from the start line: nobody can
+   *    reach him, let alone pass him. Only a cycle's FIRST run has the whole line
+   *    in it, and `gather` — the walk down to the bank, once per cycle — is what
+   *    announces it.
+   *  - The 45 s window was mostly the roaming phase. The section shortens
+   *    `roamSeconds` to 8, but the off-game ROCK guard held every cycle for its
+   *    full 45 s of overtime on top (the boulder goes unnamed at these seeds), so
+   *    the phase still ran 55 s and the window held one short run at best.
+   *
+   * Measured over the layouts below, both defects fixed: 75 of 75 windows carry a
+   * crossing at 120 s. At the old 45 s, six of 84 carried none — a gate that went
+   * green on luck, which is exactly what it did until it did not.
+   */
+  it('carries a child past a planted traveller in every cycle-first run window (work-order 687)', () => {
+    const CASES: Array<[string, number]> = [
+      ['bambara-village', 42],
+      ['bambara-village', 2972259115],
+      ['nubian-village', 42],
+      ['mandinka-village', 99],
+    ]
+    // What the browser section sets while it watches, and why: see
+    // `scripts/verify/polish.mjs`, section `children-bank-game`.
+    const SECTION_ROAM_S = 8
+    const SECTION_GUARD_S = 8
+    // The window the section opens, and the budget it gives a cycle-first run to
+    // come, both in played seconds.
+    const LANE_WINDOW_S = 120
+    const RUN_BUDGET_S = 150
+    const shippedRoam = BANK_CFG.roamSeconds
+    const shippedGuard = BANK_CFG.roamGuardSeconds
+    try {
+      BANK_CFG.roamSeconds = SECTION_ROAM_S
+      BANK_CFG.roamGuardSeconds = SECTION_GUARD_S
+      for (const [placeId, seed] of CASES) {
+        const v = village(placeId, seed)
+        expect({ placeId, seed, staged: !!v.stage }).toEqual({ placeId, seed, staged: true })
+        const stage = v.stage!
+        const up = rockAt(stage, 'upstream')
+        const down = rockAt(stage, 'downstream')
+        const him = { x: (up.x + down.x) / 2, z: (up.z + down.z) / 2, radius: PLAYER_RADIUS }
+        v.world.stranger = him
+        const dx = down.x - up.x
+        const dz = down.z - up.z
+        const len = Math.hypot(dx, dz) || 1
+        const ax = dx / len
+        const az = dz / len
+        const dt = 1 / 60
+        // Long enough to hold several whole cycles AND one full window after the
+        // last opening this asserts on.
+        const trace: Array<{ t: number; phase: string; along: number[] }> = []
+        for (let t = 0; t < 480; t += dt) {
+          frame(v, dt)
+          trace.push({
+            t,
+            phase: v.bank!.phase,
+            along: v.children.map((c) => (c.x - him.x) * ax + (c.z - him.z) * az),
+          })
+        }
+        // The openings the browser wait now picks: the first run of a cycle, the
+        // one `gather` announces.
+        const opens: number[] = []
+        let prev = trace[0].phase
+        let lastNonRun = trace[0].phase
+        for (const s of trace) {
+          if (s.phase === 'run' && prev !== 'run' && lastNonRun === 'gather') opens.push(s.t)
+          if (s.phase !== 'run') lastNonRun = s.phase
+          prev = s.phase
+        }
+        // A cycle-first run comes inside the budget the browser wait allows, from
+        // a cold start and between any two of them.
+        let worstWait = opens.length > 0 ? opens[0] : Infinity
+        for (let i = 1; i < opens.length; i++) worstWait = Math.max(worstWait, opens[i] - opens[i - 1])
+        expect({ placeId, seed, inBudget: worstWait <= RUN_BUDGET_S }).toEqual({
+          placeId,
+          seed,
+          inBudget: true,
+        })
+        // ...and every window that fits whole inside the replay carries a
+        // crossing, counted exactly as the browser counts it: inside the run
+        // phase only, with the side forgotten on leaving it and a metre of
+        // hysteresis about his line.
+        const windows = opens.filter((t) => t + LANE_WINDOW_S <= trace[trace.length - 1].t)
+        expect({ placeId, seed, windows: windows.length > 0 }).toEqual({ placeId, seed, windows: true })
+        const crossers = windows.map((from) => {
+          const win = trace.filter((s) => s.t >= from && s.t < from + LANE_WINDOW_S)
+          let n = 0
+          for (let k = 0; k < v.children.length; k++) {
+            let side = 0
+            let swapped = false
+            for (const s of win) {
+              if (s.phase !== 'run') {
+                side = 0
+                continue
+              }
+              const a = s.along[k]
+              if (a > 1 || a < -1) {
+                const now = a > 0 ? 1 : -1
+                if (side !== 0 && now !== side) swapped = true
+                side = now
+              }
+            }
+            if (swapped) n++
+          }
+          return n
+        })
+        expect({ placeId, seed, empty: crossers.filter((n) => n === 0).length }).toEqual({
+          placeId,
+          seed,
+          empty: 0,
+        })
+      }
+    } finally {
+      BANK_CFG.roamSeconds = shippedRoam
+      BANK_CFG.roamGuardSeconds = shippedGuard
+    }
+    // Four layouts of 480 replayed seconds each: this measurement carries its own
+    // budget rather than flaking under the suite's worker contention.
+  }, 120000)
+
+
+
+  /**
+   * THE ROAMING PHASE CANNOT RUN FOREVER (work-order 687). Its only exit was the
+   * off-game ROCK guard resolving, and that guard's watch resets on ANY gain
+   * toward the boulder — so a child creeping at a stone it can never quite reach
+   * neither arrived nor gave up, and the phase had no bound. Measured in the
+   * browser under load: the round played 150 s of its own clock in `roam` and
+   * never opened a run, which is a player standing at the bank watching the
+   * children wander and never play.
+   *
+   * The three layouts below are the ones that showed it, and they are here by
+   * measurement: at this section's shortened roam the guard spent 136 s of
+   * overtime in bambara@7, 206 s in mandinka@99, and in bambara@236333330 it
+   * NEVER named the boulder at all (275 s to abandon). The ordinary case is
+   * beside them so the bound is not only proved where it bites.
+   */
+  it('bounds the roaming phase, so a run always comes (work-order 687)', () => {
+    const CASES: Array<[string, number]> = [
+      ['bambara-village', 42],
+      ['bambara-village', 7],
+      ['mandinka-village', 99],
+      ['bambara-village', 236333330],
+      // THE CASE THAT PROVES THE FOLD BELOW, and the only one of the five that
+      // does. Swept out of 120 village/seed layouts against the UNBOUNDED code:
+      // here every roam that ENDS inside the window stays within the cap (45.9 s
+      // against 55.0 s) while the roam the window CLOSES in has already run
+      // 55.4 s, and a run had opened long before (38.6 s). It is therefore the
+      // one layout where the exit-only measurement reads green on a round that
+      // is over its bound — which is what made the test unable to fail.
+      ['mandinka-village', 58],
+    ]
+    const shippedRoam = BANK_CFG.roamSeconds
+    try {
+      // The browser section shortens the roam exactly this way (debug menu §21),
+      // and it is the stress case: less time inside the phase means the guard
+      // spends more of it in overtime.
+      BANK_CFG.roamSeconds = 8
+      const cap = BANK_CFG.roamSeconds * (1 + BANK_CFG.roamSpread) + BANK_CFG.roamGuardSeconds
+      // The budget the browser check gives a run to start, in played seconds.
+      const RUN_BUDGET_S = 150
+      for (const [placeId, seed] of CASES) {
+        const v = village(placeId, seed)
+        const dt = 1 / 60
+        let worstRoam = 0
+        let roamFor = 0
+        let firstRun = Infinity
+        let last = ''
+        for (let t = 0; t < 400; t += dt) {
+          frame(v, dt)
+          const b = v.bank!
+          if (b.phase === 'roam') roamFor += dt
+          else {
+            if (last === 'roam') worstRoam = Math.max(worstRoam, roamFor)
+            roamFor = 0
+          }
+          if (b.phase === 'run' && firstRun === Infinity) firstRun = b.playedClock
+          last = b.phase
+        }
+        // THE PHASE THE WINDOW CLOSES IN IS COUNTED TOO (cross-vendor finding,
+        // 14.08.2026). Folding a roam in only where it ENDS is blind to the one
+        // failure this test exists for: a round still roaming when the window
+        // closes never left the phase, so its length was never measured — and an
+        // earlier successful run had already made `firstRun` green. The test
+        // then passed on exactly the state it is meant to catch.
+        if (last === 'roam') worstRoam = Math.max(worstRoam, roamFor)
+        // A tenth of a second of slack for the frame the bound falls in.
+        expect({ placeId, seed, longestRoam: worstRoam <= cap + 0.1 }).toEqual({
+          placeId,
+          seed,
+          longestRoam: true,
+        })
+        // ...and the round got to its game, inside the budget the picture check
+        // allows it.
+        expect({ placeId, seed, ranWithin: firstRun <= RUN_BUDGET_S }).toEqual({
+          placeId,
+          seed,
+          ranWithin: true,
+        })
+      }
+    } finally {
+      BANK_CFG.roamSeconds = shippedRoam
+    }
+    // Five cases of 400 replayed seconds each: 17 s alone on this machine, and
+    // over the default 20 s budget under the full suite's worker contention —
+    // a measurement this long carries its own budget, not a flake.
+  }, 60_000)
+
+  for (const [placeId, seed] of RIVER_VILLAGES) {
+    it(`${placeId} at seed ${seed} walks the group down to the bank and runs the stretch`, () => {
+      const v = village(placeId, seed)
+      const stage = v.stage!
+      const up = rockAt(stage, 'upstream')
+      const down = rockAt(stage, 'downstream')
+      const mid = { x: (up.x + down.x) / 2, z: (up.z + down.z) / 2 }
+      const span = Math.hypot(down.x - up.x, down.z - up.z) || 1
+      const ax = (down.x - up.x) / span
+      const az = (down.z - up.z) / span
+      // The window is a BOUND, not the cost: every condition measured below is
+      // monotone — counts only grow, the nearest distances only shrink, a
+      // crossing once seen stays seen — so the replay stops at the first frame
+      // on which all of them already hold, and 600 s is how long it may take.
+      // The bound is wide by need: a run-phase crossing is a sparse event under
+      // the shipped roam length (roaming is ~65 % of the round's time), and the
+      // latest first crossing measured below falls at 447 s.
+      const stood = BANK_CFG.standOff + BANK_CFG.reachDistance
+      const nearest = { up: Infinity, down: Infinity }
+      const side = v.children.map(() => ({ before: 0, crossed: false }))
+      const dt = 1 / 60
+      for (let t = 0; t < 600; t += dt) {
+        frame(v, dt)
+        const running = v.bank!.phase === 'run'
+        for (let i = 0; i < v.children.length; i++) {
+          const c = v.children[i]
+          nearest.up = Math.min(nearest.up, Math.hypot(c.x - up.x, c.z - up.z))
+          nearest.down = Math.min(nearest.down, Math.hypot(c.x - down.x, c.z - down.z))
+          // The lane's own axis with the middle of the stretch as its origin, and
+          // a metre of hysteresis so a child loitering beside the middle is never
+          // read as having crossed it.
+          const along = (c.x - mid.x) * ax + (c.z - mid.z) * az
+          if (Math.abs(along) <= 1) continue
+          const now = along > 0 ? 1 : -1
+          // The side is TRACKED through every phase — so the side a child holds
+          // when a run opens is known — but a flip COUNTS only while the round
+          // is in its run phase: a child drifting across the middle while
+          // roaming or walking down with the gather is not "the stretch was
+          // run", however many runs happen elsewhere in the window.
+          if (running && side[i].before !== 0 && now !== side[i].before) side[i].crossed = true
+          side[i].before = now
+        }
+        if (
+          v.bank!.runs > 0 &&
+          v.bank!.cycles > 0 &&
+          nearest.up <= stood &&
+          nearest.down <= stood &&
+          Math.min(nearest.up, nearest.down) <= BANK_CFG.reachDistance &&
+          side.some((s) => s.crossed)
+        )
+          break
+      }
+      // A CYCLE WAS PLAYED — not merely a phase clock ticking over a group that
+      // never arrived, which is exactly what the plain circle produced.
+      expect(v.bank!.runs).toBeGreaterThan(0)
+      expect(v.bank!.cycles).toBeGreaterThan(0)
+      // BOTH ENDS OF THE STAGE WERE STOOD AT: a child at its station is
+      // `standOff` from its rock, so this is the group at each end rather than
+      // near one of them.
+      expect(nearest.up).toBeLessThanOrEqual(stood)
+      expect(nearest.down).toBeLessThanOrEqual(stood)
+      // ...and one of them was TOUCHED, inside the reach the arrival is judged
+      // by — so a run can end in a `ROCK` at the far stone and not only in tags.
+      expect(Math.min(nearest.up, nearest.down)).toBeLessThanOrEqual(BANK_CFG.reachDistance)
+      // AND THE STRETCH WAS RUN: somebody went from one side of its middle to
+      // the other DURING A RUN. That middle is where the browser section plants
+      // the traveller, so this is the pure half of "the children walk PAST him"
+      // — and it must be the run that carries them past, not a drift across the
+      // middle while roaming beside an unrelated run, which the uncoupled count
+      // accepted. Measured with the phase coupling over the full 600 s bound:
+      // 2 of 4 children cross during runs (bambara@42, first at 251 s), 3 of 4
+      // (bambara@2972259115, first at 80 s), 1 of 4 (nubian@42, first at
+      // 447 s), 4 of 4 (mandinka@99, first at 228 s) — often the catcher
+      // running to meet the group is the first across the middle, and most
+      // runs end in tags short of it, which is why the event is sparse.
+      expect(side.filter((s) => s.crossed).length).toBeGreaterThan(0)
+    })
+  }
+
+  /**
+   * AND THE CARVE'S REMOVAL IS PAID FOR, CHILD BY CHILD (work-order 687 item 11,
+   * cross-vendor finding 18.08.2026). `PlaceLife` takes `buildWedgeCarve` off
+   * EVERY bank phase, because at the verification's own seed the only route from
+   * the children's quarter to the water ran through one carved wedge and the
+   * group stood in a pocket instead. That is right, and it has a COST: a roaming
+   * child is steered LOCALLY, so with the carve gone nothing but its own steering
+   * keeps it out of a dead-end wedge. Nothing measured that. The per-child
+   * shuffle measure ran over `bambara@2972259115`, `maasai@42` and `swahili@99`
+   * — and the last two stand on no river, so they never play this round at all —
+   * while the cases above assert reachable ground and a played cycle, never
+   * per-child progress. Three of the four river layouts were ungated.
+   *
+   * THE WINDOW IS 120 s BECAUSE THAT IS WHERE THE WHOLE CYCLE FITS, and the
+   * carve is gone from all of it. Measured over the four layouts: at 60 s the
+   * round has not left its opening phases in ANY of them (roam 55 s, gather 5 s,
+   * no run at all), so a minute would gate the roaming and nothing else; at
+   * 120 s every one of them has closed a full cycle — roam 75.5-88.5 s, gather
+   * 20.8-33.9 s, run 2.4-3.3 s, part 8 s, runs 1, cycles 1.
+   */
+  for (const [placeId, seed] of RIVER_VILLAGES) {
+    it(`${placeId} at seed ${seed} keeps every child covering ground with the carve gone`, () => {
+      const { v, paths } = playRound(placeId, seed, 120)
+      // THE WINDOW HELD A WHOLE CYCLE, read off the very replay judged below —
+      // not a second one that could have diverged. Without this the gate could
+      // pass on a round stalled in its roam, which is the one state the phases
+      // above are bounded to prevent.
+      expect({ runs: v.bank!.runs > 0, cycles: v.bank!.cycles > 0 }).toEqual({ runs: true, cycles: true })
+      expectLively(paths)
+      const r = shuffleWindows(paths)
+      const burst = shuffleWindows(paths, CHILD_MOTION.short)
+      // AND BOTH MEASURES LOOKED AT SOMETHING: a share is 0 when nothing was bad
+      // and equally when nothing was judged. Measured over the 120 s cycle, the
+      // same in all four layouts: 476 judged child-seconds and least judgeable
+      // child 0.992 on the one-second window, 478 and 0.996 on the burst — the
+      // missing part is the tail no window can reach into.
+      expect(judgedEnough(r)).toBe(true)
+      expect(judgedEnough(burst)).toBe(true)
+      // THE VERDICT OFF THE WORST CHILD, because one child wedged among three
+      // healthy ones is divided by four in every group average — which is the
+      // whole shape of the cost being gated here. Measured with the carve gone,
+      // worst child of each layout: bambara@42 0.000 %, bambara@2972259115
+      // 0.000 %, nubian@42 0.000 %, mandinka@99 0.000 % against the 0.25 % gate
+      // — exactly zero, not a rounded value: not one window of the cycle is bad
+      // in any of the four, and the burst window reads 0.000 % in all four too.
+      expect(r.leastJudged).toBeGreaterThan(CHILD_MOTION.judgedGate)
+      expect(r.worstShare).toBeLessThan(CHILD_MOTION.shareGate)
+      expect(burst.worstShare).toBeLessThan(CHILD_MOTION.shareGate)
+      // AND NOBODY IS CARRIED OUT OF A WEDGE INSTEAD: the rescue teleport is what
+      // ENDS a snag, so a layout that keeps its share down only by picking a
+      // child up would fail here rather than pass above. Measured: not one rescue
+      // and not one carried metre falls in the cycle, in any of the four.
+      const rescues = rescueRate(paths)
+      expect(rescues.carriedPublished).toBe(true)
+      expect(rescues.nudgesPublished).toBe(true)
+      expect(rescues.worstPerChildMinute).toBeLessThan(CHILD_MOTION.worstChildRescueGate)
+      expect(rescues.worstCarriedMetresPerChildMinute).toBeLessThan(CHILD_MOTION.worstChildCarryGate)
+    })
+  }
+})
+
+/**
+ * WHAT HAPPENS TO THE CORNER A CHILD CANNOT REACH (cross-vendor finding,
+ * 14.08.2026). The walk drops such a corner rather than pressing against it —
+ * right, because a corner inside a carved wedge is unreachable however long the
+ * child walks at it. But the corner may equally have been the way ROUND a
+ * collider, and dropping it then leaves a leg that runs straight through what it
+ * was avoiding, with nothing re-planning while a path exists.
+ *
+ * On synthetic geometry, where both cases are visible: the drop stands where the
+ * leg it opens is clear, and gives the route up where it is not.
+ */
+describe('the walk drops a corner it cannot reach, but not into a wall', () => {
+  const GOAL = { x: 0, z: 10 }
+  /** A child of the round, taken from the round itself so it carries every
+   *  field the walk reads, and stood where the case needs it. */
+  const childAt = (x: number, z: number): BankChild => {
+    const s = createBankGame([{ x, z }], () => 0.5, BANK_CFG)
+    return s.children[0]
+  }
+  /** A world whose straight line to the goal is always shut — the child is on a
+   *  planned route throughout — with `route` and the leg rule handed in. */
+  const worldWith = (
+    route: Array<{ x: number; z: number }>,
+    legShut: (ax: number, az: number, bx: number, bz: number) => boolean,
+  ): BankWorld =>
+    ({
+      radius: 40,
+      centerX: 0,
+      centerZ: 0,
+      childRadius: NPC_RADIUS,
+      blocked: () => false,
+      nudge: (x: number, z: number) => ({ x, z, found: true }),
+      lineBlocked: (ax: number, az: number, bx: number, bz: number) =>
+        bx === GOAL.x && bz === GOAL.z ? true : legShut(ax, az, bx, bz),
+      route: () => route.map((p) => ({ ...p })),
+    }) as unknown as BankWorld
+
+  /** Walk the child's stall watch out several times over without ever letting it
+   *  get closer — the corner it can never reach. The child is held still, which
+   *  is the worst case: the planner is asked from the same spot every time and
+   *  can only answer with the same route. Returns every place the walk aimed. */
+  const stallAt = (c: BankChild, world: BankWorld) => {
+    const dt = 1 / 60
+    const aims: Array<{ x: number; z: number }> = []
+    for (let t = 0; t < 20; t += dt) {
+      const aim = wayTo(c, GOAL, dt, world)
+      aims.push({ x: aim.x, z: aim.z })
+    }
+    return aims
+  }
+
+  it('drops the corner and walks on where the leg behind it is clear', () => {
+    const c = childAt(0, 0)
+    // A route whose first corner the child never reaches, and a second corner it
+    // has a clear line to.
+    const world = worldWith([{ x: 6, z: 2 }, { x: 0, z: 6 }, GOAL], () => false)
+    const aims = stallAt(c, world)
+    // The unreachable corner is given up on and the walk carries on along the
+    // route, rather than standing at that corner for the whole window.
+    expect(aims).toContainEqual({ x: 0, z: 6 })
+  })
+
+  it('never steers at the corner behind a shut leg', () => {
+    const c = childAt(0, 0)
+    // The same route, but the corner that was dropped was the way round a
+    // collider: the leg from the child to the next corner is shut.
+    const world = worldWith([{ x: 6, z: 2 }, { x: 0, z: 6 }, GOAL], (_ax, _az, bx, bz) => bx === 0 && bz === 6)
+    const aims = stallAt(c, world)
+    // NOT ONCE in twenty seconds is the child sent at the corner behind the
+    // wall — which is what it was steered at before, for as long as the route
+    // held. It is sent at its goal instead, and walks there deflecting off what
+    // it meets like any other walk.
+    expect(aims).not.toContainEqual({ x: 0, z: 6 })
+    expect(aims).toContainEqual(GOAL)
+  })
+
+  it('never re-plans the refused corner from the spot it stalled on (work-order 687)', () => {
+    const c = childAt(0, 0)
+    const CORNER = { x: 6, z: 2 }
+    // The shut-leg give-up: the child stalls at the first corner, the leg the
+    // drop opens is shut, the route is cleared. The child is HELD STILL — which
+    // is what a stalled child is — so the planner, asked again a second later,
+    // can only hand back the identical route with the identical corner. Before
+    // the fix that was a four-second cycle: stall, give up, re-plan the same
+    // corner, stall again, for the whole window.
+    const world = worldWith([CORNER, { x: 0, z: 6 }, GOAL], (_ax, _az, bx, bz) => bx === 0 && bz === 6)
+    const aims = stallAt(c, world)
+    const gaveUp = aims.findIndex((a) => a.x === GOAL.x && a.z === GOAL.z)
+    // The give-up happened (one stall window in)...
+    expect(gaveUp).toBeGreaterThan(0)
+    // ...and from then on, over the remaining ~15 s, the corner NEVER comes
+    // back: every aim is the goal itself. Not "rarely" — the guarantee is that
+    // no plan made near the refusal spot may re-instate that corner.
+    expect(aims.slice(gaveUp)).not.toContainEqual(CORNER)
+  })
+
+  it('may plan the refused corner again once the child has genuinely left the spot', () => {
+    const c = childAt(0, 0)
+    const CORNER = { x: 6, z: 2 }
+    const world = worldWith([CORNER, { x: 0, z: 6 }, GOAL], (_ax, _az, bx, bz) => bx === 0 && bz === 6)
+    stallAt(c, world)
+    // Carry the child well past the leave distance by hand (the harness has no
+    // real mover). The refusal is scoped to the SPOT the stall happened on, not
+    // to the corner for ever — from genuinely elsewhere the same corner may be
+    // a sound way round, and banning it for good could strand a child walking
+    // at a wall with no route allowed at all.
+    c.x = 5
+    c.z = 0
+    const dt = 1 / 60
+    const aims: Array<{ x: number; z: number }> = []
+    for (let t = 0; t < 2; t += dt) {
+      const aim = wayTo(c, GOAL, dt, world)
+      aims.push({ x: aim.x, z: aim.z })
+    }
+    expect(aims).toContainEqual(CORNER)
+  })
+
+  it('survives a planner that knows no way at all, once a corner stands refused', () => {
+    const c = childAt(0, 0)
+    const CORNER = { x: 6, z: 2 }
+    // `BankWorld.route` is declared to answer null where no way round is known,
+    // and the refusal check read that answer's length without asking whether it
+    // was one. The branch tip did not compile because of it. The crash is not
+    // reachable from a fresh child — `c.refused !== null` short-circuits ahead of
+    // it — so the refusal has to stand FIRST, which is exactly the state the
+    // stall branch leaves behind: a child that has just given a corner up and is
+    // still standing on the spot it gave it up from.
+    const world = worldWith([CORNER, { x: 0, z: 6 }, GOAL], (_ax, _az, bx, bz) => bx === 0 && bz === 6)
+    stallAt(c, world)
+    expect(c.refused).not.toBeNull()
+    // Now the planner loses the way entirely, with the child still on that spot.
+    const lost = { ...world, route: () => null } as unknown as BankWorld
+    const dt = 1 / 60
+    const aims: Array<{ x: number; z: number }> = []
+    for (let t = 0; t < 5; t += dt) {
+      const aim = wayTo(c, GOAL, dt, lost)
+      aims.push({ x: aim.x, z: aim.z })
+    }
+    // It keeps walking at its goal instead of throwing, and no corner is banned
+    // on the strength of a route that was never handed back.
+    expect(aims.every((a) => a.x === GOAL.x && a.z === GOAL.z)).toBe(true)
   })
 })
 

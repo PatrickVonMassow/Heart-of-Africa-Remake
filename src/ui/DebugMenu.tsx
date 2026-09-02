@@ -170,6 +170,41 @@ const TAG_FIELDS: ReadonlyArray<{
 ]
 
 /**
+ * Every calibratable value of the children's game at the river bank (work-order
+ * 687): the length of each phase of a cycle, the stage's own distances, the
+ * walking pace between runs and the extra berth the group gives the traveller.
+ * Same table shape as the chase's above — the completeness is visible at a
+ * glance, which is the point of the rule that every balance value is editable.
+ */
+const BANK_GAME_FIELDS: ReadonlyArray<{
+  key: keyof typeof balance.villageLife.bankGame
+  label: DebugLabelKey
+  step: number
+  min: number
+  max?: number
+}> = [
+  { key: 'roamSeconds', label: 'bankRoam', step: 5, min: 5 },
+  { key: 'roamSpread', label: 'bankRoamSpread', step: 0.05, min: 0, max: 1 },
+  { key: 'gatherSeconds', label: 'bankGather', step: 2, min: 2 },
+  { key: 'runSeconds', label: 'bankRun', step: 2, min: 2 },
+  { key: 'regroupSeconds', label: 'bankRegroup', step: 2, min: 2 },
+  { key: 'partSeconds', label: 'bankPart', step: 1, min: 1 },
+  { key: 'reachDistance', label: 'bankReach', step: 0.1, min: 0.5 },
+  { key: 'standOff', label: 'bankStandOff', step: 0.2, min: 0.5 },
+  { key: 'stationSpacing', label: 'bankSpacing', step: 0.1, min: 0.3 },
+  { key: 'laneSpacing', label: 'bankLaneSpacing', step: 0.1, min: 0 },
+  { key: 'dodgeDistance', label: 'bankDodgeDistance', step: 0.5, min: 0 },
+  { key: 'dodgeReach', label: 'bankDodgeReach', step: 0.5, min: 0 },
+  { key: 'roamTurn', label: 'bankRoamTurn', step: 0.1, min: 0 },
+  { key: 'roamGoalSeconds', label: 'bankRoamGoal', step: 1, min: 1 },
+  { key: 'roamGuardSeconds', label: 'bankRoamGuard', step: 5, min: 0 },
+  { key: 'walkPace', label: 'bankWalkPace', step: 0.1, min: 0.1 },
+  { key: 'strangerBerth', label: 'bankStrangerBerth', step: 0.1, min: 0 },
+  { key: 'utteranceGapSeconds', label: 'bankUtteranceGap', step: 0.5, min: 0 },
+  { key: 'roundSilenceSeconds', label: 'bankSilence', step: 10, min: 10 },
+]
+
+/**
  * Every calibratable value of what the children SAY at that game (work-order
  * point 481): how often a situation is staged, how long its following action
  * runs, and how readily a call is refused. Same table shape as the chase's, for
@@ -188,7 +223,6 @@ const CHILD_SPEECH_FIELDS: ReadonlyArray<{
   { key: 'actionPace', label: 'childSpeechPace', step: 0.1, min: 0.1 },
   { key: 'refusalChance', label: 'childSpeechRefusal', step: 0.05, min: 0, max: 1 },
   { key: 'replySeconds', label: 'childSpeechReply', step: 0.5, min: 0 },
-  { key: 'silenceSeconds', label: 'childSpeechSilence', step: 5, min: 1 },
 ]
 
 /**
@@ -210,7 +244,6 @@ const ADULT_ERRAND_FIELDS: ReadonlyArray<{
   { key: 'digSeconds', label: 'adultErrandDig', step: 0.5, min: 0 },
   { key: 'errandSeconds', label: 'adultErrandLife', step: 5, min: 1 },
   { key: 'stallSeconds', label: 'adultErrandStall', step: 1, min: 1 },
-  { key: 'silenceSeconds', label: 'adultErrandSilence', step: 5, min: 1 },
   { key: 'pace', label: 'adultErrandPace', step: 0.1, min: 0.1 },
   { key: 'villagerCount', label: 'adultErrandCount', step: 1, min: 0, max: 12 },
 ]
@@ -649,6 +682,9 @@ export function DebugMenu() {
       check(t.debug.speechConceptLabels, speechConceptLabels, setSpeechConceptLabels),
       // The children's game of tag (design.md §19.10, point 480/351).
       ...tableRows(TAG_FIELDS, (f) => balance.villageLife.tag[f.key], (f, v) => { balance.villageLife.tag[f.key] = v }),
+      // The children's game at the river bank (point 687).
+      ...tableRows(BANK_GAME_FIELDS, (f) => balance.villageLife.bankGame[f.key],
+        (f, v) => { balance.villageLife.bankGame[f.key] = v }),
       // What the children SAY at that game (point 481).
       ...tableRows(CHILD_SPEECH_FIELDS, (f) => balance.villageLife.childSpeech[f.key],
         (f, v) => { balance.villageLife.childSpeech[f.key] = v }),

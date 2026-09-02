@@ -615,7 +615,11 @@ if (section('panorama-wildlife')) {
 // DOM box, so no frame passes between deciding and measuring.
 if (section('speech-hypothesis')) {
   await goToPlace('maasai-village')
-  const COME = 'BA-BA-ba-ba-ba'
+  // A SHIPPED word, not a hand-typed shape: RIVER as src/communication/lexicon.ts
+  // beats it. A five-syllable literal survived the four-syllable rebuild here and
+  // proved the label path for an utterance the game can no longer produce
+  // (point 686); src/communication/verifySuiteUtterances.test.ts pins it now.
+  const RIVER = 'ba-BA-ba-BA'
   const pose = await page.evaluate(() => {
     const p = window.__placePlayer
     return p ? { x: p.x, z: p.z, yaw: p.yaw, pitch: p.pitch } : null
@@ -742,7 +746,7 @@ if (section('speech-hypothesis')) {
         figure.name = 'inhabitant'
         return ok
       },
-      { u: COME, idx: speakerIndex },
+      { u: RIVER, idx: speakerIndex },
     )
     check('a figure can speak over its head at all (point 485)', spoke, `spoke ${spoke}`)
     await nextFrames(3)
@@ -825,17 +829,17 @@ if (section('speech-hypothesis')) {
     const last = samples[samples.length - 1] ?? { syllables: '', reading: '' }
     check(
       'the label shows the syllables beside the reading, `???` where none is written (point 485)',
-      last.syllables === COME && last.reading === '???',
+      last.syllables === RIVER && last.reading === '???',
       JSON.stringify(last),
     )
     // Point 485 (3): editing the note in the journal changes the label at once —
     // one source seen twice, nothing copied onto the label.
-    await page.evaluate((u) => window.__game.getState().setUtteranceHypothesis(u, 'come here'), COME)
+    await page.evaluate((u) => window.__game.getState().setUtteranceHypothesis(u, 'the water'), RIVER)
     await nextFrames(2)
     const afterEdit = await read()
     check(
       'a reading written in the journal stands over the head immediately (point 485)',
-      !!afterEdit && afterEdit.reading === 'come here',
+      !!afterEdit && afterEdit.reading === 'the water',
       JSON.stringify(afterEdit),
     )
     // Re-aim before the shutter: the speaker has kept walking through the
@@ -883,7 +887,7 @@ if (section('speech-hypothesis')) {
       window.__game.getState().setUtteranceHypothesis(u, '')
       window.__speech?.clear()
       delete window.__speechProbeFigures
-    }, COME)
+    }, RIVER)
   }
   await page.evaluate((saved) => {
     const p = window.__placePlayer
@@ -905,7 +909,7 @@ if (section('speech-hypothesis')) {
 // the typing are the genuine article.
 if (section('speech-guess')) {
   await goToPlace('maasai-village')
-  const GUESS_UTTERANCE = 'BA-BA-ba-ba-ba'
+  const GUESS_UTTERANCE = 'ba-BA-ba-BA' // RIVER, as the shipped lexicon beats it
   const guessPose = await page.evaluate(() => {
     const p = window.__placePlayer
     return p ? { x: p.x, z: p.z, yaw: p.yaw, pitch: p.pitch } : null
@@ -3846,19 +3850,626 @@ if (section('children-motion')) {
   await page.evaluate((seed) => window.__game.setState({ seed }), bootSeed)
 }
 
-// --- The adults' errands (work-order point 483) -------------------------------
-// What needs a real browser here is the WALK: the catalogue, the fair queue and
-// every teaching rule are pinned in src/scenes/place/adultErrands.test.ts, but
-// only the live scene can show that a villager told to go somewhere actually
-// crosses the village to it against the collision set and stands there.
+// --- The children's game at the river bank (work-order point 687) -------------
+// The round itself is pinned in the fast layer: `src/scenes/place/bankGame.test.ts`
+// replays a whole cycle (the phases, the caller who becomes the first catcher,
+// the direction alternating with the side swap, the guards that keep ROCK from
+// meaning "made it") and `src/scenes/place/bankStage.test.ts` measures the stage
+// (the stretch in world units, the far rock's share of the frame, the lane's free
+// width). Two of the point's claims are the PICTURE's, and neither can be made
+// without a browser:
+//
+//   1. BOTH ROCKS IN FRAME FROM THE START LINE. The fast layer computes that from
+//      a MODEL of the camera — 50 deg vertical at 1440x900. This section asks the
+//      camera the scene really renders through, by projecting each rock with its
+//      own matrices (CLAUDE.md §7.2: never a radius, never an assumed distance),
+//      and then ray-probes both to prove the frame DRAWS a solid where the layout
+//      says the stone stands rather than open bank.
+//   2. THE TRAVELLER IS AN OBSTACLE, NEVER A STOP (spec item 7). Nothing outside
+//      the running scene can show that the game goes ON with a player planted in
+//      the lane — that the children come past him, from one side to the other,
+//      without walking through him.
+//
+// The village is the Bambara one: it stands on a river, so it carries a bank, the
+// two play rocks and the bank round (the settlements without a bank keep the tag
+// round, which `children-tag` above covers).
+if (section('children-bank-game')) {
+  // The bodies the berth is measured against, mirrored from
+  // src/scenes/place/collision.ts: the player's own radius and the walker's,
+  // which is what a child's body claims (NPC_RADIUS = WALKER_RADIUS).
+  const BANK_PLAYER_RADIUS = 0.35
+  const BANK_CHILD_RADIUS = 0.3
+  // The roaming phase is a balance value the debug menu edits (§21), and its
+  // shipped 55 s is chosen so a VISITING player does not miss the call that opens
+  // a cycle. This section needs the RUN, twice, so it shortens the roam the way
+  // the debug menu would and puts it back afterwards. Nothing else about the
+  // cycle is touched: the walk down to the bank and every run is the shipped one.
+  //
+  // BOTH LENGTHS OF THAT PHASE, not only the first. `roamSeconds` is what the
+  // phase is SCHEDULED for; the off-game ROCK guard may then hold the cycle for
+  // `roamGuardSeconds` (45 s) beyond it, and at the verify seed the boulder goes
+  // unnamed every cycle, so the guard runs its overtime out every time. Shortening
+  // the schedule alone therefore did not shorten the phase at all: measured in the
+  // fast-layer replay, the roaming phase still ran 55 s and the cycles came 74-100 s
+  // apart, which is what left the window below with a single 2 s run in it. With
+  // both shortened the cycles come 35-59 s apart. The guard's own bound is proved
+  // at its SHIPPED length in `src/scenes/place/tagShuffle.test.ts`; this is a
+  // spectator-time knob, not a weakened assertion.
+  const shippedRoam = await page.evaluate(() => {
+    const b = window.__balance.villageLife.bankGame
+    const was = { roamSeconds: b.roamSeconds, roamGuardSeconds: b.roamGuardSeconds }
+    b.roamSeconds = 8
+    b.roamGuardSeconds = 8
+    return was
+  })
+  await goToPlace('bambara-village')
+  const staged = await page
+    .waitForFunction(
+      () => !!window.__placeLayout?.playRocks && !!window.__placeTag && window.__placeTag().phase !== null,
+      null,
+      { timeout: 40000 },
+    )
+    .then(() => true)
+    .catch(() => false)
+  check('the river village stands its two play rocks and its children play the bank round', staged)
+  if (staged) {
+    // THE SPECTATOR'S STANCE AT THE START LINE. The runners' own stations stand
+    // `standOff` from their rock on the side FACING the far one, so a figure on
+    // the line itself has the near rock behind it — "both rocks in one frame" is
+    // a statement about the stance riverBank.ts measured, a spectator standing
+    // BACK of the line.
+    //
+    // AND OFF ITS AXIS, which the first run of this section taught: standing back
+    // ON the lane's own line put the near stone across the whole frame with the
+    // far one peeping over its shoulder, 35 px of it. Both projected, both were
+    // drawn, and the picture still did not show the stretch — the "looks wrong
+    // but passes" case. A spectator does not stand in the running lane anyway.
+    //
+    // So the stance is back of the line AND a couple of paces INLAND of the lane,
+    // aimed level at the middle of the stretch. The two offsets are the stretch's
+    // own fractions, and they are the MEASURED optimum rather than a guess: swept
+    // over the three river villages (nubian, bambara, mandinka) and both ends of
+    // each stretch, 0.25 and 0.13 of the stretch is the stance with the largest
+    // JOINT margin against the three walls this picture sits between — the
+    // settlement boundary (5.0 m of room; the bank's walkable lobe is a ±34 deg
+    // wedge and the second run of this section walked a stance straight out of
+    // it), the frame edge (7.6 deg) and the two stones overlapping (5.9 deg).
+    const stood = await page.evaluate(() => {
+      const L = window.__placeLayout
+      const p = window.__placePlayer
+      const cam = window.__placeCamera
+      if (!L?.playRocks || !p || !cam) return null
+      const near = L.playRocks.upstream
+      const far = L.playRocks.downstream
+      const dx = far.x - near.x
+      const dz = far.z - near.z
+      const len = Math.hypot(dx, dz) || 1
+      const ax = dx / len
+      const az = dz / len
+      const pose = { x: p.x, z: p.z, yaw: p.yaw, pitch: p.pitch }
+      // Inland is the side of the lane the village is on — the water is the other
+      // one, and there is no standing in it.
+      const inland = ax * -near.z - az * -near.x > 0 ? 1 : -1
+      const vx = -az * inland
+      const vz = ax * inland
+      const back = len * 0.25
+      const aside = len * 0.13
+      p.x = near.x - ax * back + vx * aside
+      p.z = near.z - az * back + vz * aside
+      p.pitch = 0
+      // Level, down the middle of the stretch: the aim a spectator takes, and the
+      // one that challenges BOTH ends instead of centring the far rock by
+      // construction. Place-camera yaw 0 looks toward -Z, so aim with the +PI
+      // complement.
+      const mid = { x: (near.x + far.x) / 2, z: (near.z + far.z) / 2 }
+      p.yaw = Math.atan2(mid.x - p.x, mid.z - p.z) + Math.PI
+      // Is that ground a player could have walked to? The shipped collider set
+      // decides; a box is taken at its circumscribed radius, the conservative
+      // reading.
+      const reach = (c) =>
+        c.kind === 'box'
+          ? Math.hypot(c.hx, c.hz)
+          : c.kind === 'segment'
+            ? c.r + Math.hypot(c.x2 - c.x1, c.z2 - c.z1) / 2
+            : c.r
+      let clear = Infinity
+      for (const c of window.__placeColliders ?? []) {
+        const m = c.kind === 'segment' ? { x: (c.x1 + c.x2) / 2, z: (c.z1 + c.z2) / 2 } : { x: c.x, z: c.z }
+        clear = Math.min(clear, Math.hypot(p.x - m.x, p.z - m.z) - reach(c))
+      }
+      return { pose, near, far, r: L.playRocks.r, stretch: len, back, clear, x: p.x, z: p.z }
+    })
+    check(
+      'a spectator can stand back of the start line on ground the colliders leave free',
+      !!stood && stood.clear > 0.35,
+      stood
+        ? `${stood.back.toFixed(1)} m back of the upstream rock, ${stood.clear.toFixed(2)} m clear of the nearest collider, ` +
+            `stretch ${stood.stretch.toFixed(1)} m`
+        : 'no stage to stand at',
+    )
+    // Let the camera follow the teleport — and the settlement's own boundary
+    // judge it — before anything is projected from it.
+    if (stood) await nextFrames(2)
+    // A stance the boundary rejects unmounts the whole settlement scene, and
+    // every projection below then reads an undefined camera. It fails HERE, by
+    // name, rather than crashing the suite in a stack trace about a matrix.
+    const held = stood
+      ? await page.evaluate(() => window.__game.getState().placeId === 'bambara-village' && !!window.__placeCamera)
+      : false
+    if (stood) {
+      check(
+        'and standing there leaves him inside the settlement, the scene still mounted',
+        held,
+        held ? `at ${stood.x.toFixed(1)}, ${stood.z.toFixed(1)}` : 'the boundary put him back on the map',
+      )
+    }
+    if (stood && held) {
+      const seen = await page.evaluate((rocks) => {
+        const cam = window.__placeCamera
+        const apply = (e, v) => [0, 1, 2, 3].map((r) => e[r] * v[0] + e[r + 4] * v[1] + e[r + 8] * v[2] + e[r + 12] * v[3])
+        // The shutter's own projection (scripts/verify/frameSubject.mjs), read
+        // here for TWO points at once — the shutter judges one subject, and the
+        // claim is about the pair.
+        const ndc = (x, y, z) => {
+          const eye = apply(cam.matrixWorldInverse.elements, [x, y, z, 1])
+          const clip = apply(cam.projectionMatrix.elements, eye)
+          const w = clip[3]
+          if (!(w > 0)) return null
+          return { x: clip[0] / w, y: clip[1] / w, z: clip[2] / w }
+        }
+        const read = (p) => {
+          // Foot and upper body: a stone whose base has slid under the frame edge
+          // is not "in frame from the start line", however well its top projects.
+          const foot = ndc(p.x, 0, p.z)
+          const top = ndc(p.x, rocks.r, p.z)
+          const inFrame = (n) => !!n && Math.abs(n.x) <= 1 && Math.abs(n.y) <= 1 && n.z < 1
+          // The stone's own silhouette across the frame: its centre offset by a
+          // radius either way, perpendicular to the sight line. Two stones whose
+          // spans OVERLAP are one stone with something behind it, whatever their
+          // centres project to.
+          const eye = cam.position
+          const sx = p.x - eye.x
+          const sz = p.z - eye.z
+          const sl = Math.hypot(sx, sz) || 1
+          const edgeA = ndc(p.x - (-sz / sl) * rocks.r, rocks.r * 0.5, p.z - (sx / sl) * rocks.r)
+          const edgeB = ndc(p.x + (-sz / sl) * rocks.r, rocks.r * 0.5, p.z + (sx / sl) * rocks.r)
+          const span = edgeA && edgeB ? [Math.min(edgeA.x, edgeB.x), Math.max(edgeA.x, edgeB.x)] : null
+          // Is a SOLID drawn there? The ray meets the stone's near face, so it
+          // comes back short of the centre by up to a radius; anything nearer is
+          // something standing in front of it, anything beyond is the bank behind.
+          const hit = window.__placeRayHit ? window.__placeRayHit(p.x, rocks.r * 0.5, p.z) : null
+          const ratio = hit && hit.hitDistance != null ? hit.hitDistance / hit.targetDistance : Infinity
+          const nearBound = hit ? (hit.targetDistance - rocks.r - 0.3) / hit.targetDistance : 0
+          return {
+            foot,
+            top,
+            span,
+            inFrame: inFrame(foot) && inFrame(top),
+            distance: hit ? hit.targetDistance : null,
+            ratio,
+            solid: ratio >= nearBound && ratio <= 1.05,
+            what: hit ? (hit.hitName ?? 'sky') : 'no probe',
+            // The stone's height in frame pixels, for the reader: the fast layer
+            // pins the angular share, this says what it came to on the real frame.
+            px: foot && top ? Math.round((Math.abs(top.y - foot.y) / 2) * window.innerHeight) : 0,
+          }
+        }
+        return { near: read(rocks.near), far: read(rocks.far), viewport: { w: window.innerWidth, h: window.innerHeight } }
+      }, { near: stood.near, far: stood.far, r: stood.r })
+      const describeRock = (label, r) =>
+        `${label} ${r.distance == null ? '?' : r.distance.toFixed(1)} m, ndc ` +
+        `${r.foot ? `${r.foot.x.toFixed(2)}/${r.foot.y.toFixed(2)}` : 'behind the camera'}, ` +
+        `${r.px} px, first surface ${Number.isFinite(r.ratio) ? r.ratio.toFixed(2) : '∞'}×@${r.what}`
+      check(
+        'both play rocks stand in the rendered frame from a spectator`s stance at the upstream end (point 687)',
+        seen.near.inFrame && seen.far.inFrame,
+        `${describeRock('near', seen.near)}; ${describeRock('far', seen.far)} ` +
+          `[${seen.viewport.w}x${seen.viewport.h}]`,
+      )
+      check(
+        'and the frame draws a solid at each of them, not open bank',
+        seen.near.solid && seen.far.solid,
+        `${describeRock('near', seen.near)}; ${describeRock('far', seen.far)}`,
+      )
+      // The picture has to show the STRETCH, not one stone with a bump behind it.
+      const apart =
+        !!seen.near.span &&
+        !!seen.far.span &&
+        (seen.near.span[0] > seen.far.span[1] || seen.far.span[0] > seen.near.span[1])
+      check(
+        'and they stand apart in it, the running ground between them',
+        apart,
+        seen.near.span && seen.far.span
+          ? `near spans ndc ${seen.near.span[0].toFixed(2)}..${seen.near.span[1].toFixed(2)}, far ` +
+              `${seen.far.span[0].toFixed(2)}..${seen.far.span[1].toFixed(2)}`
+          : 'a stone projected behind the camera',
+      )
+      await frame('687-bank-play-rocks', {
+        local: { x: stood.far.x, y: stood.r * 0.5, z: stood.far.z },
+        label:
+          `both play rocks seen from a quarter of the stretch back of the upstream rock and ` +
+          `an eighth of it aside (stretch ${stood.stretch.toFixed(1)} m)`,
+      })
+    }
+
+    // THE TRAVELLER IN THE LANE (spec item 7). He plants himself in the middle of
+    // the running ground and stays there, facing down the stretch — the worst
+    // place he could pick, and the one a game that stopped at him would visibly
+    // halt in.
+    const planted = await page.evaluate(() => {
+      const L = window.__placeLayout
+      const p = window.__placePlayer
+      if (!L?.playRocks || !p) return null
+      const near = L.playRocks.upstream
+      const far = L.playRocks.downstream
+      const dx = far.x - near.x
+      const dz = far.z - near.z
+      const len = Math.hypot(dx, dz) || 1
+      p.x = (near.x + far.x) / 2
+      p.z = (near.z + far.z) / 2
+      p.pitch = 0
+      p.yaw = Math.atan2(far.x - p.x, far.z - p.z) + Math.PI
+      return { x: p.x, z: p.z, ax: dx / len, az: dz / len, far, r: L.playRocks.r, berth: window.__balance.villageLife.bankGame.strangerBerth }
+    })
+    // WAITING FOR A RUN IS WAITING ON THE GAME'S CLOCK, NOT ON THE WALL'S. This
+    // was a 240 s wall-clock deadline on an event of the round's own clock, and
+    // it broke the rule the lane window below states for itself: a headless
+    // frame buys wildly different amounts of game per machine. Starve the
+    // process and those 240 s buy far less played time, the round has not
+    // reached its run phase inside them, and the check reports a product defect
+    // that is not there — measured by `throttle-probe.mjs` on a quarter of a
+    // core at a 6/8 skew rate, every one of the six reds this check and no
+    // other.
+    //
+    // The budget is therefore PLAYED SECONDS. 150 of them, against a worst
+    // measured wait of 79.7 s: replayed in the fast layer at this section's own
+    // shortened roam (`src/scenes/place/tagShuffle.test.ts`), the longest gap
+    // between two runs in the bambara village at the verification's seed is
+    // 79.7 s of played time and the first run from a cold start falls at 71.3 s.
+    //
+    // The wall clock keeps one job only — telling a DEAD PAGE from a round that
+    // played its budget without opening a run. Those are different findings and
+    // they get different messages: a page that has stopped stepping buys no
+    // played time at all, so it is caught by the played clock STANDING STILL,
+    // never by a deadline the game's own progress has to beat.
+    const RUN_WAIT_PLAYED_S = 150
+    const RUN_WAIT_STALL_MS = 90000
+    const RUN_WAIT_WALL_MS = 1800000
+    let runPhase = null
+    let runPlayed = 0
+    let runDead = false
+    let runWallMs = 0
+    if (planted) {
+      const readRound = () =>
+        page.evaluate(() => {
+          const t = window.__placeTag()
+          return { phase: t.phase, playedClock: t.playedClock }
+        })
+      const first = await readRound()
+      let seen = first.playedClock
+      const wallStart = Date.now()
+      // THE WINDOW OPENS ON A CYCLE'S FIRST RUN, never wherever a run happens to
+      // be. Two things were wrong with taking any run at all. The round keeps
+      // playing while the traveller is planted, so the wait could begin mid-run
+      // and the window then got the TAIL of it. And a cycle's LATER runs — the
+      // ones after a `regroup` — carry only the runners that survived the ones
+      // before, so they end in a second or two, far too short to carry anybody
+      // the ten metres from the start line to the traveller in the middle of it.
+      // A cycle's first run is the one with the whole line still in it.
+      //
+      // `gather` is the walk down to the bank and happens exactly once per cycle,
+      // immediately before that first run, so it is what the wait watches for.
+      // Measured in the fast-layer replay over the seven river layouts (with the
+      // roam shortened as above): 84 cycle-first runs, and at the OLD 45 s window
+      // six of them carried no crossing at all — the check was a coin toss, not a
+      // measurement, and it had gone green on luck. The budget above covers the
+      // wait: the longest gap between two cycle-first runs measured over those
+      // layouts is 61 s, against 150.
+      let sawGather = false
+      for (;;) {
+        const now = await readRound()
+        runPhase = now.phase
+        runPlayed = now.playedClock - first.playedClock
+        if (runPhase === 'gather') sawGather = true
+        if (sawGather && runPhase === 'run') break
+        runWallMs = Date.now() - wallStart
+        if (runPlayed >= RUN_WAIT_PLAYED_S) break
+        if (Date.now() - wallStart > RUN_WAIT_WALL_MS) {
+          runDead = true
+          break
+        }
+        // ON TO THE NEXT SAMPLE BY WAITING FOR THE GAME'S CLOCK TO MOVE — a
+        // CONDITION, never a pause (this suite's own fixed-wait gate, and the
+        // same reason the budget above is played seconds). Its deadline is the
+        // dead-page detector and nothing else: a scene that is still stepping
+        // satisfies it in a frame however slow the machine, and only one that
+        // has stopped buying game time at all can run it out.
+        seen = now.playedClock
+        const stepped = await page
+          .waitForFunction((was) => window.__placeTag().playedClock > was, seen, {
+            timeout: RUN_WAIT_STALL_MS,
+            polling: 'raf',
+          })
+          .then(() => true)
+          .catch(() => false)
+        if (!stepped) {
+          runDead = true
+          break
+        }
+      }
+    }
+    const running = runPhase === 'run'
+    check(
+      'a run starts while the traveller stands in the lane',
+      running,
+      running
+        ? `after ${runPlayed.toFixed(1)}s of played time (budget ${RUN_WAIT_PLAYED_S}s)`
+        : runDead
+          ? `THE PAGE STOPPED STEPPING — only ${runPlayed.toFixed(1)}s of played time in ` +
+            `${(runWallMs / 1000).toFixed(0)}s of wall clock. This is a dead or frozen scene, NOT a round ` +
+            `that failed to open a run: nothing about the GAME is judged by this red.`
+          : `the round played ${runPlayed.toFixed(1)}s of its own clock without opening a run ` +
+            `(budget ${RUN_WAIT_PLAYED_S}s, phase ${runPhase})`,
+    )
+    if (planted && running) {
+      // The window is an interval of the GAME's own clock, never a frame count:
+      // a headless frame buys wildly different amounts of game per machine, and
+      // this one has to span a run, the regroup walk and the next run.
+      //
+      // 120 SECONDS OF IT, which is the length at which the crossing below stops
+      // being a coin toss. Measured in the fast-layer replay over the seven river
+      // layouts, opening on a cycle's first run as this wait now does: of 75
+      // windows NONE was without a crossing at 120 s, against one at 90 s and six
+      // of 84 at the 45 s this used to take. The cost is spectator time only —
+      // the round is the shipped one and every check below reads the longer trace.
+      const LANE_WINDOW_S = 120
+      // What counts as "went nowhere" over that window. A child that walked less
+      // than half a metre in forty-five seconds of play did not walk; anything
+      // above it is a slow child, which is a different complaint and not this
+      // check's.
+      const LANE_STARVED_M = 0.5
+      // How near a child has to come before the picture below is worth taking:
+      // close enough that the frame shows him and the runner together, wide
+      // enough that the shot is not waiting on the single closest pass of the
+      // whole window.
+      const LANE_SHOT_GAP = 10
+      const LANE_SHOT_AHEAD = 1.5
+      // ...and it must be CLOSING on him by at least this much between two
+      // samples. Being on the positive side of the lane axis says nothing about
+      // which way a child is going: the run reverses at every side swap, a
+      // runner that got past him is walking away down the same axis, and a
+      // tagged one holds its crouch where it fell. Without this the frame could
+      // be written of any of the three under the label "coming at the
+      // traveller".
+      const LANE_SHOT_CLOSING = 0.05
+      let prevGap = null
+      let shotRun = false
+      const first = await page.evaluate(() => window.__placeTag().clock)
+      const lane = []
+      let laneClock = first
+      // The iteration cap is a runaway backstop, not the window: two frames per
+      // sample at 60 fps is some 30 samples per played second, so 120 s of window
+      // asks for about 3 600 of them and the cap has to sit well clear of that.
+      for (let i = 0; i < 12000 && laneClock - first < LANE_WINDOW_S; i++) {
+        const s = await page.evaluate(() => {
+          const t = window.__placeTag()
+          const p = window.__placePlayer
+          return {
+            clock: t.clock,
+            playedClock: t.playedClock,
+            phase: t.phase,
+            tags: t.tags,
+            bodyRadius: t.bodyRadius,
+            px: p.x,
+            pz: p.z,
+            // `held` is the settlement's own word for a stillness that was ORDERED —
+            // the tagged child holding its crouch — as against one that just happened.
+            // The starvation check below cannot be written without it.
+            c: t.children.map((k) => ({ x: k.x, z: k.z, walked: k.walked, held: k.held })),
+          }
+        })
+        laneClock = s.clock
+        lane.push(s)
+        // THE PICTURE IS TAKEN WHERE THE CLAIM IS TRUE (point 375). Shot after
+        // this window instead, it caught whatever the group happened to be doing
+        // by then — the run long over, the children back in their quarter — and
+        // wrote an empty stretch of bank under the label "the children's run".
+        // The frame's SUBJECT is therefore the nearest CHILD, not the rock: the
+        // shutter refuses to write it unless that child is in the picture.
+        if (!shotRun && s.phase === 'run') {
+          let near = -1
+          let gap = Infinity
+          for (let k = 0; k < s.c.length; k++) {
+            // IN FRONT OF HIM, not merely near: he faces down the stretch toward
+            // the far rock, so a child behind him projects behind the camera and
+            // the shutter rightly refuses the frame. The lane's own axis says
+            // which side he is looking at.
+            const along = (s.c[k].x - s.px) * planted.ax + (s.c[k].z - s.pz) * planted.az
+            if (along < LANE_SHOT_AHEAD) continue
+            const d = Math.hypot(s.c[k].x - s.px, s.c[k].z - s.pz)
+            // AND COMING AT HIM: the gap it stands at has to be shrinking.
+            if (!(prevGap && prevGap[k] != null && d < prevGap[k] - LANE_SHOT_CLOSING)) continue
+            if (d < gap) {
+              gap = d
+              near = k
+            }
+          }
+          if (near >= 0 && gap <= LANE_SHOT_GAP) {
+            shotRun = true
+            await frame('687-bank-game-traveller', {
+              local: { x: s.c[near].x, y: planted.r * 0.5, z: s.c[near].z },
+              label: `a child of the run coming at the traveller planted in their lane, ${gap.toFixed(1)} m off him`,
+              settle: false,
+            })
+          }
+        }
+        prevGap = s.c.map((k) => Math.hypot(k.x - s.px, k.z - s.pz))
+        await nextFrames(2)
+      }
+      const head = lane[0]
+      const tail = lane[lane.length - 1]
+      const kids = head ? head.c.length : 0
+      const phases = new Set(lane.map((s) => s.phase))
+      const played = tail && head ? tail.playedClock - head.playedClock : 0
+      const walked = Array.from({ length: kids }, (_, k) => tail.c[k].walked - head.c[k].walked)
+      // A GAME, not a group standing about with the phases ticking over it: the
+      // cycle must ADVANCE — two distinct phases inside the window — and the legs
+      // must carry the group at the walking floor the child-motion metric already
+      // sets (m per child-minute). This is a LIVENESS check and says no more: two
+      // phases are a run followed by a walk-back, not a closed
+      // call -> runs -> walk -> roam, and it watches one village. The whole cycle
+      // in every river layout, per child, is measured where it belongs — the
+      // replay in `src/scenes/place/tagShuffle.test.ts` over a 120 s window.
+      const groupWalked = walked.reduce((a, b) => a + b, 0)
+      const perChildMinute = played > 0 && kids > 0 ? groupWalked / kids / (played / 60) : 0
+      // AND NOT ONE CHILD STARVED INSIDE THAT AVERAGE (cross-vendor review,
+      // 29.08.2026). The floor above is asked of the GROUP, for the good reason
+      // that a tagged child legitimately holds its crouch — but that reason
+      // excuses a child the round HELD, not every child, and a group average
+      // hides one standing at zero while the others carry it. The settlement
+      // says which stillness was ordered, so the two are told apart here rather
+      // than guessed: a child never held over the whole window has to have got
+      // somewhere. The bar is deliberately low — this is a starvation detector,
+      // not a second pace gate.
+      const heldEver = Array.from({ length: kids }, (_, k) => lane.some((s) => s.c[k]?.held))
+      const starved = []
+      for (let k = 0; k < kids; k++) {
+        if (!heldEver[k] && walked[k] <= LANE_STARVED_M) starved.push(k)
+      }
+      check(
+        'the round goes on with him planted in it, rather than halting at him',
+        played >= LANE_WINDOW_S * 0.9 &&
+          phases.size >= 2 &&
+          perChildMinute > CHILD_MOTION.walkFloor &&
+          starved.length === 0,
+        `${played.toFixed(1)}s of ${LANE_WINDOW_S}s played over ${lane.length} samples, phases ` +
+          `[${[...phases].join(', ')}], ${kids} children walked ` +
+          `[${walked.map((m) => m.toFixed(1)).join(', ')}] m = ${perChildMinute.toFixed(1)} m per ` +
+          `child-minute (floor ${CHILD_MOTION.walkFloor}), ${tail.tags - head.tags} tagged` +
+          (starved.length
+            ? ` — STARVED: child(ren) ${starved.join(', ')} walked at most ${LANE_STARVED_M} m and were never held, ` +
+              `so their stillness was not the crouch`
+            : ''),
+      )
+      // WALKED AROUND, not merely near: a child counts as having passed him when
+      // it goes from one side of him to the other along the lane's own axis, with
+      // a metre of hysteresis so a figure jittering beside him is never counted.
+      let crossers = 0
+      let minGap = Infinity
+      let closestAt = null
+      const reach = []
+      for (let k = 0; k < kids; k++) {
+        let side = 0
+        let swapped = false
+        let lo = Infinity
+        let hi = -Infinity
+        let nearest = Infinity
+        for (const s of lane) {
+          const c = s.c[k]
+          const along = (c.x - s.px) * planted.ax + (c.z - s.pz) * planted.az
+          const gap = Math.hypot(c.x - s.px, c.z - s.pz)
+          if (along < lo) lo = along
+          if (along > hi) hi = along
+          if (gap < nearest) nearest = gap
+          // The body separation is judged over EVERY phase — a child may not walk
+          // through him while roaming any more than while running.
+          if (gap < minGap) {
+            minGap = gap
+            closestAt = s.phase
+          }
+          // THE CROSSING IS NOT (cross-vendor review, 29.08.2026). What this
+          // section claims is that the RUN carries the group past a planted
+          // figure; a child that stays on one side throughout every run and
+          // wanders past him afterwards, while the group walks back or roams,
+          // proves nothing of the sort. So the side-swap is accumulated inside
+          // the run phase only, and the side is forgotten on leaving it, which
+          // also stops two separate runs being welded into one crossing.
+          if (s.phase !== 'run') {
+            side = 0
+            continue
+          }
+          if (along > 1 || along < -1) {
+            const now = along > 0 ? 1 : -1
+            if (side !== 0 && now !== side) swapped = true
+            side = now
+          }
+        }
+        reach.push(`${lo.toFixed(0)}..${hi.toFixed(0)}@${nearest.toFixed(0)}`)
+        if (swapped) crossers++
+      }
+      // A red here has to NAME what it found, because "0 crossed" has three very
+      // different causes: a group held up by the traveller, a group tagged out
+      // before it reaches him, and a group that never came down to the bank at
+      // all. So the detail carries how far along the lane each child got (0 is
+      // the line he stands on) with its closest approach, how the window's
+      // samples split over the phases, and the metres each child walked.
+      const phaseCount = new Map()
+      for (const s of lane) phaseCount.set(s.phase, (phaseCount.get(s.phase) ?? 0) + 1)
+      check(
+        'the children walk PAST the traveller — from one side of him to the other',
+        crossers >= 1,
+        `${crossers} of ${kids} crossed his line; along the lane (0 = his line) ` +
+          `[${reach.join(', ')}] m, walked [${walked.map((m) => m.toFixed(0)).join(', ')}] m, phases ` +
+          `[${[...phaseCount].map(([p, n]) => `${p}×${n}`).join(' ')}] over ${played.toFixed(0)}s played, ` +
+          `${tail.tags - head.tags} tagged`,
+      )
+      const bodies = BANK_PLAYER_RADIUS + BANK_CHILD_RADIUS
+      check(
+        'and never through him: no child body reaches the traveller`s own',
+        minGap >= bodies,
+        `closest approach ${minGap.toFixed(2)} m (bodies meet at ${bodies.toFixed(2)} m) during ${closestAt}`,
+      )
+      check(
+        'they give the stranger the extra berth they owe him over a villager (spec item 7)',
+        minGap >= bodies + planted.berth,
+        `closest approach ${minGap.toFixed(2)} m against the berth ${(bodies + planted.berth).toFixed(2)} m ` +
+          `(strangerBerth ${planted.berth})`,
+      )
+      // A window in which no runner ever came within `LANE_SHOT_GAP` of him is a
+      // FAILURE of the check above, not a picture to paper over — but the frame
+      // is still written, aimed at the stage, so the reader can see WHAT the
+      // group was doing instead.
+      check('and the run was photographed with a child in it', shotRun, shotRun ? '' : 'no runner came near enough to shoot')
+      if (!shotRun) {
+        await frame('687-bank-game-traveller', {
+          local: { x: planted.far.x, y: planted.r * 0.5, z: planted.far.z },
+          label: 'the stretch the traveller stood in — no runner came near enough to photograph',
+          settle: false,
+        })
+      }
+    }
+  }
+  // The world goes back as it was found: the shipped roaming phase, and the game
+  // left outside the settlement — every section after this one would otherwise be
+  // reading a village this one staged.
+  await page.evaluate((was) => {
+    const b = window.__balance.villageLife.bankGame
+    b.roamSeconds = was.roamSeconds
+    b.roamGuardSeconds = was.roamGuardSeconds
+  }, shippedRoam)
+  await page.evaluate(() => window.__game.getState().leavePlace())
+  await page.waitForFunction(() => !window.__game.getState().placeId, null, { timeout: 30000 })
+}
+
+// --- The adults at the water and the ground work ------------------------------
+// THE ERRAND CATALOGUE IS EMPTY ON PURPOSE, AND THIS SECTION SAYS SO. The
+// five-concept rebuild deleted the eleven-concept teaching this section used to
+// watch — the sendings, the callings back, the mirrored upstream/downstream
+// walks — and the adults' replacement teaching (an adult carrying a jar to the
+// water and back saying RIVER, a digger saying DIG on the stroke) is WORK-ORDER
+// 688, not this one. Until it lands the adults stroll the village and stage
+// nothing at all.
+//
+// So what this section still proves is the STAGE that teaching will stand on —
+// the dig sites, the bank, its two stretches, the drawn river and the direction
+// its current runs, all of which 688's situations are placed against — plus one
+// TRIPWIRE: nothing is staged. The moment 688 stages its first situation that
+// check goes red, and it is replaced there by the walk-and-arrive checks this
+// section used to carry (they are in the history of this file, at the commit
+// before the empty catalogue).
 //
 // The village is the PoC's own (the Bambara village), because that is the one
 // with the teaching stone; the ground work is in every village.
-//
-// The RIVER errands are checked here too (work-order 482 landed the bank): the
-// village now carries a walkable bank and two stretches along it, so a villager
-// told to go to the water has somewhere to go — and this is where that walk, and
-// the current it is walked beside, can be seen.
 if (section('adult-errands')) {
   await page.evaluate(() => {
     const g = window.__game.getState()
@@ -3905,83 +4516,52 @@ if (section('adult-errands')) {
       JSON.stringify({ bank: geography.bank, upstream: geography.upstream, downstream: geography.downstream }),
     )
 
-    // Sample the group over a window of frames: every errand handed out, and how
-    // far its villager still is from where it was sent.
-    // The seven errands that are ABOUT the water (work-order 482): the three
-    // that name the river and the two mirrored direction pairs.
-    const RIVER_ERRANDS = [
-      'sendToTheBank',
-      'callBackFromTheBank',
-      'gatherAtTheBank',
-      'sendUpTheBank',
-      'sendDownTheBank',
-      'haulUpTheBank',
-      'haulDownTheBank',
-    ]
-    const isRiverErrand = (key) => RIVER_ERRANDS.some((id) => key.includes(`:${id}:`))
-    const seen = new Map()
-    let arrivals = 0
-    let progressed = 0
-    let riverArrivals = 0
-    let riverProgress = 0
+    // THE TRIPWIRE, AND IT IS AGGREGATED ACROSS THE WINDOW, NOT READ OFF THE LAST
+    // SAMPLE. This one check replaced six, and its whole justification is that it
+    // goes red the moment 688 stages anything — so it may not depend on the shape
+    // of a counter it does not own. Keeping only the final snapshot would prove
+    // "nothing was staged" only if `staged` were guaranteed cumulative and the
+    // settlement were guaranteed not to remount; taking the LARGEST value each
+    // key ever showed survives a reset and a remount alike.
+    // WHAT IT DOES NOT SURVIVE, said plainly because the comment used to claim
+    // otherwise (cross-vendor review, 29.08.2026): a situation that is staged and
+    // cleared ENTIRELY BETWEEN two samples is never observed, and no maximum over
+    // observations can recover it. The bound this check really carries is that a
+    // staged situation persists at least one sampling interval — which the
+    // scheduler's own 0.8 s against this loop's two frames gives with room to
+    // spare, but which is an assumption about the producer and not a proof.
+    //
+    // What is proven: over this window no situation counter ever rose above zero,
+    // no villager was ever seen carrying an errand, and none was ever at the
+    // digging pose. The scheduler's own interval is 0.8 s above, so the window
+    // covers it many times over.
+    const staged = {}
+    let errands = 0
     let dug = 0
-    let staged = {}
-    for (let i = 0; i < 1400; i++) {
+    for (let i = 0; i < 120; i++) {
       const now = await page.evaluate(() => window.__placeErrands())
-      staged = now.staged
-      for (const [index, v] of now.villagers.entries()) {
-        if (v.digging) dug++
-        if (!v.errand) continue
-        const key = `${index}:${v.errand.situation}:${v.errand.x.toFixed(2)}:${v.errand.z.toFixed(2)}`
-        const gap = Math.hypot(v.x - v.errand.x, v.z - v.errand.z)
-        const first = seen.get(key)
-        if (!first) seen.set(key, { gap, best: gap, arrived: v.errand.arrived })
-        else {
-          first.best = Math.min(first.best, gap)
-          first.arrived = first.arrived || v.errand.arrived
-        }
+      for (const [id, n] of Object.entries(now.staged ?? {})) {
+        staged[id] = Math.max(staged[id] ?? 0, n ?? 0)
       }
-      // Everything this window is here to show has happened: stop sampling
-      // rather than spend minutes proving it again. A scene that never gets
-      // there runs the whole cap and fails on the checks below.
-      arrivals = [...seen.values()].filter((e) => e.arrived).length
-      progressed = [...seen.values()].filter((e) => e.gap - e.best > 0.8).length
-      riverArrivals = [...seen.entries()].filter(([k, e]) => isRiverErrand(k) && e.arrived).length
-      riverProgress = [...seen.entries()].filter(([k, e]) => isRiverErrand(k) && e.gap - e.best > 0.8).length
-      if (arrivals >= 2 && progressed >= 2 && dug > 0 && riverArrivals >= 1 && riverProgress >= 1) break
+      for (const v of now.villagers) {
+        if (v.digging) dug++
+        if (v.errand) errands++
+      }
       await nextFrames(2)
     }
     const stagedTotal = Object.values(staged).reduce((a, b) => a + b, 0)
     check(
-      'the adults stage errands while the player watches',
-      stagedTotal >= 3,
-      `${stagedTotal} staged: ${Object.entries(staged).filter(([, n]) => n > 0).map(([k, n]) => `${k}×${n}`).join(', ')}`,
-    )
-    check(
-      'a villager told to go somewhere WALKS there: it closes the distance to its target',
-      progressed >= 1,
-      `${progressed} of ${seen.size} errands visibly closed the gap`,
-    )
-    check(
-      'and it gets there: the walk ends at the place it was sent to',
-      arrivals >= 1,
-      `${arrivals} of ${seen.size} errands reached their target`,
-    )
-    check(
-      'the ground work is worked: a villager is seen digging',
-      dug > 0,
-      `${dug} samples with a villager at the digging pose; ground-work errands staged ` +
-        `${['digWhereIStand', 'sendToThePostHole', 'joinTheDigging'].map((id) => `${id}×${staged[id] ?? 0}`).join(', ')}`,
-    )
-    check(
-      'the adults stage the errands that are about the water (work-order 482)',
-      RIVER_ERRANDS.reduce((n, id) => n + (staged[id] ?? 0), 0) >= 1,
-      RIVER_ERRANDS.map((id) => `${id}×${staged[id] ?? 0}`).join(', '),
-    )
-    check(
-      'a villager sent to the BANK crosses the village to it and arrives',
-      riverProgress >= 1 && riverArrivals >= 1,
-      `${riverProgress} closed the gap, ${riverArrivals} arrived`,
+      'the adults stage nothing while the catalogue awaits its rebuild (work-order 688)',
+      stagedTotal === 0 && errands === 0 && dug === 0,
+      `${stagedTotal} staged at the window's peak over 120 samples, ${errands} villager-samples ` +
+        `carrying an errand, ` +
+        `${dug} at the digging pose` +
+        (stagedTotal > 0
+          ? ` — ${Object.entries(staged)
+              .filter(([, n]) => n > 0)
+              .map(([k, n]) => `${k}×${n}`)
+              .join(', ')}. The adults teach again: restore the walk-and-arrive checks here`
+          : ''),
     )
 
     // The picture: a villager standing at the ground work it was sent to.

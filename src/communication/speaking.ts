@@ -50,8 +50,8 @@ export interface SpeechOptions {
 
 /**
  * The fraction of a syllable's step the sample actually sounds. Shape, not
- * balance: it keeps a gap between two syllables at ANY pace, so five beats read
- * as five and never smear into one tone.
+ * balance: it keeps a gap between two syllables at ANY pace, so four beats read
+ * as four and never smear into one tone.
  */
 const SYLLABLE_DUTY = 0.62
 

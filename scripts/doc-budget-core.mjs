@@ -296,7 +296,12 @@ export const DOC_BUDGETS = [
     // docs/acceptance-criteria-detail.md, so only the decision is priced here.
     // NOT yet confirmed by the user: the rule above wants his yes for a raise,
     // and the alternative is 102 words found elsewhere in design.md.
-    maxWords: 28488,
+    // LOWERED to the 28 019 words measured after the five-word rebuild rewrote
+    // §13.4 (point 686): eleven taught concepts, twelve child situations and an
+    // errand catalogue came out of the section and five words went in. A cut
+    // that leaves its ceiling standing hands the next writer the 469 words it
+    // just bought, which is how the file walks straight back up.
+    maxWords: 28019,
     // A hundred words across 28k: design.md is edited section by section and a genuine
     // new decision runs 40–215 measured words, so the slack absorbs the rewording that
     // accompanies one and refuses the disappearance of a whole section without a

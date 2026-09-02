@@ -49,11 +49,22 @@ import { placeById } from '../../world/geo'
 import { useGame } from '../../state/store'
 import { START_YEAR, balance } from '../../config/balance'
 import type { RegionPlaceStyle } from './regionStyles'
-import { nudgeToFree, nudgeWhere, resolveMove, spawnPointFree, standingClear, tryNudgeToFree, WALKER_RADIUS, type Collider } from './collision'
+import { nudgeToFree, nudgeWhere, PLAYER_RADIUS, resolveMove, spawnPointFree, standingClear, tryNudgeToFree, WALKER_RADIUS, type Collider } from './collision'
+import { utteranceOf } from '../../communication/lexicon'
 import { insidePlace } from './boundary'
-import type { PlaceRiverBank } from './riverBank'
-import { buildPlaceNavGrid, findPlaceRoute, navClearBetween, type NavPoint } from './routing'
-import { absorbSeparation, createTagGame, stepTagGame, type TagChild, type TagWorld } from './tagGame'
+import { standsOnGroundPlate, type PlaceRiverBank } from './riverBank'
+import { buildPlaceNavGrid, findPlaceRoute, navClearBetween, navRestrict, type NavPoint } from './routing'
+import { absorbSeparation, createTagGame, stepTagGame, type TagChild } from './tagGame'
+import {
+  bankChildCanSeparate,
+  createBankGame,
+  insideStrangerBerth,
+  stepBankGame,
+  type BankChild,
+  type BankStage,
+  type BankUtterance,
+  type BankWorld,
+} from './bankGame'
 import {
   childSteer,
   createChildSpeech,
@@ -485,6 +496,59 @@ function speakSituation(
 }
 
 /**
+ * A TAGGED CHILD'S POSTURE (work-order 687 item 3): squatted to about two thirds
+ * of its height, trunk folded well over and both arms crossed in front of the
+ * chest. It must never be confusable with a walking child, which is why all
+ * three read at once — the height, the fold and the arms — and why the legs go
+ * still by themselves (a child that walks nowhere adds nothing to `walked`, and
+ * the gait rides that).
+ */
+const CROUCH_SQUAT = 0.66
+const CROUCH_POSE: FigurePose = {
+  left: { pitch: -1.35, yaw: 0.55, roll: -0.95 },
+  right: { pitch: -1.35, yaw: -0.55, roll: 0.95 },
+  lean: 0.85,
+  turn: 0,
+}
+
+/**
+ * Speaks one moment of the children's bank game (work-order 687): the atom
+ * through the §13.4 hearing curve, the reading over the speaker's head and the
+ * gesture on its own arms, aimed at what the moment named — the water, a rock,
+ * the bank or the boulder. The DISTANCE decides all three as one decision
+ * (point 580), exactly as it does for every other village voice: an utterance
+ * the player could not hear teaches him nothing however plainly he saw the arm.
+ */
+function speakBankUtterance(
+  said: BankUtterance,
+  speaker: TagChild | undefined,
+  anchor: THREE.Group | null,
+  gesture: RefObject<GestureState> | undefined,
+): void {
+  if (!speaker || !gesture) return
+  const distance = placePlayerPosition.active
+    ? Math.hypot(speaker.x - placePlayerPosition.x, speaker.z - placePlayerPosition.z)
+    : Infinity
+  const reach = speechReach(distance)
+  const utterance = utteranceOf(said.concept)
+  playSpeech(utterancePlan(utterance, distance))
+  if (reach.audible) {
+    useGame.getState().hearUtterance(utterance)
+    if (anchor) {
+      speakOverhead(`kid-${said.speaker}`, [utterance], anchor, { seconds: speechLabelSeconds(1) })
+    }
+  }
+  gesture.current = gestureIfHeard(distance, said.gesture, {
+    ...aimAt(
+      { x: speaker.x, z: speaker.z, yaw: speaker.facing },
+      said.aim,
+      KID_SCALE * FIGURE_LIMBS.shoulderY,
+    ),
+    phase: said.speaker * 1.1,
+  })
+}
+
+/**
  * The children's game of tag (design.md §19.10, point 480/351). One of them is
  * IT and chases the others; whoever is caught becomes the new IT. The behaviour
  * itself is the pure `tagGame` module — this component only feeds it the
@@ -517,6 +581,8 @@ function Kids({
   cloth,
   colliders,
   radius,
+  stage,
+  bank,
 }: {
   x: number
   z: number
@@ -527,6 +593,14 @@ function Kids({
   cloth: string[]
   colliders: Collider[]
   radius: number
+  /** The children's BANK STAGE (work-order 687): the two play rocks, the water,
+   *  an ordinary boulder and their own quarter. Given one, the group plays the
+   *  bank game; without one — a village with no river — it keeps the tag round
+   *  the port cities inherit in their own point. */
+  stage: BankStage | null
+  /** The settlement's river bank, where it has one: what makes its walkable
+   *  region a lobe rather than a circle, and where the shore begins. */
+  bank: PlaceRiverBank | null
 }) {
   const refs = useRef<Array<THREE.Group | null>>([])
   // The world leg length these children walk on, and the cadence it dictates.
@@ -549,7 +623,7 @@ function Kids({
   // 657): without that, a child whose way crossed an adult standing in the
   // ground read it as open, walked into the body, and the separation pushed it
   // straight back out — walking on the spot, the user's own report.
-  const world = useMemo<TagWorld>(() => {
+  const world = useMemo<BankWorld>(() => {
     const rim = Math.max(1, radius - NPC_RADIUS * 2)
     // The ground between two boundaries that pinch below a passage is not
     // offered to the chase at all (point 657): the reported village carried a
@@ -557,18 +631,75 @@ function Kids({
     // rim-straddling hut closes to nothing, and every live red window of the
     // measurement sat in one of the two — evaders pacing the pinch, groups
     // herding into the corridor. See `buildWedgeCarve`.
-    const carve = buildWedgeCarve(colliders, NPC_RADIUS, { x, z, radius: playRadius })
+    // THE BANK ROUND WALKS THE WHOLE SETTLEMENT (work-order 687): its quarter is
+    // where the group ROAMS, not a wall it is kept behind — the cycle takes it
+    // down to the water and back. The tag round keeps its bounded ground.
+    const region = stage ? { x: 0, z: 0, radius: rim } : { x, z, radius: playRadius }
+    // ...AND ONLY THE TAG ROUND IS KEPT OUT OF THEM. The carve answers the
+    // CHASE's failure (point 657): a fixed target behind a pinch herded the
+    // group into a dead-end slot and it walked on the spot there. The bank round
+    // has no such steering — it roams on a drifting heading, runs an open lane
+    // and otherwise walks a PLANNED way across the village — and for that walk
+    // the carve is a wall in the wrong place: measured at the verification's own
+    // seed, the only route from the children's quarter to the bank runs through
+    // one carved wedge, so the group stood in a pocket for the whole gather and
+    // never came down to the water. The child-motion gate judges this round in
+    // the bambara village and stays green without it.
+    const carve = stage ? () => false : buildWedgeCarve(colliders, NPC_RADIUS, region)
+    // AND THE SETTLEMENT IS NOT A CIRCLE WHERE IT STANDS ON A RIVER. A village
+    // with a bank grows a lobe out to the water (`boundary.ts`), and the two
+    // play rocks stand ON that lobe: measured on all three river villages they
+    // sit 32.5 m from the middle while the plain walkable radius is 28 and the
+    // children's own rim 27.4. Held to the circle, the group could not reach its
+    // own stage at all — the gather timed out at the rim, the run opened with
+    // everybody bunched four metres short of the stones, the catcher swept the
+    // lot in seconds and the cycle ended without a single child on the bank.
+    // That is the round the traveller frame photographed empty. So the bank
+    // round walks the SAME shape the player does — inset by its own footprint —
+    // and is kept off the shore, which is ground that slopes into the water.
+    const bounds = { radius, bank }
+    const onGround = stage
+      ? (px: number, pz: number) =>
+          insidePlace(bounds, px, pz, NPC_RADIUS * 2) && standsOnGroundPlate(bank, px, pz, NPC_RADIUS)
+      : (px: number, pz: number) =>
+          Math.hypot(px, pz) <= rim && Math.hypot(px - region.x, pz - region.z) <= region.radius
     const blocked = (px: number, pz: number) =>
-      Math.hypot(px, pz) > rim ||
-      Math.hypot(px - x, pz - z) > playRadius ||
-      !standingClear(colliders, px, pz, NPC_RADIUS) ||
-      carve(px, pz)
+      !onGround(px, pz) || !standingClear(colliders, px, pz, NPC_RADIUS) || carve(px, pz)
+    // THE WAY ROUND THE VILLAGE, for the one long walk the round has (work-order
+    // 687): the RIVER call sends the group from its own quarter down to the
+    // bank, and where the quarter lies across the built ground from the water
+    // that is forty metres past huts, fences and compounds — the mandinka
+    // village, where a locally steering group pressed into the first wall and
+    // never reached the stage at all. The same grid the adults' errands cross
+    // the village by, built from the same boundary and the same colliders the
+    // step above obeys, so a route can never lead where the step is refused.
+    // Only a settlement that plays the bank round pays for it.
+    const nav = stage ? buildPlaceNavGrid(bounds, colliders, NPC_RADIUS) : null
+    // AND NARROWED BY THE STEP'S OWN PREDICATE — the SAME `onGround`, not a
+    // second expression that happens to agree today (points 129/378). What it
+    // actually adds is the shore: the grid reads the boundary and the colliders,
+    // so the bank lobe it calls walkable runs on down the sloping shore into the
+    // water. The boundary half is already implied — `buildPlaceNavGrid` tests it
+    // at `margin + slack`, strictly stronger than the `margin` here — and
+    // passing it costs nothing while making the invariant one predicate deep
+    // instead of two that must be kept in step. `routing.test.ts` asserts it:
+    // every cell the planner calls free is ground the step accepts.
+    //
+    // The wedge carve is deliberately NOT part of this — measured over five
+    // layouts of the bambara village it disconnects the bank from the village on
+    // three of them, and a corner that does fall in a wedge is dropped by the
+    // walk itself (`wayTo`).
+    if (nav) navRestrict(nav, onGround)
     return {
-      radius: playRadius,
-      centerX: x,
-      centerZ: z,
+      radius: region.radius,
+      centerX: region.x,
+      centerZ: region.z,
       childRadius: NPC_RADIUS,
       blocked,
+      lineBlocked: nav
+        ? (ax: number, az: number, bx: number, bz: number) => !navClearBetween(nav, ax, az, bx, bz)
+        : undefined,
+      route: nav ? (from: NavPoint, to: NavPoint) => findPlaceRoute(nav, from, to) : undefined,
       // WHICH BODIES ARE A CHILD'S WALLS: everybody OUTSIDE the game — adults,
       // porters, errand walkers, the standing and slow-crossing figures the
       // measured red windows coincided with — and NEVER a playmate. Both
@@ -603,7 +734,7 @@ function Kids({
         return { x: r.pos[0], z: r.pos[1], found: r.found }
       },
     }
-  }, [colliders, radius, x, z, playRadius, bodySet, kidIndex])
+  }, [colliders, radius, x, z, playRadius, bodySet, kidIndex, stage, bank])
 
   // The group, spawned on validated ground (point 155): a play spot covered by a
   // hut is nudged to the nearest free one before the first frame — INSIDE the
@@ -611,19 +742,30 @@ function Kids({
   // — and the scheduler of what it SAYS (point 481) is built with it, because a
   // new group is a new scheduler: a second settlement must never inherit the
   // first one's turn or its half-finished errands.
-  const { game, speech } = useMemo(() => {
+  const round = useMemo(() => {
     const rand = mulberry32((seed + 5171) >>> 0)
     const spots = Array.from({ length: count }, (_, i) => {
       const a = (i / Math.max(1, count)) * Math.PI * 2
       const spot = world.nudge(x + Math.cos(a) * 2.4, z + Math.sin(a) * 2.4)
       return { x: spot.x, z: spot.z }
     })
+    if (stage) {
+      const bank = createBankGame(spots, rand, { ...balance.villageLife.tag, ...balance.villageLife.bankGame })
+      return { bank, game: null, speech: null, children: bank.children as TagChild[], rand }
+    }
+    const game = createTagGame(spots, rand, balance.villageLife.tag)
     return {
-      game: createTagGame(spots, rand, balance.villageLife.tag),
+      bank: null,
+      game,
       speech: createChildSpeech(count, balance.villageLife.childSpeech),
+      children: game.children,
+      rand,
     }
     // `world` carries the collider set, so it is the only dependency needed for it.
-  }, [x, z, count, seed, world])
+  }, [x, z, count, seed, world, stage])
+  const game = round.game
+  const speech = round.speech
+  const children = round.children
 
   // The view the situations read the live game through: built once and
   // refreshed each frame rather than allocated per frame.
@@ -634,13 +776,20 @@ function Kids({
       chaser: -1,
       target: -1,
       immune: -1,
-      children: game.children,
+      children,
       ground: { x, z, radius: playRadius },
       // What THERE points at: the settlement's own middle, well outside the
       // play ground and plainly not a place anyone is being sent to.
       farMark: { x: 0, z: 0 },
     }),
-    [game, x, z, playRadius],
+    [children, x, z, playRadius],
+  )
+  // The world the BODY SEPARATION resolves in: the round's own ground, plus the
+  // traveller's berth, written in place each frame (the stranger moves, the
+  // object must not be rebuilt per frame).
+  const separationWorld = useMemo(
+    () => ({ blocked: world.blocked, nudge: world.nudge }),
+    [world],
   )
   const gestures = useRef<Array<RefObject<GestureState>>>([])
   if (gestures.current.length !== count) {
@@ -669,17 +818,35 @@ function Kids({
   useFrame((_, rawDt) => {
     const dt = Math.min(rawDt, 0.1)
     const cfg = balance.villageLife.childSpeech
-    // The view the situations read the game through, refreshed in place.
-    view.playing = game.playing
-    view.chaser = game.chaser
-    view.target = game.target
-    view.immune = game.immuneFor > 0 ? game.immune : -1
-    view.ground.x = x
-    view.ground.z = z
-    view.ground.radius = playRadius
-    // What was said last frame steers the children this one: the chase keeps
-    // the collisions, the stamina and the floor pace.
-    stepTagGame(game, dt, balance.villageLife.tag, world, (i) => childSteer(speech, view, i, cfg))
+    let spoken: BankUtterance | null = null
+    if (round.bank) {
+      // THE TRAVELLER IS AN OBSTACLE, NEVER A STOP (work-order 687 item 7): the
+      // children steer round him — with one extra radius over a villager's body,
+      // because they are shy of the stranger — and the game goes on.
+      world.stranger = placePlayerPosition.active
+        ? { x: placePlayerPosition.x, z: placePlayerPosition.z, radius: PLAYER_RADIUS }
+        : null
+      spoken = stepBankGame(
+        round.bank,
+        dt,
+        { ...balance.villageLife.tag, ...balance.villageLife.bankGame },
+        stage!,
+        world,
+        round.rand,
+      )
+    } else if (game && speech) {
+      // The view the situations read the game through, refreshed in place.
+      view.playing = game.playing
+      view.chaser = game.chaser
+      view.target = game.target
+      view.immune = game.immuneFor > 0 ? game.immune : -1
+      view.ground.x = x
+      view.ground.z = z
+      view.ground.radius = playRadius
+      // What was said last frame steers the children this one: the chase keeps
+      // the collisions, the stamina and the floor pace.
+      stepTagGame(game, dt, balance.villageLife.tag, world, (i) => childSteer(speech, view, i, cfg))
+    }
     // THE BODIES (point 578), resolved where the chase left them and before
     // anything is drawn: a child's body is its own scale's, and it is far
     // smaller than the catch distance — the tag always wins over the separation.
@@ -690,29 +857,49 @@ function Kids({
     // three apart at all — together that was the user's "Kinder klemmen kurz
     // ineinander". `separateGroup` sweeps until nobody moves.
     const sep = balance.villageLife.separation
-    for (let i = 0; i < game.children.length; i++) {
+    // ...AND THE SEPARATION KEEPS THE TRAVELLER'S BERTH TOO (work-order 687 item
+    // 7). It resolves the inhabitants' bodies against one another, and the
+    // traveller is not one of them — so without this it pushed a child inside
+    // the berth the round's own steering had just kept clear.
+    separationWorld.blocked = (px: number, pz: number) =>
+      world.blocked(px, pz) ||
+      insideStrangerBerth(world, balance.villageLife.bankGame, px, pz)
+    for (let i = 0; i < children.length; i++) {
       const b = bodies[i]
       if (!b) continue
-      b.x = game.children[i].x
-      b.z = game.children[i].z
+      b.x = children[i].x
+      b.z = children[i].z
     }
-    separateGroup(bodySet, bodies, dt, sep, world)
-    for (let i = 0; i < game.children.length; i++) {
+    const separable = round.bank
+      ? bodies.filter((_, i) => bankChildCanSeparate(children[i] as BankChild))
+      : bodies
+    separateGroup(bodySet, separable, dt, sep, separationWorld)
+    for (let i = 0; i < children.length; i++) {
       const b = bodies[i]
       if (!b) continue
       // The resolved position AND whatever the separation's own wedge escape
       // did (point 656 follow-up): its teleport is a rescue like any other, and
       // uncounted it read as the child walking out of its pocket.
-      absorbSeparation(game.children[i], b)
+      absorbSeparation(children[i], b)
     }
-    const said = stepChildSpeech(speech, view, dt, cfg, speechRand)
-    if (said) speakSituation(said, game.children[said.speaker], refs.current[said.speaker], gestures.current[said.speaker])
-    game.children.forEach((c, i) => {
+    if (spoken) {
+      speakBankUtterance(spoken, children[spoken.speaker], refs.current[spoken.speaker], gestures.current[spoken.speaker])
+    }
+    const said = game && speech ? stepChildSpeech(speech, view, dt, cfg, speechRand) : null
+    if (said) speakSituation(said, children[said.speaker], refs.current[said.speaker], gestures.current[said.speaker])
+    children.forEach((c, i) => {
       const g = refs.current[i]
       if (!g) return
       const phase = gaitPhase(c.walked, cadence)
       gaits.current[i].current = phase
-      g.position.set(c.x, gaitBodyLift(phase, legLength), c.z)
+      const climbing = (c as BankChild).climbing === true
+      g.position.set(c.x, gaitBodyLift(phase, legLength) + (climbing ? 0.32 : 0), c.z)
+      // A TAGGED CHILD IS UNMISTAKABLY OUT OF PLAY (work-order 687 item 3):
+      // squatted down, trunk folded over and both arms crossed in front of it.
+      // Written here rather than as a prop, because the state changes inside the
+      // frame loop and a re-render per tag would be the wrong tool.
+      const crouched = (c as BankChild).crouched === true
+      g.scale.set(1, crouched ? CROUCH_SQUAT : 1, 1)
       // The eased FACING, not the raw travel heading: the body turns into a new
       // direction rather than snapping about-face inside one frame.
       g.rotation.y = c.facing
@@ -725,10 +912,10 @@ function Kids({
       const gesture = gestures.current[i]
       gesture.current = advanceGesture(gesture.current, dt)
       const shown = gesturePose(gesture.current)
-      pose.left = shown.left
-      pose.right = shown.right
+      pose.left = crouched ? CROUCH_POSE.left : shown.left
+      pose.right = crouched ? CROUCH_POSE.right : shown.right
       pose.turn = shown.turn
-      pose.lean = c.lean + shown.lean
+      pose.lean = crouched ? CROUCH_POSE.lean : c.lean + shown.lean
     })
   })
 
@@ -736,23 +923,32 @@ function Kids({
   useEffect(() => {
     if (!import.meta.env.DEV) return
     const w = window as unknown as Record<string, unknown>
+    const bank = round.bank
+    // ONE HOOK FOR BOTH ROUNDS. The live child-motion check reads this shape,
+    // and it must not have to know which game a settlement plays: the bank round
+    // reports its own catcher, quarry, tags and clocks under the same names.
     w.__placeTag = () => ({
-      playing: game.playing,
-      chaser: game.chaser,
-      target: game.target,
-      tags: game.tags,
-      chaserFor: game.chaserFor,
+      playing: bank ? bank.playing : game!.playing,
+      chaser: bank ? bank.children.findIndex((c) => c.role === 'catcher') : game!.chaser,
+      target: bank
+        ? (bank.children.find((c) => c.role === 'catcher')?.quarry ?? -1)
+        : game!.target,
+      tags: bank ? bank.tags : game!.tags,
+      chaserFor: bank ? bank.phaseFor : game!.chaserFor,
+      /** The bank round's own phase, for a check that wants to know what it is
+       *  looking at; absent in the tag round. */
+      phase: bank ? bank.phase : null,
       // The game's OWN clock: the verification samples an interval of GAME,
       // never a count of frames, which buy different amounts of it per machine.
-      clock: game.clock,
+      clock: bank ? bank.clock : game!.clock,
       // Of that clock, the part actually PLAYED (point 656) — the game's own
       // count, so a check need not decide from a sampled flag which side of a
       // round's first frame an interval falls on.
-      playedClock: game.playedClock,
+      playedClock: bank ? bank.playedClock : game!.playedClock,
       // The radius a child's BODY occupies, so a live check can judge an overlap
       // against the real figure rather than against a guessed one (point 648).
       bodyRadius: balance.villageLife.separation.bodyRadius * KID_SCALE,
-      children: game.children.map((c) => ({
+      children: children.map((c) => ({
         x: c.x,
         z: c.z,
         heading: c.heading,
@@ -783,19 +979,19 @@ function Kids({
     // What the group has SAID so far this visit (point 481), by situation — a
     // live check can read the coverage the pure tests pin.
     w.__placeChildSpeech = () => ({
-      staged: { ...speech.staged },
-      last: speech.last ? { ...speech.last } : null,
+      staged: speech ? { ...speech.staged } : {},
+      last: speech?.last ? { ...speech.last } : null,
       ground: { x, z, radius: playRadius },
     })
     return () => {
       delete w.__placeTag
       delete w.__placeChildSpeech
     }
-  }, [game, speech, x, z, playRadius])
+  }, [round, game, speech, children, x, z, playRadius])
 
   return (
     <>
-      {game.children.map((c, i) => (
+      {children.map((c, i) => (
         <group
           key={i}
           // Born on its play spot (point 509), not at the settlement origin the
@@ -1155,8 +1351,8 @@ function talkerAim(
  * mute pantomime the user reported from the picture ("they gesture, but I see
  * no texts over their heads"), and at ANY distance, since nothing it did could
  * ever be heard. Those four gestures are the very ones the teaching situations
- * use for COME, GO_THERE, THERE and NO, so an ambient pair performing them
- * showed the player concepts with no word attached to them. Gesturing now
+ * use, so an ambient pair performing them showed the player concepts with no
+ * word attached to them. Gesturing now
  * belongs to the figures that SPEAK: the children's situations and the adults'
  * errands, which drive the same `gesture` refs through the hearing gate
  * (`src/communication/spokenGesture.ts`).
@@ -1853,9 +2049,10 @@ const ERRAND_ARRIVE_RADIUS = 1.1
 const WAYPOINT_RADIUS = 1.2
 
 /**
- * The adults at their errands (work-order point 483), and the five concepts they
- * teach at them: RIVER, UPSTREAM, DOWNSTREAM, BIG_ROCK and DIG. The catalogue
- * and the scheduler are the pure `adultErrands` module; here it is given the
+ * The adults at their errands, and the concepts they teach at them: RIVER,
+ * UPSTREAM, DOWNSTREAM, ROCK and DIG. The catalogue is EMPTY until the water
+ * and digging teaching is rebuilt, so nothing is staged here for now. It and
+ * the scheduler are the pure `adultErrands` module; here it is given the
  * live village, and what comes back is spoken (through the §13.4 hearing curve),
  * shown over the speaker's head, gestured with the point-479 arms and CARRIED
  * OUT — the villager walks to the bank, up or down the stretch, over to the
@@ -2194,10 +2391,6 @@ function ErrandVillagers({
     w.__placeErrands = () => ({
       staged: { ...errands.staged },
       last: errands.last ? { ...errands.last } : null,
-      // How long the village has been quiet — what point 586 is measured by,
-      // and what the `errands-silent` assert fires on.
-      silence: errands.speech.silence,
-      spoken: errands.speech.produced,
       geography: {
         bank: geography.bank,
         upstream: geography.upstream,
@@ -2366,6 +2559,8 @@ export function PlaceLife({
   teachingStone,
   digSites,
   bank,
+  playRocks,
+  rocks,
   pen,
   colliders,
   radius,
@@ -2389,6 +2584,11 @@ export function PlaceLife({
   /** The walkable river bank, where the settlement stands on a river
    *  (work-order 482): what the RIVER/UPSTREAM/DOWNSTREAM errands are about. */
   bank: PlaceRiverBank | null
+  /** The two play rocks of the children's bank game (work-order 687), and the
+   *  settlement's loose boulders — one of which a child climbs and names while
+   *  the group roams, so ROCK is heard at a stone that is no part of the game. */
+  playRocks: { upstream: { x: number; z: number }; downstream: { x: number; z: number } } | null
+  rocks: Array<[number, number, number]>
   pen: PenDef | null
   colliders: Collider[]
   /** The settlement's walkable radius — the children's play area (point 480). */
@@ -2501,6 +2701,37 @@ export function PlaceLife({
       `(fabric ${playGround.fabric.toFixed(2)}) — the two teaching voices need another means of being told apart`,
   )
 
+  // THE CHILDREN'S STAGE (work-order 687): the two play rocks, the water the
+  // opening call points at, an ordinary village boulder that is no part of the
+  // game, and the quarter the group roams in between cycles. A settlement
+  // without a bank carries no stage, and its children keep the tag round.
+  const bankStage = useMemo<BankStage | null>(() => {
+    if (!bank || !playRocks) return null
+    // The nearest loose boulder to the children's own quarter — the one they
+    // would plausibly be standing at anyway. It is the guard that keeps ROCK
+    // from meaning only a game target, so without one this settlement keeps the
+    // old tag round just as a riverless village does.
+    let boulder: { x: number; z: number } | null = null
+    let best = Infinity
+    for (const [rx, rz] of rocks) {
+      const d = Math.hypot(rx - playGround.x, rz - playGround.z)
+      if (d < best) {
+        best = d
+        boulder = { x: rx, z: rz }
+      }
+    }
+    if (!boulder) return null
+    return {
+      upstream: playRocks.upstream,
+      downstream: playRocks.downstream,
+      // The waterline straight out from the settlement's middle, which is what
+      // the drawn river is: the call points at the water, not at a bank stop.
+      water: { x: bank.nx * bank.distance, z: bank.nz * bank.distance },
+      boulder,
+      roam: { x: playGround.x, z: playGround.z, radius: playGround.radius },
+    }
+  }, [bank, playRocks, rocks, playGround])
+
   // Every spot this settlement hands out (point 509): what tells an inhabitant
   // standing at the middle of a village apart from one that was never placed —
   // a settlement whose own layout puts a figure at its origin is not reported.
@@ -2542,6 +2773,8 @@ export function PlaceLife({
             cloth={style.cloth}
             colliders={colliders}
             radius={radius}
+            stage={bankStage}
+            bank={bank}
           />
           {/* The adults at their errands (point 483): the five landscape and
               action concepts, taught by what the villagers visibly go and do. */}

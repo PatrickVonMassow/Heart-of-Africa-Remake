@@ -187,10 +187,12 @@ THE VILLAGE SPEECH (§13.4, docs/communication-poc-spec.md, work-order points
 nothing in the mechanic needs a browser, and the one thing that does (the note
 landing over the figure the scene drew) is the polish suite below:
 
-- `src/communication/lexicon.test.ts` — the eleven concepts and the spec's table
+- `src/communication/lexicon.test.ts` — the five concepts (`RIVER`, `UPSTREAM`,
+  `DOWNSTREAM`, `ROCK`, `DIG`) and the spec's table
   syllable for syllable; every pair at least two syllables apart, so a misheard
-  beat can only produce a non-word, never a second concept; the four mirrored
-  opposite pairs; and the journal sort order as a total order.
+  beat can only produce a non-word, never a second concept; the one mirrored
+  opposite pair (`UPSTREAM`/`DOWNSTREAM`); and the journal sort order as a total
+  order.
 - `src/communication/speaking.test.ts` — the syllable timing at the calibratable
   pace, the constant pause BETWEEN a phrase's atoms and nowhere else, the
   distance curve, and that "audible" and "recorded as heard" are one condition.
@@ -208,14 +210,24 @@ landing over the figure the scene drew) is the polish suite below:
   spoken order, rides on the SPEAKER'S OWN height (point 582), never accumulates;
   and the click goes to the NEAREST speaker, a tie held rather than flickering,
   with no invitation while a dialog stands open (point 588).
-- `src/scenes/place/childSituations.test.ts` — the children's six concepts, each
-  in more than one situation, the staged contrasts (a COME from a child standing
-  still, a THERE nobody moves after), one situation at a time, and the scheduler
-  putting every one of them in front of the player within a visit.
-- `src/scenes/place/adultErrands.test.ts` — the five concepts the children do NOT
-  teach, each in at least two distinct situations and mixed with a known one;
-  RIVER unable to collapse into "fetch water"; UPSTREAM/DOWNSTREAM staged as a
-  mirrored pair; and a BIG_ROCK errand with no upstream walk (point 482).
+- `src/scenes/place/bankGame.test.ts` (work-order 687) — the children's ONE game
+  at the river bank, which teaches four of the five words: the cycle's phases in
+  order, the caller of RIVER as the first catcher, the announced direction
+  alternating with the side swap, ROCK called once with nobody arriving (the
+  catcher's tap) and once outside the game altogether (a child naming an ordinary
+  village boulder while the group roams), a direction word called once with no
+  rock as its target (the parting walk along the bank), the run and cycle ending
+  exactly as the spec states, no utterance reducing a playing child's pace, and a
+  tagged child holding its crouch until the run ends.
+- `src/scenes/place/bankStage.test.ts` (work-order 687) — the stage the game is
+  played on, measured rather than asserted: the two play rocks at the ends of the
+  settlement's own bank stretch, the stretch in world units, the far rock's share
+  of the frame at the default field of view and the reference viewport, and the
+  lane at least three walker diameters wide against the shipped collider set.
+- `src/scenes/place/mutedTeaching.test.ts` (work-order 686) — the removed
+  eleven-concept catalogues stage nothing: neither the children's old situations
+  nor the adults' old errands speak or steer. The adults' own teaching of RIVER
+  and DIG is owed by work-order point 688 and is not claimed here.
 - `src/scenes/place/speechChannel.test.ts` — the scene speaks over a named
   figure, holds the click target, and never accumulates standing text.
 - `src/systems/ambience.test.ts` (`playSpeech`) — the syllables reach the audio
@@ -240,8 +252,8 @@ note against that figure's own head (`146-speech-hypothesis-label`), and section
 THE CHIEF'S MESSAGE ON THE DRUMS (§13.4, docs/communication-poc-spec.md,
 point 486). Asked for at the audience — in his village alone, and only once a
 culturally correct gift has earned his trust (the §12 condition every hint
-stands under) — the chief has his drummer beat out GO_THERE · RIVER · FOLLOW ·
-UPSTREAM · BIG_ROCK · THERE · DIG on two drums: the large low one for `ba`, the
+stands under) — the chief has his drummer beat out RIVER · UPSTREAM · ROCK ·
+DIG on two drums: the large low one for `ba`, the
 small high one for `BA`, the hand falling and the head dipping on the drum that
 sounds. The sequences are never re-authored: the message is a list of CONCEPT
 ids whose atoms come from the lexicon and whose timing is the same phrase plan a
@@ -272,7 +284,7 @@ and the spot that yields are the same value, and a dig anywhere else yields the
 ordinary nothing. The find rides OUTSIDE the inventory capacity: it is a puzzle
 token, not trade goods, so a full pack can never strand the errand. Carried back
 into the chief's own village it is laid in his hands, and that hand-over is what
-solves the puzzle — he answers with BIG_ROCK · DIG · HERE, three concepts the
+solves the puzzle — he answers with ROCK · DIG, two concepts the
 village has already taught, recorded like any other speech of his people and
 shown with the player's OWN notes over them. Nothing is translated for him,
 here least of all.
@@ -1245,8 +1257,10 @@ in the real walk loop and the place is left within 1.5 m of the drawn line
 (`scripts/verify/polish.mjs`, screenshots 488-village-edge-band /
 488-port-edge-band / 488-monument-edge-band).
 
-THE CHILDREN PLAY A GAME OF TAG (§19.10, points 480/351). One of them is IT and
-chases the others; whoever is caught becomes the new IT, and any number plays.
+THE CHILDREN PLAY A GAME OF TAG (§19.10, points 480/351) WHERE THE SETTLEMENT
+STANDS ON NO RIVER. Since the five-word rebuild a riverside village plays the
+bank round instead (§7), and this chase is what the children play everywhere
+else. One of them is IT and chases the others; whoever is caught becomes the new IT, and any number plays.
 It is a CHASE, not a route — nothing here holds a ring, an orbit or a tour of
 waypoints, because a path is periodic and the eye reads it within two passes.
 STAMINA is what makes it legible: every child carries a sprint reserve, and the
@@ -1301,47 +1315,38 @@ against the built fabric (`src/scenes/place/lifeSpots.test.ts` pins that for
 every shipped village) (`scripts/verify/polish.mjs`, screenshot
 480-village-tag).
 
-AT THAT GAME THE CHILDREN TEACH THE SIX GENERAL CONCEPTS (§13.4,
-docs/communication-poc-spec.md, point 481). Twelve situations, two per concept:
-one atomic utterance, the gesture the speaker makes while it says it, and the
-ACTION that visibly follows — a child calls the others in (COME), sends one to a
-named spot (GO_THERE), asks another along as it runs (FOLLOW), names where it
-stands (HERE), points something out beyond the ground (THERE) and refuses (NO).
-Nothing is ever translated: the meaning lives in what happens next. The two
-look-alikes are staged apart, because otherwise they teach nothing — COME is
-spoken by a child STANDING STILL against FOLLOW's caller running away, and THERE
-by a child after whom NOBODY moves against GO_THERE, which always ends in the
-addressee walking to the spot. The scheduler is a fair queue (the least-staged
-castable situation goes next), so nothing starves inside a visit; a refusal is
-offered out of turn as the answer to the call just spoken, and the freshly-tagged
-child's HERE as a moment whose state is gone within seconds. The group plays on
-its own ground — the largest disc on the bearing furthest from every fixed adult
-vignette whose whole area still clears them by the §13.4 hearing radius — so
-among the children the player hears the children and among the adults the adults.
-The chase carries out what was said: the situation decides a runner's direction,
-the chase keeps the collisions, the stamina and the floor pace, and between
-rounds that claim is what moves anyone at all. Rate, action life, errand pace and
-refusal chance are calibratable (`balance.villageLife.childSpeech`) and
-debug-editable in both languages, as is the play radius.
-Verifiable: pure Vitest on the catalogue and the scheduler
-(`src/scenes/place/childSituations.test.ts`) — one atom per situation and it is
-the concept's own; a gesture and a following action on every one; every concept
-in more than one situation, and heard in at least two DIFFERENT ones over a
-driven visit; every situation staged within a visit; both staged contrasts; the
-refusals only ever as answers, cancelling what the child was told; the errands
-really carried out and every one of them expiring.
-THE VILLAGE'S PRODUCERS ARE ALARMED FOR THE LONG RUN (point 589): the adults'
-utterances, the children's play and the children's speech each carry a watch of
+THE CHASE ITSELF TEACHES NOTHING, AND SAYS SO (points 686/687). It once carried
+twelve staged situations teaching six general concepts — COME, GO_THERE, FOLLOW,
+HERE, THERE and NO — and the user could learn nothing from them: "Ich erkenne da
+kein Fangspiel … Das Herumschicken wirkt wie zum Selbstzweck eingeführt". The
+diagnosis was that the design had forced six lessons onto a game that cannot
+carry them, and the rebuild replaced all of it with FIVE words taught in two
+places (§7): the children's bank round, and the adults at their own work. The
+catalogue is therefore GONE, not merely unused — `childSituations.ts` keeps its
+exported types and stages nothing, and the twelve-situation suite that pinned the
+old curriculum was deleted with the curriculum. What replaced it is the bank
+round, and its evidence stands under §7 rather than being restated here.
+Verifiable: `src/scenes/place/mutedTeaching.test.ts` asserts that the adapter
+stages NOTHING — the one claim this paragraph now makes — and the browser tripwire
+in `scripts/verify/polish.mjs` goes red the moment anything is staged again, so
+the emptiness is measured live and not merely asserted in a unit. Point 688 fills
+the adults' half; when it lands, this paragraph is replaced by what they teach,
+not extended.
+THE VILLAGE'S PRODUCERS ARE ALARMED FOR THE LONG RUN (point 589): the children's
+play at the chase and their speech at the bank round each carry a watch of
 the dev-assert channel's long-run family (`watchProducer`,
-`src/systems/devAssert.ts`), and each raises `errands-silent` / `tag-silent` /
-`child-speech-silent` once it has produced nothing for its own window
-(`balance.villageLife.*.silenceSeconds`, debug-editable in both languages) —
+`src/systems/devAssert.ts`), and each raises `tag-silent` /
+`bank-speech-silent` once it has produced nothing for its own window
+(`balance.villageLife.tag.silenceSeconds` and
+`balance.villageLife.bankGame.roundSilenceSeconds`, debug-editable in both
+languages) — the two alarms of the deleted situation catalogues went with them,
+because a watch on a producer that can no longer produce reads as covered —
 so a village that goes quiet after minutes reports itself in every session,
 headless or manual, which no seconds-long suite can reach. Verifiable both ways
-in the fast layer (`src/systems/devAssert.test.ts`, plus the three producers'
+in the fast layer (`src/systems/devAssert.test.ts`, plus both producers'
 own test files): a stalled producer trips its alarm, a healthy one is silent
 through half an hour of simulated play, a legitimately quiet one (a lone child,
-a village with nowhere to send anyone) is never judged, and a frame-loop gap
+a group with nobody to play the round with) is never judged, and a frame-loop gap
 cannot raise the alarm while a loop crawling at six-second frames still does.
 The watches reach the SCHEDULERS, so the ear's own end of the chain is armed
 where it lives: `playSpeech` raises `speech-inaudible` when the level that

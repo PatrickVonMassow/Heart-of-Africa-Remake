@@ -87,7 +87,7 @@ export interface UiState {
   fpsVisible: boolean
   /**
    * DEBUG ONLY (user 09.08.2026): show the CONCEPT behind each utterance over
-   * the speaker's head — `COME`, `GO_THERE`, … — instead of the syllables and
+   * the speaker's head — `RIVER`, `UPSTREAM`, … — instead of the syllables and
    * the player's own guess. It is the one view the player must never have, and
    * exactly the one a developer needs to see whether a situation staged the
    * concept it meant to. Off by default; nothing but the debug menu sets it.

@@ -709,6 +709,52 @@ export interface BalanceConfig {
        *  (point 481/478), not a scatter across the whole settlement. */
       playRadius: number
     }
+    /** The children's game at the river bank (work-order 687): the phases of one
+     *  cycle, the stage's own distances and the berth they give the traveller.
+     *  The paces, the stamina and the steering are the tag game's above. */
+    bankGame: {
+      /** How long the group roams its own quarter between two cycles. */
+      roamSeconds: number
+      /** Per-cycle spread of that length, 0..1 (0 = a metronome). */
+      roamSpread: number
+      /** Backstop on the walk down to the bank. */
+      gatherSeconds: number
+      /** Backstop on one run. */
+      runSeconds: number
+      /** Backstop on the walk between two runs. */
+      regroupSeconds: number
+      /** How long the group walks off along the bank before roaming again. */
+      partSeconds: number
+      /** How near a rock's centre counts as touching it. */
+      reachDistance: number
+      /** How far off a rock's centre a child's waiting station stands. */
+      standOff: number
+      /** Side-by-side spacing of the stations at one rock. */
+      stationSpacing: number
+      /** Sideways spacing of the runners' lanes across the stretch. */
+      laneSpacing: number
+      /** How near a catcher must be before a runner bends its line round him. */
+      dodgeDistance: number
+      /** How far sideways that bend carries the runner's aim at the closest. */
+      dodgeReach: number
+      /** How fast a roaming child's heading drifts (rad/s). */
+      roamTurn: number
+      /** How long the climber may make no progress toward the boulder before giving up. */
+      roamGoalSeconds: number
+      /** The most OVERTIME the off-game ROCK guard may hold a cycle for, past
+       *  the roaming phase's own length. Beyond it the RIVER call goes out with
+       *  that one cycle's boulder unnamed. */
+      roamGuardSeconds: number
+      /** The pace of every walk that is not a run (m/s). */
+      walkPace: number
+      /** The EXTRA berth the children give the traveller over a villager. */
+      strangerBerth: number
+      /** Constant gap between two utterances of the round. */
+      utteranceGapSeconds: number
+      /** Dev-mode alarm (point 589): a round that could speak and has said
+       *  nothing for this long raises `bank-speech-silent`. */
+      roundSilenceSeconds: number
+    }
     /** What the children SAY at their game (work-order point 481). */
     childSpeech: {
       /** Seconds between two staged situations. */
@@ -723,9 +769,6 @@ export interface BalanceConfig {
       refusalChance: number
       /** How long after a call a refusal still reads as its answer. */
       replySeconds: number
-      /** Dev-mode alarm: a group of children that could speak and has said
-       *  nothing for this long raises `child-speech-silent`. */
-      silenceSeconds: number
     }
     /** The adults' errands, which teach the five landscape and action concepts
      *  (work-order point 483). */
@@ -743,9 +786,6 @@ export interface BalanceConfig {
       /** Seconds of NO headway toward the target after which the errand is let
        *  go, so a walk that cannot finish stops holding its villager. */
       stallSeconds: number
-      /** Dev-mode alarm: no errand staged for this long in a village that could
-       *  stage one raises the `errands-silent` assert. */
-      silenceSeconds: number
       /** The pace a villager walks at while on an errand (m/s). */
       pace: number
       /** How many errand villagers a village keeps out and about. Read when a
@@ -1227,6 +1267,88 @@ export const balance: BalanceConfig = {
       // group stays one group a player can stand among and hear (point 481).
       playRadius: 10,
     },
+    // The children's game at the bank (work-order 687). Calibratable starting
+    // values (educated guess, CLAUDE.md §2), all debug-editable, chosen so a
+    // visiting player sees a WHOLE cycle rather than a fragment of one: the
+    // roaming phase is of the order of a minute so the RIVER call that opens the
+    // cycle is never missed, and every phase that ends on a CONDITION carries a
+    // backstop generous enough that it is the condition — not the clock — that
+    // normally ends it.
+    bankGame: {
+      roamSeconds: 55,
+      roamSpread: 0.25,
+      // The stretch is ~20 m and a child crosses it at a run in some six
+      // seconds; the walk down from the quarter is longer, hence the wider
+      // backstop on the gather. MEASURED on the three river villages, replayed
+      // in `tagShuffle.test.ts`: the whole group is at its stations after 19.9 s
+      // (nubian), 22.9 s (bambara) and 34.5 s (mandinka, whose quarter lies
+      // across the built ground from its water). At 30 s the mandinka run opened
+      // on a group still walking — the clock ending a phase that is meant to end
+      // on its condition — so the backstop carries a third again over the
+      // slowest walk measured.
+      gatherSeconds: 45,
+      runSeconds: 20,
+      regroupSeconds: 14,
+      partSeconds: 8,
+      // Past the rock's own collider (1.2 m) plus a child's footprint (0.3 m):
+      // touching the stone, not standing in it.
+      reachDistance: 2.2,
+      standOff: 2.6,
+      stationSpacing: 1,
+      // The swerve that makes a run a game rather than a sweep: a runner starts
+      // bending its line SEVEN metres out from a catcher and, at the closest,
+      // aims THREE metres to the side of the rock. Wide enough that the dodge is
+      // visible from the far end of the stretch, narrow enough that the runner is
+      // still plainly making for the rock. (The prose said six and six until
+      // 29.08.2026 — the values had been retuned and it had not, so a tuner read
+      // both the trigger distance and the swerve width wrong.)
+      laneSpacing: 1.2,
+      dodgeDistance: 7,
+      dodgeReach: 3,
+      // A quarter turn a second at the most: a wander that reads as wandering
+      // rather than as a figure being blown about.
+      roamTurn: 1.4,
+      // A reachable stone keeps resetting this watch as the climber gets
+      // closer. Thirty seconds without gaining any ground toward it means a
+      // hut, pocket or other collider has made the approach impossible.
+      roamGoalSeconds: 30,
+      // AND THE PHASE ITSELF IS BOUNDED, because the watch above is not enough:
+      // it resets on ANY gain, so a child creeping toward a stone it can never
+      // quite reach neither arrives nor fails, and the roaming phase then has no
+      // end at all. Measured under load, the round sat in `roam` for 150 s of
+      // its own clock without ever opening a run — a player at the bank watching
+      // the children wander and never play.
+      //
+      // 45 s is the KNEE of the measured curve, not a round number: replayed
+      // over nine village/seed layouts at the verification's own shortened roam
+      // (122 roaming phases, 113 namings), a 45 s bound keeps 92 % of the
+      // namings — and 60 s or 90 s keep 92-93 %, because every remaining one
+      // needs 89-206 s. So the overtime past 45 s buys almost no teaching and
+      // costs the deliverable: the game itself. What a cut-off cycle loses is
+      // the off-game ROCK once; the RIVER call, the runs and the arrivals all
+      // still happen.
+      roamGuardSeconds: 45,
+      // A child's walk, well under the chase's trot — the walks between runs
+      // must read as walking, not as more running.
+      walkPace: 1.4,
+      // ONE EXTRA RADIUS over what a villager's body already claims (spec item
+      // 7): the children are shy of the stranger, so they visibly swerve round
+      // the traveller rather than brushing past him.
+      strangerBerth: 0.3,
+      // One atom is four syllables at `communication.syllableSeconds` — 0.3 s —
+      // so an atom runs 1.2 s; this leaves a clear breath between two moments
+      // that fall together.
+      utteranceGapSeconds: 2,
+      // The long-run alarm's window (point 589), which the bank round inherits
+      // from the situation catalogue the five-word rebuild deleted. Read off the
+      // round's OWN phases: the longest LEGITIMATE quiet spell runs from the
+      // parting call to the next cycle's RIVER call — partSeconds (8) plus a
+      // roaming phase at its widest spread (55 x 1.25 = 68.75) plus the off-game
+      // ROCK guard's whole overtime (45), which is ~122 s, and in that stretch a
+      // cycle whose boulder proves unreachable says nothing at all. Half again
+      // over that, so only a round that has genuinely stopped speaking trips it.
+      roundSilenceSeconds: 180,
+    },
     // What the children SAY (work-order point 481). Calibratable starting
     // values: an utterance every few seconds is often enough to be heard several
     // times in one visit and rare enough that the group is not a chatterbox, and
@@ -1239,9 +1361,6 @@ export const balance: BalanceConfig = {
       actionPace: 1.6, // a brisk errand walk, well under the chase's trot
       refusalChance: 0.35,
       replySeconds: 5,
-      // The long-run alarm's window (point 589): well clear of the interval and
-      // its spread, so only a group that has genuinely stopped speaking trips it.
-      silenceSeconds: 60,
     },
     // The adults' errands (work-order point 483). Calibratable starting values
     // (educated guess, CLAUDE.md §2): slower than the children's chatter,
@@ -1266,10 +1385,6 @@ export const balance: BalanceConfig = {
       // above, which on its own held a blocked villager for twenty staged
       // errands and left the village silent for minutes (point 586).
       stallSeconds: 20,
-      // The alarm window. Measured on a healthy village, the longest quiet
-      // spell between two errands is ~25 s; the user watched them stay silent
-      // for minutes, so anything past a minute is a defect, not a lull.
-      silenceSeconds: 60,
       pace: 1.25, // an unhurried working walk
       villagerCount: 4,
     },
@@ -1327,8 +1442,9 @@ export const balance: BalanceConfig = {
     // The rule lives in src/communication/spokenGesture.ts and follows this
     // value wherever the debug menu sets it.
     hearingRadius: 10,
-    // One five-syllable atom takes 1.5 s at this pace — slow enough to count
-    // the beats by ear, quick enough that a seven-atom message stays short.
+    // One four-syllable atom takes 1.2 s at this pace (point 686 shortened the
+    // word from five syllables to four) — slow enough to count the beats by ear,
+    // quick enough that the chief's four-atom message stays short.
     syllableSeconds: 0.3,
     // A sharp fall: half way to the radius a voice is already at ~14 % and at
     // the rim at 4 %, so the children's group and the adults' group are never
