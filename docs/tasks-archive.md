@@ -26044,3 +26044,98 @@ Nummerierung bleiben deshalb identisch — hier wird nur verschoben, nie umgesch
     in the 45 s window — are a plausible but UNMEASURED account of the shortfall.
   Refs: src/scenes/place/tagGame.ts, src/scenes/place/childSituations.ts, src/scenes/place/PlaceLife.tsx, src/scenes/place/lifeSpots.ts, src/scenes/place/layout.ts, src/config/balance.ts
   Bundle: Dorfleben.
+
+- [x] 688. The adults teach water and digging by doing their own work (user 13.08.2026, playing
+  the deployed communication slice).
+  The user played the deployed communication slice on 13.08.2026 with the debug
+  switch "Speech: show concepts instead of syllables" on and could learn nothing:
+  "Ich erkenne da kein Fangspiel … Das Herumschicken wirkt wie zum Selbstzweck
+  eingeführt", and about the adults "Selbst wenn ich diese Übersetzungen sehe,
+  erkenne ich keinen Sinn hinter den Handlungen." The evening's conversation
+  diagnosed the cause — the design taught eleven concepts through situations
+  forced onto a game that cannot carry them — and rebuilt the whole slice around
+  five words, two teaching places and one game per settlement kind. This point is
+  one of six that carry that rebuild; they are specified together and read
+  together.
+
+  The six specifications were reviewed cross-vendor before filing (GPT-5.6 Sol at
+  effort high, 13.08.2026, verdict do-not-merge on the first draft): it found two
+  outright contradictions and, more valuable, three wrong readings a player could
+  learn and still finish the puzzle with. What stands here is the corrected state.
+  The adults teach `RIVER` and `DIG` by doing their own work, and they never stand
+  at the bank.
+
+  Final state:
+
+  1. WATER. One adult sets off from the village toward the water with an EMPTY jar,
+     says `RIVER` as he goes, and walks out of the settlement down the water path.
+     Another comes back UP that path with a FULL jar carried in the head-load pose,
+     and says `RIVER` on arriving. Both utterances fall in the village, at the head
+     of the path — never at the bank, so no adult voice is ever inside the
+     children's earshot. The two together fix the word on the PLACE: once it is a
+     destination, once an origin, and only the water is common to both. Jar and
+     head-load pose already exist (`TaskWalker`'s jar; the porters' head-carry).
+  2. DIGGING, AND THE WORD SITS ON THE STROKE. At the village's work sites an adult
+     digs visibly and says `DIG` AS HE STRIKES — not before, not while walking
+     there. The second situation is another digger at another site doing the same
+     while a second villager, unbidden, joins in. No adult ever CALLS another over
+     with `DIG`: a word spoken to summon somebody teaches "come" or "help" at least
+     as well as "dig". Two situations, one atom each, both spoken at the moment the
+     ground is worked.
+  3. EVERYTHING ELSE GOES. The old errand catalogue — the sendings, the callings
+     back, the mirrored upstream/downstream walks, every errand that ended in a
+     villager standing still — is deleted. The direction words are the children's
+     now.
+  4. THE WORK SITES LEAVE THE MIDDLE. The three dig sites (store pit, post hole,
+     turned patch) are placed where such work belongs — at a compound edge, beside
+     a lane, at the edge of the worked ground — never on the open central ground.
+  5. THE TEACHING ROCKS ARE LAYOUT. The two rocks of the children's game stand on
+     the bank, one upstream and one downstream of the descent, in the current
+     teaching-stone size; the old single stone in the village centre is gone. The
+     WATER PATH meets the bank OUTSIDE the stretch between them, so the water
+     carrier never crosses the running lane. A settlement with no bank carries
+     neither rocks nor the children's bank game; its adults keep only `DIG`, and
+     its children play the SILENT tag game the ports have (see the port point), so
+     no settlement is ever left without a children's game. Each rock is drawn as an
+     upright erratic of the same shape family as the goal boulder of
+     `src/world/communicationRock.ts` at settlement scale, so the object `ROCK` is
+     learnt on is the same KIND of thing the chief's message points at. Standing one
+     upstream and one downstream of the descent also KEEPS the rock/direction
+     discriminator that the old village placement existed for: a rock on the
+     upstream stretch alone would make "go upstream" and "go to the rock" the same
+     picture, and that must not be dropped while the stones move to the bank.
+  6. The three areas — village core (adults), children's roaming quarter, bank
+     stage — each clear the others by at least the hearing radius. Where a layout
+     cannot give all three, the ADULTS are moved, not the children: their words do
+     not depend on where they stand, the children's do.
+  7. THE LAYOUT COMMENT SAYS WHERE THE ROCKS STAND AND WHY. `layout.ts` long placed a
+     single teaching stone 6.5 to 13.6 m from the village centre while
+     `docs/communication-poc-spec.md` already assumed the rock lay upstream — the
+     code and the spec must never again describe different places. The placement
+     comment states the built arrangement; the spec's own rock sentences belong to
+     the document sweep (point 692) and are not rewritten twice.
+
+  Test: Vitest over the layout — the rocks lie on the bank on either side of the
+  descent, the water path meets the bank outside the stretch, no dig site lies on
+  the central ground, the three areas clear each other by the hearing radius, and
+  the placement is stable for a seed. Vitest over the adult situations — two for
+  each word, one atom each, the digging ones ending in the dig pose. Picture check
+  on both backends.
+  Constraints:
+  - Depends on the five-concept lexicon; pairs with the children's bank game (the
+    rocks it places are that game's stage).
+  - No new prop model is required: the jar and the head-load pose exist. A fish was
+    considered and dropped — a net cannot be drawn in this stylised look.
+  - `RIVER` may be read by the player as "water"; that is acceptable and was
+    decided by the user — "Wasser, aufwärts, Fels, graben" leads to the same place.
+  Quotes:
+  Nutzer, 13.08.2026 22:42: »Insgesamt sagen mir die Erwachsenen mit nur einem Wort bisher zu wenig. Vielleicht können sie auch noch irgendwie RIVER benutzen.«
+  Nutzer, 13.08.2026 22:48: »Ein Krug fände ich schon in Ordnung. Wenn der Spieler dann RIVER als WATER interpretiert, wäre das für die Botschaft des Häuptlings nicht schlimm.«
+  Nutzer, 13.08.2026 20:46: »Der Lehrstein soll flussaufwärts wandern. Ein großer Felsbrocken mitten im Dorf macht keinen Sinn - ebensowenig, wie dort zugraben.«
+  Nutzer, 13.08.2026 20:41 (die Beobachtung dahinter): »dann sagt er GO_THERE BIG_ROCK und zeigt in die Dorfmitte, wo der große Felsen liegt (warum auch immer) … sie bleiben am Felsbrocken stehen und machen nichts«
+  The same evening's reading, kept because it names the defect precisely: a boulder
+  on the village square that everybody walks to for no reason, with people digging
+  beside it, reads as meaningless — and the settlement's rock was not the rock the
+  chief's message means.
+  Refs: src/scenes/place/adultErrands.ts, src/scenes/place/PlaceLife.tsx (TaskWalker, HEAD_CARRY_POSE), src/scenes/place/layout.ts (teachingStone, digSites), src/scenes/place/riverBank.ts
+  Bundle: Dorfleben.
