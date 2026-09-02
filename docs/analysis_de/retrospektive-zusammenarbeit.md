@@ -1424,7 +1424,7 @@ keinen Träger hat. Gebucht als Punkt 956.
 
 ## Anhang A — Maschinell gepflegte Quellen-Übersicht
 
-Zuletzt aktualisiert: Mittwoch, 02.09.2026, 09:24 · Quellen-Fingerprint: `9ebbf521855b…`
+Zuletzt aktualisiert: Mittwoch, 02.09.2026, 14:46 · Quellen-Fingerprint: `a30b870184f0…`
 
 Spalten heuristisch aus den Quellen abgeleitet (Anläufe = distinkte Datumsnennungen im Memory;
 Maßnahme = Guard-Skripte mit Namens-Treffer). Die inhaltliche Bewertung gehört der Prosa oben.
@@ -1527,8 +1527,8 @@ Maßnahme = Guard-Skripte mit Namens-Treffer). Die inhaltliche Bewertung gehört
 
 Erfasste Quellen: 93 Feedback-/Projekt-Memories · 57 Guard-/Hook-Skripte · 6 Revert-/Reapply-Commits · 120 Prozess-/Meta-TASKS-Punkte (davon 54 offen).
 
-<!-- RETRO-FINGERPRINT: 9ebbf521855b456c1d015c56e1f741ca6b89b7de3a6b5a3a87a3d471a008484b -->
-<!-- RETRO-LAST-REFRESHED: 2026-09-02T07:24:59.175Z -->
+<!-- RETRO-FINGERPRINT: a30b870184f0a32eb87abfa8a069c9b08267b0550fb3ae367cc4f8f2bde2f765 -->
+<!-- RETRO-LAST-REFRESHED: 2026-09-02T12:46:33.689Z -->
 <!-- AUTO-GENERATED:END -->
 
 ### 3.111 Ein Erfolg ist kein Beweis für den Weg, auf dem er zustande kam
@@ -5313,3 +5313,33 @@ den Satz »Hier laeuft nichts weiter.« weiterhin bedingungslos an — genau der
 Defekt aus §3.111ff., den Punkt 871 seit dem 24.08. beschreibt. Hier waere er
 gleich zweifach falsch gewesen, denn diese Sitzung hinterliess selbst einen
 gepushten Zweig, der auf sein CI wartet.
+
+### 3.113 Ein Test, dem der Gegenstand unter den Fuessen weggeht, wird still gruen
+
+Punkt 688 verlegte das Quartier, in dem die Kinder spielen. Der Test des
+Keil-Ausschnitts prueft ihn an einem gemeldeten Dorf, an fuenf gemessenen
+Koordinaten. Nach der Verlegung lagen alle fuenf ausserhalb der neuen Scheibe.
+Eine Zusage ging rot — die entdeckte den Punkt ueberhaupt erst —, die beiden
+anderen wurden STILL GRUEN: Sie fragten weiter, und die Antwort war weiter
+richtig, nur handelte sie von nichts mehr. Am selben Zweig fanden sich zwei
+weitere Faelle derselben Bauform: ein Ersatz-Quartier, das der Test erfand,
+sobald das Layout keines lieferte, und ein Nachspiel des Ufer-Spiels, das noch
+den GELOESCHTEN Botengang-Katalog simulierte und dabei Erwachsene mitten ueber
+die Kinderbuehne schickte — eine Bewegung, die das Spiel nie macht.
+
+Die drei sind nicht drei Fehler, sondern einer: Ein Test haelt seinen Gegenstand
+an einer Koordinate, einem Vorgabewert oder einer nachgebauten Simulation fest,
+und wenn der Gegenstand umzieht, prueft der Test weiterhin — nur eben die alte
+Welt. Ein roter Test meldet sich; ein leer gewordener nicht. Deshalb ist die
+Verlegung eines Gegenstands nicht mit dem Anpassen der roten Stellen erledigt:
+Es gehoert dazu, jede Zusage desselben Blocks daraufhin anzusehen, ob sie noch
+ueber etwas urteilt. Praktisch heisst das: den Gegenstand ableiten statt ihn zu
+nennen, und wo das nicht geht, seine Zugehoerigkeit mitpruefen — liegt der
+gemessene Punkt noch in der Scheibe, ist die abgeleitete Menge nicht leer.
+
+Die Fremd-Pruefung derselben Runde zeigte, dass die Bauform auch die ANTWORTEN
+befaellt: Fuenf der Tests, die ich zur Absicherung neu schrieb, waeren gruen
+geblieben, haette man den gepruefen Mechanismus danach entfernt — weil sie auf
+die Gelegenheit warteten, statt sie herzustellen. Ein Test, der einen Mann auf
+die Grabstelle STELLT, prueft die Regel; einer, der zusieht, ob zufaellig einer
+dort steht, prueft die Wuerfel.

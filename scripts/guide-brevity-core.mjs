@@ -311,7 +311,7 @@ export const LIMITS = {
   // above (a budget bounds how much rule-making happens; this is an escape from a
   // rule already built). The entry measures +7 lines / +61 words, so the ceilings
   // move 515 -> 522 and 4735 -> 4796 with zero slack.
-  maxLines: 522,
+  maxLines: 531,
   // EXACT FIT, not headroom — corrected 30.07.2026 after the four-eyes review
   // pointed out that this comment had long stopped describing the numbers. The
   // rule above ("raised only by the measured size of genuinely new tips")
@@ -513,7 +513,7 @@ export const LIMITS = {
   // and the ceiling follows it: 4737 -> 4735, no unearned headroom.
   // 01.09.2026 (fourth): the off-switch tip justified beside maxLines measures
   // 61 words, so this ceiling moves 4735 -> 4796 by the same measurement.
-  maxWords: 4796,
+  maxWords: 4904,
   // A pitfall entry = the risk lines plus its prompt. Anything longer is a
   // story, not a tip.
   maxEntryLines: 11,
@@ -526,6 +526,22 @@ export const LIMITS = {
 
 // Markers of project-specific content. Each one belongs in the retrospective
 // instead — the guide must read for someone who has never seen this repo.
+// Raised on 02.09.2026 by ONE genuinely new tip, measured at +9 lines / +108 words net:
+// a test whose SUBJECT moves out from under it. It keeps asking its question and keeps
+// answering correctly — about nothing at all — and unlike a red it never says so. Measured on
+// this project the same day: moving one quarter emptied a whole block of a pinned test, of
+// which exactly one case went red and two went silently green; on the same branch a test
+// invented a replacement when the layout gave none, and another replayed a system that had
+// been deleted. The cross-vendor round then found five of the ANSWERING tests carrying the
+// same shape: they waited for the situation instead of staging it, so the guarded rule could
+// have been removed under them. SHORTEN-BEFORE-RAISE was applied to the tip itself: as first
+// written it cost +11 lines / +140 words, and cutting the risk half and the prompt to what the
+// reader needs paid back 2 lines and 32 words. No neighbouring entry was folded into — the
+// nearest, "Grüner Test, falsches Bild", names a test that never called the thing, which is a
+// different failure from one that calls it about the wrong world — and no existing claim was
+// dropped. The long-form telling stays in the retrospective (§3.113). Not escalated to the
+// user, under his general withdrawal of ask-before-raising of 10.08.2026; this written
+// justification is the last step.
 export const PROJECT_MARKERS = [
   { re: /\b\d{1,2}\.\d{1,2}\.\d{4}\b/, hint: 'konkretes Datum' },
   { re: /\b(?:Punkt|point)\s+\d+\b/i, hint: 'Punkt-Nummer aus der Aufgabenliste' },

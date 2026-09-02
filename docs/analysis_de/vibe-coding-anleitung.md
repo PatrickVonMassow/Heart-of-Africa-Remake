@@ -163,6 +163,15 @@ Die Ursache findest du durch **Zerlegen**, nicht durch Wiederholen.
   sie kaputt wäre?** Zeit darf ein Test abkürzen, den **Aufruf** nie. Ist die **Ausgabe** das
   Produkt — Urteil, Plan, Anleitung —, lies sie am **echten Bestand**, nie nur an selbstgebauten
   Eingaben.“ *(Sieht das richtig aus?)*
+- **Dem Test geht der Gegenstand unter den Füßen weg.** Er hält seinen Prüfling an einer
+  Koordinate, einem Vorgabewert oder einer nachgebauten Simulation fest. Zieht der Prüfling um,
+  fragt der Test weiter — richtig, nur über nichts mehr. Ein Rot meldet sich; ein leer
+  gewordener nicht.
+  → *Prompt:* „**Verlegst** du etwas, ist das Anpassen der roten Stellen nur die Hälfte: Sieh
+  jede übrige Zusage desselben Blocks an, ob sie **noch über etwas urteilt**. Leite den Prüfling
+  **ab** statt ihn zu nennen, sonst prüf seine **Zugehörigkeit** mit. Und **stell die Gelegenheit
+  her**, statt auf sie zu warten — wer zusieht, ob zufällig ein Störer dort steht, prüft die
+  Würfel.“
 - **Der Fühler misst sich selbst.** Eine Überwachung liest einen Wert, den ihr Nachsehen selbst
   erneuert — ein toter Vorgang wirkt lebendig, und je öfter du prüfst, desto lebendiger.
   → *Prompt:* „Ein Lebenszeichen darf nur aus einer Quelle kommen, die der **Beobachter nicht
@@ -520,4 +529,4 @@ Die Ursache findest du durch **Zerlegen**, nicht durch Wiederholen.
 
 Sie ersetzt die Fallstricke oben nicht.
 
-<!-- GUIDE-FINGERPRINT: 9ebbf521855b456c1d015c56e1f741ca6b89b7de3a6b5a3a87a3d471a008484b -->
+<!-- GUIDE-FINGERPRINT: a30b870184f0a32eb87abfa8a069c9b08267b0550fb3ae367cc4f8f2bde2f765 -->
