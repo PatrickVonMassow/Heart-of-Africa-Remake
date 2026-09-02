@@ -2093,15 +2093,17 @@ function ErrandVillagers({
   const handJars = useRef<Array<THREE.Object3D | null>>([])
   const rim = Math.max(1, radius - NPC_RADIUS * 2)
 
-  /** Every place a villager may stroll to of its own accord: the two ends of
-   *  the water path and the work sites. The FOOT of the path matters most — the
-   *  carrier who comes back up with a full jar is cast from whoever is standing
-   *  down there, so somebody has to go down there on his own. */
+  /** Every place a villager may stroll to of its own accord: the head of the
+   *  water path and the work sites.
+   *
+   *  THE FOOT IS NOT AMONG THEM (work-order 688 item 6). It stands on the bank,
+   *  inside the children's stage, and an adult loitering there crowds the round
+   *  even while he says nothing. Only the water CARRIER goes down, and he goes on
+   *  a task and comes back up — which is also what makes him the man the next
+   *  situation casts as the one arriving with a full jar. */
   const namedPlaces = useMemo(() => {
     const out: ErrandPoint[] = []
-    for (const p of [geography.waterHead, geography.waterFoot]) {
-      if (p) out.push(p)
-    }
+    if (geography.waterHead) out.push(geography.waterHead)
     for (const d of geography.digSites) out.push({ x: d.x, z: d.z })
     return out
   }, [geography])

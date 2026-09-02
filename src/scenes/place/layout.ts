@@ -14,6 +14,7 @@ import { windingPoints, laneSlots, closestOnPolyline, bendAround, type LaneSlot 
 import { buildGizaLayout } from './gizaSite'
 import { ROCK_FOOTPRINT_UNITS } from '../../world/communicationRock'
 import {
+  BANK_PLAY_LANE_HALF,
   bankPlayRocks,
   bankWaterFoot,
   buildRiverBank,
@@ -1263,6 +1264,24 @@ export function buildLayout(placeId: string, seed: number): PlaceLayout {
   /** Whether a body of radius `r` would stand in the children's quarter. */
   const inPlayGround = (x: number, z: number, r: number) =>
     !!playGround && Math.hypot(x - playGround.x, z - playGround.z) < playGround.radius + r
+  /**
+   * ... or on their WAY DOWN TO THE WATER (work-order 688). The bank round walks
+   * the whole group from the quarter to the descent and back again once a cycle,
+   * and it walks it steered LOCALLY: work-order 687 took the wedge carve off
+   * every bank phase, so nothing but a child's own steering keeps it out of a
+   * pocket on that route. The route is therefore kept clear the way the running
+   * lane is — one rule, read by every scatter, rather than a carve applied
+   * afterwards.
+   */
+  const onWayToWater = (x: number, z: number, r: number) => {
+    if (!playGround || !bank) return false
+    const d = closestOnPolyline(
+      [[playGround.x, playGround.z], [bank.bank.x, bank.bank.z]],
+      x,
+      z,
+    ).dist
+    return d < BANK_PLAY_LANE_HALF + r
+  }
   /** ... and whether it would stand inside their earshot of it. */
   const inPlayEarshot = (x: number, z: number) => inPlayGround(x, z, balance.communication.hearingRadius)
 
@@ -1361,7 +1380,8 @@ export function buildLayout(placeId: string, seed: number): PlaceLayout {
     // fixed before the scatter, so this is a one-way rule and not a circle, and
     // it is what keeps the chase on ground the player can see into — a boulder
     // field the group shuffles between is point 480's own evidence.
-    !inPlayGround(x, z, bodyR)
+    !inPlayGround(x, z, bodyR) &&
+    !onWayToWater(x, z, bodyR)
   for (let i = 0; i < 48 && flora.length < 9; i++) {
     const angle = rand() * Math.PI * 2
     const r = 8 + rand() * 18

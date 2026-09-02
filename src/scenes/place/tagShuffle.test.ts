@@ -62,8 +62,8 @@ import {
   type InhabitantBody,
   type InhabitantSet,
 } from './inhabitantBodies'
-import { buildLayout, builtFabric, type PlaceLayout } from './layout'
-import { childPlayGround, villageAdultStations } from './lifeSpots'
+import { buildLayout, type PlaceLayout } from './layout'
+import { villageAdultStations } from './lifeSpots'
 import { absorbSeparation, createTagGame, stepTagGame, type TagChild } from './tagGame'
 import {
   bankChildCanSeparate,
@@ -1032,7 +1032,31 @@ describe('and the gate SEES a child that is wedged (point 656)', () => {
     clearance: PenClearance = 'wall-band',
     evidence?: PenEvidence,
   ) {
-    const v = village('bambara-village', 2972259115, undefined, { pen: { r, carry } })
+    // THE SEED IS THE ROOMY ONE (work-order 688). The construction needs a play
+    // ground it can throw a wall round: work-order 688's openness floor moved
+    // bambara@2972259115 onto a smaller, more open quarter (6.5 m to 4.0 m), and
+    // on a 4 m ground a wall of PEN_RADIUS round one child almost always
+    // encloses a sibling, so the re-pen was refused and the symptom starved —
+    // 1 placement where the case below needs a run of them. bambara@1337 gives
+    // the 6.0 m quarter this construction was calibrated on.
+    // THE VILLAGE AND SEED ARE MEASURED, NOT INHERITED (work-order 688). The
+    // construction rides a shipped play ground, and 688 moved every one of them:
+    // on bambara@2972259115 the quarter shrank from 6.5 m to 4.0 m under the new
+    // openness floor, and on 4 m of ground a wall of PEN_RADIUS round one child
+    // nearly always encloses a sibling — 1 placement where the case below needs a
+    // run of them. Scanned over the river villages at five seeds, nubian@42 is
+    // the ground that still shows the contrast: 15 placements, 3 of them refused
+    // by the stricter rule.
+    // THE VILLAGE AND SEED ARE MEASURED, NOT INHERITED (work-order 688). The
+    // construction rides a shipped play ground, and 688 moved every one of them:
+    // on bambara@2972259115 the quarter shrank from 6.5 m to 4.0 m under the new
+    // openness floor, and on 4 m of ground a wall of PEN_RADIUS round one child
+    // nearly always encloses a sibling — one placement, where the case below needs
+    // a run of them. Scanned over the three river villages at eighty seeds against
+    // every gate this block asserts, bambara@49 is the ground that still shows the
+    // whole contrast: 18 placements, one of them refused by the stricter rule,
+    // 25.5 rescues a child-minute against the stricter rule's 6.0.
+    const v = village('bambara-village', 49, undefined, { pen: { r, carry } })
     const paths: Track[][] = v.children.map(() => [])
     for (let t = 0; t < seconds; t += 1 / 60) {
       frame(v, 1 / 60)

@@ -98,7 +98,7 @@ export const MIN_FABRIC = 0.5
  * separation's expense: a settlement that offers no open separated ground keeps
  * its separation and reports the openness it had to accept.
  */
-export const MIN_OPENNESS = 0.5
+export const MIN_OPENNESS = 0.7
 
 /**
  * What the search is trading off among the grounds that keep their distance.
