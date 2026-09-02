@@ -14040,3 +14040,55 @@ to land than a mechanism that needs a review.
   only way through is to re-measure the death by hand, which is half an hour each time.
   Refs: scripts/verify/run-all.mjs, scripts/verify/run-logged.mjs, scripts/render-verify-recorder.mjs
   Bundle: Testinfrastruktur.
+
+- [ ] 1045. A straight water path cannot clear the compound fences, so the drawn track
+  crosses one (measured 02.09.2026 while answering the cross-vendor findings of point 688).
+  Point 688 fits the village water path by sweeping its head until the straight walk to
+  the water clears the settlement. That clearance test was widened to the fabric as it is
+  DRAWN — dwellings at their true shape, boxes at their corners, the pen, the play rocks,
+  the props — and it stops there: the compound FENCE PANELS are excluded, because with
+  them counted no head exists at all for some plans. Measured at `f8ec2a8`:
+  bambara-village at seeds 7 and 1337 have no clear straight line from ANY head between
+  10 and 24 m to the water's foot once the panels count, at any bearing within 120°.
+  So in those layouts the drawn track runs through a fence, and the carrier walking it
+  meets a collider standing on his own path — he is routed round it by the nav grid while
+  the picture shows a lane going through it.
+  Final state:
+  - The water path clears the compound fences as well as the buildings, in every village
+    at every seed, and the code no longer has to name an exception it cannot meet.
+  - One of the two ways is taken and written down: either the track may BEND once at the
+    gap between two compounds (it is a worn footpath, not a surveyed road), or the
+    compound builder opens a GATE where the lane crosses its ring, the way a real
+    compound has one.
+  Test: Vitest over the layout — every river village at every swept seed carries a water
+  path whose whole run clears the FULL collider set, fence panels included, at the drawn
+  lane's half-width. Picture check on both backends: the track and the fence it passes.
+  Criticality: medium — it is visible in the settlement the communication slice is played
+  in, but it misleads rather than blocks: the carrier still arrives.
+  Refs: src/scenes/place/layout.ts (the `clearRun` sweep and the `bodies` filter beside
+  the fence-collider block), src/scenes/place/collision.ts
+  Bundle: Dorfleben.
+
+- [ ] 1046. The children's bank round hardly ever carries anyone past the middle of the
+  stretch (measured 02.09.2026 while answering the cross-vendor findings of point 688).
+  The replay in `tagShuffle.test.ts` used to walk adult bodies to the water's FOOT, which
+  stands on the children's own stage — a place the shipped scene pointedly refuses as a
+  stroll target. A grown man crossing the round shoves children over the middle of the
+  stretch, and a good share of the "the stretch was run" events were his doing. With the
+  replay driving the shipped choreography instead, measured at `12b17c25a`, the event is
+  rare: bambara-village@42 needs 1711 s of play and 13 runs before its first crossing;
+  the other three cases fall at 175 s, 290 s and 358 s. The middle of the stretch is
+  exactly where the browser section plants the traveller, so "the children run PAST him"
+  is a thing the player rarely gets to see at all.
+  Final state:
+  - A round that reaches its stage ends at a rock often enough that a watching player sees
+    the stretch actually run, rather than a chase that peters out in a tag short of it.
+  - The number that says so is measured and stated, not assumed: the replay's first
+    crossing falls inside a window a player would plausibly watch.
+  Test: Vitest over the bank round — the first run-phase crossing of the stretch's middle
+  falls within the stated window at every swept village and seed.
+  Criticality: medium — the round is the whole of what the children teach, and its most
+  legible moment is the one that hardly happens.
+  Refs: src/scenes/place/bankGame.ts, src/scenes/place/tagShuffle.test.ts (the bank-round
+  replay and `BANK_ROUND_WINDOW`)
+  Bundle: Dorfleben.
