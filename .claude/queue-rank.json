@@ -1146,10 +1146,48 @@
       "why": "User decision 02.09.2026: the bank-game rework is worked NEXT, ahead of every point standing before the release.",
       "origin": "user",
       "place": "ahead"
+    },
+    "1048": {
+      "at": "2026-09-02T23:24:17.286Z",
+      "why": "User order 03.09.2026: die Batch darf niemals stehenbleiben — mache direkt einen Punkt, blind vier Augen, drittes Modell führt zusammen, dann umsetzen",
+      "origin": "user",
+      "place": "ahead"
     }
   },
+  "boundary": {
+    "at": "2026-08-21T00:55:14.962Z",
+    "points": [
+      336,
+      553,
+      596,
+      633,
+      659,
+      660,
+      663,
+      689,
+      690,
+      691,
+      692,
+      708,
+      715,
+      719,
+      733,
+      735,
+      736,
+      738,
+      739,
+      746,
+      747,
+      750,
+      759,
+      760,
+      762,
+      764
+    ],
+    "why": "The order standing in front of the release today is the arrangement that predates this rule; the four machine-filed points that had ranked themselves there were moved behind 174 first"
+  },
   "settled": {
-    "at": "2026-09-02T12:46:16.587Z",
+    "at": "2026-09-02T23:27:18.664Z",
     "points": [
       174,
       184,
@@ -1509,39 +1547,10 @@
       1043,
       1044,
       1045,
-      1046
+      1046,
+      1047,
+      1048,
+      1049
     ]
-  },
-  "boundary": {
-    "at": "2026-08-21T00:55:14.962Z",
-    "points": [
-      336,
-      553,
-      596,
-      633,
-      659,
-      660,
-      663,
-      689,
-      690,
-      691,
-      692,
-      708,
-      715,
-      719,
-      733,
-      735,
-      736,
-      738,
-      739,
-      746,
-      747,
-      750,
-      759,
-      760,
-      762,
-      764
-    ],
-    "why": "The order standing in front of the release today is the arrangement that predates this rule; the four machine-filed points that had ranked themselves there were moved behind 174 first"
   }
 }

@@ -115,6 +115,13 @@ put it is the mistake this line exists to stop.
      0.3-1.0 of the scattered dressing, which is where the huge flat facets come from. Large
      instances get a higher-detail variant (a detail-1 dodecahedron with seeded vertex
      noise) that keeps the silhouette and the collider; the scatter keeps the cheap mesh.
+  8. THE PLAY ROCKS DO NOT BALANCE ON THEIR TIP (F6 report "BalancierendeFelsen",
+     03.09.2026, seed 516331552, build 699fa58, WebGPU, bambara-village: both play rocks
+     stand upright on their narrow end like balanced eggs, ringed by the small scatter
+     stones — user: "Warum balancieren die beiden Felsen auf einmal aufrecht auf der
+     Spitze, umgeben von kleinen Steinen?"). Whatever orientation the instance transform
+     rolls, a large play rock rests on a flat base broad enough to read as lying, never on
+     a vertex; the archive lies under `local/incoming-f6/BalancierendeFelsen/`.
   Every number stays in `balance.villageLife.bankGame`; the child-motion metric stays green.
   Test: Vitest over the round for the tap pause, the tag count of a typical run, the audible
   first arrival, the crouch-then-rise ending and the parting walk's direction; a
