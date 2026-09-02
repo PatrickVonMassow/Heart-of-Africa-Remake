@@ -14007,3 +14007,36 @@ to land than a mechanism that needs a review.
   SUSPECT, which covers no backend at all.
   Refs: scripts/verify/polish.mjs (section speech-hypothesis), src/scenes/place/PlaceScene.tsx
   Bundle: Testinfrastruktur.
+
+- [ ] 1044. A crashed suite's stack is swallowed before any log can keep it, so the sign-off
+  the picture gate asks for cannot be given.
+  `render-verify-guard --crashed` asks for "what the kept log shows — the death". Twice now a
+  landing has stalled on exactly that: four crashed records on 29.08.2026 (the reason point 1016
+  was filed, which recorded the kept log as a FILTERED view and declined to sign) and six on
+  02.09.2026, all with `crashSource: uncaught-exception` and no death visible anywhere.
+  MEASURED 02.09.2026, both halves:
+  - `run-logged.mjs` is NOT the filter. Its `consume()` calls `log.write(text)` on every raw
+    chunk, so the kept log holds the whole stream it is handed; only the CONSOLE echo is
+    selected. The 29.08.2026 reading was wrong about which layer loses the line.
+  - `run-all.mjs` IS the filter. `runSuite` spawns each suite with `encoding: 'utf8'` rather
+    than `stdio: 'inherit'` and echoes only lines matching `/^FAIL|ERR:/`; the twelve-line tail
+    that would carry the stack is echoed ONLY when the suite exits non-zero with NO FAIL line
+    (`scripts/verify/run-all.mjs:207-213`). A suite that prints a FAIL and THEN dies therefore
+    loses its stack before run-logged ever sees it — which is the whole recurring case.
+  - THE DEATH ITSELF, measured by running `world.mjs` and `enrichments.mjs` outside `run-all`
+    against a dev server: it is the SHUTTER'S OWN THROW — `Error: frame NN-…: its subject is not
+    in the rendered picture`, thrown at `captureFrame` (`scripts/verify/frameSubject.mjs:261`)
+    and awaited uncaught in the suite, so Node's uncaught-exception path fires and the terminal
+    reporter never runs. The record then holds exactly the red the throw carried, and that red
+    is charged like any other. The same two aborts explain the recurring "N frames missing"
+    receipt note: both suites stop short of their frame lists.
+  Final state:
+  - The tail is echoed whenever the suite exits non-zero, not only when it printed no FAIL, so
+    a crash that follows a red is diagnosable from the kept log alone.
+  - A crash that IS a frame-subject throw says so where the guard reads it, rather than
+    presenting as an unexplained death that needs a hand-written sign-off every time.
+  Test: a fixture suite that prints a FAIL and then throws; the kept log must contain the throw.
+  Criticality: medium — it does not touch the game, but it has now blocked two landings and the
+  only way through is to re-measure the death by hand, which is half an hour each time.
+  Refs: scripts/verify/run-all.mjs, scripts/verify/run-logged.mjs, scripts/render-verify-recorder.mjs
+  Bundle: Testinfrastruktur.
