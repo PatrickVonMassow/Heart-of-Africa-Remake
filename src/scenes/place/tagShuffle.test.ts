@@ -84,6 +84,7 @@ import { insidePlace } from './boundary'
 import { buildPlaceNavGrid, findPlaceRoute, navClearBetween, navRestrict } from './routing'
 import { standsOnGroundPlate } from './riverBank'
 import { buildWedgeCarve } from './wedgeCarve'
+import { createAdultWork, goalOf, stepAdultWork, taskOf, type AdultWorkView } from './adultWork'
 
 /** The children's round as `PlaceLife` composes it (work-order 687): the bank
  *  game where the settlement stands on a river, the tag round everywhere else. */
@@ -93,6 +94,11 @@ const BANK_CFG: BankConfig = { ...balance.villageLife.tag, ...balance.villageLif
 const KID_SCALE = 0.55
 const NPC_RADIUS = WALKER_RADIUS
 const FIRE: [number, number] = [-3.5, 2.5]
+
+/** How long the bank-round replay may take to show everything it asks for. A
+ *  run-phase crossing of the stretch is the sparse event in it; the latest first
+ *  crossing measured across the four cases falls at 1711 s. */
+const BANK_ROUND_WINDOW = 2400
 
 /**
  * THE REST OF THE SETTLEMENT (point 656.4). The separation was only ever
@@ -168,20 +174,23 @@ function crowd(
     porters[i].z = r.az
   })
 
-  // The errand villagers, spawned on the ring `ErrandVillagers` spawns them on
-  // and strolling as it strolls: to one of the settlement's own named places, or
-  // — every other stroll — to a free point anywhere in it, which is what takes
-  // an ADULT BODY straight across the children's ground.
+  // The WORKING adults, spawned on the ring `ErrandVillagers` spawns them on and
+  // moved by the work module the scene actually runs. They used to stroll a
+  // catalogue this branch DELETED — the free errands, and among their targets
+  // the water's FOOT, which stands on the children's own stage and which the
+  // shipped component pointedly leaves out of its stroll list. The replay was
+  // therefore crowding the bank with adult bodies the game never sends there
+  // (GPT-5.6 Sol, first cross-vendor round, D10).
+  //
+  // What is replayed now is the shipped choreography: `stepAdultWork` stages the
+  // situations, a man with a task walks to `goalOf` it, and a man without one
+  // strolls to the head of the water path or a work site — or, every other
+  // stroll, to a free point anywhere in the settlement, which is what takes an
+  // ADULT BODY straight across the children's ground.
   const errandCount = balance.villageLife.adultErrands.villagerCount
   const named: Array<[number, number]> = [
-    ...layout.errands,
+    ...(layout.waterPath ? ([[layout.waterPath.head.x, layout.waterPath.head.z]] as Array<[number, number]>) : []),
     ...layout.digSites.map((d): [number, number] => [d.x, d.z]),
-    ...(layout.waterPath
-      ? ([
-          [layout.waterPath.head.x, layout.waterPath.head.z],
-          [layout.waterPath.foot.x, layout.waterPath.foot.z],
-        ] as Array<[number, number]>)
-      : []),
   ]
   const walkers = claimBodies(set, errandCount)
   const stroll = (): [number, number] => {
@@ -202,6 +211,18 @@ function crowd(
     walkers[i].z = z
     return { to: stroll(), pause: 1 + i * 0.7, stuck: 0 }
   })
+  // The work itself, stepped exactly as `ErrandVillagers` steps it.
+  const workCfg = balance.villageLife.adultErrands
+  const work = createAdultWork(errandCount, workCfg)
+  const workView: AdultWorkView = {
+    villagers: walkers.map((b) => ({ x: b.x, z: b.z, free: true })),
+    geography: {
+      waterHead: layout.waterPath ? { x: layout.waterPath.head.x, z: layout.waterPath.head.z } : null,
+      waterFoot: layout.waterPath ? { x: layout.waterPath.foot.x, z: layout.waterPath.foot.z } : null,
+      digSites: layout.digSites,
+    },
+    standable: (x, z) => !world.blocked(x, z),
+  }
 
   return {
     standing,
@@ -227,8 +248,41 @@ function crowd(
         b.z = z
         separateBody(set, b, dt, sep, world)
       })
+      // The work module sees the bodies where they now stand, and decides who is
+      // free before anybody moves — the order `ErrandVillagers` keeps.
+      for (let i = 0; i < walkers.length; i++) {
+        const view = workView.villagers[i] as { x: number; z: number; free: boolean }
+        view.x = walkers[i].x
+        view.z = walkers[i].z
+        view.free = !taskOf(work, i)
+      }
+      stepAdultWork(work, workView, dt, workCfg, rand)
       errands.forEach((e, i) => {
         const b = walkers[i]
+        const task = taskOf(work, i)
+        if (task && !task.arrived) {
+          // A man on a task walks where the task sends him and nowhere else.
+          const to = goalOf(task)
+          const d = Math.hypot(to.x - b.x, to.z - b.z)
+          if (d > 1e-6) {
+            const pace = workCfg.pace
+            const want = stepRoundBodies(
+              set,
+              b,
+              b.x,
+              b.z,
+              b.x + ((to.x - b.x) / d) * pace * dt,
+              b.z + ((to.z - b.z) / d) * pace * dt,
+              sep,
+              world.blocked,
+            )
+            const [x, z] = resolveMove(colliders, want.x, want.z, NPC_RADIUS, [b.x, b.z])
+            b.x = x
+            b.z = z
+          }
+          return
+        }
+        if (task) return
         if (e.pause > 0) {
           e.pause -= dt
           return
@@ -288,15 +342,14 @@ function village(
   for (const c of placeId) hash = (hash * 31 + c.charCodeAt(0)) | 0
   const localSeed = (seed ^ hash) >>> 0
   // THE LAYOUT'S OWN GROUND (work-order 688): the scene reads `playGround` from
-  // the layout now, so the rig reads the same one rather than deriving a second.
-  const ground = layout.playGround ?? {
-    x: 0,
-    z: 0,
-    radius: balance.villageLife.tag.playRadius,
-    clearance: 0,
-    openness: 1,
-    fabric: 1,
-  }
+  // the layout now, so the rig reads the same one rather than deriving a second
+  // — and it INSISTS on it. The fallback that stood here fabricated a perfect
+  // quarter at the origin whenever the layout gave none, which is precisely the
+  // regression every case in this file exists to catch: a village whose children
+  // have no ground would have played happily on an invented one (GPT-5.6 Sol,
+  // first cross-vendor round, D9).
+  const ground = layout.playGround
+  if (!ground) throw new Error(`${placeId}@${seed}: the layout carries no children's quarter to play in`)
   const rim = Math.max(1, layout.radius - NPC_RADIUS * 2)
   // THE PEN, when the case asks for one: a wall thrown up round one child, with
   // just enough room inside to keep walking and not enough to get anywhere.
@@ -1657,15 +1710,15 @@ describe('the children`s bank round can reach its own stage (work-order 687)', (
       // The window is a BOUND, not the cost: every condition measured below is
       // monotone — counts only grow, the nearest distances only shrink, a
       // crossing once seen stays seen — so the replay stops at the first frame
-      // on which all of them already hold, and 600 s is how long it may take.
-      // The bound is wide by need: a run-phase crossing is a sparse event under
-      // the shipped roam length (roaming is ~65 % of the round's time), and the
-      // latest first crossing measured below falls at 447 s.
+      // on which all of them already hold, and `BANK_ROUND_WINDOW` is how long
+      // it may take. The bound is wide by need: a run-phase crossing is a sparse
+      // event under the shipped roam length (roaming is ~65 % of the round's
+      // time).
       const stood = BANK_CFG.standOff + BANK_CFG.reachDistance
       const nearest = { up: Infinity, down: Infinity }
       const side = v.children.map(() => ({ before: 0, crossed: false }))
       const dt = 1 / 60
-      for (let t = 0; t < 600; t += dt) {
+      for (let t = 0; t < BANK_ROUND_WINDOW; t += dt) {
         frame(v, dt)
         const running = v.bank!.phase === 'run'
         for (let i = 0; i < v.children.length; i++) {
@@ -1713,12 +1766,22 @@ describe('the children`s bank round can reach its own stage (work-order 687)', (
       // the traveller, so this is the pure half of "the children walk PAST him"
       // — and it must be the run that carries them past, not a drift across the
       // middle while roaming beside an unrelated run, which the uncoupled count
-      // accepted. Measured with the phase coupling over the full 600 s bound:
-      // 2 of 4 children cross during runs (bambara@42, first at 251 s), 3 of 4
-      // (bambara@2972259115, first at 80 s), 1 of 4 (nubian@42, first at
-      // 447 s), 4 of 4 (mandinka@99, first at 228 s) — often the catcher
-      // running to meet the group is the first across the middle, and most
-      // runs end in tags short of it, which is why the event is sparse.
+      // accepted. Measured over the bound, with the crowd
+      // replaying the SHIPPED work choreography: 1 of 4 children crosses during
+      // a run at bambara@42 (first at 1711 s), 1 of 4 at bambara@2972259115
+      // (358 s), 1 of 4 at nubian@42 (175 s), 1 of 4 at mandinka@99 (290 s).
+      // Often the catcher running to meet the group is the first across the
+      // middle, and most runs end in tags short of it, which is why the event is
+      // sparse.
+      //
+      // THE NUMBERS MOVED, AND WHY THEY MOVED IS THE POINT. They used to read 2
+      // of 4 at 251 s, 3 of 4 at 80 s and so on — measured while this replay
+      // still strolled adult bodies to the water's FOOT, which stands on the
+      // children's own stage and which the shipped component pointedly refuses
+      // as a stroll target. A grown man walking through the middle of the round
+      // shoves children across it, and a good share of those crossings were his
+      // doing rather than the game's. With him gone the event is rarer, and the
+      // count is honest.
       expect(side.filter((s) => s.crossed).length).toBeGreaterThan(0)
     })
   }

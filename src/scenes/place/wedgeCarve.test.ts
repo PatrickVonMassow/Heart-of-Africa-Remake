@@ -5,10 +5,8 @@
 // has to keep deciding something in whatever quarter the village hands the
 // children today.
 import { describe, expect, it } from 'vitest'
-import { balance } from '../../config/balance'
 import { standingClear, WALKER_RADIUS, type Collider } from './collision'
-import { buildLayout, builtFabric } from './layout'
-import { childPlayGround, villageAdultStations } from './lifeSpots'
+import { buildLayout } from './layout'
 import { buildWedgeCarve, WEDGE_PASSAGE } from './wedgeCarve'
 
 const NPC = 0.3
@@ -140,16 +138,14 @@ describe('buildWedgeCarve in the quarter the reported village measured (seed 297
 describe('buildWedgeCarve in the quarter the reported village places today (seed 2972259115)', () => {
   const layout = buildLayout('bambara-village', 2972259115)
   const NPC_RADIUS = WALKER_RADIUS
-  const ground = childPlayGround(
-    villageAdultStations([-3.5, 2.5]),
-    Math.max(1, layout.radius - NPC_RADIUS * 2),
-    balance.villageLife.tag.playRadius,
-    balance.communication.hearingRadius,
-    {
-      free: (x, z) => standingClear(layout.colliders, x, z, NPC_RADIUS),
-      fabric: builtFabric(layout),
-    },
-  )
+  // THE LAYOUT'S OWN QUARTER, not a second one derived here. Work-order 688
+  // moved the decision into the layout exactly so it is made once; a test that
+  // rebuilds it from `childPlayGround` measures whatever ITS inputs happen to be
+  // and can drift away from what the scene plays on (GPT-5.6 Sol, first
+  // cross-vendor round, D8). It is required, not defaulted: a village with no
+  // quarter is the regression, not a case to be papered over.
+  const ground = layout.playGround
+  if (!ground) throw new Error('the reported village carries no children`s quarter')
   const carve = buildWedgeCarve(layout.colliders, NPC_RADIUS, ground)
 
   it('still decides something where the children are actually put', () => {

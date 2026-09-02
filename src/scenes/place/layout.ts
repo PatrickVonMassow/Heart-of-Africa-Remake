@@ -25,6 +25,8 @@ import {
   type PlaceRiverBank,
 } from './riverBank'
 import { balance } from '../../config/balance'
+import { WORK_ARRIVE_RADIUS } from './adultWork'
+import { devAssert } from '../../systems/devAssert'
 import type { BuildingType } from '../../state/ui'
 
 export const PLACE_RADIUS = 28 // walkable radius in meters; leaving it exits the place
@@ -196,8 +198,17 @@ export const DIG_SITE_FIELD_BAND = 0.62
 export const WATER_PATH_HEAD_RADIUS = 15
 
 /** The radii the head is tried at, the nominal one first: a dense plan can leave
- *  that exact ring occupied, and a step in or out costs the picture nothing. */
-export const WATER_PATH_HEAD_RADII = [15, 13.5, 16.5, 12, 18] as const
+ *  that exact ring occupied, and a step in or out costs the picture nothing.
+ *
+ *  The ladder was five rungs wide while the walk was tested against the
+ *  dwellings as circles. Tested against the fabric AS DRAWN — boxes at their
+ *  corners, fence panels, posts — five rungs left four of fifteen river villages
+ *  with no head at all, so it steps half a metre at a time now. The first clear
+ *  run still wins, and a candidate whose own head is occupied dies on the first
+ *  sample, so the finer ladder costs little. */
+export const WATER_PATH_HEAD_RADII = [
+  15, 14.5, 15.5, 14, 16, 13.5, 16.5, 13, 17, 12.5, 17.5, 12, 18, 11.5, 18.5, 11, 19, 19.5, 20, 20.5, 21,
+] as const
 
 /** How far to either side of the water's own bearing the head may be swept, in
  *  degrees, to find a straight walk that clears the settlement's buildings. */
@@ -1204,7 +1215,12 @@ export function buildLayout(placeId: string, seed: number): PlaceLayout {
         colliders.push({ x: d.x, z: d.z, r: dwellingCircleRadius(d, style) ?? d.r + 0.3 })
     }
   }
+  // The fence colliders occupy ONE contiguous block, and where it starts and
+  // ends is remembered: the water path's clearance test names exactly what it
+  // does and does not measure itself against.
+  const fenceFrom = colliders.length
   for (const f of fences) colliders.push(...fenceColliders(f))
+  const fenceTo = colliders.length
   // The two entries the play rocks occupy are remembered, because the stage they
   // draw is derived from bank points that have not settled yet: once they have,
   // the settled pair is written back into these same slots rather than appended
@@ -1282,8 +1298,18 @@ export function buildLayout(placeId: string, seed: number): PlaceLayout {
     ).dist
     return d < BANK_PLAY_LANE_HALF + r
   }
-  /** ... and whether it would stand inside their earshot of it. */
-  const inPlayEarshot = (x: number, z: number) => inPlayGround(x, z, balance.communication.hearingRadius)
+  /**
+   * ... and whether an ADULT PLACE would stand inside their earshot of it.
+   *
+   * The margin is the hearing radius PLUS a walker's arrival radius, because
+   * what has to stay outside the earshot is not the anchor but the position a
+   * man may SPEAK from: he counts as arrived, and his word falls, anywhere
+   * within `WORK_ARRIVE_RADIUS` of the place he was sent to. Measuring the
+   * anchor alone let a site sitting exactly on the floor put the actual speaker
+   * inside the children's earshot (GPT-5.6 Sol, first cross-vendor round, A4).
+   */
+  const ADULT_SPEECH_MARGIN = balance.communication.hearingRadius + WORK_ARRIVE_RADIUS
+  const inPlayEarshot = (x: number, z: number) => inPlayGround(x, z, ADULT_SPEECH_MARGIN)
 
   // THE WATER PATH IS LAID LAST OF ALL THE ADULTS' PLACES (work-order 688). A
   // lane forced through the house band BEFORE the plan costs it a dwelling
@@ -1295,23 +1321,33 @@ export function buildLayout(placeId: string, seed: number): PlaceLayout {
   // bends round three huts, and a straight one is also what reads as a path to
   // the river from inside the village.
   if (waterPath) {
-    const solid = [
-      ...dwellings.map((d) => ({ x: d.x, z: d.z, r: d.r })),
-      // The functional buildings at the radii `isFree` keeps every other lane
-      // out of.
-      ...interactives
-        .filter((it) => it.type !== 'villager')
-        .map((it) => ({
-          x: it.pos[0],
-          z: it.pos[1],
-          r: place.kind === 'port' ? 3.2 : it.type === 'market' ? 2.9 : 3.35,
-        })),
-    ]
-    const clearance = WATER_PATH_WIDTH / 2 + WALKER_RADIUS
+    // THE WALK IS TESTED AGAINST THE BODIES AS THEY ARE DRAWN. It used to be
+    // tested against the dwellings as CIRCLES of radius `d.r`, which a box, a
+    // warehouse and a mosque all reach past at their corners, so an accepted
+    // track could cross a drawn wall (GPT-5.6 Sol, first cross-vendor round,
+    // B2). It asks `standingClear` now — the same predicate the carrier's own
+    // step obeys — over every solid body of the settlement: the dwellings at
+    // their true shape, the functional buildings, the pen, the play rocks, the
+    // props.
+    //
+    // NOT THE COMPOUND FENCES, AND THAT IS SAID HERE RATHER THAN HIDDEN. A
+    // straight worn track from the village to the water cannot always clear
+    // them: measured on this tree, bambara at seeds 7 and 1337 have NO clear
+    // straight line at ANY bearing between 10 and 24 metres once the panels are
+    // counted. Letting the track bend, or making the compound builder open a
+    // gate on it, is a design change beyond this point; it is filed as its own
+    // work-order point rather than answered with a number that happens to pass.
+    const bodies = colliders.filter((_, i) => i < fenceFrom || i >= fenceTo)
+    // TWO CLEARANCES, EACH WITH ITS OWN REASON. Against solid fabric the rule is
+    // that the DRAWN track never overlaps it — half the lane's width — and the
+    // carrier walking its middle is narrower than that, so nothing further is
+    // owed. Against the children's running lane the rule is not overlap but
+    // SEPARATION, so a body's width is added: the two teachings have to stay
+    // apart, not merely not intersect.
+    const drawnHalf = WATER_PATH_WIDTH / 2
+    const laneClearance = drawnHalf + WALKER_RADIUS
     const foot = waterPath.foot
     const clearRun = (head: BankPoint) => {
-      const run: Array<[number, number]> = [[head.x, head.z], [foot.x, foot.z]]
-      if (!solid.every((b) => closestOnPolyline(run, b.x, b.z).dist > b.r + clearance)) return false
       // AND IT NEVER CROSSES THE CHILDREN'S RUNNING LANE. A carrier walking
       // through the middle of a run would be read as part of the game, and the
       // two teachings have to stay separable. Sampled along the whole walk, not
@@ -1320,7 +1356,8 @@ export function buildLayout(placeId: string, seed: number): PlaceLayout {
       for (let t = 0; t <= 48; t++) {
         const x = head.x + (foot.x - head.x) * (t / 48)
         const z = head.z + (foot.z - head.z) * (t / 48)
-        if (inBankPlayLane(playRocks, x, z, clearance)) return false
+        if (inBankPlayLane(playRocks, x, z, laneClearance)) return false
+        if (!standingClear(bodies, x, z, drawnHalf)) return false
       }
       return true
     }
@@ -1356,6 +1393,12 @@ export function buildLayout(placeId: string, seed: number): PlaceLayout {
     // Nothing shipped reaches this — `layout.test.ts` sweeps every river village
     // at every seed and finds a head for each.
     if (!head) {
+      // ... and it says so, everywhere, rather than shipping a silent village:
+      // every headless suite fails on the console error and every manual session
+      // shows it. `layout.test.ts` sweeps all three river villages at every seed
+      // and finds a head for each, so this firing means the plan changed under
+      // the rule.
+      devAssert(false, 'water-path-missing', () => `${place.id}: a village on a river with no clear walk to it`)
       waterPath = null
     } else {
       waterPath.head = head
@@ -1380,7 +1423,11 @@ export function buildLayout(placeId: string, seed: number): PlaceLayout {
     // fixed before the scatter, so this is a one-way rule and not a circle, and
     // it is what keeps the chase on ground the player can see into — a boulder
     // field the group shuffles between is point 480's own evidence.
-    !inPlayGround(x, z, bodyR) &&
+    // The walker's own width is added to the body's: a stone excluded by its own
+    // radius alone can still sit near enough OUTSIDE the disc to make the rim
+    // unstandable, and the openness the quarter was chosen for is measured on
+    // ground that is standable (GPT-5.6 Sol, first cross-vendor round, B4).
+    !inPlayGround(x, z, bodyR + WALKER_RADIUS) &&
     !onWayToWater(x, z, bodyR)
   for (let i = 0; i < 48 && flora.length < 9; i++) {
     const angle = rand() * Math.PI * 2
@@ -1482,7 +1529,7 @@ export function buildLayout(placeId: string, seed: number): PlaceLayout {
     // where they cannot all fit it is the ADULTS that move: their words hang on
     // what they are DOING (a jar, a stroke of the hoe), the children's on where
     // they are standing. So the dig sites are what gives way here.
-    const earshot = balance.communication.hearingRadius
+    const earshot = ADULT_SPEECH_MARGIN
     /** How far a spot stands from the nearest place a child speaks. */
     const toChildren = (x: number, z: number) => {
       let best = Infinity
@@ -1528,6 +1575,16 @@ export function buildLayout(placeId: string, seed: number): PlaceLayout {
           digSites.push({ x, z, kind })
         }
       }
+      // A kind the two passes could not place leaves the village short of a work
+      // site — and with fewer than two sites the joined dig cannot be shown at
+      // all. `layout.test.ts` sweeps every village at every seed and finds all
+      // three, so this firing means a plan changed under the rule rather than an
+      // ordinary unlucky draw (GPT-5.6 Sol, first cross-vendor round, B3).
+      devAssert(
+        digSites.some((s) => s.kind === kind),
+        'dig-site-missing',
+        () => `${place.id}: no ${kind} could be placed outside the middle and clear of the children`,
+      )
     }
   }
 
