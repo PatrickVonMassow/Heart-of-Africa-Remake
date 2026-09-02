@@ -177,7 +177,7 @@ put it is the mistake this line exists to stop.
   Refs: scripts/batch-emergency-core.mjs, scripts/batch-standstill-core.mjs,
   scripts/batch-launcher.mjs, scripts/batch-in-flight.mjs, scripts/verify/run-wait.mjs,
   .claude/batch-launcher.log (02./03.09. ticks)
-  Bundle: Session- & Repo-Hygiene (not worked beside 947, 958, 985 or 1002 — they edit the
+  Bundle: Urlaubsfestigkeit (not worked beside 947, 958, 985 or 1002 — they edit the
   same emergency/standstill decision core).
 
 - [ ] 689. The chief speaks from the first minute, and pays in a direction and a mould (user
