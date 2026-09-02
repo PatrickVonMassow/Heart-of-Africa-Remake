@@ -86,6 +86,7 @@ Das Musterbeispiel sind die Chat-Zeitstempel: neun Eskalationsstufen, acht weich
 | 01.09. abends | Eine Nutzerfrage deckte auf, dass unsere Fable-Bahn auf einer festgenagelten Versionsnummer stand: Eine neue Fable-Version hätte uns nie von allein erreicht, weil nichts die eingetragene Konstante gegen die verfügbare hält — stille Stagnation als Umkehrung der stillen Degradation von §3.20 (§3.229) |
 | 01.09. nachm. | **Die Umsteuerung**: Blind-Doppeldiagnose (Fable + Sol, Opus-Merge) auf die Nutzerfrage nach dem Spielstillstand — die Steuerung war zum Hauptprodukt geworden; der Nutzer gab Freeze, Aufnahmeregel und die Streichung des §7.1-Tors direkt frei, und die Umsetzung bewies Punkt 1005 gleich mit: punktlose Arbeit fand keine Karte (§3.227, Punkt 1039) |
 | 02.09. früh | Zwei Tore standen auf einem einzigen Kandidaten und waren damit Münzwürfe: Die Kreuzungsprüfung des Ufer-Fangspiels öffnete ihr Fenster auf irgendeinem Lauf statt auf dem ersten eines Zyklus und bestand fast nur aus der Streifphase — nachgemessen trugen sechs von 84 Fenstern gar keine Überquerung, das Grün war Glück. Die Sprecher-Prüfung derselben Suite bietet zehn Figuren an, fünf davon sind bei jedem Lauf dieselben Fehlschüsse, und eine sechste entscheidet allein (§3.231, Punkte 687/1043) |
+| 02./03.09. nachts | Die Batch kroch stundenlang hinter Warte-Schleifen, deren Suchmuster die eigene Warte-Maschinerie fand: zehn `while pgrep`-Beobachter, jeder mit dem Muster wörtlich in der eigenen Kommandozeile, hielten sich gegenseitig am Leben, während längst nichts mehr lief — Heartbeat frisch, Starter „owner alive", ETA-Überfälligkeit nur als Warnung; der vorgesehene Warteweg (`run-wait.mjs --await`) wurde umgangen. Aufgelöst durch die Nutzerfrage um 1 Uhr; Analysepunkt blind mit vier Augen per Nutzer-Anordnung (Punkt 1048, Vorhersage von Punkt 958 eingetreten). Dieselbe Nacht ließ den Front-beorderten Felsenspiel-Punkt als letzten von 360 stehen — Wiedergänger von §3.77, Punkt 1049 |
 
 
 Muster: Ab dem 22.07. explodiert die Commit-Rate (Delegation) — und genau dann häufen sich die Infrastruktur-Vorfälle. **Skalierung der Autonomie erzeugt eine eigene Problemklasse, die die Feature-Arbeit zeitweise überholt.**
@@ -115,6 +116,8 @@ Gelöst durch den harten Singleton: Liveness am **OS-PID + Prozessstartzeit**, *
 **Nachtrag 08.08.2026 — der OS-Fakt, der keiner war.** Die Lehre „Liveness immer aus einem OS-Fakt" stimmt, aber sie schützt nur, wenn der Fakt auch unverrechnet bleibt. Die Prozess-Startzeit wird hier als `Date.now() − (Uptime − Startzeit-Ticks)` gebildet — zwei Uhren, die in diesem Container auseinanderlaufen —, und sobald der Abstand die feste 2-Sekunden-Toleranz übersteigt, liest der Starter jeden lebenden Besitzer als „Prozess wiederverwendet", also als nachweislich tot. Heute Abend zum dritten Mal, diesmal mitten in einer Zweit-Backend-Prüfung, deren Lauf mit der enteigneten Sitzung starb. Ein aus zwei Größen berechneter Wert ist kein OS-Fakt mehr, sondern eine Heuristik mit einem OS-Fakt darin.
 
 Der zweite Teil ist die eigentlich teure Lehre: Am selben Tag war eine Absicherung genau gegen „lebender Besitzer wird enteignet" gebaut worden — sie greift nur, wenn die Pacht abläuft, und dieser Fall kam durch die Tür „nachweislich tot", die davor rangiert. Die Absicherung war korrekt gebaut und wurde nie gefragt. **Wer gegen eine Fehlerart absichert, muss die Absicherung an jeder Tür anbringen, durch die diese Fehlerart hereinkommt** — sonst prüft man den Weg, den man sich vorgestellt hat, statt den, den der Fehler nimmt. Der Stand-down-Teil derselben Absicherung hat dagegen funktioniert: Die enteignete Sitzung erfuhr es beim nächsten Hook und trat sauber ab.
+
+**Nachtrag 03.09.2026 — die Messung, die ihren eigenen Messstand misst.** Die Nacht-Session wartete auf das Ende ihrer Testläufe mit `while pgrep -f "npm exec vitest"`-Schleifen — und das Suchmuster steht wörtlich in der Kommandozeile jeder dieser Schleifen, also fand jede die Geschwister der anderen und keine konnte je enden. Alle zehn Minuten kam ein weiterer Beobachter dazu, zehn Stück in zwei Stunden, während real längst nichts mehr lief. Jede Einzelsicherung tat dabei, was sie sollte, und keine griff: Der Heartbeat blieb frisch (die Session lebte ja), der Starter las „owner alive", die überfällige Board-ETA wurde jeden Tick als bloße Warnung geloggt, und der veraltete In-Flight-Marker einer toten PID hielt „es läuft eine Prüfung" plausibel. Das ist derselbe Fehlertyp wie die Liveness-Probe von §3 (Punkt 985), nur eine Schicht höher: **eine Warte-Bedingung, die das eigene Warten mitzählt, ist keine Messung des Beobachteten mehr** — und eine Wache, die Lebenszeichen statt Fortschritt liest, hält genau diesen Zustand für Gesundheit. Punkt 958 hatte die Lücke vorhergesagt (ein Keil, der weiter Werkzeugaufrufe macht, lässt die Notfall-Uhr nie ablaufen); diese Nacht hat sie das erste Mal in Produktion vorgeführt. Die Analyse läuft als blinder Vier-Augen-Punkt mit Drittmodell-Merge per Nutzer-Anordnung (Punkt 1048).
 
 Die Eindämmung ist am **27.07.2026** wieder aufgehoben: Der Scheduled Task ist auf Nutzerbefehl erneut scharf (`Enable-ScheduledTask`, State *Ready*), nachdem der Singleton live gegengeprüft war — während eine Sitzung die Sperre hielt, spawnte der Starter nichts, sondern meldete „owner alive". Das ist die Vorbedingung der autonomen Sitzungsgrenze, und es zeigt die Reihenfolge, die vorher fehlte: erst die Exklusivität am OS-Fakt beweisen, dann die Redundanz wieder einschalten. Eine spontan auftauchende zweite Sitzung ist seitdem **erwartetes Verhalten**, kein Vorfall — solange sie für den Lock-Owner zurücktritt. **Nachtrag 24.08.2026:** Genau diese Bedingung hatte nie einen Mechanismus für eine bereits laufende Sitzung — siehe §3.173.
 
@@ -1424,7 +1427,7 @@ keinen Träger hat. Gebucht als Punkt 956.
 
 ## Anhang A — Maschinell gepflegte Quellen-Übersicht
 
-Zuletzt aktualisiert: Mittwoch, 02.09.2026, 14:46 · Quellen-Fingerprint: `a30b870184f0…`
+Zuletzt aktualisiert: Donnerstag, 03.09.2026, 01:35 · Quellen-Fingerprint: `833133f37854…`
 
 Spalten heuristisch aus den Quellen abgeleitet (Anläufe = distinkte Datumsnennungen im Memory;
 Maßnahme = Guard-Skripte mit Namens-Treffer). Die inhaltliche Bewertung gehört der Prosa oben.
@@ -1525,10 +1528,10 @@ Maßnahme = Guard-Skripte mit Namens-Treffer). Die inhaltliche Bewertung gehört
 | A pending batch claim HOLDS THE LAUNCHER BACK — withdraw it whenever the claiming window is left unattended | 2 | mittel | clear-claim-guard.mjs | ✔ Mechanismus |
 | Multi-agent workflows eat the session/weekly limit fast — verify findings INLINE, keep fan-outs small, warn the user with a cost estimate before any big workflow | 3 | mittel | doc-budget-guard.mjs | ✔ Mechanismus |
 
-Erfasste Quellen: 93 Feedback-/Projekt-Memories · 57 Guard-/Hook-Skripte · 6 Revert-/Reapply-Commits · 120 Prozess-/Meta-TASKS-Punkte (davon 54 offen).
+Erfasste Quellen: 93 Feedback-/Projekt-Memories · 57 Guard-/Hook-Skripte · 6 Revert-/Reapply-Commits · 121 Prozess-/Meta-TASKS-Punkte (davon 55 offen).
 
-<!-- RETRO-FINGERPRINT: a30b870184f0a32eb87abfa8a069c9b08267b0550fb3ae367cc4f8f2bde2f765 -->
-<!-- RETRO-LAST-REFRESHED: 2026-09-02T12:46:33.689Z -->
+<!-- RETRO-FINGERPRINT: 833133f378544676f2466323da1d166e08a7202411df46f1d044f25a9d024bcc -->
+<!-- RETRO-LAST-REFRESHED: 2026-09-02T23:35:37.099Z -->
 <!-- AUTO-GENERATED:END -->
 
 ### 3.111 Ein Erfolg ist kein Beweis für den Weg, auf dem er zustande kam
