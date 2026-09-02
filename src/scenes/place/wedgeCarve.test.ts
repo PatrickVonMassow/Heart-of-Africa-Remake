@@ -1,7 +1,9 @@
 // The wedge carve (work-order point 657): the ground between two boundaries
 // that pinch below a passage is not offered to the chase. Pinned first on
-// synthetic geometry — each rule one case — and then on the REPORTED village
-// itself, because the carve exists for two named slots at one named seed.
+// synthetic geometry — each rule one case — and then twice on the REPORTED
+// village, because the carve exists for two named slots at one named seed AND
+// has to keep deciding something in whatever quarter the village hands the
+// children today.
 import { describe, expect, it } from 'vitest'
 import { balance } from '../../config/balance'
 import { standingClear, WALKER_RADIUS, type Collider } from './collision'
@@ -98,7 +100,44 @@ describe('buildWedgeCarve on synthetic geometry', () => {
   })
 })
 
-describe('buildWedgeCarve on the reported village (seed 2972259115)', () => {
+// The children's quarter this village placed when the two red windows were
+// live-probed (point 657): a 6.5 m disc at (10.54, -10.54). The quarter has
+// since moved (work-order 688 fixed it before the adults and gave the search an
+// openness floor), while the bodies around these windows stand exactly where
+// they stood. What the windows pin is the carve RULE — including one corridor
+// that only exists because a hut straddles THIS disc's rim — so the disc they
+// were measured in is stated here rather than derived from a layout that has
+// walked away from them.
+const MEASURED_QUARTER = { x: 10.54, z: -10.54, radius: 6.5 }
+
+describe('buildWedgeCarve in the quarter the reported village measured (seed 2972259115)', () => {
+  const layout = buildLayout('bambara-village', 2972259115)
+  const NPC_RADIUS = WALKER_RADIUS
+  const carve = buildWedgeCarve(layout.colliders, NPC_RADIUS, MEASURED_QUARTER)
+
+  it('carves the two slots every measured red window sat in', () => {
+    // The 0.76 m channel between the two hut clearances — the live-probed
+    // windows at (10.4-10.7, -5.6..-5.8) — and the corridor the rim-straddling
+    // hut at (13.5, -6.4) pinches shut, where the evader herds compressed.
+    expect(carve(10.55, -5.7)).toBe(true)
+    expect(carve(15.85, -7.75)).toBe(true)
+  })
+
+  it('keeps the passages healthy play depended on', () => {
+    // The quarter's exact CENTRE is deliberately not here: it happens to sit in
+    // the 0.06 m pinch between two further huts, which the carve rightly takes
+    // — the spawn nudge places the group by the same predicate.
+    for (const [x, z] of [
+      [13.9, -14.83], // the south band between hut and rim (1.6 m+ wide)
+      [7.5, -6.3], // the open west ground
+      [12.9, -12.9], // the open south-east field
+    ] as const) {
+      expect(carve(x, z)).toBe(false)
+    }
+  })
+})
+
+describe('buildWedgeCarve in the quarter the reported village places today (seed 2972259115)', () => {
   const layout = buildLayout('bambara-village', 2972259115)
   const NPC_RADIUS = WALKER_RADIUS
   const ground = childPlayGround(
@@ -113,26 +152,16 @@ describe('buildWedgeCarve on the reported village (seed 2972259115)', () => {
   )
   const carve = buildWedgeCarve(layout.colliders, NPC_RADIUS, ground)
 
-  it('carves the two slots every measured red window sat in', () => {
-    // The 0.76 m channel between the two hut clearances — the live-probed
-    // windows at (10.4-10.7, -5.6..-5.8) — and the corridor the rim-straddling
-    // hut at (13.5, -6.4) pinches shut, where the evader herds compressed.
-    expect(carve(10.55, -5.7)).toBe(true)
-    expect(carve(15.85, -7.75)).toBe(true)
-  })
-
-  it('keeps the ground the game really uses', () => {
-    // The passages the panels showed healthy play depending on. The ground's
-    // exact CENTRE is deliberately not here: it happens to sit in the 0.06 m
-    // pinch between two further huts, which the carve rightly takes — the
-    // spawn nudge places the group by the same predicate.
-    for (const [x, z] of [
-      [13.9, -14.83], // the south band between hut and rim (1.6 m+ wide)
-      [7.5, -6.3], // the open west ground
-      [12.9, -12.9], // the open south-east field
-    ] as const) {
-      expect(carve(x, z)).toBe(false)
-    }
+  it('still decides something where the children are actually put', () => {
+    // The block above stands on a STATED disc and therefore cannot notice the
+    // quarter moving out from under it — which is exactly what happened, and
+    // every one of its cases went vacuously green outside the new ground. This
+    // one is derived, so it goes red the moment the carve stops meaning
+    // anything in the quarter the game hands the children.
+    // The corridor the compound's fence arc pinches shut against the rim:
+    expect(carve(4.64, -15.72)).toBe(true)
+    // The open middle of the quarter, two metres inside it:
+    expect(carve(2.54, -12.02)).toBe(false)
   })
 
   it('takes only a small share of the statically free ground', () => {
