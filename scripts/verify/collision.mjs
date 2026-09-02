@@ -597,28 +597,45 @@ if (section('play-rocks')) {
         `(cs)=>cs.findIndex((c)=>!c.kind&&Math.hypot(c.x-(${p.x}),c.z-(${p.z}))<0.01)`,
       )
     }
-    // Stand a couple of steps off the upstream block, looking at it and down the
-    // stretch, so the frame shows the rock the way a child running at it sees it
-    // — and the second one behind it, which is the pair the game is played
-    // between.
-    await page.evaluate((s) => {
-      const p = window.__placePlayer
-      const dx = s.downstream.x - s.upstream.x
-      const dz = s.downstream.z - s.upstream.z
-      const len = Math.hypot(dx, dz) || 1
-      p.x = s.upstream.x - (dx / len) * (s.r + 3.5)
-      p.z = s.upstream.z - (dz / len) * (s.r + 3.5)
-      p.yaw = Math.atan2(-(s.upstream.x - p.x), -(s.upstream.z - p.z))
-    }, rocks)
-    // Let the scene consume the teleport on ITS clock before the shutter judges:
-    // two animation frames, not a wall-clock guess (CLAUDE.md §7.2). On a loaded
-    // host a frame can take a second, and the camera would still be easing toward
-    // the rock when the picture is taken.
-    await page.evaluate(() => new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(() => r(null)))))
-    await shot('54-collision-play-rocks', {
-      local: { x: rocks.upstream.x, z: rocks.upstream.z },
-      label: 'the two play rocks on the bank of the PoC village',
-    })
+    // STAND OFF THE STRETCH'S AXIS, not on it. The camera used to be put on the
+    // line between the two rocks and aimed at the near one, which puts the far
+    // one exactly behind it — and the shutter gated the near rock alone, so the
+    // claimed two-rock photograph would have passed with the second stone
+    // occluded or missing outright (GPT-5.6 Sol, first cross-vendor round, D3).
+    // The stand comes from the scene itself (`bankPlayRocksView`), so the suite
+    // and `bankStage.test.ts` judge one description of it and not two.
+    const view = await page.evaluate(() => window.__bankStageView?.() ?? null)
+    check(
+      'the bank stage hands over a stand to photograph both its rocks from',
+      !!view,
+      JSON.stringify(view),
+    )
+    if (view) {
+      await page.evaluate((v) => {
+        const p = window.__placePlayer
+        p.x = v.x
+        p.z = v.z
+        p.yaw = v.yaw
+        p.pitch = -0.05
+      }, view)
+      // Let the scene consume the teleport on ITS clock before the shutter
+      // judges: two animation frames, not a wall-clock guess (CLAUDE.md §7.2).
+      // On a loaded host a frame can take a second, and the camera would still
+      // be easing toward the stage when the picture is taken.
+      await page.evaluate(() => new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(() => r(null)))))
+      // ONE STAND, TWO DECLARATIONS. A frame carries a single subject by
+      // contract, so each rock is claimed by its own frame from the same camera:
+      // the pair is proven in the rendered picture rather than asserted in a
+      // caption.
+      await shot('54-collision-play-rocks', {
+        local: { x: rocks.upstream.x, z: rocks.upstream.z },
+        label: 'the upstream play rock, from the stand that shows the whole stage',
+      })
+      await shot('54b-collision-play-rocks-far', {
+        local: { x: rocks.downstream.x, z: rocks.downstream.z },
+        label: 'the downstream play rock, from the same stand',
+      })
+    }
   }
 }
 

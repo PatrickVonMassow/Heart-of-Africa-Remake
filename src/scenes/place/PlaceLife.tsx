@@ -7,7 +7,7 @@
 // carried from the well.
 // Pure animation, no mechanics.
 
-import { createContext, useContext, useEffect, useMemo, useRef, type RefObject } from 'react'
+import { createContext, useContext, useEffect, useMemo, useRef, type ReactNode, type RefObject } from 'react'
 import { useFrame, useThree } from '@react-three/fiber'
 import * as THREE from 'three/webgpu'
 import { mulberry32 } from '../../world/noise'
@@ -229,6 +229,7 @@ function Figure({
   gesture,
   pose,
   gait,
+  handProp,
 }: {
   cloth: string
   skin?: string
@@ -246,6 +247,16 @@ function Figure({
   /** Gait phase (rad) driving the leg swing — the caller accumulates the
    *  distance walked, because only it knows this figure's world scale. */
   gait?: RefObject<number>
+  /**
+   * Something CARRIED IN A HAND, mounted inside the arm pivot so it rides
+   * whatever that arm does.
+   *
+   * A prop hung on the figure's own group instead sits at a fixed spot beside
+   * the trunk: the water carrier's jar floated at his hip while his arm went up
+   * to indicate the river (GPT-5.6 Sol, first cross-vendor round, C2). The arm
+   * is the +x one, which is the side the jar was drawn on.
+   */
+  handProp?: ReactNode
 }) {
   const bodyH = kneel ? 0.55 : 1.0
   const cold = useContext(ColdCloaksContext)
@@ -362,6 +373,8 @@ function Figure({
               <sphereGeometry args={[L.handRadius, ...TESSELLATION.figureHand]} />
               <meshStandardMaterial color={skin} roughness={0.85} />
             </mesh>
+            {/* What this hand is carrying, at the hand rather than beside it. */}
+            {i === 0 && handProp && <group position={[0, -armLen, 0]}>{handProp}</group>}
           </group>
         ))}
       </group>
@@ -2474,28 +2487,34 @@ function ErrandVillagers({
             refs.current[i] = el
           }}
         >
-          <Figure cloth={cloth[i % cloth.length]} pose={poses.current[i]} />
           {/* The water carrier's jar — the same vessel the task walkers carry to
               the well, so the object the player learns RIVER beside is one he has
-              already seen in the village. */}
+              already seen in the village. The EMPTY one hangs in his hand, inside
+              the arm pivot, so it goes where the hand goes. */}
+          <Figure
+            cloth={cloth[i % cloth.length]}
+            pose={poses.current[i]}
+            handProp={
+              <mesh
+                ref={(el) => {
+                  handJars.current[i] = el
+                }}
+                visible={false}
+                position={[0, -0.12, 0.04]}
+                rotation={[0, 0, 0.12]}
+                castShadow
+              >
+                <cylinderGeometry args={[0.12, 0.16, 0.32, 8]} />
+                <meshStandardMaterial color="#8a5a30" roughness={0.9} />
+              </mesh>
+            }
+          />
           <mesh
             ref={(el) => {
               headJars.current[i] = el
             }}
             visible={false}
             position={[0, 1.5, 0]}
-            castShadow
-          >
-            <cylinderGeometry args={[0.12, 0.16, 0.32, 8]} />
-            <meshStandardMaterial color="#8a5a30" roughness={0.9} />
-          </mesh>
-          <mesh
-            ref={(el) => {
-              handJars.current[i] = el
-            }}
-            visible={false}
-            position={[0.28, 0.82, 0.06]}
-            rotation={[0, 0, 0.12]}
             castShadow
           >
             <cylinderGeometry args={[0.12, 0.16, 0.32, 8]} />
@@ -2749,6 +2768,19 @@ export function PlaceLife({
   // because the adults' dig sites are placed CLEAR of it, and a quarter derived
   // once there and once here would be two quarters (points 129/378).
   useGame((s) => s.balanceVersion)
+  // A VILLAGE WITHOUT A QUARTER IS NOT A PASS. The separation assert below used
+  // to accept `!playGround` outright, so the one state that switches the bank
+  // stage off entirely and drops the chase onto an origin-centred disc with no
+  // clearance at all went by as success (GPT-5.6 Sol, first cross-vendor round,
+  // C1). The fallback stays — a malformed layout must not take the scene down —
+  // but it says so.
+  devAssert(
+    kind !== 'village' || !!playGround,
+    'tag-play-ground-missing',
+    () =>
+      `${placeId}: a village with no children's quarter — the chase falls back to the origin ` +
+      `and the bank stage is switched off`,
+  )
   // Point 524.2: a ground that had to give up its separation leaves two teaching
   // voices inside one earshot. Nothing in the shipped villages reaches this, so
   // it is armed as an assert rather than answered by a second mechanism.

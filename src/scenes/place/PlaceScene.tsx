@@ -101,7 +101,7 @@ import {
   fleckPosition,
 } from '../../render/placeRiver'
 import { RIVER_DRIFT_SPEED } from '../../render/waterAppearance'
-import { bankGroundHeight, type PlaceRiverBank } from './riverBank'
+import { bankGroundHeight, bankPlayRocksView, type PlaceRiverBank } from './riverBank'
 import { scatterGrassTufts } from './groundScatter'
 import { clearEdgeBand, setEdgeBandBoundary, setEdgeBandLook } from '../../render/edgeBand'
 import { devAssert } from '../../systems/devAssert'
@@ -2352,6 +2352,13 @@ export function PlaceScene() {
     const w = window as unknown as Record<string, unknown>
     w.__placePlayer = player.current
     w.__placeLayout = layout
+    // WHERE TO STAND TO PHOTOGRAPH BOTH PLAY ROCKS. Handed over rather than
+    // transcribed into the suite: the collision suite used to place its camera
+    // on the stretch's own axis, which puts the far rock exactly behind the near
+    // one, and its shutter then gated the near one alone (GPT-5.6 Sol, first
+    // cross-vendor round, D3). One description of the stand, read by the suite
+    // and by `bankStage.test.ts` alike.
+    w.__bankStageView = () => (layout?.playRocks ? bankPlayRocksView(layout.playRocks) : null)
     w.__placeColliders = layout?.colliders
     w.__placeCamera = camera
     w.__placeScene = r3fScene
@@ -2393,6 +2400,7 @@ export function PlaceScene() {
       delete w.__placeSeason
       delete w.__placePlayer
       delete w.__placeLayout
+      delete w.__bankStageView
       delete w.__placeColliders
       delete w.__placeCamera
       delete w.__placeScene

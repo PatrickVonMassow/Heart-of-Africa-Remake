@@ -4523,12 +4523,28 @@ if (section('adult-errands')) {
     // What only the live scene can settle is that PlaceLife carries the work out:
     // a man at the digging pose, a man with a jar on the way to the water, and
     // both words really reaching the player.
+    // WHERE THE CHILDREN ARE, so an adult voice can be measured against it. The
+    // water's foot alone stood for the whole stage before, which is neither the
+    // rocks the round is played between nor the quarter the group roams in.
+    const stage = await page.evaluate(() => {
+      const l = window.__placeLayout
+      const pts = []
+      if (l?.playRocks) {
+        pts.push({ what: 'upstream rock', x: l.playRocks.upstream.x, z: l.playRocks.upstream.z })
+        pts.push({ what: 'downstream rock', x: l.playRocks.downstream.x, z: l.playRocks.downstream.z })
+      }
+      if (l?.waterPath) pts.push({ what: "the water's foot", x: l.waterPath.foot.x, z: l.waterPath.foot.z })
+      return { pts, roam: l?.playGround ? { x: l.playGround.x, z: l.playGround.z, r: l.playGround.radius } : null }
+    })
     const staged = {}
+    const heard = {}
     let dug = 0
     let carriedEmpty = 0
     let carriedFull = 0
     let atWork = 0
     let nearestBankVoice = Infinity
+    let nearestVoiceWhat = null
+    let seen = null
     for (let i = 0; i < 240; i++) {
       const now = await page.evaluate(() => window.__placeErrands())
       for (const [id, n] of Object.entries(now.staged ?? {})) {
@@ -4540,17 +4556,39 @@ if (section('adult-errands')) {
         if (v.carry === 'fullJar') carriedFull++
         if (v.work) atWork++
       }
-      // AND NO ADULT VOICE EVER FALLS AT THE BANK (the spec's own rule): the
-      // last word's speaker is read where he stands, and the nearest any of them
-      // came to the water is reported.
+      // AND NO ADULT VOICE EVER FALLS INSIDE THE CHILDREN'S EARSHOT (the spec's
+      // own rule). The speaker is read WHERE HE STOOD WHEN HE SPOKE — only on
+      // the sample that first carries a NEW utterance, which `age` resetting to
+      // zero identifies. Reading his CURRENT place on every later sample instead
+      // measured a man who had walked on: a correct carrier says RIVER at the
+      // head of the path and then goes down to the water, which failed the check
+      // though nothing was wrong, while a word really spoken at the bank slipped
+      // through as soon as its speaker walked away (GPT-5.6 Sol, first
+      // cross-vendor round, D1).
       const last = now.last
-      if (last) {
+      const key = last ? `${last.id}/${last.concept}/${last.speaker}` : null
+      const fresh = last && (!seen || seen.key !== key || last.age < seen.age)
+      if (fresh) {
+        heard[last.concept] = (heard[last.concept] ?? 0) + 1
         const who = now.villagers[last.speaker]
-        const foot = now.geography.waterFoot
-        if (who && foot) {
-          nearestBankVoice = Math.min(nearestBankVoice, Math.hypot(who.x - foot.x, who.z - foot.z))
+        if (who) {
+          for (const pt of stage.pts) {
+            const d = Math.hypot(who.x - pt.x, who.z - pt.z)
+            if (d < nearestBankVoice) {
+              nearestBankVoice = d
+              nearestVoiceWhat = `${last.concept} at ${d.toFixed(1)} m from ${pt.what}`
+            }
+          }
+          if (stage.roam) {
+            const d = Math.max(0, Math.hypot(who.x - stage.roam.x, who.z - stage.roam.z) - stage.roam.r)
+            if (d < nearestBankVoice) {
+              nearestBankVoice = d
+              nearestVoiceWhat = `${last.concept} at ${d.toFixed(1)} m from the roaming quarter's rim`
+            }
+          }
         }
       }
+      if (last) seen = { key, age: last.age }
       await nextFrames(2)
     }
     const stagedTotal = Object.values(staged).reduce((a, b) => a + b, 0)
@@ -4563,17 +4601,27 @@ if (section('adult-errands')) {
           .join(', ')}), ${atWork} villager-samples at work`,
     )
     check(
-      'a villager is seen digging, and a villager is seen carrying the jar',
-      dug > 0 && carriedEmpty + carriedFull > 0,
+      'a villager is seen digging, and the jar goes down EMPTY and comes back FULL',
+      dug > 0 && carriedEmpty > 0 && carriedFull > 0,
       `${dug} villager-samples at the dig pose, ${carriedEmpty} with the empty jar, ` +
         `${carriedFull} with the full one`,
     )
+    // BOTH WORDS ARE ACTUALLY HEARD. Nothing here used to require either of them:
+    // the staging, digging and carrying checks are satisfied by animation alone,
+    // and the earshot check passed EXPLICITLY when nobody spoke at all — so a
+    // broken speech path would have gone green (GPT-5.6 Sol, first cross-vendor
+    // round, D2).
     check(
-      'and no adult word ever falls at the bank, inside the children`s earshot',
-      !Number.isFinite(nearestBankVoice) || nearestBankVoice > 10,
+      'and both adult words are really spoken — RIVER and DIG',
+      (heard.RIVER ?? 0) > 0 && (heard.DIG ?? 0) > 0,
+      `RIVER ×${heard.RIVER ?? 0}, DIG ×${heard.DIG ?? 0} over 240 samples`,
+    )
+    check(
+      'and no adult word ever falls inside the children`s earshot',
+      Number.isFinite(nearestBankVoice) && nearestBankVoice > 10,
       Number.isFinite(nearestBankVoice)
-        ? `nearest speaker to the water's foot: ${nearestBankVoice.toFixed(1)} m`
-        : 'no adult spoke in the window',
+        ? `nearest utterance to the children: ${nearestVoiceWhat}`
+        : 'NO ADULT SPOKE IN THE WINDOW — nothing was measured',
     )
 
     // The picture: a villager standing at the ground work it was sent to.

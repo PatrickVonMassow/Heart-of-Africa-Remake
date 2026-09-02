@@ -196,6 +196,48 @@ export function bankPlayRocks(
 }
 
 /**
+ * WHERE TO STAND TO SEE BOTH PLAY ROCKS AT ONCE, and which way to look.
+ *
+ * A spectator on the stretch's own AXIS sees the near rock and the far one on
+ * one line: the near one hides the far one, and a picture taken from there shows
+ * a rock, singular, however honestly it is labelled. The stage is photographed —
+ * and judged — from a three-quarter stand instead: back from the middle by the
+ * stretch's own length, and off the axis by half of it, looking at the middle.
+ *
+ * It lives here, beside the rocks themselves, because the browser suite that
+ * takes that picture and the unit case that proves both rocks fall inside the
+ * frame must use ONE description of it (points 129/378). The axis stand is what
+ * the collision suite used, and its shutter then gated the upstream rock alone
+ * (GPT-5.6 Sol, first cross-vendor round, D3/D7).
+ */
+export function bankPlayRocksView(rocks: { upstream: BankPoint; downstream: BankPoint }): {
+  x: number
+  z: number
+  yaw: number
+  look: BankPoint
+} {
+  const mx = (rocks.upstream.x + rocks.downstream.x) / 2
+  const mz = (rocks.upstream.z + rocks.downstream.z) / 2
+  const dx = rocks.downstream.x - rocks.upstream.x
+  const dz = rocks.downstream.z - rocks.upstream.z
+  const len = Math.hypot(dx, dz) || 1
+  // The stretch's own direction, and the perpendicular that carries the stand
+  // off its line. The perpendicular is taken TOWARD the settlement's middle, so
+  // the picture looks from the village at the water rather than the other way.
+  const ax = dx / len
+  const az = dz / len
+  let px = -az
+  let pz = ax
+  if (px * mx + pz * mz > 0) {
+    px = -px
+    pz = -pz
+  }
+  const x = mx + px * len
+  const z = mz + pz * len
+  return { x, z, yaw: Math.atan2(-(mx - x), -(mz - z)), look: { x: mx, z: mz } }
+}
+
+/**
  * Whether a body of radius `r` would stand in the children's running lane —
  * the corridor between the two rocks, plus the rocks' own ends. Everything the
  * layout scatters loose asks this, so the lane the picture shows is the lane

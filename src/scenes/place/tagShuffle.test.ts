@@ -1783,7 +1783,12 @@ describe('the children`s bank round can reach its own stage (work-order 687)', (
       // doing rather than the game's. With him gone the event is rarer, and the
       // count is honest.
       expect(side.filter((s) => s.crossed).length).toBeGreaterThan(0)
-    })
+      // The replay stops at the first frame that satisfies everything, so only
+      // the sparse case pays the full bound — bambara@42 runs to 1711 s of
+      // simulated time, which is past the default 20 s wall-clock budget under
+      // the full suite's worker contention. A measurement this long carries its
+      // own budget, as the case above it does.
+    }, 120_000)
   }
 
   /**

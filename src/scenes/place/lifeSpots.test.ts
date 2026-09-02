@@ -9,6 +9,7 @@ import { describe, expect, it } from 'vitest'
 import {
   FABRIC_REACH,
   MIN_FABRIC,
+  MIN_OPENNESS,
   MIN_PLAY_RADIUS,
   SPECTATOR_MARGIN,
   PORT_TALKERS,
@@ -233,10 +234,16 @@ describe('every shipped village can seat its children (point 524)', () => {
     // Still a game of tag, still inside the settlement.
     expect(g.radius).toBeGreaterThanOrEqual(MIN_PLAY_RADIUS)
     expect(Math.hypot(g.x, g.z) + g.radius + SPECTATOR_MARGIN).toBeLessThanOrEqual(walk + 1e-6)
-    // AND STILL GROUND A CHILD CAN STAND ON once the settlement is finished —
-    // measured against the FULL collider set, dressing included, which is what
-    // the child actually meets. The ground was chosen against the built bodies
-    // only; keeping the scatter out of it is what makes this hold.
+    // The openness FLOOR is met, not merely preferred. It gave way only in
+    // theory: every village, at every seed swept here, offers a separated ground
+    // at or above it.
+    expect(g.openness, `${id}: the quarter's own openness`).toBeGreaterThanOrEqual(MIN_OPENNESS)
+    // AND THE SCATTER TAKES NONE OF IT BACK. The ground is chosen against the
+    // BUILT bodies; measured again against the FULL collider set — dressing
+    // included, which is what a child actually meets — it must come out the
+    // same. Accepting 40 % here while the floor was 70 % meant the floor was
+    // never guaranteed in the layout that ships, only in the search that picked
+    // it (GPT-5.6 Sol, first cross-vendor round, B4).
     let free = 0
     let n = 0
     for (const ring of [0, 0.35, 0.7, 1]) {
@@ -249,7 +256,7 @@ describe('every shipped village can seat its children (point 524)', () => {
         if (ring === 0) break
       }
     }
-    expect(free / n, `${id}: the finished ground is standable`).toBeGreaterThan(0.4)
+    expect(free / n, `${id}: the finished ground is as open as the chosen one`).toBeCloseTo(g.openness, 6)
   })
 
   it('counts the buildings as fabric and the villager markers not', () => {
