@@ -13,6 +13,9 @@ import {
   PLAY_ROCK_RADIUS,
   WATER_PATH_HEAD_RADII,
   WATER_PATH_WIDTH,
+  WAY_OUT_HALF_WIDTH,
+  WAY_OUT_INNER,
+  WAY_OUT_OUTER,
   buildLayout,
   dwellingCircleRadius,
   fenceColliders,
@@ -848,6 +851,67 @@ describe('no two palisades cross (work-order 604)', () => {
           ).toBeGreaterThan(-0.5)
         }
       }
+    }
+  })
+})
+
+// THE WAY OUT OF A SETTLEMENT (work-order 688). The loose dressing used to be
+// scattered over the boundary ring as well, and whether a walker could cross
+// that ring anywhere without squeezing past a boulder was left to the draw. It
+// ran out: at the Bambara village, seed 42, exactly ONE of 180 bearings was open
+// before this point rearranged the village and NONE after it, and the browser
+// suite's edge-band section reported "every bearing blocked" on both seasons —
+// a boundary the player cannot walk out over and a give-way band that cannot be
+// read against bare ground anywhere.
+describe('every settlement keeps one way out free (work-order 688)', () => {
+  /** The crossing as the picture check reads it: bare ground from well inside
+   *  the boundary to well outside it, at the way out's own width. */
+  const crossingIsClear = (layout: PlaceLayout, bearing: number): string | null => {
+    const clear = (ax: number, az: number): string | null => {
+      const hit = (x: number, z: number, need: number, what: string) =>
+        Math.hypot(x - ax, z - az) < need ? what : null
+      for (const c of layout.colliders) {
+        const found =
+          c.kind === 'segment'
+            ? hit(c.x1, c.z1, WAY_OUT_HALF_WIDTH, 'fence') ?? hit(c.x2, c.z2, WAY_OUT_HALF_WIDTH, 'fence')
+            : c.kind === 'box'
+              ? hit(c.x, c.z, Math.hypot(c.hx, c.hz) + WAY_OUT_HALF_WIDTH, 'building')
+              : hit(c.x, c.z, c.r + WAY_OUT_HALF_WIDTH, 'solid')
+        if (found) return found
+      }
+      return null
+    }
+    for (let d = layout.radius - WAY_OUT_INNER; d <= layout.radius + WAY_OUT_OUTER; d += 1.5) {
+      const blocker = clear(Math.cos(bearing) * d, Math.sin(bearing) * d)
+      if (blocker) return `${blocker} at ${d.toFixed(1)} m out`
+    }
+    return null
+  }
+
+  it.each([...PORTS, ...VILLAGES].map((p) => [p.id] as const))('%s: the way out stays walkable', (id) => {
+    for (const seed of [...SEEDS, REPORTED_SEED, WEDGE_SEED, 1, 2, 3]) {
+      const layout = buildLayout(id, seed)
+      expect(layout.wayOut, `${id} seed ${seed}: no crossing of the boundary is free`).not.toBeNull()
+      expect(
+        crossingIsClear(layout, layout.wayOut as number),
+        `${id} seed ${seed}: the way out at ${(layout.wayOut as number).toFixed(3)} rad is blocked`,
+      ).toBeNull()
+    }
+  })
+
+  // WHAT THE CROSSING COSTS. The dressing that falls in it is dropped and not
+  // drawn again elsewhere, so the price is paid in loose objects — and it has to
+  // stay small, because a village stripped of its greenery to buy the corridor
+  // would pass the check above and be a worse picture than the one it fixed.
+  // Measured over every settlement at eight seeds: 0.74 of the 23 loose objects
+  // dropped on average, 5 in the worst layout, and the floors below are the
+  // worst kept counts on record (baganda-village seed 7 and tuareg-village seed
+  // 7). They are a bar on the price, not a target.
+  it.each([...PORTS, ...VILLAGES].map((p) => [p.id] as const))('%s: the dressing is not thinned out for it', (id) => {
+    for (const seed of [...SEEDS, REPORTED_SEED, WEDGE_SEED, 1, 2, 3]) {
+      const layout = buildLayout(id, seed)
+      expect(layout.flora.length, `${id} seed ${seed}: flora`).toBeGreaterThanOrEqual(6)
+      expect(layout.rocks.length, `${id} seed ${seed}: rocks`).toBeGreaterThanOrEqual(11)
     }
   })
 })

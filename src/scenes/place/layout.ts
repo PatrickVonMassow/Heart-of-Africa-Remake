@@ -14,6 +14,7 @@ import { windingPoints, laneSlots, closestOnPolyline, bendAround, type LaneSlot 
 import { buildGizaLayout } from './gizaSite'
 import { ROCK_FOOTPRINT_UNITS } from '../../world/communicationRock'
 import {
+  BANK_FADE_ANGLE,
   BANK_PLAY_LANE_HALF,
   bankPlayRocks,
   bankWaterFoot,
@@ -137,6 +138,16 @@ export interface PlaceLayout {
    * `adultErrands.villagerCount` already follows.
    */
   playGround: PlayGround | null
+  /**
+   * The settlement's WAY OUT (work-order 688): the bearing, in place radians, of
+   * the one crossing of the boundary that is kept free of loose dressing, so a
+   * person can walk out over the edge band without stepping around a bush or a
+   * boulder. It is chosen from what the BUILT fabric already leaves open — the
+   * huts, the compound fences and the lanes are never moved for it — and the
+   * scattered flora and rocks that fall in it are dropped. Null where no bearing
+   * is open.
+   */
+  wayOut: number | null
   /** Livestock pen (kraal layouts). */
   pen: { x: number; z: number; r: number } | null
   /** Points walkers visit on their errands. */
@@ -189,6 +200,21 @@ export const DIG_SITE_ANCHOR_REACH = 3.5
  *  turned patch lies out here, past the last compound rather than between
  *  them. */
 export const DIG_SITE_FIELD_BAND = 0.62
+
+/** How wide the settlement's WAY OUT is kept, measured from its axis (work-order
+ *  688): far enough that a walker crosses the boundary without stepping around
+ *  anything, and that the give-way band on the ground is read against bare
+ *  earth rather than against a bush. Calibratable. */
+export const WAY_OUT_HALF_WIDTH = 4
+
+/** How far the way out reaches INSIDE the boundary, and how far OUTSIDE it: the
+ *  stretch a walker leaving the place actually covers. */
+export const WAY_OUT_INNER = 9
+export const WAY_OUT_OUTER = 6
+
+/** How many bearings the way out is looked for on — one every two degrees, which
+ *  is finer than the half-width it is looking for. */
+const WAY_OUT_BEARINGS = 180
 
 /** Where the WATER PATH's head stands: on the bank's own bearing, out past the
  *  compound ring (7-14 m, work-order 604) at the edge of the built ground. It
@@ -441,6 +467,86 @@ function fabricOf(
     ...dwellings.map((d) => [d.x, d.z] as [number, number]),
     ...interactives.filter((it) => it.type !== 'villager').map((it) => it.pos),
   ]
+}
+
+/**
+ * THE SETTLEMENT'S WAY OUT (work-order 688). Loose dressing used to be scattered
+ * over the whole ground, the boundary ring included, and whether a walker could
+ * cross that ring anywhere without squeezing past a boulder was left to the
+ * draw. Measured at the Bambara village, seed 42: of 180 bearings exactly ONE
+ * was open before this point rearranged the village, and none after it — the
+ * rearrangement consumed the last gap, and the edge band could no longer be read
+ * against bare ground anywhere on the ring.
+ *
+ * So the way out is CHOSEN rather than hoped for: the widest crossing the BUILT
+ * fabric leaves open — nothing built is moved for it — and the scatter then
+ * keeps off it. Bearings pointing at the water are skipped, because a way out
+ * over the bank is a way into the river.
+ *
+ * Returns the bearing, or null where the fabric itself leaves no crossing.
+ */
+export function pickWayOut(
+  colliders: readonly Collider[],
+  radius: number,
+  bank: PlaceRiverBank | null,
+): number | null {
+  /** How much room a corridor point has beyond what it needs, in metres. */
+  const clearanceAt = (ax: number, az: number): number => {
+    let worst = Infinity
+    const gap = (x: number, z: number, need: number) => {
+      const room = Math.hypot(x - ax, z - az) - need
+      if (room < worst) worst = room
+    }
+    for (const c of colliders) {
+      if (c.kind === 'segment') {
+        gap(c.x1, c.z1, WAY_OUT_HALF_WIDTH)
+        gap(c.x2, c.z2, WAY_OUT_HALF_WIDTH)
+      } else if (c.kind === 'box') {
+        gap(c.x, c.z, Math.hypot(c.hx, c.hz) + WAY_OUT_HALF_WIDTH)
+      } else {
+        gap(c.x, c.z, c.r + WAY_OUT_HALF_WIDTH)
+      }
+    }
+    return worst
+  }
+  let best: number | null = null
+  let bestRoom = 0
+  for (let i = 0; i < WAY_OUT_BEARINGS; i++) {
+    const b = (i / WAY_OUT_BEARINGS) * Math.PI * 2
+    // Not over the water: the bank's own arc is where the ground stops being
+    // ground, and the shore already carries the children's stretch and the
+    // water path.
+    if (bank && Math.cos(b) * bank.nx + Math.sin(b) * bank.nz > Math.cos(BANK_FADE_ANGLE)) continue
+    let room = Infinity
+    for (let d = radius - WAY_OUT_INNER; d <= radius + WAY_OUT_OUTER; d += 1.5) {
+      room = Math.min(room, clearanceAt(Math.cos(b) * d, Math.sin(b) * d))
+      if (room <= bestRoom) break
+    }
+    if (room > bestRoom) {
+      bestRoom = room
+      best = b
+    }
+  }
+  return best
+}
+
+/**
+ * Whether a loose object of body radius `bodyR` would stand in the way out.
+ *
+ * The corridor is a CAPSULE, not a rectangle: it is kept clear of everything
+ * within the half-width of any point ON the axis, its two ends included. A flat
+ * cut at the ends let a boulder sit two metres short of the inner end and still
+ * come within reach of the point measured there — three villages went on
+ * reporting a blocked crossing at exactly `radius - WAY_OUT_INNER`.
+ */
+export function onWayOut(wayOut: number | null, radius: number, x: number, z: number, bodyR: number): boolean {
+  if (wayOut === null) return false
+  const along = Math.cos(wayOut) * x + Math.sin(wayOut) * z
+  const across = -Math.sin(wayOut) * x + Math.cos(wayOut) * z
+  const inner = radius - WAY_OUT_INNER
+  const outer = radius + WAY_OUT_OUTER
+  const overshoot = along < inner ? inner - along : along > outer ? along - outer : 0
+  return Math.hypot(overshoot, across) < WAY_OUT_HALF_WIDTH + bodyR
 }
 
 export function buildLayout(placeId: string, seed: number): PlaceLayout {
@@ -1422,6 +1528,18 @@ export function buildLayout(placeId: string, seed: number): PlaceLayout {
     }
   }
 
+  // THE WAY OUT (work-order 688), read off the BUILT fabric before a single
+  // loose object is placed: the huts, the compound fences, the lanes and the
+  // functional buildings are all standing by now, and none of them is moved for
+  // it. The play rocks are settled onto the bank further down, which the bank's
+  // own arc keeps out of the crossing anyway.
+  const wayOut = pickWayOut(colliders, radius, bank)
+  devAssert(
+    wayOut !== null,
+    'way-out-missing',
+    () => `${place.id}: the built fabric leaves no crossing of the boundary free`,
+  )
+
   const flora: PlaceLayout['flora'] = []
   const rocks: PlaceLayout['rocks'] = []
   // The TRAVELLER's width, not the villager's: he is the wider of the two and
@@ -1464,6 +1582,19 @@ export function buildLayout(placeId: string, seed: number): PlaceLayout {
     if (!clearOfDressing(x, z, 0.35 + s * 0.5)) continue
     rocks.push([x, z, s])
   }
+
+  // THE CROSSING IS CLEARED (work-order 688), and it is cleared by a FILTER
+  // rather than by a rule inside the two loops above. A rejection there would
+  // draw the next candidate's height from a different place in the seeded
+  // stream, which moves EVERY later object in the settlement: measured at the
+  // Bambara village, one refused bush replaced all fourteen boulders, an adult's
+  // station with them, and one window of the children's bank game then carried
+  // no runner past the traveller at all. Filtering afterwards removes exactly
+  // what stands in the way out and leaves the rest of the village where it was.
+  for (let i = flora.length - 1; i >= 0; i--)
+    if (onWayOut(wayOut, radius, flora[i].x, flora[i].z, 0.45)) flora.splice(i, 1)
+  for (let i = rocks.length - 1; i >= 0; i--)
+    if (onWayOut(wayOut, radius, rocks[i][0], rocks[i][1], 0.35 + rocks[i][2] * 0.5)) rocks.splice(i, 1)
 
   // ... and the loose dressing joins them once it has been scattered.
   for (const t of flora) colliders.push({ x: t.x, z: t.z, r: 0.45 })
@@ -1595,5 +1726,5 @@ export function buildLayout(placeId: string, seed: number): PlaceLayout {
   }
 
 
-  return { radius, spawnZ: radius - SPAWN_INSET, interactives, dwellings, fences, paths, flora, rocks, digSites, bank, playRocks, waterPath, playGround, pen, errands, colliders }
+  return { radius, spawnZ: radius - SPAWN_INSET, interactives, dwellings, fences, paths, flora, rocks, digSites, bank, playRocks, waterPath, playGround, wayOut, pen, errands, colliders }
 }
