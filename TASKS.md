@@ -14041,32 +14041,33 @@ to land than a mechanism that needs a review.
   Refs: scripts/verify/run-all.mjs, scripts/verify/run-logged.mjs, scripts/render-verify-recorder.mjs
   Bundle: Testinfrastruktur.
 
-- [ ] 1045. A straight water path cannot clear the compound fences, so the drawn track
-  crosses one (measured 02.09.2026 while answering the cross-vendor findings of point 688).
+- [ ] 1045. Two village layouts have no straight walk to the water, so they teach no RIVER
+  at all (measured 02.09.2026 while answering the cross-vendor findings of point 688).
   Point 688 fits the village water path by sweeping its head until the straight walk to
-  the water clears the settlement. That clearance test was widened to the fabric as it is
-  DRAWN — dwellings at their true shape, boxes at their corners, the pen, the play rocks,
-  the props — and it stops there: the compound FENCE PANELS are excluded, because with
-  them counted no head exists at all for some plans. Measured at `f8ec2a8`:
-  bambara-village at seeds 7 and 1337 have no clear straight line from ANY head between
-  10 and 24 m to the water's foot once the panels count, at any bearing within 120°.
-  So in those layouts the drawn track runs through a fence, and the carrier walking it
-  meets a collider standing on his own path — he is routed round it by the nav grid while
-  the picture shows a lane going through it.
+  the water clears the settlement's fabric as it is DRAWN — dwellings at their true shape,
+  boxes at their corners, the compound fence panels, the pen, the play rocks, the props.
+  A village that can give no such walk gives NO water path, which is the point's own rule:
+  a track drawn through a wall teaches the wrong thing, and no teaching beats a wrong one.
+  Measured at `abf2faf49` over nine villages at six seeds, two layouts pay that price —
+  bambara-village at seeds 7 and 1337 — and there both water situations are simply absent:
+  no jar goes down, no jar comes back, and the word RIVER is never taught in that village.
+  The village the communication slice is played in is NOT among them, which is why this is
+  a point of its own rather than a blocker. `layout.test.ts` names the two, so a third one
+  appearing goes red.
   Final state:
-  - The water path clears the compound fences as well as the buildings, in every village
-    at every seed, and the code no longer has to name an exception it cannot meet.
+  - Every river village carries a water path, and none of them draws it through a wall.
   - One of the two ways is taken and written down: either the track may BEND once at the
     gap between two compounds (it is a worn footpath, not a surveyed road), or the
     compound builder opens a GATE where the lane crosses its ring, the way a real
     compound has one.
+  - The named-exception list in `layout.test.ts` is deleted with the cause.
   Test: Vitest over the layout — every river village at every swept seed carries a water
-  path whose whole run clears the FULL collider set, fence panels included, at the drawn
-  lane's half-width. Picture check on both backends: the track and the fence it passes.
-  Criticality: medium — it is visible in the settlement the communication slice is played
-  in, but it misleads rather than blocks: the carrier still arrives.
-  Refs: src/scenes/place/layout.ts (the `clearRun` sweep and the `bodies` filter beside
-  the fence-collider block), src/scenes/place/collision.ts
+  path whose whole run clears the FULL collider set at the drawn lane's half-width, with
+  no exception list. Picture check on both backends: the track where it passes a compound.
+  Criticality: medium — it costs one of the two adult words entirely in the layouts it
+  hits, but not in the one the player is given.
+  Refs: src/scenes/place/layout.ts (the `clearRun` sweep and the head ladder),
+  src/scenes/place/layout.test.ts (`NO_STRAIGHT_WALK`)
   Bundle: Dorfleben.
 
 - [ ] 1046. The children's bank round hardly ever carries anyone past the middle of the
