@@ -4136,11 +4136,23 @@ if (section('children-bank-game')) {
       const first = await readRound()
       let seen = first.playedClock
       const wallStart = Date.now()
+      // THE WINDOW OPENS AT A RUN'S START, never wherever one happens to be. The
+      // round keeps playing while the traveller is planted, so it can already be
+      // mid-run by the time this wait begins — and then the window gets the TAIL
+      // of that run. Measured on 01.09.2026: 2 s of run, then `part` and `roam`
+      // filled the other 43 s, and the crossing, which is counted inside the run
+      // phase alone, had no run left to happen in. So a run already in progress
+      // is waited OUT first and the window opens on the NEXT one. The budget
+      // above still covers it: the remaining tail of a run (at most `runSeconds`,
+      // 20 s) plus the worst measured gap between two runs (79.7 s) is 100 s
+      // against 150.
+      let leftRun = first.phase !== 'run'
       for (;;) {
         const now = await readRound()
         runPhase = now.phase
         runPlayed = now.playedClock - first.playedClock
-        if (runPhase === 'run') break
+        if (runPhase !== 'run') leftRun = true
+        if (leftRun && runPhase === 'run') break
         runWallMs = Date.now() - wallStart
         if (runPlayed >= RUN_WAIT_PLAYED_S) break
         if (Date.now() - wallStart > RUN_WAIT_WALL_MS) {
