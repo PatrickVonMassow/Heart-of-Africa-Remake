@@ -14010,3 +14010,49 @@ to land than a mechanism that needs a review.
   Refs: src/scenes/place/bankGame.ts, src/scenes/place/tagShuffle.test.ts (the bank-round
   replay and `BANK_ROUND_WINDOW`)
   Bundle: Dorfleben.
+
+- [ ] 1047. The bank game is unwatchable on its first live viewing: the runs are a sweep,
+  the tap is invisible, the end is instant and the play rocks are coarse (user, 02.09.2026,
+  watching the children's round in the deployed build). The user watched the round live and
+  reported eight things; each was verified against `bankGame.ts` at `65bd03e8e`. The point is
+  worked NEXT, at the FRONT of the work order, by the user's own decision of the same day.
+  Final state:
+  1. THE TAP IS SEEN. The tap utterance in `openRun` falls one frame before everybody
+     sprints, so ROCK is shown while the catcher is already charging. A short calibratable
+     pause holds the catcher at his rock, tapping, before the run opens. It uses the
+     held-standing pattern (`drive(s, i, null, …)`) so the stall watches read him as
+     standing rather than stalling.
+  2. A RUN IS NOT A SWEEP. `dodgedAim` exists (dodgeDistance 7, dodgeReach 3) but the
+     swerve is invisible and the catcher, with the tag config's pace advantage, tags all or
+     nearly all of them in run 1 — which is also why the direction seems announced only
+     once: `announceRun` IS per run, but a cycle almost never reaches run 2. Retuned so a
+     typical run ends with one or two tags and the rest arriving, with a swerve that is
+     bigger and earlier but still bounded to the stretch (user: "größer, aber nicht riesig").
+  3. ONE MORE CHILD: `balance.villageLife.childCount` 4 -> 5.
+  4. AN ARRIVAL IS HEARD. Arrival ROCK is implemented in `stepRun`, but `drain()` drops any
+     utterance inside `utteranceGapSeconds` and never replays it, so an arrival right after
+     a tag is silent. At least a run's first arrival is reliably audible.
+  5. THE END IS READABLE. The last tag and `endRun` resolve in the same frame and `endRun`
+     clears `crouched` on everybody at once. At the end of a cycle every caught child stays
+     crouched for a calibratable few seconds, then rises and leaves; the bank
+     crouched-outside-a-run dev assertion moves with it.
+  6. THE PARTING CALL IS DROPPED — it reads as unnatural — and the parting walk goes from
+     wherever each child stands back toward the roaming quarter rather than along the bank.
+     Decided knowing it deletes the reading guard that detached UPSTREAM/DOWNSTREAM from the
+     rocks; the river's own current remains the corroboration. The header comment,
+     `stepPart`, the meaning of `partSeconds`, the now-unused 'parting'/'bank' moment and aim
+     types, `docs/communication-poc-spec.md` §13.4 and the parting tests change with it.
+  7. THE PLAY ROCKS ARE NOT FACETED. `buildRock()` is a `DodecahedronGeometry(0.5, 0)` —
+     twelve faces — and the play rocks draw that same geometry at scale ~2.4 against the
+     0.3-1.0 of the scattered dressing, which is where the huge flat facets come from. Large
+     instances get a higher-detail variant (a detail-1 dodecahedron with seeded vertex
+     noise) that keeps the silhouette and the collider; the scatter keeps the cheap mesh.
+  Every number stays in `balance.villageLife.bankGame`; the child-motion metric stays green.
+  Test: Vitest over the round for the tap pause, the tag count of a typical run, the audible
+  first arrival, the crouch-then-rise ending and the parting walk's direction; a
+  backend-sensitive picture check for the play rocks.
+  Criticality: high — this is the first live viewing of the mechanic the whole communication
+  slice is built on, and the user could not read it.
+  Refs: src/scenes/place/bankGame.ts, src/config/balance.ts, src/world/communicationRock.ts,
+  src/scenes/place/layout.ts, docs/communication-poc-spec.md
+  Bundle: Dorfleben.

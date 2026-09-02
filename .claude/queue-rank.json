@@ -1140,40 +1140,13 @@
       "why": "Last is right: whether the round's rarity reads as a defect can only be judged once the other five points of the rebuilt slice are playable",
       "origin": "machine",
       "place": "last"
+    },
+    "1047": {
+      "at": "2026-09-02T23:04:51.595Z",
+      "why": "User decision 02.09.2026: the bank-game rework is worked NEXT, ahead of every point standing before the release.",
+      "origin": "user",
+      "place": "ahead"
     }
-  },
-  "boundary": {
-    "at": "2026-08-21T00:55:14.962Z",
-    "points": [
-      336,
-      553,
-      596,
-      633,
-      659,
-      660,
-      663,
-      688,
-      689,
-      690,
-      691,
-      692,
-      708,
-      715,
-      719,
-      733,
-      735,
-      736,
-      738,
-      739,
-      746,
-      747,
-      750,
-      759,
-      760,
-      762,
-      764
-    ],
-    "why": "The order standing in front of the release today is the arrangement that predates this rule; the four machine-filed points that had ranked themselves there were moved behind 174 first"
   },
   "settled": {
     "at": "2026-09-02T12:46:16.587Z",
@@ -1330,7 +1303,6 @@
       678,
       680,
       683,
-      688,
       689,
       690,
       691,
@@ -1539,5 +1511,37 @@
       1045,
       1046
     ]
+  },
+  "boundary": {
+    "at": "2026-08-21T00:55:14.962Z",
+    "points": [
+      336,
+      553,
+      596,
+      633,
+      659,
+      660,
+      663,
+      689,
+      690,
+      691,
+      692,
+      708,
+      715,
+      719,
+      733,
+      735,
+      736,
+      738,
+      739,
+      746,
+      747,
+      750,
+      759,
+      760,
+      762,
+      764
+    ],
+    "why": "The order standing in front of the release today is the arrangement that predates this rule; the four machine-filed points that had ranked themselves there were moved behind 174 first"
   }
 }
