@@ -4,8 +4,8 @@
 // seed is `Math.floor(Math.random() * 0xffffffff)` unless the DEV-only `?seed=<n>`
 // query parameter pins it (src/state/store.ts, `newSeed`). Every suite that opens
 // the bare dev-server URL therefore walks into a DIFFERENT world on every run:
-// other hut positions, another teaching stone, other ring stones, other villager
-// spawn spots.
+// other hut positions, other play rocks on the bank, other ring stones, other
+// villager spawn spots.
 //
 // That is what made `polish` unable to give the same verdict twice on this host
 // (measured 07./08.08.2026, eight attempts, not one clean, no two red at the same

@@ -4452,24 +4452,21 @@ if (section('children-bank-game')) {
 }
 
 // --- The adults at the water and the ground work ------------------------------
-// THE ERRAND CATALOGUE IS EMPTY ON PURPOSE, AND THIS SECTION SAYS SO. The
-// five-concept rebuild deleted the eleven-concept teaching this section used to
-// watch — the sendings, the callings back, the mirrored upstream/downstream
-// walks — and the adults' replacement teaching (an adult carrying a jar to the
-// water and back saying RIVER, a digger saying DIG on the stroke) is WORK-ORDER
-// 688, not this one. Until it lands the adults stroll the village and stage
-// nothing at all.
+// THE ADULTS TEACH BY DOING THEIR OWN WORK (work-order 688). The errand
+// catalogue is gone: what the live scene has to show now is that the two words
+// really are spoken, that they are spoken IN THE VILLAGE and never at the bank,
+// and that the digging one falls while a man is at the ground rather than while
+// he walks to it. The where-and-when is proven in Vitest over the pure module
+// (`adultWork.test.ts`); what only the browser can settle is that PlaceLife
+// carries it out at all — a villager with a jar, a villager at the dig pose, and
+// a word over his head.
 //
-// So what this section still proves is the STAGE that teaching will stand on —
-// the dig sites, the bank, its two stretches, the drawn river and the direction
-// its current runs, all of which 688's situations are placed against — plus one
-// TRIPWIRE: nothing is staged. The moment 688 stages its first situation that
-// check goes red, and it is replaced there by the walk-and-arrive checks this
-// section used to carry (they are in the history of this file, at the commit
-// before the empty catalogue).
+// The rest of the section proves the STAGE the teaching stands on: the dig
+// sites, the water path, the bank, the drawn river and the direction its current
+// runs.
 //
-// The village is the PoC's own (the Bambara village), because that is the one
-// with the teaching stone; the ground work is in every village.
+// The village is the PoC's own (the Bambara village); the ground work is in
+// every village.
 if (section('adult-errands')) {
   await page.evaluate(() => {
     const g = window.__game.getState()
@@ -4507,61 +4504,76 @@ if (section('adult-errands')) {
     const geography = await page.evaluate(() => window.__placeErrands().geography)
     check(
       'the village draws the ground work the adults teach DIG at',
-      (geography.digSites ?? []).length >= 2 && !!geography.stone,
-      `${(geography.digSites ?? []).length} dig sites, stone ${geography.stone ? 'present' : 'MISSING'}`,
+      (geography.digSites ?? []).length >= 2,
+      `${(geography.digSites ?? []).length} dig sites`,
     )
     check(
-      'and the river bank the adults teach RIVER, UPSTREAM and DOWNSTREAM at (work-order 482)',
-      !!geography.bank && !!geography.upstream && !!geography.downstream,
-      JSON.stringify({ bank: geography.bank, upstream: geography.upstream, downstream: geography.downstream }),
+      'and the water path the adults teach RIVER along (work-order 688)',
+      !!geography.waterHead && !!geography.waterFoot,
+      JSON.stringify({ head: geography.waterHead, foot: geography.waterFoot }),
     )
 
-    // THE TRIPWIRE, AND IT IS AGGREGATED ACROSS THE WINDOW, NOT READ OFF THE LAST
-    // SAMPLE. This one check replaced six, and its whole justification is that it
-    // goes red the moment 688 stages anything — so it may not depend on the shape
-    // of a counter it does not own. Keeping only the final snapshot would prove
-    // "nothing was staged" only if `staged` were guaranteed cumulative and the
-    // settlement were guaranteed not to remount; taking the LARGEST value each
+    // WHAT THE SCENE ACTUALLY CARRIES OUT, aggregated across the window rather
+    // than read off the last sample: a situation that is staged and cleared
+    // ENTIRELY BETWEEN two samples is never observed, and the largest value each
     // key ever showed survives a reset and a remount alike.
-    // WHAT IT DOES NOT SURVIVE, said plainly because the comment used to claim
-    // otherwise (cross-vendor review, 29.08.2026): a situation that is staged and
-    // cleared ENTIRELY BETWEEN two samples is never observed, and no maximum over
-    // observations can recover it. The bound this check really carries is that a
-    // staged situation persists at least one sampling interval — which the
-    // scheduler's own 0.8 s against this loop's two frames gives with room to
-    // spare, but which is an assumption about the producer and not a proof.
     //
-    // What is proven: over this window no situation counter ever rose above zero,
-    // no villager was ever seen carrying an errand, and none was ever at the
-    // digging pose. The scheduler's own interval is 0.8 s above, so the window
-    // covers it many times over.
+    // The WHERE of every word is pinned in Vitest over the pure module, which
+    // can hold a whole village still and read every utterance's own position.
+    // What only the live scene can settle is that PlaceLife carries the work out:
+    // a man at the digging pose, a man with a jar on the way to the water, and
+    // both words really reaching the player.
     const staged = {}
-    let errands = 0
     let dug = 0
-    for (let i = 0; i < 120; i++) {
+    let carriedEmpty = 0
+    let carriedFull = 0
+    let atWork = 0
+    let nearestBankVoice = Infinity
+    for (let i = 0; i < 240; i++) {
       const now = await page.evaluate(() => window.__placeErrands())
       for (const [id, n] of Object.entries(now.staged ?? {})) {
         staged[id] = Math.max(staged[id] ?? 0, n ?? 0)
       }
       for (const v of now.villagers) {
         if (v.digging) dug++
-        if (v.errand) errands++
+        if (v.carry === 'emptyJar') carriedEmpty++
+        if (v.carry === 'fullJar') carriedFull++
+        if (v.work) atWork++
+      }
+      // AND NO ADULT VOICE EVER FALLS AT THE BANK (the spec's own rule): the
+      // last word's speaker is read where he stands, and the nearest any of them
+      // came to the water is reported.
+      const last = now.last
+      if (last) {
+        const who = now.villagers[last.speaker]
+        const foot = now.geography.waterFoot
+        if (who && foot) {
+          nearestBankVoice = Math.min(nearestBankVoice, Math.hypot(who.x - foot.x, who.z - foot.z))
+        }
       }
       await nextFrames(2)
     }
     const stagedTotal = Object.values(staged).reduce((a, b) => a + b, 0)
     check(
-      'the adults stage nothing while the catalogue awaits its rebuild (work-order 688)',
-      stagedTotal === 0 && errands === 0 && dug === 0,
-      `${stagedTotal} staged at the window's peak over 120 samples, ${errands} villager-samples ` +
-        `carrying an errand, ` +
-        `${dug} at the digging pose` +
-        (stagedTotal > 0
-          ? ` — ${Object.entries(staged)
-              .filter(([, n]) => n > 0)
-              .map(([k, n]) => `${k}×${n}`)
-              .join(', ')}. The adults teach again: restore the walk-and-arrive checks here`
-          : ''),
+      'the adults teach their two words by working (work-order 688)',
+      stagedTotal > 0 && atWork > 0,
+      `${stagedTotal} situations staged at the window's peak over 240 samples ` +
+        `(${Object.entries(staged)
+          .map(([k, n]) => `${k}×${n}`)
+          .join(', ')}), ${atWork} villager-samples at work`,
+    )
+    check(
+      'a villager is seen digging, and a villager is seen carrying the jar',
+      dug > 0 && carriedEmpty + carriedFull > 0,
+      `${dug} villager-samples at the dig pose, ${carriedEmpty} with the empty jar, ` +
+        `${carriedFull} with the full one`,
+    )
+    check(
+      'and no adult word ever falls at the bank, inside the children`s earshot',
+      !Number.isFinite(nearestBankVoice) || nearestBankVoice > 10,
+      Number.isFinite(nearestBankVoice)
+        ? `nearest speaker to the water's foot: ${nearestBankVoice.toFixed(1)} m`
+        : 'no adult spoke in the window',
     )
 
     // The picture: a villager standing at the ground work it was sent to.
@@ -4586,7 +4598,7 @@ if (section('adult-errands')) {
       await nextFrames(6)
       await frame('483-village-errands', {
         local: { x: spot.x, y: 0.6, z: spot.z },
-        label: 'the ground work the adults teach digging at',
+        label: 'the ground work the adults teach digging at, off the village middle',
       })
     }
 

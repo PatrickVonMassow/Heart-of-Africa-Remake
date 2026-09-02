@@ -89,7 +89,7 @@ words without a staged lesson (work-order 687). They roam their own quarter out
 of earshot of the adults; at the end of that phase one of them calls `RIVER`,
 points at the water and the group runs to the bank, and that caller is the first
 catcher. Two rocks stand at the ends of a stretch of bank, one upstream and one
-downstream, in the teaching stone's own size. The runners gather at one, the
+downstream, in the play rocks' own size. The runners gather at one, the
 catcher waits at the other, the direction is announced before each run, whoever
 reaches the far rock calls `ROCK`, and whoever is caught drops out where he
 stands until the run ends. Sides swap every run, so the announced word alternates

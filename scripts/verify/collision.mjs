@@ -545,11 +545,12 @@ if (section('village')) {
   )
 }
 
-// === The PoC village's teaching stone (work-order 482) ========================
-// The adults teach the word for a rock at a stone in the open (docs/
-// communication-poc-spec.md), so it has to BE there: a solid the player walks up
-// to and not through, standing where the layout says — and in the picture, which
-// is the only place a "visible from the village" claim can be judged.
+// === The PoC village's play rocks (work-order 687/688) =======================
+// The word for a rock is learnt at the TWO blocks on the bank now — the village's
+// lone teaching stone went with the errands that pointed at it (work-order 688).
+// They have to BE there: solids the player walks up to and not through, standing
+// where the layout says, and in the picture, which is the only place their
+// "unmistakable for the dressing" claim can be judged.
 if (section('drawn-colliders')) {
   await enterSettlement('bambara-village')
   // === Nothing blocks where nothing is drawn (work-order 583) ===================
@@ -582,32 +583,41 @@ if (section('drawn-colliders')) {
   )
 }
 
-if (section('teaching-stone')) {
+if (section('play-rocks')) {
   await enterSettlement('bambara-village')
-  const teachingStone = await page.evaluate(() => window.__placeLayout.teachingStone ?? null)
-  check('PoC village: the teaching stone is in the layout', !!teachingStone, JSON.stringify(teachingStone))
-  if (teachingStone) {
-    await ejectTest(
-      'Teaching stone',
-      `(cs)=>cs.findIndex((c)=>!c.kind&&Math.hypot(c.x-(${teachingStone.x}),c.z-(${teachingStone.z}))<0.01)`,
-    )
-    // Stand a couple of steps off it, looking at it, so the frame shows the stone
-    // the way a player walking up to it sees it.
+  const rocks = await page.evaluate(() => window.__placeLayout.playRocks ?? null)
+  check('PoC village: the two play rocks are in the layout', !!rocks, JSON.stringify(rocks))
+  if (rocks) {
+    for (const [name, p] of [
+      ['Play rock upstream', rocks.upstream],
+      ['Play rock downstream', rocks.downstream],
+    ]) {
+      await ejectTest(
+        name,
+        `(cs)=>cs.findIndex((c)=>!c.kind&&Math.hypot(c.x-(${p.x}),c.z-(${p.z}))<0.01)`,
+      )
+    }
+    // Stand a couple of steps off the upstream block, looking at it and down the
+    // stretch, so the frame shows the rock the way a child running at it sees it
+    // — and the second one behind it, which is the pair the game is played
+    // between.
     await page.evaluate((s) => {
       const p = window.__placePlayer
-      const len = Math.hypot(s.x, s.z) || 1
-      p.x = s.x - (s.x / len) * (s.r + 2.6)
-      p.z = s.z - (s.z / len) * (s.r + 2.6)
-      p.yaw = Math.atan2(-(s.x - p.x), -(s.z - p.z))
-    }, teachingStone)
+      const dx = s.downstream.x - s.upstream.x
+      const dz = s.downstream.z - s.upstream.z
+      const len = Math.hypot(dx, dz) || 1
+      p.x = s.upstream.x - (dx / len) * (s.r + 3.5)
+      p.z = s.upstream.z - (dz / len) * (s.r + 3.5)
+      p.yaw = Math.atan2(-(s.upstream.x - p.x), -(s.upstream.z - p.z))
+    }, rocks)
     // Let the scene consume the teleport on ITS clock before the shutter judges:
     // two animation frames, not a wall-clock guess (CLAUDE.md §7.2). On a loaded
     // host a frame can take a second, and the camera would still be easing toward
-    // the stone when the picture is taken.
+    // the rock when the picture is taken.
     await page.evaluate(() => new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(() => r(null)))))
-    await shot('54-collision-teaching-stone', {
-      local: { x: teachingStone.x, z: teachingStone.z },
-      label: 'the teaching stone in the PoC village',
+    await shot('54-collision-play-rocks', {
+      local: { x: rocks.upstream.x, z: rocks.upstream.z },
+      label: 'the two play rocks on the bank of the PoC village',
     })
   }
 }
