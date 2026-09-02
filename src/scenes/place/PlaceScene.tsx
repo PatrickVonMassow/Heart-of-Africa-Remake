@@ -63,7 +63,7 @@ import { setSkyOvercast, skyOvercast } from '../../render/skyOvercast'
 import { PORT_SKY, VILLAGE_SKY } from '../../render/skyPresets'
 import { createGroundMaterial, createNoisyMaterial, createSurfaceMaterial } from '../../render/materials'
 import { TESSELLATION } from '../../render/figures'
-import { buildAcacia, buildBush, buildGrassTuft, buildJungleTree, buildPalm, buildRock } from '../../render/flora'
+import { buildAcacia, buildBush, buildErraticBoulder, buildGrassTuft, buildJungleTree, buildPalm, buildRock } from '../../render/flora'
 import { buildTableMountain, buildGizaPyramids, buildGizaSiteMonuments } from '../../render/landmarks'
 import { GIZA_AMBIENT, GIZA_PYRAMIDS, type GizaAmbientRole } from './gizaSite'
 import {
@@ -101,11 +101,11 @@ import {
   fleckPosition,
 } from '../../render/placeRiver'
 import { RIVER_DRIFT_SPEED } from '../../render/waterAppearance'
-import { bankGroundHeight, type PlaceRiverBank } from './riverBank'
+import { bankGroundHeight, bankPlayRocksView, type PlaceRiverBank } from './riverBank'
 import { scatterGrassTufts } from './groundScatter'
 import { clearEdgeBand, setEdgeBandBoundary, setEdgeBandLook } from '../../render/edgeBand'
 import { devAssert } from '../../systems/devAssert'
-import { buildLayout, builtFabric, DIG_SITE_RADIUS, fencePanels, isOnLane, nearestActionable, PLACE_RADIUS, SPAWN_INSET, VILLAGE_FIRE, type Interactive, type PathDef, type DwellingDef, type FenceDef, type PlaceLayout } from './layout'
+import { buildLayout, DIG_SITE_RADIUS, fencePanels, isOnLane, nearestActionable, PLACE_RADIUS, SPAWN_INSET, VILLAGE_FIRE, type Interactive, type PathDef, type DwellingDef, type FenceDef, type PlaceLayout } from './layout'
 import {
   COOK_SHELTER,
   EYE_HEIGHT,
@@ -1215,40 +1215,22 @@ function GroundScatter({
 }
 
 /**
- * The teaching stone (work-order 482, docs/communication-poc-spec.md): ONE
- * boulder standing in the open of the PoC village. It is deliberately a small,
- * near stone — the erratic the chief's drum message sends the player to is a
- * much larger block far upstream, and making that transfer is the puzzle. Its
- * position and radius are the layout's, so the drawn stone and its collider are
- * the same object (points 129/378).
- */
-function TeachingStone({ stone }: { stone: PlaceLayout['teachingStone'] }) {
-  const geo = useMemo(() => buildRock(), [])
-  if (!stone) return null
-  return (
-    <mesh
-      geometry={geo}
-      position={[stone.x, 0, stone.z]}
-      rotation={[0, stone.x * 1.7 + stone.z, 0]}
-      scale={stone.scale}
-      castShadow
-      receiveShadow
-    >
-      <meshStandardMaterial vertexColors roughness={0.95} />
-    </mesh>
-  )
-}
-
-/**
  * The two PLAY ROCKS of the children's bank game (work-order 687): the run-to
- * targets at the upstream and downstream ends of their stretch. They are drawn
- * from the same rock dressing as the teaching stone and at the same scale — the
- * word called at them is the same word, and ROCK has to transfer between
- * instances rather than name one boulder. Positions and radius are the layout's,
- * so the drawn stone and its collider are one object (points 129/378).
+ * targets at the upstream and downstream ends of their stretch.
+ *
+ * Each is an UPRIGHT ERRATIC (work-order 688) — the same block
+ * `world/communicationRock.ts` stands a day upstream, drawn at settlement scale.
+ * That is the whole point of the shape: ROCK is learnt HERE and has to be
+ * applied THERE, so the two must be the same KIND of thing at two sizes rather
+ * than a squatting boulder in the village and a standing one outside it. The
+ * village's single teaching stone, which used to carry the word from the middle
+ * of the square, is gone with the errands that pointed at it.
+ *
+ * Positions and radius are the layout's, so the drawn block and its collider are
+ * one object (points 129/378).
  */
 function PlayRocks({ rocks }: { rocks: PlaceLayout['playRocks'] }) {
-  const geo = useMemo(() => buildRock(), [])
+  const geo = useMemo(() => buildErraticBoulder(), [])
   if (!rocks) return null
   return (
     <>
@@ -2259,7 +2241,6 @@ export function PlaceScene() {
   }, [groundPlate])
   // Where the settlement's walls stand (point 524) — the children's play ground
   // is kept against them.
-  const fabric = useMemo(() => (layout ? builtFabric(layout) : []), [layout])
   const isPort = place?.kind === 'port'
   const isMonument = place?.kind === 'monument'
   const isVillage = place?.kind === 'village'
@@ -2371,6 +2352,13 @@ export function PlaceScene() {
     const w = window as unknown as Record<string, unknown>
     w.__placePlayer = player.current
     w.__placeLayout = layout
+    // WHERE TO STAND TO PHOTOGRAPH BOTH PLAY ROCKS. Handed over rather than
+    // transcribed into the suite: the collision suite used to place its camera
+    // on the stretch's own axis, which puts the far rock exactly behind the near
+    // one, and its shutter then gated the near one alone (GPT-5.6 Sol, first
+    // cross-vendor round, D3). One description of the stand, read by the suite
+    // and by `bankStage.test.ts` alike.
+    w.__bankStageView = () => (layout?.playRocks ? bankPlayRocksView(layout.playRocks) : null)
     w.__placeColliders = layout?.colliders
     w.__placeCamera = camera
     w.__placeScene = r3fScene
@@ -2412,6 +2400,7 @@ export function PlaceScene() {
       delete w.__placeSeason
       delete w.__placePlayer
       delete w.__placeLayout
+      delete w.__bankStageView
       delete w.__placeColliders
       delete w.__placeCamera
       delete w.__placeScene
@@ -2938,7 +2927,6 @@ export function PlaceScene() {
           the open the adults teach the word for a rock at. Drawn from the same
           rock dressing as the scatter, at its own bigger scale, exactly at the
           layout position its collider comes from. */}
-      <TeachingStone stone={layout.teachingStone} />
 
       {/* The two rocks the children's bank game runs between (work-order 687):
           the same dressing at the same size as the teaching stone, because the
@@ -2959,17 +2947,17 @@ export function PlaceScene() {
           placeId={place.id}
           style={style}
           buildings={layout.interactives.filter((it) => it.type !== 'villager').map((it) => it.pos)}
-          fabric={fabric}
           playRocks={layout.playRocks}
+          playGround={layout.playGround}
           rocks={layout.rocks}
           firePos={[-3.5, 2.5]}
           homes={layout.dwellings
             .filter((d) => d.kind === 'hut' || d.kind === 'box')
             .map((d) => ({ x: d.x, z: d.z, door: d.door }))}
           errands={layout.errands}
-          teachingStone={layout.teachingStone}
           digSites={layout.digSites}
           bank={layout.bank}
+          waterPath={layout.waterPath}
           pen={layout.pen}
           colliders={layout.colliders}
           radius={layout.radius}

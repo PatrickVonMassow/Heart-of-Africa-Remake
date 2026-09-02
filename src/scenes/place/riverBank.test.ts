@@ -150,7 +150,11 @@ describe('the bank is REACHABLE, and the village stays dry', () => {
     for (const [x, z, s] of layout.rocks) expect(wet(x, z, 0.35 + s * 0.5)).toBe(false)
     for (const f of layout.flora) expect(wet(f.x, f.z, 0.45)).toBe(false)
     for (const s of layout.digSites) expect(wet(s.x, s.z, 1)).toBe(false)
-    if (layout.teachingStone) expect(wet(layout.teachingStone.x, layout.teachingStone.z, layout.teachingStone.r)).toBe(false)
+    // The play rocks are the exception the rule is stated against: they stand ON
+    // the bank by design (work-order 687), inland of the waterline but past the
+    // built ground, so what is asserted of them is the ground plate, not dryness
+    // of the village kind. `bankStage.test.ts` carries that.
+    if (layout.waterPath) expect(wet(layout.waterPath.head.x, layout.waterPath.head.z, 0.5)).toBe(false)
   })
 
   it.each(BANK_SEEDS)('THE WATER IS NOT A WALL at seed %d: nothing invisible stands at the waterline', (seed) => {
@@ -352,7 +356,10 @@ describe('nothing solid stands in the children`s running lane (work-order 687)',
     }
     // The sweep is worthless if it found no lane to sweep.
     expect(checked).toBeGreaterThan(0)
-  })
+    // A hundred and eighty layouts built and swept: 18 s alone on this machine,
+    // and over the default 20 s budget under the full suite's worker contention.
+    // A measurement this long carries its own budget, not a flake.
+  }, 90_000)
 
   // AND THE STAGE IS THE ONE THE BANK ACTUALLY SETTLED ON. The play rocks are
   // derived from the bank points, and `settleBankPoints` may pull those inland

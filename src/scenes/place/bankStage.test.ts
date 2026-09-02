@@ -10,9 +10,10 @@
 
 import { describe, expect, it } from 'vitest'
 import { standingClear, WALKER_RADIUS, spawnPointFree } from './collision'
-import { buildLayout, TEACHING_STONE_SCALE } from './layout'
-import { BANK_PLAY_LANE_HALF, inBankPlayLane, standsOnGroundPlate } from './riverBank'
+import { buildLayout, PLAY_ROCK_SCALE } from './layout'
+import { BANK_PLAY_LANE_HALF, bankPlayRocksView, inBankPlayLane, standsOnGroundPlate } from './riverBank'
 import { PLACES } from '../../world/geo'
+import { ROCK_HEIGHT_UNITS } from '../../world/communicationRock'
 
 /** The camera the player looks through: App.tsx's own field of view, and the
  *  viewport the verification scripts run at. */
@@ -22,10 +23,10 @@ const VIEWPORT = { width: 1440, height: 900 }
 /** The three river villages are the settlements that carry a bank at all. */
 const RIVER_VILLAGES = ['nubian-village', 'bambara-village', 'mandinka-village']
 
-/** Height of a play rock: `buildRock` is a unit-radius blob scaled by this, and
- *  the collider takes half of it as a radius — so the stone stands roughly
- *  waist-high on a grown man. */
-const ROCK_HEIGHT = 0.54 * TEACHING_STONE_SCALE
+/** Height of a play rock: the erratic block of `world/communicationRock.ts`
+ *  drawn at settlement scale (work-order 688), so it stands well over a man and
+ *  is unmistakable for the dressing at either end of the stretch. */
+const ROCK_HEIGHT = ROCK_HEIGHT_UNITS * PLAY_ROCK_SCALE
 
 describe('the children`s play stage on the bank (point 687)', () => {
   it('gives exactly the river villages two play rocks, and no other settlement any', () => {
@@ -82,14 +83,42 @@ describe('the children`s play stage on the bank (point 687)', () => {
       expect(stretch).toBeLessThan(22)
       // A runner at the start line looks down the lane at the far rock: it must
       // be a rock rather than a speck. Its height over the stretch, against the
-      // vertical frame — some 3.8 deg of 50, about 68 px of the 900.
+      // vertical frame — some 12.4 deg of 50, about 220 px of the 900 now that
+      // it stands upright (work-order 688).
       const subtended = 2 * Math.atan(ROCK_HEIGHT / 2 / stretch)
       expect((subtended / (2 * halfV)) * VIEWPORT.height).toBeGreaterThan(40)
-      // And BOTH are in the frame at once: a spectator standing back from the
-      // start line by one stretch-length sees the near rock at this bearing off
-      // his line to the far one, well inside the horizontal half-frame.
-      const bearing = Math.atan(stretch / 2 / stretch)
-      expect(bearing).toBeLessThan(halfH)
+      // AND BOTH ARE IN THE FRAME AT ONCE, from the stand the picture is taken
+      // at. The old form of this check was `atan(stretch / 2 / stretch)` — a
+      // constant, `atan(0.5)`, that used neither rock position nor any camera
+      // and could not have noticed either rock leaving the frame (GPT-5.6 Sol,
+      // first cross-vendor round, D7). It is measured from the real stand and
+      // the real stones now.
+      const view = bankPlayRocksView(rocks)
+      const bearingTo = (p: { x: number; z: number }) => {
+        const lx = view.look.x - view.x
+        const lz = view.look.z - view.z
+        const px = p.x - view.x
+        const pz = p.z - view.z
+        const dot = (lx * px + lz * pz) / (Math.hypot(lx, lz) * Math.hypot(px, pz) || 1)
+        return Math.acos(Math.max(-1, Math.min(1, dot)))
+      }
+      const bUp = bearingTo(rocks.upstream)
+      const bDown = bearingTo(rocks.downstream)
+      expect(bUp, `${id}: the upstream rock is outside the frame`).toBeLessThan(halfH)
+      expect(bDown, `${id}: the downstream rock is outside the frame`).toBeLessThan(halfH)
+      // ... and they read as TWO stones rather than one behind the other: the
+      // stand is off the stretch's axis by design, and this is what says so.
+      expect(bUp + bDown, `${id}: the two rocks stand on one line from the camera`).toBeGreaterThan(
+        20 * (Math.PI / 180),
+      )
+      // The far stone from that stand is further off than the stretch itself,
+      // and must still read as a rock rather than a speck.
+      const far = Math.max(
+        Math.hypot(rocks.upstream.x - view.x, rocks.upstream.z - view.z),
+        Math.hypot(rocks.downstream.x - view.x, rocks.downstream.z - view.z),
+      )
+      const fromStand = 2 * Math.atan(ROCK_HEIGHT / 2 / far)
+      expect((fromStand / (2 * halfV)) * VIEWPORT.height).toBeGreaterThan(30)
     }
   })
 

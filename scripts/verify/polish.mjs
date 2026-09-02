@@ -2580,8 +2580,29 @@ if (section('campfire-shadows')) {
 // year — a step visible only in the dry-season straw would be half a feature.
 if (section('settlement-edge')) {
   // Ground crops: how far inside / outside the boundary each sample sits.
+  //
+  // THE INSIDE CROP SITS INSIDE THE BAND, NOT ON ITS INNER EDGE (work-order
+  // 688). It stood at −5 m, which was well clear of the band this check was
+  // written against — but the band was widened to 8 m in play on 27.08.2026 and
+  // the crops were not re-aimed with it. −5 then sat ON the band's own inner
+  // edge (radius − 4, ± the 0.4 m wander), the least stable ground on the whole
+  // profile, and whether the criterion passed came down to which bearing the
+  // corridor scan happened to pick.
+  //
+  // MEASURED, band on / band off, over the whole ray at 1 m steps:
+  //   bambara (dry)  −5 ×0.690  −3 ×0.695  −2 ×0.704  0 ×0.857  +1 ×0.968  +2 ×0.999
+  //   bambara (wet)  −5 ×0.838  −3 ×0.723  −2 ×0.709  0 ×0.837  +1 ×0.961  +2 ×0.998
+  //   capetown (wet) −5 ×0.867  −3 ×0.798  −2 ×0.776  0 ×0.904  +1 ×0.985  +2 ×1.000
+  //   giza (dry)     −5 ×0.864  −3 ×0.875  −2 ×0.878  0 ×0.948  +1 ×0.991  +2 ×1.000
+  //   giza (wet)     −5 ×0.820  −3 ×0.799  −2 ×0.797  0 ×0.907  +1 ×0.982  +2 ×1.000
+  // The visible fall runs from about −1.4 to +1.4, exactly the width the band's
+  // core says it should. At −3 the sweep is at full strength everywhere and in
+  // both seasons; at −5 it is not — bambara in the rains reads ×0.838 there,
+  // ABOVE its own boundary crop, and the give-way check had a margin of −0.001
+  // against a bar of 0.008. Off −3 the same margins are 0.11 to 0.16: the bar is
+  // unchanged and is no longer decided by noise.
   const SAMPLES = [
-    { name: 'inside', at: -5 },
+    { name: 'inside', at: -3 },
     { name: 'boundary', at: 0 },
     { name: 'outside', at: 4 },
   ]
@@ -4452,24 +4473,21 @@ if (section('children-bank-game')) {
 }
 
 // --- The adults at the water and the ground work ------------------------------
-// THE ERRAND CATALOGUE IS EMPTY ON PURPOSE, AND THIS SECTION SAYS SO. The
-// five-concept rebuild deleted the eleven-concept teaching this section used to
-// watch — the sendings, the callings back, the mirrored upstream/downstream
-// walks — and the adults' replacement teaching (an adult carrying a jar to the
-// water and back saying RIVER, a digger saying DIG on the stroke) is WORK-ORDER
-// 688, not this one. Until it lands the adults stroll the village and stage
-// nothing at all.
+// THE ADULTS TEACH BY DOING THEIR OWN WORK (work-order 688). The errand
+// catalogue is gone: what the live scene has to show now is that the two words
+// really are spoken, that they are spoken IN THE VILLAGE and never at the bank,
+// and that the digging one falls while a man is at the ground rather than while
+// he walks to it. The where-and-when is proven in Vitest over the pure module
+// (`adultWork.test.ts`); what only the browser can settle is that PlaceLife
+// carries it out at all — a villager with a jar, a villager at the dig pose, and
+// a word over his head.
 //
-// So what this section still proves is the STAGE that teaching will stand on —
-// the dig sites, the bank, its two stretches, the drawn river and the direction
-// its current runs, all of which 688's situations are placed against — plus one
-// TRIPWIRE: nothing is staged. The moment 688 stages its first situation that
-// check goes red, and it is replaced there by the walk-and-arrive checks this
-// section used to carry (they are in the history of this file, at the commit
-// before the empty catalogue).
+// The rest of the section proves the STAGE the teaching stands on: the dig
+// sites, the water path, the bank, the drawn river and the direction its current
+// runs.
 //
-// The village is the PoC's own (the Bambara village), because that is the one
-// with the teaching stone; the ground work is in every village.
+// The village is the PoC's own (the Bambara village); the ground work is in
+// every village.
 if (section('adult-errands')) {
   await page.evaluate(() => {
     const g = window.__game.getState()
@@ -4507,61 +4525,145 @@ if (section('adult-errands')) {
     const geography = await page.evaluate(() => window.__placeErrands().geography)
     check(
       'the village draws the ground work the adults teach DIG at',
-      (geography.digSites ?? []).length >= 2 && !!geography.stone,
-      `${(geography.digSites ?? []).length} dig sites, stone ${geography.stone ? 'present' : 'MISSING'}`,
+      (geography.digSites ?? []).length >= 2,
+      `${(geography.digSites ?? []).length} dig sites`,
     )
     check(
-      'and the river bank the adults teach RIVER, UPSTREAM and DOWNSTREAM at (work-order 482)',
-      !!geography.bank && !!geography.upstream && !!geography.downstream,
-      JSON.stringify({ bank: geography.bank, upstream: geography.upstream, downstream: geography.downstream }),
+      'and the water path the adults teach RIVER along (work-order 688)',
+      !!geography.waterHead && !!geography.waterFoot,
+      JSON.stringify({ head: geography.waterHead, foot: geography.waterFoot }),
     )
 
-    // THE TRIPWIRE, AND IT IS AGGREGATED ACROSS THE WINDOW, NOT READ OFF THE LAST
-    // SAMPLE. This one check replaced six, and its whole justification is that it
-    // goes red the moment 688 stages anything — so it may not depend on the shape
-    // of a counter it does not own. Keeping only the final snapshot would prove
-    // "nothing was staged" only if `staged` were guaranteed cumulative and the
-    // settlement were guaranteed not to remount; taking the LARGEST value each
+    // WHAT THE SCENE ACTUALLY CARRIES OUT, aggregated across the window rather
+    // than read off the last sample: a situation that is staged and cleared
+    // ENTIRELY BETWEEN two samples is never observed, and the largest value each
     // key ever showed survives a reset and a remount alike.
-    // WHAT IT DOES NOT SURVIVE, said plainly because the comment used to claim
-    // otherwise (cross-vendor review, 29.08.2026): a situation that is staged and
-    // cleared ENTIRELY BETWEEN two samples is never observed, and no maximum over
-    // observations can recover it. The bound this check really carries is that a
-    // staged situation persists at least one sampling interval — which the
-    // scheduler's own 0.8 s against this loop's two frames gives with room to
-    // spare, but which is an assumption about the producer and not a proof.
     //
-    // What is proven: over this window no situation counter ever rose above zero,
-    // no villager was ever seen carrying an errand, and none was ever at the
-    // digging pose. The scheduler's own interval is 0.8 s above, so the window
-    // covers it many times over.
+    // The WHERE of every word is pinned in Vitest over the pure module, which
+    // can hold a whole village still and read every utterance's own position.
+    // What only the live scene can settle is that PlaceLife carries the work out:
+    // a man at the digging pose, a man with a jar on the way to the water, and
+    // both words really reaching the player.
+    // WHERE THE CHILDREN ARE, so an adult voice can be measured against it. The
+    // water's foot alone stood for the whole stage before, which is neither the
+    // rocks the round is played between nor the quarter the group roams in.
+    const stage = await page.evaluate(() => {
+      const l = window.__placeLayout
+      const pts = []
+      if (l?.playRocks) {
+        pts.push({ what: 'upstream rock', x: l.playRocks.upstream.x, z: l.playRocks.upstream.z })
+        pts.push({ what: 'downstream rock', x: l.playRocks.downstream.x, z: l.playRocks.downstream.z })
+      }
+      if (l?.waterPath) pts.push({ what: "the water's foot", x: l.waterPath.foot.x, z: l.waterPath.foot.z })
+      return { pts, roam: l?.playGround ? { x: l.playGround.x, z: l.playGround.z, r: l.playGround.radius } : null }
+    })
     const staged = {}
-    let errands = 0
+    const heard = {}
     let dug = 0
-    for (let i = 0; i < 120; i++) {
+    let carriedEmpty = 0
+    let carriedFull = 0
+    let atWork = 0
+    let nearestBankVoice = Infinity
+    let nearestVoiceWhat = null
+    // THE UTTERANCE ALREADY STANDING WHEN THE WINDOW OPENS IS NOT ONE OF OURS.
+    // `last` survives its own moment, so the first sample would otherwise be
+    // counted as a fresh word and measured at a speaker who has since walked on
+    // (GPT-5.6 Sol, confirming round). It is read once, before the loop, and
+    // becomes the thing every later sample is compared against.
+    const first = await page.evaluate(() => window.__placeErrands())
+    let seen = first.last
+      ? { key: `${first.last.id}/${first.last.concept}/${first.last.speaker}`, age: first.last.age }
+      : null
+    for (let i = 0; i < 240; i++) {
       const now = await page.evaluate(() => window.__placeErrands())
       for (const [id, n] of Object.entries(now.staged ?? {})) {
         staged[id] = Math.max(staged[id] ?? 0, n ?? 0)
       }
       for (const v of now.villagers) {
         if (v.digging) dug++
-        if (v.errand) errands++
+        if (v.carry === 'emptyJar') carriedEmpty++
+        if (v.carry === 'fullJar') carriedFull++
+        if (v.work) atWork++
       }
+      // AND NO ADULT VOICE EVER FALLS INSIDE THE CHILDREN'S EARSHOT (the spec's
+      // own rule). The speaker is read WHERE HE STOOD WHEN HE SPOKE — only on
+      // the sample that first carries a NEW utterance, which `age` resetting to
+      // zero identifies. Reading his CURRENT place on every later sample instead
+      // measured a man who had walked on: a correct carrier says RIVER at the
+      // head of the path and then goes down to the water, which failed the check
+      // though nothing was wrong, while a word really spoken at the bank slipped
+      // through as soon as its speaker walked away (GPT-5.6 Sol, first
+      // cross-vendor round, D1).
+      const last = now.last
+      const key = last ? `${last.id}/${last.concept}/${last.speaker}` : null
+      const fresh = last && (!seen || seen.key !== key || last.age < seen.age)
+      if (fresh) {
+        heard[last.concept] = (heard[last.concept] ?? 0) + 1
+        const who = now.villagers[last.speaker]
+        if (who) {
+          // AGAINST THE CHILDREN THEMSELVES, first. The stage says where they
+          // belong; a child on the speaker's side of a rock is nearer him than
+          // the rock is, and it is the child who hears (GPT-5.6 Sol, confirming
+          // round). The stage points stay as a floor for the moment when the
+          // children are elsewhere entirely.
+          const kids = await page.evaluate(() => window.__placeTag?.()?.children ?? [])
+          for (const kid of kids) {
+            const d = Math.hypot(who.x - kid.x, who.z - kid.z)
+            if (d < nearestBankVoice) {
+              nearestBankVoice = d
+              nearestVoiceWhat = `${last.concept} at ${d.toFixed(1)} m from a child`
+            }
+          }
+          for (const pt of stage.pts) {
+            const d = Math.hypot(who.x - pt.x, who.z - pt.z)
+            if (d < nearestBankVoice) {
+              nearestBankVoice = d
+              nearestVoiceWhat = `${last.concept} at ${d.toFixed(1)} m from ${pt.what}`
+            }
+          }
+          if (stage.roam) {
+            const d = Math.max(0, Math.hypot(who.x - stage.roam.x, who.z - stage.roam.z) - stage.roam.r)
+            if (d < nearestBankVoice) {
+              nearestBankVoice = d
+              nearestVoiceWhat = `${last.concept} at ${d.toFixed(1)} m from the roaming quarter's rim`
+            }
+          }
+        }
+      }
+      if (last) seen = { key, age: last.age }
       await nextFrames(2)
     }
     const stagedTotal = Object.values(staged).reduce((a, b) => a + b, 0)
     check(
-      'the adults stage nothing while the catalogue awaits its rebuild (work-order 688)',
-      stagedTotal === 0 && errands === 0 && dug === 0,
-      `${stagedTotal} staged at the window's peak over 120 samples, ${errands} villager-samples ` +
-        `carrying an errand, ` +
-        `${dug} at the digging pose` +
-        (stagedTotal > 0
-          ? ` — ${Object.entries(staged)
-              .filter(([, n]) => n > 0)
-              .map(([k, n]) => `${k}×${n}`)
-              .join(', ')}. The adults teach again: restore the walk-and-arrive checks here`
-          : ''),
+      'the adults teach their two words by working (work-order 688)',
+      stagedTotal > 0 && atWork > 0,
+      `${stagedTotal} situations staged at the window's peak over 240 samples ` +
+        `(${Object.entries(staged)
+          .map(([k, n]) => `${k}×${n}`)
+          .join(', ')}), ${atWork} villager-samples at work`,
+    )
+    check(
+      'a villager is seen digging, and the jar goes down EMPTY and comes back FULL',
+      dug > 0 && carriedEmpty > 0 && carriedFull > 0,
+      `${dug} villager-samples at the dig pose, ${carriedEmpty} with the empty jar, ` +
+        `${carriedFull} with the full one`,
+    )
+    // BOTH WORDS ARE ACTUALLY HEARD. Nothing here used to require either of them:
+    // the staging, digging and carrying checks are satisfied by animation alone,
+    // and the earshot check passed EXPLICITLY when nobody spoke at all — so a
+    // broken speech path would have gone green (GPT-5.6 Sol, first cross-vendor
+    // round, D2).
+    check(
+      'and both adult words are really spoken — RIVER and DIG',
+      (heard.RIVER ?? 0) > 0 && (heard.DIG ?? 0) > 0,
+      `RIVER ×${heard.RIVER ?? 0}, DIG ×${heard.DIG ?? 0} over 240 samples`,
+    )
+    check(
+      'and no adult word ever falls inside the children`s earshot',
+      Number.isFinite(nearestBankVoice) && nearestBankVoice > 10,
+      Number.isFinite(nearestBankVoice)
+        ? `nearest utterance to the children: ${nearestVoiceWhat}`
+        : 'NO ADULT SPOKE IN THE WINDOW — nothing was measured',
     )
 
     // The picture: a villager standing at the ground work it was sent to.
@@ -4586,7 +4688,7 @@ if (section('adult-errands')) {
       await nextFrames(6)
       await frame('483-village-errands', {
         local: { x: spot.x, y: 0.6, z: spot.z },
-        label: 'the ground work the adults teach digging at',
+        label: 'the ground work the adults teach digging at, off the village middle',
       })
     }
 

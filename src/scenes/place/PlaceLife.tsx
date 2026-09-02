@@ -7,7 +7,7 @@
 // carried from the well.
 // Pure animation, no mechanics.
 
-import { createContext, useContext, useEffect, useMemo, useRef, type RefObject } from 'react'
+import { createContext, useCallback, useContext, useEffect, useMemo, useRef, type ReactNode, type RefObject } from 'react'
 import { useFrame, useThree } from '@react-three/fiber'
 import * as THREE from 'three/webgpu'
 import { mulberry32 } from '../../world/noise'
@@ -31,6 +31,7 @@ import {
   armAim,
   digPose,
   gesturePose,
+  isGesturing,
   REST_POSE,
   restGesture,
   startGesture,
@@ -73,20 +74,22 @@ import {
   type SpokenSituation,
 } from './childSituations'
 import {
-  clearErrand,
-  createAdultErrands,
-  errandOf,
+  carryOf,
+  clearTask,
+  createAdultWork,
   isDigging,
-  noteErrandArrival,
-  stepAdultErrands,
+  goalOf,
+  stepAdultWork,
+  taskOf,
+  type AdultWorkGeography,
+  type AdultWorkView,
   type DigSite,
-  type ErrandGeography,
   type ErrandPoint,
-  type ErrandView,
-  type SpokenErrand,
-} from './adultErrands'
+  type SpokenWord,
+  WORK_ARRIVE_RADIUS,
+} from './adultWork'
 import { gestureIfHeard, speechReach } from '../../communication/spokenGesture'
-import { phrasePlan, utterancePlan } from '../../communication/speaking'
+import { utterancePlan } from '../../communication/speaking'
 import { speechLabelSeconds } from '../../communication/speechLabel'
 import { playSpeech } from '../../systems/ambience'
 import { speakOverhead, speechClock } from './speechChannel'
@@ -112,7 +115,7 @@ import {
   LOW_DRUM,
   type DrumGeometry,
 } from './drummerPose'
-import { childPlayGround, PORT_TALKERS, VILLAGE_SPOTS, villageAdultStations } from './lifeSpots'
+import { PORT_TALKERS, VILLAGE_SPOTS, villageAdultStations, type PlayGround } from './lifeSpots'
 import { buildWedgeCarve } from './wedgeCarve'
 import { figureStance, unplacedInhabitant, type PlaceSpot } from './placement'
 
@@ -226,6 +229,7 @@ function Figure({
   gesture,
   pose,
   gait,
+  handProp,
 }: {
   cloth: string
   skin?: string
@@ -243,6 +247,16 @@ function Figure({
   /** Gait phase (rad) driving the leg swing — the caller accumulates the
    *  distance walked, because only it knows this figure's world scale. */
   gait?: RefObject<number>
+  /**
+   * Something CARRIED IN A HAND, mounted inside the arm pivot so it rides
+   * whatever that arm does.
+   *
+   * A prop hung on the figure's own group instead sits at a fixed spot beside
+   * the trunk: the water carrier's jar floated at his hip while his arm went up
+   * to indicate the river (GPT-5.6 Sol, first cross-vendor round, C2). The arm
+   * is the +x one, which is the side the jar was drawn on.
+   */
+  handProp?: ReactNode
 }) {
   const bodyH = kneel ? 0.55 : 1.0
   const cold = useContext(ColdCloaksContext)
@@ -359,6 +373,8 @@ function Figure({
               <sphereGeometry args={[L.handRadius, ...TESSELLATION.figureHand]} />
               <meshStandardMaterial color={skin} roughness={0.85} />
             </mesh>
+            {/* What this hand is carrying, at the hand rather than beside it. */}
+            {i === 0 && handProp && <group position={[0, -armLen, 0]}>{handProp}</group>}
           </group>
         ))}
       </group>
@@ -583,6 +599,7 @@ function Kids({
   radius,
   stage,
   bank,
+  childBodies,
 }: {
   x: number
   z: number
@@ -601,6 +618,10 @@ function Kids({
   /** The settlement's river bank, where it has one: what makes its walkable
    *  region a lobe rather than a circle, and where the shore begins. */
   bank: PlaceRiverBank | null
+  /** Where the settlement can find the children (work-order 688). The adults'
+   *  own work reads it to keep DIG out of a passing child's ear; the bodies are
+   *  the live ones this component moves, so nothing is copied per frame. */
+  childBodies: RefObject<readonly InhabitantBody[]>
 }) {
   const refs = useRef<Array<THREE.Group | null>>([])
   // The world leg length these children walk on, and the cadence it dictates.
@@ -614,6 +635,14 @@ function Kids({
   const bodies = useInhabitantBodies(count, { scale: KID_SCALE })
   // Which bodies are the game's own playmates, for the world's occupied rules.
   const kidIndex = useMemo(() => new Set(bodies), [bodies])
+  // ... and the same bodies published to the settlement, so the adults' work can
+  // hold a word while one of them walks past (work-order 688).
+  useEffect(() => {
+    childBodies.current = bodies
+    return () => {
+      childBodies.current = []
+    }
+  }, [bodies, childBodies])
 
   // The settlement as the chase sees it: ONE predicate for the colliders, the
   // fire ring (a collider like any other), the walkable rim and the PLAY GROUND
@@ -2041,7 +2070,7 @@ function Walkers({
 }
 
 /** How near a villager must come to count as having arrived where it was sent. */
-const ERRAND_ARRIVE_RADIUS = 1.1
+const ERRAND_ARRIVE_RADIUS = WORK_ARRIVE_RADIUS
 
 /** How near a waypoint of a route counts as passed. Wider than a stride, so a
  *  figure sliding along a wall beside the waypoint still ticks it off instead of
@@ -2072,6 +2101,7 @@ function ErrandVillagers({
   bank,
   geography,
   count,
+  childBodies,
 }: {
   seed: number
   cloth: string[]
@@ -2080,23 +2110,35 @@ function ErrandVillagers({
   /** The settlement's river bank (work-order 482) — part of the walkable shape
    *  these villagers keep to, since the errands send them out onto it. */
   bank: PlaceRiverBank | null
-  geography: ErrandGeography
+  geography: AdultWorkGeography
   count: number
+  /** The children's live bodies (work-order 688) — see `AdultWorkView.childrenHear`. */
+  childBodies: RefObject<readonly InhabitantBody[]>
 }) {
   const refs = useRef<Array<THREE.Group | null>>([])
+  // The jar each carrier holds: on the head when it is FULL, in the hand when it
+  // is empty. Both are mounted once and shown by the frame loop, like every other
+  // per-frame visibility in this scene.
+  const headJars = useRef<Array<THREE.Object3D | null>>([])
+  const handJars = useRef<Array<THREE.Object3D | null>>([])
   const rim = Math.max(1, radius - NPC_RADIUS * 2)
 
-  /** Every place a villager may stroll to of its own accord. */
+  /** Every place a villager may stroll to of its own accord: the head of the
+   *  water path and the work sites.
+   *
+   *  THE FOOT IS NOT AMONG THEM (work-order 688 item 6). It stands on the bank,
+   *  inside the children's stage, and an adult loitering there crowds the round
+   *  even while he says nothing. Only the water CARRIER goes down, and he goes on
+   *  a task and comes back up — which is also what makes him the man the next
+   *  situation casts as the one arriving with a full jar. */
   const namedPlaces = useMemo(() => {
     const out: ErrandPoint[] = []
-    for (const p of [geography.bank, geography.upstream, geography.downstream, geography.stone]) {
-      if (p) out.push(p)
-    }
-    for (const s of geography.digSites) out.push({ x: s.x, z: s.z })
+    if (geography.waterHead) out.push(geography.waterHead)
+    for (const d of geography.digSites) out.push({ x: d.x, z: d.z })
     return out
   }, [geography])
 
-  const { people, errands, rand } = useMemo(() => {
+  const { people, work, rand } = useMemo(() => {
     const r = mulberry32((seed + 30011) >>> 0)
     const spawn = Array.from({ length: count }, (_, i) => {
       const a = (i / Math.max(1, count)) * Math.PI * 2
@@ -2105,7 +2147,7 @@ function ErrandVillagers({
     })
     return {
       people: spawn,
-      errands: createAdultErrands(count, balance.villageLife.adultErrands),
+      work: createAdultWork(count, balance.villageLife.adultErrands),
       rand: r,
     }
   }, [seed, count, colliders])
@@ -2175,7 +2217,37 @@ function ErrandVillagers({
     yaws.current = Array.from({ length: count }, (_, i) => yaws.current[i] ?? 0)
   }
 
-  const view = useMemo<ErrandView>(() => ({ villagers: people, geography }), [people, geography])
+  // May a body stand here? The settlement boundary and the collider set
+  // together — the same question this component's own step asks. The work
+  // module is handed it so the second digger's place beside a dig site is a
+  // REAL one; picking his bearing without asking sent him into a hut, where he
+  // never arrived while the joined situation counted as shown.
+  const standable = useMemo(
+    () => (px: number, pz: number) =>
+      insidePlace({ radius, bank }, px, pz, NPC_RADIUS * 2) &&
+      standingClear(colliders, px, pz, NPC_RADIUS),
+    [colliders, radius, bank],
+  )
+
+  // Would a child hear a word spoken here? The radius is the settlement's own
+  // hearing radius, read at the call so a debug edit takes effect at once, and
+  // an inactive body — a figure that is out of the picture — hears nothing.
+  const childrenHear = useCallback(
+    (x: number, z: number) => {
+      const ear = balance.communication.hearingRadius
+      const kids = childBodies.current
+      for (const kid of kids) {
+        if (!kid.active) continue
+        if (Math.hypot(kid.x - x, kid.z - z) <= ear) return true
+      }
+      return false
+    },
+    [childBodies],
+  )
+  const view = useMemo<AdultWorkView>(
+    () => ({ villagers: people, geography, standable, childrenHear }),
+    [people, geography, standable, childrenHear],
+  )
 
   // The body each villager presents to every other inhabitant (point 578): two
   // of them sent to neighbouring spots used to end up in one body.
@@ -2183,15 +2255,13 @@ function ErrandVillagers({
   const bodies = useInhabitantBodies(count)
   const separationWorld = useMemo(
     () => ({
-      blocked: (px: number, pz: number) =>
-        !insidePlace({ radius, bank }, px, pz, NPC_RADIUS * 2) ||
-        !standingClear(colliders, px, pz, NPC_RADIUS),
+      blocked: (px: number, pz: number) => !standable(px, pz),
       nudge: (px: number, pz: number) => {
         const free = tryNudgeToFree(colliders, px, pz, NPC_RADIUS)
         return { x: free.pos[0], z: free.pos[1], found: free.found }
       },
     }),
-    [colliders, radius, bank],
+    [colliders, standable],
   )
 
   useFrame((_, rawDt) => {
@@ -2199,19 +2269,23 @@ function ErrandVillagers({
     const cfg = balance.villageLife.adultErrands
     for (let i = 0; i < people.length; i++) {
       const me = people[i]
-      const task = errandOf(errands, i)
+      const task = taskOf(work, i)
       me.free = !task
       const state = idle.current[i]
       // Where this villager is headed: what it was told, or its own stroll.
       let goal: ErrandPoint | null = null
-      if (task && !(task.arrived && task.kind === 'dig')) {
-        goal = task.arrived ? null : { x: task.x, z: task.z }
+      if (task) {
+        // `goalOf`, not the task's own place: a water carrier is walked to the
+        // head of the path first, where his word falls, and only then to the
+        // water.
+        goal = task.arrived ? null : goalOf(task)
       } else if (!task) {
         if (state.pause > 0) {
           state.pause -= dt
         } else if (!state.target) {
-          // Half the strolls go to a place an errand can be spoken about, so the
-          // situations that need someone standing there keep coming round.
+          // Half the strolls go to a place the adults work, so the situations
+          // that need someone already standing somewhere — above all the carrier
+          // coming back up from the water — stay castable rather than theoretical.
           const pick = rand()
           if (pick < 0.55 && namedPlaces.length > 0) {
             state.target = namedPlaces[Math.floor(rand() * namedPlaces.length) % namedPlaces.length]
@@ -2236,8 +2310,7 @@ function ErrandVillagers({
         const d = Math.hypot(dx, dz)
         const arriveAt = task ? ERRAND_ARRIVE_RADIUS : 0.9
         if (d <= arriveAt) {
-          if (task) noteErrandArrival(errands, i, cfg)
-          else {
+          if (!task) {
             state.target = null
             state.pause = 3 + rand() * 6
           }
@@ -2316,7 +2389,7 @@ function ErrandVillagers({
               if (free.found) {
                 me.x = free.pos[0]
                 me.z = free.pos[1]
-              } else if (task) clearErrand(errands, i)
+              } else if (task) clearTask(work, i)
               else state.target = null
               state.stuck = 0
             }
@@ -2338,11 +2411,21 @@ function ErrandVillagers({
         me.z = body.z
       }
 
-      // The pose: digging wins over everything, then the gesture, then rest.
+      // WHAT HE IS CARRYING, and what that does to his body: a full jar rides on
+      // the head and both hands steady it, an empty one hangs from a hand and
+      // leaves the arms free.
+      const carry = carryOf(work, i)
+      const headJar = headJars.current[i]
+      const handJar = handJars.current[i]
+      if (headJar) headJar.visible = carry === 'fullJar'
+      if (handJar) handJar.visible = carry === 'emptyJar'
+
+      // The pose: digging wins over everything, then the gesture, then the load
+      // on the head, then rest.
       const pose = poses.current[i].current
       const gesture = gestures.current[i]
       gesture.current = advanceGesture(gesture.current, dt)
-      if (isDigging(errands, i)) {
+      if (isDigging(work, i)) {
         state.dug += dt
         const dig = digPose(state.dug, i * 0.37)
         if (pose) {
@@ -2350,6 +2433,15 @@ function ErrandVillagers({
           pose.right = dig.right
           pose.lean = dig.lean
           pose.turn = dig.turn
+        }
+      } else if (carry === 'fullJar' && !isGesturing(gesture.current)) {
+        state.dug = 0
+        const load = HEAD_CARRY_POSE.current
+        if (pose) {
+          pose.left = load.left
+          pose.right = load.right
+          pose.lean = load.lean
+          pose.turn = load.turn
         }
       } else {
         state.dug = 0
@@ -2371,14 +2463,14 @@ function ErrandVillagers({
       }
     }
 
-    const said = stepAdultErrands(errands, view, dt, cfg, rand)
+    const said = stepAdultWork(work, view, dt, cfg, rand)
     if (said) {
-      // The speaker turns to what it is talking about before it says it: an
-      // errand pointed out over a shoulder reads as nothing at all.
+      // The speaker turns to what he is talking about before he says it: a word
+      // thrown over a shoulder at nothing reads as nothing at all.
       const speaker = people[said.speaker]
       if (speaker) {
         yaws.current[said.speaker] = Math.atan2(said.aim.x - speaker.x, said.aim.z - speaker.z)
-        speakErrand(said, speaker, yaws.current[said.speaker], refs.current[said.speaker], gestures.current[said.speaker])
+        speakWork(said, speaker, yaws.current[said.speaker], refs.current[said.speaker], gestures.current[said.speaker])
       }
     }
   })
@@ -2389,24 +2481,23 @@ function ErrandVillagers({
     if (!import.meta.env.DEV) return
     const w = window as unknown as Record<string, unknown>
     w.__placeErrands = () => ({
-      staged: { ...errands.staged },
-      last: errands.last ? { ...errands.last } : null,
+      staged: { ...work.staged },
+      last: work.last ? { ...work.last } : null,
       geography: {
-        bank: geography.bank,
-        upstream: geography.upstream,
-        downstream: geography.downstream,
-        stone: geography.stone,
-        digSites: geography.digSites.map((s) => ({ ...s })),
+        waterHead: geography.waterHead,
+        waterFoot: geography.waterFoot,
+        digSites: geography.digSites.map((d) => ({ ...d })),
       },
       villagers: people.map((p, i) => {
-        const task = errandOf(errands, i)
+        const task = taskOf(work, i)
         return {
           x: p.x,
           z: p.z,
           free: p.free,
-          digging: isDigging(errands, i),
-          errand: task
-            ? { situation: task.situation, kind: task.kind, place: task.place, x: task.x, z: task.z, arrived: task.arrived }
+          digging: isDigging(work, i),
+          carry: carryOf(work, i),
+          work: task
+            ? { situation: task.situation, phase: task.phase, x: task.x, z: task.z, arrived: task.arrived }
             : null,
         }
       }),
@@ -2414,7 +2505,7 @@ function ErrandVillagers({
     return () => {
       delete w.__placeErrands
     }
-  }, [errands, people, geography])
+  }, [work, people, geography])
 
   return (
     <>
@@ -2427,7 +2518,39 @@ function ErrandVillagers({
             refs.current[i] = el
           }}
         >
-          <Figure cloth={cloth[i % cloth.length]} pose={poses.current[i]} />
+          {/* The water carrier's jar — the same vessel the task walkers carry to
+              the well, so the object the player learns RIVER beside is one he has
+              already seen in the village. The EMPTY one hangs in his hand, inside
+              the arm pivot, so it goes where the hand goes. */}
+          <Figure
+            cloth={cloth[i % cloth.length]}
+            pose={poses.current[i]}
+            handProp={
+              <mesh
+                ref={(el) => {
+                  handJars.current[i] = el
+                }}
+                visible={false}
+                position={[0, -0.12, 0.04]}
+                rotation={[0, 0, 0.12]}
+                castShadow
+              >
+                <cylinderGeometry args={[0.12, 0.16, 0.32, 8]} />
+                <meshStandardMaterial color="#8a5a30" roughness={0.9} />
+              </mesh>
+            }
+          />
+          <mesh
+            ref={(el) => {
+              headJars.current[i] = el
+            }}
+            visible={false}
+            position={[0, 1.5, 0]}
+            castShadow
+          >
+            <cylinderGeometry args={[0.12, 0.16, 0.32, 8]} />
+            <meshStandardMaterial color="#8a5a30" roughness={0.9} />
+          </mesh>
         </group>
       ))}
     </>
@@ -2435,16 +2558,20 @@ function ErrandVillagers({
 }
 
 /**
- * Speaks one staged errand (point 483): the PHRASE through the §13.4 hearing
- * curve, one reading per atom over the speaker's head, and the gesture on its
- * own arms, aimed at the world point the errand named.
+ * Speaks one word of the adults' work (work-order 688): the single atom through
+ * the §13.4 hearing curve, the reading over the speaker's head, and the gesture
+ * on his own arms, aimed at what he is doing — the water he is going to or
+ * coming from, or the ground under his hoe.
  *
  * The DISTANCE decides all three, exactly as it does for the children (point
  * 580): what the player could not hear teaches him nothing however plainly he
- * saw the walk, so beyond the hearing radius the villager's arms stay down.
+ * saw the work, so beyond the hearing radius the villager's arms stay down.
+ *
+ * The gesture is `indicate`, never `beckon`: an adult who waved somebody over
+ * while saying DIG would teach "come" at least as well (the spec's own rule).
  */
-function speakErrand(
-  said: SpokenErrand,
+function speakWork(
+  said: SpokenWord,
   speaker: { x: number; z: number },
   yaw: number,
   anchor: THREE.Group | null,
@@ -2454,19 +2581,15 @@ function speakErrand(
   const distance = placePlayerPosition.active
     ? Math.hypot(speaker.x - placePlayerPosition.x, speaker.z - placePlayerPosition.z)
     : Infinity
-  const reach = speechReach(distance)
-  playSpeech(phrasePlan(said.utterances, distance))
-  if (reach.audible) {
-    const store = useGame.getState()
-    // Each atom of the phrase is observed on its own, in order.
-    for (const atom of said.utterances) store.hearUtterance(atom)
+  const utterance = utteranceOf(said.concept)
+  playSpeech(utterancePlan(utterance, distance))
+  if (speechReach(distance).audible) {
+    useGame.getState().hearUtterance(utterance)
     if (anchor) {
-      speakOverhead(`villager-${said.speaker}`, said.utterances, anchor, {
-        seconds: speechLabelSeconds(said.utterances.length),
-      })
+      speakOverhead(`villager-${said.speaker}`, [utterance], anchor, { seconds: speechLabelSeconds(1) })
     }
   }
-  gesture.current = gestureIfHeard(distance, said.gesture, {
+  gesture.current = gestureIfHeard(distance, 'indicate', {
     ...aimAt({ x: speaker.x, z: speaker.z, yaw }, said.aim, FIGURE_LIMBS.shoulderY),
     phase: said.speaker * 1.1, // no two villagers beat in lockstep
   })
@@ -2552,14 +2675,14 @@ export function PlaceLife({
   placeId,
   style,
   buildings,
-  fabric,
   firePos,
   homes,
   errands,
-  teachingStone,
   digSites,
   bank,
+  waterPath,
   playRocks,
+  playGround,
   rocks,
   pen,
   colliders,
@@ -2572,22 +2695,24 @@ export function PlaceLife({
   placeId: string
   style: RegionPlaceStyle
   buildings: Array<[number, number]>
-  /** The BUILT FABRIC: every dwelling and functional building of the settlement.
-   *  What the children's play ground is kept against (point 524). */
-  fabric: Array<[number, number]>
   firePos: [number, number]
   homes: HomeDef[]
   errands: Array<[number, number]>
-  /** The teaching stone and the ground work the adults teach at (point 483). */
-  teachingStone: { x: number; z: number } | null
+  /** The ground work the adults teach DIG at (point 483/688). */
   digSites: DigSite[]
   /** The walkable river bank, where the settlement stands on a river
-   *  (work-order 482): what the RIVER/UPSTREAM/DOWNSTREAM errands are about. */
+   *  (work-order 482): the ground the children's stage stands on. */
   bank: PlaceRiverBank | null
+  /** The village's water path (work-order 688): its head in the village, where
+   *  both carriers speak, and its foot at the river, where neither does. */
+  waterPath: { head: { x: number; z: number }; foot: { x: number; z: number } } | null
   /** The two play rocks of the children's bank game (work-order 687), and the
    *  settlement's loose boulders — one of which a child climbs and names while
    *  the group roams, so ROCK is heard at a stone that is no part of the game. */
   playRocks: { upstream: { x: number; z: number }; downstream: { x: number; z: number } } | null
+  /** The children's roaming quarter, decided by the layout (work-order 688) so
+   *  the adults' work sites can be placed clear of it. */
+  playGround: PlayGround | null
   rocks: Array<[number, number, number]>
   pen: PenDef | null
   colliders: Collider[]
@@ -2605,6 +2730,11 @@ export function PlaceLife({
   // per mounted settlement: every vignette claims its slots from it and gives
   // them back when it goes.
   const inhabitantBodies = useMemo(() => createInhabitantSet(), [])
+  // WHERE THE CHILDREN ARE, for the one part of the settlement that has to know
+  // (work-order 688): the adults' work holds a word rather than say it into a
+  // passing child's ear. `Kids` publishes the bodies it already moves and
+  // `ErrandVillagers` reads them, so nothing is copied and nothing is stale.
+  const childBodies = useRef<readonly InhabitantBody[]>([])
 
   // Dev hook for the headless verification and for diagnosing motion defects
   // (point 657): the whole body registry, so a live trace can say WHAT stood
@@ -2654,51 +2784,48 @@ export function PlaceLife({
   // it scales with, and never below one.
   const kidCount = Math.max(1, Math.round(balance.villageLife.tag.childCount * presence))
 
-  // The places the adults' errands are about (point 483). Every one of them is
-  // the layout's own — the bank and its two stretches as much as the stone and
-  // the ground work — so a villager is sent to exactly what the scene draws. A
-  // settlement with no river simply carries no bank, and the scheduler then
-  // stages only the errands it CAN show rather than pointing at water that is
-  // not there.
-  const errandGeography = useMemo<ErrandGeography>(
+  // The places the adults WORK (work-order 688). Every one of them is the
+  // layout's own, so a villager works exactly where the scene draws the work. A
+  // settlement with no river carries no water path, and its adults then teach
+  // only DIG rather than point at water that is not there.
+  const workGeography = useMemo<AdultWorkGeography>(
     () => ({
-      bank: bank ? { x: bank.bank.x, z: bank.bank.z } : null,
-      upstream: bank ? { x: bank.upstream.x, z: bank.upstream.z } : null,
-      downstream: bank ? { x: bank.downstream.x, z: bank.downstream.z } : null,
-      stone: teachingStone ? { x: teachingStone.x, z: teachingStone.z } : null,
+      waterHead: waterPath ? { x: waterPath.head.x, z: waterPath.head.z } : null,
+      waterFoot: waterPath ? { x: waterPath.foot.x, z: waterPath.foot.z } : null,
       digSites,
     }),
-    [bank, teachingStone, digSites],
+    [waterPath, digSites],
   )
 
-  // WHERE they play: far enough from every adult vignette that the §13.4
-  // hearing range separates the two groups (point 481.4) and against the
-  // village's own walls, so the chase is watched with the settlement behind it
-  // (point 524). The play radius is read here rather than inside the memo, so a
-  // debug edit of it (§21) re-derives the ground while the game runs — the
-  // balanceVersion subscription is what brings the edit here at all.
+  // WHERE they play comes from the LAYOUT (work-order 688): far enough from
+  // every adult vignette that the §13.4 hearing range separates the two groups
+  // (point 481.4) and against the village's own walls, so the chase is watched
+  // with the settlement behind it (point 524). It moved out of this component
+  // because the adults' dig sites are placed CLEAR of it, and a quarter derived
+  // once there and once here would be two quarters (points 129/378).
   useGame((s) => s.balanceVersion)
-  const wantPlayRadius = balance.villageLife.tag.playRadius
-  const playGround = useMemo(
+  // A VILLAGE WITHOUT A QUARTER IS NOT A PASS. The separation assert below used
+  // to accept `!playGround` outright, so the one state that switches the bank
+  // stage off entirely and drops the chase onto an origin-centred disc with no
+  // clearance at all went by as success (GPT-5.6 Sol, first cross-vendor round,
+  // C1). The fallback stays — a malformed layout must not take the scene down —
+  // but it says so.
+  devAssert(
+    kind !== 'village' || !!playGround,
+    'tag-play-ground-missing',
     () =>
-      childPlayGround(
-        villageAdultStations(firePos),
-        Math.max(1, radius - NPC_RADIUS * 2),
-        wantPlayRadius,
-        balance.communication.hearingRadius,
-        { free: (px, pz) => standingClear(colliders, px, pz, NPC_RADIUS), fabric },
-      ),
-    [firePos, radius, colliders, fabric, wantPlayRadius],
+      `${placeId}: a village with no children's quarter — the chase falls back to the origin ` +
+      `and the bank stage is switched off`,
   )
   // Point 524.2: a ground that had to give up its separation leaves two teaching
   // voices inside one earshot. Nothing in the shipped villages reaches this, so
   // it is armed as an assert rather than answered by a second mechanism.
   devAssert(
-    kind !== 'village' || playGround.clearance >= balance.communication.hearingRadius,
+    kind !== 'village' || !playGround || playGround.clearance >= balance.communication.hearingRadius,
     'tag-play-ground-unseparated',
     () =>
-      `${placeId}: the play ground clears the adults by only ${playGround.clearance.toFixed(1)} m ` +
-      `(fabric ${playGround.fabric.toFixed(2)}) — the two teaching voices need another means of being told apart`,
+      `${placeId}: the play ground clears the adults by only ${playGround?.clearance.toFixed(1)} m ` +
+      `(fabric ${playGround?.fabric.toFixed(2)}) — the two teaching voices need another means of being told apart`,
   )
 
   // THE CHILDREN'S STAGE (work-order 687): the two play rocks, the water the
@@ -2706,7 +2833,7 @@ export function PlaceLife({
   // game, and the quarter the group roams in between cycles. A settlement
   // without a bank carries no stage, and its children keep the tag round.
   const bankStage = useMemo<BankStage | null>(() => {
-    if (!bank || !playRocks) return null
+    if (!bank || !playRocks || !playGround) return null
     // The nearest loose boulder to the children's own quarter — the one they
     // would plausibly be standing at anyway. It is the guard that keeps ROCK
     // from meaning only a game target, so without one this settlement keeps the
@@ -2731,6 +2858,18 @@ export function PlaceLife({
       roam: { x: playGround.x, z: playGround.z, radius: playGround.radius },
     }
   }, [bank, playRocks, rocks, playGround])
+
+  // A village always carries a play ground (`layout.ts` builds one for every
+  // settlement of that kind); the fallback keeps a malformed layout from taking
+  // the whole scene down, and the assert above is what reports it.
+  const ground = playGround ?? {
+    x: 0,
+    z: 0,
+    radius: balance.villageLife.tag.playRadius,
+    clearance: 0,
+    openness: 1,
+    fabric: 1,
+  }
 
   // Every spot this settlement hands out (point 509): what tells an inhabitant
   // standing at the middle of a village apart from one that was never placed —
@@ -2765,9 +2904,10 @@ export function PlaceLife({
           <Cook x={firePos[0] + 1.2} z={firePos[1] + 1.0} cloth={style.cloth[0]} />
           <Weaver x={-8.5} z={-7} cloth={style.cloth[1 % style.cloth.length]} weave={style.bandColor} />
           <Kids
-            x={playGround.x}
-            z={playGround.z}
-            playRadius={playGround.radius}
+            childBodies={childBodies}
+            x={ground.x}
+            z={ground.z}
+            playRadius={ground.radius}
             count={kidCount}
             seed={localSeed}
             cloth={style.cloth}
@@ -2779,12 +2919,13 @@ export function PlaceLife({
           {/* The adults at their errands (point 483): the five landscape and
               action concepts, taught by what the villagers visibly go and do. */}
           <ErrandVillagers
+            childBodies={childBodies}
             seed={localSeed}
             cloth={style.cloth}
             colliders={colliders}
             radius={radius}
             bank={bank}
-            geography={errandGeography}
+            geography={workGeography}
             count={Math.max(1, Math.round(balance.villageLife.adultErrands.villagerCount * presence))}
           />
           <Goats seed={localSeed} count={pen ? 4 : 3} pen={pen} colliders={colliders} />
