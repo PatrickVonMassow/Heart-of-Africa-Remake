@@ -56,6 +56,24 @@
 /** @type {RedCharge[]} */
 export const RED_CHARGES = [
   {
+    point: 1043,
+    suite: 'polish',
+    kind: 'check',
+    match: /the settlement offers a figure in clear view to speak over/i,
+    why:
+      'FILED AS 1043 ON 02.09.2026, MEASURED ON BOTH SIDES OF THE BRANCH. The section offers ten '
+      + 'named figures and the first five never qualify: the probe list is identical run to run '
+      + '(2.00@ground-disc twice, 0.21@CylinderGeometry, 1.15@BoxGeometry, then 1.55-1.58@ground-disc '
+      + 'six times), so the whole check hangs on figure #5, which reads 0.97@SphereGeometry on a '
+      + 'green run and 1.57@ground-disc on a red one. Sampled the same day on WebGL 2 with '
+      + '`polish --section=speech-hypothesis`: three of nine section runs on the merge-base code '
+      + '(1ae86eb2a) went red on the first attempt, and none of four did on '
+      + '`feat/686-five-word-lexicon-game` — so it says nothing about any change under '
+      + 'scripts/verify/ or src/scenes/place/. '
+      + 'It is charged, not excused: 1043 owns naming why five candidates are unhittable, and the '
+      + 'charge dies with that point.',
+  },
+  {
     point: 733,
     suite: 'startup',
     backend: 'webgpu',
