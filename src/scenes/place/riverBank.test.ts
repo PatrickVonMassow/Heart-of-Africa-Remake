@@ -356,7 +356,10 @@ describe('nothing solid stands in the children`s running lane (work-order 687)',
     }
     // The sweep is worthless if it found no lane to sweep.
     expect(checked).toBeGreaterThan(0)
-  })
+    // A hundred and eighty layouts built and swept: 18 s alone on this machine,
+    // and over the default 20 s budget under the full suite's worker contention.
+    // A measurement this long carries its own budget, not a flake.
+  }, 90_000)
 
   // AND THE STAGE IS THE ONE THE BANK ACTUALLY SETTLED ON. The play rocks are
   // derived from the bank points, and `settleBankPoints` may pull those inland

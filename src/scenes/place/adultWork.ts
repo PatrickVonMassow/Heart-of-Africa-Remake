@@ -31,6 +31,7 @@
 
 import type { ConceptId } from '../../communication/lexicon'
 import { DIG_CYCLE_SECONDS } from '../../render/gesture'
+import { devAssert } from '../../systems/devAssert'
 
 /** The four situations. Two per word, one atom each. */
 export type AdultSituationId = 'water-out' | 'water-back' | 'dig-alone' | 'dig-joined'
@@ -168,6 +169,23 @@ export const WATER_FOOT_REACH = 4
 /** Nearer than this to the ground a word points at, and a bystander IS what the
  *  word points at as far as the player can tell. */
 export const AIM_CLEARANCE = 1.2
+
+/**
+ * Is a joined dig actually joined yet — has the second man arrived?
+ *
+ * For every other situation this is trivially true. For `dig-joined` it is the
+ * whole of what the situation shows: the word must fall while TWO men work one
+ * piece of ground, not while one of them is still walking over.
+ */
+function joinedIsJoined(state: AdultWorkState, primary: number, t: AdultTask): boolean {
+  if (t.situation !== 'dig-joined') return true
+  for (let k = 0; k < state.tasks.length; k++) {
+    if (k === primary) continue
+    const mate = state.tasks[k]
+    if (mate && mate.situation === 'dig-joined' && !mate.owes && mate.arrived) return true
+  }
+  return false
+}
 
 /**
  * How near a digger a neighbour joins in at — close enough to read as the same
@@ -361,6 +379,17 @@ export function stepAdultWork(
     t.age += dt
     const me = view.villagers[i]
     if (!me || t.age > cfg.errandSeconds) {
+      // THE BACKSTOP, AND IT IS NOT FREE. A task that ran out of time is let go
+      // so its man is not held for the rest of the visit — but if it still owed
+      // its word, a teaching atom was lost, and that is a defect rather than
+      // housekeeping. The `digSeconds` guard below keeps a FINISHED bout from
+      // eating one; only a task that never got there reaches this, and it says
+      // so (GPT-5.6 Sol, confirming round, task expiry).
+      devAssert(
+        !t.owes,
+        'adult-atom-lost',
+        () => `${t.situation}: villager ${i} ran out of time with his ${t.phase} word unspoken`,
+      )
       state.tasks[i] = null
       continue
     }
@@ -409,14 +438,26 @@ export function stepAdultWork(
       // same holds when somebody is CROSSING the ground he points at — the
       // joiner walks over it on his way round — because a word pointed at
       // occupied ground reads as pointing at the man standing on it.
-      if (!spoken && t.owes && digStrikeCrossed(before, t.dug, i * 0.37) && siteClear(view, t, i)) {
+      //
+      // AND THE JOINED SITUATION IS ONLY JOINED ONCE THE SECOND MAN IS THERE.
+      // Casting him was not enough: the primary could dig, speak and finish
+      // while his neighbour was still walking, and the player would have seen
+      // one man at a hole and another arriving at an empty one (GPT-5.6 Sol,
+      // confirming round, joined staging).
+      if (
+        !spoken &&
+        t.owes &&
+        joinedIsJoined(state, i, t) &&
+        digStrikeCrossed(before, t.dug, i * 0.37) &&
+        siteClear(view, t, i)
+      ) {
         t.owes = false
         spoken = { id: t.situation, concept: 'DIG', speaker: i, aim: { x: t.x, y: 0, z: t.z } }
       }
       // He digs on while his word is still owed, so a bout can never end having
       // eaten the atom it existed for; `errandSeconds` still bounds the task.
       if (t.dug >= cfg.digSeconds && !t.owes) state.tasks[i] = null
-    } else if (t.arrived && t.phase === 'fetch') {
+    } else if (t.arrived && t.phase === 'fetch' && !t.via) {
       t.dug += dt
       // He fills the jar and is free again — the man the NEXT situation casts as
       // the one coming back up with it.

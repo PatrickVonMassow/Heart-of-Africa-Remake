@@ -155,7 +155,17 @@ describe('buildWedgeCarve in the quarter the reported village places today (seed
     // one is derived, so it goes red the moment the carve stops meaning
     // anything in the quarter the game hands the children.
     // The corridor the compound's fence arc pinches shut against the rim:
-    expect(carve(4.64, -15.72)).toBe(true)
+    const pinch = { x: 4.64, z: -15.72 }
+    // ... and it is a point of THIS quarter's own free ground, not a coordinate
+    // that happens to still be classified. A pinned probe that has drifted
+    // outside the disc, or under a body, would answer without meaning anything
+    // (GPT-5.6 Sol, confirming round).
+    expect(
+      Math.hypot(pinch.x - ground.x, pinch.z - ground.z),
+      'the pinned pinch has drifted out of the quarter',
+    ).toBeLessThanOrEqual(ground.radius)
+    expect(standingClear(layout.colliders, pinch.x, pinch.z, NPC_RADIUS), 'the pinch is not free ground').toBe(true)
+    expect(carve(pinch.x, pinch.z)).toBe(true)
     // The open middle of the quarter, two metres inside it:
     expect(carve(2.54, -12.02)).toBe(false)
   })
@@ -175,6 +185,9 @@ describe('buildWedgeCarve in the quarter the reported village places today (seed
       }
     }
     expect(free).toBeGreaterThan(500)
+    // A TRIM, and a trim of something. The upper bound alone would be satisfied
+    // by a carve that took nothing at all in the quarter the game hands out.
+    expect(carved, 'the carve decides nothing in this quarter').toBeGreaterThan(0)
     expect(carved / free).toBeLessThan(0.15)
   })
 })

@@ -605,10 +605,25 @@ if (section('play-rocks')) {
     // The stand comes from the scene itself (`bankPlayRocksView`), so the suite
     // and `bankStage.test.ts` judge one description of it and not two.
     const view = await page.evaluate(() => window.__bankStageView?.() ?? null)
+    // AND THE STAND IS REALLY OFF THE AXIS. A stand ON it would satisfy every
+    // other claim here — both rocks project inside the frame, because they are
+    // on one line through its middle — while showing a single stone with another
+    // hidden behind it (GPT-5.6 Sol, confirming round). The angle the pair
+    // subtends from the camera is what says otherwise, measured from the rocks
+    // and the stand rather than assumed.
+    const spread = view
+      ? (() => {
+          const a = Math.atan2(rocks.upstream.z - view.z, rocks.upstream.x - view.x)
+          const b = Math.atan2(rocks.downstream.z - view.z, rocks.downstream.x - view.x)
+          let d = Math.abs(a - b)
+          if (d > Math.PI) d = 2 * Math.PI - d
+          return (d * 180) / Math.PI
+        })()
+      : 0
     check(
-      'the bank stage hands over a stand to photograph both its rocks from',
-      !!view,
-      JSON.stringify(view),
+      'the two rocks are photographed from a stand that separates them',
+      !!view && spread > 20,
+      view ? `they subtend ${spread.toFixed(1)}° from the stand at ${view.x.toFixed(1)},${view.z.toFixed(1)}` : 'no stand',
     )
     if (view) {
       await page.evaluate((v) => {

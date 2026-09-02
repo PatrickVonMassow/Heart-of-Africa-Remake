@@ -1215,12 +1215,7 @@ export function buildLayout(placeId: string, seed: number): PlaceLayout {
         colliders.push({ x: d.x, z: d.z, r: dwellingCircleRadius(d, style) ?? d.r + 0.3 })
     }
   }
-  // The fence colliders occupy ONE contiguous block, and where it starts and
-  // ends is remembered: the water path's clearance test names exactly what it
-  // does and does not measure itself against.
-  const fenceFrom = colliders.length
   for (const f of fences) colliders.push(...fenceColliders(f))
-  const fenceTo = colliders.length
   // The two entries the play rocks occupy are remembered, because the stage they
   // draw is derived from bank points that have not settled yet: once they have,
   // the settled pair is written back into these same slots rather than appended
@@ -1309,7 +1304,25 @@ export function buildLayout(placeId: string, seed: number): PlaceLayout {
    * inside the children's earshot (GPT-5.6 Sol, first cross-vendor round, A4).
    */
   const ADULT_SPEECH_MARGIN = balance.communication.hearingRadius + WORK_ARRIVE_RADIUS
-  const inPlayEarshot = (x: number, z: number) => inPlayGround(x, z, ADULT_SPEECH_MARGIN)
+  /**
+   * How far a spot stands from the NEAREST place a child speaks: the roaming
+   * quarter's rim, either play rock, and the descent they gather at.
+   *
+   * One function for both adult places. The water path's head used to be judged
+   * against the roaming quarter ALONE, so an outer head could stand within
+   * hearing of children on the bank while the dig sites — judged against all
+   * three — could not (GPT-5.6 Sol, confirming round, hearing separation).
+   */
+  const toChildren = (x: number, z: number) => {
+    let best = Infinity
+    if (playGround) best = Math.min(best, Math.hypot(x - playGround.x, z - playGround.z) - playGround.radius)
+    for (const p of playRocks ? [playRocks.upstream, playRocks.downstream] : []) {
+      best = Math.min(best, Math.hypot(x - p.x, z - p.z))
+    }
+    if (bank) best = Math.min(best, Math.hypot(x - bank.bank.x, z - bank.bank.z))
+    return best
+  }
+  const inPlayEarshot = (x: number, z: number) => toChildren(x, z) < ADULT_SPEECH_MARGIN
 
   // THE WATER PATH IS LAID LAST OF ALL THE ADULTS' PLACES (work-order 688). A
   // lane forced through the house band BEFORE the plan costs it a dwelling
@@ -1321,23 +1334,20 @@ export function buildLayout(placeId: string, seed: number): PlaceLayout {
   // bends round three huts, and a straight one is also what reads as a path to
   // the river from inside the village.
   if (waterPath) {
-    // THE WALK IS TESTED AGAINST THE BODIES AS THEY ARE DRAWN. It used to be
-    // tested against the dwellings as CIRCLES of radius `d.r`, which a box, a
-    // warehouse and a mosque all reach past at their corners, so an accepted
-    // track could cross a drawn wall (GPT-5.6 Sol, first cross-vendor round,
-    // B2). It asks `standingClear` now — the same predicate the carrier's own
-    // step obeys — over every solid body of the settlement: the dwellings at
-    // their true shape, the functional buildings, the pen, the play rocks, the
-    // props.
+    // THE WALK IS TESTED AGAINST THE FABRIC AS IT IS DRAWN — ALL OF IT. It used
+    // to be tested against the dwellings as CIRCLES of radius `d.r`, which a
+    // box, a warehouse and a mosque all reach past at their corners, and the
+    // compound fences were not in the reckoning at all, so an accepted track
+    // could cross a drawn wall. It asks `standingClear` now, over the whole
+    // collider set — the same predicate the carrier's own step obeys.
     //
-    // NOT THE COMPOUND FENCES, AND THAT IS SAID HERE RATHER THAN HIDDEN. A
-    // straight worn track from the village to the water cannot always clear
-    // them: measured on this tree, bambara at seeds 7 and 1337 have NO clear
-    // straight line at ANY bearing between 10 and 24 metres once the panels are
-    // counted. Letting the track bend, or making the compound builder open a
-    // gate on it, is a design change beyond this point; it is filed as its own
-    // work-order point rather than answered with a number that happens to pass.
-    const bodies = colliders.filter((_, i) => i < fenceFrom || i >= fenceTo)
+    // AND WHERE THAT LEAVES NO WALK, THERE IS NO PATH, which is this point's own
+    // rule: a track drawn through a wall teaches the wrong thing, and no
+    // teaching beats a wrong one. Measured over nine villages at six seeds, two
+    // layouts pay that price — bambara at 7 and at 1337 — and the village the
+    // communication slice is actually played in is not one of them. Work-order
+    // 1045 removes the cause rather than the rule: either the track may bend
+    // once at the gap, or the compound builder opens a gate where it crosses.
     // TWO CLEARANCES, EACH WITH ITS OWN REASON. Against solid fabric the rule is
     // that the DRAWN track never overlaps it — half the lane's width — and the
     // carrier walking its middle is narrower than that, so nothing further is
@@ -1353,11 +1363,18 @@ export function buildLayout(placeId: string, seed: number): PlaceLayout {
       // two teachings have to stay separable. Sampled along the whole walk, not
       // only at its foot: the straight line from the village middle to the water
       // cuts the lane's chord even when both of its ENDS lie clear of it.
-      for (let t = 0; t <= 48; t++) {
-        const x = head.x + (foot.x - head.x) * (t / 48)
-        const z = head.z + (foot.z - head.z) * (t / 48)
+      // SAMPLED BY LENGTH, NOT BY A FIXED COUNT. Forty-eight samples over a
+      // twenty-metre walk leave gaps of 0.4 m, and a fence post or a box corner
+      // that overlaps the lane by less than that slips between two of them
+      // (GPT-5.6 Sol, confirming round, path clearance). A step of a tenth of a
+      // metre is finer than the thinnest body in the set.
+      const runLength = Math.hypot(foot.x - head.x, foot.z - head.z)
+      const steps = Math.max(48, Math.ceil(runLength / 0.1))
+      for (let t = 0; t <= steps; t++) {
+        const x = head.x + (foot.x - head.x) * (t / steps)
+        const z = head.z + (foot.z - head.z) * (t / steps)
         if (inBankPlayLane(playRocks, x, z, laneClearance)) return false
-        if (!standingClear(bodies, x, z, drawnHalf)) return false
+        if (!standingClear(colliders, x, z, drawnHalf)) return false
       }
       return true
     }
@@ -1393,12 +1410,11 @@ export function buildLayout(placeId: string, seed: number): PlaceLayout {
     // Nothing shipped reaches this — `layout.test.ts` sweeps every river village
     // at every seed and finds a head for each.
     if (!head) {
-      // ... and it says so, everywhere, rather than shipping a silent village:
-      // every headless suite fails on the console error and every manual session
-      // shows it. `layout.test.ts` sweeps all three river villages at every seed
-      // and finds a head for each, so this firing means the plan changed under
-      // the rule.
-      devAssert(false, 'water-path-missing', () => `${place.id}: a village on a river with no clear walk to it`)
+      // MEASURED, NAMED, AND NOT ASSERTED. Two of the swept layouts reach this,
+      // and an alarm that fires on a known, filed condition is one its reader
+      // learns to skip. `layout.test.ts` names exactly which layouts pay it and
+      // points at work-order 1045; a THIRD one appearing is what that case
+      // catches.
       waterPath = null
     } else {
       waterPath.head = head
@@ -1530,16 +1546,6 @@ export function buildLayout(placeId: string, seed: number): PlaceLayout {
     // what they are DOING (a jar, a stroke of the hoe), the children's on where
     // they are standing. So the dig sites are what gives way here.
     const earshot = ADULT_SPEECH_MARGIN
-    /** How far a spot stands from the nearest place a child speaks. */
-    const toChildren = (x: number, z: number) => {
-      let best = Infinity
-      if (playGround) best = Math.min(best, Math.hypot(x - playGround.x, z - playGround.z) - playGround.radius)
-      for (const p of playRocks ? [playRocks.upstream, playRocks.downstream] : []) {
-        best = Math.min(best, Math.hypot(x - p.x, z - p.z))
-      }
-      if (bank) best = Math.min(best, Math.hypot(x - bank.bank.x, z - bank.bank.z))
-      return best
-    }
     /** What each kind of work needs of its spot, beyond the shared rules. */
     const belongs: Record<PlaceLayout['digSites'][number]['kind'], (x: number, z: number) => boolean> = {
       // A store pit is sunk against the wall of the compound it stores for.

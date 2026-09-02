@@ -336,10 +336,18 @@ describe('the digging word sits on the stroke', () => {
     // A2. The staged tally used to be bumped whether or not a second adult was
     // free, so the catalogue moved on having shown one man digging alone — and
     // the situation the spec asks for was never played.
-    const v = view(1)
-    const state = createAdultWork(1, CFG)
+    // A POPULATED village where nobody else is FREE — which is the state the
+    // rule is about. Casting it with a village of one would only prove that a
+    // second body does not exist, and an implementation that counted heads
+    // instead of asking who is free would pass it (GPT-5.6 Sol, confirming
+    // round).
+    const v = view(5)
+    const state = createAdultWork(5, CFG)
     const dt = 1 / 60
     for (let t = 0; t < 240; t += dt) {
+      // Only villager 0 is ever offered: every other man is busy with something
+      // this module knows nothing about.
+      for (let i = 1; i < v.villagers.length; i++) v.villagers[i].free = false
       const task = taskOf(state, 0)
       v.villagers[0].free = !task
       if (task && !task.arrived) {
@@ -379,13 +387,20 @@ describe('the digging word sits on the stroke', () => {
         me.z += ((to.z - me.z) / d) * step
       }
       stepAdultWork(state, v, dt, CFG, () => 0.5)
-      for (const task of state.tasks) {
-        if (task?.situation !== 'dig-joined' || task.owes) continue
-        sawAJoiner = true
-        expect(
-          standable(task.x, task.z),
-          `the joiner was sent to ${task.x.toFixed(1)},${task.z.toFixed(1)}, where no body fits`,
-        ).toBe(true)
+      // THE JOINER IS THE SECOND OF A PAIR, not merely a man with no debt: the
+      // primary also owes nothing once he has spoken, so a lone digger would
+      // have satisfied the old reading and the constrained ground would never
+      // have been exercised at all (GPT-5.6 Sol, confirming round).
+      const pair = state.tasks.filter((t2) => t2?.situation === 'dig-joined')
+      if (pair.length === 2) {
+        const joiner = pair.find((t2) => t2 && !t2.owes && t2.say === null && pair.some((o) => o !== t2 && o!.owes))
+        if (joiner) {
+          sawAJoiner = true
+          expect(
+            standable(joiner.x, joiner.z),
+            `the joiner was sent to ${joiner.x.toFixed(1)},${joiner.z.toFixed(1)}, where no body fits`,
+          ).toBe(true)
+        }
       }
     }
     expect(sawAJoiner, 'the shut ground must not stop the pair happening elsewhere').toBe(true)
@@ -410,6 +425,10 @@ describe('the digging word sits on the stroke', () => {
         me.z += ((to.z - me.z) / d) * step
       }
       stepAdultWork(state, v, dt, CFG, () => 0.5)
+      // BOTH tasks of the pair, and the joiner identified as the one who is not
+      // the digger: 'has no debt' also describes the primary once he has spoken,
+      // so a lone primary would have satisfied the old reading of this loop
+      // (GPT-5.6 Sol, confirming round).
       const joiners = state.tasks.filter((t2) => t2?.situation === 'dig-joined')
       if (joiners.length < 2) continue
       // Every pair works ONE piece of ground: the joiner stands a stand-off away
@@ -446,6 +465,90 @@ describe('every utterance is a single atom', () => {
       const word = stepAdultWork(state, v, 1 / 60, CFG, () => 0.5)
       if (word) expect(state.last).toMatchObject({ id: word.id, concept: word.concept, speaker: word.speaker })
     }
+  })
+
+  it('never hands out a site somebody is standing on', () => {
+    // FORCED, not waited for. The ordinary replay only ever inspects the bodies
+    // where speech happens to occur, so the site-clear rule could be deleted and
+    // it would stay green (GPT-5.6 Sol, confirming round). Here a man is PARKED
+    // on the first site for the whole run, and the diggers must go elsewhere.
+    const occupied = { x: -11, z: 2 }
+    const v = view(5)
+    v.villagers[4].x = occupied.x
+    v.villagers[4].z = occupied.z
+    const state = createAdultWork(5, CFG)
+    const dt = 1 / 60
+    let staged = 0
+    for (let t = 0; t < 360; t += dt) {
+      for (let i = 0; i < 4; i++) {
+        const me = v.villagers[i]
+        const task = taskOf(state, i)
+        me.free = !task
+        if (!task || task.arrived) continue
+        const to = goalOf(task)
+        const d = Math.hypot(to.x - me.x, to.z - me.z)
+        if (d <= 1e-6) continue
+        const step = Math.min(d, CFG.pace * dt)
+        me.x += ((to.x - me.x) / d) * step
+        me.z += ((to.z - me.z) / d) * step
+      }
+      // The parked man never moves and never takes work.
+      v.villagers[4].free = false
+      v.villagers[4].x = occupied.x
+      v.villagers[4].z = occupied.z
+      stepAdultWork(state, v, dt, CFG, () => 0.5)
+      for (const task of state.tasks) {
+        if (task?.phase !== 'dig') continue
+        staged++
+        expect(
+          Math.hypot(task.x - occupied.x, task.z - occupied.z),
+          'a dig site was handed out with a man standing on it',
+        ).toBeGreaterThan(1e-6)
+      }
+    }
+    expect(staged, 'the run must actually stage digging somewhere').toBeGreaterThan(0)
+  })
+
+  it('does not end a finished bout that still owes its word', () => {
+    // The case below arranges two atoms on one CYCLE boundary; this one is about
+    // the BOUT boundary, which is the invariant the code actually claims: a dig
+    // whose seconds are up but whose word never fell keeps digging rather than
+    // taking the atom with it (GPT-5.6 Sol, confirming round).
+    const dt = 1 / 60
+    const v = view(2, [
+      { x: -11, z: 2 },
+      { x: -11.4, z: 2 },
+    ])
+    const state = createAdultWork(2, CFG)
+    state.tasks[0] = {
+      situation: 'dig-alone',
+      phase: 'dig',
+      carry: 'none',
+      x: v.geography.digSites[0].x,
+      z: v.geography.digSites[0].z,
+      arrived: true,
+      // Past its own digging time, and still owing.
+      dug: CFG.digSeconds + 1,
+      owes: true,
+      say: null,
+      via: null,
+      age: 0,
+    }
+    v.villagers[0].free = false
+    // Villager 1 stands ON the ground the word points at, so the stroke is held.
+    v.villagers[1].free = false
+    stepAdultWork(state, v, dt, CFG, () => 0.5)
+    expect(taskOf(state, 0), 'the bout must not end on an unspoken word').not.toBeNull()
+    expect(taskOf(state, 0)?.owes).toBe(true)
+    // Once the ground is clear again the word falls, and only then does the bout
+    // end.
+    v.villagers[1].x = 40
+    v.villagers[1].z = 40
+    let spoke = null
+    for (let t = 0; t < DIG_CYCLE_SECONDS * 2 && !spoke; t += dt) {
+      spoke = stepAdultWork(state, v, dt, CFG, () => 0.5)
+    }
+    expect(spoke?.concept).toBe('DIG')
   })
 
   it('holds the second atom back rather than swallowing it, when two fall together', () => {

@@ -4544,7 +4544,15 @@ if (section('adult-errands')) {
     let atWork = 0
     let nearestBankVoice = Infinity
     let nearestVoiceWhat = null
-    let seen = null
+    // THE UTTERANCE ALREADY STANDING WHEN THE WINDOW OPENS IS NOT ONE OF OURS.
+    // `last` survives its own moment, so the first sample would otherwise be
+    // counted as a fresh word and measured at a speaker who has since walked on
+    // (GPT-5.6 Sol, confirming round). It is read once, before the loop, and
+    // becomes the thing every later sample is compared against.
+    const first = await page.evaluate(() => window.__placeErrands())
+    let seen = first.last
+      ? { key: `${first.last.id}/${first.last.concept}/${first.last.speaker}`, age: first.last.age }
+      : null
     for (let i = 0; i < 240; i++) {
       const now = await page.evaluate(() => window.__placeErrands())
       for (const [id, n] of Object.entries(now.staged ?? {})) {
@@ -4572,6 +4580,19 @@ if (section('adult-errands')) {
         heard[last.concept] = (heard[last.concept] ?? 0) + 1
         const who = now.villagers[last.speaker]
         if (who) {
+          // AGAINST THE CHILDREN THEMSELVES, first. The stage says where they
+          // belong; a child on the speaker's side of a rock is nearer him than
+          // the rock is, and it is the child who hears (GPT-5.6 Sol, confirming
+          // round). The stage points stay as a floor for the moment when the
+          // children are elsewhere entirely.
+          const kids = await page.evaluate(() => window.__placeTag?.()?.children ?? [])
+          for (const kid of kids) {
+            const d = Math.hypot(who.x - kid.x, who.z - kid.z)
+            if (d < nearestBankVoice) {
+              nearestBankVoice = d
+              nearestVoiceWhat = `${last.concept} at ${d.toFixed(1)} m from a child`
+            }
+          }
           for (const pt of stage.pts) {
             const d = Math.hypot(who.x - pt.x, who.z - pt.z)
             if (d < nearestBankVoice) {
