@@ -25784,3 +25784,263 @@ Nummerierung bleiben deshalb identisch — hier wird nur verschoben, nie umgesch
   Nutzer, 13.08.2026 23:38: »Stimmt, fünf Silben sind dann wohl nicht mehr notwendig.«
   Refs: src/communication/lexicon.ts, src/communication/drumMessage.ts, src/scenes/place/childSituations.ts, src/scenes/place/adultErrands.ts, docs/communication-poc-spec.md, design.md 13.4
   Bundle: Dorfleben.
+
+- [x] 687. The village children play one game at the bank, and it teaches four words (user
+  13.08.2026, playing the deployed communication slice).
+  The user played the deployed communication slice on 13.08.2026 with the debug
+  switch "Speech: show concepts instead of syllables" on and could learn nothing:
+  "Ich erkenne da kein Fangspiel … Das Herumschicken wirkt wie zum Selbstzweck
+  eingeführt", and about the adults "Selbst wenn ich diese Übersetzungen sehe,
+  erkenne ich keinen Sinn hinter den Handlungen." The evening's conversation
+  diagnosed the cause — the design taught eleven concepts through situations
+  forced onto a game that cannot carry them — and rebuilt the whole slice around
+  five words, two teaching places and one game per settlement kind. This point is
+  one of six that carry that rebuild; they are specified together and read
+  together.
+
+  The six specifications were reviewed cross-vendor before filing (GPT-5.6 Sol at
+  effort high, 13.08.2026, verdict do-not-merge on the first draft): it found two
+  outright contradictions and, more valuable, three wrong readings a player could
+  learn and still finish the puzzle with. What stands here is the corrected state.
+  The village children play ONE game at the river bank, and it teaches four of the
+  five words without a single staged lesson.
+
+  Final state:
+
+  1. THE CYCLE. The children roam their own quarter of the village, out of earshot
+     of the adults. At the end of that phase one of them calls `RIVER`, points at
+     the water, and the whole group runs to the bank — the caller is the first
+     catcher. A CYCLE is: that call, then runs until no runner is left free, then
+     the group walks back and roams again. Phase lengths are balance values,
+     debug-editable; the roaming phase is short (order of a minute) so a visiting
+     player does not miss the call that opens the cycle.
+  2. THE GAME. Two rocks stand on the bank, one upstream, one downstream, in the
+     CURRENT teaching-stone size (scale 2.4) — they are run-to targets and must be
+     recognisable from the far end of the stretch. The runners gather at one rock,
+     the catcher waits at the other. Before each run one of them announces the
+     direction — `UPSTREAM` or `DOWNSTREAM` — and the whole group sets off that way
+     while the catcher comes to meet them. Whoever reaches the far rock calls
+     `ROCK`.
+  3. THE RUN'S STATE MACHINE, stated exactly, because half of it decides what the
+     picture shows:
+     - A run ENDS when every runner has either touched the far rock or been tagged.
+     - A tagged runner drops out where he stands, in an UNMISTAKABLE out-of-play
+       posture (crouched, arms folded — never confusable with a walking child), and
+       holds it until the run ends.
+     - Between runs the dropped-out children WALK to the catchers' side; from the
+       next run on they tag as well. Only catchers tag.
+     - Sides swap every run: the survivors now start where they arrived, so the
+       announced direction alternates by construction.
+     - The cycle ends when no free runner is left.
+  4. THE THREE WRONG READINGS ARE CLOSED — this is the part the cross-vendor review
+     (GPT-5.6 Sol, 13.08.2026) blocked the earlier draft on, and none of it is
+     optional:
+     - `ROCK` must not be learnable as "base", "goal" or "made it". Two guards: the
+       catcher taps his rock and names it at the start of a run, with nobody
+       arriving; and during the ROAMING phase a child climbs one of the ordinary
+       scattered boulders in the village and names it — a rock that is no part of
+       the game at all.
+     - `UPSTREAM`/`DOWNSTREAM` must not be learnable as "to the far rock" or as
+       left/right. Guard: when the group breaks up at the end of a cycle it walks
+       off ALONG the bank and one child announces that walk with the opposite word,
+       from wherever the group happens to stand and with no rock as its target.
+       The words therefore appear once per cycle detached from the two rocks.
+     - Corroboration the world already offers: the river visibly flows, so the two
+       words correlate with the current for a player who watches the water.
+  5. IT MUST READ AS A GAME, WHICH IS WHAT THE OLD ROUND STOPPED DOING (the user, 13.08.2026:
+     »Ich erkenne da kein Fangspiel … Das Herumschicken wirkt wie zum Selbstzweck eingeführt«).
+     A player watching must be able to read the rule without a word of explanation: who chases,
+     who is caught, and what a caught child does next. NOTHING IS STAGED. There is no situation
+     catalogue any more. Every utterance
+     falls at a fixed point of the round — the opening call, the direction
+     announcement, the arrival, the catcher's tap, the parting call — and not one
+     of them takes a child out of the game or slows it.
+  6. THE STAGE, in numbers rather than adjectives: the stretch between the rocks is
+     stated in world units, chosen so both rocks are inside the frame from the
+     start line at the default field of view and the stated reference viewport, and
+     the lane is at least three walker diameters wide so a child can pass an adult
+     or the traveller without being pushed into the water or a wall. The numbers
+     stand in the layout comment with the measurement that produced them.
+  7. THE TRAVELLER IS AN OBSTACLE, NEVER A STOP. Children steer round the player
+     and round any villager and keep playing; a game that halts when the player
+     steps in would never be seen. They give the STRANGER a WIDER berth than a
+     villager — one extra radius, calibratable — so they visibly swerve rather than
+     brush past him.
+  8. Every utterance is one atom, read from the same lexicon as everything else.
+  9. THE THREE CHILD-MOTION PINS THE VOCABULARY POINT LOOSENED ARE RESTORED AND
+     RE-MEASURED (measured 14.08.2026 on `feat/686-five-word-lexicon`). Emptying
+     the child situations took the children's steering with it, and
+     `src/scenes/place/tagShuffle.test.ts` measured the cost: bambara-village at
+     seed 2972259115 shuffles 0.42 % of its judged time over 60 s against the
+     0.25 % gate, the progress watch fires twice over 90 s where once was enough,
+     and the constructed pen stops producing the symptom at 0.65 m (6.7 % shuffled,
+     82.3 % of the trace still judged — the gate passing a wedged child). The
+     interim run is 120 s, the exact rescue pin is `toBeGreaterThan(0)` and the
+     pen is 0.6 m; each site names the number it held. This point puts the 60 s,
+     the exact `toBe(1)` and the 0.65 m yard back, and states the re-measurement
+     in the same commit. A pin that cannot be restored is a finding, not a value
+     to re-tune.
+ 10. THE CROSS-VENDOR REVIEW'S FINDINGS ARE ANSWERED (GPT-5.6 Sol at effort high on
+     `44f37c6a..9598673d`, 14.08.2026, verdict DO-NOT-MERGE). Each is fixed or
+     refuted with evidence, and the ones that are fixed are pinned by a test that
+     would fail without the fix:
+     - THE CYCLE CAN NEVER END. `endRun` promotes only children already `out`, and
+       the sole cycle exit is "no free runner left", so a sequence of runs in which
+       nobody is tagged repeats run/regroup forever. The roaming phase then never
+       returns — and with it neither the boulder that teaches `ROCK` off the game nor
+       the opening `RIVER` call. The round needs a guaranteed elimination or an
+       explicit cycle backstop, and a test that drives a no-tag run to termination.
+     - THE CATCHER'S TAP CAN FALL AFTER SOMEBODY ARRIVES. The tap and the direction
+       announcement are QUEUED and drained one per `utteranceGapSeconds`, so the tap
+       is emitted at least one gap into the run — which is exactly the "made it"
+       reading item 4 forbids. Every utterance that item 5 fixes to a moment of the
+       round is emitted AT that moment or not at all.
+     - THE OFF-GAME `ROCK` GUARD IS SILENTLY ABANDONED when the roaming goal runs
+       long (`namedBoulder` is set true without anyone speaking), `BankStage.boulder`
+       is nullable, and no code makes the child climb. The guard either fires every
+       roaming phase or the settlement has no bank round; a cycle without the boulder
+       utterance is a failing test, not an accepted case.
+     - THE BODY SEPARATION MOVES CROUCHED CHILDREN. `separateGroup` and
+       `absorbSeparation` run unconditionally after the round's own step, so a tagged
+       child can be pushed while it is meant to hold its posture, and can be pushed
+       inside the traveller's berth because the round's obstacle check has already
+       finished. The pure test asserts immobility on a path the game does not take —
+       the integration path is what must be pinned.
+     - THREE ASSERTIONS PIN NOTHING and are replaced by ones that bite:
+       `expect(free).toBeGreaterThanOrEqual(0)` is tautological, `expect(pace)
+       .toBeGreaterThanOrEqual(Math.min(paceBefore, pace))` is always true, and
+       `expect(nearest).toBeGreaterThan(berth * 0.9)` permits ten percent penetration
+       of the very radius it guards and never compares against the ordinary villager's.
+     - The re-pen construction of item 9 was NOT judged (it fell outside the reviewed
+       range), so the re-review covers it: the guard was loosened from demanding a
+       clear r+1.6 m yard to only refusing to leave a sibling in the wall band, and
+       that must be shown to be a correction rather than a weakening.
+ 11. THE CARVE REMOVAL IS GATED PER CHILD, IN EVERY RIVER VILLAGE (cross-vendor
+     finding, GPT-5.6 Sol at effort high on `59740c15..206ae092`, 18.08.2026,
+     verdict merge-with-fixes; counted and confirmed before filing).
+     `src/scenes/place/PlaceLife.tsx` takes `buildWedgeCarve` off EVERY bank phase
+     (`const carve = stage ? () => false : …`), on the measured ground that at the
+     verification's own seed the only route from the children's quarter to the bank
+     ran through one carved wedge — with the carve the group stood in a pocket and
+     never reached the water. That reason stands. What is missing is the gate on
+     its cost: a roaming child is steered LOCALLY, so with the carve gone nothing
+     keeps an individual child out of a dead-end wedge. The per-child measure that
+     would catch it — "the children never shuffle on the spot", which reads
+     `worstShare` and `leastJudged` off the WORST child — runs over
+     `bambara-village@2972259115`, `maasai-village@42` and `swahili-village@99`,
+     and the last two stand on no river, so they never play this round at all. The
+     round's own cross-layout test asserts stations reachable, both rocks stood at,
+     one rock touched and one run-phase crossing — never per-child progress. Three
+     of the four river layouts are therefore ungated. FINAL STATE: the per-child
+     shuffle measure runs over the bank-round replay in all four river villages
+     (`bambara@42`, `bambara@2972259115`, `nubian@42`, `mandinka@99`), gating
+     `worstShare` and `leastJudged` there as the shuffle pin does, and the measured
+     numbers are stated at the site. Restoring the carve for the locally steered
+     phases is the alternative and is second choice: it puts back a wall the
+     measurement showed was in the wrong place, so it may only be taken if the
+     measure cannot be made to hold.
+
+  Test: Vitest over a replayed cycle — the phases alternate; the caller becomes the
+  first catcher; the direction alternates with the side swap; `ROCK` occurs once
+  without an arrival and once outside the game; a direction word occurs once with
+  no rock as its target; the run and cycle end exactly as §3 says; no utterance
+  reduces a playing child's pace; a tagged child holds the posture and only moves
+  between runs. A browser section judges the picture: both rocks in frame from the
+  start line, and a player standing in the lane is walked around while play goes on.
+  The same section REPORTS, over a minute of play, the fraction of clock in which the round is
+  actually running and the number of tags in it, and FAILS when the round is not recognisable as a
+  game by those numbers — the measured form of the complaint this rebuild answers.
+  Constraints:
+  - Depends on the five-concept lexicon (the vocabulary point).
+  - The old tag round (chaser, flight, role handover) is NOT deleted — it moves to
+    the port cities in its own point. Keep the reusable parts.
+  - The stuck/trembling child (carrier findings on 666) is a SEPARATE defect; this
+    point must not be measured on a group whose children are wedged.
+  - Difficulty high: this is a new round structure plus layout work, and the
+    picture decides.
+  Quotes:
+  Nutzer, 13.08.2026 22:24: »Am Fluss gibt es am einen Ende und am anderen einen großen Felsen. Die Kinder spielen "Wer hat Angst vorm weißen Hai?" … Schaffen es, rufen sie beim Ankommen ROCK. Bevor sie losrennen, kündigen sie ihre Richtung an: flussaufwärts oder flussabwärts … Wer erwischt wurde, bleibt stehen. Dann beginnt eine neue Runde mit Seitentausch und die vorher vom Fänger erwischten Spieler gehören jetzt zu seinem Team.«
+  Nutzer, 13.08.2026 22:36: »Die Kinder spielen nicht permanent … Irgendwann ruft eines RIVER und zeigt auf den Fluss. Dann laufen alle dort hin und spielen das Spiel. Das Kind, das RIVER gerufen hat, ist dann zu Beginn der Fänger.«
+  Nutzer, 13.08.2026 23:11: »Man sollte meinen, dass die Kinder etwas Angst/Respekt vor mir als fremder Erwachsener haben, anstatt mich fast umzurennen.«
+  Nutzer, 13.08.2026 20:51: »Beim Kinderspiel kann ich auch nichts lernen. Ich erkenne da kein Fangspiel. Für mich laufen die Kinder mehr oder weniger zufällig hin und her (wenn sie mal nicht festhängen) und werfen mit Anweisungen um sich, die dem Spiel nicht dienlich sind. Ursprünglich war es mal ein Fangspiel, bei dem einer die anderen fangen muss und der Gefangene dadurch zum Fänger wird. Durch die ganzen neuen Situationen, die zur Erklärung der Kommunikationskonzepte COME, THERE, FOLLOW, usw. hinzugekommen sind, ist das Kinderspiel völlig verwässert. Das Herumschicken wirkt wie zum Selbstzweck eingeführt und macht das Fangspiel nicht mehr erkennbar.«
+  CROSS-VENDOR REVIEW OF THE LANDING (29.08.2026, 16 passes over `main..de7e175`, cut by per-file
+  authorship: GPT-5.6 Sol read the Claude-authored files, Opus 4.8 the Sol-authored ones). THE
+  ROUND ITSELF CAME BACK CLEAN — pass 16 traced bankGame.ts's state machine and its multi-seed
+  hand-stepped tests against §1-§4 and recorded merge, its one gap the untested `roamGuardSeconds`
+  abandon branch; passes 15, 2 and 11 merge on PlaceLife.tsx, lexicon.ts and PlaceScene.tsx. All
+  three do-not-merge verdicts fell on the SUPPORTING work, and ALL SIXTEEN FINDINGS ARE ANSWERED on
+  the branch (`9c17272` `ab53909` `6e92f9f` `7c87fd6` `6e89540`), each mutation-checked where a
+  mutation was possible. In one line each, with the detail in those commits:
+  - `findPlaceRoute` could return a route whose last leg ended inside a collider instead of saying
+    NO ROUTE, and the case meant to catch that recomputed the predicates the grid was built from.
+    The grid now records WHY a cell is unfree, so water is still walked into and rock is not.
+  - The children's running lane was guarded against loose dressing only, and the play-rock stage was
+    derived from a bank that had not settled — with the play rocks themselves in the set deciding
+    whether it could. Both were true by luck; they are true by construction now, at no cost in
+    placement.
+  - `docs/acceptance-evidence.md` §15 still described the twelve situations and six concepts the
+    rebuild deleted, and named a suite that no longer exists.
+  - The browser checks outran their own wording: a crossing counted in any phase, a group average
+    that hid a starved child, two labels naming a camera stance the suite does not take, and a
+    tripwire comment claiming a proof its mechanism cannot give.
+  - Smaller, each pointed at a line: `speaking.test.ts` pinned ROCK's tones under RIVER's name;
+    `settings.mjs` said "every word" over four of five; the literal sweep saw single quotes only and
+    read comments as speech; nothing pinned the three river places apart since the errand suite was
+    deleted; the nineteen bank controls were proven to exist and never to act, with no restore
+    entry; `Dialogs.test.tsx` did not tie NO_READING to ROCK; the journal had the drums name the
+    boulder "taller than a man, alone"; a gather phase was labelled a walk where the group runs;
+    and `balance.ts`, `chiefReply.ts`, `lexicon.ts` and `design.md` §8 each carried a number or a
+    pointer that outlived what it described.
+  ONE FINDING IS NOT FIXED AND SAYS SO: `penHasClearWall`'s inner edge carries no body radius, so a
+  sibling on the wall counts as inside the yard. Correcting it yields 6 valid placements where the
+  fixture needs more than 10, and three assertions pinned to that trace fall with it — affordable
+  only with a longer trace and a re-measurement of those three numbers.
+  THE FULL REGRESSION OF 29.08.2026 (`npm test` on `de7e175`, WebGL 2, 91m 09s, 131 frames): RED,
+  so the WebGPU pass never started. Four of twenty suites failed, none of them this rebuild's:
+  - `settings` — "first-person ground shows micro-detail (edge energy)", laplacian mean 1.07, the
+    SAME check twice. Classified against the merge-base `4acf6039abe0`: PRE-EXISTING, already red
+    on the baseline.
+  - `benchmark` — six checks twice: `ssaoEnabled`, `travelZoom`, `travelSpeed`, `seed`, `day` not
+    restored and `Math.random` still replaced. All PRE-EXISTING, owned by nobody — now point 1009.
+  - `enrichments` — "the streamed dressing does not grow over a session at a fixed anchor", the
+    same `{samples:[0,0,0,0,0]}` on the branch and on the baseline: PRE-EXISTING. It is charged, to
+    point 938, but that entry is scoped to `webgpu`/`compatibility` and this reading is WebGL 2, so
+    the charge does not cover the lane it was measured on and needs widening with today's evidence.
+  - `flow` — `page.reload` timed out on `networkidle`, green on retry, SUSPECT.
+  ONE APPARENT REGRESSION DID NOT SURVIVE MEASUREMENT. That classification's single current-tree
+  run also called two checks REAL REGRESSION — "a feed that ends without a kill leaves no remnant"
+  and the dev assertion `animal-buried` (zebra bodyY=0.42 against ground=1.03) — green on both
+  baseline runs. Re-measured at once: five more branch passes, ZERO occurrences of either — one run
+  rotated onto two OTHER checks instead. That is the rotating family flake
+  `scripts/verify/README.md` says this suite carries. Only baseline runs in the same NUMBER would
+  settle it; two cannot separate a 1-in-6 rate from zero.
+  WHAT IT PROVES: build, lint, type-check and 14,467 unit tests green; `polish` green at 200
+  checks, and `world`, `collision`, `handwriting`, `gamepad`, `touch`, `voice`, `health`, `events`,
+  `startup`, `report`, `preview` green. The loading-picture freeze that reddened the aborted 10:40
+  run passed here — that run had declared its own machine loaded and its timing verdicts void, so
+  it was the load. The WebGPU half of the two-backend obligation is still owed.
+  WHAT THE 29.08.2026 WEBGPU RUN LEFT OWED (measured on `feat/687-roam-bound-fixes`, LARGE,
+  90 m 52 s, exit 1). Every red of that run now names an open point and `render-verify-guard
+  --status` reports no unaccounted red on the branch — the freeze to 733, world's frame 11 to 627,
+  the crossing to 698, enrichments' frame 72 and the MSAA cascade to 514, the picture-less bug
+  report to 927, the Ctrl labels to 1010, the benchmark's borrowed world to 1009, and the three
+  that had no point at all to 1011, 1012 and 1013. THREE THINGS STILL BLOCK THE LANDING:
+  - THE WEBGL 2 HALF WAS NEVER RUN. The run requested `backends: ["webgpu","webgl"]`
+    (`local/verify-logs/2026-08-29T19-31-59-213-large.log.run.json`) and its receipt records
+    `backends: ["WebGPU"]` — run-all stops at the first red backend. LARGE owes the complete
+    WebGL 2 regression lane (CLAUDE.md §7.2), so this run does not satisfy it.
+  - FOUR RUN RECORDS CARRY `crashed: true` AND CANNOT BE SIGNED OFF FROM THE KEPT LOG.
+    `webgpu/world` (19:37, 19:38) and `webgpu/enrichments` (20:51, 20:53) are marked crashed in
+    `.claude/render-verify-state.json` while each stored its reds and each is charged (627, 514).
+    `render-verify-recorder` sets the flag from a `CRASH_LINE` on STDERR; `scripts/verify/run-logged.mjs`
+    merges stderr into the log but writes only lines its `select()` keeps, so the kept log is a
+    FILTERED view and cannot evidence the absence of that line. The sign-off the guard asks for
+    ("what the log shows") therefore cannot be given honestly from the material that exists, and
+    it was deliberately NOT given on 29.08.2026. Either the recorder keeps the line that set the
+    flag, or the run is re-taken with the raw stream retained.
+  - SIX FRAMES ARE MISSING, 88 of 94, and which suite stopped short is not established. The
+    shutter's refusals (world's frame 11 twice, enrichments' frame 72 twice) and the
+    `687-bank-game-traveller` frame that never fired — the run phase held only 16 of 395 samples
+    in the 45 s window — are a plausible but UNMEASURED account of the shortfall.
+  Refs: src/scenes/place/tagGame.ts, src/scenes/place/childSituations.ts, src/scenes/place/PlaceLife.tsx, src/scenes/place/lifeSpots.ts, src/scenes/place/layout.ts, src/config/balance.ts
+  Bundle: Dorfleben.
