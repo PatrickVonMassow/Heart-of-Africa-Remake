@@ -466,23 +466,26 @@ export function stepAdultWork(
       // while his neighbour was still walking, and the player would have seen
       // one man at a hole and another arriving at an empty one (GPT-5.6 Sol,
       // confirming round, joined staging).
-      // AND NO CHILD IS IN EARSHOT. See `childrenHear`: a passing child would
-      // learn DIG from the adults instead of its own four words, and the whole
-      // point of the three separate teaching places is that it does not. The
-      // hold is recorded, because a man held to his time limit by a child that
-      // would not walk on has not LOST his atom — see `hushed`.
-      const hush = t.owes && view.childrenHear(me.x, me.z)
-      if (hush) t.hushed = true
-      if (
-        !spoken &&
-        t.owes &&
-        !hush &&
-        joinedIsJoined(state, i, t) &&
-        digStrikeCrossed(before, t.dug, i * 0.37) &&
-        siteClear(view, t, i)
-      ) {
-        t.owes = false
-        spoken = { id: t.situation, concept: 'DIG', speaker: i, aim: { x: t.x, y: 0, z: t.z } }
+      if (!spoken && t.owes && joinedIsJoined(state, i, t) && digStrikeCrossed(before, t.dug, i * 0.37)) {
+        // THE STROKE CAME — and it is here, with the word ready, that the two
+        // holds apply. Somebody standing on the ground he points at makes the
+        // word read as aimed at the man; a child within earshot would learn DIG
+        // from the adults instead of its own four words, and the whole point of
+        // the three separate teaching places is that it does not.
+        //
+        // A WITHHELD WORD IS RECORDED (`hushed`). It stays owed and falls on a
+        // later stroke, but a man held to his time limit by a bystander who
+        // never moved has not LOST his atom to a defect — he gave it up to the
+        // rule — and the expiry assertion above must not call that a defect.
+        // Only the child hold used to be recorded, so the older occupancy hold
+        // could still fire the assertion in a settlement where nothing was
+        // wrong.
+        if (!siteClear(view, t, i) || view.childrenHear(me.x, me.z)) {
+          t.hushed = true
+        } else {
+          t.owes = false
+          spoken = { id: t.situation, concept: 'DIG', speaker: i, aim: { x: t.x, y: 0, z: t.z } }
+        }
       }
       // He digs on while his word is still owed, so a bout can never end having
       // eaten the atom it existed for; `errandSeconds` still bounds the task.

@@ -2580,8 +2580,29 @@ if (section('campfire-shadows')) {
 // year — a step visible only in the dry-season straw would be half a feature.
 if (section('settlement-edge')) {
   // Ground crops: how far inside / outside the boundary each sample sits.
+  //
+  // THE INSIDE CROP SITS INSIDE THE BAND, NOT ON ITS INNER EDGE (work-order
+  // 688). It stood at −5 m, which was well clear of the band this check was
+  // written against — but the band was widened to 8 m in play on 27.08.2026 and
+  // the crops were not re-aimed with it. −5 then sat ON the band's own inner
+  // edge (radius − 4, ± the 0.4 m wander), the least stable ground on the whole
+  // profile, and whether the criterion passed came down to which bearing the
+  // corridor scan happened to pick.
+  //
+  // MEASURED, band on / band off, over the whole ray at 1 m steps:
+  //   bambara (dry)  −5 ×0.690  −3 ×0.695  −2 ×0.704  0 ×0.857  +1 ×0.968  +2 ×0.999
+  //   bambara (wet)  −5 ×0.838  −3 ×0.723  −2 ×0.709  0 ×0.837  +1 ×0.961  +2 ×0.998
+  //   capetown (wet) −5 ×0.867  −3 ×0.798  −2 ×0.776  0 ×0.904  +1 ×0.985  +2 ×1.000
+  //   giza (dry)     −5 ×0.864  −3 ×0.875  −2 ×0.878  0 ×0.948  +1 ×0.991  +2 ×1.000
+  //   giza (wet)     −5 ×0.820  −3 ×0.799  −2 ×0.797  0 ×0.907  +1 ×0.982  +2 ×1.000
+  // The visible fall runs from about −1.4 to +1.4, exactly the width the band's
+  // core says it should. At −3 the sweep is at full strength everywhere and in
+  // both seasons; at −5 it is not — bambara in the rains reads ×0.838 there,
+  // ABOVE its own boundary crop, and the give-way check had a margin of −0.001
+  // against a bar of 0.008. Off −3 the same margins are 0.11 to 0.16: the bar is
+  // unchanged and is no longer decided by noise.
   const SAMPLES = [
-    { name: 'inside', at: -5 },
+    { name: 'inside', at: -3 },
     { name: 'boundary', at: 0 },
     { name: 'outside', at: 4 },
   ]
