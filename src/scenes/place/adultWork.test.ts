@@ -11,11 +11,13 @@ import {
   clearTask,
   createAdultWork,
   digStrikeCrossed,
+  goalOf,
   isDigging,
   stepAdultWork,
   taskOf,
   WATER_FOOT_REACH,
   WORK_ARRIVE_RADIUS,
+  type AdultTask,
   type AdultWorkConfig,
   type AdultWorkView,
   type SpokenWord,
@@ -36,8 +38,18 @@ const CFG: AdultWorkConfig = {
 const HEAD = { x: 12, z: 0 }
 const FOOT = { x: 34, z: -6 }
 
-/** A village of `n` adults, all free, all standing at the middle. */
-function view(n: number, at?: Array<{ x: number; z: number }>): AdultWorkView {
+/** Nearer than this to what a word points at, and a bystander IS what it points
+ *  at as far as the player can tell. The joining digger keeps `JOIN_STAND_OFF`
+ *  (1.6 m) from the site, so this clears him. */
+const AIMED_AT_A_PERSON = 1
+
+/** A village of `n` adults, all free, all standing at the middle. `standable`
+ *  defaults to open ground; a case that wants to shut a site in passes its own. */
+function view(
+  n: number,
+  at?: Array<{ x: number; z: number }>,
+  standable: (x: number, z: number) => boolean = () => true,
+): AdultWorkView {
   return {
     villagers: Array.from({ length: n }, (_, i) => ({
       x: at?.[i]?.x ?? 0,
@@ -53,6 +65,7 @@ function view(n: number, at?: Array<{ x: number; z: number }>): AdultWorkView {
         { x: -4, z: -19, kind: 'patch' },
       ],
     },
+    standable,
   }
 }
 
@@ -67,9 +80,9 @@ function run(
   seconds: number,
   cfg = CFG,
   rand: () => number = () => 0.5,
-): Array<SpokenWord & { at: { x: number; z: number } }> {
+): Array<SpokenWord & { at: { x: number; z: number }; crowd: Array<{ x: number; z: number }> }> {
   const state = createAdultWork(v.villagers.length, cfg)
-  const said: Array<SpokenWord & { at: { x: number; z: number } }> = []
+  const said: Array<SpokenWord & { at: { x: number; z: number }; crowd: Array<{ x: number; z: number }> }> = []
   const dt = 1 / 60
   for (let t = 0; t < seconds; t += dt) {
     for (let i = 0; i < v.villagers.length; i++) {
@@ -77,14 +90,24 @@ function run(
       const task = taskOf(state, i)
       me.free = !task
       if (!task || task.arrived) continue
-      const d = Math.hypot(task.x - me.x, task.z - me.z)
+      const to = goalOf(task)
+      const d = Math.hypot(to.x - me.x, to.z - me.z)
       if (d <= 1e-6) continue
       const step = Math.min(d, cfg.pace * dt)
-      me.x += ((task.x - me.x) / d) * step
-      me.z += ((task.z - me.z) / d) * step
+      me.x += ((to.x - me.x) / d) * step
+      me.z += ((to.z - me.z) / d) * step
     }
     const word = stepAdultWork(state, v, dt, cfg, rand)
-    if (word) said.push({ ...word, at: { x: v.villagers[word.speaker].x, z: v.villagers[word.speaker].z } })
+    if (word) {
+      said.push({
+        ...word,
+        at: { x: v.villagers[word.speaker].x, z: v.villagers[word.speaker].z },
+        // WHERE EVERY OTHER BODY STOOD AT THE SHUTTER. Without it the "nobody is
+        // called over" case had nothing to judge — it looked at the catalogue's
+        // targets and never at a person.
+        crowd: v.villagers.map((p) => ({ x: p.x, z: p.z })),
+      })
+    }
   }
   return said
 }
@@ -147,11 +170,12 @@ describe('the water is taught at the head of the path, never at the bank', () =>
         me.free = !task
         if (task) carried.add(`${task.situation}:${carryOf(state, i)}`)
         if (!task || task.arrived) continue
-        const d = Math.hypot(task.x - me.x, task.z - me.z)
+        const to = goalOf(task)
+        const d = Math.hypot(to.x - me.x, to.z - me.z)
         if (d <= 1e-6) continue
         const step = Math.min(d, CFG.pace * dt)
-        me.x += ((task.x - me.x) / d) * step
-        me.z += ((task.z - me.z) / d) * step
+        me.x += ((to.x - me.x) / d) * step
+        me.z += ((to.z - me.z) / d) * step
       }
       stepAdultWork(state, v, dt, CFG, () => 0.5)
     }
@@ -213,22 +237,45 @@ describe('the digging word sits on the stroke', () => {
         const task = taskOf(state, i)
         me.free = !task
         if (!task || task.arrived) continue
-        const d = Math.hypot(task.x - me.x, task.z - me.z)
+        const to = goalOf(task)
+        const d = Math.hypot(to.x - me.x, to.z - me.z)
         if (d <= 1e-6) continue
         const step = Math.min(d, CFG.pace * dt)
-        me.x += ((task.x - me.x) / d) * step
-        me.z += ((task.z - me.z) / d) * step
+        me.x += ((to.x - me.x) / d) * step
+        me.z += ((to.z - me.z) / d) * step
       }
+      // The bout's own clock BEFORE the step: a task whose dig is finished is
+      // cleared in the very step it speaks, so reading it afterwards reads null.
+      const dugBefore = v.villagers.map((_, i) => taskOf(state, i)?.dug ?? null)
+      // Whether he was digging is read BEFORE the step for the same reason: the
+      // step that carries his word may also be the one that ends his bout.
+      const diggingBefore = v.villagers.map((_, i) => isDigging(state, i))
       const word = stepAdultWork(state, v, dt, CFG, () => 0.5)
       if (word?.concept === 'DIG') {
-        if (isDigging(state, word.speaker)) spokeWhileDigging++
+        if (diggingBefore[word.speaker]) spokeWhileDigging++
         else spokeOtherwise++
+        // AT WHICH PHASE OF THE CYCLE DID IT ACTUALLY FALL? The task is still
+        // running, so its own `dug` clock plus the speaker's phase offset is the
+        // stroke phase the word landed on. Asserting a FIXED phase instead —
+        // `DIG_CYCLE_SECONDS * 0.99` — proved nothing about the utterance: the
+        // word could have moved anywhere inside the digging interval and the
+        // case would have stayed green (GPT-5.6 Sol, first cross-vendor round,
+        // D5).
+        const dug = dugBefore[word.speaker]
+        expect(dug).not.toBeNull()
+        const struckAt = dug! + dt + word.speaker * 0.37
+        const phase = struckAt % DIG_CYCLE_SECONDS
+        // The blow lands where the cycle wraps, so the word falls within one
+        // frame of the wrap — never mid-lift.
+        expect(
+          Math.min(phase, DIG_CYCLE_SECONDS - phase),
+          `DIG fell at phase ${phase.toFixed(3)} of a ${DIG_CYCLE_SECONDS} s cycle`,
+        ).toBeLessThanOrEqual(dt)
+        expect(poseDistanceFromRest(digPose(struckAt))).toBeGreaterThan(1)
       }
     }
     expect(spokeWhileDigging).toBeGreaterThan(0)
     expect(spokeOtherwise).toBe(0)
-    // And the pose that goes with it is a visible stroke, not a figure at rest.
-    expect(poseDistanceFromRest(digPose(DIG_CYCLE_SECONDS * 0.99))).toBeGreaterThan(1)
   })
 
   it('digs at two different sites, so DIG is not the name of one hole', () => {
@@ -242,18 +289,106 @@ describe('the digging word sits on the stroke', () => {
   })
 
   it('never aims a word at another villager — nobody is called over', () => {
+    // TWO CLAIMS, AND THE SECOND IS THE ONE WITH TEETH. That the aim is one of
+    // the catalogue's own places is cheap; what the spec forbids is a word that
+    // READS as aimed at a person, and that can only be judged against the bodies
+    // as they stood at the moment of speech. The first version of this case
+    // looped over the other villagers without ever looking at one of them and
+    // would have passed with every man standing on the aim point (GPT-5.6 Sol,
+    // first cross-vendor round, D4).
     const v = view(6)
-    for (const s of run(v, 360)) {
-      for (let i = 0; i < v.villagers.length; i++) {
+    const said = run(v, 360)
+    expect(said.length).toBeGreaterThan(0)
+    for (const s of said) {
+      expect([...v.geography.digSites.map((d) => `${d.x},${d.z}`), `${FOOT.x},${FOOT.z}`]).toContain(
+        `${s.aim.x},${s.aim.z}`,
+      )
+      for (let i = 0; i < s.crowd.length; i++) {
         if (i === s.speaker) continue
-        // The aim is a place — the water or the worked ground — and a villager
-        // who happens to stand there is a coincidence, so this is checked at the
-        // moment of speech against the catalogue's own targets instead.
-        expect([...v.geography.digSites.map((d) => `${d.x},${d.z}`), `${FOOT.x},${FOOT.z}`]).toContain(
-          `${s.aim.x},${s.aim.z}`,
-        )
+        const d = Math.hypot(s.crowd[i].x - s.aim.x, s.crowd[i].z - s.aim.z)
+        expect(
+          d,
+          `${s.concept} was aimed at ${s.aim.x.toFixed(1)},${s.aim.z.toFixed(1)} with villager ${i} standing ${d.toFixed(2)} m away`,
+        ).toBeGreaterThan(AIMED_AT_A_PERSON)
       }
     }
+  })
+
+  it('brings the full jar back even when the carrier is the only man at the water', () => {
+    // A1 of the first cross-vendor round. `avoid` was an EXCLUSION, so the man
+    // who had just walked down — the last speaker, and in a small village the
+    // only body anywhere near the foot — was skipped, `nearestFree` returned -1
+    // and the required return trip was never staged at all. The comment above it
+    // promised the opposite.
+    const v = view(2, [
+      { x: 0, z: 0 },
+      { x: 0, z: 0.5 },
+    ])
+    const said = run(v, 240)
+    expect(said.filter((w) => w.id === 'water-out').length).toBeGreaterThan(0)
+    expect(
+      said.filter((w) => w.id === 'water-back').length,
+      'the carrier must come back up with the full jar even with nobody to relieve him',
+    ).toBeGreaterThan(0)
+  })
+
+  it('never counts a joined dig it has nobody to show', () => {
+    // A2. The staged tally used to be bumped whether or not a second adult was
+    // free, so the catalogue moved on having shown one man digging alone — and
+    // the situation the spec asks for was never played.
+    const v = view(1)
+    const state = createAdultWork(1, CFG)
+    const dt = 1 / 60
+    for (let t = 0; t < 240; t += dt) {
+      const task = taskOf(state, 0)
+      v.villagers[0].free = !task
+      if (task && !task.arrived) {
+        const to = goalOf(task)
+        v.villagers[0].x = to.x
+        v.villagers[0].z = to.z
+      }
+      stepAdultWork(state, v, dt, CFG, () => 0.5)
+    }
+    expect(state.staged['dig-alone'] ?? 0).toBeGreaterThan(0)
+    expect(state.staged['dig-joined'] ?? 0).toBe(0)
+    for (const task of state.tasks) expect(task?.situation).not.toBe('dig-joined')
+  })
+
+  it('never stands the joining digger where a body does not fit', () => {
+    // A3. His bearing was drawn at random and never tested against anything, so
+    // he could be sent into a hut or over the boundary, never arrive, and the
+    // joined situation counted as shown regardless. Here the ground east of the
+    // middle site is shut: every spot he is given must be one he can stand on.
+    const shut = { x: -16, z: -1 }
+    const standable = (x: number, z: number) => !(x > shut.x && Math.hypot(x - shut.x, z - shut.z) < 3)
+    const v = view(6, undefined, standable)
+    const state = createAdultWork(6, CFG)
+    const dt = 1 / 60
+    let sawAJoiner = false
+    for (let t = 0; t < 360; t += dt) {
+      for (let i = 0; i < v.villagers.length; i++) {
+        const me = v.villagers[i]
+        const task = taskOf(state, i)
+        me.free = !task
+        if (!task || task.arrived) continue
+        const to = goalOf(task)
+        const d = Math.hypot(to.x - me.x, to.z - me.z)
+        if (d <= 1e-6) continue
+        const step = Math.min(d, CFG.pace * dt)
+        me.x += ((to.x - me.x) / d) * step
+        me.z += ((to.z - me.z) / d) * step
+      }
+      stepAdultWork(state, v, dt, CFG, () => 0.5)
+      for (const task of state.tasks) {
+        if (task?.situation !== 'dig-joined' || task.owes) continue
+        sawAJoiner = true
+        expect(
+          standable(task.x, task.z),
+          `the joiner was sent to ${task.x.toFixed(1)},${task.z.toFixed(1)}, where no body fits`,
+        ).toBe(true)
+      }
+    }
+    expect(sawAJoiner, 'the shut ground must not stop the pair happening elsewhere').toBe(true)
   })
 
   it('lets a neighbour join the second digger without a word of his own', () => {
@@ -267,11 +402,12 @@ describe('the digging word sits on the stroke', () => {
         const task = taskOf(state, i)
         me.free = !task
         if (!task || task.arrived) continue
-        const d = Math.hypot(task.x - me.x, task.z - me.z)
+        const to = goalOf(task)
+        const d = Math.hypot(to.x - me.x, to.z - me.z)
         if (d <= 1e-6) continue
         const step = Math.min(d, CFG.pace * dt)
-        me.x += ((task.x - me.x) / d) * step
-        me.z += ((task.z - me.z) / d) * step
+        me.x += ((to.x - me.x) / d) * step
+        me.z += ((to.z - me.z) / d) * step
       }
       stepAdultWork(state, v, dt, CFG, () => 0.5)
       const joiners = state.tasks.filter((t2) => t2?.situation === 'dig-joined')
@@ -310,6 +446,53 @@ describe('every utterance is a single atom', () => {
       const word = stepAdultWork(state, v, 1 / 60, CFG, () => 0.5)
       if (word) expect(state.last).toMatchObject({ id: word.id, concept: word.concept, speaker: word.speaker })
     }
+  })
+
+  it('holds the second atom back rather than swallowing it, when two fall together', () => {
+    // THE SEAM THE ONE-WORD RULE COSTS. Only one utterance leaves a step, so a
+    // step in which two men both reach their moment must EMIT one and KEEP the
+    // other — the earlier code cleared both and returned the last, which spent a
+    // teaching atom on a frame that never spoke it (GPT-5.6 Sol, first
+    // cross-vendor round, A5/D6).
+    //
+    // Two diggers are set down mid-bout with their strikes arranged to cross in
+    // the same frame: villager 0 carries phase 0, villager 1 carries 0.37.
+    const dt = 1 / 60
+    const v = view(2, [
+      { x: -11, z: 2 },
+      { x: -16, z: -1 },
+    ])
+    const state = createAdultWork(2, CFG)
+    const digging = (dug: number, site: { x: number; z: number }): AdultTask => ({
+      situation: 'dig-alone',
+      phase: 'dig',
+      carry: 'none',
+      x: site.x,
+      z: site.z,
+      arrived: true,
+      dug,
+      owes: true,
+      say: null,
+      via: null,
+      age: 0,
+    })
+    state.tasks[0] = digging(DIG_CYCLE_SECONDS - dt / 2, v.geography.digSites[0])
+    state.tasks[1] = digging(DIG_CYCLE_SECONDS - 0.37 - dt / 2, v.geography.digSites[1])
+    v.villagers[0].free = false
+    v.villagers[1].free = false
+
+    const first = stepAdultWork(state, v, dt, CFG, () => 0.5)
+    expect(first?.concept).toBe('DIG')
+    const heldBack = first!.speaker === 0 ? 1 : 0
+    expect(taskOf(state, heldBack)?.owes, 'the other man`s atom must survive the frame').toBe(true)
+
+    // And it is not merely postponed for ever: it falls on his next stroke.
+    let second: SpokenWord | null = null
+    for (let t = 0; t < DIG_CYCLE_SECONDS * 2 && !second; t += dt) {
+      const w = stepAdultWork(state, v, dt, CFG, () => 0.5)
+      if (w && w.speaker === heldBack) second = w
+    }
+    expect(second?.concept, 'the held-back atom must still be spoken').toBe('DIG')
   })
 })
 

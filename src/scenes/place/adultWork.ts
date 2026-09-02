@@ -82,6 +82,17 @@ export interface AdultWorker extends ErrandPoint {
 export interface AdultWorkView {
   villagers: readonly AdultWorker[]
   geography: AdultWorkGeography
+  /**
+   * May a body stand here? The same predicate the villagers' own step obeys —
+   * the boundary and the collider set together.
+   *
+   * It is REQUIRED rather than optional because the one place that needs it is
+   * the one place nothing else checks: the second digger's stand-off spot was
+   * picked on a random bearing and never tested, so he could be sent into a hut
+   * and never arrive, while the joined situation counted as shown (GPT-5.6 Sol,
+   * first cross-vendor round, A3).
+   */
+  standable: (x: number, z: number) => boolean
 }
 
 /** One atom, spoken by one villager, aimed at what he is doing. */
@@ -116,6 +127,17 @@ export interface AdultTask extends ErrandPoint {
   owes: boolean
   /** Where that atom falls, and what it is aimed at. */
   say: { at: ErrandPoint; aim: ErrandPoint } | null
+  /**
+   * A place to walk to FIRST, cleared once it is reached.
+   *
+   * The outbound water carrier says his word at the HEAD of the path and ends at
+   * the foot, and the two are not on one line: routed round the buildings, or
+   * simply setting off from the wrong side of the village, he could walk to the
+   * water without ever passing within earshot-distance of the head — and the
+   * situation was staged, counted and silent. The head is his first goal now,
+   * and the water his second.
+   */
+  via: ErrandPoint | null
   age: number
 }
 
@@ -143,9 +165,44 @@ export const WORK_ARRIVE_RADIUS = 1.1
  *  has to have been there. */
 export const WATER_FOOT_REACH = 4
 
-/** How near a digger a neighbour joins in at — close enough to read as the same
- *  piece of work, far enough that the two do not stand in one body. */
-export const JOIN_STAND_OFF = 1.6
+/** Nearer than this to the ground a word points at, and a bystander IS what the
+ *  word points at as far as the player can tell. */
+export const AIM_CLEARANCE = 1.2
+
+/**
+ * How near a digger a neighbour joins in at — close enough to read as the same
+ * piece of work, far enough that the two do not stand in one body.
+ *
+ * THE NUMBER IS ARITHMETIC, NOT TASTE. A walker stops as much as
+ * `WORK_ARRIVE_RADIUS` short of the spot he was sent to, so a joiner sent to
+ * `JOIN_STAND_OFF` can settle `JOIN_STAND_OFF - WORK_ARRIVE_RADIUS` from the
+ * site. At the old 1.6 that was half a metre: he stood ON the ground the digger
+ * then pointed at, and the word read as aimed at him. It must stay clear of
+ * `AIM_CLEARANCE`, which is what 2.4 buys (2.4 - 1.1 = 1.3 > 1.2).
+ */
+export const JOIN_STAND_OFF = 2.4
+
+/** How many bearings round a dig site the joining digger's spot is tried on. */
+const JOIN_BEARINGS = 12
+
+/**
+ * Where the second digger stands, or null when the site has no room for him.
+ *
+ * The bearing starts at random so the pair does not always face the same way,
+ * and every bearing is TESTED: an untested one sent him into a hut or over the
+ * settlement boundary, where he never arrived — while the joined situation had
+ * already been counted as shown.
+ */
+function joinSpot(view: AdultWorkView, site: ErrandPoint, rand: () => number): ErrandPoint | null {
+  const start = rand() * Math.PI * 2
+  for (let k = 0; k < JOIN_BEARINGS; k++) {
+    const a = start + (k / JOIN_BEARINGS) * Math.PI * 2
+    const x = site.x + Math.cos(a) * JOIN_STAND_OFF
+    const z = site.z + Math.sin(a) * JOIN_STAND_OFF
+    if (view.standable(x, z)) return { x, z }
+  }
+  return null
+}
 
 export function createAdultWork(count: number, cfg: AdultWorkConfig): AdultWorkState {
   return {
@@ -159,6 +216,12 @@ export function createAdultWork(count: number, cfg: AdultWorkConfig): AdultWorkS
 
 export function taskOf(state: AdultWorkState, index: number): AdultTask | null {
   return state.tasks[index] ?? null
+}
+
+/** Where this task is sending its villager RIGHT NOW: its waypoint while it has
+ *  one, its own place afterwards. The scene walks to this, not to `x`/`z`. */
+export function goalOf(task: AdultTask): ErrandPoint {
+  return task.via ?? { x: task.x, z: task.z }
 }
 
 /** Whether this villager is visibly digging — what the dig pose is driven by. */
@@ -188,20 +251,39 @@ export function digStrikeCrossed(before: number, after: number, phase = 0): bool
   return Math.floor((after + phase) / DIG_CYCLE_SECONDS) > Math.floor((before + phase) / DIG_CYCLE_SECONDS)
 }
 
-/** The villager nearest a point among those free for new work, or -1. */
+/**
+ * The villager nearest a point among those free for new work, or -1.
+ *
+ * `avoid` is a PREFERENCE, not an exclusion. Keeping the word off one man is
+ * worth doing where the village can afford it; where it cannot — nobody else is
+ * standing down at the water — the carrier who just walked down comes back up
+ * himself, which is the picture the situation wanted in the first place.
+ * Skipping him outright is what let the required full-jar return be dropped
+ * altogether whenever he was the only man near the foot (GPT-5.6 Sol, first
+ * cross-vendor round, A1).
+ */
 function nearestFree(view: AdultWorkView, to: ErrandPoint, within: number, avoid: number): number {
   let best = -1
   let bestD = within
+  let fallback = -1
+  let fallbackD = within
   for (let i = 0; i < view.villagers.length; i++) {
     const v = view.villagers[i]
-    if (!v.free || i === avoid) continue
+    if (!v.free) continue
     const d = Math.hypot(v.x - to.x, v.z - to.z)
+    if (i === avoid) {
+      if (d <= fallbackD) {
+        fallbackD = d
+        fallback = i
+      }
+      continue
+    }
     if (d <= bestD) {
       bestD = d
       best = i
     }
   }
-  return best
+  return best >= 0 ? best : fallback
 }
 
 /** Any free villager, the one furthest from `to` last, so the cast rotates. */
@@ -223,13 +305,35 @@ function castable(id: AdultSituationId, view: AdultWorkView): boolean {
   return g.digSites.length >= 1
 }
 
+/**
+ * Is this ground free of everybody but the man who is about to work it?
+ *
+ * A word points at the ground its speaker is working. If another villager
+ * happens to be STANDING on that ground, the pointing reads as pointing at HIM,
+ * and the player learns "come here" from a word that means "dig" — the one
+ * mis-reading the spec's own cross-vendor review put a rule in this file about.
+ * A dig site is therefore only handed out while it is clear.
+ */
+function siteClear(view: AdultWorkView, site: ErrandPoint, digger: number): boolean {
+  for (let i = 0; i < view.villagers.length; i++) {
+    if (i === digger) continue
+    const v = view.villagers[i]
+    if (Math.hypot(v.x - site.x, v.z - site.z) <= AIM_CLEARANCE) return false
+  }
+  return true
+}
+
 /** Picks the dig site the digger of `which` staging uses, so the two digging
  *  situations happen at DIFFERENT sites — one word learnt at one hole would be
- *  a word for that hole. */
-function digSiteFor(view: AdultWorkView, taken: number): DigSite | null {
+ *  a word for that hole — and skips a site somebody else is standing on. */
+function digSiteFor(view: AdultWorkView, taken: number, digger: number): DigSite | null {
   const sites = view.geography.digSites
   if (sites.length === 0) return null
-  return sites[taken % sites.length]
+  for (let k = 0; k < sites.length; k++) {
+    const site = sites[(taken + k) % sites.length]
+    if (siteClear(view, site, digger)) return site
+  }
+  return null
 }
 
 /**
@@ -260,26 +364,58 @@ export function stepAdultWork(
       state.tasks[i] = null
       continue
     }
-    if (!t.arrived && Math.hypot(me.x - t.x, me.z - t.z) <= WORK_ARRIVE_RADIUS) {
+    const goal = goalOf(t)
+    if (!t.arrived && Math.hypot(me.x - goal.x, me.z - goal.z) <= WORK_ARRIVE_RADIUS) {
       t.arrived = true
       t.dug = 0
     }
 
     // The water carrier speaks at the HEAD of the path — the outbound one as he
     // sets off, the inbound one as he arrives — and never at the bank.
-    if (t.owes && t.say && Math.hypot(me.x - t.say.at.x, me.z - t.say.at.z) <= WORK_ARRIVE_RADIUS && t.phase !== 'dig') {
+    //
+    // No occupancy test guards THIS aim: it points at the water, twenty metres
+    // off, and the foot is the one named place the adults never stroll to — only
+    // a carrier on a task goes down. Holding the word here would drop it instead
+    // of delaying it, because he is walking away from the head as he says it.
+    // `adultWork.test.ts` asserts the emptiness rather than assuming it.
+    //
+    // ONE WORD A FRAME, AND NO ATOM SPENT ON A FRAME THAT CANNOT CARRY IT. Only
+    // one utterance leaves this step, so a second task that reaches its own
+    // moment in the same step keeps `owes` and speaks at the next one. Clearing
+    // it regardless is what silently swallowed a teaching atom whenever two
+    // pieces of work came due together (GPT-5.6 Sol, first cross-vendor round,
+    // A5).
+    if (
+      !spoken &&
+      t.owes &&
+      t.say &&
+      Math.hypot(me.x - t.say.at.x, me.z - t.say.at.z) <= WORK_ARRIVE_RADIUS &&
+      t.phase !== 'dig'
+    ) {
       t.owes = false
       spoken = { id: t.situation, concept: 'RIVER', speaker: i, aim: { x: t.say.aim.x, y: 0.2, z: t.say.aim.z } }
+      // The word was the whole point of the waypoint: he goes on to the water.
+      if (t.via) {
+        t.via = null
+        t.arrived = false
+      }
     }
 
     if (t.arrived && t.phase === 'dig') {
       const before = t.dug
       t.dug += dt
-      if (t.owes && digStrikeCrossed(before, t.dug, i * 0.37)) {
+      // A strike missed because another man spoke this frame is not lost: the
+      // word stays owed and falls on the NEXT stroke, still on a stroke. The
+      // same holds when somebody is CROSSING the ground he points at — the
+      // joiner walks over it on his way round — because a word pointed at
+      // occupied ground reads as pointing at the man standing on it.
+      if (!spoken && t.owes && digStrikeCrossed(before, t.dug, i * 0.37) && siteClear(view, t, i)) {
         t.owes = false
         spoken = { id: t.situation, concept: 'DIG', speaker: i, aim: { x: t.x, y: 0, z: t.z } }
       }
-      if (t.dug >= cfg.digSeconds) state.tasks[i] = null
+      // He digs on while his word is still owed, so a bout can never end having
+      // eaten the atom it existed for; `errandSeconds` still bounds the task.
+      if (t.dug >= cfg.digSeconds && !t.owes) state.tasks[i] = null
     } else if (t.arrived && t.phase === 'fetch') {
       t.dug += dt
       // He fills the jar and is free again — the man the NEXT situation casts as
@@ -321,6 +457,7 @@ export function stepAdultWork(
         dug: 0,
         owes: true,
         say: { at: g.waterHead, aim: g.waterFoot },
+        via: { x: g.waterHead.x, z: g.waterHead.z },
         age: 0,
       }
       state.staged[id] = (state.staged[id] ?? 0) + 1
@@ -344,8 +481,9 @@ export function stepAdultWork(
         dug: 0,
         owes: true,
         // He says it ON ARRIVING, at the head, pointing back down at the water
-        // he came from.
+        // he came from — the head IS his goal, so he needs no waypoint.
         say: { at: g.waterHead, aim: g.waterFoot },
+        via: null,
         age: 0,
       }
       state.staged[id] = (state.staged[id] ?? 0) + 1
@@ -353,10 +491,12 @@ export function stepAdultWork(
     }
 
     if (id === 'dig-alone' || id === 'dig-joined') {
-      const site = digSiteFor(view, (state.staged[id] ?? 0) + (id === 'dig-joined' ? 1 : 0))
-      if (!site) continue
+      // The digger is cast FIRST: which sites are usable depends on who else is
+      // standing about, and he must not disqualify his own.
       const who = anyFree(view, avoid)
       if (who < 0) continue
+      const site = digSiteFor(view, (state.staged[id] ?? 0) + (id === 'dig-joined' ? 1 : 0), who)
+      if (!site) continue
       state.tasks[who] = {
         situation: id,
         phase: 'dig',
@@ -367,27 +507,38 @@ export function stepAdultWork(
         dug: 0,
         owes: true,
         say: null,
+        via: null,
         age: 0,
       }
       if (id === 'dig-joined') {
         // A NEIGHBOUR JOINS IN, UNBIDDEN — nobody calls him, and he says nothing.
         // He simply walks over and works the same ground, which is what makes the
         // digger's word about the digging rather than about the neighbour.
+        //
+        // THE SITUATION IS EITHER SHOWN OR NOT STAGED. There is no second digger
+        // to spare, or no room beside the site for him to stand: then this is
+        // not the joined situation at all, and counting it as staged would let
+        // the catalogue move on having shown a man digging alone (GPT-5.6 Sol,
+        // first cross-vendor round, A2/A3). The primary's task is taken back and
+        // the next entry in the catalogue is tried instead.
         const mate = anyFree(view, who)
-        if (mate >= 0 && mate !== who) {
-          const a = rand() * Math.PI * 2
-          state.tasks[mate] = {
-            situation: id,
-            phase: 'dig',
-            carry: 'none',
-            x: site.x + Math.cos(a) * JOIN_STAND_OFF,
-            z: site.z + Math.sin(a) * JOIN_STAND_OFF,
-            arrived: false,
-            dug: 0,
-            owes: false,
-            say: null,
-            age: 0,
-          }
+        const spot = mate >= 0 && mate !== who ? joinSpot(view, site, rand) : null
+        if (!spot || mate < 0) {
+          state.tasks[who] = null
+          continue
+        }
+        state.tasks[mate] = {
+          situation: id,
+          phase: 'dig',
+          carry: 'none',
+          x: spot.x,
+          z: spot.z,
+          arrived: false,
+          dug: 0,
+          owes: false,
+          say: null,
+          via: null,
+          age: 0,
         }
       }
       state.staged[id] = (state.staged[id] ?? 0) + 1

@@ -78,6 +78,7 @@ import {
   clearTask,
   createAdultWork,
   isDigging,
+  goalOf,
   stepAdultWork,
   taskOf,
   type AdultWorkGeography,
@@ -2187,7 +2188,22 @@ function ErrandVillagers({
     yaws.current = Array.from({ length: count }, (_, i) => yaws.current[i] ?? 0)
   }
 
-  const view = useMemo<AdultWorkView>(() => ({ villagers: people, geography }), [people, geography])
+  // May a body stand here? The settlement boundary and the collider set
+  // together — the same question this component's own step asks. The work
+  // module is handed it so the second digger's place beside a dig site is a
+  // REAL one; picking his bearing without asking sent him into a hut, where he
+  // never arrived while the joined situation counted as shown.
+  const standable = useMemo(
+    () => (px: number, pz: number) =>
+      insidePlace({ radius, bank }, px, pz, NPC_RADIUS * 2) &&
+      standingClear(colliders, px, pz, NPC_RADIUS),
+    [colliders, radius, bank],
+  )
+
+  const view = useMemo<AdultWorkView>(
+    () => ({ villagers: people, geography, standable }),
+    [people, geography, standable],
+  )
 
   // The body each villager presents to every other inhabitant (point 578): two
   // of them sent to neighbouring spots used to end up in one body.
@@ -2195,15 +2211,13 @@ function ErrandVillagers({
   const bodies = useInhabitantBodies(count)
   const separationWorld = useMemo(
     () => ({
-      blocked: (px: number, pz: number) =>
-        !insidePlace({ radius, bank }, px, pz, NPC_RADIUS * 2) ||
-        !standingClear(colliders, px, pz, NPC_RADIUS),
+      blocked: (px: number, pz: number) => !standable(px, pz),
       nudge: (px: number, pz: number) => {
         const free = tryNudgeToFree(colliders, px, pz, NPC_RADIUS)
         return { x: free.pos[0], z: free.pos[1], found: free.found }
       },
     }),
-    [colliders, radius, bank],
+    [colliders, standable],
   )
 
   useFrame((_, rawDt) => {
@@ -2217,7 +2231,10 @@ function ErrandVillagers({
       // Where this villager is headed: what it was told, or its own stroll.
       let goal: ErrandPoint | null = null
       if (task) {
-        goal = task.arrived ? null : { x: task.x, z: task.z }
+        // `goalOf`, not the task's own place: a water carrier is walked to the
+        // head of the path first, where his word falls, and only then to the
+        // water.
+        goal = task.arrived ? null : goalOf(task)
       } else if (!task) {
         if (state.pause > 0) {
           state.pause -= dt
