@@ -123,12 +123,13 @@ export const BANK_DRESSING_CLEARANCE = 0.9
 // BOTH ROCKS IN ONE FRAME. At the reference viewport of the verification
 // (1440x900) and the default field of view (50 deg vertical, App.tsx), a
 // spectator at the start line sees the near rock beside him and the far one
-// 19.7 m down the bank: the far rock is 2.4 m across and 1.3 m tall, which is
-// 3.8 deg of the 50 deg frame — some 68 px of the 900, plainly a rock rather
-// than a speck. The horizontal frame is 2*atan(tan(25 deg)*1.6) = 73.4 deg, so
-// the whole stretch fits with either rock a good 20 deg inside the edge for a
-// spectator standing back from the line. `riverBank.test.ts` computes both
-// angles rather than restating them.
+// 19.7 m down the bank: the far rock is 2.4 m across and stands 4.3 m tall
+// (work-order 688 made it an UPRIGHT erratic instead of the squatting boulder
+// the stage was first built with), which is 12.4 deg of the 50 deg frame — some
+// 220 px of the 900, a landmark rather than a speck. The horizontal frame is
+// 2*atan(tan(25 deg)*1.6) = 73.4 deg, so the whole stretch fits with either rock
+// a good 20 deg inside the edge for a spectator standing back from the line.
+// `riverBank.test.ts` computes both angles rather than restating them.
 //
 // THE LANE IS THREE WALKER DIAMETERS. `BANK_PLAY_LANE_HALF` is kept clear of
 // every scattered boulder, tuft and tree, which leaves 3.0 m of running ground
@@ -145,6 +146,40 @@ export const BANK_PLAY_ROCK_INSET = 2.6
 /** Half-width of the running lane between the two play rocks that the loose
  *  dressing is kept out of. */
 export const BANK_PLAY_LANE_HALF = 1.5
+
+// --- Where the village fetches its water (work-order 688) -----------------
+//
+// THE WATER PATH LANDS OUTSIDE THE CHILDREN'S STRETCH. The adults teach RIVER by
+// fetching water: one carrier walks down to the river with an empty jar, another
+// comes back up with a full one. Their lane may not cross the stage the children
+// run on — a carrier walking through the middle of a run would be read as part
+// of the game, and the two teachings have to stay separable.
+//
+// It lands UPSTREAM of the stretch, not downstream, and that is not a coin toss:
+// a settlement draws its drinking water above the water it plays, washes and
+// wades in. The landing therefore sits beyond the upstream rock, at
+// `BANK_WATER_PATH_ANGLE_FRAC` of the plateau angle — still inside the plateau,
+// where the walkable ground reaches the water, and 3.9 m beyond the upstream
+// rock on the three river villages (`riverBank.test.ts` measures it rather than
+// restating it).
+
+/** Angular offset of the water path's landing from the bank normal, as a
+ *  fraction of the plateau angle. Below 1 so the landing stays inside the
+ *  plateau however the calibratable river width moves the waterline; above
+ *  `BANK_STRETCH_ANGLE_FRAC` so it lies beyond the upstream rock. */
+export const BANK_WATER_PATH_ANGLE_FRAC = 0.95
+
+/**
+ * Where the village's water path meets the bank: on the UPSTREAM side, beyond
+ * the children's stretch, drawn `BANK_STAND_INSET` inland of the plate edge so a
+ * carrier arriving there stands on flat ground rather than on the shore.
+ */
+export function bankWaterFoot(
+  bank: Pick<PlaceRiverBank, 'nx' | 'nz' | 'fx' | 'fz' | 'walkEdge'>,
+): BankPoint {
+  const a = -BANK_PLATEAU_ANGLE * BANK_WATER_PATH_ANGLE_FRAC
+  return alongBank(bank, a, bank.walkEdge / Math.cos(a) - BANK_STAND_INSET)
+}
 
 /** The two play rocks of a bank: the ends of the children's stretch, upstream
  *  and downstream, mirrored exactly as the bank's own stretch points are. */

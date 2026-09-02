@@ -7,14 +7,15 @@
 import { placeById } from '../../world/geo'
 import { mulberry32 } from '../../world/noise'
 import { REGION_PLACE_STYLES, VILLAGE_PLANS, type RegionPlaceStyle } from './regionStyles'
-import { PORT_TALKERS, VILLAGE_SPOTS } from './lifeSpots'
+import { PORT_TALKERS, VILLAGE_SPOTS, childPlayGround, villageAdultStations, type PlayGround } from './lifeSpots'
 import { boxCollider, nudgeToFree, spawnPointFree, standingClear, PLAYER_RADIUS, WALKER_RADIUS, type Collider } from './collision'
 import { CHIEF_HUT, MARKET_HUT, dwellingRoofProfile, hutRoofProfile, roofStandOff } from './roofClearance'
 import { windingPoints, laneSlots, closestOnPolyline, bendAround, type LaneSlot } from './lanePlan'
 import { buildGizaLayout } from './gizaSite'
-import { ROCK_VILLAGE_ID } from '../../world/communicationRock'
+import { ROCK_FOOTPRINT_UNITS } from '../../world/communicationRock'
 import {
   bankPlayRocks,
+  bankWaterFoot,
   buildRiverBank,
   inBankPlayLane,
   settleBankPoints,
@@ -22,6 +23,7 @@ import {
   type BankPoint,
   type PlaceRiverBank,
 } from './riverBank'
+import { balance } from '../../config/balance'
 import type { BuildingType } from '../../state/ui'
 
 export const PLACE_RADIUS = 28 // walkable radius in meters; leaving it exits the place
@@ -83,20 +85,16 @@ export interface PlaceLayout {
   /** Scattered boulders (solid, part of the collision set). */
   rocks: Array<[number, number, number]>
   /**
-   * The communication PoC's TEACHING STONE (work-order 482): a single boulder
-   * standing in the open of the PoC village, where the adults teach the word
-   * for a rock by pointing at it. Deliberately a knee-to-waist-high stone a few
-   * steps away — the erratic the chief's message sends the player to is a far
-   * bigger block a day upstream, and the player has to make that transfer
-   * himself. Null in every other settlement.
-   */
-  teachingStone: { x: number; z: number; r: number; scale: number } | null
-  /**
-   * Ground work in the open of a village (work-order point 483): a store pit
-   * being sunk, a post hole beside the lane, a patch of earth turned over. They
-   * are where the adults teach the word for digging, so they are LAYOUT data —
-   * the villager digs at exactly the spot the scene draws the turned earth, and
-   * no second, drifting position can exist. Empty in ports.
+   * Ground work in a village (work-order point 483): a store pit being sunk, a
+   * post hole beside the lane, a patch of earth turned over. They are where the
+   * adults teach the word for digging, so they are LAYOUT data — the villager
+   * digs at exactly the spot the scene draws the turned earth, and no second,
+   * drifting position can exist. Empty in ports.
+   *
+   * They stand where such work belongs and NOT on the open central ground
+   * (work-order 688): a store pit at a compound edge, a post hole beside a lane,
+   * a turned patch at the edge of the worked ground. Digging in the middle of
+   * the village square is what made the old picture read as meaningless.
    */
   digSites: Array<{ x: number; z: number; kind: 'pit' | 'postHole' | 'patch' }>
   /**
@@ -115,6 +113,27 @@ export interface PlaceLayout {
    * in every settlement without a bank.
    */
   playRocks: { upstream: BankPoint; downstream: BankPoint; r: number; scale: number } | null
+  /**
+   * The village's WATER PATH (work-order 688): the lane its water carriers walk
+   * between the settlement and the river. `head` is the point in the village
+   * where the path leaves the built ground — where both carriers speak, one
+   * setting out with an empty jar and one arriving with a full one — and `foot`
+   * is where it meets the bank, upstream of and clear of the children's stretch.
+   * Null in every settlement without a bank.
+   */
+  waterPath: { head: BankPoint; foot: BankPoint } | null
+  /**
+   * The children's roaming quarter (work-order 481.4): where the group plays
+   * between two cycles of its bank game, and how far it roams. It is layout data
+   * since work-order 688, because the adults' own teaching places — the dig
+   * sites — are placed clear of it, and a quarter derived a second time in the
+   * scene would be a second quarter. Null outside villages.
+   *
+   * `balance.villageLife.tag.playRadius` is read when the layout is built, so an
+   * edit takes effect on the next visit rather than mid-scene — the same rule
+   * `adultErrands.villagerCount` already follows.
+   */
+  playGround: PlayGround | null
   /** Livestock pen (kraal layouts). */
   pen: { x: number; z: number; r: number } | null
   /** Points walkers visit on their errands. */
@@ -124,14 +143,22 @@ export interface PlaceLayout {
 }
 
 /**
- * The teaching stone's instance scale on `buildRock` (base radius 0.5) and the
- * collider that follows from it: ~2.4 m across and ~1.3 m tall, against the
- * 0.3-1.0 scale of the scattered rock dressing. Big enough to be pointed at
- * from across the village, small enough that nobody mistakes it for the
- * landmark erratic outside.
+ * The play rocks' footprint, in metres — ~2.4 m across, the size the stage was
+ * measured at in work-order 687, against the 0.3-1.0 scale of the scattered
+ * rock dressing. It is the collider radius AND the drawn block's half-width,
+ * because the two are one object (points 129/378).
  */
-export const TEACHING_STONE_SCALE = 2.4
-export const TEACHING_STONE_RADIUS = 0.5 * TEACHING_STONE_SCALE
+export const PLAY_ROCK_RADIUS = 1.2
+
+/**
+ * The instance scale that gives `buildErraticBoulder` that footprint. The block
+ * is the UPRIGHT erratic of `world/communicationRock.ts` (work-order 688), not
+ * the squatting dressing boulder: the word ROCK has to transfer from these two
+ * to the block the chief's message sends the player to, so the two must be the
+ * same KIND of thing at two sizes. At this scale the play rock stands ~4.3 m —
+ * a head-and-shoulders landmark on the bank, well under the goal boulder.
+ */
+export const PLAY_ROCK_SCALE = PLAY_ROCK_RADIUS / ROCK_FOOTPRINT_UNITS
 
 /**
  * Radius of a patch of ground work (work-order point 483), in metres: the pit
@@ -139,6 +166,45 @@ export const TEACHING_STONE_RADIUS = 0.5 * TEACHING_STONE_SCALE
  * from across the village, small enough to keep out of the lanes.
  */
 export const DIG_SITE_RADIUS = 0.9
+
+/**
+ * Radius of the OPEN CENTRAL GROUND of a village (work-order 688): the middle
+ * the fire, the pounder, the drummer and the talking pair share, and where the
+ * settlement's own traffic crosses. Nothing is dug here — a store pit sunk on
+ * the village square is the picture the user read as meaningless on 13.08.2026.
+ * It reaches just past the pounder (7.1 m out) and the talkers (7.2 m).
+ */
+export const CENTRAL_GROUND_RADIUS = 9
+
+/** How near a dig site must stand to the thing whose work it is — a compound
+ *  wall for the store pit, a lane edge for the post hole. Two paces: near
+ *  enough that the eye joins the two, far enough that the digger still fits
+ *  between them. */
+export const DIG_SITE_ANCHOR_REACH = 3.5
+
+/** Where the WORKED GROUND begins, as a fraction of the walkable radius: the
+ *  turned patch lies out here, past the last compound rather than between
+ *  them. */
+export const DIG_SITE_FIELD_BAND = 0.62
+
+/** Where the WATER PATH's head stands: on the bank's own bearing, out past the
+ *  compound ring (7-14 m, work-order 604) at the edge of the built ground. It
+ *  is the point both water carriers speak at, so it has to be a place the
+ *  player can stand among the village and hear — not a spot on the open plain
+ *  and not the middle of the square. */
+export const WATER_PATH_HEAD_RADIUS = 15
+
+/** The radii the head is tried at, the nominal one first: a dense plan can leave
+ *  that exact ring occupied, and a step in or out costs the picture nothing. */
+export const WATER_PATH_HEAD_RADII = [15, 13.5, 16.5, 12, 18] as const
+
+/** How far to either side of the water's own bearing the head may be swept, in
+ *  degrees, to find a straight walk that clears the settlement's buildings. */
+export const WATER_PATH_HEAD_SWEEP = 60
+
+/** Width of the water path, in metres: a walked footpath, narrower than the
+ *  village's own lanes. */
+export const WATER_PATH_WIDTH = 1.6
 
 /** Where a village's cooking fire burns (design.md §19.10) — the collider here
  *  and the `FirePit` the scene draws read the same spot. */
@@ -350,9 +416,18 @@ export function isOnLane(x: number, z: number, paths: PathDef[]): boolean {
  * granary. The villager markers are not buildings and stay out.
  */
 export function builtFabric(layout: PlaceLayout): Array<[number, number]> {
+  return fabricOf(layout.dwellings, layout.interactives)
+}
+
+/** The same list from the two parts it is made of, so `buildLayout` can ask for
+ *  it before there is a `PlaceLayout` to ask about. */
+function fabricOf(
+  dwellings: readonly DwellingDef[],
+  interactives: readonly Interactive[],
+): Array<[number, number]> {
   return [
-    ...layout.dwellings.map((d) => [d.x, d.z] as [number, number]),
-    ...layout.interactives.filter((it) => it.type !== 'villager').map((it) => it.pos),
+    ...dwellings.map((d) => [d.x, d.z] as [number, number]),
+    ...interactives.filter((it) => it.type !== 'villager').map((it) => it.pos),
   ]
 }
 
@@ -383,7 +458,23 @@ export function buildLayout(placeId: string, seed: number): PlaceLayout {
   // stage instead of into it. See `riverBank.ts` for the numbers and the
   // measurement behind them.
   const playRocks: PlaceLayout['playRocks'] = bank
-    ? { ...bankPlayRocks(bank), r: TEACHING_STONE_RADIUS, scale: TEACHING_STONE_SCALE }
+    ? { ...bankPlayRocks(bank), r: PLAY_ROCK_RADIUS, scale: PLAY_ROCK_SCALE }
+    : null
+  // THE WATER PATH (work-order 688): the lane the village's water carriers walk.
+  // It is laid down HERE, before a single hut is placed, because it is a lane
+  // like any other — the plan builds against it, and nothing is put on it.
+  //
+  // Its foot is `bankWaterFoot`'s landing, upstream of the children's stretch
+  // (see riverBank.ts for why upstream). Its head is the point where it leaves
+  // the built ground, on the same bearing, at `WATER_PATH_HEAD_RADIUS`: that is
+  // where BOTH carriers speak — one setting out with an empty jar, one arriving
+  // with a full one — so the word RIVER falls in the VILLAGE and never at the
+  // bank, where it would land inside the children's earshot.
+  let waterPath: PlaceLayout['waterPath'] = bank
+    ? {
+        head: { x: bank.nx * WATER_PATH_HEAD_RADIUS, z: bank.nz * WATER_PATH_HEAD_RADIUS },
+        foot: bankWaterFoot(bank),
+      }
     : null
 
   const interactives: Interactive[] = []
@@ -1067,16 +1158,87 @@ export function buildLayout(placeId: string, seed: number): PlaceLayout {
   // traveller pressed into it cannot walk out. Every loose object therefore keeps
   // a walkable gap from every other one — `isFree` covers the buildings, this
   // covers the dressing among itself.
+  // THE WATER PATH IS LAID AFTER THE PLAN (work-order 688). A lane forced
+  // through the house band BEFORE the plan costs it a dwelling (measured at
+  // nubian-village, seed 42: seven boxes became six), so the track is fitted to
+  // the settlement instead: its FOOT is fixed at the water, and its HEAD is swept
+  // round the bank's bearing until the straight walk between the two clears every
+  // building. A carrier's track is a straight worn line, not a lane that bends
+  // round three huts, and a straight one is also what reads as a path to the
+  // river from inside the village.
+  if (waterPath) {
+    const solid = [
+      ...dwellings.map((d) => ({ x: d.x, z: d.z, r: d.r })),
+      // The functional buildings at the radii `isFree` keeps every other lane
+      // out of.
+      ...interactives
+        .filter((it) => it.type !== 'villager')
+        .map((it) => ({
+          x: it.pos[0],
+          z: it.pos[1],
+          r: place.kind === 'port' ? 3.2 : it.type === 'market' ? 2.9 : 3.35,
+        })),
+    ]
+    const clearance = WATER_PATH_WIDTH / 2 + WALKER_RADIUS
+    const foot = waterPath.foot
+    const clearRun = (head: BankPoint) => {
+      const run: Array<[number, number]> = [[head.x, head.z], [foot.x, foot.z]]
+      if (!solid.every((b) => closestOnPolyline(run, b.x, b.z).dist > b.r + clearance)) return false
+      // AND IT NEVER CROSSES THE CHILDREN'S RUNNING LANE. A carrier walking
+      // through the middle of a run would be read as part of the game, and the
+      // two teachings have to stay separable. Sampled along the whole walk, not
+      // only at its foot: the straight line from the village middle to the water
+      // cuts the lane's chord even when both of its ENDS lie clear of it.
+      for (let t = 0; t <= 48; t++) {
+        const x = head.x + (foot.x - head.x) * (t / 48)
+        const z = head.z + (foot.z - head.z) * (t / 48)
+        if (inBankPlayLane(playRocks, x, z, clearance)) return false
+      }
+      return true
+    }
+    // Swept from the FOOT's own bearing outward, so the track is the straight
+    // walk to the water wherever the plan and the children's lane allow one.
+    const base = Math.atan2(foot.z, foot.x)
+    // Straight out toward the water first, then to either side in one-degree
+    // steps, and at each bearing a little nearer and a little further out — the
+    // first head that gives a clear walk wins, so the track stays as near the
+    // direct line as the plan and the children's lane allow.
+    let head: BankPoint | null = null
+    for (let step = 0; step <= WATER_PATH_HEAD_SWEEP && !head; step++) {
+      for (const sign of step === 0 ? [1] : [-1, 1]) {
+        const a = base + sign * step * (Math.PI / 180)
+        for (const r of WATER_PATH_HEAD_RADII) {
+          const cand = { x: Math.cos(a) * r, z: Math.sin(a) * r }
+          if (!isFree(cand.x, cand.z, 2.0, WALKER_RADIUS)) continue
+          if (!clearRun(cand)) continue
+          head = cand
+          break
+        }
+        if (head) break
+      }
+    }
+    // A settlement that can give no clear walk gives NO water path at all: an
+    // adult whose RIVER falls on a track through the children's running lane
+    // teaches the wrong thing, and no teaching beats a wrong one. Its adults then
+    // keep only their digging, exactly as a village without a river does.
+    // Nothing shipped reaches this — `layout.test.ts` sweeps every river village
+    // at every seed and finds a head for each.
+    if (!head) {
+      waterPath = null
+    } else {
+      waterPath.head = head
+      paths.push({ points: [[head.x, head.z], [foot.x, foot.z]], width: WATER_PATH_WIDTH })
+    }
+  }
+
   const flora: PlaceLayout['flora'] = []
   const rocks: PlaceLayout['rocks'] = []
-  let teachingStone: PlaceLayout['teachingStone'] = null
   // The TRAVELLER's width, not the villager's: he is the wider of the two and
   // the one who cannot be nudged free by the game.
   const dressingGap = 2 * PLAYER_RADIUS
   const clearOfDressing = (x: number, z: number, bodyR: number) =>
     flora.every((t) => Math.hypot(x - t.x, z - t.z) > 0.45 + bodyR + dressingGap) &&
     rocks.every(([rx, rz, rs]) => Math.hypot(x - rx, z - rz) > 0.35 + rs * 0.5 + bodyR + dressingGap) &&
-    (!teachingStone || Math.hypot(x - teachingStone.x, z - teachingStone.z) > teachingStone.r + bodyR + dressingGap) &&
     // AND OUT OF THE CHILDREN'S LANE (work-order 687). A boulder dropped between
     // the two play rocks narrows the running ground the game needs, and the pair
     // themselves are solid: the lane test covers both, because the corridor runs
@@ -1089,52 +1251,6 @@ export function buildLayout(placeId: string, seed: number): PlaceLayout {
     const z = Math.sin(angle) * r
     if (!isFree(x, z, 3.5) || onLane(x, z, 0.5) || !clearOfDressing(x, z, 0.45)) continue
     flora.push({ x, z, h: 3 + rand() * 2 })
-  }
-
-  // The PoC village's teaching stone (work-order 482): placed BEFORE the loose
-  // rock scatter so the dressing grows around it, in the open at a walkable
-  // distance from the centre where it is visible from the middle of the village
-  // and from the arrival path. Seeded like everything else in the layout.
-  if (placeId === ROCK_VILLAGE_ID) {
-    for (let i = 0; i < 48 && !teachingStone; i++) {
-      // A deterministic golden-angle sweep, so a crowded seed still finds a spot.
-      // The band reaches in as well as out: the compounds' walls stand between 7
-      // and 14 m out (work-order 604), and a sweep that only tried that ring
-      // could come back empty-handed in a well-filled village.
-      const a = rand() * Math.PI * 2 + i * 2.399963
-      const r = 6.5 + (i % 8) * 0.9
-      const x = Math.cos(a) * r
-      const z = Math.sin(a) * r
-      if (!isFree(x, z, 3.2, TEACHING_STONE_RADIUS) || onLane(x, z, TEACHING_STONE_RADIUS + 0.3)) continue
-      if (!clearOfDressing(x, z, TEACHING_STONE_RADIUS)) continue
-      teachingStone = { x, z, r: TEACHING_STONE_RADIUS, scale: TEACHING_STONE_SCALE }
-      // Villagers have an errand at it — the adults' pointing situations
-      // (docs/communication-poc-spec.md) need someone standing there.
-      errands.push([x + Math.cos(a) * (TEACHING_STONE_RADIUS + 1.1), z + Math.sin(a) * (TEACHING_STONE_RADIUS + 1.1)])
-    }
-  }
-
-  // The village's ground work (work-order point 483): three patches in the open
-  // where villagers dig — a store pit, a post hole and a patch turned over. They
-  // are placed like every other loose object (free ground, off the lanes, seeded
-  // by the same generator) and they carry NO collider: a shallow pit is walked
-  // over, and the villager working it must be able to stand IN it.
-  const digSites: PlaceLayout['digSites'] = []
-  if (place.kind === 'village') {
-    const kinds: Array<PlaceLayout['digSites'][number]['kind']> = ['pit', 'postHole', 'patch']
-    for (const kind of kinds) {
-      // A deterministic golden-angle sweep over the whole open ground, so even a
-      // ksar — the densest plan there is — still finds room for all three.
-      for (let i = 0; i < 96 && !digSites.some((s) => s.kind === kind); i++) {
-        const a = rand() * Math.PI * 2 + i * 2.399963
-        const r = 5 + (i % 12) * 1.15
-        const x = Math.cos(a) * r
-        const z = Math.sin(a) * r
-        if (!isFree(x, z, 2.4, DIG_SITE_RADIUS) || onLane(x, z, DIG_SITE_RADIUS + 0.4)) continue
-        if (digSites.some((s) => Math.hypot(s.x - x, s.z - z) < 3)) continue
-        digSites.push({ x, z, kind })
-      }
-    }
   }
 
   for (let i = 0; i < 40 && rocks.length < 14; i++) {
@@ -1196,7 +1312,6 @@ export function buildLayout(placeId: string, seed: number): PlaceLayout {
   for (const f of fences) colliders.push(...fenceColliders(f))
   for (const t of flora) colliders.push({ x: t.x, z: t.z, r: 0.45 })
   for (const [x, z, s] of rocks) colliders.push({ x, z, r: 0.35 + s * 0.5 })
-  if (teachingStone) colliders.push({ x: teachingStone.x, z: teachingStone.z, r: teachingStone.r })
   // The two entries the play rocks occupy are remembered, because the stage they
   // draw is derived from bank points that have not settled yet: once they have,
   // the settled pair is written back into these same slots rather than appended
@@ -1272,14 +1387,111 @@ export function buildLayout(placeId: string, seed: number): PlaceLayout {
     }
   }
 
-  // The ground work is a target a villager walks INTO, so it obeys the same
-  // reachability rule as every errand point (point 155): nudged onto free ground
-  // it can also leave, against the full collider set.
-  for (const site of digSites) {
-    const [x, z] = nudgeToFree(colliders, site.x, site.z, WALKER_RADIUS)
-    site.x = x
-    site.z = z
+  // THE CHILDREN'S ROAMING QUARTER (work-order 481.4, moved here by 688). It is
+  // decided from the FINISHED settlement — the full collider set and the built
+  // fabric — and it is decided HERE rather than in the scene, because the adults'
+  // own teaching places are placed against it below, and a quarter computed twice
+  // from two collider sets is two quarters (points 129/378). The village core
+  // counts the water path's head among its stations: a carrier speaking there is
+  // an adult voice like the well or the fire, and the children have to stand
+  // clear of it.
+  const playGround: PlaceLayout['playGround'] =
+    place.kind === 'village'
+      ? childPlayGround(
+          [
+            ...villageAdultStations(VILLAGE_FIRE),
+            ...(waterPath ? [[waterPath.head.x, waterPath.head.z] as [number, number]] : []),
+          ],
+          Math.max(1, radius - WALKER_RADIUS * 2),
+          balance.villageLife.tag.playRadius,
+          balance.communication.hearingRadius,
+          {
+            free: (px, pz) => standingClear(colliders, px, pz, WALKER_RADIUS),
+            fabric: fabricOf(dwellings, interactives),
+          },
+        )
+      : null
+
+  // The village's ground work (work-order point 483): three patches where
+  // villagers dig — a store pit, a post hole and a patch turned over. They are
+  // placed like every other loose object (free ground, off the lanes, seeded by
+  // the same generator) and they carry NO collider: a shallow pit is walked
+  // over, and the villager working it must be able to stand IN it.
+  //
+  // THEY LEAVE THE MIDDLE (work-order 688). The first placement swept the whole
+  // open ground from 5 m out, which put men digging on the village square beside
+  // a boulder that stood there for no reason — the picture the user read as
+  // meaningless on 13.08.2026. Each kind now stands where its own work belongs:
+  // the store pit at a compound edge, the post hole beside a lane, the turned
+  // patch out at the edge of the worked ground. All three keep clear of
+  // `CENTRAL_GROUND_RADIUS`, the open middle the fire, the pounder and the
+  // talkers share.
+  const digSites: PlaceLayout['digSites'] = []
+  if (place.kind === 'village') {
+    /** Distance to the nearest dwelling WALL, or Infinity where none is built. */
+    const toCompound = (x: number, z: number) =>
+      dwellings.reduce((best, d) => Math.min(best, Math.hypot(x - d.x, z - d.z) - d.r), Infinity)
+    /** Distance to the nearest lane EDGE. */
+    const toLane = (x: number, z: number) =>
+      paths.reduce(
+        (best, pth) => Math.min(best, closestOnPolyline(pth.points, x, z).dist - pth.width / 2),
+        Infinity,
+      )
+    // NO ADULT VOICE INSIDE THE CHILDREN'S EARSHOT (work-order 688 item 6). The
+    // three teaching areas — the village core, the children's roaming quarter and
+    // the stage on the bank — each clear the others by the hearing radius, and
+    // where they cannot all fit it is the ADULTS that move: their words hang on
+    // what they are DOING (a jar, a stroke of the hoe), the children's on where
+    // they are standing. So the dig sites are what gives way here.
+    const earshot = balance.communication.hearingRadius
+    /** How far a spot stands from the nearest place a child speaks. */
+    const toChildren = (x: number, z: number) => {
+      let best = Infinity
+      if (playGround) best = Math.min(best, Math.hypot(x - playGround.x, z - playGround.z) - playGround.radius)
+      for (const p of playRocks ? [playRocks.upstream, playRocks.downstream] : []) {
+        best = Math.min(best, Math.hypot(x - p.x, z - p.z))
+      }
+      if (bank) best = Math.min(best, Math.hypot(x - bank.bank.x, z - bank.bank.z))
+      return best
+    }
+    /** What each kind of work needs of its spot, beyond the shared rules. */
+    const belongs: Record<PlaceLayout['digSites'][number]['kind'], (x: number, z: number) => boolean> = {
+      // A store pit is sunk against the wall of the compound it stores for.
+      pit: (x, z) => toCompound(x, z) <= DIG_SITE_ANCHOR_REACH,
+      // A post hole is dug where the post goes: at the side of a lane.
+      postHole: (x, z) => toLane(x, z) <= DIG_SITE_ANCHOR_REACH,
+      // Ground is turned at the outer edge of what the village works, past the
+      // last compound rather than between them.
+      patch: (x, z) => Math.hypot(x, z) >= radius * DIG_SITE_FIELD_BAND,
+    }
+    const kinds: Array<PlaceLayout['digSites'][number]['kind']> = ['pit', 'postHole', 'patch']
+    for (const kind of kinds) {
+      // TWO PASSES, AND THE ORDER OF THEM IS THE RULE. The first asks for the
+      // spot the work belongs at; the second drops that and takes any spot
+      // outside the middle. What is NEVER dropped is the central ground and the
+      // children's earshot — those are what the point is about — while the
+      // anchor is what a ksar, the densest plan there is, cannot always give:
+      // measured at tuareg-village, no ground beside a lane there is both free
+      // and outside the middle, and a village short of a work site is worse than
+      // a post hole away from its lane.
+      for (const anchored of [true, false]) {
+        // A deterministic golden-angle sweep over the ground outside the middle.
+        for (let i = 0; i < 240 && !digSites.some((s) => s.kind === kind); i++) {
+          const a = rand() * Math.PI * 2 + i * 2.399963
+          const r = CENTRAL_GROUND_RADIUS + DIG_SITE_RADIUS + (i % 24) * 0.62
+          const x = Math.cos(a) * r
+          const z = Math.sin(a) * r
+          if (!isFree(x, z, 2.4, DIG_SITE_RADIUS) || onLane(x, z, DIG_SITE_RADIUS + 0.4)) continue
+          if (digSites.some((s) => Math.hypot(s.x - x, s.z - z) < 3)) continue
+          if (!standingClear(colliders, x, z, WALKER_RADIUS)) continue
+          if (toChildren(x, z) < earshot) continue
+          if (anchored && !belongs[kind](x, z)) continue
+          digSites.push({ x, z, kind })
+        }
+      }
+    }
   }
 
-  return { radius, spawnZ: radius - SPAWN_INSET, interactives, dwellings, fences, paths, flora, rocks, teachingStone, digSites, bank, playRocks, pen, errands, colliders }
+
+  return { radius, spawnZ: radius - SPAWN_INSET, interactives, dwellings, fences, paths, flora, rocks, digSites, bank, playRocks, waterPath, playGround, pen, errands, colliders }
 }

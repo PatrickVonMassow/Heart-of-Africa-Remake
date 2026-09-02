@@ -6,7 +6,13 @@
 
 import { beforeAll, describe, expect, it } from 'vitest'
 import {
+  CENTRAL_GROUND_RADIUS,
   COMPOUND_RING_MIN,
+  DIG_SITE_ANCHOR_REACH,
+  DIG_SITE_FIELD_BAND,
+  PLAY_ROCK_RADIUS,
+  WATER_PATH_HEAD_RADII,
+  WATER_PATH_WIDTH,
   buildLayout,
   dwellingCircleRadius,
   fenceColliders,
@@ -19,7 +25,9 @@ import { spawnPointFree, standingClear, PLAYER_RADIUS, WALKER_RADIUS, type Colli
 import { ANIMAL_RADIUS, animalAnchors } from './animalSpots'
 import { closestOnPolyline } from './lanePlan'
 import { PLACES, placeById } from '../../world/geo'
-import { ROCK_VILLAGE_ID, ROCK_HEIGHT_UNITS, communicationRockSite } from '../../world/communicationRock'
+import { ROCK_VILLAGE_ID, ROCK_FOOTPRINT_UNITS, ROCK_HEIGHT_UNITS, communicationRockSite } from '../../world/communicationRock'
+import { inBankPlayLane } from './riverBank'
+import { balance } from '../../config/balance'
 import { setupGeodata } from '../../test/geodata'
 import { REGION_PLACE_STYLES, VILLAGE_PLANS } from './regionStyles'
 
@@ -465,70 +473,134 @@ describe('animal anchors stand on free ground (point 413)', () => {
   })
 })
 
-// The communication PoC's TWO stones (work-order 482, user 04.08.2026): a small
-// one INSIDE the PoC village, where the adults teach the word for a rock, and a
-// far bigger erratic OUTSIDE, upstream, where the message sends the player to
-// dig. The transfer between them is the puzzle, so the two must be clearly
-// different in size and distance — that difference is checked here, across both
-// layers, rather than trusted to two separate files staying in step.
-describe('the teaching stone in the PoC village (work-order 482)', () => {
-  it.each(SEEDS)('seed %i: stands in the open, inside the walkable area, on its own collider', (seed) => {
-    const layout = buildLayout(ROCK_VILLAGE_ID, seed)
-    const stone = layout.teachingStone
-    expect(stone, 'the PoC village always has its teaching stone').not.toBeNull()
-    if (!stone) return
-    const d = Math.hypot(stone.x, stone.z)
-    // Well inside the walkable disc and away from the very centre, so it is
-    // visible from the middle of the village and reachable on foot.
-    expect(d).toBeGreaterThan(6)
-    expect(d).toBeLessThan(layout.radius - stone.r - 2)
-    // Its collider is the drawn stone, and it is the ONLY collider there.
-    const own = layout.colliders.filter(
-      (c): c is { kind?: 'circle'; x: number; z: number; r: number } =>
-        (c.kind === undefined || c.kind === 'circle') &&
-        Math.hypot(c.x - stone.x, c.z - stone.z) < 0.01,
-    )
-    expect(own).toHaveLength(1)
-    expect(own[0].r).toBeCloseTo(stone.r, 6)
-    // Clear of every other solid body — a player must be able to walk up to it.
-    for (const body of solidBodies(layout, false)) {
-      expect(Math.hypot(body.x - stone.x, body.z - stone.z)).toBeGreaterThan(body.r + stone.r)
-    }
-    // A villager errand stands at it (the adults' pointing situations).
-    expect(layout.errands.some((e) => Math.hypot(e[0] - stone.x, e[1] - stone.z) < stone.r + 3)).toBe(true)
-  })
-
-  it('stands in the PoC village only — no other settlement grows one', () => {
+// THE VILLAGE'S SINGLE TEACHING STONE IS GONE (work-order 688). It stood in the
+// open of the PoC village, and a boulder on the village square that everybody
+// walked to for no reason is exactly what the user read as meaningless on
+// 13.08.2026. The word ROCK is learnt at the two PLAY ROCKS on the bank now
+// (work-order 687, pinned in `bankStage.test.ts`), which are upright erratics of
+// the goal boulder's own shape family — so the object the word is learnt on is
+// the same KIND of thing the chief's message points at.
+describe('no settlement carries a lone teaching stone any more (work-order 688)', () => {
+  it('gives every village its two bank rocks instead, and no third stone', () => {
     for (const p of PLACES) {
-      if (p.id === ROCK_VILLAGE_ID) continue
-      expect(buildLayout(p.id, 42).teachingStone, p.id).toBeNull()
+      const layout = buildLayout(p.id, 42)
+      expect('teachingStone' in layout, `${p.id}: the field itself is gone`).toBe(false)
+      expect(!!layout.playRocks, `${p.id}: rocks exactly where there is a bank`).toBe(!!layout.bank)
     }
   })
 
-  it('is markedly larger than the loose rock dressing around it', () => {
-    const layout = buildLayout(ROCK_VILLAGE_ID, 42)
-    const stone = layout.teachingStone
-    expect(stone).not.toBeNull()
-    if (!stone) return
-    // The scatter rocks run scale 0.3-1.0; the teaching stone is well above them
-    // so it reads as THE stone rather than one more pebble.
-    for (const [, , s] of layout.rocks) expect(stone.scale).toBeGreaterThan(s * 2)
+  it('keeps the play rocks markedly larger than the loose rock dressing', () => {
+    for (const id of ['nubian-village', 'bambara-village', 'mandinka-village']) {
+      const layout = buildLayout(id, 42)
+      const rocks = layout.playRocks
+      expect(rocks, id).not.toBeNull()
+      if (!rocks) continue
+      // The scatter runs scale 0.3-1.0 on a 0.5-radius blob, i.e. up to 0.5 m of
+      // footprint; a play rock's is PLAY_ROCK_RADIUS. It reads as A ROCK rather
+      // than as one more pebble.
+      for (const [, , s] of layout.rocks) expect(rocks.r).toBeGreaterThan(s * 0.5 * 2)
+    }
   })
 
   it('is the SMALL near stone: the erratic upstream is bigger and a journey away', () => {
     const layout = buildLayout(ROCK_VILLAGE_ID, 42)
-    const stone = layout.teachingStone
-    expect(stone).not.toBeNull()
-    if (!stone) return
+    const rocks = layout.playRocks
+    expect(rocks).not.toBeNull()
+    if (!rocks) return
     const village = placeById(ROCK_VILLAGE_ID)
     const rock = communicationRockSite(42)
-    // Size: the erratic is a block of the WORLD scale (1 unit ~ 11 km of map),
-    // the teaching stone a boulder of the settlement scale (metres) — different
-    // classes of object, compared through the constants both scenes draw from.
-    expect(ROCK_HEIGHT_UNITS * 1000).toBeGreaterThan(stone.scale)
-    // Distance: the teaching stone is a few steps away, the erratic a journey.
-    expect(Math.hypot(stone.x, stone.z)).toBeLessThan(layout.radius)
+    // SETTLEMENT SCALE, NOT WORLD SCALE. The mesh is the erratic's own, so its
+    // drawn size follows from the instance scale: a footprint of PLAY_ROCK_RADIUS
+    // and a height that stands well over a man without reaching a hut's ridge.
+    // Same shape, two classes of size — which is what the player has to transfer
+    // across, and it is measured through the constants both scenes draw from.
+    expect(ROCK_FOOTPRINT_UNITS * rocks.scale).toBeCloseTo(PLAY_ROCK_RADIUS, 6)
+    const height = ROCK_HEIGHT_UNITS * rocks.scale
+    expect(height).toBeGreaterThan(2.5)
+    expect(height).toBeLessThan(6)
+    // And it stands UP: taller than it is wide, the way the goal boulder does.
+    expect(height).toBeGreaterThan(2 * ROCK_FOOTPRINT_UNITS * rocks.scale)
+    // Distance: the play rocks are a walk down the bank, the erratic a journey.
+    expect(Math.hypot(rocks.upstream.x, rocks.upstream.z)).toBeLessThan(layout.radius + 12)
     expect(Math.hypot(rock.lat - village.lat, rock.lon - village.lon)).toBeGreaterThan(1)
+  })
+})
+
+// THE WATER PATH (work-order 688). The adults teach RIVER by fetching water, so
+// there has to be a path to fetch it along: a head in the village where both
+// carriers speak, a foot at the river where neither does, and a walk between the
+// two that crosses neither a building nor the children's running lane.
+describe('the village water path (work-order 688)', () => {
+  const RIVER_VILLAGES = ['nubian-village', 'bambara-village', 'mandinka-village']
+
+  it('exists exactly where there is a bank, and nowhere else', () => {
+    for (const p of PLACES) {
+      const layout = buildLayout(p.id, 42)
+      expect(!!layout.waterPath, p.id).toBe(!!layout.bank)
+    }
+  })
+
+  it.each(SEEDS)('seed %i: runs from the village out to the water', (seed) => {
+    for (const id of RIVER_VILLAGES) {
+      const layout = buildLayout(id, seed)
+      const path = layout.waterPath
+      const bank = layout.bank
+      expect(path, id).not.toBeNull()
+      if (!path || !bank) continue
+      // The head stands in the village, at the sweep's own radius, on free
+      // ground a villager can speak from.
+      const headR = Math.hypot(path.head.x, path.head.z)
+      expect(WATER_PATH_HEAD_RADII.map((r) => Math.abs(headR - r) < 1e-6), `${id}: head radius ${headR}`).toContain(true)
+      expect(standingClear(layout.colliders, path.head.x, path.head.z, WALKER_RADIUS), `${id}: head is free`).toBe(true)
+      // The foot stands AT the water, on the flat plate rather than on the shore.
+      const out = path.foot.x * bank.nx + path.foot.z * bank.nz
+      expect(out, `${id}: foot is on the plate`).toBeLessThanOrEqual(bank.walkEdge)
+      expect(out, `${id}: foot is at the water, not in the village`).toBeGreaterThan(layout.radius * 0.8)
+      expect(standingClear(layout.colliders, path.foot.x, path.foot.z, WALKER_RADIUS), `${id}: foot is free`).toBe(true)
+      // And the head is nearer the middle than the foot is, so the walk really
+      // leads OUT of the settlement.
+      expect(Math.hypot(path.head.x, path.head.z)).toBeLessThan(Math.hypot(path.foot.x, path.foot.z))
+    }
+  })
+
+  it.each(SEEDS)('seed %i: meets the bank OUTSIDE the children`s stretch', (seed) => {
+    for (const id of RIVER_VILLAGES) {
+      const layout = buildLayout(id, seed)
+      const path = layout.waterPath
+      const rocks = layout.playRocks
+      expect(path, id).not.toBeNull()
+      expect(rocks, id).not.toBeNull()
+      if (!path || !rocks) continue
+      // Not in the running lane at its foot, and not anywhere along its length —
+      // a carrier crossing the lane would be read as part of the game.
+      for (let t = 0; t <= 40; t++) {
+        const x = path.head.x + (path.foot.x - path.head.x) * (t / 40)
+        const z = path.head.z + (path.foot.z - path.head.z) * (t / 40)
+        expect(
+          inBankPlayLane(rocks, x, z, WALKER_RADIUS + WATER_PATH_WIDTH / 2),
+          `${id}: the walk crosses the children's lane at t=${t}`,
+        ).toBe(false)
+      }
+      // And the foot lies BEYOND one of the rocks rather than between the two:
+      // its distance along the bank from the descent exceeds the stretch's own.
+      const bank = layout.bank!
+      const along = (p: { x: number; z: number }) => p.x * bank.fx + p.z * bank.fz
+      const stretch = Math.max(Math.abs(along(rocks.upstream)), Math.abs(along(rocks.downstream)))
+      expect(Math.abs(along(path.foot)), `${id}: foot beyond the stretch`).toBeGreaterThan(stretch)
+    }
+  })
+
+  it.each(SEEDS)('seed %i: is a drawn lane nothing is built on', (seed) => {
+    for (const id of RIVER_VILLAGES) {
+      const layout = buildLayout(id, seed)
+      const path = layout.waterPath!
+      const lane = layout.paths.find(
+        (p) =>
+          p.width === WATER_PATH_WIDTH &&
+          Math.hypot(p.points[0][0] - path.head.x, p.points[0][1] - path.head.z) < 1e-6,
+      )
+      expect(lane, `${id}: the water path is in the drawn lane net`).toBeTruthy()
+    }
   })
 })
 
@@ -579,6 +651,73 @@ describe('the ground work villagers dig at (work-order 483)', () => {
       )
       expect(own, site.kind).toHaveLength(0)
     }
+  })
+
+  it.each(SEEDS)('seed %i: leaves the open central ground alone', (seed) => {
+    for (const v of VILLAGES) {
+      const layout = buildLayout(v.id, seed)
+      for (const site of layout.digSites) {
+        // Nobody digs on the village square: the picture of men digging in the
+        // middle beside a pointless boulder is what work-order 688 removed.
+        expect(Math.hypot(site.x, site.z), `${v.id} ${site.kind}`).toBeGreaterThanOrEqual(
+          CENTRAL_GROUND_RADIUS,
+        )
+      }
+    }
+  })
+
+  it.each(SEEDS)('seed %i: keeps every work site out of the children`s earshot', (seed) => {
+    for (const v of VILLAGES) {
+      const layout = buildLayout(v.id, seed)
+      const earshot = balance.communication.hearingRadius
+      for (const site of layout.digSites) {
+        const where = `${v.id} ${site.kind}`
+        if (layout.playGround) {
+          const toRim =
+            Math.hypot(site.x - layout.playGround.x, site.z - layout.playGround.z) - layout.playGround.radius
+          expect(toRim, `${where}: inside the roaming quarter's earshot`).toBeGreaterThanOrEqual(earshot)
+        }
+        for (const rock of layout.playRocks ? [layout.playRocks.upstream, layout.playRocks.downstream] : []) {
+          expect(
+            Math.hypot(site.x - rock.x, site.z - rock.z),
+            `${where}: inside the bank stage's earshot`,
+          ).toBeGreaterThanOrEqual(earshot)
+        }
+      }
+    }
+  })
+
+  it('puts most of them where their own work belongs', () => {
+    // The anchor is a first-pass rule with a documented fallback (a ksar cannot
+    // always give one), so this pins that the rule is doing real work rather
+    // than that it never yields.
+    let anchored = 0
+    let total = 0
+    for (const seed of SEEDS) {
+      for (const v of VILLAGES) {
+        const layout = buildLayout(v.id, seed)
+        for (const site of layout.digSites) {
+          total++
+          const toCompound = layout.dwellings.reduce(
+            (best, d) => Math.min(best, Math.hypot(site.x - d.x, site.z - d.z) - d.r),
+            Infinity,
+          )
+          const toLane = layout.paths.reduce(
+            (best, p) => Math.min(best, closestOnPolyline(p.points, site.x, site.z).dist - p.width / 2),
+            Infinity,
+          )
+          const ok =
+            site.kind === 'pit'
+              ? toCompound <= DIG_SITE_ANCHOR_REACH
+              : site.kind === 'postHole'
+                ? toLane <= DIG_SITE_ANCHOR_REACH
+                : Math.hypot(site.x, site.z) >= layout.radius * DIG_SITE_FIELD_BAND
+          if (ok) anchored++
+        }
+      }
+    }
+    expect(total).toBeGreaterThan(100)
+    expect(anchored / total).toBeGreaterThan(0.8)
   })
 
   it('gives ports none: the teaching is a village matter', () => {
