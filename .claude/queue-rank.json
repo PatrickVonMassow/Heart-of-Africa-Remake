@@ -1128,6 +1128,18 @@
       "why": "Last is right: the freeze keeps it waiting, and this session showed the hand route through it — run the two suites outside run-all and read the throw. That costs half an hour per occurrence, which is cheaper than jumping the game work.",
       "origin": "machine",
       "place": "last"
+    },
+    "1045": {
+      "at": "2026-09-02T12:46:16.452Z",
+      "why": "Last is right: it costs nothing in the village the player is actually given, and the fix is a layout design change better made once the slice has been played",
+      "origin": "machine",
+      "place": "last"
+    },
+    "1046": {
+      "at": "2026-09-02T12:46:16.575Z",
+      "why": "Last is right: whether the round's rarity reads as a defect can only be judged once the other five points of the rebuilt slice are playable",
+      "origin": "machine",
+      "place": "last"
     }
   },
   "boundary": {
@@ -1164,7 +1176,7 @@
     "why": "The order standing in front of the release today is the arrangement that predates this rule; the four machine-filed points that had ranked themselves there were moved behind 174 first"
   },
   "settled": {
-    "at": "2026-09-02T07:23:31.992Z",
+    "at": "2026-09-02T12:46:16.587Z",
     "points": [
       174,
       184,
@@ -1523,7 +1535,9 @@
       1039,
       1042,
       1043,
-      1044
+      1044,
+      1045,
+      1046
     ]
   }
 }
