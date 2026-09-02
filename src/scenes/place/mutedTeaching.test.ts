@@ -1,9 +1,9 @@
-// The two teaching adapters in their INTERMEDIATE state (work-order point 686):
-// the eleven-word catalogues went with the six concepts they spoke, and their
-// replacements — the children's bank game and the adults' water and digging —
-// are built in the two points that follow. Until then both adapters stage
-// nothing, and this file pins that they stay SILENT rather than crash: the
-// village keeps moving, so PlaceLife steps them every frame.
+// The CHILDREN'S OLD SITUATION ADAPTER, which stages nothing (work-order 686):
+// the eleven-word catalogue went with the six concepts it spoke, and the group's
+// teaching is the bank game of work-order 687 now. PlaceLife still steps this
+// adapter every frame, so what is pinned here is that it stays SILENT rather
+// than crash. The adults' side moved to `adultWork.test.ts` when their water and
+// digging work was built (work-order 688).
 
 import { describe, expect, it } from 'vitest'
 import {
@@ -15,18 +15,7 @@ import {
   type ChildSpeechConfig,
   type SituationView,
 } from './childSituations'
-import {
-  ADULT_CONCEPTS,
-  ERRAND_SITUATIONS,
-  clearErrand,
-  createAdultErrands,
-  errandOf,
-  isDigging,
-  noteErrandArrival,
-  stepAdultErrands,
-  type AdultErrandConfig,
-  type ErrandView,
-} from './adultErrands'
+import { ADULT_CONCEPTS } from './adultWork'
 import { CONCEPT_IDS } from '../../communication/lexicon'
 
 const CHILD_CFG: ChildSpeechConfig = {
@@ -52,30 +41,6 @@ const CHILD_VIEW: SituationView = {
   farMark: { x: 12, z: 4 },
 }
 
-const ADULT_CFG: AdultErrandConfig = {
-  intervalSeconds: 8,
-  intervalSpread: 3,
-  dwellSeconds: 2,
-  digSeconds: 4,
-  errandSeconds: 20,
-  stallSeconds: 6,
-  pace: 1,
-}
-
-const ADULT_VIEW: ErrandView = {
-  villagers: [
-    { x: 0, z: 0, free: true },
-    { x: 5, z: 5, free: true },
-  ],
-  geography: {
-    bank: { x: 4, z: 0 },
-    upstream: { x: 8, z: -2 },
-    downstream: { x: -6, z: 3 },
-    stone: { x: 1, z: 9 },
-    digSites: [{ x: 2, z: 2, kind: 'pit' }],
-  },
-}
-
 describe('the children stage no situation while the bank game is unbuilt', () => {
   it('has an empty catalogue and claims no concept', () => {
     expect(CHILD_SITUATIONS).toEqual([])
@@ -99,39 +64,7 @@ describe('the children stage no situation while the bank game is unbuilt', () =>
   })
 })
 
-describe('the adults stage no errand while the water and digging work is unbuilt', () => {
-  it('has an empty catalogue and claims no concept', () => {
-    expect(ERRAND_SITUATIONS).toEqual([])
-    expect(ADULT_CONCEPTS).toEqual([])
-  })
-
-  it('gives every villager an empty assignment and never digs', () => {
-    const state = createAdultErrands(ADULT_VIEW.villagers.length, ADULT_CFG)
-    expect(state.assignments).toHaveLength(ADULT_VIEW.villagers.length)
-    for (let i = 0; i < ADULT_VIEW.villagers.length; i++) {
-      expect(errandOf(state, i)).toBeNull()
-      expect(isDigging(state, i)).toBe(false)
-    }
-  })
-
-  it('stays silent over a long run of frames instead of throwing', () => {
-    const state = createAdultErrands(ADULT_VIEW.villagers.length, ADULT_CFG)
-    for (let frame = 0; frame < 600; frame++) {
-      expect(stepAdultErrands(state, ADULT_VIEW, 1 / 60, ADULT_CFG, () => 0.5)).toBeNull()
-    }
-    expect(state.last).toBeNull()
-  })
-
-  it('survives an arrival and a clear on an index that holds nothing', () => {
-    const state = createAdultErrands(2, ADULT_CFG)
-    expect(() => noteErrandArrival(state, 0, ADULT_CFG)).not.toThrow()
-    expect(() => clearErrand(state, 0)).not.toThrow()
-    expect(() => clearErrand(state, 9)).not.toThrow()
-    expect(state.assignments).toHaveLength(2)
-  })
-})
-
-describe('neither adapter reaches past the five-word language', () => {
+describe('neither teaching reaches past the five-word language', () => {
   it('names only concepts the lexicon still carries', () => {
     for (const concept of [...CHILD_CONCEPTS, ...ADULT_CONCEPTS]) {
       expect(CONCEPT_IDS).toContain(concept)

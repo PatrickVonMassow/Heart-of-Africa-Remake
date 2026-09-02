@@ -1158,14 +1158,123 @@ export function buildLayout(placeId: string, seed: number): PlaceLayout {
   // traveller pressed into it cannot walk out. Every loose object therefore keeps
   // a walkable gap from every other one — `isFree` covers the buildings, this
   // covers the dressing among itself.
-  // THE WATER PATH IS LAID AFTER THE PLAN (work-order 688). A lane forced
-  // through the house band BEFORE the plan costs it a dwelling (measured at
-  // nubian-village, seed 42: seven boxes became six), so the track is fitted to
-  // the settlement instead: its FOOT is fixed at the water, and its HEAD is swept
-  // round the bank's bearing until the straight walk between the two clears every
-  // building. A carrier's track is a straight worn line, not a lane that bends
-  // round three huts, and a straight one is also what reads as a path to the
-  // river from inside the village.
+  // A POST STANDING IN A BUILDING IS PULLED (work-order 604). Some plans raise
+  // their fence after the dwellings — a Tuareg camp windbreak, a kraal ring — so
+  // `isFree` cannot keep the two apart, and a panel that runs through a tent
+  // leaves a slot narrower than a man on either side of the crossing. The post is
+  // dropped instead: the drawn run and the collider run are cut from the same
+  // list, so what is left is an opening beside the building, which is what a
+  // fence meeting a wall looks like anyway.
+  for (const f of fences) {
+    f.posts = f.posts.filter((post) =>
+      dwellings.every((d) => {
+        const body = dwellingCircleRadius(d, style) ?? d.r + 0.3
+        return Math.hypot(post[0] - d.x, post[1] - d.z) > body + FENCE_PANEL_RADIUS[f.kind]
+      }),
+    )
+  }
+
+  // --- Collision set: every solid object becomes one or more circles ------
+  const colliders: Collider[] = []
+  interactives.forEach((it) => {
+    if (it.type === 'villager') {
+      colliders.push({ x: it.pos[0], z: it.pos[1], r: 0.45 })
+    } else if (place.kind === 'port') {
+      // The building's yaw travels in the layout data (it fronts its lane).
+      colliders.push(boxCollider(it.pos[0], it.pos[1], 2.5, 2.0, it.rot ?? 0))
+    } else {
+      // Chief hut and the smaller trading post (both round village huts).
+      colliders.push({ x: it.pos[0], z: it.pos[1], r: interactiveCircleRadius(it.type, style) })
+    }
+  })
+  for (const d of dwellings) {
+    switch (d.kind) {
+      case 'box':
+        colliders.push(boxCollider(d.x, d.z, d.r, d.r * 0.875, d.rot))
+        break
+      case 'warehouse':
+        colliders.push(boxCollider(d.x, d.z, d.r, 2.3, d.rot))
+        break
+      case 'mosque':
+        colliders.push(boxCollider(d.x, d.z, d.r, d.r * 0.8, d.rot))
+        break
+      default:
+        // Round bodies: the wall, widened where the roof overhangs low (349).
+        colliders.push({ x: d.x, z: d.z, r: dwellingCircleRadius(d, style) ?? d.r + 0.3 })
+    }
+  }
+  for (const f of fences) colliders.push(...fenceColliders(f))
+  // The two entries the play rocks occupy are remembered, because the stage they
+  // draw is derived from bank points that have not settled yet: once they have,
+  // the settled pair is written back into these same slots rather than appended
+  // a second time.
+  const playRockSlots: number[] = []
+  if (playRocks) {
+    playRockSlots.push(colliders.length, colliders.length + 1)
+    colliders.push({ x: playRocks.upstream.x, z: playRocks.upstream.z, r: playRocks.r })
+    colliders.push({ x: playRocks.downstream.x, z: playRocks.downstream.z, r: playRocks.r })
+  }
+  if (place.kind === 'village') {
+    // The fire pit alone (work-order 604). The cook used to carry a collider of
+    // her own 1.56 m from the fire's centre, which overlapped the fire's 1.3 m by
+    // a finger's breadth — and the notch where two circles cross is narrower than
+    // a walker, so an errand villager sent past the fire was caught in it. Her own
+    // collider bought nothing: she kneels INSIDE the fire's stand-off (1.3 + the
+    // traveller's 0.35), so nobody could reach her spot in the first place.
+    colliders.push({ x: VILLAGE_FIRE[0], z: VILLAGE_FIRE[1], r: 1.3 })
+    colliders.push({ x: -8.5, z: -7, r: 1.0 }) // weaver's loom
+    // Village-life props (design.md §19; positions from PlaceLife).
+    colliders.push({ x: VILLAGE_SPOTS.talkers[0], z: VILLAGE_SPOTS.talkers[1], r: 0.85 })
+    colliders.push({ x: VILLAGE_SPOTS.pounder[0], z: VILLAGE_SPOTS.pounder[1], r: 0.55 })
+    // The drummer sits behind TWO drums now (point 486), so his blob covers the
+    // pair the renderer draws, not the single drum it used to be.
+    colliders.push({ x: VILLAGE_SPOTS.drummer[0], z: VILLAGE_SPOTS.drummer[1], r: 0.8 })
+    colliders.push({ x: VILLAGE_SPOTS.well[0], z: VILLAGE_SPOTS.well[1], r: 0.75 })
+  } else {
+    colliders.push({ x: PORT_TALKERS[0], z: PORT_TALKERS[1], r: 0.85 }) // chatting pair
+  }
+
+
+  // THE CHILDREN'S ROAMING QUARTER (work-order 481.4, moved here by 688). It is
+  // decided from the settlement's BUILT bodies, BEFORE anything loose is
+  // scattered and BEFORE the water path is laid, and that order is item 6 of the
+  // point: where the three teaching areas cannot all clear each other, THE
+  // ADULTS move. The children's words hang on where they stand — at the rocks,
+  // at the water — so the quarter is fixed first and the adults' own places, the
+  // water path's head and the three work sites, are fitted around it.
+  //
+  // It is decided in the LAYOUT rather than in the scene because those places are
+  // placed against it, and a quarter derived once there and once here would be
+  // two quarters (points 129/378). The dressing is then scattered AROUND it, so
+  // the chase is watched over open ground rather than between boulders.
+  const playGround: PlaceLayout['playGround'] =
+    place.kind === 'village'
+      ? childPlayGround(
+          villageAdultStations(VILLAGE_FIRE),
+          Math.max(1, radius - WALKER_RADIUS * 2),
+          balance.villageLife.tag.playRadius,
+          balance.communication.hearingRadius,
+          {
+            free: (px, pz) => standingClear(colliders, px, pz, WALKER_RADIUS),
+            fabric: fabricOf(dwellings, interactives),
+          },
+        )
+      : null
+  /** Whether a body of radius `r` would stand in the children's quarter. */
+  const inPlayGround = (x: number, z: number, r: number) =>
+    !!playGround && Math.hypot(x - playGround.x, z - playGround.z) < playGround.radius + r
+  /** ... and whether it would stand inside their earshot of it. */
+  const inPlayEarshot = (x: number, z: number) => inPlayGround(x, z, balance.communication.hearingRadius)
+
+  // THE WATER PATH IS LAID LAST OF ALL THE ADULTS' PLACES (work-order 688). A
+  // lane forced through the house band BEFORE the plan costs it a dwelling
+  // (measured at nubian-village, seed 42: seven boxes became six), so the track
+  // is fitted to the settlement instead: its FOOT is fixed at the water, and its
+  // HEAD is swept round the bank's bearing until the straight walk between the
+  // two clears every building, the children's running lane AND their roaming
+  // quarter's earshot. A carrier's track is a straight worn line, not a lane that
+  // bends round three huts, and a straight one is also what reads as a path to
+  // the river from inside the village.
   if (waterPath) {
     const solid = [
       ...dwellings.map((d) => ({ x: d.x, z: d.z, r: d.r })),
@@ -1210,6 +1319,10 @@ export function buildLayout(placeId: string, seed: number): PlaceLayout {
         for (const r of WATER_PATH_HEAD_RADII) {
           const cand = { x: Math.cos(a) * r, z: Math.sin(a) * r }
           if (!isFree(cand.x, cand.z, 2.0, WALKER_RADIUS)) continue
+          // NO ADULT VOICE INSIDE THE CHILDREN'S EARSHOT (item 6): both water
+          // carriers speak at the head, so the head keeps the hearing radius from
+          // the quarter the children roam.
+          if (inPlayEarshot(cand.x, cand.z)) continue
           if (!clearRun(cand)) continue
           head = cand
           break
@@ -1243,7 +1356,12 @@ export function buildLayout(placeId: string, seed: number): PlaceLayout {
     // the two play rocks narrows the running ground the game needs, and the pair
     // themselves are solid: the lane test covers both, because the corridor runs
     // from one rock centre to the other.
-    !inBankPlayLane(playRocks, x, z, bodyR)
+    !inBankPlayLane(playRocks, x, z, bodyR) &&
+    // AND OUT OF THE CHILDREN'S ROAMING QUARTER (work-order 688). The quarter is
+    // fixed before the scatter, so this is a one-way rule and not a circle, and
+    // it is what keeps the chase on ground the player can see into — a boulder
+    // field the group shuffles between is point 480's own evidence.
+    !inPlayGround(x, z, bodyR)
   for (let i = 0; i < 48 && flora.length < 9; i++) {
     const angle = rand() * Math.PI * 2
     const r = 8 + rand() * 18
@@ -1264,83 +1382,9 @@ export function buildLayout(placeId: string, seed: number): PlaceLayout {
     rocks.push([x, z, s])
   }
 
-  // --- Collision set: every solid object becomes one or more circles ------
-  // A POST STANDING IN A BUILDING IS PULLED (work-order 604). Some plans raise
-  // their fence after the dwellings — a Tuareg camp windbreak, a kraal ring — so
-  // `isFree` cannot keep the two apart, and a panel that runs through a tent
-  // leaves a slot narrower than a man on either side of the crossing. The post is
-  // dropped instead: the drawn run and the collider run are cut from the same
-  // list, so what is left is an opening beside the building, which is what a
-  // fence meeting a wall looks like anyway.
-  for (const f of fences) {
-    f.posts = f.posts.filter((post) =>
-      dwellings.every((d) => {
-        const body = dwellingCircleRadius(d, style) ?? d.r + 0.3
-        return Math.hypot(post[0] - d.x, post[1] - d.z) > body + FENCE_PANEL_RADIUS[f.kind]
-      }),
-    )
-  }
-
-  const colliders: Collider[] = []
-  interactives.forEach((it) => {
-    if (it.type === 'villager') {
-      colliders.push({ x: it.pos[0], z: it.pos[1], r: 0.45 })
-    } else if (place.kind === 'port') {
-      // The building's yaw travels in the layout data (it fronts its lane).
-      colliders.push(boxCollider(it.pos[0], it.pos[1], 2.5, 2.0, it.rot ?? 0))
-    } else {
-      // Chief hut and the smaller trading post (both round village huts).
-      colliders.push({ x: it.pos[0], z: it.pos[1], r: interactiveCircleRadius(it.type, style) })
-    }
-  })
-  for (const d of dwellings) {
-    switch (d.kind) {
-      case 'box':
-        colliders.push(boxCollider(d.x, d.z, d.r, d.r * 0.875, d.rot))
-        break
-      case 'warehouse':
-        colliders.push(boxCollider(d.x, d.z, d.r, 2.3, d.rot))
-        break
-      case 'mosque':
-        colliders.push(boxCollider(d.x, d.z, d.r, d.r * 0.8, d.rot))
-        break
-      default:
-        // Round bodies: the wall, widened where the roof overhangs low (349).
-        colliders.push({ x: d.x, z: d.z, r: dwellingCircleRadius(d, style) ?? d.r + 0.3 })
-    }
-  }
-  for (const f of fences) colliders.push(...fenceColliders(f))
+  // ... and the loose dressing joins them once it has been scattered.
   for (const t of flora) colliders.push({ x: t.x, z: t.z, r: 0.45 })
   for (const [x, z, s] of rocks) colliders.push({ x, z, r: 0.35 + s * 0.5 })
-  // The two entries the play rocks occupy are remembered, because the stage they
-  // draw is derived from bank points that have not settled yet: once they have,
-  // the settled pair is written back into these same slots rather than appended
-  // a second time.
-  const playRockSlots: number[] = []
-  if (playRocks) {
-    playRockSlots.push(colliders.length, colliders.length + 1)
-    colliders.push({ x: playRocks.upstream.x, z: playRocks.upstream.z, r: playRocks.r })
-    colliders.push({ x: playRocks.downstream.x, z: playRocks.downstream.z, r: playRocks.r })
-  }
-  if (place.kind === 'village') {
-    // The fire pit alone (work-order 604). The cook used to carry a collider of
-    // her own 1.56 m from the fire's centre, which overlapped the fire's 1.3 m by
-    // a finger's breadth — and the notch where two circles cross is narrower than
-    // a walker, so an errand villager sent past the fire was caught in it. Her own
-    // collider bought nothing: she kneels INSIDE the fire's stand-off (1.3 + the
-    // traveller's 0.35), so nobody could reach her spot in the first place.
-    colliders.push({ x: VILLAGE_FIRE[0], z: VILLAGE_FIRE[1], r: 1.3 })
-    colliders.push({ x: -8.5, z: -7, r: 1.0 }) // weaver's loom
-    // Village-life props (design.md §19; positions from PlaceLife).
-    colliders.push({ x: VILLAGE_SPOTS.talkers[0], z: VILLAGE_SPOTS.talkers[1], r: 0.85 })
-    colliders.push({ x: VILLAGE_SPOTS.pounder[0], z: VILLAGE_SPOTS.pounder[1], r: 0.55 })
-    // The drummer sits behind TWO drums now (point 486), so his blob covers the
-    // pair the renderer draws, not the single drum it used to be.
-    colliders.push({ x: VILLAGE_SPOTS.drummer[0], z: VILLAGE_SPOTS.drummer[1], r: 0.8 })
-    colliders.push({ x: VILLAGE_SPOTS.well[0], z: VILLAGE_SPOTS.well[1], r: 0.75 })
-  } else {
-    colliders.push({ x: PORT_TALKERS[0], z: PORT_TALKERS[1], r: 0.85 }) // chatting pair
-  }
 
   // NO COLLIDER STANDS AT THE WATER (work-order 584). Work-order 482 had fenced
   // the waterline with an invisible panel so the last step could not carry the
@@ -1386,31 +1430,6 @@ export function buildLayout(placeId: string, seed: number): PlaceLayout {
       colliders[playRockSlots[1]] = { x: settled.downstream.x, z: settled.downstream.z, r: playRocks.r }
     }
   }
-
-  // THE CHILDREN'S ROAMING QUARTER (work-order 481.4, moved here by 688). It is
-  // decided from the FINISHED settlement — the full collider set and the built
-  // fabric — and it is decided HERE rather than in the scene, because the adults'
-  // own teaching places are placed against it below, and a quarter computed twice
-  // from two collider sets is two quarters (points 129/378). The village core
-  // counts the water path's head among its stations: a carrier speaking there is
-  // an adult voice like the well or the fire, and the children have to stand
-  // clear of it.
-  const playGround: PlaceLayout['playGround'] =
-    place.kind === 'village'
-      ? childPlayGround(
-          [
-            ...villageAdultStations(VILLAGE_FIRE),
-            ...(waterPath ? [[waterPath.head.x, waterPath.head.z] as [number, number]] : []),
-          ],
-          Math.max(1, radius - WALKER_RADIUS * 2),
-          balance.villageLife.tag.playRadius,
-          balance.communication.hearingRadius,
-          {
-            free: (px, pz) => standingClear(colliders, px, pz, WALKER_RADIUS),
-            fabric: fabricOf(dwellings, interactives),
-          },
-        )
-      : null
 
   // The village's ground work (work-order point 483): three patches where
   // villagers dig — a store pit, a post hole and a patch turned over. They are

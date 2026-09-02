@@ -32,7 +32,7 @@ function directStarts(): number[] {
 }
 
 describe('the settlement gestures only where it is heard', () => {
-  it.each(['speakSituation', 'speakErrand'])('%s poses the figure through the hearing gate', (name) => {
+  it.each(['speakSituation', 'speakWork'])('%s poses the figure through the hearing gate', (name) => {
     const body = bodyOf(name)
     expect(body).toContain('gestureIfHeard(')
     expect(body, `${name}() starts a gesture beside the gate instead of behind it`).not.toContain(

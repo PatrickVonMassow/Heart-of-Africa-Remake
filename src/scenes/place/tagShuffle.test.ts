@@ -176,7 +176,12 @@ function crowd(
   const named: Array<[number, number]> = [
     ...layout.errands,
     ...layout.digSites.map((d): [number, number] => [d.x, d.z]),
-    ...(layout.teachingStone ? [[layout.teachingStone.x, layout.teachingStone.z] as [number, number]] : []),
+    ...(layout.waterPath
+      ? ([
+          [layout.waterPath.head.x, layout.waterPath.head.z],
+          [layout.waterPath.foot.x, layout.waterPath.foot.z],
+        ] as Array<[number, number]>)
+      : []),
   ]
   const walkers = claimBodies(set, errandCount)
   const stroll = (): [number, number] => {
@@ -282,13 +287,16 @@ function village(
   let hash = 0
   for (const c of placeId) hash = (hash * 31 + c.charCodeAt(0)) | 0
   const localSeed = (seed ^ hash) >>> 0
-  const ground = childPlayGround(
-    villageAdultStations(FIRE),
-    Math.max(1, layout.radius - NPC_RADIUS * 2),
-    balance.villageLife.tag.playRadius,
-    balance.communication.hearingRadius,
-    { free: (x, z) => standingClear(colliders, x, z, NPC_RADIUS), fabric: builtFabric(layout) },
-  )
+  // THE LAYOUT'S OWN GROUND (work-order 688): the scene reads `playGround` from
+  // the layout now, so the rig reads the same one rather than deriving a second.
+  const ground = layout.playGround ?? {
+    x: 0,
+    z: 0,
+    radius: balance.villageLife.tag.playRadius,
+    clearance: 0,
+    openness: 1,
+    fabric: 1,
+  }
   const rim = Math.max(1, layout.radius - NPC_RADIUS * 2)
   // THE PEN, when the case asks for one: a wall thrown up round one child, with
   // just enough room inside to keep walking and not enough to get anywhere.

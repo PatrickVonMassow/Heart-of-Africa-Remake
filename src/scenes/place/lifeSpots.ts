@@ -89,6 +89,18 @@ export const FABRIC_REACH = 6
 export const MIN_FABRIC = 0.5
 
 /**
+ * The least of a ground a child must actually be able to stand on. Openness was
+ * only ever a SCORE term, which let a ground with perfect fabric win at 36 % —
+ * mongo-village, seed 7, a disc whose middle lay two metres from the chief's
+ * hut. That is the "ground you cannot see into" the placement rule was written
+ * about (point 480's own evidence), so it is a floor now and not a preference,
+ * ranked BESIDE `MIN_FABRIC` among the separated candidates, and never at the
+ * separation's expense: a settlement that offers no open separated ground keeps
+ * its separation and reports the openness it had to accept.
+ */
+export const MIN_OPENNESS = 0.5
+
+/**
  * What the search is trading off among the grounds that keep their distance.
  * Standing against the village outweighs everything — a chase nobody can place
  * in a settlement teaches nothing — a clear ground outweighs a big one, and
@@ -214,16 +226,25 @@ export function childPlayGround(
     }
   }
 
-  // Rank 1: far enough from the adults AND standing against the village. Only
-  // the candidates that already clear the cheap half are ever sampled. The pick
+  // Rank 1: far enough from the adults, standing against the village AND open
+  // enough to play on. Only the candidates that already clear the cheap half are
+  // ever sampled. The pick
   // is held in an object rather than a `let`, because the assignment happens
   // inside the visitor and a captured `let` keeps its initial narrowing.
-  const picked: { best: PlayGround | null } = { best: null }
+  //
+  // Two picks are kept, and the order between them is the rule: the best ground
+  // that meets BOTH floors wins, and only where the settlement offers no such
+  // ground does the openness floor give way — never the separation, which is
+  // what the whole placement exists for.
+  const picked: { best: PlayGround | null; both: PlayGround | null } = { best: null, both: null }
   eachCandidate((x, z, r, clearance) => {
     if (clearance < minClearance) return
     const here = measure(x, z, r, clearance)
     if (!picked.best || score(here) > score(picked.best)) picked.best = here
+    if (here.fabric < MIN_FABRIC || here.openness < MIN_OPENNESS) return
+    if (!picked.both || score(here) > score(picked.both)) picked.both = here
   })
+  if (picked.both) return picked.both
   const separated = picked.best
   if (separated && separated.fabric >= MIN_FABRIC) return separated
 
