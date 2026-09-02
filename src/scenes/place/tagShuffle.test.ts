@@ -1404,7 +1404,7 @@ describe('the children`s bank round can reach its own stage (work-order 687)', (
    * crossing at 120 s. At the old 45 s, six of 84 carried none — a gate that went
    * green on luck, which is exactly what it did until it did not.
    */
-  it('carries a child past a planted traveller in every cycle-first run window (work-order 687)', () => {
+  it('carries a child past a planted traveller in every cycle-first run window (work-order 687)', async () => {
     const CASES: Array<[string, number]> = [
       ['bambara-village', 42],
       ['bambara-village', 2972259115],
@@ -1441,6 +1441,15 @@ describe('the children`s bank round can reach its own stage (work-order 687)', (
         // Long enough to hold several whole cycles AND one full window after the
         // last opening this asserts on.
         const trace: Array<{ t: number; phase: string; along: number[] }> = []
+        // THE REPLAY YIELDS, or it starves the worker's own bookkeeping. Four
+        // layouts of 480 replayed seconds is some twelve seconds of straight
+        // synchronous stepping, and the file already carries a seventeen-second
+        // one beside it — measured on CI, the two together blocked the vitest
+        // worker long enough to miss its `onTaskUpdate` RPC, and the whole run
+        // failed with 14 598 tests green and no failing test named (the load
+        // signature of point 803). A yield every replayed minute costs nothing
+        // and lets the worker answer.
+        let steps = 0
         for (let t = 0; t < 480; t += dt) {
           frame(v, dt)
           trace.push({
@@ -1448,6 +1457,7 @@ describe('the children`s bank round can reach its own stage (work-order 687)', (
             phase: v.bank!.phase,
             along: v.children.map((c) => (c.x - him.x) * ax + (c.z - him.z) * az),
           })
+          if (++steps % 3600 === 0) await new Promise((resolve) => setTimeout(resolve, 0))
         }
         // The openings the browser wait now picks: the first run of a cycle, the
         // one `gather` announces.
@@ -1527,7 +1537,7 @@ describe('the children`s bank round can reach its own stage (work-order 687)', (
    * NEVER named the boulder at all (275 s to abandon). The ordinary case is
    * beside them so the bound is not only proved where it bites.
    */
-  it('bounds the roaming phase, so a run always comes (work-order 687)', () => {
+  it('bounds the roaming phase, so a run always comes (work-order 687)', async () => {
     const CASES: Array<[string, number]> = [
       ['bambara-village', 42],
       ['bambara-village', 7],
@@ -1558,7 +1568,11 @@ describe('the children`s bank round can reach its own stage (work-order 687)', (
         let roamFor = 0
         let firstRun = Infinity
         let last = ''
+        // Yields for the same reason the traveller-lane replay above does: a
+        // long synchronous replay starves the worker's own RPC.
+        let steps = 0
         for (let t = 0; t < 400; t += dt) {
+          if (++steps % 3600 === 0) await new Promise((resolve) => setTimeout(resolve, 0))
           frame(v, dt)
           const b = v.bank!
           if (b.phase === 'roam') roamFor += dt
