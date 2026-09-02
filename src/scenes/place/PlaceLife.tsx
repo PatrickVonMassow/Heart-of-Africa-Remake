@@ -7,7 +7,7 @@
 // carried from the well.
 // Pure animation, no mechanics.
 
-import { createContext, useContext, useEffect, useMemo, useRef, type ReactNode, type RefObject } from 'react'
+import { createContext, useCallback, useContext, useEffect, useMemo, useRef, type ReactNode, type RefObject } from 'react'
 import { useFrame, useThree } from '@react-three/fiber'
 import * as THREE from 'three/webgpu'
 import { mulberry32 } from '../../world/noise'
@@ -599,6 +599,7 @@ function Kids({
   radius,
   stage,
   bank,
+  childBodies,
 }: {
   x: number
   z: number
@@ -617,6 +618,10 @@ function Kids({
   /** The settlement's river bank, where it has one: what makes its walkable
    *  region a lobe rather than a circle, and where the shore begins. */
   bank: PlaceRiverBank | null
+  /** Where the settlement can find the children (work-order 688). The adults'
+   *  own work reads it to keep DIG out of a passing child's ear; the bodies are
+   *  the live ones this component moves, so nothing is copied per frame. */
+  childBodies: RefObject<readonly InhabitantBody[]>
 }) {
   const refs = useRef<Array<THREE.Group | null>>([])
   // The world leg length these children walk on, and the cadence it dictates.
@@ -630,6 +635,14 @@ function Kids({
   const bodies = useInhabitantBodies(count, { scale: KID_SCALE })
   // Which bodies are the game's own playmates, for the world's occupied rules.
   const kidIndex = useMemo(() => new Set(bodies), [bodies])
+  // ... and the same bodies published to the settlement, so the adults' work can
+  // hold a word while one of them walks past (work-order 688).
+  useEffect(() => {
+    childBodies.current = bodies
+    return () => {
+      childBodies.current = []
+    }
+  }, [bodies, childBodies])
 
   // The settlement as the chase sees it: ONE predicate for the colliders, the
   // fire ring (a collider like any other), the walkable rim and the PLAY GROUND
@@ -2088,6 +2101,7 @@ function ErrandVillagers({
   bank,
   geography,
   count,
+  childBodies,
 }: {
   seed: number
   cloth: string[]
@@ -2098,6 +2112,8 @@ function ErrandVillagers({
   bank: PlaceRiverBank | null
   geography: AdultWorkGeography
   count: number
+  /** The children's live bodies (work-order 688) — see `AdultWorkView.childrenHear`. */
+  childBodies: RefObject<readonly InhabitantBody[]>
 }) {
   const refs = useRef<Array<THREE.Group | null>>([])
   // The jar each carrier holds: on the head when it is FULL, in the hand when it
@@ -2213,9 +2229,24 @@ function ErrandVillagers({
     [colliders, radius, bank],
   )
 
+  // Would a child hear a word spoken here? The radius is the settlement's own
+  // hearing radius, read at the call so a debug edit takes effect at once, and
+  // an inactive body — a figure that is out of the picture — hears nothing.
+  const childrenHear = useCallback(
+    (x: number, z: number) => {
+      const ear = balance.communication.hearingRadius
+      const kids = childBodies.current
+      for (const kid of kids) {
+        if (!kid.active) continue
+        if (Math.hypot(kid.x - x, kid.z - z) <= ear) return true
+      }
+      return false
+    },
+    [childBodies],
+  )
   const view = useMemo<AdultWorkView>(
-    () => ({ villagers: people, geography, standable }),
-    [people, geography, standable],
+    () => ({ villagers: people, geography, standable, childrenHear }),
+    [people, geography, standable, childrenHear],
   )
 
   // The body each villager presents to every other inhabitant (point 578): two
@@ -2699,6 +2730,11 @@ export function PlaceLife({
   // per mounted settlement: every vignette claims its slots from it and gives
   // them back when it goes.
   const inhabitantBodies = useMemo(() => createInhabitantSet(), [])
+  // WHERE THE CHILDREN ARE, for the one part of the settlement that has to know
+  // (work-order 688): the adults' work holds a word rather than say it into a
+  // passing child's ear. `Kids` publishes the bodies it already moves and
+  // `ErrandVillagers` reads them, so nothing is copied and nothing is stale.
+  const childBodies = useRef<readonly InhabitantBody[]>([])
 
   // Dev hook for the headless verification and for diagnosing motion defects
   // (point 657): the whole body registry, so a live trace can say WHAT stood
@@ -2868,6 +2904,7 @@ export function PlaceLife({
           <Cook x={firePos[0] + 1.2} z={firePos[1] + 1.0} cloth={style.cloth[0]} />
           <Weaver x={-8.5} z={-7} cloth={style.cloth[1 % style.cloth.length]} weave={style.bandColor} />
           <Kids
+            childBodies={childBodies}
             x={ground.x}
             z={ground.z}
             playRadius={ground.radius}
@@ -2882,6 +2919,7 @@ export function PlaceLife({
           {/* The adults at their errands (point 483): the five landscape and
               action concepts, taught by what the villagers visibly go and do. */}
           <ErrandVillagers
+            childBodies={childBodies}
             seed={localSeed}
             cloth={style.cloth}
             colliders={colliders}

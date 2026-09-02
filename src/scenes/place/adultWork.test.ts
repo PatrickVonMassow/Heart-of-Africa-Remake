@@ -49,6 +49,7 @@ function view(
   n: number,
   at?: Array<{ x: number; z: number }>,
   standable: (x: number, z: number) => boolean = () => true,
+  childrenHear: (x: number, z: number) => boolean = () => false,
 ): AdultWorkView {
   return {
     villagers: Array.from({ length: n }, (_, i) => ({
@@ -66,6 +67,7 @@ function view(
       ],
     },
     standable,
+    childrenHear,
   }
 }
 
@@ -223,6 +225,54 @@ describe('the digging word sits on the stroke', () => {
       expect({ x: s.aim.x, z: s.aim.z }).toEqual({ x: site!.x, z: site!.z })
       expect(s.aim.y).toBe(0)
     }
+  })
+
+  // NOT INTO A CHILD'S EAR (work-order 688). The layout keeps the work sites a
+  // hearing radius clear of the children's three places, but the children WALK
+  // between two of them: measured at the Bambara village, seed 42, a child on
+  // its way from the roaming quarter down to the bank passed 9.1 m from the
+  // store pit and the digger said DIG into its ear, which the browser suite's
+  // `adult-errands` section reported twice running. The word gives way instead
+  // of the site, exactly as it already does for a man crossing the ground it
+  // points at.
+  it('holds DIG while a child is in earshot, and does not lose it', () => {
+    const deaf = view(6)
+    const spokenWithNobodyAbout = run(deaf, 240).filter((w) => w.concept === 'DIG')
+    expect(spokenWithNobodyAbout.length).toBeGreaterThan(0)
+
+    // The same village with a child standing among the work sites the whole
+    // time: not one DIG is spoken while it can hear.
+    const heard = view(6, undefined, undefined, () => true)
+    expect(run(heard, 240).filter((w) => w.concept === 'DIG')).toEqual([])
+
+    // And the atom is only DELAYED: once the child walks on, the word comes.
+    let deafFrom = 120
+    const passing = view(6, undefined, undefined, (x, z) => {
+      void x
+      void z
+      return deafFrom > 0
+    })
+    const state = createAdultWork(6, CFG)
+    const late: string[] = []
+    const dt = 1 / 60
+    for (let t = 0; t < 480; t += dt) {
+      deafFrom -= dt
+      for (let i = 0; i < passing.villagers.length; i++) {
+        const me = passing.villagers[i]
+        const task = taskOf(state, i)
+        me.free = !task
+        if (!task || task.arrived) continue
+        const to = goalOf(task)
+        const d = Math.hypot(to.x - me.x, to.z - me.z)
+        if (d <= 1e-6) continue
+        const step = Math.min(d, CFG.pace * dt)
+        me.x += ((to.x - me.x) / d) * step
+        me.z += ((to.z - me.z) / d) * step
+      }
+      const word = stepAdultWork(state, passing, dt, CFG, () => 0.5)
+      if (word) late.push(word.concept)
+    }
+    expect(late.filter((c) => c === 'DIG').length).toBeGreaterThan(0)
   })
 
   it('holds the digging pose while it speaks — the word lands mid-stroke', () => {

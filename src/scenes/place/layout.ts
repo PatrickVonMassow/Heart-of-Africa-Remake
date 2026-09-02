@@ -1418,6 +1418,13 @@ export function buildLayout(placeId: string, seed: number): PlaceLayout {
    * against the roaming quarter ALONE, so an outer head could stand within
    * hearing of children on the bank while the dig sites — judged against all
    * three — could not (GPT-5.6 Sol, confirming round, hearing separation).
+   *
+   * WHAT IT DOES NOT COVER, AND WHERE THAT IS ANSWERED. These are the three
+   * places the children BELONG; they also WALK between two of them, and that
+   * walk sweeps most of the village. Keeping the work sites clear of it as well
+   * would leave no ground to dig on, so the walk is answered where it happens
+   * instead: `adultWork.ts` holds the digging word while a child is in earshot
+   * of the speaker, and it falls on a later stroke.
    */
   const toChildren = (x: number, z: number) => {
     let best = Infinity

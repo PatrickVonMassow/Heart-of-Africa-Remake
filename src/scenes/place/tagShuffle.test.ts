@@ -130,6 +130,10 @@ function crowd(
   /** Where the errand villagers stroll, when the case wants them somewhere
    *  particular — the children's own ground, for one. */
   focus?: { x: number; z: number; radius: number },
+  /** The children themselves (work-order 688): the adults' work holds a word
+   *  rather than say it into a passing child's ear, exactly as `PlaceLife`
+   *  wires it. */
+  children: readonly InhabitantBody[] = [],
 ): Crowd {
   const colliders = layout.colliders
   const rim = Math.max(1, layout.radius - NPC_RADIUS * 2)
@@ -222,6 +226,10 @@ function crowd(
       digSites: layout.digSites,
     },
     standable: (x, z) => !world.blocked(x, z),
+    childrenHear: (x, z) =>
+      children.some(
+        (c) => c.active && Math.hypot(c.x - x, c.z - z) <= balance.communication.hearingRadius,
+      ),
   }
 
   return {
@@ -456,6 +464,7 @@ function village(
     layout,
     localSeed,
     options.adultsAmongTheChildren ? { x: ground.x, z: ground.z, radius: ground.radius } : undefined,
+    bodies,
   )
   // The other inhabitants' bodies as ground the chase walks round (point 657),
   // wired exactly as `PlaceLife` wires it: everybody OUTSIDE the game, never a

@@ -94,6 +94,24 @@ export interface AdultWorkView {
    * first cross-vendor round, A3).
    */
   standable: (x: number, z: number) => boolean
+  /**
+   * Would a CHILD hear a word spoken here?
+   *
+   * The layout keeps the adults' work sites a hearing radius clear of the
+   * children's own three places (`layout.ts`, `toChildren`), but the children
+   * WALK between two of them — out of their roaming quarter, down to the bank —
+   * and that walk crosses the village. Measured at the Bambara village, seed 42:
+   * the store pit stands 11.2 m from the quarter's rim and 18.2 m from the
+   * running lane, and a child on its way from the one to the other still passed
+   * 9.1 m from the digger, who said DIG into its ear.
+   *
+   * Moving the site cannot answer that — the walk sweeps most of the village —
+   * so the WORD gives way instead, exactly as it already does for a man crossing
+   * the ground it points at: it stays owed and falls on a later stroke. It is a
+   * predicate rather than a list because the caller owns the radius (the
+   * settlement's hearing radius) and the live positions.
+   */
+  childrenHear: (x: number, z: number) => boolean
 }
 
 /** One atom, spoken by one villager, aimed at what he is doing. */
@@ -120,6 +138,10 @@ export interface AdultTask extends ErrandPoint {
   situation: AdultSituationId
   phase: AdultPhase
   carry: AdultCarry
+  /** The word was ready and was HELD because a child was in earshot (work-order
+   *  688). A task that then runs out of time did not lose its atom to a defect —
+   *  it gave it up to the rule — and the expiry assertion below says so. */
+  hushed?: boolean
   /** Reached the goal named by `x`/`z`. */
   arrived: boolean
   /** Seconds of digging done, which is what drives the strike and the pose. */
@@ -386,7 +408,7 @@ export function stepAdultWork(
       // eating one; only a task that never got there reaches this, and it says
       // so (GPT-5.6 Sol, confirming round, task expiry).
       devAssert(
-        !t.owes,
+        !t.owes || t.hushed === true,
         'adult-atom-lost',
         () => `${t.situation}: villager ${i} ran out of time with his ${t.phase} word unspoken`,
       )
@@ -444,9 +466,17 @@ export function stepAdultWork(
       // while his neighbour was still walking, and the player would have seen
       // one man at a hole and another arriving at an empty one (GPT-5.6 Sol,
       // confirming round, joined staging).
+      // AND NO CHILD IS IN EARSHOT. See `childrenHear`: a passing child would
+      // learn DIG from the adults instead of its own four words, and the whole
+      // point of the three separate teaching places is that it does not. The
+      // hold is recorded, because a man held to his time limit by a child that
+      // would not walk on has not LOST his atom — see `hushed`.
+      const hush = t.owes && view.childrenHear(me.x, me.z)
+      if (hush) t.hushed = true
       if (
         !spoken &&
         t.owes &&
+        !hush &&
         joinedIsJoined(state, i, t) &&
         digStrikeCrossed(before, t.dug, i * 0.37) &&
         siteClear(view, t, i)
