@@ -77,6 +77,102 @@ then point 633 (the closing run), then point 174 (the tag). A newly appended poi
 kind is MOVED to the front in the same turn that files it; leaving it where append-and-defer
 put it is the mistake this line exists to stop.
 
+- [ ] 1047. The bank game is unwatchable on its first live viewing: the runs are a sweep,
+  the tap is invisible, the end is instant and the play rocks are coarse (user, 02.09.2026,
+  watching the children's round in the deployed build). The user watched the round live and
+  reported eight things; each was verified against `bankGame.ts` at `65bd03e8e`. The point is
+  worked NEXT, at the FRONT of the work order, by the user's own decision of the same day
+  (reconfirmed 03.09.2026: "der soll oben in der Queue landen"); it was moved here from the
+  append position on 03.09.2026.
+  Final state:
+  1. THE TAP IS SEEN. The tap utterance in `openRun` falls one frame before everybody
+     sprints, so ROCK is shown while the catcher is already charging. A short calibratable
+     pause holds the catcher at his rock, tapping, before the run opens. It uses the
+     held-standing pattern (`drive(s, i, null, …)`) so the stall watches read him as
+     standing rather than stalling.
+  2. A RUN IS NOT A SWEEP. `dodgedAim` exists (dodgeDistance 7, dodgeReach 3) but the
+     swerve is invisible and the catcher, with the tag config's pace advantage, tags all or
+     nearly all of them in run 1 — which is also why the direction seems announced only
+     once: `announceRun` IS per run, but a cycle almost never reaches run 2. Retuned so a
+     typical run ends with one or two tags and the rest arriving, with a swerve that is
+     bigger and earlier but still bounded to the stretch (user: "größer, aber nicht riesig").
+  3. ONE MORE CHILD: `balance.villageLife.childCount` 4 -> 5.
+  4. AN ARRIVAL IS HEARD. Arrival ROCK is implemented in `stepRun`, but `drain()` drops any
+     utterance inside `utteranceGapSeconds` and never replays it, so an arrival right after
+     a tag is silent. At least a run's first arrival is reliably audible.
+  5. THE END IS READABLE. The last tag and `endRun` resolve in the same frame and `endRun`
+     clears `crouched` on everybody at once. At the end of a cycle every caught child stays
+     crouched for a calibratable few seconds, then rises and leaves; the bank
+     crouched-outside-a-run dev assertion moves with it.
+  6. THE PARTING CALL IS DROPPED — it reads as unnatural — and the parting walk goes from
+     wherever each child stands back toward the roaming quarter rather than along the bank.
+     Decided knowing it deletes the reading guard that detached UPSTREAM/DOWNSTREAM from the
+     rocks; the river's own current remains the corroboration. The header comment,
+     `stepPart`, the meaning of `partSeconds`, the now-unused 'parting'/'bank' moment and aim
+     types, `docs/communication-poc-spec.md` §13.4 and the parting tests change with it.
+  7. THE PLAY ROCKS ARE NOT FACETED. `buildRock()` is a `DodecahedronGeometry(0.5, 0)` —
+     twelve faces — and the play rocks draw that same geometry at scale ~2.4 against the
+     0.3-1.0 of the scattered dressing, which is where the huge flat facets come from. Large
+     instances get a higher-detail variant (a detail-1 dodecahedron with seeded vertex
+     noise) that keeps the silhouette and the collider; the scatter keeps the cheap mesh.
+  Every number stays in `balance.villageLife.bankGame`; the child-motion metric stays green.
+  Test: Vitest over the round for the tap pause, the tag count of a typical run, the audible
+  first arrival, the crouch-then-rise ending and the parting walk's direction; a
+  backend-sensitive picture check for the play rocks.
+  Criticality: high — this is the first live viewing of the mechanic the whole communication
+  slice is built on, and the user could not read it.
+  Refs: src/scenes/place/bankGame.ts, src/config/balance.ts, src/world/communicationRock.ts,
+  src/scenes/place/layout.ts, docs/communication-poc-spec.md
+  Bundle: Dorfleben.
+
+- [ ] 1048. The batch crawled through the night while every safeguard reported health:
+  the owner waited on stacked watchers that can never return (measured 03.09.2026,
+  00:55–01:15, live in the stalled session). Between the communication-point merge at
+  23:05 and the next main commit at 00:52 the owning session advanced nothing, yet held a
+  fresh heartbeat the whole time, so the launcher skipped every tick with "owner alive"
+  and only WARNED about the published now-card ETA running 81+ minutes past. The session
+  woke roughly every ten minutes, spawned another background watcher of the form
+  `while pgrep -f "npm exec vitest" >/dev/null; do sleep 30; done`, and blocked again —
+  ten such shells stood at 01:00. Each watcher's own command line contains the literal
+  pattern, so pgrep finds the sibling watchers themselves and the loops cannot terminate:
+  every wait was for a run that had already finished. The session's own instructions name
+  `scripts/verify/run-wait.mjs --await` as THE blocking wait; the hand-rolled watchers
+  bypassed it. A stale `.claude/batch-in-flight.json` of a pid dead since the afternoon
+  kept "a verification is running" plausible the whole time. This is the wedge point 958
+  predicts — a session that keeps making tool calls never trips the emergency clock —
+  observed in production. The infrastructure freeze of 01.09.2026 admits this point
+  through its blockade exception: the defect reproducibly stalled the batch for hours.
+  Final state:
+  - Two authors work BLIND-PARALLEL from identical inputs (this point's text), cross-vendor,
+    each delivering an independent root-cause analysis plus a solution proposal covering at
+    least: the self-matching watcher pattern, the unbounded watcher stacking, heartbeat
+    read as liveness while no progress happens, the launcher's warn-only overdue ETA, and
+    stale in-flight markers of dead pids. A third model that wrote neither proposal merges
+    them through `scripts/blind-merge.mjs`, counted entry by entry; the merged solution is
+    then implemented. (User order 03.09.2026, verbatim: "mache direkt einen Punkt, der das
+    Problem blind mit vier Augen analysiert und eine zuverlässige Lösung entwickelt, die
+    sicher verhindert, dass so etwas noch mal passieren kann. Lasse die
+    Lösungungsvorschläge dann von einem dritten Modell zusammenführen und danach
+    umsetzen.")
+  - The merged solution keys recovery on observable PROGRESS rather than liveness: a
+    session whose waits can never return is detected and recovered from without a human,
+    within a bounded time the solution states and tests. The user is away for days at a
+    time; "Die Batch darf niemals stehenbleiben" (user, 03.09.2026).
+  - Overlap with 947 (blind sweep of every way the batch can stop) and 958 (the busy wedge
+    the emergency clock cannot see) is resolved by the merge — this point supersedes or
+    narrows them rather than duplicating their mechanism.
+  Test: Vitest over the decision cores the merged solution lands in, replaying the
+  incident's shape — alive heartbeat plus eternal waits plus no main progress leads to
+  recovery within the stated bound; a drill that calls the real recovery path per the
+  drills rule, not a recreation of its aftermath.
+  Criticality: high — hours of unattended standstill with every monitor green, on the one
+  path that may never block.
+  Refs: scripts/batch-emergency-core.mjs, scripts/batch-standstill-core.mjs,
+  scripts/batch-launcher.mjs, scripts/batch-in-flight.mjs, scripts/verify/run-wait.mjs,
+  .claude/batch-launcher.log (02./03.09. ticks)
+  Bundle: Session- & Repo-Hygiene (not worked beside 947, 958, 985 or 1002 — they edit the
+  same emergency/standstill decision core).
+
 - [ ] 689. The chief speaks from the first minute, and pays in a direction and a mould (user
   13.08.2026, playing the deployed communication slice).
   The user played the deployed communication slice on 13.08.2026 with the debug
@@ -685,6 +781,36 @@ put it is the mistake this line exists to stop.
   tag plus `poc` dynamically, but a tag push alone does not trigger it. Then VERIFY
   that /v0.3/ and /poc/ serve the new state, and FREEZE the tag: it is never
   re-pointed.
+
+- [ ] 1049. A user front-order and the communication-first rule both failed to order the
+  queue: the bank-round point was filed carrying "worked NEXT, at the FRONT" in its own
+  text and still stood LAST of 360 open points (user, 03.09.2026: "Ich hatte zum einen
+  damals ausdrücklich gefordert, dass es nach ganz oben soll und zum anderen sollte das
+  ohnehin automatisch durch die allgemein[e] Regel passieren, dass alles zur
+  Kommunikationsmechanik Priorität hat. Hier haben als[o] gleich zwei Sachen versagt.").
+  Measured 03.09.2026: the wedged night session filed the intake at 01:05 in append
+  position and never made the move its own text promised; the TASKS.md header names
+  exactly this mistake, but it is prose; the communication-first release order is prose in
+  the same header; `queue-rank` flags an unranked append only as a one-time advisory; and
+  `queue-order-guard-core.mjs` encodes fixes-before-finders and machine-filed-behind-
+  release, but knows neither user front-orders nor the communication-first rule. Nothing
+  refuses a turn that files a front-ordered point and leaves it at the bottom.
+  Final state:
+  - A point whose filed text records a user front-order cannot rest at append position:
+    the turn that files it either moves it or is refused. The EXISTING queue-order reader
+    learns the rule — no new guard is built; the user's demand of 03.09.2026 admits this
+    change past the infrastructure freeze as a defect that misordered his priority work.
+  - The communication-first release order is checked by the same reader, or the point
+    records why prose must suffice and what then catches the next silent misplacement.
+  - Vitest coverage over this incident's shape: a filed "FRONT" point standing last is a
+    red.
+  Criticality: medium — user-priority work silently waited behind 359 points and was
+  caught only because the user asked after it.
+  Refs: scripts/queue-order-guard-core.mjs, scripts/queue-rank-core.mjs, TASKS.md (header
+  order rule)
+  Bundle: Chat & Tafel (edits the queue-order reader on the board publish path; not worked
+  beside another point touching that path). Placed behind the release by the 20.08.2026
+  ranking rule for machine-filed points below high urgency; veto moves it.
 
 - [ ] 1026. LARGE pays for a second backend pass on every change, including the ones that
   cannot touch the renderer (measured 31.08.2026).
@@ -14009,50 +14135,4 @@ to land than a mechanism that needs a review.
   legible moment is the one that hardly happens.
   Refs: src/scenes/place/bankGame.ts, src/scenes/place/tagShuffle.test.ts (the bank-round
   replay and `BANK_ROUND_WINDOW`)
-  Bundle: Dorfleben.
-
-- [ ] 1047. The bank game is unwatchable on its first live viewing: the runs are a sweep,
-  the tap is invisible, the end is instant and the play rocks are coarse (user, 02.09.2026,
-  watching the children's round in the deployed build). The user watched the round live and
-  reported eight things; each was verified against `bankGame.ts` at `65bd03e8e`. The point is
-  worked NEXT, at the FRONT of the work order, by the user's own decision of the same day.
-  Final state:
-  1. THE TAP IS SEEN. The tap utterance in `openRun` falls one frame before everybody
-     sprints, so ROCK is shown while the catcher is already charging. A short calibratable
-     pause holds the catcher at his rock, tapping, before the run opens. It uses the
-     held-standing pattern (`drive(s, i, null, …)`) so the stall watches read him as
-     standing rather than stalling.
-  2. A RUN IS NOT A SWEEP. `dodgedAim` exists (dodgeDistance 7, dodgeReach 3) but the
-     swerve is invisible and the catcher, with the tag config's pace advantage, tags all or
-     nearly all of them in run 1 — which is also why the direction seems announced only
-     once: `announceRun` IS per run, but a cycle almost never reaches run 2. Retuned so a
-     typical run ends with one or two tags and the rest arriving, with a swerve that is
-     bigger and earlier but still bounded to the stretch (user: "größer, aber nicht riesig").
-  3. ONE MORE CHILD: `balance.villageLife.childCount` 4 -> 5.
-  4. AN ARRIVAL IS HEARD. Arrival ROCK is implemented in `stepRun`, but `drain()` drops any
-     utterance inside `utteranceGapSeconds` and never replays it, so an arrival right after
-     a tag is silent. At least a run's first arrival is reliably audible.
-  5. THE END IS READABLE. The last tag and `endRun` resolve in the same frame and `endRun`
-     clears `crouched` on everybody at once. At the end of a cycle every caught child stays
-     crouched for a calibratable few seconds, then rises and leaves; the bank
-     crouched-outside-a-run dev assertion moves with it.
-  6. THE PARTING CALL IS DROPPED — it reads as unnatural — and the parting walk goes from
-     wherever each child stands back toward the roaming quarter rather than along the bank.
-     Decided knowing it deletes the reading guard that detached UPSTREAM/DOWNSTREAM from the
-     rocks; the river's own current remains the corroboration. The header comment,
-     `stepPart`, the meaning of `partSeconds`, the now-unused 'parting'/'bank' moment and aim
-     types, `docs/communication-poc-spec.md` §13.4 and the parting tests change with it.
-  7. THE PLAY ROCKS ARE NOT FACETED. `buildRock()` is a `DodecahedronGeometry(0.5, 0)` —
-     twelve faces — and the play rocks draw that same geometry at scale ~2.4 against the
-     0.3-1.0 of the scattered dressing, which is where the huge flat facets come from. Large
-     instances get a higher-detail variant (a detail-1 dodecahedron with seeded vertex
-     noise) that keeps the silhouette and the collider; the scatter keeps the cheap mesh.
-  Every number stays in `balance.villageLife.bankGame`; the child-motion metric stays green.
-  Test: Vitest over the round for the tap pause, the tag count of a typical run, the audible
-  first arrival, the crouch-then-rise ending and the parting walk's direction; a
-  backend-sensitive picture check for the play rocks.
-  Criticality: high — this is the first live viewing of the mechanic the whole communication
-  slice is built on, and the user could not read it.
-  Refs: src/scenes/place/bankGame.ts, src/config/balance.ts, src/world/communicationRock.ts,
-  src/scenes/place/layout.ts, docs/communication-poc-spec.md
   Bundle: Dorfleben.
