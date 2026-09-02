@@ -235,7 +235,7 @@ describe('the digging word sits on the stroke', () => {
   // `adult-errands` section reported twice running. The word gives way instead
   // of the site, exactly as it already does for a man crossing the ground it
   // points at.
-  it('holds DIG while a child is in earshot, and does not lose it', () => {
+  it('holds DIG while a child is in earshot, and does not lose it', async () => {
     const deaf = view(6)
     const spokenWithNobodyAbout = run(deaf, 240).filter((w) => w.concept === 'DIG')
     expect(spokenWithNobodyAbout.length).toBeGreaterThan(0)
@@ -255,7 +255,15 @@ describe('the digging word sits on the stroke', () => {
     const state = createAdultWork(6, CFG)
     const late: string[] = []
     const dt = 1 / 60
+    // THE REPLAY YIELDS, like the bank round's beside it: eight replayed minutes
+    // is 28 800 straight synchronous steps, and a worker that never comes up for
+    // air misses its own `onTaskUpdate` RPC — the whole run then fails with every
+    // test green and none named (the load signature of point 803). Measured here:
+    // the unyielding version reddened two full unit runs in a row on an idle
+    // machine. A yield every replayed minute costs nothing.
+    let steps = 0
     for (let t = 0; t < 480; t += dt) {
+      if (++steps % 3600 === 0) await new Promise((resolve) => setTimeout(resolve, 0))
       deafFrom -= dt
       for (let i = 0; i < passing.villagers.length; i++) {
         const me = passing.villagers[i]

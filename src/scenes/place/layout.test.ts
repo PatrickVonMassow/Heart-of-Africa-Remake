@@ -888,8 +888,14 @@ describe('every settlement keeps one way out free (work-order 688)', () => {
     return null
   }
 
-  it.each([...PORTS, ...VILLAGES].map((p) => [p.id] as const))('%s: the way out stays walkable', (id) => {
+  // THE SWEEP YIELDS between worlds. This file is the slowest in the unit layer,
+  // and a worker that builds settlement after settlement without coming up for
+  // air misses its own `onTaskUpdate` RPC: the run then fails with every test
+  // green and none named, which is the load signature of point 803 — measured
+  // here on an idle machine, twice running, until these two sweeps yielded.
+  it.each([...PORTS, ...VILLAGES].map((p) => [p.id] as const))('%s: the way out stays walkable', async (id) => {
     for (const seed of [...SEEDS, REPORTED_SEED, WEDGE_SEED, 1, 2, 3]) {
+      await new Promise((resolve) => setTimeout(resolve, 0))
       const layout = buildLayout(id, seed)
       expect(layout.wayOut, `${id} seed ${seed}: no crossing of the boundary is free`).not.toBeNull()
       expect(
@@ -907,8 +913,9 @@ describe('every settlement keeps one way out free (work-order 688)', () => {
   // dropped on average, 5 in the worst layout, and the floors below are the
   // worst kept counts on record (baganda-village seed 7 and tuareg-village seed
   // 7). They are a bar on the price, not a target.
-  it.each([...PORTS, ...VILLAGES].map((p) => [p.id] as const))('%s: the dressing is not thinned out for it', (id) => {
+  it.each([...PORTS, ...VILLAGES].map((p) => [p.id] as const))('%s: the dressing is not thinned out for it', async (id) => {
     for (const seed of [...SEEDS, REPORTED_SEED, WEDGE_SEED, 1, 2, 3]) {
+      await new Promise((resolve) => setTimeout(resolve, 0))
       const layout = buildLayout(id, seed)
       expect(layout.flora.length, `${id} seed ${seed}: flora`).toBeGreaterThanOrEqual(6)
       expect(layout.rocks.length, `${id} seed ${seed}: rocks`).toBeGreaterThanOrEqual(11)

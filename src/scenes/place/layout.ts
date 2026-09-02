@@ -549,6 +549,96 @@ export function onWayOut(wayOut: number | null, radius: number, x: number, z: nu
   return Math.hypot(overshoot, across) < WAY_OUT_HALF_WIDTH + bodyR
 }
 
+/** How far a collider reaches from the point that stands for it — its own
+ *  radius, a box's half-diagonal, a panel's half-length plus its radius. Always
+ *  an OVER-estimate, because it is used to throw colliders away. */
+function colliderReach(c: Collider): number {
+  if (c.kind === 'segment') return Math.hypot(c.x2 - c.x1, c.z2 - c.z1) / 2 + c.r
+  if (c.kind === 'box') return Math.hypot(c.hx, c.hz)
+  return c.r
+}
+
+/** The point that stands for a collider in a distance test. */
+function colliderAt(c: Collider): { x: number; z: number } {
+  return c.kind === 'segment' ? { x: (c.x1 + c.x2) / 2, z: (c.z1 + c.z2) / 2 } : { x: c.x, z: c.z }
+}
+
+/**
+ * The colliders that could possibly meet a walk from (ax,az) to (bx,bz) by a
+ * body of radius `radius`.
+ *
+ * A CULL, NOT A TEST: it keeps everything within its own reach of the corridor
+ * and throws away only what cannot be touched, so `standingClear` over the
+ * result answers exactly what it answers over the whole set. It exists because
+ * the water path's sweep asks that question for every candidate head at 0.1 m
+ * steps — measured at the Bambara village, 159 of the 217 ms one `buildLayout`
+ * took, and a settlement layout is built while the player walks into the place.
+ */
+function collidersNearRun(
+  colliders: readonly Collider[],
+  ax: number,
+  az: number,
+  bx: number,
+  bz: number,
+  radius: number,
+): Collider[] {
+  const dx = bx - ax
+  const dz = bz - az
+  const len2 = dx * dx + dz * dz
+  const out: Collider[] = []
+  for (const c of colliders) {
+    const p = colliderAt(c)
+    const t = len2 === 0 ? 0 : Math.max(0, Math.min(1, ((p.x - ax) * dx + (p.z - az) * dz) / len2))
+    const d = Math.hypot(p.x - (ax + dx * t), p.z - (az + dz * t))
+    if (d <= radius + colliderReach(c)) out.push(c)
+  }
+  return out
+}
+
+/** Side of one bucket of `colliderBuckets`, in metres. Wide enough that a
+ *  settlement fills a few dozen buckets, narrow enough that one holds a handful
+ *  of bodies. */
+const COLLIDER_BUCKET = 8
+
+const NO_COLLIDERS: Collider[] = []
+
+/**
+ * A bucket index over a settlement's colliders, for a query of at most
+ * `reach` metres.
+ *
+ * Every collider is filed in each bucket its own reach plus `reach` touches, so
+ * asking the bucket a point falls in returns EVERY collider that could overlap a
+ * body of that radius there — the answer is the whole set's answer, over a
+ * handful of bodies instead of a hundred and sixty.
+ *
+ * It is here for the children's quarter: that search samples discs at 64
+ * bearings and asks whether a child could stand at each sample, which was a full
+ * scan of the settlement per sample — measured at the Bambara village, 58 of the
+ * 217 ms one `buildLayout` took, and the layout is built while the player walks
+ * into the place.
+ */
+function colliderBuckets(colliders: readonly Collider[], reach: number): (x: number, z: number) => Collider[] {
+  const buckets = new Map<string, Collider[]>()
+  for (const c of colliders) {
+    const p = colliderAt(c)
+    const r = colliderReach(c) + reach
+    const x0 = Math.floor((p.x - r) / COLLIDER_BUCKET)
+    const x1 = Math.floor((p.x + r) / COLLIDER_BUCKET)
+    const z0 = Math.floor((p.z - r) / COLLIDER_BUCKET)
+    const z1 = Math.floor((p.z + r) / COLLIDER_BUCKET)
+    for (let ix = x0; ix <= x1; ix++) {
+      for (let iz = z0; iz <= z1; iz++) {
+        const key = `${ix},${iz}`
+        const list = buckets.get(key)
+        if (list) list.push(c)
+        else buckets.set(key, [c])
+      }
+    }
+  }
+  return (x, z) =>
+    buckets.get(`${Math.floor(x / COLLIDER_BUCKET)},${Math.floor(z / COLLIDER_BUCKET)}`) ?? NO_COLLIDERS
+}
+
 export function buildLayout(placeId: string, seed: number): PlaceLayout {
   const place = placeById(placeId)
   // Monument sites (design.md §4.4, point 273) are a bare walkable disc with the
@@ -1365,6 +1455,9 @@ export function buildLayout(placeId: string, seed: number): PlaceLayout {
   // placed against it, and a quarter derived once there and once here would be
   // two quarters (points 129/378). The dressing is then scattered AROUND it, so
   // the chase is watched over open ground rather than between boulders.
+  // The fabric as the quarter's search asks about it, bucketed once: the search
+  // samples thousands of points and each used to walk the whole collider set.
+  const standableAt = colliderBuckets(colliders, WALKER_RADIUS)
   const playGround: PlaceLayout['playGround'] =
     place.kind === 'village'
       ? childPlayGround(
@@ -1373,7 +1466,7 @@ export function buildLayout(placeId: string, seed: number): PlaceLayout {
           balance.villageLife.tag.playRadius,
           balance.communication.hearingRadius,
           {
-            free: (px, pz) => standingClear(colliders, px, pz, WALKER_RADIUS),
+            free: (px, pz) => standingClear(standableAt(px, pz), px, pz, WALKER_RADIUS),
             fabric: fabricOf(dwellings, interactives),
           },
         )
@@ -1483,11 +1576,17 @@ export function buildLayout(placeId: string, seed: number): PlaceLayout {
       // metre is finer than the thinnest body in the set.
       const runLength = Math.hypot(foot.x - head.x, foot.z - head.z)
       const steps = Math.max(48, Math.ceil(runLength / 0.1))
+      // The fabric this walk could possibly meet, once per candidate rather than
+      // once per sample: three hundred samples over a settlement's whole collider
+      // set, for every bearing of the sweep, was the single most expensive thing
+      // in the layout. `collidersNearRun` throws away only what the corridor
+      // cannot reach, so the answer is the same one.
+      const near = collidersNearRun(colliders, head.x, head.z, foot.x, foot.z, drawnHalf)
       for (let t = 0; t <= steps; t++) {
         const x = head.x + (foot.x - head.x) * (t / steps)
         const z = head.z + (foot.z - head.z) * (t / steps)
         if (inBankPlayLane(playRocks, x, z, laneClearance)) return false
-        if (!standingClear(colliders, x, z, drawnHalf)) return false
+        if (!standingClear(near, x, z, drawnHalf)) return false
       }
       return true
     }
