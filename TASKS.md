@@ -9631,14 +9631,26 @@ to land than a mechanism that needs a review.
   that caused the first red. Two hours earlier the same push had gone green on a quiet host with
   the same 374 files. So the defect is confirmed as contention, not flakiness of unknown origin,
   and the cost is measured twice now: bookkeeping left committed and unpushed both times.
+  REPRODUCED A THIRD TIME 02.09.2026, ON A QUIET HOST, AND IT BLOCKED A LANDING. Three LARGE runs
+  for point 688 died at the unit stage with the same signature. The first two had a cause of the
+  known kind — a six-pass review running beside the suite, then a repository action taken while it
+  ran — but the THIRD had neither: nothing else was on the machine, and vitest's own summary read
+  `Test Files 447 passed (447)` and `Tests 14642 passed | 6 skipped`. NOTHING failed. What made the
+  runner exit non-zero was two `[vitest-worker]: Timeout calling "onTaskUpdate"` reporter errors,
+  counted as unhandled errors. The LARGE then skipped every browser suite, so the point's picture
+  evidence could not be taken at all.
+  THAT CHANGES THE SHAPE OF THIS POINT: the load reading is not sufficient. A quiet-host run can
+  exit non-zero with nothing failing, so the discriminator has to be the SUMMARY — a run whose own
+  report names no failing test has not judged anything, at any load — and the load reading belongs
+  in the verdict text as evidence rather than as the condition.
   FINAL STATE: the gate measures load before it starts and names it in its verdict. A run whose
-  summary names NO failing test while the measured load sits above a calibrated threshold is
-  treated as NOT JUDGED and waits for a quiet moment, rather than blocking as a red — the
-  distinction the gate already draws in prose is drawn in its decision too. A run that names a
-  failing test blocks as it does today, at any load.
+  summary names NO failing test is treated as NOT JUDGED and re-run, rather than blocking as a red
+  — at any load, with the measured load named in the verdict either way. A run that names a
+  failing test blocks as it does today, at any load. The same rule applies to the LARGE runner,
+  which today throws away every browser suite behind such a stage.
   VERIFIABLE: pure tests over the verdict function — a summary with a named failure blocks at any
-  load; a no-failure non-zero exit under high load yields "not judged"; the same under low load
-  keeps blocking; and the measured load appears in the verdict text in every case.
+  load; a no-failure non-zero exit yields "not judged" at any load, high or low; and the measured
+  load appears in the verdict text in every case.
   Criticality: medium — no product defect, but it withholds the push rule's protection exactly when
   a delegated agent is running, which is the normal operating state of this batch.
   Bundle: Session- & Repo-Hygiene.
