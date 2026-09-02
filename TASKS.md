@@ -14343,3 +14343,36 @@ to land than a mechanism that needs a review.
   Criticality: medium — no player impact, but it is a real blockade: it stops the one
   mechanism that keeps session cost bounded.
   Bundle: Session- & Repo-Hygiene.
+
+- [ ] 1043. The speech-label check stands on one figure, and that figure is a coin toss.
+  `polish --section=speech-hypothesis` picks a figure of the maasai village to speak over and
+  proves the label sits ON it by ray-probing the rendered scene: the first surface along the
+  sight line must be the figure itself, `0.85 <= hitDistance / targetDistance <= 1.15`. Ten
+  named figures are offered to it, each at two stand-backs.
+  MEASURED 02.09.2026, WebGL 2, on `feat/686-five-word-lexicon-game` and on the merge-base
+  `1ae86eb2a` alike: the probe list is IDENTICAL run to run for the first five figures —
+  `2.00@ground-disc, 2.00@ground-disc, 0.21@CylinderGeometry, 1.15@BoxGeometry, 1.58@ground-disc,
+  1.58@ground-disc, 1.56@ground-disc, 1.58@ground-disc, 1.57@ground-disc, 1.58@ground-disc` — so
+  five of the ten candidates NEVER qualify, deterministically, and the whole check hangs on
+  figure #5, whose own probe reads `0.97@SphereGeometry` on a run that passes and
+  `1.57@ground-disc` on one that does not. A ratio of 1.55-1.58 is the signature of a ray that
+  sailed PAST the figure and hit the ground beyond it.
+  WHAT IT COST: two SUSPECT records and one unaccounted red against the 686/687 merge candidate
+  on 02.09.2026, none of them that candidate's. IT IS NOT THAT CANDIDATE'S: sampled the same day
+  with `polish --section=speech-hypothesis` on WebGL 2, THREE of NINE section runs on the
+  merge-base code went red on the first attempt (twice this check, once two console errors) and
+  NONE of four did on the branch. The flake is pre-existing and belongs to no landing.
+  Final state:
+  - WHY THE FIRST FIVE NEVER QUALIFY IS MEASURED, not guessed. The probe aims at
+    `e[13] + max(0.4, scaleY)` above the figure's own origin and reads the group's scale; either
+    that height misses those figures, or they carry no geometry `__placeRayHit` can see at all.
+  - The check then rests on more than one candidate, or it says out loud that it rests on one
+    and why that is the best the scene can offer.
+  - The two console errors observed on one attempt of the same section are named, or shown not
+    to exist.
+  Test: the browser section stays the proof; the fast layer pins whatever selection rule
+  replaces the current one.
+  Criticality: medium — it blocks landings that have nothing to do with it, and a retry-green is
+  SUSPECT, which covers no backend at all.
+  Refs: scripts/verify/polish.mjs (section speech-hypothesis), src/scenes/place/PlaceScene.tsx
+  Bundle: Testinfrastruktur.
