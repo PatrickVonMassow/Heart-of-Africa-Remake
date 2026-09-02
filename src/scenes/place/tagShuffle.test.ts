@@ -1382,6 +1382,134 @@ describe('the children`s bank round can reach its own stage (work-order 687)', (
     expect(minGap).toBeGreaterThanOrEqual(owed)
   })
 
+  /**
+   * AND THE BROWSER SECTION'S OWN LANE RULE, REPLAYED (work-order 687). The
+   * picture check stands the traveller in the middle of the stretch, opens a
+   * window on the round's own clock and asks whether a child goes from one side
+   * of him to the other INSIDE A RUN. Which run it opened on, and how long it
+   * watched, decided the answer — and nobody had measured that:
+   *
+   *  - A cycle's LATER runs carry only the runners that survived the ones before
+   *    it, so they end in about two seconds. A runner covers six or seven metres
+   *    in that, and the traveller stands ten from the start line: nobody can
+   *    reach him, let alone pass him. Only a cycle's FIRST run has the whole line
+   *    in it, and `gather` — the walk down to the bank, once per cycle — is what
+   *    announces it.
+   *  - The 45 s window was mostly the roaming phase. The section shortens
+   *    `roamSeconds` to 8, but the off-game ROCK guard held every cycle for its
+   *    full 45 s of overtime on top (the boulder goes unnamed at these seeds), so
+   *    the phase still ran 55 s and the window held one short run at best.
+   *
+   * Measured over the layouts below, both defects fixed: 75 of 75 windows carry a
+   * crossing at 120 s. At the old 45 s, six of 84 carried none — a gate that went
+   * green on luck, which is exactly what it did until it did not.
+   */
+  it('carries a child past a planted traveller in every cycle-first run window (work-order 687)', () => {
+    const CASES: Array<[string, number]> = [
+      ['bambara-village', 42],
+      ['bambara-village', 2972259115],
+      ['nubian-village', 42],
+      ['mandinka-village', 99],
+    ]
+    // What the browser section sets while it watches, and why: see
+    // `scripts/verify/polish.mjs`, section `children-bank-game`.
+    const SECTION_ROAM_S = 8
+    const SECTION_GUARD_S = 8
+    // The window the section opens, and the budget it gives a cycle-first run to
+    // come, both in played seconds.
+    const LANE_WINDOW_S = 120
+    const RUN_BUDGET_S = 150
+    const shippedRoam = BANK_CFG.roamSeconds
+    const shippedGuard = BANK_CFG.roamGuardSeconds
+    try {
+      BANK_CFG.roamSeconds = SECTION_ROAM_S
+      BANK_CFG.roamGuardSeconds = SECTION_GUARD_S
+      for (const [placeId, seed] of CASES) {
+        const v = village(placeId, seed)
+        expect({ placeId, seed, staged: !!v.stage }).toEqual({ placeId, seed, staged: true })
+        const stage = v.stage!
+        const up = rockAt(stage, 'upstream')
+        const down = rockAt(stage, 'downstream')
+        const him = { x: (up.x + down.x) / 2, z: (up.z + down.z) / 2, radius: PLAYER_RADIUS }
+        v.world.stranger = him
+        const dx = down.x - up.x
+        const dz = down.z - up.z
+        const len = Math.hypot(dx, dz) || 1
+        const ax = dx / len
+        const az = dz / len
+        const dt = 1 / 60
+        // Long enough to hold several whole cycles AND one full window after the
+        // last opening this asserts on.
+        const trace: Array<{ t: number; phase: string; along: number[] }> = []
+        for (let t = 0; t < 480; t += dt) {
+          frame(v, dt)
+          trace.push({
+            t,
+            phase: v.bank!.phase,
+            along: v.children.map((c) => (c.x - him.x) * ax + (c.z - him.z) * az),
+          })
+        }
+        // The openings the browser wait now picks: the first run of a cycle, the
+        // one `gather` announces.
+        const opens: number[] = []
+        let prev = trace[0].phase
+        let lastNonRun = trace[0].phase
+        for (const s of trace) {
+          if (s.phase === 'run' && prev !== 'run' && lastNonRun === 'gather') opens.push(s.t)
+          if (s.phase !== 'run') lastNonRun = s.phase
+          prev = s.phase
+        }
+        // A cycle-first run comes inside the budget the browser wait allows, from
+        // a cold start and between any two of them.
+        let worstWait = opens.length > 0 ? opens[0] : Infinity
+        for (let i = 1; i < opens.length; i++) worstWait = Math.max(worstWait, opens[i] - opens[i - 1])
+        expect({ placeId, seed, inBudget: worstWait <= RUN_BUDGET_S }).toEqual({
+          placeId,
+          seed,
+          inBudget: true,
+        })
+        // ...and every window that fits whole inside the replay carries a
+        // crossing, counted exactly as the browser counts it: inside the run
+        // phase only, with the side forgotten on leaving it and a metre of
+        // hysteresis about his line.
+        const windows = opens.filter((t) => t + LANE_WINDOW_S <= trace[trace.length - 1].t)
+        expect({ placeId, seed, windows: windows.length > 0 }).toEqual({ placeId, seed, windows: true })
+        const crossers = windows.map((from) => {
+          const win = trace.filter((s) => s.t >= from && s.t < from + LANE_WINDOW_S)
+          let n = 0
+          for (let k = 0; k < v.children.length; k++) {
+            let side = 0
+            let swapped = false
+            for (const s of win) {
+              if (s.phase !== 'run') {
+                side = 0
+                continue
+              }
+              const a = s.along[k]
+              if (a > 1 || a < -1) {
+                const now = a > 0 ? 1 : -1
+                if (side !== 0 && now !== side) swapped = true
+                side = now
+              }
+            }
+            if (swapped) n++
+          }
+          return n
+        })
+        expect({ placeId, seed, empty: crossers.filter((n) => n === 0).length }).toEqual({
+          placeId,
+          seed,
+          empty: 0,
+        })
+      }
+    } finally {
+      BANK_CFG.roamSeconds = shippedRoam
+      BANK_CFG.roamGuardSeconds = shippedGuard
+    }
+    // Four layouts of 480 replayed seconds each: this measurement carries its own
+    // budget rather than flaking under the suite's worker contention.
+  }, 120000)
+
 
 
   /**

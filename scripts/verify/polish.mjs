@@ -3884,10 +3884,22 @@ if (section('children-bank-game')) {
   // a cycle. This section needs the RUN, twice, so it shortens the roam the way
   // the debug menu would and puts it back afterwards. Nothing else about the
   // cycle is touched: the walk down to the bank and every run is the shipped one.
+  //
+  // BOTH LENGTHS OF THAT PHASE, not only the first. `roamSeconds` is what the
+  // phase is SCHEDULED for; the off-game ROCK guard may then hold the cycle for
+  // `roamGuardSeconds` (45 s) beyond it, and at the verify seed the boulder goes
+  // unnamed every cycle, so the guard runs its overtime out every time. Shortening
+  // the schedule alone therefore did not shorten the phase at all: measured in the
+  // fast-layer replay, the roaming phase still ran 55 s and the cycles came 74-100 s
+  // apart, which is what left the window below with a single 2 s run in it. With
+  // both shortened the cycles come 35-59 s apart. The guard's own bound is proved
+  // at its SHIPPED length in `src/scenes/place/tagShuffle.test.ts`; this is a
+  // spectator-time knob, not a weakened assertion.
   const shippedRoam = await page.evaluate(() => {
     const b = window.__balance.villageLife.bankGame
-    const was = b.roamSeconds
+    const was = { roamSeconds: b.roamSeconds, roamGuardSeconds: b.roamGuardSeconds }
     b.roamSeconds = 8
+    b.roamGuardSeconds = 8
     return was
   })
   await goToPlace('bambara-village')
@@ -4136,23 +4148,30 @@ if (section('children-bank-game')) {
       const first = await readRound()
       let seen = first.playedClock
       const wallStart = Date.now()
-      // THE WINDOW OPENS AT A RUN'S START, never wherever one happens to be. The
-      // round keeps playing while the traveller is planted, so it can already be
-      // mid-run by the time this wait begins — and then the window gets the TAIL
-      // of that run. Measured on 01.09.2026: 2 s of run, then `part` and `roam`
-      // filled the other 43 s, and the crossing, which is counted inside the run
-      // phase alone, had no run left to happen in. So a run already in progress
-      // is waited OUT first and the window opens on the NEXT one. The budget
-      // above still covers it: the remaining tail of a run (at most `runSeconds`,
-      // 20 s) plus the worst measured gap between two runs (79.7 s) is 100 s
-      // against 150.
-      let leftRun = first.phase !== 'run'
+      // THE WINDOW OPENS ON A CYCLE'S FIRST RUN, never wherever a run happens to
+      // be. Two things were wrong with taking any run at all. The round keeps
+      // playing while the traveller is planted, so the wait could begin mid-run
+      // and the window then got the TAIL of it. And a cycle's LATER runs — the
+      // ones after a `regroup` — carry only the runners that survived the ones
+      // before, so they end in a second or two, far too short to carry anybody
+      // the ten metres from the start line to the traveller in the middle of it.
+      // A cycle's first run is the one with the whole line still in it.
+      //
+      // `gather` is the walk down to the bank and happens exactly once per cycle,
+      // immediately before that first run, so it is what the wait watches for.
+      // Measured in the fast-layer replay over the seven river layouts (with the
+      // roam shortened as above): 84 cycle-first runs, and at the OLD 45 s window
+      // six of them carried no crossing at all — the check was a coin toss, not a
+      // measurement, and it had gone green on luck. The budget above covers the
+      // wait: the longest gap between two cycle-first runs measured over those
+      // layouts is 61 s, against 150.
+      let sawGather = false
       for (;;) {
         const now = await readRound()
         runPhase = now.phase
         runPlayed = now.playedClock - first.playedClock
-        if (runPhase !== 'run') leftRun = true
-        if (leftRun && runPhase === 'run') break
+        if (runPhase === 'gather') sawGather = true
+        if (sawGather && runPhase === 'run') break
         runWallMs = Date.now() - wallStart
         if (runPlayed >= RUN_WAIT_PLAYED_S) break
         if (Date.now() - wallStart > RUN_WAIT_WALL_MS) {
@@ -4196,7 +4215,14 @@ if (section('children-bank-game')) {
       // The window is an interval of the GAME's own clock, never a frame count:
       // a headless frame buys wildly different amounts of game per machine, and
       // this one has to span a run, the regroup walk and the next run.
-      const LANE_WINDOW_S = 45
+      //
+      // 120 SECONDS OF IT, which is the length at which the crossing below stops
+      // being a coin toss. Measured in the fast-layer replay over the seven river
+      // layouts, opening on a cycle's first run as this wait now does: of 75
+      // windows NONE was without a crossing at 120 s, against one at 90 s and six
+      // of 84 at the 45 s this used to take. The cost is spectator time only —
+      // the round is the shipped one and every check below reads the longer trace.
+      const LANE_WINDOW_S = 120
       // What counts as "went nowhere" over that window. A child that walked less
       // than half a metre in forty-five seconds of play did not walk; anything
       // above it is a slow child, which is a different complaint and not this
@@ -4221,7 +4247,10 @@ if (section('children-bank-game')) {
       const first = await page.evaluate(() => window.__placeTag().clock)
       const lane = []
       let laneClock = first
-      for (let i = 0; i < 4000 && laneClock - first < LANE_WINDOW_S; i++) {
+      // The iteration cap is a runaway backstop, not the window: two frames per
+      // sample at 60 fps is some 30 samples per played second, so 120 s of window
+      // asks for about 3 600 of them and the cap has to sit well clear of that.
+      for (let i = 0; i < 12000 && laneClock - first < LANE_WINDOW_S; i++) {
         const s = await page.evaluate(() => {
           const t = window.__placeTag()
           const p = window.__placePlayer
@@ -4414,7 +4443,9 @@ if (section('children-bank-game')) {
   // left outside the settlement — every section after this one would otherwise be
   // reading a village this one staged.
   await page.evaluate((was) => {
-    window.__balance.villageLife.bankGame.roamSeconds = was
+    const b = window.__balance.villageLife.bankGame
+    b.roamSeconds = was.roamSeconds
+    b.roamGuardSeconds = was.roamGuardSeconds
   }, shippedRoam)
   await page.evaluate(() => window.__game.getState().leavePlace())
   await page.waitForFunction(() => !window.__game.getState().placeId, null, { timeout: 30000 })
