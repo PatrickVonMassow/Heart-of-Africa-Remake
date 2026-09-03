@@ -63,7 +63,7 @@ import { setSkyOvercast, skyOvercast } from '../../render/skyOvercast'
 import { PORT_SKY, VILLAGE_SKY } from '../../render/skyPresets'
 import { createGroundMaterial, createNoisyMaterial, createSurfaceMaterial } from '../../render/materials'
 import { TESSELLATION } from '../../render/figures'
-import { buildAcacia, buildBush, buildErraticBoulder, buildGrassTuft, buildJungleTree, buildPalm, buildRock } from '../../render/flora'
+import { buildAcacia, buildBush, buildGrassTuft, buildJungleTree, buildPalm, buildPlayRock, buildRock } from '../../render/flora'
 import { buildTableMountain, buildGizaPyramids, buildGizaSiteMonuments } from '../../render/landmarks'
 import { GIZA_AMBIENT, GIZA_PYRAMIDS, type GizaAmbientRole } from './gizaSite'
 import {
@@ -1218,26 +1218,24 @@ function GroundScatter({
  * The two PLAY ROCKS of the children's bank game (work-order 687): the run-to
  * targets at the upstream and downstream ends of their stretch.
  *
- * Each is an UPRIGHT ERRATIC (work-order 688) — the same block
- * `world/communicationRock.ts` stands a day upstream, drawn at settlement scale.
- * That is the whole point of the shape: ROCK is learnt HERE and has to be
- * applied THERE, so the two must be the same KIND of thing at two sizes rather
- * than a squatting boulder in the village and a standing one outside it. The
- * village's single teaching stone, which used to carry the word from the middle
- * of the square, is gone with the errands that pointed at it.
+ * These are higher-detail variants of the scattered weathered rock: enough
+ * triangles and seeded surface variation to survive their much larger scale,
+ * with a broad flat base instead of an upright block balanced on a tip. The
+ * cheap detail-0 geometry remains on the many small dressing stones.
  *
  * Positions and radius are the layout's, so the drawn block and its collider are
  * one object (points 129/378).
  */
 function PlayRocks({ rocks }: { rocks: PlaceLayout['playRocks'] }) {
-  const geo = useMemo(() => buildErraticBoulder(), [])
+  const geos = useMemo(() => [buildPlayRock(0x504c4159), buildPlayRock(0x524f434b)], [])
   if (!rocks) return null
   return (
     <>
+      {/* Yaw varies the silhouette while preserving the mesh's broad base. */}
       {[rocks.upstream, rocks.downstream].map((p, i) => (
         <mesh
           key={i}
-          geometry={geo}
+          geometry={geos[i]}
           position={[p.x, 0, p.z]}
           rotation={[0, p.x * 1.7 + p.z, 0]}
           scale={rocks.scale}

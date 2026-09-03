@@ -165,12 +165,9 @@ export interface PlaceLayout {
 export const PLAY_ROCK_RADIUS = 1.2
 
 /**
- * The instance scale that gives `buildErraticBoulder` that footprint. The block
- * is the UPRIGHT erratic of `world/communicationRock.ts` (work-order 688), not
- * the squatting dressing boulder: the word ROCK has to transfer from these two
- * to the block the chief's message sends the player to, so the two must be the
- * same KIND of thing at two sizes. At this scale the play rock stands ~4.3 m —
- * a head-and-shoulders landmark on the bank, well under the goal boulder.
+ * The instance scale that gives `buildPlayRock` that footprint. Its detail-1
+ * mesh uses the same native footprint as the upstream erratic but lies on a
+ * broad base; the collider remains derived from the drawn radius.
  */
 export const PLAY_ROCK_SCALE = PLAY_ROCK_RADIUS / ROCK_FOOTPRINT_UNITS
 

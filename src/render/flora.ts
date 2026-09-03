@@ -5,6 +5,7 @@
 
 import * as THREE from 'three/webgpu'
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js'
+import { ROCK_FOOTPRINT_UNITS } from '../world/communicationRock'
 import { mulberry32 } from '../world/noise'
 
 /** Paint a geometry with a base color plus deterministic per-vertex jitter. */
@@ -304,6 +305,69 @@ export function buildRock(): THREE.BufferGeometry {
   r.translate(0, 0.24, 0)
   tint(r, '#8a8178', 0.12, 71)
   return merge([r]) // through merge so it carries the (zero) foliage attribute
+}
+
+/** Native height of the settlement-scale play-rock mesh. Its instance scale is
+ *  still derived from its footprint, so renderer and collider stay coupled. */
+export const PLAY_ROCK_HEIGHT_UNITS = 1.05
+
+/**
+ * One of the two large rocks used by the children's bank game. The scattered
+ * dressing keeps `buildRock`'s cheap detail-0 mesh; only these two conspicuous
+ * instances pay for detail 1 and deterministic vertex weathering.
+ *
+ * The bottom band is flattened after weathering and the mesh is left upright.
+ * Its instance may yaw around that base, but never rolls onto an arbitrary
+ * dodecahedron vertex — the failure that made the large stones look balanced.
+ */
+export function buildPlayRock(seed: number): THREE.BufferGeometry {
+  const rock = new THREE.DodecahedronGeometry(0.5, 1)
+  const position = rock.getAttribute('position') as THREE.BufferAttribute
+  const rand = mulberry32(seed >>> 0)
+  const weathering = new Map<string, number>()
+  let maxRadius = 0
+
+  // PolyhedronGeometry repeats positions at face seams. Keying the seeded noise
+  // by coordinate gives every copy the same displacement, so weathering cannot
+  // tear a seam open.
+  for (let i = 0; i < position.count; i++) {
+    const x = position.getX(i)
+    const y = position.getY(i)
+    const z = position.getZ(i)
+    const key = `${x.toFixed(6)},${y.toFixed(6)},${z.toFixed(6)}`
+    let factor = weathering.get(key)
+    if (factor === undefined) {
+      factor = 0.9 + rand() * 0.2
+      weathering.set(key, factor)
+    }
+    position.setXYZ(i, x * factor, y * factor, z * factor)
+    maxRadius = Math.max(maxRadius, Math.hypot(x * factor, z * factor))
+  }
+
+  const footprintScale = ROCK_FOOTPRINT_UNITS / Math.max(Number.EPSILON, maxRadius)
+  let minY = Infinity
+  let maxY = -Infinity
+  for (let i = 0; i < position.count; i++) {
+    position.setXYZ(
+      i,
+      position.getX(i) * footprintScale,
+      position.getY(i),
+      position.getZ(i) * footprintScale,
+    )
+    minY = Math.min(minY, position.getY(i))
+    maxY = Math.max(maxY, position.getY(i))
+  }
+
+  const spanY = Math.max(Number.EPSILON, maxY - minY)
+  const baseBand = PLAY_ROCK_HEIGHT_UNITS * 0.2
+  for (let i = 0; i < position.count; i++) {
+    const y = ((position.getY(i) - minY) / spanY) * PLAY_ROCK_HEIGHT_UNITS
+    position.setY(i, y <= baseBand ? 0 : y)
+  }
+  position.needsUpdate = true
+  rock.computeVertexNormals()
+  tint(rock, '#8a8178', 0.1, seed ^ 0x504c4159)
+  return merge([rock])
 }
 
 /**

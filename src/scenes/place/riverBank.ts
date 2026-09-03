@@ -123,10 +123,8 @@ export const BANK_DRESSING_CLEARANCE = 0.9
 // BOTH ROCKS IN ONE FRAME. At the reference viewport of the verification
 // (1440x900) and the default field of view (50 deg vertical, App.tsx), a
 // spectator at the start line sees the near rock beside him and the far one
-// 19.7 m down the bank: the far rock is 2.4 m across and stands 4.3 m tall
-// (work-order 688 made it an UPRIGHT erratic instead of the squatting boulder
-// the stage was first built with), which is 12.4 deg of the 50 deg frame — some
-// 220 px of the 900, a landmark rather than a speck. The horizontal frame is
+// 19.7 m down the bank: the far rock is 2.4 m across and its detailed, lying
+// silhouette remains large enough to identify. The horizontal frame is
 // 2*atan(tan(25 deg)*1.6) = 73.4 deg, so the whole stretch fits with either rock
 // a good 20 deg inside the edge for a spectator standing back from the line.
 // `riverBank.test.ts` computes both angles rather than restating them.
