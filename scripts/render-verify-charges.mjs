@@ -74,6 +74,24 @@ export const RED_CHARGES = [
       + 'charge dies with that point.',
   },
   {
+    point: 939,
+    suite: 'polish',
+    backend: 'webgpu',
+    featureLevel: 'compatibility',
+    kind: 'console',
+    // ANCHORED AT THE STORED IDENTITY like the startup entry of the same
+    // point: the identical Vite optimizer transient reached the polish lane on
+    // 03.09.2026, and the startup-scoped entry rightly did not cover it.
+    match: /^console error: Failed to load resource: the server responded with a status of 504 \(Outdated Optimize Dep\)/i,
+    why:
+      'MEASURED 03.09.2026, TWICE IN ONE NIGHT on webgpu/polish (00:19:58Z red, 00:46:15Z retry '
+      + 'clean): a cold or invalidated Vite optimize-dep cache re-bundles while the suite pages '
+      + 'are already open, and an open page then requests the outdated chunk — 203 of 203 picture '
+      + 'checks were green on both runs, so the verdict tracked cache temperature rather than the '
+      + 'code under test. The same environment transient point 939 was opened for on the startup '
+      + 'lane, charged here for the lane this evidence measured; the charge dies with that point.',
+  },
+  {
     point: 733,
     suite: 'startup',
     backend: 'webgpu',
