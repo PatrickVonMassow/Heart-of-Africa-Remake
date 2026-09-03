@@ -6,16 +6,15 @@
 // calls RIVER, points at the water and the whole group runs to the bank — and
 // that caller is the first catcher. Between two rocks, one upstream and one
 // downstream, they then play run after run: the direction is announced before
-// each one, whoever reaches the far rock calls ROCK, whoever is caught drops out
-// where he stands, and the sides swap every run so the announced direction
-// alternates by construction. When no free runner is left the group breaks up,
-// walks off along the bank — announced with the OPPOSITE word, from wherever it
-// happens to stand and with no rock as its target — and roams again.
+// each one, the catcher taps ROCK while everybody holds, whoever reaches the far
+// rock calls ROCK, whoever is caught drops out where he stands, and the sides
+// swap every run so the announced direction alternates by construction. When no
+// free runner is left the caught children remain down long enough for the result
+// to read, then everybody walks back toward the roaming quarter.
 //
 // EVERY UTTERANCE FALLS AT A FIXED POINT OF THE ROUND. There is no situation
 // catalogue and no scheduler: the opening call, the direction announcement, the
-// catcher's tap, the arrival and the parting call are moments of the game
-// itself, and not one of them takes a child out of it or slows it down. That is
+// catcher's tap and the arrival are moments of the game itself. That is
 // the whole difference to what point 686 removed — the old catalogue forced
 // eleven concepts onto a chase that could not carry them, and the player read
 // nothing out of it.
@@ -26,11 +25,8 @@
 //    TAPS his own rock and names it at the start of a run, with nobody arriving,
 //    and during the roaming phase a child climbs an ORDINARY scattered boulder
 //    in the village — no part of the game at all — and names that.
-//  - UPSTREAM/DOWNSTREAM must not be learnable as "to the far rock" or as
-//    left/right. So the parting call detaches both words from the rocks once per
-//    cycle: the group walks off along the bank with no rock as its target.
-//  - And the world corroborates: the river visibly flows, so the pair correlates
-//    with the current for a player who watches the water.
+//  - The river visibly flows, so UPSTREAM/DOWNSTREAM correlate with the current
+//    for a player who watches the water.
 //
 // THE WALKING IS THE TAG GAME'S. `moveChild`, `trackProgress` and `ageEdge` come
 // from `tagGame.ts` — the same deflection, the same one-side commitment round an
@@ -74,12 +70,11 @@ export type BankPhase = 'roam' | 'gather' | 'run' | 'regroup' | 'part'
 export type BankRole = 'runner' | 'catcher' | 'out'
 
 /** The fixed point of the round an utterance falls at. */
-export type BankMoment = 'call' | 'boulder' | 'announce' | 'tap' | 'arrival' | 'parting'
+export type BankMoment = 'call' | 'boulder' | 'announce' | 'tap' | 'arrival'
 
-/** What the utterance was aimed at. The reading guards rest on it: a direction
- *  word must fall at least once with NO rock as its target, and ROCK once with
- *  nobody arriving and once outside the game altogether. */
-export type BankAim = 'water' | 'rock' | 'bank' | 'boulder'
+/** What the utterance was aimed at. ROCK falls once with nobody arriving and
+ *  once outside the game altogether. */
+export type BankAim = 'water' | 'rock' | 'boulder'
 
 /** One utterance of the round, ready to be spoken through the §13.4 hearing
  *  curve exactly as any other village speech is. */
@@ -99,7 +94,8 @@ export interface BankChild extends TagChild {
   /** Touched the far rock in the current run — safe, and out of the catchers'
    *  reach until the next one. */
   arrived: boolean
-  /** Tagged: crouched where it stood, arms folded, until the run ends. */
+  /** Tagged: crouched where it stood, arms folded, through the readable ending
+   *  when this is the cycle's last run. */
   crouched: boolean
   /**
    * THE HEADING IT IS ROAMING ON — not a point it is walking to. A fixed goal is
@@ -140,6 +136,9 @@ export interface BankChild extends TagChild {
    *  swept a bunched group and tagged all of it, and no run ever ended in an
    *  arrival. */
   quarry: number
+  /** This catcher has already made its one tag in the current run. It holds at
+   *  that result instead of sweeping immediately through the remaining line. */
+  madeTag: boolean
   /**
    * THE WAY ROUND THE VILLAGE, for the one walk of the round that is long: the
    * call takes the group from its own quarter down to the bank, and in a
@@ -201,10 +200,14 @@ export interface BankRoundConfig {
   /** Backstop on one run: whoever has not arrived by then counts as safe, so a
    *  child held up on the way can never freeze the cycle. */
   runSeconds: number
+  /** How long everybody holds at the stations while the catcher taps ROCK. */
+  tapPauseSeconds: number
   /** Backstop on the walk between two runs. */
   regroupSeconds: number
-  /** How long the group walks off along the bank before it roams again. */
+  /** How long the group walks toward its roaming quarter before roaming again. */
   partSeconds: number
+  /** How long the caught children remain crouched after the cycle's last run. */
+  endPauseSeconds: number
   /** How near a rock's CENTRE counts as touching it. It must clear the rock's
    *  own collider plus a child's footprint, or nobody could ever arrive. */
   reachDistance: number
@@ -317,6 +320,12 @@ export interface BankState {
    *  hearing gap is omitted, never carried into a later moment. */
   pending: BankUtterance[]
   sinceSaid: number
+  /** Seconds left of the visible tap hold at the start of a run. */
+  tapFor: number
+  /** Seconds left before the caught children rise at the end of a cycle. */
+  endFor: number
+  /** The first arrival of this run has reached the speech output. */
+  arrivalSpoken: boolean
   /** The point-589 long-run watch on the round's own SPEECH. It moved here with
    *  the words: the alarm used to sit on the situation catalogue the five-word
    *  rebuild deleted, and was left watching a producer that could no longer
@@ -402,6 +411,7 @@ export function createBankGame(
       settled: false,
       lane: 0,
       quarry: -1,
+      madeTag: false,
       path: null,
       pathTo: null,
       replan: 0,
@@ -431,6 +441,9 @@ export function createBankGame(
     playing: true,
     pending: [],
     sinceSaid: Infinity,
+    tapFor: 0,
+    endFor: 0,
+    arrivalSpoken: false,
     speech: createProducerWatch(),
   }
 }
@@ -469,23 +482,6 @@ export function stationAt(
     x: here.x + ax * out - az * across * cfg.stationSpacing,
     z: here.z + az * out + ax * across * cfg.stationSpacing,
   }
-}
-
-/** A point far down the bank in the direction `word` names, used as the aim of
- *  an announcement. Deliberately BEYOND the stretch: the parting call must have
- *  no rock as its target. */
-function bankwardAim(
-  stage: BankStage,
-  word: BankConcept,
-  from: { x: number; z: number },
-): { x: number; y: number; z: number } {
-  const to = word === 'UPSTREAM' ? stage.upstream : stage.downstream
-  const away = word === 'UPSTREAM' ? stage.downstream : stage.upstream
-  const dx = to.x - away.x
-  const dz = to.z - away.z
-  const len = Math.hypot(dx, dz) || 1
-  const reach = len * 2
-  return { x: from.x + (dx / len) * reach, y: 0.6, z: from.z + (dz / len) * reach }
 }
 
 /** Offer one utterance in this step. Nothing here touches a pace or a heading:
@@ -566,18 +562,20 @@ function openCycle(s: BankState, stage: BankStage, cfg: BankConfig): void {
 /** Announces the direction while both sides are still at their stations. The
  *  run itself waits one hearing gap, so its tap is a distinct audible moment. */
 function announceRun(s: BankState, stage: BankStage): void {
-  const direction = wordToward(otherEnd(s.from))
+  const to = otherEnd(s.from)
+  const direction = wordToward(to)
   const line = runners(s)
   const announcer = line.length > 0 ? nearestOf(s, line, rockAt(stage, s.from)) : -1
   if (announcer < 0) return
+  const rock = rockAt(stage, to)
   s.direction = direction
   say(s, {
     concept: direction,
     moment: 'announce',
     speaker: announcer,
     gesture: 'point',
-    aim: bankwardAim(stage, direction, s.children[announcer]),
-    at: 'bank',
+    aim: { x: rock.x, y: 0.6, z: rock.z },
+    at: 'rock',
   })
 }
 
@@ -587,6 +585,8 @@ function openRun(s: BankState, stage: BankStage, cfg: BankConfig): void {
   const to = otherEnd(s.from)
   s.phase = 'run'
   s.phaseFor = cfg.runSeconds
+  s.tapFor = cfg.tapPauseSeconds
+  s.arrivalSpoken = false
   // The stations are behind them: no run, roam or parting walk follows a route.
   for (const c of s.children) clearPath(c)
   s.runsThisCycle++
@@ -603,7 +603,10 @@ function openRun(s: BankState, stage: BankStage, cfg: BankConfig): void {
   line.forEach((idx, k) => {
     s.children[idx].lane = (k - (line.length - 1) / 2) * cfg.laneSpacing
   })
-  for (const idx of catchers(s)) s.children[idx].quarry = -1
+  for (const idx of catchers(s)) {
+    s.children[idx].quarry = -1
+    s.children[idx].madeTag = false
+  }
   // THE TAP (spec item 4). The catcher names the rock he is STANDING at, at the
   // start of the run, with nobody arriving anywhere — so ROCK cannot be read as
   // "made it".
@@ -624,12 +627,9 @@ function openRun(s: BankState, stage: BankStage, cfg: BankConfig): void {
 
 /** Ends the run: the sides swap — the survivors start where they arrived — and
  *  the children caught in it join the catchers for the next one. */
-function endRun(s: BankState, stage: BankStage, cfg: BankConfig): void {
+function endRun(s: BankState, cfg: BankConfig): void {
+  const cycleEnded = runners(s).length === 0 || s.runsThisCycle >= s.children.length
   for (const c of s.children) {
-    if (c.role === 'out') {
-      c.role = 'catcher'
-      c.crouched = false
-    }
     c.arrived = false
     c.settled = false
   }
@@ -639,33 +639,17 @@ function endRun(s: BankState, stage: BankStage, cfg: BankConfig): void {
   // explicit backstop for the equally valid sequence in which every runner
   // reaches the rock untouched: without it the same sides swap forever and the
   // game never returns to the roaming ROCK guard or the next RIVER call.
-  if (runners(s).length === 0 || s.runsThisCycle >= s.children.length) {
+  if (cycleEnded) {
     s.phase = 'part'
     s.phaseFor = cfg.partSeconds
+    s.endFor = cfg.endPauseSeconds
     s.cycles++
-    // THE PARTING CALL (spec item 4): the group walks off ALONG the bank and one
-    // child announces that walk with the OPPOSITE word, from wherever it happens
-    // to stand and with no rock as its target. That is what keeps the two
-    // direction words from being learnable as "to the far rock". `s.from` has
-    // already swapped to the end the last run ARRIVED at, so the word for
-    // walking back down the bank is the one for the far end of that swap.
-    const word = wordToward(otherEnd(s.from))
-    const speaker = nearestOf(
-      s,
-      s.children.map((_, i) => i),
-      rockAt(stage, s.from),
-    )
-    if (speaker >= 0) {
-      say(s, {
-        concept: word,
-        moment: 'parting',
-        speaker,
-        gesture: 'point',
-        aim: bankwardAim(stage, word, s.children[speaker]),
-        at: 'bank',
-      })
-    }
     return
+  }
+  for (const c of s.children) {
+    if (c.role !== 'out') continue
+    c.role = 'catcher'
+    c.crouched = false
   }
   s.phase = 'regroup'
   s.phaseFor = cfg.regroupSeconds
@@ -678,6 +662,8 @@ function openRoam(s: BankState, cfg: BankConfig, rand: () => number): void {
   s.phaseFor = cfg.roamSeconds * (1 + (rand() * 2 - 1) * cfg.roamSpread)
   for (const c of s.children) clearPath(c)
   s.direction = null
+  s.tapFor = 0
+  s.endFor = 0
   s.caller = -1
   s.namedBoulder = false
   s.abandonedBoulder = false
@@ -757,7 +743,11 @@ function advanceBankGame(
   // that had just been stepped by the phase BEFORE it — so the announcement of a
   // run was recorded against children still standing at their stations, and
   // "no utterance slows a playing child" read as a slowed child.
-  s.phaseFor -= dt
+  const holdsTapThisStep = s.phase === 'run' && s.tapFor > 0
+  const holdsEndThisStep = s.phase === 'part' && s.endFor > 0
+  if (holdsTapThisStep) s.tapFor = Math.max(0, s.tapFor - dt)
+  else if (holdsEndThisStep) s.endFor = Math.max(0, s.endFor - dt)
+  else s.phaseFor -= dt
   // The off-game ROCK guard is part of every roaming phase, not an optional
   // attempt. The river call waits until the boulder has actually been climbed
   // and named, unless the approach itself has gone a full calibrated interval
@@ -810,12 +800,13 @@ function advanceBankGame(
       stepStations(s, dt, cfg, stage, world, s.from, otherEnd(s.from))
       break
     case 'run':
-      // The opening frame belongs to the tap: nobody has started toward the far
-      // rock yet, so the returned ROCK cannot be read as an arrival.
-      if (!openedRun) stepRun(s, dt, cfg, stage, world)
+      // The tap owns a visible held-standing interval, including its opening
+      // frame. Only after it expires does either side charge.
+      if (openedRun || holdsTapThisStep) stepHeld(s, dt, cfg, world)
+      else stepRun(s, dt, cfg, stage, world)
       break
     case 'part':
-      stepPart(s, dt, cfg, stage, world)
+      stepPart(s, dt, cfg, stage, world, holdsEndThisStep)
       break
   }
   assertPlaced(s, world)
@@ -826,6 +817,18 @@ function advanceBankGame(
  *  Everything else from the step is omitted rather than replayed late. */
 function drain(s: BankState, cfg: BankRoundConfig): BankUtterance | null {
   if (s.pending.length === 0) return null
+  // The first safe child is part of the run's result, not optional chatter. It
+  // wins over the hearing gap so a near-simultaneous earlier moment cannot erase
+  // every audible arrival from the run.
+  if (!s.arrivalSpoken) {
+    const firstArrival = s.pending.find((u) => u.moment === 'arrival')
+    if (firstArrival) {
+      s.arrivalSpoken = true
+      s.sinceSaid = 0
+      s.pending.length = 0
+      return firstArrival
+    }
+  }
   if (s.sinceSaid < cfg.utteranceGapSeconds) {
     s.pending.length = 0
     return null
@@ -1250,9 +1253,16 @@ function dodgedAim(
     const gap = dist(c, k)
     if (gap < cfg.dodgeDistance) {
       // Which side of that line the catcher stands on; the runner leans the
-      // other way, and harder the nearer he is.
+      // other way, and harder the nearer he is. The bend closes again over its
+      // own configured width as the runner reaches the rock: without that
+      // arrival taper a successful dodge aimed beside the collider forever and
+      // turned into a timeout rather than a visible swerve followed by safety.
       const cross = (k.x - c.x) * dz - (k.z - c.z) * dx
-      across += (cross > 0 ? -1 : 1) * cfg.dodgeReach * (1 - gap / cfg.dodgeDistance)
+      const arrivalTaper = Math.max(
+        0,
+        Math.min(1, (len - cfg.reachDistance) / Math.max(1e-6, cfg.dodgeReach)),
+      )
+      across += (cross > 0 ? -1 : 1) * cfg.dodgeReach * (1 - gap / cfg.dodgeDistance) * arrivalTaper
     }
   }
   return { x: farRock.x + px * across, z: farRock.z + pz * across }
@@ -1297,6 +1307,10 @@ function stepRun(
       continue
     }
     if (c.role === 'catcher') {
+      if (c.madeTag) {
+        drive(s, i, null, false, dt, cfg, world)
+        continue
+      }
       c.quarry = chooseQuarry(s, i, cfg)
       const target = c.quarry
       drive(s, i, target >= 0 ? s.children[target] : farRock, target >= 0, dt, cfg, world)
@@ -1345,29 +1359,47 @@ function stepRun(
       runner.pace = 0
       runner.held = true
       catcher.quarry = -1
+      catcher.madeTag = true
       s.tags++
     }
   }
 
   // A run ENDS when every runner has either touched the far rock or been tagged
   // — and the backstop closes it where a child could not get there at all.
-  if (free(s).length === 0 || s.phaseFor <= 0) endRun(s, stage, cfg)
+  if (free(s).length === 0 || s.phaseFor <= 0) endRun(s, cfg)
 }
 
-/** The group breaks up and walks off ALONG the bank, past the end of the
- *  stretch, with no rock as its target. */
+/** Holds every child in the posture the visible moment requires. These are
+ *  commanded standing frames, so the stall watches read them as held. */
+function stepHeld(s: BankState, dt: number, cfg: BankConfig, world: BankWorld): void {
+  for (let i = 0; i < s.children.length; i++) drive(s, i, null, false, dt, cfg, world)
+}
+
+/** After the caught children have stayed down long enough to read, the group
+ *  rises and walks from wherever each child finished toward its roaming quarter. */
 function stepPart(
   s: BankState,
   dt: number,
   cfg: BankConfig,
   stage: BankStage,
   world: BankWorld,
+  holding: boolean,
 ): void {
-  const word = wordToward(s.from)
+  if (holding) {
+    stepHeld(s, dt, cfg, world)
+    if (s.endFor === 0) {
+      for (const c of s.children) {
+        if (c.role === 'out') c.role = 'catcher'
+        c.crouched = false
+      }
+    }
+    return
+  }
   for (let i = 0; i < s.children.length; i++) {
     const c = s.children[i]
-    const aim = bankwardAim(stage, word, c)
-    drive(s, i, { x: aim.x, z: aim.z }, false, dt, cfg, world)
+    if (c.role === 'out') c.role = 'catcher'
+    c.crouched = false
+    drive(s, i, stage.roam, false, dt, cfg, world)
   }
 }
 
@@ -1383,12 +1415,13 @@ function assertRoundSound(s: BankState, cfg: BankConfig): void {
     () => `a run is on with no direction announced (run ${s.runs})`,
   )
   devAssert(
-    s.phase === 'run' || s.children.every((c) => !c.crouched),
+    s.phase === 'run' || (s.phase === 'part' && s.endFor > 0) || s.children.every((c) => !c.crouched),
     'bank-crouched-outside-run',
     () => `${s.children.filter((c) => c.crouched).length} children crouched in phase ${s.phase}`,
   )
   devAssert(
-    s.phaseFor <= Math.max(cfg.roamSeconds * (1 + cfg.roamSpread), cfg.gatherSeconds, cfg.runSeconds, cfg.regroupSeconds, cfg.partSeconds) + 1e-6,
+    s.phaseFor <= Math.max(cfg.roamSeconds * (1 + cfg.roamSpread), cfg.gatherSeconds, cfg.runSeconds, cfg.regroupSeconds, cfg.partSeconds) + 1e-6 &&
+      s.tapFor <= cfg.tapPauseSeconds + 1e-6 && s.endFor <= cfg.endPauseSeconds + 1e-6,
     'bank-phase-overrun',
     () => `phase ${s.phase} has ${s.phaseFor.toFixed(1)}s left, more than its own length`,
   )

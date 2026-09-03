@@ -579,8 +579,10 @@ export interface Strings {
     bankRoamSpread: string
     bankGather: string
     bankRun: string
+    bankTapPause: string
     bankRegroup: string
     bankPart: string
+    bankEndPause: string
     bankReach: string
     bankStandOff: string
     bankSpacing: string

@@ -721,10 +721,14 @@ export interface BalanceConfig {
       gatherSeconds: number
       /** Backstop on one run. */
       runSeconds: number
+      /** Visible held-standing pause while the catcher taps ROCK. */
+      tapPauseSeconds: number
       /** Backstop on the walk between two runs. */
       regroupSeconds: number
-      /** How long the group walks off along the bank before roaming again. */
+      /** How long the group walks toward its roaming quarter before roaming again. */
       partSeconds: number
+      /** How long caught children stay down after the cycle's last run. */
+      endPauseSeconds: number
       /** How near a rock's centre counts as touching it. */
       reachDistance: number
       /** How far off a rock's centre a child's waiting station stands. */
@@ -1220,7 +1224,7 @@ export const balance: BalanceConfig = {
     // pursuit is decided by a runner running out of steam within a quarter of
     // the backstop cap, never by the cap itself.
     tag: {
-      childCount: 4,
+      childCount: 5,
       sprintSpeed: 3.4, // a child at a flat run, a little under an adult's sprint
       // Strictly above 1: a FRESH runner must be faster than a fresh chaser (so
       // a catch is never immediate) while a SPENT one sits at the shared floor
@@ -1288,23 +1292,24 @@ export const balance: BalanceConfig = {
       // slowest walk measured.
       gatherSeconds: 45,
       runSeconds: 20,
+      // One complete atom lasts 1.2 s. The extra beat lets the player connect
+      // the catcher's held indication to ROCK before either side charges.
+      tapPauseSeconds: 1.5,
       regroupSeconds: 14,
       partSeconds: 8,
+      endPauseSeconds: 3,
       // Past the rock's own collider (1.2 m) plus a child's footprint (0.3 m):
       // touching the stone, not standing in it.
       reachDistance: 2.2,
       standOff: 2.6,
       stationSpacing: 1,
-      // The swerve that makes a run a game rather than a sweep: a runner starts
-      // bending its line SEVEN metres out from a catcher and, at the closest,
-      // aims THREE metres to the side of the rock. Wide enough that the dodge is
-      // visible from the far end of the stretch, narrow enough that the runner is
-      // still plainly making for the rock. (The prose said six and six until
-      // 29.08.2026 — the values had been retuned and it had not, so a tuner read
-      // both the trigger distance and the swerve width wrong.)
+      // The swerve that makes a run a game rather than a sweep: it begins while
+      // the catcher is still twelve metres away and reaches 4.5 m at the closest.
+      // The bend is therefore readable before the catch, while its aim remains
+      // inside the twenty-metre stretch rather than turning into an escape.
       laneSpacing: 1.2,
-      dodgeDistance: 7,
-      dodgeReach: 3,
+      dodgeDistance: 12,
+      dodgeReach: 4.5,
       // A quarter turn a second at the most: a wander that reads as wandering
       // rather than as a figure being blown about.
       roamTurn: 1.4,
@@ -1342,7 +1347,8 @@ export const balance: BalanceConfig = {
       // The long-run alarm's window (point 589), which the bank round inherits
       // from the situation catalogue the five-word rebuild deleted. Read off the
       // round's OWN phases: the longest LEGITIMATE quiet spell runs from the
-      // parting call to the next cycle's RIVER call — partSeconds (8) plus a
+      // last arrival to the next cycle's RIVER call — endPauseSeconds (3), the
+      // walk home (8), plus a
       // roaming phase at its widest spread (55 x 1.25 = 68.75) plus the off-game
       // ROCK guard's whole overtime (45), which is ~122 s, and in that stretch a
       // cycle whose boulder proves unreachable says nothing at all. Half again
