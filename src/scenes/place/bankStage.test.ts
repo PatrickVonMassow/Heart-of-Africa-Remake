@@ -13,7 +13,7 @@ import { standingClear, WALKER_RADIUS, spawnPointFree } from './collision'
 import { buildLayout, PLAY_ROCK_SCALE } from './layout'
 import { BANK_PLAY_LANE_HALF, bankPlayRocksView, inBankPlayLane, standsOnGroundPlate } from './riverBank'
 import { PLACES } from '../../world/geo'
-import { ROCK_HEIGHT_UNITS } from '../../world/communicationRock'
+import { PLAY_ROCK_HEIGHT_UNITS } from '../../render/flora'
 
 /** The camera the player looks through: App.tsx's own field of view, and the
  *  viewport the verification scripts run at. */
@@ -23,10 +23,9 @@ const VIEWPORT = { width: 1440, height: 900 }
 /** The three river villages are the settlements that carry a bank at all. */
 const RIVER_VILLAGES = ['nubian-village', 'bambara-village', 'mandinka-village']
 
-/** Height of a play rock: the erratic block of `world/communicationRock.ts`
- *  drawn at settlement scale (work-order 688), so it stands well over a man and
- *  is unmistakable for the dressing at either end of the stretch. */
-const ROCK_HEIGHT = ROCK_HEIGHT_UNITS * PLAY_ROCK_SCALE
+/** Height of the detailed play-rock mesh after the layout applies the same
+ *  scale that couples its drawn footprint to its collider. */
+const ROCK_HEIGHT = PLAY_ROCK_HEIGHT_UNITS * PLAY_ROCK_SCALE
 
 describe('the children`s play stage on the bank (point 687)', () => {
   it('gives exactly the river villages two play rocks, and no other settlement any', () => {
@@ -83,8 +82,8 @@ describe('the children`s play stage on the bank (point 687)', () => {
       expect(stretch).toBeLessThan(22)
       // A runner at the start line looks down the lane at the far rock: it must
       // be a rock rather than a speck. Its height over the stretch, against the
-      // vertical frame — some 12.4 deg of 50, about 220 px of the 900 now that
-      // it stands upright (work-order 688).
+      // vertical frame. The rock now lies on a broad base, so this measures the
+      // shorter mesh the scene really draws rather than its former upright block.
       const subtended = 2 * Math.atan(ROCK_HEIGHT / 2 / stretch)
       expect((subtended / (2 * halfV)) * VIEWPORT.height).toBeGreaterThan(40)
       // AND BOTH ARE IN THE FRAME AT ONCE, from the stand the picture is taken

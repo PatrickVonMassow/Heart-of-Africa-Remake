@@ -8,11 +8,13 @@ import {
   buildKopje,
   buildPalm,
   buildPapyrus,
+  buildPlayRock,
   buildRock,
   buildErraticBoulder,
   buildTermiteMound,
   buildBaobab,
   splitFoliage,
+  PLAY_ROCK_HEIGHT_UNITS,
 } from './flora'
 import type * as THREE from 'three/webgpu'
 import { FLORA_COLOR_LIFT, seasonTintCpu } from './seasonTint'
@@ -46,6 +48,7 @@ describe('the baked foliage attribute (point 144 — per part, binary, never col
       buildAcacia, buildJungleTree, () => buildPalm(false), () => buildPalm(true),
       buildBush, buildRock, buildBaobab, buildTermiteMound, buildDeadTree,
       buildPapyrus, buildKopje, buildGrassTuft, buildErraticBoulder,
+      () => buildPlayRock(1),
     ]) {
       foliageOf(build())
     }
@@ -69,9 +72,61 @@ describe('the baked foliage attribute (point 144 — per part, binary, never col
       const g = foliageOf(build())
       expect(g.twos).toBe(g.total)
     }
-    for (const build of [buildRock, buildTermiteMound, buildDeadTree, buildKopje, buildErraticBoulder]) {
+    for (const build of [
+      buildRock,
+      buildTermiteMound,
+      buildDeadTree,
+      buildKopje,
+      buildErraticBoulder,
+      () => buildPlayRock(1),
+    ]) {
       const g = foliageOf(build())
       expect(g.ones + g.twos).toBe(0) // dead wood and stone never collapse
+    }
+  })
+})
+
+describe('the children`s large play rocks', () => {
+  const extents = (geo: THREE.BufferGeometry) => {
+    const pos = geo.getAttribute('position') as THREE.BufferAttribute
+    let maxR = 0
+    let minY = Infinity
+    let maxY = -Infinity
+    const base: Array<{ x: number; z: number }> = []
+    for (let i = 0; i < pos.count; i++) {
+      const x = pos.getX(i)
+      const y = pos.getY(i)
+      const z = pos.getZ(i)
+      maxR = Math.max(maxR, Math.hypot(x, z))
+      minY = Math.min(minY, y)
+      maxY = Math.max(maxY, y)
+      if (Math.abs(y) < 1e-7) base.push({ x, z })
+    }
+    return { count: pos.count, maxR, minY, maxY, base }
+  }
+
+  it('uses the detailed mesh only for the large instances and remains seeded', () => {
+    const cheap = buildRock()
+    const a = buildPlayRock(0x504c4159)
+    const again = buildPlayRock(0x504c4159)
+    const other = buildPlayRock(0x524f434b)
+    expect(a.getAttribute('position').count).toBeGreaterThan(cheap.getAttribute('position').count)
+    expect(a.getAttribute('position').array).toEqual(again.getAttribute('position').array)
+    expect(a.getAttribute('color').array).toEqual(again.getAttribute('color').array)
+    expect(a.getAttribute('position').array).not.toEqual(other.getAttribute('position').array)
+  })
+
+  it('fills its declared footprint and rests level on a broad base', () => {
+    for (const seed of [0x504c4159, 0x524f434b, 516331552]) {
+      const { maxR, minY, maxY, base } = extents(buildPlayRock(seed))
+      expect(maxR).toBeCloseTo(ROCK_FOOTPRINT_UNITS, 6)
+      expect(minY).toBeCloseTo(0, 7)
+      expect(maxY).toBeCloseTo(PLAY_ROCK_HEIGHT_UNITS, 6)
+      expect(base.length).toBeGreaterThan(6)
+      const spanX = Math.max(...base.map((p) => p.x)) - Math.min(...base.map((p) => p.x))
+      const spanZ = Math.max(...base.map((p) => p.z)) - Math.min(...base.map((p) => p.z))
+      expect(spanX).toBeGreaterThan(ROCK_FOOTPRINT_UNITS)
+      expect(spanZ).toBeGreaterThan(ROCK_FOOTPRINT_UNITS)
     }
   })
 })

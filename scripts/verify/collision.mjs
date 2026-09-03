@@ -546,11 +546,12 @@ if (section('village')) {
 }
 
 // === The PoC village's play rocks (work-order 687/688) =======================
-// The word for a rock is learnt at the TWO blocks on the bank now — the village's
+// The word for a rock is learnt at the TWO large rocks on the bank now — the village's
 // lone teaching stone went with the errands that pointed at it (work-order 688).
-// They have to BE there: solids the player walks up to and not through, standing
-// where the layout says, and in the picture, which is the only place their
-// "unmistakable for the dressing" claim can be judged.
+// They have to BE there: solids the player walks up to and not through, resting
+// where the layout says. The backend-sensitive pictures are also where the
+// detailed surfaces and broad level bases can actually be judged; neither may
+// read as an egg balanced on a vertex.
 if (section('drawn-colliders')) {
   await enterSettlement('bambara-village')
   // === Nothing blocks where nothing is drawn (work-order 583) ===================
@@ -644,11 +645,11 @@ if (section('play-rocks')) {
       // caption.
       await shot('54-collision-play-rocks', {
         local: { x: rocks.upstream.x, z: rocks.upstream.z },
-        label: 'the upstream play rock, from the stand that shows the whole stage',
+        label: 'the detailed upstream play rock resting on its broad base, from the stand that shows the whole stage',
       })
       await shot('54b-collision-play-rocks-far', {
         local: { x: rocks.downstream.x, z: rocks.downstream.z },
-        label: 'the downstream play rock, from the same stand',
+        label: 'the detailed downstream play rock resting on its broad base, from the same stand',
       })
     }
   }

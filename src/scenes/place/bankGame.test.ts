@@ -3,9 +3,9 @@
 // The spec's own test list, one case each: the phases alternate, the caller
 // becomes the first catcher, the direction alternates with the side swap, ROCK
 // falls once with nobody arriving and once outside the game altogether, a
-// direction word falls once with no rock as its target, the run and the cycle
-// end exactly as item 3 says, no utterance reduces a playing child's pace, and a
-// tagged child holds its posture and moves only between runs.
+// the first arrival is audible, the run and the cycle end exactly as specified,
+// no utterance reduces a moving child's pace, and a tagged child holds its
+// posture through the readable ending before walking home.
 //
 // The stage here is a bare one — two rocks 20 m apart on open ground, which is
 // the shipped stretch measured in `bankStage.test.ts` — so what these cases pin
@@ -84,7 +84,7 @@ function replay(
   options: { seed?: number; count?: number; world?: BankWorld; cfg?: BankConfig } = {},
 ): { s: BankState; log: Log } {
   const cfg = options.cfg ?? CFG
-  const count = options.count ?? 4
+  const count = options.count ?? balance.villageLife.tag.childCount
   const rand = mulberry32(options.seed ?? 7)
   const spots = Array.from({ length: count }, (_, i) => ({
     x: STAGE.roam.x + Math.cos((i / count) * Math.PI * 2) * 2.4,
@@ -140,6 +140,10 @@ function replayAll(
 }
 
 describe('the children`s game at the bank (point 687)', () => {
+  it('brings five children to the village round', () => {
+    expect(balance.villageLife.tag.childCount).toBe(5)
+  })
+
   it('runs the cycle in order: roam, gather, runs with their swaps, parting, roam again', () => {
     const { s, log } = replay(400)
     expect(s.cycles).toBeGreaterThan(0)
@@ -368,7 +372,7 @@ describe('the children`s game at the bank (point 687)', () => {
     expect(s.abandonedBoulder).toBe(false)
   })
 
-  it('emits the catcher`s tap on the exact frame the run opens', () => {
+  it('holds everybody at the rocks while the catcher`s tap is seen', () => {
     const cfg: BankConfig = { ...CFG, roamSeconds: 0.1, roamSpread: 0, utteranceGapSeconds: 5 }
     const rand = mulberry32(31)
     const spots = Array.from({ length: 4 }, (_, i) => ({
@@ -388,34 +392,106 @@ describe('the children`s game at the bank (point 687)', () => {
     expect(s.phase).toBe('run')
     expect(s.phaseFor).toBe(cfg.runSeconds)
     expect(s.children.every((c) => !c.arrived)).toBe(true)
+    const atTap = s.children.map((c) => ({ x: c.x, z: c.z }))
+    let heldFor = 0
+    while (s.tapFor > 0) {
+      stepBankGame(s, 1 / 60, cfg, STAGE, world, rand)
+      heldFor += 1 / 60
+      s.children.forEach((c, i) => {
+        expect(c.x).toBeCloseTo(atTap[i].x, 9)
+        expect(c.z).toBeCloseTo(atTap[i].z, 9)
+        expect(c.held).toBe(true)
+        expect(c.pace).toBe(0)
+      })
+    }
+    expect(heldFor).toBeGreaterThanOrEqual(cfg.tapPauseSeconds)
+    expect(s.phaseFor).toBe(cfg.runSeconds)
   })
 
-  it('says a direction word once per cycle with no rock as its target', () => {
+  it('drops the parting call and walks from the bank toward the roaming quarter', () => {
     const { log } = replayAll(600)
-    const partings = log.said.filter((u) => u.moment === 'parting')
-    expect(partings.length).toBeGreaterThan(0)
-    const stretch = Math.hypot(
-      STAGE.upstream.x - STAGE.downstream.x,
-      STAGE.upstream.z - STAGE.downstream.z,
-    )
-    for (const p of partings) {
-      expect(p.concept === 'UPSTREAM' || p.concept === 'DOWNSTREAM').toBe(true)
-      expect(p.at).toBe('bank')
-      // Its aim lies down the bank, clear of BOTH rocks by half the stretch —
-      // it is not a rock the child is pointing at.
-      for (const end of ['upstream', 'downstream'] as const) {
-        const r = rockAt(STAGE, end)
-        expect(Math.hypot(p.aim.x - r.x, p.aim.z - r.z)).toBeGreaterThan(stretch / 2)
+    expect(log.said.every((u) => !('moment' in u) || (u.moment as string) !== 'parting')).toBe(true)
+
+    const rand = mulberry32(32)
+    const s = createBankGame([STAGE.downstream, STAGE.upstream], rand, CFG)
+    s.phase = 'run'
+    s.phaseFor = CFG.runSeconds
+    s.direction = 'UPSTREAM'
+    s.runsThisCycle = 1
+    s.children[0].role = 'catcher'
+    s.children[1].role = 'out'
+    s.children[1].crouched = true
+    stepBankGame(s, 1 / 60, CFG, STAGE, openWorld(), rand)
+    expect(s.phase).toBe('part')
+    expect(s.children[1].crouched).toBe(true)
+    const before = s.children.map((c) => Math.hypot(c.x - STAGE.roam.x, c.z - STAGE.roam.z))
+    const ending = s.children.map((c) => ({ x: c.x, z: c.z }))
+    let heldFor = 0
+    while (s.endFor > 0) {
+      stepBankGame(s, 1 / 60, CFG, STAGE, openWorld(), rand)
+      heldFor += 1 / 60
+      if (s.endFor > 0) {
+        expect(s.children[1].crouched).toBe(true)
+        s.children.forEach((c, i) => {
+          expect(c.x).toBeCloseTo(ending[i].x, 9)
+          expect(c.z).toBeCloseTo(ending[i].z, 9)
+          expect(c.held).toBe(true)
+        })
       }
     }
-    // …and it is the OPPOSITE of the run that just ended.
-    for (const run of replayAll(600).runs) {
-      const order = run.log.said.filter((u) => u.moment === 'announce' || u.moment === 'parting')
-      for (let i = 1; i < order.length; i++) {
-        if (order[i].moment !== 'parting') continue
-        expect(order[i].concept).not.toBe(order[i - 1].concept)
-      }
+    expect(heldFor).toBeGreaterThanOrEqual(CFG.endPauseSeconds)
+    expect(s.children[1].crouched).toBe(false)
+    for (let t = 0; t < 1; t += 1 / 60) stepBankGame(s, 1 / 60, CFG, STAGE, openWorld(), rand)
+    s.children.forEach((c, i) => {
+      expect(c.crouched).toBe(false)
+      expect(Math.hypot(c.x - STAGE.roam.x, c.z - STAGE.roam.z)).toBeLessThan(before[i])
+    })
+  })
+
+  it('lets a typical first run tag one or two children and bring the rest home', () => {
+    const rand = mulberry32(7)
+    const spots = [
+      stationAt(STAGE, 'downstream', 0, CFG),
+      ...Array.from({ length: 4 }, (_, i) => stationAt(STAGE, 'upstream', i, CFG)),
+    ]
+    const s = createBankGame(spots, rand, CFG)
+    s.phase = 'run'
+    s.phaseFor = CFG.runSeconds
+    s.from = 'upstream'
+    s.direction = 'DOWNSTREAM'
+    s.runsThisCycle = 1
+    s.children[0].role = 'catcher'
+    for (let i = 1; i < s.children.length; i++) s.children[i].role = 'runner'
+    const arrived = new Set<number>()
+    while (s.phase === 'run') {
+      stepBankGame(s, 1 / 60, CFG, STAGE, openWorld(), rand)
+      s.children.forEach((c, i) => { if (c.arrived) arrived.add(i) })
     }
+    expect(s.tags).toBeGreaterThanOrEqual(1)
+    expect(s.tags).toBeLessThanOrEqual(2)
+    // The last arrival can close the run in its own frame and is reset by
+    // `endRun` before this outside sampler sees it. The surviving roles and the
+    // unspent backstop prove that every untagged runner reached the rock.
+    expect(s.phaseFor).toBeGreaterThan(0)
+    expect(s.children.filter((c) => c.role === 'runner')).toHaveLength(4 - s.tags)
+    expect(arrived.size).toBeGreaterThanOrEqual(4 - s.tags - 1)
+  })
+
+  it('always speaks the first arrival even inside the ordinary utterance gap', () => {
+    const rand = mulberry32(33)
+    const s = createBankGame([STAGE.upstream, STAGE.downstream], rand, CFG)
+    s.phase = 'run'
+    s.phaseFor = CFG.runSeconds
+    s.from = 'upstream'
+    s.direction = 'DOWNSTREAM'
+    s.runsThisCycle = 1
+    s.sinceSaid = 0
+    s.children[0].role = 'catcher'
+    s.children[1].role = 'runner'
+    const arrival = stepBankGame(s, 1 / 60, CFG, STAGE, openWorld(), rand)
+    expect(arrival?.moment).toBe('arrival')
+    expect(arrival?.speaker).toBe(1)
+    expect(s.arrivalSpoken).toBe(true)
   })
 
   it('ends a run when every runner has arrived or been tagged, and the cycle when none is free', () => {
@@ -550,13 +626,13 @@ describe('the children`s game at the bank (point 687)', () => {
           // reading rather than a stall.
           expect(c.pace).toBe(0)
           expect(c.held).toBe(true)
-          expect(s.phase).toBe('run')
+          expect(s.phase === 'run' || (s.phase === 'part' && s.endFor > 0)).toBe(true)
           if (before[i]) {
             crouchedFrames++
             if (moved > 1e-9) movedWhileCrouched++
           }
         }
-        // …and once the run is over, the same child walks to the catchers' side.
+        // …and once the readable ending is over, the same child walks home.
         if (wasOut[i] && !c.crouched && s.phase !== 'run' && c.walked > walkedBefore[i]) {
           walkedAfterOut++
         }

@@ -4082,7 +4082,7 @@ if (section('children-bank-game')) {
         `${r.foot ? `${r.foot.x.toFixed(2)}/${r.foot.y.toFixed(2)}` : 'behind the camera'}, ` +
         `${r.px} px, first surface ${Number.isFinite(r.ratio) ? r.ratio.toFixed(2) : '∞'}×@${r.what}`
       check(
-        'both play rocks stand in the rendered frame from a spectator`s stance at the upstream end (point 687)',
+        'both play rocks rest in the rendered frame from a spectator`s stance at the upstream end (point 687)',
         seen.near.inFrame && seen.far.inFrame,
         `${describeRock('near', seen.near)}; ${describeRock('far', seen.far)} ` +
           `[${seen.viewport.w}x${seen.viewport.h}]`,
@@ -4108,7 +4108,7 @@ if (section('children-bank-game')) {
       await frame('687-bank-play-rocks', {
         local: { x: stood.far.x, y: stood.r * 0.5, z: stood.far.z },
         label:
-          `both play rocks seen from a quarter of the stretch back of the upstream rock and ` +
+          `both detailed play rocks resting on broad bases, seen from a quarter of the stretch back of the upstream rock and ` +
           `an eighth of it aside (stretch ${stood.stretch.toFixed(1)} m)`,
       })
     }
