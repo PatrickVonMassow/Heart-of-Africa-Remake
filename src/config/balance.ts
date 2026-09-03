@@ -753,7 +753,7 @@ export interface BalanceConfig {
       walkPace: number
       /** The EXTRA berth the children give the traveller over a villager. */
       strangerBerth: number
-      /** Constant gap between two utterances of the round. */
+      /** Ordinary gap between two utterances; the first arrival is guaranteed. */
       utteranceGapSeconds: number
       /** Dev-mode alarm (point 589): a round that could speak and has said
        *  nothing for this long raises `bank-speech-silent`. */

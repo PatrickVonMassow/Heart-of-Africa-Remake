@@ -239,8 +239,8 @@ export interface BankRoundConfig {
   /** The EXTRA berth the children give the traveller over a villager — they are
    *  shy of the stranger and visibly swerve rather than brush past him. */
   strangerBerth: number
-  /** Constant gap between two utterances, so two moments falling in the same
-   *  breath are still heard as two. */
+  /** Ordinary gap between two utterances. A run's first arrival is the one
+   *  deliberate exception: that result may not be dropped. */
   utteranceGapSeconds: number
   /** The longest silence tolerated of a round that could speak, before the
    *  dev-mode alarm of point 589 fires. Deliberately NOT `silenceSeconds`: the
@@ -316,8 +316,8 @@ export interface BankState {
    */
   playedClock: number
   playing: boolean
-  /** Utterances born in the current step. A moment that falls inside the
-   *  hearing gap is omitted, never carried into a later moment. */
+  /** Utterances born in the current step. An ordinary moment that falls inside
+   *  the hearing gap is omitted, never carried into a later moment. */
   pending: BankUtterance[]
   sinceSaid: number
   /** Seconds left of the visible tap hold at the start of a run. */
@@ -813,8 +813,8 @@ function advanceBankGame(
   return drain(s, cfg)
 }
 
-/** Speaks at most one utterance born this step, with a constant hearing gap.
- *  Everything else from the step is omitted rather than replayed late. */
+/** Speaks at most one utterance born this step, normally after the configured
+ *  hearing gap. Everything else from the step is omitted rather than replayed late. */
 function drain(s: BankState, cfg: BankRoundConfig): BankUtterance | null {
   if (s.pending.length === 0) return null
   // The first safe child is part of the run's result, not optional chatter. It

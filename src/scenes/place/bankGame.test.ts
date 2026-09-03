@@ -422,10 +422,26 @@ describe('the children`s game at the bank (point 687)', () => {
     s.children[1].role = 'out'
     s.children[1].crouched = true
     stepBankGame(s, 1 / 60, CFG, STAGE, openWorld(), rand)
+    expect(s.phase).toBe('part')
+    expect(s.children[1].crouched).toBe(true)
     const before = s.children.map((c) => Math.hypot(c.x - STAGE.roam.x, c.z - STAGE.roam.z))
-    for (let t = 0; t < CFG.endPauseSeconds + 1; t += 1 / 60) {
+    const ending = s.children.map((c) => ({ x: c.x, z: c.z }))
+    let heldFor = 0
+    while (s.endFor > 0) {
       stepBankGame(s, 1 / 60, CFG, STAGE, openWorld(), rand)
+      heldFor += 1 / 60
+      if (s.endFor > 0) {
+        expect(s.children[1].crouched).toBe(true)
+        s.children.forEach((c, i) => {
+          expect(c.x).toBeCloseTo(ending[i].x, 9)
+          expect(c.z).toBeCloseTo(ending[i].z, 9)
+          expect(c.held).toBe(true)
+        })
+      }
     }
+    expect(heldFor).toBeGreaterThanOrEqual(CFG.endPauseSeconds)
+    expect(s.children[1].crouched).toBe(false)
+    for (let t = 0; t < 1; t += 1 / 60) stepBankGame(s, 1 / 60, CFG, STAGE, openWorld(), rand)
     s.children.forEach((c, i) => {
       expect(c.crouched).toBe(false)
       expect(Math.hypot(c.x - STAGE.roam.x, c.z - STAGE.roam.z)).toBeLessThan(before[i])
