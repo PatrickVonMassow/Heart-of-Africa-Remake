@@ -1428,7 +1428,7 @@ keinen Träger hat. Gebucht als Punkt 956.
 
 ## Anhang A — Maschinell gepflegte Quellen-Übersicht
 
-Zuletzt aktualisiert: Donnerstag, 03.09.2026, 20:58 · Quellen-Fingerprint: `6327522e1eb4…`
+Zuletzt aktualisiert: Donnerstag, 03.09.2026, 21:45 · Quellen-Fingerprint: `6f61af381088…`
 
 Spalten heuristisch aus den Quellen abgeleitet (Anläufe = distinkte Datumsnennungen im Memory;
 Maßnahme = Guard-Skripte mit Namens-Treffer). Die inhaltliche Bewertung gehört der Prosa oben.
@@ -1530,10 +1530,10 @@ Maßnahme = Guard-Skripte mit Namens-Treffer). Die inhaltliche Bewertung gehört
 | A pending batch claim HOLDS THE LAUNCHER BACK — withdraw it whenever the claiming window is left unattended | 2 | mittel | clear-claim-guard.mjs | ✔ Mechanismus |
 | Multi-agent workflows eat the session/weekly limit fast — verify findings INLINE, keep fan-outs small, warn the user with a cost estimate before any big workflow | 3 | mittel | doc-budget-guard.mjs | ✔ Mechanismus |
 
-Erfasste Quellen: 94 Feedback-/Projekt-Memories · 57 Guard-/Hook-Skripte · 6 Revert-/Reapply-Commits · 121 Prozess-/Meta-TASKS-Punkte (davon 55 offen).
+Erfasste Quellen: 94 Feedback-/Projekt-Memories · 57 Guard-/Hook-Skripte · 6 Revert-/Reapply-Commits · 122 Prozess-/Meta-TASKS-Punkte (davon 56 offen).
 
-<!-- RETRO-FINGERPRINT: 6327522e1eb48176015c596db076221b014d027a7533d4931b9cc523fe4eb155 -->
-<!-- RETRO-LAST-REFRESHED: 2026-09-03T18:58:25.467Z -->
+<!-- RETRO-FINGERPRINT: 6f61af381088c3b0b61087d52bdf2fe1fa10ed6b61f62a7409b8b587548f32fa -->
+<!-- RETRO-LAST-REFRESHED: 2026-09-03T19:45:58.422Z -->
 <!-- AUTO-GENERATED:END -->
 
 ### 3.111 Ein Erfolg ist kein Beweis für den Weg, auf dem er zustande kam
@@ -5382,3 +5382,40 @@ geblieben, haette man den gepruefen Mechanismus danach entfernt — weil sie auf
 die Gelegenheit warteten, statt sie herzustellen. Ein Test, der einen Mann auf
 die Grabstelle STELLT, prueft die Regel; einer, der zusieht, ob zufaellig einer
 dort steht, prueft die Wuerfel.
+
+### 3.232 Die Maschine lud sich selbst ein und nannte es eine Anweisung des Nutzers
+
+Am 03.09.2026 öffnete der Nutzer ein Fenster, um eine Frage zu stellen. Die
+Sitzung meldete ihm kurz darauf, sie habe die Batch übernommen. Nachgemessen an
+derselben Sitzung: Der Prozess lief seit 16:17:48; ein `/clear` gab ihm eine
+neue Sitzungs-Kennung, und der SessionStart-Hook gewann um 21:00:46 die
+gewöhnliche atomare Übernahme — dreieinhalb Minuten, bevor die Sitzung ihren
+ersten Werkzeugaufruf tat. Die geschriebene Sperre trug `"kind": "session"`,
+nicht die Vormerkung des Launchers. Es gab also keinen Entschluss, den man hätte
+prüfen können: Die teuerste Tätigkeit der Maschine begann, weil ein Hook
+schneller war als der erste Gedanke.
+
+Der zweite Teil wiegt schwerer als der erste. Derselbe Hook fügt dem Kontext den
+fest einprogrammierten Satz „Standing user instruction: continue the batch
+autonomously" bei. Die Sitzung liest ihn als Auftrag — und er ist keiner. In dem
+Gespräch, in dem er auftauchte, hatte der Nutzer nichts dergleichen gesagt; er
+hatte eine Frage gestellt. Damit erzeugt die Infrastruktur eine Freigabe, die
+der Nutzer nie erteilt hat, und legt sie dem Modell in den Mund, das sich später
+darauf beruft. Das ist genau die Bauform, die das Memory `no-invented-user-
+instructions` verbietet, nur eine Ebene tiefer: nicht das Modell erfindet die
+Anweisung, sondern das Skript, dem das Modell glauben muss.
+
+Die naheliegende Reparatur — Übernahme nur noch bei Vormerkung — ist die
+gefährliche. Verliert eine vom Launcher geschickte Nachfolgerin ihre Vormerkung,
+darf die Batch nicht ownerlos liegenbleiben; falsch gebaut steht sie still,
+und Stillstand ist der eine Zustand, den diese Steuerung nie erzeugen soll. Der
+Punkt wurde deshalb mit Test eingereiht statt als schnelle Bedingung gebaut, und
+hinter die Freigabe gestellt: Er hält sie nicht auf, und der Nutzer kann eine
+uneingeladene Eignerin mit einem Befehl anhalten.
+
+**Lehre:** Eine Vollmacht, die eine Sitzung sich selbst ausstellt, ist keine.
+Wo ein Hook Kontext einspeist, der wie eine Nutzeräußerung klingt, muss er sagen,
+woher sie stammt — und wo er nichts vorweisen kann, hat er zu orientieren statt
+zu beauftragen. Die Gegenprobe gehört zur selben Änderung: Autonomie, die nur
+noch auf Einladung anspringt, muss beweisen, dass die Einladung auch dann
+ankommt, wenn der Weg dahin abbricht.

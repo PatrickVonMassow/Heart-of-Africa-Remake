@@ -371,60 +371,6 @@ put it is the mistake this line exists to stop.
   Refs: src/communication/chiefReply.ts, src/state/store.ts (rockArtefact), src/ui/Dialogs.tsx, src/world/data/landmarks.ts (bandiagara), docs/205-world-accuracy-findings.md A18
   Bundle: Dorfleben.
 
-- [ ] 690. The classic game of tag moves to the port cities, and is silent there (user
-  13.08.2026, playing the deployed communication slice).
-  The user played the deployed communication slice on 13.08.2026 with the debug
-  switch "Speech: show concepts instead of syllables" on and could learn nothing:
-  "Ich erkenne da kein Fangspiel … Das Herumschicken wirkt wie zum Selbstzweck
-  eingeführt", and about the adults "Selbst wenn ich diese Übersetzungen sehe,
-  erkenne ich keinen Sinn hinter den Handlungen." The evening's conversation
-  diagnosed the cause — the design taught eleven concepts through situations
-  forced onto a game that cannot carry them — and rebuilt the whole slice around
-  five words, two teaching places and one game per settlement kind. This point is
-  one of six that carry that rebuild; they are specified together and read
-  together.
-
-  The six specifications were reviewed cross-vendor before filing (GPT-5.6 Sol at
-  effort high, 13.08.2026, verdict do-not-merge on the first draft): it found two
-  outright contradictions and, more valuable, three wrong readings a player could
-  learn and still finish the puzzle with. What stands here is the corrected state.
-  The classic game of tag survives — in the PORT CITIES and in any village without
-  a bank, and it is silent wherever it runs.
-
-  Final state:
-
-  1. The round that exists today — one child is IT, the group flees, the child that
-     is caught takes over the role, with its stamina, its break-offs and its
-     body-avoidance — is kept and becomes the PORT settlements' children's game. It
-     is the game the user asked for originally and it works; only the teaching
-     layer bolted onto it was wrong.
-  2. Wherever this game runs the children DO NOT SPEAK. There is no lect to learn
-     in a port, and syllables that mean nothing anywhere would only mislead.
-  3. WHICH SETTLEMENT PLAYS WHAT, with no gap and no overlap:
-     - a village WITH a bank: the bank game, and only that;
-     - a village WITHOUT a bank: this silent tag game, and only that;
-     - a port: this silent tag game, and only that.
-     No settlement ever runs two children's games at once.
-  4. The children of a port (and of a bankless village) get their own play ground,
-     derived like the village one and clearing that settlement's own vignettes by
-     the hearing radius.
-
-  Test: Vitest over the three settlement cases of §3 — each stages exactly one
-  game, the bank game only where a bank exists, and the tag game speaks nothing.
-  The existing children-motion gate keeps running against this game wherever it is
-  staged.
-  Constraints:
-  - Depends on the children's bank game only in so far as the two must not both
-    run in one settlement.
-  - The stuck/trembling child of the user's two bug reports lives in exactly this
-    steering. It MOVES WITH the game to the ports, so it must be cured at its cause
-    (carrier findings on 666) — otherwise the next report says "a child is stuck in
-    the harbour".
-  Quotes:
-  Nutzer, 13.08.2026 22:59: »Es ist schade, dass damit das bisherige Fangspiel, bei dem einer Fänger ist, die Gruppe vor ihm wegrennt und ein gefangenes Kind die Fängerrolle übernimmt, komplett wegfällt. Das würde ich zusätzlich als anderes Spiel beibehalten - allerdings nicht für die Dörfer, weil das sonst zu unübersichtlich wird, wenn zwei verschiedene Spiele parallel laufen. Aber in den Hafenstädten können die Kinder dieses klassische Fangspiel spielen.«
-  Refs: src/scenes/place/tagGame.ts, src/scenes/place/PlaceLife.tsx, src/scenes/place/lifeSpots.ts
-  Bundle: Dorfleben.
-
 - [ ] 691. A guess is entered with space, and the nearer thing wins (user 13.08.2026, playing
   the deployed communication slice).
   The user played the deployed communication slice on 13.08.2026 with the debug
@@ -478,6 +424,60 @@ put it is the mistake this line exists to stop.
   Nutzer, 13.08.2026 22:59: »Eine Änderung an der Bedienung: Anstatt per Klicken eine Interpretation für etwas Gesagtes festlegen zu können, soll das per SPACE passieren. Das ist ja die Benutzen-Taste. Zusätzlich jetzt Klicken einzuführen war nur unnötig umständlich.«
   Nutzer, 13.08.2026 23:13: »Vorfahrt hat, was dem Spieler näher ist.«
   Refs: src/scenes/place/SpeechLabels.tsx, src/communication/speechTarget.ts, src/ui/Dialogs.tsx, src/i18n/de.ts, src/i18n/en.ts
+  Bundle: Dorfleben.
+
+- [ ] 690. The classic game of tag moves to the port cities, and is silent there (user
+  13.08.2026, playing the deployed communication slice).
+  The user played the deployed communication slice on 13.08.2026 with the debug
+  switch "Speech: show concepts instead of syllables" on and could learn nothing:
+  "Ich erkenne da kein Fangspiel … Das Herumschicken wirkt wie zum Selbstzweck
+  eingeführt", and about the adults "Selbst wenn ich diese Übersetzungen sehe,
+  erkenne ich keinen Sinn hinter den Handlungen." The evening's conversation
+  diagnosed the cause — the design taught eleven concepts through situations
+  forced onto a game that cannot carry them — and rebuilt the whole slice around
+  five words, two teaching places and one game per settlement kind. This point is
+  one of six that carry that rebuild; they are specified together and read
+  together.
+
+  The six specifications were reviewed cross-vendor before filing (GPT-5.6 Sol at
+  effort high, 13.08.2026, verdict do-not-merge on the first draft): it found two
+  outright contradictions and, more valuable, three wrong readings a player could
+  learn and still finish the puzzle with. What stands here is the corrected state.
+  The classic game of tag survives — in the PORT CITIES and in any village without
+  a bank, and it is silent wherever it runs.
+
+  Final state:
+
+  1. The round that exists today — one child is IT, the group flees, the child that
+     is caught takes over the role, with its stamina, its break-offs and its
+     body-avoidance — is kept and becomes the PORT settlements' children's game. It
+     is the game the user asked for originally and it works; only the teaching
+     layer bolted onto it was wrong.
+  2. Wherever this game runs the children DO NOT SPEAK. There is no lect to learn
+     in a port, and syllables that mean nothing anywhere would only mislead.
+  3. WHICH SETTLEMENT PLAYS WHAT, with no gap and no overlap:
+     - a village WITH a bank: the bank game, and only that;
+     - a village WITHOUT a bank: this silent tag game, and only that;
+     - a port: this silent tag game, and only that.
+     No settlement ever runs two children's games at once.
+  4. The children of a port (and of a bankless village) get their own play ground,
+     derived like the village one and clearing that settlement's own vignettes by
+     the hearing radius.
+
+  Test: Vitest over the three settlement cases of §3 — each stages exactly one
+  game, the bank game only where a bank exists, and the tag game speaks nothing.
+  The existing children-motion gate keeps running against this game wherever it is
+  staged.
+  Constraints:
+  - Depends on the children's bank game only in so far as the two must not both
+    run in one settlement.
+  - The stuck/trembling child of the user's two bug reports lives in exactly this
+    steering. It MOVES WITH the game to the ports, so it must be cured at its cause
+    (carrier findings on 666) — otherwise the next report says "a child is stuck in
+    the harbour".
+  Quotes:
+  Nutzer, 13.08.2026 22:59: »Es ist schade, dass damit das bisherige Fangspiel, bei dem einer Fänger ist, die Gruppe vor ihm wegrennt und ein gefangenes Kind die Fängerrolle übernimmt, komplett wegfällt. Das würde ich zusätzlich als anderes Spiel beibehalten - allerdings nicht für die Dörfer, weil das sonst zu unübersichtlich wird, wenn zwei verschiedene Spiele parallel laufen. Aber in den Hafenstädten können die Kinder dieses klassische Fangspiel spielen.«
+  Refs: src/scenes/place/tagGame.ts, src/scenes/place/PlaceLife.tsx, src/scenes/place/lifeSpots.ts
   Bundle: Dorfleben.
 
 - [ ] 692. Every document describes the rebuilt communication mechanic, not the old one (user
@@ -14371,4 +14371,5 @@ to land than a mechanism that needs a review.
   @2026-09-03T01:27:16.220Z), scripts/verify/polish.mjs, scripts/throttle-probe.mjs,
   scripts/render-verify-charges.mjs
   Bundle: Session- & Repo-Hygiene.
+
 

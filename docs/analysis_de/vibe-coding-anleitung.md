@@ -259,6 +259,14 @@ Die Ursache findest du durch **Zerlegen**, nicht durch Wiederholen.
   periodisch **nebeneinander**, zieh **den Code auf den Satz**, und frag: **Welcher naheliegende
   Fall wird von keiner Regel erfasst?**"
 
+- **Die Automatik spricht in deinem Namen.** Was ein Hook in den Kontext schreibt, liest das
+  Modell wie deine Worte — ein fest einprogrammiertes „stehende Anweisung: mach autonom weiter"
+  ist eine Freigabe, die du nie erteilt hast, und teure Arbeit beginnt, ohne dass jemand sie
+  beschlossen hat.
+  → *Prompt:* „Jeder eingespeiste Satz nennt **seine Quelle**. Wo du keine vorweisen kannst,
+  **orientiere statt zu beauftragen** — und wo eine Automatik sich selbst startet, verlang eine
+  **Einladung**, die sie vorzeigen kann."
+
 - **Die Verweigerung nennt eine Abhilfe, die schadet, nie eintritt — oder längst getan ist.** Wer
   ihr folgt, steht schlechter da, wartet vergeblich oder wiederholt einen erledigten Schritt.
   → *Prompt:* „**Geh den Ausweg jeder Verweigerung einmal wirklich**, im auslösenden Zustand:
