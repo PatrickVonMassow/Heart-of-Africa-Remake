@@ -311,7 +311,16 @@ export const LIMITS = {
   // above (a budget bounds how much rule-making happens; this is an escape from a
   // rule already built). The entry measures +7 lines / +61 words, so the ceilings
   // move 515 -> 522 and 4735 -> 4796 with zero slack.
-  maxLines: 531,
+  // 03.09.2026: ONE genuinely new tip — two checks whose demands cannot BOTH be met, where
+  // obeying the one is what breaks the other and the session is thrown away for complying.
+  // It is neither neighbour: the guard that stands down still measures nothing wrong, and the
+  // debt that outgrows its repayment is one duty against itself. Here two separate duties are
+  // each satisfiable alone and jointly impossible, so no correct turn exists and the log reads
+  // as a violation. Measured today: a wait declaration was refused over free agent slots, the
+  // author commissioned to fill them killed the 81-minute run that declaration covered. The
+  // entry measures +10 lines / +122 words, so the ceilings move 531 -> 541 and 4903 -> 5025
+  // with zero slack.
+  maxLines: 541,
   // EXACT FIT, not headroom — corrected 30.07.2026 after the four-eyes review
   // pointed out that this comment had long stopped describing the numbers. The
   // rule above ("raised only by the measured size of genuinely new tips")
@@ -516,7 +525,10 @@ export const LIMITS = {
   // 03.09.2026: the wait-loop lesson folded into the self-measuring-probe
   // pitfall lands one word under the old ceiling, so it moves 4904 -> 4903 —
   // the ceiling follows the measurement, never the other way around.
-  maxWords: 4903,
+  // 03.09.2026 (second): the two-checks-that-contradict tip justified beside
+  // maxLines measures 122 words, so this ceiling moves 4903 -> 5025 by the same
+  // measurement.
+  maxWords: 5025,
   // A pitfall entry = the risk lines plus its prompt. Anything longer is a
   // story, not a tip.
   maxEntryLines: 11,

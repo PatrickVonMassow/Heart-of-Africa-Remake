@@ -486,6 +486,16 @@ Die Ursache findest du durch **Zerlegen**, nicht durch Wiederholen.
   eigenen Ticket. Eine Verweigerung nennt ihren **Grund**, nie ihren Bestand; sieht eine Pflicht
   unerfüllbar aus, prüf zuerst dein **Messgerät**."
 
+- **Zwei Prüfungen, die einander widersprechen — Gehorsam sieht aus wie ein Verstoß.** Die eine
+  verlangt, freie Kapazität zu nutzen; die andere duldet keine Änderung, während sie läuft. Wer
+  der ersten folgt, bricht die zweite: Die Arbeit wird verworfen, und das Protokoll zeigt einen
+  Fehler, obwohl genau das getan wurde, was verlangt war.
+  → *Prompt:* „Jede Prüfung, die eine Handlung **fordert**, muss die Fenster kennen, in denen
+  eine andere sie **verbietet** — sonst steht sie still oder liest die Forderung als bereits
+  beantwortet. Und wer etwas verbietet, sagt selbst, **wann es wieder erlaubt** ist; diese
+  Bedingung darf nie im Quelltext eines dritten Werkzeugs versteckt liegen. Prüffrage: Gibt es
+  einen einzigen Zug, der **beide** Auflagen erfüllt? Wenn nicht, ist nicht die Sitzung schuld."
+
 - **Das Protokoll ohne Verfallsdatum wird zum Dauerplakat.** Was dein Werkzeug über die eigene
   Entscheidung aufschreibt, nimmt niemand je wieder heraus.
   → *Prompt:* „Eine Entscheidung, die du selbst triffst, nennt die **Messung**, die sie stützen
@@ -529,4 +539,4 @@ Die Ursache findest du durch **Zerlegen**, nicht durch Wiederholen.
 
 Sie ersetzt die Fallstricke oben nicht.
 
-<!-- GUIDE-FINGERPRINT: 833133f378544676f2466323da1d166e08a7202411df46f1d044f25a9d024bcc -->
+<!-- GUIDE-FINGERPRINT: 3c9bf82e56bde87b9564635e7feb829e481037cd9856aef8dbb385dc7553dc23 -->

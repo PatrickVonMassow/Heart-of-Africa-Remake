@@ -4197,6 +4197,18 @@ Build order, chosen so no two parallel agents own the same file:
   as a pre-existing defect the tripwire surfaced, not a regression — but CONFIRM that on
   `main` before fixing, because a confirmation is one run and a wrong assumption is a
   rebuild.
+  A SECOND COMPOSITION, AND THE DRINK LEAD DOES NOT COVER IT (measured 03.09.2026,
+  07:21:44Z, `enrichments` on the WebGL 2 lane, LARGE run on
+  `feat/1047-bank-game-readable`): `animal-buried — warthog bodyY=2.72 ground=3.59
+  y=2.43 young=false bathe=false drink=false dodge=false hop=false chunk=11,-1
+  shoreSeed=false parent=false child=false dPlayer=84`. No pose is running, the
+  animal is grown, and this time it is the ANCHOR that is wrong: `y` sits 1.16 BELOW
+  the ground sample, where the calf's `y` matched its ground exactly and only the
+  body offset was at fault. So the point owns TWO faults under one assert — a body
+  that dips below a correct anchor, and an anchor placed below the terrain — and it
+  may not be closed on the calf alone. Charged to this point in
+  `scripts/render-verify-charges.mjs` on the lane both firings were measured on;
+  the charge dies with the point, which is what its VERIFIABLE below already asks.
   THE LEAD THE DUMP GIVES: `drink=true` and `child=true` with `bathe=false`. The drink
   cycle lowers the body toward the water, and a CALF carries a smaller `scale`, which
   shrinks the assert's own tolerance (`ground - 0.75 * a.scale`) at the same time as the
@@ -4207,7 +4219,10 @@ Build order, chosen so no two parallel agents own the same file:
   for the whole drink cycle, at every scale the herds spawn; the tripwire stays armed and
   unchanged (it is the detector, not the thing to tune away); and if the drink pose
   legitimately needs to dip lower than the current tolerance, the tolerance is derived
-  from the pose rather than widened flat.
+  from the pose rather than widened flat. AND the second composition is answered in its
+  own terms: an animal's ANCHOR is never placed below the terrain sample under it, at
+  any distance from the player and with no pose running, so the assert has nothing left
+  to fire on.
   VERIFIABLE: a Vitest case over the drink-pose body offset sweeps the full scale range
   the herds use, at both ages, and asserts the offset never falls below the ground
   sample; `enrichments` runs on both backends without the `animal-buried` assert firing.
@@ -12282,6 +12297,21 @@ to land than a mechanism that needs a review.
   push only went through on a later manual attempt that happened to fall in a quiet window. Add to
   the final state that the gate's verdict NAMES a teardown red over foreign activity as an
   environment condition and says which lane collided, rather than reporting it as a blocking red.
+  MEASURED A FOURTH TIME 03.09.2026, 07:27-07:31 — AND THIS TIME A GUARD ORDERED IT. The new
+  element is not another collision but its cause: the owner was DIRECTED into it. Declaring the
+  wait for point 1047's both-backends LARGE run, `batch-in-flight` REFUSED the declaration because
+  two of three agent slots stood free, named eight independent open points and demanded either a
+  commission or a written reason. The owner complied and commissioned GPT-5.6 Sol onto point 1049
+  in its own worktree; Sol's FIRST commit — the commission record it writes before it even starts —
+  killed the run 3m51s in on `refs/heads/feat/1049-queue-order-rule <absent> -> 9815ce1b1`. So the
+  rule this point calls unworkable ("touch no ref while a LARGE runs") is not merely unenforced:
+  another guard actively punishes obeying it, and the owner had to stop the author it had just been
+  told to start. The same edge caught the board in the same hour — `board-publish.mjs` commits to
+  `refs/heads/board`, so the dashboard duty is a ref mutation too and the publish had to be held
+  until the unit stage passed, which is only knowable by reading `run-all.mjs` to learn that the
+  second backend pass skips the preflight. Add to the final state: while a browser regression is
+  declared in flight, the agent-pool guard stands down, or the declaration itself is the account
+  its free slots need.
   VERIFIABLE: Vitest over the decision — a moved foreign branch passes, a moved own HEAD fails, and
   an undeclared foreign ref is reported by name rather than silently allowed.
   Criticality: medium-high — it turns every parallel authoring evening into red gates that hide real

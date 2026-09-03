@@ -1143,4 +1143,57 @@ export const RED_CHARGES = [
       + 'verdict: point 1050 owes the throttle probe over that section which says whether the '
       + 'spread is the host or the scene, and the charge dies with that point.',
   },
+  {
+    point: 1013,
+    suite: 'enrichments',
+    backend: 'webgl',
+    kind: 'check',
+    // NAME-SCOPED, AND THE RECORD IS WHY. The check prints its whole hunt sample
+    // as JSON, which runs past the 200-character bound, so every record of it is
+    // cut mid-`predMismatch` — a detail signature would have to declare that it
+    // reads only the front, and the declaration is deliberately held to the two
+    // entries that argued for it. What remains is the check's own name, and that
+    // is no wider than the point: 1013's whole subject is this one check and
+    // whether it asks the region it means, so any failure of it belongs to that
+    // point until it lands. Scoped to the lane both firings were measured on.
+    match: /^every predator fits the region and period$/i,
+    why:
+      'FILED AS 1013 ON 29.08.2026 FROM EXACTLY THIS RED, and reproduced 03.09.2026 in the LARGE '
+      + 'run on feat/1047-bank-game-readable (webgl/enrichments, 07:02:14Z): sixteen hunts, the '
+      + 'prey side clean, one predator scored outside its region — a cheetah in central Africa on '
+      + 'the day it was filed, a hyena in central Africa today. The species differs and the shape '
+      + 'does not, which is what 1013 says is unsettled: the check may read the region where the '
+      + 'hunt ENDED rather than where it began, or the placement may be genuinely wrong, and the '
+      + 'two regions have never been logged side by side. Nothing in the bank-game branch touches '
+      + 'the wildlife simulation or the food-web table, so this red says nothing about that '
+      + 'change. It is charged, not excused: 1013 owes the logged sample that decides which '
+      + 'reading is right, and the charge dies with that point.',
+  },
+  {
+    point: 565,
+    suite: 'enrichments',
+    backend: 'webgl',
+    kind: 'console',
+    // NAME-SCOPED ON PURPOSE, where its neighbours are detail-scoped: 565's own
+    // VERIFIABLE is "`enrichments` runs on both backends without the
+    // `animal-buried` assert firing", so the assert AS SUCH is what that point
+    // owes — a second buried animal is the same unmet acceptance, not a second
+    // owner. Anchored at the front so only this assert is read, and scoped to the
+    // WebGL 2 lane both recorded firings were measured on; on WebGPU it has never
+    // fired and stays a real red.
+    match: /^console error: \[ASSERT\] animal-buried /i,
+    why:
+      'THE TRIPWIRE POINT 565 WAS FILED FOR, on the lane it was filed from. 565 records the first '
+      + 'firing (08.08.2026, webgl/enrichments): a drinking wildebeest calf with `y` equal to its '
+      + 'ground sample and the BODY 0.73 below it. Measured again 03.09.2026, 07:21:44Z, in the '
+      + 'LARGE run on feat/1047-bank-game-readable: `animal-buried — warthog bodyY=2.72 '
+      + 'ground=3.59 y=2.43 young=false bathe=false drink=false dodge=false hop=false chunk=11,-1 '
+      + 'shoreSeed=false parent=false child=false dPlayer=84` — a SECOND composition, in which the '
+      + 'ANCHOR itself sits 1.16 below the ground sample and no drink, bathe or dodge pose is '
+      + 'running. It is recorded in 565 with that reading, because the drink-pose lead the point '
+      + 'was opened on cannot explain it and the point must not be closed on the calf alone. '
+      + 'It says nothing about the bank-game branch: that change moves village children, bank-game '
+      + 'balance values and play-rock geometry, and touches no wildlife anchoring. The charge dies '
+      + 'with 565.',
+  },
 ]

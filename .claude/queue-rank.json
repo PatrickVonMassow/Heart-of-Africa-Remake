@@ -1152,6 +1152,12 @@
       "why": "User order 03.09.2026: die Batch darf niemals stehenbleiben — mache direkt einen Punkt, blind vier Augen, drittes Modell führt zusammen, dann umsetzen",
       "origin": "user",
       "place": "ahead"
+    },
+    "1050": {
+      "at": "2026-09-03T03:58:47.175Z",
+      "why": "Bookkeeping for two polish picture reds whose cause point 939 already owns (Vite 504 on a dirty tree); no player impact, so it stays behind the release point 174.",
+      "origin": "machine",
+      "place": "last"
     }
   },
   "boundary": {
@@ -1187,7 +1193,7 @@
     "why": "The order standing in front of the release today is the arrangement that predates this rule; the four machine-filed points that had ranked themselves there were moved behind 174 first"
   },
   "settled": {
-    "at": "2026-09-02T23:27:18.664Z",
+    "at": "2026-09-03T03:58:47.183Z",
     "points": [
       174,
       184,
@@ -1550,7 +1556,8 @@
       1046,
       1047,
       1048,
-      1049
+      1049,
+      1050
     ]
   }
 }

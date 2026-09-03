@@ -70,6 +70,7 @@ Das Musterbeispiel sind die Chat-Zeitstempel: neun Eskalationsstufen, acht weich
 | 26.08. nachts | Zweimal grün über einer Attrappe, die das echte Board nur nachgebaut statt gelesen hat: Das Kritikalitäts-Stylesheet landete im Kommentar der Refresh-Routine, und die auf Zuruf nachgereichte Regressionsprüfung ließ genau die eine `<meta>`-Zeile weg, die den gemeinten Anker im echten Board verfehlen lässt — Runde zwei verschob und löschte dabei die BOM der Datei (§3.184, Punkt 844) |
 | 26.08. früh | Dritter Rückfall derselben Dublette, diesmal von mir: Ich legte einen frisch gemessenen Befund als Punkt 928 ab, obwohl Punkt 856 seit dem 23.08. genau ihn beschreibt — gefunden wieder erst von der Bündelpflicht, nicht beim Anlegen. Neu war nur die zweite Messung; sie ist jetzt in 856 nachgetragen (§3.168-Nachtrag, 928 in 856 gefaltet) |
 | 24.08. mittags | Der delegierte Autor schrieb drei Commits um, die er bereits veroeffentlicht hatte: Sein Abschluss-Push scheiterte als non-fast-forward, und sein eigener Bericht meldete die fertige Arbeit als „nur lokal“ — obwohl die Baeume beider Seiten byte-identisch waren und sich nur eine Leerzeile im Commit-Text unterschied. Wer dem Bericht glaubt, sucht verlorene Arbeit, die nie verloren war; wer ihn ignoriert, uebersieht den echten Fall. Dieselbe Stunde zeigte die Kehrseite von der Gegenseite: Ein Tor-Lauf im Arbeitsbaum wurde rot, weil die pruefende Sitzung selbst waehrenddessen auf main committete — kein Test schlug fehl, nur der Teardown benannte die Ref-Bewegung |
+| 03.09. | Ein Wächter ordnete an, was ein zweiter bestraft: Die Wartemeldung für einen 81-Minuten-Lauf wurde wegen freier Agentenplätze abgelehnt, der daraufhin beauftragte Autor tötete mit seinem ersten Commit genau diesen Lauf — Gehorsam gegenüber der einen Auflage ist der Bruch der anderen (§3.231, Punkt 955) |
 | 29.08. | Kein Regressionslauf des Tages hatte ein gültiges Zeit-Urteil: Der Ruhe-Wächter las den Auftragstext der eigenen Batch-Sitzung als zweiten Prüflauf, weil dieser die Prüfbefehle zitiert, erklärte die Maschine für belastet und strich die Zeit-Urteile — protokolliert in einer Zeile, die wie Hausmeisterei klingt; am selben Abend tötete der Integritäts-Wächter eine 85-minütige Zwei-Backend-Regression, weil dieselbe Sitzung nebenher auf main committete (§3.214, Punkt 955) |
 | 26.08. vormittags | Neun Gegenlesungsdurchgänge über die abgeleitete Board-Sektion fanden am Ende EINE Fehlerklasse — zweimal: Ein Beleg ohne zuordenbaren Punkt und ein Fokus-Eintrag, der etwas nennt, das keine Punktnummer ist, kamen beide als »kein Fokus« heraus, also Byte für Byte als die Antwort einer FEHLENDEN Quelle. Aus beschädigten Daten wurde so eine geprüfte Null (§3.185, Punkt 713) |
 | 26.08. mittags | Zwanzig Minuten nach der Landung verweigerte derselbe Mechanismus die Veröffentlichung des Boards an der Sitzungsgrenze: Die Ausnahme für das Kärtchen, das die Maschine selbst schreibt, galt nur im Zweig »es läuft etwas« und nie in seinem Spiegel (§3.186, Punkt 935) |
@@ -1427,7 +1428,7 @@ keinen Träger hat. Gebucht als Punkt 956.
 
 ## Anhang A — Maschinell gepflegte Quellen-Übersicht
 
-Zuletzt aktualisiert: Donnerstag, 03.09.2026, 01:35 · Quellen-Fingerprint: `833133f37854…`
+Zuletzt aktualisiert: Donnerstag, 03.09.2026, 08:00 · Quellen-Fingerprint: `3c9bf82e56bd…`
 
 Spalten heuristisch aus den Quellen abgeleitet (Anläufe = distinkte Datumsnennungen im Memory;
 Maßnahme = Guard-Skripte mit Namens-Treffer). Die inhaltliche Bewertung gehört der Prosa oben.
@@ -1465,7 +1466,7 @@ Maßnahme = Guard-Skripte mit Namens-Treffer). Die inhaltliche Bewertung gehört
 | Work at High effort by default; the user reserves Extra high for research and design decisions, not implementation | 4 | hoch | — (Regel/Memory) | ◐ Regel |
 | Write idiomatic English in all English text (README, code comments, commit messages) — no German calques like 'stand' for a version | 1 | niedrig | — (Regel/Memory) | ◐ Regel |
 | Fable is NOT the default lane because its volume is the scarcest; difficulty is no reason for it either (since 18.08.2026 hard cases go straight to Sol), and review is cross-vendor, not Fable-by-default | 5 | hoch | — (Regel/Memory) | ◐ Regel |
-| Findings recorded by a session that could not write the work order — carry each into TASKS.md, then mark it drained | 41 | hoch | findings-guard.mjs | ✔ Mechanismus |
+| Findings recorded by a session that could not write the work order — carry each into TASKS.md, then mark it drained | 42 | hoch | findings-guard.mjs | ✔ Mechanismus |
 | A recurring lookup gets a script; never pull raw transcripts, listings, or logs into context to answer it | 1 | niedrig | — (Regel/Memory) | ◐ Regel |
 | Past the 150k context watermark, FINISH the step and hand over — never start a suite, an agent or a point after it; the user raised the cost twice (13.08. and 17.08.2026) | 2 | mittel | — (Regel/Memory) | ◐ Regel |
 | User 18.08.2026: hard, complex, error-prone and HIGH-criticality points are AUTHORED by GPT-5.6 Sol directly — Opus 5 authors only what is left, and Fable authors only a point that tags its lane or one the router escalates | 4 | hoch | — (Regel/Memory) | ◐ Regel |
@@ -1530,8 +1531,8 @@ Maßnahme = Guard-Skripte mit Namens-Treffer). Die inhaltliche Bewertung gehört
 
 Erfasste Quellen: 93 Feedback-/Projekt-Memories · 57 Guard-/Hook-Skripte · 6 Revert-/Reapply-Commits · 121 Prozess-/Meta-TASKS-Punkte (davon 55 offen).
 
-<!-- RETRO-FINGERPRINT: 833133f378544676f2466323da1d166e08a7202411df46f1d044f25a9d024bcc -->
-<!-- RETRO-LAST-REFRESHED: 2026-09-02T23:35:37.099Z -->
+<!-- RETRO-FINGERPRINT: 3c9bf82e56bde87b9564635e7feb829e481037cd9856aef8dbb385dc7553dc23 -->
+<!-- RETRO-LAST-REFRESHED: 2026-09-03T06:00:22.231Z -->
 <!-- AUTO-GENERATED:END -->
 
 ### 3.111 Ein Erfolg ist kein Beweis für den Weg, auf dem er zustande kam
@@ -5316,6 +5317,40 @@ den Satz »Hier laeuft nichts weiter.« weiterhin bedingungslos an — genau der
 Defekt aus §3.111ff., den Punkt 871 seit dem 24.08. beschreibt. Hier waere er
 gleich zweifach falsch gewesen, denn diese Sitzung hinterliess selbst einen
 gepushten Zweig, der auf sein CI wartet.
+
+### 3.231 Der Wächter, der den Verstoß anordnet, den ein zweiter bestraft
+
+Am 03.09.2026, 07:27, meldete eine Sitzung ordnungsgemäß die Wartestellung für
+einen 81-minütigen Zwei-Backend-Lauf an. Die Meldung wurde ABGELEHNT: Zwei von
+drei Agentenplätzen standen leer, der Wächter nannte acht unabhängige offene
+Punkte und verlangte entweder eine Beauftragung oder einen geschriebenen Grund.
+Die Sitzung gehorchte und setzte einen Autor auf einen dieser Punkte an. Dessen
+ERSTER Commit — der Auftragsvermerk, den er schreibt, bevor er überhaupt
+anfängt — tötete den Lauf nach 3 Minuten 51, weil der Integritäts-Wächter der
+Unit-Suite jede fremde Ref-Bewegung als Testleck wertet. Achtzig Minuten
+Bildprüfung waren verloren, und der eben beauftragte Autor musste wieder
+gestoppt werden.
+
+Der Vorfall selbst ist der vierte seiner Art (§3.198, §3.214, Punkt 955), aber
+die Klasse ist eine neue. Bisher war die Diagnose: eine Regel, die niemand
+durchsetzt — »rühre keine Ref an, während ein LARGE läuft« steht in Punkt 955
+ausdrücklich als praktisch unbrauchbar, weil ein LARGE genau das Zeitfenster
+ist, in dem Buchführung anfällt. Heute zeigte sich, dass sie nicht nur
+undurchgesetzt ist: Ein zweiter Wächter verlangt aktiv ihren Bruch. Wer sich an
+die eine Auflage hält, verletzt die andere; wer beiden folgen will, findet
+keinen Zug, der beides erfüllt. Dieselbe Kante traf in derselben Stunde die
+Dashboard-Pflicht, denn die Veröffentlichung des Boards schreibt selbst eine
+Ref — die Sitzung musste erst aus dem Quelltext des Läufers herauslesen, dass
+der zweite Backend-Durchgang die Vorstufe überspringt, um zu wissen, wann sie
+wieder veröffentlichen darf.
+
+**Lehre:** Zwei Auflagen, die sich nur gegenseitig ausschließen, sind kein
+strenges Regime, sondern eine Falle mit Alibi — die Sitzung sieht wie ein
+Verstoß aus, obwohl sie gehorcht hat. Ein Wächter, der eine Handlung FORDERT,
+muss die Fenster kennen, in denen ein anderer sie verbietet; er hat entweder
+stillzustehen oder die Forderung als bereits beantwortet zu lesen. Und die
+Bedingung dafür darf nicht im Quelltext eines dritten Skripts versteckt liegen:
+Wann eine Ref-Schreibung gefahrlos ist, muss der sagen, der sie verbietet.
 
 ### 3.113 Ein Test, dem der Gegenstand unter den Fuessen weggeht, wird still gruen
 
