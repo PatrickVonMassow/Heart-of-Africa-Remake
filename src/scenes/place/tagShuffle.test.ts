@@ -1551,7 +1551,7 @@ describe('the children`s bank round can reach its own stage (work-order 687)', (
             phase: v.bank!.phase,
             along: v.children.map((c) => (c.x - him.x) * ax + (c.z - him.z) * az),
           })
-          if (++steps % 3600 === 0) await new Promise((resolve) => setTimeout(resolve, 0))
+          if (++steps % 1200 === 0) await new Promise((resolve) => setTimeout(resolve, 0))
         }
         // The openings the browser wait now picks: the first run of a cycle, the
         // one `gather` announces.
@@ -1666,7 +1666,7 @@ describe('the children`s bank round can reach its own stage (work-order 687)', (
         // long synchronous replay starves the worker's own RPC.
         let steps = 0
         for (let t = 0; t < 400; t += dt) {
-          if (++steps % 3600 === 0) await new Promise((resolve) => setTimeout(resolve, 0))
+          if (++steps % 1200 === 0) await new Promise((resolve) => setTimeout(resolve, 0))
           frame(v, dt)
           const b = v.bank!
           if (b.phase === 'roam') roamFor += dt
