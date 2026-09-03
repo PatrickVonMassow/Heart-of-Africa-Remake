@@ -4197,6 +4197,18 @@ Build order, chosen so no two parallel agents own the same file:
   as a pre-existing defect the tripwire surfaced, not a regression — but CONFIRM that on
   `main` before fixing, because a confirmation is one run and a wrong assumption is a
   rebuild.
+  A SECOND COMPOSITION, AND THE DRINK LEAD DOES NOT COVER IT (measured 03.09.2026,
+  07:21:44Z, `enrichments` on the WebGL 2 lane, LARGE run on
+  `feat/1047-bank-game-readable`): `animal-buried — warthog bodyY=2.72 ground=3.59
+  y=2.43 young=false bathe=false drink=false dodge=false hop=false chunk=11,-1
+  shoreSeed=false parent=false child=false dPlayer=84`. No pose is running, the
+  animal is grown, and this time it is the ANCHOR that is wrong: `y` sits 1.16 BELOW
+  the ground sample, where the calf's `y` matched its ground exactly and only the
+  body offset was at fault. So the point owns TWO faults under one assert — a body
+  that dips below a correct anchor, and an anchor placed below the terrain — and it
+  may not be closed on the calf alone. Charged to this point in
+  `scripts/render-verify-charges.mjs` on the lane both firings were measured on;
+  the charge dies with the point, which is what its VERIFIABLE below already asks.
   THE LEAD THE DUMP GIVES: `drink=true` and `child=true` with `bathe=false`. The drink
   cycle lowers the body toward the water, and a CALF carries a smaller `scale`, which
   shrinks the assert's own tolerance (`ground - 0.75 * a.scale`) at the same time as the
@@ -4207,7 +4219,10 @@ Build order, chosen so no two parallel agents own the same file:
   for the whole drink cycle, at every scale the herds spawn; the tripwire stays armed and
   unchanged (it is the detector, not the thing to tune away); and if the drink pose
   legitimately needs to dip lower than the current tolerance, the tolerance is derived
-  from the pose rather than widened flat.
+  from the pose rather than widened flat. AND the second composition is answered in its
+  own terms: an animal's ANCHOR is never placed below the terrain sample under it, at
+  any distance from the player and with no pose running, so the assert has nothing left
+  to fire on.
   VERIFIABLE: a Vitest case over the drink-pose body offset sweeps the full scale range
   the herds use, at both ages, and asserts the offset never falls below the ground
   sample; `enrichments` runs on both backends without the `animal-buried` assert firing.
