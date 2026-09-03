@@ -1196,4 +1196,31 @@ export const RED_CHARGES = [
       + 'balance values and play-rock geometry, and touches no wildlife anchoring. The charge dies '
       + 'with 565.',
   },
+  {
+    point: 1043,
+    suite: 'polish',
+    backend: 'webgl',
+    kind: 'check',
+    match: /^the speaking figure itself stands in the frame, under its note/i,
+    // DETAIL-SCOPED TO A SAMPLE THAT FELL SHORT, which is the observation. The
+    // same check also prints `MEASURED NOTHING` when the probe produced no
+    // samples at all — a section that measured nothing is a different defect and
+    // stays a real red — and the bar is six of the sampled frames, so only a
+    // count BELOW six may be excused here.
+    detailMatch: /^body at \(-?\d+, -?\d+\), label bottom -?\d+ — [0-5]\/[1-9]\d* frames$/i,
+    why:
+      'THE SECOND CHECK OF THE SECTION POINT 1043 OWNS, measured 03.09.2026, 06:09:56Z, '
+      + 'webgl/polish in the LARGE run on feat/1047-bank-game-readable: `body at (651, 776), '
+      + 'label bottom 700 — 3/8 frames` against a bar of six. The speaker WALKS through the '
+      + 'sampling, so this reads whether a walking figure stays in its note\'s column for eight '
+      + 'shutters — the same staleness that makes 1043\'s candidate probe a coin toss, one step '
+      + 'further along, and 1043 now names it. '
+      + 'IT IS UNREPRODUCED ON BOTH SIDES OF THE BRANCH: sampled the same day on a quiet host '
+      + '(load 0.6) with `throttle-probe polish --section=speech-hypothesis --no-throttle '
+      + '--runs 6`, six runs on main at 7913c60e9 and six on the branch at ec2ed0280 — twelve '
+      + 'section runs, and this check went red in none of them. So the one occurrence says '
+      + 'nothing about the bank-game change under it. It is charged, not excused: 1043 owes the '
+      + 'selection that no longer rests on a walking coin toss, and the charge dies with that '
+      + 'point.',
+  },
 ]
