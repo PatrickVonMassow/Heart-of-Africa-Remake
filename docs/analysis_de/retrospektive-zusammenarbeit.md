@@ -1428,7 +1428,7 @@ keinen Träger hat. Gebucht als Punkt 956.
 
 ## Anhang A — Maschinell gepflegte Quellen-Übersicht
 
-Zuletzt aktualisiert: Donnerstag, 03.09.2026, 21:51 · Quellen-Fingerprint: `439e1d154182…`
+Zuletzt aktualisiert: Donnerstag, 03.09.2026, 22:22 · Quellen-Fingerprint: `9635b28ca80e…`
 
 Spalten heuristisch aus den Quellen abgeleitet (Anläufe = distinkte Datumsnennungen im Memory;
 Maßnahme = Guard-Skripte mit Namens-Treffer). Die inhaltliche Bewertung gehört der Prosa oben.
@@ -1530,10 +1530,10 @@ Maßnahme = Guard-Skripte mit Namens-Treffer). Die inhaltliche Bewertung gehört
 | A pending batch claim HOLDS THE LAUNCHER BACK — withdraw it whenever the claiming window is left unattended | 2 | mittel | clear-claim-guard.mjs | ✔ Mechanismus |
 | Multi-agent workflows eat the session/weekly limit fast — verify findings INLINE, keep fan-outs small, warn the user with a cost estimate before any big workflow | 3 | mittel | doc-budget-guard.mjs | ✔ Mechanismus |
 
-Erfasste Quellen: 94 Feedback-/Projekt-Memories · 57 Guard-/Hook-Skripte · 6 Revert-/Reapply-Commits · 122 Prozess-/Meta-TASKS-Punkte (davon 56 offen).
+Erfasste Quellen: 94 Feedback-/Projekt-Memories · 57 Guard-/Hook-Skripte · 6 Revert-/Reapply-Commits · 123 Prozess-/Meta-TASKS-Punkte (davon 57 offen).
 
-<!-- RETRO-FINGERPRINT: 439e1d15418284b905d47ba5e9698655c2e4d42384c5fcec6dd155b09592532d -->
-<!-- RETRO-LAST-REFRESHED: 2026-09-03T19:51:47.460Z -->
+<!-- RETRO-FINGERPRINT: 9635b28ca80e2d84d243967b0a2831fc51bd733a033186e323a87a6d8a1393f6 -->
+<!-- RETRO-LAST-REFRESHED: 2026-09-03T20:22:42.552Z -->
 <!-- AUTO-GENERATED:END -->
 
 ### 3.111 Ein Erfolg ist kein Beweis für den Weg, auf dem er zustande kam
@@ -5345,6 +5345,24 @@ Ref — die Sitzung musste erst aus dem Quelltext des Läufers herauslesen, dass
 der zweite Backend-Durchgang die Vorstufe überspringt, um zu wissen, wann sie
 wieder veröffentlichen darf.
 
+Am selben Abend traf dieselbe Klasse ein zweites Mal, und schärfer. Eine
+Sitzung, die den Stapel abgegeben hatte, legte einen Nutzerauftrag auf dem
+Carrier ab — dem Weg, der genau für diesen Fall existiert. Die Ablage hängte
+eine Zeigerzeile an den Erinnerungsindex, weil die Zeichenfolge, die das
+verhindert, drei Stunden zuvor beim Kürzen desselben Index herausgefallen war.
+Der Index stand damit über seiner Decke, und der Budget-Wächter blockierte jedes
+Zug-Ende. Seine Absage nannte zwei Auswege — Index kürzen oder Decke anheben —
+und beide sind Schreibzugriffe, die der Stillstands-Wächter derselben Sitzung
+ausnahmslos verbot. Vier Züge lang endete jeder Versuch in derselben Absage.
+
+Der Unterschied zum Vorfall am Morgen ist der Grad. Dort konnte die Sitzung der
+einen Auflage folgen und die andere brechen; hier konnte sie **keiner von beiden**
+folgen. Und der Weg, der schließlich half — den Stapel über den Anspruchsweg
+zurückfordern —, kam in der Absage des blockierenden Wächters nicht vor; er steht
+nur in der Absage des anderen. Die fünfundzwanzig Minuten dazwischen gingen für
+Nachrichten an eine Sitzung drauf, von der nicht einmal sicher war, dass sie
+Nachrichten empfängt.
+
 **Lehre:** Zwei Auflagen, die sich nur gegenseitig ausschließen, sind kein
 strenges Regime, sondern eine Falle mit Alibi — die Sitzung sieht wie ein
 Verstoß aus, obwohl sie gehorcht hat. Ein Wächter, der eine Handlung FORDERT,
@@ -5352,6 +5370,10 @@ muss die Fenster kennen, in denen ein anderer sie verbietet; er hat entweder
 stillzustehen oder die Forderung als bereits beantwortet zu lesen. Und die
 Bedingung dafür darf nicht im Quelltext eines dritten Skripts versteckt liegen:
 Wann eine Ref-Schreibung gefahrlos ist, muss der sagen, der sie verbietet.
+Ergänzung vom Abend: Ein Wächter, dessen sämtliche Auswege Schreibzugriffe sind,
+darf eine Sitzung ohne Schreibrecht gar nicht erst blockieren — er meldet den
+Befund und nennt den einen Weg, der ihr offensteht. Ein Ausweg, der nur in der
+Absage eines anderen Wächters steht, ist für den Blockierten kein Ausweg.
 
 ### 3.113 Ein Test, dem der Gegenstand unter den Fuessen weggeht, wird still gruen
 
