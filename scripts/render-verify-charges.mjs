@@ -1104,4 +1104,43 @@ export const RED_CHARGES = [
       + '1010 owes the throttle probe that separates real fusion at this crowd density from a '
       + 'loaded host, and the charge dies with it.',
   },
+  {
+    point: 1050,
+    suite: 'polish',
+    backend: 'webgpu',
+    featureLevel: 'compatibility',
+    kind: 'check',
+    match: /^bambara-village \(wet\): the boundary ground crop could be measured$/i,
+    // DETAIL-SCOPED to the one wording measured: this check can also fail with a
+    // crop that WAS measured and came out wrong, and that is a different red from
+    // a frame that never held the crop at all.
+    detailMatch: /^crop off-frame$/i,
+    why:
+      'MEASURED 03.09.2026, 01:00:06Z, webgpu/polish on a DIRTY tree at a9013987e, in a run '
+      + 'that also carried the Vite optimize-dep 504 point 939 owns; at 01:27:16Z the same '
+      + 'check was SUSPECT with its retry green, and the 02:09:51Z webgpu and 02:37:59Z webgl '
+      + 'runs were clean over 44 screenshots each — which under point 640 closes nothing. '
+      + 'The charge gives the red an owner that can CLOSE it; it does not decide the cause. '
+      + 'Point 1050 owes the throttle probe over `settlement-edge` that separates a real '
+      + 'framing defect from a loaded host, and the charge dies with that point.',
+  },
+  {
+    point: 1050,
+    suite: 'polish',
+    backend: 'webgpu',
+    featureLevel: 'compatibility',
+    kind: 'check',
+    match: /^leaving after several settlement visits stays fluid \(point \d+\)$/i,
+    // DETAIL-SCOPED to a DURATION and nothing else: the same check fails for a
+    // leave that never completes at all, and a missing measurement is not the red
+    // this charge was measured on.
+    detailMatch: /^\d+ ms$/i,
+    why:
+      'MEASURED 03.09.2026, 01:27:16Z, webgpu/polish on a DIRTY tree at a9013987e: 3683 ms in '
+      + 'section `travel-panorama-capture`, in a run whose Vite optimize-dep 504 point 939 '
+      + 'owns; the 02:09:51Z webgpu and 02:37:59Z webgl runs were clean over 44 screenshots '
+      + 'each, which closes nothing (point 640). A duration is the load signature, not a '
+      + 'verdict: point 1050 owes the throttle probe over that section which says whether the '
+      + 'spread is the host or the scene, and the charge dies with that point.',
+  },
 ]

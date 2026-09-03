@@ -14143,3 +14143,34 @@ to land than a mechanism that needs a review.
   Refs: src/scenes/place/bankGame.ts, src/scenes/place/tagShuffle.test.ts (the bank-round
   replay and `BANK_ROUND_WINDOW`)
   Bundle: Dorfleben.
+
+- [ ] 1050. Two picture checks went red on the polish lane in one night and neither has an
+  owner (read 03.09.2026 out of `.claude/render-verify-state.json`). Both runs were
+  webgpu/polish at compatibility level, on a DIRTY tree at `a9013987e`, and both also
+  carried the Vite optimize-dep 504 that point 939 owns:
+  - 01:00:06Z — "bambara-village (wet): the boundary ground crop could be measured",
+    detail "crop off-frame", section `settlement-edge`.
+  - 01:27:16Z — "leaving after several settlement visits stays fluid (point 96)", detail
+    "3683 ms", section `travel-panorama-capture`. In that same record the boundary-crop
+    check was only SUSPECT — its retry came back green.
+  The webgpu run at 02:09:51Z and the webgl run at 02:37:59Z were clean over 44
+  screenshots each, which under point 640 closes nothing.
+  WHY IT MATTERS: the two reds have different shapes and must not be waved through
+  together. "crop off-frame" is a FRAMING failure and reads like a defect; "3683 ms" is a
+  DURATION and reads like load. Neither has been separated from the host it was measured
+  on, and an unowned red holds the render gate shut for every point that comes after.
+  Final state:
+  - Each red is decided on a measurement rather than on a later green: the throttle probe
+    runs its own section on a quiet host (`node scripts/throttle-probe.mjs report
+    --section=settlement-edge --runs 8`, and likewise `travel-panorama-capture`), and this
+    point states the measured spread and the verdict — load or defect — for each.
+  - A red the probe calls a defect is FIXED here; a red the probe calls load keeps its
+    charge, with the measurement that earns it written down.
+  Test: the probe's report for both sections, plus — for whichever turns out to be a
+  defect — an assertion on the layer that can hold it.
+  Criticality: medium — no player has seen either symptom, but the pair blocks the render
+  gate, and the framing red may be a real defect nobody has looked at yet.
+  Refs: .claude/render-verify-state.json (the runs @2026-09-03T01:00:06.905Z and
+  @2026-09-03T01:27:16.220Z), scripts/verify/polish.mjs, scripts/throttle-probe.mjs,
+  scripts/render-verify-charges.mjs
+  Bundle: Session- & Repo-Hygiene.
