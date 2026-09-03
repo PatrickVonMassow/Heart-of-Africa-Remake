@@ -1428,7 +1428,7 @@ keinen Träger hat. Gebucht als Punkt 956.
 
 ## Anhang A — Maschinell gepflegte Quellen-Übersicht
 
-Zuletzt aktualisiert: Donnerstag, 03.09.2026, 17:50 · Quellen-Fingerprint: `09e387567144…`
+Zuletzt aktualisiert: Donnerstag, 03.09.2026, 22:22 · Quellen-Fingerprint: `9635b28ca80e…`
 
 Spalten heuristisch aus den Quellen abgeleitet (Anläufe = distinkte Datumsnennungen im Memory;
 Maßnahme = Guard-Skripte mit Namens-Treffer). Die inhaltliche Bewertung gehört der Prosa oben.
@@ -1515,6 +1515,7 @@ Maßnahme = Guard-Skripte mit Namens-Treffer). Die inhaltliche Bewertung gehört
 | Der 9-Punkte-Plan vom 01.09.2026 gegen die Governance-Selbstproduktion — Stand, offene Maßnahmen, Veto-Wege; Stichwort „Umsteuerung\" | 2 | mittel | — (Regel/Memory) | ◐ Regel |
 | On every user change request, also update CLAUDE.md and design.md where appropriate — standing directive for all future sessions. | 1 | niedrig | — (Regel/Memory) | ◐ Regel |
 | Every place/landmark/settlement name in the game uses the name that was VALID IN 1890, not a later renaming | 1 | niedrig | — (Regel/Memory) | ◐ Regel |
+| A user order from a session that cannot write the work order goes into the findings carrier as a --request, never into a fire-and-forget peer message | 1 | niedrig | — (Regel/Memory) | ◐ Regel |
 | vdzk-answer.mjs CLI refuses in SDK-driven sessions; record via its exported functions with the real transcript uuid | 1 | niedrig | — (Regel/Memory) | ◐ Regel |
 | Run the both-backend browser verify on the feat BRANCH before merging to main — merging an unverified render change first triggers a render-verify Stop-guard block-loop | 1 | niedrig | render-verify-guard.mjs | ✔ Mechanismus |
 | Headless probes must screenshot the DEFAULT zoom too (zoom-gated dressing like haze only shows there); headless WebGPU is impossible, so WebGPU-only branches stay user-checked | 2 | mittel | render-verify-guard.mjs | ✔ Mechanismus |
@@ -1529,10 +1530,10 @@ Maßnahme = Guard-Skripte mit Namens-Treffer). Die inhaltliche Bewertung gehört
 | A pending batch claim HOLDS THE LAUNCHER BACK — withdraw it whenever the claiming window is left unattended | 2 | mittel | clear-claim-guard.mjs | ✔ Mechanismus |
 | Multi-agent workflows eat the session/weekly limit fast — verify findings INLINE, keep fan-outs small, warn the user with a cost estimate before any big workflow | 3 | mittel | doc-budget-guard.mjs | ✔ Mechanismus |
 
-Erfasste Quellen: 93 Feedback-/Projekt-Memories · 57 Guard-/Hook-Skripte · 6 Revert-/Reapply-Commits · 121 Prozess-/Meta-TASKS-Punkte (davon 55 offen).
+Erfasste Quellen: 94 Feedback-/Projekt-Memories · 57 Guard-/Hook-Skripte · 6 Revert-/Reapply-Commits · 123 Prozess-/Meta-TASKS-Punkte (davon 57 offen).
 
-<!-- RETRO-FINGERPRINT: 09e387567144aa8d54464e1ab541ac85a93ab4ab6f04219c2102245d91afeefa -->
-<!-- RETRO-LAST-REFRESHED: 2026-09-03T15:50:12.468Z -->
+<!-- RETRO-FINGERPRINT: 9635b28ca80e2d84d243967b0a2831fc51bd733a033186e323a87a6d8a1393f6 -->
+<!-- RETRO-LAST-REFRESHED: 2026-09-03T20:22:42.552Z -->
 <!-- AUTO-GENERATED:END -->
 
 ### 3.111 Ein Erfolg ist kein Beweis für den Weg, auf dem er zustande kam
@@ -5344,6 +5345,24 @@ Ref — die Sitzung musste erst aus dem Quelltext des Läufers herauslesen, dass
 der zweite Backend-Durchgang die Vorstufe überspringt, um zu wissen, wann sie
 wieder veröffentlichen darf.
 
+Am selben Abend traf dieselbe Klasse ein zweites Mal, und schärfer. Eine
+Sitzung, die den Stapel abgegeben hatte, legte einen Nutzerauftrag auf dem
+Carrier ab — dem Weg, der genau für diesen Fall existiert. Die Ablage hängte
+eine Zeigerzeile an den Erinnerungsindex, weil die Zeichenfolge, die das
+verhindert, drei Stunden zuvor beim Kürzen desselben Index herausgefallen war.
+Der Index stand damit über seiner Decke, und der Budget-Wächter blockierte jedes
+Zug-Ende. Seine Absage nannte zwei Auswege — Index kürzen oder Decke anheben —
+und beide sind Schreibzugriffe, die der Stillstands-Wächter derselben Sitzung
+ausnahmslos verbot. Vier Züge lang endete jeder Versuch in derselben Absage.
+
+Der Unterschied zum Vorfall am Morgen ist der Grad. Dort konnte die Sitzung der
+einen Auflage folgen und die andere brechen; hier konnte sie **keiner von beiden**
+folgen. Und der Weg, der schließlich half — den Stapel über den Anspruchsweg
+zurückfordern —, kam in der Absage des blockierenden Wächters nicht vor; er steht
+nur in der Absage des anderen. Die fünfundzwanzig Minuten dazwischen gingen für
+Nachrichten an eine Sitzung drauf, von der nicht einmal sicher war, dass sie
+Nachrichten empfängt.
+
 **Lehre:** Zwei Auflagen, die sich nur gegenseitig ausschließen, sind kein
 strenges Regime, sondern eine Falle mit Alibi — die Sitzung sieht wie ein
 Verstoß aus, obwohl sie gehorcht hat. Ein Wächter, der eine Handlung FORDERT,
@@ -5351,6 +5370,10 @@ muss die Fenster kennen, in denen ein anderer sie verbietet; er hat entweder
 stillzustehen oder die Forderung als bereits beantwortet zu lesen. Und die
 Bedingung dafür darf nicht im Quelltext eines dritten Skripts versteckt liegen:
 Wann eine Ref-Schreibung gefahrlos ist, muss der sagen, der sie verbietet.
+Ergänzung vom Abend: Ein Wächter, dessen sämtliche Auswege Schreibzugriffe sind,
+darf eine Sitzung ohne Schreibrecht gar nicht erst blockieren — er meldet den
+Befund und nennt den einen Weg, der ihr offensteht. Ein Ausweg, der nur in der
+Absage eines anderen Wächters steht, ist für den Blockierten kein Ausweg.
 
 ### 3.113 Ein Test, dem der Gegenstand unter den Fuessen weggeht, wird still gruen
 
@@ -5381,3 +5404,40 @@ geblieben, haette man den gepruefen Mechanismus danach entfernt — weil sie auf
 die Gelegenheit warteten, statt sie herzustellen. Ein Test, der einen Mann auf
 die Grabstelle STELLT, prueft die Regel; einer, der zusieht, ob zufaellig einer
 dort steht, prueft die Wuerfel.
+
+### 3.232 Die Maschine lud sich selbst ein und nannte es eine Anweisung des Nutzers
+
+Am 03.09.2026 öffnete der Nutzer ein Fenster, um eine Frage zu stellen. Die
+Sitzung meldete ihm kurz darauf, sie habe die Batch übernommen. Nachgemessen an
+derselben Sitzung: Der Prozess lief seit 16:17:48; ein `/clear` gab ihm eine
+neue Sitzungs-Kennung, und der SessionStart-Hook gewann um 21:00:46 die
+gewöhnliche atomare Übernahme — dreieinhalb Minuten, bevor die Sitzung ihren
+ersten Werkzeugaufruf tat. Die geschriebene Sperre trug `"kind": "session"`,
+nicht die Vormerkung des Launchers. Es gab also keinen Entschluss, den man hätte
+prüfen können: Die teuerste Tätigkeit der Maschine begann, weil ein Hook
+schneller war als der erste Gedanke.
+
+Der zweite Teil wiegt schwerer als der erste. Derselbe Hook fügt dem Kontext den
+fest einprogrammierten Satz „Standing user instruction: continue the batch
+autonomously" bei. Die Sitzung liest ihn als Auftrag — und er ist keiner. In dem
+Gespräch, in dem er auftauchte, hatte der Nutzer nichts dergleichen gesagt; er
+hatte eine Frage gestellt. Damit erzeugt die Infrastruktur eine Freigabe, die
+der Nutzer nie erteilt hat, und legt sie dem Modell in den Mund, das sich später
+darauf beruft. Das ist genau die Bauform, die das Memory `no-invented-user-
+instructions` verbietet, nur eine Ebene tiefer: nicht das Modell erfindet die
+Anweisung, sondern das Skript, dem das Modell glauben muss.
+
+Die naheliegende Reparatur — Übernahme nur noch bei Vormerkung — ist die
+gefährliche. Verliert eine vom Launcher geschickte Nachfolgerin ihre Vormerkung,
+darf die Batch nicht ownerlos liegenbleiben; falsch gebaut steht sie still,
+und Stillstand ist der eine Zustand, den diese Steuerung nie erzeugen soll. Der
+Punkt wurde deshalb mit Test eingereiht statt als schnelle Bedingung gebaut, und
+hinter die Freigabe gestellt: Er hält sie nicht auf, und der Nutzer kann eine
+uneingeladene Eignerin mit einem Befehl anhalten.
+
+**Lehre:** Eine Vollmacht, die eine Sitzung sich selbst ausstellt, ist keine.
+Wo ein Hook Kontext einspeist, der wie eine Nutzeräußerung klingt, muss er sagen,
+woher sie stammt — und wo er nichts vorweisen kann, hat er zu orientieren statt
+zu beauftragen. Die Gegenprobe gehört zur selben Änderung: Autonomie, die nur
+noch auf Einladung anspringt, muss beweisen, dass die Einladung auch dann
+ankommt, wenn der Weg dahin abbricht.

@@ -243,6 +243,49 @@ put it is the mistake this line exists to stop.
   Bundle: Urlaubsfestigkeit (not worked beside 947, 958, 985 or 1002 — they edit the
   same emergency/standstill decision core).
 
+- [ ] 1052. The elder retires and the audience overlay with him: one chief, met outside
+  at the drums (user 03.09.2026).
+  THE ORDER (user, 03.09.2026, verbatim): »Okay, dann baue das so um und reihe das in der
+  Queue relativ weit oben, an geeigneter Stelle ein. Vielleicht direkt vor oder zusammen
+  mit 689? Zu deiner Frage bzgl. Raub-Option: streichen.« Decided in the same
+  conversation, verbatim: »Das mit den Richtungen ist nur ein Platzhalter für eine später
+  eingeführte regionale Mechanik. Das brauchen wir erstmal nicht mehr. Und das mit dem
+  verherten Gut auch. Kann erstmal alles raus. Also ja: Das Beobachtungsmodell soll das
+  perspektivisch ersetzen. In den anderen Regionen soll es nur andere Dinge geben, die zu
+  beobachten sind. Der Älteste - in seiner aktuellen Form - scheint mir damit erstmal
+  komplett überflüssig zu sein.« This settles the board card "Ältester und
+  Richtungswort-Ebene: ganz streichen oder nur im Kommunikationsdorf?".
+  MEASURED 03.09.2026: the chief's hut interior is no scene — Space at the door opens the
+  audience DIALOG overlay (src/scenes/place/PlaceScene.tsx ~2495) while the drummer and
+  both drums stand outside in the village (PlaceLife); the elder's two talks teach the
+  region's direction system and reveal the revered good (src/state/store.ts ~1848) —
+  both pre-13.08 legacy, and the staging puts the message in a UI window while its
+  sound source stands behind the player.
+  Final state:
+  - ONE PERSON. The separate village-elder figure retires; the chief is the person. The
+    use key at the chief's hut brings him OUT of the hut; the audience dialog is gone.
+  - THE MESSAGE OUTSIDE. Asking stages the four-word drum message outdoors at the
+    drummer — diegetic, visible, exactly the strike plan drumMessage.ts defines; the
+    heard/journal flow (recorded after the last beat, reopenable) is unchanged.
+  - THE REWARD OUTSIDE. Point 689's handover (the dug-up thing → RIVER · DOWNSTREAM plus
+    the clay mould) happens with the same man outside. Specify and build this point
+    together with 689 so the no-precondition rework and the staging land as one flow.
+  - DELETED: the rifle-gated robbery option (design.md §12) — user: »streichen«; the
+    direction-system teaching; the revered-good reveal; and the goodwill/gift state
+    feeding them (store fields, dialog paths, i18n in both languages). Other regions
+    later get other things to OBSERVE (user), never an elder.
+  - design.md and docs/communication-poc-spec.md change with this point per CLAUDE.md §4
+    (§12 audience/robbery, §13.2 elder passages, the §8 revered reveal, the outdoor
+    staging).
+  Test: Vitest over the interaction and state cores (use at the hut → the chief steps
+  out → message heard; no audience dialog reachable; robbery and goodwill state gone);
+  the outdoor staging on the browser suites of the communication slice.
+  Criticality: high — it rebuilds the PoC's central hint path.
+  Refs: src/scenes/place/PlaceScene.tsx, src/scenes/place/PlaceLife.tsx,
+  src/state/store.ts, src/ui/Dialogs.tsx, src/communication/drumMessage.ts,
+  docs/communication-poc-spec.md, design.md §8/§12/§13.
+  Bundle: Dorfleben (specify together with 689, land adjacent).
+
 - [ ] 689. The chief speaks from the first minute, and pays in a direction and a mould (user
   13.08.2026, playing the deployed communication slice).
   The user played the deployed communication slice on 13.08.2026 with the debug
@@ -328,60 +371,6 @@ put it is the mistake this line exists to stop.
   Refs: src/communication/chiefReply.ts, src/state/store.ts (rockArtefact), src/ui/Dialogs.tsx, src/world/data/landmarks.ts (bandiagara), docs/205-world-accuracy-findings.md A18
   Bundle: Dorfleben.
 
-- [ ] 690. The classic game of tag moves to the port cities, and is silent there (user
-  13.08.2026, playing the deployed communication slice).
-  The user played the deployed communication slice on 13.08.2026 with the debug
-  switch "Speech: show concepts instead of syllables" on and could learn nothing:
-  "Ich erkenne da kein Fangspiel … Das Herumschicken wirkt wie zum Selbstzweck
-  eingeführt", and about the adults "Selbst wenn ich diese Übersetzungen sehe,
-  erkenne ich keinen Sinn hinter den Handlungen." The evening's conversation
-  diagnosed the cause — the design taught eleven concepts through situations
-  forced onto a game that cannot carry them — and rebuilt the whole slice around
-  five words, two teaching places and one game per settlement kind. This point is
-  one of six that carry that rebuild; they are specified together and read
-  together.
-
-  The six specifications were reviewed cross-vendor before filing (GPT-5.6 Sol at
-  effort high, 13.08.2026, verdict do-not-merge on the first draft): it found two
-  outright contradictions and, more valuable, three wrong readings a player could
-  learn and still finish the puzzle with. What stands here is the corrected state.
-  The classic game of tag survives — in the PORT CITIES and in any village without
-  a bank, and it is silent wherever it runs.
-
-  Final state:
-
-  1. The round that exists today — one child is IT, the group flees, the child that
-     is caught takes over the role, with its stamina, its break-offs and its
-     body-avoidance — is kept and becomes the PORT settlements' children's game. It
-     is the game the user asked for originally and it works; only the teaching
-     layer bolted onto it was wrong.
-  2. Wherever this game runs the children DO NOT SPEAK. There is no lect to learn
-     in a port, and syllables that mean nothing anywhere would only mislead.
-  3. WHICH SETTLEMENT PLAYS WHAT, with no gap and no overlap:
-     - a village WITH a bank: the bank game, and only that;
-     - a village WITHOUT a bank: this silent tag game, and only that;
-     - a port: this silent tag game, and only that.
-     No settlement ever runs two children's games at once.
-  4. The children of a port (and of a bankless village) get their own play ground,
-     derived like the village one and clearing that settlement's own vignettes by
-     the hearing radius.
-
-  Test: Vitest over the three settlement cases of §3 — each stages exactly one
-  game, the bank game only where a bank exists, and the tag game speaks nothing.
-  The existing children-motion gate keeps running against this game wherever it is
-  staged.
-  Constraints:
-  - Depends on the children's bank game only in so far as the two must not both
-    run in one settlement.
-  - The stuck/trembling child of the user's two bug reports lives in exactly this
-    steering. It MOVES WITH the game to the ports, so it must be cured at its cause
-    (carrier findings on 666) — otherwise the next report says "a child is stuck in
-    the harbour".
-  Quotes:
-  Nutzer, 13.08.2026 22:59: »Es ist schade, dass damit das bisherige Fangspiel, bei dem einer Fänger ist, die Gruppe vor ihm wegrennt und ein gefangenes Kind die Fängerrolle übernimmt, komplett wegfällt. Das würde ich zusätzlich als anderes Spiel beibehalten - allerdings nicht für die Dörfer, weil das sonst zu unübersichtlich wird, wenn zwei verschiedene Spiele parallel laufen. Aber in den Hafenstädten können die Kinder dieses klassische Fangspiel spielen.«
-  Refs: src/scenes/place/tagGame.ts, src/scenes/place/PlaceLife.tsx, src/scenes/place/lifeSpots.ts
-  Bundle: Dorfleben.
-
 - [ ] 691. A guess is entered with space, and the nearer thing wins (user 13.08.2026, playing
   the deployed communication slice).
   The user played the deployed communication slice on 13.08.2026 with the debug
@@ -435,6 +424,60 @@ put it is the mistake this line exists to stop.
   Nutzer, 13.08.2026 22:59: »Eine Änderung an der Bedienung: Anstatt per Klicken eine Interpretation für etwas Gesagtes festlegen zu können, soll das per SPACE passieren. Das ist ja die Benutzen-Taste. Zusätzlich jetzt Klicken einzuführen war nur unnötig umständlich.«
   Nutzer, 13.08.2026 23:13: »Vorfahrt hat, was dem Spieler näher ist.«
   Refs: src/scenes/place/SpeechLabels.tsx, src/communication/speechTarget.ts, src/ui/Dialogs.tsx, src/i18n/de.ts, src/i18n/en.ts
+  Bundle: Dorfleben.
+
+- [ ] 690. The classic game of tag moves to the port cities, and is silent there (user
+  13.08.2026, playing the deployed communication slice).
+  The user played the deployed communication slice on 13.08.2026 with the debug
+  switch "Speech: show concepts instead of syllables" on and could learn nothing:
+  "Ich erkenne da kein Fangspiel … Das Herumschicken wirkt wie zum Selbstzweck
+  eingeführt", and about the adults "Selbst wenn ich diese Übersetzungen sehe,
+  erkenne ich keinen Sinn hinter den Handlungen." The evening's conversation
+  diagnosed the cause — the design taught eleven concepts through situations
+  forced onto a game that cannot carry them — and rebuilt the whole slice around
+  five words, two teaching places and one game per settlement kind. This point is
+  one of six that carry that rebuild; they are specified together and read
+  together.
+
+  The six specifications were reviewed cross-vendor before filing (GPT-5.6 Sol at
+  effort high, 13.08.2026, verdict do-not-merge on the first draft): it found two
+  outright contradictions and, more valuable, three wrong readings a player could
+  learn and still finish the puzzle with. What stands here is the corrected state.
+  The classic game of tag survives — in the PORT CITIES and in any village without
+  a bank, and it is silent wherever it runs.
+
+  Final state:
+
+  1. The round that exists today — one child is IT, the group flees, the child that
+     is caught takes over the role, with its stamina, its break-offs and its
+     body-avoidance — is kept and becomes the PORT settlements' children's game. It
+     is the game the user asked for originally and it works; only the teaching
+     layer bolted onto it was wrong.
+  2. Wherever this game runs the children DO NOT SPEAK. There is no lect to learn
+     in a port, and syllables that mean nothing anywhere would only mislead.
+  3. WHICH SETTLEMENT PLAYS WHAT, with no gap and no overlap:
+     - a village WITH a bank: the bank game, and only that;
+     - a village WITHOUT a bank: this silent tag game, and only that;
+     - a port: this silent tag game, and only that.
+     No settlement ever runs two children's games at once.
+  4. The children of a port (and of a bankless village) get their own play ground,
+     derived like the village one and clearing that settlement's own vignettes by
+     the hearing radius.
+
+  Test: Vitest over the three settlement cases of §3 — each stages exactly one
+  game, the bank game only where a bank exists, and the tag game speaks nothing.
+  The existing children-motion gate keeps running against this game wherever it is
+  staged.
+  Constraints:
+  - Depends on the children's bank game only in so far as the two must not both
+    run in one settlement.
+  - The stuck/trembling child of the user's two bug reports lives in exactly this
+    steering. It MOVES WITH the game to the ports, so it must be cured at its cause
+    (carrier findings on 666) — otherwise the next report says "a child is stuck in
+    the harbour".
+  Quotes:
+  Nutzer, 13.08.2026 22:59: »Es ist schade, dass damit das bisherige Fangspiel, bei dem einer Fänger ist, die Gruppe vor ihm wegrennt und ein gefangenes Kind die Fängerrolle übernimmt, komplett wegfällt. Das würde ich zusätzlich als anderes Spiel beibehalten - allerdings nicht für die Dörfer, weil das sonst zu unübersichtlich wird, wenn zwei verschiedene Spiele parallel laufen. Aber in den Hafenstädten können die Kinder dieses klassische Fangspiel spielen.«
+  Refs: src/scenes/place/tagGame.ts, src/scenes/place/PlaceLife.tsx, src/scenes/place/lifeSpots.ts
   Bundle: Dorfleben.
 
 - [ ] 692. Every document describes the rebuilt communication mechanic, not the old one (user
@@ -851,6 +894,46 @@ put it is the mistake this line exists to stop.
   tag plus `poc` dynamically, but a tag push alone does not trigger it. Then VERIFY
   that /v0.3/ and /poc/ serve the new state, and FREEZE the tag: it is never
   re-pointed.
+
+- [ ] 1053. A session the user opened for something else silently becomes the batch owner
+  (user 03.09.2026, on seeing this session announce "Batch übernommen": »Wieso hast du die
+  Batch übernommen, ich habe dich nicht dazu aufgefordert. Manchmal fällt sie dir
+  anscheinend einfach irgendwie zu.«).
+  MEASURED 03.09.2026 on this very session: the process had been running since 16:17:48; a
+  `/clear` gave it a new session id, `scripts/batch-resume-hook.mjs` ran on SessionStart
+  and won the ordinary atomic `acquire` at 21:00:46 — three and a half minutes before the
+  session's first tool call. The lock it wrote carries `"kind": "session"`, NOT the
+  launcher's `pending-spawn`. The same hook then injects the hard-coded sentence "Standing
+  user instruction: continue the batch autonomously"
+  (scripts/batch-resume-hook.mjs ~436), which the session reads as an order the user never
+  gave in that conversation.
+  WHY IT MATTERS: the batch is the machine's most expensive activity, and it starts without
+  anyone deciding that it should. Every window the user opens to ask a question becomes an
+  owner that dispatches agents, merges and pushes.
+  Final state:
+  - Ownership on SessionStart requires an INVITATION: the launcher's `pending-spawn`
+    reservation converted for THIS session (`acquired-spawn`), or a lock this same process
+    already held across a compaction (`mine`). A bare `acquire` in a session with no
+    reservation orients the session — repository state, open points, runbook — and says how
+    to take the batch, but does not take it.
+  - THE LAUNCHER'S AUTONOMY IS NOT WEAKENED. A spawned successor that reaches the hook with
+    its reservation lost must not leave the batch ownerless: the fallback is measured
+    against the spawn token the launcher already writes, and a successor that proves it,
+    acquires. Whatever cannot prove it raises the launcher's existing `lockConverted`
+    telemetry rather than silently taking or silently dropping the batch.
+  - The injected "Standing user instruction" sentence stops asserting a user order for a
+    session that was not invited; an uninvited session is told the batch is available and
+    by which word the user starts it.
+  Test: Vitest over the hook's ownership branch — a pending-spawn conversion still owns, a
+  compaction of the owning process still owns, a bare session start does NOT own and gets
+  the orientation text without the standing-instruction sentence, and a spawned successor
+  whose reservation is gone but whose spawn token holds still owns.
+  Criticality: high — it decides who may spend the machine, and getting the fallback wrong
+  stalls the batch instead.
+  Refs: scripts/batch-resume-hook.mjs (~372-440), scripts/batch-singleton.mjs (acquire,
+  convertPendingSpawn), scripts/batch-autostart.mjs (~1637 the pending-spawn writer, ~988
+  lockConverted), scripts/batch-lock.mjs
+  Bundle: Session- & Repo-Hygiene.
 
 - [ ] 1049. A user front-order and the communication-first rule both failed to order the
   queue: the bank-round point was filed carrying "worked NEXT, at the FRONT" in its own
@@ -14287,4 +14370,45 @@ to land than a mechanism that needs a review.
   Refs: .claude/render-verify-state.json (the runs @2026-09-03T01:00:06.905Z and
   @2026-09-03T01:27:16.220Z), scripts/verify/polish.mjs, scripts/throttle-probe.mjs,
   scripts/render-verify-charges.mjs
+  Bundle: Session- & Repo-Hygiene.
+
+
+
+- [ ] 1054. A content guard demands a write from a session that no guard lets write
+  (measured 03.09.2026, four blocked turn ends in a row).
+  MEASURED: at 21:42 a stood-down session deposited a user order on the findings
+  carrier. `ensureIndexed()` in `scripts/finding.mjs` appended an index line to
+  MEMORY.md, which pushed it to 51 lines / 806 words against its ceiling of 50 /
+  787. `doc-budget-guard` then blocked every turn end. Its own remedy names exactly
+  two ways out — cut MEMORY.md, or raise the ceiling in
+  `scripts/doc-budget-core.mjs` — and BOTH are writes, while the ownership
+  stand-down refused every write the session could make: Write and Edit refused by
+  the stand-down guard, shell redirection refused by the main-write guard. The
+  guard that demanded the repair demanded it from the one session forbidden to make
+  it. Four turns ended in the same refusal before a claim on the batch cleared it,
+  about 25 minutes later.
+  WHY IT MATTERS: `doc-budget-guard` says in its own header that it deliberately
+  does NOT stand down, because documents are edited during pauses. That reasoning
+  holds for the OWNER. For a stood-down session it produces a hard deadlock, and it
+  is not the only content guard with the property — `dashboard-conciseness-guard`
+  and the board guards have the same shape. Any of them can pin a session that is
+  correctly standing down.
+  Final state:
+  - A content guard that blocks a turn end states, in its refusal, what a session
+    WITHOUT the batch lock is to do — the sanctioned route
+    (`scripts/batch-claim.mjs`) rather than two remedies that session cannot reach.
+  - A guard whose only remedies are writes does not block a stood-down session's
+    turn end at all: it reports the finding and lets the stop through, because the
+    session it is blocking cannot be the one that fixes it. The owner's turn end
+    still blocks, which is where the check earns its keep.
+  - Which guards are content guards and which stand down is stated in one place
+    rather than in each guard's header comment.
+  Test: Vitest over the guard decision with the lock held and not held — the same
+  over-budget document blocks the owner and reports-without-blocking the stood-down
+  session; the refusal text names the claim path.
+  Criticality: high — it stops a session dead with no route out, and the route that
+  finally worked was one the blocking guard never mentioned.
+  Refs: scripts/doc-budget-guard.mjs (5-7 the stand-down comment, 34-47 the block),
+  scripts/doc-budget-core.mjs, scripts/dashboard-conciseness-guard.mjs,
+  scripts/batch-claim.mjs, scripts/finding.mjs (ensureIndexed)
   Bundle: Session- & Repo-Hygiene.
