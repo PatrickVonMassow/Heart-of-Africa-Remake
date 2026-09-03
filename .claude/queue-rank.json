@@ -1158,6 +1158,12 @@
       "why": "Bookkeeping for two polish picture reds whose cause point 939 already owns (Vite 504 on a dirty tree); no player impact, so it stays behind the release point 174.",
       "origin": "machine",
       "place": "last"
+    },
+    "1051": {
+      "at": "2026-09-03T08:33:35.701Z",
+      "why": "Die Änderung an DIG ist die Anordnung des Nutzers vom 03.09.2026, und sie gehört in die Verständigungsscheibe, die vor dem Release umgebaut wird — der Dokumenten-Sweep 692 dahinter muss über den Endzustand schließen.",
+      "origin": "user",
+      "place": "ahead"
     }
   },
   "boundary": {
@@ -1193,7 +1199,7 @@
     "why": "The order standing in front of the release today is the arrangement that predates this rule; the four machine-filed points that had ranked themselves there were moved behind 174 first"
   },
   "settled": {
-    "at": "2026-09-03T03:58:47.183Z",
+    "at": "2026-09-03T08:33:35.710Z",
     "points": [
       174,
       184,
@@ -1557,7 +1563,8 @@
       1047,
       1048,
       1049,
-      1050
+      1050,
+      1051
     ]
   }
 }
