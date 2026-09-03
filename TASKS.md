@@ -284,7 +284,7 @@ put it is the mistake this line exists to stop.
   Refs: src/scenes/place/PlaceScene.tsx, src/scenes/place/PlaceLife.tsx,
   src/state/store.ts, src/ui/Dialogs.tsx, src/communication/drumMessage.ts,
   docs/communication-poc-spec.md, design.md §8/§12/§13.
-  Bundle: communication rebuild (specify together with 689, land adjacent).
+  Bundle: Dorfleben (specify together with 689, land adjacent).
 
 - [ ] 689. The chief speaks from the first minute, and pays in a direction and a mould (user
   13.08.2026, playing the deployed communication slice).
