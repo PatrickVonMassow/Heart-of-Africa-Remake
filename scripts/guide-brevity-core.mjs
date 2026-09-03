@@ -513,7 +513,10 @@ export const LIMITS = {
   // and the ceiling follows it: 4737 -> 4735, no unearned headroom.
   // 01.09.2026 (fourth): the off-switch tip justified beside maxLines measures
   // 61 words, so this ceiling moves 4735 -> 4796 by the same measurement.
-  maxWords: 4904,
+  // 03.09.2026: the wait-loop lesson folded into the self-measuring-probe
+  // pitfall lands one word under the old ceiling, so it moves 4904 -> 4903 —
+  // the ceiling follows the measurement, never the other way around.
+  maxWords: 4903,
   // A pitfall entry = the risk lines plus its prompt. Anything longer is a
   // story, not a tip.
   maxEntryLines: 11,
