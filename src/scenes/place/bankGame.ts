@@ -140,6 +140,18 @@ export interface BankChild extends TagChild {
    *  that result instead of sweeping immediately through the remaining line. */
   madeTag: boolean
   /**
+   * THE SIDE THIS RUNNER SWERVES TO, committed for the run: +1, -1, or 0 before
+   * the swerve has engaged at all. The side is chosen from where the catcher
+   * stands the first time he comes inside `dodgeDistance`, and then HELD. Read
+   * fresh every frame it flipped the moment the catcher crossed the runner's own
+   * line to the rock — and with the swerve widened to `dodgeReach` the runner
+   * then walked the width of it back the other way, over and over, which the
+   * child-motion metric reads for exactly what it looks like: walking without
+   * getting anywhere. It is the same one-side commitment `moveChild` makes round
+   * an obstacle and `chooseQuarry` makes on a target.
+   */
+  dodgeSide: number
+  /**
    * THE WAY ROUND THE VILLAGE, for the one walk of the round that is long: the
    * call takes the group from its own quarter down to the bank, and in a
    * settlement whose quarter lies across the built ground from its water that is
@@ -412,6 +424,7 @@ export function createBankGame(
       lane: 0,
       quarry: -1,
       madeTag: false,
+      dodgeSide: 0,
       path: null,
       pathTo: null,
       replan: 0,
@@ -607,6 +620,9 @@ function openRun(s: BankState, stage: BankStage, cfg: BankConfig): void {
     s.children[idx].quarry = -1
     s.children[idx].madeTag = false
   }
+  // A fresh run is a fresh choice of side: the stations have swapped and the
+  // catcher stands somewhere else entirely.
+  for (const c of s.children) c.dodgeSide = 0
   // THE TAP (spec item 4). The catcher names the rock he is STANDING at, at the
   // start of the run, with nobody arriving anywhere — so ROCK cannot be read as
   // "made it".
@@ -1257,12 +1273,16 @@ function dodgedAim(
       // own configured width as the runner reaches the rock: without that
       // arrival taper a successful dodge aimed beside the collider forever and
       // turned into a timeout rather than a visible swerve followed by safety.
-      const cross = (k.x - c.x) * dz - (k.z - c.z) * dx
+      // COMMITTED ON FIRST ENGAGEMENT, not re-read per frame — see `dodgeSide`.
+      if (c.dodgeSide === 0) {
+        const cross = (k.x - c.x) * dz - (k.z - c.z) * dx
+        c.dodgeSide = cross > 0 ? -1 : 1
+      }
       const arrivalTaper = Math.max(
         0,
         Math.min(1, (len - cfg.reachDistance) / Math.max(1e-6, cfg.dodgeReach)),
       )
-      across += (cross > 0 ? -1 : 1) * cfg.dodgeReach * (1 - gap / cfg.dodgeDistance) * arrivalTaper
+      across += c.dodgeSide * cfg.dodgeReach * (1 - gap / cfg.dodgeDistance) * arrivalTaper
     }
   }
   return { x: farRock.x + px * across, z: farRock.z + pz * across }
