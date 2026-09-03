@@ -1830,16 +1830,21 @@ describe('the children`s bank round can reach its own stage (work-order 687)', (
    * while the cases above assert reachable ground and a played cycle, never
    * per-child progress. Three of the four river layouts were ungated.
    *
-   * THE WINDOW IS 120 s BECAUSE THAT IS WHERE THE WHOLE CYCLE FITS, and the
-   * carve is gone from all of it. Measured over the four layouts: at 60 s the
-   * round has not left its opening phases in ANY of them (roam 55 s, gather 5 s,
-   * no run at all), so a minute would gate the roaming and nothing else; at
-   * 120 s every one of them has closed a full cycle — roam 75.5-88.5 s, gather
-   * 20.8-33.9 s, run 2.4-3.3 s, part 8 s, runs 1, cycles 1.
+   * THE WINDOW IS 200 s BECAUSE THAT IS WHERE THE WHOLE CYCLE FITS, and the
+   * carve is gone from all of it. It was 120 s, measured on a round of four
+   * children whose catcher swept the line: one run of 2.4-3.3 s closed the
+   * cycle. Work-order 1047 made the round watchable instead — a fifth child,
+   * a catcher that holds at its one tag, a held tap before each run and a
+   * readable crouch at the end — so a cycle now takes three or four runs and
+   * the gather walks one more body down to the bank. Re-measured over 400 s of
+   * each of the four layouts, the first full cycle closes at 105.1 s
+   * (nubian@42), 108.3 s (bambara@2972259115), 164.7 s (mandinka@99) and
+   * 169.7 s (bambara@42); 200 s clears the slowest of them by half a minute.
    */
+
   for (const [placeId, seed] of RIVER_VILLAGES) {
     it(`${placeId} at seed ${seed} keeps every child covering ground with the carve gone`, () => {
-      const { v, paths } = playRound(placeId, seed, 120)
+      const { v, paths } = playRound(placeId, seed, 200)
       // THE WINDOW HELD A WHOLE CYCLE, read off the very replay judged below —
       // not a second one that could have diverged. Without this the gate could
       // pass on a round stalled in its roam, which is the one state the phases
@@ -1849,26 +1854,31 @@ describe('the children`s bank round can reach its own stage (work-order 687)', (
       const r = shuffleWindows(paths)
       const burst = shuffleWindows(paths, CHILD_MOTION.short)
       // AND BOTH MEASURES LOOKED AT SOMETHING: a share is 0 when nothing was bad
-      // and equally when nothing was judged. Measured over the 120 s cycle, the
-      // same in all four layouts: 476 judged child-seconds and least judgeable
-      // child 0.992 on the one-second window, 478 and 0.996 on the burst — the
+      // and equally when nothing was judged. Measured over the 200 s cycle, the
+      // same in all four layouts: 995 judged child-seconds and least judgeable
+      // child 0.995 on the one-second window, 998 and 0.998 on the burst — the
       // missing part is the tail no window can reach into.
       expect(judgedEnough(r)).toBe(true)
       expect(judgedEnough(burst)).toBe(true)
-      // THE VERDICT OFF THE WORST CHILD, because one child wedged among three
-      // healthy ones is divided by four in every group average — which is the
+      // THE VERDICT OFF THE WORST CHILD, because one child wedged among four
+      // healthy ones is divided by five in every group average — which is the
       // whole shape of the cost being gated here. Measured with the carve gone,
       // worst child of each layout: bambara@42 0.000 %, bambara@2972259115
-      // 0.000 %, nubian@42 0.000 %, mandinka@99 0.000 % against the 0.25 % gate
-      // — exactly zero, not a rounded value: not one window of the cycle is bad
-      // in any of the four, and the burst window reads 0.000 % in all four too.
+      // 0.000 %, nubian@42 0.050 %, mandinka@99 0.126 % against the 0.25 % gate,
+      // and the burst window 0.000 / 0.000 / 0.042 / 0.000 %. Two of them read
+      // above zero where all four read exactly zero before 1047: the swerve is
+      // wider now (dodgeReach 3 -> 4.5), so a runner bending round its catcher
+      // covers a shorter straight line inside one second. That is the widened
+      // dodge being paid for, and the margin to the gate is still a factor of
+      // two on the worst of the four.
       expect(r.leastJudged).toBeGreaterThan(CHILD_MOTION.judgedGate)
       expect(r.worstShare).toBeLessThan(CHILD_MOTION.shareGate)
       expect(burst.worstShare).toBeLessThan(CHILD_MOTION.shareGate)
       // AND NOBODY IS CARRIED OUT OF A WEDGE INSTEAD: the rescue teleport is what
       // ENDS a snag, so a layout that keeps its share down only by picking a
-      // child up would fail here rather than pass above. Measured: not one rescue
-      // and not one carried metre falls in the cycle, in any of the four.
+      // child up would fail here rather than pass above. Re-measured over the
+      // 200 s window: not one rescue and not one carried metre falls in the
+      // cycle, in any of the four.
       const rescues = rescueRate(paths)
       expect(rescues.carriedPublished).toBe(true)
       expect(rescues.nudgesPublished).toBe(true)
