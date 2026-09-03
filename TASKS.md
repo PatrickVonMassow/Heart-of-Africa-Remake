@@ -243,6 +243,49 @@ put it is the mistake this line exists to stop.
   Bundle: Urlaubsfestigkeit (not worked beside 947, 958, 985 or 1002 — they edit the
   same emergency/standstill decision core).
 
+- [ ] 1052. The elder retires and the audience overlay with him: one chief, met outside
+  at the drums (user 03.09.2026).
+  THE ORDER (user, 03.09.2026, verbatim): »Okay, dann baue das so um und reihe das in der
+  Queue relativ weit oben, an geeigneter Stelle ein. Vielleicht direkt vor oder zusammen
+  mit 689? Zu deiner Frage bzgl. Raub-Option: streichen.« Decided in the same
+  conversation, verbatim: »Das mit den Richtungen ist nur ein Platzhalter für eine später
+  eingeführte regionale Mechanik. Das brauchen wir erstmal nicht mehr. Und das mit dem
+  verherten Gut auch. Kann erstmal alles raus. Also ja: Das Beobachtungsmodell soll das
+  perspektivisch ersetzen. In den anderen Regionen soll es nur andere Dinge geben, die zu
+  beobachten sind. Der Älteste - in seiner aktuellen Form - scheint mir damit erstmal
+  komplett überflüssig zu sein.« This settles the board card "Ältester und
+  Richtungswort-Ebene: ganz streichen oder nur im Kommunikationsdorf?".
+  MEASURED 03.09.2026: the chief's hut interior is no scene — Space at the door opens the
+  audience DIALOG overlay (src/scenes/place/PlaceScene.tsx ~2495) while the drummer and
+  both drums stand outside in the village (PlaceLife); the elder's two talks teach the
+  region's direction system and reveal the revered good (src/state/store.ts ~1848) —
+  both pre-13.08 legacy, and the staging puts the message in a UI window while its
+  sound source stands behind the player.
+  Final state:
+  - ONE PERSON. The separate village-elder figure retires; the chief is the person. The
+    use key at the chief's hut brings him OUT of the hut; the audience dialog is gone.
+  - THE MESSAGE OUTSIDE. Asking stages the four-word drum message outdoors at the
+    drummer — diegetic, visible, exactly the strike plan drumMessage.ts defines; the
+    heard/journal flow (recorded after the last beat, reopenable) is unchanged.
+  - THE REWARD OUTSIDE. Point 689's handover (the dug-up thing → RIVER · DOWNSTREAM plus
+    the clay mould) happens with the same man outside. Specify and build this point
+    together with 689 so the no-precondition rework and the staging land as one flow.
+  - DELETED: the rifle-gated robbery option (design.md §12) — user: »streichen«; the
+    direction-system teaching; the revered-good reveal; and the goodwill/gift state
+    feeding them (store fields, dialog paths, i18n in both languages). Other regions
+    later get other things to OBSERVE (user), never an elder.
+  - design.md and docs/communication-poc-spec.md change with this point per CLAUDE.md §4
+    (§12 audience/robbery, §13.2 elder passages, the §8 revered reveal, the outdoor
+    staging).
+  Test: Vitest over the interaction and state cores (use at the hut → the chief steps
+  out → message heard; no audience dialog reachable; robbery and goodwill state gone);
+  the outdoor staging on the browser suites of the communication slice.
+  Criticality: high — it rebuilds the PoC's central hint path.
+  Refs: src/scenes/place/PlaceScene.tsx, src/scenes/place/PlaceLife.tsx,
+  src/state/store.ts, src/ui/Dialogs.tsx, src/communication/drumMessage.ts,
+  docs/communication-poc-spec.md, design.md §8/§12/§13.
+  Bundle: communication rebuild (specify together with 689, land adjacent).
+
 - [ ] 689. The chief speaks from the first minute, and pays in a direction and a mould (user
   13.08.2026, playing the deployed communication slice).
   The user played the deployed communication slice on 13.08.2026 with the debug
