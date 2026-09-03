@@ -316,7 +316,7 @@ export const PLAY_ROCK_HEIGHT_UNITS = 1.05
  * dressing keeps `buildRock`'s cheap detail-0 mesh; only these two conspicuous
  * instances pay for detail 1 and deterministic vertex weathering.
  *
- * The bottom band is flattened after weathering and the mesh is left upright.
+ * The bottom band is flattened after weathering and the mesh is left level.
  * Its instance may yaw around that base, but never rolls onto an arbitrary
  * dodecahedron vertex — the failure that made the large stones look balanced.
  */

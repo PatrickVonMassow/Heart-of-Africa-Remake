@@ -28,7 +28,7 @@ import { spawnPointFree, standingClear, PLAYER_RADIUS, WALKER_RADIUS, type Colli
 import { ANIMAL_RADIUS, animalAnchors } from './animalSpots'
 import { closestOnPolyline } from './lanePlan'
 import { PLACES, placeById } from '../../world/geo'
-import { ROCK_VILLAGE_ID, ROCK_FOOTPRINT_UNITS, ROCK_HEIGHT_UNITS, communicationRockSite } from '../../world/communicationRock'
+import { ROCK_VILLAGE_ID, ROCK_FOOTPRINT_UNITS, communicationRockSite } from '../../world/communicationRock'
 import { inBankPlayLane } from './riverBank'
 import { balance } from '../../config/balance'
 import { setupGeodata } from '../../test/geodata'
@@ -480,9 +480,8 @@ describe('animal anchors stand on free ground (point 413)', () => {
 // open of the PoC village, and a boulder on the village square that everybody
 // walked to for no reason is exactly what the user read as meaningless on
 // 13.08.2026. The word ROCK is learnt at the two PLAY ROCKS on the bank now
-// (work-order 687, pinned in `bankStage.test.ts`), which are upright erratics of
-// the goal boulder's own shape family — so the object the word is learnt on is
-// the same KIND of thing the chief's message points at.
+// (work-order 687, pinned in `bankStage.test.ts`), which are large detailed
+// variants of the ordinary rock rather than another loose piece of dressing.
 describe('no settlement carries a lone teaching stone any more (work-order 688)', () => {
   it('gives every village its two bank rocks instead, and no third stone', () => {
     for (const p of PLACES) {
@@ -505,24 +504,16 @@ describe('no settlement carries a lone teaching stone any more (work-order 688)'
     }
   })
 
-  it('is the SMALL near stone: the erratic upstream is bigger and a journey away', () => {
+  it('keeps the play rocks settlement-sized and the erratic a journey away', () => {
     const layout = buildLayout(ROCK_VILLAGE_ID, 42)
     const rocks = layout.playRocks
     expect(rocks).not.toBeNull()
     if (!rocks) return
     const village = placeById(ROCK_VILLAGE_ID)
     const rock = communicationRockSite(42)
-    // SETTLEMENT SCALE, NOT WORLD SCALE. The mesh is the erratic's own, so its
-    // drawn size follows from the instance scale: a footprint of PLAY_ROCK_RADIUS
-    // and a height that stands well over a man without reaching a hut's ridge.
-    // Same shape, two classes of size — which is what the player has to transfer
-    // across, and it is measured through the constants both scenes draw from.
+    // SETTLEMENT SCALE, NOT WORLD SCALE. The drawn footprint follows from the
+    // instance scale and remains exactly the collider's PLAY_ROCK_RADIUS.
     expect(ROCK_FOOTPRINT_UNITS * rocks.scale).toBeCloseTo(PLAY_ROCK_RADIUS, 6)
-    const height = ROCK_HEIGHT_UNITS * rocks.scale
-    expect(height).toBeGreaterThan(2.5)
-    expect(height).toBeLessThan(6)
-    // And it stands UP: taller than it is wide, the way the goal boulder does.
-    expect(height).toBeGreaterThan(2 * ROCK_FOOTPRINT_UNITS * rocks.scale)
     // Distance: the play rocks are a walk down the bank, the erratic a journey.
     expect(Math.hypot(rocks.upstream.x, rocks.upstream.z)).toBeLessThan(layout.radius + 12)
     expect(Math.hypot(rock.lat - village.lat, rock.lon - village.lon)).toBeGreaterThan(1)
