@@ -656,12 +656,12 @@ function play(placeId: string, seed: number, seconds: number, dt = 1 / 60): Trac
  * group is playing before it judges anything; the pure proof of the user's own
  * bug had no such assertion at all, and would have gone green on a trace with no
  * game in it. The bars are measured on the four settlements replayed below —
- * four children, the whole minute played, 92-111 m walked per child-minute with
+ * five children, the whole minute played, 92-115 m walked per child-minute with
  * the bank round —
  * and set far below them: they separate a game from NOTHING, not a good game
  * from a poor one — and the walking bar is asked of the QUIETEST child, because
- * a group of four with one statue in it walks three quarters as far as a group
- * of four that all play.
+ * a group of five with one statue in it walks four fifths as far as a group
+ * of five that all play.
  */
 function expectLively(paths: Track[][]): void {
   const live = traceLiveness(paths)
@@ -671,10 +671,10 @@ function expectLively(paths: Track[][]): void {
   expect(live.walkedPerChildMinute).toBeGreaterThan(20)
   // THE SAME CONDITION THE LIVE GATE USES, from the same place (point 656): the
   // group played a majority of the game CLOCK, and every child walked WHILE it
-  // was played — one motionless child among three busy ones is invisible in a
+  // was played — one motionless child among four busy ones is invisible in a
   // sum, and walking counted over the whole trace would take a group's warm-up
-  // for a game. Re-measured with the bank round (work-order 687): the quietest
-  // child of each village walks 92-111 m per minute of play.
+  // for a game. Re-measured at five children (work-order 1047): the quietest
+  // child of each village walks 91-111 m per minute of play.
   expect(live.quietestWalkedPerPlayedMinute).toBeGreaterThan(CHILD_MOTION.walkFloor)
   expect(holdsAGame(live)).toBe(true)
 }
@@ -1094,46 +1094,36 @@ describe('and the gate SEES a child that is wedged (point 656)', () => {
     clearance: PenClearance = 'wall-band',
     evidence?: PenEvidence,
   ) {
-    // THE SEED IS THE ROOMY ONE (work-order 688). The construction needs a play
-    // ground it can throw a wall round: work-order 688's openness floor moved
-    // bambara@2972259115 onto a smaller, more open quarter (6.5 m to 4.0 m), and
-    // on a 4 m ground a wall of PEN_RADIUS round one child almost always
-    // encloses a sibling, so the re-pen was refused and the symptom starved —
-    // 1 placement where the case below needs a run of them. bambara@1337 gives
-    // the 6.0 m quarter this construction was calibrated on.
-    // THE VILLAGE AND SEED ARE MEASURED, NOT INHERITED (work-order 688). The
-    // construction rides a shipped play ground, and 688 moved every one of them:
-    // on bambara@2972259115 the quarter shrank from 6.5 m to 4.0 m under the new
-    // openness floor, and on 4 m of ground a wall of PEN_RADIUS round one child
-    // nearly always encloses a sibling — 1 placement where the case below needs a
-    // run of them. Scanned over the river villages at five seeds, nubian@42 is
-    // the ground that still shows the contrast: 15 placements, 3 of them refused
-    // by the stricter rule.
-    // THE VILLAGE AND SEED ARE MEASURED, NOT INHERITED (work-order 688). The
-    // construction rides a shipped play ground, and 688 moved every one of them:
-    // on bambara@2972259115 the quarter shrank from 6.5 m to 4.0 m under the new
-    // openness floor, and on 4 m of ground a wall of PEN_RADIUS round one child
-    // nearly always encloses a sibling — one placement, where the case below needs
-    // a run of them. Scanned over the three river villages at eighty seeds against
-    // every gate this block asserts, bambara@49 is the ground that still shows the
-    // whole contrast: 18 placements, one of them refused by the stricter rule,
-    // 25.5 rescues a child-minute against the stricter rule's 6.0.
-    const v = village('bambara-village', 49, undefined, { pen: { r, carry } })
+    // THE VILLAGE AND SEED ARE MEASURED, NOT INHERITED. The construction rides a
+    // shipped play ground and needs one it can throw a wall round: where the
+    // quarter is small, a wall of PEN_RADIUS round one child nearly always
+    // encloses a sibling, the re-pen is refused, and the symptom this whole
+    // block exists to produce starves — one placement, where the cases below
+    // need a run of them. So the ground is re-scanned whenever the round's own
+    // body count or geometry moves, and it has moved twice: work-order 688's
+    // openness floor shrank bambara@2972259115 from 6.5 m to 4.0 m, and
+    // work-order 1047 put a FIFTH child on every quarter, which crowds the wall
+    // again — bambara@49 fell from 18 placements to 7.
+    // Re-scanned at five children over the three river villages at sixty seeds,
+    // against every gate this block asserts: four grounds still show the whole
+    // contrast, and bambara@21 shows it most strongly — 18 placements, two of
+    // them refused by the stricter rule, 25.5 rescues a child-minute against the
+    // stricter rule's 4.5.
+    const v = village('bambara-village', 21, undefined, { pen: { r, carry } })
     const paths: Track[][] = v.children.map(() => [])
     for (let t = 0; t < seconds; t += 1 / 60) {
       frame(v, 1 / 60)
       const c = v.children[0]
       // Penned once the game is running, and re-penned wherever it is carried.
-      // Never over ANOTHER child, though: the wall is ground nobody may stand
-      // on, and building it round a passer-by would leave that child inside a
-      // collider — a broken settlement rather than a wedged child.
       // Never OVER another child, though: the wall is ground nobody may stand
-      // on, so no sibling may be left inside the band it occupies. Asking for a
-      // clear yard of r + 1.6 m all round was stricter than that and, with the
-      // bank round's children walking their quarter together, it refused nearly
-      // every re-pen — 6 rescues a child-minute where the tag round produced 18,
-      // which is the construction losing its grip on the symptom rather than the
-      // gate losing sight of it.
+      // on, so no sibling may be left inside the band it occupies, and building
+      // it round a passer-by would leave that child inside a collider — a broken
+      // settlement rather than a wedged one. Asking for a clear yard of r + 1.6 m
+      // all round was stricter than that and, with the bank round's children
+      // walking their quarter together, it refused nearly every re-pen — 4.5
+      // rescues a child-minute where the wall-band rule produces 25.5, which is
+      // the construction losing its grip on the symptom rather than the gate
+      // losing sight of it.
       const clear = penHasClearWall(v.children, 0, r, clearance)
       if (clear && v.clock() > 3 && (!v.pen.on || Math.hypot(c.x - v.pen.x, c.z - v.pen.z) > r)) {
         if (evidence) {
@@ -1185,10 +1175,11 @@ describe('and the gate SEES a child that is wedged (point 656)', () => {
     const r = shuffleWindows(penned)
     const rescues = rescueRate(penned)
 
-    // The gate bites: the penned child walks and gets nowhere, over and over,
-    // and is carried out of its yard some thirty times a minute. Read on the
-    // WHOLE village, the same trace fails on the per-child gates and would have
-    // been diluted by three healthy siblings without them.
+    // The gate bites: the penned child walks and gets nowhere over a third of
+    // its judged time (32.6 %), and is carried out of its yard 25.5 times a
+    // minute — 76.5 metres of it. Read on the WHOLE village, the same trace
+    // fails on the per-child gates and would have been diluted by four healthy
+    // siblings without them.
     const village = shuffleWindows(paths)
     expect(village.worstShare).toBeGreaterThan(CHILD_MOTION.shareGate)
     expect(village.leastJudged).toBeLessThan(CHILD_MOTION.judgedGate)
@@ -1205,8 +1196,9 @@ describe('and the gate SEES a child that is wedged (point 656)', () => {
     // opened for, and it is measured here rather than argued.
     // AND THE WALKING FLOOR CANNOT SEE THIS AT ALL, which is why the share
     // exists. The penned child's legs move exactly as much as a healthy child's
-    // — re-measured 84.0 m per played minute, inside the shipped villages' own
-    // 92-111 band once the walk of the roaming phase is counted — so no floor could separate the two without failing
+    // — re-measured 84.0 m per played minute, just under the shipped villages'
+    // own 91-111 band once the walk of the roaming phase is counted — so no
+    // floor could separate the two without failing
     // ordinary play. The floor answers "did it move?"; the share answers "did
     // it get anywhere?", and only the second one is the reported bug.
     const legs = traceLiveness(penned)
@@ -1228,13 +1220,13 @@ describe('and the gate SEES a child that is wedged (point 656)', () => {
     // WHAT IS PINNED HERE IS THE VERDICT, NOT THE NUMBER, and the difference is
     // deliberate. This child is CARRIED every other second, and a window that
     // spans a carry is refused rather than guessed at — so a little over half
-    // the trace can be judged (re-measured with the bank round, judgedShare
-    // 0.525-0.553 across the cadences), and what survives is a scatter of short
-    // continuous stretches whose share swings a little with the cadence: 25.00 /
-    // 24.77 / 25.62 / 25.76 / 27.16 %. The one thing that does NOT swing is the
-    // answer the gate reads — every cadence is RED by a factor of at least
-    // sixty — and the rescue rate below, which counts the very carries that
-    // made the trace unjudgeable, is red by a factor of three at all of them.
+    // the trace can be judged (re-measured at five children, judgedShare
+    // 0.523-0.554 across the cadences), and what survives is a scatter of short
+    // continuous stretches whose share swings a little with the cadence: 32.56 /
+    // 32.95 / 32.50 / 34.16 / 33.89 %. The one thing that does NOT swing is the
+    // answer the gate reads — every cadence is RED by a factor of at least a
+    // hundred — and the rescue rate below, which counts the very carries that
+    // made the trace unjudgeable, is red by a factor of four at all of them.
     // This is the worst case the metric has, and it is stated rather than
     // smoothed over.
     const penned = [wedged()[0]]
