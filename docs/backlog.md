@@ -17,3 +17,7 @@ Format: one line per finding — `- YYYY-MM-DD <source> — <finding>`.
   middle distance, feet off the surface; the report's wildlife section lists 0 animals in
   radius, so the floater sits outside it or is place dressing. Worth a look when wildlife
   anchoring is next worked; archive: local/incoming-f6/BalancierendeFelsen/.
+- 2026-09-03 polish frames, both backends (verification/111-village-season-wet.png) — among the
+  thin rain streaks one oversized billboard renders as a solid vertical pillar (WebGPU) or a
+  broad translucent band (WebGL 2), roughly a hut wide and half the frame tall. Likely a rain
+  particle whose scale or near-camera clamp misses; purely aesthetic, no check judges it.
