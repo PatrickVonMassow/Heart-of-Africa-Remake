@@ -14373,3 +14373,42 @@ to land than a mechanism that needs a review.
   Bundle: Session- & Repo-Hygiene.
 
 
+
+- [ ] 1054. A content guard demands a write from a session that no guard lets write
+  (measured 03.09.2026, four blocked turn ends in a row).
+  MEASURED: at 21:42 a stood-down session deposited a user order on the findings
+  carrier. `ensureIndexed()` in `scripts/finding.mjs` appended an index line to
+  MEMORY.md, which pushed it to 51 lines / 806 words against its ceiling of 50 /
+  787. `doc-budget-guard` then blocked every turn end. Its own remedy names exactly
+  two ways out — cut MEMORY.md, or raise the ceiling in
+  `scripts/doc-budget-core.mjs` — and BOTH are writes, while the ownership
+  stand-down refused every write the session could make: Write and Edit refused by
+  the stand-down guard, shell redirection refused by the main-write guard. The
+  guard that demanded the repair demanded it from the one session forbidden to make
+  it. Four turns ended in the same refusal before a claim on the batch cleared it,
+  about 25 minutes later.
+  WHY IT MATTERS: `doc-budget-guard` says in its own header that it deliberately
+  does NOT stand down, because documents are edited during pauses. That reasoning
+  holds for the OWNER. For a stood-down session it produces a hard deadlock, and it
+  is not the only content guard with the property — `dashboard-conciseness-guard`
+  and the board guards have the same shape. Any of them can pin a session that is
+  correctly standing down.
+  Final state:
+  - A content guard that blocks a turn end states, in its refusal, what a session
+    WITHOUT the batch lock is to do — the sanctioned route
+    (`scripts/batch-claim.mjs`) rather than two remedies that session cannot reach.
+  - A guard whose only remedies are writes does not block a stood-down session's
+    turn end at all: it reports the finding and lets the stop through, because the
+    session it is blocking cannot be the one that fixes it. The owner's turn end
+    still blocks, which is where the check earns its keep.
+  - Which guards are content guards and which stand down is stated in one place
+    rather than in each guard's header comment.
+  Test: Vitest over the guard decision with the lock held and not held — the same
+  over-budget document blocks the owner and reports-without-blocking the stood-down
+  session; the refusal text names the claim path.
+  Criticality: high — it stops a session dead with no route out, and the route that
+  finally worked was one the blocking guard never mentioned.
+  Refs: scripts/doc-budget-guard.mjs (5-7 the stand-down comment, 34-47 the block),
+  scripts/doc-budget-core.mjs, scripts/dashboard-conciseness-guard.mjs,
+  scripts/batch-claim.mjs, scripts/finding.mjs (ensureIndexed)
+  Bundle: Session- & Repo-Hygiene.
