@@ -21,3 +21,11 @@ Format: one line per finding — `- YYYY-MM-DD <source> — <finding>`.
   thin rain streaks one oversized billboard renders as a solid vertical pillar (WebGPU) or a
   broad translucent band (WebGL 2), roughly a hut wide and half the frame tall. Likely a rain
   particle whose scale or near-camera clamp misses; purely aesthetic, no check judges it.
+- 2026-09-03 Sol lane down provider-side: the ChatGPT Codex backend answers 404 on
+  /backend-api/codex/responses for every request — valid login, any model id, with and
+  without -m; the last successful Sol ledger entry is 02.09. ~14:07. A CLI update
+  0.147.0→0.153.0 changed nothing and `review-sol --probe` still passes, so the id
+  handling is fine and the outage is on the provider. Effect: ask-sol/review-sol/
+  author-sol exit 3; blind halves and cross-vendor reviews fall back per CLAUDE.md §6
+  (decorrelated same-vendor pair, recorded). No repo defect; re-probe with a minimal
+  `ask-sol --kind explain` before routing Sol work.
