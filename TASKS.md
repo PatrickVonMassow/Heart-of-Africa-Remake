@@ -14073,12 +14073,33 @@ to land than a mechanism that needs a review.
   with `polish --section=speech-hypothesis` on WebGL 2, THREE of NINE section runs on the
   merge-base code went red on the first attempt (twice this check, once two console errors) and
   NONE of four did on the branch. The flake is pre-existing and belongs to no landing.
+  A SECOND CHECK OF THE SAME SECTION, AND THE SAME FRAGILITY (measured 03.09.2026,
+  06:09:56Z, webgl/polish in the LARGE run on `feat/1047-bank-game-readable`): `the
+  speaking figure itself stands in the frame, under its note (point 485)` wants the body
+  under its label in at least six of eight sampled frames and read `body at (651, 776),
+  label bottom 700 — 3/8 frames`. The speaker WALKS through the sampling, so the check
+  measures whether a walking figure stays in its note's column for eight shutters — the
+  same staleness that makes the candidate probe a coin toss, one step further along.
+  IT IS NOT THE BANK-GAME BRANCH'S. Sampled the same day with
+  `throttle-probe polish --section=speech-hypothesis --no-throttle --runs 6` on a quiet
+  host (load 0.6), on BOTH sides: six runs on `main` at 7913c60e9 and six on the branch
+  at ec2ed0280 — TWELVE section runs, and this check went red in NONE of them. (One of
+  the twelve reddened on the Vite optimize-dep 504 that point 939 owns, on the WebGL 2
+  lane, where 939's ledger entry is scoped to WebGPU.) So the single occurrence is
+  unreproduced on either side and says nothing about the change under it; it is charged
+  to this point in `scripts/render-verify-charges.mjs`, scoped to a sample that fell
+  SHORT of the bar — a run that measured nothing at all is a different red and stays
+  real.
   Final state:
   - WHY THE FIRST FIVE NEVER QUALIFY IS MEASURED, not guessed. The probe aims at
     `e[13] + max(0.4, scaleY)` above the figure's own origin and reads the group's scale; either
     that height misses those figures, or they carry no geometry `__placeRayHit` can see at all.
   - The check then rests on more than one candidate, or it says out loud that it rests on one
     and why that is the best the scene can offer.
+  - AND THE CHOSEN SPEAKER IS JUDGED WHERE IT IS. Whatever the section asserts about the
+    note over a figure holds for a figure that KEEPS WALKING while the samples are taken —
+    either the sampling follows it, or the check says in its own text that it accepts a
+    minority of frames and why.
   - The two console errors observed on one attempt of the same section are named, or shown not
     to exist.
   Test: the browser section stays the proof; the fast layer pins whatever selection rule
