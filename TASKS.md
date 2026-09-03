@@ -374,6 +374,63 @@ put it is the mistake this line exists to stop.
   Refs: src/scenes/place/SpeechLabels.tsx, src/communication/speechTarget.ts, src/ui/Dialogs.tsx, src/i18n/de.ts, src/i18n/en.ts
   Bundle: Dorfleben.
 
+- [ ] 1051. Digging is unreadable, and DIG stops narrating the digger's own hands (user
+  03.09.2026, playing the deployed build, four findings of one hour merged here as ONE
+  rework because they share a scene and would otherwise be built three times).
+  THE USER SAW AN ADULT WALK TO A DARK CIRCLE AND WAVE HIS ARMS. Three causes were found
+  in the code the same day, and each on its own is enough to break the DIG teaching that
+  work-order 688 rests on ("the player has to read digging from the body alone"):
+  1. NO TOOL IN THE HANDS. `digPose` (`src/render/gesture.ts:353-383`) swings both arms as
+     if on a shaft, but the digging villager carries NO tool mesh — the digging stick is a
+     separate prop lying in the earth at the site (`PlaceScene.tsx` DigSites). The Pounder
+     holds a real pestle and the fire tender a real stick; the digger holds nothing, so the
+     1.5 s cycle reads as bowing or waving. The stroke needs a tool in hand, riding it the
+     way the pestle does (`PlaceLife.tsx:2428-2436`).
+  2. THE WORK LEAVES NO MARK. The site never changes while he works: nothing is removed and
+     nothing heaps up. The site meshes are layout-only and ignore progress, although
+     `AdultTask.dug` already counts the seconds and `digStrikeCrossed` marks every stroke —
+     so a visible change is drivable today (a spoil heap that grows with `dug`, a pit that
+     deepens, earth thrown per stroke).
+  3. THE SITE IS NOT AN EXCAVATION. It is a flat dark cylinder 0.03 m high plus a sphere for
+     spoil and one leaning stick (`PlaceScene.tsx` DigSites, ~1266-1306). From player height
+     that is a dark circle. It needs real depth — a rim, inner walls, a shadowed bottom,
+     broken ground and clods, a spoil heap that reads as one.
+  AND THE WORD CHANGES SIDES (user order 03.09.2026, verbatim): »Zudem wirkt es etwas
+  konstruiert, dass der Erwachsene DIG sagt, wenn er gräbt - als wäre es eine Tonspur für
+  seine Handlungen. Ich würde im Alltag das auch nicht sagen, bevor ich etwas ausgrabe.
+  Änderung: DIG soll er als Aufforderung benutzen, anstatt als Kommentar seiner eigenen
+  Handlung. Wenn er graben will, soll er vorher zu einem anderen Erwachsenen gehen und DIG
+  sagen. Das soll eine Aufforderung an den anderen Erwachsenen sein, gemeinsam zu graben.
+  Sie sollen dann zu zweit zur Grabungsstelle gehen, dort erneut DIG sagen und dann
+  gemeinsam graben.«
+  Final state:
+  - DIG IS A SUMMONS. The initiator walks to another adult and says DIG to him as an
+    invitation; the two walk to the dig site together; DIG is said again at the site; then
+    both dig. This SUPERSEDES `adultWork.ts` rule 2 ("nobody is called over with DIG", from
+    the GPT-5.6 Sol spec review of 13.08.2026) and the word-on-the-stroke staging
+    (dig-alone / dig-joined): the user's decision takes precedence, and the DOUBLE utterance
+    — once as the invitation, once at the site — is what contains the come/help ambiguity
+    that rule was written to guard against.
+  - The four open questions are answered as recommended unless the user says otherwise: the
+    INITIATOR says the second DIG (one voice carries the word); the hush-while-a-child-is-in-
+    earshot rule applies to BOTH utterances; two stagings at two sites per teaching round
+    stay; and a bout with no free second adult is SKIPPED and retried later rather than
+    played alone.
+  - The digger holds his tool, the ground records his work, and the site reads as a hole in
+    the earth from standing height.
+  Docs change with the code (CLAUDE.md §4): `design.md`'s adult-teaching section, the
+  `adultWork.ts` header rationale, the `adultWork.test.ts` stroke assertions, and any
+  document restating the old staging.
+  Test: Vitest over the summons — the invitation utterance, the joint walk, the second
+  utterance at the site, the skip with no partner free, and the hush rule on both; plus the
+  strike-driven site progress. A backend-sensitive picture check for the tool in hand and
+  the excavated site, judged from player height.
+  Criticality: high — it is the second half of the teaching the whole communication slice is
+  built on, and the user could read none of it.
+  Refs: src/scenes/place/adultWork.ts, src/scenes/place/PlaceLife.tsx,
+  src/scenes/place/PlaceScene.tsx (DigSites), src/render/gesture.ts, design.md
+  Bundle: Dorfleben.
+
 - [ ] 692. Every document describes the rebuilt communication mechanic, not the old one (user
   13.08.2026, playing the deployed communication slice).
   The rebuild changes what the mechanic IS, and the documents are what the next
