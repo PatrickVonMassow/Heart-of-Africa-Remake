@@ -61,6 +61,11 @@ export default defineConfig({
     // the SAME ~91 s wall clock, because the extra forks were queueing, not
     // running. The cap therefore costs no time and buys back the gate. Raise it
     // only against a measurement showing the wall clock actually falls.
-    maxWorkers: 4,
+    // THE SAME STARVATION RETURNED ON CI (03.09.2026): three fast-job runs in
+    // one night, every test green (447 files / 14713 tests) and exit 1 on the
+    // identical `Timeout calling "onTaskUpdate"` — the hosted runner has ~4
+    // cores, so 4 workers there is the very over-subscription the cap above
+    // fixed locally on 16. On CI the pool leaves a core for the main thread.
+    maxWorkers: process.env.CI ? 2 : 4,
   },
 })
