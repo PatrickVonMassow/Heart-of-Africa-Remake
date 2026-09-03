@@ -1428,7 +1428,7 @@ keinen Träger hat. Gebucht als Punkt 956.
 
 ## Anhang A — Maschinell gepflegte Quellen-Übersicht
 
-Zuletzt aktualisiert: Donnerstag, 03.09.2026, 17:50 · Quellen-Fingerprint: `09e387567144…`
+Zuletzt aktualisiert: Donnerstag, 03.09.2026, 20:58 · Quellen-Fingerprint: `6327522e1eb4…`
 
 Spalten heuristisch aus den Quellen abgeleitet (Anläufe = distinkte Datumsnennungen im Memory;
 Maßnahme = Guard-Skripte mit Namens-Treffer). Die inhaltliche Bewertung gehört der Prosa oben.
@@ -1515,6 +1515,7 @@ Maßnahme = Guard-Skripte mit Namens-Treffer). Die inhaltliche Bewertung gehört
 | Der 9-Punkte-Plan vom 01.09.2026 gegen die Governance-Selbstproduktion — Stand, offene Maßnahmen, Veto-Wege; Stichwort „Umsteuerung\" | 2 | mittel | — (Regel/Memory) | ◐ Regel |
 | On every user change request, also update CLAUDE.md and design.md where appropriate — standing directive for all future sessions. | 1 | niedrig | — (Regel/Memory) | ◐ Regel |
 | Every place/landmark/settlement name in the game uses the name that was VALID IN 1890, not a later renaming | 1 | niedrig | — (Regel/Memory) | ◐ Regel |
+| A user order from a session that cannot write the work order goes into the findings carrier as a --request, never into a fire-and-forget peer message | 1 | niedrig | — (Regel/Memory) | ◐ Regel |
 | vdzk-answer.mjs CLI refuses in SDK-driven sessions; record via its exported functions with the real transcript uuid | 1 | niedrig | — (Regel/Memory) | ◐ Regel |
 | Run the both-backend browser verify on the feat BRANCH before merging to main — merging an unverified render change first triggers a render-verify Stop-guard block-loop | 1 | niedrig | render-verify-guard.mjs | ✔ Mechanismus |
 | Headless probes must screenshot the DEFAULT zoom too (zoom-gated dressing like haze only shows there); headless WebGPU is impossible, so WebGPU-only branches stay user-checked | 2 | mittel | render-verify-guard.mjs | ✔ Mechanismus |
@@ -1529,10 +1530,10 @@ Maßnahme = Guard-Skripte mit Namens-Treffer). Die inhaltliche Bewertung gehört
 | A pending batch claim HOLDS THE LAUNCHER BACK — withdraw it whenever the claiming window is left unattended | 2 | mittel | clear-claim-guard.mjs | ✔ Mechanismus |
 | Multi-agent workflows eat the session/weekly limit fast — verify findings INLINE, keep fan-outs small, warn the user with a cost estimate before any big workflow | 3 | mittel | doc-budget-guard.mjs | ✔ Mechanismus |
 
-Erfasste Quellen: 93 Feedback-/Projekt-Memories · 57 Guard-/Hook-Skripte · 6 Revert-/Reapply-Commits · 121 Prozess-/Meta-TASKS-Punkte (davon 55 offen).
+Erfasste Quellen: 94 Feedback-/Projekt-Memories · 57 Guard-/Hook-Skripte · 6 Revert-/Reapply-Commits · 121 Prozess-/Meta-TASKS-Punkte (davon 55 offen).
 
-<!-- RETRO-FINGERPRINT: 09e387567144aa8d54464e1ab541ac85a93ab4ab6f04219c2102245d91afeefa -->
-<!-- RETRO-LAST-REFRESHED: 2026-09-03T15:50:12.468Z -->
+<!-- RETRO-FINGERPRINT: 6327522e1eb48176015c596db076221b014d027a7533d4931b9cc523fe4eb155 -->
+<!-- RETRO-LAST-REFRESHED: 2026-09-03T18:58:25.467Z -->
 <!-- AUTO-GENERATED:END -->
 
 ### 3.111 Ein Erfolg ist kein Beweis für den Weg, auf dem er zustande kam
