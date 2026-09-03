@@ -12282,6 +12282,21 @@ to land than a mechanism that needs a review.
   push only went through on a later manual attempt that happened to fall in a quiet window. Add to
   the final state that the gate's verdict NAMES a teardown red over foreign activity as an
   environment condition and says which lane collided, rather than reporting it as a blocking red.
+  MEASURED A FOURTH TIME 03.09.2026, 07:27-07:31 — AND THIS TIME A GUARD ORDERED IT. The new
+  element is not another collision but its cause: the owner was DIRECTED into it. Declaring the
+  wait for point 1047's both-backends LARGE run, `batch-in-flight` REFUSED the declaration because
+  two of three agent slots stood free, named eight independent open points and demanded either a
+  commission or a written reason. The owner complied and commissioned GPT-5.6 Sol onto point 1049
+  in its own worktree; Sol's FIRST commit — the commission record it writes before it even starts —
+  killed the run 3m51s in on `refs/heads/feat/1049-queue-order-rule <absent> -> 9815ce1b1`. So the
+  rule this point calls unworkable ("touch no ref while a LARGE runs") is not merely unenforced:
+  another guard actively punishes obeying it, and the owner had to stop the author it had just been
+  told to start. The same edge caught the board in the same hour — `board-publish.mjs` commits to
+  `refs/heads/board`, so the dashboard duty is a ref mutation too and the publish had to be held
+  until the unit stage passed, which is only knowable by reading `run-all.mjs` to learn that the
+  second backend pass skips the preflight. Add to the final state: while a browser regression is
+  declared in flight, the agent-pool guard stands down, or the declaration itself is the account
+  its free slots need.
   VERIFIABLE: Vitest over the decision — a moved foreign branch passes, a moved own HEAD fails, and
   an undeclared foreign ref is reported by name rather than silently allowed.
   Criticality: medium-high — it turns every parallel authoring evening into red gates that hide real
