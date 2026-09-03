@@ -172,15 +172,11 @@ Die Ursache findest du durch **Zerlegen**, nicht durch Wiederholen.
   **ab** statt ihn zu nennen, sonst prüf seine **Zugehörigkeit** mit. Und **stell die Gelegenheit
   her**, statt auf sie zu warten — wer zusieht, ob zufällig ein Störer dort steht, prüft die
   Würfel.“
-- **Der Fühler misst sich selbst.** Eine Überwachung liest einen Wert, den ihr Nachsehen selbst
-  erneuert — ein toter Vorgang wirkt lebendig, und je öfter du prüfst, desto lebendiger. Die
-  Warte-Variante ist dieselbe Falle: Eine Schleife, die auf das Ende eines Prozesses wartet,
-  indem sie nach seinem **Namen sucht**, findet die Suche selbst — und jede weitere Wache, die
-  daneben gestellt wird, hält alle anderen am Leben, während längst nichts mehr läuft.
-  → *Prompt:* „Ein Lebenszeichen darf nur aus einer Quelle kommen, die der **Beobachter nicht
-  beschreibt**. Prüf das am **stillgelegten** Gegenstand, mit und ohne Blick dazwischen: Bewegt
-  **erst der Blick** den Wert, misst sie sich selbst. Warte auf Prozesse über ihr **Handle oder
-  ihre PID**, nie über eine Textsuche, in deren Treffer die Wache selbst fällt.“
+- **Der Fühler misst sich selbst.** Eine Überwachung erneuert beim Nachsehen den eigenen
+  Messwert, oder eine Warteschleife findet per **Namenssuche** sich selbst: Totes wirkt lebendig.
+  → *Prompt:* „Ein Lebenszeichen kommt nur aus einer Quelle, die der **Beobachter nicht
+  beschreibt** — prüf am **stillgelegten** Gegenstand: Bewegt **erst der Blick** den Wert, misst
+  sie sich selbst. Warte über **Handle oder PID**, nie über eine Textsuche.“
 
 - **Die Sonde kann ihr Nein nicht erreichen.** Die Prüfung könnte „tot“ sagen — aber nur, wenn
   man ihr den Beweis übergibt, und genau diese eine Aufrufstelle übergibt ihn nicht. Ihr „lebt
