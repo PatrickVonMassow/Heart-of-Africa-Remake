@@ -221,6 +221,16 @@ put it is the mistake this line exists to stop.
   - Overlap with 947 (blind sweep of every way the batch can stop) and 958 (the busy wedge
     the emergency clock cannot see) is resolved by the merge — this point supersedes or
     narrows them rather than duplicating their mechanism.
+  - A SECOND wedge shape, measured live 03.09.2026 17:45–17:47 in the owning session, is
+    covered by the same analysis: after `batch-boundary --commit` the boundary refuses
+    every tool call (the 90 s sleep and the clock included), while `ci-status-guard`
+    refuses every turn end until the pushed ref's CI concludes — and prescribes exactly
+    the refused wait. The session could neither work nor stop and emitted identical
+    farewell messages until the user intervened; the boundary marker was then invalidated
+    by the first later mutation, silently re-opening the handed-over batch. The merged
+    solution must resolve guard pairs that jointly demand and forbid the same action
+    (e.g. the boundary exempts the wait a Stop guard prescribes, or ci-status-guard
+    stands down for a committed boundary).
   Test: Vitest over the decision cores the merged solution lands in, replaying the
   incident's shape — alive heartbeat plus eternal waits plus no main progress leads to
   recovery within the stated bound; a drill that calls the real recovery path per the
