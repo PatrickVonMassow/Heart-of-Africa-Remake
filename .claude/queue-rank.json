@@ -1182,6 +1182,12 @@
       "why": "User order 04.09.2026: »Setze beides … als neuen Punkt um und reihe ihn direkt vor 690 ein.«",
       "origin": "user",
       "place": "ahead"
+    },
+    "1058": {
+      "at": "2026-09-04T08:20:20.620Z",
+      "why": "Es steht zwischen jeder Render-Änderung und ihrem Bildnachweis und ist auf ruhiger Maschine rot — es blockiert jetzt.",
+      "origin": "machine",
+      "place": "ahead"
     }
   },
   "boundary": {
@@ -1217,7 +1223,7 @@
     "why": "The order standing in front of the release today is the arrangement that predates this rule; the four machine-filed points that had ranked themselves there were moved behind 174 first"
   },
   "settled": {
-    "at": "2026-09-04T07:15:52.175Z",
+    "at": "2026-09-04T08:20:20.629Z",
     "points": [
       174,
       184,
@@ -1586,7 +1592,8 @@
       1054,
       1055,
       1056,
-      1057
+      1057,
+      1058
     ]
   }
 }

@@ -135,6 +135,46 @@ put it is the mistake this line exists to stop.
   Bundle: Urlaubsfestigkeit (not worked beside 947, 958, 985 or 1002 — they edit the
   same emergency/standstill decision core).
 
+- [ ] 1058. The speech-label picture check lost its subject for good: the speaker walks out
+  of half the sampled frames, every run (measured 04.09.2026 on a quiet host).
+  `the speaking figure itself stands in the frame, under its note (point 485)` wants the
+  speaker's body inside the frame and under its label in at least six of eight sampled
+  frames. Measured at `6822804e6` with `throttle-probe polish --section=speech-hypothesis
+  --backend webgpu --no-throttle --runs 6`, load below 2: FIVE OF SIX runs red, at 4/8 and
+  5/8 frames every time (`body at (532, 700), label bottom 636 — 5/8`, `(489, 719)/649 —
+  4/8`, `(526, 709)/642 — 5/8`, `(500, 721)/653 — 4/8`, `(505, 708)/644 — 5/8`). The full
+  webgpu polish run of the same morning carried it too, together with `the note rides on
+  the figure that speaks` at a worst sideways offset of 68.3 px, and passed only on its
+  retry — which covers nothing.
+  THIS IS NOT POINT 1043's COIN TOSS ANY MORE. 1043 measured the same check on 03.09.2026
+  on a quiet host, twelve section runs across `main` and a branch, and it went red in NONE
+  of them. Between then and now the paired DIG summons landed: an adult now says his word
+  and walks off to the site in the same breath, so a speaker leaving the staged shot is the
+  RULE rather than the unlucky draw 1043 describes. What is open is which side owes the
+  fix — the choreography that sends a speaker away mid-utterance, or a check that stages a
+  shot around a figure free to walk out of it.
+  WHAT IT COSTS: every render change is judged by the picture, and this check is between
+  every one of them and its proof. It blocks now.
+  Final state:
+  - The cause is NAMED from the frames, not argued: it is stated whether the speaker walks
+    out of shot, the label lags him, or the probe stages the shot around a figure it cannot
+    hold — and the fix is made on that side.
+  - The check holds its subject for the whole sample, or it stops claiming to: a picture
+    check that cannot keep its speaker in frame proves nothing to a human eye either.
+  - Both reds of the section close for the right reason on a quiet host, over a run of at
+    least six, on webgpu and on webgl.
+  - Point 1043's text records what changed under it, so the two are not read as one flake.
+  Test: the throttle probe over `speech-hypothesis` on both backends, unthrottled and
+  throttled, with the run counts and the frame counts stated; plus the full polish suite
+  clean on both lanes.
+  Criticality: high — it is the gate every rendered proof passes through, and it is red on
+  a quiet machine.
+  Refs: scripts/verify/polish.mjs (`speech-hypothesis`), src/scenes/place/SpeechLabels.tsx,
+  src/scenes/place/adultWork.ts (`startJointWalk` — the speaker leaves as he speaks),
+  scripts/render-verify-charges.mjs, local/throttle-probe/polish-speech-hypothesis-2026-09-04T08-14-51-973Z
+  Bundle: Dorfleben (it edits the speech-label path and the adult teaching choreography that
+  1056 and 1057 also reach, so it is worked before them and never beside them).
+
 - [ ] 1052. The elder retires and the audience overlay with him: one chief, met outside
   at the drums (user 03.09.2026).
   THE ORDER (user, 03.09.2026, verbatim): »Okay, dann baue das so um und reihe das in der

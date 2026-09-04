@@ -1223,4 +1223,51 @@ export const RED_CHARGES = [
       + 'selection that no longer rests on a walking coin toss, and the charge dies with that '
       + 'point.',
   },
+  {
+    point: 1058,
+    suite: 'polish',
+    backend: 'webgpu',
+    featureLevel: 'compatibility',
+    kind: 'check',
+    match: /^the speaking figure itself stands in the frame, under its note/i,
+    // DETAIL-SCOPED TO A SAMPLE THAT FELL SHORT, exactly like the WebGL 2 entry
+    // above: `MEASURED NOTHING` is a section that measured nothing at all, which
+    // is a different defect and stays a real red, and only a count BELOW the bar
+    // of six may be excused here.
+    detailMatch: /^body at \(-?\d+, -?\d+\), label bottom -?\d+ — [0-5]\/[1-9]\d* frames$/i,
+    why:
+      'FILED AS 1058 ON 04.09.2026 BECAUSE IT STOPPED BEING A FLAKE. Measured at 6822804e6 with '
+      + '`throttle-probe polish --section=speech-hypothesis --backend webgpu --no-throttle --runs 6` '
+      + 'on a quiet host (load below 2): FIVE OF SIX runs red, at 4/8 and 5/8 frames every time. '
+      + 'Point 1043 measured the same check on 03.09.2026 over twelve section runs on both sides of '
+      + 'a branch and it went red in NONE of them, so this is not 1043\'s coin toss: between the two '
+      + 'measurements the paired DIG summons landed, and a speaker now walks off to his dig site in '
+      + 'the same breath as his word. '
+      + 'The charge gives the red an owner that can CLOSE it; it does not decide which side owes the '
+      + 'fix — the choreography that sends a speaker away mid-utterance, or a check that stages its '
+      + 'shot around a figure free to leave it. Point 1058 owes exactly that naming, and the charge '
+      + 'dies with it.',
+  },
+  {
+    point: 1058,
+    suite: 'polish',
+    backend: 'webgpu',
+    featureLevel: 'compatibility',
+    kind: 'check',
+    match: /^the note rides on the figure that speaks/i,
+    // DETAIL-SCOPED TO A SIDEWAYS-ONLY MISS: the vertical offset must still be
+    // NEGATIVE, i.e. inside its own allowance. A note that also drifts
+    // vertically, or a `MEASURED NOTHING` sample, is a different defect and
+    // stays a real red.
+    detailMatch: /^worst sideways offset past half the label height \d+(\.\d+)? px, worst vertical offset past the scaled lift -\d+(\.\d+)? px, over [1-9]\d* frames$/i,
+    why:
+      'THE SAME SECTION AND THE SAME MORNING as the entry above, measured 04.09.2026 in the webgpu '
+      + 'polish run at 07:39:00Z: `worst sideways offset past half the label height 68.3 px, worst '
+      + 'vertical offset past the scaled lift -36.4 px, over 8 frames` — the note trails its speaker '
+      + 'SIDEWAYS while the vertical lift stays inside its allowance, which is the signature of a '
+      + 'figure walking through the sample rather than of a label left at a world coordinate. That '
+      + 'is the defect 1058 owns, read one step earlier than the body-in-frame check. '
+      + 'It is charged, not excused: the run that carried it passed only on its retry and therefore '
+      + 'covers nothing, and the charge dies with 1058.',
+  },
 ]
