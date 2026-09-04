@@ -127,6 +127,44 @@ function putAtGoal(state: AdultWorkState, v: AdultWorkView, index: number): void
   v.villagers[index].z = goal.z
 }
 
+function threeWordsDue(): { state: AdultWorkState; v: AdultWorkView } {
+  const v = view(5, [
+    { ...HEAD },
+    { x: 5, z: 5 },
+    { x: 5, z: 5.5 },
+    { x: -16, z: -1 },
+    { x: -13.6, z: -1 },
+  ])
+  const state = createAdultWork(5, CFG)
+  state.next = Number.POSITIVE_INFINITY
+  state.tasks[0] = {
+    situation: 'water-back', phase: 'walk', carry: 'fullJar', role: 'worker', partner: null, siteIndex: null,
+    x: HEAD.x, z: HEAD.z, arrived: false, dug: 0, owes: true,
+    say: { at: HEAD, aim: FOOT }, via: null, age: 0,
+  }
+  state.tasks[1] = {
+    situation: 'dig-first', phase: 'invite', carry: 'digTool', role: 'initiator', partner: 2, siteIndex: 0,
+    x: v.villagers[2].x, z: v.villagers[2].z, arrived: true, dug: 0, owes: true,
+    say: null, via: null, age: 0,
+  }
+  state.tasks[2] = {
+    situation: 'dig-first', phase: 'invite', carry: 'digTool', role: 'partner', partner: 1, siteIndex: 0,
+    x: -8.6, z: 2, arrived: true, dug: 0, owes: false,
+    say: null, via: null, age: 0,
+  }
+  state.tasks[3] = {
+    situation: 'dig-second', phase: 'site', carry: 'digTool', role: 'initiator', partner: 4, siteIndex: 1,
+    x: -16, z: -1, arrived: true, dug: 0, owes: true,
+    say: null, via: null, age: 0,
+  }
+  state.tasks[4] = {
+    situation: 'dig-second', phase: 'site', carry: 'digTool', role: 'partner', partner: 3, siteIndex: 1,
+    x: -13.6, z: -1, arrived: true, dug: 0, owes: false,
+    say: null, via: null, age: 0,
+  }
+  return { state, v }
+}
+
 describe('the adults keep to their four teaching situations', () => {
   it('owns only RIVER and DIG, with two situations for each', () => {
     expect([...ADULT_CONCEPTS].sort()).toEqual(['DIG', 'RIVER'])
@@ -347,6 +385,32 @@ describe('digging records work at the site', () => {
     shown[0].dug = 99
     expect(state.siteProgress[0].dug).toBe(4)
     expect(shown[1]).toEqual({ dug: 0, strikes: 0 })
+  })
+})
+
+describe('the single-utterance frame slot', () => {
+  it('speaks at most one word a frame', () => {
+    const { state, v } = threeWordsDue()
+    const word = stepAdultWork(state, v, 1 / 60, CFG, () => 0.5)
+
+    expect(word).toMatchObject({ concept: 'RIVER', speaker: 0 })
+    expect(state.last).toMatchObject({ id: word!.id, concept: word!.concept, speaker: word!.speaker })
+    expect(taskOf(state, 1)?.owes).toBe(true)
+    expect(taskOf(state, 3)?.owes).toBe(true)
+  })
+
+  it('holds the second atom back rather than swallowing it, when two fall together', () => {
+    const { state, v } = threeWordsDue()
+    const words: SpokenWord[] = []
+    for (let frame = 0; frame < 3; frame++) {
+      const word = stepAdultWork(state, v, 1 / 60, CFG, () => 0.5)
+      if (word) words.push(word)
+    }
+
+    expect(words).toHaveLength(3)
+    expect(words.map((word) => word.concept)).toEqual(['RIVER', 'DIG', 'DIG'])
+    expect(words.map((word) => word.purpose ?? 'water')).toEqual(['water', 'invitation', 'site'])
+    expect(new Set(words.map((word) => word.speaker)).size).toBe(3)
   })
 })
 
