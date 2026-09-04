@@ -1,7 +1,7 @@
 // The awaiting CLI (point 592). The exit paths are what matters here — a mode
 // that silently fell through into another would be the same class of bug the
 // `--show` cases of run-logged.test.mjs were written for.
-import { mkdtempSync, writeFileSync } from 'node:fs'
+import { mkdtempSync, readFileSync, writeFileSync } from 'node:fs'
 import { spawnSync } from 'node:child_process'
 import { tmpdir } from 'node:os'
 import { dirname, join } from 'node:path'
@@ -11,8 +11,22 @@ import { describe, it, expect } from 'vitest'
 const HERE = dirname(fileURLToPath(import.meta.url))
 const CLI = join(HERE, 'run-wait.mjs')
 
-function run(args) {
-  return spawnSync(process.execPath, [CLI, ...args], { windowsHide: true, encoding: 'utf8', timeout: 30_000 })
+/** Every invocation keeps its wait lease and its journal in a throwaway
+ *  directory: a unit run must not write into the live batch's registry, and
+ *  two fixtures must not inherit each other's lease. */
+function run(args, env = {}) {
+  const dir = mkdtempSync(join(tmpdir(), 'hoa-runwait-env-'))
+  return spawnSync(process.execPath, [CLI, ...args], {
+    windowsHide: true,
+    encoding: 'utf8',
+    timeout: 30_000,
+    env: {
+      ...process.env,
+      HOA_WAIT_LEASE_PATH: join(dir, 'wait-leases.json'),
+      HOA_ACTIVITY_JOURNAL_PATH: join(dir, 'activity.jsonl'),
+      ...env,
+    },
+  })
 }
 
 /** A log path plus its record, in a throwaway directory. */
@@ -96,6 +110,70 @@ describe('--await: one blocking call, and no poll counted', () => {
     expect(res.status).toBe(3)
     expect(res.stdout).toMatch(/STILL RUNNING/)
     expect(res.stdout).toMatch(/Do NOT start a poll loop/)
+  })
+
+  // Point 1048, union entries U11 to U13: the wait is an owned, bounded,
+  // unambiguous object, because the incident of 03.09.2026 had none of the three.
+  it('refuses a SECOND wait of this session for the same run instead of stacking one', () => {
+    const { dir, log } = fixture({ ...finished, status: 'running', pid: process.pid, startedAt: Date.now() })
+    const lease = join(dir, 'wait-leases.json')
+    // A live waiter of this session: pid alive, run still running.
+    writeFileSync(lease, JSON.stringify({
+      v: 1,
+      leases: [{
+        sessionId: 'fixture-session',
+        runId: 'run',
+        pid: process.pid,
+        startedAt: Date.now(),
+        recordPath: `${log}.run.json`,
+      }],
+    }))
+    const res = run(['--await', log, '--timeout', '1'], {
+      HOA_WAIT_LEASE_PATH: lease,
+      CLAUDE_SESSION_ID: 'fixture-session',
+    })
+    expect(res.status).toBe(4)
+    expect(res.stdout).toMatch(/ALREADY holds a wait/)
+    expect(res.stdout).toMatch(/stacked ten shells/)
+  })
+
+  it('releases its lease when the wait returns, so the next wait is not refused', () => {
+    const { dir, log } = fixture({ ...finished, status: 'running', pid: process.pid, startedAt: Date.now() })
+    const lease = join(dir, 'wait-leases.json')
+    const env = { HOA_WAIT_LEASE_PATH: lease, CLAUDE_SESSION_ID: 'fixture-session' }
+    expect(run(['--await', log, '--timeout', '1'], env).status).toBe(3)
+    expect(JSON.parse(readFileSync(lease, 'utf8')).leases).toEqual([])
+    expect(run(['--await', log, '--timeout', '1'], env).status).toBe(3)
+  })
+
+  it('calls the wait HUNG past 2.5x the expectation rather than advising again', () => {
+    const { log } = fixture({
+      ...finished,
+      status: 'running',
+      pid: process.pid,
+      expectedRuntimeMs: 60_000,
+      startedAt: Date.now() - 10 * 60_000,
+    })
+    const res = run(['--await', log, '--timeout', '1'])
+    expect(res.status).toBe(5)
+    expect(res.stdout).toMatch(/HUNG/)
+    expect(res.stdout).toMatch(/emergency lane/)
+  })
+
+  it('refuses to guess which of two live runs it is waiting for', () => {
+    const dir = mkdtempSync(join(tmpdir(), 'hoa-runwait-two-'))
+    for (const name of ['2026-09-03T00-10-00-000-large', '2026-09-03T00-40-00-000-docs']) {
+      const log = join(dir, `${name}.log`)
+      writeFileSync(log, 'running\n')
+      writeFileSync(`${log}.run.json`, JSON.stringify({
+        ...finished, log, status: 'running', pid: process.pid, startedAt: Date.now(), receipt: null,
+      }))
+    }
+    const res = run(['--await'], { VERIFY_LOG_DIR: dir, HOA_REPO_ROOT: '/' })
+    expect(res.status).toBe(2)
+    expect(res.stdout).toMatch(/2 verify runs are live at once/)
+    expect(res.stdout).toMatch(/2026-09-03T00-10-00-000-large/)
+    expect(res.stdout).toMatch(/2026-09-03T00-40-00-000-docs/)
   })
 })
 

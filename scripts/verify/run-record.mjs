@@ -165,6 +165,24 @@ export function activeRecordPath(dir = logDir(), { max = SCAN_LIMIT } = {}) {
 }
 
 /**
+ * EVERY run record that is still going (point 1048, union entry U13).
+ *
+ * `activeRecordPath` answers "the newest live one", which is the right answer
+ * for a status glance and the wrong one for an automated wait: a quick suite
+ * started beside a running LARGE makes the resolution AMBIGUOUS, and a wait
+ * that silently picks one of two runs cannot be told from a wait on a stale
+ * record. A caller that finds more than one entry here must name its run.
+ */
+export function liveRecordPaths(dir = logDir(), { max = SCAN_LIMIT } = {}) {
+  const live = []
+  for (const { path, record } of scanRecords(dir, max)) {
+    if (!Number.isFinite(Number(record?.startedAt))) continue
+    if (runIsLive(record).live) live.push({ path, record })
+  }
+  return live.sort((a, b) => Number(b.record.startedAt) - Number(a.record.startedAt))
+}
+
+/**
  * HOW MANY DISTINCT FRAMES DID THIS RUN WRITE? By mtime against the run's start,
  * because the frames themselves carry no run identity — and DISTINCT, because a
  * both-backends run photographs the same names twice and counting writes would

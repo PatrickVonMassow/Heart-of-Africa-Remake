@@ -35,8 +35,10 @@ import { readRecord, recordPathFor } from './verify/run-record.mjs'
  *  tolerance absorbs clock and jiffy resolution, nothing more. */
 export const PID_START_TOLERANCE_MS = 2000
 
-export function registryPath(repo = REPO_ROOT || process.cwd()) {
-  return join(repo, WAIT_LEASE_PATH)
+/** The registry file. `HOA_WAIT_LEASE_PATH` redirects it, so a fixture never
+ *  writes leases into the live batch's registry. */
+export function registryPath(repo = REPO_ROOT || process.cwd(), env = process.env) {
+  return env.HOA_WAIT_LEASE_PATH ? env.HOA_WAIT_LEASE_PATH : join(repo, WAIT_LEASE_PATH)
 }
 
 export function readRegistry(path = registryPath()) {

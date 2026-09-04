@@ -40,11 +40,14 @@ import {
   activeRecordPath,
   countPoll,
   elapsedMs,
+  liveRecordPaths,
   logDir,
   readRecord,
   recordPathFor,
   runIsLive,
 } from './run-record.mjs'
+import { claimWait, finishWait, waitStatus } from '../wait-lease.mjs'
+import { runIdFromLog } from '../wait-lease-core.mjs'
 
 const USAGE = [
   'usage:',
@@ -64,16 +67,47 @@ function forDisplay(path) {
   return rel && !rel.startsWith('..') ? rel.replace(/\\/g, '/') : path
 }
 
-/** The record this invocation is about: the named log's, or the newest one. */
+/**
+ * The record this invocation is about: the named log's, or the newest one.
+ *
+ * With no argument the answer is the newest LIVE run, not merely the newest: a
+ * quick suite that finished beside a running LARGE must not become "the run"
+ * (four-eyes finding 2). When SEVERAL runs are live the answer is `ambiguous`
+ * instead of a guess (point 1048, union entry U13) — a wait that silently picks
+ * one of two concurrent runs cannot be distinguished from a wait on the wrong
+ * one, which is how a session ends up waiting for something that is already
+ * over.
+ */
 function resolveRecord(logArg) {
   if (logArg) {
     const path = recordPathFor(isAbsolute(logArg) ? logArg : join(ROOT, logArg))
-    return { path, record: readRecord(path) }
+    return { path, record: readRecord(path), ambiguous: [] }
   }
-  // The newest LIVE run, not merely the newest: a quick suite that finished
-  // beside a running LARGE must not become "the run" (four-eyes finding 2).
+  const live = liveRecordPaths(logDir())
+  if (live.length > 1) {
+    return { path: live[0].path, record: live[0].record, ambiguous: live }
+  }
   const path = activeRecordPath(logDir())
-  return { path, record: path ? readRecord(path) : null }
+  return { path, record: path ? readRecord(path) : null, ambiguous: [] }
+}
+
+/** Who is waiting. The lease is keyed by it, so an unknown session still gets a
+ *  stable key rather than colliding with every other unknown caller. */
+function sessionId() {
+  return process.env.CLAUDE_SESSION_ID || process.env.HOA_SESSION_ID || `pid-${process.ppid}`
+}
+
+/** The refusal U13 asks for: name the run, here are the ones that are live. */
+function refuseAmbiguous(live) {
+  console.log(
+    `${live.length} verify runs are live at once, so "the run" is not a well-defined answer. Name the one you ` +
+      'mean — an automated wait passes the run token that started it:',
+  )
+  for (const { record } of live) {
+    console.log(`  ${runIdFromLog(record.log ?? '')}  ${record.command ?? '?'} (pid ${record.pid ?? '?'})`)
+    console.log(`     node scripts/verify/run-wait.mjs --await ${record.log ?? ''}`)
+  }
+  return 2
 }
 
 /**
@@ -135,9 +169,19 @@ function doPlan(argv) {
   return 0
 }
 
-/** `--await`: ONE blocking call. Returns the run's own exit code. */
+/**
+ * `--await`: ONE blocking call. Returns the run's own exit code.
+ *
+ * It also HOLDS THE WAIT LEASE for as long as it blocks (point 1048, union
+ * entries U11 and U12). Two things follow, and they are what the incident of
+ * 03.09.2026 lacked: a second wait for this same run from this same session is
+ * refused rather than started, and a wait that runs past the run's own estimate
+ * is journalled and — past the hung mark — asks the emergency core to recover
+ * the batch, instead of exiting 3 with advice nobody was awake to read.
+ */
 async function doAwait(logArg, timeoutS) {
-  const { path, record } = resolveRecord(logArg)
+  const { path, record, ambiguous } = resolveRecord(logArg)
+  if (ambiguous.length > 1) return refuseAmbiguous(ambiguous)
   if (!record) return noRecord(path)
   const live = runIsLive(record)
   if (!live.live) {
@@ -145,6 +189,27 @@ async function doAwait(logArg, timeoutS) {
     console.log(`# the run is already over (${live.reason}) — no waiting was needed.`)
     printReceipt(fresh)
     return exitOf(fresh)
+  }
+  const session = sessionId()
+  const runId = runIdFromLog(record.log ?? path)
+  const claim = claimWait({
+    sessionId: session,
+    runId,
+    logPath: record.log ?? null,
+    recordPath: path,
+    subject: record.command ?? runId,
+    expectedRuntimeMs: record.expectedRuntimeMs ?? 0,
+  })
+  if (claim.verdict === 'attach') {
+    console.log(
+      `# this session ALREADY holds a wait for ${runId} (pid ${claim.lease.pid}). A second waiter is exactly what ` +
+        'stacked ten shells on 03.09.2026, so this call does not start one. Let the wait that is running return, ' +
+        `then read \`node scripts/verify/run-wait.mjs --receipt ${forDisplay(record.log ?? '')}\`.`,
+    )
+    return 4
+  }
+  for (const retired of claim.terminated ?? []) {
+    console.log(`# retired the earlier wait of this session: pid ${retired.pid} — ${retired.outcome}`)
   }
   const budget = Number.isFinite(timeoutS) && timeoutS > 0
     ? timeoutS * 1000
@@ -155,21 +220,40 @@ async function doAwait(logArg, timeoutS) {
   )
   const deadline = Date.now() + budget
   let current = record
-  while (Date.now() < deadline) {
-    await delay(TICK_MS)
-    current = readRecord(path) ?? current
-    if (!runIsLive(current).live) {
-      printReceipt(current)
-      return exitOf(current)
+  try {
+    while (Date.now() < deadline) {
+      await delay(TICK_MS)
+      current = readRecord(path) ?? current
+      if (!runIsLive(current).live) {
+        printReceipt(current)
+        return exitOf(current)
+      }
     }
+  } finally {
+    // The lease belongs to THIS blocking call. Whether the run ended, the budget
+    // ran out or the process was interrupted, the lease goes with it — a lease
+    // outliving its waiter is the stale marker this point exists to remove.
+    finishWait({ sessionId: session, runId, cause: 'await-returned' })
   }
   const waited = elapsedMs(current) ?? budget
+  // The crossing is now EVIDENCE, not advice: the registry journals it once and
+  // says whether this run has passed its hung mark.
+  const status = waitStatus({ lastProgressAt: current?.startedAt ?? null })
+  const hung = status.hung.some((lease) => lease.runId === runId) ||
+    (Number.isFinite(current?.expectedRuntimeMs) && current.expectedRuntimeMs > 0 &&
+      waited > current.expectedRuntimeMs * 2.5)
   console.log(
     `STILL RUNNING after ${formatDuration(waited)} — this call's ${formatDuration(budget)} is spent, the run is not. ` +
       'Do NOT start a poll loop: let the background run\'s completion notification announce the exit, then read ' +
-      `\`node scripts/verify/run-wait.mjs --receipt ${forDisplay(record.log ?? '')}\`. If nothing arrives and the ` +
-      'elapsed time passes 2.5x the expectation, treat it as hung.',
+      `\`node scripts/verify/run-wait.mjs --receipt ${forDisplay(record.log ?? '')}\`.`,
   )
+  if (hung) {
+    console.log(
+      `HUNG — ${formatDuration(waited)} is past 2.5x this run's expectation. The wait has been recorded as hung and ` +
+        'the batch emergency lane will treat it as a standstill; end the run rather than waiting again.',
+    )
+    return 5
+  }
   return 3
 }
 
