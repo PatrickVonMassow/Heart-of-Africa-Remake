@@ -26194,3 +26194,56 @@ Nummerierung bleiben deshalb identisch — hier wird nur verschoben, nie umgesch
   Refs: src/scenes/place/bankGame.ts, src/config/balance.ts, src/world/communicationRock.ts,
   src/scenes/place/layout.ts, docs/communication-poc-spec.md
   Bundle: Dorfleben.
+
+- [x] 1051. Digging is unreadable, and DIG is the word that fetches a second digger (user
+  03.09.2026, playing the deployed build; four reports of one hour, held together here
+  because they share one scene and would otherwise be built three times).
+  WHAT THE USER SAW: an adult walks to a dark circle and waves his arms. Three causes were
+  found in the code the same day, and each on its own is enough to break the DIG teaching
+  work-order 688 rests on ("the player has to read digging from the body alone"):
+  1. NO TOOL IN THE HANDS. `digPose` (`src/render/gesture.ts:353-383`) swings both arms as
+     if on a shaft, but the digging villager carries NO tool mesh — the digging stick is a
+     separate prop lying in the earth at the site (`PlaceScene.tsx` DigSites). The Pounder
+     holds a real pestle and the fire tender a real stick; the digger holds nothing, so the
+     1.5 s cycle reads as bowing or waving.
+  2. THE WORK LEAVES NO MARK. The site never changes while he works: nothing is removed and
+     nothing heaps up. The site meshes are layout-only and ignore progress, although
+     `AdultTask.dug` already counts the seconds and `digStrikeCrossed` marks every stroke —
+     so a visible change is drivable today.
+  3. THE SITE IS NOT AN EXCAVATION. It is a flat dark cylinder 0.03 m high plus a sphere for
+     spoil and one leaning stick (`PlaceScene.tsx` DigSites, ~1266-1306). From player height
+     that is a dark circle.
+  THE USER'S ORDER OF THE SAME DAY, verbatim: »Zudem wirkt es etwas konstruiert, dass der
+  Erwachsene DIG sagt, wenn er gräbt - als wäre es eine Tonspur für seine Handlungen. Ich
+  würde im Alltag das auch nicht sagen, bevor ich etwas ausgrabe. Änderung: DIG soll er als
+  Aufforderung benutzen, anstatt als Kommentar seiner eigenen Handlung. Wenn er graben will,
+  soll er vorher zu einem anderen Erwachsenen gehen und DIG sagen. Das soll eine Aufforderung
+  an den anderen Erwachsenen sein, gemeinsam zu graben. Sie sollen dann zu zweit zur
+  Grabungsstelle gehen, dort erneut DIG sagen und dann gemeinsam graben.«
+  Final state:
+  - DIG IS A SUMMONS, SAID TWICE. An adult who wants to dig walks to another adult and says
+    DIG to him as an invitation; the two walk to the dig site together; the INITIATOR says
+    DIG again at the site; then both dig. The double utterance is what separates the
+    invitation from the come/help reading: the word is heard once beside a person and once
+    beside the hole, and the player sees the same word answered by the same pair.
+  - The hush-while-a-child-is-in-earshot rule applies to BOTH utterances. Two stagings at two
+    sites per teaching round stay. A bout that finds no second adult free is SKIPPED and
+    retried later, never played alone.
+  - THE DIGGER HOLDS HIS TOOL for the whole stroke, riding it the way the pestle rides the
+    pounder's (`PlaceLife.tsx:2428-2436`).
+  - THE GROUND RECORDS THE WORK: the spoil grows with `dug`, the pit deepens, and each stroke
+    throws earth, so a player who watches for five seconds sees the hole change.
+  - THE SITE READS AS A HOLE IN THE EARTH from standing height: a rim, inner walls, a
+    shadowed bottom, broken ground and clods, and a spoil heap that reads as one.
+  Docs change with the code (CLAUDE.md §4): `design.md`'s adult-teaching section, the
+  `adultWork.ts` header rationale, the `adultWork.test.ts` assertions, and any document that
+  states where the word falls.
+  Test: Vitest over the summons — the invitation utterance, the joint walk, the second
+  utterance at the site, the skip when no partner is free, and the hush rule on both; plus
+  the strike-driven site progress. A backend-sensitive picture check for the tool in hand and
+  the excavated site, judged from player height.
+  Criticality: high — it is the second half of the teaching the whole communication slice is
+  built on, and the user could read none of it.
+  Refs: src/scenes/place/adultWork.ts, src/scenes/place/PlaceLife.tsx,
+  src/scenes/place/PlaceScene.tsx (DigSites), src/render/gesture.ts, design.md
+  Bundle: Dorfleben.
