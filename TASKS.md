@@ -14482,3 +14482,43 @@ to land than a mechanism that needs a review.
   Refs: scripts/board-edit-lock.mjs, scripts/batch-singleton.mjs (DEAD_CONFIRM_MS,
   liveness), scripts/board-heartbeat.mjs (runBoardStatus), scripts/board-publish.mjs
   Bundle: Session- & Repo-Hygiene.
+
+- [ ] 1059. Every context boundary kills the interactive session with exit code 143 and
+  tears Remote Control down, so the owner's remote view of the batch ends silently.
+  WHAT HAPPENS. Measured 04.09.2026 in the owning session: the ledger writes
+  `handover` for session 1a7cf1bb, pid 1375, cause `context-boundary` at 19:06:28.776Z,
+  then two `spawn-attempt` rows with cause `handover-successor` (pids 6930, 7080) — and
+  at 19:08:26Z that same pid 1375 takes a SIGTERM (143 = 128+15) and shuts down cleanly
+  (shell-snapshot cleanup, `Archive session … status=200`, SessionEnd
+  `lock-release-hook.mjs` status 0). Neither the container nor VS Code restarted in that
+  window: the VS Code extension host and the container's keep-alive process were both
+  ~75 min old afterwards, and the only vscode-server log directory of the day is
+  `20260904T210027` (21:00, not 21:08). The only sender in this repository that fits is the
+  autostart remediation "alive but not the lock owner → kill it"
+  (`scripts/batch-autostart.mjs`, bare `process.kill` = SIGTERM), which is exactly what a
+  handed-over predecessor becomes two minutes after `markHandover`.
+  WHAT IT COSTS. The dying process archives its remote session, so the server holds it
+  `session_not_active`, the next CCR request answers 409 and the client shuts the channel
+  down. The user's phone then reads "Remote Control is disabled" until a new session
+  registers, and the VS Code panel shows a red "Claude Code process exited with code 143".
+  Eight handovers on 04.09. alone, so the owner loses the remote view of an unattended
+  batch several times an evening while the batch itself carries on — the monitor is gone,
+  not the work. The user asked about it directly (04.09.2026).
+  Final state:
+  - A HANDED-OVER PREDECESSOR ENDS ITSELF rather than being signalled: after
+    `markHandover` succeeds, the session's own stop path exits 0, so the remediation finds
+    nothing to kill and no host reports an abnormal exit.
+  - The remediation keeps its safety net for a predecessor that does NOT exit, and says in
+    its log which case it hit.
+  - No new guard, ledger field or router — this is a change inside the existing handover
+    and remediation paths (infrastructure freeze, 01.09.2026).
+  Test: Vitest over the remediation's decision core — a pid that is alive, is not the lock
+  owner and carries a settled handover marker is left alone within the grace, and one
+  without a handover marker is still killed; plus the handover stop path asserting the
+  intended exit code.
+  Criticality: medium — it costs no batch work, but it repeatedly and silently removes the
+  owner's only remote view of an unattended run.
+  Refs: scripts/batch-autostart.mjs (rogue-spawn remediation), scripts/batch-singleton.mjs
+  (`markHandover`, `HANDOVER_SETTLE_MS`), .claude/batch-activity.jsonl (04.09. handover and
+  process-exit rows)
+  Bundle: Session- & Repo-Hygiene.
