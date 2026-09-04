@@ -123,10 +123,27 @@ put it is the mistake this line exists to stop.
     solution must resolve guard pairs that jointly demand and forbid the same action
     (e.g. the boundary exempts the wait a Stop guard prescribes, or ci-status-guard
     stands down for a committed boundary).
+  - A THIRD shape, measured 04.09.2026 ON THIS POINT'S OWN WORK and therefore the
+    twenty-second union entry: the session committed at 13:22 and ended. The launcher
+    ticked at 13:24 and 13:39 and started no successor either time, because
+    `successorStartDecision` returns `registered-writer-live` — `registeredFeatureWriters`
+    measures the feature branch through `checkAgentOutput`, and `agentOutputVerdict` reads
+    a branch tip younger than `RESPAWN_GRACE_MS` (30 min) as `verdict: 'alive'` with no
+    process behind it. The first tick that could have spawned was 13:54: 32 minutes of
+    structural standstill, ended by the user at 13:39. The U4 mechanism does not reach it —
+    `ownerKeepsBatch` hardens the sibling "skip: owner alive" branch and only bites past
+    the 60-minute threshold or the hard deadline, while `registered-writer-live` carries no
+    progress test at all. The error is the same one this point exists to remove: a COMMIT
+    IS THE LAST THING A SESSION DOES, so a fresh branch tip is evidence the writer just
+    FINISHED, not that it is working. Final state: a branch tip alone may not keep a writer
+    alive without process or worktree evidence beside it, or its grace drops well below one
+    tick — and the launcher says which evidence it stood on.
   Test: Vitest over the decision cores the merged solution lands in, replaying the
   incident's shape — alive heartbeat plus eternal waits plus no main progress leads to
   recovery within the stated bound; a drill that calls the real recovery path per the
-  drills rule, not a recreation of its aftermath.
+  drills rule, not a recreation of its aftermath. For the third shape: a tick whose only
+  liveness evidence is a branch tip minutes old, with no live process and no moving
+  worktree, must start a successor rather than veto.
   Criticality: high — hours of unattended standstill with every monitor green, on the one
   path that may never block.
   Refs: scripts/batch-emergency-core.mjs, scripts/batch-standstill-core.mjs,
