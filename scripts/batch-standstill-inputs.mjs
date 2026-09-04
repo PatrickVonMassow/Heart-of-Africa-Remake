@@ -198,8 +198,18 @@ function sameVerificationPath(left, right) {
   return resolve(left) === resolve(right)
 }
 
+/**
+ * The last moment this run demonstrably ADVANCED (point 1048, union entry U3).
+ *
+ * A progress event carries the run's output progress mark. Repeating a mark is
+ * the same progress seen again, so only the FIRST event bearing a given mark
+ * counts — a run reprinting one line for an hour renews nothing, however many
+ * events its chatter produces. An event without a mark predates this repair and
+ * is trusted as distinct, because a missing field may not erase real progress.
+ */
 function emittedVerificationProgress(records, record, path, end) {
   let latest = null
+  const firstSeen = new Map()
   for (const event of records ?? []) {
     const evidence = event?.evidence
     const sameRecord = evidence?.recordPath === path || evidence?.id === path
@@ -207,9 +217,31 @@ function emittedVerificationProgress(records, record, path, end) {
     if (Number(evidence?.startedAt) !== Number(record?.startedAt) || event?.pid !== record?.pid) continue
     const at = Number(event?.atMs)
     if (!finite(at) || at <= Number(record.startedAt) || at > end) continue
+    const value = evidence?.value
+    if (value !== undefined && value !== null) {
+      const key = String(value)
+      const first = firstSeen.get(key)
+      if (first !== undefined && first <= at) continue
+      firstSeen.set(key, at)
+    }
     latest = latest === null ? at : Math.max(latest, at)
   }
-  return latest
+  if (firstSeen.size === 0) return latest
+  // Recompute from the first-occurrence times so a late repeat cannot outrank
+  // its own original, keeping every mark-less event as it was.
+  let best = null
+  for (const at of firstSeen.values()) best = best === null ? at : Math.max(best, at)
+  for (const event of records ?? []) {
+    const evidence = event?.evidence
+    const sameRecord = evidence?.recordPath === path || evidence?.id === path
+    if (event?.event !== ACTIVITY_EVENTS.VERIFICATION_PROGRESS || !sameRecord) continue
+    if (Number(evidence?.startedAt) !== Number(record?.startedAt) || event?.pid !== record?.pid) continue
+    if (evidence?.value !== undefined && evidence?.value !== null) continue
+    const at = Number(event?.atMs)
+    if (!finite(at) || at <= Number(record.startedAt) || at > end) continue
+    best = best === null ? at : Math.max(best, at)
+  }
+  return best
 }
 
 /** Finished named runs are explicit verification intervals. A running record is

@@ -9,12 +9,14 @@
 import { describe, it, expect } from 'vitest'
 import {
   DEFAULTS,
+  advanceOutputProgress,
   applyBudget,
   buildDigest,
   classifyLine,
   createSelector,
   failureSurface,
   formatDuration,
+  outputProgressState,
   resultName,
   selectLines,
   showWindow,
@@ -349,5 +351,35 @@ describe('formatDuration', () => {
     expect(formatDuration(38_000)).toBe('38s')
     expect(formatDuration(252_000)).toBe('4m 12s')
     expect(formatDuration(NaN)).toBe('?')
+  })
+})
+
+// Point 1048, union entry U3: what a lease may renew on.
+describe('output progress mark', () => {
+  const markOf = (...chunks) => {
+    const state = outputProgressState()
+    for (const chunk of chunks) advanceOutputProgress(state, chunk)
+    return state.mark
+  }
+
+  it('stands still while a run reprints what it has already said', () => {
+    const spinning = 'still waiting for the run to finish\n'
+    expect(markOf(spinning, spinning)).toBe(markOf(spinning))
+    expect(markOf(spinning, spinning, spinning)).toBe(markOf(spinning))
+  })
+
+  it('moves on a new line and on an accumulating unterminated one', () => {
+    expect(markOf('PASS  a\n', 'PASS  b\n')).not.toBe(markOf('PASS  a\n'))
+    // A dot reporter never ends its line; each dot is still a passed test.
+    expect(markOf('····')).not.toBe(markOf('···'))
+  })
+
+  it('is unmoved by an empty chunk and starts from a fixed empty mark', () => {
+    const state = outputProgressState()
+    const empty = state.mark
+    advanceOutputProgress(state, '')
+    expect(state.mark).toBe(empty)
+    advanceOutputProgress(state, 'x')
+    expect(state.mark).not.toBe(empty)
   })
 })

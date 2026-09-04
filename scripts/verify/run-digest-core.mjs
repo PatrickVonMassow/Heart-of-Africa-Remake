@@ -329,3 +329,61 @@ export function showWindow(lines, { grep = null, tail = 120, max = 400 } = {}) {
   const window = list.slice(-Math.max(0, Math.min(tail, max)))
   return { lines: window, total, matched, truncated: total - window.length }
 }
+
+/**
+ * WHAT COUNTS AS SEMANTIC PROGRESS IN A RUN'S OUTPUT (point 1048, union entry U3).
+ *
+ * A verification lease used to renew on the mere ARRIVAL of output: any byte
+ * within the emit window pushed the lease out, so a hung run that keeps
+ * reprinting the same line suspends recovery for as long as it keeps talking.
+ * That is the mistake the progress clock of U1 corrected elsewhere — a repeat of
+ * an identical observation is the same observation, not new progress.
+ *
+ * The mark below is what the run has actually produced, in two numbers a
+ * repetition cannot move: how many DISTINCT lines it has emitted, and what its
+ * newest line currently says. A loop reprinting one line adds no distinct line
+ * and leaves the tail identical, so its mark stands still. A dot reporter, whose
+ * dots accumulate on one unterminated line, moves the tail with every dot. A
+ * suite naming its next file adds a distinct line.
+ *
+ * Lines are kept as 32-bit hashes rather than text: a LARGE run emits hundreds
+ * of thousands of them, and a collision can only make a new line look seen —
+ * which errs towards NOT renewing a lease, the safe side.
+ */
+export const PROGRESS_TAIL_CHARS = 200
+
+function lineHash(line) {
+  let h = 0x811c9dc5
+  for (let i = 0; i < line.length; i += 1) {
+    h ^= line.charCodeAt(i)
+    h = Math.imul(h, 0x01000193)
+  }
+  return h >>> 0
+}
+
+/** The empty mark a run starts from. */
+export function outputProgressState() {
+  return { seen: new Set(), pending: '', tail: '', mark: '0 ' }
+}
+
+/**
+ * Fold one chunk of a run's output into its progress mark. Returns the same
+ * state object, mutated — this sits in the wrapper's hot read path and runs once
+ * per chunk of a transcript that can reach hundreds of megabytes.
+ */
+export function advanceOutputProgress(state, chunk) {
+  const text = String(chunk ?? '')
+  if (text.length === 0) return state
+  state.pending += text
+  const parts = state.pending.split(/\r?\n/)
+  state.pending = parts.pop() ?? ''
+  for (const line of parts) {
+    state.seen.add(lineHash(line))
+    state.tail = line
+  }
+  // An unterminated remainder is the newest thing the run has said, so it is the
+  // tail while it grows; the completed line takes over once the newline lands.
+  const tail = state.pending.length > 0 ? state.pending : state.tail
+  state.mark = `${state.seen.size} ${tail.slice(-PROGRESS_TAIL_CHARS)}`
+  return state
+}

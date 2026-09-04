@@ -17,11 +17,11 @@ import {
 import { parseWindow, renderStandstillReport } from './batch-standstill-report.mjs'
 
 describe('standstill report inputs', () => {
-  const verificationProgress = ({ at, path, startedAt, pid = 4242 }) => ({
+  const verificationProgress = ({ at, path, startedAt, pid = 4242, value = undefined }) => ({
     event: 'verification-progress',
     atMs: at,
     pid,
-    evidence: { id: path, recordPath: path, startedAt },
+    evidence: { id: path, recordPath: path, startedAt, ...(value === undefined ? {} : { value }) },
   })
 
   it('pairs only timestamped tool calls, not heartbeat-like transcript lines', () => {
@@ -143,6 +143,48 @@ describe('standstill report inputs', () => {
         pid: 4242,
         processAlive: true,
       }])
+    } finally {
+      rmSync(dir, { recursive: true, force: true })
+    }
+  })
+
+  // Point 1048, union entry U3: a lease renews on progress, not on chatter.
+  it('renews the lease only up to the first event of each output mark', () => {
+    const dir = mkdtempSync(join(tmpdir(), 'hoa-verification-repeat-'))
+    const now = Date.parse('2026-08-21T10:00:00Z')
+    const startedAt = now - 80 * 60_000
+    const log = join(dir, 'large.log')
+    const recordPath = `${log}.run.json`
+    try {
+      writeFileSync(log, 'waiting\n')
+      writeFileSync(recordPath, JSON.stringify({
+        command: 'verify --plan large', log, status: 'running', startedAt, pid: 4242,
+      }))
+      const advancedAt = now - 70 * 60_000
+      const evidence = (records) => verificationRecordEvidence(dir, {
+        start: startedAt - 1, end: now, records, processAlive: () => true,
+      })
+      // The run said something new once, then repeated itself for an hour.
+      const repeating = evidence([
+        verificationProgress({ at: advancedAt, path: recordPath, startedAt, value: '12 waiting' }),
+        verificationProgress({ at: now - 30 * 60_000, path: recordPath, startedAt, value: '12 waiting' }),
+        verificationProgress({ at: now - 60_000, path: recordPath, startedAt, value: '12 waiting' }),
+      ])
+      // The lease stops at the FIRST event of that mark and has long expired by
+      // `now`, so an hour of chatter suspends nothing.
+      expect(repeating.leases).toEqual([expect.objectContaining({
+        progressAt: advancedAt, leaseUntil: advancedAt + 15 * 60_000,
+      })])
+      expect(repeating.leases[0].leaseUntil).toBeLessThan(now)
+      // A mark that actually moved renews, and the mark-less events of the old
+      // emitter keep counting exactly as they did.
+      const advancing = evidence([
+        verificationProgress({ at: advancedAt, path: recordPath, startedAt, value: '12 waiting' }),
+        verificationProgress({ at: now - 60_000, path: recordPath, startedAt, value: '13 PASS  world' }),
+      ])
+      expect(advancing.leases).toEqual([expect.objectContaining({ progressAt: now - 60_000 })])
+      const legacy = evidence([verificationProgress({ at: now - 60_000, path: recordPath, startedAt })])
+      expect(legacy.leases).toEqual([expect.objectContaining({ progressAt: now - 60_000 })])
     } finally {
       rmSync(dir, { recursive: true, force: true })
     }
