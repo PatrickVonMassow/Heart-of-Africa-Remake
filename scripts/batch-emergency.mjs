@@ -20,7 +20,8 @@ import {
   release,
   revokeWriterFence,
 } from './batch-singleton.mjs'
-import { EMERGENCY_THRESHOLD_MS, emergencyDecision, strikeRecord } from './batch-emergency-core.mjs'
+import { EMERGENCY_THRESHOLD_MS, emergencyDecision, recoveryEpisodeKey, strikeRecord } from './batch-emergency-core.mjs'
+import { readRegistry, registryPath, retireWaiters } from './wait-lease.mjs'
 import { EMERGENCY_INTERVAL_MINUTES, EMERGENCY_SCRIPT_PATH, EMERGENCY_TASK_NAME, PRIMARY_TASK_NAME } from './windows-task-core.mjs'
 
 export { EMERGENCY_INTERVAL_MINUTES, EMERGENCY_SCRIPT_PATH, EMERGENCY_TASK_NAME }
@@ -129,20 +130,37 @@ export function runEmergency({
   logPath = join(repo, 'local', 'batch-emergency-strikes.jsonl'), execute = execFileSync,
   getLock = () => readOwnerLock(LOCK_PATH), revoke = revokeWriterFence,
   getProcesses = () => readSessionProcesses(), terminate = terminateLockedOwner, releaseLock = release,
+  getWaitLeases = () => readRegistry(registryPath(repo)).leases ?? [], retireWaits = retireWaiters,
 } = {}) {
   const observed = inputs ?? defaultInputs({ repo, now, thresholdMs })
   const decision = emergencyDecision({ now, thresholdMs, ...observed })
   if (!decision.strike || dryRun) return { decision, outcomes: [], restored: false, dryRun }
 
-  const id = `emergency-${now}-${randomUUID()}`
-  const intent = strikeRecord({ id, decision, at: now, phase: 'intent' })
-  writeJsonAtomic(statePath, { ...observed.state, lastStrikeAt: now, lastStrikeProgressAt: decision.progressAt, lastStrikeId: id, pending: intent })
-  appendRecord(logPath, intent)
+  const lock = getLock()
+  // ONE EPISODE, ONE ATTEMPT (union entries U7 and U9). The key is the progress
+  // boundary being recovered from plus the owner generation being recovered —
+  // the same key points 947 and 958 reach recovery under. A run that crashed
+  // after writing its intent finds that intent again and RESUMES it: the id and
+  // the deferral record are reused, so a retried recovery still yields exactly
+  // one successor and one queue exception.
+  const episode = recoveryEpisodeKey({ progressAt: decision.progressAt, ownerGeneration: lock?.fence ?? null })
+  const pending = observed.state?.pending
+  const resuming = pending?.phase === 'intent' && episode !== null && pending?.episode === episode
+  const id = resuming ? pending.id : `emergency-${now}-${randomUUID()}`
+  const intent = resuming ? pending : strikeRecord({ id, decision, at: now, phase: 'intent', episode })
+  writeJsonAtomic(statePath, {
+    ...observed.state,
+    lastStrikeAt: now,
+    lastStrikeProgressAt: decision.progressAt,
+    lastStrikeId: id,
+    lastEpisode: episode,
+    pending: intent,
+  })
+  if (!resuming) appendRecord(logPath, intent)
 
   const outcomes = []
   let mayRepair = true
   if (decision.action === 'hard-recover') {
-    const lock = getLock()
     if (lock && Number.isSafeInteger(lock.fence)) {
       const revoked = revoke(lock.sessionId, lock.fence, { reason: 'emergency-total-wedge' })
       outcomes.push({ step: 'revoke-writer-fence', ok: revoked?.revoked === true, detail: revoked?.reason ?? 'no verdict' })
@@ -159,6 +177,21 @@ export function runEmergency({
       outcomes.push({ ...ended, sessionId: target.sessionId })
       if (!ended.ok) mayRepair = false
     }
+    // THE WAITS GO WITH THE SESSION THAT OWNED THEM (union entry U8). Ten
+    // watcher shells outlived the incident's owner and went on feeding
+    // misleading command-line matches. The registry names each wait's session,
+    // run and pid incarnation, so recovery retires exactly that bounded group —
+    // by identity, never by scanning for a command substring, and never
+    // touching an unrelated process that merely inherited a pid.
+    const recovered = new Set(targets.map((target) => target.sessionId).filter(Boolean))
+    let waits = []
+    try {
+      waits = (getWaitLeases() ?? []).filter((lease) => recovered.has(lease?.sessionId))
+    } catch (error) {
+      outcomes.push({ step: 'retire-waits', ok: false, error: error?.message ?? String(error) })
+    }
+    if (waits.length) outcomes.push({ step: 'retire-waits', ok: true, waits: retireWaits(waits, { now }) })
+    else outcomes.push({ step: 'retire-waits', ok: true, skipped: 'no-registered-wait' })
     if (mayRepair && lock?.sessionId) outcomes.push({ step: 'release-owner-lock', ok: releaseLock(lock.sessionId) === true })
   }
   // Doctor may write only after every recorded live process was terminated with
@@ -166,13 +199,18 @@ export function runEmergency({
   outcomes.push(commandOutcome('batch-doctor.mjs', mayRepair ? ['--repair'] : [], { execute, repo }))
   outcomes.push(restartOutcome({ execute, repo }))
   const restored = outcomes.at(-1)?.ok === true
-  const outcome = strikeRecord({ id, decision, at: Date.now(), phase: 'outcome', outcomes })
+  const outcome = strikeRecord({ id, decision, at: Date.now(), phase: 'outcome', outcomes, episode })
+  // `pending` DELIBERATELY SURVIVES the outcome: the successor reads it for its
+  // emergency handoff prompt, and a later tick of the same episode recognising
+  // it is exactly what keeps one wedge from producing a second deferral.
   writeJsonAtomic(statePath, {
     ...observed.state,
     lastStrikeAt: now,
     lastStrikeProgressAt: decision.progressAt,
     lastStrikeId: id,
+    lastEpisode: episode,
     lastOutcome: outcome,
+    pending: intent,
   })
   appendRecord(logPath, outcome)
   return { decision, outcomes, restored, dryRun: false }

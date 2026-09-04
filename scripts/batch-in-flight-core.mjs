@@ -159,7 +159,67 @@ export function assessCiWait({ wait, now = Date.now(), probePid = () => null } =
  * Returns { shields, reason, ageMs }. Anything unreadable SHIELDS: a declaration
  * this cannot parse is not evidence that the work is over.
  */
-export function declarationShields({ declaration, now = Date.now(), maxAgeMs = IN_FLIGHT_MAX_AGE_MS } = {}) {
+/**
+ * IS THE SESSION THAT WROTE THIS DECLARATION STILL RUNNING? PURE (point 1048,
+ * union entry U2).
+ *
+ * The declaration's `evidence` entries are probed; its own WRITER never was.
+ * That is how `.claude/batch-in-flight.json` kept "a verification is running"
+ * plausible all night on 02./03.09.2026 while naming a pid dead since the
+ * afternoon — and, measured again on 04.09.2026, how the marker in this
+ * checkout still named pid 1761118, which no longer exists. A declaration with
+ * an empty `evidence` array — the incident's exact shape — was believed on its
+ * timestamp alone.
+ *
+ * Identity, not existence: the recorded `pidStartedAt` must match what the OS
+ * reports, so a reused pid cannot resurrect a dead session's paperwork. The
+ * comparison is the one `resolveOwnership` and the pid evidence kind already
+ * use.
+ *
+ * UNJUDGEABLE IS NOT DEAD. A declaration carrying no pid, or one whose start
+ * time the OS will not report, answers `known: false` and changes nothing — the
+ * clock stays its bound. Only a pid that is demonstrably gone or demonstrably
+ * somebody else's answers `alive: false`.
+ *
+ * @returns {{known: boolean, alive: boolean, reason: string, pid: number|null}}
+ */
+export function declarationWriterAlive({
+  declaration,
+  probePid = null,
+  tolerance = PID_START_TOLERANCE_MS,
+} = {}) {
+  const unknown = (reason, pid = null) => ({ known: false, alive: true, reason, pid })
+  if (!declaration || typeof declaration !== 'object') return unknown('no-declaration')
+  const pid = Number(declaration.pid)
+  if (!Number.isInteger(pid) || pid <= 0) return unknown('no-writer-pid')
+  if (typeof probePid !== 'function') return unknown('no-probe', pid)
+  let probe = null
+  try {
+    probe = probePid(pid)
+  } catch {
+    return unknown('probe-failed', pid)
+  }
+  if (!probe || probe.exists !== true) return { known: true, alive: false, reason: 'writer-gone', pid }
+  const recorded = declaration.pidStartedAt
+  if (typeof recorded !== 'number' || !Number.isFinite(recorded)) return unknown('no-writer-start-time', pid)
+  if (typeof probe.startedAt !== 'number' || !Number.isFinite(probe.startedAt)) {
+    return unknown('writer-start-time-unverifiable', pid)
+  }
+  if (Math.abs(probe.startedAt - recorded) > tolerance) {
+    return { known: true, alive: false, reason: 'writer-pid-reused', pid }
+  }
+  return { known: true, alive: true, reason: 'writer-alive', pid }
+}
+
+export function declarationShields({
+  declaration,
+  now = Date.now(),
+  maxAgeMs = IN_FLIGHT_MAX_AGE_MS,
+  // The writer probe is INJECTED and defaults to absent, so every existing
+  // caller keeps the clock-only behaviour it was written against and only a
+  // caller that can actually probe pays for the stricter answer.
+  probePid = null,
+} = {}) {
   if (!declaration || typeof declaration !== 'object') return { shields: true, reason: 'unreadable', ageMs: null }
   const at = Number(declaration.at)
   if (!Number.isFinite(at)) return { shields: true, reason: 'no-timestamp', ageMs: null }
@@ -167,8 +227,13 @@ export function declarationShields({ declaration, now = Date.now(), maxAgeMs = I
   // A stamp from the future is a clock nothing here can reason about — shield,
   // and let the wait-side assessment, which blocks on skew, be the strict one.
   if (!(ageMs >= 0)) return { shields: true, reason: 'clock-skew', ageMs }
-  if (ageMs > maxAgeMs) return { shields: false, reason: 'expired', ageMs }
-  return { shields: true, reason: 'live', ageMs }
+  // A DEAD WRITER SHIELDS NOTHING (union entry U2), whatever the clock says. A
+  // declaration is a claim about what a running session is doing; once that
+  // session is gone the claim has no subject.
+  const writer = declarationWriterAlive({ declaration, probePid })
+  if (writer.known && !writer.alive) return { shields: false, reason: writer.reason, ageMs, writer }
+  if (ageMs > maxAgeMs) return { shields: false, reason: 'expired', ageMs, writer }
+  return { shields: true, reason: 'live', ageMs, writer }
 }
 
 /** How recently a declared LOG file must have been written to count as proof that
@@ -913,6 +978,25 @@ export const RESPAWN_GRACE_MS = 30 * 60 * 1000
 export const LOG_OVERRIDES_QUIET_GIT_MS = 2 * RESPAWN_GRACE_MS
 
 /**
+ * How long COMMIT-SHAPED evidence alone keeps a writer alive (point 1048, union
+ * entry U22, measured 04.09.2026 on this point's own work).
+ *
+ * A COMMIT IS THE LAST THING A SESSION DOES. The launcher skipped two ticks —
+ * 32 minutes of structural standstill — because a branch tip four minutes old
+ * read as `alive` for the full half-hour grace, with no process behind it and
+ * nothing moving in the checkout. The grace above is calibrated for the opposite
+ * risk (shooting an agent that is still editing files), and working-file
+ * movement is what proves that. A commit proves the writer FINISHED.
+ *
+ * So evidence that is only commit-shaped — the branch tip, or the worktree's own
+ * git metadata, which a commit rewrites just the same — keeps the writer alive
+ * for well under one launcher tick (15 min), which is all the original
+ * protection needs: an agent that commits WHILE the replacement decision is
+ * being made must not be shot by a stale reading.
+ */
+export const COMMIT_ONLY_GRACE_MS = 5 * 60 * 1000
+
+/**
  * IS A DELEGATED AGENT STILL PRODUCING? PURE — every stamp is injected as epoch
  * ms, or null where the probe could not answer.
  *
@@ -920,7 +1004,9 @@ export const LOG_OVERRIDES_QUIET_GIT_MS = 2 * RESPAWN_GRACE_MS
  *   'dead'         — recorded process identity was positively refuted as gone
  *                    or reused; `refutations` names it and the output it beats.
  *   'alive'        — something moved inside the grace window. `judgedOn` names
- *                    what: 'git' (its worktree or branch) or 'log'.
+ *                    what: 'git' (its worktree or branch) or 'log', and `detail`
+ *                    names WHICH git stamp carried it, because commit-shaped
+ *                    evidence gets only `COMMIT_ONLY_GRACE_MS`.
  *   'quiet'        — git output COULD be measured and has stood still.
  *   'unmeasurable' — neither a worktree nor a branch could be read, so the only
  *                    thing left is silence, and silence is not evidence of death
@@ -934,6 +1020,7 @@ export function agentOutputVerdict({
   now,
   graceMs = RESPAWN_GRACE_MS,
   logOverrideMs = LOG_OVERRIDES_QUIET_GIT_MS,
+  commitOnlyGraceMs = COMMIT_ONLY_GRACE_MS,
 } = {}) {
   const num = (v) => (typeof v === 'number' && Number.isFinite(v) ? v : null)
   // The worktree probe answers { at, source } (point 434 (5b)) and a bare number
@@ -945,13 +1032,29 @@ export function agentOutputVerdict({
   // Say which source the newest stamp came from where the WORKTREE is the newest
   // one and it named itself; a branch tip is already named by `commit`.
   const named = wt && wt.source && wt.at === newestGit ? wt.source : null
+  // WHICH GIT STAMP IS THIS, AND HOW LONG MAY IT SPEAK FOR THE WRITER (U22)?
+  // A commit rewrites the branch tip AND the worktree's git metadata, so both
+  // carry the same meaning: the writer reached the end of a piece of work. Only
+  // moving WORKING FILES prove it is still in the middle of one — and a stamp
+  // whose source a caller did not name keeps the full grace, because "unknown"
+  // must never be read as "finished". A MEASURED LIVE PROCESS beside the commit
+  // keeps the full grace too: the writer is demonstrably there, and a live pid
+  // that cannot make a stamp alive may still say which of two graces applies.
+  const measured = evidenceVerdict(processEvidence)
+  const processAlive = measured.judgedOn === 'process' && measured.refutations.length === 0
+  const commitShaped =
+    !processAlive && !(wt && wt.at === newestGit && wt.source !== WORKTREE_SOURCE.git)
+  const gitGraceMs = commitShaped
+    ? Math.min(graceMs, Number.isFinite(commitOnlyGraceMs) && commitOnlyGraceMs > 0 ? commitOnlyGraceMs : graceMs)
+    : graceMs
+  const stampName = named ?? (commitShaped ? 'commit' : null)
   let output
-  if (newestGit !== null && now - newestGit <= graceMs) {
+  if (newestGit !== null && now - newestGit <= gitGraceMs) {
     output = {
       verdict: 'alive',
       judgedOn: 'git',
       ageMs: now - newestGit,
-      detail: `work output ${minutes(now - newestGit)} min old${named ? ` (${named})` : ''}`,
+      detail: `work output ${minutes(now - newestGit)} min old${stampName ? ` (${stampName})` : ''}`,
     }
   } else {
     // A FRESH log is genuine evidence that something is happening — it is only
@@ -967,12 +1070,14 @@ export function agentOutputVerdict({
         verdict: 'quiet',
         judgedOn: 'git',
         ageMs: now - newestGit,
-        detail: `no commit and nothing written for ${minutes(now - newestGit)} min${named ? ` (newest: ${named})` : ''}`,
+        detail: commitShaped && now - newestGit <= graceMs
+          ? `only a ${minutes(now - newestGit)} min old commit, with nothing running and no working file touched ` +
+            `since (a commit is the last thing a session does)`
+          : `no commit and nothing written for ${minutes(now - newestGit)} min${stampName ? ` (newest: ${stampName})` : ''}`,
       }
     }
   }
 
-  const measured = evidenceVerdict(processEvidence)
   if (measured.refutations.length === 0) return output
   const refuted = `${output.detail} (judged on ${output.judgedOn})`
   return {
@@ -2338,6 +2443,11 @@ export function assessOwnerWork({ declaration, lock, now, maxAgeMs = LAUNCHER_WO
   })
   if (!owner.mine) return out({ reason: `not-owners:${owner.via}` })
 
+  // NOT the writer's liveness (union entry U2). The launcher already asks that
+  // of the LOCK through `assessOwner`, with its own owner probe, and the probe
+  // handed in here answers for the DECLARED work's pids — reusing it for the
+  // session itself would read a finished agent as a dead owner. The writer test
+  // belongs where a declaration shields something: `declarationShields`.
   const declaredAt = declaration.at
   const ageMs = now - declaredAt
   // A declaration from the future is a clock this cannot reason about → the same

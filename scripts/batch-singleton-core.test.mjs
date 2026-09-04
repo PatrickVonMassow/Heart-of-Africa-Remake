@@ -1354,6 +1354,72 @@ describe('acquire (atomic test-and-set on the real filesystem)', () => {
     expect(readOwnerLock(lockPath).handedOver).toBeUndefined()
   })
 
+  // Point 1048, union entry U19: the boundary is a fact in the lock, not a
+  // property of the worktree.
+  it('a boundary COMMITTED with its marker seals the lock, and the stale hour does not end it', () => {
+    const markerPath = join(dir, 'batch-boundary.json')
+    const at = Date.now() - BOUNDARY_FRESH_MS - 60_000
+    const marker = { v: 2, phase: 'committed', cause: 'point', sessionId: 's1', point: 675, at }
+    acquire('s1', opts())
+    markHandover('s1', { lockPath, point: 675, now: at, marker })
+    writeFileSync(markerPath, JSON.stringify(marker))
+
+    const sealed = readOwnerLock(lockPath)
+    expect(sealed.boundarySeal).toMatchObject({ v: 1, sessionId: 's1', point: 675, cause: 'point', mutations: 0 })
+
+    // The marker is over an hour old — the exact state in which the first later
+    // mutation used to delete it and re-open the handed-over batch in silence.
+    expect(withdrawHandover('s1', { lockPath, now: Date.now(), trigger: 'Bash: git commit' })).toBe(false)
+    expect(existsSync(markerPath)).toBe(true)
+    const after = readOwnerLock(lockPath)
+    expect(after.handedOver).toBe(true)
+    expect(after.boundarySeal.mutations).toBe(1)
+  })
+
+  it('records every post-commit mutation and says so loudly from the second', () => {
+    const at = Date.now() - BOUNDARY_FRESH_MS - 60_000
+    const marker = { v: 2, phase: 'committed', cause: 'context', sessionId: 's1', point: null, at }
+    const logPath = join(dir, 'boundary.log')
+    acquire('s1', opts())
+    markHandover('s1', { lockPath, now: at, marker })
+    writeFileSync(join(dir, 'batch-boundary.json'), JSON.stringify(marker))
+
+    withdrawHandover('s1', { lockPath, logPath, now: Date.now(), trigger: 'Bash: git commit' })
+    expect(readFileSync(logPath, 'utf8')).toMatch(/SEALED MARKER KEPT/)
+    withdrawHandover('s1', { lockPath, logPath, now: Date.now(), trigger: 'Edit: src/main.ts' })
+    const text = readFileSync(logPath, 'utf8')
+    expect(text).toMatch(/SEALED BOUNDARY MUTATED AGAIN/)
+    expect(text).toMatch(/WORKING PAST ITS OWN HANDOVER/)
+    expect(readOwnerLock(lockPath).boundarySeal.mutations).toBe(2)
+  })
+
+  it('spends the seal when a successor claims the batch, rather than never', () => {
+    const at = Date.now()
+    const marker = { v: 2, phase: 'committed', cause: 'point', sessionId: 's1', point: 675, at }
+    acquire('s1', opts())
+    markHandover('s1', { lockPath, point: 675, now: at, marker })
+    const lock = readOwnerLock(lockPath)
+    // The generation moving on is what ends it: the boundary was used.
+    writeFileSync(lockPath, JSON.stringify({ ...lock, fence: (lock.fence ?? 0) + 1 }))
+    expect(withdrawHandover('s1', { lockPath, now: at + BOUNDARY_FRESH_MS + 60_000 })).toBe(true)
+  })
+
+  it('the deliberate withdrawal takes the seal with it, so it is not a no-op', () => {
+    const at = Date.now()
+    const marker = { v: 2, phase: 'committed', cause: 'point', sessionId: 's1', point: 675, at }
+    acquire('s1', opts())
+    markHandover('s1', { lockPath, point: 675, now: at, marker })
+    writeFileSync(join(dir, 'batch-boundary.json'), JSON.stringify(marker))
+
+    expect(withdrawHandover('s1', { lockPath, now: at + 1000, force: true })).toBe(true)
+    const cleared = readOwnerLock(lockPath)
+    expect(cleared.boundarySeal).toBeUndefined()
+    expect(cleared.handedOver).toBeUndefined()
+    // And the next mutation is an ordinary one again, not a kept seal.
+    expect(withdrawHandover('s1', { lockPath, now: at + 2000, trigger: 'Bash: git commit' })).toBe(false)
+    expect(readOwnerLock(lockPath).boundarySeal).toBeUndefined()
+  })
+
   it('a stale sealed marker does not carry the heartbeat handover either', () => {
     const markerPath = join(dir, 'batch-boundary.json')
     const at = Date.now() - BOUNDARY_FRESH_MS - 60_000

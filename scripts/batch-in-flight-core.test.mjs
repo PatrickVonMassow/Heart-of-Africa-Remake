@@ -22,8 +22,10 @@ import {
   IN_FLIGHT_MAX_AGE_MS,
   LAUNCHER_WORK_MAX_AGE_MS,
   LOG_FRESH_MS,
+  COMMIT_ONLY_GRACE_MS,
   LOG_OVERRIDES_QUIET_GIT_MS,
   RESPAWN_GRACE_MS,
+  WORKTREE_SOURCE,
   WORK_FRESH_MS,
   agentOutputVerdict,
   declaredAgentProbe,
@@ -50,6 +52,7 @@ import {
   statusVerdict,
   closingFreezeActive,
   declarationShields,
+  declarationWriterAlive,
   pastEtaCards,
   waitEtaRefusal,
   adoptionAssessment,
@@ -1204,6 +1207,46 @@ describe('agentOutputVerdict / respawnDecision — an agent is judged by what it
     // is never punished.
     expect(verdict({ worktreeAt: NOW - LOG_OVERRIDES_QUIET_GIT_MS, logAt: NOW - 60 * 1000 }).verdict).toBe('alive')
     expect(LOG_OVERRIDES_QUIET_GIT_MS).toBeGreaterThan(RESPAWN_GRACE_MS)
+  })
+
+  it('U22: a COMMIT alone stops speaking for the writer well inside one launcher tick', () => {
+    // 04.09.2026, measured on this point's own work: the session committed at
+    // 13:22 and ended. The launcher skipped 13:24 and 13:39 — 32 minutes of
+    // structural standstill — because a branch tip four minutes old read as
+    // `alive` for the full half-hour grace with no process behind it.
+    const justCommitted = verdict({ branchTipAt: NOW - 60 * 1000 })
+    expect(justCommitted.verdict).toBe('alive')
+    expect(justCommitted.detail).toContain('commit')
+    const stale = verdict({ branchTipAt: NOW - COMMIT_ONLY_GRACE_MS - 1 })
+    expect(stale.verdict).toBe('quiet')
+    expect(stale.detail).toContain('a commit is the last thing a session does')
+    expect(respawnDecision({ output: stale })).toMatchObject({ respawn: true, reason: 'output-quiet' })
+    // Well below one 15-minute launcher tick, so a single skipped tick can no
+    // longer be bought with a commit.
+    expect(COMMIT_ONLY_GRACE_MS).toBeLessThan(10 * 60 * 1000)
+    expect(COMMIT_ONLY_GRACE_MS).toBeLessThan(RESPAWN_GRACE_MS)
+  })
+
+  it('…and the worktree\'s own git metadata is the same evidence, not a second witness', () => {
+    // A commit rewrites HEAD and COMMIT_EDITMSG too, so a checkout that has gone
+    // clean carries the identical footprint under a different name.
+    const committed = { at: NOW - COMMIT_ONLY_GRACE_MS - 1, source: WORKTREE_SOURCE.git }
+    expect(verdict({ worktreeAt: committed }).verdict).toBe('quiet')
+    // Working files are the half that proves work in the MIDDLE of a piece, and
+    // they keep the full grace.
+    const editing = { at: NOW - COMMIT_ONLY_GRACE_MS - 1, source: WORKTREE_SOURCE.files }
+    expect(verdict({ worktreeAt: editing }).verdict).toBe('alive')
+    // A stamp whose source nobody named keeps the full grace: "unknown" may
+    // never be read as "finished".
+    expect(verdict({ worktreeAt: NOW - COMMIT_ONLY_GRACE_MS - 1 }).verdict).toBe('alive')
+  })
+
+  it('…and a MEASURED LIVE process beside the commit keeps the full grace', () => {
+    const live = [{ kind: 'pid', ok: true, describe: 'pid 4242', detail: 'running' }]
+    expect(verdict({ branchTipAt: NOW - COMMIT_ONLY_GRACE_MS - 1, processEvidence: live }).verdict).toBe('alive')
+    // A REFUTED process still overrules everything, exactly as before.
+    const gone = [{ kind: 'pid', ok: false, describe: 'pid 4242', detail: 'process-gone' }]
+    expect(verdict({ branchTipAt: NOW - 60 * 1000, processEvidence: gone }).verdict).toBe('dead')
   })
 
   it('is wider than the WAIT window, because the two mistakes cost differently', () => {
@@ -4539,5 +4582,69 @@ describe('commissionTarget — the act of opening a point, recognised', () => {
     expect(() => commissionTarget({ toolName: null, command: null, prompt: null, description: null })).not.toThrow()
     expect(commissionTarget({ toolName: 'Bash', command: 'git checkout -b feat/0-nope' }).point).toBeNull()
     expect(commissionTarget({ toolName: 'Agent', prompt: 'feat/'.repeat(500) }).point).toBeNull()
+  })
+})
+
+// --- POINT 1048: A DECLARATION OF A DEAD SESSION SAYS NOTHING -----------------
+// `.claude/batch-in-flight.json` kept "a verification is running" plausible all
+// night on 02./03.09.2026 while naming a pid dead since the afternoon, and the
+// marker measured in this checkout on 04.09.2026 still named pid 1761118, gone.
+// The evidence entries were probed; the writer never was.
+describe('the declaration\'s own writer (union entry U2)', () => {
+  const NOW_U2 = Date.parse('2026-09-04T09:00:00Z')
+  const born = NOW_U2 - 4 * 60 * 60 * 1000
+  const declaration = { at: NOW_U2 - 60_000, pid: 1761118, pidStartedAt: born, evidence: [] }
+  const aliveProbe = () => ({ exists: true, startedAt: born })
+  const deadProbe = () => ({ exists: false, startedAt: null })
+  const strangerProbe = () => ({ exists: true, startedAt: born + 10 * 60 * 1000 })
+
+  it('reads a live writer as live', () => {
+    expect(declarationWriterAlive({ declaration, probePid: aliveProbe }))
+      .toMatchObject({ known: true, alive: true, reason: 'writer-alive', pid: 1761118 })
+  })
+
+  it('reads the incident — a pid gone for hours — as dead', () => {
+    expect(declarationWriterAlive({ declaration, probePid: deadProbe }))
+      .toMatchObject({ known: true, alive: false, reason: 'writer-gone' })
+  })
+
+  it('does not let a REUSED pid resurrect the paperwork', () => {
+    expect(declarationWriterAlive({ declaration, probePid: strangerProbe }))
+      .toMatchObject({ known: true, alive: false, reason: 'writer-pid-reused' })
+  })
+
+  it('answers UNKNOWN — never dead — where it cannot judge', () => {
+    for (const [input, reason] of [
+      [{ declaration: { at: 1 }, probePid: aliveProbe }, 'no-writer-pid'],
+      [{ declaration, probePid: null }, 'no-probe'],
+      [{ declaration, probePid: () => { throw new Error('boom') } }, 'probe-failed'],
+      [{ declaration: { ...declaration, pidStartedAt: undefined }, probePid: aliveProbe }, 'no-writer-start-time'],
+      [{ declaration, probePid: () => ({ exists: true, startedAt: null }) }, 'writer-start-time-unverifiable'],
+      [{}, 'no-declaration'],
+    ]) {
+      expect(declarationWriterAlive(input)).toMatchObject({ known: false, alive: true, reason })
+    }
+  })
+
+  it('stops a dead writer\'s declaration from shielding anything', () => {
+    // Fresh by the clock — one minute old — and still worthless.
+    expect(declarationShields({ declaration, now: NOW_U2, probePid: deadProbe }))
+      .toMatchObject({ shields: false, reason: 'writer-gone' })
+    expect(declarationShields({ declaration, now: NOW_U2, probePid: aliveProbe }))
+      .toMatchObject({ shields: true, reason: 'live' })
+  })
+
+  it('leaves every caller that cannot probe exactly as it was', () => {
+    expect(declarationShields({ declaration, now: NOW_U2 })).toMatchObject({ shields: true, reason: 'live' })
+  })
+
+  it('leaves assessOwnerWork alone — the launcher asks the LOCK about liveness', () => {
+    // Reusing the declared work's pid probe for the session itself would read a
+    // finished agent beside a running branch as a dead owner, which is the
+    // mistake that killed four sessions in one afternoon.
+    const lock = { sessionId: 'S1', pid: 1761118, pidStartedAt: born }
+    const owned = { ...declaration, sessionId: 'S1', evidence: [{ kind: 'log', path: 'x.log' }] }
+    expect(assessOwnerWork({ declaration: owned, lock, now: NOW_U2, probePid: deadProbe, mtimeOf: () => NOW_U2 - 1000 }))
+      .toMatchObject({ declared: true })
   })
 })

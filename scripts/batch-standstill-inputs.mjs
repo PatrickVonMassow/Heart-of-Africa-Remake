@@ -198,8 +198,18 @@ function sameVerificationPath(left, right) {
   return resolve(left) === resolve(right)
 }
 
+/**
+ * The last moment this run demonstrably ADVANCED (point 1048, union entry U3).
+ *
+ * A progress event carries the run's output progress mark. Repeating a mark is
+ * the same progress seen again, so only the FIRST event bearing a given mark
+ * counts — a run reprinting one line for an hour renews nothing, however many
+ * events its chatter produces. An event without a mark predates this repair and
+ * is trusted as distinct, because a missing field may not erase real progress.
+ */
 function emittedVerificationProgress(records, record, path, end) {
   let latest = null
+  const firstSeen = new Map()
   for (const event of records ?? []) {
     const evidence = event?.evidence
     const sameRecord = evidence?.recordPath === path || evidence?.id === path
@@ -207,9 +217,31 @@ function emittedVerificationProgress(records, record, path, end) {
     if (Number(evidence?.startedAt) !== Number(record?.startedAt) || event?.pid !== record?.pid) continue
     const at = Number(event?.atMs)
     if (!finite(at) || at <= Number(record.startedAt) || at > end) continue
+    const value = evidence?.value
+    if (value !== undefined && value !== null) {
+      const key = String(value)
+      const first = firstSeen.get(key)
+      if (first !== undefined && first <= at) continue
+      firstSeen.set(key, at)
+    }
     latest = latest === null ? at : Math.max(latest, at)
   }
-  return latest
+  if (firstSeen.size === 0) return latest
+  // Recompute from the first-occurrence times so a late repeat cannot outrank
+  // its own original, keeping every mark-less event as it was.
+  let best = null
+  for (const at of firstSeen.values()) best = best === null ? at : Math.max(best, at)
+  for (const event of records ?? []) {
+    const evidence = event?.evidence
+    const sameRecord = evidence?.recordPath === path || evidence?.id === path
+    if (event?.event !== ACTIVITY_EVENTS.VERIFICATION_PROGRESS || !sameRecord) continue
+    if (Number(evidence?.startedAt) !== Number(record?.startedAt) || event?.pid !== record?.pid) continue
+    if (evidence?.value !== undefined && evidence?.value !== null) continue
+    const at = Number(event?.atMs)
+    if (!finite(at) || at <= Number(record.startedAt) || at > end) continue
+    best = best === null ? at : Math.max(best, at)
+  }
+  return best
 }
 
 /** Finished named runs are explicit verification intervals. A running record is
@@ -265,6 +297,45 @@ export function verificationRecordEvidence(dir, {
     boundaries.push(began, finished)
   }
   return { intervals: intervals.filter(Boolean), boundaries, leases }
+}
+
+/**
+ * WHEN DID THIS START RECORD'S IDENTITY STOP EXISTING? (point 1048, union entry
+ * U15.) The measuring half of the clamp `journalIntervals` applies: for a
+ * verification start, the moment its run record turned non-running, or — failing
+ * that — the last progress it emitted before its process disappeared.
+ *
+ * Null is the honest answer for everything it cannot see, and it changes no
+ * classification: a delegated agent and a CI wait have no run record to read.
+ */
+export function runIdentityTerminalAt({ dir, repo, records = [], processAlive: processAliveProbe } = {}) {
+  const byPath = new Map()
+  for (const path of recordFiles(dir)) {
+    try { byPath.set(path, JSON.parse(readFileSync(path, 'utf8'))) } catch { /* unreadable is not terminal */ }
+  }
+  return (startRecord) => {
+    if (startRecord?.event !== ACTIVITY_EVENTS.VERIFICATION_START) return null
+    const named = startRecord?.evidence?.recordPath ?? startRecord?.evidence?.id ?? null
+    if (typeof named !== 'string' || named.trim() === '') return null
+    const path = [...byPath.keys()].find((candidate) => candidate === named || sameVerificationPath(candidate, named))
+    const record = path ? byPath.get(path) : null
+    if (!record) return null
+    if (record.status !== 'running') {
+      const finishedAt = Number(record.finishedAt)
+      return finite(finishedAt) ? finishedAt : null
+    }
+    let alive = true
+    try {
+      alive = processAliveProbe?.(record, path, resolveVerificationLog(record.log, { repo })) !== false
+    } catch {
+      return null
+    }
+    if (alive) return null
+    // The process is gone and no completion was ever written: the run stopped
+    // being work at its last emitted progress, not when its lease ran out.
+    const lastProgress = emittedVerificationProgress(records, record, path, Number.POSITIVE_INFINITY)
+    return finite(lastProgress) ? lastProgress : Number(record.startedAt) || null
+  }
 }
 
 function transcriptTimestamp(row) {

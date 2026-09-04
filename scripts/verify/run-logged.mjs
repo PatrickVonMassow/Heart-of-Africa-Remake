@@ -46,7 +46,14 @@ import { createWriteStream, mkdirSync, readFileSync } from 'node:fs'
 import { constants as osConstants } from 'node:os'
 import { dirname, isAbsolute, join, relative } from 'node:path'
 import { fileURLToPath } from 'node:url'
-import { buildDigest, createSelector, failureSurface, showWindow } from './run-digest-core.mjs'
+import {
+  advanceOutputProgress,
+  buildDigest,
+  createSelector,
+  failureSurface,
+  outputProgressState,
+  showWindow,
+} from './run-digest-core.mjs'
 import { backendsFrom, buildReceipt, formatReceipt, planRun } from './run-wait-core.mjs'
 import { framesWrittenSince, gitPosition, readRecord, recordPathFor, selfCommandLine, writeRecord } from './run-record.mjs'
 import { emitActivity } from '../batch-activity-journal.mjs'
@@ -60,7 +67,10 @@ const PROGRESS_LEASE_MS = 15 * 60_000
 const PROGRESS_EMIT_MS = 60_000
 const RUNNER_STARTED_AT = Date.now() - Math.round(process.uptime() * 1000)
 
-function emitRunActivity(event, { at = Date.now(), recordPath, command, startedAt, leaseUntil = null, result = null } = {}) {
+function emitRunActivity(
+  event,
+  { at = Date.now(), recordPath, command, startedAt, leaseUntil = null, result = null, value = null } = {},
+) {
   emitActivity({
     event,
     at,
@@ -69,7 +79,10 @@ function emitRunActivity(event, { at = Date.now(), recordPath, command, startedA
     pidStartedAt: RUNNER_STARTED_AT,
     generation: null,
     cause: 'named-verification-run',
-    evidence: { id: recordPath, recordPath, command, startedAt, leaseUntil, result },
+    // `value` is the run's output progress mark (union entry U3): the reader
+    // treats a repeated value as the same progress seen again, so a lease cannot
+    // be renewed by output that says nothing new.
+    evidence: { id: recordPath, recordPath, command, startedAt, leaseUntil, result, value },
   })
 }
 
@@ -260,20 +273,28 @@ function runVerify() {
   let rawChars = 0
   let pending = ''
   let lastProgressEmittedAt = started
+  // The run's own progress mark, and the last one that was reported. A window
+  // whose output repeats what the run has already said emits NOTHING, so the
+  // lease behind it lapses on schedule (union entry U3).
+  const progress = outputProgressState()
+  let lastProgressMark = progress.mark
 
   function consume(chunk) {
     const text = String(chunk)
     rawChars += text.length
     log.write(text)
     const progressAt = Date.now()
-    if (text.length > 0 && progressAt - lastProgressEmittedAt >= PROGRESS_EMIT_MS) {
+    advanceOutputProgress(progress, text)
+    if (progress.mark !== lastProgressMark && progressAt - lastProgressEmittedAt >= PROGRESS_EMIT_MS) {
       lastProgressEmittedAt = progressAt
+      lastProgressMark = progress.mark
       emitRunActivity(ACTIVITY_EVENTS.VERIFICATION_PROGRESS, {
         at: progressAt,
         recordPath,
         command,
         startedAt: started,
         leaseUntil: progressAt + PROGRESS_LEASE_MS,
+        value: progress.mark,
       })
     }
     pending += text

@@ -316,6 +316,91 @@ export function markerPhase(marker) {
  *  prefixed string would no longer equal the region this code now cuts, and the
  *  unchanged card would read as fresh. A receipt of an older version is refused
  *  and re-taken rather than compared across representations. */
+/**
+ * THE BOUNDARY AS AN IMMUTABLE FACT (point 1048, union entry U19).
+ *
+ * The marker file answered "is the boundary still good?" with freshness plus
+ * "has nothing been mutated since". Both are properties of the WORKTREE, and
+ * both quietly expire: an hour after the commit the seal stopped holding, the
+ * next mutation deleted the marker, and the handed-over batch re-opened with
+ * nobody told. On 03.09.2026 that is precisely what happened while the session
+ * was stuck between two guards.
+ *
+ * The seal below is written into the LOCK at commit time and says what cannot
+ * change afterwards: which session handed over, at which owner generation, and
+ * from which head. Its validity is a comparison of those three against the lock
+ * as it stands — never an elapsed time, never an unchanged tree.
+ *
+ * A later mutation ESCALATES rather than withdraws (the union leaves the choice
+ * open and names both halves): the boundary keeps standing, the mutation is
+ * recorded, the handover is re-armed, and repeats are alerted. Rejecting the
+ * mutation instead would put the session back in the deadlock union entry U17
+ * had just opened.
+ */
+export const BOUNDARY_SEAL_V = 1
+
+export function committedBoundarySeal({ marker, generation = null, head = null, at = null } = {}) {
+  if (marker?.phase !== BOUNDARY_PHASES.COMMITTED) return null
+  const sessionId = typeof marker.sessionId === 'string' && marker.sessionId.trim() ? marker.sessionId : null
+  if (!sessionId) return null
+  const stamp = typeof at === 'number' && Number.isFinite(at) ? at : (typeof marker.at === 'number' ? marker.at : null)
+  if (stamp === null) return null
+  return {
+    v: BOUNDARY_SEAL_V,
+    sessionId,
+    cause: marker.cause === BOUNDARY_CAUSES.CONTEXT ? BOUNDARY_CAUSES.CONTEXT : BOUNDARY_CAUSES.POINT,
+    point: Number.isInteger(Number(marker.point)) && Number(marker.point) > 0 ? Number(marker.point) : null,
+    generation: Number.isSafeInteger(generation) ? generation : null,
+    head: typeof head === 'string' && head.trim() ? head.trim() : null,
+    at: stamp,
+    mutations: 0,
+  }
+}
+
+/**
+ * Does the seal recorded in the lock still bind THIS session? No clock is
+ * consulted on purpose: a boundary that expires by itself is a handover that
+ * cancels itself, which is the failure this entry exists to remove.
+ */
+export function boundarySealHolds({ seal, sid, generation = null } = {}) {
+  if (!seal || typeof seal !== 'object' || seal.v !== BOUNDARY_SEAL_V) return { holds: false, reason: 'no-seal' }
+  if (!sid || seal.sessionId !== sid) return { holds: false, reason: 'seal-foreign-session' }
+  if (
+    Number.isSafeInteger(seal.generation) && Number.isSafeInteger(generation) && seal.generation !== generation
+  ) {
+    // The generation moved on: a successor has claimed the batch, so this
+    // session's boundary is spent rather than broken.
+    return { holds: false, reason: 'generation-advanced' }
+  }
+  return { holds: true, reason: 'sealed-in-lock' }
+}
+
+/** How many recorded mutations before a kept seal becomes an ALERT rather than
+ *  a log line. One slip is a session finishing its bookkeeping; a second is a
+ *  session that did not understand it had handed over. */
+export const SEAL_MUTATION_ALERT_AFTER = 2
+
+/**
+ * What a repository mutation after a committed boundary does. The answer is
+ * never "withdraw quietly": the seal stands, the trigger is recorded, the
+ * handover is re-armed, and from the second mutation the reader is told.
+ */
+export function boundaryMutationDecision({
+  seal, sid, generation = null, trigger = null, alertAfter = SEAL_MUTATION_ALERT_AFTER,
+} = {}) {
+  const held = boundarySealHolds({ seal, sid, generation })
+  if (!held.holds) return { keep: false, escalate: false, alert: false, mutations: 0, reason: held.reason }
+  const mutations = (Number.isSafeInteger(seal.mutations) ? seal.mutations : 0) + 1
+  return {
+    keep: true,
+    escalate: true,
+    alert: mutations >= alertAfter,
+    mutations,
+    trigger: typeof trigger === 'string' && trigger.trim() ? trigger.trim() : null,
+    reason: 'sealed-boundary-survives-mutation',
+  }
+}
+
 export const PREPARED_RECEIPT_V = 4
 
 export function preparedReceipt({
@@ -642,6 +727,30 @@ export function boardCarriesCard(
  * seal without end, is the one thing a guard here may never be: a session
  * trapped by a marker nothing can time out.
  */
+/**
+ * IS THIS SESSION'S BOUNDARY SEALED? PURE (point 1048, union entry U17).
+ *
+ * The same three conditions `sealedBoundaryDeny` applies before it refuses a
+ * call — committed, this session's, still fresh — asked as a plain question, so
+ * a Stop-side guard can STAND DOWN in exactly the state the boundary refuses to
+ * work in.
+ *
+ * WHY A SECOND CALLER NEEDS IT (measured 03.09.2026, 17:45–17:47). After
+ * `--commit` the boundary refused every tool call, the prescribed 90-second
+ * wait included, while `ci-status-guard` refused every turn end until the pushed
+ * ref's CI concluded — and its refusal prescribed exactly that refused wait. The
+ * session could neither work nor stop and emitted identical farewells until a
+ * person intervened. Two guards may not jointly demand and forbid one action;
+ * the committed boundary is the terminal state, so the Stop guard is the one
+ * that yields. The CI obligation is not dropped but TRANSFERRED — the successor
+ * is started with the terminal handoff naming the pending run.
+ */
+export function boundaryIsSealed({ marker, sid, now, freshMs = BOUNDARY_FRESH_MS } = {}) {
+  if (markerPhase(marker) !== 'committed') return false
+  if (!sid || marker.sessionId !== sid) return false
+  return markerFresh(marker, now, freshMs)
+}
+
 export function sealedBoundaryDeny({
   marker,
   sid,

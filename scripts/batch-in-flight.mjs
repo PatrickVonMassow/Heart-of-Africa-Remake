@@ -63,6 +63,7 @@ import {
   transferBlockMessage,
   closingFreezeActive,
   declaredAgentProbe,
+  declarationWriterAlive,
   standDownBoundaryDecision,
   successorAgentOrientation,
   declaredAgentCount,
@@ -147,6 +148,26 @@ export function maxAgeMs(env = process.env) {
   return Number.isFinite(raw) && raw > 0 ? raw * 60 * 1000 : IN_FLIGHT_MAX_AGE_MS
 }
 
+/**
+ * THE DECLARATION, AND A DEAD ONE IS TOMBSTONED ON SIGHT (point 1048, union
+ * entry U2).
+ *
+ * Measured 02./03.09.2026: this file named a pid dead since the afternoon and
+ * kept "a verification is running" plausible all night; measured again
+ * 04.09.2026, the marker in this checkout still named pid 1761118, gone for
+ * hours. A declaration is a claim about what a RUNNING session is doing, so once
+ * its writer is provably gone the claim has no subject — and leaving the file in
+ * place means the next reader inherits the same lie.
+ *
+ * Only a writer that is demonstrably gone or demonstrably somebody else clears
+ * it: no pid, no probe, an unreadable start time all leave the file exactly as
+ * it is, because the cost of a wrong clear is a killed wait and the cost of a
+ * missed one is a re-read.
+ *
+ * A TRANSFERRED declaration is exempt, and that exemption is the whole point of
+ * the handover: it names its predecessor's pid ON PURPOSE, and that predecessor
+ * is expected to be gone. Reaping it would delete the successor's inheritance.
+ */
 export function readDeclaration(path = IN_FLIGHT_PATH) {
   try {
     const d = JSON.parse(readFileSync(path, 'utf8'))
@@ -154,6 +175,26 @@ export function readDeclaration(path = IN_FLIGHT_PATH) {
   } catch {
     return null
   }
+}
+
+/**
+ * CLEAR A DECLARATION WHOSE WRITER IS GONE. Returns what it did.
+ *
+ * Separate from `readDeclaration` on purpose: a READ must stay a read, and the
+ * many callers that only want to look at the paperwork must not delete it as a
+ * side effect. This runs once at the start of a CLI invocation, which is where
+ * the question "is anything actually in flight" is being asked.
+ *
+ * @returns {{reaped: boolean, reason: string, pid: number|null}}
+ */
+export function reapDeadDeclaration(path = IN_FLIGHT_PATH, { probe = probePid } = {}) {
+  const d = readDeclaration(path)
+  if (!d) return { reaped: false, reason: 'no-declaration', pid: null }
+  if (d.transfer) return { reaped: false, reason: 'transferred', pid: null }
+  const writer = declarationWriterAlive({ declaration: d, probePid: probe })
+  if (!writer.known || writer.alive) return { reaped: false, reason: writer.reason, pid: writer.pid }
+  clearDeclaration(path)
+  return { reaped: true, reason: writer.reason, pid: writer.pid }
 }
 
 export function writeDeclaration(declaration, path = IN_FLIGHT_PATH) {
@@ -1506,6 +1547,19 @@ const isMain = process.argv[1] && import.meta.url === new URL(`file://${process.
 
 if (isMain) {
   const argv = process.argv.slice(2)
+  // A DEAD SESSION'S PAPERWORK GOES FIRST (point 1048, union entry U2). Measured
+  // 02./03.09.2026: this file named a pid dead since the afternoon and kept "a
+  // verification is running" plausible all night. Every command below asks some
+  // form of "what is in flight", so the answer must not start from a claim whose
+  // author is gone. It says so out loud — a silent clear would be the same
+  // blindness pointing the other way.
+  const reaped = reapDeadDeclaration()
+  if (reaped.reaped) {
+    console.error(
+      `batch-in-flight: cleared a declaration whose writing session is gone (pid ${reaped.pid}, ${reaped.reason}). ` +
+        'Nothing was in flight; the file was.',
+    )
+  }
   const sid = readOwnerLock()?.sessionId ?? ''
   const fail = (msg) => {
     console.error(msg)

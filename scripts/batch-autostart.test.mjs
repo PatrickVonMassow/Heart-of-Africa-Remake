@@ -762,3 +762,60 @@ describe('the launcher declares recurring event notifications', () => {
     expect(source.slice(start, start + 1_000)).toMatch(/\{\s*(?:key:\s*'[^']+',\s*)?recurring:\s*true\s*\}/)
   })
 })
+
+// --- POINT 1048: THE SKIP MUST ASK ABOUT PROGRESS ------------------------------
+// The decision itself is `ownerKeepsBatch`, unit-tested in the core suite. What
+// can only be pinned here is that the launcher actually ASKS it, and asks it
+// BEFORE it skips: the whole incident is a skip that fired without ever having
+// looked at whether the batch had moved.
+describe('the launcher keys its skip on progress (union entry U4)', () => {
+  const source = readFileSync(resolve(process.cwd(), 'scripts', 'batch-autostart.mjs'), 'utf8')
+
+  it('measures progress from the three durable kinds, on local refs only', () => {
+    expect(source).toMatch(/const observableProgressAt = \(\) =>/)
+    expect(source).toMatch(/'log', '-1', '--first-parent', '--format=%ct', 'main'/)
+    expect(source).toMatch(/refs\/heads\/feat/)
+    expect(source).toMatch(/boundary\.log/)
+  })
+
+  it('asks ownerKeepsBatch BEFORE the owner-alive skip, with both bars', () => {
+    const asked = source.indexOf('const keeps = ownerKeepsBatch({')
+    const skipped = source.indexOf('log(`skip: owner alive')
+    expect(asked).toBeGreaterThan(0)
+    expect(skipped).toBeGreaterThan(asked)
+    expect(source).toMatch(/thresholdMs: EMERGENCY_THRESHOLD_MS/)
+    expect(source).toMatch(/hardDeadlineMs: EMERGENCY_HARD_DEADLINE_MS/)
+    expect(source).toMatch(/etaMinutesPast,/)
+  })
+
+  it('says out loud when it overrides a live owner, and alerts', () => {
+    // Tick after tick of green skips is how the last wedge stayed invisible.
+    expect(source).toMatch(/TAKING THE BATCH despite a live owner/)
+    expect(source).toMatch(/'Batch taken from a live owner'/)
+  })
+
+  // UNION ENTRY U23. The take and the refusal to spawn stood in the same tick on
+  // 04.09.2026, so the batch lost its owner and gained no successor. Only the
+  // ORDER of the two measurements can be pinned from here; the decision itself is
+  // `takeoverHandsOver` in the core suite.
+  it('measures the spawn backoff BEFORE the ownership verdict, and gates the take on it', () => {
+    const measured = source.indexOf('const spawnBackoffBlocks = shouldWaitForSpawnBackoff({')
+    const asked = source.indexOf('const keeps = ownerKeepsBatch({')
+    const gated = source.indexOf('const handover = takeoverHandsOver({')
+    const took = source.indexOf('TAKING THE BATCH despite a live owner')
+    expect(measured).toBeGreaterThan(0)
+    expect(asked).toBeGreaterThan(measured)
+    expect(gated).toBeGreaterThan(asked)
+    expect(took).toBeGreaterThan(gated)
+    expect(source).toMatch(/takeoverHandsOver\(\{ keeps, spawnBlocked: spawnBackoffBlocks, blockedReason: spawnBackoffReason \}\)/)
+    // The take itself now runs off the handover verdict, not off `keeps` alone.
+    expect(source).toMatch(/if \(!writerRecovered && handover\.take\) \{/)
+    expect(source).toMatch(/NOT TAKING THE BATCH: /)
+    expect(source).toMatch(/'Batch stalled, takeover deferred'/)
+  })
+
+  it('calls the backoff a backoff — the dead spawn it waits on claims nothing', () => {
+    expect(source).toMatch(/min ago is still inside its backoff/)
+    expect(source).not.toMatch(/min ago is still claiming the lock/)
+  })
+})

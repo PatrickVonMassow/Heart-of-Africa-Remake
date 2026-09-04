@@ -65,7 +65,7 @@ import {
   normaliseFence,
 } from './batch-lease-core.mjs'
 import { IDLE_WINDOW_MS, ownershipVerdict } from './batch-ownership-core.mjs'
-import { markerFresh } from './batch-boundary-core.mjs'
+import { boundaryMutationDecision, boundarySealHolds, committedBoundarySeal, markerFresh } from './batch-boundary-core.mjs'
 import { emitActivity } from './batch-activity-journal.mjs'
 import { ACTIVITY_EVENTS } from './batch-activity-journal-core.mjs'
 
@@ -92,11 +92,23 @@ function emitLockActivity(event, lock, { lockPath = LOCK_PATH, at = Date.now(), 
  * anyway, so keeping the handover alive beside resumed work would let the
  * launcher spawn a successor next to a working session.
  */
-function sealedMarkerHolds(marker, sessionId, now) {
+function sealedMarkerHolds(marker, sessionId, now, lock = null) {
   // The freshness test is the boundary core's, so a future-dated marker cannot
   // hold the seal here while `assessBoundary` calls the same marker stale (Sol's
   // review of ffa0a78).
-  return marker?.phase === 'committed' && !!sessionId && marker.sessionId === sessionId && markerFresh(marker, now)
+  if (marker?.phase === 'committed' && !!sessionId && marker.sessionId === sessionId && markerFresh(marker, now)) {
+    return true
+  }
+  // …AND THE SEAL IN THE LOCK OUTLIVES THE MARKER'S HOUR (point 1048, union
+  // entry U19). The marker going stale used to end the seal, so the first
+  // mutation after that hour deleted it and the handed-over batch re-opened with
+  // nobody told. The lock's seal has no clock: it ends when a successor claims
+  // the batch, or when `--clear` withdraws it deliberately.
+  return boundarySealHolds({
+    seal: lock?.boundarySeal,
+    sid: sessionId,
+    generation: Number.isSafeInteger(lock?.fence) ? lock.fence : null,
+  }).holds
 }
 
 // --- Constants (exported for tests and callers) -------------------------------
@@ -1506,7 +1518,7 @@ export function heartbeat(sessionId, opts = {}) {
     // read when a handover actually stands, so the hot path pays nothing.
     let sealed = false
     try {
-      sealed = sealedMarkerHolds(readJson(statePathsFor(lockPath).boundaryPath), sessionId, now)
+      sealed = sealedMarkerHolds(readJson(statePathsFor(lockPath).boundaryPath), sessionId, now, lock)
     } catch {
       /* an unreadable marker is not sealed */
     }
@@ -1965,6 +1977,19 @@ export function release(sessionId, lockPath = LOCK_PATH) {
  * of point 340 is converted to data, because its single caller must allow the
  * stop while telling the session the truth about it.
  */
+/** The head the boundary was committed from. Best effort: a seal without a ref
+ *  is still a seal, and no bookkeeping read may fail a handover. */
+function currentHeadForSeal(lockPath) {
+  try {
+    return execFileSync('git', ['rev-parse', 'HEAD'], {
+      cwd: dirname(dirname(lockPath)), windowsHide: true, encoding: 'utf8', timeout: 8000,
+      stdio: ['ignore', 'pipe', 'ignore'],
+    }).trim() || null
+  } catch {
+    return null
+  }
+}
+
 export function markHandover(sessionId, opts = {}) {
   const lockPath = opts.lockPath ?? LOCK_PATH
   const lock = readOwnerLock(lockPath)
@@ -1972,9 +1997,30 @@ export function markHandover(sessionId, opts = {}) {
     return { handed: false, reason: lock ? 'not-owner' : 'no-lock', attempts: 0, error: null }
   }
   const now = opts.now ?? Date.now()
+  // THE SEAL GOES INTO THE LOCK WITH THE HANDOVER (point 1048, union entry
+  // U19): session, owner generation and head at the moment of the commit. That
+  // triple is what later reads compare against, so the boundary no longer
+  // depends on a marker file staying fresh and a worktree staying untouched.
+  // Only a COMMITTED boundary seals. `markHandover` also serves the ordinary
+  // Stop-side handover, which an ordinary later call still withdraws exactly as
+  // before — sealing that one would make every handover permanent.
+  const seal = opts.marker
+    ? committedBoundarySeal({
+      marker: opts.marker,
+      generation: Number.isSafeInteger(lock.fence) ? lock.fence : null,
+      head: opts.head ?? currentHeadForSeal(lockPath),
+      at: now,
+    })
+    : null
   const res = tryWriteJsonAtomic(
     lockPath,
-    { ...lock, handedOver: true, handedOverAt: now, handoverPoint: opts.point ?? null },
+    {
+      ...lock,
+      handedOver: true,
+      handedOverAt: now,
+      handoverPoint: opts.point ?? null,
+      ...(seal ? { boundarySeal: seal } : {}),
+    },
     opts,
   )
   if (res.ok) {
@@ -2082,17 +2128,51 @@ export function withdrawHandover(sessionId, opts = {}) {
   // (`sealedBoundaryDeny`), and only the deliberate `--clear` (or the user's own
   // prompt, `force`) withdraws. Without this, the seal would deny a mutation and
   // this withdrawal would still eat the marker for the call that was denied.
-  if (sealedMarkerHolds(marker, sessionId, opts.now ?? Date.now()) && opts.force !== true) {
+  const sealNow = opts.now ?? Date.now()
+  if (sealedMarkerHolds(marker, sessionId, sealNow, lock) && opts.force !== true) {
+    // THE MUTATION ESCALATES, IT DOES NOT WITHDRAW (point 1048, union entry
+    // U19). The seal stands, the triggering call is recorded against it, and
+    // from the second one the log says so loudly instead of leaving the reader
+    // to notice that a handover quietly stopped meaning anything.
+    const escalation = boundaryMutationDecision({
+      seal: lock.boundarySeal,
+      sid: sessionId,
+      generation: Number.isSafeInteger(lock.fence) ? lock.fence : null,
+      trigger: opts.trigger ?? null,
+    })
+    const what = marker?.cause === 'context'
+      ? 'the context watermark'
+      : `point ${marker?.point ?? lock.boundarySeal?.point ?? '?'}`
     try {
       appendFileSync(
         opts.logPath ?? statePathsFor(lockPath).boundaryLogPath,
-        `[${new Date(opts.now ?? Date.now()).toISOString()}] SEALED MARKER KEPT for ` +
-          `${marker.cause === 'context' ? 'the context watermark' : `point ${marker.point ?? '?'}`} by ${sessionId} — ` +
-          `a post-commit call (${opts.trigger ?? 'unrecorded'}) does not withdraw a committed boundary; ` +
-          `only \`batch-boundary.mjs --clear\` or the user's own prompt does.\n`,
+        `[${new Date(sealNow).toISOString()}] ${escalation.alert ? 'SEALED BOUNDARY MUTATED AGAIN' : 'SEALED MARKER KEPT'} for ` +
+          `${what} by ${sessionId} — a post-commit call (${opts.trigger ?? 'unrecorded'}) does not withdraw a ` +
+          `committed boundary; only \`batch-boundary.mjs --clear\` or the user's own prompt does.` +
+          (escalation.keep ? ` Mutation ${escalation.mutations} since the commit.` : '') +
+          (escalation.alert ? ' THE SESSION IS WORKING PAST ITS OWN HANDOVER — end it.' : '') +
+          '\n',
       )
     } catch {
       /* best effort */
+    }
+    if (escalation.keep) {
+      // Re-arm the handover the mutation would otherwise have left half-standing,
+      // and carry the mutation count forward on the seal itself.
+      try {
+        tryWriteJsonAtomic(
+          lockPath,
+          {
+            ...lock,
+            handedOver: true,
+            handedOverAt: sealNow,
+            boundarySeal: { ...lock.boundarySeal, mutations: escalation.mutations },
+          },
+          opts,
+        )
+      } catch {
+        /* the seal in the lock still stands; only the counter is behind */
+      }
     }
     return false
   }
@@ -2128,6 +2208,10 @@ export function withdrawHandover(sessionId, opts = {}) {
   delete next.handedOver
   delete next.handedOverAt
   delete next.handoverPoint
+  // The seal goes with the handover it belongs to. Leaving it behind would make
+  // `--clear` a no-op: the very next call would read the stale seal out of the
+  // lock and hold the boundary the user had just withdrawn.
+  delete next.boundarySeal
   writeJsonAtomic(lockPath, next, opts)
   // Recorded beside the handover it cancels: without this line, a launcher tick
   // that finds a live owner past the grace cannot be told apart from one whose

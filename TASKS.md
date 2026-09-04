@@ -123,10 +123,44 @@ put it is the mistake this line exists to stop.
     solution must resolve guard pairs that jointly demand and forbid the same action
     (e.g. the boundary exempts the wait a Stop guard prescribes, or ci-status-guard
     stands down for a committed boundary).
+  - A THIRD shape, measured 04.09.2026 ON THIS POINT'S OWN WORK and therefore the
+    twenty-second union entry: the session committed at 13:22 and ended. The launcher
+    ticked at 13:24 and 13:39 and started no successor either time, because
+    `successorStartDecision` returns `registered-writer-live` — `registeredFeatureWriters`
+    measures the feature branch through `checkAgentOutput`, and `agentOutputVerdict` reads
+    a branch tip younger than `RESPAWN_GRACE_MS` (30 min) as `verdict: 'alive'` with no
+    process behind it. The first tick that could have spawned was 13:54: 32 minutes of
+    structural standstill, ended by the user at 13:39. The U4 mechanism does not reach it —
+    `ownerKeepsBatch` hardens the sibling "skip: owner alive" branch and only bites past
+    the 60-minute threshold or the hard deadline, while `registered-writer-live` carries no
+    progress test at all. The error is the same one this point exists to remove: a COMMIT
+    IS THE LAST THING A SESSION DOES, so a fresh branch tip is evidence the writer just
+    FINISHED, not that it is working. Final state: a branch tip alone may not keep a writer
+    alive without process or worktree evidence beside it, or its grace drops well below one
+    tick — and the launcher says which evidence it stood on.
+  - A FOURTH SHAPE, measured 04.09.2026 ON THIS POINT'S OWN WORK three hours after the
+    third and therefore the twenty-third union entry: the launcher TAKES the batch from a
+    live owner and hands it to NOBODY. At 14:15:25Z it logged `TAKING THE BATCH despite a
+    live owner — stalled-past-threshold-without-advancing-work` (63 minutes without
+    progress) — the U4 mechanism working exactly as designed — and in the SAME tick
+    `skip: a spawn 32 min ago is still claiming the lock (backoff 40 min at failCount 2)`.
+    The three preceding spawns had each died within three seconds without writing a line
+    to `autostart-run.log`, so `failCount` stood at 2 and `spawnBackoffMs` was longer than
+    the takeover it was blocking. The owner was declared dead, its lock released at
+    14:16:18Z, and no successor existed to take it: a batch with an owner became a batch
+    with none. The stall clock measures the last BATCH progress, not the age of the
+    session, so every freshly woken session inherits the full stall and is taken from
+    again within a minute — the loop the launcher log shows from 14:15 to 14:28, when the
+    watchdog paused the batch itself (`cause: runaway`). Final state: the decision to take
+    a batch from a live owner is not taken unless a successor can actually start now — the
+    two decisions are ONE, or the takeover states which successor it handed to; and a
+    successor that dies without output counts as a failed START, never as a served one.
   Test: Vitest over the decision cores the merged solution lands in, replaying the
   incident's shape — alive heartbeat plus eternal waits plus no main progress leads to
   recovery within the stated bound; a drill that calls the real recovery path per the
-  drills rule, not a recreation of its aftermath.
+  drills rule, not a recreation of its aftermath. For the third shape: a tick whose only
+  liveness evidence is a branch tip minutes old, with no live process and no moving
+  worktree, must start a successor rather than veto.
   Criticality: high — hours of unattended standstill with every monitor green, on the one
   path that may never block.
   Refs: scripts/batch-emergency-core.mjs, scripts/batch-standstill-core.mjs,

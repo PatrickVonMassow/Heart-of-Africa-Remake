@@ -86,6 +86,8 @@ import {
   judgeSpawnOutcome,
   announceSpawn,
   firewallTopUpDecision,
+  ownerKeepsBatch,
+  takeoverHandsOver,
   staleEtaLogLine,
   launcherStartRecord,
   successorStartDecision,
@@ -111,7 +113,11 @@ import { ownerActivityDecision } from './batch-ownership-core.mjs'
 import { acknowledgeCiWait } from './ci-status-guard.mjs'
 import { modelHandoffSpawn } from './model-handoff-core.mjs'
 import { REPO_ROOT, requireMainCheckoutRoot } from './repo-paths.mjs'
-import { emergencyHandoffPrompt } from './batch-emergency-core.mjs'
+import {
+  EMERGENCY_HARD_DEADLINE_MS,
+  EMERGENCY_THRESHOLD_MS,
+  emergencyHandoffPrompt,
+} from './batch-emergency-core.mjs'
 
 // IMPORT-PROOF (27.07.2026). Everything below runs at MODULE LOAD, so merely
 // importing this file — a syntax check, a test, a tooling scan — SPAWNS a
@@ -172,8 +178,44 @@ const recentActivityRecords = () => {
     return null
   }
 }
+// How far the published now-card's "~HH:MM" promise is past, filled in by the
+// board watchdog below and read by the skip decision (union entry U10).
+let etaMinutesPast = null
 const head = () => { try { return execSync('git rev-parse HEAD', { windowsHide: true, cwd: REPO, encoding: 'utf8' }).trim() } catch { return '' } }
 const pidAlive = (pid) => { try { process.kill(pid, 0); return true } catch (e) { return e && e.code === 'EPERM' } }
+
+// WHEN THE BATCH ITSELF LAST MOVED (point 1048, union entry U4). The three kinds
+// `BATCH_PROGRESS_KINDS` names, measured the cheapest way the launcher can: all
+// local refs, no network, no suite, ~30 ms together. A commit on the trunk, a
+// delegated branch that grew, and the boundary log a committed handover writes.
+// Returns epoch ms, or null when nothing could be read — and null is NOT a
+// verdict: `ownerKeepsBatch` treats an unreadable measurement as "keeps".
+const gitSeconds = (args) => {
+  try {
+    const out = execFileSync('git', args, { cwd: REPO, encoding: 'utf8', timeout: 15000, windowsHide: true }).trim()
+    const value = Number(out.split(/\s+/).filter(Boolean).sort((a, b) => Number(b) - Number(a))[0])
+    return Number.isFinite(value) && value > 0 ? value * 1000 : null
+  } catch {
+    return null
+  }
+}
+const observableProgressAt = () => {
+  const candidates = [
+    // first-parent-commit: the trunk, however it was reached.
+    gitSeconds(['log', '-1', '--first-parent', '--format=%ct', 'main']),
+    // delegated-branch-moved: the newest tip among the feature branches.
+    gitSeconds(['for-each-ref', '--format=%(committerdate:unix)', 'refs/heads/feat']),
+    // committed-boundary: the handover's own log.
+    (() => {
+      try {
+        return statSync(join(REPO, '.claude', 'boundary.log')).mtimeMs
+      } catch {
+        return null
+      }
+    })(),
+  ].filter((value) => Number.isFinite(value) && value > 0)
+  return candidates.length > 0 ? Math.max(...candidates) : null
+}
 // (`sleepSync`/`waitForExit` went with the kill-then-take valve, point 434: the
 // launcher no longer ends the owner's process, so nothing here waits for an exit.)
 // Open points, or -1 for the FORMAT ALARM (checkboxes but no parseable point).
@@ -794,6 +836,12 @@ try {
   if (r.verdict !== 'current') log(`board: ${r.verdict}${r.reason ? ` — ${r.reason}` : ''} (${BOARD_PAGE_URL})`)
   // The PUBLISHED promise must not age unwatched (point 661): the child hands
   // back the live page's overdue "~HH:MM" cards, the pure sibling decides.
+  // Kept for the skip decision below (union entry U10): an overdue promise is a
+  // witness there, not only a log line here.
+  etaMinutesPast = Math.max(
+    ...[0, ...(Array.isArray(r.etaOverdue) ? r.etaOverdue : [])
+      .map((c) => (typeof c?.minutesPast === 'number' && Number.isFinite(c.minutesPast) ? c.minutesPast : 0))],
+  )
   const etaLine = staleEtaLogLine({ overdue: r.etaOverdue })
   if (etaLine) log(`${etaLine} (${BOARD_PAGE_URL})`)
   if (r.notified) {
@@ -1136,6 +1184,27 @@ if (state.failCount >= RUNAWAY_FAIL_LIMIT) {
   process.exit(0)
 }
 
+// Debounce, and it ESCALATES (point 433 (iii)): the base ten minutes is what a
+// healthy spawn needs to come up, but each recorded failure doubles the wait up to
+// the cap, so a refusing environment is no longer hammered at a fixed rate all
+// night. `failCount` is cleared the moment a spawn makes progress, so the ladder
+// falls back to the floor by itself.
+// A standing QUOTA block short-circuits the ladder to its floor (point 444): the
+// only way to learn that the budget is back is to try, and a refused start costs
+// practically nothing, so the probe rides the ordinary tick.
+//
+// MEASURED BEFORE THE OWNERSHIP VERDICT (point 1048, union entry U23), because a
+// takeover that cannot be followed by a spawn hands the batch to NOBODY. Both
+// reads are side-effect free, and nothing between here and the spawn changes
+// `failCount`, so the ladder produces exactly the value it always did.
+const backoffMs = spawnBackoffMs({ failCount: state.failCount, quota: !!state.quota })
+const lastSpawn = readJson(C('autostart-last.json'))
+const spawnBackoffBlocks = shouldWaitForSpawnBackoff({ triggerKind, lastSpawnAt: lastSpawn?.at, now, backoffMs })
+const spawnBackoffReason = spawnBackoffBlocks
+  ? `a spawn ${Math.round((now - lastSpawn.at) / 60000)} min ago is still inside its backoff ` +
+    `(${Math.round(backoffMs / 60000)} min at failCount ${state.failCount || 0})`
+  : ''
+
 // --- Liveness verdict ----------------------------------------------------------
 // TWO OUTCOMES, NOT THREE (point 434). 'skip-wedged' and everything under it —
 // the stall verdict, the two-stage silence report, the wedge takeover, the
@@ -1336,9 +1405,62 @@ if (verdict === 'skip-alive') {
       process.exit(0)
     }
   }
+  // PROGRESS, NOT LIVENESS (point 1048, union entry U4) — asked BEFORE the skip,
+  // because the skip is what fired 107 minutes in a row on 02./03.09.2026 while
+  // the owner's heartbeat stayed fresh and the batch advanced nothing. Past the
+  // threshold only demonstrably advancing work keeps the batch; past the
+  // absolute deadline nothing does. An unreadable measurement keeps it, so a
+  // launcher that cannot read the repository's history never takes a batch away
+  // on its own ignorance.
+  const keeps = ownerKeepsBatch({
+    progressAt: observableProgressAt(),
+    now,
+    workAdvancing: work.advancing === true,
+    etaMinutesPast,
+    thresholdMs: EMERGENCY_THRESHOLD_MS,
+    hardDeadlineMs: EMERGENCY_HARD_DEADLINE_MS,
+  })
+  // AND A TAKEOVER IS A HANDOVER (union entry U23) — it needs somebody to hand
+  // to. On 04.09.2026 this tick took the batch from a live owner and refused, in
+  // the same breath, to spawn the successor: the lock was released and nobody
+  // held it, so every woken session inherited the whole stall and was taken from
+  // again within a minute, until the watchdog paused the batch as a runaway.
+  const handover = takeoverHandsOver({ keeps, spawnBlocked: spawnBackoffBlocks, blockedReason: spawnBackoffReason })
+  if (!writerRecovered && handover.code === 'no-successor-available') {
+    log(`NOT TAKING THE BATCH: ${handover.reason}. The owner keeps it until a successor can actually start.`)
+    await notify(
+      'Batch stalled, takeover deferred',
+      `${keeps.witnesses.join('; ')}. The launcher would have taken the batch from its live owner, but it cannot ` +
+        `start a successor this tick (${spawnBackoffReason}), and an ownerless batch is worse than a stalled one. ` +
+        'It takes the batch on the first tick that can also spawn. Please look if this repeats.',
+      'urgent',
+      { recurring: true },
+    )
+  }
+  if (!writerRecovered && handover.take) {
+    // AND IT SAYS SO (union entry U20). Tick after tick of green skips is how the
+    // last wedge stayed invisible; the line that OVERRIDES a skip must name the
+    // evidence that outvoted it.
+    log(
+      `TAKING THE BATCH despite a live owner — ${keeps.reason}: ${keeps.witnesses.join('; ')}. ` +
+        `Owner ${lock.sessionId} (pid ${lock.pid ?? 'unknown'}) had a heartbeat ${Math.round((now - lock.claimedAt) / 60000)} min old ` +
+        `and ${work.advancing ? `declared work advancing — ${work.summary}` : 'no advancing declared work'}.`,
+    )
+    await notify(
+      'Batch taken from a live owner',
+      `${keeps.witnesses.join('; ')}. The owner was alive by heartbeat the whole time, which is exactly the ` +
+        'shape that stood the batch still for 107 minutes on 03.09.2026. A successor is being started.',
+      'high',
+    )
+    delete state.wedgeVerdictKey
+    delete state.wedgeVerdictRepeats
+    delete state.writerVetoSince
+    writerRecovered = true
+  }
   if (!writerRecovered) {
     const why = work.advancing ? `; declared work advancing — ${work.summary}` : ''
-    log(`skip: owner alive (${assessment.reason}; heartbeat ${Math.round((now - lock.claimedAt) / 60000)} min old, pid ${lock.pid ?? 'unknown'}${why})`)
+    const moved = Number.isFinite(keeps.stalledMs) ? `, batch moved ${Math.round(keeps.stalledMs / 60000)} min ago` : ''
+    log(`skip: owner alive (${assessment.reason}; heartbeat ${Math.round((now - lock.claimedAt) / 60000)} min old, pid ${lock.pid ?? 'unknown'}${moved}${why})`)
     // AND IT SAYS WHAT IT OVERRODE (point 556). A skip that silently swallowed an
     // expired lease would be the same blindness in the other direction: the morning
     // reader must be able to see that the arithmetic said "take it" and what
@@ -1468,17 +1590,7 @@ if (dispossessed) {
   log('no owner lock — taking over; no live batch-writer process measured')
 }
 
-// Debounce, and it ESCALATES (point 433 (iii)): the base ten minutes is what a
-// healthy spawn needs to come up, but each recorded failure doubles the wait up to
-// the cap, so a refusing environment is no longer hammered at a fixed rate all
-// night. `failCount` is cleared the moment a spawn makes progress, so the ladder
-// falls back to the floor by itself.
-// A standing QUOTA block short-circuits the ladder to its floor (point 444): the
-// only way to learn that the budget is back is to try, and a refused start costs
-// practically nothing, so the probe rides the ordinary tick.
-const backoffMs = spawnBackoffMs({ failCount: state.failCount, quota: !!state.quota })
-const lastSpawn = readJson(C('autostart-last.json'))
-if (shouldWaitForSpawnBackoff({ triggerKind, lastSpawnAt: lastSpawn?.at, now, backoffMs })) {
+if (spawnBackoffBlocks) {
   const waitOutcome = judgeSpawnOutcome({
     verdict: 'refused',
     failCount: state.failCount || 0,
@@ -1489,13 +1601,18 @@ if (shouldWaitForSpawnBackoff({ triggerKind, lastSpawnAt: lastSpawn?.at, now, ba
   state.failCount = waitOutcome.failCount
   state.lastWatchdogCause = {
     code: 'spawn-backoff',
-    reason: `the previous spawn is still inside its ${Math.round(backoffMs / 60000)} minute backoff`,
+    reason: spawnBackoffReason,
     at: now,
   }
+  // IT IS A BACKOFF, NOT A CLAIM (union entry U23). The line used to say the
+  // previous spawn was "still claiming the lock"; on 04.09.2026 that spawn had
+  // been dead for 32 minutes, having died three seconds in without writing a
+  // line — `judgePreviousSpawn` had already counted it as a failed START, which
+  // is precisely why the ladder stood at 40 minutes. Saying so is what lets a
+  // reader tell a slow starter from a ladder built out of corpses.
   log(
-    `skip: a spawn ${Math.round((now - lastSpawn.at) / 60000)} min ago is still claiming the lock ` +
-      `(backoff ${Math.round(backoffMs / 60000)} min at failCount ${state.failCount || 0}` +
-      `${state.quota ? `, quota block standing since ${new Date(state.quota.since).toISOString()}` : ''})`,
+    `skip: ${spawnBackoffReason}` +
+      `${state.quota ? `, quota block standing since ${new Date(state.quota.since).toISOString()}` : ''}`,
   )
   writeJsonAtomic(C('autostart-state.json'), state)
   process.exit(0)

@@ -1,10 +1,13 @@
 import { describe, expect, it } from 'vitest'
 import {
   ACTIVITY_CLASSES,
+  WEDGE_REPEAT_THRESHOLD,
   classifyTimeline,
   commitGapSummary,
   evidenceInterval,
   journalIntervals,
+  outcomeSignature,
+  repeatedOutcomeWedge,
   timelineTotals,
 } from './batch-standstill-core.mjs'
 import { ACTIVITY_EVENTS, activityRecord } from './batch-activity-journal-core.mjs'
@@ -114,5 +117,101 @@ describe('measured commit gaps', () => {
     expect(summary.commits).toBe(3)
     expect(summary.gaps).toHaveLength(1)
     expect(summary.gapMs).toBe(21 * 60_000)
+  })
+})
+
+
+// Point 1048, union entry U15: the wait is not the work.
+describe('an interval closes with its identity', () => {
+  it('attributes the post-run eternal wait to an idle owner, not to verification', () => {
+    // The measured shape of 02./03.09.2026: a verification starts, the run ENDS
+    // at minute 15 without writing a finish record, and the owner goes on waiting
+    // for it under a lease that keeps being renewed until minute 100.
+    const records = [
+      rec(1, 0, ACTIVITY_EVENTS.OWNER_CLAIM, { evidence: { leaseUntil: START + 120 * 60_000 } }),
+      rec(2, 2, ACTIVITY_EVENTS.VERIFICATION_START, {
+        evidence: { id: 'verify-1', command: 'verify large', leaseUntil: START + 100 * 60_000 },
+      }),
+    ]
+    const window = { start: START, end: START + 110 * 60_000 }
+    const blind = classifyTimeline({
+      ...window, ...journalIntervals(records, window), journalStartedAt: START,
+    })
+    expect(blind.some((x) => x.className === ACTIVITY_CLASSES.VERIFICATION && x.end > START + 90 * 60_000)).toBe(true)
+
+    const seeing = classifyTimeline({
+      ...window,
+      ...journalIntervals(records, {
+        ...window,
+        identityTerminalAt: (record) => (record.event === ACTIVITY_EVENTS.VERIFICATION_START ? START + 15 * 60_000 : null),
+      }),
+      journalStartedAt: START,
+    })
+    const afterTheRun = seeing.filter((x) => x.start >= START + 15 * 60_000)
+    expect(afterTheRun.every((x) => x.className === ACTIVITY_CLASSES.IDLE_OWNER)).toBe(true)
+    expect(seeing.some((x) => x.className === ACTIVITY_CLASSES.VERIFICATION && x.end <= START + 15 * 60_000)).toBe(true)
+  })
+
+  it('leaves the classification alone when the measuring half cannot see', () => {
+    const records = [
+      rec(1, 0, ACTIVITY_EVENTS.OWNER_CLAIM, { evidence: { leaseUntil: START + 40 * 60_000 } }),
+      rec(2, 2, ACTIVITY_EVENTS.VERIFICATION_START, { evidence: { id: 'v', command: 'verify small', leaseUntil: START + 30 * 60_000 } }),
+    ]
+    const window = { start: START, end: START + 35 * 60_000 }
+    const withNull = classifyTimeline({ ...window, ...journalIntervals(records, { ...window, identityTerminalAt: () => null }), journalStartedAt: START })
+    const without = classifyTimeline({ ...window, ...journalIntervals(records, window), journalStartedAt: START })
+    expect(withNull).toEqual(without)
+  })
+})
+
+// Point 1048, union entry U16: the busy wedge, counted.
+describe('repeated identical outcomes', () => {
+  const spawnWatcher = (seq, minute) => rec(seq, minute, ACTIVITY_EVENTS.WAIT_LEASE_ACQUIRE, {
+    cause: 'first-wait-for-this-run',
+    evidence: { runId: 'verify-1', subject: 'npm exec vitest', pid: 5000 + seq, elapsedMs: seq * 1000 },
+  })
+
+  it('declares the session wedged after ten identical watcher spawns with no progress', () => {
+    const records = Array.from({ length: 10 }, (_, i) => spawnWatcher(i + 1, i * 10))
+    const verdict = repeatedOutcomeWedge({ records, progressAt: START - 60_000 })
+    expect(verdict.wedged).toBe(true)
+    expect(verdict.count).toBe(10)
+    expect(verdict.session).toBe('owner')
+    expect(verdict.sinceProgressMs).toBe(90 * 60_000 + 60_000)
+  })
+
+  it('ignores what differs only in pid and elapsed time, which every repeat does', () => {
+    expect(outcomeSignature(spawnWatcher(1, 0))).toBe(outcomeSignature(spawnWatcher(9, 90)))
+  })
+
+  it('stays quiet below the threshold', () => {
+    const records = Array.from({ length: WEDGE_REPEAT_THRESHOLD - 1 }, (_, i) => spawnWatcher(i + 1, i * 10))
+    expect(repeatedOutcomeWedge({ records, progressAt: START - 60_000 }).wedged).toBe(false)
+  })
+
+  it('counts nothing that happened before the last observable progress', () => {
+    const records = Array.from({ length: 10 }, (_, i) => spawnWatcher(i + 1, i * 10))
+    expect(repeatedOutcomeWedge({ records, progressAt: START + 95 * 60_000 })).toMatchObject({ wedged: false, count: 0 })
+  })
+
+  it('does not merge two sessions repeating the same outcome into one wedge', () => {
+    const records = [
+      spawnWatcher(1, 0), spawnWatcher(2, 10),
+      rec(3, 20, ACTIVITY_EVENTS.WAIT_LEASE_ACQUIRE, {
+        session: 'other', cause: 'first-wait-for-this-run', evidence: { runId: 'verify-1', subject: 'npm exec vitest' },
+      }),
+      spawnWatcher(4, 30), spawnWatcher(5, 40),
+    ]
+    expect(repeatedOutcomeWedge({ records, progressAt: START - 60_000 }).count).toBe(2)
+  })
+
+  it('is not fooled by a session that varies what it does', () => {
+    const records = [
+      spawnWatcher(1, 0),
+      rec(2, 10, ACTIVITY_EVENTS.FOREGROUND_ACTIVITY, { cause: 'tool', evidence: { tool: 'Bash' } }),
+      spawnWatcher(3, 20),
+      rec(4, 30, ACTIVITY_EVENTS.FOREGROUND_ACTIVITY, { cause: 'tool', evidence: { tool: 'Edit' } }),
+    ]
+    expect(repeatedOutcomeWedge({ records, progressAt: START - 60_000 }).wedged).toBe(false)
   })
 })
