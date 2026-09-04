@@ -1,0 +1,182 @@
+{
+ "mergedBy": "Fable 5.1",
+ "entries": [
+  {
+   "id": "U1",
+   "from": [
+    "B7"
+   ],
+   "file": "scripts/batch-emergency-core.mjs",
+   "defect": "Root cause: the batch has no single definition of what counts as progress, so tool calls, watcher spawns, log mtime and heartbeats all look like work while nothing in the queue moves. Final state: one function derives the last observable-progress time only from durable batch events, delegated-ref movement, verification phase or result advancement, and content-changing checkpoints, and requires the evidence value to differ from the previous sample. Heartbeats and repeated identical observations never advance it. Every later entry that speaks of 'no progress' reads this clock and nothing else."
+  },
+  {
+   "id": "U2",
+   "from": [
+    "A5",
+    "B5"
+   ],
+   "file": "scripts/batch-in-flight-core.mjs",
+   "defect": "Root cause: the in-flight marker is believed because it exists and is recent, not because its writer is alive; the incident's marker named a pid dead since the afternoon and an empty evidence array, and the checkout measured live on 04.09.2026 still names pid 1761118, which is gone. Final state: every read validates the writer identity (pid alive and process start time equal to pidStartedAt so a reused pid cannot revive it), the run id and command identity, and the run record's state; a marker that fails any check is atomically tombstoned and the clearing journalled before any verification veto is weighed. A marker with no evidence may suspend recovery for at most one re-declaration interval. An exact live identity with fresh semantic progress survives."
+  },
+  {
+   "id": "U3",
+   "from": [
+    "B15"
+   ],
+   "file": "scripts/batch-emergency-core.mjs",
+   "defect": "Root cause: a verification lease renewed on process-alive and output-mtime evidence lets a hung or chatty run suspend recovery indefinitely, and sequential replacement runs each reset the per-run cap. Final state: leases renew only on semantic run progress from U1, keep the pid and start-time checks, cap each run and the cumulative suspension per batch-progress boundary, and cannot carry past the hard deadline of U5 without qualifying progress. Unchanged chatty output, back-to-back replacement runs and future-dated leases cannot defer recovery; a measurably advancing verification still can."
+  },
+  {
+   "id": "U4",
+   "from": [
+    "A3",
+    "B6"
+   ],
+   "file": "scripts/batch-autostart.mjs",
+   "defect": "Root cause: the launcher's 'skip: owner alive' branch rests on a fresh heartbeat plus a live pid, and a session in an eternal loop keeps calling tools, so the heartbeat stays fresh and the launcher skipped every tick for 107 minutes with the work order advancing by nothing; the emergency core already owns the right currency but the skip path never consults it. Final state: the emergency decision runs before the owner-alive skip, and pid and heartbeat freshness count only as fencing information. The owner keeps the batch only while U1 progress is younger than the emergency threshold or a corroborated verification lease under U3 is live; otherwise the launcher takes the batch and logs that it overrode a live heartbeat. List B names this file scripts/batch-launcher.mjs; the fix lands in whichever script holds that skip branch."
+  },
+  {
+   "id": "U5",
+   "from": [
+    "B8"
+   ],
+   "file": "scripts/batch-emergency-core.mjs",
+   "defect": "Root cause: threshold, cooldown and renewable vetoes never combine into one absolute deadline, so any liveness signal can push recovery forward without limit. Final state: a persisted hard deadline computed from the last U1 progress time is scheduled in the launcher daemon and evaluated immediately on host wake; a soft recovery fires at the threshold and a hard recovery at the deadline regardless of heartbeat or stale wait evidence, and only qualifying progress moves it. The two halves disagree on the numbers: list A's entry A3 bounds worst-case recovery at last progress plus 60 minutes plus one 15-minute tick, list B sets soft at 60 and hard at 120 minutes. The implementation must pick one and state it in the fixture of U21."
+  },
+  {
+   "id": "U6",
+   "from": [
+    "B17"
+   ],
+   "file": "scripts/batch-emergency-core.mjs",
+   "defect": "Root cause: cooldown and strike state can be reset by non-progress activity or can outlive the progress boundary they belong to, producing either delayed recovery or repeated soft strikes against one wedge. Final state: the whole recovery episode is keyed to the exact durable progress boundary and resets only when the U1 clock advances. Heartbeats and watcher wakes leave the episode untouched; a commit or delegated-ref move clears strikes and starts a new deadline under U5."
+  },
+  {
+   "id": "U7",
+   "from": [
+    "B10"
+   ],
+   "file": "scripts/batch-emergency.mjs",
+   "defect": "Root cause: recording a strike or warning is not proof that recovery ran, and a partial kill or restart can leave two owners competing for the batch. Final state: recovery is a transaction that persists intent, fences the old owner generation, terminates its registered work, records each outcome, atomically transfers ownership, launches the successor with the emergency handoff prompt, and marks completion idempotently. An injected failure after any phase can be retried and still yields exactly one successor and no duplicate deferral."
+  },
+  {
+   "id": "U8",
+   "from": [
+    "B11"
+   ],
+   "file": "scripts/batch-emergency.mjs",
+   "defect": "Root cause: retiring only the owning pid leaves the accumulated watcher shells alive, where they burn resources and keep feeding misleading process-name matches. Final state: spawned waits are registered under owner and run identity, and recovery terminates that bounded descendant group after verifying start times, never by scanning for a command substring. A tree holding ten watchers is fully retired while unrelated similarly named processes are left alone."
+  },
+  {
+   "id": "U9",
+   "from": [
+    "B19"
+   ],
+   "file": "scripts/batch-emergency-core.mjs",
+   "defect": "Root cause: the mechanisms from points 947, 958 and this point overlap and could race, kill twice, or apply different notions of progress. Final state: this core is the sole authority for progress and deadline decisions; 947 is narrowed to total-wedge evidence collection and 958 to busy-wedge detection, and both route into one idempotency key of progress time plus owner generation. Simultaneous triggers from all three sources produce one U7 transaction and one successor."
+  },
+  {
+   "id": "U10",
+   "from": [
+    "A4",
+    "B9"
+   ],
+   "file": "scripts/batch-autostart.mjs",
+   "defect": "Root cause: the published now-card ETA stood 81 or more minutes past and the launcher only warned, although an overdue ETA is the owner's own progress claim failing and the one signal a reader on a phone can see. Final state: an ETA more than one launcher tick past, combined with no U1 progress, triggers an immediate emergency evaluation on the U4 takeover path and escalates through soft and hard recovery. An overdue ETA with progress still flowing produces a reforecast and a warning, never a kill, and a merely malformed ETA does neither. List A places this in scripts/batch-in-flight-core.mjs where pastEtaCards is computed; the decision belongs beside U4."
+  },
+  {
+   "id": "U11",
+   "from": [
+    "A2",
+    "B2"
+   ],
+   "file": "scripts/batch-in-flight.mjs",
+   "defect": "Root cause: nothing owns or deduplicates background waits, so every wake-up spawned another watcher and ten stood at 01:00, the clearest evidence of the wedge, visible to no component. Final state: one wait lease per session and run id, carrying pid, subject, owner generation and deadline. A second declaration while the first is live replaces and terminates it or attaches to the existing receipt instead of spawning; terminal run records release the lease; the attempt is journalled; and two or more simultaneous live waits from one session is itself an emergency input. Ten concurrent acquires yield one owner and one cleanup."
+  },
+  {
+   "id": "U12",
+   "from": [
+    "A9",
+    "B4"
+   ],
+   "file": "scripts/verify/run-wait.mjs",
+   "defect": "Root cause: an --await that times out only prints advice and exits 3, and the wait itself is invisible to the registry, so the session wakes and starts another waiter with no durable trace. Final state: --await registers its wait in the same registry batch-in-flight writes, with a deadline derived from the --plan tier estimate. Crossing the deadline writes a verification-wait-timeout journal event carrying run id, last semantic progress, elapsed time and deadline; at 2.5 times expectation or the lease cap the run is atomically marked hung and the U9 core is invoked. Fake time crossing each threshold yields one event and one recovery request, never a second waiter."
+  },
+  {
+   "id": "U13",
+   "from": [
+    "B3"
+   ],
+   "file": "scripts/verify/run-wait.mjs",
+   "defect": "Root cause: when the log is omitted, --await resolves to the newest live record, which can be an unrelated concurrent run and makes stale-state errors indistinguishable from real waits. Final state: the run launcher returns an immutable run id and record path, automated awaits must pass that token, and newest-run lookup survives only for interactive status. Overlapping quick and LARGE records always await the explicitly selected run."
+  },
+  {
+   "id": "U14",
+   "from": [
+    "A1",
+    "B1"
+   ],
+   "file": "scripts/verify/wait-command-core.mjs",
+   "defect": "Root cause: a hand-rolled loop of the shape while pgrep -f 'npm exec vitest'; do sleep 30; done runs in a shell whose own argv contains the pattern, so pgrep matches the watcher and the loop cannot end; nothing refuses the hand-rolled wait although --await is the named blocking wait. Final state: a pure command-policy classifier used by the tool guard recognises the poll-loop shape (a while or until whose condition runs pgrep, pidof, ps or jobs with a sleeping body, or a sleep followed by that check), refuses it, and names run-wait.mjs --await as the replacement. The self-matching case is flagged separately as non-terminating rather than merely wasteful. An argv containing the pattern is rejected; a finished run record makes --await return at once."
+  },
+  {
+   "id": "U15",
+   "from": [
+    "B16"
+   ],
+   "file": "scripts/batch-standstill-core.mjs",
+   "defect": "Root cause: the standstill analysis classifies a live owner or an open wait interval as activity even after the underlying run has terminated. Final state: verification and CI intervals are derived from paired durable records and fresh semantic leases, closed the moment the identity is terminal or dead, and the remaining owner time is classified as IDLE_OWNER. A replay of 23:05 to 00:52 attributes the post-run eternal-watcher period to an idle owner, not to verification."
+  },
+  {
+   "id": "U16",
+   "from": [
+    "A8"
+   ],
+   "file": "scripts/batch-standstill-core.mjs",
+   "defect": "Root cause: both incidents ended with the session emitting the same outcome repeatedly, ten identical watcher spawns and then identical farewells, until a person broke the loop; repeated identical outcomes are the signature of a busy wedge and nothing counts them, the detector point 958 named but never built. Final state: consecutive identical turn outcomes from one session are counted, reusing the launcher's existing verdict-repeat notion. At a stated count with no U1 progress between them the session is declared wedged, journalled, alerted, and handed over through U7 under the U9 key."
+  },
+  {
+   "id": "U17",
+   "from": [
+    "A6",
+    "B13"
+   ],
+   "file": "scripts/ci-status-guard.mjs",
+   "defect": "Root cause: after batch-boundary --commit the boundary refuses every tool call including the 90-second wait, while ci-status-guard refuses every turn end until the pushed ref's CI concludes and prescribes exactly that refused wait; the CI guard contains no mention of the boundary. Final state: a committed boundary is terminal, and on commit the pushed ref, check identity and notification duty transfer durably to the launcher, which records CI transitions and starts recovery on failure or timeout. ci-status-guard gains an applicable-false stand-down with cause committed-boundary, alongside the ones it already has for a paused batch and a non-owner. Pending CI plus a committed boundary permits stop and monitoring continues under the same check id."
+  },
+  {
+   "id": "U18",
+   "from": [
+    "B12"
+   ],
+   "file": "scripts/guard-compatibility-core.mjs",
+   "defect": "Root cause: the guards are written independently, so a state can exist in which one guard demands an action another guard forbids, and U17 fixes only the one instance that was observed. Final state: guard arbitration is centralised and asserts, for every state, that each action a guard requires is permitted by all others. The full boundary and CI state truth table is a test fixture that contains no must-do-X state in which X is forbidden."
+  },
+  {
+   "id": "U19",
+   "from": [
+    "A7",
+    "B14"
+   ],
+   "file": "scripts/batch-boundary-core.mjs",
+   "defect": "Root cause: the boundary marker's validity was 'no repository mutation since it was taken', so the first later mutation silently invalidated it and the handed-over batch re-opened with nobody told. Final state: the boundary is persisted as an immutable generation and ref transition in the lock, and validity never derives from an unchanged worktree. The halves differ on what a later mutation does: list A escalates it (journalled, handoff re-armed, alerting on repeat) while list B rejects it and requires an audited --reopen or successor claim to create a new generation. Both agree the marker stays valid and the handover is never cancelled quietly; the implementation must choose reject or escalate."
+  },
+  {
+   "id": "U20",
+   "from": [
+    "B20"
+   ],
+   "file": "scripts/batch-autostart.mjs",
+   "defect": "Root cause: tick after tick of green skips and warnings hid which evidence overruled stale progress, so another wedge would look healthy for as long as it lasted. Final state: every tick logs structured progress kind and time, owner identity, verification validity, ETA overdue duration, deadline and the selected action, and alerts describe recovery outcomes rather than liveness. Golden records for the incident contain no owner-alive verdict and name the exact deadline and recovery reason."
+  },
+  {
+   "id": "U21",
+   "from": [
+    "A10",
+    "B18"
+   ],
+   "file": "scripts/batch-emergency-drill.mjs",
+   "defect": "Root cause: the point's test line asks for the incident replayed against the real actor, and a test that only builds the expected aftermath proves nothing about detection, fencing or restart. Final state: one Vitest fixture carries the measured 03.09.2026 timeline (heartbeat refreshed every ten minutes, finished verification, in-flight marker of a dead pid, ten stacked eternal waits, an ETA 81 minutes past, no first-parent commit between 23:05 and 00:52) and drives the real launcher-to-emergency entry point with fake clock and process adapters, asserting one soft action, hard recovery within the U5 bound, descendant cleanup under U8, successor launch and continued queue movement. A second fixture carries the 17:45 to 17:47 deadlock and asserts the committed boundary lets the turn end under U17."
+  }
+ ]
+}
