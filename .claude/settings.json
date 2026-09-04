@@ -239,7 +239,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "node scripts/wait-command-guard.mjs"
+            "command": "node \"$CLAUDE_PROJECT_DIR/scripts/wait-command-guard.mjs\""
           }
         ]
       },
@@ -248,7 +248,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "node scripts/wait-command-guard.mjs"
+            "command": "node \"$CLAUDE_PROJECT_DIR/scripts/wait-command-guard.mjs\""
           }
         ]
       },
