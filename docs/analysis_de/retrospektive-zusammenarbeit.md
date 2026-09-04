@@ -88,6 +88,7 @@ Das Musterbeispiel sind die Chat-Zeitstempel: neun Eskalationsstufen, acht weich
 | 01.09. nachm. | **Die Umsteuerung**: Blind-Doppeldiagnose (Fable + Sol, Opus-Merge) auf die Nutzerfrage nach dem Spielstillstand — die Steuerung war zum Hauptprodukt geworden; der Nutzer gab Freeze, Aufnahmeregel und die Streichung des §7.1-Tors direkt frei, und die Umsetzung bewies Punkt 1005 gleich mit: punktlose Arbeit fand keine Karte (§3.227, Punkt 1039) |
 | 02.09. früh | Zwei Tore standen auf einem einzigen Kandidaten und waren damit Münzwürfe: Die Kreuzungsprüfung des Ufer-Fangspiels öffnete ihr Fenster auf irgendeinem Lauf statt auf dem ersten eines Zyklus und bestand fast nur aus der Streifphase — nachgemessen trugen sechs von 84 Fenstern gar keine Überquerung, das Grün war Glück. Die Sprecher-Prüfung derselben Suite bietet zehn Figuren an, fünf davon sind bei jedem Lauf dieselben Fehlschüsse, und eine sechste entscheidet allein (§3.231, Punkte 687/1043) |
 | 02./03.09. nachts | Die Batch kroch stundenlang hinter Warte-Schleifen, deren Suchmuster die eigene Warte-Maschinerie fand: zehn `while pgrep`-Beobachter, jeder mit dem Muster wörtlich in der eigenen Kommandozeile, hielten sich gegenseitig am Leben, während längst nichts mehr lief — Heartbeat frisch, Starter „owner alive", ETA-Überfälligkeit nur als Warnung; der vorgesehene Warteweg (`run-wait.mjs --await`) wurde umgangen. Aufgelöst durch die Nutzerfrage um 1 Uhr; Analysepunkt blind mit vier Augen per Nutzer-Anordnung (Punkt 1048, Vorhersage von Punkt 958 eingetreten). Dieselbe Nacht ließ den Front-beorderten Felsenspiel-Punkt als letzten von 360 stehen — Wiedergänger von §3.77, Punkt 1049 |
+| 04.09. | Der Nutzer sah den frisch gelandeten Grabe-Vorgang an und fand keinen Zweck: Jede Grube ist als Vorratsgrube, Pfostenloch oder gewendeter Boden gesetzt, kommentiert, getestet und per Dev-Assertion abgesichert — sichtbar ist davon nichts, alle drei sind dasselbe runde Loch und ein Arbeitsgang hinterlässt kein Ergebnis. Zweiter Fall derselben Bauform in derselben Szene nach dem 13.08. (§3.233, Punkte 1056/1057) |
 
 
 Muster: Ab dem 22.07. explodiert die Commit-Rate (Delegation) — und genau dann häufen sich die Infrastruktur-Vorfälle. **Skalierung der Autonomie erzeugt eine eigene Problemklasse, die die Feature-Arbeit zeitweise überholt.**
@@ -1428,7 +1429,7 @@ keinen Träger hat. Gebucht als Punkt 956.
 
 ## Anhang A — Maschinell gepflegte Quellen-Übersicht
 
-Zuletzt aktualisiert: Donnerstag, 03.09.2026, 22:22 · Quellen-Fingerprint: `9635b28ca80e…`
+Zuletzt aktualisiert: Freitag, 04.09.2026, 09:32 · Quellen-Fingerprint: `458553bd8847…`
 
 Spalten heuristisch aus den Quellen abgeleitet (Anläufe = distinkte Datumsnennungen im Memory;
 Maßnahme = Guard-Skripte mit Namens-Treffer). Die inhaltliche Bewertung gehört der Prosa oben.
@@ -1466,7 +1467,7 @@ Maßnahme = Guard-Skripte mit Namens-Treffer). Die inhaltliche Bewertung gehört
 | Work at High effort by default; the user reserves Extra high for research and design decisions, not implementation | 4 | hoch | — (Regel/Memory) | ◐ Regel |
 | Write idiomatic English in all English text (README, code comments, commit messages) — no German calques like 'stand' for a version | 1 | niedrig | — (Regel/Memory) | ◐ Regel |
 | Fable is NOT the default lane because its volume is the scarcest; difficulty is no reason for it either (since 18.08.2026 hard cases go straight to Sol), and review is cross-vendor, not Fable-by-default | 5 | hoch | — (Regel/Memory) | ◐ Regel |
-| Findings recorded by a session that could not write the work order — carry each into TASKS.md, then mark it drained | 43 | hoch | findings-guard.mjs | ✔ Mechanismus |
+| Findings recorded by a session that could not write the work order — carry each into TASKS.md, then mark it drained | 44 | hoch | findings-guard.mjs | ✔ Mechanismus |
 | A recurring lookup gets a script; never pull raw transcripts, listings, or logs into context to answer it | 1 | niedrig | — (Regel/Memory) | ◐ Regel |
 | Past the 150k context watermark, FINISH the step and hand over — never start a suite, an agent or a point after it; the user raised the cost twice (13.08. and 17.08.2026) | 2 | mittel | — (Regel/Memory) | ◐ Regel |
 | User 18.08.2026: hard, complex, error-prone and HIGH-criticality points are AUTHORED by GPT-5.6 Sol directly — Opus 5 authors only what is left, and Fable authors only a point that tags its lane or one the router escalates | 4 | hoch | — (Regel/Memory) | ◐ Regel |
@@ -1530,10 +1531,10 @@ Maßnahme = Guard-Skripte mit Namens-Treffer). Die inhaltliche Bewertung gehört
 | A pending batch claim HOLDS THE LAUNCHER BACK — withdraw it whenever the claiming window is left unattended | 2 | mittel | clear-claim-guard.mjs | ✔ Mechanismus |
 | Multi-agent workflows eat the session/weekly limit fast — verify findings INLINE, keep fan-outs small, warn the user with a cost estimate before any big workflow | 3 | mittel | doc-budget-guard.mjs | ✔ Mechanismus |
 
-Erfasste Quellen: 94 Feedback-/Projekt-Memories · 57 Guard-/Hook-Skripte · 6 Revert-/Reapply-Commits · 123 Prozess-/Meta-TASKS-Punkte (davon 57 offen).
+Erfasste Quellen: 94 Feedback-/Projekt-Memories · 57 Guard-/Hook-Skripte · 6 Revert-/Reapply-Commits · 124 Prozess-/Meta-TASKS-Punkte (davon 58 offen).
 
-<!-- RETRO-FINGERPRINT: 9635b28ca80e2d84d243967b0a2831fc51bd733a033186e323a87a6d8a1393f6 -->
-<!-- RETRO-LAST-REFRESHED: 2026-09-03T20:22:42.552Z -->
+<!-- RETRO-FINGERPRINT: 458553bd884745a777291644e1a415d921e77257b4f553e7cde6f1d7b6f3cae3 -->
+<!-- RETRO-LAST-REFRESHED: 2026-09-04T07:32:32.958Z -->
 <!-- AUTO-GENERATED:END -->
 
 ### 3.111 Ein Erfolg ist kein Beweis für den Weg, auf dem er zustande kam
@@ -5441,3 +5442,41 @@ woher sie stammt — und wo er nichts vorweisen kann, hat er zu orientieren stat
 zu beauftragen. Die Gegenprobe gehört zur selben Änderung: Autonomie, die nur
 noch auf Einladung anspringt, muss beweisen, dass die Einladung auch dann
 ankommt, wenn der Weg dahin abbricht.
+
+### 3.233 Der Zweck stand nur im Code — im Bild sah der Spieler Selbstzweck
+
+Am 04.09.2026 sah der Nutzer den frisch zusammengeführten Grabe-Vorgang an und
+fragte: „Was ist der inhaltliche Grund fürs Graben der Erwachsenen? … Sie
+scheinen zum Selbstzweck zu graben." Nachgemessen: Der Grund existiert, und zwar
+sorgfältig. Jede Grabstelle wird als Sorte gesetzt — Vorratsgrube an der
+Gehöftwand, Pfostenloch an der Gasse, gewendeter Boden am Feldrand —, und die
+Platzierungsregeln dafür sind kommentiert, getestet und mit einer Dev-Assertion
+abgesichert. Nur ist die Sorte ausschließlich eine Platzierungsregel: Alle drei
+rendern dasselbe runde Loch, es kommt nie ein Pfosten hinein, nie Vorrat, nie
+eine Pflanze, und der Fortschritt beginnt beim nächsten Betreten des Dorfes von
+vorn. Der Aufwand ging vollständig in die Begründung und gar nicht in ihre
+Sichtbarkeit.
+
+Das ist keine Wiederholung von §3.99 (dort war ein Liefergegenstand schlicht
+nicht gebaut). Hier ist alles gebaut, getestet und grün — die Sorte steht im
+Datenmodell, im Kommentar und in der Testabdeckung. Was fehlt, ist die einzige
+Instanz, die im Spiel urteilt: das gerenderte Bild. Und es ist der zweite Fall
+derselben Bauform. Am 13.08.2026 hatte derselbe Nutzer über dieselbe Szene
+gesagt: „Selbst wenn ich diese Übersetzungen sehe, erkenne ich keinen Sinn
+hinter den Handlungen" — daraus wurde der Umbau der ganzen Verständigungsscheibe.
+Dass die Klasse in derselben Szene wiederkehrt, obwohl sie dort schon einmal
+teuer bezahlt wurde, ist der eigentliche Befund.
+
+Die Ursache liegt in unserer Prüfordnung. Wir prüfen das Bild darauf, ob es
+korrekt ist — steht die Grube außerhalb der Mitte, hört kein Kind das Wort, malt
+der Backend-Vergleich dasselbe. Keine dieser Prüfungen fragt, ob ein Mensch dem
+Bild ansieht, wozu die Handlung dient. Das Memory `watch-for-aesthetic-oddities`
+fordert genau diesen Blick, aber es hat keinen Träger in der Abnahme: Der
+Screenshot beweist Anwesenheit, nicht Lesbarkeit.
+
+**Lehre:** Eine Begründung, die nur im Code steht, existiert für den Spieler
+nicht. Wo wir Aufwand in die Rechtfertigung einer Spielhandlung stecken, gehört
+dieselbe Frage an das gerenderte Bild gestellt — und zwar in Worten, die ein
+Mensch beantworten muss („Wozu tut die Figur das?"), nicht als Metrik. Und wo
+eine Klasse in derselben Szene zum zweiten Mal auftritt, ist die Wiederholung
+selbst der Befund, nicht der Einzelfall.

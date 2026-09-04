@@ -163,6 +163,14 @@ Die Ursache findest du durch **Zerlegen**, nicht durch Wiederholen.
   sie kaputt wäre?** Zeit darf ein Test abkürzen, den **Aufruf** nie. Ist die **Ausgabe** das
   Produkt — Urteil, Plan, Anleitung —, lies sie am **echten Bestand**, nie nur an selbstgebauten
   Eingaben.“ *(Sieht das richtig aus?)*
+- **Der Grund steht nur im Code.** Die Handlung ist begründet, kommentiert, getestet und grün —
+  im Bild ist davon nichts zu sehen, und der Nutzer liest Selbstzweck. Der Aufwand ging
+  vollständig in die Rechtfertigung und gar nicht in ihre Sichtbarkeit.
+  → *Prompt:* „Prüf jede sichtbare Handlung mit einer Frage, die ein **Mensch** beantworten muss:
+  **Wozu tut die Figur das — und sieht man das dem Bild an, ohne den Code zu kennen?** Eine
+  Unterscheidung, die nur im Datenmodell existiert, existiert für den Nutzer nicht. Tritt dieselbe
+  Klasse ein zweites Mal in derselben Szene auf, ist die **Wiederholung** der Befund, nicht der
+  Einzelfall.“
 - **Dem Test geht der Gegenstand unter den Füßen weg.** Er hält seinen Prüfling an einer
   Koordinate, einem Vorgabewert oder einer nachgebauten Simulation fest. Zieht der Prüfling um,
   fragt der Test weiter — richtig, nur über nichts mehr. Ein Rot meldet sich; ein leer
@@ -539,4 +547,4 @@ Die Ursache findest du durch **Zerlegen**, nicht durch Wiederholen.
 
 Sie ersetzt die Fallstricke oben nicht.
 
-<!-- GUIDE-FINGERPRINT: 9635b28ca80e2d84d243967b0a2831fc51bd733a033186e323a87a6d8a1393f6 -->
+<!-- GUIDE-FINGERPRINT: 458553bd884745a777291644e1a415d921e77257b4f553e7cde6f1d7b6f3cae3 -->

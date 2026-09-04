@@ -362,6 +362,59 @@ put it is the mistake this line exists to stop.
   (the durable work record), design.md §7
   Bundle: Dorfleben.
 
+- [ ] 1057. The spoil heap buries the diggers, and everyone else walks straight through it
+  (user 04.09.2026, watching the merged digging work; measured the same morning).
+  Three causes, each read off the shipped code:
+  - The heap's SIDE is fixed. It sits at a constant local offset in a group rotated by an
+    angle derived from the site's own coordinates, so it grows where it grows no matter
+    who stands there.
+  - The initiator walks into the MIDDLE of the pit — `startJointWalk` sets his goal to the
+    site centre and he stops within `WORK_ARRIVE_RADIUS` of it, while the heap's centre
+    lies about 1.19 m out at `DIG_SITE_RADIUS` 0.9. He digs himself in.
+  - NOTHING collides with the excavation. The collider set is finished before the dig
+    sites are placed at all, and neither pit nor heap is ever added, so villagers,
+    children and the player pass through the earth.
+  The user decided the shape of the remedy and the reason for it: a collider is NOT the
+  answer, because an impassable heap wedges figures — the player included — into corners.
+  The heap becomes a LOCAL RAISING OF THE GROUND that everyone walks up and over, the way
+  the height profile outside a settlement already works. Today a settlement is flat: every
+  actor's Y is set independently and lands at zero (the bank children's climb is the one
+  exception), while outdoors the figure rides `sampleTerrain(...).height`. So this point
+  brings a place its first ground height, and it must arrive as ONE source every actor
+  reads, not as a second scatter of Y assignments.
+  Final state:
+  - The heap never grows on a side somebody is standing on — the digging pair's places are
+    chosen away from it, and the initiator works from the rim instead of the middle.
+  - Nobody walks through the heap: villagers, children and the player ride over it, in
+    both perspectives, and the first-person camera rises and falls smoothly rather than
+    stepping.
+  - One ground-height source for a place, read by every actor and by the camera; a flat
+    settlement keeps behaving exactly as it does today.
+  - Nothing in a settlement becomes impassable through this point — no new collider, and
+    no figure can be wedged by the earth.
+  Test: Vitest over the ground-height source and the standing-place choice — a pair never
+  takes a place inside the heap's footprint, and the height is zero everywhere no
+  excavation reaches; Playwright on the polish lane — a frame with a figure carried over
+  the heap, judged on both backends.
+  Criticality: high — the defect is visible in the picture the player is meant to learn
+  from, and the remedy touches every actor's height in a place, which is the error-prone
+  half.
+  Quotes:
+  Nutzer, 04.09.2026 09:05: »Die Erwachsenen sollten nicht in dem entstehenden Erdhaufen
+  stehen. Zum einen graben sie sich damit manchmal quasi selbst ein und zum anderen laufen
+  sie später ohne Clipping-Abfrage hindurch.«
+  Nutzer, 04.09.2026 09:05: »Der Erdhaufen ist nicht unpassierbar, sondern er ist eine
+  lokale Erhöhung des Bodens, über den die Figuren laufen — so wie bei dem Höhenprofil in
+  der Vogelperspektive.«
+  Nutzer, 04.09.2026 09:14: »Setze beides — Höhenprofil statt Kollision und die Leute dem
+  Haufen ausweichen zu lassen — als neuen Punkt um und reihe ihn direkt vor 690 ein.«
+  Refs: src/scenes/place/PlaceScene.tsx (`DigSites`, the player mesh's fixed Y),
+  src/scenes/place/PlaceLife.tsx (every actor's `position.set`), src/scenes/place/adultWork.ts
+  (`startJointWalk`, `joinSpot`, `JOIN_STAND_OFF`), src/scenes/place/layout.ts (the collider
+  set and the dig-site placement), src/scenes/travel/TravelScene.tsx (how the outdoor height
+  profile carries a figure)
+  Bundle: Dorfleben.
+
 - [ ] 690. The classic game of tag moves to the port cities, and is silent there (user
   13.08.2026, playing the deployed communication slice).
   The user played the deployed communication slice on 13.08.2026 with the debug

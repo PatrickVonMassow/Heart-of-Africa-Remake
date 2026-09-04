@@ -1176,10 +1176,48 @@
       "why": "User order 04.09.2026: »Reihe einen Punkt direkt vor 690 ein, der das sichtbar macht.«",
       "origin": "user",
       "place": "ahead"
+    },
+    "1057": {
+      "at": "2026-09-04T07:15:52.153Z",
+      "why": "User order 04.09.2026: »Setze beides … als neuen Punkt um und reihe ihn direkt vor 690 ein.«",
+      "origin": "user",
+      "place": "ahead"
     }
   },
+  "boundary": {
+    "at": "2026-08-21T00:55:14.962Z",
+    "points": [
+      336,
+      553,
+      596,
+      633,
+      659,
+      660,
+      663,
+      689,
+      690,
+      691,
+      692,
+      708,
+      715,
+      719,
+      733,
+      735,
+      736,
+      738,
+      739,
+      746,
+      747,
+      750,
+      759,
+      760,
+      762,
+      764
+    ],
+    "why": "The order standing in front of the release today is the arrangement that predates this rule; the four machine-filed points that had ranked themselves there were moved behind 174 first"
+  },
   "settled": {
-    "at": "2026-09-04T07:05:24.272Z",
+    "at": "2026-09-04T07:15:52.175Z",
     "points": [
       174,
       184,
@@ -1547,39 +1585,8 @@
       1053,
       1054,
       1055,
-      1056
+      1056,
+      1057
     ]
-  },
-  "boundary": {
-    "at": "2026-08-21T00:55:14.962Z",
-    "points": [
-      336,
-      553,
-      596,
-      633,
-      659,
-      660,
-      663,
-      689,
-      690,
-      691,
-      692,
-      708,
-      715,
-      719,
-      733,
-      735,
-      736,
-      738,
-      739,
-      746,
-      747,
-      750,
-      759,
-      760,
-      762,
-      764
-    ],
-    "why": "The order standing in front of the release today is the arrangement that predates this rule; the four machine-filed points that had ranked themselves there were moved behind 174 first"
   }
 }
