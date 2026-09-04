@@ -84,7 +84,14 @@ import { insidePlace } from './boundary'
 import { buildPlaceNavGrid, findPlaceRoute, navClearBetween, navRestrict } from './routing'
 import { standsOnGroundPlate } from './riverBank'
 import { buildWedgeCarve } from './wedgeCarve'
-import { createAdultWork, goalOf, stepAdultWork, taskOf, type AdultWorkView } from './adultWork'
+import {
+  createAdultWork,
+  goalOf,
+  stepAdultWork,
+  taskOf,
+  WORK_ARRIVE_RADIUS,
+  type AdultWorkView,
+} from './adultWork'
 
 /** The children's round as `PlaceLife` composes it (work-order 687): the bank
  *  game where the settlement stands on a river, the tag round everywhere else. */
@@ -218,6 +225,19 @@ function crowd(
   // The work itself, stepped exactly as `ErrandVillagers` steps it.
   const workCfg = balance.villageLife.adultErrands
   const work = createAdultWork(errandCount, workCfg)
+  const invitationClear = (x: number, z: number) => {
+    const margin = balance.communication.hearingRadius + WORK_ARRIVE_RADIUS
+    if (
+      layout.playGround &&
+      Math.hypot(x - layout.playGround.x, z - layout.playGround.z) - layout.playGround.radius <= margin
+    ) return false
+    if (layout.waterPath && Math.hypot(x - layout.waterPath.foot.x, z - layout.waterPath.foot.z) <= margin) return false
+    if (layout.playRocks) {
+      if (Math.hypot(x - layout.playRocks.upstream.x, z - layout.playRocks.upstream.z) <= margin) return false
+      if (Math.hypot(x - layout.playRocks.downstream.x, z - layout.playRocks.downstream.z) <= margin) return false
+    }
+    return true
+  }
   const workView: AdultWorkView = {
     villagers: walkers.map((b) => ({ x: b.x, z: b.z, free: true })),
     geography: {
@@ -226,6 +246,7 @@ function crowd(
       digSites: layout.digSites,
     },
     standable: (x, z) => !world.blocked(x, z),
+    invitationClear,
     childrenHear: (x, z) =>
       children.some(
         (c) => c.active && Math.hypot(c.x - x, c.z - z) <= balance.communication.hearingRadius,

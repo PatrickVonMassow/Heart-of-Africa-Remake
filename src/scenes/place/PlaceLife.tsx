@@ -77,6 +77,7 @@ import {
   carryOf,
   clearTask,
   createAdultWork,
+  digProgressOf,
   isDigging,
   goalOf,
   stepAdultWork,
@@ -84,6 +85,7 @@ import {
   type AdultWorkGeography,
   type AdultWorkView,
   type DigSite,
+  type DigSiteProgress,
   type ErrandPoint,
   type SpokenWord,
   WORK_ARRIVE_RADIUS,
@@ -2078,14 +2080,12 @@ const ERRAND_ARRIVE_RADIUS = WORK_ARRIVE_RADIUS
 const WAYPOINT_RADIUS = 1.2
 
 /**
- * The adults at their errands, and the concepts they teach at them: RIVER,
- * UPSTREAM, DOWNSTREAM, ROCK and DIG. The catalogue is EMPTY until the water
- * and digging teaching is rebuilt, so nothing is staged here for now. It and
- * the scheduler are the pure `adultErrands` module; here it is given the
+ * The adults at their errands teach RIVER and DIG. The scheduler is the pure
+ * `adultWork` module; here it is given the
  * live village, and what comes back is spoken (through the §13.4 hearing curve),
  * shown over the speaker's head, gestured with the point-479 arms and CARRIED
- * OUT — the villager walks to the bank, up or down the stretch, over to the
- * stone or onto a patch of ground and digs it.
+ * OUT — the water carrier walks the path, while a would-be digger collects a
+ * partner and the two walk to and work one excavation.
  *
  * These are villagers who stay OUT (unlike `Walkers`, who spend most of their
  * cycle inside a hut): an errand nobody is there to be given teaches nothing.
@@ -2100,8 +2100,11 @@ function ErrandVillagers({
   radius,
   bank,
   geography,
+  playGround,
+  playRocks,
   count,
   childBodies,
+  onDigProgress,
 }: {
   seed: number
   cloth: string[]
@@ -2111,9 +2114,12 @@ function ErrandVillagers({
    *  these villagers keep to, since the errands send them out onto it. */
   bank: PlaceRiverBank | null
   geography: AdultWorkGeography
+  playGround: PlayGround | null
+  playRocks: { upstream: ErrandPoint; downstream: ErrandPoint } | null
   count: number
   /** The children's live bodies (work-order 688) — see `AdultWorkView.childrenHear`. */
   childBodies: RefObject<readonly InhabitantBody[]>
+  onDigProgress: (progress: readonly DigSiteProgress[]) => void
 }) {
   const refs = useRef<Array<THREE.Group | null>>([])
   // The jar each carrier holds: on the head when it is FULL, in the hand when it
@@ -2121,6 +2127,8 @@ function ErrandVillagers({
   // per-frame visibility in this scene.
   const headJars = useRef<Array<THREE.Object3D | null>>([])
   const handJars = useRef<Array<THREE.Object3D | null>>([])
+  const digTools = useRef<Array<THREE.Object3D | null>>([])
+  const reportedStrikes = useRef<number[]>([])
   const rim = Math.max(1, radius - NPC_RADIUS * 2)
 
   /** Every place a villager may stroll to of its own accord: the head of the
@@ -2244,9 +2252,26 @@ function ErrandVillagers({
     },
     [childBodies],
   )
+
+  // An invitation is spoken wherever the partner happened to be standing when
+  // cast. Keep that anchor far enough from every fixed children's place that
+  // even the initiator's arrival tolerance cannot put the word in its earshot.
+  const invitationClear = useCallback(
+    (x: number, z: number) => {
+      const margin = balance.communication.hearingRadius + WORK_ARRIVE_RADIUS
+      if (playGround && Math.hypot(x - playGround.x, z - playGround.z) - playGround.radius <= margin) return false
+      if (geography.waterFoot && Math.hypot(x - geography.waterFoot.x, z - geography.waterFoot.z) <= margin) return false
+      if (playRocks) {
+        if (Math.hypot(x - playRocks.upstream.x, z - playRocks.upstream.z) <= margin) return false
+        if (Math.hypot(x - playRocks.downstream.x, z - playRocks.downstream.z) <= margin) return false
+      }
+      return true
+    },
+    [geography, playGround, playRocks],
+  )
   const view = useMemo<AdultWorkView>(
-    () => ({ villagers: people, geography, standable, childrenHear }),
-    [people, geography, standable, childrenHear],
+    () => ({ villagers: people, geography, standable, invitationClear, childrenHear }),
+    [people, geography, standable, invitationClear, childrenHear],
   )
 
   // The body each villager presents to every other inhabitant (point 578): two
@@ -2411,14 +2436,16 @@ function ErrandVillagers({
         me.z = body.z
       }
 
-      // WHAT HE IS CARRYING, and what that does to his body: a full jar rides on
-      // the head and both hands steady it, an empty one hangs from a hand and
-      // leaves the arms free.
+      // WHAT HE IS CARRYING, and what that does to his body: jars keep their
+      // established positions; the digging tool lives in the hand pivot so the
+      // shaft rides the stroke instead of swinging beside an empty-handed man.
       const carry = carryOf(work, i)
       const headJar = headJars.current[i]
       const handJar = handJars.current[i]
+      const digTool = digTools.current[i]
       if (headJar) headJar.visible = carry === 'fullJar'
       if (handJar) handJar.visible = carry === 'emptyJar'
+      if (digTool) digTool.visible = carry === 'digTool'
 
       // The pose: digging wins over everything, then the gesture, then the load
       // on the head, then rest.
@@ -2427,6 +2454,9 @@ function ErrandVillagers({
       gesture.current = advanceGesture(gesture.current, dt)
       if (isDigging(work, i)) {
         state.dug += dt
+        const siteIndex = task?.siteIndex
+        const site = siteIndex === null || siteIndex === undefined ? null : geography.digSites[siteIndex]
+        if (site) yaws.current[i] = Math.atan2(site.x - me.x, site.z - me.z)
         const dig = digPose(state.dug, i * 0.37)
         if (pose) {
           pose.left = dig.left
@@ -2464,6 +2494,11 @@ function ErrandVillagers({
     }
 
     const said = stepAdultWork(work, view, dt, cfg, rand)
+    const progress = digProgressOf(work, geography.digSites.length)
+    if (progress.some((site, i) => site.strikes !== (reportedStrikes.current[i] ?? 0))) {
+      reportedStrikes.current = progress.map((site) => site.strikes)
+      onDigProgress(progress)
+    }
     if (said) {
       // The speaker turns to what he is talking about before he says it: a word
       // thrown over a shoulder at nothing reads as nothing at all.
@@ -2488,6 +2523,7 @@ function ErrandVillagers({
         waterFoot: geography.waterFoot,
         digSites: geography.digSites.map((d) => ({ ...d })),
       },
+      digProgress: digProgressOf(work, geography.digSites.length),
       villagers: people.map((p, i) => {
         const task = taskOf(work, i)
         return {
@@ -2526,18 +2562,37 @@ function ErrandVillagers({
             cloth={cloth[i % cloth.length]}
             pose={poses.current[i]}
             handProp={
-              <mesh
-                ref={(el) => {
-                  handJars.current[i] = el
-                }}
-                visible={false}
-                position={[0, -0.12, 0.04]}
-                rotation={[0, 0, 0.12]}
-                castShadow
-              >
-                <cylinderGeometry args={[0.12, 0.16, 0.32, 8]} />
-                <meshStandardMaterial color="#8a5a30" roughness={0.9} />
-              </mesh>
+              <>
+                <mesh
+                  ref={(el) => {
+                    handJars.current[i] = el
+                  }}
+                  visible={false}
+                  position={[0, -0.12, 0.04]}
+                  rotation={[0, 0, 0.12]}
+                  castShadow
+                >
+                  <cylinderGeometry args={[0.12, 0.16, 0.32, 8]} />
+                  <meshStandardMaterial color="#8a5a30" roughness={0.9} />
+                </mesh>
+                <group
+                  name="digging-tool"
+                  ref={(el) => {
+                    digTools.current[i] = el
+                  }}
+                  visible={false}
+                  position={[0, -0.34, 0]}
+                >
+                  <mesh castShadow>
+                    <cylinderGeometry args={[0.027, 0.035, 1.05, 6]} />
+                    <meshStandardMaterial color="#654522" roughness={0.95} />
+                  </mesh>
+                  <mesh position={[0, -0.48, 0.07]} rotation={[0.28, 0, 0]} castShadow>
+                    <boxGeometry args={[0.28, 0.055, 0.18]} />
+                    <meshStandardMaterial color="#51483d" roughness={0.82} />
+                  </mesh>
+                </group>
+              </>
             }
           />
           <mesh
@@ -2560,15 +2615,15 @@ function ErrandVillagers({
 /**
  * Speaks one word of the adults' work (work-order 688): the single atom through
  * the §13.4 hearing curve, the reading over the speaker's head, and the gesture
- * on his own arms, aimed at what he is doing — the water he is going to or
- * coming from, or the ground under his hoe.
+ * on his own arms, aimed at the water, the invited adult, or the excavation.
  *
  * The DISTANCE decides all three, exactly as it does for the children (point
  * 580): what the player could not hear teaches him nothing however plainly he
  * saw the work, so beyond the hearing radius the villager's arms stay down.
  *
- * The gesture is `indicate`, never `beckon`: an adult who waved somebody over
- * while saying DIG would teach "come" at least as well (the spec's own rule).
+ * The first DIG beckons to its listener; the second indicates the excavation.
+ * Their repeated word and unchanged pair distinguish the invitation from a
+ * generic "come" reading.
  */
 function speakWork(
   said: SpokenWord,
@@ -2589,7 +2644,7 @@ function speakWork(
       speakOverhead(`villager-${said.speaker}`, [utterance], anchor, { seconds: speechLabelSeconds(1) })
     }
   }
-  gesture.current = gestureIfHeard(distance, 'indicate', {
+  gesture.current = gestureIfHeard(distance, said.purpose === 'invitation' ? 'beckon' : 'indicate', {
     ...aimAt({ x: speaker.x, z: speaker.z, yaw }, said.aim, FIGURE_LIMBS.shoulderY),
     phase: said.speaker * 1.1, // no two villagers beat in lockstep
   })
@@ -2687,6 +2742,7 @@ export function PlaceLife({
   pen,
   colliders,
   radius,
+  onDigProgress,
 }: {
   kind: 'port' | 'village'
   /** Settlement size (design.md §4.1): big cities show more bustle. */
@@ -2718,6 +2774,8 @@ export function PlaceLife({
   colliders: Collider[]
   /** The settlement's walkable radius — the children's play area (point 480). */
   radius: number
+  /** Publishes strike-quantized progress to the site meshes in PlaceScene. */
+  onDigProgress: (progress: readonly DigSiteProgress[]) => void
 }) {
   let hash = 0
   for (const c of placeId) hash = (hash * 31 + c.charCodeAt(0)) | 0
@@ -2926,6 +2984,9 @@ export function PlaceLife({
             radius={radius}
             bank={bank}
             geography={workGeography}
+            playGround={playGround}
+            playRocks={playRocks}
+            onDigProgress={onDigProgress}
             count={Math.max(1, Math.round(balance.villageLife.adultErrands.villagerCount * presence))}
           />
           <Goats seed={localSeed} count={pen ? 4 : 3} pen={pen} colliders={colliders} />

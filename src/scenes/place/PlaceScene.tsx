@@ -4,7 +4,7 @@
 // which buildings exist is fixed per place kind. Visuals: TSL sky dome and
 // noise materials, sun shadows, detailed buildings, palms and scatter props.
 
-import { useEffect, useMemo, useRef, type MutableRefObject } from 'react'
+import { useEffect, useMemo, useRef, useState, type MutableRefObject } from 'react'
 import { useFrame, useThree } from '@react-three/fiber'
 import { Html } from '@react-three/drei'
 import * as THREE from 'three/webgpu'
@@ -84,6 +84,8 @@ import {
 } from '../../render/fauna'
 import { MONUMENT_GROUND, PORT_GROUND, REGION_PLACE_STYLES, type RegionPlaceStyle } from './regionStyles'
 import { PlaceLife } from './PlaceLife'
+import { digSiteAppearance } from './digSiteAppearance'
+import type { DigSiteProgress } from './adultWork'
 import { SpeechLabels } from './SpeechLabels'
 import { releasePointerLock, requestPlacePointerLock } from './pointerLock'
 import { ActorLabels } from '../ActorLabels'
@@ -1253,49 +1255,139 @@ function PlayRocks({ rocks }: { rocks: PlaceLayout['playRocks'] }) {
  * The village's ground work (work-order point 483): the patches the adults teach
  * the word for digging at — a store pit being sunk, a post hole beside the lane,
  * a patch of earth turned over. Small dressing drawn at the layout's own
- * positions, so a villager digs exactly where the turned earth is (points
- * 129/378), with a digging stick left standing in the spoil so the spot reads as
- * WORK rather than as a stain even while nobody is at it.
+ * positions, so a villager digs exactly where the excavation is (points
+ * 129/378). A raised broken rim, sloping inner walls, shadowed bottom and one
+ * joined spoil mass make each read as a HOLE from standing height; the adults
+ * carry the tools themselves.
  *
  * No quality lever of its own: three patches of a few small meshes are the same
  * order as the rock scatter beside them, and they ride the place scene's shadow
  * settings like every other prop.
  */
-function DigSites({ sites }: { sites: PlaceLayout['digSites'] }) {
+/** The brief shower from one completed tool stroke, thrown toward the heap. */
+function EarthThrow({ strike, radius }: { strike: number; radius: number }) {
+  const group = useRef<THREE.Group>(null)
+  const age = useRef(Number.POSITIVE_INFINITY)
+  const previous = useRef(strike)
+  useEffect(() => {
+    if (strike > previous.current) age.current = 0
+    previous.current = strike
+  }, [strike])
+  useFrame((_, rawDt) => {
+    const g = group.current
+    if (!g) return
+    age.current += Math.min(rawDt, 0.1)
+    g.visible = age.current < 0.72
+    if (!g.visible) return
+    for (let i = 0; i < g.children.length; i++) {
+      const t = age.current
+      const clod = g.children[i]
+      clod.position.set(
+        radius * 0.12 + t * (0.72 + i * 0.07),
+        0.12 + t * (1.2 + (i % 3) * 0.16) - t * t * 2.35,
+        (i - 2.5) * 0.075 + Math.sin(t * 7 + i) * 0.035,
+      )
+      clod.rotation.x += rawDt * (3 + i)
+      clod.rotation.z += rawDt * (2 + i * 0.4)
+    }
+  })
+  return (
+    <group ref={group} visible={false}>
+      {Array.from({ length: 6 }, (_, i) => (
+        <mesh key={i} scale={0.045 + (i % 2) * 0.012} castShadow>
+          <dodecahedronGeometry args={[1, 0]} />
+          <meshStandardMaterial color={i % 2 ? '#6b4929' : '#52351f'} roughness={1} />
+        </mesh>
+      ))}
+    </group>
+  )
+}
+
+function DigSites({
+  sites,
+  progress,
+}: {
+  sites: PlaceLayout['digSites']
+  progress: readonly DigSiteProgress[]
+}) {
   if (sites.length === 0) return null
   return (
     <>
       {sites.map((site, i) => {
         const wide = site.kind === 'patch'
         const r = wide ? DIG_SITE_RADIUS * 1.35 : DIG_SITE_RADIUS
+        const worked = progress[i]
+        const look = digSiteAppearance(worked)
         return (
-          <group key={i} position={[site.x, 0, site.z]} rotation={[0, site.x * 2.3 + site.z, 0]}>
-            {/* The worked ground itself: dark, turned earth, sunk a little. */}
-            <mesh position={[0, 0.015, 0]} receiveShadow>
-              <cylinderGeometry args={[r, r * 0.82, 0.03, 14]} />
-              <meshStandardMaterial color={wide ? '#5b4229' : '#3f2d1d'} roughness={1} />
+          <group
+            name="dig-site"
+            userData={{ kind: site.kind, dug: worked?.dug ?? 0, strikes: worked?.strikes ?? 0 }}
+            key={i}
+            position={[site.x, 0, site.z]}
+            rotation={[0, site.x * 2.3 + site.z, 0]}
+            scale={[wide ? 1.18 : 1, 1, wide ? 0.86 : 1]}
+          >
+            {/* Broken ground under the raised rim keeps the ground plate from
+                reading through the excavation as an untouched flat circle. */}
+            <mesh position={[0, 0.018, 0]} receiveShadow>
+              <cylinderGeometry args={[r * 1.08, r * 1.12, 0.035, 15]} />
+              <meshStandardMaterial color="#62452a" roughness={1} />
             </mesh>
-            {/* The spoil heaped on one side — absent on the patch, which is
-                turned over rather than dug out. */}
-            {!wide && (
-              <mesh position={[r * 0.95, 0.11, 0]} castShadow receiveShadow>
-                <sphereGeometry args={[r * 0.55, 8, 6]} />
-                <meshStandardMaterial color="#6b4d2e" roughness={1} />
-              </mesh>
-            )}
-            {/* The post already standing in its hole, or the digging stick left
-                in the earth. */}
-            {site.kind === 'postHole' ? (
-              <mesh position={[0, 0.62, 0]} castShadow receiveShadow>
-                <cylinderGeometry args={[0.075, 0.09, 1.24, 6]} />
-                <meshStandardMaterial color="#6c5330" roughness={0.95} />
-              </mesh>
-            ) : (
-              <mesh position={[r * 0.5, 0.42, r * 0.2]} rotation={[0.34, 0, 0.22]} castShadow>
-                <cylinderGeometry args={[0.035, 0.045, 0.95, 5]} />
-                <meshStandardMaterial color="#7a5c33" roughness={0.95} />
-              </mesh>
-            )}
+            {/* A real mouth, sloping inner walls, and the shadowed bottom. The
+                bottom tightens while `wallDepth` grows, so watched work reads
+                as a deepening hole from the standing camera. */}
+            <mesh position={[0, 0.058, 0]} rotation={[Math.PI / 2, 0, 0]} castShadow receiveShadow>
+              <torusGeometry args={[r * 0.78, r * 0.14, 5, 15]} />
+              <meshStandardMaterial color="#775334" roughness={1} />
+            </mesh>
+            <mesh position={[0, 0.045 - look.wallDepth * 0.12, 0]} receiveShadow>
+              <cylinderGeometry args={[r * 0.82, r * look.bottomRadius, look.wallDepth, 16, 2, true]} />
+              <meshStandardMaterial color="#49301f" roughness={1} side={THREE.DoubleSide} />
+            </mesh>
+            <mesh position={[0, 0.026, 0]} receiveShadow>
+              <cylinderGeometry args={[r * look.bottomRadius, r * look.bottomRadius * 0.92, 0.025, 16]} />
+              <meshStandardMaterial color="#211914" roughness={1} />
+            </mesh>
+
+            {/* Irregular clods break the rim silhouette; they are individually
+                small but share its earth colours, rather than forming beads. */}
+            {Array.from({ length: 9 }, (_, k) => {
+              const a = (k / 9) * Math.PI * 2
+              const d = r * (0.9 + (k % 3) * 0.06)
+              return (
+                <mesh
+                  key={k}
+                  position={[Math.cos(a) * d, 0.075 + (k % 2) * 0.018, Math.sin(a) * d]}
+                  rotation={[k * 0.31, a, k * 0.17]}
+                  scale={[0.13 + (k % 2) * 0.035, 0.075, 0.11 + (k % 3) * 0.018]}
+                  castShadow
+                  receiveShadow
+                >
+                  <dodecahedronGeometry args={[1, 0]} />
+                  <meshStandardMaterial color={k % 2 ? '#765236' : '#5d4028'} roughness={1} />
+                </mesh>
+              )
+            })}
+
+            {/* One overlapping spoil mass, grown from durable worker-seconds. */}
+            <group
+              name="dig-spoil"
+              position={[r * 1.32, look.spoilHeight, 0]}
+              scale={[look.spoilScale, look.spoilScale, look.spoilScale]}
+            >
+              {[
+                [0, 0, 0, 0.48],
+                [-0.3, -0.01, 0.18, 0.34],
+                [0.25, 0.01, 0.2, 0.36],
+                [0.08, 0.08, -0.22, 0.31],
+              ].map(([x, y, z, s], k) => (
+                <mesh key={k} position={[x, y, z]} scale={[s * 1.35, s * 0.62, s]} castShadow receiveShadow>
+                  <dodecahedronGeometry args={[1, 1]} />
+                  <meshStandardMaterial color={k % 2 ? '#6b492d' : '#795438'} roughness={1} />
+                </mesh>
+              ))}
+            </group>
+            <EarthThrow strike={worked?.strikes ?? 0} radius={r} />
           </group>
         )
       })}
@@ -2191,6 +2283,7 @@ export function PlaceScene() {
   const orientationGiven = useGame((s) => s.orientationGiven)
   const setPrompt = useUi((s) => s.setPrompt)
   const setDialog = useUi((s) => s.setDialog)
+  const [digProgress, setDigProgress] = useState<readonly DigSiteProgress[]>([])
 
   // The camera is shared across scenes: the travel view widens its near plane
   // in the debug zoom range (depth precision at continental distances), and a
@@ -2216,6 +2309,7 @@ export function PlaceScene() {
     void balanceVersion // read so the rebuild is the dependency it looks like
     return placeId ? buildLayout(placeId, seed) : null
   }, [placeId, seed, balanceVersion])
+  useEffect(() => setDigProgress([]), [placeId, seed])
   // The settlement edge on the ground (design.md §2.6, point 352/488): the band
   // is pointed at the boundary the leave check reads, sampled over the full
   // turn — it never carries a radius of its own.
@@ -2933,7 +3027,7 @@ export function PlaceScene() {
       <PlayRocks rocks={layout.playRocks} />
 
       {/* The ground work the adults teach DIG at (work-order point 483). */}
-      <DigSites sites={layout.digSites} />
+      <DigSites sites={layout.digSites} progress={digProgress} />
 
       {/* Ambient settlement life — ports and villages only; a monument has its
           own sparse crowd (above) and no bustle/hints. */}
@@ -2959,6 +3053,7 @@ export function PlaceScene() {
           pen={layout.pen}
           colliders={layout.colliders}
           radius={layout.radius}
+          onDigProgress={setDigProgress}
         />
       )}
 

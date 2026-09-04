@@ -301,7 +301,12 @@ export const DOC_BUDGETS = [
     // errand catalogue came out of the section and five words went in. A cut
     // that leaves its ceiling standing hands the next writer the 469 words it
     // just bought, which is how the file walks straight back up.
-    maxWords: 28019,
+    // RAISED by the 91 measured words of point 1051's adult-teaching rule: DIG
+    // changed from commentary over one man's stroke to a two-person summons
+    // said beside the listener and again at the excavation, with both hush
+    // points, no solo fallback, tools and lasting ground work. Those are new
+    // user decisions of 03.09.2026, not a longer account of the former rule.
+    maxWords: 28110,
     // A hundred words across 28k: design.md is edited section by section and a genuine
     // new decision runs 40–215 measured words, so the slack absorbs the rewording that
     // accompanies one and refuses the disappearance of a whole section without a

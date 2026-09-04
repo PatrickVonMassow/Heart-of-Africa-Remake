@@ -110,6 +110,18 @@ same lexicon, heard through the same range rule as any other village speech. The
 phase lengths, the stage's distances and the extra berth the children give the
 traveller are calibratable under `balance.villageLife.bankGame`.
 
+## The adults' work
+
+The adults teach RIVER through an empty-jar departure and a full-jar return at
+the village end of the water path. DIG is said twice in each of two paired
+bouts at different excavations: an initiator first walks to a free adult and
+says it as an invitation, then both walk to the site, where the initiator says
+it again before they dig together with tools in hand. A bout with no second
+adult free is retried later, never performed alone. Both DIG utterances wait
+while a child is in earshot, preserving the separation between the two teaching
+groups. Each stroke changes the site by deepening the pit, growing the spoil
+and throwing earth.
+
 ## The message
 
 `RIVER · UPSTREAM · ROCK · DIG`
