@@ -70,6 +70,7 @@ Das Musterbeispiel sind die Chat-Zeitstempel: neun Eskalationsstufen, acht weich
 | 26.08. nachts | Zweimal grün über einer Attrappe, die das echte Board nur nachgebaut statt gelesen hat: Das Kritikalitäts-Stylesheet landete im Kommentar der Refresh-Routine, und die auf Zuruf nachgereichte Regressionsprüfung ließ genau die eine `<meta>`-Zeile weg, die den gemeinten Anker im echten Board verfehlen lässt — Runde zwei verschob und löschte dabei die BOM der Datei (§3.184, Punkt 844) |
 | 26.08. früh | Dritter Rückfall derselben Dublette, diesmal von mir: Ich legte einen frisch gemessenen Befund als Punkt 928 ab, obwohl Punkt 856 seit dem 23.08. genau ihn beschreibt — gefunden wieder erst von der Bündelpflicht, nicht beim Anlegen. Neu war nur die zweite Messung; sie ist jetzt in 856 nachgetragen (§3.168-Nachtrag, 928 in 856 gefaltet) |
 | 24.08. mittags | Der delegierte Autor schrieb drei Commits um, die er bereits veroeffentlicht hatte: Sein Abschluss-Push scheiterte als non-fast-forward, und sein eigener Bericht meldete die fertige Arbeit als „nur lokal“ — obwohl die Baeume beider Seiten byte-identisch waren und sich nur eine Leerzeile im Commit-Text unterschied. Wer dem Bericht glaubt, sucht verlorene Arbeit, die nie verloren war; wer ihn ignoriert, uebersieht den echten Fall. Dieselbe Stunde zeigte die Kehrseite von der Gegenseite: Ein Tor-Lauf im Arbeitsbaum wurde rot, weil die pruefende Sitzung selbst waehrenddessen auf main committete — kein Test schlug fehl, nur der Teardown benannte die Ref-Bewegung |
+| 04.09. | Zwei Sitzungen starben mitten im Testlauf, und der einzige Beleg war ein Allzeit-Höchststand ohne Uhrzeit: 15,7 von 15,9 GB — daraus wurde fast die Maßnahme, den Testlauf zu beschneiden. Die Messung eines echten Laufs entlastete ihn vollständig (1,4 GB Spitze, nie unter 10,9 GB frei, Auslagerung unverändert), und die Sitzung starb bei zwei Dritteln freiem Speicher erneut (§3.235) |
 | 03.09. | Ein Wächter ordnete an, was ein zweiter bestraft: Die Wartemeldung für einen 81-Minuten-Lauf wurde wegen freier Agentenplätze abgelehnt, der daraufhin beauftragte Autor tötete mit seinem ersten Commit genau diesen Lauf — Gehorsam gegenüber der einen Auflage ist der Bruch der anderen (§3.231, Punkt 955) |
 | 29.08. | Kein Regressionslauf des Tages hatte ein gültiges Zeit-Urteil: Der Ruhe-Wächter las den Auftragstext der eigenen Batch-Sitzung als zweiten Prüflauf, weil dieser die Prüfbefehle zitiert, erklärte die Maschine für belastet und strich die Zeit-Urteile — protokolliert in einer Zeile, die wie Hausmeisterei klingt; am selben Abend tötete der Integritäts-Wächter eine 85-minütige Zwei-Backend-Regression, weil dieselbe Sitzung nebenher auf main committete (§3.214, Punkt 955) |
 | 26.08. vormittags | Neun Gegenlesungsdurchgänge über die abgeleitete Board-Sektion fanden am Ende EINE Fehlerklasse — zweimal: Ein Beleg ohne zuordenbaren Punkt und ein Fokus-Eintrag, der etwas nennt, das keine Punktnummer ist, kamen beide als »kein Fokus« heraus, also Byte für Byte als die Antwort einer FEHLENDEN Quelle. Aus beschädigten Daten wurde so eine geprüfte Null (§3.185, Punkt 713) |
@@ -1430,7 +1431,7 @@ keinen Träger hat. Gebucht als Punkt 956.
 
 ## Anhang A — Maschinell gepflegte Quellen-Übersicht
 
-Zuletzt aktualisiert: Freitag, 04.09.2026, 14:06 · Quellen-Fingerprint: `c1ed5ddf97f0…`
+Zuletzt aktualisiert: Freitag, 04.09.2026, 17:19 · Quellen-Fingerprint: `7ca11fee29f1…`
 
 Spalten heuristisch aus den Quellen abgeleitet (Anläufe = distinkte Datumsnennungen im Memory;
 Maßnahme = Guard-Skripte mit Namens-Treffer). Die inhaltliche Bewertung gehört der Prosa oben.
@@ -1523,7 +1524,7 @@ Maßnahme = Guard-Skripte mit Namens-Treffer). Die inhaltliche Bewertung gehört
 | Headless probes must screenshot the DEFAULT zoom too (zoom-gated dressing like haze only shows there); headless WebGPU is impossible, so WebGPU-only branches stay user-checked | 2 | mittel | render-verify-guard.mjs | ✔ Mechanismus |
 | Every GUI/rendering fix must be verified on BOTH WebGPU and WebGL2 before it counts as done — never mark a render fix done on one path | 2 | mittel | render-verify-guard.mjs | ✔ Mechanismus |
 | A resumed batch session must check the previous owner's PROCESS before working — the launcher's \"provably dead\" verdict was wrong and double-spawned | 2 | mittel | render-verify-guard.mjs | ✔ Mechanismus |
-| Rotating verify AND unit failures under a running agent pool are LOAD, not bugs — 8 of 12 unit runs red from load alone; judge a red only on a quiet machine | 5 | hoch | render-verify-guard.mjs | ✔ Mechanismus |
+| Rotating verify AND unit failures under a running agent pool are LOAD, not bugs — 8 of 12 unit runs red from load alone; judge a red only on a quiet machine | 6 | hoch | render-verify-guard.mjs | ✔ Mechanismus |
 | The named \"version release\" process and its trigger — queue/run a version release for a version the user names (full closing → user approval → tag → mirror poc → publish /TAG/ and /poc/) | 1 | niedrig | lock-release-hook.mjs | ✔ Mechanismus |
 | Standing licence to move, REMOVE or ADD villages when it helps — but every change must be checked against the other requirements first, and the check has already caught a real bug | 1 | niedrig | — (Regel/Memory) | ◐ Regel |
 | A VS Code restart restarts the devcontainer — every process inside dies, PPID 1 proves nothing | 2 | mittel | container-ask-guard.mjs | ✔ Mechanismus |
@@ -1534,8 +1535,8 @@ Maßnahme = Guard-Skripte mit Namens-Treffer). Die inhaltliche Bewertung gehört
 
 Erfasste Quellen: 94 Feedback-/Projekt-Memories · 58 Guard-/Hook-Skripte · 6 Revert-/Reapply-Commits · 124 Prozess-/Meta-TASKS-Punkte (davon 58 offen).
 
-<!-- RETRO-FINGERPRINT: c1ed5ddf97f0cb0cf18f49a2b55e555a2808719dd650bb9742776595f3c89492 -->
-<!-- RETRO-LAST-REFRESHED: 2026-09-04T12:06:41.885Z -->
+<!-- RETRO-FINGERPRINT: 7ca11fee29f159340e79307e980a5757debacf94df4d785419bdcc3bf24ec91b -->
+<!-- RETRO-LAST-REFRESHED: 2026-09-04T15:19:11.454Z -->
 <!-- AUTO-GENERATED:END -->
 
 ### 3.111 Ein Erfolg ist kein Beweis für den Weg, auf dem er zustande kam
@@ -5507,3 +5508,35 @@ Deshalb gehört jeder Hook-Pfad an `$CLAUDE_PROJECT_DIR` verankert, und deshalb
 prüft die Gesundheitsprüfung die **Verdrahtung**, nicht nur die Existenz des
 Skripts: Gefunden hat diesen Befund kein Mensch und kein Test, sondern der
 Wächter über den Wächtern.
+
+### 3.235 Ein Höchststand ohne Uhrzeit ist kein Messwert — und der Verdacht traf den Falschen
+
+Am 04.09.2026 starben zwei Sitzungen mitten im Unit-Lauf (Tests mit SIGKILL, die
+Sitzung mit SIGTERM). Der einzige Beleg, der zur Hand war, hieß `memory.peak`:
+15,7 von 15,9 GB. Daraus wurde die Erklärung „Vitest frisst den Speicher" und
+daraus fast die Maßnahme „`maxWorkers` senken". `memory.peak` ist aber ein
+**Allzeit-Höchststand der cgroup ohne Zeitstempel** und schreibgeschützt — er
+sagt, dass irgendwann einmal so viel belegt war, und kein Wort darüber, wann und
+durch wen.
+
+Die Messung eines ECHTEN Laufs (Sekundenproben über alle Prozesse) entlastete
+Vitest vollständig: 1,39 GB für fünf Worker, 3,38 GB für die ganze Maschine, nie
+weniger als 10,87 GB frei, die Auslagerung über den kompletten Lauf unverändert,
+und der Allzeit-Höchststand bewegte sich um kein Byte. Die Sitzung starb während
+dieser Messung erneut — bei zwei Dritteln freiem Speicher, mit `oom_kill 0` in
+`memory.events`. Die naheliegende Kur hätte also einen gesunden Mechanismus
+beschnitten und die echte Ursache verdeckt, die im Journal steht: ein sauberes
+`owner-release` der Sitzung, die ihren ganzen Kindbaum mitnimmt.
+
+Das ist nicht die Klasse „unter Last gemessen" aus der ruhigen Maschine, sondern
+ihre Umkehrung: Dort ist der Messwert echt und der Zeitpunkt falsch gewählt,
+hier ist der Zeitpunkt gar nicht enthalten. Ein akkumulierender Maximalwert
+beantwortet eine Frage nach dem Jetzt grundsätzlich nicht, egal wie dramatisch
+die Zahl aussieht.
+
+**Lehre:** Ein Messwert ohne Uhrzeit taugt nur zum Ausschließen, nie zum
+Beschuldigen. Bevor eine Zahl eine Maßnahme trägt, muss sie ein Fenster haben —
+sonst wird nach dem stärksten Verdächtigen gehandelt statt nach dem gemessenen.
+Und ein langer Lauf gehört abgekoppelt (`setsid`, eigene Prozessgruppe, Log in
+eine Datei): Hängt er am Leben der Sitzung, nimmt jeder Sitzungstod die Arbeit
+UND ihren Beweis mit.
