@@ -2080,14 +2080,12 @@ const ERRAND_ARRIVE_RADIUS = WORK_ARRIVE_RADIUS
 const WAYPOINT_RADIUS = 1.2
 
 /**
- * The adults at their errands, and the concepts they teach at them: RIVER,
- * UPSTREAM, DOWNSTREAM, ROCK and DIG. The catalogue is EMPTY until the water
- * and digging teaching is rebuilt, so nothing is staged here for now. It and
- * the scheduler are the pure `adultErrands` module; here it is given the
+ * The adults at their errands teach RIVER and DIG. The scheduler is the pure
+ * `adultWork` module; here it is given the
  * live village, and what comes back is spoken (through the §13.4 hearing curve),
  * shown over the speaker's head, gestured with the point-479 arms and CARRIED
- * OUT — the villager walks to the bank, up or down the stretch, over to the
- * stone or onto a patch of ground and digs it.
+ * OUT — the water carrier walks the path, while a would-be digger collects a
+ * partner and the two walk to and work one excavation.
  *
  * These are villagers who stay OUT (unlike `Walkers`, who spend most of their
  * cycle inside a hut): an errand nobody is there to be given teaches nothing.
@@ -2596,15 +2594,15 @@ function ErrandVillagers({
 /**
  * Speaks one word of the adults' work (work-order 688): the single atom through
  * the §13.4 hearing curve, the reading over the speaker's head, and the gesture
- * on his own arms, aimed at what he is doing — the water he is going to or
- * coming from, or the ground under his hoe.
+ * on his own arms, aimed at the water, the invited adult, or the excavation.
  *
  * The DISTANCE decides all three, exactly as it does for the children (point
  * 580): what the player could not hear teaches him nothing however plainly he
  * saw the work, so beyond the hearing radius the villager's arms stay down.
  *
- * The gesture is `indicate`, never `beckon`: an adult who waved somebody over
- * while saying DIG would teach "come" at least as well (the spec's own rule).
+ * The first DIG beckons to its listener; the second indicates the excavation.
+ * Their repeated word and unchanged pair distinguish the invitation from a
+ * generic "come" reading.
  */
 function speakWork(
   said: SpokenWord,
@@ -2625,7 +2623,7 @@ function speakWork(
       speakOverhead(`villager-${said.speaker}`, [utterance], anchor, { seconds: speechLabelSeconds(1) })
     }
   }
-  gesture.current = gestureIfHeard(distance, 'indicate', {
+  gesture.current = gestureIfHeard(distance, said.purpose === 'invitation' ? 'beckon' : 'indicate', {
     ...aimAt({ x: speaker.x, z: speaker.z, yaw }, said.aim, FIGURE_LIMBS.shoulderY),
     phase: said.speaker * 1.1, // no two villagers beat in lockstep
   })

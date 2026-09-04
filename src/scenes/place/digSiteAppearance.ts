@@ -10,9 +10,9 @@ export interface DigSiteAppearance {
 
 /**
  * Turns the scheduler's durable work record into restrained scene dimensions.
- * Eighteen worker-seconds is roughly five watched seconds with a pair plus the
- * opening strokes: enough movement to notice, without making later rounds grow
- * an implausible crater without limit.
+ * Eighteen worker-seconds is one complete nine-second bout by a pair. Five
+ * watched seconds already move it past halfway, without making later rounds
+ * grow an implausible crater without limit.
  */
 export function digSiteAppearance(progress?: DigSiteProgress): DigSiteAppearance {
   const dug = Number.isFinite(progress?.dug) ? Math.max(0, progress?.dug ?? 0) : 0
