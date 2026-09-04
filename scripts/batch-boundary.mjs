@@ -545,11 +545,15 @@ export function requestImmediateSuccessor({ generation, cause = 'boundary', run 
 export function handoverAndRequest({
   sid,
   point = null,
+  // The committed marker this handover belongs to. Passing it is what makes the
+  // lock carry the immutable seal of union entry U19; a Stop-side handover
+  // without one keeps the ordinary withdrawable semantics.
+  marker = null,
   mark = markHandover,
   readLock = readOwnerLock,
   request = requestImmediateSuccessor,
 } = {}) {
-  const handed = mark(sid, { point })
+  const handed = mark(sid, { point, marker })
   if (!handed?.handed) return handed
   const lock = readLock()
   const generation = lock?.sessionId === sid && Number.isSafeInteger(lock?.fence) ? lock.fence : null
@@ -829,10 +833,26 @@ if (isMain) {
       // before anything is recorded.
       let transferred = null
       let handoverResult = null
+      // Named rather than inline: the handover writes the lock's seal from the
+      // very marker the commit records (union entry U19), so the two can never
+      // describe different boundaries.
+      const contextMarker = {
+        v: 2,
+        phase: BOUNDARY_PHASES.COMMITTED,
+        cause: BOUNDARY_CAUSES.CONTEXT,
+        sessionId: sid,
+        point: null,
+        tokens: wm.tokens,
+        // The mark the reading was judged against — assessBoundary
+        // re-judges the claim (tokens >= watermark), so a marker cannot
+        // smuggle a sub-threshold reading past the guard.
+        watermark: wm.watermark,
+        at: Date.now(),
+      }
       try {
         transferred = commitSealedBoundary({
           transfer,
-          handover: () => (handoverResult = handoverAndRequest({ sid, point: null })),
+          handover: () => (handoverResult = handoverAndRequest({ sid, point: null, marker: contextMarker })),
           complete: (committedMarker) => {
             recordHandoverBudgetCompletion({
               sessionId: sid,
@@ -849,19 +869,7 @@ if (isMain) {
               destination: handover.destination,
             })
           },
-          marker: {
-            v: 2,
-            phase: BOUNDARY_PHASES.COMMITTED,
-            cause: BOUNDARY_CAUSES.CONTEXT,
-            sessionId: sid,
-            point: null,
-            tokens: wm.tokens,
-            // The mark the reading was judged against — assessBoundary
-            // re-judges the claim (tokens >= watermark), so a marker cannot
-            // smuggle a sub-threshold reading past the guard.
-            watermark: wm.watermark,
-            at: Date.now(),
-          },
+          marker: contextMarker,
         })
       } catch (e) {
         fail(
@@ -1053,10 +1061,23 @@ if (isMain) {
     // `commitSealedBoundary` pins the order.
     let transferred = null
     let handoverResult = null
+    const pointMarker = {
+      v: 2,
+      phase: BOUNDARY_PHASES.COMMITTED,
+      cause: BOUNDARY_CAUSES.POINT,
+      sessionId: sid,
+      point,
+      // The context this boundary was taken at (point 700) — informational
+      // for a POINT cause (assessBoundary judges only a CONTEXT claim by
+      // it), recorded so the reading outlives the session.
+      tokens: contextTokens,
+      watermark: wmPoint.watermark,
+      at: Date.now(),
+    }
     try {
       transferred = commitSealedBoundary({
         transfer,
-        handover: () => (handoverResult = handoverAndRequest({ sid, point })),
+        handover: () => (handoverResult = handoverAndRequest({ sid, point, marker: pointMarker })),
         complete: (committedMarker) => {
           recordHandoverBudgetCompletion({
             sessionId: sid,
@@ -1073,19 +1094,7 @@ if (isMain) {
             destination: handover.destination,
           })
         },
-        marker: {
-          v: 2,
-          phase: BOUNDARY_PHASES.COMMITTED,
-          cause: BOUNDARY_CAUSES.POINT,
-          sessionId: sid,
-          point,
-          // The context this boundary was taken at (point 700) — informational
-          // for a POINT cause (assessBoundary judges only a CONTEXT claim by
-          // it), recorded so the reading outlives the session.
-          tokens: contextTokens,
-          watermark: wmPoint.watermark,
-          at: Date.now(),
-        },
+        marker: pointMarker,
       })
     } catch (e) {
       fail(
