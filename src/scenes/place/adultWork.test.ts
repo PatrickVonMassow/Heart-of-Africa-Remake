@@ -44,6 +44,7 @@ function view(
   at?: Array<{ x: number; z: number }>,
   standable: (x: number, z: number) => boolean = () => true,
   childrenHear: (x: number, z: number) => boolean = () => false,
+  invitationClear: (x: number, z: number) => boolean = () => true,
 ): AdultWorkView {
   return {
     villagers: Array.from({ length: n }, (_, i) => ({
@@ -61,6 +62,7 @@ function view(
       ],
     },
     standable,
+    invitationClear,
     childrenHear,
   }
 }
@@ -292,6 +294,24 @@ describe('DIG is a summons said twice', () => {
     expect(state.staged['dig-first'] ?? 0).toBe(0)
     expect(state.staged['dig-second'] ?? 0).toBe(0)
     expect(state.tasks.every((task) => task === null)).toBe(true)
+  })
+
+  it('invites only a free adult standing clear of the children`s ground', () => {
+    const positions = [{ x: 0, z: 0 }, { x: 2, z: 0 }, { x: 14, z: 0 }, { x: 3, z: 0 }]
+    const v = riverless(view(4, positions, undefined, undefined, (x) => x > 10))
+    const state = stageDig(v)
+    const initiator = initiatorOf(state)
+
+    expect(taskOf(state, initiator)?.partner).toBe(2)
+    expect(v.invitationClear(v.villagers[2].x, v.villagers[2].z)).toBe(true)
+  })
+
+  it('skips a dig bout when no free partner stands clear of the children`s ground', () => {
+    const v = riverless(view(4, undefined, undefined, undefined, () => false))
+    const state = stageDig(v)
+
+    expect(state.tasks.every((task) => task === null)).toBe(true)
+    expect(state.staged['dig-first'] ?? 0).toBe(0)
   })
 
   it('holds both utterances while a child can hear and resumes each afterwards', () => {

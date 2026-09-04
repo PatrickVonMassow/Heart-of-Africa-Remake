@@ -2100,6 +2100,8 @@ function ErrandVillagers({
   radius,
   bank,
   geography,
+  playGround,
+  playRocks,
   count,
   childBodies,
   onDigProgress,
@@ -2112,6 +2114,8 @@ function ErrandVillagers({
    *  these villagers keep to, since the errands send them out onto it. */
   bank: PlaceRiverBank | null
   geography: AdultWorkGeography
+  playGround: PlayGround | null
+  playRocks: { upstream: ErrandPoint; downstream: ErrandPoint } | null
   count: number
   /** The children's live bodies (work-order 688) — see `AdultWorkView.childrenHear`. */
   childBodies: RefObject<readonly InhabitantBody[]>
@@ -2248,9 +2252,26 @@ function ErrandVillagers({
     },
     [childBodies],
   )
+
+  // An invitation is spoken wherever the partner happened to be standing when
+  // cast. Keep that anchor far enough from every fixed children's place that
+  // even the initiator's arrival tolerance cannot put the word in its earshot.
+  const invitationClear = useCallback(
+    (x: number, z: number) => {
+      const margin = balance.communication.hearingRadius + WORK_ARRIVE_RADIUS
+      if (playGround && Math.hypot(x - playGround.x, z - playGround.z) - playGround.radius <= margin) return false
+      if (geography.waterFoot && Math.hypot(x - geography.waterFoot.x, z - geography.waterFoot.z) <= margin) return false
+      if (playRocks) {
+        if (Math.hypot(x - playRocks.upstream.x, z - playRocks.upstream.z) <= margin) return false
+        if (Math.hypot(x - playRocks.downstream.x, z - playRocks.downstream.z) <= margin) return false
+      }
+      return true
+    },
+    [geography, playGround, playRocks],
+  )
   const view = useMemo<AdultWorkView>(
-    () => ({ villagers: people, geography, standable, childrenHear }),
-    [people, geography, standable, childrenHear],
+    () => ({ villagers: people, geography, standable, invitationClear, childrenHear }),
+    [people, geography, standable, invitationClear, childrenHear],
   )
 
   // The body each villager presents to every other inhabitant (point 578): two
@@ -2963,6 +2984,8 @@ export function PlaceLife({
             radius={radius}
             bank={bank}
             geography={workGeography}
+            playGround={playGround}
+            playRocks={playRocks}
             onDigProgress={onDigProgress}
             count={Math.max(1, Math.round(balance.villageLife.adultErrands.villagerCount * presence))}
           />

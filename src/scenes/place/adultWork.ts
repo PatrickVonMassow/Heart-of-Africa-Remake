@@ -9,11 +9,12 @@
 // situations uses a different site, so neither the person nor one particular
 // hole can become the word's accidental meaning.
 //
-// Both utterances yield while a child can hear. A bout that cannot cast two
-// free adults is not staged at all and returns on a later catalogue pass. The
-// module also records every worker-second and every completed stroke at the
-// site, giving the scene one durable source for the deepening pit, growing
-// spoil and thrown earth.
+// Both utterances yield while a child can hear, and an invitation is staged
+// only beside a partner who stands clear of the children's fixed grounds. A
+// bout that cannot cast two such adults is not staged at all and returns on a
+// later catalogue pass. The module also records every worker-second and every
+// completed stroke at the site, giving the scene one durable source for the
+// deepening pit, growing spoil and thrown earth.
 //
 // The module is pure: no three, no scene. `PlaceLife` gives it the live village
 // and carries out what comes back.
@@ -55,6 +56,9 @@ export interface AdultWorkView {
   villagers: readonly AdultWorker[]
   geography: AdultWorkGeography
   standable: (x: number, z: number) => boolean
+  /** Can an adult word safely fall beside this anchor without entering any of
+   * the children's fixed teaching grounds? The caller includes arrival slack. */
+  invitationClear: (x: number, z: number) => boolean
   childrenHear: (x: number, z: number) => boolean
 }
 
@@ -209,7 +213,10 @@ function anyFree(view: AdultWorkView, avoid: number): number {
 }
 
 function anotherFree(view: AdultWorkView, first: number): number {
-  for (let i = 0; i < view.villagers.length; i++) if (i !== first && view.villagers[i].free) return i
+  for (let i = 0; i < view.villagers.length; i++) {
+    const v = view.villagers[i]
+    if (i !== first && v.free && view.invitationClear(v.x, v.z)) return i
+  }
   return -1
 }
 
