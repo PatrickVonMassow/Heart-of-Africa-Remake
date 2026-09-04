@@ -281,6 +281,33 @@ describe('DIG is a summons said twice', () => {
     expect(isDigging(state, initiator)).toBe(true)
     expect(isDigging(state, partner)).toBe(true)
   })
+
+  it('holds the site word when a bystander enters the hole after staging', () => {
+    const v = riverless(view(5))
+    const state = stageDig(v)
+    const initiator = initiatorOf(state)
+    const partner = taskOf(state, initiator)!.partner!
+    putAtGoal(state, v, initiator)
+    expect(stepAdultWork(state, v, 1 / 60, CFG, () => 0.5)?.purpose).toBe('invitation')
+
+    const site = v.geography.digSites[taskOf(state, initiator)!.siteIndex!]
+    const bystander = v.villagers.findIndex((_, i) => i !== initiator && i !== partner)
+    v.villagers[bystander].x = site.x
+    v.villagers[bystander].z = site.z
+    putAtGoal(state, v, initiator)
+    putAtGoal(state, v, partner)
+    stepAdultWork(state, v, 1 / 60, CFG, () => 0.5)
+
+    expect(stepAdultWork(state, v, 1 / 60, CFG, () => 0.5)).toBeNull()
+    expect(taskOf(state, initiator)).toMatchObject({ phase: 'site', owes: true, hushed: true })
+    expect(isDigging(state, initiator)).toBe(false)
+
+    v.villagers[bystander].x = 40
+    v.villagers[bystander].z = 40
+    expect(stepAdultWork(state, v, 1 / 60, CFG, () => 0.5)?.purpose).toBe('site')
+    expect(isDigging(state, initiator)).toBe(true)
+    expect(isDigging(state, partner)).toBe(true)
+  })
 })
 
 describe('digging records work at the site', () => {

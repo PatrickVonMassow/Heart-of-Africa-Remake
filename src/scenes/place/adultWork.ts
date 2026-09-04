@@ -222,9 +222,9 @@ function castable(id: AdultSituationId, view: AdultWorkView): boolean {
 
 /** The partner and every bystander must be clear of the future hole. The
  * initiator may already be there: he still has to go away to make the invite. */
-function siteClear(view: AdultWorkView, site: ErrandPoint, initiator: number): boolean {
+function siteClear(view: AdultWorkView, site: ErrandPoint, initiator: number, partner = -1): boolean {
   for (let i = 0; i < view.villagers.length; i++) {
-    if (i === initiator) continue
+    if (i === initiator || i === partner) continue
     const v = view.villagers[i]
     if (Math.hypot(v.x - site.x, v.z - site.z) <= AIM_CLEARANCE) return false
   }
@@ -342,7 +342,8 @@ export function stepAdultWork(
       if (view.childrenHear(me.x, me.z)) t.hushed = true
       else if (t.siteIndex !== null) {
         const site = view.geography.digSites[t.siteIndex]
-        if (site) {
+        if (site && !siteClear(view, site, i, t.partner ?? -1)) t.hushed = true
+        else if (site) {
           t.owes = false
           spoken = {
             id: t.situation, concept: 'DIG', speaker: i, purpose: 'site',
