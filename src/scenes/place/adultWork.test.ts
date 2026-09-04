@@ -2,7 +2,7 @@
 // is an invitation beside a person, a shared walk, a second utterance beside a
 // site, and only then a two-person bout whose strokes alter that site.
 
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 import {
   ADULT_CONCEPTS,
   ADULT_SITUATIONS,
@@ -24,6 +24,7 @@ import {
 } from './adultWork'
 import { CONCEPT_IDS } from '../../communication/lexicon'
 import { DIG_CYCLE_SECONDS } from '../../render/gesture'
+import { resetDevAsserts } from '../../systems/devAssert'
 
 const CFG: AdultWorkConfig = {
   intervalSeconds: 1,
@@ -347,7 +348,9 @@ describe('task lifecycle safeguards', () => {
     expect(state.staged['dig-first'] ?? 0).toBe(0)
   })
 
-  it('releases an unreachable pair at the errand backstop', () => {
+  it('reports and releases an unreachable pair that still owes its word at the errand backstop', () => {
+    resetDevAsserts()
+    const errors = vi.spyOn(console, 'error').mockImplementation(() => {})
     const v = riverless(view(3))
     const state = stageDig(v)
     for (let elapsed = 0; elapsed < CFG.errandSeconds + 1; elapsed += 1 / 30) {
@@ -355,6 +358,27 @@ describe('task lifecycle safeguards', () => {
       stepAdultWork(state, v, 1 / 30, CFG, () => 0.5)
     }
     expect(state.tasks.every((task) => task === null)).toBe(true)
+    expect(errors.mock.calls.map((call) => String(call[0])).join(' ')).toContain('[ASSERT] adult-atom-lost')
+    errors.mockRestore()
+    resetDevAsserts()
+  })
+
+  it('does not report an owed word that expires only because a child held it', () => {
+    resetDevAsserts()
+    const errors = vi.spyOn(console, 'error').mockImplementation(() => {})
+    const v = riverless(view(3, undefined, undefined, () => true))
+    const state = stageDig(v)
+    const initiator = initiatorOf(state)
+    putAtGoal(state, v, initiator)
+    stepAdultWork(state, v, 1 / 60, CFG, () => 0.5)
+    expect(taskOf(state, initiator)).toMatchObject({ owes: true, hushed: true })
+
+    state.next = Number.POSITIVE_INFINITY
+    stepAdultWork(state, v, CFG.errandSeconds, CFG, () => 0.5)
+    expect(state.tasks.every((task) => task === null)).toBe(true)
+    expect(errors).not.toHaveBeenCalled()
+    errors.mockRestore()
+    resetDevAsserts()
   })
 
   it('is inert in a settlement with neither water nor work', () => {

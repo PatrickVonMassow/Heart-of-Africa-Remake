@@ -20,6 +20,7 @@
 
 import type { ConceptId } from '../../communication/lexicon'
 import { DIG_CYCLE_SECONDS } from '../../render/gesture'
+import { devAssert } from '../../systems/devAssert'
 
 export type AdultSituationId = 'water-out' | 'water-back' | 'dig-first' | 'dig-second'
 
@@ -169,6 +170,14 @@ function clearPair(state: AdultWorkState, index: number): void {
   if (task?.partner !== null && task?.partner !== undefined) state.tasks[task.partner] = null
 }
 
+function assertNoOwedWord(task: AdultTask, index: number): void {
+  devAssert(
+    !task.owes || task.hushed === true,
+    'adult-atom-lost',
+    () => `${task.situation}: villager ${index} ran out of time with his ${task.phase} word unspoken`,
+  )
+}
+
 export function clearTask(state: AdultWorkState, index: number): void {
   if (index >= 0 && index < state.tasks.length) clearPair(state, index)
 }
@@ -247,6 +256,7 @@ function startJointWalk(state: AdultWorkState, initiator: AdultTask, geography: 
   initiator.z = site.z
   initiator.arrived = false
   initiator.owes = true
+  delete initiator.hushed
   partner.phase = 'site'
   partner.arrived = false
 }
@@ -290,7 +300,18 @@ export function stepAdultWork(
     if (!t) continue
     t.age += dt
     const me = view.villagers[i]
-    if (!me || t.age > cfg.errandSeconds) { clearPair(state, i); continue }
+    if (!me || t.age > cfg.errandSeconds) {
+      // Expiry releases the whole pair, but it may not silently spend either
+      // member's word. A word deliberately held for a child is the one valid
+      // exception; beginning the site phase clears an earlier invitation hush.
+      assertNoOwedWord(t, i)
+      if (t.partner !== null) {
+        const partner = state.tasks[t.partner]
+        if (partner) assertNoOwedWord(partner, t.partner)
+      }
+      clearPair(state, i)
+      continue
+    }
 
     const goal = goalOf(t)
     if (!t.arrived && Math.hypot(me.x - goal.x, me.z - goal.z) <= WORK_ARRIVE_RADIUS) {
