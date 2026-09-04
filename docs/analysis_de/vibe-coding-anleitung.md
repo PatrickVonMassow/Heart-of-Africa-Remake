@@ -162,15 +162,9 @@ Die Ursache findest du durch **Zerlegen**, nicht durch Wiederholen.
   geprüft wurde. Zu jeder Prüfung: **Welche Zeile ruft die Sache auf — und was bliebe grün, wenn
   sie kaputt wäre?** Zeit darf ein Test abkürzen, den **Aufruf** nie. Ist die **Ausgabe** das
   Produkt — Urteil, Plan, Anleitung —, lies sie am **echten Bestand**, nie nur an selbstgebauten
-  Eingaben.“ *(Sieht das richtig aus?)*
-- **Der Grund steht nur im Code.** Die Handlung ist begründet, kommentiert, getestet und grün —
-  im Bild ist davon nichts zu sehen, und der Nutzer liest Selbstzweck. Der Aufwand ging
-  vollständig in die Rechtfertigung und gar nicht in ihre Sichtbarkeit.
-  → *Prompt:* „Prüf jede sichtbare Handlung mit einer Frage, die ein **Mensch** beantworten muss:
-  **Wozu tut die Figur das — und sieht man das dem Bild an, ohne den Code zu kennen?** Eine
-  Unterscheidung, die nur im Datenmodell existiert, existiert für den Nutzer nicht. Tritt dieselbe
-  Klasse ein zweites Mal in derselben Szene auf, ist die **Wiederholung** der Befund, nicht der
-  Einzelfall.“
+  Eingaben. Und das Bild beantwortet nicht nur ‚stimmt es?‘, sondern **wozu tut die Figur das —
+  sieht man es ihr an?** Was nur im Datenmodell steht, existiert für den Nutzer nicht.“
+  *(Sieht das richtig aus?)*
 - **Dem Test geht der Gegenstand unter den Füßen weg.** Er hält seinen Prüfling an einer
   Koordinate, einem Vorgabewert oder einer nachgebauten Simulation fest. Zieht der Prüfling um,
   fragt der Test weiter — richtig, nur über nichts mehr. Ein Rot meldet sich; ein leer
@@ -186,14 +180,12 @@ Die Ursache findest du durch **Zerlegen**, nicht durch Wiederholen.
   beschreibt** — prüf am **stillgelegten** Gegenstand: Bewegt **erst der Blick** den Wert, misst
   sie sich selbst. Warte über **Handle oder PID**, nie über eine Textsuche.“
 
-- **Die Sonde kann ihr Nein nicht erreichen.** Die Prüfung könnte „tot“ sagen — aber nur, wenn
-  man ihr den Beweis übergibt, und genau diese eine Aufrufstelle übergibt ihn nicht. Ihr „lebt
-  noch“ ist dann kein Ergebnis, sondern der einzig mögliche Satz. Beliebter Sonderfall: Der Fix
-  wurde eingebaut — an der Stelle, an der der Fehler auffiel, und nicht an der zweiten.
-  → *Prompt:* „Nimm jede Prüfung und frag: **Mit den Eingaben, die dieser Aufrufer ihr wirklich
-  gibt — kann sie überhaupt das negative Urteil erreichen?** Wo nein, ist ihr Grün eine
-  Tautologie. Und wenn du einen Fix an einer gemeinsamen Funktion machst: **zähl ihre
-  Aufrufstellen** und prüf sie einzeln, statt nur die zu reparieren, die dich gebissen hat.“
+- **Die Sonde kann ihr Nein nicht erreichen.** Die Prüfung könnte „tot“ sagen — aber nur, wenn man
+  ihr den Beweis übergibt, und genau dieser Aufrufer übergibt ihn nicht. Ihr „lebt noch“ ist dann
+  der einzig mögliche Satz.
+  → *Prompt:* „Frag zu jeder Prüfung: **Kann sie mit den Eingaben dieses Aufrufers das negative
+  Urteil überhaupt erreichen?** Wo nein, ist ihr Grün eine Tautologie. Und einen Fix an einer
+  gemeinsamen Funktion prüfst du an **allen** Aufrufstellen, nicht nur an der, die dich biss.“
 
 
 - **Neue Features zerbrechen alte.** Eine Änderung repariert X und bricht das unbeobachtete Y.

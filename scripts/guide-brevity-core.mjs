@@ -528,7 +528,11 @@ export const LIMITS = {
   // 03.09.2026 (second): the two-checks-that-contradict tip justified beside
   // maxLines measures 122 words, so this ceiling moves 4903 -> 5025 by the same
   // measurement.
-  maxWords: 5025,
+  // 04.09.2026: the invisible-purpose lesson folded into the rendered-picture
+  // pitfall and the probe-reachability entry was cut to pay for it, so the
+  // measured guide came DOWN seven words and the ceiling follows it:
+  // 5025 -> 5018, no unearned headroom.
+  maxWords: 5018,
   // A pitfall entry = the risk lines plus its prompt. Anything longer is a
   // story, not a tip.
   maxEntryLines: 11,
