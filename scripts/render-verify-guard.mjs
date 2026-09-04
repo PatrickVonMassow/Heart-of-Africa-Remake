@@ -67,6 +67,8 @@ import {
 } from './render-verify-core.mjs'
 import { readTasksAll } from './tasks-source.mjs'
 import { heldByOtherLiveOwner } from './batch-singleton.mjs'
+import { boundaryIsSealed } from './batch-boundary-core.mjs'
+import { readJson as readBoundaryMarker } from './dashboard-state.mjs'
 import { isMainModule } from './is-main.mjs'
 import { gatherGuardDutyContext } from './guard-duty.mjs'
 
@@ -224,6 +226,23 @@ export function gatherRenderVerifyInputs({ sessionId = '', deps = {} } = {}) {
   // Hard singleton: a session that does not own the live batch lock stands down.
   if (heldByOther(sessionId)) {
     return { applicable: false, why: 'another live session owns the batch lock', cause: 'not-lock-owner' }
+  }
+  // A COMMITTED BOUNDARY IS TERMINAL (point 1048, union entry U18). The remedy
+  // this gate prescribes is a browser suite run, and the committed boundary
+  // refuses exactly that — so refusing the turn end here would leave the session
+  // unable to work and unable to stop, the shape measured on 03.09.2026 with
+  // ci-status-guard. The obligation is not dropped: the unverified change is
+  // still on its branch, still unmerged, and this same gate refuses the
+  // successor that picks it up.
+  if (boundaryIsSealed({ marker: readBoundaryMarker(resolve(REPO_ROOT, '.claude/batch-boundary.json')), sid: sessionId, now: Date.now() })) {
+    return {
+      applicable: false,
+      cause: 'committed-boundary',
+      why:
+        'this session committed its batch boundary, which refuses the suite run this gate would ' +
+        'prescribe. The unverified render change stays on its unmerged branch and this gate refuses ' +
+        'the successor that takes it up.',
+    }
   }
   const head = revParseHead()
   const branch = branchOf()

@@ -642,6 +642,30 @@ export function boardCarriesCard(
  * seal without end, is the one thing a guard here may never be: a session
  * trapped by a marker nothing can time out.
  */
+/**
+ * IS THIS SESSION'S BOUNDARY SEALED? PURE (point 1048, union entry U17).
+ *
+ * The same three conditions `sealedBoundaryDeny` applies before it refuses a
+ * call — committed, this session's, still fresh — asked as a plain question, so
+ * a Stop-side guard can STAND DOWN in exactly the state the boundary refuses to
+ * work in.
+ *
+ * WHY A SECOND CALLER NEEDS IT (measured 03.09.2026, 17:45–17:47). After
+ * `--commit` the boundary refused every tool call, the prescribed 90-second
+ * wait included, while `ci-status-guard` refused every turn end until the pushed
+ * ref's CI concluded — and its refusal prescribed exactly that refused wait. The
+ * session could neither work nor stop and emitted identical farewells until a
+ * person intervened. Two guards may not jointly demand and forbid one action;
+ * the committed boundary is the terminal state, so the Stop guard is the one
+ * that yields. The CI obligation is not dropped but TRANSFERRED — the successor
+ * is started with the terminal handoff naming the pending run.
+ */
+export function boundaryIsSealed({ marker, sid, now, freshMs = BOUNDARY_FRESH_MS } = {}) {
+  if (markerPhase(marker) !== 'committed') return false
+  if (!sid || marker.sessionId !== sid) return false
+  return markerFresh(marker, now, freshMs)
+}
+
 export function sealedBoundaryDeny({
   marker,
   sid,

@@ -65,6 +65,7 @@ import {
   candidateDeployments,
 } from './pages-deploy-unblock-core.mjs'
 import { heldByOtherLiveOwner, probePid, readOwnerLock } from './batch-singleton.mjs'
+import { boundaryIsSealed } from './batch-boundary-core.mjs'
 import { assessCiWait } from './batch-in-flight-core.mjs'
 import { gatherInFlight, worktreeBranch } from './batch-in-flight.mjs'
 import { isMainModule } from './is-main.mjs'
@@ -72,6 +73,7 @@ import { emitActivity } from './batch-activity-journal.mjs'
 import { ACTIVITY_EVENTS } from './batch-activity-journal-core.mjs'
 
 const PAUSE = repoPath('.claude/batch-paused')
+const BOUNDARY = repoPath('.claude/batch-boundary.json')
 const STATE = repoPath('.claude/ci-status-guard-state.json')
 const STATE_LOCK = repoPath('.claude/ci-status-guard-state.lock')
 const SELF = repoPath('scripts/ci-status-guard.mjs')
@@ -582,6 +584,29 @@ async function judgeRed(repo, { sha, runs, classification, famine, now, rerunWai
  * cache and performs no state write or ntfy alert. */
 export async function gatherCiStatusInputs({ sessionId = '', readOnly = false } = {}) {
   if (existsSync(PAUSE)) return { applicable: false, why: 'the batch is paused' }
+  // A COMMITTED BOUNDARY IS TERMINAL (point 1048, union entry U17). Measured
+  // 03.09.2026, 17:45–17:47: after `batch-boundary --commit` the boundary
+  // refuses every tool call — the wait this guard prescribes included — while
+  // this guard refused every turn end until the pushed ref's CI concluded. The
+  // session could neither work nor stop and emitted identical farewells until a
+  // person intervened. Two guards may not jointly demand and forbid one action,
+  // and between the two the boundary is the one that must win: it is the state
+  // in which the session's only remaining legal act is to end.
+  //
+  // The obligation is TRANSFERRED, not dropped. The successor is started with
+  // the terminal handoff, which already names the pending or red run — this very
+  // session was woken that way — so the pushed ref is still watched, by somebody
+  // who can act on it.
+  if (boundaryIsSealed({ marker: readJson(BOUNDARY), sid: sessionId, now: Date.now() })) {
+    return {
+      applicable: false,
+      cause: 'committed-boundary',
+      why:
+        'this session committed its batch boundary, which refuses every tool call including the wait ' +
+        'this guard would prescribe. The CI obligation passes to the successor through the terminal ' +
+        'handoff instead of trapping a session that may only end.',
+    }
+  }
   if (heldByOtherLiveOwner(sessionId)) {
     return {
       applicable: false,
