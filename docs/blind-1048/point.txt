@@ -1,0 +1,60 @@
+--- THE POINT (verbatim, work-order point 1048) ---
+The batch crawled through the night while every safeguard reported health:
+the owner waited on stacked watchers that can never return (measured 03.09.2026,
+00:55–01:15, live in the stalled session). Between the communication-point merge at
+23:05 and the next main commit at 00:52 the owning session advanced nothing, yet held a
+fresh heartbeat the whole time, so the launcher skipped every tick with "owner alive"
+and only WARNED about the published now-card ETA running 81+ minutes past. The session
+woke roughly every ten minutes, spawned another background watcher of the form
+`while pgrep -f "npm exec vitest" >/dev/null; do sleep 30; done`, and blocked again —
+ten such shells stood at 01:00. Each watcher's own command line contains the literal
+pattern, so pgrep finds the sibling watchers themselves and the loops cannot terminate:
+every wait was for a run that had already finished. The session's own instructions name
+`scripts/verify/run-wait.mjs --await` as THE blocking wait; the hand-rolled watchers
+bypassed it. A stale `.claude/batch-in-flight.json` of a pid dead since the afternoon
+kept "a verification is running" plausible the whole time. This is the wedge point 958
+predicts — a session that keeps making tool calls never trips the emergency clock —
+observed in production. The infrastructure freeze of 01.09.2026 admits this point
+through its blockade exception: the defect reproducibly stalled the batch for hours.
+Final state:
+- Two authors work BLIND-PARALLEL from identical inputs (this point's text), cross-vendor,
+  each delivering an independent root-cause analysis plus a solution proposal covering at
+  least: the self-matching watcher pattern, the unbounded watcher stacking, heartbeat
+  read as liveness while no progress happens, the launcher's warn-only overdue ETA, and
+  stale in-flight markers of dead pids. A third model that wrote neither proposal merges
+  them through `scripts/blind-merge.mjs`, counted entry by entry; the merged solution is
+  then implemented. (User order 03.09.2026, verbatim: "mache direkt einen Punkt, der das
+  Problem blind mit vier Augen analysiert und eine zuverlässige Lösung entwickelt, die
+  sicher verhindert, dass so etwas noch mal passieren kann. Lasse die
+  Lösungungsvorschläge dann von einem dritten Modell zusammenführen und danach
+  umsetzen.")
+- The merged solution keys recovery on observable PROGRESS rather than liveness: a
+  session whose waits can never return is detected and recovered from without a human,
+  within a bounded time the solution states and tests. The user is away for days at a
+  time; "Die Batch darf niemals stehenbleiben" (user, 03.09.2026).
+- Overlap with 947 (blind sweep of every way the batch can stop) and 958 (the busy wedge
+  the emergency clock cannot see) is resolved by the merge — this point supersedes or
+  narrows them rather than duplicating their mechanism.
+- A SECOND wedge shape, measured live 03.09.2026 17:45–17:47 in the owning session, is
+  covered by the same analysis: after `batch-boundary --commit` the boundary refuses
+  every tool call (the 90 s sleep and the clock included), while `ci-status-guard`
+  refuses every turn end until the pushed ref's CI concludes — and prescribes exactly
+  the refused wait. The session could neither work nor stop and emitted identical
+  farewell messages until the user intervened; the boundary marker was then invalidated
+  by the first later mutation, silently re-opening the handed-over batch. The merged
+  solution must resolve guard pairs that jointly demand and forbid the same action
+  (e.g. the boundary exempts the wait a Stop guard prescribes, or ci-status-guard
+  stands down for a committed boundary).
+Test: Vitest over the decision cores the merged solution lands in, replaying the
+incident's shape — alive heartbeat plus eternal waits plus no main progress leads to
+recovery within the stated bound; a drill that calls the real recovery path per the
+drills rule, not a recreation of its aftermath.
+Criticality: high — hours of unattended standstill with every monitor green, on the one
+path that may never block.
+Refs: scripts/batch-emergency-core.mjs, scripts/batch-standstill-core.mjs,
+scripts/batch-launcher.mjs, scripts/batch-in-flight.mjs, scripts/verify/run-wait.mjs,
+.claude/batch-launcher.log (02./03.09. ticks)
+Bundle: Urlaubsfestigkeit (not worked beside 947, 958, 985 or 1002 — they edit the
+same emergency/standstill decision core).
+
+--- ORIENTATION (GENERATED HINT — the spec decides, this only says where to look) ---
