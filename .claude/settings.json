@@ -239,6 +239,24 @@
         "hooks": [
           {
             "type": "command",
+            "command": "node scripts/wait-command-guard.mjs"
+          }
+        ]
+      },
+      {
+        "matcher": "PowerShell",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node scripts/wait-command-guard.mjs"
+          }
+        ]
+      },
+      {
+        "matcher": "Bash",
+        "hooks": [
+          {
+            "type": "command",
             "command": "node scripts/firewall-guard.mjs"
           }
         ]
