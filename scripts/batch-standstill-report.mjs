@@ -21,6 +21,7 @@ import {
   readJournal,
   readText,
   pauseMarkerEvidence,
+  runIdentityTerminalAt,
   timestampedLogBoundaries,
   transcriptEvidence,
   transcriptFiles,
@@ -70,7 +71,16 @@ export function gatherStandstillReport({
 } = {}) {
   const paths = declaredInputPaths(repo, transcriptFiles({ repo, start }), ref)
   const journal = readJournal(paths.journal)
-  const journalDerived = journalIntervals(journal.records, { start, end })
+  const verifyLogDir = resolve(repo, 'local', 'verify-logs')
+  // The clamp of union entry U15: an interval ends when its identity does, not
+  // when its lease would have.
+  const journalDerived = journalIntervals(journal.records, {
+    start,
+    end,
+    identityTerminalAt: runIdentityTerminalAt({
+      dir: verifyLogDir, repo, records: journal.records, processAlive: verificationProcessAlive,
+    }),
+  })
   const commits = firstParentCommitTimes({ repo, ref, start, end })
   const auto = autostartEvidence(readText(paths.autostartLog), { end })
   const autoLast = autostartLastEvidence(readText(paths.autostartLast))
@@ -78,7 +88,7 @@ export function gatherStandstillReport({
   const boundaryMarker = boundaryMarkerEvidence(readText(paths.boundaryMarker), { end })
   const delegatedProgress = delegatedBranchProgress(readText(paths.inFlight), { repo, records: journal.records, start, end })
   const pauseMarker = pauseMarkerEvidence(readText(paths.pauseMarker), { start, end })
-  const verification = verificationRecordEvidence(resolve(repo, 'local', 'verify-logs'), {
+  const verification = verificationRecordEvidence(verifyLogDir, {
     repo, start, end, records: journal.records, processAlive: verificationProcessAlive,
   })
   const transcripts = paths.sessionTranscripts.map((path) => transcriptEvidence(readText(path), { session: path.split(/[\\/]/).at(-1)?.replace(/\.jsonl$/, '') }))

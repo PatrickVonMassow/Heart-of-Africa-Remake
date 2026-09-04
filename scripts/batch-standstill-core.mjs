@@ -141,7 +141,9 @@ function identityMatches(a, b) {
 
 const eventId = (record) => String(record?.evidence?.id ?? record?.evidence?.runId ?? record?.evidence?.command ?? '')
 
-function pairedIntervals(records, { starts, progresses = [], finishes, className, defaultCause, matchIdentity = true }) {
+function pairedIntervals(records, {
+  starts, progresses = [], finishes, className, defaultCause, matchIdentity = true, identityTerminalAt = () => null,
+}) {
   const out = []
   for (const record of records.filter((item) => starts.includes(item.event))) {
     const id = eventId(record)
@@ -157,7 +159,16 @@ function pairedIntervals(records, { starts, progresses = [], finishes, className
     // A lease bounds an OPEN run. Once an explicit terminal record exists it
     // proves the real interval retrospectively, even if the last renewable lease
     // elapsed before the process managed to write its completion receipt.
-    const end = explicitEnd ?? leaseEnd
+    const openEnd = explicitEnd ?? leaseEnd
+    // THE INTERVAL CLOSES WITH ITS IDENTITY (point 1048, union entry U15). A run
+    // whose record says finished, or whose process is gone, stopped being work at
+    // that moment — however long its lease was still good for. The night of
+    // 02./03.09.2026 read exactly this stretch as verification: the run had ended
+    // and the session went on waiting for it, and the analysis reported the wait
+    // as the work. Clamped here, the remainder falls through to the owner
+    // interval and is classified IDLE_OWNER, which is what it was.
+    const terminalAt = identityTerminalAt(record)
+    const end = finite(terminalAt) ? Math.min(openEnd ?? terminalAt, terminalAt) : openEnd
     if (!finite(end) || end <= record.atMs) continue
     out.push(evidenceInterval({
       start: finite(record.evidence?.startedAt) ? record.evidence.startedAt : record.atMs,
@@ -170,8 +181,16 @@ function pairedIntervals(records, { starts, progresses = [], finishes, className
   return out
 }
 
-/** Convert durable transitions to bounded evidence intervals. */
-export function journalIntervals(records = [], { start, end } = {}) {
+/**
+ * Convert durable transitions to bounded evidence intervals.
+ *
+ * `identityTerminalAt(startRecord)` answers, for one start record, the moment its
+ * identity stopped existing — the run record turned non-running, or the process
+ * died. It is supplied by the measuring half (scripts/batch-standstill-inputs.mjs)
+ * because only that half may touch the filesystem; returning null everywhere is
+ * the honest "cannot see" and leaves the old behaviour in place.
+ */
+export function journalIntervals(records = [], { start, end, identityTerminalAt = () => null } = {}) {
   const ordered = [...records].sort((a, b) => a.seq - b.seq)
   const intervals = []
   const boundaries = ordered.map((record) => record.atMs).filter(finite)
@@ -230,15 +249,17 @@ export function journalIntervals(records = [], { start, end } = {}) {
 
   intervals.push(...pairedIntervals(ordered, {
     starts: [ACTIVITY_EVENTS.DELEGATED_START], finishes: [ACTIVITY_EVENTS.DELEGATED_FINISH],
-    className: ACTIVITY_CLASSES.DELEGATED, defaultCause: 'delegated-agent',
+    className: ACTIVITY_CLASSES.DELEGATED, defaultCause: 'delegated-agent', identityTerminalAt,
   }))
   intervals.push(...pairedIntervals(ordered, {
     starts: [ACTIVITY_EVENTS.VERIFICATION_START], progresses: [ACTIVITY_EVENTS.VERIFICATION_PROGRESS],
     finishes: [ACTIVITY_EVENTS.VERIFICATION_FINISH], className: ACTIVITY_CLASSES.VERIFICATION, defaultCause: 'verification-run',
+    identityTerminalAt,
   }))
   intervals.push(...pairedIntervals(ordered, {
     starts: [ACTIVITY_EVENTS.CI_WAIT_START], progresses: [ACTIVITY_EVENTS.CI_WAIT_OBSERVATION],
     finishes: [ACTIVITY_EVENTS.CI_WAIT_FINISH], className: ACTIVITY_CLASSES.CI_WAIT, defaultCause: 'ci-run', matchIdentity: false,
+    identityTerminalAt,
   }))
 
   for (const record of ordered.filter((item) => item.event === ACTIVITY_EVENTS.HANDOVER)) {
@@ -289,4 +310,81 @@ export function commitGapSummary(commitTimes = [], thresholdMs = STANDSTILL_THRE
     if (durationMs >= thresholdMs) gaps.push({ start: times[index - 1], end: times[index], durationMs })
   }
   return { commits: times.length, gaps, gapMs: gaps.reduce((sum, gap) => sum + gap.durationMs, 0) }
+}
+
+/**
+ * THE BUSY WEDGE, COUNTED (point 1048, union entry U16; the detector point 958
+ * named and never built).
+ *
+ * Both incidents ended the same way: the session kept emitting the SAME outcome.
+ * Ten identical watcher spawns on 02./03.09.2026, then ten identical farewell
+ * messages on 03.09.2026 at 17:45, until a person broke the loop. A session
+ * repeating one outcome is doing something, so every liveness signal stays
+ * green; what it is not doing is making progress. That combination — n identical
+ * outcomes with no progress between them — is the signature, and this counts it.
+ */
+export const WEDGE_REPEAT_THRESHOLD = 4
+
+/** Events that ARE a turn's outcome. A heartbeat or a lease renewal is not one:
+ *  those are the signals that stayed green throughout the incident. */
+export const OUTCOME_EVENTS = Object.freeze([
+  ACTIVITY_EVENTS.FOREGROUND_ACTIVITY,
+  ACTIVITY_EVENTS.WAIT_LEASE_ACQUIRE,
+  ACTIVITY_EVENTS.WAIT_LEASE_ATTACH,
+  ACTIVITY_EVENTS.SPAWN_ATTEMPT,
+  ACTIVITY_EVENTS.HANDOVER,
+])
+
+/** What makes two outcomes "the same": what was done and to what, never when it
+ *  was done, by which pid, or how long it had taken. Those differ on every
+ *  repetition and would make ten identical outcomes look like ten distinct ones. */
+const VOLATILE_EVIDENCE = new Set(['at', 'atMs', 'startedAt', 'finishedAt', 'leaseUntil', 'elapsedMs', 'pid', 'pidStartedAt', 'seq', 'deadlineAt', 'hungAt', 'lastProgressAt', 'terminated'])
+
+export function outcomeSignature(record) {
+  const evidence = record?.evidence && typeof record.evidence === 'object' ? record.evidence : {}
+  const stable = Object.keys(evidence)
+    .filter((key) => !VOLATILE_EVIDENCE.has(key))
+    .sort()
+    .map((key) => `${key}=${JSON.stringify(evidence[key])}`)
+    .join(',')
+  return `${record?.event ?? ''}|${record?.cause ?? ''}|${stable}`
+}
+
+/**
+ * The longest run of consecutive identical outcomes from ONE session that lies
+ * entirely after the last observable progress, and whether it has reached the
+ * threshold. `progressAt` comes from the one progress clock (union entry U1);
+ * without it every outcome counts, because nothing has been shown to have moved.
+ */
+export function repeatedOutcomeWedge({
+  records = [], progressAt = null, threshold = WEDGE_REPEAT_THRESHOLD,
+} = {}) {
+  const ordered = [...records]
+    .filter((record) => OUTCOME_EVENTS.includes(record?.event) && finite(record?.atMs))
+    .filter((record) => !finite(progressAt) || record.atMs > progressAt)
+    .sort((a, b) => a.atMs - b.atMs)
+  let best = null
+  let run = null
+  for (const record of ordered) {
+    const signature = outcomeSignature(record)
+    const session = record.session ?? null
+    if (run && run.signature === signature && run.session === session) {
+      run.count += 1
+      run.lastAt = record.atMs
+    } else {
+      run = { signature, session, count: 1, firstAt: record.atMs, lastAt: record.atMs }
+    }
+    if (!best || run.count > best.count) best = { ...run }
+  }
+  if (!best) return { wedged: false, count: 0, threshold, session: null, signature: null }
+  return {
+    wedged: best.count >= threshold,
+    count: best.count,
+    threshold,
+    session: best.session,
+    signature: best.signature,
+    firstAt: best.firstAt,
+    lastAt: best.lastAt,
+    sinceProgressMs: finite(progressAt) ? best.lastAt - progressAt : null,
+  }
 }

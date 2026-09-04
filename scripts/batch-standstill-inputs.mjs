@@ -267,6 +267,45 @@ export function verificationRecordEvidence(dir, {
   return { intervals: intervals.filter(Boolean), boundaries, leases }
 }
 
+/**
+ * WHEN DID THIS START RECORD'S IDENTITY STOP EXISTING? (point 1048, union entry
+ * U15.) The measuring half of the clamp `journalIntervals` applies: for a
+ * verification start, the moment its run record turned non-running, or — failing
+ * that — the last progress it emitted before its process disappeared.
+ *
+ * Null is the honest answer for everything it cannot see, and it changes no
+ * classification: a delegated agent and a CI wait have no run record to read.
+ */
+export function runIdentityTerminalAt({ dir, repo, records = [], processAlive: processAliveProbe } = {}) {
+  const byPath = new Map()
+  for (const path of recordFiles(dir)) {
+    try { byPath.set(path, JSON.parse(readFileSync(path, 'utf8'))) } catch { /* unreadable is not terminal */ }
+  }
+  return (startRecord) => {
+    if (startRecord?.event !== ACTIVITY_EVENTS.VERIFICATION_START) return null
+    const named = startRecord?.evidence?.recordPath ?? startRecord?.evidence?.id ?? null
+    if (typeof named !== 'string' || named.trim() === '') return null
+    const path = [...byPath.keys()].find((candidate) => candidate === named || sameVerificationPath(candidate, named))
+    const record = path ? byPath.get(path) : null
+    if (!record) return null
+    if (record.status !== 'running') {
+      const finishedAt = Number(record.finishedAt)
+      return finite(finishedAt) ? finishedAt : null
+    }
+    let alive = true
+    try {
+      alive = processAliveProbe?.(record, path, resolveVerificationLog(record.log, { repo })) !== false
+    } catch {
+      return null
+    }
+    if (alive) return null
+    // The process is gone and no completion was ever written: the run stopped
+    // being work at its last emitted progress, not when its lease ran out.
+    const lastProgress = emittedVerificationProgress(records, record, path, Number.POSITIVE_INFINITY)
+    return finite(lastProgress) ? lastProgress : Number(record.startedAt) || null
+  }
+}
+
 function transcriptTimestamp(row) {
   const candidates = [row?.timestamp, row?.at, row?.created_at, row?.message?.timestamp]
   for (const value of candidates) {
