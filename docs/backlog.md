@@ -32,3 +32,14 @@ Format: one line per finding — `- YYYY-MM-DD <source> — <finding>`.
   the §6 same-vendor fallback for this — wait until the providers recover; the work goes
   to the top models. No repo defect; re-probe with a minimal `ask-sol --kind explain`
   before routing Sol work.
+- 2026-09-04 `mechanism-review.mjs --record` prints the wrong reason when `--model-at`
+  is not anchored. The reviewer identity check wants a timestamp that lands on an actual
+  `message.model` row of the session transcript; a freshly generated `new Date()` is a
+  little later than the last written row and is rejected — but the refusal is the same
+  text it prints when the two flags are MISSING ("pass --model-at <ISO> and
+  --model-transcript <session.jsonl>"), so the obvious reading is "the flags did not
+  arrive" and the same wrong value gets retried. `checkAuthorshipFile` itself returns a
+  clean `agreement` for the anchored timestamp, so only the message is wrong. Cost three
+  attempts while recording the point-1051 review; the working call reads the anchor out
+  of the transcript's last model-bearing row first. Non-blocking: the gate stands down
+  under the 01.09. decision, and the record went through once anchored.
