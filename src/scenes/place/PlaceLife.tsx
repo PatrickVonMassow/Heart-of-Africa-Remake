@@ -77,6 +77,7 @@ import {
   carryOf,
   clearTask,
   createAdultWork,
+  digProgressOf,
   isDigging,
   goalOf,
   stepAdultWork,
@@ -84,6 +85,7 @@ import {
   type AdultWorkGeography,
   type AdultWorkView,
   type DigSite,
+  type DigSiteProgress,
   type ErrandPoint,
   type SpokenWord,
   WORK_ARRIVE_RADIUS,
@@ -2102,6 +2104,7 @@ function ErrandVillagers({
   geography,
   count,
   childBodies,
+  onDigProgress,
 }: {
   seed: number
   cloth: string[]
@@ -2114,6 +2117,7 @@ function ErrandVillagers({
   count: number
   /** The children's live bodies (work-order 688) — see `AdultWorkView.childrenHear`. */
   childBodies: RefObject<readonly InhabitantBody[]>
+  onDigProgress: (progress: readonly DigSiteProgress[]) => void
 }) {
   const refs = useRef<Array<THREE.Group | null>>([])
   // The jar each carrier holds: on the head when it is FULL, in the hand when it
@@ -2121,6 +2125,8 @@ function ErrandVillagers({
   // per-frame visibility in this scene.
   const headJars = useRef<Array<THREE.Object3D | null>>([])
   const handJars = useRef<Array<THREE.Object3D | null>>([])
+  const digTools = useRef<Array<THREE.Object3D | null>>([])
+  const reportedStrikes = useRef<number[]>([])
   const rim = Math.max(1, radius - NPC_RADIUS * 2)
 
   /** Every place a villager may stroll to of its own accord: the head of the
@@ -2411,14 +2417,16 @@ function ErrandVillagers({
         me.z = body.z
       }
 
-      // WHAT HE IS CARRYING, and what that does to his body: a full jar rides on
-      // the head and both hands steady it, an empty one hangs from a hand and
-      // leaves the arms free.
+      // WHAT HE IS CARRYING, and what that does to his body: jars keep their
+      // established positions; the digging tool lives in the hand pivot so the
+      // shaft rides the stroke instead of swinging beside an empty-handed man.
       const carry = carryOf(work, i)
       const headJar = headJars.current[i]
       const handJar = handJars.current[i]
+      const digTool = digTools.current[i]
       if (headJar) headJar.visible = carry === 'fullJar'
       if (handJar) handJar.visible = carry === 'emptyJar'
+      if (digTool) digTool.visible = carry === 'digTool'
 
       // The pose: digging wins over everything, then the gesture, then the load
       // on the head, then rest.
@@ -2427,6 +2435,9 @@ function ErrandVillagers({
       gesture.current = advanceGesture(gesture.current, dt)
       if (isDigging(work, i)) {
         state.dug += dt
+        const siteIndex = task?.siteIndex
+        const site = siteIndex === null || siteIndex === undefined ? null : geography.digSites[siteIndex]
+        if (site) yaws.current[i] = Math.atan2(site.x - me.x, site.z - me.z)
         const dig = digPose(state.dug, i * 0.37)
         if (pose) {
           pose.left = dig.left
@@ -2464,6 +2475,11 @@ function ErrandVillagers({
     }
 
     const said = stepAdultWork(work, view, dt, cfg, rand)
+    const progress = digProgressOf(work, geography.digSites.length)
+    if (progress.some((site, i) => site.strikes !== (reportedStrikes.current[i] ?? 0))) {
+      reportedStrikes.current = progress.map((site) => site.strikes)
+      onDigProgress(progress)
+    }
     if (said) {
       // The speaker turns to what he is talking about before he says it: a word
       // thrown over a shoulder at nothing reads as nothing at all.
@@ -2488,6 +2504,7 @@ function ErrandVillagers({
         waterFoot: geography.waterFoot,
         digSites: geography.digSites.map((d) => ({ ...d })),
       },
+      digProgress: digProgressOf(work, geography.digSites.length),
       villagers: people.map((p, i) => {
         const task = taskOf(work, i)
         return {
@@ -2526,18 +2543,37 @@ function ErrandVillagers({
             cloth={cloth[i % cloth.length]}
             pose={poses.current[i]}
             handProp={
-              <mesh
-                ref={(el) => {
-                  handJars.current[i] = el
-                }}
-                visible={false}
-                position={[0, -0.12, 0.04]}
-                rotation={[0, 0, 0.12]}
-                castShadow
-              >
-                <cylinderGeometry args={[0.12, 0.16, 0.32, 8]} />
-                <meshStandardMaterial color="#8a5a30" roughness={0.9} />
-              </mesh>
+              <>
+                <mesh
+                  ref={(el) => {
+                    handJars.current[i] = el
+                  }}
+                  visible={false}
+                  position={[0, -0.12, 0.04]}
+                  rotation={[0, 0, 0.12]}
+                  castShadow
+                >
+                  <cylinderGeometry args={[0.12, 0.16, 0.32, 8]} />
+                  <meshStandardMaterial color="#8a5a30" roughness={0.9} />
+                </mesh>
+                <group
+                  name="digging-tool"
+                  ref={(el) => {
+                    digTools.current[i] = el
+                  }}
+                  visible={false}
+                  position={[0, -0.34, 0]}
+                >
+                  <mesh castShadow>
+                    <cylinderGeometry args={[0.027, 0.035, 1.05, 6]} />
+                    <meshStandardMaterial color="#654522" roughness={0.95} />
+                  </mesh>
+                  <mesh position={[0, -0.48, 0.07]} rotation={[0.28, 0, 0]} castShadow>
+                    <boxGeometry args={[0.28, 0.055, 0.18]} />
+                    <meshStandardMaterial color="#51483d" roughness={0.82} />
+                  </mesh>
+                </group>
+              </>
             }
           />
           <mesh
@@ -2687,6 +2723,7 @@ export function PlaceLife({
   pen,
   colliders,
   radius,
+  onDigProgress,
 }: {
   kind: 'port' | 'village'
   /** Settlement size (design.md §4.1): big cities show more bustle. */
@@ -2718,6 +2755,8 @@ export function PlaceLife({
   colliders: Collider[]
   /** The settlement's walkable radius — the children's play area (point 480). */
   radius: number
+  /** Publishes strike-quantized progress to the site meshes in PlaceScene. */
+  onDigProgress: (progress: readonly DigSiteProgress[]) => void
 }) {
   let hash = 0
   for (const c of placeId) hash = (hash * 31 + c.charCodeAt(0)) | 0
@@ -2926,6 +2965,7 @@ export function PlaceLife({
             radius={radius}
             bank={bank}
             geography={workGeography}
+            onDigProgress={onDigProgress}
             count={Math.max(1, Math.round(balance.villageLife.adultErrands.villagerCount * presence))}
           />
           <Goats seed={localSeed} count={pen ? 4 : 3} pen={pen} colliders={colliders} />
