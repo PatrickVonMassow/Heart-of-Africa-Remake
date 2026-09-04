@@ -978,6 +978,25 @@ export const RESPAWN_GRACE_MS = 30 * 60 * 1000
 export const LOG_OVERRIDES_QUIET_GIT_MS = 2 * RESPAWN_GRACE_MS
 
 /**
+ * How long COMMIT-SHAPED evidence alone keeps a writer alive (point 1048, union
+ * entry U22, measured 04.09.2026 on this point's own work).
+ *
+ * A COMMIT IS THE LAST THING A SESSION DOES. The launcher skipped two ticks —
+ * 32 minutes of structural standstill — because a branch tip four minutes old
+ * read as `alive` for the full half-hour grace, with no process behind it and
+ * nothing moving in the checkout. The grace above is calibrated for the opposite
+ * risk (shooting an agent that is still editing files), and working-file
+ * movement is what proves that. A commit proves the writer FINISHED.
+ *
+ * So evidence that is only commit-shaped — the branch tip, or the worktree's own
+ * git metadata, which a commit rewrites just the same — keeps the writer alive
+ * for well under one launcher tick (15 min), which is all the original
+ * protection needs: an agent that commits WHILE the replacement decision is
+ * being made must not be shot by a stale reading.
+ */
+export const COMMIT_ONLY_GRACE_MS = 5 * 60 * 1000
+
+/**
  * IS A DELEGATED AGENT STILL PRODUCING? PURE — every stamp is injected as epoch
  * ms, or null where the probe could not answer.
  *
@@ -985,7 +1004,9 @@ export const LOG_OVERRIDES_QUIET_GIT_MS = 2 * RESPAWN_GRACE_MS
  *   'dead'         — recorded process identity was positively refuted as gone
  *                    or reused; `refutations` names it and the output it beats.
  *   'alive'        — something moved inside the grace window. `judgedOn` names
- *                    what: 'git' (its worktree or branch) or 'log'.
+ *                    what: 'git' (its worktree or branch) or 'log', and `detail`
+ *                    names WHICH git stamp carried it, because commit-shaped
+ *                    evidence gets only `COMMIT_ONLY_GRACE_MS`.
  *   'quiet'        — git output COULD be measured and has stood still.
  *   'unmeasurable' — neither a worktree nor a branch could be read, so the only
  *                    thing left is silence, and silence is not evidence of death
@@ -999,6 +1020,7 @@ export function agentOutputVerdict({
   now,
   graceMs = RESPAWN_GRACE_MS,
   logOverrideMs = LOG_OVERRIDES_QUIET_GIT_MS,
+  commitOnlyGraceMs = COMMIT_ONLY_GRACE_MS,
 } = {}) {
   const num = (v) => (typeof v === 'number' && Number.isFinite(v) ? v : null)
   // The worktree probe answers { at, source } (point 434 (5b)) and a bare number
@@ -1010,13 +1032,29 @@ export function agentOutputVerdict({
   // Say which source the newest stamp came from where the WORKTREE is the newest
   // one and it named itself; a branch tip is already named by `commit`.
   const named = wt && wt.source && wt.at === newestGit ? wt.source : null
+  // WHICH GIT STAMP IS THIS, AND HOW LONG MAY IT SPEAK FOR THE WRITER (U22)?
+  // A commit rewrites the branch tip AND the worktree's git metadata, so both
+  // carry the same meaning: the writer reached the end of a piece of work. Only
+  // moving WORKING FILES prove it is still in the middle of one — and a stamp
+  // whose source a caller did not name keeps the full grace, because "unknown"
+  // must never be read as "finished". A MEASURED LIVE PROCESS beside the commit
+  // keeps the full grace too: the writer is demonstrably there, and a live pid
+  // that cannot make a stamp alive may still say which of two graces applies.
+  const measured = evidenceVerdict(processEvidence)
+  const processAlive = measured.judgedOn === 'process' && measured.refutations.length === 0
+  const commitShaped =
+    !processAlive && !(wt && wt.at === newestGit && wt.source !== WORKTREE_SOURCE.git)
+  const gitGraceMs = commitShaped
+    ? Math.min(graceMs, Number.isFinite(commitOnlyGraceMs) && commitOnlyGraceMs > 0 ? commitOnlyGraceMs : graceMs)
+    : graceMs
+  const stampName = named ?? (commitShaped ? 'commit' : null)
   let output
-  if (newestGit !== null && now - newestGit <= graceMs) {
+  if (newestGit !== null && now - newestGit <= gitGraceMs) {
     output = {
       verdict: 'alive',
       judgedOn: 'git',
       ageMs: now - newestGit,
-      detail: `work output ${minutes(now - newestGit)} min old${named ? ` (${named})` : ''}`,
+      detail: `work output ${minutes(now - newestGit)} min old${stampName ? ` (${stampName})` : ''}`,
     }
   } else {
     // A FRESH log is genuine evidence that something is happening — it is only
@@ -1032,12 +1070,14 @@ export function agentOutputVerdict({
         verdict: 'quiet',
         judgedOn: 'git',
         ageMs: now - newestGit,
-        detail: `no commit and nothing written for ${minutes(now - newestGit)} min${named ? ` (newest: ${named})` : ''}`,
+        detail: commitShaped && now - newestGit <= graceMs
+          ? `only a ${minutes(now - newestGit)} min old commit, with nothing running and no working file touched ` +
+            `since (a commit is the last thing a session does)`
+          : `no commit and nothing written for ${minutes(now - newestGit)} min${stampName ? ` (newest: ${stampName})` : ''}`,
       }
     }
   }
 
-  const measured = evidenceVerdict(processEvidence)
   if (measured.refutations.length === 0) return output
   const refuted = `${output.detail} (judged on ${output.judgedOn})`
   return {

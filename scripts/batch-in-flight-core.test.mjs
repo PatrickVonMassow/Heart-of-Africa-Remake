@@ -22,8 +22,10 @@ import {
   IN_FLIGHT_MAX_AGE_MS,
   LAUNCHER_WORK_MAX_AGE_MS,
   LOG_FRESH_MS,
+  COMMIT_ONLY_GRACE_MS,
   LOG_OVERRIDES_QUIET_GIT_MS,
   RESPAWN_GRACE_MS,
+  WORKTREE_SOURCE,
   WORK_FRESH_MS,
   agentOutputVerdict,
   declaredAgentProbe,
@@ -1205,6 +1207,46 @@ describe('agentOutputVerdict / respawnDecision — an agent is judged by what it
     // is never punished.
     expect(verdict({ worktreeAt: NOW - LOG_OVERRIDES_QUIET_GIT_MS, logAt: NOW - 60 * 1000 }).verdict).toBe('alive')
     expect(LOG_OVERRIDES_QUIET_GIT_MS).toBeGreaterThan(RESPAWN_GRACE_MS)
+  })
+
+  it('U22: a COMMIT alone stops speaking for the writer well inside one launcher tick', () => {
+    // 04.09.2026, measured on this point's own work: the session committed at
+    // 13:22 and ended. The launcher skipped 13:24 and 13:39 — 32 minutes of
+    // structural standstill — because a branch tip four minutes old read as
+    // `alive` for the full half-hour grace with no process behind it.
+    const justCommitted = verdict({ branchTipAt: NOW - 60 * 1000 })
+    expect(justCommitted.verdict).toBe('alive')
+    expect(justCommitted.detail).toContain('commit')
+    const stale = verdict({ branchTipAt: NOW - COMMIT_ONLY_GRACE_MS - 1 })
+    expect(stale.verdict).toBe('quiet')
+    expect(stale.detail).toContain('a commit is the last thing a session does')
+    expect(respawnDecision({ output: stale })).toMatchObject({ respawn: true, reason: 'output-quiet' })
+    // Well below one 15-minute launcher tick, so a single skipped tick can no
+    // longer be bought with a commit.
+    expect(COMMIT_ONLY_GRACE_MS).toBeLessThan(10 * 60 * 1000)
+    expect(COMMIT_ONLY_GRACE_MS).toBeLessThan(RESPAWN_GRACE_MS)
+  })
+
+  it('…and the worktree\'s own git metadata is the same evidence, not a second witness', () => {
+    // A commit rewrites HEAD and COMMIT_EDITMSG too, so a checkout that has gone
+    // clean carries the identical footprint under a different name.
+    const committed = { at: NOW - COMMIT_ONLY_GRACE_MS - 1, source: WORKTREE_SOURCE.git }
+    expect(verdict({ worktreeAt: committed }).verdict).toBe('quiet')
+    // Working files are the half that proves work in the MIDDLE of a piece, and
+    // they keep the full grace.
+    const editing = { at: NOW - COMMIT_ONLY_GRACE_MS - 1, source: WORKTREE_SOURCE.files }
+    expect(verdict({ worktreeAt: editing }).verdict).toBe('alive')
+    // A stamp whose source nobody named keeps the full grace: "unknown" may
+    // never be read as "finished".
+    expect(verdict({ worktreeAt: NOW - COMMIT_ONLY_GRACE_MS - 1 }).verdict).toBe('alive')
+  })
+
+  it('…and a MEASURED LIVE process beside the commit keeps the full grace', () => {
+    const live = [{ kind: 'pid', ok: true, describe: 'pid 4242', detail: 'running' }]
+    expect(verdict({ branchTipAt: NOW - COMMIT_ONLY_GRACE_MS - 1, processEvidence: live }).verdict).toBe('alive')
+    // A REFUTED process still overrules everything, exactly as before.
+    const gone = [{ kind: 'pid', ok: false, describe: 'pid 4242', detail: 'process-gone' }]
+    expect(verdict({ branchTipAt: NOW - 60 * 1000, processEvidence: gone }).verdict).toBe('dead')
   })
 
   it('is wider than the WAIT window, because the two mistakes cost differently', () => {

@@ -516,7 +516,13 @@ export function launcherStartDecision({
     (writer) => writer?.recognized !== true && writer?.output?.verdict === 'alive',
   ) : []
   if (featureVetoes.length > 0) {
-    const identities = featureVetoes.map((writer) => `${writer.branch} (${writer.worktree})`).join(', ')
+    // AND IT SAYS WHICH EVIDENCE IT STOOD ON (point 1048, union entry U22). The
+    // refusal used to read "recent activity" for a branch tip that was nothing
+    // but a finished session's last commit, and two ticks skipped on it in
+    // silence. The stamp that carried the veto now travels with the veto.
+    const identities = featureVetoes
+      .map((writer) => `${writer.branch} (${writer.worktree})${writer.output?.detail ? ` — ${writer.output.detail}` : ''}`)
+      .join(', ')
     return {
       start: false,
       code: 'registered-writer-live',
