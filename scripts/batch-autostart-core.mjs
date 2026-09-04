@@ -1495,3 +1495,74 @@ export function staleEtaLogLine({ overdue, tickMin = ETA_OVERDUE_ALERT_MIN } = {
     'The reader sees a stalled batch; the working session must refresh the "~HH:MM" and republish.'
   )
 }
+
+// --- PROGRESS, NOT LIVENESS (point 1048, union entry U4) -----------------------
+//
+// WHY THIS EXISTS (measured 02./03.09.2026). Between the communication-point
+// merge at 23:05 and the next commit on main at 00:52 the owning session
+// advanced nothing, yet held a fresh heartbeat the whole time — it woke every
+// ten minutes, spawned another watcher that could never return, and blocked
+// again. `skip: owner alive` therefore fired on every tick for 107 minutes.
+//
+// The heartbeat cannot answer this. A session in an eternal loop keeps making
+// tool calls, and every tool call refreshes it; point 958 predicted exactly that
+// and the prediction was left standing. So the skip stops asking whether the
+// owner is ALIVE and starts asking whether the BATCH has moved.
+//
+// TWO BARS, and they are deliberately different:
+//   · past the THRESHOLD the owner keeps the batch only if its declared work is
+//     demonstrably advancing — a commit, a written file, a moving branch tip.
+//     That is evidence of work, and evidence of work is what the threshold
+//     exists to protect;
+//   · past the HARD DEADLINE nothing keeps it. Not a heartbeat, not a declared
+//     wait, not a fresh log. This is the bound the incident had no equivalent
+//     of, and its whole purpose is that no signal a wedged session can keep
+//     producing may extend it.
+//
+// The overdue published ETA joins as a second witness rather than a third bar:
+// on its own a slipped estimate during real work is ordinary, but a promise
+// broken by more than a tick WHILE the batch stands still is the owner's own
+// admission, and it is what the reader on the phone can see.
+
+/**
+ * MAY THE OWNER KEEP THE BATCH? PURE, TOTAL.
+ *
+ * @param {object} input
+ * @param {number|null} input.progressAt when the batch last observably moved
+ * @param {number} input.now
+ * @param {boolean} input.workAdvancing `assessOwnerWork(...).advancing`
+ * @param {number|null} input.etaMinutesPast how far the published promise is past
+ * @param {number} input.thresholdMs the soft bar
+ * @param {number} input.hardDeadlineMs the bar nothing may extend
+ * @param {number} input.tickMin one launcher interval, in minutes
+ * @returns {{keeps: boolean, reason: string, stalledMs: number|null, witnesses: string[]}}
+ */
+export function ownerKeepsBatch({
+  progressAt = null,
+  now = Date.now(),
+  workAdvancing = false,
+  etaMinutesPast = null,
+  thresholdMs,
+  hardDeadlineMs,
+  tickMin = ETA_OVERDUE_ALERT_MIN,
+} = {}) {
+  // NO MEASUREMENT IS NOT A VERDICT. A launcher that cannot read the repository's
+  // own history must not start taking batches away on that ignorance; the lease
+  // path it would otherwise reach is the safe one.
+  if (!Number.isFinite(progressAt) || !Number.isFinite(thresholdMs) || !Number.isFinite(hardDeadlineMs)) {
+    return { keeps: true, reason: 'no-progress-measurement', stalledMs: null, witnesses: [] }
+  }
+  const stalledMs = Math.max(0, Number(now) - progressAt)
+  const witnesses = []
+  if (typeof etaMinutesPast === 'number' && Number.isFinite(etaMinutesPast) && etaMinutesPast > tickMin) {
+    witnesses.push(`the published now-card promise is ${Math.round(etaMinutesPast)} min past`)
+  }
+  if (stalledMs >= hardDeadlineMs) {
+    witnesses.unshift(`the batch has not moved for ${Math.round(stalledMs / 60000)} min`)
+    return { keeps: false, reason: 'past-absolute-deadline', stalledMs, witnesses }
+  }
+  if (stalledMs < thresholdMs) return { keeps: true, reason: 'progress-within-threshold', stalledMs, witnesses }
+  if (workAdvancing === true) return { keeps: true, reason: 'declared-work-advancing', stalledMs, witnesses }
+  witnesses.unshift(`the batch has not moved for ${Math.round(stalledMs / 60000)} min`)
+  return { keeps: false, reason: 'stalled-past-threshold-without-advancing-work', stalledMs, witnesses }
+}

@@ -68,6 +68,7 @@ import {
   supervisorRestartDecision,
   supervisedExitTrigger,
   SUCCESSOR_TRIGGERS,
+  ownerKeepsBatch,
 } from './batch-autostart-core.mjs'
 import { readState, writeState } from './fable-switch-core.mjs'
 import { PAUSE_RETRY_LADDER_MS } from './batch-pause-core.mjs'
@@ -1995,5 +1996,70 @@ describe('the launcher calls out a published now-card ETA older than a tick (poi
     expect(staleEtaLogLine({ overdue: [{ points: [1], meta: 'm', minutesPast: Infinity }] })).toBeNull()
     expect(staleEtaLogLine({ overdue: [{ points: [1], meta: 'm' }] })).toBeNull()
     expect(staleEtaLogLine()).toBeNull()
+  })
+})
+
+// --- POINT 1048: THE SKIP ASKS ABOUT PROGRESS, NOT LIVENESS -------------------
+// Between 23:05 and 00:52 on 02./03.09.2026 the owner advanced nothing and held
+// a fresh heartbeat the whole time, so `skip: owner alive` fired on every tick
+// for 107 minutes. These cases pin the two bars that replace it.
+describe('may the owner keep the batch? (union entry U4)', () => {
+  const NOW_1048 = Date.parse('2026-09-03T00:52:00+02:00')
+  const HOUR = 60 * 60 * 1000
+  const keep = (over = {}) =>
+    ownerKeepsBatch({ now: NOW_1048, thresholdMs: HOUR, hardDeadlineMs: 2 * HOUR, ...over })
+
+  it('keeps it while the batch is moving', () => {
+    expect(keep({ progressAt: NOW_1048 - 10 * 60_000 }))
+      .toMatchObject({ keeps: true, reason: 'progress-within-threshold' })
+  })
+
+  it('keeps it past the threshold only on demonstrably advancing work', () => {
+    const progressAt = NOW_1048 - 90 * 60_000
+    expect(keep({ progressAt, workAdvancing: true }))
+      .toMatchObject({ keeps: true, reason: 'declared-work-advancing' })
+    expect(keep({ progressAt, workAdvancing: false }))
+      .toMatchObject({ keeps: false, reason: 'stalled-past-threshold-without-advancing-work' })
+  })
+
+  it('takes it past the deadline even from work that claims to be advancing', () => {
+    // The incident's own claim: ten watchers "waiting on the verification".
+    expect(keep({ progressAt: NOW_1048 - 2 * HOUR, workAdvancing: true }))
+      .toMatchObject({ keeps: false, reason: 'past-absolute-deadline' })
+  })
+
+  it('replays the measured night — the 23:05 merge, no progress since', () => {
+    const merge = Date.parse('2026-09-02T23:05:00+02:00')
+    // At 00:05, one hour in and with nothing advancing, the launcher takes it.
+    expect(ownerKeepsBatch({
+      progressAt: merge, now: merge + HOUR, thresholdMs: HOUR, hardDeadlineMs: 2 * HOUR,
+      workAdvancing: false, etaMinutesPast: 81,
+    })).toMatchObject({ keeps: false, reason: 'stalled-past-threshold-without-advancing-work' })
+    // Ten minutes earlier it still skips: the bound is a bound, not a mood.
+    expect(ownerKeepsBatch({
+      progressAt: merge, now: merge + HOUR - 10 * 60_000, thresholdMs: HOUR, hardDeadlineMs: 2 * HOUR,
+      workAdvancing: false,
+    }).keeps).toBe(true)
+  })
+
+  it('names the overdue published promise as a witness, never as a bar of its own', () => {
+    const fresh = keep({ progressAt: NOW_1048 - 10 * 60_000, etaMinutesPast: 81 })
+    expect(fresh.keeps).toBe(true)
+    expect(fresh.witnesses).toEqual(['the published now-card promise is 81 min past'])
+    const stalled = keep({ progressAt: NOW_1048 - 90 * 60_000, etaMinutesPast: 81 })
+    expect(stalled.witnesses).toEqual([
+      'the batch has not moved for 90 min',
+      'the published now-card promise is 81 min past',
+    ])
+    // Inside one tick it is not yet news.
+    expect(keep({ progressAt: NOW_1048 - 10 * 60_000, etaMinutesPast: 5 }).witnesses).toEqual([])
+  })
+
+  it('never takes a batch away on an unreadable measurement', () => {
+    for (const over of [{}, { progressAt: null }, { progressAt: NaN }, { progressAt: 1, thresholdMs: null }]) {
+      expect(ownerKeepsBatch({ now: NOW_1048, thresholdMs: HOUR, hardDeadlineMs: 2 * HOUR, ...over }))
+        .toMatchObject({ keeps: true, reason: 'no-progress-measurement' })
+    }
+    expect(() => ownerKeepsBatch()).not.toThrow()
   })
 })

@@ -762,3 +762,35 @@ describe('the launcher declares recurring event notifications', () => {
     expect(source.slice(start, start + 1_000)).toMatch(/\{\s*(?:key:\s*'[^']+',\s*)?recurring:\s*true\s*\}/)
   })
 })
+
+// --- POINT 1048: THE SKIP MUST ASK ABOUT PROGRESS ------------------------------
+// The decision itself is `ownerKeepsBatch`, unit-tested in the core suite. What
+// can only be pinned here is that the launcher actually ASKS it, and asks it
+// BEFORE it skips: the whole incident is a skip that fired without ever having
+// looked at whether the batch had moved.
+describe('the launcher keys its skip on progress (union entry U4)', () => {
+  const source = readFileSync(resolve(process.cwd(), 'scripts', 'batch-autostart.mjs'), 'utf8')
+
+  it('measures progress from the three durable kinds, on local refs only', () => {
+    expect(source).toMatch(/const observableProgressAt = \(\) =>/)
+    expect(source).toMatch(/'log', '-1', '--first-parent', '--format=%ct', 'main'/)
+    expect(source).toMatch(/refs\/heads\/feat/)
+    expect(source).toMatch(/boundary\.log/)
+  })
+
+  it('asks ownerKeepsBatch BEFORE the owner-alive skip, with both bars', () => {
+    const asked = source.indexOf('const keeps = ownerKeepsBatch({')
+    const skipped = source.indexOf('log(`skip: owner alive')
+    expect(asked).toBeGreaterThan(0)
+    expect(skipped).toBeGreaterThan(asked)
+    expect(source).toMatch(/thresholdMs: EMERGENCY_THRESHOLD_MS/)
+    expect(source).toMatch(/hardDeadlineMs: EMERGENCY_HARD_DEADLINE_MS/)
+    expect(source).toMatch(/etaMinutesPast,/)
+  })
+
+  it('says out loud when it overrides a live owner, and alerts', () => {
+    // Tick after tick of green skips is how the last wedge stayed invisible.
+    expect(source).toMatch(/TAKING THE BATCH despite a live owner/)
+    expect(source).toMatch(/'Batch taken from a live owner'/)
+  })
+})

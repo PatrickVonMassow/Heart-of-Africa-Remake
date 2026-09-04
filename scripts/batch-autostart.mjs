@@ -86,6 +86,7 @@ import {
   judgeSpawnOutcome,
   announceSpawn,
   firewallTopUpDecision,
+  ownerKeepsBatch,
   staleEtaLogLine,
   launcherStartRecord,
   successorStartDecision,
@@ -111,7 +112,11 @@ import { ownerActivityDecision } from './batch-ownership-core.mjs'
 import { acknowledgeCiWait } from './ci-status-guard.mjs'
 import { modelHandoffSpawn } from './model-handoff-core.mjs'
 import { REPO_ROOT, requireMainCheckoutRoot } from './repo-paths.mjs'
-import { emergencyHandoffPrompt } from './batch-emergency-core.mjs'
+import {
+  EMERGENCY_HARD_DEADLINE_MS,
+  EMERGENCY_THRESHOLD_MS,
+  emergencyHandoffPrompt,
+} from './batch-emergency-core.mjs'
 
 // IMPORT-PROOF (27.07.2026). Everything below runs at MODULE LOAD, so merely
 // importing this file — a syntax check, a test, a tooling scan — SPAWNS a
@@ -172,8 +177,44 @@ const recentActivityRecords = () => {
     return null
   }
 }
+// How far the published now-card's "~HH:MM" promise is past, filled in by the
+// board watchdog below and read by the skip decision (union entry U10).
+let etaMinutesPast = null
 const head = () => { try { return execSync('git rev-parse HEAD', { windowsHide: true, cwd: REPO, encoding: 'utf8' }).trim() } catch { return '' } }
 const pidAlive = (pid) => { try { process.kill(pid, 0); return true } catch (e) { return e && e.code === 'EPERM' } }
+
+// WHEN THE BATCH ITSELF LAST MOVED (point 1048, union entry U4). The three kinds
+// `BATCH_PROGRESS_KINDS` names, measured the cheapest way the launcher can: all
+// local refs, no network, no suite, ~30 ms together. A commit on the trunk, a
+// delegated branch that grew, and the boundary log a committed handover writes.
+// Returns epoch ms, or null when nothing could be read — and null is NOT a
+// verdict: `ownerKeepsBatch` treats an unreadable measurement as "keeps".
+const gitSeconds = (args) => {
+  try {
+    const out = execFileSync('git', args, { cwd: REPO, encoding: 'utf8', timeout: 15000, windowsHide: true }).trim()
+    const value = Number(out.split(/\s+/).filter(Boolean).sort((a, b) => Number(b) - Number(a))[0])
+    return Number.isFinite(value) && value > 0 ? value * 1000 : null
+  } catch {
+    return null
+  }
+}
+const observableProgressAt = () => {
+  const candidates = [
+    // first-parent-commit: the trunk, however it was reached.
+    gitSeconds(['log', '-1', '--first-parent', '--format=%ct', 'main']),
+    // delegated-branch-moved: the newest tip among the feature branches.
+    gitSeconds(['for-each-ref', '--format=%(committerdate:unix)', 'refs/heads/feat']),
+    // committed-boundary: the handover's own log.
+    (() => {
+      try {
+        return statSync(join(REPO, '.claude', 'boundary.log')).mtimeMs
+      } catch {
+        return null
+      }
+    })(),
+  ].filter((value) => Number.isFinite(value) && value > 0)
+  return candidates.length > 0 ? Math.max(...candidates) : null
+}
 // (`sleepSync`/`waitForExit` went with the kill-then-take valve, point 434: the
 // launcher no longer ends the owner's process, so nothing here waits for an exit.)
 // Open points, or -1 for the FORMAT ALARM (checkboxes but no parseable point).
@@ -794,6 +835,12 @@ try {
   if (r.verdict !== 'current') log(`board: ${r.verdict}${r.reason ? ` — ${r.reason}` : ''} (${BOARD_PAGE_URL})`)
   // The PUBLISHED promise must not age unwatched (point 661): the child hands
   // back the live page's overdue "~HH:MM" cards, the pure sibling decides.
+  // Kept for the skip decision below (union entry U10): an overdue promise is a
+  // witness there, not only a log line here.
+  etaMinutesPast = Math.max(
+    ...[0, ...(Array.isArray(r.etaOverdue) ? r.etaOverdue : [])
+      .map((c) => (typeof c?.minutesPast === 'number' && Number.isFinite(c.minutesPast) ? c.minutesPast : 0))],
+  )
   const etaLine = staleEtaLogLine({ overdue: r.etaOverdue })
   if (etaLine) log(`${etaLine} (${BOARD_PAGE_URL})`)
   if (r.notified) {
@@ -1336,9 +1383,45 @@ if (verdict === 'skip-alive') {
       process.exit(0)
     }
   }
+  // PROGRESS, NOT LIVENESS (point 1048, union entry U4) — asked BEFORE the skip,
+  // because the skip is what fired 107 minutes in a row on 02./03.09.2026 while
+  // the owner's heartbeat stayed fresh and the batch advanced nothing. Past the
+  // threshold only demonstrably advancing work keeps the batch; past the
+  // absolute deadline nothing does. An unreadable measurement keeps it, so a
+  // launcher that cannot read the repository's history never takes a batch away
+  // on its own ignorance.
+  const keeps = ownerKeepsBatch({
+    progressAt: observableProgressAt(),
+    now,
+    workAdvancing: work.advancing === true,
+    etaMinutesPast,
+    thresholdMs: EMERGENCY_THRESHOLD_MS,
+    hardDeadlineMs: EMERGENCY_HARD_DEADLINE_MS,
+  })
+  if (!writerRecovered && !keeps.keeps) {
+    // AND IT SAYS SO (union entry U20). Tick after tick of green skips is how the
+    // last wedge stayed invisible; the line that OVERRIDES a skip must name the
+    // evidence that outvoted it.
+    log(
+      `TAKING THE BATCH despite a live owner — ${keeps.reason}: ${keeps.witnesses.join('; ')}. ` +
+        `Owner ${lock.sessionId} (pid ${lock.pid ?? 'unknown'}) had a heartbeat ${Math.round((now - lock.claimedAt) / 60000)} min old ` +
+        `and ${work.advancing ? `declared work advancing — ${work.summary}` : 'no advancing declared work'}.`,
+    )
+    await notify(
+      'Batch taken from a live owner',
+      `${keeps.witnesses.join('; ')}. The owner was alive by heartbeat the whole time, which is exactly the ` +
+        'shape that stood the batch still for 107 minutes on 03.09.2026. A successor is being started.',
+      'high',
+    )
+    delete state.wedgeVerdictKey
+    delete state.wedgeVerdictRepeats
+    delete state.writerVetoSince
+    writerRecovered = true
+  }
   if (!writerRecovered) {
     const why = work.advancing ? `; declared work advancing — ${work.summary}` : ''
-    log(`skip: owner alive (${assessment.reason}; heartbeat ${Math.round((now - lock.claimedAt) / 60000)} min old, pid ${lock.pid ?? 'unknown'}${why})`)
+    const moved = Number.isFinite(keeps.stalledMs) ? `, batch moved ${Math.round(keeps.stalledMs / 60000)} min ago` : ''
+    log(`skip: owner alive (${assessment.reason}; heartbeat ${Math.round((now - lock.claimedAt) / 60000)} min old, pid ${lock.pid ?? 'unknown'}${moved}${why})`)
     // AND IT SAYS WHAT IT OVERRODE (point 556). A skip that silently swallowed an
     // expired lease would be the same blindness in the other direction: the morning
     // reader must be able to see that the arithmetic said "take it" and what
