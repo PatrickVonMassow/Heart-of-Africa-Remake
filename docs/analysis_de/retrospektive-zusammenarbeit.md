@@ -91,6 +91,7 @@ Das Musterbeispiel sind die Chat-Zeitstempel: neun Eskalationsstufen, acht weich
 | 02./03.09. nachts | Die Batch kroch stundenlang hinter Warte-Schleifen, deren Suchmuster die eigene Warte-Maschinerie fand: zehn `while pgrep`-Beobachter, jeder mit dem Muster wörtlich in der eigenen Kommandozeile, hielten sich gegenseitig am Leben, während längst nichts mehr lief — Heartbeat frisch, Starter „owner alive", ETA-Überfälligkeit nur als Warnung; der vorgesehene Warteweg (`run-wait.mjs --await`) wurde umgangen. Aufgelöst durch die Nutzerfrage um 1 Uhr; Analysepunkt blind mit vier Augen per Nutzer-Anordnung (Punkt 1048, Vorhersage von Punkt 958 eingetreten). Dieselbe Nacht ließ den Front-beorderten Felsenspiel-Punkt als letzten von 360 stehen — Wiedergänger von §3.77, Punkt 1049 |
 | 04.09. | Der Nutzer sah den frisch gelandeten Grabe-Vorgang an und fand keinen Zweck: Jede Grube ist als Vorratsgrube, Pfostenloch oder gewendeter Boden gesetzt, kommentiert, getestet und per Dev-Assertion abgesichert — sichtbar ist davon nichts, alle drei sind dasselbe runde Loch und ein Arbeitsgang hinterlässt kein Ergebnis. Zweiter Fall derselben Bauform in derselben Szene nach dem 13.08. (§3.233, Punkte 1056/1057) |
 | 04.09. mittags | Zwei von 45 Durchsetzern waren still tot: Die Vor-Prüfungen für `Bash` und `PowerShell` riefen `wait-command-guard.mjs` über einen cwd-relativen Pfad auf, was in jedem Arbeitsbaum ein nicht-blockierendes `Cannot find module` ergibt — der Wächter läuft nie, und die Regel gilt trotzdem als abgesichert. Gefunden hat es kein Test, sondern der Wächter über den Wächtern (§3.234) |
+| 04.09. abends | Der Nutzer fragte nach dem roten Kasten, den er „immer wieder" sieht: `exited with code 143` und „Remote Control is disabled" sind kein Absturz, sondern unsere eigene Kontextgrenze — die Autostart-Remediation erschießt den übergebenen Vorgänger zwei Minuten nach `markHandover`, und mit dem Prozess stirbt die Fernsicht auf die unbeaufsichtigte Batch. Acht Übergaben an einem Abend, und keine Meldung sagte je, dass wir es selbst waren (§3.236, Punkt 1059) |
 
 
 Muster: Ab dem 22.07. explodiert die Commit-Rate (Delegation) — und genau dann häufen sich die Infrastruktur-Vorfälle. **Skalierung der Autonomie erzeugt eine eigene Problemklasse, die die Feature-Arbeit zeitweise überholt.**
@@ -1431,7 +1432,7 @@ keinen Träger hat. Gebucht als Punkt 956.
 
 ## Anhang A — Maschinell gepflegte Quellen-Übersicht
 
-Zuletzt aktualisiert: Freitag, 04.09.2026, 17:58 · Quellen-Fingerprint: `7ca11fee29f1…`
+Zuletzt aktualisiert: Freitag, 04.09.2026, 22:23 · Quellen-Fingerprint: `65d4e927c21f…`
 
 Spalten heuristisch aus den Quellen abgeleitet (Anläufe = distinkte Datumsnennungen im Memory;
 Maßnahme = Guard-Skripte mit Namens-Treffer). Die inhaltliche Bewertung gehört der Prosa oben.
@@ -1468,9 +1469,10 @@ Maßnahme = Guard-Skripte mit Namens-Treffer). Die inhaltliche Bewertung gehört
 | a drill that recreates the state after an action tests the assumption, not the action — and stays green forever | 1 | niedrig | — (Regel/Memory) | ◐ Regel |
 | Work at High effort by default; the user reserves Extra high for research and design decisions, not implementation | 4 | hoch | — (Regel/Memory) | ◐ Regel |
 | Write idiomatic English in all English text (README, code comments, commit messages) — no German calques like 'stand' for a version | 1 | niedrig | — (Regel/Memory) | ◐ Regel |
+| Claude Code process exited with code 143" plus "Remote Control is disabled" is our own context-boundary handover, not a crash | 1 | niedrig | — (Regel/Memory) | ◐ Regel |
 | Fable is NOT the default lane because its volume is the scarcest; difficulty is no reason for it either (since 18.08.2026 hard cases go straight to Sol), and review is cross-vendor, not Fable-by-default | 5 | hoch | — (Regel/Memory) | ◐ Regel |
-| Findings recorded by a session that could not write the work order — carry each into TASKS.md, then mark it drained | 44 | hoch | findings-guard.mjs | ✔ Mechanismus |
-| A recurring lookup gets a script; never pull raw transcripts, listings, or logs into context to answer it | 1 | niedrig | wait-command-guard.mjs | ✔ Mechanismus |
+| Findings recorded by a session that could not write the work order — carry each into TASKS.md, then mark it drained | 45 | hoch | findings-guard.mjs | ✔ Mechanismus |
+| A recurring lookup gets a script; never pull raw transcripts, listings, or logs into context to answer it | 1 | niedrig | — (Regel/Memory) | ◐ Regel |
 | Past the 150k context watermark, FINISH the step and hand over — never start a suite, an agent or a point after it; the user raised the cost twice (13.08. and 17.08.2026) | 2 | mittel | — (Regel/Memory) | ◐ Regel |
 | User 18.08.2026: hard, complex, error-prone and HIGH-criticality points are AUTHORED by GPT-5.6 Sol directly — Opus 5 authors only what is left, and Fable authors only a point that tags its lane or one the router escalates | 4 | hoch | — (Regel/Memory) | ◐ Regel |
 | Two test layers — Vitest (jsdom) for logic/store/HUD, Playwright for browser-only; add a test per new feature on the right layer | 1 | niedrig | — (Regel/Memory) | ◐ Regel |
@@ -1533,10 +1535,10 @@ Maßnahme = Guard-Skripte mit Namens-Treffer). Die inhaltliche Bewertung gehört
 | A pending batch claim HOLDS THE LAUNCHER BACK — withdraw it whenever the claiming window is left unattended | 2 | mittel | clear-claim-guard.mjs | ✔ Mechanismus |
 | Multi-agent workflows eat the session/weekly limit fast — verify findings INLINE, keep fan-outs small, warn the user with a cost estimate before any big workflow | 3 | mittel | doc-budget-guard.mjs | ✔ Mechanismus |
 
-Erfasste Quellen: 94 Feedback-/Projekt-Memories · 58 Guard-/Hook-Skripte · 6 Revert-/Reapply-Commits · 124 Prozess-/Meta-TASKS-Punkte (davon 58 offen).
+Erfasste Quellen: 95 Feedback-/Projekt-Memories · 57 Guard-/Hook-Skripte · 6 Revert-/Reapply-Commits · 124 Prozess-/Meta-TASKS-Punkte (davon 58 offen).
 
-<!-- RETRO-FINGERPRINT: 7ca11fee29f159340e79307e980a5757debacf94df4d785419bdcc3bf24ec91b -->
-<!-- RETRO-LAST-REFRESHED: 2026-09-04T15:58:06.700Z -->
+<!-- RETRO-FINGERPRINT: 65d4e927c21ff8103ec52a6a78c252bd1bc80ef5697d29568eda988d1a5f2e78 -->
+<!-- RETRO-LAST-REFRESHED: 2026-09-04T20:23:41.296Z -->
 <!-- AUTO-GENERATED:END -->
 
 ### 3.111 Ein Erfolg ist kein Beweis für den Weg, auf dem er zustande kam
@@ -5540,3 +5542,33 @@ sonst wird nach dem stärksten Verdächtigen gehandelt statt nach dem gemessenen
 Und ein langer Lauf gehört abgekoppelt (`setsid`, eigene Prozessgruppe, Log in
 eine Datei): Hängt er am Leben der Sitzung, nimmt jeder Sitzungstod die Arbeit
 UND ihren Beweis mit.
+
+### 3.236 Unser eigener Handgriff meldet sich beim Nutzer als Fremdabsturz
+
+Am 04.09.2026 fragte der Nutzer, warum „immer wieder" `Error: Claude Code
+process exited with code 143` erscheint und danach „Remote Control is disabled"
+steht. Das Fehlerbild kommt von außen daher — ein abgestürzter Prozess, ein
+abgerissener Dienst, ein Verdacht Richtung Speicher oder Container. Gemessen war
+es das genaue Gegenteil: 143 ist 128+15, also ein SIGTERM, und im eigenen
+Hauptbuch steht zwei Minuten vorher die Zeile `handover` mit `cause:
+context-boundary` auf genau der pid, die dann stirbt. Weder Container noch
+VS Code hatten in dem Fenster neu gestartet. Der einzige passende Absender im
+Repository ist unsere Autostart-Remediation „lebt, ist aber nicht mehr
+Lock-Owner → kill it" — und genau das wird ein übergebener Vorgänger.
+
+Das ist nicht §3.235 („der Messwert ohne Uhrzeit"), sondern die Stufe davor: Der
+Mechanismus arbeitet korrekt, aber sein Abschluss verlässt das System als
+Fehlermeldung eines fremden Werkzeugs. Für die Batch ist der Vorgang folgenlos,
+der Nachfolger läuft weiter; für den NUTZER ist er es nicht, denn mit dem
+Prozess archiviert sich dessen Remote-Sitzung, und die Fernsicht auf einen
+unbeaufsichtigten Lauf ist weg — acht Mal an diesem Abend, ohne dass irgendwo
+gestanden hätte, dass wir es selbst waren. Bezeichnend ist, wer es gefunden hat:
+kein Wächter, kein Test, sondern eine Nutzerfrage nach einem wiederkehrenden
+roten Kasten — dieselbe Fundquelle wie in §3.229 und §3.233.
+
+**Lehre:** Ein geplanter Abgang muss auch so AUSSEHEN. Wo unsere Automatik einen
+Prozess beendet, gehört das Signal so gewählt (oder der Weg so gebaut, dass der
+Vorgänger sich selbst mit 0 beendet), dass kein Wirtsprogramm daraus eine
+Fehlermeldung baut — und was am Prozess hängt und den Nutzer betrifft, muss der
+Nachfolger wieder anmelden. Sonst zahlt der Nutzer für unsere Sauberkeit mit
+Verunsicherung und mit dem Verlust seines einzigen Fernblicks.
