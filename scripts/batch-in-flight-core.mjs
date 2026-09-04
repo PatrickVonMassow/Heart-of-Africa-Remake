@@ -159,7 +159,67 @@ export function assessCiWait({ wait, now = Date.now(), probePid = () => null } =
  * Returns { shields, reason, ageMs }. Anything unreadable SHIELDS: a declaration
  * this cannot parse is not evidence that the work is over.
  */
-export function declarationShields({ declaration, now = Date.now(), maxAgeMs = IN_FLIGHT_MAX_AGE_MS } = {}) {
+/**
+ * IS THE SESSION THAT WROTE THIS DECLARATION STILL RUNNING? PURE (point 1048,
+ * union entry U2).
+ *
+ * The declaration's `evidence` entries are probed; its own WRITER never was.
+ * That is how `.claude/batch-in-flight.json` kept "a verification is running"
+ * plausible all night on 02./03.09.2026 while naming a pid dead since the
+ * afternoon — and, measured again on 04.09.2026, how the marker in this
+ * checkout still named pid 1761118, which no longer exists. A declaration with
+ * an empty `evidence` array — the incident's exact shape — was believed on its
+ * timestamp alone.
+ *
+ * Identity, not existence: the recorded `pidStartedAt` must match what the OS
+ * reports, so a reused pid cannot resurrect a dead session's paperwork. The
+ * comparison is the one `resolveOwnership` and the pid evidence kind already
+ * use.
+ *
+ * UNJUDGEABLE IS NOT DEAD. A declaration carrying no pid, or one whose start
+ * time the OS will not report, answers `known: false` and changes nothing — the
+ * clock stays its bound. Only a pid that is demonstrably gone or demonstrably
+ * somebody else's answers `alive: false`.
+ *
+ * @returns {{known: boolean, alive: boolean, reason: string, pid: number|null}}
+ */
+export function declarationWriterAlive({
+  declaration,
+  probePid = null,
+  tolerance = PID_START_TOLERANCE_MS,
+} = {}) {
+  const unknown = (reason, pid = null) => ({ known: false, alive: true, reason, pid })
+  if (!declaration || typeof declaration !== 'object') return unknown('no-declaration')
+  const pid = Number(declaration.pid)
+  if (!Number.isInteger(pid) || pid <= 0) return unknown('no-writer-pid')
+  if (typeof probePid !== 'function') return unknown('no-probe', pid)
+  let probe = null
+  try {
+    probe = probePid(pid)
+  } catch {
+    return unknown('probe-failed', pid)
+  }
+  if (!probe || probe.exists !== true) return { known: true, alive: false, reason: 'writer-gone', pid }
+  const recorded = declaration.pidStartedAt
+  if (typeof recorded !== 'number' || !Number.isFinite(recorded)) return unknown('no-writer-start-time', pid)
+  if (typeof probe.startedAt !== 'number' || !Number.isFinite(probe.startedAt)) {
+    return unknown('writer-start-time-unverifiable', pid)
+  }
+  if (Math.abs(probe.startedAt - recorded) > tolerance) {
+    return { known: true, alive: false, reason: 'writer-pid-reused', pid }
+  }
+  return { known: true, alive: true, reason: 'writer-alive', pid }
+}
+
+export function declarationShields({
+  declaration,
+  now = Date.now(),
+  maxAgeMs = IN_FLIGHT_MAX_AGE_MS,
+  // The writer probe is INJECTED and defaults to absent, so every existing
+  // caller keeps the clock-only behaviour it was written against and only a
+  // caller that can actually probe pays for the stricter answer.
+  probePid = null,
+} = {}) {
   if (!declaration || typeof declaration !== 'object') return { shields: true, reason: 'unreadable', ageMs: null }
   const at = Number(declaration.at)
   if (!Number.isFinite(at)) return { shields: true, reason: 'no-timestamp', ageMs: null }
@@ -167,8 +227,13 @@ export function declarationShields({ declaration, now = Date.now(), maxAgeMs = I
   // A stamp from the future is a clock nothing here can reason about — shield,
   // and let the wait-side assessment, which blocks on skew, be the strict one.
   if (!(ageMs >= 0)) return { shields: true, reason: 'clock-skew', ageMs }
-  if (ageMs > maxAgeMs) return { shields: false, reason: 'expired', ageMs }
-  return { shields: true, reason: 'live', ageMs }
+  // A DEAD WRITER SHIELDS NOTHING (union entry U2), whatever the clock says. A
+  // declaration is a claim about what a running session is doing; once that
+  // session is gone the claim has no subject.
+  const writer = declarationWriterAlive({ declaration, probePid })
+  if (writer.known && !writer.alive) return { shields: false, reason: writer.reason, ageMs, writer }
+  if (ageMs > maxAgeMs) return { shields: false, reason: 'expired', ageMs, writer }
+  return { shields: true, reason: 'live', ageMs, writer }
 }
 
 /** How recently a declared LOG file must have been written to count as proof that
@@ -2338,6 +2403,11 @@ export function assessOwnerWork({ declaration, lock, now, maxAgeMs = LAUNCHER_WO
   })
   if (!owner.mine) return out({ reason: `not-owners:${owner.via}` })
 
+  // NOT the writer's liveness (union entry U2). The launcher already asks that
+  // of the LOCK through `assessOwner`, with its own owner probe, and the probe
+  // handed in here answers for the DECLARED work's pids — reusing it for the
+  // session itself would read a finished agent as a dead owner. The writer test
+  // belongs where a declaration shields something: `declarationShields`.
   const declaredAt = declaration.at
   const ageMs = now - declaredAt
   // A declaration from the future is a clock this cannot reason about → the same

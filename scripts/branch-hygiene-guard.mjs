@@ -15,6 +15,7 @@ import { isMainModule } from './is-main.mjs'
 import { heldByOtherLiveOwner } from './batch-singleton.mjs'
 import { assessBranchHygiene, formatBranchHygiene, DEFAULT_GRACE_MS, normBranch } from './branch-hygiene-core.mjs'
 import { declarationShields } from './batch-in-flight-core.mjs'
+import { probePid } from './batch-singleton.mjs'
 
 const PAUSE = repoPath('.claude/batch-paused')
 const IN_FLIGHT = repoPath('.claude/batch-in-flight.json')
@@ -175,7 +176,11 @@ function isAncestorOfMain(sha) {
 function readInFlight(now = Date.now()) {
   try {
     const d = JSON.parse(readFileSync(IN_FLIGHT, 'utf8'))
-    const verdict = declarationShields({ declaration: d, now })
+    // The writer probe too (point 1048, union entry U2): a declaration whose
+    // session is provably gone shielded its branch and its worktree for the
+    // whole 45 minutes of its clock, which is the shape that kept the incident's
+    // dead pid credible.
+    const verdict = declarationShields({ declaration: d, now, probePid })
     if (!verdict.shields) return { branches: [], paths: [], expired: true, ageMs: verdict.ageMs }
     const evidence = Array.isArray(d?.evidence) ? d.evidence : []
     return {

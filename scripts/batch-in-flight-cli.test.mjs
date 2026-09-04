@@ -7,6 +7,7 @@ import { tmpdir } from 'node:os'
 import { join, resolve } from 'node:path'
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 
+import { reapDeadDeclaration } from './batch-in-flight.mjs'
 const CLI = resolve(import.meta.dirname, 'batch-in-flight.mjs')
 const OWNER = 'cli-owner'
 let root = ''
@@ -300,5 +301,57 @@ describe('batch-in-flight — durable adoption CLI flags', () => {
     expect(result.status, result.stderr).toBe(0)
     expect(result.stdout).toContain('"verdict": "quiet"')
     expect(result.stdout).not.toContain('"verdict": "alive"')
+  })
+})
+
+// --- POINT 1048: THE PAPERWORK OF A DEAD SESSION -----------------------------
+describe('a declaration whose writing session is gone', () => {
+  it('is cleared before any command reads it, and the clearing is said out loud', () => {
+    const dir = mkdtempSync(join(tmpdir(), 'hoa-inflight-reap-'))
+    const path = join(dir, 'batch-in-flight.json')
+    try {
+      // A pid that cannot exist: pid 0 is never a user process, and the shape is
+      // otherwise the marker measured live on 04.09.2026 — fresh, evidence-less,
+      // and naming a session that had been gone for hours.
+      writeFileSync(path, JSON.stringify({
+        v: 1, sessionId: 'S-dead', pid: 999_999_999, pidStartedAt: Date.now() - 3_600_000,
+        at: Date.now() - 60_000, waitingOn: 'a WebGPU lane that finished long ago', evidence: [],
+      }))
+      const verdict = reapDeadDeclaration(path, { probe: () => ({ exists: false, startedAt: null }) })
+      expect(verdict).toMatchObject({ reaped: true, reason: 'writer-gone' })
+      expect(existsSync(path)).toBe(false)
+    } finally {
+      rmSync(dir, { recursive: true, force: true })
+    }
+  })
+
+  it('leaves a TRANSFERRED declaration alone — its dead pid is the point of a handover', () => {
+    const dir = mkdtempSync(join(tmpdir(), 'hoa-inflight-transfer-'))
+    const path = join(dir, 'batch-in-flight.json')
+    try {
+      writeFileSync(path, JSON.stringify({
+        v: 1, sessionId: 'S-gone', pid: 999_999_999, pidStartedAt: Date.now() - 3_600_000,
+        at: Date.now() - 60_000, waitingOn: 'a delegated author', evidence: [],
+        transfer: { v: 1, by: 'S-gone', at: Date.now() - 30_000, checkpoints: [] },
+      }))
+      expect(reapDeadDeclaration(path, { probe: () => ({ exists: false, startedAt: null }) }))
+        .toMatchObject({ reaped: false, reason: 'transferred' })
+      expect(existsSync(path)).toBe(true)
+    } finally {
+      rmSync(dir, { recursive: true, force: true })
+    }
+  })
+
+  it('never clears what it cannot judge', () => {
+    const dir = mkdtempSync(join(tmpdir(), 'hoa-inflight-unknown-'))
+    const path = join(dir, 'batch-in-flight.json')
+    try {
+      writeFileSync(path, JSON.stringify({ v: 1, sessionId: 'S', at: Date.now(), waitingOn: 'x', evidence: [] }))
+      expect(reapDeadDeclaration(path, { probe: () => ({ exists: false, startedAt: null }) }))
+        .toMatchObject({ reaped: false, reason: 'no-writer-pid' })
+      expect(existsSync(path)).toBe(true)
+    } finally {
+      rmSync(dir, { recursive: true, force: true })
+    }
   })
 })

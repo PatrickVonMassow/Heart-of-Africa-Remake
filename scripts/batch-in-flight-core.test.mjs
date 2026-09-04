@@ -50,6 +50,7 @@ import {
   statusVerdict,
   closingFreezeActive,
   declarationShields,
+  declarationWriterAlive,
   pastEtaCards,
   waitEtaRefusal,
   adoptionAssessment,
@@ -4539,5 +4540,69 @@ describe('commissionTarget — the act of opening a point, recognised', () => {
     expect(() => commissionTarget({ toolName: null, command: null, prompt: null, description: null })).not.toThrow()
     expect(commissionTarget({ toolName: 'Bash', command: 'git checkout -b feat/0-nope' }).point).toBeNull()
     expect(commissionTarget({ toolName: 'Agent', prompt: 'feat/'.repeat(500) }).point).toBeNull()
+  })
+})
+
+// --- POINT 1048: A DECLARATION OF A DEAD SESSION SAYS NOTHING -----------------
+// `.claude/batch-in-flight.json` kept "a verification is running" plausible all
+// night on 02./03.09.2026 while naming a pid dead since the afternoon, and the
+// marker measured in this checkout on 04.09.2026 still named pid 1761118, gone.
+// The evidence entries were probed; the writer never was.
+describe('the declaration\'s own writer (union entry U2)', () => {
+  const NOW_U2 = Date.parse('2026-09-04T09:00:00Z')
+  const born = NOW_U2 - 4 * 60 * 60 * 1000
+  const declaration = { at: NOW_U2 - 60_000, pid: 1761118, pidStartedAt: born, evidence: [] }
+  const aliveProbe = () => ({ exists: true, startedAt: born })
+  const deadProbe = () => ({ exists: false, startedAt: null })
+  const strangerProbe = () => ({ exists: true, startedAt: born + 10 * 60 * 1000 })
+
+  it('reads a live writer as live', () => {
+    expect(declarationWriterAlive({ declaration, probePid: aliveProbe }))
+      .toMatchObject({ known: true, alive: true, reason: 'writer-alive', pid: 1761118 })
+  })
+
+  it('reads the incident — a pid gone for hours — as dead', () => {
+    expect(declarationWriterAlive({ declaration, probePid: deadProbe }))
+      .toMatchObject({ known: true, alive: false, reason: 'writer-gone' })
+  })
+
+  it('does not let a REUSED pid resurrect the paperwork', () => {
+    expect(declarationWriterAlive({ declaration, probePid: strangerProbe }))
+      .toMatchObject({ known: true, alive: false, reason: 'writer-pid-reused' })
+  })
+
+  it('answers UNKNOWN — never dead — where it cannot judge', () => {
+    for (const [input, reason] of [
+      [{ declaration: { at: 1 }, probePid: aliveProbe }, 'no-writer-pid'],
+      [{ declaration, probePid: null }, 'no-probe'],
+      [{ declaration, probePid: () => { throw new Error('boom') } }, 'probe-failed'],
+      [{ declaration: { ...declaration, pidStartedAt: undefined }, probePid: aliveProbe }, 'no-writer-start-time'],
+      [{ declaration, probePid: () => ({ exists: true, startedAt: null }) }, 'writer-start-time-unverifiable'],
+      [{}, 'no-declaration'],
+    ]) {
+      expect(declarationWriterAlive(input)).toMatchObject({ known: false, alive: true, reason })
+    }
+  })
+
+  it('stops a dead writer\'s declaration from shielding anything', () => {
+    // Fresh by the clock — one minute old — and still worthless.
+    expect(declarationShields({ declaration, now: NOW_U2, probePid: deadProbe }))
+      .toMatchObject({ shields: false, reason: 'writer-gone' })
+    expect(declarationShields({ declaration, now: NOW_U2, probePid: aliveProbe }))
+      .toMatchObject({ shields: true, reason: 'live' })
+  })
+
+  it('leaves every caller that cannot probe exactly as it was', () => {
+    expect(declarationShields({ declaration, now: NOW_U2 })).toMatchObject({ shields: true, reason: 'live' })
+  })
+
+  it('leaves assessOwnerWork alone — the launcher asks the LOCK about liveness', () => {
+    // Reusing the declared work's pid probe for the session itself would read a
+    // finished agent beside a running branch as a dead owner, which is the
+    // mistake that killed four sessions in one afternoon.
+    const lock = { sessionId: 'S1', pid: 1761118, pidStartedAt: born }
+    const owned = { ...declaration, sessionId: 'S1', evidence: [{ kind: 'log', path: 'x.log' }] }
+    expect(assessOwnerWork({ declaration: owned, lock, now: NOW_U2, probePid: deadProbe, mtimeOf: () => NOW_U2 - 1000 }))
+      .toMatchObject({ declared: true })
   })
 })
