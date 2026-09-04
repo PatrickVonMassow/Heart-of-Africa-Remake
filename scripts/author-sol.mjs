@@ -65,6 +65,7 @@ import {
   KILL_GRACE_MS,
   parseAuthoringAnswer,
   PUSH_INTERVAL_MS,
+  FINAL_PUSH_TIMEOUT_MS,
   PUSH_TIMEOUT_MS,
   readinessProblems,
   SOL_MODEL_ID,
@@ -316,12 +317,25 @@ export function uncommittedNumstat({ cwd = process.cwd(), read = readFileSync } 
 /** git's unit separator, so a subject holding any punctuation still parses. */
 const UNIT = String.fromCharCode(31)
 
-/** Push the branch, quietly. Returns true only on a real success. */
-export function pushBranch(branch, { cwd = process.cwd(), timeoutMs = PUSH_TIMEOUT_MS } = {}) {
+/** Push the branch, quietly. Returns true only on a real success.
+ *
+ *  A CHECKPOINT PUSH DOES NOT RUN THE FAST GATE (`verify: false`). Measured
+ *  04.09.2026 on point 1051: `scripts/git-hooks/pre-push` runs build, lint and
+ *  the unit suite, which took 3 min 20 s on this machine, so EVERY interim push
+ *  was SIGKILLed at the 60 s bound and not one checkpoint reached the remote —
+ *  six in a row, each having burnt a full gate run against the author's own
+ *  gates first. The gate exists so CI never reports a break first; a checkpoint
+ *  commit is marked `[skip ci]` and starts no CI at all, and the author's own
+ *  three gates, the final push and the landing all still run it. This is the
+ *  same cut the durable lane already makes, where `installPrePushHook`
+ *  (`scripts/detached-agent.mjs`) replaces the gate hook outright for the
+ *  checkpoints of a worktree.
+ */
+export function pushBranch(branch, { cwd = process.cwd(), timeoutMs = PUSH_TIMEOUT_MS, verify = true } = {}) {
   // TIMED, because the interim push runs on the event loop the kill timer lives
   // on (second cross-vendor round): a push that hangs on the network would
   // otherwise block the timeout that is supposed to bound the whole run.
-  const res = spawnSync('git', ['push', '-u', 'origin', branch], {
+  const res = spawnSync('git', ['push', ...(verify ? [] : ['--no-verify']), '-u', 'origin', branch], {
     cwd,
     encoding: 'utf8',
     windowsHide: true,
@@ -417,7 +431,7 @@ export async function runAuthoringCodex({
           onPush({ ok: false, skipped: true, head, why: `checkpoint not pushed: ${problem}` })
           return
         }
-        const { ok, why } = pushBranch(branch, { cwd })
+        const { ok, why } = pushBranch(branch, { cwd, verify: false })
         if (ok) lastPushed = head
         onPush({ ok, head, why })
       }, pushEveryMs)
@@ -806,7 +820,7 @@ export async function runAuthoringCli({ authorLane = 'sol', argv = process.argv.
     })
     if (commissioned.written) {
       records.push(commissioned.record)
-      const saved = pushBranch(branch, { cwd })
+      const saved = pushBranch(branch, { cwd, verify: false })
       console.error(
         saved.ok
           ? `${commandName}: recorded and pushed the authoring commission before starting it`
@@ -903,7 +917,7 @@ export async function runAuthoringCli({ authorLane = 'sol', argv = process.argv.
     // not local-only work.
     let pushed = null
     if (judged.commits.length) {
-      const res = pushBranch(branch, { cwd })
+      const res = pushBranch(branch, { cwd, timeoutMs: FINAL_PUSH_TIMEOUT_MS })
       const tip = git(['rev-parse', `refs/heads/${branch}`], { cwd })
       pushed = res.ok || (Boolean(tip) && tip === run.lastPushed)
       if (!res.ok) {
