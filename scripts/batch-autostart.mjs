@@ -87,6 +87,7 @@ import {
   announceSpawn,
   firewallTopUpDecision,
   ownerKeepsBatch,
+  takeoverHandsOver,
   staleEtaLogLine,
   launcherStartRecord,
   successorStartDecision,
@@ -1183,6 +1184,27 @@ if (state.failCount >= RUNAWAY_FAIL_LIMIT) {
   process.exit(0)
 }
 
+// Debounce, and it ESCALATES (point 433 (iii)): the base ten minutes is what a
+// healthy spawn needs to come up, but each recorded failure doubles the wait up to
+// the cap, so a refusing environment is no longer hammered at a fixed rate all
+// night. `failCount` is cleared the moment a spawn makes progress, so the ladder
+// falls back to the floor by itself.
+// A standing QUOTA block short-circuits the ladder to its floor (point 444): the
+// only way to learn that the budget is back is to try, and a refused start costs
+// practically nothing, so the probe rides the ordinary tick.
+//
+// MEASURED BEFORE THE OWNERSHIP VERDICT (point 1048, union entry U23), because a
+// takeover that cannot be followed by a spawn hands the batch to NOBODY. Both
+// reads are side-effect free, and nothing between here and the spawn changes
+// `failCount`, so the ladder produces exactly the value it always did.
+const backoffMs = spawnBackoffMs({ failCount: state.failCount, quota: !!state.quota })
+const lastSpawn = readJson(C('autostart-last.json'))
+const spawnBackoffBlocks = shouldWaitForSpawnBackoff({ triggerKind, lastSpawnAt: lastSpawn?.at, now, backoffMs })
+const spawnBackoffReason = spawnBackoffBlocks
+  ? `a spawn ${Math.round((now - lastSpawn.at) / 60000)} min ago is still inside its backoff ` +
+    `(${Math.round(backoffMs / 60000)} min at failCount ${state.failCount || 0})`
+  : ''
+
 // --- Liveness verdict ----------------------------------------------------------
 // TWO OUTCOMES, NOT THREE (point 434). 'skip-wedged' and everything under it —
 // the stall verdict, the two-stage silence report, the wedge takeover, the
@@ -1398,7 +1420,24 @@ if (verdict === 'skip-alive') {
     thresholdMs: EMERGENCY_THRESHOLD_MS,
     hardDeadlineMs: EMERGENCY_HARD_DEADLINE_MS,
   })
-  if (!writerRecovered && !keeps.keeps) {
+  // AND A TAKEOVER IS A HANDOVER (union entry U23) — it needs somebody to hand
+  // to. On 04.09.2026 this tick took the batch from a live owner and refused, in
+  // the same breath, to spawn the successor: the lock was released and nobody
+  // held it, so every woken session inherited the whole stall and was taken from
+  // again within a minute, until the watchdog paused the batch as a runaway.
+  const handover = takeoverHandsOver({ keeps, spawnBlocked: spawnBackoffBlocks, blockedReason: spawnBackoffReason })
+  if (!writerRecovered && handover.code === 'no-successor-available') {
+    log(`NOT TAKING THE BATCH: ${handover.reason}. The owner keeps it until a successor can actually start.`)
+    await notify(
+      'Batch stalled, takeover deferred',
+      `${keeps.witnesses.join('; ')}. The launcher would have taken the batch from its live owner, but it cannot ` +
+        `start a successor this tick (${spawnBackoffReason}), and an ownerless batch is worse than a stalled one. ` +
+        'It takes the batch on the first tick that can also spawn. Please look if this repeats.',
+      'urgent',
+      { recurring: true },
+    )
+  }
+  if (!writerRecovered && handover.take) {
     // AND IT SAYS SO (union entry U20). Tick after tick of green skips is how the
     // last wedge stayed invisible; the line that OVERRIDES a skip must name the
     // evidence that outvoted it.
@@ -1551,17 +1590,7 @@ if (dispossessed) {
   log('no owner lock — taking over; no live batch-writer process measured')
 }
 
-// Debounce, and it ESCALATES (point 433 (iii)): the base ten minutes is what a
-// healthy spawn needs to come up, but each recorded failure doubles the wait up to
-// the cap, so a refusing environment is no longer hammered at a fixed rate all
-// night. `failCount` is cleared the moment a spawn makes progress, so the ladder
-// falls back to the floor by itself.
-// A standing QUOTA block short-circuits the ladder to its floor (point 444): the
-// only way to learn that the budget is back is to try, and a refused start costs
-// practically nothing, so the probe rides the ordinary tick.
-const backoffMs = spawnBackoffMs({ failCount: state.failCount, quota: !!state.quota })
-const lastSpawn = readJson(C('autostart-last.json'))
-if (shouldWaitForSpawnBackoff({ triggerKind, lastSpawnAt: lastSpawn?.at, now, backoffMs })) {
+if (spawnBackoffBlocks) {
   const waitOutcome = judgeSpawnOutcome({
     verdict: 'refused',
     failCount: state.failCount || 0,
@@ -1572,13 +1601,18 @@ if (shouldWaitForSpawnBackoff({ triggerKind, lastSpawnAt: lastSpawn?.at, now, ba
   state.failCount = waitOutcome.failCount
   state.lastWatchdogCause = {
     code: 'spawn-backoff',
-    reason: `the previous spawn is still inside its ${Math.round(backoffMs / 60000)} minute backoff`,
+    reason: spawnBackoffReason,
     at: now,
   }
+  // IT IS A BACKOFF, NOT A CLAIM (union entry U23). The line used to say the
+  // previous spawn was "still claiming the lock"; on 04.09.2026 that spawn had
+  // been dead for 32 minutes, having died three seconds in without writing a
+  // line — `judgePreviousSpawn` had already counted it as a failed START, which
+  // is precisely why the ladder stood at 40 minutes. Saying so is what lets a
+  // reader tell a slow starter from a ladder built out of corpses.
   log(
-    `skip: a spawn ${Math.round((now - lastSpawn.at) / 60000)} min ago is still claiming the lock ` +
-      `(backoff ${Math.round(backoffMs / 60000)} min at failCount ${state.failCount || 0}` +
-      `${state.quota ? `, quota block standing since ${new Date(state.quota.since).toISOString()}` : ''})`,
+    `skip: ${spawnBackoffReason}` +
+      `${state.quota ? `, quota block standing since ${new Date(state.quota.since).toISOString()}` : ''}`,
   )
   writeJsonAtomic(C('autostart-state.json'), state)
   process.exit(0)

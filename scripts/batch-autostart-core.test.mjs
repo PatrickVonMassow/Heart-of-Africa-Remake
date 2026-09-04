@@ -69,6 +69,7 @@ import {
   supervisedExitTrigger,
   SUCCESSOR_TRIGGERS,
   ownerKeepsBatch,
+  takeoverHandsOver,
 } from './batch-autostart-core.mjs'
 import { readState, writeState } from './fable-switch-core.mjs'
 import { PAUSE_RETRY_LADDER_MS } from './batch-pause-core.mjs'
@@ -2061,5 +2062,43 @@ describe('may the owner keep the batch? (union entry U4)', () => {
         .toMatchObject({ keeps: true, reason: 'no-progress-measurement' })
     }
     expect(() => ownerKeepsBatch()).not.toThrow()
+  })
+})
+
+describe('U23 — a takeover is a handover, and needs somebody to hand to', () => {
+  const HOUR = 60 * 60 * 1000
+  const NOW = Date.parse('2026-09-04T14:15:25Z')
+  const stalled = ownerKeepsBatch({
+    progressAt: NOW - 63 * 60_000, now: NOW, thresholdMs: HOUR, hardDeadlineMs: 2 * HOUR, workAdvancing: false,
+  })
+
+  it('replays 14:15:25Z — the take and the refusal to spawn stood in the SAME tick', () => {
+    expect(stalled).toMatchObject({ keeps: false, reason: 'stalled-past-threshold-without-advancing-work' })
+    const decision = takeoverHandsOver({
+      keeps: stalled,
+      spawnBlocked: true,
+      blockedReason: 'a spawn 32 min ago is still inside its backoff (40 min at failCount 2)',
+    })
+    expect(decision).toMatchObject({ take: false, code: 'no-successor-available' })
+    expect(decision.reason).toContain('cannot start a successor')
+    expect(decision.reason).toContain('failCount 2')
+    expect(decision.reason).toContain('ownerless batch is worse than a stalled one')
+  })
+
+  it('takes it the moment the same tick could also spawn', () => {
+    expect(takeoverHandsOver({ keeps: stalled, spawnBlocked: false }))
+      .toMatchObject({ take: true, code: 'taken', reason: 'stalled-past-threshold-without-advancing-work' })
+  })
+
+  it('leaves an owner that keeps the batch entirely alone, blocked spawn or not', () => {
+    const keeping = ownerKeepsBatch({
+      progressAt: NOW - 10 * 60_000, now: NOW, thresholdMs: HOUR, hardDeadlineMs: 2 * HOUR,
+    })
+    for (const spawnBlocked of [true, false]) {
+      expect(takeoverHandsOver({ keeps: keeping, spawnBlocked })).toMatchObject({ take: false, code: 'owner-keeps' })
+    }
+    // No verdict at all is not a licence to take the batch either.
+    expect(takeoverHandsOver()).toMatchObject({ take: false, code: 'owner-keeps' })
+    expect(() => takeoverHandsOver({ keeps: stalled, spawnBlocked: true })).not.toThrow()
   })
 })
