@@ -318,6 +318,50 @@ put it is the mistake this line exists to stop.
   Refs: src/scenes/place/SpeechLabels.tsx, src/communication/speechTarget.ts, src/ui/Dialogs.tsx, src/i18n/de.ts, src/i18n/en.ts
   Bundle: Dorfleben.
 
+- [ ] 1056. The adults dig for no visible reason, and the picture never says what comes
+  out (user 04.09.2026, watching the merged digging work).
+  The user asked what the adults are digging FOR and found no answer in the scene: "Sie
+  scheinen zum Selbstzweck zu graben. Was graben sie aus?" The reason exists in the code
+  and nowhere else. Every site is placed as a KIND with a real purpose — a store pit
+  against a compound wall, a post hole beside a lane, turned ground at the outer edge of
+  the worked land — but the kind is only a placement rule. All three render the same
+  round hole; only the patch is a little wider. No post is ever set, no store is ever
+  sunk, no ground is ever planted, and the pair's bout ends with the hole a little deeper
+  and the spoil a little higher and nothing else. The excavation also resets when the
+  village is re-entered, so a returning player finds untouched ground where he watched
+  men work. This is the 13.08.2026 complaint of point 690 in a new place — "Selbst wenn
+  ich diese Übersetzungen sehe, erkenne ich keinen Sinn hinter den Handlungen" — and it
+  costs the DIG lesson its footing: a word demonstrated on a purposeless act is a word
+  the player has no reason to trust.
+  Final state:
+  - A standing player can tell, without text and without the concept overlay, what each
+    of the three excavations is FOR. Each kind carries its own answer in the scene beside
+    it, and the three no longer read as one repeated hole.
+  - A finished bout leaves a RESULT, not only a deeper hole: what the pair was digging
+    for is there to be seen when they walk away.
+  - The turned patch is worked ground, not a pit — its shape says what is done to it.
+  - The DIG lesson is untouched: two bouts at two different sites, the invitation and the
+    site word, both still held while a child can hear, and the aim of the site word still
+    lands on the excavation itself.
+  - Design and code agree afterwards: `design.md` §7 states what the digging is for in the
+    world, not only that it teaches a word.
+  Test: Vitest over the scene description — each dig-site kind carries its own distinct
+  furniture, and a completed bout adds the result to the site; Playwright on the polish
+  lane — a village frame in which the three sites are visibly different things, judged on
+  both backends.
+  Criticality: high — this is the second time the player has read village work as
+  meaningless, and the first time cost the whole communication slice a rebuild.
+  Quotes:
+  Nutzer, 04.09.2026 08:40: »Was ist der inhaltliche Grund fürs Graben der Erwachsenen?
+  Bisher ist keiner erkennbar. Sie scheinen zum Selbstzweck zu graben. Was graben sie
+  aus?«
+  Nutzer, 04.09.2026 08:47: »Reihe einen Punkt direkt vor 690 ein, der das sichtbar
+  macht.«
+  Refs: src/scenes/place/PlaceScene.tsx (`DigSites`), src/scenes/place/digSiteAppearance.ts,
+  src/scenes/place/layout.ts (the kind-anchored placement), src/scenes/place/adultWork.ts
+  (the durable work record), design.md §7
+  Bundle: Dorfleben.
+
 - [ ] 690. The classic game of tag moves to the port cities, and is silent there (user
   13.08.2026, playing the deployed communication slice).
   The user played the deployed communication slice on 13.08.2026 with the debug
