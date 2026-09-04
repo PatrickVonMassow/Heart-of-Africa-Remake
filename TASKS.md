@@ -14357,3 +14357,40 @@ to land than a mechanism that needs a review.
   scripts/doc-budget-core.mjs, scripts/dashboard-conciseness-guard.mjs,
   scripts/batch-claim.mjs, scripts/finding.mjs (ensureIndexed)
   Bundle: Session- & Repo-Hygiene.
+
+- [ ] 1055. A killed board writer keeps the board's edit lock, and the next three board
+  writes wait three minutes and fail (measured twice on 04.09.2026, in one session, both
+  times against a provably dead holder).
+  WHAT HAPPENS. `runBoardStatus` (`scripts/board-heartbeat.mjs:114-136`) spawns
+  `board.mjs status` with `BOARD_WRITE_TIMEOUT_MS` and SIGKILLs it when the machine is
+  busy — which it is whenever a gate, a suite or an authoring run is going, i.e. exactly
+  when the batch is working. The killed child was holding the board edit lock
+  (`.claude/board-edit-lock.json`, `scripts/board-edit-lock.mjs`), so the lock file
+  survives its owner carrying a 24-hour lease.
+  WHAT IT COSTS. `withBoardEditLock` waits `BOARD_EDIT_LOCK_WAIT_MS` — three minutes —
+  and then throws `board edit lock stayed held for 180000 ms; no board update was
+  attempted`. Measured tonight: `board-publish` lost three minutes and published nothing
+  at 01:52, and `board.mjs focus` lost another three at 02:33. A retry roughly a quarter
+  of an hour later succeeded both times, so the effective grace before the dead holder is
+  reaped is longer than the wait that is supposed to outlast it. That combination —
+  a wait strictly shorter than the reaping grace — means the FIRST caller after any killed
+  writer always fails, and `board-first-guard` refuses the session's next mutation because
+  the published board no longer matches the file.
+  Final state:
+  - A BOARD EDIT LOCK WHOSE HOLDER IS PROVABLY DEAD IS TAKEN, NOT WAITED OUT. The holder
+    of this lock is a short-lived local process this machine spawned seconds ago, not a
+    remote session that might be mid-acquisition, so the session-shaped grace does not
+    apply to it. Name the grace this lock uses and make it shorter than
+    `BOARD_EDIT_LOCK_WAIT_MS`, so a contender reaps a corpse inside its own wait.
+  - THE WRITER DOES NOT DIE HOLDING IT, where that is cheap: the spawn bound and the lock
+    hold are the same interval today, so the bound cannot expire without stranding the lock.
+  - The refusal text says the holder is dead and what was done about it, rather than only
+    how long it waited.
+  Test: Vitest over `withBoardEditLock` with a lock file whose recorded pid is dead —
+  the contender acquires inside its wait rather than throwing — and over the pairing of
+  the two constants, so a later edit cannot make the wait shorter than the grace again.
+  Criticality: high — it does not lose a board update, it blocks the guard that every
+  turn's first mutation passes, and it fires precisely when the batch is busiest.
+  Refs: scripts/board-edit-lock.mjs, scripts/batch-singleton.mjs (DEAD_CONFIRM_MS,
+  liveness), scripts/board-heartbeat.mjs (runBoardStatus), scripts/board-publish.mjs
+  Bundle: Session- & Repo-Hygiene.
