@@ -17,7 +17,12 @@ const fixture = () => {
   const dir = mkdtempSync(join(tmpdir(), 'hoa-emergency-'))
   dirs.push(dir)
   const now = Date.parse('2026-08-26T20:00:00Z')
-  const progressAt = now - 2 * EMERGENCY_THRESHOLD_MS
+  // PAST THE THRESHOLD, SHORT OF THE ABSOLUTE DEADLINE. The deadline of union
+  // entry U5 sits at twice the threshold and is decided BEFORE the cooldown and
+  // the lease, so a fixture stalled by exactly that much recovers hard for a
+  // reason none of these cases is about — and every soft path below would be
+  // tested against a decision it never reaches.
+  const progressAt = now - 1.5 * EMERGENCY_THRESHOLD_MS
   return {
     dir, repo: dir, now, progressAt,
     statePath: join(dir, 'state.json'),
@@ -49,7 +54,10 @@ describe('the real emergency strike orchestration', () => {
     expect(result.outcomes.map((x) => x.step)).toEqual(['batch-doctor.mjs --repair', 'batch-autostart.mjs'])
     const rows = readFileSync(f.logPath, 'utf8').trim().split('\n').map(JSON.parse)
     expect(rows.map((x) => x.phase)).toEqual(['intent', 'outcome'])
-    expect(JSON.parse(readFileSync(f.statePath, 'utf8')).pending).toBeUndefined()
+    // The intent SURVIVES the outcome (union entry U7): it is what the
+    // successor reads for its handoff and what the next tick of the same
+    // episode recognises instead of opening a second recovery.
+    expect(JSON.parse(readFileSync(f.statePath, 'utf8')).pending).toMatchObject({ phase: 'intent' })
   })
 
   it('hard-recovers only the exact locked identity, then doctors and restarts', () => {
@@ -87,6 +95,100 @@ describe('the real emergency strike orchestration', () => {
     })
     expect(result.outcomes.filter((x) => x.step === 'terminate-owner').map((x) => x.pid)).toEqual([10, 11])
     expect(commands[0].slice(-1)).toEqual([join(f.dir, 'scripts', 'batch-doctor.mjs')])
+  })
+
+  it('resumes its own crashed attempt instead of opening a second one', () => {
+    const f = fixture()
+    const lock = { sessionId: 'wedged-owner', pid: 123, pidStartedAt: 1000, fence: 8 }
+    const first = runEmergency({ ...f, getLock: () => lock, execute: () => '' })
+    expect(first.decision.strike).toBe(true)
+
+    // The crash: the strike died between its intent and its outcome, so the
+    // state carries a pending intent and the log carries one row.
+    const afterIntent = JSON.parse(readFileSync(f.statePath, 'utf8'))
+    const state = { ...afterIntent, pending: { ...afterIntent.pending, phase: 'intent' }, lastOutcome: undefined }
+    // The retry is the NEXT scheduled tick, not a second attempt inside the
+    // cooldown: the crashed strike left its episode's silence behind, and the
+    // hourly task is what comes back to it.
+    const retry = runEmergency({
+      ...f,
+      now: f.now + EMERGENCY_COOLDOWN_MS + 60_000,
+      inputs: { ...f.inputs, state },
+      getLock: () => lock,
+      execute: () => '',
+    })
+
+    expect(retry.decision.strike).toBe(true)
+    const rows = readFileSync(f.logPath, 'utf8').trim().split('\n').map(JSON.parse)
+    // ONE intent for one episode: the retry reuses the recorded id rather than
+    // minting a second recovery for the same wedge.
+    expect(rows.filter((x) => x.phase === 'intent')).toHaveLength(1)
+    expect(new Set(rows.map((x) => x.id)).size).toBe(1)
+    expect(JSON.parse(readFileSync(f.statePath, 'utf8')).lastStrikeId).toBe(state.lastStrikeId)
+  })
+
+  it('opens a new episode when the owner generation it recovers from has changed', () => {
+    const f = fixture()
+    const first = runEmergency({ ...f, getLock: () => ({ sessionId: 'a', pid: 1, pidStartedAt: 1, fence: 8 }), execute: () => '' })
+    expect(first.decision.strike).toBe(true)
+    const afterIntent = JSON.parse(readFileSync(f.statePath, 'utf8'))
+    const state = { ...afterIntent, pending: { ...afterIntent.pending, phase: 'intent' } }
+
+    const next = runEmergency({
+      ...f,
+      now: f.now + EMERGENCY_COOLDOWN_MS + 60_000,
+      inputs: { ...f.inputs, state },
+      getLock: () => ({ sessionId: 'b', pid: 2, pidStartedAt: 2, fence: 9 }),
+      execute: () => '',
+    })
+    expect(next.decision.strike).toBe(true)
+    const rows = readFileSync(f.logPath, 'utf8').trim().split('\n').map(JSON.parse)
+    expect(rows.filter((x) => x.phase === 'intent')).toHaveLength(2)
+    expect(JSON.parse(readFileSync(f.statePath, 'utf8')).lastStrikeId).not.toBe(state.lastStrikeId)
+  })
+
+  it('retires the waits of the sessions it recovered and leaves every other one alone', () => {
+    const f = fixture()
+    f.inputs.state = { lastStrikeAt: f.now - EMERGENCY_COOLDOWN_MS - 1, lastStrikeProgressAt: f.progressAt }
+    const lock = { sessionId: 'owner', pid: 10, pidStartedAt: 1000, fence: 2 }
+    const handed = []
+    const result = runEmergency({
+      ...f,
+      getLock: () => lock,
+      getProcesses: () => ({ owner: { pid: 10, startedAt: 1000 }, delegate: { pid: 11, startedAt: 2000 } }),
+      revoke: () => ({ revoked: true, reason: 'revoked' }),
+      terminate: (target) => ({ step: 'terminate-owner', ok: true, pid: target.pid }),
+      releaseLock: () => true,
+      getWaitLeases: () => [
+        { sessionId: 'owner', pid: 900, pidStartedAt: 5, runId: 'r1' },
+        { sessionId: 'delegate', pid: 901, pidStartedAt: 6, runId: 'r2' },
+        { sessionId: 'a-live-stranger', pid: 902, pidStartedAt: 7, runId: 'r3' },
+      ],
+      retireWaits: (waits) => { handed.push(...waits); return waits.map((w) => ({ pid: w.pid, outcome: 'terminated' })) },
+      execute: () => '',
+    })
+    expect(handed.map((w) => w.pid)).toEqual([900, 901])
+    expect(result.outcomes.find((x) => x.step === 'retire-waits')).toMatchObject({ ok: true })
+  })
+
+  it('survives an unreadable wait registry rather than skipping the repair', () => {
+    const f = fixture()
+    f.inputs.state = { lastStrikeAt: f.now - EMERGENCY_COOLDOWN_MS - 1, lastStrikeProgressAt: f.progressAt }
+    const result = runEmergency({
+      ...f,
+      getLock: () => ({ sessionId: 'owner', pid: 10, pidStartedAt: 1000, fence: 2 }),
+      getProcesses: () => ({}),
+      revoke: () => ({ revoked: true, reason: 'revoked' }),
+      terminate: () => ({ step: 'terminate-owner', ok: true, pid: 10 }),
+      releaseLock: () => true,
+      getWaitLeases: () => { throw new Error('registry is corrupt') },
+      execute: () => '',
+    })
+    expect(result.outcomes.filter((x) => x.step === 'retire-waits')).toEqual([
+      { step: 'retire-waits', ok: false, error: 'registry is corrupt' },
+      { step: 'retire-waits', ok: true, skipped: 'no-registered-wait' },
+    ])
+    expect(result.outcomes.at(-1)).toMatchObject({ step: 'batch-autostart.mjs', ok: true })
   })
 
   it('dry-run, pause and veto write and execute nothing', () => {

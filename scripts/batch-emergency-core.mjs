@@ -216,13 +216,17 @@ export function emergencyDecision({
   }
 }
 
-export function strikeRecord({ id, decision, at = Date.now(), phase = 'intent', outcomes = [] } = {}) {
+export function strikeRecord({ id, decision, at = Date.now(), phase = 'intent', outcomes = [], episode = null } = {}) {
   return {
     v: 1,
     id,
     at,
     atIso: new Date(at).toISOString(),
     phase,
+    // The one key points 947, 958 and 1048 all reach recovery under (union
+    // entry U9), carried on the record so a retry can recognise its own attempt
+    // instead of opening a second one.
+    episode,
     action: decision.action,
     reason: decision.reason,
     progressAt: decision.progressAt,
