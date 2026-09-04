@@ -27,6 +27,15 @@ export const ACTIVITY_EVENTS = Object.freeze({
   SPAWN_ATTEMPT: 'spawn-attempt',
   SPAWN_FAILURE: 'spawn-failure',
   SUCCESSOR_START: 'successor-start',
+  // The wait as an owned object (point 1048, union entries U11 and U12). Ten
+  // untracked watcher shells stood at 01:00 on 03.09.2026 and no journal line
+  // named one of them; these five make every wait, every deduplication and
+  // every crossed deadline readable after the fact.
+  WAIT_LEASE_ACQUIRE: 'wait-lease-acquire',
+  WAIT_LEASE_ATTACH: 'wait-lease-attach',
+  WAIT_LEASE_REPLACE: 'wait-lease-replace',
+  WAIT_LEASE_RELEASE: 'wait-lease-release',
+  VERIFICATION_WAIT_TIMEOUT: 'verification-wait-timeout',
 })
 
 export const ACTIVITY_EVENT_SET = new Set(Object.values(ACTIVITY_EVENTS))
