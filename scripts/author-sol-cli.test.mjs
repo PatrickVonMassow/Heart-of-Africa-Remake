@@ -5,7 +5,7 @@ import { dirname, join, resolve } from 'node:path'
 import { afterEach, describe, expect, it } from 'vitest'
 import { AUTHORING_COMMISSION_KIND, AUTHORING_FRAMINGS, FABLE_ESCALATION_ROUNDS } from './author-routing-core.mjs'
 import { uncommittedSummary } from './author-sol-core.mjs'
-import { commitsSince, ledgerSnapshot, recordAuthoringCommission, restoreLedger, uncommittedNumstat } from './author-sol.mjs'
+import { commitsSince, ledgerSnapshot, pushBranch, recordAuthoringCommission, restoreLedger, uncommittedNumstat } from './author-sol.mjs'
 import { writeState as writeFableState } from './fable-switch-core.mjs'
 
 const root = resolve(process.cwd())
@@ -489,5 +489,39 @@ describe('author-sol examination does not require an authoring worktree', () => 
     expect(result.stdout).toContain('SPEC EXAMINATION REQUIRED')
     expect(result.stdout).toContain('SPEC EXAMINATION FOR WORK-ORDER POINT 727')
     expect(result.stderr).not.toContain('refusing to start')
+  })
+})
+
+describe('pushBranch and the fast gate', () => {
+  /** A repo whose `origin` is a real bare remote, with a pre-push hook that
+   *  records that it ran and then REFUSES — the cheap stand-in for the fast
+   *  gate, which on 04.09.2026 took 3 min 20 s and so was SIGKILLed at the 60 s
+   *  bound on every one of six checkpoint pushes. */
+  const repoWithRefusingHook = () => {
+    const remote = mkdtempSync(join(tmpdir(), 'hoa-push-remote-'))
+    dirs.push(remote)
+    git(remote, 'init', '-q', '--bare', '-b', 'main')
+    const repo = gitRepo()
+    git(repo, 'remote', 'add', 'origin', remote)
+    const ran = join(repo, 'hook-ran.txt')
+    const hooks = join(repo, '.git', 'hooks')
+    mkdirSync(hooks, { recursive: true })
+    writeFileSync(join(hooks, 'pre-push'), `#!/bin/sh\necho ran >> ${JSON.stringify(ran)}\nexit 1\n`, { mode: 0o755 })
+    return { repo, remote, ran }
+  }
+
+  it('bypasses the pre-push gate for a checkpoint push, so the checkpoint reaches the remote', () => {
+    const { repo, remote, ran } = repoWithRefusingHook()
+
+    expect(pushBranch('main', { cwd: repo, verify: false }).ok).toBe(true)
+    expect(existsSync(ran)).toBe(false)
+    expect(git(remote, 'rev-parse', 'main')).toBe(git(repo, 'rev-parse', 'HEAD'))
+  })
+
+  it('still runs the gate on the final push, so a red one keeps the branch off the remote', () => {
+    const { repo, ran } = repoWithRefusingHook()
+
+    expect(pushBranch('main', { cwd: repo }).ok).toBe(false)
+    expect(readFileSync(ran, 'utf8')).toContain('ran')
   })
 })

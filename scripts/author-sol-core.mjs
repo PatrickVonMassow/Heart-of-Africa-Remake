@@ -107,6 +107,13 @@ export const PUSH_INTERVAL_MS = 2 * 60_000
  *  the bound (second cross-vendor round). */
 export const PUSH_TIMEOUT_MS = 60_000
 
+/** How long the ONE final, fast-gated push may take. It runs after the author's
+ *  child has closed, so it blocks no kill timer, and it must be able to outlast
+ *  `scripts/git-hooks/pre-push` — build, lint and the unit suite, measured at
+ *  3 min 20 s on 04.09.2026 while an author was working beside it. The 60 s
+ *  bound of the checkpoint push turned that gate into a guaranteed SIGKILL. */
+export const FINAL_PUSH_TIMEOUT_MS = 15 * 60_000
+
 /** After SIGTERM, how long the run gets to exit before it is SIGKILLed — and
  *  after that, how long its pipes get to close before the wrapper stops waiting.
  *  A timeout that only asks politely is not a bound: a child ignoring SIGTERM,
