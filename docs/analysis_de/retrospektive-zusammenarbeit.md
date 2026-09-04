@@ -70,6 +70,7 @@ Das Musterbeispiel sind die Chat-Zeitstempel: neun Eskalationsstufen, acht weich
 | 26.08. nachts | Zweimal grün über einer Attrappe, die das echte Board nur nachgebaut statt gelesen hat: Das Kritikalitäts-Stylesheet landete im Kommentar der Refresh-Routine, und die auf Zuruf nachgereichte Regressionsprüfung ließ genau die eine `<meta>`-Zeile weg, die den gemeinten Anker im echten Board verfehlen lässt — Runde zwei verschob und löschte dabei die BOM der Datei (§3.184, Punkt 844) |
 | 26.08. früh | Dritter Rückfall derselben Dublette, diesmal von mir: Ich legte einen frisch gemessenen Befund als Punkt 928 ab, obwohl Punkt 856 seit dem 23.08. genau ihn beschreibt — gefunden wieder erst von der Bündelpflicht, nicht beim Anlegen. Neu war nur die zweite Messung; sie ist jetzt in 856 nachgetragen (§3.168-Nachtrag, 928 in 856 gefaltet) |
 | 24.08. mittags | Der delegierte Autor schrieb drei Commits um, die er bereits veroeffentlicht hatte: Sein Abschluss-Push scheiterte als non-fast-forward, und sein eigener Bericht meldete die fertige Arbeit als „nur lokal“ — obwohl die Baeume beider Seiten byte-identisch waren und sich nur eine Leerzeile im Commit-Text unterschied. Wer dem Bericht glaubt, sucht verlorene Arbeit, die nie verloren war; wer ihn ignoriert, uebersieht den echten Fall. Dieselbe Stunde zeigte die Kehrseite von der Gegenseite: Ein Tor-Lauf im Arbeitsbaum wurde rot, weil die pruefende Sitzung selbst waehrenddessen auf main committete — kein Test schlug fehl, nur der Teardown benannte die Ref-Bewegung |
+| 04.09. | Zwei Sitzungen starben mitten im Testlauf, und der einzige Beleg war ein Allzeit-Höchststand ohne Uhrzeit: 15,7 von 15,9 GB — daraus wurde fast die Maßnahme, den Testlauf zu beschneiden. Die Messung eines echten Laufs entlastete ihn vollständig (1,4 GB Spitze, nie unter 10,9 GB frei, Auslagerung unverändert), und die Sitzung starb bei zwei Dritteln freiem Speicher erneut (§3.235) |
 | 03.09. | Ein Wächter ordnete an, was ein zweiter bestraft: Die Wartemeldung für einen 81-Minuten-Lauf wurde wegen freier Agentenplätze abgelehnt, der daraufhin beauftragte Autor tötete mit seinem ersten Commit genau diesen Lauf — Gehorsam gegenüber der einen Auflage ist der Bruch der anderen (§3.231, Punkt 955) |
 | 29.08. | Kein Regressionslauf des Tages hatte ein gültiges Zeit-Urteil: Der Ruhe-Wächter las den Auftragstext der eigenen Batch-Sitzung als zweiten Prüflauf, weil dieser die Prüfbefehle zitiert, erklärte die Maschine für belastet und strich die Zeit-Urteile — protokolliert in einer Zeile, die wie Hausmeisterei klingt; am selben Abend tötete der Integritäts-Wächter eine 85-minütige Zwei-Backend-Regression, weil dieselbe Sitzung nebenher auf main committete (§3.214, Punkt 955) |
 | 26.08. vormittags | Neun Gegenlesungsdurchgänge über die abgeleitete Board-Sektion fanden am Ende EINE Fehlerklasse — zweimal: Ein Beleg ohne zuordenbaren Punkt und ein Fokus-Eintrag, der etwas nennt, das keine Punktnummer ist, kamen beide als »kein Fokus« heraus, also Byte für Byte als die Antwort einer FEHLENDEN Quelle. Aus beschädigten Daten wurde so eine geprüfte Null (§3.185, Punkt 713) |
@@ -89,6 +90,7 @@ Das Musterbeispiel sind die Chat-Zeitstempel: neun Eskalationsstufen, acht weich
 | 02.09. früh | Zwei Tore standen auf einem einzigen Kandidaten und waren damit Münzwürfe: Die Kreuzungsprüfung des Ufer-Fangspiels öffnete ihr Fenster auf irgendeinem Lauf statt auf dem ersten eines Zyklus und bestand fast nur aus der Streifphase — nachgemessen trugen sechs von 84 Fenstern gar keine Überquerung, das Grün war Glück. Die Sprecher-Prüfung derselben Suite bietet zehn Figuren an, fünf davon sind bei jedem Lauf dieselben Fehlschüsse, und eine sechste entscheidet allein (§3.231, Punkte 687/1043) |
 | 02./03.09. nachts | Die Batch kroch stundenlang hinter Warte-Schleifen, deren Suchmuster die eigene Warte-Maschinerie fand: zehn `while pgrep`-Beobachter, jeder mit dem Muster wörtlich in der eigenen Kommandozeile, hielten sich gegenseitig am Leben, während längst nichts mehr lief — Heartbeat frisch, Starter „owner alive", ETA-Überfälligkeit nur als Warnung; der vorgesehene Warteweg (`run-wait.mjs --await`) wurde umgangen. Aufgelöst durch die Nutzerfrage um 1 Uhr; Analysepunkt blind mit vier Augen per Nutzer-Anordnung (Punkt 1048, Vorhersage von Punkt 958 eingetreten). Dieselbe Nacht ließ den Front-beorderten Felsenspiel-Punkt als letzten von 360 stehen — Wiedergänger von §3.77, Punkt 1049 |
 | 04.09. | Der Nutzer sah den frisch gelandeten Grabe-Vorgang an und fand keinen Zweck: Jede Grube ist als Vorratsgrube, Pfostenloch oder gewendeter Boden gesetzt, kommentiert, getestet und per Dev-Assertion abgesichert — sichtbar ist davon nichts, alle drei sind dasselbe runde Loch und ein Arbeitsgang hinterlässt kein Ergebnis. Zweiter Fall derselben Bauform in derselben Szene nach dem 13.08. (§3.233, Punkte 1056/1057) |
+| 04.09. mittags | Zwei von 45 Durchsetzern waren still tot: Die Vor-Prüfungen für `Bash` und `PowerShell` riefen `wait-command-guard.mjs` über einen cwd-relativen Pfad auf, was in jedem Arbeitsbaum ein nicht-blockierendes `Cannot find module` ergibt — der Wächter läuft nie, und die Regel gilt trotzdem als abgesichert. Gefunden hat es kein Test, sondern der Wächter über den Wächtern (§3.234) |
 
 
 Muster: Ab dem 22.07. explodiert die Commit-Rate (Delegation) — und genau dann häufen sich die Infrastruktur-Vorfälle. **Skalierung der Autonomie erzeugt eine eigene Problemklasse, die die Feature-Arbeit zeitweise überholt.**
@@ -1429,7 +1431,7 @@ keinen Träger hat. Gebucht als Punkt 956.
 
 ## Anhang A — Maschinell gepflegte Quellen-Übersicht
 
-Zuletzt aktualisiert: Freitag, 04.09.2026, 09:32 · Quellen-Fingerprint: `458553bd8847…`
+Zuletzt aktualisiert: Freitag, 04.09.2026, 17:19 · Quellen-Fingerprint: `7ca11fee29f1…`
 
 Spalten heuristisch aus den Quellen abgeleitet (Anläufe = distinkte Datumsnennungen im Memory;
 Maßnahme = Guard-Skripte mit Namens-Treffer). Die inhaltliche Bewertung gehört der Prosa oben.
@@ -1443,7 +1445,7 @@ Maßnahme = Guard-Skripte mit Namens-Treffer). Die inhaltliche Bewertung gehört
 | For code audits/reviews, mix in a DIFFERENT model than the one that wrote the code — different blind spots find more bugs | 1 | niedrig | model-guard.mjs | ✔ Mechanismus |
 | The hardened batch-autonomy system — never idle-stop, resurrect after crash/reboot, signal on failure, never block on the user | 1 | niedrig | batch-autostart.mjs, batch-doctor-states.mjs, batch-doctor.mjs, batch-lock.mjs, batch-progress-guard.mjs, batch-resume-hook.mjs, batch-singleton.mjs | ✔ Mechanismus |
 | The batch dashboard — its live GH-Pages transport, its BINDING four-section structure (never change without explicit user go) and update discipline | 11 | hoch | batch-autostart.mjs, batch-doctor-states.mjs, batch-doctor.mjs, batch-lock.mjs, batch-progress-guard.mjs, batch-resume-hook.mjs, batch-singleton.mjs, dashboard-card-topic-guard.mjs, dashboard-conciseness-guard.mjs, dashboard-guard-fixtures.mjs, dashboard-guard.mjs, dashboard-integrity-guard.mjs, dashboard-reminder-hook.mjs | ✔ Mechanismus |
-| A blocked tool call means the wrong path, not a missing permission — search the repo for its own command; never hand the user manual steps | 2 | mittel | findings-guard.mjs | ✔ Mechanismus |
+| A blocked tool call means the wrong path, not a missing permission — search the repo for its own command; never hand the user manual steps | 2 | mittel | findings-guard.mjs, wait-command-guard.mjs | ✔ Mechanismus |
 | board.mjs commands must run SEQUENTIALLY — two in one turn raced and tore the dashboard's section structure | 1 | niedrig | board-edit-lock.mjs, board-first-guard.mjs, dashboard-card-topic-guard.mjs, dashboard-conciseness-guard.mjs, dashboard-guard-fixtures.mjs, dashboard-guard.mjs, dashboard-integrity-guard.mjs, dashboard-reminder-hook.mjs | ✔ Mechanismus |
 | The batch dashboard may leave the private claude.ai artifact for a publicly readable transport — privacy is no longer a constraint | 1 | niedrig | board-edit-lock.mjs, board-first-guard.mjs, dashboard-card-topic-guard.mjs, dashboard-conciseness-guard.mjs, dashboard-guard-fixtures.mjs, dashboard-guard.mjs, dashboard-integrity-guard.mjs, dashboard-reminder-hook.mjs | ✔ Mechanismus |
 | Take the session boundary as the LAST action and with bare commands — a pipe makes the call count as work and silently deletes the marker | 1 | niedrig | — (Regel/Memory) | ◐ Regel |
@@ -1468,7 +1470,7 @@ Maßnahme = Guard-Skripte mit Namens-Treffer). Die inhaltliche Bewertung gehört
 | Write idiomatic English in all English text (README, code comments, commit messages) — no German calques like 'stand' for a version | 1 | niedrig | — (Regel/Memory) | ◐ Regel |
 | Fable is NOT the default lane because its volume is the scarcest; difficulty is no reason for it either (since 18.08.2026 hard cases go straight to Sol), and review is cross-vendor, not Fable-by-default | 5 | hoch | — (Regel/Memory) | ◐ Regel |
 | Findings recorded by a session that could not write the work order — carry each into TASKS.md, then mark it drained | 44 | hoch | findings-guard.mjs | ✔ Mechanismus |
-| A recurring lookup gets a script; never pull raw transcripts, listings, or logs into context to answer it | 1 | niedrig | — (Regel/Memory) | ◐ Regel |
+| A recurring lookup gets a script; never pull raw transcripts, listings, or logs into context to answer it | 1 | niedrig | wait-command-guard.mjs | ✔ Mechanismus |
 | Past the 150k context watermark, FINISH the step and hand over — never start a suite, an agent or a point after it; the user raised the cost twice (13.08. and 17.08.2026) | 2 | mittel | — (Regel/Memory) | ◐ Regel |
 | User 18.08.2026: hard, complex, error-prone and HIGH-criticality points are AUTHORED by GPT-5.6 Sol directly — Opus 5 authors only what is left, and Fable authors only a point that tags its lane or one the router escalates | 4 | hoch | — (Regel/Memory) | ◐ Regel |
 | Two test layers — Vitest (jsdom) for logic/store/HUD, Playwright for browser-only; add a test per new feature on the right layer | 1 | niedrig | — (Regel/Memory) | ◐ Regel |
@@ -1522,7 +1524,7 @@ Maßnahme = Guard-Skripte mit Namens-Treffer). Die inhaltliche Bewertung gehört
 | Headless probes must screenshot the DEFAULT zoom too (zoom-gated dressing like haze only shows there); headless WebGPU is impossible, so WebGPU-only branches stay user-checked | 2 | mittel | render-verify-guard.mjs | ✔ Mechanismus |
 | Every GUI/rendering fix must be verified on BOTH WebGPU and WebGL2 before it counts as done — never mark a render fix done on one path | 2 | mittel | render-verify-guard.mjs | ✔ Mechanismus |
 | A resumed batch session must check the previous owner's PROCESS before working — the launcher's \"provably dead\" verdict was wrong and double-spawned | 2 | mittel | render-verify-guard.mjs | ✔ Mechanismus |
-| Rotating verify AND unit failures under a running agent pool are LOAD, not bugs — 8 of 12 unit runs red from load alone; judge a red only on a quiet machine | 5 | hoch | render-verify-guard.mjs | ✔ Mechanismus |
+| Rotating verify AND unit failures under a running agent pool are LOAD, not bugs — 8 of 12 unit runs red from load alone; judge a red only on a quiet machine | 6 | hoch | render-verify-guard.mjs | ✔ Mechanismus |
 | The named \"version release\" process and its trigger — queue/run a version release for a version the user names (full closing → user approval → tag → mirror poc → publish /TAG/ and /poc/) | 1 | niedrig | lock-release-hook.mjs | ✔ Mechanismus |
 | Standing licence to move, REMOVE or ADD villages when it helps — but every change must be checked against the other requirements first, and the check has already caught a real bug | 1 | niedrig | — (Regel/Memory) | ◐ Regel |
 | A VS Code restart restarts the devcontainer — every process inside dies, PPID 1 proves nothing | 2 | mittel | container-ask-guard.mjs | ✔ Mechanismus |
@@ -1531,10 +1533,10 @@ Maßnahme = Guard-Skripte mit Namens-Treffer). Die inhaltliche Bewertung gehört
 | A pending batch claim HOLDS THE LAUNCHER BACK — withdraw it whenever the claiming window is left unattended | 2 | mittel | clear-claim-guard.mjs | ✔ Mechanismus |
 | Multi-agent workflows eat the session/weekly limit fast — verify findings INLINE, keep fan-outs small, warn the user with a cost estimate before any big workflow | 3 | mittel | doc-budget-guard.mjs | ✔ Mechanismus |
 
-Erfasste Quellen: 94 Feedback-/Projekt-Memories · 57 Guard-/Hook-Skripte · 6 Revert-/Reapply-Commits · 124 Prozess-/Meta-TASKS-Punkte (davon 58 offen).
+Erfasste Quellen: 94 Feedback-/Projekt-Memories · 58 Guard-/Hook-Skripte · 6 Revert-/Reapply-Commits · 124 Prozess-/Meta-TASKS-Punkte (davon 58 offen).
 
-<!-- RETRO-FINGERPRINT: 458553bd884745a777291644e1a415d921e77257b4f553e7cde6f1d7b6f3cae3 -->
-<!-- RETRO-LAST-REFRESHED: 2026-09-04T07:32:32.958Z -->
+<!-- RETRO-FINGERPRINT: 7ca11fee29f159340e79307e980a5757debacf94df4d785419bdcc3bf24ec91b -->
+<!-- RETRO-LAST-REFRESHED: 2026-09-04T15:19:11.454Z -->
 <!-- AUTO-GENERATED:END -->
 
 ### 3.111 Ein Erfolg ist kein Beweis für den Weg, auf dem er zustande kam
@@ -5480,3 +5482,61 @@ dieselbe Frage an das gerenderte Bild gestellt — und zwar in Worten, die ein
 Mensch beantworten muss („Wozu tut die Figur das?"), nicht als Metrik. Und wo
 eine Klasse in derselben Szene zum zweiten Mal auftritt, ist die Wiederholung
 selbst der Befund, nicht der Einzelfall.
+
+### 3.234 Ein Wächter, der seinen eigenen Pfad nicht findet, meldet nichts — und die Regel gilt als abgesichert
+
+Am 04.09.2026 meldete die Wächter-Gesundheitsprüfung zwei Einträge derselben
+Bauart: Die Vor-Prüfung für `Bash` und die für `PowerShell` riefen
+`node scripts/wait-command-guard.mjs` über einen **cwd-relativen** Pfad auf. In
+der Hauptablage funktioniert das; in jedem Arbeitsbaum und in jeder Sitzung, die
+woanders steht, antwortet node mit `Cannot find module` — nicht blockierend, also
+**still**. Der Wächter läuft nicht, wirft nicht, protokolliert nicht, und die
+Regel, die er durchsetzen soll (kein Umfrage-Warten auf einen Prozess), steht in
+der Bestandsliste weiter als „durch einen Mechanismus abgesichert". Von 45
+Durchsetzern waren zwei auf diese Weise tot.
+
+Das ist nicht die Klasse aus §3.88 — dort behauptet eine Regel eine Reichweite,
+die ihr Mechanismus nie hatte. Hier ist der Mechanismus richtig gebaut und
+vollständig; er wird nur unter einer Bedingung nicht gefunden, die im
+Normalbetrieb selten und in der delegierten Arbeit die Regel ist. Genau die
+Sitzungen, für die der Wächter gedacht ist — Agenten in isolierten Arbeitsbäumen
+—, sind die einzigen, in denen er sicher nicht greift.
+
+**Lehre:** Ein stiller Ausfall ist teurer als ein lauter. Ein Wächter, der nie
+auslöst, ist schlimmer als einer, der immer auslöst, weil niemand mehr nachsieht.
+Deshalb gehört jeder Hook-Pfad an `$CLAUDE_PROJECT_DIR` verankert, und deshalb
+prüft die Gesundheitsprüfung die **Verdrahtung**, nicht nur die Existenz des
+Skripts: Gefunden hat diesen Befund kein Mensch und kein Test, sondern der
+Wächter über den Wächtern.
+
+### 3.235 Ein Höchststand ohne Uhrzeit ist kein Messwert — und der Verdacht traf den Falschen
+
+Am 04.09.2026 starben zwei Sitzungen mitten im Unit-Lauf (Tests mit SIGKILL, die
+Sitzung mit SIGTERM). Der einzige Beleg, der zur Hand war, hieß `memory.peak`:
+15,7 von 15,9 GB. Daraus wurde die Erklärung „Vitest frisst den Speicher" und
+daraus fast die Maßnahme „`maxWorkers` senken". `memory.peak` ist aber ein
+**Allzeit-Höchststand der cgroup ohne Zeitstempel** und schreibgeschützt — er
+sagt, dass irgendwann einmal so viel belegt war, und kein Wort darüber, wann und
+durch wen.
+
+Die Messung eines ECHTEN Laufs (Sekundenproben über alle Prozesse) entlastete
+Vitest vollständig: 1,39 GB für fünf Worker, 3,38 GB für die ganze Maschine, nie
+weniger als 10,87 GB frei, die Auslagerung über den kompletten Lauf unverändert,
+und der Allzeit-Höchststand bewegte sich um kein Byte. Die Sitzung starb während
+dieser Messung erneut — bei zwei Dritteln freiem Speicher, mit `oom_kill 0` in
+`memory.events`. Die naheliegende Kur hätte also einen gesunden Mechanismus
+beschnitten und die echte Ursache verdeckt, die im Journal steht: ein sauberes
+`owner-release` der Sitzung, die ihren ganzen Kindbaum mitnimmt.
+
+Das ist nicht die Klasse „unter Last gemessen" aus der ruhigen Maschine, sondern
+ihre Umkehrung: Dort ist der Messwert echt und der Zeitpunkt falsch gewählt,
+hier ist der Zeitpunkt gar nicht enthalten. Ein akkumulierender Maximalwert
+beantwortet eine Frage nach dem Jetzt grundsätzlich nicht, egal wie dramatisch
+die Zahl aussieht.
+
+**Lehre:** Ein Messwert ohne Uhrzeit taugt nur zum Ausschließen, nie zum
+Beschuldigen. Bevor eine Zahl eine Maßnahme trägt, muss sie ein Fenster haben —
+sonst wird nach dem stärksten Verdächtigen gehandelt statt nach dem gemessenen.
+Und ein langer Lauf gehört abgekoppelt (`setsid`, eigene Prozessgruppe, Log in
+eine Datei): Hängt er am Leben der Sitzung, nimmt jeder Sitzungstod die Arbeit
+UND ihren Beweis mit.

@@ -532,7 +532,11 @@ export const LIMITS = {
   // pitfall and the probe-reachability entry was cut to pay for it, so the
   // measured guide came DOWN seven words and the ceiling follows it:
   // 5025 -> 5018, no unearned headroom.
-  maxWords: 5018,
+  // 04.09.2026 (second): the "measured without a clock" lesson folded into the
+  // estimated-numbers pitfall — an accumulated maximum may exonerate, never
+  // accuse — and three neighbouring entries were compressed to pay for it, so
+  // the measured guide came down three more words: 5018 -> 5015.
+  maxWords: 5015,
   // A pitfall entry = the risk lines plus its prompt. Anything longer is a
   // story, not a tip.
   maxEntryLines: 11,

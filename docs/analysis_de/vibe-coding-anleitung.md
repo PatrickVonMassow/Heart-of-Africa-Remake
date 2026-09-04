@@ -187,11 +187,10 @@ Die Ursache findest du durch **Zerlegen**, nicht durch Wiederholen.
   Urteil überhaupt erreichen?** Wo nein, ist ihr Grün eine Tautologie. Und einen Fix an einer
   gemeinsamen Funktion prüfst du an **allen** Aufrufstellen, nicht nur an der, die dich biss.“
 
-
 - **Neue Features zerbrechen alte.** Eine Änderung repariert X und bricht das unbeobachtete Y.
-  → *Prompt:* „Etabliere einen Mechanismus, der jede Mechanik auch im **Danach-Zustand** prüft und
-  nach jedem Zusammenführen die schnelle Testschicht erzwingt. Bau ‚Invarianten' ein, die im
-  Entwicklungsmodus laut meckern — jeder Testlauf wird so zum Detektor."
+  → *Prompt:* „Prüfe jede Mechanik auch im **Danach-Zustand** und erzwing nach jedem
+  Zusammenführen die schnelle Testschicht. Bau ‚Invarianten' ein, die im Entwicklungsmodus laut
+  meckern — jeder Testlauf wird zum Detektor."
 
 - **Angeblich behoben, im Präsens behauptet.** Der Fix gilt als fertig, das Symptom bleibt.
   → *Prompt:* „Fertig ist ein Fix, wenn das **Symptom am Ort des Symptoms** weg ist **und** der
@@ -212,10 +211,11 @@ Die Ursache findest du durch **Zerlegen**, nicht durch Wiederholen.
   → *Prompt:* „Trag eine Ausnahme **im selben Zug** dort ein, wo der Mechanismus sie liest, und
   nenn zu jedem Tor den **Weg, der es fährt**.“
 
-- **Zahlen geschätzt statt gemessen — auch die, die dir jemand reicht.** ‚Das dauert ~2 Minuten';
-  oder ein Wert, der einmal stimmte.
-  → *Prompt:* „Laufzeiten, Performance und Kosten nennst du nur **gemessen**, Performance auf der
-  **Ziel-Hardware**; was altern kann, erhebe neu."
+- **Zahlen geschätzt statt gemessen — oder gemessen ohne Uhrzeit.** ‚Das dauert ~2 Minuten'; ein
+  Höchststand ohne Uhrzeit.
+  → *Prompt:* „Laufzeiten, Performance und Kosten nennst du nur **gemessen**, auf der
+  **Ziel-Hardware**; was altern kann, erhebe neu. Ein Maximalwert darf **entlasten**, nie
+  beschuldigen — miss den **echten Lauf** über die Zeit."
 
 - **Das Kontingent ist die Grenze, nicht die Zeit.** Der Verbrauch hängt an der Kontextgröße,
   nicht an den Stunden.
@@ -227,12 +227,12 @@ Die Ursache findest du durch **Zerlegen**, nicht durch Wiederholen.
   → *Prompt:* „Stell zu Sitzungsbeginn fest, **welches Modell tatsächlich antwortet**, und halte es
   gegen die erlaubte Reihe. Steht es außerhalb, **halte an und melde**."
 
-- **Der autonome Lauf bleibt stehen — still oder wartend.** Beides teuer, wenn du weg bist —
-  auch durch Rettungsmechanismen, die einzeln das Richtige tun und einander verklemmen.
+- **Der autonome Lauf bleibt stehen — still oder wartend.** Beides teuer, wenn du weg bist — auch
+  durch Rettungen, die einzeln richtig sind und einander verklemmen.
   → *Prompt:* „Bleib **nie mit einer Rückfrage stehen**: Annahme treffen, festhalten, weitergehen.
-  Prüfe Rettung **paarweise** — jeder Wächter nennt die eine Bewegung, die ihn erfüllt —, zähle nur
-  **Versuchtes**, sichere mit **zweitem, eigenem Zeitgeber**, und lass den am **Ergebnis** messen,
-  nie an der Betriebsamkeit dessen, den er auffangen soll."
+  Prüfe Rettung **paarweise** — jeder Wächter nennt die Bewegung, die ihn erfüllt —, zähle nur
+  **Versuchtes** und sichere mit **zweitem Zeitgeber**, der am **Ergebnis** misst, nie an der
+  Betriebsamkeit des Aufgefangenen."
 
 - **Kommunikation verfehlt.** Zu technisch, zu lang, an der Zielgruppe vorbei.
   → *Prompt:* „Beschreibe Bugs und Status in der Zielgruppensprache — Symptom zuerst, fürs
@@ -539,4 +539,4 @@ Die Ursache findest du durch **Zerlegen**, nicht durch Wiederholen.
 
 Sie ersetzt die Fallstricke oben nicht.
 
-<!-- GUIDE-FINGERPRINT: 458553bd884745a777291644e1a415d921e77257b4f553e7cde6f1d7b6f3cae3 -->
+<!-- GUIDE-FINGERPRINT: 7ca11fee29f159340e79307e980a5757debacf94df4d785419bdcc3bf24ec91b -->
