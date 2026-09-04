@@ -4568,6 +4568,10 @@ Build order, chosen so no two parallel agents own the same file:
   stable while the traveller moves (frame-diff over the water region bounded, on
   BOTH backends), plus the screenshot pair before/after; pure test for whichever
   sampling rule was wrong.
+  SEEN AGAIN 04.09.2026 (user, findings carrier): white plates drift on the RIVER,
+  away from the river mouth, and read as plastic rather than as water — so the
+  class is not confined to the coast, and whatever the diagnosis finds must also
+  explain a plate-like, hard-edged look on an inland river surface.
 
 - [ ] 575. The animals carry no pelt pattern and no face (found 09.08.2026 by the
   point-264 control frame, which photographed two zebras at the player's own zoom).
