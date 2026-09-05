@@ -1188,6 +1188,12 @@
       "why": "Es steht zwischen jeder Render-Änderung und ihrem Bildnachweis und ist auf ruhiger Maschine rot — es blockiert jetzt.",
       "origin": "machine",
       "place": "ahead"
+    },
+    "1059": {
+      "at": "2026-09-05T05:14:33.727Z",
+      "why": "Appended by the responder path; ranking belongs to the batch owner",
+      "origin": "machine",
+      "place": "last"
     }
   },
   "boundary": {
@@ -1223,7 +1229,7 @@
     "why": "The order standing in front of the release today is the arrangement that predates this rule; the four machine-filed points that had ranked themselves there were moved behind 174 first"
   },
   "settled": {
-    "at": "2026-09-04T08:20:20.629Z",
+    "at": "2026-09-05T05:14:33.736Z",
     "points": [
       174,
       184,
@@ -1593,7 +1599,8 @@
       1055,
       1056,
       1057,
-      1058
+      1058,
+      1059
     ]
   }
 }
