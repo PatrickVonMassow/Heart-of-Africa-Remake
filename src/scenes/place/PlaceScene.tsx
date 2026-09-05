@@ -518,9 +518,6 @@ function meetChief(hut: Interactive): void {
       game.setToast(strings.toasts.drumsSending)
       break
     }
-    case 'withhold-message':
-      game.setToast(strings.dialogs.askDrumsLocked)
-      break
     case 'no-message':
       game.setToast(strings.toasts.chiefNoMessage)
       break
@@ -2645,14 +2642,8 @@ export function PlaceScene() {
     // the dialog is unobstructed (design.md §16/§17).
     if (game.journalOpen) game.setJournalOpen(false)
     if (near.type === 'chief') {
-      // Standing gate (design.md §12): hostility lingers. Otherwise the chief
-      // is met OUTSIDE his hut.
-      const place = game.placeId ? placeById(game.placeId) : null
-      if (place && (game.hostileUntil[place.id] ?? 0) > game.day) {
-        game.setToast(getStrings().toasts.chiefHostile)
-      } else {
-        meetChief(near)
-      }
+      // The chief is met OUTSIDE his hut, never in a window (design.md §12).
+      meetChief(near)
     } else if (near.type === 'bazaar' || near.type === 'agency') {
       setDialog({ kind: near.type })
       releasePointerLock()

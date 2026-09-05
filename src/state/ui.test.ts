@@ -95,7 +95,7 @@ describe('dialogs and bazaar bid (design.md §10)', () => {
   it('opening/closing a dialog discards a pending bazaar bid', () => {
     u().setBazaarBid({ treasure: 'gold', amount: 120 })
     expect(u().bazaarBid).not.toBeNull()
-    u().setDialog({ kind: 'audience' })
+    u().setDialog({ kind: 'agency' })
     expect(u().bazaarBid).toBeNull()
     u().setBazaarBid({ treasure: 'silver', amount: 30 })
     u().setDialog(null)

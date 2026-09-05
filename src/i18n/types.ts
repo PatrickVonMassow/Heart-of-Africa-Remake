@@ -371,15 +371,11 @@ export interface Strings {
     /** The bazaar refuses a regionally rejected material (design.md §10). */
     bazaarRejected(name: string): string
     graveyardEmpty: string
-    /** Standing gate (design.md §12). */
-    chiefHostile: string
     /** Camps (design.md §6). */
     campPitched: string
     campNeedsFriend: string
     /** Position query (design.md §17), e.g. via P or the gamepad. */
     positionReport(coords: string, region: string): string
-    /** A gift unlocked the settlement orientation (design.md §17). */
-    orientationGained: string
     /** The escape from a wedge (design.md §17.5): the hint that names the key,
      *  and the three honest outcomes of a press — he was carried clear, he was
      *  standing free already, or nothing within reach was free (work-order 610).
@@ -406,28 +402,7 @@ export interface Strings {
     leave: string
     foodItem: string
     gift(name: string): string
-    audienceTitle(people: string): string
-    audienceIntro(mood: string): string
-    moodHigh: string
-    moodMid: string
-    moodLow: string
-    chiefDone: string
-    /** Ask the chief to send his message on the drums (point 486). */
-    askDrums: string
-    /** Why the chief will not send it yet — no gift has earned his trust. */
-    askDrumsLocked: string
-    /** What the traveller carries back from the boulder (point 487). */
-    artefactCarried: string
-    /** Lay it in the chief's hands — the hand-over that solves the puzzle. */
-    handArtefact: string
-    /** Introduces the chief's answer, which stays in HIS tongue: never a
-     *  translation, only the note the player wrote for each utterance. Written
-     *  in the past tense — the answer stays standing in the audience as a
-     *  record, so a re-opened dialog must not read as if he said it again. */
-    chiefAcknowledges: string
-    give: string
     stock(n: number): string
-    endAudience: string
     /** Bazaar (design.md §10): bid flow on offered treasures. */
     bazaarGreeting: string
     bazaarSell: string
@@ -680,7 +655,6 @@ export interface Strings {
     foodUnitDays: string
     oceanSwimMargin: string
     digRadius: string
-    goodwillForHint: string
     randomEvents: string
     triggerEvent: string
     eventNames: Record<string, string>
@@ -764,8 +738,6 @@ export interface Strings {
       /** Arrival at a walkable monument site, and a changed return (§16). */
       monument(p: TextParams): string
       monumentReturn(p: TextParams): string
-      audience: string
-      mistake: string
       chiefHint: string
       /** The chief's drum message (design.md §13.4, point 486). */
       drumMessage: string
@@ -813,7 +785,6 @@ export interface Strings {
       bounty: string
       ferry: string
       valuableReaction: string
-      friend: string
       rescue: string
       friendSupplies: string
       campLooted: string
@@ -834,9 +805,6 @@ export interface Strings {
     monumentReturn(p: TextParams): string
     villageFirstVisit(p: TextParams): string
     villageReturn(p: TextParams): string
-    giftRevered(p: TextParams): string
-    giftNeutral: string
-    giftRejected(p: TextParams): string
     /** Raw location hint in the region's own words (design.md §13.1/13.3). */
     hintRaw(p: TextParams): string
     /** Deciphered version of the same hint. */
@@ -901,8 +869,7 @@ export interface Strings {
     /** Reactions to a visibly carried valuable (design.md §8). */
     valuableRevered(p: TextParams): string
     valuableRejected(p: TextParams): string
-    /** "Honored Friend" (design.md §12): pledge, rescues, aid, supplies. */
-    friendPledge(p: TextParams): string
+    /** "Honored Friend" (design.md §12): rescues, aid, supplies. */
     friendRescue(p: TextParams): string
     friendRescueRobbers(p: TextParams): string
     friendAid(p: TextParams): string

@@ -729,9 +729,8 @@ export function DebugMenu() {
       num(t.debug.giftsTotal, totalGifts(game.gifts), (v) => game.debugSetGiftTotal(v), 1),
       num(t.debug.inventoryCapacity, balance.inventoryCapacity,
         (v) => set('inventoryCapacity', Math.max(1, Math.round(v))), 1),
-      // What is dug up and what a hint costs are the other half of the trade.
+      // What is dug up is the other half of the trade.
       num(t.debug.digRadius, balance.digRadius, (v) => set('digRadius', v), 0.5),
-      num(t.debug.goodwillForHint, balance.goodwillForHint, (v) => set('goodwillForHint', v), 1),
       custom(t.debug.addEquipment, (
         <ActionSelect
           label={t.debug.addEquipment}

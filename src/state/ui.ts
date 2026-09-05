@@ -49,7 +49,6 @@ export type Dialog =
   | { kind: 'trade'; building: TradeBuilding }
   | { kind: 'bazaar' }
   | { kind: 'agency' }
-  | { kind: 'audience' }
   // The chief's drum message, shown after the drums and reopenable at any time
   // from the journal (design.md §13.4, point 486).
   | { kind: 'drumMessage' }

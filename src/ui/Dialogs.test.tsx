@@ -1,22 +1,17 @@
-// Trade + audience dialogs (CLAUDE.md §7.1 pt. 5/6/7/26, design.md §9/§12).
-// Ports the render-side dialog asserts of i18n.mjs / economy.mjs / reputation.mjs
-// into React Testing Library checks: the trade dialog lays goods out as a
-// name/price table, villages price in gifts not money, and robbing the chief
-// takes a deliberate confirmation. Pixel-perfect column alignment (getBounding-
-// ClientRect) stays in Playwright — jsdom has no layout.
+// Trade, bazaar, ferry and camp dialogs (CLAUDE.md §7.1 pt. 5/6/7/26,
+// design.md §9/§10/§6). Ports the render-side dialog asserts of i18n.mjs /
+// economy.mjs into React Testing Library checks: the trade dialog lays goods
+// out as a name/price table, and villages price in gifts, not money.
+// Pixel-perfect column alignment (getBoundingClientRect) stays in Playwright —
+// jsdom has no layout.
 import { describe, it, expect, beforeEach, afterEach } from 'vitest'
-import { render, fireEvent } from '@testing-library/react'
+import { render } from '@testing-library/react'
 import { Dialogs } from './Dialogs'
 import { en } from '../i18n/en'
 import { useLocale } from '../i18n'
 import { useUi } from '../state/ui'
 import { freshGame, g, useGame } from '../test/store'
-import { DRUM_MESSAGE_VILLAGE } from '../state/store'
-import { CHIEF_ACKNOWLEDGE_CONCEPTS, chiefAcknowledgePhrase } from '../communication/chiefReply'
-import { NO_READING } from '../communication/speechLabel'
-import { utteranceOf } from '../communication/lexicon'
 import { PLACES } from '../world/geo'
-import { balance } from '../config/balance'
 
 beforeEach(() => {
   freshGame()
@@ -188,126 +183,6 @@ describe('camp dialog — free camp (design.md §6)', () => {
     rerender(<Dialogs />)
     expect(takeBtns().length).toBeGreaterThan(0)
     expect(text()).toContain(en.dialogs.campContents)
-  })
-})
-
-describe('audience dialog (design.md §8/§12)', () => {
-  it('shows five gift rows, each disabled when its stock is 0', () => {
-    g().enterPlace('nubian-village')
-    useGame.setState({ gifts: { gold: 0, silver: 0, emerald: 0, copper: 0, ivory: 0 } })
-    useUi.getState().setDialog({ kind: 'audience' })
-    render(<Dialogs />)
-    const rows = document.querySelectorAll('.dialog .row')
-    expect(rows.length).toBe(5)
-    for (const row of rows) expect(row.querySelector('button')).toBeDisabled()
-  })
-
-  it('switches the mood flavor with the chief\'s goodwill', () => {
-    g().enterPlace('nubian-village')
-    useUi.getState().setDialog({ kind: 'audience' })
-    const { rerender } = render(<Dialogs />)
-    const text = () => document.querySelector('.dialog')?.textContent ?? ''
-    // Goodwill 0 → guarded (moodLow).
-    expect(text()).toContain(en.dialogs.moodLow)
-    useGame.setState({ goodwill: { 'nubian-village': 1 } })
-    rerender(<Dialogs />)
-    expect(text()).toContain(en.dialogs.moodMid)
-    // goodwillForHint is 2, so 3 clears the high-mood threshold.
-    useGame.setState({ goodwill: { 'nubian-village': 3 } })
-    rerender(<Dialogs />)
-    expect(text()).toContain(en.dialogs.moodHigh)
-  })
-
-  it('shows the chief-done flavor once a hint/unspecific has been given', () => {
-    g().enterPlace('nubian-village')
-    useUi.getState().setDialog({ kind: 'audience' })
-    const { rerender } = render(<Dialogs />)
-    expect(document.querySelector('.dialog')?.textContent).not.toContain(en.dialogs.chiefDone)
-    useGame.setState({ unspecificGiven: { 'nubian-village': true } })
-    rerender(<Dialogs />)
-    expect(document.querySelector('.dialog')?.textContent).toContain(en.dialogs.chiefDone)
-  })
-
-  it('reaches moodHigh exactly at the goodwillForHint boundary, not just past it (point 173)', () => {
-    g().enterPlace('nubian-village')
-    useUi.getState().setDialog({ kind: 'audience' })
-    useGame.setState({ goodwill: { 'nubian-village': balance.goodwillForHint } })
-    render(<Dialogs />)
-    expect(document.querySelector('.dialog')?.textContent).toContain(en.dialogs.moodHigh)
-  })
-})
-
-describe('handing the artefact to the chief (point 487)', () => {
-  const dialogText = () => document.querySelector('.dialog')?.textContent ?? ''
-  const handButton = () =>
-    [...document.querySelectorAll('.dialog button')].find(
-      (b) => b.textContent === en.dialogs.handArtefact,
-    )
-
-  it('offers the hand-over only where the errand was set, and only when carried', () => {
-    g().enterPlace('nubian-village') // another people's chief has no errand
-    useGame.setState({ rockArtefact: 'carried' })
-    useUi.getState().setDialog({ kind: 'audience' })
-    const wrongVillage = render(<Dialogs />)
-    expect(handButton()).toBeUndefined()
-    wrongVillage.unmount()
-
-    g().enterPlace(DRUM_MESSAGE_VILLAGE)
-    useGame.setState({ rockArtefact: 'buried' }) // nothing dug up yet
-    render(<Dialogs />)
-    expect(handButton()).toBeUndefined()
-  })
-
-  it('lays it in his hands and shows his answer in his OWN tongue', () => {
-    g().enterPlace(DRUM_MESSAGE_VILLAGE)
-    useGame.setState({ rockArtefact: 'carried' })
-    useUi.getState().setDialog({ kind: 'audience' })
-    const { rerender } = render(<Dialogs />)
-    expect(dialogText()).toContain(en.dialogs.artefactCarried)
-    fireEvent.click(handButton() as Element)
-    rerender(<Dialogs />)
-
-    expect(g().rockArtefact).toBe('given')
-    expect(dialogText()).toContain(en.dialogs.chiefAcknowledges)
-    const concepts = document.querySelectorAll('.chief-acknowledge .drum-concept')
-    expect(concepts).toHaveLength(chiefAcknowledgePhrase().length)
-    // The syllables he actually spoke stand there, low and high told apart.
-    const spoken = [...concepts].map((c) =>
-      [...(c.querySelector('.utterance')?.children ?? [])].map((s) => s.textContent).join('-'),
-    )
-    expect(spoken).toEqual([...chiefAcknowledgePhrase()])
-    // The offer is gone once it is given — nothing to hand over twice.
-    expect(handButton()).toBeUndefined()
-  })
-
-  it('shows the player’s OWN reading, and ??? where he wrote none — never a translation', () => {
-    g().enterPlace(DRUM_MESSAGE_VILLAGE)
-    useGame.setState({ rockArtefact: 'carried' })
-    // A note exists only for what he has already HEARD in the village.
-    g().hearUtterance(utteranceOf('DIG'))
-    g().setUtteranceHypothesis(utteranceOf('DIG'), 'to dig')
-    useUi.getState().setDialog({ kind: 'audience' })
-    const { rerender } = render(<Dialogs />)
-    fireEvent.click(handButton() as Element)
-    rerender(<Dialogs />)
-
-    // PAIRED, not merely present (cross-vendor review, 29.08.2026). Asking only
-    // that the two readings appear SOMEWHERE let ROCK show a translation while
-    // DIG supplied the `???` the assertion looked for — which is the one thing
-    // this case exists to forbid. The list renders the acknowledge phrase in its
-    // own order, so each item is tied back to the concept that produced it.
-    const items = [...document.querySelectorAll('.chief-acknowledge .drum-concept')]
-    expect(items).toHaveLength(CHIEF_ACKNOWLEDGE_CONCEPTS.length)
-    const readingOf = (concept: (typeof CHIEF_ACKNOWLEDGE_CONCEPTS)[number]) =>
-      items[CHIEF_ACKNOWLEDGE_CONCEPTS.indexOf(concept)]?.querySelector('.reading')?.textContent
-    expect(readingOf('DIG')).toBe('to dig')
-    expect(readingOf('ROCK')).toBe(NO_READING) // he wrote no note for it
-    // And the unread one is MARKED unread, so the picture says so too.
-    expect(
-      items[CHIEF_ACKNOWLEDGE_CONCEPTS.indexOf('ROCK')]?.querySelector('.reading')?.className,
-    ).toContain('unread')
-    // Nothing here is clickable: the answer is heard, not edited.
-    expect(document.querySelectorAll('.chief-acknowledge button')).toHaveLength(0)
   })
 })
 

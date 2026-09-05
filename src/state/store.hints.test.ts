@@ -1,13 +1,13 @@
-// Store hints & language/direction system (CLAUDE.md §7.1 pt. 7/10, design.md
-// §13). Ports the store-driven asserts of scripts/verify/hints.mjs into fast
-// jsdom checks: one knowing village per region, the hint→decoded cascade, the
-// north-latitude / east-longitude triangulation matching the actual grave, and
-// the unspecific words of a non-knowing chief pointing to the knowing people.
-// The single DOM assert (the raw in-world word "koko" in the rendered
-// JournalPanel) stays in the Playwright E2E.
+// Store hints (CLAUDE.md §7.1 pt. 7/10, design.md §13). Ports the store-driven
+// asserts of scripts/verify/hints.mjs into fast jsdom checks: one knowing
+// village per region, the hint→decoded cascade the chief gives when he steps
+// out of his hut, the north-latitude / east-longitude triangulation matching
+// the actual grave, and the unspecific words of a non-knowing chief pointing
+// to the knowing people. The single DOM assert (the raw in-world word "koko"
+// in the rendered JournalPanel) stays in the Playwright E2E.
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
 import type { RegionId } from '../world/geo'
-import { PLACES, REGION_VALUES } from '../world/geo'
+import { PLACES } from '../world/geo'
 import { UNSPECIFIC_WORDS } from '../world/lore'
 import { balance } from '../config/balance'
 import { g, freshGame, withWorld } from '../test/store'
@@ -25,20 +25,14 @@ afterEach(() => {
 
 const REGIONS = ['north', 'west', 'central', 'east', 'south'] as const
 
-// The culturally-correct (revered) gift the chief demands; revered[0] equals
-// hints.mjs's fixed REVERED map (north gold, west ivory, central silver, east
-// emerald, south copper).
-const reveredGift = (region: RegionId) => REGION_VALUES[region].revered[0]
-
 /** Grave/hint layout is seeded per run, so read the knowing village from state. */
 const knowingVillage = (region: RegionId) => g().knowingVillages[region]
 
-/** The full hint cascade at a region's knowing village. */
+/** The full hint cascade at a region's knowing village: the use key at the hut
+ *  calls the chief out, and he says what he knows in the same breath. */
 function cascadeKnowingVillage(region: RegionId): void {
   g().enterPlace(knowingVillage(region))
-  const gift = reveredGift(region)
-  g().debugAddGift(gift)
-  g().giveGift(gift) // revered gift reaches the goodwill threshold at once → raw hint
+  g().callChiefOut()
   g().leavePlace()
 }
 
@@ -91,9 +85,7 @@ describe('unspecific knowledge (design.md §13.3)', () => {
     const other = PLACES.find((p) => p.kind === 'village' && p.region === region && p.id !== knowingId)
     expect(other).toBeTruthy()
     g().enterPlace(other!.id)
-    const gift = reveredGift(region) // revered here, so goodwill still unlocks a word
-    g().debugAddGift(gift)
-    g().giveGift(gift)
+    g().callChiefOut()
     const entry = g().journal.filter((e) => e.text.key === 'journal.unspecific').pop()
     expect(entry).toBeTruthy()
     const knowingPeople = PLACES.find((p) => p.id === knowingId)?.peopleId

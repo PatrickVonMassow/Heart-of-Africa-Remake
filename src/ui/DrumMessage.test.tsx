@@ -11,13 +11,13 @@ import { en } from '../i18n/en'
 import { de } from '../i18n/de'
 import { useLocale } from '../i18n'
 import { useUi } from '../state/ui'
-import { freshGame, g, useGame } from '../test/store'
-import { balance } from '../config/balance'
+import { freshGame, g } from '../test/store'
 import { chiefMessagePhrase, drumMessagePlan } from '../communication/drumMessage'
 import { utteranceOf } from '../communication/lexicon'
 import { hypothesisFor } from '../communication/heard'
 import { NO_READING } from '../communication/speechLabel'
 import { DRUM_MESSAGE_VILLAGE } from '../state/store'
+import { nextChiefAction } from '../scenes/place/chiefMeeting'
 
 const DIG = utteranceOf('DIG')
 const RIVER = utteranceOf('RIVER')
@@ -212,57 +212,29 @@ describe('the drums are waited out before the message is understood', () => {
   })
 })
 
-describe('the chief sends the message (design.md §12 gift condition)', () => {
-  const ready = () => {
-    useGame.setState({
-      reveredGiftGiven: { [DRUM_MESSAGE_VILLAGE]: true },
-      goodwill: { [DRUM_MESSAGE_VILLAGE]: balance.goodwillForHint },
-    })
-  }
-
-  it('offers the drums in his village once a revered gift has earned his trust', () => {
+describe('the chief sends the message outdoors (design.md §12/§13.4)', () => {
+  it('offers the drums in his own village, with no precondition (point 689)', () => {
     g().enterPlace(DRUM_MESSAGE_VILLAGE)
-    ready()
-    useUi.getState().setDialog({ kind: 'audience' })
-    render(<Dialogs />)
-    expect(document.querySelector('.dialog')?.textContent).toContain(en.dialogs.askDrums)
+    g().callChiefOut()
+    expect(nextChiefAction(g())).toBe('send-message')
   })
 
-  it('withholds them from a stranger who has brought nothing', () => {
-    g().enterPlace(DRUM_MESSAGE_VILLAGE)
-    useUi.getState().setDialog({ kind: 'audience' })
-    render(<Dialogs />)
-    const text = document.querySelector('.dialog')?.textContent ?? ''
-    expect(text).toContain(en.dialogs.askDrumsLocked)
-    expect(text).not.toContain(en.dialogs.askDrums)
-  })
-
-  it('is not another people\'s message: no other chief sends it', () => {
+  it('is not another people\u2019s message: no other chief sends it', () => {
     g().enterPlace('nubian-village')
-    useGame.setState({
-      reveredGiftGiven: { 'nubian-village': true },
-      goodwill: { 'nubian-village': balance.goodwillForHint },
-    })
-    useUi.getState().setDialog({ kind: 'audience' })
-    render(<Dialogs />)
-    const text = document.querySelector('.dialog')?.textContent ?? ''
-    expect(text).not.toContain(en.dialogs.askDrums)
-    expect(text).not.toContain(en.dialogs.askDrumsLocked)
+    g().callChiefOut()
+    expect(nextChiefAction(g())).toBe('no-message')
   })
 
-  it('ends the audience and sets the drums beating for the message length', () => {
-    g().enterPlace(DRUM_MESSAGE_VILLAGE)
-    ready()
-    useUi.getState().setDialog({ kind: 'audience' })
-    const view = render(<Dialogs />)
-    fireEvent.click(view.getByText(en.dialogs.askDrums))
-    expect(useUi.getState().dialog).toBeNull()
+  it('sets the drums beating for the whole message length', () => {
+    const plan = drumMessagePlan()
+    act(() => {
+      useUi.getState().startDrumMessage(plan)
+    })
     const beating = useUi.getState().drumPerformance
     expect(beating).not.toBeNull()
-    expect(beating!.plan).toEqual(drumMessagePlan())
-    expect((beating!.endsAt - beating!.startedAt) / 1000).toBeCloseTo(drumMessagePlan().duration, 6)
+    expect(beating!.plan).toEqual(plan)
+    expect((beating!.endsAt - beating!.startedAt) / 1000).toBeCloseTo(plan.duration, 6)
     // Nothing is understood yet — the drums have only just started.
     expect(g().drumMessageHeard).toBe(false)
-    expect(g().toast).toBe(en.toasts.drumsSending)
   })
 })

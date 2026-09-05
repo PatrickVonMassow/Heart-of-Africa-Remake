@@ -185,7 +185,7 @@ describe('template-function callability (de and en behave alike)', () => {
     // where the word was spoken; minus the four the elder and the robbery took
     // with them). A drift here means a template was added/removed and this
     // suite should follow.
-    expect(FUNCTION_PATHS.length).toBe(77)
+    expect(FUNCTION_PATHS.length).toBe(72)
   })
 
   it.each(FUNCTION_PATHS)('%s: renders in both languages (or throws in both)', (path) => {

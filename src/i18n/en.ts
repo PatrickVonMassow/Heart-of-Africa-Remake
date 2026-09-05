@@ -392,11 +392,9 @@ export const en: Strings = {
     notEnoughGifts: 'Not enough gifts — money means nothing here.',
     bazaarRejected: (name) => `The merchant waves it away — ${name.toLowerCase()} is not traded here.`,
     graveyardEmpty: 'The bleached bones hold no more ivory worth taking.',
-    chiefHostile: 'The village has not forgotten my offense. The chief refuses to see me.',
     campPitched: 'Camp pitched — an X on my map marks the spot.',
     campNeedsFriend: 'Only an Honored Friend of this region may leave belongings in the village.',
     positionReport: (coords, region) => `By my reckoning: ${coords} — the ${region} region.`,
-    orientationGained: 'In thanks for the gift, they point out the important buildings to me.',
     stuckHint: (key) => `Wedged in? Press ${key} to work free.`,
     unstuckFreed: 'I worked myself loose and stand on open ground again.',
     unstuckAlreadyFree: 'Nothing holds me here — the ground under my boots is open already.',
@@ -415,20 +413,7 @@ export const en: Strings = {
     leave: 'Leave (Esc)',
     foodItem: 'Provisions (1 week)',
     gift: (name) => `Gift: ${name}`,
-    audienceTitle: (people) => `Audience with the Chief of the ${people}`,
-    audienceIntro: (mood) => `In the half-dark of the chief's hut, the chief sits upon carved wood. ${mood}`,
-    moodHigh: 'The chief regards you with great goodwill.',
-    moodMid: 'The chief seems well-disposed toward you.',
-    moodLow: 'The chief studies you, giving nothing away.',
-    chiefDone: '"I have told you all I know. May your path be blessed."',
-    askDrums: 'Ask him to send his message on the drums',
-    askDrumsLocked: 'He has a message to send, he lets me know — but not to a stranger who has brought his people nothing.',
-    artefactCarried: 'The thing from the foot of the great rock, still wrapped in river clay',
-    handArtefact: 'Lay it in his hands',
-    chiefAcknowledges: 'He turned it over once, and said:',
-    give: 'Offer',
     stock: (n) => `you have ${n}`,
-    endAudience: 'End audience (Esc)',
     bazaarGreeting: '"Treasures, effendi! Show me what the wilderness yielded — or take a piece home yourself."',
     bazaarSell: 'Offer a find:',
     bazaarBuy: 'For sale:',
@@ -675,7 +660,6 @@ export const en: Strings = {
     foodUnitDays: 'Provisions per food unit (days)',
     oceanSwimMargin: 'Swimmable coastal band (°)',
     digRadius: 'Dig radius',
-    goodwillForHint: 'Goodwill required for hint',
     randomEvents: 'Random events',
     triggerEvent: 'Trigger event:',
     eventNames: {
@@ -766,8 +750,6 @@ export const en: Strings = {
       villageReturn: (p: TextParams) => `Back in ${PLACES[p.place as string]}`,
       monument: (p: TextParams) => PLACES[p.place as string],
       monumentReturn: (p: TextParams) => `${PLACES[p.place as string]} Once More`,
-      audience: 'Audience with the Chief',
-      mistake: 'A Grave Mistake',
       chiefHint: "The Chief's Words",
       drumMessage: 'The Drums Speak',
       rockArtefact: 'At the Foot of the Great Rock',
@@ -828,7 +810,6 @@ export const en: Strings = {
       bounty: 'The Bounty of Discovery',
       ferry: 'Passage by Sea',
       valuableReaction: 'The Valuable in My Hand',
-      friend: 'An Honored Friend',
       rescue: 'Saved by the Villagers',
       friendSupplies: 'Guests of the Region',
       campLooted: 'The Looted Camp',
@@ -987,12 +968,6 @@ export const en: Strings = {
         `[somber]I came back, and the place is not the one I left.[pause] What has happened here since my last visit stands unspoken in every face.[/somber]`
       )
     },
-    giftRevered: (p: TextParams) =>
-      `I presented my gift to the chief of the ${PEOPLES[p.people as string]}. [excited]His eyes lit up —[pause] I have found the very thing his people revere![/excited] He bowed his head and bade me welcome. [pause][excited]My standing here grows.[/excited]`,
-    giftNeutral:
-      'The chief accepted my gift with a polite nod. [somber]No light came into his eyes —[pause] it was not, I think, what his people hold dear.[/somber] [pause]But a beginning has been made.',
-    giftRejected: (p: TextParams) =>
-      `[fear]A grave mistake![/fear] No sooner had the chief of the ${PEOPLES[p.people as string]} laid eyes on my gift than his face darkened. [somber]What I offered counts among his people as an ill omen.[pause] I was led out without a word.[/somber] [breath][weary]It will take time to wear down this mistrust.[/weary]`,
     hintRaw: (p: TextParams) => {
       const regionId = p.region as string
       const w = DIRECTION_WORDS[regionId as keyof typeof DIRECTION_WORDS]
@@ -1150,8 +1125,6 @@ export const en: Strings = {
       `No sooner had I entered the village than eyes turned to the [emph]${en.treasures[p.treasure as keyof typeof en.treasures].toLowerCase()}[/emph] in my hand. [excited]Murmurs of awe followed me through the lanes —[pause] the ${PEOPLES[p.people as string]} revere what I carry.[/excited]`,
     valuableRejected: (p: TextParams) =>
       `[fear]A mistake to carry it openly![/fear] The ${PEOPLES[p.people as string]} shrank back from the [emph]${en.treasures[p.treasure as keyof typeof en.treasures].toLowerCase()}[/emph] in my hand as from an ill omen. [somber]Doors closed;[pause] mothers pulled their children inside.[/somber]`,
-    friendPledge: (p: TextParams) =>
-      `[awe]The chief of the ${PEOPLES[p.people as string]} rose and laid both hands upon my shoulders.[/awe] Before the assembled village he named me [emph]Honored Friend[/emph] of his people. [excited]"Wherever our villages stand," he pledged, "our people shall watch over you."[/excited] [breath][somber]I bowed deeply.[pause] Such a gift weighs more than gold.[/somber]`,
     friendRescue: (p: TextParams) => {
       const animal = en.animals[p.animal as keyof typeof en.animals]
       const hurt = p.result === 'light' ? ' [somber]I was only lightly injured.[/somber]' : ' [excited]I escaped unharmed.[/excited]'

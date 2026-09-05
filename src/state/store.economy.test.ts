@@ -345,13 +345,12 @@ describe('buried treasure caches (design.md §8/§18)', () => {
 })
 
 describe('presented valuables (design.md §8)', () => {
-  it('a revered material creates goodwill, a rejected one provokes the negative reaction', () => {
+  it('a revered material draws the positive reaction, a rejected one the negative', () => {
     // North reveres gold, rejects silver.
     g().debugAddTreasure('gold')
     g().enterPlace('nubian-village')
     g().presentValuable('gold')
     expect(journalKeys()).toContain('journal.valuableRevered')
-    expect(g().goodwill['nubian-village'] ?? 0).toBeGreaterThan(0)
 
     g().leavePlace()
     g().debugAddTreasure('silver')

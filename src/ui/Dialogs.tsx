@@ -1,8 +1,8 @@
-// Trade and audience dialogs (design.md §9/§10/§12). All player-visible
-// text comes from the language files (design.md §17 localization).
+// Trade, bazaar, ferry and camp dialogs (design.md §9/§10). The chief is met
+// outside his hut, not in a window (§12). All player-visible text comes from
+// the language files (design.md §17 localization).
 
 import {
-  canAskForDrumMessage, DRUM_MESSAGE_VILLAGE,
   EQUIPMENT_IDS, bagItemCount, emptyBag, giftPriceOfGood, priceOfGood, totalGifts,
   useGame, VILLAGE_TRADE_GOODS,
   type EquipmentId, type ItemBag, type ItemKind,
@@ -11,12 +11,8 @@ import { useUi, type TradeBuilding } from '../state/ui'
 import { PLACES, placeById, type Material } from '../world/geo'
 import { ferryCost, ferryDays, treasureBuyPrice, TREASURE_IDS } from '../systems/economy'
 import { balance } from '../config/balance'
-import { drumMessagePlan } from '../communication/drumMessage'
-import { playDrumMessage } from '../systems/ambience'
-import { DrumMessageDialog, Syllables } from './DrumMessage'
+import { DrumMessageDialog } from './DrumMessage'
 import { SpeechGuessDialog } from './SpeechGuess'
-import { chiefAcknowledgePhrase } from '../communication/chiefReply'
-import { labelReadings, NO_READING } from '../communication/speechLabel'
 import { useStrings } from '../i18n'
 import type { Strings } from '../i18n/types'
 
@@ -99,103 +95,6 @@ function TradeDialog({ building }: { building: TradeBuilding }) {
         )}
         <div className="actions">
           <button className="hud-button" onClick={() => setDialog(null)}>{t.dialogs.leave}</button>
-        </div>
-      </div>
-    </div>
-  )
-}
-
-function AudienceDialog() {
-  const t = useStrings()
-  const placeId = useGame((s) => s.placeId)
-  const gifts = useGame((s) => s.gifts)
-  const goodwill = useGame((s) => s.goodwill)
-  const giveGift = useGame((s) => s.giveGift)
-  const hintsGiven = useGame((s) => s.hintsGiven)
-  const unspecificGiven = useGame((s) => s.unspecificGiven)
-  const setDialog = useUi((s) => s.setDialog)
-  const reveredGiftGiven = useGame((s) => s.reveredGiftGiven)
-  const setToast = useGame((s) => s.setToast)
-  const rockArtefact = useGame((s) => s.rockArtefact)
-  const handArtefactToChief = useGame((s) => s.handArtefactToChief)
-  const memory = useGame((s) => s.communication)
-  if (!placeId) return null
-  const place = placeById(placeId)
-  const gw = goodwill[placeId] ?? 0
-  const drumMessageReady = canAskForDrumMessage({ reveredGiftGiven, goodwill }, placeId)
-
-  // The chief calls his drummer: the audience ends, the drums beat the message
-  // out over the village, and the display opens when they have finished
-  // (DrumMessageWatcher). The plan is the one the drummer's hands animate from,
-  // so what sounds and what is seen cannot disagree.
-  const sendDrumMessage = () => {
-    const plan = drumMessagePlan()
-    setDialog(null)
-    useUi.getState().startDrumMessage(plan)
-    playDrumMessage(plan)
-    setToast(t.toasts.drumsSending)
-  }
-
-  const mood =
-    gw >= balance.goodwillForHint ? t.dialogs.moodHigh : gw > 0 ? t.dialogs.moodMid : t.dialogs.moodLow
-  const peopleName = place.peopleId ? t.peoples[place.peopleId] : t.places[place.id]
-
-  return (
-    <div className="dialog-backdrop">
-      <div className="dialog">
-        <h3>{t.dialogs.audienceTitle(peopleName)}</h3>
-        <p className="flavor">{t.dialogs.audienceIntro(mood)}</p>
-        {(hintsGiven[place.region] === true || unspecificGiven[place.id] === true) && (
-          <p className="flavor">{t.dialogs.chiefDone}</p>
-        )}
-        {/* The chief's drum message (design.md §13.4, point 486). Only this
-            village's chief has it to send, and only to a traveller whose gift
-            has earned his trust — the §12 condition every hint stands under. */}
-        {place.id === DRUM_MESSAGE_VILLAGE && (
-          drumMessageReady ? (
-            <div className="row">
-              <span>{t.drumMessage.title}</span>
-              <button className="hud-button" onClick={sendDrumMessage}>{t.dialogs.askDrums}</button>
-            </div>
-          ) : (
-            <p className="flavor">{t.dialogs.askDrumsLocked}</p>
-          )
-        )}
-        {/* The end of the drum errand (point 487): what was dug up at the
-            boulder is laid in the chief's hands, and he answers in his OWN
-            tongue — the readings shown over his words are the player's own
-            notes, never a translation the game hands him. */}
-        {place.id === DRUM_MESSAGE_VILLAGE && rockArtefact === 'carried' && (
-          <div className="row">
-            <span>{t.dialogs.artefactCarried}</span>
-            <button className="hud-button" onClick={handArtefactToChief}>{t.dialogs.handArtefact}</button>
-          </div>
-        )}
-        {place.id === DRUM_MESSAGE_VILLAGE && rockArtefact === 'given' && (
-          <div className="chief-acknowledge">
-            <p className="flavor">{t.dialogs.chiefAcknowledges}</p>
-            <ol className="drum-concepts">
-              {labelReadings(memory, chiefAcknowledgePhrase()).map((a) => (
-                <li className="drum-concept" key={a.utterance}>
-                  <span className={a.reading === NO_READING ? 'reading unread' : 'reading'}>{a.reading}</span>
-                  <Syllables utterance={a.utterance} />
-                </li>
-              ))}
-            </ol>
-          </div>
-        )}
-        {MATERIALS.map((m) => (
-          <div className="row" key={m}>
-            <span>{t.gifts[m]} ({t.dialogs.stock(gifts[m])})</span>
-            <button className="hud-button" onClick={() => giveGift(m)} disabled={gifts[m] <= 0}>
-              {t.dialogs.give}
-            </button>
-          </div>
-        ))}
-        {/* Which gift the region reveres is discoverable in play: the village
-            elder reveals it on a second talk (design.md §8, journal.giftLore). */}
-        <div className="actions">
-          <button className="hud-button" onClick={() => setDialog(null)}>{t.dialogs.endAudience}</button>
         </div>
       </div>
     </div>
@@ -370,7 +269,6 @@ function CampDialog({ scope, campId, placeId }: { scope: 'free' | 'village'; cam
 export function Dialogs() {
   const dialog = useUi((s) => s.dialog)
   if (!dialog) return null
-  if (dialog.kind === 'audience') return <AudienceDialog />
   if (dialog.kind === 'drumMessage') return <DrumMessageDialog />
   if (dialog.kind === 'speechGuess') return <SpeechGuessDialog atoms={dialog.atoms} />
   if (dialog.kind === 'bazaar') return <BazaarDialog />

@@ -199,9 +199,5 @@ describe('both languages carry the new chronicle texts (point 487)', () => {
     for (const key of ['journal.titles.rockArtefact', 'journal.titles.artefactGiven']) {
       expect(resolveText(s, { key }).length).toBeGreaterThan(3)
     }
-    // The audience's own hand-over strings exist in both languages too.
-    expect(s.dialogs.handArtefact.length).toBeGreaterThan(3)
-    expect(s.dialogs.artefactCarried.length).toBeGreaterThan(3)
-    expect(s.dialogs.chiefAcknowledges.length).toBeGreaterThan(3)
   })
 })

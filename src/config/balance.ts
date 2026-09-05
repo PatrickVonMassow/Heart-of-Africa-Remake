@@ -177,12 +177,6 @@ export interface BalanceConfig {
   /** How far (degrees) off the coast the sea stays swimmable (design.md
    *  §11.2); beyond it the open ocean blocks movement even inside bays. */
   oceanSwimMarginDeg: number
-  /** Goodwill points required before the chief reveals the location hint. */
-  goodwillForHint: number
-  /** Goodwill gained per culturally revered gift. */
-  goodwillRevered: number
-  /** Goodwill gained per neutral gift. */
-  goodwillNeutral: number
   /** Random events enabled (design.md §14). */
   randomEventsEnabled: boolean
   /** Per-day base probabilities of the random events (design.md §14). */
@@ -250,10 +244,6 @@ export interface BalanceConfig {
   inventoryCapacity: number
   /** Standing with the native peoples (design.md §12). */
   reputation: {
-    /** Goodwill at which a chief bestows "Honored Friend" on his region. */
-    goodwillForFriend: number
-    /** Days a village stays hostile after wrong behavior (expulsion). */
-    hostilityDays: number
     /** Radius in degrees around a friend region's villages with protection. */
     friendProtectRadiusDeg: number
     /** Days between two aid deliveries when close to death (§12). */
@@ -935,9 +925,6 @@ export const balance: BalanceConfig = {
   // passage down the channel is never deflected by a riverside settlement.
   placeCollisionFactor: 0.6,
   oceanSwimMarginDeg: 1.0, // calibratable: swimmable coastal band width in degrees (point 221: narrowed from 1.2 so the traveller cannot wade ~1.18 deg out into deep blue while the ~0.89 deg nearshore stays swimmable)
-  goodwillForHint: 2,
-  goodwillRevered: 2,
-  goodwillNeutral: 1,
   randomEventsEnabled: false, // demo start preset (point 104): events off by default; debug toggle
   // Per-day base probabilities (design.md §14). Reduced by a factor of 5 from
   // the earlier calibration on user request — events should be markedly rarer.
@@ -980,8 +967,6 @@ export const balance: BalanceConfig = {
   showHiddenObjects: false,
   inventoryCapacity: 20,
   reputation: {
-    goodwillForFriend: 6,
-    hostilityDays: 30,
     friendProtectRadiusDeg: 1.5,
     friendAidCooldownDays: 10,
     friendVillageFoodDays: 21,

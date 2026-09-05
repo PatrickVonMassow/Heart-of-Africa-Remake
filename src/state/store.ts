@@ -209,12 +209,11 @@ export interface GameState {
   chiefOutside: Record<string, boolean>
   /** Explored map cells for the self-drawing map (design.md §19). */
   explored: Record<string, true>
-  goodwill: Record<string, number>
-  reveredGiftGiven: Record<string, boolean>
-  /** "Honored Friend" standing per region (design.md §12). */
+  /** "Honored Friend" standing per region (design.md §12).
+   *  OPEN: no producer left since the gift/goodwill state retired (point 1052).
+   *  Its camp, aid and HUD consumers stand untouched and wait for the
+   *  observation model that is to bestow it. */
   honoredFriend: Partial<Record<RegionId, boolean>>
-  /** Per village: in-game day until which it stays hostile (§12 expulsion). */
-  hostileUntil: Record<string, number>
   /** Day of the last near-death aid delivery (§12), for the cooldown. */
   lastFriendAidDay: number
   /** Free camps pitched in the open (design.md §6): lootable item caches. */
@@ -262,7 +261,6 @@ export interface GameState {
   buyTreasure: (treasure: TreasureId) => void
   /** Travel agency (design.md §10): passage to another port city. */
   bookFerry: (destId: string) => void
-  giveGift: (material: Material) => void
   /** Present a carried valuable to a village — provokes the §8 reaction. */
   presentValuable: (treasure: TreasureId) => void
   /** Pitch a camp in the open, or reopen the one nearby (design.md §6). */
@@ -315,6 +313,8 @@ export interface GameState {
    *  (design.md §12). Everything he has to give is given out there, at his
    *  drummer's side — there is no audience indoors. */
   callChiefOut: () => void
+  /** The chief's own knowledge about the tomb, told when he steps out (§13.3). */
+  tellChiefHint: () => void
   setToast: (msg: string | null) => void
   saveCheckpoint: () => void
   /** Load a port-visit snapshot; the latest without an index (design.md §18). */
@@ -533,10 +533,7 @@ export function startState(seed: number, placeId: string = startPlaceId()) {
     placeSituations: {} as Record<string, string>,
     explored: withExplored({}, start.lat, start.lon) ?? {},
     chiefOutside: {} as Record<string, boolean>,
-    goodwill: {},
-    reveredGiftGiven: {},
     honoredFriend: {} as Partial<Record<RegionId, boolean>>,
-    hostileUntil: {} as Record<string, number>,
     lastFriendAidDay: -9999,
     freeCamps: [] as FreeCamp[],
     villageCamps: {} as Record<string, ItemBag>,
@@ -611,21 +608,6 @@ function newSeed(): number {
  * Another people's chief has no message about that rock and sends none.
  */
 export const DRUM_MESSAGE_VILLAGE = ROCK_VILLAGE_ID
-
-/**
- * May this chief be asked to send his message on the drums? Only in his own
- * village, and only once a culturally correct gift has earned his trust — the
- * same condition §12 sets for a hint, since the message IS the hint of the
- * communication slice. Being asked again after the drums have spoken is fine:
- * a player who wants to hear them once more may.
- */
-export function canAskForDrumMessage(
-  s: Pick<GameState, 'reveredGiftGiven' | 'goodwill'>,
-  placeId: string | null,
-): boolean {
-  if (placeId !== DRUM_MESSAGE_VILLAGE) return false
-  return s.reveredGiftGiven[placeId] === true && (s.goodwill[placeId] ?? 0) >= balance.goodwillForHint
-}
 
 /**
  * The settlement an utterance heard right now belongs to: the place the player
@@ -742,6 +724,44 @@ export const useGame = create<GameState>()((set, get) => ({
     if (!s.orientationGiven[place.id]) {
       set({ orientationGiven: { ...get().orientationGiven, [place.id]: true } })
     }
+    // He says what he knows in the same breath (design.md §13.1/§13.3).
+    get().tellChiefHint()
+  },
+
+  /**
+   * What this chief knows about the tomb, told when he comes out (design.md
+   * §13.1/§13.3). Per region only the KNOWING people names the location
+   * component; every other chief offers unspecific knowledge and points at
+   * them. Each is said once.
+   */
+  tellChiefHint: () => {
+    const s = get()
+    if (s.mode !== 'place' || !s.placeId) return
+    const place = placeById(s.placeId)
+    if (place.kind !== 'village') return
+    const region = place.region
+    if (s.knowingVillages[region] === place.id) {
+      if (s.hintsGiven[region]) return
+      set({ hintsGiven: { ...s.hintsGiven, [region]: true } })
+      const g = get().graveLatLon
+      get().addEntry(
+        { key: 'journal.titles.chiefHint' },
+        { key: 'journal.hintRaw', params: { region, lat: g.lat, lon: g.lon } },
+        'hint',
+        'compass',
+      )
+      get().revealDecoded(region)
+      return
+    }
+    if (s.unspecificGiven[place.id]) return
+    set({ unspecificGiven: { ...s.unspecificGiven, [place.id]: true } })
+    const knowing = placeById(s.knowingVillages[region])
+    const word = UNSPECIFIC_WORDS[(place.id.length + region.length) % UNSPECIFIC_WORDS.length]
+    get().addEntry(
+      { key: 'journal.titles.unspecific' },
+      { key: 'journal.unspecific', params: { people: knowing.peopleId ?? knowing.id, word } },
+      'hint',
+    )
   },
 
   handArtefactToChief: () => {
@@ -1507,7 +1527,7 @@ export const useGame = create<GameState>()((set, get) => ({
   },
 
   /** Present a carried valuable to the villagers (design.md §8): once per
-   *  village, a revered material creates goodwill, a rejected one costs it. */
+   *  village, and the reaction goes into the journal. */
   presentValuable: (treasure) => {
     const s = get()
     const place = s.placeId ? placeById(s.placeId) : null
@@ -1522,13 +1542,11 @@ export const useGame = create<GameState>()((set, get) => ({
     const material = treasure === 'statue' ? null : treasure
     set((st) => ({ valuableShown: { ...st.valuableShown, [id]: true } }))
     if (material && values.rejected.includes(material)) {
-      set((st) => ({ goodwill: { ...st.goodwill, [id]: Math.max(0, (st.goodwill[id] ?? 0) - 2) } }))
       get().addEntry(
         { key: 'journal.titles.valuableReaction' },
         { key: 'journal.valuableRejected', params: { people: place.peopleId ?? id, treasure } },
       )
     } else if (!material || values.revered.includes(material)) {
-      set((st) => ({ goodwill: { ...st.goodwill, [id]: (st.goodwill[id] ?? 0) + 1 } }))
       get().addEntry(
         { key: 'journal.titles.valuableReaction' },
         { key: 'journal.valuableRevered', params: { people: place.peopleId ?? id, treasure } },
@@ -1718,96 +1736,6 @@ export const useGame = create<GameState>()((set, get) => ({
     get().tickDeadline(get().day)
   },
 
-  giveGift: (material) => {
-    const s = get()
-    if (!s.placeId) return
-    const place = placeById(s.placeId)
-    if (place.kind !== 'village' || s.gifts[material] <= 0) return
-    // Standing guard (design.md §12): hostility must wear off first.
-    if ((s.hostileUntil[place.id] ?? 0) > s.day) {
-      set({ toast: getStrings().toasts.chiefHostile })
-      return
-    }
-    const values = REGION_VALUES[place.region]
-    const gifts = { ...s.gifts, [material]: s.gifts[material] - 1 }
-    const gw = s.goodwill[place.id] ?? 0
-
-    if (values.rejected.includes(material)) {
-      // Wrong behavior: hostility and expulsion (design.md §12).
-      set({
-        gifts,
-        goodwill: { ...s.goodwill, [place.id]: 0 },
-        hostileUntil: { ...s.hostileUntil, [place.id]: s.day + balance.reputation.hostilityDays },
-      })
-      get().addEntry({ key: 'journal.titles.mistake' }, { key: 'journal.giftRejected', params: { people: place.peopleId ?? place.id } })
-      get().leavePlace()
-      return
-    }
-
-    const revered = values.revered.includes(material)
-    const gain = revered ? balance.goodwillRevered : balance.goodwillNeutral
-    const newGw = gw + gain
-    const reveredGiven = { ...s.reveredGiftGiven, [place.id]: (s.reveredGiftGiven[place.id] ?? false) || revered }
-    set({ gifts, goodwill: { ...s.goodwill, [place.id]: newGw }, reveredGiftGiven: reveredGiven })
-
-    // A gift to a native provides orientation over the settlement (§17):
-    // from now on the enterable buildings are highlighted here.
-    if (!s.orientationGiven[place.id]) {
-      set({
-        orientationGiven: { ...get().orientationGiven, [place.id]: true },
-        toast: getStrings().toasts.orientationGained,
-      })
-    }
-
-    // Repeated correct satisfaction bestows "Honored Friend" for the whole
-    // region (design.md §12).
-    if (revered && newGw >= balance.reputation.goodwillForFriend && !s.honoredFriend[place.region]) {
-      set({ honoredFriend: { ...get().honoredFriend, [place.region]: true } })
-      get().addEntry(
-        { key: 'journal.titles.friend' },
-        { key: 'journal.friendPledge', params: { people: place.peopleId ?? place.id, region: place.region } },
-        'event',
-        'face',
-      )
-    }
-
-    if (revered) {
-      get().addEntry({ key: 'journal.titles.audience' }, { key: 'journal.giftRevered', params: { people: place.peopleId ?? place.id } })
-    } else {
-      get().addEntry({ key: 'journal.titles.audience' }, { key: 'journal.giftNeutral' })
-    }
-
-    // The culturally correct (revered) gift is the hard condition for the
-    // hint (CLAUDE.md §7.1.6), plus sufficient goodwill. Per region only the
-    // knowing people reveals the location component; the other chiefs offer
-    // unspecific knowledge and point to the knowing people (§13.3).
-    if (reveredGiven[place.id] && newGw >= balance.goodwillForHint) {
-      const region = place.region
-      if (s.knowingVillages[region] === place.id) {
-        if (!s.hintsGiven[region]) {
-          set({ hintsGiven: { ...get().hintsGiven, [region]: true } })
-          const g = get().graveLatLon
-          get().addEntry(
-            { key: 'journal.titles.chiefHint' },
-            { key: 'journal.hintRaw', params: { region, lat: g.lat, lon: g.lon } },
-            'hint',
-            'compass',
-          )
-          get().revealDecoded(region)
-        }
-      } else if (!s.unspecificGiven[place.id]) {
-        set({ unspecificGiven: { ...get().unspecificGiven, [place.id]: true } })
-        const knowing = placeById(get().knowingVillages[region])
-        const word = UNSPECIFIC_WORDS[(place.id.length + region.length) % UNSPECIFIC_WORDS.length]
-        get().addEntry(
-          { key: 'journal.titles.unspecific' },
-          { key: 'journal.unspecific', params: { people: knowing.peopleId ?? knowing.id, word } },
-          'hint',
-        )
-      }
-    }
-  },
-
   revealDecoded: (region) => {
     const s = get()
     if (s.decodedGiven[region] || !s.hintsGiven[region]) return
@@ -1992,7 +1920,7 @@ export const useGame = create<GameState>()((set, get) => ({
       health: s.health, afflictions: s.afflictions, sunblindRecovery: s.sunblindRecovery,
       dryDays: s.dryDays, canteenFill: s.canteenFill, woundHealDays: s.woundHealDays,
       visitedPlaces: s.visitedPlaces, enteredPlaces: s.enteredPlaces, placeSituations: s.placeSituations,
-      goodwill: s.goodwill, reveredGiftGiven: s.reveredGiftGiven, chiefOutside: s.chiefOutside,
+      chiefOutside: s.chiefOutside,
       knowingVillages: s.knowingVillages, hintsGiven: s.hintsGiven, decodedGiven: s.decodedGiven,
       unspecificGiven: s.unspecificGiven,
       graveLatLon: s.graveLatLon, foodWarned: s.foodWarned, foodOutWarned: s.foodOutWarned,
@@ -2003,8 +1931,7 @@ export const useGame = create<GameState>()((set, get) => ({
       treasures: s.treasures, treasureSites: s.treasureSites, graveyardIvoryLeft: s.graveyardIvoryLeft,
       pendingBounties: s.pendingBounties, landmarksSeen: s.landmarksSeen, valuableShown: s.valuableShown,
       orientationGiven: s.orientationGiven,
-      honoredFriend: s.honoredFriend,
-      hostileUntil: s.hostileUntil, lastFriendAidDay: s.lastFriendAidDay,
+      honoredFriend: s.honoredFriend, lastFriendAidDay: s.lastFriendAidDay,
       freeCamps: s.freeCamps, villageCamps: s.villageCamps,
       communication: serializeMemory(s.communication),
       drumMessageHeard: s.drumMessageHeard,
@@ -2082,7 +2009,6 @@ export const useGame = create<GameState>()((set, get) => ({
         orientationGiven: snap.orientationGiven ?? {},
         chiefOutside: snap.chiefOutside ?? {},
         honoredFriend: snap.honoredFriend ?? {},
-        hostileUntil: snap.hostileUntil ?? {},
         lastFriendAidDay: snap.lastFriendAidDay ?? -9999,
         freeCamps: snap.freeCamps ?? [],
         villageCamps: snap.villageCamps ?? {},
