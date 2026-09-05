@@ -471,6 +471,23 @@ if (section('core-loop')) {
   await page.waitForTimeout(300)
   s = await state()
   check('The use key brings the chief out of his hut', s.chiefOutside[s.placeId] === true)
+  // Step BACK from the door and face the hut, or the frame holds nothing but
+  // wall: at the door the camera stands inside the building's own footprint.
+  // From ~9 m out on the door's own bearing, hut, door and the man standing
+  // 1.6 m beside it are all in the picture.
+  await page.evaluate(() => {
+    const it = window.__placeLayout.interactives.find((i) => i.type === 'chief')
+    const p = window.__placePlayer
+    const [hx, hz] = it.pos
+    const [dx, dz] = it.door
+    const ux = dx - hx
+    const uz = dz - hz
+    const l = Math.hypot(ux, uz) || 1
+    p.x = dx + (ux / l) * 9
+    p.z = dz + (uz / l) * 9
+    // Place-camera yaw 0 looks toward -Z, so aim with the +PI complement.
+    p.yaw = Math.atan2(hx - p.x, hz - p.z) + Math.PI
+  })
   await shot('04-chief-outside-his-hut', { place: 'nubian-village', label: 'the chief standing in the open before his hut' })
   check('Meeting him unlocks the hint', s.hintsGiven.north === true)
   const hint = s.journal.find((e) => titleKey(e) === 'journal.titles.chiefHint')

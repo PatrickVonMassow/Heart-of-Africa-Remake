@@ -479,6 +479,23 @@ if (section('village')) {
   check('Village: the chief comes out with Space at his door', chiefCameOut)
   await page.waitForTimeout(200)
   await dwellingDoorsReachable('Village')
+  // Step BACK from the door and face the hut, or the frame holds nothing but
+  // wall: at the door the camera stands inside the building's own footprint.
+  // From ~9 m out on the door's own bearing, hut, door and the man standing
+  // 1.6 m beside it are all in the picture.
+  await page.evaluate(() => {
+    const it = window.__placeLayout.interactives.find((i) => i.type === 'chief')
+    const p = window.__placePlayer
+    const [hx, hz] = it.pos
+    const [dx, dz] = it.door
+    const ux = dx - hx
+    const uz = dz - hz
+    const l = Math.hypot(ux, uz) || 1
+    p.x = dx + (ux / l) * 9
+    p.z = dz + (uz / l) * 9
+    // Place-camera yaw 0 looks toward -Z, so aim with the +PI complement.
+    p.yaw = Math.atan2(hx - p.x, hz - p.z) + Math.PI
+  })
   await shot('53-collision-village-chief-hut', { place: 'maasai-village', label: "the chief's hut, its door and the chief standing out in front of it" })
   await page.evaluate(() => { const p = window.__placePlayer; p.x = 0; p.z = 0 })
   await page.waitForTimeout(150)
