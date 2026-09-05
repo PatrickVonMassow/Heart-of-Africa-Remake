@@ -1017,7 +1017,8 @@ put it is the mistake this line exists to stop.
   Criticality: medium — none of them blocks the game, two of them block the turn end.
   Refs: scripts/board.mjs, scripts/retro-sources.mjs, scripts/finding.mjs,
   docs/analysis_de/vibe-coding-anleitung.md, scripts/land-point.mjs
-  Bundle: Umsteuerung.
+  Bundle: Session- & Repo-Hygiene (it edits the board, finding and landing commands
+  that bundle already owns).
 - [ ] 1053. A session the user opened for something else silently becomes the batch owner
   (user 03.09.2026, on seeing this session announce "Batch übernommen": »Wieso hast du die
   Batch übernommen, ich habe dich nicht dazu aufgefordert. Manchmal fällt sie dir
