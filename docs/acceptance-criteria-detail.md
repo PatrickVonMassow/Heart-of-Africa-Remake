@@ -487,16 +487,14 @@ languages with voice markup.
 
 ## 26. Standing with the natives.
 
-The reputation system of `design.md` §12 is implemented as far as §12 still defines it: the
-"Honored Friend" status with its pledge journal entry and regional protections (attack
+The "Honored Friend" status of `design.md` §12 with its regional protections: attack
 outcomes capped at lightly injured with rescue entries naming the people, near-death aid
-with cooldown, free village supplies). Item effects are possession-based (§6.1/§7): merely
+with cooldown, free village supplies. Item effects are possession-based (§6.1/§7): merely
 carrying a rifle scares no villager. All texts exist in both languages with voice markup.
 
-The gift/goodwill ladder that used to BESTOW the standing, the hostility period and the
-rifle-gated robbery that used to forfeit it retired with §12 on 05.09.2026 (user
-03.09.2026). The consumers above stand and are covered; the status has no producer until
-the observation model arrives, and this criterion cannot be met in full before it does.
+NOT MET in full: the gift ladder that BESTOWED the standing, the hostility period and the
+robbery that forfeited it retired with §12 on 05.09.2026 (user 03.09.2026). Every consumer
+stands and is covered; the status waits for the observation model to produce it again.
 
 ## 27. Camps (item caches).
 
