@@ -44,3 +44,12 @@ Format: one line per finding — `- YYYY-MM-DD <source> — <finding>`.
   attempts while recording the point-1051 review; the working call reads the anchor out
   of the transcript's last model-bearing row first. Non-blocking: the gate stands down
   under the 01.09. decision, and the record went through once anchored.
+- 2026-09-05 session-death hunt — `scripts/finding.mjs --record` appends its MEMORY.md index line
+  with `appendFileSync` and no leading newline; when the index has no trailing newline (the
+  doc-budget count keeps it that way) the line glues onto the last entry. Cosmetic, fixed by
+  hand once; a `\n`-guard before the append would end it.
+- 2026-09-05 session-death hunt — `.claude/session-process.json` (the claude-ancestor cache the
+  emergency strike reads as its target list) holds 93 entries, most for pids long dead, some
+  keyed by fixture ids (`x`, `answer-test-session`, `tool-output-interception-test`) that tests
+  wrote into the live file. No harm now that the tests are pinned, but a live registry that
+  tests can write is the shape that made 05.09. possible; worth a sweep and a fixture path.

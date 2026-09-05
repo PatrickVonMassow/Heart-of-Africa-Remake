@@ -320,7 +320,15 @@ export const LIMITS = {
   // author commissioned to fill them killed the 81-minute run that declaration covered. The
   // entry measures +10 lines / +122 words, so the ceilings move 531 -> 541 and 4903 -> 5025
   // with zero slack.
-  maxLines: 541,
+  // 05.09.2026: ONE genuinely new tip, folded into "Die KI repariert den Wächter, der sie gerade
+  // sperrt" — a refusal that comes back WORD FOR WORD after the session complied is not the guard
+  // erring but the session's picture of the state; re-measure instead of answering it again. It is
+  // not the repeated-refusal lesson already folded there (answering ten refusals with a fresh closing
+  // line): that one is about repairing rather than re-closing, this one is about what an identical
+  // second refusal MEANS. Measured on 05.09.2026 across a session that answered the same refusal
+  // twice. The entry measures +6 lines / +53 words, so the ceilings move 541 -> 547 and
+  // 5015 -> 5068 with zero slack.
+  maxLines: 547,
   // EXACT FIT, not headroom — corrected 30.07.2026 after the four-eyes review
   // pointed out that this comment had long stopped describing the numbers. The
   // rule above ("raised only by the measured size of genuinely new tips")
@@ -536,7 +544,7 @@ export const LIMITS = {
   // estimated-numbers pitfall — an accumulated maximum may exonerate, never
   // accuse — and three neighbouring entries were compressed to pay for it, so
   // the measured guide came down three more words: 5018 -> 5015.
-  maxWords: 5015,
+  maxWords: 5068,
   // A pitfall entry = the risk lines plus its prompt. Anything longer is a
   // story, not a tip.
   maxEntryLines: 11,

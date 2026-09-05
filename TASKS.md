@@ -1050,8 +1050,18 @@ put it is the mistake this line exists to stop.
     cse_016Kki... across four different local pids. NOT our machinery: at 13:32:31 the
     session exited BEFORE the launcher spawned its successor at 13:32:32, and no
     `handover` row precedes any of the deaths — so the mechanism point 1059 describes
-    does not fit these. Next step: test whether a second client registration supersedes
-    the remote session.
+    does not fit these. THE REMOTE-CONTROL TRAIL IS DEAD (measured 05.09. 18:03):
+    `claude doctor` reports "Remote Control is disabled by your organization's policy
+    (managed setting disableRemoteControl)" — the key is valid and in force, so remote
+    control cannot be ending these sessions. The `end_session` lines above come from a
+    transcript of 04.09. and were wrongly carried over to the 05.09. deaths; the three
+    sessions that died on 05.09. carry none. (A dying session does not write its own
+    stderr to its transcript, so that is not proof of absence — only the carry-over was
+    unsound.) `~/.claude.json` and both workspace settings files hold no
+    `remoteControlAtStartup: true` either. Next step: the FULL stderr of a dying session
+    (VS Code "View output logs") — every excerpt so far starts at the shutdown, and the
+    triggering line sits before it. Second candidate to measure rather than assume: our
+    own context watermark. Details: local/session-death-cause.md.
   - The delegated request "Entscheidung ueber 1048 an die Batch-Sitzung delegiert" is
     ANSWERED: the user ruled on 05.09. that the rest of 1048 moves behind 174.
   Test: Vitest over whatever decision core each repair touches; no new guard is added
@@ -14641,10 +14651,24 @@ to land than a mechanism that needs a review.
   Eight handovers on 04.09. alone, so the owner loses the remote view of an unattended
   batch several times an evening while the batch itself carries on — the monitor is gone,
   not the work. The user asked about it directly (04.09.2026).
+  AND IT IS NOT ONLY THE BOUNDARY (measured 05.09.2026, user asked again). The same 143
+  hit a session that was NOT handing over: pid 3123985 died at 13:14:13.085Z in the middle
+  of a foreground `npm run test:unit`, which reported 137 as its child tree went down. No
+  restart (container PID 1 was 18 h old, unchanged), no shortage (`oom_kill 0`, 12.6 GB
+  available, cgroup at 5.4 GB), and the autostart log one second later says `skip:
+  successor decision refused (registered-writer-live)` — so the sender this point names
+  did not fire. The journal's row is `process-exit … cause "owner-release", explicit:
+  true`, and that proves NOTHING about who started it: an external SIGTERM runs the same
+  clean shutdown as a deliberate exit. The one shape common to all four deaths so far is a
+  long BLOCKING foreground call with no output. `node scripts/session-death.mjs` now
+  prints this comparison instead of it being redone by hand.
   Final state:
   - A HANDED-OVER PREDECESSOR ENDS ITSELF rather than being signalled: after
     `markHandover` succeeds, the session's own stop path exits 0, so the remediation finds
     nothing to kill and no host reports an abnormal exit.
+  - THE NON-BOUNDARY DEATH IS ATTRIBUTED TOO: the sender of the SIGTERM to a session that
+    is neither handing over nor out of memory is named, and either removed or recorded
+    where the owner can see it.
   - The remediation keeps its safety net for a predecessor that does NOT exit, and says in
     its log which case it hit.
   - No new guard, ledger field or router — this is a change inside the existing handover

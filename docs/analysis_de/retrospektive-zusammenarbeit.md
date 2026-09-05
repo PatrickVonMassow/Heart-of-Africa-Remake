@@ -71,6 +71,7 @@ Das Musterbeispiel sind die Chat-Zeitstempel: neun Eskalationsstufen, acht weich
 | 26.08. früh | Dritter Rückfall derselben Dublette, diesmal von mir: Ich legte einen frisch gemessenen Befund als Punkt 928 ab, obwohl Punkt 856 seit dem 23.08. genau ihn beschreibt — gefunden wieder erst von der Bündelpflicht, nicht beim Anlegen. Neu war nur die zweite Messung; sie ist jetzt in 856 nachgetragen (§3.168-Nachtrag, 928 in 856 gefaltet) |
 | 24.08. mittags | Der delegierte Autor schrieb drei Commits um, die er bereits veroeffentlicht hatte: Sein Abschluss-Push scheiterte als non-fast-forward, und sein eigener Bericht meldete die fertige Arbeit als „nur lokal“ — obwohl die Baeume beider Seiten byte-identisch waren und sich nur eine Leerzeile im Commit-Text unterschied. Wer dem Bericht glaubt, sucht verlorene Arbeit, die nie verloren war; wer ihn ignoriert, uebersieht den echten Fall. Dieselbe Stunde zeigte die Kehrseite von der Gegenseite: Ein Tor-Lauf im Arbeitsbaum wurde rot, weil die pruefende Sitzung selbst waehrenddessen auf main committete — kein Test schlug fehl, nur der Teardown benannte die Ref-Bewegung |
 | 04.09. | Zwei Sitzungen starben mitten im Testlauf, und der einzige Beleg war ein Allzeit-Höchststand ohne Uhrzeit: 15,7 von 15,9 GB — daraus wurde fast die Maßnahme, den Testlauf zu beschneiden. Die Messung eines echten Laufs entlastete ihn vollständig (1,4 GB Spitze, nie unter 10,9 GB frei, Auslagerung unverändert), und die Sitzung starb bei zwei Dritteln freiem Speicher erneut (§3.235) |
+| 05.09. | Der Ersatz für den entlasteten Speicherverdacht war wieder ein Beleg, der die Frage nicht beantworten kann: Aus `cause "owner-release"` wurde „die Sitzung beendet sich selbst" — dabei durchläuft ein SIGTERM von außen denselben sauberen Abschluss. Vierter Sitzungstod derselben Bauart, wieder in einem langen blockierenden Vordergrundaufruf (§3.235, Punkt 1059) |
 | 03.09. | Ein Wächter ordnete an, was ein zweiter bestraft: Die Wartemeldung für einen 81-Minuten-Lauf wurde wegen freier Agentenplätze abgelehnt, der daraufhin beauftragte Autor tötete mit seinem ersten Commit genau diesen Lauf — Gehorsam gegenüber der einen Auflage ist der Bruch der anderen (§3.231, Punkt 955) |
 | 29.08. | Kein Regressionslauf des Tages hatte ein gültiges Zeit-Urteil: Der Ruhe-Wächter las den Auftragstext der eigenen Batch-Sitzung als zweiten Prüflauf, weil dieser die Prüfbefehle zitiert, erklärte die Maschine für belastet und strich die Zeit-Urteile — protokolliert in einer Zeile, die wie Hausmeisterei klingt; am selben Abend tötete der Integritäts-Wächter eine 85-minütige Zwei-Backend-Regression, weil dieselbe Sitzung nebenher auf main committete (§3.214, Punkt 955) |
 | 26.08. vormittags | Neun Gegenlesungsdurchgänge über die abgeleitete Board-Sektion fanden am Ende EINE Fehlerklasse — zweimal: Ein Beleg ohne zuordenbaren Punkt und ein Fokus-Eintrag, der etwas nennt, das keine Punktnummer ist, kamen beide als »kein Fokus« heraus, also Byte für Byte als die Antwort einer FEHLENDEN Quelle. Aus beschädigten Daten wurde so eine geprüfte Null (§3.185, Punkt 713) |
@@ -1432,7 +1433,7 @@ keinen Träger hat. Gebucht als Punkt 956.
 
 ## Anhang A — Maschinell gepflegte Quellen-Übersicht
 
-Zuletzt aktualisiert: Samstag, 05.09.2026, 13:41 · Quellen-Fingerprint: `6991897579a9…`
+Zuletzt aktualisiert: Samstag, 05.09.2026, 18:08 · Quellen-Fingerprint: `e64a57bc7830…`
 
 Spalten heuristisch aus den Quellen abgeleitet (Anläufe = distinkte Datumsnennungen im Memory;
 Maßnahme = Guard-Skripte mit Namens-Treffer). Die inhaltliche Bewertung gehört der Prosa oben.
@@ -1526,7 +1527,7 @@ Maßnahme = Guard-Skripte mit Namens-Treffer). Die inhaltliche Bewertung gehört
 | Headless probes must screenshot the DEFAULT zoom too (zoom-gated dressing like haze only shows there); headless WebGPU is impossible, so WebGPU-only branches stay user-checked | 2 | mittel | render-verify-guard.mjs | ✔ Mechanismus |
 | Every GUI/rendering fix must be verified on BOTH WebGPU and WebGL2 before it counts as done — never mark a render fix done on one path | 2 | mittel | render-verify-guard.mjs | ✔ Mechanismus |
 | A resumed batch session must check the previous owner's PROCESS before working — the launcher's \"provably dead\" verdict was wrong and double-spawned | 2 | mittel | render-verify-guard.mjs | ✔ Mechanismus |
-| Rotating verify AND unit failures under a running agent pool are LOAD, not bugs — 8 of 12 unit runs red from load alone; judge a red only on a quiet machine | 6 | hoch | render-verify-guard.mjs | ✔ Mechanismus |
+| Rotating verify AND unit failures under a running agent pool are LOAD, not bugs — 8 of 12 unit runs red from load alone; judge a red only on a quiet machine | 8 | hoch | render-verify-guard.mjs | ✔ Mechanismus |
 | The named \"version release\" process and its trigger — queue/run a version release for a version the user names (full closing → user approval → tag → mirror poc → publish /TAG/ and /poc/) | 1 | niedrig | lock-release-hook.mjs | ✔ Mechanismus |
 | Standing licence to move, REMOVE or ADD villages when it helps — but every change must be checked against the other requirements first, and the check has already caught a real bug | 1 | niedrig | — (Regel/Memory) | ◐ Regel |
 | A VS Code restart restarts the devcontainer — every process inside dies, PPID 1 proves nothing | 3 | mittel | container-ask-guard.mjs | ✔ Mechanismus |
@@ -1537,8 +1538,8 @@ Maßnahme = Guard-Skripte mit Namens-Treffer). Die inhaltliche Bewertung gehört
 
 Erfasste Quellen: 95 Feedback-/Projekt-Memories · 58 Guard-/Hook-Skripte · 6 Revert-/Reapply-Commits · 125 Prozess-/Meta-TASKS-Punkte (davon 59 offen).
 
-<!-- RETRO-FINGERPRINT: 6991897579a96ada7c65050b88b44a6fff78922e8432802c568a2dc1456d7b5d -->
-<!-- RETRO-LAST-REFRESHED: 2026-09-05T11:41:35.828Z -->
+<!-- RETRO-FINGERPRINT: e64a57bc783078c835c78f6284a53dd0aea4f75fa8ab1f5af3df9681c8ad4c51 -->
+<!-- RETRO-LAST-REFRESHED: 2026-09-05T16:08:15.548Z -->
 <!-- AUTO-GENERATED:END -->
 
 ### 3.111 Ein Erfolg ist kein Beweis für den Weg, auf dem er zustande kam
@@ -5527,8 +5528,23 @@ weniger als 10,87 GB frei, die Auslagerung über den kompletten Lauf unveränder
 und der Allzeit-Höchststand bewegte sich um kein Byte. Die Sitzung starb während
 dieser Messung erneut — bei zwei Dritteln freiem Speicher, mit `oom_kill 0` in
 `memory.events`. Die naheliegende Kur hätte also einen gesunden Mechanismus
-beschnitten und die echte Ursache verdeckt, die im Journal steht: ein sauberes
-`owner-release` der Sitzung, die ihren ganzen Kindbaum mitnimmt.
+beschnitten.
+
+**Und dann trat dieselbe Klasse ein zweites Mal auf, im Ausweg.** Als Ersatz für
+den entlasteten Speicherverdacht wurde die Journalzeile `process-exit … cause
+"owner-release", explicit: true` zur Erklärung erhoben: „die Sitzung beendet sich
+selbst und reißt ihren Kindbaum mit". Am 05.09.2026 starb eine Sitzung erneut,
+mitten in einem `npm run test:unit` im Vordergrund, und die Prüfung dieser
+Erklärung fiel durch: **ein SIGTERM von außen durchläuft exakt denselben sauberen
+SessionEnd-Pfad wie ein gewollter Ausstieg.** Die Zeile benennt das
+Herunterfahren, nicht seinen Absender — sie kann die beiden Fälle gar nicht
+unterscheiden. Der Absender, den Punkt 1059 dafür nennt, scheidet für diesen Fall
+zudem aus: sein Log sagt eine Sekunde später `skip: successor decision refused`.
+
+Damit ist es dieselbe Klasse wie der Höchststand ohne Uhrzeit — ein Artefakt, das
+die entscheidende Unterscheidung nicht enthält, wird gelesen, als enthielte es
+sie. Beim ersten Mal fehlte die Zeit, beim zweiten der Absender. Und beide Male
+war das Ersatzartefakt sofort zur Hand, weil die Frage drängte.
 
 Das ist nicht die Klasse „unter Last gemessen" aus der ruhigen Maschine, sondern
 ihre Umkehrung: Dort ist der Messwert echt und der Zeitpunkt falsch gewählt,
@@ -5536,9 +5552,13 @@ hier ist der Zeitpunkt gar nicht enthalten. Ein akkumulierender Maximalwert
 beantwortet eine Frage nach dem Jetzt grundsätzlich nicht, egal wie dramatisch
 die Zahl aussieht.
 
-**Lehre:** Ein Messwert ohne Uhrzeit taugt nur zum Ausschließen, nie zum
-Beschuldigen. Bevor eine Zahl eine Maßnahme trägt, muss sie ein Fenster haben —
-sonst wird nach dem stärksten Verdächtigen gehandelt statt nach dem gemessenen.
+**Lehre:** Ein Beleg taugt nur zum Ausschließen, wenn ihm die entscheidende
+Unterscheidung fehlt — ein Messwert ohne Uhrzeit ebenso wie eine Abschlusszeile
+ohne Absender. Bevor er eine Maßnahme trägt, muss er die Gegenhypothese
+ausschließen KÖNNEN; sonst wird nach dem stärksten Verdächtigen gehandelt statt
+nach dem gemessenen. Wiederkehrende Nachforschungen dieser Art gehören in einen
+Befehl, damit die Gegenüberstellung nicht jedes Mal neu erfunden wird
+(`node scripts/session-death.mjs`).
 Und ein langer Lauf gehört abgekoppelt (`setsid`, eigene Prozessgruppe, Log in
 eine Datei): Hängt er am Leben der Sitzung, nimmt jeder Sitzungstod die Arbeit
 UND ihren Beweis mit.

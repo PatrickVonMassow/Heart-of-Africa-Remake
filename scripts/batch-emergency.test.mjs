@@ -1,4 +1,4 @@
-import { afterEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
@@ -8,7 +8,18 @@ import { runRecordFor } from './batch-in-flight.mjs'
 import { defaultInputs, restartOutcome, runEmergency, terminateLockedOwner, verificationProcessAlive } from './batch-emergency.mjs'
 
 const dirs = []
+let kills = null
+beforeEach(() => {
+  kills = vi.spyOn(process, 'kill')
+})
 afterEach(() => {
+  // NO TEST HERE MAY SIGNAL A REAL PROCESS. On 05.09.2026 two tests left
+  // `getProcesses` and `terminate` at their live defaults; the hard-recover path
+  // then SIGTERMed every claude session recorded in .claude/session-process.json —
+  // in every vitest run, gate or not — and each session died with exit 143.
+  // Signal 0 is the liveness probe and stays allowed.
+  const signalled = (kills?.mock.calls ?? []).filter(([, signal]) => signal !== 0)
+  expect(signalled, 'a test signalled a real process').toEqual([])
   vi.restoreAllMocks()
   for (const dir of dirs.splice(0)) rmSync(dir, { recursive: true, force: true })
 })
@@ -27,6 +38,17 @@ const fixture = () => {
     dir, repo: dir, now, progressAt,
     statePath: join(dir, 'state.json'),
     logPath: join(dir, 'strikes.jsonl'),
+    // Every seam that reaches a REAL process is pinned to an inert stand-in.
+    // `runEmergency` defaults to the live lock, the live session registry, a
+    // real SIGTERM and a real lock release; a test that spreads this fixture and
+    // forgets one of them strikes the running batch (05.09.2026). Override on
+    // purpose, per test, never by omission.
+    getLock: () => null,
+    getProcesses: () => ({}),
+    revoke: () => ({ revoked: true, reason: 'fixture' }),
+    terminate: (target) => ({ step: 'terminate-owner', ok: true, pid: target.pid }),
+    releaseLock: () => true,
+    getWaitLeases: () => [],
     inputs: {
       workablePoints: [947], paused: false, veto: null, state: {},
       report: {
