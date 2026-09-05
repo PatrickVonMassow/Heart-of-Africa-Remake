@@ -1,6 +1,6 @@
 // THE SWITCH HAS TO BE HONEST ABOUT WHERE WORK GOES (point 654). Its failure modes, each
 // pinned below:
-//   - a setting that routes work to Sol without saying so, or says so without routing it;
+//   - a setting that routes work to Astra without saying so, or says so without routing it;
 //   - `--more` wrapping around at an end, which would move load to the very vendor the
 //     user was trying to spare;
 //   - a broken state file taking the whole path down, or degrading in the SPENDING
@@ -34,7 +34,7 @@ import {
 } from './astra-share-core.mjs'
 
 describe('the settings themselves', () => {
-  it('are ordered from the least Sol to the most, with the default in the middle', () => {
+  it('are ordered from the least Astra to the most, with the default in the middle', () => {
     expect(SETTINGS).toEqual(['claude-only', 'default', 'prefer-astra'])
     expect(DEFAULT_SETTING).toBe('default')
     for (const s of SETTINGS) expect(SETTING_NOTES[s]).toBeTruthy()
@@ -49,30 +49,30 @@ describe('the settings themselves', () => {
   })
 
   it('takes only a real setting, whatever the casing and the spacing', () => {
-    expect(normaliseSetting(' Prefer-Sol ')).toBe('prefer-astra')
-    expect(normaliseSetting('sol')).toBeNull()
+    expect(normaliseSetting(' Prefer-Astra ')).toBe('prefer-astra')
+    expect(normaliseSetting('astra')).toBeNull()
     expect(normaliseSetting(undefined)).toBeNull()
   })
 })
 
 describe('routing', () => {
-  it('sends only the review to Sol at the default — today’s behaviour, unchanged', () => {
-    expect(routeFor('review', 'default')).toBe('sol')
+  it('sends only the review to Astra at the default — today’s behaviour, unchanged', () => {
+    expect(routeFor('review', 'default')).toBe('astra')
     for (const kind of ASK_KINDS) expect(routeFor(kind, 'default')).toBe('claude')
   })
 
-  it('sends every read-only kind to Sol at prefer-astra', () => {
-    for (const kind of KINDS) expect(routeFor(kind, 'prefer-astra')).toBe('sol')
+  it('sends every read-only kind to Astra at prefer-astra', () => {
+    for (const kind of KINDS) expect(routeFor(kind, 'prefer-astra')).toBe('astra')
     expect(kindsToAstra('prefer-astra')).toEqual(KINDS)
   })
 
-  it('sends NOTHING to Sol at claude-only — the reviews included, that being the point', () => {
+  it('sends NOTHING to Astra at claude-only — the reviews included, that being the point', () => {
     for (const kind of KINDS) expect(routeFor(kind, 'claude-only')).toBe('claude')
     expect(kindsToAstra('claude-only')).toEqual([])
   })
 
   // Audit finding, 12.08.2026: an unknown setting used to route as the DEFAULT, and the
-  // default sends reviews to Sol — so a garbled value spent the second vendor's
+  // default sends reviews to Astra — so a garbled value spent the second vendor's
   // allowance. The old case only asked about `diagnose`, whose default route is Claude
   // anyway, and so proved nothing.
   it('routes an unknown setting as the SAFE one — the review included, which is where it hid', () => {
@@ -91,7 +91,7 @@ describe('routing', () => {
   it('routes AUTHORING only at prefer-astra — the lane the operator can turn off', () => {
     // The whole OpenAI authoring lane hangs off this row (point 667): at the two
     // lower settings the work stays with Claude, exactly as it did before.
-    expect(routeFor('author', 'prefer-astra')).toBe('sol')
+    expect(routeFor('author', 'prefer-astra')).toBe('astra')
     expect(routeFor('author', 'default')).toBe('claude')
     expect(routeFor('author', 'claude-only')).toBe('claude')
     // …and an unusable state falls back to the setting that spends nothing new.
@@ -101,7 +101,7 @@ describe('routing', () => {
   it('offers the whole table, so no consumer has to keep its own copy', () => {
     const table = routingTable('prefer-astra')
     expect(table.map((r) => r.kind)).toEqual(KINDS)
-    for (const row of table) expect(row.to).toBe('sol')
+    for (const row of table) expect(row.to).toBe('astra')
   })
 })
 
@@ -152,20 +152,20 @@ describe('the state file', () => {
   })
 
   // Cross-vendor review, 12.08.2026: falling back to `default` meant a CORRUPTED
-  // `claude-only` state quietly began sending reviews to Sol again — fail-open in exactly
+  // `claude-only` state quietly began sending reviews to Astra again — fail-open in exactly
   // the direction this switch exists to prevent.
   it('reads a BROKEN file as the setting that spends nothing, and names the problem', () => {
     expect(readSetting('{not json')).toMatchObject({ setting: SAFE_SETTING, corrupt: true })
     expect(readSetting('{not json').problem).toMatch(/not JSON/)
-    expect(readSetting('{"setting":"sol-only"}')).toMatchObject({ setting: SAFE_SETTING, corrupt: true })
-    expect(readSetting('{"setting":"sol-only"}').problem).toMatch(/not one of/)
+    expect(readSetting('{"setting":"astra-only"}')).toMatchObject({ setting: SAFE_SETTING, corrupt: true })
+    expect(readSetting('{"setting":"astra-only"}').problem).toMatch(/not one of/)
     expect(SAFE_SETTING).toBe('claude-only')
     for (const kind of KINDS) expect(routeFor(kind, SAFE_SETTING)).toBe('claude')
     expect(readSetting('{"setting":"prefer-astra","changedAt":"soon"}').changedAt).toBeNull()
   })
 
   it('refuses to write a setting that is not one', () => {
-    expect(() => writeState('sol-only')).toThrow()
+    expect(() => writeState('astra-only')).toThrow()
   })
 
   it('lives in the MAIN checkout, so a worktree agent reads the setting the user flipped', () => {
@@ -180,9 +180,9 @@ describe('what it says', () => {
   it('states in ONE line what goes where', () => {
     const line = statusLine('default')
     expect(line.split('\n')).toHaveLength(1)
-    expect(line).toMatch(/to GPT-5\.6 Sol: review/)
+    expect(line).toMatch(/to GPT-6 Astra: review/)
     expect(line).toMatch(/to Claude: diagnose/)
-    expect(statusLine('claude-only')).toMatch(/to GPT-5\.6 Sol: nothing/)
+    expect(statusLine('claude-only')).toMatch(/to GPT-6 Astra: nothing/)
     expect(statusLine('prefer-astra')).toMatch(/to Claude: nothing/)
   })
 
@@ -202,7 +202,7 @@ describe('what it says', () => {
     expect(briefLine('prefer-astra')).toMatch(/ask-astra\.mjs/)
     expect(briefLine('prefer-astra')).toMatch(/diagnose/)
     expect(briefLine('claude-only')).toMatch(/do NOT call/)
-    expect(briefLine('default')).toMatch(/reviews go to GPT-5\.6 Sol/)
+    expect(briefLine('default')).toMatch(/reviews go to GPT-6 Astra/)
     for (const s of SETTINGS) expect(briefLine(s)).toBeTruthy()
   })
 })
@@ -218,17 +218,17 @@ describe('the board note', () => {
 
   it('names a non-default setting in the board’s own language', () => {
     expect(applyFooterNote(footer('Stand: 11.08.2026 · 3 offene Punkte'), 'prefer-astra')).toContain(
-      'Sol-Routing: prefer-astra — Diagnose, Audit, Aufzählungen und Erklärungen laufen über GPT-5.6 Sol',
+      'Astra-Routing: prefer-astra — Diagnose, Audit, Aufzählungen und Erklärungen laufen über GPT-6 Astra',
     )
-    expect(applyFooterNote(footer('Stand: x'), 'claude-only')).toContain('Sol-Routing: claude-only')
+    expect(applyFooterNote(footer('Stand: x'), 'claude-only')).toContain('Astra-Routing: claude-only')
   })
 
   it('replaces a stale note rather than stacking one on the other', () => {
     const once = applyFooterNote(footer('Stand: x · 3 offene Punkte'), 'prefer-astra')
     const twice = applyFooterNote(once, 'claude-only')
-    expect(twice.match(/Sol-Routing:/g)).toHaveLength(1)
+    expect(twice.match(/Astra-Routing:/g)).toHaveLength(1)
     expect(twice).toContain('claude-only')
-    expect(applyFooterNote(twice, 'default')).not.toMatch(/Sol-Routing/)
+    expect(applyFooterNote(twice, 'default')).not.toMatch(/Astra-Routing/)
   })
 
   it('keeps the footer’s own segments, and leaves a board without a footer alone', () => {

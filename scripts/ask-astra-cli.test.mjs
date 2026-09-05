@@ -250,12 +250,12 @@ describe('an ask that runs', () => {
   it('proves the model id first, sends the material on stdin and prints the answer', () => {
     setting('prefer-astra')
     clearCalls()
-    // With no receipt the id must be PROVEN before a word is attributed to Sol.
+    // With no receipt the id must be PROVEN before a word is attributed to Astra.
     rmSync(join(stateDir, 'review-astra-probe.json'), { force: true })
     const r = run(['--kind', 'diagnose', '--brief', 'why did the place suite go red?', '--file', materialFile], { INPUT: 'piped material too\n' })
     expect(r.status, r.stderr).toBe(0)
     // The unknown id is asked FIRST (the probe), then the real one: that refusal is the
-    // whole proof that an answer attributed to Sol really is Sol's.
+    // whole proof that an answer attributed to Astra really is Astra's.
     expect(calls()[0]).not.toBe('gpt-6-astra')
     expect(calls().at(-1)).toBe('gpt-6-astra')
     const sent = readFileSync(join(dir, 'stdin.txt'), 'utf8')
@@ -273,7 +273,7 @@ describe('an ask that runs', () => {
     expect(r.status, r.stderr).toBe(0)
     const json = JSON.parse(r.stdout)
     expect(json.kind).toBe('enumerate')
-    expect(json.model).toBe('GPT-5.6 Sol')
+    expect(json.model).toBe('GPT-6 Astra')
     expect(json.setting).toBe('prefer-astra')
     expect(json.answer.entries.map((e) => e.id)).toEqual(['B1', 'B2'])
   })

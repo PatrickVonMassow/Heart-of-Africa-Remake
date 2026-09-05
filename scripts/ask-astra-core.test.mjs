@@ -24,7 +24,7 @@ import {
 
 describe('the kinds', () => {
   it('addresses every model the blind-merger switch can select', () => {
-    expect(resolveAskModel()).toMatchObject({ key: 'sol', runtime: 'codex', name: 'GPT-5.6 Sol' })
+    expect(resolveAskModel()).toMatchObject({ key: 'astra', runtime: 'codex', name: 'GPT-6 Astra' })
     expect(resolveAskModel('fable')).toMatchObject({ runtime: 'claude', name: 'Fable 5.1', id: 'claude-fable-5-1' })
     expect(resolveAskModel('opus')).toMatchObject({ runtime: 'claude', name: 'Opus 5' })
     expect(resolveAskModel('sonnet')).toBeNull()
@@ -118,7 +118,7 @@ describe('the prompt', () => {
 })
 
 describe('model-specific reports', () => {
-  it('never labels a Fable refusal or answer as Sol', () => {
+  it('never labels a Fable refusal or answer as Astra', () => {
     expect(formatUnavailable({ kind: 'explain', cause: 'substituted', modelName: 'Fable 5.1' })).toMatch(
       /Fable 5.1 did NOT answer/,
     )
@@ -445,7 +445,7 @@ describe('reading the answer', () => {
   })
 
   // Same round: a sweep may honestly find nothing, and refusing that reported a CLEAN
-  // audit as "Sol did not answer" after the allowance had already been spent.
+  // audit as "Astra did not answer" after the allowance had already been spent.
   it('accepts an audit that found nothing, but only when it SAYS so', () => {
     const clean = parseAnswer({ kind: 'audit', text: 'I read every line of both files.\n\nNO FINDINGS: the switch table, the fallback and the three consumers' })
     expect(clean.ok).toBe(true)
@@ -490,7 +490,7 @@ describe('reading the answer', () => {
 })
 
 describe('what the command says', () => {
-  it('names the cause in ONE line and hands the work back — never records it as Sol’s', () => {
+  it('names the cause in ONE line and hands the work back — never records it as Astra’s', () => {
     const out = formatUnavailable({ kind: 'diagnose', cause: 'the ChatGPT allowance for this account is exhausted' })
     expect(out.split('\n')[0]).toMatch(/did NOT answer this diagnose: the ChatGPT allowance/)
     expect(out).toMatch(/Do it in the Claude chain/)

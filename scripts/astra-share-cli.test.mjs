@@ -40,12 +40,12 @@ describe('astra-share.mjs', () => {
   // The mutation's OWN output is read, not a later --status (audit, 12.08.2026): asserting
   // the file and then asking again would pass even if the command printed one setting and
   // saved another.
-  it('steps towards Sol, persists it, and says so in the SAME invocation', () => {
+  it('steps towards Astra, persists it, and says so in the SAME invocation', () => {
     const r = run('--more')
     expect(r.status).toBe(0)
     expect(r.stdout).toMatch(/^astra-share: prefer-astra —/)
     expect(state().setting).toBe('prefer-astra')
-    expect(run('--status').stdout).toMatch(/^astra-share: prefer-astra — to GPT-5\.6 Sol: review, diagnose/)
+    expect(run('--status').stdout).toMatch(/^astra-share: prefer-astra — to GPT-6 Astra: review, diagnose/)
   })
 
   it('refuses to wrap past the end, leaving the setting where it was', () => {
@@ -60,38 +60,38 @@ describe('astra-share.mjs', () => {
     expect(state().setting).toBe('default')
     expect(run('--less').stdout).toMatch(/^astra-share: claude-only —/)
     expect(state().setting).toBe('claude-only')
-    expect(run('--status').out).toMatch(/to GPT-5\.6 Sol: nothing/)
+    expect(run('--status').out).toMatch(/to GPT-6 Astra: nothing/)
   })
 
   it('sets a named setting and answers --json machine-readably', () => {
     expect(run('--set', 'prefer-astra').stdout).toMatch(/^astra-share: prefer-astra —/)
     const json = JSON.parse(run('--status', '--json').stdout)
     expect(json.setting).toBe('prefer-astra')
-    expect(json.routing.find((r) => r.kind === 'diagnose').to).toBe('sol')
+    expect(json.routing.find((r) => r.kind === 'diagnose').to).toBe('astra')
     expect(json.file).toBe(file)
   })
 
   it('refuses a setting that is not one, with usage and a non-zero code', () => {
-    const r = run('--set', 'sol-only')
+    const r = run('--set', 'astra-only')
     expect(r.status).toBe(2)
     expect(r.out).toMatch(/not a setting/)
     expect(state().setting).toBe('prefer-astra')
   })
 
   // Cross-vendor review, 12.08.2026: a broken file used to read as `default`, which
-  // sends reviews to Sol — so corrupting a `claude-only` state started spending the very
+  // sends reviews to Astra — so corrupting a `claude-only` state started spending the very
   // allowance the operator had moved away from.
   it('DEGRADES to the setting that spends nothing on a broken state file, and says so', () => {
     writeFileSync(file, '{ this is not json')
     const r = run('--status')
     expect(r.status).toBe(0)
     expect(r.stdout).toMatch(/^astra-share: claude-only —/)
-    expect(r.stdout).toMatch(/to GPT-5\.6 Sol: nothing/)
+    expect(r.stdout).toMatch(/to GPT-6 Astra: nothing/)
     expect(r.out).toMatch(/NOTE: .*not JSON/)
   })
 
   // Audit finding, 12.08.2026: only MALFORMED JSON was covered, so the unreadable-file
-  // branch could have been changed back to `default` — resuming Sol spending — with the
+  // branch could have been changed back to `default` — resuming Astra spending — with the
   // suite still green. A directory is a file that exists and cannot be read.
   it('DEGRADES the same way when the file cannot be read at all', () => {
     rmSync(file, { force: true })
@@ -118,10 +118,10 @@ describe('the delegation brief carries the switch', () => {
 
   it('states the routing, and SAYS when that routing is a fallback rather than a choice', () => {
     const chosen = brief(JSON.stringify({ setting: 'claude-only' }))
-    expect(chosen).toMatch(/SOL ROUTING is at `claude-only`/)
+    expect(chosen).toMatch(/ASTRA ROUTING is at `claude-only`/)
     expect(chosen).not.toMatch(/FALLBACK/)
     const fallen = brief('{ not json at all')
-    expect(fallen).toMatch(/SOL ROUTING is at `claude-only`/)
+    expect(fallen).toMatch(/ASTRA ROUTING is at `claude-only`/)
     expect(fallen).toMatch(/FALLBACK — the share state file is unusable/)
     expect(fallen).toMatch(/share setting is UNUSABLE/)
   })

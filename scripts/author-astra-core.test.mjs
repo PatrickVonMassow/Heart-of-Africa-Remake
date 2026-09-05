@@ -31,13 +31,13 @@ import {
 } from './author-astra-core.mjs'
 import { evaluateCommitMessage } from './commit-scope-guard-core.mjs'
 
-const astraCommit = (sha, subject = 'Do a thing') => ({ sha, subject, trailers: 'GPT-5.6 Sol <noreply@openai.com>' })
+const astraCommit = (sha, subject = 'Do a thing') => ({ sha, subject, trailers: 'GPT-6 Astra <noreply@openai.com>' })
 const okRun = { ok: true, kind: 'ok', cause: '' }
 const answered = parseAuthoringAnswer('DONE: built the thing\nGATES: test:unit, build and lint all green\nOPEN: none\n')
 
 describe('the commit trailer of the lane', () => {
   it('is the allowlist’s own spelling, and passes the commit-msg gate', () => {
-    expect(ASTRA_TRAILER).toBe('Co-Authored-By: GPT-5.6 Sol <noreply@openai.com>')
+    expect(ASTRA_TRAILER).toBe('Co-Authored-By: GPT-6 Astra <noreply@openai.com>')
     expect(allowedTrailers()).toContain(ASTRA_TRAILER)
     expect(evaluateCommitTrailers(`Do a thing\n\n${ASTRA_TRAILER}\n`).block).toBe(false)
   })
@@ -317,7 +317,7 @@ describe('parseAuthoringAnswer', () => {
 })
 
 describe('judgeAuthoring — what GIT says, not what the run claimed', () => {
-  it('accepts a clean run that committed under Sol’s name', () => {
+  it('accepts a clean run that committed under Astra’s name', () => {
     const j = judgeAuthoring({ outcome: okRun, commits: [astraCommit('a'.repeat(40))], parsed: answered })
     expect(j).toMatchObject({ delivered: true, clean: true })
     expect(j.problems).toEqual([])
@@ -362,20 +362,20 @@ describe('judgeAuthoring — what GIT says, not what the run claimed', () => {
       commits: [{ sha: 'd'.repeat(40), subject: 'x', trailers: 'Claude Opus 5 <x@y>' }],
       parsed: answered,
     })
-    expect(other.problems.join(' ')).toMatch(/does not name GPT-5\.6 Sol/)
+    expect(other.problems.join(' ')).toMatch(/does not name GPT-6 Astra/)
   })
 
-  it('does not read a "sol" in an e-mail address as Sol’s authorship (cross-vendor P1)', () => {
-    // `Claude Opus 5 <build@sol.example>` is an allowlisted commit by ANOTHER
+  it('does not read a "astra" in an e-mail address as Astra’s authorship (cross-vendor P1)', () => {
+    // `Claude Opus 5 <build@astra.example>` is an allowlisted commit by ANOTHER
     // model. Tested against the raw trailer, it counted as this lane's work.
     const j = judgeAuthoring({
       outcome: okRun,
-      commits: [{ sha: 'a'.repeat(40), subject: 'x', trailers: 'Claude Opus 5 <build@sol.example>' }],
+      commits: [{ sha: 'a'.repeat(40), subject: 'x', trailers: 'Claude Opus 5 <build@astra.example>' }],
       parsed: answered,
     })
-    expect(j.problems.join(' ')).toMatch(/does not name GPT-5\.6 Sol/)
-    // …while every real spelling of Sol's own trailer is accepted.
-    for (const trailers of ['GPT-5.6 Sol <noreply@openai.com>', 'Sol <noreply@openai.com>', 'gpt-6-astra <x@y>']) {
+    expect(j.problems.join(' ')).toMatch(/does not name GPT-6 Astra/)
+    // …while every real spelling of Astra's own trailer is accepted.
+    for (const trailers of ['GPT-6 Astra <noreply@openai.com>', 'Astra <noreply@openai.com>', 'gpt-6-astra <x@y>']) {
       const ok = judgeAuthoring({ outcome: okRun, commits: [{ sha: 'b'.repeat(40), subject: 'x', trailers }], parsed: answered })
       expect(ok.problems, trailers).toEqual([])
     }
