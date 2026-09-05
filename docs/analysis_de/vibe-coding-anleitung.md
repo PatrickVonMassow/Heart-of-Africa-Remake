@@ -502,6 +502,26 @@ Die Ursache findest du durch **Zerlegen**, nicht durch Wiederholen.
   Bedingung darf nie im Quelltext eines dritten Werkzeugs versteckt liegen. Prüffrage: Gibt es
   einen einzigen Zug, der **beide** Auflagen erfüllt? Wenn nicht, ist nicht die Sitzung schuld."
 
+- **Die Anweisung hebt ihre eigene Voraussetzung auf.** Ein Ablauf schreibt vor, erst eine
+  Markierung zu setzen und sie dann zu veröffentlichen — aber das Veröffentlichen zählt als
+  Arbeit, und Arbeit löscht die Markierung. Wer die Anweisung *ganz* befolgt, macht sie zunichte;
+  wer sie halb befolgt, liefert einen halben Zustand. Dasselbe trifft den Wächter, den man laut
+  Regel vorher befragen soll und der von Hand aufgerufen endlos auf eine Eingabe wartet, die nur
+  der automatische Aufruf mitliefert.
+  → *Prompt:* „Spiel jede neue Durchsetzung einmal als **wörtlichen Gehorsam** durch und einmal
+  als **Handaufruf** — beides als Test, nicht als Gedankenspiel. Prüffrage: Zerstört die
+  Handlungsfolge, die der Mechanismus selbst vorschreibt, seine eigene Voraussetzung?"
+
+- **Der Rückfall rettet die Funktion und setzt still eine Vereinbarung aus.** Ist ein zweiter
+  Anbieter nicht erreichbar, verhält sich jedes Werkzeug einzeln korrekt: Die Gegenlese reicht
+  sauber weiter, die Leseaufträge steigen sauber aus. Zusammen verschieben sie die ganze Last auf
+  den einen Anbieter, von dem du sie ausdrücklich weg verteilt hattest — Zwei-Anbieter-Aufteilung
+  und Vier-Augen-Prinzip sind außer Kraft, ohne dass irgendwo eine Entscheidung fiel.
+  → *Prompt:* „Ein Rückfallpfad meldet nicht nur, **dass** er greift, sondern **welche Zusage er
+  dabei aussetzt** — nicht ‚Anbieter nicht erreichbar', sondern ‚solange dies gilt, ist die
+  Aufteilung ausgesetzt'. Prüffrage bei jedem Rückfall: Welche Vereinbarung bricht er still,
+  während er die Funktion rettet?"
+
 - **Das Protokoll ohne Verfallsdatum wird zum Dauerplakat.** Was dein Werkzeug über die eigene
   Entscheidung aufschreibt, nimmt niemand je wieder heraus.
   → *Prompt:* „Eine Entscheidung, die du selbst triffst, nennt die **Messung**, die sie stützen
