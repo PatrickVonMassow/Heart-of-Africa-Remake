@@ -227,14 +227,14 @@ async function ejectTest(sceneLabel, pick) {
 
 /**
  * Every functional building must be operable: there is a collision-free
- * standpoint within the door's trigger radius from which walking onto it opens
- * the building's dialog (§7.1.16 / design.md §2 walk-in).
+ * standpoint within the door's trigger radius from which the Space use key
+ * does what that door does (§7.1.16 / design.md §2 walk-in). For a trade or
+ * service building that is its dialog; at the chief's hut it is the chief
+ * himself, who steps OUT of it (design.md §12) and opens no window at all.
  */
 async function reachableBuildings(sceneLabel) {
   const targets = await page.evaluate(() =>
-    window.__placeLayout.interactives
-      .map((it, i) => ({ i, type: it.type, door: it.door ?? null }))
-      .filter((t) => t.type !== 'villager'),
+    window.__placeLayout.interactives.map((it, i) => ({ i, type: it.type, door: it.door ?? null })),
   )
   const notOperable = []
   for (const t of targets) {
@@ -263,12 +263,27 @@ async function reachableBuildings(sceneLabel) {
     }, t.door)
     let opened = false
     if (placed) {
+      if (t.type === 'chief') {
+        // Send him back inside first, so the press below has to do the work even
+        // when an earlier check in this scene has already called him out.
+        await page.evaluate(() => {
+          const g = window.__game.getState()
+          window.__game.setState({ chiefOutside: { ...g.chiefOutside, [g.placeId]: false } })
+        })
+      }
       // Arm the Space prompt at the door, then press it (design.md §2.3).
       await page.waitForFunction(() => !!document.querySelector('.prompt'), null, { timeout: 8000 }).catch(() => {})
       await page.keyboard.press('Space')
-      opened = await page.waitForFunction(() => !!document.querySelector('.dialog'), null, { timeout: 8000 }).then(() => true).catch(() => false)
+      const answered = t.type === 'chief'
+        ? () => {
+            const g = window.__game.getState()
+            return g.chiefOutside[g.placeId] === true
+          }
+        : () => !!document.querySelector('.dialog')
+      opened = await page.waitForFunction(answered, null, { timeout: 8000 }).then(() => true).catch(() => false)
     }
-    if (!placed || !opened) notOperable.push(`${t.type}${placed ? '' : '(no clear standpoint)'}${opened ? '' : '(no open)'}`)
+    const missed = t.type === 'chief' ? '(did not come out)' : '(no open)'
+    if (!placed || !opened) notOperable.push(`${t.type}${placed ? '' : '(no clear standpoint)'}${opened ? '' : missed}`)
     // Close and step away from the door for the next building.
     await page.keyboard.press('Escape')
     await page.evaluate(() => { const p = window.__placePlayer; p.x = 0; p.z = 0 })
@@ -276,7 +291,7 @@ async function reachableBuildings(sceneLabel) {
     await page.waitForTimeout(150)
   }
   check(
-    `${sceneLabel}: all functional buildings operable (Space at the door opens it)`,
+    `${sceneLabel}: every door answers its Space use key`,
     notOperable.length === 0,
     notOperable.length ? `not operable: ${notOperable.join(',')}` : `${targets.length} buildings ok`,
   )
