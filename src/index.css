@@ -240,22 +240,6 @@ textarea {
   font-style: italic;
 }
 
-/* The robbery action (design.md §12) reads as a dangerous, ruinous step. */
-.hud-button.danger {
-  border-color: #8c2f22;
-  color: #d4715f;
-}
-
-/* Robbery safety confirmation (design.md §12). */
-.rob-confirm {
-  margin-top: 8px;
-  border-top: 1px solid var(--hud-border);
-  padding-top: 8px;
-}
-.rob-confirm .danger-text {
-  color: #e0715f;
-}
-
 .inventory-bar button:hover,
 .hud-button:hover {
   border-color: var(--hud-accent);

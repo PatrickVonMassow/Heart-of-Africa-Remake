@@ -137,7 +137,7 @@ if (section('look-drag')) {
   check('right-half drag turns the first-person view', Math.abs(yaw1 - yaw0) > 0.1, `yaw ${yaw0.toFixed(2)} → ${yaw1.toFixed(2)}`)
 }
 
-// --- Tapping the interaction prompt fires the Space use key (talk to elder) ---
+// --- Tapping the interaction prompt fires the Space use key (call the chief out) ---
 if (section('prompt-tap')) {
   await armTouchLayer()
   await page.evaluate(() => window.__game.getState().enterPlace('nubian-village'))
@@ -147,18 +147,21 @@ if (section('prompt-tap')) {
   await page.waitForTimeout(500)
   await page.evaluate(() => {
     window.__game.getState().setJournalOpen(false)
-    const el = window.__placeLayout.interactives.find((i) => i.type === 'villager')
+    const it = window.__placeLayout.interactives.find((i) => i.type === 'chief')
     const p = window.__placePlayer
-    p.x = el.pos[0]
-    p.z = el.pos[1] + 2
+    p.x = it.door[0]
+    p.z = it.door[1]
   })
   // Let the prompt appear, then tap it.
   await page.waitForSelector('.prompt-tappable', { timeout: 8000 }).catch(() => {})
   const promptShown = await page.evaluate(() => !!document.querySelector('.prompt-tappable'))
   await page.click('.prompt-tappable').catch(() => {})
   await page.waitForTimeout(300)
-  const talked = await page.evaluate(() => window.__game.getState().languagesLearned.north)
-  check('tapping the prompt fires the interaction (elder addressed)', promptShown && talked === true, `prompt ${promptShown}, learned ${talked}`)
+  const cameOut = await page.evaluate(() => {
+    const g = window.__game.getState()
+    return g.chiefOutside[g.placeId] === true
+  })
+  check('tapping the prompt fires the interaction (the chief comes out)', promptShown && cameOut === true, `prompt ${promptShown}, chief out ${cameOut}`)
 }
 
 // --- Two-finger pinch zooms the bird's-eye view -------------------------------

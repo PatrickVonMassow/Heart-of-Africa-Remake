@@ -385,8 +385,7 @@ export function Hud() {
   const campMode = useGame((s) => s.mode)
   const campPlaceId = useGame((s) => s.placeId)
   const campHonored = useGame((s) => s.honoredFriend)
-  const campRobbed = useGame((s) => s.regionRobbed)
-  const showCamp = canCampHere({ mode: campMode, placeId: campPlaceId, honoredFriend: campHonored, regionRobbed: campRobbed })
+  const showCamp = canCampHere({ mode: campMode, placeId: campPlaceId, honoredFriend: campHonored })
   const touchActive = useUi((s) => s.touchActive)
 
   // The first real touch arms the touch layer (deliberate-input guard in

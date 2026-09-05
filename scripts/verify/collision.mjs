@@ -227,14 +227,14 @@ async function ejectTest(sceneLabel, pick) {
 
 /**
  * Every functional building must be operable: there is a collision-free
- * standpoint within the door's trigger radius from which walking onto it opens
- * the building's dialog (§7.1.16 / design.md §2 walk-in).
+ * standpoint within the door's trigger radius from which the Space use key
+ * does what that door does (§7.1.16 / design.md §2 walk-in). For a trade or
+ * service building that is its dialog; at the chief's hut it is the chief
+ * himself, who steps OUT of it (design.md §12) and opens no window at all.
  */
 async function reachableBuildings(sceneLabel) {
   const targets = await page.evaluate(() =>
-    window.__placeLayout.interactives
-      .map((it, i) => ({ i, type: it.type, door: it.door ?? null }))
-      .filter((t) => t.type !== 'villager'),
+    window.__placeLayout.interactives.map((it, i) => ({ i, type: it.type, door: it.door ?? null })),
   )
   const notOperable = []
   for (const t of targets) {
@@ -263,12 +263,27 @@ async function reachableBuildings(sceneLabel) {
     }, t.door)
     let opened = false
     if (placed) {
+      if (t.type === 'chief') {
+        // Send him back inside first, so the press below has to do the work even
+        // when an earlier check in this scene has already called him out.
+        await page.evaluate(() => {
+          const g = window.__game.getState()
+          window.__game.setState({ chiefOutside: { ...g.chiefOutside, [g.placeId]: false } })
+        })
+      }
       // Arm the Space prompt at the door, then press it (design.md §2.3).
       await page.waitForFunction(() => !!document.querySelector('.prompt'), null, { timeout: 8000 }).catch(() => {})
       await page.keyboard.press('Space')
-      opened = await page.waitForFunction(() => !!document.querySelector('.dialog'), null, { timeout: 8000 }).then(() => true).catch(() => false)
+      const answered = t.type === 'chief'
+        ? () => {
+            const g = window.__game.getState()
+            return g.chiefOutside[g.placeId] === true
+          }
+        : () => !!document.querySelector('.dialog')
+      opened = await page.waitForFunction(answered, null, { timeout: 8000 }).then(() => true).catch(() => false)
     }
-    if (!placed || !opened) notOperable.push(`${t.type}${placed ? '' : '(no clear standpoint)'}${opened ? '' : '(no open)'}`)
+    const missed = t.type === 'chief' ? '(did not come out)' : '(no open)'
+    if (!placed || !opened) notOperable.push(`${t.type}${placed ? '' : '(no clear standpoint)'}${opened ? '' : missed}`)
     // Close and step away from the door for the next building.
     await page.keyboard.press('Escape')
     await page.evaluate(() => { const p = window.__placePlayer; p.x = 0; p.z = 0 })
@@ -276,7 +291,7 @@ async function reachableBuildings(sceneLabel) {
     await page.waitForTimeout(150)
   }
   check(
-    `${sceneLabel}: all functional buildings operable (Space at the door opens it)`,
+    `${sceneLabel}: every door answers its Space use key`,
     notOperable.length === 0,
     notOperable.length ? `not operable: ${notOperable.join(',')}` : `${targets.length} buildings ok`,
   )
@@ -435,7 +450,8 @@ if (section('village')) {
   await ejectTest('Village', '(cs)=>cs.reduce((b,c,i)=>(c.kind==="segment"&&b<0)?i:b,-1)') // fence panel
 
   // Chief hut operable despite collision: standing at its door and pressing the
-  // Space use key opens the audience dialog (design.md §2.3).
+  // Space use key brings the chief OUT of it (design.md §2.3, §12). There is no
+  // audience window any more — the answer to the press is a man in the open.
   await page.evaluate(() => {
     const it = window.__placeLayout.interactives.find((i) => i.type === 'chief')
     const p = window.__placePlayer
@@ -453,18 +469,35 @@ if (section('village')) {
     { timeout: 8000 },
   )
   await page.keyboard.press('Space')
-  const audienceOpened = await page
-    .waitForFunction(() => !!document.querySelector('.dialog'), null, { timeout: 8000 })
+  const chiefCameOut = await page
+    .waitForFunction(() => {
+      const g = window.__game.getState()
+      return g.chiefOutside[g.placeId] === true
+    }, null, { timeout: 8000 })
     .then(() => true)
     .catch(() => false)
-  check('Village: chief hut opens with Space at its door', audienceOpened)
-  await page.evaluate(() => window.__ui?.getState?.().setDialog(null))
+  check('Village: the chief comes out with Space at his door', chiefCameOut)
   await page.waitForTimeout(200)
   await dwellingDoorsReachable('Village')
-  await shot('53-collision-village-chief-hut', { place: 'maasai-village', label: "the chief's hut and its door" })
-  await page.keyboard.press('Escape')
+  // Step BACK from the door and face the hut, or the frame holds nothing but
+  // wall: at the door the camera stands inside the building's own footprint.
+  // From ~9 m out on the door's own bearing, hut, door and the man standing
+  // 1.6 m beside it are all in the picture.
+  await page.evaluate(() => {
+    const it = window.__placeLayout.interactives.find((i) => i.type === 'chief')
+    const p = window.__placePlayer
+    const [hx, hz] = it.pos
+    const [dx, dz] = it.door
+    const ux = dx - hx
+    const uz = dz - hz
+    const l = Math.hypot(ux, uz) || 1
+    p.x = dx + (ux / l) * 9
+    p.z = dz + (uz / l) * 9
+    // Place-camera yaw 0 looks toward -Z, so aim with the +PI complement.
+    p.yaw = Math.atan2(hx - p.x, hz - p.z) + Math.PI
+  })
+  await shot('53-collision-village-chief-hut', { place: 'maasai-village', label: "the chief's hut, its door and the chief standing out in front of it" })
   await page.evaluate(() => { const p = window.__placePlayer; p.x = 0; p.z = 0 })
-  await page.waitForFunction(() => !document.querySelector('.dialog'), null, { timeout: 8000 }).catch(() => {})
   await page.waitForTimeout(150)
 
   await reachableBuildings('Village')

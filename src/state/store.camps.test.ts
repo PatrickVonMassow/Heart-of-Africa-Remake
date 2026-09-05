@@ -9,7 +9,6 @@ import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
 import { balance } from '../config/balance'
 import { usedInventory, bagItemCount } from './store'
 import { useUi } from './ui'
-import { getStrings } from '../i18n'
 import { g, freshGame, withWorld, jumpTo, useGame, COORD } from '../test/store'
 
 withWorld()
@@ -184,46 +183,3 @@ describe('village caches: Honored Friend privilege (design.md §6/§12)', () => 
   })
 })
 
-describe('village caches: a regional robbery destroys them (design.md §6/§12)', () => {
-  it('robVillage wipes the region\'s village caches for good', () => {
-    g().enterPlace('nubian-village')
-    useGame.setState({ honoredFriend: { north: true } })
-    g().openVillageCamp()
-    g().debugAddGift('emerald')
-    g().campStore('gift', 'emerald')
-    expect(g().villageCamps['nubian-village']?.gifts.emerald).toBe(1)
-
-    useUi.getState().setDialog(null)
-    g().debugAddEquipment('rifle')
-    g().robVillage()
-
-    expect(g().villageCamps['nubian-village']).toBeUndefined()
-    expect(g().regionRobbed.north).toBe(true)
-  })
-
-  it('openVillageCamp refuses with the regionShunned toast, even for a still-marked friend', () => {
-    // A robbed region always clears honoredFriend in the real robVillage() flow
-    // (store.reputation.test.ts covers that forfeiture); setting both flags
-    // directly isolates that the shunned check in openVillageCamp is checked
-    // BEFORE the friend-status gate, not merely that the friendship is gone.
-    g().enterPlace('nubian-village')
-    useGame.setState({ honoredFriend: { north: true }, regionRobbed: { north: true } })
-    g().setToast(null)
-    g().openVillageCamp()
-    expect(useUi.getState().dialog).toBeNull()
-    expect(g().toast).toBe(getStrings().toasts.regionShunned)
-  })
-
-  it('a robbed region stays shunned for openVillageCamp after the real robbery flow', () => {
-    g().enterPlace('nubian-village')
-    useGame.setState({ honoredFriend: { north: true } })
-    g().debugAddEquipment('rifle')
-    g().robVillage() // robs the north region and expels the traveller
-
-    g().enterPlace('tuareg-village') // same north region, still shunned
-    g().setToast(null)
-    g().openVillageCamp()
-    expect(useUi.getState().dialog).toBeNull()
-    expect(g().toast).toBe(getStrings().toasts.regionShunned)
-  })
-})

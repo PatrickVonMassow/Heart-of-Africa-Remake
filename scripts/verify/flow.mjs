@@ -1,5 +1,5 @@
 // End-to-end verification of the POC gameplay loop (CLAUDE.md §7.1/§7.2):
-// start → trade in Cairo → checkpoint → travel → village → audience → hint →
+// start → trade in Cairo → checkpoint → travel → village → the chief outside →
 // grave → victory. Runs against the dev server (dev hooks __game,
 // __placePlayer, __placeLayout are DEV-only). UI text is asserted in German,
 // the default game language; journal entries are asserted by their
@@ -19,7 +19,7 @@ const errors = []
 page.on('console', (m) => m.type() === 'error' && errors.push(m.text()))
 page.on('pageerror', (e) => errors.push('PAGEERROR: ' + e.message))
 
-// SECTIONS (point 566). This suite is ONE story — trade, travel, audience, hint,
+// SECTIONS (point 566). This suite is ONE story — trade, travel, the chief, hint,
 // grave — and a step of it cannot be replayed without the steps before it, so it
 // is NOT cut into per-step blocks: that would be the silent-dependency shape the
 // mechanism exists to avoid. What IS separable is the pair of checks that run in
@@ -53,30 +53,19 @@ const findInteractive = async (type) =>
     return it ? { pos: it.pos, door: it.door ?? null } : null
   }, type)
 
-// The elder prompt label in the default language (German). A functional building
-// now carries a "Space — <name>" prompt at its door too (design.md §2.3).
-const ELDER_LABEL = 'Alten'
-
 // German building labels (src/i18n/de.ts): the door prompt NAMES its building, so
 // the use-key wait can require the TARGET's name — not merely any prompt. This is
 // what makes the entry deterministic against the one-frame stale-candidate race
 // (point 244): waiting on "some prompt" could arm on a neighbouring building.
 const BUILDING_LABELS = { tools: 'Geräte-Hütte', shop: 'Laden', chief: 'Chefhütte' }
 
-// Stand at the interactive (the elder, or a building's door), wait for the Space
-// use-key prompt to arm, then press Space to talk/enter (design.md §2.3): the
-// building no longer opens by merely walking into its door.
+// Stand at the building's door, wait for the Space use-key prompt to arm, then
+// press Space (design.md §2.3): the building no longer opens by merely walking
+// into its door. At the CHIEF's hut the press opens no window at all — it brings
+// the man out (design.md §12), so that is what the wait looks for.
 async function enterBuilding(type) {
   const it = await findInteractive(type)
-  if (type === 'villager') {
-    await moveTo(it.pos[0], it.pos[1] + 2)
-    await page.waitForFunction(
-      (label) => (document.querySelector('.prompt')?.textContent ?? '').includes(label),
-      ELDER_LABEL,
-      { timeout: 30000 },
-    )
-    await page.keyboard.press('Space')
-  } else {
+  {
     // Step onto the door point; the door prompt arms in the render loop, then
     // Space enters (walking in alone does nothing now, design.md §2.3). Wait for
     // the prompt that NAMES THIS building so the press cannot fire on a stale or
@@ -88,7 +77,14 @@ async function enterBuilding(type) {
       { timeout: 30000 },
     )
     await page.keyboard.press('Space')
-    await page.waitForFunction(() => !!document.querySelector('.dialog'), null, { timeout: 30000 })
+    if (type === 'chief') {
+      await page.waitForFunction(() => {
+        const g = window.__game.getState()
+        return g.chiefOutside[g.placeId] === true
+      }, null, { timeout: 30000 })
+    } else {
+      await page.waitForFunction(() => !!document.querySelector('.dialog'), null, { timeout: 30000 })
+    }
   }
   await page.waitForTimeout(400)
 }
@@ -468,26 +464,36 @@ if (section('core-loop')) {
     check('a hut door opens even with the journal open (design.md §16)', true, 'no market hut in this village — skipped')
   }
 
-  // --- 6. Villager: the elder teaches the North's direction system (§13.2) ---
-  await enterBuilding('villager')
-  s = await state()
-  check('Language lesson (Nivera = north) in the journal', s.languagesLearned.north === true &&
-    s.journal.some((e) => titleKey(e) === 'journal.titles.language'))
-  await page.evaluate(() => window.__game.getState().setJournalOpen(false))
-  await page.waitForTimeout(200)
-
-  // --- 7. Chief audience: culturally correct gift → hint (criteria 6, 7) ---
+  // --- 6. The chief comes out and says what he knows (criteria 6, 7) ---
+  // No gift buys this and no window holds it any more (point 1052): the use key
+  // at his door brings him into the open, and he speaks from the first minute.
   await enterBuilding('chief')
   await page.waitForTimeout(300)
-  await shot('04-chief-hut-audience', { element: '.dialog', label: 'the audience with the chief' })
-  await page.locator('.dialog .row', { hasText: 'Goldschmuck' }).locator('button').click()
-  await page.waitForTimeout(400)
   s = await state()
-  check('Culturally correct gift → hint unlocked', s.hintsGiven.north === true)
+  check('The use key brings the chief out of his hut', s.chiefOutside[s.placeId] === true)
+  // Step BACK from the door and face the hut, or the frame holds nothing but
+  // wall: at the door the camera stands inside the building's own footprint.
+  // From ~9 m out on the door's own bearing, hut, door and the man standing
+  // 1.6 m beside it are all in the picture.
+  await page.evaluate(() => {
+    const it = window.__placeLayout.interactives.find((i) => i.type === 'chief')
+    const p = window.__placePlayer
+    const [hx, hz] = it.pos
+    const [dx, dz] = it.door
+    const ux = dx - hx
+    const uz = dz - hz
+    const l = Math.hypot(ux, uz) || 1
+    p.x = dx + (ux / l) * 9
+    p.z = dz + (uz / l) * 9
+    // Place-camera yaw 0 looks toward -Z, so aim with the +PI complement.
+    p.yaw = Math.atan2(hx - p.x, hz - p.z) + Math.PI
+  })
+  await shot('04-chief-outside-his-hut', { place: 'nubian-village', label: 'the chief standing in the open before his hut' })
+  check('Meeting him unlocks the hint', s.hintsGiven.north === true)
   const hint = s.journal.find((e) => titleKey(e) === 'journal.titles.chiefHint')
   check('Hint stores grave coordinates (language-neutral)',
     !!hint && typeof hint.text === 'object' && typeof hint.text.params?.lat === 'number')
-  check('Learned language deciphers the hint (latitude)', s.decodedGiven.north === true &&
+  check('The hint is deciphered in the same breath (latitude)', s.decodedGiven.north === true &&
     s.journal.some((e) => titleKey(e) === 'journal.titles.decoded'))
   // Do-not-disturb is on for this run (line ~110, so the long walks are not
   // interrupted), and DND is exactly the setting that stops a new entry from
@@ -496,11 +502,10 @@ if (section('core-loop')) {
   await page.evaluate(() => window.__game.getState().setJournalOpen(true))
   await page.waitForFunction(() => !!document.querySelector('.journal'), null, { timeout: 5000 })
   await shot('05-journal-hint', { element: '.journal', label: 'the journal holding the hint' })
-  await closeDialog()
   await page.evaluate(() => window.__game.getState().setJournalOpen(false))
   await page.waitForTimeout(200)
 
-  // --- 8. Triangulation: the East's knowing people contributes the longitude ---
+  // --- 7. Triangulation: the East's knowing people contributes the longitude ---
   await leaveByWalking()
   await page.evaluate(() => {
     const g = window.__game.getState()
@@ -510,9 +515,7 @@ if (section('core-loop')) {
   await page.evaluate(() => {
     const g = () => window.__game.getState()
     g().setJournalOpen(false)
-    g().debugAddGift('emerald') // the East reveres emeralds (design.md §8)
-    g().giveGift('emerald')
-    g().talkToVillager()
+    g().callChiefOut() // the same meeting in the other region, no gift needed
   })
   await page.waitForTimeout(400)
   s = await state()
@@ -521,10 +524,10 @@ if (section('core-loop')) {
   await page.evaluate(() => window.__game.getState().leavePlace())
   await page.waitForTimeout(800)
 
-  // --- 9. Grave: dig with shovel → victory (criterion 10) ---
+  // --- 8. Grave: dig with shovel → victory (criterion 10) ---
   s = await state()
   const grave = s.graveLatLon
-  check('Grave lies north of the village (Nivera matches)', grave.lat > 21.8)
+  check('Grave lies north of the village', grave.lat > 21.8)
   await page.evaluate(([lat, lon]) => window.__game.getState().debugJumpTo(lat, lon), [grave.lat, grave.lon])
   await page.waitForTimeout(400)
   // Dig with no shovel in the pack → must fail politely (effects are possession-

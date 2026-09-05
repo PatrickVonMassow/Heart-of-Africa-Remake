@@ -36,7 +36,7 @@ export const PLACE_RADIUS = 28 // walkable radius in meters; leaving it exits th
 export const SPAWN_INSET = 10
 
 export interface Interactive {
-  type: BuildingType | 'villager'
+  type: BuildingType
   pos: [number, number]
   /** World-space point in front of the entrance door; touching it opens the building. */
   door?: [number, number]
@@ -273,14 +273,32 @@ export function dwellingRoofStandOff(d: DwellingDef, style: RegionPlaceStyle): n
 
 /** The same rule for the two enterable round huts (design.md §9): the collider
  *  is the hut body unless its roof rim hangs into the camera's reach. */
-export function interactiveCircleRadius(type: BuildingType | 'villager', style: RegionPlaceStyle): number {
-  if (type === 'villager') return 0.45
+export function interactiveCircleRadius(type: BuildingType, style: RegionPlaceStyle): number {
   const hut = type === 'market' ? MARKET_HUT : CHIEF_HUT
   return Math.max(type === 'market' ? 2.9 : 3.35, roofStandOff(hutRoofProfile(style.roof, hut.r, hut.h, style.stilts)))
 }
 
-/** Interact radius for the elder/villager Space use key (design.md §2.3). */
-export const INTERACT_RADIUS = 4.5
+/** How far beside his own door the chief stands once he has come out
+ *  (design.md §12): clear of the door point the traveller uses, and clear of
+ *  the hut's own collider, so he is met face to face rather than walked into. */
+export const CHIEF_STAND_OFFSET = 1.6
+
+/**
+ * Where the chief stands once the use key has brought him out of his hut
+ * (design.md §12): one step out of the doorway and to the side of it, facing
+ * the open ground his drummer sits on. Pure geometry off the hut's own door,
+ * so the figure the picture shows and the door the key is pressed at can never
+ * describe different spots.
+ */
+export function chiefStandingSpot(it: Interactive): [number, number] {
+  const door = it.door ?? it.pos
+  const dx = door[0] - it.pos[0]
+  const dz = door[1] - it.pos[1]
+  const len = Math.hypot(dx, dz) || 1
+  const nx = dx / len
+  const nz = dz / len
+  return [door[0] + nz * CHIEF_STAND_OFFSET, door[1] - nx * CHIEF_STAND_OFFSET]
+}
 /**
  * Door proximity that arms the Space use key at a functional building — merely
  * walking into the door no longer enters; the discrete press does (design.md §2.3).
@@ -289,9 +307,9 @@ export const DOOR_TRIGGER_RADIUS = 1.2
 
 /**
  * The nearest actionable interactive for the Space use key (design.md §2.3):
- * the elder/villager within the interact radius, or the functional building at
- * whose door the traveller stands, whichever is closer — null when none is in
- * reach. A PURE function of the layout and the LIVE player position, so the key
+ * the functional building at whose door the traveller stands, and the nearest
+ * of them when two doors overlap — null when none is in reach. A PURE function
+ * of the layout and the LIVE player position, so the key
  * press can act on where the traveller IS NOW rather than on the last rendered
  * frame's candidate: a synchronous keydown after a teleport or a fast step used
  * to read a frame-lagged `nearRef` and open the previously-near building.
@@ -305,18 +323,11 @@ export function nearestActionable(
   let near: Interactive | null = null
   let best = Infinity
   for (const it of layout.interactives) {
-    if (it.type === 'villager') {
-      const d = Math.hypot(x - it.pos[0], z - it.pos[1])
-      if (d <= INTERACT_RADIUS && d < best) {
-        best = d
-        near = it
-      }
-    } else if (it.door) {
-      const d = Math.hypot(x - it.door[0], z - it.door[1])
-      if (d <= DOOR_TRIGGER_RADIUS && d < best) {
-        best = d
-        near = it
-      }
+    if (!it.door) continue
+    const d = Math.hypot(x - it.door[0], z - it.door[1])
+    if (d <= DOOR_TRIGGER_RADIUS && d < best) {
+      best = d
+      near = it
     }
   }
   return near
@@ -448,7 +459,7 @@ export function isOnLane(x: number, z: number, paths: PathDef[]): boolean {
  * buildings stand (point 524). One list rather than two, because the children's
  * play ground is kept against the BUILDINGS and does not care which of them a
  * player may enter — a chief's hut is as much a wall behind a chase as a
- * granary. The villager markers are not buildings and stay out.
+ * granary.
  */
 export function builtFabric(layout: PlaceLayout): Array<[number, number]> {
   return fabricOf(layout.dwellings, layout.interactives)
@@ -462,7 +473,7 @@ function fabricOf(
 ): Array<[number, number]> {
   return [
     ...dwellings.map((d) => [d.x, d.z] as [number, number]),
-    ...interactives.filter((it) => it.type !== 'villager').map((it) => it.pos),
+    ...interactives.map((it) => it.pos),
   ]
 }
 
@@ -684,8 +695,8 @@ export function buildLayout(placeId: string, seed: number): PlaceLayout {
 
   const interactives: Interactive[] = []
   if (place.kind === 'village') {
-    // Villages carry the chief's hut, the elder and a trading post that
-    // barters the baseline goods for gifts (design.md §9/§10).
+    // Villages carry the chief's hut and a trading post that barters the
+    // baseline goods for gifts (design.md §9/§10).
     const chiefPos: [number, number] = [jitter(0, 4), jitter(-13, 3)]
     // Must match VillageHut's default facing (door toward the place center);
     // the door point sits just outside the hut collider (r 3.35).
@@ -714,19 +725,13 @@ export function buildLayout(placeId: string, seed: number): PlaceLayout {
       marketPos[1] = chiefPos[1] + nz * 7.25
     }
     interactives.push({ type: 'market', pos: marketPos, door: hutDoor(marketPos) })
-    // The elder never stands inside a door trigger: talking to him must not
-    // pop the chief's or trading post's dialog instead.
-    const elderPos: [number, number] = [jitter(4, 3), jitter(-4, 2)]
-    for (const door of [hutDoor(chiefPos), hutDoor(marketPos)]) {
-      const dE = Math.hypot(elderPos[0] - door[0], elderPos[1] - door[1])
-      if (dE < 3.6) {
-        const nx = dE > 1e-6 ? (elderPos[0] - door[0]) / dE : 0
-        const nz = dE > 1e-6 ? (elderPos[1] - door[1]) / dE : 1
-        elderPos[0] = door[0] + nx * 3.6
-        elderPos[1] = door[1] + nz * 3.6
-      }
-    }
-    interactives.push({ type: 'villager', pos: elderPos })
+    // The retired village elder's two position draws (point 1052). The whole
+    // settlement is generated from ONE seeded stream, so dropping them
+    // reshuffles every village: measured, that walls the Tuareg thorn gate
+    // shut at seed 42 and thins three villages below their inhabited minimum.
+    // The draws stay so the layouts stay exactly as they were built and tested.
+    rand()
+    rand()
   }
 
   const dwellings: DwellingDef[] = []
@@ -756,7 +761,7 @@ export function buildLayout(placeId: string, seed: number): PlaceLayout {
     // radius plus the same 0.9 m gap — design.md §2.6).
     if (
       !interactives.every((it) => {
-        const rInt = it.type === 'villager' ? 0.45 : place.kind === 'port' ? 3.2 : it.type === 'market' ? 2.9 : 3.35
+        const rInt = place.kind === 'port' ? 3.2 : it.type === 'market' ? 2.9 : 3.35
         return Math.hypot(x - it.pos[0], z - it.pos[1]) > Math.max(margin, ownR + rInt + 0.9)
       })
     )
@@ -805,7 +810,7 @@ export function buildLayout(placeId: string, seed: number): PlaceLayout {
   // to stand there — design.md §2, point 6).
   const doorReachable = (dx: number, dz: number): boolean => {
     if (Math.hypot(dx, dz) > radius - 0.5) return false
-    if (!interactives.every((it) => Math.hypot(dx - it.pos[0], dz - it.pos[1]) > (it.type === 'villager' ? 0.9 : place.kind === 'port' ? 2.9 : 3.5))) return false
+    if (!interactives.every((it) => Math.hypot(dx - it.pos[0], dz - it.pos[1]) > (place.kind === 'port' ? 2.9 : 3.5))) return false
     return dwellings.every((d) => Math.hypot(dx - d.x, dz - d.z) > d.r + 0.8)
   }
   // Orient a dwelling so its door opens onto free space: try the preferred
@@ -1039,9 +1044,7 @@ export function buildLayout(placeId: string, seed: number): PlaceLayout {
     const chief = interactives[0]
     // Village lanes bend around the chief hut and trading post instead of
     // running through them; a path that TARGETS a door keeps its endpoint.
-    const obstacles = interactives
-      .filter((it) => it.type !== 'villager')
-      .map((it) => ({ x: it.pos[0], z: it.pos[1], r: it.type === 'market' ? 2.9 : 3.35 }))
+    const obstacles = interactives.map((it) => ({ x: it.pos[0], z: it.pos[1], r: it.type === 'market' ? 2.9 : 3.35 }))
     const bendLane = (points: Array<[number, number]>, keepEnds = false): Array<[number, number]> => {
       if (!keepEnds) return bendAround(points, obstacles, 0.8)
       const first = points[0]
@@ -1181,7 +1184,6 @@ export function buildLayout(placeId: string, seed: number): PlaceLayout {
           // through the chief's hut is the same trap seen from the other side,
           // and it seals the door the audience is held at (design.md §2.6).
           interactives.every((it) => {
-            if (it.type === 'villager') return true
             const rInt = interactiveCircleRadius(it.type, style)
             return (
               Math.hypot(x - it.pos[0], z - it.pos[1]) >=
@@ -1382,9 +1384,7 @@ export function buildLayout(placeId: string, seed: number): PlaceLayout {
   // --- Collision set: every solid object becomes one or more circles ------
   const colliders: Collider[] = []
   interactives.forEach((it) => {
-    if (it.type === 'villager') {
-      colliders.push({ x: it.pos[0], z: it.pos[1], r: 0.45 })
-    } else if (place.kind === 'port') {
+    if (place.kind === 'port') {
       // The building's yaw travels in the layout data (it fronts its lane).
       colliders.push(boxCollider(it.pos[0], it.pos[1], 2.5, 2.0, it.rot ?? 0))
     } else {

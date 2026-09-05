@@ -17,11 +17,10 @@ import { RIVERS_DATA } from '../world/data/rivers'
 import { LAKES } from '../world/data/lakes'
 import { MOUNTAINS, WATERFALLS, CULTURAL_LANDMARKS } from '../world/data/landmarks'
 import { CELL_OCEAN, cellAt } from '../world/geoIndex'
-import { buildLayout, type Interactive } from '../scenes/place/layout'
+import { buildLayout } from '../scenes/place/layout'
 import { maxBoundaryRadius, placeBoundaryRadius } from '../scenes/place/boundary'
 import type { PlaceRiverBank } from '../scenes/place/riverBank'
 import { placePlayerPosition } from '../scenes/place/playerPosition'
-import type { BuildingType } from '../state/ui'
 import { LON_MIN, LON_MAX, LAT_MIN, LAT_MAX, REGION_IDS, regionStats } from './mapLayout'
 
 const W = 640
@@ -739,7 +738,6 @@ function PlacePlan({ placeId }: { placeId: string }) {
     return () => cancelAnimationFrame(raf)
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [placeId])
-  const label = (type: Interactive['type']) => (type === 'villager' ? t.labels.talkToElder : t.buildings[type as BuildingType])
   return (
     <div className="map-overlay map-place-plan">
       <header>
@@ -791,13 +789,9 @@ function PlacePlan({ placeId }: { placeId: string }) {
         {/* Functional, enterable buildings: filled markers with their names */}
         {layout.interactives.map((it, i) => (
           <g key={`f${i}`} className="plan-building">
-            {it.type === 'villager' ? (
-              <circle cx={sx(it.pos[0])} cy={sx(it.pos[1])} r={5} fill={REGION_INK} />
-            ) : (
-              <rect x={sx(it.pos[0]) - 6} y={sx(it.pos[1]) - 6} width={12} height={12} fill={REGION_INK} />
-            )}
+            <rect x={sx(it.pos[0]) - 6} y={sx(it.pos[1]) - 6} width={12} height={12} fill={REGION_INK} />
             <text className="plan-building-label" x={sx(it.pos[0])} y={sx(it.pos[1]) - 10} textAnchor="middle" fill={INK}>
-              {label(it.type)}
+              {t.buildings[it.type]}
             </text>
           </g>
         ))}

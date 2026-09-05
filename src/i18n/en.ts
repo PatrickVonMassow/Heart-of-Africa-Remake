@@ -140,7 +140,6 @@ export const en: Strings = {
       leopard: { noun: 'leopard', gender: 'n' },
       hyena: { noun: 'hyena', gender: 'n' },
       vulture: { noun: 'vulture', gender: 'n' },
-      elder: { noun: 'elder', gender: 'n' },
       trader: { noun: 'trader', gender: 'n' },
       porter: { noun: 'porter', gender: 'n' },
       villager: { noun: 'villager', gender: 'n' },
@@ -241,8 +240,8 @@ export const en: Strings = {
   },
 
   labels: {
-    talkToElder: 'Talk to the elder',
-    oldMan: 'Elder',
+    speakToChief: 'Speak to the chief',
+    chief: 'Chief',
     graveDebug: 'Grave (debug)',
     camp: 'Camp',
   },
@@ -371,8 +370,9 @@ export const en: Strings = {
     bought: (name) => `${name} purchased.`,
     notEnoughMoney: 'Not enough money.',
     digNoShovel: 'I cannot dig without a shovel in hand.',
-    villagerNod: 'The old man gives me a friendly nod.',
     drumsSending: 'The chief calls his drummer. The message is going out over the village.',
+    chiefStepsOut: 'The chief steps out of his hut and stands before me in the open.',
+    chiefNoMessage: 'The chief looks me over and nods. He has nothing to send out over the village.',
     journalDndOn: 'Journal interruptions off — entries appear silently.',
     journalDndOff: 'Journal interruptions on — new entries open the journal.',
     graphicsLevel: {
@@ -392,12 +392,9 @@ export const en: Strings = {
     notEnoughGifts: 'Not enough gifts — money means nothing here.',
     bazaarRejected: (name) => `The merchant waves it away — ${name.toLowerCase()} is not traded here.`,
     graveyardEmpty: 'The bleached bones hold no more ivory worth taking.',
-    chiefHostile: 'The village has not forgotten my offense. The chief refuses to see me.',
-    regionShunned: 'Word of my robbery has spread — no hut of this region will open to me again.',
     campPitched: 'Camp pitched — an X on my map marks the spot.',
     campNeedsFriend: 'Only an Honored Friend of this region may leave belongings in the village.',
     positionReport: (coords, region) => `By my reckoning: ${coords} — the ${region} region.`,
-    orientationGained: 'In thanks for the gift, they point out the important buildings to me.',
     stuckHint: (key) => `Wedged in? Press ${key} to work free.`,
     unstuckFreed: 'I worked myself loose and stand on open ground again.',
     unstuckAlreadyFree: 'Nothing holds me here — the ground under my boots is open already.',
@@ -416,27 +413,7 @@ export const en: Strings = {
     leave: 'Leave (Esc)',
     foodItem: 'Provisions (1 week)',
     gift: (name) => `Gift: ${name}`,
-    audienceTitle: (people) => `Audience with the Chief of the ${people}`,
-    audienceIntro: (mood) => `In the half-dark of the chief's hut, the chief sits upon carved wood. ${mood}`,
-    moodHigh: 'The chief regards you with great goodwill.',
-    moodMid: 'The chief seems well-disposed toward you.',
-    moodLow: 'The chief studies you, giving nothing away.',
-    chiefDone: '"I have told you all I know. May your path be blessed."',
-    askDrums: 'Ask him to send his message on the drums',
-    askDrumsLocked: 'He has a message to send, he lets me know — but not to a stranger who has brought his people nothing.',
-    artefactCarried: 'The thing from the foot of the great rock, still wrapped in river clay',
-    handArtefact: 'Lay it in his hands',
-    chiefAcknowledges: 'He turned it over once, and said:',
-    give: 'Offer',
     stock: (n) => `you have ${n}`,
-    endAudience: 'End audience (Esc)',
-    rob: 'Draw the rifle and rob',
-    robConfirm:
-      'Rob this village at rifle point? This antagonizes the whole region for good — no more audiences, hints or aid, and any "Honored Friend" standing is lost forever.',
-    robConfirmYes: 'Yes, rob them',
-    robCancel: 'No, stand down',
-    robOrphansGoal:
-      'Beware: only this region can still teach you a bearing to the tomb that you have not yet learned. Rob it, and that knowledge is lost for good — the grave may become impossible to find.',
     bazaarGreeting: '"Treasures, effendi! Show me what the wilderness yielded — or take a piece home yourself."',
     bazaarSell: 'Offer a find:',
     bazaarBuy: 'For sale:',
@@ -683,7 +660,6 @@ export const en: Strings = {
     foodUnitDays: 'Provisions per food unit (days)',
     oceanSwimMargin: 'Swimmable coastal band (°)',
     digRadius: 'Dig radius',
-    goodwillForHint: 'Goodwill required for hint',
     randomEvents: 'Random events',
     triggerEvent: 'Trigger event:',
     eventNames: {
@@ -774,16 +750,12 @@ export const en: Strings = {
       villageReturn: (p: TextParams) => `Back in ${PLACES[p.place as string]}`,
       monument: (p: TextParams) => PLACES[p.place as string],
       monumentReturn: (p: TextParams) => `${PLACES[p.place as string]} Once More`,
-      audience: 'Audience with the Chief',
-      mistake: 'A Grave Mistake',
       chiefHint: "The Chief's Words",
       drumMessage: 'The Drums Speak',
       rockArtefact: 'At the Foot of the Great Rock',
       artefactGiven: 'Into the Hands of the Chief',
       decoded: 'Deciphered!',
       unspecific: 'Vague Murmurs',
-      giftLore: 'What the People Revere',
-      language: (p: TextParams) => `The Language of the ${en.regions[p.region as keyof typeof en.regions]}`,
       victory: 'The Heart of Africa',
       foodLow: 'Provisions Running Low',
       foodOut: 'Provisions Exhausted',
@@ -838,10 +810,8 @@ export const en: Strings = {
       bounty: 'The Bounty of Discovery',
       ferry: 'Passage by Sea',
       valuableReaction: 'The Valuable in My Hand',
-      friend: 'An Honored Friend',
       rescue: 'Saved by the Villagers',
       friendSupplies: 'Guests of the Region',
-      robberyCommitted: 'A Deed Beyond Forgiving',
       campLooted: 'The Looted Camp',
     },
     start:
@@ -998,27 +968,6 @@ export const en: Strings = {
         `[somber]I came back, and the place is not the one I left.[pause] What has happened here since my last visit stands unspoken in every face.[/somber]`
       )
     },
-    giftRevered: (p: TextParams) =>
-      `I presented my gift to the chief of the ${PEOPLES[p.people as string]}. [excited]His eyes lit up —[pause] I have found the very thing his people revere![/excited] He bowed his head and bade me welcome. [pause][excited]My standing here grows.[/excited]`,
-    giftNeutral:
-      'The chief accepted my gift with a polite nod. [somber]No light came into his eyes —[pause] it was not, I think, what his people hold dear.[/somber] [pause]But a beginning has been made.',
-    giftRejected: (p: TextParams) =>
-      `[fear]A grave mistake![/fear] No sooner had the chief of the ${PEOPLES[p.people as string]} laid eyes on my gift than his face darkened. [somber]What I offered counts among his people as an ill omen.[pause] I was led out without a word.[/somber] [breath][weary]It will take time to wear down this mistrust.[/weary]`,
-    languageLesson: (p: TextParams) => {
-      const texts: Record<string, string> = {
-        north:
-          'An old man by the fire spoke with me at length, with hands as much as words. He named the winds: [emph]"Nivera"[/emph] where the cold night wind is born — toward midnight —, "Chamsina" for the hot breath of noon, "Levantra" for the morning, "Gharbia" for the evening. [breath][excited]Now I understand:[pause] the North reads its directions from the origin of the wind, and [emph]"Nivera" means north![/emph][/excited]',
-        west:
-          'An elder drew four marks into the dust and spoke slowly: [emph]"koko"[/emph] toward midnight, [emph]"Katula"[/emph] toward the sunrise, "Phuthswama" toward noon, "Mimbumi" toward the sunset. [breath][excited]The words of the West are mine now:[pause] koko is north, Katula is east![/excited]',
-        central:
-          'By the fire an elder kept pointing at the great river, which his people call [emph]"Utomba"[/emph] — the Mongdamara. Everything lies "wa-Utomba" or "ka-Utomba": away from the river or toward it, "lem-Utomba" toward the sunrise side, "mos-Utomba" toward the sunset. [breath][excited]The forest measures the world from its river![/excited]',
-        east:
-          'An old herdsman raised his staff toward the shining mountain his people call [emph]"Odabi"[/emph] — the Unumpara. From it flow the directions: [emph]"Relolo"[/emph] beyond it toward midnight, "Dethamee" toward noon, "Salewa" toward the sunrise, "Munjori" toward the sunset. [breath][excited]The East measures the world from the holy mountain![/excited]',
-        south:
-          'An elder woman laughed at my compass and pointed at the sky: her people name the directions after the seasons — [emph]toward summer[/emph] is toward midnight, toward winter is noon, spring is the sunrise, autumn the sunset. [breath][excited]What a curious, beautiful way to carry the world![/excited]',
-      }
-      return texts[p.region as string]
-    },
     hintRaw: (p: TextParams) => {
       const regionId = p.region as string
       const w = DIRECTION_WORDS[regionId as keyof typeof DIRECTION_WORDS]
@@ -1053,8 +1002,6 @@ export const en: Strings = {
     },
     unspecific: (p: TextParams) =>
       `The chief nodded gravely, waved his hands and said again and again only [emph]"${p.word}"[/emph]. [somber]Whatever he knows, he cannot or will not say it in words I grasp.[/somber] [pause]But he pointed insistently toward the villages of the [emph]${PEOPLES[p.people as string]}[/emph] — [excited]they are said to know more.[/excited]`,
-    giftLore: (p: TextParams) =>
-      `The old man spoke of the treasures of his land: what his people revere above all is [emph]${en.gifts[p.gift as keyof typeof en.gifts]}[/emph]. [pause]A chief honored with it will open his heart.`,
     drumMessage:
       '[awe]The chief called his drummer, and two drums spoke for him — a great one and a small one.[/awe] [pause]Four words, each of four beats, each parted from the next by the same short silence — deep for the low syllable, bright for the high one. [excited]I know these words. I have heard every one of them in the lanes and at the water.[/excited] [pause]I have written them down in the order they were beaten; what they ask of me I must read for myself.',
     rockArtefact:
@@ -1178,8 +1125,6 @@ export const en: Strings = {
       `No sooner had I entered the village than eyes turned to the [emph]${en.treasures[p.treasure as keyof typeof en.treasures].toLowerCase()}[/emph] in my hand. [excited]Murmurs of awe followed me through the lanes —[pause] the ${PEOPLES[p.people as string]} revere what I carry.[/excited]`,
     valuableRejected: (p: TextParams) =>
       `[fear]A mistake to carry it openly![/fear] The ${PEOPLES[p.people as string]} shrank back from the [emph]${en.treasures[p.treasure as keyof typeof en.treasures].toLowerCase()}[/emph] in my hand as from an ill omen. [somber]Doors closed;[pause] mothers pulled their children inside.[/somber]`,
-    friendPledge: (p: TextParams) =>
-      `[awe]The chief of the ${PEOPLES[p.people as string]} rose and laid both hands upon my shoulders.[/awe] Before the assembled village he named me [emph]Honored Friend[/emph] of his people. [excited]"Wherever our villages stand," he pledged, "our people shall watch over you."[/excited] [breath][somber]I bowed deeply.[pause] Such a gift weighs more than gold.[/somber]`,
     friendRescue: (p: TextParams) => {
       const animal = en.animals[p.animal as keyof typeof en.animals]
       const hurt = p.result === 'light' ? ' [somber]I was only lightly injured.[/somber]' : ' [excited]I escaped unharmed.[/excited]'
@@ -1191,8 +1136,6 @@ export const en: Strings = {
       `[weary]I could go no farther;[pause] the land swam before my eyes.[/weary] [somber]Then hands lifted me —[/somber] [excited]people of the ${PEOPLES[p.people as string]} had found me.[/excited] They brought water, food and bitter medicine, and stayed until my strength returned. [pause][awe]I am alive because I am their friend.[/awe]`,
     friendSupplies: (p: TextParams) =>
       `In the village of the ${PEOPLES[p.people as string]} I was received like family: [excited]they filled my packs with provisions and pressed medicine into my hands,[/excited] and no one would hear of payment. [pause][somber]The friendship of this region is my safest possession.[/somber]`,
-    robberyCommitted: (p: TextParams) =>
-      `[somber]I have done a thing that cannot be undone.[/somber] [fear]With the rifle raised I emptied the hut of the ${PEOPLES[p.people as string]} and fled the village.[/fear] [breath][weary]The haul: ${p.money} dollars, ${p.gifts} trade goods and ${p.food} days of provisions.[pause] Behind me: screams, and a silence worse than the screams.[pause] No hut of this region will ever open to me again.[/weary]`,
     campLooted:
       '[somber]I found my camp torn apart —[pause] the poles thrown down, the ground churned by strange feet.[/somber] [weary]Everything I had left behind is gone.[/weary] [fear]Nothing in this wilderness is safe that is not carried or guarded.[/fear]',
   },

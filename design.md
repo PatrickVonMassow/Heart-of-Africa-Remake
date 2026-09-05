@@ -4,7 +4,7 @@ This document describes the target state of a modern indie remake. It is based o
 
 The original is *The Heart of Africa* (Ozark Softscape / Electronic Arts, 1985), the follow-up to the same team's far better-known *The Seven Cities of Gold* (1984) — it carries that game's loop (explore an unmapped continent on foot, uncovering the map as you go, and trade and negotiate with the peoples who live there) from the Americas to Africa. The lineage is named here and in the README because it is how most people will recognise this project at all.
 
-Contents: §1 Technical framework · §2 Perspectives and camera · §3 World model and map · §4 Settlements · §5 Time and calendar · §6 Resources and conditions · §7 Equipment · §8 Valuables and the value matrix · §9 Building types · §10 Trade and economy · §11 Terrain and movement · §12 Audience with the chief · §13 Language and hint system · §14 Random events · §15 Chronicle/journal · §16 Presentation of events · §17 User interface · §18 Victory/defeat, saving · §19 Atmosphere and immersion · §20 Core gameplay loop · §21 Debug menu
+Contents: §1 Technical framework · §2 Perspectives and camera · §3 World model and map · §4 Settlements · §5 Time and calendar · §6 Resources and conditions · §7 Equipment · §8 Valuables and the value matrix · §9 Building types · §10 Trade and economy · §11 Terrain and movement · §12 Meeting the chief · §13 Language and hint system · §14 Random events · §15 Chronicle/journal · §16 Presentation of events · §17 User interface · §18 Victory/defeat, saving · §19 Atmosphere and immersion · §20 Core gameplay loop · §21 Debug menu
 
 ---
 
@@ -23,7 +23,7 @@ Navigation across the continent works as in the original from a bird's-eye view,
 
 ### 2.2 First-person view (settlements)
 
-On entering a village or a port city, the game switches to the first-person view. The settlement is walkable: you walk through it and to its buildings, buy and sell goods there (§9), and hold an audience with the chief in a village (§12).
+On entering a village or a port city, the game switches to the first-person view. The settlement is walkable: you walk through it and to its buildings, buy and sell goods there (§9), and call the chief out of his hut in a village (§12).
 
 Walking speed: inside settlements, walking forward is fastest; strafing sideways and walking backward move at a reduced factor of the forward speed (a calibratable value, default 80 %, adjustable in the debug menu §21). A diagonal is never faster than walking straight.
 
@@ -37,7 +37,7 @@ Entering a settlement is movement-based but confirmed with the use key (Space, �
 - Inside, walking beyond the settlement's walkable edge leaves it and switches back to the bird's-eye view with the field of view around the current position — there is no exit archway and no "leave" key. On leaving, the traveller lands just clear of the enter radius, so the enter hint does not reappear the instant he returns to the map.
 - A Space press while the traveller is on a water cell does not enter: even with the village-river clearance of §4.2, a riverside village's enter radius can touch the water, and canoeing a river must never drift him in by accident. He enters by standing on land within the radius and pressing Space.
 - The §4.2 clearances scale with the river width (point 156): however wide the calibratable band is set, a village keeps its full hut footprint dry, a port keeps its rendered cluster out of the band (while still sitting AT the river), and every landmark field clears it by its own radius — only the Okavango's fan stays in the water, because flooding is its identity.
-- Enterable buildings (trade, service and audience buildings) are entered with the Space use key while standing at their entrance door — the door proximity shows the prompt and arms the key; merely walking against the door no longer opens the building. Only the village elder is likewise addressed with the same use key.
+- Enterable buildings (trade and service buildings) are entered with the Space use key while standing at their entrance door — the door proximity shows the prompt and arms the key; merely walking against the door no longer opens the building. The same key at the chief's hut calls the chief out (§12).
 
 ### 2.4 Graphics and atmosphere
 
@@ -57,7 +57,7 @@ The background of the first-person view plausibly matches the landscape one woul
 
 Settlements do not read as a sparse cluster of a few functional buildings but as believably inhabited communities. The presentation effort inside settlements is considerably higher:
 
-- A clear majority of the buildings is non-functional: dwellings, granaries, animal pens, workshops, tents and storage buildings the player cannot enter, beside the enterable trade, service and audience buildings (§9). Density, size gradation and arrangement are region-typical (§2.4, §4.5) and procedurally varied per settlement (§18); port cities build denser and more massively than villages.
+- A clear majority of the buildings is non-functional: dwellings, granaries, animal pens, workshops, tents and storage buildings the player cannot enter, beside the enterable trade and service buildings (§9). Density, size gradation and arrangement are region-typical (§2.4, §4.5) and procedurally varied per settlement (§18); port cities build denser and more massively than villages.
 - The settlement's EDGE is readable on the ground (user decision 25.07.2026). Where the inhabited ground ends — the very line at which walking on leaves the place (§2.3) — the earth shows it: the swept, trodden ground of the settlement gives way to open land across a soft band, instead of the boundary being invisible until the view suddenly changes. It stays quiet and belongs to the world: no glow, no drawn ring, nothing a traveller of 1890 would not have seen underfoot, and its outline wanders a little rather than describing a machined circle. The one thing it must do is tell the truth — the band lies where the boundary really is, so a player who keeps inside it keeps inside the settlement. Every kind of place has it: a village, a port and the monument site alike.
 - A recognizable path network connects buildings, squares and the settlement edge, in region-typical material and routing (dusty tracks, stamped clay paths, busy harbor lanes); it structures the settlement and guides player and inhabitants.
 - Buildings line implicit streets rather than scattering freely. Port cities grow an organic, period-appropriate lane network — winding alleys and small irregular squares, explicitly not a rectangular grid — and every building fronts its lane with the door side: each door is reachable directly from a lane, every window keeps a clear line outward (no wall pressed against a neighbour's), and no building stands on a lane. Villages do NOT use the port fabric: each people follows its own period-accurate organising principle per §4.5 (researched against the ~1890 record), from ring plans around a cattle enclosure to a single cleared street to dispersed camps without any lane at all.
@@ -143,7 +143,7 @@ Built cultural landmarks — the game's structures among the otherwise natural l
 
 Two further landmarks live in their port's first-person scene rather than on the travel map (a map marker would duplicate the port marker): Table Mountain stands as a flat-topped massif skyline behind Cape Town, and the Djinguereber mosque (the authentic 1327 Sudano-Sahelian mud landmark, standing in for the excluded 1907 Djenné mosque) rises inside Timbuktu's town fabric — buttressed mud walls and a pyramidal toron-studded minaret, impenetrable like every building (§2.6).
 
-The Giza plateau is also an ENTERABLE monument site — a walkable first-person scene, like a settlement but with no trade, elder or hints, reached with the SPACE use key exactly like a settlement (§2.3): its own map point south-west of Cairo (the map scale cannot resolve the real 13 km, so it is placed clear of the city's enter radius), known from the start and marked with a three-pyramid glyph. Inside, the traveller stands before and walks AROUND the three great pyramids and the Great Sphinx as GIANT collidable monuments (the §2.6 settlement collision reused). The ~1890 state is rendered faithfully (researched in docs/giza-1890.md): the three pyramids stand in their real south-west diagonal row — Khufu largest in the north-east, Khafre in the centre raised on higher bedrock (so it reads as tall as Khufu) and alone keeping a pale cap of surviving Tura-limestone casing near its apex, Menkaure smallest in the south-west with a red Aswan-granite base casing (a solid, seated lower course, not a floating band); Khufu's apex and top courses are quarried away, leaving a blunt flat summit; and the Great Sphinx crouches east of Khafre, facing east, buried to the shoulders in wind-blown sand and noseless, as a ~1890 expedition found it (rendering the fully-cleared modern monument would be a ~35-year anachronism) — its nemes headdress with the two side lappets framing the face reads as the couchant lion's head rising from a soft banked sand drift, not a block on a hard sand seam. The site ground reads as warm, granular desert sand. The site is lightly peopled with sparse Thomas-Cook-era ambient life — robed guides/dragomen, a Bedouin cameleer, a donkey-boy and a few 1890s tourists, with their camels and donkeys — a handful, not a throng. The period-correct casing cap and half-buried Sphinx are carried into Cairo's western skyline and the bird's-eye Giza landmark (§4.4/point 82); Menkaure's red-granite casing is a CLOSE-RANGE cue only — at the distant skyline / bird's-eye scale the smallest pyramid subtends too few pixels for a base course and a red band there read as an error stripe, so it is drawn only in the walkable site. Myths are excluded (no pharaoh's curse, no mystic alignment, no Napoleon's-cannon nose). The pyramids stay clearly distinct from the game's Meroë (Nubian) pyramids: Giza is a few huge, shallow ~52° masses; Meroë a dense cluster of small, steep ~70° cones.
+The Giza plateau is also an ENTERABLE monument site — a walkable first-person scene, like a settlement but with no trade, chief or hints, reached with the SPACE use key exactly like a settlement (§2.3): its own map point south-west of Cairo (the map scale cannot resolve the real 13 km, so it is placed clear of the city's enter radius), known from the start and marked with a three-pyramid glyph. Inside, the traveller stands before and walks AROUND the three great pyramids and the Great Sphinx as GIANT collidable monuments (the §2.6 settlement collision reused). The ~1890 state is rendered faithfully (researched in docs/giza-1890.md): the three pyramids stand in their real south-west diagonal row — Khufu largest in the north-east, Khafre in the centre raised on higher bedrock (so it reads as tall as Khufu) and alone keeping a pale cap of surviving Tura-limestone casing near its apex, Menkaure smallest in the south-west with a red Aswan-granite base casing (a solid, seated lower course, not a floating band); Khufu's apex and top courses are quarried away, leaving a blunt flat summit; and the Great Sphinx crouches east of Khafre, facing east, buried to the shoulders in wind-blown sand and noseless, as a ~1890 expedition found it (rendering the fully-cleared modern monument would be a ~35-year anachronism) — its nemes headdress with the two side lappets framing the face reads as the couchant lion's head rising from a soft banked sand drift, not a block on a hard sand seam. The site ground reads as warm, granular desert sand. The site is lightly peopled with sparse Thomas-Cook-era ambient life — robed guides/dragomen, a Bedouin cameleer, a donkey-boy and a few 1890s tourists, with their camels and donkeys — a handful, not a throng. The period-correct casing cap and half-buried Sphinx are carried into Cairo's western skyline and the bird's-eye Giza landmark (§4.4/point 82); Menkaure's red-granite casing is a CLOSE-RANGE cue only — at the distant skyline / bird's-eye scale the smallest pyramid subtends too few pixels for a base course and a red band there read as an error stripe, so it is drawn only in the walkable site. Myths are excluded (no pharaoh's curse, no mystic alignment, no Napoleon's-cannon nose). The pyramids stay clearly distinct from the game's Meroë (Nubian) pyramids: Giza is a few huge, shallow ~52° masses; Meroë a dense cluster of small, steep ~70° cones.
 
 ### 4.5 Region Assignment
 | Region | Landscape | Peoples |
@@ -210,7 +210,7 @@ whole of the revert.
 - Currency: \$ (means of payment in the port cities). Starting capital \$250. Used for: equipment, provisions, ferries, gifts; income through sales and discovery bounties.
 - Provisions (food): consumed per time step; can be bought. The POC ships a relaxed exploration preset (user calibration 15.07.2026): the default consumption rate is ZERO — provisions do not drain unless the rate is raised in the debug menu (§21.2); the mechanic itself stays fully implemented.
 - Water: the canteen holds a fill level (a percentage). It refills to full at FRESH water (river, lake) only — salt water is not drinkable, so the sea never refills it or quenches thirst even where the coast is swimmable (point 208 A4) — drains on land — faster in the desert — and, once empty, thirst builds and then health drops. In the relaxed exploration preset both drain rates default to ZERO (debug-editable, §21.2); the thirst mechanics stay fully implemented. The inventory bar shows the fill and warns as it runs low (glowing yellow and blinking below a third, red below 5 %, still blinking when empty). It protects against dehydration in the desert only while it still holds water.
-- Gifts: trade goods for chiefs; they create goodwill and unlock hints. They are also the means of payment in the native villages (money has no value there).
+- Gifts: trade goods, and the means of payment in the native villages (money has no value there). They buy nothing from a chief since §12 dropped its preconditions.
 - A new expedition sets out fully equipped (relaxed exploration preset): one each of shovel, rope, machete, rifle, medicine and a FULL canteen; only the canoe remains a purchase. Starting capital stays \$250 and the start stays Cairo 1890 (fixed values). The inventory bar lists gear alphabetically by the localized item name (re-sorting on a language switch), treasures after gear.
 - Item effects are possession-based: a piece of equipment in the inventory acts on its own — there is no "taking an object in hand". What is carried (§7) decides terrain mobility (§11), protection in events (§14) and treasure recovery; consumables and tools are used by clicking them in the inventory bar (medicine cures, the shovel digs). The map is NOT an inventory item: it is always available from its own button in the bottom-right button row (left of the journal button, §17.4) and the M key, opening the exploration overview — inside a settlement the place plan (§7/§19.11).
 
@@ -230,7 +230,7 @@ Afflictions alter controls/vision and can be fatal:
 Inventory caches relieve the limited inventory and allow, for instance, leaving the canoe behind when moving away from waterways (on land it causes a speed penalty, §7, §11).
 
 - Free camp: in the bird's-eye view a camp can be pitched anywhere in the open (near an existing camp, that camp is reopened instead of pitching a second), holding any number of inventory items. It is marked with an X on the exploration map and a pole marker in the bird's-eye view. Such a camp can however be looted while the traveler is away; the loss is revealed by a journal entry when he returns — items stored there are not safe.
-- Village camp: once you are an "Honored Friend" (§12) in a native village, you may store any number of inventory items there at any time; they never disappear. If however you forfeit that standing in this region through a robbery (§12), the items stored there are irretrievably lost.
+- Village camp: once you are an "Honored Friend" (§12) in a native village, you may store any number of inventory items there at any time; they never disappear. Nothing forfeits the standing any more — the robbery that did retired with §12.
 
 ---
 
@@ -241,9 +241,9 @@ Inventory caches relieve the limited inventory and allow, for instance, leaving 
 | Rope | Safe, faster ascent in the mountains. Mountains can also be climbed without a rope, but slower and dangerously: after a warning, every stretch on the rock risks a fall that wounds the traveler (light or severe) and can tear a carried item loose |
 | Machete | Crossing jungle/dense grassland; also offers protection against animal attacks, though weaker than the rifle |
 | Shovel | Digging up treasures and the tomb at marked sites |
-| Rifle | Hunting and defense; carried in the pack it offers the strongest protection against animal and robber attacks on land — stronger than the machete (§14) — and enables the robbery of a chief's hut (with a permanent reputation loss in the region, §12) |
+| Rifle | Hunting and defense; carried in the pack it offers the strongest protection against animal and robber attacks on land — stronger than the machete (§14) |
 | Medicine | Cures fever/illness and wounds; used by clicking it in the inventory bar |
-| Gifts | Trade goods for chiefs (goodwill, hints) |
+| Gifts | Trade goods, and the village means of payment (§9) |
 | Canteen | Holds a fill level; refills at fresh water, drains on land (faster in the desert); protects against dehydration in the desert while it holds water (not against sun blindness) |
 | Canoe | Fast, safe travel on rivers/lakes (the rifle also stays usable there); on land it slows the traveler markedly (a hint names it). Without a canoe, water is slower, more exposed to the current and to crocodiles. Its depiction in the bird's-eye view makes the state legible: travelling water the explorer sits in the canoe (riding on the surface, paddling); on land he drags it along behind him — the hull trails the walked path like a trailer, lies on the terrain (pitching down to where its far end rests on the ground, rolling slightly on cross-slopes) and swings clear of stones, trees, animals and settlement edges instead of clipping through them; at a bank it stays on the land side — the rope rotates to land at full length (or shortens on a spit narrower than the rope), so the dragged hull never pierces a river, lake or sea surface |
 
@@ -295,7 +295,7 @@ Every settlement — port city or native village — offers at least the baselin
 | Tool hut | Sells shovel, rope, canteen |
 | Market hut | Sells canoe, food |
 | Village trading post | Village only: barters the baseline goods (food, medicine, machete, shovel, rope, canteen) for gifts, and buys gear back for gifts |
-| Chief's hut | Village only: audience with the chief to obtain hints |
+| Chief's hut | Village only: the use key at its door calls the chief out (§12) |
 
 ---
 
@@ -364,25 +364,22 @@ Visual water realism:
 
 ---
 
-## 12. Audience with the Chief
+## 12. Meeting the Chief
 
-Access to hints leads through the chiefs, in the chief's hut of a village (first-person view). Procedure:
+Access to hints leads through the chiefs, met OUTSIDE the hut in a village (first-person view). Procedure:
 1. Enter the village.
-2. Visit the chief's hut, audience.
-3. Present a culturally fitting gift → goodwill.
-4. With sufficient goodwill: a hint about the tomb/treasure (into the chronicle, §15).
-5. Wrong behavior: hostility, expulsion.
+2. Stand at the chief's hut and press the Space use key: the chief comes OUT and from then on stands in the open, at his drummer's side.
+3. He says in the same breath what he knows about the tomb (into the chronicle, §15), and standing before him orients the traveler in the settlement (§17).
+4. Every further press decides between the things he still has to give: the drum message, and his answer to what the traveler dug up at the boulder (§13.4).
 
-**Hostility.**
-A rejected gift means hostility and expulsion: the traveler is thrown out of the village, accumulated goodwill resets, and the chief refuses further audiences for a hostility period (a calibratable balance value) before relations can be rebuilt.
+There is no audience window and no precondition. The gift/goodwill state, the hostility period and the rifle-gated robbery of a chief's hut retired on 05.09.2026 together with the village elder (user 03.09.2026): the chief speaks from the first minute, and what a region reveres is a trading value (§8), no longer a key to him.
 
 **Honored Friend.**
-Satisfying a chief correctly repeatedly bestows the status of "Honored Friend" for all villages of his region. The bestowal is journaled: an entry in which the chief pledges his people's protection. A robbery forfeits the status irretrievably.
+The status of "Honored Friend" holds for all villages of a chief's region. Its bestowal is journaled: an entry in which the chief pledges his people's protection.
+
+OPEN: nothing bestows the status since the goodwill state retired; the observation model that replaces the elder is to give it a producer again. Everything that CONSUMES it — the village camp (§6), the help during attacks, the HUD — stands unchanged and waits.
 
 Effect: near the region's native villages the natives protect the traveler from animal and robber attacks (§14) — he is at most lightly injured; close to death, inhabitants hurry over with food, water or medicine; and in the region's villages he always receives food, water and medicine free of charge. Each such event is journaled, typically like "I was attacked by lions. A group of the … people rushed to my aid at once and saved me from the attack. I was only lightly injured."
-
-**Robbery and reputation.**
-With a rifle in the pack, the chief's audience offers to rob the hut — behind a deliberate safety confirmation (a warning naming the consequences, confirm/cancel), because the deed is irreversible. The haul is deliberately rich — a large sum of money, trade goods up to the pack limit, and provisions — so a robbery can genuinely pay off despite its cost; the chronicle reports exactly what was taken. It permanently antagonizes all villages of the region (no hut enterable, no more hints) and irretrievably forfeits the "Honored Friend" status including its protection.
 
 ---
 
@@ -403,7 +400,7 @@ Every region expresses directions differently; the player must decipher each sys
 
 Glossary (landmarks in the local tongue): El Mora Levimara / Mongdamara (Congo), Lastwana (Zambezi), Gumba lu Untoba (Victoria Falls), Unumpara (Kilimanjaro), Galumba / Ut-hu Manbwama (elephants), Oz Oz / Oink Oink / Auke Auke (unspecific knowledge).
 
-A village elder teaches the region's direction words; a second talk with the elder reveals what the region reveres (§8). A chief's raw hint is recorded in the journal in the region's own words and turns into a deciphered entry as soon as the region's language has been learned — in either order (lesson before or after the hint), so an undeciphered hint is decoded retroactively.
+The direction words themselves are not taught in the PoC: nobody in a village hands them out. A chief's raw hint is recorded in the journal in the region's own words, and a deciphered entry follows it. (Until 05.09.2026 a village elder taught the region's direction system and revealed what it reveres (§8); the observation model replaces him, and other regions will hold other things to observe — user 03.09.2026.)
 
 ### 13.3 Cascade and Time Limit
 Per region exactly one knowing people (seeded anew each run) reveals the region's component of the site: the North's chief the latitude, the East's the longitude, the other regions narrowing statements. Every other chief offers only unspecific knowledge (Oz Oz …) that points toward the region's knowing people. Several hints are triangulated into the exact position of the tomb.
@@ -509,7 +506,7 @@ RETURN VISITS (points 170/394): re-entering a place whose SITUATION has changed 
 ### 16.1 Non-modal journal
 
 - The opened journal does not freeze the game: the character keeps moving in both perspectives while the journal is open and even while an entry is being read aloud — reading and narration never halt travel.
-- Only the modal dialogs (trade, audience, camp and the like) block movement.
+- Only the modal dialogs (trade, camp and the like) block movement.
 - Entering a building with the Space use key at its door (§2.3) therefore works with the journal open too — the book closes as the building's modal appears; an auto-opened journal never leaves a hut unenterable.
 
 ### 16.2 Do not disturb
@@ -545,15 +542,15 @@ Map-point labels are gated by discovery: the floating name of a settlement or a 
 
 ### 17.3 First-person UI
 
-First-person view (settlements): walkable space, use-key prompts at buildings/persons ("Space — <name>", shown once the traveller stands at the door or by the elder), trade and dialog windows. In the bird's-eye view the settlement's own prompt reads "Space to enter <name>" while the traveller is within its enter radius (§2.3) — with the kind placeholder in place of the name while the settlement is still undiscovered (§17.2). A gift to a native additionally provides an orientation over the settlement's buildings, with the important, enterable buildings highlighted.
+First-person view (settlements): walkable space, use-key prompts at buildings/persons ("Space — <name>", shown once the traveller stands at the door or before the chief), trade and dialog windows. In the bird's-eye view the settlement's own prompt reads "Space to enter <name>" while the traveller is within its enter radius (§2.3) — with the kind placeholder in place of the name while the settlement is still undiscovered (§17.2). Meeting the chief additionally provides an orientation over the settlement's buildings, with the important, enterable buildings highlighted.
 
 ### 17.4 Layering
 
-Modal windows (trade, audience, bazaar, travel agency, camp caches) and the full-screen overlays (start/load, victory, defeat) always render on top of everything else in the scene, including the floating building and place labels. A modal is never obscured by an in-world label. The chronicle/journal panel (docked on the right) keeps a small gap to the right screen edge and ends above the bottom-right button row (camp / map / journal), so those buttons are never covered.
+Modal windows (trade, bazaar, travel agency, camp caches) and the full-screen overlays (start/load, victory, defeat) always render on top of everything else in the scene, including the floating building and place labels. A modal is never obscured by an in-world label. The chronicle/journal panel (docked on the right) keeps a small gap to the right screen edge and ends above the bottom-right button row (camp / map / journal), so those buttons are never covered.
 
 ### 17.5 Controls and focus
 
-- Controls suitable for mouse/keyboard and gamepad. The use key is **Space**: it addresses the village elder, enters the functional building at whose door the traveller stands (§2.3), and confirms entering a settlement from the bird's-eye view. The chronicle/journal opens and closes with the Tab key (gamepad: Y). Holding Ctrl names the animals, people and usable objects on screen (§17.8; the hold key is rebindable, §21). **U** frees a wedged traveller onto the nearest free ground, in either view and at no cost; a held key that gets nowhere raises a toast naming U; nothing frees him unasked. Tab's default focus cycling is suppressed while playing so focus never shifts onto UI controls; inside form controls it still navigates normally. Mouse and right stick also PITCH the first-person view, inverted by default (forward looks down; a debug-menu checkbox switches that off, §21.3) and clamped short of vertical (§21.2) so it can never roll over; horizontal look is unaffected.
+- Controls suitable for mouse/keyboard and gamepad. The use key is **Space**: it enters the functional building at whose door the traveller stands (§2.3), calls the chief out of his hut (§12), and confirms entering a settlement from the bird's-eye view. The chronicle/journal opens and closes with the Tab key (gamepad: Y). Holding Ctrl names the animals, people and usable objects on screen (§17.8; the hold key is rebindable, §21). **U** frees a wedged traveller onto the nearest free ground, in either view and at no cost; a held key that gets nowhere raises a toast naming U; nothing frees him unasked. Tab's default focus cycling is suppressed while playing so focus never shifts onto UI controls; inside form controls it still navigates normally. Mouse and right stick also PITCH the first-person view, inverted by default (forward looks down; a debug-menu checkbox switches that off, §21.3) and clamped short of vertical (§21.2) so it can never roll over; horizontal look is unaffected.
 - Gamepad: the left stick moves the character in both perspectives (merged with WASD), the right stick turns and pitches the first-person view, and the buttons map onto existing key handlers (A interact → the Space use key, B close, X dig, Y journal, LB map, RB camp, Select position query, Start debug menu, L3 unstuck) — a single input path, no second one. Only standard-mapped pads are read, and one steers only after a deliberate input (a button press or a full stick push): idle axis drift of wheels, flight sticks or worn pads must never move or turn the game by itself.
 - Touch / tablet: a third input source beside keyboard and gamepad. It is a *feel* layer, not a rules change: walk/travel speeds, look sensitivity and every gameplay value stay as on the desktop. On-screen controls appear only once the layer arms, and it arms solely on the first real touch (the gamepad guard's deliberate-input idea); an untouched desktop, touch-screen laptop included, stays pixel-identical and shows nothing. A virtual stick at the bottom-left drives movement (merged with WASD/gamepad like the left stick); the right screen half is a drag surface that turns the first-person view, and a two-finger pinch there zooms the bird's-eye view through the mouse wheel's clamp and debug unlock. The interaction prompt and the stuck hint become tappable — a tap dispatches the key it names, so there is still one input path. The camp/journal/map controls stay ordinary buttons. With the layer active the HUD honours device safe-area insets and tightens on short viewports. Arming the layer also applies a mobile quality preset — temporal anti-aliasing off, screen-space ambient occlusion off, half-resolution sun-shadow maps and campfire shadows off — as internal render flags, not debug-menu checkboxes (§21.3 keeps the single detail-level picker); it stays a subset of the low quality level, tied to the touch layer, never to user-agent sniffing.
 - Entering a settlement puts the focus on the controls: any lingering HUD button is blurred so the keyboard drives the character at once, and mouse-look (pointer lock) engages straight away on the user activation the entering Space press carries. A modal dialog releases the lock so its buttons stay clickable (Escape too); where a browser refuses the un-clicked request, a deliberate click on the view remains the fallback. Mouse-look is never grabbed while a full-screen overlay is up (the initial checkpoint-load choice, defeat or victory): the cursor is needed there.
@@ -571,7 +568,7 @@ English (default) and German. The language can be switched at runtime (POC: via 
 
 While the Ctrl key is held down, everything on screen that ACTS names itself with a small floating label — and only that. Every animal, every person, every object the player can use or interact with. Scenery does not answer: no tree, rock, grass tuft or house wall, because the layer exists to tell the living and the usable APART from the backdrop, and a label over every plant would tell nothing. The test is "can it move, or can I do something with it?" — the crocodile in the river yes, the reeds it lies in no. It works in both perspectives.
 
-The label says WHAT a thing is, never who: its kind, its age where the game distinguishes one, and its state where that state changes what the player is looking at — a dead animal is named as dead. Hence "Adult giraffe" and "Dead giraffe calf". People read by their role (elder, trader, villager), objects by their kind (a pitched camp, the canoe).
+The label says WHAT a thing is, never who: its kind, its age where the game distinguishes one, and its state where that state changes what the player is looking at — a dead animal is named as dead. Hence "Adult giraffe" and "Dead giraffe calf". People read by their role (trader, porter, villager), objects by their kind (a pitched camp, the canoe).
 
 Four rules keep it honest:
 
@@ -777,7 +774,7 @@ of §19.14 applies to it too.
 1. Port city (first-person): buy equipment, gifts, weapons, canteen, rope, canoe, provisions; possibly take a ferry. Entering the port city saves automatically (checkpoint).
 2. Head for a region (bird's-eye view, 3D); carry the terrain-appropriate item.
 3. Enter a village (first-person): visit the chief's hut.
-4. Culturally correct gift → hint into the chronicle.
+4. Call the chief out → his hint into the chronicle.
 5. Decipher the region's language/direction system, decode the hint, determine the target position.
 6. Travel to the target position, mind the terrain items, dig with the shovel → treasure.
 7. Sell treasure finds region-wisely at the bazaar.

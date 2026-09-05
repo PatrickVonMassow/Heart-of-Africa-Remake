@@ -1195,20 +1195,20 @@ if (section('town-plan')) {
   await page.waitForTimeout(200)
 }
 
-// --- Orientation after a gift (design.md §17) ---------------------------------------
+// --- Orientation after meeting the chief (design.md §17) -----------------------------
 if (section('orientation-markers')) {
   await goToPlace('maasai-village')
   const before = await page.evaluate(() => document.querySelectorAll('.building-highlight').length)
-  check('no building markers before the gift', before === 0, `${before}`)
+  check('no building markers before the chief comes out', before === 0, `${before}`)
   const toast = await page.evaluate(() => {
-    const g = window.__game.getState()
-    g.debugAddGift('emerald') // revered in the east
-    g.giveGift('emerald')
+    // Standing before the head man is what orients the traveller now; the gift
+    // that used to buy it retired with the goodwill state (point 1052).
+    window.__game.getState().callChiefOut()
     return window.__game.getState().toast
   })
   await page.waitForTimeout(600)
   const after = await page.evaluate(() => document.querySelectorAll('.building-highlight').length)
-  check('the gift unlocks the building markers', after >= 1, `${after} markers`)
+  check('meeting the chief unlocks the building markers', after >= 1, `${after} markers`)
   check('the orientation announces itself', !!toast && toast.length > 0, `"${toast}"`)
   await page.evaluate(() => window.__game.getState().setJournalOpen(false))
   // AIM the camera at a marked building before photographing its marker. The
@@ -1216,10 +1216,10 @@ if (section('orientation-markers')) {
   // so whether a marker was in the picture at all was chance — the shutter
   // (point 375) refused the frame and that is how the missing aim was found.
   // The chief's hut is the marker the shutter judges (it is the first
-  // `.building-highlight` in DOM order, the layout's first non-villager
-  // interactive), so stand back from it on its own bearing and face it.
+  // `.building-highlight` in DOM order, the layout's first interactive), so
+  // stand back from it on its own bearing and face it.
   const marked = await page.evaluate(() => {
-    const it = (window.__placeLayout?.interactives ?? []).find((i) => i.type !== 'villager')
+    const it = (window.__placeLayout?.interactives ?? [])[0] ?? null
     if (!it) return null
     const p = window.__placePlayer
     const [mx, mz] = it.pos
@@ -1757,7 +1757,7 @@ if (section('giza-site')) {
     JSON.stringify(site.monuments),
   )
   check(
-    'the monuments are collidable and the site has no trade/elder',
+    'the monuments are collidable and the site has no trade and no chief',
     site.colliders >= 4 && site.interactives === 0,
     JSON.stringify({ colliders: site.colliders, interactives: site.interactives }),
   )

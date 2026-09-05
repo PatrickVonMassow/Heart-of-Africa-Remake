@@ -172,21 +172,25 @@ if (section('left-stick-travel')) {
 }
 
 // --- A interacts (Space): addresses the elder in a village -------------------------------------
-// The A button maps to the Space use key (design.md §17.5), which addresses the
-// village elder when standing by him. The northern Nubian village keeps the
-// following position query in the North.
-if (section('interact-elder')) {
+// The A button maps to the Space use key (design.md §17.5), which at the chief's
+// door brings him out of his hut (design.md §12). The northern Nubian village
+// keeps the following position query in the North.
+if (section('interact-chief')) {
   await enterNubianVillage()
   await page.evaluate(() => {
-    const el = window.__placeLayout.interactives.find((i) => i.type === 'villager')
+    const it = window.__placeLayout.interactives.find((i) => i.type === 'chief')
     const p = window.__placePlayer
-    p.x = el.pos[0]
-    p.z = el.pos[1] + 2
+    p.x = it.door[0]
+    p.z = it.door[1]
   })
   await page.waitForTimeout(500)
-  await pulseButtonUntil(0, () => window.__game.getState().languagesLearned.north === true) // A → Space → talk
-  const talked = await page.evaluate(() => window.__game.getState().languagesLearned.north)
-  check('A interacts: the elder is addressed (language lesson)', talked === true, '')
+  const chiefIsOut = () => {
+    const g = window.__game.getState()
+    return g.chiefOutside[g.placeId] === true
+  }
+  await pulseButtonUntil(0, chiefIsOut) // A → Space → the chief steps out
+  const cameOut = await page.evaluate(chiefIsOut)
+  check('A interacts: the chief comes out of his hut', cameOut === true, '')
 }
 
 // --- Position query (P / Select) in both languages -------------------------------------------

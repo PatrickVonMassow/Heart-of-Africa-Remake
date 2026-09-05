@@ -131,9 +131,11 @@ four concepts, sixteen strikes, three equal inter-word pauses, and no other
 structure. Afterwards it is displayed with the player's own reading over each
 element. Those readings are the journal notes themselves and remain editable.
 
-The message is asked for at the chief's audience, in his village alone, after a
-culturally correct gift earns his trust. It is recorded as heard only after the
-last beat and can then be reopened from the journal.
+The message is asked for OUTSIDE, in his village alone. The use key at the
+chief's hut brings the chief out of it — there is no audience overlay — and he
+then stands beside his own door, in sight of the drummer who beats his message.
+Asking him again sends it; it is recorded as heard only after the last beat and
+can then be reopened from the journal.
 
 ## Where the digging happens
 
@@ -143,8 +145,10 @@ the recovered artefact to the chief, and completes the puzzle. The village's
 play rocks teach a category that applies to this separate boulder.
 
 The artefact remains a single quest object: it is not trade stock, does not use
-pack capacity, and cannot be sold. The chief's acknowledgement uses only ROCK
-and DIG from the same language.
+pack capacity, and cannot be sold. It is laid in the chief's hands OUTSIDE, with
+the same use key at his hut, and his acknowledgement stands over his own head
+like any other villager's word — it uses only ROCK and DIG from the same
+language.
 
 ## Save compatibility
 

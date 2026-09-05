@@ -14,12 +14,8 @@ import { SPECIES, type Species } from '../scenes/travel/animalBodies'
 /** The bird's-eye fauna: the herd species plus the scavenging vultures. */
 export type ActorFaunaKind = Species | 'vulture'
 /** Settlement people, read by their ROLE — never by a name (§17.8). The last
- *  four are the Giza site's own ~1890 crowd (design.md §4.4). `elder` is the
- *  role's word for the vocabulary and the language files; the village elder
- *  himself is not marked, because he already carries a standing label of his
- *  own and the layer would only repeat it. */
+ *  four are the Giza site's own ~1890 crowd (design.md §4.4). */
 export type ActorRoleKind =
-  | 'elder'
   | 'trader'
   | 'porter'
   | 'villager'
@@ -43,7 +39,6 @@ export type ActorAge = 'adult' | 'young'
 export const ACTOR_KINDS: readonly ActorKind[] = [
   ...SPECIES,
   'vulture',
-  'elder',
   'trader',
   'porter',
   'villager',
@@ -82,10 +77,8 @@ export interface ActorCandidate {
    * draws whether the key is held or not (a pitched camp says "Camp" at all
    * times). Naming it again stacks two identical boxes over one object, which
    * reads as a defect rather than as an aid. Stated once here as a rule about
-   * permanent labels, so it holds whoever draws them: the village elder, whose
-   * own standing name showed the same doubling first, is simply left unmarked;
-   * this flag is for an object that must STAY in the roster for the layer's
-   * other readers.
+   * permanent labels, so it holds whoever draws them; this flag is for an
+   * object that must STAY in the roster for the layer's other readers.
    */
   permanentLabel?: boolean
   /**

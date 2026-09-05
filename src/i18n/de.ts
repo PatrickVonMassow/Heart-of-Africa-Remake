@@ -140,7 +140,6 @@ export const de: Strings = {
       leopard: { noun: 'Leopard', gender: 'm' },
       hyena: { noun: 'Hyäne', gender: 'f' },
       vulture: { noun: 'Geier', gender: 'm' },
-      elder: { noun: 'Ältester', gender: 'm' },
       trader: { noun: 'Händler', gender: 'm' },
       porter: { noun: 'Träger', gender: 'm' },
       villager: { noun: 'Dorfbewohner', gender: 'm' },
@@ -243,8 +242,8 @@ export const de: Strings = {
   },
 
   labels: {
-    talkToElder: 'Mit dem Alten sprechen',
-    oldMan: 'Alter Mann',
+    speakToChief: 'Mit dem Oberhaupt sprechen',
+    chief: 'Oberhaupt',
     graveDebug: 'Grab (Debug)',
     camp: 'Lager',
   },
@@ -373,8 +372,9 @@ export const de: Strings = {
     bought: (name) => `${name} gekauft.`,
     notEnoughMoney: 'Nicht genug Geld.',
     digNoShovel: 'Ohne Schaufel in der Hand kann ich nicht graben.',
-    villagerNod: 'Der Alte nickt mir freundlich zu.',
     drumsSending: 'Das Oberhaupt ruft seinen Trommler. Die Botschaft geht über das Dorf hinaus.',
+    chiefStepsOut: 'Das Oberhaupt tritt aus seiner Hütte und steht vor mir im Freien.',
+    chiefNoMessage: 'Das Oberhaupt mustert mich und nickt. Es hat nichts über das Dorf hinauszusenden.',
     journalDndOn: 'Tagebuch-Unterbrechungen aus – Einträge erscheinen still.',
     journalDndOff: 'Tagebuch-Unterbrechungen an – neue Einträge öffnen das Tagebuch.',
     graphicsLevel: {
@@ -394,12 +394,9 @@ export const de: Strings = {
     notEnoughGifts: 'Nicht genug Gaben – hier zählt kein Geld.',
     bazaarRejected: (name) => `Der Händler winkt ab – mit ${name} wird hier nicht gehandelt.`,
     graveyardEmpty: 'Die gebleichten Knochen geben kein Elfenbein mehr her.',
-    chiefHostile: 'Das Dorf hat meinen Fehltritt nicht vergessen. Das Oberhaupt empfängt mich nicht.',
-    regionShunned: 'Die Kunde von meinem Raub hat sich verbreitet – keine Hütte dieser Region öffnet sich mir mehr.',
     campPitched: 'Lager aufgeschlagen – ein X auf meiner Karte markiert die Stelle.',
     campNeedsFriend: 'Nur ein Ehrenfreund dieser Region darf seine Habe im Dorf zurücklassen.',
     positionReport: (coords, region) => `Nach meiner Rechnung: ${coords} – Region ${region}.`,
-    orientationGained: 'Zum Dank für die Gabe zeigt man mir die wichtigen Gebäude.',
     stuckHint: (key) => `Festgeklemmt? ${key} befreit dich.`,
     unstuckFreed: 'Ich habe mich losgearbeitet und stehe wieder im Freien.',
     unstuckAlreadyFree: 'Mich hält hier nichts – der Boden unter meinen Stiefeln ist schon frei.',
@@ -418,27 +415,7 @@ export const de: Strings = {
     leave: 'Verlassen (Esc)',
     foodItem: 'Proviant (1 Woche)',
     gift: (name) => `Gabe: ${name}`,
-    audienceTitle: (people) => `Audienz beim Oberhaupt der ${people}`,
-    audienceIntro: (mood) => `Im Halbdunkel der Chefhütte sitzt das Oberhaupt auf geschnitzten Hölzern. ${mood}`,
-    moodHigh: 'Das Oberhaupt betrachtet dich mit großem Wohlwollen.',
-    moodMid: 'Das Oberhaupt wirkt dir gegenüber freundlich gesinnt.',
-    moodLow: 'Das Oberhaupt mustert dich abwartend.',
-    chiefDone: '„Ich habe dir gesagt, was ich weiß. Möge dein Weg gesegnet sein."',
-    askDrums: 'Ihn bitten, seine Botschaft auf den Trommeln zu senden',
-    askDrumsLocked: 'Er habe eine Botschaft zu senden, gibt er mir zu verstehen – aber nicht an einen Fremden, der seinem Volk nichts gebracht hat.',
-    artefactCarried: 'Das Ding vom Fuß des großen Felsens, noch im Lehm des Flusses',
-    handArtefact: 'Es ihm in die Hände legen',
-    chiefAcknowledges: 'Er drehte es einmal um und sagte:',
-    give: 'Überreichen',
     stock: (n) => `Vorrat: ${n}`,
-    endAudience: 'Audienz beenden (Esc)',
-    rob: 'Gewehr ziehen und rauben',
-    robConfirm:
-      'Dieses Dorf mit vorgehaltenem Gewehr ausrauben? Das verfeindet die ganze Region für immer – keine Audienzen, Hinweise oder Hilfe mehr, und ein etwaiger Status als "Geehrter Freund" ist unwiederbringlich verloren.',
-    robConfirmYes: 'Ja, ausrauben',
-    robCancel: 'Nein, ablassen',
-    robOrphansGoal:
-      'Achtung: Nur diese Region kann dir noch eine Richtung zum Grab lehren, die du noch nicht kennst. Raubst du sie aus, ist dieses Wissen für immer verloren – das Grab könnte unauffindbar werden.',
     bazaarGreeting: '„Schätze, Effendi! Zeig her, was die Wildnis hergab – oder nimm selbst ein Stück mit heim."',
     bazaarSell: 'Einen Fund anbieten:',
     bazaarBuy: 'Zum Verkauf:',
@@ -685,7 +662,6 @@ export const de: Strings = {
     foodUnitDays: 'Proviant pro Nahrungseinheit (Tage)',
     oceanSwimMargin: 'Schwimmbares Küstenband (°)',
     digRadius: 'Grabe-Radius',
-    goodwillForHint: 'Wohlwollen für Hinweis',
     randomEvents: 'Zufallsereignisse',
     triggerEvent: 'Ereignis auslösen:',
     eventNames: {
@@ -776,23 +752,12 @@ export const de: Strings = {
       villageReturn: (p: TextParams) => `Wieder in ${PLACES[p.place as string]}`,
       monument: (p: TextParams) => PLACES[p.place as string],
       monumentReturn: (p: TextParams) => `${PLACES[p.place as string]} – noch einmal`,
-      audience: 'Audienz beim Oberhaupt',
-      mistake: 'Ein schwerer Fehler',
       chiefHint: 'Die Worte des Oberhaupts',
       drumMessage: 'Die Trommeln sprechen',
       rockArtefact: 'Am Fuß des großen Felsens',
       artefactGiven: 'In die Hände des Oberhaupts',
       decoded: 'Entschlüsselt!',
       unspecific: 'Unbestimmtes Gemurmel',
-      giftLore: 'Was das Volk verehrt',
-      language: (p: TextParams) => {
-        const names: Record<string, string> = {
-          north: 'Die Sprache des Nordens', west: 'Die Sprache des Westens',
-          central: 'Die Sprache des Dschungels', east: 'Die Sprache des Ostens',
-          south: 'Die Sprache des Südens',
-        }
-        return names[p.region as string]
-      },
       victory: 'Das Herz von Afrika',
       foodLow: 'Proviant knapp',
       foodOut: 'Proviant aufgebraucht',
@@ -847,10 +812,8 @@ export const de: Strings = {
       bounty: 'Der Lohn der Entdeckungen',
       ferry: 'Passage übers Meer',
       valuableReaction: 'Der Schatz in meiner Hand',
-      friend: 'Ein Ehrenfreund',
       rescue: 'Von den Dorfbewohnern gerettet',
       friendSupplies: 'Gäste der Region',
-      robberyCommitted: 'Eine Tat ohne Vergebung',
       campLooted: 'Das geplünderte Lager',
     },
     start:
@@ -1009,27 +972,6 @@ export const de: Strings = {
         `[somber]Ich kam zurück, und der Ort ist nicht mehr, wie ich ihn verließ.[pause] Was hier seit meinem letzten Besuch geschah, steht stumm in den Gesichtern.[/somber]`
       )
     },
-    giftRevered: (p: TextParams) =>
-      `Ich überreichte dem Oberhaupt der ${PEOPLES[p.people as string]} meine Gabe. [excited]Seine Augen leuchteten auf –[pause] ich habe getroffen, was sein Volk verehrt![/excited] Er neigte das Haupt und hieß mich willkommen. [pause][excited]Das Wohlwollen wächst.[/excited]`,
-    giftNeutral:
-      'Das Oberhaupt nahm meine Gabe mit höflichem Nicken entgegen. [somber]Kein Leuchten in den Augen –[pause] es war wohl nicht das, was sein Volk verehrt.[/somber] [pause]Aber ein Anfang ist gemacht.',
-    giftRejected: (p: TextParams) =>
-      `[fear]Ein schwerer Fehler![/fear] Kaum sah das Oberhaupt der ${PEOPLES[p.people as string]} meine Gabe, verfinsterte sich seine Miene. [somber]Was ich anbot, gilt seinem Volk als Unglücksbringer.[pause] Man führte mich wortlos hinaus.[/somber] [breath][weary]Ich muss dieses Misstrauen erst wieder abtragen.[/weary]`,
-    languageLesson: (p: TextParams) => {
-      const texts: Record<string, string> = {
-        north:
-          'Ein alter Mann am Feuer sprach lange mit mir, mit Händen und Worten. Er nannte die Winde: [emph]„Nivera"[/emph], wo der kalte Nachtwind geboren wird – gen Mitternacht –, „Chamsina" für den heißen Atem des Mittags, „Levantra" für den Morgen, „Gharbia" für den Abend. [breath][excited]Ich begreife:[pause] Der Norden liest seine Richtungen am Ursprung des Windes, und [emph]„Nivera" bedeutet Norden![/emph][/excited]',
-        west:
-          'Ein Ältester zog vier Striche in den Staub und sprach bedächtig: [emph]„koko"[/emph] gen Mitternacht, [emph]„Katula"[/emph] gen Sonnenaufgang, „Phuthswama" gen Mittag, „Mimbumi" gen Sonnenuntergang. [breath][excited]Die Worte des Westens gehören nun mir:[pause] koko ist Norden, Katula ist Osten![/excited]',
-        central:
-          'Am Feuer wies ein Alter immer wieder auf den großen Fluss, den sein Volk [emph]„Utomba"[/emph] nennt – den Mongdamara. Alles liegt „wa-Utomba" oder „ka-Utomba": fort vom Fluss oder zu ihm hin, „lem-Utomba" zur Sonnenaufgangsseite, „mos-Utomba" zum Sonnenuntergang. [breath][excited]Der Wald misst die Welt an seinem Fluss![/excited]',
-        east:
-          'Ein alter Hirte hob den Stab zum leuchtenden Berg, den sein Volk [emph]„Odabi"[/emph] nennt – den Unumpara. Von ihm gehen die Richtungen aus: [emph]„Relolo"[/emph] jenseits von ihm gen Mitternacht, „Dethamee" gen Mittag, „Salewa" gen Sonnenaufgang, „Munjori" gen Sonnenuntergang. [breath][excited]Der Osten misst die Welt am heiligen Berg![/excited]',
-        south:
-          'Eine alte Frau lachte über meinen Kompass und deutete in den Himmel: Ihr Volk nennt die Richtungen nach den Jahreszeiten – [emph]gen Sommer[/emph] heißt gen Mitternacht, gen Winter gen Mittag, Frühling ist der Sonnenaufgang, Herbst der Sonnenuntergang. [breath][excited]Was für eine wunderliche, schöne Art, die Welt zu tragen![/excited]',
-      }
-      return texts[p.region as string]
-    },
     hintRaw: (p: TextParams) => {
       const regionId = p.region as string
       const w = DIRECTION_WORDS[regionId as keyof typeof DIRECTION_WORDS]
@@ -1065,8 +1007,6 @@ export const de: Strings = {
     },
     unspecific: (p: TextParams) =>
       `Das Oberhaupt nickte ernst, ruderte mit den Händen und sagte immer wieder nur [emph]„${p.word}"[/emph]. [somber]Was immer es weiß – es kann oder will es nicht in Worten sagen, die ich fasse.[/somber] [pause]Doch es wies beharrlich zu den Dörfern der [emph]${PEOPLES[p.people as string]}[/emph] – [excited]sie sollen mehr wissen.[/excited]`,
-    giftLore: (p: TextParams) =>
-      `Der Alte sprach von den Schätzen seines Landes: Was sein Volk über alles verehrt, ist [emph]${de.gifts[p.gift as keyof typeof de.gifts]}[/emph]. [pause]Ein damit geehrtes Oberhaupt öffnet sein Herz.`,
     drumMessage:
       '[awe]Das Oberhaupt rief seinen Trommler, und zwei Trommeln sprachen an seiner Statt – eine große und eine kleine.[/awe] [pause]Vier Wörter zu je vier Schlägen, jedes vom nächsten durch dieselbe kurze Stille getrennt – dumpf für die tiefe Silbe, hell für die hohe. [excited]Ich kenne diese Wörter. Jedes einzelne habe ich in den Gassen und am Wasser gehört.[/excited] [pause]Ich habe sie in der Reihenfolge notiert, in der sie geschlagen wurden; was sie von mir verlangen, muss ich selbst lesen.',
     rockArtefact:
@@ -1190,8 +1130,6 @@ export const de: Strings = {
       `Kaum betrat ich das Dorf, richteten sich alle Blicke auf [emph]${de.treasures[p.treasure as keyof typeof de.treasures]}[/emph] in meiner Hand. [excited]Ehrfürchtiges Raunen folgte mir durch die Gassen –[pause] die ${PEOPLES[p.people as string]} verehren, was ich trage.[/excited]`,
     valuableRejected: (p: TextParams) =>
       `[fear]Ein Fehler, es offen zu tragen![/fear] Die ${PEOPLES[p.people as string]} wichen vor [emph]${de.treasures[p.treasure as keyof typeof de.treasures]}[/emph] in meiner Hand zurück wie vor einem bösen Omen. [somber]Türen schlossen sich;[pause] Mütter zogen ihre Kinder ins Haus.[/somber]`,
-    friendPledge: (p: TextParams) =>
-      `[awe]Das Oberhaupt der ${PEOPLES[p.people as string]} erhob sich und legte mir beide Hände auf die Schultern.[/awe] Vor dem versammelten Dorf nannte es mich [emph]Ehrenfreund[/emph] seines Volkes. [excited]„Wo immer unsere Dörfer stehen", gelobte es, „werden unsere Leute über dich wachen."[/excited] [breath][somber]Ich verneigte mich tief.[pause] Ein solches Geschenk wiegt schwerer als Gold.[/somber]`,
     friendRescue: (p: TextParams) => {
       const animal = de.animals[p.animal as keyof typeof de.animals]
       const hurt = p.result === 'light' ? ' [somber]Ich wurde nur leicht verletzt.[/somber]' : ' [excited]Ich blieb unversehrt.[/excited]'
@@ -1203,8 +1141,6 @@ export const de: Strings = {
       `[weary]Ich konnte nicht mehr weiter;[pause] das Land verschwamm vor meinen Augen.[/weary] [somber]Dann hoben mich Hände auf –[/somber] [excited]Leute der ${PEOPLES[p.people as string]} hatten mich gefunden.[/excited] Sie brachten Wasser, Nahrung und bittere Medizin und blieben, bis meine Kräfte zurückkehrten. [pause][awe]Ich lebe, weil ich ihr Freund bin.[/awe]`,
     friendSupplies: (p: TextParams) =>
       `Im Dorf der ${PEOPLES[p.people as string]} empfing man mich wie Familie: [excited]Man füllte mein Gepäck mit Proviant und drückte mir Medizin in die Hände,[/excited] von Bezahlung wollte niemand hören. [pause][somber]Die Freundschaft dieser Region ist mein sicherster Besitz.[/somber]`,
-    robberyCommitted: (p: TextParams) =>
-      `[somber]Ich habe etwas getan, das sich nicht ungeschehen machen lässt.[/somber] [fear]Mit erhobenem Gewehr räumte ich die Hütte der ${PEOPLES[p.people as string]} aus und floh aus dem Dorf.[/fear] [breath][weary]Die Beute: ${p.money} Dollar, ${p.gifts} Handelswaren und ${p.food} Tage Proviant.[pause] Hinter mir: Schreie, und eine Stille, die schlimmer war als die Schreie.[pause] Keine Hütte dieser Region wird sich mir je wieder öffnen.[/weary]`,
     campLooted:
       '[somber]Ich fand mein Lager verwüstet vor –[pause] die Stangen umgerissen, der Boden von fremden Füßen zerwühlt.[/somber] [weary]Alles, was ich zurückgelassen hatte, ist fort.[/weary] [fear]Nichts ist sicher in dieser Wildnis, was nicht getragen oder bewacht wird.[/fear]',
   },

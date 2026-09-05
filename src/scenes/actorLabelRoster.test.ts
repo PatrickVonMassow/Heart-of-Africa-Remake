@@ -38,11 +38,10 @@ function node(
 
 /**
  * The kinds that reach the layer as marked nodes: everything but the streamed
- * fauna (its own sources) and the elder, who is deliberately unmarked because
- * he carries his own standing label — pinned as such further down.
+ * fauna, which has its own sources.
  */
 const MARKED_KINDS: ActorKind[] = ACTOR_KINDS.filter(
-  (k) => !(SPECIES as readonly string[]).includes(k) && k !== 'vulture' && k !== 'elder',
+  (k) => !(SPECIES as readonly string[]).includes(k) && k !== 'vulture',
 )
 
 /**
@@ -168,7 +167,7 @@ function roleLiterals(): Set<string> {
 }
 
 describe('every kind the roster can name is really drawn by some scene', () => {
-  it('leaves no kind unreachable — except the elder, whose own label stands instead', () => {
+  it('leaves no kind unreachable', () => {
     const reachable = new Set<string>([
       // The streamed herds and the scavenging flocks (wildlifeActorSource.ts).
       ...SPECIES,
@@ -185,13 +184,7 @@ describe('every kind the roster can name is really drawn by some scene', () => {
       ...GIZA_AMBIENT.map((a) => a.role),
     ])
     const unreachable = ACTOR_KINDS.filter((k) => !reachable.has(k))
-    expect(unreachable).toEqual(['elder'])
-  })
-
-  it('the elder is unmarked ON PURPOSE, and the reason stands at the figure', () => {
-    const villager = SOURCES.find((s) => s.path.endsWith('PlaceScene.tsx'))
-    expect(villager).toBeDefined()
-    expect(villager!.text).toContain('NOT marked for the §17.8 Ctrl layer')
+    expect(unreachable).toEqual([])
   })
 
   it('marks no kind the roster does not know', () => {
