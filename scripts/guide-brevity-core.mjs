@@ -328,7 +328,17 @@ export const LIMITS = {
   // second refusal MEANS. Measured on 05.09.2026 across a session that answered the same refusal
   // twice. The entry measures +6 lines / +53 words, so the ceilings move 541 -> 547 and
   // 5015 -> 5068 with zero slack.
-  maxLines: 547,
+  // 05.09.2026 (second): TWO genuinely new pitfalls the guide's list did not hold. First, the
+  // instruction whose prescribed sequence destroys its own precondition (a handover marker that
+  // the prescribed publish counts as work and erases) — the neighbouring "two checks that
+  // contradict each other" is about two duties, this is one duty against itself. Second, the
+  // fallback that saves the FUNCTION and silently suspends the AGREEMENT about which provider
+  // works — the neighbouring "silently substituted" entry is about a broken input answering like
+  // a missing one, this is about a fallback that works perfectly and voids a policy. Both entries
+  // were written to the tightest form that still carries them, and three neighbouring lines were
+  // compressed to pay part of the bill, so together they measure +15 lines / +155 words: the
+  // ceilings move 547 -> 562 and 5068 -> 5223 with zero slack.
+  maxLines: 562,
   // EXACT FIT, not headroom — corrected 30.07.2026 after the four-eyes review
   // pointed out that this comment had long stopped describing the numbers. The
   // rule above ("raised only by the measured size of genuinely new tips")
@@ -544,7 +554,7 @@ export const LIMITS = {
   // estimated-numbers pitfall — an accumulated maximum may exonerate, never
   // accuse — and three neighbouring entries were compressed to pay for it, so
   // the measured guide came down three more words: 5018 -> 5015.
-  maxWords: 5068,
+  maxWords: 5223,
   // A pitfall entry = the risk lines plus its prompt. Anything longer is a
   // story, not a tip.
   maxEntryLines: 11,
