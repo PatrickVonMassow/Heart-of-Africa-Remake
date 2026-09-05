@@ -51,7 +51,7 @@
 | `batch-doctor-states.mjs` | THE TORN STATES A KILL LEAVES BEHIND (point 443) — the filesystem half. | — |
 | `batch-doctor.mjs` | Batch doctor (user mandate 24.07.2026): after a parallel-session incident the OWNER verifies the repo was not corrupted by the concurrent writes, and remediates — willing to THROW AWAY suspect work (recoverably: rescue branch + named stash) rather than leave a corrupted tree. | Usage: |
 | `batch-emergency-core.mjs` | THE INDEPENDENT TOTAL-WEDGE DECISION (point 947) — the pure half. | — |
-| `batch-emergency-drill.mjs` | Chaos drill: run the real emergency orchestrator through soft failure and a hard strike, with an actual wedged child process as the owner. | — |
+| `batch-emergency-drill.mjs` | CHAOS DRILL for point 1048, union entry U21 — the two measured wedges of 02.–04.09.2026 replayed against the REAL actors, not against a recreation of their aftermath. | — |
 | `batch-emergency.mjs` | Independent last-resort lane for a total batch wedge. | usage: node scripts/batch-emergency.mjs [--dry-run\|--status] |
 | `batch-handover-observe-core.mjs` | Pure core of the END-TO-END HANDOVER OBSERVATION (point 388). | — |
 | `batch-handover-observe.mjs` | READ-ONLY observer for the end-to-end handover (point 388). | — |
