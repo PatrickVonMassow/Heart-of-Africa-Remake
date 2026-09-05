@@ -77,6 +77,48 @@ then point 633 (the closing run), then point 174 (the tag). A newly appended poi
 kind is MOVED to the front in the same turn that files it; leaving it where append-and-defer
 put it is the mistake this line exists to stop.
 
+- [ ] 1061. Sol retires: the OpenAI lane is GPT-6 Astra from here on (user 05.09.2026).
+  THE ORDER (user, 05.09.2026, verbatim): »Erreichst du mit der Model-Id gpt-6-astra ein
+  OpenAI-Modell? Falls ja, stelle von Sol auf gpt-6-astra um. Schaue, dass das überall
+  konsistent und redundanzfrei hinterlegt ist. Alles, was vorher von Sol gemacht wurde,
+  soll ab jetzt mit Astra gemacht werden.«
+  AHEAD OF THE COMMUNICATION BLOCK on purpose, against the release order above: »ab jetzt«
+  means the next authoring must not run on the retired lane, and the routing hands the very
+  next point (1052) to the OpenAI vendor. It is the only point that may jump this queue for
+  that reason.
+  MEASURED 05.09.2026: `codex exec -m gpt-6-astra --sandbox read-only` answers over
+  provider `openai` (session 01a07174-9919-7202-adb2-570b4b9c03b0, 1 922 tokens) — the
+  condition the order names is met. The identity itself lives ONCE (`SOL_MODEL_ID`,
+  `SOL_MODEL_NAME`, scripts/review-sol-core.mjs ~55) and is imported everywhere; the
+  redundancy sits in the ~20 command FILENAMES, the `SOL_*`/`sol-*` identifiers and the
+  prose that names the lane (CLAUDE.md §6, README, docs/sol-routing.md,
+  docs/batch-autonomy.md, docs/batch-owner-runbook.md, docs/command-index.md, the hook
+  remedy texts). Measured spread: 229 tracked files mention the lane, of which the clear
+  majority are records of past work.
+  Final state:
+  - THE LANE IS ASTRA. The model id is `gpt-6-astra` and the recorded name »GPT-6 Astra«.
+    Every read-only kind and every authoring the routing gives to the OpenAI vendor goes
+    there. Reasoning effort, the share switch's settings and the cross-vendor rule (no
+    model reviews its own work) are unchanged — only the identity behind the lane moves.
+  - ONE NAME, EVERYWHERE. Commands, core modules, exported constants, the share switch,
+    the routing cut and every prose passage that names the lane read »Astra«. Nothing
+    forward-looking still says »Sol«, and the name is stated in one place that the rest
+    imports rather than repeating.
+  - HISTORY IS NOT REWRITTEN. `.claude/mechanism-reviews.jsonl`, `docs/tasks-archive.md`,
+    `docs/four-eyes/*`, `docs/blind-*/*` and the retrospectives record what a model
+    ACTUALLY did on a date; they keep the name Sol. The guards that read past commits and
+    past records keep recognising »GPT-5.6 Sol« as a historical author and reviewer, so a
+    landed commit stays verifiable.
+  Test: Vitest over the renamed cores, the share switch, the routing cut and the model
+  guard (a past `Co-Authored-By: GPT-5.6 Sol` still parses as a valid historical trailer;
+  a new one names Astra); plus one live `--dry-run`/`--status` of each renamed command.
+  Criticality: high — it moves the vendor lane the whole batch routes through.
+  Refs: scripts/review-sol-core.mjs, scripts/ask-sol*.mjs, scripts/author-sol*.mjs,
+  scripts/sol-share*.mjs, scripts/model-guard-core.mjs, scripts/author-routing-core.mjs,
+  CLAUDE.md §6, docs/sol-routing.md.
+  Bundle: Modell & Wächter (it renames the review, ask, author and share commands, so it
+  is not worked beside another point that edits them).
+
 - [ ] 1052. The elder retires and the audience overlay with him: one chief, met outside
   at the drums (user 03.09.2026).
   THE ORDER (user, 03.09.2026, verbatim): »Okay, dann baue das so um und reihe das in der
