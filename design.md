@@ -377,12 +377,9 @@ Access to hints leads through the chiefs, in the chief's hut of a village (first
 A rejected gift means hostility and expulsion: the traveler is thrown out of the village, accumulated goodwill resets, and the chief refuses further audiences for a hostility period (a calibratable balance value) before relations can be rebuilt.
 
 **Honored Friend.**
-Satisfying a chief correctly repeatedly bestows the status of "Honored Friend" for all villages of his region. The bestowal is journaled: an entry in which the chief pledges his people's protection. A robbery forfeits the status irretrievably.
+Satisfying a chief correctly repeatedly bestows the status of "Honored Friend" for all villages of his region. The bestowal is journaled: an entry in which the chief pledges his people's protection.
 
 Effect: near the region's native villages the natives protect the traveler from animal and robber attacks (§14) — he is at most lightly injured; close to death, inhabitants hurry over with food, water or medicine; and in the region's villages he always receives food, water and medicine free of charge. Each such event is journaled, typically like "I was attacked by lions. A group of the … people rushed to my aid at once and saved me from the attack. I was only lightly injured."
-
-**Robbery and reputation.**
-With a rifle in the pack, the chief's audience offers to rob the hut — behind a deliberate safety confirmation (a warning naming the consequences, confirm/cancel), because the deed is irreversible. The haul is deliberately rich — a large sum of money, trade goods up to the pack limit, and provisions — so a robbery can genuinely pay off despite its cost; the chronicle reports exactly what was taken. It permanently antagonizes all villages of the region (no hut enterable, no more hints) and irretrievably forfeits the "Honored Friend" status including its protection.
 
 ---
 

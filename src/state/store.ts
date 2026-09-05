@@ -213,10 +213,6 @@ export interface GameState {
   reveredGiftGiven: Record<string, boolean>
   /** "Honored Friend" standing per region (design.md §12). */
   honoredFriend: Partial<Record<RegionId, boolean>>
-  /** Regions whose friend status was forfeited by a robbery — for good. */
-  friendForfeited: Partial<Record<RegionId, boolean>>
-  /** Regions antagonized by a hut robbery: no huts, no hints (§12). */
-  regionRobbed: Partial<Record<RegionId, boolean>>
   /** Per village: in-game day until which it stays hostile (§12 expulsion). */
   hostileUntil: Record<string, number>
   /** Day of the last near-death aid delivery (§12), for the cooldown. */
@@ -274,8 +270,6 @@ export interface GameState {
   talkToVillager: () => void
   /** Present a carried valuable to a village — provokes the §8 reaction. */
   presentValuable: (treasure: TreasureId) => void
-  /** Rob the hut with a rifle (design.md §12) — permanent regional loss. */
-  robVillage: () => void
   /** Pitch a camp in the open, or reopen the one nearby (design.md §6). */
   pitchOrOpenCamp: () => void
   /** Open the village cache — requires "Honored Friend" (design.md §6). */
@@ -547,8 +541,6 @@ export function startState(seed: number, placeId: string = startPlaceId()) {
     goodwill: {},
     reveredGiftGiven: {},
     honoredFriend: {} as Partial<Record<RegionId, boolean>>,
-    friendForfeited: {} as Partial<Record<RegionId, boolean>>,
-    regionRobbed: {} as Partial<Record<RegionId, boolean>>,
     hostileUntil: {} as Record<string, number>,
     lastFriendAidDay: -9999,
     freeCamps: [] as FreeCamp[],
@@ -618,21 +610,6 @@ function newSeed(): number {
     if (p !== null && /^\d+$/.test(p)) return Number(p) >>> 0
   }
   return Math.floor(Math.random() * 0xffffffff)
-}
-
-/** The two regions whose knowing chief reveals a USABLE tomb coordinate
- *  (design.md §13: the North teaches the latitude, the East the longitude —
- *  en.ts hintDecoded; the other regions give only flavour). Robbing one of
- *  these before its hint is learned is the only path that can orphan the goal,
- *  since a robbery blocks the region's audiences for good (point 208 A7). */
-export const TOMB_COORDINATE_REGIONS: RegionId[] = ['north', 'east']
-
-/** Would robbing this region put the tomb out of reach (point 208 A7)? True only
- *  for a coordinate-bearing region whose hint the traveller has NOT yet learned —
- *  a robbery then forfeits the audience that alone could reveal it. Once the raw
- *  hint is in the journal it deciphers retroactively, so the goal is safe. */
-export function robWouldOrphanGoal(s: Pick<GameState, 'hintsGiven'>, region: RegionId): boolean {
-  return TOMB_COORDINATE_REGIONS.includes(region) && s.hintsGiven[region] !== true
 }
 
 /**
@@ -1753,12 +1730,7 @@ export const useGame = create<GameState>()((set, get) => ({
     if (!s.placeId) return
     const place = placeById(s.placeId)
     if (place.kind !== 'village' || s.gifts[material] <= 0) return
-    // Standing guards (design.md §12): a robbed region shuns the traveler,
-    // hostility must wear off.
-    if (s.regionRobbed[place.region]) {
-      set({ toast: getStrings().toasts.regionShunned })
-      return
-    }
+    // Standing guard (design.md §12): hostility must wear off first.
     if ((s.hostileUntil[place.id] ?? 0) > s.day) {
       set({ toast: getStrings().toasts.chiefHostile })
       return
@@ -1795,13 +1767,8 @@ export const useGame = create<GameState>()((set, get) => ({
     }
 
     // Repeated correct satisfaction bestows "Honored Friend" for the whole
-    // region (design.md §12) — unless it was forfeited by a robbery.
-    if (
-      revered &&
-      newGw >= balance.reputation.goodwillForFriend &&
-      !s.honoredFriend[place.region] &&
-      !s.friendForfeited[place.region]
-    ) {
+    // region (design.md §12).
+    if (revered && newGw >= balance.reputation.goodwillForFriend && !s.honoredFriend[place.region]) {
       set({ honoredFriend: { ...get().honoredFriend, [place.region]: true } })
       get().addEntry(
         { key: 'journal.titles.friend' },
@@ -1865,11 +1832,6 @@ export const useGame = create<GameState>()((set, get) => ({
     const s = get()
     if (!s.placeId) return
     const region = placeById(s.placeId).region
-    // A robbed region shuns the traveler entirely (design.md §12).
-    if (s.regionRobbed[region]) {
-      set({ toast: getStrings().toasts.regionShunned })
-      return
-    }
     // First talk: the elder teaches the region's direction system (§13.2);
     // a second talk reveals what the region reveres (§8).
     if (!s.languagesLearned[region]) {
@@ -1892,49 +1854,6 @@ export const useGame = create<GameState>()((set, get) => ({
       return
     }
     set({ toast: getStrings().toasts.villagerNod })
-  },
-
-  robVillage: () => {
-    const s = get()
-    if (!s.placeId || s.defeat || s.victory) return
-    const place = placeById(s.placeId)
-    if (place.kind !== 'village' || (s.equipment.rifle ?? 0) <= 0) return
-    const region = place.region
-    const rep = balance.reputation
-    // Loot at rifle point (design.md §12): a rich haul — cash, gifts as far as
-    // the pack holds, and provisions — so the robbery can pay off despite the
-    // permanent regional fallout.
-    const space = Math.max(0, balance.inventoryCapacity - usedInventory(s))
-    const lootMaterial = REGION_VALUES[region].revered[0]
-    const lootGifts = Math.min(rep.robberyGifts, space)
-    const lootMoney = rep.robberyMoney
-    const lootFood = rep.robberyFoodDays
-    set({
-      money: s.money + lootMoney,
-      gifts: { ...s.gifts, [lootMaterial]: s.gifts[lootMaterial] + lootGifts },
-      foodDays: s.foodDays + lootFood,
-      // The whole region is antagonized for good: no huts, no hints, and
-      // the "Honored Friend" standing is forfeited irretrievably.
-      regionRobbed: { ...s.regionRobbed, [region]: true },
-      honoredFriend: { ...s.honoredFriend, [region]: false },
-      friendForfeited: { ...s.friendForfeited, [region]: true },
-    })
-    // Village caches of the region are irretrievably lost (design.md §6).
-    const villageCamps = { ...s.villageCamps }
-    for (const p of PLACES) {
-      if (p.kind === 'village' && p.region === region) delete villageCamps[p.id]
-    }
-    set({ villageCamps })
-    useUi.getState().setDialog(null)
-    // Report the haul so the player learns what the robbery yielded (design.md §12).
-    get().addEntry(
-      { key: 'journal.titles.robberyCommitted' },
-      {
-        key: 'journal.robberyCommitted',
-        params: { people: place.peopleId ?? place.id, region, money: lootMoney, gifts: lootGifts, food: Math.round(lootFood) },
-      },
-    )
-    get().leavePlace()
   },
 
   pitchOrOpenCamp: () => {
@@ -1961,10 +1880,6 @@ export const useGame = create<GameState>()((set, get) => ({
     if (s.mode !== 'place' || !s.placeId) return
     const place = placeById(s.placeId)
     if (place.kind !== 'village') return
-    if (s.regionRobbed[place.region]) {
-      set({ toast: getStrings().toasts.regionShunned })
-      return
-    }
     // The safe village cache is a privilege of the Honored Friend (§6/§12).
     if (!s.honoredFriend[place.region]) {
       set({ toast: getStrings().toasts.campNeedsFriend })
@@ -2123,7 +2038,7 @@ export const useGame = create<GameState>()((set, get) => ({
       treasures: s.treasures, treasureSites: s.treasureSites, graveyardIvoryLeft: s.graveyardIvoryLeft,
       pendingBounties: s.pendingBounties, landmarksSeen: s.landmarksSeen, valuableShown: s.valuableShown,
       orientationGiven: s.orientationGiven,
-      honoredFriend: s.honoredFriend, friendForfeited: s.friendForfeited, regionRobbed: s.regionRobbed,
+      honoredFriend: s.honoredFriend,
       hostileUntil: s.hostileUntil, lastFriendAidDay: s.lastFriendAidDay,
       freeCamps: s.freeCamps, villageCamps: s.villageCamps,
       communication: serializeMemory(s.communication),
@@ -2204,8 +2119,6 @@ export const useGame = create<GameState>()((set, get) => ({
         orientationGiven: snap.orientationGiven ?? {},
         chiefOutside: snap.chiefOutside ?? {},
         honoredFriend: snap.honoredFriend ?? {},
-        friendForfeited: snap.friendForfeited ?? {},
-        regionRobbed: snap.regionRobbed ?? {},
         hostileUntil: snap.hostileUntil ?? {},
         lastFriendAidDay: snap.lastFriendAidDay ?? -9999,
         freeCamps: snap.freeCamps ?? [],
@@ -2378,16 +2291,16 @@ function spendGifts(gifts: Record<Material, number>, n: number): Record<Material
 /**
  * Whether a camp can be pitched here (design.md §6.3, point 93): always in the
  * open bird's-eye world, in a settlement only inside a village whose region
- * holds "Honored Friend" (and is not robbed), never in a port. One predicate
- * for BOTH the camp button's visibility and the C-shortcut, so they agree.
+ * holds "Honored Friend", never in a port. One predicate for BOTH the camp
+ * button's visibility and the C-shortcut, so they agree.
  */
 export function canCampHere(
-  s: Pick<GameState, 'mode' | 'placeId' | 'honoredFriend' | 'regionRobbed'>,
+  s: Pick<GameState, 'mode' | 'placeId' | 'honoredFriend'>,
 ): boolean {
   if (s.mode === 'travel') return true
   if (s.mode === 'place' && s.placeId) {
     const p = placeById(s.placeId)
-    return p.kind === 'village' && !!s.honoredFriend[p.region] && !s.regionRobbed[p.region]
+    return p.kind === 'village' && !!s.honoredFriend[p.region]
   }
   return false
 }

@@ -399,7 +399,6 @@ export const de: Strings = {
     bazaarRejected: (name) => `Der Händler winkt ab – mit ${name} wird hier nicht gehandelt.`,
     graveyardEmpty: 'Die gebleichten Knochen geben kein Elfenbein mehr her.',
     chiefHostile: 'Das Dorf hat meinen Fehltritt nicht vergessen. Das Oberhaupt empfängt mich nicht.',
-    regionShunned: 'Die Kunde von meinem Raub hat sich verbreitet – keine Hütte dieser Region öffnet sich mir mehr.',
     campPitched: 'Lager aufgeschlagen – ein X auf meiner Karte markiert die Stelle.',
     campNeedsFriend: 'Nur ein Ehrenfreund dieser Region darf seine Habe im Dorf zurücklassen.',
     positionReport: (coords, region) => `Nach meiner Rechnung: ${coords} – Region ${region}.`,
@@ -436,13 +435,6 @@ export const de: Strings = {
     give: 'Überreichen',
     stock: (n) => `Vorrat: ${n}`,
     endAudience: 'Audienz beenden (Esc)',
-    rob: 'Gewehr ziehen und rauben',
-    robConfirm:
-      'Dieses Dorf mit vorgehaltenem Gewehr ausrauben? Das verfeindet die ganze Region für immer – keine Audienzen, Hinweise oder Hilfe mehr, und ein etwaiger Status als "Geehrter Freund" ist unwiederbringlich verloren.',
-    robConfirmYes: 'Ja, ausrauben',
-    robCancel: 'Nein, ablassen',
-    robOrphansGoal:
-      'Achtung: Nur diese Region kann dir noch eine Richtung zum Grab lehren, die du noch nicht kennst. Raubst du sie aus, ist dieses Wissen für immer verloren – das Grab könnte unauffindbar werden.',
     bazaarGreeting: '„Schätze, Effendi! Zeig her, was die Wildnis hergab – oder nimm selbst ein Stück mit heim."',
     bazaarSell: 'Einen Fund anbieten:',
     bazaarBuy: 'Zum Verkauf:',
@@ -854,7 +846,6 @@ export const de: Strings = {
       friend: 'Ein Ehrenfreund',
       rescue: 'Von den Dorfbewohnern gerettet',
       friendSupplies: 'Gäste der Region',
-      robberyCommitted: 'Eine Tat ohne Vergebung',
       campLooted: 'Das geplünderte Lager',
     },
     start:
@@ -1207,8 +1198,6 @@ export const de: Strings = {
       `[weary]Ich konnte nicht mehr weiter;[pause] das Land verschwamm vor meinen Augen.[/weary] [somber]Dann hoben mich Hände auf –[/somber] [excited]Leute der ${PEOPLES[p.people as string]} hatten mich gefunden.[/excited] Sie brachten Wasser, Nahrung und bittere Medizin und blieben, bis meine Kräfte zurückkehrten. [pause][awe]Ich lebe, weil ich ihr Freund bin.[/awe]`,
     friendSupplies: (p: TextParams) =>
       `Im Dorf der ${PEOPLES[p.people as string]} empfing man mich wie Familie: [excited]Man füllte mein Gepäck mit Proviant und drückte mir Medizin in die Hände,[/excited] von Bezahlung wollte niemand hören. [pause][somber]Die Freundschaft dieser Region ist mein sicherster Besitz.[/somber]`,
-    robberyCommitted: (p: TextParams) =>
-      `[somber]Ich habe etwas getan, das sich nicht ungeschehen machen lässt.[/somber] [fear]Mit erhobenem Gewehr räumte ich die Hütte der ${PEOPLES[p.people as string]} aus und floh aus dem Dorf.[/fear] [breath][weary]Die Beute: ${p.money} Dollar, ${p.gifts} Handelswaren und ${p.food} Tage Proviant.[pause] Hinter mir: Schreie, und eine Stille, die schlimmer war als die Schreie.[pause] Keine Hütte dieser Region wird sich mir je wieder öffnen.[/weary]`,
     campLooted:
       '[somber]Ich fand mein Lager verwüstet vor –[pause] die Stangen umgerissen, der Boden von fremden Füßen zerwühlt.[/somber] [weary]Alles, was ich zurückgelassen hatte, ist fort.[/weary] [fear]Nichts ist sicher in dieser Wildnis, was nicht getragen oder bewacht wird.[/fear]',
   },

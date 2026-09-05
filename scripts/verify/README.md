@@ -1081,7 +1081,7 @@ of their asserts moved to Vitest.
 | Deleted script | New home (Vitest) |
 |---|---|
 | `economy.mjs` | `src/systems/economy.test.ts` (pure pricing/ferry/sites), `src/state/store.economy.test.ts` (bazaar/ferry/bounty/dig/capacity/trade), `src/ui/Dialogs.test.tsx` (village gifts-not-$), `src/ui/JournalPanel.test.tsx` (bounty telegraphic transfer) |
-| `reputation.mjs` | `src/state/store.reputation.test.ts` (gifts/expulsion/friend/robVillage), `src/ui/Dialogs.test.tsx` (rob-confirm gate) |
+| `reputation.mjs` | `src/state/store.reputation.test.ts` (gifts/expulsion/friend) |
 | `camps.mjs` | `src/state/store.camps.test.ts` (pitch/store/take/loot/village-cache). *Map X-marker drawing (canvas) is dropped; the underlying `freeCamps` state is covered.* |
 | `hints.mjs` | `src/state/store.hints.test.ts` (knowing villages, gift→hint→decode either order, triangulation, gift-lore), `src/i18n/i18n.test.ts` (in-world words in the dictionaries). *The rendered in-world word is now shown only in the journal screenshots.* |
 | `expedition.mjs` | `src/state/store.expedition.test.ts` (staged warnings/expiry/successor), `src/ui/Hud.test.tsx` (deadline-recalled overlay, no successor button) |

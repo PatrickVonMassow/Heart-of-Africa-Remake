@@ -1,10 +1,9 @@
 // Trade and audience dialogs (design.md §9/§10/§12). All player-visible
 // text comes from the language files (design.md §17 localization).
 
-import { useState } from 'react'
 import {
   canAskForDrumMessage, DRUM_MESSAGE_VILLAGE,
-  EQUIPMENT_IDS, bagItemCount, emptyBag, giftPriceOfGood, priceOfGood, robWouldOrphanGoal, totalGifts,
+  EQUIPMENT_IDS, bagItemCount, emptyBag, giftPriceOfGood, priceOfGood, totalGifts,
   useGame, VILLAGE_TRADE_GOODS,
   type EquipmentId, type ItemBag, type ItemKind,
 } from '../state/store'
@@ -114,15 +113,12 @@ function AudienceDialog() {
   const giveGift = useGame((s) => s.giveGift)
   const hintsGiven = useGame((s) => s.hintsGiven)
   const unspecificGiven = useGame((s) => s.unspecificGiven)
-  const hasRifle = useGame((s) => (s.equipment.rifle ?? 0) > 0)
-  const robVillage = useGame((s) => s.robVillage)
   const setDialog = useUi((s) => s.setDialog)
   const reveredGiftGiven = useGame((s) => s.reveredGiftGiven)
   const setToast = useGame((s) => s.setToast)
   const rockArtefact = useGame((s) => s.rockArtefact)
   const handArtefactToChief = useGame((s) => s.handArtefactToChief)
   const memory = useGame((s) => s.communication)
-  const [confirmingRob, setConfirmingRob] = useState(false)
   if (!placeId) return null
   const place = placeById(placeId)
   const gw = goodwill[placeId] ?? 0
@@ -198,29 +194,7 @@ function AudienceDialog() {
         ))}
         {/* Which gift the region reveres is discoverable in play: the village
             elder reveals it on a second talk (design.md §8, journal.giftLore). */}
-        {/* Safety confirmation before the robbery (design.md §12): the deed is
-            irreversible, so it takes a deliberate second confirmation. */}
-        {confirmingRob && (
-          <div className="rob-confirm">
-            <p className="flavor danger-text">{t.dialogs.robConfirm}</p>
-            {robWouldOrphanGoal({ hintsGiven }, place.region) && (
-              // Point 208 A7: this region alone can teach a tomb coordinate the
-              // traveller has not learned yet — robbing it forfeits that for
-              // good and may put the goal out of reach.
-              <p className="flavor danger-text">{t.dialogs.robOrphansGoal}</p>
-            )}
-            <div className="actions">
-              <button className="hud-button danger" onClick={robVillage}>{t.dialogs.robConfirmYes}</button>
-              <button className="hud-button" onClick={() => setConfirmingRob(false)}>{t.dialogs.robCancel}</button>
-            </div>
-          </div>
-        )}
         <div className="actions">
-          {hasRifle && !confirmingRob && (
-            // With a rifle in the pack the audience can be turned into a
-            // robbery — a permanent regional reputation loss (design.md §12).
-            <button className="hud-button danger" onClick={() => setConfirmingRob(true)}>{t.dialogs.rob}</button>
-          )}
           <button className="hud-button" onClick={() => setDialog(null)}>{t.dialogs.endAudience}</button>
         </div>
       </div>

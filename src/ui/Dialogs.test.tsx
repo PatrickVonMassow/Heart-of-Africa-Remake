@@ -78,29 +78,6 @@ describe('trade dialog (design.md §9)', () => {
   })
 })
 
-describe('rob the chief (design.md §12)', () => {
-  it('offers the robbery only with a rifle and gates it behind a confirmation', () => {
-    g().enterPlace('nubian-village')
-    useUi.getState().setDialog({ kind: 'audience' })
-
-    // Without a rifle the audience offers no robbery button.
-    const { rerender } = render(<Dialogs />)
-    expect(document.querySelector('.dialog')?.textContent).not.toContain(en.dialogs.rob)
-
-    // A rifle in the pack unlocks the Rob button; clicking it reveals the
-    // deliberate confirmation gate, not an immediate robbery.
-    g().debugAddEquipment('rifle')
-    rerender(<Dialogs />)
-    const robBtn = [...document.querySelectorAll('button')].find((b) => b.textContent === en.dialogs.rob)
-    expect(robBtn).toBeTruthy()
-    fireEvent.click(robBtn!)
-    expect(document.querySelector('.rob-confirm')).toBeInTheDocument()
-    expect(document.querySelector('.rob-confirm')?.textContent).toContain(en.dialogs.robConfirmYes)
-    // The village has not been robbed yet (still in the village, confirmation pending).
-    expect(g().mode).toBe('place')
-  })
-})
-
 describe('bazaar dialog (design.md §10)', () => {
   it('prices the treasure buy list in $ and offers an owned treasure', () => {
     g().enterPlace('cairo')

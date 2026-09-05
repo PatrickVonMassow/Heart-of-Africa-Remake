@@ -397,7 +397,6 @@ export const en: Strings = {
     bazaarRejected: (name) => `The merchant waves it away — ${name.toLowerCase()} is not traded here.`,
     graveyardEmpty: 'The bleached bones hold no more ivory worth taking.',
     chiefHostile: 'The village has not forgotten my offense. The chief refuses to see me.',
-    regionShunned: 'Word of my robbery has spread — no hut of this region will open to me again.',
     campPitched: 'Camp pitched — an X on my map marks the spot.',
     campNeedsFriend: 'Only an Honored Friend of this region may leave belongings in the village.',
     positionReport: (coords, region) => `By my reckoning: ${coords} — the ${region} region.`,
@@ -434,13 +433,6 @@ export const en: Strings = {
     give: 'Offer',
     stock: (n) => `you have ${n}`,
     endAudience: 'End audience (Esc)',
-    rob: 'Draw the rifle and rob',
-    robConfirm:
-      'Rob this village at rifle point? This antagonizes the whole region for good — no more audiences, hints or aid, and any "Honored Friend" standing is lost forever.',
-    robConfirmYes: 'Yes, rob them',
-    robCancel: 'No, stand down',
-    robOrphansGoal:
-      'Beware: only this region can still teach you a bearing to the tomb that you have not yet learned. Rob it, and that knowledge is lost for good — the grave may become impossible to find.',
     bazaarGreeting: '"Treasures, effendi! Show me what the wilderness yielded — or take a piece home yourself."',
     bazaarSell: 'Offer a find:',
     bazaarBuy: 'For sale:',
@@ -845,7 +837,6 @@ export const en: Strings = {
       friend: 'An Honored Friend',
       rescue: 'Saved by the Villagers',
       friendSupplies: 'Guests of the Region',
-      robberyCommitted: 'A Deed Beyond Forgiving',
       campLooted: 'The Looted Camp',
     },
     start:
@@ -1195,8 +1186,6 @@ export const en: Strings = {
       `[weary]I could go no farther;[pause] the land swam before my eyes.[/weary] [somber]Then hands lifted me —[/somber] [excited]people of the ${PEOPLES[p.people as string]} had found me.[/excited] They brought water, food and bitter medicine, and stayed until my strength returned. [pause][awe]I am alive because I am their friend.[/awe]`,
     friendSupplies: (p: TextParams) =>
       `In the village of the ${PEOPLES[p.people as string]} I was received like family: [excited]they filled my packs with provisions and pressed medicine into my hands,[/excited] and no one would hear of payment. [pause][somber]The friendship of this region is my safest possession.[/somber]`,
-    robberyCommitted: (p: TextParams) =>
-      `[somber]I have done a thing that cannot be undone.[/somber] [fear]With the rifle raised I emptied the hut of the ${PEOPLES[p.people as string]} and fled the village.[/fear] [breath][weary]The haul: ${p.money} dollars, ${p.gifts} trade goods and ${p.food} days of provisions.[pause] Behind me: screams, and a silence worse than the screams.[pause] No hut of this region will ever open to me again.[/weary]`,
     campLooted:
       '[somber]I found my camp torn apart —[pause] the poles thrown down, the ground churned by strange feet.[/somber] [weary]Everything I had left behind is gone.[/weary] [fear]Nothing in this wilderness is safe that is not carried or guarded.[/fear]',
   },

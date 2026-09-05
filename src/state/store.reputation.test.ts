@@ -1,18 +1,12 @@
 // Standing with the natives (CLAUDE.md §7.1 pt. 26, design.md §12/§7). Ports
 // the store-driven asserts of scripts/verify/reputation.mjs into fast jsdom
-// checks: rifle possession no longer blocks the village, gift rejection ->
-// hostility/expulsion and its wear-off, the "Honored Friend" pledge with its
-// protection/aid/supplies, and the permanent robbery fallout. The DOM-only
-// parts (the .rob-confirm confirmation gate and screenshots) stay in the
-// Playwright E2E.
+// checks: gift rejection -> hostility/expulsion and its wear-off, and the
+// "Honored Friend" pledge with its protection/aid/supplies.
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
 import { balance } from '../config/balance'
-import { totalGifts, usedInventory, robWouldOrphanGoal, TOMB_COORDINATE_REGIONS } from './store'
 import { g, freshGame, withWorld, jumpTo, useGame } from '../test/store'
 
 withWorld()
-
-const DEFAULT_CAPACITY = balance.inventoryCapacity
 
 beforeEach(() => {
   freshGame()
@@ -20,7 +14,6 @@ beforeEach(() => {
 })
 afterEach(() => {
   balance.randomEventsEnabled = true
-  balance.inventoryCapacity = DEFAULT_CAPACITY
   vi.restoreAllMocks()
 })
 
@@ -30,24 +23,6 @@ const journalKeys = () => g().journal.map((e) => (typeof e.text === 'object' ? e
 const NUBIAN = 'nubian-village'
 const NUBIAN_LAT = 21.8
 const NUBIAN_LON = 31.6
-
-describe('rifle possession does not block the village (design.md §12/§7)', () => {
-  it('a rifle in the pack still allows the elder talk and the audience', () => {
-    // Item effects are possession-based now: merely owning a rifle no longer
-    // makes the villagers flee — the elder still teaches, the chief still
-    // holds audience; the rifle only enables the later robbery.
-    g().leavePlace()
-    g().debugAddEquipment('rifle')
-    g().debugAddGift('gold')
-    g().enterPlace(NUBIAN)
-
-    g().talkToVillager()
-    expect(g().languagesLearned.north).toBe(true)
-
-    g().giveGift('gold')
-    expect(g().goodwill[NUBIAN] ?? 0).toBeGreaterThan(0)
-  })
-})
 
 describe('hostility and expulsion (design.md §12)', () => {
   it('a rejected gift expels the traveller, turns the chief hostile, and wears off', () => {
@@ -158,87 +133,5 @@ describe('Honored Friend (design.md §12)', () => {
     expect(g().foodDays).toBeGreaterThanOrEqual(balance.reputation.friendVillageFoodDays)
     expect(g().equipment.medicine ?? 0).toBeGreaterThanOrEqual(1)
     expect(journalKeys()).toContain('journal.friendSupplies')
-  })
-})
-
-describe("robbing a chief's hut (design.md §12)", () => {
-  it('yields the rich haul and forfeits Honored Friend for the region', () => {
-    g().leavePlace()
-    g().enterPlace('tuareg-village')
-    g().debugAddEquipment('rifle') // a rifle in the pack enables the robbery
-    useGame.setState({ honoredFriend: { north: true } }) // prove it is forfeited
-
-    const before = { money: g().money, gifts: totalGifts(g().gifts), food: g().foodDays }
-    const rep = balance.reputation
-    g().robVillage()
-    const after = { money: g().money, gifts: totalGifts(g().gifts), food: g().foodDays }
-
-    expect(after.money).toBeGreaterThanOrEqual(before.money + rep.robberyMoney)
-    expect(after.gifts).toBeGreaterThan(before.gifts)
-    expect(after.food).toBeGreaterThan(before.food + 1)
-    expect(g().mode).toBe('travel') // the robber is expelled
-    expect(journalKeys()).toContain('journal.robberyCommitted')
-    expect(g().regionRobbed.north).toBe(true)
-    expect(g().honoredFriend.north).toBe(false)
-    expect(g().friendForfeited.north).toBe(true)
-  })
-
-  it('clamps the looted gifts to the free pack space, not the flat robberyGifts amount', () => {
-    g().leavePlace()
-    g().enterPlace('tuareg-village')
-    g().debugAddEquipment('rifle')
-    balance.inventoryCapacity = usedInventory(g()) + 5 // room for only 5 more items
-    expect(balance.reputation.robberyGifts).toBeGreaterThan(5) // the flat haul would overflow it
-
-    const gifts0 = totalGifts(g().gifts)
-    g().robVillage()
-    const gained = totalGifts(g().gifts) - gifts0
-
-    expect(gained).toBe(5) // clamped to the free space
-    expect(gained).toBeLessThan(balance.reputation.robberyGifts)
-  })
-
-  it('permanently shuns the region so no talks open and the friendship cannot be re-earned', () => {
-    g().leavePlace()
-    g().enterPlace('tuareg-village')
-    g().debugAddEquipment('rifle')
-    g().robVillage()
-
-    // No hut of the robbed region opens again.
-    g().enterPlace(NUBIAN)
-    g().talkToVillager()
-    expect(g().languagesLearned.north).toBeUndefined() // shunned -> no lesson
-    expect(g().giftLoreGiven.north).toBeUndefined()
-    expect(g().toast).toBeTruthy()
-
-    // The friendship is irretrievable: further revered gifts change nothing.
-    const need = balance.reputation.goodwillForFriend
-    for (let i = 0; i < need + 2; i++) {
-      g().debugAddGift('gold')
-      g().giveGift('gold')
-    }
-    expect(g().honoredFriend.north).not.toBe(true)
-  })
-})
-
-describe('a robbery warns when it would orphan the goal (point 208 A7)', () => {
-  it('flags a coordinate-bearing region whose hint is not yet learned', () => {
-    // North (latitude) and East (longitude) are the only coordinate-bearing
-    // regions; before their hint is learned, robbing them can orphan the goal.
-    expect(TOMB_COORDINATE_REGIONS).toEqual(['north', 'east'])
-    expect(robWouldOrphanGoal({ hintsGiven: {} }, 'north')).toBe(true)
-    expect(robWouldOrphanGoal({ hintsGiven: {} }, 'east')).toBe(true)
-  })
-
-  it('does not flag the flavour-only regions', () => {
-    for (const region of ['west', 'central', 'south'] as const) {
-      expect(robWouldOrphanGoal({ hintsGiven: {} }, region)).toBe(false)
-    }
-  })
-
-  it('stops flagging once that region’s hint is in the journal (it deciphers retroactively)', () => {
-    expect(robWouldOrphanGoal({ hintsGiven: { north: true } }, 'north')).toBe(false)
-    // East is still unlearned, so it still warns.
-    expect(robWouldOrphanGoal({ hintsGiven: { north: true } }, 'east')).toBe(true)
   })
 })

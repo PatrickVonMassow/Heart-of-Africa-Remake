@@ -374,9 +374,8 @@ export interface Strings {
     /** The bazaar refuses a regionally rejected material (design.md §10). */
     bazaarRejected(name: string): string
     graveyardEmpty: string
-    /** Standing gates (design.md §12). */
+    /** Standing gate (design.md §12). */
     chiefHostile: string
-    regionShunned: string
     /** Camps (design.md §6). */
     campPitched: string
     campNeedsFriend: string
@@ -432,13 +431,6 @@ export interface Strings {
     give: string
     stock(n: number): string
     endAudience: string
-    /** Draw the rifle and rob the hut (design.md §12). */
-    rob: string
-    /** Safety confirmation before the robbery, and its yes/cancel labels. */
-    robConfirm: string
-    robConfirmYes: string
-    robCancel: string
-    robOrphansGoal: string
     /** Bazaar (design.md §10): bid flow on offered treasures. */
     bazaarGreeting: string
     bazaarSell: string
@@ -829,7 +821,6 @@ export interface Strings {
       friend: string
       rescue: string
       friendSupplies: string
-      robberyCommitted: string
       campLooted: string
     }
     start: string
@@ -925,8 +916,6 @@ export interface Strings {
     friendRescueRobbers(p: TextParams): string
     friendAid(p: TextParams): string
     friendSupplies(p: TextParams): string
-    /** A hut robbery at rifle point (design.md §12). */
-    robberyCommitted(p: TextParams): string
     /** A looted free camp, discovered on return (design.md §6). */
     campLooted: string
   }

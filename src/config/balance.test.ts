@@ -77,14 +77,11 @@ describe('expedition deadline (design.md §5/§18)', () => {
   })
 })
 
-describe('reputation & robbery (design.md §12)', () => {
-  it('friend thresholds, protection radii and the robbery haul', () => {
+describe('reputation (design.md §12)', () => {
+  it('friend thresholds and protection radii', () => {
     const r = balance.reputation
     expect(r.goodwillForFriend).toBe(6)
     expect(r.hostilityDays).toBe(30)
-    expect(r.robberyMoney).toBe(600)
-    expect(r.robberyGifts).toBe(24)
-    expect(r.robberyFoodDays).toBe(40)
     expect(r.friendVillageFoodDays).toBe(21)
     expect(r.friendProtectRadiusDeg).toBe(1.5)
     expect(r.friendAidCooldownDays).toBe(10)

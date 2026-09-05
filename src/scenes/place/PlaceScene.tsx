@@ -2711,14 +2711,11 @@ export function PlaceScene() {
     // the dialog is unobstructed (design.md §16/§17).
     if (game.journalOpen) game.setJournalOpen(false)
     if (near.type === 'chief') {
-      // Standing gates (design.md §12): a robbed region shuns the traveler,
-      // hostility lingers. Otherwise the chief is met OUTSIDE his hut.
-      const strings = getStrings()
+      // Standing gate (design.md §12): hostility lingers. Otherwise the chief
+      // is met OUTSIDE his hut.
       const place = game.placeId ? placeById(game.placeId) : null
-      if (place && game.regionRobbed[place.region]) {
-        game.setToast(strings.toasts.regionShunned)
-      } else if (place && (game.hostileUntil[place.id] ?? 0) > game.day) {
-        game.setToast(strings.toasts.chiefHostile)
+      if (place && (game.hostileUntil[place.id] ?? 0) > game.day) {
+        game.setToast(getStrings().toasts.chiefHostile)
       } else {
         meetChief(near)
       }
