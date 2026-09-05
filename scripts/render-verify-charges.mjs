@@ -56,6 +56,21 @@
 /** @type {RedCharge[]} */
 export const RED_CHARGES = [
   {
+    point: 1062,
+    suite: 'gamepad',
+    kind: 'check',
+    match: /position query localized \(DE\)/i,
+    why:
+      'FILED AS 1062 ON 06.09.2026, MEASURED ON BOTH SIDES OF THE BRANCH. Run in isolation '
+      + '(`gamepad --section=position-query`) the check reds identically on main at 859aec1fd and '
+      + 'on feat/1052-chief-outside at 3aa7fd442: the first Select press answers in English '
+      + '("Latitude"/"North"), then `window.__setLang("de")` lands, the same press is repeated and '
+      + '`toast` stays null for the whole 8 s window, so the check prints "null". It reds on the '
+      + 'retry the same way, which is why the flake lane calls it a candidate real failure. '
+      + 'It predates every change of 1052 and says nothing about it. 1062 owns deciding FIRST '
+      + 'whether the player or the injected window.__pad is hit, and the charge dies with it.',
+  },
+  {
     point: 1043,
     suite: 'polish',
     kind: 'check',
