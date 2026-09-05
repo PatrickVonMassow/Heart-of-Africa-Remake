@@ -4,11 +4,11 @@
 // version that led there. Each net-changed path therefore appears once, routed
 // around every model that contributed to that retained end-state path. Intermediate versions are named as
 // superseded, and paths whose final state equals the base are dropped.
-import { independentReviewProblem, sameModel } from './mechanism-review-core.mjs'
-import { FABLE_MODEL } from './fable-switch-core.mjs'
+import { independentReviewProblem, modelVendor, sameModel } from './mechanism-review-core.mjs'
+import { ASTRA_MODEL, FABLE_MODEL } from './fable-switch-core.mjs'
 import { passComposition } from './review-material-core.mjs'
 
-export const REVIEWER_CANDIDATES = Object.freeze(['GPT-5.6 Sol', 'Opus 5', FABLE_MODEL, 'Opus 4.8'])
+export const REVIEWER_CANDIDATES = Object.freeze([ASTRA_MODEL, 'Opus 5', FABLE_MODEL, 'Opus 4.8'])
 export const UNREVIEWABLE_NARROWING_REMEDY =
   'Review every runnable pass and record the exact measured remainder with the criticality-review-unavailable command printed by review-astra.'
 export const NO_ELIGIBLE_REVIEWER_REASON =
@@ -208,11 +208,11 @@ export function parseRangeLog(out, { decodePath = (path) => path } = {}) {
   return commits
 }
 
+/** The vendor a designation belongs to — the core's one classifier, which knows
+ *  both of the OpenAI lane's names (point 1061); a local copy keyed on "gpt-5"
+ *  read GPT-6 Astra as nobody. */
 export function vendorOf(model) {
-  const value = String(model ?? '').toLowerCase()
-  if (/\bsol\b|\bgpt[- ]?5(?:\.|\b)/.test(value) || /openai\.com/.test(value)) return 'openai'
-  if (/\b(?:claude|opus|fable|sonnet|haiku)\b/.test(value) || /anthropic\.com/.test(value)) return 'anthropic'
-  return 'unknown'
+  return modelVendor(model)
 }
 
 export function commitAuthors(commit = {}) {
@@ -285,11 +285,16 @@ export function eligibleReviewer(authors = [], candidates = REVIEWER_CANDIDATES)
   // assignment made from absence.
   if (!writtenBy.length) return ''
   if (writtenBy.some((author) => vendorOf(author) === 'unknown')) return ''
-  // The roster order preserves the cross-vendor preference: Claude-only work
-  // lands on Sol, Sol-only work on Claude. Where BOTH vendors contributed,
-  // vendor separation is impossible; the documented fallback is then the
-  // first exact model that wrote no part of the end state.
-  return (candidates ?? []).find((candidate) => !writtenBy.some((author) => sameModel(candidate, author))) ?? ''
+  // Cross-vendor first: Claude-only work lands on Astra, OpenAI-only work
+  // (Astra's, or the retired Sol's — same vendor, different version, so
+  // `sameModel` alone would let Astra read Sol's work) lands on Claude. Where
+  // BOTH vendors contributed, vendor separation is impossible; the documented
+  // fallback is then the first exact model that wrote no part of the end state.
+  const roster = candidates ?? []
+  const authorVendors = new Set(writtenBy.map(vendorOf))
+  const crossVendor = roster.find((candidate) => !authorVendors.has(vendorOf(candidate)))
+  if (crossVendor) return crossVendor
+  return roster.find((candidate) => !writtenBy.some((author) => sameModel(candidate, author))) ?? ''
 }
 
 const reviewerFields = (authors, candidates) => {

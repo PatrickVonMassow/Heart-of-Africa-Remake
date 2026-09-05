@@ -111,7 +111,7 @@ describe('printed review pass commands', () => {
     const routed = planAuthorshipGroups({
       commits: [{
         sha,
-        authorModels: ['GPT-5.6 Sol', 'Opus 5', 'Fable 5.1', 'Opus 4.8'],
+        authorModels: ['GPT-6 Astra', 'Opus 5', 'Fable 5.1', 'Opus 4.8'],
         files,
       }],
       endStateFiles: files,
