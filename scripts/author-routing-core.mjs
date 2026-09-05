@@ -1,4 +1,4 @@
-// WHICH AUTHORING LANE A POINT GOES TO (point 667). rule:model-policy@d0066fb3
+// WHICH AUTHORING LANE A POINT GOES TO (point 667). rule:model-policy@4f05875b
 //
 // The user pays two vendors, and authoring is the largest single item of the
 // spend, so it is split across both rather than sitting on one. It does NOT all
@@ -33,7 +33,7 @@
 // itself. Side-effect free; the work-order reading belongs to
 // scripts/author-astra.mjs. Pinned by author-routing-core.test.mjs.
 
-import { FABLE_MODEL, fableIsOn, fableRefusalReason, requireState } from './fable-switch-core.mjs'
+import { ASTRA_MODEL, FABLE_MODEL, fableIsOn, fableRefusalReason, requireState } from './fable-switch-core.mjs'
 
 /** The authoring lanes, in the order this file describes them. */
 export const LANES = Object.freeze(['astra', 'fable', 'opus'])
@@ -41,7 +41,7 @@ export const LANES = Object.freeze(['astra', 'fable', 'opus'])
 /** Who each lane is, for the report a dispatcher reads. The Fable name is DERIVED
  * from the switch, so a version bump moves one constant and not a scattered set. */
 export const LANE_MODEL = Object.freeze({
-  astra: 'GPT-6 Astra',
+  astra: ASTRA_MODEL,
   fable: FABLE_MODEL,
   opus: 'Opus 5',
 })
@@ -106,7 +106,7 @@ export function specExaminerFor(history = {}, fallbackAuthor = '') {
   if (/\b(?:astra|sol)\b/i.test(author)) {
     return { vendor: 'claude', model: 'Opus 5', route: 'claude-read', author }
   }
-  return { vendor: 'astra', model: 'GPT-6 Astra', route: 'ask-astra', author }
+  return { vendor: 'astra', model: ASTRA_MODEL, route: 'ask-astra', author }
 }
 
 /**

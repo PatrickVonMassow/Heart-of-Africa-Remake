@@ -1,4 +1,4 @@
-// THE OPENAI AUTHORING LANE, decided (point 667). Pure half. rule:model-policy@d0066fb3
+// THE OPENAI AUTHORING LANE, decided (point 667). Pure half. rule:model-policy@4f05875b
 //
 // `scripts/review-astra.mjs` and `scripts/ask-astra.mjs` send Astra work it may only
 // READ. This lane sends it work it WRITES: a point, on its own branch, in its

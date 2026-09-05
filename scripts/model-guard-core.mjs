@@ -1,4 +1,4 @@
-// Pure decision core of the serving-model tripwire (point 309). rule:model-policy@d0066fb3
+// Pure decision core of the serving-model tripwire (point 309). rule:model-policy@4f05875b
 // On 24.07.2026 the session silently degraded to Haiku 4.5 and merged defective work; the
 // The Co-Authored-By field in `git log` is the mechanical record of which MODEL
 // authored a commit. A reviewer uses the distinct Reviewed-By key and therefore
@@ -50,7 +50,7 @@
 // Reducing them to one string is what once raised a breach on an allowed pair.
 // A cross-vendor reviewer is not an author and uses Reviewed-By (point 982).
 
-import { FABLE_MODEL, fableIsOn, fableRefusalReason } from './fable-switch-core.mjs'
+import { ASTRA_MODEL, FABLE_MODEL, fableIsOn, fableRefusalReason } from './fable-switch-core.mjs'
 
 /** Model names allowed to author batch commits, ONE PATTERN PER AUTHORING LANE,
  *  matched against the name PARSED out of a trailer (`modelNamesIn`) — anchored,
@@ -353,7 +353,7 @@ export function allowedTrailers(fableState) {
     'Co-Authored-By: Claude Opus 5 <noreply@anthropic.com>',
     ...(admitsFable(fableState) ? [`Co-Authored-By: Claude ${FABLE_MODEL} <noreply@anthropic.com>`] : []),
     'Co-Authored-By: Claude Opus 4.8 <noreply@anthropic.com>',
-    'Co-Authored-By: GPT-6 Astra <noreply@openai.com>',
+    `Co-Authored-By: ${ASTRA_MODEL} <noreply@openai.com>`,
   ])
 }
 
@@ -370,8 +370,8 @@ export function allowedReviewerTrailers(fableState) {
 /** The authoring lanes in one phrase, generated for the same refusal surface. */
 export function allowedModelsPhrase(fableState) {
   return admitsFable(fableState)
-    ? `Opus 5, Opus 4.8, ${FABLE_MODEL} and GPT-6 Astra`
-    : 'Opus 5, Opus 4.8 and GPT-6 Astra'
+    ? `Opus 5, Opus 4.8, ${FABLE_MODEL} and ${ASTRA_MODEL}`
+    : `Opus 5, Opus 4.8 and ${ASTRA_MODEL}`
 }
 
 /** The `Co-Authored-By` values in a commit message, git's comment lines dropped
@@ -570,7 +570,7 @@ export const TRANSCRIPT_HINT = [
   '',
   '    ~/.claude/projects/<repo-slug>/<session>.jsonl',
   '    ~/.claude/projects/<repo-slug>/<session>/subagents/agent-*.jsonl   (delegated work)',
-  '    ~/.codex/sessions/<yyyy>/…                                        (the GPT-6 Astra lane)',
+  `    ~/.codex/sessions/<yyyy>/…                                        (the ${ASTRA_MODEL} lane)`,
 ]
 
 /** The prefix git's history-rewriting tools park the pre-rewrite commits under. */
@@ -640,7 +640,7 @@ export function formatForbiddenReason(hits, { backupRefs = [], alsoUnidentified 
   const switchRefusal = fableState !== undefined && !admitsFable(fableState) ? ` ${fableRefusalReason(fableState)}` : ''
   return [
     `SERVING-MODEL TRIPWIRE: commit(s) ${shaList(hits)} carry a co-author trailer NAMING a model ` +
-      `outside the allowlist in force at each commit's own time (Opus 5, Opus 4.8 and GPT-6 Astra ` +
+      `outside the allowlist in force at each commit's own time (Opus 5, Opus 4.8 and ${ASTRA_MODEL} ` +
       `may author throughout; ${FABLE_MODEL} may author only while its recorded policy is ON; Sonnet and Haiku ` +
       `are never admitted; user policy 25.07./13.08.2026).${switchRefusal} Do NOT continue batch work. ` +
       'The tripwire records a handoff to the next allowed lane of the serving chain. Only that fresh lane, ' +

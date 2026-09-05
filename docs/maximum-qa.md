@@ -87,10 +87,10 @@ must pass clean before any tag.
 ## Phase 5 — Code audit with model diversity
 - Sweep the subsystems (systems/state, travel/world, render/ui/i18n) of the
   rebuilt code for test gaps AND real bugs, reading it against the design.
-<!-- rule:model-policy@d0066fb3 -->
+<!-- rule:model-policy@4f05875b -->
 - Mix in a **different model than the recent author** for a blind pass — the
-  cross-vendor default, so Sol reads Anthropic-authored code and Claude reads
-  Sol's (CLAUDE.md §6; memory `audit-with-model-diversity`). ONE pass,
+  cross-vendor default, so Astra reads Anthropic-authored code and Claude reads
+  Astra's (CLAUDE.md §6; memory `audit-with-model-diversity`). ONE pass,
   harvested and every finding re-verified inline before it is filed.
 - **Leak & accumulation code-review class (point 285, prong A):** the same
   fresh-model pass explicitly sweeps for the dispose/prune/re-seed/effect-cleanup

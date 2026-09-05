@@ -32,15 +32,15 @@ const decision = (input = {}) => authorLaneFor({ fableState: OFF, ...input })
 const lane = (body, extra = {}) => decision({ body, ...extra }).lane
 
 describe('authorLaneFor — which lane authors a point', () => {
-  it('sends the mechanical and mid-difficulty work to Sol, which is the point', () => {
-    expect(lane('THE DEPLOY DIES ON A FROZEN TAG’S FLAKY DOWNLOAD. Retry the fetch three times.')).toBe('sol')
-    expect(lane('The board card says "stand" for a point nobody is working on. Say what it is.')).toBe('sol')
+  it('sends the mechanical and mid-difficulty work to Astra, which is the point', () => {
+    expect(lane('THE DEPLOY DIES ON A FROZEN TAG’S FLAKY DOWNLOAD. Retry the fetch three times.')).toBe('astra')
+    expect(lane('The board card says "stand" for a point nobody is working on. Say what it is.')).toBe('astra')
     // No signal at all is the mechanical case, not a reason to hold the work back.
-    expect(lane('')).toBe('sol')
-    expect(decision()).toMatchObject({ lane: 'sol', model: 'GPT-5.6 Sol' })
+    expect(lane('')).toBe('astra')
+    expect(decision()).toMatchObject({ lane: 'astra', model: 'GPT-6 Astra' })
   })
 
-  it('sends the hard cases straight to Sol, in CLAUDE.md §6’s own words (user 18.08.2026)', () => {
+  it('sends the hard cases straight to Astra, in CLAUDE.md §6’s own words (user 18.08.2026)', () => {
     for (const body of [
       'This is difficult: the lock is taken twice.',
       'A complex rebuild of the launcher.',
@@ -50,25 +50,25 @@ describe('authorLaneFor — which lane authors a point', () => {
       'A deadlock between the hook and the gate.',
       'A migration of every recorded review row.',
     ]) {
-      expect(lane(body), body).toBe('sol')
+      expect(lane(body), body).toBe('astra')
     }
     expect(decision({ body: 'A complex rebuild.' }).why[0]).toMatch(/hard case \(complex\)/)
     // Neither of the two lanes this used to take: not Fable from the start (its
     // weekly pool is the scarcest, 17.08.) and no longer held back for Opus.
-    expect(decision({ body: 'A complex rebuild.' }).why[0]).toMatch(/straight to Sol/)
+    expect(decision({ body: 'A complex rebuild.' }).why[0]).toMatch(/straight to Astra/)
     // AND IT OUTRANKS THE VERIFICATION LANE (user 18.08.2026, asked explicitly):
-    // a hard picture point is authored by Sol too — the main session judges the
+    // a hard picture point is authored by Astra too — the main session judges the
     // picture whoever wrote the code, so only the authoring moves.
-    expect(lane('A complex screenshot problem on both backends.')).toBe('sol')
+    expect(lane('A complex screenshot problem on both backends.')).toBe('astra')
   })
 
   it('treats a HIGH-criticality tag as a hard case by definition', () => {
-    expect(lane('Anything at all.', { criticality: 'high' })).toBe('sol')
-    expect(lane('The screenshot must hold.', { criticality: 'high' })).toBe('sol')
+    expect(lane('Anything at all.', { criticality: 'high' })).toBe('astra')
+    expect(lane('The screenshot must hold.', { criticality: 'high' })).toBe('astra')
     // …and med/low/none leave the decision to the text.
-    expect(lane('Anything at all.', { criticality: 'med' })).toBe('sol')
-    expect(lane('Anything at all.', { criticality: 'low' })).toBe('sol')
-    expect(lane('Anything at all.', { criticality: null })).toBe('sol')
+    expect(lane('Anything at all.', { criticality: 'med' })).toBe('astra')
+    expect(lane('Anything at all.', { criticality: 'low' })).toBe('astra')
+    expect(lane('Anything at all.', { criticality: null })).toBe('astra')
   })
 
   it('keeps a point whose VERIFICATION is the work with the main session', () => {
@@ -87,24 +87,24 @@ describe('authorLaneFor — which lane authors a point', () => {
   it('does NOT read the workflow’s own phrase as picture work (measured 13.08.2026)', () => {
     // The finding from routing all 170 open points: CLAUDE.md §6 says Claude
     // "runs the suites, judges the picture and lands", so every point that merely
-    // MENTIONS the workflow routed itself away from the Sol lane — point 667,
+    // MENTIONS the workflow routed itself away from the Astra lane — point 667,
     // which builds this file, first among them.
     const body =
-      'Where Sol authors, Claude reviews, runs the suites, judges the picture and lands. ' +
-      'The commit trailer names Sol and the guard learns the reversed direction.'
-    expect(lane(body)).toBe('sol')
-    expect(lane('The picture judgment stays with the main session.')).toBe('sol')
+      'Where Astra authors, Claude reviews, runs the suites, judges the picture and lands. ' +
+      'The commit trailer names Astra and the guard learns the reversed direction.'
+    expect(lane(body)).toBe('astra')
+    expect(lane('The picture judgment stays with the main session.')).toBe('astra')
     // A point whose SUBJECT really is the picture still says so in its own words.
     expect(lane('Claude judges the picture. The picture shows a black horizon on WebGL.')).toBe('opus')
   })
 
   it('keeps every pre-boundary rework in the lane its other signals demand', () => {
     for (let reworkRounds = 0; reworkRounds < FABLE_ESCALATION_ROUNDS; reworkRounds += 1) {
-      expect(lane('Something mechanical.', { reworkRounds }), `ordinary round ${reworkRounds}`).toBe('sol')
+      expect(lane('Something mechanical.', { reworkRounds }), `ordinary round ${reworkRounds}`).toBe('astra')
       expect(
         lane('A complex screenshot problem.', { criticality: 'high', reworkRounds }),
         `hard/HIGH round ${reworkRounds}`,
-      ).toBe('sol')
+      ).toBe('astra')
       expect(lane('A screenshot point.', { reworkRounds }), `verification round ${reworkRounds}`).toBe('opus')
     }
   })
@@ -112,11 +112,11 @@ describe('authorLaneFor — which lane authors a point', () => {
   it('sends nothing to Fable at the boundary while the switch refuses it', () => {
     const reworkRounds = FABLE_ESCALATION_ROUNDS
     // Past the threshold the point stays in the lane its other signals demand.
-    expect(lane('Something mechanical.', { reworkRounds })).toBe('sol')
-    expect(lane('A complex screenshot problem.', { criticality: 'high', reworkRounds })).toBe('sol')
-    expect(lane('Something mechanical.\nAuthor lane: sol', { reworkRounds })).toBe('sol')
+    expect(lane('Something mechanical.', { reworkRounds })).toBe('astra')
+    expect(lane('A complex screenshot problem.', { criticality: 'high', reworkRounds })).toBe('astra')
+    expect(lane('Something mechanical.\nAuthor lane: sol', { reworkRounds })).toBe('astra')
     expect(lane('A picture point.\nAuthor lane: opus', { reworkRounds })).toBe('opus')
-    expect(lane('x', { reworkRounds, override: 'sol' })).toBe('sol')
+    expect(lane('x', { reworkRounds, override: 'astra' })).toBe('astra')
     // Neither explicit door bypasses the one shared decision.
     expect(decision({ body: 'x\nAuthor lane: fable', reworkRounds: 0 })).toMatchObject({ lane: '', refused: true })
     expect(decision({ body: 'x', reworkRounds: 0, override: 'fable' })).toMatchObject({ lane: '', refused: true })
@@ -140,12 +140,12 @@ describe('authorLaneFor — which lane authors a point', () => {
   })
 
   it('lets a point name its own lane, and a caller override even that', () => {
-    expect(lane('A complex rebuild.\nAuthor lane: sol')).toBe('sol')
+    expect(lane('A complex rebuild.\nAuthor lane: sol')).toBe('astra')
     expect(authorLaneFor({ body: 'Something mechanical.\nAuthor lane: fable', fableState: ON }).lane).toBe('fable')
     expect(lane('Something mechanical.\nAuthor lane: opus')).toBe('opus')
     expect(lane('A complex rebuild.\nAuthor lane: sol', { override: 'opus' })).toBe('opus')
     // An override that is not a lane is no override at all.
-    expect(lane('Something mechanical.', { override: 'haiku' })).toBe('sol')
+    expect(lane('Something mechanical.', { override: 'haiku' })).toBe('astra')
     expect(authorLaneFor({ body: 'x', override: 'FABLE', fableState: ON }).lane).toBe('fable')
   })
 
@@ -160,13 +160,13 @@ describe('authorLaneFor — which lane authors a point', () => {
     // …and the real thing, however it is bulleted or quoted as markdown.
     expect(laneTagIn('Author lane: fable')).toBe('fable')
     expect(laneTagIn('  - Author lane: opus')).toBe('opus')
-    expect(laneTagIn('> Author lane: sol')).toBe('sol')
+    expect(laneTagIn('> Author lane: sol')).toBe('astra')
     // The LAST tag wins: a spec revises itself at the end.
     expect(laneTagIn('Author lane: sol\n… revised.\nAuthor lane: opus')).toBe('opus')
     // Nor is a tag with prose after it a tag (third cross-vendor round): the
     // anchor had no end, so `Author lane: sol is the example spelling` routed.
     expect(laneTagIn('Author lane: sol is the example spelling')).toBe('')
-    expect(laneTagIn('Author lane: sol.')).toBe('sol')
+    expect(laneTagIn('Author lane: sol.')).toBe('astra')
     // …and a FENCED example is an example, which is where a document shows one.
     expect(laneTagIn('The tag looks like this:\n```\nAuthor lane: sol\n```\n')).toBe('')
     expect(laneTagIn('~~~\nAuthor lane: fable\n~~~\nAuthor lane: opus')).toBe('opus')
@@ -182,10 +182,10 @@ describe('authorLaneFor — which lane authors a point', () => {
     // …and the same indent rule binds the OPENER (sixth round): four spaces are
     // an indented code block, and reading one as a fence swallowed every line
     // after it — suppressing a REAL tag instead of an example.
-    expect(laneTagIn('    ```\nAuthor lane: sol')).toBe('sol')
+    expect(laneTagIn('    ```\nAuthor lane: sol')).toBe('astra')
     expect(laneTagIn('   ```\nAuthor lane: sol\n   ```')).toBe('')
     // …and a TAB is four columns, not zero (seventh round).
-    expect(laneTagIn('\t```\nAuthor lane: sol')).toBe('sol')
+    expect(laneTagIn('\t```\nAuthor lane: sol')).toBe('astra')
     expect(laneTagIn(' \t```\nAuthor lane: opus')).toBe('opus')
     // A blockquote's markers are not indentation (eighth round): an ordinary
     // quoted example looked over-indented, and its tag became operative.
@@ -197,8 +197,8 @@ describe('authorLaneFor — which lane authors a point', () => {
     // The list claimed locks and state migration and held only the noun. They
     // are hard subjects, so since 18.08.2026 they answer `sol` — the marker
     // still fires, only the lane it feeds changed.
-    expect(lane('The batch lock is taken twice.')).toBe('sol')
-    expect(lane('Migrating every recorded review row.')).toBe('sol')
+    expect(lane('The batch lock is taken twice.')).toBe('astra')
+    expect(lane('Migrating every recorded review row.')).toBe('astra')
     // …and "visually inspect" is how half the render points are written, which
     // is the verification lane and stays with the main session.
     expect(lane('Visually inspect the horizon banding.')).toBe('opus')
@@ -210,8 +210,8 @@ describe('authorLaneFor — which lane authors a point', () => {
     expect(d.signals.hard).toEqual(['complex'])
     expect(d.signals.verification).toEqual(['screenshot'])
     // The two signals now answer DIFFERENTLY, and the order decides: hard wins,
-    // so this point is Sol's while the verification signal is still reported.
-    expect(d.lane).toBe('sol')
+    // so this point is Astra's while the verification signal is still reported.
+    expect(d.lane).toBe('astra')
   })
 
   it('answers for every lane and cannot be handed something it throws on', () => {
@@ -457,8 +457,8 @@ describe('re-authoring rounds — decorrelated before Fable', () => {
       route: 'claude-read',
     })
     expect(specExaminerFor({ rounds: [{ authoredBy: 'Claude Opus 5 <noreply@anthropic.com>' }] })).toMatchObject({
-      vendor: 'sol',
-      model: 'GPT-5.6 Sol',
+      vendor: 'astra',
+      model: 'GPT-6 Astra',
       route: 'ask-astra',
     })
   })
@@ -483,13 +483,13 @@ describe('re-authoring rounds — decorrelated before Fable', () => {
 describe('formatLaneReport', () => {
   it('answers the question first: how much actually moves', () => {
     const rows = [
-      { number: 1, lane: 'sol', why: ['mechanical'] },
-      { number: 2, lane: 'sol', why: ['mechanical'] },
+      { number: 1, lane: 'astra', why: ['mechanical'] },
+      { number: 2, lane: 'astra', why: ['mechanical'] },
       { number: 3, lane: 'opus', why: ['picture'] },
     ]
     const text = formatLaneReport(rows)
-    expect(text.split('\n')[0]).toBe('author-routing: 3 open point(s) — sol 2 · fable 0 · opus 1 · blocked 0')
-    expect(text).toMatch(/ {4}1 {2}sol {4}mechanical/)
+    expect(text.split('\n')[0]).toBe('author-routing: 3 open point(s) — astra 2 · fable 0 · opus 1 · blocked 0')
+    expect(text).toMatch(/ {4}1 {2}astra {2}mechanical/)
     expect(formatLaneReport()).toContain('0 open point(s)')
   })
 })

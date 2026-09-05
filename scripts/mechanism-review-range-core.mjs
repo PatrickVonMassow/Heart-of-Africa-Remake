@@ -292,7 +292,10 @@ export function eligibleReviewer(authors = [], candidates = REVIEWER_CANDIDATES)
   // fallback is then the first exact model that wrote no part of the end state.
   const roster = candidates ?? []
   const authorVendors = new Set(writtenBy.map(vendorOf))
-  const crossVendor = roster.find((candidate) => !authorVendors.has(vendorOf(candidate)))
+  const crossVendor = roster.find((candidate) => {
+    const vendor = vendorOf(candidate)
+    return vendor !== 'unknown' && !authorVendors.has(vendor)
+  })
   if (crossVendor) return crossVendor
   return roster.find((candidate) => !writtenBy.some((author) => sameModel(candidate, author))) ?? ''
 }

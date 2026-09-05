@@ -1480,10 +1480,10 @@ export const usage = () =>
   `       source reading, and COPIES its verdict/model/evidence — do not pass them. The\n` +
   `       gates re-verify the blobs on every read; a changed file refuses the carry.\n` +
   `\nWHO REVIEWS (CLAUDE.md §6): the first eligible model in the required chain, never\n` +
-  `       an author of the range. Claude authored it → GPT-5.6 Sol at reasoning effort\n` +
-  `       high, and when Sol is unavailable or ineligible the first of Fable 5 / Opus 5 /\n` +
+  `       an author of the range. Claude authored it → GPT-6 Astra at reasoning effort\n` +
+  `       high, and when Astra is unavailable or ineligible the first of Fable 5 / Opus 5 /\n` +
   `       Opus 4.8 that wrote no part of it.\n` +
-  `       SOL authored it → the first of Opus 5 / Fable 5 / Opus 4.8 that wrote no part\n` +
+  `       ASTRA authored it → the first of Opus 5 / Fable 5 / Opus 4.8 that wrote no part\n` +
   `       of it, which also runs the suites, judges the picture and lands the point.\n` +
   `       Run it — never a hand-typed codex line — with:\n` +
   `       node scripts/review-astra.mjs --sha <sha> --brief "<what to judge>"\n` +

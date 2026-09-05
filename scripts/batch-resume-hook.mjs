@@ -218,7 +218,7 @@ const RESUME_BODY =
   'changes (guards, docs, dashboard, process files) go directly to main. MAXIMAL ' +
   'DELEGATION (user decision 22.07.2026): delegate implementation AND infra/guard/doc/' +
   'dashboard work to parallel WORKTREE-ISOLATED subagents on NON-OVERLAPPING files — under ' +
-  'the model policy stated above, so the points go to GPT-5.6 Sol — the hard and critical ' +
+  'the model policy stated above, so the points go to GPT-6 Astra — the hard and critical ' +
   'ones included — while a point whose verification is the work stays with Opus 5 unless ' +
   'its spec marks it hard ' +
   '(each point on its own branch, gates green, pushed, not merged by the agent); the main ' +
@@ -280,15 +280,15 @@ try {
     const header =
       openPointsHeadline(nums, { gated: gatedNums }) +
 
-      // rule:model-policy@d0066fb3
+      // rule:model-policy@4f05875b
       'MODEL POLICY (CLAUDE.md §6): AUTHORING HAS THREE LANES. ' +
       'CLAUDE.md §6 owns the authoring and escalation policy; scripts/author-routing-core.mjs ' +
       'makes that cut from point text and recorded review history, while a point\'s own ' +
       '`Author lane:` tag remains an operator decision (ordinary-lane tags yield only to a ' +
       'reached §6 Fable escalation threshold). ' +
       'scripts/astra-share.mjs --status says what the switch routes right now. REVIEW is ' +
-      'CROSS-VENDOR: Sol reads Anthropic-authored work (scripts/review-astra.mjs), Claude ' +
-      'reads Sol-authored work, and no model reviews its own. ' +
+      'CROSS-VENDOR: Astra reads Anthropic-authored work (scripts/review-astra.mjs), Claude ' +
+      'reads Astra-authored work, and no model reviews its own. ' +
       (fableState.ok ? servingPolicyLine(fableState) : `FABLE SWITCH UNKNOWN: ${fableState.problem}`)
     const now = Date.now()
     if (isPaused()) {
