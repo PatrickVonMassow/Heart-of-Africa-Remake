@@ -8,6 +8,7 @@ import type { TreasureId } from '../systems/economy'
 import type { Material, RegionId } from '../world/geo'
 import type { BuildingType } from '../state/ui'
 import type { SketchId } from '../journal/sketches'
+import type { FormId } from '../world/forms'
 import type { ActorKind } from '../systems/actorLabels'
 
 /**
@@ -91,6 +92,11 @@ export interface Strings {
   gifts: Record<Material, string>
   /** Treasure finds/valuables (design.md §8). */
   treasures: Record<TreasureId, string>
+  /** Carried FORMS — shapes that fit a socket somewhere in the world. There is
+   *  no item picture in this game, so the name and the journal carry the thing:
+   *  it must say what it is well enough that a player can put it and a spoken
+   *  direction together by himself. */
+  forms: Record<FormId, string>
   buildings: Record<BuildingType, string>
   sketches: Record<SketchId, string>
 
@@ -342,6 +348,12 @@ export interface Strings {
     bought(name: string): string
     notEnoughMoney: string
     digNoShovel: string
+    /** A carried form fits nothing where the traveller stands — his own voice,
+     *  never silence: a wrong or a spent place is how he learns the rule. */
+    formNoFit: string
+    /** The dummy success of this proof of concept: a form has found its socket
+     *  and the PoC's puzzle is solved. */
+    pocSolved: string
     /** The chief has come out of his hut and stands in the open (§12). */
     chiefStepsOut: string
     /** This chief has no drum message of his own to send (§13.4). */
@@ -743,8 +755,10 @@ export interface Strings {
       drumMessage: string
       /** Dug up at the foot of the landmark boulder (point 487). */
       rockArtefact: string
-      /** The artefact laid in the chief's hands — the puzzle solved (point 487). */
+      /** The artefact laid in the chief's hands, and what he pays for it. */
       artefactGiven: string
+      /** The clay impression pressed into the rock it was taken from. */
+      mouldFitted: string
       decoded: string
       unspecific: string
       victory: string
@@ -815,8 +829,11 @@ export interface Strings {
     drumMessage: string
     /** The dig at the boulder the drum message sends the traveller to (point 487). */
     rockArtefact: string
-    /** Handing the artefact to the chief — what solves the puzzle (point 487). */
+    /** Handing the artefact to the chief: two words back, and a thing of clay
+     *  handed over without a word. */
     artefactGiven: string
+    /** The clay impression fitted where it belongs — the end of the errand. */
+    mouldFitted: string
     digNothing: string
     victory(p: TextParams): string
     foodLow: string

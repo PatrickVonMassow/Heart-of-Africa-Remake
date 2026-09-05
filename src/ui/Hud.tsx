@@ -29,6 +29,7 @@ function InventoryBar() {
   const t = useStrings()
   const equipment = useGame((s) => s.equipment)
   const treasures = useGame((s) => s.treasures)
+  const carriedForms = useGame((s) => s.carriedForms)
   const canteenFill = useGame((s) => s.canteenFill)
   const mode = useGame((s) => s.mode)
   const pos = useGame((s) => s.pos)
@@ -42,6 +43,10 @@ function InventoryBar() {
   const ownedTreasures = TREASURE_IDS.filter((id) => treasures[id] > 0).sort((a, b) =>
     t.treasures[a].localeCompare(t.treasures[b], t.lang),
   )
+  // Carried FORMS come last. There is no item picture in this game, so the bar
+  // is where the thing's NAME stands — and the name is half of what the player
+  // has to put together with the direction he was given.
+  const ownedForms = [...carriedForms].sort((a, b) => t.forms[a].localeCompare(t.forms[b], t.lang))
 
   // Publish the live inventory-bar height as --inv-bar-height so the map overlay
   // (and its town-plan variant) can anchor its bottom edge above the bar however
@@ -67,7 +72,7 @@ function InventoryBar() {
     }
   }, [itemCount])
 
-  if (owned.length === 0 && ownedTreasures.length === 0) return null
+  if (owned.length === 0 && ownedTreasures.length === 0 && ownedForms.length === 0) return null
 
   // Medicine and shovel are used by clicking them on the spot (design.md §17);
   // the rest act by mere possession (rifle/rope/machete/canoe) or show a
@@ -126,6 +131,24 @@ function InventoryBar() {
           </span>
         )
       })}
+      {/* A form is pressed against the place it might fit — the same act as
+          digging with the shovel, and out on the map only. */}
+      {ownedForms.map((id) =>
+        mode === 'travel' ? (
+          <button
+            key={id}
+            data-form={id}
+            onClick={() => useGame.getState().useCarriedForm()}
+            title={t.hud.useTooltip}
+          >
+            {t.forms[id]}
+          </button>
+        ) : (
+          <span key={id} data-form={id} className="inv-item" title={t.hud.passiveTooltip}>
+            {t.forms[id]}
+          </span>
+        ),
+      )}
       {/* Presenting a valuable to a village provokes the §8 reaction. */}
       {ownedTreasures.map((id) => (
         <button key={id} onClick={() => useGame.getState().presentValuable(id)} title={t.hud.presentTooltip}>

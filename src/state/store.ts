@@ -32,6 +32,7 @@ import type { Phrase, UtteranceId } from '../communication/lexicon'
 import { chiefMessagePhrase } from '../communication/drumMessage'
 import { chiefRewardPhrase } from '../communication/chiefReply'
 import { ROCK_VILLAGE_ID, isAtCommunicationRock } from '../world/communicationRock'
+import { resolveFormUse, type FormId, type SocketId } from '../world/forms'
 import type { SketchId } from '../journal/sketches'
 import { getStrings, type TextRef } from '../i18n'
 import { stripVoiceMarkup } from '../journal/voiceMarkup'
@@ -169,6 +170,15 @@ export interface GameState {
    *  CARRIED from there, and is GIVEN once it lies in the chief's hands — which
    *  is what solves the communication puzzle. It never goes back a stage. */
   rockArtefact: RockArtefactState
+  /** The FORMS in the pack (src/world/forms.ts): shapes that fit a socket
+   *  somewhere in the world. They ride OUTSIDE the pack capacity and cannot be
+   *  traded, like the buried thing before them — a full pack must never strand
+   *  an errand — and fitting one does not spend it, so a second visit to a lock
+   *  is never a dead end. */
+  carriedForms: FormId[]
+  /** The sockets already opened. A spent socket answers like a wrong place, and
+   *  it is world state like any other: it goes into the saved game. */
+  spentSockets: SocketId[]
   /** Health points (design.md §6); 0 = death of the character. */
   health: number
   afflictions: Afflictions
@@ -274,6 +284,9 @@ export interface GameState {
   /** Write the decoded version of a region's hint once language + hint meet. */
   revealDecoded: (region: RegionId) => void
   dig: () => void
+  /** Press a carried form against whatever the traveller is standing at
+   *  (src/world/forms.ts). Answers in his own voice where nothing fits. */
+  useCarriedForm: () => void
   /** Health per travelled day; exposed for the event engine and tests. */
   tickHealth: (dayDelta: number, terrain: string, lat: number, lon: number) => void
   /** Random events per travelled day (design.md §14). */
@@ -507,6 +520,8 @@ export function startState(seed: number, placeId: string = startPlaceId()) {
     communication: emptyMemory(),
     drumMessageHeard: false,
     rockArtefact: 'buried' as RockArtefactState,
+    carriedForms: [] as FormId[],
+    spentSockets: [] as SocketId[],
     health: balance.health.max,
     afflictions: { fever: false, dehydration: false, sunblind: false, wounds: 0 as const },
     sunblindRecovery: 0,
@@ -610,6 +625,15 @@ function newSeed(): number {
 export const DRUM_MESSAGE_VILLAGE = ROCK_VILLAGE_ID
 
 /**
+ * The shape the chief pays with, handed over without a word (design.md §13.3:
+ * a token of goodwill passed from one people to the next, never a looted
+ * thing). Its NAME and the journal entry carry it — there is no item picture in
+ * this game — and it is the only half of his answer that says what to do; the
+ * words say only where.
+ */
+export const CHIEF_REWARD_FORM: FormId = 'rock-relief'
+
+/**
  * The settlement an utterance heard right now belongs to: the place the player
  * stands in, and nothing while he is out on the map. The journal names it
  * beside the day it was first heard (design.md §13.4).
@@ -704,11 +728,11 @@ export const useGame = create<GameState>()((set, get) => ({
     )
   },
 
-  // The hand-over that solves the communication puzzle (point 487). It is
-  // possible only where the errand was set: in the chief's own village, with the
-  // artefact actually carried. The chief's answer is a PHRASE in his own tongue,
-  // recorded exactly like any other speech of his people — untranslated, so it
-  // reads only to a player who learned the words.
+  // The hand-over. It is possible only where the errand was set: in the chief's
+  // own village, with the artefact actually carried. His answer is a PHRASE in
+  // his own tongue, recorded exactly like any other speech of his people —
+  // untranslated, so it reads only to a player who learned the words — and it
+  // says WHERE and no more; the rest he hands over as a shape.
   callChiefOut: () => {
     const s = get()
     if (s.mode !== 'place' || !s.placeId) return
@@ -769,7 +793,16 @@ export const useGame = create<GameState>()((set, get) => ({
     if (s.mode !== 'place' || s.placeId !== DRUM_MESSAGE_VILLAGE) return
     if (s.rockArtefact !== 'carried') return
     const heard = observePhrase(s.communication, chiefRewardPhrase(), Math.floor(s.day), heardIn(s))
-    set({ communication: heard, rockArtefact: 'given' })
+    // What he pays with: a direction in words, and — wordlessly — the clay
+    // impression. The impression is the other half of the sentence, so it is
+    // handed over in the same move and recorded in the same journal entry.
+    set({
+      communication: heard,
+      rockArtefact: 'given',
+      carriedForms: s.carriedForms.includes(CHIEF_REWARD_FORM)
+        ? s.carriedForms
+        : [...s.carriedForms, CHIEF_REWARD_FORM],
+    })
     get().addEntry(
       { key: 'journal.titles.artefactGiven' },
       { key: 'journal.artefactGiven' },
@@ -1911,6 +1944,42 @@ export const useGame = create<GameState>()((set, get) => ({
     set({ toast: stripVoiceMarkup(getStrings().journal.digNothing) })
   },
 
+  // Pressing a carried FORM against the ground the traveller stands on
+  // (src/world/forms.ts owns the rules; this only carries them into the world).
+  //
+  // The reach is the one the digging uses: a lock and a buried thing are the
+  // same kind of "right here" for a traveller on the bird's-eye map, and a
+  // second radius would be a second thing to calibrate.
+  //
+  // A miss ANSWERS. A wrong place and a spent one give the same sentence in the
+  // traveller's own voice, because silence would teach him nothing and he must
+  // be able to carry the rule to the next lock.
+  useCarriedForm: () => {
+    const s = get()
+    if (s.mode !== 'travel' || s.victory || s.defeat) return
+    // Nothing in the pack to press against anything: not a miss, a non-action.
+    if (s.carriedForms.length === 0) return
+    const cur = worldToLatLon(s.pos.x, s.pos.z)
+    const use = resolveFormUse({
+      lat: cur.lat,
+      lon: cur.lon,
+      radiusDeg: balance.digRadius / 10, // world units → degrees
+      carriedForms: s.carriedForms,
+      spentSockets: s.spentSockets,
+    })
+    if (use.kind !== 'fits') {
+      set({ toast: getStrings().toasts.formNoFit })
+      return
+    }
+    // The socket is spent, the form is NOT: it stays in the pack, so coming
+    // back here is never a dead end.
+    set({
+      spentSockets: [...s.spentSockets, use.socket.id],
+      toast: getStrings().toasts.pocSolved,
+    })
+    get().addEntry({ key: 'journal.titles.mouldFitted' }, { key: 'journal.mouldFitted' }, 'event')
+  },
+
   saveCheckpoint: () => {
     const s = get()
     const snapshot = {
@@ -1935,7 +2004,7 @@ export const useGame = create<GameState>()((set, get) => ({
       freeCamps: s.freeCamps, villageCamps: s.villageCamps,
       communication: serializeMemory(s.communication),
       drumMessageHeard: s.drumMessageHeard,
-      rockArtefact: s.rockArtefact,
+      rockArtefact: s.rockArtefact, carriedForms: s.carriedForms, spentSockets: s.spentSockets,
       nextEntryId,
     }
     try {
@@ -2020,6 +2089,10 @@ export const useGame = create<GameState>()((set, get) => ({
         drumMessageHeard: snap.drumMessageHeard ?? false,
         // A snapshot from before the boulder was dug simply leaves it buried.
         rockArtefact: snap.rockArtefact ?? 'buried',
+        // A save written before the forms existed carried neither, and a
+        // traveller in it has opened nothing and holds nothing.
+        carriedForms: snap.carriedForms ?? [],
+        spentSockets: snap.spentSockets ?? [],
         defeat: null,
         deathCause: null,
         mode: 'place',
