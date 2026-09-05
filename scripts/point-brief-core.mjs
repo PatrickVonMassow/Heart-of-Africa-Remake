@@ -1210,7 +1210,7 @@ const HOUSE_FACTS = [
 ]
 
 /**
- * The header, with the SOL ROUTING line the current switch setting dictates (point 654).
+ * The header, with the ASTRA ROUTING line the current switch setting dictates (point 654).
  *
  * It is one line at EVERY setting, the default included: an agent that is never told the
  * lever exists cannot pull it, and a brief that named it only sometimes would train its

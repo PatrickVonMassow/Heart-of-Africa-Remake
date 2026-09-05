@@ -897,12 +897,12 @@ describe('the astra-routing line', () => {
   const briefAt = (astraShare) => assembleBrief({ point: { number: 1, done: false, body: 'x' }, astraShare })
 
   it('names the switch at the default, without asking for anything', () => {
-    expect(briefAt('default')).toMatch(/SOL ROUTING is at `default`/)
+    expect(briefAt('default')).toMatch(/ASTRA ROUTING is at `default`/)
     expect(briefAt('default')).toMatch(/astra-share\.mjs --status/)
     expect(briefAt('default')).not.toMatch(/ask-astra\.mjs --kind/)
   })
 
-  it('tells the agent WHAT to hand over while the switch prefers Sol', () => {
+  it('tells the agent WHAT to hand over while the switch prefers Astra', () => {
     const brief = briefAt('prefer-astra')
     expect(brief).toMatch(/hand diagnose\/audit\/enumerate\/explain/)
     expect(brief).toMatch(/ask-astra\.mjs --kind/)
@@ -913,18 +913,18 @@ describe('the astra-routing line', () => {
     expect(brief).not.toMatch(/enumerate\/explain\/author/)
   })
 
-  it('tells it to stay off Sol entirely at claude-only', () => {
+  it('tells it to stay off Astra entirely at claude-only', () => {
     expect(briefAt('claude-only')).toMatch(/do NOT call `scripts\/ask-astra\.mjs`/)
   })
 
   it('defaults to the default when the caller passes nothing at all', () => {
-    expect(assembleBrief({ point: { number: 1, done: false, body: 'x' } })).toMatch(/SOL ROUTING is at `default`/)
+    expect(assembleBrief({ point: { number: 1, done: false, body: 'x' } })).toMatch(/ASTRA ROUTING is at `default`/)
   })
 
   it('stands among the house facts, above the call discipline', () => {
     const brief = briefAt('prefer-astra')
-    expect(brief.indexOf('SOL ROUTING')).toBeGreaterThan(brief.indexOf('HOUSE FACTS NO POINT STATES'))
-    expect(brief.indexOf('SOL ROUTING')).toBeLessThan(brief.indexOf('HOW TO SPEND A TURN'))
+    expect(brief.indexOf('ASTRA ROUTING')).toBeGreaterThan(brief.indexOf('HOUSE FACTS NO POINT STATES'))
+    expect(brief.indexOf('ASTRA ROUTING')).toBeLessThan(brief.indexOf('HOW TO SPEND A TURN'))
   })
 })
 
