@@ -33,7 +33,6 @@ import {
 } from '../../state/ui'
 import { balance, START_YEAR } from '../../config/balance'
 import { advanceGroundWetness, coldnessAt, effectiveGreenness, effectiveWetness, fireRainFactor, groundWetnessFactor, harmattanAt, karifAt, RAIN_GRAY, rainAmount, skyOvercastParams, strikeSchedulerStep, sunDimFactor, thunderstormAt, type StrikeSchedulerState } from '../../systems/season'
-import { playThunder } from '../../systems/ambience'
 import { marketPlentyAt } from '../../systems/seasonalLife'
 import { cloakForCloth } from '../../systems/dress'
 import { fireHasCookShelter } from '../../systems/cookShelter'
@@ -87,6 +86,15 @@ import { PlaceLife } from './PlaceLife'
 import { digSiteAppearance } from './digSiteAppearance'
 import type { DigSiteProgress } from './adultWork'
 import { SpeechLabels } from './SpeechLabels'
+import { CHIEF_SPEAKER_ID, chiefAnchor, setChiefAnchor } from './chiefPresence'
+import { nextChiefAction } from './chiefMeeting'
+import { speakOverhead } from './speechChannel'
+import { chiefAcknowledgePhrase } from '../../communication/chiefReply'
+import type { Phrase } from '../../communication/lexicon'
+import { phrasePlan } from '../../communication/speaking'
+import { speechLabelSeconds } from '../../communication/speechLabel'
+import { drumMessagePlan } from '../../communication/drumMessage'
+import { playDrumMessage, playSpeech, playThunder } from '../../systems/ambience'
 import { releasePointerLock, requestPlacePointerLock } from './pointerLock'
 import { ActorLabels } from '../ActorLabels'
 import { markActor } from '../actorLabelSource'
@@ -107,7 +115,7 @@ import { bankGroundHeight, bankPlayRocksView, type PlaceRiverBank } from './rive
 import { scatterGrassTufts } from './groundScatter'
 import { clearEdgeBand, setEdgeBandBoundary, setEdgeBandLook } from '../../render/edgeBand'
 import { devAssert } from '../../systems/devAssert'
-import { buildLayout, DIG_SITE_RADIUS, fencePanels, isOnLane, nearestActionable, PLACE_RADIUS, SPAWN_INSET, VILLAGE_FIRE, type Interactive, type PathDef, type DwellingDef, type FenceDef, type PlaceLayout } from './layout'
+import { buildLayout, chiefStandingSpot, DIG_SITE_RADIUS, fencePanels, isOnLane, nearestActionable, PLACE_RADIUS, SPAWN_INSET, VILLAGE_FIRE, type Interactive, type PathDef, type DwellingDef, type FenceDef, type PlaceLayout } from './layout'
 import {
   COOK_SHELTER,
   EYE_HEIGHT,
@@ -539,6 +547,133 @@ function Villager({
       </mesh>
       <Html center position={[0, 2.3, 0]} distanceFactor={14}>
         <div className="map-label">{t.labels.oldMan}</div>
+      </Html>
+    </group>
+  )
+}
+
+/**
+ * The use key at the chief's hut (design.md §12, §13.4): the chief comes out,
+ * and from then on every press gives what he has to give, out in the open —
+ * the message on the drums his own drummer beats, and the answer to the find
+ * from the boulder. `nextChiefAction` decides; this only executes.
+ */
+function meetChief(hut: Interactive): void {
+  const game = useGame.getState()
+  const strings = getStrings()
+  switch (nextChiefAction(game)) {
+    case 'step-out':
+      game.callChiefOut()
+      break
+    case 'hand-over': {
+      // The phrase is taken BEFORE the hand-over so the label and the sound
+      // carry the same atoms the store records as heard.
+      const phrase = chiefAcknowledgePhrase()
+      game.handArtefactToChief()
+      speakChiefPhrase(phrase, hut)
+      break
+    }
+    case 'send-message': {
+      // The plan the drummer's hands animate from is the plan WebAudio plays,
+      // so what sounds and what is seen cannot disagree (point 486).
+      const plan = drumMessagePlan()
+      useUi.getState().startDrumMessage(plan)
+      playDrumMessage(plan)
+      game.setToast(strings.toasts.drumsSending)
+      break
+    }
+    case 'withhold-message':
+      game.setToast(strings.dialogs.askDrumsLocked)
+      break
+    case 'no-message':
+      game.setToast(strings.toasts.chiefNoMessage)
+      break
+    default:
+      break
+  }
+}
+
+/** What the chief says: sounded at the traveller's own distance and written
+ *  over the chief's head, like any other villager's word (design.md §13.4). */
+function speakChiefPhrase(phrase: Phrase, hut: Interactive): void {
+  const [x, z] = chiefStandingSpot(hut)
+  const distance = placePlayerPosition.active
+    ? Math.hypot(placePlayerPosition.x - x, placePlayerPosition.z - z)
+    : 0
+  playSpeech(phrasePlan(phrase, distance))
+  const anchor = chiefAnchor()
+  if (anchor) speakOverhead(CHIEF_SPEAKER_ID, phrase, anchor, { seconds: speechLabelSeconds(phrase.length) })
+}
+
+/**
+ * The chief, out of his hut and standing in the open (design.md §12): the use
+ * key at his door brings him out and he stays out, one step beside the doorway,
+ * on the ground his drummer sits on. There is no audience indoors — what he has
+ * to give is given here, in the picture, where the drums that carry his message
+ * are seen and heard.
+ *
+ * He registers himself as the speaker anchor, so what he says stands over HIS
+ * head like any other villager's word (design.md §13.4).
+ */
+function Chief({
+  item,
+  style,
+  dress,
+}: {
+  item: Interactive
+  style: RegionPlaceStyle
+  dress: ColdDress | null
+}) {
+  const t = useStrings()
+  const group = useRef<THREE.Group>(null)
+  const [x, z] = chiefStandingSpot(item)
+  // He faces the open ground, away from his own hut wall.
+  const facing = Math.atan2(x - item.pos[0], z - item.pos[1])
+  const robe = style.cloth[0]
+  // The season's wrap over the shoulders, always — he is the notable
+  // (design.md §19.13, the reasoning that dressed the elder before him).
+  const shoulder = dress
+    ? cloakForCloth(dress.cloaks, dress.palette, style.cloth[1 % style.cloth.length])
+    : style.cloth[1 % style.cloth.length]
+  useEffect(() => {
+    setChiefAnchor(group.current)
+    return () => setChiefAnchor(null)
+  }, [])
+  return (
+    // NOT marked for the §17.8 Ctrl layer: he carries his own standing label
+    // below, and the layer would print the same word twice over one man.
+    <group ref={group} position={[x, 0, z]} rotation={[0, facing, 0]}>
+      {/* Robe */}
+      <mesh position={[0, 0.62, 0]} castShadow>
+        <coneGeometry args={[0.42, 1.25, TESSELLATION.figureBody]} />
+        <meshStandardMaterial color={robe} roughness={0.95} />
+      </mesh>
+      {/* Torso and shoulder cloth */}
+      <mesh position={[0, 1.28, 0]} castShadow>
+        <cylinderGeometry args={[0.22, 0.28, 0.5, TESSELLATION.figureBody]} />
+        <meshStandardMaterial color={shoulder} roughness={0.95} />
+      </mesh>
+      {/* Head */}
+      <mesh position={[0, 1.68, 0]} castShadow>
+        <sphereGeometry args={[0.2, ...TESSELLATION.figureHead]} />
+        <meshStandardMaterial color="#5c3317" roughness={0.85} />
+      </mesh>
+      {/* Cap of office */}
+      <mesh position={[0, 1.8, 0]}>
+        <sphereGeometry args={[0.19, ...TESSELLATION.figureCap, 0, Math.PI * 2, 0, Math.PI / 2.6]} />
+        <meshStandardMaterial color="#cfc8bd" roughness={1} />
+      </mesh>
+      {/* Staff of office */}
+      <mesh position={[0.38, 0.95, 0.05]} rotation={[0, 0, -0.08]} castShadow>
+        <cylinderGeometry args={[0.03, 0.04, 1.9, 6]} />
+        <meshStandardMaterial color="#5f4526" roughness={0.9} />
+      </mesh>
+      <mesh position={[0.4, 1.92, 0.05]}>
+        <sphereGeometry args={[0.06, ...TESSELLATION.figureHand]} />
+        <meshStandardMaterial color="#4a3018" roughness={0.9} />
+      </mesh>
+      <Html center position={[0, 2.3, 0]} distanceFactor={14}>
+        <div className="map-label">{t.labels.chief}</div>
       </Html>
     </group>
   )
@@ -2281,6 +2416,7 @@ export function PlaceScene() {
   const placeId = useGame((s) => s.placeId)
   const seed = useGame((s) => s.seed)
   const orientationGiven = useGame((s) => s.orientationGiven)
+  const chiefOutside = useGame((s) => s.chiefOutside)
   const setPrompt = useUi((s) => s.setPrompt)
   const setDialog = useUi((s) => s.setDialog)
   const [digProgress, setDigProgress] = useState<readonly DigSiteProgress[]>([])
@@ -2576,7 +2712,7 @@ export function PlaceScene() {
     if (game.journalOpen) game.setJournalOpen(false)
     if (near.type === 'chief') {
       // Standing gates (design.md §12): a robbed region shuns the traveler,
-      // hostility lingers. The audience itself offers the (rifle-gated) robbery.
+      // hostility lingers. Otherwise the chief is met OUTSIDE his hut.
       const strings = getStrings()
       const place = game.placeId ? placeById(game.placeId) : null
       if (place && game.regionRobbed[place.region]) {
@@ -2584,8 +2720,7 @@ export function PlaceScene() {
       } else if (place && (game.hostileUntil[place.id] ?? 0) > game.day) {
         game.setToast(strings.toasts.chiefHostile)
       } else {
-        setDialog({ kind: 'audience' })
-        releasePointerLock()
+        meetChief(near)
       }
     } else if (near.type === 'bazaar' || near.type === 'agency') {
       setDialog({ kind: near.type })
@@ -2894,7 +3029,14 @@ export function PlaceScene() {
     // the live position through the same helper), never walking in.
     const near = nearestActionable(layout, p.x, p.z)
     const strings = getStrings()
-    const prompt = near ? strings.prompts.interact(interactiveLabel(strings, near.type)) : null
+    // At the chief's hut the key names the HUT while he is inside it, and the
+    // MAN once he stands in front of it (design.md §12).
+    const gameNow = useGame.getState()
+    const chiefIsOut =
+      near?.type === 'chief' && !!gameNow.placeId && gameNow.chiefOutside[gameNow.placeId] === true
+    const prompt = near
+      ? strings.prompts.interact(chiefIsOut ? strings.labels.speakToChief : interactiveLabel(strings, near.type))
+      : null
     if (useUi.getState().prompt !== prompt) setPrompt(prompt)
   })
 
@@ -2968,8 +3110,16 @@ export function PlaceScene() {
         )
       })}
 
-      {/* Orientation after a gift (design.md §17): the important, enterable
-          buildings carry a pulsing marker. */}
+      {/* The chief himself, once the use key has brought him out (design.md
+          §12): he stands beside his own door for the rest of the run. */}
+      {isVillage &&
+        chiefOutside[place.id] &&
+        layout.interactives
+          .filter((it) => it.type === 'chief')
+          .map((it, i) => <Chief key={`chief-${i}`} item={it} style={style} dress={dress} />)}
+
+      {/* Orientation after meeting the chief (design.md §17): the important,
+          enterable buildings carry a pulsing marker. */}
       {orientationGiven[place.id] &&
         layout.interactives
           .filter((it) => it.type !== 'villager')

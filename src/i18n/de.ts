@@ -245,6 +245,8 @@ export const de: Strings = {
   labels: {
     talkToElder: 'Mit dem Alten sprechen',
     oldMan: 'Alter Mann',
+    speakToChief: 'Mit dem Oberhaupt sprechen',
+    chief: 'Oberhaupt',
     graveDebug: 'Grab (Debug)',
     camp: 'Lager',
   },
@@ -375,6 +377,8 @@ export const de: Strings = {
     digNoShovel: 'Ohne Schaufel in der Hand kann ich nicht graben.',
     villagerNod: 'Der Alte nickt mir freundlich zu.',
     drumsSending: 'Das Oberhaupt ruft seinen Trommler. Die Botschaft geht über das Dorf hinaus.',
+    chiefStepsOut: 'Das Oberhaupt tritt aus seiner Hütte und steht vor mir im Freien.',
+    chiefNoMessage: 'Das Oberhaupt mustert mich und nickt. Es hat nichts über das Dorf hinauszusenden.',
     journalDndOn: 'Tagebuch-Unterbrechungen aus – Einträge erscheinen still.',
     journalDndOff: 'Tagebuch-Unterbrechungen an – neue Einträge öffnen das Tagebuch.',
     graphicsLevel: {

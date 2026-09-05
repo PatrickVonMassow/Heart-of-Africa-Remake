@@ -203,7 +203,10 @@ export interface GameState {
    *  change, then updates this. A place with no modelled situation reports a
    *  constant key and so never changes or re-fires (systems/placeSituation). */
   placeSituations: Record<string, string>
-  /** Audience state per village. */
+  /** Villages whose chief has come out of his hut and stands in the open
+   *  (design.md §12): the use key at his door brings him out, and from then on
+   *  he is met outdoors, where his drummer stands. */
+  chiefOutside: Record<string, boolean>
   /** Explored map cells for the self-drawing map (design.md §19). */
   explored: Record<string, true>
   goodwill: Record<string, number>
@@ -319,6 +322,10 @@ export interface GameState {
    *  hand-over that solves the puzzle. He acknowledges it in his own tongue,
    *  which enters the heard memory like any other phrase he speaks. */
   handArtefactToChief: () => void
+  /** The use key at the chief's hut: the chief comes OUT and stands in the open
+   *  (design.md §12). Everything he has to give is given out there, at his
+   *  drummer's side — there is no audience indoors. */
+  callChiefOut: () => void
   setToast: (msg: string | null) => void
   saveCheckpoint: () => void
   /** Load a port-visit snapshot; the latest without an index (design.md §18). */
@@ -536,6 +543,7 @@ export function startState(seed: number, placeId: string = startPlaceId()) {
     enteredPlaces: [] as string[],
     placeSituations: {} as Record<string, string>,
     explored: withExplored({}, start.lat, start.lon) ?? {},
+    chiefOutside: {} as Record<string, boolean>,
     goodwill: {},
     reveredGiftGiven: {},
     honoredFriend: {} as Partial<Record<RegionId, boolean>>,
@@ -749,6 +757,23 @@ export const useGame = create<GameState>()((set, get) => ({
   // artefact actually carried. The chief's answer is a PHRASE in his own tongue,
   // recorded exactly like any other speech of his people — untranslated, so it
   // reads only to a player who learned the words.
+  callChiefOut: () => {
+    const s = get()
+    if (s.mode !== 'place' || !s.placeId) return
+    const place = placeById(s.placeId)
+    if (place.kind !== 'village' || s.chiefOutside[place.id]) return
+    set({
+      chiefOutside: { ...s.chiefOutside, [place.id]: true },
+      toast: getStrings().toasts.chiefStepsOut,
+    })
+    // Standing before the village's own head man is what orients the traveller
+    // in the settlement (design.md §17): from now on the enterable buildings
+    // are marked here.
+    if (!s.orientationGiven[place.id]) {
+      set({ orientationGiven: { ...get().orientationGiven, [place.id]: true } })
+    }
+  },
+
   handArtefactToChief: () => {
     const s = get()
     if (s.mode !== 'place' || s.placeId !== DRUM_MESSAGE_VILLAGE) return
@@ -2087,7 +2112,7 @@ export const useGame = create<GameState>()((set, get) => ({
       health: s.health, afflictions: s.afflictions, sunblindRecovery: s.sunblindRecovery,
       dryDays: s.dryDays, canteenFill: s.canteenFill, woundHealDays: s.woundHealDays,
       visitedPlaces: s.visitedPlaces, enteredPlaces: s.enteredPlaces, placeSituations: s.placeSituations,
-      goodwill: s.goodwill, reveredGiftGiven: s.reveredGiftGiven,
+      goodwill: s.goodwill, reveredGiftGiven: s.reveredGiftGiven, chiefOutside: s.chiefOutside,
       knowingVillages: s.knowingVillages, hintsGiven: s.hintsGiven, decodedGiven: s.decodedGiven,
       languagesLearned: s.languagesLearned, unspecificGiven: s.unspecificGiven, giftLoreGiven: s.giftLoreGiven,
       graveLatLon: s.graveLatLon, foodWarned: s.foodWarned, foodOutWarned: s.foodOutWarned,
@@ -2177,6 +2202,7 @@ export const useGame = create<GameState>()((set, get) => ({
         landmarksSeen: Array.from(new Set([...KNOWN_FROM_START_LANDMARKS, ...(snap.landmarksSeen ?? [])])),
         valuableShown: snap.valuableShown ?? {},
         orientationGiven: snap.orientationGiven ?? {},
+        chiefOutside: snap.chiefOutside ?? {},
         honoredFriend: snap.honoredFriend ?? {},
         friendForfeited: snap.friendForfeited ?? {},
         regionRobbed: snap.regionRobbed ?? {},

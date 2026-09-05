@@ -281,6 +281,28 @@ export function interactiveCircleRadius(type: BuildingType | 'villager', style: 
 
 /** Interact radius for the elder/villager Space use key (design.md §2.3). */
 export const INTERACT_RADIUS = 4.5
+
+/** How far beside his own door the chief stands once he has come out
+ *  (design.md §12): clear of the door point the traveller uses, and clear of
+ *  the hut's own collider, so he is met face to face rather than walked into. */
+export const CHIEF_STAND_OFFSET = 1.6
+
+/**
+ * Where the chief stands once the use key has brought him out of his hut
+ * (design.md §12): one step out of the doorway and to the side of it, facing
+ * the open ground his drummer sits on. Pure geometry off the hut's own door,
+ * so the figure the picture shows and the door the key is pressed at can never
+ * describe different spots.
+ */
+export function chiefStandingSpot(it: Interactive): [number, number] {
+  const door = it.door ?? it.pos
+  const dx = door[0] - it.pos[0]
+  const dz = door[1] - it.pos[1]
+  const len = Math.hypot(dx, dz) || 1
+  const nx = dx / len
+  const nz = dz / len
+  return [door[0] + nz * CHIEF_STAND_OFFSET, door[1] - nx * CHIEF_STAND_OFFSET]
+}
 /**
  * Door proximity that arms the Space use key at a functional building — merely
  * walking into the door no longer enters; the discrete press does (design.md §2.3).

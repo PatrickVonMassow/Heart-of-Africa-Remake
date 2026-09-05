@@ -152,6 +152,10 @@ export interface Strings {
   labels: {
     talkToElder: string
     oldMan: string
+    /** Use-key prompt at the hut of a chief standing in the open (§12). */
+    speakToChief: string
+    /** Standing label over the chief himself, once he is outside (§12). */
+    chief: string
     graveDebug: string
     /** Marker label of a pitched free camp (design.md §6). */
     camp: string
@@ -341,6 +345,10 @@ export interface Strings {
     notEnoughMoney: string
     digNoShovel: string
     villagerNod: string
+    /** The chief has come out of his hut and stands in the open (§12). */
+    chiefStepsOut: string
+    /** This chief has no drum message of his own to send (§13.4). */
+    chiefNoMessage: string
     /** The chief has sent for his drummer; the message is being beaten out. */
     drumsSending: string
     journalDndOn: string

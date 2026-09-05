@@ -243,6 +243,8 @@ export const en: Strings = {
   labels: {
     talkToElder: 'Talk to the elder',
     oldMan: 'Elder',
+    speakToChief: 'Speak to the chief',
+    chief: 'Chief',
     graveDebug: 'Grave (debug)',
     camp: 'Camp',
   },
@@ -373,6 +375,8 @@ export const en: Strings = {
     digNoShovel: 'I cannot dig without a shovel in hand.',
     villagerNod: 'The old man gives me a friendly nod.',
     drumsSending: 'The chief calls his drummer. The message is going out over the village.',
+    chiefStepsOut: 'The chief steps out of his hut and stands before me in the open.',
+    chiefNoMessage: 'The chief looks me over and nods. He has nothing to send out over the village.',
     journalDndOn: 'Journal interruptions off — entries appear silently.',
     journalDndOff: 'Journal interruptions on — new entries open the journal.',
     graphicsLevel: {
