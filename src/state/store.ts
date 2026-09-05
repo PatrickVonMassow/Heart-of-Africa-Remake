@@ -30,7 +30,7 @@ import {
 } from '../communication/heard'
 import type { Phrase, UtteranceId } from '../communication/lexicon'
 import { chiefMessagePhrase } from '../communication/drumMessage'
-import { chiefAcknowledgePhrase } from '../communication/chiefReply'
+import { chiefRewardPhrase } from '../communication/chiefReply'
 import { ROCK_VILLAGE_ID, isAtCommunicationRock } from '../world/communicationRock'
 import type { SketchId } from '../journal/sketches'
 import { getStrings, type TextRef } from '../i18n'
@@ -768,7 +768,7 @@ export const useGame = create<GameState>()((set, get) => ({
     const s = get()
     if (s.mode !== 'place' || s.placeId !== DRUM_MESSAGE_VILLAGE) return
     if (s.rockArtefact !== 'carried') return
-    const heard = observePhrase(s.communication, chiefAcknowledgePhrase(), Math.floor(s.day), heardIn(s))
+    const heard = observePhrase(s.communication, chiefRewardPhrase(), Math.floor(s.day), heardIn(s))
     set({ communication: heard, rockArtefact: 'given' })
     get().addEntry(
       { key: 'journal.titles.artefactGiven' },
