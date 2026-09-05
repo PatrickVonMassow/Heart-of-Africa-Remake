@@ -52,7 +52,7 @@ describe('fable-switch.mjs', () => {
       reason: 'not enough volume left',
       setBy: 'test operator',
     })
-    expect(mergerModel(currentFableState(file))).toBe('GPT-5.6 Sol')
+    expect(mergerModel(currentFableState(file))).toBe('GPT-6 Astra')
   })
 
   it('makes the opposite flip visible to a fresh reader in the same run', () => {

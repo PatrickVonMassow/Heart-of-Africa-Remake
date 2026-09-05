@@ -1783,7 +1783,7 @@ function segmentTarget(seg) {
   // An authoring run IS the commissioning of a point, whichever vendor runs it —
   // unless it is one of the read-only legs, which produce no work at all.
   if (!/--routing\b|--dry-run\b/.test(seg)) {
-    const authored = uniq([...seg.matchAll(/author-(?:sol|fable)\.mjs.*?--point\s+(\d+)/gi)].map((m) => Number(m[1])))
+    const authored = uniq([...seg.matchAll(/author-(?:astra|sol|fable)\.mjs.*?--point\s+(\d+)/gi)].map((m) => Number(m[1])))
     if (authored.length) return { points: authored, refs: [], how: 'author' }
   }
   if (/\bworktree\s+add\b/.test(seg)) {

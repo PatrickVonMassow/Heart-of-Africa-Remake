@@ -75,7 +75,7 @@ describe('the commit-msg model-trailer gate', () => {
     )
     expect(undocumented.status).toBe(1)
     expect(undocumented.stderr).toContain('undocumented-reviewer-trailer')
-    expect(undocumented.stderr).toContain('Reviewed-By: GPT-5.6 Sol <noreply@openai.com>')
+    expect(undocumented.stderr).toContain('Reviewed-By: GPT-6 Astra <noreply@openai.com>')
   })
 
   it('REFUSES the bare trailer that cost the batch a round, and says what to write', () => {

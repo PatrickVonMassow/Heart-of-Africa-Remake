@@ -78,7 +78,7 @@ describe('Fable authoring CLI', () => {
     expect(result.stdout).not.toContain('--fallback-model')
     expect(result.stdout).toContain('as Fable 5.1')
     expect(result.stdout).toContain('Co-Authored-By: Claude Fable 5.1 <noreply@anthropic.com>')
-    expect(result.stdout).toContain('A GPT-5.6 Sol session then REVIEWS')
+    expect(result.stdout).toContain('A GPT-6 Astra session then REVIEWS')
     expect(result.stdout).toContain('Do NOT push, do NOT merge')
   })
 

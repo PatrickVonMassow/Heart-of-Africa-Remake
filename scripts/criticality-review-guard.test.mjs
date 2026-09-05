@@ -690,7 +690,7 @@ describe('the unavailable-receipt CLI', { timeout: 30_000 }, () => {
       const base = runGit('rev-parse', 'HEAD').stdout.trim()
       writeFileSync(
         resolve(receiptRepo, '.claude/mechanism-reviews.jsonl'),
-        `${JSON.stringify({ kind: 'authoring-commission', point: 870, sha: base, model: 'GPT-5.6 Sol', at: 1 })}\n`,
+        `${JSON.stringify({ kind: 'authoring-commission', point: 870, sha: base, model: 'GPT-6 Astra', at: 1 })}\n`,
       )
       mkdirSync(resolve(receiptRepo, 'src'), { recursive: true })
       writeFileSync(resolve(receiptRepo, 'src/both.mjs'), 'export const both = true\n')
@@ -698,7 +698,7 @@ describe('the unavailable-receipt CLI', { timeout: 30_000 }, () => {
       expect(
         runGit(
           'commit', '-q', '-m',
-          'Add a contribution by every configured reader\n\nCo-Authored-By: GPT-5.6 Sol <noreply@openai.com>\nCo-Authored-By: Claude Opus 5 <noreply@anthropic.com>\nCo-Authored-By: Claude Fable 5.1 <noreply@anthropic.com>\nCo-Authored-By: Claude Opus 4.8 <noreply@anthropic.com>',
+          'Add a contribution by every configured reader\n\nCo-Authored-By: GPT-6 Astra <noreply@openai.com>\nCo-Authored-By: Claude Opus 5 <noreply@anthropic.com>\nCo-Authored-By: Claude Fable 5.1 <noreply@anthropic.com>\nCo-Authored-By: Claude Opus 4.8 <noreply@anthropic.com>',
         ).status,
       ).toBe(0)
       const head = runGit('rev-parse', 'HEAD').stdout.trim()
