@@ -1432,7 +1432,7 @@ keinen Träger hat. Gebucht als Punkt 956.
 
 ## Anhang A — Maschinell gepflegte Quellen-Übersicht
 
-Zuletzt aktualisiert: Freitag, 04.09.2026, 22:23 · Quellen-Fingerprint: `65d4e927c21f…`
+Zuletzt aktualisiert: Samstag, 05.09.2026, 07:47 · Quellen-Fingerprint: `4fec53eeb260…`
 
 Spalten heuristisch aus den Quellen abgeleitet (Anläufe = distinkte Datumsnennungen im Memory;
 Maßnahme = Guard-Skripte mit Namens-Treffer). Die inhaltliche Bewertung gehört der Prosa oben.
@@ -1469,10 +1469,9 @@ Maßnahme = Guard-Skripte mit Namens-Treffer). Die inhaltliche Bewertung gehört
 | a drill that recreates the state after an action tests the assumption, not the action — and stays green forever | 1 | niedrig | — (Regel/Memory) | ◐ Regel |
 | Work at High effort by default; the user reserves Extra high for research and design decisions, not implementation | 4 | hoch | — (Regel/Memory) | ◐ Regel |
 | Write idiomatic English in all English text (README, code comments, commit messages) — no German calques like 'stand' for a version | 1 | niedrig | — (Regel/Memory) | ◐ Regel |
-| Claude Code process exited with code 143" plus "Remote Control is disabled" is our own context-boundary handover, not a crash | 1 | niedrig | — (Regel/Memory) | ◐ Regel |
 | Fable is NOT the default lane because its volume is the scarcest; difficulty is no reason for it either (since 18.08.2026 hard cases go straight to Sol), and review is cross-vendor, not Fable-by-default | 5 | hoch | — (Regel/Memory) | ◐ Regel |
-| Findings recorded by a session that could not write the work order — carry each into TASKS.md, then mark it drained | 45 | hoch | findings-guard.mjs | ✔ Mechanismus |
-| A recurring lookup gets a script; never pull raw transcripts, listings, or logs into context to answer it | 1 | niedrig | — (Regel/Memory) | ◐ Regel |
+| Findings recorded by a session that could not write the work order — carry each into TASKS.md, then mark it drained | 46 | hoch | findings-guard.mjs | ✔ Mechanismus |
+| A recurring lookup gets a script; never pull raw transcripts, listings, or logs into context to answer it | 1 | niedrig | wait-command-guard.mjs | ✔ Mechanismus |
 | Past the 150k context watermark, FINISH the step and hand over — never start a suite, an agent or a point after it; the user raised the cost twice (13.08. and 17.08.2026) | 2 | mittel | — (Regel/Memory) | ◐ Regel |
 | User 18.08.2026: hard, complex, error-prone and HIGH-criticality points are AUTHORED by GPT-5.6 Sol directly — Opus 5 authors only what is left, and Fable authors only a point that tags its lane or one the router escalates | 4 | hoch | — (Regel/Memory) | ◐ Regel |
 | Two test layers — Vitest (jsdom) for logic/store/HUD, Playwright for browser-only; add a test per new feature on the right layer | 1 | niedrig | — (Regel/Memory) | ◐ Regel |
@@ -1510,7 +1509,7 @@ Maßnahme = Guard-Skripte mit Namens-Treffer). Die inhaltliche Bewertung gehört
 | Write about this project as a participant (\"wir/unser\"), never as an outside observer (\"euer Mechanismus\", \"die ihr abschaffen wollt\") | 1 | niedrig | — (Regel/Memory) | ◐ Regel |
 | a large point that stops converging is cut into smaller standalone points and each is worked on its own — general procedure, no confirmation needed | 1 | niedrig | point-proof-guard.mjs | ✔ Mechanismus |
 | Never access paths outside the project directory unless strictly necessary (e.g. the global ~/.claude rules); keep local non-versioned artefacts in a git-ignored local/ folder inside the repo | 1 | niedrig | — (Regel/Memory) | ◐ Regel |
-| a repeated Stop-guard refusal means my model of the state is wrong — re-measure, never answer it twice with the same words | 1 | niedrig | — (Regel/Memory) | ◐ Regel |
+| a repeated Stop-guard refusal means my model of the state is wrong — re-measure, never answer it twice with the same words | 2 | mittel | — (Regel/Memory) | ◐ Regel |
 | Release tags are re-pointed ONLY on the user's explicit request — never automatically after a fix; a cut vX.Y is frozen | 3 | mittel | — (Regel/Memory) | ◐ Regel |
 | TASKS.md and all new entries in it are written in English | 1 | niedrig | tasks-archive-guard.mjs, tasks-spec-guard.mjs | ✔ Mechanismus |
 | TASKS.md entries state the final correct target directly — never keep a 'first defined wrong, then clarified/corrected' trail in the spec | 1 | niedrig | batch-doctor-states.mjs, tasks-archive-guard.mjs, tasks-spec-guard.mjs | ✔ Mechanismus |
@@ -1529,16 +1528,16 @@ Maßnahme = Guard-Skripte mit Namens-Treffer). Die inhaltliche Bewertung gehört
 | Rotating verify AND unit failures under a running agent pool are LOAD, not bugs — 8 of 12 unit runs red from load alone; judge a red only on a quiet machine | 6 | hoch | render-verify-guard.mjs | ✔ Mechanismus |
 | The named \"version release\" process and its trigger — queue/run a version release for a version the user names (full closing → user approval → tag → mirror poc → publish /TAG/ and /poc/) | 1 | niedrig | lock-release-hook.mjs | ✔ Mechanismus |
 | Standing licence to move, REMOVE or ADD villages when it helps — but every change must be checked against the other requirements first, and the check has already caught a real bug | 1 | niedrig | — (Regel/Memory) | ◐ Regel |
-| A VS Code restart restarts the devcontainer — every process inside dies, PPID 1 proves nothing | 2 | mittel | container-ask-guard.mjs | ✔ Mechanismus |
+| A VS Code restart restarts the devcontainer — every process inside dies, PPID 1 proves nothing | 3 | mittel | container-ask-guard.mjs | ✔ Mechanismus |
 | Keep the visual QA eye open for functionally-fine but weird-LOOKING oddities, not just functional bugs | 2 | mittel | — (Regel/Memory) | ◐ Regel |
 | WebGPU is testable headless/autonomously via system Chrome (channel:'chrome') + --headless=new; the limitation applies only to Playwright's bundled Chromium | 2 | mittel | — (Regel/Memory) | ◐ Regel |
 | A pending batch claim HOLDS THE LAUNCHER BACK — withdraw it whenever the claiming window is left unattended | 2 | mittel | clear-claim-guard.mjs | ✔ Mechanismus |
 | Multi-agent workflows eat the session/weekly limit fast — verify findings INLINE, keep fan-outs small, warn the user with a cost estimate before any big workflow | 3 | mittel | doc-budget-guard.mjs | ✔ Mechanismus |
 
-Erfasste Quellen: 95 Feedback-/Projekt-Memories · 57 Guard-/Hook-Skripte · 6 Revert-/Reapply-Commits · 124 Prozess-/Meta-TASKS-Punkte (davon 58 offen).
+Erfasste Quellen: 94 Feedback-/Projekt-Memories · 58 Guard-/Hook-Skripte · 6 Revert-/Reapply-Commits · 124 Prozess-/Meta-TASKS-Punkte (davon 58 offen).
 
-<!-- RETRO-FINGERPRINT: 65d4e927c21ff8103ec52a6a78c252bd1bc80ef5697d29568eda988d1a5f2e78 -->
-<!-- RETRO-LAST-REFRESHED: 2026-09-04T20:23:41.296Z -->
+<!-- RETRO-FINGERPRINT: 4fec53eeb26031fe805aad6a1900a18e38a7100b3defcf9c7b615b846cd8df93 -->
+<!-- RETRO-LAST-REFRESHED: 2026-09-05T05:47:34.909Z -->
 <!-- AUTO-GENERATED:END -->
 
 ### 3.111 Ein Erfolg ist kein Beweis für den Weg, auf dem er zustande kam
