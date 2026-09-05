@@ -12,6 +12,7 @@ import {
   checkKey,
   classifyAgainstBaseline,
   consoleErrorChecks,
+  countCheckLines,
   failedChecks,
   foldBaselineRuns,
   formatBaselineReport,
@@ -65,6 +66,26 @@ describe('parsing a suite output', () => {
     expect(parseCheckLines('FAILURES: 2\nFAIL\nALL CHECKS PASSED')).toEqual([])
     // flow.mjs prints its checks without a detail — those ARE checks.
     expect(parseCheckLines('FAIL  the ferry sails to Zanzibar')).toHaveLength(1)
+  })
+
+  it('tallies the printed result lines and never counts a summary line as a check', () => {
+    // MEASURED 05.09.2026, webgpu flow at 23:21: the runner counted flow.mjs's
+    // own closing `FAILURES: 0` as one failing check and printed a red that
+    // named nothing, which nobody could then own.
+    const out = [
+      'PASS  the ferry sails to Zanzibar',
+      'PASS  the journal writes its arrival entry',
+      'FAIL  the chief answers — no reply',
+      'console errors: 0',
+      'FAILURES: 1',
+    ].join('\n')
+    expect(countCheckLines(out)).toEqual({ pass: 2, fail: 1 })
+    // preview.mjs prints a bare `FAIL` with no name: not a check either, and a
+    // non-zero exit still speaks for itself.
+    expect(countCheckLines('FAIL\nFAILURES: 0')).toEqual({ pass: 0, fail: 0 })
+    // The same check printed twice is counted twice — this is the raw tally the
+    // run's headline reports, not the de-duplicated list.
+    expect(countCheckLines('PASS  a\nPASS  a')).toEqual({ pass: 2, fail: 0 })
   })
 
   it('lists failing and all-reached checks de-duplicated', () => {

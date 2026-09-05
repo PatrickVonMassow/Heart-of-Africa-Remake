@@ -15,7 +15,7 @@ import { spawnSync } from 'node:child_process'
 import { fileURLToPath } from 'node:url'
 import { dirname, join } from 'node:path'
 import { killTree, launchServer } from './_server.mjs'
-import { allChecks, changeRelatedness, failedChecks, formatRepeatReport, repeatSignature } from './baseline-classify-core.mjs'
+import { allChecks, changeRelatedness, countCheckLines, failedChecks, formatRepeatReport, repeatSignature } from './baseline-classify-core.mjs'
 import {
   LEVEL, annotateResult, annotateStageFailure, decideRun, formatLoadReport, onLoadMode,
 } from './machine-load-core.mjs'
@@ -198,14 +198,16 @@ function runSuite(name, baseUrl, retryAfter = '') {
     return { ok: false, out: '' }
   }
   const out = (res.stdout ?? '') + (res.stderr ?? '')
-  const pass = (out.match(/^PASS/gm) ?? []).length
-  const fail = (out.match(/^FAIL/gm) ?? []).length
-  const errMatch = out.match(/console errors: (\d+)/)
+  // COUNT THE RESULT LINES BY THE RULE THAT KNOWS THEM (`CHECK_LINE`), not by a
+  // bare `^FAIL` prefix: flow.mjs closes with `FAILURES: <n>`, which a prefix
+  // match counts as a failing check nobody can name.
+  const { pass, fail } = countCheckLines(out)
+  const errMatch = out.match(/console errors: (\d+)/i)
   const consoleErrors = errMatch ? Number(errMatch[1]) : 0
   const ok = res.status === 0 && fail === 0 && consoleErrors === 0
   console.log(`${ok ? 'PASS' : 'FAIL'}  ${name.padEnd(12)} ${pass} pass, ${fail} fail, ${consoleErrors} console-errors (exit ${res.status})`)
   if (!ok) {
-    for (const line of out.split('\n')) if (/^FAIL|ERR:/.test(line)) console.log('      ' + line)
+    for (const line of out.split('\n')) if (/^FAIL\s{2,}\S|^ERR:/.test(line)) console.log('      ' + line)
     // A non-zero exit without any FAIL line is a CRASH (uncaught exception,
     // timeout throw): echo the tail so the cause is not swallowed.
     if (res.status !== 0 && fail === 0) {
@@ -329,15 +331,14 @@ function runCrossBrowser(baseUrl, depth) {
     env: { ...process.env, BASE_URL: baseUrl, CROSSBROWSER_DEPTH: depth },
   })
   const out = (res.stdout ?? '') + (res.stderr ?? '')
-  const pass = (out.match(/^PASS/gm) ?? []).length
-  const fail = (out.match(/^FAIL/gm) ?? []).length
+  const { pass, fail } = countCheckLines(out)
   const skip = (out.match(/^SKIP/gm) ?? []).length
   const ok = res.status === 0
   console.log(`${ok ? 'PASS' : 'FAIL'}  crossbrowser  ${pass} pass, ${fail} fail, ${skip} skip (${depth}, exit ${res.status})`)
   // Always surface the per-engine backend + any skips; on failure also the FAILs.
   for (const line of out.split('\n')) {
     if (/backend:|^SKIP/.test(line)) console.log('      ' + line.trim())
-    else if (!ok && /^FAIL/.test(line)) console.log('      ' + line.trim())
+    else if (!ok && /^FAIL\s{2,}\S/.test(line)) console.log('      ' + line.trim())
   }
   return ok
 }

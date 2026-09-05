@@ -670,7 +670,11 @@ const unrun = sections.unrun()
 if (unrun) check('the selected section actually ran — ' + unrun, false)
 
 console.log('---')
-console.log('CONSOLE ERRORS:', errors.length === 0 ? 'none' : errors.length)
+// THE HOUSE WORDING, like every other suite: the runner reads the console-error
+// count off `console errors: <n>`, and this line used to be the one outlier
+// (`CONSOLE ERRORS: none`). The runner therefore read 0 for every flow run and
+// could not say WHY a red flow run had gone red — measured 05.09.2026 at 23:21.
+console.log('console errors:', errors.length)
 for (const e of errors.slice(0, 10)) console.log('  -', e)
 console.log(failCount === 0 && errors.length === 0 ? 'ALL CHECKS PASSED' : `FAILURES: ${failCount}`)
 // Said again where the verdict is read: a green one-section run is not a green
