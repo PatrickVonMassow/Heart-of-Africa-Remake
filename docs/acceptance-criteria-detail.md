@@ -23,8 +23,8 @@ Bird's-eye view (3D travel across the continent) and first-person view (walkable
 settlement) exist; switching between them is movement-based, confirmed with the SPACE use
 key, per `design.md` §2.3. In particular: functional buildings are entered with the SPACE
 use key while standing at their door (door proximity shows the prompt and arms the key —
-merely walking into the door no longer enters), and the elder is addressed with the same
-use key. Settlement entry from the bird's-eye view is likewise movement-based but
+merely walking into the door no longer enters), and the same use key at the chief's hut
+calls the chief out of it (§12). Settlement entry from the bird's-eye view is likewise movement-based but
 confirmed with SPACE: within the enter radius the localized hint "Space to enter <name>"
 shows (the map name-label hidden while it does) and a SPACE press enters; reaching the
 radius alone never enters. The hint honours the §17.2 discovery gate (point 287): an
@@ -487,15 +487,16 @@ languages with voice markup.
 
 ## 26. Standing with the natives.
 
-The reputation system of `design.md` §12 is implemented: hostility and expulsion on a
-rejected gift with the hostility period and its wear-off, the "Honored Friend" status with
-its pledge journal entry and regional protections (attack outcomes capped at lightly
-injured with rescue entries naming the people, near-death aid with cooldown, free village
-supplies), and the robbery behind a deliberate safety confirmation with its rich haul
-reported in the chronicle and its permanent regional consequences incl. the irretrievably
-forfeited friendship. Item effects are possession-based (§6.1/§7): merely carrying a rifle
-blocks no audience and scares no villager. All new texts exist in both languages with
-voice markup.
+The reputation system of `design.md` §12 is implemented as far as §12 still defines it: the
+"Honored Friend" status with its pledge journal entry and regional protections (attack
+outcomes capped at lightly injured with rescue entries naming the people, near-death aid
+with cooldown, free village supplies). Item effects are possession-based (§6.1/§7): merely
+carrying a rifle scares no villager. All texts exist in both languages with voice markup.
+
+The gift/goodwill ladder that used to BESTOW the standing, the hostility period and the
+rifle-gated robbery that used to forfeit it retired with §12 on 05.09.2026 (user
+03.09.2026). The consumers above stand and are covered; the status has no producer until
+the observation model arrives, and this criterion cannot be met in full before it does.
 
 ## 27. Camps (item caches).
 
@@ -504,8 +505,8 @@ with C in the open, holding any number of inventory items (taking back respects 
 inventory capacity; storing the canoe leaves it behind, dropping its land penalty), marked
 with the map X and the bird's-eye pole marker, with the per-day looting risk (balance
 value) revealed by a journal entry on return; village caches gated by "Honored Friend",
-persistent, and irretrievably destroyed by a robbery in the region. All new texts exist in
-both languages with voice markup.
+persistent, and no longer destructible — the robbery that destroyed them retired with §12.
+All new texts exist in both languages with voice markup.
 
 ## 28. Full saving and loading.
 

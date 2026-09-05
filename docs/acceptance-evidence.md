@@ -177,10 +177,12 @@ money.
 
 ## 7. Language and communication.
 
-THE §13.1–13.3 LAYER (elder, glossary, hints) — verifiable:
-`src/state/store.hints.test.ts` covers all five
-regions, the retroactive deciphering (either order) and the gift lore;
-`src/i18n/i18n.test.ts` the in-world words in the language files.
+THE §13.1–13.3 LAYER (glossary, hints) — verifiable:
+`src/state/store.hints.test.ts` covers the one knowing village per region, the
+recorded and deciphered hint in every region, the triangulation of the actual
+grave and the unspecific word a non-knowing chief offers instead;
+`src/i18n/i18n.test.ts` the in-world words in the language files. The elder who
+taught the direction system retired on 05.09.2026 (design.md §13.2).
 
 THE VILLAGE SPEECH (§13.4, docs/communication-poc-spec.md, work-order points
 477–488 and their successors 579/580/582/588/589). Pure Vitest throughout —
@@ -250,9 +252,9 @@ note against that figure's own head (`146-speech-hypothesis-label`), and section
 (`148-speech-guess-invitation`, `149-speech-guess-dialog`).
 
 THE CHIEF'S MESSAGE ON THE DRUMS (§13.4, docs/communication-poc-spec.md,
-point 486). Asked for at the audience — in his village alone, and only once a
-culturally correct gift has earned his trust (the §12 condition every hint
-stands under) — the chief has his drummer beat out RIVER · UPSTREAM · ROCK ·
+point 486). Asked for outside his hut — in his village alone, with no
+precondition left since the gift/goodwill state retired (§12) — the chief has
+his drummer beat out RIVER · UPSTREAM · ROCK ·
 DIG on two drums: the large low one for `ba`, the
 small high one for `BA`, the hand falling and the head dipping on the drum that
 sounds. The sequences are never re-authored: the message is a list of CONCEPT
@@ -402,9 +404,9 @@ named while standing, walking, gesturing, kneeling, carrying, drawn
 small and deep under the settlement group, in both languages, the
 switched-off figure the one silence — and every kind of the roster
 traced to a scene that really draws it (a herd, a flock, the hunt, a
-`markActor` site, a `Figure` role or the Giza anchors), leaving the
-elder the single documented exception, since he carries his own
-standing label (`src/scenes/actorLabelRoster.test.ts`). Live: nothing
+`markActor` site, a `Figure` role or the Giza anchors), with no
+documented exception left since the elder and his own standing label
+retired (`src/scenes/actorLabelRoster.test.ts`). Live: nothing
 DRAWN is invisible to the layer — every animal stamped by the current
 draw pass and standing in the picture, and the hunt's own two figures,
 reach the raw candidate set (`scripts/verify/enrichments.mjs`), and
@@ -1139,7 +1141,7 @@ granite skirt, the buried Sphinx) pure-tested in
 Thomas-Cook-era ambient anchors (guides, cameleer, donkey-boy,
 tourists) for a free standing spot they can also leave — and the live
 enter-with-SPACE, the three pyramids + buried Sphinx rendering, the
-collidable-and-no-trade/elder site and the warm desert-sand ground
+collidable site with neither trade nor chief, and the warm desert-sand ground
 gated in `scripts/verify/polish.mjs` (screenshot 139);
 the same period casing cap and half-buried Sphinx carry into Cairo's
 western skyline (point 82).
@@ -1760,17 +1762,16 @@ their coordinates and reveal their label on sighting (screenshots 91,
 
 ## 26. Standing with the natives.
 
-Verifiable: `src/state/store.reputation.test.ts`
-asserts a rifle in the pack does not block the elder talk or
-audience, the hostility/expulsion and its wear-off, the friend pledge
-(exactly once), the capped attack outcomes with rescue entries, the
-near-death aid, the free village supplies, the rich
-money/gifts/provisions haul, and the permanent robbery consequences
-including the forfeited friendship, and the goal-orphan warning
-predicate (point 208 A7 — `robWouldOrphanGoal` fires for a
-coordinate-bearing region, North or East, whose hint is not yet
-learned, and clears once it is); `src/ui/Dialogs.test.tsx` the
-confirmation gate on the Rob button.
+Verifiable for what §12 still defines:
+`src/state/store.reputation.test.ts` asserts the capped attack outcomes with
+their rescue entries, the near-death aid with its cooldown and the free village
+supplies an Honored Friend receives.
+
+NOT MET, and openly so: nothing bestows the standing any more. The gift/goodwill
+ladder, the hostility period and the rifle-gated robbery that produced and
+forfeited it retired on 05.09.2026 (user 03.09.2026); the tests above set the
+status directly. The criterion waits for the observation model to give it a
+producer.
 
 ## 27. Camps (item caches).
 
@@ -1778,8 +1779,8 @@ Verifiable:
 `src/state/store.camps.test.ts` asserts pitching and reopening,
 storing/taking incl. the capacity refusal and the canoe put-away, the
 loot-and-discover flow with its journal entry, the friend gate on
-village caches, their persistence, and their destruction by the
-robbery (the map X rides on the covered `freeCamps` state).
+village caches and their persistence (the map X rides on the covered
+`freeCamps` state). The robbery that used to destroy them retired with §12.
 
 ## 28. Full saving and loading.
 
@@ -1831,13 +1832,13 @@ declutter);
 events) that no overlay shows before the first touch, the first touch
 mounts it and applies the preset, the stick walks the character (and
 releasing it settles), a right-half drag turns the first-person yaw,
-tapping the prompt addresses the elder, and a two-finger pinch changes
+tapping the prompt calls the chief out of his hut, and a two-finger pinch changes
 the bird's-eye zoom — all without console errors.
 
 ## 31. Settlement orientation and panorama wildlife.
 
 Verifiable: `scripts/verify/polish.mjs`
-asserts no markers before and markers after the gift plus the toast,
+asserts no markers before and markers after the chief comes out plus the toast,
 their persistence across re-entry, and the panorama wildlife count via
 the dev hook, with a screenshot of the highlighted village; plus that
 every silhouette reads small (bounded subtended angle), is hazed (not

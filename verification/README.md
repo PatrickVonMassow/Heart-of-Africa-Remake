@@ -17,7 +17,7 @@ point(s).
 | 01-birdseye-view.png | 1, 4 — bird's-eye view, status bar, travel |
 | 02-port-cairo-trade.png | 5 — Cairo trade with aligned price table |
 | 03-village-nubians.png | 6, 15 — village fabric, chief's hut |
-| 04-chief-hut-audience.png | 6, 12 — audience, gift dialog |
+| 04-chief-outside-his-hut.png | 6, 12 — the chief called out, standing in the open |
 | 05-journal-hint.png | 7, 8 — journal with language/location hints |
 | 06-start-journal.png | 8, 19 — start entry, markup-free display |
 | 07-victory.png | 10 — victory after the dig |

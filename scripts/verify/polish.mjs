@@ -1757,7 +1757,7 @@ if (section('giza-site')) {
     JSON.stringify(site.monuments),
   )
   check(
-    'the monuments are collidable and the site has no trade/elder',
+    'the monuments are collidable and the site has no trade and no chief',
     site.colliders >= 4 && site.interactives === 0,
     JSON.stringify({ colliders: site.colliders, interactives: site.interactives }),
   )

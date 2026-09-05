@@ -218,7 +218,6 @@ are adjustable at runtime). The complete set, grouped as the menu presents it:
 - Input fields for cash, gifts and food.
 - Input field for the inventory capacity.
 - The dig radius (§18): how close to the buried site a dig with the shovel must be to succeed.
-- The goodwill points a chief requires before he parts with the location hint (§12/§13).
 
 ---
 
