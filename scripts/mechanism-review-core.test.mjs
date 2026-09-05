@@ -1584,7 +1584,7 @@ describe('evaluateMechanismReview', () => {
       const text = formatMechanismReviewVerdict(v)
       expect(text).toContain('split into 3 passes')
       expect(text).toContain('missing pass 2')
-      expect(text).not.toContain('review-sol.mjs --sha')
+      expect(text).not.toContain('review-astra.mjs --sha')
       expect(text).toContain('immutable commit boundary')
     })
 
@@ -1600,7 +1600,7 @@ describe('evaluateMechanismReview', () => {
         ['Fable 5', ['scripts/render-verify-core.test.mjs', 'scripts/section-tag-core.mjs', 'scripts/verify/sections.mjs']],
         ['Opus 5', ['scripts/criticality-review-guard.mjs', 'scripts/mechanism-review-core.test.mjs']],
         ['Opus 5', ['scripts/render-verify-guard.mjs', 'scripts/render-verify-guard.test.mjs', 'scripts/render-verify-recorder.mjs']],
-        ['Opus 5', ['scripts/review-sol.mjs', 'scripts/tasks-spec-guard.mjs', 'scripts/verify/sections.test.mjs', 'scripts/review-sol-plan.test.mjs']],
+        ['Opus 5', ['scripts/review-astra.mjs', 'scripts/tasks-spec-guard.mjs', 'scripts/verify/sections.test.mjs', 'scripts/review-astra-plan.test.mjs']],
         ['Fable 5', ['scripts/mechanism-review-core.mjs']],
         ['Fable 5', ['scripts/render-verify-recorder.test.mjs']],
         ['Fable 5', ['scripts/verify/README.md']],

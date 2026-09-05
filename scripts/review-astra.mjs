@@ -1,11 +1,11 @@
 #!/usr/bin/env node
 // THE ONE COMMAND FOR A CROSS-VENDOR FOUR-EYES REVIEW (work-order point 624).
 //
-//   node scripts/review-sol.mjs --sha <sha> --brief "<what to judge>" \
+//   node scripts/review-astra.mjs --sha <sha> --brief "<what to judge>" \
 //        [--mode review|blind-parallel] [--point <N>] [--since <ref>] [--timeout <ms>]
-//   node scripts/review-sol.mjs --probe          # is the -m flag honoured at all?
-//   node scripts/review-sol.mjs --save-login     # keep the login across a rebuild
-//   node scripts/review-sol.mjs --restore-login
+//   node scripts/review-astra.mjs --probe          # is the -m flag honoured at all?
+//   node scripts/review-astra.mjs --save-login     # keep the login across a rebuild
+//   node scripts/review-astra.mjs --restore-login
 //
 // It runs the review through `codex exec` non-interactively in a READ-ONLY
 // sandbox and prints the verdict and the evidence in the shape
@@ -18,10 +18,10 @@
 // cannot create user namespaces and codex's sandbox launcher therefore kills
 // every command the reviewer would run (see formatReviewMaterial).
 //
-// WHEN SOL IS NOT AVAILABLE the command says so in ONE line, names the cause,
+// WHEN ASTRA IS NOT AVAILABLE the command says so in ONE line, names the cause,
 // and hands the review to the first eligible Claude reviewer — and the record it
 // prints then carries that model's name with an EMPTY verdict, so nothing can be recorded as reviewed
-// that nobody reviewed. The decision logic is pure (review-sol-core.mjs); this
+// that nobody reviewed. The decision logic is pure (review-astra-core.mjs); this
 // half does the process work and fails LOUD. It is a command, not a hook.
 //
 // THE LOGIN (the point's open question, answered here): `codex login` stores its
@@ -48,13 +48,13 @@ import { dirname, join, sep as sep_ } from 'node:path'
 import { createHash } from 'node:crypto'
 import { REPO_ROOT } from './repo-paths.mjs'
 import { isMainModule } from './is-main.mjs'
-import { currentSetting, settingProblemLine } from './sol-share.mjs'
-import { routeFor } from './sol-share-core.mjs'
+import { currentSetting, settingProblemLine } from './astra-share.mjs'
+import { routeFor } from './astra-share-core.mjs'
 import { currentFableState } from './fable-switch.mjs'
 import { readRecords, verifyCarried } from './mechanism-review.mjs'
 import { mergeProblem, reviewRecordWellFormed, sameModel } from './mechanism-review-core.mjs'
 import { authoringClaudeArgs } from './author-fable-core.mjs'
-import { parseClaudeAskOutput } from './ask-sol-core.mjs'
+import { parseClaudeAskOutput } from './ask-astra-core.mjs'
 import {
   addedFilesAreCoveredByPatch,
   buildReviewPrompt,
@@ -76,11 +76,11 @@ import {
   REVIEW_TIMEOUT_MS,
   reviewerDescriptor,
   savedAuthPathFrom,
-  solAuthored,
-  SOL_MODEL_ID,
-  SOL_MODEL_NAME,
-  SOL_REASONING_EFFORT,
-} from './review-sol-core.mjs'
+  astraAuthored,
+  ASTRA_MODEL_ID,
+  ASTRA_MODEL_NAME,
+  ASTRA_REASONING_EFFORT,
+} from './review-astra-core.mjs'
 import {
   assembleMaterial,
   formatCoveragePlan,
@@ -118,11 +118,11 @@ export const AUTH_FILE = join(CODEX_HOME, 'auth.json')
 /**
  * Where this command keeps its own state: the saved login and the probe receipt.
  * The MAIN checkout's `local/` — never the throwaway worktree's (see the core).
- * `REVIEW_SOL_STATE_DIR` redirects it, which is how the CLI suite exercises the
+ * `REVIEW_ASTRA_STATE_DIR` redirects it, which is how the CLI suite exercises the
  * real command without writing into the developer's checkout.
  */
 export const STATE_DIR =
-  process.env.REVIEW_SOL_STATE_DIR ||
+  process.env.REVIEW_ASTRA_STATE_DIR ||
   dirname(
     savedAuthPathFrom(
       spawnSync('git', ['rev-parse', '--path-format=absolute', '--git-common-dir'], {
@@ -543,7 +543,7 @@ export function formatContributionPassPlan(plan = {}) {
         const fileFlags = (entry.files ?? []).map((file) => ` --file ${shellQuote(file)}`).join('')
         const reviewer = reviewerDescriptor(pass.reviewer)
         lines.push(
-          `    node scripts/review-sol.mjs --sha ${entry.sha} --since ${entry.base} ` +
+          `    node scripts/review-astra.mjs --sha ${entry.sha} --since ${entry.base} ` +
             `${reviewer ? `--reviewer ${reviewer.key} ` : ''}--brief "<what to judge>"${passFlag}${fileFlags}`,
         )
       }
@@ -566,7 +566,7 @@ export function formatContributionPassPlan(plan = {}) {
 
 export function formatAuthorshipPlan(plan, { sha = '' } = {}) {
   const lines = [
-    `review-sol: the material budget is ${plan.budget} characters per round; ` +
+    `review-astra: the material budget is ${plan.budget} characters per round; ` +
       `this range has ${plan.rawSize} characters of outstanding material.`,
   ]
   if (!plan.passes.length && plan.dropped?.length) {
@@ -588,7 +588,7 @@ export function formatAuthorshipPlan(plan, { sha = '' } = {}) {
       `  pass ${pass.index}/${pass.total} → ${pass.reviewer ? `${pass.reviewerVendor} reviewer ${pass.reviewer}` : 'UNREVIEWABLE'}; ` +
         `${pass.size} characters; end state ${String(pass.endState).slice(0, 7)}; ` +
         `files ${pass.files.map(quotePassFile).join(', ')}`,
-      `    node scripts/review-sol.mjs --sha ${sha} --since ${pass.rangeBase} ` +
+      `    node scripts/review-astra.mjs --sha ${sha} --since ${pass.rangeBase} ` +
         `${reviewer ? `--reviewer ${reviewer.key} ` : ''}--brief "<what to judge>" --pass ${pass.index}`,
     )
   }
@@ -622,10 +622,10 @@ export function formatUnavailableReceiptRoute(plan, { sha = '', point = '' } = {
   const files = [...new Set((plan?.unreviewable ?? []).flatMap((group) => group?.files ?? []))]
   if (!files.length) return ''
   if (!/^\d+$/.test(String(point).trim())) {
-    return 'review-sol: unavailable files need a point-bound receipt; rerun this plan with --point <N> to print its verified record command.'
+    return 'review-astra: unavailable files need a point-bound receipt; rerun this plan with --point <N> to print its verified record command.'
   }
   return [
-    'review-sol: after every runnable pass is recorded, record only the measured unavailable remainder:',
+    'review-astra: after every runnable pass is recorded, record only the measured unavailable remainder:',
     '  node scripts/criticality-review-guard.mjs ' +
       `--record-unavailable ${sha} --point ${String(point).trim()} ` +
       `--files ${shellQuote(formatPassFiles(files))} ` +
@@ -665,7 +665,7 @@ function assemblePass(range, pass, plan = null) {
  * The pass plan for a range, or null when it could not be measured.
  *
  * For the paths that spend NO round and still print a record command for the
- * whole range — the share switch at `claude-only`, and a range Sol authored. A
+ * whole range — the share switch at `claude-only`, and a range Astra authored. A
  * measurement that fails is reported as a measurement that failed: `null` yields
  * the `unplanned` refusal, never a silent "it fits".
  */
@@ -720,14 +720,14 @@ function mergeBase(ref, sha, { explicit = false } = {}) {
 /**
  * Run codex once and hand back everything the classifier needs.
  *
- * EXPORTED so `scripts/ask-sol.mjs` runs the SAME path rather than a second one of its
+ * EXPORTED so `scripts/ask-astra.mjs` runs the SAME path rather than a second one of its
  * own (point 654): the sandbox flags, the stdin hand-off, the temp output file and the
  * timeout are decisions this file already got right the hard way, and two copies of them
  * would drift the day one is fixed.
  */
-export function runCodex({ prompt, input = '', modelId = SOL_MODEL_ID, timeoutMs = REVIEW_TIMEOUT_MS }) {
-  const outFile = join(tmpdir(), `review-sol-${process.pid}-${Date.now()}.txt`)
-  const args = codexArgs({ modelId, effort: SOL_REASONING_EFFORT, cwd: REPO_ROOT, outputFile: outFile, prompt })
+export function runCodex({ prompt, input = '', modelId = ASTRA_MODEL_ID, timeoutMs = REVIEW_TIMEOUT_MS }) {
+  const outFile = join(tmpdir(), `review-astra-${process.pid}-${Date.now()}.txt`)
+  const args = codexArgs({ modelId, effort: ASTRA_REASONING_EFFORT, cwd: REPO_ROOT, outputFile: outFile, prompt })
   const res = spawnSync(CODEX_BIN, args, {
     encoding: 'utf8',
     // codex appends piped stdin to the prompt as a <stdin> block; that is how
@@ -847,7 +847,7 @@ export function runClaudeReviewer({ prompt, input = '', reviewer, timeoutMs = RE
 }
 
 /** The receipt of the last passed model-id probe (see probeFreshness). */
-export const PROBE_RECEIPT_FILE = join(STATE_DIR, 'review-sol-probe.json')
+export const PROBE_RECEIPT_FILE = join(STATE_DIR, 'review-astra-probe.json')
 
 /**
  * What the model-id proof is TIED TO: the codex binary, its version and the
@@ -889,15 +889,15 @@ export function probe() {
       `${JSON.stringify({ at: Date.now(), refused: true, id: bogus, fingerprint: codexFingerprint() })}\n`,
     )
     console.log(
-      `review-sol --probe: PASS — the server REFUSED the unknown id "${bogus}", so \`-m\` is honoured\n` +
-        `  and a review run with -m ${SOL_MODEL_ID} really is ${SOL_MODEL_NAME}.`,
+      `review-astra --probe: PASS — the server REFUSED the unknown id "${bogus}", so \`-m\` is honoured\n` +
+        `  and a review run with -m ${ASTRA_MODEL_ID} really is ${ASTRA_MODEL_NAME}.`,
     )
     return 0
   }
   console.error(
-    `review-sol --probe: FAIL — the unknown id "${bogus}" was NOT refused (exit ${res.exitCode}).\n` +
-      '  A model id that is silently substituted makes every recorded Sol review worthless:\n' +
-      '  the ledger would name Sol for work some other model did. Do not record Sol reviews\n' +
+    `review-astra --probe: FAIL — the unknown id "${bogus}" was NOT refused (exit ${res.exitCode}).\n` +
+      '  A model id that is silently substituted makes every recorded Astra review worthless:\n' +
+      '  the ledger would name Astra for work some other model did. Do not record Astra reviews\n' +
       `  until this passes again.\n  codex said: ${text.trim().split('\n').slice(-3).join(' | ') || '(nothing)'}`,
   )
   return 1
@@ -907,11 +907,11 @@ export function probe() {
  * Is `-m` PROVEN honoured on this machine, proving it now where the receipt is missing
  * or stale? Returns false when the proof could not be obtained.
  *
- * EXPORTED for `scripts/ask-sol.mjs` (point 654): every kind of work attributed to Sol
+ * EXPORTED for `scripts/ask-astra.mjs` (point 654): every kind of work attributed to Astra
  * rests on the same proof, since nothing in a run's output names the model that answered.
  * A second implementation of this check would be a second place for it to be skipped.
  */
-export function ensureModelProven({ log = console.error, who = 'review-sol' } = {}) {
+export function ensureModelProven({ log = console.error, who = 'review-astra' } = {}) {
   const freshness = probeFreshness(readProbeReceipt(), Date.now(), PROBE_MAX_AGE_MS, codexFingerprint())
   if (freshness.fresh) return true
   log(`${who}: ${freshness.warning}\n  proving the model id first …`)
@@ -950,7 +950,7 @@ function pathEscapes(target) {
 /** `--save-login` / `--restore-login`: the container-rebuild answer. */
 function saveLogin() {
   if (!existsSync(AUTH_FILE)) {
-    console.error(`review-sol --save-login: no login found at ${AUTH_FILE} — run \`codex login\` first.`)
+    console.error(`review-astra --save-login: no login found at ${AUTH_FILE} — run \`codex login\` first.`)
     return 1
   }
   mkdirSync(dirname(SAVED_AUTH_FILE), { recursive: true })
@@ -967,7 +967,7 @@ function saveLogin() {
   })
   if (ignored.status !== 0) {
     console.error(
-      `review-sol --save-login: REFUSING — git does not ignore ${SAVED_AUTH_FILE}.\n` +
+      `review-astra --save-login: REFUSING — git does not ignore ${SAVED_AUTH_FILE}.\n` +
         '  A login token written where git can see it is one `git add -A` away from the repository.',
     )
     return 1
@@ -980,15 +980,15 @@ function saveLogin() {
   for (const end of [SAVED_AUTH_FILE, AUTH_FILE]) {
     const escape = pathEscapes(end)
     if (escape) {
-      console.error(`review-sol --save-login: REFUSING — ${escape}`)
+      console.error(`review-astra --save-login: REFUSING — ${escape}`)
       return 1
     }
   }
   copyFileSync(AUTH_FILE, SAVED_AUTH_FILE)
   chmodSync(SAVED_AUTH_FILE, 0o600)
   console.log(
-    `review-sol: login saved to ${SAVED_AUTH_FILE} (git-ignored, 0600).\n` +
-      '  After a container rebuild: node scripts/review-sol.mjs --restore-login',
+    `review-astra: login saved to ${SAVED_AUTH_FILE} (git-ignored, 0600).\n` +
+      '  After a container rebuild: node scripts/review-astra.mjs --restore-login',
   )
   return 0
 }
@@ -996,8 +996,8 @@ function saveLogin() {
 function restoreLogin() {
   if (!existsSync(SAVED_AUTH_FILE)) {
     console.error(
-      `review-sol --restore-login: nothing saved at ${SAVED_AUTH_FILE}.\n` +
-        '  Log in once (`codex login`), then `node scripts/review-sol.mjs --save-login`.',
+      `review-astra --restore-login: nothing saved at ${SAVED_AUTH_FILE}.\n` +
+        '  Log in once (`codex login`), then `node scripts/review-astra.mjs --save-login`.',
     )
     return 1
   }
@@ -1006,7 +1006,7 @@ function restoreLogin() {
   for (const end of [SAVED_AUTH_FILE, AUTH_FILE]) {
     const escape = pathEscapes(end)
     if (escape) {
-      console.error(`review-sol --restore-login: REFUSING — ${escape}`)
+      console.error(`review-astra --restore-login: REFUSING — ${escape}`)
       return 1
     }
   }
@@ -1015,7 +1015,7 @@ function restoreLogin() {
   chmodSync(AUTH_FILE, 0o600)
   const age = Math.round((Date.now() - statSync(SAVED_AUTH_FILE).mtimeMs) / 86_400_000)
   console.log(
-    `review-sol: login restored to ${AUTH_FILE} (saved ${age} day(s) ago).\n` +
+    `review-astra: login restored to ${AUTH_FILE} (saved ${age} day(s) ago).\n` +
       '  Check it with: codex login status',
   )
   return 0
@@ -1023,11 +1023,11 @@ function restoreLogin() {
 
 export const usage = () =>
   [
-    'usage: node scripts/review-sol.mjs [--reviewer sol|fable|opus|opus48] --sha <sha> --brief "<what to judge>" \\',
+    'usage: node scripts/review-astra.mjs [--reviewer astra|fable|opus|opus48] --sha <sha> --brief "<what to judge>" \\',
     '           [--mode review|blind-parallel] [--point <N>] [--since <ref>] [--timeout <ms>] \\',
     '           [--pass <k>] [--file <current end-state path>]…',
-    '       node scripts/review-sol.mjs --probe            (is -m honoured?)',
-    '       node scripts/review-sol.mjs --save-login | --restore-login',
+    '       node scripts/review-astra.mjs --probe            (is -m honoured?)',
+    '       node scripts/review-astra.mjs --save-login | --restore-login',
     '',
     'The material is the whole range <since>..<sha> (--since defaults to main), because',
     'one record covers every commit it contains.',
@@ -1046,7 +1046,7 @@ export const usage = () =>
     'Files with no independent reviewer stay outside runnable pass indices instead of blocking',
     'them. With --point <N>, the plan prints the Git-verified unavailable-receipt command for',
     'that exact remainder; the receipt never claims that a review occurred.',
-    `Reviews run on ${SOL_MODEL_NAME} at reasoning effort ${SOL_REASONING_EFFORT} (CLAUDE.md §6). When it`,
+    `Reviews run on ${ASTRA_MODEL_NAME} at reasoning effort ${ASTRA_REASONING_EFFORT} (CLAUDE.md §6). When it`,
     'cannot be reached the review is HANDED OVER to the first eligible Claude model',
     'allowed by the shared Fable switch (`node scripts/fable-switch.mjs --status`)',
     'that authored no part of the reviewed range — the recorded review always names the',
@@ -1075,12 +1075,12 @@ if (isMainModule(import.meta.url)) {
     const selectedFiles = [...new Set(flags('--file'))]
     const requestedReviewer = reviewerFlag ? reviewerDescriptor(reviewerFlag) : null
     if (!sha || !brief) {
-      console.error('review-sol: --sha and --brief are both required.\n')
+      console.error('review-astra: --sha and --brief are both required.\n')
       console.error(usage())
       process.exit(2)
     }
     if (reviewerFlag && !requestedReviewer) {
-      console.error('review-sol: --reviewer must be one of sol, fable, opus, opus48.\n')
+      console.error('review-astra: --reviewer must be one of astra, fable, opus, opus48.\n')
       console.error(usage())
       process.exit(2)
     }
@@ -1093,20 +1093,20 @@ if (isMainModule(import.meta.url)) {
       windowsHide: true,
     })
     if (resolved.status !== 0) {
-      console.error(`review-sol: "${sha}" is not a commit in this repository.`)
+      console.error(`review-astra: "${sha}" is not a commit in this repository.`)
       process.exit(2)
     }
     const full = (resolved.stdout ?? '').trim()
 
     // THE SHARE SWITCH IS ASKED FIRST (point 654). At `claude-only` the operator has
     // moved the load off OpenAI, so no request is sent at all — and the review lands
-    // exactly where every unavailable Sol lands: with a Claude reviewer that authored
+    // exactly where every unavailable Astra lands: with a Claude reviewer that authored
     // none of the range, and with NO verdict, because nobody has reviewed it yet.
     const share = currentSetting()
     const fableState = currentFableState()
     if (!fableState.ok) throw new Error(fableState.problem)
     // A fallback nobody is told about is a setting nobody chose (cross-vendor review).
-    if (share.problem) console.error(settingProblemLine(share, 'review-sol'))
+    if (share.problem) console.error(settingProblemLine(share, 'review-astra'))
     // THE COVERAGE QUESTION IS ASKED ON EVERY PATH THAT PRINTS A TEMPLATE
     // (escalation round): the early routes hard-coded `partial: null`, so an
     // explicit narrowed `--since` on a fitting range printed a whole-SHA record
@@ -1126,7 +1126,7 @@ if (isMainModule(import.meta.url)) {
     const passFlag = flag('--pass')
     if (argv.includes('--carry-from')) {
       console.error(
-        'review-sol: --carry-from is obsolete — recorded pass coverage follows end-state files, so the next ' +
+        'review-astra: --carry-from is obsolete — recorded pass coverage follows end-state files, so the next ' +
           'plan automatically omits unchanged files and owes only files changed since their recorded state.',
       )
       process.exit(2)
@@ -1175,25 +1175,25 @@ if (isMainModule(import.meta.url)) {
     if (unavailableRoute) console.error(unavailableRoute)
     if (plan.passes.length > MAX_PASS_TOTAL) {
       console.error(
-        `review-sol: this range needs ${plan.passes.length} passes — more than the ${MAX_PASS_TOTAL} a record can hold.`,
+        `review-astra: this range needs ${plan.passes.length} passes — more than the ${MAX_PASS_TOTAL} a record can hold.`,
       )
       process.exit(2)
     }
     if (!plan.passes.length && plan.dropped.length && !plan.uncoverable.length) {
-      console.error('review-sol: every touched file returned to its base state; no review record is needed.')
+      console.error('review-astra: every touched file returned to its base state; no review record is needed.')
       process.exit(0)
     }
     if (!plan.passes.length || plan.uncoverable.length) {
       console.error(
         plan.unreviewable.length && !plan.uncoverable.length
-          ? 'review-sol: no runnable review pass remains; use the verified unavailable receipt route above.'
-          : 'review-sol: the authorship plan cannot cover every changed file; no record is offered.',
+          ? 'review-astra: no runnable review pass remains; use the verified unavailable receipt route above.'
+          : 'review-astra: the authorship plan cannot cover every changed file; no record is offered.',
       )
       process.exit(4)
     }
     const selection = passFor(plan)
     if (selection.error) {
-      console.error(`review-sol: ${selection.error}`)
+      console.error(`review-astra: ${selection.error}`)
       process.exit(2)
     }
     const selected = plan.fits ? plan.passes[0] : selection.pass
@@ -1205,7 +1205,7 @@ if (isMainModule(import.meta.url)) {
       ? selected.authors
       : [...new Set(plan.passes.flatMap((candidate) => candidate.authors ?? []))]
     if (!selected) {
-      console.error('review-sol: REFUSING to spend a round on the whole range — run one of the authored passes above.')
+      console.error('review-astra: REFUSING to spend a round on the whole range — run one of the authored passes above.')
       process.exit(4)
     }
     const commandFor = (decision) => formatReviewerCommand({
@@ -1220,10 +1220,10 @@ if (isMainModule(import.meta.url)) {
       files: selectedFiles,
     })
 
-    let targetReviewer = requestedReviewer ?? reviewerDescriptor(SOL_MODEL_NAME)
+    let targetReviewer = requestedReviewer ?? reviewerDescriptor(ASTRA_MODEL_NAME)
     let handover = ''
     if (requestedReviewer?.runtime === 'claude') {
-      handover = solAuthored(rangeAuthors) ? 'sol-authored' : 'sol-unavailable'
+      handover = astraAuthored(rangeAuthors) ? 'sol-authored' : 'sol-unavailable'
       const routed = decideReview({
         outcome: {
           ok: false,
@@ -1236,17 +1236,17 @@ if (isMainModule(import.meta.url)) {
       })
       if (!routed.model || !sameModel(routed.model, requestedReviewer.name)) {
         console.error(
-          `review-sol: --reviewer ${requestedReviewer.key} is not this range's first eligible handover; ` +
+          `review-astra: --reviewer ${requestedReviewer.key} is not this range's first eligible handover; ` +
             `the route names ${routed.model || 'nobody'}.`,
         )
         process.exit(2)
       }
-    } else if (requestedReviewer && solAuthored(rangeAuthors)) {
-      console.error(`review-sol: ${SOL_MODEL_NAME} authored part of this range and may not review it.`)
+    } else if (requestedReviewer && astraAuthored(rangeAuthors)) {
+      console.error(`review-astra: ${ASTRA_MODEL_NAME} authored part of this range and may not review it.`)
       process.exit(2)
     }
 
-    if (!requestedReviewer && routeFor('review', share.setting) !== 'sol') {
+    if (!requestedReviewer && routeFor('review', share.setting) !== 'astra') {
       const decision = decideReview({
         outcome: { ok: false, kind: OUTCOME.SWITCHED_OFF, cause: causeTextFor(OUTCOME.SWITCHED_OFF) },
         parsed: { ok: false },
@@ -1280,10 +1280,10 @@ if (isMainModule(import.meta.url)) {
     }
 
     // WHO WROTE IT DECIDES WHO MAY JUDGE IT, and that is asked BEFORE a codex
-    // call is paid for (point 667). Sol AUTHORS now, and a review it may not
-    // give is not worth an allowance: a Sol-authored range goes straight to the
+    // call is paid for (point 667). Astra AUTHORS now, and a review it may not
+    // give is not worth an allowance: a Astra-authored range goes straight to the
     // Claude reviewer that also runs the suites, judges the picture and lands.
-    if (!requestedReviewer && solAuthored(rangeAuthors)) {
+    if (!requestedReviewer && astraAuthored(rangeAuthors)) {
       const decision = decideReview({
         outcome: { ok: false, kind: OUTCOME.SELF_REVIEW, cause: causeTextFor(OUTCOME.SELF_REVIEW) },
         parsed: { ok: false },
@@ -1309,17 +1309,17 @@ if (isMainModule(import.meta.url)) {
     }
 
     console.error(
-      `review-sol: asking ${targetReviewer.name} (effort ${targetReviewer.effort}) to review ${full.slice(0, 7)} …`,
+      `review-astra: asking ${targetReviewer.name} (effort ${targetReviewer.effort}) to review ${full.slice(0, 7)} …`,
     )
     // THE IDENTITY IS PROVEN BEFORE THE REVIEW, NOT MENTIONED AFTER IT (second
     // cross-vendor round). Nothing in a run's output names the model that
     // answered, so the whole attribution rests on the server refusing an unknown
-    // id. A note under the record was too weak: the record command naming Sol
+    // id. A note under the record was too weak: the record command naming Astra
     // was printed either way. The probe therefore RUNS when its receipt is
     // missing or stale, and a failed probe stops the review before a word of it
     // can be attributed to a model that may not have written it.
     if (targetReviewer.runtime === 'codex' && !ensureModelProven()) {
-      console.error('review-sol: the model id is not proven honoured — refusing to attribute a review to it.')
+      console.error('review-astra: the model id is not proven honoured — refusing to attribute a review to it.')
       process.exit(2)
     }
 
@@ -1363,7 +1363,7 @@ if (isMainModule(import.meta.url)) {
     // `ready` rests on this answer (escalation round): a clean exit with a
     // parseable verdict is not delivery evidence.
     const shortfall = materialShortfall({ assembly, sent: run.sentInput, transportError: run.transportError })
-    // WHO AUTHORED IT decides who may review it if Sol is unavailable: no model
+    // WHO AUTHORED IT decides who may review it if Astra is unavailable: no model
     // can review its own commit (see fallbackReviewerFor), and the record
     // covers the whole range, so every author in it counts.
     const decision = targetReviewer.runtime === 'codex'
@@ -1399,7 +1399,7 @@ if (isMainModule(import.meta.url)) {
     }
     if (targetReviewer.runtime === 'claude' && decision.fellBack) {
       console.log(
-        `review-sol: ${targetReviewer.name} did not deliver a recordable review of ${full.slice(0, 7)}: ` +
+        `review-astra: ${targetReviewer.name} did not deliver a recordable review of ${full.slice(0, 7)}: ` +
           `${decision.cause || 'no usable verdict'}.\n  The review is NOT done; no record command is printed.`,
       )
       process.exit(3)
@@ -1432,7 +1432,7 @@ if (isMainModule(import.meta.url)) {
     // is the same shape of answer: a verdict was given, no record may rest on it.
     process.exit(decision.fellBack || shortfall ? 3 : 0)
   } catch (e) {
-    console.error(`review-sol failed: ${(e && e.message) || e}`)
+    console.error(`review-astra failed: ${(e && e.message) || e}`)
     process.exit(1)
   }
 }

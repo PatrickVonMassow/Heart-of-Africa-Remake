@@ -2,7 +2,7 @@
 // wording lives in mechanism-review-guard-gap-core.mjs.
 //
 // Called by mechanism-review-guard.mjs ONLY on a turn it would block: it
-// assembles the same shape of material `review-sol` would send for the range
+// assembles the same shape of material `review-astra` would send for the range
 // (diffstat + patch + every touched path's content at head), measures it
 // against the budget, asks the pass-splitting tool — where this tree carries
 // one — whether a split covers the range, and hands the numbers to the pure
@@ -74,7 +74,7 @@ export const runGitArgs = (args, { cwd = REPO_ROOT, env = process.env } = {}) =>
 
 /**
  * Assemble and measure the range's material. Character counts over the same
- * parts `review-sol` sends: the diffstat, the whole patch, and each touched
+ * parts `review-astra` sends: the diffstat, the whole patch, and each touched
  * path's content at `head` (a path absent there — deleted — still counts its
  * patch, which the patch total already carries).
  */

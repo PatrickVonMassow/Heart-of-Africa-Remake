@@ -4500,7 +4500,7 @@ describe('commissionTarget — the act of opening a point, recognised', () => {
   })
 
   it('recognises an authoring run as the commissioning it is', () => {
-    expect(commissionTarget({ toolName: 'Bash', command: 'node scripts/author-sol.mjs --point 697' })).toEqual({
+    expect(commissionTarget({ toolName: 'Bash', command: 'node scripts/author-astra.mjs --point 697' })).toEqual({
       point: 697,
       points: [697],
       refs: [],
@@ -4517,11 +4517,11 @@ describe('commissionTarget — the act of opening a point, recognised', () => {
   })
 
   it('opens NOTHING on the read-only authoring legs — routing and dry-run', () => {
-    expect(commissionTarget({ toolName: 'Bash', command: 'node scripts/author-sol.mjs --routing --point 697' })).toEqual(
+    expect(commissionTarget({ toolName: 'Bash', command: 'node scripts/author-astra.mjs --routing --point 697' })).toEqual(
       { point: null, points: [], refs: [], refsLoose: false, how: 'none' },
     )
     expect(
-      commissionTarget({ toolName: 'Bash', command: 'node scripts/author-sol.mjs --point 697 --dry-run' }).point,
+      commissionTarget({ toolName: 'Bash', command: 'node scripts/author-astra.mjs --point 697 --dry-run' }).point,
     ).toBeNull()
     expect(
       commissionTarget({ toolName: 'Bash', command: 'node scripts/author-fable.mjs --point 834 --dry-run' }).point,
@@ -4530,7 +4530,7 @@ describe('commissionTarget — the act of opening a point, recognised', () => {
     expect(
       commissionTarget({
         toolName: 'Bash',
-        command: 'node scripts/author-sol.mjs --routing --point 705 && git checkout -b feat/697-a',
+        command: 'node scripts/author-astra.mjs --routing --point 705 && git checkout -b feat/697-a',
       }).points,
     ).toEqual([697])
   })

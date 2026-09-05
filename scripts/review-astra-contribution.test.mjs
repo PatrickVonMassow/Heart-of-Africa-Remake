@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { buildContributionPassPlan, formatContributionPassPlan } from './review-sol.mjs'
+import { buildContributionPassPlan, formatContributionPassPlan } from './review-astra.mjs'
 import { formatMechanismReviewVerdict } from './mechanism-review-core.mjs'
 
 const commit = (letter, files = ['scripts/example-guard.mjs']) => ({

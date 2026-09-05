@@ -11,7 +11,7 @@ import { delimiter, dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 
 const HERE = dirname(fileURLToPath(import.meta.url))
-const CLI = join(HERE, 'ask-sol.mjs')
+const CLI = join(HERE, 'ask-astra.mjs')
 
 /** A `codex` that answers however the case's env asks it to. */
 const STUB = `#!/usr/bin/env node
@@ -28,7 +28,7 @@ try { stdin = readFileSync(0, 'utf8') } catch {}
 writeFileSync(process.env.STUB_STDIN, stdin)
 writeFileSync(process.env.STUB_PROMPT, argv[argv.length - 1])
 appendFileSync(process.env.STUB_LOG, model + '\\n')
-if (model !== 'gpt-5.6-sol') {
+if (model !== 'gpt-6-astra') {
   process.stderr.write('The requested model is not supported when using Codex with a ChatGPT account.\\n')
   process.exit(1)
 }
@@ -83,8 +83,8 @@ const run = (args, env = {}) =>
     env: {
       ...process.env,
       PATH: `${stubDir}${delimiter}${process.env.PATH}`,
-      REVIEW_SOL_STATE_DIR: stateDir,
-      SOL_SHARE_FILE: shareFile,
+      REVIEW_ASTRA_STATE_DIR: stateDir,
+      ASTRA_SHARE_FILE: shareFile,
       // The Fable switch lives in the MAIN checkout's .claude/, which is
       // git-ignored: a fresh clone and every CI runner have none, and the two
       // Fable cases below then died on "the switch state is absent" while
@@ -103,7 +103,7 @@ const calls = () => readFileSync(join(dir, 'calls.log'), 'utf8').trim().split('\
 const clearCalls = () => writeFileSync(join(dir, 'calls.log'), '')
 
 beforeAll(() => {
-  dir = mkdtempSync(join(tmpdir(), 'hoa-ask-sol-'))
+  dir = mkdtempSync(join(tmpdir(), 'hoa-ask-astra-'))
   stubDir = join(dir, 'bin')
   stateDir = join(dir, 'state')
   mkdirSync(stubDir, { recursive: true })
@@ -112,12 +112,12 @@ beforeAll(() => {
   chmodSync(join(stubDir, 'codex'), 0o755)
   writeFileSync(join(stubDir, 'claude'), CLAUDE_STUB)
   chmodSync(join(stubDir, 'claude'), 0o755)
-  shareFile = join(dir, 'sol-share.json')
-  setting('prefer-sol')
+  shareFile = join(dir, 'astra-share.json')
+  setting('prefer-astra')
   fableFile = join(dir, 'fable-switch.json')
   writeFileSync(fableFile, JSON.stringify({
     state: 'on', reason: 'fixture: the Fable lane is open for this suite',
-    setBy: 'ask-sol-cli.test', changedAt: Date.parse('2026-08-22T16:26:48.740Z'),
+    setBy: 'ask-astra-cli.test', changedAt: Date.parse('2026-08-22T16:26:48.740Z'),
   }))
   materialFile = join(dir, 'suite.log')
   writeFileSync(materialFile, 'FAIL place: the frame shows the port, not the village\n')
@@ -140,7 +140,7 @@ describe('what it refuses before spending anything', () => {
     const r = run(['--kind', 'diagnose', '--brief', 'why is it red?', '--file', materialFile])
     expect(r.status).toBe(3)
     expect(r.stderr).toMatch(/share switch is at `default`/)
-    expect(r.stderr).toMatch(/sol-share\.mjs --more/)
+    expect(r.stderr).toMatch(/astra-share\.mjs --more/)
     expect(calls()).toEqual([])
   })
 
@@ -161,15 +161,15 @@ describe('what it refuses before spending anything', () => {
     clearCalls()
     const r = run(['--kind', 'diagnose', '--brief', 'why is it red?', '--file', materialFile, '--anyway'])
     expect(r.status, r.stderr).toBe(0)
-    expect(calls()).toContain('gpt-5.6-sol')
+    expect(calls()).toContain('gpt-6-astra')
   })
 
   it('refuses to send an empty request when nothing was given as material', () => {
-    setting('prefer-sol')
+    setting('prefer-astra')
     clearCalls()
     // Even with NO probe receipt: a request with nothing to send must cost no codex call
     // at all, and the probe is a codex call (cross-vendor review, 12.08.2026).
-    rmSync(join(stateDir, 'review-sol-probe.json'), { force: true })
+    rmSync(join(stateDir, 'review-astra-probe.json'), { force: true })
     const r = run(['--kind', 'explain', '--brief', 'what does it do?'])
     expect(r.status).toBe(2)
     expect(r.stderr).toMatch(/no material at all/)
@@ -179,9 +179,9 @@ describe('what it refuses before spending anything', () => {
   // Same review: an unreadable file used to travel as "(could not be read: …)", which is
   // text a model will happily answer ABOUT — a shaped answer about nothing.
   it('refuses a request whose material is ENTIRELY placeholders, naming what failed', () => {
-    setting('prefer-sol')
+    setting('prefer-astra')
     clearCalls()
-    rmSync(join(stateDir, 'review-sol-probe.json'), { force: true })
+    rmSync(join(stateDir, 'review-astra-probe.json'), { force: true })
     const r = run(['--kind', 'diagnose', '--brief', 'why?', '--log', join(dir, 'does-not-exist.log')])
     expect(r.status).toBe(2)
     expect(r.stderr).toMatch(/material MISSING/)
@@ -193,9 +193,9 @@ describe('what it refuses before spending anything', () => {
   // readable but EMPTY file carries nothing, and a shaped answer about it would be an
   // answer about nothing.
   it('refuses a request whose only material is a readable but EMPTY file', () => {
-    setting('prefer-sol')
+    setting('prefer-astra')
     clearCalls()
-    rmSync(join(stateDir, 'review-sol-probe.json'), { force: true })
+    rmSync(join(stateDir, 'review-astra-probe.json'), { force: true })
     const empty = join(dir, 'empty.log')
     writeFileSync(empty, '   \n')
     const r = run(['--kind', 'diagnose', '--brief', 'why?', '--log', empty])
@@ -205,12 +205,12 @@ describe('what it refuses before spending anything', () => {
   })
 
   it('names a failed read but still runs when the rest of the material is real', () => {
-    setting('prefer-sol')
+    setting('prefer-astra')
     clearCalls()
     const r = run(['--kind', 'diagnose', '--brief', 'why?', '--file', materialFile, '--log', join(dir, 'does-not-exist.log')])
     expect(r.status, r.stderr).toBe(0)
     expect(r.stderr).toMatch(/material MISSING/)
-    expect(calls()).toContain('gpt-5.6-sol')
+    expect(calls()).toContain('gpt-6-astra')
   })
 })
 
@@ -248,16 +248,16 @@ describe('an ask that runs', () => {
   })
 
   it('proves the model id first, sends the material on stdin and prints the answer', () => {
-    setting('prefer-sol')
+    setting('prefer-astra')
     clearCalls()
     // With no receipt the id must be PROVEN before a word is attributed to Sol.
-    rmSync(join(stateDir, 'review-sol-probe.json'), { force: true })
+    rmSync(join(stateDir, 'review-astra-probe.json'), { force: true })
     const r = run(['--kind', 'diagnose', '--brief', 'why did the place suite go red?', '--file', materialFile], { INPUT: 'piped material too\n' })
     expect(r.status, r.stderr).toBe(0)
     // The unknown id is asked FIRST (the probe), then the real one: that refusal is the
     // whole proof that an answer attributed to Sol really is Sol's.
-    expect(calls()[0]).not.toBe('gpt-5.6-sol')
-    expect(calls().at(-1)).toBe('gpt-5.6-sol')
+    expect(calls()[0]).not.toBe('gpt-6-astra')
+    expect(calls().at(-1)).toBe('gpt-6-astra')
     const sent = readFileSync(join(dir, 'stdin.txt'), 'utf8')
     expect(sent).toContain('piped material too')
     expect(sent).toContain('FAIL place: the frame shows the port')
@@ -266,7 +266,7 @@ describe('an ask that runs', () => {
   })
 
   it('answers --json machine-readably, with the parsed answer and the setting it ran under', () => {
-    setting('prefer-sol')
+    setting('prefer-astra')
     const r = run(['--kind', 'enumerate', '--brief', 'what could go wrong?', '--file', materialFile, '--json'], {
       STUB_ANSWER: 'B1 | scripts/x.mjs | the lease is not renewed while a suite runs\nB2 | scripts/y.mjs | the fence is off after a rebuild',
     })
@@ -274,14 +274,14 @@ describe('an ask that runs', () => {
     const json = JSON.parse(r.stdout)
     expect(json.kind).toBe('enumerate')
     expect(json.model).toBe('GPT-5.6 Sol')
-    expect(json.setting).toBe('prefer-sol')
+    expect(json.setting).toBe('prefer-astra')
     expect(json.answer.entries.map((e) => e.id)).toEqual(['B1', 'B2'])
   })
 })
 
 describe('an ask that does not run', () => {
   it('names the cause in ONE line, hands the work back and exits 3 — never 0', () => {
-    setting('prefer-sol')
+    setting('prefer-astra')
     const r = run(['--kind', 'audit', '--brief', 'sweep it', '--file', materialFile], { STUB_MODE: 'fail' })
     expect(r.status).toBe(3)
     // ONE line names the cause — the line itself, not a paragraph the reader must mine.
@@ -291,7 +291,7 @@ describe('an ask that does not run', () => {
   })
 
   it('treats an answer without its shape as no answer at all, and shows what came back', () => {
-    setting('prefer-sol')
+    setting('prefer-astra')
     const r = run(['--kind', 'diagnose', '--brief', 'why?', '--file', materialFile], { STUB_ANSWER: 'it is probably a timing thing, hard to say' })
     expect(r.status).toBe(3)
     expect(r.stderr).toMatch(/no usable answer/)
@@ -299,7 +299,7 @@ describe('an ask that does not run', () => {
   })
 
   it('treats a model that says it saw nothing as no answer, whatever shape it wrote', () => {
-    setting('prefer-sol')
+    setting('prefer-astra')
     const r = run(['--kind', 'diagnose', '--brief', 'why?', '--file', materialFile], {
       STUB_ANSWER: 'CAUSE: unknown\nEVIDENCE: none of my commands reached the repository, so I inspected nothing',
     })

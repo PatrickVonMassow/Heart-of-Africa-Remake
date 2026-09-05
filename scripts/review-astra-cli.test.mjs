@@ -23,7 +23,7 @@
 // runs THAT. Every sha, every range and every author below is a fact of the
 // fixture, identical on any branch, on any machine, at any time.
 //
-// All state is redirected into the fixture too (`REVIEW_SOL_STATE_DIR`,
+// All state is redirected into the fixture too (`REVIEW_ASTRA_STATE_DIR`,
 // `CODEX_HOME`), so the suite never touches the developer's checkout or login.
 import { describe, expect, it, beforeAll, afterAll } from 'vitest'
 import { spawnSync } from 'node:child_process'
@@ -41,14 +41,14 @@ import {
 } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { delimiter, join, resolve } from 'node:path'
-import { FALLBACK_MODEL_NAME, SECOND_FALLBACK_MODEL_NAME, SOL_MODEL_NAME } from './review-sol-core.mjs'
+import { FALLBACK_MODEL_NAME, SECOND_FALLBACK_MODEL_NAME, ASTRA_MODEL_NAME } from './review-astra-core.mjs'
 import { writeState as writeFableState } from './fable-switch-core.mjs'
-import { formatContributionPassPlan } from './review-sol.mjs'
+import { formatContributionPassPlan } from './review-astra.mjs'
 
 /** The command and everything it imports — copied so REPO_ROOT is the fixture. */
 const SCRIPT_FILES = [
-  'review-sol.mjs',
-  'review-sol-core.mjs',
+  'review-astra.mjs',
+  'review-astra-core.mjs',
   // The material budget, its accounting and the pass plan (point 714): the
   // command refuses a record whose round did not carry the range, and the suite
   // exercises that refusal against the real command.
@@ -75,11 +75,11 @@ const SCRIPT_FILES = [
   // The share switch the command asks BEFORE it spends an allowance (point 654), and
   // the atomic write it persists a setting with. The fixture leaves the setting unset,
   // so every case below runs at `default` — reviews to Sol, as before.
-  'sol-share.mjs',
-  'sol-share-core.mjs',
+  'astra-share.mjs',
+  'astra-share-core.mjs',
   'fable-switch.mjs',
   'fable-switch-core.mjs',
-  'ask-sol-core.mjs',
+  'ask-astra-core.mjs',
   'author-fable-core.mjs',
   'atomic-write.mjs',
 ]
@@ -94,8 +94,8 @@ let script = ''
 let mainSha = ''
 let headSha = ''
 let fableSha = ''
-let solSha = ''
-let solHeadSha = ''
+let astraSha = ''
+let astraHeadSha = ''
 let unreviewableSha = ''
 let partlyReviewableSha = ''
 let mergeResolutionSha = ''
@@ -144,7 +144,7 @@ let stdin = ''
 try { stdin = readFileSync(0, 'utf8') } catch {}
 writeFileSync(process.env.STUB_STDIN, stdin)
 appendFileSync(process.env.STUB_LOG, model + '\\n')
-if (model !== 'gpt-5.6-sol') {
+if (model !== 'gpt-6-astra') {
   // The unknown-id probe: the real server refuses it, which is what proves -m
   // is honoured at all.
   process.stderr.write('The requested model is not supported when using Codex with a ChatGPT account.\\n')
@@ -253,7 +253,7 @@ const run = (args, env = {}) =>
     cwd: repo,
     env: hermeticEnv({
       PATH: `${stubDir}${delimiter}${process.env.PATH}`,
-      REVIEW_SOL_STATE_DIR: stateDir,
+      REVIEW_ASTRA_STATE_DIR: stateDir,
       CODEX_HOME: join(dir, 'codex-home'),
       STUB_LOG: join(dir, 'calls.log'),
       STUB_STDIN: join(dir, 'stdin.txt'),
@@ -297,7 +297,7 @@ const provenId = () => {
 }
 
 beforeAll(() => {
-  dir = mkdtempSync(join(tmpdir(), 'review-sol-cli-'))
+  dir = mkdtempSync(join(tmpdir(), 'review-astra-cli-'))
   emptyTemplate = join(dir, 'empty-git-template')
   mkdirSync(emptyTemplate, { recursive: true })
   repo = join(dir, 'repo')
@@ -336,7 +336,7 @@ beforeAll(() => {
     windowsHide: true,
     env: hermeticEnv(),
   })
-  script = join(repo, 'scripts', 'review-sol.mjs')
+  script = join(repo, 'scripts', 'review-astra.mjs')
   for (const file of SCRIPT_FILES) copyFileSync(resolve('scripts', file), join(repo, 'scripts', file))
   // `local/` is ignored here as it is in the real repository — the saved-login
   // path is refused unless git PROVES it ignored, and that proof is a property
@@ -365,12 +365,12 @@ beforeAll(() => {
   writeFileSync(join(repo, 'sol.txt'), 'written in the OpenAI authoring lane\n')
   git('add', '-A')
   git('commit', '--no-verify', '-q', '-m', 'Write something as Sol\n\nCo-Authored-By: GPT-5.6 Sol <noreply@openai.com>')
-  solSha = git('rev-parse', 'HEAD')
+  astraSha = git('rev-parse', 'HEAD')
   // …with a SECOND commit above it, so a `--since` can narrow the Sol range.
   writeFileSync(join(repo, 'sol2.txt'), 'a second commit in the OpenAI authoring lane\n')
   git('add', '-A')
   git('commit', '--no-verify', '-q', '-m', 'Extend the Sol work\n\nCo-Authored-By: GPT-5.6 Sol <noreply@openai.com>')
-  solHeadSha = git('rev-parse', 'HEAD')
+  astraHeadSha = git('rev-parse', 'HEAD')
 
   // A single contribution authored by both vendors has no independent vendor
   // left in the configured reviewer pool. Its refusal must still name the
@@ -570,7 +570,7 @@ describe('a review that runs', () => {
     provenId()
     const r = run(['--sha', headSha, '--point', '624', '--brief', 'judge the fallback path'])
     expect(r.status, r.stderr).toBe(0)
-    expect(r.stdout).toContain(SOL_MODEL_NAME)
+    expect(r.stdout).toContain(ASTRA_MODEL_NAME)
     expect(r.stdout).toContain('read the whole range and both test files')
     // THE RECORD COMMAND IS RUN, not merely pattern-matched (four-eyes finding,
     // 11.08.2026): asserting three of its flags leaves a malformed, unrunnable
@@ -746,10 +746,10 @@ describe('a review that does not run', () => {
   // quietly recorded a green review would be the worst of both.
   it('asks NOTHING at all while the share switch is at claude-only, and still hands the review on', () => {
     provenId()
-    const shareFile = join(dir, 'sol-share.json')
+    const shareFile = join(dir, 'astra-share.json')
     writeFileSync(shareFile, JSON.stringify({ setting: 'claude-only' }))
     writeFileSync(join(dir, 'calls.log'), '')
-    const r = run(['--sha', headSha, '--brief', 'judge it'], { SOL_SHARE_FILE: shareFile })
+    const r = run(['--sha', headSha, '--brief', 'judge it'], { ASTRA_SHARE_FILE: shareFile })
     expect(r.status).toBe(3)
     expect(r.stdout).toContain('FALLBACK')
     expect(r.stdout).toMatch(/claude-only/)
@@ -807,7 +807,7 @@ describe('the guards around the run', () => {
   it('prints a runnable Fable handover when both vendors but not every model authored', () => {
     const r = run(['--sha', unreviewableSha, '--brief', 'judge it', '--point', '870'])
     expect(r.status).toBe(3)
-    expect(r.stdout).toContain('node scripts/review-sol.mjs --reviewer fable')
+    expect(r.stdout).toContain('node scripts/review-astra.mjs --reviewer fable')
     expect(r.stdout).toContain('--point 870')
     expect(r.stderr).not.toMatch(/UNREVIEWABLE/)
   })
@@ -870,18 +870,18 @@ describe('the guards around the run', () => {
   })
 
   it('PROVES the model id before attributing a review to it, and remembers the proof', () => {
-    rmSync(join(stateDir, 'review-sol-probe.json'), { force: true })
+    rmSync(join(stateDir, 'review-astra-probe.json'), { force: true })
     writeFileSync(join(dir, 'calls.log'), '')
     const r = run(['--sha', headSha, '--brief', 'judge it'])
     expect(r.status, r.stderr).toBe(0)
     // The unknown id was tried first, then the real review ran.
-    expect(calls()[0]).not.toBe('gpt-5.6-sol')
-    expect(calls()).toContain('gpt-5.6-sol')
-    expect(JSON.parse(readFileSync(join(stateDir, 'review-sol-probe.json'), 'utf8'))).toMatchObject({ refused: true })
+    expect(calls()[0]).not.toBe('gpt-6-astra')
+    expect(calls()).toContain('gpt-6-astra')
+    expect(JSON.parse(readFileSync(join(stateDir, 'review-astra-probe.json'), 'utf8'))).toMatchObject({ refused: true })
     // …and the next review does not pay for the probe again.
     writeFileSync(join(dir, 'calls.log'), '')
     expect(run(['--sha', headSha, '--brief', 'judge it']).status).toBe(0)
-    expect(calls()).toEqual(['gpt-5.6-sol'])
+    expect(calls()).toEqual(['gpt-6-astra'])
   })
 
   it('re-proves it the moment the codex it was proven with changes', () => {
@@ -892,7 +892,7 @@ describe('the guards around the run', () => {
     writeFileSync(join(dir, 'calls.log'), '')
     expect(run(['--sha', headSha, '--brief', 'judge it'], { STUB_VERSION: 'codex-cli 9.9.9' }).status).toBe(0)
     expect(calls()).toHaveLength(2)
-    expect(calls()[0]).not.toBe('gpt-5.6-sol')
+    expect(calls()[0]).not.toBe('gpt-6-astra')
   })
 })
 
@@ -907,7 +907,7 @@ describe('the saved login', () => {
     const state = join(repo, 'local', id)
     mkdirSync(home, { recursive: true })
     if (token) writeFileSync(join(home, 'auth.json'), `{"tokens":{"access_token":"s","account_id":"${id}"}}`)
-    return { id, home, state, env: { CODEX_HOME: home, REVIEW_SOL_STATE_DIR: state } }
+    return { id, home, state, env: { CODEX_HOME: home, REVIEW_ASTRA_STATE_DIR: state } }
   }
 
   it('says so when there is no login to save', () => {
@@ -941,7 +941,7 @@ describe('the saved login', () => {
   it('REFUSES to write the token where git does not ignore it', () => {
     const w = world()
     const notIgnored = join(repo, 'not-ignored', w.id)
-    const r = run(['--save-login'], { ...w.env, REVIEW_SOL_STATE_DIR: notIgnored })
+    const r = run(['--save-login'], { ...w.env, REVIEW_ASTRA_STATE_DIR: notIgnored })
     expect(r.status).toBe(1)
     expect(r.stderr).toMatch(/does not ignore/)
     expect(existsSync(join(notIgnored, 'codex-auth.json'))).toBe(false)
@@ -959,7 +959,7 @@ describe('the saved login', () => {
     // (four-eyes finding, 11.08.2026).
     symlinkSync(elsewhere, linked, process.platform === 'win32' ? 'junction' : 'dir')
     writeFileSync(join(elsewhere, 'codex-auth.json'), '{"tokens":{}}')
-    const r = run(['--restore-login'], { ...w.env, REVIEW_SOL_STATE_DIR: linked })
+    const r = run(['--restore-login'], { ...w.env, REVIEW_ASTRA_STATE_DIR: linked })
     expect(r.status).toBe(1)
     expect(r.stderr).toMatch(/REFUSING/)
     expect(r.stderr).toMatch(/resolves to/)
@@ -967,7 +967,7 @@ describe('the saved login', () => {
 
   it('says what to do when nothing was ever saved', () => {
     const w = world()
-    const r = run(['--restore-login'], { ...w.env, REVIEW_SOL_STATE_DIR: join(dir, `${w.id}-nothing-here`) })
+    const r = run(['--restore-login'], { ...w.env, REVIEW_ASTRA_STATE_DIR: join(dir, `${w.id}-nothing-here`) })
     expect(r.status).toBe(1)
     expect(r.stderr).toMatch(/nothing saved/)
     expect(r.stderr).toMatch(/--save-login/)
@@ -979,11 +979,11 @@ describe('the saved login', () => {
 describe('a range SOL authored', () => {
   it('refuses to review its own work, spends no codex call, and prints the runnable Claude reviewer', () => {
     writeFileSync(join(dir, 'calls.log'), '')
-    const r = run(['--sha', solSha, '--point', '667', '--brief', 'judge the authoring lane'])
+    const r = run(['--sha', astraSha, '--point', '667', '--brief', 'judge the authoring lane'])
     expect(r.status, r.stderr).toBe(3)
     expect(r.stdout).toMatch(/ROLE SWAP/)
     expect(r.stdout).toMatch(/AUTHORED part of/)
-    expect(r.stdout).toContain('node scripts/review-sol.mjs --reviewer opus')
+    expect(r.stdout).toContain('node scripts/review-astra.mjs --reviewer opus')
     // Not one call — not even the model-id probe: the question is answered from
     // the trailers, and paying for a review Sol may not give is the waste this
     // ordering exists to prevent.
@@ -993,7 +993,7 @@ describe('a range SOL authored', () => {
 
   it('starts the selected Opus reader and prints a record command with its model receipt', () => {
     writeFileSync(join(dir, 'calls.log'), '')
-    const r = run(['--reviewer', 'opus', '--sha', solSha, '--point', '667', '--brief', 'judge the authoring lane'])
+    const r = run(['--reviewer', 'opus', '--sha', astraSha, '--point', '667', '--brief', 'judge the authoring lane'])
     expect(r.status, `${r.stdout}${r.stderr}`).toBe(0)
     expect(calls()).toEqual(['claude-opus-5[1m]'])
     expect(r.stdout).toContain('Opus 5 reviewed')
@@ -1093,12 +1093,12 @@ describe('a modified gitlink', () => {
 // verdict nobody gave.
 describe('a narrowed --since on the early routes', () => {
   it('prints a scoped runnable reader at claude-only while --since narrows the range', () => {
-    const shareFile = join(dir, 'sol-share.json')
+    const shareFile = join(dir, 'astra-share.json')
     writeFileSync(shareFile, JSON.stringify({ setting: 'claude-only' }))
     writeFileSync(join(dir, 'calls.log'), '')
-    const r = run(['--sha', headSha, '--since', `${headSha}~1`, '--brief', 'judge it'], { SOL_SHARE_FILE: shareFile })
+    const r = run(['--sha', headSha, '--since', `${headSha}~1`, '--brief', 'judge it'], { ASTRA_SHARE_FILE: shareFile })
     expect(r.status).toBe(3)
-    expect(r.stdout).toContain('node scripts/review-sol.mjs --reviewer fable')
+    expect(r.stdout).toContain('node scripts/review-astra.mjs --reviewer fable')
     expect(r.stdout).toContain(`--since ${headSha}~1`)
     expect(readFileSync(join(dir, 'calls.log'), 'utf8').trim()).toBe('')
     rmSync(shareFile, { force: true })
@@ -1106,19 +1106,19 @@ describe('a narrowed --since on the early routes', () => {
 
   it('prints a scoped runnable reader for a narrowed Sol-authored range too', () => {
     writeFileSync(join(dir, 'calls.log'), '')
-    const r = run(['--sha', solHeadSha, '--since', `${solHeadSha}~1`, '--brief', 'judge it'])
+    const r = run(['--sha', astraHeadSha, '--since', `${astraHeadSha}~1`, '--brief', 'judge it'])
     expect(r.status).toBe(3)
-    expect(r.stdout).toContain('node scripts/review-sol.mjs --reviewer opus')
-    expect(r.stdout).toContain(`--since ${solHeadSha}~1`)
+    expect(r.stdout).toContain('node scripts/review-astra.mjs --reviewer opus')
+    expect(r.stdout).toContain(`--since ${astraHeadSha}~1`)
     expect(calls()).toEqual([])
   })
 
   it('still hands over the full runnable command when no --since narrows the early route', () => {
     // The refusal is about the narrowing, not about the hand-over itself.
     writeFileSync(join(dir, 'calls.log'), '')
-    const r = run(['--sha', solHeadSha, '--brief', 'judge it'])
+    const r = run(['--sha', astraHeadSha, '--brief', 'judge it'])
     expect(r.status).toBe(3)
-    expect(r.stdout).toContain('node scripts/review-sol.mjs --reviewer opus')
+    expect(r.stdout).toContain('node scripts/review-astra.mjs --reviewer opus')
     expect(r.stdout).not.toContain('--since')
   })
 })
@@ -1239,10 +1239,10 @@ describe('a range too large for one round', () => {
   })
 
   it('offers no whole-range record at claude-only either, while the range does not fit', () => {
-    const shareFile = join(dir, 'sol-share.json')
+    const shareFile = join(dir, 'astra-share.json')
     writeFileSync(shareFile, JSON.stringify({ setting: 'claude-only' }))
     writeFileSync(join(dir, 'calls.log'), '')
-    const r = run(['--sha', bulkSha, '--brief', 'judge the bulk range'], { SOL_SHARE_FILE: shareFile })
+    const r = run(['--sha', bulkSha, '--brief', 'judge the bulk range'], { ASTRA_SHARE_FILE: shareFile })
     expect(r.status).toBe(4)
     expect(r.stderr).toContain('2 RUNNABLE PASSES')
     expect(r.stderr).toContain('bulk-a.txt')
@@ -1255,11 +1255,11 @@ describe('a range too large for one round', () => {
     // The flag was parsed only after the hand-off exits, so a pass-scoped
     // hand-off was unreachable: --pass was silently ignored and the report
     // covered the whole range.
-    const shareFile = join(dir, 'sol-share.json')
+    const shareFile = join(dir, 'astra-share.json')
     writeFileSync(shareFile, JSON.stringify({ setting: 'claude-only' }))
     writeFileSync(join(dir, 'calls.log'), '')
     const r = run(['--sha', bulkSha, '--brief', 'judge the bulk range', '--pass', '1'], {
-      SOL_SHARE_FILE: shareFile,
+      ASTRA_SHARE_FILE: shareFile,
     })
     expect(r.status).toBe(3)
     expect(r.stdout).toMatch(/claude-only/)
@@ -1275,10 +1275,10 @@ describe('a range too large for one round', () => {
   })
 
   it('refuses a pass number the hand-off range does not have, exactly like the paid path', () => {
-    const shareFile = join(dir, 'sol-share.json')
+    const shareFile = join(dir, 'astra-share.json')
     writeFileSync(shareFile, JSON.stringify({ setting: 'claude-only' }))
     const r = run(['--sha', bulkSha, '--brief', 'judge the bulk range', '--pass', '9'], {
-      SOL_SHARE_FILE: shareFile,
+      ASTRA_SHARE_FILE: shareFile,
     })
     expect(r.status).toBe(2)
     expect(r.stderr).toContain('splits into 2 pass(es)')
@@ -1288,11 +1288,11 @@ describe('a range too large for one round', () => {
   it('still hands over a runnable reader command where the range DOES fit', () => {
     // The refusal is about the material, not about the hand-over: a small range
     // must keep its ready-to-run template.
-    const shareFile = join(dir, 'sol-share.json')
+    const shareFile = join(dir, 'astra-share.json')
     writeFileSync(shareFile, JSON.stringify({ setting: 'claude-only' }))
-    const r = run(['--sha', headSha, '--brief', 'judge the ordinary range'], { SOL_SHARE_FILE: shareFile })
+    const r = run(['--sha', headSha, '--brief', 'judge the ordinary range'], { ASTRA_SHARE_FILE: shareFile })
     expect(r.status).toBe(3)
-    expect(r.stdout).toContain('node scripts/review-sol.mjs --reviewer fable')
+    expect(r.stdout).toContain('node scripts/review-astra.mjs --reviewer fable')
     rmSync(shareFile, { force: true })
   })
 
@@ -1341,7 +1341,7 @@ describe('a range too large for one round', () => {
         unreviewable: [],
       }],
     })
-    const command = planText.split('\n').find((line) => line.trim().startsWith('node scripts/review-sol.mjs'))?.trim()
+    const command = planText.split('\n').find((line) => line.trim().startsWith('node scripts/review-astra.mjs'))?.trim()
     expect(command).toBeTruthy()
     expect(command).not.toContain('--pass')
 

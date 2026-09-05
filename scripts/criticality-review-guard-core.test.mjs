@@ -619,7 +619,7 @@ describe('evaluateCriticalityReview', () => {
       verdict: 'do-not-merge',
       at: 1_787_000_001_000,
     })
-    const solHalf = record({
+    const astraHalf = record({
       sha: 'b'.repeat(40),
       model: OPUS,
       authoredBy: SOL,
@@ -640,7 +640,7 @@ describe('evaluateCriticalityReview', () => {
       baseline: 'b',
       ticks: [tick()],
       openPoints: [817, 818],
-      records: [claudeHalf, solHalf, filed(claudeHalf, 817, 1_787_000_003_000), filed(solHalf, 818, 1_787_000_004_000)],
+      records: [claudeHalf, astraHalf, filed(claudeHalf, 817, 1_787_000_003_000), filed(astraHalf, 818, 1_787_000_004_000)],
     })
     expect(v).toMatchObject({ block: false, clear: true })
   })

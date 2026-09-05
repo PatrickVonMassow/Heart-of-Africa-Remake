@@ -74,7 +74,7 @@ export const DEFAULT_TOPUP = [
   { host: 'registry.npmjs.org', net24: false },
   // THE REVIEWER'S HOSTS (added 11.08.2026, after a container restart cut them off).
   // `chatgpt.com` carries the Codex endpoint every Sol review speaks to, and Sol is
-  // the project's cross-vendor reviewer — without it `review-sol.mjs` hands every
+  // the project's cross-vendor reviewer — without it `review-astra.mjs` hands every
   // review to one of our OWN models and the four-eyes rule quietly loses the
   // decorrelation it exists for. These hosts sit behind Cloudflare and their
   // addresses ROTATE, so a boot-time snapshot goes stale exactly the way

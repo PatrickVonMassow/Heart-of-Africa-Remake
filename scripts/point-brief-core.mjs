@@ -32,7 +32,7 @@
 // This module is pure: text in, text out, no I/O. scripts/point-brief.mjs is the
 // I/O wrapper (same split as doc-budget-core.mjs / doc-budget-guard.mjs).
 import { createHash } from 'node:crypto'
-import { DEFAULT_SETTING as DEFAULT_SOL_SHARE, briefLine as solBriefLine } from './sol-share-core.mjs'
+import { DEFAULT_SETTING as DEFAULT_ASTRA_SHARE, briefLine as astraBriefLine } from './astra-share-core.mjs'
 
 /** Thrown for a failure the reader must see: unknown point, dangling section. */
 export class BriefError extends Error {
@@ -1214,11 +1214,11 @@ const HOUSE_FACTS = [
  *
  * It is one line at EVERY setting, the default included: an agent that is never told the
  * lever exists cannot pull it, and a brief that named it only sometimes would train its
- * readers to skip the line. The setting itself is READ from `.claude/sol-share.json` by
+ * readers to skip the line. The setting itself is READ from `.claude/astra-share.json` by
  * the wrapper — nothing here keeps its own copy of the routing table.
  */
-export function headerLines(solShare = DEFAULT_SOL_SHARE) {
-  return [...HOUSE_FACTS, solBriefLine(solShare), '', ...CALL_DISCIPLINE]
+export function headerLines(astraShare = DEFAULT_ASTRA_SHARE) {
+  return [...HOUSE_FACTS, astraBriefLine(astraShare), '', ...CALL_DISCIPLINE]
 }
 
 /**
@@ -1307,14 +1307,14 @@ export function assembleBrief({
   adoptionBeyond = [],
   adoptionCap = ADOPTION_DEPTH_CAP,
   sliceDocs = [],
-  solShare = DEFAULT_SOL_SHARE,
+  astraShare = DEFAULT_ASTRA_SHARE,
 }) {
   const out = [
     `=== DELEGATION BRIEF — WORK-ORDER POINT ${point.number} (${point.done ? 'DONE/ARCHIVED' : 'OPEN'}) ===`,
     'Assembled by scripts/point-brief.mjs from the work order, design.md and the research docs.',
     formatRevisionLine(revision ?? {}),
     '',
-    ...headerLines(solShare),
+    ...headerLines(astraShare),
     '',
     `--- THE POINT (verbatim, work-order point ${point.number}) ---`,
     point.body,
@@ -1422,7 +1422,7 @@ export function buildBrief({
   revision = {},
   readTree = null,
   diffPaths = [],
-  solShare = DEFAULT_SOL_SHARE,
+  astraShare = DEFAULT_ASTRA_SHARE,
 }) {
   const all = parseWorkOrderPoints(tasksText)
   const point = all.find((p) => p.number === Number(number)) ?? null
@@ -1665,7 +1665,7 @@ export function buildBrief({
     adopted,
     adoptionBeyond,
     sliceDocs,
-    solShare,
+    astraShare,
   })
   return {
     brief,

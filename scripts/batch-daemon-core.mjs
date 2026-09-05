@@ -117,11 +117,11 @@ export function mayStartAttempt({ attempts = [], cap = DAEMON_POOL_CAP, admissio
  *  name; a request supplies data (point, branch, worktree, paths) and that data
  *  is validated as DATA — it becomes argv values, never argv structure, and
  *  nothing derived from worker output ever reaches an exec path ("Additional
- *  omissions": daemon authorization). `sol` wraps the proven author-sol.mjs in
+ *  omissions": daemon authorization). `sol` wraps the proven author-astra.mjs in
  *  the detached-agent contract rather than changing its authoring behavior
  *  (union M5); `stub` is the hermetic worker the drills use. */
 export const WORKER_ADAPTERS = Object.freeze({
-  sol: Object.freeze({ runner: 'author-sol' }),
+  sol: Object.freeze({ runner: 'author-astra' }),
   stub: Object.freeze({ runner: 'stub' }),
 })
 

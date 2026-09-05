@@ -286,8 +286,8 @@ try {
       'makes that cut from point text and recorded review history, while a point\'s own ' +
       '`Author lane:` tag remains an operator decision (ordinary-lane tags yield only to a ' +
       'reached §6 Fable escalation threshold). ' +
-      'scripts/sol-share.mjs --status says what the switch routes right now. REVIEW is ' +
-      'CROSS-VENDOR: Sol reads Anthropic-authored work (scripts/review-sol.mjs), Claude ' +
+      'scripts/astra-share.mjs --status says what the switch routes right now. REVIEW is ' +
+      'CROSS-VENDOR: Sol reads Anthropic-authored work (scripts/review-astra.mjs), Claude ' +
       'reads Sol-authored work, and no model reviews its own. ' +
       (fableState.ok ? servingPolicyLine(fableState) : `FABLE SWITCH UNKNOWN: ${fableState.problem}`)
     const now = Date.now()

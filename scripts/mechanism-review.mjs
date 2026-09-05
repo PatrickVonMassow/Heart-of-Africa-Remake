@@ -1468,7 +1468,7 @@ export const usage = () =>
   `--pass <k>/<n> --pass-files "<a,b,c>" records ONE bounded end-state file scope, or one\n` +
   `       pass of a range whose material no single review round can hold. The passes cut\n` +
   `       through the FILE SET. A recorded pass clears the files it names at the reviewed\n` +
-  `       end state; the rest of the range stays owed. review-sol.mjs prints the plan.\n` +
+  `       end state; the rest of the range stays owed. review-astra.mjs prints the plan.\n` +
   `       A path holding a comma, a quote or edge whitespace is written C-QUOTED, exactly\n` +
   `       as git prints it; nothing is ever trimmed into a different path.\n` +
   `       The record stores the reviewed head as the files' end-state sha. A later commit to\n` +
@@ -1485,7 +1485,7 @@ export const usage = () =>
   `       SOL authored it → the first of Opus 5 / Fable 5 / Opus 4.8 that wrote no part\n` +
   `       of it, which also runs the suites, judges the picture and lands the point.\n` +
   `       Run it — never a hand-typed codex line — with:\n` +
-  `       node scripts/review-sol.mjs --sha <sha> --brief "<what to judge>"\n` +
+  `       node scripts/review-astra.mjs --sha <sha> --brief "<what to judge>"\n` +
   `\nThe GATES are separate commands and answer --status themselves:\n` +
   `       node scripts/mechanism-review-guard.mjs --status\n` +
   `       node scripts/criticality-review-guard.mjs --status`

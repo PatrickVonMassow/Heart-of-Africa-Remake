@@ -59,11 +59,11 @@ describe('recorded Codex fixtures', () => {
     expect(turns[0]).toMatchObject({ role: 'agent', agent: 'codex:codex-author' })
   })
 
-  it('classifies the real review-sol commission as review cost', () => {
+  it('classifies the real review-astra commission as review cost', () => {
     expect(parseCodexTranscript(fixture('codex-review.jsonl'))[0]).toMatchObject({ role: 'review', tokens: 800 })
   })
 
-  it('keeps the real ask-sol commission as delegated agent work', () => {
+  it('keeps the real ask-astra commission as delegated agent work', () => {
     expect(parseCodexTranscript(fixture('codex-ask.jsonl'))[0]).toMatchObject({ role: 'agent', tokens: 450 })
   })
 })

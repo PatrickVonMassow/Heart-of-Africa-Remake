@@ -1037,9 +1037,9 @@ export function formatCoveragePlan(plan) {
  * The line the caller must see BEFORE a round is spent: the threshold, this
  * range's real size, and — when it does not fit — the passes it needs.
  */
-export function formatBudgetNotice(plan, { sha = '', command = 'node scripts/review-sol.mjs' } = {}) {
+export function formatBudgetNotice(plan, { sha = '', command = 'node scripts/review-astra.mjs' } = {}) {
   const at = String(sha).slice(0, 7)
-  const head = `review-sol: the material budget is ${plan.budget} characters per round; this range assembles ${plan.rawSize}.`
+  const head = `review-astra: the material budget is ${plan.budget} characters per round; this range assembles ${plan.rawSize}.`
   if (plan.fits) {
     // A round that fits only at a DECLARED delivery level says so: the caller
     // deciding whether this review suffices must know which content stays out.

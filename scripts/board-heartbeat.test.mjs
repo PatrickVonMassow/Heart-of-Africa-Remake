@@ -538,7 +538,7 @@ describe('the board belongs to the owning checkout', () => {
   // A review round is routinely run from a DELEGATED WORKTREE, which holds no
   // board, no dashboard state and no focus of its own. Resolving to the main
   // checkout is what keeps the heartbeat from silently doing nothing there —
-  // the same resolution review-sol uses for its saved login.
+  // the same resolution review-astra uses for its saved login.
   it('resolves a worktree to the main checkout that holds the board', () => {
     const root = boardRoot({
       root: '/repo/.worktrees/point-848',

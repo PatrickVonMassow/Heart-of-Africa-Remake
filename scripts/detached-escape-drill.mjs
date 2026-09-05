@@ -2,7 +2,7 @@
 // WHY A CHILD DIES WITH THE SESSION THAT SPAWNED IT — measured, not argued.
 //
 // The authoring lane of 21.08.2026 died with its parent session and took ~1.5 h
-// and a run's whole token spend with it. `scripts/author-sol.mjs` spawns codex
+// and a run's whole token spend with it. `scripts/author-astra.mjs` spawns codex
 // `detached`, so the obvious explanation — the group signal reached it — is
 // wrong, and a design built on that explanation would keep the defect.
 //

@@ -459,12 +459,12 @@ describe('re-authoring rounds — decorrelated before Fable', () => {
     expect(specExaminerFor({ rounds: [{ authoredBy: 'Claude Opus 5 <noreply@anthropic.com>' }] })).toMatchObject({
       vendor: 'sol',
       model: 'GPT-5.6 Sol',
-      route: 'ask-sol',
+      route: 'ask-astra',
     })
   })
 
   it('does not accept a malformed, aborted or same-vendor examination as the one reading', () => {
-    const solRound = failed({ authoredBy: 'GPT-5.6 Sol <noreply@openai.com>' })
+    const astraRound = failed({ authoredBy: 'GPT-5.6 Sol <noreply@openai.com>' })
     const examination = (extra = {}) => ({
       point: 727,
       mode: 'review',
@@ -474,9 +474,9 @@ describe('re-authoring rounds — decorrelated before Fable', () => {
       evidence: 'the point and brief agree with every finding',
       ...extra,
     })
-    expect(authorRoundHistory([solRound, examination({ aborted: true })], 727).examination).toBeNull()
-    expect(authorRoundHistory([solRound, examination({ model: 'GPT-5.6 Sol' })], 727).examination).toBeNull()
-    expect(authorRoundHistory([solRound, examination()], 727).examination).toMatchObject({ specExamination: 'sound' })
+    expect(authorRoundHistory([astraRound, examination({ aborted: true })], 727).examination).toBeNull()
+    expect(authorRoundHistory([astraRound, examination({ model: 'GPT-5.6 Sol' })], 727).examination).toBeNull()
+    expect(authorRoundHistory([astraRound, examination()], 727).examination).toMatchObject({ specExamination: 'sound' })
   })
 })
 

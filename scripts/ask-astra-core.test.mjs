@@ -20,7 +20,7 @@ import {
   parseAnswer,
   parseClaudeAskOutput,
   resolveAskModel,
-} from './ask-sol-core.mjs'
+} from './ask-astra-core.mjs'
 
 describe('the kinds', () => {
   it('addresses every model the blind-merger switch can select', () => {
@@ -494,11 +494,11 @@ describe('what the command says', () => {
     const out = formatUnavailable({ kind: 'diagnose', cause: 'the ChatGPT allowance for this account is exhausted' })
     expect(out.split('\n')[0]).toMatch(/did NOT answer this diagnose: the ChatGPT allowance/)
     expect(out).toMatch(/Do it in the Claude chain/)
-    expect(out).not.toMatch(/sol-share\.mjs --more/)
+    expect(out).not.toMatch(/astra-share\.mjs --more/)
   })
 
   it('names the switch where the switch is what stopped it', () => {
-    expect(formatUnavailable({ kind: 'audit', cause: 'x', setting: 'claude-only' })).toMatch(/sol-share\.mjs --more/)
+    expect(formatUnavailable({ kind: 'audit', cause: 'x', setting: 'claude-only' })).toMatch(/astra-share\.mjs --more/)
   })
 
   it('prints a diagnosis as its pair and a list as its entries', () => {

@@ -3,7 +3,7 @@
 // last live publish, and where the core says so, restamps the now-card through
 // the ordinary board command and republishes.
 //
-// CALLED BY THE RECORDING STEPS, NEVER BY A CLOCK: review-sol.mjs when a round
+// CALLED BY THE RECORDING STEPS, NEVER BY A CLOCK: review-astra.mjs when a round
 // comes back, mechanism-review.mjs when a verdict is recorded, batch-in-flight.mjs
 // when a wait is declared or refreshed. Each of those already happens repeatedly
 // inside the long turns that used to leave the board standing still.
@@ -30,7 +30,7 @@ export { TRIGGERS }
  * The board file and its state live in the main working tree, while review
  * rounds are routinely run from a delegated worktree — and there the heartbeat
  * would find no board, decide nothing and silently do nothing at all. This is
- * the same resolution `review-sol` uses for the saved login: `--git-common-dir`
+ * the same resolution `review-astra` uses for the saved login: `--git-common-dir`
  * points at the one real `.git` directory from every worktree alike, and with
  * no git answer the current checkout is the honest fallback.
  */

@@ -1,6 +1,6 @@
 // THE OPENAI AUTHORING LANE, decided (point 667). Pure half. rule:model-policy@d0066fb3
 //
-// `scripts/review-sol.mjs` and `scripts/ask-sol.mjs` send Sol work it may only
+// `scripts/review-astra.mjs` and `scripts/ask-astra.mjs` send Astra work it may only
 // READ. This lane sends it work it WRITES: a point, on its own branch, in its
 // own worktree, committed step by step. Claude then reviews it, runs the suites,
 // judges the picture and lands it — the role swap of CLAUDE.md §6, which keeps
@@ -9,7 +9,7 @@
 // TWO THINGS ARE DIFFERENT FROM THE READ-ONLY PATHS, and both are load-bearing:
 //
 // 1. THE SANDBOX IS OFF, and it has to be. Measured 13.08.2026 (and again on
-//    every earlier Sol path): this container cannot create unprivileged user
+//    every earlier Astra path): this container cannot create unprivileged user
 //    namespaces, so codex's bubblewrap launcher dies before ANY command of the
 //    model's runs — `codex sandbox read-only -- echo hi` prints the bwrap error
 //    and nothing else. A read-only reviewer works around it by having the
@@ -28,17 +28,17 @@
 //    tree left behind — never what the run said about itself (`judgeAuthoring`).
 //
 // Side-effect free: the spawn, the git work and the push belong to
-// scripts/author-sol.mjs. Pinned by author-sol-core.test.mjs.
+// scripts/author-astra.mjs. Pinned by author-astra-core.test.mjs.
 
 import { allowedTrailers, classifyTrailer, modelNamesIn } from './model-guard-core.mjs'
 import { sameModel } from './mechanism-review-core.mjs'
-import { charStripped, rawFieldValue, stripDecoration, SOL_MODEL_ID, SOL_MODEL_NAME, SOL_REASONING_EFFORT } from './review-sol-core.mjs'
+import { charStripped, rawFieldValue, stripDecoration, ASTRA_MODEL_ID, ASTRA_MODEL_NAME, ASTRA_REASONING_EFFORT } from './review-astra-core.mjs'
 
-export { SOL_MODEL_ID, SOL_MODEL_NAME, SOL_REASONING_EFFORT }
+export { ASTRA_MODEL_ID, ASTRA_MODEL_NAME, ASTRA_REASONING_EFFORT }
 
 /** The trailer every commit of this lane carries — the allowlist's own spelling,
  *  so the `commit-msg` gate and the serving-model tripwire both accept it. */
-export const SOL_TRAILER = allowedTrailers().find((t) => /sol/i.test(t)) ?? ''
+export const ASTRA_TRAILER = allowedTrailers().find((t) => /astra/i.test(t)) ?? ''
 
 export const AUTHOR_COMPLETION_SUBJECT = 'Complete the authored changes'
 
@@ -51,24 +51,24 @@ export const AUTHOR_COMPLETION_SUBJECT = 'Complete the authored changes'
  * exited cleanly and its report accounts for all three required gates.
  *
  * THE TRAILER IS THE LANE'S, NOT THIS FILE'S: `author-fable.mjs` drives the same
- * wrapper, so a hard-coded Sol trailer would sign Fable's checkpoints as Sol's —
+ * wrapper, so a hard-coded Astra trailer would sign Fable's checkpoints as Astra's —
  * and that trailer is the only machine-readable record of who authored a commit.
  */
-export function authorCommitMessage({ subject = '', rescue = '', final = false, trailer = SOL_TRAILER } = {}) {
+export function authorCommitMessage({ subject = '', rescue = '', final = false, trailer = ASTRA_TRAILER } = {}) {
   const oneLine = (value) => String(value ?? '').replace(/[\r\n]+/g, ' ').trim()
   const plainSubject = oneLine(subject)
     .replace(/\[(?:skip ci|ci skip|no ci|skip actions|actions skip)\]/gi, '')
     .replace(/\s+/g, ' ')
     .trim()
   const heading = plainSubject || (final ? AUTHOR_COMPLETION_SUBJECT : 'Checkpoint authoring work')
-  const signature = String(trailer || SOL_TRAILER)
+  const signature = String(trailer || ASTRA_TRAILER)
   if (final) return `${heading}\n\n${signature}`
   const reason = oneLine(rescue) || 'the authoring run is still in progress'
   return `${heading} [skip ci]\n\nRescue: ${reason}\n${signature}`
 }
 
 /** A completion message exists only for a run the existing judge found clean. */
-export function authorCompletionMessage(judged = {}, trailer = SOL_TRAILER) {
+export function authorCompletionMessage(judged = {}, trailer = ASTRA_TRAILER) {
   return judged?.clean === true ? authorCommitMessage({ final: true, trailer }) : null
 }
 
@@ -180,8 +180,8 @@ export function withheldEnvNames(env = {}) {
  * POINT'S WORKTREE, so every relative path the model uses lands there.
  */
 export function authoringCodexArgs({
-  modelId = SOL_MODEL_ID,
-  effort = SOL_REASONING_EFFORT,
+  modelId = ASTRA_MODEL_ID,
+  effort = ASTRA_REASONING_EFFORT,
   cwd = '',
   outputFile = '',
   prompt = '',
@@ -208,7 +208,7 @@ export function authoringCodexArgs({
  * The checks are the ones whose absence is unrecoverable rather than merely
  * annoying. Authoring straight onto `main`, or into the main checkout, would put
  * an unreviewed model's commits on the deployed branch — and a dirty tree makes
- * "what did Sol write" unanswerable afterwards, which is the question every
+ * "what did Astra write" unanswerable afterwards, which is the question every
  * check below it depends on.
  */
 export function readinessProblems({
@@ -217,7 +217,7 @@ export function readinessProblems({
   mainCheckout = '',
   dirty = '',
   point = '',
-  authorName = 'Sol',
+  authorName = 'Astra',
 } = {}) {
   const problems = []
   const b = String(branch ?? '').trim()
@@ -249,7 +249,7 @@ export function readinessProblems({
 /** The house rules the authoring prompt states, one per line. Exported so the
  *  test pins them: a rule that quietly falls out of the prompt is a rule the
  *  lane stops following, and nothing else would notice. */
-export const houseRulesFor = (trailer = SOL_TRAILER) => Object.freeze([
+export const houseRulesFor = (trailer = ASTRA_TRAILER) => Object.freeze([
   `Every commit ends with the trailer \`${trailer}\` — it is the ONLY machine-readable`,
   '  record of who authored it, and a commit without it is REFUSED by a git hook.',
   'COMMIT AT EVERY SELF-CONTAINED STEP, not at the end. An uncommitted tree is the one state',
@@ -292,8 +292,8 @@ export function buildAuthoringPrompt({
   branch = '',
   findings = '',
   framing = '',
-  authorModel = SOL_MODEL_NAME,
-  authorTrailer = SOL_TRAILER,
+  authorModel = ASTRA_MODEL_NAME,
+  authorTrailer = ASTRA_TRAILER,
   reviewer = 'Claude',
   laneDescription = 'the hard and critical ones included',
 } = {}) {
@@ -505,7 +505,7 @@ export function parseAuthoringAnswer(text) {
  * is worth keeping rather than throwing away.
  */
 /**
- * Does this trailer name SOL as the author — the PARSED model name, never the
+ * Does this trailer name ASTRA as the author — the PARSED model name, never the
  * raw line?
  *
  * The raw line carries the address, and `Claude Opus 5 <build@sol.example>` is
@@ -514,7 +514,7 @@ export function parseAuthoringAnswer(text) {
  * as this lane's own work.
  */
 export function namesSolAsAuthor(trailers) {
-  return namesModelAsAuthor(trailers, SOL_MODEL_NAME)
+  return namesModelAsAuthor(trailers, ASTRA_MODEL_NAME)
 }
 
 export function namesModelAsAuthor(trailers, model) {
@@ -551,7 +551,7 @@ export function judgeAuthoring({
   numstat = '',
   branchAfter = '',
   branch = '',
-  authorModel = SOL_MODEL_NAME,
+  authorModel = ASTRA_MODEL_NAME,
   fableState,
   runtime = 'codex',
 } = {}) {
@@ -627,10 +627,10 @@ export function formatAuthoringReport({
   reviewer = 'Opus 5',
   pushed = null,
   framing = '',
-  commandName = 'author-sol',
-  authorModel = SOL_MODEL_NAME,
-  authorDetail = `(effort ${SOL_REASONING_EFFORT})`,
-  authorTrailer = SOL_TRAILER,
+  commandName = 'author-astra',
+  authorModel = ASTRA_MODEL_NAME,
+  authorDetail = `(effort ${ASTRA_REASONING_EFFORT})`,
+  authorTrailer = ASTRA_TRAILER,
   reviewCommand = '',
 } = {}) {
   const lines = []

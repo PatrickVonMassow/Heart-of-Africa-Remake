@@ -672,7 +672,7 @@ describe('the GPT-5.6 Sol authoring lane', () => {
     for (const t of [
       'GPT-5.6 Sol <noreply@openai.com>',
       'GPT-5.6 Sol (high effort) <noreply@openai.com>',
-      'gpt-5.6-sol <noreply@openai.com>',
+      'gpt-6-astra <noreply@openai.com>',
       'Sol <noreply@openai.com>',
     ]) {
       expect(judgeTrailer(t).verdict, t).toBe('allowed')

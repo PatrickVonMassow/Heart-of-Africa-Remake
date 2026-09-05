@@ -4,12 +4,12 @@ import { tmpdir } from 'node:os'
 import { dirname, join, resolve } from 'node:path'
 import { afterEach, describe, expect, it } from 'vitest'
 import { AUTHORING_COMMISSION_KIND, AUTHORING_FRAMINGS, FABLE_ESCALATION_ROUNDS } from './author-routing-core.mjs'
-import { uncommittedSummary } from './author-sol-core.mjs'
-import { commitsSince, ledgerSnapshot, pushBranch, recordAuthoringCommission, restoreLedger, uncommittedNumstat } from './author-sol.mjs'
+import { uncommittedSummary } from './author-astra-core.mjs'
+import { commitsSince, ledgerSnapshot, pushBranch, recordAuthoringCommission, restoreLedger, uncommittedNumstat } from './author-astra.mjs'
 import { writeState as writeFableState } from './fable-switch-core.mjs'
 
 const root = resolve(process.cwd())
-const script = resolve(root, 'scripts', 'author-sol.mjs')
+const script = resolve(root, 'scripts', 'author-astra.mjs')
 const point = '999991'
 const dirs = []
 
@@ -142,7 +142,7 @@ afterEach(() => {
   while (dirs.length) rmSync(dirs.pop(), { recursive: true, force: true })
 })
 
-describe('author-sol records a commission before dispatch', () => {
+describe('author-astra records a commission before dispatch', () => {
   it('appends and durably commits the exact point, round and framing once', () => {
     const events = []
     const input = {
@@ -392,7 +392,7 @@ describe('author-sol records a commission before dispatch', () => {
   })
 })
 
-describe('author-sol routing reads unsuccessful rounds from the review ledger', () => {
+describe('author-astra routing reads unsuccessful rounds from the review ledger', () => {
   it('reports zero and uses the ordinary lane when the point has no review record', () => {
     const result = route(ledger([]))
     expect(result.status, result.stderr).toBe(0)
@@ -475,7 +475,7 @@ describe('author-sol routing reads unsuccessful rounds from the review ledger', 
   })
 })
 
-describe('author-sol examination does not require an authoring worktree', () => {
+describe('author-astra examination does not require an authoring worktree', () => {
   it('prints the read-only examination packet before branch and worktree readiness', () => {
     const records = ledger(
       Array.from({ length: FABLE_ESCALATION_ROUNDS - 1 }, () => ({

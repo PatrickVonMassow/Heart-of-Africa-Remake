@@ -1838,7 +1838,7 @@ function segmentTarget(seg) {
  * Switching to an existing branch, pushing one, landing one — none of them
  * CREATES anything, and none is recognised here.
  *
- * A READ-ONLY RUN OPENS NOTHING either: `author-sol.mjs --routing` answers which
+ * A READ-ONLY RUN OPENS NOTHING either: `author-astra.mjs --routing` answers which
  * lane owns a point and either author command's `--dry-run` prints the prompt it
  * would send. Refusing
  * those would deny the very question a session asks BEFORE it commissions.

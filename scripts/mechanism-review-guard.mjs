@@ -63,7 +63,7 @@ import {
   guardOutcome,
 } from './mechanism-review-guard-gap-core.mjs'
 import { gatherGuardDutyContext } from './guard-duty.mjs'
-import { buildAuthorshipPassPlan, formatContributionPassPlan } from './review-sol.mjs'
+import { buildAuthorshipPassPlan, formatContributionPassPlan } from './review-astra.mjs'
 
 
 // SWITCHED OFF, NOT REBUILT (CLAUDE.md §2 infrastructure freeze, user decision
@@ -234,7 +234,7 @@ export function baselineFor(state, branch) {
 export async function measureReviewGap({
   blocked = false,
   commits = [],
-  loadPlanner = () => import('./review-sol.mjs'),
+  loadPlanner = () => import('./review-astra.mjs'),
 }) {
   if (!blocked) return { gap: null, sizedPlan: null }
   let sizedPlan = null
@@ -959,7 +959,7 @@ if (isMainModule(import.meta.url)) {
       if (owedContributions.length) {
         try {
           if (!statusPlan) {
-            const { buildContributionPassPlan } = await import('./review-sol.mjs')
+            const { buildContributionPassPlan } = await import('./review-astra.mjs')
             statusPlan = buildContributionPassPlan({ commits: owedContributions })
           }
         } catch {

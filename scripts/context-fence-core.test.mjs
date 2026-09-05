@@ -113,10 +113,10 @@ describe('over the mark, a STARTING call is denied — naming the mark', () => {
           },
         }),
     }],
-    ['delegating to Sol', { toolName: 'Bash', command: 'node scripts/author-sol.mjs 701' }],
+    ['delegating to Sol', { toolName: 'Bash', command: 'node scripts/author-astra.mjs 701' }],
     ['delegating to Fable', { toolName: 'Bash', command: 'node scripts/author-fable.mjs --point 834' }],
-    ['a cross-vendor review run', { toolName: 'Bash', command: 'node scripts/review-sol.mjs --commit abc' }],
-    ['a delegated ask run', { toolName: 'Bash', command: 'node scripts/ask-sol.mjs --kind audit --brief "x"' }],
+    ['a cross-vendor review run', { toolName: 'Bash', command: 'node scripts/review-astra.mjs --commit abc' }],
+    ['a delegated ask run', { toolName: 'Bash', command: 'node scripts/ask-astra.mjs --kind audit --brief "x"' }],
   ]
   for (const [name, call] of starts) {
     it(`denies ${name}`, () => {
@@ -543,7 +543,7 @@ describe('over the mark, FINISHING calls and reads stay allowed', () => {
     ['a commit message mentioning npm test', { toolName: 'Bash', command: 'git commit -m "note: npm test moved to the successor"' }],
     ['a commit message quoting a chain', { toolName: 'Bash', command: 'git commit -m "fence denies npm test && npm run test:large"' }],
     ['a commit message quoting a redirect target', { toolName: 'Bash', command: 'git commit -m "stop appending >> TASKS.md"' }],
-    ['an echo of the review command name', { toolName: 'Bash', command: 'echo "run scripts/review-sol.mjs later"' }],
+    ['an echo of the review command name', { toolName: 'Bash', command: 'echo "run scripts/review-astra.mjs later"' }],
     ['the fast gate with a filter argument named test', { toolName: 'Bash', command: 'npx vitest run scripts/context-fence-core.test.mjs' }],
   ]
   for (const [name, call] of quotedNotStarted) {

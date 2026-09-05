@@ -72,7 +72,7 @@ describe('transcript-backed authorship', () => {
       JSON.stringify({
         timestamp: '2026-08-13T15:33:32.265Z',
         type: 'turn_context',
-        payload: { turn_id: 'sol-turn', model: 'gpt-5.6-sol' },
+        payload: { turn_id: 'sol-turn', model: 'gpt-6-astra' },
       }),
       JSON.stringify({
         timestamp: '2026-08-13T15:36:56.233Z',
@@ -87,7 +87,7 @@ describe('transcript-backed authorship', () => {
       transcriptText: text,
     })
     expect(result.status).toBe('agreement')
-    expect(result.actualModel).toBe('gpt-5.6-sol')
+    expect(result.actualModel).toBe('gpt-6-astra')
     expect(authorshipRefusesPermission(result)).toBe(false)
   })
 

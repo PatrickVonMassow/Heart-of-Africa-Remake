@@ -9,7 +9,7 @@
 //     the switch does another;
 //   - a consumer keeping its own copy of the table instead of asking this core.
 import { describe, it, expect } from 'vitest'
-import { KINDS as ASK_KINDS } from './ask-sol-core.mjs'
+import { KINDS as ASK_KINDS } from './ask-astra-core.mjs'
 import {
   DEFAULT_SETTING,
   KINDS,
@@ -21,7 +21,7 @@ import {
   applyFooterNote,
   boardNoteSegment,
   briefLine,
-  kindsToSol,
+  kindsToAstra,
   normaliseSetting,
   readSetting,
   routeFor,
@@ -31,25 +31,25 @@ import {
   statusLine,
   step,
   writeState,
-} from './sol-share-core.mjs'
+} from './astra-share-core.mjs'
 
 describe('the settings themselves', () => {
   it('are ordered from the least Sol to the most, with the default in the middle', () => {
-    expect(SETTINGS).toEqual(['claude-only', 'default', 'prefer-sol'])
+    expect(SETTINGS).toEqual(['claude-only', 'default', 'prefer-astra'])
     expect(DEFAULT_SETTING).toBe('default')
     for (const s of SETTINGS) expect(SETTING_NOTES[s]).toBeTruthy()
     expect(NEVER_ROUTED.length).toBeGreaterThan(0)
   })
 
   it('carry every kind that can actually be routed, and no kind nothing can', () => {
-    // `author` joined the table when scripts/author-sol.mjs made it routable
+    // `author` joined the table when scripts/author-astra.mjs made it routable
     // (point 667) — the switch's biggest lever, and the reason it exists.
     expect(KINDS).toEqual(['review', ...ASK_KINDS, 'author'])
     for (const kind of KINDS) expect(KIND_NOTES[kind]).toBeTruthy()
   })
 
   it('takes only a real setting, whatever the casing and the spacing', () => {
-    expect(normaliseSetting(' Prefer-Sol ')).toBe('prefer-sol')
+    expect(normaliseSetting(' Prefer-Sol ')).toBe('prefer-astra')
     expect(normaliseSetting('sol')).toBeNull()
     expect(normaliseSetting(undefined)).toBeNull()
   })
@@ -61,14 +61,14 @@ describe('routing', () => {
     for (const kind of ASK_KINDS) expect(routeFor(kind, 'default')).toBe('claude')
   })
 
-  it('sends every read-only kind to Sol at prefer-sol', () => {
-    for (const kind of KINDS) expect(routeFor(kind, 'prefer-sol')).toBe('sol')
-    expect(kindsToSol('prefer-sol')).toEqual(KINDS)
+  it('sends every read-only kind to Sol at prefer-astra', () => {
+    for (const kind of KINDS) expect(routeFor(kind, 'prefer-astra')).toBe('sol')
+    expect(kindsToAstra('prefer-astra')).toEqual(KINDS)
   })
 
   it('sends NOTHING to Sol at claude-only — the reviews included, that being the point', () => {
     for (const kind of KINDS) expect(routeFor(kind, 'claude-only')).toBe('claude')
-    expect(kindsToSol('claude-only')).toEqual([])
+    expect(kindsToAstra('claude-only')).toEqual([])
   })
 
   // Audit finding, 12.08.2026: an unknown setting used to route as the DEFAULT, and the
@@ -80,18 +80,18 @@ describe('routing', () => {
     expect(routeFor('review', 'whatever')).toBe('claude')
     expect(routeFor('review', undefined)).toBe('claude')
     expect(settingOrSafe('whatever')).toBe(SAFE_SETTING)
-    expect(settingOrSafe('prefer-sol')).toBe('prefer-sol')
+    expect(settingOrSafe('prefer-astra')).toBe('prefer-astra')
   })
 
   it('answers `claude` for an unknown kind rather than throwing', () => {
-    expect(routeFor('landing', 'prefer-sol')).toBe('claude')
-    expect(routeFor('', 'prefer-sol')).toBe('claude')
+    expect(routeFor('landing', 'prefer-astra')).toBe('claude')
+    expect(routeFor('', 'prefer-astra')).toBe('claude')
   })
 
-  it('routes AUTHORING only at prefer-sol — the lane the operator can turn off', () => {
+  it('routes AUTHORING only at prefer-astra — the lane the operator can turn off', () => {
     // The whole OpenAI authoring lane hangs off this row (point 667): at the two
     // lower settings the work stays with Claude, exactly as it did before.
-    expect(routeFor('author', 'prefer-sol')).toBe('sol')
+    expect(routeFor('author', 'prefer-astra')).toBe('sol')
     expect(routeFor('author', 'default')).toBe('claude')
     expect(routeFor('author', 'claude-only')).toBe('claude')
     // …and an unusable state falls back to the setting that spends nothing new.
@@ -99,7 +99,7 @@ describe('routing', () => {
   })
 
   it('offers the whole table, so no consumer has to keep its own copy', () => {
-    const table = routingTable('prefer-sol')
+    const table = routingTable('prefer-astra')
     expect(table.map((r) => r.kind)).toEqual(KINDS)
     for (const row of table) expect(row.to).toBe('sol')
   })
@@ -107,13 +107,13 @@ describe('routing', () => {
 
 describe('stepping the ladder', () => {
   it('moves one setting per step, in both directions', () => {
-    expect(step('default', 'more')).toMatchObject({ to: 'prefer-sol', changed: true })
+    expect(step('default', 'more')).toMatchObject({ to: 'prefer-astra', changed: true })
     expect(step('default', 'less')).toMatchObject({ to: 'claude-only', changed: true })
     expect(step('claude-only', 'more')).toMatchObject({ to: 'default', changed: true })
   })
 
   it('stops at each end instead of wrapping around to the opposite vendor', () => {
-    expect(step('prefer-sol', 'more')).toMatchObject({ to: 'prefer-sol', changed: false, atEnd: true })
+    expect(step('prefer-astra', 'more')).toMatchObject({ to: 'prefer-astra', changed: false, atEnd: true })
     expect(step('claude-only', 'less')).toMatchObject({ to: 'claude-only', changed: false, atEnd: true })
   })
 
@@ -125,8 +125,8 @@ describe('stepping the ladder', () => {
 
 describe('the state file', () => {
   it('reads a written state back', () => {
-    const state = writeState('prefer-sol', { now: 1_700_000_000_000, by: 'test' })
-    expect(readSetting(JSON.stringify(state))).toMatchObject({ setting: 'prefer-sol', changedAt: 1_700_000_000_000, changedBy: 'test', problem: '' })
+    const state = writeState('prefer-astra', { now: 1_700_000_000_000, by: 'test' })
+    expect(readSetting(JSON.stringify(state))).toMatchObject({ setting: 'prefer-astra', changedAt: 1_700_000_000_000, changedBy: 'test', problem: '' })
   })
 
   it('reads an ABSENT file as the default — nothing was ever set', () => {
@@ -146,9 +146,9 @@ describe('the state file', () => {
   // THROWS — taking down the status report of a switch that promises not to break its
   // caller.
   it('drops a timestamp no Date can hold, so the status report cannot crash on it', () => {
-    expect(readSetting('{"setting":"prefer-sol","changedAt":1e300}').changedAt).toBeNull()
-    expect(readSetting('{"setting":"prefer-sol","changedAt":-5}').changedAt).toBeNull()
-    expect(readSetting('{"setting":"prefer-sol","changedAt":1700000000000}').changedAt).toBe(1_700_000_000_000)
+    expect(readSetting('{"setting":"prefer-astra","changedAt":1e300}').changedAt).toBeNull()
+    expect(readSetting('{"setting":"prefer-astra","changedAt":-5}').changedAt).toBeNull()
+    expect(readSetting('{"setting":"prefer-astra","changedAt":1700000000000}').changedAt).toBe(1_700_000_000_000)
   })
 
   // Cross-vendor review, 12.08.2026: falling back to `default` meant a CORRUPTED
@@ -161,7 +161,7 @@ describe('the state file', () => {
     expect(readSetting('{"setting":"sol-only"}').problem).toMatch(/not one of/)
     expect(SAFE_SETTING).toBe('claude-only')
     for (const kind of KINDS) expect(routeFor(kind, SAFE_SETTING)).toBe('claude')
-    expect(readSetting('{"setting":"prefer-sol","changedAt":"soon"}').changedAt).toBeNull()
+    expect(readSetting('{"setting":"prefer-astra","changedAt":"soon"}').changedAt).toBeNull()
   })
 
   it('refuses to write a setting that is not one', () => {
@@ -169,10 +169,10 @@ describe('the state file', () => {
   })
 
   it('lives in the MAIN checkout, so a worktree agent reads the setting the user flipped', () => {
-    expect(settingPathFrom('/workspace/hoa/.git', '/workspace/hoa/.claude/worktrees/agent-a1')).toBe('/workspace/hoa/.claude/sol-share.json')
-    expect(settingPathFrom('/workspace/hoa/.git', '/workspace/hoa')).toBe('/workspace/hoa/.claude/sol-share.json')
-    expect(settingPathFrom('', '/workspace/hoa')).toBe('/workspace/hoa/.claude/sol-share.json')
-    expect(settingPathFrom('/srv/hoa.git', '/workspace/hoa')).toBe('/workspace/hoa/.claude/sol-share.json')
+    expect(settingPathFrom('/workspace/hoa/.git', '/workspace/hoa/.claude/worktrees/agent-a1')).toBe('/workspace/hoa/.claude/astra-share.json')
+    expect(settingPathFrom('/workspace/hoa/.git', '/workspace/hoa')).toBe('/workspace/hoa/.claude/astra-share.json')
+    expect(settingPathFrom('', '/workspace/hoa')).toBe('/workspace/hoa/.claude/astra-share.json')
+    expect(settingPathFrom('/srv/hoa.git', '/workspace/hoa')).toBe('/workspace/hoa/.claude/astra-share.json')
   })
 })
 
@@ -183,7 +183,7 @@ describe('what it says', () => {
     expect(line).toMatch(/to GPT-5\.6 Sol: review/)
     expect(line).toMatch(/to Claude: diagnose/)
     expect(statusLine('claude-only')).toMatch(/to GPT-5\.6 Sol: nothing/)
-    expect(statusLine('prefer-sol')).toMatch(/to Claude: nothing/)
+    expect(statusLine('prefer-astra')).toMatch(/to Claude: nothing/)
   })
 
   // Audit finding, 12.08.2026: presented bare, a safe setting reads as the operator's
@@ -199,8 +199,8 @@ describe('what it says', () => {
   })
 
   it('tells a delegated agent what to hand over, at every setting', () => {
-    expect(briefLine('prefer-sol')).toMatch(/ask-sol\.mjs/)
-    expect(briefLine('prefer-sol')).toMatch(/diagnose/)
+    expect(briefLine('prefer-astra')).toMatch(/ask-astra\.mjs/)
+    expect(briefLine('prefer-astra')).toMatch(/diagnose/)
     expect(briefLine('claude-only')).toMatch(/do NOT call/)
     expect(briefLine('default')).toMatch(/reviews go to GPT-5\.6 Sol/)
     for (const s of SETTINGS) expect(briefLine(s)).toBeTruthy()
@@ -217,14 +217,14 @@ describe('the board note', () => {
   })
 
   it('names a non-default setting in the board’s own language', () => {
-    expect(applyFooterNote(footer('Stand: 11.08.2026 · 3 offene Punkte'), 'prefer-sol')).toContain(
-      'Sol-Routing: prefer-sol — Diagnose, Audit, Aufzählungen und Erklärungen laufen über GPT-5.6 Sol',
+    expect(applyFooterNote(footer('Stand: 11.08.2026 · 3 offene Punkte'), 'prefer-astra')).toContain(
+      'Sol-Routing: prefer-astra — Diagnose, Audit, Aufzählungen und Erklärungen laufen über GPT-5.6 Sol',
     )
     expect(applyFooterNote(footer('Stand: x'), 'claude-only')).toContain('Sol-Routing: claude-only')
   })
 
   it('replaces a stale note rather than stacking one on the other', () => {
-    const once = applyFooterNote(footer('Stand: x · 3 offene Punkte'), 'prefer-sol')
+    const once = applyFooterNote(footer('Stand: x · 3 offene Punkte'), 'prefer-astra')
     const twice = applyFooterNote(once, 'claude-only')
     expect(twice.match(/Sol-Routing:/g)).toHaveLength(1)
     expect(twice).toContain('claude-only')
@@ -232,9 +232,9 @@ describe('the board note', () => {
   })
 
   it('keeps the footer’s own segments, and leaves a board without a footer alone', () => {
-    const out = applyFooterNote(footer('Stand: x · 3 offene Punkte · lädt sich alle 30 s selbst neu.'), 'prefer-sol')
+    const out = applyFooterNote(footer('Stand: x · 3 offene Punkte · lädt sich alle 30 s selbst neu.'), 'prefer-astra')
     expect(out).toContain('3 offene Punkte')
     expect(out).toContain('lädt sich alle 30 s selbst neu.')
-    expect(applyFooterNote('<main>no footer</main>', 'prefer-sol')).toBe('<main>no footer</main>')
+    expect(applyFooterNote('<main>no footer</main>', 'prefer-astra')).toBe('<main>no footer</main>')
   })
 })

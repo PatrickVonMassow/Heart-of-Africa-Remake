@@ -7,7 +7,7 @@ import { FABLE_ESCALATION_ROUNDS } from './author-routing-core.mjs'
 import { writeState } from './fable-switch-core.mjs'
 
 const root = resolve(process.cwd())
-const solScript = resolve(root, 'scripts', 'author-sol.mjs')
+const astraScript = resolve(root, 'scripts', 'author-astra.mjs')
 const fableScript = resolve(root, 'scripts', 'author-fable.mjs')
 const dirs = []
 
@@ -46,18 +46,18 @@ describe('Fable authoring CLI', () => {
     const result = run(fableScript, ['--help'])
     expect(result.status, result.stderr).toBe(0)
     expect(result.stdout).toContain('usage: node scripts/author-fable.mjs --point <N>')
-    expect(result.stdout).not.toContain('scripts/author-sol.mjs')
+    expect(result.stdout).not.toContain('scripts/author-astra.mjs')
   })
 
   it('names the serving command in the shared routing report', () => {
-    const result = run(solScript, ['--routing', '--point', '834', '--rounds', String(FABLE_ESCALATION_ROUNDS)])
+    const result = run(astraScript, ['--routing', '--point', '834', '--rounds', String(FABLE_ESCALATION_ROUNDS)])
     expect(result.status, result.stderr).toBe(0)
     expect(result.stdout).toContain('point 834 → fable (Fable 5.1)')
     expect(result.stdout).toContain('commission: node scripts/author-fable.mjs --point 834')
   })
 
   it('redirects a Sol dry-run to the command that serves the Fable lane instead of refusing it', () => {
-    const result = run(solScript, ['--point', '834', '--rounds', String(FABLE_ESCALATION_ROUNDS), '--dry-run'])
+    const result = run(astraScript, ['--point', '834', '--rounds', String(FABLE_ESCALATION_ROUNDS), '--dry-run'])
     expect(result.status, result.stderr).toBe(0)
     expect(result.stderr).toContain('node scripts/author-fable.mjs --point 834')
     expect(result.stderr).not.toContain('not to GPT-5.6 Sol')

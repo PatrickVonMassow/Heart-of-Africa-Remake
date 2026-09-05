@@ -10,7 +10,7 @@ import { passComposition } from './review-material-core.mjs'
 
 export const REVIEWER_CANDIDATES = Object.freeze(['GPT-5.6 Sol', 'Opus 5', FABLE_MODEL, 'Opus 4.8'])
 export const UNREVIEWABLE_NARROWING_REMEDY =
-  'Review every runnable pass and record the exact measured remainder with the criticality-review-unavailable command printed by review-sol.'
+  'Review every runnable pass and record the exact measured remainder with the criticality-review-unavailable command printed by review-astra.'
 export const NO_ELIGIBLE_REVIEWER_REASON =
   `every configured reviewer model authored part of this contribution. ${UNREVIEWABLE_NARROWING_REMEDY}`
 export const UNKNOWN_AUTHOR_REVIEWER_REASON =
