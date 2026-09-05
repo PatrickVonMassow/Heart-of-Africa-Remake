@@ -10,9 +10,13 @@
 // mechanism-review consume the same verdict rather than reimplementing it.
 import { sameModel } from './mechanism-review-core.mjs'
 
-/** Model designations accepted from a prose heading. JSON uses its `model` field. */
+/** Model designations accepted from a prose heading. JSON uses its `model` field.
+ *  The OpenAI lane is matched under BOTH its names (point 1061): `GPT-6 Astra`
+ *  writes the artefacts from 05.09.2026 on, and the retired `GPT-5.6 Sol` heads
+ *  the blind halves already lying in `docs/four-eyes/`, which must keep proving
+ *  their author. */
 const MODEL_IN_HEADING =
-  /\b(GPT[\s-]*\d+(?:\.\d+)?[\s-]*Sol|Sol(?:[\s-]*\d+(?:\.\d+)?)?|Claude[\s-]+(?:Opus|Fable|Sonnet|Haiku)(?:[\s-]*\d+(?:\.\d+)?)?|(?:Opus|Fable|Sonnet|Haiku)(?:[\s-]*\d+(?:\.\d+)?)?)\b/i
+  /\b(GPT[\s-]*\d+(?:\.\d+)?[\s-]*(?:Astra|Sol)|(?:Astra|Sol)(?:[\s-]*\d+(?:\.\d+)?)?|Claude[\s-]+(?:Opus|Fable|Sonnet|Haiku)(?:[\s-]*\d+(?:\.\d+)?)?|(?:Opus|Fable|Sonnet|Haiku)(?:[\s-]*\d+(?:\.\d+)?)?)\b/i
 
 /** Remove HTML comments while retaining any visible content around them. */
 function visibleMarkdownOnLine(line, commentState) {
@@ -96,7 +100,7 @@ export function readTranscriptMessages(text) {
   const eventTimes = []
   let malformedLines = 0
   // Codex writes the selected model on each turn_context and the answer as a
-  // later response_item. This is the Sol lane's per-turn equivalent of Claude
+  // later response_item. This is the OpenAI lane's per-turn equivalent of Claude
   // Code's message.model; retaining it is what makes the second 676 half
   // verifiable from its own transcript too.
   let codexTurnModel = ''

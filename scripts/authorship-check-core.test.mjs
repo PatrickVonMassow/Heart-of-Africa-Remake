@@ -20,6 +20,10 @@ const transcript = (...lines) => lines.join('\n')
 describe('transcript-backed authorship', () => {
   it('reads a JSON model or the artefact title without inventing an unnamed author', () => {
     expect(claimedModelFromArtefact('{"model":"GPT-5.6 Sol","entries":[]}')).toBe('GPT-5.6 Sol')
+    // The lane's CURRENT name has to be readable from a heading too (point 1061):
+    // an artefact Astra writes is unattributable while only the retired name parses.
+    expect(claimedModelFromArtefact('# List B — GPT-6 Astra, written blind\n\nBody')).toBe('GPT-6 Astra')
+    expect(claimedModelFromArtefact('# List B — GPT-5.6 Sol, written blind\n\nBody')).toBe('GPT-5.6 Sol')
     expect(claimedModelFromArtefact('# Proposal A — Fable 5, written blind\n\nBody')).toBe('Fable 5')
     expect(claimedModelFromArtefact('# Proposal A — written blind\n\nBody')).toBe('')
   })
@@ -67,12 +71,16 @@ describe('transcript-backed authorship', () => {
     expect(authorshipRefusesPermission(result)).toBe(true)
   })
 
-  it('accepts the 676 half-B claim when its producing message says Sol', () => {
-    const text = transcript(
+  // The OpenAI lane's transcript, under BOTH its names (point 1061). The half-B
+  // case is the REAL 676 record of 13.08.2026 and keeps the retired id, because a
+  // rename may not cost a landed artefact its proof of authorship; the Astra case
+  // is the same shape for the lane as it runs from 05.09.2026 on.
+  const openAiLaneTranscript = (turnModel, turnId) =>
+    transcript(
       JSON.stringify({
         timestamp: '2026-08-13T15:33:32.265Z',
         type: 'turn_context',
-        payload: { turn_id: 'sol-turn', model: 'gpt-6-astra' },
+        payload: { turn_id: turnId, model: turnModel },
       }),
       JSON.stringify({
         timestamp: '2026-08-13T15:36:56.233Z',
@@ -81,10 +89,23 @@ describe('transcript-backed authorship', () => {
       }),
       JSON.stringify({ timestamp: '2026-08-13T15:36:56.284Z', type: 'event_msg', payload: {} }),
     )
+
+  it('accepts the 676 half-B claim when its producing message says Sol', () => {
     const result = checkAuthorship({
       claimedModel: 'GPT-5.6 Sol',
       artefactAt: '2026-08-13T15:36:56.233Z',
-      transcriptText: text,
+      transcriptText: openAiLaneTranscript('gpt-5.6-sol', 'sol-turn'),
+    })
+    expect(result.status).toBe('agreement')
+    expect(result.actualModel).toBe('gpt-5.6-sol')
+    expect(authorshipRefusesPermission(result)).toBe(false)
+  })
+
+  it('accepts an Astra claim when its producing message says Astra', () => {
+    const result = checkAuthorship({
+      claimedModel: 'GPT-6 Astra',
+      artefactAt: '2026-08-13T15:36:56.233Z',
+      transcriptText: openAiLaneTranscript('gpt-6-astra', 'astra-turn'),
     })
     expect(result.status).toBe('agreement')
     expect(result.actualModel).toBe('gpt-6-astra')
