@@ -93,6 +93,7 @@ Das Musterbeispiel sind die Chat-Zeitstempel: neun Eskalationsstufen, acht weich
 | 04.09. | Der Nutzer sah den frisch gelandeten Grabe-Vorgang an und fand keinen Zweck: Jede Grube ist als Vorratsgrube, Pfostenloch oder gewendeter Boden gesetzt, kommentiert, getestet und per Dev-Assertion abgesichert — sichtbar ist davon nichts, alle drei sind dasselbe runde Loch und ein Arbeitsgang hinterlässt kein Ergebnis. Zweiter Fall derselben Bauform in derselben Szene nach dem 13.08. (§3.233, Punkte 1056/1057) |
 | 04.09. mittags | Zwei von 45 Durchsetzern waren still tot: Die Vor-Prüfungen für `Bash` und `PowerShell` riefen `wait-command-guard.mjs` über einen cwd-relativen Pfad auf, was in jedem Arbeitsbaum ein nicht-blockierendes `Cannot find module` ergibt — der Wächter läuft nie, und die Regel gilt trotzdem als abgesichert. Gefunden hat es kein Test, sondern der Wächter über den Wächtern (§3.234) |
 | 04.09. abends | Der Nutzer fragte nach dem roten Kasten, den er „immer wieder" sieht: `exited with code 143` und „Remote Control is disabled" sind kein Absturz, sondern unsere eigene Kontextgrenze — die Autostart-Remediation erschießt den übergebenen Vorgänger zwei Minuten nach `markHandover`, und mit dem Prozess stirbt die Fernsicht auf die unbeaufsichtigte Batch. Acht Übergaben an einem Abend, und keine Meldung sagte je, dass wir es selbst waren (§3.236, Punkt 1059) |
+| 05.09. abends | Zwölf Sitzungstode an einem Tag, jeder ein sauberes `exit 143`, jede Fährte falsch (Container, Erweiterung, Übergabe, Push-Tor) — bis ein Prozess-Recorder zwei Sessions in derselben Sekunde verschwinden sah: Zwei Tests des Notfall-Schlags ließen die echten Nähte stehen und terminierten in jedem Vitest-Lauf jede im Register verzeichnete Session (§3.238) |
 
 
 Muster: Ab dem 22.07. explodiert die Commit-Rate (Delegation) — und genau dann häufen sich die Infrastruktur-Vorfälle. **Skalierung der Autonomie erzeugt eine eigene Problemklasse, die die Feature-Arbeit zeitweise überholt.**
@@ -1433,7 +1434,7 @@ keinen Träger hat. Gebucht als Punkt 956.
 
 ## Anhang A — Maschinell gepflegte Quellen-Übersicht
 
-Zuletzt aktualisiert: Samstag, 05.09.2026, 18:08 · Quellen-Fingerprint: `e64a57bc7830…`
+Zuletzt aktualisiert: Samstag, 05.09.2026, 19:39 · Quellen-Fingerprint: `0b9317965d1f…`
 
 Spalten heuristisch aus den Quellen abgeleitet (Anläufe = distinkte Datumsnennungen im Memory;
 Maßnahme = Guard-Skripte mit Namens-Treffer). Die inhaltliche Bewertung gehört der Prosa oben.
@@ -1482,7 +1483,6 @@ Maßnahme = Guard-Skripte mit Namens-Treffer). Die inhaltliche Bewertung gehört
 | Immer auf Deutsch mit dem Nutzer kommunizieren, und immer in der Du-Form — nie siezen | 4 | hoch | — (Regel/Memory) | ◐ Regel |
 | After every change, npm run lint (oxlint) and npm audit must be clean — zero lint errors/warnings, zero CVEs. Standing user directive. | 1 | niedrig | — (Regel/Memory) | ◐ Regel |
 | hoa PERMANENT process — delegate as much implementation as possible to worktree-isolated subagents; keep only picture-verify + merge at the main session; run a pool of parallel agents on non-overlapping files | 4 | hoch | — (Regel/Memory) | ◐ Regel |
-| The \"Maximum QA\" QA process and the \"new demo\" trigger (append it + closing + increment tag + publish) | 2 | mittel | — (Regel/Memory) | ◐ Regel |
 | State only what was just measured, with its reading time; never assert machine/repo state from a plausible model | 2 | mittel | — (Regel/Memory) | ◐ Regel |
 | Before building, triage difficulty × criticality; HIGH/critical work gets a second, different model — in which FORM (blind-parallel vs. review) is normative in CLAUDE.md §6, not here | 3 | mittel | criticality-review-guard.mjs, model-guard.mjs | ✔ Mechanismus |
 | A user question is an INTERRUPT, not a new task — after answering, the last action of the turn must resume the batch; only an explicit stop or a genuine block on user input ends it | 3 | mittel | batch-autostart.mjs, batch-doctor-states.mjs, batch-doctor.mjs, batch-lock.mjs, batch-progress-guard.mjs, batch-resume-hook.mjs, batch-singleton.mjs | ✔ Mechanismus |
@@ -1506,6 +1506,7 @@ Maßnahme = Guard-Skripte mit Namens-Treffer). Die inhaltliche Bewertung gehört
 | Saved games do not constrain design work: the feature is switched off, nobody plays a serious run, and no migration is ever owed for a data change | 1 | niedrig | — (Regel/Memory) | ◐ Regel |
 | 24.07.2026 evening chaos — serving model silently degraded to Haiku 4.5; verify the serving model before batch work, Haiku-class must pause instead of working | 5 | hoch | model-guard.mjs | ✔ Mechanismus |
 | Keep the shell cwd in /workspace/hoa; a worktree cwd makes the Stop guards judge the wrong repo root | 1 | niedrig | worktree-reminder.mjs | ✔ Mechanismus |
+| Solved 05.09.2026: every claude session died with exit 143 because two batch-emergency tests ran the real strike against the live session registry — evidence, method, fix, and what to keep in mind | 2 | mittel | — (Regel/Memory) | ◐ Regel |
 | ENDED 17.08.2026 — the 13.08. emergency that pushed the MAXIMUM load to OpenAI (hard cases to Sol via --anyway, pool of one) is over; the normal three-lane split of CLAUDE.md §6 applies again | 4 | hoch | — (Regel/Memory) | ◐ Regel |
 | Every new optical/graphics feature must be sorted into the low/medium/high detail presets, enforced by a pure completeness test — a new quality key with no preset entries fails the gate | 2 | mittel | — (Regel/Memory) | ◐ Regel |
 | Write about this project as a participant (\"wir/unser\"), never as an outside observer (\"euer Mechanismus\", \"die ihr abschaffen wollt\") | 1 | niedrig | — (Regel/Memory) | ◐ Regel |
@@ -1528,7 +1529,7 @@ Maßnahme = Guard-Skripte mit Namens-Treffer). Die inhaltliche Bewertung gehört
 | Every GUI/rendering fix must be verified on BOTH WebGPU and WebGL2 before it counts as done — never mark a render fix done on one path | 2 | mittel | render-verify-guard.mjs | ✔ Mechanismus |
 | A resumed batch session must check the previous owner's PROCESS before working — the launcher's \"provably dead\" verdict was wrong and double-spawned | 2 | mittel | render-verify-guard.mjs | ✔ Mechanismus |
 | Rotating verify AND unit failures under a running agent pool are LOAD, not bugs — 8 of 12 unit runs red from load alone; judge a red only on a quiet machine | 8 | hoch | render-verify-guard.mjs | ✔ Mechanismus |
-| The named \"version release\" process and its trigger — queue/run a version release for a version the user names (full closing → user approval → tag → mirror poc → publish /TAG/ and /poc/) | 1 | niedrig | lock-release-hook.mjs | ✔ Mechanismus |
+| The named \"version release\" process and its trigger — queue/run a version release for a version the user names (full closing → user approval → tag → mirror poc → publish /TAG/ and /poc/) | 3 | mittel | lock-release-hook.mjs | ✔ Mechanismus |
 | Standing licence to move, REMOVE or ADD villages when it helps — but every change must be checked against the other requirements first, and the check has already caught a real bug | 1 | niedrig | — (Regel/Memory) | ◐ Regel |
 | A VS Code restart restarts the devcontainer — every process inside dies, PPID 1 proves nothing | 3 | mittel | container-ask-guard.mjs | ✔ Mechanismus |
 | Keep the visual QA eye open for functionally-fine but weird-LOOKING oddities, not just functional bugs | 2 | mittel | — (Regel/Memory) | ◐ Regel |
@@ -1538,8 +1539,8 @@ Maßnahme = Guard-Skripte mit Namens-Treffer). Die inhaltliche Bewertung gehört
 
 Erfasste Quellen: 95 Feedback-/Projekt-Memories · 58 Guard-/Hook-Skripte · 6 Revert-/Reapply-Commits · 125 Prozess-/Meta-TASKS-Punkte (davon 59 offen).
 
-<!-- RETRO-FINGERPRINT: e64a57bc783078c835c78f6284a53dd0aea4f75fa8ab1f5af3df9681c8ad4c51 -->
-<!-- RETRO-LAST-REFRESHED: 2026-09-05T16:08:15.548Z -->
+<!-- RETRO-FINGERPRINT: 0b9317965d1f28bbea5032713b8297689b714599247ba32f7944cf9776b406f1 -->
+<!-- RETRO-LAST-REFRESHED: 2026-09-05T17:39:15.893Z -->
 <!-- AUTO-GENERATED:END -->
 
 ### 3.111 Ein Erfolg ist kein Beweis für den Weg, auf dem er zustande kam
@@ -5621,3 +5622,42 @@ ein erster Versuch.
 eine Spur hinterlassen, die seinen Nachfolger warnt — sonst wiederholt die Kette
 denselben Versuch, so oft der Neustart sie anwirft, und meldet dabei jedes Mal
 wahrheitsgemäß Fortschritt.
+
+### 3.238 Der Test, der nach echten Prozessen griff — zwölf Sitzungstode mit sauberem Abgang
+
+**Was geschah.** Am 05.09.2026 starb zwischen 15:50 und 19:12 jede Claude-Sitzung im
+Container nach wenigen Minuten mit `exited with code 143` — die interaktive ebenso wie
+der kopflose Arbeiter des Launchers, zwölfmal, vom Nutzer sechsmal gemeldet. Jede
+Fährte war plausibel und falsch: kein Container-Neustart, kein Speichermangel, kein
+Kill der Erweiterung, keine Übergabe-Remediation (§3.236), und der Notfall-Schlag hatte
+keinen Eintrag geschrieben. Die stärkste Korrelation — jeder Tod fiel in ein laufendes
+Push-Tor — führte zur Vermutung, das Tor selbst töte. Sie war richtig und irreführend
+zugleich: Nicht das Tor tötete, sondern der Vitest-Lauf darin. Zwei Tests in
+`batch-emergency.test.mjs` riefen die echte Orchestrierung `runEmergency` auf und
+injizierten nur den Lock und den Befehlsausführer; Prozessregister, Terminierung und
+Lock-Freigabe blieben auf ihren LIVE-Voreinstellungen. Der wiederholte Schlag erreicht
+»hard-recover« und beendet jeden Eintrag des echten Registers `session-process.json`
+per SIGTERM — mit exakter PID-Inkarnationsprüfung, also zielgenau. Eine Sitzung stand
+in diesem Register, sobald sie den Batch-Lock erworben hatte; darum überlebte ein
+harmloser Testlauf vor dem Erwerb, und darum starben um 19:11:23 beide lebenden
+Sitzungen in derselben Sekunde, während ein getarnter Kanarienvogel mit dem Pfad der
+Claude-Binärdatei unberührt blieb.
+
+**Warum es so lange dauerte.** Der sterbende Prozess schrieb selbst die einzige Spur:
+`process-exit / owner-release, explicit`. Ein SIGTERM durchläuft denselben sauberen
+Abgang wie ein gewollter Ausstieg, und die Zeile nennt keinen Absender (§3.236). Die
+Kanarienvögel sahen nichts, weil der Täter nicht nach Namen, sondern nach Registereintrag
+schoss. Gefunden hat es erst ein Recorder, der die Prozesstabelle jede Sekunde festhielt
+und beim Verschwinden einer Claude-PID die letzten zwölf Aufnahmen ablegte: In der
+Todessekunde waren nur Vitest-Arbeiter neu, und zwei Sitzungen gingen zusammen. Von da
+an war die Frage nicht mehr »wer tötet«, sondern »welcher Test kennt PIDs« — und die
+Antwort stand in einer Fixture, die drei von sieben Nähten pinnte.
+
+**Lehren:** Ein Test, der ein echtes Orchestrierungsmodul importiert, pinnt JEDE Naht,
+die einen Prozess, ein Lock oder ein Register erreicht — in der Fixture, nicht im
+Gedächtnis des Testschreibers; ein `afterEach`-Spion auf `process.kill` macht die
+Verletzung zum roten Test statt zum toten Batch. Ein Register, in das Tests schreiben
+können, ist die Bauform, die diesen Tag ermöglicht hat (Rückstand, `docs/backlog.md`).
+Und die Forensik-Lehre von §3.237 gilt verschärft: Wer stirbt, kann seinen Mörder nicht
+protokollieren — die Aufzeichnung muss außerhalb des Opfers laufen, und ein Diff zweier
+Aufnahmen sagt mehr als jede Hypothese über den Sender.
