@@ -435,7 +435,8 @@ if (section('village')) {
   await ejectTest('Village', '(cs)=>cs.reduce((b,c,i)=>(c.kind==="segment"&&b<0)?i:b,-1)') // fence panel
 
   // Chief hut operable despite collision: standing at its door and pressing the
-  // Space use key opens the audience dialog (design.md §2.3).
+  // Space use key brings the chief OUT of it (design.md §2.3, §12). There is no
+  // audience window any more — the answer to the press is a man in the open.
   await page.evaluate(() => {
     const it = window.__placeLayout.interactives.find((i) => i.type === 'chief')
     const p = window.__placePlayer
@@ -453,18 +454,18 @@ if (section('village')) {
     { timeout: 8000 },
   )
   await page.keyboard.press('Space')
-  const audienceOpened = await page
-    .waitForFunction(() => !!document.querySelector('.dialog'), null, { timeout: 8000 })
+  const chiefCameOut = await page
+    .waitForFunction(() => {
+      const g = window.__game.getState()
+      return g.chiefOutside[g.placeId] === true
+    }, null, { timeout: 8000 })
     .then(() => true)
     .catch(() => false)
-  check('Village: chief hut opens with Space at its door', audienceOpened)
-  await page.evaluate(() => window.__ui?.getState?.().setDialog(null))
+  check('Village: the chief comes out with Space at his door', chiefCameOut)
   await page.waitForTimeout(200)
   await dwellingDoorsReachable('Village')
-  await shot('53-collision-village-chief-hut', { place: 'maasai-village', label: "the chief's hut and its door" })
-  await page.keyboard.press('Escape')
+  await shot('53-collision-village-chief-hut', { place: 'maasai-village', label: "the chief's hut, its door and the chief standing out in front of it" })
   await page.evaluate(() => { const p = window.__placePlayer; p.x = 0; p.z = 0 })
-  await page.waitForFunction(() => !document.querySelector('.dialog'), null, { timeout: 8000 }).catch(() => {})
   await page.waitForTimeout(150)
 
   await reachableBuildings('Village')
