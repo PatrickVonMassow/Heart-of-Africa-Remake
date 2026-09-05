@@ -1153,12 +1153,6 @@
       "origin": "machine",
       "place": "last"
     },
-    "1052": {
-      "at": "2026-09-03T18:55:11.319Z",
-      "why": "User order 03.09.2026: rebuild filed and queued right before 689 at the user's explicit placement (vor oder zusammen mit 689)",
-      "origin": "user",
-      "place": "ahead"
-    },
     "1054": {
       "at": "2026-09-03T20:21:02.283Z",
       "why": "Last is right: the infrastructure freeze (CLAUDE.md §2) parks guard work, and the concrete deadlock is already resolved — the sentinel that triggered it is restored, so nothing is blocked while it waits.",
@@ -1194,6 +1188,12 @@
       "why": "Appended by the responder path; ranking belongs to the batch owner",
       "origin": "machine",
       "place": "last"
+    },
+    "1062": {
+      "at": "2026-09-05T23:52:58.326Z",
+      "why": "Der Abschlusslauf 633 faehrt LARGE, LARGE faehrt die Gamepad-Suite, und die bleibt rot, bis dieser Punkt landet — er steht deshalb vor der Veroeffentlichung.",
+      "origin": "machine",
+      "place": "ahead"
     }
   },
   "boundary": {
@@ -1229,7 +1229,7 @@
     "why": "The order standing in front of the release today is the arrangement that predates this rule; the four machine-filed points that had ranked themselves there were moved behind 174 first"
   },
   "settled": {
-    "at": "2026-09-05T18:27:04.452Z",
+    "at": "2026-09-05T23:52:58.345Z",
     "points": [
       174,
       184,
@@ -1593,7 +1593,6 @@
       1048,
       1049,
       1050,
-      1052,
       1053,
       1054,
       1055,
@@ -1601,7 +1600,8 @@
       1057,
       1058,
       1059,
-      1060
+      1060,
+      1062
     ]
   }
 }
