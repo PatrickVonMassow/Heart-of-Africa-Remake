@@ -1,33 +1,33 @@
 // THE SWITCH THAT MOVES WORK BETWEEN THE TWO VENDORS (point 654, widened by 667).
-// rule:model-policy@d0066fb3
+// rule:model-policy@4f05875b
 //
 // WHY IT EXISTS: the user pays two vendors whose allowances run out at different times,
 // and wants the load moved BEFORE one of them is nearly spent. It began as a read-only
-// switch, which cost almost nothing to build because nothing Sol did carried a commit
+// switch, which cost almost nothing to build because nothing Astra did carried a commit
 // trailer. Point 667 then added the `author` kind, and with it the machinery a role swap
-// needs — Sol stands in the author allowlist (scripts/model-guard-core.mjs), the
-// `commit-msg` hook takes its trailer, and where Sol authored, CLAUDE reviews, runs the
+// needs — Astra stands in the author allowlist (scripts/model-guard-core.mjs), the
+// `commit-msg` hook takes its trailer, and where Astra authored, CLAUDE reviews, runs the
 // suites, judges the picture and lands.
 //
 // Side-effect free: reading and writing the file, and the printing, belong to
-// scripts/sol-share.mjs. Pinned by sol-share-core.test.mjs.
+// scripts/astra-share.mjs. Pinned by astra-share-core.test.mjs.
 
-import { KINDS as ASK_KINDS } from './ask-sol-core.mjs'
+import { KINDS as ASK_KINDS } from './ask-astra-core.mjs'
 import { mainCheckoutFrom } from './main-checkout-core.mjs'
 
 /**
- * The three settings, ordered from the least Sol to the most. The order IS the
+ * The three settings, ordered from the least Astra to the most. The order IS the
  * semantics: `--more` steps one to the right, `--less` one to the left, so a user who
  * only remembers "more OpenAI" never has to remember the names.
  */
-export const SETTINGS = Object.freeze(['claude-only', 'default', 'prefer-sol'])
+export const SETTINGS = Object.freeze(['claude-only', 'default', 'prefer-astra'])
 
 /**
  * What an ABSENT file routes as — not the project's standing policy.
  *
  * The name is a file-format default, and the two are different things (cross-vendor
- * audit, 17.08.2026): CLAUDE.md §6 has Sol authoring the points — the hard and critical
- * ones included — which only `prefer-sol` routes. A checkout that never set the switch therefore
+ * audit, 17.08.2026): CLAUDE.md §6 has Astra authoring the points — the hard and critical
+ * ones included — which only `prefer-astra` routes. A checkout that never set the switch therefore
  * runs BELOW the standing policy rather than at it — deliberately, because an unset file
  * must never spend a vendor nobody chose.
  */
@@ -37,12 +37,12 @@ export const DEFAULT_SETTING = 'default'
  * What a file that EXISTS but cannot be read falls back to (cross-vendor review,
  * 12.08.2026), and what any value that is not a setting routes as.
  *
- * NOT the default. The default routes reviews to Sol, so a corrupted `claude-only` state
+ * NOT the default. The default routes reviews to Astra, so a corrupted `claude-only` state
  * would quietly start spending the very allowance the operator had moved away from —
  * fail-open in the one direction a switch can fail open UNOBSERVED.
  *
  * IT IS NOT NEUTRAL, and the audit of 12.08.2026 was right to say so: a corrupted
- * `prefer-sol` state falls back to the vendor THAT operator was sparing. There is no
+ * `prefer-astra` state falls back to the vendor THAT operator was sparing. There is no
  * setting that spends nothing on both, so the honest claim is the narrow one — the
  * fallback sends nothing to the SECOND vendor, and the work stays where it would be
  * without the switch at all, in the session that is already running. That is recoverable
@@ -59,7 +59,7 @@ export const SAFE_SETTING = 'claude-only'
  *
  * One rule everywhere: a value that is not one of the three is an anomaly, and an anomaly
  * is read as the safe setting. It used to fall back to the default, which routes reviews
- * to Sol — so a garbled setting spent the second vendor's allowance (audit, 12.08.2026).
+ * to Astra — so a garbled setting spent the second vendor's allowance (audit, 12.08.2026).
  */
 export function settingOrSafe(value) {
   return normaliseSetting(value) ?? SAFE_SETTING
@@ -81,7 +81,7 @@ export function asState(value) {
 }
 
 /** Where the setting lives, relative to the checkout that owns it. */
-export const SETTING_FILE_NAME = 'sol-share.json'
+export const SETTING_FILE_NAME = 'astra-share.json'
 
 /**
  * The setting's path, given git's common dir. PURE.
@@ -99,25 +99,25 @@ export function settingPathFrom(gitCommonDir, repoRoot, { sep = '/' } = {}) {
 /**
  * Every kind of work this switch has an opinion about.
  *
- * `review` is the four-eyes review that already goes to Sol (point 624), the middle ones
- * are the read-only kinds `scripts/ask-sol.mjs` can carry, and `author` is the writing
+ * `review` is the four-eyes review that already goes to Astra (point 624), the middle ones
+ * are the read-only kinds `scripts/ask-astra.mjs` can carry, and `author` is the writing
  * lane of point 667 — deliberately absent while nothing could route it, and added the
- * moment `scripts/author-sol.mjs` existed to. It matters most: authoring is the largest
+ * moment `scripts/author-astra.mjs` existed to. It matters most: authoring is the largest
  * single item of the spend, so the switch that exists to move load between two vendors
  * would be missing its biggest lever without it.
  */
 export const KINDS = Object.freeze(['review', ...ASK_KINDS, 'author'])
 
-/** The kinds `scripts/ask-sol.mjs` carries — every kind that is pure reading. */
+/** The kinds `scripts/ask-astra.mjs` carries — every kind that is pure reading. */
 export const READ_ONLY_KINDS = Object.freeze([...ASK_KINDS])
 
 export const KIND_NOTES = Object.freeze({
-  review: 'the four-eyes review of a diff (scripts/review-sol.mjs)',
+  review: 'the four-eyes review of a diff (scripts/review-astra.mjs)',
   diagnose: 'name the cause of a red from log plus diff',
   audit: 'the enumerating plausibility and bug-finding sweeps',
   enumerate: 'risk, test-case and option lists (a blind-parallel half)',
   explain: 'what a subsystem does, where something is handled',
-  author: 'authoring a point, the hard and critical ones included (scripts/author-sol.mjs)',
+  author: 'authoring a point, the hard and critical ones included (scripts/author-astra.mjs)',
 })
 
 /**
@@ -127,21 +127,21 @@ export const KIND_NOTES = Object.freeze({
  */
 const ROUTING = Object.freeze({
   'claude-only': Object.freeze({ review: 'claude', diagnose: 'claude', audit: 'claude', enumerate: 'claude', explain: 'claude', author: 'claude' }),
-  default: Object.freeze({ review: 'sol', diagnose: 'claude', audit: 'claude', enumerate: 'claude', explain: 'claude', author: 'claude' }),
-  'prefer-sol': Object.freeze({ review: 'sol', diagnose: 'sol', audit: 'sol', enumerate: 'sol', explain: 'sol', author: 'sol' }),
+  default: Object.freeze({ review: 'astra', diagnose: 'claude', audit: 'claude', enumerate: 'claude', explain: 'claude', author: 'claude' }),
+  'prefer-astra': Object.freeze({ review: 'astra', diagnose: 'astra', audit: 'astra', enumerate: 'astra', explain: 'astra', author: 'astra' }),
 })
 
 /** One line per setting, saying what it is FOR — printed by `--status` and by `--help`. */
 export const SETTING_NOTES = Object.freeze({
-  'claude-only': 'the escape hatch when the ChatGPT side is the scarce one — nothing goes to Sol',
-  default: 'reviews to Sol, everything else to Claude — BELOW the standing policy of CLAUDE.md §6',
-  'prefer-sol': 'the standing policy of CLAUDE.md §6: every read-only kind AND the authoring of every point the cut does not keep here — the hard and critical ones included — goes to Sol; Claude reviews it, runs the suites, judges the picture and lands',
+  'claude-only': 'the escape hatch when the ChatGPT side is the scarce one — nothing goes to Astra',
+  default: 'reviews to Astra, everything else to Claude — BELOW the standing policy of CLAUDE.md §6',
+  'prefer-astra': 'the standing policy of CLAUDE.md §6: every read-only kind AND the authoring of every point the cut does not keep here — the hard and critical ones included — goes to Astra; Claude reviews it, runs the suites, judges the picture and lands',
 })
 
 /** WHAT IS NEVER ROUTED, whatever the setting says. Printed, so nobody has to ask. */
 export const NEVER_ROUTED = Object.freeze([
   'a point whose VERIFICATION is the work, unless its spec marks it hard or names a lane (scripts/author-routing-core.mjs decides)',
-  'REVIEWING what Sol itself authored — no model reviews its own work',
+  'REVIEWING what Astra itself authored — no model reviews its own work',
   'driving the browser suites and JUDGING the picture',
   'the landing (scripts/land-point.mjs) and the main session bookkeeping',
 ])
@@ -204,7 +204,7 @@ export function readSetting(raw) {
 /** The state object to write for a setting. PURE. */
 export function writeState(setting, { now = Date.now(), by = '' } = {}) {
   const value = normaliseSetting(setting)
-  if (!value) throw new Error(`sol-share: not a setting: ${setting}`)
+  if (!value) throw new Error(`astra-share: not a setting: ${setting}`)
   return { setting: value, changedAt: now, changedBy: String(by ?? '') }
 }
 
@@ -217,14 +217,14 @@ export function writeState(setting, { now = Date.now(), by = '' } = {}) {
 export function step(setting, direction) {
   const from = settingOrSafe(setting)
   const delta = direction === 'more' ? 1 : direction === 'less' ? -1 : 0
-  if (!delta) throw new Error(`sol-share: not a direction: ${direction}`)
+  if (!delta) throw new Error(`astra-share: not a direction: ${direction}`)
   const i = SETTINGS.indexOf(from)
   const j = i + delta
   if (j < 0 || j >= SETTINGS.length) return { from, to: from, changed: false, atEnd: true }
   return { from, to: SETTINGS[j], changed: true, atEnd: false }
 }
 
-/** Where one kind of work goes under one setting: 'sol' or 'claude'. PURE. */
+/** Where one kind of work goes under one setting: 'astra' or 'claude'. PURE. */
 export function routeFor(kind, setting) {
   const table = ROUTING[settingOrSafe(setting)]
   return table[String(kind ?? '').trim().toLowerCase()] ?? 'claude'
@@ -235,22 +235,22 @@ export function routingTable(setting) {
   return KINDS.map((kind) => ({ kind, to: routeFor(kind, setting), note: KIND_NOTES[kind] }))
 }
 
-/** Are ANY of the read-only kinds routed to Sol under this setting? PURE. */
-export function kindsToSol(setting) {
-  return KINDS.filter((kind) => routeFor(kind, setting) === 'sol')
+/** Are ANY of the read-only kinds routed to Astra under this setting? PURE. */
+export function kindsToAstra(setting) {
+  return KINDS.filter((kind) => routeFor(kind, setting) === 'astra')
 }
 
 /** `--status` in ONE line: what goes where right now. PURE. */
 export function statusLine(setting) {
   const value = settingOrSafe(setting)
-  const sol = kindsToSol(value)
-  const claude = KINDS.filter((kind) => !sol.includes(kind))
+  const astra = kindsToAstra(value)
+  const claude = KINDS.filter((kind) => !astra.includes(kind))
   const half = (label, list) => `${label}: ${list.length ? list.join(', ') : 'nothing'}`
-  return `sol-share: ${value} — ${half('to GPT-5.6 Sol', sol)} · ${half('to Claude', claude)}`
+  return `astra-share: ${value} — ${half('to GPT-6 Astra', astra)} · ${half('to Claude', claude)}`
 }
 
 /**
- * The line the DELEGATION BRIEF carries (point 654 A3), so a delegated agent asks Sol
+ * The line the DELEGATION BRIEF carries (point 654 A3), so a delegated agent asks Astra
  * for its diagnosis or its enumeration instead of doing it in its own context.
  *
  * It is one line at every setting, including the default: an agent that is never told
@@ -261,20 +261,20 @@ export function briefLine(state) {
   const { setting: value, corrupt } = asState(state)
   // A FALLBACK SAYS IT IS ONE (audit, 12.08.2026). Presented bare, a safe setting reads
   // as the operator's choice, and nobody repairs the file it actually came from.
-  const mark = corrupt ? ' (FALLBACK — the share state file is unusable; repair it with `node scripts/sol-share.mjs --set <setting>`)' : ''
-  if (value === 'prefer-sol') {
+  const mark = corrupt ? ' (FALLBACK — the share state file is unusable; repair it with `node scripts/astra-share.mjs --set <setting>`)' : ''
+  if (value === 'prefer-astra') {
     // The brief speaks to a DELEGATED agent, which is authoring already — so it is told
     // about the reading kinds it can hand over, not about the authoring lane it is in.
     return (
-      `- SOL ROUTING is at \`prefer-sol\`: hand ${kindsToSol(value).filter((k) => READ_ONLY_KINDS.includes(k)).join('/')} to ` +
-      '`node scripts/ask-sol.mjs --kind <kind> --brief "…"` (material on stdin) instead of doing it in your own\n' +
+      `- ASTRA ROUTING is at \`prefer-astra\`: hand ${kindsToAstra(value).filter((k) => READ_ONLY_KINDS.includes(k)).join('/')} to ` +
+      '`node scripts/ask-astra.mjs --kind <kind> --brief "…"` (material on stdin) instead of doing it in your own\n' +
       `  context. You keep the gates, the suites and the pictures; a read-only ask writes no commit.${mark}`
     )
   }
   if (value === 'claude-only') {
-    return `- SOL ROUTING is at \`claude-only\`: the ChatGPT side is the scarce one — do NOT call \`scripts/ask-sol.mjs\`.${mark}`
+    return `- ASTRA ROUTING is at \`claude-only\`: the ChatGPT side is the scarce one — do NOT call \`scripts/ask-astra.mjs\`.${mark}`
   }
-  return `- SOL ROUTING is at \`default\`: reviews go to GPT-5.6 Sol, everything else stays with you (\`node scripts/sol-share.mjs --status\`).${mark}`
+  return `- ASTRA ROUTING is at \`default\`: reviews go to GPT-6 Astra, everything else stays with you (\`node scripts/astra-share.mjs --status\`).${mark}`
 }
 
 /**
@@ -289,13 +289,13 @@ export function boardNoteSegment(state) {
   // A fallback is named as one here too — on the board the reader is the user, and the
   // difference between "I set this" and "the file is broken" is the whole message.
   const mark = corrupt ? ' (Notfall-Rückfall: die Einstellungsdatei ist unlesbar)' : ''
-  if (value === 'prefer-sol') return `Sol-Routing: prefer-sol — Diagnose, Audit, Aufzählungen und Erklärungen laufen über GPT-5.6 Sol${mark}`
-  if (value === 'claude-only') return `Sol-Routing: claude-only — auch Reviews bleiben in der Claude-Kette${mark}`
+  if (value === 'prefer-astra') return `Astra-Routing: prefer-astra — Diagnose, Audit, Aufzählungen und Erklärungen laufen über GPT-6 Astra${mark}`
+  if (value === 'claude-only') return `Astra-Routing: claude-only — auch Reviews bleiben in der Claude-Kette${mark}`
   return ''
 }
 
 /** The footer segment marker: what an OLD note is recognised and removed by. PURE. */
-const NOTE_MARK = /^Sol-Routing:/
+const NOTE_MARK = /^Astra-Routing:/
 
 /**
  * Put the current note into the board's footer, or take a stale one out. PURE.

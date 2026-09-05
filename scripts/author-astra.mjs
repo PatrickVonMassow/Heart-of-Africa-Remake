@@ -1,11 +1,11 @@
 #!/usr/bin/env node
 // THE COMMAND THAT LETS THE OPENAI LANE AUTHOR A POINT (work-order point 667).
 //
-//   node scripts/author-sol.mjs --point 651                  # author it, here, on this branch
-//   node scripts/author-sol.mjs --point 651 --findings f.md  # the second leg: answer the review
-//   node scripts/author-sol.mjs --routing --point 651        # which lane owns it, and why
-//   node scripts/author-sol.mjs --routing --all              # the whole open queue
-//   node scripts/author-sol.mjs --point 651 --dry-run        # the prompt and argv, no spend
+//   node scripts/author-astra.mjs --point 651                  # author it, here, on this branch
+//   node scripts/author-astra.mjs --point 651 --findings f.md  # the second leg: answer the review
+//   node scripts/author-astra.mjs --routing --point 651        # which lane owns it, and why
+//   node scripts/author-astra.mjs --routing --all              # the whole open queue
+//   node scripts/author-astra.mjs --point 651 --dry-run        # the prompt and argv, no spend
 //
 // It is the delegated-agent flow with the author swapped: an isolated worktree,
 // its own `feat/` branch, the point handed over as a BRIEF, atomic commits, and
@@ -15,7 +15,7 @@
 // picture and the verdict are the reviewing Claude session's, and nothing here
 // merges. The report ends by naming what that session owes.
 //
-// The decisions are pure and tested (author-sol-core.mjs, author-routing-core.mjs);
+// The decisions are pure and tested (author-astra-core.mjs, author-routing-core.mjs);
 // this half does the process work, the git work and the push, and fails LOUD.
 import { spawn, spawnSync } from 'node:child_process'
 import { readFileSync, rmSync, writeFileSync } from 'node:fs'
@@ -37,10 +37,10 @@ import {
 import { criticalityOf, parsePointBlocks } from './criticality-review-guard-core.mjs'
 import { readTasksOpen } from './tasks-source.mjs'
 import { appendRecord, gitToplevel, readRecords, recordsPathFor } from './mechanism-review.mjs'
-import { classifyOutcome } from './review-sol-core.mjs'
-import { ensureModelProven } from './review-sol.mjs'
-import { currentSetting, settingProblemLine } from './sol-share.mjs'
-import { routeFor } from './sol-share-core.mjs'
+import { classifyOutcome } from './review-astra-core.mjs'
+import { ensureModelProven } from './review-astra.mjs'
+import { currentSetting, settingProblemLine } from './astra-share.mjs'
+import { routeFor } from './astra-share-core.mjs'
 import { currentFableState } from './fable-switch.mjs'
 import { fableIsOn } from './fable-switch-core.mjs'
 import {
@@ -68,12 +68,12 @@ import {
   FINAL_PUSH_TIMEOUT_MS,
   PUSH_TIMEOUT_MS,
   readinessProblems,
-  SOL_MODEL_ID,
-  SOL_MODEL_NAME,
-  SOL_REASONING_EFFORT,
-  SOL_TRAILER,
+  ASTRA_MODEL_ID,
+  ASTRA_MODEL_NAME,
+  ASTRA_REASONING_EFFORT,
+  ASTRA_TRAILER,
   withheldEnvNames,
-} from './author-sol-core.mjs'
+} from './author-astra-core.mjs'
 
 /** One git read in the WORKTREE this command was started in — never REPO_ROOT's
  *  idea of it: the whole lane exists to work in an isolated checkout. */
@@ -157,7 +157,7 @@ export function restoreLedger(snapshot, { git: run = git } = {}) {
 /**
  * Append one commission to the shared ledger and make that append durable.
  * The injected callbacks keep the state transition unit-testable; production
- * appends to the tracked review ledger and commits it before Sol starts.
+ * appends to the tracked review ledger and commits it before Astra starts.
  */
 export function recordAuthoringCommission({
   records = [],
@@ -165,7 +165,7 @@ export function recordAuthoringCommission({
   round = 0,
   framing = '',
   sha = '',
-  model = SOL_MODEL_NAME,
+  model = ASTRA_MODEL_NAME,
   now = Date.now(),
   append = () => {},
   commit = () => {},
@@ -363,15 +363,15 @@ export async function runAuthoringCodex({
   cwd,
   branch = '',
   timeoutMs = AUTHOR_TIMEOUT_MS,
-  modelId = SOL_MODEL_ID,
+  modelId = ASTRA_MODEL_ID,
   runtime = 'codex',
   pushEveryMs = PUSH_INTERVAL_MS,
   onPush = () => {},
 }) {
-  const outFile = runtime === 'codex' ? join(tmpdir(), `author-sol-${process.pid}-${Date.now()}.txt`) : ''
+  const outFile = runtime === 'codex' ? join(tmpdir(), `author-astra-${process.pid}-${Date.now()}.txt`) : ''
   const args = runtime === 'claude'
     ? authoringClaudeArgs({ modelId, prompt })
-    : authoringCodexArgs({ modelId, effort: SOL_REASONING_EFFORT, cwd, outputFile: outFile, prompt })
+    : authoringCodexArgs({ modelId, effort: ASTRA_REASONING_EFFORT, cwd, outputFile: outFile, prompt })
   // ITS OWN PROCESS GROUP (third cross-vendor round). Signalling the child alone
   // left its shells and test runners alive: they went on writing to the worktree
   // AFTER the commits had been inspected, pushed and reported, so the report
@@ -482,17 +482,17 @@ export async function runAuthoringCodex({
 }
 
 const AUTHOR_LANE_CONFIG = Object.freeze({
-  sol: Object.freeze({
-    lane: 'sol',
-    commandName: 'author-sol',
-    model: SOL_MODEL_NAME,
-    modelId: SOL_MODEL_ID,
-    trailer: SOL_TRAILER,
+  astra: Object.freeze({
+    lane: 'astra',
+    commandName: 'author-astra',
+    model: ASTRA_MODEL_NAME,
+    modelId: ASTRA_MODEL_ID,
+    trailer: ASTRA_TRAILER,
     reviewer: 'Opus 5',
     reviewerLabel: 'Claude',
     runtime: 'codex',
     runtimeLabel: 'codex',
-    detail: `(effort ${SOL_REASONING_EFFORT})`,
+    detail: `(effort ${ASTRA_REASONING_EFFORT})`,
     laneDescription: 'the hard and critical ones included',
   }),
   fable: Object.freeze({
@@ -501,8 +501,8 @@ const AUTHOR_LANE_CONFIG = Object.freeze({
     model: FABLE_MODEL,
     modelId: FABLE_MODEL_ID,
     trailer: FABLE_TRAILER,
-    reviewer: SOL_MODEL_NAME,
-    reviewerLabel: SOL_MODEL_NAME,
+    reviewer: ASTRA_MODEL_NAME,
+    reviewerLabel: ASTRA_MODEL_NAME,
     runtime: 'claude',
     runtimeLabel: 'Claude',
     detail: '',
@@ -510,11 +510,11 @@ const AUTHOR_LANE_CONFIG = Object.freeze({
   }),
 })
 
-export const usage = ({ commandName = 'author-sol', model = SOL_MODEL_NAME, reviewerLabel = 'Claude' } = {}) =>
+export const usage = ({ commandName = 'author-astra', model = ASTRA_MODEL_NAME, reviewerLabel = 'Claude' } = {}) =>
   [
-    'usage: node scripts/author-sol.mjs --point <N> [--findings <file>] [--rounds <n>] [--timeout <ms>]',
+    'usage: node scripts/author-astra.mjs --point <N> [--findings <file>] [--rounds <n>] [--timeout <ms>]',
     '           [--anyway] [--dry-run]',
-    '       node scripts/author-sol.mjs --routing (--point <N> [--rounds <n>] | --all)',
+    '       node scripts/author-astra.mjs --routing (--point <N> [--rounds <n>] | --all)',
     '',
     `${model} AUTHORS the point in THIS worktree, on THIS branch, committing at every step;`,
     'the branch is pushed for it while it works. It runs the three cheap gates (test:unit, build,',
@@ -524,10 +524,10 @@ export const usage = ({ commandName = 'author-sol', model = SOL_MODEL_NAME, revi
     '',
     'The lane is decided by the point itself (--routing shows why). A point the routing gives to',
     'another lane is refused unless --anyway is given, and the share switch can turn the whole',
-    `lane off:  node scripts/${commandName === 'author-fable' ? 'fable-switch' : 'sol-share'}.mjs --status`,
-  ].join('\n').replaceAll('scripts/author-sol.mjs', `scripts/${commandName}.mjs`)
+    `lane off:  node scripts/${commandName === 'author-fable' ? 'fable-switch' : 'astra-share'}.mjs --status`,
+  ].join('\n').replaceAll('scripts/author-astra.mjs', `scripts/${commandName}.mjs`)
 
-export async function runAuthoringCli({ authorLane = 'sol', argv = process.argv.slice(2) } = {}) {
+export async function runAuthoringCli({ authorLane = 'astra', argv = process.argv.slice(2) } = {}) {
   const config = AUTHOR_LANE_CONFIG[authorLane]
   if (!config) throw new Error(`unknown authoring lane ${authorLane}`)
   const { commandName, model: authorModel } = config
@@ -652,8 +652,8 @@ export async function runAuthoringCli({ authorLane = 'sol', argv = process.argv.
       }
       const examinationRoute = specExaminerFor(decided.roundHistory, authorModel)
       const route = examinationRoute.route === 'claude-read'
-        ? 'Claude reads this packet directly because Sol authored the round.'
-        : 'Run `node scripts/ask-sol.mjs --kind audit` with this packet because Claude authored the round.'
+        ? 'Claude reads this packet directly because Astra authored the round.'
+        : 'Run `node scripts/ask-astra.mjs --kind audit` with this packet because Claude authored the round.'
       const packet = buildSpecExaminationPrompt({
         point,
         pointText: decided.body,
@@ -713,8 +713,8 @@ export async function runAuthoringCli({ authorLane = 'sol', argv = process.argv.
     )
     console.error(formatAuthorRoundHistory(decided.roundHistory))
     if (decided.lane !== config.lane && !argv.includes('--anyway')) {
-      if (dryRun && decided.lane === 'fable' && config.lane === 'sol') {
-        console.error(`author-sol: this point is commissioned with: node scripts/author-fable.mjs --point ${point}`)
+      if (dryRun && decided.lane === 'fable' && config.lane === 'astra') {
+        console.error(`author-astra: this point is commissioned with: node scripts/author-fable.mjs --point ${point}`)
         process.exit(0)
       }
       console.error(
@@ -731,13 +731,13 @@ export async function runAuthoringCli({ authorLane = 'sol', argv = process.argv.
       console.error(`${commandName}: ${FABLE_MODEL} is switched off; node scripts/fable-switch.mjs --status`)
       process.exit(3)
     }
-    if (config.lane === 'sol') {
+    if (config.lane === 'astra') {
       const share = currentSetting()
       if (share.problem) console.error(settingProblemLine(share, commandName))
-      if (routeFor('author', share.setting) !== 'sol' && !argv.includes('--anyway')) {
+      if (routeFor('author', share.setting) !== 'astra' && !argv.includes('--anyway')) {
         console.error(
           `${commandName}: the share switch is at \`${share.setting}\`, which keeps authoring with Claude.\n` +
-            '  node scripts/sol-share.mjs --more   (override once with --anyway)',
+            '  node scripts/astra-share.mjs --more   (override once with --anyway)',
         )
         process.exit(3)
       }
@@ -775,10 +775,10 @@ export async function runAuthoringCli({ authorLane = 'sol', argv = process.argv.
       process.exit(0)
     }
 
-    // The identity is PROVEN before a commit is stamped with Sol's name: nothing
+    // The identity is PROVEN before a commit is stamped with Astra's name: nothing
     // in a run's output says which model answered, so the attribution rests on
-    // the server refusing an unknown id (review-sol.mjs --probe).
-    if (config.lane === 'sol' && !ensureModelProven({ who: commandName })) {
+    // the server refusing an unknown id (review-astra.mjs --probe).
+    if (config.lane === 'astra' && !ensureModelProven({ who: commandName })) {
       console.error(`${commandName}: the model id is not proven honoured — refusing to attribute commits to ${authorModel}.`)
       process.exit(2)
     }
@@ -829,7 +829,7 @@ export async function runAuthoringCli({ authorLane = 'sol', argv = process.argv.
     }
 
     // The commission receipt is orchestration, not authored work. Start the
-    // delivered range after it so the report and reviewer see only Sol's edits.
+    // delivered range after it so the report and reviewer see only Astra's edits.
     const base = git(['rev-parse', 'HEAD'], { cwd, required: true })
     console.error(
       `${commandName}: ${authorModel}${config.detail ? ` ${config.detail}` : ''} is authoring point ${point} on ${branch}` +
@@ -940,7 +940,7 @@ export async function runAuthoringCli({ authorLane = 'sol', argv = process.argv.
       authorDetail: config.detail,
       authorTrailer: config.trailer,
       reviewCommand: config.lane === 'fable'
-        ? `node scripts/review-sol.mjs --sha <sha> --brief "review point ${point}" --mode review --point ${point}`
+        ? `node scripts/review-astra.mjs --sha <sha> --brief "review point ${point}" --mode review --point ${point}`
         : '',
     }))
     // 0 only for a clean run that produced work; 3 says "look at this before you

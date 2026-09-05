@@ -73,7 +73,7 @@ describe('authorship-cut mechanism review planning', () => {
         vendor: 'anthropic',
         files: ['scripts/a-guard.mjs', 'scripts/b-guard.mjs'],
         commits: [sha('a'), sha('b')],
-        reviewer: 'GPT-5.6 Sol',
+        reviewer: 'GPT-6 Astra',
       }),
     ])
   })
@@ -91,7 +91,7 @@ describe('authorship-cut mechanism review planning', () => {
         authors: ['Claude Opus 5', 'GPT-5.6 Sol'],
         commits: [sha('a'), sha('b')],
         files: [file],
-        reviewer: 'Fable 5.1',
+        reviewer: 'GPT-6 Astra',
       }),
     ])
   })
@@ -128,7 +128,7 @@ describe('authorship-cut mechanism review planning', () => {
   it('names a group with no eligible reviewer instead of assigning an author', () => {
     const plan = planAuthorshipGroups({
       commits: [
-        { sha: sha('a'), authorModels: ['GPT-5.6 Sol', 'Opus 5', 'Fable 5.1', 'Opus 4.8'], files: ['x'] },
+        { sha: sha('a'), authorModels: ['GPT-6 Astra', 'Opus 5', 'Fable 5.1', 'Opus 4.8'], files: ['x'] },
       ],
     })
     expect(plan.groups[0].reviewer).toBe('')
@@ -148,8 +148,8 @@ describe('authorship-cut mechanism review planning', () => {
       ],
     })
     expect(plan.groups[0]).toMatchObject({
-      reviewer: 'Fable 5.1',
-      reviewerVendor: 'anthropic',
+      reviewer: 'GPT-6 Astra',
+      reviewerVendor: 'openai',
     })
     expect(plan.unreviewable).toEqual([])
   })
@@ -164,7 +164,7 @@ describe('authorship-cut mechanism review planning', () => {
     expect(plan.groups).toEqual([
       expect.objectContaining({
         vendor: 'anthropic',
-        reviewer: 'GPT-5.6 Sol',
+        reviewer: 'GPT-6 Astra',
         reviewerVendor: 'openai',
         files: ['scripts/claude-guard.mjs'],
       }),
@@ -210,7 +210,7 @@ describe('authorship-cut mechanism review planning', () => {
         files: [carried],
         commits: [sha('b'), sha('c')],
         authors: ['Claude Opus 5'],
-        reviewer: 'GPT-5.6 Sol',
+        reviewer: 'GPT-6 Astra',
       }),
     ])
     expect(plan.unreviewable).toEqual([])
@@ -231,15 +231,16 @@ describe('authorship-cut mechanism review planning', () => {
     expect(plan.groups[0]).toMatchObject({
       files: ['scripts/conflict-resolution.mjs'],
       authors: ['Claude Opus 5'],
-      reviewer: 'GPT-5.6 Sol',
+      reviewer: 'GPT-6 Astra',
     })
     expect(plan.unreviewable).toEqual([])
   })
 
   it('requires the other vendor even when another same-vendor model is not an author', () => {
-    expect(eligibleReviewer(['Claude Fable 5.1'])).toBe('GPT-5.6 Sol')
+    expect(eligibleReviewer(['Claude Fable 5.1'])).toBe('GPT-6 Astra')
     expect(eligibleReviewer(['GPT-5.6 Sol'])).toBe('Opus 5')
-    expect(eligibleReviewer(['GPT-5.6 Sol', 'Claude Opus 5'])).toBe('Fable 5.1')
+    expect(eligibleReviewer(['GPT-6 Astra'])).toBe('Opus 5')
+    expect(eligibleReviewer(['GPT-5.6 Sol', 'Claude Opus 5'])).toBe('GPT-6 Astra')
     expect(vendorOf('Claude Opus 5 <noreply@anthropic.com>')).toBe('anthropic')
   })
 })

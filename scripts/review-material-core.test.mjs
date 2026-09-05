@@ -31,7 +31,7 @@ import {
   unquoteGitPath,
   worstVerdict,
 } from './review-material-core.mjs'
-import { formatReviewReport, OUTCOME } from './review-sol-core.mjs'
+import { formatReviewReport, OUTCOME } from './review-astra-core.mjs'
 
 const file = (path, size, ch = 'x') => ({ path, text: ch.repeat(size) })
 const patchFor = (paths) =>
@@ -459,7 +459,7 @@ describe('opaque file bodies are absent by design', () => {
   })
 })
 
-// These two reviewer-facing rulings are formatted in review-sol-core.mjs, but
+// These two reviewer-facing rulings are formatted in review-astra-core.mjs, but
 // belong in the material suite too: a reader checking pass delivery here must
 // see that one recorded pass never reads as range clearance, and that the route
 // to the remainder consults the ledger rather than assuming numeric order.

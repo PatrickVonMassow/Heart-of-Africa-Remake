@@ -24,22 +24,22 @@ import {
   parseAuthoringAnswer,
   PUSH_INTERVAL_MS,
   readinessProblems,
-  SOL_MODEL_ID,
-  SOL_TRAILER,
+  ASTRA_MODEL_ID,
+  ASTRA_TRAILER,
   uncommittedSummary,
   withheldEnvNames,
-} from './author-sol-core.mjs'
+} from './author-astra-core.mjs'
 import { evaluateCommitMessage } from './commit-scope-guard-core.mjs'
 
-const solCommit = (sha, subject = 'Do a thing') => ({ sha, subject, trailers: 'GPT-5.6 Sol <noreply@openai.com>' })
+const astraCommit = (sha, subject = 'Do a thing') => ({ sha, subject, trailers: 'GPT-6 Astra <noreply@openai.com>' })
 const okRun = { ok: true, kind: 'ok', cause: '' }
 const answered = parseAuthoringAnswer('DONE: built the thing\nGATES: test:unit, build and lint all green\nOPEN: none\n')
 
 describe('the commit trailer of the lane', () => {
   it('is the allowlist’s own spelling, and passes the commit-msg gate', () => {
-    expect(SOL_TRAILER).toBe('Co-Authored-By: GPT-5.6 Sol <noreply@openai.com>')
-    expect(allowedTrailers()).toContain(SOL_TRAILER)
-    expect(evaluateCommitTrailers(`Do a thing\n\n${SOL_TRAILER}\n`).block).toBe(false)
+    expect(ASTRA_TRAILER).toBe('Co-Authored-By: GPT-6 Astra <noreply@openai.com>')
+    expect(allowedTrailers()).toContain(ASTRA_TRAILER)
+    expect(evaluateCommitTrailers(`Do a thing\n\n${ASTRA_TRAILER}\n`).block).toBe(false)
   })
 })
 
@@ -48,8 +48,8 @@ describe('author commit messages', () => {
     const message = authorCommitMessage({ subject: 'Add branch selection', rescue: 'the guard tests are still in progress' })
     expect(message.split('\n')[0]).toBe('Add branch selection [skip ci]')
     expect(message).toContain('\nRescue: the guard tests are still in progress\n')
-    expect(message).toContain(`Rescue: the guard tests are still in progress\n${SOL_TRAILER}`)
-    expect(message).toContain(SOL_TRAILER)
+    expect(message).toContain(`Rescue: the guard tests are still in progress\n${ASTRA_TRAILER}`)
+    expect(message).toContain(ASTRA_TRAILER)
     expect(evaluateCommitMessage(message).block).toBe(false)
   })
 
@@ -60,7 +60,7 @@ describe('author commit messages', () => {
       final: true,
     })
     expect(message).not.toMatch(/\[skip ci\]|^Rescue:/m)
-    expect(message).toContain(SOL_TRAILER)
+    expect(message).toContain(ASTRA_TRAILER)
     expect(evaluateCommitMessage(message).block).toBe(false)
   })
 
@@ -79,7 +79,7 @@ describe('authoringCodexArgs', () => {
     expect(args).toContain('--dangerously-bypass-approvals-and-sandbox')
     expect(args).not.toContain('--sandbox')
     expect(args.slice(args.indexOf('-C'), args.indexOf('-C') + 2)).toEqual(['-C', '/w'])
-    expect(args.slice(args.indexOf('-m'), args.indexOf('-m') + 2)).toEqual(['-m', SOL_MODEL_ID])
+    expect(args.slice(args.indexOf('-m'), args.indexOf('-m') + 2)).toEqual(['-m', ASTRA_MODEL_ID])
     expect(args).toContain('model_reasoning_effort=high')
     expect(args[args.length - 1]).toBe('p')
   })
@@ -167,7 +167,7 @@ describe('childEnv — the one enforcement left once the sandbox is off', () => 
     // The cross-vendor review's P0: with the sandbox off, the run can still read
     // a token FILE and push. The regex must not be described as preventing that,
     // and the wrapper is what pushes, so the claim to check is the narrow one.
-    const source = readFileSync(resolve('scripts', 'author-sol-core.mjs'), 'utf8')
+    const source = readFileSync(resolve('scripts', 'author-astra-core.mjs'), 'utf8')
     expect(source).toMatch(/HYGIENE, NOT CONTAINMENT/)
     expect(source).toMatch(/can read `\.secrets\/`/)
   })
@@ -215,7 +215,7 @@ describe('buildAuthoringPrompt', () => {
     for (const rule of HOUSE_RULES) expect(prompt, rule).toContain(rule.trim())
     // A rule spanning two lines reads as one rule, not as two bullets.
     expect(prompt).not.toMatch(/^ {2}- {3}/m)
-    expect(prompt).toContain(SOL_TRAILER)
+    expect(prompt).toContain(ASTRA_TRAILER)
     expect(prompt).toContain('THE POINT: fix the drum loop')
     expect(prompt).toMatch(/Do NOT read TASKS\.md/)
     expect(prompt).toMatch(/Do NOT push, do NOT merge/)
@@ -317,8 +317,8 @@ describe('parseAuthoringAnswer', () => {
 })
 
 describe('judgeAuthoring — what GIT says, not what the run claimed', () => {
-  it('accepts a clean run that committed under Sol’s name', () => {
-    const j = judgeAuthoring({ outcome: okRun, commits: [solCommit('a'.repeat(40))], parsed: answered })
+  it('accepts a clean run that committed under Astra’s name', () => {
+    const j = judgeAuthoring({ outcome: okRun, commits: [astraCommit('a'.repeat(40))], parsed: answered })
     expect(j).toMatchObject({ delivered: true, clean: true })
     expect(j.problems).toEqual([])
   })
@@ -362,20 +362,20 @@ describe('judgeAuthoring — what GIT says, not what the run claimed', () => {
       commits: [{ sha: 'd'.repeat(40), subject: 'x', trailers: 'Claude Opus 5 <x@y>' }],
       parsed: answered,
     })
-    expect(other.problems.join(' ')).toMatch(/does not name GPT-5\.6 Sol/)
+    expect(other.problems.join(' ')).toMatch(/does not name GPT-6 Astra/)
   })
 
-  it('does not read a "sol" in an e-mail address as Sol’s authorship (cross-vendor P1)', () => {
-    // `Claude Opus 5 <build@sol.example>` is an allowlisted commit by ANOTHER
+  it('does not read a "astra" in an e-mail address as Astra’s authorship (cross-vendor P1)', () => {
+    // `Claude Opus 5 <build@astra.example>` is an allowlisted commit by ANOTHER
     // model. Tested against the raw trailer, it counted as this lane's work.
     const j = judgeAuthoring({
       outcome: okRun,
-      commits: [{ sha: 'a'.repeat(40), subject: 'x', trailers: 'Claude Opus 5 <build@sol.example>' }],
+      commits: [{ sha: 'a'.repeat(40), subject: 'x', trailers: 'Claude Opus 5 <build@astra.example>' }],
       parsed: answered,
     })
-    expect(j.problems.join(' ')).toMatch(/does not name GPT-5\.6 Sol/)
-    // …while every real spelling of Sol's own trailer is accepted.
-    for (const trailers of ['GPT-5.6 Sol <noreply@openai.com>', 'Sol <noreply@openai.com>', 'gpt-5.6-sol <x@y>']) {
+    expect(j.problems.join(' ')).toMatch(/does not name GPT-6 Astra/)
+    // …while every real spelling of Astra's own trailer is accepted.
+    for (const trailers of ['GPT-6 Astra <noreply@openai.com>', 'Astra <noreply@openai.com>', 'gpt-6-astra <x@y>']) {
       const ok = judgeAuthoring({ outcome: okRun, commits: [{ sha: 'b'.repeat(40), subject: 'x', trailers }], parsed: answered })
       expect(ok.problems, trailers).toEqual([])
     }
@@ -384,7 +384,7 @@ describe('judgeAuthoring — what GIT says, not what the run claimed', () => {
   it('refuses to attribute commits made on another branch (cross-vendor P1)', () => {
     const j = judgeAuthoring({
       outcome: okRun,
-      commits: [solCommit('c'.repeat(40))],
+      commits: [astraCommit('c'.repeat(40))],
       parsed: answered,
       branch: 'feat/667-x',
       branchAfter: 'main',
@@ -393,7 +393,7 @@ describe('judgeAuthoring — what GIT says, not what the run claimed', () => {
     expect(j.problems.join(' ')).toMatch(/ended on `main`, not on `feat\/667-x`/)
     // Ending where it started is silent.
     expect(
-      judgeAuthoring({ outcome: okRun, commits: [solCommit('d'.repeat(40))], parsed: answered, branch: 'b', branchAfter: 'b' }).problems,
+      judgeAuthoring({ outcome: okRun, commits: [astraCommit('d'.repeat(40))], parsed: answered, branch: 'b', branchAfter: 'b' }).problems,
     ).toEqual([])
   })
 
@@ -421,13 +421,13 @@ describe('judgeAuthoring — what GIT says, not what the run claimed', () => {
       '',
     ]) {
       const parsed = parseAuthoringAnswer(`DONE: a thing\nGATES: ${gates || 'x'}\nOPEN: none`)
-      const j = judgeAuthoring({ outcome: okRun, commits: [solCommit('a'.repeat(40))], parsed: gates ? parsed : { ok: true, gates: '' } })
+      const j = judgeAuthoring({ outcome: okRun, commits: [astraCommit('a'.repeat(40))], parsed: gates ? parsed : { ok: true, gates: '' } })
       expect(j.clean, gates).toBe(false)
       expect(j.problems.join(' '), gates).toMatch(/GATES line/)
     }
     // A report naming all three as green stays clean — including one that says
     // so with a negative WORD in a positive sentence.
-    expect(judgeAuthoring({ outcome: okRun, commits: [solCommit('b'.repeat(40))], parsed: answered }).clean).toBe(true)
+    expect(judgeAuthoring({ outcome: okRun, commits: [astraCommit('b'.repeat(40))], parsed: answered }).clean).toBe(true)
     for (const gates of [
       'test:unit, build and lint all passed without errors',
       'vitest green, build green, oxlint clean',
@@ -447,7 +447,7 @@ describe('judgeAuthoring — what GIT says, not what the run claimed', () => {
     // because the run ended badly would discard the only thing that survived.
     const j = judgeAuthoring({
       outcome: { ok: false, kind: 'timeout', cause: 'the review did not finish inside its time budget' },
-      commits: [solCommit('e'.repeat(40))],
+      commits: [astraCommit('e'.repeat(40))],
       parsed: { ok: false, error: 'no closing lines' },
       dirty: ' M scripts/x.mjs',
       numstat: '118\t6\tscripts/x.mjs',
@@ -474,7 +474,7 @@ describe('uncommittedSummary', () => {
 
 describe('formatAuthoringReport', () => {
   it('hands the rest of the point to the reviewer, in order', () => {
-    const judged = judgeAuthoring({ outcome: okRun, commits: [solCommit('f'.repeat(40), 'Fix the loop')], parsed: answered })
+    const judged = judgeAuthoring({ outcome: okRun, commits: [astraCommit('f'.repeat(40), 'Fix the loop')], parsed: answered })
     const text = formatAuthoringReport({ point: 651, branch: 'feat/651-x', judged, parsed: answered, pushed: true })
     expect(text).toMatch(/authored 1 commit\(s\) on feat\/651-x/)
     expect(text).toMatch(/ffffff {2}Fix the loop/)
@@ -487,12 +487,12 @@ describe('formatAuthoringReport', () => {
   })
 
   it('says a failed push first, because only that work is at risk', () => {
-    const judged = judgeAuthoring({ outcome: okRun, commits: [solCommit('a'.repeat(40))], parsed: answered })
+    const judged = judgeAuthoring({ outcome: okRun, commits: [astraCommit('a'.repeat(40))], parsed: answered })
     expect(formatAuthoringReport({ point: 1, judged, parsed: answered, pushed: false })).toMatch(/PUSH FAILED/)
   })
 
   it('puts the exact author framing on the command that records the following review', () => {
-    const judged = judgeAuthoring({ outcome: okRun, commits: [solCommit('a'.repeat(40))], parsed: answered })
+    const judged = judgeAuthoring({ outcome: okRun, commits: [astraCommit('a'.repeat(40))], parsed: answered })
     const framing = 'Act as a hostile tester and probe every adjacent transition.'
     const text = formatAuthoringReport({ point: 1, judged, parsed: answered, framing })
     expect(text).toContain(`--mode review --point 1 --author-framing "${framing}"`)
@@ -518,7 +518,7 @@ describe('formatAuthoringReport', () => {
     expect(text).toMatch(/left UNCOMMITTED WORK/)
     expect(text).toMatch(/2 changed path\(s\), 118 insertion\(s\), 6 deletion\(s\)/)
     expect(text).toContain(
-      `git add -A && git commit -m 'Checkpoint uncommitted authoring work' -m '${SOL_TRAILER}'` +
+      `git add -A && git commit -m 'Checkpoint uncommitted authoring work' -m '${ASTRA_TRAILER}'` +
         ` && git push -u origin feat/792-fable-state`,
     )
     expect(text).not.toMatch(/authored NOTHING/)
@@ -527,7 +527,7 @@ describe('formatAuthoringReport', () => {
   it('reports commits first even when more work remains dirty', () => {
     const judged = judgeAuthoring({
       outcome: okRun,
-      commits: [solCommit('a'.repeat(40), 'Save the first step')],
+      commits: [astraCommit('a'.repeat(40), 'Save the first step')],
       parsed: answered,
       dirty: '?? scripts/next.mjs',
       numstat: '7\t0\tscripts/next.mjs',

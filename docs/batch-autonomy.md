@@ -62,7 +62,7 @@ not permission to fold their implementation into this policy-only point.
 | D2 | A parallel-session alert Stop-blocks the owner into `batch-doctor --gate` (`block-remediate` in `scripts/batch-progress-guard.mjs`). | **Self-recovery.** Run the gate and repair path in the owning session; an inconclusive loaded-machine run is retried when quiet. No user decision is involved. | **In place:** point 431. |
 | D3 | An unidentified author blocks until transcript evidence identifies the model; a proved forbidden model then enters P8 (`scripts/model-guard-core.mjs`). | **Self-recovery.** Resolve the author from durable evidence; allowed means advance and continue, forbidden means trusted-lane handoff. | **In place:** evidence lookup plus point 866's trusted handoff and capped probe. |
 | Q1 | A main-session usage-limit refusal produces launcher state `quota` (`scripts/batch-autostart-core.mjs`, `scripts/batch-autostart.mjs`). | **Self-recovery.** No failure count and no pause file; probe on every ordinary launcher tick and resume on the first successful start. | **In place:** point 444, exercised by `scripts/quota-drill.mjs`. |
-| Q2 | An OpenAI author/reviewer run can return `allowance-exhausted` while that vendor's result is mandatory (`scripts/review-sol-core.mjs`, `scripts/review-sol.mjs`, `scripts/author-sol.mjs`). | **Self-recovery.** Route work that policy permits to the other vendor. If cross-vendor evidence is mandatory, park that point with a scheduled provider probe and work another point; automatically resume it when the probe succeeds. | Routing is **in place** (points 654/667); durable per-point probe is **Follow-up point — Cross-vendor quota retry**. |
+| Q2 | An OpenAI author/reviewer run can return `allowance-exhausted` while that vendor's result is mandatory (`scripts/review-astra-core.mjs`, `scripts/review-astra.mjs`, `scripts/author-astra.mjs`). | **Self-recovery.** Route work that policy permits to the other vendor. If cross-vendor evidence is mandatory, park that point with a scheduled provider probe and work another point; automatically resume it when the probe succeeds. | Routing is **in place** (points 654/667); durable per-point probe is **Follow-up point — Cross-vendor quota retry**. |
 | G1 | The PermissionRequest hook deliberately leaves `AskUserQuestion` to a human while auto-granting other prompts (`scripts/permission-autogrant-core.mjs`). | **Narrow confirm only.** The batch does not invoke it for uncertainty or advice; it decides and records. It is permitted only to obtain a U3 confirmation. | Policy changes **in place here**; the U3 classifier of point 864 (Advisory decision defaults) is **in place** and supplies the enforceable scope. |
 | G2 | `container-ask-guard` blocks a reply that sends the user into the container (`scripts/container-ask-guard-core.mjs`). | **Self-recovery.** Run the repository command in-session and report its result. This is a machine-remedy gate, never a user wait. | **In place.** |
 | G3 | A disabled/unknown launcher blocks the point/context boundary; Linux can self-arm, Windows requires an elevated user command (`launcherRemedy` in `scripts/batch-launcher-core.mjs`, `block-launcher` in `scripts/batch-progress-guard.mjs`). | **Self-recovery where possible.** Linux starts its daemon. On Windows the current owner keeps working and does not take a boundary; the durable fix is an install-time, privilege-bearing watchdog that can re-arm the task without an attended batch turn. | Linux path **in place** (point 474). Windows path is **Follow-up point — Unattended launcher arming**. |
@@ -77,7 +77,7 @@ The divergent sweep was genuinely independent: Opus 5 produced 23 entries in
 `docs/four-eyes/947-blind-b-sol.json`, and the switch-selected third model,
 Fable 5, folded the complete lists into `947-union.json`. The accounting receipt
 is **23 A + 18 B → 27 union entries; all 41 inputs accounted for**. The fold was
-reachable through `ask-sol.mjs --model fable`: a read-only, tool-less ask that
+reachable through `ask-astra.mjs --model fable`: a read-only, tool-less ask that
 proves the top-level answer model and refuses substitution.
 
 Each row below is one union entry. “Containment” means the independent emergency
@@ -111,13 +111,13 @@ named owner. Only S-12 is allowed to stop the whole batch.
 | S-23 | Individual mechanism inventory misses pair-only wedges, including 944+945. | **Closed here:** this composition table is mandatory input for future hard guards; S-02/S-03 and S-05/S-06/S-25 preserve the measured pairs separately. |
 | S-24 | Dead-owner in-flight records leave every point busy. | **Direct fix:** exclude/reclaim expired records before candidate selection. Emergency independently computes logical workable points with dead in-flight records omitted. |
 | S-25 | Board-first guard forbids the failed landing's remaining cleanup. | **Direct fix:** narrowly permit the authenticated landing-recovery mutation; owned with S-05 by point 937. |
-| S-26 | One selected author model fails although another allowed model is available. | **In place for blind folds:** `ask-sol.mjs --model` reaches every merger roster model under the recorded switches. Author routing must likewise advance through the allowed serving route instead of global refusal. |
+| S-26 | One selected author model fails although another allowed model is available. | **In place for blind folds:** `ask-astra.mjs --model` reaches every merger roster model under the recorded switches. Author routing must likewise advance through the allowed serving route instead of global refusal. |
 | S-27 | Owner and its only watcher are both absent or wedged. | **Closed by double safety:** `HoA-Batch-Emergency` is an hourly SYSTEM timer outside those sessions; the watchdog checks/re-registers it, while it starts the authenticated primary task. |
 
 One further stop path was measured while cross-reading the range rather than by
 the sweep, and it belongs to the same class. `mechanism-review-guard.mjs` built
 the sized review plan inside the SAME `try` that assessed the review gap, so a
-throw out of `review-sol.mjs`'s planner left the ruling null and the guard
+throw out of `review-astra.mjs`'s planner left the ruling null and the guard
 blocked — a broken planner turned a suspendable range into a hard block with no
 runnable review, which is exactly what the gap clause exists to prevent. The two
 steps are now separate: `measureReviewGap` sizes the plan in its own `try` and

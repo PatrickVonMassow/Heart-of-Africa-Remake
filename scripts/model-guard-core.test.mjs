@@ -560,13 +560,13 @@ describe('evaluateCommitTrailers (the commit-msg gate)', () => {
   it('keeps a documented reviewer separate from the author and validates both', () => {
     const message = msg(
       'Co-Authored-By: Claude Opus 5 <noreply@anthropic.com>',
-      'Reviewed-By: GPT-5.6 Sol <noreply@openai.com>',
+      'Reviewed-By: GPT-6 Astra <noreply@openai.com>',
     )
-    expect(modelTrailerIdentities(message)).toEqual({ authors: ['Opus 5'], reviewers: ['GPT 5.6 Sol'] })
-    expect(reviewerTrailers(message)).toEqual(['GPT-5.6 Sol <noreply@openai.com>'])
+    expect(modelTrailerIdentities(message)).toEqual({ authors: ['Opus 5'], reviewers: ['GPT 6 Astra'] })
+    expect(reviewerTrailers(message)).toEqual(['GPT-6 Astra <noreply@openai.com>'])
     expect(evaluateCommitTrailers(message, POLICY_NEUTRAL).block).toBe(false)
     expect(allowedReviewerTrailers(POLICY_NEUTRAL)).toContain(
-      'Reviewed-By: GPT-5.6 Sol <noreply@openai.com>',
+      'Reviewed-By: GPT-6 Astra <noreply@openai.com>',
     )
   })
 
@@ -665,14 +665,14 @@ describe('evaluateCommitTrailers (the commit-msg gate)', () => {
 // where it authors, Claude reviews — so its trailer must pass the guard. The
 // same change TIGHTENS everything around it: a non-Claude trailer used to be
 // read as "no model evidence" and waved through whatever model it named.
-describe('the GPT-5.6 Sol authoring lane', () => {
+describe('the GPT-6 Astra authoring lane', () => {
   const msg = (...trailers) => `Do a thing\n\n${trailers.join('\n')}\n`
 
   it('accepts a Sol-authored commit as an author', () => {
     for (const t of [
       'GPT-5.6 Sol <noreply@openai.com>',
       'GPT-5.6 Sol (high effort) <noreply@openai.com>',
-      'gpt-5.6-sol <noreply@openai.com>',
+      'gpt-6-astra <noreply@openai.com>',
       'Sol <noreply@openai.com>',
     ]) {
       expect(judgeTrailer(t).verdict, t).toBe('allowed')
@@ -683,8 +683,8 @@ describe('the GPT-5.6 Sol authoring lane', () => {
     expect(modelNameIn('GPT-5.6 Sol <noreply@openai.com>')).toBe('GPT 5.6 Sol')
   })
 
-  it('advertises the Sol trailer, and every advertised trailer passes the gate', () => {
-    expect(allowedTrailers(POLICY_NEUTRAL)).toContain('Co-Authored-By: GPT-5.6 Sol <noreply@openai.com>')
+  it('advertises the Astra trailer, and every advertised trailer passes the gate', () => {
+    expect(allowedTrailers(POLICY_NEUTRAL)).toContain('Co-Authored-By: GPT-6 Astra <noreply@openai.com>')
     for (const t of allowedTrailers(POLICY_NEUTRAL)) {
       expect(evaluateCommitTrailers(msg(t), POLICY_NEUTRAL).block, t).toBe(false)
     }
@@ -816,6 +816,6 @@ describe('the GPT-5.6 Sol authoring lane', () => {
     ].join('\n')
     expect(findForbiddenCommits(log, T0).map((h) => h.sha)).toEqual(['bbbbbbb'])
     expect(findUnidentifiedCommits(log, T0)).toEqual([])
-    expect(formatForbiddenReason(findForbiddenCommits(log, T0))).toContain('GPT-5.6 Sol')
+    expect(formatForbiddenReason(findForbiddenCommits(log, T0))).toContain('GPT-6 Astra')
   })
 })

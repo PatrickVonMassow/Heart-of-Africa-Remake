@@ -11,7 +11,7 @@
 //     actually survives (mechanism 1): detached, group leader, stdio on a FILE
 //     DESCRIPTOR — never a pipe a dying parent can break — and unref()ed.
 //   - THE WORKER CLI the daemon spawns: `--runner stub` is the hermetic worker
-//     the drills use; `--runner author-sol` WRAPS the proven scripts/author-sol.mjs
+//     the drills use; `--runner author-astra` WRAPS the proven scripts/author-astra.mjs
 //     without changing its authoring behavior — the wrapper is the daemon's
 //     child and holds the runner's pipes, so the session's death reaches neither.
 //   - THE CONTRACT PATHS a successor probes, all inside the attempt's own state
@@ -340,7 +340,7 @@ async function runWorker(argv) {
 
   let runnerChild = null
   let runnerExit = null
-  if (args.runner === 'author-sol') {
+  if (args.runner === 'author-astra') {
     // The proven authoring path, UNCHANGED (M2/M5): this wrapper is the daemon's
     // child, so it survives the session, and the runner's pipes end HERE — at a
     // parent that stays alive — never at the session that asked for the work.
@@ -349,7 +349,7 @@ async function runWorker(argv) {
     // alone leaves grandchildren writing. (If the wrapper itself is SIGKILLed
     // the runner group survives orphaned; the revoked lease and the pre-push
     // hook fence its pushes, and reconciliation reads the orphan.)
-    runnerChild = spawn(process.execPath, ['scripts/author-sol.mjs', '--point', args.point], {
+    runnerChild = spawn(process.execPath, ['scripts/author-astra.mjs', '--point', args.point], {
       cwd: args.worktree,
       env: process.env,
       windowsHide: true,
@@ -422,7 +422,7 @@ async function runWorker(argv) {
     }
     answerCheckpoint()
     if (args.runner === 'stub') stubWork()
-    if (args.runner === 'author-sol' && runnerExit !== null) {
+    if (args.runner === 'author-astra' && runnerExit !== null) {
       const pushed = push()
       if (pushed.fenced) return fencedExit(pushed.why)
       // 'done' is a claim about DURABLE work, not about the runner's mood: a
@@ -467,7 +467,7 @@ if (isMainModule(import.meta.url)) {
   }
   if (!existsSync('scripts/detached-agent.mjs')) {
     // The spawn plan passes a repo-relative script path; a worker started from
-    // elsewhere would silently resolve author-sol against the wrong tree.
+    // elsewhere would silently resolve author-astra against the wrong tree.
     console.error('detached-agent: must be started from the repository root')
     process.exit(WORKER_EXIT.badInvocation)
   }

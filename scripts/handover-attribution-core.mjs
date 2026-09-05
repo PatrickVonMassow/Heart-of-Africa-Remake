@@ -211,7 +211,7 @@ export function rampCallBearsWork(call = {}) {
       if (segmentInvokesPathWhere(segment, (candidate) => /(?:^|\/)scripts\/verify\/[^/]+\.mjs$/.test(candidate))) {
         return true
       }
-      return segmentInvokesScript(segment, ['author-sol.mjs', 'author-fable.mjs', 'review-sol.mjs', 'ask-sol.mjs'])
+      return segmentInvokesScript(segment, ['author-astra.mjs', 'author-fable.mjs', 'review-astra.mjs', 'ask-astra.mjs'])
     })
   } catch {
     return false

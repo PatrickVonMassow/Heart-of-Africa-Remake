@@ -4,12 +4,12 @@ import { tmpdir } from 'node:os'
 import { dirname, join, resolve } from 'node:path'
 import { afterEach, describe, expect, it } from 'vitest'
 import { AUTHORING_COMMISSION_KIND, AUTHORING_FRAMINGS, FABLE_ESCALATION_ROUNDS } from './author-routing-core.mjs'
-import { uncommittedSummary } from './author-sol-core.mjs'
-import { commitsSince, ledgerSnapshot, pushBranch, recordAuthoringCommission, restoreLedger, uncommittedNumstat } from './author-sol.mjs'
+import { uncommittedSummary } from './author-astra-core.mjs'
+import { commitsSince, ledgerSnapshot, pushBranch, recordAuthoringCommission, restoreLedger, uncommittedNumstat } from './author-astra.mjs'
 import { writeState as writeFableState } from './fable-switch-core.mjs'
 
 const root = resolve(process.cwd())
-const script = resolve(root, 'scripts', 'author-sol.mjs')
+const script = resolve(root, 'scripts', 'author-astra.mjs')
 const point = '999991'
 const dirs = []
 
@@ -88,7 +88,7 @@ describe('commitsSince', () => {
       '-m',
       'Rescue: the author is still testing',
       '-m',
-      'Co-Authored-By: GPT-5.6 Sol <noreply@openai.com>',
+      'Co-Authored-By: GPT-6 Astra <noreply@openai.com>',
     )
 
     expect(commitsSince(base, { cwd: repo })).toEqual([
@@ -96,7 +96,7 @@ describe('commitsSince', () => {
         sha: git(repo, 'rev-parse', 'HEAD'),
         subject: 'Checkpoint the parser [skip ci]',
         rescue: 'the author is still testing',
-        trailers: 'GPT-5.6 Sol <noreply@openai.com>',
+        trailers: 'GPT-6 Astra <noreply@openai.com>',
       },
     ])
   })
@@ -142,7 +142,7 @@ afterEach(() => {
   while (dirs.length) rmSync(dirs.pop(), { recursive: true, force: true })
 })
 
-describe('author-sol records a commission before dispatch', () => {
+describe('author-astra records a commission before dispatch', () => {
   it('appends and durably commits the exact point, round and framing once', () => {
     const events = []
     const input = {
@@ -163,7 +163,7 @@ describe('author-sol records a commission before dispatch', () => {
       round: 3,
       authorFraming: AUTHORING_FRAMINGS[0],
       sha: 'b'.repeat(40),
-      model: 'GPT-5.6 Sol',
+      model: 'GPT-6 Astra',
     })
     expect(events.map(([event]) => event)).toEqual(['append', 'commit'])
 
@@ -172,7 +172,7 @@ describe('author-sol records a commission before dispatch', () => {
     expect(events.map(([event]) => event)).toEqual(['append', 'commit'])
   })
 
-  it('records the commissioned lane model while keeping Sol as the default', () => {
+  it('records the commissioned lane model while keeping Astra as the default', () => {
     const events = []
     const fable = recordAuthoringCommission({
       records: [],
@@ -188,7 +188,7 @@ describe('author-sol records a commission before dispatch', () => {
     expect(fable.record.model).toBe('Fable 5')
     expect(events[0]).toMatchObject({ model: 'Fable 5' })
 
-    const sol = recordAuthoringCommission({
+    const astra = recordAuthoringCommission({
       records: [],
       point,
       round: 0,
@@ -197,7 +197,7 @@ describe('author-sol records a commission before dispatch', () => {
       append: () => {},
       commit: () => {},
     })
-    expect(sol.record.model).toBe('GPT-5.6 Sol')
+    expect(astra.record.model).toBe('GPT-6 Astra')
   })
 
   it('refuses to reuse one round under a different lane model', () => {
@@ -392,11 +392,11 @@ describe('author-sol records a commission before dispatch', () => {
   })
 })
 
-describe('author-sol routing reads unsuccessful rounds from the review ledger', () => {
+describe('author-astra routing reads unsuccessful rounds from the review ledger', () => {
   it('reports zero and uses the ordinary lane when the point has no review record', () => {
     const result = route(ledger([]))
     expect(result.status, result.stderr).toBe(0)
-    expect(result.stdout).toContain(`point ${point} → sol`)
+    expect(result.stdout).toContain(`point ${point} → astra`)
     expect(result.stdout).toContain('review record: 0 unsuccessful round(s)')
   })
 
@@ -417,7 +417,7 @@ describe('author-sol routing reads unsuccessful rounds from the review ledger', 
     rows.unshift({ point: Number(point), mode: 'review', verdict: 'merge' })
     const result = route(ledger(rows))
     expect(result.status, result.stderr).toBe(0)
-    expect(result.stdout).toContain(`point ${point} → sol`)
+    expect(result.stdout).toContain(`point ${point} → astra`)
     expect(result.stdout).toContain('node scripts/fable-switch.mjs --status')
     expect(result.stdout).toContain(
       `review record: ${FABLE_ESCALATION_ROUNDS} unsuccessful round(s); ${FABLE_ESCALATION_ROUNDS} fresh attempt(s)`,
@@ -436,7 +436,7 @@ describe('author-sol routing reads unsuccessful rounds from the review ledger', 
     }
     const result = route(ledger(rows))
     expect(result.status, result.stderr).toBe(0)
-    expect(result.stdout).toContain(`point ${point} → sol`)
+    expect(result.stdout).toContain(`point ${point} → astra`)
     expect(result.stdout).toContain(`${FABLE_ESCALATION_ROUNDS} unsuccessful round(s); 2 fresh attempt(s)`)
     expect(result.stdout).toContain('REPEAT — no author framing was recorded')
   })
@@ -449,7 +449,7 @@ describe('author-sol routing reads unsuccessful rounds from the review ledger', 
     }))
     const result = route(ledger(rows))
     expect(result.status, result.stderr).toBe(0)
-    expect(result.stdout).toContain(`point ${point} → sol`)
+    expect(result.stdout).toContain(`point ${point} → astra`)
     expect(result.stdout).toContain('11 unsuccessful round(s); 11 fresh attempt(s)')
   })
 
@@ -457,7 +457,7 @@ describe('author-sol routing reads unsuccessful rounds from the review ledger', 
     const result = route(ledger([]), ['--rounds', String(FABLE_ESCALATION_ROUNDS)])
     expect(result.status, result.stderr).toBe(0)
     // The override still carries the count; only the lane change is withheld.
-    expect(result.stdout).toContain(`point ${point} → sol`)
+    expect(result.stdout).toContain(`point ${point} → astra`)
     expect(result.stdout).toContain('node scripts/fable-switch.mjs --status')
   })
 
@@ -475,7 +475,7 @@ describe('author-sol routing reads unsuccessful rounds from the review ledger', 
   })
 })
 
-describe('author-sol examination does not require an authoring worktree', () => {
+describe('author-astra examination does not require an authoring worktree', () => {
   it('prints the read-only examination packet before branch and worktree readiness', () => {
     const records = ledger(
       Array.from({ length: FABLE_ESCALATION_ROUNDS - 1 }, () => ({

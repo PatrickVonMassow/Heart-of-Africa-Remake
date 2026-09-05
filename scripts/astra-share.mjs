@@ -1,27 +1,27 @@
 #!/usr/bin/env node
 // THE SWITCH THAT MOVES WORK TOWARDS OPENAI (work-order point 654, A2; widened by 667).
 //
-//   node scripts/sol-share.mjs --status     # what goes where right now, in ONE line
-//   node scripts/sol-share.mjs --more       # one step towards Sol
-//   node scripts/sol-share.mjs --less       # one step back towards Claude
-//   node scripts/sol-share.mjs --set prefer-sol|default|claude-only
-//   node scripts/sol-share.mjs --json       # the same, machine-readable
+//   node scripts/astra-share.mjs --status     # what goes where right now, in ONE line
+//   node scripts/astra-share.mjs --more       # one step towards Astra
+//   node scripts/astra-share.mjs --less       # one step back towards Claude
+//   node scripts/astra-share.mjs --set prefer-astra|default|claude-only
+//   node scripts/astra-share.mjs --json       # the same, machine-readable
 //
 // WHY IT EXISTS (user 11.08.2026): two vendors, two allowances that run out at different
 // times. Rather than wait until the Anthropic volume is nearly spent, the user wants to
 // shift load to OpenAI EARLIER — first the work that needs no write access at all:
 // diagnoses, audits, enumerations, explanations.
 //
-// AND SINCE POINT 667, AUTHORING TOO. At `prefer-sol` the `author` kind goes to Sol —
+// AND SINCE POINT 667, AUTHORING TOO. At `prefer-astra` the `author` kind goes to Astra —
 // since 18.08.2026 for the hard and critical points as well, which is the largest single
-// item of the spend; the role swap it needs is built — Sol stands in the author allowlist, the
+// item of the spend; the role swap it needs is built — Astra stands in the author allowlist, the
 // `commit-msg` hook takes its trailer, and Claude reviews, runs the suites, judges the
 // picture and lands. What no setting routes is in NEVER_ROUTED below.
 //
-// The setting lives in the MAIN checkout's `.claude/sol-share.json` (git-ignored, this
-// machine's state), and every consumer — `scripts/ask-sol.mjs`, `scripts/review-sol.mjs`,
+// The setting lives in the MAIN checkout's `.claude/astra-share.json` (git-ignored, this
+// machine's state), and every consumer — `scripts/ask-astra.mjs`, `scripts/review-astra.mjs`,
 // the delegation brief and the board footer — READS it rather than keeping its own copy.
-// The decisions are pure and Vitest-covered in scripts/sol-share-core.mjs.
+// The decisions are pure and Vitest-covered in scripts/astra-share-core.mjs.
 import { spawnSync } from 'node:child_process'
 import { existsSync, mkdirSync, readFileSync } from 'node:fs'
 import { dirname, sep as sep_ } from 'node:path'
@@ -42,15 +42,15 @@ import {
   statusLine,
   step,
   writeState,
-} from './sol-share-core.mjs'
+} from './astra-share-core.mjs'
 
 /**
  * The state file, resolved to the MAIN checkout even from a delegated agent's worktree.
- * `SOL_SHARE_FILE` redirects it, which is how the CLI suite exercises the real command
+ * `ASTRA_SHARE_FILE` redirects it, which is how the CLI suite exercises the real command
  * without touching the developer's own setting.
  */
 export const SETTING_FILE =
-  process.env.SOL_SHARE_FILE ||
+  process.env.ASTRA_SHARE_FILE ||
   settingPathFrom(
     spawnSync('git', ['rev-parse', '--path-format=absolute', '--git-common-dir'], {
       cwd: REPO_ROOT,
@@ -84,11 +84,11 @@ export function currentSetting(file = SETTING_FILE) {
  * The line a consumer prints when the state file is broken, or ''.
  *
  * It exists because a fallback nobody is told about is a setting nobody chose (cross-
- * vendor review, 12.08.2026): `review-sol.mjs` and `board-publish.mjs` read the setting,
+ * vendor review, 12.08.2026): `review-astra.mjs` and `board-publish.mjs` read the setting,
  * so they must also say when it is not the operator's.
  */
-export function settingProblemLine(state, who = 'sol-share') {
-  return state?.problem ? `${who}: the share setting is UNUSABLE — ${state.problem}. Repair it: node scripts/sol-share.mjs --set <setting>` : ''
+export function settingProblemLine(state, who = 'astra-share') {
+  return state?.problem ? `${who}: the share setting is UNUSABLE — ${state.problem}. Repair it: node scripts/astra-share.mjs --set <setting>` : ''
 }
 
 /** Where one kind of work goes right now — the one call every consumer needs. */
@@ -107,7 +107,7 @@ export function statusReport(state) {
   if (state.problem) lines.push(`  NOTE: ${state.problem}`)
   lines.push(`  ${SETTING_NOTES[state.setting]}`)
   for (const row of routingTable(state.setting)) {
-    lines.push(`  ${row.kind.padEnd(10)} → ${row.to === 'sol' ? 'GPT-5.6 Sol' : 'Claude     '}   ${KIND_NOTES[row.kind]}`)
+    lines.push(`  ${row.kind.padEnd(10)} → ${row.to === 'astra' ? 'GPT-6 Astra' : 'Claude     '}   ${KIND_NOTES[row.kind]}`)
   }
   lines.push('  NEVER routed, at any setting:')
   for (const n of NEVER_ROUTED) lines.push(`    · ${n}`)
@@ -117,13 +117,13 @@ export function statusReport(state) {
 
 export const usage = () =>
   [
-    'usage: node scripts/sol-share.mjs --status | --more | --less | --set <setting> [--json]',
+    'usage: node scripts/astra-share.mjs --status | --more | --less | --set <setting> [--json]',
     '',
-    `settings, from the least Sol to the most: ${SETTINGS.join(' → ')}`,
+    `settings, from the least Astra to the most: ${SETTINGS.join(' → ')}`,
     ...SETTINGS.map((s) => `  ${s.padEnd(12)} ${SETTING_NOTES[s]}`),
     '',
     'The board shows a non-default setting while it is on, and the delegation brief tells',
-    'every agent which kinds to hand over. At prefer-sol Sol also AUTHORS every point the',
+    'every agent which kinds to hand over. At prefer-astra Astra also AUTHORS every point the',
     'routing cut does not keep here, the hard and critical ones included; Claude reviews them.',
     'What no setting routes is listed under',
     '"NEVER routed" by --status.',
@@ -148,11 +148,11 @@ if (isMainModule(import.meta.url)) {
     if (setIndex >= 0) {
       const wanted = normaliseSetting(argv[setIndex + 1])
       if (!wanted) {
-        console.error(`sol-share: not a setting: ${argv[setIndex + 1] ?? '(none)'}\n`)
+        console.error(`astra-share: not a setting: ${argv[setIndex + 1] ?? '(none)'}\n`)
         console.error(usage())
         process.exit(2)
       }
-      save(wanted, { by: 'sol-share --set' })
+      save(wanted, { by: 'astra-share --set' })
       emit(currentSetting(), { changed: true })
       process.exit(0)
     }
@@ -162,18 +162,18 @@ if (isMainModule(import.meta.url)) {
       if (!moved.changed) {
         // AT AN END IT SAYS SO rather than wrapping: a `--more` that quietly became
         // `claude-only` would move the load to the very vendor the user was sparing.
-        console.error(`sol-share: already at \`${moved.from}\` — no setting further ${direction === 'more' ? 'towards Sol' : 'towards Claude'}.`)
+        console.error(`astra-share: already at \`${moved.from}\` — no setting further ${direction === 'more' ? 'towards Astra' : 'towards Claude'}.`)
         emit(currentSetting(), { changed: false })
         process.exit(0)
       }
-      save(moved.to, { by: `sol-share --${direction}` })
+      save(moved.to, { by: `astra-share --${direction}` })
       emit(currentSetting(), { changed: true, from: moved.from })
       process.exit(0)
     }
     emit(currentSetting(), { changed: false })
     process.exit(0)
   } catch (e) {
-    console.error(`sol-share failed: ${(e && e.message) || e}`)
+    console.error(`astra-share failed: ${(e && e.message) || e}`)
     process.exit(1)
   }
 }

@@ -136,7 +136,7 @@ eyes from a model of a *different* vendor — different training, less correlate
 blind spots. That review runs through one command:
 
 ```
-node scripts/review-sol.mjs --sha <sha> --brief "<what to judge>"
+node scripts/review-astra.mjs --sha <sha> --brief "<what to judge>"
 ```
 
 It uses the [Codex CLI](https://github.com/openai/codex) with a ChatGPT login
@@ -147,9 +147,9 @@ the fallback model instead of inventing a verdict. The login lives in
 container rebuild — so save it once and restore it in one command afterwards:
 
 ```
-node scripts/review-sol.mjs --save-login     # → local/ of the main checkout (git-ignored, 0600)
-node scripts/review-sol.mjs --restore-login  # after a container rebuild
-node scripts/review-sol.mjs --probe          # is the model id really honoured?
+node scripts/review-astra.mjs --save-login     # → local/ of the main checkout (git-ignored, 0600)
+node scripts/review-astra.mjs --restore-login  # after a container rebuild
+node scripts/review-astra.mjs --probe          # is the model id really honoured?
 ```
 
 ## Geodata

@@ -1,4 +1,4 @@
-// WHICH AUTHORING LANE A POINT GOES TO (point 667). rule:model-policy@d0066fb3
+// WHICH AUTHORING LANE A POINT GOES TO (point 667). rule:model-policy@4f05875b
 //
 // The user pays two vendors, and authoring is the largest single item of the
 // spend, so it is split across both rather than sitting on one. It does NOT all
@@ -9,7 +9,7 @@
 // (cross-vendor audit 17.08.2026 — the header used to argue from one day's
 // quota reading, which then outlived it).
 //
-//   sol    GPT-5.6 Sol authors the points, and Claude then reviews, runs the
+//   astra  GPT-6 Astra authors the points, and Claude then reviews, runs the
 //          suites, judges the picture and lands. Since 18.08.2026 that includes
 //          the HARD and CRITICAL ones — difficult, complex, error-prone or
 //          tagged HIGH criticality goes STRAIGHT here, where it used to be held
@@ -31,17 +31,17 @@
 // It is ADVISORY, not a gate. Nothing blocks on it: the reasons travel with the
 // verdict so a dispatcher can see WHY and override with a tag in the point
 // itself. Side-effect free; the work-order reading belongs to
-// scripts/author-sol.mjs. Pinned by author-routing-core.test.mjs.
+// scripts/author-astra.mjs. Pinned by author-routing-core.test.mjs.
 
-import { FABLE_MODEL, fableIsOn, fableRefusalReason, requireState } from './fable-switch-core.mjs'
+import { ASTRA_MODEL, FABLE_MODEL, fableIsOn, fableRefusalReason, requireState } from './fable-switch-core.mjs'
 
 /** The authoring lanes, in the order this file describes them. */
-export const LANES = Object.freeze(['sol', 'fable', 'opus'])
+export const LANES = Object.freeze(['astra', 'fable', 'opus'])
 
 /** Who each lane is, for the report a dispatcher reads. The Fable name is DERIVED
  * from the switch, so a version bump moves one constant and not a scattered set. */
 export const LANE_MODEL = Object.freeze({
-  sol: 'GPT-5.6 Sol',
+  astra: ASTRA_MODEL,
   fable: FABLE_MODEL,
   opus: 'Opus 5',
 })
@@ -61,7 +61,7 @@ export const LANE_MODEL = Object.freeze({
  */
 export const FABLE_ESCALATION_ROUNDS = 10
 
-/** The last Sol/Opus round pauses for a spec reading before Fable may take it. */
+/** The last Astra/Opus round pauses for a spec reading before Fable may take it. */
 export const SPEC_EXAMINATION_ROUND = FABLE_ESCALATION_ROUNDS - 1
 
 /**
@@ -78,7 +78,7 @@ export const AUTHORING_FRAMINGS = Object.freeze([
 /** The two outcomes a completed examination may record. */
 export const SPEC_EXAMINATION_VERDICTS = Object.freeze(['sound', 'amended'])
 
-/** A pre-dispatch receipt written by author-sol for a round governed by this mechanism. */
+/** A pre-dispatch receipt written by author-astra for a round governed by this mechanism. */
 export const AUTHORING_COMMISSION_KIND = 'authoring-commission'
 
 const isUnsuccessfulReview = (record, wanted) => {
@@ -103,10 +103,10 @@ const isExaminationRecord = (record, wanted) =>
 export function specExaminerFor(history = {}, fallbackAuthor = '') {
   const rounds = Array.isArray(history?.rounds) ? history.rounds : []
   const author = [...rounds].reverse().find((round) => round.authoredBy)?.authoredBy || String(fallbackAuthor)
-  if (/\bsol\b/i.test(author)) {
+  if (/\b(?:astra|sol)\b/i.test(author)) {
     return { vendor: 'claude', model: 'Opus 5', route: 'claude-read', author }
   }
-  return { vendor: 'sol', model: 'GPT-5.6 Sol', route: 'ask-sol', author }
+  return { vendor: 'astra', model: ASTRA_MODEL, route: 'ask-astra', author }
 }
 
 /**
@@ -196,7 +196,7 @@ export function authorRoundHistory(records = [], point = '') {
         if (!expectedExaminer.author) return true
         return expectedExaminer.route === 'claude-read'
           ? /\bopus\b/i.test(String(record?.model))
-          : /\bsol\b/i.test(String(record?.model))
+          : /\b(?:astra|sol)\b/i.test(String(record?.model))
       }) ?? null
   return { unsuccessfulRounds: rounds.length, freshRounds, rounds, examination }
 }
@@ -317,13 +317,13 @@ export const HARD_MARKERS = Object.freeze([
  * and saves little — which is why this lane exists at all.
  *
  * IT IS THE LAST WORD ONLY WHERE NOTHING MARKS THE POINT HARD (user
- * 18.08.2026). A hard or HIGH-criticality picture point is Sol's: the branch
+ * 18.08.2026). A hard or HIGH-criticality picture point is Astra's: the branch
  * above returns before this one, and the test file pins that order. What is left
  * here is the ordinary picture point.
  *
  * THEY ERR TOWARDS MATCHING, deliberately (cross-vendor review of point 667,
  * P1): a mechanical rename that merely mentions WebGPU is routed here and costs
- * the Sol lane one point. The point's own `Author lane:` tag is the cheap way
+ * the Astra lane one point. The point's own `Author lane:` tag is the cheap way
  * back.
  */
 export const VERIFICATION_MARKERS = Object.freeze([
@@ -342,7 +342,7 @@ export const VERIFICATION_MARKERS = Object.freeze([
 ])
 
 /**
- * An explicit lane tag in the point's own text: `Author lane: sol`.
+ * An explicit lane tag in the point's own text: `Author lane: astra`.
  *
  * The escape hatch, and the reason the rules below may stay simple. A spec that
  * knows better than the markers says so once, in the work order where it is
@@ -350,7 +350,7 @@ export const VERIFICATION_MARKERS = Object.freeze([
  *
  * A TAG IS A LINE OF ITS OWN, not a phrase inside a sentence (cross-vendor
  * review of point 667, P1). Skipping only a quote character immediately in front
- * of it left `"use Author lane: sol for this example"` operative — and a
+ * of it left `"use Author lane: astra for this example"` operative — and a
  * document that DESCRIBES this convention would route the points that quote it.
  * Requiring the line to begin with the tag is both simpler and stricter than
  * chasing quotation, and it is how the tag is meant to be written anyway.
@@ -400,10 +400,12 @@ export function laneTagIn(body) {
     if (fence) continue
     // A list marker or blockquote may precede it; a quote character may not. The
     // line must also END there (second cross-vendor round): without the closing
-    // anchor, `Author lane: sol is the example spelling` was still an operative
+    // anchor, `Author lane: astra is the example spelling` was still an operative
     // tag, which is the same sentence-inside-a-document case one round on.
-    const m = /^[\s>*-]*author lane:\s*(sol|fable|opus)\s*[.;,)`'"]*\s*$/i.exec(line)
-    if (m) found = m[1].toLowerCase()
+    // `sol` is the OpenAI lane's RETIRED spelling (point 1061), still read so an
+    // operator's older tag routes to the lane it means instead of being dropped.
+    const m = /^[\s>*-]*author lane:\s*(astra|sol|fable|opus)\s*[.;,)`'"]*\s*$/i.exec(line)
+    if (m) found = m[1].toLowerCase() === 'sol' ? 'astra' : m[1].toLowerCase()
   }
   return found
 }
@@ -491,21 +493,21 @@ export function authorLaneFor({ body = '', criticality = null, reworkRounds = 0,
     )
   }
   if (tag) return decide(tag, `the point itself carries \`Author lane: ${tag}\``)
-  // A HARD OR CRITICAL POINT GOES STRAIGHT TO SOL (user 18.08.2026). It used to
+  // A HARD OR CRITICAL POINT GOES STRAIGHT TO ASTRA (user 18.08.2026). It used to
   // be held back for Opus — and before that routed to Fable — and it now takes
   // the direct route, ABOVE the verification lane: the user was asked which of
-  // the two wins and answered that these go to Sol as well. The picture is still
+  // the two wins and answered that these go to Astra as well. The picture is still
   // judged here whoever authored it, so only the AUTHORING moves.
   if (criticality === 'high') {
-    return decide('sol', 'the point is tagged HIGH criticality — hard and critical work goes straight to Sol')
+    return decide('astra', 'the point is tagged HIGH criticality — hard and critical work goes straight to Astra')
   }
   if (hard.length) {
-    return decide('sol', `the spec names it a hard case (${hard.join(', ')}) — hard cases go straight to Sol`)
+    return decide('astra', `the spec names it a hard case (${hard.join(', ')}) — hard cases go straight to Astra`)
   }
   if (verification.length) {
     return decide('opus', `its VERIFICATION is the work (${verification.join(', ')}) — the main session judges that anyway`)
   }
-  return decide('sol', 'mechanical or mid-difficulty, and nothing marks it otherwise')
+  return decide('astra', 'mechanical or mid-difficulty, and nothing marks it otherwise')
 }
 
 /** One line per point, for the dispatcher's report. PURE. */

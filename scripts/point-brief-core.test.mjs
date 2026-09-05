@@ -893,19 +893,19 @@ describe('the durability demand every brief carries (point 629)', () => {
 // THE BRIEF TELLS EVERY AGENT WHERE THE READ-ONLY WORK GOES (point 654 A3). It is one
 // line at every setting: an agent that is never told the lever exists cannot pull it, and
 // a line that appeared only sometimes would train its readers to skip it.
-describe('the sol-routing line', () => {
-  const briefAt = (solShare) => assembleBrief({ point: { number: 1, done: false, body: 'x' }, solShare })
+describe('the astra-routing line', () => {
+  const briefAt = (astraShare) => assembleBrief({ point: { number: 1, done: false, body: 'x' }, astraShare })
 
   it('names the switch at the default, without asking for anything', () => {
     expect(briefAt('default')).toMatch(/SOL ROUTING is at `default`/)
-    expect(briefAt('default')).toMatch(/sol-share\.mjs --status/)
-    expect(briefAt('default')).not.toMatch(/ask-sol\.mjs --kind/)
+    expect(briefAt('default')).toMatch(/astra-share\.mjs --status/)
+    expect(briefAt('default')).not.toMatch(/ask-astra\.mjs --kind/)
   })
 
   it('tells the agent WHAT to hand over while the switch prefers Sol', () => {
-    const brief = briefAt('prefer-sol')
+    const brief = briefAt('prefer-astra')
     expect(brief).toMatch(/hand diagnose\/audit\/enumerate\/explain/)
-    expect(brief).toMatch(/ask-sol\.mjs --kind/)
+    expect(brief).toMatch(/ask-astra\.mjs --kind/)
     expect(brief).toMatch(/You keep the gates, the suites and the pictures/)
     // The reader of a brief is ALREADY the author, whichever lane it is in
     // (point 667), so the line offers it the READING kinds and no other.
@@ -914,7 +914,7 @@ describe('the sol-routing line', () => {
   })
 
   it('tells it to stay off Sol entirely at claude-only', () => {
-    expect(briefAt('claude-only')).toMatch(/do NOT call `scripts\/ask-sol\.mjs`/)
+    expect(briefAt('claude-only')).toMatch(/do NOT call `scripts\/ask-astra\.mjs`/)
   })
 
   it('defaults to the default when the caller passes nothing at all', () => {
@@ -922,7 +922,7 @@ describe('the sol-routing line', () => {
   })
 
   it('stands among the house facts, above the call discipline', () => {
-    const brief = briefAt('prefer-sol')
+    const brief = briefAt('prefer-astra')
     expect(brief.indexOf('SOL ROUTING')).toBeGreaterThan(brief.indexOf('HOUSE FACTS NO POINT STATES'))
     expect(brief.indexOf('SOL ROUTING')).toBeLessThan(brief.indexOf('HOW TO SPEND A TURN'))
   })

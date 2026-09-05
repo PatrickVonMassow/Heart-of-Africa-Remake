@@ -603,7 +603,7 @@ export function formatCriticalityReviewVerdict(verdict) {
     '',
     `If Git proves no configured vendor can review part of the point, record that exact exception:`,
     '  node scripts/criticality-review-guard.mjs --record-unavailable <sha> --point <N> \\',
-    '      --files "<exact paths printed by review-sol>" --reason "<why no vendor is eligible>"',
+    '      --files "<exact paths printed by review-astra>" --reason "<why no vendor is eligible>"',
     `It writes kind ${REVIEW_UNAVAILABLE_KIND}; it covers only its verified file list and answers no refusal.`,
     '',
     'Inspect the gate with: node scripts/criticality-review-guard.mjs --status',

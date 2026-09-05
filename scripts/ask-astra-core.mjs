@@ -1,22 +1,22 @@
 // THE READ-ONLY PATH TO THE OTHER VENDOR, GENERALISED BEYOND REVIEWS (point 654, A1).
 //
-// `scripts/review-sol.mjs` proved one shape of this: `codex exec` in a READ-ONLY sandbox
+// `scripts/review-astra.mjs` proved one shape of this: `codex exec` in a READ-ONLY sandbox
 // with the artefact on stdin, because this container cannot create user namespaces and a
 // shell command of the reviewer's would die before it ran. The last twelve recorded
-// mechanism reviews all carry "GPT-5.6 Sol" with no silent fallback, so the path works.
+// mechanism reviews all carry "GPT-6 Astra" with no silent fallback, so the path works.
 //
 // What it did NOT do is carry any other kind of pure text work — and text work is where
 // the volume is: measured 12.08.2026, verification is 41.5 % of the whole spend and
 // 48.0 % of that is reading logs, scripts and reports, i.e. 19.9 % of everything, with
-// no browser and no picture involved (docs/sol-routing.md carries the whole table).
+// no browser and no picture involved (docs/astra-routing.md carries the whole table).
 //
 // THE RULE THIS FILE IS SHAPED AROUND is the review path's, unchanged: an answer nobody
 // gave must never be reported as an answer. Every path out of a failed run says so in
 // ONE line, names the cause and hands the work back to the Claude chain — never silently,
-// never recorded as Sol's.
+// never recorded as Astra's.
 //
 // Side-effect free: the process spawn, the material gathering and the printing belong to
-// scripts/ask-sol.mjs. Pinned by ask-sol-core.test.mjs.
+// scripts/ask-astra.mjs. Pinned by ask-astra-core.test.mjs.
 
 import {
   FABLE_MODEL,
@@ -27,22 +27,22 @@ import {
   OPUS_MODEL_ID,
   parseClaudeResultOutput,
 } from './fable-switch-core.mjs'
-import { blindReviewerAdmission, charStripped, MATERIAL_BUDGET_CHARS, rawFieldValue, SOL_MODEL_ID, SOL_MODEL_NAME, stripDecoration, SOL_REASONING_EFFORT } from './review-sol-core.mjs'
+import { blindReviewerAdmission, charStripped, MATERIAL_BUDGET_CHARS, rawFieldValue, ASTRA_MODEL_ID, ASTRA_MODEL_NAME, stripDecoration, ASTRA_REASONING_EFFORT } from './review-astra-core.mjs'
 
-export { MATERIAL_BUDGET_CHARS, SOL_MODEL_NAME, SOL_REASONING_EFFORT }
+export { MATERIAL_BUDGET_CHARS, ASTRA_MODEL_NAME, ASTRA_REASONING_EFFORT }
 
 /** Every read-only model this command can address. The served model must agree
  *  with this descriptor before any output is attributed to it. */
 export const ASK_MODELS = Object.freeze({
-  sol: Object.freeze({ key: 'sol', name: SOL_MODEL_NAME, id: SOL_MODEL_ID, runtime: 'codex', effort: SOL_REASONING_EFFORT }),
+  astra: Object.freeze({ key: 'astra', name: ASTRA_MODEL_NAME, id: ASTRA_MODEL_ID, runtime: 'codex', effort: ASTRA_REASONING_EFFORT }),
   fable: Object.freeze({ key: 'fable', name: FABLE_MODEL, id: FABLE_MODEL_ID, runtime: 'claude', effort: 'high' }),
   opus: Object.freeze({ key: 'opus', name: OPUS_MODEL, id: OPUS_MODEL_ID, runtime: 'claude', effort: 'high' }),
   opus48: Object.freeze({ key: 'opus48', name: OPUS_FALLBACK_MODEL, id: OPUS_FALLBACK_MODEL_ID, runtime: 'claude', effort: 'high' }),
 })
 
-/** A supported model descriptor, or null. Sol remains the compatibility default. */
-export function resolveAskModel(value = 'sol') {
-  const key = String(value ?? '').trim().toLowerCase() || 'sol'
+/** A supported model descriptor, or null. Astra remains the compatibility default. */
+export function resolveAskModel(value = 'astra') {
+  const key = String(value ?? '').trim().toLowerCase() || 'astra'
   return ASK_MODELS[key] ?? null
 }
 
@@ -76,7 +76,7 @@ export function normaliseKind(value) {
  * blind-merge accounting, into a work-order point — and a free-form answer cannot be
  * transcribed without someone re-reading the whole thing. `enumerate` uses the very entry
  * form `scripts/blind-merge.mjs` counts (`B<n> | <file> | <one line>`), so a divergent
- * half from Sol drops straight into the merge accounting CLAUDE.md §6 demands.
+ * half from Astra drops straight into the merge accounting CLAUDE.md §6 demands.
  */
 export const ANSWER_SHAPES = Object.freeze({
   diagnose: ['CAUSE: <the one cause, named>', 'EVIDENCE: <the line(s) in the material that show it>'],
@@ -94,16 +94,16 @@ export function entryPrefix(kind) {
 }
 
 /**
- * The prompt Sol is given for one kind.
+ * The prompt Astra is given for one kind.
  *
  * Two facts every kind carries, both learned the hard way on the review path: the
- * material is ATTACHED (a shell command of Sol's cannot run in this container, so it must
+ * material is ATTACHED (a shell command of Astra's cannot run in this container, so it must
  * not be told to fetch anything), and a part marked TRUNCATED must be reported as such
  * rather than guessed past.
  */
-export function buildAskPrompt({ kind = '', brief = '', modelName = SOL_MODEL_NAME } = {}) {
+export function buildAskPrompt({ kind = '', brief = '', modelName = ASTRA_MODEL_NAME } = {}) {
   const k = normaliseKind(kind)
-  if (!k) throw new Error(`ask-sol: not a kind: ${kind}`)
+  if (!k) throw new Error(`ask-astra: not a kind: ${kind}`)
   const shape = ANSWER_SHAPES[k]
   const lines = [
     `You are doing READ-ONLY work for this repository as ${modelName}. You were chosen`,
@@ -250,7 +250,7 @@ function parseDiagnose(lines) {
  * not an entry.
  *
  * `allowEmpty` exists for the AUDIT: a sweep that finds nothing is a real answer, and
- * refusing it would report a clean audit as "Sol did not answer" after the allowance was
+ * refusing it would report a clean audit as "Astra did not answer" after the allowance was
  * already spent. It must SAY so in the prescribed line — silence is still no answer.
  */
 function parseEntries(lines, prefix, { allowEmpty = false } = {}) {
@@ -318,7 +318,7 @@ function parseEntries(lines, prefix, { allowEmpty = false } = {}) {
 }
 
 /**
- * Pull the answer out of Sol's final message. PURE.
+ * Pull the answer out of Astra's final message. PURE.
  *
  * Tolerant on the way in — markdown emphasis, a leading bullet, a code fence — and strict
  * on the way out: an answer that does not carry its shape is NOT an answer, and the caller
@@ -328,7 +328,7 @@ function parseEntries(lines, prefix, { allowEmpty = false } = {}) {
  */
 export function parseAnswer({ kind = '', text = '' } = {}) {
   const k = normaliseKind(kind)
-  if (!k) throw new Error(`ask-sol: not a kind: ${kind}`)
+  if (!k) throw new Error(`ask-astra: not a kind: ${kind}`)
   // Markdown DECORATION by its SHAPE, never by bare character (round-7
   // pass 1, sharpening round 6): deleting every `*_#>` globally corrupted
   // structured answers (`src/foo_bar.mjs` → `src/foobar.mjs`) and could
@@ -397,27 +397,27 @@ export function parseAnswer({ kind = '', text = '' } = {}) {
 }
 
 /**
- * WHAT THE COMMAND SAYS WHEN SOL DID NOT DELIVER: one line, the cause named, and the work
+ * WHAT THE COMMAND SAYS WHEN ASTRA DID NOT DELIVER: one line, the cause named, and the work
  * handed back. PURE.
  *
- * The exit code beside it (3, as on the review path) is what lets a script tell "Sol
- * answered" from "Sol did not" without reading prose.
+ * The exit code beside it (3, as on the review path) is what lets a script tell "Astra
+ * answered" from "Astra did not" without reading prose.
  */
-export function formatUnavailable({ kind = '', cause = '', setting = '', modelName = SOL_MODEL_NAME } = {}) {
+export function formatUnavailable({ kind = '', cause = '', setting = '', modelName = ASTRA_MODEL_NAME } = {}) {
   const k = normaliseKind(kind) ?? String(kind ?? '')
-  const handoff = modelName === SOL_MODEL_NAME ? 'Do it in the Claude chain' : 'Hand it to another eligible lane'
+  const handoff = modelName === ASTRA_MODEL_NAME ? 'Do it in the Claude chain' : 'Hand it to another eligible lane'
   return [
-    `ask-sol: ${modelName} did NOT answer this ${k}: ${cause || 'no cause was reported'}.`,
+    `ask-astra: ${modelName} did NOT answer this ${k}: ${cause || 'no cause was reported'}.`,
     `  The ${k} is NOT done. ${handoff} — nothing here may be recorded as ${modelName}'s work.`,
-    ...(setting === 'claude-only' ? ['  (The share switch is at `claude-only`; `node scripts/sol-share.mjs --more` sends this kind to Sol again.)'] : []),
+    ...(setting === 'claude-only' ? ['  (The share switch is at `claude-only`; `node scripts/astra-share.mjs --more` sends this kind to Astra again.)'] : []),
   ].join('\n')
 }
 
 /** The whole answer as the command prints it: the shape first, the reader's summary last. */
-export function formatAnswerReport({ kind = '', parsed = {}, elapsedMs = 0, modelName = SOL_MODEL_NAME, effort = SOL_REASONING_EFFORT } = {}) {
+export function formatAnswerReport({ kind = '', parsed = {}, elapsedMs = 0, modelName = ASTRA_MODEL_NAME, effort = ASTRA_REASONING_EFFORT } = {}) {
   const k = normaliseKind(kind) ?? String(kind ?? '')
   const seconds = Number.isFinite(Number(elapsedMs)) ? Math.round(Number(elapsedMs) / 1000) : 0
-  const head = `ask-sol: ${modelName} (effort ${effort}) answered the ${k} in ${seconds}s — ${parsed.summary ?? ''}`
+  const head = `ask-astra: ${modelName} (effort ${effort}) answered the ${k} in ${seconds}s — ${parsed.summary ?? ''}`
   if (k === 'diagnose') return [head, `  CAUSE:    ${parsed.answer?.cause ?? ''}`, `  EVIDENCE: ${parsed.answer?.evidence ?? ''}`].join('\n')
   if (k === 'audit' || k === 'enumerate') {
     return [head, ...(parsed.answer?.entries ?? []).map((e) => `  ${e.id} | ${e.file} | ${e.text}`)].join('\n')

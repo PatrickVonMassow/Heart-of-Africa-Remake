@@ -3,7 +3,7 @@ import {
   formatAuthorshipPlan,
   formatContributionPassPlan,
   formatUnavailableReceiptRoute,
-} from './review-sol.mjs'
+} from './review-astra.mjs'
 import { planAuthorshipGroups } from './mechanism-review-range-core.mjs'
 
 const sha = 'a'.repeat(40)
@@ -33,7 +33,7 @@ describe('printed review pass commands', () => {
     }, { sha })
 
     expect(text).toContain(
-      `node scripts/review-sol.mjs --sha ${sha} --since ${base} ` +
+      `node scripts/review-astra.mjs --sha ${sha} --since ${base} ` +
         '--reviewer opus --brief "<what to judge>" --pass 1',
     )
   })
@@ -52,7 +52,7 @@ describe('printed review pass commands', () => {
     })
 
     expect(text).toContain(
-      `node scripts/review-sol.mjs --sha ${sha} --since ${base} ` +
+      `node scripts/review-astra.mjs --sha ${sha} --since ${base} ` +
         '--reviewer opus --brief "<what to judge>"',
     )
   })
@@ -111,7 +111,7 @@ describe('printed review pass commands', () => {
     const routed = planAuthorshipGroups({
       commits: [{
         sha,
-        authorModels: ['GPT-5.6 Sol', 'Opus 5', 'Fable 5.1', 'Opus 4.8'],
+        authorModels: ['GPT-6 Astra', 'Opus 5', 'Fable 5.1', 'Opus 4.8'],
         files,
       }],
       endStateFiles: files,
@@ -133,7 +133,7 @@ describe('printed review pass commands', () => {
 
     expect(text).toContain('UNREVIEWABLE: scripts/no-independent-reviewer.mjs')
     expect(text).not.toMatch(/pass \d+\/\d+/)
-    expect(text).not.toContain('node scripts/review-sol.mjs --sha')
+    expect(text).not.toContain('node scripts/review-astra.mjs --sha')
     expect(text).toContain(`--record-unavailable ${sha} --point 1008`)
     expect(text).toContain('--files "scripts/no-independent-reviewer.mjs"')
   })

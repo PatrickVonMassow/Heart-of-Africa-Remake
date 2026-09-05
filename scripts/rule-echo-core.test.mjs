@@ -212,14 +212,14 @@ describe('the registry itself', () => {
     expect(rule.source).toEqual({ file: 'CLAUDE.md', startsWith: '- **Model policy' })
     expect(rule.echoes.map((e) => e.file)).toEqual([
       'docs/maximum-qa.md',
-      'docs/sol-routing.md',
+      'docs/astra-routing.md',
       'scripts/author-routing-core.mjs',
-      'scripts/author-sol-core.mjs',
+      'scripts/author-astra-core.mjs',
       'scripts/batch-autostart-core.mjs',
       'scripts/batch-resume-hook.mjs',
       'scripts/model-guard-core.mjs',
-      'scripts/review-sol-core.mjs',
-      'scripts/sol-share-core.mjs',
+      'scripts/review-astra-core.mjs',
+      'scripts/astra-share-core.mjs',
       'memory/hard-cases-go-to-sol.md',
       'memory/fable-sparingly.md',
       'memory/serving-model-watch.md',

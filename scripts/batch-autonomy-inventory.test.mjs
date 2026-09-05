@@ -87,7 +87,7 @@ const HUMAN_WAIT_FILES = [
   'scripts/dashboard-guard-core.mjs',
   'scripts/defer-for-user.mjs',
   'scripts/permission-autogrant-core.mjs',
-  'scripts/review-sol-core.mjs',
+  'scripts/review-astra-core.mjs',
   'scripts/user-gate-core.mjs',
   'scripts/vdzk-admissibility-core.mjs',
 ]

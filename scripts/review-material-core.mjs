@@ -38,7 +38,7 @@ import { createHash } from 'node:crypto'
  * 200_000 characters, and deliberately unchanged by this point: it is the ceiling
  * the 17.08.2026 measurement was taken against (the material came to 201567
  * characters and was cut here), so moving it would invalidate the one reading we
- * have. It is not a model limit — Sol's context is far larger — but an ATTENTION
+ * have. It is not a model limit — Astra's context is far larger — but an ATTENTION
  * and cost limit: a reviewer handed a megabyte reports on the part it read. The
  * answer to a range that does not fit is more passes, not a bigger round; the
  * case that motivated this point (a 1.39M bookkeeping file) is out of reach of
@@ -1037,9 +1037,9 @@ export function formatCoveragePlan(plan) {
  * The line the caller must see BEFORE a round is spent: the threshold, this
  * range's real size, and — when it does not fit — the passes it needs.
  */
-export function formatBudgetNotice(plan, { sha = '', command = 'node scripts/review-sol.mjs' } = {}) {
+export function formatBudgetNotice(plan, { sha = '', command = 'node scripts/review-astra.mjs' } = {}) {
   const at = String(sha).slice(0, 7)
-  const head = `review-sol: the material budget is ${plan.budget} characters per round; this range assembles ${plan.rawSize}.`
+  const head = `review-astra: the material budget is ${plan.budget} characters per round; this range assembles ${plan.rawSize}.`
   if (plan.fits) {
     // A round that fits only at a DECLARED delivery level says so: the caller
     // deciding whether this review suffices must know which content stays out.
@@ -1132,7 +1132,7 @@ export function formatBudgetNotice(plan, { sha = '', command = 'node scripts/rev
  *
  * It exists for the paths that print a record command without ever assembling
  * anything (cross-vendor review, second round): the share switch at `claude-only`
- * and a range Sol authored both hand the review to a Claude model and print the
+ * and a range Astra authored both hand the review to a Claude model and print the
  * template it must record — for the WHOLE range, whose fit nobody had measured.
  * The point's rule is the same wherever it is asked: an unknown fit refuses.
  */

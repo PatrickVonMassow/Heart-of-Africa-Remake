@@ -341,8 +341,8 @@ describe('context-fence-guard, OBSERVING (spawned) — the default', () => {
       ['Agent', { prompt: 'build point 757' }],
       ['Task', { prompt: 'build point 757' }],
       ['Bash', { command: 'npm test' }],
-      ['Bash', { command: 'node scripts/author-sol.mjs --point 757' }],
-      ['Bash', { command: 'node scripts/review-sol.mjs --point 757' }],
+      ['Bash', { command: 'node scripts/author-astra.mjs --point 757' }],
+      ['Bash', { command: 'node scripts/review-astra.mjs --point 757' }],
       ['Bash', { command: 'node scripts/verify/world.mjs' }],
       // THE FILE SET THAT FORCED THIS POINT: the fence refused writes to every
       // authoring target, which is exactly what the floor-cutting point must
@@ -366,7 +366,7 @@ describe('context-fence-guard, OBSERVING (spawned) — the default', () => {
 
   it('STILL MEASURES AND STILL RECORDS — the series does not stop when the fence does', () => {
     rmSync(observationsPath(), { force: true })
-    callGuard('Bash', { command: 'node scripts/author-sol.mjs --point 757' }, { env: OBSERVE })
+    callGuard('Bash', { command: 'node scripts/author-astra.mjs --point 757' }, { env: OBSERVE })
     callGuard('Edit', { file_path: 'TASKS.md' }, { env: OBSERVE })
     const recs = observations()
     expect(recs).toHaveLength(2)

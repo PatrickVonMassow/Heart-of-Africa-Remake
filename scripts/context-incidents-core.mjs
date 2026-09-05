@@ -94,7 +94,7 @@ const READ_TOOLS = new Set(['Read'])
 /** The sanctioned browser-suite launchers, and the delegating asks. Same names
  *  the context fence classifies as "starting new work" — one vocabulary. */
 const SUITE_SCRIPTS = ['run-all.mjs', 'run-logged.mjs']
-const ASK_SCRIPTS = ['ask-sol.mjs', 'author-sol.mjs', 'author-fable.mjs', 'review-sol.mjs']
+const ASK_SCRIPTS = ['ask-astra.mjs', 'author-astra.mjs', 'author-fable.mjs', 'review-astra.mjs']
 const VERIFY_PREFIX = /(?:^|\/)scripts\/verify\/[^\s]+\.mjs$/i
 /** npm subcommands that ARE a browser run, and the fast gates beside them. */
 const NPM_SUITE_ARGS = new Set(['test', 'test:small', 'test:large'])

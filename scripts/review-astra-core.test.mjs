@@ -31,24 +31,24 @@ import {
   savedAuthPathFrom,
   claudeReviewerFor,
   CLAUDE_REVIEW_CHAIN,
-  solAuthored,
+  astraAuthored,
   SECOND_FALLBACK_MODEL_NAME,
   reviewerDescriptor,
   REVIEWER_ROSTER,
-  SOL_MODEL_ID,
-  SOL_MODEL_NAME,
-  SOL_REASONING_EFFORT,
-} from './review-sol-core.mjs'
+  ASTRA_MODEL_ID,
+  ASTRA_MODEL_NAME,
+  ASTRA_REASONING_EFFORT,
+} from './review-astra-core.mjs'
 import { readState, writeState } from './fable-switch-core.mjs'
 
 const FABLE_OFF = readState(JSON.stringify(writeState('off', { why: 'test', by: 'test', now: 1 })))
 
-const solSays = (verdict = 'merge', evidence = 'read the diff and the guard test; the fail-open path is covered') =>
+const astraSays = (verdict = 'merge', evidence = 'read the diff and the guard test; the fail-open path is covered') =>
   `I checked the change.\n\nVERDICT: ${verdict}\nEVIDENCE: ${evidence}\n`
 
 // `shortfall: null` is the material accounting's explicit "the round provably
 // carried everything" — the only value that lets a decision become ready.
-const okRun = (text = solSays()) => ({
+const okRun = (text = astraSays()) => ({
   outcome: classifyOutcome({ exitCode: 0, stdout: text }),
   parsed: parseVerdict(text),
   shortfall: null,
@@ -155,13 +155,13 @@ describe('classifyOutcome — how a codex run ended', () => {
 
   it('the bubblewrap warning codex prints on stderr does not fail a green run', () => {
     const noise = 'warning: bubblewrap sandbox unavailable, continuing'
-    expect(classifyOutcome({ exitCode: 0, stderr: noise, stdout: solSays() }).ok).toBe(true)
+    expect(classifyOutcome({ exitCode: 0, stderr: noise, stdout: astraSays() }).ok).toBe(true)
   })
 })
 
 describe('parseVerdict — only a real verdict is a verdict', () => {
   it('reads the verdict and its evidence', () => {
-    expect(parseVerdict(solSays('merge-with-fixes', 'two findings, both in the parser'))).toMatchObject({
+    expect(parseVerdict(astraSays('merge-with-fixes', 'two findings, both in the parser'))).toMatchObject({
       ok: true,
       verdict: 'merge-with-fixes',
       evidence: 'two findings, both in the parser',
@@ -211,7 +211,7 @@ describe('parseVerdict — only a real verdict is a verdict', () => {
   })
 
   it('takes the LAST pair, so a quoted instruction cannot shadow the answer', () => {
-    const text = `End with:\nVERDICT: <merge|do-not-merge>\n\n…\n\n${solSays('merge', 'checked every branch of the classifier')}`
+    const text = `End with:\nVERDICT: <merge|do-not-merge>\n\n…\n\n${astraSays('merge', 'checked every branch of the classifier')}`
     expect(parseVerdict(text)).toMatchObject({ ok: true, verdict: 'merge' })
   })
 
@@ -289,7 +289,7 @@ describe('parseVerdict — only a real verdict is a verdict', () => {
   it('demands the material RECEIPT back where one was issued', () => {
     const good = `looked closely.\n\nRECEIPT: abcd1234abcd1234\nVERDICT: merge\nEVIDENCE: read the whole diff and its tests`
     expect(parseVerdict(good, { receipt: 'abcd1234abcd1234' })).toMatchObject({ ok: true, verdict: 'merge' })
-    const missing = parseVerdict(solSays(), { receipt: 'abcd1234abcd1234' })
+    const missing = parseVerdict(astraSays(), { receipt: 'abcd1234abcd1234' })
     expect(missing.ok).toBe(false)
     expect(missing.error).toContain('no RECEIPT')
     const wrong = parseVerdict(good, { receipt: 'ffff0000ffff0000' })
@@ -297,20 +297,20 @@ describe('parseVerdict — only a real verdict is a verdict', () => {
     expect(wrong.error).toContain('does not match')
     // …and a message shaped for a receipt but asked without one still parses
     // as before: the last two lines are the pair.
-    expect(parseVerdict(solSays())).toMatchObject({ ok: true, verdict: 'merge' })
+    expect(parseVerdict(astraSays())).toMatchObject({ ok: true, verdict: 'merge' })
   })
 
   it('requires the pair to be the LAST two lines, not two matches from anywhere', () => {
     const spliced = 'VERDICT: merge\n\nSome later paragraph.\n\nEVIDENCE: read the whole diff and the tests'
     expect(parseVerdict(spliced)).toMatchObject({ ok: false })
-    expect(parseVerdict(`intro\n${solSays('merge', 'read the whole diff and the tests')}`)).toMatchObject({ ok: true })
+    expect(parseVerdict(`intro\n${astraSays('merge', 'read the whole diff and the tests')}`)).toMatchObject({ ok: true })
   })
 })
 
 describe('decideReview — the recorded model follows the RUN, never the preference', () => {
   it('maps every model either review chain can name to this runnable command', () => {
     expect(REVIEWER_ROSTER.map(({ name }) => name)).toEqual([
-      'GPT-5.6 Sol',
+      'GPT-6 Astra',
       'Fable 5.1',
       'Opus 5',
       'Opus 4.8',
@@ -335,12 +335,12 @@ describe('decideReview — the recorded model follows the RUN, never the prefere
       sha: '16793dd'.padEnd(40, '0'),
       brief: 'read the guide and brevity core at their end state',
       point: 977,
-    })).toMatch(/^node scripts\/review-sol\.mjs --reviewer fable /)
+    })).toMatch(/^node scripts\/review-astra\.mjs --reviewer fable /)
   })
 
   it('a reachable Sol reviews, and is recorded as the reviewer', () => {
     const d = decideReview(okRun())
-    expect(d).toMatchObject({ model: SOL_MODEL_NAME, fellBack: false, ready: true, verdict: 'merge' })
+    expect(d).toMatchObject({ model: ASTRA_MODEL_NAME, fellBack: false, ready: true, verdict: 'merge' })
   })
 
   it('is NOT ready without delivery evidence — a clean exit is not a carried round', () => {
@@ -496,20 +496,20 @@ describe('decideReview — the recorded model follows the RUN, never the prefere
   })
 
   it('never names Sol on a failed run, and never names Fable on a successful one', () => {
-    expect(decideReview({ outcome: classifyOutcome({ exitCode: 1, stderr: 'not logged in' }), parsed: parseVerdict(solSays()) }).model).toBe(
+    expect(decideReview({ outcome: classifyOutcome({ exitCode: 1, stderr: 'not logged in' }), parsed: parseVerdict(astraSays()) }).model).toBe(
       FALLBACK_MODEL_NAME,
     )
-    expect(decideReview(okRun(solSays('do-not-merge', 'the fallback path records a verdict nobody gave'))).model).toBe(
-      SOL_MODEL_NAME,
+    expect(decideReview(okRun(astraSays('do-not-merge', 'the fallback path records a verdict nobody gave'))).model).toBe(
+      ASTRA_MODEL_NAME,
     )
   })
 })
 
 describe('the record the command prints', () => {
-  it('is complete and ACCEPTED by the recorder after a Sol review', () => {
+  it('is complete and ACCEPTED by the recorder after an Astra review', () => {
     const d = decideReview(okRun())
     const cmd = formatRecordCommand({ sha: 'a'.repeat(40), ...d, mode: 'review', point: 624 })
-    expect(cmd).toContain('--model "GPT-5.6 Sol"')
+    expect(cmd).toContain('--model "GPT-6 Astra"')
     expect(cmd).toContain('--verdict merge')
     expect(cmd).toContain('--point 624')
     expect(
@@ -563,8 +563,8 @@ describe('the record the command prints', () => {
     // on the decision, so a caller that never asked the accounting gets the
     // unverified refusal, not a command.
     const decision = decideReview({
-      outcome: classifyOutcome({ exitCode: 0, stdout: solSays() }),
-      parsed: parseVerdict(solSays()),
+      outcome: classifyOutcome({ exitCode: 0, stdout: astraSays() }),
+      parsed: parseVerdict(astraSays()),
       // no shortfall handed over at all — the accounting was never consulted
     })
     expect(decision.fellBack).toBe(false)
@@ -579,7 +579,7 @@ describe('the record the command prints', () => {
     // The two inputs contradicting each other must resolve toward the refusal:
     // ready is the decision's word, and null alone must not outvote it.
     const decision = {
-      model: SOL_MODEL_NAME,
+      model: ASTRA_MODEL_NAME,
       fellBack: false,
       ready: false,
       verdict: 'merge',
@@ -741,7 +741,7 @@ describe('the record the command prints', () => {
   it('quotes an evidence line containing a double quote instead of breaking the command line', () => {
     const cmd = formatRecordCommand({
       sha: 'd'.repeat(40),
-      model: SOL_MODEL_NAME,
+      model: ASTRA_MODEL_NAME,
       verdict: 'merge',
       evidence: 'the "no-verdict" branch is covered',
       mode: 'review',
@@ -755,7 +755,7 @@ describe('the recorder accepts the reviewer the rule now prefers (point 624)', (
     expect(
       validateRecord({
         sha: 'e'.repeat(40),
-        model: SOL_MODEL_NAME,
+        model: ASTRA_MODEL_NAME,
         verdict: 'merge',
         evidence: 'read the diff and both tests; the fallback path is the one that matters',
         authoredBy: 'Claude Opus 5 <noreply@anthropic.com>',
@@ -768,7 +768,7 @@ describe('the recorder accepts the reviewer the rule now prefers (point 624)', (
     for (const author of ['Claude Opus 5 <noreply@anthropic.com>', 'Claude Fable 5.1', 'Claude Opus 4.8']) {
       const check = validateRecord({
         sha: 'f'.repeat(40),
-        model: SOL_MODEL_NAME,
+        model: ASTRA_MODEL_NAME,
         verdict: 'merge',
         evidence: 'a cross-vendor reviewer is never the same eyes as the author',
         authoredBy: author,
@@ -912,8 +912,8 @@ describe('the codex command line is the rule, not a preference of the caller', (
     expect(args.slice(0, 2)).toEqual(['exec', '--skip-git-repo-check'])
     expect(args).toContain('--sandbox')
     expect(args[args.indexOf('--sandbox') + 1]).toBe('read-only')
-    expect(args[args.indexOf('-m') + 1]).toBe(SOL_MODEL_ID)
-    expect(args).toContain(`model_reasoning_effort=${SOL_REASONING_EFFORT}`)
+    expect(args[args.indexOf('-m') + 1]).toBe(ASTRA_MODEL_ID)
+    expect(args).toContain(`model_reasoning_effort=${ASTRA_REASONING_EFFORT}`)
     expect(args[args.indexOf('-C') + 1]).toBe('/repo')
     expect(args.at(-1)).toBe('judge this')
   })
@@ -971,31 +971,31 @@ describe('the codex command line is the rule, not a preference of the caller', (
 // over a range Sol WROTE. That reads green at both gates and is nobody's second
 // pair of eyes.
 describe('the reversed direction — where SOL authored', () => {
-  const SOL_COMMIT = 'GPT-5.6 Sol <noreply@openai.com>'
+  const ASTRA_COMMIT = 'GPT-5.6 Sol <noreply@openai.com>'
 
   it('recognises Sol as an author in every spelling of its name', () => {
-    for (const author of [SOL_COMMIT, 'GPT-5.6 Sol', 'Sol', 'gpt-5.6-sol', ['Claude Opus 5', SOL_COMMIT]]) {
-      expect(solAuthored(author), String(author)).toBe(true)
+    for (const author of [ASTRA_COMMIT, 'GPT-5.6 Sol', 'Sol', 'gpt-6-astra', ['Claude Opus 5', ASTRA_COMMIT]]) {
+      expect(astraAuthored(author), String(author)).toBe(true)
     }
     for (const author of ['', 'Claude Opus 5 <x@y>', ['Claude Opus 5', 'Claude Fable 5.1'], 'Patrick <p@x>']) {
-      expect(solAuthored(author), String(author)).toBe(false)
+      expect(astraAuthored(author), String(author)).toBe(false)
     }
   })
 
   it('hands a Sol-authored range to Opus 5 — the model that also lands it', () => {
     expect(CLAUDE_REVIEW_CHAIN[0]).toBe('Opus 5')
-    expect(claudeReviewerFor(SOL_COMMIT)).toBe('Opus 5')
+    expect(claudeReviewerFor(ASTRA_COMMIT)).toBe('Opus 5')
     // …and skips a Claude model that authored part of the range.
-    expect(claudeReviewerFor([SOL_COMMIT, 'Claude Opus 5 <x@y>'])).toBe('Fable 5.1')
-    expect(claudeReviewerFor([SOL_COMMIT, 'Claude Opus 5 <x@y>', 'Claude Fable 5.1 <x@y>'])).toBe('Opus 4.8')
+    expect(claudeReviewerFor([ASTRA_COMMIT, 'Claude Opus 5 <x@y>'])).toBe('Fable 5.1')
+    expect(claudeReviewerFor([ASTRA_COMMIT, 'Claude Opus 5 <x@y>', 'Claude Fable 5.1 <x@y>'])).toBe('Opus 4.8')
     // Every candidate authored part of it: no reviewer, said plainly.
-    expect(claudeReviewerFor([SOL_COMMIT, 'Claude Opus 5', 'Claude Fable 5.1', 'Claude Opus 4.8'])).toBe('')
+    expect(claudeReviewerFor([ASTRA_COMMIT, 'Claude Opus 5', 'Claude Fable 5.1', 'Claude Opus 4.8'])).toBe('')
   })
 
   it('refuses to record a SUCCESSFUL Sol run over a range Sol authored', () => {
     // The dangerous case: the run worked and came back with a clean verdict.
     // Recording it would be a self-review that reads green at both gates.
-    const d = decideReview({ ...okRun(), authorModel: [SOL_COMMIT] })
+    const d = decideReview({ ...okRun(), authorModel: [ASTRA_COMMIT] })
     expect(d.kind).toBe(OUTCOME.SELF_REVIEW)
     expect(d.ready).toBe(false)
     expect(d.verdict).toBe('')
@@ -1006,14 +1006,14 @@ describe('the reversed direction — where SOL authored', () => {
 
   it('leaves the ordinary direction exactly as it was', () => {
     const d = decideReview({ ...okRun(), authorModel: ['Claude Opus 5 <x@y>'] })
-    expect(d).toMatchObject({ model: SOL_MODEL_NAME, ranBy: SOL_MODEL_NAME, verdict: 'merge', ready: true })
+    expect(d).toMatchObject({ model: ASTRA_MODEL_NAME, ranBy: ASTRA_MODEL_NAME, verdict: 'merge', ready: true })
     // Sol unavailable over Claude-authored work still falls back to Fable.
     expect(fallbackReviewerFor('Claude Opus 5 <x@y>')).toBe(FALLBACK_MODEL_NAME)
     expect(fallbackReviewerFor('Claude Fable 5.1 <x@y>')).toBe(SECOND_FALLBACK_MODEL_NAME)
   })
 
   it('reports a role swap as a role swap, not as a failure, and invents no verdict', () => {
-    const d = decideReview({ ...okRun(), authorModel: [SOL_COMMIT] })
+    const d = decideReview({ ...okRun(), authorModel: [ASTRA_COMMIT] })
     const text = formatReviewReport({ decision: d, sha: 'abcdef1234567', mode: 'review', point: '667' })
     expect(text).toMatch(/ROLE SWAP/)
     expect(text).not.toMatch(/FALLBACK/)
@@ -1028,7 +1028,7 @@ describe('the reversed direction — where SOL authored', () => {
       model: 'Opus 5',
       verdict: '<merge|merge-with-fixes|do-not-merge>',
       evidence: '<what the review actually checked>',
-      authoredBy: SOL_COMMIT,
+      authoredBy: ASTRA_COMMIT,
       mode: 'review',
     }).ok).toBe(false)
   })
@@ -1036,7 +1036,7 @@ describe('the reversed direction — where SOL authored', () => {
   it('says so when the whole chain authored the range', () => {
     const d = decideReview({
       ...okRun(),
-      authorModel: [SOL_COMMIT, 'Claude Opus 5', 'Claude Fable 5.1', 'Claude Opus 4.8'],
+      authorModel: [ASTRA_COMMIT, 'Claude Opus 5', 'Claude Fable 5.1', 'Claude Opus 4.8'],
     })
     const text = formatReviewReport({ decision: d, sha: 'abcdef1234567' })
     expect(d.model).toBe('')

@@ -23,7 +23,7 @@ import { resolve } from 'node:path'
 // allowlist's own answer (scripts/model-guard-core.mjs, which imports nothing),
 // so "who authored this" cannot drift from "who may author at all".
 import { modelNamesIn } from './model-guard-core.mjs'
-import { FABLE_MODEL, fableIsOn, isSwitchFallbackReason, mergeFallbackReason, mergerModel } from './fable-switch-core.mjs'
+import { ASTRA_MODEL, FABLE_MODEL, fableIsOn, isSwitchFallbackReason, mergeFallbackReason, mergerModel } from './fable-switch-core.mjs'
 // …and how a review split into PASSES over the file set composes back into a
 // coverage (point 714). Both the recorder and this gate ask the same module, so
 // what may be WRITTEN and what CLEARS cannot drift apart.
@@ -251,11 +251,14 @@ export function parseModel(name) {
   return {
     raw,
     // ONE FAMILY PER MODEL, WHICHEVER HALF OF THE NAME IS WRITTEN (point 667).
-    // Sol's designation carries its vendor's word in FRONT of it — "GPT-5.6
-    // Sol" — so reading the first word as the family made it a different model
-    // from the bare "Sol". Harmless while Sol only reviewed; now that it also
-    // AUTHORS, that difference is how a self-review would pass the ledger.
-    family: /\bsol\b/.test(cleaned) ? 'sol' : (cleaned.match(/[a-z]+/) ?? [''])[0],
+    // The OpenAI lane's designation carries its vendor's word in FRONT of it —
+    // "GPT-6 Astra" — so reading the first word as the family made it a different
+    // model from the bare "Astra". Harmless while that lane only reviewed; now
+    // that it also AUTHORS, that difference is how a self-review would pass the
+    // ledger. The RETIRED name is read into the same family (point 1061): the 84
+    // recorded reviews naming "GPT-5.6 Sol" must keep judging as that lane, and a
+    // version tells the two apart where a record needs them told apart.
+    family: /\b(?:astra|sol)\b/.test(cleaned) ? 'astra' : (cleaned.match(/[a-z]+/) ?? [''])[0],
     version: (cleaned.match(/\d+(?:\.\d+)?/) ?? [''])[0],
   }
 }
@@ -303,19 +306,42 @@ export function reviewIdentityProblem(reviewer, commit = {}) {
   return named.some((author) => modelVendor(author) === reviewerVendor) ? 'same-vendor' : ''
 }
 
+/** Every designation the OpenAI lane has carried: GPT-6 Astra since 05.09.2026,
+ *  GPT-5.6 Sol before it (point 1061). A guard reading PAST commits and PAST
+ *  records must recognise the retired name as the same lane, or a landed commit
+ *  stops verifying the day the lane is renamed. */
+export const OPENAI_LANE_NAMES = Object.freeze([ASTRA_MODEL, 'GPT-5.6 Sol'])
+
+/** Was this designation written by the OpenAI lane, under either of its names? */
+export function isOpenAiLane(name) {
+  return OPENAI_LANE_NAMES.some((lane) => sameModel(lane, name))
+}
+
 /** The two reasons the preferred OpenAI reader can legitimately yield to the
  *  Claude chain. They are explicit because a same-vendor review without a
  *  handover would otherwise bypass the cross-vendor preference by assertion. */
-export const REVIEW_HANDOVERS = Object.freeze(['sol-authored', 'sol-unavailable'])
-export const SOL_UNAVAILABLE_REVIEW_CHAIN = Object.freeze([FABLE_MODEL, 'Opus 5', 'Opus 4.8'])
-export const SOL_AUTHORED_REVIEW_CHAIN = Object.freeze(['Opus 5', FABLE_MODEL, 'Opus 4.8'])
+export const REVIEW_HANDOVERS = Object.freeze(['astra-authored', 'astra-unavailable'])
+
+/** The retired lane's spellings, still standing in recorded reviews (point 1061).
+ *  They are READ, never written: `normaliseHandover` maps a stored reason onto
+ *  the current one so an old record keeps its meaning. */
+const RETIRED_HANDOVERS = Object.freeze({ 'sol-authored': 'astra-authored', 'sol-unavailable': 'astra-unavailable' })
+
+/** The current spelling of a recorded handover reason. PURE. */
+export function normaliseHandover(reason) {
+  const raw = String(reason ?? '').trim()
+  return RETIRED_HANDOVERS[raw] ?? raw
+}
+export const ASTRA_UNAVAILABLE_REVIEW_CHAIN = Object.freeze([FABLE_MODEL, 'Opus 5', 'Opus 4.8'])
+export const ASTRA_AUTHORED_REVIEW_CHAIN = Object.freeze(['Opus 5', FABLE_MODEL, 'Opus 4.8'])
 
 /** The chain in force for a handover at record time. */
 export function handoverChainFor(reason, fableState) {
-  const chain = reason === 'sol-authored'
-    ? SOL_AUTHORED_REVIEW_CHAIN
-    : reason === 'sol-unavailable'
-      ? SOL_UNAVAILABLE_REVIEW_CHAIN
+  const reasonNow = normaliseHandover(reason)
+  const chain = reasonNow === 'astra-authored'
+    ? ASTRA_AUTHORED_REVIEW_CHAIN
+    : reasonNow === 'astra-unavailable'
+      ? ASTRA_UNAVAILABLE_REVIEW_CHAIN
       : []
   if (!chain.length) return Object.freeze([])
   if (fableState === undefined || fableIsOn(fableState)) return Object.freeze([...chain])
@@ -325,17 +351,17 @@ export function handoverChainFor(reason, fableState) {
 /** What is wrong with a recorded handover, or ''. The selected fallback must
  *  be the first chain member that authored no part of the range. */
 export function reviewHandoverProblem({ reviewer = '', authors = [], handover = '', chain = null } = {}) {
-  const reason = String(handover ?? '').trim()
+  const reason = normaliseHandover(handover)
   if (!REVIEW_HANDOVERS.includes(reason)) return 'missing-or-unknown-handover'
   const named = (Array.isArray(authors) ? authors : [authors]).map(String).filter(Boolean)
   if (!named.length || named.some((author) => modelVendor(author) === 'unknown')) return 'unknown-author'
   const candidates = Array.isArray(chain) && chain.length ? chain.map(String) : handoverChainFor(reason)
   if (!candidates.length) return 'empty-handover-chain'
-  if (reason === 'sol-authored' && !named.some((author) => sameModel(author, 'GPT-5.6 Sol'))) {
-    return 'sol-was-not-an-author'
+  if (reason === 'astra-authored' && !named.some((author) => isOpenAiLane(author))) {
+    return 'astra-was-not-an-author'
   }
-  if (reason === 'sol-unavailable' && named.some((author) => sameModel(author, 'GPT-5.6 Sol'))) {
-    return 'sol-authorship-requires-role-swap'
+  if (reason === 'astra-unavailable' && named.some((author) => isOpenAiLane(author))) {
+    return 'astra-authorship-requires-role-swap'
   }
   const expected = candidates.find((candidate) => !named.some((author) => sameModel(candidate, author))) ?? ''
   if (!expected) return 'every-handover-model-authored'
@@ -435,17 +461,17 @@ const commitAuthors = (commit = {}) => {
  * Files on a refusing contribution which a later contribution by the refusing
  * vendor demonstrably fixed and had read by the other vendor.
  *
- * This belongs at refusal evaluation, not in `review-sol`'s authorship cut.
- * Changing the planner per contribution could OFFER a Sol pass for the old
+ * This belongs at refusal evaluation, not in `review-astra`'s authorship cut.
+ * Changing the planner per contribution could OFFER an Astra pass for the old
  * Claude contribution, but it could not make the gate accept the Claude review
- * of Sol's answering commit; the command and the decision would still disagree.
+ * of Astra's answering commit; the command and the decision would still disagree.
  * Here both file-scoped and legacy refusal paths consume the same ledger fact.
  *
  * The exception is a CHAIN, never a waiver. Each link is machine-checkable:
  * the answering commit is later, is authored wholly by the vendor that made the
  * refusal, touches the refused file, and has an exact-sha code review whose
  * measured ancestry contains the refusal. That review is judged against the
- * ANSWER'S authors, so the original author may clear Sol's fix without being
+ * ANSWER'S authors, so the original author may clear Astra's fix without being
  * allowed to review their own original contribution.
  */
 const filesClearedByRefusingVendor = (refusal, { commits = [], records = [], files = [] } = {}) => {
@@ -565,12 +591,12 @@ const openRefusalsIn = (records = [], chain = {}) => {
 }
 
 /** The family words of a model this project would recognise. */
-const MODEL_FAMILY = 'sol|gpt|fable|opus|claude|sonnet|haiku|gemini|grok|llama|mistral|qwen|deepseek'
+const MODEL_FAMILY = 'astra|sol|gpt|fable|opus|claude|sonnet|haiku|gemini|grok|llama|mistral|qwen|deepseek'
 
 /** A model designation this project would recognise, for the fallback below. */
 const MODEL_NAMED = new RegExp(`\\b(${MODEL_FAMILY})\\b`, 'gi')
 
-/** …with its version where one is given: "Opus 4.8", "GPT-5.6", plain "Sol". */
+/** …with its version where one is given: "Opus 4.8", "GPT-5.6", plain "Astra". */
 const MODEL_WITH_VERSION = new RegExp(`\\b(?:${MODEL_FAMILY})(?:[\\s-]*\\d+(?:\\.\\d+)?)?`, 'gi')
 
 /**
@@ -602,8 +628,8 @@ const NEGATED_ABSENCE = /\bnot\s+(unavailable|unreachable|inaccessible|offline|a
  * A designation carrying a VERSION is judged by sameModel, so an Opus 5 merger
  * may name Opus 4.8 as the model that was missing (four-eyes review, sixth
  * round: the family-word test refused that legitimate case). A bare family word
- * falls back to the words of the merger's own name, so "Sol was unreachable"
- * cannot be written by GPT-5.6 Sol about itself.
+ * falls back to the words of the merger's own name, so "Astra was unreachable"
+ * cannot be written by GPT-6 Astra about itself.
  */
 export function namesOtherModel(text, who) {
   const mine = new Set([...String(who ?? '').matchAll(MODEL_NAMED)].map((m) => m[1].toLowerCase()))
@@ -767,8 +793,8 @@ export function validateMerger({ mergedBy, authors = [], fallback = '' } = {}) {
     const bound = clauses.some(
       (c) => UNAVAILABLE.test(c) && !NEGATED_ABSENCE.test(c) && namesOtherModel(c, who),
     )
-    if (switchFallback && !sameModel(who, 'GPT-5.6 Sol')) {
-      errors.push(`the Fable-switch fallback is only the recorded reason GPT-5.6 Sol may merge its own blind half`)
+    if (switchFallback && !isOpenAiLane(who)) {
+      errors.push(`the Fable-switch fallback is only the recorded reason the OpenAI lane may merge its own blind half`)
     } else if (switchFallback && !conflict) {
       // The general no-fallback-needed error above remains the one explanation.
     } else if (switchFallback) {
@@ -909,8 +935,8 @@ export function modelFromTrailers(field) {
  * merge its own list (four-eyes review of point 634).
  *
  * IT ASKS THE AUTHOR ALLOWLIST WHAT A MODEL TRAILER LOOKS LIKE (point 667), and
- * no longer "does it say Claude". Since Sol authors too, a Claude-only reading
- * would report a Sol-authored commit as having no author at all — and every
+ * no longer "does it say Claude". Since the OpenAI lane authors too, a Claude-only
+ * reading would report an Astra-authored commit as having no author at all — and every
  * self-review refusal downstream is built on knowing who wrote it. Human
  * co-authors still name no model and are still dropped.
  */
@@ -1298,7 +1324,7 @@ export function validateMode({ mode, framing } = {}) {
  * limit, and the recorder does not know the range. A record's range is fixed by
  * the GATE's baseline, not by anything the record carries, so "does this range
  * fit one round" is not a question this function can even ask — while the
- * offering side, which does know, already refuses (review-sol.mjs). What IS
+ * offering side, which does know, already refuses (review-astra.mjs). What IS
  * checkable travels with the pass: the files it read, which the gate holds
  * against the commit it would clear. The check the recorder cannot make lives
  * where the range IS known (escalation round of the same review): the GATE
@@ -1414,9 +1440,9 @@ export function validateRecord({
   }
   if (!String(model ?? '').trim()) {
     // The example NAMES the reviewer the rule prefers (point 624): reviews go to
-    // GPT-5.6 Sol first and to Fable 5 when Sol is unavailable, and nothing here
+    // GPT-6 Astra first and to Fable 5 when Astra is unavailable, and nothing here
     // restricts the value — a reviewer this recorder refused could not be used.
-    errors.push(`--model <name>: which model performed the review (e.g. "GPT-5.6 Sol", "${FABLE_MODEL}")`)
+    errors.push(`--model <name>: which model performed the review (e.g. "GPT-6 Astra", "${FABLE_MODEL}")`)
   }
   if (!VERDICTS.includes(String(verdict ?? '').trim())) {
     errors.push(`--verdict <v>: one of ${VERDICTS.join(' | ')}`)
@@ -1472,7 +1498,11 @@ export function validateRecord({
       // means an EARLIER author of the same file inside the same range is not
       // seen by the independence check. The file's own `sourceCommits` carries
       // that history for anything that needs it.
-      const deferredPassHandover = String(pass ?? '').trim() && REVIEW_HANDOVERS.includes(String(handover ?? '').trim())
+      // READ THROUGH THE RETIRED SPELLING (point 1061): a record written while
+      // the lane was Sol carries `sol-authored`, and a raw comparison here would
+      // stop deferring the day the lane was renamed — turning 84 landed records
+      // into same-vendor refusals.
+      const deferredPassHandover = String(pass ?? '').trim() && REVIEW_HANDOVERS.includes(normaliseHandover(handover))
       const handoverProblem = deferredPassHandover
         ? ''
         : reviewHandoverProblem({
@@ -1704,7 +1734,7 @@ function pendingEndStateFiles(pendingCommits, endStateFiles) {
 
 export const modelVendor = (model) => {
   const value = String(model ?? '').toLowerCase()
-  const openai = /\bsol\b|\bgpt[- ]?5(?:\.|\b)/.test(value) || /openai\.com/.test(value)
+  const openai = /\bastra\b|\bsol\b|\bgpt[- ]?\d/.test(value) || /openai\.com/.test(value)
   const anthropic = /\b(?:claude|opus|fable|sonnet|haiku)\b/.test(value) || /anthropic\.com/.test(value)
   // CONTRADICTORY MARKERS ARE NOBODY, not first-match-wins (re-review round 5):
   // "Claude Opus 5 GPT-5" reached the OpenAI branch and cleared as
@@ -2399,7 +2429,7 @@ export function formatMechanismReviewVerdict(
     )
   }
   if (String(contributionPlanText ?? '').trim()) {
-    lines.push('', 'RUNNABLE CONTRIBUTION PLAN (the same planner review-sol executes):', contributionPlanText.trim())
+    lines.push('', 'RUNNABLE CONTRIBUTION PLAN (the same planner review-astra executes):', contributionPlanText.trim())
   }
   return lines.join('\n')
 }

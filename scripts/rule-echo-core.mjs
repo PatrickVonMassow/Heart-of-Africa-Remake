@@ -2,7 +2,7 @@
 //
 // WHY IT EXISTS (user 17.08.2026, measured the same evening): the model policy
 // moved the hard cases out of the Fable lane, and the sentence describing that
-// rule stood in NINE places — CLAUDE.md §6, docs/sol-routing.md, four script
+// rule stood in NINE places — CLAUDE.md §6, docs/astra-routing.md, four script
 // headers, the resume hook's two prompt texts and three memory entries. Changing
 // the rule left eight of them asserting the old one, and one of those eight is
 // read into EVERY session's context at start. This is not a one-off: the same
@@ -67,14 +67,14 @@ export const RULE_REGISTRY = Object.freeze([
     source: Object.freeze({ file: 'CLAUDE.md', startsWith: '- **Model policy' }),
     echoes: Object.freeze([
       Object.freeze({ file: 'docs/maximum-qa.md' }),
-      Object.freeze({ file: 'docs/sol-routing.md' }),
+      Object.freeze({ file: 'docs/astra-routing.md' }),
       Object.freeze({ file: 'scripts/author-routing-core.mjs' }),
-      Object.freeze({ file: 'scripts/author-sol-core.mjs' }),
+      Object.freeze({ file: 'scripts/author-astra-core.mjs' }),
       Object.freeze({ file: 'scripts/batch-autostart-core.mjs' }),
       Object.freeze({ file: 'scripts/batch-resume-hook.mjs' }),
       Object.freeze({ file: 'scripts/model-guard-core.mjs' }),
-      Object.freeze({ file: 'scripts/review-sol-core.mjs' }),
-      Object.freeze({ file: 'scripts/sol-share-core.mjs' }),
+      Object.freeze({ file: 'scripts/review-astra-core.mjs' }),
+      Object.freeze({ file: 'scripts/astra-share-core.mjs' }),
       Object.freeze({ file: 'memory/hard-cases-go-to-sol.md', optional: true }),
       Object.freeze({ file: 'memory/fable-sparingly.md', optional: true }),
       Object.freeze({ file: 'memory/serving-model-watch.md', optional: true }),

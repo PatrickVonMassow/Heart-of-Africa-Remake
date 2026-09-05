@@ -52,9 +52,9 @@ export const ITEM_LABELS = {
 
 const IMAGE_PATH = /\.(?:png|jpe?g|webp|gif|avif|bmp|tiff?)\b/i
 const WHOLE_SPEC_PATH = /(?:^|[\\/\s"'=:])(?:TASKS\.md|design\.md|docs[\\/]tasks-archive\.md)\b/i
-// `review-sol.mjs` is the only mechanism that creates a cross-vendor review in
+// `review-astra.mjs` is the only mechanism that creates a cross-vendor review in
 // this corpus. Match its commission, not incidental prose such as "a reviewer will
-// read every line" in an authoring brief. `ask-sol.mjs` has a different opening and
+// read every line" in an authoring brief. `ask-astra.mjs` has a different opening and
 // deliberately remains delegated agent work.
 const REVIEW_COMMISSION = /^You are the SECOND pair of eyes on a change in this repository, working under the\n(?:four-eyes rule|four[- ]eyes rule)/i
 const REPORT_PATH = /(?:author|agent|sol|fable|opus|review)[^\s/\\]*\.log\b/i
@@ -152,7 +152,7 @@ function classifyRole({ scope = 'top-level', prompt = '', provider = 'anthropic'
   // Claude subagents are authoring/delegation traffic. Their real hand-over and
   // escalation prompts contain review vocabulary as process guidance, which is not
   // evidence that the transcript itself is a review. Positive review attribution is
-  // restricted to the OpenAI commission emitted by review-sol.mjs.
+  // restricted to the OpenAI commission emitted by review-astra.mjs.
   if (provider === 'openai' && REVIEW_COMMISSION.test(opening)) return 'review'
   return 'agent'
 }

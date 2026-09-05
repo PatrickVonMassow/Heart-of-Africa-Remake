@@ -7,7 +7,9 @@
 export const SWITCH_COMMAND = 'node scripts/fable-switch.mjs'
 export const STATE_FILE_NAME = 'fable-switch.json'
 export const FABLE_MODEL = 'Fable 5.1'
-export const SOL_MODEL = 'GPT-5.6 Sol'
+// The OpenAI lane, stated ONCE here beside the other model identities and imported
+// everywhere else (point 1061). GPT-5.6 Sol held this lane until 05.09.2026.
+export const ASTRA_MODEL = 'GPT-6 Astra'
 export const CLAUDE_MODEL = 'Claude Opus 5'
 export const OPUS_MODEL = 'Opus 5'
 export const OPUS_FALLBACK_MODEL = 'Opus 4.8'
@@ -16,6 +18,7 @@ export const OPUS_MODEL_ID = 'claude-opus-5[1m]'
 // recorded here cannot go red on its own, so nothing but this line notices a new release.
 // Needs Claude Code >= 2.1.251; older CLIs answer 400 "does not support this model".
 export const FABLE_MODEL_ID = 'claude-fable-5-1'
+export const ASTRA_MODEL_ID = 'gpt-6-astra'
 export const OPUS_FALLBACK_MODEL_ID = 'claude-opus-4-8[1m]'
 
 /** Read Claude Code's single-result JSON and identify the TOP-LEVEL answer
@@ -185,12 +188,12 @@ function authorList(authors) {
 function sameModelName(a, b) {
   const parse = (value) => {
     const text = String(value ?? '').toLowerCase()
-    const family = text.match(/\b(sol|gpt|fable|opus|claude|sonnet|haiku)\b/g) ?? []
+    const family = text.match(/\b(astra|sol|gpt|fable|opus|claude|sonnet|haiku)\b/g) ?? []
     if (!family.length) return null
-    // "GPT-5.6 Sol" and "Claude Opus 5" both name a vendor word and a model word; the
+    // "GPT-6 Astra" and "Claude Opus 5" both name a vendor word and a model word; the
     // LAST recognised word is the model, which is what the roster entries are keyed on.
-    // A name carrying MODEL WORDS OF BOTH VENDORS — "Fable / GPT-5.6 Sol" — is not
-    // resolved to either: first-match made it Sol, and mergerModel then offered
+    // A name carrying MODEL WORDS OF BOTH VENDORS — "Fable / GPT-6 Astra" — is not
+    // resolved to either: first-match made it the OpenAI lane, and mergerModel then offered
     // Fable as untainted although the marker names Fable (re-review round 6). Such
     // a name matches EVERY model it actually MENTIONS — and only those (round 7:
     // a wildcard also disqualified models the name never named).
@@ -199,17 +202,19 @@ function sameModelName(a, b) {
     // each with its own version. Reducing a compound to one key let a forged
     // author marker leave a NAMED co-model looking untainted, and erasing the
     // versions disqualified models the name never named (re-review rounds 6-9).
-    const modelWords = family.map((w) => (w === 'gpt' ? 'sol' : w)).filter((w) => ['sol', 'fable', 'opus', 'sonnet', 'haiku'].includes(w))
+    // The RETIRED name folds into the same key (point 1061): a recorded half written by
+    // "GPT-5.6 Sol" is still the OpenAI lane's half, and its version keeps it distinct.
+    const modelWords = family.map((w) => (w === 'gpt' || w === 'sol' ? 'astra' : w)).filter((w) => ['astra', 'fable', 'opus', 'sonnet', 'haiku'].includes(w))
     const keys = [...new Set(modelWords)]
     const versionsOf = (key) => {
-      const words = key === 'sol' ? ['sol', 'gpt'] : [key]
+      const words = key === 'astra' ? ['astra', 'sol', 'gpt'] : [key]
       const found = []
       for (const w of words) {
         for (const m of text.matchAll(new RegExp(`\\b${w}[\\s-]*(\\d+(?:\\.\\d+)?)`, 'g'))) found.push(m[1])
       }
       return [...new Set(found)]
     }
-    // A name repeating ONE family with SEVERAL versions — "GPT-6 Sol / GPT-5.6
+    // A name repeating ONE family with SEVERAL versions — "GPT-6 Astra / GPT-5.6
     // Sol" — mentions each of those models; collapsing to the first version let
     // the other one pass as untainted (re-review round 10).
     if (keys.length === 1) {
@@ -221,13 +226,13 @@ function sameModelName(a, b) {
     if (keys.length > 1) {
       return { entries: keys.map((key) => ({ key, version: versionsOf(key)[0] ?? '' })) }
     }
-    const key = family.includes('sol') ? 'sol' : family.includes('fable') ? 'fable' : family[family.length - 1]
+    const key = family.includes('astra') || family.includes('sol') ? 'astra' : family.includes('fable') ? 'fable' : family[family.length - 1]
     // THE VERSION IS NOT ALWAYS ATTACHED TO THE KEY WORD (four-eyes finding 1 on this
-    // change): "GPT-5.6 Sol" carries its version on the VENDOR word, so keying the
-    // search on "sol" found no digits and made every Sol version compare equal —
-    // "GPT-5.6 Sol" and "GPT-6 Sol" were one model. The version is therefore the first
+    // change): "GPT-6 Astra" carries its version on the VENDOR word, so keying the
+    // search on the model word found no digits and made every version compare equal —
+    // "GPT-5.6 Sol" and "GPT-6 Astra" were one model. The version is therefore the first
     // one any recognised word carries, wherever in the name it sits.
-    const version = [...text.matchAll(/\b(?:sol|gpt|fable|opus|claude|sonnet|haiku)[\s-]*(\d+(?:\.\d+)?)/g)]
+    const version = [...text.matchAll(/\b(?:astra|sol|gpt|fable|opus|claude|sonnet|haiku)[\s-]*(\d+(?:\.\d+)?)/g)]
       .map((m) => m[1])
       .find(Boolean)
     return { key, version: version ?? '' }
@@ -246,19 +251,19 @@ function sameModelName(a, b) {
 export function mergerModel(value, authors = []) {
   const on = fableIsOn(value)
   // THE RULE IS "THE MODEL THAT WROTE NEITHER HALF" (CLAUDE.md §6), and for a long
-  // time this function could not express it: it answered Fable-or-Sol, so with Fable
-  // switched off the only merger it would ever name was Sol. Measured on the 13.08.2026
-  // stage recovered under docs/four-eyes/: half A is Fable's and half B is Sol's, and
-  // this function insisted that Sol — an author — owned the merge, while Claude, which
+  // time this function could not express it: it answered Fable-or-OpenAI, so with Fable
+  // switched off the only merger it would ever name was the OpenAI lane. Measured on the
+  // 13.08.2026 stage recovered under docs/four-eyes/: half A is Fable's and half B is Sol's,
+  // and this function insisted that Sol — an author — owned the merge, while Claude, which
   // wrote neither half, was refused. That inverts the one rule the merge step exists to
   // enforce. The roster is therefore consulted against the actual authors, and the
   // switch keeps its authority over exactly one thing: whether Fable may be spent.
-  const roster = on ? [FABLE_MODEL, SOL_MODEL, CLAUDE_MODEL] : [SOL_MODEL, CLAUDE_MODEL]
+  const roster = on ? [FABLE_MODEL, ASTRA_MODEL, CLAUDE_MODEL] : [ASTRA_MODEL, CLAUDE_MODEL]
   const wrote = (model) => authorList(authors).some((author) => sameModelName(model, author))
   const untainted = roster.find((model) => !wrote(model))
   // None left means only two models existed for three roles — the caller then owes the
   // recorded two-model fallback, so the previous answer is kept for it to judge.
-  return untainted ?? (on ? FABLE_MODEL : SOL_MODEL)
+  return untainted ?? (on ? FABLE_MODEL : ASTRA_MODEL)
 }
 
 /** Additional framing owed when the merging model merges its own blind half. */
@@ -286,7 +291,7 @@ export function mergePromptFraming(value, authors = []) {
   )
 }
 
-/** The canonical, ledger-safe reason Sol may merge its own blind half while OFF. */
+/** The canonical, ledger-safe reason Astra may merge its own blind half while OFF. */
 export function mergeFallbackReason(value) {
   const state = requireState(value)
   if (state.state !== 'off') return ''

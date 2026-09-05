@@ -761,7 +761,7 @@ describe('measureReviewGap', () => {
       blocked: true,
       commits: [{ sha: 'c'.repeat(40) }],
       loadPlanner: () => {
-        throw new Error('review-sol.mjs is broken')
+        throw new Error('review-astra.mjs is broken')
       },
     })
     expect(gap).toMatchObject({ gap: false, reason: 'unmeasured' })

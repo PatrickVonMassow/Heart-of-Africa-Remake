@@ -869,13 +869,13 @@ describe('the mode round-trips into the ledger', () => {
       // THE HALVES ARE COMMITTED ARTEFACTS, because that is the only form whose
       // authorship the recorder can prove (cross-vendor review of point 889).
       const halfA = { model: 'Opus 5', entries: [{ id: 'A1', file: 'x.ts', defect: 'the first defect' }] }
-      const halfB = { model: 'GPT-5.6 Sol', entries: [{ id: 'B1', file: 'x.ts', defect: 'the first defect said differently' }] }
+      const halfB = { model: 'GPT-6 Astra', entries: [{ id: 'B1', file: 'x.ts', defect: 'the first defect said differently' }] }
       mkdirSync(join(repo, 'docs'), { recursive: true })
       writeFileSync(join(repo, 'docs', 'A.json'), JSON.stringify(halfA))
       writeFileSync(join(repo, 'docs', 'B.json'), JSON.stringify(halfB))
       writeFileSync(
         join(repo, 'docs', 'U.json'),
-        JSON.stringify({ mergedBy: 'GPT-5.6 Sol', entries: [{ id: 'U1', from: ['A1', 'B1'], defect: 'the first defect' }] }),
+        JSON.stringify({ mergedBy: 'GPT-6 Astra', entries: [{ id: 'U1', from: ['A1', 'B1'], defect: 'the first defect' }] }),
       )
       git('add', '-A')
       git('commit', '-q', '-m', 'File the two blind halves and their union\n\nCo-Authored-By: Claude Opus 5 <noreply@anthropic.com>')
@@ -892,7 +892,7 @@ describe('the mode round-trips into the ledger', () => {
           [
             join(repo, 'scripts', 'mechanism-review.mjs'),
             '--record', sha2,
-            '--model', 'GPT-5.6 Sol',
+            '--model', 'GPT-6 Astra',
             '--verdict', 'merge',
             '--evidence', 'read both lists and the union that folded them',
             '--mode', 'blind-parallel',
@@ -906,14 +906,14 @@ describe('the mode round-trips into the ledger', () => {
       const ok = record(union)
       expect(ok.status, `${ok.stdout}${ok.stderr}`).toBe(0)
       const row = JSON.parse(readFileSync(join(repo, '.claude', 'mechanism-reviews.jsonl'), 'utf8').trim())
-      expect(row).toMatchObject({ sha: sha2, mergedBy: 'GPT-5.6 Sol', accountingSource: 'computed', mode: 'blind-parallel' })
+      expect(row).toMatchObject({ sha: sha2, mergedBy: 'GPT-6 Astra', accountingSource: 'computed', mode: 'blind-parallel' })
       // The whole switch-generated sentence, not merely the status command: the
       // false "two models existed" wording would still have contained it
       // (re-review round 3).
       expect(row.mergeFallback).toMatch(/^Fable 5.1 is switched off by the recorded Fable switch \(node scripts\/fable-switch\.mjs --status\): /)
       expect(row.accounting).toMatch(/1 A \+ 1 B entries → 1 union entries .*every input entry accounted for/)
       // The row says which blobs it read, so a later reader re-derives the proof.
-      expect(row.halfAuthors).toEqual(['Opus 5', 'GPT-5.6 Sol'])
+      expect(row.halfAuthors).toEqual(['Opus 5', 'GPT-6 Astra'])
       // Stored repo-relative, so the ledger row is valid from every checkout.
       expect(row.halfSources).toEqual(['docs/A.json', 'docs/B.json'])
       expect(row.halfBlobs).toEqual([
@@ -948,7 +948,7 @@ describe('the mode round-trips into the ledger', () => {
       writeFileSync(
         join(repo, 'docs', 'B.json'),
         JSON.stringify({
-          model: 'GPT-5.6 Sol',
+          model: 'GPT-6 Astra',
           entries: [{ id: 'B1', file: 'x.ts', defect: 'the first defect, but reworded after the fold' }],
         }),
       )

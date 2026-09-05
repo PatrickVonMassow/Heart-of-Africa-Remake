@@ -1,29 +1,38 @@
 // Pure decision core of the CROSS-VENDOR four-eyes review (work-order point 624).
 //
-// rule:model-policy@d0066fb3
+// rule:model-policy@4f05875b
 // WHY IT EXISTS: our Claude reviewers are one house, with similar
 // training, therefore CORRELATED blind spots, which is exactly what the
 // four-eyes rule is bought against (CLAUDE.md §6). A model from a different
 // vendor is the strongest decorrelation available, so REVIEWS go to OpenAI's
-// GPT-5.6 Sol at reasoning effort HIGH first and to the first eligible Claude
-// reviewer when Sol cannot be reached. Since point 667 Sol also AUTHORS under
-// the role swap (scripts/author-sol.mjs, admitted in the model-guard allowlist);
+// GPT-6 Astra at reasoning effort HIGH first and to the first eligible Claude
+// reviewer when Astra cannot be reached. Since point 667 Astra also AUTHORS under
+// the role swap (scripts/author-astra.mjs, admitted in the model-guard allowlist);
 // what this file protects is the other half of that swap — no model reviews its
-// own work (`solAuthored`, the self-review refusal), whoever wrote the commit.
+// own work (`astraAuthored`, the self-review refusal), whoever wrote the commit.
 //
 // THE FAILURE MODE THIS FILE IS SHAPED AROUND: a review nobody ran must never be
 // recorded as done. That is worse than having no second pair of eyes, because
 // the mechanism/criticality gates then read GREEN on a commit nothing judged.
-// So every path out of a failed Sol run yields an eligible Claude reviewer and NO
+// So every path out of a failed Astra run yields an eligible Claude reviewer and NO
 // verdict — the verdict is the reviewer's to give, never the runner's to
 // invent — and the model that is RECORDED is always the one that actually ran,
 // never the one that was preferred.
 //
 // Side-effect free: the process spawn, the temp files and the printing belong to
-// scripts/review-sol.mjs. Pinned by review-sol-core.test.mjs.
+// scripts/review-astra.mjs. Pinned by review-astra-core.test.mjs.
 
-import { BLIND_REVIEWER, blindReviewerAdmission, modelFromTrailers, sameModel, VERDICTS } from './mechanism-review-core.mjs'
 import {
+  BLIND_REVIEWER,
+  blindReviewerAdmission,
+  isOpenAiLane,
+  modelFromTrailers,
+  sameModel,
+  VERDICTS,
+} from './mechanism-review-core.mjs'
+import {
+  ASTRA_MODEL,
+  ASTRA_MODEL_ID,
   FABLE_MODEL,
   FABLE_MODEL_ID,
   OPUS_FALLBACK_MODEL_ID,
@@ -51,14 +60,17 @@ export { BLIND_REVIEWER, blindReviewerAdmission }
 // caller of the review command already looks for them.
 export { MATERIAL_BUDGET_CHARS, PATCH_SHARE }
 
-/** The model id `codex exec -m` is given, and the name a record calls it by. */
-export const SOL_MODEL_ID = 'gpt-5.6-sol'
-export const SOL_MODEL_NAME = 'GPT-5.6 Sol'
+/** The model id `codex exec -m` is given, and the name a record calls it by.
+ *  Both are stated ONCE, in fable-switch-core.mjs beside the other model
+ *  identities, and re-exported here because this is where every caller of the
+ *  review command already looks for them (point 1061). */
+export { ASTRA_MODEL_ID }
+export const ASTRA_MODEL_NAME = ASTRA_MODEL
 
 /** The reasoning effort the user's decision fixes for reviews (10.08.2026). */
-export const SOL_REASONING_EFFORT = 'high'
+export const ASTRA_REASONING_EFFORT = 'high'
 
-/** The reviewers that take over whenever Sol did not deliver a verdict, in
+/** The reviewers that take over whenever Astra did not deliver a verdict, in
  *  order. The ones behind Fable exist because Fable and Opus also AUTHOR here,
  *  and no model may review its own work (CLAUDE.md §6). */
 export const FALLBACK_MODEL_NAME = FABLE_MODEL
@@ -66,12 +78,12 @@ export const SECOND_FALLBACK_MODEL_NAME = 'Opus 5'
 export const FALLBACK_CHAIN = Object.freeze([FALLBACK_MODEL_NAME, SECOND_FALLBACK_MODEL_NAME, 'Opus 4.8'])
 
 /**
- * …and the chain for the OTHER direction (point 667): who reviews what SOL
+ * …and the chain for the OTHER direction (point 667): who reviews what ASTRA
  * AUTHORED.
  *
- * A separate order, deliberately. The chain above answers "Sol is unreachable,
+ * A separate order, deliberately. The chain above answers "Astra is unreachable,
  * who else can look at this?" and starts at Fable, the second-opinion model.
- * This one answers "Sol wrote it, who takes it from here?" — and under the role
+ * This one answers "Astra wrote it, who takes it from here?" — and under the role
  * swap that reviewer ALSO runs the suites, judges the picture and lands the
  * point, which is the main authoring session's job. So it starts at Opus 5.
  */
@@ -81,7 +93,7 @@ export const CLAUDE_REVIEW_CHAIN = Object.freeze(['Opus 5', FABLE_MODEL, 'Opus 4
  *  to start it. Keeping the executable roster beside the decision chains makes
  *  an assignment incomplete unless it is runnable. */
 export const REVIEWER_ROSTER = Object.freeze([
-  Object.freeze({ key: 'sol', name: SOL_MODEL_NAME, id: SOL_MODEL_ID, runtime: 'codex', effort: SOL_REASONING_EFFORT }),
+  Object.freeze({ key: 'astra', name: ASTRA_MODEL_NAME, id: ASTRA_MODEL_ID, runtime: 'codex', effort: ASTRA_REASONING_EFFORT }),
   Object.freeze({ key: 'fable', name: FALLBACK_MODEL_NAME, id: FABLE_MODEL_ID, runtime: 'claude', effort: 'high' }),
   Object.freeze({ key: 'opus', name: SECOND_FALLBACK_MODEL_NAME, id: OPUS_MODEL_ID, runtime: 'claude', effort: 'high' }),
   Object.freeze({ key: 'opus48', name: 'Opus 4.8', id: OPUS_FALLBACK_MODEL_ID, runtime: 'claude', effort: 'high' }),
@@ -104,7 +116,7 @@ export const CODEX_BIN = 'codex'
 export const REVIEW_TIMEOUT_MS = 15 * 60_000
 
 /**
- * How a Sol run ended. `ok` is the ONLY kind that may be recorded as Sol's; each
+ * How a Astra run ended. `ok` is the ONLY kind that may be recorded as Astra's; each
  * other kind is a cause the command names in one line before handing the review
  * to the first eligible Claude reviewer.
  */
@@ -120,10 +132,10 @@ export const OUTCOME = Object.freeze({
   NO_VERDICT: 'no-verdict',
   // NOT a failure: the operator has moved the load away from OpenAI (point 654). It ends
   // in the same place every failure does — the review handed to a Claude reviewer with NO
-  // verdict — because that is the honest state either way: Sol has not seen this change.
+  // verdict — because that is the honest state either way: Astra has not seen this change.
   SWITCHED_OFF: 'switched-off',
-  // Also not a failure, and not even a fallback: Sol AUTHORED this range, so the review
-  // was never Sol's to give (point 667). It ends in the same place for the same reason.
+  // Also not a failure, and not even a fallback: Astra AUTHORED this range, so the review
+  // was never Astra's to give (point 667). It ends in the same place for the same reason.
   SELF_REVIEW: 'self-review',
 })
 
@@ -131,14 +143,14 @@ export const OUTCOME = Object.freeze({
 const CAUSE_TEXT = Object.freeze({
   [OUTCOME.NOT_INSTALLED]: `\`${CODEX_BIN}\` is not on PATH in this container`,
   [OUTCOME.UNREACHABLE]: 'the OpenAI host could not be reached (network or firewall)',
-  [OUTCOME.LOGIN_EXPIRED]: `the ChatGPT login is gone or expired (see \`review-sol.mjs --restore-login\`)`,
+  [OUTCOME.LOGIN_EXPIRED]: `the ChatGPT login is gone or expired (see \`review-astra.mjs --restore-login\`)`,
   [OUTCOME.ALLOWANCE_EXHAUSTED]: 'the ChatGPT allowance for this account is exhausted',
-  [OUTCOME.MODEL_REFUSED]: `the server refused the model id "${SOL_MODEL_ID}"`,
+  [OUTCOME.MODEL_REFUSED]: `the server refused the model id "${ASTRA_MODEL_ID}"`,
   [OUTCOME.TIMEOUT]: 'the review did not finish inside its time budget',
   [OUTCOME.ERROR_EXIT]: 'codex exited with an error',
   [OUTCOME.NO_VERDICT]: 'the run produced no parseable verdict',
-  [OUTCOME.SWITCHED_OFF]: 'the share switch is at `claude-only` (node scripts/sol-share.mjs --status)',
-  [OUTCOME.SELF_REVIEW]: `${SOL_MODEL_NAME} AUTHORED part of this range — no model reviews its own work`,
+  [OUTCOME.SWITCHED_OFF]: 'the share switch is at `claude-only` (node scripts/astra-share.mjs --status)',
+  [OUTCOME.SELF_REVIEW]: `${ASTRA_MODEL_NAME} AUTHORED part of this range — no model reviews its own work`,
 })
 
 /** The cause sentence of one outcome kind — for the callers that skip classifyOutcome. */
@@ -225,7 +237,7 @@ export function classifyOutcome({ spawnError = null, exitCode = 0, stdout = '', 
  * The probe that proves the `-m` flag is honoured at all: an unknown id must be
  * rejected rather than silently substituted, because a green review against a
  * substituted model would be worthless — it would be a review by whatever the
- * account defaults to, recorded under Sol's name.
+ * account defaults to, recorded under Astra's name.
  */
 export function isUnknownModelRefusal(text) {
   return FAILURE_PATTERNS[0][1].test(String(text ?? ''))
@@ -233,8 +245,8 @@ export function isUnknownModelRefusal(text) {
 
 /** The `codex exec` command line for one review. Read-only sandbox, no writes. */
 export function codexArgs({
-  modelId = SOL_MODEL_ID,
-  effort = SOL_REASONING_EFFORT,
+  modelId = ASTRA_MODEL_ID,
+  effort = ASTRA_REASONING_EFFORT,
   cwd = '',
   outputFile = '',
   prompt = '',
@@ -258,7 +270,7 @@ export function codexArgs({
 }
 
 /**
- * The prompt Sol is given.
+ * The prompt Astra is given.
  *
  * It states the ARTEFACT first and the author's rationale never: CLAUDE.md §6
  * requires a convergent reviewer to read the diff before any justification, so
@@ -355,7 +367,7 @@ export function buildReviewPrompt({ sha = '', brief = '', mode = 'review', pass 
  *  label's colon, around an entry's pipes, at line end — because that padding
  *  belongs to the `LABEL: value` / `id | file | text` format the prompts
  *  demand; the bytes INSIDE a field travel exactly. A whole-message quote
- *  (ask-sol's explain) is not a labelled field and trims NOTHING. */
+ *  (ask-astra's explain) is not a labelled field and trims NOTHING. */
 /** The SHAPE-AWARE decoration strip every ruling reads (final-round pass 1,
  *  third instance): deleting `[*_#>` + backtick] characters outright let a
  *  FABRICATED label match — `D_ONE:` became `DONE:` — so label recognition
@@ -499,19 +511,19 @@ export function parseVerdict(text, { receipt = '' } = {}) {
  * WHO REVIEWED, AND WHAT MAY BE RECORDED.
  *
  * The one rule this function exists for: the recorded model NAMES THE RUN THAT
- * ACTUALLY HAPPENED, never the preference. Sol is preferred, so a successful Sol
- * run records Sol — but every failure records the selected Claude reviewer, and does
+ * ACTUALLY HAPPENED, never the preference. Astra is preferred, so a successful Astra
+ * run records Astra — but every failure records the selected Claude reviewer, and does
  * so with an EMPTY verdict, because at that moment no second pair of eyes has
  * seen the change yet. `ready` says whether a record may be written at all.
  */
 export function decideReview({ outcome = {}, parsed = {}, authorModel = '', shortfall, fableState } = {}) {
-  // THE REVERSED DIRECTION IS DECIDED BEFORE ANYTHING ELSE (point 667). Sol now
+  // THE REVERSED DIRECTION IS DECIDED BEFORE ANYTHING ELSE (point 667). Astra now
   // AUTHORS as well as reviews, and a model may not review its own work — so a
-  // Sol run over a Sol-authored range is not a review whatever it answered, and
+  // Astra run over a Astra-authored range is not a review whatever it answered, and
   // recording it would put a self-review in front of a gate that then reads
   // green. The runner asks the same question before it spends a codex call; this
   // is the backstop for every caller that does not.
-  if (solAuthored(authorModel)) {
+  if (astraAuthored(authorModel)) {
     const chain = availableReviewChain(CLAUDE_REVIEW_CHAIN, fableState)
     return {
       model: firstNonAuthor(chain, authorModel),
@@ -527,8 +539,8 @@ export function decideReview({ outcome = {}, parsed = {}, authorModel = '', shor
   }
   if (outcome.ok && parsed.ok) {
     return {
-      model: SOL_MODEL_NAME,
-      ranBy: SOL_MODEL_NAME,
+      model: ASTRA_MODEL_NAME,
+      ranBy: ASTRA_MODEL_NAME,
       verdict: parsed.verdict,
       evidence: parsed.evidence,
       fellBack: false,
@@ -567,7 +579,7 @@ export function decideReview({ outcome = {}, parsed = {}, authorModel = '', shor
  *
  * The chain follows the shared Fable switch. Fable also AUTHORS here (CLAUDE.md §6), and a Fable
  * review of Fable's own commit is the self-review both gates refuse. That would
- * leave a Fable-authored change with no reachable reviewer at all whenever Sol
+ * leave a Fable-authored change with no reachable reviewer at all whenever Astra
  * is down, so the second Anthropic model in the chain takes over instead (found
  * by the cross-vendor review of this very branch, 10.08.2026).
  *
@@ -579,7 +591,7 @@ export function decideReview({ outcome = {}, parsed = {}, authorModel = '', shor
  *
  * With every model in the chain among the authors it returns '' : there is then
  * no valid Anthropic reviewer at all, and saying so is the only honest answer —
- * the review waits for Sol rather than being recorded by an author of the work.
+ * the review waits for Astra rather than being recorded by an author of the work.
  */
 export function fallbackReviewerFor(authorModels = '', fableState) {
   return firstNonAuthor(availableReviewChain(FALLBACK_CHAIN, fableState), authorModels)
@@ -597,21 +609,22 @@ function firstNonAuthor(chain, authorModels) {
 }
 
 /**
- * Did GPT-5.6 Sol author any part of this range (point 667)?
+ * Did the OpenAI lane author any part of this range (point 667)?
  *
- * Judged by `sameModel`, so every spelling of the one model answers alike — the
- * trailer's "GPT-5.6 Sol", a bare "Sol", the raw id. A range Sol wrote is a
- * range Sol may not review.
+ * Judged by `isOpenAiLane`, so every spelling of the lane answers alike — the
+ * trailer's "GPT-6 Astra", a bare "Astra", the raw id, and the RETIRED
+ * "GPT-5.6 Sol" (point 1061). Four eyes is a VENDOR boundary: work the lane
+ * wrote under its old name is work it may not review under its new one.
  */
-export function solAuthored(authorModels = '') {
-  return authorList(authorModels).some((a) => sameModel(a, SOL_MODEL_NAME))
+export function astraAuthored(authorModels = '') {
+  return authorList(authorModels).some((a) => isOpenAiLane(a))
 }
 
 /**
- * The Claude reviewer for work SOL AUTHORED — the first of CLAUDE_REVIEW_CHAIN
+ * The Claude reviewer for work ASTRA AUTHORED — the first of CLAUDE_REVIEW_CHAIN
  * that authored no part of the range, or '' when every one of them did.
  *
- * Empty is a real answer and is reported as one: a range written by Sol AND by
+ * Empty is a real answer and is reported as one: a range written by Astra AND by
  * all three Claude models has no reviewer that is not also an author, and
  * saying so beats recording a self-review.
  */
@@ -742,7 +755,7 @@ export const PROBE_MAX_AGE_MS = 30 * 86_400_000
 export function probeFreshness(receipt, now = Date.now(), maxAgeMs = PROBE_MAX_AGE_MS, fingerprint = '') {
   const at = Number(receipt?.at ?? 0)
   if (!receipt || receipt.refused !== true || !at) {
-    return { fresh: false, warning: `the model id ${SOL_MODEL_ID} has never been proven honoured on this machine — run: node scripts/review-sol.mjs --probe` }
+    return { fresh: false, warning: `the model id ${ASTRA_MODEL_ID} has never been proven honoured on this machine — run: node scripts/review-astra.mjs --probe` }
   }
   // THE PROOF IS BOUND TO WHAT PRODUCED IT (fifth cross-vendor round). The
   // receipt outlives container rebuilds, so a proof taken with another codex
@@ -761,7 +774,7 @@ export function probeFreshness(receipt, now = Date.now(), maxAgeMs = PROBE_MAX_A
   }
   const ageDays = Math.floor((now - at) / 86_400_000)
   if (now - at > maxAgeMs) {
-    return { fresh: false, warning: `the model-id probe is ${ageDays} days old — run: node scripts/review-sol.mjs --probe` }
+    return { fresh: false, warning: `the model-id probe is ${ageDays} days old — run: node scripts/review-astra.mjs --probe` }
   }
   return { fresh: true, warning: '', ageDays }
 }
@@ -801,7 +814,7 @@ export function formatReviewerCommand({
   const reviewer = reviewerDescriptor(model)
   if (!reviewer || !sha || !String(brief).trim()) return ''
   const parts = [
-    'node scripts/review-sol.mjs',
+    'node scripts/review-astra.mjs',
     `--reviewer ${reviewer.key}`,
     `--sha ${String(sha)}`,
     `--brief ${q(brief)}`,
@@ -821,7 +834,7 @@ const short = (s) => (/^[0-9a-f]{7,40}$/i.test(String(s ?? '')) ? String(s).slic
 /**
  * The record command, in the shape `mechanism-review.mjs --record` expects.
  *
- * After a Sol run it is complete and can be run as printed. After a fallback the
+ * After a Astra run it is complete and can be run as printed. After a fallback the
  * verdict and the evidence stand as ANGLE-BRACKET PLACEHOLDERS the recorder
  * refuses — so a hand that pastes it without giving the review to Fable first
  * gets a refusal, not a green ledger line.
@@ -912,10 +925,10 @@ export function formatReviewReport({
   // is still reported; the ready-to-run command is not.
   if (partial) {
     const said = decision.fellBack
-      ? `${SOL_MODEL_NAME} did not review it: ${decision.cause}`
-      : `${SOL_MODEL_NAME} reviewed ${partial.reviewedBase.slice(0, 7)}..${String(sha).slice(0, 7)} → ${decision.verdict}\n  ${decision.evidence}`
+      ? `${ASTRA_MODEL_NAME} did not review it: ${decision.cause}`
+      : `${ASTRA_MODEL_NAME} reviewed ${partial.reviewedBase.slice(0, 7)}..${String(sha).slice(0, 7)} → ${decision.verdict}\n  ${decision.evidence}`
     return [
-      `review-sol: ${said}`,
+      `review-astra: ${said}`,
       '',
       `  NO RECORD COMMAND IS PRINTED. A record at ${String(sha).slice(0, 7)} clears every commit it contains,`,
       // A hand-over never SAW anything, but the refusal is the same: only the
@@ -940,7 +953,7 @@ export function formatReviewReport({
   // the ready-to-run command is not.
   if (gap) {
     // THE HAND-OVER STILL HAS TO NAME ITS READER. A short-fall on a path that
-    // never ran Sol at all — the share switch, or a range Sol authored — is
+    // never ran Astra at all — the share switch, or a range Astra authored — is
     // still a review somebody must do, and a refusal that dropped the reviewer's
     // name left the caller with no idea whose review it was waiting for.
     const who = decision.model
@@ -948,11 +961,11 @@ export function formatReviewReport({
       ? `  The review is ${who}'s, and it is NOT done.`
       : '  No model of the chain may review this range — every one of them authored part of it.'
     const said = !decision.fellBack
-      ? `${SOL_MODEL_NAME} answered ${decision.verdict} on ${String(sha).slice(0, 7)}\n  ${decision.evidence}`
+      ? `${ASTRA_MODEL_NAME} answered ${decision.verdict} on ${String(sha).slice(0, 7)}\n  ${decision.evidence}`
       : decision.kind === OUTCOME.SELF_REVIEW
-        ? `ROLE SWAP — ${SOL_MODEL_NAME} AUTHORED part of ${String(sha).slice(0, 7)}, so it may not review it.\n${handOver}`
-        : `${SOL_MODEL_NAME} did not review it: ${decision.cause}.\n${handOver}`
-    return [`review-sol: ${said}`, '', formatShortfall(gap, { sha, plan })].join('\n')
+        ? `ROLE SWAP — ${ASTRA_MODEL_NAME} AUTHORED part of ${String(sha).slice(0, 7)}, so it may not review it.\n${handOver}`
+        : `${ASTRA_MODEL_NAME} did not review it: ${decision.cause}.\n${handOver}`
+    return [`review-astra: ${said}`, '', formatShortfall(gap, { sha, plan })].join('\n')
   }
   const cmd = formatRecordCommand({
     sha,
@@ -976,15 +989,15 @@ export function formatReviewReport({
       ]
     : []
   if (!decision.fellBack) {
-    const ranBy = decision.ranBy || SOL_MODEL_NAME
-    const detail = sameModel(ranBy, SOL_MODEL_NAME) ? ` (effort ${SOL_REASONING_EFFORT})` : ''
+    const ranBy = decision.ranBy || ASTRA_MODEL_NAME
+    const detail = sameModel(ranBy, ASTRA_MODEL_NAME) ? ` (effort ${ASTRA_REASONING_EFFORT})` : ''
     const scope = pass
       ? Number(pass.total) === 1
         ? ` (SCOPED PASS — ${(pass.files ?? []).length} end-state file(s))`
         : ` (PASS ${pass.index}/${pass.total} — ${(pass.files ?? []).length} file(s) of a range too large for one round)`
       : ''
     return [
-      `review-sol: ${ranBy}${detail} reviewed ${String(sha).slice(0, 7)} → ${decision.verdict}${scope}`,
+      `review-astra: ${ranBy}${detail} reviewed ${String(sha).slice(0, 7)} → ${decision.verdict}${scope}`,
       `  ${decision.evidence}`,
       ...(plan ? ['', formatReviewCoverage(plan, pass)] : []),
       '',
@@ -999,18 +1012,18 @@ export function formatReviewReport({
   // recorded (four-eyes finding, second round, 10.08.2026).
   const who = decision.model
   // THE ROLE SWAP IS NOT A FALLBACK (point 667), and calling it one would read as
-  // something having gone wrong. Sol authored this range; the review was always
+  // something having gone wrong. Astra authored this range; the review was always
   // Claude's, together with the suites, the picture and the landing.
   if (decision.kind === OUTCOME.SELF_REVIEW) {
     if (!who) {
       return [
-        `review-sol: ROLE SWAP — ${SOL_MODEL_NAME} AUTHORED part of ${String(sha).slice(0, 7)}, so it may not review it.`,
+        `review-astra: ROLE SWAP — ${ASTRA_MODEL_NAME} AUTHORED part of ${String(sha).slice(0, 7)}, so it may not review it.`,
         `  And every model of ${(decision.chain ?? CLAUDE_REVIEW_CHAIN).join(', ')} authored part of it too, so none of them`,
         '  may either. The review is NOT done and cannot be recorded: review a narrower range.',
       ].join('\n')
     }
     return [
-      `review-sol: ROLE SWAP — ${SOL_MODEL_NAME} AUTHORED part of ${String(sha).slice(0, 7)}, so it may not review it.`,
+      `review-astra: ROLE SWAP — ${ASTRA_MODEL_NAME} AUTHORED part of ${String(sha).slice(0, 7)}, so it may not review it.`,
       `  The review is ${who}'s, which also runs the suites, judges the picture and lands the point.`,
       reviewerCommand ? '  Start that reader with the same bounded request:' : '  Record what IT says — never a verdict this command invented:',
       '',
@@ -1020,10 +1033,10 @@ export function formatReviewReport({
   }
   if (!who) {
     return [
-      `review-sol: FALLBACK — ${SOL_MODEL_NAME} did not review ${String(sha).slice(0, 7)}: ${decision.cause}.`,
+      `review-astra: FALLBACK — ${ASTRA_MODEL_NAME} did not review ${String(sha).slice(0, 7)}: ${decision.cause}.`,
       `  And EVERY model in the fallback chain (${(decision.chain ?? FALLBACK_CHAIN).join(', ')}) authored part of this`,
       '  range, so none of them may review it. The review is NOT done and cannot be recorded:',
-      `  fix the ${SOL_MODEL_NAME} run, or review a narrower range one of them did not write.`,
+      `  fix the ${ASTRA_MODEL_NAME} run, or review a narrower range one of them did not write.`,
     ].join('\n')
   }
   // A FAILED DELIVERY OFFERS NO RECORD IN ANY SHAPE (escalation round). A record
@@ -1038,7 +1051,7 @@ export function formatReviewReport({
   // stays. Every other kind — the unknown ones included — refuses.
   if (decision.kind !== OUTCOME.NO_VERDICT && decision.kind !== OUTCOME.SWITCHED_OFF) {
     return [
-      `review-sol: FALLBACK — ${SOL_MODEL_NAME} did not review ${String(sha).slice(0, 7)}: ${decision.cause}.`,
+      `review-astra: FALLBACK — ${ASTRA_MODEL_NAME} did not review ${String(sha).slice(0, 7)}: ${decision.cause}.`,
       '  NO RECORD COMMAND IS PRINTED: the hand-off did not complete, so nothing of this range',
       "  was read — the whole round's material was lost with the run.",
       `  The review is NOT done — it is ${who}'s now. Hand it the commit and the brief above;`,
@@ -1047,7 +1060,7 @@ export function formatReviewReport({
     ].join('\n')
   }
   return [
-    `review-sol: FALLBACK — ${SOL_MODEL_NAME} did not review ${String(sha).slice(0, 7)}: ${decision.cause}.`,
+    `review-astra: FALLBACK — ${ASTRA_MODEL_NAME} did not review ${String(sha).slice(0, 7)}: ${decision.cause}.`,
     `  The review is NOT done. Hand it to ${who} and record what IT says:`,
     '',
     reviewerCommand ? `  Start it: ${reviewerCommand}` : `  1. give ${who} the commit and the brief above,`,

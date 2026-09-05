@@ -63,9 +63,9 @@ export const FILE_WRITING_TOOLS = new Set(['Edit', 'Write', 'MultiEdit', 'Notebo
  * deliberately, and the coverage stated (Sol review of d0aebb6, finding 3):
  *   COVERED: the two sanctioned suite launchers (`run-all.mjs`,
  *   `run-logged.mjs` — everything `npm test`/`test:small`/`test:large` also
- *   reaches), delegating an author (`author-sol.mjs`), starting a
- *   cross-vendor review (`review-sol.mjs`) and a delegated ask
- *   (`ask-sol.mjs`) — each begins an expensive new unit of work.
+ *   reaches), delegating an author (`author-astra.mjs`), starting a
+ *   cross-vendor review (`review-astra.mjs`) and a delegated ask
+ *   (`ask-astra.mjs`) — each begins an expensive new unit of work.
  *   AND TAKING THE BATCH (`batch-claim.mjs`, point 542): a claim is not
  *   bookkeeping, it is the moment a session starts working, and one was
  *   measured at ~250,000 tokens of context. Its refusal names `/clear`
@@ -86,10 +86,10 @@ export const FILE_WRITING_TOOLS = new Set(['Edit', 'Write', 'MultiEdit', 'Notebo
 const START_SCRIPTS = {
   'run-all.mjs': 'starting a browser verify run',
   'run-logged.mjs': 'starting a browser verify run',
-  'author-sol.mjs': 'delegating a new authoring run',
+  'author-astra.mjs': 'delegating a new authoring run',
   'author-fable.mjs': 'delegating a new authoring run',
-  'review-sol.mjs': 'starting a cross-vendor review run',
-  'ask-sol.mjs': 'starting a delegated ask run',
+  'review-astra.mjs': 'starting a cross-vendor review run',
+  'ask-astra.mjs': 'starting a delegated ask run',
   'batch-claim.mjs': 'taking the batch, which is where a session begins its work',
 }
 

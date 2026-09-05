@@ -1,4 +1,4 @@
-// Pure decision core of the serving-model tripwire (point 309). rule:model-policy@d0066fb3
+// Pure decision core of the serving-model tripwire (point 309). rule:model-policy@4f05875b
 // On 24.07.2026 the session silently degraded to Haiku 4.5 and merged defective work; the
 // The Co-Authored-By field in `git log` is the mechanical record of which MODEL
 // authored a commit. A reviewer uses the distinct Reviewed-By key and therefore
@@ -7,8 +7,8 @@
 //
 // Model policy (users 25.07.2026 / 18.08.2026): ONLY Opus 5 (the serving
 // session, and the author of the points whose verification is the work and
-// that nothing marks hard — a hard one is Sol's), Opus 4.8 (fallback when Opus
-// 5 is unavailable), GPT-5.6 Sol (the OpenAI authoring lane, point 667, which
+// that nothing marks hard — a hard one is Astra's), Opus 4.8 (fallback when Opus
+// 5 is unavailable), GPT-6 Astra (the OpenAI authoring lane, point 667, which
 // since 18.08.2026 takes the hard and critical points too), and Fable (the newest
 // released version, which is what FABLE_MODEL names -- point 1041) when
 // admitted by the shared Fable switch may run the batch. Every other
@@ -19,9 +19,9 @@
 // so `Opus 99` would pass; what the tripwire is bought against is the silent
 // swap to another family, not a point release inside an allowed one.
 //
-// SOL AUTHORS UNDER A ROLE SWAP (point 667). Where Sol authors, CLAUDE reviews,
+// THE OPENAI LANE AUTHORS UNDER A ROLE SWAP (point 667). Where it authors, CLAUDE reviews,
 // runs the suites, judges the picture and lands — so the change is still seen by
-// two vendors and no model reviews its own work. Admitting Sol as an author is
+// two vendors and no model reviews its own work. Admitting that lane as an author is
 // therefore the ONE thing that loosens here; everything else is TIGHTENED in the
 // same breath (see MODEL_TRAILER): a trailer naming a NON-Claude model used to
 // pass this guard unread, because "no Claude token" was taken for "no model
@@ -50,21 +50,24 @@
 // Reducing them to one string is what once raised a breach on an allowed pair.
 // A cross-vendor reviewer is not an author and uses Reviewed-By (point 982).
 
-import { FABLE_MODEL, fableIsOn, fableRefusalReason } from './fable-switch-core.mjs'
+import { ASTRA_MODEL, FABLE_MODEL, fableIsOn, fableRefusalReason } from './fable-switch-core.mjs'
 
 /** Model names allowed to author batch commits, ONE PATTERN PER AUTHORING LANE,
  *  matched against the name PARSED out of a trailer (`modelNamesIn`) — anchored,
  *  so an allowed name carrying any addition is no longer allowed by accident.
  *  Everything after the family name must be version digits: the policy names the
- *  model FAMILIES (Opus, Fable, Sol), and a pinned version would redden the whole
+ *  model FAMILIES (Opus, Fable, Astra), and a pinned version would redden the whole
  *  batch the day the harness serves a point release or writes the raw model id
  *  (`claude-opus-5[1m]`, 14 commits on 29.07.2026, which normalises to `opus 5`).
  *
- *  The OpenAI lane demands the word `sol`: `gpt` alone is NOT an author here, so
- *  a session degraded to some other GPT is a breach exactly as Haiku is. */
+ *  The OpenAI lane demands its own word: `gpt` alone is NOT an author here, so
+ *  a session degraded to some other GPT is a breach exactly as Haiku is. The lane
+ *  is GPT-6 Astra since 05.09.2026 (point 1061); `sol` stays admitted because the
+ *  guard judges PAST commits against this same list, and the 5.6 Sol trailers
+ *  those commits carry must keep verifying. */
 export const ALLOWED = Object.freeze([
   /^opus[\s.\d]*$/i, //                   the standing Anthropic lane: Opus 5 / 4.8
-  /^(gpt[\s.\d]*)?sol[\s.\d]*$/i, //     the OpenAI lane: GPT-5.6 Sol (point 667)
+  /^(gpt[\s.\d]*)?(?:astra|sol)[\s.\d]*$/i, // the OpenAI lane: GPT-6 Astra, and the retired GPT-5.6 Sol
 ])
 
 const FABLE_ALLOWED = /^fable[\s.\d]*$/i
@@ -114,11 +117,11 @@ export const CLAUDE_TRAILER = /\bclaude\b/i
  * `Gemini 2.5 Pro <x@y>` carries no "Claude" token, so before this it produced
  * no model evidence and was waved through as a human co-author — inside the very
  * guard whose purpose is to catch a session that silently degraded. Every name
- * here becomes evidence the ALLOWLIST then judges, and only Opus, Fable and Sol
+ * here becomes evidence the ALLOWLIST then judges, and only Opus, Fable and Astra
  * survive that.
  */
 export const MODEL_FAMILY_WORD =
-  /\b(claude|opus|fable|sonnet|haiku|sol|codex|gemini|grok|llama|mistral|qwen|deepseek|o\d(?:-\w+)?)\b|gpt|chatgpt/i
+  /\b(claude|opus|fable|sonnet|haiku|astra|sol|codex|gemini|grok|llama|mistral|qwen|deepseek|o\d(?:-\w+)?)\b|gpt|chatgpt/i
 
 /**
  * The addresses the two vendors' MODELS commit under. A trailer carrying one is
@@ -145,7 +148,7 @@ export const MODEL_VENDOR_ADDRESS = /(?:^|[\s<"'(])(?:noreply|no-reply|bot|assis
  *  `GPT-5.6 Sol`, `o3`. A digit merely somewhere in the line is not a version:
  *  it made `Sol Smith 2nd` a model (third cross-vendor round). */
 const FAMILY_WITH_VERSION =
-  /\b(?:claude|opus|fable|sonnet|haiku|sol|codex|gemini|grok|llama|mistral|qwen|deepseek)[\s.\-_]*\d|gpt[\s.\-_]*\d|\bo\d(?:-\w+)?\b/i
+  /\b(?:claude|opus|fable|sonnet|haiku|astra|sol|codex|gemini|grok|llama|mistral|qwen|deepseek)[\s.\-_]*\d|gpt[\s.\-_]*\d|\bo\d(?:-\w+)?\b/i
 
 /**
  * Does a NON-Claude trailer name a model rather than a person?
@@ -350,7 +353,7 @@ export function allowedTrailers(fableState) {
     'Co-Authored-By: Claude Opus 5 <noreply@anthropic.com>',
     ...(admitsFable(fableState) ? [`Co-Authored-By: Claude ${FABLE_MODEL} <noreply@anthropic.com>`] : []),
     'Co-Authored-By: Claude Opus 4.8 <noreply@anthropic.com>',
-    'Co-Authored-By: GPT-5.6 Sol <noreply@openai.com>',
+    `Co-Authored-By: ${ASTRA_MODEL} <noreply@openai.com>`,
   ])
 }
 
@@ -367,8 +370,8 @@ export function allowedReviewerTrailers(fableState) {
 /** The authoring lanes in one phrase, generated for the same refusal surface. */
 export function allowedModelsPhrase(fableState) {
   return admitsFable(fableState)
-    ? `Opus 5, Opus 4.8, ${FABLE_MODEL} and GPT-5.6 Sol`
-    : 'Opus 5, Opus 4.8 and GPT-5.6 Sol'
+    ? `Opus 5, Opus 4.8, ${FABLE_MODEL} and ${ASTRA_MODEL}`
+    : `Opus 5, Opus 4.8 and ${ASTRA_MODEL}`
 }
 
 /** The `Co-Authored-By` values in a commit message, git's comment lines dropped
@@ -567,7 +570,7 @@ export const TRANSCRIPT_HINT = [
   '',
   '    ~/.claude/projects/<repo-slug>/<session>.jsonl',
   '    ~/.claude/projects/<repo-slug>/<session>/subagents/agent-*.jsonl   (delegated work)',
-  '    ~/.codex/sessions/<yyyy>/…                                        (the GPT-5.6 Sol lane)',
+  `    ~/.codex/sessions/<yyyy>/…                                        (the ${ASTRA_MODEL} lane)`,
 ]
 
 /** The prefix git's history-rewriting tools park the pre-rewrite commits under. */
@@ -637,7 +640,7 @@ export function formatForbiddenReason(hits, { backupRefs = [], alsoUnidentified 
   const switchRefusal = fableState !== undefined && !admitsFable(fableState) ? ` ${fableRefusalReason(fableState)}` : ''
   return [
     `SERVING-MODEL TRIPWIRE: commit(s) ${shaList(hits)} carry a co-author trailer NAMING a model ` +
-      `outside the allowlist in force at each commit's own time (Opus 5, Opus 4.8 and GPT-5.6 Sol ` +
+      `outside the allowlist in force at each commit's own time (Opus 5, Opus 4.8 and ${ASTRA_MODEL} ` +
       `may author throughout; ${FABLE_MODEL} may author only while its recorded policy is ON; Sonnet and Haiku ` +
       `are never admitted; user policy 25.07./13.08.2026).${switchRefusal} Do NOT continue batch work. ` +
       'The tripwire records a handoff to the next allowed lane of the serving chain. Only that fresh lane, ' +

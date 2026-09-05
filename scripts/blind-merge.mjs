@@ -13,7 +13,7 @@
 // Input list, as either model hands it back — the line form the review prompt
 // asks for, `B1 | src/x.ts | one line saying what is wrong`, or the same as JSON
 // (a bare array of entries is accepted too):
-//   { "model": "GPT-5.6 Sol", "entries": [ { "id": "B1", "file": "src/x.ts",
+//   { "model": "GPT-6 Astra", "entries": [ { "id": "B1", "file": "src/x.ts",
 //     "defect": "one line saying what is wrong" } ] }
 // Union, as the THIRD model writes it — `from` names the input entries each
 // union entry stands for, and the three dispositions follow from it:

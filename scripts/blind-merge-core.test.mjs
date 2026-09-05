@@ -391,12 +391,12 @@ describe('who may merge', () => {
     expect(split.ok).toBe(false)
     expect(split.errors.join(' ')).toMatch(/OTHER model was the absent one/)
     // …and the merger cannot excuse itself under its own other name either.
-    const solItself = validateMerger({
+    const astraItself = validateMerger({
       mergedBy: 'GPT-5.6 Sol',
       authors: ['GPT-5.6 Sol'],
       fallback: 'Sol was unreachable',
     })
-    expect(solItself.ok).toBe(false)
+    expect(astraItself.ok).toBe(false)
   })
 
   it('reads the absence claim, not the words in it', () => {
