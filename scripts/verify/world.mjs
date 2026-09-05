@@ -295,13 +295,21 @@ if (section('communication-errand')) {
       g.enterPlace('bambara-village')
       window.__game.getState().handArtefactToChief()
       const s = window.__game.getState()
-      return { artefact: s.rockArtefact, keys: s.journal.map((e) => e.text.key) }
+      return { artefact: s.rockArtefact, keys: s.journal.map((e) => e.text.key), forms: s.carriedForms }
     })
     const handedOk = handed.artefact === 'given' && handed.keys.includes('journal.artefactGiven')
     console.log(
-      `${handedOk ? 'PASS' : 'FAIL'}  the artefact laid in the chief's hands solves the puzzle and is journaled`,
+      `${handedOk ? 'PASS' : 'FAIL'}  the artefact laid in the chief's hands is answered and journaled`,
     )
     if (!handedOk) errors.push(`the hand-over left the artefact ${handed.artefact}`)
+
+    // What he pays with, besides the two words: the clay impression, in the
+    // pack from this moment on.
+    const gotMould = handed.forms.includes('rock-relief')
+    console.log(
+      `${gotMould ? 'PASS' : 'FAIL'}  the chief hands over the clay impression with his answer`,
+    )
+    if (!gotMould) errors.push(`the hand-over left the pack carrying ${JSON.stringify(handed.forms)}`)
 
     // Back onto the map for the remaining frames, with the world as it was.
     await page.evaluate((sites) => {
@@ -313,6 +321,124 @@ if (section('communication-errand')) {
     // Wait on the STATE, not the wall clock: the map frames below may only be
     // taken once the traveller is back out of the settlement.
     await page.waitForFunction(() => window.__game.getState().mode === 'travel', null, { timeout: 20000 })
+
+    // THE OTHER END OF THE DIRECTION. The words said where; the clay says what
+    // to do there. This is driven through the REAL use key on the REAL keyboard
+    // — the wiring from keydown to store is exactly what a unit test cannot
+    // reach, and the socket's coordinate is read from the world module the
+    // scene draws the escarpment from, never copied into this script.
+    const talus = await page.evaluate(async () => {
+      const forms = await import('/src/world/forms.ts')
+      const socket = forms.FORM_SOCKETS.find((x) => x.id === 'bandiagara-talus')
+      return { ...forms.socketPosition(socket), id: socket.id, form: socket.form }
+    })
+    // A random event's dialog blocks the use key by design, so the roulette is
+    // switched off for this block and put back after it: what is under test is
+    // the key, not the odds.
+    const eventsWere = await page.evaluate(() => {
+      const was = window.__balance.randomEventsEnabled
+      window.__balance.randomEventsEnabled = false
+      return was
+    })
+    // WHAT THE TOAST SAID IS RECORDED AS IT IS SET, not read back afterwards.
+    // The HUD clears a toast by itself after a few seconds; on a loaded machine
+    // the read can arrive after that expiry and report an empty toast for a
+    // press that answered perfectly well — a flake in the probe, not in the
+    // game. It cost this section a first-attempt red on 05.09.2026.
+    const pressUseKey = async () => {
+      await page.evaluate(() => {
+        const g = window.__game.getState()
+        g.setToast(null)
+        g.setJournalOpen(false)
+        window.__toastLog = []
+        window.__toastUnsub =
+          window.__toastUnsub ??
+          window.__game.subscribe((s, prev) => {
+            if (s.toast && s.toast !== prev.toast) window.__toastLog.push(s.toast)
+          })
+      })
+      await page.keyboard.press('Space')
+      return page.evaluate(() => {
+        const s = window.__game.getState()
+        return {
+          said: window.__toastLog,
+          spent: s.spentSockets,
+          keys: s.journal.map((e) => e.text.key),
+          // Reported on a failure so a red names its own cause instead of
+          // sending the next reader back to the browser.
+          mode: s.mode,
+          dialog: window.__ui.getState().dialog ?? null,
+        }
+      })
+    }
+    const strings = await page.evaluate(async () => {
+      const i18n = await import('/src/i18n/index.ts')
+      const t = i18n.getStrings()
+      return { noFit: t.toasts.formNoFit, solved: t.toasts.pocSolved, name: t.forms['rock-relief'] }
+    })
+
+    // A wrong place answers, and answers with a SENTENCE — the rule the player
+    // has to be able to carry to the next lock.
+    await jump(talus.lat + reachDeg * 4, talus.lon, 600)
+    const miss = await pressUseKey()
+    const missOk = miss.said.includes(strings.noFit) && !miss.spent.includes('bandiagara-talus')
+    console.log(
+      `${missOk ? 'PASS' : 'FAIL'}  the use key clear of the escarpment answers in the traveller's own voice`,
+    )
+    if (!missOk) {
+      errors.push(
+        `a use ${(reachDeg * 4).toFixed(2)}° off the talus foot said ${JSON.stringify(miss.said)} ` +
+          `(mode ${miss.mode}, dialog ${JSON.stringify(miss.dialog)})`,
+      )
+    }
+
+    // And at the foot of the wall it fits. The frame is taken BEFORE the press,
+    // so the picture shows the place the claim is about rather than the journal
+    // that opens on top of it — and a step wider than the erratic's frame,
+    // because the evidence here is the traveller standing at the FOOT of the
+    // escarpment: at the closest zoom the slab fills the frame and there is no
+    // ground left in it to stand on.
+    await page.evaluate(() => window.__ui.getState().setTravelZoom(0.25))
+    await jump(talus.lat, talus.lon)
+    await shot('20-worldmodel-bandiagara-talus-foot', {
+      world: { lat: talus.lat, lon: talus.lon },
+      label: `the talus foot below the Bandiagara escarpment, where the ${strings.name} fits`,
+    })
+    await page.evaluate(() => window.__ui.getState().setTravelZoom(0.5))
+    const fitted = await pressUseKey()
+    const fittedOk =
+      fitted.said.includes(strings.solved) &&
+      fitted.spent.includes('bandiagara-talus') &&
+      fitted.keys.includes('journal.mouldFitted')
+    console.log(
+      `${fittedOk ? 'PASS' : 'FAIL'}  the use key at the talus foot fits the impression and solves the puzzle`,
+    )
+    if (!fittedOk) {
+      errors.push(
+        `the use key at the talus foot said ${JSON.stringify(fitted.said)} and spent ` +
+          `${JSON.stringify(fitted.spent)} (mode ${fitted.mode}, dialog ${JSON.stringify(fitted.dialog)})`,
+      )
+    }
+
+    // A spent socket answers like a wrong place, and writes no second page.
+    const again = await pressUseKey()
+    const againOk =
+      again.said.includes(strings.noFit) &&
+      again.keys.filter((k) => k === 'journal.mouldFitted').length === 1
+    console.log(
+      `${againOk ? 'PASS' : 'FAIL'}  a second press at the spent socket answers like a wrong place`,
+    )
+    if (!againOk) {
+      errors.push(
+        `a second press at the spent socket said ${JSON.stringify(again.said)} ` +
+          `(mode ${again.mode}, dialog ${JSON.stringify(again.dialog)})`,
+      )
+    }
+
+    await page.evaluate((was) => {
+      window.__balance.randomEventsEnabled = was
+      window.__game.getState().setJournalOpen(false)
+    }, eventsWere)
   }
 }
 
