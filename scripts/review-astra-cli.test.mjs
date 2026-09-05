@@ -577,7 +577,7 @@ describe('a review that runs', () => {
     // command green, and "prints a complete record command" is a claim about
     // whether the recorder ACCEPTS it.
     const printed = recordCommandIn(r.stdout)
-    expect(printed).toContain('--model "GPT-5.6 Sol"')
+    expect(printed).toContain(`--model "${ASTRA_MODEL_NAME}"`)
     expect(printed).toContain('--verdict merge')
     expect(printed).toContain('--point 624')
     expect(printed).toContain(headSha)
@@ -591,7 +591,7 @@ describe('a review that runs', () => {
     const ledger = readFileSync(join(repo, '.claude', 'mechanism-reviews.jsonl'), 'utf8').trim().split('\n')
     expect(JSON.parse(ledger.at(-1))).toMatchObject({
       sha: headSha,
-      model: 'GPT-5.6 Sol',
+      model: ASTRA_MODEL_NAME,
       verdict: 'merge',
       mode: 'review',
       point: 624,
@@ -999,10 +999,10 @@ describe('a range SOL authored', () => {
     expect(r.stdout).toContain('Opus 5 reviewed')
     expect(r.stdout).toContain('--model "Opus 5"')
     expect(r.stdout).toContain('--model-result')
-    expect(r.stdout).toContain('--handover sol-authored')
+    expect(r.stdout).toContain('--handover astra-authored')
   })
 
-  it('runs Fable for the mixed Sol/Opus end state and the recorder accepts exactly that routed verdict', () => {
+  it('runs Fable for the mixed Astra/Opus end state and the recorder accepts exactly that routed verdict', () => {
     writeFileSync(join(dir, 'calls.log'), '')
     const r = run([
       '--reviewer', 'fable', '--sha', unreviewableSha, '--point', '977', '--brief', 'judge the mixed end state',
@@ -1024,7 +1024,7 @@ describe('a range SOL authored', () => {
       sha: unreviewableSha,
       model: 'Fable 5.1',
       verdict: 'merge',
-      handover: 'sol-authored',
+      handover: 'astra-authored',
       pass: { index: 1, total: 1, files: ['unreviewable.txt'], endState: unreviewableSha },
       reviewerAuthorship: {
         status: 'agreement', actualModel: 'Fable 5.1', servedModel: 'claude-fable-5-1', proof: 'claude-result',

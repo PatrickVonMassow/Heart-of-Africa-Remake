@@ -1223,12 +1223,12 @@ if (isMainModule(import.meta.url)) {
     let targetReviewer = requestedReviewer ?? reviewerDescriptor(ASTRA_MODEL_NAME)
     let handover = ''
     if (requestedReviewer?.runtime === 'claude') {
-      handover = astraAuthored(rangeAuthors) ? 'sol-authored' : 'sol-unavailable'
+      handover = astraAuthored(rangeAuthors) ? 'astra-authored' : 'astra-unavailable'
       const routed = decideReview({
         outcome: {
           ok: false,
-          kind: handover === 'sol-authored' ? OUTCOME.SELF_REVIEW : OUTCOME.UNREACHABLE,
-          cause: handover === 'sol-authored' ? causeTextFor(OUTCOME.SELF_REVIEW) : 'the preferred reader was unavailable',
+          kind: handover === 'astra-authored' ? OUTCOME.SELF_REVIEW : OUTCOME.UNREACHABLE,
+          cause: handover === 'astra-authored' ? causeTextFor(OUTCOME.SELF_REVIEW) : 'the preferred reader was unavailable',
         },
         parsed: { ok: false },
         authorModel: rangeAuthors,

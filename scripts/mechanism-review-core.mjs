@@ -1498,7 +1498,11 @@ export function validateRecord({
       // means an EARLIER author of the same file inside the same range is not
       // seen by the independence check. The file's own `sourceCommits` carries
       // that history for anything that needs it.
-      const deferredPassHandover = String(pass ?? '').trim() && REVIEW_HANDOVERS.includes(String(handover ?? '').trim())
+      // READ THROUGH THE RETIRED SPELLING (point 1061): a record written while
+      // the lane was Sol carries `sol-authored`, and a raw comparison here would
+      // stop deferring the day the lane was renamed — turning 84 landed records
+      // into same-vendor refusals.
+      const deferredPassHandover = String(pass ?? '').trim() && REVIEW_HANDOVERS.includes(normaliseHandover(handover))
       const handoverProblem = deferredPassHandover
         ? ''
         : reviewHandoverProblem({

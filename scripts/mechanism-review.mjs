@@ -53,6 +53,7 @@ import {
   modelVendor,
   MODES,
   parseArgs,
+  REVIEW_HANDOVERS,
   sameModel,
   validatePass,
   validateRecord,
@@ -1437,7 +1438,7 @@ export const usage = () =>
   `usage: node scripts/mechanism-review.mjs --record <sha> --model <name> ` +
   `--verdict <${VERDICTS.join('|')}> --evidence "<one line>" \\\n` +
   `           [--model-at <ISO timestamp> (--model-transcript <session.jsonl> | --model-result <result.json>)] \\\n` +
-  `           [--handover <sol-authored|sol-unavailable>] \\\n` +
+  `           [--handover <${REVIEW_HANDOVERS.join('|')}>] \\\n` +
   `           --mode <${MODES.join('|')}> [--framing "<one line>"] [--point <N>]\n` +
   `           [--author-framing "<one line>" | --spec-examination <sound|amended>]\n` +
   `           [--merged-by "<switch-selected model>"] --accounting "<the blind-merge summary line>" \\\n` +

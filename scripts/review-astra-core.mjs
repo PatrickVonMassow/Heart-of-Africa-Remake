@@ -22,7 +22,14 @@
 // Side-effect free: the process spawn, the temp files and the printing belong to
 // scripts/review-astra.mjs. Pinned by review-astra-core.test.mjs.
 
-import { BLIND_REVIEWER, blindReviewerAdmission, modelFromTrailers, sameModel, VERDICTS } from './mechanism-review-core.mjs'
+import {
+  BLIND_REVIEWER,
+  blindReviewerAdmission,
+  isOpenAiLane,
+  modelFromTrailers,
+  sameModel,
+  VERDICTS,
+} from './mechanism-review-core.mjs'
 import {
   ASTRA_MODEL,
   ASTRA_MODEL_ID,
@@ -602,14 +609,15 @@ function firstNonAuthor(chain, authorModels) {
 }
 
 /**
- * Did GPT-6 Astra author any part of this range (point 667)?
+ * Did the OpenAI lane author any part of this range (point 667)?
  *
- * Judged by `sameModel`, so every spelling of the one model answers alike — the
- * trailer's "GPT-6 Astra", a bare "Astra", the raw id. A range Astra wrote is a
- * range Astra may not review.
+ * Judged by `isOpenAiLane`, so every spelling of the lane answers alike — the
+ * trailer's "GPT-6 Astra", a bare "Astra", the raw id, and the RETIRED
+ * "GPT-5.6 Sol" (point 1061). Four eyes is a VENDOR boundary: work the lane
+ * wrote under its old name is work it may not review under its new one.
  */
 export function astraAuthored(authorModels = '') {
-  return authorList(authorModels).some((a) => sameModel(a, ASTRA_MODEL_NAME))
+  return authorList(authorModels).some((a) => isOpenAiLane(a))
 }
 
 /**

@@ -310,7 +310,7 @@ describe('parseVerdict — only a real verdict is a verdict', () => {
 describe('decideReview — the recorded model follows the RUN, never the preference', () => {
   it('maps every model either review chain can name to this runnable command', () => {
     expect(REVIEWER_ROSTER.map(({ name }) => name)).toEqual([
-      'GPT-5.6 Sol',
+      'GPT-6 Astra',
       'Fable 5.1',
       'Opus 5',
       'Opus 4.8',
@@ -506,10 +506,10 @@ describe('decideReview — the recorded model follows the RUN, never the prefere
 })
 
 describe('the record the command prints', () => {
-  it('is complete and ACCEPTED by the recorder after a Sol review', () => {
+  it('is complete and ACCEPTED by the recorder after an Astra review', () => {
     const d = decideReview(okRun())
     const cmd = formatRecordCommand({ sha: 'a'.repeat(40), ...d, mode: 'review', point: 624 })
-    expect(cmd).toContain('--model "GPT-5.6 Sol"')
+    expect(cmd).toContain('--model "GPT-6 Astra"')
     expect(cmd).toContain('--verdict merge')
     expect(cmd).toContain('--point 624')
     expect(

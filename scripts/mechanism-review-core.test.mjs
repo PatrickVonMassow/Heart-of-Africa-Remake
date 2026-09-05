@@ -246,7 +246,11 @@ describe('model identity', () => {
     expect(sameModel('GPT-5.6 Sol <noreply@openai.com>', 'Sol')).toBe(true)
     expect(sameModel('GPT-5.6 Sol', 'GPT-5.6 Sol')).toBe(true)
     expect(sameModel('GPT-5.6 Sol', 'Claude Opus 5')).toBe(false)
-    expect(parseModel('GPT-5.6 Sol')).toMatchObject({ family: 'sol', version: '5.6' })
+    // THE RETIRED NAME READS INTO THE LANE IT WAS (point 1061), so the recorded
+    // reviews naming Sol keep judging as the OpenAI lane — and the VERSION is
+    // what tells the retired model apart from the one serving it now.
+    expect(parseModel('GPT-5.6 Sol')).toMatchObject({ family: 'astra', version: '5.6' })
+    expect(sameModel('GPT-5.6 Sol', 'GPT-6 Astra')).toBe(false)
   })
 
   it('refuses Sol reviewing what Sol authored, and lets Claude review it', () => {
@@ -2505,10 +2509,10 @@ describe('validateRecord carries the mode', () => {
     expect(validateRecord({ ...good, ...counted }).ok, validateRecord({ ...good, ...counted }).errors).toBe(true)
   })
 
-  it('derives a Sol merger and the weaker switch reason while Fable is off', () => {
+  it('derives an Astra merger and the weaker switch reason while Fable is off', () => {
     const input = {
       sha: 'a'.repeat(40),
-      model: 'GPT-5.6 Sol',
+      model: 'GPT-6 Astra',
       verdict: 'merge',
       evidence: 'read both independent lists against the same invariants',
       authoredBy: 'Claude Opus 5',
@@ -2518,11 +2522,34 @@ describe('validateRecord carries the mode', () => {
     }
     expect(validateRecord(input).ok, validateRecord(input).errors).toBe(true)
     expect(resolveMergePolicy({ ...input, authors: [input.model, input.authoredBy] })).toMatchObject({
-      mergedBy: 'GPT-5.6 Sol',
+      mergedBy: 'GPT-6 Astra',
       mergeFallback: expect.stringContaining('node scripts/fable-switch.mjs --status'),
       errors: [],
     })
     expect(validateRecord({ ...input, mergedBy: 'Fable 5' }).ok).toBe(false)
+  })
+
+  // THE RETIRED LANE STILL VALIDATES (point 1061). A blind record naming
+  // GPT-5.6 Sol is history, and history keeps clearing: the merger derived for
+  // it today is the lane's CURRENT model, which authored none of those halves
+  // and therefore owes no self-merge reason.
+  it('keeps a Sol-authored blind record valid, and derives no self-merge for it', () => {
+    const historical = {
+      sha: 'a'.repeat(40),
+      model: 'GPT-5.6 Sol',
+      verdict: 'merge',
+      evidence: 'read both independent lists against the same invariants',
+      authoredBy: 'Claude Opus 5',
+      mode: 'blind-parallel',
+      accounting: counted.accounting,
+      fableState: FABLE_OFF,
+    }
+    expect(validateRecord(historical).ok, validateRecord(historical).errors).toBe(true)
+    expect(resolveMergePolicy({ ...historical, authors: [historical.model, historical.authoredBy] })).toMatchObject({
+      mergedBy: 'GPT-6 Astra',
+      mergeFallback: '',
+      errors: [],
+    })
   })
 
   it('refuses a blind-parallel record that names no merging model', () => {
