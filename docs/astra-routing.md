@@ -1,18 +1,18 @@
-# Sol routing — moving work between the two vendors
+# Astra routing — moving work between the two vendors
 
 Work-order points 654 and 667. We pay two vendors whose allowances run out at
 different times. This is the lever that shifts load towards OpenAI **before**
 the Anthropic volume is nearly spent, rather than at the last percent.
 
-Point 654 built the cheap half: the READ-ONLY kinds, where Sol authored nothing
+Point 654 built the cheap half: the READ-ONLY kinds, where Astra authored nothing
 and no commit carried its trailer, so the author allowlist, the `commit-msg`
 hook and the model guard could all stay as they were. That half is described
 first below, and it is unchanged.
 
 Point 667 built the other half, because the read-only lever had reached its
 maximum while the largest single item of the spend — the AUTHORING of delegated
-points, ~58 % of the weighted total — was still entirely Anthropic's. Sol now
-authors suitable points, under a role swap that keeps four eyes: **where Sol
+points, ~58 % of the weighted total — was still entirely Anthropic's. Astra now
+authors suitable points, under a role swap that keeps four eyes: **where Astra
 authors, Claude reviews, runs the suites, judges the picture and lands.** Every
 point still has two vendors on it and neither model reviews its own work. See
 [Authoring](#authoring-point-667) for what that costs and what it does not buy.
@@ -20,26 +20,26 @@ point still has two vendors on it and neither model reviews its own work. See
 ## The switch
 
 ```
-node scripts/sol-share.mjs --status          # what goes where right now, in one line
-node scripts/sol-share.mjs --more            # one step towards Sol
-node scripts/sol-share.mjs --less            # one step back towards Claude
-node scripts/sol-share.mjs --set prefer-sol  # or default, or claude-only
+node scripts/astra-share.mjs --status          # what goes where right now, in one line
+node scripts/astra-share.mjs --more            # one step towards Astra
+node scripts/astra-share.mjs --less            # one step back towards Claude
+node scripts/astra-share.mjs --set prefer-astra  # or default, or claude-only
 ```
 
 | setting | review | diagnose · audit · enumerate · explain |
 | --- | --- | --- |
 | `claude-only` | Claude | Claude |
-| `default` | GPT-5.6 Sol | Claude |
-| `prefer-sol` | GPT-5.6 Sol | GPT-5.6 Sol |
+| `default` | GPT-6 Astra | Claude |
+| `prefer-astra` | GPT-6 Astra | GPT-6 Astra |
 
-`default` is today's behaviour and changes nothing. `prefer-sol` hands every
-read-only kind to Sol. `claude-only` is the escape hatch for the other
+`default` is today's behaviour and changes nothing. `prefer-astra` hands every
+read-only kind to Astra. `claude-only` is the escape hatch for the other
 direction — when the ChatGPT side is the scarce one — and it stops the review
-path too: `review-sol.mjs` then sends nothing at all and hands the review to a
+path too: `review-astra.mjs` then sends nothing at all and hands the review to a
 Claude reviewer that authored none of the range, with **no verdict**, which is
-the honest state (Sol has not seen the change).
+the honest state (Astra has not seen the change).
 
-The setting lives in the **main checkout's** `.claude/sol-share.json`, which is
+The setting lives in the **main checkout's** `.claude/astra-share.json`, which is
 git-ignored: it is this machine's operator state, and a delegated agent working
 in a worktree resolves the same file through git's common dir, so it reads the
 setting the user actually flipped. It can never take down the work that asked: a
@@ -49,7 +49,7 @@ is not a setting — falls back to `claude-only`, and so does any unrecognised
 value anywhere. Falling back to `default` instead would let a corrupted
 `claude-only` state quietly resume spending the allowance the operator had moved
 away from. That fallback is not neutral, and it does not pretend to be: a
-corrupted `prefer-sol` state lands on the vendor THAT operator was sparing. There
+corrupted `prefer-astra` state lands on the vendor THAT operator was sparing. There
 is no setting that spends nothing on both, so the narrow claim is the honest one
 — nothing goes to the SECOND vendor, and the work stays where it would be without
 the switch at all. Every consumer prints the problem, and the board note and the
@@ -59,14 +59,14 @@ repaired instead of lived with.
 While the setting is off its default, the board's footer says so, so nobody
 wonders why a diagnosis came back in another voice.
 
-## Asking Sol
+## Asking Astra
 
 ```
-node scripts/ask-sol.mjs --kind diagnose  --brief "why did the place suite go red?" \
+node scripts/ask-astra.mjs --kind diagnose  --brief "why did the place suite go red?" \
      --log /tmp/place.log --diff main..HEAD
-node scripts/ask-sol.mjs --kind audit     --brief "…" --file src/world/river.ts
-node scripts/ask-sol.mjs --kind enumerate --brief "…"        # a blind-parallel half
-node scripts/ask-sol.mjs --kind explain   --brief "…" --file scripts/board-core.mjs
+node scripts/ask-astra.mjs --kind audit     --brief "…" --file src/world/river.ts
+node scripts/ask-astra.mjs --kind enumerate --brief "…"        # a blind-parallel half
+node scripts/ask-astra.mjs --kind explain   --brief "…" --file scripts/board-core.mjs
 ```
 
 Anything piped on stdin is material too. Nothing is fetched by the model: this
@@ -82,7 +82,7 @@ Four kinds, all pure text:
   per line, `A<n> | <file> | <the defect>`, or the single line `NO FINDINGS: …`
   when the sweep found none — a clean audit is an answer, not a failure.
 - **enumerate** — risk, test-case and option lists: a **divergent** stage, so
-  Sol writes its own complete list from a blank page, numbered
+  Astra writes its own complete list from a blank page, numbered
   `B<n> | <file> | <the item>` — the very form `scripts/blind-merge.mjs` counts,
   so the half drops straight into the merge accounting CLAUDE.md §6 demands.
 - **explain** — what a subsystem does, where something is handled. Prose.
@@ -94,7 +94,7 @@ allowance out of habit.
 **An answer nobody gave is never reported as an answer.** A failed run, an answer
 without its shape, and a model that says it could not see the material all end
 the same way — one line naming the cause, the work handed back to the Claude
-chain, exit 3. A caller can therefore tell "Sol answered" from "Sol did not"
+chain, exit 3. A caller can therefore tell "Astra answered" from "Astra did not"
 without reading prose. For the same reason a request whose material could not be
 read at all is refused before it is sent (exit 2): an unreadable file travels as
 "(could not be read: …)", and that is text a model will answer *about* — a shaped
@@ -104,28 +104,30 @@ through.
 ## Authoring (point 667)
 
 ```
-node scripts/author-sol.mjs --routing --all        # which lane owns each open point, and why
-node scripts/author-sol.mjs --routing --point 651  # one point
-node scripts/author-sol.mjs --point 651            # author it here, on this branch
-node scripts/author-sol.mjs --point 651 --dry-run  # the prompt and the argv, nothing spent
-node scripts/author-sol.mjs --point 651 --findings f.md   # the second leg: answer the review
+node scripts/author-astra.mjs --routing --all        # which lane owns each open point, and why
+node scripts/author-astra.mjs --routing --point 651  # one point
+node scripts/author-astra.mjs --point 651            # author it here, on this branch
+node scripts/author-astra.mjs --point 651 --dry-run  # the prompt and the argv, nothing spent
+node scripts/author-astra.mjs --point 651 --findings f.md   # the second leg: answer the review
 ```
 
 <!-- rule:model-policy@d0066fb3 -->
 **The cut is a function, not a taste.** CLAUDE.md §6 is the single prose source
 for the authoring and escalation policy. `scripts/author-routing-core.mjs`
 applies it from the point text and recorded review history. A point may request
-a lane with `Author lane: sol|fable|opus` **as a standalone line** in its
+a lane with `Author lane: astra|fable|opus` **as a standalone line** in its
 spec; the Fable lane remains subject to `node scripts/fable-switch.mjs --status`.
-A `fable` tag is immediate, while `sol`/`opus` tags yield to ONE thing: the
+A point still tagged with the retired `sol` spelling is read as `astra`, so the
+rename costs no queued point its lane.
+A `fable` tag is immediate, while `astra`/`opus` tags yield to ONE thing: the
 recorded §6 Fable escalation once its round threshold is actually reached —
 the rescue for a stuck point outranks the ordinary routing that got it stuck
 (so does the caller's explicit `--anyway`/override argument, which beats both).
 `--rounds <n>` is the deliberate override for history the ledger cannot know.
 
 **What the cut actually moved**, measured over the whole open queue on
-18.08.2026, before and after the day's ruling: **203 points → 120 Sol / 0 Fable
-/ 83 main session**, against 65 / 0 / 138 the day before. This is a MEASUREMENT,
+18.08.2026, before and after the day's ruling: **203 points → 120 to the OpenAI
+lane / 0 Fable / 83 main session**, against 65 / 0 / 138 the day before. This is a MEASUREMENT,
 not a restatement of the policy — it stands here because nothing else records it,
 and it is the reading against which a later re-measurement is judged.
 
@@ -175,12 +177,12 @@ reported as having authored nothing.
 ## What is never routed, at any setting
 
 - A point whose verification is the work, unless its spec marks it hard — since
-  18.08.2026 a hard or critical point is Sol's whatever else it says, short of
+  18.08.2026 a hard or critical point is Astra's whatever else it says, short of
   the one exception above: a reached §6 Fable escalation threshold. No SETTING
   routes it; the routing function decides, and a point's own `Author lane:` tag
   or `--anyway` is the deliberate override subject to the model switches.
-- REVIEWING what Sol itself authored — no model reviews its own work, so
-  `review-sol.mjs` refuses such a range before it spends a call on it.
+- REVIEWING what Astra itself authored — no model reviews its own work, so
+  `review-astra.mjs` refuses such a range before it spends a call on it.
 - Driving the browser suites and **judging the picture**.
 - The landing (`scripts/land-point.mjs`) and the main session's bookkeeping.
 
@@ -224,6 +226,10 @@ lost by scoping it there. The `unclear` row exists so the
 residue is visible rather than distributed.
 
 ## The first real run
+
+Recorded verbatim from 13.08.2026, so it names the commands and files as they were
+spelled then — `ask-sol.mjs`, `sol-share.mjs`, `review-sol.mjs` are today's
+`ask-astra.mjs`, `astra-share.mjs` and `review-astra.mjs`.
 
 Not a stub: `scripts/review-sol-cli.test.mjs` was reproduced red on this branch —
 18 of 19 cases failing — and the run went

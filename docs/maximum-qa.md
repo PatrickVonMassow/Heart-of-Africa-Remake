@@ -7,8 +7,8 @@ technique the project has built up (points 173, 184, 195–200, 203/203A, 204,
 **No ultracode / no large agent fan-outs.** Ultracode workflows burn the
 session/weekly token budget in minutes. Maximum QA runs as ordinary inline
 work: sequential checks, the driven visual sweep inspected in the main loop, and
-at most a *single* model-diverse audit pass by the OTHER vendor (`scripts/review-sol.mjs`
-/ `scripts/ask-sol.mjs --kind audit`) whose findings are always harvested and verified inline. See the memory
+at most a *single* model-diverse audit pass by the OTHER vendor (`scripts/review-astra.mjs`
+/ `scripts/ask-astra.mjs --kind audit`) whose findings are always harvested and verified inline. See the memory
 `workflows-token-budget`.
 
 Run the phases **in the order below**. Each real finding becomes its own atomic

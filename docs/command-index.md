@@ -8,17 +8,19 @@
 | `active-work-source.mjs` | Thin I/O adapter for the board's authoritative active-point projection. | — |
 | `alert-escalation-core.mjs` | THE ESCALATION LADDER (point 434, the remainder of part 1) — the pure half. | — |
 | `alert-escalation.mjs` | THE ESCALATION LADDER (point 434, remainder of part 1) — the I/O half. | — |
-| `ask-sol-core.mjs` | THE READ-ONLY PATH TO THE OTHER VENDOR, GENERALISED BEYOND REVIEWS (point 654, A1). | — |
-| `ask-sol.mjs` | ASK THE OTHER VENDOR FOR PURE TEXT WORK (work-order point 654, A1). | usage: node scripts/ask-sol.mjs [--model sol\|fable\|opus\|opus48] --kind <' + KINDS.join('\|') + '> --brief "<the question>" \\ |
+| `ask-astra-core.mjs` | THE READ-ONLY PATH TO THE OTHER VENDOR, GENERALISED BEYOND REVIEWS (point 654, A1). | — |
+| `ask-astra.mjs` | ASK THE OTHER VENDOR FOR PURE TEXT WORK (work-order point 654, A1). | usage: node scripts/ask-astra.mjs [--model astra\|fable\|opus\|opus48] --kind <' + KINDS.join('\|') + '> --brief "<the question>" \\ |
 | `assertionHealth.mjs` | Pure detector for assertions that CANNOT FAIL. | — |
+| `astra-share-core.mjs` | THE SWITCH THAT MOVES WORK BETWEEN THE TWO VENDORS (point 654, widened by 667). | — |
+| `astra-share.mjs` | THE SWITCH THAT MOVES WORK TOWARDS OPENAI (work-order point 654, A2; widened by 667). | usage: node scripts/astra-share.mjs --status \| --more \| --less \| --set <setting> [--json] |
 | `atomic-write.mjs` | Atomic JSON writes that survive a Windows moment (point 388, first live finding 28.07.2026). | — |
 | `attended-context-notice.mjs` | Durable once-per-session state for the attended context-ceiling notice. | — |
 | `audit-check.mjs` | Dependency audit gate (CLAUDE.md §7.1 pt.18). | — |
+| `author-astra-core.mjs` | THE OPENAI AUTHORING LANE, decided (point 667). | — |
+| `author-astra.mjs` | THE COMMAND THAT LETS THE OPENAI LANE AUTHOR A POINT (work-order point 667). | usage: node scripts/author-astra.mjs --point <N> [--findings <file>] [--rounds <n>] [--timeout <ms>] |
 | `author-fable-core.mjs` | Pure decisions for the Fable authoring command. | — |
-| `author-fable.mjs` | Commission the Fable authoring lane through the same durable worktree, ledger, push, gate-report and no-merge contract as author-sol.mjs. | usage: node scripts/author-fable.mjs --point <N> [--findings <file>] [--rounds <n>] [--timeout <ms>] |
+| `author-fable.mjs` | Commission the Fable authoring lane through the same durable worktree, ledger, push, gate-report and no-merge contract as author-astra.mjs. | usage: node scripts/author-fable.mjs --point <N> [--findings <file>] [--rounds <n>] [--timeout <ms>] |
 | `author-routing-core.mjs` | WHICH AUTHORING LANE A POINT GOES TO (point 667). | — |
-| `author-sol-core.mjs` | THE OPENAI AUTHORING LANE, decided (point 667). | — |
-| `author-sol.mjs` | THE COMMAND THAT LETS THE OPENAI LANE AUTHOR A POINT (work-order point 667). | usage: node scripts/author-sol.mjs --point <N> [--findings <file>] [--rounds <n>] [--timeout <ms>] |
 | `authorship-check-core.mjs` | PROVE WHO WROTE AN ARTEFACT FROM THE SESSION TRANSCRIPT (point 840). | — |
 | `authorship-check-io.mjs` | Filesystem adapter shared by every permission path that verifies authorship. | — |
 | `authorship-check.mjs` | Check an artefact's claimed author against per-message session metadata. | usage: node scripts/authorship-check.mjs --artefact <file> --at <ISO timestamp> \\ |
@@ -305,9 +307,9 @@
 | `retro-currency-guard.mjs` | Stop hook: GUARANTEE the retrospective document (docs/analysis_de/retrospektive-zusammenarbeit.md) stays current — enforcement, not a reminder (the document's own lesson #1: only blocking mechanisms hold). | — |
 | `retro-refresh.mjs` | Refresh the retrospective's auto-generated section (docs/analysis_de/retrospektive-zusammenarbeit.md — git-ignored, German). | — |
 | `retro-sources.mjs` | Shared fs/git source collector for the retrospective-currency toolchain (retro-refresh.mjs + retro-currency-guard.mjs). | — |
+| `review-astra-core.mjs` | Pure decision core of the CROSS-VENDOR four-eyes review (work-order point 624). | — |
+| `review-astra.mjs` | THE ONE COMMAND FOR A CROSS-VENDOR FOUR-EYES REVIEW (work-order point 624). | usage: node scripts/review-astra.mjs [--reviewer astra\|fable\|opus\|opus48] --sha <sha> --brief "<what to judge>" \\ |
 | `review-material-core.mjs` | WHAT A REVIEW ROUND ACTUALLY CARRIED — the material budget, its accounting, and the passes a range too large is cut into (work-order point 714). | — |
-| `review-sol-core.mjs` | Pure decision core of the CROSS-VENDOR four-eyes review (work-order point 624). | — |
-| `review-sol.mjs` | THE ONE COMMAND FOR A CROSS-VENDOR FOUR-EYES REVIEW (work-order point 624). | usage: node scripts/review-sol.mjs [--reviewer sol\|fable\|opus\|opus48] --sha <sha> --brief "<what to judge>" \\ |
 | `rule-echo-core.mjs` | WHEN A RULE CHANGES, EVERY PLACE THAT RESTATES IT MUST CHANGE WITH IT. | — |
 | `rule-echo-guard.mjs` | Stop hook: a rule that moved drags its restatements with it (user 17.08.2026). | — |
 | `rule-echo.mjs` | THE COMMAND BESIDE THE RULE-ECHO GUARD (user 17.08.2026). | usage: node scripts/rule-echo.mjs --status |
@@ -319,8 +321,6 @@
 | `session-context-ceiling-core.mjs` | SESSION CLASS POLICY FOR THE CONTEXT CEILING (point 748) — pure. | — |
 | `settled-owner-rulings.mjs` | The single tracked register of owner decisions that must not be put back to the owner. | — |
 | `settled-ruling-core.mjs` | Tests and support for settled-ruling-core. | — |
-| `sol-share-core.mjs` | THE SWITCH THAT MOVES WORK BETWEEN THE TWO VENDORS (point 654, widened by 667). | — |
-| `sol-share.mjs` | THE SWITCH THAT MOVES WORK TOWARDS OPENAI (work-order point 654, A2; widened by 667). | usage: node scripts/sol-share.mjs --status \| --more \| --less \| --set <setting> [--json] |
 | `tasks-archive-guard-core.mjs` | Pure decision core for the tasks-archive guard (user 26.07.2026). | — |
 | `tasks-archive-guard.mjs` | Stop hook: the work order stays split — TASKS.md open, docs/tasks-archive.md finished (user 26.07.2026). | — |
 | `tasks-source.mjs` | One place that knows the work order is stored in TWO files (user 26.07.2026). | — |

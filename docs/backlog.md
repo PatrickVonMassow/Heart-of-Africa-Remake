@@ -28,10 +28,11 @@ Format: one line per finding — `- YYYY-MM-DD <source> — <finding>`.
   handling is fine and the outage is on the provider. Confirmed 03.09. ~17:10: BOTH
   vendors had incidents on their status pages (user), Anthropic threw 529 Overloaded on
   Opus in the same window, and fresh community reports matched the exact Codex 404.
-  Effect: ask-sol/review-sol/author-sol exit 3. User decision 03.09.2026: do NOT take
+  Effect: the OpenAI-lane commands exit 3. User decision 03.09.2026: do NOT take
   the §6 same-vendor fallback for this — wait until the providers recover; the work goes
-  to the top models. No repo defect; re-probe with a minimal `ask-sol --kind explain`
-  before routing Sol work.
+  to the top models. No repo defect; re-probe with a minimal `ask-astra --kind explain`
+  before routing OpenAI-lane work. CLOSED 05.09.2026: `codex exec -m gpt-6-astra` answers
+  over provider `openai`, and the lane moved to GPT-6 Astra with that measurement.
 - 2026-09-04 `mechanism-review.mjs --record` prints the wrong reason when `--model-at`
   is not anchored. The reviewer identity check wants a timestamp that lands on an actual
   `message.model` row of the session transcript; a freshly generated `new Date()` is a

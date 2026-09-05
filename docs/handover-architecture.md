@@ -77,10 +77,10 @@ ruled out, and an implementer who does not see them re-proposes them.
 | Union entry | Sources | Disposition and merged meaning |
 |---|---|---|
 | M1 | A1+B1 merged | Decision: the two goals are not inherently conflicting; the conflict is an artefact of coupling worker lifetime and recoverability to the main session's process parentage. The in-flight declaration names branch, worktree, pid and log — enough to LOCATE the run, but not to adopt it: PID is reusable, so adoption additionally requires the stable batch, job, attempt and process-start identities and the adoption record that M17 defines. Handover must therefore cease to mean terminating active work. |
-| M2 | A2+B3 merged | The coupling is provably breakable, and the detached Sol authoring lane (scripts/author-sol.mjs) is the proof and the reference: measured 13.08.2026, it ran through the supervising session's landing of another point, a board rebuild and a failed boundary attempt, and would have survived that session's death. Treat that proven path as the reference worker contract: stable worktree and branch, detached launcher ownership, step commits, periodic pushes, heartbeat, log, and explicit terminal status. |
-| M3 | only A3a | Delegated AUTHORING runs as a detached process (the author-sol.mjs shape), never as an in-process Agent-tool subagent, whenever the point is authored rather than judged. |
+| M2 | A2+B3 merged | The coupling is provably breakable, and the detached Sol authoring lane (scripts/author-astra.mjs) is the proof and the reference: measured 13.08.2026, it ran through the supervising session's landing of another point, a board rebuild and a failed boundary attempt, and would have survived that session's death. Treat that proven path as the reference worker contract: stable worktree and branch, detached launcher ownership, step commits, periodic pushes, heartbeat, log, and explicit terminal status. |
+| M3 | only A3a | Delegated AUTHORING runs as a detached process (the author-astra.mjs shape), never as an in-process Agent-tool subagent, whenever the point is authored rather than judged. |
 | M4 | only B2 | Split the system into a short-lived coordinator plane and a session-independent worker plane: sessions select work, review, verify, land, and record progress, while durable workers author isolated points. |
-| M5 | only B4 | Add a model-neutral detached-worker adapter around available CLI runners; an adapter is handover-capable only if it satisfies the same checkpoint, push, heartbeat, status, and cancellation contract as author-sol.mjs. |
+| M5 | only B4 | Add a model-neutral detached-worker adapter around available CLI runners; an adapter is handover-capable only if it satisfies the same checkpoint, push, heartbeat, status, and cancellation contract as author-astra.mjs. |
 | M6 | only B5 | Do not relabel an Agent-tool child as durable: unsupported agents remain session-bound, and a boundary is blocked until those particular children finish or are safely stopped. |
 | M7 | only B6 | Make the OS launcher daemon, rather than a main session, the parent and lifecycle owner of every handover-capable worker so session exit cannot kill it. |
 | M8 | only B7 | Give every run a stable batch id, point id, attempt id, process-start identity, branch, worktree, base SHA, PID, log path, heartbeat path, and launcher lease. |
@@ -135,7 +135,7 @@ ruled out, and an implementer who does not see them re-proposes them.
 | M57 | only B52 | Report handover checkpoint wait, marker-to-successor-ready latency, running workers carried across each boundary, landing duration, and the share of token spend occurring above 150k context. |
 | M58 | only B53 | Accept the design after a representative multi-point batch reaches at least 90% eligible three-lane utilization, p95 checkpoint wait at most three minutes, p95 successor-ready latency at most five minutes, and less than 10% of tokens above 150k. |
 | M59 | only B54 | Require zero lost worker attempts, duplicate active writers, overlapping coordinator leases, unaccounted idle intervals, or silently missed boundaries; any nonzero count fails the trial regardless of average speed. |
-| M60 | only B55 | Roll out first with the already-proven author-sol.mjs adapter behind a handover-capable flag, then enable other adapters only after crash, stall, push-failure, marker-deletion, daemon-restart, and split-brain drills pass. |
+| M60 | only B55 | Roll out first with the already-proven author-astra.mjs adapter behind a handover-capable flag, then enable other adapters only after crash, stall, push-failure, marker-deletion, daemon-restart, and split-brain drills pass. |
 | M61 | only B56 | Retain the existing drain-before-boundary rule as the explicit safe fallback whenever any active lane lacks the durable contract; degradation is visible and slower, but never loses work. |
 
 All 14 A identifiers and all 56 B identifiers appear exactly once. The two units are counted separately, because they do not add up to each other: 70 SOURCE IDENTIFIERS (14 A + 56 B) map onto 61 UNION ENTRIES — 9 merged rows consuming 18 identifiers, and 52 rows carrying one identifier each (5 only A, 47 only B). Counted by `blind-merge.mjs`.
@@ -157,7 +157,7 @@ A bounded ready queue and completed-review backlog limit preserve parallelism wi
 The implementation lives in:
 
 - `CLAUDE.md`: lifecycle rules, role split, boundary prohibition, rejected alternatives and fallback.
-- `scripts/author-sol.mjs`: first conforming worker adapter.
+- `scripts/author-astra.mjs`: first conforming worker adapter.
 - `scripts/detached-agent.mjs`: common worker contract and adapter interface.
 - `scripts/batch-daemon.mjs`: new daemon entry point, global cap, leases, fencing and process ownership.
 - `scripts/batch-dispatch.mjs`: authorized queue, dependencies and backlog control.
@@ -230,7 +230,7 @@ survives a crash.
 
 3. Implement the daemon and the Sol adapter.
 
-   Add `scripts/batch-daemon.mjs`; move transferable process parentage, leases, stable identities, logs and heartbeats under it. Adapt `scripts/author-sol.mjs` without changing its proven authoring behavior. Commands must include `node scripts/batch-daemon.mjs start`, `status`, `stop` and `drill`. Verify worker survival after launcher-client exit, global-cap enforcement, daemon restart and the readiness rule of mechanism 1 — `start` reports ready only on a record whose launch nonce equals the one it generated, whose pid and pid start time probe live and whose state reads `running`, and a record left at `starting` must time the start out rather than satisfy it — with `npx vitest run scripts/detached-agent.test.mjs scripts/batch-daemon-core.test.mjs scripts/batch-daemon.test.mjs` (the union's `scripts/__tests__/…`, translated).
+   Add `scripts/batch-daemon.mjs`; move transferable process parentage, leases, stable identities, logs and heartbeats under it. Adapt `scripts/author-astra.mjs` without changing its proven authoring behavior. Commands must include `node scripts/batch-daemon.mjs start`, `status`, `stop` and `drill`. Verify worker survival after launcher-client exit, global-cap enforcement, daemon restart and the readiness rule of mechanism 1 — `start` reports ready only on a record whose launch nonce equals the one it generated, whose pid and pid start time probe live and whose state reads `running`, and a record left at `starting` must time the start out rather than satisfy it — with `npx vitest run scripts/detached-agent.test.mjs scripts/batch-daemon-core.test.mjs scripts/batch-daemon.test.mjs` (the union's `scripts/__tests__/…`, translated).
 
 4. Implement transferable declarations and fencing.
 
@@ -266,7 +266,7 @@ survives a crash.
 
 12. Run staged failure trials.
 
-    First enable only `author-sol.mjs`. Run normal handover plus worker crash, stall, push failure, dirty worktree, marker deletion, daemon restart, corrupt snapshot, PID reuse, duplicate coordinator, remote outage and checkpoint-timeout drills through `node scripts/batch-daemon.mjs drill --scenario <name>`. Run the complete regression layers with `npm run test:unit` and the LARGE browser gate `npm test` (CLAUDE.md §5); there is no Playwright here. Enable another adapter only after all drills pass.
+    First enable only `author-astra.mjs`. Run normal handover plus worker crash, stall, push failure, dirty worktree, marker deletion, daemon restart, corrupt snapshot, PID reuse, duplicate coordinator, remote outage and checkpoint-timeout drills through `node scripts/batch-daemon.mjs drill --scenario <name>`. Run the complete regression layers with `npm run test:unit` and the LARGE browser gate `npm test` (CLAUDE.md §5); there is no Playwright here. Enable another adapter only after all drills pass.
 
 13. Measure a representative trial before changing the default.
 
@@ -295,7 +295,7 @@ measurement is named.
 #### 1. How the daemon escapes the session that starts it
 
 This is the defect that killed the run of 21.08.2026, so it is stated against the code that failed
-and against a drill that reproduces it. `scripts/author-sol.mjs` spawns `codex` like this:
+and against a drill that reproduces it. `scripts/author-astra.mjs` spawns `codex` like this:
 
 ```js
 const child = spawn('codex', args, {
@@ -728,7 +728,7 @@ actually holds is narrow:
   than a residual: two writers of the same local state, one of them uninstrumented.
 
   **A previous draft said a legacy operation "runs inside a session process, so it cannot outlive
-  one", and mechanism 1 of this very document refutes that.** `scripts/author-sol.mjs` spawns a
+  one", and mechanism 1 of this very document refutes that.** `scripts/author-astra.mjs` spawns a
   DETACHED child; whether it survives its parent depends on its stdio, which is the entire subject
   above. Probing former session pids therefore proves nothing about their detached children. So
   the precondition probes the work, not only the workers:

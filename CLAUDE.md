@@ -77,16 +77,16 @@ strategy and suite map: `scripts/verify/README.md`.
 - A delegated author runs `node scripts/point-brief.mjs <N>`, may read named
   sections on demand, and escalates an ambiguous or insufficient brief instead
   of guessing. Regenerate a brief from an older revision.
-- Durable Sol authors are daemon-owned and survive handover; Agent-tool children stay session-bound and block it. Delegates test, commit, push, and never merge.
+- Durable Astra authors are daemon-owned and survive handover; Agent-tool children stay session-bound and block it. Delegates test, commit, push, and never merge.
 - The context fence remains preventive text, not a pointer: at its refusal mark
   do not begin agents, suites, points, or authoring; finish/reading/boundary
   remain allowed. It currently defaults to `observe` and refuses nothing until
   its arming point lands. Owner mechanics: `docs/batch-owner-runbook.md`.
-- **Model policy.** GPT-5.6 Sol authors difficult, complex, error-prone, and
+- **Model policy.** GPT-6 Astra authors difficult, complex, error-prone, and
   HIGH-criticality points; Opus 5 authors points whose verification is the work.
   Fable 5.1 authors tagged points and router escalations. Review is cross-vendor and
-  never by an author of the range: Sol reviews Claude work through
-  `scripts/review-sol.mjs`, Claude reviews Sol work. `node
+  never by an author of the range: Astra reviews Claude work through
+  `scripts/review-astra.mjs`, Claude reviews Astra work. `node
   scripts/fable-switch.mjs --status` is the sole answer whether Fable
   participates in authoring, serving, commit trailers, or blind merging.
   Serving models outside its reported chain pause the batch. Every commit names
