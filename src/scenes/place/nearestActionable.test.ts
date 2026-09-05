@@ -6,7 +6,6 @@
 import { describe, expect, it } from 'vitest'
 import {
   nearestActionable,
-  INTERACT_RADIUS,
   DOOR_TRIGGER_RADIUS,
   type Interactive,
   type PlaceLayout,
@@ -18,7 +17,6 @@ const layoutOf = (interactives: Interactive[]): PlaceLayout =>
 
 const bazaarA: Interactive = { type: 'bazaar', pos: [10, 12], door: [10, 0] }
 const agencyB: Interactive = { type: 'agency', pos: [-10, 12], door: [-10, 0] }
-const elder: Interactive = { type: 'villager', pos: [0, 0] }
 
 describe('nearestActionable', () => {
   it('returns null for a null layout', () => {
@@ -38,12 +36,6 @@ describe('nearestActionable', () => {
     expect(nearestActionable(layout, 10, DOOR_TRIGGER_RADIUS + 0.01)).toBeNull()
   })
 
-  it('addresses the elder within the interact radius, not beyond it', () => {
-    const layout = layoutOf([elder])
-    expect(nearestActionable(layout, INTERACT_RADIUS - 0.1, 0)).toBe(elder)
-    expect(nearestActionable(layout, INTERACT_RADIUS + 0.1, 0)).toBeNull()
-  })
-
   it('picks the actually-nearest of two doors', () => {
     const layout = layoutOf([bazaarA, agencyB])
     // Between the two doors but closer to B's door at (-10, 0).
@@ -52,7 +44,7 @@ describe('nearestActionable', () => {
   })
 
   it('returns null when the traveller is far from every interactive', () => {
-    const layout = layoutOf([bazaarA, agencyB, elder])
+    const layout = layoutOf([bazaarA, agencyB])
     expect(nearestActionable(layout, 50, 50)).toBeNull()
   })
 

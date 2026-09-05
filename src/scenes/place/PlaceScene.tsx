@@ -1,5 +1,5 @@
 // First-person place view (design.md §2): walkable port/village with
-// enterable trade buildings, chief hut audience and a villager NPC.
+// enterable trade buildings and the chief met outside his hut.
 // Building *positions and looks* are procedural per run (design.md §18);
 // which buildings exist is fixed per place kind. Visuals: TSL sky dome and
 // noise materials, sun shadows, detailed buildings, palms and scatter props.
@@ -172,7 +172,6 @@ const placeRainColor = new THREE.Color(RAIN_GRAY)
 
 /** Display label of an interactive in the current language. */
 function interactiveLabel(strings: ReturnType<typeof getStrings>, type: Interactive['type']): string {
-  if (type === 'villager') return strings.labels.talkToElder
   return strings.buildings[type]
 }
 
@@ -485,69 +484,6 @@ function VillageHut({
           <div className="map-label">{label}</div>
         </Html>
       )}
-    </group>
-  )
-}
-
-function Villager({
-  item,
-  style,
-  dress,
-}: {
-  item: Interactive
-  style: RegionPlaceStyle
-  dress: ColdDress | null
-}) {
-  const t = useStrings()
-  const robe = style.cloth[0]
-  // In the cold the elder wears his cloak over the shoulders (design.md
-  // §19.13) — the shoulder cloth IS that garment, so it takes the cloak's
-  // colour rather than growing a second one. Without it he would stand in
-  // summer dress among cloaked villagers.
-  // The elder wears the season's wrap whenever there is one — and ALWAYS, even
-  // where the garment is rank-gated for everyone else: he is the notable. Barth
-  // on the Tuareg, "the principal people wear a red bernus thrown across their
-  // shoulders"; on the Hausa zenne, "only the wealthier amongst them can
-  // afford" it. If anyone in the village owns one, it is this man.
-  const shoulder = dress
-    ? cloakForCloth(dress.cloaks, dress.palette, style.cloth[1 % style.cloth.length])
-    : style.cloth[1 % style.cloth.length]
-  return (
-    // NOT marked for the §17.8 Ctrl layer: this figure already carries his own
-    // standing label below, so the layer would print the same word twice over
-    // one man (measured — two "Elder" boxes stacked in the frame).
-    <group position={[item.pos[0], 0, item.pos[1]]}>
-      {/* Robe */}
-      <mesh position={[0, 0.62, 0]} castShadow>
-        <coneGeometry args={[0.42, 1.25, TESSELLATION.figureBody]} />
-        <meshStandardMaterial color={robe} roughness={0.95} />
-      </mesh>
-      {/* Torso and shoulder cloth */}
-      <mesh position={[0, 1.28, 0]} castShadow>
-        <cylinderGeometry args={[0.22, 0.28, 0.5, TESSELLATION.figureBody]} />
-        <meshStandardMaterial color={shoulder} roughness={0.95} />
-      </mesh>
-      {/* Head with gray hair */}
-      <mesh position={[0, 1.68, 0]} castShadow>
-        <sphereGeometry args={[0.2, ...TESSELLATION.figureHead]} />
-        <meshStandardMaterial color="#5c3317" roughness={0.85} />
-      </mesh>
-      <mesh position={[0, 1.8, 0]}>
-        <sphereGeometry args={[0.19, ...TESSELLATION.figureCap, 0, Math.PI * 2, 0, Math.PI / 2.6]} />
-        <meshStandardMaterial color="#cfc8bd" roughness={1} />
-      </mesh>
-      {/* Walking staff */}
-      <mesh position={[0.38, 0.95, 0.05]} rotation={[0, 0, -0.08]} castShadow>
-        <cylinderGeometry args={[0.03, 0.04, 1.9, 6]} />
-        <meshStandardMaterial color="#5f4526" roughness={0.9} />
-      </mesh>
-      <mesh position={[0.4, 1.92, 0.05]}>
-        <sphereGeometry args={[0.06, ...TESSELLATION.figureHand]} />
-        <meshStandardMaterial color="#4a3018" roughness={0.9} />
-      </mesh>
-      <Html center position={[0, 2.3, 0]} distanceFactor={14}>
-        <div className="map-label">{t.labels.oldMan}</div>
-      </Html>
     </group>
   )
 }
@@ -2477,7 +2413,7 @@ export function PlaceScene() {
   const sandy = isPort || isMonument
   const style = REGION_PLACE_STYLES[place?.region ?? 'west']
   // The settlement's cold-weather dress (§19.13). Shared with PlaceLife so the
-  // elder and the villagers dress for the same season.
+  // chief and the villagers dress for the same season.
   const dress = useColdCloaks(placeId, style.cloth)
   // The warming-fire season (point 142): the village fire burns harder when
   // the place's own season is cold or dust-chilled — the same drivers the
@@ -2702,11 +2638,9 @@ export function PlaceScene() {
   }, [gl])
 
   // Functional buildings are entered with the Space use key while standing at
-  // their door (design.md §2.3); the elder is addressed with the same key.
+  // their door (design.md §2.3).
   const openBuilding = (near: Interactive) => {
     const game = useGame.getState()
-    // The elder is addressed via talkToVillager, not this building path.
-    if (near.type === 'villager') return
     // A building's modal opens over the (non-modal) journal — close the book so
     // the dialog is unobstructed (design.md §16/§17).
     if (game.journalOpen) game.setJournalOpen(false)
@@ -2728,9 +2662,9 @@ export function PlaceScene() {
     }
   }
 
-  // Use key (Space, design.md §2.3/§17.5): addresses the elder when near him,
-  // or enters the functional building at whose door the traveller stands. A
-  // ref keeps openBuilding stable for the one-shot subscription.
+  // Use key (Space, design.md §2.3/§17.5): enters the functional building at
+  // whose door the traveller stands, or calls the chief out of his hut. A ref
+  // keeps openBuilding stable for the one-shot subscription.
   const openBuildingRef = useRef(openBuilding)
   openBuildingRef.current = openBuilding
   // PlaceScene stays mounted across placeId changes and the handler's effect
@@ -2794,8 +2728,7 @@ export function PlaceScene() {
       const p = player.current
       const near = nearestActionable(layoutRef.current, p.x, p.z)
       if (!near) return
-      if (near.type === 'villager') useGame.getState().talkToVillager()
-      else openBuildingRef.current(near)
+      openBuildingRef.current(near)
     })
     return () => {
       off()
@@ -3096,7 +3029,6 @@ export function PlaceScene() {
       )}
 
       {layout.interactives.map((it, i) => {
-        if (it.type === 'villager') return <Villager key={i} item={it} style={style} dress={dress} />
         if (isPort) return <PortBuilding key={i} item={it} mats={mats} variant={i} />
         // Village trading post: a plain hut labelled as the market.
         if (it.type === 'market')
@@ -3118,13 +3050,11 @@ export function PlaceScene() {
       {/* Orientation after meeting the chief (design.md §17): the important,
           enterable buildings carry a pulsing marker. */}
       {orientationGiven[place.id] &&
-        layout.interactives
-          .filter((it) => it.type !== 'villager')
-          .map((it, i) => (
-            <Html key={`hl-${i}`} center position={[it.pos[0], isPort ? 5.4 : 5.6, it.pos[1]]} distanceFactor={40}>
-              <div className="building-highlight">▼</div>
-            </Html>
-          ))}
+        layout.interactives.map((it, i) => (
+          <Html key={`hl-${i}`} center position={[it.pos[0], isPort ? 5.4 : 5.6, it.pos[1]]} distanceFactor={40}>
+            <div className="building-highlight">▼</div>
+          </Html>
+        ))}
 
       {/* Non-enterable dwellings and outbuildings (design.md §2 lively settlements) */}
       {layout.dwellings.map((d, i) => (
@@ -3185,7 +3115,7 @@ export function PlaceScene() {
           seed={seed}
           placeId={place.id}
           style={style}
-          buildings={layout.interactives.filter((it) => it.type !== 'villager').map((it) => it.pos)}
+          buildings={layout.interactives.map((it) => it.pos)}
           playRocks={layout.playRocks}
           playGround={layout.playGround}
           rocks={layout.rocks}

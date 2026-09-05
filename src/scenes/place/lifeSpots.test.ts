@@ -259,15 +259,10 @@ describe('every shipped village can seat its children (point 524)', () => {
     expect(free / n, `${id}: the finished ground is as open as the chosen one`).toBeCloseTo(g.openness, 6)
   })
 
-  it('counts the buildings as fabric and the villager markers not', () => {
+  it('counts every building as fabric', () => {
     const layout = buildLayout('maasai-village', 7)
     const fabric = builtFabric(layout)
-    expect(fabric.length).toBe(
-      layout.dwellings.length + layout.interactives.filter((it) => it.type !== 'villager').length,
-    )
-    expect(layout.interactives.some((it) => it.type === 'villager')).toBe(true)
-    for (const it of layout.interactives) {
-      if (it.type === 'villager') expect(fabric).not.toContainEqual(it.pos)
-    }
+    expect(fabric.length).toBe(layout.dwellings.length + layout.interactives.length)
+    for (const it of layout.interactives) expect(fabric).toContainEqual(it.pos)
   })
 })

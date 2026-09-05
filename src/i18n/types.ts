@@ -150,8 +150,6 @@ export interface Strings {
   }
 
   labels: {
-    talkToElder: string
-    oldMan: string
     /** Use-key prompt at the hut of a chief standing in the open (§12). */
     speakToChief: string
     /** Standing label over the chief himself, once he is outside (§12). */
@@ -344,7 +342,6 @@ export interface Strings {
     bought(name: string): string
     notEnoughMoney: string
     digNoShovel: string
-    villagerNod: string
     /** The chief has come out of his hut and stands in the open (§12). */
     chiefStepsOut: string
     /** This chief has no drum message of his own to send (§13.4). */
@@ -778,8 +775,6 @@ export interface Strings {
       artefactGiven: string
       decoded: string
       unspecific: string
-      giftLore: string
-      language(p: TextParams): string
       victory: string
       foodLow: string
       foodOut: string
@@ -842,16 +837,12 @@ export interface Strings {
     giftRevered(p: TextParams): string
     giftNeutral: string
     giftRejected(p: TextParams): string
-    /** Elder lesson on the region's direction system (design.md §13.2). */
-    languageLesson(p: TextParams): string
     /** Raw location hint in the region's own words (design.md §13.1/13.3). */
     hintRaw(p: TextParams): string
-    /** Deciphered version once the language is learned. */
+    /** Deciphered version of the same hint. */
     hintDecoded(p: TextParams): string
     /** Unspecific knowledge pointing to the knowing people (§13.3). */
     unspecific(p: TextParams): string
-    /** What the region reveres (design.md §8), told by an elder. */
-    giftLore(p: TextParams): string
     /** The chief's drums beat his message out (design.md §13.4, point 486). */
     drumMessage: string
     /** The dig at the boulder the drum message sends the traveller to (point 487). */

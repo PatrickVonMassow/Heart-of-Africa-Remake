@@ -140,7 +140,6 @@ export const en: Strings = {
       leopard: { noun: 'leopard', gender: 'n' },
       hyena: { noun: 'hyena', gender: 'n' },
       vulture: { noun: 'vulture', gender: 'n' },
-      elder: { noun: 'elder', gender: 'n' },
       trader: { noun: 'trader', gender: 'n' },
       porter: { noun: 'porter', gender: 'n' },
       villager: { noun: 'villager', gender: 'n' },
@@ -241,8 +240,6 @@ export const en: Strings = {
   },
 
   labels: {
-    talkToElder: 'Talk to the elder',
-    oldMan: 'Elder',
     speakToChief: 'Speak to the chief',
     chief: 'Chief',
     graveDebug: 'Grave (debug)',
@@ -373,7 +370,6 @@ export const en: Strings = {
     bought: (name) => `${name} purchased.`,
     notEnoughMoney: 'Not enough money.',
     digNoShovel: 'I cannot dig without a shovel in hand.',
-    villagerNod: 'The old man gives me a friendly nod.',
     drumsSending: 'The chief calls his drummer. The message is going out over the village.',
     chiefStepsOut: 'The chief steps out of his hut and stands before me in the open.',
     chiefNoMessage: 'The chief looks me over and nods. He has nothing to send out over the village.',
@@ -778,8 +774,6 @@ export const en: Strings = {
       artefactGiven: 'Into the Hands of the Chief',
       decoded: 'Deciphered!',
       unspecific: 'Vague Murmurs',
-      giftLore: 'What the People Revere',
-      language: (p: TextParams) => `The Language of the ${en.regions[p.region as keyof typeof en.regions]}`,
       victory: 'The Heart of Africa',
       foodLow: 'Provisions Running Low',
       foodOut: 'Provisions Exhausted',
@@ -999,21 +993,6 @@ export const en: Strings = {
       'The chief accepted my gift with a polite nod. [somber]No light came into his eyes —[pause] it was not, I think, what his people hold dear.[/somber] [pause]But a beginning has been made.',
     giftRejected: (p: TextParams) =>
       `[fear]A grave mistake![/fear] No sooner had the chief of the ${PEOPLES[p.people as string]} laid eyes on my gift than his face darkened. [somber]What I offered counts among his people as an ill omen.[pause] I was led out without a word.[/somber] [breath][weary]It will take time to wear down this mistrust.[/weary]`,
-    languageLesson: (p: TextParams) => {
-      const texts: Record<string, string> = {
-        north:
-          'An old man by the fire spoke with me at length, with hands as much as words. He named the winds: [emph]"Nivera"[/emph] where the cold night wind is born — toward midnight —, "Chamsina" for the hot breath of noon, "Levantra" for the morning, "Gharbia" for the evening. [breath][excited]Now I understand:[pause] the North reads its directions from the origin of the wind, and [emph]"Nivera" means north![/emph][/excited]',
-        west:
-          'An elder drew four marks into the dust and spoke slowly: [emph]"koko"[/emph] toward midnight, [emph]"Katula"[/emph] toward the sunrise, "Phuthswama" toward noon, "Mimbumi" toward the sunset. [breath][excited]The words of the West are mine now:[pause] koko is north, Katula is east![/excited]',
-        central:
-          'By the fire an elder kept pointing at the great river, which his people call [emph]"Utomba"[/emph] — the Mongdamara. Everything lies "wa-Utomba" or "ka-Utomba": away from the river or toward it, "lem-Utomba" toward the sunrise side, "mos-Utomba" toward the sunset. [breath][excited]The forest measures the world from its river![/excited]',
-        east:
-          'An old herdsman raised his staff toward the shining mountain his people call [emph]"Odabi"[/emph] — the Unumpara. From it flow the directions: [emph]"Relolo"[/emph] beyond it toward midnight, "Dethamee" toward noon, "Salewa" toward the sunrise, "Munjori" toward the sunset. [breath][excited]The East measures the world from the holy mountain![/excited]',
-        south:
-          'An elder woman laughed at my compass and pointed at the sky: her people name the directions after the seasons — [emph]toward summer[/emph] is toward midnight, toward winter is noon, spring is the sunrise, autumn the sunset. [breath][excited]What a curious, beautiful way to carry the world![/excited]',
-      }
-      return texts[p.region as string]
-    },
     hintRaw: (p: TextParams) => {
       const regionId = p.region as string
       const w = DIRECTION_WORDS[regionId as keyof typeof DIRECTION_WORDS]
@@ -1048,8 +1027,6 @@ export const en: Strings = {
     },
     unspecific: (p: TextParams) =>
       `The chief nodded gravely, waved his hands and said again and again only [emph]"${p.word}"[/emph]. [somber]Whatever he knows, he cannot or will not say it in words I grasp.[/somber] [pause]But he pointed insistently toward the villages of the [emph]${PEOPLES[p.people as string]}[/emph] — [excited]they are said to know more.[/excited]`,
-    giftLore: (p: TextParams) =>
-      `The old man spoke of the treasures of his land: what his people revere above all is [emph]${en.gifts[p.gift as keyof typeof en.gifts]}[/emph]. [pause]A chief honored with it will open his heart.`,
     drumMessage:
       '[awe]The chief called his drummer, and two drums spoke for him — a great one and a small one.[/awe] [pause]Four words, each of four beats, each parted from the next by the same short silence — deep for the low syllable, bright for the high one. [excited]I know these words. I have heard every one of them in the lanes and at the water.[/excited] [pause]I have written them down in the order they were beaten; what they ask of me I must read for myself.',
     rockArtefact:

@@ -52,7 +52,7 @@ const VILLAGES = PLACES.filter((p) => p.kind === 'village')
 /** Circle-approximated body radius of a solid building. */
 const bodyR = (d: DwellingDef) => d.r
 const interactiveR = (it: Interactive, port: boolean) =>
-  it.type === 'villager' ? 0 : port ? 3.2 : it.type === 'market' ? 2.9 : 3.35
+  port ? 3.2 : it.type === 'market' ? 2.9 : 3.35
 
 interface Body {
   x: number
@@ -158,18 +158,6 @@ describe.each(SEEDS)('layout invariants (seed %i)', (seed) => {
     }
   })
 
-  it.each(VILLAGES.map((v) => [v.id] as const))('%s: the elder stands clear of every door trigger', (id) => {
-    const layout = buildLayout(id, seed)
-    const elder = layout.interactives.find((i) => i.type === 'villager')!
-    for (const it2 of layout.interactives) {
-      if (!it2.door) continue
-      expect(
-        Math.hypot(elder.pos[0] - it2.door[0], elder.pos[1] - it2.door[1]),
-        `${id}: elder vs ${it2.type} door`,
-      ).toBeGreaterThan(3.3)
-    }
-  })
-
   it.each(PLACES.map((p) => [p.id] as const))('%s: no building corner reaches the walkable edge', (id) => {
     const layout = buildLayout(id, seed)
     for (const d of layout.dwellings) {
@@ -211,7 +199,7 @@ describe.each(SEEDS)('layout invariants (seed %i)', (seed) => {
     }
     expect(lateral, `${id}: lanes are winding`).toBeGreaterThan(1)
     // Six functional buildings, each fronting a lane with its door.
-    const functional = layout.interactives.filter((it) => it.type !== 'villager')
+    const functional = layout.interactives
     expect(functional).toHaveLength(6)
     for (const it of functional) {
       expect(it.rot, `${id}: ${it.type} carries its yaw`).toBeTypeOf('number')

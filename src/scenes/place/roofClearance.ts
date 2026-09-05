@@ -293,7 +293,6 @@ export function dwellingRoofProfile(d: DwellingDef, style: RegionPlaceStyle): Pl
 
 /** Roof(s) of one enterable building. */
 function interactiveRoofs(it: Interactive, style: RegionPlaceStyle, port: boolean): PlaceRoof[] {
-  if (it.type === 'villager') return []
   const [x, z] = it.pos
   if (port) {
     const rot = it.rot ?? 0

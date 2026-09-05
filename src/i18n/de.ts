@@ -140,7 +140,6 @@ export const de: Strings = {
       leopard: { noun: 'Leopard', gender: 'm' },
       hyena: { noun: 'Hyäne', gender: 'f' },
       vulture: { noun: 'Geier', gender: 'm' },
-      elder: { noun: 'Ältester', gender: 'm' },
       trader: { noun: 'Händler', gender: 'm' },
       porter: { noun: 'Träger', gender: 'm' },
       villager: { noun: 'Dorfbewohner', gender: 'm' },
@@ -243,8 +242,6 @@ export const de: Strings = {
   },
 
   labels: {
-    talkToElder: 'Mit dem Alten sprechen',
-    oldMan: 'Alter Mann',
     speakToChief: 'Mit dem Oberhaupt sprechen',
     chief: 'Oberhaupt',
     graveDebug: 'Grab (Debug)',
@@ -375,7 +372,6 @@ export const de: Strings = {
     bought: (name) => `${name} gekauft.`,
     notEnoughMoney: 'Nicht genug Geld.',
     digNoShovel: 'Ohne Schaufel in der Hand kann ich nicht graben.',
-    villagerNod: 'Der Alte nickt mir freundlich zu.',
     drumsSending: 'Das Oberhaupt ruft seinen Trommler. Die Botschaft geht über das Dorf hinaus.',
     chiefStepsOut: 'Das Oberhaupt tritt aus seiner Hütte und steht vor mir im Freien.',
     chiefNoMessage: 'Das Oberhaupt mustert mich und nickt. Es hat nichts über das Dorf hinauszusenden.',
@@ -780,15 +776,6 @@ export const de: Strings = {
       artefactGiven: 'In die Hände des Oberhaupts',
       decoded: 'Entschlüsselt!',
       unspecific: 'Unbestimmtes Gemurmel',
-      giftLore: 'Was das Volk verehrt',
-      language: (p: TextParams) => {
-        const names: Record<string, string> = {
-          north: 'Die Sprache des Nordens', west: 'Die Sprache des Westens',
-          central: 'Die Sprache des Dschungels', east: 'Die Sprache des Ostens',
-          south: 'Die Sprache des Südens',
-        }
-        return names[p.region as string]
-      },
       victory: 'Das Herz von Afrika',
       foodLow: 'Proviant knapp',
       foodOut: 'Proviant aufgebraucht',
@@ -1010,21 +997,6 @@ export const de: Strings = {
       'Das Oberhaupt nahm meine Gabe mit höflichem Nicken entgegen. [somber]Kein Leuchten in den Augen –[pause] es war wohl nicht das, was sein Volk verehrt.[/somber] [pause]Aber ein Anfang ist gemacht.',
     giftRejected: (p: TextParams) =>
       `[fear]Ein schwerer Fehler![/fear] Kaum sah das Oberhaupt der ${PEOPLES[p.people as string]} meine Gabe, verfinsterte sich seine Miene. [somber]Was ich anbot, gilt seinem Volk als Unglücksbringer.[pause] Man führte mich wortlos hinaus.[/somber] [breath][weary]Ich muss dieses Misstrauen erst wieder abtragen.[/weary]`,
-    languageLesson: (p: TextParams) => {
-      const texts: Record<string, string> = {
-        north:
-          'Ein alter Mann am Feuer sprach lange mit mir, mit Händen und Worten. Er nannte die Winde: [emph]„Nivera"[/emph], wo der kalte Nachtwind geboren wird – gen Mitternacht –, „Chamsina" für den heißen Atem des Mittags, „Levantra" für den Morgen, „Gharbia" für den Abend. [breath][excited]Ich begreife:[pause] Der Norden liest seine Richtungen am Ursprung des Windes, und [emph]„Nivera" bedeutet Norden![/emph][/excited]',
-        west:
-          'Ein Ältester zog vier Striche in den Staub und sprach bedächtig: [emph]„koko"[/emph] gen Mitternacht, [emph]„Katula"[/emph] gen Sonnenaufgang, „Phuthswama" gen Mittag, „Mimbumi" gen Sonnenuntergang. [breath][excited]Die Worte des Westens gehören nun mir:[pause] koko ist Norden, Katula ist Osten![/excited]',
-        central:
-          'Am Feuer wies ein Alter immer wieder auf den großen Fluss, den sein Volk [emph]„Utomba"[/emph] nennt – den Mongdamara. Alles liegt „wa-Utomba" oder „ka-Utomba": fort vom Fluss oder zu ihm hin, „lem-Utomba" zur Sonnenaufgangsseite, „mos-Utomba" zum Sonnenuntergang. [breath][excited]Der Wald misst die Welt an seinem Fluss![/excited]',
-        east:
-          'Ein alter Hirte hob den Stab zum leuchtenden Berg, den sein Volk [emph]„Odabi"[/emph] nennt – den Unumpara. Von ihm gehen die Richtungen aus: [emph]„Relolo"[/emph] jenseits von ihm gen Mitternacht, „Dethamee" gen Mittag, „Salewa" gen Sonnenaufgang, „Munjori" gen Sonnenuntergang. [breath][excited]Der Osten misst die Welt am heiligen Berg![/excited]',
-        south:
-          'Eine alte Frau lachte über meinen Kompass und deutete in den Himmel: Ihr Volk nennt die Richtungen nach den Jahreszeiten – [emph]gen Sommer[/emph] heißt gen Mitternacht, gen Winter gen Mittag, Frühling ist der Sonnenaufgang, Herbst der Sonnenuntergang. [breath][excited]Was für eine wunderliche, schöne Art, die Welt zu tragen![/excited]',
-      }
-      return texts[p.region as string]
-    },
     hintRaw: (p: TextParams) => {
       const regionId = p.region as string
       const w = DIRECTION_WORDS[regionId as keyof typeof DIRECTION_WORDS]
@@ -1060,8 +1032,6 @@ export const de: Strings = {
     },
     unspecific: (p: TextParams) =>
       `Das Oberhaupt nickte ernst, ruderte mit den Händen und sagte immer wieder nur [emph]„${p.word}"[/emph]. [somber]Was immer es weiß – es kann oder will es nicht in Worten sagen, die ich fasse.[/somber] [pause]Doch es wies beharrlich zu den Dörfern der [emph]${PEOPLES[p.people as string]}[/emph] – [excited]sie sollen mehr wissen.[/excited]`,
-    giftLore: (p: TextParams) =>
-      `Der Alte sprach von den Schätzen seines Landes: Was sein Volk über alles verehrt, ist [emph]${de.gifts[p.gift as keyof typeof de.gifts]}[/emph]. [pause]Ein damit geehrtes Oberhaupt öffnet sein Herz.`,
     drumMessage:
       '[awe]Das Oberhaupt rief seinen Trommler, und zwei Trommeln sprachen an seiner Statt – eine große und eine kleine.[/awe] [pause]Vier Wörter zu je vier Schlägen, jedes vom nächsten durch dieselbe kurze Stille getrennt – dumpf für die tiefe Silbe, hell für die hohe. [excited]Ich kenne diese Wörter. Jedes einzelne habe ich in den Gassen und am Wasser gehört.[/excited] [pause]Ich habe sie in der Reihenfolge notiert, in der sie geschlagen wurden; was sie von mir verlangen, muss ich selbst lesen.',
     rockArtefact:

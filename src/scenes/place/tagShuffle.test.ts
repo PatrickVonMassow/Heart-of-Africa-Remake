@@ -164,7 +164,7 @@ function crowd(
 
   // The porters, on the routes `Porters` builds from the settlement's buildings.
   const rand = mulberry32((seed + 4711) >>> 0)
-  const stops = layout.interactives.filter((it) => it.type !== 'villager').map((it) => it.pos)
+  const stops = layout.interactives.map((it) => it.pos)
   const routes = Array.from({ length: Math.min(3, Math.max(1, stops.length)) }, (_, i) => {
     const a = stops[i % stops.length]
     const px = (rand() - 0.5) * 7

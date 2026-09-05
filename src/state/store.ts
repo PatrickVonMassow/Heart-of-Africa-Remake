@@ -227,12 +227,8 @@ export interface GameState {
   hintsGiven: Partial<Record<RegionId, boolean>>
   /** Regions whose raw hint has been deciphered into a decoded entry. */
   decodedGiven: Partial<Record<RegionId, boolean>>
-  /** Regions whose direction system has been learned from an elder (§13.2). */
-  languagesLearned: Partial<Record<RegionId, boolean>>
   /** Villages whose chief already shared his unspecific knowledge. */
   unspecificGiven: Record<string, boolean>
-  /** Regions whose revered gift an elder has revealed (§8). */
-  giftLoreGiven: Partial<Record<RegionId, boolean>>
   graveLatLon: LatLon
   victory: boolean
   /** Short-lived HUD message. */
@@ -267,7 +263,6 @@ export interface GameState {
   /** Travel agency (design.md §10): passage to another port city. */
   bookFerry: (destId: string) => void
   giveGift: (material: Material) => void
-  talkToVillager: () => void
   /** Present a carried valuable to a village — provokes the §8 reaction. */
   presentValuable: (treasure: TreasureId) => void
   /** Pitch a camp in the open, or reopen the one nearby (design.md §6). */
@@ -548,9 +543,7 @@ export function startState(seed: number, placeId: string = startPlaceId()) {
     knowingVillages: pickKnowingVillages(seed),
     hintsGiven: {} as Partial<Record<RegionId, boolean>>,
     decodedGiven: {} as Partial<Record<RegionId, boolean>>,
-    languagesLearned: {} as Partial<Record<RegionId, boolean>>,
     unspecificGiven: {} as Record<string, boolean>,
-    giftLoreGiven: {} as Partial<Record<RegionId, boolean>>,
     graveLatLon: generateGrave(seed),
     victory: false,
     toast: null,
@@ -1817,7 +1810,7 @@ export const useGame = create<GameState>()((set, get) => ({
 
   revealDecoded: (region) => {
     const s = get()
-    if (s.decodedGiven[region] || !s.hintsGiven[region] || !s.languagesLearned[region]) return
+    if (s.decodedGiven[region] || !s.hintsGiven[region]) return
     set({ decodedGiven: { ...s.decodedGiven, [region]: true } })
     const g = s.graveLatLon
     get().addEntry(
@@ -1826,34 +1819,6 @@ export const useGame = create<GameState>()((set, get) => ({
       'hint',
       'compass',
     )
-  },
-
-  talkToVillager: () => {
-    const s = get()
-    if (!s.placeId) return
-    const region = placeById(s.placeId).region
-    // First talk: the elder teaches the region's direction system (§13.2);
-    // a second talk reveals what the region reveres (§8).
-    if (!s.languagesLearned[region]) {
-      set({ languagesLearned: { ...s.languagesLearned, [region]: true } })
-      get().addEntry(
-        { key: 'journal.titles.language', params: { region } },
-        { key: 'journal.languageLesson', params: { region } },
-        'hint',
-        'face',
-      )
-      get().revealDecoded(region)
-      return
-    }
-    if (!s.giftLoreGiven[region]) {
-      set({ giftLoreGiven: { ...s.giftLoreGiven, [region]: true } })
-      get().addEntry(
-        { key: 'journal.titles.giftLore' },
-        { key: 'journal.giftLore', params: { gift: REGION_VALUES[region].revered[0], region } },
-      )
-      return
-    }
-    set({ toast: getStrings().toasts.villagerNod })
   },
 
   pitchOrOpenCamp: () => {
@@ -2029,7 +1994,7 @@ export const useGame = create<GameState>()((set, get) => ({
       visitedPlaces: s.visitedPlaces, enteredPlaces: s.enteredPlaces, placeSituations: s.placeSituations,
       goodwill: s.goodwill, reveredGiftGiven: s.reveredGiftGiven, chiefOutside: s.chiefOutside,
       knowingVillages: s.knowingVillages, hintsGiven: s.hintsGiven, decodedGiven: s.decodedGiven,
-      languagesLearned: s.languagesLearned, unspecificGiven: s.unspecificGiven, giftLoreGiven: s.giftLoreGiven,
+      unspecificGiven: s.unspecificGiven,
       graveLatLon: s.graveLatLon, foodWarned: s.foodWarned, foodOutWarned: s.foodOutWarned,
       penaltyJournaled: s.penaltyJournaled,
       dangerWarned: s.dangerWarned,
@@ -2099,9 +2064,7 @@ export const useGame = create<GameState>()((set, get) => ({
         knowingVillages: snap.knowingVillages ?? pickKnowingVillages(snap.seed ?? 0),
         hintsGiven: snap.hintsGiven ?? {},
         decodedGiven: snap.decodedGiven ?? {},
-        languagesLearned: snap.languagesLearned ?? {},
         unspecificGiven: snap.unspecificGiven ?? {},
-        giftLoreGiven: snap.giftLoreGiven ?? {},
         afflictions: snap.afflictions ?? { fever: false, dehydration: false, sunblind: false, wounds: 0 },
         sunblindRecovery: snap.sunblindRecovery ?? 0,
         dryDays: snap.dryDays ?? 0,

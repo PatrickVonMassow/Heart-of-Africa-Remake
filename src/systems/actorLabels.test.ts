@@ -27,7 +27,7 @@ describe('qualifiesAsActor — what can move, or be used', () => {
   it('vultures, inhabitants, their animals and the usable objects are named', () => {
     const kinds = [
       'vulture',
-      'elder', 'trader', 'porter', 'villager', 'child',
+      'trader', 'porter', 'villager', 'child',
       'guide', 'cameleer', 'donkeyboy', 'tourist',
       'goat', 'camel', 'donkey',
       'camp', 'canoe',
@@ -135,8 +135,8 @@ describe('actorLabelText — kind, age, state, in both languages', () => {
   })
 
   it('people read by their role and objects by their kind', () => {
-    expect(actorLabelText(en, { kind: 'elder' })).toBe('Elder')
-    expect(actorLabelText(de, { kind: 'elder' })).toBe('Ältester')
+    expect(actorLabelText(en, { kind: 'trader' })).toBe('Trader')
+    expect(actorLabelText(de, { kind: 'trader' })).toBe('Händler')
     expect(actorLabelText(en, { kind: 'canoe' })).toBe('Canoe')
     expect(actorLabelText(de, { kind: 'canoe' })).toBe('Kanu')
   })
