@@ -53,3 +53,16 @@ Format: one line per finding — `- YYYY-MM-DD <source> — <finding>`.
   keyed by fixture ids (`x`, `answer-test-session`, `tool-output-interception-test`) that tests
   wrote into the live file. No harm now that the tests are pinned, but a live registry that
   tests can write is the shape that made 05.09. possible; worth a sweep and a fixture path.
+- 2026-09-05 four abandoned feature branches and their worktrees survive their points.
+  Measured on main: `feat/834-durable-authoring-lane` (122 commits ahead, last 24.08.) belongs
+  to a point that was CUT that same day into 889–895 and landed instead through
+  `feat/834-takeover-drills` (merge b8f169f73), so its branch is dead work still holding a
+  worktree; `feat/847-brevity-guard-gaps` (17 commits, last 23.08.) belongs to a point that is
+  still OPEN, so its work is unmerged rather than dead; `feat/901-superseded-ci-run` and
+  `feat/1049-queue-order-rule` each carry a single "Record hostile-test authoring commission"
+  commit and nothing else. Nothing is lost — everything is committed and on a branch — but the
+  five live worktrees are what makes `batch-doctor --gate` report every unit run INCONCLUSIVE
+  under load, which is how they were found. Non-blocking, and deliberately NOT acted on here:
+  deleting 847's branch would discard work for an open point, and the "merge ends the branch"
+  rule says nothing about a branch whose point was cut. Whoever picks this up decides per
+  branch, and asks before any deletion.

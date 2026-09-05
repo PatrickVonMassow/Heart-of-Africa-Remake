@@ -502,6 +502,21 @@ Die Ursache findest du durch **Zerlegen**, nicht durch Wiederholen.
   Bedingung darf nie im Quelltext eines dritten Werkzeugs versteckt liegen. Prüffrage: Gibt es
   einen einzigen Zug, der **beide** Auflagen erfüllt? Wenn nicht, ist nicht die Sitzung schuld."
 
+- **Die Anweisung hebt ihre eigene Voraussetzung auf.** Ein Ablauf verlangt, erst eine Markierung
+  zu setzen und sie dann zu veröffentlichen — doch das Veröffentlichen zählt als Arbeit, und Arbeit
+  löscht die Markierung. Wer ganz gehorcht, macht sie zunichte; wer halb gehorcht, hinterlässt
+  einen halben Zustand.
+  → *Prompt:* „Spiel jede neue Durchsetzung als **wörtlichen Gehorsam** durch und einmal als
+  **Handaufruf** — beides als Test. Prüffrage: Zerstört die Handlungsfolge, die der Mechanismus
+  selbst vorschreibt, seine eigene Voraussetzung?"
+
+- **Der Rückfall rettet die Funktion und setzt still eine Vereinbarung aus.** Fällt der zweite
+  Anbieter aus, verhält sich jedes Werkzeug einzeln korrekt und reicht sauber weiter. Zusammen
+  schieben sie die ganze Last auf den einen Anbieter, von dem du sie ausdrücklich weg verteilt
+  hattest — ohne dass irgendwo eine Entscheidung fiel.
+  → *Prompt:* „Ein Rückfall meldet nicht nur, **dass** er greift, sondern **welche Zusage er dabei
+  aussetzt**. Prüffrage: Welche Vereinbarung bricht er still, während er die Funktion rettet?"
+
 - **Das Protokoll ohne Verfallsdatum wird zum Dauerplakat.** Was dein Werkzeug über die eigene
   Entscheidung aufschreibt, nimmt niemand je wieder heraus.
   → *Prompt:* „Eine Entscheidung, die du selbst triffst, nennt die **Messung**, die sie stützen
@@ -545,4 +560,4 @@ Die Ursache findest du durch **Zerlegen**, nicht durch Wiederholen.
 
 Sie ersetzt die Fallstricke oben nicht.
 
-<!-- GUIDE-FINGERPRINT: e64a57bc783078c835c78f6284a53dd0aea4f75fa8ab1f5af3df9681c8ad4c51 -->
+<!-- GUIDE-FINGERPRINT: 3d81bc8ff0da85a93bbf554daab29c6c17281fbc326dca75664a1fa6084493cc -->

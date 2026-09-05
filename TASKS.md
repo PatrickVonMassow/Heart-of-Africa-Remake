@@ -119,6 +119,35 @@ put it is the mistake this line exists to stop.
   src/state/store.ts, src/ui/Dialogs.tsx, src/communication/drumMessage.ts,
   docs/communication-poc-spec.md, design.md §8/§12/§13.
   Bundle: Dorfleben (specify together with 689, land adjacent).
+  STATE 05.09.2026 (measured; the point continues on feat/1052-chief-outside from
+  39fa30da6 and is NOT restarted): the STAGING is built and pushed — a saved
+  chiefOutside state, callChiefOut, the pure ladder nextChiefAction (step out,
+  handover, message, refusal, nothing to send), a chief figure at chiefStandingSpot
+  beside his own door with a speech anchor, drum question and artefact handover on the
+  use key, his acknowledgement over his head instead of in a window, the prompt moved
+  from hut to man, and §17 orientation through the encounter. Lint, test:unit and tsc
+  ran green; build and the browser suites did not run.
+  OPEN is the whole DELETION cascade: AudienceDialog and the ui.ts kind `audience`; the
+  rifle robbery chain (robVillage, regionRobbed, friendForfeited, robWouldOrphanGoal,
+  TOMB_COORDINATE_REGIONS, its balance values); the gift/goodwill state (goodwill,
+  reveredGiftGiven, hostileUntil, giveGift); the elder (talkToVillager, languagesLearned,
+  giftLoreGiven, the villager interactive with its Villager component, INTERACT_RADIUS,
+  the MapOverlay/roofClearance/layout branches); their i18n in BOTH languages; design.md
+  §12/§13.2/§8/§17; and the suite rewrites (flow.mjs steps 6–8, collision.mjs the
+  chief-hut `.dialog` assert, polish.mjs orientation-markers).
+  FOUR CONSEQUENCES THE POINT TEXT DOES NOT DECIDE — owner-confirmed 05.09.2026, binding
+  until the user says otherwise, because giveGift/goodwill is the ONLY producer of the
+  §13.1 hint, of Honored Friend and of the §17 orientation:
+  (1) canAskForDrumMessage loses its gift gate — the ordered goodwill deletion cannot land
+      otherwise, and it is what 689 paragraph 1 ("no precondition") asks for anyway.
+  (2) THE CHIEF'S HINT STAYS and moves to callChiefOut as a new action tellChiefHint, with
+      the same texts and the same knowingVillages/hintsGiven/unspecificGiven; revealDecoded
+      loses its languagesLearned condition. Without this, acceptance criterion 10 would be
+      unreachable, and 1052 never ordered that.
+  (3) honoredFriend stays with an `// OPEN:` marker but has no producer left after this
+      point; the camp, help and HUD consumers stay untouched and wait for the observation
+      model.
+  (4) presentValuable loses its goodwill arithmetic and keeps its journal reaction.
 
 - [ ] 689. The chief speaks from the first minute, and pays in a direction and a mould (user
   13.08.2026, playing the deployed communication slice).
