@@ -778,8 +778,9 @@ put it is the mistake this line exists to stop.
     too, where a language switch costs no browser.
   Test: `npm test -- gamepad` unfiltered (an incremental `--section` green is not the
   acceptance), plus Vitest over whatever pure part the cause turns out to have.
-  Criticality: medium — it blocks one criterion's evidence and one suite, and it may or may
-  not be a player-visible defect; that is what the point decides first.
+  Criticality: medium — but it blocks the release, which is why it stands here: the closing
+  run of point 633 drives LARGE, LARGE runs the gamepad suite, and that suite stays red until
+  this lands. Whether the PLAYER is hit is what the point decides first.
   Refs: scripts/verify/gamepad.mjs (section `position-query`), src/systems/gamepadMap.ts,
   the position-query toast in src/state/store.ts and both language files
   Bundle: Testinfrastruktur.
