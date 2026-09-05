@@ -14670,3 +14670,37 @@ to land than a mechanism that needs a review.
   (`markHandover`, `HANDOVER_SETTLE_MS`), .claude/batch-activity.jsonl (04.09. handover and
   process-exit rows)
   Bundle: Session- & Repo-Hygiene.
+
+- [ ] 1062. The position query stops answering after a language switch, and no gamepad
+  evidence can be filed while it does.
+  WHAT HAPPENS. Measured 06.09.2026 on TWO trees — `main` at 859aec1fd and
+  feat/1052-chief-outside at 3aa7fd442 — with the section run in isolation
+  (`npm test -- gamepad --section=position-query`), so nothing in the branch causes it.
+  The first Select press answers: the English toast carries "Latitude" and "North" and the
+  check passes. Then the suite switches the language (`window.__setLang('de')`), waits for
+  `document.documentElement.lang` to read `de`, and presses Select again — and for the
+  whole 8 s window `useGame.getState().toast` stays null. The check reports `"null"`, the
+  suite retries once and fails identically, so the flake lane calls it a candidate real
+  failure.
+  WHAT IT COSTS. Acceptance criterion 30 is gamepad AND position query, and its browser
+  evidence comes from exactly this suite: while the section is red, no gamepad run can be
+  filed green, and every future LARGE carries the same red.
+  WHAT IS NOT YET KNOWN — and settling it IS the first half of this point: whether the
+  PLAYER is hit (the query really goes silent for anyone who switches language mid-run,
+  which is a defect in the localized toast path) or only the HARNESS is (the injected
+  `window.__pad` does not survive the re-render the language switch triggers, so the poller
+  reads a real, empty gamepad list). Answer that BEFORE touching either side: a fix aimed
+  at the wrong half leaves the other half broken and the suite green.
+  Final state:
+  - The cause is named in the commit — player path or harness — with the measurement that
+    distinguishes them.
+  - The named side is fixed, and the section passes twice in a row on a quiet machine.
+  - If the player path is at fault, the localized toast is asserted on the Vitest layer
+    too, where a language switch costs no browser.
+  Test: `npm test -- gamepad` unfiltered (an incremental `--section` green is not the
+  acceptance), plus Vitest over whatever pure part the cause turns out to have.
+  Criticality: medium — it blocks one criterion's evidence and one suite, and it may or may
+  not be a player-visible defect; that is what the point decides first.
+  Refs: scripts/verify/gamepad.mjs (section `position-query`), src/systems/gamepadMap.ts,
+  the position-query toast in src/state/store.ts and both language files
+  Bundle: Testinfrastruktur.
