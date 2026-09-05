@@ -32,7 +32,7 @@
 export const DURABLE_LANE_STEPS = Object.freeze({
   1: Object.freeze({ title: 'schemas and invariants', green: true, evidence: 'batch-schema-core unit invariants' }),
   2: Object.freeze({ title: 'durable state store', green: true, evidence: 'checksummed journal and atomic snapshot durability suites' }),
-  3: Object.freeze({ title: 'daemon and Sol adapter', green: true, evidence: 'daemon lifecycle and detached-agent suites' }),
+  3: Object.freeze({ title: 'daemon and Astra adapter', green: true, evidence: 'daemon lifecycle and detached-agent suites' }),
   4: Object.freeze({ title: 'transferable declarations and fencing', green: true, evidence: 'attempt lease and epoch fencing suites' }),
   8: Object.freeze({ title: 'successor startup and reconciliation', green: true, evidence: 'successor boundary, reconciliation, and adoption suites' }),
   9: Object.freeze({ title: 'crash-recoverable serial landing', green: true, evidence: 'staged landing recovery and serial lock suites' }),
