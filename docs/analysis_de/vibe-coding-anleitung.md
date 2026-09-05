@@ -252,17 +252,17 @@ Die Ursache findest du durch **Zerlegen**, nicht durch Wiederholen.
   → *Prompt:* „Beleg nach jeder Fernwirkung den **Zielzustand** statt des Versuchs, und melde beim
   Start, was **lokal fertig, aber nirgends angekommen** ist.“
 
-- **Regeln und Wächter verrotten — nur merkt es niemand.** Eine Absicherung greift enger oder
-  weiter als ihr Satz; mehrere richtige Regeln verbieten durch ihre Lücke etwas, und Warten sieht
-  dabei wie Sorgfalt aus.
+- **Regeln und Wächter verrotten — nur merkt es niemand.** Eine Absicherung greift enger als ihr
+  Satz, oder weiter; mehrere richtige Regeln können durch ihre Lücke etwas verbieten — und Warten
+  sieht dabei wie Sorgfalt aus.
   → *Prompt:* „Schreib die **Erlaubnis im selben Satz wie ihre Grenze**. Leg Satz und Code
-  **nebeneinander**, zieh **den Code auf den Satz**, und frag: **Welcher naheliegende Fall wird
-  von keiner Regel erfasst?**"
+  periodisch **nebeneinander**, zieh **den Code auf den Satz**, und frag: **Welcher naheliegende
+  Fall wird von keiner Regel erfasst?**"
 
-- **Die Verweigerung nennt eine Abhilfe, die schadet, nie eintritt oder längst getan ist — und
-  kommt dann wortgleich wieder.** Beim zweiten Mal ist das eigene Zustandsbild falsch.
-  → *Prompt:* „**Geh den Ausweg einmal wirklich**: Führt er zum Guten, kann er eintreten, gilt er
-  für **den, der ihn liest**? Kommt sie identisch wieder, **miss nach** statt zu antworten.“
+- **Die Verweigerung nennt eine Abhilfe, die schadet, nie eintritt — oder längst getan ist.** Wer
+  ihr folgt, steht schlechter da, wartet vergeblich oder wiederholt einen erledigten Schritt.
+  → *Prompt:* „**Geh den Ausweg jeder Verweigerung einmal wirklich**, im auslösenden Zustand:
+  Führt er zum Guten, kann er eintreten, und gilt er auch für **den, der die Meldung liest**?“
 
 - **Der rote Test klagt den Falschen an.** Prüfungen veralten; ein Rot täuscht gefährlich.
   → *Prompt:* „Verlang auf ein Rot hin erst ein **Experiment**: Produkt oder Messung? Gemessen
