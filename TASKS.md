@@ -1050,8 +1050,18 @@ put it is the mistake this line exists to stop.
     cse_016Kki... across four different local pids. NOT our machinery: at 13:32:31 the
     session exited BEFORE the launcher spawned its successor at 13:32:32, and no
     `handover` row precedes any of the deaths — so the mechanism point 1059 describes
-    does not fit these. Next step: test whether a second client registration supersedes
-    the remote session.
+    does not fit these. THE REMOTE-CONTROL TRAIL IS DEAD (measured 05.09. 18:03):
+    `claude doctor` reports "Remote Control is disabled by your organization's policy
+    (managed setting disableRemoteControl)" — the key is valid and in force, so remote
+    control cannot be ending these sessions. The `end_session` lines above come from a
+    transcript of 04.09. and were wrongly carried over to the 05.09. deaths; the three
+    sessions that died on 05.09. carry none. (A dying session does not write its own
+    stderr to its transcript, so that is not proof of absence — only the carry-over was
+    unsound.) `~/.claude.json` and both workspace settings files hold no
+    `remoteControlAtStartup: true` either. Next step: the FULL stderr of a dying session
+    (VS Code "View output logs") — every excerpt so far starts at the shutdown, and the
+    triggering line sits before it. Second candidate to measure rather than assume: our
+    own context watermark. Details: local/session-death-cause.md.
   - The delegated request "Entscheidung ueber 1048 an die Batch-Sitzung delegiert" is
     ANSWERED: the user ruled on 05.09. that the rest of 1048 moves behind 174.
   Test: Vitest over whatever decision core each repair touches; no new guard is added
