@@ -1432,7 +1432,7 @@ keinen Träger hat. Gebucht als Punkt 956.
 
 ## Anhang A — Maschinell gepflegte Quellen-Übersicht
 
-Zuletzt aktualisiert: Samstag, 05.09.2026, 07:47 · Quellen-Fingerprint: `4fec53eeb260…`
+Zuletzt aktualisiert: Samstag, 05.09.2026, 13:41 · Quellen-Fingerprint: `6991897579a9…`
 
 Spalten heuristisch aus den Quellen abgeleitet (Anläufe = distinkte Datumsnennungen im Memory;
 Maßnahme = Guard-Skripte mit Namens-Treffer). Die inhaltliche Bewertung gehört der Prosa oben.
@@ -1465,12 +1465,13 @@ Maßnahme = Guard-Skripte mit Namens-Treffer). Die inhaltliche Bewertung gehört
 | hoa dashboard \"Woran ich gerade arbeite\" holds ONE CARD PER parallel point being actively worked (not a single card); cards move from Warteschlange into it (possibly several at once); a point is NEVER in both sections at once | 1 | niedrig | dashboard-card-topic-guard.mjs, dashboard-conciseness-guard.mjs, dashboard-guard-fixtures.mjs, dashboard-guard.mjs, dashboard-integrity-guard.mjs, dashboard-reminder-hook.mjs | ✔ Mechanismus |
 | Never put a hardcoded `open` attribute on a dashboard `<details>` card — default all closed; localStorage persistence keeps user-opened cards open across refresh | 1 | niedrig | batch-autostart.mjs, dashboard-card-topic-guard.mjs, dashboard-conciseness-guard.mjs, dashboard-guard-fixtures.mjs, dashboard-guard.mjs, dashboard-integrity-guard.mjs, dashboard-reminder-hook.mjs | ✔ Mechanismus |
 | The batch dashboard \"Von dir zu klären\" section holds ONLY genuine user decisions — no done items, no announcements for in-progress work | 2 | mittel | dashboard-card-topic-guard.mjs, dashboard-conciseness-guard.mjs, dashboard-guard-fixtures.mjs, dashboard-guard.mjs, dashboard-integrity-guard.mjs, dashboard-reminder-hook.mjs | ✔ Mechanismus |
+| Start a landing or long gate with setsid so a session death cannot kill it and swallow its verdict | 1 | niedrig | — (Regel/Memory) | ◐ Regel |
 | When a measured doc budget blocks an addition, shorten or MERGE existing entries — raising the limit is the last resort, decided by me with a written reason, NEVER asked of the user | 4 | hoch | doc-budget-guard.mjs | ✔ Mechanismus |
 | a drill that recreates the state after an action tests the assumption, not the action — and stays green forever | 1 | niedrig | — (Regel/Memory) | ◐ Regel |
 | Work at High effort by default; the user reserves Extra high for research and design decisions, not implementation | 4 | hoch | — (Regel/Memory) | ◐ Regel |
 | Write idiomatic English in all English text (README, code comments, commit messages) — no German calques like 'stand' for a version | 1 | niedrig | — (Regel/Memory) | ◐ Regel |
 | Fable is NOT the default lane because its volume is the scarcest; difficulty is no reason for it either (since 18.08.2026 hard cases go straight to Sol), and review is cross-vendor, not Fable-by-default | 5 | hoch | — (Regel/Memory) | ◐ Regel |
-| Findings recorded by a session that could not write the work order — carry each into TASKS.md, then mark it drained | 46 | hoch | findings-guard.mjs | ✔ Mechanismus |
+| Findings recorded by a session that could not write the work order — carry each into TASKS.md, then mark it drained | 48 | hoch | findings-guard.mjs | ✔ Mechanismus |
 | A recurring lookup gets a script; never pull raw transcripts, listings, or logs into context to answer it | 1 | niedrig | wait-command-guard.mjs | ✔ Mechanismus |
 | Past the 150k context watermark, FINISH the step and hand over — never start a suite, an agent or a point after it; the user raised the cost twice (13.08. and 17.08.2026) | 2 | mittel | — (Regel/Memory) | ◐ Regel |
 | User 18.08.2026: hard, complex, error-prone and HIGH-criticality points are AUTHORED by GPT-5.6 Sol directly — Opus 5 authors only what is left, and Fable authors only a point that tags its lane or one the router escalates | 4 | hoch | — (Regel/Memory) | ◐ Regel |
@@ -1534,10 +1535,10 @@ Maßnahme = Guard-Skripte mit Namens-Treffer). Die inhaltliche Bewertung gehört
 | A pending batch claim HOLDS THE LAUNCHER BACK — withdraw it whenever the claiming window is left unattended | 2 | mittel | clear-claim-guard.mjs | ✔ Mechanismus |
 | Multi-agent workflows eat the session/weekly limit fast — verify findings INLINE, keep fan-outs small, warn the user with a cost estimate before any big workflow | 3 | mittel | doc-budget-guard.mjs | ✔ Mechanismus |
 
-Erfasste Quellen: 94 Feedback-/Projekt-Memories · 58 Guard-/Hook-Skripte · 6 Revert-/Reapply-Commits · 124 Prozess-/Meta-TASKS-Punkte (davon 58 offen).
+Erfasste Quellen: 95 Feedback-/Projekt-Memories · 58 Guard-/Hook-Skripte · 6 Revert-/Reapply-Commits · 125 Prozess-/Meta-TASKS-Punkte (davon 59 offen).
 
-<!-- RETRO-FINGERPRINT: 4fec53eeb26031fe805aad6a1900a18e38a7100b3defcf9c7b615b846cd8df93 -->
-<!-- RETRO-LAST-REFRESHED: 2026-09-05T05:47:34.909Z -->
+<!-- RETRO-FINGERPRINT: 6991897579a96ada7c65050b88b44a6fff78922e8432802c568a2dc1456d7b5d -->
+<!-- RETRO-LAST-REFRESHED: 2026-09-05T11:41:35.828Z -->
 <!-- AUTO-GENERATED:END -->
 
 ### 3.111 Ein Erfolg ist kein Beweis für den Weg, auf dem er zustande kam
@@ -5571,3 +5572,32 @@ Vorgänger sich selbst mit 0 beendet), dass kein Wirtsprogramm daraus eine
 Fehlermeldung baut — und was am Prozess hängt und den Nutzer betrifft, muss der
 Nachfolger wieder anmelden. Sonst zahlt der Nutzer für unsere Sauberkeit mit
 Verunsicherung und mit dem Verlust seines einzigen Fernblicks.
+
+### 3.237 Zehn Sitzungen liefen dasselbe Tor blind — weil ein sterbendes Tor keine Spur hinterlässt
+
+**Was geschah.** Zwischen 07:53 und 13:11 am 05.09.2026 starteten nacheinander zehn
+Batch-Sitzungen `land-point.mjs 1048`. Jede starb 3:30 bis 3:52 nach ihrem Beginn
+mitten im Tor; das Bash-Ergebnis lautete jedes Mal „Exit code 137", das Transkript
+endete dort, keine dieser Sitzungen schrieb je eine Antwort. Keine von ihnen hat das
+Urteil des Tores gesehen. Jede Nachfolgerin fand denselben Zustand vor — der Merge lag
+auf main, der Haken fehlte — meldete daraus korrekt „es fehlt nur noch die Buchhaltung"
+und starb an derselben Stelle. Der Nutzer las über Stunden dieselbe Lagemeldung und
+schloss daraus auf Zähigkeit; tatsächlich war das Tor die ganze Zeit ROT, an einem
+Generat-Drift in `docs/command-index.md`, und nach dessen Reparatur an einem zweiten
+Test. Sichtbar wurde das erst, als ein per `setsid` ABGEKOPPELTER Lauf den Tod seiner
+Sitzung überlebte und sein Urteil auf Platte schrieb.
+
+**Warum es so lange unsichtbar blieb.** Das Tor ist ein Kind der Sitzung. Stirbt die
+Sitzung, stirbt das Tor — und zwar bevor es irgendetwas schreibt. Was fehlt, ist kein
+Wächter, sondern ein Rückstand: Ein Lauf, der abbricht, hinterlässt nichts, woraus die
+nächste Sitzung lernen könnte, dass sie gerade denselben blinden Versuch wiederholt.
+Der Zustand auf Platte („Merge da, Haken fehlt") war für zehn Sitzungen identisch, also
+war auch ihre Schlussfolgerung identisch. Das ist kein Denkfehler einer Sitzung, sondern
+ein Konstruktionsfehler der Kette: Wiederholung ohne Gedächtnis sieht von innen aus wie
+ein erster Versuch.
+
+**Lehre:** Ein mehrminütiger Lauf gehört ABGEKOPPELT gestartet, mit Protokoll in
+`local/`, damit der Sitzungstod ihn nicht mitnimmt. Und jeder abgebrochene Lauf muss
+eine Spur hinterlassen, die seinen Nachfolger warnt — sonst wiederholt die Kette
+denselben Versuch, so oft der Neustart sie anwirft, und meldet dabei jedes Mal
+wahrheitsgemäß Fortschritt.

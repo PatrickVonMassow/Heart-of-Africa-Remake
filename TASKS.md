@@ -77,138 +77,6 @@ then point 633 (the closing run), then point 174 (the tag). A newly appended poi
 kind is MOVED to the front in the same turn that files it; leaving it where append-and-defer
 put it is the mistake this line exists to stop.
 
-- [ ] 1048. The batch crawled through the night while every safeguard reported health:
-  the owner waited on stacked watchers that can never return (measured 03.09.2026,
-  00:55–01:15, live in the stalled session). Between the communication-point merge at
-  23:05 and the next main commit at 00:52 the owning session advanced nothing, yet held a
-  fresh heartbeat the whole time, so the launcher skipped every tick with "owner alive"
-  and only WARNED about the published now-card ETA running 81+ minutes past. The session
-  woke roughly every ten minutes, spawned another background watcher of the form
-  `while pgrep -f "npm exec vitest" >/dev/null; do sleep 30; done`, and blocked again —
-  ten such shells stood at 01:00. Each watcher's own command line contains the literal
-  pattern, so pgrep finds the sibling watchers themselves and the loops cannot terminate:
-  every wait was for a run that had already finished. The session's own instructions name
-  `scripts/verify/run-wait.mjs --await` as THE blocking wait; the hand-rolled watchers
-  bypassed it. A stale `.claude/batch-in-flight.json` of a pid dead since the afternoon
-  kept "a verification is running" plausible the whole time. This is the wedge point 958
-  predicts — a session that keeps making tool calls never trips the emergency clock —
-  observed in production. The infrastructure freeze of 01.09.2026 admits this point
-  through its blockade exception: the defect reproducibly stalled the batch for hours.
-  Final state:
-  - Two authors work BLIND-PARALLEL from identical inputs (this point's text), cross-vendor,
-    each delivering an independent root-cause analysis plus a solution proposal covering at
-    least: the self-matching watcher pattern, the unbounded watcher stacking, heartbeat
-    read as liveness while no progress happens, the launcher's warn-only overdue ETA, and
-    stale in-flight markers of dead pids. A third model that wrote neither proposal merges
-    them through `scripts/blind-merge.mjs`, counted entry by entry; the merged solution is
-    then implemented. (User order 03.09.2026, verbatim: "mache direkt einen Punkt, der das
-    Problem blind mit vier Augen analysiert und eine zuverlässige Lösung entwickelt, die
-    sicher verhindert, dass so etwas noch mal passieren kann. Lasse die
-    Lösungungsvorschläge dann von einem dritten Modell zusammenführen und danach
-    umsetzen.")
-  - The merged solution keys recovery on observable PROGRESS rather than liveness: a
-    session whose waits can never return is detected and recovered from without a human,
-    within a bounded time the solution states and tests. The user is away for days at a
-    time; "Die Batch darf niemals stehenbleiben" (user, 03.09.2026).
-  - Overlap with 947 (blind sweep of every way the batch can stop) and 958 (the busy wedge
-    the emergency clock cannot see) is resolved by the merge — this point supersedes or
-    narrows them rather than duplicating their mechanism.
-  - A SECOND wedge shape, measured live 03.09.2026 17:45–17:47 in the owning session, is
-    covered by the same analysis: after `batch-boundary --commit` the boundary refuses
-    every tool call (the 90 s sleep and the clock included), while `ci-status-guard`
-    refuses every turn end until the pushed ref's CI concludes — and prescribes exactly
-    the refused wait. The session could neither work nor stop and emitted identical
-    farewell messages until the user intervened; the boundary marker was then invalidated
-    by the first later mutation, silently re-opening the handed-over batch. The merged
-    solution must resolve guard pairs that jointly demand and forbid the same action
-    (e.g. the boundary exempts the wait a Stop guard prescribes, or ci-status-guard
-    stands down for a committed boundary).
-  - A THIRD shape, measured 04.09.2026 ON THIS POINT'S OWN WORK and therefore the
-    twenty-second union entry: the session committed at 13:22 and ended. The launcher
-    ticked at 13:24 and 13:39 and started no successor either time, because
-    `successorStartDecision` returns `registered-writer-live` — `registeredFeatureWriters`
-    measures the feature branch through `checkAgentOutput`, and `agentOutputVerdict` reads
-    a branch tip younger than `RESPAWN_GRACE_MS` (30 min) as `verdict: 'alive'` with no
-    process behind it. The first tick that could have spawned was 13:54: 32 minutes of
-    structural standstill, ended by the user at 13:39. The U4 mechanism does not reach it —
-    `ownerKeepsBatch` hardens the sibling "skip: owner alive" branch and only bites past
-    the 60-minute threshold or the hard deadline, while `registered-writer-live` carries no
-    progress test at all. The error is the same one this point exists to remove: a COMMIT
-    IS THE LAST THING A SESSION DOES, so a fresh branch tip is evidence the writer just
-    FINISHED, not that it is working. Final state: a branch tip alone may not keep a writer
-    alive without process or worktree evidence beside it, or its grace drops well below one
-    tick — and the launcher says which evidence it stood on.
-  - A FOURTH SHAPE, measured 04.09.2026 ON THIS POINT'S OWN WORK three hours after the
-    third and therefore the twenty-third union entry: the launcher TAKES the batch from a
-    live owner and hands it to NOBODY. At 14:15:25Z it logged `TAKING THE BATCH despite a
-    live owner — stalled-past-threshold-without-advancing-work` (63 minutes without
-    progress) — the U4 mechanism working exactly as designed — and in the SAME tick
-    `skip: a spawn 32 min ago is still claiming the lock (backoff 40 min at failCount 2)`.
-    The three preceding spawns had each died within three seconds without writing a line
-    to `autostart-run.log`, so `failCount` stood at 2 and `spawnBackoffMs` was longer than
-    the takeover it was blocking. The owner was declared dead, its lock released at
-    14:16:18Z, and no successor existed to take it: a batch with an owner became a batch
-    with none. The stall clock measures the last BATCH progress, not the age of the
-    session, so every freshly woken session inherits the full stall and is taken from
-    again within a minute — the loop the launcher log shows from 14:15 to 14:28, when the
-    watchdog paused the batch itself (`cause: runaway`). Final state: the decision to take
-    a batch from a live owner is not taken unless a successor can actually start now — the
-    two decisions are ONE, or the takeover states which successor it handed to; and a
-    successor that dies without output counts as a failed START, never as a served one.
-  Test: Vitest over the decision cores the merged solution lands in, replaying the
-  incident's shape — alive heartbeat plus eternal waits plus no main progress leads to
-  recovery within the stated bound; a drill that calls the real recovery path per the
-  drills rule, not a recreation of its aftermath. For the third shape: a tick whose only
-  liveness evidence is a branch tip minutes old, with no live process and no moving
-  worktree, must start a successor rather than veto.
-  Criticality: high — hours of unattended standstill with every monitor green, on the one
-  path that may never block.
-  Refs: scripts/batch-emergency-core.mjs, scripts/batch-standstill-core.mjs,
-  scripts/batch-launcher.mjs, scripts/batch-in-flight.mjs, scripts/verify/run-wait.mjs,
-  .claude/batch-launcher.log (02./03.09. ticks)
-  Bundle: Urlaubsfestigkeit (not worked beside 947, 958, 985 or 1002 — they edit the
-  same emergency/standstill decision core).
-
-- [ ] 1058. The speech-label picture check lost its subject for good: the speaker walks out
-  of half the sampled frames, every run (measured 04.09.2026 on a quiet host).
-  `the speaking figure itself stands in the frame, under its note (point 485)` wants the
-  speaker's body inside the frame and under its label in at least six of eight sampled
-  frames. Measured at `6822804e6` with `throttle-probe polish --section=speech-hypothesis
-  --backend webgpu --no-throttle --runs 6`, load below 2: FIVE OF SIX runs red, at 4/8 and
-  5/8 frames every time (`body at (532, 700), label bottom 636 — 5/8`, `(489, 719)/649 —
-  4/8`, `(526, 709)/642 — 5/8`, `(500, 721)/653 — 4/8`, `(505, 708)/644 — 5/8`). The full
-  webgpu polish run of the same morning carried it too, together with `the note rides on
-  the figure that speaks` at a worst sideways offset of 68.3 px, and passed only on its
-  retry — which covers nothing.
-  THIS IS NOT POINT 1043's COIN TOSS ANY MORE. 1043 measured the same check on 03.09.2026
-  on a quiet host, twelve section runs across `main` and a branch, and it went red in NONE
-  of them. Between then and now the paired DIG summons landed: an adult now says his word
-  and walks off to the site in the same breath, so a speaker leaving the staged shot is the
-  RULE rather than the unlucky draw 1043 describes. What is open is which side owes the
-  fix — the choreography that sends a speaker away mid-utterance, or a check that stages a
-  shot around a figure free to walk out of it.
-  WHAT IT COSTS: every render change is judged by the picture, and this check is between
-  every one of them and its proof. It blocks now.
-  Final state:
-  - The cause is NAMED from the frames, not argued: it is stated whether the speaker walks
-    out of shot, the label lags him, or the probe stages the shot around a figure it cannot
-    hold — and the fix is made on that side.
-  - The check holds its subject for the whole sample, or it stops claiming to: a picture
-    check that cannot keep its speaker in frame proves nothing to a human eye either.
-  - Both reds of the section close for the right reason on a quiet host, over a run of at
-    least six, on webgpu and on webgl.
-  - Point 1043's text records what changed under it, so the two are not read as one flake.
-  Test: the throttle probe over `speech-hypothesis` on both backends, unthrottled and
-  throttled, with the run counts and the frame counts stated; plus the full polish suite
-  clean on both lanes.
-  Criticality: high — it is the gate every rendered proof passes through, and it is red on
-  a quiet machine.
-  Refs: scripts/verify/polish.mjs (`speech-hypothesis`), src/scenes/place/SpeechLabels.tsx,
-  src/scenes/place/adultWork.ts (`startJointWalk` — the speaker leaves as he speaks),
-  scripts/render-verify-charges.mjs, local/throttle-probe/polish-speech-hypothesis-2026-09-04T08-14-51-973Z
-  Bundle: Dorfleben (it edits the speech-label path and the adult teaching choreography that
-  1056 and 1057 also reach, so it is worked before them and never beside them).
-
 - [ ] 1052. The elder retires and the audience overlay with him: one chief, met outside
   at the drums (user 03.09.2026).
   THE ORDER (user, 03.09.2026, verbatim): »Okay, dann baue das so um und reihe das in der
@@ -391,6 +259,46 @@ put it is the mistake this line exists to stop.
   Nutzer, 13.08.2026 23:13: »Vorfahrt hat, was dem Spieler näher ist.«
   Refs: src/scenes/place/SpeechLabels.tsx, src/communication/speechTarget.ts, src/ui/Dialogs.tsx, src/i18n/de.ts, src/i18n/en.ts
   Bundle: Dorfleben.
+
+- [ ] 1058. The speech-label picture check lost its subject for good: the speaker walks out
+  of half the sampled frames, every run (measured 04.09.2026 on a quiet host).
+  `the speaking figure itself stands in the frame, under its note (point 485)` wants the
+  speaker's body inside the frame and under its label in at least six of eight sampled
+  frames. Measured at `6822804e6` with `throttle-probe polish --section=speech-hypothesis
+  --backend webgpu --no-throttle --runs 6`, load below 2: FIVE OF SIX runs red, at 4/8 and
+  5/8 frames every time (`body at (532, 700), label bottom 636 — 5/8`, `(489, 719)/649 —
+  4/8`, `(526, 709)/642 — 5/8`, `(500, 721)/653 — 4/8`, `(505, 708)/644 — 5/8`). The full
+  webgpu polish run of the same morning carried it too, together with `the note rides on
+  the figure that speaks` at a worst sideways offset of 68.3 px, and passed only on its
+  retry — which covers nothing.
+  THIS IS NOT POINT 1043's COIN TOSS ANY MORE. 1043 measured the same check on 03.09.2026
+  on a quiet host, twelve section runs across `main` and a branch, and it went red in NONE
+  of them. Between then and now the paired DIG summons landed: an adult now says his word
+  and walks off to the site in the same breath, so a speaker leaving the staged shot is the
+  RULE rather than the unlucky draw 1043 describes. What is open is which side owes the
+  fix — the choreography that sends a speaker away mid-utterance, or a check that stages a
+  shot around a figure free to walk out of it.
+  WHAT IT COSTS: every render change is judged by the picture, and this check is between
+  every one of them and its proof. It blocks now.
+  Final state:
+  - The cause is NAMED from the frames, not argued: it is stated whether the speaker walks
+    out of shot, the label lags him, or the probe stages the shot around a figure it cannot
+    hold — and the fix is made on that side.
+  - The check holds its subject for the whole sample, or it stops claiming to: a picture
+    check that cannot keep its speaker in frame proves nothing to a human eye either.
+  - Both reds of the section close for the right reason on a quiet host, over a run of at
+    least six, on webgpu and on webgl.
+  - Point 1043's text records what changed under it, so the two are not read as one flake.
+  Test: the throttle probe over `speech-hypothesis` on both backends, unthrottled and
+  throttled, with the run counts and the frame counts stated; plus the full polish suite
+  clean on both lanes.
+  Criticality: high — it is the gate every rendered proof passes through, and it is red on
+  a quiet machine.
+  Refs: scripts/verify/polish.mjs (`speech-hypothesis`), src/scenes/place/SpeechLabels.tsx,
+  src/scenes/place/adultWork.ts (`startJointWalk` — the speaker leaves as he speaks),
+  scripts/render-verify-charges.mjs, local/throttle-probe/polish-speech-hypothesis-2026-09-04T08-14-51-973Z
+  Bundle: Dorfleben (it edits the speech-label path and the adult teaching choreography that
+  1056 and 1057 also reach, so it is worked before them and never beside them).
 
 - [ ] 1056. The adults dig for no visible reason, and the picture never says what comes
   out (user 04.09.2026, watching the merged digging work).
@@ -958,6 +866,158 @@ put it is the mistake this line exists to stop.
   that /v0.3/ and /poc/ serve the new state, and FREEZE the tag: it is never
   re-pointed.
 
+- [ ] 1048. The batch crawled through the night while every safeguard reported health:
+  the owner waited on stacked watchers that can never return (measured 03.09.2026,
+  00:55–01:15, live in the stalled session). Between the communication-point merge at
+  23:05 and the next main commit at 00:52 the owning session advanced nothing, yet held a
+  fresh heartbeat the whole time, so the launcher skipped every tick with "owner alive"
+  and only WARNED about the published now-card ETA running 81+ minutes past. The session
+  woke roughly every ten minutes, spawned another background watcher of the form
+  `while pgrep -f "npm exec vitest" >/dev/null; do sleep 30; done`, and blocked again —
+  ten such shells stood at 01:00. Each watcher's own command line contains the literal
+  pattern, so pgrep finds the sibling watchers themselves and the loops cannot terminate:
+  every wait was for a run that had already finished. The session's own instructions name
+  `scripts/verify/run-wait.mjs --await` as THE blocking wait; the hand-rolled watchers
+  bypassed it. A stale `.claude/batch-in-flight.json` of a pid dead since the afternoon
+  kept "a verification is running" plausible the whole time. This is the wedge point 958
+  predicts — a session that keeps making tool calls never trips the emergency clock —
+  observed in production. The infrastructure freeze of 01.09.2026 admits this point
+  through its blockade exception: the defect reproducibly stalled the batch for hours.
+  Final state:
+  - Two authors work BLIND-PARALLEL from identical inputs (this point's text), cross-vendor,
+    each delivering an independent root-cause analysis plus a solution proposal covering at
+    least: the self-matching watcher pattern, the unbounded watcher stacking, heartbeat
+    read as liveness while no progress happens, the launcher's warn-only overdue ETA, and
+    stale in-flight markers of dead pids. A third model that wrote neither proposal merges
+    them through `scripts/blind-merge.mjs`, counted entry by entry; the merged solution is
+    then implemented. (User order 03.09.2026, verbatim: "mache direkt einen Punkt, der das
+    Problem blind mit vier Augen analysiert und eine zuverlässige Lösung entwickelt, die
+    sicher verhindert, dass so etwas noch mal passieren kann. Lasse die
+    Lösungungsvorschläge dann von einem dritten Modell zusammenführen und danach
+    umsetzen.")
+  - The merged solution keys recovery on observable PROGRESS rather than liveness: a
+    session whose waits can never return is detected and recovered from without a human,
+    within a bounded time the solution states and tests. The user is away for days at a
+    time; "Die Batch darf niemals stehenbleiben" (user, 03.09.2026).
+  - Overlap with 947 (blind sweep of every way the batch can stop) and 958 (the busy wedge
+    the emergency clock cannot see) is resolved by the merge — this point supersedes or
+    narrows them rather than duplicating their mechanism.
+  - A SECOND wedge shape, measured live 03.09.2026 17:45–17:47 in the owning session, is
+    covered by the same analysis: after `batch-boundary --commit` the boundary refuses
+    every tool call (the 90 s sleep and the clock included), while `ci-status-guard`
+    refuses every turn end until the pushed ref's CI concludes — and prescribes exactly
+    the refused wait. The session could neither work nor stop and emitted identical
+    farewell messages until the user intervened; the boundary marker was then invalidated
+    by the first later mutation, silently re-opening the handed-over batch. The merged
+    solution must resolve guard pairs that jointly demand and forbid the same action
+    (e.g. the boundary exempts the wait a Stop guard prescribes, or ci-status-guard
+    stands down for a committed boundary).
+  - A THIRD shape, measured 04.09.2026 ON THIS POINT'S OWN WORK and therefore the
+    twenty-second union entry: the session committed at 13:22 and ended. The launcher
+    ticked at 13:24 and 13:39 and started no successor either time, because
+    `successorStartDecision` returns `registered-writer-live` — `registeredFeatureWriters`
+    measures the feature branch through `checkAgentOutput`, and `agentOutputVerdict` reads
+    a branch tip younger than `RESPAWN_GRACE_MS` (30 min) as `verdict: 'alive'` with no
+    process behind it. The first tick that could have spawned was 13:54: 32 minutes of
+    structural standstill, ended by the user at 13:39. The U4 mechanism does not reach it —
+    `ownerKeepsBatch` hardens the sibling "skip: owner alive" branch and only bites past
+    the 60-minute threshold or the hard deadline, while `registered-writer-live` carries no
+    progress test at all. The error is the same one this point exists to remove: a COMMIT
+    IS THE LAST THING A SESSION DOES, so a fresh branch tip is evidence the writer just
+    FINISHED, not that it is working. Final state: a branch tip alone may not keep a writer
+    alive without process or worktree evidence beside it, or its grace drops well below one
+    tick — and the launcher says which evidence it stood on.
+  - A FOURTH SHAPE, measured 04.09.2026 ON THIS POINT'S OWN WORK three hours after the
+    third and therefore the twenty-third union entry: the launcher TAKES the batch from a
+    live owner and hands it to NOBODY. At 14:15:25Z it logged `TAKING THE BATCH despite a
+    live owner — stalled-past-threshold-without-advancing-work` (63 minutes without
+    progress) — the U4 mechanism working exactly as designed — and in the SAME tick
+    `skip: a spawn 32 min ago is still claiming the lock (backoff 40 min at failCount 2)`.
+    The three preceding spawns had each died within three seconds without writing a line
+    to `autostart-run.log`, so `failCount` stood at 2 and `spawnBackoffMs` was longer than
+    the takeover it was blocking. The owner was declared dead, its lock released at
+    14:16:18Z, and no successor existed to take it: a batch with an owner became a batch
+    with none. The stall clock measures the last BATCH progress, not the age of the
+    session, so every freshly woken session inherits the full stall and is taken from
+    again within a minute — the loop the launcher log shows from 14:15 to 14:28, when the
+    watchdog paused the batch itself (`cause: runaway`). Final state: the decision to take
+    a batch from a live owner is not taken unless a successor can actually start now — the
+    two decisions are ONE, or the takeover states which successor it handed to; and a
+    successor that dies without output counts as a failed START, never as a served one.
+  Test: Vitest over the decision cores the merged solution lands in, replaying the
+  incident's shape — alive heartbeat plus eternal waits plus no main progress leads to
+  recovery within the stated bound; a drill that calls the real recovery path per the
+  drills rule, not a recreation of its aftermath. For the third shape: a tick whose only
+  liveness evidence is a branch tip minutes old, with no live process and no moving
+  worktree, must start a successor rather than veto.
+  Criticality: high — hours of unattended standstill with every monitor green, on the one
+  path that may never block.
+  Refs: scripts/batch-emergency-core.mjs, scripts/batch-standstill-core.mjs,
+  scripts/batch-launcher.mjs, scripts/batch-in-flight.mjs, scripts/verify/run-wait.mjs,
+  .claude/batch-launcher.log (02./03.09. ticks)
+  Bundle: Urlaubsfestigkeit (not worked beside 947, 958, 985 or 1002 — they edit the
+  same emergency/standstill decision core).
+  STATE 05.09.2026 (deferred behind 174 on the user’s instruction): the branch is MERGED
+  on main (127069582); what is left is only the landing bookkeeping — tick, archive move,
+  branch/worktree cleanup. Do NOT redo the work. Resume with
+  `setsid node scripts/land-point.mjs 1048 --model "<model>"`; it restarts at the gate.
+  Run it DETACHED: ten sessions died mid-gate and never saw its verdict (see the carrier
+  finding ‚Ein sterbender Gate hinterlaesst keine Spur‘).
+
+- [ ] 1060. Seven findings of 05.09.2026 that the carrier held while the batch stood still.
+  Collected from the findings carrier (bundle: Umsteuerung — every one of them is a
+  guard or a process document, so none may be worked beside another guard point).
+  Final state: each item below is either fixed or explicitly dropped with a reason.
+  - GUARD LOOP, MEASURED TWICE. `board.mjs vdzk-add` refuses a card whose body already
+    carries the demanded shape and answers with the very instruction the card follows.
+    Measured by two sessions independently: five attempts on 05.09. 05:47 (with and
+    without the category prefix, via --text-stdin and positionally), four more at 13:30
+    (Entscheidungsprotokoll body with the required four labels). Nothing can be filed
+    through that path today, so an owner-decided card cannot reach the board at all.
+  - THE RETROSPECTIVE CAN NEVER BE CURRENT. `findings-carrier.md` carries
+    `type: project` and is therefore a source of the retro fingerprint
+    (scripts/retro-sources.mjs collectMemories). Every `finding.mjs --record` changes
+    its hash and puts docs/analysis_de/retrospektive-zusammenarbeit.md back to STALE at
+    once, so the retro guard and the findings guard can never both be satisfied.
+  - PROSE IS UNREPAIRABLE WITHOUT THE LOCK. A session without the batch lock is refused
+    on docs/analysis_de/*.md by both python heredoc and the Edit tool (MAIN WRITE
+    REFUSED), while scripts/retro-refresh.mjs writes the same directory — yet the Stop
+    guard demands the repair from exactly that session.
+  - THE BEGINNER GUIDE MISSES THE REPEATED-REFUSAL TRAP.
+    docs/analysis_de/vibe-coding-anleitung.md has no trap for the lesson whose counter
+    just rose to 2: when the same guard refusal arrives word for word a second time, the
+    refusal is not stubborn — the own state picture is wrong. Measure again instead of
+    repeating the reasoning.
+  - UNPUSHED MAIN COMMITS HAVE NO OWNER. Measured 05.09. 05:43 with no live batch
+    session at all: the focus card claimed a running land-point while no process stood
+    behind it, and the commits sat local. Repeated at 13:34 — the push is refused by its
+    own pre-push gate, and nothing owns the retry.
+  - A DYING GATE LEAVES NO TRACE. Measured 07:53-13:11: ten batch sessions ran
+    `land-point.mjs 1048` and each died 3:30-3:52 into the gate (Bash result
+    "Exit code 137", transcript ends, no reply written). The gate is a child of the
+    session, so it dies with it and writes nothing; every successor found the same state
+    and reported the same "only the bookkeeping is left". The first DETACHED run (setsid)
+    survived and printed the verdict no one had seen for 24 hours. Consequence: the
+    landing runs detached, and an aborted gate must leave a verdict on disk.
+  - SESSIONS DIE EVERY FEW MINUTES ON A TORN TRANSPORT. 5475e647 (pid 2328848) and the
+    attended session pid 2339195 died on the same second, 13:11:48; then 13:18:05,
+    13:26:53, 13:32:30. Every time SIGTERM (143) with SessionEnd hooks run cleanly, no
+    SIGKILL, no OOM (memory.events oom_kill 0, 9.4 GB free). stderr shows an inbound
+    `control_request subtype=end_session` and `Epoch mismatch (409,
+    session_not_active)`, and all four reports name the SAME remote session
+    cse_016Kki... across four different local pids. NOT our machinery: at 13:32:31 the
+    session exited BEFORE the launcher spawned its successor at 13:32:32, and no
+    `handover` row precedes any of the deaths — so the mechanism point 1059 describes
+    does not fit these. Next step: test whether a second client registration supersedes
+    the remote session.
+  - The delegated request "Entscheidung ueber 1048 an die Batch-Sitzung delegiert" is
+    ANSWERED: the user ruled on 05.09. that the rest of 1048 moves behind 174.
+  Test: Vitest over whatever decision core each repair touches; no new guard is added
+  (infrastructure freeze 01.09.2026).
+  Criticality: medium — none of them blocks the game, two of them block the turn end.
+  Refs: scripts/board.mjs, scripts/retro-sources.mjs, scripts/finding.mjs,
+  docs/analysis_de/vibe-coding-anleitung.md, scripts/land-point.mjs
+  Bundle: Umsteuerung.
 - [ ] 1053. A session the user opened for something else silently becomes the batch owner
   (user 03.09.2026, on seeing this session announce "Batch übernommen": »Wieso hast du die
   Batch übernommen, ich habe dich nicht dazu aufgefordert. Manchmal fällt sie dir

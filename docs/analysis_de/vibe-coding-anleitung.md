@@ -264,6 +264,14 @@ Die Ursache findest du durch **Zerlegen**, nicht durch Wiederholen.
   → *Prompt:* „**Geh den Ausweg jeder Verweigerung einmal wirklich**, im auslösenden Zustand:
   Führt er zum Guten, kann er eintreten, und gilt er auch für **den, der die Meldung liest**?“
 
+- **Dieselbe Verweigerung kommt wortgleich ein zweites Mal.** Dann ist nicht die Meldung stur,
+  sondern das eigene Zustandsbild falsch: Der Zustand, gegen den sie prüft, ist ein anderer als der
+  angenommene. Wer stattdessen seine Begründung wiederholt oder dieselbe Formulierung noch einmal
+  einreicht, verbrennt Züge und hält Stillstand für Betrieb.
+  → *Prompt:* „Kommt eine Ablehnung ein zweites Mal identisch: **miss den Zustand nach**, den sie
+  nennt, statt sie erneut zu beantworten. Und wenn der Ausweg, den sie vorschlägt, genau das ist,
+  was du schon getan hast — **melde den Wächter als defekt**, statt ihn ein drittes Mal zu bedienen."
+
 - **Der rote Test klagt den Falschen an.** Prüfungen veralten; ein Rot täuscht gefährlich.
   → *Prompt:* „Verlang auf ein Rot hin erst ein **Experiment**: Produkt oder Messung? Gemessen
   wird nur an einem eingeschwungenen Zustand, dessen Bereitschaft der **Gegenstand** meldet, nie
@@ -539,4 +547,4 @@ Die Ursache findest du durch **Zerlegen**, nicht durch Wiederholen.
 
 Sie ersetzt die Fallstricke oben nicht.
 
-<!-- GUIDE-FINGERPRINT: 22cee7b07995c989b704b5017bdffee5805c4cd6c05e105af7dc6ba330288841 -->
+<!-- GUIDE-FINGERPRINT: 6991897579a96ada7c65050b88b44a6fff78922e8432802c568a2dc1456d7b5d -->
