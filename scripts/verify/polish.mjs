@@ -5625,6 +5625,21 @@ if (section('ctrl-actor-labels')) {
         let worstPair = null
         let labelsMin = Infinity
         let labelsMax = 0
+        // WHICH KIND OF FUSION WAS IT (point 1067)? The verdict below cannot say,
+        // and the bar's own reasoning assumes an answer: it excuses a pair that
+        // DRIFTED between two refreshes and reds a pair the declutter PLACED
+        // overlapping. The two leave different traces — a drifted pair lasts a
+        // frame or two while the geometry moves under it, a placed one stands
+        // unmoved for the whole refresh interval — so the trace is recorded here
+        // and printed beside the verdict. It changes no verdict and no detail
+        // wording: the charges in scripts/render-verify-charges.mjs read that
+        // line, and a diagnostic that rewrote it would silently orphan them.
+        let prevPrint = null
+        let frozenFused = 0
+        let movedFused = 0
+        let longestRun = 0
+        let currentRun = 0
+        let worstRects = null
         const read = () => {
           const boxes = [...document.querySelectorAll('.actor-label')]
             .map((el) => {
@@ -5647,12 +5662,27 @@ if (section('ctrl-actor-labels')) {
                 if (depth > worstDepth) {
                   worstDepth = depth
                   worstPair = `"${a.text}"×"${b.text}" ${across.toFixed(0)}×${down.toFixed(0)} px`
+                  worstRects =
+                    `a[${a.left.toFixed(0)},${a.top.toFixed(0)} ${(a.right - a.left).toFixed(0)}×${(a.bottom - a.top).toFixed(0)}] ` +
+                    `b[${b.left.toFixed(0)},${b.top.toFixed(0)} ${(b.right - b.left).toFixed(0)}×${(b.bottom - b.top).toFixed(0)}]`
                 }
               }
             }
           }
-          if (fusedHere) fusedFrames++
-          if (++sampled >= SAMPLES) return res({ samples: sampled, fusedFrames, worstDepth, worstPair, labelsMin, labelsMax })
+          const print = boxes.map((b) => `${b.text}@${b.left.toFixed(1)},${b.top.toFixed(1)}`).join('|')
+          if (fusedHere) {
+            fusedFrames++
+            currentRun++
+            if (currentRun > longestRun) longestRun = currentRun
+            if (prevPrint !== null && prevPrint === print) frozenFused++
+            else if (prevPrint !== null) movedFused++
+          } else currentRun = 0
+          prevPrint = print
+          if (++sampled >= SAMPLES)
+            return res({
+              samples: sampled, fusedFrames, worstDepth, worstPair, labelsMin, labelsMax,
+              frozenFused, movedFused, longestRun, worstRects,
+            })
           requestAnimationFrame(read)
         }
         requestAnimationFrame(read)
@@ -5669,6 +5699,14 @@ if (section('ctrl-actor-labels')) {
   const fusionPost = await sampleFusion(45)
   const fusionVerdict = judgeLabelFusion(mergeFusionReadings(fusionPre, fusionPost))
   check('no two Ctrl labels fuse in the village crowd (point 628)', fusionVerdict.ok, fusionVerdict.detail)
+  // Printed WHATEVER the verdict (point 1067): a green run's trace is the control
+  // the red is read against, and a diagnostic that only spoke on failure would
+  // have nothing to compare with.
+  const trace = (tag, r) =>
+    `${tag}: ${r.fusedFrames}/${r.samples} fused, longest unbroken ${r.longestRun} frame(s), ` +
+    `${r.frozenFused} frozen + ${r.movedFused} moved, deepest ${r.worstDepth.toFixed(0)} px` +
+    (r.worstRects ? ` ${r.worstRects}` : '')
+  console.log(`# label-fusion trace (point 1067) — ${trace('pre-shutter', fusionPre)}; ${trace('post-shutter', fusionPost)}`)
 
   await page.keyboard.up('Control')
   const cleared = await page
