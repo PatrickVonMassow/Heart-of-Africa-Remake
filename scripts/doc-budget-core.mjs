@@ -150,8 +150,15 @@ export const DOC_BUDGETS = [
     // rather than carries at every turn. The ceilings follow the cut down to
     // the measured 50 / 787 fit — a cut lands with its lowered ceiling, or the
     // room it frees is spent silently.
+    // LOWERED on 06.09.2026 by the cut that retired the point-205 audit-decisions
+    // entry: those rulings steered point 208, which shipped 21.07.2026 ("all six
+    // agreed world-coherence fixes"), and the archive plus design.md now carry
+    // them — a closed steering note is what this index stops paying for at every
+    // turn. The memory file itself stays on disk, unindexed. The ceilings follow
+    // the cut down to the measured 50 / 766 fit; the index had grown one line
+    // past its line ceiling, which is what the run went red on.
     maxLines: 50,
-    maxWords: 787,
+    maxWords: 766,
     maxEntryWords: 22,
     // Fifteen words: an index of one-hook lines, where a whole new entry is ~20 words —
     // so the slack cannot hide one, and re-wording an existing hook is free.
