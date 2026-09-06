@@ -87,3 +87,28 @@ Format: one line per finding — `- YYYY-MM-DD <source> — <finding>`.
   deleting 847's branch would discard work for an open point, and the "merge ends the branch"
   rule says nothing about a branch whose point was cut. Whoever picks this up decides per
   branch, and asks before any deletion.
+- 2026-09-06 three picture observations from the point-689 evidence frames, none of them that
+  point's own claim, all read at full resolution from `verification/18|19|20`:
+  (a) the Bandiagara escarpment renders as a smooth brown box. Two frames earlier the
+  communication erratic reads convincingly as rock — faceted grey block, scree at its foot —
+  and the cliff the whole PoC puzzle ends at reads as a crate. The socket works and 689 does
+  not ask for cliff geometry, so this is scenery debt, not a defect of that point.
+  (b) same frame: two elephants stand at the puzzle's climax, one apparently overlapping the
+  ruin geometry. Whether the animal walks THROUGH the landmark or only looks that way from the
+  top-down camera was NOT resolved. Note against it: the `collision` suite passed 40 checks in
+  the same run, which makes the camera the likelier reading.
+  (c) `18-worldmodel-bambara-village-niger.png`: only the traveller's head is visible, sitting
+  on the roof of the middle hut, his body hidden by it — it reads as the figure standing INSIDE
+  a hut. The frame predates 689 (04.09.) and was only regenerated here. Same caveat as (b):
+  `collision` sees nothing.
+- 2026-09-06 the three picture-heavy suites of a LARGE run take two to three times their
+  measured medians on this host: `polish` 21 min against a median of 5.7, `enrichments` ~19 min,
+  while the light suites ran at normal speed. The renderer is genuinely busy throughout
+  (64-69 % CPU, frames written continuously), so it is a slowdown and not a hang. What is
+  missing is the measurement that would decide it: the quiet-machine check reports
+  "GPU load NOT measured (no sysfs gpu_busy_percent, no nvidia-smi)" on this host, so whatever
+  else uses the card is invisible to us. One whole-suite LARGE now costs ~90 min per backend.
+- 2026-09-06 point 603's ground-detail measurement is DRIFTING, which its own text does not yet
+  record: 1.08-1.09 on 13.08.2026, twice 1.07 today (06.09.) against the unchanged bar of 1.1,
+  both attempts on the same run. A number that moves is a different question from a number that
+  sits still under its bar, and 603 owes the verdict either way.

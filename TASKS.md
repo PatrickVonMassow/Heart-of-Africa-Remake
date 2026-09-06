@@ -14633,3 +14633,39 @@ to land than a mechanism that needs a review.
   (`markHandover`, `HANDOVER_SETTLE_MS`), .claude/batch-activity.jsonl (04.09. handover and
   process-exit rows)
   Bundle: Session- & Repo-Hygiene.
+
+- [ ] 1063. A wildebeest is hunted in the central African rainforest, and the check that
+  catches it belongs to nobody.
+  WHAT HAPPENS. Measured 06.09.2026 in the LARGE run on feat/689-chief-direction-and-mould
+  (webgl/enrichments, HEAD 8944a52c6): the `predator-food-web` section reports
+  `preyMismatch: [{prey: "wildebeest", region: "central"}]` and
+  `webMismatch: [{predator: "lion", prey: "wildebeest", region: "central"}]` over sixteen
+  hunts. Wildebeest are plains animals; the central region is rainforest. The check
+  `every hunted prey fits the region and the predator food web` is the one that catches it,
+  and it went GREEN on the same run's retry — so the placement is INTERMITTENT, not constant.
+  WHY IT IS NOT ALREADY CHARGED. The ledger entry that looks like this one is point 1013's,
+  and it is anchored on `every predator fits the region and period` — a DIFFERENT, older
+  check. 1013's own `why` records the prey side as clean, which is exactly what this
+  measurement contradicts. The failing check was added later, by the commit "Lions hunt
+  varied, region-appropriate prey; add wildebeest and warthog" (531319528) — the same commit
+  that introduced the wildebeest. So the animal and the check that rejects it arrived
+  together, and nothing owns the red.
+  WHAT IT COSTS. An unowned red makes the whole run neither clean nor accounted for, so no
+  LARGE can be filed as coverage while it stands. It cost this run its verdict.
+  WHAT IS NOT YET KNOWN — and settling it IS the first half of this point: 1013 says of the
+  predator side that the check "may read the region where the hunt ENDED rather than where it
+  began". An animal that crosses a region border mid-hunt explains BOTH the red and its
+  disappearance on the retry. Decide that FIRST: log the region at the hunt's start and at
+  its end side by side, for one sample, and see whether they differ.
+  Final state:
+  - The cause is named from the logged sample — wandering across a border, or a genuinely
+    wrong placement — and the fix is made on that side.
+  - The section passes on a quiet host over a run of at least six, on both backends.
+  - If the cause is shared with 1013, both points say so, and only one of them carries the fix.
+  Test: `npm test -- enrichments` unfiltered, plus the throttle probe over
+  `predator-food-web` with the run counts stated.
+  Criticality: medium — it blocks no game work, but it blocks the evidence every render
+  change is filed with, and it is the second unowned red of the same family.
+  Refs: scripts/verify/enrichments.mjs (`predator-food-web`), the food-web table the check
+  reads, scripts/render-verify-charges.mjs (point 1013's entry, prey side NOT covered)
+  Bundle: Testinfrastruktur.
