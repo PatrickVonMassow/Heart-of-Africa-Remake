@@ -71,6 +71,29 @@ export const RED_CHARGES = [
       + 'whether the player or the injected window.__pad is hit, and the charge dies with it.',
   },
   {
+    point: 642,
+    suite: 'polish',
+    kind: 'check',
+    match: /^the (dry|wet) settlement season reading settles before it is read/i,
+    // NO detailMatch, deliberately. The check has exactly ONE failing mode —
+    // `waitForReadingStable` returning unsettled, which happens only when its
+    // 60 s window runs out — so the name alone is already as narrow as a
+    // measurement would make it. And a SUSPECT record carries its first
+    // attempt's reds by NAME only, with no measurement at all, so a
+    // detail-scoped entry could never own the very record this red arrives in.
+    why:
+      'THE SETTLE DEADLINE POINT 642 NAMES BY NAME. That point lists this very check — '
+      + '"polish\'s ... dry settlement-season settle (read after 60176 ms)" — among the checks '
+      + 'whose subject is a wall-clock budget and which therefore have to DECLARE the throughput '
+      + 'they need and SKIP below it, rather than red on a lane that cannot deliver frames fast '
+      + 'enough. Measured again 06.09.2026 in the webgpu polish run at 19:15:15Z ("after 60276 '
+      + 'ms"), on a host whose quiet the run itself could not verify, and the retry read it '
+      + 'clean. Nothing in the change under it touches the settlement season: the same run was '
+      + 'taken for point 1058, whose whole diff is the speech-hypothesis section of this suite. '
+      + 'It is charged, not excused — 642 owns making the check say what it needs — and the '
+      + 'charge dies with that point.',
+  },
+  {
     point: 1043,
     suite: 'polish',
     kind: 'check',
@@ -1302,79 +1325,5 @@ export const RED_CHARGES = [
       + 'It says nothing about the bank-game branch: that change moves village children, bank-game '
       + 'balance values and play-rock geometry, and touches no wildlife anchoring. The charge dies '
       + 'with 565.',
-  },
-  {
-    point: 1043,
-    suite: 'polish',
-    backend: 'webgl',
-    kind: 'check',
-    match: /^the speaking figure itself stands in the frame, under its note/i,
-    // DETAIL-SCOPED TO A SAMPLE THAT FELL SHORT, which is the observation. The
-    // same check also prints `MEASURED NOTHING` when the probe produced no
-    // samples at all — a section that measured nothing is a different defect and
-    // stays a real red — and the bar is six of the sampled frames, so only a
-    // count BELOW six may be excused here.
-    detailMatch: /^body at \(-?\d+, -?\d+\), label bottom -?\d+ — [0-5]\/[1-9]\d* frames$/i,
-    why:
-      'THE SECOND CHECK OF THE SECTION POINT 1043 OWNS, measured 03.09.2026, 06:09:56Z, '
-      + 'webgl/polish in the LARGE run on feat/1047-bank-game-readable: `body at (651, 776), '
-      + 'label bottom 700 — 3/8 frames` against a bar of six. The speaker WALKS through the '
-      + 'sampling, so this reads whether a walking figure stays in its note\'s column for eight '
-      + 'shutters — the same staleness that makes 1043\'s candidate probe a coin toss, one step '
-      + 'further along, and 1043 now names it. '
-      + 'IT IS UNREPRODUCED ON BOTH SIDES OF THE BRANCH: sampled the same day on a quiet host '
-      + '(load 0.6) with `throttle-probe polish --section=speech-hypothesis --no-throttle '
-      + '--runs 6`, six runs on main at 7913c60e9 and six on the branch at ec2ed0280 — twelve '
-      + 'section runs, and this check went red in none of them. So the one occurrence says '
-      + 'nothing about the bank-game change under it. It is charged, not excused: 1043 owes the '
-      + 'selection that no longer rests on a walking coin toss, and the charge dies with that '
-      + 'point.',
-  },
-  {
-    point: 1058,
-    suite: 'polish',
-    backend: 'webgpu',
-    featureLevel: 'compatibility',
-    kind: 'check',
-    match: /^the speaking figure itself stands in the frame, under its note/i,
-    // DETAIL-SCOPED TO A SAMPLE THAT FELL SHORT, exactly like the WebGL 2 entry
-    // above: `MEASURED NOTHING` is a section that measured nothing at all, which
-    // is a different defect and stays a real red, and only a count BELOW the bar
-    // of six may be excused here.
-    detailMatch: /^body at \(-?\d+, -?\d+\), label bottom -?\d+ — [0-5]\/[1-9]\d* frames$/i,
-    why:
-      'FILED AS 1058 ON 04.09.2026 BECAUSE IT STOPPED BEING A FLAKE. Measured at 6822804e6 with '
-      + '`throttle-probe polish --section=speech-hypothesis --backend webgpu --no-throttle --runs 6` '
-      + 'on a quiet host (load below 2): FIVE OF SIX runs red, at 4/8 and 5/8 frames every time. '
-      + 'Point 1043 measured the same check on 03.09.2026 over twelve section runs on both sides of '
-      + 'a branch and it went red in NONE of them, so this is not 1043\'s coin toss: between the two '
-      + 'measurements the paired DIG summons landed, and a speaker now walks off to his dig site in '
-      + 'the same breath as his word. '
-      + 'The charge gives the red an owner that can CLOSE it; it does not decide which side owes the '
-      + 'fix — the choreography that sends a speaker away mid-utterance, or a check that stages its '
-      + 'shot around a figure free to leave it. Point 1058 owes exactly that naming, and the charge '
-      + 'dies with it.',
-  },
-  {
-    point: 1058,
-    suite: 'polish',
-    backend: 'webgpu',
-    featureLevel: 'compatibility',
-    kind: 'check',
-    match: /^the note rides on the figure that speaks/i,
-    // DETAIL-SCOPED TO A SIDEWAYS-ONLY MISS: the vertical offset must still be
-    // NEGATIVE, i.e. inside its own allowance. A note that also drifts
-    // vertically, or a `MEASURED NOTHING` sample, is a different defect and
-    // stays a real red.
-    detailMatch: /^worst sideways offset past half the label height \d+(\.\d+)? px, worst vertical offset past the scaled lift -\d+(\.\d+)? px, over [1-9]\d* frames$/i,
-    why:
-      'THE SAME SECTION AND THE SAME MORNING as the entry above, measured 04.09.2026 in the webgpu '
-      + 'polish run at 07:39:00Z: `worst sideways offset past half the label height 68.3 px, worst '
-      + 'vertical offset past the scaled lift -36.4 px, over 8 frames` — the note trails its speaker '
-      + 'SIDEWAYS while the vertical lift stays inside its allowance, which is the signature of a '
-      + 'figure walking through the sample rather than of a label left at a world coordinate. That '
-      + 'is the defect 1058 owns, read one step earlier than the body-in-frame check. '
-      + 'It is charged, not excused: the run that carried it passed only on its retry and therefore '
-      + 'covers nothing, and the charge dies with 1058.',
   },
 ]

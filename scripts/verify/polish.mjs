@@ -659,10 +659,12 @@ if (section('speech-hypothesis')) {
   // walk up to is rejected for the geometry behind the lens. The nearer range is
   // tried before the candidate is given up on.
   const STAND_BACKS = [5, 3.5]
-  /** Stand `back` in front of figure `i`, on the outward bearing, and report what
-   *  the frame draws at its chest. */
-  const aimAt = async (i, STAND_BACK) => {
-    await page.evaluate(
+  /** Put the camera `back` in front of figure `i`, on the outward bearing, and
+   *  look at it. Reads the figure's position LIVE, so it composes the shot on
+   *  wherever the figure stands at this instant — which is the whole point of
+   *  calling it more than once (point 1058). */
+  const standBefore = (i, STAND_BACK) =>
+    page.evaluate(
       ({ idx, back }) => {
         const figure = window.__speechProbeFigures?.[idx]
         const p = window.__placePlayer
@@ -686,6 +688,10 @@ if (section('speech-hypothesis')) {
       },
       { idx: i, back: STAND_BACK },
     )
+  /** Stand `back` in front of figure `i`, on the outward bearing, and report what
+   *  the frame draws at its chest. */
+  const aimAt = async (i, STAND_BACK) => {
+    await standBefore(i, STAND_BACK)
     await nextFrames(2)
     return page.evaluate((idx) => {
       const figure = window.__speechProbeFigures?.[idx]
@@ -785,11 +791,26 @@ if (section('speech-hypothesis')) {
           reading: el.querySelector('.reading')?.textContent ?? '',
         }
       }, speakerIndex)
+    // THE SHOT FOLLOWS ITS SPEAKER (point 1058). Measured 06.09.2026 on a quiet
+    // host: the body walked out of the frame SIDEWAYS — bodyX ran 496, 360, 234,
+    // 123, 11, -70, -140, -208 across the eight samples of a 1440-wide viewport
+    // — while its note stayed over it in every one of them (the body below the
+    // label's bottom edge throughout, the vertical offset inside its allowance)
+    // and the label shrank 212 -> 160 px as the figure receded. So neither the
+    // note nor the choreography was at fault: this block aimed the camera ONCE
+    // and then spent eight shutters measuring a figure that the paired DIG
+    // summons (point 688) sends off to its site in the same breath as its word.
+    // A shot staged around a figure free to leave it proves nothing to a human
+    // eye either, so the camera is put back on the subject before EVERY sample,
+    // exactly as the shutter below already does before its frame. Two frames,
+    // because the pose is consumed by the place controller and the note is
+    // projected by a frame callback of drei's own.
     const samples = []
     for (let k = 0; k < 8; k++) {
+      await standBefore(speakerIndex, speakerBack)
+      await nextFrames(2)
       const s = await read()
       if (s) samples.push(s)
-      await nextFrames(1)
     }
     // Both allowances are expressed in the LABEL'S OWN height, which drei's
     // distanceFactor scales with the distance — a screen constant would pass at
@@ -814,14 +835,29 @@ if (section('speech-hypothesis')) {
     // And the picture must SHOW that: the speaker's own body stands inside the
     // frame, directly under its note. A label over an empty patch of village
     // would satisfy every number above and prove nothing to a human eye.
-    const underNote = samples.filter(
-      (s) => s.bodyX > 0 && s.bodyX < s.vw && s.bodyY > s.labelBottom && s.bodyY < s.vh,
-    )
+    const inFrame = (s) => s.bodyX > 0 && s.bodyX < s.vw && s.bodyY > s.labelBottom && s.bodyY < s.vh
+    const underNote = samples.filter(inFrame)
+    // WHICH BOUND BROKE, from the frames themselves (point 1058). The old detail
+    // printed sample ZERO and the count, and sample zero is the one taken before
+    // the subject had moved anywhere — so a red said only "5/8" and naming the
+    // cause cost an instrumented probe run. A miss now says which side of the
+    // frame the body left by, and the track of the reading that left it.
+    const missReason = (s) => {
+      if (!(s.bodyX > 0)) return 'off the left edge'
+      if (!(s.bodyX < s.vw)) return 'off the right edge'
+      if (!(s.bodyY > s.labelBottom)) return 'above its own note'
+      if (!(s.bodyY < s.vh)) return 'below the bottom edge'
+      return 'in frame'
+    }
+    const misses = [...new Set(samples.filter((s) => !inFrame(s)).map(missReason))]
     check(
       'the speaking figure itself stands in the frame, under its note (point 485)',
       underNote.length >= 6,
       samples.length
         ? `body at (${samples[0].bodyX.toFixed(0)}, ${samples[0].bodyY.toFixed(0)}), label bottom ${samples[0].labelBottom.toFixed(0)} — ${underNote.length}/${samples.length} frames`
+          + (misses.length
+            ? `; missed ${misses.join(' and ')} — bodyX ${samples.map((s) => s.bodyX.toFixed(0)).join(', ')} of ${samples[0].vw}, bodyY ${samples.map((s) => s.bodyY.toFixed(0)).join(', ')} of ${samples[0].vh}`
+            : '')
         : 'MEASURED NOTHING',
     )
     // Point 485 (1)/(4): the syllables stand BESIDE the reading, never instead of
