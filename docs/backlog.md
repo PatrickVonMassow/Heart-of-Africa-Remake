@@ -129,3 +129,5 @@ Format: one line per finding — `- YYYY-MM-DD <source> — <finding>`.
   the scale question, separate from the overlap noted above on 05.09.: there the doubt was
   whether an animal walks through the landmark, here it is how big the animal is at all. Both
   frames are otherwise identical between the backends, so it is not a renderer artefact.
+
+- 06.09.2026: A batch claim expires after 30 min without claimant ACTIVITY, and a background polling loop is not activity — the launcher took the released lock first. Renew the claim (re-run batch-claim.mjs) while waiting, or claim only when the release is near.
