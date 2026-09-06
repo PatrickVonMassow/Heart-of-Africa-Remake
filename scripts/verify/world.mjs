@@ -381,15 +381,18 @@ if (section('communication-errand')) {
     // has to be able to carry to the next lock.
     await jump(talus.lat + reachDeg * 4, talus.lon, 600)
     const miss = await pressUseKey()
+    // The detail rides ON the FAIL line: the runner echoes only those lines, and
+    // the `console errors:` list below never reaches a run log.
+    const pressDetail = (r) =>
+      `said ${JSON.stringify(r.said)}, spent ${JSON.stringify(r.spent)}, mode ${r.mode}, ` +
+      `dialog ${JSON.stringify(r.dialog)}`
     const missOk = miss.said.includes(strings.noFit) && !miss.spent.includes('bandiagara-talus')
     console.log(
-      `${missOk ? 'PASS' : 'FAIL'}  the use key clear of the escarpment answers in the traveller's own voice`,
+      `${missOk ? 'PASS' : 'FAIL'}  the use key clear of the escarpment answers in the traveller's own voice` +
+        (missOk ? '' : ` — ${pressDetail(miss)}`),
     )
     if (!missOk) {
-      errors.push(
-        `a use ${(reachDeg * 4).toFixed(2)}° off the talus foot said ${JSON.stringify(miss.said)} ` +
-          `(mode ${miss.mode}, dialog ${JSON.stringify(miss.dialog)})`,
-      )
+      errors.push(`a use ${(reachDeg * 4).toFixed(2)}° off the talus foot: ${pressDetail(miss)}`)
     }
 
     // And at the foot of the wall it fits. The frame is taken BEFORE the press,
@@ -411,14 +414,10 @@ if (section('communication-errand')) {
       fitted.spent.includes('bandiagara-talus') &&
       fitted.keys.includes('journal.mouldFitted')
     console.log(
-      `${fittedOk ? 'PASS' : 'FAIL'}  the use key at the talus foot fits the impression and solves the puzzle`,
+      `${fittedOk ? 'PASS' : 'FAIL'}  the use key at the talus foot fits the impression and solves the puzzle` +
+        (fittedOk ? '' : ` — ${pressDetail(fitted)}`),
     )
-    if (!fittedOk) {
-      errors.push(
-        `the use key at the talus foot said ${JSON.stringify(fitted.said)} and spent ` +
-          `${JSON.stringify(fitted.spent)} (mode ${fitted.mode}, dialog ${JSON.stringify(fitted.dialog)})`,
-      )
-    }
+    if (!fittedOk) errors.push(`the use key at the talus foot: ${pressDetail(fitted)}`)
 
     // A spent socket answers like a wrong place, and writes no second page.
     const again = await pressUseKey()
@@ -426,14 +425,10 @@ if (section('communication-errand')) {
       again.said.includes(strings.noFit) &&
       again.keys.filter((k) => k === 'journal.mouldFitted').length === 1
     console.log(
-      `${againOk ? 'PASS' : 'FAIL'}  a second press at the spent socket answers like a wrong place`,
+      `${againOk ? 'PASS' : 'FAIL'}  a second press at the spent socket answers like a wrong place` +
+        (againOk ? '' : ` — ${pressDetail(again)}`),
     )
-    if (!againOk) {
-      errors.push(
-        `a second press at the spent socket said ${JSON.stringify(again.said)} ` +
-          `(mode ${again.mode}, dialog ${JSON.stringify(again.dialog)})`,
-      )
-    }
+    if (!againOk) errors.push(`a second press at the spent socket: ${pressDetail(again)}`)
 
     await page.evaluate((was) => {
       window.__balance.randomEventsEnabled = was
