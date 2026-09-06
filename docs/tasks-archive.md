@@ -26361,3 +26361,88 @@ Nummerierung bleiben deshalb identisch — hier wird nur verschoben, nie umgesch
       point; the camp, help and HUD consumers stay untouched and wait for the observation
       model.
   (4) presentValuable loses its goodwill arithmetic and keeps its journal reaction.
+
+- [x] 689. The chief speaks from the first minute, and pays in a direction and a mould (user
+  13.08.2026, playing the deployed communication slice).
+  The user played the deployed communication slice on 13.08.2026 with the debug
+  switch "Speech: show concepts instead of syllables" on and could learn nothing:
+  "Ich erkenne da kein Fangspiel … Das Herumschicken wirkt wie zum Selbstzweck
+  eingeführt", and about the adults "Selbst wenn ich diese Übersetzungen sehe,
+  erkenne ich keinen Sinn hinter den Handlungen." The evening's conversation
+  diagnosed the cause — the design taught eleven concepts through situations
+  forced onto a game that cannot carry them — and rebuilt the whole slice around
+  five words, two teaching places and one game per settlement kind. This point is
+  one of six that carry that rebuild; they are specified together and read
+  together.
+
+  The six specifications were reviewed cross-vendor before filing (GPT-5.6 Sol at
+  effort high, 13.08.2026, verdict do-not-merge on the first draft): it found two
+  outright contradictions and, more valuable, three wrong readings a player could
+  learn and still finish the puzzle with. What stands here is the corrected state.
+  The chief speaks to anyone from the first minute, and what he gives back for the
+  buried thing is a direction and a mould.
+
+  Final state:
+
+  1. NO PRECONDITION. The audience and the drummed message need no gift, no trust,
+     no "Honored Friend" — the player may ask from his first visit. The only thing
+     between him and the message is that he does not know the words. Every gate on
+     the message is removed (it was a placeholder from an early version).
+  2. THE MESSAGE stays as the vocabulary point defines it: `RIVER · UPSTREAM ·
+     ROCK · DIG`, drummed, never translated, reopenable from the journal with the
+     player's own readings.
+  3. THE REWARD. When the traveller hands over what he dug up at the boulder
+     upstream, the chief answers with `RIVER · DOWNSTREAM` — the direction, nothing
+     else. The phrase says WHERE and no more; what to do there is carried by the
+     mould alone. Nothing may be read into the ABSENCE of `DIG`: silence teaches
+     nothing, so no meaning is assigned to it anywhere in the design. The old
+     acknowledgment `BIG_ROCK · DIG · HERE` is gone with the concepts it used.
+  4. THE MOULD. With it he hands over, wordlessly, one item: DE "Tonabdruck eines
+     Felsens", EN "Clay Impression of a Rock". It rides OUTSIDE the pack capacity
+     and cannot be traded, like the buried thing before it. There is no item
+     picture in this game, so the NAME and the JOURNAL carry it: the entry at the
+     handover describes what the traveller sees — a flat back, a hollowed face, a
+     form that wants to go INTO something, not onto it — in the ~1890 voice with
+     the §15 markup, in both languages. That is his own observation, not a
+     translation of the chief's speech, so the no-translation rule stands.
+  5. BANDIAGARA. Downstream lie the cliffs. At the TALUS FOOT — not in the cliff-
+     face niches, which are Tellem burial and granary places (docs/205-world-
+     accuracy-findings.md A18) — the mould fits its socket. Using it there with the
+     use key, within the same kind of radius the digging uses, fires a dummy
+     success message: the PoC puzzle is solved. The message is localized in both
+     languages.
+  6. IT IS A SMALL SYSTEM, NOT A ONE-OFF. An item carries a FORM ID, a place
+     carries the matching SOCKET, and the use key at proximity resolves them. The
+     state rules are part of the system, not left to the first caller:
+     - the traveller may carry several forms; the socket picks the one that MATCHES
+       it and ignores the rest, so nothing has to be "selected" first;
+     - a socket is either open or spent; a spent one answers like a wrong place;
+     - a form is NOT consumed — it stays in the pack, so a second visit is never a
+       dead end;
+     - the spent state is part of the saved game like any other world state;
+     - a use at a wrong or spent place answers with a sentence in the traveller's
+       voice ("the rock here has no such hollow") rather than with silence — that
+       is how the player learns the rule for the next lock.
+     A pyramid or the Sphinx must later be a data line, not a new mechanism.
+
+  Test: Vitest — the message needs no gift/reputation state; the reward phrase is
+  exactly `RIVER · DOWNSTREAM`; the mould is outside capacity and untradeable; the
+  form/socket resolution succeeds only within the radius at the talus foot and
+  answers with the miss sentence elsewhere; the success message exists in both
+  languages. One browser flow proves the handover and the use at the cliff.
+  Constraints:
+  - Depends on the five-concept lexicon.
+  - The goal boulder of src/world/communicationRock.ts is untouched.
+  - Do not let the item name or the journal entry say "cliff" — it must say an
+    impression of A ROCK. The direction comes from the word, the place from the
+    player putting the two together.
+  - The framing is a token of goodwill from one people to the next (the §13.3 chain
+    of knowing people), never a looted sacred object, and nothing is opened in a
+    burial niche.
+  Quotes:
+  Nutzer, 13.08.2026 21:22: »Das mit dem Vertrauen raus - das war nur ein Platzhalter einer frühen Version … Man soll von Anfang an jeder Zeit mit dem Häuptling reden können - nur versteht man ihn nicht, wenn man nicht von den Kindern und den Erwachsenen die Sprache gelernt hat.«
+  Nutzer, 13.08.2026 21:22: »Wie wäre damit, dass er einem etwas und dieses Mal nur flussabwärts (bisher wurde nur flussaufwärts verwendet) sagt? Flussabwärts kommt man zu Bandiagara. Wenn man dort den neuen Gegenstand benutzt, erscheint eine Dummy-Erfolgsmeldung, die besagt, dass man das Rätsel des PoCs gelöst hat.«
+  Nutzer, 13.08.2026 21:37: »Der Gegenstand soll sozusagen ein Negativ zu einem Stück von der Felswand sein. Drückt man ihn dagegen, löst das irgendetwas aus - ein Bisschen Zak McKracken Vibes. Auf ähnliche Art könnte man später vielleicht in einem Pyramide oder in die Sphinx gelangen.«
+  Nutzer, 13.08.2026 22:59: »Der Häuptling sagt zur Belohnung nicht nur DOWNSTREAM, sondern RIVER DOWNSTREAM. Nur dieses Mal kein DIG.«
+  Refs: src/communication/chiefReply.ts, src/state/store.ts (rockArtefact), src/ui/Dialogs.tsx, src/world/data/landmarks.ts (bandiagara), docs/205-world-accuracy-findings.md A18
+  Bundle: Dorfleben.
