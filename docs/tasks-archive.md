@@ -26446,3 +26446,58 @@ Nummerierung bleiben deshalb identisch — hier wird nur verschoben, nie umgesch
   Nutzer, 13.08.2026 22:59: »Der Häuptling sagt zur Belohnung nicht nur DOWNSTREAM, sondern RIVER DOWNSTREAM. Nur dieses Mal kein DIG.«
   Refs: src/communication/chiefReply.ts, src/state/store.ts (rockArtefact), src/ui/Dialogs.tsx, src/world/data/landmarks.ts (bandiagara), docs/205-world-accuracy-findings.md A18
   Bundle: Dorfleben.
+
+- [x] 691. A guess is entered with space, and the nearer thing wins (user 13.08.2026, playing
+  the deployed communication slice).
+  The user played the deployed communication slice on 13.08.2026 with the debug
+  switch "Speech: show concepts instead of syllables" on and could learn nothing:
+  "Ich erkenne da kein Fangspiel … Das Herumschicken wirkt wie zum Selbstzweck
+  eingeführt", and about the adults "Selbst wenn ich diese Übersetzungen sehe,
+  erkenne ich keinen Sinn hinter den Handlungen." The evening's conversation
+  diagnosed the cause — the design taught eleven concepts through situations
+  forced onto a game that cannot carry them — and rebuilt the whole slice around
+  five words, two teaching places and one game per settlement kind. This point is
+  one of six that carry that rebuild; they are specified together and read
+  together.
+
+  The six specifications were reviewed cross-vendor before filing (GPT-5.6 Sol at
+  effort high, 13.08.2026, verdict do-not-merge on the first draft): it found two
+  outright contradictions and, more valuable, three wrong readings a player could
+  learn and still finish the puzzle with. What stands here is the corrected state.
+  A guess is entered with SPACE, the use key — the mouse click goes, and the use
+  key has ONE candidate list.
+
+  Final state:
+
+  1. The reading dialog for a heard utterance opens with SPACE on the targeted
+     speaker. The left-click path on the canvas is removed, together with the
+     pointer-lock release it needed only so the dialog could receive keys
+     (src/scenes/place/SpeechLabels.tsx).
+  2. ONE CANDIDATE SET FOR THE USE KEY. Everything SPACE can mean in a settlement —
+     a hut door, a speaker's utterance, a dig site, the chief, a form socket — is
+     collected as candidates with a distance from the player and a range of its
+     own. The nearest candidate IN range wins; a tie holds the standing pick the
+     way the speech target already does (TARGET_HOLD), so the choice cannot flicker
+     between two things a step apart. Distances are measured on the ground plane in
+     place units for every candidate, so they are comparable at all.
+  3. THE PROMPT SHOWS WHAT SPACE WILL ACTUALLY DO. The highlight and the on-screen
+     hint belong to the WINNING candidate — when the door wins, the speaker's note
+     carries no invitation, and the door's hint is shown instead. A prompt that
+     offers something SPACE will not do is a bug, not a detail.
+  4. `src/communication/speechTarget.ts` keeps deciding WHICH speaker is the
+     speaker candidate; it simply no longer decides what SPACE does.
+  5. On-screen hints and both language files say SPACE, never "click".
+
+  Test: Vitest over the candidate arbitration — nearer door wins, nearer speaker
+  wins, a candidate out of its own range never wins, the tie holds its standing
+  pick, and the prompt named by the arbitration is the one the winner owns. A
+  browser check opens a guess with SPACE and proves no mouse handler is left on the
+  canvas.
+  Constraints:
+  - Independent of the rest of the rebuild; it can land on its own.
+  - Small and mechanical — a good fit for the OpenAI lane.
+  Quotes:
+  Nutzer, 13.08.2026 22:59: »Eine Änderung an der Bedienung: Anstatt per Klicken eine Interpretation für etwas Gesagtes festlegen zu können, soll das per SPACE passieren. Das ist ja die Benutzen-Taste. Zusätzlich jetzt Klicken einzuführen war nur unnötig umständlich.«
+  Nutzer, 13.08.2026 23:13: »Vorfahrt hat, was dem Spieler näher ist.«
+  Refs: src/scenes/place/SpeechLabels.tsx, src/communication/speechTarget.ts, src/ui/Dialogs.tsx, src/i18n/de.ts, src/i18n/en.ts
+  Bundle: Dorfleben.
