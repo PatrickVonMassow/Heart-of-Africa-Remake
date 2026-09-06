@@ -131,3 +131,13 @@ Format: one line per finding — `- YYYY-MM-DD <source> — <finding>`.
   frames are otherwise identical between the backends, so it is not a renderer artefact.
 
 - 06.09.2026: A batch claim expires after 30 min without claimant ACTIVITY, and a background polling loop is not activity — the launcher took the released lock first. Renew the claim (re-run batch-claim.mjs) while waiting, or claim only when the release is near.
+
+- 2026-09-06 the `polish` suite's cost table is stale, and `run-wait.mjs --await` therefore calls
+  a healthy run HUNG. Measured today on `feat/691-space-guess-and-nearest-candidate`: the plan
+  promised "21 frames, 5m 41s"; the WebGPU pass wrote 44 frames in 26m 48s and the WebGL 2 pass
+  44 frames in 49m 02s, both GREEN. Past 2.5x the expectation the await prints "HUNG … end the
+  run rather than waiting again" and records a standstill for the emergency lane — so the
+  advice, followed, would have thrown away two green passes of a mandatory both-backends picture
+  check. The frame count is already reported as "a floor, not a ceiling"; the TIME is not, and
+  it is the one the hung verdict is computed from. No player impact; the workaround is to judge
+  progress from the frames being written and keep awaiting.
