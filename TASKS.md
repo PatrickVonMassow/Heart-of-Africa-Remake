@@ -221,6 +221,7 @@ put it is the mistake this line exists to stop.
   Nutzer, 06.09.2026 13:48 (Einreihung aller drei Punkte): »An der Kommunikationsmechanik zu überarbeiten, einzureihen direkt nach 1058, in der Rehenfolge, in der ich es hier aufzähle:« — dieser Punkt ist der ERSTE der drei.
   Refs: src/state/store.ts (rockArtefact, handArtefactToChief, carriedForms), src/scenes/place/chiefMeeting.ts, src/scenes/place/PlaceScene.tsx (meetChief), src/ui/Hud.tsx (InventoryBar), src/config/balance.ts, src/i18n/en.ts, src/i18n/de.ts, docs/communication-poc-spec.md, design.md §6 §13.4
   Doc impact: docs/communication-poc-spec.md 'Where the digging happens': the artefact is laid in the chief's hands by USING the inventory item before him, not by the use key at his hut. design.md §6 (inventory bar): the quest find is listed as an acting item; §13.4: the hand-over sentence. i18n en/de: item label, Ctrl label, refusal toast.
+  Bundle: Dorfleben.
 
 - [ ] 1065. The tapping child's hand touches the rock it names (user 06.09.2026).
   The child that names the rock TOUCHES it. Today the tap of the children's bank game
@@ -260,6 +261,7 @@ put it is the mistake this line exists to stop.
   Nutzer, 06.09.2026 13:48 (Einreihung aller drei Punkte): »An der Kommunikationsmechanik zu überarbeiten, einzureihen direkt nach 1058, in der Rehenfolge, in der ich es hier aufzähle:« — dieser Punkt ist der ZWEITE der drei.
   Refs: src/scenes/place/bankGame.ts (THE TAP ~626, reachDistance/standOff ~223), src/config/balance.ts (bankGame reachDistance 2.2, standOff 2.6), src/render/gesture.ts (GestureKind), src/scenes/place/PlaceLife.tsx, src/scenes/place/layout.ts (PLAY_ROCK_RADIUS), design.md §13.4, docs/communication-poc-spec.md
   Doc impact: design.md §13.4 and docs/communication-poc-spec.md item 4: the catcher touches the rock with its hand while naming it. If a new gesture kind is added, the point-479 gesture list in the code comments / docs names it.
+  Bundle: Dorfleben.
 
 - [ ] 1066. The water carrier visibly fills the jar at the water and carries visible water (user 06.09.2026).
   The filling of the jar READS as filling. Today the RIVER errand sends an adult with an
@@ -305,6 +307,7 @@ put it is the mistake this line exists to stop.
   Nutzer, 06.09.2026 13:48 (Einreihung aller drei Punkte): »An der Kommunikationsmechanik zu überarbeiten, einzureihen direkt nach 1058, in der Rehenfolge, in der ich es hier aufzähle:« — dieser Punkt ist der DRITTE der drei.
   Refs: src/scenes/place/adultWork.ts (water-out/water-back ~390-410, AdultCarry, WATER_FOOT_REACH), src/scenes/place/riverBank.ts (bankWaterFoot, BANK_STAND_INSET 1.5, BANK_SHORE_HALF 1.2, walkable region through the waterline ~47-62), src/scenes/place/PlaceLife.tsx (ErrandVillagers, head/hand jar meshes ~2440-2612, HEAD_CARRY_POSE), src/scenes/place/layout.ts (waterPath head/foot), src/render/figures.ts, design.md §13.4
   Doc impact: design.md §13.4: the water carrier dips the jar at the waterline and carries visible water back. docs/communication-poc-spec.md: the errand description. balance.ts: fill seconds (calibratable).
+  Bundle: Dorfleben.
 
 - [ ] 1056. The adults dig for no visible reason, and the picture never says what comes
   out (user 04.09.2026, watching the merged digging work).
