@@ -112,3 +112,20 @@ Format: one line per finding — `- YYYY-MM-DD <source> — <finding>`.
   record: 1.08-1.09 on 13.08.2026, twice 1.07 today (06.09.) against the unchanged bar of 1.1,
   both attempts on the same run. A number that moves is a different question from a number that
   sits still under its bar, and 603 owes the verdict either way.
+- 2026-09-06 the board and the in-flight declaration contradict each other the moment a landed
+  point still owes closing work. `batch-in-flight.mjs --waiting-on` insists every evidence item
+  name a point ("1 evidence item(s) name no point"), while `board-publish.mjs` refuses to render
+  a now-section whose focus names a point that is no longer open ("the owner focus names point
+  689, which is not open"). Passing `--point 689` therefore satisfies the first and breaks the
+  second, and omitting it breaks the first — so a wait taken during a landed point's closing
+  duties cannot be declared at all. Measured today between the merge of 689 and its covering
+  WebGL run: four attempts, every combination refused. The `closing <N>` board card exists for
+  exactly this state and is accepted; the in-flight declaration simply does not know about it.
+  No player impact, and the workaround is to run the wait undeclared, which is why this is an
+  observation and not a point.
+- 2026-09-06 `20-worldmodel-bandiagara-talus-foot.png` on BOTH backends of the merged state
+  (WebGPU compatibility 21 FPS, WebGL 2 49 FPS): the two elephants dominate the upper half of
+  the frame and read as oversized against the traveller and the ruin slab beside them. This is
+  the scale question, separate from the overlap noted above on 05.09.: there the doubt was
+  whether an animal walks through the landmark, here it is how big the animal is at all. Both
+  frames are otherwise identical between the backends, so it is not a renderer artefact.
