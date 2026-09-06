@@ -89,7 +89,7 @@ import { SpeechLabels } from './SpeechLabels'
 import { CHIEF_SPEAKER_ID, chiefAnchor, setChiefAnchor } from './chiefPresence'
 import { nextChiefAction } from './chiefMeeting'
 import { speakOverhead } from './speechChannel'
-import { chiefAcknowledgePhrase } from '../../communication/chiefReply'
+import { chiefRewardPhrase } from '../../communication/chiefReply'
 import type { Phrase } from '../../communication/lexicon'
 import { phrasePlan } from '../../communication/speaking'
 import { speechLabelSeconds } from '../../communication/speechLabel'
@@ -504,7 +504,7 @@ function meetChief(hut: Interactive): void {
     case 'hand-over': {
       // The phrase is taken BEFORE the hand-over so the label and the sound
       // carry the same atoms the store records as heard.
-      const phrase = chiefAcknowledgePhrase()
+      const phrase = chiefRewardPhrase()
       game.handArtefactToChief()
       speakChiefPhrase(phrase, hut)
       break

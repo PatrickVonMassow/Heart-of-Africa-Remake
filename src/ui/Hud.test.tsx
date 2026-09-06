@@ -75,6 +75,18 @@ describe('map overlay anchors above the inventory bar (point 163)', () => {
     // Cleared when the bar leaves, so the map falls back to the single-row default.
     expect(document.documentElement.style.getPropertyValue('--inv-bar-height')).toBe('')
   })
+
+  it('a bar holding only a carried form publishes its height too (cross-vendor review of point 689)', () => {
+    jumpTo(...COORD.savanna)
+    // No equipment, no treasure: the bar is absent, and nothing observes it.
+    const { rerender } = render(<Hud />)
+    expect(document.documentElement.style.getPropertyValue('--inv-bar-height')).toBe('')
+    // The impression arrives — the bar appears for the form alone and must
+    // publish, or the map overlay anchors at the no-bar height.
+    useGame.setState({ carriedForms: ['rock-relief'] })
+    rerender(<Hud />)
+    expect(document.documentElement.style.getPropertyValue('--inv-bar-height')).toMatch(/px$/)
+  })
 })
 
 describe('bottom-right button row: map always, camp only where allowed (point 93)', () => {

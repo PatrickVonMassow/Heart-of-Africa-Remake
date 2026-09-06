@@ -178,6 +178,9 @@ export const en: Strings = {
     gold: 'Gold', silver: 'Silver', emerald: 'Emeralds',
     copper: 'Copper', ivory: 'Ivory', statue: 'Golden Statue',
   },
+  forms: {
+    'rock-relief': 'Clay Impression of a Rock',
+  },
   buildings: {
     shop: 'General Store', weapons: 'Weapons Hut', tools: 'Tool Hut',
     market: 'Market Hut', bazaar: 'Bazaar', agency: 'Travel Agency', chief: "Chief's Hut",
@@ -370,6 +373,8 @@ export const en: Strings = {
     bought: (name) => `${name} purchased.`,
     notEnoughMoney: 'Not enough money.',
     digNoShovel: 'I cannot dig without a shovel in hand.',
+    formNoFit: 'Nothing here has a hollow that would take this shape.',
+    pocSolved: 'Dummy message: the puzzle of this proof of concept is solved.',
     drumsSending: 'The chief calls his drummer. The message is going out over the village.',
     chiefStepsOut: 'The chief steps out of his hut and stands before me in the open.',
     chiefNoMessage: 'The chief looks me over and nods. He has nothing to send out over the village.',
@@ -754,6 +759,7 @@ export const en: Strings = {
       drumMessage: 'The Drums Speak',
       rockArtefact: 'At the Foot of the Great Rock',
       artefactGiven: 'Into the Hands of the Chief',
+      mouldFitted: 'The Clay Finds Its Rock',
       decoded: 'Deciphered!',
       unspecific: 'Vague Murmurs',
       victory: 'The Heart of Africa',
@@ -1007,7 +1013,9 @@ export const en: Strings = {
     rockArtefact:
       "[excited]Four words, and they were an errand after all.[/excited] I followed the water against its own pull until a block of stone stood on the bank — the kind of thing the children name at their own two rocks, and the only one up here. [pause]The drums had said no more than that: water, against the pull, stone, dig. Everything else about it I had to find for myself. [pause]Three spans down my shovel met something that was not stone: hammered metal on worn wood, sealed in the river's own clay. [awe]It has lain here longer than the village has stood.[/awe] [pause]I did not open it further. [somber]It is not mine to open.[/somber]",
     artefactGiven:
-      "[breath]I carried it back down the river and laid it in the chief's hands.[/breath] [pause]He turned it over once and spoke three words over it. [excited]I had heard every one of them before — one at the water, one at the rocks the children run to, and one in the beat of his own drums.[/excited] [pause][awe]He had sent me to a place he cannot name in any tongue of mine, and I went there and came back with what lay buried at it.[/awe] [pause][somber]We share no language.[pause] And yet we have just understood one another.[/somber]",
+      "[breath]I carried it back down the river and laid it in the chief's hands.[/breath] [pause]He turned it over once and spoke two words over it. [excited]Both of them I had heard before — one wherever the water is meant, and one among the calls the children throw at each other when they run.[/excited] [pause]What the two say together I must work out for myself; nobody here will say it in a tongue of mine. [pause]Then he took a thing of baked clay from beside the drums and put it into my hands without a single word over it. [pause]It is flat at the back and hollowed at the front, and the hollow is no bowl: it is the shape of a piece of rock, taken off it the way a seal takes a signet. [awe]A form that wants to go INTO something, not onto it.[/awe] [pause][somber]We share no language.[pause] And yet he has given me two words and a shape, and both are meant for someone who has been listening.[/somber]",
+    mouldFitted:
+      "[whisper]This time I followed the water the way it wants to go, until the land stood up in a long wall of stone above the plain.[/whisper] [pause]I did not climb to the little chambers on the face — they are graves and granaries, and no business of mine. [pause]At the foot of the wall, on the ground where the people live, one weathered block carried a relief I had already held in my hands: the clay went against it and sat into it without a hair's play. [pause][awe]Something behind the stone gave — a weight shifting, a long breath of cold air out of the ground.[/awe] [pause][excited]So this is what the words were for.[/excited] [pause][somber]What lies behind it is for another day.[/somber]",
     digNothing: '[weary]I dug at this spot, but the sand yielded nothing except stones and old roots.[/weary]',
     victory: (p: TextParams) =>
       `${en.formatDate(p.day as number, 1890)}. [excited]My shovel struck stone —[pause] hewn stone![/excited] [breath]With trembling hands I laid the burial chamber bare. [awe]Gold gleams in the torchlight, and upon the sarcophagus rests the mask of the great king.[/awe] [breath][awe]I have found it.[pause] The Heart of Africa.[/awe] [pause][somber]The journey was worth every step.[/somber]`,

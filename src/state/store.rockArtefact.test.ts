@@ -8,7 +8,7 @@ import { describe, it, expect, beforeEach, afterEach } from 'vitest'
 import { balance } from '../config/balance'
 import { g, freshGame, withWorld, useGame } from '../test/store'
 import { communicationRockSite } from '../world/communicationRock'
-import { chiefAcknowledgePhrase } from '../communication/chiefReply'
+import { chiefRewardPhrase } from '../communication/chiefReply'
 import { hasHeard, hypothesisFor } from '../communication/heard'
 import { utteranceOf } from '../communication/lexicon'
 import { DRUM_MESSAGE_VILLAGE } from './store'
@@ -110,7 +110,7 @@ describe('handing the artefact to the chief (point 487)', () => {
     carriedIntoTheVillage()
     g().debugSet({ day: 60 })
     g().handArtefactToChief()
-    for (const atom of chiefAcknowledgePhrase()) {
+    for (const atom of chiefRewardPhrase()) {
       expect(hasHeard(g().communication, atom)).toBe(true)
     }
     // Nothing is translated for the player: an utterance he wrote no note for

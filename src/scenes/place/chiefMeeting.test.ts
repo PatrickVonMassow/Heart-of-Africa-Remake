@@ -16,6 +16,9 @@ beforeEach(() => {
   freshGame()
 })
 
+/** An empty pack of trade goods — every material at zero, none missing. */
+const NO_GIFTS = { gold: 0, silver: 0, emerald: 0, copper: 0, ivory: 0 }
+
 /** A village that is NOT the one whose chief has a message to send. */
 const OTHER_VILLAGE = 'maasai-village'
 
@@ -57,6 +60,29 @@ describe('the chief comes out of his hut (design.md §12)', () => {
     g().callChiefOut()
     useGame.setState({ rockArtefact: 'carried' })
     expect(nextChiefAction(g())).toBe('hand-over')
+  })
+
+  it('sends his message on the first visit — no gift, no standing, no trust', () => {
+    // The only thing between the traveller and the message is that he does not
+    // know the words. Every gate that once stood here was a placeholder of an
+    // early version; this pins its absence, from a state that has given nothing
+    // away and earned nothing.
+    g().enterPlace(DRUM_MESSAGE_VILLAGE)
+    // Stripped of the starting outfit's trade goods, so nothing he owns can be
+    // mistaken for the price of the message.
+    useGame.setState({ gifts: NO_GIFTS })
+    expect(Object.values(g().gifts).reduce((a, b) => a + b, 0)).toBe(0)
+    expect(g().honoredFriend).toEqual({})
+    expect(g().drumMessageHeard).toBe(false)
+    g().callChiefOut()
+    expect(nextChiefAction(g())).toBe('send-message')
+  })
+
+  it('keeps sending it however poor and however unknown the traveller is', () => {
+    g().enterPlace(DRUM_MESSAGE_VILLAGE)
+    g().callChiefOut()
+    useGame.setState({ gifts: NO_GIFTS, honoredFriend: {}, money: 0 })
+    expect(nextChiefAction(g())).toBe('send-message')
   })
 
   it('the chief being outside survives a save and its reload', () => {

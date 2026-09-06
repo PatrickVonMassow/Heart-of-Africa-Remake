@@ -180,6 +180,9 @@ export const de: Strings = {
     gold: 'Gold', silver: 'Silber', emerald: 'Smaragde',
     copper: 'Kupfer', ivory: 'Elfenbein', statue: 'Goldene Statue',
   },
+  forms: {
+    'rock-relief': 'Tonabdruck eines Felsens',
+  },
   buildings: {
     shop: 'Laden', weapons: 'Waffenhütte', tools: 'Geräte-Hütte',
     market: 'Markthütte', bazaar: 'Basar', agency: 'Reisebüro', chief: 'Chefhütte',
@@ -372,6 +375,8 @@ export const de: Strings = {
     bought: (name) => `${name} gekauft.`,
     notEnoughMoney: 'Nicht genug Geld.',
     digNoShovel: 'Ohne Schaufel in der Hand kann ich nicht graben.',
+    formNoFit: 'Hier ist nichts, das diese Form aufnehmen würde.',
+    pocSolved: 'Dummy-Meldung: Das Rätsel dieses Proof of Concept ist gelöst.',
     drumsSending: 'Das Oberhaupt ruft seinen Trommler. Die Botschaft geht über das Dorf hinaus.',
     chiefStepsOut: 'Das Oberhaupt tritt aus seiner Hütte und steht vor mir im Freien.',
     chiefNoMessage: 'Das Oberhaupt mustert mich und nickt. Es hat nichts über das Dorf hinauszusenden.',
@@ -756,6 +761,7 @@ export const de: Strings = {
       drumMessage: 'Die Trommeln sprechen',
       rockArtefact: 'Am Fuß des großen Felsens',
       artefactGiven: 'In die Hände des Oberhaupts',
+      mouldFitted: 'Der Ton findet seinen Felsen',
       decoded: 'Entschlüsselt!',
       unspecific: 'Unbestimmtes Gemurmel',
       victory: 'Das Herz von Afrika',
@@ -1012,7 +1018,9 @@ export const de: Strings = {
     rockArtefact:
       '[excited]Vier Wörter – und es war doch ein Auftrag.[/excited] Ich bin dem Wasser gegen seinen eigenen Zug gefolgt, bis ein Steinblock am Ufer stand – von der Art, die die Kinder an ihren beiden Felsen benennen, und der einzige hier oben. [pause]Mehr hatten die Trommeln nicht gesagt: Wasser, gegen den Zug, Stein, graben. Alles Übrige daran musste ich selbst finden. [pause]Drei Spann tief stieß mein Spaten auf etwas, das kein Stein war: gehämmertes Metall auf verwittertem Holz, eingeschlossen im Lehm des Flusses. [awe]Es liegt hier länger, als das Dorf steht.[/awe] [pause]Ich habe es nicht weiter geöffnet. [somber]Es steht mir nicht zu, es zu öffnen.[/somber]',
     artefactGiven:
-      '[breath]Ich habe es den Fluss hinab zurückgetragen und dem Oberhaupt in die Hände gelegt.[/breath] [pause]Er drehte es einmal um und sprach drei Wörter darüber. [excited]Jedes einzelne hatte ich schon gehört – eines am Wasser, eines an den Felsen, zu denen die Kinder laufen, und eines im Schlag seiner eigenen Trommeln.[/excited] [pause][awe]Er hatte mich an einen Ort geschickt, den er in keiner meiner Sprachen benennen kann, und ich war dort gewesen und mit dem zurückgekommen, was daran begraben lag.[/awe] [pause][somber]Wir haben keine gemeinsame Sprache.[pause] Und doch haben wir einander eben verstanden.[/somber]',
+      '[breath]Ich habe es den Fluss hinab zurückgetragen und dem Oberhaupt in die Hände gelegt.[/breath] [pause]Er drehte es einmal um und sprach zwei Wörter darüber. [excited]Beide hatte ich schon gehört – eines überall dort, wo das Wasser gemeint ist, und eines unter den Rufen, die die Kinder einander zuwerfen, wenn sie laufen.[/excited] [pause]Was die beiden zusammen sagen, muss ich selbst herausbekommen; niemand hier wird es mir in einer meiner Sprachen sagen. [pause]Dann nahm er ein Ding aus gebranntem Ton neben den Trommeln auf und legte es mir in die Hände, ohne ein einziges Wort darüber. [pause]Es ist flach im Rücken und ausgehöhlt an der Vorderseite, und die Höhlung ist keine Schale: Sie ist die Gestalt eines Stücks Fels, ihm abgenommen, wie ein Siegel ein Petschaft abnimmt. [awe]Eine Form, die IN etwas hinein will, nicht auf etwas darauf.[/awe] [pause][somber]Wir haben keine gemeinsame Sprache.[pause] Und doch hat er mir zwei Wörter und eine Gestalt gegeben, und beides ist für jemanden gemeint, der zugehört hat.[/somber]',
+    mouldFitted:
+      '[whisper]Diesmal bin ich dem Wasser dorthin gefolgt, wohin es selbst will, bis sich das Land in einer langen Wand aus Stein über der Ebene aufrichtete.[/whisper] [pause]Zu den kleinen Kammern in der Wand bin ich nicht hinaufgestiegen – es sind Gräber und Speicher, und sie gehen mich nichts an. [pause]Am Fuß der Wand, auf dem Boden, auf dem die Menschen leben, trug ein verwitterter Block ein Relief, das ich längst in Händen gehalten hatte: Der Ton legte sich dagegen und saß darin ohne ein Haar Spiel. [pause][awe]Hinter dem Stein gab etwas nach – ein Gewicht, das sich verschob, ein langer Zug kalter Luft aus dem Boden.[/awe] [pause][excited]Dafür also waren die Wörter.[/excited] [pause][somber]Was dahinterliegt, ist eine Sache für einen anderen Tag.[/somber]',
     digNothing: '[weary]Ich grub an dieser Stelle, doch der Sand gab nichts preis als Steine und alte Wurzeln.[/weary]',
     victory: (p: TextParams) =>
       `${de.formatDate(p.day as number, 1890)}. [excited]Meine Schaufel stieß auf Stein –[pause] behauenen Stein![/excited] [breath]Mit zitternden Händen legte ich die Grabkammer frei. [awe]Gold glänzt im Licht der Fackel, und auf dem Sarkophag ruht die Maske des großen Königs.[/awe] [breath][awe]Ich habe es gefunden.[pause] Das Herz von Afrika.[/awe] [pause][somber]Die Reise war jeden Schritt wert.[/somber]`,

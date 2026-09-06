@@ -16,6 +16,7 @@ import { en } from './en'
 import { PLACES, REGION_VALUES } from '../world/geo'
 import { EQUIPMENT_IDS, type DeathCause } from '../state/store'
 import { TREASURE_IDS } from '../systems/economy'
+import { FORM_IDS } from '../world/forms'
 import { EVENT_KINDS } from '../systems/events'
 
 /** Traverse a dotted path (e.g. "overlays.deathCauses") without `any`. */
@@ -33,7 +34,7 @@ function getAtPath(obj: unknown, path: string): unknown {
 // language would slip through. Assert the key sets match and nothing is blank.
 const MAP_PATHS = [
   'places', 'peoples', 'landmarks', 'equipment', 'gifts',
-  'treasures', 'buildings', 'sketches', 'regions', 'animals',
+  'treasures', 'forms', 'buildings', 'sketches', 'regions', 'animals',
   'overlays.deathCauses', 'hud.movementPenalty', 'health.states',
 ]
 
@@ -76,6 +77,7 @@ const COVERAGE: Array<[string, string[]]> = [
   ['peoples', VILLAGE_PEOPLE_IDS],
   ['equipment', EQUIPMENT_IDS],
   ['treasures', TREASURE_IDS],
+  ['forms', [...FORM_IDS]],
   ['debug.eventNames', EVENT_KINDS],
   ['overlays.deathCauses', DEATH_CAUSES],
   ['gifts', MATERIAL_IDS],

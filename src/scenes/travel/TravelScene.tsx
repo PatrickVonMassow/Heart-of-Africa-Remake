@@ -2946,7 +2946,16 @@ export function TravelScene() {
         onWater,
         blocked,
       )
-      if (id !== null) g.enterPlace(id)
+      if (id !== null) {
+        g.enterPlace(id)
+        return
+      }
+      // Out on the open map the SAME use key presses a carried form against
+      // whatever the traveller is standing at: one key for "use what is here",
+      // whether that is a settlement gate or a socket in a rock. The store
+      // answers a wrong or a spent place in his own voice, and does nothing at
+      // all when he carries no form.
+      if (!blocked) g.useCarriedForm()
     })
     return () => {
       off()
