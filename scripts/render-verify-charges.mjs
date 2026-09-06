@@ -91,6 +91,24 @@ export const RED_CHARGES = [
   {
     point: 939,
     suite: 'polish',
+    backend: 'webgl',
+    kind: 'console',
+    // THE SAME VITE TRANSIENT ON THE OTHER LANE, and it needs its own entry
+    // because every entry here excuses only the lane its evidence measured.
+    match: /^console error: Failed to load resource: the server responded with a status of 504 \(Outdated Optimize Dep\)/i,
+    why:
+      'MEASURED 06.09.2026 on main (734de0eb3), webgl/polish, the covering picture run of the '
+      + 'use-key rework: the first attempt reported 207 pass, 0 fail and exactly two console reds, '
+      + 'both this 504, and the retry ran clean. The dev server had been restarted twice in that '
+      + 'hour, so its optimize-dep cache was cold and re-bundled while the suite pages were open — '
+      + 'the environment transient CLAUDE.md §7.2 tells us to fail soft on, not a product defect, '
+      + 'and the identical red point 939 already owns on webgpu/polish, webgpu/startup and '
+      + 'webgpu/report. Nothing about the code under test reaches this reading: no check failed on '
+      + 'either attempt. The charge dies with point 939.',
+  },
+  {
+    point: 939,
+    suite: 'polish',
     backend: 'webgpu',
     featureLevel: 'compatibility',
     kind: 'console',
