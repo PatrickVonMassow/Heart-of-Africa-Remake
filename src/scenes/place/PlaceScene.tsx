@@ -2777,7 +2777,7 @@ export function PlaceScene() {
       useKeyPick.current = winner.key
       if (winner.payload.kind === 'interactive') openBuildingRef.current(winner.payload.interactive)
       else openSpeechGuessRef.current(winner.payload.label)
-    })
+    }, { preventDefault: true })
     return () => {
       off()
       setPrompt(null)
