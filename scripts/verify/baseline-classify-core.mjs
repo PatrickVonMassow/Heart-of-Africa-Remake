@@ -178,6 +178,31 @@ export function failedChecks(output, { includeConsoleErrors = true } = {}) {
   return out
 }
 
+/**
+ * The RAW result-line tally of one output — every `PASS  <name>` / `FAIL  <name>`
+ * line, counted as printed and NOT de-duplicated, which is what a run's headline
+ * ("36 pass, 1 fail") means.
+ *
+ * It exists because a bare `^FAIL` prefix count is wrong: flow.mjs closes with
+ * `FAILURES: <n>`, and `^FAIL` counts that summary as a failing check. Measured
+ * 05.09.2026 in the webgpu flow run at 23:21 — the runner printed "36 pass, 1
+ * fail, 0 console-errors" and then echoed its one "failure" as the line
+ * `FAILURES: 0`. The red named nothing, so nobody could own it, and the crash
+ * tail that would have shown the real cause was suppressed because the count
+ * was not zero. `CHECK_LINE` is the rule that already knows the difference.
+ */
+export function countCheckLines(output) {
+  let pass = 0
+  let fail = 0
+  for (const line of String(output ?? '').split(/\r?\n/)) {
+    const m = CHECK_LINE.exec(line)
+    if (!m || !m[2].trim()) continue
+    if (m[1] === 'PASS') pass += 1
+    else fail += 1
+  }
+  return { pass, fail }
+}
+
 /** Every check a run REACHED (passed or failed), de-duplicated by key. Console
  *  pseudo-checks are not "reached" — their absence means the error did not
  *  happen, which classifyAgainstBaseline handles by kind. */
