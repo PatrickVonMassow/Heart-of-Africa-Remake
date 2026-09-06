@@ -9,6 +9,18 @@ when their area is touched anyway or a triage says otherwise.
 Format: one line per finding — `- YYYY-MM-DD <source> — <finding>`.
 
 <!-- entries -->
+- 2026-09-06 point 689 LARGE regression (`world`, feat/689 at 8c70662b8, WebGL 2) — the landmark
+  frame `11-worldmodel-khartoum-confluence` red with "its subject is not in the rendered picture:
+  off the left and bottom edge of the frame". That is verbatim the unsettled-jump signature point
+  627 owns, but every measurement behind the charge in `scripts/render-verify-charges.mjs` is
+  WebGPU/compatibility, and that entry states outright that a WebGL 2 red stays a real red — so
+  this is the FIRST WebGL 2 sighting of the signature, and it carries the detail line the
+  point-627 entry says it has been waiting for (point 995 owns re-recording these reds). The run
+  died in its own `world` retry when the session did, so the retry's verdict was never written.
+  Re-measured 06.09. 08:02 on the same branch and backend, `world --section=landmark-frames`:
+  green, all seven landmark frames written and none refused by the shutter. Not reproducible; no
+  player impact — the frame is a test camera jump, not a game state. The red is NOT covered by
+  that green: point 689 lands only on a LARGE that goes green on its own.
 - 2026-09-06 point 689 WebGPU proof runs (`world`, feat/689 at 49df5fb3d) — the two talus-foot
   checks ("the use key at the talus foot fits the impression and solves the puzzle", "a second
   press at the spent socket answers like a wrong place") went red in 3 of 6 runner attempts
