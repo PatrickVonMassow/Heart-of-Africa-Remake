@@ -1200,6 +1200,24 @@
       "why": "Last is right under the infrastructure freeze: it blocks no game work, it cleared on its own retry, and its charge entry lands with it, so no future run is left unaccounted while it waits for its sibling 1013.",
       "origin": "machine",
       "place": "last"
+    },
+    "1064": {
+      "at": "2026-09-06T12:34:42.637Z",
+      "why": "The user asked for it on 06.09.2026 and placed it directly after 1058",
+      "origin": "user",
+      "place": "ahead"
+    },
+    "1065": {
+      "at": "2026-09-06T12:34:42.732Z",
+      "why": "The user asked for it on 06.09.2026 and placed it directly after 1058",
+      "origin": "user",
+      "place": "ahead"
+    },
+    "1066": {
+      "at": "2026-09-06T12:34:42.829Z",
+      "why": "The user asked for it on 06.09.2026 and placed it directly after 1058",
+      "origin": "user",
+      "place": "ahead"
     }
   },
   "boundary": {
@@ -1234,7 +1252,7 @@
     "why": "The order standing in front of the release today is the arrangement that predates this rule; the four machine-filed points that had ranked themselves there were moved behind 174 first"
   },
   "settled": {
-    "at": "2026-09-06T10:23:35.223Z",
+    "at": "2026-09-06T12:34:42.840Z",
     "points": [
       174,
       184,
@@ -1606,7 +1624,10 @@
       1059,
       1060,
       1062,
-      1063
+      1063,
+      1064,
+      1065,
+      1066
     ]
   }
 }
