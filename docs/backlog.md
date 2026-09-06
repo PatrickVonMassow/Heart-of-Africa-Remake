@@ -141,3 +141,18 @@ Format: one line per finding — `- YYYY-MM-DD <source> — <finding>`.
   check. The frame count is already reported as "a floor, not a ceiling"; the TIME is not, and
   it is the one the hung verdict is computed from. No player impact; the workaround is to judge
   progress from the frames being written and keep awaiting.
+
+- 2026-09-06 under a HARD throttle the browser lane dies before it measures anything, and the
+  death has no owner. Measured with `throttle-probe polish --section=speech-hypothesis --backend
+  webgl --runs 6` at about a quarter of one core: run 2 of 6 read `0 pass, 0 fail, 0
+  console-errors (exit 1)` with `page.evaluate: Execution context was destroyed, most likely
+  because of a navigation` thrown from `assertBackend` (`scripts/verify/_browser.mjs:100`, called
+  at `scripts/verify/polish.mjs:146`) — the dev server reloaded the page while the backend
+  assertion was reading `window.__renderer`, so the run measured nothing at all rather than
+  failing a check. The same six runs were otherwise green, and twelve unthrottled runs on both
+  backends carried no red, so it is load-shaped: the Vite optimizer re-bundling behind an open
+  page, the same environment class point 939 owns for the 504 console reading, but a different
+  signature and not covered by its charge. No player impact and no blockade — a full suite run is
+  never taken at a quarter core — which is why this is an observation rather than a point. If it
+  ever reaches an unthrottled lane it needs an owner, because a run that measured nothing is a
+  real red and no retry may close it.
