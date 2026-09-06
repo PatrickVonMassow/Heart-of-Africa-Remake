@@ -88,11 +88,11 @@ import type { DigSiteProgress } from './adultWork'
 import { SpeechLabels } from './SpeechLabels'
 import { CHIEF_SPEAKER_ID, chiefAnchor, setChiefAnchor } from './chiefPresence'
 import { nextChiefAction } from './chiefMeeting'
-import { speakOverhead } from './speechChannel'
+import { speakOverhead, speechUseCandidate } from './speechChannel'
 import { chiefRewardPhrase } from '../../communication/chiefReply'
 import type { Phrase } from '../../communication/lexicon'
 import { phrasePlan } from '../../communication/speaking'
-import { speechLabelSeconds } from '../../communication/speechLabel'
+import { speechLabelSeconds, type SpeechLabel } from '../../communication/speechLabel'
 import { drumMessagePlan } from '../../communication/drumMessage'
 import { playDrumMessage, playSpeech, playThunder } from '../../systems/ambience'
 import { releasePointerLock, requestPlacePointerLock } from './pointerLock'
@@ -115,7 +115,8 @@ import { bankGroundHeight, bankPlayRocksView, type PlaceRiverBank } from './rive
 import { scatterGrassTufts } from './groundScatter'
 import { clearEdgeBand, setEdgeBandBoundary, setEdgeBandLook } from '../../render/edgeBand'
 import { devAssert } from '../../systems/devAssert'
-import { buildLayout, chiefStandingSpot, DIG_SITE_RADIUS, fencePanels, isOnLane, nearestActionable, PLACE_RADIUS, SPAWN_INSET, VILLAGE_FIRE, type Interactive, type PathDef, type DwellingDef, type FenceDef, type PlaceLayout } from './layout'
+import { pickUseCandidate, type UseCandidate } from './useKeyTarget'
+import { buildLayout, chiefStandingSpot, DIG_SITE_RADIUS, doorCandidates, fencePanels, isOnLane, PLACE_RADIUS, SPAWN_INSET, VILLAGE_FIRE, type Interactive, type PathDef, type DwellingDef, type FenceDef, type PlaceLayout } from './layout'
 import {
   COOK_SHELTER,
   EYE_HEIGHT,
@@ -2342,6 +2343,39 @@ function GizaAmbient({ anchors }: { anchors: Array<{ x: number; z: number; role:
 
 // --- Scene --------------------------------------------------------------------
 
+/** Everything the use key can mean where the player stands (work-order point 691). */
+type UseAction =
+  | { kind: 'interactive'; interactive: Interactive }
+  | { kind: 'speech'; label: SpeechLabel }
+
+/**
+ * ONE candidate list for the use key (work-order point 691): the functional
+ * doors and the utterance over the nearest speaker's head, each with its own
+ * reach, all measured on the ground plane in place units against the LIVE
+ * player position. `pickUseCandidate` then decides which of them SPACE means —
+ * so the highlight, the hint and the key press can never describe three
+ * different things. A dig site, the chief's own socket and the rest of the
+ * rebuild join this list here.
+ */
+function settlementUseCandidates(layout: PlaceLayout | null, x: number, z: number): UseCandidate<UseAction>[] {
+  const out: UseCandidate<UseAction>[] = doorCandidates(layout, x, z).map((c) => ({
+    key: c.key,
+    distance: c.distance,
+    range: c.range,
+    payload: { kind: 'interactive', interactive: c.payload },
+  }))
+  const speech = speechUseCandidate()
+  if (speech) {
+    out.push({
+      key: speech.key,
+      distance: speech.distance,
+      range: speech.range,
+      payload: { kind: 'speech', label: speech.payload },
+    })
+  }
+  return out
+}
+
 export function PlaceScene() {
   const camera = useThree((s) => s.camera)
   const r3fScene = useThree((s) => s.scene)
@@ -2653,11 +2687,32 @@ export function PlaceScene() {
     }
   }
 
-  // Use key (Space, design.md §2.3/§17.5): enters the functional building at
-  // whose door the traveller stands, or calls the chief out of his hut. A ref
-  // keeps openBuilding stable for the one-shot subscription.
+  // The guess at what a speaker just said, opened by the SAME use key
+  // (work-order point 691). It replaced a left click on the canvas: a second
+  // key for a second kind of thing left the player unable to tell what either
+  // would do. The dialog keeps the utterance it was opened for, so it survives
+  // the label it came from, and the pointer goes back to the player or no key
+  // reaches its field.
+  const openSpeechGuess = (label: SpeechLabel) => {
+    const game = useGame.getState()
+    if (game.journalOpen) game.setJournalOpen(false)
+    releasePointerLock()
+    setDialog({ kind: 'speechGuess', speakerId: label.speakerId, atoms: [...label.atoms] })
+  }
+
+  // Use key (Space, design.md §2.3/§17.5): acts on the NEAREST candidate in its
+  // own reach — the functional building at whose door the traveller stands, the
+  // chief called out of his hut, or the utterance over a speaker's head. Refs
+  // keep the two openers stable for the one-shot subscription.
   const openBuildingRef = useRef(openBuilding)
   openBuildingRef.current = openBuilding
+  const openSpeechGuessRef = useRef(openSpeechGuess)
+  openSpeechGuessRef.current = openSpeechGuess
+  // The standing pick, so a tie holds it rather than flickering between two
+  // things a step apart (TARGET_HOLD). The frame loop keeps it; the key press
+  // re-decides against the LIVE position with the same held key, so the prompt
+  // the player read and the thing SPACE does are one and the same.
+  const useKeyPick = useRef<string | null>(null)
   // PlaceScene stays mounted across placeId changes and the handler's effect
   // only re-subscribes on setPrompt, so read the CURRENT layout through a ref.
   const layoutRef = useRef(layout)
@@ -2717,13 +2772,16 @@ export function PlaceScene() {
       // `nearRef`: a synchronous keydown after a teleport/fast step used to act
       // on the frame-lagged candidate and open the previously-near building.
       const p = player.current
-      const near = nearestActionable(layoutRef.current, p.x, p.z)
-      if (!near) return
-      openBuildingRef.current(near)
+      const winner = pickUseCandidate(settlementUseCandidates(layoutRef.current, p.x, p.z), useKeyPick.current)
+      if (!winner) return
+      useKeyPick.current = winner.key
+      if (winner.payload.kind === 'interactive') openBuildingRef.current(winner.payload.interactive)
+      else openSpeechGuessRef.current(winner.payload.label)
     })
     return () => {
       off()
       setPrompt(null)
+      useUi.getState().setUseKeyOwner(null)
     }
   }, [setPrompt])
 
@@ -2943,22 +3001,31 @@ export function PlaceScene() {
       if (lastSurface) wfh.lastFootstepSurface = lastSurface
     }
 
-    // Nearest actionable interactive for the Space use key (design.md §2.3):
-    // the elder within the interact radius, or the functional building at whose
-    // door the traveller stands. Door proximity only ARMS the key + shows the
-    // prompt now — entry is the discrete Space press (which reselects against
-    // the live position through the same helper), never walking in.
-    const near = nearestActionable(layout, p.x, p.z)
+    // What the Space use key would act on (design.md §2.3, work-order point
+    // 691): ONE candidate list — the functional door the traveller stands at
+    // and the utterance over the nearest speaker's head — and the nearest of
+    // them still in its own reach wins. Door proximity only ARMS the key + shows
+    // the prompt; entry is the discrete Space press (which reselects against the
+    // live position through the same helper), never walking in.
+    const winner = pickUseCandidate(settlementUseCandidates(layout, p.x, p.z), useKeyPick.current)
+    useKeyPick.current = winner?.key ?? null
     const strings = getStrings()
     // At the chief's hut the key names the HUT while he is inside it, and the
     // MAN once he stands in front of it (design.md §12).
     const gameNow = useGame.getState()
+    const near = winner?.payload.kind === 'interactive' ? winner.payload.interactive : null
     const chiefIsOut =
       near?.type === 'chief' && !!gameNow.placeId && gameNow.chiefOutside[gameNow.placeId] === true
+    // The hint belongs to the WINNER: while the door owns the key the speaker's
+    // note carries no invitation, and while the speaker owns it the bottom
+    // prompt is empty and his own note invites the guess instead.
     const prompt = near
       ? strings.prompts.interact(chiefIsOut ? strings.labels.speakToChief : interactiveLabel(strings, near.type))
       : null
-    if (useUi.getState().prompt !== prompt) setPrompt(prompt)
+    const uiNow = useUi.getState()
+    if (uiNow.prompt !== prompt) setPrompt(prompt)
+    const owner = winner ? winner.payload.kind : null
+    if (uiNow.useKeyOwner !== owner) uiNow.setUseKeyOwner(owner)
   })
 
   if (!place || !layout || !groundPlate) return null

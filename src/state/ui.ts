@@ -52,9 +52,9 @@ export type Dialog =
   // The chief's drum message, shown after the drums and reopenable at any time
   // from the journal (design.md §13.4, point 486).
   | { kind: 'drumMessage' }
-  // A guess at what a speaker just said, opened by clicking him (design.md
-  // §13.4, point 588). It carries the atoms it was opened FOR, so it outlives
-  // the label over the speaker's head.
+  // A guess at what a speaker just said, opened with the use key on him
+  // (design.md §13.4, points 588/691). It carries the atoms it was opened FOR,
+  // so it outlives the label over the speaker's head.
   | { kind: 'speechGuess'; speakerId: string; atoms: readonly UtteranceId[] }
   // Camp caches (design.md §6): a free camp by id, or a village cache.
   | { kind: 'camp'; scope: 'free'; campId: number }
@@ -65,6 +65,14 @@ export interface UiState {
   dialog: Dialog
   /** Interaction prompt shown at the bottom of the screen, e.g. "Space — Laden". */
   prompt: string | null
+  /**
+   * What the use key (SPACE) would act on where the player stands, decided by
+   * the one candidate arbitration of the settlement (work-order point 691). The
+   * highlight and the hint belong to the WINNER alone: while a door owns the
+   * key the speaker's note carries no invitation, and the other way round.
+   * null outside a settlement and wherever nothing is in reach.
+   */
+  useKeyOwner: 'interactive' | 'speech' | null
   /** The settlement (place id) whose enter radius the traveller is within in the
    *  bird's-eye view (design.md §2.3): the "Space to enter" hint shows and the
    *  marker's name-label is hidden while set. null when clear of every settlement. */
@@ -195,6 +203,7 @@ export interface UiState {
   clearDrumMessage: () => void
   setDialog: (d: Dialog) => void
   setPrompt: (p: string | null) => void
+  setUseKeyOwner: (owner: 'interactive' | 'speech' | null) => void
   setEnterPlaceId: (id: string | null) => void
   toggleDebug: () => void
   /** Open/close one debug-menu group by id (design.md §21.3). */
@@ -240,6 +249,7 @@ export const DEFAULT_TRAVEL_ZOOM = 0.5
 export const useUi = create<UiState>()((set) => ({
   dialog: null,
   prompt: null,
+  useKeyOwner: null,
   enterPlaceId: null,
   debugOpen: false,
   debugGroupsOpen: [],
@@ -288,6 +298,7 @@ export const useUi = create<UiState>()((set) => ({
   // Closing or switching a dialog always discards a pending bazaar bid.
   setDialog: (dialog) => set({ dialog, bazaarBid: null }),
   setPrompt: (prompt) => set({ prompt }),
+  setUseKeyOwner: (useKeyOwner) => set({ useKeyOwner }),
   setEnterPlaceId: (enterPlaceId) => set({ enterPlaceId }),
   toggleDebug: () => set((s) => ({ debugOpen: !s.debugOpen })),
   toggleDebugGroup: (id) =>

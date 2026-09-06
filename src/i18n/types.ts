@@ -192,11 +192,13 @@ export interface Strings {
     reopenDrumMessage: string
   }
 
-  /** Guessing a meaning where it is spoken (design.md §13.4, point 588): the
-   *  invitation under the highlighted speaker's note, and the dialog it opens. */
+  /** Guessing a meaning where it is spoken (design.md §13.4, points 588/691):
+   *  the invitation under the highlighted speaker's note, and the dialog the use
+   *  key opens on it. */
   speechGuess: {
-    /** Invitation under the note of the speaker a click would take. Never in
-     *  upper case — it is spoken to the player, not shouted at him. */
+    /** Invitation under the note of the speaker the use key would take. It names
+     *  SPACE, never a click — there is no click path. Never in upper case — it is
+     *  spoken to the player, not shouted at him. */
     invite: string
     title: string
     /** Line above the fields: the reading is his own and nothing checks it. */

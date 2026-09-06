@@ -267,7 +267,7 @@ export const en: Strings = {
   },
 
   speechGuess: {
-    invite: 'Click to guess meaning',
+    invite: 'Space — guess meaning',
     title: 'What did he mean?',
     hint: 'What I take his words to mean. My own note — nobody here can tell me whether it is right.',
     readingFor: (utterance: string) => `My reading of ${utterance}`,

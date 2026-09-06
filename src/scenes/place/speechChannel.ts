@@ -31,6 +31,7 @@ import {
 } from '../../communication/speechLabel'
 import { pickSpeechTarget, type SpeechTargetCandidate } from '../../communication/speechTarget'
 import { markedActorRise, type MarkedNode } from '../actorLabelSource'
+import type { UseCandidate } from './useKeyTarget'
 import { placePlayerPosition } from './playerPosition'
 
 let state: SpeechLabelState = noSpeechLabels()
@@ -128,10 +129,39 @@ export function updateSpeechTarget(
   publish(withSpeechTarget(state, pickSpeechTarget(candidates, state.targetId, reach)))
 }
 
-/** The label a click would take right now, or null while none is highlighted. */
+/** The label SPACE would take right now, or null while none is highlighted. */
 export function speechTargetLabel(): SpeechLabel | null {
   const { labels, targetId } = state
   return targetId === null ? null : (labels.find((l) => l.speakerId === targetId) ?? null)
+}
+
+/**
+ * The speech target as a USE-KEY candidate (work-order point 691): SPACE means
+ * several things in a settlement, and the nearest of them wins. WHICH speaker is
+ * the speaker candidate is still decided by speechTarget.ts above; this only
+ * measures how far he stands and how far a voice carries, so the door and the
+ * utterance are comparable at all.
+ *
+ * The distance is taken from the speaker's LIVE world position rather than from
+ * the frame that picked him, so a key press after a teleport or a fast step
+ * cannot act on a stale reading.
+ */
+export function speechUseCandidate(
+  player: { x: number; z: number; active: boolean } = placePlayerPosition,
+  reach: number = balance.communication.hearingRadius,
+): UseCandidate<SpeechLabel> | null {
+  const label = speechTargetLabel()
+  if (!label || !player.active) return null
+  const anchor = anchors.get(label.speakerId)
+  if (!anchor || anchor.parent === null) return null
+  anchor.updateWorldMatrix(true, false)
+  const e = anchor.matrixWorld.elements
+  return {
+    key: `speech:${label.speakerId}`,
+    distance: Math.hypot(e[12] - player.x, e[14] - player.z),
+    range: reach,
+    payload: label,
+  }
 }
 
 /**

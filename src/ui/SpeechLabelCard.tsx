@@ -7,9 +7,11 @@
 // never copied onto the label, so a reading edited in the journal changes over
 // the speaker's head at once: one source, two views.
 //
-// The TARGETED card is the one a left click would take (point 588): it is
+// The TARGETED card is the one the use key would take (points 588/691): it is
 // highlighted against the others and carries the invitation to guess, so which
-// speaker the click means is never in doubt.
+// speaker SPACE means is never in doubt. It is highlighted only while SPACE
+// really means him — a door the player stands at takes the key, and then this
+// card carries no invitation.
 
 import { conceptOf } from '../communication/lexicon'
 import type { Phrase } from '../communication/lexicon'
@@ -29,7 +31,7 @@ export function SpeechLabelCard({
   memory: CommunicationMemory
   /** DEBUG view: the concept behind the utterance instead of syllables + guess. */
   conceptLabels?: boolean
-  /** This speaker is the one a click would take. */
+  /** This speaker is the one the use key would take. */
   targeted?: boolean
 }) {
   const t = useStrings()

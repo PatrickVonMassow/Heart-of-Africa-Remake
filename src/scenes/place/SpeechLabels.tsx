@@ -24,14 +24,12 @@ import { type Phrase } from '../../communication/lexicon'
 import { isSpeechLabelVisible, type SpeechLabel } from '../../communication/speechLabel'
 import { labelPresentation } from '../../communication/speechTarget'
 import { SpeechLabelCard } from '../../ui/SpeechLabelCard'
-import { releasePointerLock } from './pointerLock'
 import {
   clearSpeechLabels,
   pruneSpeechLabels,
   speakOverhead,
   speechAnchor,
   speechLabelState,
-  speechTargetLabel,
   subscribeSpeechLabels,
   updateSpeechTarget,
 } from './speechChannel'
@@ -96,53 +94,31 @@ export function SpeechLabels() {
   // run has NOT taught yet as much as about the others.
   const conceptLabels = useUi((s) => s.speechConceptLabels)
   const dialog = useUi((s) => s.dialog)
+  // Which candidate the use key would act on right now (point 691).
+  const useKeyOwner = useUi((s) => s.useKeyOwner)
   const scene = useThree((s) => s.scene)
   const camera = useThree((s) => s.camera)
   const size = useThree((s) => s.size)
-  const gl = useThree((s) => s.gl)
 
   // Leaving the settlement takes every label with it.
   useEffect(() => clearSpeechLabels, [])
 
   // Which label a drawn label IS — the same gate the render below applies, so
-  // the click target and the highlighted note can never be two different things.
+  // the use-key candidate and the highlighted note can never be two different
+  // things.
   const visible = (label: SpeechLabel) => conceptLabels || isSpeechLabelVisible(memory, label.atoms)
   const visibleRef = useRef(visible)
   visibleRef.current = visible
 
-  // The click target is picked first, then the sweep runs: the target is what
-  // holds its label against expiry (point 588), so deciding it after the sweep
-  // would drop the very note the player is reaching for.
+  // The speaker candidate is picked first, then the sweep runs: the target is
+  // what holds its label against expiry (point 588), so deciding it after the
+  // sweep would drop the very note the player is reaching for. This picks WHICH
+  // speaker is the candidate; whether SPACE actually means him is decided in
+  // PlaceScene against every other thing the key could do (point 691).
   useFrame(() => {
     updateSpeechTarget((label) => visibleRef.current(label))
     pruneSpeechLabels()
   })
-
-  // A LEFT CLICK guesses at what the highlighted speaker just said (point 588).
-  // It is taken on the CANVAS: in the first-person view the pointer is locked,
-  // so there is no cursor to hit the note itself with — the highlight is what
-  // makes the click unambiguous. The dialog keeps the utterance it was opened
-  // for, so it survives the label it came from.
-  useEffect(() => {
-    const el = gl.domElement
-    const onMouseDown = (e: MouseEvent) => {
-      if (e.button !== 0) return
-      if (useUi.getState().dialog) return
-      const target = speechTargetLabel()
-      if (!target) return
-      e.preventDefault()
-      // The pointer goes back to the player, or the click never reaches the
-      // dialog and no key reaches its field.
-      releasePointerLock()
-      useUi.getState().setDialog({
-        kind: 'speechGuess',
-        speakerId: target.speakerId,
-        atoms: [...target.atoms],
-      })
-    }
-    el.addEventListener('mousedown', onMouseDown)
-    return () => el.removeEventListener('mousedown', onMouseDown)
-  }, [gl])
 
   // Dev hook for the headless verification and manual checks (CLAUDE.md §7.2):
   // speak over any named object of the scene — the villager behaviour that will
@@ -179,10 +155,13 @@ export function SpeechLabels() {
     }
   }, [scene, camera, size])
 
-  // While a modal stands open the click handler above ignores every click, so
-  // no note may still invite one — and the guess dialog shows its own utterance,
-  // so the note it was opened from is not drawn a second time behind it.
-  const { targetedId, hiddenId } = labelPresentation(dialog, labels.targetId)
+  // While a modal stands open SPACE does nothing, so no note may still invite
+  // it — and the guess dialog shows its own utterance, so the note it was
+  // opened from is not drawn a second time behind it. The highlight and the
+  // invitation also stand down while the use key belongs to something else,
+  // a door the player is standing at (point 691): a note that invited a press
+  // SPACE will not make is a bug, not a detail.
+  const { targetedId, hiddenId } = labelPresentation(dialog, labels.targetId, useKeyOwner === 'speech')
 
   return (
     <>
