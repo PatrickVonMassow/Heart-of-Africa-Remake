@@ -16,6 +16,7 @@ import {
   speechClock,
   speechLabelState,
   speechTargetLabel,
+  speechUseCandidate,
   subscribeSpeechLabels,
   updateSpeechTarget,
 } from './speechChannel'
@@ -170,7 +171,7 @@ describe('the height comes from the speaker itself', () => {
  * owes is the measurement: the nearest DRAWN label, from the player's live
  * position, and no target at all outside a settlement.
  */
-describe('the speaker a click would take (design.md §13.4)', () => {
+describe('the speaker the use key would take (design.md §13.4)', () => {
   /** A figure standing at (x, z), mounted in the scene graph. */
   function standing(x: number, z: number): Object3D {
     return {
@@ -216,6 +217,27 @@ describe('the speaker a click would take (design.md §13.4)', () => {
     speakOverhead('kid-1', [RIVER_UTTERANCE], standing(1, 0), { now: 0, seconds: 100 })
     updateSpeechTarget(anyLabel, 10, { x: 0, z: 0, active: false })
     expect(speechLabelState().targetId).toBeNull()
+  })
+
+  it('offers the speaker as a use-key candidate, measured live (point 691)', () => {
+    const kid = standing(3, 4)
+    speakOverhead('kid-1', [RIVER_UTTERANCE], kid, { now: 0, seconds: 100 })
+    updateSpeechTarget(anyLabel, 10, player(0, 0))
+    const candidate = speechUseCandidate(player(0, 0), 10)
+    expect(candidate?.key).toBe('speech:kid-1')
+    expect(candidate?.distance).toBeCloseTo(5, 6)
+    expect(candidate?.range).toBe(10)
+    expect(candidate?.payload.speakerId).toBe('kid-1')
+    // The distance is taken from where the speaker stands NOW, not from the
+    // frame that picked him: a step after the pick moves the candidate with it.
+    expect(speechUseCandidate(player(3, 0), 10)?.distance).toBeCloseTo(4, 6)
+  })
+
+  it('offers no candidate without a highlighted speaker, or outside a settlement', () => {
+    expect(speechUseCandidate(player(0, 0), 10)).toBeNull()
+    speakOverhead('kid-1', [RIVER_UTTERANCE], standing(1, 0), { now: 0, seconds: 100 })
+    updateSpeechTarget(anyLabel, 10, player(0, 0))
+    expect(speechUseCandidate({ x: 0, z: 0, active: false }, 10)).toBeNull()
   })
 
   it('takes the highlight with a figure that leaves the scene', () => {

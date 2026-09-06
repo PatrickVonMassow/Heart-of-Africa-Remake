@@ -269,7 +269,7 @@ export const de: Strings = {
   },
 
   speechGuess: {
-    invite: 'Klicken und Bedeutung raten',
+    invite: 'Space – Bedeutung raten',
     title: 'Was hat er gemeint?',
     hint: 'Wofür ich seine Worte halte. Meine eigene Notiz – niemand hier sagt mir, ob sie stimmt.',
     readingFor: (utterance: string) => `Meine Deutung von ${utterance}`,

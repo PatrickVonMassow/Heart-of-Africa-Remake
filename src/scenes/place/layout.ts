@@ -29,6 +29,7 @@ import { balance } from '../../config/balance'
 import { WORK_ARRIVE_RADIUS } from './adultWork'
 import { devAssert } from '../../systems/devAssert'
 import type { BuildingType } from '../../state/ui'
+import { pickUseCandidate, type UseCandidate } from './useKeyTarget'
 
 export const PLACE_RADIUS = 28 // walkable radius in meters; leaving it exits the place
 
@@ -319,18 +320,32 @@ export function nearestActionable(
   x: number,
   z: number,
 ): Interactive | null {
-  if (!layout) return null
-  let near: Interactive | null = null
-  let best = Infinity
+  return pickUseCandidate(doorCandidates(layout, x, z), null)?.payload ?? null
+}
+
+/**
+ * Every functional door as a use-key candidate, measured against the LIVE
+ * player position (work-order point 691). The reach filter is NOT applied here:
+ * the arbitration compares a door with everything else SPACE could mean in the
+ * settlement, and each candidate carries its own reach for that comparison.
+ */
+export function doorCandidates(
+  layout: PlaceLayout | null,
+  x: number,
+  z: number,
+): UseCandidate<Interactive>[] {
+  if (!layout) return []
+  const out: UseCandidate<Interactive>[] = []
   for (const it of layout.interactives) {
     if (!it.door) continue
-    const d = Math.hypot(x - it.door[0], z - it.door[1])
-    if (d <= DOOR_TRIGGER_RADIUS && d < best) {
-      best = d
-      near = it
-    }
+    out.push({
+      key: `door:${it.type}:${it.pos[0].toFixed(2)},${it.pos[1].toFixed(2)}`,
+      distance: Math.hypot(x - it.door[0], z - it.door[1]),
+      range: DOOR_TRIGGER_RADIUS,
+      payload: it,
+    })
   }
-  return near
+  return out
 }
 
 /** Half-thickness of the drawn fence run, per material. */

@@ -103,27 +103,33 @@ describe('picking the speaker a click takes (design.md §13.4)', () => {
   })
 })
 
-describe('what the notes show while a dialog stands open (point 588)', () => {
-  it('highlights the picked speaker while nothing is open', () => {
-    expect(labelPresentation(null, 'kid-2')).toEqual({ targetedId: 'kid-2', hiddenId: null })
-    expect(labelPresentation(undefined, null)).toEqual({ targetedId: null, hiddenId: null })
+describe('what the notes show while a dialog stands open (points 588/691)', () => {
+  it('highlights the picked speaker while nothing is open and the key is his', () => {
+    expect(labelPresentation(null, 'kid-2', true)).toEqual({ targetedId: 'kid-2', hiddenId: null })
+    expect(labelPresentation(undefined, null, true)).toEqual({ targetedId: null, hiddenId: null })
   })
 
-  it('invites no click while any dialog is open, since none would be taken', () => {
-    expect(labelPresentation({ kind: 'trade' }, 'kid-2')).toEqual({
+  it('invites nothing while the use key belongs to another candidate (point 691)', () => {
+    // The player stands at a door: SPACE opens the door, so the speaker's note
+    // may not offer a guess it would not make.
+    expect(labelPresentation(null, 'kid-2', false)).toEqual({ targetedId: null, hiddenId: null })
+  })
+
+  it('invites no press while any dialog is open, since none would be taken', () => {
+    expect(labelPresentation({ kind: 'trade' }, 'kid-2', true)).toEqual({
       targetedId: null,
       hiddenId: null,
     })
   })
 
   it('hides the note the open guess was opened from, and only that one', () => {
-    expect(labelPresentation({ kind: 'speechGuess', speakerId: 'kid-2' }, 'kid-2')).toEqual({
+    expect(labelPresentation({ kind: 'speechGuess', speakerId: 'kid-2' }, 'kid-2', true)).toEqual({
       targetedId: null,
       hiddenId: 'kid-2',
     })
     // The player walked on: the guess still stands for the speaker it was
     // opened for, so it is HIS note that stays hidden, not the nearest one's.
-    expect(labelPresentation({ kind: 'speechGuess', speakerId: 'kid-2' }, 'villager-1')).toEqual({
+    expect(labelPresentation({ kind: 'speechGuess', speakerId: 'kid-2' }, 'villager-1', true)).toEqual({
       targetedId: null,
       hiddenId: 'kid-2',
     })

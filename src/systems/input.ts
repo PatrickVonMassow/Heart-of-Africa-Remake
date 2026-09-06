@@ -77,6 +77,17 @@ export interface KeyPressOptions {
    * reaches the handler.
    */
   ignoreModified?: boolean
+  /**
+   * Take the press away from the browser once the game has acted on it
+   * (work-order point 691). The use key OPENS a dialog whose field takes the
+   * keyboard at once, and React flushes a discrete keydown synchronously — so
+   * the very press that opened the guess went on to type its own space into the
+   * field that had just appeared under it, and every reading began with a blank.
+   * A key the game consumed is the game's; it may not also reach what the game
+   * put on screen with it. Opt-in, because Escape and the F-keys keep browser
+   * behaviour a player relies on (leaving fullscreen, reloading).
+   */
+  preventDefault?: boolean
 }
 
 /** Register a keydown handler for a specific code; returns unsubscribe. */
@@ -84,7 +95,9 @@ export function onKeyPress(code: string, cb: () => void, options: KeyPressOption
   const handler = (e: KeyboardEvent) => {
     if (isTypingTarget(e)) return
     if (options.ignoreModified && (e.ctrlKey || e.altKey || e.metaKey)) return
-    if (e.code === code) cb()
+    if (e.code !== code) return
+    if (options.preventDefault) e.preventDefault()
+    cb()
   }
   window.addEventListener('keydown', handler)
   return () => window.removeEventListener('keydown', handler)

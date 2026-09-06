@@ -898,15 +898,16 @@ if (section('speech-hypothesis')) {
     if (saved.pitch !== undefined) p.pitch = saved.pitch
   }, pose)
 }
-// --- Guessing a meaning where it is spoken (design.md §13.4, point 588) -------
-// The picking rule, the dialog and the note it writes are pinned in the Vitest
-// layer. What ONLY a browser can answer is the input path: a real left click on
-// the settlement view opens the dialog at all, the pointer lock is given up for
-// it and asked back on close, and real keystrokes land in the field. The lock
-// itself cannot be exercised here — it is deliberately never engaged under
+// --- Guessing a meaning where it is spoken (design.md §13.4, points 588/691) --
+// The arbitration, the dialog and the note it writes are pinned in the Vitest
+// layer. What ONLY a browser can answer is the input path: the use key opens the
+// dialog at all, a real left click on the settlement view opens NOTHING because
+// the mouse handler is gone (point 691), the pointer lock is given up for the
+// dialog and asked back on close, and real keystrokes land in the field. The
+// lock itself cannot be exercised here — it is deliberately never engaged under
 // browser automation (system-Chrome headless grabs the real OS cursor), so what
-// is read is the game's own DECISION counter, while the click, the focus and
-// the typing are the genuine article.
+// is read is the game's own DECISION counter, while the click, the key, the
+// focus and the typing are the genuine article.
 if (section('speech-guess')) {
   await goToPlace('maasai-village')
   const GUESS_UTTERANCE = 'ba-BA-ba-BA' // RIVER, as the shipped lexicon beats it
@@ -914,9 +915,11 @@ if (section('speech-guess')) {
     const p = window.__placePlayer
     return p ? { x: p.x, z: p.z, yaw: p.yaw, pitch: p.pitch } : null
   })
-  // Stage ONE speaker a few steps in front of the player: the click takes the
-  // NEAREST speaker, so standing near him is what the highlight is for — and at
-  // a distance a player really walks up to, since the note's size follows it.
+  // Stage ONE speaker a few steps in front of the player: the use key takes the
+  // NEAREST candidate, so standing near him is what the highlight is for — and
+  // at a distance a player really walks up to, since the note's size follows it.
+  // The spot is open ground away from every door, so the speaker really is what
+  // SPACE means here and not a hut the player happens to be standing at.
   const staged = await page.evaluate((u) => {
     const scene = window.__placeScene
     const p = window.__placePlayer
@@ -972,13 +975,32 @@ if (section('speech-guess')) {
       highlight.strayInvites === 0,
     `invite ${JSON.stringify(highlight.invite)}, invitations on unhighlighted notes ${highlight.strayInvites}`,
   )
+  // What the invitation NAMES is the key the player presses (point 691): a note
+  // that still said "click" would send him to a handler that no longer exists.
+  check(
+    'the invitation names the use key, never a click (point 691)',
+    /space/i.test(highlight.invite) && !/click|klick/i.test(highlight.invite),
+    `invite ${JSON.stringify(highlight.invite)}`,
+  )
+  // The arbitration decided for the speaker, so the bottom prompt — the OTHER
+  // hint slot — stands empty: two hints at once is what point 691 removed.
+  const useKey = await page.evaluate(() => ({
+    owner: window.__ui.getState().useKeyOwner,
+    prompt: window.__ui.getState().prompt,
+  }))
+  check(
+    'the speaker owns the use key here, and the door prompt is empty with it (point 691)',
+    useKey.owner === 'speech' && useKey.prompt === null,
+    JSON.stringify(useKey),
+  )
   await frame('148-speech-guess-invitation', {
     element: '.speech-label.targeted',
     label: 'the highlighted note of the nearest speaker, inviting the guess',
   })
-  // A point of the settlement view the click can actually land on: the notes are
-  // drawn in an overlay of their own, and a click that hit one would prove
-  // nothing about the canvas the player clicks.
+  // The use key owns the guess now (point 691), so the mouse must be PROVED
+  // dead: a point of the settlement view a click can actually land on — the
+  // notes are drawn in an overlay of their own, and a click that hit one would
+  // prove nothing about the canvas the player clicks.
   const spot = await page.evaluate(() => {
     const w = window.innerWidth
     const h = window.innerHeight
@@ -989,10 +1011,28 @@ if (section('speech-guess')) {
     }
     return null
   })
-  check('the settlement view offers a spot to click on (point 588)', !!spot, JSON.stringify(spot))
+  check('the settlement view offers a spot to click on (point 691)', !!spot, JSON.stringify(spot))
   if (spot) {
-    const lockBefore = await page.evaluate(() => ({ ...window.__placeLock }))
     await page.mouse.click(spot.x, spot.y)
+    await nextFrames(2)
+    const afterClick = await page.evaluate(() => !!document.querySelector('.dialog.speech-guess'))
+    check(
+      'a left click on the settlement opens nothing — the mouse handler is gone (point 691)',
+      afterClick === false,
+      `guess dialog after the click: ${afterClick}`,
+    )
+    // And the note that survives that click is still the one SPACE means, so
+    // the invitation the player just read has not gone stale.
+    const stillTargeted = await page.evaluate(
+      () => document.querySelector('.speech-label.targeted')?.getAttribute('data-speaker') ?? null,
+    )
+    check(
+      'the highlight survives the dead click (point 691)',
+      stillTargeted === 'guess-speaker',
+      `highlighted ${JSON.stringify(stillTargeted)}`,
+    )
+    const lockBefore = await page.evaluate(() => ({ ...window.__placeLock }))
+    await page.keyboard.press('Space')
     await nextFrames(2)
     const opened = await page.evaluate(() => {
       const dialog = document.querySelector('.dialog.speech-guess')
@@ -1008,7 +1048,7 @@ if (section('speech-guess')) {
       }
     })
     check(
-      'a left click on the settlement opens the guess for the highlighted speaker (point 588)',
+      'SPACE opens the guess for the highlighted speaker (point 691)',
       opened.open && opened.spoken.join(' ') === highlight.syllables.join(' '),
       `${JSON.stringify(opened.spoken)} against the note's ${JSON.stringify(highlight.syllables)}`,
     )
@@ -1057,7 +1097,7 @@ if (section('speech-guess')) {
       `grabs ${lockBefore.grabs} → ${saved.lock.grabs}`,
     )
     // And Escape leaves the note exactly as it was.
-    await page.mouse.click(spot.x, spot.y)
+    await page.keyboard.press('Space')
     await nextFrames(2)
     const reopened = await page.evaluate(() => !!document.querySelector('.dialog.speech-guess'))
     if (reopened) await page.keyboard.type(' and never mind')

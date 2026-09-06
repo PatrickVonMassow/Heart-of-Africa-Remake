@@ -67,6 +67,32 @@ describe('onKeyPress (design.md §17)', () => {
     release('KeyM')
   })
 
+  // Work-order 691: the use key opens a dialog whose field takes the keyboard
+  // at once, and the very press that opened it went on to type its own space
+  // into that field — every reading began with a blank.
+  it('takes the press away from the browser only when registered preventDefault', () => {
+    const consumed = vi.fn()
+    const plain = vi.fn()
+    const offConsumed = onKeyPress('Space', consumed, { preventDefault: true })
+    const offPlain = onKeyPress('KeyM', plain)
+    const taken = new KeyboardEvent('keydown', { code: 'Space', cancelable: true })
+    window.dispatchEvent(taken)
+    expect(consumed).toHaveBeenCalledTimes(1)
+    expect(taken.defaultPrevented).toBe(true)
+    const left = new KeyboardEvent('keydown', { code: 'KeyM', cancelable: true })
+    window.dispatchEvent(left)
+    expect(plain).toHaveBeenCalledTimes(1)
+    expect(left.defaultPrevented).toBe(false)
+    // A press the handler stands down on is left alone, whatever it registered.
+    const other = new KeyboardEvent('keydown', { code: 'KeyG', cancelable: true })
+    window.dispatchEvent(other)
+    expect(other.defaultPrevented).toBe(false)
+    offConsumed()
+    offPlain()
+    release('Space')
+    release('KeyM')
+  })
+
   it('ignores keydowns originating from a text input (debug-field guard)', () => {
     // input.ts guards only INPUT targets (the debug-menu fields); TEXTAREA and
     // SELECT are not handled by the source, so only INPUT is asserted here.
