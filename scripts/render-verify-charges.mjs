@@ -1185,6 +1185,27 @@ export const RED_CHARGES = [
       + 'reading is right, and the charge dies with that point.',
   },
   {
+    point: 1063,
+    suite: 'enrichments',
+    kind: 'check',
+    // NAME-SCOPED, and deliberately NOT folded into 1013's entry next door: that
+    // one is anchored on `every predator fits the region and period`, a DIFFERENT
+    // and older check whose `why` records the PREY side as clean. This is the prey
+    // side, and it is a check that did not exist when 1013 was written.
+    match: /^every hunted prey fits the region and the predator food web/i,
+    why:
+      'FILED AS 1063 ON 06.09.2026 FROM EXACTLY THIS RED, measured in the LARGE run on '
+      + 'feat/689-chief-direction-and-mould at 8944a52c6 (webgl/enrichments): sixteen hunts, the '
+      + 'predator side clean, one wildebeest scored as hunted in `central` and the lion/wildebeest '
+      + 'pair rejected with it. It went GREEN on the same run\'s retry, so the placement is '
+      + 'INTERMITTENT — which is the same unsettled reading 1013 states for the predator side: the '
+      + 'check may score the region where the hunt ENDED rather than where it began, and an animal '
+      + 'crossing a border mid-hunt would produce both the red and its disappearance. Nothing in '
+      + 'the chief-reply branch touches the wildlife simulation or the food-web table, so this red '
+      + 'says nothing about that change. It is charged, not excused: 1063 owes the logged start/end '
+      + 'sample that decides which reading is right, and the charge dies with the point.',
+  },
+  {
     point: 565,
     suite: 'enrichments',
     backend: 'webgl',

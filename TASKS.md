@@ -14668,4 +14668,5 @@ to land than a mechanism that needs a review.
   change is filed with, and it is the second unowned red of the same family.
   Refs: scripts/verify/enrichments.mjs (`predator-food-web`), the food-web table the check
   reads, scripts/render-verify-charges.mjs (point 1013's entry, prey side NOT covered)
-  Bundle: Testinfrastruktur.
+  Bundle: Tierverhalten (it reads the same food-web table and the same enrichments section as
+  1013, so the two must not run in parallel).

@@ -1194,6 +1194,12 @@
       "why": "Der Abschlusslauf 633 faehrt LARGE, LARGE faehrt die Gamepad-Suite, und die bleibt rot, bis dieser Punkt landet — er steht deshalb vor der Veroeffentlichung.",
       "origin": "machine",
       "place": "ahead"
+    },
+    "1063": {
+      "at": "2026-09-06T08:43:31.239Z",
+      "why": "Last is right under the infrastructure freeze: it blocks no game work, it cleared on its own retry, and its charge entry lands with it, so no future run is left unaccounted while it waits for its sibling 1013.",
+      "origin": "machine",
+      "place": "last"
     }
   },
   "boundary": {
@@ -1229,7 +1235,7 @@
     "why": "The order standing in front of the release today is the arrangement that predates this rule; the four machine-filed points that had ranked themselves there were moved behind 174 first"
   },
   "settled": {
-    "at": "2026-09-05T23:52:58.345Z",
+    "at": "2026-09-06T08:43:31.266Z",
     "points": [
       174,
       184,
@@ -1601,7 +1607,8 @@
       1058,
       1059,
       1060,
-      1062
+      1062,
+      1063
     ]
   }
 }
