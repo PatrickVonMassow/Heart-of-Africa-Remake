@@ -71,6 +71,29 @@ export const RED_CHARGES = [
       + 'whether the player or the injected window.__pad is hit, and the charge dies with it.',
   },
   {
+    point: 642,
+    suite: 'polish',
+    kind: 'check',
+    match: /^the (dry|wet) settlement season reading settles before it is read/i,
+    // NO detailMatch, deliberately. The check has exactly ONE failing mode —
+    // `waitForReadingStable` returning unsettled, which happens only when its
+    // 60 s window runs out — so the name alone is already as narrow as a
+    // measurement would make it. And a SUSPECT record carries its first
+    // attempt's reds by NAME only, with no measurement at all, so a
+    // detail-scoped entry could never own the very record this red arrives in.
+    why:
+      'THE SETTLE DEADLINE POINT 642 NAMES BY NAME. That point lists this very check — '
+      + '"polish\'s ... dry settlement-season settle (read after 60176 ms)" — among the checks '
+      + 'whose subject is a wall-clock budget and which therefore have to DECLARE the throughput '
+      + 'they need and SKIP below it, rather than red on a lane that cannot deliver frames fast '
+      + 'enough. Measured again 06.09.2026 in the webgpu polish run at 19:15:15Z ("after 60276 '
+      + 'ms"), on a host whose quiet the run itself could not verify, and the retry read it '
+      + 'clean. Nothing in the change under it touches the settlement season: the same run was '
+      + 'taken for point 1058, whose whole diff is the speech-hypothesis section of this suite. '
+      + 'It is charged, not excused — 642 owns making the check say what it needs — and the '
+      + 'charge dies with that point.',
+  },
+  {
     point: 1043,
     suite: 'polish',
     kind: 'check',
