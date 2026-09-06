@@ -136,6 +136,8 @@ put it is the mistake this line exists to stop.
   WHAT IT COSTS. It blocks the covering picture check of every render change on the WebGL 2
   lane. It cost the landing of point 691 three runs of about 50 minutes each, and it will cost
   the next render point the same until it has an owner.
+  It holds a red that cannot otherwise close, and it blocks the lane every WebGL 2
+  picture proof runs on.
   WHAT IS AND IS NOT MEASURED. Measured: three runs, one host, the same afternoon; the depth
   crossing the bar in two of them; the pair a Villager/Villager or Child/Child neighbour pair,
   never a label against a distant one. NOT measured, and named here rather than assumed:
