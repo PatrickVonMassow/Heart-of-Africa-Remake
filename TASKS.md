@@ -117,6 +117,48 @@ put it is the mistake this line exists to stop.
   Bundle: Dorfleben (it edits the speech-label path and the adult teaching choreography that
   1056 and 1057 also reach, so it is worked before them and never beside them).
 
+- [ ] 1067. Ctrl labels fuse DEEPLY in the village crowd on WebGL 2, and no charge covers it
+  (measured 06.09.2026 on main, three consecutive `polish` runs on the WebGL 2 lane).
+  `scripts/verify/polish.mjs`, section `ctrl-actor-labels`, judges label overlap on two bars:
+  a COUNT bar (at most 4 of 90 sampled frames may hold a fused pair beyond 6 px) and a DEPTH
+  bar (18 px, the width at which the check calls a pair unreadable). Today's three runs, all
+  on the same host and the same code:
+  - 17:00, HEAD 31d7fa903: FAIL — 5/90 frames, deepest 19 px, `"Child"×"Child" 38×19 px`.
+  - 18:0x, HEAD 734de0eb3: PASS — 2/90 frames, deepest 16 px, `"Villager"×"Villager" 21×16 px`.
+  - 18:51, HEAD 77065b3c4: FAIL — 2/90 frames, deepest 19 px, `"Villager"×"Villager" 51×19 px`.
+  So the count bar is not what fails: two of the three runs sat at 2/90, well inside the
+  allowance, and the verdict turned on the DEPTH alone. That is a different composition from the
+  one point 1010 owns, and 1010's charge says so itself — it was detail-scoped by a cross-vendor
+  review on 30.08.2026 to exactly `1/N frames`, precisely so that a wider or deeper fusion would
+  NOT be swallowed as the single-frame observation. It is not swallowed, and it is also not
+  owned: `scripts/render-verify-charges.mjs` holds no entry that matches, so every WebGL 2
+  picture run that hits it is neither clean nor accounted for.
+  WHAT IT COSTS. It blocks the covering picture check of every render change on the WebGL 2
+  lane. It cost the landing of point 691 three runs of about 50 minutes each, and it will cost
+  the next render point the same until it has an owner.
+  WHAT IS AND IS NOT MEASURED. Measured: three runs, one host, the same afternoon; the depth
+  crossing the bar in two of them; the pair a Villager/Villager or Child/Child neighbour pair,
+  never a label against a distant one. NOT measured, and named here rather than assumed:
+  whether the depth is load-dependent (the host drew two other suites that afternoon), whether
+  the WebGPU lane shows the same depths (its runs were green, but their depths were not read
+  out), and whether a player at this crowd density actually loses a name — the frames were
+  judged for the speech-label subject, not for this.
+  Final state:
+  - The cause is named from the measurement: either the label layer genuinely lets a
+    neighbouring pair fuse past readability at this crowd density and the layer is fixed, or
+    the 18 px bar is restated with the measurement that justifies it.
+  - Whichever it is, the red has an owner: an entry in `scripts/render-verify-charges.mjs`
+    scoped to the measured composition, or a fix that removes it.
+  - Point 1010 keeps its own, narrower observation; the two say in one line which is which.
+  Test: `node scripts/throttle-probe.mjs polish --section=ctrl-actor-labels --runs 8` on a quiet
+  host, with the eight depths printed, plus the same probe on WebGPU for the comparison this
+  point currently lacks.
+  Criticality: medium — it costs no player anything yet, but it blocks the evidence every render
+  change on one backend is filed with.
+  Refs: scripts/verify/polish.mjs (`ctrl-actor-labels`), scripts/verify/labelFusion.mjs,
+  scripts/render-verify-charges.mjs (point 1010's entry, `1/N frames` only)
+  Bundle: Session- & Repo-Hygiene.
+
 - [ ] 1064. The find from the boulder is an inventory item and is given by using it before the chief (user 06.09.2026).
   The find from the boulder is an INVENTORY ITEM and is handed over by USING it before the
   chief, not by the use key at his hut. Today the artefact dug up at the upstream erratic
@@ -14363,6 +14405,19 @@ to land than a mechanism that needs a review.
   to this point in `scripts/render-verify-charges.mjs`, scoped to a sample that fell
   SHORT of the bar — a run that measured nothing at all is a different red and stays
   real.
+  WHAT POINT 1058 CHANGED UNDER THIS POINT (06.09.2026). The second check named above —
+  `the speaking figure itself stands in the frame, under its note (point 485)` — is no
+  longer this point's. It stopped being a flake on 04.09.2026, went red in five of six
+  runs on a quiet host, was filed as 1058, and 1058 measured the cause from the frames:
+  the note sat correctly over its speaker in EVERY sample, and the body walked out of the
+  frame SIDEWAYS (bodyX 496, 360, 234, 123, 11, -70, -140, -208 of a 1440-wide viewport)
+  because the block aimed its camera ONCE and then took eight shutters of a figure that
+  the paired DIG summons sends off to its site in the same breath as its word. The shot
+  now follows its subject before every sample, so this point's third final-state bullet —
+  the chosen speaker judged where it IS — is already met for that check, and its charge in
+  `scripts/render-verify-charges.mjs` is retired with 1058. What remains open here is the
+  FIRST half: the candidate probe whose first five figures never qualify, and a check that
+  rests on figure #5 alone.
   Final state:
   - WHY THE FIRST FIVE NEVER QUALIFY IS MEASURED, not guessed. The probe aims at
     `e[13] + max(0.4, scaleY)` above the figure's own origin and reads the group's scale; either
@@ -14667,45 +14722,3 @@ to land than a mechanism that needs a review.
   reads, scripts/render-verify-charges.mjs (point 1013's entry, prey side NOT covered)
   Bundle: Tierverhalten (it reads the same food-web table and the same enrichments section as
   1013, so the two must not run in parallel).
-
-- [ ] 1067. Ctrl labels fuse DEEPLY in the village crowd on WebGL 2, and no charge covers it
-  (measured 06.09.2026 on main, three consecutive `polish` runs on the WebGL 2 lane).
-  `scripts/verify/polish.mjs`, section `ctrl-actor-labels`, judges label overlap on two bars:
-  a COUNT bar (at most 4 of 90 sampled frames may hold a fused pair beyond 6 px) and a DEPTH
-  bar (18 px, the width at which the check calls a pair unreadable). Today's three runs, all
-  on the same host and the same code:
-  - 17:00, HEAD 31d7fa903: FAIL — 5/90 frames, deepest 19 px, `"Child"×"Child" 38×19 px`.
-  - 18:0x, HEAD 734de0eb3: PASS — 2/90 frames, deepest 16 px, `"Villager"×"Villager" 21×16 px`.
-  - 18:51, HEAD 77065b3c4: FAIL — 2/90 frames, deepest 19 px, `"Villager"×"Villager" 51×19 px`.
-  So the count bar is not what fails: two of the three runs sat at 2/90, well inside the
-  allowance, and the verdict turned on the DEPTH alone. That is a different composition from the
-  one point 1010 owns, and 1010's charge says so itself — it was detail-scoped by a cross-vendor
-  review on 30.08.2026 to exactly `1/N frames`, precisely so that a wider or deeper fusion would
-  NOT be swallowed as the single-frame observation. It is not swallowed, and it is also not
-  owned: `scripts/render-verify-charges.mjs` holds no entry that matches, so every WebGL 2
-  picture run that hits it is neither clean nor accounted for.
-  WHAT IT COSTS. It blocks the covering picture check of every render change on the WebGL 2
-  lane. It cost the landing of point 691 three runs of about 50 minutes each, and it will cost
-  the next render point the same until it has an owner.
-  WHAT IS AND IS NOT MEASURED. Measured: three runs, one host, the same afternoon; the depth
-  crossing the bar in two of them; the pair a Villager/Villager or Child/Child neighbour pair,
-  never a label against a distant one. NOT measured, and named here rather than assumed:
-  whether the depth is load-dependent (the host drew two other suites that afternoon), whether
-  the WebGPU lane shows the same depths (its runs were green, but their depths were not read
-  out), and whether a player at this crowd density actually loses a name — the frames were
-  judged for the speech-label subject, not for this.
-  Final state:
-  - The cause is named from the measurement: either the label layer genuinely lets a
-    neighbouring pair fuse past readability at this crowd density and the layer is fixed, or
-    the 18 px bar is restated with the measurement that justifies it.
-  - Whichever it is, the red has an owner: an entry in `scripts/render-verify-charges.mjs`
-    scoped to the measured composition, or a fix that removes it.
-  - Point 1010 keeps its own, narrower observation; the two say in one line which is which.
-  Test: `node scripts/throttle-probe.mjs polish --section=ctrl-actor-labels --runs 8` on a quiet
-  host, with the eight depths printed, plus the same probe on WebGPU for the comparison this
-  point currently lacks.
-  Criticality: medium — it costs no player anything yet, but it blocks the evidence every render
-  change on one backend is filed with.
-  Refs: scripts/verify/polish.mjs (`ctrl-actor-labels`), scripts/verify/labelFusion.mjs,
-  scripts/render-verify-charges.mjs (point 1010's entry, `1/N frames` only)
-  Bundle: Session- & Repo-Hygiene.
