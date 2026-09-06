@@ -560,4 +560,4 @@ Die Ursache findest du durch **Zerlegen**, nicht durch Wiederholen.
 
 Sie ersetzt die Fallstricke oben nicht.
 
-<!-- GUIDE-FINGERPRINT: f73a3744ca1df2cc505b0d83684480bcb1eb4f023ec7185b64894e43d5eb5f22 -->
+<!-- GUIDE-FINGERPRINT: c85f146e15ecfd1669b323a8aebf37d63df2072e758cfadb63a30bc14643933b -->

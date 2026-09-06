@@ -156,3 +156,17 @@ Format: one line per finding — `- YYYY-MM-DD <source> — <finding>`.
   never taken at a quarter core — which is why this is an observation rather than a point. If it
   ever reaches an unthrottled lane it needs an owner, because a run that measured nothing is a
   real red and no retry may close it.
+
+- 2026-09-06 `batch-doctor --gate` derives "live agent" from a worktree EXISTING rather than from
+  its activity, so its gate verdict can never come back cleanly green while a corpse stands.
+  Measured on tonight's run: the gate declared INCONCLUSIVE (load) and named "4 live agent
+  worktree(s)" — `point-1049`, `point-834`, `point-847`, `point-901`. `batch-in-flight
+  --agent-check` over those exact four paths judged them `quiet`, "no commit and nothing written
+  for 5299 min" — roughly 88 hours dead. So the activity test the doctor is missing already
+  exists in the same repository. Nothing is at risk in them: all four branches are fully pushed
+  (1049 and 901 one commit each, 847 seventeen, 834 one hundred twenty-two). The same run had a
+  second, GENUINE load source — the concurrent `test:unit` of point 1058's landing — so this
+  reading alone did not decide the verdict, and the doctor's own advice ("repeat once the agent
+  pool is idle") is unreachable as long as existence counts as work. No player impact and no
+  blockade: an inconclusive verdict never approves anything, and the doctor says the batch
+  continues. The cheap fix is one call, not a new mechanism.

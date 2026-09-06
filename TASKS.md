@@ -1190,6 +1190,11 @@ put it is the mistake this line exists to stop.
   concluded green sha on the same ref yields the supersession wording and no repair order; a
   cancelled run with nothing newer yields the no-verdict wording naming the sha to re-run; a real
   `failure` still yields the repair handoff; and neither cancelled case is ever reported green.
+  RECURRED 06.09.2026, unchanged in mechanism: run 34059652201 on `589d01e76` was cancelled by the
+  same `cancel-in-progress` when `b3c058821` was pushed to the ref one minute later, and that sha's
+  own run concluded `success`. The handoff again opened the successor session with "concluded RED.
+  This successor is the repair path", over a branch whose picture proof was green on both backends.
+  Second measured occurrence, no new mechanism — it does not change the final state above.
   Criticality: medium — it costs a whole session per occurrence and points it at work that does not
   exist, but never loses code.
   Bundle: Session- & Repo-Hygiene.
