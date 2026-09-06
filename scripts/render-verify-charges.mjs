@@ -706,6 +706,31 @@ export const RED_CHARGES = [
   },
   {
     point: 939,
+    suite: 'benchmark',
+    backend: 'webgpu',
+    featureLevel: 'compatibility',
+    kind: 'check',
+    match: /^no console errors$/i,
+    // DETAIL-SCOPED for the same reason the report entry beside it is: "no
+    // console errors" is a generic assertion, so the name alone would excuse
+    // every console error the benchmark suite ever reports. Only the 504
+    // sentence is excused, repeated as the check joins repeats with ` | `, and
+    // a second, different error riding along keeps the red.
+    detailMatch:
+      /^(Failed to load resource: the server responded with a status of 504 \(Outdated Optimize Dep\))( \| \1)*$/i,
+    why:
+      'THE SAME VITE TRANSIENT POINT 939 OWNS, ARRIVING IN THE BENCHMARK SUITE AS A CHECK. '
+      + 'Measured 06.09.2026 10:13Z on main (0e53f9ce2), webgpu/benchmark at recorded '
+      + 'featureLevel=compatibility: the dev server answered a request with 504 while the run was '
+      + 'open, which CLAUDE.md §7.2 classifies as an environment transient rather than a product '
+      + 'defect. 939 already holds it as a startup/webgpu console red, as a report/webgpu check '
+      + 'and as a polish/webgl console red, and each entry excuses only the lane its evidence '
+      + 'measured — this is the fourth lane it has now been measured on. The run\'s other eight '
+      + 'reds are the ones points 1009 and 1012 describe and are untouched here. The charge dies '
+      + 'with point 939.',
+  },
+  {
+    point: 939,
     suite: 'report',
     backend: 'webgpu',
     featureLevel: 'compatibility',
