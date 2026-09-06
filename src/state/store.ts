@@ -2090,7 +2090,10 @@ export const useGame = create<GameState>()((set, get) => ({
         // A snapshot from before the boulder was dug simply leaves it buried.
         rockArtefact: snap.rockArtefact ?? 'buried',
         // A save written before the forms existed carried neither, and a
-        // traveller in it has opened nothing and holds nothing.
+        // traveller in it has opened nothing and holds nothing. One such save
+        // with the artefact already GIVEN can never receive the impression —
+        // accepted, not migrated: saving is off in the PoC and old saves are
+        // irrelevant (user decision), so the dead end is named here, not built around.
         carriedForms: snap.carriedForms ?? [],
         spentSockets: snap.spentSockets ?? [],
         defeat: null,

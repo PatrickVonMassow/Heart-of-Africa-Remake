@@ -54,7 +54,9 @@ function InventoryBar() {
   // row). Hooks stay above the early return. Cleared when the bar is absent, so
   // the CSS falls back to the single-row default.
   const barRef = useRef<HTMLDivElement>(null)
-  const itemCount = owned.length + ownedTreasures.length
+  // Every kind the bar shows counts, forms included: the impression can arrive
+  // while the bar is absent, and the observer must attach the moment it appears.
+  const itemCount = owned.length + ownedTreasures.length + ownedForms.length
   useEffect(() => {
     const root = document.documentElement
     const el = barRef.current
