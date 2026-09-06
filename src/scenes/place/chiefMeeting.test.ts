@@ -16,6 +16,9 @@ beforeEach(() => {
   freshGame()
 })
 
+/** An empty pack of trade goods — every material at zero, none missing. */
+const NO_GIFTS = { gold: 0, silver: 0, emerald: 0, copper: 0, ivory: 0 }
+
 /** A village that is NOT the one whose chief has a message to send. */
 const OTHER_VILLAGE = 'maasai-village'
 
@@ -67,7 +70,7 @@ describe('the chief comes out of his hut (design.md §12)', () => {
     g().enterPlace(DRUM_MESSAGE_VILLAGE)
     // Stripped of the starting outfit's trade goods, so nothing he owns can be
     // mistaken for the price of the message.
-    useGame.setState({ gifts: {} })
+    useGame.setState({ gifts: NO_GIFTS })
     expect(Object.values(g().gifts).reduce((a, b) => a + b, 0)).toBe(0)
     expect(g().honoredFriend).toEqual({})
     expect(g().drumMessageHeard).toBe(false)
@@ -78,7 +81,7 @@ describe('the chief comes out of his hut (design.md §12)', () => {
   it('keeps sending it however poor and however unknown the traveller is', () => {
     g().enterPlace(DRUM_MESSAGE_VILLAGE)
     g().callChiefOut()
-    useGame.setState({ gifts: {}, honoredFriend: {}, money: 0 })
+    useGame.setState({ gifts: NO_GIFTS, honoredFriend: {}, money: 0 })
     expect(nextChiefAction(g())).toBe('send-message')
   })
 
