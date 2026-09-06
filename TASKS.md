@@ -172,6 +172,140 @@ put it is the mistake this line exists to stop.
   Bundle: Dorfleben (it edits the speech-label path and the adult teaching choreography that
   1056 and 1057 also reach, so it is worked before them and never beside them).
 
+- [ ] 1064. The find from the boulder is an inventory item and is given by using it before the chief (user 06.09.2026).
+  The find from the boulder is an INVENTORY ITEM and is handed over by USING it before the
+  chief, not by the use key at his hut. Today the artefact dug up at the upstream erratic
+  (`rockArtefact` 'buried' → 'carried' in `src/state/store.ts`, the dig at ~1911) never shows in
+  the inventory bar (`InventoryBar` in `src/ui/Hud.tsx` lists equipment, forms and treasures
+  only), and the hand-over fires by itself: `nextChiefAction` (`src/scenes/place/chiefMeeting.ts`)
+  answers 'hand-over' to the next SPACE at the chief's hut whenever the find is carried, and
+  `meetChief` (`src/scenes/place/PlaceScene.tsx` ~505) executes it. The player never chooses to
+  give it; the drum message and the hand-over share one key and the game picks. The user
+  reported it 06.09.2026 and asked for the give to be an explicit act on the item.
+  Final state:
+  - The find is an item in the inventory bar from the moment it is dug up until it is given:
+    it appears with its own localized label (en/de together), carries a Ctrl-hold label like
+    every other acting thing (design.md §17.3), and leaves the bar once given. It stays the
+    quest object docs/communication-poc-spec.md describes: outside the pack capacity, not
+    trade stock, never sold.
+  - Handing over is USING the item: the player stands before the chief who is out in the open
+    (`chiefStandingSpot`/`chiefAnchor`, inside a calibratable give reach in
+    `src/config/balance.ts`) and activates the item in the bar (click, exactly as medicine and
+    the shovel act on click, design.md §6). Only then `handArtefactToChief` runs, the chief's
+    two-word answer sounds and stands over his head, and the clay form is put into the
+    traveller's hands as today. Using it anywhere else — no chief outside, or out of reach —
+    gives nothing and says why in one toast (both languages); the item stays.
+  - The use key at the chief's hut no longer hands anything over: `ChiefAction` loses
+    'hand-over'; SPACE at his door brings him out and afterwards sends the drums (or
+    acknowledges, in a village with no message) exactly as before, whether or not the find is
+    carried.
+  - The same rule holds for EVERY later quest find that is brought to a chief: a found thing
+    is an inventory item, and giving it is using that item before him. The clay form the chief
+    gives back already lives in the bar (`carriedForms`); nothing about its map use changes.
+  - Doc: docs/communication-poc-spec.md 'Where the digging happens' (the sentence 'laid in the
+    chief's hands OUTSIDE, with the same use key at his hut'), design.md §6 (inventory bar) and
+    §13.4 state the new act; the journal entry `artefactGiven` still fits.
+  Test: Vitest — `nextChiefAction` never returns 'hand-over' any more (carried find, chief
+  outside, drum village → 'send-message'); the store's give action turns 'carried' into 'given'
+  only with the chief outside and inside reach, and otherwise leaves the state and sets the
+  toast key; the inventory bar renders the find while carried and not when 'given' or 'buried';
+  en and de carry the same new keys. Browser (WebGPU lane): dig the find, enter the village,
+  call the chief out, click the item in the bar and prove the answer label over his head and
+  the item gone; one screenshot with the item in the bar before the give, one with the chief's
+  words after it.
+  Constraints:
+  - No new mechanic beyond the give: no dialog, no drag, no confirmation.
+  - Bundle: Dorfleben.
+  Quotes:
+  Nutzer, 06.09.2026 13:48: »Der Findling, am Felsen flussaufwärts erscheint nicht im Inventar. Dieser muss ein Inventargegenstand werden und wenn man sich vor den Häuptling stellt und ihn benutzt, muss das Übergeben passieren - nicht einfach automatisch beim betätigen von SPACE. Auch das, was man dann später findet und ihm bringt, muss sich so verhalten.«
+  Nutzer, 06.09.2026 13:48 (Einreihung aller drei Punkte): »An der Kommunikationsmechanik zu überarbeiten, einzureihen direkt nach 1058, in der Rehenfolge, in der ich es hier aufzähle:« — dieser Punkt ist der ERSTE der drei.
+  Refs: src/state/store.ts (rockArtefact, handArtefactToChief, carriedForms), src/scenes/place/chiefMeeting.ts, src/scenes/place/PlaceScene.tsx (meetChief), src/ui/Hud.tsx (InventoryBar), src/config/balance.ts, src/i18n/en.ts, src/i18n/de.ts, docs/communication-poc-spec.md, design.md §6 §13.4
+  Doc impact: docs/communication-poc-spec.md 'Where the digging happens': the artefact is laid in the chief's hands by USING the inventory item before him, not by the use key at his hut. design.md §6 (inventory bar): the quest find is listed as an acting item; §13.4: the hand-over sentence. i18n en/de: item label, Ctrl label, refusal toast.
+
+- [ ] 1065. The tapping child's hand touches the rock it names (user 06.09.2026).
+  The child that names the rock TOUCHES it. Today the tap of the children's bank game
+  (`bankGame.ts` ~626, spec item 4) is spoken from the catcher's waiting station — `standOff`
+  2.6 m off the rock's centre (`src/config/balance.ts`), the play rock itself ~1.2 m in radius
+  (`PLAY_ROCK_RADIUS`, `layout.ts`) — with an 'indicate' arm sweep aimed at the centre. The hand
+  ends more than a metre from the stone, so the utterance has no visible object and the user
+  read it as 'go!' rather than ROCK (06.09.2026). The tap exists precisely so that ROCK is
+  learned on a stone with nobody arriving (design.md §13.4); without contact it teaches the
+  wrong thing.
+  Final state:
+  - Before the tap the tapper steps to the rock and lays its hand ON the stone: the hand end
+    reaches the rock's drawn surface at the point nearest the child (a few centimetres, never
+    through it), the body leans into the reach, and the pose is HELD for the whole visible
+    tap interval (`tapPauseSeconds`) while the word falls. The other children hold at their
+    stations as today.
+  - The contact is derived from what the picture draws — the play rock's instanced mesh at
+    its own scale — not from a nominal radius, so a wider or narrower rock keeps the hand on
+    its surface. A child that cannot reach the stone in time does not speak the tap from
+    afar: the run waits for the contact, and a blocked walk to the stone falls back to the
+    existing stall handling rather than a tap in the air.
+  - The arm vocabulary gains the touch it needs (a `touch` gesture kind or a held pose in
+    `src/render/gesture.ts`), used only here for now; the utterance timing, the hearing gate
+    and the tap's audible distinctness (spec: one hearing gap before the run) do not change.
+  - Doc: design.md §13.4 says the catcher's hand touches the rock while he names it;
+    docs/communication-poc-spec.md item 4 likewise; the Ctrl-hold label and the speech label
+    are unchanged.
+  Test: Vitest over the bank game — the tap utterance is offered only once the speaker's hand
+  point lies within a small tolerance of the rock surface, and never from the station; the
+  held pose lasts the tap interval; a geometric check that the hand target lies on the drawn
+  rock's surface for both play rocks of the three river villages (nubian, bambara, mandinka).
+  Browser (WebGPU lane): a picture check of the tap moment that measures, in the projection,
+  the hand's screen position against the rock's silhouette (hand inside or on its edge), plus
+  a screenshot of that frame (verification/, subject declared: the tapping child at its rock).
+  Quotes:
+  Nutzer, 06.09.2026 13:48: »Wenn ein Kind beim Fangspiel an den Felsen tippt und ROCK sagt, berührt seine Hand nicht annähernd den Felsen. Das Kind steht in dem Augenblick noch sehr seit davon entfernt. So erkennt man nicht, dass das Gesprochene etwas mit dem Felsen zu tun hat und man könne eher glauben, dass es "Los!" o. ä. bedeutet.«
+  Nutzer, 06.09.2026 13:48 (Einreihung aller drei Punkte): »An der Kommunikationsmechanik zu überarbeiten, einzureihen direkt nach 1058, in der Rehenfolge, in der ich es hier aufzähle:« — dieser Punkt ist der ZWEITE der drei.
+  Refs: src/scenes/place/bankGame.ts (THE TAP ~626, reachDistance/standOff ~223), src/config/balance.ts (bankGame reachDistance 2.2, standOff 2.6), src/render/gesture.ts (GestureKind), src/scenes/place/PlaceLife.tsx, src/scenes/place/layout.ts (PLAY_ROCK_RADIUS), design.md §13.4, docs/communication-poc-spec.md
+  Doc impact: design.md §13.4 and docs/communication-poc-spec.md item 4: the catcher touches the rock with its hand while naming it. If a new gesture kind is added, the point-479 gesture list in the code comments / docs names it.
+
+- [ ] 1066. The water carrier visibly fills the jar at the water and carries visible water (user 06.09.2026).
+  The filling of the jar READS as filling. Today the RIVER errand sends an adult with an
+  empty jar to the foot of the water path and back with a full one, and nothing in between is
+  shown: the foot (`bankWaterFoot`, `riverBank.ts`) stands `BANK_STAND_INSET` 1.5 m inside the
+  walkable edge while the waterline lies `BANK_SHORE_HALF` 1.2 m beyond it, so the carrier
+  halts about 2.7 m from the water; the carry flips 'emptyJar' → 'fullJar' between the
+  'water-out' and 'water-back' situations (`adultWork.ts` ~390-410) with no act; and both jars
+  are one closed opaque cylinder (`PlaceLife.tsx` ~2557-2612), the full one merely moved onto
+  the head. The user (06.09.2026) could not tell that water was being fetched — and this
+  errand is where RIVER is learned (design.md §13.4).
+  Final state:
+  - The carrier goes TO the water: the errand's last leg walks down the shore to the
+    waterline (the walkable region already reaches through it to `balance.bankWadeDepth`,
+    `riverBank.ts`), and he stands with his feet at the water's edge or ankle-deep, never
+    2.7 m up the bank. The path's foot for the WORD (`say.aim`) may stay where it is; the
+    fill spot is at the water.
+  - The fill is an ACT with its own phase: he crouches or bends, the jar in his hand goes
+    down into the water — visibly below the drawn surface — stays there a readable moment
+    (calibratable seconds in `src/config/balance.ts`), comes up, and is lifted onto the head
+    (a fill pose beside `digPose` / `HEAD_CARRY_POSE`). 'fullJar' begins only after the dip;
+    the carry never flips without it. The errand's timing backstops (`errandSeconds`,
+    `stallSeconds`) cover the added leg.
+  - Water is visible: both jars have an open mouth; the empty one shows a dark hollow, the
+    full one a water surface at the rim (a bright disc with the water's tint, readable at
+    the distance the player watches from) — so head-carried and hand-carried jars read as
+    full and empty at a glance, on both backends.
+  - The word RIVER still falls at the head of the path, aimed at the water, gated by a
+    hearing child exactly as today; nothing about who is cast or when changes.
+  - Doc: design.md §13.4 ('the adults' water and digging work') states the dip at the
+    waterline; docs/communication-poc-spec.md likewise where it describes the errand.
+  Test: Vitest over adultWork / riverBank — the fill spot lies within a small tolerance of
+  the waterline for the three river villages (nubian, bambara, mandinka); a 'fill' phase
+  sits between the walk down and the walk back, with 'fullJar' set only after it; the phase
+  lasts its configured seconds. Browser (LARGE, both backends — the water surface is
+  backend-sensitive): a picture check of the dip frame that measures the hand jar below the
+  drawn water surface at the carrier's feet, and one of the return walk that measures the
+  water disc visible at the head jar's rim; screenshots of both (verification/, subjects
+  declared: the carrier dipping at the waterline; the carrier walking back with the full
+  jar).
+  Quotes:
+  Nutzer, 06.09.2026 13:48: »Man erkennte das Auffüllen des Kruges mit Wasser nicht als solches. Das liegt an mehreren Problemen: Der Erwachsene geht nicht nah genug an den Fluss, für die Tätigkeit des Auffüllens fehlt eine Darstellung (ich würde erwarten, dass er den Krug in die Hand nimmt und ins Wasser taucht) und wenn er ihn dann gefüllt auf dem Kopf trägt, sieht man darin kein Wasser.«
+  Nutzer, 06.09.2026 13:48 (Einreihung aller drei Punkte): »An der Kommunikationsmechanik zu überarbeiten, einzureihen direkt nach 1058, in der Rehenfolge, in der ich es hier aufzähle:« — dieser Punkt ist der DRITTE der drei.
+  Refs: src/scenes/place/adultWork.ts (water-out/water-back ~390-410, AdultCarry, WATER_FOOT_REACH), src/scenes/place/riverBank.ts (bankWaterFoot, BANK_STAND_INSET 1.5, BANK_SHORE_HALF 1.2, walkable region through the waterline ~47-62), src/scenes/place/PlaceLife.tsx (ErrandVillagers, head/hand jar meshes ~2440-2612, HEAD_CARRY_POSE), src/scenes/place/layout.ts (waterPath head/foot), src/render/figures.ts, design.md §13.4
+  Doc impact: design.md §13.4: the water carrier dips the jar at the waterline and carries visible water back. docs/communication-poc-spec.md: the errand description. balance.ts: fill seconds (calibratable).
+
 - [ ] 1056. The adults dig for no visible reason, and the picture never says what comes
   out (user 04.09.2026, watching the merged digging work).
   The user asked what the adults are digging FOR and found no answer in the scene: "Sie
