@@ -14405,6 +14405,19 @@ to land than a mechanism that needs a review.
   to this point in `scripts/render-verify-charges.mjs`, scoped to a sample that fell
   SHORT of the bar — a run that measured nothing at all is a different red and stays
   real.
+  WHAT POINT 1058 CHANGED UNDER THIS POINT (06.09.2026). The second check named above —
+  `the speaking figure itself stands in the frame, under its note (point 485)` — is no
+  longer this point's. It stopped being a flake on 04.09.2026, went red in five of six
+  runs on a quiet host, was filed as 1058, and 1058 measured the cause from the frames:
+  the note sat correctly over its speaker in EVERY sample, and the body walked out of the
+  frame SIDEWAYS (bodyX 496, 360, 234, 123, 11, -70, -140, -208 of a 1440-wide viewport)
+  because the block aimed its camera ONCE and then took eight shutters of a figure that
+  the paired DIG summons sends off to its site in the same breath as its word. The shot
+  now follows its subject before every sample, so this point's third final-state bullet —
+  the chosen speaker judged where it IS — is already met for that check, and its charge in
+  `scripts/render-verify-charges.mjs` is retired with 1058. What remains open here is the
+  FIRST half: the candidate probe whose first five figures never qualify, and a check that
+  rests on figure #5 alone.
   Final state:
   - WHY THE FIRST FIVE NEVER QUALIFY IS MEASURED, not guessed. The probe aims at
     `e[13] + max(0.4, scaleY)` above the figure's own origin and reads the group's scale; either
