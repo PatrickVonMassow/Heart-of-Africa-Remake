@@ -2046,11 +2046,6 @@ export const useGame = create<GameState>()((set, get) => ({
       // Legacy saves may carry the removed 'map' equipment item (point 93) —
       // strip it so loading never fails and the bag/capacity read correctly.
       const { map: _legacyMap, ...cleanEquipment } = (snap.equipment ?? {}) as Record<string, number>
-      // The coarse flag below is cleared, so the WALK has to start over with it
-      // (design.md §13.4): clearing the flag alone strands the walk beside the
-      // drummer, and a stranded walk answers the hut key with nothing for the
-      // rest of the session.
-      resetChiefWalk()
       set({
         ...snap,
         equipment: cleanEquipment,
@@ -2127,6 +2122,12 @@ export const useGame = create<GameState>()((set, get) => ({
         toast: null,
         journalOpen: false,
       })
+      // The flag above was cleared, so the WALK starts over with it (design.md
+      // §13.4): clearing one half alone strands the other, and either way round
+      // the hut key then answers with nothing for the rest of the session. It
+      // runs AFTER the state is in place, so a snapshot that throws half way
+      // through leaves both halves as they were rather than one of them.
+      resetChiefWalk()
       return true
     } catch {
       return false

@@ -162,6 +162,19 @@ describe('a settlement entered has its chief indoors (design.md §13.4)', () => 
     expect(nextChiefAction('hut', g(), chiefWalkState().phase)).toBe('step-out')
   })
 
+  it('a load that FAILS leaves both halves of him exactly as they were', () => {
+    g().enterPlace(DRUM_MESSAGE_VILLAGE)
+    g().callChiefOut()
+    // A checkpoint the load cannot read: visitedPlaces is spread as an array,
+    // so building the replacement state throws before anything is set. Resetting
+    // one half before that point would leave the flag up and the walk indoors —
+    // the same standoff the other way round, and the hut key dead with it.
+    localStorage.setItem('hoa-checkpoints-v1', JSON.stringify([{ visitedPlaces: {} }]))
+    expect(g().loadCheckpoint()).toBe(false)
+    expect(g().chiefOutside[DRUM_MESSAGE_VILLAGE]).toBe(true)
+    expect(chiefWalkState().phase).not.toBe('in-hut')
+  })
+
   it('a new game finds him in his hut too — both halves are cleared together', () => {
     g().enterPlace(DRUM_MESSAGE_VILLAGE)
     g().callChiefOut()
