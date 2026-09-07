@@ -12667,6 +12667,18 @@ to land than a mechanism that needs a review.
   an undeclared foreign ref is reported by name rather than silently allowed.
   Criticality: medium-high — it turns every parallel authoring evening into red gates that hide real
   reds among false ones.
+  MEASURED AGAIN 07.09.2026, and this time it BLOCKED the main session for half an hour: three
+  commits on `main` failed the pre-push gate twice with `LIVE REPOSITORY CHANGED WHILE UNIT SUITE
+  RAN: refs changed: refs/heads/feat/1069-wsl-vm-death e3edd33 -> 4506bc7; worktree registrations
+  changed; one or more worktree indexes changed` — GPT-6 Astra committing in
+  `.claude/worktrees/point-1069`, exactly what CLAUDE.md §6 requires of it. Build, lint and audit
+  were green each time. The push only went through once the author's run had finished. Two things
+  the 26.08. reading did not yet show: the collision now meets `push-arrival-guard`, which refuses
+  to let a turn END on unpushed work, so the session was wedged between two rules rather than
+  merely slowed; and load makes the gate spend its one re-run BEFORE the decisive red (99 % CPU
+  across 16 cores, six concurrent vitest runs), so the retry that exists for false reds was already
+  gone when the real refusal came. Raises the criticality: with maximum delegation an author is
+  almost always committing, so `main` is almost never pushable.
   Bundle: Urlaubsfestigkeit.
 
 - [ ] 956. A merge-with-fixes verdict leaves its named fix owed, and nothing tracks it (measured
