@@ -145,10 +145,19 @@ the recovered artefact to the chief, and completes the puzzle. The village's
 play rocks teach a category that applies to this separate boulder.
 
 The artefact remains a single quest object: it is not trade stock, does not use
-pack capacity, and cannot be sold. It is laid in the chief's hands OUTSIDE, with
-the same use key at his hut, and his acknowledgement stands over his own head
-like any other villager's word — it uses only ROCK and DIG from the same
-language.
+pack capacity, and cannot be sold. From the moment the shovel reaches it, it is
+an ITEM IN THE INVENTORY BAR under its own name, and it is given by USING it:
+the traveller stands before the chief who has come out into the open, within the
+give reach (`balance.communication.giveReach`), and activates the find in the
+bar — a click, exactly as medicine and the shovel act. Only then is it laid in
+his hands. Used anywhere else — no chief out in the open, or too far from him —
+it hands nothing over and one toast says why, and the find stays in the pack.
+The use key at his hut hands nothing over at all; it brings him out and
+afterwards sends the drums. His acknowledgement stands over his own head like
+any other villager's word — it uses only ROCK and DIG from the same language.
+
+Every later quest find brought to a chief follows the same rule: a found thing
+is an inventory item, and giving it is using that item before him.
 
 ## Save compatibility
 
