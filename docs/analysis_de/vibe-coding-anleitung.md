@@ -108,8 +108,10 @@ Füllstand empfiehlt ein leeres Modell.
 
    Ein „passt schon" des Autors zählt nicht. *(Kosten ≈ 2x)*
 
-   Genau dieses Tor kann dir den Stapel blockieren: Jede Korrektur an einem
-   Mechanismus ist selbst eine Mechanismus-Änderung. Bau die Notbremse mit ein:
+   Genau dieses Tor kann dir den ganzen Stapel blockieren: Jede Korrektur an
+   einem Mechanismus ist selbst eine Mechanismus-Änderung, also wächst die
+   Schuld schneller, als eine Sitzung sie abtragen kann. Bau die Notbremse
+   gleich mit ein:
    > „Der Zwang muss abschaltbar sein, ohne die Messung zu verlieren: eine Zeile,
    > die den Block aufhebt, während der Bericht die offene Schuld weiter zeigt."
 
@@ -486,11 +488,15 @@ Die Ursache findest du durch **Zerlegen**, nicht durch Wiederholen.
   → *Prompt:* „Zurücktreten heißt **nicht handeln**, nie **nicht wissen**. Lesen kollidiert mit
   nichts.“
 
-- **Die Pflicht wächst schneller, als du sie erfüllen kannst.** „Alles seit dem letzten Mal" ist
-  unerfüllbar; und ein Veto gegen die **Datei** statt den Befund schuldet beim Abtragen neu.
-  → *Prompt:* „Binde jede Prüfpflicht an den **einzelnen Beitrag**, nie an einen Zeitraum, und
-  buch ein Veto gegen den **Befund**: eine Reparaturkette zählt am **Endzustand** als ein
-  Beitrag. Eine Verweigerung nennt ihren **Grund**, nie ihren Bestand."
+- **Die Pflicht wächst schneller, als du sie erfüllen kannst.** Verlangt eine Prüfung „alles seit
+  dem letzten Mal", wird sie unerfüllbar und setzt sich aus. Gilt ein Veto der **Datei** statt dem
+  Befund, wächst der Rückstand beim Abtragen: Wer ihn behebt, fasst die Datei an und schuldet
+  neu — während die Absage den ganzen Bestand druckt und den Platz dafür wegnimmt.
+  → *Prompt:* „Binde jede Prüfpflicht an den **einzelnen Beitrag**, nie an einen offenen Zeitraum,
+  und buch ein Veto gegen den **Befund**: trenne **gelesen** von bloß berührt, quittiere eine
+  Reparaturkette am **Endzustand** als einen Beitrag, und mach neue Befunde derselben Datei zum
+  eigenen Ticket. Eine Verweigerung nennt ihren **Grund**, nie ihren Bestand; sieht eine Pflicht
+  unerfüllbar aus, prüf zuerst dein **Messgerät**."
 
 - **Zwei Prüfungen, die einander widersprechen — Gehorsam sieht aus wie ein Verstoß.** Die eine
   verlangt, freie Kapazität zu nutzen; die andere duldet keine Änderung, während sie läuft. Wer
@@ -568,4 +574,4 @@ Die Ursache findest du durch **Zerlegen**, nicht durch Wiederholen.
 
 Sie ersetzt die Fallstricke oben nicht.
 
-<!-- GUIDE-FINGERPRINT: eda4f58267e1b446db1612af2e909ed9c70a67a14222a06cacaa1948043e146d -->
+<!-- GUIDE-FINGERPRINT: 9646d0b67d0f6fb114d920dd13e1c255b0e7f96b20a0ad1bbd3dca683eb7b9d1 -->

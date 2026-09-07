@@ -346,7 +346,21 @@ export const LIMITS = {
   // halves were calibrated apart. Written in the tightest form that still carries it: it
   // measures +8 lines / +88 words, so the ceilings move 562 -> 570 and 5223 -> 5311 with zero
   // slack.
-  maxLines: 570,
+  // 07.09.2026: ONE genuinely new pitfall — every finding becomes work, and the work finds new
+  // findings. The rule of queueing everything noticed is right in the first month and the CAUSE
+  // in the third: the checking machinery finds its own faults, the inflow has no limit, and the
+  // project ends up working on itself. Measured on this project on 01.09.2026: about half of 358
+  // open points and nearly every recent commit belonged to the checking and steering
+  // infrastructure, not to the product (retrospective §3.227). The guide already carried the
+  // outside budget and the emergency brake for a single gate; what it had no entry for is the
+  // INTAKE THRESHOLD that stops the inflow — a finding becomes a work item only on user impact,
+  // risk, a real blockade or a simplification, everything else going to a collected,
+  // NON-BLOCKING list. Written in the tightest form that still carries it, and no neighbouring
+  // entry could be shortened without dropping a claim its own test pins: it measures +6 lines /
+  // +63 words, so the ceilings move 570 -> 576 and 5311 -> 5372 with zero slack. Not escalated
+  // to the user, under his general withdrawal of ask-before-raising of 10.08.2026; this written
+  // justification is the last step.
+  maxLines: 576,
   // EXACT FIT, not headroom — corrected 30.07.2026 after the four-eyes review
   // pointed out that this comment had long stopped describing the numbers. The
   // rule above ("raised only by the measured size of genuinely new tips")
@@ -566,7 +580,9 @@ export const LIMITS = {
   // of the fallback entry the guide already carried (a failed provider there, an
   // absent settings file here), so it was folded into that entry instead of added
   // beside it. Folding says it in two words less than the old wording: 5311 -> 5309.
-  maxWords: 5309,
+  // 07.09.2026: the intake-threshold pitfall justified beside maxLines measures 63 words:
+  // 5309 -> 5372.
+  maxWords: 5372,
   // A pitfall entry = the risk lines plus its prompt. Anything longer is a
   // story, not a tip.
   maxEntryLines: 11,
