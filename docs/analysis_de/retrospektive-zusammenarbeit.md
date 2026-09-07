@@ -96,6 +96,8 @@ Das Musterbeispiel sind die Chat-Zeitstempel: neun Eskalationsstufen, acht weich
 | 05.09. abends | Zwölf Sitzungstode an einem Tag, jeder ein sauberes `exit 143`, jede Fährte falsch (Container, Erweiterung, Übergabe, Push-Tor) — bis ein Prozess-Recorder zwei Sessions in derselben Sekunde verschwinden sah: Zwei Tests des Notfall-Schlags ließen die echten Nähte stehen und terminierten in jedem Vitest-Lauf jede im Register verzeichnete Session (§3.238) |
 | 07.09. | Eine Prüfschranke färbte auf ihrer eigenen Messbewegung rot: Die Tiefenhälfte hatte als einzige gar kein Polster, während die Zählhälfte vier Bilder von neunzig durchgehen ließ — und beide sahen dieselben Bilder. Die Entwirrung kann kein überlappendes Paar setzen, jede Verschmelzung war ein Paar, das nach dem Setzen ineinander gewandert war; 22 Spurläufe zeigten sie ausnahmslos im Fenster NACH dem Auslöser, ein bis drei Bilder lang (§3.239, Punkt 1067) |
 | 07.09. mittags | Der Nutzer fragte nach der Lastverteilung seit dem Zehn-Uhr-Reset und deckte 100 % zu 0 % auf: In viereinhalb Stunden liefen ~627k Ausgabe-Token auf Anthropic, während OpenAI keinen einzigen Aufruf bekam. `.claude/astra-share.json` fehlte, der Schalter lief daher im Zustand `default` — der nach seinem eigenen Hilfetext UNTER der stehenden Policy von CLAUDE.md §6 liegt und nur den Review abgibt. Ein Rückfallwert, der für sich gültig ist, macht seine eigene Abwesenheit unsichtbar; die Wirkung stand nur auf zwei fremden Verbrauchsanzeigen (§3.240) |
+| 07.09. abends | Der Nutzer hörte die Richtungsansage des Ufer-Spiels „fast nie" — gemessen ist es **nie**: 19,7 m Strecke gegen 10 m Hörweite mit hartem Schnitt, und der vom Projekt selbst definierte Zuschauerstand liegt 22,0 m von jedem Felsen entfernt. Zwei sorgfältig gebaute Zahlen, nie gegeneinander gehalten, weil kein Test von der Zuschauerposition aus misst; dritter Fall derselben Bauform in derselben Szene nach dem 13.08. und 04.09. (§3.233) |
+| 07.09. abends | Beim Prüfen, ob das Verstummen der Erwachsenen entfallen kann: Dorfsprache hat gar keine Stereo-Ortung (kein Panner, ein Mono-Bus), und die Assertion `adult-atom-lost` nimmt ausgerechnet `hushed` als Freibrief — das Flag, dessen Mechanismus den Wortverlust erzeugt, entwaffnet die Prüfung darauf. Latent bei 10 m Hörweite, dauerhaft bei jeder Vergrößerung (§3.241) |
 
 
 Muster: Ab dem 22.07. explodiert die Commit-Rate (Delegation) — und genau dann häufen sich die Infrastruktur-Vorfälle. **Skalierung der Autonomie erzeugt eine eigene Problemklasse, die die Feature-Arbeit zeitweise überholt.**
@@ -1436,7 +1438,7 @@ keinen Träger hat. Gebucht als Punkt 956.
 
 ## Anhang A — Maschinell gepflegte Quellen-Übersicht
 
-Zuletzt aktualisiert: Montag, 07.09.2026, 16:33 · Quellen-Fingerprint: `523eab554e6f…`
+Zuletzt aktualisiert: Montag, 07.09.2026, 18:57 · Quellen-Fingerprint: `8980b24998ac…`
 
 Spalten heuristisch aus den Quellen abgeleitet (Anläufe = distinkte Datumsnennungen im Memory;
 Maßnahme = Guard-Skripte mit Namens-Treffer). Die inhaltliche Bewertung gehört der Prosa oben.
@@ -1475,7 +1477,7 @@ Maßnahme = Guard-Skripte mit Namens-Treffer). Die inhaltliche Bewertung gehört
 | Work at High effort by default; the user reserves Extra high for research and design decisions, not implementation | 4 | hoch | — (Regel/Memory) | ◐ Regel |
 | Write idiomatic English in all English text (README, code comments, commit messages) — no German calques like 'stand' for a version | 1 | niedrig | — (Regel/Memory) | ◐ Regel |
 | Fable is NOT the default lane because its volume is the scarcest; difficulty is no reason for it either (since 18.08.2026 hard cases go straight to the OpenAI lane, GPT-6 Astra), and review is cross-vendor, not Fable-by-default | 6 | hoch | — (Regel/Memory) | ◐ Regel |
-| Findings recorded by a session that could not write the work order — carry each into TASKS.md, then mark it drained | 52 | hoch | findings-guard.mjs | ✔ Mechanismus |
+| Findings recorded by a session that could not write the work order — carry each into TASKS.md, then mark it drained | 53 | hoch | findings-guard.mjs | ✔ Mechanismus |
 | A recurring lookup gets a script; never pull raw transcripts, listings, or logs into context to answer it | 1 | niedrig | wait-command-guard.mjs | ✔ Mechanismus |
 | Past the 150k context watermark, FINISH the step and hand over — never start a suite, an agent or a point after it; the user raised the cost twice (13.08. and 17.08.2026) | 2 | mittel | — (Regel/Memory) | ◐ Regel |
 | User 18.08.2026: hard, complex, error-prone and HIGH-criticality points are AUTHORED by the OpenAI lane directly (GPT-6 Astra since 05.09.2026, GPT-5.6 Sol before) — Opus 5 authors only what is left, and Fable authors only a point that tags its lane or one the router escalates | 5 | hoch | — (Regel/Memory) | ◐ Regel |
@@ -1541,8 +1543,8 @@ Maßnahme = Guard-Skripte mit Namens-Treffer). Die inhaltliche Bewertung gehört
 
 Erfasste Quellen: 95 Feedback-/Projekt-Memories · 58 Guard-/Hook-Skripte · 6 Revert-/Reapply-Commits · 125 Prozess-/Meta-TASKS-Punkte (davon 59 offen).
 
-<!-- RETRO-FINGERPRINT: 523eab554e6f34b870bbeeb04dd4543ef2bda64640d07485a9da6d145ae7f94d -->
-<!-- RETRO-LAST-REFRESHED: 2026-09-07T14:33:22.654Z -->
+<!-- RETRO-FINGERPRINT: 8980b24998ac6e4ce2e359711a30385354afed1af9a2ac04f9f94064f444fa7c -->
+<!-- RETRO-LAST-REFRESHED: 2026-09-07T16:57:24.092Z -->
 <!-- AUTO-GENERATED:END -->
 
 ### 3.111 Ein Erfolg ist kein Beweis für den Weg, auf dem er zustande kam
@@ -5489,6 +5491,25 @@ Mensch beantworten muss („Wozu tut die Figur das?"), nicht als Metrik. Und wo
 eine Klasse in derselben Szene zum zweiten Mal auftritt, ist die Wiederholung
 selbst der Befund, nicht der Einzelfall.
 
+Nachtrag vom 07.09.2026 — dritter Fall, dieselbe Szene, diesmal im Ohr statt im
+Auge. Der Nutzer bemängelte, dass die Kinder am Ufer die Laufrichtung ansagen,
+er sie aber „nur fast nie" höre. Nachgemessen ist es nicht „fast nie", sondern
+**nie**: Der Ansager steht am Startfelsen, die Strecke zwischen den Spielfelsen
+ist 19,7 m lang, die Hörweite 10 m mit hartem Schnitt — und der Stand, den das
+Projekt selbst als Zuschauerplatz definiert (`bankPlayRocksView`, der einzige mit
+beiden Felsen im Bild), liegt 22,0 m von jedem Felsen entfernt. Von genau der
+Stelle, von der aus die Bühne gebaut, fotografiert und abgenommen wird, kommt
+keine einzige Ansage an. Auch hier ist alles vorhanden: der Ansager ist gesetzt,
+die Seiten wechseln, eine Dev-Assertion bewacht sogar, dass kein Lauf ohne
+Ansage stattfindet. Was niemand geprüft hat, ist die eine Größe, die beide Teile
+verbindet — die Streckenlänge gegen die Hörweite. Zwei sorgfältig gebaute Zahlen,
+nie gegeneinander gehalten, weil kein Test von der Zuschauerposition aus misst.
+
+**Zusatzlehre:** Wo eine Prüfung eine Kameraposition als „die Stelle, von der aus
+man das sieht" festschreibt, muss dieselbe Position auch die Frage beantworten,
+was man von dort **hört** und tun kann. Ein Stand, der für das Bild definiert und
+für die Wahrnehmung nie eingesetzt wird, ist ein halber Beweis.
+
 ### 3.234 Ein Wächter, der seinen eigenen Pfad nicht findet, meldet nichts — und die Regel gilt als abgesichert
 
 Am 04.09.2026 meldete die Wächter-Gesundheitsprüfung zwei Einträge derselben
@@ -5742,3 +5763,43 @@ still eine Vereinbarung aus«, aufgeschrieben nach genau derselben Lastverschieb
 neue Fall ist keine neue Klasse, sondern ihre zweite Ausprägung: dort ein *ausgefallener*
 Anbieter, hier eine *fehlende Datei*. Der Eintrag wurde deshalb geschärft statt verdoppelt
 — die Aufnahmeregel schließt Duplikate, sie mechanisiert sie nicht neu.
+
+### 3.241 Die Assertion war entwaffnet — und zwar von dem Flag, dessen Mechanismus den Verlust erzeugt
+
+Am Abend des 07.09.2026 fragte der Nutzer, ob das Verstummen der Erwachsenen
+überhaupt nötig sei — sein Argument: Stereo-Ortung, Lautstärke und die
+entfernungsabhängige SPACE-Aufforderung sollten überlappende Lehrstimmen
+auseinanderhalten. Beim Nachmessen fiel neben der Antwort (Stereo gibt es im
+Bestand gar nicht — kein `PannerNode`, kein `StereoPanner`, jede Silbe läuft über
+einen Mono-Bus) eine Kopplung auf, die niemand gesucht hatte.
+
+Der Mechanismus ist gutartig gemeint: Hört ein Kind mit, setzt der erwachsene
+Sprecher `hushed = true` und **schuldet sein Wort weiterhin** — es fällt, sobald
+die Kinder außer Hörweite sind. Eine Verschiebung, keine Streichung. Die
+Dev-Assertion `adult-atom-lost` bewacht genau das: Sie schlägt an, wenn einem
+Dorfbewohner die Zeit ausgeht, während er noch ein Wort schuldet. Ihre Bedingung
+lautet aber `!task.owes || task.hushed === true` — **`hushed` ist die Ausnahme**.
+Damit entwaffnet ausgerechnet das Flag, das die Verzögerung verursacht, die
+Prüfung, die den daraus entstehenden Verlust melden soll. Solange die Hörweite
+bei 10 m steht, ist das Verstummen selten und kurz, der Fall bleibt latent. Jede
+Vergrößerung der Trag- oder Hörweite — genau das, was in derselben Sitzung als
+Kur für §3.233 diskutiert wurde — macht ihn häufig bis dauerhaft: Die Wörter
+RIVER und DIG gingen dann still verloren, mit der einzigen Prüfung stumm
+geschaltet, die es hätte sagen können.
+
+Das ist verwandt mit §3.234, aber nicht dasselbe. Dort lief ein Wächter wegen
+eines falschen Pfades **nie**; hier läuft er, sieht den Zustand und wird von ihm
+ausdrücklich zum Schweigen gebracht. Die Ausnahme war zum Zeitpunkt ihrer
+Einführung sachlich richtig — ein absichtlich verschobenes Wort ist kein
+verlorenes —, sie verwechselt aber „verschoben" mit „verschoben und nie
+nachgeholt". Eine Ausnahme, die den *Grund* der Verzögerung nennt statt ihrer
+*Begrenzung*, deckt beides ab.
+
+**Lehre:** Wenn eine Assertion eine Ausnahme kennt, muss geprüft werden, wer
+dieses Ausnahme-Flag setzt. Setzt es derselbe Mechanismus, dessen Fehlverhalten
+die Assertion bewachen soll, bewacht sie nichts mehr. Und eine Verschiebung
+gehört **begrenzt**: nach einer Haltezeit wird gesprochen oder laut gemeldet —
+ein unbegrenztes „später" ist von „nie" nicht unterscheidbar. Der Befund kostet
+heute nichts und wäre der stille Preis der ersten Kur gewesen, die man für
+§3.233 ansetzt; gefunden wurde er nur, weil der Nutzer eine Regel hinterfragt
+hat, statt sie zu akzeptieren.
