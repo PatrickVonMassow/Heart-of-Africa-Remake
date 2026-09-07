@@ -5829,20 +5829,23 @@ if (section('chief-to-drummer')) {
       (want) => (document.querySelector('.prompt')?.textContent ?? '').includes(want),
       askLabel,
     )
-    const armedWhy = await page.evaluate(() => ({
-      prompt: document.querySelector('.prompt')?.textContent ?? null,
-      uiPrompt: window.__ui.getState().prompt,
-      owner: window.__ui.getState().useKeyOwner,
-      dialog: window.__ui.getState().dialog,
-      chief: window.__chief,
-      player: { x: window.__placePlayer?.x, z: window.__placePlayer?.z },
-      place: window.__game.getState().placeId,
-      heard: window.__game.getState().drumMessageHeard,
-    }))
+    // What owned the key instead, read only when the wait ran out: this check
+    // failed once on a stale note of the drummer's holding SPACE, and "no
+    // prompt" alone did not say so.
+    const armedWhy = armed
+      ? null
+      : await page.evaluate(() => ({
+          prompt: document.querySelector('.prompt')?.textContent ?? null,
+          owner: window.__ui.getState().useKeyOwner,
+          dialog: window.__ui.getState().dialog,
+          speaking: window.__speech?.labels().map((l) => l.speakerId) ?? null,
+          chief: window.__chief,
+          player: { x: window.__placePlayer?.x, z: window.__placePlayer?.z },
+        }))
     check(
       'the use key arms at the drummer with the chief standing there',
       armed,
-      `waited for: ${askLabel} — ${JSON.stringify(armedWhy)}`,
+      armedWhy ? `waited for: ${askLabel} — ${JSON.stringify(armedWhy)}` : `named: ${askLabel}`,
     )
     await page.keyboard.press('Space')
     const beating = await page
