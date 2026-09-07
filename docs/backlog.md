@@ -256,3 +256,25 @@ Gemessen 07.09.2026 19:10-19:12. Situation: Der Nutzer erteilte in DIESEM Fenste
 ## Gegenbeleg: am 06.09. gingen drei --request-Uebergaben aus einem Nicht-Owner-Fenster gegen einen LEBENDEN Owner durch (07.09.2026)
 
 Gemessen 07.09.2026 19:20 auf Nachfrage des Nutzers ('Bisher konntest du doch immer Specs ohne Batch uebergeben, oder?'). ERGAENZT den Befund 'Der sanktionierte Nicht-Owner-Weg ist unbenutzbar'. BELEG: Der Traeger enthaelt 14 [request]-Eintraege; die juengsten drei stammen vom 2026-09-06T11:52:27Z, 11:52:54Z und 11:53:22Z, Sitzungs-Tag 6c6d1be1, und wurden zu den Punkten 1064, 1065 und 1066. Aus .claude/batch-activity.jsonl: der Lock gehoerte zu diesem Zeitpunkt b7321dff (owner-claim 2026-09-06T10:35:51Z 'successor-converted-pending-spawn'), das naechste Ereignis ist erst 'pause awaiting-user' um 12:10:47Z, und b7321dff sendete um 11:37, 11:46, 11:56 und 12:01 foreground-activity mit lebender pid 2387673 (process-exit erst 12:01:23Z). 6c6d1be1 selbst beansprucht den Lock erst 12:32:17Z. Also: Nicht-Owner-Fenster, lebender Fremd-Owner, drei erfolgreiche Datei-basierte Uebergaben. WAECHTER UNVERAENDERT: ownershipStandDownDecision (board-first-core.mjs:163-206) blockiert seit 23cee76d4 vom 24.08.2026 jedes Edit/Write/MultiEdit/NotebookEdit/Agent ohne Pfadausnahme (einzige Ausnahmen: isBoardFile, paused===true, isWorktreeCheckout); seit dem 06.09. gibt es keinen Commit auf board-first-core.mjs, board-first-guard.mjs, command-classify-core.mjs oder batch-lease-core.mjs. HEUTE GEMESSEN ABGELEHNT in derselben Lage: Write ins eigene Scratchpad (zweimal, verschiedene Dateien), 'mkdir -p' auf ein BEREITS BESTEHENDES Scratchpad-Verzeichnis, 'git branch -a --sort=-committerdate'. NICHT AUFGEKLAERT und deshalb nicht als Regression behauptet: ueber welchen Schreibweg 6c6d1be1 seine --spec-file/--why-file-Dateien am 06.09. erzeugt hat. Die Klassifikation urteilt segmentweise am Kommando-KOPF (command-classify-core.mjs isMutatingSegment/segmentIntent), 'node' ist kein schreibender Kopf — ein 'node -e' mit writeFileSync oder ein Heredoc koennte also durchgelaufen sein, waehrend das Write-Werkzeug abgelehnt wird. Das waere kein funktionierender Weg, sondern ein Loch: derselbe Vorgang haengt davon ab, welches Werkzeug man waehlt. BEIDE Auflagen des Vorschlags bleiben: --request Inline-Flags geben (dann braucht der Weg keine Datei), UND entscheiden, ob die Kopf-Klassifikation ein Loch ist oder eine gewollte Ausnahme.
+- 2026-09-07 user proposal (ChatGPT) — an OpenAI "owner-assistant" would take the owner work
+  itself: hand it point brief, git status, author report, review receipt and verify digest, get
+  back STATE/VERDICT/NEXT_COMMAND/RISKS/NEEDS_CLAUDE_JUDGMENT, and normally just run NEXT_COMMAND.
+  VERIFIED, not assumed: `scripts/ask-astra.mjs` really does carry --kind diagnose|audit|enumerate|
+  explain with --file/--log/--diff, so a fifth kind `owner-step` would be small, and the cost
+  diagnosis holds (07.09.: Opus 5 141k output against 28.4M cache-read, Fable 486k against 43.9M —
+  the spend is context, not thinking). THREE OBJECTIONS: the middle of the proposal is already
+  routed (diff inspection, log diagnosis and test-result judgment are our diagnose/audit and have
+  gone to Astra since 14:48; only "analyse state, determine the next step" is new); ask-astra
+  fetches nothing, so the SELECTION of the material is the judgment work, and a fixed five-artefact
+  packet is mechanical exactly where we really burn context — chasing a red into a file nobody
+  predicted; and running NEXT_COMMAND unread abolishes the check instead of moving it, against our
+  own rule that a reviewer handed a finished list checks that list. MEASURED remainder: of 374 open
+  points 115 stay here through the verification carve-out, 196 go to Astra unmarked and 62 as hard;
+  only 19 of the 115 matched on an incidental word (webgpu/webgl/visual/both backends), so cutting
+  the markers narrower would move 5 % of the queue. `prefer-astra` is already the top switch
+  setting. RECOMMENDATION: build `owner-step` as a fifth ask-astra kind but NOT as the normal
+  path — only for the red triage after a verify run, where the material really is bounded (log,
+  diff, charge ledger); NEEDS_CLAUDE_JUDGMENT stays a hard gate and no NEXT_COMMAND runs unread
+  where the step is irreversible (landing, merge, push, tag). Not built: the user asked for an
+  answer only (07.09.2026, 21:59). Not a work-order point under the CLAUDE.md §2 intake rule — no
+  player impact, no risk, no blockade, and it adds rather than deletes.
