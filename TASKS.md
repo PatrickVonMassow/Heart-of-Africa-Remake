@@ -127,22 +127,29 @@ put it is the mistake this line exists to stop.
   Refs: src/state/store.ts (rockArtefact, handArtefactToChief, carriedForms), src/scenes/place/chiefMeeting.ts, src/scenes/place/PlaceScene.tsx (meetChief), src/ui/Hud.tsx (InventoryBar), src/config/balance.ts, src/i18n/en.ts, src/i18n/de.ts, docs/communication-poc-spec.md, design.md §6 §13.4
   Doc impact: docs/communication-poc-spec.md 'Where the digging happens': the artefact is laid in the chief's hands by USING the inventory item before him, not by the use key at his hut. design.md §6 (inventory bar): the quest find is listed as an acting item; §13.4: the hand-over sentence. i18n en/de: item label, Ctrl label, refusal toast.
   Bundle: Dorfleben.
-  RED ON THE MERGE CANDIDATE (measured 07.09.2026, run 2026-09-07T12-07-22, WebGPU, exit 1
-  after 48m14s on cd0418380, suites docs world i18n flow collision polish settings
-  enrichments): six failures in two classes, and NEITHER may be waved through.
-  (a) `world` — frames `15-worldmodel-victoria-falls` and `11-worldmodel-khartoum-confluence`
-      do not contain their subject; it sits off the left and bottom edge. This branch edits
-      `scripts/verify/world.mjs` itself, so treat it as this point's own until measured
-      otherwise. The shutter rule stands: fix the cause, never the assertion.
-  (b) `settings`/`enrichments` — four console-error assertions fail on
-      `THREE.WebGPURenderer: GPUValidationError: The texture format (RGBA16Float) does not
-      support multisampling` in the TRAA-off path. This branch touches no renderer code.
-      The same error text is already described further down this file for the
-      COMPATIBILITY lane (WebGL 2); here it appeared on WEBGPU. Before filing anything new,
-      measure whether that existing point covers the WebGPU manifestation — do not duplicate.
-  The earlier run of this branch (08:53) still had 8 `settings` failures; the four
-  "renders non-black" ones went away with the merge from main. No author is running on
-  `feat/1064-artefact-give`; the branch lies idle with this red candidate.
+  RED ON THE MERGE CANDIDATE — MEASURED AND CHARGED AWAY (07.09.2026). The run
+  2026-09-07T12-07-22 (WebGPU, exit 1 after 48m14s on cd0418380) was red in two classes.
+  BOTH are now measured, and NEITHER belongs to this point.
+  (a) `world` — `11-worldmodel-khartoum-confluence` and `15-worldmodel-victoria-falls`, each
+      "off the left and bottom edge of the frame". `node scripts/verify/baseline-classify.mjs
+      world --failed "frame 11-worldmodel-khartoum-confluence"` answers PRE-EXISTING / STALE
+      ASSUMPTION: already red on the merge-base 107af759, where 6 of the 11 checks fail. Both
+      frames are charged in `scripts/render-verify-charges.mjs` to POINT 627, scoped to
+      `world`/WebGPU, and the run's own verdict line reads "FAIL (twice, DIFFERENT checks) —
+      LOAD/FLAKE SIGNATURE". The errand edit in `scripts/verify/world.mjs` is not the cause:
+      it runs in `communication-errand`, the landmark block restores nothing from it, and the
+      other five landmark frames pass in the same run.
+  (b) `settings` — all EIGHT failures match the POINT 514 charge already in
+      `scripts/render-verify-charges.mjs`, whose pattern covers `TRAA (off again|toggle
+      stress):`, `F9 low:`, `Graphics levels:`, `the leak block produced no OTHER` and
+      `first-person ground shows micro-detail`: the compatibility lane's RGBA16Float MSAA
+      cascade. This is the WebGPU manifestation the earlier note asked about — the lane on
+      this host reports `level=compatibility` (point 514's own 20.08.2026 measurement), so
+      the WebGPU lane IS that lane. Nothing new is filed; no duplicate.
+  `polish` passed 217/0 in the same run, which is where this point's own picture proof lives.
+  What is still owed at the merge is the SECOND backend: the change is backend-sensitive
+  (`isBackendSensitivePath` names PlaceScene.tsx, chiefPresence.ts, finds.ts, and both verify
+  scripts), so `polish` must come up green on WebGL 2 as well.
 
 - [ ] 1069. The WSL VM dies in the GPU passthrough driver during browser suites, and nothing
   re-arms the batch without a VS Code session (machine-filed 07.09.2026).
