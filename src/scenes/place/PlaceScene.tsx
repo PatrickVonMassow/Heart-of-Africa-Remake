@@ -615,18 +615,22 @@ function Chief({
   // The two ends of his path: the spot beside his own door he has always come
   // out onto, and the stand abreast of the drummer.
   const door = useMemo(() => chiefStandingSpot(item), [item])
-  const beside = useMemo(
-    () => chiefBesideDrummerSpot(balance.communication.chiefBesideDrummer),
-    [],
-  )
-  const timing = useMemo(
-    () => ({
+  // The stand and the timing are read from the CALIBRATABLE values, so a live
+  // change in the debug menu has to reach them: without the version the memo
+  // holds the stand he was mounted with until he next comes out.
+  const balanceVersion = useGame((s) => s.balanceVersion)
+  const beside = useMemo(() => {
+    void balanceVersion // read so the rebuild is the dependency it looks like
+    return chiefBesideDrummerSpot(balance.communication.chiefBesideDrummer)
+  }, [balanceVersion])
+  const timing = useMemo(() => {
+    void balanceVersion // read so the rebuild is the dependency it looks like
+    return {
       speed: balance.communication.chiefWalkSpeed,
       staySeconds: balance.communication.chiefStaySeconds,
       pathLength: Math.hypot(beside[0] - door[0], beside[1] - door[1]),
-    }),
-    [door, beside],
-  )
+    }
+  }, [door, beside, balanceVersion])
   // Standing, he faces exactly where the drummer faces; back at his own door he
   // faces the open ground rather than his wall.
   const standingFacing = drummerFacing()
@@ -643,6 +647,10 @@ function Chief({
     return () => {
       setChiefAnchor(null)
       clearChiefStanding()
+      // …and the dev hook below goes with him. A snapshot left standing at
+      // 'at-drummer' after the figure is gone would satisfy a suite's wait for
+      // his arrival with a man who is no longer in the scene.
+      if (import.meta.env.DEV) (window as unknown as Record<string, unknown>).__chief = null
     }
   }, [x, z])
   // His walk, one frame at a time. The clock is the WALL clock — the minute he

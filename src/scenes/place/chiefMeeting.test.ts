@@ -148,6 +148,9 @@ describe('a settlement entered has its chief indoors (design.md §13.4)', () => 
     g().callChiefOut()
     g().saveCheckpoint()
     g().newGame()
+    // A fresh game leaves the walk exactly where it stood, so what follows is
+    // really the LOAD putting him back indoors and cannot pass by accident.
+    expect(chiefWalkState().phase).not.toBe('in-hut')
     expect(g().loadCheckpoint()).toBe(true)
     expect(g().chiefOutside[DRUM_MESSAGE_VILLAGE]).toBeFalsy()
     // …and the WALK starts over with the flag. Clearing the coarse half alone
