@@ -63,7 +63,7 @@
 | `batch-landing-journal-core.mjs` | CRASH-RECOVERABLE SERIAL LANDING — the remainder of ordered-work step 9. | — |
 | `batch-landing-journal.mjs` | Tests and support for batch-landing-journal. | — |
 | `batch-launcher-core.mjs` | Pure core of the LAUNCHER, on both hosts (point 474, user 03.08.2026). | — |
-| `batch-launcher.mjs` | THE LINUX LAUNCHER (point 474, user 03.08.2026) — a self-scheduling daemon. | Usage: --start \| --stop \| --status |
+| `batch-launcher.mjs` | THE LINUX LAUNCHER (point 474, user 03.08.2026) — a self-scheduling daemon. | Usage: --start \| --arm \| --stop \| --status |
 | `batch-lease-core.mjs` | THE LEASE AND THE FENCE — pure decision core (layer 1 of docs/batch-resilience.md §3). | — |
 | `batch-lock.mjs` | Batch PAUSE state + legacy lock reader. | — |
 | `batch-metric-events.mjs` | Production bridge from measured operations to the daemon's fenced journal. | — |
