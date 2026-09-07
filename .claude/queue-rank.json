@@ -1195,12 +1195,6 @@
       "origin": "machine",
       "place": "last"
     },
-    "1064": {
-      "at": "2026-09-06T12:34:42.637Z",
-      "why": "The user asked for it on 06.09.2026 and placed it directly after 1058",
-      "origin": "user",
-      "place": "ahead"
-    },
     "1065": {
       "at": "2026-09-06T12:34:42.732Z",
       "why": "The user asked for it on 06.09.2026 and placed it directly after 1058",
@@ -1213,17 +1207,17 @@
       "origin": "user",
       "place": "ahead"
     },
-    "1069": {
-      "at": "2026-09-07T11:04:18.745Z",
-      "why": "It reproducibly kills every batch session several times a day, so every point behind it, the release included, pays for each death; its first condition is checked by the very next LARGE run anyway",
-      "origin": "machine",
-      "place": "ahead"
-    },
     "1070": {
       "at": "2026-09-07T11:33:35.892Z",
       "why": "User order 07.09.2026: queue it directly behind 1069",
       "origin": "user",
       "place": "ahead"
+    },
+    "1071": {
+      "at": "2026-09-07T15:32:20.885Z",
+      "why": "It is gated on host work only the user can perform — copying the reviewed .devcontainer onto Windows, rebuilding the container, running the no-editor restart drill — so no session can start it whatever its rank; moving it forward would park the batch on a human, and its board card is what actually reaches him.",
+      "origin": "machine",
+      "place": "last"
     }
   },
   "boundary": {
@@ -1257,7 +1251,7 @@
     "why": "The order standing in front of the release today is the arrangement that predates this rule; the four machine-filed points that had ranked themselves there were moved behind 174 first"
   },
   "settled": {
-    "at": "2026-09-07T11:33:35.903Z",
+    "at": "2026-09-07T15:32:20.895Z",
     "points": [
       174,
       184,
@@ -1628,12 +1622,11 @@
       1060,
       1062,
       1063,
-      1064,
       1065,
       1066,
       1068,
-      1069,
-      1070
+      1070,
+      1071
     ]
   }
 }
