@@ -108,10 +108,8 @@ Füllstand empfiehlt ein leeres Modell.
 
    Ein „passt schon" des Autors zählt nicht. *(Kosten ≈ 2x)*
 
-   Genau dieses Tor kann dir den ganzen Stapel blockieren: Jede Korrektur an
-   einem Mechanismus ist selbst eine Mechanismus-Änderung, also wächst die
-   Schuld schneller, als eine Sitzung sie abtragen kann. Bau die Notbremse
-   gleich mit ein:
+   Genau dieses Tor kann dir den Stapel blockieren: Jede Korrektur an einem
+   Mechanismus ist selbst eine Mechanismus-Änderung. Bau die Notbremse mit ein:
    > „Der Zwang muss abschaltbar sein, ohne die Messung zu verlieren: eine Zeile,
    > die den Block aufhebt, während der Bericht die offene Schuld weiter zeigt."
 
@@ -331,14 +329,11 @@ Die Ursache findest du durch **Zerlegen**, nicht durch Wiederholen.
   → *Prompt:* „Wo ein Teil schreibt, was ein anderes prüft, **importiere** den Wert; der Eingang
   ist **Pflicht**, kein Vorgabewert."
 
-- **Jeder Befund wird zur Arbeit — und die Arbeit findet neue Befunde.** Die Regel, alles
-  Aufgefallene einzureihen, ist im ersten Monat richtig und im dritten die Ursache: Die
-  Prüfmechanik findet ihre eigenen Fehler, jeder wird ein Punkt, und der Zulauf hat keine
-  Grenze mehr. Am Ende arbeitet das Projekt an sich selbst statt am Produkt.
-  → *Prompt:* „Ein Befund wird nur dann ein Arbeitspunkt, wenn er den Nutzer des Produkts
-  trifft, ein Sicherheits- oder Datenrisiko ist, echt blockiert — oder wenn er etwas löscht
-  oder vereinfacht. Alles andere geht in eine gesammelte, **nicht blockierende** Liste, und
-  Doppelte werden geschlossen statt neu vermessen."
+- **Jeder Befund wird zur Arbeit — und die Arbeit findet neue Befunde.** Alles einzureihen ist
+  im ersten Monat richtig und im dritten die Ursache: Die Prüfmechanik findet ihre eigenen
+  Fehler, der Zulauf hat keine Grenze, das Projekt arbeitet an sich selbst.
+  → *Prompt:* „Ein Befund wird nur Arbeitspunkt bei Nutzerwirkung, Risiko, echter Blockade oder
+  Vereinfachung. Sonst in eine gesammelte, **nicht blockierende** Liste."
 
 - **Der Befund stirbt mit dem Gespräch.** Ein echter Fehler fällt nebenbei auf und bleibt im Chat.
   → *Prompt:* „Sichere Befunde mit einem billigen Kommando, das immer schreibt, und einer Prüfung,
@@ -491,15 +486,11 @@ Die Ursache findest du durch **Zerlegen**, nicht durch Wiederholen.
   → *Prompt:* „Zurücktreten heißt **nicht handeln**, nie **nicht wissen**. Lesen kollidiert mit
   nichts.“
 
-- **Die Pflicht wächst schneller, als du sie erfüllen kannst.** Verlangt eine Prüfung „alles seit
-  dem letzten Mal", wird sie unerfüllbar und setzt sich aus. Gilt ein Veto der **Datei** statt dem
-  Befund, wächst der Rückstand beim Abtragen: Wer ihn behebt, fasst die Datei an und schuldet
-  neu — während die Absage den ganzen Bestand druckt und den Platz dafür wegnimmt.
-  → *Prompt:* „Binde jede Prüfpflicht an den **einzelnen Beitrag**, nie an einen offenen Zeitraum,
-  und buch ein Veto gegen den **Befund**: trenne **gelesen** von bloß berührt, quittiere eine
-  Reparaturkette am **Endzustand** als einen Beitrag, und mach neue Befunde derselben Datei zum
-  eigenen Ticket. Eine Verweigerung nennt ihren **Grund**, nie ihren Bestand; sieht eine Pflicht
-  unerfüllbar aus, prüf zuerst dein **Messgerät**."
+- **Die Pflicht wächst schneller, als du sie erfüllen kannst.** „Alles seit dem letzten Mal" ist
+  unerfüllbar; und ein Veto gegen die **Datei** statt den Befund schuldet beim Abtragen neu.
+  → *Prompt:* „Binde jede Prüfpflicht an den **einzelnen Beitrag**, nie an einen Zeitraum, und
+  buch ein Veto gegen den **Befund**: eine Reparaturkette zählt am **Endzustand** als ein
+  Beitrag. Eine Verweigerung nennt ihren **Grund**, nie ihren Bestand."
 
 - **Zwei Prüfungen, die einander widersprechen — Gehorsam sieht aus wie ein Verstoß.** Die eine
   verlangt, freie Kapazität zu nutzen; die andere duldet keine Änderung, während sie läuft. Wer
