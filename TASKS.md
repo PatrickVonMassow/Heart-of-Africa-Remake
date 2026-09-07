@@ -114,7 +114,20 @@ put it is the mistake this line exists to stop.
   Doc impact: docs/communication-poc-spec.md (chief comes out to the drummer, CHIEF word), design.md §13.4.
   Bundle: Kommunikation.
 
-- [ ] 1065. The tapping child's hand touches the rock it names (user 06.09.2026).
+- [ ] 1065. The teaching hands touch what they name: the tapping child at its rock, the
+  carrier at the water (user 06.09.2026; point 1066 folded in here 07.09.2026 on the user's
+  instruction to bundle points that would otherwise each buy their own regression run).
+  ONE DEFECT IN TWO PLACES, and the user reported both in the same message. A figure teaches
+  a word by acting on an object, stops one to three metres short of it, and the act stays
+  invisible: the tapping child's hand ends more than a metre from the rock it names, and the
+  water carrier halts 2.7 m up the bank while his jar changes from empty to full with nothing
+  shown in between. Both are proven by the same kind of evidence — a frame in which a hand
+  meets a drawn surface — in the same scene, over the same figure and gesture code. Kept
+  apart they would buy two picture runs for one verdict; §A and §B below are the two former
+  points, unchanged in substance, and either half may be cut back out if the branch does not
+  converge.
+
+  §A — THE TAPPING CHILD'S HAND TOUCHES THE ROCK IT NAMES.
   The child that names the rock TOUCHES it. Today the tap of the children's bank game
   (`bankGame.ts` ~626, spec item 4) is spoken from the catcher's waiting station — `standOff`
   2.6 m off the rock's centre (`src/config/balance.ts`), the play rock itself ~1.2 m in radius
@@ -140,18 +153,61 @@ put it is the mistake this line exists to stop.
   - Doc: design.md §13.4 says the catcher's hand touches the rock while he names it;
     docs/communication-poc-spec.md item 4 likewise; the Ctrl-hold label and the speech label
     are unchanged.
-  Test: Vitest over the bank game — the tap utterance is offered only once the speaker's hand
-  point lies within a small tolerance of the rock surface, and never from the station; the
-  held pose lasts the tap interval; a geometric check that the hand target lies on the drawn
-  rock's surface for both play rocks of the three river villages (nubian, bambara, mandinka).
-  Browser (WebGPU lane): a picture check of the tap moment that measures, in the projection,
-  the hand's screen position against the rock's silhouette (hand inside or on its edge), plus
-  a screenshot of that frame (verification/, subject declared: the tapping child at its rock).
+
+  §B — THE WATER CARRIER VISIBLY FILLS THE JAR AT THE WATER AND CARRIES VISIBLE WATER.
+  The filling of the jar READS as filling. Today the RIVER errand sends an adult with an
+  empty jar to the foot of the water path and back with a full one, and nothing in between is
+  shown: the foot (`bankWaterFoot`, `riverBank.ts`) stands `BANK_STAND_INSET` 1.5 m inside the
+  walkable edge while the waterline lies `BANK_SHORE_HALF` 1.2 m beyond it, so the carrier
+  halts about 2.7 m from the water; the carry flips 'emptyJar' → 'fullJar' between the
+  'water-out' and 'water-back' situations (`adultWork.ts` ~390-410) with no act; and both jars
+  are one closed opaque cylinder (`PlaceLife.tsx` ~2557-2612), the full one merely moved onto
+  the head. The user (06.09.2026) could not tell that water was being fetched — and this
+  errand is where RIVER is learned (design.md §13.4).
+  Final state:
+  - The carrier goes TO the water: the errand's last leg walks down the shore to the
+    waterline (the walkable region already reaches through it to `balance.bankWadeDepth`,
+    `riverBank.ts`), and he stands with his feet at the water's edge or ankle-deep, never
+    2.7 m up the bank. The path's foot for the WORD (`say.aim`) may stay where it is; the
+    fill spot is at the water.
+  - The fill is an ACT with its own phase: he crouches or bends, the jar in his hand goes
+    down into the water — visibly below the drawn surface — stays there a readable moment
+    (calibratable seconds in `src/config/balance.ts`), comes up, and is lifted onto the head
+    (a fill pose beside `digPose` / `HEAD_CARRY_POSE`). 'fullJar' begins only after the dip;
+    the carry never flips without it. The errand's timing backstops (`errandSeconds`,
+    `stallSeconds`) cover the added leg.
+  - Water is visible: both jars have an open mouth; the empty one shows a dark hollow, the
+    full one a water surface at the rim (a bright disc with the water's tint, readable at
+    the distance the player watches from) — so head-carried and hand-carried jars read as
+    full and empty at a glance, on both backends.
+  - The word RIVER still falls at the head of the path, aimed at the water, gated by a
+    hearing child exactly as today; nothing about who is cast or when changes.
+  - Doc: design.md §13.4 ('the adults' water and digging work') states the dip at the
+    waterline; docs/communication-poc-spec.md likewise where it describes the errand.
+
+  Test (ONE run for both halves — this is why they are one point). Vitest: for §A, the tap
+  utterance is offered only once the speaker's hand point lies within a small tolerance of
+  the rock surface and never from the station, the held pose lasts the tap interval, and the
+  hand target lies on the drawn rock's surface for both play rocks of the three river
+  villages (nubian, bambara, mandinka); for §B, the fill spot lies within a small tolerance
+  of the waterline for the same three villages, a 'fill' phase sits between the walk down and
+  the walk back with 'fullJar' set only after it, and the phase lasts its configured seconds.
+  Browser (LARGE, both backends — §B's water surface is backend-sensitive and therefore sets
+  the lane for both halves): a picture check of the tap moment measuring the hand's screen
+  position against the rock's silhouette; one of the dip frame measuring the hand jar below
+  the drawn water surface at the carrier's feet; one of the return walk measuring the water
+  disc at the head jar's rim. Screenshots of all three (verification/, subjects declared: the
+  tapping child at its rock; the carrier dipping at the waterline; the carrier walking back
+  with the full jar).
   Quotes:
   Nutzer, 06.09.2026 13:48: »Wenn ein Kind beim Fangspiel an den Felsen tippt und ROCK sagt, berührt seine Hand nicht annähernd den Felsen. Das Kind steht in dem Augenblick noch sehr seit davon entfernt. So erkennt man nicht, dass das Gesprochene etwas mit dem Felsen zu tun hat und man könne eher glauben, dass es "Los!" o. ä. bedeutet.«
-  Nutzer, 06.09.2026 13:48 (Einreihung aller drei Punkte): »An der Kommunikationsmechanik zu überarbeiten, einzureihen direkt nach 1058, in der Rehenfolge, in der ich es hier aufzähle:« — dieser Punkt ist der ZWEITE der drei.
-  Refs: src/scenes/place/bankGame.ts (THE TAP ~626, reachDistance/standOff ~223), src/config/balance.ts (bankGame reachDistance 2.2, standOff 2.6), src/render/gesture.ts (GestureKind), src/scenes/place/PlaceLife.tsx, src/scenes/place/layout.ts (PLAY_ROCK_RADIUS), design.md §13.4, docs/communication-poc-spec.md
-  Doc impact: design.md §13.4 and docs/communication-poc-spec.md item 4: the catcher touches the rock with its hand while naming it. If a new gesture kind is added, the point-479 gesture list in the code comments / docs names it.
+  Nutzer, 06.09.2026 13:48: »Man erkennte das Auffüllen des Kruges mit Wasser nicht als solches. Das liegt an mehreren Problemen: Der Erwachsene geht nicht nah genug an den Fluss, für die Tätigkeit des Auffüllens fehlt eine Darstellung (ich würde erwarten, dass er den Krug in die Hand nimmt und ins Wasser taucht) und wenn er ihn dann gefüllt auf dem Kopf trägt, sieht man darin kein Wasser.«
+  Nutzer, 06.09.2026 13:48 (Einreihung aller drei Punkte): »An der Kommunikationsmechanik zu überarbeiten, einzureihen direkt nach 1058, in der Rehenfolge, in der ich es hier aufzähle:« — §A war der ZWEITE der drei, §B der DRITTE; die vom Nutzer genannte Reihenfolge bleibt innerhalb dieses Punktes erhalten.
+  Nutzer, 07.09.2026 19:25: »Kannst du weitere Zusammenführungen von offenen Punkten zur
+  Kommunikationsmechanik vornehmen, um Regressionsdurchläufe einzusparen?« — daraufhin ist
+  der frühere Punkt 1066 hier als §B eingefaltet worden.
+  Refs: §A — src/scenes/place/bankGame.ts (THE TAP ~626, reachDistance/standOff ~223), src/config/balance.ts (bankGame reachDistance 2.2, standOff 2.6), src/render/gesture.ts (GestureKind), src/scenes/place/layout.ts (PLAY_ROCK_RADIUS). §B — src/scenes/place/adultWork.ts (water-out/water-back ~390-410, AdultCarry, WATER_FOOT_REACH), src/scenes/place/riverBank.ts (bankWaterFoot, BANK_STAND_INSET 1.5, BANK_SHORE_HALF 1.2, walkable region through the waterline ~47-62), src/scenes/place/layout.ts (waterPath head/foot), src/render/figures.ts. Both — src/scenes/place/PlaceLife.tsx (ErrandVillagers, head/hand jar meshes ~2440-2612, HEAD_CARRY_POSE), design.md §13.4, docs/communication-poc-spec.md
+  Doc impact: design.md §13.4 and docs/communication-poc-spec.md item 4: the catcher touches the rock with its hand while naming it, and the water carrier dips the jar at the waterline and carries visible water back. If a new gesture kind is added, the point-479 gesture list in the code comments / docs names it. balance.ts: fill seconds (calibratable).
   Bundle: Dorfleben.
 
 - [ ] 1066. The water carrier visibly fills the jar at the water and carries visible water (user 06.09.2026).
@@ -200,6 +256,141 @@ put it is the mistake this line exists to stop.
   Doc impact: design.md §13.4: the water carrier dips the jar at the waterline and carries visible water back. docs/communication-poc-spec.md: the errand description. balance.ts: fill seconds (calibratable).
   Bundle: Dorfleben.
 
+- [ ] 1072. The village speaks with a direction, and the children sound like children (user
+  07.09.2026, deciding the first two of the six shore-call aspects).
+  Measured 07.09.2026: `src/` holds no `PannerNode`, `createPanner`, `StereoPanner` or
+  `PositionalAudio` at all. `speaking.ts` `phrasePlan` takes a scalar distance and returns a
+  scalar peak, and `ambience.ts` routes every syllable through ONE mono `speechBus`. All
+  village speech therefore arrives dead centre whatever the bearing to the speaker. Every
+  figure in the game also shares one carrier pitch and one interval
+  (`speechPitchHz` 140, `speechPitchInterval` 1.68, a major sixth), so a child and a grown
+  man are acoustically the same voice. That is the hardest case an ear can be given: two
+  voices at a similar distance cannot be separated at all, and the level says nothing.
+  This is why the adults are hushed whenever a child can hear them — separation is
+  impossible today, so overlap has to be PREVENTED instead of heard through. It is also the
+  precondition for letting a call carry further than the hearing radius (point 1073): a
+  louder village without direction is a louder mush.
+  Final state:
+  - Every spoken syllable arrives from the DIRECTION of its speaker: one stereo position per
+    utterance, taken from the bearing camera -> speaker when the utterance is planned. A
+    speaker straight ahead stays centred, the position is bounded so no voice leaves the
+    stage, and a speaker behind the camera keeps a stable side instead of flipping.
+  - The children speak a HIGHER low/high pair than the adults. The two-tone relation itself
+    is untouched — the pair is TRANSPOSED, not re-intervalled — because the exact tonal
+    mirror of low against high carries the whole language (`lexicon.ts`, the UPSTREAM /
+    DOWNSTREAM pair). The adults keep today's pair.
+  - Panning never costs level: an utterance is not quieter for having been panned, and a
+    mono output (device or comfort setting) loses the direction and nothing else.
+  - Both pitch pairs and the stereo width are calibratable fields in `balance.ts`, with the
+    English and German debug labels changed together.
+  - The deployed-graph speech headroom assertion is RE-MEASURED for the new carriers and the
+    added node, and still judges the level that LEAVES the chain rather than the level the
+    plan asked for (point 589, rule 1).
+  Test: Vitest over the plan and the graph — bearing -> stereo position for the
+  straight-ahead, hard-side and behind-the-camera cases, the mono fallback losing direction
+  but not level, and the child carriers lying above the adult ones while the interval is
+  preserved for both. Browser (audio lane, WebGL 2 per the §7.2 routing): two overlapping
+  village voices measured at different stereo positions with the headroom assertion green.
+  Criticality: normal — it changes how the village sounds and unblocks 1073, but nothing the
+  player can already do breaks if it lands late.
+  Quotes:
+  Nutzer, 07.09.2026: »Okay, dann brauchen wir einen StereoPanner. Zudem sollen die Kinder
+  zwei Tonhöhen verwenden, die höher sind als bei den Erwachsenen. Dann klingt es auch mehr
+  nach Kinderstimmen.«
+  Nutzer, 07.09.2026 19:08 (Einreihung aller sechs Aspekte): »Setze alle 6 Punkte so um, wie
+  jetzt in der Karte beschrieben. Fasse dabei sinnvoll Punkte zusammen, sodass nicht alles in
+  einzelnen Tasks steht, von denen jeder für sich einen teuren Regressionstest benötigt.« —
+  dieser Punkt fasst die Aspekte 1 und 2 zusammen, weil beide denselben Audiographen
+  anfassen und dieselbe Headroom-Nachmessung erzwingen.
+  Refs: src/systems/ambience.ts (`speechBus`, `syllableCarrier`, `playSpeech`, the headroom
+  assertion), src/communication/speaking.ts (`phrasePlan`, `hearingGain`),
+  src/communication/lexicon.ts (the direction pair's tonal mirror), src/config/balance.ts
+  (`communication.speechPitchHz`, `speechPitchInterval`), src/i18n/en.ts + src/i18n/de.ts
+  (debug labels), src/systems/ambience.test.ts, design.md §13.4
+  Doc impact: design.md §13.4: village speech carries the speaker's direction, and the
+  children's voices sit above the adults'. balance.ts: both pitch pairs and the stereo width
+  (calibratable).
+  Bundle: Dorfleben.
+
+- [ ] 1073. A call carries to the stand the game photographs it from, and the hush stops
+  eating words (user 07.09.2026, deciding aspects 3, 4 and 5 of the shore-call card).
+  THE DEFECT, measured 07.09.2026. The bank round announces its direction before every run
+  (`bankGame.ts` `announceRun`, gaplessly, because the run waits on `s.direction !== null`),
+  but the announcer is the runner at the START rock while the catcher taps ROCK at the far
+  one. The rocks stand 19.7 m apart (`riverBank.ts`), `hearingRadius` is 10 m, and it is a
+  HARD cut: beyond it no sound, no label and no pointing gesture (`spokenGesture.ts`
+  `speechReach`, `PlaceLife.tsx` `speakBankUtterance`). The sides swap every run, so a
+  spectator at one rock is in earshot at best every second run, and in the middle he stands
+  9.85 m from both at about 4 % level. Worse, the stand the project itself photographs and
+  judges the game from — `bankPlayRocksView`, back by the stretch's length and off its axis
+  — lies 22.0 m from EITHER rock, so from the documented spectator's place the direction
+  call is never audible at all. Evidence: state dump hoa-state-2026-09-07-1186491426
+  (bambara-village) holds two heard words after a whole session, both of them single-tone
+  non-words; RIVER and both direction words are missing. Test gap: `bankGame.test.ts` checks
+  only the alternation and runs with `utteranceGapSeconds` 0 and no distance evaluation at
+  all.
+  THE SECOND HALF, also measured. `t.hushed` is set at three places in `adultWork.ts` (the
+  invitation, and twice for the site word) and is never taken back inside a running task —
+  the only `delete` sits where a fresh initiator task is cast. `assertNoOwedWord` fires
+  `adult-atom-lost` on `!task.owes || task.hushed === true`, so the flag that CAUSES the
+  deferral is exactly the exemption that permits the word to be dropped. Since the shore
+  game (point 687) the children cross the whole village, so "a child can hear" is far more
+  common than the dig-site placement assumed, and the only way out is the 180 s
+  `errandSeconds` backstop (`stallSeconds` 20 s is declared, settable in the debug menu and
+  set in tests, but read nowhere). That is the same defect as the user's report of two
+  adults standing around doing nothing.
+  Final state:
+  - Carrying distance is a property of the UTTERANCE, not of the village. The bank round's
+    CALLS — `moment` `call` (RIVER), `announce` (the direction) and `arrival` (ROCK at the
+    far rock) — carry about 22 m; every other utterance, the catcher's `tap` and the off-game
+    `boulder` included, keeps the 10 m `hearingRadius`. One calibratable field in
+    `balance.ts`, passed through the radius parameter `speaking.ts`, `spokenGesture.ts` and
+    `heard.ts` already accept.
+  - The value is DERIVED, not guessed: it is at least the distance from `bankPlayRocksView`'s
+    stand to either play rock, and the test computes that distance rather than restating it.
+  - Untouched, as the card promises: `hearingRadius` itself, `childrenHear`'s separation
+    budget, the children's-quarter assertion and `invitationClear` — all of which read
+    `hearingRadius` directly and therefore keep their 10 m.
+  - The adults' hush becomes a BOUNDED deferral: `hushed` holds an owed word for at most a
+    calibratable hold, after which the villager speaks anyway or the loss is reported loudly.
+    `assertNoOwedWord` stops taking `hushed === true` as a blanket excuse — a word held past
+    the hold is a defect, not an exemption.
+  - Reception is measured, not assumed: over a full bank round watched from the documented
+    stand, the player hears the RIVER call, both direction announcements and the arrival ROCK.
+    Today that count is zero.
+  Test: Vitest — the reach of each utterance moment, `bankPlayRocksView`'s stand-to-rock
+  distance bounding the call reach, a full bank round evaluated from that stand yielding
+  every call word heard, and a hush held past its hold firing `adult-atom-lost` instead of
+  being excused by it. Browser (communication lane): the direction word's label and pointing
+  gesture present in a frame taken from the documented stand (verification/, subject
+  declared: the announcing child seen from the bank-game spectator stand).
+  Criticality: high — the taught direction word never reaches the player at the very stand
+  the project photographs the game from, and the one assertion that should catch a lost adult
+  word is disarmed by the flag that causes the loss.
+  Quotes:
+  Nutzer, 07.09.2026: »Die Kinder müssen vor jedem Start ihre Richtung ansagen. Ich sehe sie
+  das nur selten machen.«
+  Nutzer, 07.09.2026 19:08: »Setze alle 6 Punkte so um, wie jetzt in der Karte beschrieben.« —
+  dieser Punkt fasst die Aspekte 3, 4 und 5 zusammen: 3 ohne 4 wäre stiller Wortverlust, und
+  5 ist der Beweis von 3.
+  Note: the card justifies the bounded hush by saying the raised reach would otherwise cause
+  silent word loss. Measured, that chain does not hold — `childrenHear` gates on the CHILD's
+  distance to the speaking adult and a separate call-reach field leaves it at 10 m. The hush
+  bound is due anyway, for the reason measured above, and stays bundled here by the user's
+  decision. Recorded 07.09.2026 19:16 and reported to the user in the same turn.
+  Refs: src/scenes/place/bankGame.ts (`BankMoment`, `announceRun`, `say`),
+  src/scenes/place/riverBank.ts (`bankPlayRocksView`, `BANK_PLAY_ROCK_INSET`),
+  src/scenes/place/PlaceLife.tsx (`speakBankUtterance` ~540, `childrenHear` ~2243,
+  `invitationClear` ~2259), src/communication/spokenGesture.ts (`speechReach`),
+  src/communication/speaking.ts, src/communication/heard.ts,
+  src/scenes/place/adultWork.ts (`assertNoOwedWord` ~176, the `hushed` sites ~339/349/352),
+  src/config/balance.ts (`communication.hearingRadius`), src/scenes/place/bankGame.test.ts,
+  design.md §13.4
+  Doc impact: design.md §13.4: a call carries further than ordinary speech, and a held word
+  is spoken or reported rather than dropped. docs/communication-poc-spec.md: the bank round's
+  audibility from the spectator's stand. balance.ts: call reach and hush hold (calibratable).
+  Bundle: Dorfleben.
+
 - [ ] 1056. The adults dig for no visible reason, and the picture never says what comes
   out (user 04.09.2026, watching the merged digging work).
   The user asked what the adults are digging FOR and found no answer in the scene: "Sie
@@ -216,9 +407,19 @@ put it is the mistake this line exists to stop.
   costs the DIG lesson its footing: a word demonstrated on a purposeless act is a word
   the player has no reason to trust.
   Final state:
+  - THE VILLAGE KEEPS TWO EXCAVATIONS, NOT THREE (user 07.09.2026, aspect 6 of the
+    shore-call card). Two carry the distinction completely: `adultWork.ts` asks only for
+    `digSites.length >= 2` before the second dig situation, so the DIG lesson is untouched
+    and the third site is variety, not meaning. Both remaining sites sit as far from the
+    water as their placement rules allow, in the village half turned away from the shore, so
+    the diggers and the shore game share less ground. The field-edge turned ground is the
+    only freely placeable kind and therefore stays; the second is one of the two kinds
+    anchored near the middle (the store pit at a compound, the post hole beside a lane), and
+    the remaining kind is dropped. Nothing of this is visible today — all three render the
+    same round hole — so the removal alone changes no picture.
   - A standing player can tell, without text and without the concept overlay, what each
-    of the three excavations is FOR. Each kind carries its own answer in the scene beside
-    it, and the three no longer read as one repeated hole.
+    of the two excavations is FOR. Each kind carries its own answer in the scene beside
+    it, and the two no longer read as one repeated hole.
   - A finished bout leaves a RESULT, not only a deeper hole: what the pair was digging
     for is there to be seen when they walk away.
   - The turned patch is worked ground, not a pit — its shape says what is done to it.
@@ -229,8 +430,9 @@ put it is the mistake this line exists to stop.
     world, not only that it teaches a word.
   Test: Vitest over the scene description — each dig-site kind carries its own distinct
   furniture, and a completed bout adds the result to the site; Playwright on the polish
-  lane — a village frame in which the three sites are visibly different things, judged on
-  both backends.
+  lane — a village frame in which the two sites are visibly different things, judged on
+  both backends; and a Vitest case pinning that a village lays out exactly two dig sites,
+  both on the side of the settlement away from the water.
   Criticality: high — this is the second time the player has read village work as
   meaningless, and the first time cost the whole communication slice a rebuild.
   Quotes:
@@ -239,6 +441,12 @@ put it is the mistake this line exists to stop.
   aus?«
   Nutzer, 04.09.2026 08:47: »Reihe einen Punkt direkt vor 690 ein, der das sichtbar
   macht.«
+  Nutzer, 07.09.2026 19:08: »Setze alle 6 Punkte so um, wie jetzt in der Karte beschrieben.
+  Fasse dabei sinnvoll Punkte zusammen, sodass nicht alles in einzelnen Tasks steht, von
+  denen jeder für sich einen teuren Regressionstest benötigt. Evtl. Passen manche der 6
+  Aspekte ja auch als Zusatz an noch offene Punkte in der Queue.« — Aspekt 6 (drei
+  Grabungsstellen auf zwei, beide vom Fluss abgewandt) ist hier eingehängt statt als eigener
+  Punkt: dieselben Dateien, derselbe Zweig, derselbe Bildlauf.
   Refs: src/scenes/place/PlaceScene.tsx (`DigSites`), src/scenes/place/digSiteAppearance.ts,
   src/scenes/place/layout.ts (the kind-anchored placement), src/scenes/place/adultWork.ts
   (the durable work record), design.md §7
