@@ -1218,6 +1218,12 @@
       "why": "Nutzer-Entscheidung 07.09.2026 zur Ufer-Karte: die Richtungsansage ist vom definierten Zuschauerstand aus heute nie hörbar",
       "origin": "user",
       "place": "ahead"
+    },
+    "1074": {
+      "at": "2026-09-07T19:47:32.134Z",
+      "why": "Last is right: the footgun has a known, proven workaround (start the run under setsid), so it no longer blocks — and under the infrastructure freeze an infra defect waits unless it reproducibly blocks game work. It is read together with 567 when either is taken.",
+      "origin": "machine",
+      "place": "last"
     }
   },
   "boundary": {
@@ -1250,7 +1256,7 @@
     "why": "The order standing in front of the release today is the arrangement that predates this rule; the four machine-filed points that had ranked themselves there were moved behind 174 first"
   },
   "settled": {
-    "at": "2026-09-07T19:38:31.457Z",
+    "at": "2026-09-07T19:47:32.148Z",
     "points": [
       174,
       184,
@@ -1624,7 +1630,8 @@
       1070,
       1071,
       1072,
-      1073
+      1073,
+      1074
     ]
   }
 }

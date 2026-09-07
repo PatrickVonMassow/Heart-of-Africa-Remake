@@ -372,7 +372,17 @@ export const LIMITS = {
   // Voraussetzung auf" and was FOLDED into it, while two neighbouring entries were compressed to
   // pay for the folding. The measured guide therefore came DOWN: 578 -> 576 lines and
   // 5396 -> 5381 words, no unearned headroom either way.
-  maxLines: 576,
+  // 07.09.2026 (third): the run that DIES with the session that ordered it — a twenty-minute
+  // measurement is a child of the window that started it, and its death reads exactly like a
+  // failure (exit code set, failing list EMPTY, log cut mid-sentence). Measured twice that
+  // evening, it cost point 1070 its verification. No existing entry carries it: the neighbouring
+  // ones are about enforcement contradicting itself, not about a lifetime mismatch, so folding
+  // would have dropped either the detach rule or the abort-is-not-a-red rule. Its own entry
+  // costs +9 lines. Beside it, the exemption-chain half of the same evening (a guard exempt from
+  // a lock while its remedies stay under it) WAS folded into "Die Anweisung hebt ihre eigene
+  // Voraussetzung auf" and the entry was compressed to stay inside its 11-line ceiling: +2 lines.
+  // Ceilings move 576 -> 587 with zero slack.
+  maxLines: 587,
   // EXACT FIT, not headroom — corrected 30.07.2026 after the four-eyes review
   // pointed out that this comment had long stopped describing the numbers. The
   // rule above ("raised only by the measured size of genuinely new tips")
@@ -596,7 +606,9 @@ export const LIMITS = {
   // 5309 -> 5372.
   // 07.09.2026 (second): the folded escape-hatch lesson plus the two compressions came in fifteen
   // words under the old ceiling: 5396 -> 5381.
-  maxWords: 5381,
+  // 07.09.2026 (third): the detached-run pitfall justified beside maxLines measures 99 words and
+  // the folded exemption-chain question 29: 5381 -> 5509.
+  maxWords: 5509,
   // A pitfall entry = the risk lines plus its prompt. Anything longer is a
   // story, not a tip.
   maxEntryLines: 11,
