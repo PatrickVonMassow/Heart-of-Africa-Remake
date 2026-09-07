@@ -1440,7 +1440,7 @@ keinen Träger hat. Gebucht als Punkt 956.
 
 ## Anhang A — Maschinell gepflegte Quellen-Übersicht
 
-Zuletzt aktualisiert: Montag, 07.09.2026, 22:14 · Quellen-Fingerprint: `1a098094e9e1…`
+Zuletzt aktualisiert: Montag, 07.09.2026, 22:27 · Quellen-Fingerprint: `4efc7d3d7cc7…`
 
 Spalten heuristisch aus den Quellen abgeleitet (Anläufe = distinkte Datumsnennungen im Memory;
 Maßnahme = Guard-Skripte mit Namens-Treffer). Die inhaltliche Bewertung gehört der Prosa oben.
@@ -1543,10 +1543,10 @@ Maßnahme = Guard-Skripte mit Namens-Treffer). Die inhaltliche Bewertung gehört
 | A pending batch claim HOLDS THE LAUNCHER BACK — withdraw it whenever the claiming window is left unattended | 2 | mittel | clear-claim-guard.mjs | ✔ Mechanismus |
 | Multi-agent workflows eat the session/weekly limit fast — verify findings INLINE, keep fan-outs small, warn the user with a cost estimate before any big workflow | 3 | mittel | doc-budget-guard.mjs | ✔ Mechanismus |
 
-Erfasste Quellen: 95 Feedback-/Projekt-Memories · 58 Guard-/Hook-Skripte · 6 Revert-/Reapply-Commits · 125 Prozess-/Meta-TASKS-Punkte (davon 59 offen).
+Erfasste Quellen: 95 Feedback-/Projekt-Memories · 58 Guard-/Hook-Skripte · 6 Revert-/Reapply-Commits · 126 Prozess-/Meta-TASKS-Punkte (davon 60 offen).
 
-<!-- RETRO-FINGERPRINT: 1a098094e9e1e994a7efd9c00917094e81c7a992acee67164885ec1e101d79d2 -->
-<!-- RETRO-LAST-REFRESHED: 2026-09-07T20:14:33.757Z -->
+<!-- RETRO-FINGERPRINT: 4efc7d3d7cc745b6de1d9adff26ff64b79e78210036bda19181624c529a78989 -->
+<!-- RETRO-LAST-REFRESHED: 2026-09-07T20:27:32.058Z -->
 <!-- AUTO-GENERATED:END -->
 
 ### 3.111 Ein Erfolg ist kein Beweis für den Weg, auf dem er zustande kam
@@ -5941,3 +5941,33 @@ anfallen und nicht in einer roten Suite.
 der die Regel durchsetzt. Ein von außen gestellter Stempel macht aus einer
 Beruhigung eine Wiederholung — und aus einem Schutz eine Rechnung, die niemand
 liest, weil sie nicht rot leuchtet.
+
+
+### 3.246 Der Prüffall griff aus dem Repository heraus — und ein Memory-Schreiben sperrte die Auslieferung
+
+§3.137a hielt fest, dass ein Prüffall den Zustand des Repositoriums messen kann
+statt den Code. Am 07.09.2026 zeigte sich die Steigerung: ein Prüffall misst eine
+Datei, die gar nicht im Checkout liegt.
+`scripts/cut-account-core.test.mjs` liest die lebende `MEMORY.md` aus dem
+Heimatverzeichnis des Nutzers und verlangt, dass eine Tabelle im Repository deren
+aktuelle Zeilen- und Wortzahl zitiert. Die Tabelle sagte 765 Wörter, der
+Tokenizer las 764 — reproduzierbar in 1,14 s auf ruhiger Maschine.
+
+Der Schaden entsteht erst durch den Aufrufer. Das Pre-Push-Tor fährt die
+Unit-Suite bei jedem Push nach `main`. Damit gilt: Sobald IRGENDEINE Sitzung ein
+Memory schreibt, kommt kein Push mehr durch, bis jemand diese Tabelle von Hand
+nachträgt. An diesem Abend hielt das sechs Commits zurück, und die ehrliche
+Wiederholungsregel des Tores bezahlte die ganze Suite zweimal, bevor sie es
+aussprach. Niemand kann die Verbindung sehen: Das Memory wird in einer anderen
+Datei, an einem anderen Tag, von einer anderen Sitzung geschrieben als der Push,
+den es blockiert.
+
+Bemerkenswert ist die Kombination. Eine environment-abhängige Zusicherung allein
+wäre eine Flake. Eine Zusicherung im Auslieferungspfad allein wäre streng, aber
+richtig. Beides zusammen macht aus einer Buchhaltungsnotiz eine Sperre, die sich
+nach jeder Behebung von selbst wieder scharfstellt — und zwar durch eine
+Handlung, die wir ausdrücklich fördern: das Festhalten einer Lehre.
+
+**Lehre:** Was im Auslieferungspfad hängt, darf nur messen, was mit der
+Auslieferung mitreist. Alles andere macht eine fremde, erwünschte Handlung zur
+Ursache eines Stillstands, den niemand ihr zuordnet.
