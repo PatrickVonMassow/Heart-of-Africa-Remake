@@ -360,7 +360,14 @@ export const LIMITS = {
   // +63 words, so the ceilings move 570 -> 576 and 5311 -> 5372 with zero slack. Not escalated
   // to the user, under his general withdrawal of ask-before-raising of 10.08.2026; this written
   // justification is the last step.
-  maxLines: 576,
+  // RAISED 07.09.2026 by the measured net of ONE genuinely new claim (retrospective §3.241): a
+  // dev assertion carried an EXCEPTION for exactly the flag that the mechanism it guards sets, so
+  // the check that should report the resulting loss was disarmed by the loss's own cause. FOLDED
+  // into "Die Sonde kann ihr Nein nicht erreichen", which already carries the unreachable NO but
+  // read it only off the caller's inputs — the check's own exception clause was the half it
+  // lacked. No neighbouring entry could pay it back without dropping a pinned claim: +2 lines /
+  // +24 words, so the ceilings move 576 -> 578 and 5372 -> 5396 with zero slack.
+  maxLines: 578,
   // EXACT FIT, not headroom — corrected 30.07.2026 after the four-eyes review
   // pointed out that this comment had long stopped describing the numbers. The
   // rule above ("raised only by the measured size of genuinely new tips")
@@ -582,7 +589,7 @@ export const LIMITS = {
   // beside it. Folding says it in two words less than the old wording: 5311 -> 5309.
   // 07.09.2026: the intake-threshold pitfall justified beside maxLines measures 63 words:
   // 5309 -> 5372.
-  maxWords: 5372,
+  maxWords: 5396,
   // A pitfall entry = the risk lines plus its prompt. Anything longer is a
   // story, not a tip.
   maxEntryLines: 11,

@@ -185,7 +185,9 @@ Die Ursache findest du durch **Zerlegen**, nicht durch Wiederholen.
   der einzig mögliche Satz.
   → *Prompt:* „Frag zu jeder Prüfung: **Kann sie mit den Eingaben dieses Aufrufers das negative
   Urteil überhaupt erreichen?** Wo nein, ist ihr Grün eine Tautologie. Und einen Fix an einer
-  gemeinsamen Funktion prüfst du an **allen** Aufrufstellen, nicht nur an der, die dich biss.“
+  gemeinsamen Funktion prüfst du an **allen** Aufrufstellen, nicht nur an der, die dich biss. Und
+  lies ihre **Ausnahmen**: Setzt derselbe Mechanismus, dessen Schaden sie melden soll, das Flag,
+  das sie freistellt, schweigt sie genau dann, wenn es zählt.“
 
 - **Neue Features zerbrechen alte.** Eine Änderung repariert X und bricht das unbeobachtete Y.
   → *Prompt:* „Prüfe jede Mechanik auch im **Danach-Zustand** und erzwing nach jedem
