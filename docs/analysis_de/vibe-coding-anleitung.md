@@ -331,6 +331,12 @@ Die Ursache findest du durch **Zerlegen**, nicht durch Wiederholen.
   → *Prompt:* „Wo ein Teil schreibt, was ein anderes prüft, **importiere** den Wert; der Eingang
   ist **Pflicht**, kein Vorgabewert."
 
+- **Jeder Befund wird zur Arbeit — und die Arbeit findet neue Befunde.** Alles einzureihen ist
+  im ersten Monat richtig und im dritten die Ursache: Die Prüfmechanik findet ihre eigenen
+  Fehler, der Zulauf hat keine Grenze, das Projekt arbeitet an sich selbst.
+  → *Prompt:* „Ein Befund wird nur Arbeitspunkt bei Nutzerwirkung, Risiko, echter Blockade oder
+  Vereinfachung. Sonst in eine gesammelte, **nicht blockierende** Liste."
+
 - **Der Befund stirbt mit dem Gespräch.** Ein echter Fehler fällt nebenbei auf und bleibt im Chat.
   → *Prompt:* „Sichere Befunde mit einem billigen Kommando, das immer schreibt, und einer Prüfung,
   die keinen Zug enden lässt, der untersucht und nichts hinterlassen hat."
@@ -511,11 +517,11 @@ Die Ursache findest du durch **Zerlegen**, nicht durch Wiederholen.
   selbst vorschreibt, seine eigene Voraussetzung?"
 
 - **Der Rückfall rettet die Funktion und setzt still eine Vereinbarung aus.** Fällt der zweite
-  Anbieter aus, verhält sich jedes Werkzeug einzeln korrekt und reicht sauber weiter. Zusammen
-  schieben sie die ganze Last auf den einen Anbieter, von dem du sie ausdrücklich weg verteilt
-  hattest — ohne dass irgendwo eine Entscheidung fiel.
-  → *Prompt:* „Ein Rückfall meldet nicht nur, **dass** er greift, sondern **welche Zusage er dabei
-  aussetzt**. Prüffrage: Welche Vereinbarung bricht er still, während er die Funktion rettet?"
+  Anbieter aus — oder fehlt die Datei, die deine Regel einstellt —, verhält sich jedes Werkzeug
+  einzeln korrekt. Zusammen schieben sie die ganze Last auf den Anbieter, von dem du sie weg
+  verteilt hattest; sichtbar nur an dessen Verbrauchsanzeige.
+  → *Prompt:* „Ein Rückfall meldet, **welche Zusage er aussetzt**. Vergleiche **Regel gegen Ist**,
+  nicht Ist gegen Plausibilität. Prüffrage: Welche Vereinbarung bricht er still?"
 
 - **Die Schranke aus zwei Hälften, von denen nur eine ein Polster bekam.** Eine Prüfung maß am
   selben Bild, wie OFT zwei Beschriftungen ineinander liefen und wie TIEF. Die Häufigkeit durfte
@@ -529,17 +535,6 @@ Die Ursache findest du durch **Zerlegen**, nicht durch Wiederholen.
   Entscheidung aufschreibt, nimmt niemand je wieder heraus.
   → *Prompt:* „Eine Entscheidung, die du selbst triffst, nennt die **Messung**, die sie stützen
   oder widerlegen würde, und **verfällt**, sobald diese Messung sauber vorliegt."
-
-- **Der Rückfallwert verbirgt seine eigene Abwesenheit.** Deine Regel sagt A, die Einstellungsdatei
-  fehlt, das Werkzeug springt still auf seinen Standardwert B — und weil B ein völlig gültiger
-  Zustand ist, gibt es nichts zu finden: kein Rot, kein Widerspruch, keinen Defekt. Bei uns lief so
-  monatelang die gesamte Modell-Last auf einem Anbieter, obwohl die Regel sie teilte; sichtbar war
-  es allein an der Verbrauchsanzeige des Anbieters, die keine Prüfung liest.
-  → *Prompt:* „Für jede Einstellung, die eine geschriebene Regel umsetzt: Vergleiche **Regel gegen
-  Ist**, nicht Ist gegen Plausibilität. Frag ausdrücklich, welchen Wert das Werkzeug **jetzt gerade
-  meldet** und ob eine Datei ihn überhaupt setzt. Und wenn die einzige Wirkung eines Fehlstands
-  **außerhalb** deines Projekts sichtbar wird — eine Rechnung, ein Kontingent, ein fremdes
-  Dashboard —, dann bist **du** der einzige Sensor: sieh regelmäßig selbst nach."
 
 ---
 
@@ -579,4 +574,4 @@ Die Ursache findest du durch **Zerlegen**, nicht durch Wiederholen.
 
 Sie ersetzt die Fallstricke oben nicht.
 
-<!-- GUIDE-FINGERPRINT: da3ec1cf827431195d625c3350aeb6dffeb45b5d6d5a5fcb0701b47594481c64 -->
+<!-- GUIDE-FINGERPRINT: 9646d0b67d0f6fb114d920dd13e1c255b0e7f96b20a0ad1bbd3dca683eb7b9d1 -->

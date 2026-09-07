@@ -77,57 +77,6 @@ then point 633 (the closing run), then point 174 (the tag). A newly appended poi
 kind is MOVED to the front in the same turn that files it; leaving it where append-and-defer
 put it is the mistake this line exists to stop.
 
-- [ ] 1064. The find from the boulder is an inventory item and is given by using it before the chief (user 06.09.2026).
-  The find from the boulder is an INVENTORY ITEM and is handed over by USING it before the
-  chief, not by the use key at his hut. Today the artefact dug up at the upstream erratic
-  (`rockArtefact` 'buried' → 'carried' in `src/state/store.ts`, the dig at ~1911) never shows in
-  the inventory bar (`InventoryBar` in `src/ui/Hud.tsx` lists equipment, forms and treasures
-  only), and the hand-over fires by itself: `nextChiefAction` (`src/scenes/place/chiefMeeting.ts`)
-  answers 'hand-over' to the next SPACE at the chief's hut whenever the find is carried, and
-  `meetChief` (`src/scenes/place/PlaceScene.tsx` ~505) executes it. The player never chooses to
-  give it; the drum message and the hand-over share one key and the game picks. The user
-  reported it 06.09.2026 and asked for the give to be an explicit act on the item.
-  Final state:
-  - The find is an item in the inventory bar from the moment it is dug up until it is given:
-    it appears with its own localized label (en/de together), carries a Ctrl-hold label like
-    every other acting thing (design.md §17.3), and leaves the bar once given. It stays the
-    quest object docs/communication-poc-spec.md describes: outside the pack capacity, not
-    trade stock, never sold.
-  - Handing over is USING the item: the player stands before the chief who is out in the open
-    (`chiefStandingSpot`/`chiefAnchor`, inside a calibratable give reach in
-    `src/config/balance.ts`) and activates the item in the bar (click, exactly as medicine and
-    the shovel act on click, design.md §6). Only then `handArtefactToChief` runs, the chief's
-    two-word answer sounds and stands over his head, and the clay form is put into the
-    traveller's hands as today. Using it anywhere else — no chief outside, or out of reach —
-    gives nothing and says why in one toast (both languages); the item stays.
-  - The use key at the chief's hut no longer hands anything over: `ChiefAction` loses
-    'hand-over'; SPACE at his door brings him out and afterwards sends the drums (or
-    acknowledges, in a village with no message) exactly as before, whether or not the find is
-    carried.
-  - The same rule holds for EVERY later quest find that is brought to a chief: a found thing
-    is an inventory item, and giving it is using that item before him. The clay form the chief
-    gives back already lives in the bar (`carriedForms`); nothing about its map use changes.
-  - Doc: docs/communication-poc-spec.md 'Where the digging happens' (the sentence 'laid in the
-    chief's hands OUTSIDE, with the same use key at his hut'), design.md §6 (inventory bar) and
-    §13.4 state the new act; the journal entry `artefactGiven` still fits.
-  Test: Vitest — `nextChiefAction` never returns 'hand-over' any more (carried find, chief
-  outside, drum village → 'send-message'); the store's give action turns 'carried' into 'given'
-  only with the chief outside and inside reach, and otherwise leaves the state and sets the
-  toast key; the inventory bar renders the find while carried and not when 'given' or 'buried';
-  en and de carry the same new keys. Browser (WebGPU lane): dig the find, enter the village,
-  call the chief out, click the item in the bar and prove the answer label over his head and
-  the item gone; one screenshot with the item in the bar before the give, one with the chief's
-  words after it.
-  Constraints:
-  - No new mechanic beyond the give: no dialog, no drag, no confirmation.
-  - Bundle: Dorfleben.
-  Quotes:
-  Nutzer, 06.09.2026 13:48: »Der Findling, am Felsen flussaufwärts erscheint nicht im Inventar. Dieser muss ein Inventargegenstand werden und wenn man sich vor den Häuptling stellt und ihn benutzt, muss das Übergeben passieren - nicht einfach automatisch beim betätigen von SPACE. Auch das, was man dann später findet und ihm bringt, muss sich so verhalten.«
-  Nutzer, 06.09.2026 13:48 (Einreihung aller drei Punkte): »An der Kommunikationsmechanik zu überarbeiten, einzureihen direkt nach 1058, in der Rehenfolge, in der ich es hier aufzähle:« — dieser Punkt ist der ERSTE der drei.
-  Refs: src/state/store.ts (rockArtefact, handArtefactToChief, carriedForms), src/scenes/place/chiefMeeting.ts, src/scenes/place/PlaceScene.tsx (meetChief), src/ui/Hud.tsx (InventoryBar), src/config/balance.ts, src/i18n/en.ts, src/i18n/de.ts, docs/communication-poc-spec.md, design.md §6 §13.4
-  Doc impact: docs/communication-poc-spec.md 'Where the digging happens': the artefact is laid in the chief's hands by USING the inventory item before him, not by the use key at his hut. design.md §6 (inventory bar): the quest find is listed as an acting item; §13.4: the hand-over sentence. i18n en/de: item label, Ctrl label, refusal toast.
-  Bundle: Dorfleben.
-
 - [ ] 1069. The WSL VM dies in the GPU passthrough driver during browser suites, and nothing
   re-arms the batch without a VS Code session (machine-filed 07.09.2026).
   Measured 07.09.2026: the WSL2 VM rebooted at 12:11 and again at 12:45, each time while a
@@ -12651,6 +12600,18 @@ to land than a mechanism that needs a review.
   an undeclared foreign ref is reported by name rather than silently allowed.
   Criticality: medium-high — it turns every parallel authoring evening into red gates that hide real
   reds among false ones.
+  MEASURED AGAIN 07.09.2026, and this time it BLOCKED the main session for half an hour: three
+  commits on `main` failed the pre-push gate twice with `LIVE REPOSITORY CHANGED WHILE UNIT SUITE
+  RAN: refs changed: refs/heads/feat/1069-wsl-vm-death e3edd33 -> 4506bc7; worktree registrations
+  changed; one or more worktree indexes changed` — GPT-6 Astra committing in
+  `.claude/worktrees/point-1069`, exactly what CLAUDE.md §6 requires of it. Build, lint and audit
+  were green each time. The push only went through once the author's run had finished. Two things
+  the 26.08. reading did not yet show: the collision now meets `push-arrival-guard`, which refuses
+  to let a turn END on unpushed work, so the session was wedged between two rules rather than
+  merely slowed; and load makes the gate spend its one re-run BEFORE the decisive red (99 % CPU
+  across 16 cores, six concurrent vitest runs), so the retry that exists for false reds was already
+  gone when the real refusal came. Raises the criticality: with maximum delegation an author is
+  almost always committing, so `main` is almost never pushable.
   Bundle: Urlaubsfestigkeit.
 
 - [ ] 956. A merge-with-fixes verdict leaves its named fix owed, and nothing tracks it (measured

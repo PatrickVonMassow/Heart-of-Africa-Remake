@@ -7,6 +7,8 @@ import { balance } from '../config/balance'
 import { useGame } from '../state/store'
 import { sampleTerrain, type TerrainType } from '../world/terrain'
 import { setupGeodata } from './geodata'
+import { clearChiefStanding, setChiefStanding } from '../scenes/place/chiefPresence'
+import { placePlayerPosition } from '../scenes/place/playerPosition'
 
 export { useGame }
 
@@ -40,6 +42,9 @@ export function freshGame(seed = TEST_SEED): void {
   balance.foodPerDay = 1
   balance.health.canteenDrainPerDay = 0.9
   balance.health.canteenDesertDrainPerDay = 3.0
+  // Scene furniture is module state and outlives a store reset, so a test that
+  // stood the traveller before the chief cannot leak that pose into the next.
+  leaveTheChief()
 }
 
 /** Terrain type the store sees at a coordinate under the current seed. */
@@ -61,4 +66,25 @@ export const COORD = {
 export function jumpTo(lat: number, lon: number): void {
   if (g().mode === 'place') g().leavePlace()
   g().debugJumpTo(lat, lon)
+}
+
+/**
+ * Put the traveller face to face with the chief who has come out of his hut:
+ * the pose a quest find is given in (design.md §6). The scene normally writes
+ * these two positions every frame; a store test has no scene, so it stands the
+ * pair on the same spot and the give reach is met by construction.
+ *
+ * `distance` steps the traveller away from him, for the refusal case.
+ */
+export function standBeforeChief(distance = 0): void {
+  setChiefStanding(0, 0)
+  placePlayerPosition.x = distance
+  placePlayerPosition.z = 0
+  placePlayerPosition.active = true
+}
+
+/** Nobody stands in the open: the chief is in his hut, or the place is left. */
+export function leaveTheChief(): void {
+  clearChiefStanding()
+  placePlayerPosition.active = false
 }

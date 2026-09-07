@@ -170,3 +170,29 @@ Format: one line per finding — `- YYYY-MM-DD <source> — <finding>`.
   pool is idle") is unreachable as long as existence counts as work. No player impact and no
   blockade: an inconclusive verdict never approves anything, and the doctor says the batch
   continues. The cheap fix is one call, not a new mechanism.
+
+## The give's second evidence frame is aimed by construction, not by rule (measured 07.09.2026)
+
+`150-artefact-chiefs-answer` in `scripts/verify/polish.mjs` steps the camera back seven
+metres and looks at the chief from the traveller's own eye height. On WebGPU that composes
+well — the man is central and his two words stand clear of the HUD. On WebGL 2, in the same
+tree, the shot comes out pitched at the sky: two thirds of the frame is cloud, the hut roof
+fills the rest, and the chief's note is jammed against the bottom edge, half behind the
+inventory bar. The shutter passes it — the subject IS in the picture and both the words and
+the bar are legible — so the proof stands and the suite is green on both backends.
+No player impact: this is an evidence frame, not a thing the player sees. It is the same
+class point 521 already owns (a standpoint chosen by luck rather than by a rule) and is
+recorded here so it is not re-derived, not because it needs its own point.
+
+## Point 1064's cross-vendor review covers only half its files (07.09.2026)
+
+GPT-6 Astra reviewed pass 1/2 of `cd0418380` — `PlaceScene.tsx`, `chiefMeeting.ts`,
+`chiefPresence.ts` — with the verdict `merge` and no defects; the record stands in
+`.claude/mechanism-reviews.jsonl`. Pass 2 was launched after the merge had landed and refused:
+"cd04183 does not diverge from main, so there is no branch range to show". Still owed a
+reviewer are `src/state/store.ts`, `src/ui/Hud.tsx` and `src/world/finds.ts` — the give's
+refusal path, the bar's carried-only rule and the find list. Re-runnable with an explicit
+`--since 107af759566b3c201e91367bd711312924be5ec8 --pass 2` plus those three `--file`s;
+`mechanism-review.mjs --list` shows the debt. Non-blocking: the mechanism gate no longer
+blocks under the infrastructure freeze and the point is landed. Recorded so the range is not
+re-derived — the lesson is to run the review BEFORE the merge takes the branch range away.

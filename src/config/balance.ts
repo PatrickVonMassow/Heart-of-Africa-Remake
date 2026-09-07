@@ -822,6 +822,9 @@ export interface BalanceConfig {
     speechVolume: number
     /** The gap between a speaker's own crown and its note, in settlement units. */
     labelHeadroom: number
+    /** How close the traveller must stand to the chief, in settlement units, for
+     *  the find from the boulder to be laid in his hands. */
+    giveReach: number
   }
 }
 
@@ -1458,6 +1461,12 @@ export const balance: BalanceConfig = {
     // to clear the head, little enough that the note plainly belongs to the
     // figure under it.
     labelHeadroom: 0.25,
+    // Calibratable (CLAUDE.md §2): the find is handed over face to face, so the
+    // reach is an arm's length plus a step — a little over the 1.6 m the chief
+    // stands beside his own door (CHIEF_STAND_OFFSET), and well inside the
+    // hearing radius, so a traveller who can give it is always one who can hear
+    // the answer.
+    giveReach: 2.6,
   },
 }
 

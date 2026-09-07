@@ -4,6 +4,7 @@
 // the debug menu is covered by src/ui/DebugMenu.test.tsx.
 import { describe, it, expect } from 'vitest'
 import { balance, prices, START_MONEY, START_FOOD_DAYS, START_GIFTS } from './balance'
+import { CHIEF_STAND_OFFSET } from '../scenes/place/layout'
 
 describe('comfort & control defaults (user calibration)', () => {
   it('mouse, walk, strafe, ambience and travel speed', () => {
@@ -184,7 +185,13 @@ describe('village speech (design.md §13.4)', () => {
       speechPitchInterval: 1.68,
       speechVolume: 2,
       labelHeadroom: 0.25,
+      giveReach: 2.6,
     })
+    // Handing a find over is face to face: the reach clears the step the chief
+    // stands beside his own door and stays well inside earshot, so a traveller
+    // who can give it always hears the answer.
+    expect(balance.communication.giveReach).toBeGreaterThan(CHIEF_STAND_OFFSET)
+    expect(balance.communication.giveReach).toBeLessThan(balance.communication.hearingRadius)
     // A five-syllable atom stays well under two seconds, so a seven-atom
     // message is heard in one go rather than sat through.
     expect(balance.communication.syllableSeconds * 5).toBeLessThan(2)

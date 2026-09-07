@@ -335,6 +335,58 @@ describe('InventoryBar present-valuable button (design.md §8)', () => {
   })
 })
 
+describe('InventoryBar quest find (design.md §6)', () => {
+  const findButton = () => document.querySelector('[data-find="rockArtefact"]') as HTMLElement | null
+
+  it('is absent while the find still lies buried', () => {
+    expect(g().rockArtefact).toBe('buried')
+    render(<Hud />)
+    expect(findButton()).toBeNull()
+  })
+
+  it('stands in the bar under its own name while it is carried', () => {
+    useGame.setState({ rockArtefact: 'carried' })
+    render(<Hud />)
+    const btn = findButton()
+    expect(btn).toBeTruthy()
+    expect(btn?.textContent).toBe(en.finds.rockArtefact)
+    // It ACTS on a click, like medicine and the shovel — not a passive label.
+    expect(btn?.tagName).toBe('BUTTON')
+    expect(btn?.getAttribute('title')).toBe(en.hud.findTooltip)
+  })
+
+  it('carries its name in the player’s own language', () => {
+    useLocale.getState().setLang('de')
+    useGame.setState({ rockArtefact: 'carried' })
+    render(<Hud />)
+    expect(findButton()?.textContent).toBe(de.finds.rockArtefact)
+    expect(findButton()?.getAttribute('title')).toBe(de.hud.findTooltip)
+  })
+
+  it('leaves the bar once it is given', () => {
+    useGame.setState({ rockArtefact: 'given' })
+    render(<Hud />)
+    expect(findButton()).toBeNull()
+  })
+
+  it('the click IS the hand-over — used where nobody takes it, it says why', () => {
+    useGame.setState({ rockArtefact: 'carried' })
+    render(<Hud />)
+    fireEvent.click(findButton()!)
+    // Out on the map there is no chief to lay it in the hands of: the find
+    // stays and the refusal is a toast in the player's language.
+    expect(g().rockArtefact).toBe('carried')
+    expect(g().toast).toBe(en.toasts.findNeedsChief)
+  })
+
+  it('shows the bar for the find alone, with nothing else carried', () => {
+    useGame.setState({ equipment: {}, rockArtefact: 'carried' })
+    render(<Hud />)
+    expect(document.querySelector('.inventory-bar')).toBeTruthy()
+    expect(findButton()).toBeTruthy()
+  })
+})
+
 describe('HealthBar (design.md §17.1)', () => {
   const fill = () => document.querySelector('.health-bar-fill') as HTMLElement | null
   const hueOf = (el: HTMLElement) => Number(el.getAttribute('data-hue'))

@@ -1436,7 +1436,7 @@ keinen Träger hat. Gebucht als Punkt 956.
 
 ## Anhang A — Maschinell gepflegte Quellen-Übersicht
 
-Zuletzt aktualisiert: Montag, 07.09.2026, 14:48 · Quellen-Fingerprint: `da3ec1cf8274…`
+Zuletzt aktualisiert: Montag, 07.09.2026, 16:33 · Quellen-Fingerprint: `523eab554e6f…`
 
 Spalten heuristisch aus den Quellen abgeleitet (Anläufe = distinkte Datumsnennungen im Memory;
 Maßnahme = Guard-Skripte mit Namens-Treffer). Die inhaltliche Bewertung gehört der Prosa oben.
@@ -1541,8 +1541,8 @@ Maßnahme = Guard-Skripte mit Namens-Treffer). Die inhaltliche Bewertung gehört
 
 Erfasste Quellen: 95 Feedback-/Projekt-Memories · 58 Guard-/Hook-Skripte · 6 Revert-/Reapply-Commits · 125 Prozess-/Meta-TASKS-Punkte (davon 59 offen).
 
-<!-- RETRO-FINGERPRINT: da3ec1cf827431195d625c3350aeb6dffeb45b5d6d5a5fcb0701b47594481c64 -->
-<!-- RETRO-LAST-REFRESHED: 2026-09-07T12:48:26.781Z -->
+<!-- RETRO-FINGERPRINT: 523eab554e6f34b870bbeeb04dd4543ef2bda64640d07485a9da6d145ae7f94d -->
+<!-- RETRO-LAST-REFRESHED: 2026-09-07T14:33:22.654Z -->
 <!-- AUTO-GENERATED:END -->
 
 ### 3.111 Ein Erfolg ist kein Beweis für den Weg, auf dem er zustande kam
@@ -5735,3 +5735,10 @@ diesen Befund lieferte wieder der Nutzer, und wieder war das keine Zufälligkeit
 sondern die Vorhersage: dieselbe Rolle wie in §3.99, §3.134 und §3.229. Wenn die
 einzige Wirkung einer Fehlstellung ein Zahlenstand in einem fremden Dashboard
 ist, dann ist der Nutzer der einzige Sensor, den wir dafür haben.
+
+Nachtrag aus derselben Stunde: Beim Eintragen in die Einsteiger-Anleitung stellte sich
+heraus, dass diese die Klasse längst führt — »Der Rückfall rettet die Funktion und setzt
+still eine Vereinbarung aus«, aufgeschrieben nach genau derselben Lastverschiebung. Der
+neue Fall ist keine neue Klasse, sondern ihre zweite Ausprägung: dort ein *ausgefallener*
+Anbieter, hier eine *fehlende Datei*. Der Eintrag wurde deshalb geschärft statt verdoppelt
+— die Aufnahmeregel schließt Duplikate, sie mechanisiert sie nicht neu.

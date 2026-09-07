@@ -313,7 +313,16 @@ export const DOC_BUDGETS = [
     // said beside the listener and again at the excavation, with both hush
     // points, no solo fallback, tools and lasting ground work. Those are new
     // user decisions of 03.09.2026, not a longer account of the former rule.
-    maxWords: 28110,
+    // RAISED by the 128 measured words of the give (user 06.09.2026): a quest
+    // find dug up on an errand is an INVENTORY ITEM and is handed over by using
+    // it in front of the person it is meant for, never by a use key at a door.
+    // §6 gains what such a find is — in the bar under its own name until it is
+    // given, outside the pack capacity, no trade stock — and §13.4 the act
+    // itself, standing before the chief in the open within the give reach. A
+    // genuinely new decision: the document said the find was laid in his hands
+    // and never said by what act, and the answer is the difference between a
+    // hand-over the player chooses and one the game picks for him.
+    maxWords: 28238,
     // A hundred words across 28k: design.md is edited section by section and a genuine
     // new decision runs 40–215 measured words, so the slack absorbs the rewording that
     // accompanies one and refuses the disappearance of a whole section without a
