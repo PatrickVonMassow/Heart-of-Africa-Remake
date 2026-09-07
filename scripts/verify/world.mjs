@@ -290,10 +290,38 @@ if (section('communication-errand')) {
     )
     if (!atRockOk) errors.push(`the dig at the drawn erratic left the artefact ${atRock.artefact}`)
 
+    // Closing the errand is an ACT ON THE ITEM now (design.md §6): the find is
+    // laid in the chief's hands only while he stands out in the open and the
+    // traveller is within the give reach of him. The act itself — the item in
+    // the bar, the refusal from afar, his answer over his head — is
+    // photographed in polish.mjs (`artefact-give`); what this suite still owns
+    // is that the errand the ERRATIC opened can be closed at all.
+    await page.evaluate(() => {
+      window.__game.getState().enterPlace('bambara-village')
+      window.__game.getState().callChiefOut()
+    })
+    // Stand the traveller on the spot the drawn chief occupies and give it. The
+    // scene publishes his position once per frame, so the first pass only puts
+    // him there and a later one — after a frame has carried it — hands over:
+    // waiting on the CONDITION rather than on a clock.
+    await page
+      .waitForFunction(
+        () => {
+          const figure = window.__placeScene?.getObjectByName('chief')
+          const p = window.__placePlayer
+          if (!figure || !p) return false
+          figure.updateWorldMatrix(true, false)
+          const e = figure.matrixWorld.elements
+          p.x = e[12]
+          p.z = e[14]
+          window.__game.getState().handArtefactToChief()
+          return window.__game.getState().rockArtefact === 'given'
+        },
+        null,
+        { timeout: 40000 },
+      )
+      .catch(() => {})
     const handed = await page.evaluate(() => {
-      const g = window.__game.getState()
-      g.enterPlace('bambara-village')
-      window.__game.getState().handArtefactToChief()
       const s = window.__game.getState()
       return { artefact: s.rockArtefact, keys: s.journal.map((e) => e.text.key), forms: s.carriedForms }
     })
