@@ -1440,7 +1440,7 @@ keinen Träger hat. Gebucht als Punkt 956.
 
 ## Anhang A — Maschinell gepflegte Quellen-Übersicht
 
-Zuletzt aktualisiert: Montag, 07.09.2026, 21:47 · Quellen-Fingerprint: `a55e73cbb56d…`
+Zuletzt aktualisiert: Montag, 07.09.2026, 22:14 · Quellen-Fingerprint: `1a098094e9e1…`
 
 Spalten heuristisch aus den Quellen abgeleitet (Anläufe = distinkte Datumsnennungen im Memory;
 Maßnahme = Guard-Skripte mit Namens-Treffer). Die inhaltliche Bewertung gehört der Prosa oben.
@@ -1545,8 +1545,8 @@ Maßnahme = Guard-Skripte mit Namens-Treffer). Die inhaltliche Bewertung gehört
 
 Erfasste Quellen: 95 Feedback-/Projekt-Memories · 58 Guard-/Hook-Skripte · 6 Revert-/Reapply-Commits · 125 Prozess-/Meta-TASKS-Punkte (davon 59 offen).
 
-<!-- RETRO-FINGERPRINT: a55e73cbb56d23b0f512700dbb06dd6016cfb94f6e5cfe6400fd3b4024ae500a -->
-<!-- RETRO-LAST-REFRESHED: 2026-09-07T19:47:33.020Z -->
+<!-- RETRO-FINGERPRINT: 1a098094e9e1e994a7efd9c00917094e81c7a992acee67164885ec1e101d79d2 -->
+<!-- RETRO-LAST-REFRESHED: 2026-09-07T20:14:33.757Z -->
 <!-- AUTO-GENERATED:END -->
 
 ### 3.111 Ein Erfolg ist kein Beweis für den Weg, auf dem er zustande kam
@@ -5905,3 +5905,39 @@ eine Lehre, die für einen Aufrufer gezogen wird, ist erst dann gezogen, wenn si
 im WERKZEUG steht: Solange sie eine Merkregel für den nächsten Aufrufer bleibt,
 wartet sie nur darauf, an der Stelle wieder zuzuschlagen, an die niemand gedacht
 hat.
+
+
+### 3.245 Die Einmal-pro-Zug-Beruhigung hing an einem Stempel, den der Nutzer selbst verschiebt
+
+Am 07.09.2026 wies der `board-first-guard` in EINEM Zug sechsmal dieselbe
+Mutation ab, obwohl der Fokus jedes Mal unmittelbar vorher bestätigt worden war.
+Die Meldung nannte den Grund selbst: „last stamp 20:00:38, turn began 20:00:54".
+Der Wächter misst die Frische des Fokus gegen `turnStartedAt`
+(board-first-core.mjs:365) und hält seine eigene Einmal-pro-Zug-Beruhigung an
+derselben Zahl fest (Zeile 362). Geschrieben wird dieser Stempel vom
+UserPromptSubmit-Hook — also von JEDER Nutzernachricht, auch von einer, die
+mitten in einen laufenden Zug eingeworfen wird. Jede Zwischenfrage setzte damit
+beides zurück: die Frische des schon erklärten Fokus und die Beruhigung, die
+genau dafür da ist, dass ein Wächter nicht zweimal dasselbe verlangt.
+
+Der Schaden ist nicht die Verzögerung, sondern der Verbrauch. Jede Ablehnung
+kostet einen vollen Werkzeug-Umlauf, und ein Umlauf trägt bei uns rund 100k
+Cache-Read (gemessen am selben Tag: 28,4 Mio. Cache-Read auf 262 Nachrichten der
+Opus-Bahn). Sechs Ablehnungen sind grob 0,6 Mio. Cache-Read, für null zusätzliche
+Sicherheit — geprüft wurde jedes Mal ein Fokus, der schon stand. Und der Effekt
+skaliert mit der Gesprächigkeit des Nutzers: Je mehr er mitdenkt und
+zwischenfragt, desto teurer wird die Regel, die ihn schützen soll.
+
+Die Klasse ist allgemeiner als dieser eine Wächter. Eine Beruhigung, die „einmal
+pro Zug" verspricht, braucht einen Zugbegriff, den der Zug selbst besitzt. Wir
+haben sie an eine Uhr gehängt, die eine ANDERE Partei stellt — und damit an ein
+Ereignis, das der Wächter weder kontrolliert noch vorhersieht. §3.1 hat für den
+Batch längst entschieden, dass eine Nutzernachricht ein Interrupt ist und keine
+Blockade; hier wirkt dieselbe Nachricht wieder als Rücksetzung, nur eine Ebene
+tiefer und ohne dass es jemandem auffiel, weil die Kosten in Cache-Read
+anfallen und nicht in einer roten Suite.
+
+**Lehre:** Wenn eine Regel „einmal pro X" sagt, muss X von dem gemessen werden,
+der die Regel durchsetzt. Ein von außen gestellter Stempel macht aus einer
+Beruhigung eine Wiederholung — und aus einem Schutz eine Rechnung, die niemand
+liest, weil sie nicht rot leuchtet.
