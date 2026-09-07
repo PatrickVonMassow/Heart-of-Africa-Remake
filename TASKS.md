@@ -150,7 +150,7 @@ put it is the mistake this line exists to stop.
   Refs: memory `vscode-restart-kills-the-container` (WSL VM reboot forensics section),
   docs/batch-autonomy.md (launcher layer), .devcontainer/devcontainer.json (runArgs,
   postStartCommand), scripts/batch-launcher.mjs.
-  Bundle: none — host-side infrastructure, runs alone.
+  Bundle: Urlaubsfestigkeit — host-side infrastructure, runs alone.
 
 - [ ] 1065. The tapping child's hand touches the rock it names (user 06.09.2026).
   The child that names the rock TOUCHES it. Today the tap of the children's bank game
