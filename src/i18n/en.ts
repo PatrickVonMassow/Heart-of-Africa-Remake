@@ -391,7 +391,7 @@ export const en: Strings = {
       'The chief steps out of his hut and crosses to his drummer — through the drums he will speak with me in his own mysterious way.',
     chiefCalledBack: 'The chief turns back toward his drummer.',
     chiefNoMessage: 'The chief looks me over and nods. He has nothing to send out over the village.',
-    findNeedsChief: 'There is nobody here to take it. It belongs in the chief’s own hands, out in the open before his hut.',
+    findNeedsChief: 'There is nobody here to take it. It belongs in the chief’s own hands, wherever he stands out in the open.',
     journalDndOn: 'Journal interruptions off — entries appear silently.',
     journalDndOff: 'Journal interruptions on — new entries open the journal.',
     graphicsLevel: {
