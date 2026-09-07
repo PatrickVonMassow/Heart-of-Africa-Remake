@@ -123,11 +123,11 @@ put it is the mistake this line exists to stop.
   water carrier halts 2.7 m up the bank while his jar changes from empty to full with nothing
   shown in between. Both are proven by the same kind of evidence — a frame in which a hand
   meets a drawn surface — in the same scene, over the same figure and gesture code. Kept
-  apart they would buy two picture runs for one verdict; §A and §B below are the two former
+  apart they would buy two picture runs for one verdict; PART A and PART B below are the two former
   points, unchanged in substance, and either half may be cut back out if the branch does not
   converge.
 
-  §A — THE TAPPING CHILD'S HAND TOUCHES THE ROCK IT NAMES.
+  PART A — THE TAPPING CHILD'S HAND TOUCHES THE ROCK IT NAMES.
   The child that names the rock TOUCHES it. Today the tap of the children's bank game
   (`bankGame.ts` ~626, spec item 4) is spoken from the catcher's waiting station — `standOff`
   2.6 m off the rock's centre (`src/config/balance.ts`), the play rock itself ~1.2 m in radius
@@ -154,7 +154,7 @@ put it is the mistake this line exists to stop.
     docs/communication-poc-spec.md item 4 likewise; the Ctrl-hold label and the speech label
     are unchanged.
 
-  §B — THE WATER CARRIER VISIBLY FILLS THE JAR AT THE WATER AND CARRIES VISIBLE WATER.
+  PART B — THE WATER CARRIER VISIBLY FILLS THE JAR AT THE WATER AND CARRIES VISIBLE WATER.
   The filling of the jar READS as filling. Today the RIVER errand sends an adult with an
   empty jar to the foot of the water path and back with a full one, and nothing in between is
   shown: the foot (`bankWaterFoot`, `riverBank.ts`) stands `BANK_STAND_INSET` 1.5 m inside the
@@ -185,14 +185,14 @@ put it is the mistake this line exists to stop.
   - Doc: design.md §13.4 ('the adults' water and digging work') states the dip at the
     waterline; docs/communication-poc-spec.md likewise where it describes the errand.
 
-  Test (ONE run for both halves — this is why they are one point). Vitest: for §A, the tap
+  Test (ONE run for both halves — this is why they are one point). Vitest: for PART A, the tap
   utterance is offered only once the speaker's hand point lies within a small tolerance of
   the rock surface and never from the station, the held pose lasts the tap interval, and the
   hand target lies on the drawn rock's surface for both play rocks of the three river
-  villages (nubian, bambara, mandinka); for §B, the fill spot lies within a small tolerance
+  villages (nubian, bambara, mandinka); for PART B, the fill spot lies within a small tolerance
   of the waterline for the same three villages, a 'fill' phase sits between the walk down and
   the walk back with 'fullJar' set only after it, and the phase lasts its configured seconds.
-  Browser (LARGE, both backends — §B's water surface is backend-sensitive and therefore sets
+  Browser (LARGE, both backends — PART B's water surface is backend-sensitive and therefore sets
   the lane for both halves): a picture check of the tap moment measuring the hand's screen
   position against the rock's silhouette; one of the dip frame measuring the hand jar below
   the drawn water surface at the carrier's feet; one of the return walk measuring the water
@@ -202,11 +202,11 @@ put it is the mistake this line exists to stop.
   Quotes:
   Nutzer, 06.09.2026 13:48: »Wenn ein Kind beim Fangspiel an den Felsen tippt und ROCK sagt, berührt seine Hand nicht annähernd den Felsen. Das Kind steht in dem Augenblick noch sehr seit davon entfernt. So erkennt man nicht, dass das Gesprochene etwas mit dem Felsen zu tun hat und man könne eher glauben, dass es "Los!" o. ä. bedeutet.«
   Nutzer, 06.09.2026 13:48: »Man erkennte das Auffüllen des Kruges mit Wasser nicht als solches. Das liegt an mehreren Problemen: Der Erwachsene geht nicht nah genug an den Fluss, für die Tätigkeit des Auffüllens fehlt eine Darstellung (ich würde erwarten, dass er den Krug in die Hand nimmt und ins Wasser taucht) und wenn er ihn dann gefüllt auf dem Kopf trägt, sieht man darin kein Wasser.«
-  Nutzer, 06.09.2026 13:48 (Einreihung aller drei Punkte): »An der Kommunikationsmechanik zu überarbeiten, einzureihen direkt nach 1058, in der Rehenfolge, in der ich es hier aufzähle:« — §A war der ZWEITE der drei, §B der DRITTE; die vom Nutzer genannte Reihenfolge bleibt innerhalb dieses Punktes erhalten.
+  Nutzer, 06.09.2026 13:48 (Einreihung aller drei Punkte): »An der Kommunikationsmechanik zu überarbeiten, einzureihen direkt nach 1058, in der Rehenfolge, in der ich es hier aufzähle:« — PART A war der ZWEITE der drei, PART B der DRITTE; die vom Nutzer genannte Reihenfolge bleibt innerhalb dieses Punktes erhalten.
   Nutzer, 07.09.2026 19:25: »Kannst du weitere Zusammenführungen von offenen Punkten zur
   Kommunikationsmechanik vornehmen, um Regressionsdurchläufe einzusparen?« — daraufhin ist
-  der frühere Punkt 1066 hier als §B eingefaltet worden.
-  Refs: §A — src/scenes/place/bankGame.ts (THE TAP ~626, reachDistance/standOff ~223), src/config/balance.ts (bankGame reachDistance 2.2, standOff 2.6), src/render/gesture.ts (GestureKind), src/scenes/place/layout.ts (PLAY_ROCK_RADIUS). §B — src/scenes/place/adultWork.ts (water-out/water-back ~390-410, AdultCarry, WATER_FOOT_REACH), src/scenes/place/riverBank.ts (bankWaterFoot, BANK_STAND_INSET 1.5, BANK_SHORE_HALF 1.2, walkable region through the waterline ~47-62), src/scenes/place/layout.ts (waterPath head/foot), src/render/figures.ts. Both — src/scenes/place/PlaceLife.tsx (ErrandVillagers, head/hand jar meshes ~2440-2612, HEAD_CARRY_POSE), design.md §13.4, docs/communication-poc-spec.md
+  der frühere Punkt 1066 hier als PART B eingefaltet worden.
+  Refs: PART A — src/scenes/place/bankGame.ts (THE TAP ~626, reachDistance/standOff ~223), src/config/balance.ts (bankGame reachDistance 2.2, standOff 2.6), src/render/gesture.ts (GestureKind), src/scenes/place/layout.ts (PLAY_ROCK_RADIUS). PART B — src/scenes/place/adultWork.ts (water-out/water-back ~390-410, AdultCarry, WATER_FOOT_REACH), src/scenes/place/riverBank.ts (bankWaterFoot, BANK_STAND_INSET 1.5, BANK_SHORE_HALF 1.2, walkable region through the waterline ~47-62), src/scenes/place/layout.ts (waterPath head/foot), src/render/figures.ts. Both — src/scenes/place/PlaceLife.tsx (ErrandVillagers, head/hand jar meshes ~2440-2612, HEAD_CARRY_POSE), design.md §13.4, docs/communication-poc-spec.md
   Doc impact: design.md §13.4 and docs/communication-poc-spec.md item 4: the catcher touches the rock with its hand while naming it, and the water carrier dips the jar at the waterline and carries visible water back. If a new gesture kind is added, the point-479 gesture list in the code comments / docs names it. balance.ts: fill seconds (calibratable).
   Bundle: Dorfleben.
 
@@ -350,15 +350,15 @@ put it is the mistake this line exists to stop.
   1057 folded in here 07.09.2026 on the user's instruction to bundle points that would
   otherwise each buy their own regression run).
   ONE OBJECT, TWO COMPLAINTS FROM THE SAME MORNING. The dig site says nothing about its
-  purpose (§A) and its earth behaves like nothing at all (§B). Both are judged by the same
+  purpose (PART A) and its earth behaves like nothing at all (PART B). Both are judged by the same
   evidence — a village frame holding the excavations, on both backends — and both edit the
   dig-site meshes, `layout.ts`, `adultWork.ts` and the place scene's actor heights, which is
   why the bundle already forbids working them beside each other. Landed apart, the second
-  would re-photograph the ground the first had just rebuilt, and §A's left-behind RESULT and
-  §B's raised earth occupy the very same patch. §A and §B are the two former points,
+  would re-photograph the ground the first had just rebuilt, and PART A's left-behind RESULT and
+  PART B's raised earth occupy the very same patch. PART A and PART B are the two former points,
   unchanged in substance; either half may be cut back out if the branch does not converge.
 
-  §A — THE ADULTS DIG FOR NO VISIBLE REASON, AND THE PICTURE NEVER SAYS WHAT COMES OUT.
+  PART A — THE ADULTS DIG FOR NO VISIBLE REASON, AND THE PICTURE NEVER SAYS WHAT COMES OUT.
   The user asked what the adults are digging FOR and found no answer in the scene: "Sie
   scheinen zum Selbstzweck zu graben. Was graben sie aus?" The reason exists in the code
   and nowhere else. Every site is placed as a KIND with a real purpose — a store pit
@@ -394,7 +394,7 @@ put it is the mistake this line exists to stop.
     lands on the excavation itself.
   - Design and code agree afterwards: `design.md` §7 states what the digging is for in the
     world, not only that it teaches a word.
-  §B — THE SPOIL HEAP BURIES THE DIGGERS, AND EVERYONE ELSE WALKS STRAIGHT THROUGH IT.
+  PART B — THE SPOIL HEAP BURIES THE DIGGERS, AND EVERYONE ELSE WALKS STRAIGHT THROUGH IT.
   Three causes, each read off the shipped code:
   - The heap's SIDE is fixed. It sits at a constant local offset in a group rotated by an
     angle derived from the site's own coordinates, so it grows where it grows no matter who
@@ -423,17 +423,17 @@ put it is the mistake this line exists to stop.
   - Nothing in a settlement becomes impassable through this point — no new collider, and no
     figure can be wedged by the earth.
 
-  Test (ONE picture run for both halves — this is why they are one point). Vitest: for §A,
+  Test (ONE picture run for both halves — this is why they are one point). Vitest: for PART A,
   each dig-site kind carries its own distinct furniture, a completed bout adds the result to
   the site, and a village lays out exactly two dig sites, both on the side of the settlement
-  away from the water; for §B, the ground-height source and the standing-place choice — a
+  away from the water; for PART B, the ground-height source and the standing-place choice — a
   pair never takes a place inside the heap's footprint, and the height is zero everywhere no
   excavation reaches. Browser (polish lane, both backends): one village frame in which the
   two sites are visibly different things AND a figure is carried over the raised earth;
   screenshots of it (verification/, subject declared: the two excavations with a villager
   walking over the spoil).
-  Criticality: high — §A is the second time the player has read village work as meaningless,
-  and the first time cost the whole communication slice a rebuild; §B's defect is visible in
+  Criticality: high — PART A is the second time the player has read village work as meaningless,
+  and the first time cost the whole communication slice a rebuild; PART B's defect is visible in
   the very picture the player is meant to learn from, and its remedy touches every actor's
   height in a place, which is the error-prone half.
   Quotes:
@@ -458,7 +458,7 @@ put it is the mistake this line exists to stop.
   Haufen ausweichen zu lassen — als neuen Punkt um und reihe ihn direkt vor 690 ein.«
   Nutzer, 07.09.2026 19:25: »Kannst du weitere Zusammenführungen von offenen Punkten zur
   Kommunikationsmechanik vornehmen, um Regressionsdurchläufe einzusparen?« — daraufhin ist
-  der frühere Punkt 1057 hier als §B eingefaltet worden.
+  der frühere Punkt 1057 hier als PART B eingefaltet worden.
   Refs: src/scenes/place/PlaceScene.tsx (`DigSites`, the player mesh's fixed Y),
   src/scenes/place/digSiteAppearance.ts, src/scenes/place/layout.ts (the kind-anchored
   placement, the collider set), src/scenes/place/adultWork.ts (the durable work record,
@@ -488,7 +488,7 @@ put it is the mistake this line exists to stop.
   The classic game of tag survives — in the PORT CITIES and in any village without
   a bank, and it is silent wherever it runs.
 
-  §A — THE CLASSIC GAME OF TAG MOVES TO THE PORT CITIES, AND IS SILENT THERE.
+  PART A — THE CLASSIC GAME OF TAG MOVES TO THE PORT CITIES, AND IS SILENT THERE.
   Final state:
 
   1. The round that exists today — one child is IT, the group flees, the child that
@@ -507,7 +507,7 @@ put it is the mistake this line exists to stop.
      derived like the village one and clearing that settlement's own vignettes by
      the hearing radius.
 
-  §B — EVERY DOCUMENT DESCRIBES THE REBUILT COMMUNICATION MECHANIC, NOT THE OLD ONE (former
+  PART B — EVERY DOCUMENT DESCRIBES THE REBUILT COMMUNICATION MECHANIC, NOT THE OLD ONE (former
   point 692, folded in here 07.09.2026 on the user's instruction to bundle points that would
   otherwise each buy their own regression run).
   This is the documentation half of the rebuild, and it belongs on the LAST build point of
@@ -532,10 +532,10 @@ put it is the mistake this line exists to stop.
   is worse than either state alone — so this half lands WITH the rest of this point, never
   after it.
 
-  Test: Vitest over the three settlement cases of §A.3 — each stages exactly one
+  Test: Vitest over the three settlement cases of PART A, item 3 — each stages exactly one
   game, the bank game only where a bank exists, and the tag game speaks nothing.
   The existing children-motion gate keeps running against this game wherever it is
-  staged. For §B there is no browser lane: a documentation sweep is proven by the
+  staged. For PART B there is no browser lane: a documentation sweep is proven by the
   documents themselves, and it rides this point's landing rather than buying its own.
   Constraints:
   - Depends on the children's bank game only in so far as the two must not both
@@ -6415,9 +6415,9 @@ Build order, chosen so no two parallel agents own the same file:
   still ON THE GROUND (took off too late) — an airborne bird is safe from ground
   hunters. So the existing bird fauna (the shore/scavenger birds, the plover, vultures,
   etc.) needs the ground↔air state and a takeoff-on-flee transition.
-  (B) AERIAL PREDATORS (research settled — docs/fauna-behaviour-1890.md §B): add
+  (B) AERIAL PREDATORS (research settled — docs/fauna-behaviour-1890.md PART B): add
   region-appropriate FLYING predators (raptors) that hunt prey birds and catch them IN
-  THE AIR, per the researched per-region table (§B2.1): falcons (peregrine/lanner/
+  THE AIR, per the researched per-region table (PART B2.1): falcons (peregrine/lanner/
   barbary) and the two hawk-eagles (African, Ayres's) attack by a STOOP/DESCEND, while
   the accipiter/harrier/fish-eagle majority use an air-catch tail-chase or an ambush
   from cover (no height). The stoop is BUILT — but as a SCRIPTED "descend-and-strike"
@@ -6431,14 +6431,14 @@ Build order, chosen so no two parallel agents own the same file:
   and a surprise-from-above are realistic, and whether "a ground predator only gets a
   bird caught on the ground" matches real behaviour. Produce a cited per-region aerial-
   predator + prey-bird table with the same PERIOD/INFERRED/MYTH markers, and a short
-  "Implementation brief" (§B4 — already delivered; the research half is DONE). BUILD
+  "Implementation brief" (PART B4 — already delivered; the research half is DONE). BUILD
   (after the wildlife cluster is free): the bird ground/air state machine +
   takeoff-on-flee (pure flee helpers in `src/scenes/travel/wildlifeBehavior.ts`, wired
   in `src/scenes/travel/Wildlife.tsx`) — with the researched fly/no-fly split (small
   birds and flamingos fly to escape, the flamingo with a laborious running take-off as
   a vulnerable window; plover CHICKS crouch/freeze and can be caught, the adult flies
   and does the broken-wing distraction); the aerial-predator species (build in
-  `src/render/fauna.ts`, seeded from a new region-keyed aerial-predator pool per §B2.1)
+  `src/render/fauna.ts`, seeded from a new region-keyed aerial-predator pool per PART B2.1)
   with an air-catch tail-chase for the ambush guild and the SCRIPTED descend-and-strike
   for the falcon/hawk-eagle guild; ground predators lose the airborne target. Reuse the
   existing hunt/flee/carcass machinery; every started drama resolves (I4). All
@@ -6457,7 +6457,7 @@ Build order, chosen so no two parallel agents own the same file:
   THE RESEARCH GATE IS DELIVERED FOR BOTH HALVES (carried 20.08.2026 from the 10.08.2026
   four-eyes work-order analysis, not a fresh finding). The point records it for (B), but its
   opening clause still gates (A) on a Fable pass as well — and `docs/fauna-behaviour-1890.md`
-  §B1 answers (A) too: which prey birds fly off, the flamingo's laborious running take-off
+  PART B1 answers (A) too: which prey birds fly off, the flamingo's laborious running take-off
   as the vulnerable window, the plover chick that crouches while the adult flies, and
   whether "a ground predator only gets a bird caught on the ground" matches real behaviour.
   So no research is owed at all; only the build waits for the wildlife cluster to be free.
