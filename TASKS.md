@@ -180,10 +180,53 @@ put it is the mistake this line exists to stop.
     full one a water surface at the rim (a bright disc with the water's tint, readable at
     the distance the player watches from) — so head-carried and hand-carried jars read as
     full and empty at a glance, on both backends.
-  - The word RIVER still falls at the head of the path, aimed at the water, gated by a
-    hearing child exactly as today; nothing about who is cast or when changes.
+  - THE ERRAND IS A DISPATCH, NOT A COMMENTARY (user 07.09.2026, replacing this part's
+    earlier sentence that nothing about who is cast or when changes). Today the inhabitant
+    narrates his own act, which reads as staged for the player; DIG works because one man's
+    word sends another. RIVER now does the same:
+    - ONE ROUND TRIP, NOT TWO CASTINGS. `water-out` and `water-back` stop being independently
+      cast situations (`adultWork.ts` ~390-412) and become legs of a single errand held by one
+      carrier. Both ids survive as leg labels, so the lexicon bookkeeping and the staged
+      counters are unchanged.
+    - THE WORD IS THE ORDER. At the village water stand an adult A turns to a free adult B,
+      says RIVER and points at the water; B takes the empty jar and goes.
+    - BOTH UTTERANCES FALL INSIDE THE VILLAGE, at the stand, no longer at the water path head
+      (`WATER_PATH_HEAD_RADIUS` 15, `layout.ts` ~222) — which also keeps the errand's speech
+      clear of the children's bank game.
+    - NO WORD FALLS AT THE WATER: the fill is silent and is the act this part already
+      specifies.
+    - THE RETURN HAS A DESTINATION. B walks back to the stand, sets the jar down (carry →
+      none) and says RIVER a second time, addressed to A, who is still standing there.
+    - THE STAND IS DRAWN: a water stand beside the existing `VILLAGE_FIRE` anchor
+      (`layout.ts` ~247), which already has a collider and is the plausible consumer. It holds
+      up to three standing jars; a fourth delivery replaces the oldest, so no consumer logic
+      is needed. Capacity calibratable in `balance.ts`.
+    - TWO ADULTS, NOT THREE. Water fetching gains no pair mechanics — no partner, no
+      `invitationClear` for a second adult; those stay with DIG, where two people are
+      materially required. The escort half of the user's first framing was withdrawn by his
+      own later message; what it was for (keeping the speech away from the shore) is
+      delivered by moving both utterances into the village.
+    - DELETED with the second casting: `WATER_FOOT_REACH` (`adultWork.ts` ~119) and its
+      `nearestFree` caller.
+    - THE WATER WORD IS GATED BY A HEARING CHILD exactly as the two DIG utterances are; today
+      only the DIG branches carry that check (`adultWork.ts` ~328-333).
+    - THE RULE THE DEFECT VIOLATED, written into the spec: NO VILLAGER SPEAKS TO NOBODY.
+      Every utterance has an addressee who reacts and a consequence the player sees; the
+      teaching comes from the act that follows the word, never from a word spoken beside an
+      act.
+    - THE WATER READING IS ACCEPTED, NOT CLOSED. A player may read the second RIVER as WATER;
+      the chief's message carries just as well as WATER · UPSTREAM · ROCK · DIG. Written down
+      beside the three readings ROCK deliberately closes.
+    The measured defect behind this (07.09.2026): the full jar comes from nowhere
+    (`water-back` sets `fullJar` at cast time), the same man goes down and comes up (the
+    nearest free adult within 4 m of the water foot is in practice the one who just
+    finished), and the return's goal is the path head at radius 15, where the task is nulled
+    and the full jar vanishes in the same frame. The code follows
+    docs/communication-poc-spec.md:115 literally — a gap in the SPEC, not an implementation
+    defect against it.
   - Doc: design.md §13.4 ('the adults' water and digging work') states the dip at the
-    waterline; docs/communication-poc-spec.md likewise where it describes the errand.
+    waterline AND the dispatch; docs/communication-poc-spec.md likewise where it describes
+    the errand, plus the no-villager-speaks-to-nobody rule and the accepted WATER reading.
 
   Test (ONE run for both halves — this is why they are one point). Vitest: for PART A, the tap
   utterance is offered only once the speaker's hand point lies within a small tolerance of
@@ -191,14 +234,17 @@ put it is the mistake this line exists to stop.
   hand target lies on the drawn rock's surface for both play rocks of the three river
   villages (nubian, bambara, mandinka); for PART B, the fill spot lies within a small tolerance
   of the waterline for the same three villages, a 'fill' phase sits between the walk down and
-  the walk back with 'fullJar' set only after it, and the phase lasts its configured seconds.
+  the walk back with 'fullJar' set only after it, and the phase lasts its configured seconds;
+  and for the dispatch, 'fullJar' only inside ONE continuous errand record, every water
+  utterance naming an addressee villager index, the return leg's goal being the stand rather
+  than the path head, and the stand holding at most three jars.
   Browser (LARGE, both backends — PART B's water surface is backend-sensitive and therefore sets
   the lane for both halves): a picture check of the tap moment measuring the hand's screen
   position against the rock's silhouette; one of the dip frame measuring the hand jar below
   the drawn water surface at the carrier's feet; one of the return walk measuring the water
-  disc at the head jar's rim. Screenshots of all three (verification/, subjects declared: the
-  tapping child at its rock; the carrier dipping at the waterline; the carrier walking back
-  with the full jar).
+  disc at the head jar's rim. Screenshots of all four (verification/, subjects declared: the
+  tapping child at its rock; the sending adult and the departing carrier at the village water
+  stand; the carrier dipping at the waterline; the carrier walking back with the full jar).
   Quotes:
   Nutzer, 06.09.2026 13:48: »Wenn ein Kind beim Fangspiel an den Felsen tippt und ROCK sagt, berührt seine Hand nicht annähernd den Felsen. Das Kind steht in dem Augenblick noch sehr seit davon entfernt. So erkennt man nicht, dass das Gesprochene etwas mit dem Felsen zu tun hat und man könne eher glauben, dass es "Los!" o. ä. bedeutet.«
   Nutzer, 06.09.2026 13:48: »Man erkennte das Auffüllen des Kruges mit Wasser nicht als solches. Das liegt an mehreren Problemen: Der Erwachsene geht nicht nah genug an den Fluss, für die Tätigkeit des Auffüllens fehlt eine Darstellung (ich würde erwarten, dass er den Krug in die Hand nimmt und ins Wasser taucht) und wenn er ihn dann gefüllt auf dem Kopf trägt, sieht man darin kein Wasser.«
@@ -206,6 +252,21 @@ put it is the mistake this line exists to stop.
   Nutzer, 07.09.2026 19:25: »Kannst du weitere Zusammenführungen von offenen Punkten zur
   Kommunikationsmechanik vornehmen, um Regressionsdurchläufe einzusparen?« — daraufhin ist
   der frühere Punkt 1066 hier als PART B eingefaltet worden.
+  Nutzer, 07.09.2026: »Der Einwohner kommentiert seine Handlungen. Das ist nicht organisch,
+  sondern offensichtlich nur dafür da, dem Spieler das Wort RIVER zu vermitteln. Bei DIG ist
+  das besser, weil ein Einwohner durch Benutzung des Wortes einen anderen dazu auffordert,
+  mitzukommen, um ihm beim Graben zu helfen.«
+  Nutzer, 07.09.2026: »Wasserholen soll eine Kombination aus Entsendung und Einholung einer
+  Begleitung sein. Beides soll möglichst weit weg vom Fluss passieren.« — die Begleitung hat
+  der Nutzer im selben Zug wieder zurückgenommen: »Insgesamt sind es mir mit 3 beteiligten
+  Erwachsenen beim Wasserholen jetzt doch zu viele.«
+  Nutzer, 07.09.2026: »Aber das wäre gar nicht schlimm, weil die Häuptlingsbotschaft WATER
+  UPSTREAM ROCK DIG genauso gut funktionieren würde wie mit RIVER. Insofern ist es okay, dann
+  nochmal RIVER zu sagen.«
+  Nutzer, 07.09.2026: »Reihe das alles so ein. Fasse dabei sinnvoll zusammen und/oder hänge
+  einzelne Aspekte an bereits bestehende Tasks, um Regressionsläufe einzusparen.« — deshalb
+  steht die Entsendung hier statt als eigener Punkt: PART B öffnet ohnehin adultWork.ts, den
+  Wasserpfad, die Krug-Meshes und denselben LARGE-Bildlauf.
   Refs: PART A — src/scenes/place/bankGame.ts (THE TAP ~626, reachDistance/standOff ~223), src/config/balance.ts (bankGame reachDistance 2.2, standOff 2.6), src/render/gesture.ts (GestureKind), src/scenes/place/layout.ts (PLAY_ROCK_RADIUS). PART B — src/scenes/place/adultWork.ts (water-out/water-back ~390-410, AdultCarry, WATER_FOOT_REACH), src/scenes/place/riverBank.ts (bankWaterFoot, BANK_STAND_INSET 1.5, BANK_SHORE_HALF 1.2, walkable region through the waterline ~47-62), src/scenes/place/layout.ts (waterPath head/foot), src/render/figures.ts. Both — src/scenes/place/PlaceLife.tsx (ErrandVillagers, head/hand jar meshes ~2440-2612, HEAD_CARRY_POSE), design.md §13.4, docs/communication-poc-spec.md
   Doc impact: design.md §13.4 and docs/communication-poc-spec.md item 4: the catcher touches the rock with its hand while naming it, and the water carrier dips the jar at the waterline and carries visible water back. If a new gesture kind is added, the point-479 gesture list in the code comments / docs names it. balance.ts: fill seconds (calibratable).
   Bundle: Dorfleben.
@@ -237,14 +298,30 @@ put it is the mistake this line exists to stop.
     mono output (device or comfort setting) loses the direction and nothing else.
   - Both pitch pairs and the stereo width are calibratable fields in `balance.ts`, with the
     English and German debug labels changed together.
-  - The deployed-graph speech headroom assertion is RE-MEASURED for the new carriers and the
-    added node, and still judges the level that LEAVES the chain rather than the level the
-    plan asked for (point 589, rule 1).
+  - THE VILLAGE ALSO GETS LOUDER (user 07.09.2026: »Insgesamt soll die Sprache auch lauter
+    sein«). Two more fields, both calibratable:
+    - SPEECH GETS ITS OWN VOLUME in the existing family beside `footstepVolume`,
+      `ambientVolume` and `birdsongVolume`. Measured today: a syllable peak is `SPEECH_PEAK`
+      1.8 times the distance gain times `ambienceVolume` 0.1 (`balance.ts`:871), and the chain
+      then applies the ambient bus 0.5 and the master 0.5 — so a villager beside the player
+      peaks near 0.045 at the output. `SPEECH_PEAK`'s own comment claims to compensate the
+      0.25 bus factor and never accounts for the 0.1.
+    - THE HEARING FALLOFF IS RE-CALIBRATED. `hearingGain` is 1/(1 + falloff·(d/r)²) with a
+      hard cut past r (`speaking.ts` ~78-87) and `hearingFalloff` is 24 (`balance.ts`:1437):
+      a speaker 3 m away arrives at 31.6 % and one 5 m away at 14.3 % of the level beside
+      him. Two adults standing together must be plainly audible to a player standing with
+      them; at falloff 4 the same distances give 73.5 % and 50.0 %.
+    - THE VALUES ARE MEASURED, NOT GUESSED: the new level is taken at the shipped defaults
+      over the drum bed and the ambience, not asserted from the plan.
+  - The deployed-graph speech headroom assertion is RE-MEASURED for the new carriers, the
+    added node AND the raised level, and still judges the level that LEAVES the chain rather
+    than the level the plan asked for (point 589, rule 1).
   Test: Vitest over the plan and the graph — bearing -> stereo position for the
   straight-ahead, hard-side and behind-the-camera cases, the mono fallback losing direction
-  but not level, and the child carriers lying above the adult ones while the interval is
-  preserved for both. Browser (audio lane, WebGL 2 per the §7.2 routing): two overlapping
-  village voices measured at different stereo positions with the headroom assertion green.
+  but not level, the child carriers lying above the adult ones while the interval is
+  preserved for both, and a level measured at 3 m and at the hearing rim. Browser (audio
+  lane, WebGL 2 per the §7.2 routing): two overlapping village voices measured at different
+  stereo positions with the headroom assertion green at the raised level.
   Criticality: normal — it changes how the village sounds and unblocks 1073, but nothing the
   player can already do breaks if it lands late.
   Quotes:
@@ -256,14 +333,20 @@ put it is the mistake this line exists to stop.
   einzelnen Tasks steht, von denen jeder für sich einen teuren Regressionstest benötigt.« —
   dieser Punkt fasst die Aspekte 1 und 2 zusammen, weil beide denselben Audiographen
   anfassen und dieselbe Headroom-Nachmessung erzwingen.
+  Nutzer, 07.09.2026: »Insgesamt soll die Sprache auch lauter sein und beim neu eingeführten
+  Rufen (Task 1073) noch lauter - nicht nur weiter tragen.« — die Gesamtlautstärke und der
+  Abfall stehen hier, weil dieser Punkt als einziger offener Punkt speaking.ts, ambience.ts
+  und den Kommunikationsblock von balance.ts ohnehin öffnet und die Headroom-Nachmessung
+  bereits erzwingt; die Aufteilung nach Stimmlage folgt in 1073.
   Refs: src/systems/ambience.ts (`speechBus`, `syllableCarrier`, `playSpeech`, the headroom
   assertion), src/communication/speaking.ts (`phrasePlan`, `hearingGain`),
   src/communication/lexicon.ts (the direction pair's tonal mirror), src/config/balance.ts
   (`communication.speechPitchHz`, `speechPitchInterval`), src/i18n/en.ts + src/i18n/de.ts
   (debug labels), src/systems/ambience.test.ts, design.md §13.4
-  Doc impact: design.md §13.4: village speech carries the speaker's direction, and the
-  children's voices sit above the adults'. balance.ts: both pitch pairs and the stereo width
-  (calibratable).
+  Doc impact: design.md §13.4: village speech carries the speaker's direction, the children's
+  voices sit above the adults', and how loud the village is at conversational distance.
+  balance.ts: both pitch pairs, the stereo width, the speech volume and the re-calibrated
+  falloff (calibratable), with the English and German debug labels changed together.
   Bundle: Dorfleben.
 
 - [ ] 1073. A call carries to the stand the game photographs it from, and the hush stops
@@ -294,12 +377,25 @@ put it is the mistake this line exists to stop.
   set in tests, but read nowhere). That is the same defect as the user's report of two
   adults standing around doing nothing.
   Final state:
-  - Carrying distance is a property of the UTTERANCE, not of the village. The bank round's
-    CALLS — `moment` `call` (RIVER), `announce` (the direction) and `arrival` (ROCK at the
-    far rock) — carry about 22 m; every other utterance, the catcher's `tap` and the off-game
-    `boulder` included, keeps the 10 m `hearingRadius`. One calibratable field in
-    `balance.ts`, passed through the radius parameter `speaking.ts`, `spokenGesture.ts` and
-    `heard.ts` already accept.
+  - Carrying distance is a property of the UTTERANCE, not of the village — and it is a VOICE
+    REGISTER, not a bare reach field (user 07.09.2026: calls must be LOUDER, »nicht nur
+    weiter tragen«). A register carries three numbers: reach, loudness and falloff steepness.
+    Two registers, one `balance.ts` block each, passed through the radius parameter
+    `speaking.ts`, `spokenGesture.ts` and `heard.ts` already accept:
+    - CALL — the bank round's `moment` `call` (RIVER), `announce` (the direction) and
+      `arrival` (ROCK at the far rock). About 22 m, and louder: the callers are always
+      children at play, and children at play are louder than adults talking side by side.
+    - TALK — every other utterance, the catcher's `tap` and the off-game `boulder` included,
+      keeping the 10 m `hearingRadius`.
+    WHY THE REACH ALONE DOES NOT FULFIL THIS POINT, computed at the unchanged
+    `hearingFalloff` 24: at the new ~22 m reach the call arrives at 4.8 % at 20 m, 4.0 % at
+    22 m and 4.9 % at 19.7 m — the same ~4 % this point itself cites as the reason the
+    spectator in the middle hears nothing. At falloff 4 the same distances give 23.2 %,
+    20.0 % and 23.8 %. Point 1072 lands the global level and falloff; this point splits them
+    per register.
+    THE HARD CUT IS PRESERVED at each register's own reach: audible stays the same condition
+    as `isWithinHearing`, so nothing is recorded that could not be heard and nothing heard
+    goes unrecorded.
   - The value is DERIVED, not guessed: it is at least the distance from `bankPlayRocksView`'s
     stand to either play rock, and the test computes that distance rather than restating it.
   - Untouched, as the card promises: `hearingRadius` itself, `childrenHear`'s separation
@@ -309,13 +405,44 @@ put it is the mistake this line exists to stop.
     calibratable hold, after which the villager speaks anyway or the loss is reported loudly.
     `assertNoOwedWord` stops taking `hushed === true` as a blanket excuse — a word held past
     the hold is a defect, not an exemption.
-  - Reception is measured, not assumed: over a full bank round watched from the documented
-    stand, the player hears the RIVER call, both direction announcements and the arrival ROCK.
-    Today that count is zero.
+  - Reception is measured, not assumed, and it is a LEVEL rather than a boolean: over a full
+    bank round watched from the documented stand, the player hears the RIVER call, both
+    direction announcements and the arrival ROCK, each asserted as a measured level at that
+    stand rather than as gain greater than zero. Today that count is zero — and a reach
+    change alone would turn a gain-greater-than-zero test green while the call stayed at ~4 %
+    in the built game, a point landing without reaching its goal.
+  - ONE SPEECH FLOOR FOR THE WHOLE VILLAGE (user 07.09.2026: »Die verschiedenen Abläufe
+    laufen nie gleichzeitig«). Adult work and the bank round ask ONE arbiter instead of each
+    keeping its own time. Today `bankGame`'s `utteranceGapSeconds` is internal to the game and
+    adult work allows at most one word per FRAME (~16 ms, the not-spoken guard), which is no
+    gap at all; nothing coordinates the two, and the label layer holds several labels at once.
+    Measured: an adult errand is cast every ~9 s and lives up to 180 s (`balance.ts`:1357,
+    :1366), so a dig pair overlapping a water carrier is the normal case.
+    - THE UNIT OF EXCLUSIVITY IS THE SITUATION, NOT THE WORD: while a dig bout stands between
+      its two DIGs, or a water errand between its dispatch and its report, no foreign word
+      falls. Two simultaneous dig bouts are therefore impossible too — the case the user
+      judged worst, because DIG followed by DIG from two people cannot be told from one
+      exchange.
+    - THE GAP AFTER A WORD IS A CONSEQUENCE WINDOW: the next word waits until the previous
+      word's effect was visible — the invited adult sets off, the dispatched carrier leaves.
+      Silence teaches nothing; the visible consequence is the lesson. Calibratable.
+    - THE FLOOR MEASURES AT THE PLAYER'S EAR, at the speaking register's own reach rather
+      than a flat 10 m: outside it the village keeps talking, so acceptance criterion 15
+      (lively settlements) is not paid for a confusion that never reaches the player.
+      RECOMMENDED AND DECIDED THIS WAY, with the alternative recorded for veto: if
+      player-dependent behaviour proves too risky in the branch, the global lock is the more
+      robust variant and costs only rarely audible simultaneity. The author records which was
+      built and why.
+    - A QUEUED WORD NEVER EXPIRES: the floor has an upper bound past which it lets the word
+      through — the SAME requirement as the bounded hush above, built ONCE, with the deferral
+      tool pointing at the floor instead of only at `childrenHear`. Without the bound an
+      errand runs into the 180 s `errandSeconds` backstop with a word still owed and trips
+      `assertNoOwedWord`.
   Test: Vitest — the reach of each utterance moment, `bankPlayRocksView`'s stand-to-rock
-  distance bounding the call reach, a full bank round evaluated from that stand yielding
-  every call word heard, and a hush held past its hold firing `adult-atom-lost` instead of
-  being excused by it. Browser (communication lane): the direction word's label and pointing
+  distance bounding the call reach, a full bank round evaluated from that stand yielding a
+  measured LEVEL for every call word, no two situations overlapping in the speech floor, and
+  a word held past the bound reported as `adult-atom-lost` rather than excused by the flag
+  that caused it. Browser (communication lane): the direction word's label and pointing
   gesture present in a frame taken from the documented stand (verification/, subject
   declared: the announcing child seen from the bank-game spectator stand).
   Criticality: high — the taught direction word never reaches the player at the very stand
@@ -327,6 +454,18 @@ put it is the mistake this line exists to stop.
   Nutzer, 07.09.2026 19:08: »Setze alle 6 Punkte so um, wie jetzt in der Karte beschrieben.« —
   dieser Punkt fasst die Aspekte 3, 4 und 5 zusammen: 3 ohne 4 wäre stiller Wortverlust, und
   5 ist der Beweis von 3.
+  Nutzer, 07.09.2026: »Insgesamt soll die Sprache auch lauter sein und beim neu eingeführten
+  Rufen (Task 1073) noch lauter - nicht nur weiter tragen. Die Rufer sind bisher immer Kinder.
+  Es ist ohnehin plausibel, dass spielende Kinder lauter sind als Erwachsene, die miteinander
+  reden, während sie direkt nebeneinander stehen.«
+  Nutzer, 07.09.2026: »Die verschiedenen Abläufe laufen nie gleichzeitig (sofern das nicht
+  sowieso schon der Fall ist).« — die Sprachschranke serialisiert das SPRECHEN, nicht die
+  Tätigkeit; das ist der schmalere Schnitt, der dieselbe Klarheit liefert, ohne die Siedlung
+  zur Bühne einzufrieren.
+  Nutzer, 07.09.2026: »Reihe das alles so ein.« — Register, gemessene Aufnahme und
+  Sprachschranke stehen hier statt als eigene Punkte, weil dieser Punkt die Reichweiten-
+  Verkabelung, die Sprechmomente der Bankrunde und die hush-/`assertNoOwedWord`-Stellen in
+  adultWork.ts ohnehin öffnet. Reihenfolge: 1072 vor 1073, wie in der Arbeitsliste.
   Note: the card justifies the bounded hush by saying the raised reach would otherwise cause
   silent word loss. Measured, that chain does not hold — `childrenHear` gates on the CHILD's
   distance to the speaking adult and a separate call-reach field leaves it at 10 m. The hush
@@ -340,9 +479,12 @@ put it is the mistake this line exists to stop.
   src/scenes/place/adultWork.ts (`assertNoOwedWord` ~176, the `hushed` sites ~339/349/352),
   src/config/balance.ts (`communication.hearingRadius`), src/scenes/place/bankGame.test.ts,
   design.md §13.4
-  Doc impact: design.md §13.4: a call carries further than ordinary speech, and a held word
-  is spoken or reported rather than dropped. docs/communication-poc-spec.md: the bank round's
-  audibility from the spectator's stand. balance.ts: call reach and hush hold (calibratable).
+  Doc impact: design.md §13.4 and docs/communication-poc-spec.md: the two voice registers, a
+  call carrying further AND louder than ordinary speech, the rule that no two situations
+  speak at once, a held word spoken or reported rather than dropped, and the bank round's
+  audibility from the spectator's stand. balance.ts: both register triples, the consequence
+  window and the hush hold (calibratable), with the English and German debug labels changed
+  together.
   Bundle: Dorfleben.
 
 - [ ] 1056. The excavation becomes a real place: it says what it is for, and its earth is
