@@ -390,7 +390,7 @@ export const de: Strings = {
       'Das Oberhaupt tritt aus seiner Hütte und geht hinüber zu seinem Trommler – über die Trommeln wird es auf seine geheimnisvolle Art mit mir sprechen.',
     chiefCalledBack: 'Das Oberhaupt kehrt zu seinem Trommler zurück.',
     chiefNoMessage: 'Das Oberhaupt mustert mich und nickt. Es hat nichts über das Dorf hinauszusenden.',
-    findNeedsChief: 'Hier nimmt es niemand entgegen. Es gehört dem Oberhaupt selbst in die Hände — dort, wo er im Freien steht.',
+    findNeedsChief: 'Hier nimmt es niemand entgegen. Es gehört dem Oberhaupt selbst in die Hände – dort, wo er im Freien steht.',
     journalDndOn: 'Tagebuch-Unterbrechungen aus – Einträge erscheinen still.',
     journalDndOff: 'Tagebuch-Unterbrechungen an – neue Einträge öffnen das Tagebuch.',
     graphicsLevel: {
