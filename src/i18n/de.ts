@@ -387,7 +387,7 @@ export const de: Strings = {
     pocSolved: 'Dummy-Meldung: Das Rätsel dieses Proof of Concept ist gelöst.',
     drumsSending: 'Das Oberhaupt ruft seinen Trommler. Die Botschaft geht über das Dorf hinaus.',
     chiefStepsOut:
-      'Das Oberhaupt tritt aus seiner Hütte und geht hinüber zu seinem Trommler — über die Trommeln wird es auf seine geheimnisvolle Art mit mir sprechen.',
+      'Das Oberhaupt tritt aus seiner Hütte und geht hinüber zu seinem Trommler – über die Trommeln wird es auf seine geheimnisvolle Art mit mir sprechen.',
     chiefCalledBack: 'Das Oberhaupt kehrt zu seinem Trommler zurück.',
     chiefNoMessage: 'Das Oberhaupt mustert mich und nickt. Es hat nichts über das Dorf hinauszusenden.',
     findNeedsChief: 'Hier nimmt es niemand entgegen. Es gehört dem Oberhaupt selbst in die Hände, draußen vor seiner Hütte.',

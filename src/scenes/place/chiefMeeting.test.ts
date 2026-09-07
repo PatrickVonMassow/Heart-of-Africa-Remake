@@ -12,6 +12,10 @@ import { getStrings } from '../../i18n'
 import { nextChiefAction } from './chiefMeeting'
 import { chiefWalkState } from './chiefPresence'
 import { chiefStandingSpot, CHIEF_STAND_OFFSET, buildLayout } from './layout'
+import { chiefBesideDrummerSpot } from './chiefWalk'
+import { PLAYER_RADIUS, standingClear } from './collision'
+import { VILLAGE_SPOTS } from './lifeSpots'
+import { balance } from '../../config/balance'
 import { placeById } from '../../world/geo'
 
 withWorld()
@@ -160,5 +164,32 @@ describe('where he stands (design.md §12)', () => {
     expect(Math.hypot(x - door[0], z - door[1])).toBeCloseTo(CHIEF_STAND_OFFSET, 5)
     // … and outside the hut's own body, so he is met face to face.
     expect(Math.hypot(x - hut.pos[0], z - hut.pos[1])).toBeGreaterThan(3.35)
+  })
+
+  it('walks a line to the drummer that is clear of the settlement', () => {
+    // He has no collider of his own and does not resolve one, so the path he is
+    // interpolated along has to BE clear. Measured in the village the whole
+    // mechanic plays in, by the game's OWN standing rule and with a grown
+    // figure's footprint — the two ends are excepted by construction: he steps
+    // out of his own hut and up beside the drummer's own body.
+    const layout = buildLayout(DRUM_MESSAGE_VILLAGE, 12345)
+    const hut = layout.interactives.find((it) => it.type === 'chief')!
+    const from = chiefStandingSpot(hut)
+    const to = chiefBesideDrummerSpot(balance.communication.chiefBesideDrummer)
+    const clear = layout.colliders.filter((c) => {
+      const at = c.kind === 'segment' ? [c.x1, c.z1] : [c.x, c.z]
+      return (
+        Math.hypot(at[0] - hut.pos[0], at[1] - hut.pos[1]) > 0.01 &&
+        Math.hypot(at[0] - VILLAGE_SPOTS.drummer[0], at[1] - VILLAGE_SPOTS.drummer[1]) > 0.01
+      )
+    })
+    const blocked: string[] = []
+    for (let i = 0; i <= 40; i++) {
+      const t = i / 40
+      const x = from[0] + (to[0] - from[0]) * t
+      const z = from[1] + (to[1] - from[1]) * t
+      if (!standingClear(clear, x, z, PLAYER_RADIUS)) blocked.push(t.toFixed(2))
+    }
+    expect(blocked).toEqual([])
   })
 })

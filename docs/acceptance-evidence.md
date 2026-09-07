@@ -189,8 +189,8 @@ THE VILLAGE SPEECH (§13.4, docs/communication-poc-spec.md, work-order points
 nothing in the mechanic needs a browser, and the one thing that does (the note
 landing over the figure the scene drew) is the polish suite below:
 
-- `src/communication/lexicon.test.ts` — the five concepts (`RIVER`, `UPSTREAM`,
-  `DOWNSTREAM`, `ROCK`, `DIG`) and the spec's table
+- `src/communication/lexicon.test.ts` — the six concepts (`RIVER`, `UPSTREAM`,
+  `DOWNSTREAM`, `ROCK`, `DIG`, `CHIEF`) and the spec's table
   syllable for syllable; every pair at least two syllables apart, so a misheard
   beat can only produce a non-word, never a second concept; the one mirrored
   opposite pair (`UPSTREAM`/`DOWNSTREAM`); and the journal sort order as a total

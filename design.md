@@ -405,7 +405,7 @@ The direction words themselves are not taught in the PoC: nobody in a village ha
 ### 13.3 Cascade and Time Limit
 Per region exactly one knowing people (seeded anew each run) reveals the region's component of the site: the North's chief the latitude, the East's the longitude, the other regions narrowing statements. A chief who does not know says nothing at all — the murmured pointer at the knowing people was dropped on 07.09.2026 with the stale text that carried it. Several hints are triangulated into the exact position of the tomb.
 
-### 13.4 The five-word communication slice
+### 13.4 The village communication slice
 
 The tonal West/Centre village teaches six concepts: RIVER, UPSTREAM, DOWNSTREAM, ROCK, DIG and CHIEF. The player infers them from three places rather than receiving a glossary: the children's bank game, including the village's play rocks, the adults' water and digging work, and the drummer, who points at the chief's hut and names CHIEF. ROCK is a class of thing learned on those rocks and transferred to the separate boulder upstream; it is not a proper name or shorthand for one "big rock."
 

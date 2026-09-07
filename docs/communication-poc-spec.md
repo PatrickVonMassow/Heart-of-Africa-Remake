@@ -140,11 +140,21 @@ four concepts, sixteen strikes, three equal inter-word pauses, and no other
 structure. Afterwards it is displayed with the player's own reading over each
 element. Those readings are the journal notes themselves and remain editable.
 
-The message is asked for OUTSIDE, in his village alone. The use key at the
-chief's hut brings the chief out of it — there is no audience overlay — and he
-then stands beside his own door, in sight of the drummer who beats his message.
-Asking him again sends it; it is recorded as heard only after the last beat and
-can then be reopened from the journal.
+The message is asked for OUTSIDE, in his village alone, and at the DRUMMER'S
+side. The use key at the chief's hut brings the chief out of it — there is no
+audience overlay — and he walks across the village to the drummer, taking his
+stand abreast of the man and facing the way the drummer faces, so the traveller
+can stand before the pair and see both from the front. Arrived, the use key at
+either man sends the message. He stays a calibratable minute
+(`balance.communication.chiefStaySeconds`), counted from his arrival and afresh
+from every message, in which the same key beats it out again and the prompt
+names that; then he walks home. Called on the way home — at him or at the
+drummer — he turns round where he stands and the drums beat by themselves the
+moment he is back beside them. Back in his hut, the key at the hut starts the
+whole thing over; used while he is outside, the hut does nothing and offers no
+prompt. Entering a settlement always finds him indoors: his walk is scene state
+and is never saved. The message is recorded as heard only after the last beat
+and can then be reopened from the journal.
 
 ## Where the digging happens
 

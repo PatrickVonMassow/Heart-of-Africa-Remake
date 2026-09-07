@@ -487,7 +487,6 @@ if (section('core-loop')) {
     // Place-camera yaw 0 looks toward -Z, so aim with the +PI complement.
     p.yaw = Math.atan2(mx - p.x, mz - p.z) + Math.PI
   })
-  await page.waitForTimeout(400)
   await shot('04-chief-outside-his-hut', { place: 'nubian-village', label: 'the chief standing beside his drummer, both seen from the front' })
   check('Meeting him unlocks the hint', s.hintsGiven.north === true)
   const hint = s.journal.find((e) => titleKey(e) === 'journal.titles.chiefHint')

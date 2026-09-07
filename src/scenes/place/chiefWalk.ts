@@ -131,7 +131,19 @@ export function chiefTick(walk: ChiefWalk, now: number, timing: ChiefWalkTiming)
   }
 }
 
-/** Where he stands right now, between the two ends of his path. */
+/**
+ * Where he stands right now, between the two ends of his path.
+ *
+ * A STRAIGHT line, deliberately: the ground between the chief's hut and the
+ * drummer is the settlement's own open middle, and it is measured clear in the
+ * village the mechanic plays in (chiefMeeting.test.ts).
+ * // OPEN: swept 07.09.2026 over all 22 villages — only `maasai-village` has a
+ * // scattered 0.78 m collider on the line (0.24 m into his footprint, at about
+ * // a fifth of the way over). He has no collider and does not resolve one, so
+ * // there he brushes through it. Not routed around: routing him would need the
+ * // nav grid and a path length that changes per frame, which the minute and
+ * // the call-back are counted against.
+ */
 export function chiefWalkPosition(
   walk: ChiefWalk,
   door: readonly [number, number],

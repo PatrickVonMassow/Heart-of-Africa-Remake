@@ -186,7 +186,18 @@ describe('village speech (design.md §13.4)', () => {
       speechVolume: 2,
       labelHeadroom: 0.25,
       giveReach: 2.6,
+      chiefWalkSpeed: 1.4,
+      chiefStaySeconds: 60,
+      chiefBesideDrummer: 1.5,
+      chiefTalkReach: 2.6,
     })
+    // His stand beside the drummer clears both drum shells (the further of the
+    // two reaches 0.5 m out from his own axis), and the key reaches him from
+    // there without reaching across the village.
+    expect(balance.communication.chiefBesideDrummer).toBeGreaterThan(0.5)
+    expect(balance.communication.chiefTalkReach).toBeLessThan(balance.communication.hearingRadius)
+    // He walks, rather than slides: slower than the traveller himself.
+    expect(balance.communication.chiefWalkSpeed).toBeLessThan(balance.placeWalkSpeed)
     // Handing a find over is face to face: the reach clears the step the chief
     // stands beside his own door and stays well inside earshot, so a traveller
     // who can give it always hears the answer.
