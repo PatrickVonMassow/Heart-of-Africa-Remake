@@ -476,6 +476,9 @@ if (section('core-loop')) {
   // then stand in FRONT of the pair — both men face the same way, so a spot on
   // that bearing has chief and drummer in one picture, from the front.
   await page.waitForFunction(() => window.__chief?.phase === 'at-drummer', null, { timeout: 30000 })
+  // Read the state AFTER his walk: the snapshot above was taken at his door, and
+  // the hint checks below belong to the man who has arrived.
+  s = await state()
   await page.evaluate(() => {
     const chief = window.__chief
     const yaw = chief.facing

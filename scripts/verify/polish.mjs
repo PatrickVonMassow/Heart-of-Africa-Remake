@@ -5772,8 +5772,16 @@ if (section('chief-to-drummer')) {
     )
     check('the use key arms at the chief hut door', hutPrompt, `waited for: ${hutLabel}`)
     await page.keyboard.press('Space')
+    // He must be SEEN on the way, part of the path behind him and part still in
+    // front: accepting 'at-drummer' here would let a chief who is teleported to
+    // the drummer's side pass a check that claims he walked (GPT-6 Astra, pass
+    // 3/9). The crossing takes seconds, so a walking man is sampled many times.
     const walking = await page
-      .waitForFunction(() => window.__chief?.phase === 'walking-out' || window.__chief?.phase === 'at-drummer', null, { timeout: 20000 })
+      .waitForFunction(
+        () => window.__chief?.phase === 'walking-out' && window.__chief.progress > 0 && window.__chief.progress < 1,
+        null,
+        { timeout: 20000 },
+      )
       .then(() => true)
       .catch(() => false)
     check('using the hut sets the chief walking out of it', walking, JSON.stringify(await page.evaluate(() => window.__chief ?? null)))

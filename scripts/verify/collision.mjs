@@ -262,6 +262,7 @@ async function reachableBuildings(sceneLabel) {
       return false
     }, t.door)
     let opened = false
+    let reset = true
     if (placed) {
       if (t.type === 'chief') {
         // Send him back inside first, so the press below has to do the work even
@@ -270,20 +271,38 @@ async function reachableBuildings(sceneLabel) {
         // coarse half, and clearing it alone leaves his WALK standing beside the
         // drummer, where the hut key answers with nothing at all.
         await page.evaluate(() => window.__chiefHome())
+        // …and the reset itself is CHECKED, or a half-reset that leaves the flag
+        // standing would let the press below pass without anybody coming out
+        // (GPT-6 Astra, pass 3/9). Indoors means: the flag is down and the
+        // figure is off the scene.
+        const home = await page
+          .waitForFunction(
+            () => window.__game.getState().chiefOutside[window.__game.getState().placeId] !== true && !window.__chief,
+            null,
+            { timeout: 8000 },
+          )
+          .then(() => true)
+          .catch(() => false)
+        reset = home
       }
-      // Arm the Space prompt at the door, then press it (design.md §2.3).
-      await page.waitForFunction(() => !!document.querySelector('.prompt'), null, { timeout: 8000 }).catch(() => {})
-      await page.keyboard.press('Space')
-      const answered = t.type === 'chief'
-        ? () => {
-            const g = window.__game.getState()
-            return g.chiefOutside[g.placeId] === true
-          }
-        : () => !!document.querySelector('.dialog')
-      opened = await page.waitForFunction(answered, null, { timeout: 8000 }).then(() => true).catch(() => false)
+      if (reset) {
+        // Arm the Space prompt at the door, then press it (design.md §2.3).
+        await page.waitForFunction(() => !!document.querySelector('.prompt'), null, { timeout: 8000 }).catch(() => {})
+        await page.keyboard.press('Space')
+        const answered = t.type === 'chief'
+          ? () => {
+              const g = window.__game.getState()
+              return g.chiefOutside[g.placeId] === true
+            }
+          : () => !!document.querySelector('.dialog')
+        opened = await page.waitForFunction(answered, null, { timeout: 8000 }).then(() => true).catch(() => false)
+      }
     }
     const missed = t.type === 'chief' ? '(did not come out)' : '(no open)'
-    if (!placed || !opened) notOperable.push(`${t.type}${placed ? '' : '(no clear standpoint)'}${opened ? '' : missed}`)
+    if (!placed || !reset || !opened) {
+      const why = !placed ? '(no clear standpoint)' : !reset ? '(the reset left him outside)' : missed
+      notOperable.push(`${t.type}${why}`)
+    }
     // Close and step away from the door for the next building.
     await page.keyboard.press('Escape')
     await page.evaluate(() => { const p = window.__placePlayer; p.x = 0; p.z = 0 })
