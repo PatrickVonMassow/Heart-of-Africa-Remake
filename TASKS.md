@@ -14504,6 +14504,16 @@ to land than a mechanism that needs a review.
     point states the measured spread and the verdict — load or defect — for each.
   - A red the probe calls a defect is FIXED here; a red the probe calls load keeps its
     charge, with the measurement that earns it written down.
+  SEEN AGAIN 07.09.2026, on the CORE lane this time and in the same pair: `bambara-village
+  (wet): the outside ground crop could be measured — crop off-frame` at 05:03:34Z and `leaving
+  after several settlement visits stays fluid (point 96) — 3292 ms` at 04:36:58Z, both webgpu/
+  polish at bd050ddf8. Neither could be charged: this table scopes EVERY WebGPU entry to the
+  compatibility level, and both runs recorded no level at all. Both runs were also aborted by
+  that session on a host it had itself polluted — the 04:36 log says so in its own words ("the
+  machine is busy … its timing verdicts do NOT count as evidence") and names the leftover dev
+  server — and the cleaned re-run at 05:17:36Z was green over 44 screenshots. So the sighting is
+  recorded here and deferred, not charged; the probe this point owes now has a second lane to
+  compare.
   Test: the probe's report for both sections, plus — for whichever turns out to be a
   defect — an assertion on the layer that can hold it.
   Criticality: medium — no player has seen either symptom, but the pair blocks the render
