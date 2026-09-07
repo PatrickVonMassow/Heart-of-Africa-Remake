@@ -6069,10 +6069,19 @@ if (section('artefact-give')) {
     // The frame is only evidence if the words were still standing when the
     // shutter opened — a note that expired during the wait photographs an
     // empty village.
+    // A red here has exactly two causes and they need different repairs, so the
+    // evidence names which one it was: his note simply ran out (no label left at
+    // all), or another speaker took the target that holds a note against expiry
+    // (point 588) and his went with it.
+    const atShutter = await page.evaluate(() => ({
+      standing: document.querySelector('.speech-label[data-speaker="chief"]') !== null,
+      drawn: [...document.querySelectorAll('.speech-label')].map((e) => e.getAttribute('data-speaker')),
+      held: (window.__speech?.labels() ?? []).map((l) => l.speakerId),
+    }))
     check(
       'the words were still over his head when the picture was taken',
-      await page.evaluate(() => document.querySelector('.speech-label[data-speaker="chief"]') !== null),
-      'the label had already expired at the shutter',
+      atShutter.standing,
+      `the label had already expired at the shutter — ${JSON.stringify(atShutter)}`,
     )
   }
 }
