@@ -1146,6 +1146,31 @@ export const RED_CHARGES = [
       'lands.',
   },
   {
+    point: 1068,
+    suite: 'polish',
+    backend: 'webgl',
+    kind: 'check',
+    match: /^no child walks without getting anywhere$/i,
+    // DETAIL-SCOPED to the ONE-SECOND window reading alone. The check judges two
+    // windows: a 1 s series and a 0.5 s burst series. What was measured reddened
+    // the 1 s reading (4 of 5805 windows) while the BURST reading stood at
+    // 0.00 % — a child that never treads inside half a second is a different
+    // composition from one that does, and a red on the burst is the sustained
+    // defect nobody owns. So the burst share is pinned to 0.00 % and the 1 s
+    // group share is bounded at one digit: a wider one is a real red.
+    detailMatch:
+      /^worst child \d+ at \d+\.\d+ % of its own judged time; group 0\.\d\d %? ?\(\d+ of \d+ 1s windows, [\d.]+ judged child-seconds\)\. Least judgeable child \d+ at [\d.]+ %, group [\d.]+ % of [\d.]+ traced\. In 0\.5s bursts: worst child -?\d+ at 0\.00 %, group 0\.00 % of [\d.]+ judged child-seconds, least judgeable child \d+ at [\d.]+ %\. Bad = .*$/i,
+    why:
+      'MEASURED 07.09.2026 on main at bd050ddf8, VERIFY_GL=webgl polish (log '
+      + 'local/verify-logs/2026-09-07T05-44-35-994-polish.log): worst child 0 at 0.34 % of its own '
+      + 'judged time, group 0.07 % (4 of 5805 one-second windows), and the 0.5 s burst reading at '
+      + '0.00 % — a child that treads inside a second but never inside half of one. The retry passed '
+      + 'with 207 checks, so the run was recorded SUSPECT and covered no backend, which is exactly '
+      + 'what left the WebGL 2 picture lane without a covering run. It is charged, not excused: point '
+      + '1068 owes the throttle probe that says whether this is load or a defect, and the charge dies '
+      + 'with that point.',
+  },
+  {
     point: 1010,
     suite: 'polish',
     backend: 'webgl',

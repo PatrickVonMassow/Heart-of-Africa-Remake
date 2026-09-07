@@ -834,11 +834,14 @@ put it is the mistake this line exists to stop.
   scripts/throttle-probe.mjs polish --section=children-motion --runs 8` has not been run), whether
   the WebGPU lane shows it (that lane's run was green, but this reading was not printed), and
   whether a player watching the settlement would see a child tread rather than walk.
+  ALREADY DONE, 07.09.2026: the red is CHARGED — `scripts/render-verify-charges.mjs` holds an
+  entry scoped to the measured composition (the one-second reading red while the 0.5 s burst
+  reading stands at 0.00 %), so the WebGL 2 lane can be read again. The charge dies with this
+  point and decides nothing about the cause.
   Final state:
   - The throttle probe says whether it is load or a defect, and the eight results are printed.
-  - Whichever it is, the red has an owner: a fix that removes it, or an entry in
-    `scripts/render-verify-charges.mjs` scoped to the measured composition, which dies with this
-    point.
+  - Whichever it is: the charge is removed by a fix, or it is kept with the measurement that
+    justifies it and this point closes on that.
   Test: `node scripts/throttle-probe.mjs polish --section=children-motion --runs 8` on a quiet
   host, plus the same probe on WebGPU for the comparison this point lacks; and after the decision,
   either the section green over eight consecutive runs on a loaded host, or the charge entry.
