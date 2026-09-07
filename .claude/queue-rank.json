@@ -1212,12 +1212,6 @@
       "why": "The user asked for it on 06.09.2026 and placed it directly after 1058",
       "origin": "user",
       "place": "ahead"
-    },
-    "1067": {
-      "at": "2026-09-06T19:05:25.184Z",
-      "why": "Every render change's WebGL 2 picture proof passes through it, so leaving it behind the release makes each render landing pay about fifty minutes of unaccounted red first.",
-      "origin": "machine",
-      "place": "ahead"
     }
   },
   "boundary": {
@@ -1251,7 +1245,7 @@
     "why": "The order standing in front of the release today is the arrangement that predates this rule; the four machine-filed points that had ranked themselves there were moved behind 174 first"
   },
   "settled": {
-    "at": "2026-09-06T21:46:14.733Z",
+    "at": "2026-09-07T10:44:18.705Z",
     "points": [
       174,
       184,
@@ -1625,7 +1619,7 @@
       1064,
       1065,
       1066,
-      1067
+      1068
     ]
   }
 }
