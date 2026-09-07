@@ -150,6 +150,11 @@ describe('a settlement entered has its chief indoors (design.md §13.4)', () => 
     g().newGame()
     expect(g().loadCheckpoint()).toBe(true)
     expect(g().chiefOutside[DRUM_MESSAGE_VILLAGE]).toBeFalsy()
+    // …and the WALK starts over with the flag. Clearing the coarse half alone
+    // would strand him beside the drummer, and a stranded walk answers the hut
+    // key with nothing for the rest of the session.
+    expect(chiefWalkState().phase).toBe('in-hut')
+    expect(nextChiefAction('hut', g(), chiefWalkState().phase)).toBe('step-out')
   })
 })
 

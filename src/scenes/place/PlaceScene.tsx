@@ -93,6 +93,7 @@ import {
   chiefStandingPosition,
   chiefWalkState,
   clearChiefStanding,
+  resetChiefWalk,
   setChiefAnchor,
   setChiefStanding,
   setChiefWalkState,
@@ -2730,6 +2731,14 @@ export function PlaceScene() {
     // The village's fixed life stations, handed over rather than transcribed
     // into a suite: the drummer's spot is where the chief's whole errand ends.
     w.__placeSpots = VILLAGE_SPOTS
+    // Send the chief home the way a settlement entered does (design.md §13.4).
+    // Handed over rather than transcribed: the coarse store flag is only half
+    // the state, and a suite that clears it alone leaves the walk stranded
+    // beside the drummer, where the hut key answers with nothing.
+    w.__chiefHome = () => {
+      resetChiefWalk()
+      useGame.setState({ chiefOutside: {} })
+    }
     w.__placeColliders = layout?.colliders
     w.__placeCamera = camera
     w.__placeScene = r3fScene

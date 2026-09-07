@@ -265,11 +265,11 @@ async function reachableBuildings(sceneLabel) {
     if (placed) {
       if (t.type === 'chief') {
         // Send him back inside first, so the press below has to do the work even
-        // when an earlier check in this scene has already called him out.
-        await page.evaluate(() => {
-          const g = window.__game.getState()
-          window.__game.setState({ chiefOutside: { ...g.chiefOutside, [g.placeId]: false } })
-        })
+        // when an earlier check in this scene has already called him out. The
+        // scene hands that reset over (__chiefHome): the store flag is only the
+        // coarse half, and clearing it alone leaves his WALK standing beside the
+        // drummer, where the hut key answers with nothing at all.
+        await page.evaluate(() => window.__chiefHome())
       }
       // Arm the Space prompt at the door, then press it (design.md §2.3).
       await page.waitForFunction(() => !!document.querySelector('.prompt'), null, { timeout: 8000 }).catch(() => {})

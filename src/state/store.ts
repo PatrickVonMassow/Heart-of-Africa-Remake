@@ -2046,6 +2046,11 @@ export const useGame = create<GameState>()((set, get) => ({
       // Legacy saves may carry the removed 'map' equipment item (point 93) —
       // strip it so loading never fails and the bag/capacity read correctly.
       const { map: _legacyMap, ...cleanEquipment } = (snap.equipment ?? {}) as Record<string, number>
+      // The coarse flag below is cleared, so the WALK has to start over with it
+      // (design.md §13.4): clearing the flag alone strands the walk beside the
+      // drummer, and a stranded walk answers the hut key with nothing for the
+      // rest of the session.
+      resetChiefWalk()
       set({
         ...snap,
         equipment: cleanEquipment,
