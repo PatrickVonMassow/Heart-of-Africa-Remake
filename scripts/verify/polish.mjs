@@ -14,7 +14,7 @@ import {
   judgeTagStandpoint,
 } from './tagFrameReading.mjs'
 import { judgeEavesColumn, judgeShelterRoof } from './eavesColumn.mjs'
-import { FUSE_TOLERANCE, judgeLabelFusion, mergeFusionReadings } from './labelFusion.mjs'
+import { FUSE_CROWD_SHARE, FUSE_HARD, FUSE_TOLERANCE, judgeLabelFusion, mergeFusionReadings } from './labelFusion.mjs'
 import { READ_COUNT, READ_GAP_FRAMES, CONFIRM_READS, READ_GAP_NET_MS, READ_GAP_MS, SHOT_DRIFT_BAR, luminanceSamples, settleReading, shotDrift, shotReading } from './cropLuma.mjs'
 import {
   CHILD_MOTION,
@@ -5617,10 +5617,14 @@ if (section('ctrl-actor-labels')) {
   // one series — a sample that closed before the capture would certify a
   // picture it never measured (the Sol-review gap, 17.08.).
   const sampleFusion = (windowFrames) => page.evaluate(
-    ({ TOLERANCE, SAMPLES }) =>
+    ({ TOLERANCE, HARD, SAMPLES }) =>
       new Promise((res) => {
         let sampled = 0
         let fusedFrames = 0
+        // The frames whose deepest pair reached the unreadable bar. The depth is
+        // judged on how many frames HOLD it, not on the single worst one it ever
+        // reached (point 1067), so the count has to be carried out of the page.
+        let deepFrames = 0
         let worstDepth = 0
         let worstPair = null
         let labelsMin = Infinity
@@ -5635,6 +5639,7 @@ if (section('ctrl-actor-labels')) {
           labelsMin = Math.min(labelsMin, boxes.length)
           labelsMax = Math.max(labelsMax, boxes.length)
           let fusedHere = false
+          let deepHere = false
           for (let i = 0; i < boxes.length; i++) {
             for (let j = i + 1; j < boxes.length; j++) {
               const a = boxes[i]
@@ -5644,6 +5649,7 @@ if (section('ctrl-actor-labels')) {
               if (across > TOLERANCE && down > TOLERANCE) {
                 fusedHere = true
                 const depth = Math.min(across, down)
+                if (depth >= HARD) deepHere = true
                 if (depth > worstDepth) {
                   worstDepth = depth
                   worstPair = `"${a.text}"×"${b.text}" ${across.toFixed(0)}×${down.toFixed(0)} px`
@@ -5652,12 +5658,14 @@ if (section('ctrl-actor-labels')) {
             }
           }
           if (fusedHere) fusedFrames++
-          if (++sampled >= SAMPLES) return res({ samples: sampled, fusedFrames, worstDepth, worstPair, labelsMin, labelsMax })
+          if (deepHere) deepFrames++
+          if (++sampled >= SAMPLES)
+            return res({ samples: sampled, fusedFrames, deepFrames, worstDepth, worstPair, labelsMin, labelsMax })
           requestAnimationFrame(read)
         }
         requestAnimationFrame(read)
       }),
-    { TOLERANCE: FUSE_TOLERANCE, SAMPLES: windowFrames },
+    { TOLERANCE: FUSE_TOLERANCE, HARD: FUSE_HARD, SAMPLES: windowFrames },
   )
   const fusionPre = await sampleFusion(45)
 
@@ -5667,7 +5675,11 @@ if (section('ctrl-actor-labels')) {
   })
 
   const fusionPost = await sampleFusion(45)
-  const fusionVerdict = judgeLabelFusion(mergeFusionReadings(fusionPre, fusionPost))
+  // The DENSE-CROWD cushion, not the sparse one (point 1067): this scene holds
+  // 17–23 labels, so a loaded lane's drift crosses the tolerance in several
+  // frames of the ninety where the savanna twin sees none. The measurement
+  // behind the number is in labelFusion.mjs beside FUSE_CROWD_SHARE.
+  const fusionVerdict = judgeLabelFusion(mergeFusionReadings(fusionPre, fusionPost), { maxShare: FUSE_CROWD_SHARE })
   check('no two Ctrl labels fuse in the village crowd (point 628)', fusionVerdict.ok, fusionVerdict.detail)
 
   await page.keyboard.up('Control')

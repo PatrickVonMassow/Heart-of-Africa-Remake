@@ -14,7 +14,7 @@
 // gate. Dev server only (dev hooks).
 import { launchVerifyBrowser, assertBackend } from './_browser.mjs'
 import { animalShare, readsAsAnimal, waterFloor } from './animalShare.mjs'
-import { FUSE_TOLERANCE, judgeLabelFusion, mergeFusionReadings } from './labelFusion.mjs'
+import { FUSE_HARD, FUSE_TOLERANCE, judgeLabelFusion, mergeFusionReadings } from './labelFusion.mjs'
 import { frameShutter, captureFrame, capturePixels, waitForSceneReady } from './frameSubject.mjs'
 import { snowFraction } from './snowMetric.mjs'
 import { sectionGate } from './sections.mjs'
@@ -8624,10 +8624,14 @@ if (section('ctrl-actor-labels')) {
   // that closed before the capture would certify a picture it never measured
   // (the Sol-review gap, 17.08.).
   const sampleFusion = (windowFrames) => page.evaluate(
-    ({ TOLERANCE, SAMPLES }) =>
+    ({ TOLERANCE, HARD, SAMPLES }) =>
       new Promise((res) => {
         let sampled = 0
         let fusedFrames = 0
+        // The frames whose deepest pair reached the unreadable bar. The depth is
+        // judged on how many frames HOLD it, not on the single worst one it ever
+        // reached (point 1067), so the count has to be carried out of the page.
+        let deepFrames = 0
         let worstDepth = 0
         let worstPair = null
         let labelsMin = Infinity
@@ -8642,6 +8646,7 @@ if (section('ctrl-actor-labels')) {
           labelsMin = Math.min(labelsMin, boxes.length)
           labelsMax = Math.max(labelsMax, boxes.length)
           let fusedHere = false
+          let deepHere = false
           for (let i = 0; i < boxes.length; i++) {
             for (let j = i + 1; j < boxes.length; j++) {
               const a = boxes[i]
@@ -8651,6 +8656,7 @@ if (section('ctrl-actor-labels')) {
               if (across > TOLERANCE && down > TOLERANCE) {
                 fusedHere = true
                 const depth = Math.min(across, down)
+                if (depth >= HARD) deepHere = true
                 if (depth > worstDepth) {
                   worstDepth = depth
                   worstPair = `"${a.text}"×"${b.text}" ${across.toFixed(0)}×${down.toFixed(0)} px`
@@ -8659,12 +8665,14 @@ if (section('ctrl-actor-labels')) {
             }
           }
           if (fusedHere) fusedFrames++
-          if (++sampled >= SAMPLES) return res({ samples: sampled, fusedFrames, worstDepth, worstPair, labelsMin, labelsMax })
+          if (deepHere) deepFrames++
+          if (++sampled >= SAMPLES)
+            return res({ samples: sampled, fusedFrames, deepFrames, worstDepth, worstPair, labelsMin, labelsMax })
           requestAnimationFrame(read)
         }
         requestAnimationFrame(read)
       }),
-    { TOLERANCE: FUSE_TOLERANCE, SAMPLES: windowFrames },
+    { TOLERANCE: FUSE_TOLERANCE, HARD: FUSE_HARD, SAMPLES: windowFrames },
   )
   const overlapsPre = await sampleFusion(45)
 

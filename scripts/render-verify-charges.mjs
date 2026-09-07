@@ -1146,39 +1146,18 @@ export const RED_CHARGES = [
       'lands.',
   },
   {
-    point: 1067,
-    suite: 'polish',
-    backend: 'webgl',
-    kind: 'check',
-    match: /^no two Ctrl labels fuse in the village crowd/i,
-    // THE DEPTH COMPOSITION, NOT THE COUNT ONE. Point 1010's entry beside this
-    // covers exactly `1/N frames`, deliberately, so that a wider fusion stays a
-    // real red. What was measured today is wider — 2 and 5 of 90 frames — and
-    // still inside the COUNT allowance, so the verdict turned on the depth
-    // alone. The detail is spelled out to the same discipline as 1010's: the
-    // sample, the pair identity and the unreadable bar are all mandatory, and a
-    // line that has lost any of them is a broken measurement rather than the red
-    // this owns. The frame count is bounded at 4 — the check's own allowance —
-    // because a run that ALSO breaks the count bar is the sustained regression
-    // neither point owns, and it starts at 2 because the single-frame shape
-    // belongs to point 1010's entry below and must keep belonging to it.
-    detailMatch:
-      /^[2-4]\/[1-9]\d* frames held a pair fused beyond \d+ px \(allowed \d+\), deepest \d+ px \["[^"]+"×"[^"]+" \d+×\d+ px\], \d+–\d+ labels across the sample — as deep as the \d+ px unreadable bar$/i,
-    why:
-      'MEASURED 06.09.2026 on main across three consecutive webgl/polish runs of the same code: '
-      + '5/90 frames deepest 19 px ("Child"×"Child"), then 2/90 deepest 16 px GREEN, then 2/90 '
-      + 'deepest 19 px ("Villager"×"Villager"). Two of the three sat well inside the count '
-      + 'allowance of 4, so the verdict turned on the 18 px depth bar alone — a different '
-      + 'composition from the single-frame observation point 1010 owns and was scoped to. It is '
-      + 'charged, not excused: 1067 owes the throttle probe that says whether the depth is real '
-      + 'at this crowd density or load, and the charge dies with that point.',
-  },
-  {
     point: 1010,
     suite: 'polish',
     backend: 'webgl',
     kind: 'check',
     match: /^no two Ctrl labels fuse in the village crowd/i,
+    // WHAT 1067 SETTLED, 07.09.2026: the fusion is real motion, never a placement
+    // — `declutterLabels` cannot put two boxes into each other — and the depth bar
+    // it reddened on had no cushion at all, so ONE drifted frame in ninety carried
+    // a whole run. The bar now reads the same cushion as the count, and the detail
+    // below is the wording from before that restatement: the shape this entry
+    // owns can no longer be printed. It stays until point 1010 closes, because it
+    // is 1010's record of its own red and not this table's to retire.
     // DETAIL-SCOPED 30.08.2026 (cross-vendor review, GPT-5.6 Sol, do-not-merge on
     // ffc9c23): the name alone charged EVERY future failure of this check — a
     // SUSTAINED fusion regression, where most frames hold a fused pair, would have
