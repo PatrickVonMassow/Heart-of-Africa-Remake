@@ -148,8 +148,10 @@ describe('a settlement entered has its chief indoors (design.md §13.4)', () => 
     g().callChiefOut()
     g().saveCheckpoint()
     g().newGame()
-    // A fresh game leaves the walk exactly where it stood, so what follows is
-    // really the LOAD putting him back indoors and cannot pass by accident.
+    // He is OUT again when the load comes, so what follows is really the LOAD
+    // putting him back indoors and cannot pass by accident.
+    g().enterPlace(DRUM_MESSAGE_VILLAGE)
+    g().callChiefOut()
     expect(chiefWalkState().phase).not.toBe('in-hut')
     expect(g().loadCheckpoint()).toBe(true)
     expect(g().chiefOutside[DRUM_MESSAGE_VILLAGE]).toBeFalsy()
@@ -158,6 +160,15 @@ describe('a settlement entered has its chief indoors (design.md §13.4)', () => 
     // key with nothing for the rest of the session.
     expect(chiefWalkState().phase).toBe('in-hut')
     expect(nextChiefAction('hut', g(), chiefWalkState().phase)).toBe('step-out')
+  })
+
+  it('a new game finds him in his hut too — both halves are cleared together', () => {
+    g().enterPlace(DRUM_MESSAGE_VILLAGE)
+    g().callChiefOut()
+    expect(chiefWalkState().phase).not.toBe('in-hut')
+    g().newGame()
+    expect(g().chiefOutside[DRUM_MESSAGE_VILLAGE]).toBeFalsy()
+    expect(chiefWalkState().phase).toBe('in-hut')
   })
 })
 

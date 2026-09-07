@@ -2135,6 +2135,10 @@ export const useGame = create<GameState>()((set, get) => ({
 
   newGame: () => {
     nextEntryId = 2
+    // The start state carries an empty `chiefOutside`, so the WALK starts over
+    // with it (design.md §13.4): the two halves of the chief's state may never
+    // be cleared apart, or the hut key answers a phase nobody can see.
+    resetChiefWalk()
     set({ ...startState(newSeed()) })
   },
 
