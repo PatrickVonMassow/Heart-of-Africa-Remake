@@ -210,52 +210,6 @@ put it is the mistake this line exists to stop.
   Doc impact: design.md §13.4 and docs/communication-poc-spec.md item 4: the catcher touches the rock with its hand while naming it, and the water carrier dips the jar at the waterline and carries visible water back. If a new gesture kind is added, the point-479 gesture list in the code comments / docs names it. balance.ts: fill seconds (calibratable).
   Bundle: Dorfleben.
 
-- [ ] 1066. The water carrier visibly fills the jar at the water and carries visible water (user 06.09.2026).
-  The filling of the jar READS as filling. Today the RIVER errand sends an adult with an
-  empty jar to the foot of the water path and back with a full one, and nothing in between is
-  shown: the foot (`bankWaterFoot`, `riverBank.ts`) stands `BANK_STAND_INSET` 1.5 m inside the
-  walkable edge while the waterline lies `BANK_SHORE_HALF` 1.2 m beyond it, so the carrier
-  halts about 2.7 m from the water; the carry flips 'emptyJar' → 'fullJar' between the
-  'water-out' and 'water-back' situations (`adultWork.ts` ~390-410) with no act; and both jars
-  are one closed opaque cylinder (`PlaceLife.tsx` ~2557-2612), the full one merely moved onto
-  the head. The user (06.09.2026) could not tell that water was being fetched — and this
-  errand is where RIVER is learned (design.md §13.4).
-  Final state:
-  - The carrier goes TO the water: the errand's last leg walks down the shore to the
-    waterline (the walkable region already reaches through it to `balance.bankWadeDepth`,
-    `riverBank.ts`), and he stands with his feet at the water's edge or ankle-deep, never
-    2.7 m up the bank. The path's foot for the WORD (`say.aim`) may stay where it is; the
-    fill spot is at the water.
-  - The fill is an ACT with its own phase: he crouches or bends, the jar in his hand goes
-    down into the water — visibly below the drawn surface — stays there a readable moment
-    (calibratable seconds in `src/config/balance.ts`), comes up, and is lifted onto the head
-    (a fill pose beside `digPose` / `HEAD_CARRY_POSE`). 'fullJar' begins only after the dip;
-    the carry never flips without it. The errand's timing backstops (`errandSeconds`,
-    `stallSeconds`) cover the added leg.
-  - Water is visible: both jars have an open mouth; the empty one shows a dark hollow, the
-    full one a water surface at the rim (a bright disc with the water's tint, readable at
-    the distance the player watches from) — so head-carried and hand-carried jars read as
-    full and empty at a glance, on both backends.
-  - The word RIVER still falls at the head of the path, aimed at the water, gated by a
-    hearing child exactly as today; nothing about who is cast or when changes.
-  - Doc: design.md §13.4 ('the adults' water and digging work') states the dip at the
-    waterline; docs/communication-poc-spec.md likewise where it describes the errand.
-  Test: Vitest over adultWork / riverBank — the fill spot lies within a small tolerance of
-  the waterline for the three river villages (nubian, bambara, mandinka); a 'fill' phase
-  sits between the walk down and the walk back, with 'fullJar' set only after it; the phase
-  lasts its configured seconds. Browser (LARGE, both backends — the water surface is
-  backend-sensitive): a picture check of the dip frame that measures the hand jar below the
-  drawn water surface at the carrier's feet, and one of the return walk that measures the
-  water disc visible at the head jar's rim; screenshots of both (verification/, subjects
-  declared: the carrier dipping at the waterline; the carrier walking back with the full
-  jar).
-  Quotes:
-  Nutzer, 06.09.2026 13:48: »Man erkennte das Auffüllen des Kruges mit Wasser nicht als solches. Das liegt an mehreren Problemen: Der Erwachsene geht nicht nah genug an den Fluss, für die Tätigkeit des Auffüllens fehlt eine Darstellung (ich würde erwarten, dass er den Krug in die Hand nimmt und ins Wasser taucht) und wenn er ihn dann gefüllt auf dem Kopf trägt, sieht man darin kein Wasser.«
-  Nutzer, 06.09.2026 13:48 (Einreihung aller drei Punkte): »An der Kommunikationsmechanik zu überarbeiten, einzureihen direkt nach 1058, in der Rehenfolge, in der ich es hier aufzähle:« — dieser Punkt ist der DRITTE der drei.
-  Refs: src/scenes/place/adultWork.ts (water-out/water-back ~390-410, AdultCarry, WATER_FOOT_REACH), src/scenes/place/riverBank.ts (bankWaterFoot, BANK_STAND_INSET 1.5, BANK_SHORE_HALF 1.2, walkable region through the waterline ~47-62), src/scenes/place/PlaceLife.tsx (ErrandVillagers, head/hand jar meshes ~2440-2612, HEAD_CARRY_POSE), src/scenes/place/layout.ts (waterPath head/foot), src/render/figures.ts, design.md §13.4
-  Doc impact: design.md §13.4: the water carrier dips the jar at the waterline and carries visible water back. docs/communication-poc-spec.md: the errand description. balance.ts: fill seconds (calibratable).
-  Bundle: Dorfleben.
-
 - [ ] 1072. The village speaks with a direction, and the children sound like children (user
   07.09.2026, deciding the first two of the six shore-call aspects).
   Measured 07.09.2026: `src/` holds no `PannerNode`, `createPanner`, `StereoPanner` or
