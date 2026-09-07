@@ -5694,6 +5694,155 @@ if (section('ctrl-actor-labels')) {
   check('releasing Ctrl clears the settlement labels too (point 342)', cleared, `cleared=${cleared}`)
 }
 
+// --- The chief comes out to his drummer (design.md §13.4, user 07.09.2026) -----
+// He no longer speaks at his own door. The use key at the hut sends him out and
+// ACROSS to the drummer; there the key at either man beats the message, and the
+// player standing in front of the pair sees both from the front. Only a browser
+// can answer this: it is a walking figure, a prompt that changes with his phase
+// and a picture of two men.
+if (section('chief-to-drummer')) {
+  await goToPlace('bambara-village')
+  await page.evaluate(() => window.__game.getState().setJournalOpen(false))
+
+  /** Stand at a spot, looking at another one, and let the frame carry it. */
+  const standAt = async (at, lookAt) => {
+    await page.evaluate(({ at, lookAt }) => {
+      const p = window.__placePlayer
+      if (!p) return
+      p.x = at.x
+      p.z = at.z
+      // Place-camera yaw 0 looks toward -Z, so aim with the +PI complement.
+      p.yaw = Math.atan2(lookAt.x - p.x, lookAt.z - p.z) + Math.PI
+    }, { at, lookAt })
+    await nextFrames(3)
+  }
+
+  const hut = await page.evaluate(() => {
+    const it = window.__placeLayout?.interactives.find((i) => i.type === 'chief')
+    return it ? { pos: it.pos, door: it.door } : null
+  })
+  check('the village has a chief hut with a door', !!hut?.door, JSON.stringify(hut))
+
+  // 1. The drummer names the man while the man is still indoors: he points at
+  //    the hut and says CHIEF, one atom of the same language as everything else.
+  const drummer = await page.evaluate(() => {
+    const d = window.__placeSpots?.drummer
+    return d ? { x: d[0], z: d[1], facing: Math.atan2(3.5 - d[0], 2.5 - d[1]) } : null
+  })
+  check('the village names where its drummer sits', !!drummer, JSON.stringify(drummer))
+  const inFrontOf = (at, away) => ({ x: at.x + Math.sin(drummer.facing) * away, z: at.z + Math.cos(drummer.facing) * away })
+  await standAt(inFrontOf(drummer, 2), drummer)
+  const drummerPrompt = await stepUntil(() => (document.querySelector('.prompt')?.textContent ?? '').length > 0)
+  check('the use key arms at the drummer', drummerPrompt, 'no prompt at the drummer')
+  await page.keyboard.press('Space')
+  const named = await page
+    .waitForFunction(
+      () => window.__speech?.labels().find((l) => l.speakerId === 'drummer')?.atoms ?? null,
+      null,
+      { timeout: 20000 },
+    )
+    .then((h) => h.jsonValue())
+    .catch(() => null)
+  check(
+    'the drummer names the chief with one word of the language',
+    Array.isArray(named) && named.length === 1 && named[0] === 'BA-ba-BA-ba',
+    JSON.stringify(named),
+  )
+
+  // 2. The use key at the HUT sends him out — and he walks to the drummer.
+  if (hut?.door) {
+    await standAt({ x: hut.door[0], z: hut.door[1] }, { x: hut.pos[0], z: hut.pos[1] })
+    const hutPrompt = await stepUntil(() => (document.querySelector('.prompt')?.textContent ?? '').length > 0)
+    check('the use key arms at the chief hut door', hutPrompt, 'no prompt at the hut')
+    await page.keyboard.press('Space')
+    const walking = await page
+      .waitForFunction(() => window.__chief?.phase === 'walking-out' || window.__chief?.phase === 'at-drummer', null, { timeout: 20000 })
+      .then(() => true)
+      .catch(() => false)
+    check('using the hut sets the chief walking out of it', walking, JSON.stringify(await page.evaluate(() => window.__chief ?? null)))
+    // The hut is inert while he is outside: no prompt stands at that door any more.
+    const hutSilent = await page.evaluate(() => (document.querySelector('.prompt')?.textContent ?? '').trim())
+    check('the hut offers nothing while he is out of it', hutSilent === '', `prompt: ${hutSilent}`)
+  }
+
+  const stood = await page
+    .waitForFunction(() => (window.__chief?.phase === 'at-drummer' ? window.__chief : null), null, { timeout: 40000 })
+    .then((h) => h.jsonValue())
+    .catch(() => null)
+  check('he arrives and takes his stand beside the drummer', !!stood, JSON.stringify(stood))
+
+  if (stood) {
+    // 3. Where the PICTURE puts him: abreast of the drummer, facing the same way.
+    const drawn = await page.evaluate(() => {
+      const o = window.__placeScene?.getObjectByName('chief')
+      if (!o) return null
+      o.updateWorldMatrix(true, false)
+      const e = o.matrixWorld.elements
+      return { x: e[12], y: e[13], z: e[14], yaw: o.rotation.y }
+    })
+    const beside = await page.evaluate(() => window.__balance.communication.chiefBesideDrummer)
+    const away = drawn ? Math.hypot(drawn.x - stood.drummer[0], drawn.z - stood.drummer[1]) : null
+    check(
+      'the drawn chief stands one stride beside the drummer',
+      !!drawn && Math.abs(away - beside) < 0.2,
+      JSON.stringify({ away, beside, drawn }),
+    )
+    // Abreast: the offset between the two men is square to the way they look, so
+    // neither stands in the other's picture from the front.
+    const ahead = drawn
+      ? Math.sin(stood.facing) * (drawn.x - stood.drummer[0]) + Math.cos(stood.facing) * (drawn.z - stood.drummer[1])
+      : null
+    check('the two men stand abreast, not one behind the other', Math.abs(ahead) < 0.2, `${ahead}`)
+    check(
+      'and the chief looks exactly where his drummer looks',
+      !!drawn && Math.abs(Math.atan2(Math.sin(drawn.yaw - stood.facing), Math.cos(drawn.yaw - stood.facing))) < 0.02,
+      JSON.stringify({ chief: drawn?.yaw, drummer: stood.facing }),
+    )
+
+    // 4. In FRONT of the pair, the key at the DRUMMER beats the message out.
+    const mid = { x: (stood.x + stood.drummer[0]) / 2, z: (stood.z + stood.drummer[1]) / 2 }
+    const front = { x: mid.x + Math.sin(stood.facing) * 5, z: mid.z + Math.cos(stood.facing) * 5 }
+    await standAt(front, mid)
+    await standAt(inFrontOf({ x: stood.drummer[0], z: stood.drummer[1] }, 2), mid)
+    const armed = await stepUntil(() => (document.querySelector('.prompt')?.textContent ?? '').length > 0)
+    check('the use key arms at the drummer with the chief standing there', armed, 'no prompt beside the pair')
+    await page.keyboard.press('Space')
+    const beating = await page
+      .waitForFunction(() => !!window.__ui.getState().drumPerformance, null, { timeout: 20000 })
+      .then(() => true)
+      .catch(() => false)
+    check('the key at the drummer sends the message out on the drums', beating, 'no drum performance started')
+
+    // 5. THE PICTURE: chief and drummer from the front, while the drums speak.
+    await standAt(front, mid)
+    await frame('151-chief-beside-his-drummer', {
+      local: { x: mid.x, y: 1.4, z: mid.z },
+      label: 'the chief standing beside his drummer, both seen from the front while the message is beaten out',
+    })
+
+    // 6. Once it has been heard, the same key offers the REPEAT.
+    const heard = await page
+      .waitForFunction(() => window.__game.getState().drumMessageHeard === true, null, { timeout: 40000 })
+      .then(() => true)
+      .catch(() => false)
+    check('the message enters the heard memory once it has been beaten out', heard, 'never recorded')
+    await page.evaluate(() => window.__ui.getState().setDialog(null))
+    await standAt(inFrontOf({ x: stood.drummer[0], z: stood.drummer[1] }, 2), mid)
+    const repeatPrompt = await page.evaluate(async () => {
+      const { getStrings } = await import('/src/i18n/index.ts')
+      return {
+        prompt: document.querySelector('.prompt')?.textContent ?? '',
+        expected: getStrings().labels.repeatDrumMessage,
+      }
+    })
+    check(
+      'and the prompt then offers to have it beaten again',
+      repeatPrompt.prompt.includes(repeatPrompt.expected),
+      JSON.stringify(repeatPrompt),
+    )
+  }
+}
+
 // --- The find from the boulder is GIVEN by using it (design.md §6, user 06.09.2026) --
 // The whole act, end to end, in the picture: the thing dug up at the erratic
 // stands in the inventory bar under its own localized name, a click before the
@@ -5720,6 +5869,9 @@ if (section('artefact-give')) {
 
   await goToPlace('bambara-village')
   await page.evaluate(() => window.__game.getState().callChiefOut())
+  // He walks across to his drummer before he is met (design.md §13.4): wait for
+  // him to have ARRIVED, or every measurement below is taken off a man mid-stride.
+  await page.waitForFunction(() => window.__chief?.phase === 'at-drummer', null, { timeout: 30000 })
   // The dig and the arrival both write a page, and a new entry opens the book:
   // every frame below is of the village and the bar, not of the journal.
   await page.evaluate(() => window.__game.getState().setJournalOpen(false))
@@ -5741,18 +5893,15 @@ if (section('artefact-give')) {
     .then((h) => h.jsonValue())
     .catch(() => null)
   check('the chief stands out in the open, drawn in the scene', !!chiefStood, JSON.stringify(chiefStood))
-  // The open ground he faces: out of his own hut through its door. Stepping
-  // away from the settlement centre instead walks straight into the hut wall —
-  // he stands BESIDE his door, not on the far side of the building.
+  // The open ground he faces: standing beside the drummer he looks exactly where
+  // the drummer looks, so the ground in front of the pair is where the traveller
+  // stands to be seen by both. The scene hands the bearing over rather than
+  // having it transcribed here.
   const outward = await page.evaluate(() => {
-    const it = window.__placeLayout?.interactives.find((i) => i.type === 'chief')
-    if (!it?.door) return null
-    const ux = it.door[0] - it.pos[0]
-    const uz = it.door[1] - it.pos[1]
-    const l = Math.hypot(ux, uz) || 1
-    return { x: ux / l, z: uz / l }
+    const yaw = window.__chief?.facing
+    return typeof yaw === 'number' ? { x: Math.sin(yaw), z: Math.cos(yaw) } : null
   })
-  check('his hut names the open ground he faces', !!outward, JSON.stringify(outward))
+  check('the pair names the open ground they face', !!outward, JSON.stringify(outward))
 
   if (chiefStood && outward) {
     const reach = await page.evaluate(() => window.__balance.communication.giveReach)

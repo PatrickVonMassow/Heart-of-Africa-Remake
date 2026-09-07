@@ -35,6 +35,3 @@ export const GLOSSARY = {
   elephants: 'Galumba',
   elephantsAlt: 'Ut-hu Manbwama',
 } as const
-
-/** Unspecific knowledge (design.md §13.2/§13.3). */
-export const UNSPECIFIC_WORDS = ['Oz Oz', 'Oink Oink', 'Auke Auke'] as const

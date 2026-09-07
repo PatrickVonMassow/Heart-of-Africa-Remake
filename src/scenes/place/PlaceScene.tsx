@@ -19,7 +19,7 @@ import {
   vertexColor,
 } from 'three/tsl'
 import { FLORA_COLOR_LIFT, SEASON_TINT_U, seasonFoliagePosition, seasonTintNode, setGroundWetness, setSeasonCollapse, setSeasonTint } from '../../render/seasonTint'
-import { useGame } from '../../state/store'
+import { DRUM_MESSAGE_VILLAGE, useGame } from '../../state/store'
 import {
   useUi,
   effectiveShadows,
@@ -86,9 +86,28 @@ import { PlaceLife } from './PlaceLife'
 import { digSiteAppearance } from './digSiteAppearance'
 import type { DigSiteProgress } from './adultWork'
 import { SpeechLabels } from './SpeechLabels'
-import { CHIEF_SPEAKER_ID, chiefAnchor, chiefStandingPosition, clearChiefStanding, setChiefAnchor, setChiefStanding } from './chiefPresence'
-import { nextChiefAction } from './chiefMeeting'
-import { speakOverhead, speechUseCandidate } from './speechChannel'
+import {
+  CHIEF_SPEAKER_ID,
+  chiefAnchor,
+  chiefStandingPosition,
+  chiefWalkState,
+  clearChiefStanding,
+  setChiefAnchor,
+  setChiefStanding,
+  setChiefWalkState,
+} from './chiefPresence'
+import { nextChiefAction, type ChiefAction, type ChiefTarget } from './chiefMeeting'
+import {
+  chiefBesideDrummerSpot,
+  chiefCalled,
+  chiefTick,
+  chiefWalkFacing,
+  chiefWalkPosition,
+  drummerFacing,
+} from './chiefWalk'
+import { drummerNamesChief } from './drummerVoice'
+import { VILLAGE_SPOTS } from './lifeSpots'
+import { speakOverhead, speechClock, speechUseCandidate } from './speechChannel'
 import { chiefRewardPhrase } from '../../communication/chiefReply'
 import type { Phrase } from '../../communication/lexicon'
 import { phrasePlan } from '../../communication/speaking'
@@ -490,27 +509,54 @@ function VillageHut({
 }
 
 /**
- * The use key at the chief's hut (design.md §12, §13.4): the chief comes out,
- * and from then on the press sends the message on the drums his own drummer
- * beats. It hands NOTHING over any more — the find from the boulder is an
- * inventory item and is given by using it before him (design.md §6), so the
- * message and the give no longer share one key. `nextChiefAction` decides;
- * this only executes.
+ * The drums go out (design.md §13.4, point 486). The plan the drummer's hands
+ * animate from is the plan WebAudio plays, so what sounds and what is seen can
+ * never disagree — and a village with nothing to send says so instead.
  */
-function meetChief(): void {
+function sendDrumMessage(): void {
   const game = useGame.getState()
   const strings = getStrings()
-  switch (nextChiefAction(game)) {
+  if (game.placeId !== DRUM_MESSAGE_VILLAGE) {
+    game.setToast(strings.toasts.chiefNoMessage)
+    return
+  }
+  const plan = drumMessagePlan()
+  useUi.getState().startDrumMessage(plan)
+  playDrumMessage(plan)
+  game.setToast(strings.toasts.drumsSending)
+}
+
+/**
+ * The use key at the chief's hut, at the chief himself and at his drummer
+ * (design.md §12, §13.4). The hut sends him OUT and across to the drummer;
+ * out there either man sends the message, repeats it while he stands, and calls
+ * him back while he walks home; and while he is indoors the drummer names him.
+ *
+ * It hands NOTHING over — the find from the boulder is an inventory item and is
+ * given by using it before him (design.md §6), so the message and the give no
+ * longer share one key. `nextChiefAction` decides; this only executes.
+ */
+function actOnChief(target: ChiefTarget, layout: PlaceLayout | null): void {
+  const game = useGame.getState()
+  const strings = getStrings()
+  switch (nextChiefAction(target, game, chiefWalkState().phase)) {
     case 'step-out':
       game.callChiefOut()
       break
-    case 'send-message': {
-      // The plan the drummer's hands animate from is the plan WebAudio plays,
-      // so what sounds and what is seen cannot disagree (point 486).
-      const plan = drumMessagePlan()
-      useUi.getState().startDrumMessage(plan)
-      playDrumMessage(plan)
-      game.setToast(strings.toasts.drumsSending)
+    case 'send-message':
+    case 'call-back': {
+      // ONE transition for both: beside the drummer it beats the message and
+      // begins his minute again, on the way home it turns him round and the
+      // drums follow by themselves when he arrives.
+      const step = chiefCalled(chiefWalkState(), speechClock())
+      setChiefWalkState(step.walk)
+      if (step.beatDrums) sendDrumMessage()
+      else game.setToast(strings.toasts.chiefCalledBack)
+      break
+    }
+    case 'name-chief': {
+      const hut = layout?.interactives.find((it) => it.type === 'chief')
+      if (hut) drummerNamesChief(hut.pos)
       break
     }
     case 'no-message':
@@ -539,11 +585,16 @@ function speakChiefPhrase(phrase: Phrase): void {
 }
 
 /**
- * The chief, out of his hut and standing in the open (design.md §12): the use
- * key at his door brings him out and he stays out, one step beside the doorway,
- * on the ground his drummer sits on. There is no audience indoors — what he has
- * to give is given here, in the picture, where the drums that carry his message
- * are seen and heard.
+ * The chief, out of his hut and on his feet (design.md §12/§13.4): the use key
+ * at his door sends him out and ACROSS to his drummer, where he takes his stand
+ * abreast of the man and facing the same way, so the traveller can stand before
+ * the pair and see both from the front. He stays his calibratable minute and
+ * walks home again; called on that way home he turns round, and the drums beat
+ * themselves the moment he is back.
+ *
+ * The walk itself is pure (chiefWalk.ts) and lives in a module ref, so this
+ * moves a figure and writes nothing per frame into the store — only the coarse
+ * "he is out" flag flips, once at each end of the trip.
  *
  * He registers himself as the speaker anchor, so what he says stands over HIS
  * head like any other villager's word (design.md §13.4).
@@ -559,9 +610,25 @@ function Chief({
 }) {
   const t = useStrings()
   const group = useRef<THREE.Group>(null)
-  const [x, z] = chiefStandingSpot(item)
-  // He faces the open ground, away from his own hut wall.
-  const facing = Math.atan2(x - item.pos[0], z - item.pos[1])
+  // The two ends of his path: the spot beside his own door he has always come
+  // out onto, and the stand abreast of the drummer.
+  const door = useMemo(() => chiefStandingSpot(item), [item])
+  const beside = useMemo(
+    () => chiefBesideDrummerSpot(balance.communication.chiefBesideDrummer),
+    [],
+  )
+  const timing = useMemo(
+    () => ({
+      speed: balance.communication.chiefWalkSpeed,
+      staySeconds: balance.communication.chiefStaySeconds,
+      pathLength: Math.hypot(beside[0] - door[0], beside[1] - door[1]),
+    }),
+    [door, beside],
+  )
+  // Standing, he faces exactly where the drummer faces; back at his own door he
+  // faces the open ground rather than his wall.
+  const standingFacing = drummerFacing()
+  const [x, z] = door
   const robe = style.cloth[0]
   // The season's wrap over the shoulders, always — he is the notable
   // (design.md §19.13, the reasoning that dressed the elder before him).
@@ -576,6 +643,43 @@ function Chief({
       clearChiefStanding()
     }
   }, [x, z])
+  // His walk, one frame at a time. The clock is the WALL clock — the minute he
+  // stands there is a minute the player waits, not an in-game day.
+  useFrame(() => {
+    const step = chiefTick(chiefWalkState(), speechClock(), timing)
+    setChiefWalkState(step.walk)
+    if (step.beatDrums) sendDrumMessage()
+    const [px, pz] = chiefWalkPosition(step.walk, door, beside)
+    setChiefStanding(px, pz)
+    const g = group.current
+    if (g) {
+      g.position.set(px, 0, pz)
+      g.rotation.y = chiefWalkFacing(step.walk, door, beside, standingFacing)
+    }
+    // Dev-only hook for the headless verification (CLAUDE.md §7.2): where he is
+    // in his round trip, so a suite can WAIT for him to have arrived instead of
+    // photographing a man mid-stride.
+    if (import.meta.env.DEV) {
+      const win = window as unknown as Record<string, unknown>
+      // The stand is HANDED OVER, not transcribed into a suite: where the two
+      // men are and which way they look is what a shutter needs to frame them
+      // from the front, and one description of it cannot drift from the other.
+      win.__chief = {
+        phase: step.walk.phase,
+        progress: step.walk.progress,
+        x: px,
+        z: pz,
+        facing: standingFacing,
+        drummer: [VILLAGE_SPOTS.drummer[0], VILLAGE_SPOTS.drummer[1]],
+      }
+    }
+    // Home again: the one store write of the whole trip, and it is what takes
+    // this figure off the scene until the hut is used afresh.
+    if (step.walk.phase === 'in-hut') {
+      const game = useGame.getState()
+      if (game.placeId && game.chiefOutside[game.placeId]) useGame.setState({ chiefOutside: {} })
+    }
+  })
   // His ANSWER to the find (design.md §6): the give is an act on the inventory
   // item, so the store owns it and the figure that must speak it listens for
   // it. Only the transition speaks — a settlement re-entered with the find long
@@ -593,7 +697,7 @@ function Chief({
     // below, and the layer would print the same word twice over one man.
     // Named, so a check can read where the picture really puts him — and so the
     // §13.4 speech dev hook finds his anchor by the speaker id he speaks under.
-    <group ref={group} name={CHIEF_SPEAKER_ID} position={[x, 0, z]} rotation={[0, facing, 0]}>
+    <group ref={group} name={CHIEF_SPEAKER_ID} position={[x, 0, z]} rotation={[0, standingFacing, 0]}>
       {/* Robe */}
       <mesh position={[0, 0.62, 0]} castShadow>
         <coneGeometry args={[0.42, 1.25, TESSELLATION.figureBody]} />
@@ -2364,6 +2468,7 @@ function GizaAmbient({ anchors }: { anchors: Array<{ x: number; z: number; role:
 type UseAction =
   | { kind: 'interactive'; interactive: Interactive }
   | { kind: 'speech'; label: SpeechLabel }
+  | { kind: 'chief'; target: ChiefTarget; action: ChiefAction }
 
 /**
  * ONE candidate list for the use key (work-order point 691): the functional
@@ -2375,12 +2480,38 @@ type UseAction =
  * rebuild join this list here.
  */
 function settlementUseCandidates(layout: PlaceLayout | null, x: number, z: number): UseCandidate<UseAction>[] {
-  const out: UseCandidate<UseAction>[] = doorCandidates(layout, x, z).map((c) => ({
-    key: c.key,
-    distance: c.distance,
-    range: c.range,
-    payload: { kind: 'interactive', interactive: c.payload },
-  }))
+  const game = useGame.getState()
+  const phase = chiefWalkState().phase
+  const out: UseCandidate<UseAction>[] = doorCandidates(layout, x, z)
+    // The chief's own door leaves the list while he is out of it: the key there
+    // does nothing then, and a prompt for a key that does nothing is a lie.
+    .filter((c) => c.payload.type !== 'chief' || nextChiefAction('hut', game, phase) !== 'none')
+    .map((c) => ({
+      key: c.key,
+      distance: c.distance,
+      range: c.range,
+      payload: { kind: 'interactive', interactive: c.payload },
+    }))
+  // The two men the message goes through (design.md §13.4). Each joins the list
+  // only while the key really means something at him, so a candidate the player
+  // is offered is always a candidate that answers.
+  const reach = balance.communication.chiefTalkReach
+  const men: Array<[ChiefTarget, number, number]> = [
+    ['drummer', VILLAGE_SPOTS.drummer[0], VILLAGE_SPOTS.drummer[1]],
+  ]
+  if (chiefStandingPosition.active) {
+    men.push(['chief', chiefStandingPosition.x, chiefStandingPosition.z])
+  }
+  for (const [target, mx, mz] of men) {
+    const action = nextChiefAction(target, game, phase)
+    if (action === 'none') continue
+    out.push({
+      key: `chief:${target}`,
+      distance: Math.hypot(x - mx, z - mz),
+      range: reach,
+      payload: { kind: 'chief', target, action },
+    })
+  }
   const speech = speechUseCandidate()
   if (speech) {
     out.push({
@@ -2391,6 +2522,22 @@ function settlementUseCandidates(layout: PlaceLayout | null, x: number, z: numbe
     })
   }
   return out
+}
+
+/** What the bottom prompt calls the key at the chief or at his drummer. */
+function chiefPromptLabel(strings: ReturnType<typeof getStrings>, action: ChiefAction): string {
+  switch (action) {
+    case 'send-message':
+      return useGame.getState().drumMessageHeard
+        ? strings.labels.repeatDrumMessage
+        : strings.labels.askForDrumMessage
+    case 'call-back':
+      return strings.labels.callChiefBack
+    case 'name-chief':
+      return strings.labels.askDrummer
+    default:
+      return strings.labels.speakToChief
+  }
 }
 
 export function PlaceScene() {
@@ -2571,6 +2718,9 @@ export function PlaceScene() {
     // cross-vendor round, D3). One description of the stand, read by the suite
     // and by `bankStage.test.ts` alike.
     w.__bankStageView = () => (layout?.playRocks ? bankPlayRocksView(layout.playRocks) : null)
+    // The village's fixed life stations, handed over rather than transcribed
+    // into a suite: the drummer's spot is where the chief's whole errand ends.
+    w.__placeSpots = VILLAGE_SPOTS
     w.__placeColliders = layout?.colliders
     w.__placeCamera = camera
     w.__placeScene = r3fScene
@@ -2694,7 +2844,7 @@ export function PlaceScene() {
     if (game.journalOpen) game.setJournalOpen(false)
     if (near.type === 'chief') {
       // The chief is met OUTSIDE his hut, never in a window (design.md §12).
-      meetChief()
+      actOnChief('hut', layoutRef.current)
     } else if (near.type === 'bazaar' || near.type === 'agency') {
       setDialog({ kind: near.type })
       releasePointerLock()
@@ -2793,6 +2943,7 @@ export function PlaceScene() {
       if (!winner) return
       useKeyPick.current = winner.key
       if (winner.payload.kind === 'interactive') openBuildingRef.current(winner.payload.interactive)
+      else if (winner.payload.kind === 'chief') actOnChief(winner.payload.target, layoutRef.current)
       else openSpeechGuessRef.current(winner.payload.label)
     }, { preventDefault: true })
     return () => {
@@ -3029,19 +3180,21 @@ export function PlaceScene() {
     const strings = getStrings()
     // At the chief's hut the key names the HUT while he is inside it, and the
     // MAN once he stands in front of it (design.md §12).
-    const gameNow = useGame.getState()
     const near = winner?.payload.kind === 'interactive' ? winner.payload.interactive : null
-    const chiefIsOut =
-      near?.type === 'chief' && !!gameNow.placeId && gameNow.chiefOutside[gameNow.placeId] === true
-    // The hint belongs to the WINNER: while the door owns the key the speaker's
+    // The hint belongs to the WINNER: while a door owns the key the speaker's
     // note carries no invitation, and while the speaker owns it the bottom
-    // prompt is empty and his own note invites the guess instead.
+    // prompt is empty and his own note invites the guess instead. At the chief
+    // and at his drummer the prompt names what the key would DO — ask, repeat,
+    // call him back — because the same key at the same man means all three at
+    // different points of his round trip.
     const prompt = near
-      ? strings.prompts.interact(chiefIsOut ? strings.labels.speakToChief : interactiveLabel(strings, near.type))
-      : null
+      ? strings.prompts.interact(interactiveLabel(strings, near.type))
+      : winner?.payload.kind === 'chief'
+        ? strings.prompts.interact(chiefPromptLabel(strings, winner.payload.action))
+        : null
     const uiNow = useUi.getState()
     if (uiNow.prompt !== prompt) setPrompt(prompt)
-    const owner = winner ? winner.payload.kind : null
+    const owner = winner ? (winner.payload.kind === 'speech' ? 'speech' : 'interactive') : null
     if (uiNow.useKeyOwner !== owner) uiNow.setUseKeyOwner(owner)
   })
 

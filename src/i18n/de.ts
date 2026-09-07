@@ -250,6 +250,10 @@ export const de: Strings = {
 
   labels: {
     speakToChief: 'Mit dem Oberhaupt sprechen',
+    askForDrumMessage: 'Das Oberhaupt um seine Botschaft bitten',
+    repeatDrumMessage: 'Die Botschaft noch einmal schlagen lassen',
+    callChiefBack: 'Das Oberhaupt zurückrufen',
+    askDrummer: 'Den Trommler ansprechen',
     chief: 'Oberhaupt',
     graveDebug: 'Grab (Debug)',
     camp: 'Lager',
@@ -382,7 +386,9 @@ export const de: Strings = {
     formNoFit: 'Hier ist nichts, das diese Form aufnehmen würde.',
     pocSolved: 'Dummy-Meldung: Das Rätsel dieses Proof of Concept ist gelöst.',
     drumsSending: 'Das Oberhaupt ruft seinen Trommler. Die Botschaft geht über das Dorf hinaus.',
-    chiefStepsOut: 'Das Oberhaupt tritt aus seiner Hütte und steht vor mir im Freien.',
+    chiefStepsOut:
+      'Das Oberhaupt tritt aus seiner Hütte und geht hinüber zu seinem Trommler — über die Trommeln wird es auf seine geheimnisvolle Art mit mir sprechen.',
+    chiefCalledBack: 'Das Oberhaupt kehrt zu seinem Trommler zurück.',
     chiefNoMessage: 'Das Oberhaupt mustert mich und nickt. Es hat nichts über das Dorf hinauszusenden.',
     findNeedsChief: 'Hier nimmt es niemand entgegen. Es gehört dem Oberhaupt selbst in die Hände, draußen vor seiner Hütte.',
     journalDndOn: 'Tagebuch-Unterbrechungen aus – Einträge erscheinen still.',
@@ -768,7 +774,6 @@ export const de: Strings = {
       artefactGiven: 'In die Hände des Oberhaupts',
       mouldFitted: 'Der Ton findet seinen Felsen',
       decoded: 'Entschlüsselt!',
-      unspecific: 'Unbestimmtes Gemurmel',
       victory: 'Das Herz von Afrika',
       foodLow: 'Proviant knapp',
       foodOut: 'Proviant aufgebraucht',
@@ -1016,8 +1021,6 @@ export const de: Strings = {
       }
       return texts[regionId]
     },
-    unspecific: (p: TextParams) =>
-      `Das Oberhaupt nickte ernst, ruderte mit den Händen und sagte immer wieder nur [emph]„${p.word}"[/emph]. [somber]Was immer es weiß – es kann oder will es nicht in Worten sagen, die ich fasse.[/somber] [pause]Doch es wies beharrlich zu den Dörfern der [emph]${PEOPLES[p.people as string]}[/emph] – [excited]sie sollen mehr wissen.[/excited]`,
     drumMessage:
       '[awe]Das Oberhaupt rief seinen Trommler, und zwei Trommeln sprachen an seiner Statt – eine große und eine kleine.[/awe] [pause]Vier Wörter zu je vier Schlägen, jedes vom nächsten durch dieselbe kurze Stille getrennt – dumpf für die tiefe Silbe, hell für die hohe. [excited]Ich kenne diese Wörter. Jedes einzelne habe ich in den Gassen und am Wasser gehört.[/excited] [pause]Ich habe sie in der Reihenfolge notiert, in der sie geschlagen wurden; was sie von mir verlangen, muss ich selbst lesen.',
     rockArtefact:

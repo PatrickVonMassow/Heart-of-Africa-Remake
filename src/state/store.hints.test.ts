@@ -8,7 +8,6 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
 import type { RegionId } from '../world/geo'
 import { PLACES } from '../world/geo'
-import { UNSPECIFIC_WORDS } from '../world/lore'
 import { balance } from '../config/balance'
 import { g, freshGame, withWorld } from '../test/store'
 
@@ -78,19 +77,16 @@ describe('triangulation (design.md §13.3)', () => {
   })
 })
 
-describe('unspecific knowledge (design.md §13.3)', () => {
-  it('a non-knowing chief offers only unspecific words that point to the knowing people', () => {
+describe('a chief who does not know (design.md §13.3)', () => {
+  it('says nothing at all — the murmured pointer went with its stale text', () => {
     const region: RegionId = 'north'
     const knowingId = knowingVillage(region)
     const other = PLACES.find((p) => p.kind === 'village' && p.region === region && p.id !== knowingId)
     expect(other).toBeTruthy()
     g().enterPlace(other!.id)
+    const before = g().journal.length
     g().callChiefOut()
-    const entry = g().journal.filter((e) => e.text.key === 'journal.unspecific').pop()
-    expect(entry).toBeTruthy()
-    const knowingPeople = PLACES.find((p) => p.id === knowingId)?.peopleId
-    expect(entry?.text.params?.people).toBe(knowingPeople)
-    expect(UNSPECIFIC_WORDS).toContain(entry?.text.params?.word)
+    expect(g().journal).toHaveLength(before)
     // The knowing village itself must NOT have leaked its precise hint here.
     expect(g().hintsGiven[region]).toBeFalsy()
     g().leavePlace()

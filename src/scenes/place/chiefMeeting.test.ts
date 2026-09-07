@@ -1,13 +1,16 @@
-// The chief is met OUTSIDE his hut (design.md §12, §13.4): the use key at the
-// door brings him out, and from there it sends his drummed message. No audience
-// overlay stands between the traveller and the drums any more — and the key
-// hands nothing over: the find from the boulder is given by using the inventory
-// item before him (design.md §6), which store.rockArtefact.test.ts pins.
+// The chief is met OUTSIDE his hut, at his drummer's side (design.md §12,
+// §13.4): the use key at the door sends him out and across, and out there the
+// key at either man sends his drummed message, repeats it and calls him back.
+// The hut answers nothing while he is out of it, the drummer names him while he
+// is in it, and the key hands nothing over — the find from the boulder is given
+// by using the inventory item before him (design.md §6), which
+// store.rockArtefact.test.ts pins.
 import { describe, it, expect, beforeEach } from 'vitest'
 import { g, freshGame, withWorld, useGame } from '../../test/store'
 import { DRUM_MESSAGE_VILLAGE } from '../../state/store'
 import { getStrings } from '../../i18n'
 import { nextChiefAction } from './chiefMeeting'
+import { chiefWalkState } from './chiefPresence'
 import { chiefStandingSpot, CHIEF_STAND_OFFSET, buildLayout } from './layout'
 import { placeById } from '../../world/geo'
 
@@ -25,15 +28,17 @@ const OTHER_VILLAGE = 'maasai-village'
 
 describe('the chief comes out of his hut (design.md §12)', () => {
   it('is not met at all outside a village', () => {
-    expect(nextChiefAction(g())).toBe('none')
+    expect(nextChiefAction('hut', g(), 'in-hut')).toBe('none')
+    expect(nextChiefAction('drummer', g(), 'in-hut')).toBe('none')
   })
 
-  it('the first use at his hut brings him out', () => {
+  it('the use at his hut sends him out to his drummer', () => {
     g().enterPlace(DRUM_MESSAGE_VILLAGE)
     expect(g().chiefOutside[DRUM_MESSAGE_VILLAGE]).toBeFalsy()
-    expect(nextChiefAction(g())).toBe('step-out')
+    expect(nextChiefAction('hut', g(), 'in-hut')).toBe('step-out')
     g().callChiefOut()
     expect(g().chiefOutside[DRUM_MESSAGE_VILLAGE]).toBe(true)
+    expect(chiefWalkState().phase).toBe('walking-out')
     expect(g().toast).toBe(getStrings().toasts.chiefStepsOut)
   })
 
@@ -44,16 +49,37 @@ describe('the chief comes out of his hut (design.md §12)', () => {
     expect(g().orientationGiven[OTHER_VILLAGE]).toBe(true)
   })
 
-  it('he stays out — a second use is no longer a step-out', () => {
+  it('leaves the hut inert in every phase but the one he is inside for', () => {
     g().enterPlace(DRUM_MESSAGE_VILLAGE)
-    g().callChiefOut()
-    expect(nextChiefAction(g())).not.toBe('step-out')
+    for (const phase of ['walking-out', 'at-drummer', 'walking-back'] as const) {
+      expect(nextChiefAction('hut', g(), phase), phase).toBe('none')
+    }
+    expect(nextChiefAction('hut', g(), 'in-hut')).toBe('step-out')
+  })
+
+  it('answers nothing at either man while he is still on his way out', () => {
+    g().enterPlace(DRUM_MESSAGE_VILLAGE)
+    expect(nextChiefAction('chief', g(), 'walking-out')).toBe('none')
+    expect(nextChiefAction('drummer', g(), 'walking-out')).toBe('none')
+  })
+})
+
+describe('the drums, once he stands there (design.md §13.4)', () => {
+  it('sends the message from either man', () => {
+    g().enterPlace(DRUM_MESSAGE_VILLAGE)
+    expect(nextChiefAction('chief', g(), 'at-drummer')).toBe('send-message')
+    expect(nextChiefAction('drummer', g(), 'at-drummer')).toBe('send-message')
+  })
+
+  it('calls him back from either man while he walks home', () => {
+    g().enterPlace(DRUM_MESSAGE_VILLAGE)
+    expect(nextChiefAction('chief', g(), 'walking-back')).toBe('call-back')
+    expect(nextChiefAction('drummer', g(), 'walking-back')).toBe('call-back')
   })
 
   it('another people’s chief has no message of his own to send', () => {
     g().enterPlace(OTHER_VILLAGE)
-    g().callChiefOut()
-    expect(nextChiefAction(g())).toBe('no-message')
+    expect(nextChiefAction('chief', g(), 'at-drummer')).toBe('no-message')
   })
 
   it('the key hands NOTHING over — carrying the find changes nothing about it', () => {
@@ -61,11 +87,10 @@ describe('the chief comes out of his hut (design.md §12)', () => {
     // (design.md §6). The key and the give no longer share one press, so the
     // message goes out whether the find is carried or not.
     g().enterPlace(DRUM_MESSAGE_VILLAGE)
-    g().callChiefOut()
     useGame.setState({ rockArtefact: 'carried' })
-    expect(nextChiefAction(g())).toBe('send-message')
+    expect(nextChiefAction('chief', g(), 'at-drummer')).toBe('send-message')
     useGame.setState({ rockArtefact: 'given' })
-    expect(nextChiefAction(g())).toBe('send-message')
+    expect(nextChiefAction('chief', g(), 'at-drummer')).toBe('send-message')
   })
 
   it('sends his message on the first visit — no gift, no standing, no trust', () => {
@@ -76,29 +101,51 @@ describe('the chief comes out of his hut (design.md §12)', () => {
     g().enterPlace(DRUM_MESSAGE_VILLAGE)
     // Stripped of the starting outfit's trade goods, so nothing he owns can be
     // mistaken for the price of the message.
-    useGame.setState({ gifts: NO_GIFTS })
+    useGame.setState({ gifts: NO_GIFTS, honoredFriend: {}, money: 0 })
     expect(Object.values(g().gifts).reduce((a, b) => a + b, 0)).toBe(0)
-    expect(g().honoredFriend).toEqual({})
     expect(g().drumMessageHeard).toBe(false)
-    g().callChiefOut()
-    expect(nextChiefAction(g())).toBe('send-message')
+    expect(nextChiefAction('drummer', g(), 'at-drummer')).toBe('send-message')
+  })
+})
+
+describe('the drummer’s own word (design.md §13.4)', () => {
+  it('names the chief while the chief is in his hut', () => {
+    g().enterPlace(DRUM_MESSAGE_VILLAGE)
+    expect(nextChiefAction('drummer', g(), 'in-hut')).toBe('name-chief')
+    // …and the chief himself is not there to be spoken to.
+    expect(nextChiefAction('chief', g(), 'in-hut')).toBe('none')
   })
 
-  it('keeps sending it however poor and however unknown the traveller is', () => {
+  it('says it in any village, not only the one with a message', () => {
+    g().enterPlace(OTHER_VILLAGE)
+    expect(nextChiefAction('drummer', g(), 'in-hut')).toBe('name-chief')
+  })
+
+  it('says nothing of the kind in a port', () => {
+    g().enterPlace('cairo')
+    expect(nextChiefAction('drummer', g(), 'in-hut')).toBe('none')
+  })
+})
+
+describe('a settlement entered has its chief indoors (design.md §13.4)', () => {
+  it('leaving the village and coming back finds him in his hut', () => {
     g().enterPlace(DRUM_MESSAGE_VILLAGE)
     g().callChiefOut()
-    useGame.setState({ gifts: NO_GIFTS, honoredFriend: {}, money: 0 })
-    expect(nextChiefAction(g())).toBe('send-message')
+    expect(g().chiefOutside[DRUM_MESSAGE_VILLAGE]).toBe(true)
+    g().leavePlace()
+    g().enterPlace(DRUM_MESSAGE_VILLAGE)
+    expect(g().chiefOutside[DRUM_MESSAGE_VILLAGE]).toBeFalsy()
+    expect(chiefWalkState().phase).toBe('in-hut')
+    expect(nextChiefAction('hut', g(), chiefWalkState().phase)).toBe('step-out')
   })
 
-  it('the chief being outside survives a save and its reload', () => {
+  it('a resumed run finds him in his hut too — the walk is never saved', () => {
     g().enterPlace(DRUM_MESSAGE_VILLAGE)
     g().callChiefOut()
     g().saveCheckpoint()
     g().newGame()
-    expect(g().chiefOutside[DRUM_MESSAGE_VILLAGE]).toBeFalsy()
     expect(g().loadCheckpoint()).toBe(true)
-    expect(g().chiefOutside[DRUM_MESSAGE_VILLAGE]).toBe(true)
+    expect(g().chiefOutside[DRUM_MESSAGE_VILLAGE]).toBeFalsy()
   })
 })
 

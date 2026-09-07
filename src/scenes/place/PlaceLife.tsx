@@ -118,6 +118,9 @@ import {
   type DrumGeometry,
 } from './drummerPose'
 import { PORT_TALKERS, VILLAGE_SPOTS, villageAdultStations, type PlayGround } from './lifeSpots'
+import { drummerFacing } from './chiefWalk'
+import { DRUMMER_SPEAKER_ID } from './chiefPresence'
+import { setDrummerVoice } from './drummerVoice'
 import { buildWedgeCarve } from './wedgeCarve'
 import { figureStance, unplacedInhabitant, type PlaceSpot } from './placement'
 
@@ -1533,6 +1536,37 @@ function Drum({ drum, headRef }: { drum: DrumGeometry; headRef: RefObject<THREE.
 }
 
 /**
+ * The drummer's OWN word (design.md §13.4): asked while the chief is in his
+ * hut, he points his arm at that hut and names the man — CHIEF, one atom of the
+ * same tonal language, through the same hearing gate as every other village
+ * voice. Out of earshot he neither speaks nor mimes; the player who could not
+ * have heard the word is not shown the arm that goes with it.
+ */
+function speakChiefWord(
+  drummer: { x: number; z: number; yaw: number },
+  hut: readonly [number, number],
+  anchor: THREE.Group | null,
+  gesture: RefObject<GestureState>,
+): void {
+  const distance = placePlayerPosition.active
+    ? Math.hypot(drummer.x - placePlayerPosition.x, drummer.z - placePlayerPosition.z)
+    : Infinity
+  const utterance = utteranceOf('CHIEF')
+  playSpeech(utterancePlan(utterance, distance))
+  if (speechReach(distance).audible) {
+    useGame.getState().hearUtterance(utterance)
+    if (anchor) {
+      speakOverhead(DRUMMER_SPEAKER_ID, [utterance], anchor, { seconds: speechLabelSeconds(1) })
+    }
+  }
+  // The arm is aimed at the hut's DOOR height rather than its ridge: a man
+  // points at the man inside, not at the roof.
+  gesture.current = gestureIfHeard(distance, 'point', {
+    ...aimAt({ x: drummer.x, z: drummer.z, yaw: drummer.yaw }, { x: hut[0], y: 1.6, z: hut[1] }, FIGURE_LIMBS.shoulderY),
+  })
+}
+
+/**
  * Drummer at his pair of drums — the audible village drums made visible, and
  * the voice the chief's message goes out on (design.md §13.4, point 486).
  *
@@ -1553,21 +1587,33 @@ function Drummer({ x, z, cloth }: { x: number; z: number; cloth: string }) {
   const pose = useRef<FigurePose | null>({ left: { ...REST_POSE.left }, right: { ...REST_POSE.right }, lean: DRUMMER_LEAN, turn: 0 })
   const lowHead = useRef<THREE.Mesh>(null)
   const highHead = useRef<THREE.Mesh>(null)
-  useFrame(() => {
+  const group = useRef<THREE.Group>(null)
+  const gesture = useRef<GestureState>(restGesture())
+  const yaw = drummerFacing([x, z])
+  // His voice, for the use key that is read in PlaceScene (drummerVoice.ts).
+  useEffect(() => {
+    setDrummerVoice((hut) => speakChiefWord({ x, z, yaw }, hut, group.current, gesture))
+    return () => setDrummerVoice(null)
+  }, [x, z, yaw])
+  useFrame((_, rawDt) => {
     const p = pose.current
     if (!p) return
     const beating = useUi.getState().drumPerformance
     const elapsed = beating ? (speechClock() * 1000 - beating.startedAt) / 1000 : 0
     const frame = drummerPoseAt(beating?.plan ?? null, elapsed)
-    Object.assign(p.left, frame.pose.left)
-    Object.assign(p.right, frame.pose.right)
-    p.lean = frame.pose.lean
-    p.turn = frame.pose.turn
+    gesture.current = advanceGesture(gesture.current, Math.min(rawDt, 0.1))
+    // The message outranks the word: while the drums are going out his hands
+    // belong to them, so a gesture can never take an arm off a beating drum.
+    const shown = !beating && isGesturing(gesture.current) ? gesturePose(gesture.current) : frame.pose
+    Object.assign(p.left, shown.left)
+    Object.assign(p.right, shown.right)
+    p.lean = shown.lean
+    p.turn = shown.turn
     if (lowHead.current) lowHead.current.position.y = drumHeadY(LOW_DRUM, frame.lowSwing)
     if (highHead.current) highHead.current.position.y = drumHeadY(HIGH_DRUM, frame.highSwing)
   })
   return (
-    <group position={[x, 0, z]} rotation={[0, Math.atan2(-x + 3.5, -z + 2.5), 0]}>
+    <group ref={group} name={DRUMMER_SPEAKER_ID} position={[x, 0, z]} rotation={[0, yaw, 0]}>
       <Figure cloth={cloth} pose={pose} />
       {/* The large low drum (`ba`) and the small high one (`BA`) — each on the
           side its own x puts it, which is the side its hand is read from. */}

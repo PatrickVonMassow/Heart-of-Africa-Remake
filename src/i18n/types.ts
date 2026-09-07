@@ -165,8 +165,16 @@ export interface Strings {
   }
 
   labels: {
-    /** Use-key prompt at the hut of a chief standing in the open (§12). */
+    /** Use-key prompt at a chief with nothing of his own to send (§12). */
     speakToChief: string
+    /** Use-key prompt at the chief or his drummer, before the drums have spoken. */
+    askForDrumMessage: string
+    /** The same key once the message has been heard: it beats it out again. */
+    repeatDrumMessage: string
+    /** Use-key prompt at the chief or his drummer while he walks home (§13.4). */
+    callChiefBack: string
+    /** Use-key prompt at the drummer while the chief is in his hut (§13.4). */
+    askDrummer: string
     /** Standing label over the chief himself, once he is outside (§12). */
     chief: string
     graveDebug: string
@@ -365,8 +373,10 @@ export interface Strings {
     /** The dummy success of this proof of concept: a form has found its socket
      *  and the PoC's puzzle is solved. */
     pocSolved: string
-    /** The chief has come out of his hut and stands in the open (§12). */
+    /** The chief leaves his hut and walks over to his drummer (§12/§13.4). */
     chiefStepsOut: string
+    /** He was called back on his way home and turns round (§13.4). */
+    chiefCalledBack: string
     /** This chief has no drum message of his own to send (§13.4). */
     chiefNoMessage: string
     /** The find was used where nobody can take it: no chief out in the open, or
@@ -774,7 +784,6 @@ export interface Strings {
       /** The clay impression pressed into the rock it was taken from. */
       mouldFitted: string
       decoded: string
-      unspecific: string
       victory: string
       foodLow: string
       foodOut: string
@@ -837,8 +846,6 @@ export interface Strings {
     hintRaw(p: TextParams): string
     /** Deciphered version of the same hint. */
     hintDecoded(p: TextParams): string
-    /** Unspecific knowledge pointing to the knowing people (§13.3). */
-    unspecific(p: TextParams): string
     /** The chief's drums beat his message out (design.md §13.4, point 486). */
     drumMessage: string
     /** The dig at the boulder the drum message sends the traveller to (point 487). */

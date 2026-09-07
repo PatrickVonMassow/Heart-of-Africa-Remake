@@ -7,7 +7,7 @@ import { balance } from '../config/balance'
 import { useGame } from '../state/store'
 import { sampleTerrain, type TerrainType } from '../world/terrain'
 import { setupGeodata } from './geodata'
-import { clearChiefStanding, setChiefStanding } from '../scenes/place/chiefPresence'
+import { clearChiefStanding, resetChiefWalk, setChiefStanding } from '../scenes/place/chiefPresence'
 import { placePlayerPosition } from '../scenes/place/playerPosition'
 
 export { useGame }
@@ -86,5 +86,6 @@ export function standBeforeChief(distance = 0): void {
 /** Nobody stands in the open: the chief is in his hut, or the place is left. */
 export function leaveTheChief(): void {
   clearChiefStanding()
+  resetChiefWalk()
   placePlayerPosition.active = false
 }
