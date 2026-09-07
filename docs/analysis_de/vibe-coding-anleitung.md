@@ -530,6 +530,17 @@ Die Ursache findest du durch **Zerlegen**, nicht durch Wiederholen.
   → *Prompt:* „Eine Entscheidung, die du selbst triffst, nennt die **Messung**, die sie stützen
   oder widerlegen würde, und **verfällt**, sobald diese Messung sauber vorliegt."
 
+- **Der Rückfallwert verbirgt seine eigene Abwesenheit.** Deine Regel sagt A, die Einstellungsdatei
+  fehlt, das Werkzeug springt still auf seinen Standardwert B — und weil B ein völlig gültiger
+  Zustand ist, gibt es nichts zu finden: kein Rot, kein Widerspruch, keinen Defekt. Bei uns lief so
+  monatelang die gesamte Modell-Last auf einem Anbieter, obwohl die Regel sie teilte; sichtbar war
+  es allein an der Verbrauchsanzeige des Anbieters, die keine Prüfung liest.
+  → *Prompt:* „Für jede Einstellung, die eine geschriebene Regel umsetzt: Vergleiche **Regel gegen
+  Ist**, nicht Ist gegen Plausibilität. Frag ausdrücklich, welchen Wert das Werkzeug **jetzt gerade
+  meldet** und ob eine Datei ihn überhaupt setzt. Und wenn die einzige Wirkung eines Fehlstands
+  **außerhalb** deines Projekts sichtbar wird — eine Rechnung, ein Kontingent, ein fremdes
+  Dashboard —, dann bist **du** der einzige Sensor: sieh regelmäßig selbst nach."
+
 ---
 
 ## Drei Meta-Regeln, die alles zusammenhalten
@@ -568,4 +579,4 @@ Die Ursache findest du durch **Zerlegen**, nicht durch Wiederholen.
 
 Sie ersetzt die Fallstricke oben nicht.
 
-<!-- GUIDE-FINGERPRINT: 84168975203c7290753521b90020139e436691e741e29bf069484911e41bdad3 -->
+<!-- GUIDE-FINGERPRINT: da3ec1cf827431195d625c3350aeb6dffeb45b5d6d5a5fcb0701b47594481c64 -->

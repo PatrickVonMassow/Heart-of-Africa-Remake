@@ -95,6 +95,7 @@ Das Musterbeispiel sind die Chat-Zeitstempel: neun Eskalationsstufen, acht weich
 | 04.09. abends | Der Nutzer fragte nach dem roten Kasten, den er „immer wieder" sieht: `exited with code 143` und „Remote Control is disabled" sind kein Absturz, sondern unsere eigene Kontextgrenze — die Autostart-Remediation erschießt den übergebenen Vorgänger zwei Minuten nach `markHandover`, und mit dem Prozess stirbt die Fernsicht auf die unbeaufsichtigte Batch. Acht Übergaben an einem Abend, und keine Meldung sagte je, dass wir es selbst waren (§3.236, Punkt 1059) |
 | 05.09. abends | Zwölf Sitzungstode an einem Tag, jeder ein sauberes `exit 143`, jede Fährte falsch (Container, Erweiterung, Übergabe, Push-Tor) — bis ein Prozess-Recorder zwei Sessions in derselben Sekunde verschwinden sah: Zwei Tests des Notfall-Schlags ließen die echten Nähte stehen und terminierten in jedem Vitest-Lauf jede im Register verzeichnete Session (§3.238) |
 | 07.09. | Eine Prüfschranke färbte auf ihrer eigenen Messbewegung rot: Die Tiefenhälfte hatte als einzige gar kein Polster, während die Zählhälfte vier Bilder von neunzig durchgehen ließ — und beide sahen dieselben Bilder. Die Entwirrung kann kein überlappendes Paar setzen, jede Verschmelzung war ein Paar, das nach dem Setzen ineinander gewandert war; 22 Spurläufe zeigten sie ausnahmslos im Fenster NACH dem Auslöser, ein bis drei Bilder lang (§3.239, Punkt 1067) |
+| 07.09. mittags | Der Nutzer fragte nach der Lastverteilung seit dem Zehn-Uhr-Reset und deckte 100 % zu 0 % auf: In viereinhalb Stunden liefen ~627k Ausgabe-Token auf Anthropic, während OpenAI keinen einzigen Aufruf bekam. `.claude/astra-share.json` fehlte, der Schalter lief daher im Zustand `default` — der nach seinem eigenen Hilfetext UNTER der stehenden Policy von CLAUDE.md §6 liegt und nur den Review abgibt. Ein Rückfallwert, der für sich gültig ist, macht seine eigene Abwesenheit unsichtbar; die Wirkung stand nur auf zwei fremden Verbrauchsanzeigen (§3.240) |
 
 
 Muster: Ab dem 22.07. explodiert die Commit-Rate (Delegation) — und genau dann häufen sich die Infrastruktur-Vorfälle. **Skalierung der Autonomie erzeugt eine eigene Problemklasse, die die Feature-Arbeit zeitweise überholt.**
@@ -1435,7 +1436,7 @@ keinen Träger hat. Gebucht als Punkt 956.
 
 ## Anhang A — Maschinell gepflegte Quellen-Übersicht
 
-Zuletzt aktualisiert: Montag, 07.09.2026, 13:15 · Quellen-Fingerprint: `83206ae0cbdc…`
+Zuletzt aktualisiert: Montag, 07.09.2026, 14:48 · Quellen-Fingerprint: `da3ec1cf8274…`
 
 Spalten heuristisch aus den Quellen abgeleitet (Anläufe = distinkte Datumsnennungen im Memory;
 Maßnahme = Guard-Skripte mit Namens-Treffer). Die inhaltliche Bewertung gehört der Prosa oben.
@@ -1474,7 +1475,7 @@ Maßnahme = Guard-Skripte mit Namens-Treffer). Die inhaltliche Bewertung gehört
 | Work at High effort by default; the user reserves Extra high for research and design decisions, not implementation | 4 | hoch | — (Regel/Memory) | ◐ Regel |
 | Write idiomatic English in all English text (README, code comments, commit messages) — no German calques like 'stand' for a version | 1 | niedrig | — (Regel/Memory) | ◐ Regel |
 | Fable is NOT the default lane because its volume is the scarcest; difficulty is no reason for it either (since 18.08.2026 hard cases go straight to the OpenAI lane, GPT-6 Astra), and review is cross-vendor, not Fable-by-default | 6 | hoch | — (Regel/Memory) | ◐ Regel |
-| Findings recorded by a session that could not write the work order — carry each into TASKS.md, then mark it drained | 51 | hoch | findings-guard.mjs | ✔ Mechanismus |
+| Findings recorded by a session that could not write the work order — carry each into TASKS.md, then mark it drained | 52 | hoch | findings-guard.mjs | ✔ Mechanismus |
 | A recurring lookup gets a script; never pull raw transcripts, listings, or logs into context to answer it | 1 | niedrig | wait-command-guard.mjs | ✔ Mechanismus |
 | Past the 150k context watermark, FINISH the step and hand over — never start a suite, an agent or a point after it; the user raised the cost twice (13.08. and 17.08.2026) | 2 | mittel | — (Regel/Memory) | ◐ Regel |
 | User 18.08.2026: hard, complex, error-prone and HIGH-criticality points are AUTHORED by the OpenAI lane directly (GPT-6 Astra since 05.09.2026, GPT-5.6 Sol before) — Opus 5 authors only what is left, and Fable authors only a point that tags its lane or one the router escalates | 5 | hoch | — (Regel/Memory) | ◐ Regel |
@@ -1540,8 +1541,8 @@ Maßnahme = Guard-Skripte mit Namens-Treffer). Die inhaltliche Bewertung gehört
 
 Erfasste Quellen: 95 Feedback-/Projekt-Memories · 58 Guard-/Hook-Skripte · 6 Revert-/Reapply-Commits · 125 Prozess-/Meta-TASKS-Punkte (davon 59 offen).
 
-<!-- RETRO-FINGERPRINT: 83206ae0cbdcf37ec94bed7a799b327883947db7af2ba2fe93b78824bf5de591 -->
-<!-- RETRO-LAST-REFRESHED: 2026-09-07T11:15:19.015Z -->
+<!-- RETRO-FINGERPRINT: da3ec1cf827431195d625c3350aeb6dffeb45b5d6d5a5fcb0701b47594481c64 -->
+<!-- RETRO-LAST-REFRESHED: 2026-09-07T12:48:26.781Z -->
 <!-- AUTO-GENERATED:END -->
 
 ### 3.111 Ein Erfolg ist kein Beweis für den Weg, auf dem er zustande kam
@@ -5694,3 +5695,43 @@ Und die zweite Lehre steht daneben: Das Instrument, das die Frage entschied, war
 Drosseltest, sondern eine Spur, die pro Bild aufschrieb, WO im Messfenster die Verschmelzung
 saß. Die Rotquote allein (1 von 8 ungedrosselt, 5 von 8 bei einem Viertelkern, 0 von 8 auf
 WebGPU) sagte nur, dass Last sie bewegt. Erst die Verteilung im Fenster sagte, wer sie macht.
+
+### 3.240 Ein fehlender Zustand ist ein gültiger Zustand — der Schalter fiel auf den Default und keiner sah es
+
+Am Mittag des 07.09. fragte der Nutzer, wie die Last seit dem Zehn-Uhr-Reset
+zwischen seinen beiden Kontingenten verteilt gewesen sei: Beide Pools waren um
+dieselbe Uhrzeit zurückgesetzt worden, der Anthropic-Vorrat war schon deutlich
+angegriffen, der OpenAI-Vorrat annähernd voll. Die Messung war eindeutig und
+extrem: 100 % zu 0 %. Auf Anthropic liefen in viereinhalb Stunden rund 627 000
+Ausgabe-Token (Fable 5.1 486k, Opus 5 141k) und 72 Millionen gelesene
+Cache-Token; auf OpenAI fiel kein einziger Aufruf an — keine Astra-Artefakte,
+kein `Reviewed-By`-Trailer an diesem Tag, letzter Astra-Review am Vortag, und
+alle 18 gelandeten Commits trugen Anthropic-Modelle.
+
+Die Ursache war kein Fehler, sondern eine Abwesenheit: `.claude/astra-share.json`
+existierte nicht. Ohne diese Datei läuft der Schalter im Zustand `default`, und
+in dem geht **nur** der Review zu Astra, während diagnose, audit, enumerate,
+explain und vor allem das Autorieren bei Claude bleiben. Da die Batch seit dem
+Reset durchgehend an einem einzigen Punkt autorierte und verifizierte und dabei
+kein Review anfiel, bekam OpenAI strukturell nichts. Der eigene Hilfetext des
+Schalters sagt über diesen Zustand ausdrücklich, er liege *unter* der stehenden
+Policy von CLAUDE.md §6 — die Regel forderte `prefer-astra`, die Maschine tat
+`default`, und beides galt gleichzeitig lange als in Ordnung.
+
+Das ist die Fehlerklasse, und sie ist mit §3.229 verwandt, aber nicht dieselbe.
+Dort fror eine *eingetragene* Konstante eine Fähigkeit ein; hier war überhaupt
+nichts eingetragen, und der Rückfallwert ist ein völlig legitimer Zustand des
+Systems. Genau deshalb kann kein Wächter anschlagen: Es gibt keinen Defekt zu
+finden, keinen roten Lauf, keine widersprüchliche Angabe — nur eine Datei, die
+fehlt, und einen Default, der brav einspringt. **Ein Rückfallwert, der für sich
+genommen gültig ist, macht seine eigene Abwesenheit unsichtbar.** Wo ein
+Standardzustand von der geschriebenen Policy abweicht, muss der Abgleich
+Policy-gegen-Ist geführt werden, nicht der Abgleich Ist-gegen-Plausibilität.
+
+Und die Folge war nur außerhalb des Repositories sichtbar. Der Beleg dafür, dass
+etwas schieflief, stand nicht in einem Log, sondern auf zwei Verbrauchsanzeigen
+bei zwei Anbietern — der einen Stelle, die keine unserer Prüfungen liest. Auch
+diesen Befund lieferte wieder der Nutzer, und wieder war das keine Zufälligkeit,
+sondern die Vorhersage: dieselbe Rolle wie in §3.99, §3.134 und §3.229. Wenn die
+einzige Wirkung einer Fehlstellung ein Zahlenstand in einem fremden Dashboard
+ist, dann ist der Nutzer der einzige Sensor, den wir dafür haben.
