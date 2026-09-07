@@ -175,6 +175,18 @@ describe('a settlement entered has its chief indoors (design.md §13.4)', () => 
     expect(chiefWalkState().phase).not.toBe('in-hut')
   })
 
+  it('an ENTRY that throws leaves both halves of him exactly as they were', () => {
+    g().enterPlace(DRUM_MESSAGE_VILLAGE)
+    g().callChiefOut()
+    // A state whose arrival log cannot be read: entering throws before anything
+    // is set, and a reset that ran ahead of that read would put the walk indoors
+    // under a flag that still says he is out.
+    useGame.setState({ enteredPlaces: {} as unknown as string[] })
+    expect(() => g().enterPlace(DRUM_MESSAGE_VILLAGE)).toThrow()
+    expect(g().chiefOutside[DRUM_MESSAGE_VILLAGE]).toBe(true)
+    expect(chiefWalkState().phase).not.toBe('in-hut')
+  })
+
   it('a new game finds him in his hut too — both halves are cleared together', () => {
     g().enterPlace(DRUM_MESSAGE_VILLAGE)
     g().callChiefOut()

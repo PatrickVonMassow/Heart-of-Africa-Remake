@@ -1475,9 +1475,6 @@ export const useGame = create<GameState>()((set, get) => ({
   enterPlace: (id) => {
     const s = get()
     const place = placeById(id)
-    // A settlement entered always has its chief indoors (design.md §13.4): the
-    // walk is scene furniture and starts over, and the coarse flag with it.
-    resetChiefWalk()
     const first = !s.visitedPlaces.includes(id)
     // Arrival journaling (design.md §16, point 394): the FIRST entry into any
     // walkable scene writes that place's own entry, a later one writes only
@@ -1485,6 +1482,11 @@ export const useGame = create<GameState>()((set, get) => ({
     const firstEntry = !s.enteredPlaces.includes(id)
     const situation = placeSituationAt(place, s.day, START_YEAR)
     const storedSituation = s.placeSituations[id]
+    // A settlement entered always has its chief indoors (design.md §13.4): the
+    // walk is scene furniture and starts over, and the coarse flag with it. It
+    // stands HERE, past every read that can throw and against the set that
+    // clears the flag, so the two halves of him never part company.
+    resetChiefWalk()
     set({
       mode: 'place',
       placeId: id,
