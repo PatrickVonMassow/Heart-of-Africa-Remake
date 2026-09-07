@@ -54,7 +54,7 @@ function fixture({ empty = false, missingLauncher = false, writable = false } = 
     run(env = {}) {
       return spawnSync('bash', ['-c', 'source "$1"; shift; container_entrypoint "$@"',
         'fixture', entrypoint, repo, config, process.execPath, command, 'one argument', '$literal'], {
-        encoding: 'utf8', timeout: 10_000,
+        encoding: 'utf8', timeout: 10_000, windowsHide: true,
         env: { ...process.env, PATH: `${bin}:${process.env.PATH}`, HOA_START_EVENTS: events, ...env },
       })
     },
