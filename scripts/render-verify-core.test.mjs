@@ -2876,21 +2876,34 @@ describe('the shipped charge ledger', () => {
   // to make deliberate. The two point-698 crossing entries are the whole list
   // today, and a third one has to be argued for HERE, in this test, before it
   // can charge anything.
-  it('lets exactly the two crossing entries read a cut measurement, and makes each say why', () => {
+  it('lets exactly the declared entries read a cut measurement, and makes each say why', () => {
     const MAX_STORED_DETAIL = 200
     const declaring = RED_CHARGES.filter((c) => c.detailReadsPrefix === true)
-    expect(declaring.map((c) => `${c.point}/${c.suite}/${c.backend}`)).toEqual([
-      '698/polish/webgpu',
-      '698/polish/webgl',
-    ])
-    // THE MEASUREMENT THE DECLARATION IS ABOUT, and it is the real one: 223
-    // characters, so its record is cut, while the signature stops at 178.
-    const measured =
-      'from one side of him to the other — 0 of 4 crossed his line; along the lane (0 = his line) ' +
-      '[-11..25@1, -10..22@1, -24..0@1, -11..14@1] m, walked [67, 67, 67, 68] m, phases ' +
-      '[run×16 part×72 roam×307] over 45s played, 3 tagged'
-    expect(measured.length).toBeGreaterThan(200)
+    // EACH DECLARED READER BRINGS ITS OWN MEASURED TEXT — the real one, longer
+    // than the bound, so the cut is genuine. A shared sample would only prove
+    // that one entry reads a prefix and would say nothing about the others.
+    const measuredFor = {
+      '698/polish/webgpu':
+        'from one side of him to the other — 0 of 4 crossed his line; along the lane (0 = his line) ' +
+        '[-11..25@1, -10..22@1, -24..0@1, -11..14@1] m, walked [67, 67, 67, 68] m, phases ' +
+        '[run×16 part×72 roam×307] over 45s played, 3 tagged',
+      '698/polish/webgl':
+        'from one side of him to the other — 0 of 4 crossed his line; along the lane (0 = his line) ' +
+        '[-11..25@1, -10..22@1, -24..0@1, -11..14@1] m, walked [67, 67, 67, 68] m, phases ' +
+        '[run×16 part×72 roam×307] over 45s played, 3 tagged',
+      '1068/polish/webgl':
+        'worst child 0 at 0.34 % of its own judged time; group 0.07 % (4 of 5805 1s windows, ' +
+        '151.4 judged child-seconds). Least judgeable child 4 at 96.9 %, group 96.9 % of 156.3 ' +
+        'traced. In 0.5s bursts: worst child -1 at 0.00 %, group 0.00 % of 153.8 judged ' +
+        'child-seconds, least judgeable child 4 at 98.5 %. Bad = over 1 m walked inside 0.35 m',
+    }
+    expect(declaring.map((c) => `${c.point}/${c.suite}/${c.backend}`).sort()).toEqual(
+      Object.keys(measuredFor).sort(),
+    )
     for (const c of declaring) {
+      const id = `${c.point}/${c.suite}/${c.backend}`
+      const measured = measuredFor[id]
+      expect(measured.length, `${id} — the sample must actually be cut`).toBeGreaterThan(MAX_STORED_DETAIL)
       const at = (text_) =>
         new RegExp(c.detailMatch.source, c.detailMatch.flags.replace(/[gy]/g, '')).exec(text_)
       // ASKED OF THE WHOLE MEASUREMENT, NOT ONLY OF ITS STORED PREFIX
@@ -2901,22 +2914,22 @@ describe('the shipped charge ledger', () => {
       // it in the same place.
       const whole = at(measured)
       const kept = at(measured.slice(0, MAX_STORED_DETAIL))
-      expect(whole, `point ${c.point} / ${c.backend} — the full measurement`).not.toBeNull()
-      expect(kept, `point ${c.point} / ${c.backend} — the stored prefix`).not.toBeNull()
-      expect(kept[0], `point ${c.point} / ${c.backend} — same match either way`).toBe(whole[0])
-      expect(kept.index, `point ${c.point} / ${c.backend} — same place either way`).toBe(whole.index)
+      expect(whole, `${id} — the full measurement`).not.toBeNull()
+      expect(kept, `${id} — the stored prefix`).not.toBeNull()
+      expect(kept[0], `${id} — same match either way`).toBe(whole[0])
+      expect(kept.index, `${id} — same place either way`).toBe(whole.index)
       // THE CLEARANCE IS THE WHOLE ARGUMENT: the signature must stop short of
       // the bound, or the declaration is claiming something about text the
       // record does not hold.
-      expect(whole.index + whole[0].length, `point ${c.point} / ${c.backend}`).toBeLessThan(MAX_STORED_DETAIL)
+      expect(whole.index + whole[0].length, id).toBeLessThan(MAX_STORED_DETAIL)
       // And the entry says so in its own words: the field it claims, the cut it
       // claims it about, and WHAT THE BOUND REMOVES — a `why` that merely says
       // "bound" somewhere is not an argument (same review).
       const why = String(c.why)
-      expect(why, `point ${c.point} / ${c.backend}`).toMatch(/detailReadsPrefix/)
-      expect(why, `point ${c.point} / ${c.backend}`).toMatch(/cut at the 200-character bound|cut at the \d+-character bound/i)
-      expect(why, `point ${c.point} / ${c.backend}`).toMatch(/what the bound removes|only the trailing epilogue removed/i)
-      expect(why, `point ${c.point} / ${c.backend}`).toMatch(/clear of (?:that|it|the bound)/i)
+      expect(why, id).toMatch(/detailReadsPrefix/)
+      expect(why, id).toMatch(/cut at the 200-character bound|cut at the \d+-character bound/i)
+      expect(why, id).toMatch(/what the bound removes|only the trailing epilogue removed/i)
+      expect(why, id).toMatch(/clear of (?:that|it|the bound)/i)
     }
   })
 

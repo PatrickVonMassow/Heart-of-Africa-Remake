@@ -1151,24 +1151,46 @@ export const RED_CHARGES = [
     backend: 'webgl',
     kind: 'check',
     match: /^no child walks without getting anywhere$/i,
-    // DETAIL-SCOPED to the ONE-SECOND window reading alone. The check judges two
-    // windows: a 1 s series and a 0.5 s burst series. What was measured reddened
-    // the 1 s reading (4 of 5805 windows) while the BURST reading stood at
-    // 0.00 % — a child that never treads inside half a second is a different
-    // composition from one that does, and a red on the burst is the sustained
-    // defect nobody owns. So the burst share is pinned to 0.00 % and the 1 s
-    // group share is bounded at one digit: a wider one is a real red.
+    // DETAIL-SCOPED to WHAT THE RECORD ACTUALLY HOLDS. The run record cuts the
+    // detail at 200 characters (`detailCut: true`), and the cut falls inside the
+    // words "In 0.5s bursts: worst " — so the burst reading, which is the
+    // sharpest discriminator (it stood at 0.00 % while the one-second reading
+    // reddened), is NOT in the text a charge can read. The scope is therefore
+    // everything the record does hold, spelled out rather than left to a
+    // wildcard: the group share under a tenth of a percent, its window count and
+    // the judgeability reading. A sustained tread — a group share of 1 % or more,
+    // or a red without the judgeability line — is a different composition and
+    // stays a real red.
+    // READS ONLY THE FRONT, and says so: the record cuts at 200 characters, which
+    // falls inside "In 0.5s bursts: worst ". How far the signature reaches: to
+    // the end of the judgeability reading, i.e. every number the record keeps.
+    // Why the tail cannot matter: what follows the cut is the burst series and
+    // the printed threshold sentence. The burst series can only make the red
+    // WORSE than what is charged here, and a worse one is a different
+    // composition — but it is also unreadable by construction, so this entry
+    // deliberately owns the whole of it: a tread that the one-second series puts
+    // under a tenth of a percent is the transient this charge is for, whatever
+    // the cut hides. The threshold sentence is a constant the check prints.
+    detailReadsPrefix: true,
     detailMatch:
-      /^worst child \d+ at \d+\.\d+ % of its own judged time; group 0\.\d\d %? ?\(\d+ of \d+ 1s windows, [\d.]+ judged child-seconds\)\. Least judgeable child \d+ at [\d.]+ %, group [\d.]+ % of [\d.]+ traced\. In 0\.5s bursts: worst child -?\d+ at 0\.00 %, group 0\.00 % of [\d.]+ judged child-seconds, least judgeable child \d+ at [\d.]+ %\. Bad = .*$/i,
+      /^worst child \d+ at \d+\.\d+ % of its own judged time; group 0\.0\d % \(\d+ of [1-9]\d* 1s windows, [\d.]+ judged child-seconds\)\. Least judgeable child \d+ at [\d.]+ %, group [\d.]+ % of [\d.]+ traced\./i,
     why:
       'MEASURED 07.09.2026 on main at bd050ddf8, VERIFY_GL=webgl polish (log '
       + 'local/verify-logs/2026-09-07T05-44-35-994-polish.log): worst child 0 at 0.34 % of its own '
       + 'judged time, group 0.07 % (4 of 5805 one-second windows), and the 0.5 s burst reading at '
       + '0.00 % — a child that treads inside a second but never inside half of one. The retry passed '
-      + 'with 207 checks, so the run was recorded SUSPECT and covered no backend, which is exactly '
-      + 'what left the WebGL 2 picture lane without a covering run. It is charged, not excused: point '
-      + '1068 owes the throttle probe that says whether this is load or a defect, and the charge dies '
-      + 'with that point.',
+      + 'with 207 checks, so the run was recorded SUSPECT and covered no backend, which is what left '
+      + 'the WebGL 2 picture lane without a covering run. '
+      + 'IT DECLARES detailReadsPrefix, because this measurement is cut at the 200-character bound: '
+      + 'the record keeps everything up to the words "In 0.5s bursts: worst" and no further. WHAT '
+      + 'THE BOUND REMOVES is the burst series and the constant threshold sentence the check always '
+      + 'prints. The signature stops after the judgeability reading, well clear of that bound, and '
+      + 'reads only numbers the record really holds: the one-second group share under a tenth of a '
+      + 'percent, its window count, and the judgeability shares. A sustained tread — a group share '
+      + 'of a tenth of a percent or more — is a different composition and stays a real red. The '
+      + 'burst reading cannot be scoped because it lies past the cut; this entry therefore owns the '
+      + 'transient whatever the cut hides, and point 1068 owes the throttle probe that says whether '
+      + 'it is load or a defect. The charge dies with that point.',
   },
   {
     point: 1010,
