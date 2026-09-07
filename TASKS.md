@@ -77,39 +77,6 @@ then point 633 (the closing run), then point 174 (the tag). A newly appended poi
 kind is MOVED to the front in the same turn that files it; leaving it where append-and-defer
 put it is the mistake this line exists to stop.
 
-- [ ] 1068. WebGL 2's polish run reds once on the children-motion check, and the red has no owner
-  (measured 07.09.2026 on main at bd050ddf8, `VERIFY_GL=webgl node scripts/verify/run-logged.mjs
-  polish`, log `local/verify-logs/2026-09-07T05-44-35-994-polish.log`).
-  The check `no child walks without getting anywhere` failed with: worst child 0 at 0.34 % of its
-  own judged time, group 0.07 % (4 of 5805 one-second windows, 151.4 judged child-seconds), and in
-  the burst reading worst child 0 at 10.7 s having walked 1.40 m inside 0.32 m. The retry passed
-  with 207 checks, so the run is recorded SUSPECT and covers NO backend.
-  IT HAS NO OWNER. `scripts/render-verify-charges.mjs` holds no entry that matches, and no open
-  point names a child treading in place, so the red rides along unowned — the same shape point
-  1010 records for the label-fusion check.
-  WHAT IT COSTS. It blocks the covering WebGL 2 picture run that every render change on that lane
-  owes: it is the run point 1067 had to hand to its successor, and the next render point pays the
-  same until this has an owner.
-  WHAT IS AND IS NOT MEASURED. Measured: one child, 10.7 s, 1.40 m walked inside a 0.32 m circle,
-  in one run of the WebGL 2 lane, with the retry green — on a host that had drawn suites for six
-  hours. NOT measured, and named here rather than assumed: whether it reproduces at all (`node
-  scripts/throttle-probe.mjs polish --section=children-motion --runs 8` has not been run), whether
-  the WebGPU lane shows it (that lane's run was green, but this reading was not printed), and
-  whether a player watching the settlement would see a child tread rather than walk.
-  Final state:
-  - The throttle probe says whether it is load or a defect, and the eight results are printed.
-  - Whichever it is, the red has an owner: a fix that removes it, or an entry in
-    `scripts/render-verify-charges.mjs` scoped to the measured composition, which dies with this
-    point.
-  Test: `node scripts/throttle-probe.mjs polish --section=children-motion --runs 8` on a quiet
-  host, plus the same probe on WebGPU for the comparison this point lacks; and after the decision,
-  either the section green over eight consecutive runs on a loaded host, or the charge entry.
-  Criticality: medium — it costs no player anything yet, but it blocks the evidence one backend's
-  render changes are filed with.
-  Refs: scripts/verify/polish.mjs (`children-motion`), scripts/verify/childMotionMetric.mjs,
-  scripts/render-verify-charges.mjs
-  Bundle: Session- & Repo-Hygiene.
-
 - [ ] 1064. The find from the boulder is an inventory item and is given by using it before the chief (user 06.09.2026).
   The find from the boulder is an INVENTORY ITEM and is handed over by USING it before the
   chief, not by the use key at his hut. Today the artefact dug up at the upstream erratic
@@ -847,6 +814,39 @@ put it is the mistake this line exists to stop.
   tag plus `poc` dynamically, but a tag push alone does not trigger it. Then VERIFY
   that /v0.3/ and /poc/ serve the new state, and FREEZE the tag: it is never
   re-pointed.
+
+- [ ] 1068. WebGL 2's polish run reds once on the children-motion check, and the red has no owner
+  (measured 07.09.2026 on main at bd050ddf8, `VERIFY_GL=webgl node scripts/verify/run-logged.mjs
+  polish`, log `local/verify-logs/2026-09-07T05-44-35-994-polish.log`).
+  The check `no child walks without getting anywhere` failed with: worst child 0 at 0.34 % of its
+  own judged time, group 0.07 % (4 of 5805 one-second windows, 151.4 judged child-seconds), and in
+  the burst reading worst child 0 at 10.7 s having walked 1.40 m inside 0.32 m. The retry passed
+  with 207 checks, so the run is recorded SUSPECT and covers NO backend.
+  IT HAS NO OWNER. `scripts/render-verify-charges.mjs` holds no entry that matches, and no open
+  point names a child treading in place, so the red rides along unowned — the same shape point
+  1010 records for the label-fusion check.
+  WHAT IT COSTS. It blocks the covering WebGL 2 picture run that every render change on that lane
+  owes: it is the run point 1067 had to hand to its successor, and the next render point pays the
+  same until this has an owner.
+  WHAT IS AND IS NOT MEASURED. Measured: one child, 10.7 s, 1.40 m walked inside a 0.32 m circle,
+  in one run of the WebGL 2 lane, with the retry green — on a host that had drawn suites for six
+  hours. NOT measured, and named here rather than assumed: whether it reproduces at all (`node
+  scripts/throttle-probe.mjs polish --section=children-motion --runs 8` has not been run), whether
+  the WebGPU lane shows it (that lane's run was green, but this reading was not printed), and
+  whether a player watching the settlement would see a child tread rather than walk.
+  Final state:
+  - The throttle probe says whether it is load or a defect, and the eight results are printed.
+  - Whichever it is, the red has an owner: a fix that removes it, or an entry in
+    `scripts/render-verify-charges.mjs` scoped to the measured composition, which dies with this
+    point.
+  Test: `node scripts/throttle-probe.mjs polish --section=children-motion --runs 8` on a quiet
+  host, plus the same probe on WebGPU for the comparison this point lacks; and after the decision,
+  either the section green over eight consecutive runs on a loaded host, or the charge entry.
+  Criticality: medium — it costs no player anything yet, but it blocks the evidence one backend's
+  render changes are filed with.
+  Refs: scripts/verify/polish.mjs (`children-motion`), scripts/verify/childMotionMetric.mjs,
+  scripts/render-verify-charges.mjs
+  Bundle: Session- & Repo-Hygiene.
 
 - [ ] 1048. The batch crawled through the night while every safeguard reported health:
   the owner waited on stacked watchers that can never return (measured 03.09.2026,

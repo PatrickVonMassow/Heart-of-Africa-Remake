@@ -94,6 +94,7 @@ Das Musterbeispiel sind die Chat-Zeitstempel: neun Eskalationsstufen, acht weich
 | 04.09. mittags | Zwei von 45 Durchsetzern waren still tot: Die Vor-Prüfungen für `Bash` und `PowerShell` riefen `wait-command-guard.mjs` über einen cwd-relativen Pfad auf, was in jedem Arbeitsbaum ein nicht-blockierendes `Cannot find module` ergibt — der Wächter läuft nie, und die Regel gilt trotzdem als abgesichert. Gefunden hat es kein Test, sondern der Wächter über den Wächtern (§3.234) |
 | 04.09. abends | Der Nutzer fragte nach dem roten Kasten, den er „immer wieder" sieht: `exited with code 143` und „Remote Control is disabled" sind kein Absturz, sondern unsere eigene Kontextgrenze — die Autostart-Remediation erschießt den übergebenen Vorgänger zwei Minuten nach `markHandover`, und mit dem Prozess stirbt die Fernsicht auf die unbeaufsichtigte Batch. Acht Übergaben an einem Abend, und keine Meldung sagte je, dass wir es selbst waren (§3.236, Punkt 1059) |
 | 05.09. abends | Zwölf Sitzungstode an einem Tag, jeder ein sauberes `exit 143`, jede Fährte falsch (Container, Erweiterung, Übergabe, Push-Tor) — bis ein Prozess-Recorder zwei Sessions in derselben Sekunde verschwinden sah: Zwei Tests des Notfall-Schlags ließen die echten Nähte stehen und terminierten in jedem Vitest-Lauf jede im Register verzeichnete Session (§3.238) |
+| 07.09. | Eine Prüfschranke färbte auf ihrer eigenen Messbewegung rot: Die Tiefenhälfte hatte als einzige gar kein Polster, während die Zählhälfte vier Bilder von neunzig durchgehen ließ — und beide sahen dieselben Bilder. Die Entwirrung kann kein überlappendes Paar setzen, jede Verschmelzung war ein Paar, das nach dem Setzen ineinander gewandert war; 22 Spurläufe zeigten sie ausnahmslos im Fenster NACH dem Auslöser, ein bis drei Bilder lang (§3.239, Punkt 1067) |
 
 
 Muster: Ab dem 22.07. explodiert die Commit-Rate (Delegation) — und genau dann häufen sich die Infrastruktur-Vorfälle. **Skalierung der Autonomie erzeugt eine eigene Problemklasse, die die Feature-Arbeit zeitweise überholt.**
@@ -1434,7 +1435,7 @@ keinen Träger hat. Gebucht als Punkt 956.
 
 ## Anhang A — Maschinell gepflegte Quellen-Übersicht
 
-Zuletzt aktualisiert: Sonntag, 06.09.2026, 23:49 · Quellen-Fingerprint: `c85f146e15ec…`
+Zuletzt aktualisiert: Montag, 07.09.2026, 09:03 · Quellen-Fingerprint: `84168975203c…`
 
 Spalten heuristisch aus den Quellen abgeleitet (Anläufe = distinkte Datumsnennungen im Memory;
 Maßnahme = Guard-Skripte mit Namens-Treffer). Die inhaltliche Bewertung gehört der Prosa oben.
@@ -1473,7 +1474,7 @@ Maßnahme = Guard-Skripte mit Namens-Treffer). Die inhaltliche Bewertung gehört
 | Work at High effort by default; the user reserves Extra high for research and design decisions, not implementation | 4 | hoch | — (Regel/Memory) | ◐ Regel |
 | Write idiomatic English in all English text (README, code comments, commit messages) — no German calques like 'stand' for a version | 1 | niedrig | — (Regel/Memory) | ◐ Regel |
 | Fable is NOT the default lane because its volume is the scarcest; difficulty is no reason for it either (since 18.08.2026 hard cases go straight to the OpenAI lane, GPT-6 Astra), and review is cross-vendor, not Fable-by-default | 6 | hoch | — (Regel/Memory) | ◐ Regel |
-| Findings recorded by a session that could not write the work order — carry each into TASKS.md, then mark it drained | 49 | hoch | findings-guard.mjs | ✔ Mechanismus |
+| Findings recorded by a session that could not write the work order — carry each into TASKS.md, then mark it drained | 50 | hoch | findings-guard.mjs | ✔ Mechanismus |
 | A recurring lookup gets a script; never pull raw transcripts, listings, or logs into context to answer it | 1 | niedrig | wait-command-guard.mjs | ✔ Mechanismus |
 | Past the 150k context watermark, FINISH the step and hand over — never start a suite, an agent or a point after it; the user raised the cost twice (13.08. and 17.08.2026) | 2 | mittel | — (Regel/Memory) | ◐ Regel |
 | User 18.08.2026: hard, complex, error-prone and HIGH-criticality points are AUTHORED by the OpenAI lane directly (GPT-6 Astra since 05.09.2026, GPT-5.6 Sol before) — Opus 5 authors only what is left, and Fable authors only a point that tags its lane or one the router escalates | 5 | hoch | — (Regel/Memory) | ◐ Regel |
@@ -1539,8 +1540,8 @@ Maßnahme = Guard-Skripte mit Namens-Treffer). Die inhaltliche Bewertung gehört
 
 Erfasste Quellen: 95 Feedback-/Projekt-Memories · 58 Guard-/Hook-Skripte · 6 Revert-/Reapply-Commits · 125 Prozess-/Meta-TASKS-Punkte (davon 59 offen).
 
-<!-- RETRO-FINGERPRINT: c85f146e15ecfd1669b323a8aebf37d63df2072e758cfadb63a30bc14643933b -->
-<!-- RETRO-LAST-REFRESHED: 2026-09-06T21:49:32.285Z -->
+<!-- RETRO-FINGERPRINT: 84168975203c7290753521b90020139e436691e741e29bf069484911e41bdad3 -->
+<!-- RETRO-LAST-REFRESHED: 2026-09-07T07:03:23.027Z -->
 <!-- AUTO-GENERATED:END -->
 
 ### 3.111 Ein Erfolg ist kein Beweis für den Weg, auf dem er zustande kam
@@ -5661,3 +5662,35 @@ können, ist die Bauform, die diesen Tag ermöglicht hat (Rückstand, `docs/back
 Und die Forensik-Lehre von §3.237 gilt verschärft: Wer stirbt, kann seinen Mörder nicht
 protokollieren — die Aufzeichnung muss außerhalb des Opfers laufen, und ein Diff zweier
 Aufnahmen sagt mehr als jede Hypothese über den Sender.
+
+
+### 3.239 Eine Schranke ohne Polster färbt auf der eigenen Messbewegung rot
+
+Die Verschmelzungsprüfung der Ctrl-Beschriftungen hat zwei Hälften: eine ZÄHLUNG, die
+vier verschmolzene Bilder von neunzig durchgehen lässt, und eine TIEFE, die ein einziges
+Bild ab 18 px rot färbte. Der Kommentar der Zählung begründet ihr Polster ausführlich —
+die Entwirrung entscheidet zehnmal je Sekunde, die Leute laufen in jedem Bild, also kann
+ein legal gesetztes Paar zwischen zwei Entscheidungen kurz ineinander geraten. Genau diese
+Begründung trägt die Tiefe auch, nur hatte niemand sie hinübergeschrieben.
+
+Gemessen wurde erst, als die Bahn dreimal am selben Stand verschieden urteilte. Der Blick
+in die Ebene zeigte: `declutterLabels` KANN kein überlappendes Paar setzen — sie legt eine
+Beschriftung nur dorthin, wo keine bereits gesetzte sie berührt, sonst eine Zeile höher,
+sonst gar nicht. Jede verschmolzene Aufnahme war also eine Bewegung nach dem Setzen, und
+die Rechtecke sagten es: 22 bis 29 px Abstand, wo das eigene Layout 48 bis 56 verlangt.
+22 Spurläufe fanden das Muster ausnahmslos — im Messfenster VOR dem Auslöser kein einziges
+verschmolzenes Bild, alle danach, ein bis drei Bilder lang, mit bewegter Geometrie darunter.
+Die Prüfung färbte auf der Bewegung rot, die sie selbst auslöst.
+
+Die Lehre ist nicht „Polster erhöhen". Sie ist: **Wer eine Schranke aus zwei Hälften baut,
+schuldet beiden dieselbe Begründung.** Ein Polster, das nur auf einer Seite steht, ist keine
+Nachsicht, sondern eine unausgesprochene Behauptung — hier die, dass Tiefe anders entsteht
+als Häufigkeit. Sie war falsch: Zwei Beschriftungen auf derselben Zeile überlappen vertikal
+bereits die vollen 19 px, also überschreitet `min(quer, hoch)` die 18-px-Marke, sobald sie
+sich überhaupt streifen. Beide Hälften sahen dieselben Bilder, und nur eine durfte sie
+entschuldigen.
+
+Und die zweite Lehre steht daneben: Das Instrument, das die Frage entschied, war nicht der
+Drosseltest, sondern eine Spur, die pro Bild aufschrieb, WO im Messfenster die Verschmelzung
+saß. Die Rotquote allein (1 von 8 ungedrosselt, 5 von 8 bei einem Viertelkern, 0 von 8 auf
+WebGPU) sagte nur, dass Last sie bewegt. Erst die Verteilung im Fenster sagte, wer sie macht.

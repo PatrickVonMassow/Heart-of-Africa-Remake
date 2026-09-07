@@ -338,7 +338,15 @@ export const LIMITS = {
   // were written to the tightest form that still carries them, and three neighbouring lines were
   // compressed to pay part of the bill, so together they measure +15 lines / +155 words: the
   // ceilings move 547 -> 562 and 5068 -> 5223 with zero slack.
-  maxLines: 562,
+  // 07.09.2026: ONE genuinely new pitfall — a check that lays several criteria on the SAME
+  // measurement and gives only one of them a tolerance, so it reds on the very motion its own
+  // reasoning excuses (measured on the Ctrl-label fusion bar: four fused frames of ninety
+  // allowed by the count, one reddened by the depth, on the same frames). The neighbouring
+  // "two checks that contradict each other" is about two duties; this is one check whose two
+  // halves were calibrated apart. Written in the tightest form that still carries it: it
+  // measures +8 lines / +88 words, so the ceilings move 562 -> 570 and 5223 -> 5311 with zero
+  // slack.
+  maxLines: 570,
   // EXACT FIT, not headroom — corrected 30.07.2026 after the four-eyes review
   // pointed out that this comment had long stopped describing the numbers. The
   // rule above ("raised only by the measured size of genuinely new tips")
@@ -554,7 +562,7 @@ export const LIMITS = {
   // estimated-numbers pitfall — an accumulated maximum may exonerate, never
   // accuse — and three neighbouring entries were compressed to pay for it, so
   // the measured guide came down three more words: 5018 -> 5015.
-  maxWords: 5223,
+  maxWords: 5311,
   // A pitfall entry = the risk lines plus its prompt. Anything longer is a
   // story, not a tip.
   maxEntryLines: 11,

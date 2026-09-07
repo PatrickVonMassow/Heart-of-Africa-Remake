@@ -517,6 +517,14 @@ Die Ursache findest du durch **Zerlegen**, nicht durch Wiederholen.
   → *Prompt:* „Ein Rückfall meldet nicht nur, **dass** er greift, sondern **welche Zusage er dabei
   aussetzt**. Prüffrage: Welche Vereinbarung bricht er still, während er die Funktion rettet?"
 
+- **Die Schranke aus zwei Hälften, von denen nur eine ein Polster bekam.** Eine Prüfung maß am
+  selben Bild, wie OFT zwei Beschriftungen ineinander liefen und wie TIEF. Die Häufigkeit durfte
+  vier von neunzig durchgehen lassen, die Tiefe färbte bei einem einzigen rot — dieselben Bilder,
+  dieselbe Begründung, nur auf einer Seite aufgeschrieben.
+  → *Prompt:* „Legt eine Prüfung mehrere Kriterien an denselben Messwert, schreib zu **jedem** auf,
+  was es durchgehen lässt und warum. Prüffrage: Steht ein Kriterium ohne Toleranz neben einem mit —
+  und was behauptet dieser Unterschied?"
+
 - **Das Protokoll ohne Verfallsdatum wird zum Dauerplakat.** Was dein Werkzeug über die eigene
   Entscheidung aufschreibt, nimmt niemand je wieder heraus.
   → *Prompt:* „Eine Entscheidung, die du selbst triffst, nennt die **Messung**, die sie stützen
@@ -560,4 +568,4 @@ Die Ursache findest du durch **Zerlegen**, nicht durch Wiederholen.
 
 Sie ersetzt die Fallstricke oben nicht.
 
-<!-- GUIDE-FINGERPRINT: c85f146e15ecfd1669b323a8aebf37d63df2072e758cfadb63a30bc14643933b -->
+<!-- GUIDE-FINGERPRINT: 84168975203c7290753521b90020139e436691e741e29bf069484911e41bdad3 -->
