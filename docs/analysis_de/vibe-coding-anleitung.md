@@ -331,6 +331,15 @@ Die Ursache findest du durch **Zerlegen**, nicht durch Wiederholen.
   → *Prompt:* „Wo ein Teil schreibt, was ein anderes prüft, **importiere** den Wert; der Eingang
   ist **Pflicht**, kein Vorgabewert."
 
+- **Jeder Befund wird zur Arbeit — und die Arbeit findet neue Befunde.** Die Regel, alles
+  Aufgefallene einzureihen, ist im ersten Monat richtig und im dritten die Ursache: Die
+  Prüfmechanik findet ihre eigenen Fehler, jeder wird ein Punkt, und der Zulauf hat keine
+  Grenze mehr. Am Ende arbeitet das Projekt an sich selbst statt am Produkt.
+  → *Prompt:* „Ein Befund wird nur dann ein Arbeitspunkt, wenn er den Nutzer des Produkts
+  trifft, ein Sicherheits- oder Datenrisiko ist, echt blockiert — oder wenn er etwas löscht
+  oder vereinfacht. Alles andere geht in eine gesammelte, **nicht blockierende** Liste, und
+  Doppelte werden geschlossen statt neu vermessen."
+
 - **Der Befund stirbt mit dem Gespräch.** Ein echter Fehler fällt nebenbei auf und bleibt im Chat.
   → *Prompt:* „Sichere Befunde mit einem billigen Kommando, das immer schreibt, und einer Prüfung,
   die keinen Zug enden lässt, der untersucht und nichts hinterlassen hat."
@@ -568,4 +577,4 @@ Die Ursache findest du durch **Zerlegen**, nicht durch Wiederholen.
 
 Sie ersetzt die Fallstricke oben nicht.
 
-<!-- GUIDE-FINGERPRINT: 9646d0b67d0f6fb114d920dd13e1c255b0e7f96b20a0ad1bbd3dca683eb7b9d1 -->
+<!-- GUIDE-FINGERPRINT: eda4f58267e1b446db1612af2e909ed9c70a67a14222a06cacaa1948043e146d -->
