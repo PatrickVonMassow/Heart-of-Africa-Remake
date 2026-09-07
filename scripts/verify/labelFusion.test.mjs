@@ -2,7 +2,14 @@
 // series may show and what it must red on. The page-side sampler only counts;
 // THIS is where the judgment lives.
 import { describe, expect, it } from 'vitest'
-import { FUSE_HARD, FUSE_MAX_SHARE, FUSE_TOLERANCE, judgeLabelFusion, mergeFusionReadings } from './labelFusion.mjs'
+import {
+  FUSE_CROWD_SHARE,
+  FUSE_HARD,
+  FUSE_MAX_SHARE,
+  FUSE_TOLERANCE,
+  judgeLabelFusion,
+  mergeFusionReadings,
+} from './labelFusion.mjs'
 
 const clean = { samples: 90, fusedFrames: 0, deepFrames: 0, worstDepth: 0, worstPair: null, labelsMin: 19, labelsMax: 19 }
 
@@ -58,6 +65,21 @@ describe('judgeLabelFusion (point 628)', () => {
       worstPair: '"Villager"×"Villager" 47×19 px',
     })
     expect(r.ok).toBe(false)
+  })
+
+  // The village passes the wider cushion; the savanna keeps the narrow one.
+  it('lets the dense-crowd caller widen the cushion, and still reds a standing fusion under it', () => {
+    const drifted = { ...clean, fusedFrames: 9, deepFrames: 1, worstDepth: FUSE_HARD, worstPair: '"Villager"×"Villager" 40×18 px' }
+    // 9 of 90 is what the squeezed lane really produced — red at the sparse
+    // share, green at the crowd share it is measured for.
+    expect(judgeLabelFusion(drifted).ok).toBe(false)
+    expect(judgeLabelFusion(drifted, { maxShare: FUSE_CROWD_SHARE }).ok).toBe(true)
+    // What must still red under the wider cushion: the point-628 defect.
+    const standing = { ...clean, fusedFrames: 90, deepFrames: 90, worstDepth: 19, worstPair: '"Villager"×"Villager" 40×19 px' }
+    expect(judgeLabelFusion(standing, { maxShare: FUSE_CROWD_SHARE }).ok).toBe(false)
+    // And the wider cushion is still a cushion, not an amnesty.
+    expect(FUSE_CROWD_SHARE).toBeGreaterThan(FUSE_MAX_SHARE)
+    expect(FUSE_CROWD_SHARE).toBeLessThan(0.5)
   })
 
   it('fails a sampler that never counted the deep frames — half a bar is not a reading', () => {

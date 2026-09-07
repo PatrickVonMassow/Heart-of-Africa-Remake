@@ -68,6 +68,18 @@ export const FUSE_HARD = 18
  *  frames. Both now read the same cushion. */
 export const FUSE_MAX_SHARE = 0.05
 
+/** The cushion for the DENSE crowd (the village), measured 07.09.2026 for point
+ *  1067. The share above is set for the sparse savanna, where a fused frame is
+ *  rare; the village holds 17–23 labels at once, so far more pairs sit near the
+ *  legal minimum gap and any drift crosses the 6 px tolerance at once. What the
+ *  squeezed WebGL 2 lane really produced there, across 22 traced runs at about a
+ *  quarter core: up to 9 fused frames of 90, every one of them a pair that MOVED
+ *  into itself after a placement the declutter could not have made overlapping.
+ *  The quiet lane produced 0 of 90 in the same scene, and the point-628 defect
+ *  held a fused pair in 90 of 90. So 15 % (13 of 90) clears the measured
+ *  transient with room and still reds anything that stands. */
+export const FUSE_CROWD_SHARE = 0.15
+
 /**
  * Judge one sampled series. `reading` is what the page-side sampler returns:
  *   samples      — frames sampled (must cover at least a couple of refreshes),

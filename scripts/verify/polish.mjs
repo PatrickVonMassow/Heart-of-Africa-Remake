@@ -14,7 +14,7 @@ import {
   judgeTagStandpoint,
 } from './tagFrameReading.mjs'
 import { judgeEavesColumn, judgeShelterRoof } from './eavesColumn.mjs'
-import { FUSE_HARD, FUSE_TOLERANCE, judgeLabelFusion, mergeFusionReadings } from './labelFusion.mjs'
+import { FUSE_CROWD_SHARE, FUSE_HARD, FUSE_TOLERANCE, judgeLabelFusion, mergeFusionReadings } from './labelFusion.mjs'
 import { READ_COUNT, READ_GAP_FRAMES, CONFIRM_READS, READ_GAP_NET_MS, READ_GAP_MS, SHOT_DRIFT_BAR, luminanceSamples, settleReading, shotDrift, shotReading } from './cropLuma.mjs'
 import {
   CHILD_MOTION,
@@ -5675,7 +5675,11 @@ if (section('ctrl-actor-labels')) {
   })
 
   const fusionPost = await sampleFusion(45)
-  const fusionVerdict = judgeLabelFusion(mergeFusionReadings(fusionPre, fusionPost))
+  // The DENSE-CROWD cushion, not the sparse one (point 1067): this scene holds
+  // 17–23 labels, so a loaded lane's drift crosses the tolerance in several
+  // frames of the ninety where the savanna twin sees none. The measurement
+  // behind the number is in labelFusion.mjs beside FUSE_CROWD_SHARE.
+  const fusionVerdict = judgeLabelFusion(mergeFusionReadings(fusionPre, fusionPost), { maxShare: FUSE_CROWD_SHARE })
   check('no two Ctrl labels fuse in the village crowd (point 628)', fusionVerdict.ok, fusionVerdict.detail)
 
   await page.keyboard.up('Control')
