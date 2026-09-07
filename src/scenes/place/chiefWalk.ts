@@ -105,19 +105,30 @@ export function chiefTick(walk: ChiefWalk, now: number, timing: ChiefWalkTiming)
   const span = Math.max(0, now - walk.at)
   const length = timing.pathLength > 0 ? timing.pathLength : 1
   const covered = (timing.speed * span) / length
+  // A step that CROSSES a boundary is stamped with the moment it was crossed,
+  // never with the end of the step: stamping `now` would throw the leftover
+  // seconds away, and a chief who arrived early in one long step would then
+  // stand his whole minute from the end of that step instead of from his
+  // arrival. One transition per call, but no time lost between them.
+  const secondsFor = (fraction: number) => (timing.speed > 0 ? (fraction * length) / timing.speed : 0)
   switch (walk.phase) {
     case 'walking-out': {
       const progress = walk.progress + covered
       if (progress < 1) return { walk: { ...walk, progress, at: now }, beatDrums: false }
       return {
-        walk: { phase: 'at-drummer', progress: 1, at: now, drumOnArrival: false },
+        walk: {
+          phase: 'at-drummer',
+          progress: 1,
+          at: walk.at + secondsFor(1 - walk.progress),
+          drumOnArrival: false,
+        },
         beatDrums: walk.drumOnArrival,
       }
     }
     case 'at-drummer': {
       if (span < timing.staySeconds) return { walk, beatDrums: false }
       return {
-        walk: { phase: 'walking-back', progress: 1, at: now, drumOnArrival: false },
+        walk: { phase: 'walking-back', progress: 1, at: walk.at + timing.staySeconds, drumOnArrival: false },
         beatDrums: false,
       }
     }

@@ -241,7 +241,10 @@ describe('the speaker the use key would take (design.md §13.4)', () => {
     speakOverhead('kid-1', [DIG], standing(9, 0), { now: 0, seconds: 100 })
     updateSpeechTarget(anyLabel, 10, player(0, 0))
     expect(speechLabelState().targetId).toBe('drummer')
-    pruneSpeechLabels(speechClock() + 60)
+    // The same synthetic clock both labels were written on: `speechClock()` is
+    // process uptime, and once it passes 40 seconds it prunes the child's label
+    // too and this check fails for no reason of its own.
+    pruneSpeechLabels(60)
     expect(speechLabelState().labels.map((l) => l.speakerId)).toContain('drummer')
     forgetSpeechLabel('drummer')
     expect(speechLabelState().labels.map((l) => l.speakerId)).toEqual(['kid-1'])

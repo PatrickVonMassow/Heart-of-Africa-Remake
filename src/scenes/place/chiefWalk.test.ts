@@ -110,6 +110,21 @@ describe('beside the drummer he speaks, and repeats', () => {
     expect(home.walk.progress).toBe(1)
     expect(home.beatDrums).toBe(false)
   })
+
+  it('loses no time at a boundary — a long step is taken up where it crossed', () => {
+    // He arrives at CROSSING and his minute is up at CROSSING + staySeconds. A
+    // single step that spans all of it and more must not begin the minute at the
+    // END of that step: the seconds after his arrival are his, so by t=70 he is
+    // already on his way home, not still standing there.
+    let walk = chiefTick(chiefStepsOut(chiefInHut(), 0), 70, TIMING).walk
+    expect(walk.phase).toBe('at-drummer')
+    expect(walk.at).toBeCloseTo(CROSSING, 6)
+    walk = chiefTick(walk, 70, TIMING).walk
+    expect(walk.phase).toBe('walking-back')
+    expect(walk.at).toBeCloseTo(CROSSING + TIMING.staySeconds, 6)
+    // …and what is left of that same reading carries him the rest of the way.
+    expect(chiefTick(walk, 70, TIMING).walk.phase).toBe('in-hut')
+  })
 })
 
 describe('called back on his way home', () => {
