@@ -5,6 +5,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { healthState, listCheckpoints, canCampHere, useGame, type EquipmentId } from '../state/store'
 import { TREASURE_IDS } from '../systems/economy'
+import type { FindId } from '../world/finds'
 import { placeById, worldToLatLon } from '../world/geo'
 import { sampleTerrain } from '../world/terrain'
 import { START_YEAR } from '../config/balance'
@@ -30,6 +31,7 @@ function InventoryBar() {
   const equipment = useGame((s) => s.equipment)
   const treasures = useGame((s) => s.treasures)
   const carriedForms = useGame((s) => s.carriedForms)
+  const rockArtefact = useGame((s) => s.rockArtefact)
   const canteenFill = useGame((s) => s.canteenFill)
   const mode = useGame((s) => s.mode)
   const pos = useGame((s) => s.pos)
@@ -47,6 +49,11 @@ function InventoryBar() {
   // is where the thing's NAME stands — and the name is half of what the player
   // has to put together with the direction he was given.
   const ownedForms = [...carriedForms].sort((a, b) => t.forms[a].localeCompare(t.forms[b], t.lang))
+  // Quest FINDS (design.md §6): a thing dug up on an errand rides in the bar
+  // from the moment it is recovered until it is given, outside the pack
+  // capacity and never trade stock. Giving it IS using it here, before the man
+  // it is meant for — the store refuses and says why anywhere else.
+  const ownedFinds: FindId[] = rockArtefact === 'carried' ? ['rockArtefact'] : []
 
   // Publish the live inventory-bar height as --inv-bar-height so the map overlay
   // (and its town-plan variant) can anchor its bottom edge above the bar however
@@ -56,7 +63,7 @@ function InventoryBar() {
   const barRef = useRef<HTMLDivElement>(null)
   // Every kind the bar shows counts, forms included: the impression can arrive
   // while the bar is absent, and the observer must attach the moment it appears.
-  const itemCount = owned.length + ownedTreasures.length + ownedForms.length
+  const itemCount = owned.length + ownedTreasures.length + ownedForms.length + ownedFinds.length
   useEffect(() => {
     const root = document.documentElement
     const el = barRef.current
@@ -74,7 +81,7 @@ function InventoryBar() {
     }
   }, [itemCount])
 
-  if (owned.length === 0 && ownedTreasures.length === 0 && ownedForms.length === 0) return null
+  if (itemCount === 0) return null
 
   // Medicine and shovel are used by clicking them on the spot (design.md §17);
   // the rest act by mere possession (rifle/rope/machete/canoe) or show a
@@ -151,6 +158,18 @@ function InventoryBar() {
           </span>
         ),
       )}
+      {/* A quest find is HANDED OVER by being used: the click lays it in the
+          chief's hands where he stands before the traveller (design.md §6). */}
+      {ownedFinds.map((id) => (
+        <button
+          key={id}
+          data-find={id}
+          onClick={() => useGame.getState().handArtefactToChief()}
+          title={t.hud.findTooltip}
+        >
+          {t.finds[id]}
+        </button>
+      ))}
       {/* Presenting a valuable to a village provokes the §8 reaction. */}
       {ownedTreasures.map((id) => (
         <button key={id} onClick={() => useGame.getState().presentValuable(id)} title={t.hud.presentTooltip}>

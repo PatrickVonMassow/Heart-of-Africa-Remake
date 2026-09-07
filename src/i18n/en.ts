@@ -181,6 +181,12 @@ export const en: Strings = {
   forms: {
     'rock-relief': 'Clay Impression of a Rock',
   },
+  finds: {
+    // What he actually saw before he stopped digging: metal over wood, and the
+    // stone he dug it out beside. He never opened it, so the name may not say
+    // what is inside.
+    rockArtefact: 'Find from the Boulder',
+  },
   buildings: {
     shop: 'General Store', weapons: 'Weapons Hut', tools: 'Tool Hut',
     market: 'Market Hut', bazaar: 'Bazaar', agency: 'Travel Agency', chief: "Chief's Hut",
@@ -220,6 +226,7 @@ export const en: Strings = {
     passiveTooltip: 'Works automatically while you carry it',
     canteenTooltip: 'Canteen water level — refills at fresh water',
     presentTooltip: 'Show it to a village (provokes a reaction)',
+    findTooltip: 'Click it before the chief to lay it in his hands',
     webglFallback: 'Graphics notice: WebGPU is unavailable — the game is running in WebGL 2 compatibility mode.',
     webglFallbackDismiss: 'Got it',
     fps: (fps) => `${fps} FPS`,
@@ -378,6 +385,7 @@ export const en: Strings = {
     drumsSending: 'The chief calls his drummer. The message is going out over the village.',
     chiefStepsOut: 'The chief steps out of his hut and stands before me in the open.',
     chiefNoMessage: 'The chief looks me over and nods. He has nothing to send out over the village.',
+    findNeedsChief: 'There is nobody here to take it. It belongs in the chief’s own hands, out in the open before his hut.',
     journalDndOn: 'Journal interruptions off — entries appear silently.',
     journalDndOff: 'Journal interruptions on — new entries open the journal.',
     graphicsLevel: {

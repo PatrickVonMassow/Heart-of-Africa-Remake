@@ -7,7 +7,7 @@
 // both languages, and the save/load round trip of a spent socket.
 import { describe, it, expect, beforeEach, afterEach } from 'vitest'
 import { balance } from '../config/balance'
-import { g, freshGame, withWorld, useGame } from '../test/store'
+import { g, freshGame, withWorld, useGame, standBeforeChief } from '../test/store'
 import { communicationRockSite } from '../world/communicationRock'
 import { FORM_SOCKETS, socketPosition, type FormSocket } from '../world/forms'
 import { CHIEF_REWARD_FORM, DRUM_MESSAGE_VILLAGE, usedInventory } from './store'
@@ -34,6 +34,10 @@ function handedOver(): void {
   g().debugAddEquipment('shovel')
   g().dig()
   g().enterPlace(DRUM_MESSAGE_VILLAGE)
+  // The give is an act on the inventory item, before the chief who has come
+  // out (design.md §6): call him out and stand within his reach.
+  g().callChiefOut()
+  standBeforeChief()
   g().handArtefactToChief()
 }
 

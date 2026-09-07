@@ -32,6 +32,7 @@ import type { Phrase, UtteranceId } from '../communication/lexicon'
 import { chiefMessagePhrase } from '../communication/drumMessage'
 import { chiefRewardPhrase } from '../communication/chiefReply'
 import { ROCK_VILLAGE_ID, isAtCommunicationRock } from '../world/communicationRock'
+import { withinGiveReach } from '../scenes/place/chiefPresence'
 import { resolveFormUse, type FormId, type SocketId } from '../world/forms'
 import type { SketchId } from '../journal/sketches'
 import { getStrings, type TextRef } from '../i18n'
@@ -318,9 +319,13 @@ export interface GameState {
   /** The chief's drums have finished (point 486): every concept of the message
    *  enters the heard memory and the chronicle records that it was sent. */
   receiveDrumMessage: () => void
-  /** Lay the artefact from the boulder in the chief's hands (point 487): the
-   *  hand-over that solves the puzzle. He acknowledges it in his own tongue,
-   *  which enters the heard memory like any other phrase he speaks. */
+  /** Lay the find from the boulder in the chief's hands: the hand-over that
+   *  solves the puzzle. It is an ACT ON THE ITEM (design.md §6) — the player
+   *  uses it in the inventory bar while the chief stands before him in the
+   *  open, within `balance.communication.giveReach`; used anywhere else it says
+   *  why in a toast and the find stays in the pack. He acknowledges it in his
+   *  own tongue, which enters the heard memory like any other phrase he
+   *  speaks. */
   handArtefactToChief: () => void
   /** The use key at the chief's hut: the chief comes OUT and stands in the open
    *  (design.md §12). Everything he has to give is given out there, at his
@@ -790,8 +795,21 @@ export const useGame = create<GameState>()((set, get) => ({
 
   handArtefactToChief: () => {
     const s = get()
-    if (s.mode !== 'place' || s.placeId !== DRUM_MESSAGE_VILLAGE) return
+    // Nothing in hand, nothing to give: the bar shows the find only while it is
+    // carried, so this is a no-op rather than a refusal the player can read.
     if (s.rockArtefact !== 'carried') return
+    // Using it is the whole act. It goes into the hands of a chief who really
+    // stands there — this village's chief, out in the open, within reach of the
+    // traveller — and nowhere else; everywhere else the find simply stays.
+    const beforeTheChief =
+      s.mode === 'place' &&
+      s.placeId === DRUM_MESSAGE_VILLAGE &&
+      s.chiefOutside[s.placeId] === true &&
+      withinGiveReach()
+    if (!beforeTheChief) {
+      set({ toast: getStrings().toasts.findNeedsChief })
+      return
+    }
     const heard = observePhrase(s.communication, chiefRewardPhrase(), Math.floor(s.day), heardIn(s))
     // What he pays with: a direction in words, and — wordlessly — the clay
     // impression. The impression is the other half of the sentence, so it is

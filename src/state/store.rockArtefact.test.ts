@@ -6,7 +6,7 @@
 // languages, and the save/load round trip.
 import { describe, it, expect, beforeEach, afterEach } from 'vitest'
 import { balance } from '../config/balance'
-import { g, freshGame, withWorld, useGame } from '../test/store'
+import { g, freshGame, withWorld, useGame, standBeforeChief, leaveTheChief } from '../test/store'
 import { communicationRockSite } from '../world/communicationRock'
 import { chiefRewardPhrase } from '../communication/chiefReply'
 import { hasHeard, hypothesisFor } from '../communication/heard'
@@ -90,12 +90,15 @@ describe('digging at the landmark boulder (point 487)', () => {
   })
 })
 
-describe('handing the artefact to the chief (point 487)', () => {
-  /** Carry it into the chief's own village. */
+describe('giving the find to the chief', () => {
+  /** Carry it into the chief's own village, call him out, and stand before him
+   *  — the pose the give is an act in (design.md §6). */
   function carriedIntoTheVillage(): void {
     atTheRockWithShovel()
     g().dig()
     g().enterPlace(DRUM_MESSAGE_VILLAGE)
+    g().callChiefOut()
+    standBeforeChief()
   }
 
   it('the hand-over solves the puzzle and is written down', () => {
@@ -143,8 +146,11 @@ describe('handing the artefact to the chief (point 487)', () => {
     const elsewhere = 'cairo'
     expect(elsewhere).not.toBe(DRUM_MESSAGE_VILLAGE)
     g().enterPlace(elsewhere)
+    g().callChiefOut()
+    standBeforeChief()
     g().handArtefactToChief()
     expect(g().rockArtefact).toBe('carried')
+    expect(g().toast).toBe(getStrings().toasts.findNeedsChief)
   })
 
   it('cannot be handed over out in the open, only in the settlement', () => {
@@ -153,6 +159,42 @@ describe('handing the artefact to the chief (point 487)', () => {
     expect(g().mode).toBe('travel')
     g().handArtefactToChief()
     expect(g().rockArtefact).toBe('carried')
+    expect(g().toast).toBe(getStrings().toasts.findNeedsChief)
+  })
+
+  it('gives nothing while the chief is still inside his hut', () => {
+    atTheRockWithShovel()
+    g().dig()
+    g().enterPlace(DRUM_MESSAGE_VILLAGE)
+    standBeforeChief()
+    expect(g().chiefOutside[DRUM_MESSAGE_VILLAGE]).toBeFalsy()
+    g().handArtefactToChief()
+    expect(g().rockArtefact).toBe('carried')
+    expect(bodyKeys()).not.toContain('journal.artefactGiven')
+    expect(g().toast).toBe(getStrings().toasts.findNeedsChief)
+  })
+
+  it('gives nothing from across the village — it must be laid in his hands', () => {
+    carriedIntoTheVillage()
+    // One step past the reach is out of reach; the find stays in the pack and
+    // the refusal says why.
+    standBeforeChief(balance.communication.giveReach + 0.5)
+    g().handArtefactToChief()
+    expect(g().rockArtefact).toBe('carried')
+    expect(bodyKeys()).not.toContain('journal.artefactGiven')
+    expect(g().toast).toBe(getStrings().toasts.findNeedsChief)
+    // And from inside the reach the same click gives it.
+    standBeforeChief(balance.communication.giveReach - 0.1)
+    g().handArtefactToChief()
+    expect(g().rockArtefact).toBe('given')
+  })
+
+  it('gives nothing while nobody stands in the open at all', () => {
+    carriedIntoTheVillage()
+    leaveTheChief()
+    g().handArtefactToChief()
+    expect(g().rockArtefact).toBe('carried')
+    expect(g().toast).toBe(getStrings().toasts.findNeedsChief)
   })
 
   it('is given once — a second attempt writes no second page', () => {
