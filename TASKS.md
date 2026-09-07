@@ -127,6 +127,22 @@ put it is the mistake this line exists to stop.
   Refs: src/state/store.ts (rockArtefact, handArtefactToChief, carriedForms), src/scenes/place/chiefMeeting.ts, src/scenes/place/PlaceScene.tsx (meetChief), src/ui/Hud.tsx (InventoryBar), src/config/balance.ts, src/i18n/en.ts, src/i18n/de.ts, docs/communication-poc-spec.md, design.md §6 §13.4
   Doc impact: docs/communication-poc-spec.md 'Where the digging happens': the artefact is laid in the chief's hands by USING the inventory item before him, not by the use key at his hut. design.md §6 (inventory bar): the quest find is listed as an acting item; §13.4: the hand-over sentence. i18n en/de: item label, Ctrl label, refusal toast.
   Bundle: Dorfleben.
+  RED ON THE MERGE CANDIDATE (measured 07.09.2026, run 2026-09-07T12-07-22, WebGPU, exit 1
+  after 48m14s on cd0418380, suites docs world i18n flow collision polish settings
+  enrichments): six failures in two classes, and NEITHER may be waved through.
+  (a) `world` — frames `15-worldmodel-victoria-falls` and `11-worldmodel-khartoum-confluence`
+      do not contain their subject; it sits off the left and bottom edge. This branch edits
+      `scripts/verify/world.mjs` itself, so treat it as this point's own until measured
+      otherwise. The shutter rule stands: fix the cause, never the assertion.
+  (b) `settings`/`enrichments` — four console-error assertions fail on
+      `THREE.WebGPURenderer: GPUValidationError: The texture format (RGBA16Float) does not
+      support multisampling` in the TRAA-off path. This branch touches no renderer code.
+      The same error text is already described further down this file for the
+      COMPATIBILITY lane (WebGL 2); here it appeared on WEBGPU. Before filing anything new,
+      measure whether that existing point covers the WebGPU manifestation — do not duplicate.
+  The earlier run of this branch (08:53) still had 8 `settings` failures; the four
+  "renders non-black" ones went away with the merge from main. No author is running on
+  `feat/1064-artefact-give`; the branch lies idle with this red candidate.
 
 - [ ] 1069. The WSL VM dies in the GPU passthrough driver during browser suites, and nothing
   re-arms the batch without a VS Code session (machine-filed 07.09.2026).
