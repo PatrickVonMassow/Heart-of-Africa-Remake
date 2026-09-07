@@ -152,8 +152,9 @@ RUN npx --yes playwright@latest install chromium
 
 # Copy and set up firewall script
 COPY init-firewall.sh /usr/local/bin/
+COPY container-entrypoint.sh /usr/local/bin/
 USER root
-RUN chmod +x /usr/local/bin/init-firewall.sh && \
+RUN chmod +x /usr/local/bin/init-firewall.sh /usr/local/bin/container-entrypoint.sh && \
   echo "node ALL=(root) NOPASSWD: /usr/local/bin/init-firewall.sh" > /etc/sudoers.d/node-firewall && \
   chmod 0440 /etc/sudoers.d/node-firewall
 
@@ -170,3 +171,6 @@ RUN chmod +x /usr/local/bin/init-firewall.sh && \
 RUN echo "node ALL=(root) NOPASSWD: ALL" > /etc/sudoers.d/node-all && \
   chmod 0440 /etc/sudoers.d/node-all
 USER node
+
+ENTRYPOINT ["/usr/local/bin/container-entrypoint.sh"]
+CMD ["sleep", "infinity"]
