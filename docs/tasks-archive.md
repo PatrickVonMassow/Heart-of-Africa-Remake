@@ -26683,3 +26683,322 @@ Nummerierung bleiben deshalb identisch — hier wird nur verschoben, nie umgesch
   docs/batch-autonomy.md (launcher layer), .devcontainer/devcontainer.json (runArgs,
   postStartCommand), scripts/batch-launcher.mjs.
   Bundle: Urlaubsfestigkeit — host-side infrastructure, runs alone.
+
+- [x] 1066. The water carrier visibly fills the jar at the water and carries visible water (user 06.09.2026).
+  The filling of the jar READS as filling. Today the RIVER errand sends an adult with an
+  empty jar to the foot of the water path and back with a full one, and nothing in between is
+  shown: the foot (`bankWaterFoot`, `riverBank.ts`) stands `BANK_STAND_INSET` 1.5 m inside the
+  walkable edge while the waterline lies `BANK_SHORE_HALF` 1.2 m beyond it, so the carrier
+  halts about 2.7 m from the water; the carry flips 'emptyJar' → 'fullJar' between the
+  'water-out' and 'water-back' situations (`adultWork.ts` ~390-410) with no act; and both jars
+  are one closed opaque cylinder (`PlaceLife.tsx` ~2557-2612), the full one merely moved onto
+  the head. The user (06.09.2026) could not tell that water was being fetched — and this
+  errand is where RIVER is learned (design.md §13.4).
+  Final state:
+  - The carrier goes TO the water: the errand's last leg walks down the shore to the
+    waterline (the walkable region already reaches through it to `balance.bankWadeDepth`,
+    `riverBank.ts`), and he stands with his feet at the water's edge or ankle-deep, never
+    2.7 m up the bank. The path's foot for the WORD (`say.aim`) may stay where it is; the
+    fill spot is at the water.
+  - The fill is an ACT with its own phase: he crouches or bends, the jar in his hand goes
+    down into the water — visibly below the drawn surface — stays there a readable moment
+    (calibratable seconds in `src/config/balance.ts`), comes up, and is lifted onto the head
+    (a fill pose beside `digPose` / `HEAD_CARRY_POSE`). 'fullJar' begins only after the dip;
+    the carry never flips without it. The errand's timing backstops (`errandSeconds`,
+    `stallSeconds`) cover the added leg.
+  - Water is visible: both jars have an open mouth; the empty one shows a dark hollow, the
+    full one a water surface at the rim (a bright disc with the water's tint, readable at
+    the distance the player watches from) — so head-carried and hand-carried jars read as
+    full and empty at a glance, on both backends.
+  - The word RIVER still falls at the head of the path, aimed at the water, gated by a
+    hearing child exactly as today; nothing about who is cast or when changes.
+  - Doc: design.md §13.4 ('the adults' water and digging work') states the dip at the
+    waterline; docs/communication-poc-spec.md likewise where it describes the errand.
+  Test: Vitest over adultWork / riverBank — the fill spot lies within a small tolerance of
+  the waterline for the three river villages (nubian, bambara, mandinka); a 'fill' phase
+  sits between the walk down and the walk back, with 'fullJar' set only after it; the phase
+  lasts its configured seconds. Browser (LARGE, both backends — the water surface is
+  backend-sensitive): a picture check of the dip frame that measures the hand jar below the
+  drawn water surface at the carrier's feet, and one of the return walk that measures the
+  water disc visible at the head jar's rim; screenshots of both (verification/, subjects
+  declared: the carrier dipping at the waterline; the carrier walking back with the full
+  jar).
+  Quotes:
+  Nutzer, 06.09.2026 13:48: »Man erkennte das Auffüllen des Kruges mit Wasser nicht als solches. Das liegt an mehreren Problemen: Der Erwachsene geht nicht nah genug an den Fluss, für die Tätigkeit des Auffüllens fehlt eine Darstellung (ich würde erwarten, dass er den Krug in die Hand nimmt und ins Wasser taucht) und wenn er ihn dann gefüllt auf dem Kopf trägt, sieht man darin kein Wasser.«
+  Nutzer, 06.09.2026 13:48 (Einreihung aller drei Punkte): »An der Kommunikationsmechanik zu überarbeiten, einzureihen direkt nach 1058, in der Rehenfolge, in der ich es hier aufzähle:« — dieser Punkt ist der DRITTE der drei.
+  Refs: src/scenes/place/adultWork.ts (water-out/water-back ~390-410, AdultCarry, WATER_FOOT_REACH), src/scenes/place/riverBank.ts (bankWaterFoot, BANK_STAND_INSET 1.5, BANK_SHORE_HALF 1.2, walkable region through the waterline ~47-62), src/scenes/place/PlaceLife.tsx (ErrandVillagers, head/hand jar meshes ~2440-2612, HEAD_CARRY_POSE), src/scenes/place/layout.ts (waterPath head/foot), src/render/figures.ts, design.md §13.4
+  Doc impact: design.md §13.4: the water carrier dips the jar at the waterline and carries visible water back. docs/communication-poc-spec.md: the errand description. balance.ts: fill seconds (calibratable).
+  Bundle: Dorfleben.
+
+- [x] 1057. The spoil heap buries the diggers, and everyone else walks straight through it
+  (user 04.09.2026, watching the merged digging work; measured the same morning).
+  Three causes, each read off the shipped code:
+  - The heap's SIDE is fixed. It sits at a constant local offset in a group rotated by an
+    angle derived from the site's own coordinates, so it grows where it grows no matter
+    who stands there.
+  - The initiator walks into the MIDDLE of the pit — `startJointWalk` sets his goal to the
+    site centre and he stops within `WORK_ARRIVE_RADIUS` of it, while the heap's centre
+    lies about 1.19 m out at `DIG_SITE_RADIUS` 0.9. He digs himself in.
+  - NOTHING collides with the excavation. The collider set is finished before the dig
+    sites are placed at all, and neither pit nor heap is ever added, so villagers,
+    children and the player pass through the earth.
+  The user decided the shape of the remedy and the reason for it: a collider is NOT the
+  answer, because an impassable heap wedges figures — the player included — into corners.
+  The heap becomes a LOCAL RAISING OF THE GROUND that everyone walks up and over, the way
+  the height profile outside a settlement already works. Today a settlement is flat: every
+  actor's Y is set independently and lands at zero (the bank children's climb is the one
+  exception), while outdoors the figure rides `sampleTerrain(...).height`. So this point
+  brings a place its first ground height, and it must arrive as ONE source every actor
+  reads, not as a second scatter of Y assignments.
+  Final state:
+  - The heap never grows on a side somebody is standing on — the digging pair's places are
+    chosen away from it, and the initiator works from the rim instead of the middle.
+  - Nobody walks through the heap: villagers, children and the player ride over it, in
+    both perspectives, and the first-person camera rises and falls smoothly rather than
+    stepping.
+  - One ground-height source for a place, read by every actor and by the camera; a flat
+    settlement keeps behaving exactly as it does today.
+  - Nothing in a settlement becomes impassable through this point — no new collider, and
+    no figure can be wedged by the earth.
+  Test: Vitest over the ground-height source and the standing-place choice — a pair never
+  takes a place inside the heap's footprint, and the height is zero everywhere no
+  excavation reaches; Playwright on the polish lane — a frame with a figure carried over
+  the heap, judged on both backends.
+  Criticality: high — the defect is visible in the picture the player is meant to learn
+  from, and the remedy touches every actor's height in a place, which is the error-prone
+  half.
+  Quotes:
+  Nutzer, 04.09.2026 09:05: »Die Erwachsenen sollten nicht in dem entstehenden Erdhaufen
+  stehen. Zum einen graben sie sich damit manchmal quasi selbst ein und zum anderen laufen
+  sie später ohne Clipping-Abfrage hindurch.«
+  Nutzer, 04.09.2026 09:05: »Der Erdhaufen ist nicht unpassierbar, sondern er ist eine
+  lokale Erhöhung des Bodens, über den die Figuren laufen — so wie bei dem Höhenprofil in
+  der Vogelperspektive.«
+  Nutzer, 04.09.2026 09:14: »Setze beides — Höhenprofil statt Kollision und die Leute dem
+  Haufen ausweichen zu lassen — als neuen Punkt um und reihe ihn direkt vor 690 ein.«
+  Refs: src/scenes/place/PlaceScene.tsx (`DigSites`, the player mesh's fixed Y),
+  src/scenes/place/PlaceLife.tsx (every actor's `position.set`), src/scenes/place/adultWork.ts
+  (`startJointWalk`, `joinSpot`, `JOIN_STAND_OFF`), src/scenes/place/layout.ts (the collider
+  set and the dig-site placement), src/scenes/travel/TravelScene.tsx (how the outdoor height
+  profile carries a figure)
+  Bundle: Dorfleben.
+
+- [x] 692. Every document describes the rebuilt communication mechanic, not the old one (user
+  13.08.2026, playing the deployed communication slice).
+  The rebuild changes what the mechanic IS, and the documents are what the next
+  session, the next agent and the closing run read as the target state. A sweep on
+  13.08.2026 found more than twenty places still specifying the superseded design —
+  the eleven-word lexicon, the twelve-situation catalogue, the mirrored bank
+  errands, the gift-gated message, the seven-concept sentence, the `BIG_ROCK · DIG ·
+  HERE` reply, the mouse click — and design.md §13.4 still calls the whole mechanic
+  "not yet decided". Left standing, every one of them is a trap for whoever builds
+  or judges the slice next.
+  Every document that describes the communication mechanic describes the REBUILT
+  one — no sentence of the superseded design is left standing anywhere.
+
+  This point is the documentation half of the rebuild. It lands WITH (or
+  immediately after) the five build points; a repository whose design documents
+  still specify eleven concepts, a gift-gated message and a click interaction while
+  the code does something else is worse than either state alone.
+
+  Final state, document by document. The list below was produced by a cross-vendor
+  sweep (GPT-5.6 Sol at effort high, 13.08.2026) over the spec document, design.md
+  §13, CLAUDE.md §7.1 and the acceptance detail, with every offending line quoted;
+  each item states what must happen to it. Work it as a checklist — an item is done
+  when the quoted sentence no longer exists in that form.
+  1. **Blocking — the commit does not address the communication rebuild at all.** The diffstat contains only `docs/analysis_de/vibe-coding-anleitung.md`; none of the communication design, acceptance, implementation, localization, journal, or test files changes. Consequently every contradiction below survives unchanged, and none of the six specifications’ required tests is added.
+
+  2. **`docs/communication-poc-spec.md` still declares the superseded brief authoritative.**  
+     Quote: “The user's brief of 03.08.2026 answers the open question…” and “This document is the reference the work-order points 477–488 cite”.  
+     Action: rewrite the document’s status and provenance around the new six-point design; the old work-order reference becomes obsolete.
+
+  3. **Its phrase examples use removed concepts.**  
+     Quote: “a known movement call AND the river utterance”, “dig + here”.  
+     Action: rewrite using surviving phrases, such as `RIVER · DOWNSTREAM`; `HERE` must disappear.
+
+  4. **The five-syllable rationale is still based on eleven words.**  
+     Quotes:
+
+     - “Eleven concepts need eleven sequences.”
+     - “Eleven words in a four-syllable space…”
+     - “Eleven of the fifteen are used and four stay reserved.”
+     - “the chief's message runs thirty-five syllables instead of twenty-eight.”
+     - “it is on the board as a decision the user may reverse.”
+
+     Action: rewrite for five used sequences, ten available/reserved sequences, and a four-atom/twenty-syllable message. Keeping `SEQUENCE_LENGTH` 5 and the two-syllable minimum distance is no longer an open decision.
+
+  5. **The lexicon registry still contains all six concepts that must be removed.**  
+     Quotes: the rows for `COME`, `GO_THERE`, `HERE`, `THERE`, `FOLLOW`, and `NO`.  
+     Action: delete those rows and every dependent reference.
+
+  6. **The rock concept still has the obsolete name.**  
+     Quote: “| BIG_ROCK | `BA-ba-ba-ba-BA` | framed by two highs — a solid block |”.  
+     Action: rename it to `ROCK` everywhere; it is a class, not one named boulder.
+
+  7. **The reserved-sequence registry reflects the eleven-word inventory.**  
+     Quote: “Reserved and unused: `ba-BA-ba-ba-BA`, `BA-BA-ba-BA-BA`, `BA-ba-BA-BA-BA`, `BA-BA-BA-ba-BA`.”  
+     Action: rewrite after removing six words; their sequences become unused too.
+
+  8. **Three obsolete mirror pairs remain part of the design.**  
+     Quote: “All four opposite pairs are exact mirror images: come reversed is go, here reversed is there, follow reversed is no, upstream reversed is downstream.”  
+     Action: delete the first three pairs and re-scope the explanation exclusively to `UPSTREAM`/`DOWNSTREAM`.
+
+  9. **The old child/adult teaching split remains verbatim.**  
+     Quote: “The children, at their game of tag, teach the six general concepts: COME, GO_THERE, FOLLOW, HERE, THERE, NO. The adults… teach… RIVER, UPSTREAM, DOWNSTREAM, BIG_ROCK, DIG.”  
+     Action: rewrite: bank-game children teach `RIVER`, `UPSTREAM`, `DOWNSTREAM`, and `ROCK`; adults teach `RIVER` and `DIG`.
+
+  10. **The three staged contrast lessons are wholly obsolete.**  
+      Quotes:
+
+      - “Three pairs need a deliberately staged contrast…”
+      - “COME against FOLLOW…”
+      - “GO_THERE against THERE…”
+      - “BIG_ROCK against UPSTREAM…”
+
+      Action: delete this catalogue and replace it with the organic guards against the three wrong readings specified for the bank game.
+
+  11. **The hearing/layout section still depends on the deleted situation and errand systems.**  
+      Quote: “It is one decision for the children's situations and the adults' errands alike”.  
+      Action: re-scope to the bank game, adult water/dig work, and silent tag.
+
+  12. **The child layout still describes the old bounded tag chase as the village teaching game.**  
+      Quote: “the children's play ground is DERIVED (`childPlayGround`…) as the largest disc…” and “The chase is bounded by that ground”.  
+      Action: re-scope this derived ground to ports and bankless villages’ silent tag. A bank village instead needs the roaming quarter and measured two-rock bank stage, with all three areas separated from adult speech.
+
+  13. **The chief’s message is still the old seven-concept sentence.**  
+      Quotes:
+
+      - “Go to the river. Follow it upstream. Dig at the big rock.”
+      - “`GO_THERE · RIVER · FOLLOW · UPSTREAM · BIG_ROCK · THERE · DIG`”
+      - “Seven concepts…”
+
+      Action: replace with exactly `RIVER · UPSTREAM · ROCK · DIG`, four atoms.
+
+  14. **The chief’s message is still gift/trust-gated.**  
+      Quote: “only once a culturally correct gift has earned his trust — the §12 condition every hint in the game stands under.”  
+      Action: delete the gift, trust, and honored-friend precondition; the chief must be available from the first visit.
+
+  15. **Adults are still assigned bank-based direction lessons.**  
+      Quote: “the village keeps its own reachable bank, because that is where the adults teach RIVER, UPSTREAM and DOWNSTREAM by pointing at real water.”  
+      Action: rewrite. Adults never stand at the bank and teach no directions; water carriers say `RIVER` at the village end of the path, while children teach both directions.
+
+  16. **Returning the buried item is still described as the puzzle’s endpoint.**  
+      Quote: “He travels back to the village and hands what he dug up to the chief. That solves the puzzle.”  
+      Action: rewrite: the handover yields `RIVER · DOWNSTREAM` and the mould; the puzzle ends only when the mould is used at the matching talus-foot socket below Bandiagara.
+
+  17. **The old acknowledgment remains explicit.**  
+      Quote: “the chief's answer is a PHRASE… `BIG_ROCK · DIG · HERE`”.  
+      Action: delete and replace with exactly `RIVER · DOWNSTREAM`, plus the wordless “Tonabdruck eines Felsens” / “Clay Impression of a Rock” reward and its journal observation.
+
+  18. **The old single teaching-stone transfer remains.**  
+      Quote: “BIG_ROCK is therefore taught on a SMALL boulder visible from the village, and the target upstream is a LARGER one further away”.  
+      Action: rewrite for `ROCK`, the two current-size bank game rocks, the separate ordinary scattered boulder named during roaming, and the upstream target boulder.
+
+  19. **`design.md` §13.4 still calls the mechanic undecided.**  
+      Quotes:
+
+      - “OPEN: the communication mechanic is not yet decided”
+      - “Rough direction (first thoughts, deliberately not yet binding)”
+      - “the zone cut and the mechanic itself remain the user's decision”
+      - “It needs… a decision on the mechanic itself, before any implementation point can be written.”
+      - “Until then…”
+
+      Action: rewrite §13.4 as the decided five-word mechanic. The zone cut may remain open, but the village mechanic may not.
+
+  20. **`design.md` still specifies mouse-click entry.**  
+      Quote: “the NEAREST speaker's note invites a click, and that click opens a modal”.  
+      Action: replace with SPACE/use-key candidate arbitration; remove the canvas click and its pointer-lock-release dependency.
+
+  21. **`design.md` still treats the new mechanic’s eventual landing as hypothetical.**  
+      Quote: “The moment the new mechanic is decided and built, that reverses”.  
+      Action: replace with a present-tense load-bearing description once the rebuild lands.
+
+  22. **CLAUDE.md criterion 6 can still be read as imposing the old gift gate on the communication hint.**  
+      Quote: “a culturally correct gift — not mere observation — is the condition for a hint”.  
+      Action: re-scope explicitly to other cultural-contact hints, if that criterion remains; it must exclude the rebuilt chief audience and drum message.
+
+  23. **CLAUDE.md criterion 7 still delegates its definition to the obsolete §13.4 text.**  
+      Quote: “The tonal village speech of `design.md` §13.4 is implemented”.  
+      Action: rewrite the criterion or its referenced section so acceptance pins the five concepts, new teaching systems, ungated message/reward, and SPACE interaction.
+
+  24. **`docs/acceptance-criteria-detail.md` §6 repeats the ambiguous old gate.**  
+      Quote: “a culturally correct gift is the condition for a hint”.  
+      Action: re-scope it so it cannot govern this communication message.
+
+  25. **Acceptance detail §7 explicitly accepts the eleven-word lexicon.**  
+      Quote: “the Bambara village speaks eleven concepts as five-syllable tone words”.  
+      Action: rewrite to exactly five concepts and record the accepted persisted-reading break.
+
+  26. **Acceptance detail §7 explicitly accepts the deleted teaching catalogues.**  
+      Quote: “The children's tag teaches six concepts and the adults' errands five more, look-alikes apart”.  
+      Action: delete/rewrite for the children’s bank cycle, adults’ two water and two dig situations, and silent tag only in ports or bankless villages.
+
+  27. **Acceptance detail §7 still accepts mouse clicking.**  
+      Quote: “is written by clicking him (`speechLabel`, `speechTarget`, `src/ui/SpeechGuess.tsx`)”.  
+      Action: rewrite for SPACE and the unified use-candidate list; `speechTarget` should choose only the speaker candidate.
+
+  28. **Acceptance detail §7 still accepts the gift-gated seven-word message and old reply.**  
+      Quote: “On earned trust the chief drums a seven-concept message (`drumMessage`); the artefact dug at the erratic it names is answered untranslated (`chiefReply`).”  
+      Action: rewrite for the ungated four-word message, exact two-word reply, mould handover, and Bandiagara socket conclusion.
+
+  29. **Acceptance detail §7 declares the obsolete implementation load-bearing.**  
+      Quote: “What is built is load-bearing.”  
+      Action: rewrite to identify the rebuilt systems; it must not protect the eleven-word catalogue implementation.
+
+  30. **Open point 672 contains one dependency on the old chief response.**  
+      Quote: “`playDrumMessage` and the chief's answer keep working exactly as they do”.  
+      Action: re-scope this to preserve message/reward playback after the response becomes `RIVER · DOWNSTREAM`; it cannot require the old acknowledgment to remain unchanged. The ambient-silence and synchronized-drummer subject itself remains valid.
+
+  31. **Open point 659 records an obsolete intermediate teaching-stone design.**  
+      Quote: “the teaching stone becomes small and moves to the bank upstream”.  
+      Action: rewrite for two current-size bank rocks, one upstream and one downstream, and deletion of the old single central stone.
+
+  32. **Open point 659 understates the new reply and reward.**  
+      Quote: “the chief's answer is replaced by DOWNSTREAM plus an object that leads to the Bandiagara escarpment.”  
+      Action: rewrite to the exact phrase `RIVER · DOWNSTREAM` and name the clay impression/form-and-socket system. The point’s whole-chain review remains valid and should stay on hold until the rebuild lands.
+
+  33. **No attached OPEN work-order point has a subject that becomes wholly obsolete.** Points 672 and 673 still apply to the rebuilt audio, and 659 explicitly resumes against the new chain. Only the stale clauses identified above require rewriting; the other attached open points concern unrelated release/process defects.
+
+  Three notes on that list:
+
+  - Its item 4 says the syllable length stays five. It does NOT: the user decided on
+    13.08.2026 that four syllables suffice once eleven words became five (eight
+    sequences exist at length 4, five are used, three reserved). The documents are
+    rewritten to FOUR, and the chief's message to 16 syllables.
+
+  - Item 1 is an artefact of how the sweep was run (it was handed a commit that had
+    nothing to do with the rebuild) and is NOT a finding — ignore it.
+  - Items 30 to 32 concern OPEN work-order points, not documents; they are filed
+    separately as a finding and are not part of this point.
+
+  Beyond the checklist, four things this point owes on its own:
+
+  - `CLAUDE.md` §7.1 point 7 is rewritten in its CURRENT wording, which item 23's
+    quote predates: the short criterion now reads "The §13 direction, tonal speech,
+    glossary, deciphering, and message-driven drummer rules hold", and glossary and
+    deciphering are not part of the rebuilt mechanic at all. The criterion names what
+    the five-word design actually asks of the player.
+  - `docs/acceptance-evidence.md` §7's evidence chain points at the tests that really
+    cover `src/communication/`, so the criterion is not signed off against evidence
+    for the superseded catalogue.
+  - `design.md` §13.4 stops calling the mechanic undecided and states it in the
+    present tense as the decided five-word design (the ZONE cut may remain open —
+    only the village mechanic is decided).
+  - The persisted-reading break is recorded in one line where the acceptance detail
+    claims what the slice guarantees (user 13.08.2026: saves are irrelevant in this
+    PoC, no migration is owed).
+
+  Test: the Vitest layer already pins the lexicon and the message; this point adds
+  the document check it can carry — no design or acceptance document may name a
+  removed concept (`COME`, `GO_THERE`, `FOLLOW`, `HERE`, `THERE`, `NO`,
+  `BIG_ROCK`), and `docs/communication-poc-spec.md` and design.md §13.4 must agree
+  with `ConceptId` and `DRUM_MESSAGE` on which words exist.
+  Constraints:
+  - design.md is never changed unilaterally — but this change IS the user's request
+    of 13.08.2026, so design.md and CLAUDE.md move with the code, per CLAUDE.md §4.
+  - Land with or right after the five build points, never long before them.
+  - Rewrite to the FINAL state only; no "was X, now Y" trail in the documents.
+  Quotes:
+  Nutzer, 13.08.2026 23:32: »Lasse nochmal Sol prüfen, dass nicht noch irgendwo Reste der Spezifikation der bisher geplanten Kommunikationsmechanik stehen.«
+  Refs: docs/communication-poc-spec.md, design.md 13.4, CLAUDE.md 7.1 criteria 6 and 7, docs/acceptance-criteria-detail.md 6 and 7, docs/acceptance-evidence.md 7
+  Bundle: Dorfleben.

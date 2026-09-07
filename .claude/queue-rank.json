@@ -1171,12 +1171,6 @@
       "origin": "user",
       "place": "ahead"
     },
-    "1057": {
-      "at": "2026-09-04T07:15:52.153Z",
-      "why": "User order 04.09.2026: »Setze beides … als neuen Punkt um und reihe ihn direkt vor 690 ein.«",
-      "origin": "user",
-      "place": "ahead"
-    },
     "1059": {
       "at": "2026-09-05T05:14:33.727Z",
       "why": "Appended by the responder path; ranking belongs to the batch owner",
@@ -1201,12 +1195,6 @@
       "origin": "user",
       "place": "ahead"
     },
-    "1066": {
-      "at": "2026-09-06T12:34:42.829Z",
-      "why": "The user asked for it on 06.09.2026 and placed it directly after 1058",
-      "origin": "user",
-      "place": "ahead"
-    },
     "1070": {
       "at": "2026-09-07T11:33:35.892Z",
       "why": "User order 07.09.2026: queue it directly behind 1069",
@@ -1218,6 +1206,18 @@
       "why": "It is gated on host work only the user can perform — copying the reviewed .devcontainer onto Windows, rebuilding the container, running the no-editor restart drill — so no session can start it whatever its rank; moving it forward would park the batch on a human, and its board card is what actually reaches him.",
       "origin": "machine",
       "place": "last"
+    },
+    "1072": {
+      "at": "2026-09-07T17:37:27.072Z",
+      "why": "Nutzer-Entscheidung 07.09.2026 zur Ufer-Karte: Ortung und höhere Kinderstimmen sind Voraussetzung dafür, dass ein Ruf weiter tragen darf",
+      "origin": "user",
+      "place": "ahead"
+    },
+    "1073": {
+      "at": "2026-09-07T17:37:27.184Z",
+      "why": "Nutzer-Entscheidung 07.09.2026 zur Ufer-Karte: die Richtungsansage ist vom definierten Zuschauerstand aus heute nie hörbar",
+      "origin": "user",
+      "place": "ahead"
     }
   },
   "boundary": {
@@ -1251,7 +1251,7 @@
     "why": "The order standing in front of the release today is the arrangement that predates this rule; the four machine-filed points that had ranked themselves there were moved behind 174 first"
   },
   "settled": {
-    "at": "2026-09-07T15:32:20.895Z",
+    "at": "2026-09-07T17:37:27.198Z",
     "points": [
       174,
       184,
@@ -1617,16 +1617,16 @@
       1054,
       1055,
       1056,
-      1057,
       1059,
       1060,
       1062,
       1063,
       1065,
-      1066,
       1068,
       1070,
-      1071
+      1071,
+      1072,
+      1073
     ]
   }
 }

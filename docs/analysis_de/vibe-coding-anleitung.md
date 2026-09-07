@@ -185,7 +185,9 @@ Die Ursache findest du durch **Zerlegen**, nicht durch Wiederholen.
   der einzig mögliche Satz.
   → *Prompt:* „Frag zu jeder Prüfung: **Kann sie mit den Eingaben dieses Aufrufers das negative
   Urteil überhaupt erreichen?** Wo nein, ist ihr Grün eine Tautologie. Und einen Fix an einer
-  gemeinsamen Funktion prüfst du an **allen** Aufrufstellen, nicht nur an der, die dich biss.“
+  gemeinsamen Funktion prüfst du an **allen** Aufrufstellen, nicht nur an der, die dich biss. Und
+  lies ihre **Ausnahmen**: Setzt derselbe Mechanismus, dessen Schaden sie melden soll, das Flag,
+  das sie freistellt, schweigt sie genau dann, wenn es zählt.“
 
 - **Neue Features zerbrechen alte.** Eine Änderung repariert X und bricht das unbeobachtete Y.
   → *Prompt:* „Prüfe jede Mechanik auch im **Danach-Zustand** und erzwing nach jedem
@@ -510,11 +512,12 @@ Die Ursache findest du durch **Zerlegen**, nicht durch Wiederholen.
 
 - **Die Anweisung hebt ihre eigene Voraussetzung auf.** Ein Ablauf verlangt, erst eine Markierung
   zu setzen und sie dann zu veröffentlichen — doch das Veröffentlichen zählt als Arbeit, und Arbeit
-  löscht die Markierung. Wer ganz gehorcht, macht sie zunichte; wer halb gehorcht, hinterlässt
-  einen halben Zustand.
+  löscht die Markierung. Dieselbe Falle als Sperre: Ihr vorgesehener Notausgang musste eine Datei
+  schreiben, und genau das untersagte sie als Erstes.
   → *Prompt:* „Spiel jede neue Durchsetzung als **wörtlichen Gehorsam** durch und einmal als
-  **Handaufruf** — beides als Test. Prüffrage: Zerstört die Handlungsfolge, die der Mechanismus
-  selbst vorschreibt, seine eigene Voraussetzung?"
+  **Handaufruf**, und probiere ihren Notausgang **unter** der Sperre aus. Prüffrage: Zerstört
+  die vorgeschriebene Handlungsfolge ihre eigene Voraussetzung — oder setzt der Ausweg eine
+  Fähigkeit voraus, die die Sperre gerade entzieht?"
 
 - **Der Rückfall rettet die Funktion und setzt still eine Vereinbarung aus.** Fällt der zweite
   Anbieter aus — oder fehlt die Datei, die deine Regel einstellt —, verhält sich jedes Werkzeug
@@ -523,13 +526,10 @@ Die Ursache findest du durch **Zerlegen**, nicht durch Wiederholen.
   → *Prompt:* „Ein Rückfall meldet, **welche Zusage er aussetzt**. Vergleiche **Regel gegen Ist**,
   nicht Ist gegen Plausibilität. Prüffrage: Welche Vereinbarung bricht er still?"
 
-- **Die Schranke aus zwei Hälften, von denen nur eine ein Polster bekam.** Eine Prüfung maß am
-  selben Bild, wie OFT zwei Beschriftungen ineinander liefen und wie TIEF. Die Häufigkeit durfte
-  vier von neunzig durchgehen lassen, die Tiefe färbte bei einem einzigen rot — dieselben Bilder,
-  dieselbe Begründung, nur auf einer Seite aufgeschrieben.
-  → *Prompt:* „Legt eine Prüfung mehrere Kriterien an denselben Messwert, schreib zu **jedem** auf,
-  was es durchgehen lässt und warum. Prüffrage: Steht ein Kriterium ohne Toleranz neben einem mit —
-  und was behauptet dieser Unterschied?"
+- **Die Schranke aus zwei Hälften, von denen nur eine ein Polster bekam.** Dieselbe Messung,
+  zwei Kriterien: eins ließ vier von neunzig durchgehen, das andere färbte bei einem rot.
+  → *Prompt:* „Legt eine Prüfung mehrere Kriterien an denselben Messwert, schreib zu **jedem**
+  auf, was es durchgehen lässt. Prüffrage: Steht eins ohne Toleranz neben einem mit?"
 
 - **Das Protokoll ohne Verfallsdatum wird zum Dauerplakat.** Was dein Werkzeug über die eigene
   Entscheidung aufschreibt, nimmt niemand je wieder heraus.
@@ -574,4 +574,4 @@ Die Ursache findest du durch **Zerlegen**, nicht durch Wiederholen.
 
 Sie ersetzt die Fallstricke oben nicht.
 
-<!-- GUIDE-FINGERPRINT: 523eab554e6f34b870bbeeb04dd4543ef2bda64640d07485a9da6d145ae7f94d -->
+<!-- GUIDE-FINGERPRINT: d2fcaf6b1b900e251676f5ee44571e92846c6b44eb0a0f817c5fdc73bba1d7df -->

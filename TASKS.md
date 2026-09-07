@@ -114,7 +114,20 @@ put it is the mistake this line exists to stop.
   Doc impact: docs/communication-poc-spec.md (chief comes out to the drummer, CHIEF word), design.md §13.4.
   Bundle: Kommunikation.
 
-- [ ] 1065. The tapping child's hand touches the rock it names (user 06.09.2026).
+- [ ] 1065. The teaching hands touch what they name: the tapping child at its rock, the
+  carrier at the water (user 06.09.2026; point 1066 folded in here 07.09.2026 on the user's
+  instruction to bundle points that would otherwise each buy their own regression run).
+  ONE DEFECT IN TWO PLACES, and the user reported both in the same message. A figure teaches
+  a word by acting on an object, stops one to three metres short of it, and the act stays
+  invisible: the tapping child's hand ends more than a metre from the rock it names, and the
+  water carrier halts 2.7 m up the bank while his jar changes from empty to full with nothing
+  shown in between. Both are proven by the same kind of evidence — a frame in which a hand
+  meets a drawn surface — in the same scene, over the same figure and gesture code. Kept
+  apart they would buy two picture runs for one verdict; PART A and PART B below are the two former
+  points, unchanged in substance, and either half may be cut back out if the branch does not
+  converge.
+
+  PART A — THE TAPPING CHILD'S HAND TOUCHES THE ROCK IT NAMES.
   The child that names the rock TOUCHES it. Today the tap of the children's bank game
   (`bankGame.ts` ~626, spec item 4) is spoken from the catcher's waiting station — `standOff`
   2.6 m off the rock's centre (`src/config/balance.ts`), the play rock itself ~1.2 m in radius
@@ -140,21 +153,8 @@ put it is the mistake this line exists to stop.
   - Doc: design.md §13.4 says the catcher's hand touches the rock while he names it;
     docs/communication-poc-spec.md item 4 likewise; the Ctrl-hold label and the speech label
     are unchanged.
-  Test: Vitest over the bank game — the tap utterance is offered only once the speaker's hand
-  point lies within a small tolerance of the rock surface, and never from the station; the
-  held pose lasts the tap interval; a geometric check that the hand target lies on the drawn
-  rock's surface for both play rocks of the three river villages (nubian, bambara, mandinka).
-  Browser (WebGPU lane): a picture check of the tap moment that measures, in the projection,
-  the hand's screen position against the rock's silhouette (hand inside or on its edge), plus
-  a screenshot of that frame (verification/, subject declared: the tapping child at its rock).
-  Quotes:
-  Nutzer, 06.09.2026 13:48: »Wenn ein Kind beim Fangspiel an den Felsen tippt und ROCK sagt, berührt seine Hand nicht annähernd den Felsen. Das Kind steht in dem Augenblick noch sehr seit davon entfernt. So erkennt man nicht, dass das Gesprochene etwas mit dem Felsen zu tun hat und man könne eher glauben, dass es "Los!" o. ä. bedeutet.«
-  Nutzer, 06.09.2026 13:48 (Einreihung aller drei Punkte): »An der Kommunikationsmechanik zu überarbeiten, einzureihen direkt nach 1058, in der Rehenfolge, in der ich es hier aufzähle:« — dieser Punkt ist der ZWEITE der drei.
-  Refs: src/scenes/place/bankGame.ts (THE TAP ~626, reachDistance/standOff ~223), src/config/balance.ts (bankGame reachDistance 2.2, standOff 2.6), src/render/gesture.ts (GestureKind), src/scenes/place/PlaceLife.tsx, src/scenes/place/layout.ts (PLAY_ROCK_RADIUS), design.md §13.4, docs/communication-poc-spec.md
-  Doc impact: design.md §13.4 and docs/communication-poc-spec.md item 4: the catcher touches the rock with its hand while naming it. If a new gesture kind is added, the point-479 gesture list in the code comments / docs names it.
-  Bundle: Dorfleben.
 
-- [ ] 1066. The water carrier visibly fills the jar at the water and carries visible water (user 06.09.2026).
+  PART B — THE WATER CARRIER VISIBLY FILLS THE JAR AT THE WATER AND CARRIES VISIBLE WATER.
   The filling of the jar READS as filling. Today the RIVER errand sends an adult with an
   empty jar to the foot of the water path and back with a full one, and nothing in between is
   shown: the foot (`bankWaterFoot`, `riverBank.ts`) stands `BANK_STAND_INSET` 1.5 m inside the
@@ -184,24 +184,181 @@ put it is the mistake this line exists to stop.
     hearing child exactly as today; nothing about who is cast or when changes.
   - Doc: design.md §13.4 ('the adults' water and digging work') states the dip at the
     waterline; docs/communication-poc-spec.md likewise where it describes the errand.
-  Test: Vitest over adultWork / riverBank — the fill spot lies within a small tolerance of
-  the waterline for the three river villages (nubian, bambara, mandinka); a 'fill' phase
-  sits between the walk down and the walk back, with 'fullJar' set only after it; the phase
-  lasts its configured seconds. Browser (LARGE, both backends — the water surface is
-  backend-sensitive): a picture check of the dip frame that measures the hand jar below the
-  drawn water surface at the carrier's feet, and one of the return walk that measures the
-  water disc visible at the head jar's rim; screenshots of both (verification/, subjects
-  declared: the carrier dipping at the waterline; the carrier walking back with the full
-  jar).
+
+  Test (ONE run for both halves — this is why they are one point). Vitest: for PART A, the tap
+  utterance is offered only once the speaker's hand point lies within a small tolerance of
+  the rock surface and never from the station, the held pose lasts the tap interval, and the
+  hand target lies on the drawn rock's surface for both play rocks of the three river
+  villages (nubian, bambara, mandinka); for PART B, the fill spot lies within a small tolerance
+  of the waterline for the same three villages, a 'fill' phase sits between the walk down and
+  the walk back with 'fullJar' set only after it, and the phase lasts its configured seconds.
+  Browser (LARGE, both backends — PART B's water surface is backend-sensitive and therefore sets
+  the lane for both halves): a picture check of the tap moment measuring the hand's screen
+  position against the rock's silhouette; one of the dip frame measuring the hand jar below
+  the drawn water surface at the carrier's feet; one of the return walk measuring the water
+  disc at the head jar's rim. Screenshots of all three (verification/, subjects declared: the
+  tapping child at its rock; the carrier dipping at the waterline; the carrier walking back
+  with the full jar).
   Quotes:
+  Nutzer, 06.09.2026 13:48: »Wenn ein Kind beim Fangspiel an den Felsen tippt und ROCK sagt, berührt seine Hand nicht annähernd den Felsen. Das Kind steht in dem Augenblick noch sehr seit davon entfernt. So erkennt man nicht, dass das Gesprochene etwas mit dem Felsen zu tun hat und man könne eher glauben, dass es "Los!" o. ä. bedeutet.«
   Nutzer, 06.09.2026 13:48: »Man erkennte das Auffüllen des Kruges mit Wasser nicht als solches. Das liegt an mehreren Problemen: Der Erwachsene geht nicht nah genug an den Fluss, für die Tätigkeit des Auffüllens fehlt eine Darstellung (ich würde erwarten, dass er den Krug in die Hand nimmt und ins Wasser taucht) und wenn er ihn dann gefüllt auf dem Kopf trägt, sieht man darin kein Wasser.«
-  Nutzer, 06.09.2026 13:48 (Einreihung aller drei Punkte): »An der Kommunikationsmechanik zu überarbeiten, einzureihen direkt nach 1058, in der Rehenfolge, in der ich es hier aufzähle:« — dieser Punkt ist der DRITTE der drei.
-  Refs: src/scenes/place/adultWork.ts (water-out/water-back ~390-410, AdultCarry, WATER_FOOT_REACH), src/scenes/place/riverBank.ts (bankWaterFoot, BANK_STAND_INSET 1.5, BANK_SHORE_HALF 1.2, walkable region through the waterline ~47-62), src/scenes/place/PlaceLife.tsx (ErrandVillagers, head/hand jar meshes ~2440-2612, HEAD_CARRY_POSE), src/scenes/place/layout.ts (waterPath head/foot), src/render/figures.ts, design.md §13.4
-  Doc impact: design.md §13.4: the water carrier dips the jar at the waterline and carries visible water back. docs/communication-poc-spec.md: the errand description. balance.ts: fill seconds (calibratable).
+  Nutzer, 06.09.2026 13:48 (Einreihung aller drei Punkte): »An der Kommunikationsmechanik zu überarbeiten, einzureihen direkt nach 1058, in der Rehenfolge, in der ich es hier aufzähle:« — PART A war der ZWEITE der drei, PART B der DRITTE; die vom Nutzer genannte Reihenfolge bleibt innerhalb dieses Punktes erhalten.
+  Nutzer, 07.09.2026 19:25: »Kannst du weitere Zusammenführungen von offenen Punkten zur
+  Kommunikationsmechanik vornehmen, um Regressionsdurchläufe einzusparen?« — daraufhin ist
+  der frühere Punkt 1066 hier als PART B eingefaltet worden.
+  Refs: PART A — src/scenes/place/bankGame.ts (THE TAP ~626, reachDistance/standOff ~223), src/config/balance.ts (bankGame reachDistance 2.2, standOff 2.6), src/render/gesture.ts (GestureKind), src/scenes/place/layout.ts (PLAY_ROCK_RADIUS). PART B — src/scenes/place/adultWork.ts (water-out/water-back ~390-410, AdultCarry, WATER_FOOT_REACH), src/scenes/place/riverBank.ts (bankWaterFoot, BANK_STAND_INSET 1.5, BANK_SHORE_HALF 1.2, walkable region through the waterline ~47-62), src/scenes/place/layout.ts (waterPath head/foot), src/render/figures.ts. Both — src/scenes/place/PlaceLife.tsx (ErrandVillagers, head/hand jar meshes ~2440-2612, HEAD_CARRY_POSE), design.md §13.4, docs/communication-poc-spec.md
+  Doc impact: design.md §13.4 and docs/communication-poc-spec.md item 4: the catcher touches the rock with its hand while naming it, and the water carrier dips the jar at the waterline and carries visible water back. If a new gesture kind is added, the point-479 gesture list in the code comments / docs names it. balance.ts: fill seconds (calibratable).
   Bundle: Dorfleben.
 
-- [ ] 1056. The adults dig for no visible reason, and the picture never says what comes
-  out (user 04.09.2026, watching the merged digging work).
+- [ ] 1072. The village speaks with a direction, and the children sound like children (user
+  07.09.2026, deciding the first two of the six shore-call aspects).
+  Measured 07.09.2026: `src/` holds no `PannerNode`, `createPanner`, `StereoPanner` or
+  `PositionalAudio` at all. `speaking.ts` `phrasePlan` takes a scalar distance and returns a
+  scalar peak, and `ambience.ts` routes every syllable through ONE mono `speechBus`. All
+  village speech therefore arrives dead centre whatever the bearing to the speaker. Every
+  figure in the game also shares one carrier pitch and one interval
+  (`speechPitchHz` 140, `speechPitchInterval` 1.68, a major sixth), so a child and a grown
+  man are acoustically the same voice. That is the hardest case an ear can be given: two
+  voices at a similar distance cannot be separated at all, and the level says nothing.
+  This is why the adults are hushed whenever a child can hear them — separation is
+  impossible today, so overlap has to be PREVENTED instead of heard through. It is also the
+  precondition for letting a call carry further than the hearing radius (point 1073): a
+  louder village without direction is a louder mush.
+  Final state:
+  - Every spoken syllable arrives from the DIRECTION of its speaker: one stereo position per
+    utterance, taken from the bearing camera -> speaker when the utterance is planned. A
+    speaker straight ahead stays centred, the position is bounded so no voice leaves the
+    stage, and a speaker behind the camera keeps a stable side instead of flipping.
+  - The children speak a HIGHER low/high pair than the adults. The two-tone relation itself
+    is untouched — the pair is TRANSPOSED, not re-intervalled — because the exact tonal
+    mirror of low against high carries the whole language (`lexicon.ts`, the UPSTREAM /
+    DOWNSTREAM pair). The adults keep today's pair.
+  - Panning never costs level: an utterance is not quieter for having been panned, and a
+    mono output (device or comfort setting) loses the direction and nothing else.
+  - Both pitch pairs and the stereo width are calibratable fields in `balance.ts`, with the
+    English and German debug labels changed together.
+  - The deployed-graph speech headroom assertion is RE-MEASURED for the new carriers and the
+    added node, and still judges the level that LEAVES the chain rather than the level the
+    plan asked for (point 589, rule 1).
+  Test: Vitest over the plan and the graph — bearing -> stereo position for the
+  straight-ahead, hard-side and behind-the-camera cases, the mono fallback losing direction
+  but not level, and the child carriers lying above the adult ones while the interval is
+  preserved for both. Browser (audio lane, WebGL 2 per the §7.2 routing): two overlapping
+  village voices measured at different stereo positions with the headroom assertion green.
+  Criticality: normal — it changes how the village sounds and unblocks 1073, but nothing the
+  player can already do breaks if it lands late.
+  Quotes:
+  Nutzer, 07.09.2026: »Okay, dann brauchen wir einen StereoPanner. Zudem sollen die Kinder
+  zwei Tonhöhen verwenden, die höher sind als bei den Erwachsenen. Dann klingt es auch mehr
+  nach Kinderstimmen.«
+  Nutzer, 07.09.2026 19:08 (Einreihung aller sechs Aspekte): »Setze alle 6 Punkte so um, wie
+  jetzt in der Karte beschrieben. Fasse dabei sinnvoll Punkte zusammen, sodass nicht alles in
+  einzelnen Tasks steht, von denen jeder für sich einen teuren Regressionstest benötigt.« —
+  dieser Punkt fasst die Aspekte 1 und 2 zusammen, weil beide denselben Audiographen
+  anfassen und dieselbe Headroom-Nachmessung erzwingen.
+  Refs: src/systems/ambience.ts (`speechBus`, `syllableCarrier`, `playSpeech`, the headroom
+  assertion), src/communication/speaking.ts (`phrasePlan`, `hearingGain`),
+  src/communication/lexicon.ts (the direction pair's tonal mirror), src/config/balance.ts
+  (`communication.speechPitchHz`, `speechPitchInterval`), src/i18n/en.ts + src/i18n/de.ts
+  (debug labels), src/systems/ambience.test.ts, design.md §13.4
+  Doc impact: design.md §13.4: village speech carries the speaker's direction, and the
+  children's voices sit above the adults'. balance.ts: both pitch pairs and the stereo width
+  (calibratable).
+  Bundle: Dorfleben.
+
+- [ ] 1073. A call carries to the stand the game photographs it from, and the hush stops
+  eating words (user 07.09.2026, deciding aspects 3, 4 and 5 of the shore-call card).
+  THE DEFECT, measured 07.09.2026. The bank round announces its direction before every run
+  (`bankGame.ts` `announceRun`, gaplessly, because the run waits on `s.direction !== null`),
+  but the announcer is the runner at the START rock while the catcher taps ROCK at the far
+  one. The rocks stand 19.7 m apart (`riverBank.ts`), `hearingRadius` is 10 m, and it is a
+  HARD cut: beyond it no sound, no label and no pointing gesture (`spokenGesture.ts`
+  `speechReach`, `PlaceLife.tsx` `speakBankUtterance`). The sides swap every run, so a
+  spectator at one rock is in earshot at best every second run, and in the middle he stands
+  9.85 m from both at about 4 % level. Worse, the stand the project itself photographs and
+  judges the game from — `bankPlayRocksView`, back by the stretch's length and off its axis
+  — lies 22.0 m from EITHER rock, so from the documented spectator's place the direction
+  call is never audible at all. Evidence: state dump hoa-state-2026-09-07-1186491426
+  (bambara-village) holds two heard words after a whole session, both of them single-tone
+  non-words; RIVER and both direction words are missing. Test gap: `bankGame.test.ts` checks
+  only the alternation and runs with `utteranceGapSeconds` 0 and no distance evaluation at
+  all.
+  THE SECOND HALF, also measured. `t.hushed` is set at three places in `adultWork.ts` (the
+  invitation, and twice for the site word) and is never taken back inside a running task —
+  the only `delete` sits where a fresh initiator task is cast. `assertNoOwedWord` fires
+  `adult-atom-lost` on `!task.owes || task.hushed === true`, so the flag that CAUSES the
+  deferral is exactly the exemption that permits the word to be dropped. Since the shore
+  game (point 687) the children cross the whole village, so "a child can hear" is far more
+  common than the dig-site placement assumed, and the only way out is the 180 s
+  `errandSeconds` backstop (`stallSeconds` 20 s is declared, settable in the debug menu and
+  set in tests, but read nowhere). That is the same defect as the user's report of two
+  adults standing around doing nothing.
+  Final state:
+  - Carrying distance is a property of the UTTERANCE, not of the village. The bank round's
+    CALLS — `moment` `call` (RIVER), `announce` (the direction) and `arrival` (ROCK at the
+    far rock) — carry about 22 m; every other utterance, the catcher's `tap` and the off-game
+    `boulder` included, keeps the 10 m `hearingRadius`. One calibratable field in
+    `balance.ts`, passed through the radius parameter `speaking.ts`, `spokenGesture.ts` and
+    `heard.ts` already accept.
+  - The value is DERIVED, not guessed: it is at least the distance from `bankPlayRocksView`'s
+    stand to either play rock, and the test computes that distance rather than restating it.
+  - Untouched, as the card promises: `hearingRadius` itself, `childrenHear`'s separation
+    budget, the children's-quarter assertion and `invitationClear` — all of which read
+    `hearingRadius` directly and therefore keep their 10 m.
+  - The adults' hush becomes a BOUNDED deferral: `hushed` holds an owed word for at most a
+    calibratable hold, after which the villager speaks anyway or the loss is reported loudly.
+    `assertNoOwedWord` stops taking `hushed === true` as a blanket excuse — a word held past
+    the hold is a defect, not an exemption.
+  - Reception is measured, not assumed: over a full bank round watched from the documented
+    stand, the player hears the RIVER call, both direction announcements and the arrival ROCK.
+    Today that count is zero.
+  Test: Vitest — the reach of each utterance moment, `bankPlayRocksView`'s stand-to-rock
+  distance bounding the call reach, a full bank round evaluated from that stand yielding
+  every call word heard, and a hush held past its hold firing `adult-atom-lost` instead of
+  being excused by it. Browser (communication lane): the direction word's label and pointing
+  gesture present in a frame taken from the documented stand (verification/, subject
+  declared: the announcing child seen from the bank-game spectator stand).
+  Criticality: high — the taught direction word never reaches the player at the very stand
+  the project photographs the game from, and the one assertion that should catch a lost adult
+  word is disarmed by the flag that causes the loss.
+  Quotes:
+  Nutzer, 07.09.2026: »Die Kinder müssen vor jedem Start ihre Richtung ansagen. Ich sehe sie
+  das nur selten machen.«
+  Nutzer, 07.09.2026 19:08: »Setze alle 6 Punkte so um, wie jetzt in der Karte beschrieben.« —
+  dieser Punkt fasst die Aspekte 3, 4 und 5 zusammen: 3 ohne 4 wäre stiller Wortverlust, und
+  5 ist der Beweis von 3.
+  Note: the card justifies the bounded hush by saying the raised reach would otherwise cause
+  silent word loss. Measured, that chain does not hold — `childrenHear` gates on the CHILD's
+  distance to the speaking adult and a separate call-reach field leaves it at 10 m. The hush
+  bound is due anyway, for the reason measured above, and stays bundled here by the user's
+  decision. Recorded 07.09.2026 19:16 and reported to the user in the same turn.
+  Refs: src/scenes/place/bankGame.ts (`BankMoment`, `announceRun`, `say`),
+  src/scenes/place/riverBank.ts (`bankPlayRocksView`, `BANK_PLAY_ROCK_INSET`),
+  src/scenes/place/PlaceLife.tsx (`speakBankUtterance` ~540, `childrenHear` ~2243,
+  `invitationClear` ~2259), src/communication/spokenGesture.ts (`speechReach`),
+  src/communication/speaking.ts, src/communication/heard.ts,
+  src/scenes/place/adultWork.ts (`assertNoOwedWord` ~176, the `hushed` sites ~339/349/352),
+  src/config/balance.ts (`communication.hearingRadius`), src/scenes/place/bankGame.test.ts,
+  design.md §13.4
+  Doc impact: design.md §13.4: a call carries further than ordinary speech, and a held word
+  is spoken or reported rather than dropped. docs/communication-poc-spec.md: the bank round's
+  audibility from the spectator's stand. balance.ts: call reach and hush hold (calibratable).
+  Bundle: Dorfleben.
+
+- [ ] 1056. The excavation becomes a real place: it says what it is for, and its earth is
+  ground the village walks over (user 04.09.2026, watching the merged digging work; point
+  1057 folded in here 07.09.2026 on the user's instruction to bundle points that would
+  otherwise each buy their own regression run).
+  ONE OBJECT, TWO COMPLAINTS FROM THE SAME MORNING. The dig site says nothing about its
+  purpose (PART A) and its earth behaves like nothing at all (PART B). Both are judged by the same
+  evidence — a village frame holding the excavations, on both backends — and both edit the
+  dig-site meshes, `layout.ts`, `adultWork.ts` and the place scene's actor heights, which is
+  why the bundle already forbids working them beside each other. Landed apart, the second
+  would re-photograph the ground the first had just rebuilt, and PART A's left-behind RESULT and
+  PART B's raised earth occupy the very same patch. PART A and PART B are the two former points,
+  unchanged in substance; either half may be cut back out if the branch does not converge.
+
+  PART A — THE ADULTS DIG FOR NO VISIBLE REASON, AND THE PICTURE NEVER SAYS WHAT COMES OUT.
   The user asked what the adults are digging FOR and found no answer in the scene: "Sie
   scheinen zum Selbstzweck zu graben. Was graben sie aus?" The reason exists in the code
   and nowhere else. Every site is placed as a KIND with a real purpose — a store pit
@@ -216,9 +373,19 @@ put it is the mistake this line exists to stop.
   costs the DIG lesson its footing: a word demonstrated on a purposeless act is a word
   the player has no reason to trust.
   Final state:
+  - THE VILLAGE KEEPS TWO EXCAVATIONS, NOT THREE (user 07.09.2026, aspect 6 of the
+    shore-call card). Two carry the distinction completely: `adultWork.ts` asks only for
+    `digSites.length >= 2` before the second dig situation, so the DIG lesson is untouched
+    and the third site is variety, not meaning. Both remaining sites sit as far from the
+    water as their placement rules allow, in the village half turned away from the shore, so
+    the diggers and the shore game share less ground. The field-edge turned ground is the
+    only freely placeable kind and therefore stays; the second is one of the two kinds
+    anchored near the middle (the store pit at a compound, the post hole beside a lane), and
+    the remaining kind is dropped. Nothing of this is visible today — all three render the
+    same round hole — so the removal alone changes no picture.
   - A standing player can tell, without text and without the concept overlay, what each
-    of the three excavations is FOR. Each kind carries its own answer in the scene beside
-    it, and the three no longer read as one repeated hole.
+    of the two excavations is FOR. Each kind carries its own answer in the scene beside
+    it, and the two no longer read as one repeated hole.
   - A finished bout leaves a RESULT, not only a deeper hole: what the pair was digging
     for is there to be seen when they walk away.
   - The turned patch is worked ground, not a pit — its shape says what is done to it.
@@ -227,78 +394,82 @@ put it is the mistake this line exists to stop.
     lands on the excavation itself.
   - Design and code agree afterwards: `design.md` §7 states what the digging is for in the
     world, not only that it teaches a word.
-  Test: Vitest over the scene description — each dig-site kind carries its own distinct
-  furniture, and a completed bout adds the result to the site; Playwright on the polish
-  lane — a village frame in which the three sites are visibly different things, judged on
-  both backends.
-  Criticality: high — this is the second time the player has read village work as
-  meaningless, and the first time cost the whole communication slice a rebuild.
+  PART B — THE SPOIL HEAP BURIES THE DIGGERS, AND EVERYONE ELSE WALKS STRAIGHT THROUGH IT.
+  Three causes, each read off the shipped code:
+  - The heap's SIDE is fixed. It sits at a constant local offset in a group rotated by an
+    angle derived from the site's own coordinates, so it grows where it grows no matter who
+    stands there.
+  - The initiator walks into the MIDDLE of the pit — `startJointWalk` sets his goal to the
+    site centre and he stops within `WORK_ARRIVE_RADIUS` of it, while the heap's centre lies
+    about 1.19 m out at `DIG_SITE_RADIUS` 0.9. He digs himself in.
+  - NOTHING collides with the excavation. The collider set is finished before the dig sites
+    are placed at all, and neither pit nor heap is ever added, so villagers, children and the
+    player pass through the earth.
+  The user decided the shape of the remedy and the reason for it: a collider is NOT the
+  answer, because an impassable heap wedges figures — the player included — into corners. The
+  heap becomes a LOCAL RAISING OF THE GROUND that everyone walks up and over, the way the
+  height profile outside a settlement already works. Today a settlement is flat: every actor's
+  Y is set independently and lands at zero (the bank children's climb is the one exception),
+  while outdoors the figure rides `sampleTerrain(...).height`. So this half brings a place its
+  first ground height, and it must arrive as ONE source every actor reads, not as a second
+  scatter of Y assignments.
+  Final state:
+  - The heap never grows on a side somebody is standing on — the digging pair's places are
+    chosen away from it, and the initiator works from the rim instead of the middle.
+  - Nobody walks through the heap: villagers, children and the player ride over it, in both
+    perspectives, and the first-person camera rises and falls smoothly rather than stepping.
+  - One ground-height source for a place, read by every actor and by the camera; a flat
+    settlement keeps behaving exactly as it does today.
+  - Nothing in a settlement becomes impassable through this point — no new collider, and no
+    figure can be wedged by the earth.
+
+  Test (ONE picture run for both halves — this is why they are one point). Vitest: for PART A,
+  each dig-site kind carries its own distinct furniture, a completed bout adds the result to
+  the site, and a village lays out exactly two dig sites, both on the side of the settlement
+  away from the water; for PART B, the ground-height source and the standing-place choice — a
+  pair never takes a place inside the heap's footprint, and the height is zero everywhere no
+  excavation reaches. Browser (polish lane, both backends): one village frame in which the
+  two sites are visibly different things AND a figure is carried over the raised earth;
+  screenshots of it (verification/, subject declared: the two excavations with a villager
+  walking over the spoil).
+  Criticality: high — PART A is the second time the player has read village work as meaningless,
+  and the first time cost the whole communication slice a rebuild; PART B's defect is visible in
+  the very picture the player is meant to learn from, and its remedy touches every actor's
+  height in a place, which is the error-prone half.
   Quotes:
   Nutzer, 04.09.2026 08:40: »Was ist der inhaltliche Grund fürs Graben der Erwachsenen?
   Bisher ist keiner erkennbar. Sie scheinen zum Selbstzweck zu graben. Was graben sie
   aus?«
   Nutzer, 04.09.2026 08:47: »Reihe einen Punkt direkt vor 690 ein, der das sichtbar
   macht.«
-  Refs: src/scenes/place/PlaceScene.tsx (`DigSites`), src/scenes/place/digSiteAppearance.ts,
-  src/scenes/place/layout.ts (the kind-anchored placement), src/scenes/place/adultWork.ts
-  (the durable work record), design.md §7
-  Bundle: Dorfleben.
-
-- [ ] 1057. The spoil heap buries the diggers, and everyone else walks straight through it
-  (user 04.09.2026, watching the merged digging work; measured the same morning).
-  Three causes, each read off the shipped code:
-  - The heap's SIDE is fixed. It sits at a constant local offset in a group rotated by an
-    angle derived from the site's own coordinates, so it grows where it grows no matter
-    who stands there.
-  - The initiator walks into the MIDDLE of the pit — `startJointWalk` sets his goal to the
-    site centre and he stops within `WORK_ARRIVE_RADIUS` of it, while the heap's centre
-    lies about 1.19 m out at `DIG_SITE_RADIUS` 0.9. He digs himself in.
-  - NOTHING collides with the excavation. The collider set is finished before the dig
-    sites are placed at all, and neither pit nor heap is ever added, so villagers,
-    children and the player pass through the earth.
-  The user decided the shape of the remedy and the reason for it: a collider is NOT the
-  answer, because an impassable heap wedges figures — the player included — into corners.
-  The heap becomes a LOCAL RAISING OF THE GROUND that everyone walks up and over, the way
-  the height profile outside a settlement already works. Today a settlement is flat: every
-  actor's Y is set independently and lands at zero (the bank children's climb is the one
-  exception), while outdoors the figure rides `sampleTerrain(...).height`. So this point
-  brings a place its first ground height, and it must arrive as ONE source every actor
-  reads, not as a second scatter of Y assignments.
-  Final state:
-  - The heap never grows on a side somebody is standing on — the digging pair's places are
-    chosen away from it, and the initiator works from the rim instead of the middle.
-  - Nobody walks through the heap: villagers, children and the player ride over it, in
-    both perspectives, and the first-person camera rises and falls smoothly rather than
-    stepping.
-  - One ground-height source for a place, read by every actor and by the camera; a flat
-    settlement keeps behaving exactly as it does today.
-  - Nothing in a settlement becomes impassable through this point — no new collider, and
-    no figure can be wedged by the earth.
-  Test: Vitest over the ground-height source and the standing-place choice — a pair never
-  takes a place inside the heap's footprint, and the height is zero everywhere no
-  excavation reaches; Playwright on the polish lane — a frame with a figure carried over
-  the heap, judged on both backends.
-  Criticality: high — the defect is visible in the picture the player is meant to learn
-  from, and the remedy touches every actor's height in a place, which is the error-prone
-  half.
-  Quotes:
+  Nutzer, 07.09.2026 19:08: »Setze alle 6 Punkte so um, wie jetzt in der Karte beschrieben.
+  Fasse dabei sinnvoll Punkte zusammen, sodass nicht alles in einzelnen Tasks steht, von
+  denen jeder für sich einen teuren Regressionstest benötigt. Evtl. Passen manche der 6
+  Aspekte ja auch als Zusatz an noch offene Punkte in der Queue.« — Aspekt 6 (drei
+  Grabungsstellen auf zwei, beide vom Fluss abgewandt) ist hier eingehängt statt als eigener
+  Punkt: dieselben Dateien, derselbe Zweig, derselbe Bildlauf.
   Nutzer, 04.09.2026 09:05: »Die Erwachsenen sollten nicht in dem entstehenden Erdhaufen
   stehen. Zum einen graben sie sich damit manchmal quasi selbst ein und zum anderen laufen
   sie später ohne Clipping-Abfrage hindurch.«
-  Nutzer, 04.09.2026 09:05: »Der Erdhaufen ist nicht unpassierbar, sondern er ist eine
-  lokale Erhöhung des Bodens, über den die Figuren laufen — so wie bei dem Höhenprofil in
-  der Vogelperspektive.«
+  Nutzer, 04.09.2026 09:05: »Der Erdhaufen ist nicht unpassierbar, sondern er ist eine lokale
+  Erhöhung des Bodens, über den die Figuren laufen — so wie bei dem Höhenprofil in der
+  Vogelperspektive.«
   Nutzer, 04.09.2026 09:14: »Setze beides — Höhenprofil statt Kollision und die Leute dem
   Haufen ausweichen zu lassen — als neuen Punkt um und reihe ihn direkt vor 690 ein.«
+  Nutzer, 07.09.2026 19:25: »Kannst du weitere Zusammenführungen von offenen Punkten zur
+  Kommunikationsmechanik vornehmen, um Regressionsdurchläufe einzusparen?« — daraufhin ist
+  der frühere Punkt 1057 hier als PART B eingefaltet worden.
   Refs: src/scenes/place/PlaceScene.tsx (`DigSites`, the player mesh's fixed Y),
-  src/scenes/place/PlaceLife.tsx (every actor's `position.set`), src/scenes/place/adultWork.ts
-  (`startJointWalk`, `joinSpot`, `JOIN_STAND_OFF`), src/scenes/place/layout.ts (the collider
-  set and the dig-site placement), src/scenes/travel/TravelScene.tsx (how the outdoor height
-  profile carries a figure)
+  src/scenes/place/digSiteAppearance.ts, src/scenes/place/layout.ts (the kind-anchored
+  placement, the collider set), src/scenes/place/adultWork.ts (the durable work record,
+  `startJointWalk`, `joinSpot`, `JOIN_STAND_OFF`), src/scenes/place/PlaceLife.tsx (every
+  actor's `position.set`), src/scenes/travel/TravelScene.tsx (how the outdoor height profile
+  carries a figure), design.md §7
   Bundle: Dorfleben.
 
-- [ ] 690. The classic game of tag moves to the port cities, and is silent there (user
-  13.08.2026, playing the deployed communication slice).
+- [ ] 690. The classic game of tag moves to the port cities, and every document describes
+  the rebuilt mechanic (user 13.08.2026, playing the deployed communication slice; point 692
+  folded in here 07.09.2026).
   The user played the deployed communication slice on 13.08.2026 with the debug
   switch "Speech: show concepts instead of syllables" on and could learn nothing:
   "Ich erkenne da kein Fangspiel … Das Herumschicken wirkt wie zum Selbstzweck
@@ -317,6 +488,7 @@ put it is the mistake this line exists to stop.
   The classic game of tag survives — in the PORT CITIES and in any village without
   a bank, and it is silent wherever it runs.
 
+  PART A — THE CLASSIC GAME OF TAG MOVES TO THE PORT CITIES, AND IS SILENT THERE.
   Final state:
 
   1. The round that exists today — one child is IT, the group flees, the child that
@@ -335,10 +507,36 @@ put it is the mistake this line exists to stop.
      derived like the village one and clearing that settlement's own vignettes by
      the hearing radius.
 
-  Test: Vitest over the three settlement cases of §3 — each stages exactly one
+  PART B — EVERY DOCUMENT DESCRIBES THE REBUILT COMMUNICATION MECHANIC, NOT THE OLD ONE (former
+  point 692, folded in here 07.09.2026 on the user's instruction to bundle points that would
+  otherwise each buy their own regression run).
+  This is the documentation half of the rebuild, and it belongs on the LAST build point of
+  the slice — which this one is. The rebuild changes what the mechanic IS, and the documents
+  are what the next session, the next agent and the closing run read as the target state. A
+  sweep on 13.08.2026 found more than twenty places still specifying the superseded design —
+  the eleven-word lexicon, the twelve-situation catalogue, the mirrored bank errands, the
+  gift-gated message, the seven-concept sentence, the `BIG_ROCK · DIG · HERE` reply, the
+  mouse click — and design.md §13.4 still calls the whole mechanic "not yet decided". Left
+  standing, every one of them is a trap for whoever builds or judges the slice next.
+  Final state: every document that describes the communication mechanic describes the
+  REBUILT one — no sentence of the superseded design is left standing anywhere, in the spec
+  document, design.md §13, CLAUDE.md §7.1, the acceptance detail, the localization and
+  journal files. THE ITEM-BY-ITEM CHECKLIST — the cross-vendor sweep of 13.08.2026 (GPT-5.6
+  Sol at effort high) with every offending line quoted and what must happen to it — is the
+  body of the archived point 692 in `docs/tasks-archive.md`; work it from there, an item
+  being done when the quoted sentence no longer exists in that form. Add to it whatever the
+  points landed since then changed: the `Doc impact:` line of each of 1045, 1051, 1052, 1056,
+  1058, 1064, 1065, 1072 and 1073 names a statement this sweep must now find in place.
+  Landing rule kept from 692: a repository whose design documents still specify eleven
+  concepts, a gift-gated message and a click interaction while the code does something else
+  is worse than either state alone — so this half lands WITH the rest of this point, never
+  after it.
+
+  Test: Vitest over the three settlement cases of PART A, item 3 — each stages exactly one
   game, the bank game only where a bank exists, and the tag game speaks nothing.
   The existing children-motion gate keeps running against this game wherever it is
-  staged.
+  staged. For PART B there is no browser lane: a documentation sweep is proven by the
+  documents themselves, and it rides this point's landing rather than buying its own.
   Constraints:
   - Depends on the children's bank game only in so far as the two must not both
     run in one settlement.
@@ -349,226 +547,6 @@ put it is the mistake this line exists to stop.
   Quotes:
   Nutzer, 13.08.2026 22:59: »Es ist schade, dass damit das bisherige Fangspiel, bei dem einer Fänger ist, die Gruppe vor ihm wegrennt und ein gefangenes Kind die Fängerrolle übernimmt, komplett wegfällt. Das würde ich zusätzlich als anderes Spiel beibehalten - allerdings nicht für die Dörfer, weil das sonst zu unübersichtlich wird, wenn zwei verschiedene Spiele parallel laufen. Aber in den Hafenstädten können die Kinder dieses klassische Fangspiel spielen.«
   Refs: src/scenes/place/tagGame.ts, src/scenes/place/PlaceLife.tsx, src/scenes/place/lifeSpots.ts
-  Bundle: Dorfleben.
-
-- [ ] 692. Every document describes the rebuilt communication mechanic, not the old one (user
-  13.08.2026, playing the deployed communication slice).
-  The rebuild changes what the mechanic IS, and the documents are what the next
-  session, the next agent and the closing run read as the target state. A sweep on
-  13.08.2026 found more than twenty places still specifying the superseded design —
-  the eleven-word lexicon, the twelve-situation catalogue, the mirrored bank
-  errands, the gift-gated message, the seven-concept sentence, the `BIG_ROCK · DIG ·
-  HERE` reply, the mouse click — and design.md §13.4 still calls the whole mechanic
-  "not yet decided". Left standing, every one of them is a trap for whoever builds
-  or judges the slice next.
-  Every document that describes the communication mechanic describes the REBUILT
-  one — no sentence of the superseded design is left standing anywhere.
-
-  This point is the documentation half of the rebuild. It lands WITH (or
-  immediately after) the five build points; a repository whose design documents
-  still specify eleven concepts, a gift-gated message and a click interaction while
-  the code does something else is worse than either state alone.
-
-  Final state, document by document. The list below was produced by a cross-vendor
-  sweep (GPT-5.6 Sol at effort high, 13.08.2026) over the spec document, design.md
-  §13, CLAUDE.md §7.1 and the acceptance detail, with every offending line quoted;
-  each item states what must happen to it. Work it as a checklist — an item is done
-  when the quoted sentence no longer exists in that form.
-  1. **Blocking — the commit does not address the communication rebuild at all.** The diffstat contains only `docs/analysis_de/vibe-coding-anleitung.md`; none of the communication design, acceptance, implementation, localization, journal, or test files changes. Consequently every contradiction below survives unchanged, and none of the six specifications’ required tests is added.
-
-  2. **`docs/communication-poc-spec.md` still declares the superseded brief authoritative.**  
-     Quote: “The user's brief of 03.08.2026 answers the open question…” and “This document is the reference the work-order points 477–488 cite”.  
-     Action: rewrite the document’s status and provenance around the new six-point design; the old work-order reference becomes obsolete.
-
-  3. **Its phrase examples use removed concepts.**  
-     Quote: “a known movement call AND the river utterance”, “dig + here”.  
-     Action: rewrite using surviving phrases, such as `RIVER · DOWNSTREAM`; `HERE` must disappear.
-
-  4. **The five-syllable rationale is still based on eleven words.**  
-     Quotes:
-
-     - “Eleven concepts need eleven sequences.”
-     - “Eleven words in a four-syllable space…”
-     - “Eleven of the fifteen are used and four stay reserved.”
-     - “the chief's message runs thirty-five syllables instead of twenty-eight.”
-     - “it is on the board as a decision the user may reverse.”
-
-     Action: rewrite for five used sequences, ten available/reserved sequences, and a four-atom/twenty-syllable message. Keeping `SEQUENCE_LENGTH` 5 and the two-syllable minimum distance is no longer an open decision.
-
-  5. **The lexicon registry still contains all six concepts that must be removed.**  
-     Quotes: the rows for `COME`, `GO_THERE`, `HERE`, `THERE`, `FOLLOW`, and `NO`.  
-     Action: delete those rows and every dependent reference.
-
-  6. **The rock concept still has the obsolete name.**  
-     Quote: “| BIG_ROCK | `BA-ba-ba-ba-BA` | framed by two highs — a solid block |”.  
-     Action: rename it to `ROCK` everywhere; it is a class, not one named boulder.
-
-  7. **The reserved-sequence registry reflects the eleven-word inventory.**  
-     Quote: “Reserved and unused: `ba-BA-ba-ba-BA`, `BA-BA-ba-BA-BA`, `BA-ba-BA-BA-BA`, `BA-BA-BA-ba-BA`.”  
-     Action: rewrite after removing six words; their sequences become unused too.
-
-  8. **Three obsolete mirror pairs remain part of the design.**  
-     Quote: “All four opposite pairs are exact mirror images: come reversed is go, here reversed is there, follow reversed is no, upstream reversed is downstream.”  
-     Action: delete the first three pairs and re-scope the explanation exclusively to `UPSTREAM`/`DOWNSTREAM`.
-
-  9. **The old child/adult teaching split remains verbatim.**  
-     Quote: “The children, at their game of tag, teach the six general concepts: COME, GO_THERE, FOLLOW, HERE, THERE, NO. The adults… teach… RIVER, UPSTREAM, DOWNSTREAM, BIG_ROCK, DIG.”  
-     Action: rewrite: bank-game children teach `RIVER`, `UPSTREAM`, `DOWNSTREAM`, and `ROCK`; adults teach `RIVER` and `DIG`.
-
-  10. **The three staged contrast lessons are wholly obsolete.**  
-      Quotes:
-
-      - “Three pairs need a deliberately staged contrast…”
-      - “COME against FOLLOW…”
-      - “GO_THERE against THERE…”
-      - “BIG_ROCK against UPSTREAM…”
-
-      Action: delete this catalogue and replace it with the organic guards against the three wrong readings specified for the bank game.
-
-  11. **The hearing/layout section still depends on the deleted situation and errand systems.**  
-      Quote: “It is one decision for the children's situations and the adults' errands alike”.  
-      Action: re-scope to the bank game, adult water/dig work, and silent tag.
-
-  12. **The child layout still describes the old bounded tag chase as the village teaching game.**  
-      Quote: “the children's play ground is DERIVED (`childPlayGround`…) as the largest disc…” and “The chase is bounded by that ground”.  
-      Action: re-scope this derived ground to ports and bankless villages’ silent tag. A bank village instead needs the roaming quarter and measured two-rock bank stage, with all three areas separated from adult speech.
-
-  13. **The chief’s message is still the old seven-concept sentence.**  
-      Quotes:
-
-      - “Go to the river. Follow it upstream. Dig at the big rock.”
-      - “`GO_THERE · RIVER · FOLLOW · UPSTREAM · BIG_ROCK · THERE · DIG`”
-      - “Seven concepts…”
-
-      Action: replace with exactly `RIVER · UPSTREAM · ROCK · DIG`, four atoms.
-
-  14. **The chief’s message is still gift/trust-gated.**  
-      Quote: “only once a culturally correct gift has earned his trust — the §12 condition every hint in the game stands under.”  
-      Action: delete the gift, trust, and honored-friend precondition; the chief must be available from the first visit.
-
-  15. **Adults are still assigned bank-based direction lessons.**  
-      Quote: “the village keeps its own reachable bank, because that is where the adults teach RIVER, UPSTREAM and DOWNSTREAM by pointing at real water.”  
-      Action: rewrite. Adults never stand at the bank and teach no directions; water carriers say `RIVER` at the village end of the path, while children teach both directions.
-
-  16. **Returning the buried item is still described as the puzzle’s endpoint.**  
-      Quote: “He travels back to the village and hands what he dug up to the chief. That solves the puzzle.”  
-      Action: rewrite: the handover yields `RIVER · DOWNSTREAM` and the mould; the puzzle ends only when the mould is used at the matching talus-foot socket below Bandiagara.
-
-  17. **The old acknowledgment remains explicit.**  
-      Quote: “the chief's answer is a PHRASE… `BIG_ROCK · DIG · HERE`”.  
-      Action: delete and replace with exactly `RIVER · DOWNSTREAM`, plus the wordless “Tonabdruck eines Felsens” / “Clay Impression of a Rock” reward and its journal observation.
-
-  18. **The old single teaching-stone transfer remains.**  
-      Quote: “BIG_ROCK is therefore taught on a SMALL boulder visible from the village, and the target upstream is a LARGER one further away”.  
-      Action: rewrite for `ROCK`, the two current-size bank game rocks, the separate ordinary scattered boulder named during roaming, and the upstream target boulder.
-
-  19. **`design.md` §13.4 still calls the mechanic undecided.**  
-      Quotes:
-
-      - “OPEN: the communication mechanic is not yet decided”
-      - “Rough direction (first thoughts, deliberately not yet binding)”
-      - “the zone cut and the mechanic itself remain the user's decision”
-      - “It needs… a decision on the mechanic itself, before any implementation point can be written.”
-      - “Until then…”
-
-      Action: rewrite §13.4 as the decided five-word mechanic. The zone cut may remain open, but the village mechanic may not.
-
-  20. **`design.md` still specifies mouse-click entry.**  
-      Quote: “the NEAREST speaker's note invites a click, and that click opens a modal”.  
-      Action: replace with SPACE/use-key candidate arbitration; remove the canvas click and its pointer-lock-release dependency.
-
-  21. **`design.md` still treats the new mechanic’s eventual landing as hypothetical.**  
-      Quote: “The moment the new mechanic is decided and built, that reverses”.  
-      Action: replace with a present-tense load-bearing description once the rebuild lands.
-
-  22. **CLAUDE.md criterion 6 can still be read as imposing the old gift gate on the communication hint.**  
-      Quote: “a culturally correct gift — not mere observation — is the condition for a hint”.  
-      Action: re-scope explicitly to other cultural-contact hints, if that criterion remains; it must exclude the rebuilt chief audience and drum message.
-
-  23. **CLAUDE.md criterion 7 still delegates its definition to the obsolete §13.4 text.**  
-      Quote: “The tonal village speech of `design.md` §13.4 is implemented”.  
-      Action: rewrite the criterion or its referenced section so acceptance pins the five concepts, new teaching systems, ungated message/reward, and SPACE interaction.
-
-  24. **`docs/acceptance-criteria-detail.md` §6 repeats the ambiguous old gate.**  
-      Quote: “a culturally correct gift is the condition for a hint”.  
-      Action: re-scope it so it cannot govern this communication message.
-
-  25. **Acceptance detail §7 explicitly accepts the eleven-word lexicon.**  
-      Quote: “the Bambara village speaks eleven concepts as five-syllable tone words”.  
-      Action: rewrite to exactly five concepts and record the accepted persisted-reading break.
-
-  26. **Acceptance detail §7 explicitly accepts the deleted teaching catalogues.**  
-      Quote: “The children's tag teaches six concepts and the adults' errands five more, look-alikes apart”.  
-      Action: delete/rewrite for the children’s bank cycle, adults’ two water and two dig situations, and silent tag only in ports or bankless villages.
-
-  27. **Acceptance detail §7 still accepts mouse clicking.**  
-      Quote: “is written by clicking him (`speechLabel`, `speechTarget`, `src/ui/SpeechGuess.tsx`)”.  
-      Action: rewrite for SPACE and the unified use-candidate list; `speechTarget` should choose only the speaker candidate.
-
-  28. **Acceptance detail §7 still accepts the gift-gated seven-word message and old reply.**  
-      Quote: “On earned trust the chief drums a seven-concept message (`drumMessage`); the artefact dug at the erratic it names is answered untranslated (`chiefReply`).”  
-      Action: rewrite for the ungated four-word message, exact two-word reply, mould handover, and Bandiagara socket conclusion.
-
-  29. **Acceptance detail §7 declares the obsolete implementation load-bearing.**  
-      Quote: “What is built is load-bearing.”  
-      Action: rewrite to identify the rebuilt systems; it must not protect the eleven-word catalogue implementation.
-
-  30. **Open point 672 contains one dependency on the old chief response.**  
-      Quote: “`playDrumMessage` and the chief's answer keep working exactly as they do”.  
-      Action: re-scope this to preserve message/reward playback after the response becomes `RIVER · DOWNSTREAM`; it cannot require the old acknowledgment to remain unchanged. The ambient-silence and synchronized-drummer subject itself remains valid.
-
-  31. **Open point 659 records an obsolete intermediate teaching-stone design.**  
-      Quote: “the teaching stone becomes small and moves to the bank upstream”.  
-      Action: rewrite for two current-size bank rocks, one upstream and one downstream, and deletion of the old single central stone.
-
-  32. **Open point 659 understates the new reply and reward.**  
-      Quote: “the chief's answer is replaced by DOWNSTREAM plus an object that leads to the Bandiagara escarpment.”  
-      Action: rewrite to the exact phrase `RIVER · DOWNSTREAM` and name the clay impression/form-and-socket system. The point’s whole-chain review remains valid and should stay on hold until the rebuild lands.
-
-  33. **No attached OPEN work-order point has a subject that becomes wholly obsolete.** Points 672 and 673 still apply to the rebuilt audio, and 659 explicitly resumes against the new chain. Only the stale clauses identified above require rewriting; the other attached open points concern unrelated release/process defects.
-
-  Three notes on that list:
-
-  - Its item 4 says the syllable length stays five. It does NOT: the user decided on
-    13.08.2026 that four syllables suffice once eleven words became five (eight
-    sequences exist at length 4, five are used, three reserved). The documents are
-    rewritten to FOUR, and the chief's message to 16 syllables.
-
-  - Item 1 is an artefact of how the sweep was run (it was handed a commit that had
-    nothing to do with the rebuild) and is NOT a finding — ignore it.
-  - Items 30 to 32 concern OPEN work-order points, not documents; they are filed
-    separately as a finding and are not part of this point.
-
-  Beyond the checklist, four things this point owes on its own:
-
-  - `CLAUDE.md` §7.1 point 7 is rewritten in its CURRENT wording, which item 23's
-    quote predates: the short criterion now reads "The §13 direction, tonal speech,
-    glossary, deciphering, and message-driven drummer rules hold", and glossary and
-    deciphering are not part of the rebuilt mechanic at all. The criterion names what
-    the five-word design actually asks of the player.
-  - `docs/acceptance-evidence.md` §7's evidence chain points at the tests that really
-    cover `src/communication/`, so the criterion is not signed off against evidence
-    for the superseded catalogue.
-  - `design.md` §13.4 stops calling the mechanic undecided and states it in the
-    present tense as the decided five-word design (the ZONE cut may remain open —
-    only the village mechanic is decided).
-  - The persisted-reading break is recorded in one line where the acceptance detail
-    claims what the slice guarantees (user 13.08.2026: saves are irrelevant in this
-    PoC, no migration is owed).
-
-  Test: the Vitest layer already pins the lexicon and the message; this point adds
-  the document check it can carry — no design or acceptance document may name a
-  removed concept (`COME`, `GO_THERE`, `FOLLOW`, `HERE`, `THERE`, `NO`,
-  `BIG_ROCK`), and `docs/communication-poc-spec.md` and design.md §13.4 must agree
-  with `ConceptId` and `DRUM_MESSAGE` on which words exist.
-  Constraints:
-  - design.md is never changed unilaterally — but this change IS the user's request
-    of 13.08.2026, so design.md and CLAUDE.md move with the code, per CLAUDE.md §4.
-  - Land with or right after the five build points, never long before them.
-  - Rewrite to the FINAL state only; no "was X, now Y" trail in the documents.
-  Quotes:
-  Nutzer, 13.08.2026 23:32: »Lasse nochmal Sol prüfen, dass nicht noch irgendwo Reste der Spezifikation der bisher geplanten Kommunikationsmechanik stehen.«
-  Refs: docs/communication-poc-spec.md, design.md 13.4, CLAUDE.md 7.1 criteria 6 and 7, docs/acceptance-criteria-detail.md 6 and 7, docs/acceptance-evidence.md 7
   Bundle: Dorfleben.
 
 - [ ] 659. The whole communication chain, played through and judged by what reaches the
@@ -6217,9 +6195,9 @@ Build order, chosen so no two parallel agents own the same file:
   still ON THE GROUND (took off too late) — an airborne bird is safe from ground
   hunters. So the existing bird fauna (the shore/scavenger birds, the plover, vultures,
   etc.) needs the ground↔air state and a takeoff-on-flee transition.
-  (B) AERIAL PREDATORS (research settled — docs/fauna-behaviour-1890.md §B): add
+  (B) AERIAL PREDATORS (research settled — docs/fauna-behaviour-1890.md PART B): add
   region-appropriate FLYING predators (raptors) that hunt prey birds and catch them IN
-  THE AIR, per the researched per-region table (§B2.1): falcons (peregrine/lanner/
+  THE AIR, per the researched per-region table (PART B2.1): falcons (peregrine/lanner/
   barbary) and the two hawk-eagles (African, Ayres's) attack by a STOOP/DESCEND, while
   the accipiter/harrier/fish-eagle majority use an air-catch tail-chase or an ambush
   from cover (no height). The stoop is BUILT — but as a SCRIPTED "descend-and-strike"
@@ -6233,14 +6211,14 @@ Build order, chosen so no two parallel agents own the same file:
   and a surprise-from-above are realistic, and whether "a ground predator only gets a
   bird caught on the ground" matches real behaviour. Produce a cited per-region aerial-
   predator + prey-bird table with the same PERIOD/INFERRED/MYTH markers, and a short
-  "Implementation brief" (§B4 — already delivered; the research half is DONE). BUILD
+  "Implementation brief" (PART B4 — already delivered; the research half is DONE). BUILD
   (after the wildlife cluster is free): the bird ground/air state machine +
   takeoff-on-flee (pure flee helpers in `src/scenes/travel/wildlifeBehavior.ts`, wired
   in `src/scenes/travel/Wildlife.tsx`) — with the researched fly/no-fly split (small
   birds and flamingos fly to escape, the flamingo with a laborious running take-off as
   a vulnerable window; plover CHICKS crouch/freeze and can be caught, the adult flies
   and does the broken-wing distraction); the aerial-predator species (build in
-  `src/render/fauna.ts`, seeded from a new region-keyed aerial-predator pool per §B2.1)
+  `src/render/fauna.ts`, seeded from a new region-keyed aerial-predator pool per PART B2.1)
   with an air-catch tail-chase for the ambush guild and the SCRIPTED descend-and-strike
   for the falcon/hawk-eagle guild; ground predators lose the airborne target. Reuse the
   existing hunt/flee/carcass machinery; every started drama resolves (I4). All
@@ -6259,7 +6237,7 @@ Build order, chosen so no two parallel agents own the same file:
   THE RESEARCH GATE IS DELIVERED FOR BOTH HALVES (carried 20.08.2026 from the 10.08.2026
   four-eyes work-order analysis, not a fresh finding). The point records it for (B), but its
   opening clause still gates (A) on a Fable pass as well — and `docs/fauna-behaviour-1890.md`
-  §B1 answers (A) too: which prey birds fly off, the flamingo's laborious running take-off
+  PART B1 answers (A) too: which prey birds fly off, the flamingo's laborious running take-off
   as the vulnerable window, the plover chick that crouches while the adult flies, and
   whether "a ground predator only gets a bird caught on the ground" matches real behaviour.
   So no research is owed at all; only the build waits for the wildlife cluster to be free.

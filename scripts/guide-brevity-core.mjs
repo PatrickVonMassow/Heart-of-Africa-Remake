@@ -360,6 +360,18 @@ export const LIMITS = {
   // +63 words, so the ceilings move 570 -> 576 and 5311 -> 5372 with zero slack. Not escalated
   // to the user, under his general withdrawal of ask-before-raising of 10.08.2026; this written
   // justification is the last step.
+  // RAISED 07.09.2026 by the measured net of ONE genuinely new claim (retrospective §3.241): a
+  // dev assertion carried an EXCEPTION for exactly the flag that the mechanism it guards sets, so
+  // the check that should report the resulting loss was disarmed by the loss's own cause. FOLDED
+  // into "Die Sonde kann ihr Nein nicht erreichen", which already carries the unreachable NO but
+  // read it only off the caller's inputs — the check's own exception clause was the half it
+  // lacked. No neighbouring entry could pay it back without dropping a pinned claim: +2 lines /
+  // +24 words, so the ceilings move 576 -> 578 and 5372 -> 5396 with zero slack.
+  // 07.09.2026 (second): the escape-hatch lesson — a lock whose sanctioned way out demanded the
+  // very capability the lock withdrew — is a variant of "Die Anweisung hebt ihre eigene
+  // Voraussetzung auf" and was FOLDED into it, while two neighbouring entries were compressed to
+  // pay for the folding. The measured guide therefore came DOWN: 578 -> 576 lines and
+  // 5396 -> 5381 words, no unearned headroom either way.
   maxLines: 576,
   // EXACT FIT, not headroom — corrected 30.07.2026 after the four-eyes review
   // pointed out that this comment had long stopped describing the numbers. The
@@ -582,7 +594,9 @@ export const LIMITS = {
   // beside it. Folding says it in two words less than the old wording: 5311 -> 5309.
   // 07.09.2026: the intake-threshold pitfall justified beside maxLines measures 63 words:
   // 5309 -> 5372.
-  maxWords: 5372,
+  // 07.09.2026 (second): the folded escape-hatch lesson plus the two compressions came in fifteen
+  // words under the old ceiling: 5396 -> 5381.
+  maxWords: 5381,
   // A pitfall entry = the risk lines plus its prompt. Anything longer is a
   // story, not a tip.
   maxEntryLines: 11,
