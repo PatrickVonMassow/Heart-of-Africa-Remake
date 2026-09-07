@@ -847,6 +847,21 @@ put it is the mistake this line exists to stop.
   Refs: scripts/verify/gamepad.mjs (section `position-query`), src/systems/gamepadMap.ts,
   the position-query toast in src/state/store.ts and both language files
   Bundle: Testinfrastruktur.
+  AMENDMENT 07.09.2026 (finding, drained from the carrier). Two things about this point's
+  QUEUE RANK, recorded here because prose is where they hide:
+  (a) The "it blocks the release, which is why it stands here" clause above, and the twin
+      sentence in `docs/work-packages.md` ("it stands early because it holds criterion 30's
+      only browser evidence"), are ORDERING PROSE that no rank record and no guard points
+      at. `queue-rank.mjs` reports all points ranked and stays green through any move, so a
+      reorder leaves both sentences behind claiming the old order. Whoever moves this point
+      greps its number for ordering prose in TASKS.md AND docs/work-packages.md and moves
+      that too — moving the block alone is not the move.
+  (b) The mechanical reason given for the front position is already void: both reds are
+      CHARGED to their own open point in `scripts/render-verify-charges.mjs` (RED_CHARGES
+      entries for 1062/gamepad and 733/startup, verified 07.09.2026), and CLAUDE.md §7.2
+      closes a red that is charged to its owning point. The ledger had made the front
+      position unnecessary before either point was ranked there. This records the fact; it
+      does NOT itself reorder anything — the rank is the user's call.
 
 - [ ] 633. The release's closing run — two regressions with the cleanup between them (user
   11.08.2026, splitting point 174: "Dafür scheint mir die Schätzung von 1 h viel zu wenig
@@ -14846,3 +14861,44 @@ to land than a mechanism that needs a review.
   `vscode-restart-kills-the-container`.
   Bundle: Urlaubsfestigkeit — host-side, runs alone; it is the acceptance half of 1069 and
   touches no code the other members edit.
+
+- [ ] 1074. A long verify run dies with the session that started it (measured twice on
+  07.09.2026 in the point-1070 worktree; bundle Testinfrastruktur). `run-logged.mjs` stays in
+  the STARTING SESSION'S process group, so a handover or a session end kills it mid-suite.
+  The 19:05 regression was cut at 19:25:34 UTC — the same second the previous session handed
+  the batch lock over (in-flight transfer stamp 1788809129134 = 19:25:29); the 18:25 run died
+  the same way after `flow`. Neither was a product failure: both records read `exitCode 1`
+  with `failing: []`, the log truncated mid-list, 51 of 76 and 14 of 76 frames written.
+  THE COST IS PAID TWICE OVER: a truncated pass covers no backend, and a retry is SUSPECT and
+  covers nothing (CLAUDE.md §7.2), so the ~20 minutes are not merely lost — the point could
+  not land until the suites were run again. THE LESSON ALREADY EXISTS one file over: after ten
+  sessions died mid-gate, TASKS.md:1054 tells the owner to run `land-point.mjs` under
+  `setsid`. The verify runs never got it, and every caller is expected to remember.
+  THIS IS THE COUNTERPART OF 567, NOT A DUPLICATE: 567 is the run that OUTLIVES its killed
+  session and competes with its successor for the machine; this is the run that DIES with a
+  session that ended normally. Fixing this one makes 567's stray case more common by
+  construction, so 567's reaping is what keeps it safe — they are read together.
+  FINAL STATE:
+  1. `run-logged.mjs` detaches itself into its own process group, so a run survives the
+     session that started it and no caller has to remember `setsid`. Removing the footgun is
+     the whole change; it adds no guard, no ledger field and no flag anybody must pass.
+  2. A run that is still alive when its starting session ends is reported as RUNNING rather
+     than as a red: the sidecar keeps `status: "running"` and no `exitCode` is invented for
+     it, so nothing later reads a survivor as a failure.
+  3. A truncated pass is never silently a red. When a run ends without a terminal verdict and
+     records no failing suite, its receipt says so in those words — "killed, not failed" —
+     and names the last suite that reported, so the successor re-runs the REMAINDER instead
+     of re-running everything or, worse, believing the product broke.
+  VERIFIABLE: pure Vitest — a run started under the runner reports a process group id
+  different from its parent's; a sidecar whose process is still alive classifies as running,
+  not as exit 1; and a record with `exitCode 1`, an empty `failing` list and a frame count
+  below the expectation classifies as KILLED with the last reporting suite named, while a
+  record with the same exit code and a non-empty `failing` list stays a red.
+  Criticality: medium, frequency HIGH — every context boundary and every handover can take a
+  running suite with it, and the batch hands over on a fixed watermark.
+  Refs: TASKS.md point 567 (the reaping counterpart), TASKS.md:1054 (the same lesson already
+  drawn for the landing gate), scripts/verify/run-logged.mjs, scripts/verify/run-wait.mjs,
+  memory `detach-long-running-landings`.
+  Bundle: Testinfrastruktur — it edits `scripts/verify/run-logged.mjs` and the run sidecar
+  that 1062 does not touch, so it may run beside the rest of the bundle; it is read together
+  with 567, whose stray reaping is what makes a surviving run safe, and never worked beside it.

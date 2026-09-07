@@ -98,6 +98,8 @@ Das Musterbeispiel sind die Chat-Zeitstempel: neun Eskalationsstufen, acht weich
 | 07.09. mittags | Der Nutzer fragte nach der Lastverteilung seit dem Zehn-Uhr-Reset und deckte 100 % zu 0 % auf: In viereinhalb Stunden liefen ~627k Ausgabe-Token auf Anthropic, während OpenAI keinen einzigen Aufruf bekam. `.claude/astra-share.json` fehlte, der Schalter lief daher im Zustand `default` — der nach seinem eigenen Hilfetext UNTER der stehenden Policy von CLAUDE.md §6 liegt und nur den Review abgibt. Ein Rückfallwert, der für sich gültig ist, macht seine eigene Abwesenheit unsichtbar; die Wirkung stand nur auf zwei fremden Verbrauchsanzeigen (§3.240) |
 | 07.09. abends | Der Nutzer hörte die Richtungsansage des Ufer-Spiels „fast nie" — gemessen ist es **nie**: 19,7 m Strecke gegen 10 m Hörweite mit hartem Schnitt, und der vom Projekt selbst definierte Zuschauerstand liegt 22,0 m von jedem Felsen entfernt. Zwei sorgfältig gebaute Zahlen, nie gegeneinander gehalten, weil kein Test von der Zuschauerposition aus misst; dritter Fall derselben Bauform in derselben Szene nach dem 13.08. und 04.09. (§3.233) |
 | 07.09. abends | Beim Prüfen, ob das Verstummen der Erwachsenen entfallen kann: Dorfsprache hat gar keine Stereo-Ortung (kein Panner, ein Mono-Bus), und die Assertion `adult-atom-lost` nimmt ausgerechnet `hushed` als Freibrief — das Flag, dessen Mechanismus den Wortverlust erzeugt, entwaffnet die Prüfung darauf. Latent bei 10 m Hörweite, dauerhaft bei jeder Vergrößerung (§3.241) |
+| 07.09. abends | Ein Wächter hatte sich selbst vom Stand-down befreit, sein Heilmittel aber nicht: `doc-budget-guard` maß richtig und verlangte einen Schnitt, den die schreibgesperrte Sitzung nicht ausführen durfte — vier blockierte Zugenden, Reparatur nur per Träger an den Owner; dazu misst seine Zeilenzählung per `split` eine Zeile zu viel, die 50er-Decke sind 49 Inhaltszeilen (§3.243) |
+| 07.09. abends | Punkt 1070 verlor zweimal seine Regression, ohne Produktfehler: Der Lauf hängt in der Prozessgruppe der bestellenden Sitzung und wurde bei der Lock-Übergabe auf die Sekunde abgeschnitten — `exit 1` bei LEERER Fehlschlagliste, 51 von 76 Bildern. Die Lehre stand seit zehn Sitzungstoden für das Lande-Tor bereit, war aber nie ins Werkzeug gewandert (§3.244, Punkt 1074) |
 
 
 Muster: Ab dem 22.07. explodiert die Commit-Rate (Delegation) — und genau dann häufen sich die Infrastruktur-Vorfälle. **Skalierung der Autonomie erzeugt eine eigene Problemklasse, die die Feature-Arbeit zeitweise überholt.**
@@ -1438,7 +1440,7 @@ keinen Träger hat. Gebucht als Punkt 956.
 
 ## Anhang A — Maschinell gepflegte Quellen-Übersicht
 
-Zuletzt aktualisiert: Montag, 07.09.2026, 19:38 · Quellen-Fingerprint: `d2fcaf6b1b90…`
+Zuletzt aktualisiert: Montag, 07.09.2026, 21:40 · Quellen-Fingerprint: `044de4ca8c62…`
 
 Spalten heuristisch aus den Quellen abgeleitet (Anläufe = distinkte Datumsnennungen im Memory;
 Maßnahme = Guard-Skripte mit Namens-Treffer). Die inhaltliche Bewertung gehört der Prosa oben.
@@ -1486,6 +1488,7 @@ Maßnahme = Guard-Skripte mit Namens-Treffer). Die inhaltliche Bewertung gehört
 | All journal texts (de + en) must carry emotional voice markup; English read-aloud runs via Kokoro TTS | 1 | niedrig | — (Regel/Memory) | ◐ Regel |
 | Immer auf Deutsch mit dem Nutzer kommunizieren, und immer in der Du-Form — nie siezen | 4 | hoch | — (Regel/Memory) | ◐ Regel |
 | After every change, npm run lint (oxlint) and npm audit must be clean — zero lint errors/warnings, zero CVEs. Standing user directive. | 1 | niedrig | — (Regel/Memory) | ◐ Regel |
+| A push to main runs build+lint+audit+unit — never push main while a browser regression is drawing | 1 | niedrig | push-arrival-guard.mjs | ✔ Mechanismus |
 | hoa PERMANENT process — delegate as much implementation as possible to worktree-isolated subagents; keep only picture-verify + merge at the main session; run a pool of parallel agents on non-overlapping files | 4 | hoch | — (Regel/Memory) | ◐ Regel |
 | State only what was just measured, with its reading time; never assert machine/repo state from a plausible model | 2 | mittel | — (Regel/Memory) | ◐ Regel |
 | Before building, triage difficulty × criticality; HIGH/critical work gets a second, different model — in which FORM (blind-parallel vs. review) is normative in CLAUDE.md §6, not here | 3 | mittel | criticality-review-guard.mjs, model-guard.mjs | ✔ Mechanismus |
@@ -1518,7 +1521,6 @@ Maßnahme = Guard-Skripte mit Namens-Treffer). Die inhaltliche Bewertung gehört
 | Never access paths outside the project directory unless strictly necessary (e.g. the global ~/.claude rules); keep local non-versioned artefacts in a git-ignored local/ folder inside the repo | 1 | niedrig | — (Regel/Memory) | ◐ Regel |
 | a repeated Stop-guard refusal means my model of the state is wrong — re-measure, never answer it twice with the same words | 2 | mittel | — (Regel/Memory) | ◐ Regel |
 | Release tags are re-pointed ONLY on the user's explicit request — never automatically after a fix; a cut vX.Y is frozen | 3 | mittel | — (Regel/Memory) | ◐ Regel |
-| TASKS.md and all new entries in it are written in English | 1 | niedrig | tasks-archive-guard.mjs, tasks-spec-guard.mjs | ✔ Mechanismus |
 | TASKS.md entries state the final correct target directly — never keep a 'first defined wrong, then clarified/corrected' trail in the spec | 1 | niedrig | batch-doctor-states.mjs, tasks-archive-guard.mjs, tasks-spec-guard.mjs | ✔ Mechanismus |
 | Think harder about what to test; when in doubt add MORE tests — never skimp on fast browserless Vitest cases | 1 | niedrig | — (Regel/Memory) | ◐ Regel |
 | Tests and probes must use IN-GAME-achievable zoom (non-debug 0.125–0.5 at least), never a debug-only zoom — testing at an unrealistic zoom has passed while the player still saw the bug, repeatedly | 1 | niedrig | — (Regel/Memory) | ◐ Regel |
@@ -1543,8 +1545,8 @@ Maßnahme = Guard-Skripte mit Namens-Treffer). Die inhaltliche Bewertung gehört
 
 Erfasste Quellen: 95 Feedback-/Projekt-Memories · 58 Guard-/Hook-Skripte · 6 Revert-/Reapply-Commits · 125 Prozess-/Meta-TASKS-Punkte (davon 59 offen).
 
-<!-- RETRO-FINGERPRINT: d2fcaf6b1b900e251676f5ee44571e92846c6b44eb0a0f817c5fdc73bba1d7df -->
-<!-- RETRO-LAST-REFRESHED: 2026-09-07T17:38:04.488Z -->
+<!-- RETRO-FINGERPRINT: 044de4ca8c624c14230595709005cea81e767939a5535ec8e9364701586d033e -->
+<!-- RETRO-LAST-REFRESHED: 2026-09-07T19:40:24.517Z -->
 <!-- AUTO-GENERATED:END -->
 
 ### 3.111 Ein Erfolg ist kein Beweis für den Weg, auf dem er zustande kam
@@ -5832,3 +5834,74 @@ keiner; er wird erst in dem Moment als fehlend bemerkt, in dem man ihn braucht.
 Und wo ein Werkzeug seinen Inhalt nur als Datei annimmt, während ein
 Schwester-Kommando ihn inline nimmt, ist die Datei keine Anforderung, sondern
 ein vergessener Unterschied.
+
+### 3.243 Der Wächter nahm sich selbst vom Stand-down aus — sein Heilmittel nicht
+
+Am 07.09.2026 lief eine Sitzung ohne Batch-Lock viermal gegen dieselbe Wand.
+`doc-budget-guard` meldete `MEMORY.md` als übervoll und verlangte einen Schnitt.
+Der Wächter ist absichtlich vom Ownership-Stand-down befreit — sein eigener
+Kommentar sagt es, „A CONTENT guard, so it does NOT stand down", und das ist
+richtig gedacht: Ein zu langes Dokument ist zu lang, gleich wer hinsieht. Nur
+sind seine sämtlichen Heilmittel SCHREIBVORGÄNGE, und die sind nicht befreit.
+Die Sitzung konnte den Überlauf messen, den exakten Schnitt vorbereiten und
+nichts davon ausführen; sie konnte nicht einmal ihren Zug beenden, um das zu
+berichten. Übrig blieb, die Reparatur dem Owner in den Träger zu legen.
+
+Das ist die Verschärfung von §3.242 und nicht dessen Wiederholung. Dort fehlte
+ein NOTAUSGANG, der eine entzogene Fähigkeit voraussetzte. Hier hat ein Wächter
+eine Ausnahme für sich selbst formuliert und dabei übersehen, dass eine Ausnahme
+für die PRÜFUNG wertlos ist, solange die ABHILFE unter die Sperre fällt. Die
+Selbstbefreiung war der Grund, warum niemand das Loch bemerkte: Der Wächter
+funktionierte ja — er sprach, er maß richtig, er nannte die Abhilfe. Er sprach
+nur zu jemandem, der sie nicht ausführen durfte.
+
+Ein zweites, kleineres Detail aus demselben Vorgang gehört dazu, weil es die
+Blockade verlängert hat: Die Zeilenzählung des Wächters ist ein `split('\n')`.
+Eine Datei mit abschließendem Zeilenumbruch misst damit eine Zeile mehr, als sie
+Inhalt hat — die genannte 50-Zeilen-Decke sind in Wahrheit 49 Inhaltszeilen. Der
+Owner strich daraufhin einen Eintrag, war immer noch blockiert und brauchte
+einen zweiten Schnitt.
+
+**Lehre:** Eine Ausnahme muss die ganze Kette umfassen, nicht nur ihren Anfang.
+Wer einen Wächter vom Stand-down befreit, befreit damit nicht sein Heilmittel;
+solange beides nicht zusammen befreit ist, ist der befreite Wächter kein
+schärferes Auge, sondern eine Sackgasse. Die billige Lesart bleibt die richtige:
+Ein Wächter sollte die Sitzung überspringen, die den Überlauf weder verursacht
+hat noch beheben darf. Und eine Grenze, die als runde Zahl kommuniziert wird,
+sollte auch die runde Zahl MESSEN.
+
+### 3.244 Die Messung gehörte der Sitzung, die sie bestellt hatte — und starb mit ihr
+
+Am 07.09.2026 verlor Punkt 1070 zweimal seine Regression, ohne dass am Spiel
+etwas falsch war. Der Lauf um 19:05 wurde um 19:25:34 UTC abgeschnitten — in
+derselben Sekunde, in der die Vorgängersitzung den Batch-Lock übergab. Der Lauf
+um 18:25 starb genauso, nur früher. Beide Datensätze sagen dasselbe: `exit 1`
+bei LEERER Fehlschlagliste, das Protokoll bricht mitten in der Suite-Liste ab,
+51 von 76 beziehungsweise 14 von 76 Bildern geschrieben. `run-logged.mjs` bleibt
+in der Prozessgruppe der bestellenden Sitzung, und die Übergabe nimmt die ganze
+Gruppe mit.
+
+Der Schaden ist größer als die verlorene Rechenzeit, und zwar wegen unserer
+eigenen Regeln: Ein abgeschnittener Durchlauf deckt keine Bahn, und eine
+Wiederholung ist VERDÄCHTIG und deckt gar nichts (CLAUDE.md §7.2). Der Punkt
+konnte also nicht landen, bis die Suiten neu gefahren waren — die Regel, die uns
+vor geschönten Grünen schützt, verteuert jeden Abbruch zusätzlich.
+
+Bitter ist, dass die Lehre eine Datei weiter schon steht. Nachdem zehn Sitzungen
+mitten im Lande-Tor gestorben waren (§3.237), hält TASKS.md:1054 fest, dass
+`land-point.mjs` DETACHED zu fahren ist. Gezogen wurde sie für das Tor, nicht für
+die Sache dahinter. Die Verify-Läufe, die genauso lange dauern und genauso teuer
+sind, blieben Kinder ihrer Sitzung, und jeder Aufrufer sollte sich `setsid`
+merken.
+
+Daneben steht der Gegenfall, Punkt 567: der Lauf, der seine GETÖTETE Sitzung
+ÜBERLEBT und dem Nachfolger die Maschine wegnimmt. Beide Male ist die Ursache
+dieselbe Verwechslung — die Lebensdauer einer Messung wird an die Lebensdauer
+einer Sitzung geknüpft, mal zu fest, mal zu lose.
+
+**Lehre:** Arbeit, deren Wert in Zehnminutenschritten gemessen wird, darf nicht
+am Leben eines Prozesses hängen, dessen Lebensdauer in Zügen gemessen wird. Und
+eine Lehre, die für einen Aufrufer gezogen wird, ist erst dann gezogen, wenn sie
+im WERKZEUG steht: Solange sie eine Merkregel für den nächsten Aufrufer bleibt,
+wartet sie nur darauf, an der Stelle wieder zuzuschlagen, an die niemand gedacht
+hat.

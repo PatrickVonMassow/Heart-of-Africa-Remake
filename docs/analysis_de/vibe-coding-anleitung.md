@@ -517,7 +517,11 @@ Die Ursache findest du durch **Zerlegen**, nicht durch Wiederholen.
   → *Prompt:* „Spiel jede neue Durchsetzung als **wörtlichen Gehorsam** durch und einmal als
   **Handaufruf**, und probiere ihren Notausgang **unter** der Sperre aus. Prüffrage: Zerstört
   die vorgeschriebene Handlungsfolge ihre eigene Voraussetzung — oder setzt der Ausweg eine
-  Fähigkeit voraus, die die Sperre gerade entzieht?"
+  Fähigkeit voraus, die die Sperre gerade entzieht? Und wenn du eine **Ausnahme** formulierst:
+  Nimmst du nur die **Prüfung** aus oder auch ihre **Abhilfe**? Ein Wächter, der sich selbst von
+  einer Sperre befreit, während seine Heilmittel unter ihr bleiben, prüft weiter richtig und
+  redet doch mit jemandem, der nicht handeln darf — das ist keine schärfere Kontrolle, sondern
+  eine Sackgasse."
 
 - **Der Rückfall rettet die Funktion und setzt still eine Vereinbarung aus.** Fällt der zweite
   Anbieter aus — oder fehlt die Datei, die deine Regel einstellt —, verhält sich jedes Werkzeug
@@ -525,6 +529,18 @@ Die Ursache findest du durch **Zerlegen**, nicht durch Wiederholen.
   verteilt hattest; sichtbar nur an dessen Verbrauchsanzeige.
   → *Prompt:* „Ein Rückfall meldet, **welche Zusage er aussetzt**. Vergleiche **Regel gegen Ist**,
   nicht Ist gegen Plausibilität. Prüffrage: Welche Vereinbarung bricht er still?"
+
+- **Die lange Messung hing am Leben der Sitzung, die sie bestellt hat.** Ein Prüflauf über
+  zwanzig Minuten läuft als Kind des Fensters, das ihn gestartet hat. Endet das Fenster —
+  Übergabe, Kontextgrenze, Neustart —, stirbt er mitten drin. Und er stirbt **wie ein
+  Fehlschlag**: Abbruchcode gesetzt, Fehlerliste leer, Protokoll mitten im Satz zu Ende. Wer
+  nur den Code liest, sucht den Bug im Produkt, den es nicht gibt.
+  → *Prompt:* „Was **länger dauert als ein Zug**, startest du **abgekoppelt**, in einer eigenen
+  Prozessgruppe — und zwar im **Werkzeug**, nicht als Merkregel für den nächsten Aufrufer. Ein
+  Lauf, der ohne Schlussurteil endet und **keinen einzigen** Fehlschlag nennt, heißt
+  *abgebrochen*, nicht *rot*; sag das in der Quittung und nenne die letzte Stufe, die noch
+  gemeldet hat. Prüffrage: Wessen Tod nimmt diesen Lauf mit — und würde ich seinen Abbruch von
+  einem echten Rot unterscheiden können?"
 
 - **Die Schranke aus zwei Hälften, von denen nur eine ein Polster bekam.** Dieselbe Messung,
   zwei Kriterien: eins ließ vier von neunzig durchgehen, das andere färbte bei einem rot.
@@ -574,4 +590,4 @@ Die Ursache findest du durch **Zerlegen**, nicht durch Wiederholen.
 
 Sie ersetzt die Fallstricke oben nicht.
 
-<!-- GUIDE-FINGERPRINT: d2fcaf6b1b900e251676f5ee44571e92846c6b44eb0a0f817c5fdc73bba1d7df -->
+<!-- GUIDE-FINGERPRINT: eb9f395cd13b1e222867a40aee3dbcb7fe6c83d2aed184b17e1799fe273d1051 -->
