@@ -9,6 +9,7 @@ import type { Material, RegionId } from '../world/geo'
 import type { BuildingType } from '../state/ui'
 import type { SketchId } from '../journal/sketches'
 import type { FormId } from '../world/forms'
+import type { FindId } from '../world/finds'
 import type { ActorKind } from '../systems/actorLabels'
 
 /**
@@ -97,6 +98,11 @@ export interface Strings {
    *  it must say what it is well enough that a player can put it and a spoken
    *  direction together by himself. */
   forms: Record<FormId, string>
+  /** Quest FINDS carried in the inventory bar (design.md §6): dug up on an
+   *  errand and handed over by being USED before the person they are meant for.
+   *  The name is all the player has of the thing, so it must say what he is
+   *  carrying without saying more than he has seen. */
+  finds: Record<FindId, string>
   buildings: Record<BuildingType, string>
   sketches: Record<SketchId, string>
 
@@ -133,6 +139,9 @@ export interface Strings {
     canteenTooltip: string
     /** Tooltip for presenting a valuable to a village. */
     presentTooltip: string
+    /** Tooltip for a carried quest find: it is given by being used before the
+     *  person it is meant for (design.md §6). */
+    findTooltip: string
     /** Shown when the renderer fell back from WebGPU to WebGL 2. */
     webglFallback: string
     webglFallbackDismiss: string
@@ -360,6 +369,9 @@ export interface Strings {
     chiefStepsOut: string
     /** This chief has no drum message of his own to send (§13.4). */
     chiefNoMessage: string
+    /** The find was used where nobody can take it: no chief out in the open, or
+     *  too far from him. The find stays in the pack. */
+    findNeedsChief: string
     /** The chief has sent for his drummer; the message is being beaten out. */
     drumsSending: string
     journalDndOn: string

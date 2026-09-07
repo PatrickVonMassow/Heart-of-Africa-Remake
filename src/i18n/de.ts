@@ -183,6 +183,9 @@ export const de: Strings = {
   forms: {
     'rock-relief': 'Tonabdruck eines Felsens',
   },
+  finds: {
+    rockArtefact: 'Fund vom Felsen',
+  },
   buildings: {
     shop: 'Laden', weapons: 'Waffenhütte', tools: 'Geräte-Hütte',
     market: 'Markthütte', bazaar: 'Basar', agency: 'Reisebüro', chief: 'Chefhütte',
@@ -222,6 +225,7 @@ export const de: Strings = {
     passiveTooltip: 'Wirkt automatisch, solange du es dabei hast',
     canteenTooltip: 'Füllstand der Feldflasche – füllt sich an Süßwasser wieder',
     presentTooltip: 'Einem Dorf zeigen (löst eine Reaktion aus)',
+    findTooltip: 'Vor dem Oberhaupt anklicken, um es ihm in die Hände zu legen',
     webglFallback: 'Grafik-Hinweis: WebGPU ist nicht verfügbar – das Spiel läuft im WebGL-2-Kompatibilitätsmodus.',
     webglFallbackDismiss: 'Verstanden',
     fps: (fps) => `${fps} FPS`,
@@ -380,6 +384,7 @@ export const de: Strings = {
     drumsSending: 'Das Oberhaupt ruft seinen Trommler. Die Botschaft geht über das Dorf hinaus.',
     chiefStepsOut: 'Das Oberhaupt tritt aus seiner Hütte und steht vor mir im Freien.',
     chiefNoMessage: 'Das Oberhaupt mustert mich und nickt. Es hat nichts über das Dorf hinauszusenden.',
+    findNeedsChief: 'Hier nimmt es niemand entgegen. Es gehört dem Oberhaupt selbst in die Hände, draußen vor seiner Hütte.',
     journalDndOn: 'Tagebuch-Unterbrechungen aus – Einträge erscheinen still.',
     journalDndOff: 'Tagebuch-Unterbrechungen an – neue Einträge öffnen das Tagebuch.',
     graphicsLevel: {

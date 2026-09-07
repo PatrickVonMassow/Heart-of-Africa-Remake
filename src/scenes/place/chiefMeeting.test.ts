@@ -1,7 +1,8 @@
 // The chief is met OUTSIDE his hut (design.md §12, §13.4): the use key at the
-// door brings him out, and from there he gives what he has to give in the open
-// — the drummed message and the answer to the find from the boulder. No
-// audience overlay stands between the traveller and the drums any more.
+// door brings him out, and from there it sends his drummed message. No audience
+// overlay stands between the traveller and the drums any more — and the key
+// hands nothing over: the find from the boulder is given by using the inventory
+// item before him (design.md §6), which store.rockArtefact.test.ts pins.
 import { describe, it, expect, beforeEach } from 'vitest'
 import { g, freshGame, withWorld, useGame } from '../../test/store'
 import { DRUM_MESSAGE_VILLAGE } from '../../state/store'
@@ -55,11 +56,16 @@ describe('the chief comes out of his hut (design.md §12)', () => {
     expect(nextChiefAction(g())).toBe('no-message')
   })
 
-  it('the find from the boulder outranks the message', () => {
+  it('the key hands NOTHING over — carrying the find changes nothing about it', () => {
+    // The find is an inventory item and is given by USING it before him
+    // (design.md §6). The key and the give no longer share one press, so the
+    // message goes out whether the find is carried or not.
     g().enterPlace(DRUM_MESSAGE_VILLAGE)
     g().callChiefOut()
     useGame.setState({ rockArtefact: 'carried' })
-    expect(nextChiefAction(g())).toBe('hand-over')
+    expect(nextChiefAction(g())).toBe('send-message')
+    useGame.setState({ rockArtefact: 'given' })
+    expect(nextChiefAction(g())).toBe('send-message')
   })
 
   it('sends his message on the first visit — no gift, no standing, no trust', () => {

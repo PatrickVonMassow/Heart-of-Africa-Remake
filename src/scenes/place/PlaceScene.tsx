@@ -86,7 +86,7 @@ import { PlaceLife } from './PlaceLife'
 import { digSiteAppearance } from './digSiteAppearance'
 import type { DigSiteProgress } from './adultWork'
 import { SpeechLabels } from './SpeechLabels'
-import { CHIEF_SPEAKER_ID, chiefAnchor, setChiefAnchor } from './chiefPresence'
+import { CHIEF_SPEAKER_ID, chiefAnchor, chiefStandingPosition, clearChiefStanding, setChiefAnchor, setChiefStanding } from './chiefPresence'
 import { nextChiefAction } from './chiefMeeting'
 import { speakOverhead, speechUseCandidate } from './speechChannel'
 import { chiefRewardPhrase } from '../../communication/chiefReply'
@@ -491,25 +491,19 @@ function VillageHut({
 
 /**
  * The use key at the chief's hut (design.md §12, §13.4): the chief comes out,
- * and from then on every press gives what he has to give, out in the open —
- * the message on the drums his own drummer beats, and the answer to the find
- * from the boulder. `nextChiefAction` decides; this only executes.
+ * and from then on the press sends the message on the drums his own drummer
+ * beats. It hands NOTHING over any more — the find from the boulder is an
+ * inventory item and is given by using it before him (design.md §6), so the
+ * message and the give no longer share one key. `nextChiefAction` decides;
+ * this only executes.
  */
-function meetChief(hut: Interactive): void {
+function meetChief(): void {
   const game = useGame.getState()
   const strings = getStrings()
   switch (nextChiefAction(game)) {
     case 'step-out':
       game.callChiefOut()
       break
-    case 'hand-over': {
-      // The phrase is taken BEFORE the hand-over so the label and the sound
-      // carry the same atoms the store records as heard.
-      const phrase = chiefRewardPhrase()
-      game.handArtefactToChief()
-      speakChiefPhrase(phrase, hut)
-      break
-    }
     case 'send-message': {
       // The plan the drummer's hands animate from is the plan WebAudio plays,
       // so what sounds and what is seen cannot disagree (point 486).
@@ -528,12 +522,17 @@ function meetChief(hut: Interactive): void {
 }
 
 /** What the chief says: sounded at the traveller's own distance and written
- *  over the chief's head, like any other villager's word (design.md §13.4). */
-function speakChiefPhrase(phrase: Phrase, hut: Interactive): void {
-  const [x, z] = chiefStandingSpot(hut)
-  const distance = placePlayerPosition.active
-    ? Math.hypot(placePlayerPosition.x - x, placePlayerPosition.z - z)
-    : 0
+ *  over the chief's head, like any other villager's word (design.md §13.4).
+ *  The distance is measured to the spot the standing figure registered, so the
+ *  voice comes from the man in the picture. */
+function speakChiefPhrase(phrase: Phrase): void {
+  const distance =
+    placePlayerPosition.active && chiefStandingPosition.active
+      ? Math.hypot(
+          placePlayerPosition.x - chiefStandingPosition.x,
+          placePlayerPosition.z - chiefStandingPosition.z,
+        )
+      : 0
   playSpeech(phrasePlan(phrase, distance))
   const anchor = chiefAnchor()
   if (anchor) speakOverhead(CHIEF_SPEAKER_ID, phrase, anchor, { seconds: speechLabelSeconds(phrase.length) })
@@ -571,12 +570,30 @@ function Chief({
     : style.cloth[1 % style.cloth.length]
   useEffect(() => {
     setChiefAnchor(group.current)
-    return () => setChiefAnchor(null)
-  }, [])
+    setChiefStanding(x, z)
+    return () => {
+      setChiefAnchor(null)
+      clearChiefStanding()
+    }
+  }, [x, z])
+  // His ANSWER to the find (design.md §6): the give is an act on the inventory
+  // item, so the store owns it and the figure that must speak it listens for
+  // it. Only the transition speaks — a settlement re-entered with the find long
+  // given says nothing.
+  useEffect(
+    () =>
+      useGame.subscribe((state, prev) => {
+        if (state.rockArtefact !== 'given' || prev.rockArtefact === 'given') return
+        speakChiefPhrase(chiefRewardPhrase())
+      }),
+    [],
+  )
   return (
     // NOT marked for the §17.8 Ctrl layer: he carries his own standing label
     // below, and the layer would print the same word twice over one man.
-    <group ref={group} position={[x, 0, z]} rotation={[0, facing, 0]}>
+    // Named, so a check can read where the picture really puts him — and so the
+    // §13.4 speech dev hook finds his anchor by the speaker id he speaks under.
+    <group ref={group} name={CHIEF_SPEAKER_ID} position={[x, 0, z]} rotation={[0, facing, 0]}>
       {/* Robe */}
       <mesh position={[0, 0.62, 0]} castShadow>
         <coneGeometry args={[0.42, 1.25, TESSELLATION.figureBody]} />
@@ -2677,7 +2694,7 @@ export function PlaceScene() {
     if (game.journalOpen) game.setJournalOpen(false)
     if (near.type === 'chief') {
       // The chief is met OUTSIDE his hut, never in a window (design.md §12).
-      meetChief(near)
+      meetChief()
     } else if (near.type === 'bazaar' || near.type === 'agency') {
       setDialog({ kind: near.type })
       releasePointerLock()
