@@ -60,6 +60,16 @@ export const MAX_FILE_BYTES = 2 * 1024 * 1024
 /** Directories allowed to hold files past the size limit. */
 export const LARGE_FILE_DIRS = ['verification', 'public', 'cover']
 
+/** Single FILES allowed past the size limit, by exact path. The work-order
+ *  archive is plain text that grows by design — every closed point is moved into
+ *  it verbatim — so it crosses the limit once and then stays across, and the rule
+ *  above ("a stray recording or document is exactly what this catches") does not
+ *  describe it. Measured 07.09.2026: at 2.0 MB it blocked the routine commit that
+ *  moves a folded point out of the open work order, which is the one commit that
+ *  MUST touch this file. Named here rather than by raising the ceiling, so a real
+ *  stray file of the same size still blocks. */
+export const LARGE_FILE_PATHS = ['docs/tasks-archive.md']
+
 const topSegment = (p) => String(p).split('/')[0]
 
 /**
@@ -101,7 +111,7 @@ export function evaluateStagedFiles(entries) {
       continue
     }
 
-    if (size > MAX_FILE_BYTES && !LARGE_FILE_DIRS.includes(top)) {
+    if (size > MAX_FILE_BYTES && !LARGE_FILE_DIRS.includes(top) && !LARGE_FILE_PATHS.includes(path)) {
       findings.push({
         path,
         rule: 'large-binary',
