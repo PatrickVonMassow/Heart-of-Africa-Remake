@@ -517,7 +517,9 @@ Die Ursache findest du durch **Zerlegen**, nicht durch Wiederholen.
   → *Prompt:* „Spiel jede neue Durchsetzung als **wörtlichen Gehorsam** durch und einmal als
   **Handaufruf**, und probiere ihren Notausgang **unter** der Sperre aus. Prüffrage: Zerstört
   die vorgeschriebene Handlungsfolge ihre eigene Voraussetzung — oder setzt der Ausweg eine
-  Fähigkeit voraus, die die Sperre gerade entzieht?"
+  Fähigkeit voraus, die die Sperre gerade entzieht? Und nimmt deine **Ausnahme** nur die
+  **Prüfung** aus oder auch ihre **Abhilfe**? Ein Wächter, der sich selbst befreit, während
+  seine Heilmittel gesperrt bleiben, ist keine Kontrolle, sondern eine Sackgasse."
 
 - **Der Rückfall rettet die Funktion und setzt still eine Vereinbarung aus.** Fällt der zweite
   Anbieter aus — oder fehlt die Datei, die deine Regel einstellt —, verhält sich jedes Werkzeug
@@ -525,6 +527,15 @@ Die Ursache findest du durch **Zerlegen**, nicht durch Wiederholen.
   verteilt hattest; sichtbar nur an dessen Verbrauchsanzeige.
   → *Prompt:* „Ein Rückfall meldet, **welche Zusage er aussetzt**. Vergleiche **Regel gegen Ist**,
   nicht Ist gegen Plausibilität. Prüffrage: Welche Vereinbarung bricht er still?"
+
+- **Die lange Messung hing am Leben der Sitzung, die sie bestellt hat.** Ein Prüflauf über
+  zwanzig Minuten ist ein Kind des Fensters, das ihn startete; endet das Fenster, stirbt er
+  mitten drin — und zwar **wie ein Fehlschlag**: Abbruchcode gesetzt, Fehlerliste leer,
+  Protokoll mitten im Satz zu Ende.
+  → *Prompt:* „Was **länger dauert als ein Zug**, startest du **abgekoppelt** — im **Werkzeug**,
+  nicht als Merkregel für den nächsten Aufrufer. Ein Lauf ohne Schlussurteil, der **keinen**
+  Fehlschlag nennt, heißt *abgebrochen*, nicht *rot*. Prüffrage: Wessen Tod nimmt diesen Lauf
+  mit — und unterscheide ich seinen Abbruch von einem echten Rot?"
 
 - **Die Schranke aus zwei Hälften, von denen nur eine ein Polster bekam.** Dieselbe Messung,
   zwei Kriterien: eins ließ vier von neunzig durchgehen, das andere färbte bei einem rot.
@@ -574,4 +585,4 @@ Die Ursache findest du durch **Zerlegen**, nicht durch Wiederholen.
 
 Sie ersetzt die Fallstricke oben nicht.
 
-<!-- GUIDE-FINGERPRINT: d2fcaf6b1b900e251676f5ee44571e92846c6b44eb0a0f817c5fdc73bba1d7df -->
+<!-- GUIDE-FINGERPRINT: 4efc7d3d7cc745b6de1d9adff26ff64b79e78210036bda19181624c529a78989 -->

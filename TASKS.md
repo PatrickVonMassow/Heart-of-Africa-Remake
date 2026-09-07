@@ -180,10 +180,53 @@ put it is the mistake this line exists to stop.
     full one a water surface at the rim (a bright disc with the water's tint, readable at
     the distance the player watches from) — so head-carried and hand-carried jars read as
     full and empty at a glance, on both backends.
-  - The word RIVER still falls at the head of the path, aimed at the water, gated by a
-    hearing child exactly as today; nothing about who is cast or when changes.
+  - THE ERRAND IS A DISPATCH, NOT A COMMENTARY (user 07.09.2026, replacing this part's
+    earlier sentence that nothing about who is cast or when changes). Today the inhabitant
+    narrates his own act, which reads as staged for the player; DIG works because one man's
+    word sends another. RIVER now does the same:
+    - ONE ROUND TRIP, NOT TWO CASTINGS. `water-out` and `water-back` stop being independently
+      cast situations (`adultWork.ts` ~390-412) and become legs of a single errand held by one
+      carrier. Both ids survive as leg labels, so the lexicon bookkeeping and the staged
+      counters are unchanged.
+    - THE WORD IS THE ORDER. At the village water stand an adult A turns to a free adult B,
+      says RIVER and points at the water; B takes the empty jar and goes.
+    - BOTH UTTERANCES FALL INSIDE THE VILLAGE, at the stand, no longer at the water path head
+      (`WATER_PATH_HEAD_RADIUS` 15, `layout.ts` ~222) — which also keeps the errand's speech
+      clear of the children's bank game.
+    - NO WORD FALLS AT THE WATER: the fill is silent and is the act this part already
+      specifies.
+    - THE RETURN HAS A DESTINATION. B walks back to the stand, sets the jar down (carry →
+      none) and says RIVER a second time, addressed to A, who is still standing there.
+    - THE STAND IS DRAWN: a water stand beside the existing `VILLAGE_FIRE` anchor
+      (`layout.ts` ~247), which already has a collider and is the plausible consumer. It holds
+      up to three standing jars; a fourth delivery replaces the oldest, so no consumer logic
+      is needed. Capacity calibratable in `balance.ts`.
+    - TWO ADULTS, NOT THREE. Water fetching gains no pair mechanics — no partner, no
+      `invitationClear` for a second adult; those stay with DIG, where two people are
+      materially required. The escort half of the user's first framing was withdrawn by his
+      own later message; what it was for (keeping the speech away from the shore) is
+      delivered by moving both utterances into the village.
+    - DELETED with the second casting: `WATER_FOOT_REACH` (`adultWork.ts` ~119) and its
+      `nearestFree` caller.
+    - THE WATER WORD IS GATED BY A HEARING CHILD exactly as the two DIG utterances are; today
+      only the DIG branches carry that check (`adultWork.ts` ~328-333).
+    - THE RULE THE DEFECT VIOLATED, written into the spec: NO VILLAGER SPEAKS TO NOBODY.
+      Every utterance has an addressee who reacts and a consequence the player sees; the
+      teaching comes from the act that follows the word, never from a word spoken beside an
+      act.
+    - THE WATER READING IS ACCEPTED, NOT CLOSED. A player may read the second RIVER as WATER;
+      the chief's message carries just as well as WATER · UPSTREAM · ROCK · DIG. Written down
+      beside the three readings ROCK deliberately closes.
+    The measured defect behind this (07.09.2026): the full jar comes from nowhere
+    (`water-back` sets `fullJar` at cast time), the same man goes down and comes up (the
+    nearest free adult within 4 m of the water foot is in practice the one who just
+    finished), and the return's goal is the path head at radius 15, where the task is nulled
+    and the full jar vanishes in the same frame. The code follows
+    docs/communication-poc-spec.md:115 literally — a gap in the SPEC, not an implementation
+    defect against it.
   - Doc: design.md §13.4 ('the adults' water and digging work') states the dip at the
-    waterline; docs/communication-poc-spec.md likewise where it describes the errand.
+    waterline AND the dispatch; docs/communication-poc-spec.md likewise where it describes
+    the errand, plus the no-villager-speaks-to-nobody rule and the accepted WATER reading.
 
   Test (ONE run for both halves — this is why they are one point). Vitest: for PART A, the tap
   utterance is offered only once the speaker's hand point lies within a small tolerance of
@@ -191,14 +234,17 @@ put it is the mistake this line exists to stop.
   hand target lies on the drawn rock's surface for both play rocks of the three river
   villages (nubian, bambara, mandinka); for PART B, the fill spot lies within a small tolerance
   of the waterline for the same three villages, a 'fill' phase sits between the walk down and
-  the walk back with 'fullJar' set only after it, and the phase lasts its configured seconds.
+  the walk back with 'fullJar' set only after it, and the phase lasts its configured seconds;
+  and for the dispatch, 'fullJar' only inside ONE continuous errand record, every water
+  utterance naming an addressee villager index, the return leg's goal being the stand rather
+  than the path head, and the stand holding at most three jars.
   Browser (LARGE, both backends — PART B's water surface is backend-sensitive and therefore sets
   the lane for both halves): a picture check of the tap moment measuring the hand's screen
   position against the rock's silhouette; one of the dip frame measuring the hand jar below
   the drawn water surface at the carrier's feet; one of the return walk measuring the water
-  disc at the head jar's rim. Screenshots of all three (verification/, subjects declared: the
-  tapping child at its rock; the carrier dipping at the waterline; the carrier walking back
-  with the full jar).
+  disc at the head jar's rim. Screenshots of all four (verification/, subjects declared: the
+  tapping child at its rock; the sending adult and the departing carrier at the village water
+  stand; the carrier dipping at the waterline; the carrier walking back with the full jar).
   Quotes:
   Nutzer, 06.09.2026 13:48: »Wenn ein Kind beim Fangspiel an den Felsen tippt und ROCK sagt, berührt seine Hand nicht annähernd den Felsen. Das Kind steht in dem Augenblick noch sehr seit davon entfernt. So erkennt man nicht, dass das Gesprochene etwas mit dem Felsen zu tun hat und man könne eher glauben, dass es "Los!" o. ä. bedeutet.«
   Nutzer, 06.09.2026 13:48: »Man erkennte das Auffüllen des Kruges mit Wasser nicht als solches. Das liegt an mehreren Problemen: Der Erwachsene geht nicht nah genug an den Fluss, für die Tätigkeit des Auffüllens fehlt eine Darstellung (ich würde erwarten, dass er den Krug in die Hand nimmt und ins Wasser taucht) und wenn er ihn dann gefüllt auf dem Kopf trägt, sieht man darin kein Wasser.«
@@ -206,6 +252,21 @@ put it is the mistake this line exists to stop.
   Nutzer, 07.09.2026 19:25: »Kannst du weitere Zusammenführungen von offenen Punkten zur
   Kommunikationsmechanik vornehmen, um Regressionsdurchläufe einzusparen?« — daraufhin ist
   der frühere Punkt 1066 hier als PART B eingefaltet worden.
+  Nutzer, 07.09.2026: »Der Einwohner kommentiert seine Handlungen. Das ist nicht organisch,
+  sondern offensichtlich nur dafür da, dem Spieler das Wort RIVER zu vermitteln. Bei DIG ist
+  das besser, weil ein Einwohner durch Benutzung des Wortes einen anderen dazu auffordert,
+  mitzukommen, um ihm beim Graben zu helfen.«
+  Nutzer, 07.09.2026: »Wasserholen soll eine Kombination aus Entsendung und Einholung einer
+  Begleitung sein. Beides soll möglichst weit weg vom Fluss passieren.« — die Begleitung hat
+  der Nutzer im selben Zug wieder zurückgenommen: »Insgesamt sind es mir mit 3 beteiligten
+  Erwachsenen beim Wasserholen jetzt doch zu viele.«
+  Nutzer, 07.09.2026: »Aber das wäre gar nicht schlimm, weil die Häuptlingsbotschaft WATER
+  UPSTREAM ROCK DIG genauso gut funktionieren würde wie mit RIVER. Insofern ist es okay, dann
+  nochmal RIVER zu sagen.«
+  Nutzer, 07.09.2026: »Reihe das alles so ein. Fasse dabei sinnvoll zusammen und/oder hänge
+  einzelne Aspekte an bereits bestehende Tasks, um Regressionsläufe einzusparen.« — deshalb
+  steht die Entsendung hier statt als eigener Punkt: PART B öffnet ohnehin adultWork.ts, den
+  Wasserpfad, die Krug-Meshes und denselben LARGE-Bildlauf.
   Refs: PART A — src/scenes/place/bankGame.ts (THE TAP ~626, reachDistance/standOff ~223), src/config/balance.ts (bankGame reachDistance 2.2, standOff 2.6), src/render/gesture.ts (GestureKind), src/scenes/place/layout.ts (PLAY_ROCK_RADIUS). PART B — src/scenes/place/adultWork.ts (water-out/water-back ~390-410, AdultCarry, WATER_FOOT_REACH), src/scenes/place/riverBank.ts (bankWaterFoot, BANK_STAND_INSET 1.5, BANK_SHORE_HALF 1.2, walkable region through the waterline ~47-62), src/scenes/place/layout.ts (waterPath head/foot), src/render/figures.ts. Both — src/scenes/place/PlaceLife.tsx (ErrandVillagers, head/hand jar meshes ~2440-2612, HEAD_CARRY_POSE), design.md §13.4, docs/communication-poc-spec.md
   Doc impact: design.md §13.4 and docs/communication-poc-spec.md item 4: the catcher touches the rock with its hand while naming it, and the water carrier dips the jar at the waterline and carries visible water back. If a new gesture kind is added, the point-479 gesture list in the code comments / docs names it. balance.ts: fill seconds (calibratable).
   Bundle: Dorfleben.
@@ -237,14 +298,30 @@ put it is the mistake this line exists to stop.
     mono output (device or comfort setting) loses the direction and nothing else.
   - Both pitch pairs and the stereo width are calibratable fields in `balance.ts`, with the
     English and German debug labels changed together.
-  - The deployed-graph speech headroom assertion is RE-MEASURED for the new carriers and the
-    added node, and still judges the level that LEAVES the chain rather than the level the
-    plan asked for (point 589, rule 1).
+  - THE VILLAGE ALSO GETS LOUDER (user 07.09.2026: »Insgesamt soll die Sprache auch lauter
+    sein«). Two more fields, both calibratable:
+    - SPEECH GETS ITS OWN VOLUME in the existing family beside `footstepVolume`,
+      `ambientVolume` and `birdsongVolume`. Measured today: a syllable peak is `SPEECH_PEAK`
+      1.8 times the distance gain times `ambienceVolume` 0.1 (`balance.ts`:871), and the chain
+      then applies the ambient bus 0.5 and the master 0.5 — so a villager beside the player
+      peaks near 0.045 at the output. `SPEECH_PEAK`'s own comment claims to compensate the
+      0.25 bus factor and never accounts for the 0.1.
+    - THE HEARING FALLOFF IS RE-CALIBRATED. `hearingGain` is 1/(1 + falloff·(d/r)²) with a
+      hard cut past r (`speaking.ts` ~78-87) and `hearingFalloff` is 24 (`balance.ts`:1437):
+      a speaker 3 m away arrives at 31.6 % and one 5 m away at 14.3 % of the level beside
+      him. Two adults standing together must be plainly audible to a player standing with
+      them; at falloff 4 the same distances give 73.5 % and 50.0 %.
+    - THE VALUES ARE MEASURED, NOT GUESSED: the new level is taken at the shipped defaults
+      over the drum bed and the ambience, not asserted from the plan.
+  - The deployed-graph speech headroom assertion is RE-MEASURED for the new carriers, the
+    added node AND the raised level, and still judges the level that LEAVES the chain rather
+    than the level the plan asked for (point 589, rule 1).
   Test: Vitest over the plan and the graph — bearing -> stereo position for the
   straight-ahead, hard-side and behind-the-camera cases, the mono fallback losing direction
-  but not level, and the child carriers lying above the adult ones while the interval is
-  preserved for both. Browser (audio lane, WebGL 2 per the §7.2 routing): two overlapping
-  village voices measured at different stereo positions with the headroom assertion green.
+  but not level, the child carriers lying above the adult ones while the interval is
+  preserved for both, and a level measured at 3 m and at the hearing rim. Browser (audio
+  lane, WebGL 2 per the §7.2 routing): two overlapping village voices measured at different
+  stereo positions with the headroom assertion green at the raised level.
   Criticality: normal — it changes how the village sounds and unblocks 1073, but nothing the
   player can already do breaks if it lands late.
   Quotes:
@@ -256,14 +333,20 @@ put it is the mistake this line exists to stop.
   einzelnen Tasks steht, von denen jeder für sich einen teuren Regressionstest benötigt.« —
   dieser Punkt fasst die Aspekte 1 und 2 zusammen, weil beide denselben Audiographen
   anfassen und dieselbe Headroom-Nachmessung erzwingen.
+  Nutzer, 07.09.2026: »Insgesamt soll die Sprache auch lauter sein und beim neu eingeführten
+  Rufen (Task 1073) noch lauter - nicht nur weiter tragen.« — die Gesamtlautstärke und der
+  Abfall stehen hier, weil dieser Punkt als einziger offener Punkt speaking.ts, ambience.ts
+  und den Kommunikationsblock von balance.ts ohnehin öffnet und die Headroom-Nachmessung
+  bereits erzwingt; die Aufteilung nach Stimmlage folgt in 1073.
   Refs: src/systems/ambience.ts (`speechBus`, `syllableCarrier`, `playSpeech`, the headroom
   assertion), src/communication/speaking.ts (`phrasePlan`, `hearingGain`),
   src/communication/lexicon.ts (the direction pair's tonal mirror), src/config/balance.ts
   (`communication.speechPitchHz`, `speechPitchInterval`), src/i18n/en.ts + src/i18n/de.ts
   (debug labels), src/systems/ambience.test.ts, design.md §13.4
-  Doc impact: design.md §13.4: village speech carries the speaker's direction, and the
-  children's voices sit above the adults'. balance.ts: both pitch pairs and the stereo width
-  (calibratable).
+  Doc impact: design.md §13.4: village speech carries the speaker's direction, the children's
+  voices sit above the adults', and how loud the village is at conversational distance.
+  balance.ts: both pitch pairs, the stereo width, the speech volume and the re-calibrated
+  falloff (calibratable), with the English and German debug labels changed together.
   Bundle: Dorfleben.
 
 - [ ] 1073. A call carries to the stand the game photographs it from, and the hush stops
@@ -294,12 +377,25 @@ put it is the mistake this line exists to stop.
   set in tests, but read nowhere). That is the same defect as the user's report of two
   adults standing around doing nothing.
   Final state:
-  - Carrying distance is a property of the UTTERANCE, not of the village. The bank round's
-    CALLS — `moment` `call` (RIVER), `announce` (the direction) and `arrival` (ROCK at the
-    far rock) — carry about 22 m; every other utterance, the catcher's `tap` and the off-game
-    `boulder` included, keeps the 10 m `hearingRadius`. One calibratable field in
-    `balance.ts`, passed through the radius parameter `speaking.ts`, `spokenGesture.ts` and
-    `heard.ts` already accept.
+  - Carrying distance is a property of the UTTERANCE, not of the village — and it is a VOICE
+    REGISTER, not a bare reach field (user 07.09.2026: calls must be LOUDER, »nicht nur
+    weiter tragen«). A register carries three numbers: reach, loudness and falloff steepness.
+    Two registers, one `balance.ts` block each, passed through the radius parameter
+    `speaking.ts`, `spokenGesture.ts` and `heard.ts` already accept:
+    - CALL — the bank round's `moment` `call` (RIVER), `announce` (the direction) and
+      `arrival` (ROCK at the far rock). About 22 m, and louder: the callers are always
+      children at play, and children at play are louder than adults talking side by side.
+    - TALK — every other utterance, the catcher's `tap` and the off-game `boulder` included,
+      keeping the 10 m `hearingRadius`.
+    WHY THE REACH ALONE DOES NOT FULFIL THIS POINT, computed at the unchanged
+    `hearingFalloff` 24: at the new ~22 m reach the call arrives at 4.8 % at 20 m, 4.0 % at
+    22 m and 4.9 % at 19.7 m — the same ~4 % this point itself cites as the reason the
+    spectator in the middle hears nothing. At falloff 4 the same distances give 23.2 %,
+    20.0 % and 23.8 %. Point 1072 lands the global level and falloff; this point splits them
+    per register.
+    THE HARD CUT IS PRESERVED at each register's own reach: audible stays the same condition
+    as `isWithinHearing`, so nothing is recorded that could not be heard and nothing heard
+    goes unrecorded.
   - The value is DERIVED, not guessed: it is at least the distance from `bankPlayRocksView`'s
     stand to either play rock, and the test computes that distance rather than restating it.
   - Untouched, as the card promises: `hearingRadius` itself, `childrenHear`'s separation
@@ -309,13 +405,44 @@ put it is the mistake this line exists to stop.
     calibratable hold, after which the villager speaks anyway or the loss is reported loudly.
     `assertNoOwedWord` stops taking `hushed === true` as a blanket excuse — a word held past
     the hold is a defect, not an exemption.
-  - Reception is measured, not assumed: over a full bank round watched from the documented
-    stand, the player hears the RIVER call, both direction announcements and the arrival ROCK.
-    Today that count is zero.
+  - Reception is measured, not assumed, and it is a LEVEL rather than a boolean: over a full
+    bank round watched from the documented stand, the player hears the RIVER call, both
+    direction announcements and the arrival ROCK, each asserted as a measured level at that
+    stand rather than as gain greater than zero. Today that count is zero — and a reach
+    change alone would turn a gain-greater-than-zero test green while the call stayed at ~4 %
+    in the built game, a point landing without reaching its goal.
+  - ONE SPEECH FLOOR FOR THE WHOLE VILLAGE (user 07.09.2026: »Die verschiedenen Abläufe
+    laufen nie gleichzeitig«). Adult work and the bank round ask ONE arbiter instead of each
+    keeping its own time. Today `bankGame`'s `utteranceGapSeconds` is internal to the game and
+    adult work allows at most one word per FRAME (~16 ms, the not-spoken guard), which is no
+    gap at all; nothing coordinates the two, and the label layer holds several labels at once.
+    Measured: an adult errand is cast every ~9 s and lives up to 180 s (`balance.ts`:1357,
+    :1366), so a dig pair overlapping a water carrier is the normal case.
+    - THE UNIT OF EXCLUSIVITY IS THE SITUATION, NOT THE WORD: while a dig bout stands between
+      its two DIGs, or a water errand between its dispatch and its report, no foreign word
+      falls. Two simultaneous dig bouts are therefore impossible too — the case the user
+      judged worst, because DIG followed by DIG from two people cannot be told from one
+      exchange.
+    - THE GAP AFTER A WORD IS A CONSEQUENCE WINDOW: the next word waits until the previous
+      word's effect was visible — the invited adult sets off, the dispatched carrier leaves.
+      Silence teaches nothing; the visible consequence is the lesson. Calibratable.
+    - THE FLOOR MEASURES AT THE PLAYER'S EAR, at the speaking register's own reach rather
+      than a flat 10 m: outside it the village keeps talking, so acceptance criterion 15
+      (lively settlements) is not paid for a confusion that never reaches the player.
+      RECOMMENDED AND DECIDED THIS WAY, with the alternative recorded for veto: if
+      player-dependent behaviour proves too risky in the branch, the global lock is the more
+      robust variant and costs only rarely audible simultaneity. The author records which was
+      built and why.
+    - A QUEUED WORD NEVER EXPIRES: the floor has an upper bound past which it lets the word
+      through — the SAME requirement as the bounded hush above, built ONCE, with the deferral
+      tool pointing at the floor instead of only at `childrenHear`. Without the bound an
+      errand runs into the 180 s `errandSeconds` backstop with a word still owed and trips
+      `assertNoOwedWord`.
   Test: Vitest — the reach of each utterance moment, `bankPlayRocksView`'s stand-to-rock
-  distance bounding the call reach, a full bank round evaluated from that stand yielding
-  every call word heard, and a hush held past its hold firing `adult-atom-lost` instead of
-  being excused by it. Browser (communication lane): the direction word's label and pointing
+  distance bounding the call reach, a full bank round evaluated from that stand yielding a
+  measured LEVEL for every call word, no two situations overlapping in the speech floor, and
+  a word held past the bound reported as `adult-atom-lost` rather than excused by the flag
+  that caused it. Browser (communication lane): the direction word's label and pointing
   gesture present in a frame taken from the documented stand (verification/, subject
   declared: the announcing child seen from the bank-game spectator stand).
   Criticality: high — the taught direction word never reaches the player at the very stand
@@ -327,6 +454,18 @@ put it is the mistake this line exists to stop.
   Nutzer, 07.09.2026 19:08: »Setze alle 6 Punkte so um, wie jetzt in der Karte beschrieben.« —
   dieser Punkt fasst die Aspekte 3, 4 und 5 zusammen: 3 ohne 4 wäre stiller Wortverlust, und
   5 ist der Beweis von 3.
+  Nutzer, 07.09.2026: »Insgesamt soll die Sprache auch lauter sein und beim neu eingeführten
+  Rufen (Task 1073) noch lauter - nicht nur weiter tragen. Die Rufer sind bisher immer Kinder.
+  Es ist ohnehin plausibel, dass spielende Kinder lauter sind als Erwachsene, die miteinander
+  reden, während sie direkt nebeneinander stehen.«
+  Nutzer, 07.09.2026: »Die verschiedenen Abläufe laufen nie gleichzeitig (sofern das nicht
+  sowieso schon der Fall ist).« — die Sprachschranke serialisiert das SPRECHEN, nicht die
+  Tätigkeit; das ist der schmalere Schnitt, der dieselbe Klarheit liefert, ohne die Siedlung
+  zur Bühne einzufrieren.
+  Nutzer, 07.09.2026: »Reihe das alles so ein.« — Register, gemessene Aufnahme und
+  Sprachschranke stehen hier statt als eigene Punkte, weil dieser Punkt die Reichweiten-
+  Verkabelung, die Sprechmomente der Bankrunde und die hush-/`assertNoOwedWord`-Stellen in
+  adultWork.ts ohnehin öffnet. Reihenfolge: 1072 vor 1073, wie in der Arbeitsliste.
   Note: the card justifies the bounded hush by saying the raised reach would otherwise cause
   silent word loss. Measured, that chain does not hold — `childrenHear` gates on the CHILD's
   distance to the speaking adult and a separate call-reach field leaves it at 10 m. The hush
@@ -340,9 +479,12 @@ put it is the mistake this line exists to stop.
   src/scenes/place/adultWork.ts (`assertNoOwedWord` ~176, the `hushed` sites ~339/349/352),
   src/config/balance.ts (`communication.hearingRadius`), src/scenes/place/bankGame.test.ts,
   design.md §13.4
-  Doc impact: design.md §13.4: a call carries further than ordinary speech, and a held word
-  is spoken or reported rather than dropped. docs/communication-poc-spec.md: the bank round's
-  audibility from the spectator's stand. balance.ts: call reach and hush hold (calibratable).
+  Doc impact: design.md §13.4 and docs/communication-poc-spec.md: the two voice registers, a
+  call carrying further AND louder than ordinary speech, the rule that no two situations
+  speak at once, a held word spoken or reported rather than dropped, and the bank round's
+  audibility from the spectator's stand. balance.ts: both register triples, the consequence
+  window and the hush hold (calibratable), with the English and German debug labels changed
+  together.
   Bundle: Dorfleben.
 
 - [ ] 1056. The excavation becomes a real place: it says what it is for, and its earth is
@@ -633,78 +775,38 @@ put it is the mistake this line exists to stop.
   keeps hitting the bugs.
   Bundle: Verständigung.
 
-- [ ] 733. The loading picture freezes about twice as long as its own budget allows (measured
-  19.08.2026, 13:50 and 13:51, the first two runs after point 732 brought the picture lane back).
-  MEASURED, twice, on `feat/732-verify-gpu-backend` at b2f6f5f5, backend WebGPU, frame written
-  1/1: the `startup` suite's assertion "the loading picture never freezes longer than the balance
-  budget (4000 ms, design.md §21.2)" fails with a worst standstill of 7632 / 8167 / 7833 / 7801 ms
-  across the two runs' two sections — roughly 2x the budget. The breakdown is the same every time:
-  blocked thread ~3.3 s, inside ONE animation frame ~2.3 s, unpainted ~7.8 s.
-  IT IS NOT LOAD, and that was checked rather than assumed: the four readings sit within 7 % of
-  each other across two runs at load average 3.1–4.7, where a load artefact scatters. It is also
-  not new breakage — it is newly VISIBLE: the lane could not run on this host at all until 732, so
-  this assertion had never been evaluated here.
-  WHAT IS NOT YET KNOWN, and is the first half of the work: whether the freeze belongs to the APP
-  (startup work on the main thread) or to the BACKEND the lane now uses. Point 732 restored the
-  picture through ANGLE's surfaceless EGL route, and the WebGPU lane rides a COMPATIBILITY adapter
-  there; a compat adapter's shader compilation could plausibly own the 2.3 s inside one frame. The
-  two are distinguished by MEASUREMENT before anything is changed — the same run on the WebGL 2
-  lane, and against the deployed build the user actually plays, decides which it is. Naming the
-  wrong half here would rebuild the wrong thing.
-  FINAL STATE:
-  - THE CAUSE IS NAMED with a measurement that separates app from backend, and the answer is
-    written down where the next reader finds it — including the case "the budget is right and the
-    app is too slow" and the case "this backend cannot meet a budget written for another one",
-    which have different remedies.
-  - THE STANDSTILL COMES UNDER THE §21.2 BUDGET on the lane the player uses, or the budget is
-    re-derived FROM A MEASUREMENT on the backends we actually ship and design.md §21.2 moves with
-    it in the same commit. The budget is not simply raised to whatever the current number is: it
-    is a promise to the player about the loading picture, so a raise needs the reason a player
-    would accept.
-  - THE 2.3 s INSIDE ONE ANIMATION FRAME is accounted for by name. A single frame holding the main
-    thread that long is the sharpest clue in the reading and the most likely single cause.
-  VERIFIABLE: `node scripts/verify/run-logged.mjs --suites startup` green on BOTH backends, and
-  the measurement that separated app from backend recorded with its numbers, so a later regression
-  can be compared against it rather than re-argued.
-  Criticality: medium — it fails no player-visible correctness rule and the game does start, but
-  it is a §21.2 promise the build currently breaks by 2x, and it keeps the `startup` suite red,
-  which is the suite every other run is judged beside.
-  Bundle: Session- & Repo-Hygiene.
-
-- [ ] 1062. The position query stops answering after a language switch, and no gamepad
-  evidence can be filed while it does.
-  WHAT HAPPENS. Measured 06.09.2026 on TWO trees — `main` at 859aec1fd and
-  feat/1052-chief-outside at 3aa7fd442 — with the section run in isolation
-  (`npm test -- gamepad --section=position-query`), so nothing in the branch causes it.
-  The first Select press answers: the English toast carries "Latitude" and "North" and the
-  check passes. Then the suite switches the language (`window.__setLang('de')`), waits for
-  `document.documentElement.lang` to read `de`, and presses Select again — and for the
-  whole 8 s window `useGame.getState().toast` stays null. The check reports `"null"`, the
-  suite retries once and fails identically, so the flake lane calls it a candidate real
-  failure.
-  WHAT IT COSTS. Acceptance criterion 30 is gamepad AND position query, and its browser
-  evidence comes from exactly this suite: while the section is red, no gamepad run can be
-  filed green, and every future LARGE carries the same red.
-  WHAT IS NOT YET KNOWN — and settling it IS the first half of this point: whether the
-  PLAYER is hit (the query really goes silent for anyone who switches language mid-run,
-  which is a defect in the localized toast path) or only the HARNESS is (the injected
-  `window.__pad` does not survive the re-render the language switch triggers, so the poller
-  reads a real, empty gamepad list). Answer that BEFORE touching either side: a fix aimed
-  at the wrong half leaves the other half broken and the suite green.
-  Final state:
-  - The cause is named in the commit — player path or harness — with the measurement that
-    distinguishes them.
-  - The named side is fixed, and the section passes twice in a row on a quiet machine.
-  - If the player path is at fault, the localized toast is asserted on the Vitest layer
-    too, where a language switch costs no browser.
-  Test: `npm test -- gamepad` unfiltered (an incremental `--section` green is not the
-  acceptance), plus Vitest over whatever pure part the cause turns out to have.
-  Criticality: medium — but it blocks the release, which is why it stands here: the closing
-  run of point 633 drives LARGE, LARGE runs the gamepad suite, and that suite stays red until
-  this lands. Whether the PLAYER is hit is what the point decides first.
-  Refs: scripts/verify/gamepad.mjs (section `position-query`), src/systems/gamepadMap.ts,
-  the position-query toast in src/state/store.ts and both language files
-  Bundle: Testinfrastruktur.
+- [ ] 1075. A unit test measures a file OUTSIDE the repository, so writing a memory reddens
+  `main` and blocks every push (measured 07.09.2026, 22:24, on a quiet machine).
+  WHAT HAPPENS. `scripts/cut-account-core.test.mjs:677-684` reads the live
+  `~/.claude/projects/-workspace-hoa/memory/MEMORY.md` (and the two `CLAUDE.md` files) and
+  asserts that the ceilings table of `docs/document-cut-757.md` quotes their CURRENT line and
+  word counts. MEMORY.md is not in the repository and is rewritten whenever any session saves,
+  edits or deletes a memory. This evening the table said "765 words" and the tokenizer reported
+  764: `Tests 1 failed | 56 passed`, reproduced standalone in 1.14 s at load 5.8, so it is not
+  a load artefact.
+  WHAT IT COSTS. The pre-push gate runs the unit suite for every push to `main`, so from the
+  moment a memory is written NO push to main succeeds until somebody edits that table by hand.
+  Tonight it stopped six commits, and the gate's honest retry-under-load rule paid for the full
+  suite twice before saying so. Nothing warns anybody: the memory write and the red are in
+  different files, on different days, in different sessions.
+  FINAL STATE — the test stops measuring the environment, and the choice is named in the commit:
+  either the assertion drops the two files it does not own and keeps only what the repository
+  contains, or the counts are read from a snapshot the repository DOES own and the ceilings
+  table is regenerated from it by the same command that writes it. What must not survive is a
+  hand-maintained number in a document that tracks a file outside the checkout.
+  VERIFIABLE: pure Vitest — writing, changing and deleting a memory leaves the suite green, and
+  a real ceilings breach still reds. `npx vitest run scripts/cut-account-core.test.mjs` green
+  before and after a memory write.
+  QUEUE RANK: BEFORE the release (machine-filed, urgency stated as rule 1d requires): it blocks
+  every push to `main` and therefore every landing, and the blockade returns on its own the next
+  time any session writes a memory.
+  Criticality: high, frequency HIGH — no correctness of the game is touched, but the batch
+  cannot deliver anything while it holds, and it re-arms itself.
+  Refs: scripts/cut-account-core.test.mjs (the ceilings block), docs/document-cut-757.md (the
+  table), scripts/pre-push-gate.mjs (the caller that turns it into a blockade), guide pitfall
+  "Test und Wächter hingen an ihrer Umgebung, nicht am Verhalten".
+  Bundle: Testinfrastruktur — it edits `scripts/cut-account-core.test.mjs` and the cut document,
+  which no other open point of this bundle writes, so it may run beside any of them.
 
 - [ ] 633. The release's closing run — two regressions with the cleanup between them (user
   11.08.2026, splitting point 174: "Dafür scheint mir die Schätzung von 1 h viel zu wenig
@@ -733,11 +835,26 @@ put it is the mistake this line exists to stop.
      cleanup commit — this is the run 631's order check measures.
   4. The remaining §9 steps: implementation sections, the graphics-detail doc, the §7.1
      acceptance criteria with evidence, open items, simplifications.
+  THE TWO CHARGED REDS THIS RELEASE SHIPS WITH (user 07.09.2026, moving points 733 and 1062
+  behind 174). Both regressions will carry them, and the closing does not paper that over:
+  - The evidence of steps 1 and 3 NAMES both charged reds instead of claiming an exit-0 run:
+    the `startup` freeze against the §21.2 budget (point 733) and the German position-query
+    check of the `gamepad` suite (point 1062). Everything else stays a real red.
+  - Acceptance criterion 30 is reported in `docs/acceptance-evidence.md` with the German
+    position-query check named RED under point 1062 — gamepad and the English query fulfilled,
+    the localized query NOT. It is not filed green (CLAUDE.md §7.2 forbids reporting an
+    unfulfilled criterion as fulfilled).
+  - Point 733's charge is scoped to backend `webgpu`, featureLevel `compatibility`. If the
+    freeze reproduces on WebGL 2 or on a core adapter in either regression, that red is
+    UNACCOUNTED and the closing stops for it: it then takes the measurement that either widens
+    the charge with its evidence or names the lane the freeze does not reach — minutes, not the
+    whole of 733, which keeps owning the app-versus-backend question and the §21.2 budget.
   THEN 174 takes over: report "ready to tag" and wait for the user's go.
   VERIFIABLE: `node scripts/closing-guard.mjs --status` shows every step recorded with its
   evidence, the second regression's evidence naming a commit younger than the youngest
-  cleanup commit; both regression runs green on both backends; and the cleanup's union
-  documented with, per entry, which model found it and what was decided.
+  cleanup commit; both regression runs on both backends carrying no red but the two charged
+  ones named above, each named in the evidence; and the cleanup's union documented with, per
+  entry, which model found it and what was decided.
   Criticality: HIGH — it is what the tag certifies, and v0.2 shipped with these steps
   skipped.
 
@@ -10264,7 +10381,9 @@ to land than a mechanism that needs a review.
   point that already HAS a feature branch stays in front so the branches are finally cleared
   instead of falling further behind `main`. The resulting order: sixteen points ahead of the
   communication mechanic (769, 779, 768, 597, 813, 517, 752, 669, 737, 720, 595, 598, 581, 713,
-  734, 730), 733 between the mechanic and the closing 633, and twenty-three behind 174.
+  734, 730), 733 between the mechanic and the closing 633, and twenty-three behind 174. (733 was
+  moved behind 174 by the user on 07.09.2026; this sentence records what THIS ranking produced,
+  not where the point stands today.)
   517'S ORIGIN QUESTION IS ANSWERED and needs no separate ruling: the user placed 517 in the front
   block himself when he adopted this order, so whatever its earlier `why` entry rested on, its
   placement now carries a real instruction. The class defect it pointed at stays with point 749.
@@ -14704,3 +14823,139 @@ to land than a mechanism that needs a review.
   `vscode-restart-kills-the-container`.
   Bundle: Urlaubsfestigkeit — host-side, runs alone; it is the acceptance half of 1069 and
   touches no code the other members edit.
+
+- [ ] 1074. A long verify run dies with the session that started it (measured twice on
+  07.09.2026 in the point-1070 worktree; bundle Testinfrastruktur). `run-logged.mjs` stays in
+  the STARTING SESSION'S process group, so a handover or a session end kills it mid-suite.
+  The 19:05 regression was cut at 19:25:34 UTC — the same second the previous session handed
+  the batch lock over (in-flight transfer stamp 1788809129134 = 19:25:29); the 18:25 run died
+  the same way after `flow`. Neither was a product failure: both records read `exitCode 1`
+  with `failing: []`, the log truncated mid-list, 51 of 76 and 14 of 76 frames written.
+  THE COST IS PAID TWICE OVER: a truncated pass covers no backend, and a retry is SUSPECT and
+  covers nothing (CLAUDE.md §7.2), so the ~20 minutes are not merely lost — the point could
+  not land until the suites were run again. THE LESSON ALREADY EXISTS one file over: after ten
+  sessions died mid-gate, TASKS.md:1054 tells the owner to run `land-point.mjs` under
+  `setsid`. The verify runs never got it, and every caller is expected to remember.
+  THIS IS THE COUNTERPART OF 567, NOT A DUPLICATE: 567 is the run that OUTLIVES its killed
+  session and competes with its successor for the machine; this is the run that DIES with a
+  session that ended normally. Fixing this one makes 567's stray case more common by
+  construction, so 567's reaping is what keeps it safe — they are read together.
+  FINAL STATE:
+  1. `run-logged.mjs` detaches itself into its own process group, so a run survives the
+     session that started it and no caller has to remember `setsid`. Removing the footgun is
+     the whole change; it adds no guard, no ledger field and no flag anybody must pass.
+  2. A run that is still alive when its starting session ends is reported as RUNNING rather
+     than as a red: the sidecar keeps `status: "running"` and no `exitCode` is invented for
+     it, so nothing later reads a survivor as a failure.
+  3. A truncated pass is never silently a red. When a run ends without a terminal verdict and
+     records no failing suite, its receipt says so in those words — "killed, not failed" —
+     and names the last suite that reported, so the successor re-runs the REMAINDER instead
+     of re-running everything or, worse, believing the product broke.
+  VERIFIABLE: pure Vitest — a run started under the runner reports a process group id
+  different from its parent's; a sidecar whose process is still alive classifies as running,
+  not as exit 1; and a record with `exitCode 1`, an empty `failing` list and a frame count
+  below the expectation classifies as KILLED with the last reporting suite named, while a
+  record with the same exit code and a non-empty `failing` list stays a red.
+  Criticality: medium, frequency HIGH — every context boundary and every handover can take a
+  running suite with it, and the batch hands over on a fixed watermark.
+  Refs: TASKS.md point 567 (the reaping counterpart), TASKS.md:1054 (the same lesson already
+  drawn for the landing gate), scripts/verify/run-logged.mjs, scripts/verify/run-wait.mjs,
+  memory `detach-long-running-landings`.
+  Bundle: Testinfrastruktur — it edits `scripts/verify/run-logged.mjs` and the run sidecar
+  that 1062 does not touch, so it may run beside the rest of the bundle; it is read together
+  with 567, whose stray reaping is what makes a surviving run safe, and never worked beside it.
+
+- [ ] 733. The loading picture freezes about twice as long as its own budget allows (measured
+  19.08.2026, 13:50 and 13:51, the first two runs after point 732 brought the picture lane back).
+  MEASURED, twice, on `feat/732-verify-gpu-backend` at b2f6f5f5, backend WebGPU, frame written
+  1/1: the `startup` suite's assertion "the loading picture never freezes longer than the balance
+  budget (4000 ms, design.md §21.2)" fails with a worst standstill of 7632 / 8167 / 7833 / 7801 ms
+  across the two runs' two sections — roughly 2x the budget. The breakdown is the same every time:
+  blocked thread ~3.3 s, inside ONE animation frame ~2.3 s, unpainted ~7.8 s.
+  IT IS NOT LOAD, and that was checked rather than assumed: the four readings sit within 7 % of
+  each other across two runs at load average 3.1–4.7, where a load artefact scatters. It is also
+  not new breakage — it is newly VISIBLE: the lane could not run on this host at all until 732, so
+  this assertion had never been evaluated here.
+  WHAT IS NOT YET KNOWN, and is the first half of the work: whether the freeze belongs to the APP
+  (startup work on the main thread) or to the BACKEND the lane now uses. Point 732 restored the
+  picture through ANGLE's surfaceless EGL route, and the WebGPU lane rides a COMPATIBILITY adapter
+  there; a compat adapter's shader compilation could plausibly own the 2.3 s inside one frame. The
+  two are distinguished by MEASUREMENT before anything is changed — the same run on the WebGL 2
+  lane, and against the deployed build the user actually plays, decides which it is. Naming the
+  wrong half here would rebuild the wrong thing.
+  FINAL STATE:
+  - THE CAUSE IS NAMED with a measurement that separates app from backend, and the answer is
+    written down where the next reader finds it — including the case "the budget is right and the
+    app is too slow" and the case "this backend cannot meet a budget written for another one",
+    which have different remedies.
+  - THE STANDSTILL COMES UNDER THE §21.2 BUDGET on the lane the player uses, or the budget is
+    re-derived FROM A MEASUREMENT on the backends we actually ship and design.md §21.2 moves with
+    it in the same commit. The budget is not simply raised to whatever the current number is: it
+    is a promise to the player about the loading picture, so a raise needs the reason a player
+    would accept.
+  - THE 2.3 s INSIDE ONE ANIMATION FRAME is accounted for by name. A single frame holding the main
+    thread that long is the sharpest clue in the reading and the most likely single cause.
+  VERIFIABLE: `node scripts/verify/run-logged.mjs --suites startup` green on BOTH backends, and
+  the measurement that separated app from backend recorded with its numbers, so a later regression
+  can be compared against it rather than re-argued.
+  QUEUE RANK: behind point 174, at the end of the order (user 07.09.2026, 21:38, ruling on the
+  question why this point stood before the release: the long first load "war ja anscheinend schon
+  lange so, dann kann es ruhig auch noch für diesen Release so bleiben"). It stood between the
+  communication mechanic and the closing 633 for one mechanical reason — the `startup` suite is
+  red and 633 drives a full LARGE — and that reason does not hold: the red is CHARGED to this
+  point in `scripts/render-verify-charges.mjs`, and CLAUDE.md §7.2 closes a red that is charged to
+  its owning point. What the closing owes instead is written into point 633, including the case
+  where the freeze shows outside this charge's `webgpu`/`compatibility` lane.
+  Criticality: medium — it fails no player-visible correctness rule and the game does start, but
+  it is a §21.2 promise the build currently breaks by 2x, and it keeps the `startup` suite red,
+  which is the suite every other run is judged beside.
+  Bundle: Session- & Repo-Hygiene.
+
+- [ ] 1062. The position query stops answering after a language switch, and no gamepad
+  evidence can be filed while it does.
+  WHAT HAPPENS. Measured 06.09.2026 on TWO trees — `main` at 859aec1fd and
+  feat/1052-chief-outside at 3aa7fd442 — with the section run in isolation
+  (`npm test -- gamepad --section=position-query`), so nothing in the branch causes it.
+  The first Select press answers: the English toast carries "Latitude" and "North" and the
+  check passes. Then the suite switches the language (`window.__setLang('de')`), waits for
+  `document.documentElement.lang` to read `de`, and presses Select again — and for the
+  whole 8 s window `useGame.getState().toast` stays null. The check reports `"null"`, the
+  suite retries once and fails identically, so the flake lane calls it a candidate real
+  failure.
+  WHAT IT COSTS. Acceptance criterion 30 is gamepad AND position query, and its browser
+  evidence comes from exactly this suite: while the section is red, no gamepad run can be
+  filed green, and every future LARGE carries the same red.
+  WHAT IS NOT YET KNOWN — and settling it IS the first half of this point: whether the
+  PLAYER is hit (the query really goes silent for anyone who switches language mid-run,
+  which is a defect in the localized toast path) or only the HARNESS is (the injected
+  `window.__pad` does not survive the re-render the language switch triggers, so the poller
+  reads a real, empty gamepad list). Answer that BEFORE touching either side: a fix aimed
+  at the wrong half leaves the other half broken and the suite green.
+  Final state:
+  - The cause is named in the commit — player path or harness — with the measurement that
+    distinguishes them.
+  - The named side is fixed, and the section passes twice in a row on a quiet machine.
+  - If the player path is at fault, the localized toast is asserted on the Vitest layer
+    too, where a language switch costs no browser.
+  Test: `npm test -- gamepad` unfiltered (an incremental `--section` green is not the
+  acceptance), plus Vitest over whatever pure part the cause turns out to have.
+  QUEUE RANK: behind point 174, at the end of the order (user 07.09.2026, 21:38): switching
+  language is rarely used functionality in the PoC, so this is neither the communication mechanic
+  nor a player blockade. It stood before the release because the `gamepad` suite is red and 633
+  drives a full LARGE, but that red is CHARGED to this point in
+  `scripts/render-verify-charges.mjs`, and CLAUDE.md §7.2 closes a red that is charged to its
+  owning point — the ledger had made the front position unnecessary before this point was ever
+  ranked there. What the closing owes instead, criterion 30 reported with the German check named
+  RED rather than filed green, is written into point 633. THE ORDERING PROSE WENT WITH THE MOVE
+  (the duty the drained finding of 07.09.2026 recorded, now executed): the "it blocks the release,
+  which is why it stands here" clause of the criticality line below and the twin sentence in
+  `docs/work-packages.md` both said the old order, and no rank record and no guard points at
+  either — `queue-rank.mjs` reports every point ranked and stays green through any move. Moving
+  the block alone is not the move.
+  Criticality: medium — the closing run of point 633 drives LARGE, LARGE runs the gamepad suite,
+  and that suite stays red until this lands; under the ruling above the closing carries that red
+  as a charged red instead of working this point first. Whether the PLAYER is hit is what the
+  point decides first.
+  Refs: scripts/verify/gamepad.mjs (section `position-query`), src/systems/gamepadMap.ts,
+  the position-query toast in src/state/store.ts and both language files
+  Bundle: Testinfrastruktur.
