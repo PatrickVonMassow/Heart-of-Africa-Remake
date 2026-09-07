@@ -14713,3 +14713,40 @@ to land than a mechanism that needs a review.
   reads, scripts/render-verify-charges.mjs (point 1013's entry, prey side NOT covered)
   Bundle: Tierverhalten (it reads the same food-web table and the same enrichments section as
   1013, so the two must not run in parallel).
+
+- [ ] 1071. The prepared container-restart path is deployed on the host and proven without an
+  editor (split off 1069, 07.09.2026).
+  Point 1069 landed the repository half: `.devcontainer` carries `--restart=unless-stopped`,
+  `overrideCommand: false`, `shutdownAction: none` and `init: true`, the image gains
+  `container-entrypoint.sh`, and `scripts/batch-launcher.mjs --arm` arms the daemon from
+  container startup instead of only from the SessionStart hook. None of it is ACTIVE yet:
+  `/workspace/.devcontainer` is the read-only host mount, the container has neither `docker`,
+  its socket, nor `wsl.exe`, and the tracked copy is not the configuration the running
+  container was built from. Everything 1069 could not execute from inside the container is
+  owed here, and it is why 1069's clauses (1) and (3) went unproven.
+  Done when:
+  - The host remedy is executed and recorded in `docs/wsl-vm-recovery.md`: `wsl --version`
+    before and after `wsl --update`, the Docker Desktop restart, and
+    `%LOCALAPPDATA%\Temp\wsl-crashes` inspected with dump names and timestamps, or an
+    explicit "absent/empty".
+  - The reviewed `Dockerfile`, `devcontainer.json` and `container-entrypoint.sh` are copied
+    into the active host `.devcontainer` — preserving its host-only `CLAUDE.md` and hooks —
+    and the container is REBUILT from it. A reload or `docker update` cannot install an
+    entrypoint.
+  - The no-editor drill of `docs/wsl-vm-recovery.md` runs as written: `docker stop` then
+    `docker start` from a Windows terminal with every VS Code window closed, and
+    `batch-launcher.mjs --status` reaches `ready` or `running` with a live pid and a fresh
+    `lastTickAt` within 60 s, sampled twice; then the same observation after a Docker Desktop
+    restart, recorded separately from the manual stop/start.
+  - One complete LARGE run finishes with `/proc/sys/kernel/random/boot_id` unchanged across
+    it. A failed or interrupted run is not proof of survival.
+  - If the VM dies again this point stops, and the software-rendering lane is decided WITH the
+    user (1069's clause 2): it changes both the picture and the runtime, so no lane is chosen
+    without that decision.
+  Criticality: HIGH — until this is deployed the batch still dies with the VM and nothing
+  re-arms it.
+  Refs: docs/wsl-vm-recovery.md (host remedy, deploy step and drill, all already written),
+  .devcontainer/container-entrypoint.sh, scripts/batch-launcher.mjs (`--arm`), memory
+  `vscode-restart-kills-the-container`.
+  Bundle: Urlaubsfestigkeit — host-side, runs alone; it is the acceptance half of 1069 and
+  touches no code the other members edit.
