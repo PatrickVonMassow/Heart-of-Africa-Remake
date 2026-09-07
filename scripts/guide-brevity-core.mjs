@@ -562,7 +562,11 @@ export const LIMITS = {
   // estimated-numbers pitfall — an accumulated maximum may exonerate, never
   // accuse — and three neighbouring entries were compressed to pay for it, so
   // the measured guide came down three more words: 5018 -> 5015.
-  maxWords: 5311,
+  // 07.09.2026: the missing-config case turned out to be the SECOND manifestation
+  // of the fallback entry the guide already carried (a failed provider there, an
+  // absent settings file here), so it was folded into that entry instead of added
+  // beside it. Folding says it in two words less than the old wording: 5311 -> 5309.
+  maxWords: 5309,
   // A pitfall entry = the risk lines plus its prompt. Anything longer is a
   // story, not a tip.
   maxEntryLines: 11,
