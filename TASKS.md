@@ -775,94 +775,6 @@ put it is the mistake this line exists to stop.
   keeps hitting the bugs.
   Bundle: Verständigung.
 
-- [ ] 733. The loading picture freezes about twice as long as its own budget allows (measured
-  19.08.2026, 13:50 and 13:51, the first two runs after point 732 brought the picture lane back).
-  MEASURED, twice, on `feat/732-verify-gpu-backend` at b2f6f5f5, backend WebGPU, frame written
-  1/1: the `startup` suite's assertion "the loading picture never freezes longer than the balance
-  budget (4000 ms, design.md §21.2)" fails with a worst standstill of 7632 / 8167 / 7833 / 7801 ms
-  across the two runs' two sections — roughly 2x the budget. The breakdown is the same every time:
-  blocked thread ~3.3 s, inside ONE animation frame ~2.3 s, unpainted ~7.8 s.
-  IT IS NOT LOAD, and that was checked rather than assumed: the four readings sit within 7 % of
-  each other across two runs at load average 3.1–4.7, where a load artefact scatters. It is also
-  not new breakage — it is newly VISIBLE: the lane could not run on this host at all until 732, so
-  this assertion had never been evaluated here.
-  WHAT IS NOT YET KNOWN, and is the first half of the work: whether the freeze belongs to the APP
-  (startup work on the main thread) or to the BACKEND the lane now uses. Point 732 restored the
-  picture through ANGLE's surfaceless EGL route, and the WebGPU lane rides a COMPATIBILITY adapter
-  there; a compat adapter's shader compilation could plausibly own the 2.3 s inside one frame. The
-  two are distinguished by MEASUREMENT before anything is changed — the same run on the WebGL 2
-  lane, and against the deployed build the user actually plays, decides which it is. Naming the
-  wrong half here would rebuild the wrong thing.
-  FINAL STATE:
-  - THE CAUSE IS NAMED with a measurement that separates app from backend, and the answer is
-    written down where the next reader finds it — including the case "the budget is right and the
-    app is too slow" and the case "this backend cannot meet a budget written for another one",
-    which have different remedies.
-  - THE STANDSTILL COMES UNDER THE §21.2 BUDGET on the lane the player uses, or the budget is
-    re-derived FROM A MEASUREMENT on the backends we actually ship and design.md §21.2 moves with
-    it in the same commit. The budget is not simply raised to whatever the current number is: it
-    is a promise to the player about the loading picture, so a raise needs the reason a player
-    would accept.
-  - THE 2.3 s INSIDE ONE ANIMATION FRAME is accounted for by name. A single frame holding the main
-    thread that long is the sharpest clue in the reading and the most likely single cause.
-  VERIFIABLE: `node scripts/verify/run-logged.mjs --suites startup` green on BOTH backends, and
-  the measurement that separated app from backend recorded with its numbers, so a later regression
-  can be compared against it rather than re-argued.
-  Criticality: medium — it fails no player-visible correctness rule and the game does start, but
-  it is a §21.2 promise the build currently breaks by 2x, and it keeps the `startup` suite red,
-  which is the suite every other run is judged beside.
-  Bundle: Session- & Repo-Hygiene.
-
-- [ ] 1062. The position query stops answering after a language switch, and no gamepad
-  evidence can be filed while it does.
-  WHAT HAPPENS. Measured 06.09.2026 on TWO trees — `main` at 859aec1fd and
-  feat/1052-chief-outside at 3aa7fd442 — with the section run in isolation
-  (`npm test -- gamepad --section=position-query`), so nothing in the branch causes it.
-  The first Select press answers: the English toast carries "Latitude" and "North" and the
-  check passes. Then the suite switches the language (`window.__setLang('de')`), waits for
-  `document.documentElement.lang` to read `de`, and presses Select again — and for the
-  whole 8 s window `useGame.getState().toast` stays null. The check reports `"null"`, the
-  suite retries once and fails identically, so the flake lane calls it a candidate real
-  failure.
-  WHAT IT COSTS. Acceptance criterion 30 is gamepad AND position query, and its browser
-  evidence comes from exactly this suite: while the section is red, no gamepad run can be
-  filed green, and every future LARGE carries the same red.
-  WHAT IS NOT YET KNOWN — and settling it IS the first half of this point: whether the
-  PLAYER is hit (the query really goes silent for anyone who switches language mid-run,
-  which is a defect in the localized toast path) or only the HARNESS is (the injected
-  `window.__pad` does not survive the re-render the language switch triggers, so the poller
-  reads a real, empty gamepad list). Answer that BEFORE touching either side: a fix aimed
-  at the wrong half leaves the other half broken and the suite green.
-  Final state:
-  - The cause is named in the commit — player path or harness — with the measurement that
-    distinguishes them.
-  - The named side is fixed, and the section passes twice in a row on a quiet machine.
-  - If the player path is at fault, the localized toast is asserted on the Vitest layer
-    too, where a language switch costs no browser.
-  Test: `npm test -- gamepad` unfiltered (an incremental `--section` green is not the
-  acceptance), plus Vitest over whatever pure part the cause turns out to have.
-  Criticality: medium — but it blocks the release, which is why it stands here: the closing
-  run of point 633 drives LARGE, LARGE runs the gamepad suite, and that suite stays red until
-  this lands. Whether the PLAYER is hit is what the point decides first.
-  Refs: scripts/verify/gamepad.mjs (section `position-query`), src/systems/gamepadMap.ts,
-  the position-query toast in src/state/store.ts and both language files
-  Bundle: Testinfrastruktur.
-  AMENDMENT 07.09.2026 (finding, drained from the carrier). Two things about this point's
-  QUEUE RANK, recorded here because prose is where they hide:
-  (a) The "it blocks the release, which is why it stands here" clause above, and the twin
-      sentence in `docs/work-packages.md` ("it stands early because it holds criterion 30's
-      only browser evidence"), are ORDERING PROSE that no rank record and no guard points
-      at. `queue-rank.mjs` reports all points ranked and stays green through any move, so a
-      reorder leaves both sentences behind claiming the old order. Whoever moves this point
-      greps its number for ordering prose in TASKS.md AND docs/work-packages.md and moves
-      that too — moving the block alone is not the move.
-  (b) The mechanical reason given for the front position is already void: both reds are
-      CHARGED to their own open point in `scripts/render-verify-charges.mjs` (RED_CHARGES
-      entries for 1062/gamepad and 733/startup, verified 07.09.2026), and CLAUDE.md §7.2
-      closes a red that is charged to its owning point. The ledger had made the front
-      position unnecessary before either point was ranked there. This records the fact; it
-      does NOT itself reorder anything — the rank is the user's call.
-
 - [ ] 633. The release's closing run — two regressions with the cleanup between them (user
   11.08.2026, splitting point 174: "Dafür scheint mir die Schätzung von 1 h viel zu wenig
   zu sein"). 174 carried the whole release in one card estimated at ~1 h, which was true
@@ -890,11 +802,26 @@ put it is the mistake this line exists to stop.
      cleanup commit — this is the run 631's order check measures.
   4. The remaining §9 steps: implementation sections, the graphics-detail doc, the §7.1
      acceptance criteria with evidence, open items, simplifications.
+  THE TWO CHARGED REDS THIS RELEASE SHIPS WITH (user 07.09.2026, moving points 733 and 1062
+  behind 174). Both regressions will carry them, and the closing does not paper that over:
+  - The evidence of steps 1 and 3 NAMES both charged reds instead of claiming an exit-0 run:
+    the `startup` freeze against the §21.2 budget (point 733) and the German position-query
+    check of the `gamepad` suite (point 1062). Everything else stays a real red.
+  - Acceptance criterion 30 is reported in `docs/acceptance-evidence.md` with the German
+    position-query check named RED under point 1062 — gamepad and the English query fulfilled,
+    the localized query NOT. It is not filed green (CLAUDE.md §7.2 forbids reporting an
+    unfulfilled criterion as fulfilled).
+  - Point 733's charge is scoped to backend `webgpu`, featureLevel `compatibility`. If the
+    freeze reproduces on WebGL 2 or on a core adapter in either regression, that red is
+    UNACCOUNTED and the closing stops for it: it then takes the measurement that either widens
+    the charge with its evidence or names the lane the freeze does not reach — minutes, not the
+    whole of 733, which keeps owning the app-versus-backend question and the §21.2 budget.
   THEN 174 takes over: report "ready to tag" and wait for the user's go.
   VERIFIABLE: `node scripts/closing-guard.mjs --status` shows every step recorded with its
   evidence, the second regression's evidence naming a commit younger than the youngest
-  cleanup commit; both regression runs green on both backends; and the cleanup's union
-  documented with, per entry, which model found it and what was decided.
+  cleanup commit; both regression runs on both backends carrying no red but the two charged
+  ones named above, each named in the evidence; and the cleanup's union documented with, per
+  entry, which model found it and what was decided.
   Criticality: HIGH — it is what the tag certifies, and v0.2 shipped with these steps
   skipped.
 
@@ -10421,7 +10348,9 @@ to land than a mechanism that needs a review.
   point that already HAS a feature branch stays in front so the branches are finally cleared
   instead of falling further behind `main`. The resulting order: sixteen points ahead of the
   communication mechanic (769, 779, 768, 597, 813, 517, 752, 669, 737, 720, 595, 598, 581, 713,
-  734, 730), 733 between the mechanic and the closing 633, and twenty-three behind 174.
+  734, 730), 733 between the mechanic and the closing 633, and twenty-three behind 174. (733 was
+  moved behind 174 by the user on 07.09.2026; this sentence records what THIS ranking produced,
+  not where the point stands today.)
   517'S ORIGIN QUESTION IS ANSWERED and needs no separate ruling: the user placed 517 in the front
   block himself when he adopted this order, so whatever its earlier `why` entry rested on, its
   placement now carries a real instruction. The class defect it pointed at stays with point 749.
@@ -14902,3 +14831,98 @@ to land than a mechanism that needs a review.
   Bundle: Testinfrastruktur — it edits `scripts/verify/run-logged.mjs` and the run sidecar
   that 1062 does not touch, so it may run beside the rest of the bundle; it is read together
   with 567, whose stray reaping is what makes a surviving run safe, and never worked beside it.
+
+- [ ] 733. The loading picture freezes about twice as long as its own budget allows (measured
+  19.08.2026, 13:50 and 13:51, the first two runs after point 732 brought the picture lane back).
+  MEASURED, twice, on `feat/732-verify-gpu-backend` at b2f6f5f5, backend WebGPU, frame written
+  1/1: the `startup` suite's assertion "the loading picture never freezes longer than the balance
+  budget (4000 ms, design.md §21.2)" fails with a worst standstill of 7632 / 8167 / 7833 / 7801 ms
+  across the two runs' two sections — roughly 2x the budget. The breakdown is the same every time:
+  blocked thread ~3.3 s, inside ONE animation frame ~2.3 s, unpainted ~7.8 s.
+  IT IS NOT LOAD, and that was checked rather than assumed: the four readings sit within 7 % of
+  each other across two runs at load average 3.1–4.7, where a load artefact scatters. It is also
+  not new breakage — it is newly VISIBLE: the lane could not run on this host at all until 732, so
+  this assertion had never been evaluated here.
+  WHAT IS NOT YET KNOWN, and is the first half of the work: whether the freeze belongs to the APP
+  (startup work on the main thread) or to the BACKEND the lane now uses. Point 732 restored the
+  picture through ANGLE's surfaceless EGL route, and the WebGPU lane rides a COMPATIBILITY adapter
+  there; a compat adapter's shader compilation could plausibly own the 2.3 s inside one frame. The
+  two are distinguished by MEASUREMENT before anything is changed — the same run on the WebGL 2
+  lane, and against the deployed build the user actually plays, decides which it is. Naming the
+  wrong half here would rebuild the wrong thing.
+  FINAL STATE:
+  - THE CAUSE IS NAMED with a measurement that separates app from backend, and the answer is
+    written down where the next reader finds it — including the case "the budget is right and the
+    app is too slow" and the case "this backend cannot meet a budget written for another one",
+    which have different remedies.
+  - THE STANDSTILL COMES UNDER THE §21.2 BUDGET on the lane the player uses, or the budget is
+    re-derived FROM A MEASUREMENT on the backends we actually ship and design.md §21.2 moves with
+    it in the same commit. The budget is not simply raised to whatever the current number is: it
+    is a promise to the player about the loading picture, so a raise needs the reason a player
+    would accept.
+  - THE 2.3 s INSIDE ONE ANIMATION FRAME is accounted for by name. A single frame holding the main
+    thread that long is the sharpest clue in the reading and the most likely single cause.
+  VERIFIABLE: `node scripts/verify/run-logged.mjs --suites startup` green on BOTH backends, and
+  the measurement that separated app from backend recorded with its numbers, so a later regression
+  can be compared against it rather than re-argued.
+  QUEUE RANK: behind point 174, at the end of the order (user 07.09.2026, 21:38, ruling on the
+  question why this point stood before the release: the long first load "war ja anscheinend schon
+  lange so, dann kann es ruhig auch noch für diesen Release so bleiben"). It stood between the
+  communication mechanic and the closing 633 for one mechanical reason — the `startup` suite is
+  red and 633 drives a full LARGE — and that reason does not hold: the red is CHARGED to this
+  point in `scripts/render-verify-charges.mjs`, and CLAUDE.md §7.2 closes a red that is charged to
+  its owning point. What the closing owes instead is written into point 633, including the case
+  where the freeze shows outside this charge's `webgpu`/`compatibility` lane.
+  Criticality: medium — it fails no player-visible correctness rule and the game does start, but
+  it is a §21.2 promise the build currently breaks by 2x, and it keeps the `startup` suite red,
+  which is the suite every other run is judged beside.
+  Bundle: Session- & Repo-Hygiene.
+
+- [ ] 1062. The position query stops answering after a language switch, and no gamepad
+  evidence can be filed while it does.
+  WHAT HAPPENS. Measured 06.09.2026 on TWO trees — `main` at 859aec1fd and
+  feat/1052-chief-outside at 3aa7fd442 — with the section run in isolation
+  (`npm test -- gamepad --section=position-query`), so nothing in the branch causes it.
+  The first Select press answers: the English toast carries "Latitude" and "North" and the
+  check passes. Then the suite switches the language (`window.__setLang('de')`), waits for
+  `document.documentElement.lang` to read `de`, and presses Select again — and for the
+  whole 8 s window `useGame.getState().toast` stays null. The check reports `"null"`, the
+  suite retries once and fails identically, so the flake lane calls it a candidate real
+  failure.
+  WHAT IT COSTS. Acceptance criterion 30 is gamepad AND position query, and its browser
+  evidence comes from exactly this suite: while the section is red, no gamepad run can be
+  filed green, and every future LARGE carries the same red.
+  WHAT IS NOT YET KNOWN — and settling it IS the first half of this point: whether the
+  PLAYER is hit (the query really goes silent for anyone who switches language mid-run,
+  which is a defect in the localized toast path) or only the HARNESS is (the injected
+  `window.__pad` does not survive the re-render the language switch triggers, so the poller
+  reads a real, empty gamepad list). Answer that BEFORE touching either side: a fix aimed
+  at the wrong half leaves the other half broken and the suite green.
+  Final state:
+  - The cause is named in the commit — player path or harness — with the measurement that
+    distinguishes them.
+  - The named side is fixed, and the section passes twice in a row on a quiet machine.
+  - If the player path is at fault, the localized toast is asserted on the Vitest layer
+    too, where a language switch costs no browser.
+  Test: `npm test -- gamepad` unfiltered (an incremental `--section` green is not the
+  acceptance), plus Vitest over whatever pure part the cause turns out to have.
+  QUEUE RANK: behind point 174, at the end of the order (user 07.09.2026, 21:38): switching
+  language is rarely used functionality in the PoC, so this is neither the communication mechanic
+  nor a player blockade. It stood before the release because the `gamepad` suite is red and 633
+  drives a full LARGE, but that red is CHARGED to this point in
+  `scripts/render-verify-charges.mjs`, and CLAUDE.md §7.2 closes a red that is charged to its
+  owning point — the ledger had made the front position unnecessary before this point was ever
+  ranked there. What the closing owes instead, criterion 30 reported with the German check named
+  RED rather than filed green, is written into point 633. THE ORDERING PROSE WENT WITH THE MOVE
+  (the duty the drained finding of 07.09.2026 recorded, now executed): the "it blocks the release,
+  which is why it stands here" clause of the criticality line below and the twin sentence in
+  `docs/work-packages.md` both said the old order, and no rank record and no guard points at
+  either — `queue-rank.mjs` reports every point ranked and stays green through any move. Moving
+  the block alone is not the move.
+  Criticality: medium — the closing run of point 633 drives LARGE, LARGE runs the gamepad suite,
+  and that suite stays red until this lands; under the ruling above the closing carries that red
+  as a charged red instead of working this point first. Whether the PLAYER is hit is what the
+  point decides first.
+  Refs: scripts/verify/gamepad.mjs (section `position-query`), src/systems/gamepadMap.ts,
+  the position-query toast in src/state/store.ts and both language files
+  Bundle: Testinfrastruktur.
