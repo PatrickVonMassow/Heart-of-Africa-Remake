@@ -1438,7 +1438,7 @@ keinen Träger hat. Gebucht als Punkt 956.
 
 ## Anhang A — Maschinell gepflegte Quellen-Übersicht
 
-Zuletzt aktualisiert: Montag, 07.09.2026, 19:13 · Quellen-Fingerprint: `bb12a79e1364…`
+Zuletzt aktualisiert: Montag, 07.09.2026, 19:38 · Quellen-Fingerprint: `d2fcaf6b1b90…`
 
 Spalten heuristisch aus den Quellen abgeleitet (Anläufe = distinkte Datumsnennungen im Memory;
 Maßnahme = Guard-Skripte mit Namens-Treffer). Die inhaltliche Bewertung gehört der Prosa oben.
@@ -1543,8 +1543,8 @@ Maßnahme = Guard-Skripte mit Namens-Treffer). Die inhaltliche Bewertung gehört
 
 Erfasste Quellen: 95 Feedback-/Projekt-Memories · 58 Guard-/Hook-Skripte · 6 Revert-/Reapply-Commits · 125 Prozess-/Meta-TASKS-Punkte (davon 59 offen).
 
-<!-- RETRO-FINGERPRINT: bb12a79e1364a50d3ed94f29fd091b017d84a728bbf603c2d8b0dc0c92ae72fe -->
-<!-- RETRO-LAST-REFRESHED: 2026-09-07T17:13:39.567Z -->
+<!-- RETRO-FINGERPRINT: d2fcaf6b1b900e251676f5ee44571e92846c6b44eb0a0f817c5fdc73bba1d7df -->
+<!-- RETRO-LAST-REFRESHED: 2026-09-07T17:38:04.488Z -->
 <!-- AUTO-GENERATED:END -->
 
 ### 3.111 Ein Erfolg ist kein Beweis für den Weg, auf dem er zustande kam
@@ -5803,3 +5803,32 @@ ein unbegrenztes „später" ist von „nie" nicht unterscheidbar. Der Befund ko
 heute nichts und wäre der stille Preis der ersten Kur gewesen, die man für
 §3.233 ansetzt; gefunden wurde er nur, weil der Nutzer eine Regel hinterfragt
 hat, statt sie zu akzeptieren.
+
+### 3.242 Der vorgesehene Ausweg verlangte genau das, was die Sperre verbot
+
+Am 07.09.2026 erteilte der Nutzer einen Arbeitsauftrag in einem Fenster, das den
+Batch-Lock nicht hielt. Für genau diese Lage gibt es einen sanktionierten Weg:
+`finding.mjs --request` legt eine fertige Spezifikation im Findings-Träger ab,
+und ein Wächter blockiert das Zugende des Owners, bis sie in `TASKS.md` steht.
+Dieser Weg war unbenutzbar. `--request` nimmt die Spezifikation ausschließlich
+als DATEI entgegen — anders als `--record`, das seinen Text inline annimmt —,
+und der Stand-down des Nicht-Owners lehnt jede Schreiboperation ab, gemessen bis
+hinunter zu `mkdir` auf ein bereits bestehendes Scratchpad-Verzeichnis und zu
+`git branch`. Der eine Mechanismus, der einen Nutzer-Auftrag nachweisbar
+übergibt, fiel genau in seinem Anwendungsfall aus; als Ersatz blieb nur der
+Batch-Anspruch, also ein echter Eingriff in den laufenden Batch.
+
+Das Beunruhigende steht daneben: Am 06.09.2026 gingen drei solche Übergaben aus
+einem Nicht-Owner-Fenster gegen einen nachweislich lebenden Owner durch — daraus
+wurden die Punkte 1064, 1065 und 1066. Der Wächter hat sich seither nicht
+geändert. Entweder war die Lage damals eine andere, oder die Kopf-Klassifikation
+der Kommandos (`node` ist kein schreibender Kopf) lässt durch, was das
+Write-Werkzeug verweigert. Dann hinge derselbe Vorgang davon ab, welches
+Werkzeug man wählt — und das ist kein Weg, sondern ein Loch.
+
+**Lehre:** Eine Sperre und ihr eigener Notausgang müssen zusammen geprüft
+werden. Ein Ausweg, der eine Fähigkeit voraussetzt, die die Sperre entzieht, ist
+keiner; er wird erst in dem Moment als fehlend bemerkt, in dem man ihn braucht.
+Und wo ein Werkzeug seinen Inhalt nur als Datei annimmt, während ein
+Schwester-Kommando ihn inline nimmt, ist die Datei keine Anforderung, sondern
+ein vergessener Unterschied.

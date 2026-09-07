@@ -533,6 +533,16 @@ Die Ursache findest du durch **Zerlegen**, nicht durch Wiederholen.
   was es durchgehen lässt und warum. Prüffrage: Steht ein Kriterium ohne Toleranz neben einem mit —
   und was behauptet dieser Unterschied?"
 
+- **Der Notausgang, der genau das verlangt, was die Sperre verbietet.** Eine Sperre hielt ein
+  Fenster von allen Änderungen ab und nannte dafür einen vorgesehenen Umweg. Der Umweg nahm
+  seine Eingabe aber nur als DATEI entgegen — und Dateien schreiben war das erste, was die
+  Sperre untersagte. Bemerkt wurde die Lücke erst in dem Moment, in dem der Umweg gebraucht
+  wurde.
+  → *Prompt:* „Wenn du eine Sperre baust oder benutzt, **probiere ihren eigenen Notausgang
+  unter der Sperre aus**, nicht ohne sie. Prüffrage: Setzt der Ausweg eine Fähigkeit voraus,
+  die die Sperre gerade entzieht? Und nimmt er seine Eingabe auch inline, oder zwingt er zu
+  einer Datei, die niemand anlegen darf?"
+
 - **Das Protokoll ohne Verfallsdatum wird zum Dauerplakat.** Was dein Werkzeug über die eigene
   Entscheidung aufschreibt, nimmt niemand je wieder heraus.
   → *Prompt:* „Eine Entscheidung, die du selbst triffst, nennt die **Messung**, die sie stützen
@@ -576,4 +586,4 @@ Die Ursache findest du durch **Zerlegen**, nicht durch Wiederholen.
 
 Sie ersetzt die Fallstricke oben nicht.
 
-<!-- GUIDE-FINGERPRINT: 6e5591c75c9bf48fb18080add7244cca4226d74f88433e4963fb39966a6bf121 -->
+<!-- GUIDE-FINGERPRINT: d2fcaf6b1b900e251676f5ee44571e92846c6b44eb0a0f817c5fdc73bba1d7df -->
