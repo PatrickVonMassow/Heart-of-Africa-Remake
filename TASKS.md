@@ -775,6 +775,39 @@ put it is the mistake this line exists to stop.
   keeps hitting the bugs.
   Bundle: Verständigung.
 
+- [ ] 1075. A unit test measures a file OUTSIDE the repository, so writing a memory reddens
+  `main` and blocks every push (measured 07.09.2026, 22:24, on a quiet machine).
+  WHAT HAPPENS. `scripts/cut-account-core.test.mjs:677-684` reads the live
+  `~/.claude/projects/-workspace-hoa/memory/MEMORY.md` (and the two `CLAUDE.md` files) and
+  asserts that the ceilings table of `docs/document-cut-757.md` quotes their CURRENT line and
+  word counts. MEMORY.md is not in the repository and is rewritten whenever any session saves,
+  edits or deletes a memory. This evening the table said "765 words" and the tokenizer reported
+  764: `Tests 1 failed | 56 passed`, reproduced standalone in 1.14 s at load 5.8, so it is not
+  a load artefact.
+  WHAT IT COSTS. The pre-push gate runs the unit suite for every push to `main`, so from the
+  moment a memory is written NO push to main succeeds until somebody edits that table by hand.
+  Tonight it stopped six commits, and the gate's honest retry-under-load rule paid for the full
+  suite twice before saying so. Nothing warns anybody: the memory write and the red are in
+  different files, on different days, in different sessions.
+  FINAL STATE — the test stops measuring the environment, and the choice is named in the commit:
+  either the assertion drops the two files it does not own and keeps only what the repository
+  contains, or the counts are read from a snapshot the repository DOES own and the ceilings
+  table is regenerated from it by the same command that writes it. What must not survive is a
+  hand-maintained number in a document that tracks a file outside the checkout.
+  VERIFIABLE: pure Vitest — writing, changing and deleting a memory leaves the suite green, and
+  a real ceilings breach still reds. `npx vitest run scripts/cut-account-core.test.mjs` green
+  before and after a memory write.
+  QUEUE RANK: BEFORE the release (machine-filed, urgency stated as rule 1d requires): it blocks
+  every push to `main` and therefore every landing, and the blockade returns on its own the next
+  time any session writes a memory.
+  Criticality: high, frequency HIGH — no correctness of the game is touched, but the batch
+  cannot deliver anything while it holds, and it re-arms itself.
+  Refs: scripts/cut-account-core.test.mjs (the ceilings block), docs/document-cut-757.md (the
+  table), scripts/pre-push-gate.mjs (the caller that turns it into a blockade), guide pitfall
+  "Test und Wächter hingen an ihrer Umgebung, nicht am Verhalten".
+  Bundle: Testinfrastruktur — it edits `scripts/cut-account-core.test.mjs` and the cut document,
+  which no other open point of this bundle writes, so it may run beside any of them.
+
 - [ ] 633. The release's closing run — two regressions with the cleanup between them (user
   11.08.2026, splitting point 174: "Dafür scheint mir die Schätzung von 1 h viel zu wenig
   zu sein"). 174 carried the whole release in one card estimated at ~1 h, which was true

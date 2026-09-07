@@ -1224,6 +1224,12 @@
       "why": "Last is right: the footgun has a known, proven workaround (start the run under setsid), so it no longer blocks — and under the infrastructure freeze an infra defect waits unless it reproducibly blocks game work. It is read together with 567 when either is taken.",
       "origin": "machine",
       "place": "last"
+    },
+    "1075": {
+      "at": "2026-09-07T20:25:52.481Z",
+      "why": "Es blockiert jeden Push nach main und damit jede Landung; die Blockade kehrt beim naechsten Memory-Schreiben von selbst zurueck.",
+      "origin": "machine",
+      "place": "ahead"
     }
   },
   "boundary": {
@@ -1256,7 +1262,7 @@
     "why": "The order standing in front of the release today is the arrangement that predates this rule; the four machine-filed points that had ranked themselves there were moved behind 174 first"
   },
   "settled": {
-    "at": "2026-09-07T19:47:32.148Z",
+    "at": "2026-09-07T20:25:52.492Z",
     "points": [
       174,
       184,
@@ -1631,7 +1637,8 @@
       1071,
       1072,
       1073,
-      1074
+      1074,
+      1075
     ]
   }
 }
