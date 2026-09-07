@@ -66,7 +66,8 @@ second region can add its own entry without changing consumers.
 
 Reserved and unused: the two single-tone sequences `ba-ba-ba-ba` and
 `BA-BA-BA-BA`. CHIEF took the last spare mixed sequence, RIVER's tonal mirror,
-so the language now holds two mirror pairs. UPSTREAM and DOWNSTREAM remain the
+so all six words now fall into three mirror pairs — RIVER/CHIEF,
+UPSTREAM/DOWNSTREAM and ROCK/DIG. UPSTREAM and DOWNSTREAM remain the
 only pair the player hears AS a pair — they are announced against each other in
 the same round of the bank game, while CHIEF is only ever said alone, by the
 drummer pointing at the hut.
@@ -171,8 +172,9 @@ give reach (`balance.communication.giveReach`), and activates the find in the
 bar — a click, exactly as medicine and the shovel act. Only then is it laid in
 his hands. Used anywhere else — no chief out in the open, or too far from him —
 it hands nothing over and one toast says why, and the find stays in the pack.
-The use key at his hut hands nothing over at all; it brings him out and
-afterwards sends the drums. His acknowledgement stands over his own head like
+The use key at his hut hands nothing over at all: it brings him out, and from
+then on it is the key at either man — the chief or his drummer — that sends the
+drums, while the hut itself answers nothing. His acknowledgement stands over his own head like
 any other villager's word — it uses only ROCK and DIG from the same language.
 
 Every later quest find brought to a chief follows the same rule: a found thing

@@ -277,6 +277,35 @@ and that no other people's chief sends the message;
 the day and note of a concept already heard in the village, and travels with the
 checkpoint.
 
+HE COMES OUT TO HIS DRUMMER (§13.4, docs/communication-poc-spec.md, point
+1070). The use key at his hut no longer speaks: it brings the chief out and
+walks him across to his drummer's side, and the drums answer from there. He
+stays a calibratable minute; while he stands, the key at either man repeats the
+message, and on his way home it calls him back, the drums following by
+themselves the moment he arrives. The hut answers nothing while he is outside,
+and every way back to the start — leaving the village, a new game, a loaded
+checkpoint — finds him indoors again, because the coarse flag and the walk are
+always cleared together. While he is in his hut the key at the drummer teaches
+the sixth word: he points at the hut and says CHIEF, heard, noted and guessed
+like any other word of the language.
+Verifiable: `src/scenes/place/chiefWalk.test.ts` the round trip as pure logic —
+setting out, the crossing at the walking speed, the minute counted afresh from
+every message, the turn for home, the call-back that turns him where he stands
+and beats the drums on arrival, and a boundary crossed mid-step stamped with the
+moment it was crossed rather than the end of the step;
+`src/scenes/place/chiefMeeting.test.ts` what the key does at hut, chief and
+drummer in every phase, the hut inert while he is outside, the drummer's CHIEF
+in any village and in no port, and the three resets;
+`src/communication/lexicon.test.ts` and `src/i18n/parity.test.ts` the new word
+in the table and in both language files. In the browser, `scripts/verify/
+polish.mjs` section `chief-to-drummer` proves he is SEEN walking — part of the
+path behind him, part still in front — and then standing abreast of the drummer
+where the scene really drew him; `scripts/verify/collision.mjs` that his door
+answers its use key from a collision-free standpoint, with the reset to his hut
+checked before the press; and `scripts/verify/flow.mjs` photographs the pair
+from the front in `04-chief-outside-his-hut` and
+`151-chief-beside-his-drummer.png`.
+
 THE ERRAND'S END (docs/communication-poc-spec.md, point 487). Understood, the
 message sends the traveller out of the village: in the BIRD'S-EYE view, up the
 Niger, to the erratic on its bank, where the shovel he already carries recovers
