@@ -591,7 +591,9 @@ function Chief({
   return (
     // NOT marked for the §17.8 Ctrl layer: he carries his own standing label
     // below, and the layer would print the same word twice over one man.
-    <group ref={group} position={[x, 0, z]} rotation={[0, facing, 0]}>
+    // Named, so a check can read where the picture really puts him — and so the
+    // §13.4 speech dev hook finds his anchor by the speaker id he speaks under.
+    <group ref={group} name={CHIEF_SPEAKER_ID} position={[x, 0, z]} rotation={[0, facing, 0]}>
       {/* Robe */}
       <mesh position={[0, 0.62, 0]} castShadow>
         <coneGeometry args={[0.42, 1.25, TESSELLATION.figureBody]} />

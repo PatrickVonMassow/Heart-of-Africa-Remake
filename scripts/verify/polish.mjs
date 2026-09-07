@@ -5694,6 +5694,183 @@ if (section('ctrl-actor-labels')) {
   check('releasing Ctrl clears the settlement labels too (point 342)', cleared, `cleared=${cleared}`)
 }
 
+// --- The find from the boulder is GIVEN by using it (design.md §6, user 06.09.2026) --
+// The whole act, end to end, in the picture: the thing dug up at the erratic
+// stands in the inventory bar under its own localized name, a click before the
+// chief who is out in the open lays it in his hands, his two words stand over
+// HIS head, and the bar loses it. Out of reach the same click gives nothing.
+// Only a browser can answer this: the bar is HTML, the chief is a drawn figure,
+// and the reach is measured between the two live positions the scene writes.
+if (section('artefact-give')) {
+  const FIND = '[data-find="rockArtefact"]'
+  // Dig it up first, out on the map — the bar shows the find only from the
+  // moment the shovel reaches it. The site comes from the game's OWN placement
+  // module, never from a coordinate written down here.
+  const dug = await page.evaluate(async () => {
+    const g = () => window.__game.getState()
+    if (g().placeId) g().leavePlace()
+    const rock = await import('/src/world/communicationRock.ts')
+    const site = rock.communicationRockSite(g().seed)
+    g().debugAddEquipment('shovel')
+    g().debugJumpTo(site.lat, site.lon)
+    g().dig()
+    return g().rockArtefact
+  })
+  check('digging at the erratic puts the find in the pack', dug === 'carried', `rockArtefact=${dug}`)
+
+  await goToPlace('bambara-village')
+  await page.evaluate(() => window.__game.getState().callChiefOut())
+  // The dig and the arrival both write a page, and a new entry opens the book:
+  // every frame below is of the village and the bar, not of the journal.
+  await page.evaluate(() => window.__game.getState().setJournalOpen(false))
+  await waitForStable(page)
+  // The chief's own figure, read out of the drawn scene: everything below is
+  // measured against where the PICTURE puts him.
+  const chiefStood = await page
+    .waitForFunction(
+      () => {
+        const o = window.__placeScene?.getObjectByName('chief')
+        if (!o) return null
+        o.updateWorldMatrix(true, false)
+        const e = o.matrixWorld.elements
+        return { x: e[12], y: e[13], z: e[14] }
+      },
+      null,
+      { timeout: 20000 },
+    )
+    .then((h) => h.jsonValue())
+    .catch(() => null)
+  check('the chief stands out in the open, drawn in the scene', !!chiefStood, JSON.stringify(chiefStood))
+  // The open ground he faces: out of his own hut through its door. Stepping
+  // away from the settlement centre instead walks straight into the hut wall —
+  // he stands BESIDE his door, not on the far side of the building.
+  const outward = await page.evaluate(() => {
+    const it = window.__placeLayout?.interactives.find((i) => i.type === 'chief')
+    if (!it?.door) return null
+    const ux = it.door[0] - it.pos[0]
+    const uz = it.door[1] - it.pos[1]
+    const l = Math.hypot(ux, uz) || 1
+    return { x: ux / l, z: uz / l }
+  })
+  check('his hut names the open ground he faces', !!outward, JSON.stringify(outward))
+
+  if (chiefStood && outward) {
+    const reach = await page.evaluate(() => window.__balance.communication.giveReach)
+    /** Stand `away` metres in front of the chief, on the open ground his own
+     *  door faces, looking at him — the pose the player gives the find in. */
+    const standOff = async (away) => {
+      await page.evaluate(
+        ({ at, dir, away }) => {
+          const p = window.__placePlayer
+          if (!p) return
+          p.x = at.x + dir.x * away
+          p.z = at.z + dir.z * away
+          // Place-camera yaw 0 looks toward -Z, so aim with the +PI complement.
+          p.yaw = Math.atan2(at.x - p.x, at.z - p.z) + Math.PI
+        },
+        { at: chiefStood, dir: outward, away },
+      )
+      // The scene publishes the player's position per FRAME; the reach is read
+      // from that, so the new stand must be drawn before the click.
+      await nextFrames(3)
+    }
+
+    // Composed from a step and a half away, facing him: near enough to give,
+    // far enough that the man, his hut and the bar are all in the picture.
+    await standOff(reach * 0.9)
+    // 1. The find is in the bar, under its own localized name, as a thing that
+    //    ACTS on a click — the same shape medicine and the shovel carry.
+    const inBar = await page.evaluate(async (sel) => {
+      const el = document.querySelector(sel)
+      if (!el) return null
+      const { getStrings } = await import('/src/i18n/index.ts')
+      return { tag: el.tagName, text: el.textContent, expected: getStrings().finds.rockArtefact }
+    }, FIND)
+    check(
+      'the find stands in the inventory bar under its own localized name',
+      !!inBar && inBar.tag === 'BUTTON' && inBar.text === inBar.expected && inBar.text.length > 0,
+      JSON.stringify(inBar),
+    )
+    await frame('149-artefact-in-the-bar', {
+      element: '.inventory-bar',
+      label: 'the find from the boulder standing in the inventory bar before it is given',
+    })
+
+    // 2. Out of reach the click gives NOTHING and says why.
+    await standOff(reach + 2)
+    await page.locator(FIND).click()
+    await nextFrames(3)
+    const refused = await page.evaluate((sel) => ({
+      state: window.__game.getState().rockArtefact,
+      toast: document.querySelector('.toast')?.textContent ?? null,
+      stillThere: !!document.querySelector(sel),
+    }), FIND)
+    check(
+      'used from across the village it hands nothing over, says why and keeps the find',
+      refused.state === 'carried' && !!refused.toast && refused.toast.length > 0 && refused.stillThere,
+      JSON.stringify(refused),
+    )
+
+    // 3. Face to face it IS the hand-over.
+    await standOff(reach * 0.9)
+    await page.locator(FIND).click()
+    // His words stand over his head for a few seconds only (speechLabelSeconds),
+    // so the camera steps back for the picture the moment the give is done: from
+    // an arm's length the note alone fills the frame and nothing of the man is
+    // in it. The give itself was judged at the reach it was made from, above.
+    await page.evaluate(
+      ({ at, dir }) => {
+        const g = window.__game.getState()
+        g.setJournalOpen(false) // the hand-over writes a page, which opens the book
+        const p = window.__placePlayer
+        if (!p) return
+        p.x = at.x + dir.x * 7
+        p.z = at.z + dir.z * 7
+        p.yaw = Math.atan2(at.x - p.x, at.z - p.z) + Math.PI
+      },
+      { at: chiefStood, dir: outward },
+    )
+    const spoke = await page
+      .waitForFunction(
+        () => document.querySelector('.speech-label[data-speaker="chief"]') !== null,
+        null,
+        { timeout: 20000 },
+      )
+      .then(() => true)
+      .catch(() => false)
+    const given = await page.evaluate((sel) => ({
+      state: window.__game.getState().rockArtefact,
+      gone: document.querySelector(sel) === null,
+      forms: window.__game.getState().carriedForms,
+      atoms: window.__speech?.labels().find((l) => l.speakerId === 'chief')?.atoms ?? null,
+      screen: window.__speech?.anchorScreen('chief') ?? null,
+      view: { w: window.innerWidth, h: window.innerHeight },
+    }), FIND)
+    check('using the find before him lays it in his hands', given.state === 'given', JSON.stringify(given.state))
+    check('the find leaves the bar the moment it is given', given.gone, `still in the bar: ${!given.gone}`)
+    check('and the clay impression takes its place in the pack', given.forms.includes('rock-relief'), JSON.stringify(given.forms))
+    check(
+      'his two words stand over HIS OWN head, inside the picture',
+      spoke && Array.isArray(given.atoms) && given.atoms.length === 2 &&
+        !!given.screen && given.screen.x > 0 && given.screen.x < given.view.w &&
+        given.screen.y > 0 && given.screen.y < given.view.h,
+      JSON.stringify({ spoke, atoms: given.atoms, screen: given.screen }),
+    )
+    await frame('150-artefact-chiefs-answer', {
+      local: { x: chiefStood.x, y: chiefStood.y + 2, z: chiefStood.z },
+      label: 'the chief’s answer standing over his head after the find was given',
+    })
+    // The frame is only evidence if the words were still standing when the
+    // shutter opened — a note that expired during the wait photographs an
+    // empty village.
+    check(
+      'the words were still over his head when the picture was taken',
+      await page.evaluate(() => document.querySelector('.speech-label[data-speaker="chief"]') !== null),
+      'the label had already expired at the shutter',
+    )
+  }
+}
+
 // A selected section that never executed is a FAILURE, not a quiet pass: it is
 // the one way a --section run could report green having verified nothing.
 const unrun = sections.unrun()
