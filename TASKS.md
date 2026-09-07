@@ -77,30 +77,6 @@ then point 633 (the closing run), then point 174 (the tag). A newly appended poi
 kind is MOVED to the front in the same turn that files it; leaving it where append-and-defer
 put it is the mistake this line exists to stop.
 
-- [ ] 1069. The WSL VM dies in the GPU passthrough driver during browser suites, and nothing
-  re-arms the batch without a VS Code session (machine-filed 07.09.2026).
-  Measured 07.09.2026: the WSL2 VM rebooted at 12:11 and again at 12:45, each time while a
-  browser suite drew on the passed-through RTX 4070 Ti (`/dev/dxg`, D3D12 through Mesa). The
-  dying VM's last kernel lines were dxgkrnl errors (`dxgvmb_send_sync_msg: wait_for_completion
-  failed`, `dxgkio_wait_sync_object_cpu: Ioctl failed: -512`); Docker Desktop then logged
-  `wsl-bootstrap stopped with exit code 1, did wsl shutdown?` and restarted the engine. The
-  Electron log dates the same engine restarts on 30.08. 12:18 and 06.09. 03:09/03:14/03:57,
-  matching every `heartbeat-predates-boot` row in `.claude/batch-activity.jsonl`. Every death
-  kills the owner session, its authors and the suite; the container has no `--restart` policy,
-  `postStartCommand` only runs the firewall, and the launcher daemon is armed solely by the
-  SessionStart hook, so without a person pressing Reload Window the batch stays dead.
-  Done when: (1) the user-side remedy is recorded (`wsl --update`, Docker Desktop restart,
-  `%LOCALAPPDATA%\Temp\wsl-crashes` checked) and the VM survives one LARGE run; (2) if it does
-  not, the suites get a software-rendering lane decided with the user (picture and runtime
-  change); (3) `.devcontainer` (user-side, read-only in the container) carries a restart policy
-  and starts the launcher daemon at container start, proven by a drill that stops the container
-  and measures the launcher alive without any VS Code session.
-  Criticality: HIGH — reproducibly kills all batch work several times a day.
-  Refs: memory `vscode-restart-kills-the-container` (WSL VM reboot forensics section),
-  docs/batch-autonomy.md (launcher layer), .devcontainer/devcontainer.json (runArgs,
-  postStartCommand), scripts/batch-launcher.mjs.
-  Bundle: Urlaubsfestigkeit — host-side infrastructure, runs alone.
-
 - [ ] 1070. The chief comes out to his drummer and speaks through the drums from there (user 07.09.2026).
   Today SPACE at the chief's hut first shows the stale "Vamue Murmurs …" text (with the 1985
   original's "Oink Oink" wording and a reference to the Hausa villages), and only a second SPACE
