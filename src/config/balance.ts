@@ -825,6 +825,17 @@ export interface BalanceConfig {
     /** How close the traveller must stand to the chief, in settlement units, for
      *  the find from the boulder to be laid in his hands. */
     giveReach: number
+    /** How fast the chief crosses between his hut and his drummer, in
+     *  settlement units per second (design.md §13.4). */
+    chiefWalkSpeed: number
+    /** The minute he stands beside the drummer before he walks home — counted
+     *  from his arrival and afresh from every drum message. */
+    chiefStaySeconds: number
+    /** How far beside the drummer he takes his stand, in settlement units. */
+    chiefBesideDrummer: number
+    /** How near the traveller must stand to the chief or to the drummer for the
+     *  use key to reach either man. */
+    chiefTalkReach: number
   }
 }
 
@@ -1467,6 +1478,22 @@ export const balance: BalanceConfig = {
     // hearing radius, so a traveller who can give it is always one who can hear
     // the answer.
     giveReach: 2.6,
+    // Calibratable (CLAUDE.md §2): an old man's unhurried pace, well under the
+    // traveller's own, so the walk across the village reads as a walk and not
+    // as a slide — and short enough that the player who pressed the key at the
+    // hut is not left waiting for him.
+    chiefWalkSpeed: 1.4,
+    // THE CALIBRATABLE MINUTE (user 07.09.2026). Long enough to walk over from
+    // the hut, listen to the sixteen strikes and ask for them once more;
+    // short enough that a player who wanders off finds the village as he left it.
+    chiefStaySeconds: 60,
+    // Calibratable: one long stride beside the drummer. It clears both drum
+    // shells (the further one reaches 0.5 m out) and keeps the two men close
+    // enough to stand in one picture from the front.
+    chiefBesideDrummer: 1.5,
+    // Calibratable: the same reach the give already uses, so a traveller who
+    // can hand the find over is exactly one who can ask for the drums.
+    chiefTalkReach: 2.6,
   },
 }
 
