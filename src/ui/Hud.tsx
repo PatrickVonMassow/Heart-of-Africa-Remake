@@ -159,7 +159,13 @@ function InventoryBar() {
         ),
       )}
       {/* A quest find is HANDED OVER by being used: the click lays it in the
-          chief's hands where he stands before the traveller (design.md §6). */}
+          chief's hands where he stands before the traveller (design.md §6).
+          OPEN: the point asks the find to carry "a Ctrl-hold label like every
+          other acting thing". The §17.8 hold layer names what is DRAWN in the
+          scene and has no HUD counterpart, and the bar already prints the
+          find's own name — so what it carries here is its acting tooltip. A
+          hold layer over the HUD would be a mechanism of its own and needs its
+          own point. */}
       {ownedFinds.map((id) => (
         <button
           key={id}
