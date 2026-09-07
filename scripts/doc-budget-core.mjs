@@ -331,7 +331,14 @@ export const DOC_BUDGETS = [
     // player-reachable states, not a longer telling of the old meeting; the
     // dropped murmured pointer of §13.3 and a shortened save note paid part of
     // it back in the same commit.
-    maxWords: 28411,
+    // RAISED again by the 21 measured words §12's PROCEDURE owes the same
+    // change: the step list still described one press at the hut and a further
+    // press that chose between the message and the find, and now has to say
+    // that he walks over, that the key at either man sends and repeats the
+    // message and calls him back, and that his hut answers nothing while he is
+    // outside. §12's retirement list paid 11 of the 32 back by becoming the
+    // state sentence it always meant.
+    maxWords: 28432,
     // A hundred words across 28k: design.md is edited section by section and a genuine
     // new decision runs 40–215 measured words, so the slack absorbs the rewording that
     // accompanies one and refuses the disappearance of a whole section without a

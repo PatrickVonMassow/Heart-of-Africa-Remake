@@ -368,11 +368,11 @@ Visual water realism:
 
 Access to hints leads through the chiefs, met OUTSIDE the hut in a village (first-person view). Procedure:
 1. Enter the village.
-2. Stand at the chief's hut and press the Space use key: the chief comes OUT and from then on stands in the open, at his drummer's side.
+2. Stand at the chief's hut and press the Space use key: the chief comes OUT and walks over to his drummer's side, where he stands a while before going home.
 3. He says in the same breath what he knows about the tomb (into the chronicle, §15), and standing before him orients the traveler in the settlement (§17).
-4. Every further press decides between the things he still has to give: the drum message, and his answer to what the traveler dug up at the boulder (§13.4).
+4. At the chief or at his drummer the key sends the drum message, repeats it, and calls him back on his way home; his hut answers nothing while he is outside. The find from the boulder is no longer handed over with this key: it is an inventory item, given by USING it before him (§6, §13.4).
 
-There is no audience window and no precondition. The gift/goodwill state, the hostility period and the rifle-gated robbery of a chief's hut retired on 05.09.2026 together with the village elder (user 03.09.2026): the chief speaks from the first minute, and what a region reveres is a trading value (§8), no longer a key to him.
+There is no audience window, no precondition, no gift or goodwill state, no hostility period and no robbing of his hut: the chief speaks from the first minute, and what a region reveres is a trading value (§8), no longer a key to him.
 
 **Honored Friend.**
 The status of "Honored Friend" holds for all villages of a chief's region. Its bestowal is journaled: an entry in which the chief pledges his people's protection.
