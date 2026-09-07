@@ -5732,8 +5732,18 @@ if (section('chief-to-drummer')) {
   check('the village names where its drummer sits', !!drummer, JSON.stringify(drummer))
   const inFrontOf = (at, away) => ({ x: at.x + Math.sin(drummer.facing) * away, z: at.z + Math.cos(drummer.facing) * away })
   await standAt(inFrontOf(drummer, 2), drummer)
-  const drummerPrompt = await stepUntil(() => (document.querySelector('.prompt')?.textContent ?? '').length > 0)
-  check('the use key arms at the drummer', drummerPrompt, 'no prompt at the drummer')
+  // Wait for the prompt that NAMES this key, not for any prompt: a villager
+  // speaking nearby would otherwise own the key and the press would open his
+  // guess dialog instead (the arbitration of point 691).
+  const askDrummer = await page.evaluate(async () => {
+    const { getStrings } = await import('/src/i18n/index.ts')
+    return getStrings().labels.askDrummer
+  })
+  const drummerPrompt = await stepUntil(
+    (want) => (document.querySelector('.prompt')?.textContent ?? '').includes(want),
+    askDrummer,
+  )
+  check('the use key arms at the drummer', drummerPrompt, `waited for: ${askDrummer}`)
   await page.keyboard.press('Space')
   const named = await page
     .waitForFunction(
@@ -5752,8 +5762,15 @@ if (section('chief-to-drummer')) {
   // 2. The use key at the HUT sends him out — and he walks to the drummer.
   if (hut?.door) {
     await standAt({ x: hut.door[0], z: hut.door[1] }, { x: hut.pos[0], z: hut.pos[1] })
-    const hutPrompt = await stepUntil(() => (document.querySelector('.prompt')?.textContent ?? '').length > 0)
-    check('the use key arms at the chief hut door', hutPrompt, 'no prompt at the hut')
+    const hutLabel = await page.evaluate(async () => {
+      const { getStrings } = await import('/src/i18n/index.ts')
+      return getStrings().buildings.chief
+    })
+    const hutPrompt = await stepUntil(
+      (want) => (document.querySelector('.prompt')?.textContent ?? '').includes(want),
+      hutLabel,
+    )
+    check('the use key arms at the chief hut door', hutPrompt, `waited for: ${hutLabel}`)
     await page.keyboard.press('Space')
     const walking = await page
       .waitForFunction(() => window.__chief?.phase === 'walking-out' || window.__chief?.phase === 'at-drummer', null, { timeout: 20000 })
@@ -5804,8 +5821,15 @@ if (section('chief-to-drummer')) {
     const front = { x: mid.x + Math.sin(stood.facing) * 5, z: mid.z + Math.cos(stood.facing) * 5 }
     await standAt(front, mid)
     await standAt(inFrontOf({ x: stood.drummer[0], z: stood.drummer[1] }, 2), mid)
-    const armed = await stepUntil(() => (document.querySelector('.prompt')?.textContent ?? '').length > 0)
-    check('the use key arms at the drummer with the chief standing there', armed, 'no prompt beside the pair')
+    const askLabel = await page.evaluate(async () => {
+      const { getStrings } = await import('/src/i18n/index.ts')
+      return getStrings().labels.askForDrumMessage
+    })
+    const armed = await stepUntil(
+      (want) => (document.querySelector('.prompt')?.textContent ?? '').includes(want),
+      askLabel,
+    )
+    check('the use key arms at the drummer with the chief standing there', armed, `waited for: ${askLabel}`)
     await page.keyboard.press('Space')
     const beating = await page
       .waitForFunction(() => !!window.__ui.getState().drumPerformance, null, { timeout: 20000 })
@@ -5819,6 +5843,14 @@ if (section('chief-to-drummer')) {
       local: { x: mid.x, y: 1.4, z: mid.z },
       label: 'the chief standing beside his drummer, both seen from the front while the message is beaten out',
     })
+    // The frame is only evidence of the message if the drums were still going
+    // when the shutter opened — a performance that ended during the wait
+    // photographs two men standing about.
+    check(
+      'the drums were still speaking when the picture was taken',
+      await page.evaluate(() => !!window.__ui.getState().drumPerformance),
+      'the message had already ended at the shutter',
+    )
 
     // 6. Once it has been heard, the same key offers the REPEAT.
     const heard = await page
