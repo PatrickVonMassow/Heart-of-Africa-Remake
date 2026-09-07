@@ -5829,7 +5829,21 @@ if (section('chief-to-drummer')) {
       (want) => (document.querySelector('.prompt')?.textContent ?? '').includes(want),
       askLabel,
     )
-    check('the use key arms at the drummer with the chief standing there', armed, `waited for: ${askLabel}`)
+    const armedWhy = await page.evaluate(() => ({
+      prompt: document.querySelector('.prompt')?.textContent ?? null,
+      uiPrompt: window.__ui.getState().prompt,
+      owner: window.__ui.getState().useKeyOwner,
+      dialog: window.__ui.getState().dialog,
+      chief: window.__chief,
+      player: { x: window.__placePlayer?.x, z: window.__placePlayer?.z },
+      place: window.__game.getState().placeId,
+      heard: window.__game.getState().drumMessageHeard,
+    }))
+    check(
+      'the use key arms at the drummer with the chief standing there',
+      armed,
+      `waited for: ${askLabel} — ${JSON.stringify(armedWhy)}`,
+    )
     await page.keyboard.press('Space')
     const beating = await page
       .waitForFunction(() => !!window.__ui.getState().drumPerformance, null, { timeout: 20000 })

@@ -181,6 +181,20 @@ export function pruneSpeechLabels(now: number = speechClock()): void {
   publish(next)
 }
 
+/**
+ * Takes ONE speaker's note down at once, without waiting for its own seconds.
+ *
+ * A note is normally held against expiry for as long as it is the click target
+ * (point 588), which is what lets the player reach for it — and that hold is
+ * also what makes a note go stale when the world moves on around it. The one
+ * case in the settlement is the drummer: his own word is about the chief, and
+ * the moment the chief himself walks up beside him it is no longer what the
+ * player is being shown. The figure that ends the situation ends the note.
+ */
+export function forgetSpeechLabel(speakerId: string): void {
+  publish(dropSpeechLabel(state, speakerId))
+}
+
 /** Wipes the channel — the label layer does this when the settlement is left. */
 export function clearSpeechLabels(): void {
   anchors.clear()

@@ -10,6 +10,7 @@ import { speechLabelHeight } from '../../communication/speechLabel'
 import { markActor } from '../actorLabelSource'
 import {
   clearSpeechLabels,
+  forgetSpeechLabel,
   pruneSpeechLabels,
   speakOverhead,
   speechAnchor,
@@ -231,6 +232,21 @@ describe('the speaker the use key would take (design.md §13.4)', () => {
     // The distance is taken from where the speaker stands NOW, not from the
     // frame that picked him: a step after the pick moves the candidate with it.
     expect(speechUseCandidate(player(3, 0), 10)?.distance).toBeCloseTo(4, 6)
+  })
+
+  it('takes ONE note down at once, highlight and all (the chief arriving)', () => {
+    // A targeted note is held against its own expiry so the player can reach
+    // for it — which is exactly why the situation that ends it has to say so.
+    speakOverhead('drummer', [RIVER_UTTERANCE], standing(1, 0), { now: 0, seconds: 1 })
+    speakOverhead('kid-1', [DIG], standing(9, 0), { now: 0, seconds: 100 })
+    updateSpeechTarget(anyLabel, 10, player(0, 0))
+    expect(speechLabelState().targetId).toBe('drummer')
+    pruneSpeechLabels(speechClock() + 60)
+    expect(speechLabelState().labels.map((l) => l.speakerId)).toContain('drummer')
+    forgetSpeechLabel('drummer')
+    expect(speechLabelState().labels.map((l) => l.speakerId)).toEqual(['kid-1'])
+    expect(speechLabelState().targetId).toBeNull()
+    expect(speechUseCandidate(player(0, 0), 10)).toBeNull()
   })
 
   it('offers no candidate without a highlighted speaker, or outside a settlement', () => {

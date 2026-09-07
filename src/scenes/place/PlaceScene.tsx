@@ -88,6 +88,7 @@ import type { DigSiteProgress } from './adultWork'
 import { SpeechLabels } from './SpeechLabels'
 import {
   CHIEF_SPEAKER_ID,
+  DRUMMER_SPEAKER_ID,
   chiefAnchor,
   chiefStandingPosition,
   chiefWalkState,
@@ -107,7 +108,7 @@ import {
 } from './chiefWalk'
 import { drummerNamesChief } from './drummerVoice'
 import { VILLAGE_SPOTS } from './lifeSpots'
-import { speakOverhead, speechClock, speechUseCandidate } from './speechChannel'
+import { forgetSpeechLabel, speakOverhead, speechClock, speechUseCandidate } from './speechChannel'
 import { chiefRewardPhrase } from '../../communication/chiefReply'
 import type { Phrase } from '../../communication/lexicon'
 import { phrasePlan } from '../../communication/speaking'
@@ -645,9 +646,17 @@ function Chief({
   }, [x, z])
   // His walk, one frame at a time. The clock is the WALL clock — the minute he
   // stands there is a minute the player waits, not an in-game day.
+  // His arrival ends whatever his drummer was still saying: the drummer's own
+  // word is about the chief, and a note about a man who is now standing beside
+  // the speaker is stale — it would also go on holding the use key, which from
+  // here belongs to the message (point 588 holds a targeted note against its
+  // own expiry).
+  const wasWalking = useRef(false)
   useFrame(() => {
     const step = chiefTick(chiefWalkState(), speechClock(), timing)
     setChiefWalkState(step.walk)
+    if (step.walk.phase === 'at-drummer' && wasWalking.current) forgetSpeechLabel(DRUMMER_SPEAKER_ID)
+    wasWalking.current = step.walk.phase === 'walking-out'
     if (step.beatDrums) sendDrumMessage()
     const [px, pz] = chiefWalkPosition(step.walk, door, beside)
     setChiefStanding(px, pz)
