@@ -18,7 +18,7 @@ export type Tone = 'low' | 'high'
 export type ToneSequence = readonly Tone[]
 
 /**
- * The five concepts of the slice. Adding another here fails to compile
+ * The concepts of the slice. Adding another here fails to compile
  * until every lect gives it a sequence (the Record below is exhaustive).
  */
 export type ConceptId =
@@ -27,11 +27,12 @@ export type ConceptId =
   | 'DOWNSTREAM'
   | 'ROCK'
   | 'DIG'
+  | 'CHIEF'
 
 /**
  * Every sequence is four syllables long with an even number of highs. Those
- * eight parity sequences are mutually at least two syllables apart: five are
- * words and three remain reserved.
+ * eight parity sequences are mutually at least two syllables apart: six are
+ * words and two remain reserved.
  */
 export const SEQUENCE_LENGTH = 4
 
@@ -92,7 +93,8 @@ export function toneOfSyllable(syllable: string): Tone {
  * A WORD additionally carries AT LEAST ONE SYLLABLE OF EACH TONE. The two
  * single-tone sequences are four identical strikes, the least hearable thing
  * the drums can beat, and the message opens on RIVER — so they stay out of the
- * lexicon and sit in `reserved` with the one spare mixed sequence.
+ * lexicon and are the whole of `reserved` now that CHIEF took the last spare
+ * mixed sequence.
  */
 const TONAL_WEST_CENTRE: Lect = {
   id: 'tonalWestCentre',
@@ -104,9 +106,14 @@ const TONAL_WEST_CENTRE: Lect = {
     DOWNSTREAM: seq('BA-BA-ba-ba'), // its mirror, falling with it
     ROCK: seq('BA-ba-ba-BA'), // framed by two highs: a class of solid things
     DIG: seq('ba-BA-BA-ba'),
+    // The man the drummer points his arm at. It takes the last spare mixed
+    // sequence, which is RIVER's tonal mirror — so the direction pair is no
+    // longer the ONLY mirror in the language. It stays the only mirror the
+    // player hears as a PAIR: UPSTREAM and DOWNSTREAM are said in the same
+    // breath at the bank game, while CHIEF is only ever said alone.
+    CHIEF: seq('BA-ba-BA-ba'),
   },
   reserved: [
-    seq('BA-ba-BA-ba'), // spare: the tonal mirror of RIVER, deliberately unspoken
     seq('ba-ba-ba-ba'), // single-tone, therefore never a word
     seq('BA-BA-BA-BA'), // single-tone, therefore never a word
   ],

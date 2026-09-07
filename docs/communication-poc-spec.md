@@ -1,7 +1,7 @@
 # The communication PoC (design.md §13.4)
 
 The user's decisions of 13.08.2026 replace the former eleven-word teaching
-design. The playable slice has one five-word tonal language, two teaching
+design. The playable slice has one six-word tonal language, two teaching
 places, and a four-word message. The child tag situations and the adult errand
 catalogue from the former design are not part of this version.
 
@@ -38,9 +38,9 @@ drums use. Each atom is observed and recorded separately.
 
 Every valid sequence has an even number of high tones. Any two such sequences
 differ in at least two positions, so one misheard tone cannot turn one word into
-another valid word. At length four this rule produces eight sequences. Five are
-used and three remain reserved. Length three produces only four parity
-sequences and cannot hold the five-word language.
+another valid word. At length four this rule produces eight sequences. Six are
+used and two remain reserved. Length three produces only four parity
+sequences and cannot hold the language.
 
 A word carries at least one syllable of each tone. Four identical strikes are
 the least hearable thing the drums can beat, and the message opens on RIVER, so
@@ -62,10 +62,19 @@ second region can add its own entry without changing consumers.
 | DOWNSTREAM | `BA-BA-ba-ba` | with the current; the mirror of UPSTREAM |
 | ROCK | `BA-ba-ba-BA` | a class of thing, not one named boulder |
 | DIG | `ba-BA-BA-ba` | digging |
+| CHIEF | `BA-ba-BA-ba` | the village's head man |
 
-Reserved and unused: `BA-ba-BA-ba` (the tonal mirror of RIVER, deliberately
-left unspoken so the direction pair stays the only mirror the player hears), and
-the two single-tone sequences `ba-ba-ba-ba` and `BA-BA-BA-BA`.
+Reserved and unused: the two single-tone sequences `ba-ba-ba-ba` and
+`BA-BA-BA-BA`. CHIEF took the last spare mixed sequence, RIVER's tonal mirror,
+so the language now holds two mirror pairs. UPSTREAM and DOWNSTREAM remain the
+only pair the player hears AS a pair — they are announced against each other in
+the same round of the bank game, while CHIEF is only ever said alone, by the
+drummer pointing at the hut.
+
+CHIEF is taught the way every other word is: the use key at the drummer while
+the chief is in his hut makes him point his arm at the chief's hut and say it,
+within the same hearing range, with the same overhead note and the same guess
+dialog. Nothing translates it.
 
 ROCK must transfer between instances: the player learns it from the play rocks
 in the village and applies it to the boulder upstream. It never means "the big

@@ -398,26 +398,28 @@ Every region expresses directions differently; the player must decipher each sys
 - South: seasons as directions — summer = north, winter = south, spring = east, autumn = west.
 - East: relative to "Odabi"; "Relolo" = north, "Dethamee" = south.
 
-Glossary (landmarks in the local tongue): El Mora Levimara / Mongdamara (Congo), Lastwana (Zambezi), Gumba lu Untoba (Victoria Falls), Unumpara (Kilimanjaro), Galumba / Ut-hu Manbwama (elephants), Oz Oz / Oink Oink / Auke Auke (unspecific knowledge).
+Glossary (landmarks in the local tongue): El Mora Levimara / Mongdamara (Congo), Lastwana (Zambezi), Gumba lu Untoba (Victoria Falls), Unumpara (Kilimanjaro), Galumba / Ut-hu Manbwama (elephants).
 
 The direction words themselves are not taught in the PoC: nobody in a village hands them out. A chief's raw hint is recorded in the journal in the region's own words, and a deciphered entry follows it. (Until 05.09.2026 a village elder taught the region's direction system and revealed what it reveres (§8); the observation model replaces him, and other regions will hold other things to observe — user 03.09.2026.)
 
 ### 13.3 Cascade and Time Limit
-Per region exactly one knowing people (seeded anew each run) reveals the region's component of the site: the North's chief the latitude, the East's the longitude, the other regions narrowing statements. Every other chief offers only unspecific knowledge (Oz Oz …) that points toward the region's knowing people. Several hints are triangulated into the exact position of the tomb.
+Per region exactly one knowing people (seeded anew each run) reveals the region's component of the site: the North's chief the latitude, the East's the longitude, the other regions narrowing statements. A chief who does not know says nothing at all — the murmured pointer at the knowing people was dropped on 07.09.2026 with the stale text that carried it. Several hints are triangulated into the exact position of the tomb.
 
 ### 13.4 The five-word communication slice
 
-The tonal West/Centre village teaches exactly five concepts: RIVER, UPSTREAM, DOWNSTREAM, ROCK and DIG. The player infers them from two places rather than receiving a glossary: the children's bank game, including the village's play rocks, and the adults' water and digging work. ROCK is a class of thing learned on those rocks and transferred to the separate boulder upstream; it is not a proper name or shorthand for one "big rock."
+The tonal West/Centre village teaches six concepts: RIVER, UPSTREAM, DOWNSTREAM, ROCK, DIG and CHIEF. The player infers them from three places rather than receiving a glossary: the children's bank game, including the village's play rocks, the adults' water and digging work, and the drummer, who points at the chief's hut and names CHIEF. ROCK is a class of thing learned on those rocks and transferred to the separate boulder upstream; it is not a proper name or shorthand for one "big rock."
 
 The adults show DIG in two paired bouts at two different excavations. An initiator walks to a free adult and says DIG as an invitation; the same pair walks to the site, the initiator says DIG again while indicating the hole, and only then do both dig with tools in hand. Both utterances wait while a child can hear, and a bout with no free partner is skipped and retried rather than shown alone. Their strikes deepen the shadowed pit, grow its spoil and throw earth, leaving the work visible in the ground.
 
-Each word is an atomic four-syllable sequence of low and high `ba`. Valid sequences have an even number of highs, making every pair differ in at least two positions. Four syllables provide eight such sequences: five are used and three reserved. UPSTREAM and DOWNSTREAM are exact tonal reversals and form the one direction pair the player is meant to notice.
+Each word is an atomic four-syllable sequence of low and high `ba`. Valid sequences have an even number of highs, making every pair differ in at least two positions. Four syllables provide eight such sequences: six are used and two reserved. UPSTREAM and DOWNSTREAM are exact tonal reversals and form the one direction pair the player is meant to notice; CHIEF took the last spare sequence, RIVER's mirror, and is only ever said alone.
 
 What the drums send for is brought back as an act on the ITEM (§6): the traveller stands before the chief out in the open, within the give reach, and activates the find in his inventory bar; used anywhere else it hands nothing over and says why. The use key at the chief's hut hands nothing over at all.
 
+The chief speaks through his drummer, not at his own door. The use key at his hut brings him out with one line and he walks across to the drummer's side, facing the way the drummer faces, so the traveller can stand before both and see both from the front. Arrived, the use key at either man sends the message. He then stays a calibratable minute, repeating it on request, and walks back; the prompt names the repeat while it stands. Used while he is outside, the hut does nothing. Called on his way back — at him or at the drummer — he returns, and the drums beat again the moment he arrives. Leaving the settlement always puts him back in his hut. While he is inside it, the use key at the drummer makes the drummer point at the hut and say CHIEF.
+
 The chief's message is `RIVER · UPSTREAM · ROCK · DIG`: sixteen drum strikes, with the same constant pause between atoms that speech uses. The large drum carries the low tone and the small drum the high one. The journal and the overhead note show only the player's own reading; the game never supplies or judges a translation. Full implementation detail lives in `docs/communication-poc-spec.md`.
 
-The reduced inventory deliberately breaks persisted heard-utterance readings. No migration is owed while saving is disabled for the PoC; save/load code stays in place.
+A changed word inventory breaks persisted heard-utterance readings; saving is disabled for the PoC, so no migration is owed and the save/load code stays in place.
 
 ---
 

@@ -35,15 +35,16 @@ const SPEC_TABLE: Record<ConceptId, string> = {
   DOWNSTREAM: 'BA-BA-ba-ba',
   ROCK: 'BA-ba-ba-BA',
   DIG: 'ba-BA-BA-ba',
+  CHIEF: 'BA-ba-BA-ba',
 }
 
 const key = (s: ToneSequence) => s.join(',')
 
 describe('the registry is complete', () => {
-  it('holds exactly the five concepts of the slice', () => {
-    expect(CONCEPT_IDS).toHaveLength(5)
+  it('holds exactly the six concepts of the slice', () => {
+    expect(CONCEPT_IDS).toHaveLength(6)
     expect([...CONCEPT_IDS].sort()).toEqual(
-      ['DIG', 'DOWNSTREAM', 'RIVER', 'ROCK', 'UPSTREAM'],
+      ['CHIEF', 'DIG', 'DOWNSTREAM', 'RIVER', 'ROCK', 'UPSTREAM'],
     )
   })
 
@@ -64,7 +65,7 @@ describe('the registry is complete', () => {
 
   it('resolves a spoken utterance back to its concept, and a non-word to null', () => {
     for (const concept of CONCEPT_IDS) expect(conceptOf(utteranceOf(concept))).toBe(concept)
-    expect(conceptOf('BA-ba-BA-ba')).toBeNull() // well-formed but reserved
+    expect(conceptOf('BA-ba-BA-ba')).toBe('CHIEF') // the last spare sequence, spoken now
     expect(conceptOf('BA-ba-BA')).toBeNull() // too short
     expect(conceptOf('')).toBeNull()
   })
@@ -143,9 +144,9 @@ describe('the sequences are hearable', () => {
     expect(toneDistance([], sequenceOf('RIVER'))).toBe(SEQUENCE_LENGTH)
   })
 
-  it('reserves three unused sequences, and together with them exhausts the space', () => {
+  it('reserves two unused sequences, and together with them exhausts the space', () => {
     const reserved = lectOf().reserved
-    expect(reserved).toHaveLength(3)
+    expect(reserved).toHaveLength(2)
     const used = new Set(CONCEPT_IDS.map((c) => key(sequenceOf(c))))
     for (const s of reserved) {
       expect(isWellFormed(s), key(s)).toBe(true)
@@ -235,7 +236,7 @@ describe('the journal sort order', () => {
   it('sorts the whole lexicon deterministically', () => {
     const sorted = CONCEPT_IDS.map((c) => utteranceOf(c)).sort(compareUtterances)
     expect(sorted.map((u) => conceptOf(u))).toEqual(
-      ['UPSTREAM', 'RIVER', 'DIG', 'ROCK', 'DOWNSTREAM'],
+      ['UPSTREAM', 'RIVER', 'DIG', 'ROCK', 'CHIEF', 'DOWNSTREAM'],
     )
   })
 })
