@@ -22,6 +22,7 @@
 // would be two triggers for one batch.
 //
 //   node scripts/batch-launcher.mjs --start    start it, detached
+//   node scripts/batch-launcher.mjs --arm      automatic start; honour --stop
 //   node scripts/batch-launcher.mjs --stop     stop it
 //   node scripts/batch-launcher.mjs --status   what state it is in
 //   node scripts/batch-launcher.mjs --daemon   INTERNAL: the loop itself
@@ -494,8 +495,8 @@ export async function startDaemon({ recordPath = LAUNCHER_RECORD_PATH, tickMs = 
 }
 
 /**
- * THE SESSION-START ARMING, as one injectable seam (point 859, Sol review
- * finding 6). The hook calls exactly this; a test drives it with fakes —
+ * Automatic arming for SessionStart and container startup. Both call this seam;
+ * a test drives it with fakes —
  * including a spawn that fails asynchronously — and proves it NEVER throws:
  * a hook that cannot arm must still orient its session.
  *
@@ -514,10 +515,11 @@ export async function armLauncherAtSessionStart({
     const decision = resumeArmDecision({ state: readState().state, platform, worktree })
     if (!decision.arm) return { armed: false, attempted: false, reason: decision.reason, pid: null }
     const r = await start()
+    const armed = r.started === true || r.state === 'ready' || r.state === 'running'
     return {
-      armed: r.started === true,
+      armed,
       attempted: true,
-      reason: r.started === true ? decision.reason : r.reason || 'the daemon published no record',
+      reason: armed ? r.reason || decision.reason : r.reason || 'the daemon published no record',
       pid: r.record?.pid ?? null,
     }
   } catch (e) {
@@ -618,6 +620,13 @@ if (isMainModule(import.meta.url)) {
       console.log(`\nThe launcher is NOT armed (${s.state}). Start it: ${remedy.command}`)
     }
     if (park.state !== 'none') console.log(describePause(park))
+  } else if (arg === '--arm') {
+    if (process.platform === 'win32') refuseOnWindows()
+    if (inWorktree()) refuseWorktree()
+    const r = await armLauncherAtSessionStart()
+    console.log(JSON.stringify(r, null, 2))
+    // Already armed and deliberately stopped are successful automatic no-ops.
+    process.exit(r.attempted && !r.armed ? 1 : 0)
   } else if (arg === '--start') {
     if (process.platform === 'win32') refuseOnWindows()
     if (inWorktree()) refuseWorktree()
@@ -651,7 +660,7 @@ if (isMainModule(import.meta.url)) {
       process.exit(1)
     }
   } else {
-    console.error(`unknown argument "${arg}". Usage: --start | --stop | --status`)
+    console.error(`unknown argument "${arg}". Usage: --start | --arm | --stop | --status`)
     process.exit(1)
   }
 }

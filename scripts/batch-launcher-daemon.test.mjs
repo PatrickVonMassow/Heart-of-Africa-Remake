@@ -578,6 +578,16 @@ describe('armLauncherAtSessionStart — the hook cannot be crashed by the launch
     }
   })
 
+  it('accepts a launcher armed by another startup between the probe and spawn', async () => {
+    const r = await armLauncherAtSessionStart({
+      platform: 'linux',
+      worktree: false,
+      readState: dead,
+      start: async () => ({ started: false, state: 'ready', reason: 'already running', record: { pid: 123 } }),
+    })
+    expect(r).toEqual({ armed: true, attempted: true, reason: 'already running', pid: 123 })
+  })
+
   it('an ASYNC spawn failure and a thrown start both come back as a reason, never a crash', async () => {
     const spawnFail = await armLauncherAtSessionStart({
       platform: 'linux',
