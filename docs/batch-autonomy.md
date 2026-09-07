@@ -232,7 +232,7 @@ agent must not bypass them—the follow-up changes their state transitions.
 3. **SessionStart hook `scripts/batch-resume-hook.mjs`** (across sessions). When a
    NEW session starts, it claims the batch lock and re-issues the continue
    instruction — so a freshly opened session auto-resumes the batch.
-4. **The launcher** (survives crashes AND reboots). Runs `scripts/batch-autostart.mjs`
+4. **The launcher** (outlives sessions; Linux reboot recovery requires container startup wiring). Runs `scripts/batch-autostart.mjs`
    every 15 min. Its TRIGGER differs by host and nothing else (point 474,
    03.08.2026): on **Windows** it is the Scheduled Task `HoA-Batch-Autostart`
    (indefinite, `StartWhenAvailable`); on **Linux** — where the repository lives
@@ -242,6 +242,12 @@ agent must not bypass them—the follow-up changes their state transitions.
    `.claude/batch-launcher.json`, refuses to run twice, and outlives the session
    that started it. The rest of this entry holds on both hosts, because only the
    trigger changed: the tick runs the same launcher, through the same singleton.
+   The prepared Docker entrypoint restores the firewall and invokes `--arm`
+   without a VS Code session; automatic arming preserves an explicit `--stop`.
+   The tracked `.devcontainer` must be deployed to its separate, read-only host
+   source and the image rebuilt before this path exists on the running host.
+   Host remedy, pending acceptance evidence and the no-editor restart drill:
+   [WSL VM recovery](wsl-vm-recovery.md).
    The launcher spawns a headless `claude -p` to resume the batch **only** when the
    owner is PROVABLY dead per the hard singleton (`scripts/batch-singleton.mjs`):
    heartbeat AND a real OS pid check — a live claude process blocks takeover no
