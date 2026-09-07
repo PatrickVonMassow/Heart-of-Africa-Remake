@@ -345,8 +345,20 @@ put it is the mistake this line exists to stop.
   audibility from the spectator's stand. balance.ts: call reach and hush hold (calibratable).
   Bundle: Dorfleben.
 
-- [ ] 1056. The adults dig for no visible reason, and the picture never says what comes
-  out (user 04.09.2026, watching the merged digging work).
+- [ ] 1056. The excavation becomes a real place: it says what it is for, and its earth is
+  ground the village walks over (user 04.09.2026, watching the merged digging work; point
+  1057 folded in here 07.09.2026 on the user's instruction to bundle points that would
+  otherwise each buy their own regression run).
+  ONE OBJECT, TWO COMPLAINTS FROM THE SAME MORNING. The dig site says nothing about its
+  purpose (§A) and its earth behaves like nothing at all (§B). Both are judged by the same
+  evidence — a village frame holding the excavations, on both backends — and both edit the
+  dig-site meshes, `layout.ts`, `adultWork.ts` and the place scene's actor heights, which is
+  why the bundle already forbids working them beside each other. Landed apart, the second
+  would re-photograph the ground the first had just rebuilt, and §A's left-behind RESULT and
+  §B's raised earth occupy the very same patch. §A and §B are the two former points,
+  unchanged in substance; either half may be cut back out if the branch does not converge.
+
+  §A — THE ADULTS DIG FOR NO VISIBLE REASON, AND THE PICTURE NEVER SAYS WHAT COMES OUT.
   The user asked what the adults are digging FOR and found no answer in the scene: "Sie
   scheinen zum Selbstzweck zu graben. Was graben sie aus?" The reason exists in the code
   and nowhere else. Every site is placed as a KIND with a real purpose — a store pit
@@ -382,13 +394,48 @@ put it is the mistake this line exists to stop.
     lands on the excavation itself.
   - Design and code agree afterwards: `design.md` §7 states what the digging is for in the
     world, not only that it teaches a word.
-  Test: Vitest over the scene description — each dig-site kind carries its own distinct
-  furniture, and a completed bout adds the result to the site; Playwright on the polish
-  lane — a village frame in which the two sites are visibly different things, judged on
-  both backends; and a Vitest case pinning that a village lays out exactly two dig sites,
-  both on the side of the settlement away from the water.
-  Criticality: high — this is the second time the player has read village work as
-  meaningless, and the first time cost the whole communication slice a rebuild.
+  §B — THE SPOIL HEAP BURIES THE DIGGERS, AND EVERYONE ELSE WALKS STRAIGHT THROUGH IT.
+  Three causes, each read off the shipped code:
+  - The heap's SIDE is fixed. It sits at a constant local offset in a group rotated by an
+    angle derived from the site's own coordinates, so it grows where it grows no matter who
+    stands there.
+  - The initiator walks into the MIDDLE of the pit — `startJointWalk` sets his goal to the
+    site centre and he stops within `WORK_ARRIVE_RADIUS` of it, while the heap's centre lies
+    about 1.19 m out at `DIG_SITE_RADIUS` 0.9. He digs himself in.
+  - NOTHING collides with the excavation. The collider set is finished before the dig sites
+    are placed at all, and neither pit nor heap is ever added, so villagers, children and the
+    player pass through the earth.
+  The user decided the shape of the remedy and the reason for it: a collider is NOT the
+  answer, because an impassable heap wedges figures — the player included — into corners. The
+  heap becomes a LOCAL RAISING OF THE GROUND that everyone walks up and over, the way the
+  height profile outside a settlement already works. Today a settlement is flat: every actor's
+  Y is set independently and lands at zero (the bank children's climb is the one exception),
+  while outdoors the figure rides `sampleTerrain(...).height`. So this half brings a place its
+  first ground height, and it must arrive as ONE source every actor reads, not as a second
+  scatter of Y assignments.
+  Final state:
+  - The heap never grows on a side somebody is standing on — the digging pair's places are
+    chosen away from it, and the initiator works from the rim instead of the middle.
+  - Nobody walks through the heap: villagers, children and the player ride over it, in both
+    perspectives, and the first-person camera rises and falls smoothly rather than stepping.
+  - One ground-height source for a place, read by every actor and by the camera; a flat
+    settlement keeps behaving exactly as it does today.
+  - Nothing in a settlement becomes impassable through this point — no new collider, and no
+    figure can be wedged by the earth.
+
+  Test (ONE picture run for both halves — this is why they are one point). Vitest: for §A,
+  each dig-site kind carries its own distinct furniture, a completed bout adds the result to
+  the site, and a village lays out exactly two dig sites, both on the side of the settlement
+  away from the water; for §B, the ground-height source and the standing-place choice — a
+  pair never takes a place inside the heap's footprint, and the height is zero everywhere no
+  excavation reaches. Browser (polish lane, both backends): one village frame in which the
+  two sites are visibly different things AND a figure is carried over the raised earth;
+  screenshots of it (verification/, subject declared: the two excavations with a villager
+  walking over the spoil).
+  Criticality: high — §A is the second time the player has read village work as meaningless,
+  and the first time cost the whole communication slice a rebuild; §B's defect is visible in
+  the very picture the player is meant to learn from, and its remedy touches every actor's
+  height in a place, which is the error-prone half.
   Quotes:
   Nutzer, 04.09.2026 08:40: »Was ist der inhaltliche Grund fürs Graben der Erwachsenen?
   Bisher ist keiner erkennbar. Sie scheinen zum Selbstzweck zu graben. Was graben sie
@@ -401,9 +448,23 @@ put it is the mistake this line exists to stop.
   Aspekte ja auch als Zusatz an noch offene Punkte in der Queue.« — Aspekt 6 (drei
   Grabungsstellen auf zwei, beide vom Fluss abgewandt) ist hier eingehängt statt als eigener
   Punkt: dieselben Dateien, derselbe Zweig, derselbe Bildlauf.
-  Refs: src/scenes/place/PlaceScene.tsx (`DigSites`), src/scenes/place/digSiteAppearance.ts,
-  src/scenes/place/layout.ts (the kind-anchored placement), src/scenes/place/adultWork.ts
-  (the durable work record), design.md §7
+  Nutzer, 04.09.2026 09:05: »Die Erwachsenen sollten nicht in dem entstehenden Erdhaufen
+  stehen. Zum einen graben sie sich damit manchmal quasi selbst ein und zum anderen laufen
+  sie später ohne Clipping-Abfrage hindurch.«
+  Nutzer, 04.09.2026 09:05: »Der Erdhaufen ist nicht unpassierbar, sondern er ist eine lokale
+  Erhöhung des Bodens, über den die Figuren laufen — so wie bei dem Höhenprofil in der
+  Vogelperspektive.«
+  Nutzer, 04.09.2026 09:14: »Setze beides — Höhenprofil statt Kollision und die Leute dem
+  Haufen ausweichen zu lassen — als neuen Punkt um und reihe ihn direkt vor 690 ein.«
+  Nutzer, 07.09.2026 19:25: »Kannst du weitere Zusammenführungen von offenen Punkten zur
+  Kommunikationsmechanik vornehmen, um Regressionsdurchläufe einzusparen?« — daraufhin ist
+  der frühere Punkt 1057 hier als §B eingefaltet worden.
+  Refs: src/scenes/place/PlaceScene.tsx (`DigSites`, the player mesh's fixed Y),
+  src/scenes/place/digSiteAppearance.ts, src/scenes/place/layout.ts (the kind-anchored
+  placement, the collider set), src/scenes/place/adultWork.ts (the durable work record,
+  `startJointWalk`, `joinSpot`, `JOIN_STAND_OFF`), src/scenes/place/PlaceLife.tsx (every
+  actor's `position.set`), src/scenes/travel/TravelScene.tsx (how the outdoor height profile
+  carries a figure), design.md §7
   Bundle: Dorfleben.
 
 - [ ] 1057. The spoil heap buries the diggers, and everyone else walks straight through it
@@ -459,8 +520,9 @@ put it is the mistake this line exists to stop.
   profile carries a figure)
   Bundle: Dorfleben.
 
-- [ ] 690. The classic game of tag moves to the port cities, and is silent there (user
-  13.08.2026, playing the deployed communication slice).
+- [ ] 690. The classic game of tag moves to the port cities, and every document describes
+  the rebuilt mechanic (user 13.08.2026, playing the deployed communication slice; point 692
+  folded in here 07.09.2026).
   The user played the deployed communication slice on 13.08.2026 with the debug
   switch "Speech: show concepts instead of syllables" on and could learn nothing:
   "Ich erkenne da kein Fangspiel … Das Herumschicken wirkt wie zum Selbstzweck
@@ -479,6 +541,7 @@ put it is the mistake this line exists to stop.
   The classic game of tag survives — in the PORT CITIES and in any village without
   a bank, and it is silent wherever it runs.
 
+  §A — THE CLASSIC GAME OF TAG MOVES TO THE PORT CITIES, AND IS SILENT THERE.
   Final state:
 
   1. The round that exists today — one child is IT, the group flees, the child that
@@ -497,10 +560,36 @@ put it is the mistake this line exists to stop.
      derived like the village one and clearing that settlement's own vignettes by
      the hearing radius.
 
-  Test: Vitest over the three settlement cases of §3 — each stages exactly one
+  §B — EVERY DOCUMENT DESCRIBES THE REBUILT COMMUNICATION MECHANIC, NOT THE OLD ONE (former
+  point 692, folded in here 07.09.2026 on the user's instruction to bundle points that would
+  otherwise each buy their own regression run).
+  This is the documentation half of the rebuild, and it belongs on the LAST build point of
+  the slice — which this one is. The rebuild changes what the mechanic IS, and the documents
+  are what the next session, the next agent and the closing run read as the target state. A
+  sweep on 13.08.2026 found more than twenty places still specifying the superseded design —
+  the eleven-word lexicon, the twelve-situation catalogue, the mirrored bank errands, the
+  gift-gated message, the seven-concept sentence, the `BIG_ROCK · DIG · HERE` reply, the
+  mouse click — and design.md §13.4 still calls the whole mechanic "not yet decided". Left
+  standing, every one of them is a trap for whoever builds or judges the slice next.
+  Final state: every document that describes the communication mechanic describes the
+  REBUILT one — no sentence of the superseded design is left standing anywhere, in the spec
+  document, design.md §13, CLAUDE.md §7.1, the acceptance detail, the localization and
+  journal files. THE ITEM-BY-ITEM CHECKLIST — the cross-vendor sweep of 13.08.2026 (GPT-5.6
+  Sol at effort high) with every offending line quoted and what must happen to it — is the
+  body of the archived point 692 in `docs/tasks-archive.md`; work it from there, an item
+  being done when the quoted sentence no longer exists in that form. Add to it whatever the
+  points landed since then changed: the `Doc impact:` line of each of 1045, 1051, 1052, 1056,
+  1058, 1064, 1065, 1072 and 1073 names a statement this sweep must now find in place.
+  Landing rule kept from 692: a repository whose design documents still specify eleven
+  concepts, a gift-gated message and a click interaction while the code does something else
+  is worse than either state alone — so this half lands WITH the rest of this point, never
+  after it.
+
+  Test: Vitest over the three settlement cases of §A.3 — each stages exactly one
   game, the bank game only where a bank exists, and the tag game speaks nothing.
   The existing children-motion gate keeps running against this game wherever it is
-  staged.
+  staged. For §B there is no browser lane: a documentation sweep is proven by the
+  documents themselves, and it rides this point's landing rather than buying its own.
   Constraints:
   - Depends on the children's bank game only in so far as the two must not both
     run in one settlement.
