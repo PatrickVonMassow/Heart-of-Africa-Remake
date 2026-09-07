@@ -512,11 +512,12 @@ Die Ursache findest du durch **Zerlegen**, nicht durch Wiederholen.
 
 - **Die Anweisung hebt ihre eigene Voraussetzung auf.** Ein Ablauf verlangt, erst eine Markierung
   zu setzen und sie dann zu veröffentlichen — doch das Veröffentlichen zählt als Arbeit, und Arbeit
-  löscht die Markierung. Wer ganz gehorcht, macht sie zunichte; wer halb gehorcht, hinterlässt
-  einen halben Zustand.
+  löscht die Markierung. Dieselbe Falle als Sperre: Ihr vorgesehener Notausgang musste eine Datei
+  schreiben, und genau das untersagte sie als Erstes.
   → *Prompt:* „Spiel jede neue Durchsetzung als **wörtlichen Gehorsam** durch und einmal als
-  **Handaufruf** — beides als Test. Prüffrage: Zerstört die Handlungsfolge, die der Mechanismus
-  selbst vorschreibt, seine eigene Voraussetzung?"
+  **Handaufruf**, und probiere ihren Notausgang **unter** der Sperre aus. Prüffrage: Zerstört
+  die vorgeschriebene Handlungsfolge ihre eigene Voraussetzung — oder setzt der Ausweg eine
+  Fähigkeit voraus, die die Sperre gerade entzieht?"
 
 - **Der Rückfall rettet die Funktion und setzt still eine Vereinbarung aus.** Fällt der zweite
   Anbieter aus — oder fehlt die Datei, die deine Regel einstellt —, verhält sich jedes Werkzeug
@@ -525,23 +526,10 @@ Die Ursache findest du durch **Zerlegen**, nicht durch Wiederholen.
   → *Prompt:* „Ein Rückfall meldet, **welche Zusage er aussetzt**. Vergleiche **Regel gegen Ist**,
   nicht Ist gegen Plausibilität. Prüffrage: Welche Vereinbarung bricht er still?"
 
-- **Die Schranke aus zwei Hälften, von denen nur eine ein Polster bekam.** Eine Prüfung maß am
-  selben Bild, wie OFT zwei Beschriftungen ineinander liefen und wie TIEF. Die Häufigkeit durfte
-  vier von neunzig durchgehen lassen, die Tiefe färbte bei einem einzigen rot — dieselben Bilder,
-  dieselbe Begründung, nur auf einer Seite aufgeschrieben.
-  → *Prompt:* „Legt eine Prüfung mehrere Kriterien an denselben Messwert, schreib zu **jedem** auf,
-  was es durchgehen lässt und warum. Prüffrage: Steht ein Kriterium ohne Toleranz neben einem mit —
-  und was behauptet dieser Unterschied?"
-
-- **Der Notausgang, der genau das verlangt, was die Sperre verbietet.** Eine Sperre hielt ein
-  Fenster von allen Änderungen ab und nannte dafür einen vorgesehenen Umweg. Der Umweg nahm
-  seine Eingabe aber nur als DATEI entgegen — und Dateien schreiben war das erste, was die
-  Sperre untersagte. Bemerkt wurde die Lücke erst in dem Moment, in dem der Umweg gebraucht
-  wurde.
-  → *Prompt:* „Wenn du eine Sperre baust oder benutzt, **probiere ihren eigenen Notausgang
-  unter der Sperre aus**, nicht ohne sie. Prüffrage: Setzt der Ausweg eine Fähigkeit voraus,
-  die die Sperre gerade entzieht? Und nimmt er seine Eingabe auch inline, oder zwingt er zu
-  einer Datei, die niemand anlegen darf?"
+- **Die Schranke aus zwei Hälften, von denen nur eine ein Polster bekam.** Dieselbe Messung,
+  zwei Kriterien: eins ließ vier von neunzig durchgehen, das andere färbte bei einem rot.
+  → *Prompt:* „Legt eine Prüfung mehrere Kriterien an denselben Messwert, schreib zu **jedem**
+  auf, was es durchgehen lässt. Prüffrage: Steht eins ohne Toleranz neben einem mit?"
 
 - **Das Protokoll ohne Verfallsdatum wird zum Dauerplakat.** Was dein Werkzeug über die eigene
   Entscheidung aufschreibt, nimmt niemand je wieder heraus.
