@@ -7,6 +7,7 @@
 
 import { describe, expect, it } from 'vitest'
 import { FIGURE_LIMBS, CHILD_FIGURE_SCALE } from '../../render/figures'
+import { gaitBodyLift } from '../../render/fauna'
 import { TOUCH_LEAN } from '../../render/gesture'
 import { reachFrom, solveTouch, touchedPoint } from './rockTouch'
 import { playRockFlank } from './playRockSurface'
@@ -114,6 +115,40 @@ describe('the tapping child reaches the stone it names, in every river village',
       })
     }
   }
+
+  it('is solved at the height the renderer DRAWS the body at, dip included', () => {
+    // WHY THIS TEST EXISTS. The reach is solved in the figure's own frame, so it
+    // silently assumes the renderer draws the body at ground level. It does not
+    // while the gait is mid-step: `PlaceLife` carries every child at
+    // `gaitBodyLift`, and a gait driven by distance walked freezes wherever the
+    // walk ended. The play rock NARROWS towards its foot, so a hand drawn lower
+    // than it was solved meets a thinner stone and misses it — the LARGE run of
+    // 08.09.2026 measured 6.9 cm on a 6 cm tolerance, and this is the arithmetic
+    // behind it. `restingPhase` removes the dip (`fauna.test.ts`); this pins the
+    // COST of it coming back.
+    const legLength = FIGURE_LIMBS.hipY * CHILD_FIGURE_SCALE
+    let dip = 0
+    for (let k = 0; k < 400; k++) dip = Math.min(dip, gaitBodyLift((k / 400) * 2 * Math.PI, legLength))
+    expect(dip).toBeLessThan(-0.02) // a real height, not a rounding error
+
+    let worst = 0
+    for (const id of RIVER_VILLAGES) {
+      const { stage } = stageOf(id)
+      for (const end of ENDS) {
+        const spot = touchStand(stage, end)
+        if (!spot) continue
+        const rock = rockAt(stage, end)
+        const bearing = Math.atan2(spot.x - rock.x, spot.z - rock.z)
+        const reach = touchReach(stage, end, spot)!
+        const flankAt = (y: number) => stage.flank(end, bearing, y)
+        // The same hand, drawn `dip` lower: the flank it meets is the thinner one.
+        worst = Math.max(worst, reach.gap + (flankAt(reach.height) - flankAt(reach.height + dip)))
+      }
+    }
+    // Over the 6 cm the browser allows — so a stopped child left mid-step CANNOT
+    // pass the picture check, and this number is why the settling is not cosmetic.
+    expect(worst).toBeGreaterThan(0.06)
+  })
 
   it('does NOT reach from the waiting station the tap used to be spoken from', () => {
     const { stage } = stageOf('nubian-village')

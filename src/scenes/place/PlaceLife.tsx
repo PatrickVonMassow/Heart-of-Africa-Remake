@@ -22,6 +22,7 @@ import {
   gaitRig,
   isStance,
   legSwingAngle,
+  restingPhase,
   type FootPlant,
 } from '../../render/fauna'
 import { CHILD_FIGURE_SCALE, FIGURE_LIMBS, TESSELLATION } from '../../render/figures'
@@ -870,6 +871,14 @@ function Kids({
   if (gaits.current.length !== count) {
     gaits.current = Array.from({ length: count }, (_, i) => gaits.current[i] ?? { current: 0 })
   }
+  // ...and one PHASE OFFSET per child, which is how a stopped child plants its
+  // feet without the walk it resumes snapping back (work-order 1065). The walked
+  // distance keeps running the gait; the offset absorbs the settling, so it is
+  // still there when the child sets off again and the cycle simply carries on.
+  const gaitOffsets = useRef<number[]>([])
+  if (gaitOffsets.current.length !== count) {
+    gaitOffsets.current = Array.from({ length: count }, (_, i) => gaitOffsets.current[i] ?? 0)
+  }
   // THE WORD'S OWN FRAME (work-order 1065). Where the DRAWN hand stood in the
   // very frame the tap was uttered — captured here rather than sampled from
   // outside, because a sampler reading every second frame catches that one
@@ -981,7 +990,16 @@ function Kids({
     children.forEach((c, i) => {
       const g = refs.current[i]
       if (!g) return
-      const phase = gaitPhase(c.walked, cadence)
+      // A CHILD THAT STANDS STANDS ON BOTH FEET (work-order 1065). While it is
+      // held, the offset is moved so the drawn phase reaches the neutral stance;
+      // the dip that phase carried is what put the tapping hand 7 cm off its
+      // stone, because the reach is solved at a height the body lift then took
+      // away.
+      const walking = gaitPhase(c.walked, cadence)
+      if (c.held) {
+        gaitOffsets.current[i] = restingPhase(walking + gaitOffsets.current[i], dt) - walking
+      }
+      const phase = walking + gaitOffsets.current[i]
       gaits.current[i].current = phase
       const climbing = (c as BankChild).climbing === true
       g.position.set(c.x, gaitBodyLift(phase, legLength) + (climbing ? 0.32 : 0), c.z)
