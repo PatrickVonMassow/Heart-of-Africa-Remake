@@ -47,9 +47,13 @@ export function evaluatePushArrival(input) {
       'A push that prints "Everything up-to-date" is NOT proof: on 24.07.2026 thirteen commits sat ' +
       'local for a whole night because the session pushed a different branch than the one it had ' +
       'committed to, and git called that a success.' +
-      conflictNote(inFlight),
+      conflictNote({ branch, push, inFlight }),
   }
 }
+
+/** The branch whose push runs the FULL gate — build, lint, audit and unit. Any
+ *  other branch runs lint and audit only, which is seconds and no conflict. */
+export const FULL_GATE_BRANCH = 'main'
 
 /**
  * THE CONFLICT, stated where the demand arrives (08.09.2026). A push to `main`
@@ -62,15 +66,23 @@ export function evaluatePushArrival(input) {
  * So it stands here now, and the sharper line is added when a declared run is
  * actually in flight.
  */
-function conflictNote(inFlight) {
+function conflictNote({ branch, push, inFlight }) {
+  // Only the deployed branch carries the conflict — the four-eyes review caught
+  // this generalising over every branch, and the gate itself says why: a feature
+  // push runs lint and audit alone.
+  if (branch !== FULL_GATE_BRANCH) return ''
+  // The exception keeps the whole push command, remote and target included: the
+  // incident this guard was built for was a push that went to the wrong place
+  // and still reported success, and a bare `git push --no-verify` walks back
+  // into exactly that.
   const exception =
-    ' The gate\'s own visible exception is `git push --no-verify` — and it obliges you to run the ' +
+    ` The gate's own visible exception is \`${push} --no-verify\` — and it obliges you to run the ` +
     'step your change touches by hand: "only documentation" is not safe by itself, because this ' +
     'repository holds unit tests OVER its documents (proved red on 08.09.2026).'
   if (inFlight) {
     return (
-      ` A VERIFICATION IS IN FLIGHT (${inFlight}), and pushing to a deployed branch would run the ` +
-      'full gate beside it. Prefer waiting for its receipt.' + exception
+      ` A VERIFICATION IS IN FLIGHT (${inFlight}), and this push runs the full gate — build, lint, ` +
+      'audit, unit — beside it. Prefer waiting for its receipt.' + exception
     )
   }
   return (

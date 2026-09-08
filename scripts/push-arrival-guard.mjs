@@ -26,11 +26,11 @@ const IN_FLIGHT = repoPath('.claude', 'batch-in-flight.json')
  * concrete rather than a general warning. Fail-open to null: an unreadable or
  * stale declaration must only cost the sharper wording, never the guard.
  */
-function declaredWait() {
+export function declaredWait(path = IN_FLIGHT, now = Date.now()) {
   try {
-    const d = JSON.parse(readFileSync(IN_FLIGHT, 'utf8'))
+    const d = JSON.parse(readFileSync(path, 'utf8'))
     if (!d?.waitingOn || !Number.isFinite(d.at)) return null
-    return Date.now() - d.at <= IN_FLIGHT_MAX_AGE_MS ? String(d.waitingOn) : null
+    return now - d.at <= IN_FLIGHT_MAX_AGE_MS ? String(d.waitingOn) : null
   } catch {
     return null
   }
