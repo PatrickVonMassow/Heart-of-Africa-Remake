@@ -496,26 +496,30 @@ Die Ursache findest du durch **Zerlegen**, nicht durch Wiederholen.
   neu — während die Absage den ganzen Bestand druckt und den Platz dafür wegnimmt.
   → *Prompt:* „Binde jede Prüfpflicht an den **einzelnen Beitrag**, nie an einen offenen Zeitraum,
   und buch ein Veto gegen den **Befund**: trenne **gelesen** von bloß berührt, quittiere eine
-  Reparaturkette am **Endzustand**, und mach neue Befunde derselben Datei zum eigenen Ticket.
-  Eine Verweigerung nennt ihren **Grund**, nie ihren Bestand."
+  Reparaturkette am **Endzustand** als einen Beitrag, und mach neue Befunde derselben Datei zum
+  eigenen Ticket. Eine Verweigerung nennt ihren **Grund**, nie ihren Bestand; sieht eine Pflicht
+  unerfüllbar aus, prüf zuerst dein **Messgerät**."
 
 - **Zwei Prüfungen, die einander widersprechen — Gehorsam sieht aus wie ein Verstoß.** Die eine
   verlangt, freie Kapazität zu nutzen; die andere duldet keine Änderung, während sie läuft. Wer
   der ersten folgt, bricht die zweite: Die Arbeit wird verworfen, und das Protokoll zeigt einen
   Fehler, obwohl genau das getan wurde, was verlangt war.
   → *Prompt:* „Jede Prüfung, die eine Handlung **fordert**, muss die Fenster kennen, in denen
-  eine andere sie **verbietet**; und wer verbietet, sagt selbst, **wann es wieder erlaubt** ist —
-  nie versteckt im Quelltext eines dritten Werkzeugs. Prüffrage: Gibt es einen Zug, der **beide**
-  Auflagen erfüllt? Wenn nicht, ist nicht die Sitzung schuld."
+  eine andere sie **verbietet** — sonst steht sie still oder liest die Forderung als bereits
+  beantwortet. Und wer etwas verbietet, sagt selbst, **wann es wieder erlaubt** ist; diese
+  Bedingung darf nie im Quelltext eines dritten Werkzeugs versteckt liegen. Prüffrage: Gibt es
+  einen einzigen Zug, der **beide** Auflagen erfüllt? Wenn nicht, ist nicht die Sitzung schuld."
 
 - **Die Anweisung hebt ihre eigene Voraussetzung auf.** Ein Ablauf verlangt, erst eine Markierung
   zu setzen und sie dann zu veröffentlichen — doch das Veröffentlichen zählt als Arbeit, und Arbeit
   löscht die Markierung. Dieselbe Falle als Sperre: Ihr vorgesehener Notausgang musste eine Datei
   schreiben, und genau das untersagte sie als Erstes.
-  → *Prompt:* „Spiel jede neue Durchsetzung als **wörtlichen Gehorsam** durch und probiere ihren
-  Notausgang **unter** der Sperre aus. Prüffrage: Zerstört die vorgeschriebene Folge ihre eigene
-  Voraussetzung — oder setzt der Ausweg eine Fähigkeit voraus, die die Sperre gerade entzieht?
-  Und nimmt deine **Ausnahme** nur die **Prüfung** aus oder auch ihre **Abhilfe**?"
+  → *Prompt:* „Spiel jede neue Durchsetzung als **wörtlichen Gehorsam** durch und einmal als
+  **Handaufruf**, und probiere ihren Notausgang **unter** der Sperre aus. Prüffrage: Zerstört
+  die vorgeschriebene Handlungsfolge ihre eigene Voraussetzung — oder setzt der Ausweg eine
+  Fähigkeit voraus, die die Sperre gerade entzieht? Und nimmt deine **Ausnahme** nur die
+  **Prüfung** aus oder auch ihre **Abhilfe**? Ein Wächter, der sich selbst befreit, während
+  seine Heilmittel gesperrt bleiben, ist keine Kontrolle, sondern eine Sackgasse."
 
 - **Der Rückfall rettet die Funktion und setzt still eine Vereinbarung aus.** Fällt der zweite
   Anbieter aus — oder fehlt die Datei, die deine Regel einstellt —, verhält sich jedes Werkzeug
@@ -542,10 +546,6 @@ Die Ursache findest du durch **Zerlegen**, nicht durch Wiederholen.
   Entscheidung aufschreibt, nimmt niemand je wieder heraus.
   → *Prompt:* „Eine Entscheidung, die du selbst triffst, nennt die **Messung**, die sie stützen
   oder widerlegen würde, und **verfällt**, sobald diese Messung sauber vorliegt."
-
-- **Die Fortschrittszahl zählte den Umbau mit.** Zwölf Punkte am Tag, zehn Tage lang — das Produkt wuchs dabei um 202 Zeilen.
-  → *Prompt:* „Miss Fortschritt **getrennt nach Ziel**: Produkt gegen Werkzeug, als Verhältnis
-  pro Woche mit Obergrenze. Prüffrage: Sieht die Zahl gut aus, während nichts passiert?"
 
 ---
 
@@ -585,4 +585,4 @@ Die Ursache findest du durch **Zerlegen**, nicht durch Wiederholen.
 
 Sie ersetzt die Fallstricke oben nicht.
 
-<!-- GUIDE-FINGERPRINT: e51bff79a5b0e72eef3b8845631caf4b358df8dbaf0732656bca17bae29657f6 -->
+<!-- GUIDE-FINGERPRINT: cbf58433c5ed1950d2ae7473eb8dd250b18f75be3ecc1af81dad3b94a4010724 -->
