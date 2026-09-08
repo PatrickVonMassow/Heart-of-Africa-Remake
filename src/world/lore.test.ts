@@ -2,7 +2,7 @@
 // landmark glossary and the unspecific-knowledge words are fixed constants that
 // the hint texts weave in. Pure data, no browser.
 import { describe, it, expect } from 'vitest'
-import { DIRECTION_WORDS, GLOSSARY, UNSPECIFIC_WORDS } from './lore'
+import { DIRECTION_WORDS, GLOSSARY } from './lore'
 import type { RegionId } from './geo'
 
 const REGIONS: RegionId[] = ['north', 'west', 'central', 'east', 'south']
@@ -38,11 +38,5 @@ describe('glossary + unspecific words (design.md §13.2/§13.3)', () => {
     expect(GLOSSARY.kilimanjaro).toBe('Unumpara')
     expect(GLOSSARY.victoriaFalls).toBe('Gumba lu Untoba')
     expect(GLOSSARY.elephants).toBe('Galumba')
-  })
-
-  it('has three unspecific-knowledge words including "Oz Oz"', () => {
-    expect(UNSPECIFIC_WORDS).toContain('Oz Oz')
-    expect(UNSPECIFIC_WORDS.length).toBe(3)
-    for (const w of UNSPECIFIC_WORDS) expect(w.length).toBeGreaterThan(0)
   })
 })

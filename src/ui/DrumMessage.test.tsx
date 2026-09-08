@@ -216,13 +216,13 @@ describe('the chief sends the message outdoors (design.md §12/§13.4)', () => {
   it('offers the drums in his own village, with no precondition (point 689)', () => {
     g().enterPlace(DRUM_MESSAGE_VILLAGE)
     g().callChiefOut()
-    expect(nextChiefAction(g())).toBe('send-message')
+    expect(nextChiefAction('chief', g(), 'at-drummer')).toBe('send-message')
   })
 
   it('is not another people\u2019s message: no other chief sends it', () => {
     g().enterPlace('nubian-village')
     g().callChiefOut()
-    expect(nextChiefAction(g())).toBe('no-message')
+    expect(nextChiefAction('chief', g(), 'at-drummer')).toBe('no-message')
   })
 
   it('sets the drums beating for the whole message length', () => {

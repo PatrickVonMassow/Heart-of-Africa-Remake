@@ -251,6 +251,10 @@ export const en: Strings = {
 
   labels: {
     speakToChief: 'Speak to the chief',
+    askForDrumMessage: 'Ask the chief for his message',
+    repeatDrumMessage: 'Have the message beaten again',
+    callChiefBack: 'Call the chief back',
+    askDrummer: 'Ask the drummer',
     chief: 'Chief',
     graveDebug: 'Grave (debug)',
     camp: 'Camp',
@@ -383,9 +387,11 @@ export const en: Strings = {
     formNoFit: 'Nothing here has a hollow that would take this shape.',
     pocSolved: 'Dummy message: the puzzle of this proof of concept is solved.',
     drumsSending: 'The chief calls his drummer. The message is going out over the village.',
-    chiefStepsOut: 'The chief steps out of his hut and stands before me in the open.',
+    chiefStepsOut:
+      'The chief steps out of his hut and crosses to his drummer — through the drums he will speak with me in his own mysterious way.',
+    chiefCalledBack: 'The chief turns back toward his drummer.',
     chiefNoMessage: 'The chief looks me over and nods. He has nothing to send out over the village.',
-    findNeedsChief: 'There is nobody here to take it. It belongs in the chief’s own hands, out in the open before his hut.',
+    findNeedsChief: 'There is nobody here to take it. It belongs in the chief’s own hands, wherever he stands out in the open.',
     journalDndOn: 'Journal interruptions off — entries appear silently.',
     journalDndOff: 'Journal interruptions on — new entries open the journal.',
     graphicsLevel: {
@@ -769,7 +775,6 @@ export const en: Strings = {
       artefactGiven: 'Into the Hands of the Chief',
       mouldFitted: 'The Clay Finds Its Rock',
       decoded: 'Deciphered!',
-      unspecific: 'Vague Murmurs',
       victory: 'The Heart of Africa',
       foodLow: 'Provisions Running Low',
       foodOut: 'Provisions Exhausted',
@@ -1014,8 +1019,6 @@ export const en: Strings = {
       }
       return texts[regionId]
     },
-    unspecific: (p: TextParams) =>
-      `The chief nodded gravely, waved his hands and said again and again only [emph]"${p.word}"[/emph]. [somber]Whatever he knows, he cannot or will not say it in words I grasp.[/somber] [pause]But he pointed insistently toward the villages of the [emph]${PEOPLES[p.people as string]}[/emph] — [excited]they are said to know more.[/excited]`,
     drumMessage:
       '[awe]The chief called his drummer, and two drums spoke for him — a great one and a small one.[/awe] [pause]Four words, each of four beats, each parted from the next by the same short silence — deep for the low syllable, bright for the high one. [excited]I know these words. I have heard every one of them in the lanes and at the water.[/excited] [pause]I have written them down in the order they were beaten; what they ask of me I must read for myself.',
     rockArtefact:

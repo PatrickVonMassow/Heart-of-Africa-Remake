@@ -322,7 +322,23 @@ export const DOC_BUDGETS = [
     // genuinely new decision: the document said the find was laid in his hands
     // and never said by what act, and the answer is the difference between a
     // hand-over the player chooses and one the game picks for him.
-    maxWords: 28238,
+    // RAISED by the 173 measured words of the chief's walk to his drummer (user
+    // 07.09.2026): he no longer speaks at his own door but crosses to the
+    // drummer's side, stays a calibratable minute in which the message can be
+    // repeated, can be called back on his way home, and always starts a visit
+    // in his hut — and the drummer names him with the sixth word of the
+    // language, CHIEF, which §13.4 also had to state. New behaviour with new
+    // player-reachable states, not a longer telling of the old meeting; the
+    // dropped murmured pointer of §13.3 and a shortened save note paid part of
+    // it back in the same commit.
+    // RAISED again by the 21 measured words §12's PROCEDURE owes the same
+    // change: the step list still described one press at the hut and a further
+    // press that chose between the message and the find, and now has to say
+    // that he walks over, that the key at either man sends and repeats the
+    // message and calls him back, and that his hut answers nothing while he is
+    // outside. §12's retirement list paid 11 of the 32 back by becoming the
+    // state sentence it always meant.
+    maxWords: 28432,
     // A hundred words across 28k: design.md is edited section by section and a genuine
     // new decision runs 40–215 measured words, so the slack absorbs the rewording that
     // accompanies one and refuses the disappearance of a whole section without a

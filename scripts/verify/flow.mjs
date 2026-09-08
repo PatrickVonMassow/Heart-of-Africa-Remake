@@ -471,24 +471,26 @@ if (section('core-loop')) {
   await page.waitForTimeout(300)
   s = await state()
   check('The use key brings the chief out of his hut', s.chiefOutside[s.placeId] === true)
-  // Step BACK from the door and face the hut, or the frame holds nothing but
-  // wall: at the door the camera stands inside the building's own footprint.
-  // From ~9 m out on the door's own bearing, hut, door and the man standing
-  // 1.6 m beside it are all in the picture.
+  // He does not stay at his door: he walks across to his drummer and speaks
+  // through the drums from there (design.md §13.4). Wait until he has ARRIVED,
+  // then stand in FRONT of the pair — both men face the same way, so a spot on
+  // that bearing has chief and drummer in one picture, from the front.
+  await page.waitForFunction(() => window.__chief?.phase === 'at-drummer', null, { timeout: 30000 })
+  // Read the state AFTER his walk: the snapshot above was taken at his door, and
+  // the hint checks below belong to the man who has arrived.
+  s = await state()
   await page.evaluate(() => {
-    const it = window.__placeLayout.interactives.find((i) => i.type === 'chief')
+    const chief = window.__chief
+    const yaw = chief.facing
+    const mx = (chief.x + chief.drummer[0]) / 2
+    const mz = (chief.z + chief.drummer[1]) / 2
     const p = window.__placePlayer
-    const [hx, hz] = it.pos
-    const [dx, dz] = it.door
-    const ux = dx - hx
-    const uz = dz - hz
-    const l = Math.hypot(ux, uz) || 1
-    p.x = dx + (ux / l) * 9
-    p.z = dz + (uz / l) * 9
+    p.x = mx + Math.sin(yaw) * 6
+    p.z = mz + Math.cos(yaw) * 6
     // Place-camera yaw 0 looks toward -Z, so aim with the +PI complement.
-    p.yaw = Math.atan2(hx - p.x, hz - p.z) + Math.PI
+    p.yaw = Math.atan2(mx - p.x, mz - p.z) + Math.PI
   })
-  await shot('04-chief-outside-his-hut', { place: 'nubian-village', label: 'the chief standing in the open before his hut' })
+  await shot('04-chief-outside-his-hut', { place: 'nubian-village', label: 'the chief standing beside his drummer, both seen from the front' })
   check('Meeting him unlocks the hint', s.hintsGiven.north === true)
   const hint = s.journal.find((e) => titleKey(e) === 'journal.titles.chiefHint')
   check('Hint stores grave coordinates (language-neutral)',

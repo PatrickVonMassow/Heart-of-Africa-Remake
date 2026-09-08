@@ -1,7 +1,7 @@
 # The communication PoC (design.md §13.4)
 
 The user's decisions of 13.08.2026 replace the former eleven-word teaching
-design. The playable slice has one five-word tonal language, two teaching
+design. The playable slice has one six-word tonal language, two teaching
 places, and a four-word message. The child tag situations and the adult errand
 catalogue from the former design are not part of this version.
 
@@ -38,9 +38,9 @@ drums use. Each atom is observed and recorded separately.
 
 Every valid sequence has an even number of high tones. Any two such sequences
 differ in at least two positions, so one misheard tone cannot turn one word into
-another valid word. At length four this rule produces eight sequences. Five are
-used and three remain reserved. Length three produces only four parity
-sequences and cannot hold the five-word language.
+another valid word. At length four this rule produces eight sequences. Six are
+used and two remain reserved. Length three produces only four parity
+sequences and cannot hold the language.
 
 A word carries at least one syllable of each tone. Four identical strikes are
 the least hearable thing the drums can beat, and the message opens on RIVER, so
@@ -62,10 +62,20 @@ second region can add its own entry without changing consumers.
 | DOWNSTREAM | `BA-BA-ba-ba` | with the current; the mirror of UPSTREAM |
 | ROCK | `BA-ba-ba-BA` | a class of thing, not one named boulder |
 | DIG | `ba-BA-BA-ba` | digging |
+| CHIEF | `BA-ba-BA-ba` | the village's head man |
 
-Reserved and unused: `BA-ba-BA-ba` (the tonal mirror of RIVER, deliberately
-left unspoken so the direction pair stays the only mirror the player hears), and
-the two single-tone sequences `ba-ba-ba-ba` and `BA-BA-BA-BA`.
+Reserved and unused: the two single-tone sequences `ba-ba-ba-ba` and
+`BA-BA-BA-BA`. CHIEF took the last spare mixed sequence, RIVER's tonal mirror,
+so all six words now fall into three mirror pairs — RIVER/CHIEF,
+UPSTREAM/DOWNSTREAM and ROCK/DIG. UPSTREAM and DOWNSTREAM remain the
+only pair the player hears AS a pair — they are announced against each other in
+the same round of the bank game, while CHIEF is only ever said alone, by the
+drummer pointing at the hut.
+
+CHIEF is taught the way every other word is: the use key at the drummer while
+the chief is in his hut makes him point his arm at the chief's hut and say it,
+within the same hearing range, with the same overhead note and the same guess
+dialog. Nothing translates it.
 
 ROCK must transfer between instances: the player learns it from the play rocks
 in the village and applies it to the boulder upstream. It never means "the big
@@ -131,11 +141,21 @@ four concepts, sixteen strikes, three equal inter-word pauses, and no other
 structure. Afterwards it is displayed with the player's own reading over each
 element. Those readings are the journal notes themselves and remain editable.
 
-The message is asked for OUTSIDE, in his village alone. The use key at the
-chief's hut brings the chief out of it — there is no audience overlay — and he
-then stands beside his own door, in sight of the drummer who beats his message.
-Asking him again sends it; it is recorded as heard only after the last beat and
-can then be reopened from the journal.
+The message is asked for OUTSIDE, in his village alone, and at the DRUMMER'S
+side. The use key at the chief's hut brings the chief out of it — there is no
+audience overlay — and he walks across the village to the drummer, taking his
+stand abreast of the man and facing the way the drummer faces, so the traveller
+can stand before the pair and see both from the front. Arrived, the use key at
+either man sends the message. He stays a calibratable minute
+(`balance.communication.chiefStaySeconds`), counted from his arrival and afresh
+from every message, in which the same key beats it out again and the prompt
+names that; then he walks home. Called on the way home — at him or at the
+drummer — he turns round where he stands and the drums beat by themselves the
+moment he is back beside them. Back in his hut, the key at the hut starts the
+whole thing over; used while he is outside, the hut does nothing and offers no
+prompt. Entering a settlement always finds him indoors: his walk is scene state
+and is never saved. The message is recorded as heard only after the last beat
+and can then be reopened from the journal.
 
 ## Where the digging happens
 
@@ -152,8 +172,9 @@ give reach (`balance.communication.giveReach`), and activates the find in the
 bar — a click, exactly as medicine and the shovel act. Only then is it laid in
 his hands. Used anywhere else — no chief out in the open, or too far from him —
 it hands nothing over and one toast says why, and the find stays in the pack.
-The use key at his hut hands nothing over at all; it brings him out and
-afterwards sends the drums. His acknowledgement stands over his own head like
+The use key at his hut hands nothing over at all: it brings him out, and from
+then on it is the key at either man — the chief or his drummer — that sends the
+drums, while the hut itself answers nothing. His acknowledgement stands over his own head like
 any other villager's word — it uses only ROCK and DIG from the same language.
 
 Every later quest find brought to a chief follows the same rule: a found thing

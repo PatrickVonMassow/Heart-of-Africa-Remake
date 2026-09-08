@@ -14,10 +14,38 @@
 
 import type { Object3D } from 'three/webgpu'
 import { balance } from '../../config/balance'
+import { chiefInHut, type ChiefWalk } from './chiefWalk'
 import { placePlayerPosition } from './playerPosition'
 
 /** The speaker id the chief's labels ride under — one chief per settlement. */
 export const CHIEF_SPEAKER_ID = 'chief'
+
+/** The speaker id the drummer's own word rides under. */
+export const DRUMMER_SPEAKER_ID = 'drummer'
+
+/**
+ * WHERE THE CHIEF IS IN HIS ROUND TRIP, live (design.md §13.4). Scene furniture
+ * like the anchor above: it is written every frame by the figure that walks, it
+ * is never saved, and it starts over in his hut whenever a settlement is
+ * entered — which is exactly the rule that leaving the village and coming back
+ * always finds him indoors.
+ */
+let walk: ChiefWalk = chiefInHut()
+
+/** His walk as it stands right now. */
+export function chiefWalkState(): ChiefWalk {
+  return walk
+}
+
+/** The walking figure writes each advance back here. */
+export function setChiefWalkState(next: ChiefWalk): void {
+  walk = next
+}
+
+/** Back in his hut: what a settlement entered (or left) resets him to. */
+export function resetChiefWalk(): void {
+  walk = chiefInHut()
+}
 
 let anchor: Object3D | null = null
 

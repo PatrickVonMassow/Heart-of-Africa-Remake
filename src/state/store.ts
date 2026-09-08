@@ -23,7 +23,6 @@ import {
   type TreasureId, type TreasureSite,
 } from '../systems/economy'
 import { ELEPHANT_GRAVEYARD } from '../world/data/landmarks'
-import { UNSPECIFIC_WORDS } from '../world/lore'
 import {
   deserializeMemory, emptyMemory, observePhrase, observeUtterance, serializeMemory,
   setHypothesis, type CommunicationMemory,
@@ -32,7 +31,9 @@ import type { Phrase, UtteranceId } from '../communication/lexicon'
 import { chiefMessagePhrase } from '../communication/drumMessage'
 import { chiefRewardPhrase } from '../communication/chiefReply'
 import { ROCK_VILLAGE_ID, isAtCommunicationRock } from '../world/communicationRock'
-import { withinGiveReach } from '../scenes/place/chiefPresence'
+import { chiefWalkState, resetChiefWalk, setChiefWalkState, withinGiveReach } from '../scenes/place/chiefPresence'
+import { chiefStepsOut } from '../scenes/place/chiefWalk'
+import { speechClock } from '../scenes/place/speechChannel'
 import { resolveFormUse, type FormId, type SocketId } from '../world/forms'
 import type { SketchId } from '../journal/sketches'
 import { getStrings, type TextRef } from '../i18n'
@@ -214,9 +215,12 @@ export interface GameState {
    *  change, then updates this. A place with no modelled situation reports a
    *  constant key and so never changes or re-fires (systems/placeSituation). */
   placeSituations: Record<string, string>
-  /** Villages whose chief has come out of his hut and stands in the open
-   *  (design.md §12): the use key at his door brings him out, and from then on
-   *  he is met outdoors, where his drummer stands. */
+  /** Villages whose chief is out of his hut right now (design.md §12/§13.4):
+   *  the use key at his door sends him out and across to his drummer, and he
+   *  stays out until he has walked home again. It is the COARSE half of his
+   *  state — where he is on that walk is scene furniture (chiefPresence.ts) —
+   *  and it is cleared on entering a settlement, so a village left and
+   *  re-entered always has him indoors. */
   chiefOutside: Record<string, boolean>
   /** Explored map cells for the self-drawing map (design.md §19). */
   explored: Record<string, true>
@@ -237,8 +241,6 @@ export interface GameState {
   hintsGiven: Partial<Record<RegionId, boolean>>
   /** Regions whose raw hint has been deciphered into a decoded entry. */
   decodedGiven: Partial<Record<RegionId, boolean>>
-  /** Villages whose chief already shared his unspecific knowledge. */
-  unspecificGiven: Record<string, boolean>
   graveLatLon: LatLon
   victory: boolean
   /** Short-lived HUD message. */
@@ -327,9 +329,10 @@ export interface GameState {
    *  own tongue, which enters the heard memory like any other phrase he
    *  speaks. */
   handArtefactToChief: () => void
-  /** The use key at the chief's hut: the chief comes OUT and stands in the open
-   *  (design.md §12). Everything he has to give is given out there, at his
-   *  drummer's side — there is no audience indoors. */
+  /** The use key at the chief's hut: the chief leaves it and walks over to his
+   *  drummer (design.md §12/§13.4). Everything he has to say is said out there,
+   *  on the drums — there is no audience indoors, and the hut answers nothing
+   *  while he is already outside. */
   callChiefOut: () => void
   /** The chief's own knowledge about the tomb, told when he steps out (§13.3). */
   tellChiefHint: () => void
@@ -560,7 +563,6 @@ export function startState(seed: number, placeId: string = startPlaceId()) {
     knowingVillages: pickKnowingVillages(seed),
     hintsGiven: {} as Partial<Record<RegionId, boolean>>,
     decodedGiven: {} as Partial<Record<RegionId, boolean>>,
-    unspecificGiven: {} as Record<string, boolean>,
     graveLatLon: generateGrave(seed),
     victory: false,
     toast: null,
@@ -743,6 +745,8 @@ export const useGame = create<GameState>()((set, get) => ({
     if (s.mode !== 'place' || !s.placeId) return
     const place = placeById(s.placeId)
     if (place.kind !== 'village' || s.chiefOutside[place.id]) return
+    // The walk itself is scene furniture; the store owns only that he is out.
+    setChiefWalkState(chiefStepsOut(chiefWalkState(), speechClock()))
     set({
       chiefOutside: { ...s.chiefOutside, [place.id]: true },
       toast: getStrings().toasts.chiefStepsOut,
@@ -760,8 +764,9 @@ export const useGame = create<GameState>()((set, get) => ({
   /**
    * What this chief knows about the tomb, told when he comes out (design.md
    * §13.1/§13.3). Per region only the KNOWING people names the location
-   * component; every other chief offers unspecific knowledge and points at
-   * them. Each is said once.
+   * component, once; a chief who does not know says nothing at all — the
+   * murmured pointer at the knowing people went with the stale text that
+   * carried it (user 07.09.2026).
    */
   tellChiefHint: () => {
     const s = get()
@@ -780,17 +785,7 @@ export const useGame = create<GameState>()((set, get) => ({
         'compass',
       )
       get().revealDecoded(region)
-      return
     }
-    if (s.unspecificGiven[place.id]) return
-    set({ unspecificGiven: { ...s.unspecificGiven, [place.id]: true } })
-    const knowing = placeById(s.knowingVillages[region])
-    const word = UNSPECIFIC_WORDS[(place.id.length + region.length) % UNSPECIFIC_WORDS.length]
-    get().addEntry(
-      { key: 'journal.titles.unspecific' },
-      { key: 'journal.unspecific', params: { people: knowing.peopleId ?? knowing.id, word } },
-      'hint',
-    )
   },
 
   handArtefactToChief: () => {
@@ -1487,9 +1482,15 @@ export const useGame = create<GameState>()((set, get) => ({
     const firstEntry = !s.enteredPlaces.includes(id)
     const situation = placeSituationAt(place, s.day, START_YEAR)
     const storedSituation = s.placeSituations[id]
+    // A settlement entered always has its chief indoors (design.md §13.4): the
+    // walk is scene furniture and starts over, and the coarse flag with it. It
+    // stands HERE, past every read that can throw and against the set that
+    // clears the flag, so the two halves of him never part company.
+    resetChiefWalk()
     set({
       mode: 'place',
       placeId: id,
+      chiefOutside: {},
       // §2.5: only an enter OUT of the bird's-eye view has a fresh panorama
       // capture of this settlement's horizon. A place→place enter, a ferry
       // passage and a resumed snapshot all start from inside a place — they
@@ -2007,9 +2008,7 @@ export const useGame = create<GameState>()((set, get) => ({
       health: s.health, afflictions: s.afflictions, sunblindRecovery: s.sunblindRecovery,
       dryDays: s.dryDays, canteenFill: s.canteenFill, woundHealDays: s.woundHealDays,
       visitedPlaces: s.visitedPlaces, enteredPlaces: s.enteredPlaces, placeSituations: s.placeSituations,
-      chiefOutside: s.chiefOutside,
       knowingVillages: s.knowingVillages, hintsGiven: s.hintsGiven, decodedGiven: s.decodedGiven,
-      unspecificGiven: s.unspecificGiven,
       graveLatLon: s.graveLatLon, foodWarned: s.foodWarned, foodOutWarned: s.foodOutWarned,
       penaltyJournaled: s.penaltyJournaled,
       dangerWarned: s.dangerWarned,
@@ -2078,7 +2077,6 @@ export const useGame = create<GameState>()((set, get) => ({
         knowingVillages: snap.knowingVillages ?? pickKnowingVillages(snap.seed ?? 0),
         hintsGiven: snap.hintsGiven ?? {},
         decodedGiven: snap.decodedGiven ?? {},
-        unspecificGiven: snap.unspecificGiven ?? {},
         afflictions: snap.afflictions ?? { fever: false, dehydration: false, sunblind: false, wounds: 0 },
         sunblindRecovery: snap.sunblindRecovery ?? 0,
         dryDays: snap.dryDays ?? 0,
@@ -2094,7 +2092,10 @@ export const useGame = create<GameState>()((set, get) => ({
         landmarksSeen: Array.from(new Set([...KNOWN_FROM_START_LANDMARKS, ...(snap.landmarksSeen ?? [])])),
         valuableShown: snap.valuableShown ?? {},
         orientationGiven: snap.orientationGiven ?? {},
-        chiefOutside: snap.chiefOutside ?? {},
+        // A resumed run finds the chief in his hut, like any other arrival in a
+        // settlement (design.md §13.4): where he is on his walk is scene
+        // furniture and was never saved.
+        chiefOutside: {},
         honoredFriend: snap.honoredFriend ?? {},
         lastFriendAidDay: snap.lastFriendAidDay ?? -9999,
         freeCamps: snap.freeCamps ?? [],
@@ -2123,6 +2124,12 @@ export const useGame = create<GameState>()((set, get) => ({
         toast: null,
         journalOpen: false,
       })
+      // The flag above was cleared, so the WALK starts over with it (design.md
+      // §13.4): clearing one half alone strands the other, and either way round
+      // the hut key then answers with nothing for the rest of the session. It
+      // runs AFTER the state is in place, so a snapshot that throws half way
+      // through leaves both halves as they were rather than one of them.
+      resetChiefWalk()
       return true
     } catch {
       return false
@@ -2131,6 +2138,10 @@ export const useGame = create<GameState>()((set, get) => ({
 
   newGame: () => {
     nextEntryId = 2
+    // The start state carries an empty `chiefOutside`, so the WALK starts over
+    // with it (design.md §13.4): the two halves of the chief's state may never
+    // be cleared apart, or the hut key answers a phase nobody can see.
+    resetChiefWalk()
     set({ ...startState(newSeed()) })
   },
 
