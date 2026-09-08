@@ -358,6 +358,32 @@ put it is the mistake this line exists to stop.
     while the suite ran. Do not add or remove a worktree during a unit run.
   - STILL OWED: the picture on BOTH backends. The polish section is `--section=adult-errands`;
     the previous reading needed several unthrottled runs on a quiet machine to be believed.
+  Fourth reading, 08.09.2026 14:00, WebGPU at e77155cab (run
+  local/verify-logs/2026-09-08T11-23-49-286-polish.log in the point's worktree): 241 pass, 1 fail.
+  - PART B IS IN THE PICTURE. Both water checks are green — the carrier goes into the water and
+    dips the jar below its drawn surface, and comes back with a jar that shows its water — and so
+    is "the tapping child reaches its stone at all". The depth fix holds where the pure layer
+    said it would.
+  - PART A HAS ONE RED LEFT, and it is the same number as before: "no tap is ever spoken from
+    the waiting station — the worst reading while the word was falling stood 59.1 cm off the
+    flank" (`--section=children-bank-game`). Its neighbour, which takes the BEST reading of the
+    same hand against the same flank, is green at 6 cm or less. So the hand does arrive; what
+    fails is that it is not there for the WHOLE hold.
+  - THE UTTERANCE IS ALREADY GATED ON CONTACT and the group is already frozen while the word
+    falls, both read in the code: `bankGame.ts` speaks the tap only where
+    `Math.abs(reach.gap) <= TOUCH_GAP` and arms `tapFor` in that same branch, and while
+    `tapFor > 0` in the run phase every child is driven with a null path (`stepHeld`). The
+    rock the tap measures, the rock the tapper walks to and the rock the probe measures are all
+    `otherEnd(s.from)` — checked, not assumed.
+  - HYPOTHESIS, NOT YET MEASURED: the gate is satisfied in the SIMULATION while the check reads
+    the DRAWN hand off the scene graph (`__placeTapHand` traverses the figure's `hand-left` /
+    `hand-right` meshes). If the rendered figure interpolates toward its simulated spot, the
+    drawn hand is still gliding in when the word opens and catches up during the hold — which
+    would produce exactly this pair of readings, a green best and a worst at the start of the
+    hold. PROBE FIRST: sample `__placeTapHand()` every frame across one hold and print the gap
+    against the elapsed hold, so a converging curve is told apart from a hand that never
+    arrives. If it converges, the fix is that the tapper must be settled in the DRAWN world
+    before the run opens, not only in the simulated one.
   Bundle: Dorfleben.
 
 - [ ] 1072. The village speaks with a direction, and the children sound like children (user
