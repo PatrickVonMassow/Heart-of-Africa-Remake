@@ -77,6 +77,71 @@ then point 633 (the closing run), then point 174 (the tag). A newly appended poi
 kind is MOVED to the front in the same turn that files it; leaving it where append-and-defer
 put it is the mistake this line exists to stop.
 
+- [ ] 1077. The Astra lane is routed on paper and almost never authored (measured
+  08.09.2026, two findings of the same evening folded into one point).
+  CLAUDE.md §6 splits authoring across three lanes, and `author-routing-core.mjs` cuts the
+  374 open points 271 Astra / 103 Opus once criticality is read. The LANDINGS of the last
+  three days on `main` carry 174 Anthropic `Co-Authored-By` against 6 GPT-6 Astra (plus 12
+  `Reviewed-By` Astra). 6 against 174 is past measurement error, and trailers are a weak
+  proxy in ONE direction only: unlanded work and Astra's reading are invisible, so the true
+  Astra share can only be HIGHER than 6, never lower than the ratio suggests.
+  Part of the cause is visible: six of the first ten points in work-order order (1065, 1072,
+  659, 633, 174, 1068) enter the Opus lane on 'its VERIFICATION is the work', so the QUEUE
+  HEAD alone skews the sample. What is NOT measured is whether `author-astra.mjs` ever runs
+  for the 271 Astra points at all — `.claude/batch-activity.jsonl` carries no model-bearing
+  field and the string `author-astra` appears in it zero times.
+  MEASURED 08.09.2026, and the answer is NO: the dispatcher does not delegate. The codex
+  rollouts under `~/.codex/sessions` since 04.09.2026 are 41 reviews against 3 authoring runs,
+  and those three cover two points only (1051 twice, 1069 once). Of the 12 points closed in
+  the last three days — 1061 1052 689 691 1058 1067 1064 1069 1066 1057 692 1070 — EIGHT are
+  Astra-lane, so at least six Astra-lane points were written here against their own routing.
+  The isolated worktree is not the obstacle either: `feat/834-durable-authoring-lane` (122
+  commits), `feat/847-brevity-guard-gaps` (17) and `feat/1065-teaching-hands-touch` (7) carry
+  ZERO Astra trailers, and 847 and 901 are Astra-lane. The mechanism itself is intact —
+  codex-cli 0.153.0, `--dry-run` builds the gpt-6-astra call, the lane last ran 07.09. 20:55.
+  What is missing is the CALL, not the routing: no lever that only changes the lane can move
+  load while an Astra-lane point is authored here anyway.
+  Final state:
+  - It is MEASURED, once, whether the dispatcher actually delegates an Astra-lane point:
+    watch the next Astra-lane point and record whether `author-astra.mjs` ran. That answer
+    decides everything below; without it every lever is a guess.
+  - The three levers that cost no code and no test are applied where the measurement says
+    they help:
+    A — ORDER. NOT APPLIED: the user forbade reordering the work order for load on
+    08.09.2026 and made one exception, this point itself, which moves to the head.
+    B — THE EXISTING TAG. DONE 08.09.2026 for the communication mechanic on the user's
+    order. `Author lane: astra` as its own line is read by `authorLaneFor` BEFORE the
+    verification branch (the source comment calls it 'the cheap way back'), and it must be
+    the WHOLE line: `Author lane: astra — <reason>` parses to no tag at all, so the reason
+    goes on its own line beneath it. GPT-6 Astra enumerated the communication points from
+    the open headlines (`ask-astra.mjs --kind enumerate`); seven that the verification
+    branch was holding here now carry the tag — 1072, 1076, 356, 360, 698, 1043, 1045 —
+    while 1065 was left alone as in-flight, and 357 (village ambience bed), 620 (a picture
+    check that merely uses the speech-guess section) and 1062 (the position query after a
+    UI language switch) were dropped from Astra's list as not the mechanic. Five of the
+    enumerated points already routed to Astra: 1073, 690, 659, 619, 1046. The cut over the
+    open points moves 271/105 to 281/95.
+    C — CRITICALITY. VERIFIED but DELIBERATELY NOT USED AS A LOAD LEVER. 96 of the 376 open
+    points carry none, and `Criticality: high` does route to Astra above the verification
+    branch — but criticality is a claim about the point, not a routing dial, and raising it
+    to move load would corrupt the field every gate reads. It is filled in when a point is
+    judged, never to steer a lane.
+  - NOT DONE: narrowing `VERIFICATION_MARKERS` or `HARD_MARKERS`. That is exactly the
+    infrastructure surgery the freeze (CLAUDE.md §2) excludes, the lists are hardened over
+    several cross-vendor rounds, and none of it is needed if the levers above suffice.
+  - WHAT ACTUALLY MOVES LOAD, and what this point leaves open: the tags decide the lane,
+    not the dispatch. The measurement above shows Astra-lane points being authored here
+    anyway, so the tags bite only once an Astra-lane point is commissioned through
+    `node scripts/author-astra.mjs --point <N>` in its worktree. The first proof owed is
+    one communication point authored by Astra end to end.
+  Test. No product code changes, so no product test. The measurement is the evidence: the
+  recorded observation of one Astra-lane dispatch, and the before/after cut of
+  `author-routing-core.mjs` over the open points.
+  Refs: scripts/author-routing-core.mjs (`authorLaneFor`, `criticalityOf`,
+  VERIFICATION_MARKERS, HARD_MARKERS), scripts/author-astra.mjs, scripts/astra-share.mjs,
+  scripts/fable-switch.mjs, .claude/batch-activity.jsonl, CLAUDE.md §6.
+  Bundle: Modell & Wächter.
+
 - [ ] 1065. The teaching hands touch what they name: the tapping child at its rock, the
   carrier at the water (user 06.09.2026; point 1066 folded in here 07.09.2026 on the user's
   instruction to bundle points that would otherwise each buy their own regression run).
@@ -371,6 +436,9 @@ put it is the mistake this line exists to stop.
   voices sit above the adults', and how loud the village is at conversational distance.
   balance.ts: both pitch pairs, the stereo width, the speech volume and the re-calibrated
   falloff (calibratable), with the English and German debug labels changed together.
+  Author lane: astra.
+  Why the lane: the communication mechanic is authored by Astra (user 08.09.2026); the
+  rendered picture, the browser suites and the landing stay in the main session.
   Bundle: Dorfleben.
 
 - [ ] 1073. A call carries to the stand the game photographs it from, and the hush stops
@@ -679,45 +747,10 @@ put it is the mistake this line exists to stop.
   (`journal.titles.chiefHint`, `journal.hintRaw`, `journal.hintDecoded`),
   src/scenes/place/chiefMeeting.ts, src/scenes/place/PlaceScene.tsx (the chief group, the
   collider resolve), src/scenes/place/layout.ts (the collider set), design.md §13.4, §15
+  Author lane: astra.
+  Why the lane: the communication mechanic is authored by Astra (user 08.09.2026); the
+  rendered picture, the browser suites and the landing stay in the main session.
   Bundle: Dorfleben.
-
-- [ ] 1077. The Astra lane is routed on paper and almost never authored (measured
-  08.09.2026, two findings of the same evening folded into one point).
-  CLAUDE.md §6 splits authoring across three lanes, and `author-routing-core.mjs` cuts the
-  374 open points 271 Astra / 103 Opus once criticality is read. The LANDINGS of the last
-  three days on `main` carry 174 Anthropic `Co-Authored-By` against 6 GPT-6 Astra (plus 12
-  `Reviewed-By` Astra). 6 against 174 is past measurement error, and trailers are a weak
-  proxy in ONE direction only: unlanded work and Astra's reading are invisible, so the true
-  Astra share can only be HIGHER than 6, never lower than the ratio suggests.
-  Part of the cause is visible: six of the first ten points in work-order order (1065, 1072,
-  659, 633, 174, 1068) enter the Opus lane on 'its VERIFICATION is the work', so the QUEUE
-  HEAD alone skews the sample. What is NOT measured is whether `author-astra.mjs` ever runs
-  for the 271 Astra points at all — `.claude/batch-activity.jsonl` carries no model-bearing
-  field and the string `author-astra` appears in it zero times.
-  Final state:
-  - It is MEASURED, once, whether the dispatcher actually delegates an Astra-lane point:
-    watch the next Astra-lane point and record whether `author-astra.mjs` ran. That answer
-    decides everything below; without it every lever is a guess.
-  - The three levers that cost no code and no test are applied where the measurement says
-    they help:
-    A — ORDER. The queue head is disproportionately Opus lane; Astra points move forward in
-    TASKS.md, and `queue-order-guard` keeps the dashboard in step.
-    B — THE EXISTING TAG. `Author lane: astra` as its own line in a point is read by
-    `authorLaneFor` BEFORE the verification branch (the source comment calls it 'the cheap
-    way back'). Eight open points are pure false hits, routed to Opus only because they
-    mention WebGPU/WebGL/Playwright in passing: 1072, 567, 498, 548, 568, 570, 725, 1012.
-    C — CRITICALITY. 96 of the 374 open points carry none at all, and HIGH routes to Astra
-    above the verification branch, so every genuinely high point left untagged stays here.
-  - NOT DONE: narrowing `VERIFICATION_MARKERS` or `HARD_MARKERS`. That is exactly the
-    infrastructure surgery the freeze (CLAUDE.md §2) excludes, the lists are hardened over
-    several cross-vendor rounds, and none of it is needed if the levers above suffice.
-  Test. No product code changes, so no product test. The measurement is the evidence: the
-  recorded observation of one Astra-lane dispatch, and the before/after cut of
-  `author-routing-core.mjs` over the open points.
-  Refs: scripts/author-routing-core.mjs (`authorLaneFor`, `criticalityOf`,
-  VERIFICATION_MARKERS, HARD_MARKERS), scripts/author-astra.mjs, scripts/astra-share.mjs,
-  scripts/fable-switch.mjs, .claude/batch-activity.jsonl, CLAUDE.md §6.
-  Bundle: Modell & Wächter.
 
 - [ ] 690. The classic game of tag moves to the port cities, and every document describes
   the rebuilt mechanic (user 13.08.2026, playing the deployed communication slice; point 692
@@ -7087,6 +7120,9 @@ Build order, chosen so no two parallel agents own the same file:
   backends, screenshot): walking past a group, at least one inhabitant's yaw turns
   measurably toward the player and returns afterwards, while the errands continue.
   DOCS: design.md §19.10 gains the glance beside the existing village vignettes.
+  Author lane: astra.
+  Why the lane: the communication mechanic is authored by Astra (user 08.09.2026); the
+  rendered picture, the browser suites and the landing stay in the main session.
 
 - [ ] 357. The village sounds inhabited (user 25.07.2026). Checked: the settlement
   soundscape in `src/systems/ambience.ts` runs exactly ONE layer for a village —
@@ -7199,6 +7235,9 @@ Build order, chosen so no two parallel agents own the same file:
   least one pair meets, both yaws turn toward each other, they part, and the errand
   targets are still reached afterwards; no walker is left standing past its window.
   DOCS: design.md §19.10 beside the existing village vignettes.
+  Author lane: astra.
+  Why the lane: the communication mechanic is authored by Astra (user 08.09.2026); the
+  rendered picture, the browser suites and the landing stay in the main session.
 
 - [ ] 362. The crossing turned back — the crocodile takes a calf mid-channel
   (user 26.07.2026; design.md §19.8 states the target). Two systems exist and have
@@ -9386,6 +9425,9 @@ to land than a mechanism that needs a review.
   see a child pass inside its window rather than at the end of a long one.
   Criticality: medium — nothing is broken, but the round's whole purpose is a picture the player
   currently has to wait minutes for.
+  Author lane: astra.
+  Why the lane: the communication mechanic is authored by Astra (user 08.09.2026); the
+  rendered picture, the browser suites and the landing stay in the main session.
   Bundle: Dorfleben.
 
 - [ ] 699. An actor label is drawn through the landmark label behind it (seen 17.08.2026 in the
@@ -14599,6 +14641,9 @@ to land than a mechanism that needs a review.
   Criticality: medium — it blocks landings that have nothing to do with it, and a retry-green is
   SUSPECT, which covers no backend at all.
   Refs: scripts/verify/polish.mjs (section speech-hypothesis), src/scenes/place/PlaceScene.tsx
+  Author lane: astra.
+  Why the lane: the communication mechanic is authored by Astra (user 08.09.2026); the
+  rendered picture, the browser suites and the landing stay in the main session.
   Bundle: Testinfrastruktur.
 
 - [ ] 1044. A crashed suite's stack is swallowed before any log can keep it, so the sign-off
@@ -14661,6 +14706,9 @@ to land than a mechanism that needs a review.
   hits, but not in the one the player is given.
   Refs: src/scenes/place/layout.ts (the `clearRun` sweep and the head ladder),
   src/scenes/place/layout.test.ts (`NO_STRAIGHT_WALK`)
+  Author lane: astra.
+  Why the lane: the communication mechanic is authored by Astra (user 08.09.2026); the
+  rendered picture, the browser suites and the landing stay in the main session.
   Bundle: Dorfleben.
 
 - [ ] 1046. The children's bank round hardly ever carries anyone past the middle of the
