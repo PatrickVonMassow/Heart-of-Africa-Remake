@@ -155,6 +155,16 @@ survive as LEG LABELS of that one round trip; neither is cast on its own. Like
 the two DIG words, the water words yield while a child is in earshot. Water
 fetching gains no pair mechanics beyond the two adults it takes.
 
+Two details the rule above decides, both of them ways the errand could otherwise
+speak or act into nothing. THE NEIGHBOUR IS A NEIGHBOUR: the addressee is the
+free adult already NEAREST the stand, and the order waits until he has actually
+walked there — a man declared to be at the stand without going to it would be
+ordered about from across the village, which is exactly the rule's violation.
+AND THE JAR IS SET DOWN BY ARRIVING, NOT BY SPEAKING: putting it on the stand is
+an act and owes no listener, so only the report to the sender waits for a
+hearing gap. Coupled to the word, a child standing in earshot until the errand
+expired carried the delivered jar away with it.
+
 A player may read the second RIVER as WATER. That is accepted rather than
 closed: the chief's message carries just as well as `WATER · UPSTREAM · ROCK ·
 DIG`. It is the one reading left open beside the three that ROCK deliberately

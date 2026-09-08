@@ -329,3 +329,22 @@ healthy for the ten days in which almost everything merged was infrastructure. T
 freeze of 01.09. is measurable: `scripts/` has since grown 6,700 rather than 75,000 lines per week.
 No player impact and no mechanism to build — this is the evidence base for the open Umsteuerung
 measures 4–9, recorded so the next stocktaking does not have to re-derive it.
+
+## The play rock's measured radius is an upper bound, not the surface (measured 08.09.2026)
+
+`playRockSurface.ts` bins each triangle EDGE's crossing of a ring height by bearing and keeps
+the LARGEST radius in each bin (`measure`, ~line 93); `fillGaps` then copies a neighbour's
+radius into any bin no edge crossed. Both err outward: the drawn face between two vertices lies
+INSIDE the radius of those vertices, so the answer is the circumscribed radius of the facet,
+not the facet. `reachFrom` therefore places the touching hand a little too far out — a hair of
+air rather than a hand through the stone, which is the harmless direction. Magnitude, measured
+against the constants: `PROFILE_BINS = 32` gives 11.25° bins, and the lookup rounds to the
+NEAREST bin, so the worst chord sagitta on a 1.2 m rock is 1.2·(1−cos 5.625°) ≈ 5.8 mm — under
+a centimetre, against a spec tolerance of "a few centimetres, never through it"
+(work-order 1065 PART A). Found by GPT-6 Astra's cross-vendor review of d35e890 and rated P1
+there; the measurement above is why it is filed here instead: no reproducible player impact,
+no blockade, and nothing deleted or simplified by fixing it (CLAUDE.md §2 finding intake). The
+exact fix, if the tolerance ever tightens, is to intersect the requested radial ray with the
+actual triangle cross-section rather than binning its endpoints. Note that `fillGaps` has no
+such bound — a bin with no crossing takes a neighbour's radius whole — so a much coarser rock
+mesh would need this looked at again.

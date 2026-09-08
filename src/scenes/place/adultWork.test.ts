@@ -285,17 +285,28 @@ describe('RIVER is a dispatch, not a commentary (work-order 1065)', () => {
   })
 
   it('holds the jar under the water for the configured seconds', () => {
+    // ONE JAR, NOT EVERY JAR. The village may well have two errands out at once,
+    // so a sum over all carriers measures how many men were at the water, not
+    // how long a dip lasts — it stayed under the budget only as long as the
+    // first errand happened to finish before a second one reached the water.
     const v = view(6)
     const state = createAdultWork(6, CFG)
-    let filling = 0
+    const filling = new Map<number, number>()
     for (let elapsed = 0; elapsed < 240; elapsed += 1 / 60) {
       walkFrame(state, v, 1 / 60)
-      for (let i = 0; i < 6; i++) if (taskOf(state, i)?.phase === 'fill') filling += 1 / 60
+      for (let i = 0; i < 6; i++) {
+        if (taskOf(state, i)?.phase === 'fill') filling.set(i, (filling.get(i) ?? 0) + 1 / 60)
+      }
       stepAdultWork(state, v, 1 / 60, CFG, () => 0.5)
       if (state.delivered > 0) break
     }
-    expect(filling).toBeGreaterThanOrEqual(CFG.fillSeconds * 0.9)
-    expect(filling).toBeLessThan(CFG.fillSeconds * 1.6)
+    // A dip still under way when the first delivery breaks the loop is only
+    // half measured, so the completed one is the longest: it has to reach the
+    // budget, and NO dip may run past it.
+    const dips = [...filling.values()]
+    expect(dips.length).toBeGreaterThan(0)
+    expect(Math.max(...dips)).toBeGreaterThanOrEqual(CFG.fillSeconds * 0.9)
+    expect(Math.max(...dips)).toBeLessThan(CFG.fillSeconds * 1.6)
   })
 
   it('sets the jar down on the stand, and the stand never holds more than it can', () => {
@@ -319,6 +330,107 @@ describe('RIVER is a dispatch, not a commentary (work-order 1065)', () => {
   it('never casts the return leg on its own', () => {
     expect(CASTABLE_SITUATIONS).not.toContain('water-back')
     expect(ADULT_SITUATIONS).toContain('water-back')
+  })
+
+  it('does not speak the order until the man it is spoken to has reached the stand', () => {
+    // The addressee used to be cast as ALREADY arrived at a spot he never walked
+    // to — and `arrived` is what stops the walk, so he stood wherever he was and
+    // the order carried across the village to him.
+    const v = view(6, [
+      { x: 0, z: 0 }, { x: 0.6, z: 0 }, { x: 40, z: 40 },
+      { x: 41, z: 40 }, { x: 42, z: 40 }, { x: 43, z: 40 },
+    ])
+    const state = createAdultWork(6, CFG)
+    let order: SpokenWord | null = null
+    for (let elapsed = 0; elapsed < 240 && !order; elapsed += 1 / 60) {
+      walkFrame(state, v, 1 / 60)
+      const word = stepAdultWork(state, v, 1 / 60, CFG, () => 0.5)
+      if (word?.errand === 'order') order = word
+    }
+    expect(order, 'the order was never spoken').not.toBeNull()
+    const listener = v.villagers[order!.to!]
+    // He is AT the stand when he is told, not somewhere across the village.
+    expect(Math.hypot(listener.x - STAND.x, listener.z - STAND.z))
+      .toBeLessThanOrEqual(JOIN_STAND_OFF + WORK_ARRIVE_RADIUS)
+  })
+
+  it('walks the full jar back to ground beside the stand, not onto the stand itself', () => {
+    // The stand is a collider. The departure leg was already moved off its own
+    // spot for that reason; the return walked straight back into it.
+    const v = view(6)
+    const state = createAdultWork(6, CFG)
+    const backGoals: Array<{ x: number; z: number }> = []
+    for (let elapsed = 0; elapsed < 240; elapsed += 1 / 60) {
+      walkFrame(state, v, 1 / 60)
+      for (let i = 0; i < 6; i++) {
+        const task = taskOf(state, i)
+        if (task?.situation === 'water-back') backGoals.push(goalOf(task))
+      }
+      stepAdultWork(state, v, 1 / 60, CFG, () => 0.5)
+      if (state.delivered > 0) break
+    }
+    expect(backGoals.length).toBeGreaterThan(0)
+    for (const goal of backGoals) {
+      expect(Math.hypot(goal.x - STAND.x, goal.z - STAND.z)).toBeCloseTo(JOIN_STAND_OFF, 5)
+    }
+  })
+
+  it('sets the delivered jar down even when a child holds the report back', () => {
+    // The jar used to go down only together with the word. A child within
+    // earshot until the errand expired therefore took a jar that had already
+    // been carried home: it vanished at the stand with nothing counted.
+    const v = view(6)
+    const state = createAdultWork(6, CFG)
+    let carrier = -1
+    for (let elapsed = 0; elapsed < 240 && carrier < 0; elapsed += 1 / 60) {
+      walkFrame(state, v, 1 / 60)
+      stepAdultWork(state, v, 1 / 60, CFG, () => 0.5)
+      for (let i = 0; i < 6; i++) if (taskOf(state, i)?.situation === 'water-back') carrier = i
+    }
+    expect(carrier, 'nobody ever carried water back').toBeGreaterThanOrEqual(0)
+    // From here on every child is within earshot: the report can never fall.
+    v.childrenHear = () => true
+    for (let elapsed = 0; elapsed < 240; elapsed += 1 / 60) {
+      walkFrame(state, v, 1 / 60)
+      stepAdultWork(state, v, 1 / 60, CFG, () => 0.5)
+      if (state.delivered > 0) break
+    }
+    expect(state.delivered).toBeGreaterThan(0)
+    expect(carryOf(state, carrier)).not.toBe('fullJar')
+  })
+
+  it('dips the jar even when one frame is longer than the whole fill', () => {
+    // Entering the fill used to be conditional on the first `dt` still being
+    // under the budget, so a single stalled frame left the carrier in `fetch`
+    // for the rest of the errand and no jar ever went into the water.
+    const v = view(6)
+    const state = createAdultWork(6, CFG)
+    // THE CARRIER THE STALL HIT, not whichever carrier happens to be dipping:
+    // a second errand's ordinary dip would answer for the one that was skipped.
+    let stalled = -1
+    let dipped = false
+    for (let elapsed = 0; elapsed < 240 && !dipped; elapsed += 1 / 60) {
+      walkFrame(state, v, 1 / 60)
+      if (stalled < 0) {
+        // The frame that CAUSES the arrival, not one that observes it: arriving
+        // and beginning the fill happen inside the same step, so `fetch` with
+        // `arrived` set is never visible from out here.
+        stalled = [...Array(6).keys()].find((i) => {
+          const task = taskOf(state, i)
+          if (!task || task.situation !== 'water-out' || task.phase !== 'fetch' || task.arrived) return false
+          const to = goalOf(task)
+          return Math.hypot(v.villagers[i].x - to.x, v.villagers[i].z - to.z) <= arriveRadiusOf(task)
+        }) ?? -1
+        // The stalled frame lands exactly on the arrival, which is where it hurt.
+        stepAdultWork(state, v, stalled >= 0 ? CFG.fillSeconds * 2 : 1 / 60, CFG, () => 0.5)
+      } else {
+        stepAdultWork(state, v, 1 / 60, CFG, () => 0.5)
+        if (taskOf(state, stalled)?.phase === 'fill') dipped = true
+        if (carryOf(state, stalled) === 'fullJar') break
+      }
+    }
+    expect(stalled, 'no carrier ever reached the water').toBeGreaterThanOrEqual(0)
+    expect(dipped, 'a long frame skipped the dip entirely').toBe(true)
   })
 })
 
