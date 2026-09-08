@@ -3994,9 +3994,19 @@ if (section('children-bank-game')) {
   // spectator-time knob, not a weakened assertion.
   const shippedRoam = await page.evaluate(() => {
     const b = window.__balance.villageLife.bankGame
-    const was = { roamSeconds: b.roamSeconds, roamGuardSeconds: b.roamGuardSeconds }
+    const was = {
+      roamSeconds: b.roamSeconds,
+      roamGuardSeconds: b.roamGuardSeconds,
+      tapPauseSeconds: b.tapPauseSeconds,
+    }
     b.roamSeconds = 8
     b.roamGuardSeconds = 8
+    // AND THE TAP IS HELD LONG ENOUGH TO PHOTOGRAPH (work-order 1065). The
+    // shipped pause is 1.5 s, which is right for a player and shorter than a
+    // headless shutter; the pose, the contact and the word are the SAME code
+    // path at 9 s. It is a spectator-time knob, like the roam above, and the
+    // shipped length is what `bankGame.test.ts` measures the hold against.
+    b.tapPauseSeconds = 9
     return was
   })
   await goToPlace('bambara-village')
@@ -4536,6 +4546,86 @@ if (section('children-bank-game')) {
       }
     }
   }
+  // --- THE TAPPING CHILD'S HAND ON ITS STONE (work-order 1065) ----------------
+  //
+  // The user watched a child say ROCK standing a metre off the rock it named and
+  // read the word as "go!". The Vitest layer proves the SOLVE — where to stand,
+  // which way to reach — against the mesh's own silhouette; what only the browser
+  // can settle is that the drawn hand ends on the drawn stone. So the reading is
+  // taken off the SCENE GRAPH: the hand mesh's world position, the flank the
+  // instanced rock presents at that height and bearing, and the gap between them.
+  if (staged) {
+    let bestTouch = null
+    let sawTouchPose = false
+    let stationTap = null
+    for (let i = 0; i < 400; i++) {
+      const now = await page.evaluate(() => (window.__placeTapHand ? window.__placeTapHand() : null))
+      if (now) {
+        if (now.gesture === 'touch') sawTouchPose = true
+        if (!bestTouch || Math.abs(now.gap) < Math.abs(bestTouch.gap)) bestTouch = now
+        // ...and the WORST reading while the round is holding at the stations,
+        // which is where the old defect lived: a hand out at the waiting station.
+        if (now.gesture === 'touch' && (!stationTap || Math.abs(now.gap) > Math.abs(stationTap.gap))) {
+          stationTap = now
+        }
+      }
+      if (bestTouch && Math.abs(bestTouch.gap) <= 0.06 && sawTouchPose) break
+      await nextFrames(2)
+    }
+    check(
+      'the tapping child reaches its stone at all (work-order 1065)',
+      !!bestTouch,
+      bestTouch ? `child ${bestTouch.tapper} at the ${bestTouch.end} rock` : 'no tapper was ever designated',
+    )
+    if (bestTouch) {
+      // THE DRAWN HAND MEETS THE DRAWN FLANK. The tolerance is the round's own
+      // 3 cm plus the 3 cm a walking child settles within, measured on the
+      // instanced stone rather than on a nominal radius.
+      check(
+        'and its DRAWN hand rests on the stone`s DRAWN flank, not a metre off it',
+        Math.abs(bestTouch.gap) <= 0.06,
+        `hand ${bestTouch.hand} at ${bestTouch.radius.toFixed(3)} m from the stone axis, its flank ` +
+          `${bestTouch.flank.toFixed(3)} m there — gap ${(bestTouch.gap * 100).toFixed(1)} cm ` +
+          `at height ${bestTouch.y.toFixed(2)} m`,
+      )
+      check(
+        'and the tap really is a TOUCH, held on the stone while the word falls',
+        sawTouchPose,
+        sawTouchPose ? 'the touch pose was seen running on the tapper' : 'the tapper never held a touch',
+      )
+      if (stationTap) {
+        check(
+          'and no tap is ever spoken from the waiting station',
+          Math.abs(stationTap.gap) <= 0.06,
+          `the worst touch measured stood ${(stationTap.gap * 100).toFixed(1)} cm off the flank`,
+        )
+      }
+
+      // The picture: the child at the stone, from a spectator's stance in the
+      // lane, close enough that a hand and a stone are two things.
+      const at = await page.evaluate((hand) => {
+        const p = window.__placePlayer
+        if (!p) return null
+        // Four metres off, on the lane side, level with the contact.
+        const bearing = Math.atan2(hand.x - hand.rock.x, hand.z - hand.rock.z)
+        p.x = hand.rock.x + Math.sin(bearing + 0.9) * 4.2
+        p.z = hand.rock.z + Math.cos(bearing + 0.9) * 4.2
+        p.yaw = Math.atan2(-(hand.x - p.x), -(hand.z - p.z))
+        p.pitch = -0.1
+        return { x: p.x, z: p.z }
+      }, bestTouch)
+      if (at) {
+        await nextFrames(4)
+        await frame('1065-tapping-child-at-its-rock', {
+          local: { x: bestTouch.x, y: bestTouch.y, z: bestTouch.z },
+          label:
+            `the tapping child at its rock: its hand on the drawn flank of the stone ` +
+            `(${(bestTouch.gap * 100).toFixed(1)} cm gap at ${bestTouch.y.toFixed(2)} m) while it names ROCK`,
+        })
+      }
+    }
+  }
+
   // The world goes back as it was found: the shipped roaming phase, and the game
   // left outside the settlement — every section after this one would otherwise be
   // reading a village this one staged.
@@ -4543,6 +4633,7 @@ if (section('children-bank-game')) {
     const b = window.__balance.villageLife.bankGame
     b.roamSeconds = was.roamSeconds
     b.roamGuardSeconds = was.roamGuardSeconds
+    b.tapPauseSeconds = was.tapPauseSeconds
   }, shippedRoam)
   await page.evaluate(() => window.__game.getState().leavePlace())
   await page.waitForFunction(() => !window.__game.getState().placeId, null, { timeout: 30000 })
@@ -4767,6 +4858,150 @@ if (section('adult-errands')) {
         label: 'the ground work the adults teach digging at, off the village middle',
       })
     }
+
+    // --- THE WATER IS VISIBLY FETCHED (work-order 1065) -----------------------
+    //
+    // The user could not tell that water was being fetched: the carrier stopped
+    // 2.7 m up the bank, the jar flipped from empty to full with no act between,
+    // and no water showed in it. The module tests hold the errand's SHAPE; what
+    // only the browser can settle is the picture — a jar going under the drawn
+    // surface, and a full one that reads as full.
+    //
+    // The fill is HELD long enough to photograph, exactly as the tap is: the
+    // shipped 2.4 s is right for a player and shorter than a headless shutter,
+    // and 9 s is the same code path.
+    const shippedFill = await page.evaluate(() => {
+      const e = window.__balance.villageLife.adultErrands
+      const was = e.fillSeconds
+      e.fillSeconds = 9
+      return was
+    })
+    let dipped = null
+    let carried = null
+    let ordered = null
+    for (let i = 0; i < 400; i++) {
+      const now = await page.evaluate(() => window.__placeErrands())
+      for (let k = 0; k < now.villagers.length; k++) {
+        const v = now.villagers[k]
+        if (!v.work) continue
+        // THE DIP: the jar in his hand, below the drawn water surface, at the
+        // waterline he is standing in.
+        if (v.work.phase === 'fill' && v.handJar && v.waterSurface != null) {
+          const under = v.waterSurface - v.handJar.base
+          if (!dipped || under > dipped.under) dipped = { who: k, under, ...v }
+        }
+        // THE RETURN: the full jar on his head, its water surface at the rim.
+        if (v.work.situation === 'water-back' && v.carry === 'fullJar' && v.headJar) {
+          if (!carried || v.headJar.y > carried.headJar.y) carried = { who: k, ...v }
+        }
+        // THE ORDER: the sender and the carrier both at the stand.
+        if (v.work.situation === 'water-out' && v.work.phase === 'invite') ordered = { who: k, ...v }
+      }
+      if (dipped && carried) break
+      await nextFrames(2)
+    }
+    check(
+      'the carrier goes INTO the water and dips the jar below its drawn surface (work-order 1065)',
+      !!dipped && dipped.under > 0,
+      dipped
+        ? `villager ${dipped.who} standing on ground at ${dipped.ground.toFixed(2)} m, the jar base ` +
+            `${dipped.handJar.base.toFixed(2)} m — ${(dipped.under * 100).toFixed(0)} cm under the water surface ` +
+            `at ${dipped.waterSurface.toFixed(2)} m`
+        : 'no carrier was ever seen filling a jar',
+    )
+    if (dipped) {
+      check(
+        'and he stands at the waterline rather than up the bank',
+        dipped.ground < 0,
+        `his footing is ${dipped.ground.toFixed(2)} m, i.e. ${(-dipped.ground * 100).toFixed(0)} cm below the ` +
+          `village plate — he is on the shore, in the water`,
+      )
+      const shot = await page.evaluate((v) => {
+        const p = window.__placePlayer
+        if (!p) return null
+        // Five metres inland of him, looking down at the jar.
+        const bearing = Math.atan2(v.x, v.z)
+        p.x = v.x - Math.sin(bearing) * 5
+        p.z = v.z - Math.cos(bearing) * 5
+        p.yaw = Math.atan2(-(v.x - p.x), -(v.z - p.z))
+        p.pitch = -0.22
+        return true
+      }, dipped)
+      if (shot) {
+        await nextFrames(4)
+        await frame('1065-carrier-dips-at-the-waterline', {
+          local: { x: dipped.handJar.x, y: dipped.handJar.y, z: dipped.handJar.z },
+          label:
+            `the carrier dipping at the waterline: the jar in his hand ` +
+            `${(dipped.under * 100).toFixed(0)} cm below the drawn water surface, his feet on the shore`,
+        })
+      }
+    }
+    check(
+      'and comes back with a jar that SHOWS its water (work-order 1065)',
+      !!carried,
+      carried
+        ? `villager ${carried.who} carrying the full jar on his head, its water surface at ` +
+            `${carried.headJar.surface.toFixed(2)} m, a shade under the rim at ${carried.headJar.rim.toFixed(2)} m`
+        : 'nobody was ever seen carrying water back',
+    )
+    if (carried) {
+      const shot = await page.evaluate((v) => {
+        const p = window.__placePlayer
+        if (!p) return null
+        // Close and LOW, so the open mouth of the jar on his head is in frame.
+        const bearing = Math.atan2(v.x, v.z)
+        p.x = v.x - Math.sin(bearing) * 3.4
+        p.z = v.z - Math.cos(bearing) * 3.4
+        p.yaw = Math.atan2(-(v.x - p.x), -(v.z - p.z))
+        p.pitch = 0.06
+        return true
+      }, carried)
+      if (shot) {
+        await nextFrames(4)
+        await frame('1065-carrier-walks-back-full', {
+          local: { x: carried.headJar.x, y: carried.headJar.surface, z: carried.headJar.z },
+          label:
+            `the carrier walking back with the full jar: the water surface standing at the rim of the ` +
+            `open jar on his head (${carried.headJar.surface.toFixed(2)} m)`,
+        })
+      }
+    }
+    // THE STAND, with the jars that have arrived on it and the two men whose word
+    // sends and reports. Photographed at the stand whether or not an order fell
+    // inside the window — the stand and its stock are the point.
+    const standShot = await page.evaluate(() => {
+      const s = window.__placeErrands()
+      const p = window.__placePlayer
+      const stand = s.water?.stand
+      if (!stand || !p) return null
+      const bearing = Math.atan2(stand.x, stand.z)
+      p.x = stand.x - Math.sin(bearing) * 4.4
+      p.z = stand.z - Math.cos(bearing) * 4.4
+      p.yaw = Math.atan2(-(stand.x - p.x), -(stand.z - p.z))
+      p.pitch = -0.16
+      return { stand, delivered: s.water.delivered, onStand: s.water.onStand }
+    })
+    check(
+      'the village keeps a water stand, and the fetched jars are set down on it',
+      !!standShot && standShot.delivered > 0 && standShot.onStand > 0,
+      standShot
+        ? `${standShot.delivered} deliveries, ${standShot.onStand} jars standing on it`
+        : 'the village carries no water stand',
+    )
+    if (standShot) {
+      await nextFrames(4)
+      await frame('1065-village-water-stand', {
+        local: { x: standShot.stand.x, y: 0.4, z: standShot.stand.z },
+        label:
+          `the village water stand where the errand is ordered and delivered: ` +
+          `${standShot.onStand} fetched jars standing on it after ${standShot.delivered} deliveries` +
+          (ordered ? ', with the errand cast' : ''),
+      })
+    }
+    await page.evaluate((was) => {
+      window.__balance.villageLife.adultErrands.fillSeconds = was
+    }, shippedFill)
 
     // --- The river itself (work-order 482) ------------------------------------
     // Two things only the live scene can settle: that the water is DRAWN in the

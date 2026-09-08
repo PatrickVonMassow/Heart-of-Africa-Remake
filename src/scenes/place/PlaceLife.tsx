@@ -56,12 +56,14 @@ import { utteranceOf } from '../../communication/lexicon'
 import { insidePlace } from './boundary'
 import { VILLAGE_WATER_STAND } from './layout'
 import { playRockFlank } from './playRockSurface'
-import { bankGroundHeight, standsOnGroundPlate, type PlaceRiverBank } from './riverBank'
+import { BANK_WATER_DROP, bankGroundHeight, standsOnGroundPlate, type PlaceRiverBank } from './riverBank'
 import { buildPlaceNavGrid, findPlaceRoute, navClearBetween, navRestrict, type NavPoint } from './routing'
 import { absorbSeparation, createTagGame, stepTagGame, type TagChild } from './tagGame'
 import {
   bankChildCanSeparate,
   createBankGame,
+  otherEnd,
+  rockAt,
   insideStrangerBerth,
   stepBankGame,
   type BankChild,
@@ -378,7 +380,10 @@ function Figure({
               <cylinderGeometry args={[L.armRadius[0], L.armRadius[1], armLen, segments]} />
               <meshStandardMaterial color={skin} roughness={0.88} />
             </mesh>
-            <mesh position={[0, -armLen, 0]} castShadow>
+            {/* Named so the verification can read where the hand ACTUALLY ended
+                up, rather than re-deriving it: a touch is judged by the drawn
+                hand meeting the drawn surface (work-order 1065). */}
+            <mesh name={i === 0 ? 'hand-left' : 'hand-right'} position={[0, -armLen, 0]} castShadow>
               <sphereGeometry args={[L.handRadius, ...TESSELLATION.figureHand]} />
               <meshStandardMaterial color={skin} roughness={0.85} />
             </mesh>
@@ -1019,6 +1024,50 @@ function Kids({
         walkedWhilePlaying: c.walkedWhilePlaying,
       })),
     })
+    // WHAT THE PICTURE DOES WITH THE TAPPING HAND (work-order 1065). Read off
+    // the SCENE GRAPH — the drawn hand's own world position — and compared with
+    // the drawn stone's flank at that height, so the live check measures the
+    // contact the player sees rather than the one the round solved for.
+    w.__placeTapHand = () => {
+      if (!bank || !stage) return null
+      const i = bank.tapper
+      const g = refs.current[i]
+      if (i < 0 || !g) return null
+      const end = otherEnd(bank.from)
+      const rock = rockAt(stage, end)
+      const hands: Array<{ hand: string; x: number; y: number; z: number; radius: number; flank: number; gap: number }> = []
+      g.updateWorldMatrix(true, true)
+      g.traverse((o) => {
+        if (o.name !== 'hand-left' && o.name !== 'hand-right') return
+        const p = new THREE.Vector3()
+        o.getWorldPosition(p)
+        const bearing = Math.atan2(p.x - rock.x, p.z - rock.z)
+        const radius = Math.hypot(p.x - rock.x, p.z - rock.z)
+        const flank = stage.flank(end, bearing, p.y)
+        hands.push({
+          hand: o.name,
+          x: p.x,
+          y: p.y,
+          z: p.z,
+          radius,
+          flank,
+          gap: radius - flank - FIGURE_LIMBS.handRadius * KID_SCALE,
+        })
+      })
+      // The hand that is ON the stone is the one nearest its flank; the other is
+      // hanging at the child's side.
+      const best = hands.sort((a, b) => Math.abs(a.gap) - Math.abs(b.gap))[0] ?? null
+      if (!best) return null
+      return {
+            ...best,
+            tapper: i,
+            phase: bank.phase,
+            end,
+            rock: { x: rock.x, z: rock.z },
+            gesture: gestures.current[i]?.current?.kind ?? null,
+      }
+    }
+
     // What the group has SAID so far this visit (point 481), by situation — a
     // live check can read the coverage the pure tests pin.
     w.__placeChildSpeech = () => ({
@@ -1028,9 +1077,10 @@ function Kids({
     })
     return () => {
       delete w.__placeTag
+      delete w.__placeTapHand
       delete w.__placeChildSpeech
     }
-  }, [round, game, speech, children, x, z, playRadius])
+  }, [round, game, speech, children, stage, x, z, playRadius])
 
   return (
     <>
@@ -2611,14 +2661,39 @@ function ErrandVillagers({
         digSites: geography.digSites.map((d) => ({ ...d })),
       },
       digProgress: digProgressOf(work, geography.digSites.length),
+      // WHAT THE PICTURE DOES WITH THE JARS (work-order 1065): read off the
+      // scene graph, so a live check measures the drawn jar against the drawn
+      // water rather than a number the module believes.
+      water: {
+        stand: geography.waterStand,
+        fill: geography.waterFill,
+        delivered: work.delivered,
+        onStand: standJars.current.filter((jar) => jar?.visible).length,
+      },
       villagers: people.map((p, i) => {
         const task = taskOf(work, i)
+        const jar = (ref: THREE.Object3D | null | undefined) => {
+          if (!ref || !ref.visible) return null
+          ref.updateWorldMatrix(true, false)
+          const at = new THREE.Vector3()
+          ref.getWorldPosition(at)
+          // The jar's own geometry: 0.32 tall about its centre, its rim 0.16
+          // above it and the water surface a shade under the rim.
+          return { x: at.x, y: at.y, z: at.z, base: at.y - 0.16, rim: at.y + 0.16, surface: at.y + 0.132 }
+        }
         return {
           x: p.x,
           z: p.z,
           free: p.free,
           digging: isDigging(work, i),
           carry: carryOf(work, i),
+          // The ground and the water where he is standing, from the same shore
+          // profile the mesh is built from: a dip is only a dip if the jar goes
+          // under the surface HE is standing in.
+          ground: bankGroundHeight(bank, p.x, p.z),
+          waterSurface: bank ? -BANK_WATER_DROP : null,
+          handJar: jar(handJars.current[i]),
+          headJar: jar(headJars.current[i]),
           work: task
             ? { situation: task.situation, phase: task.phase, x: task.x, z: task.z, arrived: task.arrived }
             : null,
@@ -2628,7 +2703,7 @@ function ErrandVillagers({
     return () => {
       delete w.__placeErrands
     }
-  }, [work, people, geography])
+  }, [work, people, geography, bank])
 
   return (
     <>
