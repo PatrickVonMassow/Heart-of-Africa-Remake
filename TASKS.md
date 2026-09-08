@@ -384,6 +384,26 @@ put it is the mistake this line exists to stop.
     against the elapsed hold, so a converging curve is told apart from a hand that never
     arrives. If it converges, the fix is that the tapper must be settled in the DRAWN world
     before the run opens, not only in the simulated one.
+  Fifth reading, 08.09.2026 17:30, WebGPU on the branch: THE HYPOTHESIS HELD, and the cause is
+  the DRAWING, not the round. It was measured rather than argued: the scene now records the
+  tapping child at the utterance itself (`__placeTapHand().opening`), and that reading was 54 cm
+  of arm off the stone with the shoulder still drawn at REST (0.04 rad), on the stone from the
+  next frame on. That is exactly the 58 cm the section had been failing at.
+  - THE MECHANISM. A figure applies its pose in its OWN frame callback, and React subscribes a
+    child's callback before its parent's — so a pose written by the scene was drawn one frame
+    late, and a gesture issued together with a word was drawn after the word had fallen. Body
+    position and facing never lagged: the scene writes those onto the group directly.
+  - THE FIX. `src/render/figurePose.ts` is now the one place that puts a pose on its pivots; a
+    figure publishes its pivots to the caller that owns its pose and stops applying an owned pose
+    itself. Both writers — the children at the bank and the adults at their work — apply in the
+    frame they write. Measured after: 1.6 cm off the drawn flank in the very frame the word falls.
+  - WHY THE RED CAME AND WENT. The check broke out of its sampling loop at its FIRST good
+    reading, so which single frame of a nine-second hold it measured was luck. It now reads the
+    hold frame by frame, prints the shape it read, and asserts the utterance frame from the
+    scene's own record instead of hoping a sample lands on it.
+  - NOT FIXED HERE, and no player impact known: the adults' `speakWork` runs AFTER their pose
+    loop, so an adult's gesture is still written on the frame after the word. Their teaching
+    checks are green and nothing measures it; noted rather than churned.
   Bundle: Dorfleben.
 
 - [ ] 1072. The village speaks with a direction, and the children sound like children (user
