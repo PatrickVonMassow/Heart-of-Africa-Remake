@@ -547,6 +547,16 @@ Die Ursache findest du durch **Zerlegen**, nicht durch Wiederholen.
   → *Prompt:* „Eine Entscheidung, die du selbst triffst, nennt die **Messung**, die sie stützen
   oder widerlegen würde, und **verfällt**, sobald diese Messung sauber vorliegt."
 
+- **Die Fortschrittszahl zählte den Umbau mit.** Zehn Tage lang meldete das Board zwölf
+  erledigte Punkte täglich — und das Produkt wuchs in derselben Zeit um 202 Zeilen, weil fast
+  alles davon Werkzeug, Prüfwerk und Steuerung war. Die Zahl war nie falsch, nur unspezifisch,
+  und eine unspezifische Erfolgszahl fällt beim Kippen nicht auf: Sie bestätigt weiter
+  Betriebsamkeit. Gemerkt hat es kein Werkzeug, sondern der Mensch, der aufs Produkt schaute.
+  → *Prompt:* „Miss Fortschritt **getrennt nach Ziel**: wie viel floss ins Produkt, wie viel in
+  Werkzeug und Absicherung? Nenne mir beides als Verhältnis pro Woche und eine Obergrenze für
+  den Werkzeuganteil. Prüffrage: Könnte meine Fortschrittszahl gut aussehen, während am Produkt
+  nichts passiert?"
+
 ---
 
 ## Drei Meta-Regeln, die alles zusammenhalten
@@ -585,4 +595,4 @@ Die Ursache findest du durch **Zerlegen**, nicht durch Wiederholen.
 
 Sie ersetzt die Fallstricke oben nicht.
 
-<!-- GUIDE-FINGERPRINT: cbf58433c5ed1950d2ae7473eb8dd250b18f75be3ecc1af81dad3b94a4010724 -->
+<!-- GUIDE-FINGERPRINT: e51bff79a5b0e72eef3b8845631caf4b358df8dbaf0732656bca17bae29657f6 -->

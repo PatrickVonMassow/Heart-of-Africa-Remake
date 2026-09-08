@@ -100,6 +100,7 @@ Das Musterbeispiel sind die Chat-Zeitstempel: neun Eskalationsstufen, acht weich
 | 07.09. abends | Beim Prüfen, ob das Verstummen der Erwachsenen entfallen kann: Dorfsprache hat gar keine Stereo-Ortung (kein Panner, ein Mono-Bus), und die Assertion `adult-atom-lost` nimmt ausgerechnet `hushed` als Freibrief — das Flag, dessen Mechanismus den Wortverlust erzeugt, entwaffnet die Prüfung darauf. Latent bei 10 m Hörweite, dauerhaft bei jeder Vergrößerung (§3.241) |
 | 07.09. abends | Ein Wächter hatte sich selbst vom Stand-down befreit, sein Heilmittel aber nicht: `doc-budget-guard` maß richtig und verlangte einen Schnitt, den die schreibgesperrte Sitzung nicht ausführen durfte — vier blockierte Zugenden, Reparatur nur per Träger an den Owner; dazu misst seine Zeilenzählung per `split` eine Zeile zu viel, die 50er-Decke sind 49 Inhaltszeilen (§3.243) |
 | 07.09. abends | Punkt 1070 verlor zweimal seine Regression, ohne Produktfehler: Der Lauf hängt in der Prozessgruppe der bestellenden Sitzung und wurde bei der Lock-Übergabe auf die Sekunde abgeschnitten — `exit 1` bei LEERER Fehlschlagliste, 51 von 76 Bildern. Die Lehre stand seit zehn Sitzungstoden für das Lande-Tor bereit, war aber nie ins Werkzeug gewandert (§3.244, Punkt 1074) |
+| 08.09. früh | Der Nutzer fand den Container zum dritten Mal in drei Tagen tot und fragte, warum es seit seinem Urlaub „nur schlechter" geworden sei. Gemessen: Die Maschinentode sind drei Tage alt, nicht vier Wochen — aber der Durchsatzeinbruch ist echt und älter, und die Merge-Zahl hatte ihn zehn Tage lang verdeckt, weil sie Infrastruktur mitzählte. `scripts/` wuchs seit dem 06.08. um 176.000 Zeilen, `src/` um 11.800; zwischen dem 20.08. und 01.09. um **202 Zeilen Spielcode in zwölf Tagen** (§3.247) |
 
 
 Muster: Ab dem 22.07. explodiert die Commit-Rate (Delegation) — und genau dann häufen sich die Infrastruktur-Vorfälle. **Skalierung der Autonomie erzeugt eine eigene Problemklasse, die die Feature-Arbeit zeitweise überholt.**
@@ -1440,7 +1441,7 @@ keinen Träger hat. Gebucht als Punkt 956.
 
 ## Anhang A — Maschinell gepflegte Quellen-Übersicht
 
-Zuletzt aktualisiert: Dienstag, 08.09.2026, 04:54 · Quellen-Fingerprint: `cbf58433c5ed…`
+Zuletzt aktualisiert: Dienstag, 08.09.2026, 07:50 · Quellen-Fingerprint: `e51bff79a5b0…`
 
 Spalten heuristisch aus den Quellen abgeleitet (Anläufe = distinkte Datumsnennungen im Memory;
 Maßnahme = Guard-Skripte mit Namens-Treffer). Die inhaltliche Bewertung gehört der Prosa oben.
@@ -1479,7 +1480,7 @@ Maßnahme = Guard-Skripte mit Namens-Treffer). Die inhaltliche Bewertung gehört
 | Work at High effort by default; the user reserves Extra high for research and design decisions, not implementation | 4 | hoch | — (Regel/Memory) | ◐ Regel |
 | Write idiomatic English in all English text (README, code comments, commit messages) — no German calques like 'stand' for a version | 1 | niedrig | — (Regel/Memory) | ◐ Regel |
 | Fable is NOT the default lane because its volume is the scarcest; difficulty is no reason for it either (since 18.08.2026 hard cases go straight to the OpenAI lane, GPT-6 Astra), and review is cross-vendor, not Fable-by-default | 6 | hoch | — (Regel/Memory) | ◐ Regel |
-| Findings recorded by a session that could not write the work order — carry each into TASKS.md, then mark it drained | 54 | hoch | findings-guard.mjs | ✔ Mechanismus |
+| Findings recorded by a session that could not write the work order — carry each into TASKS.md, then mark it drained | 61 | hoch | findings-guard.mjs | ✔ Mechanismus |
 | A recurring lookup gets a script; never pull raw transcripts, listings, or logs into context to answer it | 1 | niedrig | wait-command-guard.mjs | ✔ Mechanismus |
 | Past the 150k context watermark, FINISH the step and hand over — never start a suite, an agent or a point after it; the user raised the cost twice (13.08. and 17.08.2026) | 2 | mittel | — (Regel/Memory) | ◐ Regel |
 | User 18.08.2026: hard, complex, error-prone and HIGH-criticality points are AUTHORED by the OpenAI lane directly (GPT-6 Astra since 05.09.2026, GPT-5.6 Sol before) — Opus 5 authors only what is left, and Fable authors only a point that tags its lane or one the router escalates | 5 | hoch | — (Regel/Memory) | ◐ Regel |
@@ -1545,8 +1546,8 @@ Maßnahme = Guard-Skripte mit Namens-Treffer). Die inhaltliche Bewertung gehört
 
 Erfasste Quellen: 95 Feedback-/Projekt-Memories · 58 Guard-/Hook-Skripte · 6 Revert-/Reapply-Commits · 126 Prozess-/Meta-TASKS-Punkte (davon 60 offen).
 
-<!-- RETRO-FINGERPRINT: cbf58433c5ed1950d2ae7473eb8dd250b18f75be3ecc1af81dad3b94a4010724 -->
-<!-- RETRO-LAST-REFRESHED: 2026-09-08T02:54:19.350Z -->
+<!-- RETRO-FINGERPRINT: e51bff79a5b0e72eef3b8845631caf4b358df8dbaf0732656bca17bae29657f6 -->
+<!-- RETRO-LAST-REFRESHED: 2026-09-08T05:50:24.493Z -->
 <!-- AUTO-GENERATED:END -->
 
 ### 3.111 Ein Erfolg ist kein Beweis für den Weg, auf dem er zustande kam
@@ -5971,3 +5972,49 @@ Handlung, die wir ausdrücklich fördern: das Festhalten einer Lehre.
 **Lehre:** Was im Auslieferungspfad hängt, darf nur messen, was mit der
 Auslieferung mitreist. Alles andere macht eine fremde, erwünschte Handlung zur
 Ursache eines Stillstands, den niemand ihr zuordnet.
+
+### 3.247 Die Erfolgszahl zählte mit, was sie hätte messen sollen
+
+Am 08.09.2026 fragte der Nutzer, warum es seit seinem Urlaub (06.–08.08.) trotz
+großer Infrastruktur-Investition „nur schlechter" geworden sei. Die Messung gab
+ihm recht und widersprach zugleich seinem Datum — und der Unterschied ist die
+eigentliche Lehre.
+
+Die naheliegende Zahl, **Merges pro Tag auf `main`**, sah bis zum 28.08.
+kerngesund aus: 9 bis 16 Merges täglich, zehn Tage lang, danach 1 bis 4. Wer nur
+sie liest, verortet den Bruch am 29.08. Die Zeilenzahlen erzählen etwas anderes:
+`scripts/` wuchs von 97.542 Zeilen (06.08.) über 191.757 (20.08.) auf 273.603
+(08.09.), `src/` ohne Tests von 54.256 über 63.122 auf 66.038. Zwischen dem
+20.08. und dem 01.09. sind das **202 Zeilen Spielcode in zwölf Tagen** — bei
+zwölf Merges am Tag. Die offenen Punkte verdreifachten sich im selben Zeitraum
+von 118 auf 374.
+
+Die Zahl war nicht falsch, sie war unspezifisch: Sie zählte Merges, und
+Infrastruktur-Merges sind Merges. Genau darin liegt die Gefahr — eine
+unspezifische Erfolgszahl fällt nicht auf, wenn das Verhältnis kippt, sondern
+bestätigt weiter Betriebsamkeit. Der Stillstand wurde deshalb nicht von einer
+Messung entdeckt, sondern vom Nutzer, der auf das Spiel schaute; die Umsteuerung
+vom 01.09. (§3.227) war die Folge dieser Frage, nicht einer Kennzahl.
+
+Der Freeze wirkt messbar und reicht nicht: `scripts/` wächst seither 6.700 statt
+75.000 Zeilen pro Woche, aber seit dem 01.09. stehen 6.744 Infrastruktur-Zeilen
+gegen 2.714 Spiel-Zeilen — **71 % Infrastruktur-Anteil**. Das Tempo ist
+gedrittelt, das Verhältnis nicht gedreht. Maßnahme 8 des Plans („Erfolg neu
+messen: spielbarer Fortschritt pro Woche, Infra-Anteil ≤ 20–25 %") ist deshalb
+keine Buchhaltung, sondern die Maßnahme, die das Kippen beim nächsten Mal
+sichtbar macht, bevor der Nutzer fragen muss.
+
+Ein zweiter Befund desselben Morgens gehört daneben, weil er das gegenteilige
+Missverständnis korrigiert: Die Container-Tode, die den Anlass gaben, sind
+**nicht** Teil dieser Kurve. Das Aktivitätsjournal kennt genau drei
+(06.09. 03:07, 07.09. 12:12, 08.09. 05:26) und in den sechzehn Tagen davor
+keinen. Teuer war an ihnen nicht das Sterben, sondern die Nicht-Erholung: zwei
+Stunden am 08.09., drei Stunden zwanzig am 06.09., in denen niemand den Container
+zurückholte, obwohl `--restart=unless-stopped` gesetzt ist.
+
+**Lehren:** Eine Erfolgszahl, die den Anteil nicht kennt, misst Betriebsamkeit
+statt Fortschritt — sie muss trennen, worauf die Arbeit fiel, sonst bestätigt sie
+den Umbau, der das Produkt verdrängt. Und wenn ein Nutzer ein Datum nennt, ist
+die Frage ernst zu nehmen und das Datum nachzumessen: Sein Eindruck stimmte, sein
+Zeitpunkt lag drei Wochen daneben, und beide Hälften dieser Antwort ändern, was
+als Nächstes zu tun ist.
