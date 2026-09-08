@@ -5885,17 +5885,36 @@ if (section('chief-to-drummer')) {
     check('the message enters the heard memory once it has been beaten out', heard, 'never recorded')
     await page.evaluate(() => window.__ui.getState().setDialog(null))
     await standAt(inFrontOf({ x: stood.drummer[0], z: stood.drummer[1] }, 2), mid)
-    const repeatPrompt = await page.evaluate(async () => {
+    const repeatLabel = await page.evaluate(async () => {
       const { getStrings } = await import('/src/i18n/index.ts')
-      return {
-        prompt: document.querySelector('.prompt')?.textContent ?? '',
-        expected: getStrings().labels.repeatDrumMessage,
-      }
+      return getStrings().labels.repeatDrumMessage
     })
+    // Waited for BY NAME, exactly like the ask above. The nearest candidate owns
+    // the use key (point 691), so a villager whose own note stands a step nearer
+    // holds it for a moment — and while he does the bottom prompt is empty,
+    // because his note carries the invitation instead. Read in a single instant
+    // that is a coin toss; what the point promises is that the offer STANDS
+    // while the player stands there.
+    const offered = await stepUntil(
+      (want) => (document.querySelector('.prompt')?.textContent ?? '').includes(want),
+      repeatLabel,
+    )
+    // Read only when the wait ran out, and it names WHICH of the two reds it
+    // was: another speaker held the key, or the chief's own minute had run out
+    // under the player and he was already walking home.
+    const offeredWhy = offered
+      ? null
+      : await page.evaluate(() => ({
+          prompt: document.querySelector('.prompt')?.textContent ?? null,
+          owner: window.__ui.getState().useKeyOwner,
+          speaking: window.__speech?.labels().map((l) => l.speakerId) ?? null,
+          chief: window.__chief,
+          heard: window.__game.getState().drumMessageHeard,
+        }))
     check(
       'and the prompt then offers to have it beaten again',
-      repeatPrompt.prompt.includes(repeatPrompt.expected),
-      JSON.stringify(repeatPrompt),
+      offered,
+      offeredWhy ? `waited for: ${repeatLabel} — ${JSON.stringify(offeredWhy)}` : `named: ${repeatLabel}`,
     )
   }
 }
@@ -6062,6 +6081,24 @@ if (section('artefact-give')) {
         given.screen.y > 0 && given.screen.y < given.view.h,
       JSON.stringify({ spoke, atoms: given.atoms, screen: given.screen }),
     )
+    // HELD OPEN FOR THE SHUTTER, and only for it. The answer that was really
+    // given is measured LIVE in the check above — his own atoms, over his own
+    // anchor, inside the projection — but a note stands its few seconds only
+    // (speechLabelSeconds, pure-tested in Vitest), and it is held past them
+    // exclusively while its speaker is the nearest one (point 588). Composing
+    // this shot walks the traveller seven metres back, which hands that hold to
+    // whichever villager now stands nearer, and the scene-ready wait before a
+    // shutter is longer than the note's own life. So his OWN words go back over
+    // his OWN head with a lifetime that outlasts the wait — the same thing the
+    // speech-hypothesis frame does, and for the same reason. The check below
+    // still refuses a picture with no note in it.
+    if (Array.isArray(given.atoms) && given.atoms.length > 0) {
+      const held = await page.evaluate(
+        (atoms) => window.__speech?.speak('chief', atoms, 'chief', 120) === true,
+        given.atoms,
+      )
+      check('his answer is held over his head for the shutter', held, JSON.stringify(given.atoms))
+    }
     await frame('150-artefact-chiefs-answer', {
       local: { x: chiefStood.x, y: chiefStood.y + 2, z: chiefStood.z },
       label: 'the chief’s answer standing over his head after the find was given',
