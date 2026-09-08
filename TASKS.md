@@ -1107,7 +1107,17 @@ put it is the mistake this line exists to stop.
     IS THE LAST THING A SESSION DOES, so a fresh branch tip is evidence the writer just
     FINISHED, not that it is working. Final state: a branch tip alone may not keep a writer
     alive without process or worktree evidence beside it, or its grace drops well below one
-    tick — and the launcher says which evidence it stood on.
+    tick — and the launcher says which evidence it stood on. MEASURED AGAIN 08.09.2026,
+    20:26–20:56, and it CORRECTS that final state: worktree evidence is not the corroboration
+    it names. The predecessor handed over at its context mark; every launcher tick then
+    refused with `registered-writer-live … work output 14/18 min old (working files)` while
+    `ps` showed no author process at all — the fresh files were the output of the LARGE
+    regression that ran on alone in that worktree and finished at 20:36. A finished suite
+    writes working files exactly like a working author, so file mtimes are no liveness
+    signal beside a branch tip; both are traces a writer leaves BEHIND it. Half an hour of
+    standstill, and the red run lay unread. Final state, sharpened: liveness rests on a
+    measured PROCESS wherever one can be measured, and file or tip freshness may only
+    shorten a grace, never extend one.
   - A FOURTH SHAPE, measured 04.09.2026 ON THIS POINT'S OWN WORK three hours after the
     third and therefore the twenty-third union entry: the launcher TAKES the batch from a
     live owner and hands it to NOBODY. At 14:15:25Z it logged `TAKING THE BATCH despite a

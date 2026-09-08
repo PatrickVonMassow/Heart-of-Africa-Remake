@@ -102,6 +102,7 @@ Das Musterbeispiel sind die Chat-Zeitstempel: neun Eskalationsstufen, acht weich
 | 07.09. abends | Punkt 1070 verlor zweimal seine Regression, ohne Produktfehler: Der Lauf hängt in der Prozessgruppe der bestellenden Sitzung und wurde bei der Lock-Übergabe auf die Sekunde abgeschnitten — `exit 1` bei LEERER Fehlschlagliste, 51 von 76 Bildern. Die Lehre stand seit zehn Sitzungstoden für das Lande-Tor bereit, war aber nie ins Werkzeug gewandert (§3.244, Punkt 1074) |
 | 08.09. früh | Der Nutzer fand den Container zum dritten Mal in drei Tagen tot und fragte, warum es seit seinem Urlaub „nur schlechter" geworden sei. Gemessen: Die Maschinentode sind drei Tage alt, nicht vier Wochen — aber der Durchsatzeinbruch ist echt und älter, und die Merge-Zahl hatte ihn zehn Tage lang verdeckt, weil sie Infrastruktur mitzählte. `scripts/` wuchs seit dem 06.08. um 176.000 Zeilen, `src/` um 11.800; zwischen dem 20.08. und 01.09. um **202 Zeilen Spielcode in zwölf Tagen** (§3.247) |
 | 08.09. mittags | Die zweite Autorenspur war zugeteilt und nie beauftragt: Der Schalter stand richtig und die Regel gab 271 von 376 offenen Punkten an sie ab, doch die Sitzungsprotokolle zaehlen seit dem 04.09. 41 Reviews gegen 3 Autorenlaeufe, und von zwoelf geschlossenen Punkten gehoerten acht der Spur. Zwischen Zuteilung und Arbeit stand kein Aufruf ([§3.248](#3248-die-spur-war-zugeteilt-aber-nie-beauftragt)) |
+| 08.09. abends | Dritter Auftritt derselben Verwechslung, mit einem neuen Sensor: Nach der Kontextuebergabe um 20:26 lehnte der Starter jeden Tick mit `registered-writer-live` ab — „work output 14/18 min old (working files)" —, waehrend `ps` keinen einzigen Autorprozess zeigte. Die frischen Dateien waren die Ausgabe der grossen Regression, die in jenem Arbeitsbaum allein zu Ende lief und um 20:36 rot endete. Eine fertige Suite hinterlaesst Dateien wie ein arbeitender Autor; der Sollzustand von Punkt 1048 nennt Arbeitsbaum-Evidenz aber gerade als Gegenprobe zum frischen Zweigstand. Eine halbe Stunde Stillstand, der rote Lauf ungelesen, beendet wieder von einer Nutzerfrage ([§3.170](#3170-der-letzte-atemzug-wird-als-herzschlag-gelesen), Punkt 1048) |
 
 
 Muster: Ab dem 22.07. explodiert die Commit-Rate (Delegation) — und genau dann häufen sich die Infrastruktur-Vorfälle. **Skalierung der Autonomie erzeugt eine eigene Problemklasse, die die Feature-Arbeit zeitweise überholt.**
@@ -1442,7 +1443,7 @@ keinen Träger hat. Gebucht als Punkt 956.
 
 ## Anhang A — Maschinell gepflegte Quellen-Übersicht
 
-Zuletzt aktualisiert: Dienstag, 08.09.2026, 19:12 · Quellen-Fingerprint: `b533814b723c…`
+Zuletzt aktualisiert: Dienstag, 08.09.2026, 21:00 · Quellen-Fingerprint: `b89d61e90298…`
 
 Spalten heuristisch aus den Quellen abgeleitet (Anläufe = distinkte Datumsnennungen im Memory;
 Maßnahme = Guard-Skripte mit Namens-Treffer). Die inhaltliche Bewertung gehört der Prosa oben.
@@ -1547,8 +1548,8 @@ Maßnahme = Guard-Skripte mit Namens-Treffer). Die inhaltliche Bewertung gehört
 
 Erfasste Quellen: 95 Feedback-/Projekt-Memories · 58 Guard-/Hook-Skripte · 6 Revert-/Reapply-Commits · 126 Prozess-/Meta-TASKS-Punkte (davon 60 offen).
 
-<!-- RETRO-FINGERPRINT: b533814b723cd1d15bb3669d98590ca986505c909832d7cbc7679b25b938c231 -->
-<!-- RETRO-LAST-REFRESHED: 2026-09-08T17:12:33.820Z -->
+<!-- RETRO-FINGERPRINT: b89d61e902985767a462726a42dcfa0b29bb45af9f2fcbdbd0dc1e92db3b589c -->
+<!-- RETRO-LAST-REFRESHED: 2026-09-08T19:00:58.466Z -->
 <!-- AUTO-GENERATED:END -->
 
 ### 3.111 Ein Erfolg ist kein Beweis für den Weg, auf dem er zustande kam
@@ -3383,6 +3384,26 @@ das Letzte sein, was ein Sterbender hinterlässt?* Und für Verweigerungstexte: 
 Nachfolger in Großbuchstaben verbietet zu handeln, sollte die Messung, auf die er sich
 stützt, im selben Atemzug nennen — hier stand `judgedOn: "git"` als Feld in der Ausgabe und
 rettete die Diagnose, während der Fließtext daneben nur Gewissheit behauptete.
+
+**Nachtrag 08.09.2026, vierte Stufe — und sie widerlegt die Kur der dritten.** Punkt 1048
+hatte als Sollzustand notiert, ein frischer Zweigstand dürfe einen Autor nur dann am Leben
+halten, wenn *Prozess- oder Arbeitsbaum-Evidenz* danebensteht. An diesem Abend war es die
+Arbeitsbaum-Evidenz selbst, die log. Die Vorgängersitzung übergab um 20:26 an ihrer
+Kontextmarke; der Starter lehnte danach jeden Tick mit `registered-writer-live` ab und
+druckte den Grund mit: „work output 14/18 min old (working files)". Es gab keinen Autor —
+`ps` zeigte im ganzen Container nur einen Chat-Beobachter und einen CI-Wächter. Die frischen
+Dateien schrieb die grosse Regression, die in jenem Arbeitsbaum allein weiterlief und um
+20:36 rot endete. Eine halbe Stunde Stillstand, und ihr rotes Ergebnis lag ungelesen da, bis
+der Nutzer um 20:54 fragte, warum nichts passiert.
+
+Der Fehler ist derselbe wie in der dritten Stufe, nur eine Nachweisart weiter: Auch
+Datei-Zeitstempel sind eine Spur, die ein Arbeiter HINTER sich lässt, nicht ein Zeichen, dass
+er noch da ist — und eine fertig gewordene Suite hinterlässt sie in genau derselben Form wie
+ein tippender Autor. Zwei Spurarten gegeneinander abzusichern hilft deshalb nicht; beide
+zeigen in dieselbe Vergangenheit. Prüffrage, geschärft: *Ist mein Lebendzeichen eine Messung
+am Arbeiter — oder an dem, was er zurückgelassen hat?* Wo ein Prozess messbar ist, entscheidet
+er; Datei- und Zweigfrische dürfen eine Nachfrist nur verkürzen, nie verlängern. In Punkt 1048
+nachgetragen.
 
 ### 3.171 Ein Rot, das die Wiederholung heilt, ist das gefährlichste Rot
 
