@@ -49,6 +49,7 @@ import { markActor } from '../actorLabelSource'
 import { placeById } from '../../world/geo'
 import { useGame } from '../../state/store'
 import { START_YEAR, balance } from '../../config/balance'
+import { climbBoulder } from './looseRocks'
 import type { RegionPlaceStyle } from './regionStyles'
 import { nudgeToFree, nudgeWhere, PLAYER_RADIUS, resolveMove, spawnPointFree, standingClear, tryNudgeToFree, WALKER_RADIUS, type Collider } from './collision'
 import { utteranceOf } from '../../communication/lexicon'
@@ -563,7 +564,11 @@ function speakBankUtterance(
     ...aimAt(
       { x: speaker.x, z: speaker.z, yaw: speaker.facing },
       said.aim,
-      KID_SCALE * FIGURE_LIMBS.shoulderY,
+      // …plus whatever the speaker is STANDING ON (work-order 1080). `aimAt`
+      // reads the shoulder as a world height and the aim as a world point, so a
+      // child up on the boulder reported at ground level would point half a
+      // metre over the stone it is naming.
+      KID_SCALE * FIGURE_LIMBS.shoulderY + ((speaker as BankChild).lift ?? 0),
     ),
     phase: said.speaker * 1.1,
   })
@@ -926,8 +931,13 @@ function Kids({
       if (!g) return
       const phase = gaitPhase(c.walked, cadence)
       gaits.current[i].current = phase
-      const climbing = (c as BankChild).climbing === true
-      g.position.set(c.x, gaitBodyLift(phase, legLength) + (climbing ? 0.32 : 0), c.z)
+      // THE HEIGHT IS THE GAME'S, NOT THE VIEW'S (work-order 1080). What stood
+      // here was a constant 0.32 m switched on by a flag — a child hovering
+      // beside a stone rather than standing on one. The climb now carries its
+      // own lift in metres, taken from the boulder the child is actually on, and
+      // this only draws it.
+      const lift = (c as BankChild).lift ?? 0
+      g.position.set(c.x, gaitBodyLift(phase, legLength) + lift, c.z)
       // A TAGGED CHILD IS UNMISTAKABLY OUT OF PLAY (work-order 687 item 3):
       // squatted down, trunk folded over and both arms crossed in front of it.
       // Written here rather than as a prop, because the state changes inside the
@@ -2942,15 +2952,15 @@ export function PlaceLife({
     // would plausibly be standing at anyway. It is the guard that keeps ROCK
     // from meaning only a game target, so without one this settlement keeps the
     // old tag round just as a riverless village does.
-    let boulder: { x: number; z: number } | null = null
-    let best = Infinity
-    for (const [rx, rz] of rocks) {
-      const d = Math.hypot(rx - playGround.x, rz - playGround.z)
-      if (d < best) {
-        best = d
-        boulder = { x: rx, z: rz }
-      }
-    }
+    //
+    // A STONE THAT CAN BE STOOD ON (work-order 1080). The child climbs this one,
+    // so nearness alone is the wrong choice: the scatter draws its instance
+    // scale from 0.3 to 1.0, and on the small end of that a boulder is a pebble
+    // a child would step over. The nearest CLIMBABLE stone therefore wins, and
+    // where a settlement has none the tallest one it has is taken rather than
+    // the whole off-game ROCK being dropped — a low step still reads as getting
+    // up onto a rock, an unreachable guard reads as nothing at all.
+    const boulder = climbBoulder(rocks, playGround, balance.villageLife.bankGame.climbableRockTop)
     if (!boulder) return null
     return {
       upstream: playRocks.upstream,

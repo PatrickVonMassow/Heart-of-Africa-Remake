@@ -76,6 +76,10 @@ export type BankMoment = 'call' | 'boulder' | 'announce' | 'tap' | 'arrival'
  *  once outside the game altogether. */
 export type BankAim = 'water' | 'rock' | 'boulder'
 
+/** Where a child is in the climb onto the off-game boulder: on its way up, up
+ *  there, on its way down, or on the ground like everybody else. */
+export type ClimbStage = 'none' | 'up' | 'top' | 'down'
+
 /** One utterance of the round, ready to be spoken through the §13.4 hearing
  *  curve exactly as any other village speech is. */
 export interface BankUtterance {
@@ -113,9 +117,18 @@ export interface BankChild extends TagChild {
   goalZ: number
   /** How long the boulder approach has gone without getting any closer. */
   goalFor: number
-  /** Standing up against the ordinary boulder for the visible climb that
-   *  carries the off-game ROCK utterance. */
-  climbing: boolean
+  /** Where the child is in the climb onto the ordinary boulder that carries the
+   *  off-game ROCK utterance, and how long it has been in that stage. */
+  climb: ClimbStage
+  climbFor: number
+  /** How high the child's feet stand above the settlement's ground, in metres.
+   *  Zero for everybody who is not on a stone; the scene adds it to the gait's
+   *  own body lift, so the game owns the height and the view only draws it. */
+  lift: number
+  /** Where it stepped up FROM, so it comes down the same way rather than
+   *  appearing back at the stone's foot on some other side. */
+  footX: number
+  footZ: number
   /** A RUNNER's own lane across the stretch, in metres to one side of the line
    *  between the rocks. The group crosses in parallel lanes rather than in one
    *  column, which is what lets a catcher take one child and the others get
@@ -191,9 +204,17 @@ export interface BankStage {
   downstream: { x: number; z: number }
   /** Where the water lies — the point the RIVER call points at. */
   water: { x: number; z: number }
-  /** An ordinary scattered boulder in the village, climbed and named during the
-   *  roaming phase. A settlement without one must not construct this stage. */
-  boulder: { x: number; z: number }
+  /**
+   * An ordinary scattered boulder in the village, climbed and named during the
+   * roaming phase. A settlement without one must not construct this stage.
+   *
+   * It carries its own SIZE (work-order 1080), because the climb is played
+   * against the real stone: `radius` is the collider the approach has to stop
+   * outside of, and `height` is where the child's feet end up. Both come from
+   * the drawn instance, so the child stands on the stone the player sees rather
+   * than at a constant lift beside it.
+   */
+  boulder: { x: number; z: number; radius: number; height: number }
   /** The children's own quarter, out of earshot of the adults (point 481.4). */
   roam: { x: number; z: number; radius: number }
 }
@@ -241,6 +262,16 @@ export interface BankRoundConfig {
   /** How long a climber may make no progress toward the boulder before giving
    *  the obstructed approach up. A reachable stone keeps resetting this watch. */
   roamGoalSeconds: number
+  /** How far outside the boulder's own collider the approach ends and the step
+   *  up begins (work-order 1080). */
+  climbApproach: number
+  /** How long the step up onto the stone takes, how long the child then stands
+   *  on it, and how long the step back down takes. The hold is what gives a
+   *  player who hears ROCK the time to look over and see what is under the
+   *  child's feet. */
+  climbRiseSeconds: number
+  climbHoldSeconds: number
+  climbSinkSeconds: number
   /** The most OVERTIME the guard may hold a cycle for, past the roaming phase's
    *  own length. The watch above resets on any gain, so a child creeping at a
    *  stone it can never reach neither arrives nor fails; without this the phase
@@ -348,9 +379,119 @@ export interface BankState {
 const dist = (a: { x: number; z: number }, b: { x: number; z: number }) =>
   Math.hypot(a.x - b.x, a.z - b.z)
 
-/** Long enough to read as stepping onto the stone, short enough not to turn an
- *  active roaming child into an idle interval in the motion trace. */
-const BOULDER_CLIMB_SECONDS = 0.35
+/** Is this child on the stone, or on its way on or off it? */
+export function onStone(c: BankChild): boolean {
+  return c.climb !== 'none'
+}
+
+/** How near the boulder's CENTRE the approach walks before the child steps up:
+ *  the stone's own collider — which is what stops it walking any closer — plus
+ *  its own footprint and a small margin, so what follows is a step onto the
+ *  stone and not a leap at it from two metres out. */
+function climbFrom(boulder: BankStage['boulder'], cfg: BankRoundConfig, world: BankWorld): number {
+  return boulder.radius + world.childRadius + Math.max(0, cfg.climbApproach)
+}
+
+/** Back on the ground, wherever the round needs a climb cut short. */
+function endClimb(c: BankChild): void {
+  if (c.climb === 'none') return
+  c.x = c.footX
+  c.z = c.footZ
+  c.climb = 'none'
+  c.climbFor = 0
+  c.lift = 0
+}
+
+/**
+ * THE CLIMB (work-order 1080): the step up onto the stone, the stand on top of
+ * it, and the step back down.
+ *
+ * It is played as a MOVEMENT rather than a switch, because the switch is what
+ * shipped and what the player never saw: a 0.32 m lift held for 0.35 s while the
+ * child stood 2.2 m clear of the boulder. Here the child crosses the last
+ * stretch onto the stone's own centre as it rises, so the picture is a child
+ * getting up onto a rock; and it says ROCK from up there, standing still long
+ * enough for a player who hears the word to look over and find what it is
+ * standing on. That is the whole purpose of this stone — spec item 4 of
+ * `docs/communication-poc-spec.md`, the guard that keeps ROCK from being learned
+ * as "the thing you run to".
+ *
+ * The stone's collider is not consulted while it is up there: the child is ON
+ * the obstacle, not walking into it, and `bankChildCanSeparate` keeps the body
+ * separation off it for the same reason.
+ */
+function stepClimb(
+  s: BankState,
+  i: number,
+  dt: number,
+  cfg: BankConfig,
+  stage: BankStage,
+  world: BankWorld,
+): boolean {
+  const c = s.children[i]
+  const b = stage.boulder
+  c.climbFor += dt
+  // Standing, and TOLD to stand: `drive` with no goal is what resets the stall
+  // watches, so a child that holds still on a stone is never read as one that
+  // walked into something and got nowhere.
+  drive(s, i, null, false, dt, cfg, world)
+  if (c.climb === 'up') {
+    const t = Math.min(1, c.climbFor / Math.max(1e-6, cfg.climbRiseSeconds))
+    c.x = c.footX + (b.x - c.footX) * t
+    c.z = c.footZ + (b.z - c.footZ) * t
+    c.lift = b.height * t
+    // Up it goes facing the stone, the way anybody climbs one.
+    c.facing = turnToward(c.facing, Math.atan2(b.x - c.footX, b.z - c.footZ), cfg.turnRate * dt)
+    if (t >= 1) {
+      c.climb = 'top'
+      c.climbFor = 0
+      // THE WORD FALLS UP HERE, not on the way. Spoken at the foot of the stone
+      // it names whatever the child was walking past; spoken from the top of it,
+      // with the child's own gesture at the rock under its feet, it names the
+      // stone.
+      s.namedBoulder = true
+      // IT POINTS DOWN AT WHAT IT IS STANDING ON, and out toward the side it
+      // climbed from, so the arm has a direction: aimed at the stone's centre
+      // the gesture would be a vertical line under the child's own feet, which
+      // reads as nothing at all. The rim on the foot's side is the part of the
+      // stone a watcher can see past the child.
+      const away = Math.hypot(c.footX - b.x, c.footZ - b.z) || 1
+      say(s, {
+        concept: 'ROCK',
+        moment: 'boulder',
+        speaker: i,
+        gesture: 'indicate',
+        aim: {
+          x: b.x + ((c.footX - b.x) / away) * b.radius,
+          y: b.height,
+          z: b.z + ((c.footZ - b.z) / away) * b.radius,
+        },
+        at: 'boulder',
+      })
+    }
+    return false
+  }
+  if (c.climb === 'top') {
+    c.x = b.x
+    c.z = b.z
+    c.lift = b.height
+    // …and up there it turns round to face back over the quarter it climbed out
+    // of, which is where anybody who might look is standing.
+    c.facing = turnToward(c.facing, Math.atan2(c.footX - b.x, c.footZ - b.z), cfg.turnRate * dt)
+    if (c.climbFor >= cfg.climbHoldSeconds) {
+      c.climb = 'down'
+      c.climbFor = 0
+    }
+    return false
+  }
+  const t = Math.min(1, c.climbFor / Math.max(1e-6, cfg.climbSinkSeconds))
+  c.x = b.x + (c.footX - b.x) * t
+  c.z = b.z + (c.footZ - b.z) * t
+  c.lift = b.height * (1 - t)
+  if (t < 1) return false
+  endClimb(c)
+  return true
+}
 
 /** Deterministic per-child spread around 1 (never applied to a pace). */
 function spread(rand: () => number, variation: number): number {
@@ -372,7 +513,11 @@ export function wordToward(end: BankEnd): BankConcept {
  *  child is a fixed posture for the rest of its run: other bodies yield to it,
  *  but the pass must not rewrite the place where it was caught. */
 export function bankChildCanSeparate(c: BankChild): boolean {
-  return !c.crouched
+  // …and a child ON THE STONE is not in anybody's way either (work-order 1080):
+  // the separation works in the ground plane and knows nothing about the half
+  // metre it is standing above it, so left in the set it would be shoved off
+  // the boulder by whoever wandered past below.
+  return !c.crouched && !onStone(c)
 }
 
 /** A group at its spawn points, roaming. Every point must already be free — the
@@ -419,7 +564,11 @@ export function createBankGame(
       goalX: p.x,
       goalZ: p.z,
       goalFor: 0,
-      climbing: false,
+      climb: 'none' as ClimbStage,
+      climbFor: 0,
+      lift: 0,
+      footX: p.x,
+      footZ: p.z,
       settled: false,
       lane: 0,
       quarry: -1,
@@ -553,7 +702,7 @@ function openCycle(s: BankState, stage: BankStage, cfg: BankConfig): void {
     c.role = i === caller ? 'catcher' : 'runner'
     c.arrived = false
     c.crouched = false
-    c.climbing = false
+    endClimb(c)
     c.settled = false
   })
   s.phase = 'gather'
@@ -607,7 +756,7 @@ function openRun(s: BankState, stage: BankStage, cfg: BankConfig): void {
   for (const c of s.children) {
     c.arrived = false
     c.crouched = c.role === 'out'
-    c.climbing = false
+    endClimb(c)
     c.settled = false
   }
   // Each runner takes its own lane across the stretch, and every catcher starts
@@ -688,7 +837,7 @@ function openRoam(s: BankState, cfg: BankConfig, rand: () => number): void {
     c.role = 'runner'
     c.arrived = false
     c.crouched = false
-    c.climbing = false
+    endClimb(c)
     c.settled = false
   }
   // The approach is resolved against the live world on the first roaming step.
@@ -978,11 +1127,15 @@ function stepRoam(
   for (let i = 0; i < s.children.length; i++) {
     const c = s.children[i]
     c.goalFor += dt
-    if (i === s.climber && c.climbing) {
-      if (c.goalFor > BOULDER_CLIMB_SECONDS) c.climbing = false
+    // A child that is on the stone is played by the climb, not by the wander —
+    // and when it steps off it takes a fresh heading like any other child that
+    // has just finished something.
+    if (onStone(c)) {
+      if (stepClimb(s, i, dt, cfg, stage, world)) roamGoal(c, rand)
+      continue
     }
-    const climbing = i === s.climber && !s.namedBoulder
-    if (climbing) {
+    const approaching = i === s.climber && !s.namedBoulder
+    if (approaching) {
       const boulder = stage.boulder
       const nearest = Math.hypot(c.goalX - boulder.x, c.goalZ - boulder.z)
       if (dist(c, boulder) < nearest - 1e-4) {
@@ -990,23 +1143,19 @@ function stepRoam(
         c.goalZ = c.z
         c.goalFor = 0
       }
-      if (dist(c, boulder) <= cfg.reachDistance) {
-        // THE BOULDER THAT IS NO PART OF THE GAME (spec item 4). Named where it
-        // stands, in the village, far from the two rocks the run is about — so
-        // ROCK cannot be read as "the thing you run to".
-        s.namedBoulder = true
-        c.climbing = true
+      if (dist(c, boulder) <= climbFrom(boulder, cfg, world)) {
+        // THE BOULDER THAT IS NO PART OF THE GAME (spec item 4). Climbed and
+        // named where it stands, in the village, far from the two rocks the run
+        // is about — so ROCK cannot be read as "the thing you run to". The
+        // approach ends HERE, at the stone's own edge; `stepClimb` takes the
+        // child the last stretch onto it and speaks the word from up there.
+        c.footX = c.x
+        c.footZ = c.z
+        c.climb = 'up'
+        c.climbFor = 0
         c.goalFor = 0
         clearPath(c)
-        say(s, {
-          concept: 'ROCK',
-          moment: 'boulder',
-          speaker: i,
-          gesture: 'indicate',
-          aim: { x: boulder.x, y: 0.8, z: boulder.z },
-          at: 'boulder',
-        })
-        roamGoal(c, rand)
+        continue
       } else if (c.goalFor > cfg.roamGoalSeconds) {
         // The player sees the child stop pressing an obstructed route and
         // return to the group's wander while the next nearest child tries. The
@@ -1452,6 +1601,11 @@ function assertRoundSound(s: BankState, cfg: BankConfig): void {
 function assertPlaced(s: BankState, world: BankWorld): void {
   for (let i = 0; i < s.children.length; i++) {
     const c = s.children[i]
+    // A CHILD ON THE STONE IS INSIDE ITS COLLIDER BY DESIGN (work-order 1080),
+    // and standing half a metre above the ground the collider guards. The
+    // ground-plane test cannot tell that apart from a child wedged in a hut, so
+    // the climb is exempt for exactly as long as it lasts.
+    if (onStone(c)) continue
     devAssert(
       !world.blocked(c.x, c.z),
       'bank-inside',

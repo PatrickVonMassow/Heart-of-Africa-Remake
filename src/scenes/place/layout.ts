@@ -12,6 +12,7 @@ import { boxCollider, nudgeToFree, spawnPointFree, standingClear, PLAYER_RADIUS,
 import { CHIEF_HUT, MARKET_HUT, dwellingRoofProfile, hutRoofProfile, roofStandOff } from './roofClearance'
 import { windingPoints, laneSlots, closestOnPolyline, bendAround, type LaneSlot } from './lanePlan'
 import { buildGizaLayout } from './gizaSite'
+import { looseRockRadius } from './looseRocks'
 import { ROCK_FOOTPRINT_UNITS } from '../../world/communicationRock'
 import {
   BANK_FADE_ANGLE,
@@ -1696,8 +1697,8 @@ export function buildLayout(placeId: string, seed: number): PlaceLayout {
     const x = Math.cos(a) * r
     const z = Math.sin(a) * r
     const s = 0.3 + rand() * 0.7
-    if (!isFree(x, z, 2) || onLane(x, z, 0.35 + s * 0.5)) continue
-    if (!clearOfDressing(x, z, 0.35 + s * 0.5)) continue
+    if (!isFree(x, z, 2) || onLane(x, z, looseRockRadius(s))) continue
+    if (!clearOfDressing(x, z, looseRockRadius(s))) continue
     rocks.push([x, z, s])
   }
 
@@ -1712,11 +1713,11 @@ export function buildLayout(placeId: string, seed: number): PlaceLayout {
   for (let i = flora.length - 1; i >= 0; i--)
     if (onWayOut(wayOut, radius, flora[i].x, flora[i].z, 0.45)) flora.splice(i, 1)
   for (let i = rocks.length - 1; i >= 0; i--)
-    if (onWayOut(wayOut, radius, rocks[i][0], rocks[i][1], 0.35 + rocks[i][2] * 0.5)) rocks.splice(i, 1)
+    if (onWayOut(wayOut, radius, rocks[i][0], rocks[i][1], looseRockRadius(rocks[i][2]))) rocks.splice(i, 1)
 
   // ... and the loose dressing joins them once it has been scattered.
   for (const t of flora) colliders.push({ x: t.x, z: t.z, r: 0.45 })
-  for (const [x, z, s] of rocks) colliders.push({ x, z, r: 0.35 + s * 0.5 })
+  for (const [x, z, s] of rocks) colliders.push({ x, z, r: looseRockRadius(s) })
 
   // NO COLLIDER STANDS AT THE WATER (work-order 584). Work-order 482 had fenced
   // the waterline with an invisible panel so the last step could not carry the
