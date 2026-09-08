@@ -6,6 +6,31 @@ read-only and has neither `docker`, its socket, nor `wsl.exe`. The tracked
 configuration matched that mount before this change. Editing the tracked copy
 does not update the host configuration or the running container.
 
+## The three host commands
+
+Each step below is one call, staged outside the repository at
+`C:\Users\Patri\Documents\Developing\claude-code\hoa-host\` — a folder the
+container can read, so every report comes back without a hand-over. The sources
+are `scripts/windows/`; re-stage them with `node scripts/windows/stage-host-commands.mjs`.
+
+| Step | Command | Safe to run at any time |
+|---|---|---|
+| Evidence | `.\collect-crash-evidence.ps1 -Around "<death>"` | yes — reads only |
+| Deploy | `.\deploy-container-recovery.ps1` (`-WhatIfOnly`, `-Rollback`) | changes the active config; backs up first |
+| Proof | `.\restart-drill.ps1 [-IncludeEngineRestart]` | no — stops the container |
+
+The evidence step answers the question the container cannot: `docker inspect`
+exit code, `OOMKilled`, `RestartCount` and the gap between `FinishedAt` and the
+next `StartedAt`, the WSL crash-dump directory, the VM's memory ceiling from
+`.wslconfig`, and every System/Application event within ten minutes of each
+death — sleep and resume, Kernel-Power, Windows Update, Hyper-V and dxgkrnl.
+A death window with no Windows event at all is itself the answer: nothing on the
+Windows side acted, so the VM was lost rather than shut down.
+
+The deploy step copies FIVE files, not the three this document first named:
+`init-firewall.sh` also differs between the reviewed and the active copy, and
+rebuilding from the host's older one would silently narrow the network allowlist.
+
 ## Host remedy and evidence still required
 
 The incident brief records VM deaths at 12:11 and 12:45 during GPU browser suites,
