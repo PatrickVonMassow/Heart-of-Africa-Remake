@@ -361,12 +361,12 @@ put it is the mistake this line exists to stop.
     English and German debug labels changed together.
   - THE VILLAGE ALSO GETS LOUDER (user 07.09.2026: »Insgesamt soll die Sprache auch lauter
     sein«). Two more fields, both calibratable:
-    - SPEECH GETS ITS OWN VOLUME in the existing family beside `footstepVolume`,
-      `ambientVolume` and `birdsongVolume`. Measured today: a syllable peak is `SPEECH_PEAK`
-      1.8 times the distance gain times `ambienceVolume` 0.1 (`balance.ts`:871), and the chain
-      then applies the ambient bus 0.5 and the master 0.5 — so a villager beside the player
-      peaks near 0.045 at the output. `SPEECH_PEAK`'s own comment claims to compensate the
-      0.25 bus factor and never accounts for the 0.1.
+    - SPEECH GETS ITS OWN VOLUME: DONE before this point was reached, by "Give the village
+      speech its own bus instead of the 'everything else' slider" — `communication.speechVolume`
+      is 2 and a dedicated `speechBus` carries it to the master, so the syllables no longer ride
+      the ambient bus at all. `SPEECH_PEAK` and the 0.045 arithmetic this bullet was written
+      around are gone with it (re-measured 08.09.2026 during the wait on 1065). What is left of
+      the loudness half is the FALLOFF below.
     - THE HEARING FALLOFF IS RE-CALIBRATED. `hearingGain` is 1/(1 + falloff·(d/r)²) with a
       hard cut past r (`speaking.ts` ~78-87) and `hearingFalloff` is 24 (`balance.ts`:1437):
       a speaker 3 m away arrives at 31.6 % and one 5 m away at 14.3 % of the level beside
