@@ -4563,7 +4563,7 @@ if (section('children-bank-game')) {
     let stationTap = null
     let looseTouch = null
     let opening = null
-    let sawHold = false
+    let inHold = false
     let heldToTheEnd = false
     const holdTrace = []
     for (let i = 0; i < 400; i++) {
@@ -4584,12 +4584,21 @@ if (section('children-bank-game')) {
         // number; only the curve tells them apart, and only the written-against-
         // drawn pair says whether a late arrival is the pose or the drawing of
         // it (work-order 1065).
+        // COVERAGE IS PER HOLD, NEVER CARRIED ACROSS ONE. A latched flag would
+        // let the loop leave INSIDE a later hold on readings taken during an
+        // earlier one, which is the same coin toss in a longer disguise: the
+        // trace is therefore restarted at every hold and only a hold that was
+        // read from the word to its far side counts (GPT-6 Astra, second round).
         if (holding) {
+          if (!inHold) {
+            inHold = true
+            holdTrace.length = 0
+            stationTap = null
+          }
           holdTrace.push(now)
-          sawHold = true
-        } else if (sawHold) {
-          // The hold is over — the whole of it has now been read.
-          heldToTheEnd = true
+        } else if (inHold) {
+          inHold = false
+          heldToTheEnd = holdTrace.length >= 6
         }
         if (now.opening && (!opening || now.opening.tapper !== opening.tapper)) opening = now.opening
         if (holding && (!stationTap || Math.abs(now.gap) > Math.abs(stationTap.gap))) stationTap = now
@@ -4604,7 +4613,9 @@ if (section('children-bank-game')) {
       // every frame and runs THROUGH IT: a hand that arrives and then leaves
       // again is caught only by staying to the end, so the loop leaves on the
       // far side of a hold, never inside one.
-      if (bestTouch && Math.abs(bestTouch.gap) <= 0.06 && sawTouchPose && heldToTheEnd) break
+      // …and never from inside a hold: `inHold` is the current sample's own state,
+      // so the loop can only leave on the far side of one.
+      if (bestTouch && Math.abs(bestTouch.gap) <= 0.06 && sawTouchPose && heldToTheEnd && !inHold) break
       await nextFrames(now && now.phase === 'run' && now.tapFor > 0 ? 1 : 2)
     }
     check(
@@ -4630,11 +4641,11 @@ if (section('children-bank-game')) {
       )
       check(
         'and the whole hold was read, not one frame of it',
-        heldToTheEnd && holdTrace.length >= 6,
-        heldToTheEnd
-          ? `${holdTrace.length} readings from the word to the end of the hold`
-          : `the sampling left while the hold was still running (${holdTrace.length} readings) — ` +
-            'a hand that arrives and then leaves again would not be seen',
+        heldToTheEnd && !inHold,
+        heldToTheEnd && !inHold
+          ? `${holdTrace.length} readings across one hold, from the word to its far side`
+          : `the sampling left while a hold was still running (${holdTrace.length} readings ` +
+            'in the current one) — a hand that arrives and then leaves again would not be seen',
       )
       if (stationTap) {
         check(
