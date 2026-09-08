@@ -554,6 +554,13 @@ Die Ursache findest du durch **Zerlegen**, nicht durch Wiederholen.
   Zeit ist **Lesearbeit**, keine Repository-Operation. Und bevor du ein Rot untersuchst, sag mir
   **wer den roten Zustand erzeugt hat** — der Code oder der Lauf selbst."
 
+- **Die Regel sagt, WER es tun soll — und niemand zählt, ob es je übergeben wurde.** Du legst
+  fest, welche Arbeit an einen Helfer geht. Die Regel greift, jeder Bericht ist grün, und die
+  Arbeit macht das Werkzeug trotzdem selbst — weil zwischen Zuteilung und Ausführung nie ein
+  Aufruf steht. Nachetikettieren verbessert nur die Zahl im Bericht.
+  → *Prompt:* „Zähle nicht, wie viel du ZUGETEILT hast, sondern wie oft die Übergabe wirklich
+  stattfand — belege es an der Spur des Beauftragten, nicht an deiner eigenen Tabelle."
+
 ---
 
 ## Drei Meta-Regeln, die alles zusammenhalten
@@ -592,4 +599,4 @@ Die Ursache findest du durch **Zerlegen**, nicht durch Wiederholen.
 
 Sie ersetzt die Fallstricke oben nicht.
 
-<!-- GUIDE-FINGERPRINT: d29ef1f776b79c0a22fa2bff3e5fe89a7a3f988c0c0dbc5f649dacfbed4111c5 -->
+<!-- GUIDE-FINGERPRINT: 7acfb68e32db0f96d7b42be29cb7fc18af71623e8cb40e57fce43d9f8c8f53f6 -->

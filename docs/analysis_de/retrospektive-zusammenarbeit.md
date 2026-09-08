@@ -101,6 +101,7 @@ Das Musterbeispiel sind die Chat-Zeitstempel: neun Eskalationsstufen, acht weich
 | 07.09. abends | Ein Wächter hatte sich selbst vom Stand-down befreit, sein Heilmittel aber nicht: `doc-budget-guard` maß richtig und verlangte einen Schnitt, den die schreibgesperrte Sitzung nicht ausführen durfte — vier blockierte Zugenden, Reparatur nur per Träger an den Owner; dazu misst seine Zeilenzählung per `split` eine Zeile zu viel, die 50er-Decke sind 49 Inhaltszeilen (§3.243) |
 | 07.09. abends | Punkt 1070 verlor zweimal seine Regression, ohne Produktfehler: Der Lauf hängt in der Prozessgruppe der bestellenden Sitzung und wurde bei der Lock-Übergabe auf die Sekunde abgeschnitten — `exit 1` bei LEERER Fehlschlagliste, 51 von 76 Bildern. Die Lehre stand seit zehn Sitzungstoden für das Lande-Tor bereit, war aber nie ins Werkzeug gewandert (§3.244, Punkt 1074) |
 | 08.09. früh | Der Nutzer fand den Container zum dritten Mal in drei Tagen tot und fragte, warum es seit seinem Urlaub „nur schlechter" geworden sei. Gemessen: Die Maschinentode sind drei Tage alt, nicht vier Wochen — aber der Durchsatzeinbruch ist echt und älter, und die Merge-Zahl hatte ihn zehn Tage lang verdeckt, weil sie Infrastruktur mitzählte. `scripts/` wuchs seit dem 06.08. um 176.000 Zeilen, `src/` um 11.800; zwischen dem 20.08. und 01.09. um **202 Zeilen Spielcode in zwölf Tagen** (§3.247) |
+| 08.09. mittags | Die zweite Autorenspur war zugeteilt und nie beauftragt: Der Schalter stand richtig und die Regel gab 271 von 376 offenen Punkten an sie ab, doch die Sitzungsprotokolle zaehlen seit dem 04.09. 41 Reviews gegen 3 Autorenlaeufe, und von zwoelf geschlossenen Punkten gehoerten acht der Spur. Zwischen Zuteilung und Arbeit stand kein Aufruf ([§3.248](#3248-die-spur-war-zugeteilt-aber-nie-beauftragt)) |
 
 
 Muster: Ab dem 22.07. explodiert die Commit-Rate (Delegation) — und genau dann häufen sich die Infrastruktur-Vorfälle. **Skalierung der Autonomie erzeugt eine eigene Problemklasse, die die Feature-Arbeit zeitweise überholt.**
@@ -1441,7 +1442,7 @@ keinen Träger hat. Gebucht als Punkt 956.
 
 ## Anhang A — Maschinell gepflegte Quellen-Übersicht
 
-Zuletzt aktualisiert: Dienstag, 08.09.2026, 12:04 · Quellen-Fingerprint: `d29ef1f776b7…`
+Zuletzt aktualisiert: Dienstag, 08.09.2026, 12:59 · Quellen-Fingerprint: `7acfb68e32db…`
 
 Spalten heuristisch aus den Quellen abgeleitet (Anläufe = distinkte Datumsnennungen im Memory;
 Maßnahme = Guard-Skripte mit Namens-Treffer). Die inhaltliche Bewertung gehört der Prosa oben.
@@ -1546,8 +1547,8 @@ Maßnahme = Guard-Skripte mit Namens-Treffer). Die inhaltliche Bewertung gehört
 
 Erfasste Quellen: 95 Feedback-/Projekt-Memories · 58 Guard-/Hook-Skripte · 6 Revert-/Reapply-Commits · 126 Prozess-/Meta-TASKS-Punkte (davon 60 offen).
 
-<!-- RETRO-FINGERPRINT: d29ef1f776b79c0a22fa2bff3e5fe89a7a3f988c0c0dbc5f649dacfbed4111c5 -->
-<!-- RETRO-LAST-REFRESHED: 2026-09-08T10:04:38.290Z -->
+<!-- RETRO-FINGERPRINT: 7acfb68e32db0f96d7b42be29cb7fc18af71623e8cb40e57fce43d9f8c8f53f6 -->
+<!-- RETRO-LAST-REFRESHED: 2026-09-08T10:59:25.315Z -->
 <!-- AUTO-GENERATED:END -->
 
 ### 3.111 Ein Erfolg ist kein Beweis für den Weg, auf dem er zustande kam
@@ -6040,3 +6041,38 @@ Vorarbeit dieser Zeit ist Lesearbeit. Und ein rotes Urteil ist erst dann ein
 Befund über das Produkt, wenn geprüft ist, wer den roten Zustand erzeugt hat:
 Hier hätte die Zeile `FAIL unit` ohne Nachlesen eine Stunde Fehlersuche in
 grünem Code ausgelöst.
+
+### 3.248 Die Spur war zugeteilt, aber nie beauftragt
+
+Gemessen am 08.09.2026, ausgelöst durch eine Nutzerfrage: Warum liegt die Last
+weiter fast vollständig bei einem Anbieter, obwohl der Schalter seit dem
+Vortag auf die andere Spur zeigt? Der Schalter stand richtig, und die
+Zuteilungsregel arbeitete korrekt — sie gab 271 von 376 offenen Punkten an die
+zweite Spur. Trotzdem trugen die Landungen der letzten drei Tage 174
+Co-Authored-By-Zeilen des einen Anbieters gegen sechs des anderen.
+
+Die Ursache lag nicht in der Regel, sondern zwischen Regel und Ausführung. Die
+Sitzungsprotokolle des fremden Modells zählen seit dem 04.09. einundvierzig
+Review-Läufe gegen drei Autorenläufe, und diese drei decken zwei Punkte ab. Von
+den zwölf in drei Tagen geschlossenen Punkten gehörten acht der zweiten Spur;
+mindestens sechs davon wurden entgegen ihrer eigenen Zuteilung im Haupt-Fenster
+geschrieben. Die naheliegende Entschuldigung — der isolierte Arbeitsbaum fehle —
+trug nicht: drei laufende Zweige mit zusammen 146 Commits enthalten keinen
+einzigen Trailer der zweiten Spur. Der Mechanismus selbst war intakt und
+jederzeit lauffähig.
+
+Gefährlich daran ist die Form des Fehlers. Jede Prüfung, die man auf so eine
+Regel ansetzt, fällt grün aus: Der Schalter ist gesetzt, die Zuteilung
+begründet jeden einzelnen Punkt, der Bericht stimmt. Nur misst niemand, ob
+zwischen Zuteilung und Arbeit je ein Aufruf steht. Der erste Reflex war
+entsprechend falsch: mehr Punkte umzuetikettieren hätte die Zahl im Bericht
+verbessert und keine einzige Stunde Arbeit verschoben.
+
+**Lehre:** Eine Regel, die nur festlegt WER etwas tun soll, ist keine halbe
+Lösung, sondern gar keine — solange nichts misst, ob die Arbeit tatsächlich
+übergeben wird. Für jede solche Regel gehört eine Zählung an das andere Ende:
+nicht wie viele Punkte zugeteilt wurden, sondern wie viele beauftragt wurden.
+Und wenn eine Verteilung im Bericht anders aussieht als in der Wirklichkeit,
+ist die Wirklichkeit an ihrer eigenen Spur zu messen — hier an den
+Sitzungsprotokollen des beauftragten Modells, nicht an der Zuteilungstabelle,
+die genau das behauptet, was zu prüfen war.

@@ -391,7 +391,16 @@ export const LIMITS = {
   // two sessions of the tool on one project, both lifetime and ownership rather than a session
   // disturbing its own measurement, so folding would have dropped one of their claims. Its own
   // entry costs +7 lines / +83 words. Ceilings move 587 -> 594 with zero slack.
-  maxLines: 594,
+  // 08.09.2026 (second): the rule that names WHO should do the work while nothing counts whether
+  // it was ever handed over. Measured the same day on this project: a routing rule assigned 271
+  // of 376 open points to a second author, every report of it read green, and the session logs of
+  // that author held three authoring runs against forty-one reviews — no call stood between the
+  // assignment and the work, and re-labelling more points would only have improved the report.
+  // No existing entry carries it: the neighbouring ones are about a decision record that never
+  // expires and about a session disturbing its own check, neither about a rule whose audit passes
+  // because it only ever audits itself. Its own entry costs +7 lines / +87 words. Ceilings move
+  // 594 -> 601 with zero slack.
+  maxLines: 601,
   // EXACT FIT, not headroom — corrected 30.07.2026 after the four-eyes review
   // pointed out that this comment had long stopped describing the numbers. The
   // rule above ("raised only by the measured size of genuinely new tips")
@@ -619,7 +628,9 @@ export const LIMITS = {
   // the folded exemption-chain question 29: 5381 -> 5509.
   // 08.09.2026: the run-torn-up-by-its-own-session pitfall justified beside maxLines measures
   // 83 words: 5509 -> 5592.
-  maxWords: 5592,
+  // 08.09.2026 (second): the assigned-but-never-commissioned pitfall justified beside maxLines
+  // measures 87 words: 5592 -> 5679.
+  maxWords: 5679,
   // A pitfall entry = the risk lines plus its prompt. Anything longer is a
   // story, not a tip.
   maxEntryLines: 11,

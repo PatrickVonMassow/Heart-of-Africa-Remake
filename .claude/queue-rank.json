@@ -1195,12 +1195,6 @@
       "origin": "user",
       "place": "ahead"
     },
-    "1070": {
-      "at": "2026-09-07T11:33:35.892Z",
-      "why": "User order 07.09.2026: queue it directly behind 1069",
-      "origin": "user",
-      "place": "ahead"
-    },
     "1071": {
       "at": "2026-09-07T15:32:20.885Z",
       "why": "It is gated on host work only the user can perform — copying the reviewed .devcontainer onto Windows, rebuilding the container, running the no-editor restart drill — so no session can start it whatever its rank; moving it forward would park the batch on a human, and its board card is what actually reaches him.",
@@ -1229,6 +1223,18 @@
       "at": "2026-09-07T20:25:52.481Z",
       "why": "Es blockiert jeden Push nach main und damit jede Landung; die Blockade kehrt beim naechsten Memory-Schreiben von selbst zurueck.",
       "origin": "machine",
+      "place": "ahead"
+    },
+    "1076": {
+      "at": "2026-09-08T10:57:34.696Z",
+      "why": "Punkt 1076 ist eine Nutzer-Meldung vom 08.09.2026 zum Haeuptlingsauftritt und stand schon vor der Umstellung an dieser Stelle.",
+      "origin": "user",
+      "place": "ahead"
+    },
+    "1077": {
+      "at": "2026-09-08T10:57:26.960Z",
+      "why": "Der Nutzer hat am 08.09.2026 im Chat ausdruecklich 'Ziehe 1077 vor' angeordnet.",
+      "origin": "user",
       "place": "ahead"
     }
   },
@@ -1262,7 +1268,7 @@
     "why": "The order standing in front of the release today is the arrangement that predates this rule; the four machine-filed points that had ranked themselves there were moved behind 174 first"
   },
   "settled": {
-    "at": "2026-09-07T20:25:52.492Z",
+    "at": "2026-09-08T10:57:34.705Z",
     "points": [
       174,
       184,
@@ -1633,12 +1639,13 @@
       1063,
       1065,
       1068,
-      1070,
       1071,
       1072,
       1073,
       1074,
-      1075
+      1075,
+      1076,
+      1077
     ]
   }
 }
