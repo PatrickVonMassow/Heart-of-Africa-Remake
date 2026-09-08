@@ -780,6 +780,11 @@ export interface BalanceConfig {
        *  settlement is entered (like the children's count), so an edit takes
        *  effect on the next visit rather than mid-scene. */
       villagerCount: number
+      /** How long the jar stays under the water while it fills, in seconds. */
+      fillSeconds: number
+      /** How many jars the village water stand holds before a delivery replaces
+       *  the oldest one. */
+      standCapacity: number
     }
     /** The body every inhabitant presents to every other (work-order 578). */
     separation: {
@@ -1383,6 +1388,15 @@ export const balance: BalanceConfig = {
       stallSeconds: 20,
       pace: 1.25, // an unhurried working walk
       villagerCount: 4,
+      // How long the jar stays under the water (work-order 1065). Calibratable
+      // (educated guess, CLAUDE.md §2): long enough that a player who glances
+      // over sees the bend, the jar in the river and the lift as three things
+      // rather than as one flicker, short enough that the errand does not park a
+      // man in the shallows. The DIG bout runs 9 s beside it.
+      fillSeconds: 2.4,
+      // How many jars stand on the village water stand before a delivery
+      // replaces the oldest. Three reads as a stock without needing a consumer.
+      standCapacity: 3,
     },
     // The body every inhabitant presents to every other (work-order 578).
     // Calibratable starting values (educated guess, CLAUDE.md §2), stated

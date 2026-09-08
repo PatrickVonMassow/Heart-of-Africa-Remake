@@ -179,6 +179,31 @@ export function bankWaterFoot(
   return alongBank(bank, a, bank.walkEdge / Math.cos(a) - BANK_STAND_INSET)
 }
 
+/**
+ * How deep the water stands where a carrier fills a jar (work-order 1065). Ankle
+ * deep: he is IN the water rather than looking at it, and nowhere near the
+ * `balance.bankWadeDepth` a man wades to — a filling errand is not a crossing.
+ */
+export const BANK_FILL_DEPTH = 0.1
+
+/**
+ * WHERE THE WATER IS ACTUALLY FETCHED: the waterline on the water path's own
+ * bearing, out to the depth above.
+ *
+ * The carrier used to stop at `bankWaterFoot`, which sits `BANK_STAND_INSET`
+ * inside the walkable edge while the waterline lies `BANK_SHORE_HALF` beyond it
+ * — some 2.7 m short of the water, with the jar changing from empty to full
+ * where he stood. The player could not tell that water was being fetched at all
+ * (user, 06.09.2026). The spot is solved on the SAME shore profile the mesh is
+ * built from, so it is water the scene actually draws.
+ */
+export function bankFillSpot(
+  bank: Pick<PlaceRiverBank, 'nx' | 'nz' | 'fx' | 'fz' | 'distance' | 'walkEdge'>,
+): BankPoint {
+  const a = -BANK_PLATEAU_ANGLE * BANK_WATER_PATH_ANGLE_FRAC
+  return alongBank(bank, a, outAtDepth(bank, BANK_FILL_DEPTH) / Math.cos(a))
+}
+
 /** The two play rocks of a bank: the ends of the children's stretch, upstream
  *  and downstream, mirrored exactly as the bank's own stretch points are. */
 export function bankPlayRocks(

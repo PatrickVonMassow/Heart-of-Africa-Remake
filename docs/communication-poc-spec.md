@@ -134,8 +134,33 @@ traveller are calibratable under `balance.villageLife.bankGame`.
 
 ## The adults' work
 
-The adults teach RIVER through an empty-jar departure and a full-jar return at
-the village end of the water path. DIG is said twice in each of two paired
+NO VILLAGER SPEAKS TO NOBODY. Every adult utterance has an addressee who reacts
+and a consequence the player sees; the teaching comes from the act that follows
+the word, never from a word spoken beside an act.
+
+The adults teach RIVER as a DISPATCH — one errand, two legs, one carrier. At the
+village water stand beside the cooking fire, an adult turns to a free neighbour,
+says RIVER and points at the water; the neighbour takes the empty jar and walks
+down to the waterline. There he stands at the water's edge, ankle deep, bends
+and DIPS the jar visibly below the drawn surface, holds it there a calibratable
+moment, lifts it out and carries it on his head back to the stand, where he sets
+it down and says RIVER a second time to the man who sent him. Both utterances
+fall inside the village, at the stand; NO word falls at the water, which keeps
+the errand's speech clear of the children's bank game. Both jars have an open
+mouth: the empty one shows a dark hollow, the full one a water surface at the
+rim, so a jar reads as full or empty at a glance in either hand or on a head.
+The stand holds up to three standing jars and a fourth delivery replaces the
+oldest, so no consumer is needed. The situation ids `water-out` and `water-back`
+survive as LEG LABELS of that one round trip; neither is cast on its own. Like
+the two DIG words, the water words yield while a child is in earshot. Water
+fetching gains no pair mechanics beyond the two adults it takes.
+
+A player may read the second RIVER as WATER. That is accepted rather than
+closed: the chief's message carries just as well as `WATER · UPSTREAM · ROCK ·
+DIG`. It is the one reading left open beside the three that ROCK deliberately
+closes.
+
+DIG is said twice in each of two paired
 bouts at different excavations: an initiator first walks to a free adult and
 says it as an invitation, then both walk to the site, where the initiator says
 it again before they dig together with tools in hand. A bout with no second

@@ -345,7 +345,14 @@ export const DOC_BUDGETS = [
     // ROCK. New behaviour with a new player-reachable state (a run that opens
     // in silence because the stone is out of reach), not a longer telling of
     // the old tap.
-    maxWords: 28462,
+    // RAISED again by the 88 measured words work-order 1065's second half owes
+    // §13.4: RIVER stopped being a man narrating his own errand and became a
+    // DISPATCH — a word that sends somebody, a village water stand that did not
+    // exist, a visible dip at the waterline, jars that show whether they hold
+    // water, and the decision to ACCEPT the reading WATER for the second word.
+    // Five new player-reachable states and one accepted reading, none of them a
+    // longer telling of the empty-jar departure they replace.
+    maxWords: 28550,
     // A hundred words across 28k: design.md is edited section by section and a genuine
     // new decision runs 40–215 measured words, so the slack absorbs the rewording that
     // accompanies one and refuses the disappearance of a whole section without a
