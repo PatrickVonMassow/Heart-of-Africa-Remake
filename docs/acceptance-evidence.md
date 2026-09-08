@@ -1266,10 +1266,12 @@ it, so two gestures can never run on one body, and the same ref is what the
 speaking layer takes over when it arrives. The added geometry carries its
 per-level entry (`figureLimbSegments`, 5 / 8 / 12).
 Verifiable: the state machine is pure-tested — every kind's duration bounded,
-one kind per figure at every instant, the pose beginning and ending exactly at
-rest with no frame-to-frame jump, each kind visibly away from rest and
-distinguishable from the other three, and the arm maths cross-checked against a
-real `THREE.Object3D` with `YXZ` Euler order so the module and the renderer
+one kind per figure at every instant, the pose ending exactly at rest with no
+frame-to-frame jump and beginning there for every kind but the teaching TOUCH
+(point 1065: it is issued in the same frame as the word it belongs to, so it
+starts AT its pose instead of growing into it, and the test pins it as the only
+such kind), each kind visibly away from rest and distinguishable from the other
+three, and the arm maths cross-checked against a real `THREE.Object3D` with `YXZ` Euler order so the module and the renderer
 cannot drift (`src/render/gesture.test.ts`); the limb proportions and the
 scene's use of the shared constants and the quality lever in
 `src/render/figures.test.ts`; and the rendered poses are photographed at
