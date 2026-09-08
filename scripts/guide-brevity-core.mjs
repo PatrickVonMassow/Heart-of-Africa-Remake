@@ -400,7 +400,9 @@ export const LIMITS = {
   // expires and about a session disturbing its own check, neither about a rule whose audit passes
   // because it only ever audits itself. Its own entry costs +7 lines / +87 words. Ceilings move
   // 594 -> 601 with zero slack.
-  maxLines: 601,
+  // 08.09.2026: the aged-expectation pitfall adds one line net after the three compressions
+  // above: 601 -> 602.
+  maxLines: 602,
   // EXACT FIT, not headroom — corrected 30.07.2026 after the four-eyes review
   // pointed out that this comment had long stopped describing the numbers. The
   // rule above ("raised only by the measured size of genuinely new tips")
@@ -630,7 +632,11 @@ export const LIMITS = {
   // 83 words: 5509 -> 5592.
   // 08.09.2026 (second): the assigned-but-never-commissioned pitfall justified beside maxLines
   // measures 87 words: 5592 -> 5679.
-  maxWords: 5679,
+  // 08.09.2026 (third): the aged-expectation pitfall justified beside maxLines measures 52 words,
+  // and SHORTEN-BEFORE-RAISE was applied to three neighbouring entries — the growing-obligation,
+  // contradicting-checks and self-cancelling-instruction pitfalls gave back 62 between them
+  // without dropping a claim (the clause the test pins by name is untouched): 5679 -> 5669.
+  maxWords: 5669,
   // A pitfall entry = the risk lines plus its prompt. Anything longer is a
   // story, not a tip.
   maxEntryLines: 11,

@@ -495,12 +495,13 @@ Die Ursache findest du durch **Zerlegen**, nicht durch Wiederholen.
   Rückstand beim Abtragen: Wer ihn behebt, fasst die Datei an und schuldet neu.
   → *Prompt:* „Binde jede Prüfpflicht an den **einzelnen Beitrag**, nie an einen offenen Zeitraum, und
   buch ein Veto gegen den **Befund**: trenne **gelesen** von bloß berührt, quittiere eine Reparaturkette
-  am **Endzustand** als einen Beitrag. Eine Verweigerung nennt ihren **Grund**, nie ihren Bestand; sieht
-  eine Pflicht unerfüllbar aus, prüf zuerst dein **Messgerät**."
+  am **Endzustand** als einen Beitrag, und mach neue Befunde derselben Datei zum eigenen Ticket. Eine
+  Verweigerung nennt ihren **Grund**, nie ihren Bestand; sieht eine Pflicht unerfüllbar aus, prüf zuerst
+  dein **Messgerät**."
 
-- **Zwei Prüfungen, die einander widersprechen — Gehorsam sieht aus wie ein Verstoß.** Die eine
-  verlangt, freie Kapazität zu nutzen; die andere duldet keine Änderung, während sie läuft. Wer der
-  ersten folgt, bricht die zweite: Die Arbeit wird verworfen, obwohl genau das Verlangte getan wurde.
+- **Zwei Prüfungen, die einander widersprechen — Gehorsam sieht aus wie ein Verstoß.** Die eine verlangt,
+  freie Kapazität zu nutzen; die andere duldet keine Änderung, während sie läuft. Wer der ersten folgt,
+  bricht die zweite: Die Arbeit wird verworfen, obwohl genau das Verlangte getan wurde.
   → *Prompt:* „Jede Prüfung, die eine Handlung **fordert**, muss die Fenster kennen, in denen
   eine andere sie **verbietet**. Wer etwas verbietet, sagt selbst, **wann es wieder erlaubt**
   ist — nie versteckt im Quelltext eines dritten Werkzeugs. Prüffrage: Gibt es einen einzigen
@@ -558,8 +559,8 @@ Die Ursache findest du durch **Zerlegen**, nicht durch Wiederholen.
 
 - **Die gemessene Dauer von damals tötet den gesunden Lauf von heute.** Die Prüfung wächst weiter,
   ihre hinterlegte Erwartung nicht — und das Werkzeug erklärt einen rechnenden Lauf für hängend.
-  → *Prompt:* „Ein Urteil wie ‚hängt, abbrechen‘ darf nie allein auf einer hinterlegten Dauer stehen:
-  Solange der Prozess **rechnet** und sein Protokoll **wächst**, hängt er nicht."
+  → *Prompt:* „‚Hängt, abbrechen‘ darf nie allein auf einer hinterlegten Dauer stehen: Solange der
+  Prozess **rechnet** und sein Protokoll **wächst**, hängt er nicht."
 
 ---
 
