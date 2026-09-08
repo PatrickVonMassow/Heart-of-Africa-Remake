@@ -7,7 +7,7 @@
 .DESCRIPTION
     Run from an ORDINARY PowerShell on the Windows host. The agent cannot do
     this itself: the container sees /workspace/.devcontainer as a READ-ONLY
-    mount (deliberately — the running container is not allowed to rewrite its
+    mount (deliberately - the running container is not allowed to rewrite its
     own security overlay), so the reviewed files are staged next to this script
     and copied across from outside.
 
@@ -107,7 +107,7 @@ if ($hostOnly) {
 }
 
 if ($plan | Where-Object { $_.Action -eq 'MISSING IN STAGING' }) {
-    throw 'Staging is incomplete — refusing to deploy a half configuration.'
+    throw 'Staging is incomplete - refusing to deploy a half configuration.'
 }
 
 $todo = @($plan | Where-Object { $_.Action -in 'NEW', 'REPLACE' })
@@ -136,7 +136,7 @@ foreach ($row in $todo) {
 
 Write-Host ''
 Write-Host 'Deployed. THE CHANGE IS NOT LIVE YET.' -ForegroundColor Yellow
-Write-Host 'A reload does not install an entrypoint — the image must be rebuilt:' -ForegroundColor Yellow
+Write-Host 'A reload does not install an entrypoint - the image must be rebuilt:' -ForegroundColor Yellow
 Write-Host '  VS Code -> F1 -> "Dev Containers: Rebuild Container"' -ForegroundColor White
 Write-Host ''
 Write-Host 'Then prove it with the drill, which needs no editor:' -ForegroundColor Gray

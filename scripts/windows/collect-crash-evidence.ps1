@@ -7,17 +7,17 @@
 .DESCRIPTION
     Run from an ORDINARY PowerShell on the Windows host (no elevation needed for
     the Docker and WSL parts; the System event log may need elevation on some
-    machines — the script says so per section instead of failing).
+    machines - the script says so per section instead of failing).
 
     The container has neither a Docker socket nor wsl.exe, and its dmesg is
     empty, so three questions are unanswerable from inside and are exactly the
     ones that decide whether a death was the machine, the engine or the suites:
 
-      (a) HOW did the container exit — exit code, OOM flag, restart count, and
+      (a) HOW did the container exit - exit code, OOM flag, restart count, and
           whether the restart policy fired at all.
-      (b) Did the WSL VM itself crash — a dump under %LOCALAPPDATA%\Temp\wsl-crashes
+      (b) Did the WSL VM itself crash - a dump under %LOCALAPPDATA%\Temp\wsl-crashes
           is the only durable evidence, and Docker Desktop restarts erase the rest.
-      (c) What ELSE happened at that minute — a Windows update, a sleep/resume,
+      (c) What ELSE happened at that minute - a Windows update, a sleep/resume,
           an unexpected power event, a Hyper-V or dxgkrnl fault.
 
     The report is written next to this script by default, i.e. into the folder
@@ -84,7 +84,7 @@ function Add-Probe {
     try {
         $out = & $Body 2>&1
         if ($null -eq $out -or ($out | Measure-Object).Count -eq 0) {
-            Add-Line '(no rows — the source exists and returned nothing)'
+            Add-Line '(no rows - the source exists and returned nothing)'
         } else {
             $out | Out-String -Width 200 | ForEach-Object { Add-Line $_.TrimEnd() }
         }
@@ -120,7 +120,7 @@ if ($ContainerId) {
 
 if (-not $targets -or $targets.Count -eq 0) {
     Add-Section 'Docker: dev container inspection'
-    Add-Line '(no container with a vsc-* image found — pass -ContainerId explicitly)'
+    Add-Line '(no container with a vsc-* image found - pass -ContainerId explicitly)'
 } else {
     foreach ($id in $targets) {
         # The five fields that decide the question. ExitCode 137 is a SIGKILL
@@ -182,7 +182,7 @@ Add-Probe 'WSL: crash dumps' {
 Add-Probe 'WSL: .wslconfig (memory and processor ceiling of the VM)' {
     $cfg = Join-Path $env:USERPROFILE '.wslconfig'
     if (-not (Test-Path $cfg)) {
-        return "ABSENT: $cfg does not exist — WSL 2 then defaults to 50% of host RAM, which is the ceiling the browser suites run against"
+        return "ABSENT: $cfg does not exist - WSL 2 then defaults to 50% of host RAM, which is the ceiling the browser suites run against"
     }
     Get-Content $cfg
 }
@@ -244,14 +244,14 @@ foreach ($moment in $Around) {
         continue
     }
 
-    Add-Probe "Death window $($at.ToString('yyyy-MM-dd HH:mm')) +/- 10 min — EVERY System and Application row" {
+    Add-Probe "Death window $($at.ToString('yyyy-MM-dd HH:mm')) +/- 10 min - EVERY System and Application row" {
         $from = $at.AddMinutes(-10)
         $to = $at.AddMinutes(10)
         $rows = @()
         foreach ($log in 'System', 'Application') {
             $rows += Get-WinEvent -FilterHashtable @{ LogName = $log; StartTime = $from; EndTime = $to } -ErrorAction SilentlyContinue
         }
-        if ($rows.Count -eq 0) { return "(no event in either log between $from and $to — the machine logged nothing at all, which itself points at an abrupt VM loss rather than a Windows-side action)" }
+        if ($rows.Count -eq 0) { return "(no event in either log between $from and $to - the machine logged nothing at all, which itself points at an abrupt VM loss rather than a Windows-side action)" }
         $rows | Sort-Object TimeCreated |
             Select-Object TimeCreated, LogName, Id, LevelDisplayName, ProviderName, @{n = 'Message'; e = { ($_.Message -split "`n")[0] } }
     }

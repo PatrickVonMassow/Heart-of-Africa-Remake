@@ -10,7 +10,7 @@
 //
 // Re-run it after every change to a staged file; it overwrites and reports.
 
-import { copyFileSync, mkdirSync, existsSync, statSync, readdirSync } from 'node:fs'
+import { copyFileSync, mkdirSync, existsSync, statSync, readdirSync, readFileSync, writeFileSync } from 'node:fs'
 import { join, dirname } from 'node:path'
 import { fileURLToPath } from 'node:url'
 
@@ -48,13 +48,38 @@ mkdirSync(join(target, 'devcontainer'), { recursive: true })
 let copied = 0
 const missing = []
 
+// Windows PowerShell 5.1 reads a .ps1 without a byte-order mark as ANSI, not
+// UTF-8. On 08.09.2026 an em dash in a comment therefore arrived as "a-tilde
+// euro-quote" and the PARSER died on it, so the script was unusable on the only
+// machine it is for. Pure ASCII removes the question of encoding entirely, and
+// is enforced here rather than remembered.
+const nonAscii = (text) =>
+  [...text].map((c, i) => (c.charCodeAt(0) > 127 ? { c, i } : null)).filter(Boolean)
+
 for (const name of COMMANDS) {
   const from = join(here, name)
   if (!existsSync(from)) {
     missing.push(`scripts/windows/${name}`)
     continue
   }
-  copyFileSync(from, join(target, name))
+  const text = readFileSync(from, 'utf8')
+  if (name.endsWith('.ps1')) {
+    const bad = nonAscii(text)
+    if (bad.length) {
+      console.error(
+        `REFUSED ${name}: ${bad.length} non-ASCII character(s), first at offset ${bad[0].i} — ` +
+          'Windows PowerShell reads this file as ANSI and will not parse it',
+      )
+      missing.push(`scripts/windows/${name} (non-ASCII)`)
+      continue
+    }
+    writeFileSync(join(target, name), text, 'ascii')
+  } else {
+    // A .txt is read by a human in an editor, so it keeps its umlauts and gets
+    // the byte-order mark that makes Notepad show them correctly.
+    const withBom = text.startsWith('﻿') ? text : `﻿${text}`
+    writeFileSync(join(target, name), withBom, 'utf8')
+  }
   copied += 1
 }
 

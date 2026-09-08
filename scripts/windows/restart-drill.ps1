@@ -1,6 +1,6 @@
 <#
 .SYNOPSIS
-    Proves — or disproves — that the container comes back on its own after a
+    Proves - or disproves - that the container comes back on its own after a
     crash, without an editor, and that the batch launcher arms itself again.
 
 .DESCRIPTION
@@ -22,12 +22,12 @@
          stop is not mistaken for a failed recovery;
       3. `docker stop` followed by `docker start` from outside any editor,
          with a stopwatch;
-      4. how long the launcher needs to report a live PID and a FRESH tick —
+      4. how long the launcher needs to report a live PID and a FRESH tick -
          an exit code alone proves nothing and is not accepted;
       5. a second sample ten seconds later, so a launcher that starts and
          immediately dies is not recorded as a success;
       6. optionally (-IncludeEngineRestart) the same observation after a Docker
-         Desktop restart, which is what actually happens when the VM dies —
+         Desktop restart, which is what actually happens when the VM dies -
          there `docker start` must NOT be used: the restart policy has to fire
          by itself.
 
@@ -77,8 +77,11 @@ function Step { param([string] $Title) Say ''; Say ('-' * 74); Say "STEP $Title"
 
 function Record {
     param([string] $Name, [bool] $Ok, [string] $Detail)
-    $verdicts += [pscustomobject]@{ Check = $Name; Result = $(if ($Ok) { 'PASS' } else { 'FAIL' }); Detail = $Detail }
-    Say ("  [{0}] {1} — {2}" -f $(if ($Ok) { 'PASS' } else { 'FAIL' }), $Name, $Detail) $(if ($Ok) { 'Green' } else { 'Red' })
+    # $script: is required, not decoration: a bare assignment inside a function
+    # writes a LOCAL copy, and the verdict table at the end would print empty
+    # however many checks ran - a drill that silently reports nothing.
+    $script:verdicts += [pscustomobject]@{ Check = $Name; Result = $(if ($Ok) { 'PASS' } else { 'FAIL' }); Detail = $Detail }
+    Say ("  [{0}] {1} - {2}" -f $(if ($Ok) { 'PASS' } else { 'FAIL' }), $Name, $Detail) $(if ($Ok) { 'Green' } else { 'Red' })
 }
 
 # Run a command inside the container as the batch user, in the main checkout.
@@ -93,7 +96,7 @@ Say "host    : $env:COMPUTERNAME"
 
 # ------------------------------------------------------- step 1: identify it
 
-Step '1 — identify the container'
+Step '1 - identify the container'
 
 if (-not $ContainerId) {
     $candidates = @(docker ps --format '{{.ID}} {{.Image}}' | Where-Object { $_ -match '\svsc-' })
@@ -129,14 +132,14 @@ Record 'image entrypoint installed' ($entry -match 'container-entrypoint\.sh') "
 
 if ($entry -notmatch 'container-entrypoint\.sh') {
     Say ''
-    Say 'The container was not rebuilt with the reviewed configuration — the drill would' 'Yellow'
+    Say 'The container was not rebuilt with the reviewed configuration - the drill would' 'Yellow'
     Say 'only prove that Docker can start a container, not that it arms itself. Run' 'Yellow'
     Say 'deploy-container-recovery.ps1 and rebuild first.' 'Yellow'
 }
 
 # ------------------------------------------- step 2: state before, and safety
 
-Step '2 — state before the drill'
+Step '2 - state before the drill'
 
 $busy = In-Container $ContainerId @('bash', '-lc', 'pgrep -af "verify/run-all|playwright" || true')
 if ($busy -and ($busy | Out-String).Trim()) {
@@ -147,7 +150,7 @@ if ($busy -and ($busy | Out-String).Trim()) {
     Write-Host "Report: $reportPath"
     return
 }
-Say 'no browser suite running — safe to stop'
+Say 'no browser suite running - safe to stop'
 
 $statusBefore = In-Container $ContainerId @('node', 'scripts/batch-launcher.mjs', '--status')
 Say ''
@@ -160,7 +163,7 @@ $wasStopped = ($statusBefore | Out-String) -match '"?state"?\s*[:=]\s*"?stopped'
 if ($wasStopped) {
     Say ''
     Say 'The launcher is deliberately STOPPED. The drill can still prove that the' 'Yellow'
-    Say 'container returns, but not that it arms — start it first if you want that.' 'Yellow'
+    Say 'container returns, but not that it arms - start it first if you want that.' 'Yellow'
 }
 
 if (-not $Force) {
@@ -171,7 +174,7 @@ if (-not $Force) {
 
 # ------------------------------------------------- step 3: stop, then start
 
-Step '3 — docker stop, then docker start, from outside any editor'
+Step '3 - docker stop, then docker start, from outside any editor'
 
 Say "stopping $ContainerId ..."
 docker stop $ContainerId | Out-Null
@@ -188,7 +191,7 @@ Say "started again after $([math]::Round($watch.Elapsed.TotalSeconds,1)) s"
 
 # ------------------------------------ step 4: wait for a LIVE, TICKING launcher
 
-Step "4 — poll the launcher for a live PID and a fresh tick (max $TimeoutSeconds s)"
+Step "4 - poll the launcher for a live PID and a fresh tick (max $TimeoutSeconds s)"
 
 $armed = $false
 $lastOut = ''
@@ -220,7 +223,7 @@ if ($armed) {
 
 # --------------------------------------- step 5: still alive ten seconds later
 
-Step '5 — second sample after 10 s (a launcher that dies at once is not recovery)'
+Step '5 - second sample after 10 s (a launcher that dies at once is not recovery)'
 
 Start-Sleep -Seconds 10
 $second = In-Container $ContainerId @('node', 'scripts/batch-launcher.mjs', '--status')
@@ -235,14 +238,14 @@ Say ((docker logs --since 5m --timestamps $ContainerId 2>&1 | Select-Object -Las
 # --------------------------------- step 6: the engine restart, the real case
 
 if ($IncludeEngineRestart) {
-    Step '6 — Docker Desktop restart: the restart policy must fire WITHOUT docker start'
+    Step '6 - Docker Desktop restart: the restart policy must fire WITHOUT docker start'
 
     $before = (docker inspect $ContainerId --format '{{.State.StartedAt}}').Trim()
     Say "StartedAt before: $before"
 
     $dd = Get-Process 'Docker Desktop' -ErrorAction SilentlyContinue
     if (-not $dd) {
-        Say 'Docker Desktop is not running as a desktop process — skipping.' 'Yellow'
+        Say 'Docker Desktop is not running as a desktop process - skipping.' 'Yellow'
     } else {
         Say 'stopping Docker Desktop ...'
         $exe = $dd[0].Path
@@ -271,7 +274,7 @@ if ($IncludeEngineRestart) {
         }
     }
 } else {
-    Step '6 — skipped'
+    Step '6 - skipped'
     Say 'Docker Desktop restart not tested. That is the case that actually happens when'
     Say 'the VM dies, so run this again with -IncludeEngineRestart once the manual'
     Say 'stop/start half passes.'
@@ -287,10 +290,10 @@ if ($verdicts.Count -eq 0) {
     $failed = @($verdicts | Where-Object { $_.Result -eq 'FAIL' })
     if ($failed.Count -eq 0) {
         Say ''
-        Say 'ALL CHECKS PASSED — the container recovers unattended.' 'Green'
+        Say 'ALL CHECKS PASSED - the container recovers unattended.' 'Green'
     } else {
         Say ''
-        Say "$($failed.Count) CHECK(S) FAILED — the batch still dies with the VM." 'Red'
+        Say "$($failed.Count) CHECK(S) FAILED - the batch still dies with the VM." 'Red'
     }
 }
 
