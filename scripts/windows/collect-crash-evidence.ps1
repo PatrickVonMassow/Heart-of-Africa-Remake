@@ -179,6 +179,21 @@ Add-Probe 'WSL: crash dumps' {
         Select-Object LastWriteTime, @{n = 'SizeKB'; e = { [math]::Round($_.Length / 1KB, 1) } }, Name
 }
 
+# A kernel-panic file is a few kilobytes and names the failing subsystem in its
+# first lines. Listing it only proves the VM died; its CONTENT says of what, and
+# on 08.09.2026 that was the one thing the investigation still lacked.
+Add-Probe 'WSL: contents of the newest crash dumps' {
+    $dir = Join-Path $env:LOCALAPPDATA 'Temp\wsl-crashes'
+    if (-not (Test-Path $dir)) { return "ABSENT: $dir" }
+    $dumps = Get-ChildItem -File $dir | Sort-Object LastWriteTime -Descending | Select-Object -First 5
+    if (-not $dumps) { return 'no dump to read' }
+    foreach ($d in $dumps) {
+        "----- $($d.Name) ($($d.LastWriteTime)) -----"
+        Get-Content $d.FullName -TotalCount 200
+        ''
+    }
+}
+
 Add-Probe 'WSL: .wslconfig (memory and processor ceiling of the VM)' {
     $cfg = Join-Path $env:USERPROFILE '.wslconfig'
     if (-not (Test-Path $cfg)) {
