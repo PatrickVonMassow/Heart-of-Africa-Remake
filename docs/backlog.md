@@ -406,3 +406,27 @@ the Tuareg that "the wealthier MEN wear the bernus", while the scene puts the cl
 third of ARBITRARY figures — a rank gate standing where the source names a rank AND sex gate. It
 is the only place where the current depiction contradicts its own recorded source, and the
 cheapest thing to correct if the topic is ever picked up.
+
+## The LARGE run of 08.09.2026 started on a machine that was not quiet
+
+The quiet-machine check of the 1065 LARGE run reported MACHINE NOT QUIET at the shutter: a
+forgotten vite dev server from that very checkout was still running (pid 2848232, port 42729),
+and GPU load could not be read at all on this host (no sysfs `gpu_busy_percent`, no `nvidia-smi`).
+The pick contained startup, polish, voice, settings, enrichments and benchmark — precisely the
+timing-sensitive suites. The run proceeded and its pass/fail verdicts stand; its TIMING verdicts
+cover nothing, which is 115 minutes of measurement thrown away. The server was left alive because
+the run was still using the tree. Not filed as a point: point 296 already owns the quiet-machine
+check, and the fix is operational — shut the dev servers down before a LARGE run, not more
+mechanism.
+
+## A red first backend lane ends the LARGE run, so the second lane never runs
+
+Read on 08.09.2026 while reporting progress: with the WebGL 2 lane near its end and three suites
+already carrying a CANDIDATE REAL FAILURE, the remaining runtime was reported as "the same round
+again on WebGPU". That round cannot come. The run ended with exit 1 after 115m 20s and its
+receipt names `backend: WebGL 2` alone — a red first lane terminates the run. The consequence for
+any progress report: once lane one carries a candidate real failure, the remainder is the rest of
+lane one, never a second lane, and the covering second-backend run has to be started separately —
+which is exactly what `render-verify-guard` then demands before the branch may merge. The runner
+behaves correctly here; what was wrong was the reading of it, so this is a note rather than a
+point.

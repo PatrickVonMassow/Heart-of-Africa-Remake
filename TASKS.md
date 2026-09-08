@@ -15165,3 +15165,20 @@ to land than a mechanism that needs a review.
   src/world/forms.ts (`FORM_SOCKETS`, `socketPosition`), the use-key reach test and
   `spentSockets` in src/state/store.ts, docs/acceptance-criteria-detail.md §10.
   Bundle: Testinfrastruktur.
+
+- [ ] 1079. The only fix for a live vitest advisory is a semver-major jump, and the
+  advisory blocks every push until someone decides. GHSA-82fw-gwwq-j7x9 (path traversal /
+  arbitrary file read via the `@vitest/mocker` redirect) appeared on 08.09.2026 and made
+  `audit-check` red mid-session, which is the pre-push gate: the board could not publish and
+  the session boundary could not commit. It is recorded in the `ALLOW` map of
+  `scripts/audit-check.mjs` with the measured justification — dev-only dependency, never in
+  the shipped bundle, and the attack needs vitest BROWSER MODE while `vitest.config.ts` runs
+  `environment: 'jsdom'` with no browser block and nothing imports `@vitest/mocker`. That
+  acceptance buys time; it is not the answer. The answer is to decide the upgrade to vitest
+  4.1.11 deliberately: read its migration notes, run the full unit layer (14949 tests) and the
+  vitest type-check against it, and either land the jump or record why we stay on 3.2.7 and
+  what would change that. Do NOT let the ALLOW entry quietly become permanent — it names an
+  unfixed arbitrary-file-read in our own toolchain.
+  Refs: scripts/audit-check.mjs (`ALLOW`), vitest.config.ts, package.json (`vitest`,
+  `@vitest/coverage-v8`), scripts/verify/tiers.mjs (the unit tier), docs/backlog.md.
+  Bundle: Testinfrastruktur.

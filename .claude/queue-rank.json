@@ -1242,6 +1242,12 @@
       "why": "Zuletzt richtig: der Rote ist gebucht und blockiert keinen Merge mehr, der Fehler tritt sporadisch auf, und der Wiederholungslauf loest das Raetsel — er steht damit hinter jedem Punkt, den ein Spieler bei jedem Start sieht.",
       "origin": "machine",
       "place": "last"
+    },
+    "1079": {
+      "at": "2026-09-08T21:47:54.473Z",
+      "why": "Die Ausnahme haelt den Push frei, also draengt nur die Entscheidung selbst — und die gehoert hinter die Kommunikationspunkte und den Abschlussdurchlauf, nicht davor.",
+      "origin": "machine",
+      "place": "last"
     }
   },
   "boundary": {
@@ -1274,7 +1280,7 @@
     "why": "The order standing in front of the release today is the arrangement that predates this rule; the four machine-filed points that had ranked themselves there were moved behind 174 first"
   },
   "settled": {
-    "at": "2026-09-08T11:50:40.744Z",
+    "at": "2026-09-08T21:47:54.483Z",
     "points": [
       174,
       184,
@@ -1652,7 +1658,8 @@
       1075,
       1076,
       1077,
-      1078
+      1078,
+      1079
     ]
   }
 }

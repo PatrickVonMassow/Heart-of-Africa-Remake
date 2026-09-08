@@ -15,6 +15,18 @@ const ALLOW = new Map([
       '(the client TTS runs on onnxruntime/WASM) and is not run at build time, so ' +
       'it is not exploitable in the shipped game. No upstream fix as of 22.07.2026.',
   ],
+  [
+    'GHSA-82fw-gwwq-j7x9',
+    'vitest/@vitest/mocker (path traversal / arbitrary file read via the mocker ' +
+      'redirect): a DEV dependency that never enters the shipped bundle, and the ' +
+      'attack needs vitest BROWSER MODE, whose mocker serves the redirect over ' +
+      'HTTP. vitest.config.ts runs environment "jsdom" with no browser block, and ' +
+      'no file in src/, tests/ or scripts/ imports @vitest/mocker or uses a ' +
+      'redirect mock; the real browser checks run in Playwright instead. The only ' +
+      'fix offered on 08.09.2026 is vitest 4.1.11, a SEMVER-MAJOR jump under 14949 ' +
+      'unit tests — that upgrade is its own work-order point, not a midnight bump ' +
+      'that would leave the repository unpushable either way.',
+  ],
 ])
 
 let json
