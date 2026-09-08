@@ -1442,7 +1442,7 @@ keinen Träger hat. Gebucht als Punkt 956.
 
 ## Anhang A — Maschinell gepflegte Quellen-Übersicht
 
-Zuletzt aktualisiert: Dienstag, 08.09.2026, 12:59 · Quellen-Fingerprint: `7acfb68e32db…`
+Zuletzt aktualisiert: Dienstag, 08.09.2026, 13:52 · Quellen-Fingerprint: `7c441cf88b44…`
 
 Spalten heuristisch aus den Quellen abgeleitet (Anläufe = distinkte Datumsnennungen im Memory;
 Maßnahme = Guard-Skripte mit Namens-Treffer). Die inhaltliche Bewertung gehört der Prosa oben.
@@ -1547,8 +1547,8 @@ Maßnahme = Guard-Skripte mit Namens-Treffer). Die inhaltliche Bewertung gehört
 
 Erfasste Quellen: 95 Feedback-/Projekt-Memories · 58 Guard-/Hook-Skripte · 6 Revert-/Reapply-Commits · 126 Prozess-/Meta-TASKS-Punkte (davon 60 offen).
 
-<!-- RETRO-FINGERPRINT: 7acfb68e32db0f96d7b42be29cb7fc18af71623e8cb40e57fce43d9f8c8f53f6 -->
-<!-- RETRO-LAST-REFRESHED: 2026-09-08T10:59:25.315Z -->
+<!-- RETRO-FINGERPRINT: 7c441cf88b4458050e1c01fe5a1a7cff9c43cf1324dea546ef499ffddf96c405 -->
+<!-- RETRO-LAST-REFRESHED: 2026-09-08T11:52:54.544Z -->
 <!-- AUTO-GENERATED:END -->
 
 ### 3.111 Ein Erfolg ist kein Beweis für den Weg, auf dem er zustande kam
@@ -6076,3 +6076,29 @@ Und wenn eine Verteilung im Bericht anders aussieht als in der Wirklichkeit,
 ist die Wirklichkeit an ihrer eigenen Spur zu messen — hier an den
 Sitzungsprotokollen des beauftragten Modells, nicht an der Zuteilungstabelle,
 die genau das behauptet, was zu prüfen war.
+
+### 3.249 Eine gemessene Erwartung altert zu einem falschen Urteil
+
+`run-wait --plan polish` verspricht 5 Minuten 41 und 21 Bilder. Die Konstante dahinter ist
+sauber gemessen und sauber belegt — nur stammt sie vom 25.–27.07.2026. Seither ist die Suite
+auf 27 Abschnitte und 44 Bilder gewachsen: gemessen über alle vollständigen polish-Läufe in
+diesem Baum und seinen Arbeitsbäumen liegt der Median bei 1614 Sekunden, das Vierfache der
+Erwartung. Die Folge ist kein zu kurzes Warten, sondern ein falsches Urteil: `--await` gibt
+nach 9 Minuten auf, erklärt den Lauf nach 20 Minuten für HÄNGEND, bucht ihn als Stillstand in
+die Notfallspur und fordert seinen Abbruch — während der Chrome-GPU-Prozess mit 69 % und der
+Renderer mit 33 % rechnen und der Entwicklungsserver steht. Wer der Aufforderung folgt, tötet
+einen gesunden Lauf und muss die Stunde neu bezahlen.
+
+Das ist nicht die Klasse „ungemessen behauptet". Hier wurde gemessen, sorgfältig, mit Fenster
+und Stichprobenzahl im Dokument. Die Messung war zum Zeitpunkt ihrer Aufnahme richtig und ist
+seither still falsch geworden, weil das gemessene Objekt weiterwuchs und die Zahl nicht. Eine
+Konstante trägt ihr Messfenster im Kopf des Dokuments — aber niemand liest es, wenn das Werkzeug
+die Zahl als lebende Erwartung ausspricht. Verschärft wird es dadurch, dass das Nachmessen selbst
+kaputt ist: `measure-picture-cost.mjs` meldet für polish 127 Sekunden, weil es die kurzen
+`--section`-Läufe mitzählt, die per Konstruktion Teilstücke sind. Wer refreshen wollte, hätte die
+Zahl noch weiter nach unten gezogen.
+
+**Lehre:** Eine gemessene Konstante braucht ein Verfallsdatum oder einen Vergleich gegen die
+letzten echten Läufe, sonst verwandelt sie sich vom Beleg in eine Falle. Und ein Urteil so hart
+wie „HÄNGEND, brich ab" darf nicht allein auf einer Erwartung stehen: Solange der Prozess
+nachweislich rechnet und sein Log wächst, ist er nicht hängend, egal was die Tabelle sagt.

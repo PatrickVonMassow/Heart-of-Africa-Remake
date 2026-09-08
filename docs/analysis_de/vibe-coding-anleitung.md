@@ -491,35 +491,30 @@ Die Ursache findest du durch **Zerlegen**, nicht durch Wiederholen.
   nichts.“
 
 - **Die Pflicht wächst schneller, als du sie erfüllen kannst.** Verlangt eine Prüfung „alles seit
-  dem letzten Mal", wird sie unerfüllbar und setzt sich aus. Gilt ein Veto der **Datei** statt dem
-  Befund, wächst der Rückstand beim Abtragen: Wer ihn behebt, fasst die Datei an und schuldet
-  neu — während die Absage den ganzen Bestand druckt und den Platz dafür wegnimmt.
-  → *Prompt:* „Binde jede Prüfpflicht an den **einzelnen Beitrag**, nie an einen offenen Zeitraum,
-  und buch ein Veto gegen den **Befund**: trenne **gelesen** von bloß berührt, quittiere eine
-  Reparaturkette am **Endzustand** als einen Beitrag, und mach neue Befunde derselben Datei zum
-  eigenen Ticket. Eine Verweigerung nennt ihren **Grund**, nie ihren Bestand; sieht eine Pflicht
-  unerfüllbar aus, prüf zuerst dein **Messgerät**."
+  dem letzten Mal", wird sie unerfüllbar. Gilt ein Veto der **Datei** statt dem Befund, wächst der
+  Rückstand beim Abtragen: Wer ihn behebt, fasst die Datei an und schuldet neu.
+  → *Prompt:* „Binde jede Prüfpflicht an den **einzelnen Beitrag**, nie an einen offenen Zeitraum, und
+  buch ein Veto gegen den **Befund**: trenne **gelesen** von bloß berührt, quittiere eine Reparaturkette
+  am **Endzustand** als einen Beitrag. Eine Verweigerung nennt ihren **Grund**, nie ihren Bestand; sieht
+  eine Pflicht unerfüllbar aus, prüf zuerst dein **Messgerät**."
 
 - **Zwei Prüfungen, die einander widersprechen — Gehorsam sieht aus wie ein Verstoß.** Die eine
-  verlangt, freie Kapazität zu nutzen; die andere duldet keine Änderung, während sie läuft. Wer
-  der ersten folgt, bricht die zweite: Die Arbeit wird verworfen, und das Protokoll zeigt einen
-  Fehler, obwohl genau das getan wurde, was verlangt war.
+  verlangt, freie Kapazität zu nutzen; die andere duldet keine Änderung, während sie läuft. Wer der
+  ersten folgt, bricht die zweite: Die Arbeit wird verworfen, obwohl genau das Verlangte getan wurde.
   → *Prompt:* „Jede Prüfung, die eine Handlung **fordert**, muss die Fenster kennen, in denen
-  eine andere sie **verbietet** — sonst steht sie still oder liest die Forderung als bereits
-  beantwortet. Und wer etwas verbietet, sagt selbst, **wann es wieder erlaubt** ist; diese
-  Bedingung darf nie im Quelltext eines dritten Werkzeugs versteckt liegen. Prüffrage: Gibt es
-  einen einzigen Zug, der **beide** Auflagen erfüllt? Wenn nicht, ist nicht die Sitzung schuld."
+  eine andere sie **verbietet**. Wer etwas verbietet, sagt selbst, **wann es wieder erlaubt**
+  ist — nie versteckt im Quelltext eines dritten Werkzeugs. Prüffrage: Gibt es einen einzigen
+  Zug, der **beide** Auflagen erfüllt? Wenn nicht, ist nicht die Sitzung schuld."
 
-- **Die Anweisung hebt ihre eigene Voraussetzung auf.** Ein Ablauf verlangt, erst eine Markierung
-  zu setzen und sie dann zu veröffentlichen — doch das Veröffentlichen zählt als Arbeit, und Arbeit
-  löscht die Markierung. Dieselbe Falle als Sperre: Ihr vorgesehener Notausgang musste eine Datei
-  schreiben, und genau das untersagte sie als Erstes.
-  → *Prompt:* „Spiel jede neue Durchsetzung als **wörtlichen Gehorsam** durch und einmal als
-  **Handaufruf**, und probiere ihren Notausgang **unter** der Sperre aus. Prüffrage: Zerstört
-  die vorgeschriebene Handlungsfolge ihre eigene Voraussetzung — oder setzt der Ausweg eine
-  Fähigkeit voraus, die die Sperre gerade entzieht? Und nimmt deine **Ausnahme** nur die
-  **Prüfung** aus oder auch ihre **Abhilfe**? Ein Wächter, der sich selbst befreit, während
-  seine Heilmittel gesperrt bleiben, ist keine Kontrolle, sondern eine Sackgasse."
+- **Die Anweisung hebt ihre eigene Voraussetzung auf.** Ein Ablauf verlangt, erst eine Markierung zu
+  setzen und sie dann zu veröffentlichen — doch das Veröffentlichen zählt als Arbeit, und Arbeit löscht
+  die Markierung. Dieselbe Falle als Sperre: Ihr Notausgang musste eine Datei schreiben, und genau das
+  untersagte sie als Erstes.
+  → *Prompt:* „Spiel jede neue Durchsetzung als **wörtlichen Gehorsam** durch und probiere
+  ihren Notausgang **unter** der Sperre aus. Prüffrage: Zerstört die vorgeschriebene
+  Handlungsfolge ihre eigene Voraussetzung — oder setzt der Ausweg eine Fähigkeit voraus, die
+  die Sperre gerade entzieht? Und nimmt deine **Ausnahme** nur die **Prüfung** aus oder auch
+  ihre **Abhilfe**?"
 
 - **Der Rückfall rettet die Funktion und setzt still eine Vereinbarung aus.** Fällt der zweite
   Anbieter aus — oder fehlt die Datei, die deine Regel einstellt —, verhält sich jedes Werkzeug
@@ -561,6 +556,11 @@ Die Ursache findest du durch **Zerlegen**, nicht durch Wiederholen.
   → *Prompt:* „Zähle nicht, wie viel du ZUGETEILT hast, sondern wie oft die Übergabe wirklich
   stattfand — belege es an der Spur des Beauftragten, nicht an deiner eigenen Tabelle."
 
+- **Die gemessene Dauer von damals tötet den gesunden Lauf von heute.** Die Prüfung wächst weiter,
+  ihre hinterlegte Erwartung nicht — und das Werkzeug erklärt einen rechnenden Lauf für hängend.
+  → *Prompt:* „Ein Urteil wie ‚hängt, abbrechen‘ darf nie allein auf einer hinterlegten Dauer stehen:
+  Solange der Prozess **rechnet** und sein Protokoll **wächst**, hängt er nicht."
+
 ---
 
 ## Drei Meta-Regeln, die alles zusammenhalten
@@ -599,4 +599,4 @@ Die Ursache findest du durch **Zerlegen**, nicht durch Wiederholen.
 
 Sie ersetzt die Fallstricke oben nicht.
 
-<!-- GUIDE-FINGERPRINT: 7acfb68e32db0f96d7b42be29cb7fc18af71623e8cb40e57fce43d9f8c8f53f6 -->
+<!-- GUIDE-FINGERPRINT: 7c441cf88b4458050e1c01fe5a1a7cff9c43cf1324dea546ef499ffddf96c405 -->

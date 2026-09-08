@@ -329,3 +329,20 @@ healthy for the ten days in which almost everything merged was infrastructure. T
 freeze of 01.09. is measurable: `scripts/` has since grown 6,700 rather than 75,000 lines per week.
 No player impact and no mechanism to build — this is the evidence base for the open Umsteuerung
 measures 4–9, recorded so the next stocktaking does not have to re-derive it.
+
+## The polish runtime expectation is a quarter of the measured one (measured 08.09.2026)
+
+`run-wait.mjs --plan polish` promises 5m 41s and 21 frames; the constant behind it
+(`scripts/verify/run-wait-core.mjs` `polish: 340.9`, mirrored from
+`docs/picture-check-cost.md` §1, whose measurement window is 25.–27.07.2026) is six weeks old.
+Measured over every FULL-suite polish run record in this checkout and its worktrees
+(`local/verify-logs/*.run.json`, `--section` runs excluded): 19 runs, median 1658.6 s; the 14
+passing ones median 1614.0 s at 44 frames; the nine passing WebGL-2 ones median 1470.0 s. The
+consequence is a false verdict, not a lost run: `--await` gives up after 9m 01s, calls the run
+HUNG at 20 min and books it into the emergency lane as a standstill, while the Chrome GPU and
+renderer processes are measurably computing at 69 % and 33 % and the dev server stands. The run
+itself finishes and its completion notification arrives, so the wait is recoverable by declaring
+it with `batch-in-flight --waiting-on`. `scripts/measure-picture-cost.mjs` reports a polish median
+of 127.0 s over 15 runs, which is lower still — it appears to count PARTIAL `--section` runs, so
+refreshing the table needs that separation first. No player impact and no blockade under the
+infrastructure freeze; recorded so the next refresh of §1 does not have to re-derive it.
