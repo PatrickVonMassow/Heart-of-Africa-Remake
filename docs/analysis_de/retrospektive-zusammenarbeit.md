@@ -1442,7 +1442,7 @@ keinen Träger hat. Gebucht als Punkt 956.
 
 ## Anhang A — Maschinell gepflegte Quellen-Übersicht
 
-Zuletzt aktualisiert: Dienstag, 08.09.2026, 13:52 · Quellen-Fingerprint: `7c441cf88b44…`
+Zuletzt aktualisiert: Dienstag, 08.09.2026, 19:12 · Quellen-Fingerprint: `b533814b723c…`
 
 Spalten heuristisch aus den Quellen abgeleitet (Anläufe = distinkte Datumsnennungen im Memory;
 Maßnahme = Guard-Skripte mit Namens-Treffer). Die inhaltliche Bewertung gehört der Prosa oben.
@@ -1481,7 +1481,7 @@ Maßnahme = Guard-Skripte mit Namens-Treffer). Die inhaltliche Bewertung gehört
 | Work at High effort by default; the user reserves Extra high for research and design decisions, not implementation | 4 | hoch | — (Regel/Memory) | ◐ Regel |
 | Write idiomatic English in all English text (README, code comments, commit messages) — no German calques like 'stand' for a version | 1 | niedrig | — (Regel/Memory) | ◐ Regel |
 | Fable is NOT the default lane because its volume is the scarcest; difficulty is no reason for it either (since 18.08.2026 hard cases go straight to the OpenAI lane, GPT-6 Astra), and review is cross-vendor, not Fable-by-default | 6 | hoch | — (Regel/Memory) | ◐ Regel |
-| Findings recorded by a session that could not write the work order — carry each into TASKS.md, then mark it drained | 61 | hoch | findings-guard.mjs | ✔ Mechanismus |
+| Findings recorded by a session that could not write the work order — carry each into TASKS.md, then mark it drained | 63 | hoch | findings-guard.mjs | ✔ Mechanismus |
 | A recurring lookup gets a script; never pull raw transcripts, listings, or logs into context to answer it | 1 | niedrig | wait-command-guard.mjs | ✔ Mechanismus |
 | Past the 150k context watermark, FINISH the step and hand over — never start a suite, an agent or a point after it; the user raised the cost twice (13.08. and 17.08.2026) | 2 | mittel | — (Regel/Memory) | ◐ Regel |
 | User 18.08.2026: hard, complex, error-prone and HIGH-criticality points are AUTHORED by the OpenAI lane directly (GPT-6 Astra since 05.09.2026, GPT-5.6 Sol before) — Opus 5 authors only what is left, and Fable authors only a point that tags its lane or one the router escalates | 5 | hoch | — (Regel/Memory) | ◐ Regel |
@@ -1536,7 +1536,7 @@ Maßnahme = Guard-Skripte mit Namens-Treffer). Die inhaltliche Bewertung gehört
 | Headless probes must screenshot the DEFAULT zoom too (zoom-gated dressing like haze only shows there); headless WebGPU is impossible, so WebGPU-only branches stay user-checked | 2 | mittel | render-verify-guard.mjs | ✔ Mechanismus |
 | Every GUI/rendering fix must be verified on BOTH WebGPU and WebGL2 before it counts as done — never mark a render fix done on one path | 2 | mittel | render-verify-guard.mjs | ✔ Mechanismus |
 | A resumed batch session must check the previous owner's PROCESS before working — the launcher's \"provably dead\" verdict was wrong and double-spawned | 2 | mittel | render-verify-guard.mjs | ✔ Mechanismus |
-| Rotating verify AND unit failures under a running agent pool are LOAD, not bugs — 8 of 12 unit runs red from load alone; judge a red only on a quiet machine | 8 | hoch | render-verify-guard.mjs | ✔ Mechanismus |
+| Rotating verify AND unit failures under a running agent pool are LOAD, not bugs — 8 of 12 unit runs red from load alone; judge a red only on a quiet machine | 9 | hoch | render-verify-guard.mjs | ✔ Mechanismus |
 | The named \"version release\" process and its trigger — queue/run a version release for a version the user names (full closing → user approval → tag → mirror poc → publish /TAG/ and /poc/) | 3 | mittel | lock-release-hook.mjs | ✔ Mechanismus |
 | Standing licence to move, REMOVE or ADD villages when it helps — but every change must be checked against the other requirements first, and the check has already caught a real bug | 1 | niedrig | — (Regel/Memory) | ◐ Regel |
 | A VS Code restart restarts the devcontainer — every process inside dies, PPID 1 proves nothing | 9 | hoch | container-ask-guard.mjs | ✔ Mechanismus |
@@ -1547,8 +1547,8 @@ Maßnahme = Guard-Skripte mit Namens-Treffer). Die inhaltliche Bewertung gehört
 
 Erfasste Quellen: 95 Feedback-/Projekt-Memories · 58 Guard-/Hook-Skripte · 6 Revert-/Reapply-Commits · 126 Prozess-/Meta-TASKS-Punkte (davon 60 offen).
 
-<!-- RETRO-FINGERPRINT: 7c441cf88b4458050e1c01fe5a1a7cff9c43cf1324dea546ef499ffddf96c405 -->
-<!-- RETRO-LAST-REFRESHED: 2026-09-08T11:52:54.544Z -->
+<!-- RETRO-FINGERPRINT: b533814b723cd1d15bb3669d98590ca986505c909832d7cbc7679b25b938c231 -->
+<!-- RETRO-LAST-REFRESHED: 2026-09-08T17:12:33.820Z -->
 <!-- AUTO-GENERATED:END -->
 
 ### 3.111 Ein Erfolg ist kein Beweis für den Weg, auf dem er zustande kam
@@ -5184,6 +5184,22 @@ Browser-Lauf kostet und die trotzdem nur eine einzige Stichprobe liefert. Das Ge
 gehört dazu: Der reparierte Fall muss mit den alten Werten nachweislich wieder rot
 werden, sonst ist auch die Reparatur nur ein Glücksfall.
 
+**NACHTRAG 08.09.2026 — die Marge kann auch ZEITLICH eins sein, und dann sieht es aus wie
+ein Produktfehler.** Eine Bildprüfung maß die Hand eines Kindes an dem Stein, den es
+benennt, und verließ ihre Abtastschleife bei der ersten guten Ablesung. Der gemessene
+Vorgang dauert neun Sekunden; welches EINE Bild davon gemessen wurde, entschied der
+Zufall. Derselbe unveränderte Code ging abwechselnd rot und grün, und drei
+Reparaturversuche jagten daraufhin die Zahl statt die Abtastung — jeder wurde von einem
+zufällig grünen Lauf bestätigt. Als die Schleife den Vorgang vollständig las, lagen zwei
+echte Defekte an seinen beiden Enden: ein Bild Zeichenverzug am Anfang, ein Ausblenden,
+das die letzten Zehntel auffraß. Eine Einzelstichprobe traf abwechselnd den einen, den
+anderen oder keinen. Zwei Verschärfungen der Lehre folgen daraus: Die Abdeckung gehört
+als EIGENE Prüfung neben das Ergebnis, damit zu wenig Messung rot wird statt still
+durchzugehen — und sie muss JE VORKOMMEN zählen. Der erste Reparaturversuch merkte sich
+nur, dass irgendwann einmal ein vollständiger Vorgang gelesen worden war, und durfte
+danach mitten in einem späteren aussteigen; die anbieterfremde Gegenlesung hat genau
+diesen Riegel gefunden, indem sie nicht das Ergebnis, sondern die Abdeckung las.
+
 ### 3.226 Das Hauptbuch stand unter der Pflicht, die es selbst führt
 
 Am 01.09.2026 hatte eine Sitzung vierzehn anbieterübergreifende Prüfrunden über
@@ -6041,6 +6057,20 @@ Vorarbeit dieser Zeit ist Lesearbeit. Und ein rotes Urteil ist erst dann ein
 Befund über das Produkt, wenn geprüft ist, wer den roten Zustand erzeugt hat:
 Hier hätte die Zeile `FAIL unit` ohne Nachlesen eine Stunde Fehlersuche in
 grünem Code ausgelöst.
+
+**NACHTRAG 08.09.2026 — dieselbe Klasse ein drittes Mal, und das ist der eigentliche
+Befund.** Ein Backlog-Eintrag, committet und nach `main` geschoben, hat einen großen
+Lauf in seiner Unit-Stufe getötet: `refs/heads/main 44b14e0 -> 57d58bf`, vier Minuten
+Lauf für eine Buchhaltungszeile. Bemerkenswert ist nicht der Fehler, sondern wie gut er
+vorher beschrieben war: Er stand als Absatz hier, als Fallstrick in der
+Einsteiger-Anleitung („Zwei Prüfungen, die einander widersprechen — Gehorsam sieht aus
+wie ein Verstoß") und als gemessene Regel in einer Memory-Datei. Drei Warnungen, und
+keine hat gefeuert. Der Grund ist die Ablage: Die Regel lag unter „ruhige Maschine",
+während die Lage sich als „Vorarbeit leisten" anfühlte — und die Aufforderung dazu kam
+aus dem `prep-guard`, dessen Wortlaut ausdrücklich das Bearbeiten der Board-Karte
+nennt. Eine Regel wird nicht dort gebraucht, wo ihr Thema steht, sondern dort, wo die
+widersprechende Aufforderung ankommt. Die Ausnahme gehört deshalb in den Text des
+Durchsetzers, der zuerst gelesen wird, nicht in das Kapitel, das thematisch passt.
 
 ### 3.248 Die Spur war zugeteilt, aber nie beauftragt
 

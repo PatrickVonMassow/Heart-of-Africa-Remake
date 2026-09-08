@@ -387,3 +387,22 @@ rather than per kind. One warning for any such build: the corpus's passages on w
 run straight into period reports of extensive nakedness, so a depiction would have to clothe
 deliberately against its own source, and that choice would have to be argued rather than made
 silently.
+
+Why the dress work never split by sex, from the record rather than from memory. The order of
+16.07.2026 behind point 137 named two axes and sex was not one of them — "deutliche Unterschiede
+bzgl. der Kleidung je nach Region und Jahreszeit" (`docs/tasks-archive.md`, point 137) — and
+design.md carries no sex for the inhabitants to this day. The research pass was read with the
+SEASONAL question: §2.6 asks whether the same person wears more in the cold and §7 is a pure
+season sweep, so the women's and men's material in §2 was never put as its own question; where
+the source does touch sex it reports NO difference, the isipuku being worn "by males and
+females". The body could not have carried it either: point 120g recorded on 16.07.2026 that the
+primitive figures cannot even show a wrap worn differently, and arms arrived only with point 479
+on 03.08.2026, so the one shape change ever built is the Somali head-muffle. And the system has
+the wrong axis for it: `dress.ts` hangs on physical drivers (coldness, harmattan, karif), while
+sex has no driver and would be a per-figure attribute rather than another table row.
+
+One inconsistency found on the way, small and real: `docs/design-reference.md` §19.15 states for
+the Tuareg that "the wealthier MEN wear the bernus", while the scene puts the cloak on roughly a
+third of ARBITRARY figures — a rank gate standing where the source names a rank AND sex gate. It
+is the only place where the current depiction contradicts its own recorded source, and the
+cheapest thing to correct if the topic is ever picked up.
