@@ -271,6 +271,28 @@ put it is the mistake this line exists to stop.
   - UNEXPLAINED: tagShuffle.test.ts prints the dev assertion "adult-atom-lost — water-out:
     villager 1 ran out of time with his fetch word unspoken". Phase 'fetch', i.e. after the
     departure — a different case from the invite stall, not investigated.
+  Third reading, 08.09.2026 12:00 (branch at e77155cab, commit "Stop the fill leg at the water
+  instead of a metre above it"): the DEPTH red is closed at its cause in the code and in the
+  pure layer, and is NOT yet judged in a picture.
+  - The cause is the ARRIVAL, not the spot. The fill spot stands in the water; he stops
+    anywhere inside his arrival radius of it, and the shared 1.10 m is on the shore's own
+    slope some 18 cm of height. A nominal spot is not a standing place.
+  - Fixed: `FILL_ARRIVE_RADIUS` 0.35 for the fill leg alone, read by BOTH the walk
+    (`PlaceLife`) and the scheduler (`adultWork.arriveRadiusOf`), so a leg can never halt just
+    outside the radius that would have let it begin; `BANK_FILL_DEPTH` 0.10 → 0.20 m, which
+    leaves 12 cm of jar under the surface at the worst arrival and stays far under
+    `balance.bankWadeDepth`. Both docs already carry "ankle deep" and need no number.
+  - The pure tests now WALK the way the scene walks — halting at the arrival radius rather
+    than on the goal — and measure the standing height at arrival instead of the nominal
+    spot. Beware the boundary: stepping to exactly the radius leaves a leg outside `<=` on
+    the next float and it never arrives; take full steps and stop when inside, as PlaceLife
+    does.
+  - Unit stage measured green on the branch: 463 files, 14939 tests, 1 skipped
+    (local/verify-logs/2026-09-08T09-57-14-363-verify.log). That run's `FAIL unit` line is
+    NOT a test red: `repository-integrity` teardown saw a git worktree added by the session
+    while the suite ran. Do not add or remove a worktree during a unit run.
+  - STILL OWED: the picture on BOTH backends. The polish section is `--section=adult-errands`;
+    the previous reading needed several unthrottled runs on a quiet machine to be believed.
   Bundle: Dorfleben.
 
 - [ ] 1072. The village speaks with a direction, and the children sound like children (user
@@ -658,6 +680,44 @@ put it is the mistake this line exists to stop.
   src/scenes/place/chiefMeeting.ts, src/scenes/place/PlaceScene.tsx (the chief group, the
   collider resolve), src/scenes/place/layout.ts (the collider set), design.md §13.4, §15
   Bundle: Dorfleben.
+
+- [ ] 1077. The Astra lane is routed on paper and almost never authored (measured
+  08.09.2026, two findings of the same evening folded into one point).
+  CLAUDE.md §6 splits authoring across three lanes, and `author-routing-core.mjs` cuts the
+  374 open points 271 Astra / 103 Opus once criticality is read. The LANDINGS of the last
+  three days on `main` carry 174 Anthropic `Co-Authored-By` against 6 GPT-6 Astra (plus 12
+  `Reviewed-By` Astra). 6 against 174 is past measurement error, and trailers are a weak
+  proxy in ONE direction only: unlanded work and Astra's reading are invisible, so the true
+  Astra share can only be HIGHER than 6, never lower than the ratio suggests.
+  Part of the cause is visible: six of the first ten points in work-order order (1065, 1072,
+  659, 633, 174, 1068) enter the Opus lane on 'its VERIFICATION is the work', so the QUEUE
+  HEAD alone skews the sample. What is NOT measured is whether `author-astra.mjs` ever runs
+  for the 271 Astra points at all — `.claude/batch-activity.jsonl` carries no model-bearing
+  field and the string `author-astra` appears in it zero times.
+  Final state:
+  - It is MEASURED, once, whether the dispatcher actually delegates an Astra-lane point:
+    watch the next Astra-lane point and record whether `author-astra.mjs` ran. That answer
+    decides everything below; without it every lever is a guess.
+  - The three levers that cost no code and no test are applied where the measurement says
+    they help:
+    A — ORDER. The queue head is disproportionately Opus lane; Astra points move forward in
+    TASKS.md, and `queue-order-guard` keeps the dashboard in step.
+    B — THE EXISTING TAG. `Author lane: astra` as its own line in a point is read by
+    `authorLaneFor` BEFORE the verification branch (the source comment calls it 'the cheap
+    way back'). Eight open points are pure false hits, routed to Opus only because they
+    mention WebGPU/WebGL/Playwright in passing: 1072, 567, 498, 548, 568, 570, 725, 1012.
+    C — CRITICALITY. 96 of the 374 open points carry none at all, and HIGH routes to Astra
+    above the verification branch, so every genuinely high point left untagged stays here.
+  - NOT DONE: narrowing `VERIFICATION_MARKERS` or `HARD_MARKERS`. That is exactly the
+    infrastructure surgery the freeze (CLAUDE.md §2) excludes, the lists are hardened over
+    several cross-vendor rounds, and none of it is needed if the levers above suffice.
+  Test. No product code changes, so no product test. The measurement is the evidence: the
+  recorded observation of one Astra-lane dispatch, and the before/after cut of
+  `author-routing-core.mjs` over the open points.
+  Refs: scripts/author-routing-core.mjs (`authorLaneFor`, `criticalityOf`,
+  VERIFICATION_MARKERS, HARD_MARKERS), scripts/author-astra.mjs, scripts/astra-share.mjs,
+  scripts/fable-switch.mjs, .claude/batch-activity.jsonl, CLAUDE.md §6.
+  Bundle: Modell & Wächter.
 
 - [ ] 690. The classic game of tag moves to the port cities, and every document describes
   the rebuilt mechanic (user 13.08.2026, playing the deployed communication slice; point 692
