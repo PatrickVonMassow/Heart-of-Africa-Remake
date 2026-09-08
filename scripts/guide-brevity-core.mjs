@@ -382,7 +382,16 @@ export const LIMITS = {
   // a lock while its remedies stay under it) WAS folded into "Die Anweisung hebt ihre eigene
   // Voraussetzung auf" and the entry was compressed to stay inside its 11-line ceiling: +2 lines.
   // Ceilings move 576 -> 587 with zero slack.
-  maxLines: 587,
+  // 08.09.2026: the run torn up by its OWN session — waiting is expensive, so the tool fills the
+  // wait and switches branch, adds a worktree or commits while a check is running; the run then
+  // reports red although every test was green, and the hunt starts in code that never broke. The
+  // entry was written and the ceiling was NOT moved with it, which left the audit red on `main`
+  // for the whole morning; this is that missing half, not a fresh raise. No existing entry
+  // carries the direction: the neighbouring ones are about a run dying with its session and about
+  // two sessions of the tool on one project, both lifetime and ownership rather than a session
+  // disturbing its own measurement, so folding would have dropped one of their claims. Its own
+  // entry costs +7 lines / +83 words. Ceilings move 587 -> 594 with zero slack.
+  maxLines: 594,
   // EXACT FIT, not headroom — corrected 30.07.2026 after the four-eyes review
   // pointed out that this comment had long stopped describing the numbers. The
   // rule above ("raised only by the measured size of genuinely new tips")
@@ -608,7 +617,9 @@ export const LIMITS = {
   // words under the old ceiling: 5396 -> 5381.
   // 07.09.2026 (third): the detached-run pitfall justified beside maxLines measures 99 words and
   // the folded exemption-chain question 29: 5381 -> 5509.
-  maxWords: 5509,
+  // 08.09.2026: the run-torn-up-by-its-own-session pitfall justified beside maxLines measures
+  // 83 words: 5509 -> 5592.
+  maxWords: 5592,
   // A pitfall entry = the risk lines plus its prompt. Anything longer is a
   // story, not a tip.
   maxEntryLines: 11,
