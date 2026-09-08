@@ -49,7 +49,7 @@ describe('applyFigurePose', () => {
     // word falls, so the pose the touch begins at must be the posed one — not a
     // rest pose that grows into it over a blend.
     const limbs = limbSet()
-    const touch = startGesture('touch', { bearing: 0, elevation: -0.4 }, 1.5)
+    const touch = startGesture('touch', { bearing: 0, elevation: -0.4, duration: 1.5 })
     applyFigurePose(limbs, gesturePose(touch))
     expect(limbs.arms[0]!.rotation.x).not.toBeCloseTo(REST_POSE.left.pitch, 2)
   })

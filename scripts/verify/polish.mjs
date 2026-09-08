@@ -4563,6 +4563,8 @@ if (section('children-bank-game')) {
     let stationTap = null
     let looseTouch = null
     let opening = null
+    let sawHold = false
+    let heldToTheEnd = false
     const holdTrace = []
     for (let i = 0; i < 400; i++) {
       const now = await page.evaluate(() => (window.__placeTapHand ? window.__placeTapHand() : null))
@@ -4582,7 +4584,13 @@ if (section('children-bank-game')) {
         // number; only the curve tells them apart, and only the written-against-
         // drawn pair says whether a late arrival is the pose or the drawing of
         // it (work-order 1065).
-        if (holding) holdTrace.push(now)
+        if (holding) {
+          holdTrace.push(now)
+          sawHold = true
+        } else if (sawHold) {
+          // The hold is over — the whole of it has now been read.
+          heldToTheEnd = true
+        }
         if (now.opening && (!opening || now.opening.tapper !== opening.tapper)) opening = now.opening
         if (holding && (!stationTap || Math.abs(now.gap) > Math.abs(stationTap.gap))) stationTap = now
         if (now.gesture === 'touch' && !holding && (!looseTouch || Math.abs(now.gap) > Math.abs(looseTouch.gap))) {
@@ -4592,10 +4600,11 @@ if (section('children-bank-game')) {
       // ONE READING OF A HOLD IS A COIN TOSS. The loop used to stop at its first
       // good reading, so which single frame of a nine-second hold got measured
       // was luck — and the worst-reading check below then went red or green at
-      // random on the same code (measured 08.09.2026). It now stays until the
-      // hold has been read frame by frame, and reads it at every frame rather
-      // than every second one.
-      if (bestTouch && Math.abs(bestTouch.gap) <= 0.06 && sawTouchPose && holdTrace.length >= 12) break
+      // random on the same code (measured 08.09.2026). It now reads the hold at
+      // every frame and runs THROUGH IT: a hand that arrives and then leaves
+      // again is caught only by staying to the end, so the loop leaves on the
+      // far side of a hold, never inside one.
+      if (bestTouch && Math.abs(bestTouch.gap) <= 0.06 && sawTouchPose && heldToTheEnd) break
       await nextFrames(now && now.phase === 'run' && now.tapFor > 0 ? 1 : 2)
     }
     check(
@@ -4618,6 +4627,14 @@ if (section('children-bank-game')) {
         'and the tap really is a TOUCH, held on the stone while the word falls',
         sawTouchPose,
         sawTouchPose ? 'the touch pose was seen running on the tapper' : 'the tapper never held a touch',
+      )
+      check(
+        'and the whole hold was read, not one frame of it',
+        heldToTheEnd && holdTrace.length >= 6,
+        heldToTheEnd
+          ? `${holdTrace.length} readings from the word to the end of the hold`
+          : `the sampling left while the hold was still running (${holdTrace.length} readings) — ` +
+            'a hand that arrives and then leaves again would not be seen',
       )
       if (stationTap) {
         check(
@@ -4650,15 +4667,22 @@ if (section('children-bank-game')) {
       // applied. It is the check that would have named the one-frame render lag
       // straight away (08.09.2026: 54 cm at the word, on the stone from the next
       // frame on).
-      if (opening) {
-        check(
-          'and the hand is on the stone in the very frame the word falls',
-          Math.abs(opening.gap) <= 0.06,
-          `child ${opening.tapper}: gap ${(opening.gap * 100).toFixed(1)} cm at the utterance, ` +
+      check(
+        'the utterance frame was recorded at all, so the reading below is owed',
+        !!opening,
+        opening
+          ? `child ${opening.tapper}'s tap recorded at the frame it fell`
+          : 'no utterance frame was recorded — the check below would otherwise pass unasked',
+      )
+      check(
+        'and the hand is on the stone in the very frame the word falls',
+        !!opening && Math.abs(opening.gap) <= 0.06,
+        opening
+          ? `child ${opening.tapper}: gap ${(opening.gap * 100).toFixed(1)} cm at the utterance, ` +
             `shoulder drawn at ${opening.drawnPitch.toFixed(2)} rad against the ` +
-            `${opening.writtenPitch.toFixed(2)} rad written for that frame`,
-        )
-      }
+            `${opening.writtenPitch.toFixed(2)} rad written for that frame`
+          : 'unmeasured',
+      )
 
       // The picture: the child at the stone, from a spectator's stance in the
       // lane, close enough that a hand and a stone are two things.

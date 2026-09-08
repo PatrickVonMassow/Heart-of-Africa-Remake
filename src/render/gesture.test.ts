@@ -57,7 +57,10 @@ describe('a gesture is BOUNDED — it can never become a state a figure sits in'
 
   it('each kind is back at rest once its own duration is spent', () => {
     for (const kind of GESTURE_KINDS) {
-      const d = GESTURE_DURATIONS[kind]
+      // ITS OWN duration, off the state — a kind that begins at its pose is
+      // given its fade-out BEYOND the time it was asked to hold, so the two
+      // numbers are not the same one (work-order 1065).
+      const d = startGesture(kind).duration
       const states = run(startGesture(kind), d / 40, 41)
       expect(states[states.length - 1].kind, kind).toBeNull()
       expect(isGesturing(states[states.length - 1]), kind).toBe(false)
@@ -72,7 +75,7 @@ describe('a gesture is BOUNDED — it can never become a state a figure sits in'
 
   it('it stays running right up to the last instant before the duration', () => {
     for (const kind of GESTURE_KINDS) {
-      const d = GESTURE_DURATIONS[kind]
+      const d = startGesture(kind).duration
       const almost = advanceGesture(startGesture(kind), d - 0.001)
       expect(almost.kind, kind).toBe(kind)
       expect(advanceGesture(almost, 0.002).kind, kind).toBeNull()
@@ -149,7 +152,7 @@ describe('THE POSE RETURNS TO REST — at the start, at the end, and after it', 
 
   it('and settles back into rest as it ends, continuously', () => {
     for (const kind of GESTURE_KINDS) {
-      const d = GESTURE_DURATIONS[kind]
+      const d = startGesture(kind).duration
       const near = { ...startGesture(kind, { bearing: 1.2 }), t: d - 1e-4 }
       expect(poseDistanceFromRest(gesturePose(near)), kind).toBeLessThan(0.01)
       // …and the state after it is rest, so the pose is exactly rest again.
@@ -160,7 +163,7 @@ describe('THE POSE RETURNS TO REST — at the start, at the end, and after it', 
 
   it('no frame of any gesture jumps: the pose moves smoothly, step to step', () => {
     for (const kind of GESTURE_KINDS) {
-      const d = GESTURE_DURATIONS[kind]
+      const d = startGesture(kind).duration
       const dt = d / 200
       let prev = gesturePose(startGesture(kind, { bearing: 1.0, elevation: 0.3 }))
       let s = startGesture(kind, { bearing: 1.0, elevation: 0.3 })
@@ -481,7 +484,26 @@ describe('the touch: a hand laid on a thing and held there (work-order 1065)', (
   })
 
   it('returns to rest when it is spent, like every other gesture', () => {
-    expect(advanceGesture({ ...held, t: 1.49 }, 0.02).kind).toBeNull()
+    expect(advanceGesture({ ...held, t: held.duration - 0.01 }, 0.02).kind).toBeNull()
+  })
+
+  it('is asked for a HOLD, and takes its fade-out BEYOND it (work-order 1065)', () => {
+    // The other half of the same defect as the fade-in. The gesture used to run
+    // exactly as long as the hold it was given, so its out-ramp ate the last
+    // 0.12 s of that hold: measured in the browser on 08.09.2026, the drawn hand
+    // stood 50.8 cm off the stone with 0.07 s of the hold still to run, while
+    // the word was by definition still falling.
+    expect(held.duration).toBeCloseTo(1.5 + gestureBlendOf('touch'), 6)
+    // Whole for every instant of the hold it was asked for…
+    expect(gestureEnvelope({ ...held, t: 1.5 })).toBeCloseTo(1, 6)
+    expect(gestureEnvelope({ ...held, t: 1.5 - 1e-4 })).toBeCloseTo(1, 6)
+    // …and only then on its way back to rest.
+    expect(gestureEnvelope({ ...held, t: held.duration })).toBe(0)
+    // Every other kind keeps the total it was given.
+    for (const kind of GESTURE_KINDS) {
+      if (kind === 'touch') continue
+      expect(startGesture(kind, { duration: 1.5 }).duration, kind).toBe(1.5)
+    }
   })
 })
 

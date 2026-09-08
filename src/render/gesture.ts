@@ -192,7 +192,14 @@ export interface GestureAim {
  */
 export function startGesture(kind: GestureKind, aim: GestureAim = {}): GestureState {
   const wanted = aim.duration
-  const duration = Number.isFinite(wanted) && (wanted as number) > 0 ? (wanted as number) : GESTURE_DURATIONS[kind]
+  const held = Number.isFinite(wanted) && (wanted as number) > 0 ? (wanted as number) : GESTURE_DURATIONS[kind]
+  // A KIND THAT BEGINS AT ITS POSE IS ASKED FOR A HOLD, NOT A TOTAL. Its
+  // fade-out is added BEYOND the time it was asked to hold, so the pose is
+  // whole for every instant of it. Measured 08.09.2026: the tap's gesture ran
+  // exactly as long as its hold, so the arm began swinging back out 0.12 s
+  // before the hold ended and the check read 50.8 cm off the stone with the
+  // word still falling — the same defect as the fade-IN, at the other end.
+  const duration = GESTURE_NO_FADE_IN.includes(kind) ? held + gestureBlendOf(kind) : held
   return {
     kind,
     t: 0,
