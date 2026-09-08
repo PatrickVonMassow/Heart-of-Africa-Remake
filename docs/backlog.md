@@ -171,18 +171,20 @@ Format: one line per finding — `- YYYY-MM-DD <source> — <finding>`.
   blockade: an inconclusive verdict never approves anything, and the doctor says the batch
   continues. The cheap fix is one call, not a new mechanism.
 
-## The give's second evidence frame is aimed by construction, not by rule (measured 07.09.2026)
+## The give's second evidence frame is aimed by construction, not by rule (measured 07.09.2026, FIXED 08.09.2026)
 
-`150-artefact-chiefs-answer` in `scripts/verify/polish.mjs` steps the camera back seven
-metres and looks at the chief from the traveller's own eye height. On WebGPU that composes
-well — the man is central and his two words stand clear of the HUD. On WebGL 2, in the same
-tree, the shot comes out pitched at the sky: two thirds of the frame is cloud, the hut roof
-fills the rest, and the chief's note is jammed against the bottom edge, half behind the
-inventory bar. The shutter passes it — the subject IS in the picture and both the words and
-the bar are legible — so the proof stands and the suite is green on both backends.
-No player impact: this is an evidence frame, not a thing the player sees. It is the same
-class point 521 already owns (a standpoint chosen by luck rather than by a rule) and is
-recorded here so it is not re-derived, not because it needs its own point.
+`150-artefact-chiefs-answer` in `scripts/verify/polish.mjs` stepped the camera back seven
+metres and looked at the chief from the traveller's own eye height — setting his position and
+his bearing, and never his PITCH. On WebGPU that composed well on 07.09.2026 and on WebGL 2 it
+came out pitched at the sky; on 08.09.2026 the WebGPU shot came out that way too: two thirds
+cloud, the roof filling the rest, the chief nowhere in it and his note jammed against the
+inventory bar. The shutter passed it every time, because the declared subject was the note two
+metres ABOVE him and a note at the bottom edge is still in the picture.
+
+Both halves are closed now. The pose that composes the shot levels the view, so the angle no
+longer arrives from whatever the block before it last looked at; and the frame declares the
+CHIEF'S CHEST, which cannot be in a picture aimed at the sky — so the same mis-aim is refused
+instead of photographed.
 
 ## Point 1064's cross-vendor review covers only half its files (07.09.2026)
 

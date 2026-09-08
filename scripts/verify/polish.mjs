@@ -5992,6 +5992,11 @@ if (section('artefact-give')) {
           p.z = at.z + dir.z * away
           // Place-camera yaw 0 looks toward -Z, so aim with the +PI complement.
           p.yaw = Math.atan2(at.x - p.x, at.z - p.z) + Math.PI
+          // And LEVEL. The pitch survives everything this section does to the
+          // traveller — the map jump to the erratic, the dig, the walk back into
+          // the village — so whatever the block before it last looked at is
+          // still the angle this one photographs from.
+          p.pitch = 0
         },
         { at: chiefStood, dir: outward, away },
       )
@@ -6052,6 +6057,7 @@ if (section('artefact-give')) {
         p.x = at.x + dir.x * 7
         p.z = at.z + dir.z * 7
         p.yaw = Math.atan2(at.x - p.x, at.z - p.z) + Math.PI
+        p.pitch = 0
       },
       { at: chiefStood, dir: outward },
     )
@@ -6099,9 +6105,13 @@ if (section('artefact-give')) {
       )
       check('his answer is held over his head for the shutter', held, JSON.stringify(given.atoms))
     }
+    // Declared on the MAN, not on the note two metres over him: a frame aimed at
+    // the sky still holds the note at its bottom edge, and one was written and
+    // passed that way — the chief himself nowhere in it. His chest is the thing
+    // that cannot be in the picture by accident.
     await frame('150-artefact-chiefs-answer', {
-      local: { x: chiefStood.x, y: chiefStood.y + 2, z: chiefStood.z },
-      label: 'the chief’s answer standing over his head after the find was given',
+      local: { x: chiefStood.x, y: chiefStood.y + 1, z: chiefStood.z },
+      label: 'the chief with his answer standing over his head after the find was given',
     })
     // The frame is only evidence if the words were still standing when the
     // shutter opened — a note that expired during the wait photographs an
