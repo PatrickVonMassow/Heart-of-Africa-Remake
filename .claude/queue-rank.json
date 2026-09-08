@@ -1224,6 +1224,24 @@
       "why": "Es blockiert jeden Push nach main und damit jede Landung; die Blockade kehrt beim naechsten Memory-Schreiben von selbst zurueck.",
       "origin": "machine",
       "place": "ahead"
+    },
+    "1076": {
+      "at": "2026-09-08T10:57:34.696Z",
+      "why": "Punkt 1076 ist eine Nutzer-Meldung vom 08.09.2026 zum Haeuptlingsauftritt und stand schon vor der Umstellung an dieser Stelle.",
+      "origin": "user",
+      "place": "ahead"
+    },
+    "1077": {
+      "at": "2026-09-08T10:57:26.960Z",
+      "why": "Der Nutzer hat am 08.09.2026 im Chat ausdruecklich 'Ziehe 1077 vor' angeordnet.",
+      "origin": "user",
+      "place": "ahead"
+    },
+    "1078": {
+      "at": "2026-09-08T11:50:40.734Z",
+      "why": "Zuletzt richtig: der Rote ist gebucht und blockiert keinen Merge mehr, der Fehler tritt sporadisch auf, und der Wiederholungslauf loest das Raetsel — er steht damit hinter jedem Punkt, den ein Spieler bei jedem Start sieht.",
+      "origin": "machine",
+      "place": "last"
     }
   },
   "boundary": {
@@ -1256,7 +1274,7 @@
     "why": "The order standing in front of the release today is the arrangement that predates this rule; the four machine-filed points that had ranked themselves there were moved behind 174 first"
   },
   "settled": {
-    "at": "2026-09-08T16:15:47.369Z",
+    "at": "2026-09-08T11:50:40.744Z",
     "points": [
       174,
       184,
@@ -1631,7 +1649,10 @@
       1072,
       1073,
       1074,
-      1075
+      1075,
+      1076,
+      1077,
+      1078
     ]
   }
 }

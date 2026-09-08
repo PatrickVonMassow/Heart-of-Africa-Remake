@@ -1,20 +1,4 @@
 {
   "v": 1,
-  "leases": [
-    {
-      "sessionId": "pid-2384946",
-      "runId": "2026-09-08T16-14-35-821-large",
-      "pid": 2384964,
-      "pidStartedAt": 1788884169128,
-      "subject": "verify large",
-      "ownerGeneration": null,
-      "startedAt": 1788884169188,
-      "deadlineAt": 1788889016988,
-      "hungAt": 1788891369188,
-      "recordPath": "/workspace/hoa/.claude/worktrees/point-1065/local/verify-logs/2026-09-08T16-14-35-821-large.log.run.json",
-      "logPath": "local/verify-logs/2026-09-08T16-14-35-821-large.log",
-      "timeoutReportedAt": null,
-      "hungReportedAt": null
-    }
-  ]
+  "leases": []
 }
