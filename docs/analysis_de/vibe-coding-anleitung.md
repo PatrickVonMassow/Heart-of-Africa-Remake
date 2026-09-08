@@ -446,13 +446,11 @@ Die Ursache findest du durch **Zerlegen**, nicht durch Wiederholen.
   letzte. Was den Schritt **abschließt**, bleibt erlaubt; was festhält, mach **übergebbar**."
 
 - **Die KI repariert den Wächter, der sie gerade sperrt — oder beantwortet ihn zehnmal.** Ein Tor
-  kann zu Recht sperren und trotzdem unlösbar sein: es kennt nur einen erlaubten Weg, oder seine
-  Abhilfe liegt außer Reichweite. Und weil ein rotes Tor den Zug neu startet, schreibt die KI eine
-  neue Abschlusszeile statt einer Reparatur: sieht aus wie Arbeit, bewegt nichts.
+  kann zu Recht sperren und trotzdem unlösbar sein; und weil ein rotes Tor den Zug neu startet,
+  schreibt die KI eine neue Abschlusszeile statt einer Reparatur.
   → *Prompt:* „Sperrt ein Tor dich, ändere es nie allein: **leg dein Eigeninteresse offen**, nimm
-  das zweite Urteil. Bevor ein Tor scharf geht: **zähl alle Wege auf** und prüfe seine Abhilfe.
-  Eine **wiederholte** Absage beweist, dass deine Antwort nicht die Reparatur ist — miss den
-  Zustand neu und meld sie mir beim zweiten Mal."
+  das zweite Urteil. Bevor ein Tor scharf geht, **zähl alle Wege auf** und prüfe seine Abhilfe.
+  Eine **wiederholte** Absage heißt, dass deine Antwort nicht die Reparatur ist."
 
 - **Der Prüflauf verändert sein eigenes Projekt.** Eine Suite, die ihren Zielpfad aus dem Quellort
   statt der Testumgebung nimmt, schreibt Zweige um und bleibt grün.
@@ -493,11 +491,11 @@ Die Ursache findest du durch **Zerlegen**, nicht durch Wiederholen.
 - **Die Pflicht wächst schneller, als du sie erfüllen kannst.** Verlangt eine Prüfung „alles seit
   dem letzten Mal", wird sie unerfüllbar. Gilt ein Veto der **Datei** statt dem Befund, wächst der
   Rückstand beim Abtragen: Wer ihn behebt, fasst die Datei an und schuldet neu.
-  → *Prompt:* „Binde jede Prüfpflicht an den **einzelnen Beitrag**, nie an einen offenen Zeitraum, und
-  buch ein Veto gegen den **Befund**: trenne **gelesen** von bloß berührt, quittiere eine Reparaturkette
-  am **Endzustand** als einen Beitrag, und mach neue Befunde derselben Datei zum eigenen Ticket. Eine
-  Verweigerung nennt ihren **Grund**, nie ihren Bestand; sieht eine Pflicht unerfüllbar aus, prüf zuerst
-  dein **Messgerät**."
+  → *Prompt:* „Binde jede Prüfpflicht an den **einzelnen Beitrag**, nie an einen offenen Zeitraum,
+  und buch ein Veto gegen den **Befund**: trenne **gelesen** von bloß berührt, quittiere eine
+  Reparaturkette am **Endzustand** als einen Beitrag, mach neue Befunde derselben Datei zum eigenen
+  Ticket. Eine Verweigerung nennt ihren **Grund**, nie ihren Bestand; sieht eine Pflicht
+  unerfüllbar aus, prüf zuerst dein **Messgerät**."
 
 - **Zwei Prüfungen, die einander widersprechen — Gehorsam sieht aus wie ein Verstoß.** Die eine verlangt,
   freie Kapazität zu nutzen; die andere duldet keine Änderung, während sie läuft. Wer der ersten folgt,
@@ -506,6 +504,15 @@ Die Ursache findest du durch **Zerlegen**, nicht durch Wiederholen.
   eine andere sie **verbietet**. Wer etwas verbietet, sagt selbst, **wann es wieder erlaubt**
   ist — nie versteckt im Quelltext eines dritten Werkzeugs. Prüffrage: Gibt es einen einzigen
   Zug, der **beide** Auflagen erfüllt? Wenn nicht, ist nicht die Sitzung schuld."
+
+- **Die Warnung stand dreimal da und feuerte nie — sie lag unter der falschen Überschrift.**
+  Derselbe Fehler zum dritten Mal, obwohl er als Absatz, als Fallstrick und als gemessene Regel
+  notiert war: Abgelegt war er unter seinem **Thema**, gebraucht wurde er dort, wo die
+  widersprechende Aufforderung ankam — im Wortlaut des Wächters, der zur Vorarbeit drängt.
+  → *Prompt:* „Schreib die Ausnahme in den Text **dessen, der auffordert**, nicht in das Kapitel,
+  das thematisch passt. Prüffrage bei jeder neuen Regel: An welcher **Stelle im Ablauf** wird sie
+  gelesen — und steht sie dort. Eine Regel, die dreimal überlesen wurde, ist nicht zu schwach
+  formuliert, sondern am falschen Ort abgelegt."
 
 - **Die Anweisung hebt ihre eigene Voraussetzung auf.** Ein Ablauf verlangt, erst eine Markierung zu
   setzen und sie dann zu veröffentlichen — doch das Veröffentlichen zählt als Arbeit, und Arbeit löscht
@@ -524,14 +531,12 @@ Die Ursache findest du durch **Zerlegen**, nicht durch Wiederholen.
   → *Prompt:* „Ein Rückfall meldet, **welche Zusage er aussetzt**. Vergleiche **Regel gegen Ist**,
   nicht Ist gegen Plausibilität. Prüffrage: Welche Vereinbarung bricht er still?"
 
-- **Die lange Messung hing am Leben der Sitzung, die sie bestellt hat.** Ein Prüflauf über
-  zwanzig Minuten ist ein Kind des Fensters, das ihn startete; endet das Fenster, stirbt er
-  mitten drin — und zwar **wie ein Fehlschlag**: Abbruchcode gesetzt, Fehlerliste leer,
-  Protokoll mitten im Satz zu Ende.
+- **Die lange Messung hing am Leben der Sitzung, die sie bestellt hat.** Endet das Fenster, das
+  einen langen Prüflauf startete, stirbt er mitten drin — und zwar **wie ein Fehlschlag**:
+  Abbruchcode gesetzt, Fehlerliste leer, Protokoll mitten im Satz zu Ende.
   → *Prompt:* „Was **länger dauert als ein Zug**, startest du **abgekoppelt** — im **Werkzeug**,
-  nicht als Merkregel für den nächsten Aufrufer. Ein Lauf ohne Schlussurteil, der **keinen**
-  Fehlschlag nennt, heißt *abgebrochen*, nicht *rot*. Prüffrage: Wessen Tod nimmt diesen Lauf
-  mit — und unterscheide ich seinen Abbruch von einem echten Rot?"
+  nicht als Merkregel. Ein Lauf ohne Schlussurteil, der **keinen** Fehlschlag nennt, heißt
+  *abgebrochen*, nicht *rot*. Prüffrage: Wessen Tod nimmt diesen Lauf mit?"
 
 - **Die Schranke aus zwei Hälften, von denen nur eine ein Polster bekam.** Dieselbe Messung,
   zwei Kriterien: eins ließ vier von neunzig durchgehen, das andere färbte bei einem rot.
@@ -561,6 +566,10 @@ Die Ursache findest du durch **Zerlegen**, nicht durch Wiederholen.
   ihre hinterlegte Erwartung nicht — und das Werkzeug erklärt einen rechnenden Lauf für hängend.
   → *Prompt:* „‚Hängt, abbrechen‘ darf nie allein auf einer hinterlegten Dauer stehen: Solange der
   Prozess **rechnet** und sein Protokoll **wächst**, hängt er nicht."
+
+- **Ein Rot, das bei gleichem Code kommt und geht, ist ein Befund über deine MESSUNG.** Eine
+  Stichprobe aus einem langen Vorgang trifft den Defekt mal und verfehlt ihn mal.
+  → *Prompt:* „Repariere dann die Prüfung, nicht das Programm: ganzen Vorgang lesen, je Vorkommen zählen, **Abdeckung als eigene Prüfung** behaupten."
 
 ---
 
@@ -600,4 +609,4 @@ Die Ursache findest du durch **Zerlegen**, nicht durch Wiederholen.
 
 Sie ersetzt die Fallstricke oben nicht.
 
-<!-- GUIDE-FINGERPRINT: 7c441cf88b4458050e1c01fe5a1a7cff9c43cf1324dea546ef499ffddf96c405 -->
+<!-- GUIDE-FINGERPRINT: b533814b723cd1d15bb3669d98590ca986505c909832d7cbc7679b25b938c231 -->
