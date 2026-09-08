@@ -24,7 +24,7 @@ import {
   legSwingAngle,
   type FootPlant,
 } from '../../render/fauna'
-import { FIGURE_LIMBS, TESSELLATION } from '../../render/figures'
+import { CHILD_FIGURE_SCALE, FIGURE_LIMBS, TESSELLATION } from '../../render/figures'
 import {
   advanceGesture,
   aimAt,
@@ -53,6 +53,7 @@ import type { RegionPlaceStyle } from './regionStyles'
 import { nudgeToFree, nudgeWhere, PLAYER_RADIUS, resolveMove, spawnPointFree, standingClear, tryNudgeToFree, WALKER_RADIUS, type Collider } from './collision'
 import { utteranceOf } from '../../communication/lexicon'
 import { insidePlace } from './boundary'
+import { playRockFlank } from './playRockSurface'
 import { standsOnGroundPlate, type PlaceRiverBank } from './riverBank'
 import { buildPlaceNavGrid, findPlaceRoute, navClearBetween, navRestrict, type NavPoint } from './routing'
 import { absorbSeparation, createTagGame, stepTagGame, type TagChild } from './tagGame'
@@ -469,7 +470,7 @@ function Weaver({ x, z, cloth, weave }: { x: number; z: number; cloth: string; w
 }
 
 /** Height factor of a child figure against a grown one. */
-const KID_SCALE = 0.55
+const KID_SCALE = CHILD_FIGURE_SCALE
 
 /**
  * Speaks one staged situation (point 481): the atom through the §13.4 hearing
@@ -559,12 +560,17 @@ function speakBankUtterance(
       speakOverhead(`kid-${said.speaker}`, [utterance], anchor, { seconds: speechLabelSeconds(1) })
     }
   }
+  // A TOUCH BRINGS ITS OWN ARM. Its hand has to land on a drawn flank, and the
+  // round solved that through the leaning trunk the renderer draws; re-deriving
+  // the angles here from a world point through an upright shoulder puts the hand
+  // centimetres off, which is the whole tolerance a contact has (work-order
+  // 1065). Every other moment aims at what it names, exactly as before.
+  const arm =
+    said.arm ??
+    aimAt({ x: speaker.x, z: speaker.z, yaw: speaker.facing }, said.aim, KID_SCALE * FIGURE_LIMBS.shoulderY)
   gesture.current = gestureIfHeard(distance, said.gesture, {
-    ...aimAt(
-      { x: speaker.x, z: speaker.z, yaw: speaker.facing },
-      said.aim,
-      KID_SCALE * FIGURE_LIMBS.shoulderY,
-    ),
+    ...arm,
+    ...(said.hold ? { duration: said.hold } : {}),
     phase: said.speaker * 1.1,
   })
 }
@@ -2811,7 +2817,13 @@ export function PlaceLife({
   /** The two play rocks of the children's bank game (work-order 687), and the
    *  settlement's loose boulders — one of which a child climbs and names while
    *  the group roams, so ROCK is heard at a stone that is no part of the game. */
-  playRocks: { upstream: { x: number; z: number }; downstream: { x: number; z: number } } | null
+  playRocks: {
+    upstream: { x: number; z: number }
+    downstream: { x: number; z: number }
+    /** The instance scale they are drawn at — the children's round measures the
+     *  flank it reaches for through it (work-order 1065). */
+    scale: number
+  } | null
   /** The children's roaming quarter, decided by the layout (work-order 688) so
    *  the adults' work sites can be placed clear of it. */
   playGround: PlayGround | null
@@ -2955,6 +2967,9 @@ export function PlaceLife({
     return {
       upstream: playRocks.upstream,
       downstream: playRocks.downstream,
+      // The stone as the picture draws it, so the tapping child's hand is solved
+      // against the flank the player sees (work-order 1065).
+      flank: playRockFlank(playRocks),
       // The waterline straight out from the settlement's middle, which is what
       // the drawn river is: the call points at the water, not at a bank stop.
       water: { x: bank.nx * bank.distance, z: bank.nz * bank.distance },

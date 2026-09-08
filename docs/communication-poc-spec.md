@@ -101,9 +101,9 @@ points at the water and the group runs to the bank, and that caller is the first
 catcher. Two rocks stand at the ends of a stretch of bank, one upstream and one
 downstream, in the play rocks' own size. The runners gather at one, the
 catcher waits at the other, the direction is announced before each run, the
-catcher taps and names `ROCK` while everybody holds at the stones, whoever
-reaches the far rock calls `ROCK`, and whoever is caught drops out where he
-stands. Sides swap every run, so the announced word alternates by construction.
+catcher steps to his stone, LAYS HIS HAND ON IT and names `ROCK` while everybody
+holds at the stones, whoever reaches the far rock calls `ROCK`, and whoever is
+caught drops out where he stands. Sides swap every run, so the announced word alternates by construction.
 When no free runner is left, the caught children stay crouched for a readable
 ending before everybody rises and walks back toward the roaming quarter.
 
@@ -111,6 +111,18 @@ Three readings are closed deliberately. `ROCK` cannot be learned as "made it",
 because the catcher taps his own rock and names it at the start of a run with
 nobody arriving, and because a child climbs an ordinary scattered boulder in the
 village — no part of the game — and names that while the group roams.
+
+THE HAND IS ON THE STONE WHILE THE WORD FALLS. The tap is a CONTACT, not a
+gesture toward a stone: before he speaks, the tapper walks from his waiting
+station to the rock, leans in and reaches until his hand rests on the drawn
+flank, and he holds that pose for the whole tap interval. The contact is solved
+against what the picture draws — the play rock's own mesh at its own instance
+scale and yaw — rather than against a nominal radius, so a stone built wider or
+narrower keeps the hand on its surface. Where the walk to the stone is blocked,
+the run opens SILENTLY: no word is spoken from the air. (The stone's collider is
+therefore what it occupies where bodies are, not its widest overhang: a ring
+drawn at a boulder's broadest point fences off exactly the ground the child has
+to reach it from.)
 The river visibly flows, so `UPSTREAM`/`DOWNSTREAM` correlate with the current
 for a player who watches the water.
 

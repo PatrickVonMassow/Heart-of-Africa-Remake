@@ -145,3 +145,19 @@ export function playRockSurfaceRadius(
   const r = profile.rings[lo][bin] * (1 - f) + profile.rings[hi][bin] * f
   return r * scale
 }
+
+/**
+ * THE FLANK LOOKUP THE CHILDREN'S ROUND ASKS. Bound to one settlement's two
+ * placed rocks, so caller and renderer read one stone: same seed, same instance
+ * scale, same instance yaw.
+ */
+export function playRockFlank(rocks: {
+  upstream: { x: number; z: number }
+  downstream: { x: number; z: number }
+  scale: number
+}): (end: 'upstream' | 'downstream', bearing: number, y: number) => number {
+  const at = { upstream: rocks.upstream, downstream: rocks.downstream }
+  const seed = { upstream: PLAY_ROCK_SEEDS[0], downstream: PLAY_ROCK_SEEDS[1] }
+  return (end, bearing, y) =>
+    playRockSurfaceRadius(seed[end], rocks.scale, playRockYaw(at[end]), bearing, y)
+}

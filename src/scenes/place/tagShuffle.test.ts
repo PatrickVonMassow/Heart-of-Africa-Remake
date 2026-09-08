@@ -62,6 +62,7 @@ import {
   type InhabitantBody,
   type InhabitantSet,
 } from './inhabitantBodies'
+import { playRockFlank } from './playRockSurface'
 import { buildLayout, type PlaceLayout } from './layout'
 import { villageAdultStations } from './lifeSpots'
 import { absorbSeparation, createTagGame, stepTagGame, type TagChild } from './tagGame'
@@ -463,6 +464,9 @@ function village(
       ? {
           upstream: layout.playRocks.upstream,
           downstream: layout.playRocks.downstream,
+          // The stone as the scene draws it, so the replay's tapper reaches for
+          // the flank the picture has (work-order 1065).
+          flank: playRockFlank(layout.playRocks),
           water: { x: layout.bank.nx * layout.bank.distance, z: layout.bank.nz * layout.bank.distance },
           boulder: boulder!,
           roam: { x: ground.x, z: ground.z, radius: ground.radius },

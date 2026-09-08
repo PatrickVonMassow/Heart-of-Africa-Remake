@@ -34,7 +34,9 @@
 // judges the village (`scripts/verify/childMotionMetric.mjs`) judges this round
 // on the same terms. What is new here is the ROUND, not the step.
 
+import { CHILD_FIGURE_SCALE } from '../../render/figures'
 import type { GestureKind } from '../../render/gesture'
+import { reachFrom, solveTouch } from './rockTouch'
 import { createProducerWatch, devAssert, watchProducer, type ProducerWatch } from '../../systems/devAssert'
 import {
   advanceReserve,
@@ -83,6 +85,13 @@ export interface BankUtterance {
   moment: BankMoment
   speaker: number
   gesture: GestureKind
+  /** The arm, solved rather than aimed: a touch's hand has to land on a drawn
+   *  surface, and re-deriving the angles from a world point through an upright
+   *  shoulder puts it centimetres off. Absent for every other moment, which
+   *  keeps aiming at the water or a far rock exactly as it was. */
+  arm?: { bearing: number; elevation: number }
+  /** Seconds the gesture is HELD, where the moment owns its own length. */
+  hold?: number
   aim: { x: number; y: number; z: number }
   at: BankAim
 }
@@ -189,6 +198,11 @@ export interface BankChild extends TagChild {
 export interface BankStage {
   upstream: { x: number; z: number }
   downstream: { x: number; z: number }
+  /** The world radius of a play rock's DRAWN flank, on a world bearing from its
+   *  own axis and at a world height. The tap is solved against this rather than
+   *  against a nominal radius, so a wider or narrower stone keeps the hand on
+   *  its surface (work-order 1065). */
+  flank: (end: BankEnd, bearing: number, y: number) => number
   /** Where the water lies — the point the RIVER call points at. */
   water: { x: number; z: number }
   /** An ordinary scattered boulder in the village, climbed and named during the
@@ -297,6 +311,10 @@ export interface BankState {
   caller: number
   /** Who climbs the boulder this roaming phase, or −1. */
   climber: number
+  /** Who goes to the far rock to lay a hand on it and name it this run, or −1.
+   *  Chosen when the walk to the stations begins, because the walk is what has
+   *  to take it there (work-order 1065). */
+  tapper: number
   /** Children whose boulder approach made no progress this roaming phase. */
   failedClimbers: number[]
   /** Whether the boulder has already been named this roaming phase. */
@@ -441,6 +459,7 @@ export function createBankGame(
     direction: null,
     caller: -1,
     climber: -1,
+    tapper: -1,
     failedClimbers: [],
     namedBoulder: false,
     abandonedBoulder: false,
@@ -495,6 +514,75 @@ export function stationAt(
     x: here.x + ax * out - az * across * cfg.stationSpacing,
     z: here.z + az * out + ax * across * cfg.stationSpacing,
   }
+}
+
+/**
+ * HOW NEAR THE HAND HAS TO BE for the stone to count as touched, in metres. It
+ * is the tolerance the user's own report sets: a hand a metre off its object
+ * teaches nothing, a hand three centimetres off is resting on it. Nothing may
+ * be spoken at a larger gap — the tap is silent instead (spec: no tap in the
+ * air).
+ */
+export const TOUCH_GAP = 0.03
+
+/**
+ * WHERE THE TAPPER STANDS TO REACH THE STONE, and from which side.
+ *
+ * It comes at the rock from the side its own station is on — between the two
+ * stones, in the lane the player is watching — so the contact happens in the
+ * open rather than behind the rock. The distance is solved against the stone's
+ * DRAWN flank (`stage.flank`), so the child ends up at the stone however wide
+ * or narrow this one is; `null` where the flank cannot be reached at all.
+ */
+export function touchStand(
+  stage: BankStage,
+  end: BankEnd,
+  blocked?: (x: number, z: number) => boolean,
+): { x: number; z: number; bearing: number; elevation: number } | null {
+  const here = rockAt(stage, end)
+  const far = rockAt(stage, otherEnd(end))
+  const bearing = Math.atan2(far.x - here.x, far.z - here.z)
+  const flank = (y: number) => stage.flank(end, bearing, y)
+  const solved = solveTouch(flank, CHILD_FIGURE_SCALE)
+  if (!solved) return null
+  const spotAt = (stand: number) => ({
+    x: here.x + Math.sin(bearing) * stand,
+    z: here.z + Math.cos(bearing) * stand,
+  })
+  // AND IT HAS TO BE GROUND THE CHILD MAY STAND ON. The furthest stand that
+  // still touches can fall a few millimetres inside the stone's own collider —
+  // measured, the bambara upstream rock does exactly that — and a goal inside a
+  // collider is a goal the walk deflects round forever. So the spot is pushed
+  // OUT to the first free ground, and kept only while the hand still reaches.
+  let stand = solved.stand
+  if (blocked) {
+    const step = 0.02
+    for (let k = 0; k <= 20 && blocked(spotAt(stand).x, spotAt(stand).z); k++) stand = solved.stand + k * step
+    if (blocked(spotAt(stand).x, spotAt(stand).z)) return null
+  }
+  const reached = reachFrom(stand, flank, CHILD_FIGURE_SCALE)
+  if (!reached || Math.abs(reached.gap) > TOUCH_GAP) return null
+  return { ...spotAt(stand), bearing, elevation: reached.elevation }
+}
+
+/**
+ * THE REACH THIS CHILD HAS FROM WHERE IT IS STANDING — the arm that puts its
+ * hand on the flank, and how far short of it that hand falls. A walker arrives
+ * near its goal rather than on it, so the tap is judged against the spot the
+ * child really reached, never against the spot it was sent to.
+ */
+export function touchReach(
+  stage: BankStage,
+  end: BankEnd,
+  at: { x: number; z: number },
+): { elevation: number; gap: number; height: number } | null {
+  const here = rockAt(stage, end)
+  const dx = at.x - here.x
+  const dz = at.z - here.z
+  const bearing = Math.atan2(dx, dz)
+  const reached = reachFrom(Math.hypot(dx, dz), (y) => stage.flank(end, bearing, y), CHILD_FIGURE_SCALE)
+  if (!reached) return null
+  return { elevation: reached.elevation, gap: reached.gap, height: reached.height }
 }
 
 /** Offer one utterance in this step. Nothing here touches a pace or a heading:
@@ -558,6 +646,7 @@ function openCycle(s: BankState, stage: BankStage, cfg: BankConfig): void {
   })
   s.phase = 'gather'
   s.phaseFor = cfg.gatherSeconds
+  s.tapper = caller
   s.direction = null
   s.runsThisCycle = 0
   if (caller >= 0) {
@@ -623,19 +712,34 @@ function openRun(s: BankState, stage: BankStage, cfg: BankConfig): void {
   // A fresh run is a fresh choice of side: the stations have swapped and the
   // catcher stands somewhere else entirely.
   for (const c of s.children) c.dodgeSide = 0
-  // THE TAP (spec item 4). The catcher names the rock he is STANDING at, at the
+  // THE TAP (spec item 4). The catcher names the rock he is TOUCHING, at the
   // start of the run, with nobody arriving anywhere — so ROCK cannot be read as
   // "made it".
-  const waiting = catchers(s)
-  const tapper = waiting.length > 0 ? nearestOf(s, waiting, rockAt(stage, to)) : -1
-  if (tapper >= 0) {
+  //
+  // AND THE HAND IS ON THE STONE WHILE THE WORD FALLS (work-order 1065). The tap
+  // used to be spoken from the waiting station, 2.6 m off a stone 1.2 m across:
+  // the hand ended more than a metre from its own object and the user read the
+  // word as "go!" rather than as ROCK. So the word is offered only where the
+  // reach measured from the child's ACTUAL spot lands on the drawn flank; where
+  // the walk to the stone was blocked, the run opens SILENTLY rather than
+  // teaching ROCK from the air.
+  const tapper = s.tapper
+  const reach = tapper >= 0 && tapper < s.children.length ? touchReach(stage, to, s.children[tapper]) : null
+  if (tapper >= 0 && reach && Math.abs(reach.gap) <= TOUCH_GAP) {
     const rock = rockAt(stage, to)
+    const c = s.children[tapper]
+    // It faces what its hand is on: the reach is solved straight ahead, so a
+    // child looking anywhere else would lay its hand somewhere else.
+    c.heading = Math.atan2(rock.x - c.x, rock.z - c.z)
+    c.facing = c.heading
     say(s, {
       concept: 'ROCK',
       moment: 'tap',
       speaker: tapper,
-      gesture: 'indicate',
-      aim: { x: rock.x, y: 0.6, z: rock.z },
+      gesture: 'touch',
+      arm: { bearing: 0, elevation: reach.elevation },
+      hold: cfg.tapPauseSeconds,
+      aim: { x: rock.x, y: reach.height, z: rock.z },
       at: 'rock',
     })
   }
@@ -643,7 +747,7 @@ function openRun(s: BankState, stage: BankStage, cfg: BankConfig): void {
 
 /** Ends the run: the sides swap — the survivors start where they arrived — and
  *  the children caught in it join the catchers for the next one. */
-function endRun(s: BankState, cfg: BankConfig): void {
+function endRun(s: BankState, stage: BankStage, cfg: BankConfig): void {
   const cycleEnded = runners(s).length === 0 || s.runsThisCycle >= s.children.length
   for (const c of s.children) {
     c.arrived = false
@@ -669,6 +773,10 @@ function endRun(s: BankState, cfg: BankConfig): void {
   }
   s.phase = 'regroup'
   s.phaseFor = cfg.regroupSeconds
+  // The stone the next run is towards is the one that gets tapped, so the child
+  // sent to it is picked here — before the walk, which is what carries it there.
+  const waiting = catchers(s)
+  s.tapper = waiting.length > 0 ? nearestOf(s, waiting, rockAt(stage, otherEnd(s.from))) : -1
 }
 
 /** Back to roaming: everybody is a runner again, and a climber is picked for the
@@ -797,7 +905,7 @@ function advanceBankGame(
   let openedRun = false
   if (
     (s.phase === 'gather' || s.phase === 'regroup') &&
-    (s.phaseFor <= 0 || inPlace(s, stage, cfg, s.from, otherEnd(s.from)))
+    (s.phaseFor <= 0 || inPlace(s, stage, cfg, world, s.from, otherEnd(s.from)))
   ) {
     if (s.direction === null && s.sinceSaid >= cfg.utteranceGapSeconds) {
       announceRun(s, stage)
@@ -1064,15 +1172,24 @@ function inPlace(
   s: BankState,
   stage: BankStage,
   cfg: BankConfig,
+  world: BankWorld,
   line: BankEnd,
   wait: BankEnd,
 ): boolean {
   let atLine = 0
   let atWait = 0
+  const touch = touchStand(stage, wait, world.blocked)
   for (let i = 0; i < s.children.length; i++) {
     const c = s.children[i]
     const end = c.role === 'catcher' ? wait : line
     const slot = c.role === 'catcher' ? atWait++ : atLine++
+    // The tapper is in place when its HAND is on the stone, not when its body is
+    // within an arrival radius of a station: the run waits for the contact.
+    if (i === s.tapper && touch) {
+      const reach = touchReach(stage, wait, c)
+      if (!reach || Math.abs(reach.gap) > TOUCH_GAP) return false
+      continue
+    }
     if (dist(c, stationAt(stage, end, slot, cfg)) > cfg.reachDistance) return false
   }
   return true
@@ -1220,13 +1337,26 @@ function stepStations(
 ): void {
   let atLine = 0
   let atWait = 0
+  const touch = touchStand(stage, wait, world.blocked)
   for (let i = 0; i < s.children.length; i++) {
     const c = s.children[i]
     const end = c.role === 'catcher' ? wait : line
     const slot = c.role === 'catcher' ? atWait++ : atLine++
-    const to = stationAt(stage, end, slot, cfg)
+    // THE TAPPER GOES TO THE STONE, not to the waiting station a stride and a
+    // half off it (work-order 1065). The other children hold their stations as
+    // they always did; where the stone cannot be reached at all there is no
+    // touch spot and this child waits with the rest.
+    const tapping = i === s.tapper && !!touch
+    const to = tapping && touch ? { x: touch.x, z: touch.z } : stationAt(stage, end, slot, cfg)
     const away = dist(c, to)
-    if (away <= cfg.reachDistance * 0.6) c.settled = true
+    if (tapping) {
+      // THE TAPPER IS SETTLED WHEN ITS HAND REACHES, not when its body is within
+      // an arrival radius (work-order 1065). A station's arrival radius is 1.3 m
+      // of slack — the whole distance being closed here — so a tapper judged by
+      // it would stop exactly where the old defect stood.
+      const reach = touchReach(stage, wait, c)
+      c.settled = !!reach && Math.abs(reach.gap) <= TOUCH_GAP
+    } else if (away <= cfg.reachDistance * 0.6) c.settled = true
     else if (away > cfg.reachDistance) c.settled = false
     // The walk DOWN to the bank is a run — the whole group sets off at the call
     // — while the shuffle between two runs is a walk.
@@ -1386,7 +1516,7 @@ function stepRun(
 
   // A run ENDS when every runner has either touched the far rock or been tagged
   // — and the backstop closes it where a child could not get there at all.
-  if (free(s).length === 0 || s.phaseFor <= 0) endRun(s, cfg)
+  if (free(s).length === 0 || s.phaseFor <= 0) endRun(s, stage, cfg)
 }
 
 /** Holds every child in the posture the visible moment requires. These are

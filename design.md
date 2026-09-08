@@ -407,7 +407,7 @@ Per region exactly one knowing people (seeded anew each run) reveals the region'
 
 ### 13.4 The village communication slice
 
-The tonal West/Centre village teaches six concepts: RIVER, UPSTREAM, DOWNSTREAM, ROCK, DIG and CHIEF. The player infers them from three places rather than receiving a glossary: the children's bank game, including the village's play rocks, the adults' water and digging work, and the drummer, who points at the chief's hut and names CHIEF. ROCK is a class of thing learned on those rocks and transferred to the separate boulder upstream; it is not a proper name or shorthand for one "big rock."
+The tonal West/Centre village teaches six concepts: RIVER, UPSTREAM, DOWNSTREAM, ROCK, DIG and CHIEF. The player infers them from three places rather than receiving a glossary: the children's bank game, including the village's play rocks, the adults' water and digging work, and the drummer, who points at the chief's hut and names CHIEF. ROCK is a class of thing learned on those rocks and transferred to the separate boulder upstream; it is not a proper name or shorthand for one "big rock." A teaching hand TOUCHES what it names: the catcher holds his hand on the drawn stone while he says ROCK, and a stone out of reach is named by nobody.
 
 The adults show DIG in two paired bouts at two different excavations. An initiator walks to a free adult and says DIG as an invitation; the same pair walks to the site, the initiator says DIG again while indicating the hole, and only then do both dig with tools in hand. Both utterances wait while a child can hear, and a bout with no free partner is skipped and retried rather than shown alone. Their strikes deepen the shadowed pit, grow its spoil and throw earth, leaving the work visible in the ground.
 

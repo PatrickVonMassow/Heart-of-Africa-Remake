@@ -338,7 +338,14 @@ export const DOC_BUDGETS = [
     // message and calls him back, and that his hut answers nothing while he is
     // outside. §12's retirement list paid 11 of the 32 back by becoming the
     // state sentence it always meant.
-    maxWords: 28432,
+    // RAISED by the 30 measured words work-order 1065 owes §13.4: a word taught
+    // by acting on a thing is only taught if the hand ARRIVES, and the section
+    // said nothing about contact — the catcher naming ROCK stood 2.6 m off a
+    // stone 2.4 m across, and the user read the word as "go!" rather than as
+    // ROCK. New behaviour with a new player-reachable state (a run that opens
+    // in silence because the stone is out of reach), not a longer telling of
+    // the old tap.
+    maxWords: 28462,
     // A hundred words across 28k: design.md is edited section by section and a genuine
     // new decision runs 40–215 measured words, so the slack absorbs the rewording that
     // accompanies one and refuses the disappearance of a whole section without a
